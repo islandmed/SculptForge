@@ -53,6 +53,14 @@ expect_value uv_tiles == 2
 hover_window 0.45 0.5
 key f
 shot udim
+# A Columns x Rows grid (#135): the panel's sliders, then 2 x 2 fills 1001, 1002, 1011, 1012.
+expect "UV Editor/##uvcolumns"
+expect "UV Editor/##uvrows"
+run uv_pack columns=2 rows=2 margin=6
+expect_value uv_tiles == 4
+hover_window 0.45 0.5
+key f
+shot udim-grid
 run uv_pack tiles=1
 expect_value uv_tiles == 1
 

@@ -140,7 +140,6 @@ struct UvEditorState {
     int method = 0; // kMethods
     int iterations = 10;
     float marginPx = 8.0f;
-    int packTiles = 1;
     bool rotate = true;
     bool equalDensity = true;
     float targetDensity = 512.0f;
@@ -605,7 +604,8 @@ struct UvEditorUi {
 
     Args packArgs() {
         Args a{{"margin", double(s.marginPx)},
-               {"tiles", double(s.packTiles)},
+               {"columns", double(app.uvPackColumns_)},
+               {"rows", double(app.uvPackRows_)},
                {"rotate", s.rotate},
                {"equal_density", s.equalDensity},
                {"resolution", double(resolution())},
@@ -655,7 +655,8 @@ struct UvEditorUi {
         o.pack = method != UvUnwrapMethod::Unfold;
         o.packing.resolution = resolution();
         o.packing.marginPx = s.marginPx;
-        o.packing.tiles = s.packTiles;
+        o.packing.columns = app.uvPackColumns_;
+        o.packing.tiles = app.uvPackColumns_ * app.uvPackRows_;
         o.packing.rotate = s.rotate;
         o.packing.equalDensity = s.equalDensity;
         std::promise<bool> promise;
@@ -835,8 +836,8 @@ void App::registerUvEditorActions() {
         "uv_unwrap");
     add("uv.pack", "Pack", ICON_LC_PACKAGE, "", [this] { uvUi(*this, uvEditor_).run("uv_pack", uvUi(*this, uvEditor_).packArgs()); },
         nullptr, uvs,
-        "Pack the selected islands (or all) as large as they fit into the 0-1 tile, or across the chosen number of UDIM "
-        "tiles: turned to their smallest box, scaled to one texel density, with the margin between them.",
+        "Pack the selected islands (or all) as large as they fit into the 0-1 tile, or across the Columns x Rows grid "
+        "of UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them.",
         "uv_pack");
     add("uv.seam_mark", "Mark Seam", ICON_LC_SCISSORS, "", [runUv] { runUv("uv_seam", {{"op", std::string("mark")}}); }, nullptr,
         selected, "Mark the selected edges (or the border of the selected faces) as seams: Unwrap cuts there.", "uv_seam");
@@ -911,8 +912,8 @@ void App::registerUvEditorActions() {
             u.run("uv_pack", a);
         },
         nullptr, uvs,
-        "Pack at exactly the target texel density, using as many UDIM tiles as it takes (1001, 1002, ...): every island "
-        "keeps the same texels per unit across the tiles.",
+        "Pack at exactly the target texel density, using as many UDIM tiles as it takes (1001, 1002, ..., Columns "
+        "wide, then the next row up): every island keeps the same texels per unit across the tiles.",
         "uv_pack");
     add("uv.trim", "Assign to Strip", ICON_LC_STRETCH_HORIZONTAL, "",
         [this, runUv] {
@@ -1283,10 +1284,19 @@ void App::drawUvEditor() {
         ImGui::SetNextItemWidth(w);
         ui::SliderInside("##uvmargin", &s.marginPx, 0.0f, 64.0f, "Margin %.0f px");
         ui::HelpText("Margin", nullptr, "Texels kept free between islands (half of it at the tile borders), at the texture's size.", kPath);
-        float tiles = float(s.packTiles);
-        ImGui::SetNextItemWidth(w);
-        if (ui::SliderInside("##uvtiles", &tiles, 1.0f, 10.0f, "UDIM Tiles %.0f")) s.packTiles = int(std::round(tiles));
-        ui::HelpText("UDIM tiles", nullptr, "Pack across this many tiles (1001 onwards, along u): more tiles, more texels per island.", kPath);
+        // The UDIM grid (#135): Columns along u (UDIM's row is ten wide), Rows up v; 10 x 2 fills 1001-1020.
+        float columns = float(uvPackColumns_), rows = float(uvPackRows_);
+        ImGui::SetNextItemWidth(halfW);
+        if (ui::SliderInside("##uvcolumns", &columns, 1.0f, 10.0f, "Columns %.0f"))
+            uiPrefs_.uvPackColumns = uvPackColumns_ = std::clamp(int(std::round(columns)), 1, 10);
+        ui::HelpText("Columns", nullptr, "UDIM tiles across (along u, 1001 onwards; ten make a full UDIM row). Packing fills "
+                     "Columns x Rows tiles and never goes wider, also when it packs at a fixed texel density.", kPath);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(halfW);
+        if (ui::SliderInside("##uvrows", &rows, 1.0f, 10.0f, "Rows %.0f"))
+            uiPrefs_.uvPackRows = uvPackRows_ = std::clamp(int(std::round(rows)), 1, 10);
+        ui::HelpText("Rows", nullptr, "UDIM rows up (along v: 1011 sits above 1001). 10 Columns x 2 Rows fills 1001-1020; "
+                     "more tiles, more texels per island.", kPath);
         ui::Checkbox("Rotate##uvrot", &s.rotate);
         ui::HelpText("Rotate", nullptr, "Turn islands to their smallest box and allow quarter turns, so more fit.", kPath);
         ImGui::SameLine();

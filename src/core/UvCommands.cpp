@@ -57,6 +57,12 @@ UvPackOptions packOptions(const Document& doc, const Args& a) {
     o.marginPx = float(std::clamp(argNumber(a, "margin", 8.0), 0.0, 256.0));
     o.rotate = argBool(a, "rotate", true);
     o.tiles = std::clamp(int(argNumber(a, "tiles", 1)), 1, 100);
+    // A Columns x Rows grid (the UV Editor's Pack target): `columns` wide, `rows` high (or `tiles` in that width).
+    if (a.contains("columns") || a.contains("rows")) {
+        o.columns = std::clamp(int(argNumber(a, "columns", 10)), 1, 10);
+        if (a.contains("rows")) o.tiles = o.columns * std::clamp(int(argNumber(a, "rows", 1)), 1, 10);
+        else if (!a.contains("tiles")) o.tiles = o.columns;
+    }
     o.equalDensity = argBool(a, "equal_density", true);
     o.density = float(std::max(argNumber(a, "density", 0.0), 0.0));
     o.firstTile = std::clamp(int(argNumber(a, "first_tile", 1001)), 1001, 1100);
@@ -141,6 +147,8 @@ void registerUvCommands(CommandRegistry& reg) {
               {"resolution", T::Number, "Texture size the margin is measured in (default: the texture's, or 2048)", false},
               {"margin", T::Number, "Texels between packed islands (default 8)", false},
               {"tiles", T::Number, "UDIM tiles to pack across (default 1)", false},
+              {"columns", T::Number, "Pack into a grid this many tiles wide (1-10; with rows, columns x rows tiles)", false},
+              {"rows", T::Number, "Rows of the grid (1-10): fills columns x rows tiles", false},
               {"rotate", T::Bool, "Turn islands to fit better when packing (default true)", false},
               {"density", T::Number, "Pack at exactly this texel density (texels per unit; uses as many tiles as needed)", false},
               {"pack", T::Bool, "Pack the result (default true; false fits each island where its old UVs were)", false},
@@ -190,7 +198,10 @@ void registerUvCommands(CommandRegistry& reg) {
              {{"margin", T::Number, "Texels between islands (default 8)", false},
               {"resolution", T::Number, "Texture size the margin and density are measured in (default: the texture's, or 2048)", false},
               {"rotate", T::Bool, "Turn islands to fit better (default true)", false},
-              {"tiles", T::Number, "UDIM tiles to fill, 1001 onwards (default 1)", false},
+              {"tiles", T::Number, "UDIM tiles to fill, 1001 onwards, ten per row (default 1)", false},
+              {"columns", T::Number, "Fill a grid this many tiles wide (1-10): 1001 + column + 10 x row, never past it; "
+                                     "with density, the spill stays in it too", false},
+              {"rows", T::Number, "Rows of the grid (1-10): fills columns x rows tiles (e.g. columns=10 rows=2: 1001-1020)", false},
               {"first_tile", T::Number, "The UDIM tile to start at (default 1001)", false},
               {"equal_density", T::Bool, "Scale islands to one texel density first (default true; false keeps their sizes relative)", false},
               {"density", T::Number, "Keep exactly this texel density (texels per unit) and spill into more tiles", false},

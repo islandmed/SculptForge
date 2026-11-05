@@ -945,6 +945,9 @@ private:
     // uv_view_triangles, uv_overlay; NaN for other names.
     double uvEditorTestValue(const std::string& name);
     std::shared_ptr<struct UvEditorState> uvEditor_;
+    // UV Editor > Pack: the UDIM grid to fill, Columns x Rows (#135). Projects keep their own; new ones and
+    // projects from before take the preference (UiPrefs::uvPackColumns / uvPackRows), which the sliders set too.
+    int uvPackColumns_ = 1, uvPackRows_ = 1;
     bool showUvEditor_ = false;
     void startAutoUv();
     void startNewTexture(); // New Texture on the top shelf / Color palette: Auto UV first when there are no UVs

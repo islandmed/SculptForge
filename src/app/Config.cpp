@@ -131,6 +131,8 @@ Json toJson(const UiPrefs& p) {
     j.set("flatShading", p.flatShading);
     j.set("viewportCursor", double(p.viewportCursor));
     j.set("backfaceCulling", p.backfaceCulling);
+    j.set("uvPackColumns", double(p.uvPackColumns));
+    j.set("uvPackRows", double(p.uvPackRows));
     j.set("background", std::string(p.gradientBackground ? "gradient" : "flat"));
     Json bg = Json::array();
     for (int i = 0; i < 3; ++i) bg.push(double(p.backgroundColor[i]));
@@ -218,6 +220,8 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.flatShading = j["flatShading"].asBool(p.flatShading);
     p.viewportCursor = std::clamp(int(j["viewportCursor"].asNumber(p.viewportCursor)), 0, 1);
     p.backfaceCulling = j["backfaceCulling"].asBool(p.backfaceCulling);
+    p.uvPackColumns = std::clamp(int(j["uvPackColumns"].asNumber(p.uvPackColumns)), 1, 10);
+    p.uvPackRows = std::clamp(int(j["uvPackRows"].asNumber(p.uvPackRows)), 1, 10);
     if (j["background"].isString()) p.gradientBackground = j["background"].asString() != "flat";
     p.showHints = j["showHints"].asBool(p.showHints);
     if (const Json& hints = j["hiddenHints"]; hints.size() > 0) {
@@ -1008,6 +1012,7 @@ bool App::readUiConfig(const std::string& path, std::string& err, bool own) {
     doc_.sculptor.dyntopo.smoothRemesh = uiPrefs_.dyntopoSmoothRemesh;
     renderSettings_.flatShading = uiPrefs_.flatShading;
     renderSettings_.backfaceCulling = uiPrefs_.backfaceCulling;
+    uvPackColumns_ = uiPrefs_.uvPackColumns, uvPackRows_ = uiPrefs_.uvPackRows;
     renderSettings_.gradientBackground = uiPrefs_.gradientBackground;
     renderSettings_.backgroundColor = uiPrefs_.backgroundColor;
     return true;

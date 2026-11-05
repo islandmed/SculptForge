@@ -6,6 +6,12 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- **UV Editor > Pack: Columns x Rows** (#135, thanks RodTDai): the UDIM Tiles slider is now a **Columns** (1-10) and
+  **Rows** (1-10) grid, so a 10 x 2 layout fills 1001-1020 and 4 x 3 stays four tiles wide. Pack at Density spills
+  within the Columns too. Projects keep their grid; new ones take the last one used. Scripts: `uv_pack` and
+  `uv_unwrap` take `columns=` and `rows=` (`tiles=` works as before).
+
 ## [0.11.1] - 2026-11-05
 
 ### Added

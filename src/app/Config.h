@@ -90,6 +90,8 @@ struct UiPrefs {
     // Tool > Display > Backface culling (#68): skip the back faces of every Part (faster on dense meshes; see
     // through open meshes). Off by default; a preference, projects keep their own.
     bool backfaceCulling = false;
+    // UV Editor > Pack > Columns x Rows (#135): the UDIM grid the last pack filled, the default for new projects.
+    int uvPackColumns = 1, uvPackRows = 1;
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons
     SpaceMouseSettings spaceMouse; // Preferences > Input > SpaceMouse
     // Preferences > Performance (PanelPerformance.cpp).
