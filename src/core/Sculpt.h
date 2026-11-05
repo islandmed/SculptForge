@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <limits>
 #include <functional>
 #include <memory>
 #include <span>
@@ -168,6 +169,10 @@ float alphaFalloff(float dist, float radius, float focal);
 
 // Where brush time goes (core/Benchmark.h, Help > Performance): milliseconds summed over dabs since the
 // counters were last zeroed. kernel = finding the vertices and moving / masking / painting them.
+// A stroke curvature entry meaning "send the cavity term the GPU already has" (Renderer::prepareStrokeUpload): a
+// scale-adaptive dab moves a vertex without walking its ring, and the exact term follows with the exact normals.
+inline constexpr float kKeepCurvature = std::numeric_limits<float>::quiet_NaN();
+
 struct SculptTimings {
     double kernelMs = 0.0, normalsMs = 0.0, bvhMs = 0.0;
     double remeshMs = 0.0; // dynamic topology (core/Dyntopo.h)

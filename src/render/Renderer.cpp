@@ -20,6 +20,7 @@
 #include <atomic>
 #include <bit>
 #include <chrono>
+#include <cmath>
 #include <thread>
 #include <unordered_map>
 #include <cstdlib>
@@ -1437,6 +1438,8 @@ void Renderer::uploadVertices(MeshSlot& s, const Mesh& mesh, bool full) {
     std::atomic<bool> outside{false};
     const bool normals = mesh.normals.size() == mesh.vertexCount();
     const uint32_t nv = uint32_t(mesh.vertexCount());
+    s.sentCurvature.resize(nv);
+    uint16_t* sent = s.sentCurvature.data();
     // Per block, hashes of what it last sent (positions; normals and curvature): a block a dab marked but didn't
     // change (paint, mask) isn't sent again, and a cluster whose positions didn't move keeps its bounds and proxy.
     s.blockHash.resize(nb * 2, 0);
@@ -1455,6 +1458,7 @@ void Renderer::uploadVertices(MeshSlot& s, const Mesh& mesh, bool full) {
             if (v < nv) { // (else a vertex dynamic topology removed, which only patched clusters named)
                 inside &= packVertex(s.grid, mesh.positions[v], normals ? mesh.normals[v] : glm::vec3(0.0f, 0.0f, 1.0f),
                                      curvatureAt(mesh, v), pv);
+                sent[v] = uint16_t(pv.normal >> 22);
                 box.expand(mesh.positions[v]);
             }
             out[i - b] = pv;
@@ -2065,6 +2069,7 @@ void Renderer::uploadPatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
             const uint32_t v = p.verts[i];
             const glm::vec3& pos = mesh.positions[v];
             outside |= !packVertex(s.grid, pos, normals ? mesh.normals[v] : glm::vec3(0.0f, 0.0f, 1.0f), curvatureAt(mesh, v), packed[i]);
+            if (v < s.sentCurvature.size()) s.sentCurvature[v] = uint16_t(packed[i].normal >> 22);
             lo = glm::min(lo, pos);
             hi = glm::max(hi, pos);
         }
@@ -3422,6 +3427,8 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
     s.blockBox.resize(nb);
     PositionGrid grid = s.grid;
     bool everything = false;
+    // The cavity bits each vertex last went up with: kKeepCurvature (a scale-adaptive dab) sends them again.
+    uint16_t* sent = s.sentCurvature.size() == nv ? s.sentCurvature.data() : nullptr;
     const auto pack = [&] {
     poolFor(pieces.size(), [&](size_t i0, size_t i1) {
         for (size_t pi = i0; pi < i1; ++pi) {
@@ -3434,7 +3441,14 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
                 const uint32_t v = order[i];
                 PackedVertex pv{};
                 if (v < nv) {
-                    inside &= packVertex(grid, mesh.positions[v], mesh.normals[v], curvature ? curvature[v] : curvatureAt(mesh, v), pv);
+                    float c = curvature ? curvature[v] : curvatureAt(mesh, v);
+                    const bool keep = std::isnan(c);
+                    if (keep && !sent) c = curvatureAt(mesh, v);
+                    inside &= packVertex(grid, mesh.positions[v], mesh.normals[v], keep && sent ? 0.0f : c, pv);
+                    if (sent) {
+                        if (keep) pv.normal = (pv.normal & 0x003FFFFFu) | uint32_t(sent[v]) << 22;
+                        else sent[v] = uint16_t(pv.normal >> 22);
+                    }
                     box.expand(mesh.positions[v]);
                 }
                 dst[i - pc.begin] = pv;

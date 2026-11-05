@@ -332,7 +332,7 @@ void Sculptor::flushBatch(Mesh& mesh, BVH& bvh) {
                         if (glm::dot(o, o) >= k->r * k->r) continue;
                         if (curvatureStamp_[v] != stamp) {
                             curvatureStamp_[v] = stamp;
-                            curvature_[v] = mesh.curvatureAt(v);
+                            curvature_[v] = kKeepCurvature;
                         }
                         PlaneKernel::tangents(normals[v], t1, t2);
                         reached = true;

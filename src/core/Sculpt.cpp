@@ -1173,7 +1173,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                 const glm::vec3 x = pos[v];
                 if (curvatureStamp_[v] != stamp) {
                     curvatureStamp_[v] = stamp;
-                    curvature_[v] = mesh.curvatureAt(v);
+                    curvature_[v] = kKeepCurvature; // (the GPU keeps its cavity term: no ring walk here)
                 }
                 const glm::vec3 n = normals[v];
                 if (analytic) { // (no mask here: such regions take the exact path)
