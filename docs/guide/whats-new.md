@@ -5,6 +5,52 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.2
+
+```features
+date: unreleased
+tagline: Faster pen-up on dense scans, clean creases on micro levels, moves that go into sculpt layers, Maya style view keys and a UDIM grid.
+highlight: {{PERF_HIGHLIGHT}}
+highlight: Clean Sharp Crease, Crease and Pinch on micro levels
+highlight: Move, Scale and Rotate into a sculpt layer
+highlight: Maya style view keys, and UDIMs in Columns x Rows
+highlight: Traditional Chinese, and a performance trace for slow moments
+title: Clean creases on micro levels
+line: Sharp Crease, Crease and Pinch at full strength cut clean grooves on a micro level, with no noise around them.
+image: images/wn-0112-micro.jpg
+action: guide:micro-levels.md#sculpting
+title: Transforms into a layer
+line: With a sculpt layer active, the Transform gizmo moves into that layer: its weight dials the move in and out.
+image: images/wn-0112-layer.jpg
+action: guide:layers.md#add-a-layer-and-sculpt-into-it
+title: Turn your VDM stamps
+line: Brush > Vector Displacement > Stamp rotation: follow the drag, a fixed angle, or a random turn per stamp.
+image: images/wn-0112-vdm.jpg
+action: guide:sculpting.md#stamp-rotation
+title: UDIMs in Columns x Rows
+line: UV Editor > Pack fills a grid of UDIM tiles: 10 x 2 fills 1001-1020, 4 x 3 stays four tiles wide.
+image: images/wn-0112-udim.jpg
+action: ui.uv_editor
+```
+
+- **Faster pen-up on dense scans**: with a micro level, a big brush stroke on a dense scan finishes sooner after you
+  lift the pen. {{PEN_UP}}
+- **Smoother orbit after big strokes**: orbiting a dense scan with a micro level right after big strokes is smoother
+  on slower computers; the shading catches up while the view moves and finishes when it stops.
+- **Transforms into a sculpt layer**: with a layer active in **Tool > Layers**, Move, Scale and Rotate (the Transform
+  gizmo, masked or not) record into that layer like a stroke: the base mesh stays, the layer's weight dials the move
+  in and out. With **Base mesh** active they move the base and every layer, as before. Thanks Devon0209 (#133).
+- **Rotation for VDM stamps**: with the VDM brush, **Brush > Vector Displacement > Stamp rotation** has **Follow
+  stroke direction**, **Angle** and **Angle jitter** (a random turn per stamp), kept per brush. Brush files keep the
+  alpha's Angle and Angle jitter too, so shared brushes turn their alpha the same way. Thanks DonnieAlex (#136).
+- **Maya style view keys**: hold **Alt**, then add **Ctrl**, and a left drag rolls the view; **Alt+F** frames the
+  active Part and **Alt+H** resets the view. **Edit > Preferences > Input > Wheel zooms toward the pointer** keeps the
+  point under the pointer in place (on with the Maya style, a checkbox in the others). Thanks RodTDai (#134).
+- **UDIMs in Columns x Rows**: **UV Editor > Pack** has **Columns** and **Rows** (1-10 each) instead of a tile count,
+  so a 10 x 2 layout fills 1001-1020 and 4 x 3 stays four tiles wide. Thanks RodTDai (#135).
+- **Benchmark on slower computers**: **Help > Benchmark** no longer stops at "settling" when the scene takes a few
+  seconds to open.
+
 ## Version 0.11.1
 
 ```features
