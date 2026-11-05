@@ -5,6 +5,7 @@
 // download runs on a worker thread; installing happens on Restart now, or when the app quits after Later.
 #include "app/App.h"
 #include "app/I18n.h"
+#include "app/Theme.h"
 #include "app/Ui.h"
 #include "ai/Http.h"
 #include "ai/Process.h"
@@ -73,6 +74,17 @@ ai::HttpResponse postGitHub(const char* url, const std::string& body) {
 
 double nowSeconds() { return double(SDL_GetTicksNS()) * 1e-9; }
 fs::path fsPath(const std::string& s) { return fs::path(std::u8string(s.begin(), s.end())); }
+
+// The main action's button: the accent fill, as an active mode's button has (theme::accent, not ButtonActive,
+// which is a grey in some looks).
+bool accentButton(const char* label) {
+    ImGui::PushStyleColor(ImGuiCol_Button, theme::accent);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::accentHover);
+    ImGui::PushStyleColor(ImGuiCol_Text, theme::textOnAccent);
+    const bool clicked = ImGui::Button(label);
+    ImGui::PopStyleColor(3);
+    return clicked;
+}
 
 bool releaseKey(uint8_t key[32]) { return update::parseHexKey(update::kUpdatePublicKeyHex, key); }
 
@@ -339,10 +351,7 @@ bool App::drawSelfUpdate(const UpdateInfo& u, bool& close) {
             if (ImGui::Button(tr("Hide##update.hide"))) close = true;
             return true;
         }
-        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-        const bool restart = ImGui::Button(tr("Restart now##update.restart"));
-        ImGui::PopStyleColor();
-        if (restart) restartIntoUpdate();
+        if (accentButton(tr("Restart now##update.restart"))) restartIntoUpdate();
         ImGui::SameLine();
         if (ImGui::Button(tr("Later##update.later"))) installAtQuit_ = true;
         ui::HelpText("Later", nullptr, "Install it when you quit SculptForge; the next start is the new version.",
@@ -373,11 +382,9 @@ bool App::drawSelfUpdate(const UpdateInfo& u, bool& close) {
         }
     }
     if (selfUpdateOffered(u)) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); // the main action
-        const bool clicked = ImGui::Button(
-            (std::string(tr(selfUpdateStage_ == SelfUpdateStage::Failed && thisVersion ? "Try again" : "Update")) + "##update.update").c_str());
-        ImGui::PopStyleColor();
-        if (clicked) startSelfUpdate(u);
+        if (accentButton((std::string(tr(selfUpdateStage_ == SelfUpdateStage::Failed && thisVersion ? "Try again" : "Update")) +
+                          "##update.update").c_str()))
+            startSelfUpdate(u);
         ui::HelpText("Update", nullptr,
                      "Download the new version from SculptForge's GitHub releases, check its signature and checksum, "
                      "and install it. The current version is kept until the new one has started.",
@@ -587,10 +594,8 @@ void App::drawMemberSignInSteps() {
         if (guide_.bodyBoldFont()) ImGui::PopFont();
         ImGui::SameLine();
         if (ImGui::Button(tr("Copy##member.copy"))) SDL_SetClipboardText(code.c_str());
-        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); // the next step
-        const bool open = ImGui::Button(tr("Open github.com/login/device##member.open"));
-        ImGui::PopStyleColor();
-        if (open) SDL_OpenURL(member::kVerifyUrl); // (always this page, whatever GitHub's answer said)
+        if (accentButton(tr("Open github.com/login/device##member.open"))) // the next step
+            SDL_OpenURL(member::kVerifyUrl); // (always this page, whatever GitHub's answer said)
         ImGui::TextDisabled("%s", tr("Waiting for GitHub..."));
     }
     if (ImGui::Button(tr("Cancel##member.cancel"))) {
