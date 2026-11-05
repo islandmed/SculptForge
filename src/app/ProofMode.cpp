@@ -472,6 +472,12 @@ bool App::proofSkippedScenes() const {
     return std::any_of(proof_->results.begin(), proof_->results.end(), [](const SizeResult& r) { return !r.skipped.empty(); });
 }
 
+// It draws every frame until the results: the scripted stroke may end on another thread while the frame was slow
+// (2 s on the floor E-cores), and without a frame the run never saw that and slept until the next event.
+bool App::proofRunning() const {
+    return proof_ && proof_->stage != ProofState::Stage::Intro && proof_->stage != ProofState::Stage::Results;
+}
+
 void App::startProofMode() {
     if (proof_ && proof_->stage != ProofState::Stage::Results && proof_->stage != ProofState::Stage::Intro) return;
     auto p = std::make_shared<ProofState>();
