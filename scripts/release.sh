@@ -99,6 +99,10 @@ release_ready() {
     gh release view "$T" -R "$REPO" --json assets -q '.assets[].name' > "$work/assets" 2>/dev/null ||
         die "no GitHub release $T yet" "run the earlier steps: scripts/release.sh $V --from tag"
     grep -qx SHA256SUMS.txt "$work/assets" || die "release $T has no SHA256SUMS.txt (unfinished)" "re-run the Release workflow: gh workflow run release.yml -R $REPO -f tag=$T"
+    # One-click update (src/core/SelfUpdate.h): once the app has a key, every release must carry the signature.
+    if grep -q 'kUpdatePublicKeyHex = "[0-9a-f]\{64\}"' src/core/SelfUpdate.h 2>/dev/null; then
+        grep -qx SHA256SUMS.txt.sig "$work/assets" || die "release $T has no SHA256SUMS.txt.sig: apps can't update to it in one click" "check the UPDATE_SIGNING_KEY secret, then re-run the Release workflow: gh workflow run release.yml -R $REPO -f tag=$T"
+    fi
 }
 # Downloads one release asset and checks it against SHA256SUMS.txt with a checksum computed here. Prints the sum.
 asset_sha() {

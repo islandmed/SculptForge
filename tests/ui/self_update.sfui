@@ -1,0 +1,34 @@
+# One-click update (PanelUpdate.cpp): on an AppImage the banner has Update, which shows the download's progress and
+# Cancel; a package manager's install names its command instead and has no Update. UI tests never download
+# (SF_UPDATE_TEST_INSTALL only works in them), and nothing is sent: no request at all.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+env SF_UPDATE_FEED $SCRIPT_DIR/data/update_newer.json
+env SF_UPDATE_TEST_INSTALL appimage
+click "Help##palette.help"
+click "Check for updates##help.check_updates"
+wait_idle 20
+expect_text "SculptForge 99.0.0 is available"
+expect "Update##update.update"
+expect "Download"
+shot update-oneclick
+click "Update##update.update"
+expect_text "Downloading the update..."
+expect "Cancel##update.cancel"
+expect_not "Skip this version"
+shot update-oneclick-progress
+click "Cancel##update.cancel"
+expect "Update##update.update"
+expect "Skip this version"
+
+env SF_UPDATE_TEST_INSTALL pacman
+wait 0.2
+expect_text "Update with your package manager (pacman)"
+expect "Copy##update.copy"
+expect_not "Update##update.update"
+shot update-package-manager
+click "Copy##update.copy"
+expect_clipboard "yay -Syu sculptforge"
+click "Later"
+expect_not "Skip this version"
+expect_value http_requests == 0

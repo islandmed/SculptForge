@@ -29,6 +29,17 @@ HttpResponse httpRequestStream(const std::string& method, const std::string& url
                                const std::string& body, int timeoutSeconds,
                                const std::function<bool(const char* data, size_t size)>& onData);
 
+// A GET for files that must come from known places (the updater, core/SelfUpdate.h). Redirects are followed one hop
+// at a time and every URL, the first included, must pass `allowed`; https only, certificates checked. The body reaches
+// `onData` only from the final 200 answer. `onProgress(received, total)` (total 0 while unknown) returns false to
+// cancel. `stallSeconds`: give up when nothing arrives for that long (no limit on the whole download).
+HttpResponse httpGetRestricted(const std::string& url, const std::function<bool(const std::string& url)>& allowed,
+                               int stallSeconds, const std::function<bool(const char* data, size_t size)>& onData,
+                               const std::function<bool(uint64_t received, uint64_t total)>& onProgress = {});
+// httpGetRestricted's redirect rule on its own (tests): `once` makes one request, a 3xx leaving its target in `location`.
+HttpResponse followRedirects(const std::string& url, const std::function<bool(const std::string& url)>& allowed,
+                             const std::function<HttpResponse(const std::string& url, std::string& location)>& once);
+
 // One part of a multipart/form-data body: a plain field, or a file when `fileName` is set.
 struct MultipartField {
     std::string name;

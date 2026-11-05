@@ -213,16 +213,32 @@ The next chapter, [The interface](interface.md), explains what everything on scr
 
 ## Updating and uninstalling
 
-SculptForge doesn't install updates by itself, but it tells you when there is one. Once a day at start-up it
-downloads a small file from its website that names the newest version; if yours is older, a banner at the top
-of the 3D view says what's new, with **What's new**, **Download**, **Later** and **Skip this version**. Nothing
-about you or your computer is sent. **Help > Check for updates** asks right away, and **Edit > Preferences > Updates**
-turns the daily check off. Builds from a package manager (such as the AUR package) leave updates to the package
-manager and don't check.
+SculptForge tells you when there is a new version. Once a day at start-up it downloads a small file from its
+website that names the newest version; if yours is older, a banner at the top of the 3D view says what's new, with
+**What's new**, **Download**, **Later** and **Skip this version**. Nothing about you or your computer is sent.
+**Help > Check for updates** asks right away, and **Edit > Preferences > Updates** turns the daily check off (and
+picks the update channel: **Stable**, or **Preview** for the betas).
 
-To update, download the new release and install it over the old one. Your settings, brushes and library are
-kept: they live in your user folders, not next to the program (see [Troubleshooting and FAQ](troubleshooting.md)
-for where).
+**One-click update.** The Linux AppImage and the Windows installer and portable zip also get an **Update** button
+on the banner. It downloads the new version in the background (with a progress bar and **Cancel**), checks it, and
+then asks: **Restart now** installs it and starts the new version; **Later** installs it when you quit, so the
+next start is the new version. If you have unsaved changes, Restart now asks first, as quitting does.
+
+What the check means: the files come only from SculptForge's own GitHub releases, over a checked secure
+connection; the release's list of checksums must carry the SculptForge release signature (a key built into the
+app); and the download must match its checksum. If any of that fails, nothing is changed and nothing downloaded
+is run: the banner says what went wrong and **Download** still opens the release page. The current version is
+kept beside the new one (the AppImage as `<name>.AppImage.old`, the portable folder as `<folder>.old`) until the
+new version has started once, then removed; if the new version doesn't start, the old one is put back. The
+Windows installer asks for permission to change Program Files, as installing does.
+
+Installs that belong to a package manager are never replaced by the app: the AUR package (Omarchy's too) builds
+without the update check, a Homebrew install shows `brew upgrade --cask sculptforge`, and the Flatpak, `.deb`
+and `.rpm` files say to download the new file and open it. The macOS app shows **Download** for now.
+
+To update by hand, download the new release and install it over the old one. Either way your settings, brushes
+and library are kept: they live in your user folders, not next to the program (see
+[Troubleshooting and FAQ](troubleshooting.md) for where).
 
 To uninstall, use your system's usual method (Settings > Apps on Windows, dragging the app to the Bin on
 macOS, `sudo apt remove sculptforge` or `sudo dnf remove sculptforge` on Linux, `flatpak uninstall

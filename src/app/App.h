@@ -42,6 +42,7 @@
 #include "core/SurfaceCursor.h"
 #include "core/SpaceMouse.h"
 #include "core/Tablet.h"
+#include "core/SelfUpdate.h"
 #include "core/UpdateCheck.h"
 #include "core/ViewCapture.h"
 #include "core/WhatsNew.h"
@@ -68,6 +69,10 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+namespace sf::ai {
+class ChildProcess; // ai/Process.h (the updater's restart)
+}
 
 namespace sf {
 
@@ -1285,6 +1290,29 @@ private:
     std::shared_ptr<UpdateJob> updateJob_;
     std::optional<UpdateInfo> updateAvailable_; // shown as the banner until dismissed
     std::string updateStatus_;                  // the last check's result, for Preferences > Updates
+    // One-click update (PanelUpdate.cpp, core/SelfUpdate.h): the banner's Update button downloads and verifies the
+    // release on a worker thread, then installs it on Restart now (watching the new version start, rolling back
+    // when it doesn't) or when the app quits (Later). Package-managed installs get their command instead.
+    enum class SelfUpdateStage { Idle, Downloading, Ready, Restarting, Failed };
+    void initSelfUpdate();  // initProject: a just-installed version counts its start (and rolls back a broken one)
+    void tickSelfUpdate();  // each frame: confirms this version is up, watches a restart
+    bool drawSelfUpdate(const UpdateInfo& u, bool& close); // the banner's Update row; true: it replaces the usual buttons
+    bool selfUpdateOffered(const UpdateInfo& u);
+    void startSelfUpdate(const UpdateInfo& u);
+    void restartIntoUpdate();
+    bool installSelfUpdate(bool relaunch, std::string& error);
+    void finishSelfUpdate(); // at quit: installs an update left for Later
+    std::string updateNotePath() const { return prefDir_.empty() ? std::string() : prefDir_ + "update_pending.json"; }
+    const update::Install& updateInstall();
+    update::Install updateInstall_;
+    bool updateInstallKnown_ = false;
+    SelfUpdateStage selfUpdateStage_ = SelfUpdateStage::Idle;
+    std::shared_ptr<update::Download> selfUpdate_;
+    std::string selfUpdateVersion_, selfUpdateError_;
+    bool installAtQuit_ = false;
+    double confirmStartAt_ = 0.0; // > 0: this version was just installed; confirmed once it has run this long
+    std::shared_ptr<ai::ChildProcess> restartChild_;
+    double restartDeadline_ = 0.0;
     int autosaveMinutes_ = 5; // 0 = off
     float autosaveTimer_ = 0.0f;
     uint64_t autosaveRevision_ = ~uint64_t(0);

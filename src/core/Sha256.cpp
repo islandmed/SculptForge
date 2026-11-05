@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Sha256.h"
 
-#include <array>
+#include <algorithm>
+#include <cstring>
 
 namespace sf {
 
@@ -19,7 +20,7 @@ constexpr uint32_t kRound[64] = {
 
 constexpr uint32_t rotr(uint32_t x, int n) { return (x >> n) | (x << (32 - n)); }
 
-void compress(std::array<uint32_t, 8>& h, const uint8_t* block) {
+void compress(uint32_t* h, const uint8_t* block) {
     uint32_t w[64];
     for (int i = 0; i < 16; ++i)
         w[i] = uint32_t(block[i * 4]) << 24 | uint32_t(block[i * 4 + 1]) << 16 | uint32_t(block[i * 4 + 2]) << 8 |
@@ -55,27 +56,42 @@ void compress(std::array<uint32_t, 8>& h, const uint8_t* block) {
 } // namespace
 
 std::string sha256Hex(const void* data, size_t size) {
-    std::array<uint32_t, 8> h = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-                                 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
-    const auto* bytes = static_cast<const uint8_t*>(data);
-    size_t i = 0;
-    for (; i + 64 <= size; i += 64) compress(h, bytes + i);
+    Sha256 h;
+    h.update(data, size);
+    return h.hex();
+}
 
+void Sha256::update(const void* data, size_t size) {
+    const auto* bytes = static_cast<const uint8_t*>(data);
+    total_ += size;
+    while (size) {
+        if (used_ == 0 && size >= 64) { // whole blocks straight from the input
+            compress(h_, bytes);
+            bytes += 64, size -= 64;
+            continue;
+        }
+        const size_t n = std::min(size, 64 - used_);
+        std::memcpy(block_ + used_, bytes, n);
+        used_ += n, bytes += n, size -= n;
+        if (used_ == 64) compress(h_, block_), used_ = 0;
+    }
+}
+
+std::string Sha256::hex() {
     // Final block(s): the remaining bytes, 0x80, zeros, then the bit length (big-endian).
     uint8_t tail[128] = {};
-    const size_t rest = size - i;
-    for (size_t k = 0; k < rest; ++k) tail[k] = bytes[i + k];
-    tail[rest] = 0x80;
-    const size_t tailLen = rest < 56 ? 64 : 128;
-    const uint64_t bits = uint64_t(size) * 8;
+    std::memcpy(tail, block_, used_);
+    tail[used_] = 0x80;
+    const size_t tailLen = used_ < 56 ? 64 : 128;
+    const uint64_t bits = total_ * 8;
     for (int k = 0; k < 8; ++k) tail[tailLen - 1 - k] = uint8_t(bits >> (8 * k));
-    compress(h, tail);
-    if (tailLen == 128) compress(h, tail + 64);
+    compress(h_, tail);
+    if (tailLen == 128) compress(h_, tail + 64);
 
     static const char* hex = "0123456789abcdef";
     std::string out;
     out.reserve(64);
-    for (uint32_t v : h)
+    for (uint32_t v : h_)
         for (int k = 28; k >= 0; k -= 4) out += hex[(v >> k) & 0xf];
     return out;
 }

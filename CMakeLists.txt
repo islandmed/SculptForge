@@ -83,6 +83,8 @@ add_library(sculptforge_core STATIC
   src/core/Precision.cpp
   src/core/PathStroke.cpp
   src/core/Sha256.cpp
+  src/core/Ed25519.cpp
+  src/core/SelfUpdate.cpp
   src/core/BrushGallery.cpp
   src/core/VertexPaint.cpp
   src/core/PaintLayer.cpp
@@ -397,6 +399,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelMaya.cpp
     src/app/PanelPhone.cpp
     src/app/PanelProject.cpp
+    src/app/PanelUpdate.cpp
     src/app/PanelParts.cpp
     src/app/PanelSupport.cpp
     src/app/QuickTour.cpp

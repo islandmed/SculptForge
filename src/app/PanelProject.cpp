@@ -145,6 +145,7 @@ void App::initProject() {
         startInputStyle_ = uiPrefs_.inputStyle; // a new install: SculptForge's keys until the welcome's choice
         newLookCardDone_ = true; // a new install starts in the new look (or ui.json's): nothing to announce
     }
+    initSelfUpdate(); // a just-installed version counts its start (PanelUpdate.cpp)
     recentFiles_ = pruneRecentFiles(std::move(recentFiles_), fileExists);
     saveProjectPrefs(); // records this version, so What's New shows once
     updateDiscordPresence(); // on if it was left on (PanelIntegrations.cpp)
@@ -173,6 +174,7 @@ void App::initProject() {
 
 void App::finishProject() {
     if (!interactive() || prefDir_.empty()) return;
+    finishSelfUpdate(); // an update left for Later installs now
     saveProjectPrefs();
     std::ofstream(fsPath(prefDir_ + "clean_exit"), std::ios::binary | std::ios::trunc) << "SculptForge exited normally\n";
 }
@@ -764,6 +766,7 @@ void App::pollUpdateCheck() {
 
 void App::drawUpdateBanner() {
     pollUpdateCheck(); // (here, not in tickProject: this runs every frame, UI tests included)
+    tickSelfUpdate();
     if (!updateAvailable_) return;
     const UpdateInfo& u = *updateAvailable_;
     const CanvasRect c = canvasRect(); // top centre of the 3D view, clear of the shelves
@@ -786,21 +789,23 @@ void App::drawUpdateBanner() {
         if (guide_.bodyFont()) ImGui::PopFont();
         ImGui::Spacing();
         bool close = false;
-        if (ImGui::Button(tr("What's new"))) SDL_OpenURL(u.notesUrl.c_str());
-        ImGui::SameLine();
-        if (ImGui::Button(tr("Download"))) {
-            SDL_OpenURL(u.downloadUrl.c_str());
-            close = true;
-        }
-        ImGui::SameLine();
-        if (ImGui::Button(tr("Become an Insider"))) openSupportPage();
-        ImGui::SameLine();
-        if (ImGui::Button(tr("Later"))) close = true;
-        ImGui::SameLine();
-        if (ImGui::Button(tr("Skip this version"))) {
-            updateSkipped_ = u.version;
-            saveProjectPrefs();
-            close = true;
+        if (!drawSelfUpdate(u, close)) { // (PanelUpdate.cpp: Update, or the package manager's command)
+            if (ImGui::Button(tr("What's new"))) SDL_OpenURL(u.notesUrl.c_str());
+            ImGui::SameLine();
+            if (ImGui::Button(tr("Download"))) {
+                SDL_OpenURL(u.downloadUrl.c_str());
+                close = true;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(tr("Become an Insider"))) openSupportPage();
+            ImGui::SameLine();
+            if (ImGui::Button(tr("Later"))) close = true;
+            ImGui::SameLine();
+            if (ImGui::Button(tr("Skip this version"))) {
+                updateSkipped_ = u.version;
+                saveProjectPrefs();
+                close = true;
+            }
         }
         if (close) updateAvailable_.reset();
     }

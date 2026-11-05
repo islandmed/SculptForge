@@ -271,6 +271,27 @@ jobs:
         run: python3 -m zipfile -c dist/sculptforge_maya.zip integrations/maya/sculptforge_maya.py integrations/maya/README.md
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Sign the checksums (one-click update checks SHA256SUMS.txt.sig, src/core/SelfUpdate.h)
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          pub=$(sed -n 's/.*kUpdatePublicKeyHex = "\([0-9a-f]*\)".*/\1/p' src/core/SelfUpdate.h)
+          if [ -z "$UPDATE_SIGNING_KEY" ]; then
+            [ -z "$pub" ] || { echo "::error::the app checks updates with key $pub but the UPDATE_SIGNING_KEY secret is not set"; exit 1; }
+            echo "::warning::no UPDATE_SIGNING_KEY secret: no SHA256SUMS.txt.sig (one-click update stays off until the key exists)"
+            exit 0
+          fi
+          umask 077
+          key=$(mktemp)
+          trap 'rm -f "$key" "$key.pub"' EXIT
+          printf '%s\n' "$UPDATE_SIGNING_KEY" > "$key"
+          # The secret must be the private half of the key compiled into the app: a mismatch fails here, not in the field.
+          have=$(openssl pkey -in "$key" -pubout -outform DER | tail -c 32 | od -An -tx1 -v | tr -d ' \n')
+          [ "$have" = "$pub" ] || { echo "::error::UPDATE_SIGNING_KEY's public key ($have) is not kUpdatePublicKeyHex ($pub)"; exit 1; }
+          openssl pkeyutl -sign -inkey "$key" -rawin -in dist/SHA256SUMS.txt -out dist/SHA256SUMS.txt.sig
+          openssl pkey -in "$key" -pubout -out "$key.pub"
+          openssl pkeyutl -verify -pubin -inkey "$key.pub" -rawin -in dist/SHA256SUMS.txt -sigfile dist/SHA256SUMS.txt.sig
+          [ "$(stat -c %s dist/SHA256SUMS.txt.sig)" = 64 ]
       - name: Release notes from CHANGELOG
         run: |
           section=${TAG#v}
