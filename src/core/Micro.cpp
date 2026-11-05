@@ -296,6 +296,24 @@ float triangleBulge(const MicroTriangle& T) {
 
 } // namespace
 
+void microRaiseBulge(Mesh& m) {
+    if (!m.micro) return;
+    MicroMesh& mm = *m.micro;
+    const uint32_t nt = mm.baseTriangles, n = mm.n;
+    const size_t block = 1 << 14;
+    std::vector<float> bulge((nt + block - 1) / block, 0.0f);
+    poolFor(nt, [&](size_t b, size_t e) {
+        MicroTriangle T;
+        float g = 0.0f;
+        for (size_t t = b; t < e; ++t) {
+            T.set(m, uint32_t(t), n);
+            g = std::max(g, triangleBulge(T));
+        }
+        bulge[b / block] = g;
+    }, block);
+    for (float g : bulge) mm.bulgeMax = std::max(mm.bulgeMax, g);
+}
+
 bool microWantsOutOfCore(size_t points) {
     if (const char* e = std::getenv("SF_MICRO_OUT_OF_CORE"); e && *e) return std::string(e) == "1";
     if (const size_t limit = currentTierConfig().outOfCorePoints) return points > limit;

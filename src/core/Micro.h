@@ -233,6 +233,9 @@ void microNoise(Mesh& m, float amplitude, float frequency, uint32_t seed = 1);
 // Ray against the micro surface: the base triangle hit (BVH) and its neighbourhood within the displacement range,
 // at full micro resolution. hit.triangle is the base triangle; hit.position / normal are on the micro surface.
 bool microRaycast(const Mesh& m, const BVH& bvh, const glm::vec3& origin, const glm::vec3& dir, RayHit& hit);
+// After the base moved under a micro level (brushes on the base: Sculptor::microBaseDab, Move): its bulge bound
+// raised to what the base's triangles now need.
+void microRaiseBulge(Mesh& m);
 // The base triangles whose displaced surface may come within `radius` of `center` (each BVH node grown by the
 // largest displacement and bulge under it, MicroMesh::Reach), for the caller's exact test per triangle.
 void microQueryTriangles(const Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, std::vector<uint32_t>& out);
