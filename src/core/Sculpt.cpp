@@ -11,6 +11,7 @@
 #include <atomic>
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <iterator>
 #include <limits>
 #include <unordered_map>
@@ -1098,7 +1099,8 @@ void Sculptor::taubinShrink(const Mesh& mesh) {
 void Sculptor::finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_point clock) {
     timings.kernelMs += lapMs(clock);
     // The boxes every few dabs, not every dab (BVH::deferRefitQueried: until then queries grow by the moves).
-    if (dynTopo_.active()) bvh.refitQueried(mesh); // (its edits renumber leaves)
+    static const bool batched = [] { const char* e = std::getenv("SF_BATCHED_REFIT"); return !e || e[0] != '0'; }(); // =0: every dab (A/B)
+    if (dynTopo_.active() || !batched) bvh.refitQueried(mesh); // (its edits renumber leaves)
     else {
         bvh.deferRefitQueried(lastMove_);
         if (++deferredDabs_ >= kRefitEvery) {
