@@ -26,6 +26,7 @@
 #include "core/Macro.h"
 #include "core/Pack.h"
 #include "core/Document.h"
+#include "core/DiscordPresence.h"
 #include "core/Face.h"
 #include "core/GeneratedRemesh.h"
 #include "core/MeshTransform.h"
@@ -452,6 +453,19 @@ private:
     bool supportCardEvent(const SDL_Event& e); // input while it's open goes to it, not the canvas or shortcuts
     void drawSupportCard();
     void drawSupportPrefs();                    // Preferences > Support
+    // Show SculptForge on Discord (PanelIntegrations.cpp, core/DiscordPresence.h): off by default, project.json.
+    struct DiscordPresencePrefs {
+        bool enabled = false, showChallenge = false, showFileName = false;
+        std::string challenge; // the theme the user typed (sanitised when sent)
+    };
+    struct DiscordClientDelete { void operator()(discord::Client* c) const; };
+    DiscordPresencePrefs discordPrefs_;
+    std::unique_ptr<discord::Client, DiscordClientDelete> discordClient_; // made on the first switch-on
+    int64_t discordStart_ = 0;                   // seconds since 1970 when this session started (the elapsed time)
+    char discordChallengeBuf_[64 * 4 + 1] = {};  // the theme field (64 code points of UTF-8)
+    bool discordPresenceAvailable() const;       // an application ID is compiled in
+    void updateDiscordPresence();                // every frame: sends only when what's shown changes
+    void drawIntegrationsPrefs();                // Preferences > Integrations
     bool welcomeAfterCard_ = false;             // the first-run welcome waits until the card closes
     // What's New (WhatsNewPopup.cpp): the newest version's feature cards from docs/guide/whats-new.md, once after an
     // update and from Help > What's New; each Try it runs the card's action (runWhatsNewAction).

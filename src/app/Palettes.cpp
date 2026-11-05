@@ -646,6 +646,10 @@ void App::drawPalette_Preferences() {
         tray::Section section;
         drawUpdatesSection();
     }
+    if (discordPresenceAvailable() && subpalette("preferences.integrations", "Integrations")) {
+        tray::Section section;
+        drawIntegrationsPrefs(); // Show SculptForge on Discord (PanelIntegrations.cpp)
+    }
     if (subpalette("preferences.support", "Support")) {
         tray::Section section;
         drawSupportPrefs(); // the support card at launch (PanelSupportCard.cpp)

@@ -86,6 +86,7 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 43. [Performance and big meshes](performance.md)
 44. [Troubleshooting: tablets, display, crashes and FAQ](troubleshooting.md)
 45. [Glossary](glossary.md)
+46. [Show SculptForge on Discord](discord.md)
 
 ## Getting help
 

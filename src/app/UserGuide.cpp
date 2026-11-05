@@ -479,6 +479,7 @@ std::string UserGuide::chapterFor(const std::string& palette, const std::string&
         actionId == "tool.scale" || actionId == "tool.rotate")
         return "gizmo.md";
     if (starts("Transform")) return idStarts("transform.symmetry") ? "sculpting.md" : "navigation.md";
+    if (starts("Preferences > Integrations")) return "discord.md";
     if (starts("Render") || starts("Edit") || starts("Help") || starts("Palettes") || starts("Preferences") ||
         starts("Library"))
         return "interface.md";
