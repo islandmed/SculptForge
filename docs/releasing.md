@@ -147,6 +147,9 @@ What keeps the insiders token from leaking; `tools/release/check_workflows.py` (
   `publish-members` uses it; a workflow_dispatch from a branch can't. Set or rotate (never echo it):
   `wl-paste -n | gh secret set INSIDERS_REPO_TOKEN --env member-release -R islandmed/SculptForge`.
   (The daily-drop workflow and the preview-build workflow were retired with the Insider tier; betas are the members' builds.)
+- member-requests.yml's `publish` job is the only other user, also in `member-release` (one approval a month); it
+  runs from `main`, so the environment's deployment rule lists `main` besides tags `v*`. Its `public` job, which
+  writes the `packs` branch, has no environment and never sees the token.
 - release.yml: top-level `permissions: contents: read`; `publish-members` reads only, runs only for betas, and passes
   the token as an env var to its one publishing step; every `uses:` pinned to a full commit SHA with the version in a
   comment (update by resolving the new tag: `gh api repos/OWNER/REPO/git/ref/tags/vX.Y.Z --jq .object.sha`); checkouts
@@ -157,6 +160,21 @@ What keeps the insiders token from leaking; `tools/release/check_workflows.py` (
   token read-only, Actions may not create or approve pull requests.
 - islandmed/sculptforge-insiders: private, members invited with `permission=pull` only, ruleset on `main`: no force
   push, no deletion.
+
+## Membership upkeep (by hand)
+
+- **Founding Members:** `website/founding.json` (`limit` 100, `taken`, `names`). On each new member among the first
+  100: give them the Discord role, `taken` + 1, and their name in `names` only if they want it listed. The website's
+  counter and Members page read it live; the app compiles it in (Help > About, and the membership card's founding
+  note, which stops once `taken` reaches `limit`).
+- **Monthly challenge results:** when the winners are announced, add `"challenge": {"id": "YYYY-MM", "title":
+  "<theme>"}` to `website/latest.json` (push main; the site deploys). The app's daily update check reads it once per
+  id: the small membership card's challenge moment ("The <theme> challenge results are in, on Discord").
+- **Member Requests:** each approved request goes into islandmed/sculptforge-insiders as
+  `requests/YYYY-MM/<slug>/request.json` + its file (+ `preview.png`), `"approved": true` once the requester has
+  OK'd the preview (format: `tools/member-requests/requests.py`). On the 1st, member-requests.yml packs last month's,
+  waits for the `member-release` approval, releases `requests-YYYY-MM` there, posts in #members, and schedules the
+  pack in the public listing (`packs` branch) for a month later.
 
 ## When a step fails
 

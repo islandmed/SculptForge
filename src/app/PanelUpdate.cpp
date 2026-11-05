@@ -552,6 +552,14 @@ void App::startMemberSignIn(std::function<void(bool member)> onDone) {
     }).detach();
 }
 
+void App::finishMemberSignInForTest(bool ok) {
+    if (!memberSignIn_ || options_.uiTest.empty()) return;
+    memberSignIn_->ok = ok;
+    memberSignIn_->login = ok ? "test-member" : "";
+    memberSignIn_->error = ok ? "" : "this GitHub account has no access to member builds";
+    memberSignIn_->done = true;
+}
+
 void App::memberSignOut() {
     if (memberSignIn_) memberSignIn_->cancel = true;
     memberSignIn_.reset();
@@ -568,6 +576,34 @@ void App::memberSignOut() {
     if (options_.uiTest.empty()) std::thread([] { keychain::erase(member::kKeychainAccount); }).detach();
 }
 
+// A sign-in in progress: the code to enter on GitHub, Copy, the page, Cancel (Preferences > Updates and the
+// membership card's "I'm already a member").
+void App::drawMemberSignInSteps() {
+    if (!memberSignIn_) return;
+    std::string code;
+    {
+        std::lock_guard<std::mutex> lock(memberSignIn_->mutex);
+        code = memberSignIn_->userCode;
+    }
+    if (code.empty()) {
+        ImGui::TextDisabled("%s", tr("Asking GitHub..."));
+    } else {
+        ImGui::TextWrapped("%s", tr("On GitHub, enter this code:"));
+        if (ImFont* big = guide_.bodyBoldFont()) ImGui::PushFont(big);
+        ImGui::TextUnformatted(code.c_str());
+        if (guide_.bodyBoldFont()) ImGui::PopFont();
+        ImGui::SameLine();
+        if (ImGui::Button(tr("Copy##member.copy"))) SDL_SetClipboardText(code.c_str());
+        if (accentButton(tr("Open github.com/login/device##member.open"))) // the next step
+            SDL_OpenURL(member::kVerifyUrl); // (always this page, whatever GitHub's answer said)
+        ImGui::TextDisabled("%s", tr("Waiting for GitHub..."));
+    }
+    if (ImGui::Button(tr("Cancel##member.cancel"))) {
+        memberSignIn_->cancel = true;
+        if (!options_.uiTest.empty()) memberSignIn_->done = true;
+    }
+}
+
 void App::drawMemberBuildsSection() {
     ImGui::Spacing();
     ImGui::SeparatorText(tr("Member builds"));
@@ -579,28 +615,7 @@ void App::drawMemberBuildsSection() {
                  "Preferences > Updates");
     const bool signedIn = memberBuilds_;
     if (memberSignIn_) {
-        std::string code;
-        {
-            std::lock_guard<std::mutex> lock(memberSignIn_->mutex);
-            code = memberSignIn_->userCode;
-        }
-        if (code.empty()) {
-            ImGui::TextDisabled("%s", tr("Asking GitHub..."));
-        } else {
-            ImGui::TextWrapped("%s", tr("On GitHub, enter this code:"));
-            if (ImFont* big = guide_.bodyBoldFont()) ImGui::PushFont(big);
-            ImGui::TextUnformatted(code.c_str());
-            if (guide_.bodyBoldFont()) ImGui::PopFont();
-            ImGui::SameLine();
-            if (ImGui::Button(tr("Copy##member.copy"))) SDL_SetClipboardText(code.c_str());
-            if (accentButton(tr("Open github.com/login/device##member.open"))) // the next step
-                SDL_OpenURL(member::kVerifyUrl); // (always this page, whatever GitHub's answer said)
-            ImGui::TextDisabled("%s", tr("Waiting for GitHub..."));
-        }
-        if (ImGui::Button(tr("Cancel##member.cancel"))) {
-            memberSignIn_->cancel = true;
-            if (!options_.uiTest.empty()) memberSignIn_->done = true;
-        }
+        drawMemberSignInSteps();
     } else if (signedIn) {
         if (memberLogin_.empty()) ImGui::TextUnformatted(tr("Signed in with GitHub."));
         else ImGui::Text(tr("Signed in as %s on GitHub."), memberLogin_.c_str());

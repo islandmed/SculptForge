@@ -54,6 +54,9 @@
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
 //                            directory), e.g. to stage what another program would write (the Blender bridge);
 //                            $LIBRARY in DST (and in env values) is the test's Library library folder
+//   support_card first_run [test_mode]   the full membership card's launch decision (Support.h)
+//   member_card MOMENT [days=N] [sculpt_seconds=S]   a good moment for the small membership card (sculpted, render,
+//                            updated, challenge, none); member_sign_in ok|fail ends the GitHub sign-in it started
 //   wait SECONDS / wait_idle [TIMEOUT] (AI requests, thumbnails, update checks and other background jobs) / wait_for LABEL [TIMEOUT]
 //   wait_value NAME OP N [TIMEOUT]  wait (real time, default 30 s) until expect_value NAME OP N would pass
 //   expect LABEL / expect_not LABEL
@@ -75,6 +78,8 @@
 //                            whats_new_open, whats_new_cards, whats_new_tries (What's New and its Try it clicks),
 //                            whats_new_contents / whats_new_expanded (its guide chapter: contents entries, open sections),
 //                            custom_brush_active (a custom brush is the active one),
+//                            member_card_open / member_card_pending / member_card_verifying / member_signed_in /
+//                            supporter (the membership cards, Support.h),
 //                            welcome_open (the first-run welcome shown), new_look_card_open (the one-time
 //                            "SculptForge has a new look" card),
 //                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
@@ -755,7 +760,11 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "whats_new_expanded") return double(app_.guide_.whatsNewExpanded());
     if (name == "custom_brush_active") return app_.doc_.activeBrush >= 0 && !app_.paintMode_ ? 1.0 : 0.0;
     if (name == "supporter") return app_.supportCardPrefs_.supporter ? 1.0 : 0.0;
-    if (name == "support_card_enabled") return app_.supportCardPrefs_.enabled ? 1.0 : 0.0;
+    // The small membership card (Support.h): open (1), the sign-in running from it, member builds signed in.
+    if (name == "member_card_open") return app_.memberCard_ != MemberMoment::None ? 1.0 : 0.0;
+    if (name == "member_card_pending") return app_.memberMomentPending_ != MemberMoment::None ? 1.0 : 0.0;
+    if (name == "member_card_verifying") return app_.memberVerifying_ ? 1.0 : 0.0;
+    if (name == "member_signed_in") return app_.memberSignedIn() ? 1.0 : 0.0;
     if (name == "part_thumbnails") { // Part panel thumbnails rendered (#43)
         double n = 0.0;
         for (const auto& [id, tex] : app_.partThumbs_) n += tex ? 1.0 : 0.0;
@@ -1812,26 +1821,65 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             }
         });
     } else if (verb == "support_card") {
-        // The launch decision for the support card (Support.h), as a start would make it: `first_run`, `updated` (a
-        // new version since it last showed), `days=N` (the clock N days after it last showed) and `test_mode` (how
-        // every UI test, render and CI run starts: never shown).
-        bool firstRun = false, updated = false, testMode = false;
-        double days = 0.0;
+        // The launch decision for the full membership card (Support.h), as a start would make it: `first_run` and
+        // `test_mode` (how every UI test, render and CI run starts: never shown).
+        bool firstRun = false, testMode = false;
         for (size_t i = 1; i < w.size(); ++i) {
             if (w[i] == "first_run") firstRun = true;
-            else if (w[i] == "updated") updated = true;
             else if (w[i] == "test_mode") testMode = true;
-            else if (w[i].rfind("days=", 0) == 0) days = std::atof(w[i].c_str() + 5);
             else {
                 error = "support_card: unknown option '" + w[i] + "'";
                 return false;
             }
         }
-        run([this, firstRun, updated, testMode, days] {
-            SupportCardPrefs& p = app_.supportCardPrefs_;
-            if (updated) p.shownVersion = "0.0.0";
-            const int64_t base = p.shownAt > 0 ? p.shownAt : int64_t(1'800'000'000);
-            app_.launchSupportCard(firstRun, base + int64_t(days * 86400.0), testMode);
+        run([this, firstRun, testMode] { app_.launchSupportCard(firstRun, app_.memberClock(), testMode); });
+    } else if (verb == "member_card") {
+        // A good moment for the small membership card (Support.h): sculpted | render | updated | challenge | none,
+        // with `days=N` (the clock N days on from the test's start) and `sculpt_seconds=S` (this session's stroke time
+        // so far: the next frame decides the sculpting moment). UI tests otherwise never show it (test mode).
+        if (!need(1)) return false;
+        static const std::pair<const char*, MemberMoment> kMoments[] = {
+            {"sculpted", MemberMoment::Sculpted}, {"render", MemberMoment::SavedRender},
+            {"updated", MemberMoment::Updated}, {"challenge", MemberMoment::Challenge}, {"none", MemberMoment::None}};
+        MemberMoment moment = MemberMoment::None;
+        bool known = false;
+        for (const auto& [n, m] : kMoments)
+            if (w[1] == n) moment = m, known = true;
+        if (!known) {
+            error = "member_card: unknown moment '" + w[1] + "'";
+            return false;
+        }
+        double days = -1.0, sculpt = -1.0;
+        for (size_t i = 2; i < w.size(); ++i) {
+            if (w[i].rfind("days=", 0) == 0) days = std::atof(w[i].c_str() + 5);
+            else if (w[i].rfind("sculpt_seconds=", 0) == 0) sculpt = std::atof(w[i].c_str() + 15);
+            else {
+                error = "member_card: unknown option '" + w[i] + "'";
+                return false;
+            }
+        }
+        run([this, moment, days, sculpt] {
+            app_.memberCardTestMode_ = true;
+            if (days >= 0.0) app_.memberClockOffset_ = int64_t(days * 86400.0);
+            if (sculpt >= 0.0) app_.sessionSculptSeconds_ = sculpt;
+            if (moment == MemberMoment::Challenge) app_.challengeTitle_ = "Creatures";
+            app_.memberMoment(moment);
+        });
+    } else if (verb == "member_sign_in") {
+        // Ends the GitHub sign-in that is running (UI tests never reach GitHub): `ok` (the account can read the
+        // member repository) or `fail` (no access, declined, the code ran out).
+        if (!need(1)) return false;
+        const bool ok = w[1] == "ok";
+        if (!ok && w[1] != "fail") {
+            error = "member_sign_in: ok or fail";
+            return false;
+        }
+        run([this, line, ok] {
+            if (!app_.memberSignIn_) {
+                fail(line, "member_sign_in: no sign-in is running");
+                return;
+            }
+            app_.finishMemberSignInForTest(ok);
         });
     } else if (verb == "wait") {
         if (!need(1)) return false;

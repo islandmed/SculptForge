@@ -57,7 +57,7 @@ struct PackManifest {
     std::string name, version, author, license, description;
     std::string minAppVersion; // "" = any
     std::string preview;       // "preview.png" / "preview.jpg", or ""
-    std::string channel;       // "insider" marks the monthly pack or an Insider drop (display only; no DRM), or ""
+    std::string channel;       // "insider" marks a members' pack (Member Requests) (display only; no DRM), or ""
     std::vector<PackItem> contents;
 };
 

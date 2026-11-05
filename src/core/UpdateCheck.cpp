@@ -94,6 +94,27 @@ bool parseUpdateFeed(const std::string& json, UpdateInfo& out, std::string& erro
         if (readRelease(j["channels"]["preview"], preview) && compareVersions(preview.version, info.version) > 0)
             info = std::move(preview); // never older than stable: once stable passes the beta, it is offered
     }
+    const Json& challenge = j["challenge"];
+    if (challenge.isObject() && challenge["id"].isString()) {
+        const std::string& id = challenge["id"].asString();
+        const bool idOk = !id.empty() && id.size() <= 32 && std::all_of(id.begin(), id.end(), [](char c) {
+            return std::isalnum(static_cast<unsigned char>(c)) || c == '-';
+        });
+        if (idOk) {
+            info.challengeId = id;
+            if (challenge["title"].isString()) {
+                std::string title;
+                for (char c : challenge["title"].asString()) // (no control characters; UTF-8 kept whole below)
+                    if (static_cast<unsigned char>(c) >= 0x20 && c != 0x7f) title += c;
+                if (title.size() > 48) {
+                    size_t cut = 48;
+                    while (cut > 0 && (static_cast<unsigned char>(title[cut]) & 0xC0) == 0x80) --cut;
+                    title.resize(cut);
+                }
+                info.challengeTitle = title;
+            }
+        }
+    }
     out = std::move(info);
     return true;
 }

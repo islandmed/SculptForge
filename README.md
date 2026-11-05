@@ -313,8 +313,9 @@ where, and for the licences of the AI models.
 
 SculptForge is free, and nothing in the app is ever paywalled.
 **[Member](https://sculptforge.app/support.html)** ($5 / month or $48 / year): betas and early builds, the monthly
-feature vote, a brush and alpha pack every month, #members on Discord and your name in the
-[credits](https://sculptforge.app/supporters.html). **[Studio](https://sculptforge.app/studios.html#membership)**
+feature vote, Member Requests (ask for a brush, alpha or material each month), #members on Discord and your name in
+the [credits](https://sculptforge.app/supporters.html); the first 100 members are Founding Members, price locked for
+good. **[Studio](https://sculptforge.app/studios.html#membership)**
 ($150 / month): up to 10 artists with everything in Member, priority support and a private channel. Every release
 stays free for everyone; bug-fix and security releases go out to everyone the same day.
 

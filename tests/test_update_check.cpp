@@ -104,3 +104,25 @@ TEST(update_feed_on_the_website_parses) {
     CHECK(parseUpdateFeed(std::string(std::istreambuf_iterator<char>(f), {}), u, err));
     CHECK(!u.highlights.empty());
 }
+
+TEST(update_feed_challenge_results) {
+    // The monthly challenge whose results are out: the membership card's moment (Support.h), once per id.
+    UpdateInfo u;
+    std::string err;
+    CHECK(parseUpdateFeed(R"({"version":"0.6.0","download":"https://example.org/dl",
+        "challenge":{"id":"2026-11","title":"Creatures\u0007 of the deep"}})", u, err));
+    CHECK(u.challengeId == "2026-11" && u.challengeTitle == "Creatures of the deep"); // control characters dropped
+    CHECK(parseUpdateFeed(R"({"version":"0.6.0","download":"https://example.org/dl"})", u, err) && u.challengeId.empty());
+    for (const char* bad : {R"("id":"../x")", R"("id":"")", R"("id":7)", R"("id":"0123456789012345678901234567890123")"}) {
+        CHECK(parseUpdateFeed(std::string(R"({"version":"0.6.0","download":"https://example.org/dl","challenge":{)") + bad + "}}",
+                              u, err));
+        CHECK(u.challengeId.empty() && u.challengeTitle.empty());
+    }
+    // A long title is cut to 48 bytes, never inside a character.
+    std::string title;
+    for (int i = 0; i < 40; ++i) title += "\xc3\xa9";
+    CHECK(parseUpdateFeed(R"({"version":"0.6.0","download":"https://example.org/dl","challenge":{"id":"x","title":")" + title +
+                              "\"}}",
+                          u, err));
+    CHECK(u.challengeTitle.size() == 48 && u.challengeTitle == title.substr(0, 48));
+}

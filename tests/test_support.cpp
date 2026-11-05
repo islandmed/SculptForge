@@ -1,8 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Supporting SculptForge: the supporters list (docs/supporters.txt) parsed and sanitised for Help > About, and
-// when the one optional reminder may show.
+// Supporting SculptForge: the supporters list (docs/supporters.txt) and the Founding Members (website/founding.json)
+// parsed and sanitised for Help > About, and when the membership cards may show.
 #include "TestHarness.h"
 
 #include "app/Support.h"
@@ -49,22 +49,95 @@ TEST(supporters_count_is_capped) {
     CHECK(names.back() == "Name 1999");
 }
 
-TEST(support_reminder_timing) {
-    // Sculpting time grows by frames spent in strokes, a stalled frame counting at most a quarter second.
+TEST(member_card_sculpting_moment) {
+    // Stroke time grows by frames spent in strokes, a stalled frame counting at most a quarter second.
     double t = 0.0;
     t = addSculptTime(t, 0.016);
     CHECK(t > 0.015 && t < 0.017);
     CHECK(addSculptTime(t, 3600.0) - t <= kSculptTimeMaxStep + 1e-9);
     CHECK(addSculptTime(t, -5.0) == t);
-    CHECK(addSculptTime(-1.0, 0.1) <= 0.1 + 1e-9); // a damaged stored value starts again
-    const double ten = kSupportReminderSculptSeconds, session = kSupportReminderSessionSeconds;
-    CHECK(!supportReminderDue(ten - 1.0, session, false, false)); // not before ten hours
-    CHECK(!supportReminderDue(ten, 0.0, false, false));            // never at launch
-    CHECK(!supportReminderDue(ten, session - 1.0, false, false));
-    CHECK(!supportReminderDue(ten, session, true, false));         // never mid-stroke
-    CHECK(!supportReminderDue(ten, session, false, true));         // once only (shown or dismissed)
-    CHECK(supportReminderDue(ten, session, false, false));
-    CHECK(supportReminderDue(ten * 3.0, session * 6.0, false, false));
+    CHECK(addSculptTime(-1.0, 0.1) <= 0.1 + 1e-9); // a damaged value starts again
+    // About 20 minutes of active sculpting in this session (Tony 11-05: an hour was too long), once per session.
+    CHECK(kMemberCardSculptSeconds == 20.0 * 60.0);
+    CHECK(!sculptMomentDue(kMemberCardSculptSeconds - 1.0, false));
+    CHECK(sculptMomentDue(kMemberCardSculptSeconds, false));
+    CHECK(!sculptMomentDue(kMemberCardSculptSeconds * 3.0, true));
+}
+
+TEST(member_card_weekly_until_member) {
+    const int64_t day = 24 * 3600, now = 1'800'000'000;
+    SupportCardPrefs p;
+    CHECK(memberMomentAllowed(p, false, now, false)); // never shown: yes
+    p.shownAt = now;
+    CHECK(!memberMomentAllowed(p, false, now + 6 * day, false)); // at most once a week
+    CHECK(memberMomentAllowed(p, false, now + 7 * day, false));
+    CHECK(memberMomentAllowed(p, false, now + 70 * day, false)); // and weekly again, for as long as it takes
+    CHECK(memberMomentAllowed(p, false, now - 30 * day, false)); // a clock set back can't hide it for good
+    CHECK(!memberMomentAllowed(p, false, now - day, false));
+    // Never in tests, renders or CI; never for a member signed in for member builds.
+    CHECK(!memberMomentAllowed(p, false, now + 30 * day, true));
+    CHECK(!memberMomentAllowed(p, true, now + 30 * day, false));
+    // Never mid-stroke, during a background job or over another card: it waits.
+    CHECK(memberCardMayOpen(false, false, false));
+    CHECK(!memberCardMayOpen(true, false, false));
+    CHECK(!memberCardMayOpen(false, true, false));
+    CHECK(!memberCardMayOpen(false, false, true));
+}
+
+TEST(member_card_choices) {
+    const int64_t day = 24 * 3600, now = 1'800'000'000;
+    // Not now: a week.
+    SupportCardPrefs p;
+    p.shownAt = now;
+    applyMemberCardChoice(p, MemberCardChoice::NotNow, now);
+    CHECK(!memberMomentAllowed(p, false, now + 6 * day, false));
+    CHECK(memberMomentAllowed(p, false, now + 7 * day, false));
+    CHECK(!p.supporter);
+    // Become a member opens the checkout; the card comes back in a week unless they sign in.
+    SupportCardPrefs b;
+    applyMemberCardChoice(b, MemberCardChoice::Become, now);
+    CHECK(!memberMomentAllowed(b, false, now + 6 * day, false));
+    CHECK(memberMomentAllowed(b, false, now + 7 * day, false));
+    // I'm already a member, signed in (GitHub, access to the member repository): gone for good.
+    SupportCardPrefs ok;
+    applyMemberCardChoice(ok, MemberCardChoice::SignedIn, now);
+    CHECK(ok.supporter);
+    for (int64_t d : {7, 30, 365, 3650}) CHECK(!memberMomentAllowed(ok, false, now + d * day, false));
+    CHECK(supportCardDue(ok, true, false) == SupportCardReason::None);
+    // I'm already a member, no sign-in (cancelled, declined, no access): three months, then weekly again.
+    SupportCardPrefs no;
+    no.shownAt = now;
+    applyMemberCardChoice(no, MemberCardChoice::NoSignIn, now);
+    CHECK(!no.supporter);
+    CHECK(!memberMomentAllowed(no, false, now + 7 * day, false));
+    CHECK(!memberMomentAllowed(no, false, now + 89 * day, false));
+    CHECK(memberMomentAllowed(no, false, now + 90 * day, false));
+    no.shownAt = now + 90 * day;
+    CHECK(!memberMomentAllowed(no, false, now + 96 * day, false));
+    CHECK(memberMomentAllowed(no, false, now + 97 * day, false));
+    // A snooze further off than any choice makes (a damaged value, a clock set back) doesn't hide it.
+    SupportCardPrefs bad;
+    bad.hiddenUntil = now + 400 * day;
+    CHECK(memberMomentAllowed(bad, false, now, false));
+}
+
+TEST(founding_members_json) {
+    const FoundingMembers none = parseFoundingMembers("");
+    CHECK(none.limit == 100 && none.taken == 0 && none.open() && none.left() == 100 && none.names.empty());
+    const FoundingMembers f = parseFoundingMembers(R"({"limit": 100, "taken": 37, "names": ["Ada", "\u202eevil", 5, ""]})");
+    CHECK(f.taken == 37 && f.left() == 63 && f.open());
+    CHECK(f.names.size() == 2 && f.names[0] == "Ada" && f.names[1] == "evil"); // sanitised, non-strings and blanks skipped
+    const FoundingMembers full = parseFoundingMembers(R"({"limit": 100, "taken": 140})");
+    CHECK(full.taken == 100 && !full.open() && full.left() == 0); // the founding note switches off at 100
+    CHECK(parseFoundingMembers(R"({"limit": -3, "taken": -1})").limit == 100);
+    CHECK(parseFoundingMembers(R"({"limit": -3, "taken": -1})").taken == 0);
+    // The repository's file (compiled into the app, read by the website) parses as written.
+    std::ifstream in(std::string(SF_TEST_DATA_DIR) + "/../../website/founding.json", std::ios::binary);
+    CHECK(in.good());
+    const std::string text{std::istreambuf_iterator<char>(in), {}};
+    Json j;
+    std::string error;
+    CHECK(Json::parse(text, j, error) && j["limit"].isNumber() && j["taken"].isNumber() && j["names"].isArray());
 }
 
 TEST(support_card_links_match_the_website) {
@@ -86,39 +159,24 @@ TEST(support_card_links_match_the_website) {
     CHECK(page.find("data-yearly=\"" + yearly + "\"") != std::string::npos);
     CHECK(page.find(kFreeReleaseNote) != std::string::npos); // the same honest wording on both
     CHECK(page.find(std::string("href=\"") + kDiscordUrl + "\"") != std::string::npos); // the same community invite
-    // Retired: the Insider tier, one-time payments and the founding Studio offer.
+    // Retired: the Insider tier, one-time payments, the founding Studio offer and the monthly pack.
     for (const std::string& p : {page, studios})
-        for (const char* old : {"Insider", "One-time", "one-time", "Founding", "$300", "$20"}) CHECK(p.find(old) == std::string::npos);
+        for (const char* old : {"Insider", "One-time", "one-time", "Founding Studio", "$300", "$20", "monthly pack",
+                                "pack every month"})
+            CHECK(p.find(old) == std::string::npos);
+    // Founding Members and Member Requests on the membership page; its counter reads founding.json.
+    CHECK(page.find("Founding Member") != std::string::npos);
+    CHECK(page.find("Member Requests") != std::string::npos);
+    CHECK(page.find("founding.json") != std::string::npos);
 }
 
 TEST(support_card_timing) {
-    const int64_t day = 24 * 3600, now = 1'800'000'000;
+    // The full card: the first start only (Help > Support and the welcome open it by hand).
     SupportCardPrefs p;
-    // The first start after install, then the first start of each new version.
-    CHECK(supportCardDue(p, true, "0.10.4", now, false) == SupportCardReason::FirstRun);
-    CHECK(supportCardDue(p, false, "0.10.4", now, false) == SupportCardReason::Updated); // from a version before it
-    p.shownVersion = "0.10.4";
-    p.shownAt = now;
-    CHECK(supportCardDue(p, false, "0.10.4", now + 60, false) == SupportCardReason::None);
-    CHECK(supportCardDue(p, false, "0.10.4", now + 6 * day, false) == SupportCardReason::None); // at most once a week
-    CHECK(supportCardDue(p, false, "0.10.4", now + 7 * day, false) == SupportCardReason::Weekly);
-    CHECK(supportCardDue(p, false, "0.10.5", now + day, false) == SupportCardReason::Updated);
-    CHECK(supportCardDue(p, false, "0.10.4", now - 30 * day, false) == SupportCardReason::Weekly); // clock set back
-    CHECK(supportCardDue(p, false, "0.10.4", now - day, false) == SupportCardReason::None);
-    // "Maybe later": 30 days, new versions included; then as before.
-    SupportCardPrefs later = p;
-    later.laterAt = now;
-    CHECK(supportCardDue(later, false, "0.10.4", now + 7 * day, false) == SupportCardReason::None);
-    CHECK(supportCardDue(later, false, "0.10.5", now + 29 * day, false) == SupportCardReason::None);
-    CHECK(supportCardDue(later, false, "0.10.5", now + 30 * day, false) == SupportCardReason::Updated);
-    CHECK(supportCardDue(later, false, "0.10.4", now + 30 * day, false) == SupportCardReason::Weekly);
-    CHECK(supportCardDue(later, false, "0.10.4", now - 30 * day, false) == SupportCardReason::Weekly); // clock set back
-    // Never in tests, renders or CI; never once turned off; never for a supporter.
-    CHECK(supportCardDue(p, true, "0.10.5", now + 30 * day, true) == SupportCardReason::None);
-    SupportCardPrefs off = p;
-    off.enabled = false;
-    CHECK(supportCardDue(off, true, "0.10.5", now + 30 * day, false) == SupportCardReason::None);
+    CHECK(supportCardDue(p, true, false) == SupportCardReason::FirstRun);
+    CHECK(supportCardDue(p, false, false) == SupportCardReason::None);
+    CHECK(supportCardDue(p, true, true) == SupportCardReason::None); // never in tests, renders or CI
     SupportCardPrefs member = p;
     member.supporter = true;
-    CHECK(supportCardDue(member, true, "0.10.5", now + 30 * day, false) == SupportCardReason::None);
+    CHECK(supportCardDue(member, true, false) == SupportCardReason::None);
 }
