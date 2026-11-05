@@ -4,8 +4,11 @@
 #include "app/Bench.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
+#include "app/OptimisticBench.h"
 #include "app/UiServe.h"
 #include "ai/AiPolicy.h"
+#include "core/Benchmark.h"
+#include "core/Wavelet.h"
 #include "core/FocusDetail.h"
 #include "core/Pack.h"
 
@@ -74,6 +77,8 @@ void usage() {
         "  --benchmark standard-15m The standard scene: a 15M triangle head, Clay S/M/L, Move, Smooth and a 240 px\n"
         "                           brush (standard-33m: 33M; standard: both). The numbers on sculptforge.app/benchmarks\n"
         "  --benchmark standard-1b  Experimental Focus Detail: a billion micro triangle head streamed from disk\n"
+        "  --benchmark core-200m    Research: a 200 million micro triangle head in memory (open, strokes, orbit)\n"
+        "  --benchmark core-100m    The same at 100 million micro triangles\n"
         "  --focus-detail FILE      Experimental: open a Focus Detail file (.sfdetail)\n"
         "  --benchmark-sizes 5,20   Proof mode mesh sizes in millions of triangles\n"
         "  --benchmark-out FILE     Where the JSON result goes (default: sculptforge-benchmark-<time>.json here)\n"
@@ -156,11 +161,18 @@ static int runMain(int argc, char** argv) {
     std::string logDir, crashTest;
     bool sizeGiven = false;
     sf::BenchCommandLine bench;
+    bool optimistic = false; // --bench-optimistic (research, docs/design/core-200m.md N1)
+    sf::OptimisticBenchOptions optimisticOptions;
     bool calibrate = false, calibrateQuick = false, calibrateSave = true;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         auto next = [&]() -> std::string { return i + 1 < argc ? argv[++i] : std::string(); };
         if (sf::parseBenchArg(argc, argv, i, bench)) continue;
+        if (sf::parseOptimisticBenchArg(argc, argv, i, optimistic, optimisticOptions)) continue;
+        if (std::string(argv[i]) == "--bench-wavelet") { // research (docs/design/core-200m.md N2), CPU only
+            const std::string out = i + 1 < argc && argv[i + 1][0] != '-' ? argv[++i] : std::string();
+            return sf::runWaveletBench(out);
+        }
         if (a == "--calibrate") calibrate = true;
         else if (a == "--calibrate-quick") calibrate = calibrateQuick = true;
         else if (a == "--calibrate-no-save") calibrateSave = false;
@@ -199,11 +211,12 @@ static int runMain(int argc, char** argv) {
         else if (a == "--benchmark") {
             options.benchmark = true;
             // An optional scene name: sculptforge --benchmark standard-15m
-            if (i + 1 < argc && std::string(argv[i + 1]).rfind("standard", 0) == 0) {
+            if (i + 1 < argc && (std::string(argv[i + 1]).rfind("standard", 0) == 0 || std::string(argv[i + 1]).rfind("core-", 0) == 0)) {
                 options.benchmarkScene = argv[++i];
                 if (options.benchmarkScene != "standard" && options.benchmarkScene != "standard-15m" &&
-                    options.benchmarkScene != "standard-33m" && options.benchmarkScene != "standard-1b") {
-                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard or standard-1b)\n", argv[i]);
+                    options.benchmarkScene != "standard-33m" && options.benchmarkScene != "standard-1b" &&
+                    options.benchmarkScene != "core-200m" && options.benchmarkScene != "core-100m") {
+                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard, standard-1b, core-100m or core-200m)\n", argv[i]);
                     return 1;
                 }
             }
@@ -228,6 +241,7 @@ static int runMain(int argc, char** argv) {
     g_isolatedDir.clear(); // (the warm server's last script's folder)
     if (automatedRun()) isolateSettings();
     if (bench.run) return finishIsolated(sf::runAppBenchmark(bench));
+    if (optimistic) return finishIsolated(sf::runOptimisticBench(optimisticOptions));
     if (calibrate) return finishIsolated(sf::runCalibrateCommandLine(calibrateQuick, calibrateSave));
     if (!options.uiTest.empty()) {
         if (!sizeGiven) options.width = 1600, options.height = 960;
@@ -241,6 +255,14 @@ static int runMain(int argc, char** argv) {
         std::string error;
         if (sf::focusStandard1bPath(error, [](const std::string& s) { std::fprintf(stderr, "%s\n", s.c_str()); }).empty()) {
             std::fprintf(stderr, "standard-1b: %s\n", error.c_str());
+            return 1;
+        }
+    }
+    if (options.benchmarkScene == "core-200m" || options.benchmarkScene == "core-100m") { // research: micro triangles in memory, the project written once
+        std::string error;
+        if (sf::core200mScenePath(error, [](const std::string& s) { std::fprintf(stderr, "%s\n", s.c_str()); },
+                                  options.benchmarkScene == "core-100m" ? 100 : 200).empty()) {
+            std::fprintf(stderr, "%s: %s\n", options.benchmarkScene.c_str(), error.c_str());
             return 1;
         }
     }

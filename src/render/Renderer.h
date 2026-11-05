@@ -11,6 +11,7 @@
 #include "render/Clusters.h"
 #include "render/GL.h"
 #include "render/Ghost.h"
+#include "render/ScreenStroke.h"
 
 #include <cstdint>
 #include <functional>
@@ -181,6 +182,11 @@ public:
     // --- Strokes on heavy meshes (app/AsyncStroke.cpp) ---
     // The predictive stroke preview (render/Ghost.h) drawn on Part `id`; an empty stroke turns it off.
     void setGhost(uint32_t id, const GhostStroke& ghost);
+    // Research (render/ScreenStroke.h, SF_SCREEN_STROKE=1): the same pending dabs applied to the drawn view instead
+    // of the geometry (Lit Sphere views through drawView only); an empty stroke turns it off.
+    void setScreenStroke(const GhostStroke& stroke) { screenStroke_ = stroke; }
+    // The last drawView applied the screen stroke.
+    bool screenStrokeDrawn() const { return screenStrokeDrawn_; }
     // A sculpt stroke's vertex upload made in two halves: prepareStrokeUpload packs what the mesh marked dirty
     // (positions and normals only) and the culling bounds of the clusters that moved, on any thread and without
     // GL, while the GL thread keeps drawing from what it has; commitStrokeUpload sends it on the GL thread.
@@ -238,6 +244,8 @@ public:
 
     // Bytes of GPU buffers and textures the mesh slots hold.
     size_t gpuBytes() const;
+    // Micro grid points whose shading still waits for a frame's budget (MicroRenderer::pendingShading, all slots).
+    size_t microPendingShading() const;
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
     size_t lastDrawnTriangles() const { return lastDrawn_; }
     // The last syncScene left motion proxies to build (a few milliseconds of them a frame; the rest draw in full).
@@ -404,6 +412,9 @@ private:
     uint32_t ghostId_ = 0;
     struct MeshProgram;
     void setGhostUniforms(const MeshProgram& p);
+    GhostStroke screenStroke_;
+    ScreenStroke screenPass_;
+    bool screenStrokeDrawn_ = false;
     void syncNormalMap(MeshSlot& s, const Mesh& mesh, const NormalMapView* normalMap);
     // `indicesDone`: the index buffer and drawCount are already written (a full upload writes them while
     // building the layout).

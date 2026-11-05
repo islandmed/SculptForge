@@ -93,6 +93,7 @@ add_library(sculptforge_core STATIC
   src/core/UvPack.cpp
   src/core/UvUnwrap.cpp
   src/core/TileImage.cpp
+  src/core/Wavelet.cpp
   src/core/EnvironmentMath.cpp
   src/core/MeshMaps.cpp
   src/core/LayerStack.cpp
@@ -341,6 +342,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/main.cpp
     src/app/Bench.cpp
     src/app/Calibration.cpp
+    src/app/OptimisticBench.cpp
     src/app/PanelPerformanceProfile.cpp
     src/app/CrashLog.cpp
     src/app/App.cpp
@@ -412,6 +414,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/RadialMenu.cpp
     src/app/StrokePopup.cpp
     src/render/GL.cpp
+    src/render/ScreenStroke.cpp
     src/render/Renderer.cpp
     src/render/UvView.cpp
     src/render/MicroRenderer.cpp

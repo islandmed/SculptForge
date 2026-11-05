@@ -260,6 +260,7 @@ void App::hardwareProfileFrameEnd() {
                 hw.pending.pop_front();
                 s.gpuMs = gpuMs;
                 hw.lastGpuMs = gpuMs;
+                if (proof_ && proofGpuMs_.size() < 4096) proofGpuMs_.push_back(gpuMs);
                 changed = hw.governor.addFrame(s) || changed;
             }
         }

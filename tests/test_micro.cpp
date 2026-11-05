@@ -13,6 +13,7 @@
 #include "core/Primitives.h"
 #include "core/Project.h"
 #include "core/TierConfig.h"
+#include "core/Wavelet.h"
 #include "io/Zip.h"
 
 #include <chrono>
@@ -605,4 +606,59 @@ TEST(micro_tier_config_and_page_table) {
         cold.trim(1);
         CHECK(ooc.mesh.micro->disp[7 * ooc.mesh.micro->samples] == 3); // trimmed pages come back from the file
     }
+}
+
+TEST(micro_core200m_scene_small) {
+    // The core-200m research scene (docs/design/core-200m.md), at a test's size: in memory, detailed, and it
+    // survives a project round trip unchanged.
+    Document doc;
+    doc.mesh = makeCore200mMesh(2000, 3);
+    CHECK(doc.mesh.micro);
+    if (!doc.mesh.micro) return;
+    const MicroMesh& mm = *doc.mesh.micro;
+    CHECK(mm.level == 3 && !mm.disp.mapped());
+    CHECK(microTriangleCount(doc.mesh) == size_t(mm.baseTriangles) * 64);
+    CHECK(mm.rangeMax > 0); // the noise is there
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    const std::string path = (fs::temp_directory_path(ec) / "sf-test-core200m.sfproj").string();
+    std::string err;
+    const bool saved = saveProject(path, doc, err);
+    CHECK(saved);
+    Document back;
+    const bool loaded = saved && loadProject(path, back, err);
+    CHECK(loaded);
+    fs::remove(path, ec);
+    if (!loaded) return;
+    CHECK(back.mesh.micro);
+    if (!back.mesh.micro) return;
+    CHECK(back.mesh.micro->baseTriangles == mm.baseTriangles && back.mesh.micro->level == 3);
+    bool same = true;
+    for (size_t i = 0; i < mm.disp.size() && same; ++i) same = back.mesh.micro->disp[i] == mm.disp[i];
+    CHECK(same);
+}
+
+TEST(wavelet_round_trip_and_coarse_edit) {
+    // N2 (docs/design/core-200m.md): the integer lifting transform is exactly invertible, whatever the values, and a
+    // coarse edit leaves the fine detail alone: the result is the old surface plus the coarse change interpolated.
+    const uint32_t n = 32, S = (n + 1) * (n + 2) / 2;
+    std::vector<int16_t> g(S), orig;
+    uint32_t seed = 12345;
+    for (int16_t& v : g) seed = seed * 1664525u + 1013904223u, v = int16_t(seed >> 16);
+    orig = g;
+    waveletForward(g.data(), n);
+    CHECK(g != orig);
+    waveletInverse(g.data(), n);
+    CHECK(g == orig);
+    // A smooth surface with fine detail, then a constant raise on the spacing-8 lattice.
+    for (uint32_t j = 0; j <= n; ++j)
+        for (uint32_t i = 0; i + j <= n; ++i)
+            g[MicroMesh::index(i, j, n)] = int16_t(100 * i + 37 * j + ((i * 7 + j * 13) % 5) * 20);
+    orig = g;
+    waveletForward(g.data(), n);
+    waveletAddCoarse(g.data(), n, 8, [](uint32_t, uint32_t, int) { return 500; });
+    waveletInverse(g.data(), n);
+    int worst = 0;
+    for (uint32_t k = 0; k < S; ++k) worst = std::max(worst, std::abs(int(g[k]) - int(orig[k]) - 500));
+    CHECK(worst <= 3); // (floor averages round at most once per finer level: 3 levels below spacing 8)
 }
