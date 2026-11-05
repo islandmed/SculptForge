@@ -8,6 +8,7 @@
 
 #include <imgui.h>
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -31,6 +32,9 @@ void drawBrushGrid(App& app, GridMode mode);
 void drawAlphaGrid(App& app, GridMode mode);
 void drawMaterialGrid(App& app, GridMode mode);
 void drawStrokeGrid(App& app, GridMode mode);
+// The right-click menu of a custom Lit Sphere (#124), inside an open pop-up: Rename..., Move to folder, Remove.
+// `beforeRemove` runs just before it is removed (the picker puts its hover preview back).
+void litsphereMenu(App& app, int index, const std::function<void()>& beforeRemove = {});
 // The VDM brush's maps (built-in and library), reused by Brush > Vector Displacement; picking one makes the VDM
 // brush the brush. The Alpha picker shows them first while the VDM brush is the brush.
 void drawVdmGrid(App& app, GridMode mode);

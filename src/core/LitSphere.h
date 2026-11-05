@@ -45,6 +45,7 @@ struct CustomLitSphere {
     int size = 0;              // size x size pixels
     std::vector<uint8_t> rgba; // sRGB RGBA8, rows bottom-up, as generateLit Sphere
     uint64_t hash = 0;         // of the pixels (thumbnail keys, finding a project's Lit Sphere again)
+    std::string group;         // the sub-folder of the library's Lit Spheres folder it is in ("" = none): a list heading
     bool removed = false;      // removeCustomLit Sphere: kept so indices stay put, but listed and found no more
 };
 constexpr int kMaxLitSphereSide = 1024; // bigger images are scaled down
@@ -74,6 +75,17 @@ int addCustomLitSphere(CustomLitSphere m);
 // Takes a custom Lit Sphere out of the lists and name lookups for the rest of the session (its file is the caller's
 // business). False for built-ins and bad indices.
 bool removeCustomLitSphere(int index);
+// Renames a listed custom Lit Sphere (#124; its file is the caller's business). False, with `error`, for built-ins, a
+// name that isn't a valid file name (checkLitSphereFileName) or one another listed Lit Sphere has (case-insensitive).
+bool renameCustomLitSphere(int index, const std::string& name, std::string& error);
+// Where a custom Lit Sphere's image is now (after a rename or a move to another folder); bumps no revision (the pixels
+// are the same). False for built-ins.
+bool relocateCustomLitSphere(int index, const std::string& path, const std::string& group);
+// A Lit Sphere or folder name that is also a portable file name: not empty, no / \ : * ? " < > |, no control
+// characters, not "." or ".." or starting with a dot, no trailing dot or space, at most 100 bytes.
+bool checkLitSphereFileName(const std::string& name, std::string& error);
+// The groups the listed custom Lit Spheres are in, sorted case-insensitively ("" not included).
+std::vector<std::string> litsphereGroups();
 // The listed custom Lit Sphere read from `path` (exact path), or -1.
 int findLitSphereByPath(const std::string& path);
 // The index of a custom Lit Sphere with exactly these pixels, or -1.

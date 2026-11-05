@@ -49,6 +49,7 @@
 //   camera_distance D        put the camera D model units from the point it looks at (extreme zoom)
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
 //   drop FILE                as if FILE were dropped onto the window (relative to the script's folder)
+//   drop_library FILE        as if FILE were dropped onto the middle of the Library strip (an SDL drop event there)
 //   restart [FILE]           as quitting and starting again, for the preferences, shortcuts and layout: ui.json
 //                            is saved (what waits), the defaults come back, then ui.json is read as at the start;
 //                            FILE (beside the script) replaces ui.json first (an older version's settings)
@@ -718,6 +719,17 @@ double Demo::query(const std::string& name, bool& known) const {
         for (std::filesystem::directory_iterator it(std::filesystem::path(std::u8string(dir.begin(), dir.end())), ec), end;
              !dir.empty() && !ec && it != end; it.increment(ec))
             n += isLitSphereFile(it->path().string()) ? 1 : 0;
+        return double(n);
+    }
+    if (name == "litsphere_folder_files") { // images in the Lit Spheres folder's sub-folders (#124)
+        int n = 0;
+        for (const std::string& sub : app_.litsphereSubfolders()) {
+            const std::string dir = app_.litsphereFolder() + "/" + sub;
+            std::error_code ec;
+            for (std::filesystem::directory_iterator it(std::filesystem::path(std::u8string(dir.begin(), dir.end())), ec), end;
+                 !ec && it != end; it.increment(ec))
+                n += isLitSphereFile(it->path().string()) ? 1 : 0;
+        }
         return double(n);
     }
     if (name == "flat_shading") return app_.renderSettings_.flatShading ? 1.0 : 0.0;
@@ -1574,6 +1586,21 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
         const auto u8 = file.lexically_normal().u8string();
         run([this, path = std::string(u8.begin(), u8.end())] { app_.openPathConfirmed(path); });
+    } else if (verb == "drop_library") { // drop_library FILE: the file dropped on the middle of the Library strip
+        if (!need(1)) return false;
+        auto file = std::filesystem::path(std::u8string(w[1].begin(), w[1].end()));
+        if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
+        const auto u8 = file.lexically_normal().u8string();
+        run([this, path = std::string(u8.begin(), u8.end())] {
+            const ImVec2 at = app_.libraryBrowser_.shownCentre();
+            SDL_Event e{};
+            e.type = SDL_EVENT_DROP_FILE;
+            e.drop.windowID = SDL_GetWindowID(app_.window_);
+            e.drop.x = at.x;
+            e.drop.y = at.y;
+            e.drop.data = path.c_str();
+            app_.handleEvent(e);
+        });
     } else if (verb == "choose_file" && w.size() > 2 && w[1] == "maya_folder") {
         // choose_file maya_folder <folder>: what File > Maya > Exchange folder's dialog would answer (relative to the
         // working directory, like copy's destination).

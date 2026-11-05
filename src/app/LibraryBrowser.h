@@ -38,6 +38,11 @@ public:
     // Height the strip takes over the canvas at `rows` rows (logical px x scale).
     static float height(int rows, float scale);
 
+    // A file dropped at (x, y) (window coordinates): an image dropped on the Material tab loads as a Lit Sphere (#124).
+    // False when the Library doesn't take it (the canvas does what it always does).
+    bool takeDrop(App& app, float x, float y, const std::string& path);
+    ImVec2 shownCentre() const { return ImVec2((shownMin_.x + shownMax_.x) * 0.5f, (shownMin_.y + shownMax_.y) * 0.5f); }
+
     // Thread-safe: the folder dialog's callback ("Open folder..." adds a library root).
     void folderChosen(const std::string& path);
 
@@ -60,6 +65,7 @@ private:
     std::string folderLabel(const App& app, const std::string& folder) const;
 
     bool open_ = false;
+    ImVec2 shownMin_{0, 0}, shownMax_{0, 0}; // the strip's window as last drawn (empty: not shown)
     Place place_;
     std::vector<Place> back_, forward_;
     char filter_[64] = "";

@@ -5,6 +5,7 @@
 
 #include "app/App.h"
 #include "app/Pickers.h"
+#include "app/SearchAliases.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
 #include "core/ListSort.h"
@@ -28,6 +29,12 @@
 namespace sf {
 
 namespace {
+
+// The sub-folder of the Lit Spheres folder a Material tile is in ("" for others): a heading in the strip (#124).
+std::string materialGroup(const AssetEntry& e) {
+    const CustomLitSphere* c = e.kind == AssetKind::Material ? customLitSphere(e.index) : nullptr;
+    return c ? c->group : std::string();
+}
 
 namespace fs = std::filesystem;
 
@@ -285,6 +292,16 @@ void LibraryBrowser::rootEntries(App& app, std::vector<AssetEntry>& out) {
             e.name = i < 0 ? "Studio" : litsphereName(i);
             out.push_back(std::move(e));
         }
+        { // grouped like the pickers (#124): ungrouped first, then each sub-folder of the Lit Spheres folder
+            const std::vector<std::string> groups = litsphereGroups();
+            std::stable_sort(out.begin(), out.end(), [&](const AssetEntry& a, const AssetEntry& b) {
+                const auto rank = [&](const AssetEntry& e) {
+                    const std::string g = materialGroup(e);
+                    return g.empty() ? 0 : int(std::find(groups.begin(), groups.end(), g) - groups.begin()) + 1;
+                };
+                return rank(a) < rank(b);
+            });
+        }
         break;
     case LibraryTab::Image:
     case LibraryTab::Splats: {
@@ -377,9 +394,14 @@ std::vector<AssetEntry> LibraryBrowser::entries(App& app) {
     }
     if (filter_[0]) {
         const std::string f = lower(filter_);
+        // A Lit Sphere also answers to its plain words (SearchAliases.h: "material capture", "material image").
+        std::string litsphereWords = "lit sphere";
+        for (const std::string& w : searchAliasesIn("Lit Sphere")) litsphereWords += ", " + lower(w);
         out.erase(std::remove_if(out.begin(), out.end(),
                                  [&](const AssetEntry& e) {
-                                     return e.kind != AssetKind::Up && lower(e.name).find(f) == std::string::npos;
+                                     if (e.kind == AssetKind::Up || lower(e.name).find(f) != std::string::npos) return false;
+                                     return !(e.kind == AssetKind::Material && e.index >= 0 &&
+                                              litsphereWords.find(f) != std::string::npos);
                                  }),
                   out.end());
     }
@@ -513,6 +535,10 @@ void LibraryBrowser::activate(App& app, const AssetEntry& e, bool append) {
 }
 
 void LibraryBrowser::contextMenu(App& app, const AssetEntry& e) {
+    if (e.kind == AssetKind::Material && isCustomLitSphere(e.index)) { // as in the pickers (#124)
+        litsphereMenu(app, e.index);
+        return;
+    }
     ImGui::TextDisabled("%s", e.name.c_str());
     ImGui::Separator();
     const bool mesh = e.kind == AssetKind::Mesh || e.kind == AssetKind::Project || e.kind == AssetKind::Primitive;
@@ -813,6 +839,7 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
     if (open_ && ImGui::IsKeyPressed(ImGuiKey_Escape, false) && !ImGui::GetIO().WantCaptureKeyboard &&
         !ImGui::IsAnyItemActive() && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))
         open_ = false;
+    shownMin_ = shownMax_ = ImVec2(0, 0);
     if (!open_) {
         pressing_ = tileDrag_ = false;
         return;
@@ -840,6 +867,8 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
     }
     ImDrawList* wdl = ImGui::GetWindowDrawList();
     const ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
+    shownMin_ = wp;
+    shownMax_ = ImVec2(wp.x + ws.x, wp.y + ws.y);
     // 1 px edge toward the canvas.
     const float edge = layout.libraryBottom ? wp.y : wp.y + ws.y - 1.0f;
     wdl->AddLine(ImVec2(wp.x, edge), ImVec2(wp.x + ws.x, edge), IM_COL32(14, 14, 16, 255));
@@ -854,8 +883,31 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
 
     const std::vector<AssetEntry> items = entries(app);
     const float tile = kTile * scale, rowH = (kTile + kLabel + 4.0f) * scale, gap = kGap * scale;
-    const int columns = int((items.size() + size_t(rows) - 1) / size_t(rows));
-    const float contentW = float(columns) * (tile + gap);
+    // Column-major tiles; a Lit Sphere group (#124) starts a new column after a heading column with its name.
+    std::vector<ImVec2> at(items.size()); // each tile's place in the strip (x, row)
+    struct Heading {
+        float x, w;
+        std::string text;
+    };
+    std::vector<Heading> headings;
+    float contentW = 0.0f;
+    {
+        float x = 0.0f;
+        int row = 0;
+        std::string group;
+        for (size_t i = 0; i < items.size(); ++i) {
+            if (const std::string g = materialGroup(items[i]); g != group) {
+                group = g;
+                if (row > 0) x += tile + gap, row = 0;
+                const float w = std::min(ImGui::CalcTextSize(g.c_str()).x, tile * 1.5f) + 10.0f * scale;
+                headings.push_back({x, w, g});
+                x += w + gap;
+            }
+            at[i] = ImVec2(x, float(row));
+            if (++row == rows) x += tile + gap, row = 0;
+        }
+        contentW = x + (row > 0 ? tile + gap : 0.0f);
+    }
 
     ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 6.0f * scale);
     ImGui::SetNextWindowContentSize(ImVec2(contentW, float(rows) * rowH));
@@ -898,8 +950,8 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
     const ImVec2 base = ImGui::GetCursorScreenPos();
     for (size_t i = 0; i < items.size(); ++i) {
         const AssetEntry& e = items[i];
-        const int col = int(i) / rows, row = int(i) % rows;
-        const float x = float(col) * (tile + gap);
+        const float x = at[i].x;
+        const int row = int(at[i].y);
         if (x + tile < scrollX - tile || x > scrollX + viewW + tile) continue; // off screen: no thumbnail work
         ImGui::SetCursorScreenPos(ImVec2(base.x + x, base.y + float(row) * rowH + 4.0f * scale));
         const ImTextureID tex = thumbnail(app, e);
@@ -938,6 +990,16 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
             ImGui::EndPopup();
         }
     }
+    for (const Heading& h : headings) { // an accent rule down the rows, the folder's name at the top
+        if (h.x + h.w < scrollX - tile || h.x > scrollX + viewW + tile) continue;
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        const float x0 = base.x + h.x, y0 = base.y + 4.0f * scale;
+        dl->AddLine(ImVec2(x0 + 1.0f, y0), ImVec2(x0 + 1.0f, y0 + float(rows) * rowH - 8.0f * scale), kAccent, 2.0f * scale);
+        const ImVec2 t(x0 + 7.0f * scale, y0);
+        dl->PushClipRect(t, ImVec2(x0 + h.w, y0 + float(rows) * rowH), true);
+        dl->AddText(t, ImGui::GetColorU32(ImGuiCol_Text), h.text.c_str());
+        dl->PopClipRect();
+    }
     // Only folders (or nothing): say how things get here.
     const bool onlyFolders = std::all_of(items.begin(), items.end(), [](const AssetEntry& e) {
         return e.kind == AssetKind::Folder || e.kind == AssetKind::Up;
@@ -956,7 +1018,7 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
                                : "Nothing here yet.";
         const float x =
             base.x +
-            (items.empty() ? 8.0f : float((items.size() + size_t(rows) - 1) / size_t(rows)) * (tile + gap) + 12.0f);
+            (items.empty() ? 8.0f : contentW + 12.0f);
         ImGui::SetCursorScreenPos(ImVec2(x, base.y + 4.0f * scale + tile * 0.5f - ImGui::GetTextLineHeight() * 0.5f));
         if (hint)
             ImGui::TextDisabled("%s", tr(hint));
@@ -1012,6 +1074,13 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
             activate(app, dragEntry_, (SDL_GetModState() & SDL_KMOD_SHIFT) != 0);
         pressing_ = tileDrag_ = false;
     }
+}
+
+bool LibraryBrowser::takeDrop(App& app, float x, float y, const std::string& path) {
+    if (!open_ || place_.tab != LibraryTab::Material || !isLitSphereFile(path)) return false;
+    if (x < shownMin_.x || y < shownMin_.y || x >= shownMax_.x || y >= shownMax_.y) return false;
+    app.runCommand("load_litsphere", {{"path", path}}); // the loader Load Lit Sphere... uses, nothing new
+    return true;
 }
 
 void LibraryBrowser::drawPreferences(App& app) {

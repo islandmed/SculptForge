@@ -37,7 +37,7 @@ inline constexpr SearchAlias kSearchAliases[] = {
     {"Append", "insert, kitbash, add mesh, import mesh", true},
     {"Library", "assets, browser", false},
     {"Forge Sphere", "armature, skeleton, base mesh", false},
-    {"Lit Sphere", "sphere material, shader", false},
+    {"Lit Sphere", "sphere material, shader, material capture, material image", false},
     {"Close Holes", "fill holes, cap, watertight", false},
     {"Snapshot", "checkpoint, backup", false},
     {"Steady Stroke", "stabilizer, smoothing", false},
