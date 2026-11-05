@@ -266,6 +266,7 @@ bool App::init(const AppOptions& options) {
     registerViewUiCommands(); // light, xray, view_resolution, save_render (PanelView.cpp)
     std::snprintf(falKey_, sizeof falKey_, "%s", aiSettings_.falKey.c_str());
     std::snprintf(falModel_, sizeof falModel_, "%s", aiSettings_.falModel.c_str());
+    std::snprintf(hyper3dKey_, sizeof hyper3dKey_, "%s", aiSettings_.hyper3dKey.c_str());
     std::snprintf(meshyKey_, sizeof meshyKey_, "%s", aiSettings_.meshyKey.c_str());
     std::snprintf(hfToken_, sizeof hfToken_, "%s", aiSettings_.hfToken.c_str());
     std::snprintf(comfyUrl_, sizeof comfyUrl_, "%s", aiSettings_.comfyUrl.c_str());
@@ -3561,6 +3562,7 @@ void App::startGenerator() {
     aiSettings_.generatorCommand = generatorCommand_;
     aiSettings_.falKey = falKey_;
     aiSettings_.falModel = falModel_;
+    aiSettings_.hyper3dKey = hyper3dKey_;
     aiSettings_.meshyKey = meshyKey_;
     aiSettings_.hfToken = hfToken_;
     aiSettings_.comfyUrl = comfyUrl_;
@@ -3816,8 +3818,9 @@ void App::drawImageTo3D() {
                    : "Builds the whole model - limbs, face, back - from one picture with a reconstruction model, then "
                      "makes it sculptable. Characters on a transparent background work best.");
     static const char* services[] = {"Hugging Face - free models", "fal.ai - paid, your key", "Meshy - paid, your key",
+                                     "Hyper3D Rodin - free trial / your key",
                                      "ComfyUI - your server", "My generator command", "Offline blockout (inflate silhouette)"};
-    static const char* serviceIds[] = {"huggingface", "fal", "meshy", "comfyui", "command", "inflate"};
+    static const char* serviceIds[] = {"huggingface", "fal", "meshy", "hyper3d", "comfyui", "command", "inflate"};
     constexpr int kServices = int(std::size(serviceIds));
     int service = 0;
     for (int i = 0; i < kServices; ++i)
@@ -3867,6 +3870,25 @@ void App::drawImageTo3D() {
             hint(ai::kHunyuanLicenceNote);
         ImGui::InputText("API key", falKey_, sizeof falKey_, ImGuiInputTextFlags_Password);
         if (!falKey_[0]) hint(std::getenv("FAL_KEY") ? "Using FAL_KEY from the environment." : "Get a key at fal.ai/dashboard/keys");
+    } else if (serviceId == "hyper3d") {
+        ImGui::InputText("API key", hyper3dKey_, sizeof hyper3dKey_, ImGuiInputTextFlags_Password);
+        if (!hyper3dKey_[0]) {
+            ai::AiSettings settings = aiSettings_;
+            settings.hyper3dKey.clear();
+            const char* envKey = std::getenv("HYPER3D_API_KEY");
+            hint(!ai::secrets::cached(ai::secrets::kHyper3d).empty() ? "Using the key from your system keychain."
+                 : envKey && *envKey ? "Using HYPER3D_API_KEY from the environment."
+                 : settings.resolvedHyper3dKey() == "vibecoding" ? "Using the public vibecoding free trial key."
+                                                              : "Get a key at hyper3d.ai (API dashboard)");
+        }
+        static const char* tiers[] = {"Gen-2.5-Extreme-Low", "Gen-2.5-Low", "Gen-2.5-Medium",
+                                      "Gen-2.5-High", "Gen-2.5-Extreme-High"};
+        if (ImGui::BeginCombo("Tier", aiSettings_.hyper3dTier.c_str())) {
+            for (const char* tier : tiers)
+                if (ImGui::Selectable(tier, aiSettings_.hyper3dTier == tier)) aiSettings_.hyper3dTier = tier;
+            ImGui::EndCombo();
+        }
+        hint("Untextured GLB for sculpting. Basic API access supports Low and Extreme-Low tiers.");
     } else if (serviceId == "meshy") {
         ImGui::InputText("API key", meshyKey_, sizeof meshyKey_, ImGuiInputTextFlags_Password);
         if (!meshyKey_[0])
@@ -3917,6 +3939,7 @@ void App::drawImageTo3D() {
         aiSettings_.generatorCommand = generatorCommand_;
         aiSettings_.falKey = falKey_;
         aiSettings_.falModel = falModel_;
+        aiSettings_.hyper3dKey = hyper3dKey_;
         aiSettings_.meshyKey = meshyKey_;
         aiSettings_.hfToken = hfToken_;
         aiSettings_.comfyUrl = comfyUrl_;

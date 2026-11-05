@@ -9,6 +9,7 @@
 #include "ai/AiCommands.h"
 #include "ai/AiPolicy.h"
 #include "ai/Http.h"
+#include "ai/ImageTo3DService.h"
 #include "ai/Oidc.h"
 #include "ai/Providers.h"
 #include "ai/Secrets.h"
@@ -321,8 +322,9 @@ TEST(studio_keys_live_in_the_keychain) {
     s.hfToken = "hf_test";
     s.falKey = "fal-test";
     s.meshyKey = "msy-test";
+    s.hyper3dKey = "hyper3d-test";
     const std::string json = s.toJson().dump();
-    for (const char* secret : {"sk-or-test", "hf_test", "fal-test", "msy-test"}) CHECK(json.find(secret) == std::string::npos);
+    for (const char* secret : {"sk-or-test", "hf_test", "fal-test", "msy-test", "hyper3d-test"}) CHECK(json.find(secret) == std::string::npos);
     CHECK(ai::secrets::storeKeys(s));
     std::string v;
     CHECK(keychain::load("ai/openrouter", v) && v == "sk-or-test");
@@ -332,6 +334,7 @@ TEST(studio_keys_live_in_the_keychain) {
     const ai::AiSettings loaded = ai::AiSettings::fromJson(s.toJson());
     CHECK(loaded.apiKey.empty() && loaded.resolvedKey() == "sk-or-test" && loaded.resolvedHfToken() == "hf_test");
     CHECK(loaded.resolvedFalKey() == "fal-test" && loaded.resolvedMeshyKey() == "msy-test");
+    CHECK(loaded.resolvedHyper3dKey() == "hyper3d-test");
     // An older ai.json with keys in it: moved to the keychain, and out of the file.
     keychain::useMemoryForTests(true);
     ai::secrets::clearCacheForTests();
@@ -339,6 +342,7 @@ TEST(studio_keys_live_in_the_keychain) {
     Json legacy = s.toJson();
     legacy.set("apiKey", "sk-or-old");
     legacy.set("hfToken", "hf_old");
+    legacy.set("hyper3dKey", "hyper3d-old");
     std::ofstream(path) << legacy.dump();
     std::string message;
     CHECK(ai::secrets::migrateLegacyKeys(path, message) && message.find("keychain") != std::string::npos);
@@ -346,6 +350,8 @@ TEST(studio_keys_live_in_the_keychain) {
     CHECK(after.find("sk-or-old") == std::string::npos && after.find("hf_old") == std::string::npos);
     CHECK(keychain::load("ai/openrouter", v) && v == "sk-or-old");
     CHECK(ai::AiSettings::load(path).resolvedHfToken() == "hf_old");
+    CHECK(after.find("hyper3d-old") == std::string::npos);
+    CHECK(ai::AiSettings::load(path).resolvedHyper3dKey() == "hyper3d-old");
     // Nothing to move: the file is left alone.
     const auto stamp = fs::last_write_time(path);
     CHECK(ai::secrets::migrateLegacyKeys(path, message) && message.empty() && fs::last_write_time(path) == stamp);
@@ -531,4 +537,20 @@ TEST(studio_policy_network_off_is_studio_mode) {
     // Network on (or not managed): unchanged.
     const net::NetworkPolicy open = withManagedPolicy({}, parsed(R"({"format": "sculptforge-policy", "version": 1})"));
     CHECK(!open.offline && open.allow.empty());
+}
+
+TEST(hyper3d_respects_studio_policy) {
+    StudioState state("hyper3d_policy");
+    ai::AiSettings settings;
+    settings.generatorService = "hyper3d";
+    const uint64_t before = ai::httpRequestCount();
+    policy::setPolicyForTests(parsed(R"({"format":"sculptforge-policy","version":1,"ai":{"providers":["fal"]}})"));
+    CHECK(!ai::generate3D(settings, "missing.png", "unused").ok);
+    CHECK(!ai::generate3DFromText(settings, "a fox", "unused").ok);
+    policy::setPolicyForTests(parsed(R"({"format":"sculptforge-policy","version":1,"ai":{"providers":["hyper3d"],"endpoints":["https://internal.example/"]}})"));
+    CHECK(!ai::generate3DFromText(settings, "a fox", "unused").ok);
+    CHECK(ai::httpRequestCount() == before);
+    std::string error;
+    policy::setPolicyForTests(parsed(R"({"format":"sculptforge-policy","version":1,"ai":{"providers":["hyper3d"],"endpoints":["https://api.hyper3d.com/"]}})"));
+    CHECK(ai::aiRequestAllowed("hyper3d", settings.hyper3dEndpoint, error));
 }

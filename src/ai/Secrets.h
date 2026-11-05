@@ -22,6 +22,7 @@ namespace sf::ai::secrets {
 constexpr const char* kHuggingFace = "ai/huggingface";
 constexpr const char* kFal = "ai/fal";
 constexpr const char* kMeshy = "ai/meshy";
+constexpr const char* kHyper3d = "ai/hyper3d";
 // The account of a Brush Lab preset's key.
 std::string presetAccount(const std::string& presetId);
 // Every account SculptForge may keep AI keys under.

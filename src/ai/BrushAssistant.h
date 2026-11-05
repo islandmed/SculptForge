@@ -31,7 +31,7 @@ struct AiSettings {
     // fields hold one typed in this session, or read from an older ai.json (moved to the keychain at start-up).
     std::string apiKey; // Free: unused; empty = the keychain, then ANTHROPIC_API_KEY / OPENAI_API_KEY / the preset's
     std::string effort = "low";
-    // Image to 3D. service: "huggingface" (free Spaces), "fal", "meshy",
+    // Image to 3D. service: "huggingface" (free Spaces), "fal", "hyper3d", "meshy",
     // "comfyui" (your ComfyUI server), "command" (generatorCommand with
     // {input}/{output}) or "inflate" (offline).
     std::string generatorService = "huggingface";
@@ -43,6 +43,10 @@ struct AiSettings {
     std::string falKey;   // empty = FAL_KEY from the environment
     std::string falModel = "fal-ai/trellis-2";
     std::string falEndpoint = "https://queue.fal.run";
+    std::string hyper3dKey; // empty = keychain, HYPER3D_API_KEY, then the public main-site trial key
+    std::string hyper3dTier = "Gen-2.5-Low";
+    std::string hyper3dEndpoint = "https://api.hyper3d.com/api/v2";
+    std::string resolvedHyper3dKey() const;
     std::string meshyKey; // empty = MESHY_API_KEY from the environment
     std::string meshyModel = "latest";
     std::string meshyEndpoint = "https://api.meshy.ai";

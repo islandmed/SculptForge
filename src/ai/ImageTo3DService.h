@@ -7,6 +7,7 @@
 //  - Hugging Face Spaces: free public demos of TRELLIS.2, Hunyuan3D 2 / 2.1 and
 //    Stable Fast 3D on shared GPUs (daily quota; a free HF token raises it)
 //  - Meshy: direct API
+//  - Hyper3D Rodin: direct API
 // plus the local options (your own generator command, or offline silhouette
 // inflation, which is only a rough blockout).
 //
@@ -81,7 +82,7 @@ const std::vector<HfPreset>& hfTextPresets();
 GeneratorResult generate3D(const AiSettings& settings, const std::string& imagePath, const std::string& outputStem,
                            GenerationProgress* progress = nullptr);
 
-// Text to 3D: same services (Hugging Face, fal.ai, Meshy); untextured shapes for sculpting.
+// Text to 3D: same services (Hugging Face, fal.ai, Hyper3D, Meshy); untextured shapes for sculpting.
 GeneratorResult generate3DFromText(const AiSettings& settings, const std::string& prompt, const std::string& outputStem,
                                    GenerationProgress* progress = nullptr);
 
@@ -91,6 +92,9 @@ bool rodinModel(std::string_view id);
 std::string falTextModel(const std::string& falModel);
 
 // Pieces exposed for tests.
+// -1: failed/malformed; 0: pending; 1: all jobs done.
+int hyper3dJobState(const Json& response, std::string& error);
+std::string hyper3dModelUrl(const Json& response);
 std::string meshyTextBody(const std::string& model, const std::string& prompt);
 std::string falTextBody(const std::string& prompt, const std::string& model = {});
 // The image as sent to services: subject framed on a square, <= 1024 px, PNG.

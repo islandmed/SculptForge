@@ -113,13 +113,14 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                   }});
 
     add({"image_to_3d",
+                  "Hyper3D Rodin is available with HYPER3D_API_KEY or the public trial key. "
                   "Reconstruct a full 3D model from one picture (character, creature, prop) and make it sculptable. "
                   "Free by default via Hugging Face Spaces (Hunyuan3D, TRELLIS.2, Stable Fast 3D; HF_TOKEN raises the "
                   "daily quota), paid via fal.ai (FAL_KEY) / Meshy (MESHY_API_KEY), or any workflow on your own "
                   "ComfyUI (service=comfyui workflow=FILE). Replaces the scene. A transparent background works best.",
                   {{"path", T::String, "Image file (png, jpg...).", true},
-                   {"service", T::String, "'huggingface' (free, default), 'fal', 'meshy', 'comfyui' (your ComfyUI server), 'command' (your generator) or 'inflate' (offline blockout).", false},
-                   {"model", T::String, "huggingface: hunyuan3d-2.1 (default, no token), trellis-2 (needs HF_TOKEN, else hunyuan3d-2.1 runs), hunyuan3d-2-turbo, hunyuan3d-2, stable-fast-3d; fal: a model id such as fal-ai/trellis-2 or fal-ai/hyper3d/rodin/v2.5.", false},
+                   {"service", T::String, "'huggingface' (free, default), 'fal', 'hyper3d', 'meshy', 'comfyui' (your ComfyUI server), 'command' (your generator) or 'inflate' (offline blockout).", false},
+                   {"model", T::String, "huggingface: hunyuan3d-2.1 (default, no token), trellis-2 (needs HF_TOKEN, else hunyuan3d-2.1 runs), hunyuan3d-2-turbo, hunyuan3d-2, stable-fast-3d; fal: a model id such as fal-ai/trellis-2 or fal-ai/hyper3d/rodin/v2.5; hyper3d: tier (default Gen-2.5-Low).", false},
                    {"workflow", T::String, "comfyui: API-format workflow file (default: your saved one, else the bundled one).", false},
                    {"url", T::String, "comfyui: server address. Default http://127.0.0.1:8188 or your saved one.", false},
                    {"seed", T::Number, "comfyui: seed for the workflow's sf_seed / seed inputs (default: random).", false},
@@ -137,6 +138,7 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                       if (a.contains("model")) {
                           if (s.generatorService == "meshy") s.meshyModel = argString(a, "model");
                           else if (s.generatorService == "fal") s.falModel = argString(a, "model");
+                          else if (s.generatorService == "hyper3d") s.hyper3dTier = argString(a, "model");
                           else s.hfModel = argString(a, "model");
                       }
                       const auto stem = std::filesystem::temp_directory_path() /
@@ -159,9 +161,9 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                   "(Hunyuan3D 2 / 2 mini Turbo; HF_TOKEN raises the daily quota), or paid via fal.ai (FAL_KEY) / "
                   "Meshy (MESHY_API_KEY), or a workflow on your own ComfyUI (service=comfyui workflow=FILE). Replaces the scene.",
                   {{"prompt", T::String, "One object, e.g. 'a stylised dragon head with curled horns'.", true},
-                   {"service", T::String, "'huggingface' (free, default), 'fal', 'meshy' or 'comfyui' (your ComfyUI server).", false},
+                   {"service", T::String, "'huggingface' (free, default), 'fal', 'hyper3d', 'meshy' or 'comfyui' (your ComfyUI server).", false},
                    {"model", T::String, "huggingface: hunyuan3d-2-turbo or hunyuan3d-2; fal: fal-ai/hyper3d/rodin/v2.5 (or /fast), "
-                                         "else Hunyuan3D 3.1 Rapid.", false},
+                                         "else Hunyuan3D 3.1 Rapid; hyper3d: tier (default Gen-2.5-Low).", false},
                    {"workflow", T::String, "comfyui: API-format workflow file (default: your saved one, else the bundled one).", false},
                    {"url", T::String, "comfyui: server address. Default http://127.0.0.1:8188 or your saved one.", false},
                    {"seed", T::Number, "comfyui: seed for the workflow's sf_seed / seed inputs (default: random).", false},
@@ -178,10 +180,11 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                       if (a.contains("url")) s.comfyUrl = argString(a, "url");
                       if (s.generatorService == "command" || s.generatorService == "inflate")
                           return {false, "Text to 3D can't use '" + s.generatorService + "' (it works from an image); pass "
-                                         "service=huggingface, fal, meshy or comfyui"};
+                                         "service=huggingface, fal, hyper3d, meshy or comfyui"};
                       if (a.contains("model")) {
                           if (s.generatorService == "meshy") s.meshyModel = argString(a, "model");
                           else if (s.generatorService == "fal") s.falModel = argString(a, "model");
+                          else if (s.generatorService == "hyper3d") s.hyper3dTier = argString(a, "model");
                           else s.hfModel = argString(a, "model");
                       }
                       const auto stem = std::filesystem::temp_directory_path() /

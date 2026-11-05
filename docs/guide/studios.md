@@ -290,7 +290,7 @@ code 2 when it is broken); use it to check a file before you deploy it.
 |---|---|
 | `organization` | Shown as "Managed by Acme Animation" |
 | `ai.enabled` | `false`: every AI feature off and locked (as `SF_AI=off`). `true`: on and locked. Left out: the artist's choice |
-| `ai.providers` | The only AI providers artists can pick: `free`, `anthropic`, `openai`, `ollama`, `lmstudio`, `vllm`, `llamacpp`, `litellm`, `openrouter`, `openai-compatible` (Brush Lab) and `huggingface`, `fal`, `meshy`, `comfyui`, `command` (Generate 3D) |
+| `ai.providers` | The only AI providers artists can pick: `free`, `anthropic`, `openai`, `ollama`, `lmstudio`, `vllm`, `llamacpp`, `litellm`, `openrouter`, `openai-compatible` (Brush Lab) and `huggingface`, `fal`, `meshy`, `hyper3d`, `comfyui`, `command` (Generate 3D) |
 | `ai.endpoints` | The only addresses AI requests may go to (URL prefixes, matched at a `/`) |
 | `ai.requireSignIn` | AI works only while the artist is signed in with the studio account (needs `signIn`) |
 | `network.enabled` | `false`: studio mode (see [Offline deployment](#offline-deployment)): no outside connection except `network.allow`, `ai.endpoints`, the identity provider and your update feed |

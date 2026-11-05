@@ -134,13 +134,13 @@ TEST(ai_switch_off_sends_nothing) {
     err.clear();
     CHECK(smallestOllamaModel(err).empty());
     CHECK(refused(err));
-    for (const char* service : {"huggingface", "fal", "meshy", "command", "inflate"}) {
+    for (const char* service : {"huggingface", "fal", "hyper3d", "meshy", "command", "inflate"}) {
         s.generatorService = service;
         GeneratorResult g = generate3D(s, "missing.png", out);
         CHECK(!g.ok);
         CHECK(refused(g.error));
     }
-    for (const char* service : {"huggingface", "fal", "meshy"}) {
+    for (const char* service : {"huggingface", "fal", "hyper3d", "meshy"}) {
         s.generatorService = service;
         CHECK(refused(generate3DFromText(s, "a dragon head", out).error));
     }
@@ -159,4 +159,31 @@ TEST(ai_switch_off_sends_nothing) {
     err.clear();
     CHECK(!comfy::checkServer("http://127.0.0.1:9", info, err, 1));
     CHECK(httpRequestCount() > before);
+}
+
+TEST(hyper3d_key_precedence_and_trial) {
+    struct RestoreEnv {
+        std::string value;
+        bool present;
+        RestoreEnv() : present(std::getenv("HYPER3D_API_KEY") != nullptr) {
+            if (present) value = std::getenv("HYPER3D_API_KEY");
+        }
+        ~RestoreEnv() { setEnv("HYPER3D_API_KEY", present ? value.c_str() : nullptr); }
+    } restore;
+    setEnv("HYPER3D_API_KEY", nullptr);
+    AiSettings s;
+    CHECK(s.resolvedHyper3dKey() == "vibecoding");
+    CHECK(s.hyper3dKey.empty()); // resolving does not persist the trial credential
+    s.hyper3dEndpoint += "/";
+    CHECK(s.resolvedHyper3dKey() == "vibecoding");
+    s.hyper3dEndpoint = "http://localhost:1234/api/v2";
+    CHECK(s.resolvedHyper3dKey().empty());
+    setEnv("HYPER3D_API_KEY", "environment-key");
+    CHECK(s.resolvedHyper3dKey() == "environment-key");
+    s.hyper3dKey = "saved-key";
+    CHECK(s.resolvedHyper3dKey() == "saved-key");
+    s.hyper3dKey.clear();
+    setEnv("HYPER3D_API_KEY", "");
+    s.hyper3dEndpoint = AiSettings{}.hyper3dEndpoint;
+    CHECK(s.resolvedHyper3dKey() == "vibecoding");
 }

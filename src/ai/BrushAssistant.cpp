@@ -127,6 +127,16 @@ std::string AiSettings::resolvedHfToken() const {
     return {};
 }
 
+std::string AiSettings::resolvedHyper3dKey() const {
+    if (!hyper3dKey.empty()) return hyper3dKey;
+    if (std::string k = secrets::cached(secrets::kHyper3d); !k.empty()) return k;
+    if (const char* env = std::getenv("HYPER3D_API_KEY"); env && *env) return env;
+    // Public trial credential, only for the official Hyper3D endpoint.
+    if (hyper3dEndpoint == "https://api.hyper3d.com/api/v2" ||
+        hyper3dEndpoint == "https://api.hyper3d.com/api/v2/") return "vibecoding";
+    return {};
+}
+
 std::string AiSettings::resolvedMeshyKey() const {
     if (!meshyKey.empty()) return meshyKey;
     if (std::string k = secrets::cached(secrets::kMeshy); !k.empty()) return k;
@@ -149,6 +159,8 @@ Json AiSettings::toJson() const {
     j.set("hunyuanNoticeShown", hunyuanNoticeShown);
     j.set("falModel", falModel);
     j.set("falEndpoint", falEndpoint);
+    j.set("hyper3dTier", hyper3dTier);
+    j.set("hyper3dEndpoint", hyper3dEndpoint);
     j.set("meshyModel", meshyModel);
     j.set("meshyEndpoint", meshyEndpoint);
     j.set("comfyUrl", comfyUrl);
@@ -190,6 +202,9 @@ AiSettings AiSettings::fromJson(const Json& j) {
     text("falKey", s.falKey);
     text("falModel", s.falModel);
     text("falEndpoint", s.falEndpoint);
+    text("hyper3dKey", s.hyper3dKey);
+    text("hyper3dTier", s.hyper3dTier);
+    text("hyper3dEndpoint", s.hyper3dEndpoint);
     text("meshyKey", s.meshyKey);
     text("meshyModel", s.meshyModel);
     text("meshyEndpoint", s.meshyEndpoint);

@@ -1455,3 +1455,32 @@ TEST(free_huggingface_models) {
     std::string ext;
     CHECK(ai::findModelUrl(r, &ext) == "https://cdn/x/model.obj" && ext == ".obj");
 }
+
+TEST(hyper3d_protocol) {
+    Json j;
+    std::string error;
+    CHECK(Json::parse(ai::falSubmitBody("fal-ai/hyper3d/rodin/v2.5", "data:image/png;base64,eA=="), j, error));
+    CHECK(j["image_urls"][0].asString() == "data:image/png;base64,eA==");
+    CHECK(j["material"].asString() == "None" && j["geometry_file_format"].asString() == "glb");
+    CHECK(Json::parse(ai::falTextBody("a fox", "fal-ai/hyper3d/rodin/v2.5"), j, error) && j["prompt"].asString() == "a fox");
+    CHECK(Json::parse(R"({"jobs":[{"status":"Done"},{"status":"Running"}]})", j, error));
+    CHECK(ai::hyper3dJobState(j, error) == 0);
+    CHECK(Json::parse(R"({"jobs":[{"status":"Done"},{"status":"Failed"}]})", j, error));
+    CHECK(ai::hyper3dJobState(j, error) == -1 && !error.empty());
+    CHECK(Json::parse(R"({"jobs":[{"status":"Done"},{"status":"Done"}]})", j, error));
+    CHECK(ai::hyper3dJobState(j, error) == 1 && error.empty());
+    CHECK(Json::parse(R"({"jobs":[]})", j, error));
+    CHECK(ai::hyper3dJobState(j, error) == -1);
+    CHECK(Json::parse(R"({"error":"API_INSUFFICIENT_FUNDS","jobs":[{"status":"Done"}]})", j, error));
+    CHECK(ai::hyper3dJobState(j, error) == -1);
+    CHECK(Json::parse(R"({"list":[{"name":"preview.png","url":"https://cdn/image"},{"name":"model.GLB","url":"https://cdn/signed?token=x"}]})", j, error));
+    CHECK(ai::hyper3dModelUrl(j) == "https://cdn/signed?token=x");
+    ai::AiSettings s;
+    s.generatorService = "hyper3d";
+    s.hyper3dKey = "test-key";
+    s.hyper3dTier = "Gen-2.5-High";
+    s.hyper3dEndpoint = "http://localhost:1234/api/v2";
+    const auto loaded = ai::AiSettings::fromJson(s.toJson());
+    CHECK(loaded.generatorService == "hyper3d" && loaded.hyper3dKey.empty() && !s.toJson().has("hyper3dKey"));
+    CHECK(loaded.hyper3dTier == s.hyper3dTier && loaded.hyper3dEndpoint == s.hyper3dEndpoint);
+}

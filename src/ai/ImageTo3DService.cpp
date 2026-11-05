@@ -266,6 +266,86 @@ GeneratorResult runMeshyRequest(const AiSettings& s, const std::string& taskPath
     }
 }
 
+bool hyper3dResponse(const HttpResponse& r, Json& body, std::string& error) {
+    if (!r.error.empty()) { error = "Could not reach Hyper3D: " + r.error; return false; }
+    if (r.status < 200 || r.status >= 300) { error = apiError(r); return false; }
+    std::string parseError;
+    if (!Json::parse(r.body, body, parseError) || !body.isObject()) {
+        error = "Unreadable response from Hyper3D";
+        return false;
+    }
+    if (!body["error"].asString().empty()) {
+        error = "Hyper3D: " + body["error"].asString() + " " + body["message"].asString();
+        return false;
+    }
+    return true;
+}
+
+GeneratorResult runHyper3d(const AiSettings& s, const std::string& imagePath, const std::string& prompt,
+                          const std::string& outputStem, GenerationProgress* p) {
+    GeneratorResult result;
+    const std::string key = s.resolvedHyper3dKey();
+    if (key.empty()) {
+        result.error = "Add your Hyper3D API key or set HYPER3D_API_KEY";
+        return result;
+    }
+    if (prompt.size() > 1024) {
+        result.error = "Hyper3D prompt must be at most 1024 bytes";
+        return result;
+    }
+    std::vector<MultipartField> fields = {{"tier", s.hyper3dTier}, {"mesh_mode", "Raw"},
+        {"material", "None"}, {"geometry_file_format", "glb"}};
+    if (!imagePath.empty()) {
+        std::string png;
+        if (!prepareImagePng(imagePath, png, result.error)) return result;
+        fields.push_back({"images", std::move(png), "input.png", "image/png"});
+    } else fields.push_back({"prompt", prompt});
+    if (p && p->cancel) { result.error = "Cancelled"; return result; }
+    std::string endpoint = s.hyper3dEndpoint;
+    while (!endpoint.empty() && endpoint.back() == '/') endpoint.pop_back();
+    std::string contentType;
+    const std::string body = multipartBody(fields, contentType);
+    const std::vector<std::string> headers = {"Authorization: Bearer " + key, "Content-Type: application/json"};
+    status(p, "Sending to Hyper3D Rodin...");
+    Json submitted;
+    if (!hyper3dResponse(httpRequest("POST", endpoint + "/rodin", {headers[0], contentType}, body), submitted, result.error))
+        return result;
+    const std::string uuid = submitted["uuid"].asString();
+    const std::string subscription = submitted["jobs"]["subscription_key"].asString();
+    if (uuid.empty() || subscription.empty()) {
+        result.error = "Hyper3D returned no task UUID or subscription key";
+        return result;
+    }
+    Json request = Json::object();
+    request.set("subscription_key", subscription);
+    const auto start = std::chrono::steady_clock::now();
+    int delay = 5;
+    while (true) {
+        if (!wait(p, delay)) { result.error = "Cancelled (the Hyper3D task keeps running on their side)"; return result; }
+        if (std::chrono::steady_clock::now() - start > std::chrono::minutes(kMaxMinutes)) {
+            result.error = "Timed out waiting for Hyper3D";
+            return result;
+        }
+        status(p, "Generating with Hyper3D Rodin...");
+        const auto response = httpPostJson(endpoint + "/status", headers, request.dump(), 60);
+        delay = std::min(delay + 5, 30);
+        if (!response.error.empty()) continue;
+        Json jobs;
+        if (!hyper3dResponse(response, jobs, result.error)) return result;
+        const int state = hyper3dJobState(jobs, result.error);
+        if (state < 0) return result;
+        if (state > 0) break;
+    }
+    request = Json::object();
+    request.set("task_uuid", uuid);
+    Json files;
+    if (!hyper3dResponse(httpPostJson(endpoint + "/download", headers, request.dump()), files, result.error)) return result;
+    const std::string url = hyper3dModelUrl(files);
+    if (url.empty()) { result.error = "Hyper3D finished but returned no GLB"; return result; }
+    download(url, outputStem, ".glb", result, p);
+    return result;
+}
+
 // `imagePath` or `prompt` (text to 3D) - exactly one is used.
 GeneratorResult runHuggingFace(const AiSettings& s, const std::string& imagePath, const std::string& prompt,
                                const std::string& outputStem, GenerationProgress* p) {
@@ -351,6 +431,40 @@ GeneratorResult runInflate(const std::string& imagePath, const std::string& outp
 }
 
 } // namespace
+
+int hyper3dJobState(const Json& response, std::string& error) {
+    error.clear();
+    if (!response["error"].asString().empty()) {
+        error = "Hyper3D: " + response["error"].asString();
+        return -1;
+    }
+    const auto& jobs = response["jobs"];
+    if (!jobs.isArray() || jobs.items().empty()) {
+        error = "Hyper3D returned no job statuses";
+        return -1;
+    }
+    bool done = true;
+    for (const auto& job : jobs.items()) {
+        const std::string state = job["status"].asString();
+        if (state == "Failed" || state == "Canceled" || state == "Cancelled") {
+            error = "Hyper3D job " + state;
+            return -1;
+        }
+        if (state.empty()) { error = "Hyper3D returned an invalid job status"; return -1; }
+        if (state != "Done") done = false;
+    }
+    return done ? 1 : 0;
+}
+
+std::string hyper3dModelUrl(const Json& response) {
+    for (const auto& file : response["list"].items()) {
+        std::string name = file["name"].asString();
+        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+        if (name.ends_with(".glb") && !file["url"].asString().empty()) return file["url"].asString();
+    }
+    std::string extension;
+    return findModelUrl(response["list"], &extension);
+}
 
 const std::vector<ServiceModel>& falModels() {
     static const std::vector<ServiceModel> models = {
@@ -556,10 +670,10 @@ namespace {
 bool serviceAllowed(const AiSettings& s, std::string& error) {
     const std::string& svc = s.generatorService;
     if (svc == "inflate") return true;
-    const std::string url = svc == "fal" ? s.falEndpoint : svc == "meshy" ? s.meshyEndpoint : svc == "comfyui" ? s.comfyUrl
+    const std::string url = svc == "hyper3d" ? s.hyper3dEndpoint : svc == "fal" ? s.falEndpoint : svc == "meshy" ? s.meshyEndpoint : svc == "comfyui" ? s.comfyUrl
                             : svc == "command" ? std::string() : std::string("https://huggingface.co/");
     if (url.empty()) return policy::aiProviderAllowed(svc, &error);
-    return aiRequestAllowed(svc == "fal" || svc == "meshy" || svc == "comfyui" ? svc : "huggingface", url, error);
+    return aiRequestAllowed(svc == "fal" || svc == "meshy" || svc == "comfyui" || svc == "hyper3d" ? svc : "huggingface", url, error);
 }
 } // namespace
 
@@ -567,6 +681,7 @@ GeneratorResult generate3D(const AiSettings& s, const std::string& imagePath, co
                            GenerationProgress* progress) {
     if (!aiEnabled()) return {false, {}, aiOffError()};
     if (std::string why; !serviceAllowed(s, why)) return {false, {}, why};
+    if (s.generatorService == "hyper3d") return runHyper3d(s, imagePath, {}, outputStem, progress);
     if (s.generatorService == "meshy") return runMeshy(s, imagePath, outputStem, progress);
     if (s.generatorService == "command") {
         status(progress, "Running your generator...");
@@ -607,6 +722,7 @@ GeneratorResult generate3DFromText(const AiSettings& s, const std::string& promp
         result.error = "Describe the model you want";
         return result;
     }
+    if (s.generatorService == "hyper3d") return runHyper3d(s, {}, prompt, outputStem, progress);
     if (s.generatorService == "meshy") return runMeshyRequest(s, "/openapi/v2/text-to-3d", meshyTextBody(s.meshyModel, prompt), outputStem, progress);
     if (s.generatorService == "fal")
         return runFalRequest(s, falTextModel(s.falModel), falTextBody(prompt, s.falModel), outputStem, progress);

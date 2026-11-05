@@ -1,0 +1,28 @@
+# Inspect both Rodin routes without submitting a paid task.
+env HYPER3D_API_KEY ""
+run ui_look look=classic layout=classic
+drop ../../assets/demo/teddy-sketch.png
+wait_for "Generate 3D" 5
+click "Generate 3D/##service"
+click "Hyper3D Rodin - free trial / your key"
+expect "Generate 3D/API key"
+expect "Generate 3D/Tier"
+expect_text Gen-2.5-Low
+expect_text Using the public vibecoding free trial key.
+shot hyper3d-direct
+click "Generate 3D/Tier"
+click "Gen-2.5-High"
+expect_text Gen-2.5-High
+click "Generate 3D/##service"
+click "fal.ai - paid, your key"
+click "Generate 3D/Model"
+click "Rodin 2.5 (Hyper3D)"
+expect_text Rodin 2.5 (Hyper3D)
+shot hyper3d-fal
+click "Generate 3D/From text"
+expect_text Rodin 2.5 (Hyper3D)
+shot hyper3d-fal-text
+click "Generate 3D/##service"
+click "Hyper3D Rodin - free trial / your key"
+expect "Generate 3D/Tier"
+shot hyper3d-direct-text

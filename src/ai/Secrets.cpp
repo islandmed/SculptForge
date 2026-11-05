@@ -39,6 +39,7 @@ std::vector<std::string> allAccounts() {
     out.push_back(kHuggingFace);
     out.push_back(kFal);
     out.push_back(kMeshy);
+    out.push_back(kHyper3d);
     return out;
 }
 
@@ -91,6 +92,7 @@ bool storeKeys(const AiSettings& s) {
     if (!s.hfToken.empty()) ok = put(kHuggingFace, s.hfToken) && ok;
     if (!s.falKey.empty()) ok = put(kFal, s.falKey) && ok;
     if (!s.meshyKey.empty()) ok = put(kMeshy, s.meshyKey) && ok;
+    if (!s.hyper3dKey.empty()) ok = put(kHyper3d, s.hyper3dKey) && ok;
     return ok;
 }
 
@@ -104,7 +106,7 @@ bool migrateLegacyKeys(const std::string& path, std::string& message) {
     std::string err;
     if (!Json::parse(text, j, err) || !j.isObject()) return true;
     bool any = false;
-    for (const char* k : {"apiKey", "hfToken", "falKey", "meshyKey"}) any = any || !j[k].asString().empty();
+    for (const char* k : {"apiKey", "hfToken", "falKey", "meshyKey", "hyper3dKey"}) any = any || !j[k].asString().empty();
     if (!any) return true;
     const AiSettings s = AiSettings::fromJson(j);
     if (!keychain::available() || !storeKeys(s)) {

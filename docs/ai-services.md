@@ -21,19 +21,22 @@ way (see [IT deployment](guide/studios.md#it-deployment)).
 | Feature | Service (your choice) | What is sent | Key |
 |---|---|---|---|
 | Brush Lab | Free (default): Pollinations.ai's hosted open models, falling back to a running local Ollama. Or Anthropic (Claude), or any OpenAI-compatible endpoint such as a local Ollama / LM Studio | Your brush description and the current brush settings (text only) | None for Free and local models; your API key otherwise |
-| Generate 3D (image) | Hugging Face Spaces (free), fal.ai, Meshy, your own ComfyUI, or your own command | The image you chose, cropped and resized to at most 1024 px | Optional HF token; your fal.ai / Meshy key; none for ComfyUI |
-| Generate 3D (text) | Hugging Face Spaces (free), fal.ai, Meshy, your own ComfyUI | Your text description | As above |
+| Generate 3D (image) | Hugging Face Spaces (free), fal.ai, Hyper3D Rodin, Meshy, your own ComfyUI, or your own command | The image you chose, cropped and resized to at most 1024 px | Optional HF token; your fal.ai / Hyper3D / Meshy key; none for ComfyUI |
+| Generate 3D (text) | Hugging Face Spaces (free), fal.ai, Hyper3D Rodin, Meshy, your own ComfyUI | Your text description | As above |
 | Send to Unreal | Your own Unreal Editor (local network) | The exported FBX | None |
 
 Keys are stored in your operating system's keychain (macOS Keychain, Windows Credential Manager, or the Secret
 Service on Linux), never in a settings file, or read from environment variables (`ANTHROPIC_API_KEY`,
-`OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `HF_TOKEN`, `FAL_KEY`, `MESHY_API_KEY`). Keys saved by older versions in
+`OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `HF_TOKEN`, `FAL_KEY`, `MESHY_API_KEY`, `HYPER3D_API_KEY`). Keys saved by older versions in
 `ai.json` move into the keychain at the first start.
 
 **Preferences > AI > Provider** has presets for Anthropic, OpenAI, Ollama, LM Studio, vLLM, llama.cpp server,
 a LiteLLM proxy (a studio's own gateway, which can front Amazon Bedrock, Google Vertex AI and Azure OpenAI) and
 OpenRouter. Studios can limit which providers and addresses artists may use, require their single sign-on, and keep
 an audit log of every AI action: see [IT deployment](guide/studios.md#it-deployment).
+
+The direct Hyper3D service uses the public `vibecoding` trial key when no saved key or
+`HYPER3D_API_KEY` is set. This fallback only applies to the official Hyper3D endpoint, not fal.ai.
 
 ## The free Brush Lab model
 
