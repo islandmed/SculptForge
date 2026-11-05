@@ -945,6 +945,22 @@ const MeshOverlay* App::uvEditorOverlay(uint32_t part) {
     return &uvEditor_->overlay;
 }
 
+void App::uvPackGridUsed(const Args& a) {
+    int columns = 0, rows = 0;
+    if (a.contains("columns") || a.contains("rows")) { // (as UvCommands.cpp's packOptions reads them)
+        columns = std::clamp(int(argNumber(a, "columns", 10)), 1, 10);
+        if (a.contains("rows")) rows = std::clamp(int(argNumber(a, "rows", 1)), 1, 10);
+        else rows = std::clamp((std::clamp(int(argNumber(a, "tiles", columns)), 1, 100) + columns - 1) / columns, 1, 10);
+    } else {
+        // tiles= alone fills ten per row: the same grid when it's under a row or whole rows; otherwise left as is.
+        const int tiles = std::clamp(int(argNumber(a, "tiles", 1)), 1, 100);
+        if (tiles > 10 && tiles % 10) return;
+        columns = std::min(tiles, 10), rows = (tiles + 9) / 10;
+    }
+    uiPrefs_.uvPackColumns = uvPackColumns_ = columns;
+    uiPrefs_.uvPackRows = uvPackRows_ = rows;
+}
+
 void App::drawUvEditor() {
     if (!showUvEditor_) {
         if (uvEditor_ && uvEditor_->tool) uvEditor_->tool = 0;
@@ -1125,11 +1141,17 @@ void App::drawUvEditor() {
     // UDIM tile numbers.
     for (int ty = 0; ty < std::max(s.tiles.y, 1) + 1; ++ty)
         for (int tx = 0; tx < std::min(std::max(s.tiles.x, 1) + 1, 10); ++tx) {
-            const ImVec2 p = u.toScreen(glm::vec2(float(tx), float(ty) + 1.0f));
             const bool used = tx < s.tiles.x && ty < s.tiles.y;
             char label[8];
             std::snprintf(label, sizeof label, "%d", 1001 + tx + 10 * ty);
-            dl->AddText(ImVec2(p.x + 5 * scale, p.y + 3 * scale), used ? IM_COL32(170, 170, 182, 210) : IM_COL32(110, 110, 118, 150), label);
+            // In the tile's top-left corner, kept inside the tile and the view (a tile at the edge still shows its
+            // number whole); none when the visible part of the tile is too small for it.
+            const ImVec2 a = u.toScreen(glm::vec2(float(tx), float(ty) + 1.0f)), b = u.toScreen(glm::vec2(float(tx) + 1.0f, float(ty)));
+            const ImVec2 size = ImGui::CalcTextSize(label);
+            const float pad = 5 * scale;
+            const float x0 = std::max(a.x, viewMin.x) + pad, y0 = std::max(a.y, viewMin.y) + 3 * scale;
+            if (x0 + size.x > std::min(b.x, viewMax.x) - pad || y0 + size.y > std::min(b.y, viewMax.y)) continue;
+            dl->AddText(ImVec2(x0, y0), used ? IM_COL32(170, 170, 182, 210) : IM_COL32(110, 110, 118, 150), label);
         }
     // Trim strips (while the Trim Sheet section is open).
     if (s.trimOpen) {
@@ -1576,6 +1598,8 @@ double App::uvEditorTestValue(const std::string& name) {
     if (name == "uv_select_mode") return double(int(doc_.uvSelection.mode));
     if (name == "uv_unwrapping") return uvEditor_ && uvEditor_->job ? 1.0 : 0.0;
     if (name == "uv_unwraps") return uvEditor_ ? double(uvEditor_->unwraps) : 0.0;
+    if (name == "uv_pack_columns") return double(uvPackColumns_); // the Pack fields
+    if (name == "uv_pack_rows") return double(uvPackRows_);
     if (name == "uv_frame_ms") return uvEditor_ ? uvEditor_->frameMs : 0.0;
     if (name == "uv_tool") return uvEditor_ ? double(uvEditor_->tool) : 0.0;
     if (name == "uv_view_triangles") return uvEditor_ ? double(uvEditor_->gpu.triangles()) : 0.0;

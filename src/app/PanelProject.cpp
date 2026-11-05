@@ -582,6 +582,7 @@ void App::applyProjectSettings() {
 void App::afterCommand(const std::string& name, const Args& args, const CommandResult& r) {
     if (!r.ok) return;
     if (name == "undo" || name == "redo") gizmoAfterUndo(name == "redo");
+    if (name == "uv_pack" || name == "uv_unwrap") uvPackGridUsed(args);
     const std::string path = argString(args, "path", doc_.path);
     const bool project = name == "open_project" || (name == "open" && isProjectPath(path));
     if (project) {

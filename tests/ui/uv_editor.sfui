@@ -53,16 +53,30 @@ expect_value uv_tiles == 2
 hover_window 0.45 0.5
 key f
 shot udim
-# A Columns x Rows grid (#135): the panel's sliders, then 2 x 2 fills 1001, 1002, 1011, 1012.
+# A Columns x Rows grid (#135): the Pack fields show the grid a pack used, from the panel or a script.
 expect "UV Editor/##uvcolumns"
 expect "UV Editor/##uvrows"
-run uv_pack columns=2 rows=2 margin=6
-expect_value uv_tiles == 4
+run uv_pack columns=10 rows=2 margin=6
+expect_value uv_tiles == 20
+expect_value uv_pack_columns == 10
+expect_value uv_pack_rows == 2
 hover_window 0.45 0.5
 key f
-shot udim-grid
+shot udim-10x2
+run uv_pack columns=4 rows=3 margin=6
+expect_value uv_tiles == 12
+expect_value uv_pack_columns == 4
+expect_value uv_pack_rows == 3
+hover_window 0.45 0.5
+key f
+shot udim-4x3
+# The Pack button packs with the fields: still 4 x 3.
+click "UV Editor/Pack##uv.pack"
+expect_value uv_tiles == 12
 run uv_pack tiles=1
 expect_value uv_tiles == 1
+expect_value uv_pack_columns == 1
+expect_value uv_pack_rows == 1
 
 # Texel density: every island to 400 texels per unit at 2K.
 run uv_density op=set value=400
