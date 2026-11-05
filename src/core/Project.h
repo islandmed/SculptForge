@@ -15,6 +15,7 @@
 #include "core/Image.h"
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -45,6 +46,21 @@ bool isProjectPath(const std::string& path);
 // Writes `doc` (every Part with its name, visibility, mesh, attributes,
 // layers, active layer and Bridge name; the active Part; splats, brush library
 // and doc.projectSettings) to `path`. Does not change the document.
+// Opening in two steps, so the app can read on another thread while it shows the preview: readProject reads and
+// builds everything without touching a document, applyProject puts it into one (moves: quick, main thread).
+// loadProject does both.
+struct LoadedProject;
+using LoadedProjectPtr = std::unique_ptr<LoadedProject, void (*)(LoadedProject*)>;
+LoadedProjectPtr readProject(const std::string& path, std::string& error);
+void applyProject(LoadedProject& loaded, Document& doc);
+// Hands the next loadProject of `path` (so the open commands) a project already read: it applies that instead.
+void preloadProject(const std::string& path, LoadedProjectPtr loaded);
+LoadedProjectPtr takePreloadedProject(const std::string& path);
+// The coarse preview big projects carry (every visible Part, about 200 cells across, read in a moment); false
+// if there is none. Saved from openCacheMinTriangles triangles (core/OpenCache.h), not by autosave.
+bool loadProjectPreview(const std::string& path, Mesh& out, std::string& error);
+Mesh makeProjectPreview(const Document& doc, int cells = 200);
+
 // `autosave`: no open cache that would have to be worked out now (core/OpenCache.h: only one copied over).
 bool saveProject(const std::string& path, const Document& doc, std::string& error, bool autosave = false);
 // Replaces the scene with the project at `path`. On failure `doc` is untouched.

@@ -25,6 +25,8 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <tuple>
+#include <mutex>
 #include <system_error>
 #include <thread>
 
@@ -56,7 +58,8 @@ ProjectThumbnailProvider& thumbnailProvider() {
 // version 1); every other key belongs to
 // Document::projectSettings (camera, render, brush, symmetry, ...).
 const char* const kCoreKeys[] = {"format", "version", "app_version", "mesh", "layers", "active_layer",
-                                 "parts", "active_part", "brushes", "active_brush", "splats", "attachments"};
+                                 "parts", "active_part", "brushes", "active_brush", "splats", "attachments",
+                                 "preview"};
 
 std::filesystem::path fsPath(const std::string& p) { return std::filesystem::path(std::u8string(p.begin(), p.end())); }
 
@@ -1219,6 +1222,21 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         for (const auto& [key, value] : doc.projectSettings.members())
             if (!isCoreKey(key)) manifest.set(key, value);
 
+    // Big projects: a coarse preview the app shows while the rest opens (not autosave: it is worked out now).
+    if (!autosave && openCacheEnabled() && std::endian::native == std::endian::little) {
+        size_t total = 0;
+        for (int i = 0; i < doc.partCount(); ++i) total += doc.partMesh(i).triangleCount();
+        if (total >= openCacheMinTriangles)
+            if (Mesh pv = makeProjectPreview(doc); pv.triangleCount() > 0) {
+                Json pj = Json::object();
+                std::vector<uint8_t> pos(pv.positions.size() * 12), tri(pv.triangles.size() * 12);
+                std::memcpy(pos.data(), pv.positions.data(), pos.size());
+                std::memcpy(tri.data(), pv.triangles.data(), tri.size());
+                pj.set("positions", w.add("preview/positions.bin", Scalar::F32, 3, pv.positions.size(), std::move(pos)));
+                pj.set("triangles", w.add("preview/triangles.bin", Scalar::U32, 3, pv.triangles.size(), std::move(tri)));
+                manifest.set("preview", std::move(pj));
+            }
+    }
     manifest.set("version", version.version);
     const std::string text = manifest.dump(true);
     w.entries.insert(w.entries.begin(), ZipEntry{kManifestName, std::vector<uint8_t>(text.begin(), text.end())});
@@ -1252,8 +1270,27 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
     return true;
 }
 
-bool loadProject(const std::string& path, Document& doc, std::string& error) {
+// Everything a project holds, read and built, before it replaces a document (readProject / applyProject).
+struct LoadedProject {
+    std::string path;
+    Json manifest;
+    std::deque<LoadedPart> parts; // (stable addresses: BVH threads use them)
+    std::string skippedSets;      // selection sets that couldn't be read
+    int activePart = 0;
+    SplatCloud splats;
+    std::map<std::string, std::vector<uint8_t>> attachments;
+};
+
+namespace {
+
+bool readProjectInto(const std::string& path, LoadedProject& out, std::string& error) {
     openStage("(load start)");
+    out.path = path;
+    Json& manifest = out.manifest;
+    std::deque<LoadedPart>& parts = out.parts;
+    std::string& skippedSets = out.skippedSets;
+    int& activePart = out.activePart;
+    SplatCloud& splats = out.splats;
     Reader r;
     if (!r.open(path, error)) return false;
     std::vector<uint8_t> manifestText;
@@ -1261,7 +1298,6 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
         error = path + " is not a SculptForge project (no manifest)";
         return false;
     }
-    Json manifest;
     if (!Json::parse(std::string(manifestText.begin(), manifestText.end()), manifest, error) || !manifest.isObject() ||
         manifest["format"].asString() != kFormatName) {
         error = path + " is not a SculptForge project" + (error.empty() ? "" : " (" + error + ")");
@@ -1281,9 +1317,6 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     }
 
     // Parts: version 1 has one mesh at the top level, version 2 a "parts" list.
-    std::deque<LoadedPart> parts; // (stable addresses: BVH threads use them)
-    std::string skippedSets;            // selection sets that couldn't be read
-    int activePart = 0;
     if (version < 2) {
         LoadedPart& s = parts.emplace_back();
         s.name = "Sculpt";
@@ -1399,7 +1432,6 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     }
 
     // Splats
-    SplatCloud splats;
     if (const Json& sj = manifest["splats"]; sj.isObject()) {
         const size_t n = countOf(sj["count"]);
         const int degree = int(sj["sh_degree"].asNumber(0));
@@ -1423,6 +1455,33 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
         for (size_t i = 0; i < n; ++i) splats.rotations[i] = glm::quat(rot[i * 4 + 3], rot[i * 4], rot[i * 4 + 1], rot[i * 4 + 2]);
     }
 
+    // Attachments are extras (an embedded Lit Sphere): one that can't be read is left out rather than failing the file.
+    for (const Json& f : manifest["attachments"].items()) {
+        const std::string name = legacy::modernize(f["name"].asString()); // our own folder names, e.g. Lit Spheres
+        const size_t n = countOf(f["data"]["count"]);
+        if (!validAttachmentName(name) || n == size_t(-1) || n > kMaxAttachmentSize || out.attachments.size() >= 64) continue;
+        std::vector<uint8_t> bytes;
+        r.error.clear();
+        if (r.bytes(f["data"], "attachment", n, bytes)) out.attachments[name] = std::move(bytes);
+    }
+    for (LoadedPart& part : parts) part.finishBvh();
+    return true;
+}
+
+} // namespace
+
+std::unique_ptr<LoadedProject, void (*)(LoadedProject*)> readProject(const std::string& path, std::string& error) {
+    std::unique_ptr<LoadedProject, void (*)(LoadedProject*)> loaded(new LoadedProject, [](LoadedProject* p) { delete p; });
+    if (!readProjectInto(path, *loaded, error)) loaded.reset();
+    return loaded;
+}
+
+void applyProject(LoadedProject& loaded, Document& doc) {
+    Json& manifest = loaded.manifest;
+    std::deque<LoadedPart>& parts = loaded.parts;
+    const int activePart = loaded.activePart;
+    SplatCloud& splats = loaded.splats;
+    const std::string& skippedSets = loaded.skippedSets;
     // Everything parsed: replace the scene. Part 0 is checked out first; the others are added
     // behind it, given their layer and Bridge name, and the saved active Part is selected last.
     auto validLayer = [](int layer, const Mesh& m) { return layer >= 0 && layer < int(m.layers.size()) ? layer : -1; };
@@ -1467,23 +1526,129 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     doc.projectSettings = Json::object();
     for (const auto& [key, value] : manifest.members())
         if (!isCoreKey(key)) doc.projectSettings.set(key, value);
-    // Attachments are extras (an embedded Lit Sphere): one that can't be read is left out rather than failing the file.
-    doc.projectFiles.clear();
-    for (const Json& f : manifest["attachments"].items()) {
-        const std::string name = legacy::modernize(f["name"].asString()); // our own folder names, e.g. Lit Spheres
-        const size_t n = countOf(f["data"]["count"]);
-        if (!validAttachmentName(name) || n == size_t(-1) || n > kMaxAttachmentSize || doc.projectFiles.size() >= 64) continue;
-        std::vector<uint8_t> bytes;
-        r.error.clear();
-        if (r.bytes(f["data"], "attachment", n, bytes)) doc.projectFiles[name] = std::move(bytes);
-    }
-    r.error.clear();
-    doc.path = path;
+    doc.projectFiles = std::move(loaded.attachments);
+    doc.path = loaded.path;
     doc.markClean();
-    return true;
 }
 
 void setProjectThumbnailProvider(ProjectThumbnailProvider provider) { thumbnailProvider() = std::move(provider); }
+
+
+namespace {
+std::mutex& preloadMutex() {
+    static std::mutex m;
+    return m;
+}
+std::pair<std::string, LoadedProjectPtr>& preloadSlot() {
+    static std::pair<std::string, LoadedProjectPtr> slot{std::string(), LoadedProjectPtr(nullptr, [](LoadedProject* p) { delete p; })};
+    return slot;
+}
+} // namespace
+
+void preloadProject(const std::string& path, LoadedProjectPtr loaded) {
+    std::lock_guard lock(preloadMutex());
+    preloadSlot().first = path;
+    preloadSlot().second = std::move(loaded);
+}
+
+LoadedProjectPtr takePreloadedProject(const std::string& path) {
+    std::lock_guard lock(preloadMutex());
+    auto& [p, loaded] = preloadSlot();
+    if (p != path || !loaded) return LoadedProjectPtr(nullptr, [](LoadedProject* q) { delete q; });
+    p.clear();
+    return std::move(loaded);
+}
+
+Mesh makeProjectPreview(const Document& doc, int cells) {
+    // Vertex clustering on one grid (Rossignac and Borrel, 1993): each cell's vertices become their mean, triangles
+    // between three distinct cells stay (once). A micro level's corners carry their displacement.
+    AABB box;
+    for (int i = 0; i < doc.partCount(); ++i)
+        if (doc.parts[size_t(i)].visible)
+            for (const glm::vec3& p : doc.partMesh(i).positions) box.expand(p);
+    Mesh out;
+    if (!box.valid() || cells < 2) return out;
+    const float side = std::max({box.extent().x, box.extent().y, box.extent().z, 1e-20f}) / float(cells);
+    const glm::ivec3 dims = glm::clamp(glm::ivec3(box.extent() / side) + 1, glm::ivec3(1), glm::ivec3(cells + 1));
+    std::vector<uint32_t> cellIndex(size_t(dims.x) * size_t(dims.y) * size_t(dims.z), 0xFFFFFFFFu);
+    std::vector<glm::dvec3> sums;
+    std::vector<uint32_t> counts;
+    std::vector<uint64_t> keys;
+    for (int i = 0; i < doc.partCount(); ++i) {
+        if (!doc.parts[size_t(i)].visible) continue;
+        const Mesh& m = doc.partMesh(i);
+        std::vector<glm::vec3> pos = m.positions;
+        if (m.micro && microMatches(m) && m.normals.size() == pos.size()) {
+            const MicroMesh& mm = *m.micro;
+            for (uint32_t t = 0; t < mm.baseTriangles; ++t)
+                for (uint32_t k = 0; k < 3; ++k) {
+                    const uint32_t v = m.triangles[t][int(k)], idx = k == 0 ? 0 : k == 1 ? mm.n : mm.samples - 1;
+                    pos[v] = m.positions[v] + glm::normalize(m.normals[v]) * (float(mm.disp.data()[size_t(t) * mm.samples + idx]) * mm.step);
+                }
+        }
+        std::vector<uint32_t> cluster(pos.size());
+        for (size_t v = 0; v < pos.size(); ++v) {
+            const glm::ivec3 c = glm::clamp(glm::ivec3((pos[v] - box.min) / side), glm::ivec3(0), dims - 1);
+            uint32_t& id = cellIndex[(size_t(c.z) * size_t(dims.y) + size_t(c.y)) * size_t(dims.x) + size_t(c.x)];
+            if (id == 0xFFFFFFFFu) id = uint32_t(sums.size()), sums.emplace_back(0.0), counts.push_back(0);
+            sums[id] += glm::dvec3(pos[v]);
+            ++counts[id];
+            cluster[v] = id;
+        }
+        for (const glm::uvec3& t : m.triangles) {
+            uint32_t a = cluster[t.x], b = cluster[t.y], c = cluster[t.z];
+            if (a == b || b == c || a == c) continue;
+            // (the key: the three cells in a rotation that starts at the smallest, so orientation is kept)
+            while (a > b || a > c) std::tie(a, b, c) = std::make_tuple(b, c, a);
+            keys.push_back(uint64_t(a) << 42 | uint64_t(b) << 21 | uint64_t(c));
+        }
+    }
+    if (sums.size() >= (size_t(1) << 21)) return out; // (keys hold 21 bits a cell: a finer grid than ever asked for)
+    std::sort(keys.begin(), keys.end());
+    keys.erase(std::unique(keys.begin(), keys.end()), keys.end());
+    out.positions.resize(sums.size());
+    for (size_t i = 0; i < sums.size(); ++i) out.positions[i] = glm::vec3(sums[i] / double(counts[i]));
+    out.triangles.reserve(keys.size());
+    for (uint64_t k : keys) out.triangles.emplace_back(uint32_t(k >> 42), uint32_t(k >> 21) & 0x1FFFFF, uint32_t(k) & 0x1FFFFF);
+    return out;
+}
+
+bool loadProjectPreview(const std::string& path, Mesh& out, std::string& error) {
+    Reader r;
+    if (!r.open(path, error)) return false;
+    std::vector<uint8_t> text;
+    Json manifest;
+    if (!r.entry(kManifestName, text) || !Json::parse(std::string(text.begin(), text.end()), manifest, error)) return false;
+    const Json& pj = manifest["preview"];
+    if (!pj.isObject()) return false;
+    const size_t nv = countOf(pj["positions"]["count"]), nt = countOf(pj["triangles"]["count"]);
+    constexpr size_t kMax = size_t(8) << 20; // (a preview is a few hundred thousand: anything bigger isn't one)
+    if (nv == size_t(-1) || nt == size_t(-1) || nv == 0 || nt == 0 || nv > kMax || nt > kMax) return false;
+    Mesh m;
+    m.triangles.resize(nt);
+    if (!r.vec3s(pj["positions"], "preview positions", nv, m.positions) ||
+        !r.uints(pj["triangles"], "preview triangles", nt, 3, &m.triangles[0].x)) {
+        error = r.error;
+        return false;
+    }
+    for (const glm::uvec3& t : m.triangles)
+        if (t.x >= nv || t.y >= nv || t.z >= nv) return false;
+    m.rebuildTopology();
+    m.recomputeAllNormals();
+    out = std::move(m);
+    return true;
+}
+
+bool loadProject(const std::string& path, Document& doc, std::string& error) {
+    if (auto pre = takePreloadedProject(path)) { // (read on another thread already: App's open with a preview)
+        applyProject(*pre, doc);
+        return true;
+    }
+    auto loaded = readProject(path, error);
+    if (!loaded) return false;
+    applyProject(*loaded, doc);
+    return true;
+}
 
 bool loadProjectThumbnail(const std::string& path, Image& out, std::string& error) {
     std::ifstream f(fsPath(path), std::ios::binary);

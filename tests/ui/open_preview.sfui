@@ -1,0 +1,24 @@
+# Opening a big project: its saved preview shows at once while the rest is read on another thread, and nothing
+# can be edited until the project is in (strokes look around, commands wait): no edit lands in the old scene or
+# a half-opened one.
+open_cache_min 1000
+run new_sphere subdivisions=6
+run save_project path=sf_ui_open_preview.sfproj
+expect_value triangles == 81920
+run new_sphere subdivisions=3
+expect_value triangles == 1280
+open_preview sf_ui_open_preview.sfproj 3000
+expect_value opening == 1
+wait 0.3
+shot open-preview
+snapshot
+stroke 0.4 0.5 0.6 0.5
+expect_value moved == 0
+expect_status "Still opening"
+run_fails new_sphere subdivisions=2
+expect_value triangles == 1280
+expect_status "Still opening"
+wait_value opening == 0 30
+expect_value triangles == 81920
+expect_status "Opened project"
+shot open-preview-done

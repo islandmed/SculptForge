@@ -25,6 +25,8 @@ struct ProofMeshSize {
     double bytesPerTriangle = 150; // memory the run needs per triangle (mesh, BVH, levels, GPU buffers, history)
     // Set by `build` when it already built the mesh's BVH (a project load does, as File > Open keeps it): not built twice.
     std::shared_ptr<BVH> builtBvh;
+    // --benchmark-file: the project, opened as the app opens one (its preview first, when it has one).
+    std::string projectPath;
 };
 
 // The default sizes: 5M, 20M and 33M always; 100M when the free memory holds it with room to spare.

@@ -237,6 +237,9 @@
 //                            pen_mouse_down, ui_left_down (the panels hold the left button), soft_cursor
 //   mouse_move U V           a plain mouse (not the pen) moves to a point on the model, e.g. the stray mouse
 //                            events Windows Ink sends beside the pen's
+//   open_preview PATH [MS]   open a project as the app opens a big one: its preview, the rest read on another
+//                            thread (at least MS long); value: opening (1 until it's in). open_cache_min N: meshes
+//                            from N triangles save the preview and the open cache (core/OpenCache.h)
 //
 // Touch (Touch.cpp): fingers as SDL sends them, each step a frame.
 //   touch_pinch U V SCALE TWIST DX DY [trackpad] [late]   two fingers about a point on the model, 120 px apart, over
@@ -261,6 +264,7 @@
 //                            shelf, px), title_height
 //   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 classic, 1 SculptForge)
 #include "app/App.h"
+#include "core/OpenCache.h"
 #include "ai/Http.h"
 
 #ifndef SDL_PEN_INPUT_IN_PROXIMITY
@@ -436,6 +440,7 @@ double Demo::query(const std::string& name, bool& known) const {
         // (rows as saved: top first)
         return 0.2126 * lastShot_[i] + 0.7152 * lastShot_[i + 1] + 0.0722 * lastShot_[i + 2];
     }
+    if (name == "opening") return app_.opening_ ? 1.0 : 0.0; // a project still being read (open_preview)
     if (name == "triangles") return double(m.triangleCount());
     if (name == "vertices") return double(m.vertexCount());
     if (name == "layers") return double(m.layers.size());
@@ -2095,6 +2100,17 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             f << shortcutsMarkdown();
             if (!f) fail(line, "can't write " + name + " in " + shotDir_);
         });
+    } else if (verb == "open_preview") { // open_preview PATH [DELAY_MS]: open a project as the app does a big one
+        if (!need(1)) return false;           // (its preview first, the rest read on another thread)
+        const std::string path = w[1];
+        const int delay = w.size() > 2 ? std::atoi(w[2].c_str()) : 0;
+        run([this, line, path, delay] {
+            if (!app_.startOpening(path, true, delay)) fail(line, "couldn't start opening " + path);
+        });
+    } else if (verb == "open_cache_min") { // open_cache_min TRIANGLES: meshes from this size save a preview and cache
+        if (!need(1)) return false;
+        const size_t n = size_t(std::strtoull(w[1].c_str(), nullptr, 10));
+        run([n] { openCacheMinTriangles = n; });
     } else if (verb == "snapshot") {
         run([this] {
             basePositions_ = app_.doc_.mesh.positions;

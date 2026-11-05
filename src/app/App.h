@@ -1288,6 +1288,18 @@ private:
     std::vector<std::string> phoneCaptures_; // folders received this session, newest last
     // Projects, unsaved-changes safety, recent files and autosave (PanelProject.cpp).
     bool interactive() const; // false for --render, --record and demos: never prompt
+    // Opening a big project (PanelProject.cpp): its saved preview shows at once while another thread reads the rest;
+    // then the usual open command takes what was read (core/Project.h preloadProject). Until then the document
+    // can't be edited (strokes orbit, commands wait): it is still the previous scene, which goes on open.
+    struct Opening;
+    std::unique_ptr<Opening> opening_;
+    // false: no preview (open as usual). `force`: even without one (tests); `delayMs`: the read takes at least that
+    // long (tests, also SF_OPEN_DELAY_MS).
+    bool startOpening(const std::string& path, bool force = false, int delayMs = 0);
+    void pollOpening();
+    bool editsBlocked(); // true (and says so) while a project opens
+    Mesh* openingPreview();
+    void drawOpeningOverlay(); // "Opening NAME (preview)" over the canvas while it reads
     void initProject();       // end of init(): recent files, autosave restore offer
     void finishProject();     // clean exit: marks the session closed normally
     void tickProject(float dt);

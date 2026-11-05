@@ -119,6 +119,7 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
                                   return std::move(d.mesh);
                               }, 150}; // (the file's size in 20-byte triangles, at the spheres' 150 bytes each: the memory check)
         s.builtBvh = built;
+        s.projectPath = path;
         return {s};
     }
     if (name == "core-200m" || name == "core-100m") { // research (docs/design/core-200m.md): micro triangles in memory, opened from a project
@@ -414,6 +415,7 @@ struct SizeResult {
     size_t triangles = 0, vertices = 0;
     double buildSeconds = 0;
     double firstFrameSeconds = 0; // build start to the first frame showing the mesh
+    bool firstFramePreview = false; // that frame showed the project's saved preview (the rest was still being read)
     double shadedSeconds = 0;     // ... to the frame its micro level's shading was complete (0: no micro level)
     size_t loadedRamBytes = 0;    // resident memory at that frame
     size_t ramBytes = 0, peakRamBytes = 0;
@@ -428,7 +430,7 @@ struct SizeResult {
 } // namespace
 
 struct ProofState {
-    enum class Stage { Intro, Announce, Build, Settle, Phase, Finish, Results };
+    enum class Stage { Intro, Announce, Build, Opening, Settle, Phase, Finish, Results };
     Stage stage = Stage::Intro;
     bool cli = false, video = true, vsync = false;
     std::string scene; // "standard-15m", "standard-33m", "standard", or empty (the sphere sizes)
@@ -869,6 +871,18 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         const long long vramBefore = driverFreeVramKb();
         resetPeakResidentBytes();
         const double t0 = nowSeconds();
+        // A project with a preview opens as in the app: the preview shows while another thread reads the rest.
+        if (!s.projectPath.empty() && startOpening(s.projectPath)) {
+            SizeResult r;
+            r.label = s.label;
+            r.vramFreeBeforeKb = vramBefore;
+            r.firstFramePreview = true;
+            p.results.push_back(r);
+            p.buildStart = t0;
+            p.stage = Stage::Opening;
+            p.hudTitle = s.label + ": opening (its preview shows)";
+            break;
+        }
         const size_t tris = size_t(s.millions * 1e6);
         Mesh m = s.build ? s.build(tris) : makeBenchSphere(tris);
         SizeResult r;
@@ -890,6 +904,27 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         p.stage = Stage::Settle;
         char buf[160];
         std::snprintf(buf, sizeof buf, "%s triangles (%.1fM vertices), built in %.1f s", r.label.c_str(), double(r.vertices) / 1e6, r.buildSeconds);
+        p.hudTitle = buf;
+        p.hudLine2 = "settling (the first upload to the GPU)";
+        break;
+    }
+    case Stage::Opening: {
+        SizeResult& r = p.results.back();
+        if (opening_) { // (called before the swap: this frame drew the preview)
+            if (r.firstFrameSeconds == 0) r.firstFrameSeconds = now - p.buildStart, openStage("first frame (preview)");
+            break;
+        }
+        r.triangles = doc_.mesh.micro ? microTriangleCount(doc_.mesh) : doc_.mesh.triangleCount();
+        r.vertices = doc_.mesh.vertexCount();
+        r.buildSeconds = now - p.buildStart;
+        camera_.frame(sceneBounds());
+        camera_.yaw = 0.0f;
+        camera_.pitch = 0.0f;
+        p.stageStart = now;
+        p.phaseIndex = 0;
+        p.stage = Stage::Settle;
+        char buf[160];
+        std::snprintf(buf, sizeof buf, "%s triangles (%.1fM vertices), opened in %.1f s", r.label.c_str(), double(r.vertices) / 1e6, r.buildSeconds);
         p.hudTitle = buf;
         p.hudLine2 = "settling (the first upload to the GPU)";
         break;
@@ -1055,6 +1090,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             run.set("vertices", double(r.vertices));
             run.set("build_seconds", std::round(r.buildSeconds * 100) / 100);
             run.set("first_frame_seconds", std::round(r.firstFrameSeconds * 100) / 100);
+            if (r.firstFramePreview) run.set("first_frame_preview", true);
             if (r.shadedSeconds > 0) {
                 run.set("shaded_seconds", std::round(r.shadedSeconds * 100) / 100);
                 run.set("loaded_ram_mb", double(r.loadedRamBytes >> 20));

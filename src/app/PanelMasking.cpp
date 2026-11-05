@@ -55,6 +55,7 @@ Args App::withSymmetryArgs(Args args) {
 }
 
 void App::beginMaskStroke(float x, float y) {
+    if (editsBlocked()) return;
     refreshSymmetryPivot();
     // Masks are not layered, so the stroke always targets the base (its weight is never 0).
     // Ctrl+Alt erases, and so does the pen's eraser end (set to Invert or Erase mask).

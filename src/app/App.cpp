@@ -30,6 +30,7 @@
 #include "core/Benchmark.h"
 #include "core/Decimate.h"
 #include "core/ImageTo3D.h"
+#include "app/Opening.h"
 #include "core/Project.h"
 #include "core/Script.h"
 #include "io/BlenderBridge.h"
@@ -108,7 +109,7 @@ struct StartupTimer {
 } // namespace
 
 App::App() = default;
-App::~App() = default;
+App::~App() { opening_.reset(); } // (joins a project still being read)
 
 bool App::init(const AppOptions& options) {
     options_ = options;
@@ -427,6 +428,7 @@ int App::runUiTest(int w, int h, int fps) {
         pollQRemesh();
         pollSplatTrain();
         pollSculptable();
+        pollOpening();
         updateCameraAspect();
         updateSpaceMouse(dt);
         touchTick(); // a finger's press that waited for a second finger long enough goes through
@@ -616,6 +618,7 @@ int App::runRecording() {
         pollQRemesh();
         pollSplatTrain();
         pollSculptable();
+        pollOpening();
         updateCameraAspect();
 
         Demo::beginFrame();
@@ -1024,6 +1027,7 @@ int App::run() {
             pollQRemesh();
             pollSplatTrain();
             pollSculptable();
+            pollOpening(); // a big project read on another thread: open it once it's in (PanelProject.cpp)
         }
         tickProject(dt); // the title and autosave, asleep or not
         const double t = seconds();
@@ -1926,6 +1930,10 @@ glm::vec3 App::alongNormalTarget(float x, float y) const {
 }
 
 void App::beginStroke(float x, float y, const RayHit& hit) {
+    if (editsBlocked()) { // (the preview of a project still opening: look around it, no edits)
+        drag_ = Drag::Orbit;
+        return;
+    }
     refreshSymmetryPivot(); // (local symmetry: the active Part's centre as the stroke starts)
     strokeBrush_ = activeBrush();
     strokeAlongNormal_ = false;
@@ -2337,6 +2345,10 @@ void App::endStroke() {
 // ---------------------------------------------------------------------------
 
 void App::runCommand(const std::string& name, const Args& args) {
+    if (opening_ && editsBlocked()) {
+        lastCommandOk_ = false;
+        return;
+    }
     // In the app a macro asks before it first runs and a pack is reviewed before it's installed (PanelPacks.cpp),
     // whether they come from a button, a key, the console or a script.
     if (name == "macro_run" && macros_.runDepth == 0) {
@@ -2463,6 +2475,8 @@ void App::openPath(const std::string& path) {
     } else if (ext == ".exr" || ext == ".sfvdm") { // a vector displacement map for the VDM brush
         runCommand("vdm_set", {{"path", path}, {"swap_yz", vdmImport_.swapYZ}, {"flip_x", vdmImport_.flipX},
                                {"flip_y", vdmImport_.flipY}, {"flip_z", vdmImport_.flipZ}, {"scale", double(vdmImport_.scale)}});
+    } else if (isProjectPath(path) && interactive() && startOpening(path)) {
+        // (the preview shows; pollOpening finishes with the open command)
     } else {
         runCommand("open", {{"path", path}});
     }
@@ -2582,6 +2596,12 @@ void App::syncScene() {
     lastDisplayed_ = &shown;
     std::vector<SceneMesh> scene;
     scene.reserve(doc_.parts.size());
+    if (Mesh* preview = openingPreview()) { // a project opening: its preview alone (the old scene is going)
+        constexpr uint32_t kPreviewId = 0xFFFFFFE0u; // (outside the Part ids)
+        scene.push_back({kPreviewId, preview, true, true, nullptr, false, false});
+        renderer_.syncScene(scene);
+        return;
+    }
     for (int i = 0; i < doc_.partCount(); ++i) {
         Part& s = doc_.parts[size_t(i)];
         const bool active = i == doc_.activePart;
@@ -2692,6 +2712,7 @@ void App::drawUi() {
     if (uiPrefs_.showAxes) drawAxisGizmo(); // X / Y / Z in the canvas corner (#31)
     if (uiPrefs_.showViewFigure) drawViewFigure();
     drawAirStrokeIndicator(); // Start strokes off the model is on (#62, Input.cpp)
+    drawOpeningOverlay();     // a big project being read behind its preview (PanelProject.cpp)
     if (drag_ == Drag::Insert) { // the size the insert will get
         insertPx_ = std::hypot(mouse.x - insertX_, mouse.y - insertY_);
         ImGui::GetForegroundDrawList()->AddCircle(ImVec2(insertX_, insertY_), std::max(insertPx_, 12.0f * uiScale_),

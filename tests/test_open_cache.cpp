@@ -305,3 +305,35 @@ TEST(open_cache_is_copied_on_save_until_the_topology_changes) {
     CHECK(cacheEntries(c).empty());
     for (const std::string& p : {a, b, c}) std::filesystem::remove(p);
 }
+
+TEST(project_preview_and_preloaded_open) {
+    SmallCacheThreshold small;
+    Document doc = cachedDoc();
+    const std::string path = tempPath("sf_open_preview.sfproj");
+    std::string err;
+    // Autosave writes no preview (it would be worked out now); a save does.
+    CHECK(saveProject(path, doc, err, true));
+    Mesh none;
+    CHECK(!loadProjectPreview(path, none, err));
+    CHECK(saveProject(path, doc, err));
+    Mesh preview;
+    CHECK(loadProjectPreview(path, preview, err));
+    CHECK(preview.triangleCount() > 1000 && preview.triangleCount() <= doc.mesh.triangleCount()); // (a small mesh fits the grid)
+    const AABB a = preview.bounds(), b = doc.mesh.bounds();
+    CHECK(glm::length(a.min - b.min) < 0.1f && glm::length(a.max - b.max) < 0.1f);
+    // Read on its own (another thread in the app), then handed to the open: the same document as a plain load.
+    LoadedProjectPtr read = readProject(path, err);
+    CHECK(read != nullptr);
+    preloadProject(path, std::move(read));
+    Document viaPreload, plain;
+    CHECK(loadProject(path, viaPreload, err));
+    CHECK(takePreloadedProject(path) == nullptr); // (taken once)
+    CHECK(loadProject(path, plain, err));
+    CHECK(viaPreload.mesh.positions == plain.mesh.positions && viaPreload.mesh.triangles == plain.mesh.triangles);
+    CHECK(viaPreload.mesh.micro && plain.mesh.micro && viaPreload.mesh.micro->disp == plain.mesh.micro->disp);
+    // A preload of another path isn't taken.
+    preloadProject(path + ".other", readProject(path, err));
+    CHECK(takePreloadedProject(path) == nullptr);
+    CHECK(takePreloadedProject(path + ".other") != nullptr);
+    std::filesystem::remove(path);
+}
