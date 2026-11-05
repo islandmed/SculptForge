@@ -126,7 +126,7 @@ TEST(i18n_spanish_lookup_and_fallback) {
     const std::string move = "Move";
     CHECK(std::string(trAction("brush.move", move)) == "Move");
     const std::string on = "On"; // a brush setting, not a brush: translated
-    CHECK(std::string(trAction("brush.pen_size_on", on)) == "\u958b\u555f");
+    CHECK(std::string(trAction("brush.pen_size_on", on)) == "Activado");
     CHECK(std::string(trAction("tool.move", move)) == "Mover");
     CHECK(trPath("Tool > Geometry") == "Herramienta > Geometría");
     CHECK(trPath("Tool > Frobnicate") == "Herramienta > Frobnicate");
@@ -243,6 +243,6 @@ TEST(i18n_chinese_lookup_keeps_ids_and_brush_names) {
     const std::string move = "Move";
     CHECK(std::string(trAction("brush.move", move)) == "Move");
     const std::string on = "On"; // a brush setting, not a brush: translated
-    CHECK(std::string(trAction("brush.pen_size_on", on)) == "\u958b\u555f");
+    CHECK(std::string(trAction("brush.pen_size_on", on)) == "Activado");
     CHECK(trPath("Tool > Geometry") == "\u5de5\u5177 > \u5e7e\u4f55");
 }
