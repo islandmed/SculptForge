@@ -246,6 +246,9 @@ public:
     size_t gpuBytes() const;
     // Micro grid points whose shading still waits for a frame's budget (MicroRenderer::pendingShading, all slots).
     size_t microPendingShading() const;
+    // Micro levels just opened draw at once and shade over the next frames (MicroRenderer::initialShadeMs; the
+    // interactive loop turns it on: one-shot renders and thumbnails shade everything first).
+    bool microProgressiveShading = false;
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
     size_t lastDrawnTriangles() const { return lastDrawn_; }
     // The last syncScene left motion proxies to build (a few milliseconds of them a frame; the rest draw in full).

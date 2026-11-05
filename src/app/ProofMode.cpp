@@ -105,15 +105,20 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
         const std::string path = name.substr(5);
         std::error_code ec;
         const double bytes = double(std::filesystem::file_size(std::filesystem::path(std::u8string(path.begin(), path.end())), ec));
-        const ProofMeshSize s{ec ? 1.0 : bytes / 20e6, std::filesystem::path(path).stem().string(), [path](size_t) {
+        auto built = std::make_shared<BVH>();
+        ProofMeshSize s{ec ? 1.0 : bytes / 20e6, std::filesystem::path(path).stem().string(), [path, built](size_t) {
                                   std::string err;
                                   Document d;
-                                  if (!loadProject(path, d, err)) {
+                                  const bool loaded = loadProject(path, d, err);
+                                  openStage("loadProject returned");
+                                  if (!loaded) {
                                       std::fprintf(stderr, "benchmark file %s: %s\n", path.c_str(), err.c_str());
                                       return makeBenchHead(size_t(1) << 20);
                                   }
+                                  *built = std::move(d.bvh);
                                   return std::move(d.mesh);
                               }, 150}; // (the file's size in 20-byte triangles, at the spheres' 150 bytes each: the memory check)
+        s.builtBvh = built;
         return {s};
     }
     if (name == "core-200m" || name == "core-100m") { // research (docs/design/core-200m.md): micro triangles in memory, opened from a project
@@ -870,7 +875,9 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         r.label = s.label;
         r.triangles = m.micro ? microTriangleCount(m) : m.triangleCount(); // (a micro level: its micro triangles)
         r.vertices = m.vertexCount();
-        doc_.setMesh(std::move(m), "Benchmark");
+        BVH* bvh = s.builtBvh && s.builtBvh->nodeCount() ? s.builtBvh.get() : nullptr;
+        doc_.setMesh(std::move(m), "Benchmark", bvh);
+        if (s.builtBvh) *s.builtBvh = BVH();
         r.buildSeconds = nowSeconds() - t0;
         p.buildStart = t0;
         r.vramFreeBeforeKb = vramBefore;
@@ -890,7 +897,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
     case Stage::Settle: {
         // (called before the swap: this frame has drawn the new mesh)
         SizeResult& r = p.results.back();
-        if (r.firstFrameSeconds == 0) r.firstFrameSeconds = now - p.buildStart;
+        if (r.firstFrameSeconds == 0) r.firstFrameSeconds = now - p.buildStart, openStage("first frame");
         const bool shading = renderer_.microPendingShading() > 0;
         if (doc_.mesh.micro && !shading && r.shadedSeconds == 0) {
             r.shadedSeconds = now - p.buildStart;

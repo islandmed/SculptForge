@@ -452,12 +452,18 @@ bool microAttach(Mesh& m, int level, float step, MicroStore disp, std::vector<ui
     }, block);
     for (float g : bulge) mm->bulgeMax = std::max(mm->bulgeMax, g);
     {
+        std::vector<double> sums(blocks, 0.0);
+        poolFor(nt, [&](size_t b, size_t e) {
+            double sum = 0.0;
+            for (size_t t = b; t < e; ++t) {
+                const glm::uvec3 tr = m.triangles[t];
+                sum += double(glm::distance(m.positions[tr.x], m.positions[tr.y]) + glm::distance(m.positions[tr.y], m.positions[tr.z]) +
+                              glm::distance(m.positions[tr.z], m.positions[tr.x]));
+            }
+            sums[b / block] += sum;
+        }, block);
         double e = 0.0;
-        for (size_t t = 0; t < nt; ++t) {
-            const glm::uvec3 tr = m.triangles[t];
-            e += double(glm::distance(m.positions[tr.x], m.positions[tr.y]) + glm::distance(m.positions[tr.y], m.positions[tr.z]) +
-                        glm::distance(m.positions[tr.z], m.positions[tr.x]));
-        }
+        for (double v : sums) e += v;
         mm->baseEdge = float(e / double(std::max<size_t>(nt * 3, 1)));
     }
     for (uint16_t r : mm->triRange) mm->rangeMax = std::max(mm->rangeMax, r);

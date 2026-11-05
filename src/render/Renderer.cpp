@@ -320,6 +320,8 @@ flat in int vPrimBase;
 // interpolated on the micro triangle under the pixel (normal, curvature, mask), whatever level the geometry drew.
 flat in int vSlot;
 in vec2 vIJ;
+in vec3 vBaseNormal;
+uniform int uUnshaded;
 uniform samplerBuffer uShade;
 uniform int uN;
 uniform int uSamples;
@@ -336,6 +338,11 @@ vec3 octNormal(vec2 v) {
     return normalize(n);
 }
 void microFetch() {
+    if (uUnshaded == 1) { // (just opened: this cluster's shading follows in a few frames)
+        gNC = vec4(mat3(uView) * normalize(vBaseNormal), 0.0);
+        gMask = 0.0;
+        return;
+    }
     float fi = clamp(vIJ.x, 0.0, float(uN)), fj = clamp(vIJ.y, 0.0, float(uN));
     int i0 = min(int(fi), uN - 1), j0 = min(int(fj), uN - 1);
     if (i0 + j0 > uN - 1) {
@@ -2121,6 +2128,7 @@ void Renderer::drawPatches(const MeshSlot& s, GLenum mode, DrawPart part, GLint 
 void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, bool wireframe, bool pbr) {
     if (mesh.micro && microMatches(mesh)) { // a micro level draws its own way (render/MicroRenderer.h)
         if (!s.micro) s.micro = std::make_shared<MicroRenderer>();
+        s.micro->initialShadeMs = microProgressiveShading ? 40.0 : 0.0;
         s.outOfMemory = !s.micro->sync(mesh);
         s.drawnTriangles = s.outOfMemory ? 0 : 1; // (draw() skips empty slots)
         s.fresh = true;                           // (back to a mesh: a full upload)
@@ -3696,7 +3704,10 @@ bool Renderer::renderMeshThumbnail(Mesh& mesh, const Camera& camera, int size, c
     // A scratch slot outside the Part id range; the scene's draw list is put back afterwards.
     constexpr uint32_t kThumbnailSlot = 0xFFFFFFF0u;
     mesh.topologyDirty = true;
+    const bool progressive = microProgressiveShading;
+    microProgressiveShading = false; // (one frame: all of the shading first)
     sync(slot(kThumbnailSlot), mesh);
+    microProgressiveShading = progressive;
     std::vector<DrawItem> scene;
     scene.swap(drawList_);
     drawList_.push_back({kThumbnailSlot, true});

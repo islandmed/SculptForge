@@ -38,7 +38,9 @@ uniform int uSlotBase, uChunkSlot, uLevel, uN, uSamples;
 uniform int uUnrolled;
 uniform int uCorners[48];
 uniform float uStep;
+uniform int uUnshaded; // 1: the cluster's shading isn't there yet: the base normal (vBaseNormal) lights it
 flat out int vSlot;
+out vec3 vBaseNormal;
 out vec2 vIJ;
 #ifdef FLAT
 out vec3 vViewPos;
@@ -47,6 +49,7 @@ vec3 P[3];
 vec3 Nn[3];
 int ord[3];
 int localSlot;
+vec3 gBaseN; // the last microPos's interpolated base normal
 int sampleIndex(int i, int j) { return j * (uN + 1) - (j * (j - 1)) / 2 + i; }
 vec3 microPos(int I, int J) {
     float inv = 1.0 / float(uN);
@@ -64,6 +67,7 @@ vec3 microPos(int I, int J) {
     vec3 s = f - pull * 0.75;
     float len = length(nn);
     vec3 n = len > 1e-20 ? nn / len : vec3(0.0, 0.0, 1.0);
+    gBaseN = n;
     float d = float(texelFetch(uDisp, localSlot * uSamples + sampleIndex(I, J)).r) * uStep;
     return s + n * d;
 }
@@ -130,9 +134,12 @@ void main() {
     int r = k % stepE;
     if (edge >= 0 && r != 0) {
         ivec2 a = edgePoint(edge, k - r, m) * sc, b = edgePoint(edge, k - r + stepE, m) * sc;
-        pos = mix(microPos(a.x, a.y), microPos(b.x, b.y), float(r) / float(stepE));
+        vec3 pa = microPos(a.x, a.y), na = gBaseN;
+        pos = mix(pa, microPos(b.x, b.y), float(r) / float(stepE));
+        vBaseNormal = mix(na, gBaseN, float(r) / float(stepE));
     } else {
         pos = microPos(i * sc, j * sc);
+        vBaseNormal = gBaseN;
     }
     vIJ = vec2(float(i * sc), float(j * sc));
     vec4 p = uView * vec4(pos, 1.0);
@@ -150,6 +157,39 @@ uint32_t spread10(uint32_t x) {
     x = (x | (x << 4)) & 0x030C30C3;
     x = (x | (x << 2)) & 0x09249249;
     return x;
+}
+
+// Sorts (Morton code << 32 | triangle) keys made in triangle order: a parallel LSD radix sort on the 30 code bits
+// (two 15-bit digits, stable, so equal codes keep triangle order: the same order as sorting the whole keys).
+void sortMortonKeys(std::vector<uint64_t>& keys) {
+    const size_t n = keys.size();
+    constexpr uint32_t kDigits = 1u << 15;
+    const size_t blocks = std::clamp<size_t>(n >> 16, 1, 64), per = (n + blocks - 1) / blocks;
+    std::vector<uint64_t> tmp(n);
+    std::vector<uint32_t> hist(blocks * kDigits);
+    for (const int shift : {32, 47}) {
+        poolFor(blocks, [&](size_t b, size_t e) {
+            for (size_t k = b; k < e; ++k) {
+                uint32_t* h = hist.data() + k * kDigits;
+                std::fill(h, h + kDigits, 0u);
+                for (size_t i = k * per, end = std::min(n, (k + 1) * per); i < end; ++i) ++h[(keys[i] >> shift) & (kDigits - 1)];
+            }
+        }, 1);
+        uint32_t sum = 0;
+        for (uint32_t d = 0; d < kDigits; ++d)
+            for (size_t k = 0; k < blocks; ++k) {
+                const uint32_t c = hist[k * kDigits + d];
+                hist[k * kDigits + d] = sum;
+                sum += c;
+            }
+        poolFor(blocks, [&](size_t b, size_t e) {
+            for (size_t k = b; k < e; ++k) {
+                uint32_t* h = hist.data() + k * kDigits;
+                for (size_t i = k * per, end = std::min(n, (k + 1) * per); i < end; ++i) tmp[h[(keys[i] >> shift) & (kDigits - 1)]++] = keys[i];
+            }
+        }, 1);
+        keys.swap(tmp);
+    }
 }
 
 } // namespace
@@ -233,7 +273,8 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
             keys[t] = uint64_t(spread10(q.x) | spread10(q.y) << 1 | spread10(q.z) << 2) << 32 | t;
         }
     }, 1 << 14);
-    std::sort(keys.begin(), keys.end());
+    sortMortonKeys(keys);
+    openStage("layout: morton sort");
     order_.resize(nt);
     slotOf_.resize(nt);
     for (uint32_t s = 0; s < nt; ++s) {
@@ -299,7 +340,9 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
     clusterAngle_.assign(clusters, 0.0f);
     std::vector<uint32_t> all(clusters);
     for (uint32_t c = 0; c < clusters; ++c) all[c] = c;
+    openStage("layout: tri tex + chunks");
     updateClusterBounds(mesh, all);
+    openStage("layout: cluster bounds");
     pending_.assign((size_t(nt) + 63) / 64, 0);
     pendingCount_ = 0;
     ensurePatches(mm.level);
@@ -481,29 +524,46 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
         seeds.erase(std::unique(seeds.begin(), seeds.end()), seeds.end());
         if (seeds.size() > limit) seeds.resize(limit);
     }
+    shadeSeeds(mesh, seeds, staging_, sorted_);
+    sendStaged(staging_, sorted_);
+}
+
+void MicroRenderer::shadeInitial(const Mesh& mesh, bool send) {
+    if (initialSlot_ >= baseTriangles_) return;
+    const size_t S = samples_;
+    // Points this frame: initialShadeMs at the measured cost (the ring around a run adds a little), whole clusters.
+    const double ns = shadeNsPerPoint_ > 0.0 ? shadeNsPerPoint_ : 25.0;
+    const size_t points = size_t(std::max(1.0, initialShadeMs * 1e6 / ns));
+    const uint32_t size = 1u << clusterShift_;
+    uint32_t slots = uint32_t(std::clamp<size_t>(points / S, size, size_t(1) << 22)) & ~(size - 1);
+    const uint32_t end = std::min(baseTriangles_, initialSlot_ + std::max(slots, size));
+    std::vector<uint32_t>& seeds = scratch_;
+    seeds.resize(end - initialSlot_);
+    for (uint32_t s = initialSlot_; s < end; ++s) seeds[s - initialSlot_] = order_[s];
+    std::sort(seeds.begin(), seeds.end());
+    if (!initialSorted_.empty()) sendStaged(initialStage_, initialSorted_);
+    shadeSeeds(mesh, seeds, initialStage_, initialSorted_);
+    if (send) sendStaged(initialStage_, initialSorted_);
+    initialSlot_ = end;
+}
+
+void MicroRenderer::shadeSeeds(const Mesh& mesh, std::vector<uint32_t>& seeds, std::vector<uint8_t>& stage,
+                               std::vector<uint32_t>& sorted) {
+    const MicroMesh& mm = *mesh.micro;
+    const size_t S = mm.samples;
+    written_.clear();
+    sorted.clear();
     if (seeds.empty()) return;
     const auto started = std::chrono::steady_clock::now();
-    std::vector<uint32_t> sorted;
     if (stageIndex_.size() != mm.baseTriangles) stageIndex_.assign(mm.baseTriangles, 0);
     shader_.shade(mesh, seeds, false, written_, [&](uint32_t t) -> uint32_t* {
-        return reinterpret_cast<uint32_t*>(staging_.data()) + size_t(stageIndex_[t]) * S;
+        return reinterpret_cast<uint32_t*>(stage.data()) + size_t(stageIndex_[t]) * S;
     }, [&](std::span<const uint32_t> tris) {
         sorted.assign(tris.begin(), tris.end());
         std::sort(sorted.begin(), sorted.end(), [&](uint32_t a, uint32_t b) { return slotOf_[a] < slotOf_[b]; });
         for (size_t i = 0; i < sorted.size(); ++i) stageIndex_[sorted[i]] = uint32_t(i);
-        staging_.resize(sorted.size() * S * 4);
+        stage.resize(sorted.size() * S * 4);
     });
-    const auto* st = reinterpret_cast<const uint32_t*>(staging_.data());
-    for (size_t i = 0; i < sorted.size();) {
-        const uint32_t s0 = slotOf_[sorted[i]], chunk = s0 / chunkSlots_;
-        size_t j = i + 1;
-        while (j < sorted.size() && slotOf_[sorted[j]] == slotOf_[sorted[j - 1]] + 1 && slotOf_[sorted[j]] / chunkSlots_ == chunk) ++j;
-        const Chunk& c = chunks_[chunk];
-        gl::BindBuffer(GL_TEXTURE_BUFFER, c.shade);
-        gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(size_t(s0 - c.firstSlot) * S * 4), GLsizeiptr((j - i) * S * 4), st + i * S);
-        i = j;
-    }
-    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
     if (!written_.empty()) { // the cost per point, smoothed (a stroke's shading budget in time follows it)
         const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() /
                           double(written_.size() * S);
@@ -516,9 +576,25 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
     }
 }
 
+void MicroRenderer::sendStaged(const std::vector<uint8_t>& stage, std::vector<uint32_t>& sorted) {
+    const size_t S = samples_;
+    const auto* st = reinterpret_cast<const uint32_t*>(stage.data());
+    for (size_t i = 0; i < sorted.size();) {
+        const uint32_t s0 = slotOf_[sorted[i]], chunk = s0 / chunkSlots_;
+        size_t j = i + 1;
+        while (j < sorted.size() && slotOf_[sorted[j]] == slotOf_[sorted[j - 1]] + 1 && slotOf_[sorted[j]] / chunkSlots_ == chunk) ++j;
+        const Chunk& c = chunks_[chunk];
+        gl::BindBuffer(GL_TEXTURE_BUFFER, c.shade);
+        gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(size_t(s0 - c.firstSlot) * S * 4), GLsizeiptr((j - i) * S * 4), st + i * S);
+        i = j;
+    }
+    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+    sorted.clear();
+}
+
 bool MicroRenderer::sync(Mesh& mesh) {
     MicroMesh& mm = *mesh.micro;
-    mm.ensureTopology(mesh);
+    if (mm.edgeNeighbor.size() != size_t(mesh.triangleCount()) * 3) openStage("(before ensureTopology)"), mm.ensureTopology(mesh), openStage("ensureTopology");
     if (mm.dirtyBits.size() != (size_t(mm.baseTriangles) + 63) / 64) mm.dirtyBits.assign((size_t(mm.baseTriangles) + 63) / 64, 0);
     const bool baseMoved = mesh.dirtyBegin < mesh.dirtyEnd;
     const bool full = serial_ != mm.serial || baseTriangles_ != mm.baseTriangles || baseVertices_ != mm.baseVertices ||
@@ -532,14 +608,21 @@ bool MicroRenderer::sync(Mesh& mesh) {
         level_ = mm.level;
         n_ = mm.n;
         samples_ = mm.samples;
+        openStage("(sync start)");
         buildLayout(mesh);
+        openStage("buildLayout");
         uploadBase(mesh);
         uploadDispTiles(mesh, scratch_, true);
-        shadePending(mesh, true);
+        openStage("uploadBase+disp");
+        initialSlot_ = 0;
+        initialSorted_.clear();
+        if (initialShadeMs <= 0.0) shadePending(mesh, true), initialSlot_ = baseTriangles_;
+        openStage("shade (first part)");
     } else {
         // The base cage moved (dual-scale Move, big brushes on a dense base, a transform, undo of any): the detail
         // rides along on the GPU (it is relative to the base); what changes is the base, the bounds and the shading
         // around moved vertices. Their triangles in a bitset (millions on a scan: no lists to sort).
+        if (!initialSorted_.empty()) sendStaged(initialStage_, initialSorted_); // (last frame's first shading, before edits)
         bool baseEverywhere = false;
         const size_t words = mm.dirtyBits.size();
         baseBits_.assign(words, 0);
@@ -628,6 +711,7 @@ bool MicroRenderer::sync(Mesh& mesh) {
                 }
         if (mm.allDirty) {
             shadePending(mesh, true);
+            initialSlot_ = baseTriangles_;
         } else {
             for (uint32_t t : scratch_) {
                 uint64_t& w = pending_[t >> 6];
@@ -642,9 +726,13 @@ bool MicroRenderer::sync(Mesh& mesh) {
             // slower CPU doesn't spend the frame the dabs need on shading; the rest follows as before.
             if (mm.stroking) shadeBudget = strokeShadeBudget(shadeBudget, tier.strokeShadeMs, shadeNsPerPoint_, size_t(mm.samples) * 3);
             if (pendingCount_) shadePending(mesh, false);
+            // (draw() didn't run since the last sync: the first shading goes on here)
+            if (!mm.stroking && synced_ == &mesh && initialSlot_ < baseTriangles_) shadeInitial(mesh, true);
         }
     }
     step_ = mm.step;
+    synced_ = &mesh;
+    stroking_ = mm.stroking;
     mm.clearDirty();
     mesh.clearDirty();
     mesh.topologyDirty = false;
@@ -710,6 +798,7 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
         u_.step = at("uStep");
         u_.unrolled = at("uUnrolled");
         u_.corners = at("uCorners");
+        u_.unshaded = at("uUnshaded");
         gl::Uniform1i(at("uTris"), 8);
         gl::Uniform1i(at("uBase"), 9);
         gl::Uniform1i(at("uDisp"), 10);
@@ -729,6 +818,9 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
     size_t drawn = 0;
     int boundChunk = -1;
     int unrolledLevel = -2; // the patch uCorners holds (-1: instanced draws)
+    // Clusters at or past initialSlot_ wait for their first shading (runs split there).
+    const uint32_t firstUnshaded = initialSlot_ >> clusterShift_;
+    int unshadedOn = -1;
     for (uint32_t c = 0; c < clusters;) {
         if (!visible[c]) {
             ++c;
@@ -737,7 +829,8 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
         const int l = want_[c];
         const uint32_t chunk = (c << clusterShift_) / chunkSlots_;
         uint32_t e = c + 1;
-        while (e < clusters && visible[e] && want_[e] == l && (e << clusterShift_) / chunkSlots_ == chunk) ++e;
+        while (e < clusters && visible[e] && want_[e] == l && (e << clusterShift_) / chunkSlots_ == chunk && e != firstUnshaded) ++e;
+        if (const int un = c >= firstUnshaded ? 1 : 0; un != unshadedOn) gl::Uniform1i(u_.unshaded, un), unshadedOn = un;
         const uint32_t s0 = c << clusterShift_, s1 = std::min(baseTriangles_, e << clusterShift_);
         if (int(chunk) != boundChunk) {
             boundChunk = int(chunk);
@@ -774,6 +867,12 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
         gl::BindTexture(GL_TEXTURE_BUFFER, 0);
     }
     gl::ActiveTexture(GL_TEXTURE0);
+    // The first shading after opening goes on while the GPU draws this frame (sent with the next sync).
+    if (synced_ && !stroking_ && initialSlot_ < baseTriangles_) {
+        gl::Flush();
+        shadeInitial(*synced_, false);
+    }
+    synced_ = nullptr;
     return drawn;
 }
 

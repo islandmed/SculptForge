@@ -38,7 +38,10 @@
 #include "core/Mesh.h"
 #include "core/MicroStore.h"
 
+#include <chrono>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -47,6 +50,16 @@
 #include <vector>
 
 namespace sf {
+
+// SF_OPEN_PROFILE=1: how long each step of opening a project and its first upload takes (stderr).
+inline void openStage(const char* what) {
+    static const bool on = std::getenv("SF_OPEN_PROFILE") != nullptr;
+    if (!on) return;
+    static auto last = std::chrono::steady_clock::now();
+    const auto now = std::chrono::steady_clock::now();
+    std::fprintf(stderr, "open: %-28s %7.0f ms\n", what, std::chrono::duration<double, std::milli>(now - last).count());
+    last = now;
+}
 
 class BVH;
 class CommandRegistry;

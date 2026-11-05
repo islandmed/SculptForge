@@ -724,7 +724,8 @@ bool App::wantsFrames(double now) const {
            timelapseBusy() || hardwareCalibrating() || // both render a step per frame: they stop when the frames do
            spaceMouseMoving() || // a held SpaceMouse cap sends no events, but the view keeps moving (SpaceMouse.cpp)
            perf_.framesStill < 10 || // the view just moved: Fast Navigation's full-quality frame comes after it stops
-           (perf_.proxyPrebuild && renderer_.proxiesPending()); // motion proxies left to build, a few ms a frame
+           (perf_.proxyPrebuild && renderer_.proxiesPending()) || // motion proxies left to build, a few ms a frame
+           renderer_.microPendingShading() > 0; // a micro level's shading still following (just opened, or after a stroke)
 }
 
 uint64_t App::frameKey() const {
@@ -740,6 +741,7 @@ int App::run() {
     if (!options_.recordPath.empty() || !options_.uiTest.empty()) return runRecording();
     if (!options_.timelapsePath.empty()) return runTimelapseCli(); // (PanelTimeline.cpp)
     if (options_.benchmark) startProofMode();                     // runs in this loop (ProofMode.cpp)
+    renderer_.microProgressiveShading = true;                     // (frames follow: a micro level shades over them)
     if (g_wakeEvent == 0) g_wakeEvent = SDL_RegisterEvents(1);
     // Dabs are queued and placed within a time budget each frame (strokeTo). SF_STROKE_IMMEDIATE=1 places them all
     // as each pointer sample arrives, as before 0.9.6 (for comparison).

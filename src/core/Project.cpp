@@ -1007,6 +1007,7 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
 }
 
 bool loadProject(const std::string& path, Document& doc, std::string& error) {
+    openStage("(load start)");
     Reader r;
     if (!r.open(path, error)) return false;
     std::vector<uint8_t> manifestText;
@@ -1057,6 +1058,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             s.bridgeName = sj["bridge_name"].asString();
             s.qremeshGuides = qremeshGuidesFromJson(sj["qremesh_guides"]);
             if (!readMesh(r, sj["mesh"], sj["layers"], s.mesh, error, false, false)) return false;
+            openStage("readMesh");
             s.mesh.forgespheres = forgespheresFromJson(sj["forgespheres"]);
             s.mesh.forgespherePreview = !s.mesh.forgespheres.empty() && sj["forgesphere_preview"].asBool(false);
             readSelectionSets(r, sj["selection_sets"], s.mesh, skippedSets);
@@ -1066,10 +1068,11 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             if (!readPaintLayers(r, sj["paint_layers"], s.mesh, error)) return false;
             if (!readTexture(r, sj["texture"], s.mesh, error)) return false;
             if (!readSubdiv(r, sj["subdiv"], s.mesh, error, version < 5)) return false;
+            openStage("paint/texture/subdiv");
             s.mesh.rebuildTopology();
-            s.finishBvh();
-            r.parallelReads = true;
+            openStage("rebuildTopology");
             s.mesh.recomputeAllNormals();
+            openStage("normals");
             if (const Json& mj = sj["micro"]; mj.isObject() && version >= 7) {
                 const int level = int(mj["level"].asNumber(0));
                 if (level < 1 || level > MicroMesh::kMaxLevel) {
@@ -1107,8 +1110,14 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
                     error = r.error;
                     return false;
                 }
+                openStage("micro read+unpack");
                 if (!microAttach(s.mesh, level, float(mj["step"].asNumber(0)), std::move(disp), std::move(mask), error)) return false;
+                openStage("microAttach");
             }
+            // (the micro level reads and attaches while the BVH builds: both only read the mesh)
+            s.finishBvh();
+            openStage("finishBvh");
+            r.parallelReads = true;
             s.activeLayer = int(sj["active_layer"].asNumber(-1));
         }
         const double active = manifest["active_part"].asNumber(0);
