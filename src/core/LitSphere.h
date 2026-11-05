@@ -54,6 +54,7 @@ bool isCustomLitSphere(int index); // also true for a removed one (its index sta
 // Shown in the material lists: a built-in, or a custom Lit Sphere that wasn't removed.
 bool isLitSphereListed(int index);
 const CustomLitSphere* customLitSphere(int index); // null for built-ins and bad indices
+void clearCustomLitSpheres(); // none loaded, as at start (the warm UI test server, between scripts)
 // Changes whenever a custom Lit Sphere is added or its pixels replaced (renderers upload again).
 uint64_t litsphereRevision();
 // Name plus, for custom Lit Spheres, the pixel hash: a cache key that changes with the image.

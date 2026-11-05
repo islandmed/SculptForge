@@ -142,6 +142,9 @@ class Renderer {
 public:
     bool init(std::string& error);
     void shutdown();
+    // The warm UI test server (app/UiServe.h): shaders linked once and kept for the next Renderer in the same GL
+    // context (and the driver check init makes); false frees them.
+    static void keepPrograms(bool keep);
     // Makes `scene` what draw() shows, in order: uploads whatever each visible
     // mesh marked dirty and clears its dirty state (a new slot uploads
     // everything), and frees the slots of ids no longer listed.

@@ -53,6 +53,7 @@ SDL_LogOutputFunction g_sdlDefault = nullptr;
 void* g_sdlDefaultData = nullptr;
 // The last command, as a C string the crash handlers can read without allocating.
 char g_last[256] = "(none yet)";
+std::string g_lastLogged; // action(): the last one written
 std::atomic<bool> g_crashing{false};
 
 std::filesystem::path fsPath(const std::string& utf8) {
@@ -208,6 +209,8 @@ void SDLCALL onSdlLog(void*, int category, SDL_LogPriority priority, const char*
 void start(const std::string& folder) {
     std::lock_guard lock(g_mutex);
     if (g_file) return;
+    g_previousCrashed = false; // (the warm UI test server starts a log for every script)
+    g_lastLogged.clear();
     std::string dir = folder;
     if (dir.empty()) {
         if (char* pref = SDL_GetPrefPath("SculptForge", "SculptForge")) {
@@ -289,10 +292,9 @@ void note(const std::string& line) {
 void action(const std::string& what) {
     std::lock_guard lock(g_mutex);
     // Commands that run on every slider step would bury the rest: a repeat of the last one isn't written again.
-    static std::string last;
     std::snprintf(g_last, sizeof g_last, "%s", what.c_str());
-    if (what == last) return;
-    last = what;
+    if (what == g_lastLogged) return;
+    g_lastLogged = what;
     writeLocked(what);
 }
 

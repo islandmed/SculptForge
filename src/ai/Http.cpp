@@ -22,6 +22,7 @@ std::atomic<uint64_t> gRequests{0};
 }
 
 uint64_t httpRequestCount() { return gRequests; }
+void resetHttpRequestCount() { gRequests = 0; }
 
 HttpResponse httpRequest(const std::string& method, const std::string& url, const std::vector<std::string>& headers,
                          const std::string& body, int timeoutSeconds) {

@@ -348,6 +348,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/AsyncStroke.cpp
     src/app/Demo.cpp
     src/app/UiTest.cpp
+    src/app/UiServe.cpp
     src/app/Ui.cpp
     src/app/Shell.cpp
     src/app/Palettes.cpp
@@ -737,11 +738,36 @@ if(SCULPTFORGE_BUILD_TESTS)
   # UI tests: each tests/ui/*.sfui script drives the real app headless (needs an
   # OpenGL 3.3 context; CI runs them on Linux under Xvfb with Mesa). Label "ui".
   if(SCULPTFORGE_BUILD_APP)
+    # Warm UI tests (tools/test/warm_ui.py): the fixture ui_warm starts a pool of `sculptforge --ui-serve` servers
+    # (one window and GL context each, made once) and each ui_* script test is a thin client of it, with the same
+    # output and exit code as a cold run. SF_UI_COLD=1 when running ctest runs them cold, as does
+    # -DSCULPTFORGE_UI_WARM=OFF; a script with a `# cold` line always runs cold. Not yet on Windows (cold there).
+    option(SCULPTFORGE_UI_WARM "Run UI test scripts in a pool of warm servers" ON)
+    set(SF_UI_WARM_DIR ${CMAKE_CURRENT_BINARY_DIR}/ui-warm)
+    if(SCULPTFORGE_UI_WARM AND Python3_Interpreter_FOUND AND NOT WIN32)
+      sculptforge_runner(SF_UI_WARM_APP sculptforge)
+      set(SF_UI_WARM_PY ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/warm_ui.py)
+      add_test(NAME ui_warm_start COMMAND ${SF_UI_WARM_PY} start --dir ${SF_UI_WARM_DIR} --app ${SF_UI_WARM_APP})
+      add_test(NAME ui_warm_stop COMMAND ${SF_UI_WARM_PY} stop --dir ${SF_UI_WARM_DIR})
+      set_tests_properties(ui_warm_start PROPERTIES FIXTURES_SETUP ui_warm LABELS ui TIMEOUT 60)
+      set_tests_properties(ui_warm_stop PROPERTIES FIXTURES_CLEANUP ui_warm LABELS ui TIMEOUT 400)
+    endif()
+    # sculptforge_ui_test(NAME SCRIPT [ARGS...]): ui_NAME runs tests/ui/SCRIPT.sfui, screenshots in ui-shots/NAME.
+    function(sculptforge_ui_test name script)
+      set(args --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/${script}.sfui ${ARGN}
+               --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/${name})
+      if(TEST ui_warm_start)
+        add_test(NAME ui_${name} COMMAND ${SF_UI_WARM_PY} client --dir ${SF_UI_WARM_DIR} --app ${SF_UI_WARM_APP} -- ${args})
+        set_tests_properties(ui_${name} PROPERTIES FIXTURES_REQUIRED ui_warm)
+      else()
+        add_test(NAME ui_${name} COMMAND sculptforge ${args})
+      endif()
+      set_tests_properties(ui_${name} PROPERTIES LABELS ui TIMEOUT 300)
+    endfunction()
     file(GLOB SCULPTFORGE_UI_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/*.sfui)
     foreach(script ${SCULPTFORGE_UI_TESTS})
       get_filename_component(name ${script} NAME_WE)
-      add_test(NAME ui_${name} COMMAND sculptforge --ui-test ${script} --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/${name})
-      set_tests_properties(ui_${name} PROPERTIES LABELS ui TIMEOUT 300)
+      sculptforge_ui_test(${name} ${name})
     endforeach()
     # Splat training (also started by a phone scan) runs the fake Brush / COLMAP / ffmpeg.
     foreach(t ui_splat_train ui_phone_link)
@@ -755,43 +781,27 @@ if(SCULPTFORGE_BUILD_TESTS)
       set_tests_properties(ui_hardware_profile PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1")
     endif()
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
-    add_test(NAME ui_shell_layout_1080 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/shell_layout.sfui
-             --size 1920x1080 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/shell_layout_1080)
-    set_tests_properties(ui_shell_layout_1080 PROPERTIES LABELS ui TIMEOUT 300)
-    add_test(NAME ui_help_console_1080 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/help_console.sfui
-             --size 1920x1080 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/help_console_1080)
-    set_tests_properties(ui_help_console_1080 PROPERTIES LABELS ui TIMEOUT 300)
+    sculptforge_ui_test(shell_layout_1080 shell_layout --size 1920x1080)
+    sculptforge_ui_test(help_console_1080 help_console --size 1920x1080)
     # The S / U / I / O slider on a UI scaled 1.5x (Windows at 150%, #9): it must still open under the cursor.
-    add_test(NAME ui_size_popup_scaled COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/size_popup.sfui
-             --size 2400x1350 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/size_popup_scaled)
-    set_tests_properties(ui_size_popup_scaled PROPERTIES LABELS ui TIMEOUT 300)
+    sculptforge_ui_test(size_popup_scaled size_popup --size 2400x1350)
     # The stroke popup on a UI scaled 1.5x: it opens under the cursor and its items are where they're drawn.
-    add_test(NAME ui_stroke_popup_scaled COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/stroke_popup.sfui
-             --size 2400x1350 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/stroke_popup_scaled)
-    set_tests_properties(ui_stroke_popup_scaled PROPERTIES LABELS ui TIMEOUT 300)
+    sculptforge_ui_test(stroke_popup_scaled stroke_popup --size 2400x1350)
     # UI scale (#87) at 1600x900, where Automatic in a test is exactly 100 %; label "dpi": release.sh step check runs them before the tag.
-    add_test(NAME ui_ui_scale_900 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/ui_scale.sfui
-             --size 1600x900 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/ui_scale_900)
+    sculptforge_ui_test(ui_scale_900 ui_scale --size 1600x900)
     set_tests_properties(ui_ui_scale_900 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
     if(TEST ui_ui_scale)
       set_tests_properties(ui_ui_scale PROPERTIES LABELS "ui;dpi")
     endif()
     # The Library on a 1280x720 screen (#80): its close button stays on screen.
-    add_test(NAME ui_library_small_screen_720 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/library_small_screen.sfui
-             --size 1280x720 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/library_small_screen_720)
-    set_tests_properties(ui_library_small_screen_720 PROPERTIES LABELS ui TIMEOUT 300)
+    sculptforge_ui_test(library_small_screen_720 library_small_screen --size 1280x720)
     # #107: every look's right tray on a 1280x720 screen; #105: a Windows laptop at 150-200 % (2560x1600 at 200 % is
     # 1280x800 logical px), nothing past the window's edges.
-    add_test(NAME ui_right_tray_looks_720 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/right_tray_looks.sfui
-             --size 1280x720 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/right_tray_looks_720)
-    add_test(NAME ui_windows_dpi_2560 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/windows_dpi.sfui
-             --size 2560x1600 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/windows_dpi_2560)
-    add_test(NAME ui_windows_dpi_2160 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/windows_dpi.sfui
-             --size 2160x1350 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/windows_dpi_2160)
+    sculptforge_ui_test(right_tray_looks_720 right_tray_looks --size 1280x720)
+    sculptforge_ui_test(windows_dpi_2560 windows_dpi --size 2560x1600)
+    sculptforge_ui_test(windows_dpi_2160 windows_dpi --size 2160x1350)
     set_tests_properties(ui_right_tray_looks_720 ui_windows_dpi_2560 ui_windows_dpi_2160 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
-    add_test(NAME ui_user_guide_1080 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/user_guide.sfui
-             --size 1920x1080 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/user_guide_1080)
-    set_tests_properties(ui_user_guide_1080 PROPERTIES LABELS ui TIMEOUT 300)
+    sculptforge_ui_test(user_guide_1080 user_guide --size 1920x1080)
     # A crash leaves a note in the log file (#16). Needs no window.
     add_test(NAME crash_log COMMAND ${CMAKE_COMMAND} -DAPP=$<TARGET_FILE:sculptforge>
              -DDIR=${CMAKE_CURRENT_BINARY_DIR}/crash-log-test -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/crash_log.cmake)

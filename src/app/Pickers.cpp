@@ -7,6 +7,7 @@
 #include "app/Pickers.h"
 
 #include "app/App.h"
+#include "app/UiServe.h"
 #include "app/AssetLibrary.h"
 #include "app/Ui.h"
 #include "core/BrushLibrary.h"
@@ -259,6 +260,8 @@ const BrushAlpha& builtinAlpha(int i) {
     const auto& all = BrushAlpha::builtins(); // Round, Square, Noise and the generated patterns (#43)
     return all[size_t(std::clamp(i, 0, int(all.size()) - 1))];
 }
+
+char paletteFilter[64] = ""; // the brush palette's filter field
 
 } // namespace
 
@@ -619,7 +622,6 @@ void drawBrushGrid(App& app, GridMode mode) {
     const float tile = 64.0f * app.uiScale_;
     const std::vector<BrushItem> items = PickerUi::brushItems(app, true);
 
-    static char paletteFilter[64] = "";
     if (!popup) {
         ImGui::SetNextItemWidth(-SortMenuWidth());
         ImGui::InputTextWithHint("##brushfilter", ICON_LC_SEARCH "  Filter brushes", paletteFilter,
@@ -1531,6 +1533,12 @@ void App::drawColorWidget(float width) {
     ImGui::PopStyleVar();
     ui::HelpAction(*this, "color.fill");
     ImGui::EndGroup();
+}
+
+void resetPickerGlobals() {
+    glow() = {};
+    st() = {};
+    paletteFilter[0] = 0;
 }
 
 } // namespace sf

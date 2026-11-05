@@ -3,6 +3,7 @@
 #include "app/Ui.h"
 
 #include "app/App.h"
+#include "app/UiServe.h"
 #include "app/I18n.h"
 #include "app/Shell.h"
 #include "app/Theme.h"
@@ -707,6 +708,25 @@ bool g_dragScrollMoved = false;
 int g_dragScrolls = 0;
 float g_dragScrollY = 0.0f;
 } // namespace
+
+void resetUiGlobals() {
+    g_help = {};
+    g_shown.clear();
+    g_popupInfo = true;
+    g_nextShelf = ShelfNone, g_nextIndex = -1;
+    g_anims.clear();
+    g_reduceMotion = g_animating = g_animatingLast = false;
+    g_seen.clear();
+    g_rings.clear();
+    g_noRing.clear();
+    g_seenFrame = -1;
+    g_ringsShown = g_liftsShown = g_liftsCounting = 0;
+    g_dragScrollWindow = 0;
+    g_dragScrollButton = ImGuiMouseButton_Left;
+    g_dragScrollMoved = false;
+    g_dragScrolls = 0;
+    g_dragScrollY = 0.0f;
+}
 
 void DragScrollPanels() {
     ImGuiContext& g = *GImGui;

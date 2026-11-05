@@ -224,6 +224,10 @@ bool isLitSphereListed(int index) {
     return (index >= 0 && index < kStyleCount) || (isCustomLitSphere(index) && !customs()[size_t(index - kStyleCount)].removed);
 }
 const CustomLitSphere* customLitSphere(int index) { return isCustomLitSphere(index) ? &customs()[size_t(index - kStyleCount)] : nullptr; }
+void clearCustomLitSpheres() {
+    customs().clear();
+    g_revision = 1;
+}
 uint64_t litsphereRevision() { return g_revision; }
 
 std::string litsphereKey(int index) {
