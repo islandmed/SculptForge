@@ -103,6 +103,49 @@ What it says:
 - **Windows harness note:** the micro scenes have to start through `cmd /c` (win.sh with any `SFENV`); a direct
   launch from the scheduled task exits silently before writing the scene (not yet understood).
 
+## Lucy on the floor: 0.11.0 vs 0.11.1 (11-05)
+
+Does 0.11.1's micro-level speed-up (measured on the 3060) hold on the floor? Laptop, `SF_HW_SIMULATE=floor
+SF_GOVERNOR=0`, offscreen, `--benchmark-file` (Clay 25 / 120 / 240 px, then a 10 s orbit), each run under
+`~/Work/.sf/bench.lock` at load < 2. Builds: v0.11.0 and 0.11.1 (d98be72f), each with fix/bench-load-stall applied
+(without it E-core runs hang at "settling"), and v0.11.0 with the `--benchmark-file` and `SF_GOVERNOR` harness
+commits as well. 2 interleaved runs per cell unless the cell says otherwise. Committed lag p50 / p99 in ms, then
+release.
+
+| Scene | Tier | Build | 25 px | 120 px | 240 px | Orbit after strokes | First frame | RAM + GPU |
+|---|---|---|---|---|---|---|---|---|
+| Lucy 112M (micro) | floor, P-cores | 0.11.0 | 89 / 268 | 1076 / 2230 | 5540 / 5540, 14.4 s | 0.3 fps | - | 5.7 GB + 336 MB |
+| Lucy 112M (micro) | floor, P-cores | 0.11.1 | 55 / 148 | 151 / 258 | 325 / 829, 1.4 s | 13.1 fps | 8.7 s | 5.6 GB + 2245 MB |
+| Lucy 112M (micro) | floor, P-cores | 0.11.1 + fix/floor-orbit-shade | 55 / 163 | 149 / 267 | 313 / 824, 1.5 s | 19.1 fps | 8.7 s | 5.6 GB + 2245 MB |
+| Lucy 112M (micro) | E-core floor | 0.11.0 (1 run) | 83 / 902 | 4 dabs in 6 s | 5 dabs, 61.5 s | 0.1 fps | - | 5.4 GB + 336 MB |
+| Lucy 112M (micro) | E-core floor | 0.11.1 (3 runs) | 54 / 180 | 232 / 846 | 2258 / 2434, 6.7 s | 7.5 fps | 46.4 s | 5.4 GB + 2245 MB |
+| Lucy 112M (micro) | E-core floor | 0.11.1 + fix/floor-orbit-shade | 53 / 181 | 232 / 864 | 2265 / 2467, 6.7 s | 19.2 fps | 46.3 s | 5.4 GB + 2245 MB |
+| Lucy 28M (plain) | floor, P-cores | 0.11.0 | 21 / 133 | 128 / 296 | 347 / 622, 0.7 s | 64 fps | - | 4.0 GB + 336 MB |
+| Lucy 28M (plain) | floor, P-cores | 0.11.1 | 20 / 138 | 128 / 317 | 327 / 655, 0.8 s | 63 fps | 4.8 s | 3.9 GB + 500 MB |
+| Lucy 28M (plain) | E-core floor | 0.11.0 | 21 / 306 | 372 / 1592 | 2750 / 4570, 8.1 s | 53 fps | - | 3.6 GB + 336 MB |
+| Lucy 28M (plain) | E-core floor | 0.11.1 | 21 / 294 | 460 / 1752 | 2050 / 4009, 7.1 s | 54 fps | 23.8 s | 3.6 GB + 500 MB |
+
+What it says:
+
+- **Lucy 112M doesn't fit an 8 GB floor machine:** 5.6 GB RAM + 2.2 GB GPU, and an integrated GPU takes both from
+  the same memory. Lucy 28M (3.9 GB + 500 MB) is the largest Lucy that fits.
+- **0.11.1 is a real step on the floor for micro levels** (112M, P-cores): 25 px p99 268 → 148 ms, 120 px p50
+  1076 → 151 ms, 240 px release 14.4 → 1.4 s, orbit 0.3 → 13 fps. On E-cores, 0.11.0 can't sculpt 112M at all
+  (4-5 dabs per 6 s big stroke, 7-19 s frames); 0.11.1 can.
+- **The orbit claim doesn't hold on the floor:** 13 fps (P-cores) and 7.5 fps (E-cores) after strokes, against the
+  3060's 48-51 and the target of 30. Two costs: shading catch-up after strokes ran without a time cap while the view
+  moved (36 ms a frame on P-cores, 93 ms on E-cores), and drawing the 28M base triangles (the micro renderer's
+  coarsest LOD is the base; the floor's budget is 2M), about 33 ms of GPU a frame here. fix/floor-orbit-shade caps
+  the first at 10 ms a frame (orbit 13 → 19 fps, 7.5 → 19 fps; strokes unchanged). The second needs LOD below the
+  base: cluster LOD (perf-plan item 8), off until the patent opinion. A real integrated GPU is slower than this
+  M1 Pro's GPU.
+- **The 3060 "before" numbers aren't v0.11.0:** "312 ms p99 at 25 px" was main efe8bb2f (an unreleased micro-level
+  regression) and "orbit 0.7 fps" was main 8e67e3f7. Against the v0.11.0 tag on the floor the 25 px p99 gain is
+  268 → 148 ms.
+- **Plain meshes (28M) didn't change** between 0.11.0 and 0.11.1 (within noise); big brushes there are still 3-55x
+  off target (a).
+- **First frame:** 112M opens in 8.7 s on P-cores, 46 s on E-cores (target < 3 s).
+
 ## Candidates for beta.3
 
 Each candidate is measured against the row above on the same tier, interleaved, before it can be turned on.
