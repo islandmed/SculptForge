@@ -62,6 +62,8 @@ std::string multipartBody(const std::vector<MultipartField>& fields, std::string
 // Every request this process started (tests: the AI switch sends nothing while it is off).
 uint64_t httpRequestCount();
 void resetHttpRequestCount(); // (the warm UI test server, between scripts: app/UiServe.h)
+// False in a build without libcurl (non-Windows): every request fails at once. Tests that talk to a local server skip.
+bool httpSupported();
 
 inline HttpResponse httpPostJson(const std::string& url, const std::vector<std::string>& headers, const std::string& body,
                                  int timeoutSeconds = 120) {

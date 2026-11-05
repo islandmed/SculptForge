@@ -3263,7 +3263,8 @@ void App::startGenerator() {
     ai::AiSettings settings = aiSettings_;
     const bool hunyuan = settings.generatorService == "huggingface"
                              ? ai::hunyuanModel(ai::resolveHfPreset(settings, textMode_).id)
-                             : settings.generatorService == "fal" && ai::hunyuanModel(settings.falModel);
+                             : settings.generatorService == "fal" &&
+                                   ai::hunyuanModel(textMode_ ? ai::falTextModel(settings.falModel) : settings.falModel);
     if (hunyuan) showHunyuanNoticeOnce();
     if (settings.comfyImageWorkflow.empty()) settings.comfyImageWorkflow = comfyDefaultWorkflow(false);
     if (settings.comfyTextWorkflow.empty()) settings.comfyTextWorkflow = comfyDefaultWorkflow(true);
@@ -3547,7 +3548,9 @@ void App::drawImageTo3D() {
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", ai::kHunyuanLicenceNote);
         ImGui::InputText("Model id", falModel_, sizeof falModel_);
-        if (ai::hunyuanModel(falModel_)) hint(ai::kHunyuanLicenceNote);
+        if (textMode_ && !ai::rodinModel(falModel_)) hint("From text, Hunyuan3D 3.1 Rapid runs. Choose a Rodin model to use Rodin for text.");
+        if (ai::hunyuanModel(textMode_ ? ai::falTextModel(falModel_) : std::string(falModel_)))
+            hint(ai::kHunyuanLicenceNote);
         ImGui::InputText("API key", falKey_, sizeof falKey_, ImGuiInputTextFlags_Password);
         if (!falKey_[0]) hint(std::getenv("FAL_KEY") ? "Using FAL_KEY from the environment." : "Get a key at fal.ai/dashboard/keys");
     } else if (serviceId == "meshy") {

@@ -68,4 +68,5 @@ See [Generate 3D with your own ComfyUI](comfyui.md).
 ## Paid services
 
 fal.ai and Meshy are paid services with their own terms of service and pricing; generations are
-billed to your account with them. Model availability and names can change on their side.
+billed to your account with them. Hyper3D Rodin 2.5 runs through fal.ai with your fal.ai key: the
+image or description goes to fal.ai, which runs Rodin; SculptForge never contacts Hyper3D directly. Model availability and names can change on their side.

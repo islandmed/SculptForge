@@ -74,7 +74,7 @@ Which model runs depends on the service:
 | Service | Text-to-3D model |
 |---|---|
 | Hugging Face | Hunyuan3D 2 mini Turbo (Tencent), or Hunyuan3D 2 if you chose it in **Model**. Any other choice uses Turbo |
-| fal.ai | Hunyuan3D 3.1 Rapid (Tencent) |
+| fal.ai | Rodin 2.5 (Hyper3D) when it is the chosen **Model** (Rodin 2.5 or Rodin 2.5 Fast), otherwise Hunyuan3D 3.1 Rapid (Tencent) |
 | Meshy | Meshy's own text-to-3D model |
 | ComfyUI | The text workflow you choose (the bundled `text-to-3d` uses FLUX.1 schnell and Hunyuan3D 2.1) |
 
@@ -122,8 +122,10 @@ it to refill, or pick another model.
 
 ### fal.ai and Meshy (paid)
 
-- **fal.ai**: choose a **Model** (TRELLIS.2, Hunyuan3D 3.1 Pro, Hunyuan3D 3.1 Rapid or Meshy 6) or type any
-  fal model id into **Model id**. Paste your key from fal.ai/dashboard/keys into **API key**, or set
+- **fal.ai**: choose a **Model** (TRELLIS.2, Hunyuan3D 3.1 Pro, Hunyuan3D 3.1 Rapid, Meshy 6, Rodin 2.5 or
+  Rodin 2.5 Fast) or type any fal model id into **Model id**. Rodin 2.5 (Hyper3D) works from an image or a
+  description; SculptForge asks it for the shape only (GLB, no materials). Rodin 2.5 Fast is cheaper and
+  low poly (up to about 20K triangles), fine as a blockout before remeshing. Paste your key from fal.ai/dashboard/keys into **API key**, or set
   `FAL_KEY`.
 - **Meshy**: paste your key from meshy.ai (API settings) into **API key**, or set `MESHY_API_KEY`.
 
