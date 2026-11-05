@@ -104,9 +104,11 @@ part.
 ## What a transform keeps
 
 A transform only changes where the vertices are. Face Groups, quads, UVs, vertex paint, textures, the mask and
-the topology stay as they are. [Sculpt layers](layers.md) move with the surface: the base and every layer's
-offsets are transformed together, so a layer you sculpted on a forearm stays on it after posing, and layer
-sliders keep working. With [subdivision levels](subdivision-levels.md) you can pose at a low level: the detail of
+the topology stay as they are. With **Base mesh** active, [sculpt layers](layers.md) move with the surface: the
+base and every layer's offsets are transformed together, so a layer you sculpted on a forearm stays on it after
+posing, and layer sliders keep working. With a sculpt layer active, the transform goes into that layer, like a
+stroke: the base stays, and the layer's weight dials the move in and out (a pose as a blend shape). A layer whose
+weight is 0 can't be transformed into. With [subdivision levels](subdivision-levels.md) you can pose at a low level: the detail of
 the higher levels, sculpt layers included, turns with it when you step back up. Projects save the result, and the gizmo's pivot and options too.
 
 ## Scripting

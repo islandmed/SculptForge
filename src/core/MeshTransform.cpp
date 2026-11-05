@@ -154,8 +154,14 @@ glm::vec3 transformCenter(const Mesh& mesh, const std::vector<float>& weights) {
     return box.valid() ? box.center() : glm::vec3(0.0f);
 }
 
-bool TransformSession::begin(const Mesh& mesh, std::vector<float> weights, Symmetry mirror, const glm::vec3& pivot) {
+bool TransformSession::layerWeightZero(const Mesh& mesh, int layer) {
+    return layer >= 0 && layer < int(mesh.layers.size()) && std::abs(mesh.layers[size_t(layer)].weight) < 1e-6f;
+}
+
+bool TransformSession::begin(const Mesh& mesh, std::vector<float> weights, Symmetry mirror, const glm::vec3& pivot,
+                             int layer) {
     *this = TransformSession();
+    if (layerWeightZero(mesh, layer)) return false;
     const size_t nv = mesh.vertexCount();
     const bool weighted = weights.size() == nv;
     std::vector<uint16_t> full(weighted ? nv : 0, 0); // every vertex's level (0 = still)
@@ -208,17 +214,21 @@ bool TransformSession::begin(const Mesh& mesh, std::vector<float> weights, Symme
     usedLevels_.assign(kLevels + 1, 0);
     for (uint16_t l : level_) usedLevels_[l] = 1;
     layered_ = !mesh.layers.empty();
-    const auto& src = mesh.basePositions();
+    layer_ = layer >= 0 && layer < int(mesh.layers.size()) ? layer : -1;
+    if (layer_ >= 0) invWeight_ = 1.0f / mesh.layers[size_t(layer_)].weight;
+    // Recording into a layer starts from the shape as shown; otherwise from the base.
+    const auto& src = layer_ >= 0 ? mesh.positions : mesh.basePositions();
     base_.resize(verts_.size());
     normals_.resize(verts_.size());
     for (size_t i = 0; i < verts_.size(); ++i) {
         base_[i] = src[verts_[i]];
         normals_[i] = mesh.normals[verts_[i]];
     }
-    deltas_.resize(mesh.layers.size());
-    for (size_t l = 0; l < mesh.layers.size(); ++l) {
+    deltas_.resize(layer_ >= 0 ? 1 : mesh.layers.size());
+    for (size_t l = 0; l < deltas_.size(); ++l) {
+        const std::vector<glm::vec3>& d = mesh.layers[layer_ >= 0 ? size_t(layer_) : l].delta;
         deltas_[l].resize(verts_.size());
-        for (size_t i = 0; i < verts_.size(); ++i) deltas_[l][i] = mesh.layers[l].delta[verts_[i]];
+        for (size_t i = 0; i < verts_.size(); ++i) deltas_[l][i] = d[verts_[i]];
     }
     active_ = true;
     return true;
@@ -246,10 +256,23 @@ void TransformSession::apply(Mesh& mesh, const MeshTransform& t) {
         }
     }
     std::vector<glm::vec3>& target = layered_ ? mesh.base : mesh.positions;
+    std::vector<glm::vec3>* layerDelta = layer_ >= 0 ? &mesh.layers[size_t(layer_)].delta : nullptr;
     parallelRange(verts_.size(), [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
             const Level& L = table_[side_[i] * stride + level_[i]];
             const uint32_t v = verts_[i];
+            if (layerDelta) { // the move goes into the layer's offsets, scaled up by its weight
+                const glm::vec3 p = L.translateOnly ? base_[i] + L.offset : L.linear * base_[i] + L.offset;
+                (*layerDelta)[v] = deltas_[0][i] + (p - base_[i]) * invWeight_;
+                if (L.translateOnly) {
+                    mesh.normals[v] = normals_[i];
+                } else {
+                    const glm::vec3 n = L.normal * normals_[i];
+                    const float len = glm::length(n);
+                    mesh.normals[v] = len > 1e-20f ? n / len : normals_[i];
+                }
+                continue;
+            }
             if (L.translateOnly) {
                 target[v] = base_[i] + L.offset;
                 for (size_t k = 0; k < deltas_.size(); ++k) mesh.layers[k].delta[v] = deltas_[k][i];
@@ -271,6 +294,13 @@ void TransformSession::apply(Mesh& mesh, const MeshTransform& t) {
 }
 
 void TransformSession::writeBack(Mesh& mesh) {
+    if (layer_ >= 0) {
+        std::vector<glm::vec3>& d = mesh.layers[size_t(layer_)].delta;
+        for (size_t i = 0; i < verts_.size(); ++i) d[verts_[i]] = deltas_[0][i];
+        mesh.evaluate(verts_);
+        mesh.updateNormals(verts_);
+        return;
+    }
     std::vector<glm::vec3>& target = layered_ ? mesh.base : mesh.positions;
     for (size_t i = 0; i < verts_.size(); ++i) {
         target[verts_[i]] = base_[i];
@@ -299,8 +329,14 @@ UndoRecord TransformSession::finish(Mesh& mesh, BVH& bvh, std::string label) {
     if (verts_.size() * 4 > mesh.vertexCount()) bvh.refitAll(mesh);
     else bvh.refit(mesh, verts_);
     r.label = std::move(label);
-    r.layer = -1;
     r.positions.indices = verts_;
+    if (layer_ >= 0) { // like a stroke into the layer: its old offsets
+        r.layer = layer_;
+        r.positions.values = std::move(deltas_[0]);
+        *this = TransformSession();
+        return r;
+    }
+    r.layer = -1;
     r.positions.values = std::move(base_);
     for (auto& d : deltas_) {
         UndoChannel<glm::vec3> ch;
@@ -334,7 +370,8 @@ size_t transformPart(Document& doc, int index, const MeshTransform& t, bool useM
         info.bvhDirty = false;
     }
     TransformSession s;
-    if (!s.begin(mesh, transformWeights(mesh, useMask, falloff), mirror, t.pivot)) return 0;
+    const int layer = active ? doc.activeLayer : -1;
+    if (!s.begin(mesh, transformWeights(mesh, useMask, falloff), mirror, t.pivot, layer)) return 0;
     const size_t n = s.movingVertices();
     s.apply(mesh, t);
     UndoRecord r = s.finish(mesh, bvh, label);

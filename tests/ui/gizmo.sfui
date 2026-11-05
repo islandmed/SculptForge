@@ -126,6 +126,30 @@ shot posed-redo
 key ctrl+z
 run mask_clear
 
+# A sculpt layer active (GitHub #133): mask, invert, move: the move goes into the layer, so its weight dials it in
+# and out and the base mesh stays.
+run layer_add name=Pose
+expect_value layers == 1
+run mask_rect x0=-1 y0=-1 x1=0 y1=1 ; mask_invert
+key w
+snapshot
+gizmo_drag move_y 0 -70
+expect_value moved > 1000
+expect_value moved_masked == 0
+expect_status Gizmo Move
+shot layer-moved
+run layer_set_weight index=0 weight=0
+expect_value moved == 0
+run layer_set_weight index=0 weight=1
+expect_value moved > 1000
+# Weight 0: the gizmo won't move into the layer and says why.
+run layer_set_weight index=0 weight=0
+gizmo_drag move_y 0 -70
+expect_value moved == 0
+expect_status weight is 0
+run layer_set_weight index=0 weight=1 ; layer_remove index=0 ; mask_clear
+key r
+
 # Every control explains itself with Ctrl held; Ctrl+F1 opens this chapter of the guide.
 hold ctrl
 hover "Gizmo/Apply"

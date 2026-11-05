@@ -485,14 +485,18 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
                 s.bvh.build(s.mesh);
                 s.bvhDirty = false;
             }
+            // The active Part records into its active sculpt layer, as strokes do.
+            const int layer = i == doc_.activePart ? doc_.activeLayer : -1;
             TransformSession session;
-            if (!session.begin(m, transformWeights(m, gizmo_.useMask, gizmo_.falloff), symmetry_, gizmo_.pivot))
+            if (!session.begin(m, transformWeights(m, gizmo_.useMask, gizmo_.falloff), symmetry_, gizmo_.pivot, layer))
                 continue;
             gizmo_.parts.push_back(i);
             gizmo_.sessions.push_back(std::move(session));
         }
         if (gizmo_.sessions.empty()) {
-            status_ = gizmo_.useMask && doc_.mesh.hasMask() ? "Nothing to move: everything is masked (Ctrl+click the "
+            status_ = TransformSession::layerWeightZero(doc_.mesh, doc_.activeLayer)
+                          ? "Active layer weight is 0 - raise it to transform into the layer"
+                      : gizmo_.useMask && doc_.mesh.hasMask() ? "Nothing to move: everything is masked (Ctrl+click the "
                                                               "background to invert the mask)"
                                                             : "Nothing to move: the Part is hidden or empty";
             gizmo_.handle = H::None;

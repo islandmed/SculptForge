@@ -98,6 +98,8 @@ CommandResult runTransform(Document& doc, const Args& a) {
         return {false, "Bad pivot '" + pivot + "' (expected center, origin or x,y,z)"};
     }
     if (t.identity()) return {true, "Nothing to do: the transform changes nothing"};
+    if (TransformSession::layerWeightZero(doc.mesh, doc.activeLayer))
+        return {false, "Active layer weight is 0 - raise it to transform into the layer"};
 
     size_t moved = 0;
     for (int i : targets) moved += transformPart(doc, i, t, useMask, falloff, sym, "Transform");
@@ -116,7 +118,8 @@ void registerTransformCommands(CommandRegistry& reg) {
     reg.add({"transform",
              "Move, rotate and scale the active Part, or only its unmasked part (the Gizmo as a command): "
              "p' = pivot + translate + R * S * (p - pivot). Masked vertices stay, partly masked ones move partly; "
-             "falloff eases it in from the mask's edge (a soft joint for posing). One undo step per Part.",
+             "falloff eases it in from the mask's edge (a soft joint for posing). With a sculpt layer active the "
+             "move goes into that layer (as a stroke does). One undo step per Part.",
              {{"translate", T::String, "Movement x,y,z in world units. Default 0,0,0.", false},
               {"rotate", T::String, "Rotation in degrees about the X, then Y, then Z axis (of orient). Default 0,0,0.",
                false},
