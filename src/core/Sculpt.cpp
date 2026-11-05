@@ -833,7 +833,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     }
 
     // Scale-adaptive dabs (Sculpt.h, adaptiveDabs): a big region's plane from an even sample of its vertices.
-    adaptiveDab_ = adaptiveDabs && !dynTopo_.active() && !draft_ && verts_.size() >= kAdaptiveMinVertices &&
+    adaptiveDab_ = (adaptiveDabs || analyticNormals) && !dynTopo_.active() && !draft_ && verts_.size() >= kAdaptiveMinVertices &&
                    type != BrushType::Smooth && type != BrushType::Layer && type != BrushType::Morph &&
                    // (an alpha's fine pattern or Clay Block's square tip, which turn with the area normal, and the brushes that move along each vertex's own normal amplify a
                    // hair's difference in the normals the next dabs read)

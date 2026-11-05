@@ -1919,6 +1919,11 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     haveLastDab_ = false;
     doc_.sculptor.draftStrokes = draftStrokes() && asyncStrokeAllowed(); // (AsyncStroke.cpp)
     doc_.sculptor.adaptiveDabs = fastBigBrushes();
+    static const bool analyticNormals = [] { // SF_ANALYTIC_NORMALS=0: every dab's normals from the rings (A/B)
+        const char* e = std::getenv("SF_ANALYTIC_NORMALS");
+        return !(e && e[0] == '0');
+    }();
+    doc_.sculptor.analyticNormals = analyticNormals;
     if (!doc_.sculptor.beginStroke(doc_.mesh,
                                    !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushLabel(strokeBrush_),
                                    strokeSculpt_ ? doc_.activeLayer : -1)) {
