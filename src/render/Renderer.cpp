@@ -320,10 +320,9 @@ flat in int vPrimBase;
 // interpolated on the micro triangle under the pixel (normal, curvature, mask), whatever level the geometry drew.
 flat in int vSlot;
 in vec2 vIJ;
-in vec3 vBaseNormal;
-in vec3 vMicroView;
-uniform int uUnshaded;
-vec3 viewRay();
+uniform int uUnshaded; // 1: the cluster's shading isn't there yet (just opened): the drawn facets light it
+uniform mat4 uProj;
+uniform vec4 uViewport; // the view's rectangle in window pixels
 uniform samplerBuffer uShade;
 uniform int uN;
 uniform int uSamples;
@@ -340,10 +339,15 @@ vec3 octNormal(vec2 v) {
     return normalize(n);
 }
 void microFetch() {
-    if (uUnshaded == 1) { // (just opened: this cluster's shading follows in a few frames) the drawn facet's normal
-        vec3 f = cross(dFdx(vMicroView), dFdy(vMicroView));
-        f = dot(f, f) > 1e-30 ? normalize(f) : mat3(uView) * normalize(vBaseNormal);
-        if (dot(f, viewRay()) < 0.0) f = -f;
+    if (uUnshaded == 1) {
+        // The pixel's view-space point from its depth (no extra vertex outputs: they'd slow every frame), and the
+        // facet's normal from that point's screen-space slopes, turned towards the viewer.
+        vec4 ndc = vec4((gl_FragCoord.xy - uViewport.xy) / uViewport.zw * 2.0 - 1.0, gl_FragCoord.z * 2.0 - 1.0, 1.0);
+        vec4 q = inverse(uProj) * ndc;
+        vec3 v = q.xyz / q.w;
+        vec3 f = cross(dFdx(v), dFdy(v));
+        f = dot(f, f) > 1e-30 ? normalize(f) : vec3(0.0, 0.0, 1.0);
+        if (dot(f, v) > 0.0) f = -f;
         gNC = vec4(f, 0.0);
         gMask = 0.0;
         return;
@@ -375,7 +379,9 @@ void microFetch() {
 #undef V_MASK
 #define V_MASK gMask
 #endif
+#ifndef MICRO
 uniform vec4 uViewport;  // the view's rectangle in window pixels
+#endif
 uniform vec2 uProjScale; // projection x and y scale
 uniform vec3 uBaseColor;
 uniform vec3 uTintShift; // the material tint less 1 (0, the default, is no tint): the active colour, no vertex paint

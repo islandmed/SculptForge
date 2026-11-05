@@ -38,10 +38,7 @@ uniform int uSlotBase, uChunkSlot, uLevel, uN, uSamples;
 uniform int uUnrolled;
 uniform int uCorners[48];
 uniform float uStep;
-uniform int uUnshaded; // 1: the cluster's shading isn't there yet: the drawn triangles' own facets light it
 flat out int vSlot;
-out vec3 vBaseNormal;
-out vec3 vMicroView;
 out vec2 vIJ;
 #ifdef FLAT
 out vec3 vViewPos;
@@ -50,7 +47,6 @@ vec3 P[3];
 vec3 Nn[3];
 int ord[3];
 int localSlot;
-vec3 gBaseN; // the last microPos's interpolated base normal
 int sampleIndex(int i, int j) { return j * (uN + 1) - (j * (j - 1)) / 2 + i; }
 vec3 microPos(int I, int J) {
     float inv = 1.0 / float(uN);
@@ -68,7 +64,6 @@ vec3 microPos(int I, int J) {
     vec3 s = f - pull * 0.75;
     float len = length(nn);
     vec3 n = len > 1e-20 ? nn / len : vec3(0.0, 0.0, 1.0);
-    gBaseN = n;
     float d = float(texelFetch(uDisp, localSlot * uSamples + sampleIndex(I, J)).r) * uStep;
     return s + n * d;
 }
@@ -135,16 +130,12 @@ void main() {
     int r = k % stepE;
     if (edge >= 0 && r != 0) {
         ivec2 a = edgePoint(edge, k - r, m) * sc, b = edgePoint(edge, k - r + stepE, m) * sc;
-        vec3 pa = microPos(a.x, a.y), na = gBaseN;
-        pos = mix(pa, microPos(b.x, b.y), float(r) / float(stepE));
-        vBaseNormal = mix(na, gBaseN, float(r) / float(stepE));
+        pos = mix(microPos(a.x, a.y), microPos(b.x, b.y), float(r) / float(stepE));
     } else {
         pos = microPos(i * sc, j * sc);
-        vBaseNormal = gBaseN;
     }
     vIJ = vec2(float(i * sc), float(j * sc));
     vec4 p = uView * vec4(pos, 1.0);
-    vMicroView = p.xyz;
 #ifdef FLAT
     vViewPos = p.xyz;
 #endif
