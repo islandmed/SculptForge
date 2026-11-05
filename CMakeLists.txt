@@ -47,6 +47,7 @@ add_library(sculptforge_core STATIC
   src/core/Benchmark.cpp
   src/core/HardwareProfile.cpp
   src/core/FrameGovernor.cpp
+  src/core/PerfTrace.cpp
   src/core/TierConfig.cpp
   src/core/MemoryGuard.cpp
   src/core/Sculpt.cpp
@@ -323,8 +324,8 @@ target_link_libraries(sculptforge-cli PRIVATE sculptforge_core sculptforge_ai sc
 # library both link, so an edit to one of these files compiles once, not once per program.
 if(SCULPTFORGE_BUILD_APP OR SCULPTFORGE_BUILD_TESTS)
   add_library(sculptforge_appshared STATIC src/app/AssetLibrary.cpp src/app/BrushPreview.cpp src/app/UiLayout.cpp
-    src/app/ShellGeometry.cpp src/app/LookSchemes.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp src/render/Camera.cpp
-    src/render/Clusters.cpp src/render/Ghost.cpp)
+    src/app/ShellGeometry.cpp src/app/LookSchemes.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp
+    src/app/I18nTraditionalChinese.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
   target_link_libraries(sculptforge_appshared PUBLIC sculptforge_core)
   if(MSVC)
     target_compile_options(sculptforge_appshared PRIVATE /W4 /utf-8 /permissive-)
@@ -353,6 +354,7 @@ if(SCULPTFORGE_BUILD_APP)
     fontLucide ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/lucide.ttf
     fontMono ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-Regular.ttf # the looks (Preferences > Interface > Look)
     fontMonoBold ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-SemiBold.ttf
+    fontCjk ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansTC-UI.otf # Traditional Chinese (tools/i18n/subset_cjk_font.py)
     appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png
     supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt # Help > About (never empty: it starts with comments)
     foundingMembers ${CMAKE_CURRENT_SOURCE_DIR}/website/founding.json) # Help > About and the membership card
@@ -624,9 +626,7 @@ include(CPack)
 # --- Python module ---
 if(SCULPTFORGE_BUILD_PYTHON)
   find_package(Python 3.9 REQUIRED COMPONENTS Interpreter Development.Module)
-  FetchContent_Declare(pybind11
-    URL https://github.com/pybind/pybind11/archive/refs/tags/v3.0.4.tar.gz
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+  sf_fetch_declare(pybind11 DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
   FetchContent_MakeAvailable(pybind11)
   pybind11_add_module(sculptforge_python MODULE src/python/module.cpp)
   set_target_properties(sculptforge_python PROPERTIES OUTPUT_NAME sculptforge)
@@ -764,6 +764,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME release_workflows COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py)
     add_test(NAME release_workflows_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py --self-test)
     add_test(NAME release_paperwork COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/paperwork_only.py --self-test)
+    # Step bump pins tests/ui/whats_new.sfui to the newest What's New sections (tools/release/pin_whats_new_test.py).
+    add_test(NAME release_pin_whats_new COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/pin_whats_new_test.py --self-test)
+    # scripts/merge-queue.sh refuses a merge or squash that throws away the other side's change (tools/ci/no_revert.py).
+    add_test(NAME ci_no_revert COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/no_revert.py --self-test)
     # scripts/release.sh's beta (X.Y.Z-beta.N) and its promotion to stable, in a sandbox with stand-ins for gh and curl.
     if(UNIX AND NOT APPLE AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
       add_test(NAME release_script_beta COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_beta_test.sh)

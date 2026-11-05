@@ -44,11 +44,17 @@ STEPS=(bump check ci tag release site aur brew omarchy replies status)
 red() { printf '\033[1;31m%s\033[0m\n' "$*" >&2; }
 say() { printf '\033[1m== %s\033[0m\n' "$*"; }
 ok() { printf '   ok: %s\n' "$*"; }
+# resume STEP: the exact command that continues at STEP, with this run's HIGHLIGHTS, BUILD_DIR and --yes (a stopped
+# release is one the owner already said ship it for; without --yes, step tag would stop again at "not confirmed").
+resume() {
+    printf '%s%sscripts/release.sh %s --from %s --yes' "${HIGHLIGHTS_GIVEN:+HIGHLIGHTS=$HIGHLIGHTS_GIVEN }" \
+        "${BUILD_DIR:+BUILD_DIR=$BUILD_DIR }" "$V" "$1"
+}
 # die "what is wrong" "the exact fix"
 die() {
     red "STOPPED at step '$CURRENT': $1"
     printf '   fix: %s\n' "$2" >&2
-    printf '   then: scripts/release.sh %s --from %s\n' "$V" "$CURRENT" >&2
+    printf '   then: %s\n' "$(resume "$CURRENT")" >&2
     exit 1
 }
 sha256() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
@@ -84,6 +90,7 @@ TODAY=$(date +%F)
 CURRENT=setup
 # HIGHLIGHTS may be relative to where the script was started; the script works from the top of the checkout.
 case ${HIGHLIGHTS:-} in ''|/*) ;; *) HIGHLIGHTS=$PWD/$HIGHLIGHTS ;; esac
+HIGHLIGHTS_GIVEN=${HIGHLIGHTS:-} # preflight may fill HIGHLIGHTS with a file of its own; resume names only this one
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 cd "$(git rev-parse --show-toplevel)"
@@ -101,7 +108,7 @@ push_main() {
 }
 release_ready() {
     gh release view "$T" -R "$RELEASE_REPO" --json assets -q '.assets[].name' > "$work/assets" 2>/dev/null ||
-        die "no GitHub release $T yet" "run the earlier steps: scripts/release.sh $V --from tag"
+        die "no GitHub release $T yet" "run the earlier steps: $(resume tag)"
     grep -qx SHA256SUMS.txt "$work/assets" || die "release $T has no SHA256SUMS.txt (unfinished)" "re-run the Release workflow: gh workflow run release.yml -R $REPO -f tag=$T"
     # One-click update (src/core/SelfUpdate.h): once the app has a key, every release must carry the signature.
     if grep -q 'kUpdatePublicKeyHex = "[0-9a-f]\{64\}"' src/core/SelfUpdate.h 2>/dev/null; then
@@ -123,10 +130,14 @@ tarball_sha() {
         die "can't download the $T source tarball" "check that the tag is pushed: git ls-remote origin $T"
     sha256 "$work/src.tar.gz"
 }
+# server_error < log: the log shows an HTTP 5xx answer (curl, git, uv, flatpak-builder, FetchContent phrasings).
+server_error() {
+    grep -Eiq '(HTTP/[0-9.]+|HTTP status code|status code:?|error:|returned error:|response code) ?5[0-9]{2}\b|\b50[234] (Gateway Time-?out|Bad Gateway|Service Unavailable)\b'
+}
 # Successful run of a workflow on a push to main for a commit; waits for one in progress. The third argument is how
 # many 10-second tries a just-pushed commit's run gets to appear (default 1).
 wait_run() {
-    local wf=$1 sha=$2 tries=${3:-1} id="" status conclusion
+    local wf=$1 sha=$2 tries=${3:-1} id="" status conclusion rerun_done=""
     while :; do
         id=$(gh run list -R "$REPO" -w "$wf" -c "$sha" -e push -b main -L 1 --json databaseId -q '.[0].databaseId')
         tries=$((tries - 1))
@@ -140,6 +151,15 @@ wait_run() {
         gh run watch "$id" -R "$REPO" --exit-status >/dev/null || true
     fi
     conclusion=$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)
+    # A job that died on a GitHub/CDN 5xx while downloading (0.11.1: seven 504s in Packages) is rerun once, then judged.
+    if [ "$conclusion" = failure ] && [ -z "$rerun_done" ] && gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | server_error; then
+        echo "   $wf run $id failed on an HTTP 5xx download: rerunning its failed jobs once" >&2
+        rerun_done=1
+        gh run rerun "$id" --failed -R "$REPO" >/dev/null 2>&1 || true
+        sleep 10
+        gh run watch "$id" -R "$REPO" --exit-status >/dev/null 2>&1 || true
+        conclusion=$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)
+    fi
     [ "$conclusion" = success ] ||
         die "$wf run $id on $sha: $conclusion (https://github.com/$REPO/actions/runs/$id)" \
             "fix it on a branch, merge to main, then start again from step check (or re-run the run if it was a runner hiccup: gh run rerun $id --failed -R $REPO)"
@@ -193,13 +213,13 @@ highlights_ok() {
     [ "$n" -ge 3 ] && [ "$n" -le 5 ]
 }
 highlights_fix="write 3-5 one-line highlights (what users get) to a file and run again with HIGHLIGHTS=that-file"
-# The words people write for What's New: the guide section and the UI test that expects it.
+# The words people write for What's New: the guide section and (after step bump wrote it) the UI test's pin to it.
 words_ok() {
     python3 tools/release/assemble_notes.py --check >/dev/null || die "a note fragment in changes/ doesn't parse: $(python3 tools/release/assemble_notes.py --check 2>&1)" "fix it (changes/README.md has the format), commit, push main"
     grep -q "^## Version ${BASE//./\\.}\$" docs/guide/whats-new.md || grep -qs '^whats_new:' changes/*.md ||
         die "docs/guide/whats-new.md has no '## Version $BASE'" "write that section at the top (Help > What's New shows it), commit, push main"
-    grep -qF "expect_text \"Version $BASE\"" tests/ui/whats_new.sfui ||
-        die "tests/ui/whats_new.sfui doesn't check Version $BASE" "update its first expect_text lines to the new section (the version and one line from it), commit, push main"
+    [ "${1:-}" = bump ] || python3 tools/release/pin_whats_new_test.py "$BASE" --check >/dev/null ||
+        die "tests/ui/whats_new.sfui isn't pinned to $BASE's What's New" "run step bump (it pins it): $(resume bump)"
 }
 # UI scale / DPI (#87): the Windows manifest still asks for per-monitor DPI v2, and the "dpi" UI tests (100-200 %, a
 # display-scale event) pass on main's build. BUILD_DIR (default build) is the coordinator's tree, already built for
@@ -210,7 +230,7 @@ dpi_ok() {
     grep -q '<dpiAwareness[^>]*>PerMonitorV2' packaging/windows/sculptforge.manifest 2>/dev/null &&
         grep -q 'packaging/windows/sculptforge.manifest' CMakeLists.txt ||
         die "the Windows build no longer declares per-monitor DPI v2" "restore packaging/windows/sculptforge.manifest and its target_sources line in CMakeLists.txt (git log -p -- packaging/windows)"
-    [ -f "$b/CTestTestfile.cmake" ] || die "no build tree at $b for the DPI UI tests" "cmake -S . -B $b -DCMAKE_BUILD_TYPE=Release, or BUILD_DIR=<your build> scripts/release.sh $V --from check"
+    [ -f "$b/CTestTestfile.cmake" ] || die "no build tree at $b for the DPI UI tests" "cmake -S . -B $b -DCMAKE_BUILD_TYPE=Release, or run again with BUILD_DIR=<your build>"
     "${heavy[@]}" cmake --build "$b" --target sculptforge -j3 >/dev/null || die "the app doesn't build in $b" "cmake --build $b --target sculptforge and fix the error"
     SDL_APP_ID=sculptforge-agent "${heavy[@]}" ctest --test-dir "$b" -L dpi --output-on-failure >"$b/release-dpi.log" 2>&1 ||
         die "the UI scale / DPI tests fail (ctest -L dpi; log: $b/release-dpi.log)" "fix them on a branch, merge to main, run again from step check"
@@ -236,7 +256,7 @@ preflight() {
     command -v sha256sum >/dev/null || command -v shasum >/dev/null || die "no sha256sum or shasum" "install coreutils"
     auth=$(gh auth status 2>&1 || true)
     grep -q "account $AUTHOR_NAME" <<<"$auth" || die "gh is not logged in as $AUTHOR_NAME" "gh auth login (or gh auth switch -u $AUTHOR_NAME)"
-    words_ok
+    words_ok "$mode"
     grep -q '^set(SCULPTFORGE_PRERELEASE "[a-z0-9.]*")$' CMakeLists.txt ||
         die "CMakeLists.txt lost its set(SCULPTFORGE_PRERELEASE \"\") line that step bump sets" "restore it under project() (git log -p CMakeLists.txt), commit"
     python3 -c 'import json, sys; json.load(open(sys.argv[1]))' website/latest.json 2>/dev/null || die "website/latest.json is not valid JSON" "fix it, commit"
@@ -303,6 +323,9 @@ step_bump() {
     # Note fragments (changes/<branch>.md) into CHANGELOG [Unreleased] and What's New X.Y.Z; the fragments go.
     out=$(python3 tools/release/assemble_notes.py "$BASE" --apply 2>&1) || die "$out" "fix that fragment in changes/, commit, push main"
     grep -q 'written' <<<"$out" && echo "$out" | sed 's/^/   notes: /'
+    # The What's New UI test checks the guide's newest three sections: pinned here to this version's.
+    out=$(python3 tools/release/pin_whats_new_test.py "$BASE" 2>&1) || die "$out" "fix docs/guide/whats-new.md (its newest section must be '## Version $BASE'), commit, push main"
+    [ -n "$out" ] && echo "   pinned: $out"
     out=$(python3 - "$BASE" "$TODAY" "$PRE" <<'PY'
 import re, sys
 v, today, pre = sys.argv[1:]
@@ -378,7 +401,7 @@ PY
     python3 tools/guide/build_site.py >/dev/null # the guide, and the home page's What's New area for $V (not a beta's)
     [ -n "$PRE" ] || card_ok || die "website/index.html has no 'new in $V' card after build_site.py" "$card_fix"
     git add CMakeLists.txt CITATION.cff packaging/rez/package.py packaging/linux/org.sculptforge.SculptForge.metainfo.xml CHANGELOG.md website/index.html docs/guide/whats-new.md
-    git add -A changes
+    git add -A changes tests/ui/whats_new.sfui
     git add -A website/guide
     if git diff --cached --quiet; then
         ok "every version file already says $V and the guide is built"
@@ -408,7 +431,7 @@ step_check() {
         [ -z "$(git status --porcelain -- website/guide website/index.html)" ] ||
             die "website/guide is not rebuilt from docs/guide, or the home page changed (a beta leaves it alone)" "$bump"
         if git rev-parse -q --verify "refs/tags/$T" >/dev/null && [ "$(git rev-list -n1 "$T")" != "$(git rev-parse HEAD)" ]; then
-            die "$T already tags $(git rev-list -n1 "$T"), not main's $(git rev-parse --short HEAD)" "if that is the beta, continue: scripts/release.sh $V --from release; if not, use the next number ($BASE-${PRE%.*}.$((${PRE##*.} + 1)))"
+            die "$T already tags $(git rev-list -n1 "$T"), not main's $(git rev-parse --short HEAD)" "if that is the beta, continue: $(resume release); if not, use the next number ($BASE-${PRE%.*}.$((${PRE##*.} + 1)))"
         fi
         ok "CMakeLists.txt says $BASE $PRE and the guide is built at $(git rev-parse --short HEAD)"
         dpi_ok
@@ -422,7 +445,7 @@ step_check() {
     python3 tools/guide/build_site.py >/dev/null
     [ -z "$(git status --porcelain -- website/guide)" ] || die "website/guide is not rebuilt from docs/guide" "$bump"
     if git rev-parse -q --verify "refs/tags/$T" >/dev/null && [ "$(git rev-list -n1 "$T")" != "$(git rev-parse HEAD)" ]; then
-        die "$T already tags $(git rev-list -n1 "$T"), not main's $(git rev-parse --short HEAD)" "if that is the release, continue: scripts/release.sh $V --from release; if not, pick the next version"
+        die "$T already tags $(git rev-list -n1 "$T"), not main's $(git rev-parse --short HEAD)" "if that is the release, continue: $(resume release); if not, pick the next version"
     fi
     ok "version files, CHANGELOG, What's New, metainfo and guide say $V at $(git rev-parse --short HEAD)"
     dpi_ok

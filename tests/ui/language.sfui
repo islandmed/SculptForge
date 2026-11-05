@@ -68,3 +68,26 @@ key escape
 expect "Geometry##tool.geometry"
 expect "Draw##tool.draw"
 expect_text "Size"
+
+# Traditional Chinese (#114): the UI fonts are built again with the Chinese glyphs (the shots show no "?" boxes);
+# the "##" ids stay, so the same clicks work, and brush names stay in English.
+click "Preferences##palette.preferences"
+click "繁體中文##language.zh-TW"
+expect_text "語言"
+expect "偏好設定##palette.preferences"
+expect "界面##preferences.interface"
+shot zh_preferences
+key escape
+expect "檔案##palette.file"
+expect "工具##palette.tool"
+expect "繪製##tool.draw"
+expect "Clay Block##brush.clayblock"
+click "幾何##tool.geometry"
+click "細分##geometry.divide"
+expect_value sdiv_levels == 3
+shot zh_geometry
+click "幾何##tool.geometry"
+click "偏好設定##palette.preferences"
+click "English##language.en"
+expect "Preferences##palette.preferences"
+key escape

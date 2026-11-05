@@ -6,6 +6,32 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Orbiting a dense scan with a micro level right after big strokes is smoother on slower computers: the shading
+  that catches up after the strokes now takes a few milliseconds a frame while the view moves, and the rest when it
+  stops (Lucy 112M on the low-end profile: 13 to 19 frames a second).
+- **Help > Benchmark** no longer stops at "settling" on slower computers when the scene takes a few seconds to open.
+- Move, Scale and Rotate (the Transform gizmo and the `transform` command) with a sculpt layer active now record into
+  that layer, masked or not, like a stroke (#133, thanks Devon0209): the base mesh stays, the layer's weight dials
+  the move in and out, undo works. With Base mesh active they move the base and every layer, as before.
+### Added
+- **Rotation for vector displacement stamps** (#136, thanks DonnieAlex): with the VDM brush, **Sculpt > Brush > Vector
+  Displacement > Stamp rotation** has Follow stroke direction (Drag Stamp turns with the drag; off, the drag only
+  sizes the stamp), Angle and Angle jitter (a random turn per stamp), kept per brush like the alpha options.
+- Brush files keep the alpha's **Angle** and **Angle jitter** as well as Follow stroke direction: Save Brush Settings
+  on a custom brush writes all three into it, so shared brushes (brush codes, .sfpack) turn their alpha the same way.
+- **Maya style view keys** (#134, thanks RodTDai): hold Alt, then add Ctrl, and a left drag rolls the view (left /
+  right); Alt+F frames the active Part; Alt+H resets the view (front, upright, perspective, everything in view). Ctrl
+  first (or both together) still masks with Ctrl+Alt, on the model and beside it.
+- **Edit > Preferences > Input > Wheel zooms toward the pointer** (#134): the wheel zooms toward the point of the model
+  under the pointer, which stays put. On with the Maya style; the other styles keep zooming toward the middle (the box
+  turns it on in any style). **Reset view** is also an action in the Controls window, for a key of your own.
+### Changed
+- **UV Editor > Pack: Columns x Rows** (#135, thanks RodTDai): the UDIM Tiles slider is now a **Columns** (1-10) and
+  **Rows** (1-10) grid, so a 10 x 2 layout fills 1001-1020 and 4 x 3 stays four tiles wide. Pack at Density spills
+  within the Columns too. Projects keep their grid; new ones take the last one used. Scripts: `uv_pack` and
+  `uv_unwrap` take `columns=` and `rows=` (`tiles=` works as before).
+
 ## [0.11.1] - 2026-11-05
 
 ### Added

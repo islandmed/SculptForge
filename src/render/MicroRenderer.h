@@ -54,6 +54,7 @@ public:
     // Time a frame gives the first shading after opening (0 = all of it before the first frame); while the view
     // moves, initialShadeMovingMs.
     double initialShadeMs = 0.0, initialShadeMovingMs = 30.0;
+    // The view moves (set by the Renderer before sync: Fast Navigation's proxy frames): shading gets a time cap.
     bool viewMoving = false;
     // The last draw: the level used by each visible cluster (-1 = culled), and the target it settled on.
     float lastTargetPx = 0.0f;

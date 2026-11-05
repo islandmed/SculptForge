@@ -134,12 +134,12 @@ bool packByShape(Mesh& m, const UvTopology& topo, const std::vector<uint32_t>& l
         xatlas::PackCharts(atlas.get(), po);
         return atlas->meshCount == 1 ? int(std::max(atlas->atlasCount, 1u)) : 0;
     };
-    const int tiles = std::clamp(o.tiles, 1, 100);
+    const int maxTiles = uvPackMaxTiles(o), tiles = std::clamp(o.tiles, 1, maxTiles);
     float density = o.density;
     int used = 0;
     if (density > 0.0f) {
         used = pack(density, res);
-        if (used == 0 || used > 100) return false;
+        if (used == 0 || used > maxTiles) return false;
     } else {
         // Bisection at a quarter of the resolution (fast), then the full pack, a little smaller until it fits.
         const int lowRes = std::max(res / 4, 256);
@@ -160,7 +160,6 @@ bool packByShape(Mesh& m, const UvTopology& topo, const std::vector<uint32_t>& l
     }
     const xatlas::Mesh& out = atlas->meshes[0];
     if (out.indexCount != idx.size()) return false;
-    const int first = std::max(o.firstTile, 1001) - 1001;
     const float inv = 1.0f / float(res);
     // Only where xatlas put each island is taken: the move (and scale) that best maps the island onto its packed
     // copy is applied to the island's own UVs, so its shape stays exactly as it was.
@@ -173,8 +172,7 @@ bool packByShape(Mesh& m, const UvTopology& topo, const std::vector<uint32_t>& l
     std::vector<glm::vec2> placed(out.indexCount);
     for (uint32_t i = 0; i < out.indexCount; ++i) {
         const xatlas::Vertex& v = out.vertexArray[out.indexArray[i]];
-        const int t = first + std::max(v.atlasIndex, 0);
-        placed[i] = glm::vec2(float(t % 10), float(t / 10)) + glm::vec2(v.uv[0], v.uv[1]) * inv;
+        placed[i] = udimOrigin(uvPackTile(o, std::max(v.atlasIndex, 0))) + glm::vec2(v.uv[0], v.uv[1]) * inv;
     }
     for (size_t b = 0; b < idx.size();) {
         size_t e = b;
@@ -208,6 +206,19 @@ bool packByShape(Mesh& m, const UvTopology& topo, const std::vector<uint32_t>& l
 }
 
 } // namespace
+
+int uvPackTile(const UvPackOptions& o, int k) {
+    const int first = std::clamp(o.firstTile, 1001, 1100) - 1001;
+    if (o.columns <= 0) return 1001 + first + k;
+    const int columns = std::min(o.columns, 10 - first % 10);
+    return 1001 + first + k % columns + 10 * (k / columns);
+}
+
+int uvPackMaxTiles(const UvPackOptions& o) {
+    const int first = std::clamp(o.firstTile, 1001, 1100) - 1001;
+    if (o.columns <= 0) return 100 - first;
+    return std::min(o.columns, 10 - first % 10) * (10 - first / 10);
+}
 
 int packRectangles(const std::vector<glm::vec2>& sizes, int maxTiles, bool allowTurn, float border,
                    std::vector<glm::vec2>& positions, std::vector<uint8_t>& turned, std::vector<int>& tile) {
@@ -348,14 +359,16 @@ bool uvPack(Mesh& m, const UvTopology& topo, const std::vector<uint8_t>& islands
     int used = 0;
     if (o.density > 0.0f) {
         scale = o.density / float(res); // UV units per surface unit
-        used = tryScale(scale, 100);
+        const int maxTiles = uvPackMaxTiles(o);
+        used = tryScale(scale, maxTiles);
         if (!used) {
             if (useShapes()) return true;
-            error = "At that texel density an island is bigger than a tile (or it needs over 100 tiles): lower it";
+            error = "At that texel density an island is bigger than a tile (or it needs over " + std::to_string(maxTiles) +
+                    " tiles): lower it" + std::string(o.columns > 0 ? " or use more Columns" : "");
             return false;
         }
     } else {
-        const int tiles = std::clamp(o.tiles, 1, 100);
+        const int tiles = std::clamp(o.tiles, 1, uvPackMaxTiles(o));
         double boxes = 0.0;
         for (const Piece& pc : pieces) boxes += double(pc.size.x * pc.k) * double(pc.size.y * pc.k);
         if (boxes <= 0.0) {
@@ -385,15 +398,12 @@ bool uvPack(Mesh& m, const UvTopology& topo, const std::vector<uint8_t>& islands
         used = tryScale(scale, tiles);
     }
     // Place: rotate, scale, move into the box (inset by half the margin), then into its tile.
-    const int columns = 10;
-    const int first = std::max(o.firstTile, 1001) - 1001;
     poolFor(n, [&](size_t b, size_t e) {
         for (size_t p = b; p < e; ++p) {
             const uint32_t i = list[p];
             const Piece& pc = pieces[p];
             const float ca = std::cos(pc.angle), sa = std::sin(pc.angle), k = pc.k * scale;
-            const int t = first + tileOf[p];
-            const glm::vec2 origin(float(t % columns), float(t / columns));
+            const glm::vec2 origin = udimOrigin(uvPackTile(o, tileOf[p]));
             const glm::vec2 box = pc.size * k;
             for (uint32_t c = offsets[i]; c < offsets[i + 1]; ++c) {
                 glm::vec2 q = (rotate(m.uvs[corners[c]], ca, sa) - pc.lo) * k;

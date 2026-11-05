@@ -72,24 +72,44 @@ void App::drawAlphaSection() {
 }
 
 // Alpha options (#76): how the alpha turns and repeats on each dab, kept per brush (#78).
-void App::drawAlphaOptions() {
+void App::drawAlphaOptions(bool vdm) {
     AlphaOptions& o = alphaOptions_;
-    ui::Checkbox("Follow stroke direction##alpha.follow_stroke", &o.followStroke);
-    ui::HelpText("Follow stroke direction", nullptr,
-                 "The alpha turns with the stroke: its top points the way you are drawing, for scales, stitches and "
-                 "hair that line up along the stroke. Small wobbles are smoothed out (the direction is taken every "
-                 "20 pixels, as Blender's Rake does). Angle still adds its turn.",
-                 "Alpha");
+    const char* where = vdm ? "Brush > Vector Displacement" : "Alpha";
+    if (vdm) {
+        ImGui::SeparatorText("Stamp rotation");
+        ui::Checkbox("Follow stroke direction##vdm.follow_stroke", &o.followStroke);
+        ui::HelpText("Follow stroke direction", nullptr,
+                     "The stamp turns with you: with Drag Stamp its top points the way you drag; in a dots stroke it "
+                     "turns along the stroke. Off, Drag Stamp only sets the size and the stamp keeps Angle's turn. "
+                     "Slide Stamp never turns while you slide it.",
+                     where);
+    } else {
+        ui::Checkbox("Follow stroke direction##alpha.follow_stroke", &o.followStroke);
+        ui::HelpText("Follow stroke direction", nullptr,
+                     "The alpha turns with the stroke: its top points the way you are drawing, for scales, stitches "
+                     "and hair that line up along the stroke. Small wobbles are smoothed out (the direction is taken "
+                     "every 20 pixels, as Blender's Rake does). Angle still adds its turn.",
+                     where);
+    }
     ImGui::SetNextItemWidth(-1);
-    ui::SliderInside("##alpha_angle", &o.angle, -180.0f, 180.0f, "Angle %.0f");
-    ui::HelpText("Angle", nullptr, "Turn the alpha by a fixed angle in degrees (counter-clockwise); Ctrl+click to type.",
-                 "Alpha");
+    ui::SliderInside(vdm ? "##vdm_angle" : "##alpha_angle", &o.angle, -180.0f, 180.0f, "Angle %.0f");
+    ui::HelpText("Angle", nullptr,
+                 vdm ? "Turn the stamp by a fixed angle in degrees (counter-clockwise), on top of the drag's turn when "
+                       "Follow stroke direction is on; Ctrl+click to type."
+                     : "Turn the alpha by a fixed angle in degrees (counter-clockwise); Ctrl+click to type.",
+                 where);
     ImGui::SetNextItemWidth(-1);
-    ui::SliderInside("##alpha_angle_jitter", &o.jitter, 0.0f, 180.0f, "Angle jitter %.0f");
+    ui::SliderInside(vdm ? "##vdm_angle_jitter" : "##alpha_angle_jitter", &o.jitter, 0.0f, 180.0f, "Angle jitter %.0f");
     ui::HelpText("Angle jitter", nullptr,
-                 "Turn each dab by a random angle, up to this many degrees either way: breaks up repeats in skin, "
-                 "rock and noise alphas.",
-                 "Alpha");
+                 vdm ? "Turn each stamp by a random angle, up to this many degrees either way: scattered horns, "
+                       "scales or rivets that don't all face the same way."
+                     : "Turn each dab by a random angle, up to this many degrees either way: breaks up repeats in "
+                       "skin, rock and noise alphas.",
+                 where);
+    if (vdm) {
+        ImGui::Dummy(ImVec2(0, 2.0f * uiScale_));
+        return;
+    }
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     ImGui::SetNextItemWidth(half);
     float tileX = float(o.tileX), tileY = float(o.tileY);
@@ -160,7 +180,11 @@ void App::dragRectTo(float x, float y) {
     p.viewFalloff = uiPrefs_.viewFalloff;
     p.focal = focalShift_;
     p.alpha = &doc_.brushAlpha;
-    p.alphaUp = glm::normalize(q * glm::vec3(drag.x, -drag.y, 0.0f)); // the alpha's top follows the drag
+    // The stamp's top follows the drag (a VDM's only with Follow stroke direction, #136), turned by Angle and jitter.
+    const bool follow = strokeBrush_ != BrushType::Vdm || alphaOptions_.followStroke;
+    const float a = alphaStampAngle(alphaOptions_, follow, drag, stampJitter_);
+    lastDabAngle_ = a;
+    p.alphaUp = q * glm::vec3(-std::sin(a), std::cos(a), 0.0f); // (screenUpVector)
     p.vdm = doc_.brushVdm.get();
     if (strokePaint_) paintAt(p); // restoreStroke reverted the previous stamp's colours too
     if (!strokeSculpt_) return;

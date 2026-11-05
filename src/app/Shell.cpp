@@ -15,6 +15,7 @@
 #include "app/Ui.h"
 #include "app/I18n.h"
 #include "core/LitSphere.h"
+#include "core/Micro.h"
 #include "core/VertexPaint.h"
 #include "core/Texture.h"
 
@@ -236,6 +237,16 @@ std::string elide(ImFont* font, const std::string& text, float width) {
 }
 
 constexpr float kPointsReadoutW = 190.0f; // the ActiveTris / TotalTris readout at the right of the top shelf, unscaled
+constexpr float kMicroReadoutW = 100.0f;  // ... and its "Micro 300.00M" in front while a visible Part has a micro level (#125)
+
+// The micro triangles of the visible Parts (core/Micro.h).
+size_t visibleMicroTriangles(const Document& doc) {
+    size_t micro = 0;
+    for (int i = 0; i < doc.partCount(); ++i)
+        if (doc.parts[size_t(i)].visible) micro += microTriangleCount(doc.partMesh(i));
+    return micro;
+}
+float pointsReadoutW(const Document& doc) { return kPointsReadoutW + (visibleMicroTriangles(doc) ? kMicroReadoutW : 0.0f); }
 
 bool segmentPair(const std::string& a, const std::string& b) {
     auto group = [](const std::string& id) {
@@ -1474,7 +1485,9 @@ void App::drawStatusBar(const ShellGeometry& g) {
         mods.push_back({ICON_LC_FILE, "file", name});
         size_t tris = 0;
         for (int i = 0; i < doc_.partCount(); ++i) tris += doc_.partMesh(i).triangleCount();
-        mods.push_back({ICON_LC_TRIANGLE, "tris", shortCount(tris)});
+        // ... and the visible Parts' micro triangles beside them while there are any (#125): "20.5k + 5.24M micro".
+        const size_t micro = visibleMicroTriangles(doc_);
+        mods.push_back({ICON_LC_TRIANGLE, "tris", shortCount(tris) + (micro ? " + " + shortCount(micro) + " micro" : std::string())});
         if (ImGui::GetTime() - fpsShownAt_ > 0.5 || fpsShown_ < 0.0f) {
             fpsShown_ = ImGui::GetIO().Framerate;
             fpsShownAt_ = ImGui::GetTime();
@@ -1989,7 +2002,7 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
             ImGui::SameLine(0.0f, prev == "sep" || item == "sep" ? 0.0f : segmentPair(prev, item) ? 1.0f * s : 4.0f * s);
         }
         if (!vertical && item == "widget.points") { // right-aligned readout
-            const float w = kPointsReadoutW * s;
+            const float w = pointsReadoutW(doc_) * s;
             ImGui::SameLine(std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - w));
         }
         lineStart = false;
@@ -2147,23 +2160,31 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
                 activeTris_ += m.triangleCount() - std::min(hidden, m.triangleCount());
             }
         }
-        const size_t active = activeTris_;
-        // One line on the row's centre line, right-aligned to the shelf edge: "ActiveTris 20.5k   TotalTris 20.5k".
+        const size_t active = activeTris_, micro = visibleMicroTriangles(doc_);
+        // One line on the row's centre line, right-aligned to the shelf edge: "ActiveTris 20.5k   TotalTris 20.5k",
+        // after "Micro 300.00M" while a visible Part has a micro level.
         ImGui::BeginGroup();
         if (fontSmall_) ImGui::PushFont(fontSmall_);
         const ImVec2 p = ImGui::GetCursorScreenPos();
-        ImGui::Dummy(ImVec2(kPointsReadoutW * s, rowH));
+        const float readoutW = pointsReadoutW(doc_) * s;
+        ImGui::Dummy(ImVec2(readoutW, rowH));
         ImDrawList* dl = ImGui::GetWindowDrawList();
-        const std::string a = shortCount(active), t = shortCount(total);
+        const std::string a = shortCount(active), t = shortCount(total), mc = micro ? shortCount(micro) : std::string();
         const float gap = 5.0f * s, groupGap = 14.0f * s;
-        const float w = ImGui::CalcTextSize("ActiveTris").x + ImGui::CalcTextSize(a.c_str()).x + ImGui::CalcTextSize("TotalTris").x +
-                        ImGui::CalcTextSize(t.c_str()).x + 2.0f * gap + groupGap;
-        float x = std::floor(p.x + kPointsReadoutW * s - w);
+        float w = ImGui::CalcTextSize("ActiveTris").x + ImGui::CalcTextSize(a.c_str()).x + ImGui::CalcTextSize("TotalTris").x +
+                  ImGui::CalcTextSize(t.c_str()).x + 2.0f * gap + groupGap;
+        if (micro) w += ImGui::CalcTextSize("Micro").x + ImGui::CalcTextSize(mc.c_str()).x + gap + groupGap;
+        float x = std::floor(p.x + readoutW - w);
         const float y = std::floor(p.y + (rowH - ImGui::GetTextLineHeight()) * 0.5f);
         auto put = [&](const char* text, const ImVec4& col, float after) {
             dl->AddText(ImVec2(x, y), theme::u32(col), text);
             x += ImGui::CalcTextSize(text).x + after;
         };
+        if (micro) {
+            put("Micro", theme::textDim, gap);
+            put(mc.c_str(), theme::text, groupGap);
+            ImGui::LogText("Micro %s ", mc.c_str());
+        }
         put("ActiveTris", theme::textDim, gap);
         put(a.c_str(), theme::text, groupGap);
         put("TotalTris", theme::textDim, gap);
@@ -2172,7 +2193,8 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         if (fontSmall_) ImGui::PopFont();
         ImGui::EndGroup();
         ui::HelpText("ActiveTris / TotalTris", nullptr,
-                     "Triangles you can see and sculpt (visible Parts, hidden parts left out) and in the whole scene.",
+                     "Triangles you can see and sculpt (visible Parts, hidden parts left out) and in the whole scene. "
+                     "Micro: the micro triangles of the visible Parts' micro levels (Geometry > Micro).",
                      "Draw");
     } else if (item.rfind("widget.tile.", 0) == 0) {
         const float w = (shell_.narrow ? 60.0f : 76.0f) * s;

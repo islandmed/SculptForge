@@ -132,6 +132,8 @@ void BrushRecipe::clamp() {
     for (const auto& p : recipeParams())
         if (p.kind == K::Float)
             if (float* f = floatField(*this, p.key)) *f = std::clamp(*f, p.min, p.max);
+    alphaAngle = std::isfinite(alphaAngle) ? std::clamp(alphaAngle, -180.0f, 180.0f) : 0.0f;
+    alphaJitter = std::isfinite(alphaJitter) ? std::clamp(alphaJitter, 0.0f, 180.0f) : 0.0f;
     if (name.empty()) name = "Custom Brush";
     if (name.size() > 64) name.resize(64);
     if (description.size() > 500) description.resize(500);
@@ -146,6 +148,8 @@ Json BrushRecipe::toJson() const {
     if (viewFalloff) j.set("viewFalloff", true);
     if (!alpha.empty()) j.set("alpha", alpha);
     if (alphaFollow) j.set("alphaFollow", true);
+    if (alphaAngle != 0.0f) j.set("alphaAngle", std::round(double(alphaAngle) * 1000.0) / 1000.0);
+    if (alphaJitter != 0.0f) j.set("alphaAngleJitter", std::round(double(alphaJitter) * 1000.0) / 1000.0);
     if (pressureSize != PenPressure::Global) j.set("penPressureSize", penPressureId(pressureSize));
     if (pressureStrength != PenPressure::Global) j.set("penPressureStrength", penPressureId(pressureStrength));
     for (const auto& p : recipeParams()) {
@@ -169,6 +173,8 @@ void BrushRecipe::applyJson(const Json& j) {
     if (j["connectedOnly"].isBool()) connectedOnly = j["connectedOnly"].asBool();
     if (j["viewFalloff"].isBool()) viewFalloff = j["viewFalloff"].asBool();
     if (j["alphaFollow"].isBool()) alphaFollow = j["alphaFollow"].asBool();
+    if (j["alphaAngle"].isNumber()) alphaAngle = float(j["alphaAngle"].asNumber());
+    if (j["alphaAngleJitter"].isNumber()) alphaJitter = float(j["alphaAngleJitter"].asNumber());
     if (j["penPressureSize"].isString()) pressureSize = penPressureFromId(j["penPressureSize"].asString());
     if (j["penPressureStrength"].isString()) pressureStrength = penPressureFromId(j["penPressureStrength"].asString());
     if (j["alpha"].isString()) {

@@ -45,6 +45,7 @@ A `.sfbrush` file is a JSON object:
 | `cavityMask` | -1 … 1 | Only cavities (positive) or only ridges (negative) |
 | `alpha` (optional) | a built-in alpha's name, e.g. `"Rivets"` | The alpha the brush starts with the first time it is picked (written only when set; an unknown name is dropped) |
 | `alphaFollow` (optional) | `true` / `false` | That alpha turns along the stroke (written only when true) |
+| `alphaAngle`, `alphaAngleJitter` (optional) | -180 … 180; 0 … 180 (degrees) | Alpha > Angle and Angle jitter the brush starts with (written only when not 0) |
 
 Missing keys take neutral defaults, out-of-range values are clamped, and unknown keys are ignored when loading
 (the gallery is stricter, see below). `sculptforge-cli --list` shows the same parameters under `brush_create`.

@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/CrashLog.h"
+#include "app/UserData.h"
 
 #include <SDL3/SDL.h>
 
@@ -213,10 +214,7 @@ void start(const std::string& folder) {
     g_lastLogged.clear();
     std::string dir = folder;
     if (dir.empty()) {
-        if (char* pref = SDL_GetPrefPath("SculptForge", "SculptForge")) {
-            dir = pref;
-            SDL_free(pref);
-        }
+        dir = userDataDir();
     }
     if (dir.empty()) return;
     if (dir.back() != '/' && dir.back() != '\\') dir += '/';

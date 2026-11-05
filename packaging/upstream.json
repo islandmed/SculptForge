@@ -23,9 +23,9 @@
     {"name": "Godot", "version": "4.7", "track": "minor", "source": {"kind": "github", "repo": "godotengine/godot", "tag": "^(\\d+(?:\\.\\d+)*)-stable$"},
      "notes": "https://godotengine.org/releases/{major}.{minor}/"},
     {"name": "SDL3", "version": "3.2", "track": "minor", "source": {"kind": "github", "repo": "libsdl-org/SDL", "tag": "^release-(3\\.\\d+\\.\\d+)$"},
-     "why": "Pinned in cmake/Dependencies.cmake (3.2.30)."},
+     "why": "Pinned in cmake/Fetch.cmake (3.2.30)."},
     {"name": "Dear ImGui", "version": "1.91.9", "source": {"kind": "github", "repo": "ocornut/imgui"},
-     "why": "Pinned in cmake/Dependencies.cmake."},
+     "why": "Pinned in cmake/Fetch.cmake."},
     {"name": "Python", "version": "3.13", "track": "minor", "source": {"kind": "endoflife", "product": "python"},
      "notes": "https://docs.python.org/{major}.{minor}/whatsnew/{major}.{minor}.html",
      "why": "The module follows the VFX Reference Platform's Python; test it on the new version, switch when the platform does."}

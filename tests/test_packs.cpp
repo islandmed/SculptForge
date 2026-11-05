@@ -579,6 +579,44 @@ TEST(pack_write_round_trip) {
     CHECK(!parseKeymapFile("{\"format\":\"sculptforge-keymap\",\"version\":1,\"shortcuts\":{\"a\":3}}", back, err));
 }
 
+// #136: a shared brush keeps its alpha's Follow stroke direction, Angle and Angle jitter: made into a .sfpack,
+// installed, and loaded into the library.
+TEST(pack_brush_keeps_alpha_options) {
+    TempRoot root("sf_pack_alpha_options");
+    const fs::path src = root.dir / "src";
+    fs::create_directories(src);
+    BrushRecipe b;
+    b.name = "Turned Stitch";
+    b.alpha = "Stitches";
+    b.alphaFollow = true;
+    b.alphaAngle = -35.0f;
+    b.alphaJitter = 12.5f;
+    std::ofstream(src / "Turned Stitch.sfbrush") << b.toJson().dump(true);
+    PackManifest m;
+    m.id = "turned";
+    m.name = "Turned";
+    m.version = "1.0";
+    m.author = "Me";
+    m.license = "CC0-1.0";
+    std::string err;
+    const std::string out = (root.dir / "Turned.sfpack").string();
+    CHECK(writePack(out, m, {{PackItemType::Brush, (src / "Turned Stitch.sfbrush").string(), "", {}}}, "", "", err));
+    PackReview r;
+    CHECK(reviewPack(out, r, err));
+    CHECK(installPack(r, err));
+    BrushLibraryPaths paths;
+    applyPacksToBrushLibrary(paths);
+    Document doc;
+    loadBrushLibrary(doc, paths);
+    const BrushRecipe* got = nullptr;
+    for (const BrushRecipe& x : doc.brushes)
+        if (x.name == "Turned Stitch") got = &x;
+    CHECK(got != nullptr);
+    if (!got) return;
+    CHECK(got->alpha == "Stitches" && got->alphaFollow);
+    CHECK(got->alphaAngle == -35.0f && got->alphaJitter == 12.5f);
+}
+
 TEST(pack_commands) {
     TempRoot root("sf_pack_cmds");
     const fs::path src = root.dir / "layout";

@@ -482,7 +482,7 @@ private:
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
               showMask = -1, groups = -1, litsphere = -1, litsphereCavity = -1, dim = -1, primBase = -1, hasPaint = -1,
               normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1, lightRot = -1,
-              lightLevels = -1, alpha = -1;
+              lightLevels = -1, alpha = -1, microWire = -1;
         GLint hasOrm = -1, hasEmissive = -1, hasMatNormal = -1, envLevels = -1, exposure = -1, toneMap = -1, material = -1,
               pbrCavity = -1, viewToEnv = -1, sh = -1;
         GLint ghostGroups = -1, ghostRange = -1, ghostEdge = -1, ghostA = -1, ghostB = -1, ghostC = -1, ghostBound = -1, ghostKind = -1, ghostFocal = -1;

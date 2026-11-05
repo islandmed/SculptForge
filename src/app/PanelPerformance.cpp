@@ -203,6 +203,7 @@ int App::viewSamples() {
 }
 
 void App::notePerformanceFrame(double syncMs) {
+    perf_.lastSyncMs = syncMs;
     if (doc_.sculptor.strokeActive()) {
         perf_.strokeSyncMs += syncMs;
         ++perf_.strokeFrames;

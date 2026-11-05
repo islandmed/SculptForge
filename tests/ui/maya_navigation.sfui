@@ -1,0 +1,99 @@
+# The Maya style's view keys (#134): Alt, then Ctrl+left drag rolls; Alt+F frames the Part, Alt+H resets the view;
+# the wheel zooms toward the pointer (on with Maya keys, off with the others). The Ctrl+Alt mask gestures stay:
+# Ctrl first (or both at once) masks on the model and clears the mask beside it.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+input_style maya
+expect_value input_style == 3
+expect_value shortcut_conflicts == 0
+expect_value wheel_to_pointer == 1
+mouse_move 0.5 0.5
+key f
+
+# (A wait between the holds: the app sees Alt alone for a frame, as from a person's hands.)
+# Alt held, then Ctrl added: a sideways left drag rolls the view, on the model too, and doesn't mask or sculpt.
+snapshot
+remember camera_roll r0
+hold alt
+wait 0.05
+hold alt+ctrl
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value camera_roll != $r0
+expect_value masked == 0
+expect_value moved == 0
+# ... and the other way.
+remember camera_roll r1
+hold alt
+wait 0.05
+hold alt+ctrl
+stroke 0.7 0.5 0.3 0.5
+hold none
+expect_value camera_roll != $r1
+
+# Alt+H: back to the front view, upright, the whole model in view.
+key alt+h
+expect_value camera_roll == 0
+expect_value camera_yaw == 0
+expect_value camera_pitch == 0
+expect_value camera_pan == 0
+
+# Ctrl first, then Alt: still masks on the model.
+hold ctrl
+wait 0.05
+hold ctrl+alt
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value masked > 0
+expect_value camera_roll == 0
+# Both at once: masks too.
+key ctrl+z
+expect_value masked == 0
+hold ctrl+alt
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value masked > 0
+# Ctrl, then Alt, drag beside the model: clears the mask (as before).
+hold ctrl
+wait 0.05
+hold ctrl+alt
+drag_path -0.4 0.5 -0.2 0.6
+hold none
+expect_value masked == 0
+expect_value camera_roll == 0
+
+# The wheel over the side of the model zooms in toward it: the view's centre moves that way.
+key alt+h
+remember camera_distance d0
+wheel 0.8 0.5 3
+expect_value camera_distance < $d0
+expect_value camera_pan > 0.01
+# Off (Preferences > Input), the wheel zooms toward the middle as before.
+key alt+h
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+shot wheel_pref
+click "Wheel zooms toward the pointer##input.wheel_to_pointer"
+expect_value wheel_to_pointer == 0
+click "Preferences##palette.preferences"
+remember camera_distance d1
+wheel 0.8 0.5 3
+expect_value camera_distance < $d1
+expect_value camera_pan == 0
+
+# Alt+F frames the active Part: a small one comes closer than the whole model.
+key alt+h
+run part_append type=sphere size=0.3
+remember camera_distance d2
+key alt+f
+expect_value camera_distance < $d2
+
+# The other styles keep the wheel toward the middle, and Alt+F / Alt+H aren't Maya's there.
+input_style sculptforge
+expect_value wheel_to_pointer == 0
+expect_shortcut view.frame_selected Numpad .
+input_style blender
+expect_value wheel_to_pointer == 0
+expect_shortcut visibility.show_all Alt+H
+input_style classic
+expect_value wheel_to_pointer == 0

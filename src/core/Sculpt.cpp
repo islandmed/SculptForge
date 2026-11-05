@@ -894,7 +894,7 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
         const uint64_t pts = micro_.points;
         for (const SymCopy& m : copies(sym))
             micro_.dab(mesh, bvh, type, m.point(p.center), m.dir(p.viewDir), p.radius, p.strength * std::clamp(p.pressure, 0.0f, 1.0f),
-                       p.invert, p.focal, m.dir(p.alphaUp), false, 0.0f, p.alpha);
+                       p.invert, p.focal, m.dir(p.alphaUp), false, 0.0f, p.alpha, {}, m.dir(p.strokeDelta));
         timings.kernelMs += micro_.findMs + micro_.kernelMs - k0;
         timings.normalsMs += micro_.stitchMs - s0;
         timings.vertices += micro_.points - pts;

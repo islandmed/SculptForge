@@ -1,10 +1,11 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The interface language (#44): English, the default, and Spanish. A small,
-// dependency-free layer: the English text is the key, the translations are a
-// table compiled into the binary (I18nSpanish.cpp), and anything without an
-// entry stays in English, so a missing line never breaks a label.
+// The interface language (#44): English, the default, Spanish and Traditional
+// Chinese (#114). A small, dependency-free layer: the English text is the key, the
+// translations are tables compiled into the binary (I18nSpanish.cpp,
+// I18nTraditionalChinese.cpp), and anything without an entry stays in English, so
+// a missing line never breaks a label.
 //
 //   ImGui::Button(tr("Decimate"))             "Diezmar" in Spanish
 //   ImGui::Checkbox(tr("Keep Masked##remesh")) only "Keep Masked" is translated; "##remesh" is kept as it is
@@ -23,15 +24,17 @@
 
 namespace sf {
 
-enum class Language { English, Spanish };
-inline constexpr int kLanguageCount = 2;
+enum class Language { English, Spanish, TraditionalChinese };
+inline constexpr int kLanguageCount = 3;
 
 // The language tr() translates into (process-wide; Preferences > Interface sets it).
 void setLanguage(Language language);
 Language language();
-const char* languageCode(Language language);    // "en", "es" (ui.json)
+const char* languageCode(Language language);    // "en", "es", "zh-TW" (ui.json)
 Language languageFromCode(std::string_view code); // unknown codes are English
-const char* languageName(Language language);    // in that language: "English", "Español"
+const char* languageName(Language language);    // in that language: "English", "Español", "繁體中文"
+// True for a language whose text needs the CJK font merged into the UI fonts (App::buildUiFonts).
+bool languageNeedsCjkFont(Language language);
 
 // The text in the current language. The pointer is the argument itself (English, or no translation), a table
 // entry, or a string kept for the life of the program: safe to keep across frames.
@@ -47,8 +50,10 @@ struct Entry {
     const char* english;
     const char* translated;
 };
-// The compiled-in Spanish table (I18nSpanish.cpp), for tests.
+// The compiled-in tables (I18nSpanish.cpp, I18nTraditionalChinese.cpp), for tests.
 std::span<const Entry> spanishTable();
+std::span<const Entry> traditionalChineseTable();
+std::span<const Entry> table(Language language); // empty for English
 // The exact entry for `english` in that language's table, or nullptr (English has no table).
 const char* lookup(Language language, std::string_view english);
 } // namespace i18n

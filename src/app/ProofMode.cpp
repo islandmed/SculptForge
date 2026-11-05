@@ -703,12 +703,15 @@ void App::drawProofUi() {
     }
 }
 
+bool App::proofRunning() const {
+    return proof_ && proof_->stage != ProofState::Stage::Intro && proof_->stage != ProofState::Stage::Results;
+}
+
 void App::proofBeforeSwap(int fbW, int fbH) {
     ProofState& p = *proof_;
     using Stage = ProofState::Stage;
     if (p.stage == Stage::Intro || p.stage == Stage::Results) return;
     const double now = nowSeconds();
-    activeUntil_ = std::max(activeUntil_, double(SDL_GetTicksNS()) * 1e-9 + 0.5); // keep the loop drawing
     // Esc stops the run (the real pointer is kept out of the scripted stroke, the keyboard is not).
     if (const bool* keys = SDL_GetKeyboardState(nullptr); keys && keys[SDL_SCANCODE_ESCAPE] && p.stage != Stage::Finish) {
         p.error = "Stopped with Esc: the results are partial";

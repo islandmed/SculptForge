@@ -2,24 +2,14 @@
 # -DSCULPTFORGE_WEBRTC=OFF builds without it (the phone link then offers capture and AR only).
 # libdatachannel (MPL-2.0) with libjuice (MPL-2.0), usrsctp (BSD-3-Clause), plog (MIT) and Mbed TLS (Apache-2.0),
 # all static and fetched at configure time like the other dependencies. No media (SRTP) and no WebSocket parts.
-include(FetchContent)
+include(${CMAKE_CURRENT_LIST_DIR}/Fetch.cmake) # include(FetchContent), the pins, sf_fetch_declare
 
-FetchContent_Declare(mbedtls
-  URL https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.7/mbedtls-3.6.7.tar.bz2
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-FetchContent_Declare(libdatachannel
-  URL https://github.com/paullouisageneau/libdatachannel/archive/refs/tags/v0.24.6.tar.gz
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+sf_fetch_declare(mbedtls DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+sf_fetch_declare(libdatachannel DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 # libdatachannel's submodules, at the commits its v0.24.6 tag pins (GitHub archives leave submodules out).
-FetchContent_Declare(ldc_usrsctp
-  URL https://github.com/paullouisageneau/usrsctp/archive/fec583d54493f879d2ae44a743423bf8a04371ab.tar.gz
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-FetchContent_Declare(ldc_libjuice
-  URL https://github.com/paullouisageneau/libjuice/archive/b89c792e3612faf2f12cf35bcc56857313a06be3.tar.gz
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-FetchContent_Declare(ldc_plog
-  URL https://github.com/SergiusTheBest/plog/archive/94899e0b926ac1b0f4750bfbd495167b4a6ae9ef.tar.gz
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+sf_fetch_declare(ldc_usrsctp DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+sf_fetch_declare(ldc_libjuice DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+sf_fetch_declare(ldc_plog DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 
 foreach(dep mbedtls libdatachannel ldc_usrsctp ldc_libjuice ldc_plog)
   FetchContent_GetProperties(${dep})

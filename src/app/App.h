@@ -244,6 +244,8 @@ private:
     float targetUiScale() const;         // what uiScale_ should be now (Preferences, the display; Config.cpp)
     void applyUiScale();                 // rebuild fonts and style live when it changed (between frames)
     void buildUiFonts(float scale);
+    void mergeCjkFont(float px);         // the Chinese glyphs into the font just added (all of them while fontsCjk_)
+    bool fontsCjk_ = false;              // the atlas has every Chinese glyph (Traditional Chinese interface)
     ImFont* fontCaption_ = nullptr;
     ImFont* fontCaptionSub_ = nullptr;
 
@@ -787,8 +789,12 @@ private:
     AlphaOptions alphaOptions_;
     AlphaRake alphaRake_;
     uint32_t alphaSeed_ = 1;
+    // Drag Stamp / Slide Stamp (#136): Angle jitter's turn for this stroke's one stamp, from a seed that carries on
+    // from stroke to stroke (each stamp gets its own turn).
+    float stampJitter_ = 0.0f;
+    uint32_t stampSeed_ = 0x2545f491u;
     float lastDabAngle_ = 0.0f; // radians (UI tests: last_dab_angle)
-    void drawAlphaOptions();
+    void drawAlphaOptions(bool vdm = false); // vdm: Brush > Vector Displacement's rows (no Tile, #136)
     std::mutex alphaMutex_;
     std::string pendingAlphaPath_; // set by the file dialog thread
     // Vector displacement brushes (PanelVdm.cpp, core/Vdm.h): the Brush palette's Vector Displacement section,
@@ -942,9 +948,14 @@ private:
     bool uvEditorBusy() const;
     // UI test values: uv_editor_open, uv_islands, uv_seams, uv_selected, uv_select_mode, uv_pins, uv_tiles,
     // uv_stretch_x1000, uv_flipped_x1000, uv_density, uv_max_u, uv_unwrapping, uv_unwraps, uv_tool,
-    // uv_view_triangles, uv_overlay; NaN for other names.
+    // uv_view_triangles, uv_overlay, uv_pack_columns, uv_pack_rows (the Pack fields); NaN for other names.
     double uvEditorTestValue(const std::string& name);
     std::shared_ptr<struct UvEditorState> uvEditor_;
+    // UV Editor > Pack: the UDIM grid to fill, Columns x Rows (#135). Projects keep their own; new ones and
+    // projects from before take the preference (UiPrefs::uvPackColumns / uvPackRows), which the sliders set too.
+    int uvPackColumns_ = 1, uvPackRows_ = 1;
+    // After uv_pack / uv_unwrap from anywhere (the panel, a script, the console): the fields show the grid it used.
+    void uvPackGridUsed(const Args& args);
     bool showUvEditor_ = false;
     void startAutoUv();
     void startNewTexture(); // New Texture on the top shelf / Color palette: Auto UV first when there are no UVs
@@ -1045,7 +1056,18 @@ private:
         double lastStrokeSyncMs = 0.0;
         int lastStrokeFrames = 0;
         bool gpuOutOfMemory = false;
+        double lastSyncMs = 0.0;      // the last frame's scene sync (GPU uploads)
+        std::string traceJobs;        // the background jobs running at the last traced frame
+        double traceJobsSince = 0.0;  // (seconds) when they last changed
+        double traceLongMs = 33.0;    // perftrace::kLongFrameMs (SF_PERF_TRACE_MS: UI tests write every frame)
     } perf_;
+    // Help > Record a performance trace (core/PerfTrace.h, #127; PanelPerformanceProfile.cpp): the toggle, and the
+    // lines it writes: long frames (with the loop's phase times), strokes, long commands, background jobs.
+    void togglePerfTrace();
+    void tracePerfFrame(const double* phase); // phase[0..6]: the main loop's marks (App::run)
+    void tracePerfStroke(const std::string& label);
+    std::string perfTraceScene() const;       // mesh size, levels, view state
+    std::string perfTraceJobs() const;        // the background jobs running now, by name
     // Hardware profile (PanelPerformanceProfile.cpp; app/Calibration.h, core/HardwareProfile.h, core/FrameGovernor.h):
     // calibrates on first launch and when the GPU, driver or version changes; the profile section of Preferences >
     // Performance; the adaptive frame governor, fed every frame between FrameBegin and FrameEnd.
@@ -2139,6 +2161,14 @@ private:
         glm::vec2 origin{0.0f};
     } straight_;
     bool rollPending_ = false; // Shift+press on the background: let go of Shift before moving to roll the view
+    bool rollSideways_ = false; // Maya style Alt, then Ctrl+left drag (#134): left / right rolls the view
+    // Maya style (#134): Alt went down before Ctrl (Alt held, then Ctrl added) rolls on Alt+Ctrl+left drag; Ctrl first
+    // (or both at once) keeps the Ctrl+Alt mask gestures. trackModOrder follows the keys, per event and per frame.
+    SDL_Keymod modOrderLast_ = SDL_KMOD_NONE;
+    bool altBeforeCtrl_ = false;
+    void trackModOrder();
+    void wheelZoom(float x, float y, float steps); // Preferences > Input > Wheel zooms toward the pointer
+    void resetView();                              // the view.reset action (Maya keys: Alt+H, #134)
     float rollStartX_ = 0.0f, rollStartY_ = 0.0f;
     glm::vec2 lastDabScreen_{0.0f}; // window pixels of the last dab (UI tests: last_dab_x / last_dab_y)
     bool maskClickPending_ = false; // Ctrl+press on the model: a click blurs (Alt: sharpens), a drag paints
@@ -2304,6 +2334,7 @@ private:
     int runTimelapseCli();                    // sculptforge FILE --timelapse out.mp4
     void startProofMode();                    // Help > Benchmark, sculptforge --benchmark
     bool proofSkippedScenes() const;          // the benchmark skipped a scene: too little free memory
+    bool proofRunning() const;                // a benchmark is measuring (not its intro or results): every frame is wanted
     void proofBeforeSwap(int fbW, int fbH);   // the interactive loop, after drawing a frame, before showing it
     void drawProofUi();
     // ---- end Sculpt Timeline ----
