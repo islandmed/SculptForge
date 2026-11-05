@@ -72,7 +72,6 @@ expect_text "Size"
 # Traditional Chinese (#114): the UI fonts are built again with the Chinese glyphs (the shots show no "?" boxes);
 # the "##" ids stay, so the same clicks work, and brush names stay in English.
 click "Preferences##palette.preferences"
-click "Interface##preferences.interface"
 click "繁體中文##language.zh-TW"
 expect_text "語言"
 expect "偏好設定##palette.preferences"

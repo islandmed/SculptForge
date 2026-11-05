@@ -20,6 +20,7 @@ OUT = ROOT / "assets/fonts/NotoSansTC-UI.otf"
 TC_FACE = "Noto Sans CJK TC"
 # Always kept: CJK and full-width punctuation the translations (and future edits) reach for.
 PUNCTUATION = "，。、：；！？（）「」『』《》〈〉【】－～…·—％／＋"
+LANGUAGE_NAME = "繁體中文"  # the Preferences button, shown in every language (I18n.cpp languageName)
 
 
 def table_characters():
@@ -27,7 +28,7 @@ def table_characters():
     chars = set()
     for literal in re.findall(r'"((?:[^"\\]|\\.)*)"', text):
         chars.update(c for c in literal if ord(c) > 0xFF)
-    return chars | set(PUNCTUATION)
+    return chars | set(PUNCTUATION) | set(LANGUAGE_NAME)
 
 
 def main():
