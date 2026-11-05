@@ -21,6 +21,7 @@ expect "Recorrido rápido##help.quick_tour"
 shot es-help-menu
 key escape
 run ui_look layout=classic
+click "Geometría##tool.geometry"
 click "Remallado##tool.remesh"
 expect "Remallado rápido##remesh.quick"
 expect "Remallar tras cada trazo##remesh.after_stroke"
