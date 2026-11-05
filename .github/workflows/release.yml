@@ -11,12 +11,13 @@ name: Release
 #   smoke    every package installed or unpacked on a fresh runner: the app opens a model and sculpts
 #            (tests/ui/release_smoke.sfui), sculptforge-cli opens, sculpts, saves and reopens (tests/release_smoke.py).
 #   publish  only after every smoke test passed: checksums, notes from CHANGELOG.md, the GitHub release. A tag with
-#            a '-' (a beta) is a member perk: published as a pre-release in the private repository
-#            islandmed/sculptforge-insiders (INSIDERS_REPO_TOKEN: a fine-grained token for that repository only,
-#            Contents: read and write) with CHANGELOG's [Unreleased] notes, and posted in #members
-#            (DISCORD_MEMBERS_WEBHOOK). Nothing public: no release here, no update feed entry.
+#            a '-' (a beta) is a member perk, published by publish-members instead: a pre-release in the private
+#            repository islandmed/sculptforge-insiders (INSIDERS_REPO_TOKEN, held only by the environment
+#            member-release: v* tags only, maintainer approval) with CHANGELOG's [Unreleased] notes, and posted in
+#            #members (DISCORD_MEMBERS_WEBHOOK). Nothing public: no release here, no update feed entry.
 #
-# Only publish holds a token that can write (contents: write); every other job reads. Build and smoke jobs take their
+# Only publish holds a GitHub token that can write (contents: write); every other job reads. Every action is pinned
+# to a full commit SHA (scripts/release.sh check enforces it). Build and smoke jobs take their
 # runner from the SF_RUNNER_* repository variables (standard GitHub runners when unset); locate and publish always run
 # on GitHub's own runners.
 # workflow_dispatch rebuilds and republishes an existing tag; dry_run does everything but publish, and promote_run
@@ -56,7 +57,7 @@ jobs:
       sha: ${{ steps.find.outputs.sha }}
       tag: ${{ steps.find.outputs.tag }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.TAG }}', fetch-depth: 20 } # the commits before the bump, for the paperwork check
       - id: find
         env:
@@ -152,14 +153,14 @@ jobs:
       - if: matrix.kind == 'rpm'
         run: dnf -y install git tar python3 xorg-x11-server-Xvfb mesa-dri-drivers
       # The smoke scripts and the test model come from the workflow's own commit (the tag, when a tag runs this).
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           sparse-checkout: |
             tests/release_smoke.py
             tests/ui/release_smoke.sfui
             tests/data/marble-bust.glb
           sparse-checkout-cone-mode: false
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ${{ matrix.artifact }}
           path: pkg
@@ -224,7 +225,7 @@ jobs:
             --ui-test "$PWD/tests/ui/release_smoke.sfui" --ui-out "$PWD/shots/rpm"
       - name: Screenshots
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: smoke-shots-${{ matrix.artifact }}
           path: shots
@@ -233,15 +234,15 @@ jobs:
   publish:
     name: Publish GitHub Release
     needs: [locate, build, smoke]
-    if: ${{ !cancelled() && needs.smoke.result == 'success' && inputs.dry_run != true }}
+    if: ${{ !cancelled() && needs.smoke.result == 'success' && inputs.dry_run != true && !contains(needs.locate.outputs.tag, '-') }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write
       actions: read
     steps:
-      - uses: actions/checkout@v7
-        with: { ref: '${{ env.TAG }}' }
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ env.TAG }}', persist-credentials: false }
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           merge-multiple: true
@@ -252,7 +253,6 @@ jobs:
         run: |
           cd dist
           V=${TAG#v}
-          V=${V%%-*} # a beta's packages carry its version without the prerelease (the app shows it)
           cp "SculptForge-$V-windows-x86_64.exe" SculptForge-windows-x86_64-setup.exe
           cp "SculptForge-$V-windows-x86_64.zip" SculptForge-windows-x86_64-portable.zip
           cp "SculptForge-$V-darwin-universal.dmg" SculptForge-macos.dmg
@@ -267,7 +267,6 @@ jobs:
       - name: Blender add-on (extension and legacy zips, plus a version-less copy for the website's link)
         run: |
           V=${TAG#v}
-          V=${V%%-*}
           python3 addons/blender/build_addon.py --check --version "$V" --out dist
           cp "dist/sculptforge_bridge-$V.zip" dist/sculptforge_bridge.zip
       - name: Maya shelf script (Python source and its README; nothing to build)
@@ -276,31 +275,64 @@ jobs:
         run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
       - name: Release notes from CHANGELOG
         run: |
-          section=${TAG#v}
-          if [[ "$TAG" == *-* ]]; then # a beta: what has changed since the stable release
-            section=Unreleased
-            printf '%s\n\n' "**Members' beta.** Thank you for being a member! Please report problems in #members on Discord (or a GitHub issue) with your OS, this version (Help > About) and your graphics card." > notes.md
-          fi
-          awk -v h="## [$section]" 'index($0, h) == 1 {flag=1;next} /^## \[/{flag=0} flag' CHANGELOG.md >> notes.md
+          awk -v h="## [${TAG#v}]" 'index($0, h) == 1 {flag=1;next} /^## \[/{flag=0} flag' CHANGELOG.md > notes.md
           cat packaging/release-notes-footer.md >> notes.md
       - name: Create or update the release
         env:
           GH_TOKEN: ${{ github.token }}
-          INSIDERS_TOKEN: ${{ secrets.INSIDERS_REPO_TOKEN }}
         run: |
-          if [[ "$TAG" == *-* ]]; then # v0.11.0-beta.1: "SculptForge 0.11.0 Beta 1", members only, a pre-release
-            [ -n "$INSIDERS_TOKEN" ] || { echo "::error::No INSIDERS_REPO_TOKEN secret: a beta is published only in islandmed/sculptforge-insiders"; exit 1; }
-            export GH_TOKEN=$INSIDERS_TOKEN GH_REPO=islandmed/sculptforge-insiders
-            pre=${TAG#*-}
-            title="SculptForge ${TAG%%-*} $(sed -E 's/^rc/RC/; s/^./\U&/; s/\./ /g' <<<"$pre")"
-            gh release view "$TAG" >/dev/null 2>&1 ||
-              gh release create "$TAG" --title "${title/SculptForge v/SculptForge }" --notes-file notes.md --prerelease --latest=false
-          else
-            gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "SculptForge ${TAG#v}" --notes-file notes.md
-          fi
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "SculptForge ${TAG#v}" --notes-file notes.md
           gh release upload "$TAG" dist/* --clobber
-      - name: Post a beta in #members
-        if: contains(env.TAG, '-')
+
+  # A beta (a tag with a '-') is a member perk, published only in the private repository islandmed/sculptforge-insiders.
+  # INSIDERS_REPO_TOKEN lives only in the GitHub Environment "member-release" (deployment: tags v* only; the maintainer
+  # approves each run), so no other job, workflow or branch can read it. This job's GitHub token only reads; the
+  # insiders token reaches exactly one step, as an env var. Runs only for the tag push itself (the environment refuses
+  # a workflow_dispatch from a branch); scripts/release.sh check enforces the environment and pinned actions.
+  publish-members:
+    name: Publish members' beta
+    needs: [locate, build, smoke]
+    if: ${{ !cancelled() && needs.smoke.result == 'success' && inputs.dry_run != true && contains(needs.locate.outputs.tag, '-') }}
+    runs-on: ubuntu-24.04
+    environment: member-release
+    permissions:
+      contents: read
+      actions: read # the packages may be another run's artifacts
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ env.TAG }}', persist-credentials: false }
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+          pattern: '{linux,flatpak,vfx,macos,windows}*'
+          run-id: ${{ needs.locate.outputs.run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: Blender add-on and Maya shelf script
+        run: |
+          V=${TAG#v}
+          V=${V%%-*} # a beta's packages carry its version without the prerelease (the app shows it)
+          python3 addons/blender/build_addon.py --check --version "$V" --out dist
+          python3 -m zipfile -c dist/sculptforge_maya.zip integrations/maya/sculptforge_maya.py integrations/maya/README.md
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Release notes (CHANGELOG's [Unreleased])
+        run: |
+          printf '%s\n\n' "**Members' beta.** Thank you for being a member! Please report problems in #members on Discord (or a GitHub issue) with your OS, this version (Help > About) and your graphics card." > notes.md
+          awk -v h="## [Unreleased]" 'index($0, h) == 1 {flag=1;next} /^## \[/{flag=0} flag' CHANGELOG.md >> notes.md
+          cat packaging/release-notes-footer.md >> notes.md
+      - name: Pre-release in islandmed/sculptforge-insiders
+        env:
+          GH_TOKEN: ${{ secrets.INSIDERS_REPO_TOKEN }}
+          GH_REPO: islandmed/sculptforge-insiders
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "::error::No INSIDERS_REPO_TOKEN in the member-release environment"; exit 1; }
+          pre=${TAG#*-}
+          title="SculptForge ${TAG%%-*} $(sed -E 's/^rc/RC/; s/^./\U&/; s/\./ /g' <<<"$pre")" # v0.11.0-beta.1: "SculptForge 0.11.0 Beta 1"
+          gh release view "$TAG" >/dev/null 2>&1 ||
+            gh release create "$TAG" --title "${title/SculptForge v/SculptForge }" --notes-file notes.md --prerelease --latest=false
+          gh release upload "$TAG" dist/* --clobber
+      - name: Post the beta in #members
         env:
           WEBHOOK: ${{ secrets.DISCORD_MEMBERS_WEBHOOK }}
         run: |

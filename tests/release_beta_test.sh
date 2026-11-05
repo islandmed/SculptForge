@@ -21,11 +21,11 @@ quiet() { "$@" >"$S/out.log" 2>&1 || { cat "$S/out.log" >&2; fail "$* exited $?"
 # --- the sandbox -----------------------------------------------------------------------------------------------------
 git clone -q --shared --no-checkout "$ROOT" "$S/repo"
 cd "$S/repo"
-git sparse-checkout set --no-cone /CMakeLists.txt /CHANGELOG.md /CITATION.cff /packaging/ /docs/ /tools/ /website/ \
+git sparse-checkout set --no-cone /.github/workflows/ /CMakeLists.txt /CHANGELOG.md /CITATION.cff /packaging/ /docs/ /tools/ /website/ \
     /scripts/ /changes/ /tests/ui/whats_new.sfui
 git checkout -q -B main "$(git -C "$ROOT" rev-parse HEAD)"
 # This checkout's uncommitted changes (the tree being tested), then one commit on main.
-(cd "$ROOT" && git diff --name-only HEAD -- CMakeLists.txt CHANGELOG.md packaging docs tools website scripts changes tests/ui/whats_new.sfui) |
+(cd "$ROOT" && git diff --name-only HEAD -- .github/workflows CMakeLists.txt CHANGELOG.md packaging docs tools website scripts changes tests/ui/whats_new.sfui) |
     while read -r f; do
         if [ -e "$ROOT/$f" ]; then mkdir -p "$(dirname "$f")" && cp "$ROOT/$f" "$f"; else rm -f "$f"; fi
     done
