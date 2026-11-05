@@ -28,7 +28,7 @@ const char* kMicroVS = R"(
 layout(location = 0) in uvec2 aIJ; // the patch's grid point at uLevel
 uniform mat4 uView;
 uniform mat4 uProj;
-uniform usamplerBuffer uTris;   // per slot: (corner vertices, -), (cluster across each edge, -)
+uniform usamplerBuffer uTris;   // per slot: (corner vertices, wireframe edges), (cluster across each edge, -)
 uniform samplerBuffer uBase;    // per base vertex: position, normal
 uniform isamplerBuffer uDisp;   // this chunk's displacement grids
 uniform usamplerBuffer uLevels; // per cluster: the level it draws
@@ -39,6 +39,7 @@ uniform int uUnrolled;
 uniform int uCorners[48];
 uniform float uStep;
 flat out int vSlot;
+flat out int vEdges; // the base triangle's edges the wireframe draws (bit e: edge e; quad diagonals left out)
 out vec2 vIJ;
 #ifdef FLAT
 out vec3 vViewPos;
@@ -87,6 +88,7 @@ void main() {
         // The base triangle alone (a cluster far away, a scan's millions of tiny patches): each vertex is one
         // corner, where the weights below are (1, 0, 0) and the bulge 0, so the same point from one base vertex.
         uvec4 t0 = texelFetch(uTris, slot * 2);
+        vEdges = int(t0.w);
         int corner = int(ij.x) + 2 * int(ij.y);
         int vi = int(corner == 0 ? t0.x : corner == 1 ? t0.y : t0.z);
         vec3 bp = texelFetch(uBase, vi * 2).xyz, bn = texelFetch(uBase, vi * 2 + 1).xyz;
@@ -104,6 +106,7 @@ void main() {
     }
     uvec4 tv = texelFetch(uTris, slot * 2);
     uvec4 nb = texelFetch(uTris, slot * 2 + 1);
+    vEdges = int(tv.w);
     uint v[3] = uint[3](tv.x, tv.y, tv.z);
     ord[0] = 0; ord[1] = 1; ord[2] = 2;
     if (v[ord[0]] > v[ord[1]]) { int t = ord[0]; ord[0] = ord[1]; ord[1] = t; }
@@ -245,14 +248,17 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
     clusterShift_ = uint32_t(std::countr_zero(clusterSize));
     chunkSlots_ = std::max(clusterSize, (kChunkTexels / mm.samples) & ~(clusterSize - 1));
     const uint32_t clusters = (nt + clusterSize - 1) >> clusterShift_;
-    // Corners and the clusters across the edges, per slot.
+    // Corners, the edges the wireframe draws (#128: the base's, without quad diagonals, as Renderer's own
+    // wireframe) and the clusters across the edges, per slot.
     std::vector<uint32_t> tri(size_t(nt) * 8);
     poolFor(nt, [&](size_t b, size_t e) {
         for (size_t s = b; s < e; ++s) {
             const uint32_t t = order_[s];
             const glm::uvec3 tr = mesh.triangles[t];
             uint32_t* o = tri.data() + s * 8;
-            o[0] = tr.x, o[1] = tr.y, o[2] = tr.z, o[3] = 0;
+            const uint32_t partner = mesh.quadPartnerAt(t);
+            const int diagonal = partner != Mesh::kNoQuad && !mesh.triangleHidden(partner) ? mesh.quadDiagonal(t, partner) : -1;
+            o[0] = tr.x, o[1] = tr.y, o[2] = tr.z, o[3] = diagonal < 0 ? 7u : 7u & ~(1u << diagonal);
             for (int k = 0; k < 3; ++k) {
                 const uint32_t nb = mm.edgeNeighbor[size_t(t) * 3 + size_t(k)];
                 o[4 + k] = nb == MicroMesh::kNone ? kNoCluster : slotOf_[nb >> 2] >> clusterShift_;
