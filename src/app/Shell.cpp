@@ -607,6 +607,27 @@ void App::registerShellActions() {
          "Rebuild as an even, watertight surface (like Voxel Remesh): merges parts, fixes scans and generated models.",
          "Tool > Remesh", "", "remesh",
          [this] { startVoxelRemesh(); }, nullptr, [this] { return !voxelRemesh_; }});
+    // Quick Remesh (#121): Shift+R, and N held while clicking or dragging on the background (quickRemeshDragDown).
+    // Neither key is taken in any input style (Input.cpp applyInputStyle).
+    add({"geometry.quick_remesh", "Quick Remesh", nullptr,
+         "With Tool > Remesh > Quick Remesh on: remesh the active Part at the Voxel Remesh resolution, in the background.",
+         "Tool > Remesh", "Shift+R", "",
+         [this] {
+             if (uiPrefs_.quickRemesh) quickRemesh(RemeshTrigger::Quick);
+             else status_ = "Quick Remesh is off: turn it on in Tool > Remesh";
+         },
+         nullptr, nullptr});
+    add({"geometry.quick_remesh_drag", "Quick Remesh (hold and drag)", nullptr,
+         "With Tool > Remesh > Quick Remesh on: hold this key and click or drag on the background (not on the model) to "
+         "remesh the active Part.",
+         "Tool > Remesh", "N", "",
+         [this] {
+             const std::string key = actions_.shortcutText("geometry.quick_remesh_drag");
+             status_ = !uiPrefs_.quickRemesh ? "Quick Remesh is off: turn it on in Tool > Remesh"
+                       : key.empty()         ? "Quick Remesh: give this a key in Preferences > Hotkeys, then hold it and drag on the background"
+                                             : "Quick Remesh: hold " + key + " and click or drag on the background";
+         },
+         nullptr, nullptr});
     add({"geometry.to_splats", "Sculpt to Splats", nullptr, "Turn the sculpt into Gaussian splats.", "Splats", "",
          "mesh_to_splats", [this] { runCommand("mesh_to_splats"); }, nullptr, nullptr});
     add({"color.fill", "Fill", ICON_LC_PAINT_BUCKET, "Fill the unmasked area with the colour (FillObject).", "Color", "",

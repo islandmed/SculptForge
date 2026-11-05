@@ -398,6 +398,7 @@ void App::finishStrokeNow() {
     finishPaintStroke(r);
     if (r.topology && !r.topology->uvs.empty())
         status_ = "Dynamic topology removed the UVs of the remeshed Part (Undo brings them back)";
+    strokeEndedForRemesh(r); // Tool > Remesh > Remesh after each stroke (#121): stretched enough to remesh?
     if (!r.empty()) {
         doc_.undo.push(std::move(r));
         doc_.modified = true;

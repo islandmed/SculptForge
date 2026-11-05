@@ -1353,6 +1353,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (radial_.hold != RadialHold::None) closeRadialMenu(); // its key or button's release won't come here
         if (strokePopup_.held) closeStrokePopup();
         spaceHeld_ = false; // Space let go in another window never reaches us
+        quickRemeshDragKey_ = SDLK_UNKNOWN; // (the same for the Quick Remesh drag key)
         break;
     case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED: // dragged to a monitor at another scale, or the system setting changed
     case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
@@ -1416,12 +1417,14 @@ void App::dispatchEvent(const SDL_Event& event) {
             spaceHeld_ = true;
             break;
         }
+        if (!io.WantCaptureKeyboard && !e.key.repeat) quickRemeshKey(e.key.key, e.key.mod, true); // held: drag remeshes
         if (!io.WantCaptureKeyboard && !e.key.repeat) onKey(e.key.key, e.key.mod);
         else if (!io.WantCaptureKeyboard && (e.key.key == SDLK_LEFTBRACKET || e.key.key == SDLK_RIGHTBRACKET))
             onKey(e.key.key, e.key.mod);
         break;
     case SDL_EVENT_KEY_UP:
         if (e.key.key == SDLK_SPACE) spaceHeld_ = false;
+        quickRemeshKey(e.key.key, e.key.mod, false);
         if (e.key.key == SDLK_SPACE) quickMenuKeyUp(); // a held Space closes the QuickMenu when let go
         radialKeyUp(e.key.key);                        // a radial menu's held key: run the slot pointed at
         strokePopupKeyUp(e.key.key);                   // the stroke popup's held key: pick the item pointed at
@@ -1568,6 +1571,10 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         drag_ = Drag::SizeScrub; // Ctrl+Shift+right-drag: Size, finely (Precision.cpp)
         sizeScrubStart_ = radiusPx_;
         sizeScrubDx_ = 0.0f;
+        rightClick_.pending = false;
+        return;
+    }
+    if (button == SDL_BUTTON_LEFT && quickRemeshDragDown(x, y)) { // the Quick Remesh key held (#121, PanelRetopo.cpp)
         rightClick_.pending = false;
         return;
     }
@@ -1744,6 +1751,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Capture: captureMouseMove(x, y); break;
     case Drag::ForgeSphere: forgesphereDragTo(x, y); break;
     case Drag::AirStroke: airStrokeTo(x, y); break;
+    case Drag::QuickRemesh: break; // (remeshes when let go)
     case Drag::SizeScrub:
         sizeScrubDx_ += dx;
         radiusPx_ = drawSizeScrub(sizeScrubStart_, sizeScrubDx_);
@@ -1800,6 +1808,7 @@ void App::onMouseUp() {
     orbitStarted_ = false;
     panFromAlt_ = false;
     if (drag_ == Drag::Select) selectionMouseUp();
+    if (drag_ == Drag::QuickRemesh) quickRemesh(RemeshTrigger::Quick);
     if (drag_ == Drag::Insert) {
         // The drag's length on screen, as a size at the surface point's depth (at least a small default).
         const float px = std::max(insertPx_, 12.0f * uiScale_);

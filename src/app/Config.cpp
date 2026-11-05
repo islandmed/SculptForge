@@ -99,6 +99,8 @@ Json toJson(const UiPrefs& p) {
     j.set("emulate3Button", p.emulate3Button);
     j.set("mayaZoomHorizontal", p.mayaZoomHorizontal);
     j.set("invertZoom", p.invertZoom);
+    j.set("quickRemesh", p.quickRemesh);
+    j.set("remeshAfterStroke", p.remeshAfterStroke);
     j.set("alongNormal", std::string(p.alongNormal == 1 ? "always" : p.alongNormal == 2 ? "never" : "invert_key"));
     j.set("connectedOnly", p.connectedOnly);
     j.set("viewFalloff", p.viewFalloff);
@@ -168,6 +170,8 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.emulate3Button = j["emulate3Button"].asBool(p.emulate3Button);
     p.mayaZoomHorizontal = j["mayaZoomHorizontal"].asBool(p.mayaZoomHorizontal);
     p.invertZoom = j["invertZoom"].asBool(p.invertZoom);
+    p.quickRemesh = j["quickRemesh"].asBool(p.quickRemesh);
+    p.remeshAfterStroke = j["remeshAfterStroke"].asBool(p.remeshAfterStroke);
     if (j["alongNormal"].isString()) {
         const std::string a = j["alongNormal"].asString();
         p.alongNormal = a == "always" ? 1 : a == "never" ? 2 : 0;
