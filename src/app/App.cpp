@@ -3,6 +3,7 @@
 #include "app/App.h"
 #include "io/BridgeProtocol.h"
 #include "core/LayerStack.h"
+#include "core/HardwareProfile.h"
 #include "app/ShellQuote.h"
 #include "app/SpaceCamera.h"
 #include "app/UiScale.h"
@@ -1947,9 +1948,12 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     haveLastDab_ = false;
     doc_.sculptor.draftStrokes = draftStrokes() && asyncStrokeAllowed(); // (AsyncStroke.cpp)
     doc_.sculptor.adaptiveDabs = fastBigBrushes();
-    static const bool analyticNormals = [] { // SF_ANALYTIC_NORMALS=0: every dab's normals from the rings (A/B)
-        const char* e = std::getenv("SF_ANALYTIC_NORMALS");
-        return !(e && e[0] == '0');
+    // Where the CPU has room: the exact normals the analytic ones defer land at the pen-up, which on a 4-core floor
+    // machine cost more than they saved (E-core floor, 120 px release 0.5 -> 1.3 s); 6+ threads won (laptop 240 px
+    // p50 247 -> 156 ms). SF_ANALYTIC_NORMALS=0/1 forces it (A/B).
+    static const bool analyticNormals = [] {
+        if (const char* e = std::getenv("SF_ANALYTIC_NORMALS")) return e[0] != '0';
+        return !simulatedFloorTier() && std::thread::hardware_concurrency() >= 6;
     }();
     doc_.sculptor.analyticNormals = analyticNormals;
     if (!doc_.sculptor.beginStroke(doc_.mesh,
