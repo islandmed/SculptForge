@@ -1145,8 +1145,10 @@ void App::drawUvEditor() {
     else dl->AddRectFilled(viewMin, viewMax, IM_COL32(25, 25, 27, 255));
     dl->PushClipRect(viewMin, viewMax, true);
     // UDIM tile numbers.
-    for (int ty = 0; ty < std::max(s.tiles.y, 1) + 1; ++ty)
-        for (int tx = 0; tx < std::min(std::max(s.tiles.x, 1) + 1, 10); ++tx) {
+    // (over the tiles in use and the Pack grid, one more each way)
+    const glm::ivec2 labelled = glm::max(glm::max(s.tiles, glm::ivec2(1)), glm::ivec2(uvPackColumns_, uvPackRows_));
+    for (int ty = 0; ty < labelled.y + 1; ++ty)
+        for (int tx = 0; tx < std::min(labelled.x + 1, 10); ++tx) {
             const bool used = tx < s.tiles.x && ty < s.tiles.y;
             char label[8];
             std::snprintf(label, sizeof label, "%d", 1001 + tx + 10 * ty);
