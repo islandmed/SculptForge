@@ -42,7 +42,8 @@ or `Layer Base`).
 
 1. Type a name in the field at the bottom of **Tool > Layers**, for example `Smile` or `BlinkL`.
 2. Click **+ Add** (or press <kbd>Enter</kbd> in the field). The new layer becomes the active one.
-3. Sculpt. Every stroke goes into the layer until you select another layer or **Base mesh**.
+3. Sculpt. Every stroke goes into the layer until you select another layer or **Base mesh**. Moving, scaling and
+   rotating with the [Transform gizmo](gizmo.md) (or the `transform` command) goes into the layer too, masked or not.
 
 A layer whose weight is 0 can't be sculpted into: SculptForge tells you to raise the weight first.
 

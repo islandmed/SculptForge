@@ -11,8 +11,10 @@
 // weight w moves by w * translate, turns by the rotation slerped to w and scales by mix(1, scale, w).
 // Hidden vertices never move.
 //
-// Sculpt layers move with the surface: the base takes the whole transform and every layer's offsets the
-// linear part, so positions == base + sum(weight * offset) still holds and the layers keep working.
+// With Base mesh active, sculpt layers move with the surface: the base takes the whole transform and every
+// layer's offsets the linear part, so positions == base + sum(weight * offset) still holds and the layers keep
+// working. With a sculpt layer active, the transform is recorded into that layer like a stroke: its offsets take
+// (moved - current) / weight, the base and the other layers stay, and the layer's weight dials the move in and out.
 // Topology, UVs, quads, face groups, vertex paint and textures are left as they are.
 #pragma once
 
@@ -69,8 +71,9 @@ public:
     // `weights` as from transformWeights (empty = all). `mirror`: with a mask, the parts on the far side of
     // each enabled symmetry plane (through the origin, as for brushes) from the pivot take the mirrored
     // transform, so both arms pose together. Ignored for unmasked transforms and pivots on the plane.
-    // False (and nothing to do) when no vertex can move.
-    bool begin(const Mesh& mesh, std::vector<float> weights, Symmetry mirror, const glm::vec3& pivot);
+    // `layer`: the sculpt layer the transform records into (-1 = Base mesh: move the base and every layer).
+    // False (and nothing to do) when no vertex can move or `layer`'s weight is 0 (see layerWeightZero).
+    bool begin(const Mesh& mesh, std::vector<float> weights, Symmetry mirror, const glm::vec3& pivot, int layer = -1);
     void apply(Mesh& mesh, const MeshTransform& t);
     void restore(Mesh& mesh); // back to the originals (the session stays open)
     // Refits the BVH and returns the undo step (empty when nothing moved). Ends the session.
@@ -80,6 +83,8 @@ public:
     bool active() const { return active_; }
     size_t movingVertices() const { return verts_.size(); }
     bool mirrored() const { return mirrors_.size() > 1; }
+    // True when begin failed because the layer to record into has weight 0 (its offsets would not show).
+    static bool layerWeightZero(const Mesh& mesh, int layer);
 
 private:
     struct Level {
@@ -91,12 +96,15 @@ private:
 
     bool active_ = false;
     bool layered_ = false;
+    int layer_ = -1;                 // the sculpt layer recorded into (-1: base and every layer move)
+    float invWeight_ = 1.0f;         // 1 / that layer's weight
     std::vector<uint32_t> verts_;    // vertices with weight > 0
     std::vector<uint16_t> level_;    // their weight, quantized to kLevels
     std::vector<uint8_t> side_;      // index into mirrors_
     std::vector<uint32_t> boundary_; // vertices whose normals are recomputed (partial weight or a still neighbour)
-    std::vector<glm::vec3> base_, normals_;           // originals: Mesh::layerTarget(-1) and normals
-    std::vector<std::vector<glm::vec3>> deltas_;      // originals of each sculpt layer's offsets
+    std::vector<glm::vec3> base_, normals_;           // originals: Mesh::layerTarget(-1) (positions when
+                                                      // recording into a layer) and normals
+    std::vector<std::vector<glm::vec3>> deltas_;      // originals of each sculpt layer's offsets (only layer_'s)
     std::vector<glm::vec3> mirrors_;                  // sign vectors; [0] = (1,1,1)
     std::vector<uint8_t> usedLevels_;                 // which quantized weights occur
     std::vector<Level> table_;                        // mirrors_.size() * (kLevels + 1)
@@ -106,8 +114,8 @@ public:
     static constexpr int kLevels = 4096;
 };
 
-// Transforms Part `index` of `doc` (active or not) as one undoable step on that Part. Returns the number
-// of vertices that moved.
+// Transforms Part `index` of `doc` (active or not) as one undoable step on that Part; on the active Part it
+// records into the active sculpt layer (doc.activeLayer). Returns the number of vertices that moved.
 size_t transformPart(Document& doc, int index, const MeshTransform& t, bool useMask, float falloff, Symmetry mirror,
                         const std::string& label);
 

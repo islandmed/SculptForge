@@ -237,6 +237,105 @@ TEST(transform_sculpt_layers_move_with_the_surface) {
     CHECK(sameBits(m.layers[0].delta, delta));
 }
 
+// GitHub #133: with a sculpt layer active, Move / Scale / Rotate record into that layer like a stroke (masked or
+// not): the base and other layers stay, the layer's weight dials the move in and out, undo restores it.
+TEST(transform_records_into_the_active_layer) {
+    Document d = makeDoc(makeArm());
+    Mesh& m = d.mesh;
+    CHECK(run(d, "layer_add", {{"name", std::string("Other")}}).ok);
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) m.layers[0].delta[v] = m.normals[v] * 0.05f;
+    m.setLayerWeight(0, 0.5f);
+    CHECK(run(d, "layer_add", {{"name", std::string("Pose")}}).ok);
+    CHECK(d.activeLayer == 1);
+    const auto pos = m.positions, base = m.base, other = m.layers[0].delta;
+
+    // Unmasked rotate: the whole Part turns, all of it in the active layer.
+    CHECK(run(d, "transform", {{"rotate", std::string("0,0,90")}, {"pivot", std::string("origin")}}).ok);
+    auto rot = [](const glm::vec3& p) { return glm::vec3(-p.y, p.x, p.z); };
+    float err = 0.0f;
+    for (size_t v = 0; v < pos.size(); ++v) err = std::max(err, glm::length(m.positions[v] - rot(pos[v])));
+    CHECK(err < 1e-5f);
+    CHECK(sameBits(m.base, base));
+    CHECK(sameBits(m.layers[0].delta, other));
+    m.setLayerWeight(1, 0.0f); // the layer off: the shape as before
+    CHECK(maxDistance(m.positions, pos) < 1e-5f);
+    m.setLayerWeight(1, 0.5f); // half: halfway along each vertex's move
+    err = 0.0f;
+    for (size_t v = 0; v < pos.size(); ++v) err = std::max(err, glm::length(m.positions[v] - glm::mix(pos[v], rot(pos[v]), 0.5f)));
+    CHECK(err < 1e-5f);
+    m.setLayerWeight(1, 1.0f);
+    CHECK(run(d, "undo").ok);
+    CHECK(maxDistance(m.positions, pos) < 1e-6f);
+    for (const glm::vec3& o : m.layers[1].delta) CHECK(o == glm::vec3(0.0f));
+
+    // Masked (the issue: mask, invert, move): only the unmasked part moves, into the layer, at the layer's weight.
+    maskBelowX(m, 0.0f);
+    m.setLayerWeight(1, 0.25f);
+    const auto pos2 = m.positions;
+    CHECK(run(d, "transform", {{"translate", std::string("0,1,0")}}).ok);
+    bool still = true, full = true;
+    for (size_t v = 0; v < pos2.size(); ++v) {
+        if (m.mask[v] >= 1.0f) still = still && m.positions[v] == pos2[v];
+        else full = full && glm::length(m.positions[v] - (pos2[v] + glm::vec3(0, 1, 0))) < 1e-5f;
+    }
+    CHECK(still);
+    CHECK(full);
+    CHECK(sameBits(m.base, base));
+    m.setLayerWeight(1, 0.0f);
+    float e2 = 0.0f; // the layer off: base + the other layer at 0.5
+    for (size_t v = 0; v < base.size(); ++v) e2 = std::max(e2, glm::length(m.positions[v] - (base[v] + 0.5f * other[v])));
+    CHECK(e2 < 1e-5f);
+    m.setLayerWeight(1, 0.25f);
+    CHECK(run(d, "undo").ok);
+    CHECK(maxDistance(m.positions, pos2) < 1e-6f);
+
+    // Weight 0: refused, like a stroke.
+    m.setLayerWeight(1, 0.0f);
+    const auto off = m.positions;
+    CHECK(!run(d, "transform", {{"translate", std::string("0,1,0")}}).ok);
+    CHECK(sameBits(m.positions, off));
+
+    // Base mesh active: the old behaviour (the base and every layer move).
+    m.setLayerWeight(1, 1.0f);
+    CHECK(run(d, "layer_set_active", {{"index", -1.0}}).ok);
+    CHECK(run(d, "transform", {{"translate", std::string("0,1,0")}, {"masked", false}}).ok);
+    CHECK(m.base[0] == base[0] + glm::vec3(0, 1, 0));
+}
+
+// The gizmo's path: a TransformSession recording into a layer, dragged (applied many times), cancelled, finished.
+TEST(transform_session_into_a_layer) {
+    Document d = makeDoc(makeIcosphere(3));
+    Mesh& m = d.mesh;
+    m.addLayer("Pose");
+    m.setLayerWeight(0, 0.5f);
+    d.syncBvh();
+    const auto pos = m.positions, base = m.base;
+    TransformSession s;
+    CHECK(s.begin(m, {}, Symmetry{false, false, false}, glm::vec3(0.0f), 0));
+    MeshTransform t;
+    for (int k = 1; k <= 10; ++k) {
+        t.rotate = eulerRotation(glm::vec3(0, 0, 9.0f * float(k)));
+        t.scale = glm::vec3(1.0f + 0.05f * float(k));
+        s.apply(m, t);
+    }
+    s.restore(m);
+    CHECK(maxDistance(m.positions, pos) < 1e-6f);
+    s.apply(m, t);
+    float err = 0.0f;
+    for (size_t v = 0; v < pos.size(); ++v) err = std::max(err, glm::length(m.positions[v] - t.apply(pos[v])));
+    CHECK(err < 1e-4f);
+    CHECK(sameBits(m.base, base));
+    UndoRecord r = s.finish(m, d.bvh, "Gizmo Rotate");
+    CHECK(r.layer == 0 && r.layerOffsets.empty());
+    d.undo.push(std::move(r));
+    CHECK(run(d, "undo").ok);
+    CHECK(maxDistance(m.positions, pos) < 1e-6f);
+    // Weight 0: nothing to do.
+    m.setLayerWeight(0, 0.0f);
+    CHECK(!s.begin(m, {}, Symmetry{false, false, false}, glm::vec3(0.0f), 0));
+    CHECK(TransformSession::layerWeightZero(m, 0));
+}
+
 TEST(transform_leaves_topology_and_attributes) {
     Document d = makeDoc(makeCube(6));
     Mesh& m = d.mesh;

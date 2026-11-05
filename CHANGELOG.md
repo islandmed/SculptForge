@@ -6,6 +6,11 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Move, Scale and Rotate (the Transform gizmo and the `transform` command) with a sculpt layer active now record into
+  that layer, masked or not, like a stroke (#133, thanks Devon0209): the base mesh stays, the layer's weight dials
+  the move in and out, undo works. With Base mesh active they move the base and every layer, as before.
+
 ## [0.11.1] - 2026-11-05
 
 ### Added
