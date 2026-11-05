@@ -2785,7 +2785,7 @@ constexpr Entry kSpanish[] = {
      "Dibuja costuras en el modelo: arrastra por las aristas que quieres cortar (cada tramo sigue el camino de "
      "aristas más corto); Alt+arrastrar las quita. Las costuras se ven en rojo en el modelo mientras el Editor UV "
      "está abierto."},
-    {"Select in 3D", "Seleccionar en 3D"},
+    {"Select in 3D", "Elegir en 3D"},
     {"Select on the model: click or drag over it to select faces, islands, vertices or edges (the UV Editor's mode); "
      "Alt removes. The selection shows in both views.",
      "Selecciona en el modelo: haz clic o arrastra sobre él para seleccionar caras, islas, vértices o aristas (el "
@@ -3478,6 +3478,23 @@ constexpr Entry kSpanish[] = {
     {"Pen upper button", "Botón superior del lápiz"},
     {"Pen third button", "Tercer botón del lápiz"},
     {"Right mouse button", "Botón derecho del ratón"},
+    // --- PanelUvEditor.cpp (tools/i18n/coverage.py) ---
+    {" (folds)", " (pliegues)"},
+    {"%zu seam edges marked", "%zu aristas de costura marcadas"},
+    {"%u islands  |  %zu selected  |  stretch %.3f%s  |  %.0f tx/u at %dK  |  %s",
+     "%u islas  |  %zu seleccionadas  |  estiramiento %.3f%s  |  %.0f tx/u a %dK  |  %s"},
+    {"Density", "Densidad"},
+    {"Edge", "Arista"},
+    {"Face", "Cara"},
+    {"Island", "Isla"},
+    {"Islands", "Islas"},
+    {"No Image", "Sin imagen"},
+    {"Plain", "Simple"},
+    {"Selected", "Seleccionadas"},
+    {"Stretch", "Estiramiento"},
+    {"Texel Density", "Densidad de téxeles"},
+    {"Trim Sheet", "Trim sheet"},
+    {"Unwrap Selected", "Desenvolver selección"},
 };
 
 } // namespace

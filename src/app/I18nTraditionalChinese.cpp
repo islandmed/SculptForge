@@ -3011,6 +3011,23 @@ constexpr Entry kTraditionalChinese[] = {
     {"Pen upper button", "繪圖筆上方按鈕"},
     {"Pen third button", "繪圖筆第三個按鈕"},
     {"Right mouse button", "滑鼠右鍵"},
+    // --- PanelUvEditor.cpp (tools/i18n/coverage.py) ---
+    {" (folds)", " （翻折）"},
+    {"%zu seam edges marked", "已標記 %zu 條接縫邊"},
+    {"%u islands  |  %zu selected  |  stretch %.3f%s  |  %.0f tx/u at %dK  |  %s",
+     "%u 個島  |  已選取 %zu  |  拉伸 %.3f%s  |  %.0f tx/u（%dK）  |  %s"},
+    {"Density", "密度"},
+    {"Edge", "邊"},
+    {"Face", "面"},
+    {"Island", "島"},
+    {"Islands", "島"},
+    {"No Image", "無影像"},
+    {"Plain", "單色"},
+    {"Selected", "已選取"},
+    {"Stretch", "拉伸"},
+    {"Texel Density", "紋素密度"},
+    {"Trim Sheet", "裝飾貼圖"},
+    {"Unwrap Selected", "展開所選"},
 };
 
 } // namespace
