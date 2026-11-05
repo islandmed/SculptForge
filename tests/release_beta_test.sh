@@ -4,7 +4,8 @@
 #
 # scripts/release.sh's beta path, run for real in a sandbox (ctest release_script_beta): a shared clone of this
 # checkout (with its uncommitted changes), a bare repository as origin, and stand-ins for gh, curl, cmake and ctest,
-# so nothing reaches GitHub, the website or the build. It releases 9.0.0-beta.1 (steps bump check preview status),
+# so nothing reaches GitHub, the website or the build. It releases 9.0.0-beta.1 (steps bump check status: members
+# only, nothing public),
 # then promotes it to 9.0.0 (bump check site) with the beta tag present, and checks what each one may and may not
 # touch (docs/releasing.md, "Betas").
 set -euo pipefail
@@ -57,6 +58,8 @@ cat > "$S/bin/gh" <<EOF
 #!/usr/bin/env bash
 case "\$*" in
   "auth status"*) echo "Logged in to github.com account islandmed" ;;
+  "secret list"*) printf 'INSIDERS_REPO_TOKEN\t2026-11-05T00:00:00Z\n' ;;
+  "repo view islandmed/sculptforge-insiders"*) echo "islandmed/sculptforge-insiders" ;;
   "release view"*) echo SHA256SUMS.txt ;;
   "release download"*) exit 1 ;;
   *homebrew-tap*) printf '  version "0.10.10"\n' | base64 ;;
@@ -109,23 +112,15 @@ grep -q 'CMakeLists.txt says 9.0.0 beta.1' "$S/out.log" || fail "beta check: $(c
 quiet scripts/release.sh 9.0.0-beta.1 --only bump # again: nothing left to do
 grep -q 'already says' "$S/out.log" || fail "beta bump is not idempotent: $(cat "$S/out.log")"
 
-# A beta needs highlights for its feed entry: in What's New's block now (the fragment's went there).
-quiet scripts/release.sh 9.0.0-beta.1 --only preview
-python3 - <<'EOF' || fail "beta preview: wrong feed"
-import json, subprocess
-feed = json.loads(subprocess.run(["git", "show", "HEAD:website/latest.json"], capture_output=True, text=True).stdout)
-old = json.loads(subprocess.run(["git", "show", "HEAD~1:website/latest.json"], capture_output=True, text=True).stdout)
-p = feed["channels"]["preview"]
-assert p["version"] == "9.0.0-beta.1", p
-assert p["download"].endswith("/releases/tag/v9.0.0-beta.1"), p
-assert p["highlights"][0] == "First highlight of the beta", p
-assert feed["version"] == old["version"] and feed["highlights"] == old["highlights"], "the stable top level changed"
-EOF
-git diff --quiet HEAD~1 HEAD -- website/index.html || fail "beta preview touched the home page"
+# A beta is members only: nothing of the site or the update feed changes.
+[ "$(git rev-parse HEAD)" = "$(git -C "$S/origin.git" rev-parse main)" ] || fail "beta check pushed something"
+git diff --quiet "$start" HEAD -- website/latest.json website/index.html || fail "the beta touched the update feed or the home page"
+scripts/release.sh 9.0.0-beta.1 --only preview >/dev/null 2>&1 && fail "a beta still has a preview (public feed) step"
 quiet scripts/release.sh 9.0.0-beta.1 --only status
 grep -q 'release-testers-9.0.0-beta.1.md' "$S/out.log" || fail "beta status names no testers checklist"
+grep -q 'islandmed/sculptforge-insiders/releases/tag/v9.0.0-beta.1' "$S/out.log" || fail "beta status doesn't name the members' repository"
 grep -q 'scripts/release.sh 9.0.0 --yes' "$S/out.log" || fail "beta status doesn't say how to promote"
-git tag v9.0.0-beta.1 "$(git rev-parse HEAD~1)" # what step tag would have pushed
+git tag v9.0.0-beta.1 "$(git rev-parse HEAD)" # what step tag would have pushed
 
 # --- promoting it: the stable 9.0.0 with the beta tag present ------------------------------------------------------
 # People give the version its tagline before the stable release (the home page card needs it).

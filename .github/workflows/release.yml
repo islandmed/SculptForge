@@ -11,7 +11,10 @@ name: Release
 #   smoke    every package installed or unpacked on a fresh runner: the app opens a model and sculpts
 #            (tests/ui/release_smoke.sfui), sculptforge-cli opens, sculpts, saves and reopens (tests/release_smoke.py).
 #   publish  only after every smoke test passed: checksums, notes from CHANGELOG.md, the GitHub release. A tag with
-#            a '-' (a beta) is published as a pre-release, never marked latest, with CHANGELOG's [Unreleased] notes.
+#            a '-' (a beta) is a member perk: published as a pre-release in the private repository
+#            islandmed/sculptforge-insiders (INSIDERS_REPO_TOKEN: a fine-grained token for that repository only,
+#            Contents: read and write) with CHANGELOG's [Unreleased] notes, and posted in #members
+#            (DISCORD_MEMBERS_WEBHOOK). Nothing public: no release here, no update feed entry.
 #
 # Only publish holds a token that can write (contents: write); every other job reads. Build and smoke jobs take their
 # runner from the SF_RUNNER_* repository variables (standard GitHub runners when unset); locate and publish always run
@@ -276,15 +279,18 @@ jobs:
           section=${TAG#v}
           if [[ "$TAG" == *-* ]]; then # a beta: what has changed since the stable release
             section=Unreleased
-            printf '%s\n\n' "**Beta for testers.** Please report problems in the Discord's #bug-reports (or a GitHub issue) with your OS, this version (Help > About) and your graphics card. Preferences > Updates > Update channel: Preview offers the next betas." > notes.md
+            printf '%s\n\n' "**Members' beta.** Thank you for being a member! Please report problems in #members on Discord (or a GitHub issue) with your OS, this version (Help > About) and your graphics card." > notes.md
           fi
           awk -v h="## [$section]" 'index($0, h) == 1 {flag=1;next} /^## \[/{flag=0} flag' CHANGELOG.md >> notes.md
           cat packaging/release-notes-footer.md >> notes.md
       - name: Create or update the release
         env:
           GH_TOKEN: ${{ github.token }}
+          INSIDERS_TOKEN: ${{ secrets.INSIDERS_REPO_TOKEN }}
         run: |
-          if [[ "$TAG" == *-* ]]; then # v0.11.0-beta.1: "SculptForge 0.11.0 Beta 1", a pre-release, not latest
+          if [[ "$TAG" == *-* ]]; then # v0.11.0-beta.1: "SculptForge 0.11.0 Beta 1", members only, a pre-release
+            [ -n "$INSIDERS_TOKEN" ] || { echo "::error::No INSIDERS_REPO_TOKEN secret: a beta is published only in islandmed/sculptforge-insiders"; exit 1; }
+            export GH_TOKEN=$INSIDERS_TOKEN GH_REPO=islandmed/sculptforge-insiders
             pre=${TAG#*-}
             title="SculptForge ${TAG%%-*} $(sed -E 's/^rc/RC/; s/^./\U&/; s/\./ /g' <<<"$pre")"
             gh release view "$TAG" >/dev/null 2>&1 ||
@@ -293,3 +299,17 @@ jobs:
             gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "SculptForge ${TAG#v}" --notes-file notes.md
           fi
           gh release upload "$TAG" dist/* --clobber
+      - name: Post a beta in #members
+        if: contains(env.TAG, '-')
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_MEMBERS_WEBHOOK }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then echo "::warning::No DISCORD_MEMBERS_WEBHOOK secret: post the beta in #members by hand"; exit 0; fi
+          pre=${TAG#*-}
+          label="${TAG%%-*} $(sed -E 's/^rc/RC/; s/^./\U&/; s/\./ /g' <<<"$pre")"
+          url="https://github.com/islandmed/sculptforge-insiders/releases/tag/$TAG"
+          jq -n --arg c "**SculptForge ${label#v} is up for members:** $url
+          Please report anything that goes wrong here, with your OS and graphics card. Not invited to the repository yet? Reply with your GitHub username." \
+            '{content: $c, allowed_mentions: {parse: []}, flags: 4}' |
+            curl -fsS -H 'Content-Type: application/json' -d @- "$WEBHOOK" >/dev/null
+          echo "Posted to #members"

@@ -831,7 +831,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
       </div>
       <div class="links">
         <a href="index.html">User guide</a>
-        <a href="../supporters.html">Supporters</a>
+        <a href="../supporters.html">Members</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
         <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
         <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
@@ -967,7 +967,7 @@ def supporters_html() -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Supporters</title>
+  <title>Members</title>
   <meta name="description" content="The members who keep SculptForge free and open source for everyone.">
   <meta name="color-scheme" content="dark light">
   <link rel="icon" type="image/svg+xml" href="img/favicon.svg?v=2">
@@ -995,8 +995,8 @@ def supporters_html() -> str:
     <section class="section">
       <div class="wrap">
         <p class="eyebrow">Credits</p>
-        <h1>Supporters</h1>
-        <p>Thank you to everyone who supports SculptForge. The same names are in the app, under Help &gt; About.</p>
+        <h1>Members</h1>
+        <p>Thank you to every SculptForge member. The same names are in the app, under Help &gt; About.</p>
         {body}
       </div>
     </section>

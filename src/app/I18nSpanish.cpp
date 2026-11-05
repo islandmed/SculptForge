@@ -804,6 +804,8 @@ constexpr Entry kSpanish[] = {
     {"Download", "Descargar"},
     {"Later", "Más tarde"},
     {"Skip this version", "Omitir esta versión"},
+    {"Become a member", "Hazte miembro"},
+    {"Members get betas early.", "Los miembros reciben las betas antes."},
     {"Checking", "Comprobando"},
     {"This build gets its updates from your package manager.",
      "Esta compilación se actualiza desde tu gestor de paquetes."},

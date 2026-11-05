@@ -1,7 +1,8 @@
-name: Insider preview
+name: Members early build
 
-# Insider preview builds: the next release's packages, about a week early, as a prerelease in the private repository
-# islandmed/sculptforge-insiders (Insider and Studio members are invited to it), announced in #insiders on Discord.
+# Members' early builds: the next release's packages, early, as a prerelease in the private repository
+# islandmed/sculptforge-insiders (Member and Studio members are invited to it), announced in #members on Discord.
+# (Betas, X.Y.Z-beta.N, go there through release.yml; this one shares any commit in between.)
 #
 #   Run workflow  with a version label (e.g. 0.10.8-preview.1) and an optional ref (default main).
 #   push          to a preview/* branch; the label is the project version plus "-preview.<run number>".
@@ -16,7 +17,7 @@ name: Insider preview
 #                              "Only select repositories: islandmed/sculptforge-insiders", repository permission
 #                              Contents: Read and write (Metadata: Read-only is added by GitHub). Nothing else: it
 #                              can't touch this repository or any other.
-#   DISCORD_INSIDERS_WEBHOOK   a webhook of the private #insiders channel (Channel settings > Integrations).
+#   DISCORD_MEMBERS_WEBHOOK    a webhook of the private #members channel (Channel settings > Integrations).
 # Only publish sees them. The public release stays free for everyone; this only shares builds earlier. Bug-fix and
 # security releases go out to everyone the same day through release.yml, never through here.
 
@@ -129,23 +130,23 @@ jobs:
           SOURCE: ${{ github.repository }}
         run: |
           cat > notes.md <<EOF
-          SculptForge ${TAG#v}, an Insider preview of the next release (commit ${SHA::7} of $SOURCE).
-          The same packages and tests as a public release. Please report problems in #insiders or on GitHub.
+          SculptForge ${TAG#v}, a members' early build of the next release (commit ${SHA::7} of $SOURCE).
+          The same packages and tests as a public release. Please report problems in #members or on GitHub.
 
           Every release stays free for everyone; bug-fix and security releases go out to everyone the same day.
           EOF
           repo=islandmed/sculptforge-insiders
           gh release view "$TAG" --repo "$repo" >/dev/null 2>&1 ||
-            gh release create "$TAG" --repo "$repo" --prerelease --title "SculptForge ${TAG#v} (Insider preview)" \
+            gh release create "$TAG" --repo "$repo" --prerelease --title "SculptForge ${TAG#v} (members' early build)" \
               --notes-file notes.md
           gh release upload "$TAG" dist/* --repo "$repo" --clobber
-      - name: Post to #insiders
+      - name: Post to #members
         env:
-          WEBHOOK: ${{ secrets.DISCORD_INSIDERS_WEBHOOK }}
+          WEBHOOK: ${{ secrets.DISCORD_MEMBERS_WEBHOOK }}
         run: |
-          if [ -z "$WEBHOOK" ]; then echo "No DISCORD_INSIDERS_WEBHOOK secret: skipped"; exit 0; fi
+          if [ -z "$WEBHOOK" ]; then echo "No DISCORD_MEMBERS_WEBHOOK secret: skipped"; exit 0; fi
           url="https://github.com/islandmed/sculptforge-insiders/releases/tag/$TAG"
-          jq -n --arg c "**SculptForge ${TAG#v} preview is up** for Insiders: $url" \
+          jq -n --arg c "**SculptForge ${TAG#v} early build is up** for members: $url" \
             '{content: $c, allowed_mentions: {parse: []}}' |
             curl -fsS -H 'Content-Type: application/json' -d @- "$WEBHOOK" >/dev/null
-          echo "Posted to #insiders"
+          echo "Posted to #members"

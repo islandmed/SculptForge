@@ -1,5 +1,5 @@
 # The support card at launch (Support.h, PanelSupportCard.cpp): shown on the first start, after an update and at
-# most once a week; never for a supporter, never in tests. Its buttons only ask for the fixed Stripe links (UI tests
+# most once a week; never for a member, never in tests. Its buttons only ask for the fixed Stripe links (UI tests
 # never start a browser).
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
@@ -18,14 +18,14 @@ expect_text Free and open source.
 expect_text Members keep it moving.
 expect_text Every release stays free for everyone.
 expect_text RECOMMENDED
+expect_text Member
 expect_text $5
-expect_text $20
 expect_text $150
-expect_text Preview builds of the next release, about a week early
-expect_text Insider for every artist in your company
-expect_text FOUNDING STUDIO
-expect_text First 10 studios lock in $150/month for good
-expect_text $300
+expect_text Betas and early builds of the next version
+expect_text Up to 10 artists, each with everything in Member
+expect_text invoiced monthly
+expect_text or $48 a year
+expect "Member, $48 a year##card.member_yearly"
 shot first_run
 # The members' Discord in the footer opens the invite (kDiscordUrl) and leaves the card open.
 expect "Join the members on Discord##card.discord"
@@ -36,9 +36,9 @@ wait 0.4
 expect_value support_card_open == 1
 expect_value support_requests == 0
 # Clicks on the card never reach the canvas or the shortcuts underneath; a tier opens its Stripe checkout.
-click "Become an Insider##card.insider"
+click "Become a member##card.member"
 expect_value support_requests == 1
-expect_status https://buy.stripe.com/dRmdR94eH4D06qD9ux4F202
+expect_status https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201
 wait 0.4
 expect_value support_card_open == 0
 
@@ -48,9 +48,17 @@ expect_value support_card_open == 0
 support_card days=7
 expect_value support_card_open == 1
 wait 0.8
-click "One-time Supporter##card.once"
+click "Studio membership##card.studio"
 expect_value support_requests == 2
-expect_status https://buy.stripe.com/4gM7sL8uXc5s4iv5eh4F200
+expect_status https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204
+wait 0.4
+# The yearly Member checkout, in the footer.
+support_card days=15
+expect_value support_card_open == 1
+wait 0.8
+click "Member, $48 a year##card.member_yearly"
+expect_value support_requests == 3
+expect_status https://buy.stripe.com/aFa5kD4eHfhE2an6il4F206
 wait 0.4
 
 # The first start of a new version, with a way to What's New; Esc closes it.
@@ -63,7 +71,7 @@ shot updated
 key Escape
 wait 0.4
 expect_value support_card_open == 0
-expect_value support_requests == 2
+expect_value support_requests == 3
 
 # Maybe later: hidden for 30 days, past the weekly showing and a new version.
 support_card days=8
@@ -87,11 +95,11 @@ expect_value support_card_open == 0
 click "Show the support card at launch"
 expect_value support_card_enabled == 1
 
-# "I'm already a supporter" hides it for good, after updates too.
+# "I'm already a member" hides it for good, after updates too.
 support_card days=30
 expect_value support_card_open == 1
 wait 0.8
-click "I'm already a supporter##card.supporter_already"
+click "I'm already a member##card.supporter_already"
 wait 0.4
 expect_value support_card_open == 0
 expect_value supporter == 1
@@ -101,4 +109,4 @@ support_card updated
 expect_value support_card_open == 0
 support_card first_run
 expect_value support_card_open == 0
-expect_value support_requests == 2
+expect_value support_requests == 3

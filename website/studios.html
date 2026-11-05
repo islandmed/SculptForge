@@ -117,10 +117,6 @@
     .member .price span { color: var(--muted); font-size: 1rem; font-weight: 500; letter-spacing: 0; margin-left: 6px; }
     .member ul { margin: 0; padding-left: 1.1em; }
     .member li { margin: 6px 0; }
-    .member .price s { color: var(--muted); font-size: 1.3rem; font-weight: 500; letter-spacing: 0; margin-left: 12px; }
-    .member .price .now { color: inherit; font-size: inherit; font-weight: inherit; letter-spacing: inherit; margin: 0; }
-    .founding-badge { display: inline-block; margin: 0 0 12px; padding: 4px 13px; border-radius: 999px; font-size: 0.8rem;
-                      font-weight: 600; color: #ffb06a; border: 1.5px solid #f6994d; }
     .member .actions { display: grid; gap: 12px; }
     .member .actions .btn { display: block; text-align: center; padding: 14px 20px; }
     .member .actions p { margin: 0; color: var(--muted); font-size: 0.92rem; }
@@ -200,7 +196,6 @@
     }
   </style>
   <script src="motion.js?v=11" defer></script>
-  <script src="studio-offer.js?v=1" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
 <body class="studio-page">
@@ -309,32 +304,24 @@
           <div>
             <p class="eyebrow">Studio membership</p>
             <h2 id="member-title">Put a little of the licence budget back into the tool</h2>
-            <p class="founding-badge" data-founding>Founding Studio: first 10 studios lock in $150/month for good</p>
-            <p class="price"><span class="now" data-studio-price>$150</span><s data-founding>$300</s><span>/ month</span></p>
+            <p class="price">$150<span>/ month</span></p>
             <ul>
-              <li><strong>Insider for every artist in your company</strong>, no seat count: daily drops, preview
-                builds about a week early, a vote on what we build next and the dev Q&amp;A</li>
-              <li><strong>Custom studio build</strong>: your presets, keymaps, layouts, packs, shelves and pipeline
-                defaults baked in, delivered through the private repository</li>
-              <li><strong>Custom content</strong>: brushes tuned to your style, alphas and VDMs from your own
-                references or scans, macros and pipeline presets. Up to 5 custom items a month (brushes, alphas,
-                macros or presets); larger features are quoted separately.</li>
-              <li><strong>Guided development</strong>: your requests go to the front of the roadmap, with a monthly
-                call or async review with the developer</li>
-              <li><strong>Priority triage</strong>: reviewed within 2 business days (no fix-time guarantee)</li>
-              <li>A <strong>private team channel</strong>, and your <strong>logo</strong> on sculptforge.app and in
-                the project README</li>
+              <li><strong>Up to 10 artists</strong>, each with everything in Member: betas and early builds, the
+                monthly feature vote, a monthly brush and alpha pack, #members and your names in the credits</li>
+              <li><strong>Priority support</strong>: your reports reviewed within 2 business days (no fix-time
+                guarantee)</li>
+              <li>Your studio's own <strong>private channel</strong> on Discord</li>
+              <li>Invoiced monthly; cancel anytime</li>
             </ul>
           </div>
           <div class="actions">
-            <a class="btn btn-hot" data-studio-link href="https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204" rel="noopener">Become a Studio member</a>
-            <a class="btn btn-ghost" href="mailto:hello@sculptforge.app?subject=SculptForge%20studio%20work">Email about custom work</a>
-            <p>Larger custom features are quoted separately: write to
-              <a href="mailto:hello@sculptforge.app">hello@sculptforge.app</a>. Your assets stay private to your
-              studio and are never used for anything else. <a href="guide/studios.html#studio-onboarding">Studio
-              onboarding</a> explains what to send. Payments go through Stripe; cancel
-              anytime in the customer portal. Memberships are subscriptions to SculptForge benefits.
-              <a href="support.html">All memberships</a>.</p>
+            <a class="btn btn-hot" href="https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204" rel="noopener">Become a Studio member</a>
+            <a class="btn btn-ghost" href="mailto:hello@sculptforge.app?subject=SculptForge%20for%20studios">Email us</a>
+            <p>More than 10 artists, or questions first: write to
+              <a href="mailto:hello@sculptforge.app">hello@sculptforge.app</a>.
+              <a href="guide/studios.html#studio-onboarding">Studio onboarding</a> explains what to send. Payments go
+              through Stripe; cancel anytime in the customer portal. Memberships are subscriptions to SculptForge
+              benefits. <a href="support.html">All memberships</a>.</p>
           </div>
         </div>
       </div>
@@ -355,7 +342,7 @@
         <a href="benchmarks/">Benchmarks: 15M and 33M</a>
         <a href="press.html">Press kit</a>
         <a href="support.html">Membership</a>
-        <a href="supporters.html">Supporters</a>
+        <a href="supporters.html">Members</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
         <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
       </div>

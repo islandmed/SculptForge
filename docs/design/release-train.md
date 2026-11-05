@@ -38,11 +38,10 @@ opens the download page (no download or install from the app: that would be new 
 **Release script.** `scripts/release.sh X.Y.Z-rc.N` runs the same steps minus site/AUR/brew/Omarchy, and step
 `status` writes `channels.preview`. The nightly job writes `channels.nightly` through the Pages workflow.
 
-**Insiders.** Insider builds (private sculptforge-insiders repo) stay separate from Preview: the public wording is
-"Insiders will get each release about two weeks early, starting with SculptForge 1.0." Before 1.0, Preview is the
-public release candidate. Open question: from 1.0 on, is Preview for Insiders only (then the channel shows
-only to signed-in members, which needs an account check: not before the maintainer decides), or public with Insiders getting
-features two weeks earlier through feature flags (section 2)?
+**Members.** Since 0.11.1 betas are a member perk (maintainer decision, November 2026): `X.Y.Z-beta.N` is published only in the
+private sculptforge-insiders repository and posted in #members (docs/releasing.md, "Betas"); the update feed's Preview
+channel is no longer written for betas. Public wording: members get betas and early builds; from SculptForge 1.0,
+each release about two weeks early.
 
 ## 2. Feature flags
 

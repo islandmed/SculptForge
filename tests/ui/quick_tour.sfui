@@ -169,7 +169,7 @@ click "Next##quicktour.aside"
 # 10. Last: memberships, friendly. See memberships opens the page (the status bar in tests); Maybe later closes.
 expect_value quick_tour_slide == 10
 expect_text SculptForge stays free
-expect_text feature-vote
+expect_text betas and early builds
 expect_no_text "Show me"
 shot tour-10
 remember support_requests s0

@@ -82,8 +82,7 @@ constexpr TourSlide kSlides[] = {
      "tool.bake", "ui.palette.tool"},
     {"SculptForge stays free", "images/wn-first-sculpt.jpg",
      "Everything in this tour is free, and stays free. If SculptForge helps your work, a membership keeps it moving: "
-     "members vote on what we build next in #feature-vote on Discord, and Insiders get daily drops and preview "
-     "builds.",
+     "members get betas and early builds, vote on what we build next and get a brush and alpha pack every month.",
      nullptr, nullptr},
 };
 constexpr int kSlideCount = int(std::size(kSlides));
