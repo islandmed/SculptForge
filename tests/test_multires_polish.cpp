@@ -254,6 +254,7 @@ TEST(multires_layer_detail_turns_with_a_rotated_low_level) {
     CHECK(maxLength(before) > 0.02f);
 
     CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
+    d.activeLayer = -1; // posing the whole Part: Base mesh active (with a layer active the turn goes into it, #133)
     CHECK(run(d, "transform", {{"rotate", "0,90,0"}, {"pivot", "origin"}}).ok);
     CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
     const glm::mat3 R = glm::mat3_cast(eulerRotation(glm::vec3(0, 90, 0)));
