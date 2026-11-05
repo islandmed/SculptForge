@@ -3548,7 +3548,7 @@ void App::drawImageTo3D() {
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", ai::kHunyuanLicenceNote);
         ImGui::InputText("Model id", falModel_, sizeof falModel_);
-        if (textMode_ && !ai::rodinModel(falModel_)) hint("From text: Hunyuan3D 3.1 Rapid runs (Rodin 2.5 takes text too).");
+        if (textMode_ && !ai::rodinModel(falModel_)) hint("From text, Hunyuan3D 3.1 Rapid runs. Choose a Rodin model to use Rodin for text.");
         if (ai::hunyuanModel(textMode_ ? ai::falTextModel(falModel_) : std::string(falModel_)))
             hint(ai::kHunyuanLicenceNote);
         ImGui::InputText("API key", falKey_, sizeof falKey_, ImGuiInputTextFlags_Password);

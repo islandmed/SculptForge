@@ -357,8 +357,8 @@ const std::vector<ServiceModel>& falModels() {
         {"fal-ai/hunyuan-3d/v3.1/pro/image-to-3d", "Hunyuan3D 3.1 Pro (Tencent)"},
         {"fal-ai/hunyuan-3d/v3.1/rapid/image-to-3d", "Hunyuan3D 3.1 Rapid (Tencent) - fast"},
         {"fal-ai/meshy/v6/image-to-3d", "Meshy 6"},
-        {"fal-ai/hyper3d/rodin/v2.5", "Rodin 2.5 (Hyper3D) - image or text"},
-        {"fal-ai/hyper3d/rodin/v2.5/fast", "Rodin 2.5 Fast (Hyper3D) - low poly, cheaper"},
+        {"fal-ai/hyper3d/rodin/v2.5", "Rodin 2.5 (Hyper3D)"},
+        {"fal-ai/hyper3d/rodin/v2.5/fast", "Rodin 2.5 Fast (Hyper3D) - cheaper"},
     };
     return models;
 }
