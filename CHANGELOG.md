@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-04
+
 ### Added
 - **Fast Big Brushes (Experimental)** (Preferences > Performance, off by default): a dab that reaches more than
   150,000 vertices takes its plane from an even sample of them and turns the shading along with the move it makes
@@ -40,6 +42,11 @@ All notable changes to SculptForge are listed here. The format follows
   (GL_ARB_buffer_storage) and copied on the GPU (`SF_PERSISTENT_UPLOAD=0/1`). The research behind them, including a
   design for focus detail on billion-polygon assets, is in docs/design/perf-moonshots.md.
 - **Cmd+, / Ctrl+, opens Preferences** (#111, suggested by fenixpoints).
+- **Show SculptForge on Discord** (Preferences > Integrations, off by default; idea by ebarranco): Discord shows
+  SculptForge, its icon and the elapsed time; optionally "Monthly challenge: <theme>" (typed, 64 characters at most)
+  and the file's name (never its folder). Nothing else is sent. It talks only to the Discord app on the same computer
+  through Discord's local connection (no network connection, no port, no sign-in), sends its status and nothing else,
+  and ignores whatever Discord sends back. See the guide's "Show SculptForge on Discord".
 
 ### Changed
 - **Tool > Masking** is one panel of buttons with pictures and a hint each: Shapes, Mask by and Adjust, with their

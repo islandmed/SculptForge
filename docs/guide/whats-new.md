@@ -8,12 +8,13 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.11.0
 
 ```features
-date: unreleased
+date: 2026-11-04
 tagline: Sixty new brushes in six packs, a Masking panel, a quick tour for experienced sculptors, and experimental options for very dense meshes.
 highlight: Sixty new brushes in six built-in packs
 highlight: Mask by peaks, colour and facing in a new Masking panel
 highlight: A quick tour for experienced sculptors
 highlight: Experimental: Live Move and Background Preview for very dense meshes
+highlight: Show SculptForge on Discord (opt-in)
 ```
 
 - **Fast Big Brushes (Experimental)**: a new way to place big brushes on dense meshes, off by default. Try it on a
@@ -39,6 +40,8 @@ highlight: Experimental: Live Move and Background Preview for very dense meshes
 - **Pattern brushes on micro levels**: Dragon Scales, Skin Pores, Stone Chisel and the other pattern brushes keep
   their pattern on a micro level, and carving ones (Wrinkle) carve.
 - **Cmd+, opens Preferences** (Ctrl+, on Windows and Linux).
+- **Show SculptForge on Discord**: **Edit > Preferences > Integrations** lets your Discord friends see you're
+  sculpting, with the elapsed time and, if you like, the monthly challenge's theme or the file name. Off by default.
 
 ## Version 0.10.11
 
