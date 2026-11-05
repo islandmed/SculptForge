@@ -491,9 +491,10 @@ HttpResponse httpRequestStream(const std::string&, const std::string& url, const
 
 namespace {
 
-HttpResponse getOnce(const std::string&, const std::string&, const std::vector<std::string>&, const std::string&, int,
+HttpResponse getOnce(const std::string&, const std::string& url, const std::vector<std::string>&, const std::string&, int,
                      const std::function<bool(const char*, size_t)>&, const std::function<bool(uint64_t, uint64_t)>&,
                      std::string&) {
+    if (HttpResponse no; refused(url, no)) return no; // studio mode, as in the real transports
     ++gRequests;
     HttpResponse r;
     r.error = "This build of SculptForge has no HTTP support (libcurl was not found at build time)";
