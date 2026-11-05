@@ -1,0 +1,76 @@
+# The newest panels in Spanish and Traditional Chinese (tools/i18n/coverage.py keeps both tables at 100%): Preferences >
+# Input, the Help menu, Tool > Remesh with Quick Remesh, and the UV Editor's Pack, translated and laid out without
+# clipping. The "##" ids stay, so the same items are found in every language.
+run ui_look look=forge scheme=neutral layout=sculptforge
+drop ../../assets/demo/lion-head.glb
+wait_idle 60
+
+# Español
+click "Edit##menu.edit"
+click "Preferences##section.preferences"
+click "Interface##preferences.interface"
+click "Español##language.es"
+expect_text "Idioma"
+click "Entrada##preferences.input"
+expect_text "Teclas clásicas de escultura"
+expect_text "Arrastre de zoom"
+shot es-preferences-input
+key escape
+click "Ayuda##menu.help"
+expect "Tu primera escultura (10 min)##help.first_sculpt"
+expect "Recorrido rápido##help.quick_tour"
+shot es-help-menu
+key escape
+run ui_look layout=classic
+click "Remallado##tool.remesh"
+expect "Remallado rápido##remesh.quick"
+expect "Remallar tras cada trazo##remesh.after_stroke"
+shot es-remesh
+click "Remallado##tool.remesh"
+key alt+u
+expect_value uv_editor_open == 1
+run uv_pack columns=4 rows=3 margin=6
+expect_text "Columnas"
+expect_text "Densidad objetivo"
+shot es-uv-editor
+key alt+u
+expect_value uv_editor_open == 0
+
+# 繁體中文
+run ui_look layout=sculptforge
+click "Editar##menu.edit"
+click "Preferencias##section.preferences"
+click "Interfaz##preferences.interface"
+click "繁體中文##language.zh-TW"
+expect_text "語言"
+click "輸入##preferences.input"
+expect_text "經典雕刻按鍵"
+expect_text "縮放拖曳"
+shot zh-preferences-input
+key escape
+click "說明##menu.help"
+expect "你的第一件雕刻（10 分鐘）##help.first_sculpt"
+expect "快速導覽##help.quick_tour"
+shot zh-help-menu
+key escape
+run ui_look layout=classic
+click "重新網格化##tool.remesh"
+expect "Quick Remesh##remesh.quick"
+expect "每筆畫後重新網格化##remesh.after_stroke"
+shot zh-remesh
+click "重新網格化##tool.remesh"
+key alt+u
+expect_value uv_editor_open == 1
+expect_text "欄數"
+expect_text "目標密度"
+shot zh-uv-editor
+key alt+u
+
+# Back to English: the same items with their English labels.
+run ui_look layout=sculptforge
+click "編輯##menu.edit"
+click "偏好設定##section.preferences"
+click "界面##preferences.interface"
+click "English##language.en"
+expect_text "Language"
+key escape
