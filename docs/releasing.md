@@ -11,8 +11,10 @@ the gates, what each step does, and how to recover.
 
 ## Gates (in this order; a release never skips one)
 
-1. **Merged tree, tested locally**: on main with the branches for this release merged, `ctest --test-dir build -j3`
-   all green.
+1. **Merged tree, tested once on each machine** (docs/testing-flow.md): the merger's batch goes to the branch
+   `staging` (`scripts/merge-queue.sh staging --with ~/Work/.sf/t1.sh HEAD`). The whole suite runs on the PC (T1) while
+   the full CI runs on staging (T2), and main fast-forwards to the batch only when both are green. Nobody runs a
+   second local full ctest.
 2. **Version and words**:
    - written by people, on main before the release: one note fragment per branch, `changes/<branch>.md`
      (changes/README.md: the What's New bullet, CHANGELOG entry and section, highlight, #testers bullets); in
@@ -27,7 +29,11 @@ the gates, what each step does, and how to recover.
 
    Step `check` verifies all of this, plus what the steps after the tag need (PKGBUILD format, the Homebrew tap, the
    Omarchy PR is open, the home page's version text), so nothing stops after the tag for a reason known before it.
-3. **CI and Packages green on main** for exactly that commit:
+3. **CI and Packages green on main** for exactly that commit. CI's run on main reuses the staging run of the same
+   commit. For the bump commit, step `ci` and release.yml reuse the CI result of the commit before it when the bump
+   only added release paperwork (`tools/release/paperwork_only.py`: exact files and lines, fails safe). Step `check` has
+   already run the bump's own tests (What's New, the guide, notes) on the bumped tree. Packages still has to pass for the
+   bump commit itself:
    - **CI** (ci.yml) runs every test on Linux x86_64 and ARM64, macOS, Windows, the VFX platforms and Blender.
    - **Packages** (packages.yml) builds every release package the way it ships, with its tests.
 4. **Packaged-artifact smoke tests** (release.yml `smoke`): every package is installed or unpacked on a fresh runner.

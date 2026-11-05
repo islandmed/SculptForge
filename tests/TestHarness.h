@@ -59,7 +59,11 @@ inline bool inShard(const char* name, int shard, int shards) {
 inline double timeLimit(double local) {
     const char* strict = std::getenv("SF_BENCH_LIMITS");
     if (strict && std::string(strict) == "1") return local;
-    return std::getenv("CI") || std::getenv("GITHUB_ACTIONS") ? local * 4.0 : local;
+    if (std::getenv("CI") || std::getenv("GITHUB_ACTIONS")) return local * 4.0;
+    // tools/test/run.py sets SF_TIME_LIMIT_SCALE for a parallel run (ctest -jN): the machine is as loaded as CI's.
+    const char* scale = std::getenv("SF_TIME_LIMIT_SCALE");
+    const double k = scale ? std::atof(scale) : 0.0;
+    return k > 1.0 ? local * k : local;
 }
 
 // Tests that open real network connections (WebRTC peers over the machine's interfaces) return early with

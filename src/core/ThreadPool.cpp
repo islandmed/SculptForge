@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/ThreadPool.h"
 
+#include <cstdlib>
+
 namespace sf {
 
 namespace {
@@ -34,7 +36,10 @@ bool ThreadPool::setSharedThreadCount(int threads) {
 ThreadPool& ThreadPool::shared() {
     static ThreadPool pool([] {
         g_sharedMade.store(true);
-        const int wanted = g_sharedThreads.load();
+        int wanted = g_sharedThreads.load();
+        // SF_THREADS: a parallel test run (tools/test/run.py --threads-per-test) gives each process its share of
+        // the cores; ten processes with a pool as big as the machine each spend their time waiting for a core.
+        if (const char* env = std::getenv("SF_THREADS"); wanted <= 0 && env) wanted = std::clamp(std::atoi(env), 0, 64);
         return wanted > 0 ? wanted : int(std::clamp(std::thread::hardware_concurrency(), 1u, 16u));
     }());
     return pool;

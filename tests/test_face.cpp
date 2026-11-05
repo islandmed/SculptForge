@@ -437,7 +437,7 @@ TEST(face_weights_fast_path_is_exact_and_not_undoable) {
     CHECK(again.positions == doc.mesh.positions);
 }
 
-TEST(face_weights_timing_on_a_500k_head) {
+TEST(nightly_face_weights_timing_on_a_500k_head) {
     // A 720k-vertex head (the template skin divided three times) with the 52 shapes: a live frame that changes
     // every weight costs a few milliseconds and touches only the face.
     Mesh base = templateHead();

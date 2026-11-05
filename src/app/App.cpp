@@ -282,10 +282,18 @@ bool App::init(const AppOptions& options) {
     }
     initHardwareProfile(); // the cached hardware profile, or calibration over the first frames (PanelPerformanceProfile.cpp)
     timer.step("hardware profile");
+    initialised_ = true;
     return true;
 }
 
 void App::shutdown() {
+    if (!initialised_) { // init stopped early (no window or no OpenGL): nothing but SDL to take down
+        if (sharedWindow_) return; // --ui-serve: the server's window, context and SDL stay
+        if (glContext_) SDL_GL_DestroyContext(glContext_);
+        if (window_) SDL_DestroyWindow(window_);
+        SDL_Quit();
+        return;
+    }
     saveWindowState();
     discordClient_.reset(); // clears what Discord shows, then closes
     if (doc_.sculptor.strokeActive()) endStroke();
@@ -479,6 +487,7 @@ int App::runUiTest(int w, int h, int fps) {
         SDL_Log("Screenshot %s", shot.c_str());
     }
     for (auto& write : shotWrites) write.get(); // every screenshot on disk before the verdict
+    demo_->printProfile();
     for (const auto& f : demo_->failures()) std::fprintf(stderr, "FAIL %s\n", f.c_str());
     if (demo_->failures().empty())
         std::printf("PASS %s (%d frames)\n", options_.uiTest.c_str(), frames);

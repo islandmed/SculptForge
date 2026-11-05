@@ -2435,12 +2435,15 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
         std::filesystem::create_directories(std::filesystem::path(std::u8string(shotDir_.begin(), shotDir_.end())), ec);
     }
     mouse_ = ImVec2(float(app_.options_.width) * 0.5f, float(app_.options_.height) * 0.5f);
+    const bool profile = std::getenv("SF_UI_PROFILE") != nullptr;
     wait(0.2f); // first frames: windows find their places
     std::string line;
     int n = 0;
+    if (profile) scriptLines_.push_back("");
     while (std::getline(f, line)) {
         ++n;
         if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (profile) scriptLines_.push_back(line);
         auto words = splitWords(line);
         if (words.empty()) continue;
         lineText_ = line;
@@ -2449,8 +2452,13 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
             error = scriptName_ + ":" + std::to_string(n) + ": " + err;
             return false;
         }
+        if (profile) stepLines_.resize(steps_.size(), n); // (steps the line added; the first wait counts as line 0)
     }
     wait(0.1f);
+    if (profile) {
+        stepLines_.resize(steps_.size(), 0);
+        lineSeconds_.assign(scriptLines_.size(), 0.0);
+    }
     return true;
 }
 

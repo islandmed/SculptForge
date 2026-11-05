@@ -244,6 +244,7 @@ private:
     SDL_GLContext glContext_ = nullptr;
     static inline SDL_Window* sharedWindow_ = nullptr; // shareWindow
     static inline SDL_GLContext sharedContext_ = nullptr;
+    bool initialised_ = false; // init() got to the end (shutdown() takes down only what it made otherwise)
     bool running_ = true;
     std::string iniPath_;
 

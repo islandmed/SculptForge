@@ -9,6 +9,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <cstdlib>
 #include <cmath>
 #include <cstdarg>
@@ -214,6 +215,12 @@ void Demo::update(float dt) {
         SDL_Log("t=%.2f step=%zu brushlab=(%.0f,%.0f) mouse=(%.0f,%.0f) down=%d", clock_, step_, w->Pos.x, w->Pos.y, mouse_.x,
                 mouse_.y, int(buttonDown_));
     stride_ = 1;
+    if (!stepLines_.empty()) { // SF_UI_PROFILE: the frame just drawn belongs to the step that was running
+        const auto now = std::chrono::steady_clock::now();
+        if (lastUpdate_.time_since_epoch().count() != 0 && step_ < stepLines_.size())
+            lineSeconds_[size_t(stepLines_[step_])] += std::chrono::duration<double>(now - lastUpdate_).count();
+        lastUpdate_ = now;
+    }
     while (step_ < steps_.size()) {
         if (!steps_[step_](stepTime_)) {
             stepTime_ += dt;
@@ -351,6 +358,23 @@ float Demo::fade() const {
 }
 
 // ---------------------------------------------------------------- building blocks
+
+void Demo::printProfile() const {
+    if (stepLines_.empty()) return;
+    std::vector<int> order;
+    double total = 0;
+    for (size_t i = 0; i < lineSeconds_.size(); ++i) {
+        total += lineSeconds_[i];
+        if (lineSeconds_[i] > 0) order.push_back(int(i));
+    }
+    std::sort(order.begin(), order.end(), [this](int a, int b) { return lineSeconds_[size_t(a)] > lineSeconds_[size_t(b)]; });
+    std::printf("profile %s: %.2f s in script lines; slowest:\n", scriptName_.c_str(), total);
+    for (size_t k = 0; k < order.size() && k < 12; ++k) {
+        const int n = order[k];
+        std::printf("profile %6.2f s  line %d: %s\n", lineSeconds_[size_t(n)], n,
+                    size_t(n) < scriptLines_.size() ? scriptLines_[size_t(n)].c_str() : "(start or end)");
+    }
+}
 
 void Demo::wait(float seconds) {
     steps_.push_back([seconds](float t) { return t >= seconds; });

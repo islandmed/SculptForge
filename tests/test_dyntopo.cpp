@@ -224,7 +224,7 @@ TEST(dyntopo_adds_detail_under_the_brush_only) {
     CHECK(d.mesh.positions[0] == far);
 }
 
-TEST(dyntopo_random_strokes_stay_valid) {
+TEST(nightly_dyntopo_random_strokes_stay_valid) {
     Document d = sphereDoc(3);
     uint32_t rng = 12345;
     auto rnd = [&rng] {

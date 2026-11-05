@@ -132,6 +132,24 @@ wait_run() {
             "fix it on a branch, merge to main, then start again from step check (or re-run the run if it was a runner hiccup: gh run rerun $id --failed -R $REPO)"
     echo "$id"
 }
+# ci_reused SHA: prints "<ancestor> <run id>" when SHA differs from a main commit with a successful CI push run only by
+# release paperwork (the bump commit: tools/release/paperwork_only.py checks the exact files and lines), so its CI
+# stands for SHA and the release doesn't wait 20 minutes for the same answer. Fails safe: anything else, keep waiting.
+# The same rule is in release.yml (job locate), which then promotes SHA's own Packages run.
+ci_reused() {
+    local sha=$1 c id
+    for c in $(git rev-list --first-parent -n 8 "$sha~1" 2>/dev/null); do
+        python3 tools/release/paperwork_only.py "$c" "$sha" >/dev/null 2>&1 || return 1
+        id=$(gh run list -R "$REPO" -w ci.yml -c "$c" -e push -b main -L 1 --json databaseId -q '.[0].databaseId' 2>/dev/null)
+        [ -n "$id" ] || continue
+        if [ "$(gh run view "$id" -R "$REPO" --json status -q .status)" != completed ]; then
+            echo "   waiting for ci.yml run $id on ${c:0:8} (the commit before the bump) ..." >&2
+            gh run watch "$id" -R "$REPO" --exit-status >/dev/null 2>&1 || true
+        fi
+        [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)" = success ] && { echo "${c:0:8} $id"; return 0; }
+    done
+    return 1
+}
 # wait_live URL TEXT SECONDS: true once the live page contains TEXT. Pages deploys lag, so it polls every 15 s.
 # grep reads the whole page: grep -q would close the pipe early and curl would fail under pipefail.
 wait_live() {
@@ -185,6 +203,18 @@ dpi_ok() {
     "${heavy[@]}" cmake --build "$b" --target sculptforge -j3 >/dev/null || die "the app doesn't build in $b" "cmake --build $b --target sculptforge and fix the error"
     SDL_APP_ID=sculptforge-agent "${heavy[@]}" ctest --test-dir "$b" -L dpi --output-on-failure >"$b/release-dpi.log" 2>&1 ||
         die "the UI scale / DPI tests fail (ctest -L dpi; log: $b/release-dpi.log)" "fix them on a branch, merge to main, run again from step check"
+    # What the bump changed (What's New, guide, notes) is tested here, on the bumped tree: step ci may reuse the CI
+    # result of the commit before the bump (ci_reused), which never saw these files.
+    local re green
+    if green=$(git rev-list --first-parent -n 1 --grep '^Release \|^Beta ' --invert-grep HEAD 2>/dev/null) && [ -n "$green" ]; then
+        re=$(python3 tools/test/impacted.py --build "$b" --base "$green" 2>/dev/null || true)
+        if [ -n "$re" ] && [ "$re" != . ]; then
+            "${heavy[@]}" cmake --build "$b" -j3 >/dev/null || die "the build in $b fails" "cmake --build $b and fix the error"
+            SDL_APP_ID=sculptforge-agent "${heavy[@]}" ctest --test-dir "$b" -R "$re" --output-on-failure >"$b/release-bump.log" 2>&1 ||
+                die "the tests of what the bump changed fail (ctest -R '$re'; log: $b/release-bump.log)" "fix the notes or the guide, commit, run again from step check"
+            ok "the bump's own tests pass on the bumped tree ($re)"
+        fi
+    fi
     ok "UI scale tests (100-200 %, display-scale event) pass; Windows manifest declares PerMonitorV2"
 }
 # Everything the steps after the tag need that doesn't depend on the release existing. The home page card is
@@ -381,9 +411,14 @@ step_ci() {
     local sha
     sha=$(git rev-parse HEAD)
     if git rev-parse -q --verify "refs/tags/$T" >/dev/null; then ok "$T is tagged: CI was checked before tagging"; return; fi
-    # bump may have pushed a moment ago: give the run 3 minutes to appear
-    wait_run ci.yml "$sha" 18 >/dev/null || die "no CI run on main for $sha after 3 minutes" "push main first (git push origin main), or check Actions, then run again"
-    ok "CI passed on $sha"
+    local green
+    if green=$(ci_reused "$sha"); then
+        ok "CI: ${sha:0:8} only adds release paperwork to ${green%% *}, whose CI run ${green##* } passed (tools/release/paperwork_only.py): reused"
+    else
+        # bump may have pushed a moment ago: give the run 3 minutes to appear
+        wait_run ci.yml "$sha" 18 >/dev/null || die "no CI run on main for $sha after 3 minutes" "push main first (git push origin main), or check Actions, then run again"
+        ok "CI passed on $sha"
+    fi
     if wait_run packages.yml "$sha" >/dev/null; then
         ok "the Packages run passed: the release will promote its tested packages"
     else

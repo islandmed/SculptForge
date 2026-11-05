@@ -643,6 +643,12 @@ if(SCULPTFORGE_BUILD_TESTS)
     set_tests_properties(sculptforge_tests_${k}of${SCULPTFORGE_TEST_SHARDS} PROPERTIES COST 1000 # the longest: start first
                          ENVIRONMENT "TMPDIR=${shard_tmp};TMP=${shard_tmp};TEMP=${shard_tmp}")
   endforeach()
+  # T3 (docs/testing-flow.md): the TEST(nightly_*) cases, which no shard runs. Label nightly: tools/test/run.py and CI
+  # leave it out; the nightly workflow and tools/test/nightly.sh run `ctest -L nightly`.
+  add_test(NAME sculptforge_tests_nightly COMMAND sculptforge_tests --nightly)
+  set_tests_properties(sculptforge_tests_nightly PROPERTIES LABELS nightly TIMEOUT 3600
+                       ENVIRONMENT "TMPDIR=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TEMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly")
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly)
   # A stand-in for Brush, COLMAP and ffmpeg (tests/tools/fake_splat_tools.cpp): splat training is tested without a GPU.
   add_executable(sf_fake_splat_tools tests/tools/fake_splat_tools.cpp)
   target_include_directories(sf_fake_splat_tools PRIVATE third_party/stb)
@@ -711,6 +717,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME marks_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py --self-test)
     add_test(NAME release_notes COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --self-test)
     add_test(NAME release_notes_fragments COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --check)
+    add_test(NAME release_paperwork COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/paperwork_only.py --self-test)
     # scripts/release.sh's beta (X.Y.Z-beta.N) and its promotion to stable, in a sandbox with stand-ins for gh and curl.
     if(UNIX AND NOT APPLE AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
       add_test(NAME release_script_beta COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_beta_test.sh)
@@ -719,6 +726,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The Actions cache pruner keeps the newest cache of each kind (tools/ci/prune_caches.py).
     add_test(NAME ci_prune_caches COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/prune_caches.py --self-test)
     add_test(NAME ci_slowest_tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/slowest_tests.py --self-test)
+    add_test(NAME test_impact COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/impacted.py --self-test)
+    add_test(NAME test_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/run.py --self-test)
     add_test(NAME benchmark_submit COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/benchmark/submit.py selftest)
     # The upstream watch (tools/upstream-watch, .github/workflows/upstream-watch.yml) against recorded API responses.
     add_test(NAME upstream_watch COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/upstream/test_upstream_watch.py)
@@ -769,6 +778,13 @@ if(SCULPTFORGE_BUILD_TESTS)
       get_filename_component(name ${script} NAME_WE)
       sculptforge_ui_test(${name} ${name})
     endforeach()
+    # Heavy-mesh and benchmark scripts (tests/perf/*.sfui, e.g. 33M-triangle precision): nightly only (T3).
+    file(GLOB SCULPTFORGE_PERF_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/perf/*.sfui)
+    foreach(script ${SCULPTFORGE_PERF_TESTS})
+      get_filename_component(name ${script} NAME_WE)
+      add_test(NAME perf_${name} COMMAND sculptforge --ui-test ${script} --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/perf_${name})
+      set_tests_properties(perf_${name} PROPERTIES LABELS "ui;nightly" TIMEOUT 3600 RUN_SERIAL TRUE)
+    endforeach()
     # Splat training (also started by a phone scan) runs the fake Brush / COLMAP / ffmpeg.
     foreach(t ui_splat_train ui_phone_link)
       if(TEST ${t})
@@ -776,6 +792,13 @@ if(SCULPTFORGE_BUILD_TESTS)
           "SCULPTFORGE_BRUSH=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_COLMAP=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_FFMPEG=$<TARGET_FILE:sf_fake_splat_tools>")
       endif()
     endforeach()
+    # Label no_d3d12: tests that the Windows PC's WSL GPU path (Mesa's OpenGL on D3D12, ~/Work/.sf/pc.sh) can't run and
+    # pc.sh leaves out. ui_micro_levels: its first micro-displacement frame makes D3D12 remove the device (a segfault,
+    # and every UI test running beside it loses its GL context); it passes on CI's llvmpipe and on the same PC's native
+    # NVIDIA driver (2026-11-03, v0.10.11, 128 frames), so it is the translation layer, not SculptForge.
+    if(TEST ui_micro_levels)
+      set_tests_properties(ui_micro_levels PROPERTIES LABELS "ui;no_d3d12")
+    endif()
     # The hardware profile panel with a real calibration (tests/ui/hardware_profile.sfui).
     if(TEST ui_hardware_profile)
       set_tests_properties(ui_hardware_profile PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1")

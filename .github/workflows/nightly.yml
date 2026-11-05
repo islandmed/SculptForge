@@ -1,0 +1,40 @@
+name: Nightly
+
+# T3 of the test flow (docs/testing-flow.md): the ctest entries labelled `nightly` (TEST(nightly_*) cases, stress and
+# benchmark checks), which CI on main and the merge queue leave out, once a day on Linux x86_64. The GPU-bound ones
+# (label ui as well: heavy meshes, perf gates) need real graphics and run on the maintainers' PC instead
+# (~/Work/.sf/nightly.sh); this job runs the rest. No secrets, read-only token, nothing is saved.
+on:
+  schedule:
+    - cron: '17 9 * * *' # 09:17 UTC, after the US evening's merges
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nightly:
+    name: Nightly tests (Linux x86_64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v7
+      - run: |
+          sudo ./packaging/linux/install-build-deps.sh
+          sudo apt-get install -y --no-install-recommends ccache
+      - name: Compiler cache (restore main's)
+        uses: actions/cache/restore@v5
+        with:
+          path: .ccache
+          key: ccache-ci-linux-x86_64.${{ github.sha }}
+          restore-keys: ccache-ci-linux-x86_64.
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          cmake --build build --parallel 4
+      - name: Nightly tests (not the GPU-bound ones)
+        run: python3 tools/test/run.py --build build --budget 0 -- -L nightly -LE ui -j 2
