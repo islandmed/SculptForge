@@ -8,6 +8,7 @@
 #pragma once
 
 #include "core/Json.h"
+#include "core/PenPressure.h"
 
 #include <string>
 #include <vector>
@@ -78,6 +79,10 @@ struct BrushRecipe {
     // alpha is on. Written to the JSON only when set. An unknown name is dropped.
     std::string alpha;
     bool alphaFollow = false; // the alpha turns along the stroke (Alpha > Follow stroke direction) on that first pick
+    // Pen pressure > Size / Strength for this brush (#122, core/PenPressure.h): what it starts with, and what Brush
+    // Lab sets. Written to the JSON only when not Use global.
+    PenPressure pressureSize = PenPressure::Global;
+    PenPressure pressureStrength = PenPressure::Global;
 
     // Library bookkeeping, not part of the recipe: never written by toJson().
     BrushOrigin origin;

@@ -681,6 +681,16 @@ Two toggles decide what pressure does. They are on the top shelf and in **Sculpt
 | **Pressure > Strength** | On | Pen pressure scales the brush strength. |
 | **Pressure > Size** | Off | Pen pressure scales the brush size (down to 5% at the lightest touch). Move, KelvinGrab, KelvinTwist and KelvinScale always grab with the full size. |
 
+**Each brush can override them.** **Sculpt > Brush > Pen pressure** (and the same switches in [Brush
+Lab](brush-lab.md) and **Edit > Preferences > Tablet**) sets **Size** and **Strength** for the brush you are holding
+to **Use global**, **On** or **Off**. **Use global** follows the toggles above; **On** and **Off** apply to that
+brush whatever the toggles say, so you can keep Pressure > Size on for Clay and off for Standard. Grab brushes
+(Move, KelvinGrab, KelvinTwist, KelvinScale, Tendril and Elastic Tendril) start with **Size: Off**, every other
+brush with **Use global**. The switches are kept per brush like its size and alpha: **Sculpt > Brush > Save Brush
+Settings** keeps them for the next start, **Reset Brush to Default** puts back the brush's default, and a custom
+brush also keeps them in its `.sfbrush` file. Brush settings saved before 0.11.1 load as **Use global** (grab
+brushes: **Size: Off**).
+
 Pressure applies only to strokes made with the pen; mouse strokes always use full pressure. Custom brushes
 also have a **Pressure curve** setting that makes them respond to a light or a firm touch (see
 [Brush Lab](brush-lab.md)). If the pen moves the cursor but pressure does nothing, see

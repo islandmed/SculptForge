@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <bit>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -74,6 +75,7 @@ int MicroMesh::widen(float need) {
     rangeMax = uint16_t(std::min(int(rangeMax) / div + 1, 32767));
     step *= float(div);
     rescaled = true;
+    reach.all = true;
     ++revision;
     return div;
 }
@@ -294,6 +296,24 @@ float triangleBulge(const MicroTriangle& T) {
 
 } // namespace
 
+void microRaiseBulge(Mesh& m) {
+    if (!m.micro) return;
+    MicroMesh& mm = *m.micro;
+    const uint32_t nt = mm.baseTriangles, n = mm.n;
+    const size_t block = 1 << 14;
+    std::vector<float> bulge((nt + block - 1) / block, 0.0f);
+    poolFor(nt, [&](size_t b, size_t e) {
+        MicroTriangle T;
+        float g = 0.0f;
+        for (size_t t = b; t < e; ++t) {
+            T.set(m, uint32_t(t), n);
+            g = std::max(g, triangleBulge(T));
+        }
+        bulge[b / block] = g;
+    }, block);
+    for (float g : bulge) mm.bulgeMax = std::max(mm.bulgeMax, g);
+}
+
 bool microWantsOutOfCore(size_t points) {
     if (const char* e = std::getenv("SF_MICRO_OUT_OF_CORE"); e && *e) return std::string(e) == "1";
     if (const size_t limit = currentTierConfig().outOfCorePoints) return points > limit;
@@ -386,7 +406,7 @@ bool microDivide(Mesh& m, int level, std::string& error, int outOfCore) {
     // level 4). Brushes widen the range when they need more (MicroStroke).
     mm->step = std::max(avgEdge / 4096.0f, 1e-12f);
     mm->serial = MicroMesh::newSerial();
-    mm->allDirty = true;
+    mm->markAllDirty();
     m.micro = std::move(mm);
     m.topologyDirty = true; // the renderer draws it differently
     return true;
@@ -443,7 +463,7 @@ bool microAttach(Mesh& m, int level, float step, MicroStore disp, std::vector<ui
     for (uint16_t r : mm->triRange) mm->rangeMax = std::max(mm->rangeMax, r);
     mm->ensureTopology(m);
     mm->serial = MicroMesh::newSerial();
-    mm->allDirty = true;
+    mm->markAllDirty();
     m.micro = std::move(mm);
     m.topologyDirty = true;
     return true;
@@ -478,14 +498,79 @@ bool rayTriangle(const glm::vec3& o, const glm::vec3& d, const glm::vec3& a, con
 
 } // namespace
 
+namespace {
+
+// Brings m's Reach up to date with `bvh` (call with reach.lock held): a full pass when the BVH, the step or
+// everything changed, else the triangles marked since raise their leaves and ancestors.
+void syncReach(const Mesh& m, const BVH& bvh) {
+    const MicroMesh& mm = *m.micro;
+    MicroMesh::Reach& r = mm.reach;
+    const size_t words = (size_t(mm.baseTriangles) + 63) / 64;
+    const bool full = r.all || r.bvh != &bvh || r.structure != bvh.structureSerial() || r.step != mm.step ||
+                      r.pad.size() != bvh.nodeCount() || r.bits.size() != words;
+    if (full) {
+        r.bvh = &bvh, r.structure = bvh.structureSerial(), r.step = mm.step, r.all = false;
+        r.bits.assign(words, 0);
+        const size_t nodes = bvh.nodeCount();
+        r.pad.assign(nodes, 0.0f);
+        poolFor(nodes, [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                uint16_t most = 0;
+                for (uint32_t t : bvh.leafTriangles(uint32_t(i)))
+                    if (t < mm.triRange.size()) most = std::max(most, mm.triRange[t]);
+                r.pad[i] = float(most) * mm.step;
+            }
+        }, 1 << 12);
+        for (size_t i = nodes; i-- > 0;)
+            if (bvh.isInner(uint32_t(i))) {
+                const uint32_t c = bvh.leftChild(uint32_t(i));
+                r.pad[i] = std::max(r.pad[c], r.pad[c + 1]);
+            }
+        return;
+    }
+    for (size_t w = 0; w < words; ++w) {
+        if (!r.bits[w]) continue;
+        const uint64_t bits = std::atomic_ref<uint64_t>(r.bits[w]).exchange(0);
+        for (uint64_t b = bits; b; b &= b - 1) {
+            const uint32_t t = uint32_t(w * 64 + size_t(std::countr_zero(b)));
+            const float v = float(mm.triRange[t]) * mm.step;
+            for (uint32_t node = bvh.leafOf(t); node != ~0u && r.pad[node] < v; node = bvh.parentOf(node)) {
+                r.pad[node] = v;
+                if (node == 0) break;
+            }
+        }
+    }
+}
+
+} // namespace
+
+void microQueryTriangles(const Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, std::vector<uint32_t>& out) {
+    const MicroMesh& mm = *m.micro;
+    std::lock_guard<std::mutex> hold(mm.reach.lock);
+    syncReach(m, bvh);
+    bvh.queryTrianglesPadded(m, center, radius, mm.reach.pad, mm.bulgeMax, out);
+}
+
+void microRayTriangles(const Mesh& m, const BVH& bvh, const glm::vec3& origin, const glm::vec3& dir, std::vector<uint32_t>& out) {
+    const MicroMesh& mm = *m.micro;
+    std::lock_guard<std::mutex> hold(mm.reach.lock);
+    syncReach(m, bvh);
+    bvh.rayTrianglesPadded(m, origin, dir, mm.reach.pad, mm.bulgeMax, out);
+}
+
 bool microRaycast(const Mesh& m, const BVH& bvh, const glm::vec3& origin, const glm::vec3& dir, RayHit& hit) {
     if (!microMatches(m)) return bvh.raycast(m, origin, dir, hit);
     const MicroMesh& mm = *m.micro;
     RayHit base;
     if (!bvh.raycast(m, origin, dir, base)) return false;
-    const float reach = mm.bulgeMax + float(mm.rangeMax) * mm.step;
     std::vector<uint32_t> cand;
-    bvh.queryTriangles(m, base.position, 2.0f * reach + 1e-7f, cand);
+    const auto traceStart = std::chrono::steady_clock::now();
+    microRayTriangles(m, bvh, origin, dir, cand);
+    static const bool trace = [] { const char* e = std::getenv("SF_MICRO_TRACE"); return e && e[0] == '1'; }();
+    if (trace)
+        std::fprintf(stderr, "micropick %zu candidates in %.1f ms (pad root %.4f, bulgeMax %.4f)\n", cand.size(),
+                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - traceStart).count(),
+                     mm.reach.pad.empty() ? 0.0 : double(mm.reach.pad[0]), double(mm.bulgeMax));
     // Only the triangles whose own reach (their bulge and displacement range) the ray passes through.
     const glm::vec3 inv(1.0f / (std::abs(dir.x) > 1e-20f ? dir.x : 1e-20f), 1.0f / (std::abs(dir.y) > 1e-20f ? dir.y : 1e-20f),
                         1.0f / (std::abs(dir.z) > 1e-20f ? dir.z : 1e-20f));
@@ -835,7 +920,7 @@ void MicroUndo::swapWith(Mesh& m) {
     if (swapWhole) {
         std::swap(m.micro, whole);
         if (m.micro) {
-            m.micro->allDirty = true;
+            m.micro->markAllDirty();
             m.micro->ensureTopology(m);
             if (m.micro->dirtyBits.size() != (size_t(m.micro->baseTriangles) + 63) / 64)
                 m.micro->dirtyBits.assign((size_t(m.micro->baseTriangles) + 63) / 64, 0);
@@ -1237,7 +1322,7 @@ void microNoise(Mesh& m, float amplitude, float frequency, uint32_t seed) {
         }
     }, 256);
     for (uint16_t r : mm.triRange) mm.rangeMax = std::max(mm.rangeMax, r);
-    mm.allDirty = true;
+    mm.markAllDirty();
     ++mm.revision;
 }
 

@@ -118,6 +118,7 @@ void MicroStroke::begin(Mesh& m) {
     maskAdded_ = false;
     if (dabStamp_.size() != mm.baseTriangles) {
         dabStamp_.assign(mm.baseTriangles, 0);
+        stitchStamp_.assign(mm.baseTriangles, 0);
         dabEpoch_ = 0;
     }
     if (vertStamp_.size() != m.vertexCount()) vertStamp_.assign(m.vertexCount(), 0);
@@ -153,10 +154,12 @@ void MicroStroke::touch(MicroMesh& mm, std::span<const uint32_t> tris) {
 }
 
 // Makes the copies of every shared point of triangles `tris` equal again (see the file comment).
-void MicroStroke::stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t> tris) {
+void MicroStroke::stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t> tris, const uint8_t* changed) {
     const uint32_t n = mm.n, S = mm.samples;
     const uint32_t epoch = dabEpoch_;
     auto inDab = [&](uint32_t t) { return dabStamp_[t] == epoch; };
+    if (stitchStamp_.size() != mm.baseTriangles) stitchStamp_.assign(mm.baseTriangles, 0);
+    auto hit = [&](uint32_t t) { std::atomic_ref<uint32_t>(stitchStamp_[t]).store(epoch, std::memory_order_relaxed); };
     // Edges: each shared edge once, by the lower triangle of the two (both in this dab), or copied from a hidden
     // neighbour (which brushes leave alone).
     poolFor(tris.size(), [&](size_t b, size_t e) {
@@ -181,12 +184,16 @@ void MicroStroke::stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t>
                     MicroMesh::edgePoint(f, reversed ? n - k : k, n, i2, j2);
                     const uint32_t a = MicroMesh::index(i, j, n), c = MicroMesh::index(i2, j2, n);
                     if (hiddenU) {
+                        if (g[a] != h[c] || (mk && mk[a] != hk[c])) hit(t);
                         g[a] = h[c];
                         if (mk) mk[a] = hk[c];
                     } else {
                         const int16_t v = int16_t((int(g[a]) + int(h[c]) + (int(g[a]) + int(h[c]) >= 0 ? 1 : 0)) / 2);
+                        const uint8_t mv = mk ? uint8_t((int(mk[a]) + int(hk[c]) + 1) / 2) : 0;
+                        if (g[a] != v || (mk && mk[a] != mv)) hit(t);
+                        if (h[c] != v || (mk && hk[c] != mv)) hit(u);
                         g[a] = h[c] = v;
-                        if (mk) mk[a] = hk[c] = uint8_t((int(mk[a]) + int(hk[c]) + 1) / 2);
+                        if (mk) mk[a] = hk[c] = mv;
                     }
                 }
             }
@@ -238,6 +245,7 @@ void MicroStroke::stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t>
             for (uint32_t u : ring) {
                 if (!inDab(u)) continue;
                 const size_t ci = cornerIndex(u);
+                if (mm.disp[ci] != value || (mm.hasMask() && mm.mask[ci] != mval)) hit(u);
                 mm.disp[ci] = value;
                 if (mm.hasMask()) mm.mask[ci] = mval;
             }
@@ -259,7 +267,9 @@ void MicroStroke::stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t>
             mm.triRange[t] = uint16_t(std::min(r, 32767));
         }
     }, 64);
-    for (uint32_t t : tris) {
+    for (size_t s = 0; s < tris.size(); ++s) {
+        const uint32_t t = tris[s];
+        if (changed && !changed[s] && stitchStamp_[t] != epoch) continue; // (nothing of it moved)
         mm.rangeMax = std::max(mm.rangeMax, mm.triRange[t]);
         mm.markDirty(t);
     }
@@ -288,10 +298,11 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     // 1. The base triangles within reach.
     if (++dabEpoch_ == 0) {
         std::fill(dabStamp_.begin(), dabStamp_.end(), 0);
+        std::fill(stitchStamp_.begin(), stitchStamp_.end(), 0);
         std::fill(vertStamp_.begin(), vertStamp_.end(), 0);
         dabEpoch_ = 1;
     }
-    bvh.queryTriangles(m, center, r * reach + mm.bulgeMax + float(mm.rangeMax) * mm.step, cand_);
+    microQueryTriangles(m, bvh, center, r * reach, cand_); // (each node grown by the displacement under it)
     std::erase_if(cand_, [&](uint32_t t) { return m.triangleHidden(t) || !triangleNear(m, mm, t, center, r * reach); });
     if (cand_.empty()) return;
     for (uint32_t t : cand_) dabStamp_[t] = dabEpoch_;
@@ -523,7 +534,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     for (float c : clipped) over = std::max(over, c);
 
     // 4. Stitch the shared points.
-    stitch(m, mm, cand_);
+    stitch(m, mm, cand_, maskBrush ? nullptr : changed_.data());
     if (over > 0.0f) widen(mm, over * 1.5f);
     stitchMs += lapMs(clock);
 }
@@ -548,7 +559,7 @@ void MicroStroke::beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, fl
     lastStride = stride;
     const uint32_t cm = n / stride, cs = (cm + 1) * (cm + 2) / 2;
     std::vector<uint32_t> cand;
-    bvh.queryTriangles(m, center, radius + mm.bulgeMax + float(mm.rangeMax) * mm.step, cand);
+    microQueryTriangles(m, bvh, center, radius, cand);
     std::erase_if(cand, [&](uint32_t t) { return m.triangleHidden(t) || !triangleNear(m, mm, t, center, radius); });
     touch(mm, cand);
     GrabMirror gm;

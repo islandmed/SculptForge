@@ -155,6 +155,12 @@ bool ChildProcess::start(const std::string& program, const std::vector<std::stri
     return true;
 }
 
+void ChildProcess::detach() {
+    if (process_) CloseHandle(process_);
+    process_ = nullptr;
+    started_ = false;
+}
+
 bool ChildProcess::running() {
     if (!started_ || finished_) return false;
     if (WaitForSingleObject(process_, 0) == WAIT_TIMEOUT) return true;
@@ -244,6 +250,8 @@ bool ChildProcess::running() {
     finished_ = true;
     return false;
 }
+
+void ChildProcess::detach() { started_ = false; } // (it was spawned in its own process group)
 
 void ChildProcess::kill(double graceSeconds) {
     if (!running()) return;

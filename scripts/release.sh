@@ -103,6 +103,10 @@ release_ready() {
     gh release view "$T" -R "$RELEASE_REPO" --json assets -q '.assets[].name' > "$work/assets" 2>/dev/null ||
         die "no GitHub release $T yet" "run the earlier steps: scripts/release.sh $V --from tag"
     grep -qx SHA256SUMS.txt "$work/assets" || die "release $T has no SHA256SUMS.txt (unfinished)" "re-run the Release workflow: gh workflow run release.yml -R $REPO -f tag=$T"
+    # One-click update (src/core/SelfUpdate.h): once the app has a key, every release must carry the signature.
+    if grep -q 'kUpdatePublicKeyHex = "[0-9a-f]\{64\}"' src/core/SelfUpdate.h 2>/dev/null; then
+        grep -qx SHA256SUMS.txt.sig "$work/assets" || die "release $T has no SHA256SUMS.txt.sig: apps can't update to it in one click" "check the UPDATE_SIGNING_KEY secret, then re-run the Release workflow: gh workflow run release.yml -R $REPO -f tag=$T"
+    fi
 }
 # Downloads one release asset and checks it against SHA256SUMS.txt with a checksum computed here. Prints the sum.
 asset_sha() {
@@ -227,7 +231,7 @@ dpi_ok() {
 # Everything the steps after the tag need that doesn't depend on the release existing. The home page card is
 # checked through the features block until bump writes it.
 preflight() {
-    local mode=${1:-} t auth pr state owner branch pk
+    local mode=${1:-} t auth pr state owner branch pk out
     for t in git gh curl python3 base64 awk; do command -v "$t" >/dev/null || die "$t is not installed" "install $t"; done
     command -v sha256sum >/dev/null || command -v shasum >/dev/null || die "no sha256sum or shasum" "install coreutils"
     auth=$(gh auth status 2>&1 || true)
@@ -236,10 +240,13 @@ preflight() {
     grep -q '^set(SCULPTFORGE_PRERELEASE "[a-z0-9.]*")$' CMakeLists.txt ||
         die "CMakeLists.txt lost its set(SCULPTFORGE_PRERELEASE \"\") line that step bump sets" "restore it under project() (git log -p CMakeLists.txt), commit"
     python3 -c 'import json, sys; json.load(open(sys.argv[1]))' website/latest.json 2>/dev/null || die "website/latest.json is not valid JSON" "fix it, commit"
+    # The members' publishing path: release.yml's actions pinned to commit SHAs, INSIDERS_REPO_TOKEN only in the
+    # member-release environment (docs/releasing.md, "Secrets").
+    out=$(python3 tools/release/check_workflows.py 2>&1) || die "the release workflows aren't locked down: $out" "fix .github/workflows (docs/releasing.md, \"Secrets\"), commit, push main"
     if [ -n "$PRE" ]; then # a beta: members only, through the private repository; nothing of the site, no packages
-        gh secret list -R "$REPO" 2>/dev/null | grep -q '^INSIDERS_REPO_TOKEN\b' ||
-            die "the repository has no INSIDERS_REPO_TOKEN secret, so release.yml can't publish the beta to $INSIDERS_REPO" \
-                "the owner creates it (fine-grained token, only $INSIDERS_REPO, Contents: read and write): gh secret set INSIDERS_REPO_TOKEN -R $REPO"
+        gh secret list --env member-release -R "$REPO" 2>/dev/null | grep -q '^INSIDERS_REPO_TOKEN\b' ||
+            die "the member-release environment has no INSIDERS_REPO_TOKEN, so release.yml can't publish the beta to $INSIDERS_REPO" \
+                "the owner pastes it (fine-grained token, only $INSIDERS_REPO, Contents: read and write): wl-paste -n | gh secret set INSIDERS_REPO_TOKEN --env member-release -R $REPO"
         gh repo view "$INSIDERS_REPO" >/dev/null 2>&1 || die "can't see $INSIDERS_REPO" "gh auth status: log in as the owner of $INSIDERS_REPO"
         ok "What's New $BASE is ready and $INSIDERS_REPO takes the beta (a beta has no site, package or reply steps)"
         return

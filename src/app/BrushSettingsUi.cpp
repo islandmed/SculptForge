@@ -5,6 +5,7 @@
 // strokes, so every way of picking a brush (shelf, pickers, keys, the Library, scripts, Ctrl-held brushes) behaves
 // the same without each of them knowing about it.
 #include "app/App.h"
+#include "app/Ui.h"
 
 #include "core/BrushLibrary.h"
 #include "core/Image.h"
@@ -49,6 +50,8 @@ BrushToolSettings App::liveBrushSettings() const {
     s.alphaPath = a.empty() ? std::string() : a.path;
     s.alphaInvert = !s.alphaPath.empty() && a.inverted;
     s.alphaOptions = alphaOptions_;
+    s.pressureSize = penSize_;
+    s.pressureStrength = penStrength_;
     return s;
 }
 
@@ -63,6 +66,8 @@ void App::applyBrushSettings(const BrushToolSettings& in) {
     sprayScatter_ = s.sprayScatter;
     lazyMouse_.radius = s.lazyRadius;
     alphaOptions_ = s.alphaOptions;
+    penSize_ = s.pressureSize;
+    penStrength_ = s.pressureStrength;
     // The alpha, loaded only when it differs; one that can't be loaded any more (a moved image) leaves the current.
     const BrushToolSettings live = liveBrushSettings();
     if (lower(live.alphaName) == lower(s.alphaName) && live.alphaPath == s.alphaPath && live.alphaInvert == s.alphaInvert)
@@ -87,6 +92,8 @@ void App::initBrushSettings() {
                        options_.renderPath.empty() && options_.measureIdle <= 0.0f && options_.measureStroke <= 0.0f;
     brushSettingsKey_ = currentBrushKey();
     registerAlphaOptionsCommand();
+    registerPenPressureCommand();
+    shippedPenPressure();
     if (!brushSettingsOn_) return;
     std::string err;
     if (const std::string path = brushSettingsPath(); !path.empty() && !brushSettings_.load(path, err))
@@ -97,12 +104,17 @@ void App::initBrushSettings() {
 void App::syncBrushSettings() {
     if (drag_ != Drag::None || doc_.sculptor.strokeActive()) return;
     syncAlphaTile();
-    if (!brushSettingsOn_) return;
     const std::string key = currentBrushKey();
     if (key == brushSettingsKey_) return;
+    if (!brushSettingsOn_) { // (demo videos, benchmarks: their scripts set every value, but a grab brush's pen is its own)
+        brushSettingsKey_ = key;
+        shippedPenPressure();
+        return;
+    }
     const bool firstUse = !brushSettings_.known(key);
     BrushToolSettings next = brushSettings_.switchBrush(brushSettingsKey_, key, liveBrushSettings());
     if (firstUse) recipeAlpha(next); // a brush-pack brush starts with its own alpha (or none), not the last brush's
+    if (firstUse) recipePenPressure(next);
     applyBrushSettings(next);
     brushSettingsKey_ = key;
     syncAlphaTile();
@@ -117,6 +129,70 @@ void App::recipeAlpha(BrushToolSettings& s) const {
     s.alphaInvert = false;
     s.alphaOptions.followStroke = r.alphaFollow;
     s.alphaOptions.tileX = s.alphaOptions.tileY = 1;
+}
+
+void App::recipePenPressure(BrushToolSettings& s) const {
+    if (doc_.activeBrush < 0 || doc_.activeBrush >= int(doc_.brushes.size())) return;
+    const BrushRecipe& r = doc_.brushes[size_t(doc_.activeBrush)];
+    s.pressureSize = r.pressureSize;
+    s.pressureStrength = r.pressureStrength;
+}
+
+void App::shippedPenPressure() {
+    BrushToolSettings s = BrushSettingsStore::shipped(brushSettingsKey_);
+    recipePenPressure(s);
+    penSize_ = s.pressureSize;
+    penStrength_ = s.pressureStrength;
+}
+
+void App::setPenPressure(bool size, PenPressure p) {
+    (size ? penSize_ : penStrength_) = p;
+    if (BrushRecipe* r = doc_.activeBrush >= 0 && doc_.activeBrush < int(doc_.brushes.size())
+                             ? &doc_.brushes[size_t(doc_.activeBrush)]
+                             : nullptr;
+        r && (size ? r->pressureSize : r->pressureStrength) != p) {
+        (size ? r->pressureSize : r->pressureStrength) = p; // a custom brush keeps it in its .sfbrush too
+        saveBrushEdits(doc_.activeBrush);
+    }
+    const char* state = p == PenPressure::On ? "on" : p == PenPressure::Off ? "off" : "as Preferences > Tablet";
+    status_ = std::string("Pen pressure > ") + (size ? "Size" : "Strength") + " for " +
+              (activeRecipe() ? activeRecipe()->name : std::string(brushName(brush_))) + ": " + state;
+}
+
+void App::drawPenPressureSwitches(const char* id) {
+    ImGui::PushID(id);
+    ImGui::TextDisabled("Pen pressure: %s", activeRecipe() ? activeRecipe()->name.c_str() : brushLabel(brush_));
+    const float labelW = ImGui::CalcTextSize("Strength").x + ImGui::GetFontSize(); // (a clear gap before the segments)
+    for (const bool size : {true, false}) {
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(size ? "Size" : "Strength");
+        ImGui::SameLine(labelW);
+        if (size) ui::Segmented(*this, {"brush.pen_size_global", "brush.pen_size_on", "brush.pen_size_off"});
+        else ui::Segmented(*this, {"brush.pen_strength_global", "brush.pen_strength_on", "brush.pen_strength_off"});
+    }
+    ImGui::PopID();
+}
+
+void App::registerPenPressureCommand() {
+    commands_.add({"brush_pen_pressure",
+                   "The current brush's own pen pressure switches (kept per brush; Save Brush Settings keeps them): "
+                   "'global' follows Preferences > Tablet's Pressure > Size / Strength, 'on' and 'off' override it "
+                   "for this brush. Omitted switches stay as they are.",
+                   {{"size", ParamSpec::Type::String, "Pressure > Size: global, on or off.", false},
+                    {"strength", ParamSpec::Type::String, "Pressure > Strength: global, on or off.", false}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       for (const char* key : {"size", "strength"}) {
+                           const auto it = a.find(key);
+                           if (it == a.end()) continue;
+                           const std::string v = argString(a, key, "");
+                           if (v != "global" && v != "on" && v != "off")
+                               return {false, std::string(key) + " must be global, on or off"};
+                           setPenPressure(std::string(key) == "size", penPressureFromId(v));
+                       }
+                       return {true, std::string("Pen pressure: size ") + penPressureId(penSize_) + " (" +
+                                         (pressureSizeOn() ? "on" : "off") + "), strength " +
+                                         penPressureId(penStrength_) + " (" + (pressureStrengthOn() ? "on" : "off") + ")"};
+                   }});
 }
 
 void App::syncAlphaTile() { // Tile lives on the alpha (a new alpha starts at 1 x 1): the brush's option wins
@@ -165,6 +241,7 @@ void App::resetBrushSettings() {
     const bool wasSaved = brushSettings_.hasSaved(brushSettingsKey_);
     BrushToolSettings shipped = brushSettings_.reset(brushSettingsKey_);
     recipeAlpha(shipped); // (a pack brush's own alpha is part of its defaults)
+    recipePenPressure(shipped);
     applyBrushSettings(shipped);
     std::string err;
     if (wasSaved && brushSettingsOn_ && !brushSettingsPath().empty() && !brushSettings_.save(brushSettingsPath(), err))

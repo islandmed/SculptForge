@@ -517,6 +517,11 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "focal_shift") return std::round(app_.focalShift_ * 100.0f);
     if (name == "draw_size") return std::round(app_.radiusPx_);
     if (name == "brush_settings_saved") return double(app_.brushSettingsStore().savedCount()); // (#78)
+    // #122: the current brush's pen pressure switches (0 Use global, 1 On, 2 Off) and what they come to (0 / 1).
+    if (name == "pen_size_mode") return double(int(app_.penSize_));
+    if (name == "pen_strength_mode") return double(int(app_.penStrength_));
+    if (name == "pen_size") return app_.pressureSizeOn() ? 1.0 : 0.0;
+    if (name == "pen_strength") return app_.pressureStrengthOn() ? 1.0 : 0.0;
     if (name == "share_brush_size") return app_.brushSettingsStore().shareSizeIntensity ? 1.0 : 0.0;
     if (name == "alpha_follow") return app_.alphaOptions_.followStroke ? 1.0 : 0.0; // alpha options (#76)
     if (name == "alpha_angle") return std::round(app_.alphaOptions_.angle);

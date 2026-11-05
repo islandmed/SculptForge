@@ -11,6 +11,7 @@
 #include <atomic>
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <iterator>
 #include <limits>
 #include <unordered_map>
@@ -405,8 +406,115 @@ bool Sculptor::beginStroke(const Mesh& mesh, std::string label, int layer) {
     lastRemesh_ = false;
     topologyHeld_ = false;
     microMesh_ = nullptr;
+    microBase_ = -1;
     active_ = true;
     return true;
+}
+
+bool Sculptor::microBaseDefault() {
+    static const bool on = [] {
+        const char* e = std::getenv("SF_MICRO_BASE");
+        return !(e && e[0] == '0');
+    }();
+    return on;
+}
+
+bool Sculptor::microBaseDab(const Mesh& mesh, BrushType type, const DabParams& p) {
+    if (microBase_ < 0) { // (decided once a stroke: its dabs all go one way)
+        const MicroMesh& mm = *mesh.micro;
+        microBase_ = microBaseDabs && (type == BrushType::Standard || type == BrushType::Clay || type == BrushType::Inflate) &&
+                             !mm.hasMask() && mesh.mask.empty() && !mesh.hasHidden() && !(p.alpha && !p.alpha->empty()) &&
+                             mesh.layers.empty() && mm.baseEdge > 0.0f &&
+                             p.radius >= kMicroBaseSpan * mm.baseEdge
+                         ? 1
+                         : 0;
+    }
+    return microBase_ == 1;
+}
+
+void Sculptor::microBaseKernel(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Symmetry sym) {
+    auto clock = std::chrono::steady_clock::now();
+    const MicroMesh& mm = *mesh.micro;
+    const uint32_t n = mm.n, S = mm.samples;
+    const float r = p.radius, r2 = r * r;
+    const float s = std::clamp(p.strength * std::clamp(p.pressure, 0.0f, 1.0f), 0.0f, 1.0f);
+    const float sign = p.invert ? -1.0f : 1.0f;
+    for (const SymCopy& m : copies(sym)) {
+        const glm::vec3 c = m.point(p.center), view = m.dir(p.viewDir);
+        // The corners within reach: base points whose displaced corner may be in the sphere.
+        bvh.queryVertices(mesh, c, r + float(mm.rangeMax) * mm.step, baseVerts_);
+        const size_t nv = baseVerts_.size();
+        baseFall_.assign(nv, 0.0f);
+        baseCorner_.resize(nv);
+        baseNormal_.resize(nv);
+        poolFor(nv, [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                const uint32_t v = baseVerts_[i];
+                const IndexRing ring = mesh.vertexTriangles(v);
+                if (ring.empty()) continue;
+                const uint32_t t = ring[0];
+                const glm::uvec3 tr = mesh.triangles[t];
+                const int k = tr.x == v ? 0 : tr.y == v ? 1 : 2;
+                const int16_t d = mm.disp[size_t(t) * S + (k == 0 ? 0 : k == 1 ? MicroMesh::index(n, 0, n) : MicroMesh::index(0, n, n))];
+                const glm::vec3 nn = mesh.normals[v];
+                const float len = glm::length(nn);
+                const glm::vec3 un = len > 1e-20f ? nn / len : glm::vec3(0.0f, 0.0f, 1.0f);
+                const glm::vec3 q = mesh.positions[v] + un * (float(d) * mm.step);
+                const float d2 = glm::dot(q - c, q - c);
+                baseCorner_[i] = q, baseNormal_[i] = un;
+                if (d2 < r2) baseFall_[i] = brushFalloff(std::sqrt(d2), r, p.focal);
+            }
+        }, 4096);
+        // The brush plane (Standard, Clay): weighted normal and centre of the corners under the brush.
+        glm::vec3 areaNormal = -view, areaCenter = c;
+        if (type != BrushType::Inflate) {
+            glm::dvec3 nsum(0.0), csum(0.0);
+            double w = 0.0;
+            for (size_t i = 0; i < nv; ++i)
+                if (baseFall_[i] > 0.0f) {
+                    nsum += glm::dvec3(baseNormal_[i] * baseFall_[i]);
+                    csum += glm::dvec3(baseCorner_[i] * baseFall_[i]);
+                    w += baseFall_[i];
+                }
+            if (w > 0.0) {
+                areaCenter = glm::vec3(csum / w);
+                const double len = glm::length(nsum);
+                if (len > 1e-12) areaNormal = glm::vec3(nsum / len);
+            }
+        }
+        // The plain mesh's kernels (SculptKernel.h: Standard and Clay along the plane's normal, Inflate along the
+        // vertex's): the grid's own Clay moves each point along its normal by up to 3x the gap to the plane, which on
+        // a scan's noisy normals and deep folds overshoots, dab after dab, into spikes hundreds of units long.
+        PlaneKernel plane;
+        plane.type = type;
+        plane.center = c;
+        plane.viewDir = view;
+        plane.areaNormal = areaNormal;
+        plane.areaCenter = areaCenter;
+        plane.r = r;
+        plane.s = s;
+        plane.sign = sign;
+        plane.focal = p.focal;
+        plane.invert = p.invert;
+        baseMoves_.assign(nv, glm::vec3(0.0f));
+        poolFor(nv, [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                const float f = baseFall_[i];
+                if (f <= 0.0f) continue;
+                baseMoves_[i] = type == BrushType::Inflate ? baseNormal_[i] * (sign * s * r * 0.05f * f) : plane.offsetWith(baseCorner_[i], f);
+            }
+        }, 4096);
+        size_t k = 0;
+        for (size_t i = 0; i < nv; ++i)
+            if (baseMoves_[i] != glm::vec3(0.0f)) baseVerts_[k] = baseVerts_[i], baseMoves_[k++] = baseMoves_[i];
+        baseVerts_.resize(k);
+        baseMoves_.resize(k);
+        timings.kernelMs += lapMs(clock);
+        timings.vertices += k;
+        moveVertices(mesh, bvh, baseVerts_, baseMoves_); // (the undo record, normals, BVH)
+        timings.normalsMs += lapMs(clock);
+    }
+    ++timings.dabs;
 }
 
 bool Sculptor::microReady(Mesh& mesh) {
@@ -730,6 +838,7 @@ UndoRecord Sculptor::endStroke() {
             record_.topology = std::move(topo);
         }
     }
+    if (microBase_ == 1 && microMesh_) microRaiseBulge(*microMesh_); // (the base moved under it)
     if (micro_.active() && microMesh_) record_.micro = micro_.end(*microMesh_);
     microMesh_ = nullptr;
     clearRecorded();
@@ -775,7 +884,12 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
         dabKelvinlet(mesh, bvh, type, p, sym);
         return;
     }
-    if (microReady(mesh)) { // a micro level: the grid takes the dab (core/MicroSculpt.cpp)
+    // A micro level: a big dab moves the base below it (microBaseKernel), the grid takes the rest (core/MicroSculpt.cpp).
+    if (microReady(mesh) && microBaseDab(mesh, type, p)) {
+        microBaseKernel(mesh, bvh, type, p, sym);
+        return;
+    }
+    if (microReady(mesh)) {
         const double k0 = micro_.findMs + micro_.kernelMs, s0 = micro_.stitchMs;
         const uint64_t pts = micro_.points;
         for (const SymCopy& m : copies(sym))

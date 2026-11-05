@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -21,6 +22,8 @@ struct UpdateInfo {
     std::string downloadUrl;             // the download page
     std::string notesUrl;                // what's new
     std::vector<std::string> highlights; // a few short lines for the banner
+    bool member = false;                 // a member build (core/MemberBuilds.h)
+    std::map<std::string, std::string> files; // member builds: release file name -> its API URL
 };
 
 // Which releases the update check offers (Preferences > Updates): Stable, or Preview, which adds the betas

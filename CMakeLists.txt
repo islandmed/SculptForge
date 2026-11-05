@@ -83,6 +83,10 @@ add_library(sculptforge_core STATIC
   src/core/Precision.cpp
   src/core/PathStroke.cpp
   src/core/Sha256.cpp
+  src/core/Ed25519.cpp
+  src/core/SelfUpdate.cpp
+  src/core/MemberBuilds.cpp
+  src/core/Keychain.cpp
   src/core/BrushGallery.cpp
   src/core/VertexPaint.cpp
   src/core/PaintLayer.cpp
@@ -212,6 +216,9 @@ else()
 endif()
 find_package(Threads REQUIRED)
 target_link_libraries(sculptforge_core PUBLIC glm::glm Threads::Threads)
+if(UNIX AND NOT APPLE)
+  target_link_libraries(sculptforge_core PRIVATE ${CMAKE_DL_LIBS}) # core/Keychain.cpp: libsecret, loaded at run time
+endif()
 # zstd for Focus Detail tiles (core/FocusDetail.h), when the system has it; without it the tiles use our own codec.
 # Not on macOS: Homebrew's zstd is single-architecture and breaks the universal (x86_64 + arm64) build.
 find_package(PkgConfig QUIET)
@@ -397,6 +404,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelMaya.cpp
     src/app/PanelPhone.cpp
     src/app/PanelProject.cpp
+    src/app/PanelUpdate.cpp
     src/app/PanelParts.cpp
     src/app/PanelSupport.cpp
     src/app/QuickTour.cpp
@@ -722,6 +730,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME marks_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py --self-test)
     add_test(NAME release_notes COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --self-test)
     add_test(NAME release_notes_fragments COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --check)
+    # The members' publishing path stays locked down: release.yml's actions pinned to commit SHAs, INSIDERS_REPO_TOKEN only
+    # in GitHub Environments, no pull_request_target (tools/release/check_workflows.py; release.sh check runs it too).
+    add_test(NAME release_workflows COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py)
+    add_test(NAME release_workflows_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py --self-test)
     add_test(NAME release_paperwork COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/paperwork_only.py --self-test)
     # scripts/release.sh's beta (X.Y.Z-beta.N) and its promotion to stable, in a sandbox with stand-ins for gh and curl.
     if(UNIX AND NOT APPLE AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)

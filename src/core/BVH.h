@@ -78,6 +78,22 @@ public:
     bool degraded() const;
 
     size_t nodeCount() const { return nodes_.size(); }
+
+    // Per-node padding (micro levels: the largest displacement under each node, core/Micro.cpp MicroReach). The
+    // padded queries grow every node's box, and each leaf triangle's, by pad[node] (one value per node) plus
+    // `extra`; the caller then tests each triangle exactly. Leaves and parents for keeping pads up to date:
+    // structureSerial() changes whenever nodes or the triangle-to-leaf map do (build, dynamic edits).
+    uint64_t structureSerial() const { return structure_; }
+    uint32_t leafOf(uint32_t tri) const { return tri < triLeaf_.size() ? triLeaf_[tri] : kNoLeaf; }
+    uint32_t parentOf(uint32_t node) const { return nodes_[node].parent; }
+    // Child nodes have larger indices than their parent (a reverse sweep sees children first).
+    bool isInner(uint32_t node) const { return nodes_[node].count == 0 && nodes_[node].first != kNoLeaf; }
+    uint32_t leftChild(uint32_t node) const { return nodes_[node].first; }
+    void queryTrianglesPadded(const Mesh& mesh, const glm::vec3& center, float radius, std::span<const float> pad, float extra,
+                              std::vector<uint32_t>& out) const;
+    // The triangles of every leaf whose padded box the ray (from origin along dir, t >= 0) crosses.
+    void rayTrianglesPadded(const Mesh& mesh, const glm::vec3& origin, const glm::vec3& dir, std::span<const float> pad, float extra,
+                            std::vector<uint32_t>& out) const;
     size_t memoryBytes() const;
 
 private:
@@ -92,6 +108,7 @@ private:
     void recomputeLeaf(const Mesh& mesh, Node& n); // its box, and triLeaf_ for its triangles
 
     std::vector<Node> nodes_;
+    uint64_t structure_ = 0;
     std::vector<uint32_t> triIndices_;
     std::vector<uint32_t> triLeaf_;
 

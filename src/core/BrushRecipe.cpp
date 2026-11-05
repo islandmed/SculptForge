@@ -146,6 +146,8 @@ Json BrushRecipe::toJson() const {
     if (viewFalloff) j.set("viewFalloff", true);
     if (!alpha.empty()) j.set("alpha", alpha);
     if (alphaFollow) j.set("alphaFollow", true);
+    if (pressureSize != PenPressure::Global) j.set("penPressureSize", penPressureId(pressureSize));
+    if (pressureStrength != PenPressure::Global) j.set("penPressureStrength", penPressureId(pressureStrength));
     for (const auto& p : recipeParams()) {
         switch (p.kind) {
         case K::Float: j.set(p.key, std::round(double(*floatField(r, p.key)) * 1000.0) / 1000.0); break;
@@ -167,6 +169,8 @@ void BrushRecipe::applyJson(const Json& j) {
     if (j["connectedOnly"].isBool()) connectedOnly = j["connectedOnly"].asBool();
     if (j["viewFalloff"].isBool()) viewFalloff = j["viewFalloff"].asBool();
     if (j["alphaFollow"].isBool()) alphaFollow = j["alphaFollow"].asBool();
+    if (j["penPressureSize"].isString()) pressureSize = penPressureFromId(j["penPressureSize"].asString());
+    if (j["penPressureStrength"].isString()) pressureStrength = penPressureFromId(j["penPressureStrength"].asString());
     if (j["alpha"].isString()) {
         BrushAlpha a;
         alpha = BrushAlpha::builtin(j["alpha"].asString(), a) && !a.empty() ? a.name : std::string();

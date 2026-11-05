@@ -110,6 +110,9 @@ HIGHLIGHTS=highlights.txt scripts/release.sh 0.12.0 --yes   # later: the stable 
 gh api -X PUT repos/islandmed/sculptforge-insiders/collaborators/USERNAME -f permission=pull   # a new member
 ```
 
+Members are **always** invited with `permission=pull` (read: download releases, nothing else); never `push`,
+`maintain` or `admin`. Check with `gh api repos/islandmed/sculptforge-insiders/collaborators --jq '.[]|.login+" "+.role_name'`.
+
 Steps for a beta: `bump check ci tag release status`.
 
 - **bump** writes the note fragments into CHANGELOG `[Unreleased]` and What's New `0.12.0` (date stays `unreleased`), and
@@ -117,11 +120,12 @@ Steps for a beta: `bump check ci tag release status`.
   `VERSION 0.12.0` and `set(SCULPTFORGE_PRERELEASE "beta.1")`. The app reads "0.12.0 Beta 1" in the title bar and
   About; packages are named `SculptForge-0.12.0-*`. CITATION, rez, metainfo, the CHANGELOG section and the home page
   stay at the stable release (`build_site.py` leaves the home page alone while a prerelease is set).
-- **check** checks CMakeLists.txt (version and prerelease), the guide, the DPI tests, that the repository has the
-  `INSIDERS_REPO_TOKEN` secret and that gh can see the private repository. A beta skips the site/AUR/Homebrew/Omarchy
+- **check** checks CMakeLists.txt (version and prerelease), the guide, the DPI tests, the workflows (below, "Secrets"),
+  that the `member-release` environment has the `INSIDERS_REPO_TOKEN` secret and that gh can see the private repository. A beta skips the site/AUR/Homebrew/Omarchy
   checks.
 - **tag / release**: `v0.12.0-beta.1` (the tag is public, like the source). release.yml checks that the tag equals the
-  version plus the prerelease, then publishes a **pre-release in islandmed/sculptforge-insiders** with
+  version plus the prerelease, then its job `publish-members` waits for the maintainer's approval (one click in the
+  run, or `gh run view`), publishes a **pre-release in islandmed/sculptforge-insiders** with
   `INSIDERS_REPO_TOKEN` (a fine-grained token for that repository only, Contents: read and write), and posts it in
   #members (`DISCORD_MEMBERS_WEBHOOK`). Nothing is published in the public repository, and the update feed is
   untouched: the app's Preview channel offers only what the feed names.
@@ -132,6 +136,27 @@ Steps for a beta: `bump check ci tag release status`.
 after the beta's. Step `site` removes any older `channels.preview` entry (from the public betas before 0.11.1). In the
 app, Preview never offers anything older than stable. The beta's tag doesn't get in the way: stable releases take
 the guide from the newest tag without a `-` (pages.yml). A second beta is `0.12.0-beta.2`.
+
+### Secrets (the members' publishing path)
+
+What keeps the insiders token from leaking; `tools/release/check_workflows.py` (run by release.sh check and ctest
+`release_workflows`) fails when the workflow side of it breaks.
+
+- `INSIDERS_REPO_TOKEN` exists only as a secret of the environment **`member-release`**, never at repository level:
+  deployment only from tags `v*`, required reviewer islandmed (self-review allowed: solo maintainer). Only release.yml's
+  `publish-members` uses it; a workflow_dispatch from a branch can't. Set or rotate (never echo it):
+  `wl-paste -n | gh secret set INSIDERS_REPO_TOKEN --env member-release -R islandmed/SculptForge`.
+  (The daily-drop workflow and the preview-build workflow were retired with the Insider tier; betas are the members' builds.)
+- release.yml: top-level `permissions: contents: read`; `publish-members` reads only, runs only for betas, and passes
+  the token as an env var to its one publishing step; every `uses:` pinned to a full commit SHA with the version in a
+  comment (update by resolving the new tag: `gh api repos/OWNER/REPO/git/ref/tags/vX.Y.Z --jq .object.sha`); checkouts
+  don't persist credentials; no `set -x`.
+- No workflow uses `pull_request_target`; fork pull requests get no secrets (GitHub's default for `pull_request`), and
+  every outside contributor's run waits for approval.
+- Repository: secret scanning and push protection on, Dependabot alerts and security updates on, the default workflow
+  token read-only, Actions may not create or approve pull requests.
+- islandmed/sculptforge-insiders: private, members invited with `permission=pull` only, ruleset on `main`: no force
+  push, no deletion.
 
 ## When a step fails
 

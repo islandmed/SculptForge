@@ -5,6 +5,7 @@
 // in the session; Save Brush Settings writes them for the next start; Reset Brush to Default gives the shipped values.
 #include "TestHarness.h"
 
+#include "core/BrushRecipe.h"
 #include "core/BrushSettings.h"
 
 #include <cstdio>
@@ -101,4 +102,70 @@ TEST(brush_settings_save_load_reset) {
     CHECK(bad.savedFor("builtin:Clay", got));
     CHECK(got.radiusPx == 800.0f && got.strength == 0.0f && got.stroke == StrokeType::Dots);
     std::remove(path.c_str());
+}
+
+// #122: each brush's own Pen pressure > Size / Strength (Use global / On / Off), grab brushes with Size off.
+TEST(brush_settings_pen_pressure_per_brush) {
+    CHECK(penPressureOn(PenPressure::Global, true) && !penPressureOn(PenPressure::Global, false));
+    CHECK(penPressureOn(PenPressure::On, false) && !penPressureOn(PenPressure::Off, true));
+    for (const char* grab : {"Move", "KelvinGrab", "KelvinTwist", "KelvinScale", "Tendril", "KelvinSnake"}) {
+        const BrushToolSettings s = BrushSettingsStore::shipped(brushSettingsKey(grab));
+        CHECK(s.pressureSize == PenPressure::Off);
+        CHECK(s.pressureStrength == PenPressure::Global);
+    }
+    CHECK(BrushSettingsStore::shipped("builtin:Clay").pressureSize == PenPressure::Global);
+    CHECK(BrushSettingsStore::shipped("builtin:Nudge").pressureSize == PenPressure::Global);
+    CHECK(BrushSettingsStore::shipped("custom:Clay Slab").pressureSize == PenPressure::Global);
+
+    // A brush not used yet takes the current values, except its own pen pressure.
+    BrushSettingsStore store;
+    BrushToolSettings live;
+    live.radiusPx = 77.0f;
+    live.pressureStrength = PenPressure::Off;
+    BrushToolSettings move = store.switchBrush("builtin:Clay", "builtin:Move", live);
+    CHECK(move.radiusPx == 77.0f);
+    CHECK(move.pressureSize == PenPressure::Off && move.pressureStrength == PenPressure::Global);
+    move.pressureSize = PenPressure::On; // the artist's choice is kept for the brush
+    const BrushToolSettings clay = store.switchBrush("builtin:Move", "builtin:Clay", move);
+    CHECK(clay.pressureStrength == PenPressure::Off && clay.pressureSize == PenPressure::Global);
+    CHECK(store.switchBrush("builtin:Clay", "builtin:Move", clay).pressureSize == PenPressure::On);
+
+    // Saved and loaded; a file from before 0.11.1 (no pen pressure) loads as Use global, a grab brush with Size off.
+    std::string err;
+    Json j;
+    CHECK(Json::parse(R"({"brushes":{"builtin:Clay":{"draw_size":50},"builtin:Move":{"draw_size":50},
+                          "builtin:Standard":{"pen_pressure_size":"on","pen_pressure_strength":"off"}}})",
+                      j, err));
+    BrushSettingsStore old;
+    old.applyJson(j);
+    BrushToolSettings got;
+    CHECK(old.savedFor("builtin:Clay", got) && got.pressureSize == PenPressure::Global &&
+          got.pressureStrength == PenPressure::Global);
+    CHECK(old.savedFor("builtin:Move", got) && got.pressureSize == PenPressure::Off);
+    CHECK(old.savedFor("builtin:Standard", got) && got.pressureSize == PenPressure::On &&
+          got.pressureStrength == PenPressure::Off);
+    BrushToolSettings s;
+    s.pressureSize = PenPressure::Global; // an explicit Use global on Move survives a save
+    store.store("builtin:Move", s);
+    BrushSettingsStore again;
+    again.applyJson(store.toJson());
+    CHECK(again.savedFor("builtin:Move", got) && got.pressureSize == PenPressure::Global);
+
+    // A reset gives the brush's shipped pen pressure back.
+    CHECK(again.reset("builtin:Move").pressureSize == PenPressure::Off);
+}
+
+// #122: a custom brush carries its pen pressure in its .sfbrush; older files (and Use global) write nothing.
+TEST(brush_recipe_pen_pressure) {
+    BrushRecipe r;
+    CHECK(r.toJson()["penPressureSize"].isNull() && r.toJson()["penPressureStrength"].isNull());
+    r.pressureSize = PenPressure::Off;
+    r.pressureStrength = PenPressure::On;
+    const BrushRecipe back = BrushRecipe::fromJson(r.toJson());
+    CHECK(back.pressureSize == PenPressure::Off && back.pressureStrength == PenPressure::On);
+    Json j;
+    std::string err;
+    CHECK(Json::parse(R"({"name":"Old","depth":0.3,"penPressureSize":"sideways"})", j, err));
+    const BrushRecipe old = BrushRecipe::fromJson(j);
+    CHECK(old.pressureSize == PenPressure::Global && old.pressureStrength == PenPressure::Global);
 }

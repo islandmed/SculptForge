@@ -561,6 +561,24 @@ void App::initActions() {
         ICON_LC_ROTATE_CCW, nullptr, nullptr, nullptr,
         "Put the current brush's Size, Intensity, Falloff, Colour intensity, stroke and alpha back to the values "
         "SculptForge ships with, and forget what Save Brush Settings stored for it.");
+    // Pen pressure per brush (#122, BrushSettingsUi.cpp): segments of Brush, Brush Lab and Preferences > Tablet.
+    for (const bool size : {true, false})
+        for (const PenPressure p : {PenPressure::Global, PenPressure::On, PenPressure::Off}) {
+            const std::string id = std::string("brush.pen_") + (size ? "size_" : "strength_") + penPressureId(p);
+            const std::string switchName = std::string("Pressure > ") + (size ? "Size" : "Strength");
+            const std::string description =
+                p == PenPressure::Global
+                    ? "This brush follows " + switchName + " (Preferences > Tablet, the shelf). Grab brushes (Move, KelvinGrab, "
+                      "KelvinTwist, KelvinScale, the tendrils) start with Size off instead, since a pen's press is "
+                      "nearly weightless."
+                    : std::string("Pen pressure ") + (p == PenPressure::On ? "always scales" : "never scales") +
+                          " this brush's " + (size ? "size" : "strength") + ", whatever " + switchName +
+                          " says. Kept per brush; Save Brush Settings keeps it for next time.";
+            add(id.c_str(), p == PenPressure::Global ? "Use global" : p == PenPressure::On ? "On" : "Off",
+                size ? "Brush > Pen pressure > Size" : "Brush > Pen pressure > Strength", nullptr,
+                [this, size, p] { setPenPressure(size, p); }, nullptr, nullptr,
+                [this, size, p] { return (size ? penSize_ : penStrength_) == p; }, nullptr, description.c_str());
+        }
     add("brush.share_size", "Share size and intensity across brushes", "Preferences > Input", nullptr,
         [this] { setShareBrushSize(!brushSettings_.shareSizeIntensity); }, nullptr, nullptr,
         [this] { return brushSettings_.shareSizeIntensity; }, nullptr,

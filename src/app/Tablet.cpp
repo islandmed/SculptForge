@@ -643,6 +643,7 @@ void App::drawTabletSection() {
     ui::ActionButton(*this, "draw.pressure_strength", ImVec2(tw, 0));
     ImGui::SameLine();
     ui::ActionButton(*this, "draw.pressure_size", ImVec2(tw, 0));
+    drawPenPressureSwitches("prefs_pen"); // the current brush's own, over the two above (#122)
 
     // --- Eraser and side buttons ---
     ImGui::Spacing();
