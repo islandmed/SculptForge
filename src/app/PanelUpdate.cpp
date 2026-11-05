@@ -161,6 +161,10 @@ void App::tickSelfUpdate() {
         } else if (!job->cancel) {
             memberStatus_ = "Couldn't sign in: " + job->error;
         }
+        if (auto done = std::move(memberSignInDone_)) {
+            memberSignInDone_ = nullptr;
+            done(job->ok);
+        }
     }
     if (confirmStartAt_ > 0.0 && nowSeconds() >= confirmStartAt_) {
         confirmStartAt_ = 0.0;
@@ -458,8 +462,18 @@ void App::checkMemberBuilds(MemberAuth& auth, UpdateJob& job) {
     }
 }
 
-void App::startMemberSignIn() {
-    if (memberSignIn_ && !memberSignIn_->done) return;
+void App::startMemberSignIn(std::function<void(bool member)> onDone) {
+    if (memberSignIn_ && !memberSignIn_->done) { // one at a time: a second caller hears the same outcome
+        if (onDone) {
+            auto first = std::move(memberSignInDone_);
+            memberSignInDone_ = [first, onDone](bool member) {
+                if (first) first(member);
+                onDone(member);
+            };
+        }
+        return;
+    }
+    memberSignInDone_ = std::move(onDone);
     if (!memberAuth_) memberAuth_ = std::make_shared<MemberAuth>();
     auto job = std::make_shared<MemberSignIn>();
     memberSignIn_ = job;
@@ -514,7 +528,7 @@ void App::startMemberSignIn() {
         r = memberGet(member::kReleasesUrl, tokens.access, 4u << 20);
         if (r.status != 200) {
             job->error = r.status == 404 || r.status == 403
-                             ? "this GitHub account has no access to member builds (Insider or Studio membership, "
+                             ? "this GitHub account has no access to member builds (Member or Studio membership, "
                                "with the invitation to the member repository accepted)"
                              : r.error.empty() ? "GitHub answered " + std::to_string(r.status) : r.error;
             return; // (the token is dropped)
@@ -551,7 +565,7 @@ void App::drawMemberBuildsSection() {
     ImGui::Spacing();
     ImGui::SeparatorText(tr("Member builds"));
     ui::HelpText("Member builds", nullptr,
-                 "Insider and Studio members get each release early. Sign in with the GitHub account that has the "
+                 "Member and Studio members get each release early. Sign in with the GitHub account that has the "
                  "invitation to the member repository: SculptForge then also offers the member builds, checked with "
                  "the same signature as every release. The sign-in can only read that repository's releases; it is "
                  "kept in your system's keychain and Sign out removes it.",

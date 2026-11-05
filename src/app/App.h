@@ -1324,10 +1324,14 @@ private:
     // (from the keychain, refreshed when it has run out; false and `signedOut` when the sign-in is gone).
     static void checkMemberBuilds(MemberAuth& auth, UpdateJob& job);
     static bool memberAccessToken(MemberAuth& auth, std::string& token, std::string& error, bool& signedOut);
-    void startMemberSignIn();
+    // The one member sign-in (GitHub device flow; Preferences > Updates and the membership card's "I'm already a
+    // member" both use it): `onDone(member)` runs on the main thread when it ends: true = signed in with an account
+    // that can see member builds (memberBuilds_ is then true); false = not a member, declined, failed or cancelled.
+    void startMemberSignIn(std::function<void(bool member)> onDone = {});
     void memberSignOut();
     std::shared_ptr<MemberAuth> memberAuth_;
     std::shared_ptr<MemberSignIn> memberSignIn_;
+    std::function<void(bool member)> memberSignInDone_;
     bool memberBuilds_ = false;  // signed in (and the token is in the keychain); saved in the preferences
     std::string memberLogin_;    // the GitHub login shown ("Signed in as ..."); saved; not a secret
     bool memberSessionOnly_ = false; // signed in, but no keychain kept it: not saved, gone at quit
