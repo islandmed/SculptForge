@@ -30,7 +30,7 @@
 namespace sf {
 
 bool Sculptor::batchable(const Mesh& mesh, BrushType type, const DabParams& p, const Symmetry& sym) const {
-    if (!adaptiveDabs || !isPlaneKernelBrush(type) || type == BrushType::Trim || dyntopo.enabled || draft_ || (mesh.micro && microBase_ != 1))
+    if (!adaptiveDabs || !isPlaneKernelBrush(type) || type == BrushType::Trim || dyntopo.enabled || draft_ || (mesh.micro && !(microBase_ == 1 && microBaseFuse)))
         return false;
     if ((p.alpha && !p.alpha->empty()) || p.frontFacesOnly || p.connectedOnly || p.viewFalloff) return false;
     if (mesh.normals.size() != mesh.vertexCount()) return false;
