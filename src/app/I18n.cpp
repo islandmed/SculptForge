@@ -25,13 +25,20 @@ struct TransparentHash {
     size_t operator()(std::string_view s) const noexcept { return std::hash<std::string_view>{}(s); }
 };
 
-const std::unordered_map<std::string_view, const char*>& spanishMap() {
-    static const std::unordered_map<std::string_view, const char*> map = [] {
-        std::unordered_map<std::string_view, const char*> m;
-        for (const i18n::Entry& e : i18n::spanishTable()) m.emplace(e.english, e.translated);
-        return m;
-    }();
-    return map;
+using Table = std::unordered_map<std::string_view, const char*>;
+Table makeMap(std::span<const i18n::Entry> entries) {
+    Table m;
+    for (const i18n::Entry& e : entries) m.emplace(e.english, e.translated);
+    return m;
+}
+const Table* tableMap(Language language) {
+    static const Table spanish = makeMap(i18n::spanishTable());
+    static const Table chinese = makeMap(i18n::traditionalChineseTable());
+    switch (language) {
+    case Language::Spanish: return &spanish;
+    case Language::TraditionalChinese: return &chinese;
+    default: return nullptr;
+    }
 }
 
 // Labels put together from a translation (or found to have none), per language, kept for the life of the program
@@ -101,22 +108,50 @@ void setLanguage(Language language) { g_language.store(int(language)); }
 
 Language language() { return Language(g_language.load()); }
 
-const char* languageCode(Language language) { return language == Language::Spanish ? "es" : "en"; }
+const char* languageCode(Language language) {
+    switch (language) {
+    case Language::Spanish: return "es";
+    case Language::TraditionalChinese: return "zh-TW";
+    default: return "en";
+    }
+}
 
 Language languageFromCode(std::string_view code) {
-    if (code == "es" || code.substr(0, 3) == "es-" || code.substr(0, 3) == "es_") return Language::Spanish;
+    auto is = [&](std::string_view c) { return code == c || (code.size() > c.size() && code.substr(0, c.size()) == c &&
+                                                             (code[c.size()] == '-' || code[c.size()] == '_')); };
+    if (is("es")) return Language::Spanish;
+    // Traditional script: zh-TW, zh-HK, zh-MO and zh-Hant-*. Simplified (zh, zh-CN, zh-Hans) has no table yet: English.
+    if (is("zh-TW") || is("zh_TW") || is("zh-HK") || is("zh_HK") || is("zh-MO") || is("zh_MO") || is("zh-Hant") ||
+        is("zh_Hant"))
+        return Language::TraditionalChinese;
     return Language::English;
 }
 
-const char* languageName(Language language) { return language == Language::Spanish ? "Español" : "English"; }
+const char* languageName(Language language) {
+    switch (language) {
+    case Language::Spanish: return "Español";
+    case Language::TraditionalChinese: return "繁體中文";
+    default: return "English";
+    }
+}
+
+bool languageNeedsCjkFont(Language language) { return language == Language::TraditionalChinese; }
 
 namespace i18n {
 
+std::span<const Entry> table(Language language) {
+    switch (language) {
+    case Language::Spanish: return spanishTable();
+    case Language::TraditionalChinese: return traditionalChineseTable();
+    default: return {};
+    }
+}
+
 const char* lookup(Language language, std::string_view english) {
-    if (language != Language::Spanish) return nullptr;
-    const auto& map = spanishMap();
-    const auto it = map.find(english);
-    return it == map.end() ? nullptr : it->second;
+    const Table* map = tableMap(language);
+    if (!map) return nullptr;
+    const auto it = map->find(english);
+    return it == map->end() ? nullptr : it->second;
 }
 
 } // namespace i18n

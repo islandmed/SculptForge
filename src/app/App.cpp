@@ -7,6 +7,7 @@
 #include "app/SpaceCamera.h"
 #include "app/UiScale.h"
 #include "app/AirStroke.h"
+#include "app/I18n.h"
 #include "app/AsyncStroke.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
@@ -66,6 +67,8 @@ extern const unsigned char fontMono[];
 extern const unsigned long long fontMono_size;
 extern const unsigned char fontMonoBold[];
 extern const unsigned long long fontMonoBold_size;
+extern const unsigned char fontCjk[];
+extern const unsigned long long fontCjk_size;
 extern const unsigned char appIcon[];
 extern const unsigned long long appIcon_size;
 } // namespace assets
@@ -1206,7 +1209,7 @@ float App::targetUiScale() const {
 void App::applyUiScale() {
     uiScaleDirty_ = false;
     const float scale = targetUiScale();
-    if (!uiScaleChanged(uiScale_, scale)) return;
+    if (!uiScaleChanged(uiScale_, scale) && fontsCjk_ == languageNeedsCjkFont(language())) return;
     SDL_Log("UI scale %.0f%%", double(scale * 100.0f));
     uiScale_ = scale;
     ImGui::GetIO().Fonts->Clear();
@@ -1220,9 +1223,25 @@ void App::requestUiScale() {
     redrawIn(0.0);
 }
 
+// Noto Sans CJK TC (SIL OFL), cut down to the Traditional Chinese table's characters (tools/i18n/subset_cjk_font.py),
+// merged into the font added just before. In another language only the language's own name (繁體中文, the Preferences
+// button) is merged, so the atlas stays Latin-sized.
+void App::mergeCjkFont(float px) {
+    // CJK punctuation, full-width forms and the unified ideographs; the subset has only what the table uses.
+    static const ImWchar kCjkRanges[] = {0x2000, 0x206F, 0x3000, 0x30FF, 0x4E00, 0x9FFF, 0xFF00, 0xFFEF, 0};
+    static const ImWchar kNameRanges[] = {0x4E2D, 0x4E2D, 0x6587, 0x6587, 0x7E41, 0x7E41, 0x9AD4, 0x9AD4, 0}; // 中文繁體
+    ImFontConfig cjk;
+    cjk.MergeMode = true;
+    cjk.FontDataOwnedByAtlas = false;
+    cjk.OversampleH = 1; // dense glyphs: oversampling only grows the atlas
+    ImGui::GetIO().Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontCjk), int(assets::fontCjk_size), px,
+                                                &cjk, fontsCjk_ ? kCjkRanges : kNameRanges);
+}
+
 // Every font the UI uses, rasterised at `scale` for crisp text (Dear ImGui 1.91 has no dynamic font sizes).
 void App::buildUiFonts(float scale) {
     ImGuiIO& io = ImGui::GetIO();
+    fontsCjk_ = languageNeedsCjkFont(language());
     const bool recording = !options_.recordPath.empty() || !options_.uiTest.empty();
     // Inter (SIL OFL), embedded in the binary. Rasterised at the final size for crisp text.
     ImFontConfig fontConfig;
@@ -1241,6 +1260,7 @@ void App::buildUiFonts(float scale) {
         icons.GlyphOffset = ImVec2(0, 2.0f * scale);
         io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
                                        15.0f * scale, &icons, kIconRanges);
+        mergeCjkFont(15.0f * scale);
     }
     // Shell fonts: 12 px captions and 10 px right-shelf labels (with icons), large shelf icons, SemiBold titles.
     {
@@ -1254,12 +1274,14 @@ void App::buildUiFonts(float scale) {
             icons.GlyphOffset = ImVec2(0, size * 0.13f * scale);
             io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
                                            size * scale, &icons, kIconRanges);
+            mergeCjkFont(size * scale);
         };
         fontSmall_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular),
                                                     int(assets::fontRegular_size), 12.0f * scale, &fontConfig);
         addIcons(12.0f);
         fontTiny_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular),
                                                    int(assets::fontRegular_size), 10.5f * scale, &fontConfig);
+        mergeCjkFont(10.5f * scale);
         fontBold_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontSemiBold),
                                                    int(assets::fontSemiBold_size), 15.0f * scale, &fontConfig);
         addIcons(15.0f);
@@ -1283,6 +1305,7 @@ void App::buildUiFonts(float scale) {
             icons.GlyphOffset = ImVec2(0, px * 0.13f * scale);
             io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size), px * scale,
                                            &icons, kIconRanges);
+            mergeCjkFont(px * scale);
             return f;
         };
         fontMono_ = addMono(assets::fontMono, assets::fontMono_size, 15.0f);

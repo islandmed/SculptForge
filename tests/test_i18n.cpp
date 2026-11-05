@@ -2,12 +2,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The interface language (#44, app/I18n.h): exact lookups, the English fallback, labels whose "##id" must not
-// change, icon prefixes and printf tails, and a Spanish table that is safe to hand to printf.
+// change, icon prefixes and printf tails, and Spanish and Traditional Chinese tables that are safe to hand to printf
+// and that the UI fonts can draw.
 #include "TestHarness.h"
 
 #include "app/I18n.h"
 
+#include <cstdint>
 #include <cstdio>
+#include <fstream>
+#include <iterator>
 #include <set>
 #include <string>
 #include <string_view>
@@ -33,6 +37,59 @@ std::vector<std::string> conversions(std::string_view s) {
         while (j < s.size() && std::string_view("-+ #0123456789.*hlzjt").find(s[j]) != std::string_view::npos) ++j;
         if (j < s.size()) out.emplace_back(s.substr(i, j - i + 1));
         i = j;
+    }
+    return out;
+}
+
+// The code points of a UTF-8 string.
+std::vector<unsigned> codepoints(std::string_view s) {
+    std::vector<unsigned> out;
+    for (size_t i = 0; i < s.size();) {
+        const unsigned char c = static_cast<unsigned char>(s[i]);
+        unsigned cp = c;
+        size_t n = 1;
+        if (c >= 0xF0) n = 4, cp = c & 0x07;
+        else if (c >= 0xE0) n = 3, cp = c & 0x0F;
+        else if (c >= 0xC0) n = 2, cp = c & 0x1F;
+        for (size_t k = 1; k < n && i + k < s.size(); ++k) cp = (cp << 6) | (static_cast<unsigned char>(s[i + k]) & 0x3F);
+        out.push_back(cp);
+        i += n;
+    }
+    return out;
+}
+
+// In Inter as the UI rasterises it (Basic Latin + Latin-1) or the Lucide icons (U+E000-U+F8FF).
+bool inLatinFont(unsigned cp) {
+    return cp == '\n' || (cp >= 0x20 && cp <= 0x7E) || (cp >= 0xA0 && cp <= 0xFF) || (cp >= 0xE000 && cp <= 0xF8FF);
+}
+
+// The BMP code points an OpenType font maps to a glyph (its format 4 cmap), read straight from the file.
+std::set<unsigned> fontCodepoints(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    const std::string d((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    auto u16 = [&](size_t o) { return o + 2 <= d.size() ? unsigned(uint8_t(d[o])) << 8 | uint8_t(d[o + 1]) : 0u; };
+    auto u32 = [&](size_t o) { return u16(o) << 16 | u16(o + 2); };
+    std::set<unsigned> out;
+    size_t cmap = 0;
+    for (unsigned t = 0, n = u16(4); t < n; ++t)
+        if (d.compare(12 + t * 16, 4, "cmap") == 0) cmap = u32(12 + t * 16 + 8);
+    if (!cmap) return out;
+    for (unsigned t = 0, n = u16(cmap + 2); t < n; ++t) {
+        const size_t sub = cmap + u32(cmap + 4 + t * 8 + 4);
+        if (u16(sub) != 4) continue;
+        const unsigned segs = u16(sub + 6) / 2;
+        const size_t ends = sub + 14, starts = ends + segs * 2 + 2, deltas = starts + segs * 2, offsets = deltas + segs * 2;
+        for (unsigned i = 0; i < segs; ++i) {
+            const unsigned end = u16(ends + i * 2), start = u16(starts + i * 2), delta = u16(deltas + i * 2);
+            const unsigned ro = u16(offsets + i * 2);
+            for (unsigned c = start; c <= end && c != 0xFFFF; ++c) {
+                unsigned glyph = 0;
+                if (ro == 0) glyph = (c + delta) & 0xFFFF;
+                else if (const unsigned g = u16(offsets + i * 2 + ro + (c - start) * 2)) glyph = (g + delta) & 0xFFFF;
+                if (glyph) out.insert(c);
+            }
+        }
+        break;
     }
     return out;
 }
@@ -106,12 +163,22 @@ TEST(i18n_language_codes) {
     CHECK(languageFromCode("klingon") == Language::English);
     CHECK(languageFromCode("") == Language::English);
     CHECK(std::string(languageName(Language::Spanish)) == "Espa\xc3\xb1ol");
+    CHECK(std::string(languageCode(Language::TraditionalChinese)) == "zh-TW");
+    CHECK(languageFromCode("zh-TW") == Language::TraditionalChinese);
+    CHECK(languageFromCode("zh_TW") == Language::TraditionalChinese);
+    CHECK(languageFromCode("zh-HK") == Language::TraditionalChinese);
+    CHECK(languageFromCode("zh-Hant-TW") == Language::TraditionalChinese);
+    CHECK(languageFromCode("zh-CN") == Language::English); // Simplified: no table yet
+    CHECK(languageFromCode("zh") == Language::English);
+    CHECK(languageFromCode("esperanto") == Language::English);
+    CHECK(languageFromCode(languageCode(Language::TraditionalChinese)) == Language::TraditionalChinese);
 }
 
-TEST(i18n_spanish_table_is_well_formed) {
+TEST(i18n_tables_are_well_formed) {
+  for (const Language lang : {Language::Spanish, Language::TraditionalChinese}) {
     std::set<std::string_view> seen;
     int problems = 0;
-    for (const i18n::Entry& e : i18n::spanishTable()) {
+    for (const i18n::Entry& e : i18n::table(lang)) {
         const std::string_view en = e.english, es = e.translated;
         // One entry per English text, both sides non-empty, no ImGui ids in the table (tr() keeps those).
         if (!seen.insert(en).second || en.empty() || es.empty() || en.find("##") != std::string_view::npos ||
@@ -132,29 +199,44 @@ TEST(i18n_spanish_table_is_well_formed) {
     }
     CHECK(problems == 0);
     CHECK(seen.size() > 300);
+  }
 }
 
 TEST(i18n_spanish_table_fits_the_font) {
     // The UI font is Inter rasterised with ImGui's default ranges, Basic Latin + Latin-1 (U+0020-U+00FF), plus the
     // Lucide icons (U+E000-U+F8FF): every character of the table has to be in those, or it draws as "?".
     int outside = 0;
-    for (const i18n::Entry& e : i18n::spanishTable()) {
-        const std::string_view s = e.translated;
-        for (size_t i = 0; i < s.size();) {
-            const unsigned char c = static_cast<unsigned char>(s[i]);
-            unsigned cp = c;
-            size_t n = 1;
-            if (c >= 0xF0) n = 4, cp = c & 0x07;
-            else if (c >= 0xE0) n = 3, cp = c & 0x0F;
-            else if (c >= 0xC0) n = 2, cp = c & 0x1F;
-            for (size_t k = 1; k < n && i + k < s.size(); ++k) cp = (cp << 6) | (static_cast<unsigned char>(s[i + k]) & 0x3F);
-            const bool ok = cp == '\n' || (cp >= 0x20 && cp <= 0x7E) || (cp >= 0xA0 && cp <= 0xFF) || (cp >= 0xE000 && cp <= 0xF8FF);
-            if (!ok) {
+    for (const i18n::Entry& e : i18n::spanishTable())
+        for (const unsigned cp : codepoints(e.translated))
+            if (!inLatinFont(cp)) {
                 std::printf("  U+%04X is not in the UI font: \"%s\"\n", cp, e.translated);
                 ++outside;
             }
-            i += n;
-        }
-    }
     CHECK(outside == 0);
+}
+
+TEST(i18n_chinese_table_fits_the_font) {
+    // Chinese text is Inter, the icons, and assets/fonts/NotoSansTC-UI.otf merged in (App::mergeCjkFont): a subset with
+    // only the characters the table uses. A character it lacks draws as "?": run tools/i18n/subset_cjk_font.py.
+    const std::set<unsigned> cjk = fontCodepoints(std::string(SF_TEST_DATA_DIR) + "/../../assets/fonts/NotoSansTC-UI.otf");
+    CHECK(cjk.size() > 500);
+    std::set<unsigned> missing;
+    for (const i18n::Entry& e : i18n::traditionalChineseTable())
+        for (const unsigned cp : codepoints(e.translated))
+            if (!inLatinFont(cp) && !cjk.count(cp) && missing.insert(cp).second)
+                std::printf("  U+%04X is not in NotoSansTC-UI.otf: \"%s\"\n", cp, e.translated);
+    // The Preferences button shows the language's own name in every language (App::mergeCjkFont's kNameRanges).
+    for (const unsigned cp : codepoints(languageName(Language::TraditionalChinese)))
+        if (!cjk.count(cp)) missing.insert(cp);
+    CHECK(missing.empty());
+}
+
+TEST(i18n_chinese_lookup_keeps_ids_and_brush_names) {
+    LanguageScope scope(Language::TraditionalChinese);
+    CHECK(std::string(tr("Preferences##palette.preferences")) == "\u504f\u597d\u8a2d\u5b9a##palette.preferences");
+    CHECK(std::string(tr("Open...##file.open")) == "\u958b\u555f...##file.open");
+    CHECK(std::string(tr("Frobnicate")) == "Frobnicate"); // no entry: English
+    const std::string move = "Move";
+    CHECK(std::string(trAction("brush.move", move)) == "Move");
+    CHECK(trPath("Tool > Geometry") == "\u5de5\u5177 > \u5e7e\u4f55");
 }
