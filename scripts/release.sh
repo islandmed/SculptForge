@@ -215,6 +215,7 @@ highlights_ok() {
 highlights_fix="write 3-5 one-line highlights (what users get) to a file and run again with HIGHLIGHTS=that-file"
 # The words people write for What's New: the guide section and (after step bump wrote it) the UI test's pin to it.
 words_ok() {
+    python3 tools/check_marks_media.py >/dev/null 2>&1 || die "an image or video shows a mark: $(python3 tools/check_marks_media.py 2>/dev/null | grep -v '^check_marks_media:' | head -3)" "swap in a clean capture from current main (python3 tools/check_marks_media.py lists them), commit, push main"
     python3 tools/release/assemble_notes.py --check >/dev/null || die "a note fragment in changes/ doesn't parse: $(python3 tools/release/assemble_notes.py --check 2>&1)" "fix it (changes/README.md has the format), commit, push main"
     grep -q "^## Version ${BASE//./\\.}\$" docs/guide/whats-new.md || grep -qs '^whats_new:' changes/*.md ||
         die "docs/guide/whats-new.md has no '## Version $BASE'" "write that section at the top (Help > What's New shows it), commit, push main"

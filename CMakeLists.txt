@@ -744,6 +744,12 @@ if(SCULPTFORGE_BUILD_TESTS)
     # website/brushes.html #packs matches src/core/BrushPacks.cpp: every brush, its preview and the guide links.
     add_test(NAME website_brush_packs COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/brush-packs/sync_website.py --check)
     add_test(NAME marks_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py --self-test)
+    # The same marks read off the pixels of every tracked image and video (OCR, cached by file hash), and the deploy's
+    # takedown of flagged ones (tools/media_takedown.py).
+    add_test(NAME marks_media COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks_media.py
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME marks_media_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks_media.py --self-test)
+    add_test(NAME media_takedown_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/media_takedown.py --self-test)
     add_test(NAME release_notes COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --self-test)
     add_test(NAME release_notes_fragments COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --check)
     # The members' publishing path stays locked down: release.yml's actions pinned to commit SHAs, INSIDERS_REPO_TOKEN only
