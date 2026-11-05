@@ -4,7 +4,7 @@ One table for every performance claim in the beta.3 push. A number goes here onl
 method below. Claims in notes, the site or the guide quote this table, and quote the floor first. Owner: core200m
 (it updates the table as branches land). Public text states our own numbers only, never another app's.
 
-## Targets (Tony, 11-04: performance is the #1 priority until they're met)
+## Targets (the maintainer, 11-04: performance is the #1 priority until they're met)
 
 Our own numbers only. Each must hold on the floor tier first, then the E-core floor, the laptop and the Windows 3060.
 

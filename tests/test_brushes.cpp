@@ -84,7 +84,7 @@ TEST(round_alpha_leaves_existing_brushes_unchanged) {
     CHECK(std::abs(d.mesh.positions[nearest(d.mesh, glm::vec3(0))].y - 0.3f * 0.06f * 0.5f) < 1e-5f);
 }
 
-// classic Focal Shift: 0 leaves the falloff (and so every brush) exactly as before; below 0 the tip is broader
+// classic Falloff: 0 leaves the falloff (and so every brush) exactly as before; below 0 the tip is broader
 // and harder, above 0 a softer point; the cursor's inner ring sits where the falloff is one half.
 TEST(focal_shift_shapes_the_falloff) {
     for (float d : {0.0f, 0.1f, 0.33f, 0.5f, 0.77f, 1.0f}) {
@@ -330,7 +330,7 @@ TEST(alpha_shapes_and_orients_dabs) {
     BrushAlpha square = BrushAlpha::square();
     DabParams p = dabAt(glm::vec3(0));
     p.alpha = &square;
-    p.focal = -1.0f; // (Focal Shift -100: the alpha shows hard to its edges; at 0 it rounds the corners, #60)
+    p.focal = -1.0f; // (Falloff -100: the alpha shows hard to its edges; at 0 it rounds the corners, #60)
     stroke(sq, BrushType::Standard, p);
     p.focal = 0.0f;
     const uint32_t c = nearest(sq.mesh, glm::vec3(0)), diag = nearest(sq.mesh, glm::vec3(0.25f, 0, 0.25f));
@@ -371,7 +371,7 @@ TEST(alpha_shapes_and_orients_dabs) {
     CHECK(r.mesh.positions[nearest(r.mesh, glm::vec3(0.12f, 0, 0))].y == 0.0f);
 }
 
-// #60: Focal Shift shapes alpha brushes. The alpha is multiplied by a round falloff reaching the
+// #60: Falloff shapes alpha brushes. The alpha is multiplied by a round falloff reaching the
 // stamp's corners: -100 shows the whole square, 0 rounds its corners into a soft mound, +100 leaves a small point.
 TEST(focal_shift_shapes_alpha_dabs) {
     CHECK(alphaFalloff(0.0f, 1.0f, 0.0f) == 1.0f);
@@ -383,7 +383,7 @@ TEST(focal_shift_shapes_alpha_dabs) {
     CHECK(square.stamp(0.7f, 0.7f, -1.0f) == square.sample(0.7f, 0.7f));
     CHECK(square.stamp(0.7f, 0.7f, 0.0f) < 0.5f * square.stamp(0.7f, 0.0f, 0.0f)); // rounded corners
     CHECK(square.stamp(1.2f, 0.0f, -1.0f) == 0.0f);
-    const BrushAlpha round = BrushAlpha::round(); // (empty: the plain brush falloff, Focal Shift included)
+    const BrushAlpha round = BrushAlpha::round(); // (empty: the plain brush falloff, Falloff included)
     CHECK(round.stamp(0.4f, 0.0f, 0.5f) == brushFalloff(0.4f, 1.0f, 0.5f) && round.stamp(1.1f, 0.0f, -1.0f) == 0.0f);
 
     // A square-alpha dab: how much moves (footprint) and how much of the corner survives.
@@ -412,7 +412,7 @@ TEST(focal_shift_shapes_alpha_dabs) {
     }
 }
 
-// #60: Focal Shift reaches the built-in square Clay Block tip and custom (recipe) brushes; 0 keeps their own tip.
+// #60: Falloff reaches the built-in square Clay Block tip and custom (recipe) brushes; 0 keeps their own tip.
 TEST(focal_shift_reaches_clay_block_and_recipes) {
     auto height = [&](float focal, bool recipe, const glm::vec3& at) {
         Document d = planeDoc();
@@ -435,7 +435,7 @@ TEST(focal_shift_reaches_clay_block_and_recipes) {
         const float hard = height(-0.8f, recipe, at), plain = height(0.0f, recipe, at), soft = height(0.8f, recipe, at);
         CHECK(hard > plain + 0.02f && plain > soft + 0.02f);
     }
-    // 0 is bit-identical to no Focal Shift at all (the brush's own tip).
+    // 0 is bit-identical to no Falloff at all (the brush's own tip).
     Document a = planeDoc(), b = planeDoc();
     DabParams p = dabAt(glm::vec3(0));
     stroke(a, BrushType::ClayBlock, p);
@@ -444,7 +444,7 @@ TEST(focal_shift_reaches_clay_block_and_recipes) {
     CHECK(a.mesh.positions == b.mesh.positions);
 }
 
-// #75: custom and Community (recipe) brushes show the whole alpha at Focal Shift -100, as the built-ins do (#60):
+// #75: custom and Community (recipe) brushes show the whole alpha at Falloff -100, as the built-ins do (#60):
 // a DragRect-style single stamp of a corner-reaching alpha with Clay Slab displaces the square's corners, not
 // only the round tip inside the brush circle. At 0 the preset keeps its own round tip.
 TEST(custom_brush_full_alpha_at_focal_minus_100) {

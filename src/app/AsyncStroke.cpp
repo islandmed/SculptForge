@@ -55,8 +55,13 @@ void App::StrokeSolver::start() {
 }
 
 void App::StrokeSolver::wait() {
+    // The main thread waits here for the stroke thread (it must: the mesh is the stroke's until it is done). A
+    // wait of seconds is a frozen window (phoenix, Discord 11-05): say so in the log. (`batch` is only read there.)
     std::unique_lock<std::mutex> lock(mutex_);
-    idle_.wait(lock, [this] { return !busy_.load(std::memory_order_acquire); });
+    const auto start = std::chrono::steady_clock::now();
+    while (!idle_.wait_for(lock, std::chrono::seconds(2), [this] { return !busy_.load(std::memory_order_acquire); }))
+        SDL_Log("stroke: the main thread has waited %.0f s for the stroke thread (a batch of %zu dabs)",
+                std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), batch.size());
 }
 
 bool App::StrokeSolver::waitFor(double seconds) {
@@ -393,6 +398,7 @@ void App::finishStrokeNow() {
     finishPaintStroke(r);
     if (r.topology && !r.topology->uvs.empty())
         status_ = "Dynamic topology removed the UVs of the remeshed Part (Undo brings them back)";
+    strokeEndedForRemesh(r); // Tool > Remesh > Remesh after each stroke (#121): stretched enough to remesh?
     if (!r.empty()) {
         doc_.undo.push(std::move(r));
         doc_.modified = true;

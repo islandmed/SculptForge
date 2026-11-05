@@ -77,6 +77,8 @@ rez-env sculptforge -- sculptforge
 | Variable | Effect |
 |---|---|
 | `SF_AI` | `off`: every AI feature off and locked (app, `sculptforge-cli`, MCP, Python); `on`: on whatever was saved. `--no-ai` does the same as `off` for one start |
+| `SF_STUDIO_PROFILE` | A studio profile (`studio.json`) to start in studio mode with, like `--studio` (see [Your studio build](#your-studio-build)) |
+| `SF_OFFLINE` | `1`: studio mode with nothing allowed, like `--offline` |
 | `SCULPTFORGE_BRUSH_PATH` | Read-only studio brush folders (`:`-separated, `;` on Windows) |
 | `SCULPTFORGE_STUDIO_BRUSHES` | With the Rez package: appended to `SCULPTFORGE_BRUSH_PATH` |
 | `SCULPTFORGE_BRUSH_GALLERY` | Use another community brush gallery index (a URL or a folder), for example an in-house mirror |
@@ -146,56 +148,98 @@ SculptForge is free software under the GNU General Public License, version 3 or 
 
 ## Studio membership
 
-SculptForge is free for any number of artists, and nothing in the app is ever paywalled. A Studio membership
-($150 a month, invoiced monthly) covers up to 10 artists:
+SculptForge is free for any number of artists, and nothing in the app is ever paywalled. A Studio membership is
+$300 a month for up to 10 artists, plus $25 a month for each extra artist. The first 10 studios become Founding
+Studios at $150 a month, locked for as long as they stay subscribed. Each artist gets everything in Member, and the
+studio gets:
 
-- **Everything in Member for each artist:** betas and early builds, the monthly feature vote, a brush and alpha
-  pack every month, #members on Discord and their names in the credits. From SculptForge 1.0, members get each
-  release about two weeks early.
-- **Priority support:** your reports reviewed within 2 business days (no fix-time guarantee).
-- Your studio's own **private channel** on Discord.
+- **Its own build** with its brushes, alphas, Lit Spheres, keymaps, macros, preferences, paths and logo built in.
+- **Isolation:** a private release channel, and no outside connections by default (see
+  [Offline deployment](#offline-deployment)).
+- **A pinned version:** you choose when to move. Security fixes are backported to the current release and one
+  long-term support (LTS) line, and your studio is always on one of those two.
+- **An offline signed installer** with checksums for IT.
+- **Support:** a first response within 2 business days (a response, not a fix), up to 3 custom items a month
+  (bigger features are quoted separately), your requests first on the roadmap, and a private Discord channel.
 
-Every release stays free for everyone; bug-fix and security releases go out to everyone the same day. More than
-10 artists: write to hello@sculptforge.app. Join at [sculptforge.app/studios.html](https://sculptforge.app/studios.html#membership).
+Every release stays free for everyone; bug-fix and security releases go out to everyone the same day. Join at
+[sculptforge.app/studios.html](https://sculptforge.app/studios.html#membership) or write to hello@sculptforge.app.
 
-## Studio onboarding
+**What stays private, and what doesn't.** SculptForge is GPL-3.0, and so is your studio build: its source comes
+with it and is yours to share. There are no exclusive or secret features. What stays private is yours: the
+brushes, alphas, settings and files you send are never put in public builds or packs, and your build never reaches
+out of your network.
 
-After checkout, email hello@sculptforge.app from a studio address with the GitHub usernames that should get
-the private repository (as many artists as you like) and who should join the team channel.
+## Your studio build
 
-### Custom content
+Your build is SculptForge with a **studio profile** baked in: one `studio.json` and a folder beside it.
 
-Studios can ask for their own content, made to order:
+```json
+{
+  "format": "sculptforge-studio", "version": 1,
+  "id": "acme", "name": "Acme Animation",
+  "updates": {"feed": "https://sw.acme.internal/sculptforge/latest.json", "mirror": "/mnt/sw/sculptforge/latest.json"},
+  "allow": [],
+  "localNetwork": false,
+  "ai": false,
+  "packs": ["packs/acme.sfpack"],
+  "brushPaths": ["/studio/brushes"],
+  "preferences": "ui.json",
+  "branding": {"logo": "logo.png", "title": "Acme"}
+}
+```
 
-- **Brushes** tuned to your style.
-- **Alphas and VDMs** made from your own references or scans (only material you own).
-- **Macros** and one-click workflows.
-- **Pipeline presets:** export settings, naming, scale, axis, texture packing and Bridge setup.
-- **Keymaps and layouts.**
+| Key | What it does |
+|---|---|
+| `updates.feed`, `updates.mirror` | Where the build looks for updates: your private channel, then your mirror (a URL or a file on a share) |
+| `allow` | More URLs the build may reach, such as your own ComfyUI server (empty by default) |
+| `localNetwork` | `true` lets the Unreal link and phone capture use your studio network |
+| `ai` | `true` keeps the AI features; they can still reach only the URLs above |
+| `packs` | Your brushes, alphas, Lit Spheres, keymaps and macros as `.sfpack` files, installed at first start |
+| `brushPaths` | Read-only brush shares, as `SCULPTFORGE_BRUSH_PATH` |
+| `preferences` | The first-start interface settings: layout, shortcuts and UI scale (**Edit > Preferences > Interface** exports them) |
+| `branding` | Your logo in **Help > About** and a word in the title bar |
 
-All of it is baked into your custom studio build. Up to 5 custom items a month (brushes, alphas, macros or
-presets); larger features are quoted separately. Your assets stay private to your studio and are never used
-for anything else.
+Paths are relative to the profile's folder, and the profile is data only: nothing in it runs. An unknown key is an
+error, so a typo never quietly drops a setting.
 
-### Requesting a custom build
+To request your build, send in one email or a message in your team channel:
 
-Send, in one email or a message in your team channel:
-
-- **What to bake in:** your exported keymap and layout (**Edit > Preferences > Interface**), brush presets and packs
-  (`.sfbrush`, `.sfpack`), shelf setup, and the pipeline defaults you want.
+- **What to bake in:** your exported keymap and layout, brush presets and packs (`.sfbrush`, `.sfpack`), and the
+  pipeline defaults you want.
 - **References for custom content:** images or scans you own, with a line on what each item should do.
 - **Where it runs:** platforms and, for Linux, the distribution or VFX Reference Platform year.
+- **Where updates come from:** your channel or mirror URL, or a folder on a share.
+- **Who gets access:** the GitHub usernames for your private release channel.
 
-Files are treated as data only: scripts and executables you send are never run. Your build is published as a
-release in the private repository, built by the same pipeline and tests as public builds, with its source
-(it is GPL like every SculptForge build). Each new release brings an updated studio build.
+Files are treated as data only: scripts and executables you send are never run. Your build is made by the same
+pipeline and tests as public builds and published in your private channel, signed, with its checksums and source.
 
-### Guided development
+To try a profile on a public build first, start it with `sculptforge --studio /path/to/studio.json` (or set
+`SF_STUDIO_PROFILE`); `sculptforge-cli` and the Python module take the same profile.
 
-Tell us what your team needs most, in the team channel or on the monthly call (or an async review, if a call
-doesn't suit your time zone). Studio requests go to the front of the roadmap: each month we agree what comes
-next, and you see it in preview builds about a week before the release. Requests that are bigger than a
-normal release's work are quoted separately before anything starts.
+## Offline deployment
+
+A studio build is in **studio mode**, whatever happens to its files:
+
+- **No outside connections.** No update check against the public website, no AI services, no community brush
+  gallery, no Discord presence; SculptForge has no telemetry. Every request goes through one gate that allows only
+  your update channel, your mirror and your `allow` list, refuses everything else before it is sent, and never
+  follows a redirect. Network sockets open only on this computer (loopback) unless `localNetwork` is `true`.
+- **Fails closed.** If the profile is missing or broken, a studio build still starts offline, with nothing allowed.
+- **Updates on your schedule.** The build reads its feed only from your channel or mirror. Copy a new release's
+  `latest.json` to the mirror when you're ready to move; until then nobody is offered it.
+
+To install on machines without internet access:
+
+1. Download the release from your private channel: the installer or archive for each platform,
+   `SHA256SUMS.txt` and `SHA256SUMS.txt.sig`.
+2. Check the files: `sha256sum -c SHA256SUMS.txt --ignore-missing` (Windows:
+   `Get-FileHash <file> -Algorithm SHA256`), and the signature with the public key we send you:
+   `openssl pkeyutl -verify -pubin -inkey sculptforge-release.pem -rawin -in SHA256SUMS.txt -sigfile SHA256SUMS.txt.sig`.
+3. Deploy as usual: the Windows installer or portable zip, the `.rpm`/`.deb`, the tar.gz or the Rez package.
+4. To test studio mode on any machine, `sculptforge --offline` turns it on with nothing allowed; `SF_OFFLINE=1`
+   does the same for the CLI and Python.
 
 ## Not yet
 

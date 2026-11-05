@@ -168,11 +168,11 @@ void App::registerTimelineUiActions() {
         [ui] { return ui().visible; });
     add("view.timeline_top", "Top of viewport", nullptr, "Preferences > Interface",
         "Timeline position: the Sculpt Timeline strip runs along the top of the viewport, below the top shelf and away "
-        "from the brushes on the bottom shelf (the default). Store Config keeps it.",
+        "from the brushes on the bottom shelf (the default). Saved automatically.",
         [this] { uiPrefs_.timelineTop = true; }, [this] { return uiPrefs_.timelineTop; });
     add("view.timeline_bottom", "Bottom", nullptr, "Preferences > Interface",
         "Timeline position: the Sculpt Timeline strip runs along the bottom of the viewport, above the brush shelf. "
-        "Store Config keeps it.",
+        "Saved automatically.",
         [this] { uiPrefs_.timelineTop = false; }, [this] { return !uiPrefs_.timelineTop; });
     add("timeline.timelapse", "Export timelapse...", ICON_LC_FILM, "Edit",
         "Render the history of the active Part as a turntable timelapse video (1080p or 4K MP4, no captions).",

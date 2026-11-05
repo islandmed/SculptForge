@@ -13,6 +13,7 @@
 #include "app/I18n.h"
 
 #include "core/KeepMasked.h"
+#include "core/QuickRemesh.h"
 #include "core/TextureTransfer.h"
 #include "core/Voxel.h"
 
@@ -63,7 +64,7 @@ void App::registerRetopoUiActions() {
         [this] { return !qremesh_ && doc_.mesh.triangleCount() > 0; },
         "Automatic quad retopology: rebuilds the Part as clean, all-quad topology whose "
         "edge loops follow the forms, close to Target Polygons. Runs in the background (Cancel stops it); undoable. "
-        "Then divide it and use Part > Project > Project All to bring the detail back.",
+        "Then divide it and use Part > Project > Project Detail to bring the detail back.",
         "qremesh");
     {
         Action a;
@@ -85,7 +86,7 @@ void App::registerRetopoUiActions() {
     add("geometry.qremesh_guides_clear", "Clear", kQRemeshPath, [this] { runCommand("qremesh_guides_clear"); },
         [this] { return !doc_.qremeshGuides.empty(); }, "Delete every Quad Remesh guide curve of this Part.",
         "qremesh_guides_clear");
-    add("part.project_all", "Project All", kProjectPath, [this] {
+    add("part.project_all", "Project Detail", kProjectPath, [this] {
             runCommand("project_all", {{"distance", double(retopo_.projectDist)}, {"mean", retopo_.projectMean},
                                        {"blur", double(retopo_.projectBlur)}, {"geometry", retopo_.projectGeometry},
                                        {"vertexpaint", retopo_.projectVertexPaint}});
@@ -97,7 +98,7 @@ void App::registerRetopoUiActions() {
         },
         "Project the shape and vertex paint of every other visible Part onto this one: each vertex moves along its "
         "normal to the nearest surface within Dist. The mask holds vertices back. Typical use: Quad Remesh a copy, divide "
-        "it a few times, show the original, Project All.",
+        "it a few times, show the original, Project Detail.",
         "project_all");
 }
 
@@ -190,15 +191,17 @@ void App::startQRemesh() {
               " quads...";
 }
 
-void App::startVoxelRemesh() {
+void App::startVoxelRemesh(RemeshTrigger trigger) {
     if (voxelRemesh_) return;
     Args args{{"resolution", double(voxelResolution_)}};
     if (voxelKeepMasked_) args["keep_masked"] = true;
-    if (!memoryAllows("remesh", args, [this] { startVoxelRemesh(); })) return;
+    if (!memoryAllows("remesh", args, [this, trigger] { startVoxelRemesh(trigger); })) return;
     // Always in the background with progress, so the UI never freezes (keeping a texture adds Auto UV of the
     // result, seconds to minutes); the result lands as the remesh command's would (pollVoxelRemesh).
     if (doc_.sculptor.strokeActive()) endStroke();
     auto job = std::make_unique<VoxelRemeshJob>();
+    job->trigger = trigger;
+    job->revision = doc_.undo.revision();
     job->progress = std::make_shared<std::atomic<float>>(0.0f);
     job->cancel = std::make_shared<std::atomic<bool>>(false);
     job->result = std::make_shared<Mesh>();
@@ -247,20 +250,40 @@ void App::startVoxelRemesh() {
         }
         promise.set_value(ok);
     }).detach();
+    const int res = job->resolution;
+    autoRemeshDue_ = false; // (this remesh covers every stroke so far)
     voxelRemesh_ = std::move(job);
-    status_ = texture ? "Voxel Remesh: remeshing and keeping the texture..." : "Voxel Remesh: remeshing...";
+    status_ = trigger == RemeshTrigger::AfterStroke ? "Remesh after stroke: the stroke stretched the surface, remeshing at " +
+                                                          std::to_string(res) + "..."
+              : trigger == RemeshTrigger::Quick ? "Quick Remesh: remeshing at resolution " + std::to_string(res) + "..."
+              : texture                          ? "Voxel Remesh: remeshing and keeping the texture..."
+                                                 : "Voxel Remesh: remeshing...";
 }
 
 void App::pollVoxelRemesh() {
+    // Remesh after each stroke: a stretching stroke asks; the remesh starts once no stroke or job is in the way.
+    if (autoRemeshDue_ && !voxelRemesh_ && !jobWaitsForStroke()) {
+        autoRemeshDue_ = false;
+        quickRemesh(RemeshTrigger::AfterStroke);
+    }
     if (!voxelRemesh_) return;
+    const char* name = voxelRemesh_->trigger == RemeshTrigger::Quick         ? "Quick Remesh: "
+                       : voxelRemesh_->trigger == RemeshTrigger::AfterStroke ? "Remesh after stroke: "
+                                                                             : "Voxel Remesh: ";
     if (voxelRemesh_->done.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
-        status_ = "Voxel Remesh: " + std::to_string(int(voxelRemesh_->progress->load() * 100.0f)) + "%";
+        status_ = name + std::to_string(int(voxelRemesh_->progress->load() * 100.0f)) + "%";
         return;
     }
     if (jobWaitsForStroke()) return; // (the result lands when the stroke ends)
     const std::unique_ptr<VoxelRemeshJob> job = std::move(voxelRemesh_);
     if (!job->done.get()) {
         status_ = *job->error;
+        return;
+    }
+    if (job->trigger != RemeshTrigger::Button && doc_.undo.revision() != job->revision) {
+        // Sculpted (or undone) while it ran: landing would throw that work away, so it remeshes the Part as it is now.
+        status_ = std::string(name) + "the Part changed while it was remeshed, remeshing again...";
+        startVoxelRemesh(job->trigger);
         return;
     }
     int index = -1;
@@ -272,7 +295,12 @@ void App::pollVoxelRemesh() {
     }
     const JobPart part(*this, index);
     doc_.replaceMeshUndoable(std::move(*job->result), "Remesh"); // as the remesh command
-    CommandResult r{true, "Remeshed to " + std::to_string(doc_.mesh.triangleCount()) + " triangles" + *job->note};
+    CommandResult r{true, std::string(job->trigger == RemeshTrigger::Quick         ? "Quick Remesh: remeshed"
+                                      : job->trigger == RemeshTrigger::AfterStroke ? "Remeshed after the stroke"
+                                                                                   : "Remeshed") +
+                              " to " + std::to_string(doc_.mesh.triangleCount()) + " triangles" + *job->note};
+    if (job->trigger != RemeshTrigger::Button) r.message += " (resolution " + std::to_string(job->resolution) + "; " +
+                                                          actions_.shortcutText("edit.undo") + " undoes it)";
     if (const std::string notice = doc_.takeNotice(); !notice.empty()) r.message += ". " + notice; // levels dropped
     status_ = r.message;
     lastCommandOk_ = true;
@@ -284,6 +312,82 @@ void App::pollVoxelRemesh() {
     if (job->keepMasked) echo["keep_masked"] = true;
     if (!job->keepTexture && job->note->find("texture") != std::string::npos) echo["keep_texture"] = false;
     consoleEcho("remesh", echo, r);
+}
+
+// ---------------------------------------------------------------------------
+// Quick Remesh and Remesh after each stroke (#121)
+// ---------------------------------------------------------------------------
+
+void App::quickRemesh(RemeshTrigger trigger) {
+    const char* name = trigger == RemeshTrigger::AfterStroke ? "Remesh after stroke: " : "Quick Remesh: ";
+    if (voxelRemesh_) {
+        if (trigger == RemeshTrigger::Quick) status_ = std::string(name) + "already remeshing (Tool > Remesh > Cancel stops it)";
+        return; // (a stroke made meanwhile: the running quick remesh starts again when it finishes)
+    }
+    if (doc_.mesh.triangleCount() == 0) {
+        status_ = std::string(name) + "the active Part has no surface to remesh";
+        return;
+    }
+    if (!doc_.activePartInfo().visible) {
+        status_ = std::string(name) + "the active Part is hidden";
+        return;
+    }
+    startVoxelRemesh(trigger);
+}
+
+void App::strokeEndedForRemesh(const UndoRecord& stroke) {
+    lastStrokeStretched_ = 0;
+    if (!uiPrefs_.remeshAfterStroke || stroke.positions.empty() || stroke.layer >= 0 || stroke.topology || stroke.mesh ||
+        stroke.micro || stroke.subdiv)
+        return;
+    // Not where a remesh would throw work away unasked: subdivision levels, sculpt layers, a painted texture.
+    if (doc_.mesh.multires || !doc_.mesh.layers.empty() || (hasTexture(doc_.mesh) && keepTexture_)) return;
+    const StrokeStretch s = strokeStretch(doc_.mesh, stroke.positions.indices, stroke.positions.values);
+    lastStrokeStretched_ = s.stretched;
+    if (stretchWantsRemesh(s)) autoRemeshDue_ = true; // pollVoxelRemesh starts it once nothing is in the way
+}
+
+void App::quickRemeshKey(SDL_Keycode key, SDL_Keymod mods, bool down) {
+    if (!down) {
+        if (key == quickRemeshDragKey_) quickRemeshDragKey_ = SDLK_UNKNOWN;
+        return;
+    }
+    const Action* a = actions_.actionForChord(chordFromEvent(key, mods));
+    if (a && a->id == "geometry.quick_remesh_drag" && uiPrefs_.quickRemesh) quickRemeshDragKey_ = key;
+}
+
+// With the drag key held (N by default, Preferences > Hotkeys), a press on the background (no surface under it)
+// remeshes when it's let go. On the model the press stays a stroke. The key is unbound in every input style, so
+// no empty-canvas drag of any style (turn, pan, zoom, mask and hide shapes) changes.
+bool App::quickRemeshDragDown(float x, float y) {
+    if (quickRemeshDragKey_ == SDLK_UNKNOWN || !uiPrefs_.quickRemesh) return false;
+    RayHit hit;
+    if (previewLod_ < 0 && pick(x, y, hit)) return false;
+    drag_ = Drag::QuickRemesh;
+    status_ = "Quick Remesh: let go to remesh the active Part";
+    return true;
+}
+
+void App::drawQuickRemeshContents() {
+    tray::GroupLabel(*this, "Quick Remesh");
+    bool quick = uiPrefs_.quickRemesh;
+    if (ImGui::Checkbox(tr("Quick Remesh##remesh.quick"), &quick)) uiPrefs_.quickRemesh = quick;
+    const std::string key = actions_.shortcutText("geometry.quick_remesh");
+    const std::string drag = actions_.shortcutText("geometry.quick_remesh_drag");
+    const std::string help =
+        "When on, " + (key.empty() ? std::string("the Quick Remesh key (Preferences > Hotkeys)") : key) +
+        " remeshes the active Part at the Resolution above, in the background (progress and Cancel here)" +
+        (drag.empty() ? std::string(".") : "; so does holding " + drag + " and clicking or dragging on the background.") +
+        " Keep Masked and Keep Texture apply. Both keys change in Preferences > Hotkeys.";
+    ui::HelpText("Quick Remesh", nullptr, help.c_str(), "Tool > Remesh");
+    bool after = uiPrefs_.remeshAfterStroke;
+    if (ImGui::Checkbox(tr("Remesh after each stroke##remesh.after_stroke"), &after)) uiPrefs_.remeshAfterStroke = after;
+    ui::HelpText("Remesh after each stroke", nullptr,
+                 "After a stroke that stretched the surface (edges pulled to more than 1.6 times their length), the "
+                 "active Part is remeshed at the Resolution above in the background. Sculpting never waits: a stroke "
+                 "made meanwhile remeshes again. Each remesh is one undo step. Not on a Part with subdivision levels, "
+                 "sculpt layers or a painted texture.",
+                 "Tool > Remesh");
 }
 
 void App::pollQRemesh() {
@@ -405,7 +509,7 @@ void App::drawQRemeshContents() {
     ImGui::Checkbox(tr("Keep Original"), &retopo_.keepOriginal);
     ui::HelpText("Keep Original", nullptr,
                  "Keep the Part as it was, hidden, right below the new one (\"<name> Original\"), ready to "
-                 "Project All its detail back. Off: replace it (undo brings it back).",
+                 "Project Detail its detail back. Off: replace it (undo brings it back).",
                  kQRemeshPath);
     ImGui::SameLine();
     ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
@@ -435,7 +539,7 @@ void App::drawQRemeshReport() {
     ui::HelpText("Quality Report", nullptr,
                  "How clean the new topology is: poles are vertices with other than four edges (fewer is cleaner), "
                  "corners off square measure how far quad corners are from 90 degrees, and the distance is how far the "
-                 "new surface strays from the sculpt (in % of its size; Project All brings fine detail back).",
+                 "new surface strays from the sculpt (in % of its size; Project Detail brings fine detail back).",
                  kQRemeshPath);
 }
 
@@ -681,8 +785,8 @@ void App::drawProjectContents() {
                  "size. Raise it if parts don't pick up the detail; lower it where surfaces are close together.",
                  kProjectPath);
     ImGui::SetNextItemWidth(half);
-    tray::SliderInt("##pblur", &retopo_.projectBlur, 0, 10, "PA Blur %d");
-    ui::HelpText("PA Blur", nullptr, "Smooth the projected result this many times (softens noise from the source).",
+    tray::SliderInt("##pblur", &retopo_.projectBlur, 0, 10, "Blur %d");
+    ui::HelpText("Blur", nullptr, "Smooth the projected result this many times (softens noise from the source).",
                  kProjectPath);
     ImGui::SameLine();
     ImGui::Checkbox(tr("Mean"), &retopo_.projectMean);

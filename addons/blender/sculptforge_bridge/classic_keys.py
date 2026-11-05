@@ -42,9 +42,9 @@ def brush_assets():
 
 # Classic keys Blender has nothing for (or that can't be bound the same way), shown in the preferences.
 MISSING = [
-    ("I", "RGB Intensity: Blender's sculpt brushes don't paint"),
+    ("I", "Colour intensity: Blender's sculpt brushes don't paint"),
     ("Ctrl+drag on the model", "painting the mask with any brush held: Blender can't swap to the Mask brush "
-                               "for one stroke, so Ctrl+drag draws a mask lasso instead (B M P picks the Mask brush)"),
+                               "for one stroke, so Ctrl+drag draws a lasso mask instead (B M P picks the Mask brush)"),
     ("Drag on the background", "rotating: a keymap can't tell the model from the background (use the middle "
                                "button, or Blender's Emulate 3 Button Mouse)"),
     ("Ctrl+click the background", "invert or clear the mask: use Ctrl+I (invert) and Alt+M (clear)"),
@@ -201,10 +201,10 @@ def key_table():
     toggle = "wm.context_toggle"
     lasso = "paint.mask_lasso_gesture"
     return [
-        ("S", "Draw Size", "wm.radial_control", "S", False, False, False, "PRESS", radial_properties("size", "use_unified_size")),
-        ("U", "Z Intensity", "wm.radial_control", "U", False, False, False, "PRESS",
+        ("S", "Size", "wm.radial_control", "S", False, False, False, "PRESS", radial_properties("size", "use_unified_size")),
+        ("U", "Intensity", "wm.radial_control", "U", False, False, False, "PRESS",
          radial_properties("strength", "use_unified_strength")),
-        ("O", "Focal Shift (Blender: Hardness)", "wm.radial_control", "O", False, False, False, "PRESS",
+        ("O", "Falloff (Blender: Hardness)", "wm.radial_control", "O", False, False, False, "PRESS",
          radial_properties("hardness")),
         ("Space", "the quick menu at the cursor (Blender's Sculpt context menu)", "wm.call_panel", "SPACE", False,
          False, False, "PRESS", {"name": "VIEW3D_PT_sculpt_context_menu"}),
@@ -229,7 +229,7 @@ def key_table():
          "PRESS", {}),
         ("D", "SDiv up", SCULPTFORGE_OT_classic_sdiv.bl_idname, "D", False, False, False, "PRESS", {"step": 1}),
         ("Shift+D", "SDiv down", SCULPTFORGE_OT_classic_sdiv.bl_idname, "D", False, True, False, "PRESS", {"step": -1}),
-        ("Ctrl+W", "Group Masked and clear the mask, or Group Visible (face sets)", SCULPTFORGE_OT_classic_group.bl_idname,
+        ("Ctrl+W", "Group from Mask and clear the mask, or Group Visible (face sets)", SCULPTFORGE_OT_classic_group.bl_idname,
          "W", True, False, False, "PRESS", {}),
         ("W / E / R", "Move / Scale / Rotate", "wm.tool_set_by_id", "W", False, False, False, "PRESS",
          {"name": "builtin.move"}),

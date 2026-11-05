@@ -24,6 +24,10 @@ struct UpdateInfo {
     std::vector<std::string> highlights; // a few short lines for the banner
     bool member = false;                 // a member build (core/MemberBuilds.h)
     std::map<std::string, std::string> files; // member builds: release file name -> its API URL
+    // The monthly challenge whose results are out (the feed's optional "challenge": {"id": "2026-11", "title":
+    // "Creatures"}): the membership card's moment, once per id. Empty when missing or odd; id letters, digits and
+    // '-' (32 at most), title printable text (48 bytes at most).
+    std::string challengeId, challengeTitle;
 };
 
 // Which releases the update check offers (Preferences > Updates): Stable, or Preview, which adds the betas

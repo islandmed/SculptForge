@@ -14,7 +14,7 @@ interface and keep your changes. The pictures show the default look and layout.
 | Region | Where | What it holds |
 |---|---|---|
 | Menu bar | Top edge | The menus **File, Edit, Sculpt, Paint, Mesh, View, Render, Help**; the status message; mode, brush, file name, triangles and frame rate; layout presets **1 2 3**; **Search** |
-| Top shelf | Under the menu bar | Sculpt/Paint, Draw/Move/Scale/Rotate, Add/Sub, Rgb, Draw Size, Intensity, Dynamic, symmetry |
+| Top shelf | Under the menu bar | Sculpt/Paint, Draw/Move/Scale/Rotate, Add/Sub, Rgb, Size, Intensity, Dynamic, symmetry |
 | Left shelf | Left of the canvas | Brush, Stroke, Alpha and Material tiles, the colour picker, Fill |
 | Canvas | Centre | The 3D view, with the Sculpt Timeline along its top; strokes and navigation start only here |
 | Right shelf | Right of the canvas | Undo and Redo, Frame, Move, Zoom and Rotate, display toggles, Solo |
@@ -37,7 +37,7 @@ models, brushes or shortcuts.
 
 - **SculptForge** (the default for new installs): a status bar along the top with the task menus **File, Edit,
   Sculpt, Paint, Mesh, View, Render** and **Help**, the document name and scene statistics; a one-row top shelf
-  (Sculpt/Paint, Draw, Move, Scale, Rotate, Add/Sub, Rgb, Draw Size, Intensity, Dynamic, symmetry). Every palette
+  (Sculpt/Paint, Draw, Move, Scale, Rotate, Add/Sub, Rgb, Size, Intensity, Dynamic, symmetry). Every palette
   is a section of one menu: **File** (File, Script), **Edit** (Edit, Preferences), **Sculpt** (Brush, Draw &
   Tablet, Stroke, Alpha, Symmetry & Gizmo), **Paint** (Vertex Paint & Color), **Mesh** (Parts & Geometry, which is
   the Tool palette, and Generate 3D), **View** (Display), **Render** (Materials, Gaussian Splats) and **Help**. Pin
@@ -76,8 +76,8 @@ Classic sculpting keys (the keys and the Classic layout), Blender, Maya or New t
 Help > Welcome shows it again.
 
 Choosing Forge Terminal, Phosphor or Blueprint also switches to the SculptForge layout; you can pick the
-Classic layout again right after. The look and layout are remembered for the next start without
-[Store Config](#store-config-and-friends) (Store Config keeps them in your UI configuration too).
+Classic layout again right after. The look and layout are remembered for the next start on their own, like every
+[preference](#saving-preferences-and-layouts).
 
 **Updating from an older version** keeps the look and layout you had. A card, **SculptForge has a new look**,
 shows once: **Try it** switches to Forge Terminal with the Neutral colours and the SculptForge layout; **Keep my layout**
@@ -162,7 +162,7 @@ turn on **Edit > Preferences > Interface > Palettes strictly A-Z (strict order)*
 | **Alpha** | Sculpt > Alpha | The brush alphas: Round, Square, Noise and twelve patterns (Pores, Cracks, Scales...), images from your library, Load image, Invert loaded image |
 | **Brush** | Sculpt > Brush | AI Brush (Brush Lab), Community brushes, Paste brush, your custom brushes, Front faces only, Invert (Alt), the recipe editor for a custom brush, and every brush as a thumbnail grid with a filter |
 | **Color** | Paint | The Paint brush, RGB while sculpting, the paint colour and swatches, Fill, Fill masked, Cavity, Clear, Show vertex paint |
-| **Draw** | Sculpt > Draw & Tablet | Draw Size, Intensity, RGB Intensity, Falloff, Sculpt/Paint, Add/Sub, Rgb, Front, and the tablet options (Pressure > strength, Pressure > size) with a pen readout |
+| **Draw** | Sculpt > Draw & Tablet | Size, Intensity, Colour intensity, Falloff, Sculpt/Paint, Add/Sub, Rgb, Front, and the tablet options (Pressure > strength, Pressure > size) with a pen readout |
 | **Generate** | Mesh > Generate 3D | Generate 3D (image or text to 3D), Relief, Inflate and Stamp from an image, and the AI brush provider settings |
 | **Material** | Render > Materials | The Lit Sphere materials (Soft Clay, the default, first), your own (**Load Lit Sphere...**) and Studio, Base colour, Smooth / Flat shading for the scene and the active Part |
 | **Preferences** | Edit > Preferences | Config, Interface, Input, Hotkeys, Display, Library, Tablet, Performance, Updates and Autosave sub-palettes (see [Customizing the interface](#customizing-the-interface)) |
@@ -222,18 +222,18 @@ interface](#customizing-the-interface) to add items.
 - **Add** / **Sub**: brushes add to or subtract from the surface. Holding <kbd>Alt</kbd> flips it for one
   stroke.
 - **Rgb**: sculpt brushes paint the colour at the same time.
-- **Draw Size**: the brush radius in screen pixels (2 to 800).
+- **Size**: the brush radius in screen pixels (2 to 800).
 - **Intensity**: how strongly each dab changes the surface (1 to 100). While <kbd>Shift</kbd> is held it shows
   Smooth's own value.
 - **Dynamic**: [dynamic topology](dynamic-topology.md), with its **Detail** slider while it is on.
 - **X**, **Y**, **Z**: symmetry across each axis (<kbd>X</kbd> toggles X); **R** is radial symmetry.
 
-The Classic layout's top shelf has two rows: **Library** (<kbd>,</kbd>), Sculpt/Paint, Add/Sub, Rgb, Draw
-Size and Intensity on the first; **AI Brush**, **Front**, symmetry, **Pressure > Strength** and **Pressure >
+The Classic layout's top shelf has two rows: **Library** (<kbd>,</kbd>), Sculpt/Paint, Add/Sub, Rgb, Size
+and Intensity on the first; **AI Brush**, **Front**, symmetry, **Pressure > Strength** and **Pressure >
 Size**, and the **ActiveTris / TotalTris** count on the second. In the SculptForge layout these are in the
 **Sculpt** menu (AI Brush, Front, pressure) and **View** menu (Library).
 
-Draw Size and Intensity are sliders with the label inside: drag along them, or
+Size and Intensity are sliders with the label inside: drag along them, or
 <kbd>Ctrl</kbd>+click to type a value.
 
 ### Left shelf
@@ -285,7 +285,7 @@ The active brush is outlined in the accent colour.
 
 Pickers are pop-up grids of thumbnails. They open beside the left-shelf tile you click, or under the mouse
 when you use a key. They close when you pick something, press <kbd>Esc</kbd> or click elsewhere. Pointing at a
-tile for a moment shows **Quick Info**: a large preview and a description.
+tile for a moment shows **help box**: a large preview and a description.
 
 ### Brush picker
 
@@ -324,8 +324,8 @@ brushes](brush-lab.md)).
 
 ### Sliders at the cursor and the Quick Menu
 
-Press <kbd>S</kbd> for a Draw Size slider under the mouse, <kbd>U</kbd> for Intensity,
-<kbd>I</kbd> for RGB Intensity or <kbd>O</kbd> for Falloff. Drag the slider, or type a number and press
+Press <kbd>S</kbd> for a Size slider under the mouse, <kbd>U</kbd> for Intensity,
+<kbd>I</kbd> for Colour intensity or <kbd>O</kbd> for Falloff. Drag the slider, or type a number and press
 <kbd>Enter</kbd> (<kbd>Esc</kbd> cancels). The pop-up closes when you release the slider. <kbd>[</kbd> and
 <kbd>]</kbd> make the brush 10% smaller or larger at any time. <kbd>Space</kbd> (or a right click on the canvas) opens the Quick Menu with all of
 them and the brush, stroke, alpha and material (see [The Quick Menu](sculpting.md#the-quick-menu)).
@@ -388,8 +388,8 @@ the command's usage line and each parameter with its type and description. This 
 console, `sculptforge-cli` and AI agents use.
 
 Without <kbd>Ctrl</kbd>, icon-only buttons and labels that don't fit show their name after a short delay
-(**Edit > Preferences > Interface > Tooltip delay**). Turn Ctrl-hover help off with **Edit > Preferences > Interface > Popup
-Info (Ctrl+hover help)**, and make the box more or less see-through with **Popup Info opacity**.
+(**Edit > Preferences > Interface > Tooltip delay**). Turn Ctrl-hover help off with **Edit > Preferences > Interface > Ctrl+hover
+help**, and make the box more or less see-through with **Help box opacity**.
 
 ### The Controls sheet
 
@@ -456,19 +456,19 @@ See [Scripting and automation](scripting.md) for the command language, scripts a
 ## Customizing the interface
 
 Everything about the layout can change: which palettes sit in the trays, what's on each shelf, and which keys
-do what. **Changes last until you quit** unless you store them with **Store Config**.
+do what. **Shortcuts and preferences save themselves**; layout changes (shelves, trays) last until you quit unless
+you keep them with **Save Layout**.
 
 ### Move, add and remove shelf items
 
-1. Open **Edit > Preferences > Config** and turn on **Enable Customize**. The shelves get a dashed orange outline and
+1. Open **Edit > Preferences > Config** and turn on **Customize Shelves**. The shelves get a dashed orange outline and
    the status line reads "Customize: Ctrl+Alt+drag to move or remove items".
 2. Hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and drag any button, slider or tile:
    - onto a shelf to put it there (an orange line shows where it will go), which is how you **add** buttons
      from palettes to a shelf;
    - along its shelf, or to another shelf, to **move** it;
    - off the shelves (onto the canvas, for example) to **remove** it.
-3. Turn **Enable Customize** off when you're done, and press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> to
-   keep the result.
+3. Turn **Customize Shelves** off when you're done, and click **Save Layout** (same palette) to keep the result.
 
 Right-clicking a shelf item and choosing **Remove from shelf** works without Customize mode.
 
@@ -483,20 +483,24 @@ Right-clicking a shelf item and choosing **Remove from shelf** works without Cus
 If the key already belongs to another action, it moves to the new one and the status line says
 which action lost it.
 
-### Store Config and friends
+### Saving preferences and layouts
 
+Every preference (key style, shortcuts, tablet, interface, performance, radial menus...) **saves itself** a moment
+after you change it; there is nothing to press. The layout is the one thing kept on purpose, with **Save Layout**.
 All in **Edit > Preferences > Config**:
 
 | Item | What it does |
 |---|---|
-| **Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) | Keeps the current layout, shortcuts and interface preferences for future sessions |
-| **Restore Custom UI** | Goes back to what the last Store Config saved |
-| **Restore Standard UI** | Goes back to the built-in layout and default shortcuts (Store Config afterwards to make it stick) |
-| **Save UI...** | Saves the layout, shortcuts and preferences to a `.json` file you can share |
-| **Load UI...** (<kbd>Ctrl</kbd>+<kbd>L</kbd>) | Loads such a file (Store Config afterwards to keep it) |
+| **Save Layout** | Keeps the current shelves, trays and open palettes for future sessions |
+| **Revert to Saved Layout** | Goes back to the layout the last Save Layout kept |
+| **Reset Layout and Shortcuts** | Goes back to the built-in layout, shortcuts and radial menus (Save Layout afterwards to keep the layout) |
+| **Export Interface...** | Saves the layout, shortcuts and preferences to a `.json` file you can share |
+| **Import Interface...** (<kbd>Ctrl</kbd>+<kbd>L</kbd>) | Loads such a file (Save Layout afterwards to keep its layout) |
+
+The command palette (<kbd>F3</kbd>) also has **Save Preferences Now**, which writes them at once; you never need it.
 
 The first time you change the layout in a session, the status line reminds you once: "Layout changed -
-Ctrl+Shift+I to keep it". What a session changes by itself (the console and Library being open, the Library
+Edit > Preferences > Config > Save Layout keeps it". What a session changes by itself (the console and Library being open, the Library
 tab) doesn't count as a layout change.
 
 ### Layout presets
@@ -508,8 +512,8 @@ arrangements of the current layout:
 2. **Sculpt**: both trays closed, for the largest canvas.
 3. **Wide**: Brush, Stroke and Alpha in the left tray, Tool and Material in the right tray.
 
-A preset changes the layout only (the console, Library and left-handed setting stay as they are). Store
-Config keeps it.
+A preset changes the layout only (the console, Library and left-handed setting stay as they are). Save
+Layout keeps it.
 
 ### Interface preferences
 
@@ -519,8 +523,8 @@ Config keeps it.
 |---|---|---|
 | **Look**, **Outlines** and **Layout** | Forge Terminal, Neutral, Subtle, SculptForge | See [Looks and layouts](#looks-and-layouts) |
 | **Language** | English | The interface language: **English** or **Español** (see below) |
-| **Popup Info (Ctrl+hover help)** | On | Ctrl-hover help boxes |
-| **Popup Info opacity** | 0.97 | How solid the help box is |
+| **Ctrl+hover help** | On | Ctrl-hover help boxes |
+| **Help box opacity** | 0.97 | How solid the help box is |
 | **Tooltip delay** | 0.5 s | How long to point at an icon-only button before its name appears |
 | **Reduce motion** | Off | Hover and focus highlights change colour only: no easing, and tiles don't lift |
 | **One sub-palette open** | On | Opening a sub-palette closes the others in that palette |
@@ -530,14 +534,14 @@ Config keeps it.
 | **UI scale** | Automatic | Size of text and controls (100% to 200%), applied at once; Automatic follows the monitor (see below) |
 | **Camera notch** | Automatic | Keeps the interface below a laptop's camera notch in fullscreen (see below) |
 
-**Language** changes the interface at once, without a restart; Store Config keeps it for the next start. In
+**Language** changes the interface at once, without a restart; saved automatically for the next start. In
 **Español** the menus, the palettes, the shelves, the Library, the command palette and the Ctrl-help titles
 are in Spanish, while the names of tools and brushes stay in English, as Spanish-speaking sculptors use them (Parts,
 Quad Remesh, Forge Spheres, Library, Lit Sphere, Clay Block, Add). The command palette finds a command by its Spanish or its
 English name. Anything not translated yet (most Ctrl-help descriptions, this guide) shows in English. Scripts and
 `sculptforge-cli` commands are the same in every language.
 
-**UI scale** also applies at once: text, buttons, shelves and trays resize on the next frame; Store Config keeps it.
+**UI scale** also applies at once: text, buttons, shelves and trays resize on the next frame; saved automatically.
 **Automatic** uses the scale of the monitor the window is on (Windows: **Settings > Display > Scale**; macOS and
 Wayland: the display's scaling; X11: the desktop's font DPI). Drag the window to a monitor at another scale, or
 change the system setting, and the interface follows. A chosen size (100% to 200%) stays the same on every monitor.
@@ -552,7 +556,7 @@ change the system setting, and the interface follows. A chosen size (100% to 200
 
 **Edit > Preferences > Hints**: **Show hints in the viewport** (on) and one box per hint (Strokes start off the model,
 Previewing an LOD, Face landmark steps). Each hint over the 3D view also has its own **Don't show again**; **Show
-all hints again** brings them all back. Store Config keeps them.
+all hints again** brings them all back. Saved automatically.
 
 **Scrolling panels with a pen**: on small screens a palette or tray that doesn't fit scrolls with the mouse wheel,
 and also with a **left-drag on empty space** in it (between and beside the controls) or a **middle-drag anywhere**
@@ -562,7 +566,7 @@ on it, as you would scroll a list with a finger (#100).
 **SculptForge** (the default for new installs): <kbd>1</kbd> to <kbd>9</kbd> and <kbd>0</kbd> pick the first ten
 brushes, <kbd>I</kbd> opens Intensity like <kbd>U</kbd>, and <kbd>Ctrl</kbd>+drag on the background zooms when
 nothing is masked; **Classic**: the Classic sculpting keys, with the number keys free (<kbd>9</kbd> is Save Snapshot),
-<kbd>I</kbd> for RGB Intensity and <kbd>Ctrl</kbd>+drag on the background for a mask rectangle (see
+<kbd>I</kbd> for Colour intensity and <kbd>Ctrl</kbd>+drag on the background for a mask rectangle (see
 [the Classic sculpting keys](shortcuts.md#classic-sculpting-keys)); **Maya**: Maya's view controls; or **Blender**: middle-drag navigation,
 the numpad views and Blender's sculpt-mode keys (see [Blender keys](shortcuts.md#blender-keys)). In the Blender
 style, **Emulate Numpad** makes the number row work as the numpad, and **Import Blender keymap...** takes the keys
@@ -572,15 +576,15 @@ way. **Hold Space and drag to move the camera** (off by default) turns <kbd>Spac
 left-drag rotates, right- or middle-drag pans and <kbd>Ctrl</kbd>+drag zooms (see
 [Navigation](navigation.md#mouse-and-pen)). **Radial Menus** edits your pie menus and their keys (see [Radial menus](sculpting.md#radial-menus)).
 **Cursor follows surface** (on by default) lays the brush rings on the model under the pointer (see
-[Draw Size and Falloff](sculpting.md#draw-size-intensity-rgb-intensity-and-falloff)); off, they are flat circles on the screen. **Rotation** chooses free rotation or a turntable. See
+[Size and Falloff](sculpting.md#size-intensity-colour-intensity-and-falloff)); off, they are flat circles on the screen. **Rotation** chooses free rotation or a turntable. See
 [Quick tour for experienced sculptors](quick-tour.md).
 
 ### The background
 
 **Edit > Preferences > Display** (and the **View** menu) sets the view's **Background**: **Gradient**, the
 charcoal radial gradient (the default), or **Flat Colour**, one solid colour without the gradient. Click the
-**Background colour** swatch to pick the colour; picking one switches to Flat Colour. **Store Config** keeps the
-choice for the next session, and each project keeps the background it was saved with. From a script:
+**Background colour** swatch to pick the colour; picking one switches to Flat Colour. The choice
+saves itself for the next session, and each project keeps the background it was saved with. From a script:
 `set_background mode=flat`, `set_background color=60,70,80` or `set_background mode=gradient`.
 
 **Edit > Preferences > Library** has **Show at startup** (on by default), the number of **Rows**, **Placement**

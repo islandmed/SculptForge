@@ -1,0 +1,94 @@
+# Your own Lit Spheres, organised (#124): Rename and Move to folder in the right-click menu, sub-folders of the Lit
+# Spheres folder as headings, a dropped image on the Library's Material tab, and projects that keep finding a renamed one.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=4
+run load_litsphere path=$SCRIPT_DIR/data/Gold.png
+run load_litsphere path=$SCRIPT_DIR/data/Rose.png
+expect_value custom_litspheres == 2
+expect_value litsphere_files == 2
+run set_material name=gold
+run save_project path=sf_ui_litsphere_manage.sfproj
+
+# Rename from the palette's material list: a name another Lit Sphere has is refused in place, nothing overwritten.
+click "Material##palette.material"
+wait_idle 20
+right_click "Material/Gold"
+expect "Rename...##litsphere"
+expect "Move to folder##litsphere"
+click "Rename...##litsphere"
+type "##litsphererename" rose
+key enter
+expect_text "There is already a Lit Sphere called Rose"
+expect_value litsphere_files == 2
+shot rename-clash
+type "##litsphererename" Old Gold
+key enter
+expect_status "Renamed Gold to Old Gold"
+expect_value custom_litspheres == 2
+expect_value litsphere_files == 2
+expect_value material_custom == 1
+key escape
+click "Material##palette.material"
+wait_idle 20
+expect "Material/Old Gold"
+expect_not "Material/Gold"
+key escape
+
+# The project saved with Gold opens with it: matched by its pixels, not added again under the old name.
+run set_material name=studio
+run open path=sf_ui_litsphere_manage.sfproj
+expect_value material_custom == 1
+expect_value custom_litspheres == 2
+
+# Move to folder: the sub-folder is made and becomes a heading in the lists; moving it back takes the heading away.
+run move_litsphere name="old gold" folder=Metals
+expect_status "Moved Old Gold to Metals"
+expect_value litsphere_files == 1
+expect_value litsphere_folder_files == 1
+run_fails move_litsphere name=rose folder=../escape
+run_fails rename_litsphere name=rose to=a/b
+run_fails rename_litsphere name=chrome to=Shiny
+click "Material##palette.material"
+wait_idle 20
+expect_text "Metals"
+expect "Material/Old Gold"
+shot grouped-palette
+right_click "Material/Rose"
+hover "Move to folder##litsphere"
+wait 0.3
+expect "Metals##litspheremove"
+shot move-menu
+click "Metals##litspheremove"
+expect_status "Moved Rose to Metals"
+expect_value litsphere_folder_files == 2
+key escape
+
+# A folder the app didn't make, made outside it: its images show under its heading on the next look.
+copy data/Gold.png "$LIBRARY/Lit Spheres/Warm/Amber.png"
+key ,
+click "Library/Material"
+wait_idle 20
+expect "Library/Old Gold"
+shot library-groups
+type "##lbfilter" amb
+wait_idle 20
+expect "Library/Amber"
+right_click "Library/Amber"
+wait 0.2
+expect "Rename...##litsphere"
+key escape
+wait 0.2
+expect_not "Rename...##litsphere"
+# The filter also finds Lit Spheres by their plain words (aliases, not names in the UI).
+type "##lbfilter" material capture
+expect "Library/Chrome"
+expect "Library/Bronze"
+type "##lbfilter" chrome
+expect_not "Library/Amber"
+
+# An image dropped on the Material tab loads as a Lit Sphere (dropped on the canvas it keeps its usual meaning).
+drop_library data/Gold.png
+expect_status "Material: Gold"
+expect_value custom_litspheres == 4
+run move_litsphere name="old gold" folder=""
+expect_value litsphere_folder_files == 2

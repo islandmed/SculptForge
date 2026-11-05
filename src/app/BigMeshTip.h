@@ -23,7 +23,7 @@ inline size_t bigMeshTipTriangles() {
 }
 
 // Whether the tip shows now: a scene over the threshold, never shown before, and nothing else on screen or in hand
-// (a stroke, the welcome, What's New, the membership card, the quick tour, a benchmark): it waits for those.
+// (a stroke, the welcome, What's New, a membership card, the quick tour, a benchmark): it waits for those.
 inline bool bigMeshTipDue(size_t sceneTriangles, size_t threshold, bool alreadyShown, bool busy) {
     return !alreadyShown && !busy && threshold > 0 && sceneTriangles >= threshold;
 }

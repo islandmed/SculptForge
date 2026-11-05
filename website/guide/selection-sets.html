@@ -100,7 +100,7 @@ going up, masks and vertex paint are interpolated, face groups and visibility ar
 a shape travels as its difference from that level&#x27;s own surface, so the detail of the levels in between stays where it is.
 </li>
 </ul>
-<p>So you can store a mask at SDiv 1, sculpt at SDiv 5 and restore the mask there, or keep a high-resolution face group set and use it at the base cage. Sets survive <strong>Divide</strong>, <strong>Del Lower</strong>, <strong>Del Higher</strong> and <strong>Reconstruct Subdiv</strong> as long as the level they were stored at still exists.</p>
+<p>So you can store a mask at SDiv 1, sculpt at SDiv 5 and restore the mask there, or keep a high-resolution face group set and use it at the base cage. Sets survive <strong>Divide</strong>, <strong>Delete Lower</strong>, <strong>Delete Higher</strong> and <strong>Reconstruct Subdiv</strong> as long as the level they were stored at still exists.</p>
 <h2 id="morph-targets">Morph targets<a class="anchor" href="#morph-targets" aria-label="Link to this section">#</a></h2>
 <p>Store a set with <strong>Shape</strong> ticked to keep the surface as it is now. Then:</p>
 <ul>

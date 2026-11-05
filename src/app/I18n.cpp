@@ -53,7 +53,7 @@ Cache& cache() {
 constexpr size_t kCacheLimit = 1u << 16;
 
 // The translation of `text` appended to `out`: the exact entry, or one for the words before a trailing "...", ":"
-// or printf conversion ("Draw Size %.0f" from "Draw Size"). False when there is none.
+// or printf conversion ("Size %.0f" from "Size"). False when there is none.
 bool translateCore(Language lang, std::string_view text, std::string& out) {
     if (text.empty()) return false;
     if (const char* exact = i18n::lookup(lang, text)) {

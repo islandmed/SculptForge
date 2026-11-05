@@ -1,0 +1,6 @@
+{
+  "format": "sculptforge-studio", "version": 1,
+  "id": "example", "name": "Example Studio",
+  "updates": {"mirror": "latest.json"},
+  "branding": {"logo": "logo.png", "title": "Example"}
+}

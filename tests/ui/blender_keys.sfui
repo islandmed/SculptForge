@@ -54,10 +54,10 @@ key k
 expect_value brush_type == 10
 key v
 expect_value brush_type == 0
-# S is Smooth now, not the Draw Size pop-up; F is the radius, Shift+F the strength.
+# S is Smooth now, not the Size pop-up; F is the radius, Shift+F the strength.
 mouse_move 0.5 0.5
 key f
-expect_text Draw Size
+expect_text Size
 key escape
 key shift+f
 expect_text Intensity
@@ -285,10 +285,10 @@ expect_value brush_type == 0
 key shift+q
 expect_value brush_type == 9
 
-# --- Back to its keys and gestures are as they were (the imported keys stay until Restore Standard UI) ---
+# --- Back to its keys and gestures are as they were (the imported keys stay until Reset Layout and Shortcuts) ---
 click "Preferences##palette.preferences"
 click "Config##preferences.config"
-click "Restore Standard UI##config.restore_standard"
+click "Reset Layout and Shortcuts##config.restore_standard"
 expect_value shortcut_conflicts == 0
 expect_shortcut brush.standard V
 key f1
@@ -301,7 +301,7 @@ expect_shortcut view.frame F
 expect_shortcut brush.standard
 mouse_move 0.5 0.5
 key s
-expect_text Draw Size
+expect_text Size
 key escape
 key b
 key s

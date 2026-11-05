@@ -1,5 +1,5 @@
 # Sculpt layers on subdivision levels (3D Layers): a layer recorded at the top of a divided box survives
-# Lower Res / Higher Res, its weight slider works at every level, Divide carries it to a new level, and undo
+# Lower Level / Higher Level, its weight slider works at every level, Divide carries it to a new level, and undo
 # steps back through it all.
 run new_sphere subdivisions=1
 run part_append type=cube name=Box
@@ -11,7 +11,7 @@ click "Geometry/Reconstruct Subdiv"
 click "Geometry/Reconstruct Subdiv"
 click "Geometry/Reconstruct Subdiv"
 click "Geometry/Reconstruct Subdiv"
-click "Geometry/Del Higher"
+click "Geometry/Delete Higher"
 expect_value triangles == 108
 key ctrl+d
 key ctrl+d

@@ -1,5 +1,5 @@
 # The view's background (#21): Gradient (the default) or Flat Colour with a colour picker, in Preferences > Display
-# and the Render palette; kept by Store Config and in projects, and scriptable (set_background).
+# and the Render palette; saved automatically and in projects, and scriptable (set_background).
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_head
 camera 20 5
@@ -37,15 +37,9 @@ click "Gradient##view.background_gradient"
 expect_value gradient_background == 1
 key escape
 
-# Store Config keeps it for the next session (Restore Custom UI reads it back).
+# It saves itself for the next session (#117).
 run set_background mode=flat
-key ctrl+shift+i
-expect_status "UI configuration stored"
-run set_background mode=gradient
-key f3
-type "##Command palette" "restore custom"
-key enter
-expect_status "Custom UI restored"
+restart
 expect_value gradient_background == 0
 expect_value background_r == 60
 

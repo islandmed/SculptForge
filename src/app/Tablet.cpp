@@ -6,7 +6,7 @@
 // draw-test area, curve editor, mappings). SDL3 reports pens the same way on
 // Windows (Windows Ink), macOS, Wayland and X11 and also turns the tip into
 // left mouse button events (SDL_PEN_MOUSEID), which the canvas and the UI use
-// like a mouse. The settings live in UiPrefs::tablet (Store Config keeps them);
+// like a mouse. The settings live in UiPrefs::tablet (saved automatically);
 // the math is in core/Tablet.h. User guide: docs/tablet.md.
 #include "app/App.h"
 #include "app/Ui.h"
@@ -682,7 +682,7 @@ void App::drawTabletSection() {
                                              "button: Pan view. The curve and Mouse mode stay.", path);
     ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextUnformatted(tr("Store Config (Ctrl+Shift+I) keeps these settings."));
+    ImGui::TextUnformatted(tr("These settings save themselves."));
     ImGui::PopTextWrapPos();
     ImGui::PopStyleColor();
 }

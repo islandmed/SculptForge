@@ -13,7 +13,7 @@ A `.sfproj` file holds everything SculptForge knows about the scene:
 - each Part's [Quad Remesh Guides](retopology.md#quad-remesh-guides), the curves Quad Remesh's edge loops follow;
 - loaded [Gaussian splats](splats.md) and their placement;
 - your custom brushes, so a project opened on another computer still has them;
-- the camera, the material and display settings, the brush, Draw Size, Intensity (and Smooth's), RGB Intensity, Falloff, paint colour and symmetry;
+- the camera, the material and display settings, the brush, Size, Intensity (and Smooth's), Colour intensity, Falloff, paint colour and symmetry;
 - a thumbnail, shown in the Library.
 
 Undo history isn't saved: an opened project starts with a clean history.
@@ -140,8 +140,7 @@ on first use with these sub-folders:
 | `Splats` | Splats | Gaussian splat captures |
 | `QuickSave` | Snapshots | Snapshots |
 
-Change it in **Edit > Preferences > Library > Library folder**, then Store Config (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>)
-to keep the setting.
+Change it in **Edit > Preferences > Library > Library folder**; the setting saves itself.
 
 Press <kbd>,</kbd> (comma) to show the Library. The tabs that matter for projects:
 
@@ -170,7 +169,7 @@ Projects saved by `sculptforge-cli` or Python open in the app too. For the file 
 
 ## See also
 
-- [The interface](interface.md): Library, shortcuts and Store Config
+- [The interface](interface.md): Library, shortcuts and saving the layout
 - [Parts](parts.md)
 - [Exporting](exporting.md): formats for other applications
 - [Troubleshooting](troubleshooting.md): where settings and the autosave live

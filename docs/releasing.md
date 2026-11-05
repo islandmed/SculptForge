@@ -147,6 +147,9 @@ What keeps the insiders token from leaking; `tools/release/check_workflows.py` (
   `publish-members` uses it; a workflow_dispatch from a branch can't. Set or rotate (never echo it):
   `wl-paste -n | gh secret set INSIDERS_REPO_TOKEN --env member-release -R islandmed/SculptForge`.
   (The daily-drop workflow and the preview-build workflow were retired with the Insider tier; betas are the members' builds.)
+- member-requests.yml's `publish` job is the only other user, also in `member-release` (one approval a month); it
+  runs from `main`, so the environment's deployment rule lists `main` besides tags `v*`. Its `public` job, which
+  writes the `packs` branch, has no environment and never sees the token.
 - release.yml: top-level `permissions: contents: read`; `publish-members` reads only, runs only for betas, and passes
   the token as an env var to its one publishing step; every `uses:` pinned to a full commit SHA with the version in a
   comment (update by resolving the new tag: `gh api repos/OWNER/REPO/git/ref/tags/vX.Y.Z --jq .object.sha`); checkouts
@@ -157,6 +160,52 @@ What keeps the insiders token from leaking; `tools/release/check_workflows.py` (
   token read-only, Actions may not create or approve pull requests.
 - islandmed/sculptforge-insiders: private, members invited with `permission=pull` only, ruleset on `main`: no force
   push, no deletion.
+
+## Membership upkeep (by hand)
+
+- **Founding Members:** `website/founding.json` (`limit` 100, `taken`, `names`). On each new member among the first
+  100: give them the Discord role, `taken` + 1, and their name in `names` only if they want it listed. The website's
+  counter and Members page read it live; the app compiles it in (Help > About, and the membership card's founding
+  note, which stops once `taken` reaches `limit`).
+- **Monthly challenge results:** when the winners are announced, add `"challenge": {"id": "YYYY-MM", "title":
+  "<theme>"}` to `website/latest.json` (push main; the site deploys). The app's daily update check reads it once per
+  id: the small membership card's challenge moment ("The <theme> challenge results are in, on Discord").
+- **Member Requests:** each approved request goes into islandmed/sculptforge-insiders as
+  `requests/YYYY-MM/<slug>/request.json` + its file (+ `preview.png`), `"approved": true` once the requester has
+  OK'd the preview (format: `tools/member-requests/requests.py`). On the 1st, member-requests.yml packs last month's,
+  waits for the `member-release` approval, releases `requests-YYYY-MM` there, posts in #members, and schedules the
+  pack in the public listing (`packs` branch) for a month later.
+
+## Studio builds
+
+A Studio member's build is public SculptForge at a pinned tag with the studio's profile baked in (docs/guide/studios.md
+"Your studio build"; src/core/StudioProfile.h). The code is the public, GPL code; only the studio's own files are
+private, in one private repository per studio.
+
+```
+<private org>/studio-<id>          private; the studio's IT invited with permission=pull
+  studio/studio.json               the profile (tools/studio/check_profile.py checks it)
+  studio/packs/<id>.sfpack         brushes, alphas, Lit Spheres, keymaps, macros (made with File > New Pack)
+  studio/ui.json, studio/logo.png  first-start interface settings, branding
+  .github/workflows/release.yml    tools/studio/studio-release.yml, copied
+```
+
+- **Build:** Actions > Studio release > Run workflow with the tag (the current release, or the studio's LTS line). It
+  checks out islandmed/SculptForge at that tag and the studio repo, runs `check_profile.py`, builds with
+  `-DSCULPTFORGE_STUDIO_PROFILE=studio/studio.json` (the profile is compiled in, the folder is installed as
+  `share/sculptforge/studio`), packages Linux tar.gz and Windows zip, and publishes a private release in the studio
+  repository with `SHA256SUMS.txt` and `SHA256SUMS.txt.sig`. Add macOS when a studio asks for it.
+- **Signing:** the same key as public releases. `UPDATE_SIGNING_KEY` is a secret of the environment `studio-release` in
+  each studio repository (required reviewer islandmed; never at repository level); `tools/release/sign_sums.sh`
+  refuses a key that isn't the app's `kUpdatePublicKeyHex`. Give the studio's IT the public key as a PEM to check
+  installers offline.
+- **Updates:** the build reads only `updates.feed` / `updates.mirror` from its profile. For each new studio release,
+  write a `latest.json` (the public feed's format, core/UpdateCheck.h) to the studio's channel; the studio copies it to
+  its mirror when it wants to move. One-click update stays off in studio builds (it downloads only public releases).
+- **Security fixes:** backported only to the current release and ONE LTS line (`lts/X.Y` branches, tagged
+  `vX.Y.Z`); every studio is on one of the two. Rebuild each studio on the new tag the day the fix ships.
+- **Privacy:** a studio's files never go into public builds, packs or the public repository, and are never run (data
+  only). Studio mode is tested: `ctest -R studio` (no request or socket leaves the machine).
 
 ## When a step fails
 

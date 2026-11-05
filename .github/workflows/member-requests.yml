@@ -1,0 +1,157 @@
+# Member Requests (tools/member-requests/requests.py): on the 1st, last month's approved requests (committed by hand
+# under requests/YYYY-MM/ in the private repository islandmed/sculptforge-insiders) go out to members as one pack,
+# "Member Requests YYYY-MM": a release in that repository and a post in #members. A month later the pack is free for
+# everyone: this repository's public pack listing (the `packs` branch, listing.json) schedules it now and releases
+# it when its date comes (each run releases the packs that are due).
+#
+#   publish  environment member-release (the maintainer approves the run: one click), the only job that sees
+#            INSIDERS_REPO_TOKEN; its GitHub token only reads. Builds sculptforge-cli (pack_create checks the pack
+#            like an install does), bundles, releases, posts, and hands the public listing what it needs as an
+#            artifact (the bundle's listing entry and the packs now due, downloaded from the members' releases).
+#   public   no environment, no insiders token: updates the `packs` branch from that artifact.
+# Only this repository's own code runs; no pull request or issue input reaches it. A month with no approved
+# requests publishes nothing (and still releases what is due).
+name: Member Requests
+
+on:
+  schedule:
+    - cron: "0 15 1 * *" # the 1st: last month's requests
+  workflow_dispatch:
+    inputs:
+      month:
+        description: "Publish this month's requests, YYYY-MM (default: last month)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: member-requests
+
+jobs:
+  publish:
+    name: Publish to members
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: member-release
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - name: Month
+        env:
+          IN_MONTH: ${{ inputs.month }}
+        run: |
+          MONTH="${IN_MONTH:-$(date -u -d "$(date -u +%Y-%m-01) -1 day" +%Y-%m)}"
+          [[ "$MONTH" =~ ^20[0-9][0-9]-(0[1-9]|1[0-2])$ ]] || { echo "::error::bad month '$MONTH'"; exit 1; }
+          echo "MONTH=$MONTH" >> "$GITHUB_ENV"
+          echo "TODAY=$(date -u +%F)" >> "$GITHUB_ENV"
+      - name: Requests (members' repository)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: islandmed/sculptforge-insiders
+          token: ${{ secrets.INSIDERS_REPO_TOKEN }}
+          path: insiders
+          sparse-checkout: requests
+          persist-credentials: false
+      - name: Anything to publish?
+        run: |
+          if ls insiders/requests/"$MONTH"/*/request.json >/dev/null 2>&1; then echo "HAS_REQUESTS=1" >> "$GITHUB_ENV"
+          else echo "No requests for $MONTH"; fi
+      - name: Dependencies
+        if: env.HAS_REQUESTS == '1'
+        run: |
+          sudo ./packaging/linux/install-build-deps.sh
+      - name: Build sculptforge-cli
+        if: env.HAS_REQUESTS == '1'
+        run: |
+          # (no compiler cache: every action in this job is pinned to a commit, and the job holds the insiders token)
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF -DSCULPTFORGE_BUILD_TESTS=OFF
+          cmake --build build --target sculptforge-cli --parallel 4
+      - name: Bundle the month
+        if: env.HAS_REQUESTS == '1'
+        run: python3 tools/member-requests/requests.py bundle --month "$MONTH" --root insiders/requests --out out --cli build/sculptforge-cli
+      - name: Release in islandmed/sculptforge-insiders
+        if: env.HAS_REQUESTS == '1'
+        env:
+          GH_TOKEN: ${{ secrets.INSIDERS_REPO_TOKEN }}
+          GH_REPO: islandmed/sculptforge-insiders
+        run: |
+          [ -f out/bundle.json ] || { echo "No approved requests for $MONTH"; exit 0; }
+          tag="requests-$MONTH"
+          jq -r '"**\(.name)**: \(.description)\n\nInstall: File > Install Pack... and pick the .sfpack. Free for everyone on \(.publicDate)."' \
+            out/bundle.json > notes.md
+          gh release view "$tag" >/dev/null 2>&1 ||
+            gh release create "$tag" --title "Member Requests $MONTH" --notes-file notes.md --latest=false
+          gh release upload "$tag" out/*.sfpack $(ls out/*.png 2>/dev/null) out/bundle.json --clobber
+          echo "PUBLISHED=1" >> "$GITHUB_ENV"
+      - name: Post in #members
+        if: env.PUBLISHED == '1'
+        env:
+          DISCORD_MEMBERS_WEBHOOK: ${{ secrets.DISCORD_MEMBERS_WEBHOOK }}
+        run: |
+          if [ -z "$DISCORD_MEMBERS_WEBHOOK" ]; then echo "::warning::No DISCORD_MEMBERS_WEBHOOK secret: post the pack in #members by hand"; exit 0; fi
+          python3 tools/member-requests/requests.py post out --webhook-env DISCORD_MEMBERS_WEBHOOK
+      - name: What the public listing needs
+        env:
+          GH_TOKEN: ${{ secrets.INSIDERS_REPO_TOKEN }}
+          GH_REPO: islandmed/sculptforge-insiders
+          REPO: ${{ github.repository }}
+        run: |
+          mkdir -p public/requests
+          [ -f out/bundle.json ] && cp out/bundle.json public/bundle.json
+          # The packs whose public date has come: from this repository's public listing, files from the members' releases.
+          curl -fsSL "https://raw.githubusercontent.com/$REPO/packs/listing.json" -o listing.json || echo '{"packs": []}' > listing.json
+          for id in $(python3 tools/member-requests/requests.py due --listing listing.json --today "$TODAY" | grep '^member-requests-' || true); do
+            gh release download "requests-${id#member-requests-}" -p "$id.sfpack" -p "$id.png" -D public/requests --clobber || true
+            [ -f "public/requests/$id.sfpack" ] && echo "$id" >> public/due.txt
+          done
+          ls -R public
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: member-requests-public
+          path: public
+          if-no-files-found: ignore
+          retention-days: 7
+
+  public:
+    name: Public pack listing
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # the `packs` branch (public listing)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: member-requests-public
+          path: public
+        continue-on-error: true # (nothing to schedule or release)
+      - name: Schedule and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -d public ] || { echo "nothing for the listing"; exit 0; }
+          P="$RUNNER_TEMP/packs"
+          mkdir -p "$P/requests"
+          if git fetch --depth=1 "https://x-access-token:$GH_TOKEN@github.com/${{ github.repository }}" packs 2>/dev/null; then
+            git --work-tree="$P" checkout FETCH_HEAD -- . && git reset -q
+          fi
+          if [ -f public/bundle.json ]; then python3 tools/member-requests/requests.py schedule --listing "$P/listing.json" --bundle public; fi
+          for id in $(cat public/due.txt 2>/dev/null); do
+            cp "public/requests/$id.sfpack" "$P/requests/"
+            cp "public/requests/$id.png" "$P/requests/" 2>/dev/null || true
+            python3 tools/member-requests/requests.py release --listing "$P/listing.json" --id "$id"
+            echo "released $id"
+          done
+          [ -f "$P/listing.json" ] || exit 0
+          cd "$P"
+          git init -q -b packs
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "Pack listing $(date -u +%F): Member Requests"
+          git push -qf "https://x-access-token:$GH_TOKEN@github.com/${{ github.repository }}" packs

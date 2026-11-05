@@ -432,9 +432,9 @@ void App::registerShellActions() {
     };
     shape("mask.pen", "Mask Pen", "Tool > Masking", &maskShape_, SelectShape::Pen,
           "Ctrl+drag paints the mask with the brush; Ctrl+Alt+drag erases it. Ctrl+drag on the background clears it.");
-    shape("mask.lasso", "Mask Lasso", "Tool > Masking", &maskShape_, SelectShape::Lasso,
+    shape("mask.lasso", "Lasso Mask", "Tool > Masking", &maskShape_, SelectShape::Lasso,
           "Ctrl+drag draws a lasso and masks everything inside it; Ctrl+Alt+drag unmasks. The far side is included.");
-    shape("mask.rect", "Mask Rectangle", "Tool > Masking", &maskShape_, SelectShape::Rect,
+    shape("mask.rect", "Rectangle Mask", "Tool > Masking", &maskShape_, SelectShape::Rect,
           "Ctrl+drag draws a rectangle and masks everything inside it; Ctrl+Alt+drag unmasks. The far side is included.");
     shape("select.rect", "Select Rectangle", "Tool > Visibility", &hideShape_, SelectShape::Rect,
           "Ctrl+Shift+drag a rectangle to keep what's inside and hide the rest; add Alt to hide the inside.");
@@ -472,7 +472,7 @@ void App::registerShellActions() {
     flag("transform.symmetry_y", "Y", nullptr, "Transform", "", &symmetry_.y, "Mirror strokes across Y (top and bottom).");
     flag("transform.symmetry_z", "Z", nullptr, "Transform", "", &symmetry_.z, "Mirror strokes across Z (front and back).");
     flag("transform.symmetry_radial", "R", nullptr, "Transform", "", &symmetry_.radialEnabled,
-         "Radial symmetry: repeat strokes around an axis (Radial Count copies, Transform palette).");
+         "Radial symmetry: repeat strokes around an axis (Radial Copies copies, Transform palette).");
     flag("transform.symmetry_local", "Local", nullptr, "Transform", "", &symmetry_.local,
          "Local symmetry: mirror and turn strokes about the active Part's centre instead of the world origin.");
     for (int axis = 0; axis < 3; ++axis) { // the axis radial copies turn around
@@ -531,7 +531,7 @@ void App::registerShellActions() {
          [this] { return !renderSettings_.flatShading; }, nullptr});
     add({"material.flat", "Flat", nullptr,
          "Flat shading: every polygon shows its own face, so the mesh's structure and each stroke's effect on it read "
-         "clearly. Parts set to Smooth or Flat keep their own. A preference: Store Config keeps it.",
+         "clearly. Parts set to Smooth or Flat keep their own. A preference, saved automatically.",
          "Material", "", "", [this] { runCommand("set_shading", {{"mode", std::string("flat")}}); },
          [this] { return renderSettings_.flatShading; }, nullptr});
     // The view's background (#21; Preferences > Display, Render palette).
@@ -607,6 +607,27 @@ void App::registerShellActions() {
          "Rebuild as an even, watertight surface (like Voxel Remesh): merges parts, fixes scans and generated models.",
          "Tool > Remesh", "", "remesh",
          [this] { startVoxelRemesh(); }, nullptr, [this] { return !voxelRemesh_; }});
+    // Quick Remesh (#121): Shift+R, and N held while clicking or dragging on the background (quickRemeshDragDown).
+    // Neither key is taken in any input style (Input.cpp applyInputStyle).
+    add({"geometry.quick_remesh", "Quick Remesh", nullptr,
+         "With Tool > Remesh > Quick Remesh on: remesh the active Part at the Voxel Remesh resolution, in the background.",
+         "Tool > Remesh", "Shift+R", "",
+         [this] {
+             if (uiPrefs_.quickRemesh) quickRemesh(RemeshTrigger::Quick);
+             else status_ = "Quick Remesh is off: turn it on in Tool > Remesh";
+         },
+         nullptr, nullptr});
+    add({"geometry.quick_remesh_drag", "Quick Remesh (hold and drag)", nullptr,
+         "With Tool > Remesh > Quick Remesh on: hold this key and click or drag on the background (not on the model) to "
+         "remesh the active Part.",
+         "Tool > Remesh", "N", "",
+         [this] {
+             const std::string key = actions_.shortcutText("geometry.quick_remesh_drag");
+             status_ = !uiPrefs_.quickRemesh ? "Quick Remesh is off: turn it on in Tool > Remesh"
+                       : key.empty()         ? "Quick Remesh: give this a key in Preferences > Hotkeys, then hold it and drag on the background"
+                                             : "Quick Remesh: hold " + key + " and click or drag on the background";
+         },
+         nullptr, nullptr});
     add({"geometry.to_splats", "Sculpt to Splats", nullptr, "Turn the sculpt into Gaussian splats.", "Splats", "",
          "mesh_to_splats", [this] { runCommand("mesh_to_splats"); }, nullptr, nullptr});
     add({"color.fill", "Fill", ICON_LC_PAINT_BUCKET, "Fill the unmasked area with the colour (FillObject).", "Color", "",
@@ -825,7 +846,7 @@ void App::updateCameraAspect() {
     camera_.aspect = c.w / std::max(c.h, 1.0f);
 }
 
-// The one-time "Layout changed - Ctrl+Shift+I to keep it" hint comes from watchLayoutChanges (Config.cpp),
+// The one-time "Layout changed - ... Save Layout keeps it" hint comes from watchLayoutChanges (Config.cpp),
 // which compares the layout with the stored one; shell edits only need to change layout_.
 void App::noteLayoutChanged() {}
 
@@ -850,7 +871,7 @@ void App::applyPreset(int preset) {
     layout_ = std::move(l);
     collapsedPalettes_.clear();
     dropdown_.clear();
-    status_ = std::string("Layout: ") + kNames[std::clamp(preset, 0, 2)] + " (Ctrl+Shift+I keeps it)";
+    status_ = std::string("Layout: ") + kNames[std::clamp(preset, 0, 2)] + " (Save Layout keeps it)";
     lastCommandOk_ = true;
 }
 
@@ -1185,29 +1206,43 @@ ShellMetrics App::shellMetrics() const {
     return m;
 }
 
+namespace {
+// `from` moved to another shell layout: that layout's standard shelves; the trays, the console and the Library stay.
+UiLayout relayout(const UiLayout& from, int layoutKind) {
+    UiLayout l = standardLayout(layoutKind);
+    l.customize = from.customize;
+    l.leftTray = from.leftTray;
+    l.rightTray = from.rightTray;
+    l.leftTrayOpen = from.leftTrayOpen;
+    l.rightTrayOpen = from.rightTrayOpen;
+    l.leftTrayWidth = from.leftTrayWidth;
+    l.rightTrayWidth = from.rightTrayWidth;
+    l.openSubpalettes = from.openSubpalettes;
+    l.consoleOpen = from.consoleOpen;
+    l.consoleHeight = from.consoleHeight;
+    l.libraryOpen = from.libraryOpen;
+    l.libraryRows = from.libraryRows;
+    l.libraryTab = from.libraryTab;
+    l.libraryBottom = from.libraryBottom;
+    l.leftHanded = from.leftHanded;
+    l.shelfTiles = from.shelfTiles;
+    return l;
+}
+} // namespace
+
 void App::setShellLayout(int layoutKind) {
     layoutKind = std::clamp(layoutKind, 0, 1);
     if (uiPrefs_.shellLayout == layoutKind) return;
+    const int before = uiPrefs_.shellLayout;
     uiPrefs_.shellLayout = layoutKind;
-    // The shelves change to that layout's standard ones; the trays, the console and the Library stay as they are.
-    UiLayout l = standardLayout(layoutKind);
-    l.customize = layout_.customize;
-    l.leftTray = layout_.leftTray;
-    l.rightTray = layout_.rightTray;
-    l.leftTrayOpen = layout_.leftTrayOpen;
-    l.rightTrayOpen = layout_.rightTrayOpen;
-    l.leftTrayWidth = layout_.leftTrayWidth;
-    l.rightTrayWidth = layout_.rightTrayWidth;
-    l.openSubpalettes = layout_.openSubpalettes;
-    l.consoleOpen = layout_.consoleOpen;
-    l.consoleHeight = layout_.consoleHeight;
-    l.libraryOpen = layout_.libraryOpen;
-    l.libraryRows = layout_.libraryRows;
-    l.libraryTab = layout_.libraryTab;
-    l.libraryBottom = layout_.libraryBottom;
-    l.leftHanded = layout_.leftHanded;
-    l.shelfTiles = layout_.shelfTiles;
-    layout_ = std::move(l);
+    layout_ = relayout(layout_, layoutKind);
+    // The preference saves itself (#117): the saved layout follows it, or the next start would pair the new
+    // layout kind with the old kind's shelves.
+    if (storedLayout_.isObject()) {
+        UiLayout stored;
+        std::string err;
+        if (fromJson(storedLayout_, stored, err, before)) storedLayout_ = toJson(relayout(stored, layoutKind));
+    }
     dropdown_.clear();
     updateCameraAspect();
 }
@@ -2404,7 +2439,7 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
         drawHeldBrushIcon(ImGui::GetWindowDrawList(), a, b, held->icon, heldBrush() == HeldBrush::Select);
         if (clicked) openPicker(Picker::Brush, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
         ui::HelpText("Brush", "B", "Ctrl held: the mask brush (Ctrl+Shift: the selection brush). Click, or press B with Ctrl "
-                     "held, to pick Mask Pen, Mask Lasso or Mask Rectangle (Select Rectangle or Select Lasso).", "Left shelf");
+                     "held, to pick Mask Pen, Lasso Mask or Rectangle Mask (Select Rectangle or Select Lasso).", "Left shelf");
         return;
     }
     const BrushRecipe* recipe = activeRecipe();

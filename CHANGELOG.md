@@ -146,7 +146,7 @@ All notable changes to SculptForge are listed here. The format follows
   suggest in #ideas, and members' votes pick what ships. Insiders also propose the options.
 
 ### Added
-- **Stroke popup > Shapes** (Discord, Darth): Mask Pen, Mask Lasso, Mask Rect, Cut Line, Cut Lasso, Cut Rect and Cut
+- **Stroke popup > Shapes** (Discord, Darth): Mask Pen, Lasso Mask, Rectangle Mask, Cut Line, Cut Lasso, Cut Rect and Cut
   Polyline. Picking one latches Mask or Select with that shape, so a plain drag masks or cuts with it; with Mask
   latched a held Ctrl unmasks. The cursor label names the shape (e.g. "Cut Line").
 - SpaceMouse (#104, reported by fenixpoints): Preferences > Input > SpaceMouse lists each joystick SDL reports (name,
@@ -200,12 +200,12 @@ All notable changes to SculptForge are listed here. The format follows
   **CAMERA LOCKED** chip in the status bar while it is on (#62 follow-up).
 - Blender style: **Preferences > Input > Emulate 3 Button Mouse** (off by default): Alt+left-drag turns the view
   everywhere, as before.
-- Each brush keeps its own settings (#78, requested by dCo3lh0 and on Discord): Draw Size, Z Intensity, Falloff, RGB
-  Intensity, the stroke (with Spray's scatter and Lazy Stroke's radius) and the alpha follow the brush, custom and
+- Each brush keeps its own settings (#78, requested by dCo3lh0 and on Discord): Size, Intensity, Falloff, Colour
+  intensity, the stroke (with Spray's scatter and Lazy Stroke's radius) and the alpha follow the brush, custom and
   Community brushes included. Switching back brings back the values that brush had this session; a brush not used yet
   starts from the current values. **Brush > Save Brush Settings** keeps them for every start (`brush-settings.json`
   in the user data folder), **Brush > Reset Brush to Default** restores the shipped values, and **Preferences >
-  Input > Share size and intensity across brushes** (off by default) keeps Draw Size and Z Intensity shared as before.
+  Input > Share size and intensity across brushes** (off by default) keeps Size and Intensity shared as before.
 - **Gizmo size** (Draw > Camera): the corner axes come in Small, Medium (as before, the default) and Large, on top
   of the UI scale; clicking an end still snaps to that side at every size. Saved in the preferences.
 - **View Figure** (Draw > Camera, beside Axes, off by default): a small shaded head in the canvas corner that turns
@@ -241,8 +241,8 @@ All notable changes to SculptForge are listed here. The format follows
 - Precision work (guide: Sculpting > Precision work). **Steady Stroke** (<kbd>L</kbd>) now works with every stroke
   type (Dots, Drag Stamp, Slide Stamp, Spray), with **Catch up on release** (finish the line to the cursor) and the
   string drawn to the lagging brush; the Lazy Stroke type is Dots with it on. **World Size** (Draw palette) keeps
-  Draw Size in model units, so the brush stays the same size on the surface as you zoom; every Draw Size slider
-  and the cursor show px and mm. Draw Size goes down to 0.5 px; <kbd>Shift</kbd>+<kbd>[</kbd> /
+  Size in model units, so the brush stays the same size on the surface as you zoom; every Size slider
+  and the cursor show px and mm. Size goes down to 0.5 px; <kbd>Shift</kbd>+<kbd>[</kbd> /
   <kbd>Shift</kbd>+<kbd>]</kbd> step 1 px, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+right-drag scrubs the size finely,
   and small brushes space their dabs closer so tiny strokes stay continuous. **Precision drag**: hold
   <kbd>Shift</kbd>+<kbd>Alt</kbd> while drawing and the brush moves at a quarter of the pen's speed, at
@@ -258,7 +258,7 @@ All notable changes to SculptForge are listed here. The format follows
   the shape out of the surface (boolean union). An exact boolean in screen space: the uncut surface and its mask,
   colours, UVs and layers are kept, and the result is watertight. Follows X/Y/Z and radial symmetry; one undo step.
   Scriptable as the `cut` command.
-- Mask Lasso and Mask Rectangle: Front faces only (#91), also `front_faces_only` on mask_lasso / mask_rect.
+- Lasso Mask and Rectangle Mask: Front faces only (#91), also `front_faces_only` on mask_lasso / mask_rect.
 - Duplicate Part shortcut: Ctrl+Shift+D (also Duplicate Part in the command palette).
 - Stroke popup: press G (Z in the Blender style; any key in Edit > Preferences > Hotkeys) or the new button under the Stroke
   tile for a grid at the cursor with the stroke types and the modifiers Add / Sub, Smooth, Mask and Select. Hold the
@@ -324,7 +324,7 @@ All notable changes to SculptForge are listed here. The format follows
   half a pixel off). The surface point under the brush is lightly filtered, so strokes on dense meshes no longer
   wobble.
 - Preferences > Interface > UI scale applies at once: text, controls and panels resize live, no restart (#87).
-  Before, the choice waited for the next start and was lost unless Store Config saved it. Automatic now follows
+  Before, the choice waited for the next start and was lost unless the interface was saved. Automatic now follows
   the monitor the window is on: on Windows (per-monitor DPI v2, now declared in the app's manifest) dragging the
   window between a 100 % and a 150 % monitor, or changing Settings > Display > Scale, rescales the UI right away.
 - The pen picks a brush, then stops clicking the panels and the canvas until the mouse is used (#95; Huion Kamvas,
@@ -401,16 +401,16 @@ All notable changes to SculptForge are listed here. The format follows
   Insiders repository and posts to #insiders (`.github/workflows/insider-preview.yml`).
 
 ### Fixed
-- Custom and Community brushes (Clay Slab and other presets) show the whole alpha at Focal Shift -100, as the
+- Custom and Community brushes (Clay Slab and other presets) show the whole alpha at Falloff -100, as the
   built-in brushes do since #60: the stamp reaches its square's corners instead of being cut by the preset's round
-  tip (#75, reported by rodrigomoretto). At the default Focal Shift presets look as before; saved presets are unchanged.
+  tip (#75, reported by rodrigomoretto). At the default Falloff presets look as before; saved presets are unchanged.
 ### Added
 - A new default look: new installs start in **Forge Terminal** with the **Tokyo Night** colours and the
   **SculptForge layout** (menus by task: File, Edit, Sculpt, Paint, Mesh, View, Render, Help, whose sections are the
   palettes; a status bar; a one-row tool shelf). Existing installs keep their look and layout, and see a one-time card,
   "SculptForge has a new look", with **Try it** and **Keep my layout**. The welcome offers **Experienced sculptor? Use the
   Classic layout** in one click, and Preferences > Interface > Look switches any time. The look is remembered
-  without Store Config. Also in Preferences > Interface > Look: the **Classic** look, **Forge Terminal** with Tokyo
+  on its own. Also in Preferences > Interface > Look: the **Classic** look, **Forge Terminal** with Tokyo
   Night, Catppuccin Mocha, Gruvbox Dark, Nord, Rosé Pine, Kanagawa or Everforest colours or **Match my desktop
   theme** (on Linux, the Omarchy theme's colours when Omarchy is installed), **Phosphor** (green or amber, optional scanlines and glow on the interface only) and **Blueprint**.
   Scripts: `ui_look`.
@@ -519,7 +519,7 @@ All notable changes to SculptForge are listed here. The format follows
   and describe the membership benefits; the one-time option is now the One-time Supporter (pay what you want).
 - Backface culling (#68): **Tool > Display > Backface culling** skips the back faces of every Part, closed or open,
   from any view: you see through the openings of open meshes, and brushes and picking work only on the faces drawn.
-  Off by default; Store Config keeps it, projects keep their own. An 8M-triangle open mesh seen from behind: 3.1 ms
+  Off by default; saved automatically, projects keep their own. An 8M-triangle open mesh seen from behind: 3.1 ms
   -> 0.7 ms a frame; a closed 20M sculpt is unchanged (its hidden back faces were already skipped).
 - Viewport cursor (#73): a crosshair over the 3D view where brushes act; the arrow (or the resize, text and link
   cursors) over panels, menus, popups and gizmo handles. **Preferences > Interface > Viewport cursor**: Crosshair
@@ -556,13 +556,13 @@ All notable changes to SculptForge are listed here. The format follows
 ## [0.10.5] - 2026-11-01
 ### Added
 - **Radial symmetry** (#63): **R** in Transform > Symmetry and on the top shelf repeats strokes around the X, Y or Z
-  axis (Radial Count 2-64), combined with the X / Y / Z mirrors (mirror + radial = 2N copies), and **Local**
+  axis (Radial Copies 2-64), combined with the X / Y / Z mirrors (mirror + radial = 2N copies), and **Local**
   symmetry about the active Part's centre. Applies to every brush and stroke, mask and smooth strokes, vertex paint
   and texture painting, Mask / Select Rectangle and Lasso, Dynamic Topology (new topology on every copy) and Insert;
   the brush cursor shows on every copy. Saved in projects; `radial`, `radial_axis` and `local` arguments on
   `stroke`, `vdm_stamp`, `mask_rect`, `mask_lasso`, `hide_rect`, `hide_lasso`, `insert_primitive` and `insert_mesh`.
 - **Preferences > Interface > Timeline position** (#63): the Sculpt Timeline strip at the top of the viewport (the
-  new default, away from the brush shelf) or at the bottom; Store Config keeps it.
+  new default, away from the brush shelf) or at the bottom; saved automatically.
 - **UV Editor** (Tool > Texture Map > UV Editor, Alt+U): a window with the active Part's UV layout over the UDIM
   tile grid, drawn on the GPU (pan, zoom, a checker or the painted texture behind). Select vertices, edges, faces or
   islands (1-4) by click or box, or on the model with **Select in 3D**; move, rotate and scale with the selection's
@@ -586,7 +586,7 @@ All notable changes to SculptForge are listed here. The format follows
   (smooth) strokes work the same way; a Ctrl+click on the background still inverts the mask. The view still turns
   with a right-drag (or a pen button set to Right click), pans with Alt+drag or a middle-drag, moves with Space held
   when that option is on, and Blender and Maya keys keep Alt+left-drag. A label at the top of the canvas shows while
-  it is on. Mask Lasso, Mask Rectangle and the hide / show shapes are unchanged.
+  it is on. Lasso Mask, Rectangle Mask and the hide / show shapes are unchanged.
 
 ### Changed
 - Features use SculptForge's own names (Parts, Forge Spheres, Vertex Paint, Face Groups, Library, Lit Spheres,
@@ -633,7 +633,7 @@ All notable changes to SculptForge are listed here. The format follows
 
 ### Added
 - The interface in Spanish (#44): **Preferences > Interface > Language** switches between **English** (the default)
-  and **Español** at once, and Store Config keeps it. The palette bar, the palettes and their sub-palettes
+  and **Español** at once, saved automatically. The palette bar, the palettes and their sub-palettes
   (Preferences, Part, Geometry, Remesh, Masking, Face groups and more), the top, left and right shelves, the
   Library tabs, the command palette (which also finds commands by their Spanish names), Ctrl-help titles and many
   messages are translated; tool and brush names stay as Spanish-speaking experienced sculptors use them (Part, QRemesh,
@@ -664,8 +664,8 @@ All notable changes to SculptForge are listed here. The format follows
   the pie stays open for a click. A menu can also open from a mouse button (middle, back, forward) or a pen side
   button while it is held. Two built in: **Brushes** on <kbd>T</kbd> and **Masking** on <kbd>Y</kbd> (free in
   every input style). Edit them in Preferences > Input > Radial Menus: add, remove and reorder items, pick each
-  action with the palette's search, give it your own label and icon, set the menu's key and button. Store Config
-  keeps them in ui.json; Export / Import shares one menu as a small JSON file holding only action names (unknown
+  action with the palette's search, give it your own label and icon, set the menu's key and button. ui.json
+  keeps them; Export / Import shares one menu as a small JSON file holding only action names (unknown
   actions are left out, counts and text lengths are capped).
 - Insert your own mesh (#34): **Append > Insert on the model > Active Part's copy...** (another Part) or
   **From file...** (`.obj`, `.ply`, `.glb`), dragged onto the surface like the shapes: centred, sized by the drag,
@@ -683,10 +683,10 @@ All notable changes to SculptForge are listed here. The format follows
   image files), with thumbnails in the pickers and the Library (whose Brush tab now lists the built-in VDMs too).
 
 ### Fixed
-- Focal Shift now shapes brushes that use an alpha (#60): the alpha is multiplied by the round
-  falloff Focal Shift controls, so at -100 the whole alpha shows hard to its edges, at 0 a Square alpha's corners
+- Falloff now shapes brushes that use an alpha (#60): the alpha is multiplied by the round
+  falloff Falloff controls, so at -100 the whole alpha shows hard to its edges, at 0 a Square alpha's corners
   round off into a soft mound, and at +100 only a soft point in the middle is left. Before, alpha brushes always
-  behaved as at -100. Focal Shift also reaches the built-in Clay Block's square tip and custom (Brush Lab)
+  behaved as at -100. Falloff also reaches the built-in Clay Block's square tip and custom (Brush Lab)
   brushes now, which ignored it; at 0 they keep their own tip exactly as before.
 - SelectRect and SelectLasso (hide / show) ignored symmetry (#51 follow-up): with X / Y / Z on, the mirror image of
   the shape counts as inside too, as with MaskRect and MaskLasso (`hide_rect` / `hide_lasso symmetry=x`).
@@ -851,7 +851,7 @@ All notable changes to SculptForge are listed here. The format follows
   300 million micro triangles take 374 MB (1.25 bytes each; the whole app about 0.8 GB), where a mesh of that size
   would need about 27 GB. Unlike high-detail geometry the whole model is sculptable at once.
   - Brushes: Standard, Clay, Clay Block, Smooth, Inflate, Flatten, Trim, Layer, Pinch / Crease / Sharp Crease
-    (as height sharpening), Mask; symmetry, Focal Shift, pressure and the mask apply. Big brushes are evaluated on
+    (as height sharpening), Mask; symmetry, Falloff, pressure and the mask apply. Big brushes are evaluated on
     a coarser grid and interpolated (scale-adaptive). Move reshapes the base below the micro level and the detail
     rides along (dual scale); "Move along normals" moves the micro surface itself.
   - Viewport: the micro surface is evaluated on the GPU per frame, with a level of detail per cluster and a
@@ -936,7 +936,7 @@ All notable changes to SculptForge are listed here. The format follows
   it and written as a JSON result with the processor, graphics card, memory, OS, version and commit.
   `docs/benchmark.md` describes the format, `tools/benchmark/submit.py` checks results and adds them to
   `website/benchmarks/results.json`, which the new benchmarks page lists.
-- The brush cursor follows the surface (#25): over the model the Draw Size and Focal Shift rings
+- The brush cursor follows the surface (#25): over the model the Size and Falloff rings
   lie on the surface under the pointer, turned to its (smoothed) direction and pressed onto its shape, at the
   brush's real size there, with a short normal line; with symmetry on, a fainter mirrored ring shows too. Every
   brush (sculpt, paint, mask, dynamic topology). A few dozen BVH ray casts per drawn frame, no pass over the mesh
@@ -1038,7 +1038,7 @@ and a fix for Divide crashing on models from Blender, with a log file so a crash
 ### Added
 - Extract (Tool > Part > Extract): the masked, visible part of a Part becomes a shell with Thick (a share of the Part's size; negative grows inward, 0 makes a single-sided surface), E Smt (smooths the stepped edge) and Double (both ways). Extract shows a preview below the source that follows the settings; Accept keeps it as a new Part with outer, inner and rim face groups and the source's vertex paint, as one undo step (undo removes the Part, redo puts it back). TCorne and TBorder make the rim triangles instead of quads at sharp corners or all along it. An unaccepted preview goes when the source changes and is never saved. Commands: extract, extract_accept, extract_cancel.
 - Mirror And Weld (Tool > Geometry > Modify Topology, X / Y / Z): keeps the + side of the plane through the origin, cuts polygons crossing it, mirrors the half and welds the seam into one watertight mesh, keeping face groups, vertex paint, mask, UVs, quads and sculpt layers (`mirror_and_weld`, with `side=negative` for the other half). Undoable.
-- A flat viewport background (#21): Preferences > Display > Background (also in the Render palette) switches between the gradient (the default) and Flat Colour with a colour picker. Store Config keeps it, projects keep their own, and `set_background` (mode, color) scripts it.
+- A flat viewport background (#21): Preferences > Display > Background (also in the Render palette) switches between the gradient (the default) and Flat Colour with a colour picker. Saved automatically; projects keep their own, and `set_background` (mode, color) scripts it.
 - Mirror (Tool > Deformation, X / Y / Z): flips the Part across the plane through the origin, or in place with `pivot=center` (`mirror`). Undoable.
 - A log file, `sculptforge.log` in the user data folder (`%APPDATA%\SculptForge\SculptForge` on Windows,
   `~/Library/Application Support/SculptForge/SculptForge` on macOS, `~/.local/share/SculptForge/SculptForge` on
@@ -1121,7 +1121,7 @@ Thank you for the reports.
 - Smooth / Flat shading (#11): **Material** palette (and **Tool > Display**) > **Shading** switches the whole
   scene to flat, faceted shading, where every polygon shows its own face; **This Part** keeps one Part smooth
   or flat whatever the scene says. Both are saved in projects (no format change; older files open with your
-  preferred shading) and the scene's choice is a preference (Store Config). Smooth stays the default. Scripts:
+  preferred shading) and the scene's choice is a preference (saved automatically). Smooth stays the default. Scripts:
   `set_shading mode=flat`, `part_shading mode=smooth name=Eyes`.
 - 3Dconnexion SpaceMouse navigation (#6, experimental): the cap's six axes pan, zoom and turn the view about the
   orbit pivot, continuously and at the same speed whatever the frame rate, in every input style and while a pen
@@ -1129,7 +1129,7 @@ Thank you for the reports.
   (vendor 256F, and the older Logitech-id SpaceNavigator / SpacePilot / SpaceExplorer / SpaceMouse Pro).
   **Preferences > Input > SpaceMouse**: on/off, speed, dead zone, per-axis invert, Lock rotation to turntable,
   Dominant axis, live axis bars, and an action per button (the two side buttons default to Frame and Front view);
-  Store Config keeps them (`spaceMouse` in ui.json). Untested on real hardware; the guide explains what to do when
+  ui.json keeps them (`spaceMouse`). Untested on real hardware; the guide explains what to do when
   3DxWare (Windows, macOS) or spacenavd (Linux) holds the device. UI tests drive a virtual joystick with a
   SpaceMouse Compact's ids (`spacemouse`, `spacemouse_hold`, `spacemouse_button`, `spacemouse_unplug` steps).
 ### Fixed
@@ -1362,10 +1362,10 @@ Guide chapter docs/guide/dynamic-topology.md.
 Guide: docs/guide/sculpting.md, "Vector displacement brushes".
 - **VDM brush** (new brush type): one DragRect stamps a whole 3D shape with overhangs. Each point under the
   stamp moves by its texel's vector in the brush's tangent frame (Z = the surface's area normal, Y = the drag
-  direction, X = right), scaled by the radius and Z Intensity (50 = the map's own size, 100 = twice). Alt digs
+  direction, X = right), scaled by the radius and Intensity (50 = the map's own size, 100 = twice). Alt digs
   in (X, Y kept, Z flipped, as Blender). Symmetry mirrors the stamp exactly (the mirrored pass flips the frame's
   handedness); mask, Front faces only, sculpt layers and undo as every brush. Works with subdivision levels.
-- **DragDot stroke**: one stamp of the Draw Size that slides under the cursor until release (any brush).
+- **DragDot stroke**: one stamp at the brush size that slides under the cursor until release (any brush).
 - **Built-in maps** (procedural, CC0): Horn, Ear Curl, Scales, Nostril.
 - **Brush > Vector Displacement**: the maps with thumbnails, Load VDM (OpenEXR 16/32-bit, any compression, or
   .sfvdm; dropping an .exr loads it too) with Swap Y/Z, Flip X/Y/Z and Scale for maps from other apps, New VDM
@@ -1385,10 +1385,10 @@ Guide: docs/guide/sculpting.md, "Vector displacement brushes".
 
 ### Blender add-on: the Classic sculpting keys in Sculpt Mode
 Guide: docs/guide/blender.md, "the Classic sculpting keys in Sculpt Mode".
-- Add-on preference **The Classic sculpting keys in Sculpt Mode** (off by default): S / U / O radial Draw Size,
-  Strength and Hardness (Focal Shift); Space the Sculpt context menu; B a brush list by name (type to
-  filter; Blender 4.3+ brush assets, 4.2 brush tools); Alt+drag Sub; Ctrl(+Alt)+drag mask / unmask lasso;
-  Ctrl+Shift(+Alt)+drag show only / hide inside; Ctrl+W group masked and clear the mask (else group visible);
+- Add-on preference **The Classic sculpting keys in Sculpt Mode** (off by default): S / U / O radial Size,
+  Strength and Hardness (Falloff); Space the Sculpt context menu; B a brush list by name (type to
+  filter; Blender 4.3+ brush assets, 4.2 brush tools); Alt+drag Sub; Ctrl(+Alt)+drag lasso mask / unmask;
+  Ctrl+Shift(+Alt)+drag show only / hide inside; Ctrl+W group from mask and clear the mask (else group visible);
   Ctrl+D Divide (Multires), D / Shift+D SDiv up / down; X symmetry; Shift+F wireframe; F frame; P perspective;
   L Stabilize Stroke; W / E / R move / scale / rotate. Turning it off (or disabling the add-on) removes them.
   The preferences and the guide list the Classic sculpting keys Blender has no equivalent for.
@@ -1418,9 +1418,9 @@ Guide: docs/guide/blender.md, "the Classic sculpting keys in Sculpt Mode".
 - Keep Groups (loops along face group borders) and Use Vertex Paint (density) were already there.
 
 ### Sculpt layers on subdivision levels
-- Checked against 3D Layers and covered by tests: a layer recorded at the top survives Lower / Higher Res
+- Checked against 3D Layers and covered by tests: a layer recorded at the top survives Lower / Higher Level
   bit for bit, shows at lower levels as the same strokes in the base would, keeps one weight for every level, and
-  survives Divide, Reconstruct Subdiv, Del Lower / Del Higher, undo, saving and loading at any level, and blend
+  survives Divide, Reconstruct Subdiv, Delete Lower / Delete Higher, undo, saving and loading at any level, and blend
   shape export from any level (`subdiv_export`). Layers added or sculpted at a low level show above. Nothing needed
   fixing; the Layers panel got Ctrl-hover help and the guide a "Layers and subdivision levels" section.
 
@@ -1436,32 +1436,32 @@ The Classic sculpting keys and gestures by default, and a bridge to Blender.
 ### Classic feel: the Classic sculpting keys and gestures by default
 Guide chapter
 docs/guide/quick-tour.md.
-- **U / I / O**: Z Intensity, RGB Intensity and Focal Shift sliders at the cursor (S stays Draw
-  Size). Values show 0-100 (Focal Shift -100..100); the top shelf and Draw palette say Z Intensity instead of
+- **U / I / O**: Intensity, Colour intensity and Falloff sliders at the cursor (S stays
+  Size). Values show 0-100 (Falloff -100..100); the top shelf and Draw palette say Intensity instead of
   Strength.
-- **RGB Intensity**: painting has its own strength (default 100), separate from Z Intensity.
-- **Focal Shift**: the brush falloff, for every built-in brush, Move, SnakeHook, masking and painting (Brush Lab
-  recipes keep their own tip). At 0 the maths is unchanged. The cursor's inner ring now shows Focal Shift
+- **Colour intensity**: painting has its own strength (default 100), separate from Intensity.
+- **Falloff**: the brush falloff, for every built-in brush, Move, SnakeHook, masking and painting (Brush Lab
+  recipes keep their own tip). At 0 the maths is unchanged. The cursor's inner ring now shows Falloff
   (where the brush works at half strength) instead of the strength.
-- **Smooth keeps its own Z Intensity** (default 50): Shift-smoothing no longer follows the active brush's
+- **Smooth keeps its own Intensity** (default 50): Shift-smoothing no longer follows the active brush's
   strength. Holding Shift (or picking Smooth) shows and sets it.
-- **Space**: the QuickMenu under the cursor (brush, stroke, alpha, material, Draw Size, Focal Shift, the
+- **Space**: the QuickMenu under the cursor (brush, stroke, alpha, material, Size, Falloff, the
   intensities, Add/Sub, Sculpt/Paint, Rgb, X). Hold and let go to close, or tap to keep it open.
 - **Brush letters**: B C B Clay Block, B D S Sharp Crease, B M V Move, B I N Inflate, B P I Pinch, B S H
   SnakeHook, instead of the first free letter.
 - **Mask keys**: Ctrl+A Mask All, Ctrl+Shift+A Clear Mask, Ctrl+I Invert, Ctrl+H View Mask; **Ctrl+W** Group
-  Masked (and clear the mask; with nothing masked, Group Visible).
+  from Mask (and clear the mask; with nothing masked, Group Visible).
 - **Ctrl+click on the model blurs the mask, Ctrl+Alt+click sharpens it** (a Ctrl+drag still paints).
 - **Shift pressed after a stroke starts** draws a straight line, snapped to 45 degree steps.
 - **Shift+click the background, let go of Shift, drag** rolls the view about its axis.
 - **Shift+Alt+click a Part** selects and frames it.
 - **Ctrl+Shift+click a face group on a partly hidden mesh hides it** (it used to isolate it); a Ctrl+Shift
   rectangle around nothing reverses the visibility.
-- **L** toggles LazyMouse, **V** swaps the main and secondary colour, **Ctrl+Shift+Alt+I** is Save UI.
+- **L** toggles LazyMouse, **V** swaps the main and secondary colour, **Ctrl+Shift+Alt+I** is Export Interface.
 - **Preferences > Input**: Style **Classic** (default) or **SculptForge**, which keeps 0.6's keys: 1-9 and 0 pick
-  brushes (classic: free, 9 = QuickSave), I = Z Intensity, Ctrl+drag on the background zooms when nothing
+  brushes (classic: free, 9 = QuickSave), I = Intensity, Ctrl+drag on the background zooms when nothing
   is masked (classic: nothing). Rotation (free / turntable) is also here.
-- Projects store Smooth's Z Intensity, RGB Intensity and Focal Shift.
+- Projects store Smooth's Intensity, Colour intensity and Falloff.
 
 ### Blender bridge
 - **SculptForge Bridge, an add-on for Blender 4.2+** (`addons/blender`, GPL-3.0-or-later): select objects, click
@@ -1518,7 +1518,7 @@ adjacency that saves the memory).
 - **Opening a project** no longer needs twice the scene's memory (the file is read straight into the meshes) and
   is about twice as fast (33M: 4.7 -> 2.1 s; the BVH is built while the levels load). Saving no longer copies the
   meshes first, and project files of divided sculpts are about 30% smaller.
-- Lower Res after sculpting at the top level is faster (33M: 1.5 -> 0.9 s), and so is Divide (2.4 -> 1.4 s).
+- Lower Level after sculpting at the top level is faster (33M: 1.5 -> 0.9 s), and so is Divide (2.4 -> 1.4 s).
 - Project format 6. Projects from 0.5 and earlier open as before (and get the savings); 0.5 can't open format 6
   projects.
 
@@ -1575,13 +1575,13 @@ adjacency that saves the memory).
 ### Subdivision levels (multiresolution)
 - Divide (Tool > Geometry, Ctrl+D, `subdiv_divide`) adds a subdivision level per Part and keeps the lower
   ones: Catmull-Clark on meshes with quads (quads stay quads), Loop on triangle meshes, flat with Smt off.
-- Lower Res / Higher Res (Shift+D / D, `subdiv_lower`, `subdiv_higher`) and the SDiv slider (`subdiv_level`)
+- Lower Level / Higher Level (Shift+D / D, `subdiv_lower`, `subdiv_higher`) and the SDiv slider (`subdiv_level`)
   step between levels. Detail is stored per level as a displacement in the local frame of the smoothed level
   below, so reshaping a low level carries it along; edits at a high level are restricted (full weighting) to
   the lower ones. Round trips without edits are bit-for-bit.
 - Mask, vertex paint, paint layers, face groups, hidden faces and UVs follow the levels (copied down, interpolated or
   inherited up where they changed); sculpt layers have their own detail per level; the texture is shared.
-- Del Lower, Del Higher (`subdiv_delete_lower`, `subdiv_delete_higher`) and Reconstruct Subdiv
+- Delete Lower, Delete Higher (`subdiv_delete_lower`, `subdiv_delete_higher`) and Reconstruct Subdiv
   (`subdiv_reconstruct`: finds the lower level of a regular Catmull-Clark or Loop subdivision, keeping the mesh
   and its vertex order). `subdiv_info` lists the levels; `subdiv_export` writes the visible Parts at another
   level (e.g. the base cage) in any export format.
@@ -1648,7 +1648,7 @@ adjacency that saves the memory).
   interpolated onto the new mesh; sculpt layers are baked.
 - ProjectAll (Tool > Part > Project, `project_all`): moves the active Part onto the other visible
   Parts (rays both ways along the normal, nearest hit within Dist, else the closest point) and takes their
-  vertex paint. Dist, Mean, PA Blur, Geometry / Vertex Paint toggles, an optional single `source`; respects the mask
+  vertex paint. Dist, Mean, Blur, Geometry / Vertex Paint toggles, an optional single `source`; respects the mask
   and hidden faces; shape goes into the active sculpt layer, colour into the active paint layer; one undo step.
 - Fast on dense meshes (all threads, a read-only BVH): 1.3M triangles to 5,000 quads in 1.7 s, to 100,000 in
   6 s; ProjectAll onto 1.25M vertices in 0.6 s (10-core desktop).
@@ -1708,7 +1708,7 @@ adjacency that saves the memory).
   least 32 quads, or kept as they were. Parts thinner than a quad (blades, fins, slabs) keep both sides and their
   hard edges (thin slab: mean error 2.2% -> 0.05% of its size, Hausdorff 8.8% -> 2.6%).
 - Top shelf: the Vertex / Texture paint target is hidden while the Part has no texture, instead of sitting
-  there greyed out (docs/ui-design.md now states the rule for contextual shelf buttons); Draw Size and Strength
+  there greyed out (docs/ui-design.md now states the rule for contextual shelf buttons); Size and Strength
   shrink to fit when the row is full.
 - Exports: the `.mtl` and PNGs written beside a model whose file name has spaces use `_` instead (OBJ's `mtllib`
   and MTL's `map_Kd` split names at spaces). Textured exports were validated with other tools: Khronos glTF
@@ -1818,7 +1818,7 @@ Shaped by feedback from a working professional modeler and a survey of sculpting
   beside the notch. Preferences > Interface > Camera notch: Automatic / Always reserve / Off.
 - Fullscreen toggle (F11, Render palette; `--fullscreen` on the command line), and minimise / close buttons at
   the far right of the title strip (close asks to save changes; Ctrl+Q quits).
-- The canvas is framed by shelves: a top shelf (Library, Sculpt/Paint, Add/Sub, Draw Size,
+- The canvas is framed by shelves: a top shelf (Library, Sculpt/Paint, Add/Sub, Size,
   Strength, symmetry, pressure), a left shelf of Brush / Stroke / Alpha / Material pickers with the colour picker,
   a right shelf of navigation (drag Move / Zoom / Rotate) and display toggles, and a bottom shelf of your most-used
   brushes. 16 alphabetical palettes hold every tool; the Tool palette (Part, Layers, Geometry, Remesh,
@@ -1826,12 +1826,12 @@ Shaped by feedback from a working professional modeler and a survey of sculpting
 - Library (`,`): projects, models, brushes, alphas, materials, images, splats, QuickSaves and recent files as
   thumbnails across the top of the canvas; brush thumbnails are sculpted for real; projects save a thumbnail.
 - Pop-up pickers: Brush (`B`, then type letters: B S T = Standard), Material (`M`, previews on the model as you
-  hover), Draw Size / Strength at the cursor (`S` / `I`).
+  hover), Size / Strength at the cursor (`S` / `I`).
 - Hold Ctrl over any button for what it does, its shortcut and its command (Ctrl+Alt for scripting parameters).
 - Command palette (F3 / Ctrl+Shift+P) finds and runs anything; the console (`` ` ``) shows every command as a
   script line, with completion and history, and copies the session as a macro.
-- Customize: Preferences > Config > Enable Customize, then Ctrl+Alt+drag to add, move or remove shelf items;
-  Store Config (Ctrl+Shift+I), Restore Standard UI, Save / Load UI, three layout presets, and reassignable
+- Customize: Preferences > Config > Customize Shelves, then Ctrl+Alt+drag to add, move or remove shelf items;
+  saving the interface (Ctrl+Shift+I), Reset Layout and Shortcuts, Export / Import Interface, three layout presets, and reassignable
   shortcuts (Ctrl+Alt+click a button, then press a key). Tab hides the shelves.
 - Lucide icons (ISC/MIT). Brush Lab now opens from the "AI Brush" button instead of covering the model at start.
 

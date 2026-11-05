@@ -41,8 +41,10 @@
 #include "core/StrokePath.h"
 #include "core/SurfaceCursor.h"
 #include "core/SpaceMouse.h"
+#include "core/TouchGesture.h"
 #include "core/Tablet.h"
 #include "core/SelfUpdate.h"
+#include "core/StudioProfile.h"
 #include "core/UpdateCheck.h"
 #include "core/ViewCapture.h"
 #include "core/WhatsNew.h"
@@ -157,7 +159,7 @@ public:
 
 private:
     enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, PartClick, Select, Gizmo, Guide, Sculptable, ForgeSphere, Insert, Capture,
-                      AirStroke, UvTool, SizeScrub }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
+                      AirStroke, UvTool, SizeScrub, QuickRemesh }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
 
     void handleEvent(const SDL_Event& e); // the pen's mouse events first (penMouseEvents), then dispatchEvent
     void dispatchEvent(const SDL_Event& e);
@@ -325,7 +327,7 @@ private:
     struct DabSettings {
         float radiusPx = 60.0f, strength = 0.5f, smoothStrength = 0.5f, focal = 0.0f, maskStrength = 1.0f;
         float sprayScatter = 1.0f;
-        float worldRadius = 0.0f; // World Size: the brush radius in model units (0: Draw Size in pixels)
+        float worldRadius = 0.0f; // World Size: the brush radius in model units (0: Size in pixels)
         PressurePoints pressureCurve; // the brush's own (after the tablet's global curve)
         bool smoothKeepVolume = false; // Smooth keeps the volume (smoothKeepVolume_, or the alternate smooth)
         bool smoothGroupBorders = false; // Smooth moves face group borders only (smoothGroupBorders_, #81)
@@ -427,11 +429,11 @@ private:
     void openSupportPage();
     void openDiscordPage(); // kDiscordUrl in the browser (UI tests: the status bar only)
     void openSupportLink(const char* url); // one of the Support.h links (UI tests: the status bar only)
-    void drawSupportUi();               // the first-run welcome and the one reminder note
+    void drawSupportUi();               // the first-run welcome and the new-look note
     void drawSupportersSection();       // Help > About: the names from docs/supporters.txt, as plain text
     bool showWelcome_ = false;          // the first start (no project.json yet), or Help > Welcome
     // project.json "input_style": the key style an install started with (the welcome's "Coming from" choice, or
-    // SculptForge for a new install), used while ui.json (Store Config) names none; -1: an install from before it,
+    // SculptForge for a new install), used while ui.json (saved automatically) names none; -1: an install from before it,
     // which keeps the Classic sculpting keys it had.
     int startInputStyle_ = -1;
     // "SculptForge has a new look" (0.10.7, PanelSupport.cpp): once, for an install from before it that kept the
@@ -452,9 +454,6 @@ private:
     bool quickTourOffersInTests_ = false; // UI tests: the offer only after the script's quick_tour_offers
     std::string flashSubpalette_; // a Tool sub-palette "Show me" opened: scrolled to and flashed (Palettes.cpp)
     double flashSubpaletteStart_ = 0.0;
-    double sculptSeconds_ = 0.0;        // cumulative time in strokes (project.json)
-    bool supportReminderDone_ = false;  // the reminder was shown (or turned off) once: never again (project.json)
-    bool supportReminderOpen_ = false;
     // The one big-mesh tip (BigMeshTip.h): the first scene over ~20M triangles; shown once, never again (project.json).
     bool bigMeshTipDone_ = false;
     bool bigMeshTipOpen_ = false;
@@ -463,21 +462,38 @@ private:
     void tickBigMeshTip();                  // every frame (drawSupportUi): shows the tip when due
     int discordRequests_ = 0;           // UI tests: how often the Discord invite was asked for
     int supportPageRequests_ = 0;       // UI tests: how often the page was asked for (only opened when interactive)
-    // The support card at launch (PanelSupportCard.cpp): decided once while starting, never mid-session.
-    struct SupportCard; // its animation state and the background picture (loaded on a worker thread)
+    // The membership cards (Support.h, PanelSupportCard.cpp): the full card on the first start (and from Help >
+    // Support), and the small card at good moments, at most once a week, until someone becomes a member.
+    struct SupportCard; // the full card's animation state
     struct SupportCardDelete { void operator()(SupportCard* c) const; }; // (defined where SupportCard is)
     std::unique_ptr<SupportCard, SupportCardDelete> supportCard_;
     SupportCardPrefs supportCardPrefs_;          // project.json
-    SupportCardReason supportCardReason_ = SupportCardReason::None;
-    int64_t supportCardNow_ = 0;                 // the clock when this start decided on the card ("Maybe later" counts from it)
     bool supportCardTestMode() const;            // tests, renders, demos, benchmarks, CI: never
+    bool memberCardTestMode_ = false;            // UI tests: `member_card` lets the moments through
     void launchSupportCard(bool firstRun, int64_t now, bool testMode); // shows it if supportCardDue
-    void showSupportCard(SupportCardReason reason); // (also Preferences > Support > Show it now)
-    void closeSupportCard(bool supporter);
+    void showSupportCard(SupportCardReason reason); // (also Help > Support and the welcome)
+    void closeSupportCard();
     bool supportCardOpen() const;
     bool supportCardEvent(const SDL_Event& e); // input while it's open goes to it, not the canvas or shortcuts
     void drawSupportCard();
     void drawSupportPrefs();                    // Preferences > Support
+    // The small card at good moments.
+    int64_t memberClock() const;                // seconds since 1970 (UI tests: their own clock)
+    int64_t memberClockOffset_ = 0;             // UI tests: `member_card days=N`
+    void memberMoment(MemberMoment m);          // a good moment happened: the card follows if it may (Support.h)
+    void tickMemberCard(float dt);              // the sculpting time, and the card once the frame is calm
+    void drawMemberCard();
+    void memberCardChoice(MemberCardChoice c);
+    void verifyMember();                        // "I'm already a member": the member builds' GitHub sign-in
+    void memberSignInFinished(bool member);     // the card's sign-in ended (startMemberSignIn's onDone)
+    bool memberSignedIn() const { return memberBuilds_; }
+    double sessionSculptSeconds_ = 0.0;         // stroke time in this session
+    bool sculptMomentDone_ = false;             // the sculpting moment came this session
+    MemberMoment memberMomentPending_ = MemberMoment::None; // allowed, waiting for a calm frame
+    MemberMoment memberCard_ = MemberMoment::None;          // the small card showing
+    bool memberVerifying_ = false;              // the card's sign-in runs (shown in the card)
+    bool updatedThisStart_ = false;             // this start runs a newer version than the last (the update moment)
+    std::string challengeTitle_;                // the monthly challenge whose results came (latest.json)
     // Show SculptForge on Discord (PanelIntegrations.cpp, core/DiscordPresence.h): off by default, project.json.
     struct DiscordPresencePrefs {
         bool enabled = false, showChallenge = false, showFileName = false;
@@ -662,7 +678,7 @@ private:
     void runCut(const char* shape, const std::vector<ImVec2>& path, bool closed, bool flip);
     void drawCutOverlay();
     void drawCutSection();
-    bool maskFrontFacesOnly_ = false; // Mask Lasso / Rectangle: only vertices facing the viewer (#91.3)
+    bool maskFrontFacesOnly_ = false; // Lasso Mask / Rectangle: only vertices facing the viewer (#91.3)
     int cutMode_ = 0;         // 0 Away, 1 In, 2 Add, 3 Clip (core/Cut.h)
     float cutDepth_ = 0.1f;   // In / Add: fraction of the Part's size
     std::vector<ImVec2> cutPolyline_; // window pixels of the Polyline being placed
@@ -709,14 +725,14 @@ private:
     bool steadyOn() const { return steadyStroke_ || strokeType_ == StrokeType::LazyMouse; }
     glm::vec2 steadyCursor_{0.0f}; // where the pointer is (the string's far end) during a steady stroke
     void steadyCatchUp(); // on release: the brush point runs on to the pointer
-    // World Size: Draw Size kept in model units, so the brush stays the same size on the surface as you zoom.
+    // World Size: Size kept in model units, so the brush stays the same size on the surface as you zoom.
     bool worldSize_ = false;
     float worldRadius_ = 0.0f;   // model units (shown in mm)
     float worldSyncedPx_ = 0.0f; // radiusPx_ as worldSize sync last set it (a different value: the user set it)
     float cursorWorldPerPx_ = 0.0f; // at the surface under the pointer (0: not seen yet)
     void syncWorldSize();           // every frame, outside strokes
-    std::string drawSizeLabel() const; // "Draw Size %.1f px  0.42 mm" (an ImGui slider format)
-    std::string drawSizeStatus() const; // "Draw Size 3.5 px (0.42 mm)"
+    std::string drawSizeLabel() const; // "Size %.1f px  0.42 mm" (an ImGui slider format)
+    std::string drawSizeStatus() const; // "Size 3.5 px (0.42 mm)"
     void drawPrecisionCursor(ImDrawList* dl, ImVec2 cursor, float radius, ImU32 col);
     void drawPrecisionOptions(); // the Stroke picker: Steady Stroke, its radius and catch-up, Precision Intensity
     glm::vec3 cursorSurface_{0.0f}; // the surface point last under the cursor (World Size measures there)
@@ -729,7 +745,7 @@ private:
     bool precisionActive_ = false;
     float precisionIntensity_ = 0.1f;
     bool precisionHeld() const;
-    // Ctrl+Shift+right-drag: scrubs the Draw Size finely (Drag::SizeScrub).
+    // Ctrl+Shift+right-drag: scrubs the Size finely (Drag::SizeScrub).
     float sizeScrubStart_ = 0.0f, sizeScrubDx_ = 0.0f;
     // The surface pick under each dab, filtered along its ray so dense meshes don't wobble the stroke.
     PickSmoother pickSmoother_;
@@ -886,6 +902,9 @@ private:
     void loadLitSphereDialog();          // Material > Load Lit Sphere...
     void rescanLitSphereFolder();        // loads new / changed images in lit sphereFolder(), drops deleted ones
     void materialListShown();         // a material list is on screen: rescans when it has just opened
+    std::vector<std::string> litsphereSubfolders() const; // sub-folders of litsphereFolder() (one level), sorted
+    std::string litsphereLocked(int index) const;         // why Rename / Move can't touch it ("" = they can)
+    bool moveLitSphereFile(int index, const std::string& to, const std::string& group, std::string& error);
     std::map<std::string, std::pair<uintmax_t, int64_t>> litsphereFolderSeen_; // path -> size, time at the last scan
     std::set<std::string> hiddenLitSphereFiles_; // removed Lit Spheres whose file couldn't go to the trash
     int materialListFrame_ = -10;
@@ -1069,9 +1088,22 @@ private:
     void drawKeepTextureCheckbox(const char* id, const char* path); // Keep Texture under Remesh and QRemesh (PanelTexture.cpp)
     // Voxel Remesh of a painted Part with Keep Texture: the remesh, Auto UV and texture transfer run on a
     // worker thread (PanelRetopo.cpp); otherwise Voxel Remesh is the plain remesh command.
-    void startVoxelRemesh();
+    // Who asked (#121): the button, Quick Remesh (its key or the held-key drag on the background) or Remesh after
+    // each stroke. The quick ones never land over strokes made while they ran: they remesh again instead.
+    enum class RemeshTrigger { Button, Quick, AfterStroke };
+    void startVoxelRemesh(RemeshTrigger trigger = RemeshTrigger::Button);
     void pollVoxelRemesh();
+    void quickRemesh(RemeshTrigger trigger); // Quick Remesh / Remesh after each stroke: checks, then startVoxelRemesh
+    void drawQuickRemeshContents();          // their checkboxes under Tool > Remesh (PanelRetopo.cpp)
+    void strokeEndedForRemesh(const UndoRecord& stroke); // Remesh after each stroke: did it stretch the surface?
+    bool quickRemeshDragDown(float x, float y);          // a press on the background with the drag key held
+    void quickRemeshKey(SDL_Keycode key, SDL_Keymod mods, bool down); // tracks the held drag key
+    SDL_Keycode quickRemeshDragKey_ = SDLK_UNKNOWN; // the "hold and drag" key while it is down
+    bool autoRemeshDue_ = false;                    // a stroke stretched the surface: remesh once nothing waits
+    size_t lastStrokeStretched_ = 0;                // the last stroke's stretched edges (UI tests: stroke_stretched)
     struct VoxelRemeshJob {
+        RemeshTrigger trigger = RemeshTrigger::Button;
+        uint64_t revision = 0; // doc_.undo.revision() when it began (the quick ones land only on that state)
         std::future<bool> done;
         std::shared_ptr<std::atomic<float>> progress;
         std::shared_ptr<std::atomic<bool>> cancel;
@@ -1333,6 +1365,7 @@ private:
     struct MemberAuth; // the tokens, shared with worker threads
     struct MemberSignIn;
     void drawMemberBuildsSection(); // Preferences > Updates
+    void drawMemberSignInSteps();   // a sign-in in progress: the code, Copy, the page, Cancel (also the membership card)
     // (Worker threads.) Adds the newest member build to the job's answer when it is newer; a usable access token
     // (from the keychain, refreshed when it has run out; false and `signedOut` when the sign-in is gone).
     static void checkMemberBuilds(MemberAuth& auth, UpdateJob& job);
@@ -1341,6 +1374,7 @@ private:
     // member" both use it): `onDone(member)` runs on the main thread when it ends: true = signed in with an account
     // that can see member builds (memberBuilds_ is then true); false = not a member, declined, failed or cancelled.
     void startMemberSignIn(std::function<void(bool member)> onDone = {});
+    void finishMemberSignInForTest(bool ok); // UI tests' member_sign_in: the running sign-in ends (GitHub never reached)
     void memberSignOut();
     std::shared_ptr<MemberAuth> memberAuth_;
     std::shared_ptr<MemberSignIn> memberSignIn_;
@@ -1513,7 +1547,7 @@ private:
     float morphAmount_ = 1.0f;
     bool renamingSet_ = false;
     char setRenameBuffer_[64] = "";
-    void drawGeometrySection(); // PanelGeometry.cpp: Divide, SDiv, Lower / Higher Res, Del Lower / Higher, Reconstruct
+    void drawGeometrySection(); // PanelGeometry.cpp: Divide, SDiv, Lower / Higher Level, Delete Lower / Higher, Reconstruct
     bool smt_ = true;           // Tool > Geometry > Smt: Divide smooths
     float sdivSlider_ = 1.0f;   // the SDiv slider while dragged (1-based)
     float microSlider_ = 4.0f;  // Tool > Geometry > Micro: the micro level the next Divide to micro makes
@@ -1573,6 +1607,7 @@ private:
     friend struct PickerUi;
     friend void drawAlphaGrid(App&, GridMode);
     friend void drawMaterialGrid(App&, GridMode);
+    friend void litsphereMenu(App&, int, const std::function<void()>&);
     friend void drawStrokeGrid(App&, GridMode);
     void initLibraryBrowser();   // end of init(): library folders, thumbnail cache, actions, project thumbnails
     void showStarterMeshes(); // the Library at Tool > Starter meshes (File > New from Starter Mesh, the welcome)
@@ -1613,8 +1648,11 @@ public:
     void openCommandPalette() { palette_.open(); }
     void setConsoleOpen(bool open);
     void consolePrefill(const std::string& text); // opens the console with TEXT typed
-    // Store Config (Ctrl+Shift+I) / Restore Standard UI / Restore Custom UI / Save UI... / Load UI... (Ctrl+L)
-    void storeConfig();
+    // Save Layout / Reset Layout and Shortcuts / Revert to Saved Layout / Export Interface... / Import Interface...
+    // (Ctrl+L). The preferences, shortcuts and radial menus save themselves (autosavePrefs, #117).
+    void saveLayout();
+    void savePrefsNow(); // config.store: write them at once
+    void restartPrefsForTest(const std::string& uiJson = {}); // the UI test step `restart`: save, back to the defaults, read ui.json again
     void restoreStandardUi();
     void restoreCustomUi();
     void saveUiDialog();
@@ -1659,8 +1697,14 @@ private:
     std::string insertMeshKey_, insertMeshValue_;
     glm::vec3 insertAt_{0.0f}, insertNormal_{0.0f, 1.0f, 0.0f};
     float insertX_ = 0.0f, insertY_ = 0.0f, insertPx_ = 0.0f;
-    bool readUiConfig(const std::string& path, std::string& err);
+    // own: our ui.json (its layout becomes storedLayout_; it may have none), not a shared file.
+    bool readUiConfig(const std::string& path, std::string& err, bool own = false);
     bool writeUiConfig(const std::string& path, std::string& err);
+    static bool writeJsonAtomic(const std::string& path, const Json& j, std::string& err); // temp file, then rename
+    std::string prefsKey() const;          // the shortcuts, preferences and radial menus, to notice changes
+    bool saveUiPrefs(std::string& err);     // ui.json with them and storedLayout_
+    void autosavePrefs(bool flush = false); // every frame: saves a moment after a change (flush: now, at quit)
+    void noteLayoutStored();                // layout_ is what ui.json keeps now
     std::string layoutKey() const; // the layout without per-session state, to notice edits
     void watchLayoutChanges();
     void saveRecentActions();
@@ -1673,6 +1717,10 @@ private:
     std::string configDir_;           // <prefs>/ (ui.json, console_history.txt, recent_actions.txt)
     std::string capturingShortcut_;   // action id waiting for a key
     std::string layoutBaseline_;      // layoutKey() as last stored / loaded / restored
+    Json storedLayout_;               // the layout ui.json keeps (Save Layout); null: none yet, the standard one
+    std::string prefsSavedKey_;       // prefsKey() as last saved (or read at the start)
+    bool prefsKeyKnown_ = false, actionsReady_ = false;
+    double prefsCheckedAt_ = 0.0, prefsSaveAt_ = 0.0; // the last look; when a pending change is written (0: none)
     bool layoutHintShown_ = false;
     int layoutCheckFrame_ = 0;
     bool uiConfigDeterministic_ = false; // UI tests, renders, recordings: standard layout, nothing read
@@ -1770,11 +1818,11 @@ private:
     } gizmo_;
     // ---- end Transform gizmo ----
     // ---- Classic sculpting keys (Input.cpp, docs/guide/quick-tour.md) ----
-    // Preferences > Input (the classic or SculptForge key style), the Space QuickMenu, the intensities and Focal
-    // Shift (U / I / O), the classic mask and face group keys, Shift-constrained straight strokes and the
+    // Preferences > Input (the classic or SculptForge key style), the Space QuickMenu, the intensities and
+    // Falloff (U / I / O), the classic mask and face group keys, Shift-constrained straight strokes and the
     // Shift+click, release Shift, drag roll.
     void registerInputActions();
-    void applyInputStyle(); // the style's default shortcuts (1-0 brushes or 9 QuickSave; I = RGB or Z Intensity)
+    void applyInputStyle(); // the style's default shortcuts (1-0 brushes or 9 QuickSave; I = RGB or Intensity)
     bool classicStyle() const { return uiPrefs_.inputStyle == 0; }
     bool blenderStyle() const { return uiPrefs_.inputStyle == 2; }
     bool mayaStyle() const { return uiPrefs_.inputStyle == 3; } // #32: Alt+left/middle/right orbit/pan/zoom
@@ -1831,7 +1879,7 @@ private:
     bool hintShown(const char* id) const;
     void drawViewportHint(const char* id, const char* text, ImU32 colour, float top);
     void drawHintsSection();
-    // Z Intensity (0-100 on screen): Smooth's own while Shift is held or Smooth is the brush.
+    // Intensity (0-100 on screen): Smooth's own while Shift is held or Smooth is the brush.
     void drawZIntensitySlider(const char* id);
     void openQuickMenu();
     void quickMenuKeyUp();   // Space released: a hold closes the menu, a tap leaves it open
@@ -1844,16 +1892,16 @@ private:
     // Straight strokes: Shift pressed after a stroke started constrains it to a line from where Shift went down,
     // snapped to 45 degree steps on screen. Returns the point to draw towards.
     glm::vec2 constrainStroke(float x, float y);
-    float smoothStrength_ = 0.5f; // Smooth's own Z Intensity (Shift+stroke, or the Smooth brush)
+    float smoothStrength_ = 0.5f; // Smooth's own Intensity (Shift+stroke, or the Smooth brush)
     bool smoothKeepVolume_ = false; // Brush > Smooth keeps volume: a Taubin smooth instead of the plain one (#40)
     bool smoothGroupBorders_ = false; // Brush > Smooth face group borders only: straightens the borders (#81)
     // the classic alternate smooth (#40): a stroke begun with Shift held that lets go of Shift while still pressing
     // smooths the other way (keeping the volume, or plainly when Smooth keeps volume) for the rest of the stroke.
     bool strokeAltSmooth_ = false;
-    float rgbIntensity_ = 1.0f;   // paint strength (RGB Intensity, 100 by default)
-    float focalShift_ = 0.0f;     // -1..1 (Focal Shift -100..100)
+    float rgbIntensity_ = 1.0f;   // paint strength (Colour intensity, 100 by default)
+    float focalShift_ = 0.0f;     // -1..1 (Falloff -100..100)
     // Per-brush settings (#78, BrushSettingsUi.cpp, core/BrushSettings.h): each frame, a brush switch stores the
-    // brush left and brings back the picked brush's own Draw Size, Z Intensity, Falloff, RGB Intensity, stroke and
+    // brush left and brings back the picked brush's own Size, Intensity, Falloff, Colour intensity, stroke and
     // alpha. Save Brush Settings writes them (<app data>/brush-settings.json) so they load at startup; Reset Brush
     // to Default puts back the shipped values. Off in demo videos and benchmarks (their scripts set every value).
 public:
@@ -1983,7 +2031,7 @@ private:
     // Up to eight pie menus of up to eight actions each. A menu's key (action radial.menuN, set in the keymap like
     // any other) or its mouse / pen button, held: the pie shows at the cursor, a flick toward a slot and letting go
     // runs that action. Tapped: the pie stays open; click a slot (or beside the pie, or Esc, to close it). Edited in
-    // Preferences > Input > Radial Menus; Store Config keeps them in ui.json ("radialMenus").
+    // Preferences > Input > Radial Menus; saved automatically in ui.json ("radialMenus").
     enum class RadialHold { None, Key, Mouse, Pen };
     void registerRadialActions();
     void refreshRadialActions(); // the radial.menuN actions' labels follow the menus' names
@@ -2167,7 +2215,8 @@ private:
     // ---- end Tablet ----
     // ---- SpaceMouse (SpaceMouse.cpp, core/SpaceMouse.h, docs/guide/navigation.md) ----
     // A 3Dconnexion SpaceMouse read through SDL's joystick API (no 3Dconnexion SDK): its six axes move the camera
-    // every frame, independently of the mouse and pen (a stroke held by the pen keeps going), its buttons run actions.
+    // every frame, independently of the mouse and pen (held while a stroke runs, unless Hold during strokes is off),
+    // its buttons run actions.
     void spaceMouseEvent(const SDL_Event& e); // hot-plug and buttons
     void spaceMouseScan();                    // take the first SpaceMouse SDL knows about, if none is open
     void spaceMouseClose();
@@ -2186,7 +2235,40 @@ private:
     // Every joystick SDL listed at the last scan and why it was or wasn't taken, for Preferences and the device
     // report a user can paste into an issue (#104).
     std::vector<std::string> joysticksSeen_;
+    // A pointer device that is really a 6-DoF controller (a SpaceMouse the system also lists as a mouse): its
+    // pointer events never reach the canvas or the UI (phoenix, Discord 11-05). Names cached per mouse id.
+    bool sixDofPointerEvent(const SDL_Event& e);
+    std::unordered_map<SDL_MouseID, bool> sixDofMice_;
+    // The view held still and the buttons ignored while a stroke runs (SpaceMouseSettings::holdWhileStroking).
+    bool spaceMouseHeldByStroke() const;
     // ---- end SpaceMouse ----
+    // ---- Touch (Touch.cpp, core/TouchGesture.h, docs/guide/navigation.md) ----
+    // Two fingers on a touch screen pan, pinch-zoom and twist the view; on a trackpad they pinch-zoom and twist
+    // (their scroll stays the wheel). One finger on a touch screen still sculpts: its mouse press waits kTouchHold
+    // for a second finger before it reaches the canvas. SDL 3.4's pinch events zoom too (macOS trackpads).
+    static constexpr double kTouchHold = 0.08; // seconds
+    // UI tests' devices (Demo touch_pinch): any other unknown id counts as a touch screen, as SDL can't say.
+    static constexpr SDL_TouchID kUiTestTouchScreen = 0x5F70, kUiTestTrackpad = 0x5F71;
+    void touchEvent(const SDL_Event& e);       // finger and pinch events
+    bool touchMouseEvent(const SDL_Event& e);  // SDL's mouse events made from a finger: true when held or dropped
+    void touchTick();                          // once a frame: a held press that waited long enough goes through
+    void touchFlushPress();
+    void touchApply(const TwoFingerStep& step);
+    TouchGesture touch_;
+    bool touchNavigates_ = false;   // this touch began over the 3D view
+    bool touchDirect_ = true;       // a touch screen (false: a trackpad)
+    bool touchSwallowMouse_ = false; // a gesture ran: the finger's mouse events stay off the canvas until it lifts
+    bool touchNativePinch_ = false; // SDL sends pinch events: a trackpad's finger spread doesn't zoom again
+    bool touchTwisting_ = false;    // the twist passed kTouchTwistStart: it rolls the view from now on
+    bool touchPinching_ = false;    // a trackpad pinch or twist is under way: its stray scroll doesn't zoom
+    float touchTwistSum_ = 0.0f, touchZoomSum_ = 0.0f;
+    struct TouchPress {
+        bool held = false;
+        float x = 0.0f, y = 0.0f;
+        int clicks = 1;
+        double at = 0.0;
+    } touchPress_;
+    // ---- end Touch ----
     // ---- Sculpt Timeline (PanelTimeline.cpp, core/Timeline.h) and proof mode (ProofMode.cpp) ----
     // The history strip along the bottom of the canvas, the timelapse export, and Help > Benchmark: a scripted
     // stroke through the input handlers on 5M..100M+ meshes with a live HUD, an MP4 and a JSON result.

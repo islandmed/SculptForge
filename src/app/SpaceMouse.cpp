@@ -7,8 +7,8 @@
 // it, macOS, Windows without 3DxWare hiding it). The cap's six axes move the
 // camera every frame about the same pivot the mouse orbits around; the buttons
 // run actions (Frame and Front view by default). The math and the settings are
-// in core/SpaceMouse.h; Preferences > Input > SpaceMouse edits them, Store
-// Config keeps them. User guide: docs/guide/navigation.md.
+// in core/SpaceMouse.h; Preferences > Input > SpaceMouse edits them, and
+// they save themselves. User guide: docs/guide/navigation.md.
 #include "app/App.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
@@ -131,7 +131,7 @@ void App::spaceMouseEvent(const SDL_Event& e) {
         if (!spaceMouse_ || e.jbutton.which != spaceMouseId_) break;
         spaceMouseLastButton_ = e.jbutton.button;
         const SpaceMouseSettings& s = uiPrefs_.spaceMouse;
-        if (!s.enabled || e.jbutton.button >= s.buttons.size()) break;
+        if (!s.enabled || e.jbutton.button >= s.buttons.size() || spaceMouseHeldByStroke()) break;
         const std::string& id = s.buttons[e.jbutton.button];
         if (id.empty()) break;
         const Action* a = actions_.find(id);
@@ -153,6 +153,7 @@ void App::updateSpaceMouse(float dt) {
         spaceMouseAxes_[size_t(i)] = std::clamp(float(SDL_GetJoystickAxis(spaceMouse_, i)) / 32767.0f, -1.0f, 1.0f);
     for (float v : spaceMouseAxes_) spaceMouseReported_ = spaceMouseReported_ || v != 0.0f;
     const SpaceMouseSettings& s = uiPrefs_.spaceMouse;
+    if (spaceMouseHeldByStroke()) return; // (the axes above still show in Preferences)
     const SpaceMouseMotion m = spaceMouseMotion(spaceMouseAxes_, dt, s);
     if (!m.any()) return;
     spaceMouseMoving_ = true;
@@ -173,8 +174,31 @@ void App::updateSpaceMouse(float dt) {
     const float h = canvasHeight();
     if (m.panX != 0.0f || m.panY != 0.0f) camera_.pan(m.panX * h, m.panY * h, h);
     if (m.zoom != 0.0f) camera_.zoom(m.zoom);
-    // A stroke held by the pen carries on: its dabs follow the pen on screen, so the next sample sculpts where the
-    // pen now points on the turned model; nothing else about the stroke changes.
+    // With Hold during strokes off, a stroke held by the pen carries on: its dabs follow the pen on screen, so the
+    // next sample sculpts where the pen now points on the turned model; nothing else about the stroke changes.
+}
+
+bool App::spaceMouseHeldByStroke() const {
+    return uiPrefs_.spaceMouse.holdWhileStroking &&
+           (drag_ == Drag::Stroke || drag_ == Drag::MaskCanvas || drag_ == Drag::AirStroke || strokeFinishing_);
+}
+
+bool App::sixDofPointerEvent(const SDL_Event& e) {
+    SDL_MouseID which = 0;
+    if (e.type == SDL_EVENT_MOUSE_MOTION) which = e.motion.which;
+    else if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) which = e.button.which;
+    else if (e.type == SDL_EVENT_MOUSE_WHEEL) which = e.wheel.which;
+    else return false;
+    if (which == 0 || which == SDL_PEN_MOUSEID || which == SDL_TOUCH_MOUSEID) return false; // (0: the system's pointer)
+    auto it = sixDofMice_.find(which);
+    if (it == sixDofMice_.end()) {
+        const char* name = SDL_GetMouseNameForID(which);
+        // By name only (a mouse has no USB ids in SDL): "3Dconnexion ...", "SpaceMouse ...", never a CadMouse.
+        const bool sixDof = name && isSpaceMouseDevice(0, 0, name);
+        if (sixDof) SDL_Log("SpaceMouse: pointer events from \"%s\" ignored (a 6-DoF device, not a mouse)", name);
+        it = sixDofMice_.emplace(which, sixDof).first;
+    }
+    return it->second;
 }
 
 // ---------------------------------------------------------------------------
@@ -259,6 +283,11 @@ void App::drawSpaceMouseSection() {
                  "The model stays upright: twisting turns it about the world's up axis, tilting looks over or under it, "
                  "and rolling the cap does nothing.",
                  path);
+    ui::Checkbox("Hold during strokes##spacemouse.hold", &s.holdWhileStroking);
+    ui::HelpText("Hold during strokes", nullptr,
+                 "While you sculpt, paint or mask, the SpaceMouse leaves the view alone and its buttons do nothing, so "
+                 "a hand resting on the cap never moves the model under the pen. Off: the view turns mid-stroke.",
+                 path);
     ui::Checkbox("Dominant axis##spacemouse.dominant", &s.dominant);
     ui::HelpText("Dominant axis", nullptr,
                  "Only the direction you push the most moves the view: a twist doesn't also pan a little.", path);
@@ -326,8 +355,8 @@ void App::drawSpaceMouseSection() {
         ImGui::TextColored(col(ui::color::textDim), "Last button pressed: %d", spaceMouseLastButton_ + 1);
     if (ImGui::SmallButton(ICON_LC_ROTATE_CCW "  SpaceMouse defaults##spacemouse.defaults")) s = SpaceMouseSettings();
     ui::HelpText("SpaceMouse defaults", nullptr,
-                 "On, speed 1, dead zone 8%, nothing inverted, free rotation, all axes at once; left button Frame, right "
-                 "button Front view.",
+                 "On, speed 1, dead zone 8%, nothing inverted, free rotation, held during strokes, all axes at once; left "
+                 "button Frame, right button Front view.",
                  path);
 }
 

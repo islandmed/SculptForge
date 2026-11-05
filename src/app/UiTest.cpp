@@ -49,11 +49,18 @@
 //   camera_distance D        put the camera D model units from the point it looks at (extreme zoom)
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
 //   drop FILE                as if FILE were dropped onto the window (relative to the script's folder)
+//   drop_library FILE        as if FILE were dropped onto the middle of the Library strip (an SDL drop event there)
+//   restart [FILE]           as quitting and starting again, for the preferences, shortcuts and layout: ui.json
+//                            is saved (what waits), the defaults come back, then ui.json is read as at the start;
+//                            FILE (beside the script) replaces ui.json first (an older version's settings)
 //   env NAME VALUE           set an environment variable; $SCRIPT_DIR is the script's folder
 //   input_style STYLE        classic, sculptforge (the default), blender or maya, as Preferences > Input sets it
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
 //                            directory), e.g. to stage what another program would write (the Blender bridge);
 //                            $LIBRARY in DST (and in env values) is the test's Library library folder
+//   support_card first_run [test_mode]   the full membership card's launch decision (Support.h)
+//   member_card MOMENT [days=N] [sculpt_seconds=S]   a good moment for the small membership card (sculpted, render,
+//                            updated, challenge, none); member_sign_in ok|fail ends the GitHub sign-in it started
 //   wait SECONDS / wait_idle [TIMEOUT] (AI requests, thumbnails, update checks and other background jobs) / wait_for LABEL [TIMEOUT]
 //   wait_value NAME OP N [TIMEOUT]  wait (real time, default 30 s) until expect_value NAME OP N would pass
 //   expect LABEL / expect_not LABEL
@@ -75,6 +82,8 @@
 //                            whats_new_open, whats_new_cards, whats_new_tries (What's New and its Try it clicks),
 //                            whats_new_contents / whats_new_expanded (its guide chapter: contents entries, open sections),
 //                            custom_brush_active (a custom brush is the active one),
+//                            member_card_open / member_card_pending / member_card_verifying / member_signed_in /
+//                            supporter (the membership cards, Support.h),
 //                            welcome_open (the first-run welcome shown), new_look_card_open (the one-time
 //                            "SculptForge has a new look" card),
 //                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
@@ -82,7 +91,7 @@
 //                            the active Part with one triangle: 0 = watertight),
 //                            edited_parts (Parts with undo history), user_brushes (brushes in the
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
-//                            one in --ui-out/brush-library), ui_config (1 once Store Config wrote ui.json),
+//                            one in --ui-out/brush-library), ui_config (1 once ui.json is written: the preferences save themselves, or Save Layout),
 //                            console_open, command_palette_open, customize, shelves_visible,
 //                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, offscreen_items (past the window edge), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
@@ -90,7 +99,7 @@
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
 //                            moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
 //                            selection_shown (1 while a rectangle / lasso selection is drawn), symmetry_x,
-//                            symmetry_radial (the radial count, 0 off), radial_axis (0 X, 1 Y, 2 Z), symmetry_local,
+//                            symmetry_radial (the radial copies, 0 off), radial_axis (0 X, 1 Y, 2 Z), symmetry_local,
 //                            symmetry_copies (copies every stroke makes), cursor_copies (brush cursors drawn),
 //                            symmetry_pivot_x (local symmetry's centre), timeline_top (1: the strip at the top),
 //                            timeline_y / axis_gizmo_y (their tops / centre, fractions of the canvas from its top),
@@ -128,6 +137,7 @@
 //                            roughness differs from the default), shown_mean_r (mean red the viewport is sent),
 //                            layer_channel_<id> (1 when the active texture layer has channel <id> on, e.g. roughness)
 //                            auto_uv_running, qremesh_running (QRemesh working in the background),
+//                            voxel_remesh_running, quick_remesh / remesh_after_stroke (Tool > Remesh, #121), stroke_stretched,
 //                            qremesh_guides (guide curves on the active Part), qremesh_guide_loops (closed ones),
 //                            guides_mode (1 while the QRemesh Guides brush is picked),
 //                            quads (quad pairs in the active Part), quad_percent (quads among its polygons)
@@ -227,6 +237,14 @@
 //                            pen_mouse_down, ui_left_down (the panels hold the left button), soft_cursor
 //   mouse_move U V           a plain mouse (not the pen) moves to a point on the model, e.g. the stray mouse
 //                            events Windows Ink sends beside the pen's
+//
+// Touch (Touch.cpp): fingers as SDL sends them, each step a frame.
+//   touch_pinch U V SCALE TWIST DX DY [trackpad] [late]   two fingers about a point on the model, 120 px apart, over
+//                            0.4 s: their span grows SCALE times, they turn TWIST degrees (clockwise > 0) and their
+//                            midpoint moves DX DY pixels. Touch screen (SDL's mouse events for the first finger too)
+//                            or trackpad; late: the first finger lands alone and drags 40 px first (a stroke starts)
+//   touch_stroke U0 V0 U1 V1 one finger on the touch screen from one point on the model to another (sculpts)
+//   expect_value touch_fingers (fingers down now)
 //
 // Simulated 3Dconnexion SpaceMouse: an SDL virtual joystick with a SpaceMouse Compact's USB ids (256F:C635), six
 // axes and two buttons, found and opened by the app as a real one would be (SpaceMouse.cpp, hot-plug included).
@@ -455,6 +473,10 @@ double Demo::query(const std::string& name, bool& known) const {
     if (const double v = app_.splatTrainTestValue(name); !std::isnan(v)) return v; // splat_training, ...
     if (const double v = app_.sculptableTestValue(name); !std::isnan(v)) return v;
     if (name == "qremesh_running") return app_.qremesh_ ? 1.0 : 0.0;
+    if (name == "voxel_remesh_running") return app_.voxelRemesh_ ? 1.0 : 0.0;
+    if (name == "quick_remesh") return app_.uiPrefs_.quickRemesh ? 1.0 : 0.0;
+    if (name == "remesh_after_stroke") return app_.uiPrefs_.remeshAfterStroke ? 1.0 : 0.0;
+    if (name == "stroke_stretched") return double(app_.lastStrokeStretched_);
     if (name == "qremesh_guides") return double(app_.doc_.qremeshGuides.size());
     if (name == "selection_sets") return m.selectionSets ? double(m.selectionSets->sets.size()) : 0.0;
     if (name == "morph_target") return m.selectionSets && !m.selectionSets->morphTarget.empty() ? 1.0 : 0.0;
@@ -504,7 +526,7 @@ double Demo::query(const std::string& name, bool& known) const {
         const int k = name.back() == 'r' ? 0 : name.back() == 'g' ? 1 : 2;
         return sum[k] / double(px.size() / 4);
     }
-    // classic feel (Input.cpp): the intensities and Focal Shift as shown (0-100, -100..100).
+    // classic feel (Input.cpp): the intensities and Falloff as shown (0-100, -100..100).
     if (name == "z_intensity") return std::round(app_.strength_ * 100.0f);
     if (name == "smooth_keep_volume") return app_.smoothKeepVolume_ ? 1.0 : 0.0;
     if (name == "smooth_group_borders") return app_.smoothGroupBorders_ ? 1.0 : 0.0;
@@ -699,6 +721,17 @@ double Demo::query(const std::string& name, bool& known) const {
             n += isLitSphereFile(it->path().string()) ? 1 : 0;
         return double(n);
     }
+    if (name == "litsphere_folder_files") { // images in the Lit Spheres folder's sub-folders (#124)
+        int n = 0;
+        for (const std::string& sub : app_.litsphereSubfolders()) {
+            const std::string dir = app_.litsphereFolder() + "/" + sub;
+            std::error_code ec;
+            for (std::filesystem::directory_iterator it(std::filesystem::path(std::u8string(dir.begin(), dir.end())), ec), end;
+                 !ec && it != end; it.increment(ec))
+                n += isLitSphereFile(it->path().string()) ? 1 : 0;
+        }
+        return double(n);
+    }
     if (name == "flat_shading") return app_.renderSettings_.flatShading ? 1.0 : 0.0;
     if (name == "gradient_background") return app_.renderSettings_.gradientBackground ? 1.0 : 0.0;
     if (name == "background_r" || name == "background_g" || name == "background_b") // 0-255, display values
@@ -762,7 +795,11 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "whats_new_expanded") return double(app_.guide_.whatsNewExpanded());
     if (name == "custom_brush_active") return app_.doc_.activeBrush >= 0 && !app_.paintMode_ ? 1.0 : 0.0;
     if (name == "supporter") return app_.supportCardPrefs_.supporter ? 1.0 : 0.0;
-    if (name == "support_card_enabled") return app_.supportCardPrefs_.enabled ? 1.0 : 0.0;
+    // The small membership card (Support.h): open (1), the sign-in running from it, member builds signed in.
+    if (name == "member_card_open") return app_.memberCard_ != MemberMoment::None ? 1.0 : 0.0;
+    if (name == "member_card_pending") return app_.memberMomentPending_ != MemberMoment::None ? 1.0 : 0.0;
+    if (name == "member_card_verifying") return app_.memberVerifying_ ? 1.0 : 0.0;
+    if (name == "member_signed_in") return app_.memberSignedIn() ? 1.0 : 0.0;
     if (name == "part_thumbnails") { // Part panel thumbnails rendered (#43)
         double n = 0.0;
         for (const auto& [id, tex] : app_.partThumbs_) n += tex ? 1.0 : 0.0;
@@ -914,6 +951,7 @@ double Demo::query(const std::string& name, bool& known) const {
         const glm::vec3 f = glm::abs(app_.camera_.forward());
         return std::max({f.x, f.y, f.z}) > 0.99999f ? 1.0 : 0.0;
     }
+    if (name == "touch_fingers") return double(app_.touch_.fingers());
     if (name == "spacemouse_connected") return app_.spaceMouse_ ? 1.0 : 0.0;
     if (name == "spacemouse_moving") return app_.spaceMouseMoving() ? 1.0 : 0.0;
     if (name == "camera_distance") return app_.camera_.distance;
@@ -1555,6 +1593,21 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
         const auto u8 = file.lexically_normal().u8string();
         run([this, path = std::string(u8.begin(), u8.end())] { app_.openPathConfirmed(path); });
+    } else if (verb == "drop_library") { // drop_library FILE: the file dropped on the middle of the Library strip
+        if (!need(1)) return false;
+        auto file = std::filesystem::path(std::u8string(w[1].begin(), w[1].end()));
+        if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
+        const auto u8 = file.lexically_normal().u8string();
+        run([this, path = std::string(u8.begin(), u8.end())] {
+            const ImVec2 at = app_.libraryBrowser_.shownCentre();
+            SDL_Event e{};
+            e.type = SDL_EVENT_DROP_FILE;
+            e.drop.windowID = SDL_GetWindowID(app_.window_);
+            e.drop.x = at.x;
+            e.drop.y = at.y;
+            e.drop.data = path.c_str();
+            app_.handleEvent(e);
+        });
     } else if (verb == "choose_file" && w.size() > 2 && w[1] == "maya_folder") {
         // choose_file maya_folder <folder>: what File > Maya > Exchange folder's dialog would answer (relative to the
         // working directory, like copy's destination).
@@ -1771,6 +1824,18 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return false;
         }
         run([this, style] { app_.setInputStyle(style); });
+    } else if (verb == "restart") {
+        // restart [FILE]: as quitting and starting again, for the preferences (#117): what waits is saved, everything
+        // goes back to the defaults, then ui.json is read as at the start. FILE (beside the script) replaces ui.json
+        // first: a start with an older version's settings.
+        std::string from;
+        if (w.size() > 1) {
+            const auto file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) /
+                              std::filesystem::path(std::u8string(w[1].begin(), w[1].end()));
+            const auto u8 = file.lexically_normal().u8string();
+            from.assign(u8.begin(), u8.end());
+        }
+        run([this, from] { app_.restartPrefsForTest(from); });
     } else if (verb == "env") {
         if (!need(2)) return false;
         std::string value = restOf(lineText_, 2);
@@ -1819,26 +1884,65 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             }
         });
     } else if (verb == "support_card") {
-        // The launch decision for the support card (Support.h), as a start would make it: `first_run`, `updated` (a
-        // new version since it last showed), `days=N` (the clock N days after it last showed) and `test_mode` (how
-        // every UI test, render and CI run starts: never shown).
-        bool firstRun = false, updated = false, testMode = false;
-        double days = 0.0;
+        // The launch decision for the full membership card (Support.h), as a start would make it: `first_run` and
+        // `test_mode` (how every UI test, render and CI run starts: never shown).
+        bool firstRun = false, testMode = false;
         for (size_t i = 1; i < w.size(); ++i) {
             if (w[i] == "first_run") firstRun = true;
-            else if (w[i] == "updated") updated = true;
             else if (w[i] == "test_mode") testMode = true;
-            else if (w[i].rfind("days=", 0) == 0) days = std::atof(w[i].c_str() + 5);
             else {
                 error = "support_card: unknown option '" + w[i] + "'";
                 return false;
             }
         }
-        run([this, firstRun, updated, testMode, days] {
-            SupportCardPrefs& p = app_.supportCardPrefs_;
-            if (updated) p.shownVersion = "0.0.0";
-            const int64_t base = p.shownAt > 0 ? p.shownAt : int64_t(1'800'000'000);
-            app_.launchSupportCard(firstRun, base + int64_t(days * 86400.0), testMode);
+        run([this, firstRun, testMode] { app_.launchSupportCard(firstRun, app_.memberClock(), testMode); });
+    } else if (verb == "member_card") {
+        // A good moment for the small membership card (Support.h): sculpted | render | updated | challenge | none,
+        // with `days=N` (the clock N days on from the test's start) and `sculpt_seconds=S` (this session's stroke time
+        // so far: the next frame decides the sculpting moment). UI tests otherwise never show it (test mode).
+        if (!need(1)) return false;
+        static const std::pair<const char*, MemberMoment> kMoments[] = {
+            {"sculpted", MemberMoment::Sculpted}, {"render", MemberMoment::SavedRender},
+            {"updated", MemberMoment::Updated}, {"challenge", MemberMoment::Challenge}, {"none", MemberMoment::None}};
+        MemberMoment moment = MemberMoment::None;
+        bool known = false;
+        for (const auto& [n, m] : kMoments)
+            if (w[1] == n) moment = m, known = true;
+        if (!known) {
+            error = "member_card: unknown moment '" + w[1] + "'";
+            return false;
+        }
+        double days = -1.0, sculpt = -1.0;
+        for (size_t i = 2; i < w.size(); ++i) {
+            if (w[i].rfind("days=", 0) == 0) days = std::atof(w[i].c_str() + 5);
+            else if (w[i].rfind("sculpt_seconds=", 0) == 0) sculpt = std::atof(w[i].c_str() + 15);
+            else {
+                error = "member_card: unknown option '" + w[i] + "'";
+                return false;
+            }
+        }
+        run([this, moment, days, sculpt] {
+            app_.memberCardTestMode_ = true;
+            if (days >= 0.0) app_.memberClockOffset_ = int64_t(days * 86400.0);
+            if (sculpt >= 0.0) app_.sessionSculptSeconds_ = sculpt;
+            if (moment == MemberMoment::Challenge) app_.challengeTitle_ = "Creatures";
+            app_.memberMoment(moment);
+        });
+    } else if (verb == "member_sign_in") {
+        // Ends the GitHub sign-in that is running (UI tests never reach GitHub): `ok` (the account can read the
+        // member repository) or `fail` (no access, declined, the code ran out).
+        if (!need(1)) return false;
+        const bool ok = w[1] == "ok";
+        if (!ok && w[1] != "fail") {
+            error = "member_sign_in: ok or fail";
+            return false;
+        }
+        run([this, line, ok] {
+            if (!app_.memberSignIn_) {
+                fail(line, "member_sign_in: no sign-in is running");
+                return;
+            }
+            app_.finishMemberSignInForTest(ok);
         });
     } else if (verb == "wait") {
         if (!need(1)) return false;
@@ -2154,6 +2258,92 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             mouseMotion(p.x, p.y);
         });
         wait(0.05f);
+    } else if (verb == "touch_pinch" || verb == "touch_stroke") {
+        // Fingers as SDL sends them, on a touch screen with the mouse events SDL makes from the first finger (before
+        // that finger's own event), or on a trackpad (no mouse events; the pointer rests over the model).
+        if (!need(verb == "touch_pinch" ? 6 : 4)) return false;
+        struct Touch {
+            ImVec2 centre, end;
+            float scale = 1.0f, twist = 0.0f, dx = 0.0f, dy = 0.0f;
+            bool pad = false, late = false, stroke = false;
+        };
+        auto tc = std::make_shared<Touch>();
+        tc->stroke = verb == "touch_stroke";
+        const float u0 = num(1, 0.5f), v0 = num(2, 0.5f);
+        float u1 = 0.0f, v1 = 0.0f;
+        if (tc->stroke) {
+            u1 = num(3, 0.5f);
+            v1 = num(4, 0.5f);
+        } else {
+            tc->scale = num(3, 1.0f);
+            tc->twist = glm::radians(num(4, 0.0f));
+            tc->dx = num(5, 0.0f);
+            tc->dy = num(6, 0.0f);
+            for (size_t i = 7; i < w.size(); ++i) {
+                if (w[i] == "trackpad") tc->pad = true;
+                else if (w[i] == "late") tc->late = true;
+            }
+        }
+        run([this, tc, u0, v0, u1, v1] {
+            tc->centre = onModel(u0, v0);
+            tc->end = tc->stroke ? onModel(u1, v1) : tc->centre;
+        });
+        steps_.push_back([this, tc](float t) {
+            int ww = 0, wh = 0;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            const SDL_TouchID device = tc->pad ? App::kUiTestTrackpad : App::kUiTestTouchScreen;
+            auto finger = [&](SDL_EventType type, SDL_FingerID id, ImVec2 p) {
+                SDL_Event e{};
+                e.type = type;
+                e.tfinger.touchID = device;
+                e.tfinger.fingerID = id;
+                // (a trackpad's own 0..1 square, as wide as App::kTrackpadAspect: the twist keeps its angle)
+                e.tfinger.x = tc->pad ? p.x / float(wh) / 1.5f : p.x / float(ww);
+                e.tfinger.y = p.y / float(wh);
+                e.tfinger.pressure = type == SDL_EVENT_FINGER_UP ? 0.0f : 1.0f;
+                e.tfinger.windowID = SDL_GetWindowID(app_.window_);
+                app_.handleEvent(e);
+            };
+            auto first = [&](SDL_EventType type, ImVec2 p) { // the first finger, with SDL's mouse events for it
+                if (!tc->pad) {
+                    mouseMotion(p.x, p.y, SDL_TOUCH_MOUSEID);
+                    if (type == SDL_EVENT_FINGER_DOWN) mouseButton(true, SDL_BUTTON_LEFT, SDL_TOUCH_MOUSEID);
+                    if (type == SDL_EVENT_FINGER_UP) mouseButton(false, SDL_BUTTON_LEFT, SDL_TOUCH_MOUSEID);
+                }
+                finger(type, 1, p);
+            };
+            constexpr float kSeconds = 0.4f, kLate = 0.25f, kSpan = 120.0f;
+            if (tc->stroke) {
+                const float k = std::min(t / kSeconds, 1.0f);
+                const ImVec2 p(tc->centre.x + (tc->end.x - tc->centre.x) * k, tc->centre.y + (tc->end.y - tc->centre.y) * k);
+                first(t == 0.0f ? SDL_EVENT_FINGER_DOWN : SDL_EVENT_FINGER_MOTION, p);
+                if (t >= kSeconds) first(SDL_EVENT_FINGER_UP, p);
+                return t >= kSeconds;
+            }
+            // late: the first finger lands alone and drags (a stroke begins), the second lands kLate later.
+            const float start = tc->late ? kLate : 0.0f;
+            const float k = std::clamp((t - start) / kSeconds, 0.0f, 1.0f);
+            const float span = kSpan * std::pow(tc->scale, k), a = tc->twist * k;
+            const ImVec2 c(tc->centre.x + tc->dx * k, tc->centre.y + tc->dy * k);
+            const ImVec2 off(std::cos(a) * span * 0.5f, std::sin(a) * span * 0.5f);
+            ImVec2 pa(c.x - off.x, c.y - off.y);
+            const ImVec2 pb(c.x + off.x, c.y + off.y);
+            if (tc->late && t < start) pa = ImVec2(pa.x, pa.y - 40.0f * (1.0f - t / start)); // dragging down to pa
+            if (t == 0.0f) {
+                if (tc->pad) mouseMotion(c.x, c.y); // the pointer over the model
+                first(SDL_EVENT_FINGER_DOWN, tc->late ? ImVec2(pa.x, pa.y - 40.0f) : pa);
+                if (!tc->late) finger(SDL_EVENT_FINGER_DOWN, 2, pb);
+                return false;
+            }
+            first(SDL_EVENT_FINGER_MOTION, pa);
+            if (tc->late && t >= start && !app_.touch_.gesture()) finger(SDL_EVENT_FINGER_DOWN, 2, pb);
+            if (t >= start) finger(SDL_EVENT_FINGER_MOTION, 2, pb);
+            if (t < start + kSeconds) return false;
+            first(SDL_EVENT_FINGER_UP, pa);
+            finger(SDL_EVENT_FINGER_UP, 2, pb);
+            return true;
+        });
+        wait(0.15f);
     } else if (verb == "spacemouse" || verb == "spacemouse_hold") {
         if (!need(6)) return false;
         std::array<float, 6> v{};

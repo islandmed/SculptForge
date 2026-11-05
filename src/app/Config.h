@@ -1,11 +1,10 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// UI preferences and the classic configuration workflow: Store Config
-// (Ctrl+Shift+I) writes <prefs>/ui.json with the layout, shortcut overrides and
-// these preferences; nothing is saved automatically. Restore Standard UI goes
-// back to the built-in layout, Restore Custom UI to the stored one, and Save UI /
-// Load UI (Ctrl+L) share a layout as a file.
+// UI preferences and the configuration workflow. <prefs>/ui.json keeps the shortcut overrides, these preferences
+// and the radial menus, saved a moment after each change (#117), and the layout as Save Layout last kept it.
+// Reset Layout and Shortcuts goes back to the built-in ones, Revert to Saved Layout to the saved layout, and
+// Export Interface / Import Interface (Ctrl+L) share all of it as a file.
 #pragma once
 
 #include "app/LookSchemes.h"
@@ -23,8 +22,8 @@ namespace sf {
 class App;
 
 struct UiPrefs {
-    bool popupInfo = true;      // Ctrl+hover shows an item's description ("Popup Info")
-    float helpOpacity = 0.97f;  // Ctrl-help box opacity ("Quick Info Opacity")
+    bool popupInfo = true;      // Ctrl+hover shows an item's description ("Ctrl+hover help")
+    float helpOpacity = 0.97f;  // Ctrl-help box opacity ("Help box opacity")
     float tooltipDelay = 0.5f;  // plain hover tooltips on icon-only buttons and clipped labels
     bool reduceMotion = false;  // hover highlights change colour only: no easing, no lifting tiles (Ui.h)
     bool oneSubpalette = true;  // opening a sub-palette closes the others (Shift+click opens more)
@@ -37,7 +36,7 @@ struct UiPrefs {
     int cameraNotch = 0;        // keep the UI out of a laptop's camera notch: 0 automatic, 1 always, 2 never
     bool turntable = false;     // rotation: false = free, about the screen axes; true = turntable (Y up)
     int inputStyle = 1;         // Preferences > Input: 0 classic, 1 SculptForge (the default for new installs:
-                                // 1-0 brushes, I = Intensity...), 2 Blender (middle-drag orbit, numpad views,
+                                // 1-0 brushes, I = Falloff...), 2 Blender (middle-drag orbit, numpad views,
                                 // Blender's sculpt keys), 3 Maya (Input.cpp). The first-run welcome asks.
     bool inputStyleSaved = false; // ui.json named the style (not saved itself): an install from before 0.10.4
                                   // without it had the Classic sculpting keys and keeps them (PanelProject.cpp)
@@ -53,6 +52,9 @@ struct UiPrefs {
     // vertical as the other styles. invertZoom turns every zoom drag around.
     bool mayaZoomHorizontal = true;
     bool invertZoom = false;
+    // Tool > Remesh (#121): Quick Remesh (Shift+R, or hold N and drag on the background, remeshes the active Part at
+    // the Voxel Resolution) and Remesh after each stroke (a stroke that stretched the surface remeshes it).
+    bool quickRemesh = false, remeshAfterStroke = false;
     // Along the normal (from the discussions): 0 = with the invert key (Alt; Ctrl in the Blender and Maya styles),
     // 1 = always, 2 = never. For Move, Tendril, Elastic Tendril and KelvinGrab.
     int alongNormal = 0;
@@ -78,7 +80,7 @@ struct UiPrefs {
     // Preferences > Interface > Look: the colours and style of the interface (Theme.h; new installs get Forge
     // Terminal with Tokyo Night), and the shell's layout: 0 the Classic layout (the alphabetical palette bar,
     // two-row top shelf), 1 the SculptForge layout (the default: task menus File, Edit, Sculpt, Paint, Mesh, View,
-    // Render, Help, a status bar, one-row shelf). Remembered in project.json too, without Store Config.
+    // Render, Help, a status bar, one-row shelf). Remembered in project.json too, on its own.
     theme::LookSettings look;
     int shellLayout = 1;
     bool lookSaved = false; // ui.json named the look or layout (not saved itself); one from before 0.10.7 didn't
@@ -130,15 +132,15 @@ struct UiPrefs {
 
 Json toJson(const UiPrefs& prefs);
 // Just the look and the layout ("look" and "layout" keys): ui.json's prefs, and project.json's "ui_look", which
-// remembers them without Store Config. lookFromJson says whether `j` named either.
+// remembers them on its own. lookFromJson says whether `j` named either.
 void lookToJson(const UiPrefs& prefs, Json& j);
 bool lookFromJson(const Json& j, UiPrefs& prefs);
 void fromJson(const Json& j, UiPrefs& prefs);
 
 namespace config {
 // Preferences palette sub-palettes (the shell's Preferences palette calls these).
-void drawConfigSection(App& app);    // Enable Customize, Store / Restore / Save / Load UI
-void drawInterfaceSection(App& app); // UI scale, Popup Info, tooltips, sub-palettes, left-handed layout
+void drawConfigSection(App& app);    // Customize Shelves, Store / Restore / Save / Import Interface
+void drawInterfaceSection(App& app); // UI scale, Ctrl+hover help, tooltips, sub-palettes, left-handed layout
 void drawHotkeysSection(App& app);   // every action's shortcut, click to reassign
 void drawLibraryBrowserSection(App& app);  // show at startup, rows, placement, library folder
 // The Classic look's colours as a Palette (for its card; the look itself uses Theme.h's tokens).

@@ -98,6 +98,7 @@ private:
     std::vector<uint32_t> scratch_, written_, stageIndex_;
     std::vector<uint8_t> clusterSeen_;
     std::vector<uint64_t> slotBits_, baseBits_;
+    std::vector<std::vector<std::pair<uint32_t, uint32_t>>> baseRuns_; // per block of moved vertices: [first, end) runs
     std::vector<uint8_t> staging_;
     std::vector<uint32_t> levels_;
     std::vector<int8_t> want_;

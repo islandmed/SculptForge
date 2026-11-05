@@ -406,7 +406,7 @@ TEST(self_update_refuses_bad_releases) {
     CHECK(f.asked.size() == 2);
 }
 
-// The release key compiled into the app (Tony's, 11-05): 64 hex characters, a point on the curve, and the verifier
+// The release key compiled into the app (the maintainer's, 11-05): 64 hex characters, a point on the curve, and the verifier
 // accepts what is signed under a key and only that key (the sign side with the throwaway test key: the release's
 // private half never leaves the UPDATE_SIGNING_KEY secret).
 TEST(self_update_release_key) {

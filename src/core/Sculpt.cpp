@@ -1073,7 +1073,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                 const float corner = std::clamp((1.3f - glm::length(o) / r) / 0.3f, 0.0f, 1.0f);
                 const float edge = std::clamp((1.0f - cheb) / 0.35f, 0.0f, 1.0f);
                 w = edge * edge * (3.0f - 2.0f * edge) * corner;
-                // Focal Shift (#60) keeps this tip at 0: below, harder edges and a broader slab; above, it fades
+                // Falloff (#60) keeps this tip at 0: below, harder edges and a broader slab; above, it fades
                 // toward a soft round point, as an alpha does.
                 if (p.focal < 0.0f) w = std::pow(w, std::exp2(2.0f * std::max(p.focal, -1.0f)));
                 else if (p.focal > 0.0f) {
@@ -1323,7 +1323,7 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
 
 void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const DabParams& p) {
     auto clock = std::chrono::steady_clock::now();
-    // An alpha (if any) modulates the recipe's tip, oriented on the view-facing plane. Focal Shift shifts the tip
+    // An alpha (if any) modulates the recipe's tip, oriented on the view-facing plane. Falloff shifts the tip
     // (0 keeps the recipe's own Hardness / Tip Sharpness), and so the alpha with it. With an alpha the region
     // reaches the stamp's corners and, below 0, the round tip opens up toward 1 as alphaFalloff does, so at -100
     // the whole alpha shows (#75; the built-in brushes got this in #60).

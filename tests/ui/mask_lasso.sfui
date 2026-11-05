@@ -11,9 +11,9 @@ expect_value symmetry_x == 0
 
 # The shapes sit at the top of Tool > Masking, with Ctrl-hover help.
 click "Masking"
-click "Mask Lasso##mask.lasso"
+click "Lasso Mask##mask.lasso"
 hold ctrl
-hover "Mask Lasso##mask.lasso"
+hover "Lasso Mask##mask.lasso"
 expect_help "lasso"
 hold none
 
@@ -30,7 +30,7 @@ remember masked lasso
 shot lasso_masked
 
 # MaskRect: Ctrl+Alt+drag starting on the model unmasks the inside.
-click "Mask Rectangle##mask.rect"
+click "Rectangle Mask##mask.rect"
 hold ctrl+alt
 drag_path 0.1 0.35 0.9 0.65 keep
 shot rect_unmask_drawing
@@ -65,7 +65,7 @@ key ctrl+z
 expect_value masked == $unmasked
 
 # Symmetry X (#51): the lasso around the left half masks the right half too, as a mask stroke would.
-click "Mask Lasso##mask.lasso"
+click "Lasso Mask##mask.lasso"
 click "Clear##mask"
 key x
 expect_value symmetry_x == 1

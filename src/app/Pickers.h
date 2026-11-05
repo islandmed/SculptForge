@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // classic pop-up pickers: brush grid (B; type letters to choose), stroke,
-// alpha and material (M) grids, and the Draw Size / Strength sliders at the
+// alpha and material (M) grids, and the Size / Strength sliders at the
 // cursor (S / I). Also the thumbnail tile every grid and the Library draw.
 #pragma once
 
 #include <imgui.h>
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -31,6 +32,9 @@ void drawBrushGrid(App& app, GridMode mode);
 void drawAlphaGrid(App& app, GridMode mode);
 void drawMaterialGrid(App& app, GridMode mode);
 void drawStrokeGrid(App& app, GridMode mode);
+// The right-click menu of a custom Lit Sphere (#124), inside an open pop-up: Rename..., Move to folder, Remove.
+// `beforeRemove` runs just before it is removed (the picker puts its hover preview back).
+void litsphereMenu(App& app, int index, const std::function<void()>& beforeRemove = {});
 // The VDM brush's maps (built-in and library), reused by Brush > Vector Displacement; picking one makes the VDM
 // brush the brush. The Alpha picker shows them first while the VDM brush is the brush.
 void drawVdmGrid(App& app, GridMode mode);
@@ -53,8 +57,8 @@ struct PickerUi {
     static bool isActive(const App& app, const BrushItem& item);
     static void select(App& app, const BrushItem& item);
     static ImTextureID thumbnail(App& app, const BrushItem& item);
-    // Opens a slider under the mouse (S / U / I / O): Draw Size, Z Intensity (Smooth's own while Shift is
-    // held or Smooth is the brush), RGB Intensity or Focal Shift.
+    // Opens a slider under the mouse (S / U / I / O): Size, Intensity (Smooth's own while Shift is
+    // held or Smooth is the brush), Colour intensity or Falloff.
     enum class Slider { DrawSize, ZIntensity, RgbIntensity, FocalShift };
     static void sizePopup(App& app, Slider which);
     // The open slider's knob (its current value) in window coordinates, as last drawn; false when none is open.

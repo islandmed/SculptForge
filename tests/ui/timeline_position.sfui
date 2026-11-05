@@ -1,6 +1,6 @@
 # Timeline position (#63): the Sculpt Timeline strip runs along the top of the viewport by default, away from the
 # brush shelf, below the top shelf, with the axis gizmo below it; Preferences > Interface puts it back at the
-# bottom, and Store Config keeps the choice.
+# bottom, and the choice saves itself.
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=4
 stroke 0.35 0.40 0.60 0.45
@@ -27,15 +27,13 @@ expect_value timeline_y > 0.8
 expect_value axis_gizmo_y < 0.1
 shot bottom
 
-# Store Config keeps it; Restore Custom UI reads it back.
-key ctrl+shift+i
-expect_status "UI configuration stored"
+# The choice saves itself (#117): it is still there after a restart, and so is the next one.
+restart
+expect_value timeline_top == 0
 click "Preferences##palette.preferences"
+click "Interface##preferences.interface"
 click "Top of viewport##view.timeline_top"
 key escape
 expect_value timeline_top == 1
-key f3
-type "##Command palette" "restore custom"
-key enter
-expect_status "Custom UI restored"
-expect_value timeline_top == 0
+restart
+expect_value timeline_top == 1

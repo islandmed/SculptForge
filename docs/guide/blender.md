@@ -93,7 +93,7 @@ add-on. The preferences list every key while it's on.
 
 | Classic key | In Blender's Sculpt Mode |
 |---|---|
-| <kbd>S</kbd> / <kbd>U</kbd> / <kbd>O</kbd> | Draw Size / Intensity (Strength) / Falloff (Hardness), dragged at the cursor |
+| <kbd>S</kbd> / <kbd>U</kbd> / <kbd>O</kbd> | Size / Intensity (Strength) / Falloff (Hardness), dragged at the cursor |
 | <kbd>Space</kbd> | Blender's Sculpt quick menu at the cursor (brush, size, strength) |
 | <kbd>B</kbd> | The brush list by name (Standard, Sharp Crease, Clay, Clay Block, Move, Tendril...): type a few letters, <kbd>Enter</kbd> picks |
 | <kbd>Alt</kbd>+drag | Sub: the brush digs in |
@@ -114,9 +114,9 @@ Sharp, MaskPen = Mask.
 
 What Blender has no key for, or can't do:
 
-- <kbd>I</kbd> (RGB Intensity): Blender's sculpt brushes don't paint.
+- <kbd>I</kbd> (Colour intensity): Blender's sculpt brushes don't paint.
 - <kbd>Ctrl</kbd>+drag on the model doesn't paint the mask with a round brush: Blender can't switch to the Mask
-  brush for one stroke, so it draws a mask lasso (pick the Mask brush with <kbd>B</kbd> to paint it).
+  brush for one stroke, so it draws a lasso mask (pick the Mask brush with <kbd>B</kbd> to paint it).
 - Dragging on the empty background doesn't rotate: a keymap can't tell the model from the background. Use the
   middle mouse button, or Blender's *Emulate 3 Button Mouse*.
 - <kbd>Ctrl</kbd>+click on the background (invert or clear the mask) and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click

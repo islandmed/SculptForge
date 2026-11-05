@@ -3,7 +3,7 @@
 //
 // Real image-to-3D reconstruction through hosted models, with your own key:
 //  - fal.ai: one key for TRELLIS.2 (Microsoft), Hunyuan3D 3.1 (Tencent),
-//    Meshy 6 and other models, billed per generation
+//    Meshy 6, Hyper3D Rodin 2.5 and other models, billed per generation
 //  - Hugging Face Spaces: free public demos of TRELLIS.2, Hunyuan3D 2 / 2.1 and
 //    Stable Fast 3D on shared GPUs (daily quota; a free HF token raises it)
 //  - Meshy: direct API
@@ -85,9 +85,14 @@ GeneratorResult generate3D(const AiSettings& settings, const std::string& imageP
 GeneratorResult generate3DFromText(const AiSettings& settings, const std::string& prompt, const std::string& outputStem,
                                    GenerationProgress* progress = nullptr);
 
+// Hyper3D Rodin on fal.ai: image or text to 3D on one endpoint.
+bool rodinModel(std::string_view id);
+// The fal.ai model text to 3D runs: the chosen one when it takes text (Rodin), else Hunyuan3D 3.1 Rapid.
+std::string falTextModel(const std::string& falModel);
+
 // Pieces exposed for tests.
 std::string meshyTextBody(const std::string& model, const std::string& prompt);
-std::string falTextBody(const std::string& prompt);
+std::string falTextBody(const std::string& prompt, const std::string& model = {});
 // The image as sent to services: subject framed on a square, <= 1024 px, PNG.
 bool prepareImagePng(const std::string& imagePath, std::string& png, std::string& error);
 bool prepareImageDataUri(const std::string& imagePath, std::string& dataUri, std::string& error);

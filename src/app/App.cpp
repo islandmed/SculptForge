@@ -295,6 +295,7 @@ void App::shutdown() {
         return;
     }
     saveWindowState();
+    autosavePrefs(true); // a change still waiting for its moment
     discordClient_.reset(); // clears what Discord shows, then closes
     if (doc_.sculptor.strokeActive()) endStroke();
     solver_.reset(); // (its thread uses the renderer)
@@ -428,6 +429,7 @@ int App::runUiTest(int w, int h, int fps) {
         pollSculptable();
         updateCameraAspect();
         updateSpaceMouse(dt);
+        touchTick(); // a finger's press that waited for a second finger long enough goes through
 
         hardwareProfileFrameBegin(); // (only with SF_HW_PROFILE_IN_TESTS=1: tests use fixed settings)
         Demo::beginFrame();
@@ -1046,6 +1048,7 @@ int App::run() {
         // The SpaceMouse moves the view by its held axes every frame (frame-rate independent); while it does,
         // spaceMouseMoving() is true and a loop that waits for events when idle must keep drawing.
         updateSpaceMouse(dt);
+        touchTick(); // a finger's press that waited for a second finger long enough goes through
 
         hardwareProfileFrameBegin(); // the frame governor's CPU and GPU timing
         if (uiScaleDirty_) applyUiScale(); // (Preferences, a display-scale change: #87)
@@ -1314,6 +1317,7 @@ void App::handleEvent(const SDL_Event& event) {
 
 void App::dispatchEvent(const SDL_Event& event) {
     if (strayMouseMotion(event)) return; // neither the canvas nor the UI follows a driver's stray mouse events
+    if (sixDofPointerEvent(event)) return; // nor a SpaceMouse that also says it is a mouse (SpaceMouse.cpp)
     if ((event.type >= SDL_EVENT_KEY_DOWN && event.type < SDL_EVENT_JOYSTICK_AXIS_MOTION &&
          event.type != SDL_EVENT_KEYMAP_CHANGED && event.type != SDL_EVENT_KEYBOARD_ADDED &&
          event.type != SDL_EVENT_KEYBOARD_REMOVED && event.type != SDL_EVENT_MOUSE_ADDED &&
@@ -1329,6 +1333,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     if (strokePopupMouseEvent(e)) return; // clicks on the open stroke popup (StrokePopup.cpp)
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
+    if (touchMouseEvent(e)) return; // a finger's press waits for a second finger; a gesture's stay off (Touch.cpp)
 
     switch (e.type) {
     case SDL_EVENT_QUIT:
@@ -1348,6 +1353,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (radial_.hold != RadialHold::None) closeRadialMenu(); // its key or button's release won't come here
         if (strokePopup_.held) closeStrokePopup();
         spaceHeld_ = false; // Space let go in another window never reaches us
+        quickRemeshDragKey_ = SDLK_UNKNOWN; // (the same for the Quick Remesh drag key)
         break;
     case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED: // dragged to a monitor at another scale, or the system setting changed
     case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
@@ -1366,8 +1372,20 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_PEN_BUTTON_UP:
         handlePenEvent(e);
         break;
+    case SDL_EVENT_FINGER_DOWN:
+    case SDL_EVENT_FINGER_UP:
+    case SDL_EVENT_FINGER_MOTION:
+    case SDL_EVENT_FINGER_CANCELED:
+#if SDL_VERSION_ATLEAST(3, 4, 0)
+    case SDL_EVENT_PINCH_BEGIN:
+    case SDL_EVENT_PINCH_UPDATE:
+    case SDL_EVENT_PINCH_END:
+#endif
+        touchEvent(e); // two fingers navigate (Touch.cpp)
+        break;
     case SDL_EVENT_MOUSE_ADDED:
     case SDL_EVENT_MOUSE_REMOVED:
+        sixDofMice_.erase(e.mdevice.which);
         tabletDeviceEvent(e); // a tablet plugged in or out (Tablet.cpp)
         break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -1389,7 +1407,9 @@ void App::dispatchEvent(const SDL_Event& event) {
         onMouseMove(e.motion.x, e.motion.y, e.motion.xrel, e.motion.yrel, e.motion.which == SDL_PEN_MOUSEID);
         break;
     case SDL_EVENT_MOUSE_WHEEL:
-        if (!io.WantCaptureMouse && canvasRect().contains(e.wheel.mouse_x, e.wheel.mouse_y)) camera_.zoom(e.wheel.y);
+        // (Not the scroll a trackpad sends during a pinch or twist: Touch.cpp zooms for that.)
+        if (!io.WantCaptureMouse && !touchPinching_ && canvasRect().contains(e.wheel.mouse_x, e.wheel.mouse_y))
+            camera_.zoom(e.wheel.y);
         break;
     case SDL_EVENT_KEY_DOWN:
         if (e.key.key == SDLK_SPACE && !e.key.repeat && // hold Space and drag: the camera (#43; not while typing)
@@ -1397,18 +1417,20 @@ void App::dispatchEvent(const SDL_Event& event) {
             spaceHeld_ = true;
             break;
         }
+        if (!io.WantCaptureKeyboard && !e.key.repeat) quickRemeshKey(e.key.key, e.key.mod, true); // held: drag remeshes
         if (!io.WantCaptureKeyboard && !e.key.repeat) onKey(e.key.key, e.key.mod);
         else if (!io.WantCaptureKeyboard && (e.key.key == SDLK_LEFTBRACKET || e.key.key == SDLK_RIGHTBRACKET))
             onKey(e.key.key, e.key.mod);
         break;
     case SDL_EVENT_KEY_UP:
         if (e.key.key == SDLK_SPACE) spaceHeld_ = false;
+        quickRemeshKey(e.key.key, e.key.mod, false);
         if (e.key.key == SDLK_SPACE) quickMenuKeyUp(); // a held Space closes the QuickMenu when let go
         radialKeyUp(e.key.key);                        // a radial menu's held key: run the slot pointed at
         strokePopupKeyUp(e.key.key);                   // the stroke popup's held key: pick the item pointed at
         break;
     case SDL_EVENT_DROP_FILE:
-        if (e.drop.data) openPathConfirmed(e.drop.data);
+        if (e.drop.data && !libraryBrowser_.takeDrop(*this, e.drop.x, e.drop.y, e.drop.data)) openPathConfirmed(e.drop.data);
         break;
     default:
         break;
@@ -1546,9 +1568,13 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     }
     if (button == SDL_BUTTON_RIGHT && ctrlDown(SDL_GetModState()) && (SDL_GetModState() & SDL_KMOD_SHIFT) &&
         !(SDL_GetModState() & SDL_KMOD_ALT)) { // in every input style (Ctrl+right-drag still zooms)
-        drag_ = Drag::SizeScrub; // Ctrl+Shift+right-drag: Draw Size, finely (Precision.cpp)
+        drag_ = Drag::SizeScrub; // Ctrl+Shift+right-drag: Size, finely (Precision.cpp)
         sizeScrubStart_ = radiusPx_;
         sizeScrubDx_ = 0.0f;
+        rightClick_.pending = false;
+        return;
+    }
+    if (button == SDL_BUTTON_LEFT && quickRemeshDragDown(x, y)) { // the Quick Remesh key held (#121, PanelRetopo.cpp)
         rightClick_.pending = false;
         return;
     }
@@ -1725,6 +1751,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Capture: captureMouseMove(x, y); break;
     case Drag::ForgeSphere: forgesphereDragTo(x, y); break;
     case Drag::AirStroke: airStrokeTo(x, y); break;
+    case Drag::QuickRemesh: break; // (remeshes when let go)
     case Drag::SizeScrub:
         sizeScrubDx_ += dx;
         radiusPx_ = drawSizeScrub(sizeScrubStart_, sizeScrubDx_);
@@ -1781,6 +1808,7 @@ void App::onMouseUp() {
     orbitStarted_ = false;
     panFromAlt_ = false;
     if (drag_ == Drag::Select) selectionMouseUp();
+    if (drag_ == Drag::QuickRemesh) quickRemesh(RemeshTrigger::Quick);
     if (drag_ == Drag::Insert) {
         // The drag's length on screen, as a size at the surface point's depth (at least a small default).
         const float px = std::max(insertPx_, 12.0f * uiScale_);
@@ -2235,7 +2263,7 @@ void App::dabAt(float x, float y, float pressure) {
     p.pickDir = cam.ortho ? cam.forward() : hit.position - cam.position();
     p.pickNormal = glm::length(hit.normal) > 0.0f ? glm::normalize(hit.normal) : glm::vec3(0.0f);
     p.radius = baseRadius * (st.pressureSize ? std::max(pressure, 0.05f) : 1.0f) * dabRadiusScale_;
-    // Smooth keeps its own Z Intensity, whether picked or held with Shift.
+    // Smooth keeps its own Intensity, whether picked or held with Shift.
     p.strength = (st.brush == BrushType::Smooth ? st.smoothStrength : st.strength) * dabStrengthScale_;
     p.keepVolume = st.brush == BrushType::Smooth && st.smoothKeepVolume;
     p.groupBorders = st.brush == BrushType::Smooth && st.smoothGroupBorders;
@@ -2609,6 +2637,8 @@ void App::updateTitle() {
     updateDiscordPresence(); // the file name, if it's shown (sends only on a change)
     std::string title = (doc_.dirty() ? "* " : "") + name + " - SculptForge";
     if (*appPrerelease()) title += " " + appVersionLabel(); // "- SculptForge 0.11.0 Beta 1": a beta says so
+    if (const StudioStart& studio = studioMode(); studio.active && !studio.profile.title.empty())
+        title += " - " + studio.profile.title; // a studio build's own title
     if (title == windowTitle_) return; // called every frame
     windowTitle_ = title;
     SDL_SetWindowTitle(window_, title.c_str());
@@ -2681,6 +2711,16 @@ void App::drawUi() {
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (ImGui::Begin("About SculptForge", &showAbout_, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
             ImGui::Text("SculptForge %s", appVersionLabel().c_str());
+            if (const StudioStart& studio = studioMode(); studio.active) { // a studio build: its logo and name
+                const StudioProfile& p = studio.profile;
+                if (!p.logo.empty())
+                    if (const ImTextureID logo = thumbs_.file(p.logo)) ImGui::Image(logo, ImVec2(96 * uiScale_, 96 * uiScale_));
+                ImGui::TextWrapped("%s", p.name.empty() ? "Studio mode" : ("Studio build for " + p.name).c_str());
+                ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+                ImGui::TextWrapped("Offline: no outside connections. Updates come only from your studio's channel.");
+                ImGui::PopStyleColor();
+                ImGui::Spacing();
+            }
             ImGui::TextWrapped("Free and open-source digital sculpting.");
             ImGui::Spacing();
             ImGui::TextWrapped("%s", ai::kPrivacyLine); // also on the site (website/index.html) and in docs/ai-services.md
@@ -2735,7 +2775,7 @@ void App::drawLayersContents() {
             runCommand("layer_set_active", {{"index", double(i)}});
         ui::HelpText(layer.name.c_str(), nullptr,
                      "Select to sculpt into this layer. With subdivision levels, record at any level: a "
-                     "layer keeps its own detail on every level and follows Lower Res / Higher Res and Divide.",
+                     "layer keeps its own detail on every level and follows Lower Level / Higher Level and Divide.",
                      kLayersPath);
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 52 * scale);
         const bool playing = playingLayer_ == i;
@@ -3263,7 +3303,8 @@ void App::startGenerator() {
     ai::AiSettings settings = aiSettings_;
     const bool hunyuan = settings.generatorService == "huggingface"
                              ? ai::hunyuanModel(ai::resolveHfPreset(settings, textMode_).id)
-                             : settings.generatorService == "fal" && ai::hunyuanModel(settings.falModel);
+                             : settings.generatorService == "fal" &&
+                                   ai::hunyuanModel(textMode_ ? ai::falTextModel(settings.falModel) : settings.falModel);
     if (hunyuan) showHunyuanNoticeOnce();
     if (settings.comfyImageWorkflow.empty()) settings.comfyImageWorkflow = comfyDefaultWorkflow(false);
     if (settings.comfyTextWorkflow.empty()) settings.comfyTextWorkflow = comfyDefaultWorkflow(true);
@@ -3547,7 +3588,9 @@ void App::drawImageTo3D() {
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", ai::kHunyuanLicenceNote);
         ImGui::InputText("Model id", falModel_, sizeof falModel_);
-        if (ai::hunyuanModel(falModel_)) hint(ai::kHunyuanLicenceNote);
+        if (textMode_ && !ai::rodinModel(falModel_)) hint("From text, Hunyuan3D 3.1 Rapid runs. Choose a Rodin model to use Rodin for text.");
+        if (ai::hunyuanModel(textMode_ ? ai::falTextModel(falModel_) : std::string(falModel_)))
+            hint(ai::kHunyuanLicenceNote);
         ImGui::InputText("API key", falKey_, sizeof falKey_, ImGuiInputTextFlags_Password);
         if (!falKey_[0]) hint(std::getenv("FAL_KEY") ? "Using FAL_KEY from the environment." : "Get a key at fal.ai/dashboard/keys");
     } else if (serviceId == "meshy") {
@@ -3699,10 +3742,10 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col, bool ring
     if (solverBusy() || (asyncStroke_ && drag_ == Drag::Stroke)) return false;
     RayHit hit;
     if (!pick(mouseX_, mouseY_, hit)) return false; // one ray, as a press would cast
-    // The world radius a dab here gets (App::firstDab / the brushes: Draw Size times world size of a pixel).
+    // The world radius a dab here gets (App::firstDab / the brushes: Size times world size of a pixel).
     const float radius = radiusPx * camera_.worldPerPixel(hit.position, canvasHeight());
     if (!(radius > 0.0f) || !std::isfinite(radius)) return false;
-    // A steady normal over the brush's area (32 rays), then the ring and the Focal Shift ring as true circles in
+    // A steady normal over the brush's area (32 rays), then the ring and the Falloff ring as true circles in
     // that plane (#88): no per-point pressing, so bumps can't bend or break the ring. Never a pass over the mesh.
     const glm::vec3 n = surfaceCursorNormal(doc_.mesh, doc_.bvh, hit, radius);
     surfaceCursorCircle(hit.position, n, radius, 64, cursorRing_);
@@ -3902,7 +3945,7 @@ void App::drawBrushCursor() {
     if (!surfaceCursorShown_) {
         if (ring) {
             dl->AddCircle(c, r, col, 64, 1.5f);
-            // The inner ring is Focal Shift: where the falloff drops to half.
+            // The inner ring is Falloff: where the falloff drops to half.
             dl->AddCircle(c, r * focalRingFraction(focalShift_), IM_COL32(255, 255, 255, 90), 48, 1.0f);
         } else {
             dl->AddCircleFilled(c, 2.0f * uiScale_, col);

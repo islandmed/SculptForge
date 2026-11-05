@@ -71,7 +71,7 @@ model, so strokes that begin at the silhouette never turn the view by accident. 
 the mask. To move the view, right-drag (a pen's lower button is a right click by default), <kbd>Alt</kbd>+drag to pan,
 middle-drag, or hold <kbd>Space</kbd> if **Hold Space and drag to move the camera** is on; with the Blender or Maya
 style, <kbd>Alt</kbd>+left-drag rotates as before. With a pen that has no buttons and the Classic or SculptForge style,
-press <kbd>Shift</kbd>+<kbd>L</kbd> to turn it off while you rotate, or turn on Hold Space. Mask Lasso, Mask Rectangle and the
+press <kbd>Shift</kbd>+<kbd>L</kbd> to turn it off while you rotate, or turn on Hold Space. Lasso Mask, Rectangle Mask and the
 <kbd>Ctrl</kbd>+<kbd>Shift</kbd> hide and show shapes work as before.
 
 "Background" means any part of the canvas where the cursor isn't over the model. A left-drag that starts on
@@ -84,6 +84,21 @@ model fills the view, zoom out a little or use the right-shelf buttons.
 
 On macOS, <kbd>Cmd</kbd> works wherever this guide says <kbd>Ctrl</kbd> for these gestures, except
 <kbd>Ctrl</kbd>+middle-drag, which needs <kbd>Ctrl</kbd> itself.
+
+## Touch screens and trackpads
+
+Two fingers on the model navigate; they never sculpt.
+
+| Gesture | Touch screen | Trackpad |
+|---|---|---|
+| Spread or pinch two fingers | Zoom in or out | Zoom in or out |
+| Twist two fingers | Roll the view with them | Roll the view with them |
+| Slide two fingers | Pan | Zoom (as the scroll wheel) |
+| One finger | Sculpt, as with the mouse | Moves the pointer |
+
+A twist starts rolling once the fingers have turned about 10 degrees, so a pinch doesn't tilt the view by accident.
+On a touch screen a single finger waits a moment for a second one before it sculpts; if the second finger lands
+after a stroke has started, the stroke ends there and the fingers take over the view (one undo removes the stroke).
 
 ## The right-shelf navigation buttons
 
@@ -136,6 +151,9 @@ pen while they turn the view, and that works best, but you don't have to.
   doesn't drift the view. The live bars turn orange once an axis is past it.
 - **Lock rotation to turntable**: the model stays upright; twisting turns it about the world's up axis and
   rolling the cap does nothing.
+- **Hold during strokes** (on by default): while you sculpt, paint or mask, the SpaceMouse leaves the view alone and
+  its buttons do nothing, so a hand resting on the cap never moves the model under the pen. Turn it off to turn
+  the view mid-stroke.
 - **Dominant axis**: only the direction you push the most moves the view, so a twist doesn't also pan a little.
 - **Invert**: reverse any of the six moves (Pan X, Zoom, Pan Y, Tilt, Roll, Spin). If a direction feels wrong on
   your model of SpaceMouse, flip it here.
@@ -143,7 +161,7 @@ pen while they turn the view, and that works best, but you don't have to.
   axis views, Orthographic, Undo, Redo or Nothing.
 - **SpaceMouse defaults** puts everything back.
 
-Store Config (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps these settings.
+These settings save themselves.
 
 **If SculptForge doesn't see it** (Preferences says "No SpaceMouse found"):
 

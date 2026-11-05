@@ -89,7 +89,7 @@ bool App::runWhatsNewAction(const std::string& action) {
     if (action == "look:new") {
         chooseNewLook(true);
     } else if (action == "card:membership") {
-        showSupportCard(SupportCardReason::Weekly);
+        showSupportCard(SupportCardReason::Manual);
     } else if (action.rfind("brush:", 0) == 0) {
         const std::string name = after("brush:");
         for (int i = 0; i < int(doc_.brushes.size()); ++i)

@@ -60,7 +60,7 @@
 <aside class="callout callout-tip"><p><strong>Tip:</strong> Turn on <strong>Wire</strong> (<kbd>Shift</kbd>+<kbd>F</kbd>) to see the triangles appear under the brush.</p></aside>
 <h2 id="how-big-the-triangles-get">How big the triangles get<a class="anchor" href="#how-big-the-triangles-get" aria-label="Link to this section">#</a></h2>
 <p>By default the triangle size follows the brush size on screen, as in dynamic topology: <strong>zoom in or make the brush smaller for finer triangles</strong>, zoom out or make it bigger for coarser ones. At Detail 50 an edge is about an eighth of the brush radius; Detail 100 makes them about three times smaller, Detail 0 three times bigger.</p>
-<p>With <strong>Constant detail</strong> on, every stroke aims for the same size whatever the zoom and brush, set by Detail relative to the size of the mesh (at 50, about a hundredth of its bounding box diagonal). Use it to bring a whole model to an even density, or to keep the density while you change brush sizes. It is a preference: Store Config (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps it.</p>
+<p>With <strong>Constant detail</strong> on, every stroke aims for the same size whatever the zoom and brush, set by Detail relative to the size of the mesh (at 50, about a hundredth of its bounding box diagonal). Use it to bring a whole model to an even density, or to keep the density while you change brush sizes. It is a preference and saves itself.</p>
 <p>Under the brush, edges longer than the target are split, edges much shorter are merged away, and the new triangles are evened out. Outside the brush nothing changes, so you can have big triangles on the back of a head and fine ones around the eyes.</p>
 <h2 id="smooth-remesh">Smooth remesh<a class="anchor" href="#smooth-remesh" aria-label="Link to this section">#</a></h2>
 <p>Smoothing (<kbd>Shift</kbd>) with Dynamic on also simplifies by default: it remeshes toward triangles twice the size, so the smoothed area gets coarser, as in dynamic topology. <strong>Smooth remesh</strong> under <strong>Sculpt &gt; Draw &amp; Tablet &gt; Dynamic topology</strong> sets how much (from the discussions):</p>
@@ -75,7 +75,7 @@
 <strong>Simplify</strong> (100, the default): as before.
 </li>
 </ul>
-<p>It is a preference (Store Config keeps it) and is saved with the project; from a script, <code>dyntopo smooth_remesh=0</code>.</p>
+<p>It is a preference (saved automatically) and is saved with the project; from a script, <code>dyntopo smooth_remesh=0</code>.</p>
 <h2 id="what-it-keeps-and-what-it-doesnt">What it keeps and what it doesn&#x27;t<a class="anchor" href="#what-it-keeps-and-what-it-doesnt" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>
@@ -98,7 +98,7 @@
 </li>
 </ul>
 <h2 id="subdivision-levels">Subdivision levels<a class="anchor" href="#subdivision-levels" aria-label="Link to this section">#</a></h2>
-<p>Dynamic topology works on meshes without <a href="subdivision-levels.html">subdivision levels</a>. On a Part with levels, <strong>Dynamic</strong> stays off and the status bar says why: go to the level you want to keep and use <strong>Del Lower</strong> and <strong>Del Higher</strong> in <strong>Tool &gt; Geometry</strong> first. If you turn it on and then pick a Part that has levels, strokes sculpt it without remeshing.</p>
+<p>Dynamic topology works on meshes without <a href="subdivision-levels.html">subdivision levels</a>. On a Part with levels, <strong>Dynamic</strong> stays off and the status bar says why: go to the level you want to keep and use <strong>Delete Lower</strong> and <strong>Delete Higher</strong> in <strong>Tool &gt; Geometry</strong> first. If you turn it on and then pick a Part that has levels, strokes sculpt it without remeshing.</p>
 <p>A good workflow: block in with Dynamic, then <a href="retopology.html">Quad Remesh</a> or <a href="geometry.html">Voxel Remesh</a> for an even base, <strong>Divide</strong> for levels, and sculpt the fine detail on them.</p>
 <h2 id="undo-and-speed">Undo and speed<a class="anchor" href="#undo-and-speed" aria-label="Link to this section">#</a></h2>
 <p>Each stroke is one undo step. Undo puts every triangle back exactly, and it only keeps the part of the mesh the stroke changed, so it costs little memory even on millions of triangles (a few megabytes per stroke).</p>

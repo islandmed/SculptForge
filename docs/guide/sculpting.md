@@ -117,22 +117,22 @@ Hover a tile for a large preview and the brush's description. Right-click a tile
 and on custom brushes also **Copy brush code**, **Rename...**, **Save as .sfbrush...**, **Delete...** and
 **Reveal in folder** (see [Brush Lab and sharing brushes](brush-lab.md)).
 
-## Draw Size, Intensity, RGB Intensity and Falloff
+## Size, Intensity, Colour intensity and Falloff
 
-These values control every brush. Draw Size and Intensity are on the top shelf;
+These values control every brush. Size and Intensity are on the top shelf;
 all four are in **Sculpt > Draw & Tablet** and the [Quick Menu](#the-quick-menu).
 
 | Setting | Range | Default | How to change it |
 |---|---|---|---|
-| **Draw Size** | 2 to 800 | 60 | Brush radius in screen pixels. <kbd>[</kbd> and <kbd>]</kbd> make it 10% smaller or larger (hold to repeat). <kbd>S</kbd> opens a slider at the cursor. |
+| **Size** | 2 to 800 | 60 | Brush radius in screen pixels. <kbd>[</kbd> and <kbd>]</kbd> make it 10% smaller or larger (hold to repeat). <kbd>S</kbd> opens a slider at the cursor. |
 | **Intensity** | 1 to 100 | 50 | How strongly each dab changes the surface. <kbd>U</kbd> opens a slider at the cursor. |
-| **RGB Intensity** | 1 to 100 | 100 | How strongly painting colours the surface (the Paint brush, and sculpting with Rgb on). <kbd>I</kbd> opens a slider at the cursor. |
+| **Colour intensity** | 1 to 100 | 100 | How strongly painting colours the surface (the Paint brush, and sculpting with Rgb on). <kbd>I</kbd> opens a slider at the cursor. |
 | **Falloff** | -100 to 100 | 0 | The brush falloff. Below 0 the full-strength centre widens into a broad, hard tip; above 0 it narrows to a soft point. <kbd>O</kbd> opens a slider at the cursor. |
 
-Because **Draw Size** is measured on screen, the brush covers less of the model as you zoom in, which is what
+Because **Size** is measured on screen, the brush covers less of the model as you zoom in, which is what
 you want for detail work.
 
-The brush cursor shows two rings: the outer one is the Draw Size, the inner one is Falloff
+The brush cursor shows two rings: the outer one is the Size, the inner one is Falloff
 (where the brush works at half strength). Masking, painting, Move and Tendril follow Falloff too. Custom
 brushes made in Brush Lab and Clay Block's square tip keep their own tip shape at 0 and shift it like the others.
 
@@ -153,7 +153,7 @@ slider and release to close it, or type a number and press <kbd>Enter</kbd> (a m
 
 ### Each brush keeps its own settings
 
-Every brush remembers its own **Draw Size**, **Intensity**, **Falloff**, **RGB Intensity**, [stroke](#strokes)
+Every brush remembers its own **Size**, **Intensity**, **Falloff**, **Colour intensity**, [stroke](#strokes)
 and [alpha](#alphas). That includes custom and Community brushes. Set up a small, sharp crease brush and a big
 Clay brush, and each one comes back the way you left it when you switch between them. A brush you haven't used
 yet in the session starts from the values you have now, so nothing jumps.
@@ -162,8 +162,8 @@ yet in the session starts from the values you have now, so nothing jumps.
   `brush-settings.json`, in SculptForge's user data folder).
 - **Sculpt > Brush > Reset Brush to Default** puts the current brush back to the values SculptForge ships with and
   forgets what you saved for it.
-- **Edit > Preferences > Input > Share size and intensity across brushes** (off by default) keeps Draw Size and
-  Intensity the same for every brush, as before 0.10.8. Falloff, RGB Intensity, the stroke and the alpha still
+- **Edit > Preferences > Input > Share size and intensity across brushes** (off by default) keeps Size and
+  Intensity the same for every brush, as before 0.10.8. Falloff, Colour intensity, the stroke and the alpha still
   follow each brush.
 
 ### Smooth's own Intensity
@@ -190,7 +190,7 @@ bumps but leaves the form where it is (a Taubin smooth, one step in and a slight
 straightener: only the points on a border between [face groups](face-groups.md) move, each along the surface
 toward its neighbours on the border, so a jagged edge (a cuff, a collar, the hem of a shirt, a panel line) becomes
 a clean line while the rest of the model stays where it is. Corners where three or more groups meet stay put.
-Group the clothing first (for example **Group masked** after masking it), then brush over the edge. Saved with the
+Group the clothing first (for example **Group from Mask** after masking it), then brush over the edge. Saved with the
 project (#81).
 
 On a micro level (see [Micro levels](micro-levels.md)) Smooth is always the plain one for now. On a quad mesh
@@ -250,7 +250,7 @@ points right at you, drag up to pull it out. **Edit > Preferences > Input > Alon
 ## The Quick Menu
 
 Press <kbd>Space</kbd> for the Quick Menu under the cursor: the Brush, Stroke, Alpha and Material tiles,
-Draw Size, Falloff, Intensity and RGB Intensity, Add / Sub, Sculpt / Paint, Rgb and X symmetry. Hold
+Size, Falloff, Intensity and Colour intensity, Add / Sub, Sculpt / Paint, Rgb and X symmetry. Hold
 <kbd>Space</kbd> and let go to close it again (it stays while the pointer is on it), or tap <kbd>Space</kbd> to
 keep it open until you click elsewhere or press <kbd>Esc</kbd>. Clicking a tile opens its picker.
 
@@ -268,7 +268,7 @@ click an item, or click in the middle or press <kbd>Esc</kbd> to close it. Three
 | Key | Menu | Items |
 |---|---|---|
 | <kbd>T</kbd> | **Brushes** | Standard, Clay Block, Move, Sharp Crease, Inflate, Pinch, Flatten, Tendril |
-| <kbd>Y</kbd> | **Masking** | Invert Mask, Mask Lasso, Clear Mask, Mask Rectangle, Mask All, Mask Pen, View Mask, Group Masked |
+| <kbd>Y</kbd> | **Masking** | Invert Mask, Lasso Mask, Clear Mask, Rectangle Mask, Mask All, Mask Pen, View Mask, Group from Mask |
 | <kbd>J</kbd> | **Strokes** | Dots, Drag Stamp, Slide Stamp, Spray, Lazy Stroke (see [Strokes](#strokes)) |
 
 All three keys are free in every input style. Installs that stored their radial menus before 0.10.9 get the
@@ -291,7 +291,7 @@ Make your own in **Edit > Preferences > Input > Radial Menus** (up to 8 menus of
   action names, never anything that runs: names this version doesn't know are left out.
 - **Restore default menus** brings back Brushes and Masking.
 
-**Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps your menus.
+Your menus save themselves.
 
 ## Whole-Part deformations
 
@@ -321,7 +321,7 @@ shelf, which opens the stroke picker, or from **Sculpt > Stroke**.
 |---|---|---|
 | **Dots** | Even dabs along the path: the classic brush stroke (default). | None; spacing comes from the brush. |
 | **Drag Stamp** | Click and drag one stamp: the drag length sets its size and its direction the rotation. Great with alphas. | None |
-| **Slide Stamp** | Click and drag one stamp of the brush's Draw Size: it slides over the surface under the cursor and lands where you let go. Great for VDMs. | None |
+| **Slide Stamp** | Click and drag one stamp of the brush's Size: it slides over the surface under the cursor and lands where you let go. Great for VDMs. | None |
 | **Spray** | Scattered dabs of random size, strength and rotation, for organic texture. | **Scatter** (0 to 2, default 1): how far dabs land from the cursor, as a fraction of the brush size. |
 | **Lazy Stroke** | Dots with **Steady Stroke** on: the brush trails the cursor on a string, for smooth, steady lines. | **Steady radius** (1 to 300 px, default 40): longer is steadier. |
 
@@ -352,7 +352,7 @@ the **Stroke** tile on the left shelf. The top row holds the stroke types, then 
 | **Mask** | Strokes paint the mask (<kbd>Alt</kbd> or <kbd>Ctrl</kbd> unmasks). | <kbd>Ctrl</kbd> |
 | **Select** | Strokes draw the selection (hide) shape. | <kbd>Ctrl</kbd>+<kbd>Shift</kbd> |
 
-**Shapes** pick how Mask and Select draw: **Mask Pen**, **Mask Lasso** and **Mask Rect** turn Mask on with that
+**Shapes** pick how Mask and Select draw: **Mask Pen**, **Lasso Mask** and **Rectangle Mask** turn Mask on with that
 shape, **Cut Line**, **Cut Lasso**, **Cut Rect** and **Cut Polyline** turn Select on with that Cut shape. A plain drag
 then masks or cuts with it, no keys held (with a mask shape, <kbd>Ctrl</kbd>+drag unmasks; **Tool > Cut** still sets
 Away, In, Add or Clip). The label next to the brush cursor names the shape. Pick it again to go back to sculpting.
@@ -379,10 +379,10 @@ Slide Stamp and Spray. The viewport draws the string and a faint circle of its l
 length (longer is steadier). **Catch up on release** (on by default) finishes the line to where the cursor is when
 you let go; turn it off to end the line a string's length behind.
 
-**World Size** (**Sculpt > Draw & Tablet**). Draw Size is normally in screen pixels, so the brush gets smaller on the model
+**World Size** (**Sculpt > Draw & Tablet**). Size is normally in screen pixels, so the brush gets smaller on the model
 as you zoom in. With World Size on, the size is kept in model units instead: a 0.4 mm pore brush stays 0.4 mm
-whether you are looking at the whole head or one eyelid. Every Draw Size slider shows both numbers, for example
-**Draw Size 12 px 0.40 mm**; the mm figure is the brush radius on the surface under the cursor (a model unit is a
+whether you are looking at the whole head or one eyelid. Every Size slider shows both numbers, for example
+**Size 12 px 0.40 mm**; the mm figure is the brush radius on the surface under the cursor (a model unit is a
 metre, as when exporting for 3D printing).
 
 **Finer size control.**
@@ -393,7 +393,7 @@ metre, as when exporting for 3D printing).
 | <kbd>Shift</kbd>+<kbd>[</kbd> / <kbd>Shift</kbd>+<kbd>]</kbd> | 1 px smaller / larger (0.5 px below 2 px) |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+right-drag | Scrub the size finely: 100 px to the right is about 1.5 times larger |
 
-Draw Size goes down to 0.5 px. Small brushes space their dabs closer together, so a 1 px stroke is still one
+Size goes down to 0.5 px. Small brushes space their dabs closer together, so a 1 px stroke is still one
 continuous line, and the cursor adds a small cross so you can see where a tiny brush is. The size, in px and mm,
 shows next to the cursor for a moment after it changes (all the time with World Size on).
 
@@ -420,7 +420,7 @@ with every tiny bump. A real step in the surface is followed at once.
 An alpha is a grayscale stamp that shapes the brush tip: white is full effect, black is none. It affects every
 brush, built-in or custom. Choose one from the **Alpha** tile on the left shelf (the alpha picker) or the
 **Sculpt > Alpha**, which also shows a large preview of the current alpha.
-[Falloff](#draw-size-intensity-rgb-intensity-and-falloff) fades it: set it to -100 to
+[Falloff](#size-intensity-colour-intensity-and-falloff) fades it: set it to -100 to
 stamp the whole alpha (a crisp square, or a pattern out to its edges), 0 for a soft round fade, +100 for a soft
 point. Alphas work on [micro levels](micro-levels.md) too, with every stroke type including Drag Stamp.
 
@@ -495,7 +495,7 @@ overhang, as nothing made with a height ever can.
 2. Click on the model where the stamp should sit and drag: the drag's length sets the size and its direction
    points the top of the map, so a horn leans the way you drag. Let go to keep it.
 
-- **Slide Stamp** stamps at the Draw Size instead and slides the stamp under the cursor until you let go.
+- **Slide Stamp** stamps at the brush size instead and slides the stamp under the cursor until you let go.
 - **Intensity 50** (the default) presses the map at its own shape; 100 doubles it, lower values flatten it.
 - **Alt** digs the shape in: the sideways motion stays and the height flips (a horn becomes a curved hole, a
   nostril a bump). Blender's VDM brushes invert the same way.
@@ -623,7 +623,7 @@ second for a small detail and a second or so for a large patch of a 20-million-t
 **DetailClone** stamps the VDM brush's map (a captured one or any other) along your stroke, one copy every stamp
 width, each turned so its top points the way the stroke goes: rows of scales, rivets, stitches or warts that
 follow a curve. **Clone Spacing** sets the distance between copies (1 = edge to edge) and **Clone follows
-stroke** can keep every copy upright instead. Draw Size sets their size and Intensity their depth; a click
+stroke** can keep every copy upright instead. Size sets their size and Intensity their depth; a click
 without moving stamps one. Each copy is shaped to the surface under it.
 
 ## Symmetry
@@ -646,12 +646,12 @@ the other side, the model is off-centre: turn on **Local** (below).
 Radial symmetry repeats every stroke around an axis, for wheels, flowers, columns, crowns and other round
 ornaments. Turn it on with **R** on the top shelf or in **Sculpt > Symmetry & Gizmo > Symmetry**, then set:
 
-- **Radial Count**: how many copies, evenly spaced around the axis (2 to 64; 8 to start with).
+- **Radial Copies**: how many copies, evenly spaced around the axis (2 to 64; 8 to start with).
 - **X axis**, **Y axis** or **Z axis**: the axis the copies turn around (Y, up, by default).
 
 Radial symmetry works with the mirror axes: with **X** on as well, each copy is also mirrored, so 8 radial copies
 make 16. It applies wherever symmetry does: every brush and stroke type, mask and smooth strokes, vertex paint and
-texture painting, Mask Rectangle / Mask Lasso and Select Rectangle / Select Lasso, Dynamic Topology (new triangles
+texture painting, Rectangle Mask / Lasso Mask and Select Rectangle / Select Lasso, Dynamic Topology (new triangles
 appear on every copy) and Insert on the model. The brush cursor shows on every copy, so you can see where each
 one lands.
 
@@ -709,7 +709,7 @@ also have a **Pressure curve** setting that makes them respond to a light or a f
   While the pen is in range the arrow is drawn at the brush (the system's is hidden), so brush, arrow and clicks
   always agree (#72).
 
-**Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps these settings. Setup notes for Windows
+These settings save themselves. Setup notes for Windows
 Ink, macOS and Linux are in
 [docs/tablet.md](https://github.com/islandmed/SculptForge/blob/main/docs/tablet.md).
 
@@ -723,11 +723,11 @@ Move, Smooth, Inflate, Pinch, Flatten, Crease, Trim, Tendril, Layer, Nudge and P
 - **Add a brush**: click the **+** tile at the end of the shelf and pick a brush, built-in or custom. Or
   right-click any tile in the brush picker and choose **Add to bottom shelf**.
 - **Remove a brush**: right-click its tile and choose **Remove from shelf**.
-- **Reorder**: turn on **Edit > Preferences > Config > Enable Customize**, then <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+drag a
+- **Reorder**: turn on **Edit > Preferences > Config > Customize Shelves**, then <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+drag a
   tile to a new place.
 - **Change a brush's key**: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click its tile, then press the new key.
 
-Shelf changes last until you quit. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> (**Store Config**) to keep
+Shelf changes last until you quit. **Edit > Preferences > Config > Save Layout** keeps
 them. See [The interface](interface.md) for more on customizing.
 
 ## Sculpt from a script

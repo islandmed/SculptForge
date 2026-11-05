@@ -1,0 +1,27 @@
+# Generate 3D > fal.ai offers Hyper3D Rodin 2.5 (#123) for an image and for a description; other fal models
+# say which model runs from text. Nothing is generated (no key, no network).
+run ui_look look=classic layout=classic        # written for the Classic look
+drop ../../assets/demo/teddy-sketch.png
+wait_for "Generate 3D" 5
+click "Generate 3D/##service"
+click "fal.ai - paid, your key"
+click "Generate 3D/Model"
+expect_text Rodin 2.5 (Hyper3D)
+expect_text Rodin 2.5 Fast (Hyper3D) - cheaper
+click "Rodin 2.5 (Hyper3D)"
+wait 0.2
+expect_text Rodin 2.5 (Hyper3D)
+expect_no_text Tencent Hunyuan Community License
+shot generate-rodin-image
+
+click "Generate 3D/From text"
+wait 0.2
+expect_no_text From text, Hunyuan3D 3.1 Rapid runs
+shot generate-rodin-text
+
+click "Generate 3D/Model"
+click "TRELLIS.2 (Microsoft) - detailed, open model"
+wait 0.2
+expect_text From text, Hunyuan3D 3.1 Rapid runs
+expect_text Tencent Hunyuan Community License
+shot generate-fal-text-hunyuan

@@ -106,6 +106,8 @@ void App::initProject() {
         // Updated since the last start (a new install has no prefs yet and gets the Library instead).
         const std::string lastSeen = prefs["last_seen_version"].isString() ? prefs["last_seen_version"].asString() : "";
         showWhatsNew_ = lastSeen != SCULPTFORGE_VERSION;
+        // (the membership card's update moment: a newer version than the last start's)
+        updatedThisStart_ = !lastSeen.empty() && compareVersions(SCULPTFORGE_VERSION, lastSeen) > 0;
         checkUpdates_ = prefs["check_updates"].asBool(checkUpdates_);
         updateCheckedAt_ = int64_t(prefs["update_checked_at"].asNumber(0));
         if (prefs["update_skipped"].isString()) updateSkipped_ = prefs["update_skipped"].asString();
@@ -113,14 +115,14 @@ void App::initProject() {
         if (prefs["member_login"].isString()) memberLogin_ = prefs["member_login"].asString().substr(0, 39);
         if (prefs["update_channel"].isString())
             updateChannel_ = prefs["update_channel"].asString() == "preview" ? UpdateChannel::Preview : UpdateChannel::Stable;
-        sculptSeconds_ = addSculptTime(prefs["sculpt_seconds"].asNumber(0.0), 0.0);
-        supportReminderDone_ = prefs["support_reminder_done"].asBool(false);
+        // The membership cards (Support.h). ("support_card": false, the old switch, and "supporter" from before
+        // 0.11.1 are honoured as they were: a member said so.)
+        supportCardPrefs_.supporter = prefs["supporter"].asBool(false) || !prefs["support_card"].asBool(true);
         bigMeshTipDone_ = prefs["big_mesh_tip_done"].asBool(false);
-        supportCardPrefs_.enabled = prefs["support_card"].asBool(true);
-        supportCardPrefs_.supporter = prefs["supporter"].asBool(false);
         supportCardPrefs_.shownAt = int64_t(prefs["support_card_shown_at"].asNumber(0));
-        supportCardPrefs_.laterAt = int64_t(prefs["support_card_later_at"].asNumber(0));
-        if (prefs["support_card_version"].isString()) supportCardPrefs_.shownVersion = prefs["support_card_version"].asString();
+        supportCardPrefs_.hiddenUntil = int64_t(prefs["member_card_hidden_until"].asNumber(0));
+        if (prefs["member_card_challenge"].isString())
+            supportCardPrefs_.challengeSeen = prefs["member_card_challenge"].asString().substr(0, 32);
         discordPrefs_.enabled = prefs["discord_presence"].asBool(false); // Preferences > Integrations (PanelIntegrations.cpp)
         discordPrefs_.showChallenge = prefs["discord_challenge_shown"].asBool(false);
         discordPrefs_.showFileName = prefs["discord_file_name_shown"].asBool(false);
@@ -153,8 +155,8 @@ void App::initProject() {
     recentFiles_ = pruneRecentFiles(std::move(recentFiles_), fileExists);
     saveProjectPrefs(); // records this version, so What's New shows once
     updateDiscordPresence(); // on if it was left on (PanelIntegrations.cpp)
-    // The support card: decided here, while starting, and never again this session (Support.h). Its picture is
-    // decoded on a worker thread only if it shows.
+    // The full membership card on the first start (Support.h); after an update, the small card's moment.
+    if (updatedThisStart_) memberMoment(MemberMoment::Updated);
     launchSupportCard(!hadPrefs,
                       std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count(),
                       supportCardTestMode());
@@ -197,14 +199,11 @@ void App::saveProjectPrefs() {
     prefs.set("update_channel", std::string(updateChannel_ == UpdateChannel::Preview ? "preview" : "stable"));
     prefs.set("member_builds", memberBuilds_ && !memberSessionOnly_);
     if (memberBuilds_ && !memberSessionOnly_ && !memberLogin_.empty()) prefs.set("member_login", memberLogin_);
-    prefs.set("sculpt_seconds", std::floor(sculptSeconds_)); // for the one support reminder (Support.h); stays here
-    prefs.set("support_reminder_done", supportReminderDone_);
+    prefs.set("supporter", supportCardPrefs_.supporter); // the membership cards (Support.h)
     prefs.set("big_mesh_tip_done", bigMeshTipDone_); // the one big-mesh tip (BigMeshTip.h)
-    prefs.set("support_card", supportCardPrefs_.enabled); // the support card at launch (Support.h)
-    prefs.set("supporter", supportCardPrefs_.supporter);
     prefs.set("support_card_shown_at", double(supportCardPrefs_.shownAt));
-    prefs.set("support_card_later_at", double(supportCardPrefs_.laterAt));
-    if (!supportCardPrefs_.shownVersion.empty()) prefs.set("support_card_version", supportCardPrefs_.shownVersion);
+    prefs.set("member_card_hidden_until", double(supportCardPrefs_.hiddenUntil));
+    if (!supportCardPrefs_.challengeSeen.empty()) prefs.set("member_card_challenge", supportCardPrefs_.challengeSeen);
     prefs.set("discord_presence", discordPrefs_.enabled); // Preferences > Integrations (PanelIntegrations.cpp)
     prefs.set("discord_challenge_shown", discordPrefs_.showChallenge);
     prefs.set("discord_file_name_shown", discordPrefs_.showFileName);
@@ -237,9 +236,9 @@ void App::tickBigMeshTip() {
     if (!options_.renderPath.empty() || !options_.recordPath.empty() || (demo_ && !uiTest) ||
         (uiTest && !(testThreshold && *testThreshold)) || options_.benchmark || proof_)
         return;
-    // It waits for a quiet moment (no stroke, no card, tour or reminder), then shows once.
+    // It waits for a quiet moment (no stroke, no card or tour), then shows once.
     const bool busy = doc_.sculptor.strokeActive() || showWelcome_ || showWhatsNew_ || whatsNewOpen() || supportCardOpen() ||
-                      quickTourOpen_ || supportReminderOpen_;
+                      quickTourOpen_;
     if (bigMeshTipDue(sceneTrianglesWithMicro(), bigMeshTipTriangles(), bigMeshTipDone_, busy)) {
         bigMeshTipDone_ = true; // once only, written now: a crash or a forced quit doesn't bring it back
         bigMeshTipOpen_ = true;
@@ -251,15 +250,6 @@ void App::tickBigMeshTip() {
 void App::tickProject(float dt) {
     updateTitle();
     if (!interactive() || prefDir_.empty()) return;
-    // Sculpting time, for the one optional support reminder (Support.h): counted here, kept in project.json.
-    const bool stroking = doc_.sculptor.strokeActive();
-    if (stroking) sculptSeconds_ = addSculptTime(sculptSeconds_, double(dt));
-    if (supportReminderDue(sculptSeconds_, double(SDL_GetTicks()) * 1e-3, stroking, supportReminderDone_)) {
-        supportReminderDone_ = true; // once only
-        supportReminderOpen_ = true;
-        saveProjectPrefs();
-        redrawAt_ = double(SDL_GetTicksNS()) * 1e-9; // (a frame to show it, asleep or not)
-    }
     if (!doc_.dirty()) {
         autosaveTimer_ = 0.0f;
         if (autosaveWritten_) { // nothing left to recover
@@ -747,25 +737,36 @@ void App::startUpdateCheck(bool manual) {
         updateCheckedAt_ = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         saveProjectPrefs();
     }
-    const char* feed = std::getenv("SF_UPDATE_FEED");
-    std::string source = feed && *feed ? feed : kUpdateFeedUrl;
+    // Studio mode: only the studio's own channel, then its mirror (core/StudioProfile.h); else the public feed.
+    std::string fallback;
+    const std::string source = updateFeedSource(studioMode(), std::getenv("SF_UPDATE_FEED"), fallback);
+    if (source.empty()) { // a studio without a channel: nothing to ask
+        job->error = "this studio build has no update channel";
+        job->done = true;
+        return;
+    }
     // Detached: a slow network never holds up quitting (the job is shared, so it outlives the app if it must).
     const UpdateChannel channel = updateChannel_;
-    // Member builds only when signed in, and never in UI tests (the network).
-    const std::shared_ptr<MemberAuth> member = memberBuilds_ && options_.uiTest.empty() ? memberAuth_ : nullptr;
-    std::thread([job, source, channel, member] {
+    // Member builds only when signed in, never in UI tests (the network) and never in studio mode (its own channel).
+    const std::shared_ptr<MemberAuth> member =
+        memberBuilds_ && options_.uiTest.empty() && !studioMode().active ? memberAuth_ : nullptr;
+    std::thread([job, source, fallback, channel, member] {
         std::string body;
-        if (source.rfind("https://", 0) == 0 || source.rfind("http://", 0) == 0) {
-            ai::HttpResponse r = ai::httpRequest("GET", source, {"Accept: application/json"}, {}, 15);
-            if (r.status != 200 && source == kUpdateFeedUrl)
-                r = ai::httpRequest("GET", kUpdateFeedMirrorUrl, {"Accept: application/json"}, {}, 15);
-            if (r.status == 200) body = r.body;
-            else job->error = r.status ? "the server answered " + std::to_string(r.status) : (r.error.empty() ? "no connection" : r.error);
-        } else {
-            std::ifstream f(fsPath(source), std::ios::binary);
-            if (f) body.assign(std::istreambuf_iterator<char>(f), {});
-            else job->error = "can't read " + source;
-        }
+        // A URL or a local file (a studio's mirror on a share; UI tests).
+        auto fetch = [&](const std::string& from) {
+            job->error.clear();
+            if (from.rfind("https://", 0) == 0 || from.rfind("http://", 0) == 0) {
+                ai::HttpResponse r = ai::httpRequest("GET", from, {"Accept: application/json"}, {}, 15);
+                if (r.status == 200) body = r.body;
+                else job->error = r.status ? "the server answered " + std::to_string(r.status) : (r.error.empty() ? "no connection" : r.error);
+            } else {
+                std::ifstream f(fsPath(from), std::ios::binary);
+                if (f) body.assign(std::istreambuf_iterator<char>(f), {});
+                else job->error = "can't read " + from;
+            }
+            return job->error.empty();
+        };
+        if (!fetch(source) && !fallback.empty()) fetch(fallback);
         if (job->error.empty()) job->ok = parseUpdateFeed(body, job->info, job->error, channel);
         if (member) checkMemberBuilds(*member, *job); // (PanelUpdate.cpp)
         job->done = true;
@@ -789,6 +790,13 @@ void App::pollUpdateCheck() {
         return;
     }
     const UpdateInfo& u = job->info;
+    // The monthly challenge's results (latest.json's `challenge`): once per challenge, the membership card's moment.
+    if (!u.challengeId.empty() && u.challengeId != supportCardPrefs_.challengeSeen) {
+        supportCardPrefs_.challengeSeen = u.challengeId;
+        challengeTitle_ = u.challengeTitle;
+        saveProjectPrefs();
+        memberMoment(MemberMoment::Challenge);
+    }
     if (compareVersions(u.version, appFullVersion()) <= 0) {
         updateStatus_ = "SculptForge " + appVersionLabel() + " is the newest version";
         if (job->manual) status_ = updateStatus_;

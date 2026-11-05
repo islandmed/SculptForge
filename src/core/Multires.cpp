@@ -936,7 +936,7 @@ void enterLevel(Mesh& mesh, int level, BVH* bvh, const SubdivLevel* leavingLevel
     std::shared_ptr<Mesh> leaving = leavingLevel ? leavingLevel->data : nullptr;
     std::shared_ptr<const SubdivTopology> leavingTopo = leavingLevel && generatedLevel(*leavingLevel) ? leavingLevel->topo : nullptr;
     std::shared_ptr<MultiresStack> stack = mesh.multires;
-    if (leaving && leaving == stack->levels[size_t(level)].data) return; // already that level (e.g. Del Lower)
+    if (leaving && leaving == stack->levels[size_t(level)].data) return; // already that level (e.g. Delete Lower)
     if (!stack->cache) stack->cache = std::make_shared<SubdivLevelCache>();
     SubdivLevelCache& cache = *stack->cache;
     std::shared_ptr<PaintTexture> texture = mesh.texture;
@@ -2303,7 +2303,7 @@ bool setSubdivLevelUndoable(Document& doc, int level, std::string& message) {
 }
 
 bool deleteLowerUndoable(Document& doc, std::string& message) {
-    return runUndoable(doc, "Del Lower", [&](Mesh& m, std::string& msg, BVH*) {
+    return runUndoable(doc, "Delete Lower", [&](Mesh& m, std::string& msg, BVH*) {
         if (!subdivDeleteLower(m, msg)) return false;
         msg = "Deleted the lower levels: " + levelSummary(m);
         return true;
@@ -2311,7 +2311,7 @@ bool deleteLowerUndoable(Document& doc, std::string& message) {
 }
 
 bool deleteHigherUndoable(Document& doc, std::string& message) {
-    return runUndoable(doc, "Del Higher", [&](Mesh& m, std::string& msg, BVH*) {
+    return runUndoable(doc, "Delete Higher", [&](Mesh& m, std::string& msg, BVH*) {
         if (!subdivDeleteHigher(m, msg)) return false;
         msg = "Deleted the higher levels: " + levelSummary(m);
         return true;

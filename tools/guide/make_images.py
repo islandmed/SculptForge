@@ -33,6 +33,7 @@ CROPS = {
     "alpha-picker": ("alpha-picker", (0, 295, 575, 668), 575),
     "material-picker": ("material-picker", (25, 320, 505, 545), 480),
     "custom-lit-spheres": ("custom-lit-spheres", (436, 0, 980, 700), 544),
+    "lit-sphere-folders": ("lit-sphere-folders", (622, 44, 976, 496), 354),
     "ctrl-help": ("ctrl-help", (1060, 500, 1600, 740), 540),
     "command-palette": ("command-palette", (355, 100, 960, 500), 605),
     "console": ("console", (0, 698, 1275, 866), MAX_WIDTH),

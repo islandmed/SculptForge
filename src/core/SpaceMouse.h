@@ -41,6 +41,9 @@ struct SpaceMouseSettings {
     std::array<bool, kSmAxes> invert{};
     bool turntable = false; // lock rotation to a turntable: no roll, the world's up stays up
     bool dominant = false;  // only the axis pushed furthest moves the view (no accidental diagonal moves)
+    // While a pen or mouse stroke runs the view holds still and the buttons do nothing, so a hand on the cap (or a
+    // noisy cap) never moves the model under the pen (phoenix, Discord 11-05). Off: the view turns mid-stroke.
+    bool holdWhileStroking = true;
     // The action each button runs ("" = nothing): the two side buttons default to Frame and Front view.
     std::array<std::string, kSpaceMouseButtonSlots> buttons{"view.frame", "view.front"};
 };

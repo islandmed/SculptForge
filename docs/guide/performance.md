@@ -10,7 +10,7 @@ sculpt.
 
 ## What to expect
 
-On a 2021 laptop (Apple M1 Pro, 10 cores, integrated GPU), with X symmetry on and a medium Draw Size:
+On a 2021 laptop (Apple M1 Pro, 10 cores, integrated GPU), with X symmetry on and a medium Size:
 
 | Mesh | One dab of a medium brush | Turning the view |
 |---|---|---|
@@ -80,7 +80,7 @@ At the top of **Edit > Preferences > Performance**:
 
 From a shell, `sculptforge --calibrate` measures and prints the result as JSON.
 
-Like the other preferences, these last until you quit; **Edit > Preferences > Config > Store Config** keeps them. Every
+Like the other preferences, these save themselves for the next start. Every
 setting is also in the <kbd>F3</kbd> command palette (type "antialiasing", "fast navigation" or
 "multithreading").
 

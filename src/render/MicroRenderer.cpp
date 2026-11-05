@@ -546,34 +546,48 @@ bool MicroRenderer::sync(Mesh& mesh) {
         bool anyBase = false;
         if (baseMoved) {
             const uint32_t b0 = mesh.dirtyBegin, b1 = std::min<uint32_t>(mesh.dirtyEnd, uint32_t(mesh.vertexCount()));
+            // ... and the runs of moved vertices to send: a scan's vertex order isn't spatial, so a small dab's few
+            // thousand vertices can lie anywhere between the first and the last of 14M (Lucy: sending that span,
+            // ~450 MB, was a 25 px stroke's slowest frames). Gaps shorter than kGap are sent with the run.
+            constexpr uint32_t kGap = 64, kBlock = 1u << 14;
             std::atomic<size_t> moved{0};
+            baseRuns_.assign((size_t(b1 - b0) + kBlock - 1) / kBlock, {});
             poolFor(size_t(b1 - b0), [&](size_t b, size_t e) {
                 size_t count = 0;
+                auto& runs = baseRuns_[b / kBlock];
                 for (size_t i = b; i < e; ++i) {
                     const uint32_t v = b0 + uint32_t(i);
                     if (!mesh.vertexDirty(v)) continue;
                     ++count;
+                    if (!runs.empty() && v - runs.back().second <= kGap) runs.back().second = v + 1;
+                    else runs.push_back({v, v + 1});
                     for (uint32_t t : mesh.vertexTriangles(v))
                         std::atomic_ref<uint64_t>(baseBits_[t >> 6]).fetch_or(uint64_t(1) << (t & 63), std::memory_order_relaxed);
                 }
                 moved.fetch_add(count, std::memory_order_relaxed);
-            }, 1 << 14);
+            }, kBlock);
             anyBase = moved.load() > 0;
             baseEverywhere = moved.load() * 4 > mesh.vertexCount();
             if (baseEverywhere) {
                 uploadBase(mesh);
                 bytes_ -= mesh.vertexCount() * 2 * sizeof(glm::vec4);
             } else if (anyBase) {
-                std::vector<glm::vec4> part(size_t(b1 - b0) * 2);
-                poolFor(size_t(b1 - b0), [&](size_t b, size_t e) {
-                    for (size_t i = b; i < e; ++i) {
-                        part[i * 2] = glm::vec4(mesh.positions[b0 + i], 1.0f);
-                        part[i * 2 + 1] = glm::vec4(mesh.normals[b0 + i], 0.0f);
-                    }
-                }, 1 << 16);
+                std::vector<std::pair<uint32_t, uint32_t>> runs;
+                for (const auto& block : baseRuns_) runs.insert(runs.end(), block.begin(), block.end());
+                std::vector<size_t> at(runs.size() + 1, 0);
+                for (size_t k = 0; k < runs.size(); ++k) at[k + 1] = at[k] + (runs[k].second - runs[k].first);
+                std::vector<glm::vec4> part(at.back() * 2);
+                poolFor(runs.size(), [&](size_t b, size_t e) {
+                    for (size_t k = b; k < e; ++k)
+                        for (uint32_t v = runs[k].first, o = 0; v < runs[k].second; ++v, ++o) {
+                            part[(at[k] + o) * 2] = glm::vec4(mesh.positions[v], 1.0f);
+                            part[(at[k] + o) * 2 + 1] = glm::vec4(mesh.normals[v], 0.0f);
+                        }
+                }, 64);
                 gl::BindBuffer(GL_TEXTURE_BUFFER, baseData_);
-                gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(size_t(b0) * 2 * sizeof(glm::vec4)), GLsizeiptr(part.size() * sizeof(glm::vec4)),
-                                  part.data());
+                for (size_t k = 0; k < runs.size(); ++k)
+                    gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(size_t(runs[k].first) * 2 * sizeof(glm::vec4)),
+                                      GLsizeiptr((runs[k].second - runs[k].first) * 2 * sizeof(glm::vec4)), part.data() + at[k] * 2);
                 gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
             }
         }

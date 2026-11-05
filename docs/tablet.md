@@ -25,7 +25,7 @@ Open **Preferences > Tablet** to check the pen and tune it:
 - **Tilt**: shown when the pen reports it (brushes don't use it yet).
 - **Eraser** and the **side buttons**, below.
 
-Settings are kept with the UI configuration: **Store Config (Ctrl+Shift+I)** saves them.
+Settings are kept with the preferences: they save themselves.
 
 ## Eraser and side buttons
 

@@ -60,7 +60,7 @@ paint come along).
   Classic layout with alphabetical palettes in one click (Preferences > Interface > Look)
 - Shelves around the canvas, palettes holding every tool, a Library (`,`) of thumbnails, the
   brush picker (`B`, type letters to pick), hold-Ctrl help on every button, a command palette (F3) and a script
-  console (`` ` ``), and a fully customizable layout with Store Config. See [docs/ui-design.md](docs/ui-design.md).
+  console (`` ` ``), and a fully customizable layout; preferences save themselves. See [docs/ui-design.md](docs/ui-design.md).
 - A built-in **user guide** (Help > User Guide, Shift+F1) with search, also on the
   [website](https://sculptforge.app/guide/); hold Ctrl over any control and press F1 to open its
   chapter. Source: [docs/guide](docs/guide/index.md).
@@ -86,7 +86,7 @@ paint come along).
 - **Project files** (`.sfproj`) that keep everything, with an unsaved-changes prompt, recent files and autosave.
 - Unlimited undo, Loop subdivision, **voxel remesh** (voxel remesh) and quadric decimation.
 - **Quad Remesh** quad retopology (quad remesh: target count, Adaptive Size, Keep Groups, vertex paint density,
-  symmetry) and **Project All** to bring the sculpted detail back onto the new topology.
+  symmetry) and **Project Detail** to bring the sculpted detail back onto the new topology.
 - **Sculpt layers** that work as blend shapes, with live weights and playback.
 
 **Free built-in AI: Brush Lab (describe a brush, AI builds it)**
@@ -313,9 +313,12 @@ where, and for the licences of the AI models.
 
 SculptForge is free, and nothing in the app is ever paywalled.
 **[Member](https://sculptforge.app/support.html)** ($5 / month or $48 / year): betas and early builds, the monthly
-feature vote, a brush and alpha pack every month, #members on Discord and your name in the
-[credits](https://sculptforge.app/supporters.html). **[Studio](https://sculptforge.app/studios.html#membership)**
-($150 / month): up to 10 artists with everything in Member, priority support and a private channel. Every release
+feature vote, Member Requests (ask for a brush, alpha or material each month), #members on Discord and your name in
+the [credits](https://sculptforge.app/supporters.html); the first 100 members are Founding Members, price locked for
+good. **[Studio](https://sculptforge.app/studios.html#membership)**
+($300 / month for up to 10 artists, +$25 per extra artist; Founding Studio $150 for the first 10 studios): your
+studio's own isolated build with your assets built in, a pinned version with security fixes, an offline signed
+installer, support and a private channel. Every release
 stays free for everyone; bug-fix and security releases go out to everyone the same day.
 
 <!-- Studio members' logos go here. -->
