@@ -40,6 +40,10 @@ public:
 
     // Ray through a window coordinate (origin top-left).
     void screenRay(float x, float y, float width, float height, glm::vec3& origin, glm::vec3& dir) const;
+    // The same view as seen from a space placed by `place` (a similarity: rotation, translation, uniform scale;
+    // e.g. a linked Part's transform): view() becomes view() * place up to a uniform scale, which the projection
+    // ignores, so rays, projections and pixel sizes in that space match the view's.
+    Camera inSpaceOf(const glm::mat4& place) const;
     // World units covered by one window pixel at the depth of `point`.
     float worldPerPixel(const glm::vec3& point, float viewportHeight) const;
 

@@ -93,6 +93,8 @@
 //                            welcome_open (the first-run welcome shown), new_look_card_open (the one-time
 //                            "SculptForge has a new look" card),
 //                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
+//                            linked_parts (Parts sharing the active one's mesh, #94; 1 = none), part_moved, part_x (its
+//                            centre's x in the scene),
 //                            extract_preview (1 while an Extract preview waits for Accept), open_edges (edges of
 //                            the active Part with one triangle: 0 = watertight), solid_volume (the active Part's
 //                            volume with its open borders capped),
@@ -841,6 +843,11 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "saved_views") return double(app_.savedViews_.size());
     if (name == "mask_darkness") return std::round(app_.renderSettings_.maskDarkness * 100.0f);
     if (name == "brush_type") return app_.doc_.activeBrush >= 0 || app_.paintMode_ ? -1.0 : double(int(app_.brush_));
+    if (name == "dab_scene_error_px") { // the last dab's centre, placed in the scene and shown by the view, to the cursor
+        const Part& part = app_.doc_.activePartInfo(); // (a moved linked copy, #94: its own space and the scene's agree)
+        const ImVec2 p = project(glm::vec3(part.transform * glm::vec4(app_.lastDabCentre_, 1.0f)));
+        return double(glm::distance(glm::vec2(p.x, p.y), app_.lastDabScreen_));
+    }
     if (name == "last_dab_x") return app_.lastDabScreen_.x;
     if (name == "last_dab_y") return app_.lastDabScreen_.y;
     if (name == "paint_r") return std::round(255.0f * linearToSrgb(app_.doc_.paintColor).x);
@@ -1005,12 +1012,15 @@ double Demo::query(const std::string& name, bool& known) const {
                           glm::cross(glm::dvec3(capped.positions[t.y]), glm::dvec3(capped.positions[t.z])));
         return v / 6.0;
     }
+    if (name == "linked_parts") return double(app_.doc_.linkCount(app_.doc_.activePart)); // (#94: 1 = not linked)
+    if (name == "part_moved") return app_.doc_.activePartInfo().moved() ? 1.0 : 0.0;
+    if (name == "part_x") return double(app_.doc_.partBounds(app_.doc_.activePart).center().x);
     if (name == "visible_parts")
         return double(std::count_if(doc.parts.begin(), doc.parts.end(), [](const Part& s) { return s.visible; }));
     if (name == "edited_parts") { // Parts with undo history (the active one's lives in doc.undo)
         int n = 0;
         for (int i = 0; i < doc.partCount(); ++i)
-            n += (i == doc.activePart ? doc.undo.canUndo() : doc.parts[size_t(i)].undo.canUndo()) ? 1 : 0;
+            n += doc.partUndo(i).canUndo() ? 1 : 0;
         return double(n);
     }
     if (name == "user_brushes")
@@ -1545,7 +1555,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 return true;
             }
             // The point of its on-screen bounds nearest (U, V) where it's the front Part and no panel covers it.
-            const AABB b = app_.doc_.partMesh(index).bounds();
+            const AABB b = app_.doc_.partBounds(index);
             ImVec2 lo(1e9f, 1e9f), hi(-1e9f, -1e9f);
             for (int i = 0; i < 8; ++i) {
                 const ImVec2 p = project(glm::vec3((i & 1) ? b.max.x : b.min.x, (i & 2) ? b.max.y : b.min.y,
@@ -1834,7 +1844,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         auto points = std::make_shared<std::vector<ImVec2>>();
         steps_.push_back([this, uv, points](float t) {
             // The model's on-screen bounds, without onModel's walk onto the surface: points may be on the background.
-            const AABB b = app_.doc_.mesh.bounds();
+            const AABB b = app_.doc_.partBounds(app_.doc_.activePart);
             ImVec2 lo(1e9f, 1e9f), hi(-1e9f, -1e9f);
             for (int i = 0; i < 8; ++i) {
                 const ImVec2 p = project(glm::vec3((i & 1) ? b.max.x : b.min.x, (i & 2) ? b.max.y : b.min.y,

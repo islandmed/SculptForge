@@ -220,7 +220,7 @@ void App::regrabAfterViewMove() {
     if (!grabStroke()) return;
     // Where the grabbed point is on screen now: the pen's next motion moves it from there, by as much as the pen moves.
     ImVec2 at;
-    if (!gizmoProject(strokeBrush_ == BrushType::KelvinGrab ? kelvinTarget_ : grabLast_, at)) return;
+    if (!partProject(strokeBrush_ == BrushType::KelvinGrab ? kelvinTarget_ : grabLast_, at)) return;
     grabScreenOffset_ = glm::vec2(at.x, at.y) - grabScreen_;
 }
 

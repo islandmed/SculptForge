@@ -471,6 +471,14 @@ void App::initActions() {
         [this] { sculptPartUnderCursor(); }, ICON_LC_MOUSE_POINTER_CLICK, nullptr, nullptr, nullptr,
         "Make the Part under the pointer the one you sculpt, without moving the view (each Part keeps its mask). "
         "The same key as Blender's; Preferences > Hotkeys changes it.");
+    add("part.duplicate_linked", "Linked Duplicate", "Tool > Parts", nullptr, [this] { runCommand("part_duplicate_linked"); },
+        ICON_LC_LINK, "part_duplicate_linked", nullptr, [this] { return doc_.mesh.triangleCount() > 0; },
+        "A copy that shares the active Part's mesh, beside it: sculpt, paint or mask any of them and all change. Move "
+        "each with the Gizmo; Make Unique gives one its own mesh again. Hundreds of copies cost about one mesh.");
+    add("part.make_unique", "Make Unique", "Tool > Parts", nullptr, [this] { runCommand("part_make_unique"); },
+        ICON_LC_UNLINK, "part_make_unique", nullptr, [this] { return doc_.linkCount(doc_.activePart) > 1; },
+        "Give the active linked Part its own copy of the mesh: it stays where it is and no longer changes with the "
+        "others.");
     // Tool > Part > Extract, Tool > Geometry > Modify Topology, Tool > Deformation (PanelExtract.cpp).
     add("part.extract", "Extract", "Tool > Parts", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
         [this] { return doc_.mesh.hasMask(); },

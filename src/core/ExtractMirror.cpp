@@ -431,13 +431,14 @@ CommandResult runExtract(Document& doc, const Args& a) {
     const size_t tris = shell.triangleCount();
     doc.dropExtractPreview(true);
     if (doc.extractPreview.id) { // Extract again (other settings): the preview is replaced
-        Part& s = doc.parts[size_t(doc.partIndex(doc.extractPreview.id))];
+        PartData& s = *doc.parts[size_t(doc.partIndex(doc.extractPreview.id))].data;
         s.mesh = std::move(shell);
         s.mesh.topologyDirty = true;
         s.bvh.build(s.mesh);
         s.bvhDirty = false;
     } else {
         const int i = doc.addPart(std::move(shell), "Extract", false, doc.activePart + 1);
+        doc.parts[size_t(i)].transform = doc.activePartInfo().transform; // (made from the active mesh: where it is)
         doc.extractPreview = {doc.parts[size_t(i)].id, doc.activePartInfo().id, doc.undo.revision()};
     }
     if (argBool(a, "accept", false)) return acceptPreview(doc);

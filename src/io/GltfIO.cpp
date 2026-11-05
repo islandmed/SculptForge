@@ -154,8 +154,27 @@ bool saveGlb(const std::string& path, const std::vector<MeshObjectRef>& objects,
         return accessorCount++;
     };
 
-    // One node and one mesh per object, each with its own morph targets.
+    // One node and one mesh per object, each with its own morph targets. A linked copy (#94, instanceOf) is a
+    // node of its own, placed by its matrix, reusing the first one's mesh.
+    std::vector<int> meshOf(objects.size(), -1);
+    int meshCount = 0;
+    auto addNode = [&](size_t oi) {
+        nodes << (oi ? "," : "") << "{\"mesh\":" << meshOf[oi] << ",\"name\":\"" << jsonEscape(objects[oi].name) << "\"";
+        if (objects[oi].transform != glm::mat4(1.0f)) {
+            std::ostringstream m;
+            m.precision(9);
+            for (int i = 0; i < 16; ++i) m << (i ? "," : "") << glm::value_ptr(objects[oi].transform)[i];
+            nodes << ",\"matrix\":[" << m.str() << "]";
+        }
+        nodes << "}";
+    };
     for (size_t oi = 0; oi < objects.size(); ++oi) {
+        if (const int first = objects[oi].instanceOf; first >= 0 && size_t(first) < oi && meshOf[size_t(first)] >= 0) {
+            meshOf[oi] = meshOf[size_t(first)];
+            addNode(oi);
+            continue;
+        }
+        meshOf[oi] = meshCount++;
         const Mesh& mesh = *objects[oi].mesh;
         const std::string& name = objects[oi].name;
         // Base shape and its normals.
@@ -252,9 +271,9 @@ bool saveGlb(const std::string& path, const std::vector<MeshObjectRef>& objects,
             materials << "}";
         }
 
-        nodes << (oi ? "," : "") << "{\"mesh\":" << oi << ",\"name\":\"" << jsonEscape(name) << "\"}";
+        addNode(oi);
         std::ostringstream& json = meshes; // this object's entry in "meshes"
-        json << (oi ? "," : "") << "{\"name\":\"" << jsonEscape(name) << "\",\"primitives\":[{\"attributes\":{\"POSITION\":"
+        json << (meshOf[oi] ? "," : "") << "{\"name\":\"" << jsonEscape(name) << "\",\"primitives\":[{\"attributes\":{\"POSITION\":"
              << posAcc << ",\"NORMAL\":" << nrmAcc;
         if (colors) json << ",\"COLOR_0\":" << colorAcc;
         if (uvs) json << ",\"TEXCOORD_0\":" << uvAcc;

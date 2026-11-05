@@ -38,10 +38,10 @@ void App::updateFocusDetail() {
     if (!(h > 0.0f)) return;
     FocusView view;
     view.valid = true;
-    view.eye = camera_.position();
-    view.viewProj = camera_.projection() * camera_.view();
+    view.eye = partCamera().position();
+    view.viewProj = partCamera().projection() * partCamera().view();
     // pixels per world unit at distance 1 (ortho: as a perspective view would at the target's depth)
-    view.focalPx = glm::distance(view.eye, camera_.target) / std::max(camera_.worldPerPixel(camera_.target, h), 1e-12f);
+    view.focalPx = glm::distance(view.eye, partCamera().target) / std::max(partCamera().worldPerPixel(partCamera().target, h), 1e-12f);
     const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
     FocusBrush brush;
     RayHit hit;
@@ -51,7 +51,7 @@ void App::updateFocusDetail() {
         const glm::vec3 v = focusBrushValid_ && dt > 0.0f && dt < 0.25f ? (hit.position - focusBrushPos_) / dt : glm::vec3(0.0f);
         focusBrushVel_ = glm::mix(focusBrushVel_, v, 0.5f); // smoothed over a couple of frames
         focusBrushPos_ = hit.position;
-        focusBrushRadius_ = radiusPx_ * camera_.worldPerPixel(hit.position, h);
+        focusBrushRadius_ = radiusPx_ * partCamera().worldPerPixel(hit.position, h);
         focusBrushTime_ = now;
         focusBrushValid_ = true;
     } else if (!(drag_ == Drag::Stroke) || now - focusBrushTime_ > 1.0) {

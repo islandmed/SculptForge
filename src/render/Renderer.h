@@ -116,7 +116,9 @@ struct MeshOverlay {
     float checkerScale = 8.0f;    // checker squares per UV unit
 };
 
-// One mesh of the scene for Renderer::syncScene: a Part, keyed by its stable id.
+// One mesh of the scene for Renderer::syncScene: a Part, keyed by its stable id. Linked Parts (#94) share one
+// mesh: they come with the same id (their PartData key) and their own `model` matrices, and are drawn from one
+// GPU slot, uploaded once.
 struct SceneMesh {
     uint32_t id = 0;
     Mesh* mesh = nullptr;
@@ -128,6 +130,7 @@ struct SceneMesh {
     bool flat = false;      // flat shading: each triangle shows its own face normal (faceted)
     bool pbr = false;       // the view shades PBR: upload the texture's material channels and their tangents
     const MeshOverlay* overlay = nullptr; // the UV Editor's view of the active mesh (must outlive the frame)
+    glm::mat4 model{1.0f}; // where the mesh is in the scene (Part::transform)
 };
 
 // Part of the target the 3D view is drawn into (framebuffer pixels, origin bottom-left); the rest is
@@ -572,7 +575,11 @@ private:
         uint32_t id;
         bool active;
         bool flat;
+        bool moved = false;      // drawn with `model` (a linked copy, #94)
+        glm::mat4 model{1.0f};
     };
+    // drawSlot for `item`: with its model matrix in the frame's view and culling (restored after).
+    void drawItem(const MeshSlot& s, const DrawItem& item, const RenderSettings& settings);
     std::vector<DrawItem> drawList_;      // visible meshes, in scene order
     std::vector<uint32_t> visibleGroups_; // scratch for uploadFaces
     std::vector<glm::vec2> visibleUvs_;   // scratch for uploadFaces

@@ -107,6 +107,18 @@ void Camera::screenRay(float x, float y, float width, float height, glm::vec3& o
     dir = forward();
 }
 
+Camera Camera::inSpaceOf(const glm::mat4& place) const {
+    if (place == glm::mat4(1.0f)) return *this;
+    const float s = glm::length(glm::vec3(place[0]));
+    if (!(s > 0.0f) || !std::isfinite(s)) return *this;
+    const glm::mat3 r = glm::mat3(place) / s;
+    Camera c = *this;
+    c.target = glm::vec3(glm::inverse(place) * glm::vec4(target, 1.0f));
+    c.distance = distance / s;
+    c.setOrientation(glm::quat_cast(glm::transpose(r)) * orientation());
+    return c;
+}
+
 float Camera::worldPerPixel(const glm::vec3& point, float viewportHeight) const {
     if (ortho) return 2.0f * distance * std::tan(fovY * 0.5f) / std::max(viewportHeight, 1.0f);
     float depth = std::max(glm::dot(point - position(), forward()), nearPlane());

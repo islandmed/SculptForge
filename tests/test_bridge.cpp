@@ -315,7 +315,7 @@ TEST(bridge_bridge_send_and_receive) {
     CHECK(r.ok && r.message.find("Sphere_1") != std::string::npos);
     CHECK(back.partCount() == 2 && back.activePart == 0);
     CHECK(back.parts[0].name == "Sphere_1" && back.bridgeName == "Sphere_1");
-    CHECK(back.parts[1].name == "Other" && back.parts[1].bridgeName == "Other");
+    CHECK(back.parts[1].name == "Other" && back.parts[1].data->bridgeName == "Other");
     CHECK(back.mesh.vertexCount() == m.vertexCount() && back.mesh.triangleCount() == m.triangleCount());
     CHECK(back.partMesh(1).triangleCount() == second.triangleCount());
     CHECK(back.mesh.mask.size() == back.mesh.vertexCount() && back.mesh.facegroups.size() == back.mesh.triangleCount());

@@ -853,6 +853,11 @@ void App::canvasRay(float x, float y, glm::vec3& origin, glm::vec3& dir) const {
     camera_.screenRay(x - c.x, y - c.y, c.w, c.h, origin, dir);
 }
 
+void App::partRay(float x, float y, glm::vec3& origin, glm::vec3& dir) const {
+    const CanvasRect c = canvasRect();
+    partCamera().screenRay(x - c.x, y - c.y, c.w, c.h, origin, dir);
+}
+
 Renderer::Viewport App::canvasViewport(int fbWidth, int fbHeight) const {
     if (hideUi_) return {};
     int w = 0, h = 0;

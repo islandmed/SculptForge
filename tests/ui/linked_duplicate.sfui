@@ -1,0 +1,67 @@
+# Linked Duplicates (#94): Tool > Parts > Linked Duplicate and its link badge, the Gizmo moving one copy, a stroke
+# on a turned copy landing under the cursor (and changing every copy), shared undo, Make Unique, save and reopen.
+run new_sphere subdivisions=4 ; part_rename to=Body
+expect "Parts/Linked Duplicate##part.duplicate_linked"
+click "Parts/Linked Duplicate##part.duplicate_linked"
+expect_status Linked duplicate Body link
+expect_value parts == 2
+expect_value active_part == 1
+expect_value linked_parts == 2
+expect_value part_moved == 1
+click "Parts/Linked Duplicate##part.duplicate_linked"
+expect_value parts == 3
+expect_value linked_parts == 3
+key f
+wait 0.5
+shot three-linked
+
+# The Gizmo moves only the active copy: its place, not the shared mesh.
+remember part_x x0
+key w
+gizmo_drag move_y 0 -60
+expect_status Gizmo Move
+expect_value part_x == $x0
+expect_value part_moved == 1
+key q
+# Turn it a quarter about Z and scale it up (as a command, one undo step each).
+run transform rotate=0,0,90 scale=1.5
+key f
+wait 0.3
+shot moved-copy
+
+# A stroke on the turned, scaled copy lands under the cursor.
+click "Clay##brush.clay"
+stroke 0.35 0.4 0.65 0.6
+expect_value dabs > 3
+expect_value dab_scene_error_px < 0.5
+remember vertices v0
+shot sculpted-copy
+# Every copy shows it: the source has the same mesh, and its undo history takes the stroke back.
+click "Parts/Body"
+expect_value active_part == 0
+expect_value linked_parts == 3
+expect_value can_undo == 1
+key ctrl+z
+key ctrl+shift+z
+shot sculpted-source
+
+# Make Unique: the copy keeps its place, its own mesh, no history.
+click "Parts/Body link 2"
+expect_value active_part == 2
+expect_value linked_parts == 3
+click "Parts/Make Unique##part.make_unique"
+expect_status is unique now
+expect_value linked_parts == 1
+expect_value can_undo == 0
+expect_value part_moved == 1
+click "Parts/Body"
+expect_value linked_parts == 2
+
+# Save and reopen: the links and places come back.
+run save_project path=sf_ui_linked.sfproj
+run open path=sf_ui_linked.sfproj
+expect_value parts == 3
+expect_value active_part == 0
+expect_value linked_parts == 2
+wait 0.5
+shot reopened

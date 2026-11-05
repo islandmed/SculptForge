@@ -1428,7 +1428,7 @@ std::string applySculptable(Document& doc, SculptableResult& res, bool keepScan)
     if (keepScan) {
         const int s = doc.addPart(std::move(res.scan), doc.uniquePartName(base + " Scan"), false);
         doc.parts[size_t(s)].visible = false;
-        doc.parts[size_t(s)].qremeshGuides = res.guides;
+        doc.parts[size_t(s)].data->qremeshGuides = res.guides;
     }
     const std::string report = res.report();
     doc.addPart(std::move(res.mesh), doc.uniquePartName(base), true);

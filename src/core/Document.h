@@ -28,18 +28,11 @@ enum class Shading : uint8_t { Default, Smooth, Flat };
 const char* shadingName(Shading s);           // "default", "smooth", "flat"
 bool parseShading(const std::string& name, Shading& out);
 
-// One object in the scene, like a classic Part: a body, the eyes, the
-// teeth, a sword. Each keeps its own mesh, attributes, layers and undo
-// history. The active Part is "checked out" into Document::mesh / bvh /
-// undo, so every tool and command keeps working on the active one; its slot
-// here holds only the name and flags until another Part is selected.
-struct Part {
-    uint32_t id = 0; // stable for the session (renderer slots, UI selection)
-    std::string name;
-    bool visible = true;
-    Shading shading = Shading::Default; // per-Part override of the scene's shading
-    uint32_t folder = 0;                // the PartFolder it's in (its id), 0 = none
-    // Inactive Parts only (empty while active).
+// What a Part is made of: its mesh, attributes, layers and undo history. Shared (reference counted) by the Parts
+// of one link group (Linked Duplicate, #94): sculpting, painting or masking any of them edits this one mesh, and
+// they share its history. `key` names it for the renderer (one GPU mesh per PartData): the id of the Part it
+// was made for.
+struct PartData {
     Mesh mesh;
     BVH bvh;
     UndoStack undo;
@@ -48,6 +41,30 @@ struct Part {
     bool bvhDirty = false;
     uint64_t cleanRevision = 0;
     std::vector<QRemeshGuide> qremeshGuides; // QRemesh Guides (core/QRemeshGuides.h)
+    uint32_t key = 0;
+};
+
+// One object in the scene, like a classic Part: a body, the eyes, the
+// teeth, a sword. Each keeps its own mesh, attributes, layers and undo
+// history (its PartData, shared with its linked copies). The active Part is "checked out" into Document::mesh /
+// bvh / undo, so every tool and command keeps working on the active one; its PartData holds only the key until
+// a Part with other data is selected.
+struct Part {
+    uint32_t id = 0; // stable for the session (renderer slots, UI selection)
+    std::string name;
+    bool visible = true;
+    Shading shading = Shading::Default; // per-Part override of the scene's shading
+    uint32_t folder = 0;                // the PartFolder it's in (its id), 0 = none
+    // Where the mesh is in the scene: world = transform * mesh position. Identity unless the Part is a linked copy
+    // moved on its own (or was one: Make Unique keeps it). A similarity (rotation, translation, uniform scale).
+    glm::mat4 transform{1.0f};
+    std::shared_ptr<PartData> data = std::make_shared<PartData>();
+    Part() = default;
+    Part(Part&&) = default;
+    Part& operator=(Part&&) = default;
+    Part(const Part&) = delete; // (a copy would share the data: a link; Document::linkedDuplicate makes those)
+    Part& operator=(const Part&) = delete;
+    bool moved() const { return transform != glm::mat4(1.0f); }
 };
 
 // A folder in the Parts list (#96): a name the list groups its Parts under, so they hide, show and move
@@ -59,11 +76,14 @@ struct PartFolder {
 };
 
 // An undo step that added Part `id` at list position `at` (UndoRecord::part): `stashed` holds the Part
-// while it's undone.
+// while it's undone. With `isTransform` it instead moved Part `id` (a linked copy): `transform` holds the
+// other transform (undo and redo swap it with the Part's).
 struct PartStep {
     uint32_t id = 0;
     int at = 0;
     std::unique_ptr<Part> stashed;
+    bool isTransform = false;
+    glm::mat4 transform{1.0f};
 };
 
 // Extract's preview (core/ExtractMirror.h): Part `id`, made from the mask of Part `source` as it was at
@@ -156,9 +176,30 @@ struct Document {
     int partCount() const { return int(parts.size()); }
     Part& activePartInfo() { return parts[size_t(activePart)]; }
     const Part& activePartInfo() const { return parts[size_t(activePart)]; }
-    // The mesh of Part `i`, active or not.
-    Mesh& partMesh(int i) { return i == activePart ? mesh : parts[size_t(i)].mesh; }
-    const Mesh& partMesh(int i) const { return i == activePart ? mesh : parts[size_t(i)].mesh; }
+    // True when Part `i`'s data is the one checked out (the active Part, or a Part linked to it).
+    bool checkedOut(int i) const { return parts[size_t(i)].data == parts[size_t(activePart)].data; }
+    // The mesh, BVH (built if stale) and history of Part `i`, active or not (a linked copy's are its group's).
+    Mesh& partMesh(int i) { return checkedOut(i) ? mesh : parts[size_t(i)].data->mesh; }
+    const Mesh& partMesh(int i) const { return checkedOut(i) ? mesh : parts[size_t(i)].data->mesh; }
+    BVH& partBvh(int i);
+    UndoStack& partUndo(int i) { return checkedOut(i) ? undo : parts[size_t(i)].data->undo; }
+    const UndoStack& partUndo(int i) const { return checkedOut(i) ? undo : parts[size_t(i)].data->undo; }
+    // The renderer's key for Part `i`'s mesh (shared by linked copies: one GPU mesh).
+    uint32_t meshKey(int i) const { return parts[size_t(i)].data->key; }
+    // --- Linked Duplicates (#94): Parts sharing one mesh, each with its own transform.
+    // How many Parts share Part `i`'s mesh (1 = not linked).
+    int linkCount(int i) const;
+    // Adds a Part sharing Part `i`'s mesh and history at `at` (-1 = end), placed by `transform`; not undoable, not
+    // selected. Returns its index.
+    int addLink(int i, std::string name, const glm::mat4& transform, int at = -1);
+    // Adds a Part sharing Part `i`'s mesh and history, after it, offset by `offset` (world units), and makes it
+    // active; one undoable step in the shared history. Returns its index.
+    int linkedDuplicate(int i, const glm::vec3& offset);
+    // Gives Part `i` its own copy of the mesh (a fresh history), breaking its link; it keeps its transform.
+    // False when it isn't linked.
+    bool makeUnique(int i);
+    // Sets Part `i`'s transform as an undoable step in its history (`label`).
+    void setPartTransform(int i, const glm::mat4& transform, const std::string& label);
     // Makes Part `i` the one tools and commands edit.
     void selectPart(int i);
     // Inserts a Part at `at` (-1 = end of the list), made active when `select`; returns its index. `built`:
@@ -202,8 +243,10 @@ struct Document {
 
     // A name not used by any Part yet ("Eye", "Eye 2", ...).
     std::string uniquePartName(const std::string& wanted) const;
-    // Bounds of every visible Part.
+    // Bounds of every visible Part (in the scene: transforms applied).
     AABB visibleBounds() const;
+    // Bounds of Part `i` in the scene (its transform applied).
+    AABB partBounds(int i) const;
 
     // Replaces the whole scene with one Part holding `m` and clears the edit history (`built`: as addPart).
     void setMesh(Mesh m, std::string name = "Sculpt", BVH* built = nullptr);
@@ -220,6 +263,7 @@ private:
     uint64_t cleanRevision_ = 0, cleanSplatsVersion_ = 0;
     uint32_t nextPartId_ = 2;
     uint32_t nextFolderId_ = 1;
+    uint32_t newPartId(Part& p); // gives `p` the next id (and its data that key when it has none)
 };
 
 } // namespace sf

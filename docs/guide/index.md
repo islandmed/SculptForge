@@ -43,6 +43,7 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 11. [Face Groups and visibility](face-groups.md)
 12. [Selection sets and morph targets](selection-sets.md)
 13. [Parts](parts.md)
+    - [Linked Duplicates](linked-duplicates.md)
 14. [Forge Spheres](forge-spheres.md)
 15. [Vertex Paint and materials](vertex-paint.md)
 16. [Texture painting](texture-painting.md)
