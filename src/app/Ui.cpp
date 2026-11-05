@@ -147,6 +147,7 @@ bool IsModeAction(std::string_view id) {
     auto starts = [&](std::string_view p) { return id.substr(0, p.size()) == p; };
     if (id == "tool.draw" || id == "tool.move" || id == "tool.scale" || id == "tool.rotate") return true;
     if (id == "draw.sculpt" || id == "draw.paint") return true;
+    if (starts("brush.pen_")) return false; // a brush's pen pressure switches (#122): choices, not brush picks
     return starts("brush.") || starts("mask.") || starts("select.");
 }
 
@@ -154,7 +155,7 @@ bool IsChoiceAction(std::string_view id) {
     return id == "draw.raise" || id == "draw.lower" || id == "material.smooth" || id == "material.flat" ||
            id == "view.background_gradient" || id == "view.background_flat" || id == "view.shading_lit_sphere" ||
            id == "view.shading_pbr" ||
-           id.rfind("part.shading_", 0) == 0 || id.substr(0, 8) == "uv.mode_";
+           id.rfind("part.shading_", 0) == 0 || id.rfind("brush.pen_", 0) == 0 || id.substr(0, 8) == "uv.mode_";
 }
 
 void CentredGlyph(ImDrawList* dl, ImFont* font, ImVec2 a, ImVec2 b, ImU32 col, const char* glyph) {

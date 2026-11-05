@@ -63,7 +63,7 @@ void App::kelvinBegin(const RayHit& hit) {
 
 void App::kelvinTo(float x, float y) {
     if (strokeProbe_) strokeProbe_->emplace_back(x, y); // --measure-stroke counts each drag step as a dab
-    const float pressure = pressureStrength_ ? strokePressure() : 1.0f;
+    const float pressure = pressureStrengthOn() ? strokePressure() : 1.0f;
     kelvinAmount_ = std::min(1.0f, 2.0f * strength_) * pressure;
     if (strokeBrush_ == BrushType::KelvinGrab) {
         // The grabbed point follows the cursor in the plane through it facing the camera (as Move), or along the

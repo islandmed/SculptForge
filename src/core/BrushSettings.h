@@ -4,11 +4,13 @@
 // Per-brush settings (#78): each brush keeps its own Draw Size, Z Intensity, Focal Shift, RGB Intensity, stroke and
 // alpha. Picking another brush remembers the one left and brings back what the picked one had this session (or what
 // Save Brush Settings stored for it, <app data>/brush-settings.json); a brush not used yet takes the current values,
-// so nothing jumps the first time. Reset Brush to Default puts back the shipped values.
+// so nothing jumps the first time. Reset Brush to Default puts back the shipped values. Pen pressure (#122) is the
+// exception to "nothing jumps": a brush not used yet starts with its own (grab brushes: Size off).
 #pragma once
 
 #include "core/AlphaOptions.h"
 #include "core/Json.h"
+#include "core/PenPressure.h"
 #include "core/Stroke.h"
 
 #include <map>
@@ -29,6 +31,9 @@ struct BrushToolSettings {
     std::string alphaPath;
     bool alphaInvert = false;
     AlphaOptions alphaOptions; // Follow stroke direction, Angle, Angle jitter, Tile (#76)
+    // Pen pressure > Size / Strength for this brush (#122): Use global (Preferences > Tablet), On or Off.
+    PenPressure pressureSize = PenPressure::Global;
+    PenPressure pressureStrength = PenPressure::Global;
 
     bool operator==(const BrushToolSettings&) const = default;
     void clamp();
@@ -53,7 +58,9 @@ public:
     void store(const std::string& key, const BrushToolSettings& s);
     // Reset Brush to Default: forgets `key`'s session and saved values; returns the shipped ones.
     BrushToolSettings reset(const std::string& key);
-    static BrushToolSettings shipped(const std::string& key); // the Vector Displacement brush stamps with DragRect
+    // The Vector Displacement brush stamps with DragRect; grab brushes (Move, the Kelvinlet grab / twist / scale,
+    // the tendrils) have Pressure > Size off, since a pen's press is nearly weightless (#122).
+    static BrushToolSettings shipped(const std::string& key);
     bool hasSaved(const std::string& key) const { return saved_.count(key) != 0; }
     // Used this session or saved: switchBrush brings its own values back (otherwise it takes the current ones).
     bool known(const std::string& key) const { return session_.count(key) != 0 || saved_.count(key) != 0; }

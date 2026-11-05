@@ -413,8 +413,8 @@ App::DabSettings App::dabSettings() const {
     st.maskStrength = maskStrength_;
     st.sprayScatter = sprayScatter_;
     st.alphaOptions = alphaOptions_;
-    st.pressureSize = pressureSize_;
-    st.pressureStrength = pressureStrength_;
+    st.pressureSize = pressureSizeOn();
+    st.pressureStrength = pressureStrengthOn();
     st.invert = strokeInvert_;
     st.frontFacesOnly = frontFacesOnly_;
     st.connectedOnly = uiPrefs_.connectedOnly;
@@ -553,10 +553,10 @@ void App::buildGhost() {
         GhostDab d;
         if (!ghostSurface(origin, dir, d.center, n)) continue;
         d.radius = (worldSize_ && worldRadius_ > 0.0f ? worldRadius_ : radiusPx_ * camera_.worldPerPixel(d.center, c.h)) *
-                   (pressureSize_ ? std::max(sd.pressure, 0.05f) : 1.0f);
+                   (pressureSizeOn() ? std::max(sd.pressure, 0.05f) : 1.0f);
         d.normal = n;
         d.strength = std::clamp((strokeBrush_ == BrushType::Smooth ? smoothStrength_ : strength_), 0.0f, 1.0f) *
-                     std::clamp(pressureStrength_ ? sd.pressure : 1.0f, 0.0f, 1.0f);
+                     std::clamp(pressureStrengthOn() ? sd.pressure : 1.0f, 0.0f, 1.0f);
         d.areaCenter = d.center - n * depth;
         d.weight = sd.weight;
         base.push_back(d);
