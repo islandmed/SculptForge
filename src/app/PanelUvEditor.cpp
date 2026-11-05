@@ -1154,9 +1154,9 @@ void App::drawUvEditor() {
             // number whole); none when the visible part of the tile is too small for it.
             const ImVec2 a = u.toScreen(glm::vec2(float(tx), float(ty) + 1.0f)), b = u.toScreen(glm::vec2(float(tx) + 1.0f, float(ty)));
             const ImVec2 size = ImGui::CalcTextSize(label);
-            const float pad = 5 * scale;
+            const float pad = 4 * scale; // (room for the backing on both sides: small tiles of a 10-wide grid keep it)
             const float x0 = std::max(a.x, viewMin.x) + pad, y0 = std::max(a.y, viewMin.y) + 3 * scale;
-            if (x0 + size.x > std::min(b.x, viewMax.x) - pad || y0 + size.y > std::min(b.y, viewMax.y)) continue;
+            if (x0 + size.x + 3 * scale > std::min(b.x, viewMax.x) || y0 + size.y > std::min(b.y, viewMax.y)) continue;
             // Tiles in use: a small dark backing keeps the number readable over the islands.
             if (used)
                 dl->AddRectFilled(ImVec2(x0 - 3 * scale, y0 - 1 * scale), ImVec2(x0 + size.x + 3 * scale, y0 + size.y + 1 * scale),
