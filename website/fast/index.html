@@ -129,7 +129,12 @@
 
   <h2>What's still slow</h2>
   <ul class="small">
-    <li>{{KNOWN_LIMITS}}</li>
+    <!-- KNOWN_LIMITS: launchkit draft from the scoreboard + floorlucy; the coordinator checks before release -->
+    <li>Big brushes (120 and 240 px) on very dense meshes still trail the pen on every machine we test, the desktop
+      included: the stroke lands, but late.</li>
+    <li>On the low-end budget, orbiting a 112 million triangle scan right after a stroke is still below a smooth
+      30 frames a second: the whole base mesh is drawn every frame. Drawing less of it far from the camera is the next step.</li>
+    <li>Opening a scan with a micro level takes seconds, not instantly, on every machine.</li>
     <li>Lucy at 112 million triangles needs more memory than an 8 GB integrated-graphics laptop has; on those,
       the largest Lucy that fits is the 28 million triangle version.</li>
   </ul>
@@ -141,9 +146,9 @@
         unpack <a href="https://github.com/islandmed/SculptForge/releases/tag/v0.11.0">0.11.0</a> (the portable zip or
         AppImage runs beside the installed version). Close builds, games and renders.</p></li>
     <li><strong>Get the test scene</strong>
-      <p>The built-in heads need nothing. For Lucy, download <a href="{{SCENE_DOWNLOAD_URL}}">the Lucy test scene</a>
-        ({{SCENE_SIZE}}), made from the scan in the
-        <a href="https://graphics.stanford.edu/data/3Dscanrep/">Stanford 3D Scanning Repository</a>.</p></li>
+      <p>The built-in heads need nothing. For Lucy, download <code>lucy.tar.gz</code> (about 320 MB) from the
+        <a href="https://graphics.stanford.edu/data/3Dscanrep/">Stanford 3D Scanning Repository</a> and build the test
+        scenes with the command-line tool that comes with SculptForge (below). We don't redistribute the scan.</p></li>
     <li><strong>Run the same strokes</strong>
       <p>Each run opens the scene, draws scripted Clay strokes at 25, 120 and 240 px through the real pen code, then
         orbits, and writes a JSON result and a video.</p></li>
@@ -153,15 +158,21 @@
     <pre><code># the built-in 15 million triangle head (identical on every computer)
 sculptforge --benchmark standard-15m --benchmark-out head-0.11.2.json
 
-# Lucy: the downloaded scene, same strokes and orbit
-sculptforge --benchmark-file lucy-test.sfproj --benchmark-out lucy-0.11.2.json
+# Lucy: build the test scenes once from Stanford's lucy.ply (28 million triangles; 112 million with a micro level)
+tar xzf lucy.tar.gz
+sculptforge-cli -c "open path=lucy.ply; save_project path=lucy-28m.sfproj"
+sculptforge-cli -c "open path=lucy.ply; micro_divide level=1; save_project path=lucy-112m.sfproj"
+
+# Lucy: the same strokes and orbit on the scene
+sculptforge --benchmark-file lucy-112m.sfproj --benchmark-out lucy-0.11.2.json
 
 # the head with 0.11.0 (path to the unpacked 0.11.0)
 ./sculptforge-0.11.0/sculptforge --benchmark standard-15m --benchmark-out head-0.11.0.json
 
 # optional: the simulated low-end budget we report first
-SF_HW_SIMULATE=floor SF_GOVERNOR=0 sculptforge --benchmark-file lucy-test.sfproj --benchmark-out lucy-floor.json</code></pre>
-    <p class="small muted">On Windows, set the variables first in a Command Prompt (<code>set SF_HW_SIMULATE=floor</code>)
+SF_HW_SIMULATE=floor SF_GOVERNOR=0 sculptforge --benchmark-file lucy-28m.sfproj --benchmark-out lucy-floor.json</code></pre>
+    <p class="small muted">On macOS the command-line tool is <code>SculptForge.app/Contents/MacOS/sculptforge-cli</code>; on
+      Windows it is <code>sculptforge-cli.exe</code> in the install folder. On Windows, set the variables first in a Command Prompt (<code>set SF_HW_SIMULATE=floor</code>)
       and run <code>sculptforge.exe</code> from the install folder. Run each build at least twice, alternating, and
       take the median. 0.11.0 has no <code>--benchmark-file</code> (it came in 0.11.1), so our 0.11.0 Lucy rows use
       0.11.0 with only the benchmark's own commits added: {{HARNESS_BUILD_NOTE}}.</p>
