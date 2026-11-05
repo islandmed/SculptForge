@@ -9,7 +9,8 @@ click "Check for updates##help.check_updates"
 wait_idle 20
 expect_text "SculptForge 99.0.0 is available"
 expect_text "bug-fix and security releases go out to everyone the same day"
-expect "Become an Insider"
+expect "Become a member"
+expect_text "Members get betas early."
 expect_text "Twice as fast"
 expect "Download"
 shot update-banner

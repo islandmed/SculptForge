@@ -68,28 +68,27 @@ TEST(support_reminder_timing) {
 }
 
 TEST(support_card_links_match_the_website) {
-    // The card opens the same four Stripe checkout pages as the membership page (never links of its own).
-    std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../website/support.html", std::ios::binary);
-    CHECK(f.good());
-    const std::string page{std::istreambuf_iterator<char>(f), {}};
-    for (const char* url : {kSupportUrlSupporter, kSupportUrlInsider, kSupportUrlStudio, kSupportUrlOnce}) {
+    // The card opens the same Stripe checkout pages as the membership page and the studio page (never links of its own).
+    auto read = [](const char* name) {
+        std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../website/" + name, std::ios::binary);
+        CHECK(f.good());
+        return std::string{std::istreambuf_iterator<char>(f), {}};
+    };
+    const std::string page = read("support.html"), studios = read("studios.html");
+    for (const char* url : {kSupportUrlMember, kSupportUrlStudio}) {
         CHECK(std::string(url).rfind("https://buy.stripe.com/", 0) == 0);
         CHECK(page.find(std::string("href=\"") + url + "\"") != std::string::npos);
     }
+    CHECK(studios.find(std::string("href=\"") + kSupportUrlStudio + "\"") != std::string::npos);
+    // The yearly Member checkout: the same on both, or empty on both (the yearly choice hidden until it exists).
+    const std::string yearly(kSupportUrlMemberYearly);
+    CHECK(yearly.empty() || yearly.rfind("https://buy.stripe.com/", 0) == 0);
+    CHECK(page.find("data-yearly=\"" + yearly + "\"") != std::string::npos);
     CHECK(page.find(kFreeReleaseNote) != std::string::npos); // the same honest wording on both
     CHECK(page.find(std::string("href=\"") + kDiscordUrl + "\"") != std::string::npos); // the same community invite
-}
-
-TEST(studio_offer_matches_the_website) {
-    // Founding Studio: one switch in Support.h and one in website/studio-offer.js, set the same way, same $300 link.
-    std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../website/studio-offer.js", std::ios::binary);
-    CHECK(f.good());
-    const std::string js{std::istreambuf_iterator<char>(f), {}};
-    CHECK(std::string(kSupportUrlStudioRegular).rfind("https://buy.stripe.com/", 0) == 0);
-    CHECK(std::string(kSupportUrlStudioFounding).rfind("https://buy.stripe.com/", 0) == 0);
-    CHECK(js.find(std::string("const STUDIO_URL = '") + kSupportUrlStudioRegular + "'") != std::string::npos);
-    CHECK(js.find(kFoundingStudioOpen ? "const FOUNDING_STUDIO_OPEN = true;" : "const FOUNDING_STUDIO_OPEN = false;") !=
-          std::string::npos);
+    // Retired: the Insider tier, one-time payments and the founding Studio offer.
+    for (const std::string& p : {page, studios})
+        for (const char* old : {"Insider", "One-time", "one-time", "Founding", "$300", "$20"}) CHECK(p.find(old) == std::string::npos);
 }
 
 TEST(support_card_timing) {

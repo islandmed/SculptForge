@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The support card at launch: a full-window card over the app on a calm stage (a warm glow and a faint grid, drawn here,
-// no picture), the cube mark and the promise, the three memberships with their perks and
-// the one-time Supporter, in the current look's colours (Theme.h). When it may show is decided once while starting
+// no picture), the cube mark and the promise, the two memberships (Member and Studio) with their perks, in the current
+// look's colours (Theme.h). When it may show is decided once while starting
 // (supportCardDue in Support.h): the first start, the first start of each new version, then at most once a week, and
-// not for 30 days after "Maybe later"; never mid-session, never for a supporter, never in tests, renders, demos or CI.
+// not for 30 days after "Maybe later"; never mid-session, never for a member, never in tests, renders, demos or CI.
 // No countdowns, no guilt, nothing pre-selected; Close is always there. Every button only
 // opens one of the fixed links in Support.h in the browser.
 #include "app/App.h"
@@ -27,7 +27,7 @@ struct App::SupportCard {
     SupportCardReason reason = SupportCardReason::None;
     double openedAt = 0.0;          // seconds (ImGui clock)
     ImVec2 parallax{0.0f, 0.0f};    // follows the pointer, eased
-    float hover[3] = {0.0f, 0.0f, 0.0f}; // tier cards lifted under the pointer, eased
+    float hover[2] = {0.0f, 0.0f}; // tier cards lifted under the pointer, eased
     bool closing = false;
     double closingAt = 0.0;
     bool supporterOnClose = false;
@@ -99,10 +99,11 @@ struct Tier {
     const char* name;
     const char* price;
     const char* per;
-    const char* perks[4];
+    const char* perks[5]; // (unused ones nullptr)
     const char* cta;
     const char* id; // the button's ImGui label (UI tests click it)
     const char* url;
+    const char* note; // under the price (nullptr: none)
 };
 
 } // namespace
@@ -220,11 +221,11 @@ void App::drawSupportCard() {
 
     const float s = uiScale_;
     const ImVec2 view = io.DisplaySize;
-    // Logical size 1100 x 720, fitted to the window; scaled from 96 % while opening.
-    const float fit = std::min({1.0f, (view.x - 40.0f * s) / (1100.0f * s), (view.y - 40.0f * s) / (720.0f * s)});
+    // Logical size 1100 x 740, fitted to the window; scaled from 96 % while opening.
+    const float fit = std::min({1.0f, (view.x - 40.0f * s) / (1100.0f * s), (view.y - 40.0f * s) / (740.0f * s)});
     const float zoom = lerp(0.96f, 1.0f, shown);
     const float k = s * std::max(fit, 0.45f) * zoom;
-    const ImVec2 size(1100.0f * k, 720.0f * k);
+    const ImVec2 size(1100.0f * k, 740.0f * k);
     const ImVec2 a(std::floor((view.x - size.x) * 0.5f), std::floor((view.y - size.y) * 0.5f));
     const ImVec2 b(a.x + size.x, a.y + size.y);
     const float radius = 20.0f * k;
@@ -341,29 +342,27 @@ void App::drawSupportCard() {
         dl->AddLine(ImVec2(c.x - x, c.y + x), ImVec2(c.x + x, c.y - x), tc(ink, (hot ? 1.0f : 0.8f) * A), 1.6f * k);
     }
 
-    // The three memberships, with the perks worded as on website/support.html (the full list is there).
-    static const Tier kTiers[3] = {
-        {"Supporter", "$5", "/ month",
-         {"Your name in the credits, in the app and on the website", "The members' channel on Discord",
-          "Vote on what we build next (#feature-vote)", "The monthly pack at month end"},
-         "Join as a Supporter", "Join as a Supporter##card.supporter", kSupportUrlSupporter},
-        {"Insider", "$20", "/ month",
-         {"Everything in Supporter, and you propose the vote's options", "A daily drop: a brush, alpha or VDM",
-          "Preview builds of the next release, about a week early", "The monthly dev Q&A"},
-         "Become an Insider", "Become an Insider##card.insider", kSupportUrlInsider},
-        {"Studio", kFoundingStudioOpen ? "$150" : "$300", "/ month",
-         {"Insider for every artist in your company", "Your own build: presets, keymaps, brushes and packs baked in",
-          "Up to 5 custom items a month; your requests go first", "Priority triage, a team channel, your logo"},
-         "Studio membership", "Studio membership##card.studio", kSupportUrlStudio},
+    // The two memberships, with the perks worded as on website/support.html.
+    const bool yearly = kSupportUrlMemberYearly[0] != '\0'; // (the yearly checkout, once it exists)
+    const Tier kTiers[2] = {
+        {"Member", "$5", "/ month",
+         {"Betas and early builds of the next version", "The monthly feature vote: pick what we build next",
+          "A brush and alpha pack every month", "The members' channel on Discord",
+          "Your name in the credits, in the app and on the website"},
+         "Become a member", "Become a member##card.member", kSupportUrlMember, yearly ? "or $48 a year" : nullptr},
+        {"Studio", "$150", "/ month",
+         {"Up to 10 artists, each with everything in Member", "Priority support: reviewed within 2 business days",
+          "Your studio's own private channel on Discord", nullptr, nullptr},
+         "Studio membership", "Studio membership##card.studio", kSupportUrlStudio, "invoiced monthly"},
     };
-    const float gap = 18.0f * k, footer = 62.0f * k, tierH = 318.0f * k;
-    const float tierW = (size.x - pad * 2.0f - gap * 2.0f) / 3.0f;
+    const float gap = 22.0f * k, footer = 62.0f * k, tierH = 350.0f * k;
+    const float tierW = (size.x - pad * 2.0f - gap) / 2.0f;
     const float tierTop = b.y - footer - tierH;
     const char* clicked = nullptr;
     bool discord = false; // the Discord pill in the footer (opens the invite, keeps the card)
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 2; ++i) {
         const Tier& tier = kTiers[i];
-        const bool featured = i == 1;
+        const bool featured = i == 0;
         const float appear = easeOut((t - 0.04f - 0.04f * float(i)) / 0.2f) * A;
         const float lift = card.hover[i] * 4.0f * k + (featured ? 12.0f * k : 0.0f);
         const ImVec2 p0(a.x + pad + float(i) * (tierW + gap), tierTop - lift + (1.0f - appear) * 14.0f * k);
@@ -401,37 +400,19 @@ void App::drawSupportCard() {
                          tc(theme::textOnAccent, appear), badge, 1.6f);
             ty += 4.0f * k;
         }
-        const bool founding = i == 2 && kFoundingStudioOpen; // the launch offer: a quieter outlined badge
-        if (founding) {
-            const char* badge = "FOUNDING STUDIO";
-            const float bw = paint.spaced(boldUi, 11.0f, ImVec2(0, 0), 0, badge, 1.6f, false) + 24.0f * k;
-            const ImVec2 b0(p0.x + (tierW - bw) * 0.5f, p0.y - 12.0f * k), b1(b0.x + bw, b0.y + 24.0f * k);
-            dl->AddRectFilled(b0, b1, tc(tierBg, appear), 12.0f * k);
-            dl->AddRect(b0, b1, tc(accent, appear), 12.0f * k, 0, 1.5f * k);
-            paint.spaced(boldUi, 11.0f, ImVec2(b0.x + 12.0f * k, b0.y + (24.0f * k - 11.0f * k) * 0.5f - 0.5f * k),
-                         tc(theme::accentHover, appear), badge, 1.6f);
-        }
         paint.text(headFont, 21.0f, ImVec2(ix, ty), tc(featured ? theme::accentHover : ink, appear), tier.name);
         ty += 32.0f * k;
         const ImVec2 ps = paint.text(titleFont, 44.0f, ImVec2(ix, ty), tc(ink, appear), tier.price);
         const ImVec2 pe = paint.measure(bodyFont, 16.5f, tier.per);
-        float px = ix + ps.x + 6.0f * k;
-        if (founding) { // the regular price, struck through
-            const ImVec2 at(px, ty + ps.y - pe.y - 7.0f * k);
-            const ImVec2 ws = paint.text(bodyFont, 16.5f, at, tc(dim, appear), "$300");
-            dl->AddLine(ImVec2(at.x - 1.0f * k, at.y + ws.y * 0.55f), ImVec2(at.x + ws.x + 1.0f * k, at.y + ws.y * 0.55f),
-                        tc(dim, appear), 1.5f * k);
-            px += ws.x + 6.0f * k;
-        }
-        paint.text(bodyFont, 16.5f, ImVec2(px, ty + ps.y - pe.y - 7.0f * k), tc(dim, appear), tier.per);
-        ty += ps.y + (founding ? 2.0f : 10.0f) * k;
-        if (founding)
-            ty += paint.text(boldUi, 12.5f, ImVec2(ix, ty), tc(theme::accentHover, appear),
-                             "First 10 studios lock in $150/month for good", iw).y + 6.0f * k;
+        paint.text(bodyFont, 16.5f, ImVec2(ix + ps.x + 6.0f * k, ty + ps.y - pe.y - 7.0f * k), tc(dim, appear), tier.per);
+        ty += ps.y + 2.0f * k;
+        if (tier.note) ty += paint.text(bodyFont, 14.0f, ImVec2(ix, ty), tc(dim, appear), tier.note).y;
+        ty += 10.0f * k;
         dl->AddLine(ImVec2(ix, ty), ImVec2(ix + iw, ty), tc(featured ? accent : line, (featured ? 0.35f : 0.12f) * appear), hair);
         ty += 14.0f * k;
         // The perks, each after a check mark.
         for (const char* perk : tier.perks) {
+            if (!perk) break;
             const float cy = ty + 9.5f * k, cr = 8.0f * k;
             const ImVec2 cc(ix + cr, cy);
             dl->AddCircleFilled(cc, cr, tc(accent, (featured ? 0.28f : 0.16f) * appear));
@@ -468,7 +449,7 @@ void App::drawSupportCard() {
                    tc(featured ? theme::textOnAccent : ink, appear), tier.cta);
     }
 
-    // Footer: the one-time Supporter (pay what you want), the members' Discord, "I'm already a supporter" and "Maybe later".
+    // Footer: Member yearly (once that checkout exists), the members' Discord, "I'm already a member" and "Maybe later".
     const float fy = b.y - footer * 0.5f;
     const float fa = easeOut((t - 0.1f) / 0.2f) * A;
     auto link = [&](const char* label, const char* id, ImVec2 at, const ImVec4& c, bool underline) {
@@ -492,17 +473,21 @@ void App::drawSupportCard() {
         return std::pair<bool, bool>(hot, ImGui::IsItemClicked());
     };
     {
-        const char* lead = "No subscription?";
-        const ImVec2 ls = paint.measure(bodyFont, 15.0f, lead);
-        const float ly = std::floor(fy - ls.y * 0.5f);
-        paint.text(bodyFont, 15.0f, ImVec2(a.x + pad, ly), tc(dim, fa), lead);
-        if (link("One-time Supporter", "One-time Supporter##card.once", ImVec2(a.x + pad + ls.x + 8.0f * k, ly), accent, true))
-            clicked = kSupportUrlOnce;
+        float x = a.x + pad;
+        if (yearly) {
+            const char* lead = "Prefer yearly?";
+            const ImVec2 ls = paint.measure(bodyFont, 15.0f, lead);
+            const float ly = std::floor(fy - ls.y * 0.5f);
+            paint.text(bodyFont, 15.0f, ImVec2(x, ly), tc(dim, fa), lead);
+            const char* label = "Member, $48 a year";
+            if (link(label, "Member, $48 a year##card.member_yearly", ImVec2(x + ls.x + 8.0f * k, ly), accent, true))
+                clicked = kSupportUrlMemberYearly;
+            x = std::floor(x + ls.x + 8.0f * k + paint.measure(bodyFont, 15.0f, label).x + 28.0f * k);
+        }
         // The members' Discord: a pill with a drawn speech-bubble glyph (no logo asset). It opens the invite and leaves
         // the card open.
-        const ImVec2 gs = paint.measure(bodyFont, 15.0f, "One-time Supporter");
         const float glyph = 18.0f * k;
-        const ImVec2 c0(std::floor(a.x + pad + ls.x + 8.0f * k + gs.x + 28.0f * k), fy - 19.0f * k);
+        const ImVec2 c0(x, fy - 19.0f * k);
         const auto [hot, hit] = pill("Join the members on Discord", "Join the members on Discord##card.discord", c0, glyph + 10.0f * k);
         discord = hit;
         const ImVec2 g0(c0.x + 20.0f * k, fy - glyph * 0.42f), g1(g0.x + glyph, fy + glyph * 0.30f);
@@ -520,9 +505,9 @@ void App::drawSupportCard() {
         const auto [hot, hit] = pill(label, "Maybe later##card.later", c0, 0.0f);
         later = hit;
         if (hot) ImGui::SetTooltip("Hides this card for 30 days.");
-        const char* already = "I'm already a supporter";
+        const char* already = "I'm already a member";
         const ImVec2 as = paint.measure(bodyFont, 15.0f, already);
-        supporter = link(already, "I'm already a supporter##card.supporter_already",
+        supporter = link(already, "I'm already a member##card.supporter_already",
                          ImVec2(c0.x - 24.0f * k - as.x, std::floor(fy - as.y * 0.5f)), dim, false);
     }
 
@@ -554,8 +539,8 @@ void App::drawSupportPrefs() {
                  "A card with the SculptForge memberships, shown while it starts: the first time, after "
                  "each update, and at most once a week otherwise; Maybe later hides it for 30 days. Never while you work.",
                  "Preferences > Support");
-    if (ImGui::Checkbox("I'm a supporter", &supportCardPrefs_.supporter)) saveProjectPrefs();
-    ui::HelpText("I'm a supporter", nullptr,
+    if (ImGui::Checkbox("I'm a member", &supportCardPrefs_.supporter)) saveProjectPrefs();
+    ui::HelpText("I'm a member", nullptr,
                  "Thank you! The support card never shows. Kept on this computer only: SculptForge has no accounts.",
                  "Preferences > Support");
     if (ImGui::Button("Show the support card", ImVec2(-1, 0))) showSupportCard(SupportCardReason::Weekly);

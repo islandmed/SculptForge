@@ -147,21 +147,16 @@ SculptForge is free software under the GNU General Public License, version 3 or 
 ## Studio membership
 
 SculptForge is free for any number of artists, and nothing in the app is ever paywalled. A Studio membership
-($300 a month; **Founding Studio:** the first 10 studios lock in $150 a month for as long as they stay
-subscribed) covers your whole company, with no seat count:
+($150 a month, invoiced monthly) covers up to 10 artists:
 
-- **Insider for every artist:** the monthly pack, daily drops (a brush, alpha or VDM almost every day), the
-  feature vote and the monthly dev Q&A. Insiders will get each release about two weeks early, starting with
-  SculptForge 1.0.
-- **A custom studio build** with your presets, keymaps, packs, shelves and pipeline defaults baked in.
-- **Custom content:** brushes, alphas, VDMs, macros and pipeline presets made for your team.
-- **Guided development:** your requests go to the front of the roadmap, with a monthly call or async review
-  with the developer.
-- **Priority triage:** reviewed within 2 business days (no fix-time guarantee).
-- A **private team channel** on Discord, and your **logo** on the website and in the README.
+- **Everything in Member for each artist:** betas and early builds, the monthly feature vote, a brush and alpha
+  pack every month, #members on Discord and their names in the credits. From SculptForge 1.0, members get each
+  release about two weeks early.
+- **Priority support:** your reports reviewed within 2 business days (no fix-time guarantee).
+- Your studio's own **private channel** on Discord.
 
-Every release stays free for everyone; bug-fix and security releases go out to everyone the same day. Larger
-custom features are quoted separately. Join at [sculptforge.app/studios.html](https://sculptforge.app/studios.html#membership).
+Every release stays free for everyone; bug-fix and security releases go out to everyone the same day. More than
+10 artists: write to hello@sculptforge.app. Join at [sculptforge.app/studios.html](https://sculptforge.app/studios.html#membership).
 
 ## Studio onboarding
 

@@ -782,7 +782,7 @@ void App::drawUpdateBanner() {
         ImGui::SameLine();
         ImGui::TextDisabled(tr("(you have %s)"), appVersionLabel().c_str());
         for (const auto& h : u.highlights) ImGui::BulletText("%s", h.c_str());
-        ImGui::TextDisabled("%s", kFreeReleaseNote); // memberships (Support.h): releases stay free for everyone
+        ImGui::TextDisabled("%s %s", kFreeReleaseNote, tr("Members get betas early.")); // memberships (Support.h)
         if (guide_.bodyFont()) ImGui::PopFont();
         ImGui::Spacing();
         bool close = false;
@@ -793,7 +793,7 @@ void App::drawUpdateBanner() {
             close = true;
         }
         ImGui::SameLine();
-        if (ImGui::Button(tr("Become an Insider"))) openSupportPage();
+        if (ImGui::Button(tr("Become a member"))) openSupportPage();
         ImGui::SameLine();
         if (ImGui::Button(tr("Later"))) close = true;
         ImGui::SameLine();
@@ -820,9 +820,9 @@ void App::drawUpdatesSection() {
     ImGui::SameLine();
     changed |= ImGui::RadioButton((std::string(tr("Preview (betas)")) + "##prefs.update_preview").c_str(), &channel, 1);
     ui::HelpText("Update channel", nullptr,
-                 "Stable offers only finished releases. Preview also offers the betas: the next version a couple of "
-                 "weeks before it ships, for trying it out and reporting what goes wrong (Discord #bug-reports). When "
-                 "the stable release passes the beta, Preview offers that.",
+                 "Stable offers only finished releases. Preview also offers the betas the update feed names. Betas "
+                 "are a member perk: members get them from the private members' repository and the #members channel "
+                 "on Discord. When the stable release passes a beta, Preview offers that.",
                  "Preferences > Updates");
     if (changed) {
         updateChannel_ = channel ? UpdateChannel::Preview : UpdateChannel::Stable;

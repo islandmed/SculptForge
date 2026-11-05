@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Supporting SculptForge (memberships on the website; the app stays free and behaves the same for everyone). The
-// app only ever opens the fixed links below in the browser (the membership page, its four Stripe checkout pages and the
-// community Discord invite): no
-// payment code, no network, no tracking, no licence checks. Pure helpers, unit tested: the supporters list compiled
-// in from docs/supporters.txt (shown as plain text in Help > About), when the one optional reminder may show, and
-// when the support card may show at launch.
+// app only ever opens the fixed links below in the browser (the membership page, its Stripe checkout pages and the
+// community Discord invite): no payment code, no network, no tracking, no licence checks. Pure helpers, unit tested:
+// the supporters list compiled in from docs/supporters.txt (shown as plain text in Help > About), when the one optional
+// reminder may show, and when the support card may show at launch.
 #pragma once
 
 #include <algorithm>
@@ -21,18 +20,14 @@ namespace sf {
 inline constexpr const char* kSupportUrl = "https://sculptforge.app/support.html";
 // The official community Discord (a permanent invite; the same link as on the website and in the README).
 inline constexpr const char* kDiscordUrl = "https://discord.gg/gWrYkEmQhH";
-// The same Stripe checkout links as website/support.html (tests/test_support.cpp checks they match).
-inline constexpr const char* kSupportUrlSupporter = "https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201"; // $5 / month
-inline constexpr const char* kSupportUrlInsider = "https://buy.stripe.com/dRmdR94eH4D06qD9ux4F202";   // $20 / month
-// Studio ($300 / month, the whole company). Founding Studio: the first 10 studios lock in $150 / month for as long as
-// they stay subscribed. When the 10 are taken, set kFoundingStudioOpen = false here and FOUNDING_STUDIO_OPEN = false in
-// website/studio-offer.js (the one switch on the site); nothing else changes.
-inline constexpr bool kFoundingStudioOpen = true;
-inline constexpr const char* kSupportUrlStudioFounding = "https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204"; // $150 / month, locked
-inline constexpr const char* kSupportUrlStudioRegular = "https://buy.stripe.com/9B66oH8uXd9w16j2254F205"; // $300 / month
-inline constexpr const char* kSupportUrlStudio = kFoundingStudioOpen ? kSupportUrlStudioFounding : kSupportUrlStudioRegular;
-inline constexpr const char* kSupportUrlOnce = "https://buy.stripe.com/4gM7sL8uXc5s4iv5eh4F200";      // one-time Supporter (pay what you want, $5 minimum)
-// The promise next to Insider preview builds. Worded the same in the app, on the membership page and in the guide
+// Two memberships: Member ($5 / month or $48 / year) and Studio ($150 / month, up to 10 seats). The same Stripe
+// checkout links as website/support.html (tests/test_support.cpp checks they match). Until the Member and Studio
+// products exist in Stripe, Member monthly and Studio are the older $5 and $150 checkouts (same prices), and the yearly
+// link is empty: the yearly choice stays hidden in the app and on the site until it is filled in.
+inline constexpr const char* kSupportUrlMember = "https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201";   // $5 / month
+inline constexpr const char* kSupportUrlMemberYearly = "";                                           // $48 / year
+inline constexpr const char* kSupportUrlStudio = "https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204";   // $150 / month
+// The promise next to members' early builds. Worded the same in the app, on the membership page and in the guide
 // (tests/test_support.cpp checks the membership page).
 inline constexpr const char* kFreeReleaseNote =
     "Every release stays free for everyone; bug-fix and security releases go out to everyone the same day.";
