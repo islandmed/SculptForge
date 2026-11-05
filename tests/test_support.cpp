@@ -57,7 +57,7 @@ TEST(member_card_sculpting_moment) {
     CHECK(addSculptTime(t, 3600.0) - t <= kSculptTimeMaxStep + 1e-9);
     CHECK(addSculptTime(t, -5.0) == t);
     CHECK(addSculptTime(-1.0, 0.1) <= 0.1 + 1e-9); // a damaged value starts again
-    // About 20 minutes of active sculpting in this session (Tony 11-05: an hour was too long), once per session.
+    // About 20 minutes of active sculpting in this session (the maintainer, 11-05: an hour was too long), once per session.
     CHECK(kMemberCardSculptSeconds == 20.0 * 60.0);
     CHECK(!sculptMomentDue(kMemberCardSculptSeconds - 1.0, false));
     CHECK(sculptMomentDue(kMemberCardSculptSeconds, false));
