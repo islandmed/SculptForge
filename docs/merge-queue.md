@@ -26,6 +26,8 @@ The merger's own batch (branches merged without pull requests, `~/Work/.sf/merge
 `scripts/merge-queue.sh staging --with ~/Work/.sf/t1.sh HEAD`. The batch goes to the branch `staging`, the full CI runs
 there while the PC runs the whole suite, and main fast-forwards when both pass. Either way, CI's run on main finds the
 full run of the same commit and reuses it rather than building everything a second time (docs/testing-flow.md).
+Packages is dispatched on `staging` as well; main's Packages run reuses it. A red Packages run on staging doesn't hold
+main: main's push then builds its own packages, as before.
 
 Cut, don't wait: what is green at cut time lands; the rest rides the next batch.
 

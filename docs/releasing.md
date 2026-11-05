@@ -14,7 +14,11 @@ the gates, what each step does, and how to recover.
 1. **Merged tree, tested once on each machine** (docs/testing-flow.md): the merger's batch goes to the branch
    `staging` (`scripts/merge-queue.sh staging --with ~/Work/.sf/t1.sh HEAD`). The whole suite runs on the PC (T1) while
    the full CI runs on staging (T2), and main fast-forwards to the batch only when both are green. Nobody runs a
-   second local full ctest.
+   second local full ctest. Packages (packages.yml) is built on staging too, beside CI. **The release batch carries
+   the bump**: `RELEASE=X.Y.Z [HIGHLIGHTS=f] ~/Work/.sf/merge-batch.sh <branches>` runs
+   `scripts/release.sh X.Y.Z --only bump --staged` on top of the merged batch (it commits, pushes nothing), so staging
+   builds and tests the packages of the exact commit that will be tagged. The release command afterwards finds the
+   versions already set, reuses CI and promotes those packages: tag to published is the smoke tests, about 5 minutes.
 2. **Version and words**:
    - written by people, on main before the release: one note fragment per branch, `changes/<branch>.md`
      (changes/README.md: the What's New bullet, CHANGELOG entry and section, highlight, #testers bullets); in
@@ -48,8 +52,10 @@ the gates, what each step does, and how to recover.
 
 ## Build once, promote
 
-A push to main runs CI and Packages. When the tag points at a commit for which both passed on main, the Release
-workflow takes **that run's packages unchanged** (it checks the commit, the workflow file and the event). It
+A push to main runs CI and Packages; a batch that went through `staging` already ran both there, and main's runs
+reuse them. When the tag points at a commit whose CI passed on main and whose Packages passed on staging or on main,
+the Release workflow takes **that run's packages unchanged** (it checks the commit, the workflow file, the branch and
+the event). It
 smoke-tests them, then publishes. Nothing is compiled again, so a release takes a few minutes. Otherwise (for
 example, the tag is on a commit Packages skipped), Release builds the packages itself from the tag.
 

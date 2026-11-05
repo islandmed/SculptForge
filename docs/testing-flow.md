@@ -43,9 +43,12 @@ load to 65 on 12 threads and the compiler crashed. Each worktree fetches and bui
 (`/root/wt/<name>/fc`); ccache (`CCACHE_BASEDIR=/root/wt`) is shared, so another worktree's objects are cache hits.
 
 CI on main then doesn't build it all again. The `Changes` job sees that this exact commit passed a full run on
-staging, with both VFX jobs green, and passes as reused. The merger no longer runs a local full ctest.
+staging, with both VFX jobs green, and passes as reused. The merger no longer runs a local full ctest. The release
+packages (packages.yml) are built on staging beside CI, and main's Packages run reuses them (job `reuse`). A release
+batch carries the bump commit (`RELEASE=X.Y.Z ~/Work/.sf/merge-batch.sh ...`, docs/releasing.md), so its packages
+are the ones the release publishes.
 
-## Release: the bump reuses CI
+## Release: the bump reuses CI (or rides in the batch)
 
 `scripts/release.sh` step `ci` used to wait about 20 minutes for CI on the bump commit. That commit only adds
 paperwork to a commit CI had already passed. `tools/release/paperwork_only.py BASE HEAD` checks this file by file
@@ -91,8 +94,9 @@ Every tier runs ctest through `tools/test/run.py --build build [-- ctest args]`:
   `sculptforge_tests_nightly`. The `tests/perf/*.sfui` scripts are `perf_*` (labels ui and nightly).
 - `.github/workflows/nightly.yml` runs the nightly tests that don't need a GPU (`-L nightly -LE ui`) once a day.
 - `~/Work/.sf/nightly.sh` is run by hand at the end of the day, not from cron. It runs `ctest -L nightly` on the PC's GPU, the whole suite with no
-  cache, floor-tier stroke benchmarks on the laptop (`SF_HW_SIMULATE=floor`, only at load < 2), and an idle and
-  calibration check on the Windows desktop (`win.sh`). The summary goes to `~/Work/.sf/nightly/<date>.md`.
+  cache, floor-tier stroke benchmarks on the laptop (`SF_HW_SIMULATE=floor`, only at load < 2), and, only on request
+  (`SF_NIGHTLY_WIN=1`: it opens a window on that desktop), an idle and calibration check on the Windows desktop
+  (`win.sh`). Every other app run is offscreen (`SDL_VIDEO_DRIVER=offscreen`). The summary goes to `~/Work/.sf/nightly/<date>.md`.
 
 ## Speculative CI
 
