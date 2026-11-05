@@ -1,0 +1,72 @@
+# Touch screens and trackpads (phoenix, Discord 11-05: pinch and two-finger rotate did nothing on macOS). Two
+# fingers over the model pan, pinch-zoom and twist the view and never sculpt; a second finger landing on a stroke
+# ends it and navigates; one finger still sculpts; a trackpad's two fingers pinch-zoom and twist.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+snapshot
+
+# Touch screen: spread two fingers to twice their span, the model doubles on screen (half the distance).
+key f
+camera 0 0
+remember camera_distance d0
+touch_pinch 0.5 0.5 2 0 0 0
+expect_value camera_distance < $d0*0.55
+expect_value camera_distance > $d0*0.45
+expect_value moved == 0
+expect_value stroking == 0
+expect_value touch_fingers == 0
+# Pinch them together: further away.
+remember camera_distance d1
+touch_pinch 0.5 0.5 0.5 0 0 0
+expect_value camera_distance > $d1*1.8
+
+# Twist clockwise by 45 degrees: the model turns clockwise with the fingers (the camera rolls the other way).
+key f
+camera 0 0
+touch_pinch 0.5 0.5 1 45 0 0
+expect_value camera_roll < -35
+expect_value camera_roll > -55
+# A pinch whose fingers turn a little (5 degrees) doesn't roll the view.
+camera 0 0
+touch_pinch 0.5 0.5 1.5 5 0 0
+expect_value camera_roll == 0
+
+# Slide both fingers: the view pans.
+key f
+camera 0 0
+remember camera_pan p0
+touch_pinch 0.5 0.5 1 0 120 0
+expect_value camera_pan > $p0
+expect_value moved == 0
+
+# The first finger drags alone (a stroke starts), then the second lands: the stroke ends, the fingers zoom.
+key f
+camera 0 0
+remember camera_distance d2
+touch_pinch 0.5 0.5 2 0 0 0 late
+expect_value stroking == 0
+expect_value camera_distance < $d2*0.7
+key ctrl+z
+expect_value moved == 0
+
+# One finger sculpts, as before.
+key f
+camera 0 0
+touch_stroke 0.3 0.45 0.7 0.55
+expect_value stroking == 0
+expect_value moved_out > 0
+key ctrl+z
+expect_value moved == 0
+
+# Trackpad: pinch zooms, twist rolls, nothing is sculpted.
+key f
+camera 0 0
+remember camera_distance d3
+touch_pinch 0.5 0.5 2 0 0 0 trackpad
+expect_value camera_distance < $d3*0.55
+camera 0 0
+touch_pinch 0.5 0.5 1 -45 0 0 trackpad
+expect_value camera_roll > 35
+expect_value moved == 0
+expect_value touch_fingers == 0
+shot touch_after

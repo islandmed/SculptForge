@@ -155,8 +155,9 @@ TEST(spacemouse_frame_rate_independent) {
 
 TEST(spacemouse_settings_json) {
     SpaceMouseSettings s;
-    CHECK(s.enabled && s.buttons[0] == "view.frame" && s.buttons[1] == "view.front");
+    CHECK(s.enabled && s.holdWhileStroking && s.buttons[0] == "view.frame" && s.buttons[1] == "view.front");
     s.enabled = false;
+    s.holdWhileStroking = false;
     s.speed = 2.25f;
     s.deadZone = 0.2f;
     s.invert[2] = s.invert[5] = true;
@@ -170,7 +171,7 @@ TEST(spacemouse_settings_json) {
     std::string err;
     CHECK(Json::parse(toJson(s).dump(), parsed, err));
     fromJson(parsed, r);
-    CHECK(!r.enabled && near(r.speed, 2.25f) && near(r.deadZone, 0.2f) && r.turntable && r.dominant);
+    CHECK(!r.enabled && !r.holdWhileStroking && near(r.speed, 2.25f) && near(r.deadZone, 0.2f) && r.turntable && r.dominant);
     for (int i = 0; i < kSmAxes; ++i) CHECK(r.invert[size_t(i)] == (i == 2 || i == 5));
     CHECK(r.buttons[0] == "view.top" && r.buttons[1].empty() && r.buttons[3] == "edit.undo");
 
@@ -180,7 +181,7 @@ TEST(spacemouse_settings_json) {
     j.set("deadZone", -1.0);
     SpaceMouseSettings d;
     fromJson(j, d);
-    CHECK(near(d.speed, 4.0f) && near(d.deadZone, 0.0f) && d.enabled && d.buttons[0] == "view.frame");
+    CHECK(near(d.speed, 4.0f) && near(d.deadZone, 0.0f) && d.enabled && d.holdWhileStroking && d.buttons[0] == "view.frame");
     fromJson(Json(), d); // not an object: untouched
     CHECK(near(d.speed, 4.0f));
 }

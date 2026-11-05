@@ -428,6 +428,7 @@ int App::runUiTest(int w, int h, int fps) {
         pollSculptable();
         updateCameraAspect();
         updateSpaceMouse(dt);
+        touchTick(); // a finger's press that waited for a second finger long enough goes through
 
         hardwareProfileFrameBegin(); // (only with SF_HW_PROFILE_IN_TESTS=1: tests use fixed settings)
         Demo::beginFrame();
@@ -1046,6 +1047,7 @@ int App::run() {
         // The SpaceMouse moves the view by its held axes every frame (frame-rate independent); while it does,
         // spaceMouseMoving() is true and a loop that waits for events when idle must keep drawing.
         updateSpaceMouse(dt);
+        touchTick(); // a finger's press that waited for a second finger long enough goes through
 
         hardwareProfileFrameBegin(); // the frame governor's CPU and GPU timing
         if (uiScaleDirty_) applyUiScale(); // (Preferences, a display-scale change: #87)
@@ -1314,6 +1316,7 @@ void App::handleEvent(const SDL_Event& event) {
 
 void App::dispatchEvent(const SDL_Event& event) {
     if (strayMouseMotion(event)) return; // neither the canvas nor the UI follows a driver's stray mouse events
+    if (sixDofPointerEvent(event)) return; // nor a SpaceMouse that also says it is a mouse (SpaceMouse.cpp)
     if ((event.type >= SDL_EVENT_KEY_DOWN && event.type < SDL_EVENT_JOYSTICK_AXIS_MOTION &&
          event.type != SDL_EVENT_KEYMAP_CHANGED && event.type != SDL_EVENT_KEYBOARD_ADDED &&
          event.type != SDL_EVENT_KEYBOARD_REMOVED && event.type != SDL_EVENT_MOUSE_ADDED &&
@@ -1329,6 +1332,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     if (strokePopupMouseEvent(e)) return; // clicks on the open stroke popup (StrokePopup.cpp)
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
+    if (touchMouseEvent(e)) return; // a finger's press waits for a second finger; a gesture's stay off (Touch.cpp)
 
     switch (e.type) {
     case SDL_EVENT_QUIT:
@@ -1366,8 +1370,20 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_PEN_BUTTON_UP:
         handlePenEvent(e);
         break;
+    case SDL_EVENT_FINGER_DOWN:
+    case SDL_EVENT_FINGER_UP:
+    case SDL_EVENT_FINGER_MOTION:
+    case SDL_EVENT_FINGER_CANCELED:
+#if SDL_VERSION_ATLEAST(3, 4, 0)
+    case SDL_EVENT_PINCH_BEGIN:
+    case SDL_EVENT_PINCH_UPDATE:
+    case SDL_EVENT_PINCH_END:
+#endif
+        touchEvent(e); // two fingers navigate (Touch.cpp)
+        break;
     case SDL_EVENT_MOUSE_ADDED:
     case SDL_EVENT_MOUSE_REMOVED:
+        sixDofMice_.erase(e.mdevice.which);
         tabletDeviceEvent(e); // a tablet plugged in or out (Tablet.cpp)
         break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -1389,7 +1405,9 @@ void App::dispatchEvent(const SDL_Event& event) {
         onMouseMove(e.motion.x, e.motion.y, e.motion.xrel, e.motion.yrel, e.motion.which == SDL_PEN_MOUSEID);
         break;
     case SDL_EVENT_MOUSE_WHEEL:
-        if (!io.WantCaptureMouse && canvasRect().contains(e.wheel.mouse_x, e.wheel.mouse_y)) camera_.zoom(e.wheel.y);
+        // (Not the scroll a trackpad sends during a pinch or twist: Touch.cpp zooms for that.)
+        if (!io.WantCaptureMouse && !touchPinching_ && canvasRect().contains(e.wheel.mouse_x, e.wheel.mouse_y))
+            camera_.zoom(e.wheel.y);
         break;
     case SDL_EVENT_KEY_DOWN:
         if (e.key.key == SDLK_SPACE && !e.key.repeat && // hold Space and drag: the camera (#43; not while typing)

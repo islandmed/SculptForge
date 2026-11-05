@@ -41,6 +41,7 @@
 #include "core/StrokePath.h"
 #include "core/SurfaceCursor.h"
 #include "core/SpaceMouse.h"
+#include "core/TouchGesture.h"
 #include "core/Tablet.h"
 #include "core/SelfUpdate.h"
 #include "core/UpdateCheck.h"
@@ -2161,7 +2162,8 @@ private:
     // ---- end Tablet ----
     // ---- SpaceMouse (SpaceMouse.cpp, core/SpaceMouse.h, docs/guide/navigation.md) ----
     // A 3Dconnexion SpaceMouse read through SDL's joystick API (no 3Dconnexion SDK): its six axes move the camera
-    // every frame, independently of the mouse and pen (a stroke held by the pen keeps going), its buttons run actions.
+    // every frame, independently of the mouse and pen (held while a stroke runs, unless Hold during strokes is off),
+    // its buttons run actions.
     void spaceMouseEvent(const SDL_Event& e); // hot-plug and buttons
     void spaceMouseScan();                    // take the first SpaceMouse SDL knows about, if none is open
     void spaceMouseClose();
@@ -2180,7 +2182,40 @@ private:
     // Every joystick SDL listed at the last scan and why it was or wasn't taken, for Preferences and the device
     // report a user can paste into an issue (#104).
     std::vector<std::string> joysticksSeen_;
+    // A pointer device that is really a 6-DoF controller (a SpaceMouse the system also lists as a mouse): its
+    // pointer events never reach the canvas or the UI (phoenix, Discord 11-05). Names cached per mouse id.
+    bool sixDofPointerEvent(const SDL_Event& e);
+    std::unordered_map<SDL_MouseID, bool> sixDofMice_;
+    // The view held still and the buttons ignored while a stroke runs (SpaceMouseSettings::holdWhileStroking).
+    bool spaceMouseHeldByStroke() const;
     // ---- end SpaceMouse ----
+    // ---- Touch (Touch.cpp, core/TouchGesture.h, docs/guide/navigation.md) ----
+    // Two fingers on a touch screen pan, pinch-zoom and twist the view; on a trackpad they pinch-zoom and twist
+    // (their scroll stays the wheel). One finger on a touch screen still sculpts: its mouse press waits kTouchHold
+    // for a second finger before it reaches the canvas. SDL 3.4's pinch events zoom too (macOS trackpads).
+    static constexpr double kTouchHold = 0.08; // seconds
+    // UI tests' devices (Demo touch_pinch): any other unknown id counts as a touch screen, as SDL can't say.
+    static constexpr SDL_TouchID kUiTestTouchScreen = 0x5F70, kUiTestTrackpad = 0x5F71;
+    void touchEvent(const SDL_Event& e);       // finger and pinch events
+    bool touchMouseEvent(const SDL_Event& e);  // SDL's mouse events made from a finger: true when held or dropped
+    void touchTick();                          // once a frame: a held press that waited long enough goes through
+    void touchFlushPress();
+    void touchApply(const TwoFingerStep& step);
+    TouchGesture touch_;
+    bool touchNavigates_ = false;   // this touch began over the 3D view
+    bool touchDirect_ = true;       // a touch screen (false: a trackpad)
+    bool touchSwallowMouse_ = false; // a gesture ran: the finger's mouse events stay off the canvas until it lifts
+    bool touchNativePinch_ = false; // SDL sends pinch events: a trackpad's finger spread doesn't zoom again
+    bool touchTwisting_ = false;    // the twist passed kTouchTwistStart: it rolls the view from now on
+    bool touchPinching_ = false;    // a trackpad pinch or twist is under way: its stray scroll doesn't zoom
+    float touchTwistSum_ = 0.0f, touchZoomSum_ = 0.0f;
+    struct TouchPress {
+        bool held = false;
+        float x = 0.0f, y = 0.0f;
+        int clicks = 1;
+        double at = 0.0;
+    } touchPress_;
+    // ---- end Touch ----
     // ---- Sculpt Timeline (PanelTimeline.cpp, core/Timeline.h) and proof mode (ProofMode.cpp) ----
     // The history strip along the bottom of the canvas, the timelapse export, and Help > Benchmark: a scripted
     // stroke through the input handlers on 5M..100M+ meshes with a live HUD, an MP4 and a JSON result.
