@@ -14,6 +14,9 @@
 #                                           while CMD runs here (e.g. '~/Work/.sf/pc.sh .', T1), and when both pass main
 #                                           fast-forwards to exactly that commit. CI's run on main then reuses the
 #                                           staging result (ci.yml, job Changes) instead of building it all again.
+#                                           The release packages (packages.yml) are built on staging too, beside CI;
+#                                           main's Packages run reuses them, and a release batch that carries the
+#                                           bump (release.sh --staged) gets the packages it will publish.
 #
 # run, batch mode (the default): main plus every queued PR merged in queue order on a branch queue/batch-<time>
 # (a PR that conflicts, or whose own checks are red, is dropped with a comment and the "queue-failed" label), the
@@ -150,6 +153,9 @@ land_staging() { # land_staging [--with CMD] [REF]
     say "staging ${sha:0:8} ($(git log -1 --format=%s "$sha" | cut -c1-60)) on main $(git rev-parse --short origin/main)"
     git push -q --force origin "$sha:refs/heads/staging"
     git fetch -q origin staging
+    # Not waited for: a red Packages run doesn't hold main (main's push then builds its own, as before staging).
+    gh workflow run packages.yml -R "$REPO" --ref staging >/dev/null && echo "   Packages dispatched on staging" ||
+        echo "   note: couldn't dispatch Packages on staging: main's push builds them"
     if [ -n "$with" ]; then
         bash -c "$with" > "/tmp/merge-queue-with-${sha:0:8}.log" 2>&1 &
         pid=$!

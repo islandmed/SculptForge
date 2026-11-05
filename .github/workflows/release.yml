@@ -3,9 +3,10 @@ name: Release
 # A v* tag publishes a GitHub release (docs/releasing.md has the whole process; scripts/release.sh drives it).
 #
 #   locate   the tagged commit must carry the version the tag names (CMakeLists.txt's version, plus its
-#            SCULPTFORGE_PRERELEASE for a beta: v0.11.0-beta.1 tags 0.11.0 with "beta.1"). If CI and the Packages
-#            workflow (packages.yml) both succeeded on a push to main for exactly this commit, the release uses those
-#            packages: built and tested once, promoted unchanged. Otherwise:
+#            SCULPTFORGE_PRERELEASE for a beta: v0.11.0-beta.1 tags 0.11.0 with "beta.1"). If CI succeeded on a push to
+#            main for exactly this commit and the Packages workflow (packages.yml) succeeded for it, on `staging` (the
+#            release batch carried the bump) or on that push, the release uses those packages: built and tested once,
+#            promoted unchanged. Otherwise:
 #   build    the Packages workflow runs here, from the tag (compiler cache restored from main, never saved).
 #   smoke    every package installed or unpacked on a fresh runner: the app opens a model and sculpts
 #            (tests/ui/release_smoke.sfui), sculptforge-cli opens, sculpts, saves and reopens (tests/release_smoke.py).
@@ -92,7 +93,12 @@ jobs:
                     and .path == ".github/workflows/'"$1"'" and .head_repository.full_name == "'"$REPO"'") | .id' | head -1
           }
           ci=$(runs ci.yml || true)
-          pkg=$(runs packages.yml || true)
+          # The packages: the run on `staging` for exactly this commit (the release batch carried the bump: scripts/
+          # merge-queue.sh staging dispatches packages.yml there, and main's push run then reuses it), else main's own.
+          pkg=$(gh api "repos/$REPO/actions/workflows/packages.yml/runs?head_sha=$sha&event=workflow_dispatch&branch=staging&status=success&per_page=5" \
+                --jq '.workflow_runs[] | select(.head_sha == "'"$sha"'" and .head_branch == "staging" and .event == "workflow_dispatch"
+                      and .path == ".github/workflows/packages.yml" and .head_repository.full_name == "'"$REPO"'") | .id' | head -1 || true)
+          [ -n "$pkg" ] || pkg=$(runs packages.yml || true)
           if [ -z "$ci" ] && [ -n "$pkg" ]; then
             # The bump commit adds only release paperwork (tools/release/paperwork_only.py: version lines, CHANGELOG,
             # docs, site, fragments) to a main commit whose CI passed: that result stands (scripts/release.sh step ci).
@@ -113,6 +119,9 @@ jobs:
     name: Build
     needs: locate
     if: needs.locate.outputs.run-id == ''
+    permissions:
+      contents: read
+      actions: read # packages.yml's reuse job asks for it (it skips itself here: not a push to main)
     uses: ./.github/workflows/packages.yml
     with:
       ref: ${{ needs.locate.outputs.sha }}

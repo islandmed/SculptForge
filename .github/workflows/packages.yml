@@ -5,8 +5,9 @@ name: Packages
 # changes the app, so a tagged release can promote the packages of the commit it tags instead of building them again
 # (.github/workflows/release.yml); the release workflow also calls it to build from scratch when there are none.
 #
-# Integrity: the release promotes only artifacts of a successful run of THIS workflow on a push to main for exactly
-# the tagged commit (checked in release.yml). Compiler caches are restored here but saved only by branch runs (pushes
+# Integrity: the release promotes only artifacts of a successful run of THIS workflow for exactly the tagged commit,
+# either on a push to main or dispatched on `staging` by scripts/merge-queue.sh (checked in release.yml); main's push
+# then reuses the staging run (job reuse). Compiler caches are restored here but saved only by branch runs (pushes
 # to main, maintainers' own dispatches): never from a tag (a release that calls this builds from main's cache and
 # writes nothing) and never from a pull request (this workflow doesn't run on pull requests). See ci.yml for ccache.
 # Runners: repository variables SF_RUNNER_* (Settings > Secrets and variables > Actions > Variables) name other
@@ -55,8 +56,43 @@ env:
   SF_TEST_NO_NETWORK: '1'
 
 jobs:
+  reuse:
+    # A batch that went through `staging` (scripts/merge-queue.sh staging) had this workflow dispatched there for the
+    # same commit; main's push then reuses that run instead of building it all again, and the release promotes the
+    # staging run's packages (release.yml, job locate). In progress: wait for it. Failed, cancelled or none: build.
+    name: Reuse the staging run
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      run-id: ${{ steps.find.outputs.run-id }}
+    steps:
+      - id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          id=$(gh api "repos/$REPO/actions/workflows/packages.yml/runs?head_sha=$SHA&event=workflow_dispatch&branch=staging&per_page=5" \
+               --jq '[.workflow_runs[] | select(.head_sha == "'"$SHA"'" and .head_branch == "staging"
+                     and .path == ".github/workflows/packages.yml" and .head_repository.full_name == "'"$REPO"'")][0].id // empty')
+          [ -n "$id" ] || { echo "No Packages run on staging for $SHA: building here"; exit 0; }
+          while [ "$(gh api "repos/$REPO/actions/runs/$id" --jq .status)" != completed ]; do sleep 30; done
+          conclusion=$(gh api "repos/$REPO/actions/runs/$id" --jq .conclusion)
+          if [ "$conclusion" = success ]; then
+            echo "::notice::$SHA's packages were built and tested on staging (run $id, https://github.com/$REPO/actions/runs/$id): reused, not rebuilt"
+            echo "run-id=$id" >> "$GITHUB_OUTPUT"
+          else
+            echo "Packages run $id on staging: $conclusion: building here"
+          fi
+
   linux:
     name: Linux ${{ matrix.arch }} (.deb, AppImage, .tar.gz)
+    needs: reuse
+    if: ${{ !cancelled() && needs.reuse.outputs.run-id == '' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -116,6 +152,8 @@ jobs:
   # Built in the freedesktop SDK (packaging/flatpak/build.sh), installed, and UI tests run inside the sandbox.
   flatpak:
     name: Flatpak ${{ matrix.arch }}
+    needs: reuse
+    if: ${{ !cancelled() && needs.reuse.outputs.run-id == '' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -156,6 +194,8 @@ jobs:
 
   vfx:
     name: ${{ matrix.label }} ${{ matrix.arch }}
+    needs: reuse
+    if: ${{ !cancelled() && needs.reuse.outputs.run-id == '' }}
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.image }}
     strategy:
@@ -231,6 +271,8 @@ jobs:
 
   macos:
     name: macOS (universal .dmg)
+    needs: reuse
+    if: ${{ !cancelled() && needs.reuse.outputs.run-id == '' }}
     runs-on: ${{ vars.SF_RUNNER_MAC || 'macos-15' }}
     steps:
       - uses: actions/checkout@v7
@@ -280,6 +322,8 @@ jobs:
 
   windows:
     name: Windows x64 (installer, .zip)
+    needs: reuse
+    if: ${{ !cancelled() && needs.reuse.outputs.run-id == '' }}
     runs-on: ${{ vars.SF_RUNNER_WIN || 'windows-2022' }}
     steps:
       - uses: actions/checkout@v7

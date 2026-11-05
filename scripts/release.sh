@@ -7,6 +7,9 @@
 #   HIGHLIGHTS=notes.txt scripts/release.sh X.Y.Z --yes   every step, in order (the normal way: one command)
 #   scripts/release.sh X.Y.Z --from site                  resume at a step (after fixing what stopped it)
 #   scripts/release.sh X.Y.Z --only replies              one step
+#   scripts/release.sh X.Y.Z --only bump --staged        the bump commit only, not pushed: the merger puts it on top of
+#                     the release batch (RELEASE=X.Y.Z ~/Work/.sf/merge-batch.sh), so `staging` builds the packages of
+#                     the exact commit to tag while CI runs, and the release later only smoke-tests and publishes them
 #   HIGHLIGHTS=f scripts/release.sh X.Y.Z-beta.N --yes  a beta (also -rc.N): a GitHub pre-release for testers, offered
 #                     only to apps on the Preview update channel (see "Betas" below and docs/releasing.md)
 #   HIGHLIGHTS=file   the update feed's 3-5 highlight lines, one per line (default: the version's highlight: lines in
@@ -27,7 +30,7 @@
 # issue replies. The stable release later is plain scripts/release.sh X.Y.Z, which clears the prerelease.
 # Needs: gh logged in as islandmed (gh auth status), git, curl, python3, sha256sum (or shasum); run it from a clean
 # checkout of main. Pushes to main and the tag are made here, so only the release coordinator runs it, after
-# Tony's "ship it" for this version.
+# the owner's "ship it" for this version.
 set -euo pipefail
 
 REPO=islandmed/SculptForge
@@ -57,19 +60,21 @@ confirm() {
 
 V=${1:-}
 [[ "$V" =~ ^([0-9]+\.[0-9]+\.[0-9]+)(-((beta|rc)\.[0-9]+))?$ ]] ||
-    { echo "usage: scripts/release.sh X.Y.Z[-beta.N|-rc.N] [--from STEP | --only STEP] [--yes]"; exit 2; }
+    { echo "usage: scripts/release.sh X.Y.Z[-beta.N|-rc.N] [--from STEP | --only STEP] [--yes] [--staged]"; exit 2; }
 BASE=${BASH_REMATCH[1]} PRE=${BASH_REMATCH[3]} # 0.11.0-beta.1: BASE 0.11.0, PRE beta.1; a stable release: PRE ""
 [ -z "$PRE" ] || STEPS=(bump check ci tag release preview status)
 shift
-FROM=bump ONLY=
+FROM=bump ONLY= STAGED=
 while [ $# -gt 0 ]; do
     case $1 in
         --from) FROM=$2; shift 2 ;;
         --only) ONLY=$2; shift 2 ;;
         --yes) YES=1; shift ;;
+        --staged) STAGED=1; shift ;;
         *) echo "unknown argument $1"; exit 2 ;;
     esac
 done
+[ -z "$STAGED" ] || [ "$ONLY" = bump ] || { echo "--staged goes with --only bump (the later steps run on main after it lands)"; exit 2; }
 T=v$V
 TODAY=$(date +%F)
 CURRENT=setup
@@ -266,7 +271,7 @@ preflight() {
     pr=$(gh pr view "$OMARCHY_PR" -R omacom/omarchy-pkgs --json state,headRepositoryOwner,headRefName \
         -q '.state + " " + .headRepositoryOwner.login + " " + .headRefName' 2>/dev/null || true)
     read -r state owner branch <<<"$pr" || true
-    [ "$state" = OPEN ] || die "omacom/omarchy-pkgs#$OMARCHY_PR is ${state:-unreadable}" "if it merged, open a version-bump PR for pkgbuilds/sculptforge/PKGBUILD there and set OMARCHY_PR in this script; if it was closed, ask Tony"
+    [ "$state" = OPEN ] || die "omacom/omarchy-pkgs#$OMARCHY_PR is ${state:-unreadable}" "if it merged, open a version-bump PR for pkgbuilds/sculptforge/PKGBUILD there and set OMARCHY_PR in this script; if it was closed, ask the owner"
     gh_file "$owner/omarchy-pkgs" pkgbuilds/sculptforge/PKGBUILD "$branch" | grep -E "^sha256sums=\('[0-9a-f]{64}'" >/dev/null ||
         die "the Omarchy PKGBUILD on $owner/omarchy-pkgs $branch has no sha256sums=('<64 hex>' line" "fix it on that branch"
     ok "What's New, home page card, highlights, PKGBUILD, Homebrew tap and Omarchy PR #$OMARCHY_PR are ready"
@@ -274,9 +279,16 @@ preflight() {
 
 # --- steps --------------------------------------------------------------------------------------------------------
 
-# Sets every version file to X.Y.Z, rebuilds the guide and the home page's What's New area, pushes main.
+# Sets every version file to X.Y.Z, rebuilds the guide and the home page's What's New area, pushes main (--staged:
+# commits on top of the checked-out batch and pushes nothing; scripts/merge-queue.sh staging lands it).
 step_bump() {
-    on_main
+    if [ -n "$STAGED" ]; then
+        [ -z "$(git status --porcelain --untracked-files=no)" ] || die "uncommitted changes" "commit them first (git status)"
+        git fetch -q origin main --tags
+        git merge-base --is-ancestor origin/main HEAD || die "HEAD does not contain origin/main" "merge origin/main into the batch first"
+    else
+        on_main
+    fi
     preflight bump
     local out
     # A beta's #testers checklist comes from the fragments, so it is written before they go (step status names it).
@@ -372,6 +384,10 @@ PY
     else
         commit -m "Release $V: version files, CHANGELOG section, guide"
     fi
+    if [ -n "$STAGED" ]; then
+        ok "version files at $V, guide rebuilt, committed $(git rev-parse --short HEAD) (not pushed: scripts/merge-queue.sh staging HEAD lands it)"
+        return
+    fi
     push_main
     ok "version files at $V, guide rebuilt, pushed main $(git rev-parse --short HEAD)"
 }
@@ -431,7 +447,7 @@ step_tag() {
     local sha
     sha=$(git rev-parse HEAD)
     confirm "Tag $T at $(git log -1 --format='%h %s' "$sha") and push it? This publishes SculptForge $V${PRE:+ as a GitHub pre-release for testers}." ||
-        die "not confirmed" "run again and answer y (or YES=1) once Tony has said ship it for $V"
+        die "not confirmed" "run again and answer y (or YES=1) once the owner has said ship it for $V"
     git rev-parse -q --verify "refs/tags/$T" >/dev/null || git tag "$T" "$sha"
     gitp push -q origin "$T" || die "pushing $T failed" "git push origin $T (check gh auth status)"
     ok "pushed $T"
@@ -555,7 +571,7 @@ step_omarchy() {
     pr=$(gh pr view "$OMARCHY_PR" -R omacom/omarchy-pkgs --json state,headRepositoryOwner,headRefName \
         -q '.state + " " + .headRepositoryOwner.login + " " + .headRefName' 2>/dev/null || true)
     read -r state owner branch <<<"$pr" || true
-    [ "$state" = OPEN ] || die "omacom/omarchy-pkgs#$OMARCHY_PR is ${state:-unreadable}" "if it merged, open a version-bump PR for $path there and set OMARCHY_PR in this script; if it was closed, ask Tony"
+    [ "$state" = OPEN ] || die "omacom/omarchy-pkgs#$OMARCHY_PR is ${state:-unreadable}" "if it merged, open a version-bump PR for $path there and set OMARCHY_PR in this script; if it was closed, ask the owner"
     sum=$(tarball_sha)
     if gh_file "$owner/omarchy-pkgs" "$path" "$branch" | grep -x "pkgver=$V" >/dev/null; then
         ok "Omarchy PR #$OMARCHY_PR already builds $V"
