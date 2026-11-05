@@ -881,7 +881,6 @@ constexpr Entry kSpanish[] = {
 
     // --- Extract, Project, Deformation ---
     {"E Smt", "E Smt"},
-    {"PA Blur", "PA Blur"},
     {"Parts too", "También las piezas"},
     {"This Part", "Esta pieza"},
     {"Move along normals", "Mover a lo largo de las normales"},

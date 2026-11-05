@@ -681,8 +681,8 @@ void App::drawProjectContents() {
                  "size. Raise it if parts don't pick up the detail; lower it where surfaces are close together.",
                  kProjectPath);
     ImGui::SetNextItemWidth(half);
-    tray::SliderInt("##pblur", &retopo_.projectBlur, 0, 10, "PA Blur %d");
-    ui::HelpText("PA Blur", nullptr, "Smooth the projected result this many times (softens noise from the source).",
+    tray::SliderInt("##pblur", &retopo_.projectBlur, 0, 10, "Blur %d");
+    ui::HelpText("Blur", nullptr, "Smooth the projected result this many times (softens noise from the source).",
                  kProjectPath);
     ImGui::SameLine();
     ImGui::Checkbox(tr("Mean"), &retopo_.projectMean);

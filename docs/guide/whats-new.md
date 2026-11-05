@@ -1106,7 +1106,7 @@ See [Baking normal and displacement maps](baking.md).
   the forms, near a **Target Polygons** count, in the background. **Keep Groups**, **Adaptive Size**,
   **Use Vertex Paint**, **Symmetry** and **Half / Same / Double** work.
 - **Project Detail** (**Tool > Parts > Project**) puts the sculpted detail and vertex paint back onto the divided
-  quads, with **Dist**, **Mean** and **PA Blur**, and respects the mask.
+  quads, with **Dist**, **Mean** and **Blur**, and respects the mask.
 
 See [Quad retopology and detail projection](retopology.md).
 

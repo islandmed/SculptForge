@@ -167,7 +167,7 @@ void registerRetopoCommands(CommandRegistry& reg) {
              {{"distance", T::Number, "Dist: how far each vertex searches along its normal, as a fraction of the "
                                       "Part's bounding-box diagonal (0.001-1). Default 0.02.", false},
               {"mean", T::Bool, "Mean: with surface on both sides, settle halfway between them. Default false.", false},
-              {"blur", T::Number, "PA Blur: smoothing passes over the projected offsets (0-20). Default 0.", false},
+              {"blur", T::Number, "Blur: smoothing passes over the projected offsets (0-20). Default 0.", false},
               {"geometry", T::Bool, "Project the shape. Default true.", false},
               {"vertexpaint", T::Bool, "Project the vertex paint (when a source has any). Default true.", false},
               {"source", T::String, "Project only from the Part with this name (default: all visible ones).", false}},

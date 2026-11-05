@@ -1648,7 +1648,7 @@ adjacency that saves the memory).
   interpolated onto the new mesh; sculpt layers are baked.
 - ProjectAll (Tool > Part > Project, `project_all`): moves the active Part onto the other visible
   Parts (rays both ways along the normal, nearest hit within Dist, else the closest point) and takes their
-  vertex paint. Dist, Mean, PA Blur, Geometry / Vertex Paint toggles, an optional single `source`; respects the mask
+  vertex paint. Dist, Mean, Blur, Geometry / Vertex Paint toggles, an optional single `source`; respects the mask
   and hidden faces; shape goes into the active sculpt layer, colour into the active paint layer; one undo step.
 - Fast on dense meshes (all threads, a read-only BVH): 1.3M triangles to 5,000 quads in 1.7 s, to 100,000 in
   6 s; ProjectAll onto 1.25M vertices in 0.6 s (10-core desktop).

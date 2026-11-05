@@ -104,7 +104,7 @@ their old ids (`config.store`, `rgb_intensity`, `focal`, `subdiv_lower`...); onl
 | Draw Size / Z Intensity / RGB Intensity / Focal Shift | Size / Intensity / Colour intensity / Falloff |
 | Popup Info / Quick Info Opacity | Ctrl+hover help / Help box opacity |
 | Lower Res / Higher Res / Del Lower / Del Higher | Lower Level / Higher Level / Delete Lower / Delete Higher |
-| Project All | Project Detail |
+| Project All / PA Blur | Project Detail / Blur |
 | Mask Lasso / Mask Rect | Lasso Mask / Rectangle Mask |
 | Radial Count | Radial Copies |
 | Group Masked | Group from Mask |
@@ -124,6 +124,7 @@ their old ids (`config.store`, `rgb_intensity`, `focal`, `subdiv_lower`...); onl
     \bhigher res\b
     \bdel (?:lower|higher)\b
     \bproject all\b
+    \bpa blur\b
     mask lasso
     \bmask rect\b
     radial count

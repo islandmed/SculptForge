@@ -200,7 +200,7 @@ straight along the normal, it takes the closest point within **Dist**.
 |---|---|
 | **Project Detail** | Projects the visible Parts onto the active one (one undo step) |
 | **Dist** | How far to search, as a fraction of the Part's size (bounding-box diagonal). Default 0.02. Raise it if parts don't pick up the detail; lower it where two surfaces are close together (lips, eyelids, fingers) |
-| **PA Blur** | Smooths the projected result this many times, to soften noise from the source |
+| **Blur** | Smooths the projected result this many times, to soften noise from the source |
 | **Mean** | Where there is surface on both sides of a vertex, settle halfway between them instead of on the nearest |
 | **Geometry** | Project the shape (into the active sculpt layer, if you have layers) |
 | **Vertex Paint** | Project the vertex paint (into the active paint layer) when a source has any |

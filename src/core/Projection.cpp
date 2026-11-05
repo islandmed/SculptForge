@@ -107,7 +107,7 @@ bool computeProjection(const Mesh& target, const std::vector<const Mesh*>& sourc
         error = "Project Detail cancelled";
         return false;
     }
-    // PA Blur: smooth the offsets of the projected vertices.
+    // Blur: smooth the offsets of the projected vertices.
     if (opt.geometry && opt.blur > 0) {
         std::vector<glm::vec3> d(nv), next(nv);
         for (size_t v = 0; v < nv; ++v) d[v] = positions[v] - target.positions[v];
