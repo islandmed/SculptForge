@@ -53,12 +53,12 @@ generated from SculptForge's action registry, the same source as the Controls wi
 
 | Action | Keys | What it does |
 |---|---|---|
-| Size at cursor | <kbd>S</kbd> | A Size slider under the cursor: drag it, or type a number and press Enter. |
 | Falloff at cursor | <kbd>O</kbd> or <kbd>I</kbd> | A Falloff slider under the cursor: below 0 a broad, hard brush tip, above 0 a soft point (-100..100). The inner ring of the brush cursor shows it. |
 | Intensity at cursor | <kbd>U</kbd> | An Intensity slider under the cursor: drag it, or type a number (1-100) and press Enter. Hold Shift (or pick Smooth) to set Smooth's own Intensity. |
 | Larger brush | <kbd>]</kbd> | Make the brush 10% larger (hold to repeat; Shift+] steps one pixel). |
 | Larger brush by 1 px | <kbd>Shift</kbd>+<kbd>]</kbd> | Make the brush one pixel larger (half a pixel below 2 px). |
 | Paint | <kbd>P</kbd> | Paint colour without sculpting. Alt paints back to white, Shift still smooths. |
+| Size at cursor | <kbd>S</kbd> | A Size slider under the cursor: drag it, or type a number and press Enter. |
 | Smaller brush | <kbd>[</kbd> | Make the brush 10% smaller (hold to repeat; Shift+[ steps one pixel). |
 | Smaller brush by 1 px | <kbd>Shift</kbd>+<kbd>[</kbd> | Make the brush one pixel smaller (half a pixel below 2 px), down to 0.5 px. |
 
@@ -112,11 +112,11 @@ generated from SculptForge's action registry, the same source as the Controls wi
 
 | Action | Keys | What it does |
 |---|---|---|
-| Import Interface... | <kbd>Ctrl</kbd>+<kbd>L</kbd> | Load a layout file someone shared (or you saved with Export Interface). |
+| Export Interface... | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | Save the layout, shortcuts and interface preferences to a file you can share. |
+| Import Interface... | <kbd>Ctrl</kbd>+<kbd>L</kbd> | Load a layout and shortcuts file someone shared (or you saved with Export Interface). |
 | Radial menu 1: Brushes | <kbd>T</kbd> | Hold the key, flick toward an item and let go to run it; or tap the key and click one. Edit it in Preferences > Input > Radial Menus. |
 | Radial menu 2: Masking | <kbd>Y</kbd> | Hold the key, flick toward an item and let go to run it; or tap the key and click one. Edit it in Preferences > Input > Radial Menus. |
 | Radial menu 3: Strokes | <kbd>J</kbd> | Hold the key, flick toward an item and let go to run it; or tap the key and click one. Edit it in Preferences > Input > Radial Menus. |
-| Export Interface... | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | Save the layout, shortcuts and interface preferences to a file you can share. |
 | Shelves | <kbd>Tab</kbd> | Hide or show the shelves and trays around the canvas. |
 
 ### Render

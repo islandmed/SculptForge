@@ -930,6 +930,8 @@ void App::restartPrefsForTest(const std::string& uiJson) {
     layoutBaseline_ = layoutKey();
     prefsSavedKey_ = prefsKey();
     prefsSaveAt_ = 0.0;
+    ImGui::ClearActiveID(); // a new start has no text field in use (the console's would take the next keys)
+    ImGui::SetWindowFocus(nullptr);
 }
 
 void App::savePrefsNow() {

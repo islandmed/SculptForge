@@ -31,6 +31,7 @@ shot bottom
 restart
 expect_value timeline_top == 0
 click "Preferences##palette.preferences"
+click "Interface##preferences.interface"
 click "Top of viewport##view.timeline_top"
 key escape
 expect_value timeline_top == 1
