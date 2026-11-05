@@ -27,6 +27,20 @@ expect "Relief"
 expect_not "Generate 3D##ui.generate3d"
 shot ai-generate-off
 
+# The Mesh menu names that section by what is left in it (ebarranco 11-05: "Generate 3D" showed with AI off).
+run ui_look look=forge scheme=neutral layout=sculptforge
+wait 0.2
+click "Mesh##menu.mesh"
+expect "From Image##section.generate"
+expect_not "Generate 3D##section.generate"
+# The panel's title too, not Generate.
+expect_text "From Image"
+expect_not "Generate 3D##ui.generate3d"
+shot ai-mesh-menu-off
+key escape
+run ui_look look=classic layout=classic
+wait 0.2
+
 # The command palette finds the switch, not the AI tools.
 key f3
 type "##Command palette" "brush ai"
@@ -46,6 +60,15 @@ click "Preferences##palette.preferences"         # close the popup first
 click "AI Brush"
 expect "Brush Lab"
 click "AI Brush"
+run ui_look look=forge scheme=neutral layout=sculptforge
+wait 0.2
+click "Mesh##menu.mesh"
+expect "Generate 3D##section.generate"
+expect_not "From Image##section.generate"
+shot ai-mesh-menu-on
+key escape
+run ui_look look=classic layout=classic
+wait 0.2
 
 # First run: the welcome asks.
 key f3

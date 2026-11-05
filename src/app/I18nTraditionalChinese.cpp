@@ -96,6 +96,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"Camera", "相機"},
     {"Import / Export", "匯入／匯出"},
     {"From an image", "從影像建立"},
+    {"From Image", "從影像"},
     {"Voxel Remesh", "體素重新網格化"},
     {"Modify Topology", "修改拓樸"},
     {"Game Ready", "適用於遊戲"},

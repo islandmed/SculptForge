@@ -1679,7 +1679,7 @@ void App::drawTaskMenu() {
         for (int k = 0; k < sections; ++k) {
             const PaletteDef* p = findPalette(menu.sections[k]);
             if (!p) continue;
-            const std::string title = tr(menu.titles[k] ? menu.titles[k] : p->name);
+            const std::string title = tr(taskSectionTitle(menu, k));
             const bool current = dropdown_ == p->id;
             const bool inTray = std::count(layout_.leftTray.begin(), layout_.leftTray.end(), p->id) +
                                     std::count(layout_.rightTray.begin(), layout_.rightTray.end(), p->id) >
@@ -1691,7 +1691,7 @@ void App::drawTaskMenu() {
             if (current || hovered) dl->AddRectFilled(a, b, theme::u32(current ? theme::selection : theme::headerHover, current ? 1.0f : 0.6f));
             if (current) dl->AddRectFilled(a, ImVec2(a.x + 2.0f * s, b.y), theme::u32(theme::accent));
             const float ty = std::floor(a.y + (rowH - ImGui::GetFontSize()) * 0.5f);
-            dl->AddText(ImVec2(a.x + 10.0f * s, ty), theme::u32(current ? theme::accent : theme::textDim), p->icon);
+            dl->AddText(ImVec2(a.x + 10.0f * s, ty), theme::u32(current ? theme::accent : theme::textDim), taskSectionIcon(menu, k));
             dl->AddText(ImVec2(a.x + 34.0f * s, ty), theme::u32(current ? theme::textBright : theme::text), title.c_str());
             if (inTray) dl->AddText(ImVec2(b.x - 22.0f * s, ty), theme::u32(theme::textDim), ICON_LC_PANEL_RIGHT);
             if (clicked) {
@@ -1756,13 +1756,13 @@ bool App::paletteHeader(const char* id, bool inTray, bool right) {
     const bool iconHovered = ImGui::IsItemHovered();
     if (!inTray && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoDisableHover)) {
         ImGui::SetDragDropPayload("SF_PALETTE", id, std::strlen(id) + 1);
-        ImGui::Text(ICON_LC_PANEL_RIGHT "  %s", tr(def->name));
+        ImGui::Text(ICON_LC_PANEL_RIGHT "  %s", tr(paletteTitle(*def)));
         ImGui::EndDragDropSource();
     }
-    if (inTray) ui::HelpText("Back to the palette bar", nullptr, "Take this palette out of the tray.", tr(def->name));
+    if (inTray) ui::HelpText("Back to the palette bar", nullptr, "Take this palette out of the tray.", tr(paletteTitle(*def)));
     else
         ui::HelpText("Move to the tray", nullptr,
-                     "Keep this palette in the right tray (Shift+click: left tray), or drag the icon onto a tray.", tr(def->name));
+                     "Keep this palette in the right tray (Shift+click: left tray), or drag the icon onto a tray.", tr(paletteTitle(*def)));
     centredText(dl, nullptr, p, ImVec2(p.x + h, p.y + h), theme::u32(iconHovered ? theme::accentHover : theme::textDim),
                 inTray ? (right ? ICON_LC_PANEL_RIGHT : ICON_LC_PANEL_LEFT) : ICON_LC_PANEL_RIGHT);
     ImGui::SameLine();
@@ -1770,7 +1770,7 @@ bool App::paletteHeader(const char* id, bool inTray, bool right) {
     const bool titleHovered = ImGui::IsItemHovered();
     if (fontBold_) ImGui::PushFont(fontBold_);
     {
-        std::string title = tr(def->name);
+        std::string title = tr(paletteTitle(*def));
         if (theme::look.upperHeaders)
             for (auto& c : title) c = char(std::toupper(static_cast<unsigned char>(c)));
         if (headers == Headers::Ascii) title = "[ " + title + " ]";
@@ -1786,7 +1786,7 @@ bool App::paletteHeader(const char* id, bool inTray, bool right) {
             dl->AddText(ImVec2(x0, tp.y), theme::u32(theme::accent, 0.55f), run.c_str());
         }
     }
-    ImGui::LogText("%s", tr(def->name));
+    ImGui::LogText("%s", tr(paletteTitle(*def)));
     if (fontBold_) ImGui::PopFont();
     ImGui::SameLine();
     const bool endClicked = ImGui::InvisibleButton(inTray ? "##collapse" : "##close", ImVec2(h, h));

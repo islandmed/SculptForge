@@ -184,6 +184,12 @@ private:
     // sdl_pen_mouse / pen_lost). A Huion-style driver also sends mouse events of its own (pen_stream huion).
     bool sdlPenMouse_ = true;
     bool huionStream_ = false;
+    // pen_rest on: the pen lies still in range and, as a real one does, sends a hair of tilt and sub-pixel motion
+    // every frame (phoenix 11-05) until pen_rest off.
+    bool penResting_ = false;
+    ImVec2 penRestAt_{0, 0};
+    int penRestFrame_ = 0;
+    void penRestNoise();
     static constexpr SDL_MouseID kDriverMouse = 7; // the driver's own mouse device
     // `snapshot` saves the active mesh; moved* values compare against it. `remember` keeps values for $NAME.
     std::vector<glm::vec3> basePositions_, baseNormals_;

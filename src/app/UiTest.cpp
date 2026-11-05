@@ -220,6 +220,8 @@
 //   pen_pressure P           a pressure sample from the hovering pen (e.g. a stale value before a stroke)
 //   pen_enter U V            the pen comes into range at a point on the model (put down elsewhere, no hover)
 //   pen_out                  the pen leaves proximity
+//   pen_rest on|off          the pen lies still in range, sending tilt and sub-pixel motion every frame (a Wacom
+//                            laid on the tablet); the mouse and trackpad work beside it
 //   tablet_plug [NAME]       a tablet plugged in while running (default name: a generic HID mouse); its pen gets
 //                            a new id
 //   tablet_unplug            ... and unplugged
@@ -2474,6 +2476,14 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "pen_out") {
         run([this] { penProximity(false); });
         wait(0.05f);
+    } else if (verb == "pen_rest") {
+        if (!need(1)) return false;
+        run([this, on = w[1] != "off"] {
+            if (on && !penIn_) penProximity(true);
+            penRestAt_ = penAt_;
+            penResting_ = on;
+        });
+        wait(0.05f);
     } else if (verb == "shot") {
         if (!need(1)) return false;
         const std::string name = w[1];
@@ -2559,6 +2569,23 @@ void Demo::penMove(float x, float y) {
     app_.handleEvent(e);
     if (sdlPenMouse_) mouseMotion(x, y, SDL_PEN_MOUSEID); // SDL moves the mouse with a touching or hovering pen
     if (huionStream_) mouseMotion(x, y, kDriverMouse);    // ... and the driver moves it too
+}
+
+void Demo::penRestNoise() {
+    if (!penIn_ || penDown_) return;
+    if (std::hypot(penAt_.x - penRestAt_.x, penAt_.y - penRestAt_.y) > 2.0f) penRestAt_ = penAt_; // laid down elsewhere
+    const float jitter = (++penRestFrame_ & 1) ? 0.4f : -0.4f;
+    penMove(penRestAt_.x + jitter, penRestAt_.y);
+    SDL_Event e{};
+    e.type = SDL_EVENT_PEN_AXIS;
+    e.paxis.windowID = SDL_GetWindowID(app_.window_);
+    e.paxis.which = testPen_;
+    e.paxis.pen_state = penState_;
+    e.paxis.x = penAt_.x;
+    e.paxis.y = penAt_.y;
+    e.paxis.axis = SDL_PEN_AXIS_XTILT;
+    e.paxis.value = 20.0f + jitter;
+    app_.handleEvent(e);
 }
 
 void Demo::penPressure(float pressure) {
