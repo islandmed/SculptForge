@@ -402,6 +402,30 @@ int App::runUiTest(int w, int h, int fps) {
         into += std::chrono::duration<double, std::milli>(now - last).count();
         last = now;
     };
+    // --ui-record: every frame to ffmpeg, paced to real time (background jobs run at their real speed in the video);
+    // frames that take longer than 1/fps can't keep up, so the log says how much faster than real time the video ran.
+    FILE* video = nullptr;
+    if (!options_.uiRecordPath.empty()) {
+        if (shellQuote(options_.uiRecordPath).empty()) {
+            SDL_Log("--ui-record: choose a file name without \" %% ! ^ & | < > in it");
+            return 1;
+        }
+        const std::string cmd = "ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgba -s " + std::to_string(w) + "x" +
+                                std::to_string(h) + " -r " + std::to_string(fps) +
+                                " -i - -c:v libx264 -preset slow -crf 16 -pix_fmt yuv420p -movflags +faststart " +
+                                shellQuote(options_.uiRecordPath);
+#if defined(_WIN32)
+        video = _popen(cmd.c_str(), "wb");
+#else
+        video = popen(cmd.c_str(), "w");
+#endif
+        if (!video) {
+            SDL_Log("Cannot start ffmpeg");
+            return 1;
+        }
+    }
+    const auto recordStart = std::chrono::steady_clock::now();
+    int lateFrames = 0;
     while (frames < fps * 60 * 30) {
         if (timed && (frames == 1 || frames == 5 || frames == 20)) {
             std::fprintf(stderr, "frames to %2d: polls %.1f, new frame %.1f, UI %.1f, scene %.1f ms\n", frames, frameMs[0],
@@ -458,6 +482,7 @@ int App::runUiTest(int w, int h, int fps) {
         drawHardwareProfileOverlay();
         if (ImGuiContext* g = ImGui::GetCurrentContext()) demo_->setFrameText(g->LogBuffer.c_str());
         ImGui::LogFinish();
+        if (video) demo_->drawOverlay(); // the pointer (and the script's fades), as a demo recording draws them
         ImGui::Render();
         lap(frameMs[2]);
         if (tracing) tracePhase[3] = double(SDL_GetTicksNS()) * 1e-6;
@@ -477,7 +502,7 @@ int App::runUiTest(int w, int h, int fps) {
         }
         ++frames;
         const std::string shot = demo_->takeShotRequest();
-        if (shot.empty()) continue;
+        if (shot.empty() && !video) continue;
         if (!renderer_.beginCapture(w, h, err)) {
             SDL_Log("%s", err.c_str());
             return 1;
@@ -485,6 +510,14 @@ int App::runUiTest(int w, int h, int fps) {
         renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         renderer_.endCapture(rgba);
+        if (video) {
+            fwrite(rgba.data(), 1, rgba.size(), video);
+            const auto due = recordStart + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                               std::chrono::duration<double>(double(frames) * double(dt)));
+            if (std::chrono::steady_clock::now() < due) std::this_thread::sleep_until(due);
+            else ++lateFrames;
+        }
+        if (shot.empty()) continue;
         Image img;
         img.width = w;
         img.height = h;
@@ -503,6 +536,19 @@ int App::runUiTest(int w, int h, int fps) {
         SDL_Log("Screenshot %s", shot.c_str());
     }
     for (auto& write : shotWrites) write.get(); // every screenshot on disk before the verdict
+    if (video) {
+#if defined(_WIN32)
+        const int status = _pclose(video);
+#else
+        const int status = pclose(video);
+#endif
+        const double wall = std::chrono::duration<double>(std::chrono::steady_clock::now() - recordStart).count();
+        const double length = double(frames) * double(dt);
+        SDL_Log("Recorded %d frames (%.1f s) to %s in %.1f s: background jobs play at %.2fx, %d frames late%s", frames,
+                length, options_.uiRecordPath.c_str(), wall, wall / std::max(length, 1e-3), lateFrames,
+                status == 0 ? "" : " (ffmpeg failed)");
+        if (status != 0) return 1;
+    }
     demo_->printProfile();
     for (const auto& f : demo_->failures()) std::fprintf(stderr, "FAIL %s\n", f.c_str());
     if (demo_->failures().empty())

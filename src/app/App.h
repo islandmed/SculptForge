@@ -92,6 +92,7 @@ struct AppOptions {
     bool hideMesh = false; // headless: show only the splats
     std::string demo;       // scripted demo to play (see Demo.h)
     std::string recordPath; // record the session to this .mp4 (needs ffmpeg) and exit
+    std::string uiRecordPath; // --ui-test: also record every frame, paced to real time, to this .mp4 (launch clips)
     std::string demoAsset;  // file the demo opens (image or model)
     std::string demoOutput; // where the demo saves its result (optional)
     int fps = 30;
