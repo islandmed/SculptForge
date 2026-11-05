@@ -124,6 +124,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: python3 tools/check_marks.py --self-test && python3 tools/check_marks.py
+      # Private names (the maintainer's, an employer's) from the repository secret SF_PRIVATE_NAMES, so the list isn't
+      # public; reported by place only. Pull requests get no secrets, so they skip; pushes and dispatches require it.
+      - env:
+          SF_PRIVATE_NAMES: ${{ secrets.SF_PRIVATE_NAMES }}
+        run: |
+          python3 tools/check_private_names.py --self-test
+          python3 tools/check_private_names.py ${{ github.event_name != 'pull_request' && '--require' || '' }}
 
   build:
     name: ${{ matrix.name }} (${{ matrix.shard }}/${{ matrix.shards }})
