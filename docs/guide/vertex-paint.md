@@ -150,7 +150,8 @@ way round, so a stroke with **Rgb** on can sculpt into the "Smile" layer and pai
 
 ## Materials (Lit Spheres)
 
-Materials change only how the model is shaded in the viewport. They aren't exported and don't change vertex paint.
+The materials are material capture (lit sphere) images: each one is a picture of a lit sphere that shades the whole
+model. They change only how the model is shaded in the viewport. They aren't exported and don't change vertex paint.
 
 | Material | Look |
 |---|---|
@@ -187,8 +188,8 @@ PBR shading uses the material channels and is not tinted. Saved with the project
 
 ### Your own Lit Spheres
 
-A Lit Sphere is a picture of a lit sphere (Sloan and others, 2001): the view colours each point of the model with the sphere's colour where its
-surface faces the same way. Any lit-sphere image works: a square PNG, JPG or EXR
+Your own Lit Spheres are material capture (lit sphere) images too (Sloan and others, 2001): the view colours each point
+of the model with the sphere's colour where its surface faces the same way. Any lit-sphere image works: a square PNG, JPG or EXR
 with the sphere filling it (a non-square image is cropped to its centre; big ones are scaled to 1024 pixels).
 
 - **Render > Materials > Load Lit Sphere...** picks an image. It joins the material list under its file name, the view uses
@@ -198,7 +199,18 @@ with the sphere filling it (a non-square image is cropped to its centre; big one
   **Render > Materials** or the Library's Material tab, no restart needed. Studios can share a read-only folder by
   listing it in the `SCULPTFORGE_LITSPHERE_PATH` environment variable (separated by `:`, `;` on Windows); those load
   when SculptForge starts.
-- To remove one, right-click it in the material picker or palette and choose **Remove**. An image from your
+- **Drop an image onto the Library's Material tab** to load it the same way (dropped on the canvas, an image keeps
+  its usual meaning).
+- **Rename** one: right-click it in the material picker, **Render > Materials** or the Library's Material tab and choose
+  **Rename...**, type the name and press <kbd>Enter</kbd>. Its file in the Lit Spheres folder is renamed too. A name
+  another Lit Sphere already has is refused, so nothing is overwritten. Projects that use it keep their look: they find
+  it by its pixels, not its name.
+- **Organise** them in folders: each sub-folder of the Lit Spheres folder (one level) is a heading in the lists.
+  Right-click a Lit Sphere and choose **Move to folder** for an existing folder, **New folder...** to make one, or
+  **Lit Spheres (no folder)** to take it out again. You can also make the folders in your file manager.
+- Lit Spheres from a pack, from a studio folder or carried only by the open project have no file of yours to change:
+  Rename and Move to folder are greyed out, and pointing at them says why.
+- To remove one, right-click it and choose **Remove**. An image from your
   Lit Spheres folder goes to the trash (the Recycle Bin on Windows), so you can still get it back. On macOS it is
   only hidden until you restart, and the message says where its file is so you can delete it yourself.
   Built-in materials can't be removed.
@@ -206,7 +218,7 @@ with the sphere filling it (a non-square image is cropped to its centre; big one
 ![A Lit Sphere loaded from an image (Gold) in Render > Materials](images/custom-lit-spheres.jpg)
 
 Your Lit Spheres appear in the material picker (<kbd>M</kbd>), **Render > Materials** and the Library, after the
-built-in ones. A project that uses one carries a copy of the image, so it opens with the same look on another
+built-in ones, those in folders under their folder's name. A project that uses one carries a copy of the image, so it opens with the same look on another
 computer (or after you delete the file). Loading an image with the same name again replaces it. EXR images are
 read as linear light, so very bright highlights clip to white.
 
@@ -230,8 +242,6 @@ your preferred shading. The scene's shading you choose is also the preference fo
 itself). Smooth and Flat have no default shortcut, so no
 classic key changes meaning; assign one under **Edit > Preferences > Hotkeys** if you switch often.
 
-> **Not yet:** loading your own Lit Sphere images, and physically based materials or BPR-style renders.
-
 ## Scripting
 
 | Command | What it does |
@@ -249,6 +259,8 @@ classic key changes meaning; assign one under **Edit > Preferences > Hotkeys** i
 | `paint_layer_list` | List the layers, top first (`*` marks the active one) |
 | `set_material name=Chrome` | Viewport material: a Lit Sphere name (`Soft Clay` is the default, your own Lit Spheres included) or `studio` (desktop app only) |
 | `load_litsphere path=gold.png` | Load a Lit Sphere image and use it; `keep=false` doesn't copy it into the Lit Spheres folder (desktop app only) |
+| `rename_litsphere name=Gold to="Old Gold"` | Rename one of your Lit Spheres and its image in the Lit Spheres folder; a name in use is refused (desktop app only) |
+| `move_litsphere name=Gold folder=Metals` | Move one of your Lit Spheres into a sub-folder of the Lit Spheres folder (made if needed; `folder=""` moves it back) (desktop app only) |
 | `remove_litsphere name=Gold` | Remove one of your Lit Spheres; its image in the Lit Spheres folder goes to the trash (desktop app only) |
 | `set_background mode=flat color=60,70,80` | The view's background: `gradient` (the default) or `flat` with a colour (`#rrggbb`, `r,g,b` or a name); see [The background](interface.md#the-background) (desktop app only) |
 | `set_shading mode=flat` | The scene's shading: `smooth` (the default) or `flat` (desktop app only) |

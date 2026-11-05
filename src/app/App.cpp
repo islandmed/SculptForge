@@ -1409,7 +1409,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         strokePopupKeyUp(e.key.key);                   // the stroke popup's held key: pick the item pointed at
         break;
     case SDL_EVENT_DROP_FILE:
-        if (e.drop.data) openPathConfirmed(e.drop.data);
+        if (e.drop.data && !libraryBrowser_.takeDrop(*this, e.drop.x, e.drop.y, e.drop.data)) openPathConfirmed(e.drop.data);
         break;
     default:
         break;

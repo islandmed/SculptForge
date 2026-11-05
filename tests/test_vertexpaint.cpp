@@ -458,6 +458,48 @@ TEST(litsphere_remove_and_trash) {
 #endif
 }
 
+TEST(litsphere_rename_move_and_hash) {
+    // #124: renaming keeps the index and the pixels, so a project that carries the image (matched by its pixel hash)
+    // still finds it under the new name; a name clash or a name that can't be a file name is refused.
+    CustomLitSphere m;
+    m.name = "Rename Me";
+    m.size = 16;
+    m.rgba.assign(16 * 16 * 4, 91);
+    m.path = "/lib/Lit Spheres/Rename Me.png";
+    const int i = addCustomLitSphere(m);
+    CustomLitSphere other = m;
+    other.name = "Taken Name";
+    other.rgba.assign(16 * 16 * 4, 92);
+    other.hash = 0;
+    const int j = addCustomLitSphere(other);
+    const uint64_t hash = customLitSphere(i)->hash, revision = litsphereRevision();
+    std::string err;
+    CHECK(renameCustomLitSphere(i, "Brass Polished", err) && litsphereRevision() != revision);
+    CHECK(std::string(litsphereName(i)) == "Brass Polished" && findLitSphere("brass polished") == i && findLitSphere("Rename Me") == -1);
+    CHECK(findLitSphereByHash(hash) == i && customLitSphere(i)->hash == hash && litsphereKey(i).find("Brass Polished#") == 0);
+    CHECK(!renameCustomLitSphere(i, "taken name", err) && err.find("Taken Name") != std::string::npos && findLitSphere("Taken Name") == j);
+    CHECK(!renameCustomLitSphere(i, "Chrome", err) && std::string(litsphereName(i)) == "Brass Polished"); // a built-in's
+    CHECK(!renameCustomLitSphere(0, "Anything", err));                                                 // built-ins stay
+    for (const char* bad : {"", "a/b", "a\\b", "x:y", ".hidden", "trail.", "who?", "pipe|", " lead"})
+        CHECK(!checkLitSphereFileName(bad, err) && !renameCustomLitSphere(i, bad, err));
+    CHECK(checkLitSphereFileName("Gold Leaf (old) 2", err) && checkLitSphereFileName("Grès émaillé", err));
+    // A removed one of the wanted name doesn't block it, and can't take it back later.
+    CHECK(removeCustomLitSphere(j) && renameCustomLitSphere(i, "Taken Name", err) && findLitSphere("Taken Name") == i);
+    const int k = addCustomLitSphere(m); // "Rename Me" again: a new one
+    CHECK(k != i && findLitSphere("Taken Name") == i && removeCustomLitSphere(k));
+
+    // Moving to a sub-folder: the path and the group change, nothing else; the lists' headings follow the groups.
+    CHECK(relocateCustomLitSphere(i, "/lib/Lit Spheres/Metals/Taken Name.png", "Metals") && !relocateCustomLitSphere(0, "x", "y"));
+    CHECK(customLitSphere(i)->group == "Metals" && findLitSphereByHash(hash) == i);
+    const std::vector<std::string> groups = litsphereGroups();
+    CHECK(std::find(groups.begin(), groups.end(), "Metals") != groups.end() &&
+          std::find(groups.begin(), groups.end(), "") == groups.end());
+    CHECK(relocateCustomLitSphere(i, m.path, ""));
+    const std::vector<std::string> after = litsphereGroups();
+    CHECK(std::find(after.begin(), after.end(), "Metals") == after.end());
+    removeCustomLitSphere(i);
+}
+
 TEST(vertexpaint_restore_stroke_marks_colors_dirty) {
     // DragRect re-stamps by restoring the stroke first: the reverted colours must reach the GPU.
     Document doc = makeDoc(makeIcosphere(3));

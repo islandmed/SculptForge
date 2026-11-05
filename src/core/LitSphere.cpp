@@ -278,6 +278,55 @@ bool removeCustomLitSphere(int index) {
     return true;
 }
 
+bool checkLitSphereFileName(const std::string& name, std::string& error) {
+    if (name.empty()) error = "The name is empty";
+    else if (name.size() > 100) error = "The name is too long";
+    else if (name[0] == '.') error = "The name can't start with a dot";
+    else if (name.back() == '.' || name.back() == ' ' || name.front() == ' ') error = "The name can't start or end with a space or end with a dot";
+    else if (name.find_first_of("/\\:*?\"<>|") != std::string::npos) error = "The name can't contain / \\ : * ? \" < > |";
+    else if (std::any_of(name.begin(), name.end(), [](char c) { return static_cast<unsigned char>(c) < 32; }))
+        error = "The name can't contain control characters";
+    else return true;
+    return false;
+}
+
+bool renameCustomLitSphere(int index, const std::string& name, std::string& error) {
+    if (!isLitSphereListed(index) || !isCustomLitSphere(index)) {
+        error = "Only your own Lit Spheres can be renamed";
+        return false;
+    }
+    if (!checkLitSphereFileName(name, error)) return false;
+    if (const int other = findLitSphere(name); other >= 0 && other != index) {
+        error = std::string("There is already a Lit Sphere called ") + litsphereName(other);
+        return false;
+    }
+    // A removed one with this name would come back over the renamed one if its file were loaded again: it keeps its
+    // index under a name no list shows.
+    for (size_t i = 0; i < customs().size(); ++i)
+        if (customs()[i].removed && squash(customs()[i].name) == squash(name)) customs()[i].name += " (removed)";
+    customs()[size_t(index - kStyleCount)].name = name;
+    ++g_revision; // the lists and thumbnail keys show the name
+    return true;
+}
+
+bool relocateCustomLitSphere(int index, const std::string& path, const std::string& group) {
+    if (!isCustomLitSphere(index)) return false;
+    CustomLitSphere& c = customs()[size_t(index - kStyleCount)];
+    c.path = path;
+    c.group = group;
+    return true;
+}
+
+std::vector<std::string> litsphereGroups() {
+    std::vector<std::string> groups;
+    for (const CustomLitSphere& c : customs())
+        if (!c.removed && !c.group.empty() &&
+            std::none_of(groups.begin(), groups.end(), [&](const std::string& g) { return squash(g) == squash(c.group); }))
+            groups.push_back(c.group);
+    std::sort(groups.begin(), groups.end(), [](const std::string& a, const std::string& b) { return squash(a) < squash(b); });
+    return groups;
+}
+
 int findLitSphereByHash(uint64_t hash) {
     for (size_t i = 0; i < customs().size(); ++i)
         if (!customs()[i].removed && customs()[i].hash == hash) return kStyleCount + int(i);

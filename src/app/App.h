@@ -894,6 +894,9 @@ private:
     void loadLitSphereDialog();          // Material > Load Lit Sphere...
     void rescanLitSphereFolder();        // loads new / changed images in lit sphereFolder(), drops deleted ones
     void materialListShown();         // a material list is on screen: rescans when it has just opened
+    std::vector<std::string> litsphereSubfolders() const; // sub-folders of litsphereFolder() (one level), sorted
+    std::string litsphereLocked(int index) const;         // why Rename / Move can't touch it ("" = they can)
+    bool moveLitSphereFile(int index, const std::string& to, const std::string& group, std::string& error);
     std::map<std::string, std::pair<uintmax_t, int64_t>> litsphereFolderSeen_; // path -> size, time at the last scan
     std::set<std::string> hiddenLitSphereFiles_; // removed Lit Spheres whose file couldn't go to the trash
     int materialListFrame_ = -10;
@@ -1583,6 +1586,7 @@ private:
     friend struct PickerUi;
     friend void drawAlphaGrid(App&, GridMode);
     friend void drawMaterialGrid(App&, GridMode);
+    friend void litsphereMenu(App&, int, const std::function<void()>&);
     friend void drawStrokeGrid(App&, GridMode);
     void initLibraryBrowser();   // end of init(): library folders, thumbnail cache, actions, project thumbnails
     void showStarterMeshes(); // the Library at Tool > Starter meshes (File > New from Starter Mesh, the welcome)

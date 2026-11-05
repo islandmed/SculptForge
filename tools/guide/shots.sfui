@@ -371,6 +371,19 @@ wait_idle 20
 wait 0.2
 shot custom-lit-spheres
 key escape
+# ... organised in a folder (#124): its heading, and the right-click menu's Move to folder.
+run load_litsphere path=tests/ui/data/Rose.png
+run move_litsphere name=Gold folder=Metals
+click "Render##menu.render"
+click "Materials##section.material"
+wait_idle 20
+right_click "Material/Rose"
+hover "Move to folder##litsphere"
+wait 0.3
+shot lit-sphere-folders
+key escape
+key escape
+run move_litsphere name=Gold folder=""
 run set_material name="Soft Clay"
 
 # Extract (parts.md): a cap made from the masked top of a sphere, shown with its face groups (outer, inner, rim).

@@ -55,28 +55,105 @@ void App::rescanLitSphereFolder() {
     if (dir.empty()) return;
     namespace fs = std::filesystem;
     std::map<std::string, std::pair<uintmax_t, int64_t>> now;
-    std::error_code ec;
-    for (fs::directory_iterator it(u8path(dir), ec), end; !ec && it != end; it.increment(ec)) {
-        std::error_code fileEc;
-        const std::string path = u8string(it->path());
-        if (!isLitSphereFile(path) || !it->is_regular_file(fileEc)) continue;
-        const auto size = it->file_size(fileEc);
-        const auto time = it->last_write_time(fileEc).time_since_epoch().count();
-        now[path] = {size, int64_t(time)};
-    }
+    std::map<std::string, std::string> groupOf; // path -> its sub-folder ("" = the folder itself)
+    // The folder and its sub-folders, one level deep (#124): each sub-folder is a heading in the lists.
+    const auto list = [&](const fs::path& folder, const std::string& group) {
+        std::error_code ec;
+        for (fs::directory_iterator it(folder, ec), end; !ec && it != end; it.increment(ec)) {
+            std::error_code fileEc;
+            const std::string path = u8string(it->path());
+            if (!isLitSphereFile(path) || !it->is_regular_file(fileEc)) continue;
+            const auto size = it->file_size(fileEc);
+            const auto time = it->last_write_time(fileEc).time_since_epoch().count();
+            now[path] = {size, int64_t(time)};
+            groupOf[path] = group;
+        }
+    };
+    list(u8path(dir), "");
+    for (const std::string& sub : litsphereSubfolders()) list(u8path(dir) / u8path(sub), sub);
     for (const auto& [path, stamp] : now) {
         if (hiddenLitSphereFiles_.count(path)) continue;
         const auto seen = litsphereFolderSeen_.find(path);
         if (seen != litsphereFolderSeen_.end() && seen->second == stamp) continue;
         CustomLitSphere m;
         std::string err;
-        if (readLitSphereImage(path, m, err)) addCustomLitSphere(std::move(m));
-        else SDL_Log("Lit Spheres: skipped %s", err.c_str());
+        if (readLitSphereImage(path, m, err)) {
+            m.group = groupOf[path];
+            addCustomLitSphere(std::move(m));
+        } else {
+            SDL_Log("Lit Spheres: skipped %s", err.c_str());
+        }
     }
     for (const auto& [path, stamp] : litsphereFolderSeen_)
         if (!now.count(path))
             if (const int i = findLitSphereByPath(path); i >= 0 && i != renderSettings_.litsphere) removeCustomLitSphere(i);
     litsphereFolderSeen_ = std::move(now);
+}
+
+std::vector<std::string> App::litsphereSubfolders() const {
+    std::vector<std::string> subs;
+    const std::string dir = litsphereFolder();
+    if (dir.empty()) return subs;
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    for (fs::directory_iterator it(u8path(dir), ec), end; !ec && it != end; it.increment(ec)) {
+        std::error_code dirEc;
+        const std::string name = u8string(it->path().filename());
+        if (!name.empty() && name[0] != '.' && it->is_directory(dirEc)) subs.push_back(name);
+    }
+    std::sort(subs.begin(), subs.end());
+    return subs;
+}
+
+// Why Rename / Move to folder can't change this Lit Sphere's file, or "" when they can: only images in the library's
+// Lit Spheres folder (or a sub-folder of it) that SculptForge may write are ours to rename.
+std::string App::litsphereLocked(int index) const {
+    const CustomLitSphere* c = customLitSphere(index);
+    if (!c) return "Built-in Lit Spheres can't be renamed or moved.";
+    if (std::find(packs_.litspheres.begin(), packs_.litspheres.end(), index) != packs_.litspheres.end())
+        return "This Lit Sphere comes from a pack, which stays as it was installed.";
+    if (c->path.empty())
+        return "This Lit Sphere came with the open project and has no file of its own. Load Lit Sphere... with its image "
+               "to keep it in your library.";
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    const fs::path file = u8path(c->path), parent = file.parent_path();
+    const bool ours = !litsphereFolder().empty() && (fs::equivalent(parent, u8path(litsphereFolder()), ec) ||
+                                                     fs::equivalent(parent.parent_path(), u8path(litsphereFolder()), ec));
+    if (!ours) {
+        for (const std::string& d : studioLitSphereDirs())
+            if (fs::equivalent(parent, u8path(d), ec))
+                return "This Lit Sphere comes from a studio folder (SCULPTFORGE_LITSPHERE_PATH), which SculptForge only reads.";
+        return "Only Lit Spheres in your library's Lit Spheres folder can be renamed or moved.";
+    }
+    const fs::perms p = fs::status(file, ec).permissions();
+    if (!ec && (p & fs::perms::owner_write) == fs::perms::none) return "Its file is read-only.";
+    return {};
+}
+
+// Moves the image of a custom Lit Sphere in the Lit Spheres folder to `to` (no overwrite) and keeps the lists in step.
+bool App::moveLitSphereFile(int index, const std::string& to, const std::string& group, std::string& error) {
+    namespace fs = std::filesystem;
+    const std::string from = customLitSphere(index)->path;
+    std::error_code ec;
+    if (fs::exists(u8path(to), ec) && !fs::equivalent(u8path(from), u8path(to), ec)) { // (equivalent: only the case changes)
+        error = u8string(u8path(to).filename()) + " is already there";
+        return false;
+    }
+    fs::create_directories(u8path(to).parent_path(), ec);
+    ec.clear();
+    fs::rename(u8path(from), u8path(to), ec);
+    if (ec) {
+        error = "Couldn't move " + from + ": " + ec.message();
+        return false;
+    }
+    relocateCustomLitSphere(index, to, group);
+    if (const auto seen = litsphereFolderSeen_.find(from); seen != litsphereFolderSeen_.end()) { // not new on the next scan
+        const auto stamp = seen->second;
+        litsphereFolderSeen_.erase(seen);
+        litsphereFolderSeen_[to] = stamp;
+    }
+    return true;
 }
 
 // Material lists (palette, picker, Library) call this every frame they show: the first frame after a gap rescans.
@@ -166,6 +243,55 @@ void App::registerPaintUiCommands() {
                        hiddenLitSphereFiles_.insert(path); // a rescan must not bring it back
                        return {true, "Removed " + shown + " for this session; delete " + path +
                                          " to remove it for good (" + err + ")"};
+                   }});
+    commands_.add({"rename_litsphere",
+                   "Rename one of your Lit Spheres (#124): its image in the library's Lit Spheres folder is renamed too. "
+                   "Projects that use it still find it (they match its pixels). Built-in, studio-folder, pack and "
+                   "project-only Lit Spheres can't be renamed; a name another Lit Sphere has is refused.",
+                   {{"name", ParamSpec::Type::String, "The Lit Sphere's name.", true},
+                    {"to", ParamSpec::Type::String, "The new name (also the file name, without its extension).", true}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       const std::string name = argString(a, "name"), to = argString(a, "to");
+                       const int index = findLitSphere(name);
+                       if (index < 0) return {false, "No Lit Sphere called '" + name + "'"};
+                       if (const std::string why = litsphereLocked(index); !why.empty()) return {false, why};
+                       const std::string old = litsphereName(index);
+                       if (to == old) return {true, "Unchanged: " + old};
+                       std::string err;
+                       if (!checkLitSphereFileName(to, err)) return {false, err};
+                       if (const int other = findLitSphere(to); other >= 0 && other != index)
+                           return {false, std::string("There is already a Lit Sphere called ") + litsphereName(other)};
+                       namespace fs = std::filesystem;
+                       const CustomLitSphere* c = customLitSphere(index);
+                       const fs::path from = u8path(c->path);
+                       const std::string dest = u8string(from.parent_path() / u8path(to + u8string(from.extension())));
+                       if (!moveLitSphereFile(index, dest, c->group, err) || !renameCustomLitSphere(index, to, err))
+                           return {false, err};
+                       return {true, "Renamed " + old + " to " + to};
+                   }});
+    commands_.add({"move_litsphere",
+                   "Move one of your Lit Spheres into a sub-folder of the library's Lit Spheres folder (#124), which the "
+                   "material lists show as a heading; the folder is made if it isn't there. An empty folder moves it "
+                   "back to the Lit Spheres folder itself.",
+                   {{"name", ParamSpec::Type::String, "The Lit Sphere's name.", true},
+                    {"folder", ParamSpec::Type::String, "The sub-folder's name (one level; empty: none).", true}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       const std::string name = argString(a, "name"), folder = argString(a, "folder");
+                       const int index = findLitSphere(name);
+                       if (index < 0) return {false, "No Lit Sphere called '" + name + "'"};
+                       if (const std::string why = litsphereLocked(index); !why.empty()) return {false, why};
+                       std::string err;
+                       if (!folder.empty() && !checkLitSphereFileName(folder, err)) return {false, "Folder: " + err};
+                       namespace fs = std::filesystem;
+                       const CustomLitSphere* c = customLitSphere(index);
+                       if (c->group == folder) return {true, std::string(litsphereName(index)) + " is already there"};
+                       fs::path dir = u8path(litsphereFolder());
+                       if (!folder.empty()) dir /= u8path(folder);
+                       if (!moveLitSphereFile(index, u8string(dir / u8path(c->path).filename()), folder, err))
+                           return {false, err};
+                       ++materialListFrame_; // (nothing else to redo: the lists group by the registry)
+                       return {true, std::string("Moved ") + litsphereName(index) + " to " +
+                                         (folder.empty() ? std::string("Lit Spheres") : folder)};
                    }});
     // Viewport shading: Lit Sphere or PBR (render/Renderer.h RenderSettings, core/EnvironmentMath.h).
     commands_.add({"viewport_shading",

@@ -1037,6 +1037,90 @@ void drawAlphaGrid(App& app, GridMode mode) {
     AssetTileHoverGlow();
 }
 
+void litsphereMenu(App& app, int index, const std::function<void()>& beforeRemove) {
+    // One rename or new-folder field at a time, kept while the menu stays open.
+    static int editing = -1;  // the Lit Sphere whose field shows
+    static bool folderField = false; // the field is Move to folder > New folder... (else Rename)
+    static bool focus = false;
+    static char buffer[128] = {};
+    static std::string error;
+    if (ImGui::IsWindowAppearing()) editing = -1, error.clear();
+    const std::string name = litsphereName(index); // a copy: a rename changes it
+    ImGui::TextDisabled("%s", name.c_str());
+    const CustomLitSphere* c = customLitSphere(index);
+    if (c && !c->path.empty()) { // the file name (and its folder); the whole path is long
+        const std::filesystem::path p(std::u8string(c->path.begin(), c->path.end()));
+        const std::u8string file = (c->group.empty() ? p.filename() : p.parent_path().filename() / p.filename()).u8string();
+        ImGui::TextDisabled("%s", reinterpret_cast<const char*>(file.c_str()));
+    }
+    ImGui::Separator();
+    const std::string locked = app.litsphereLocked(index);
+    const auto lockedTip = [&] {
+        if (!locked.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", locked.c_str());
+    };
+    // The inline field: Enter applies, Escape cancels; a refusal (a name clash...) shows under it and keeps it open.
+    const auto field = [&](const char* id, bool forFolder) {
+        if (editing != index || folderField != forFolder) return;
+        if (focus) {
+            ImGui::SetKeyboardFocusHere();
+            focus = false;
+        }
+        ImGui::SetNextItemWidth(180.0f * app.uiScale_);
+        if (ImGui::InputText(id, buffer, sizeof buffer, ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll)) {
+            if (forFolder) app.runCommand("move_litsphere", {{"name", name}, {"folder", std::string(buffer)}});
+            else app.runCommand("rename_litsphere", {{"name", name}, {"to", std::string(buffer)}});
+            if (app.lastCommandOk_) {
+                editing = -1;
+                error.clear();
+                ImGui::CloseCurrentPopup();
+            } else {
+                error = app.status_;
+                focus = true;
+            }
+        }
+        if (!error.empty()) {
+            ImGui::PushStyleColor(ImGuiCol_Text, theme::danger);
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 240.0f * app.uiScale_);
+            ImGui::TextUnformatted(error.c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::PopStyleColor();
+        }
+    };
+    const auto openField = [&](bool forFolder) {
+        editing = index;
+        folderField = forFolder;
+        focus = true;
+        error.clear();
+        std::snprintf(buffer, sizeof buffer, "%s", forFolder ? "" : name.c_str());
+    };
+    ImGui::BeginDisabled(!locked.empty());
+    if (ImGui::Selectable("Rename...##litsphere", false, ImGuiSelectableFlags_NoAutoClosePopups)) openField(false);
+    ImGui::EndDisabled();
+    lockedTip();
+    field("##litsphererename", false);
+    ImGui::BeginDisabled(!locked.empty());
+    const bool moveMenu = ImGui::BeginMenu("Move to folder##litsphere");
+    ImGui::EndDisabled();
+    lockedTip();
+    if (moveMenu) {
+        const std::string group = c ? c->group : std::string();
+        if (ImGui::MenuItem("Lit Spheres (no folder)##litspheremove", nullptr, group.empty(), !group.empty()))
+            app.runCommand("move_litsphere", {{"name", name}, {"folder", std::string()}});
+        for (const std::string& sub : app.litsphereSubfolders())
+            if (ImGui::MenuItem((sub + "##litspheremove").c_str(), nullptr, sub == group, sub != group))
+                app.runCommand("move_litsphere", {{"name", name}, {"folder", sub}});
+        ImGui::Separator();
+        if (ImGui::Selectable("New folder...##litsphere", false, ImGuiSelectableFlags_NoAutoClosePopups)) openField(true);
+        field("##litspherefolder", true);
+        ImGui::EndMenu();
+    }
+    ImGui::Separator();
+    if (ImGui::MenuItem("Remove##litsphere")) {
+        if (beforeRemove) beforeRemove();
+        app.runCommand("remove_litsphere", {{"name", name}});
+    }
+}
+
 void drawMaterialGrid(App& app, GridMode mode) {
     State& s = st();
     const bool popup = mode == GridMode::Popup;
@@ -1055,8 +1139,23 @@ void drawMaterialGrid(App& app, GridMode mode) {
         list.push_back(i);
         keys.push_back({i < 0 ? "Studio" : litsphereName(i), "", recentRank(s.recentMaterials, std::to_string(i))});
     }
-    for (size_t o : listSortOrder(keys, listSortFromId(app.uiPrefs_.materialSort))) {
+    // The chosen order, then grouped (#124): ungrouped first, then each sub-folder of the Lit Spheres folder under its heading.
+    std::vector<size_t> order = listSortOrder(keys, listSortFromId(app.uiPrefs_.materialSort));
+    const std::vector<std::string> groups = litsphereGroups();
+    const auto groupRank = [&](size_t o) {
+        const CustomLitSphere* c = customLitSphere(list[o]);
+        if (!c || c->group.empty()) return 0;
+        return int(std::find(groups.begin(), groups.end(), c->group) - groups.begin()) + 1;
+    };
+    std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return groupRank(a) < groupRank(b); });
+    int shownGroup = 0;
+    for (size_t o : order) {
         const int i = list[o];
+        if (const int g = groupRank(o); g != shownGroup) {
+            shownGroup = g;
+            sectionHeader(groups[size_t(g - 1)].c_str());
+            column = 0;
+        }
         tileGrid(column, columns);
         const char* name = i < 0 ? "Studio" : litsphereName(i);
         const ImTextureID tex = app.thumbs_.material(i);
@@ -1073,23 +1172,16 @@ void drawMaterialGrid(App& app, GridMode mode) {
                                               "rim, so strokes read without glare."
                      : i == 0 ? "Made for sculpting: a strong key light, crisp highlights and deep cavities so "
                                 "every stroke reads."
-                     : isCustomLitSphere(i) ? "Your own Lit Sphere. Right-click to remove it."
+                     : isCustomLitSphere(i) ? "Your own Lit Sphere. Right-click to rename it, move it to a folder or remove it."
                               : "Lit Sphere material: the whole lit look in one image.",
                      "Material");
         if (isCustomLitSphere(i) && ImGui::BeginPopupContextItem()) {
-            ImGui::TextDisabled("%s", name);
-            if (const CustomLitSphere* c = customLitSphere(i); c && !c->path.empty()) { // the file name; the folder is long
-                const std::u8string file = std::filesystem::path(std::u8string(c->path.begin(), c->path.end())).filename().u8string();
-                ImGui::TextDisabled("%s", reinterpret_cast<const char*>(file.c_str()));
-            }
-            ImGui::Separator();
-            if (ImGui::MenuItem("Remove##litsphere")) {
+            litsphereMenu(app, i, [&] {
                 if (popup && s.previewing) { // put the real material back before it can go
                     app.renderSettings_.litsphere = s.savedLitSphere;
                     s.previewing = false;
                 }
-                app.runCommand("remove_litsphere", {{"name", std::string(name)}});
-            }
+            });
             ImGui::EndPopup();
         }
     }
