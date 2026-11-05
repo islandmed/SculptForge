@@ -322,8 +322,8 @@ target_link_libraries(sculptforge-cli PRIVATE sculptforge_core sculptforge_ai sc
 # library both link, so an edit to one of these files compiles once, not once per program.
 if(SCULPTFORGE_BUILD_APP OR SCULPTFORGE_BUILD_TESTS)
   add_library(sculptforge_appshared STATIC src/app/AssetLibrary.cpp src/app/BrushPreview.cpp src/app/UiLayout.cpp
-    src/app/ShellGeometry.cpp src/app/LookSchemes.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp src/render/Camera.cpp
-    src/render/Clusters.cpp src/render/Ghost.cpp)
+    src/app/ShellGeometry.cpp src/app/LookSchemes.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp
+    src/app/I18nTraditionalChinese.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
   target_link_libraries(sculptforge_appshared PUBLIC sculptforge_core)
   if(MSVC)
     target_compile_options(sculptforge_appshared PRIVATE /W4 /utf-8 /permissive-)
@@ -352,6 +352,7 @@ if(SCULPTFORGE_BUILD_APP)
     fontLucide ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/lucide.ttf
     fontMono ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-Regular.ttf # the looks (Preferences > Interface > Look)
     fontMonoBold ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-SemiBold.ttf
+    fontCjk ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansTC-UI.otf # Traditional Chinese (tools/i18n/subset_cjk_font.py)
     appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png
     supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt # Help > About (never empty: it starts with comments)
     foundingMembers ${CMAKE_CURRENT_SOURCE_DIR}/website/founding.json) # Help > About and the membership card

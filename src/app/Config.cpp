@@ -355,6 +355,7 @@ void App::addHelpFonts(float scale) {
     icons.GlyphOffset = ImVec2(0, 2.0f * scale);
     io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size), 15.0f * scale,
                                    &icons, kIconRanges);
+    mergeCjkFont(15.0f * scale);
     // ProggyClean (ships inside Dear ImGui) is a pixel font: keep it at whole multiples of 13 px.
     ImFontConfig mono;
     mono.SizePixels = 13.0f * std::max(1.0f, std::floor(scale + 0.25f));
@@ -1001,7 +1002,7 @@ bool App::readUiConfig(const std::string& path, std::string& err, bool own) {
     layout_.customize = customize;
     actions_.overridesFromJson(j["shortcuts"]);
     if (j.has("radialMenus")) applyRadialMenusJson(j["radialMenus"]); // (an older file keeps the menus there are)
-    setLanguage(languageFromCode(uiPrefs_.language));
+    setLanguage(languageFromCode(uiPrefs_.language)); // (the requestUiScale above adds the Chinese glyphs if needed)
     applyPerformancePrefs();
     applyInputStyle();
     doc_.sculptor.dyntopo.constantDetail = uiPrefs_.dyntopoConstantDetail;
@@ -1452,6 +1453,7 @@ void drawInterfaceSection(App& app) {
         if (ImGui::RadioButton(label.c_str(), languageFromCode(p.language) == lang)) {
             p.language = languageCode(lang);
             setLanguage(lang);
+            app.requestUiScale(); // the fonts again, with or without the Chinese glyphs
         }
         ui::HelpText("Language", nullptr,
                      "The language of menus, palettes, shelves and messages. Brush and tool names (Quad Remesh, Forge Spheres, "

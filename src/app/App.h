@@ -244,6 +244,8 @@ private:
     float targetUiScale() const;         // what uiScale_ should be now (Preferences, the display; Config.cpp)
     void applyUiScale();                 // rebuild fonts and style live when it changed (between frames)
     void buildUiFonts(float scale);
+    void mergeCjkFont(float px);         // the Chinese glyphs into the font just added (all of them while fontsCjk_)
+    bool fontsCjk_ = false;              // the atlas has every Chinese glyph (Traditional Chinese interface)
     ImFont* fontCaption_ = nullptr;
     ImFont* fontCaptionSub_ = nullptr;
 
