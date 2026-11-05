@@ -323,6 +323,14 @@ TEST(uv_pack_udim_grid_columns_by_rows) {
     r = run(doc, "uv_pack", {{"columns", 1.0}, {"density", 900.0}, {"resolution", 1024.0}, {"first_tile", 1091.0}});
     CHECK(!r.ok && r.message.find("Columns") != std::string::npos);
 
+    // A fit pack that can't fill the grid says so first; a full one doesn't.
+    doc = makeDoc(squares(3));
+    r = run(doc, "uv_pack", {{"columns", 10.0}, {"rows", 2.0}});
+    CHECK(r.ok && r.message.rfind("3 of 20 tiles used: the largest island limits the scale", 0) == 0);
+    doc = makeDoc(squares(4));
+    r = run(doc, "uv_pack", {{"columns", 2.0}, {"rows", 2.0}});
+    CHECK(r.ok && r.message.find("tiles used") == std::string::npos);
+
     // Scripts' tiles= alone is as before: ten per row.
     doc = makeDoc(squares(12));
     CHECK(run(doc, "uv_pack", {{"tiles", 12.0}}).ok);

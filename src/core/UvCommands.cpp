@@ -69,8 +69,15 @@ UvPackOptions packOptions(const Document& doc, const Args& a) {
     return o;
 }
 
-std::string packNote(const UvPackResult& p) {
-    std::string s = plural(p.islands, "island") + " packed";
+// A fit pack that left part of the grid empty says why first (the status line may cut the rest off).
+std::string gridNote(const UvPackResult& p, const UvPackOptions& o) {
+    if (o.density > 0.0f || o.tiles <= 1 || p.tilesUsed <= 0 || p.tilesUsed >= o.tiles) return {};
+    return std::to_string(p.tilesUsed) + " of " + std::to_string(o.tiles) +
+           " tiles used: the largest island limits the scale; Pack at Density fills more. ";
+}
+
+std::string packNote(const UvPackResult& p, const UvPackOptions& o) {
+    std::string s = gridNote(p, o) + plural(p.islands, "island") + " packed";
     if (p.tilesUsed > 1) s += " into " + std::to_string(p.tilesUsed) + " UDIM tiles";
     s += ", " + fmt("%.0f", double(p.coverage) * 100.0) + "% of the space used, " + fmt("%.1f", double(p.density)) +
          " texels per unit";
@@ -182,7 +189,7 @@ void registerUvCommands(CommandRegistry& reg) {
                  UvEditStep edit(doc, std::string("Unwrap (") + uvUnwrapMethodLabel(o.method) + ")", argBool(a, "keep_texture", true));
                  m.uvs = std::move(r.uvs);
                  const std::string note = edit.commit();
-                 std::string msg = std::string("Unwrapped (") + uvUnwrapMethodLabel(o.method) + "): " + plural(r.islands, "island");
+                 std::string msg = (o.faces ? std::string() : gridNote(r.packing, o.packing)) + "Unwrapped (" + uvUnwrapMethodLabel(o.method) + "): " + plural(r.islands, "island");
                  if (r.extraCuts) msg += ", " + plural(r.extraCuts, "edge") + " cut automatically to flatten closed pieces";
                  if (r.packing.tilesUsed > 1) msg += ", " + std::to_string(r.packing.tilesUsed) + " UDIM tiles";
                  const UvStretchStats st = uvStretchStats(m);
@@ -214,9 +221,10 @@ void registerUvCommands(CommandRegistry& reg) {
                  UvEditStep edit(doc, "Pack UVs", argBool(a, "keep_texture", true));
                  UvPackResult r;
                  std::string err;
-                 if (!uvPack(m, topo, islands, packOptions(doc, a), r, err)) return {false, err};
+                 const UvPackOptions po = packOptions(doc, a);
+                 if (!uvPack(m, topo, islands, po, r, err)) return {false, err};
                  const std::string note = edit.commit();
-                 return {true, packNote(r) + note};
+                 return {true, packNote(r, po) + note};
              }});
 
     reg.add({"uv_seam",

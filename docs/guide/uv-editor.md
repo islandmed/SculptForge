@@ -97,7 +97,8 @@ and keeps whichever holds them larger.
 **Columns** and **Rows** set the grid of UDIM tiles to fill: Columns along u (1001, 1002 and on; ten make a full UDIM
 row) and Rows up v (1011 sits above 1001). **10** Columns x **2** Rows fills 1001-1020; **4** x **3** fills
 1001-1004, 1011-1014 and 1021-1024 and never goes wider. Every island gets the same texel density: more tiles, more
-texels for everything. **Pack at Density** instead keeps exactly the target texel density and opens as many tiles as
+texels for everything; the view frames the grid after a pack. When the largest island sets the scale, fewer tiles
+than the grid holds get islands, and the status line says how many (Pack at Density fills more). **Pack at Density** instead keeps exactly the target texel density and opens as many tiles as
 it needs, Columns wide and then the next row up. Projects remember their grid; new ones start from the last one you
 used.
 

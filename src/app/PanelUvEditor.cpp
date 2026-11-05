@@ -122,6 +122,7 @@ struct UvEditorState {
     size_t selIslands = 0;
     float selDensity = 0.0f;
     glm::ivec2 tiles{1, 1};
+    glm::ivec2 frameGrid{0, 0}; // after a pack: frame the view on this grid (Columns x Rows) at the next draw
     std::vector<int> tileList;
     MeshOverlay overlay;
     // Interaction.
@@ -959,6 +960,7 @@ void App::uvPackGridUsed(const Args& a) {
     }
     uiPrefs_.uvPackColumns = uvPackColumns_ = columns;
     uiPrefs_.uvPackRows = uvPackRows_ = rows;
+    if (uvEditor_) uvEditor_->frameGrid = {columns, rows};
 }
 
 void App::drawUvEditor() {
@@ -1040,6 +1042,10 @@ void App::drawUvEditor() {
     if (s.zoom <= 0.0f) {
         u.frame(glm::vec2(0.0f), glm::vec2(float(s.tiles.x), float(s.tiles.y)));
         if (s.zoom <= 0.0f) s.zoom = 400.0f * scale;
+    }
+    if (s.frameGrid.x > 0 && !s.dirty) { // (the tiles in use are up to date: a density pack may spill past the rows)
+        u.frame(glm::vec2(0.0f), glm::vec2(glm::max(s.frameGrid, s.tiles)));
+        s.frameGrid = {0, 0};
     }
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImGui::InvisibleButton("##uvview", viewSize, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight |
@@ -1151,7 +1157,11 @@ void App::drawUvEditor() {
             const float pad = 5 * scale;
             const float x0 = std::max(a.x, viewMin.x) + pad, y0 = std::max(a.y, viewMin.y) + 3 * scale;
             if (x0 + size.x > std::min(b.x, viewMax.x) - pad || y0 + size.y > std::min(b.y, viewMax.y)) continue;
-            dl->AddText(ImVec2(x0, y0), used ? IM_COL32(170, 170, 182, 210) : IM_COL32(110, 110, 118, 150), label);
+            // Tiles in use: a small dark backing keeps the number readable over the islands.
+            if (used)
+                dl->AddRectFilled(ImVec2(x0 - 3 * scale, y0 - 1 * scale), ImVec2(x0 + size.x + 3 * scale, y0 + size.y + 1 * scale),
+                                  IM_COL32(14, 14, 17, 205), 3 * scale);
+            dl->AddText(ImVec2(x0, y0), used ? IM_COL32(205, 205, 215, 240) : IM_COL32(110, 110, 118, 150), label);
         }
     // Trim strips (while the Trim Sheet section is open).
     if (s.trimOpen) {
