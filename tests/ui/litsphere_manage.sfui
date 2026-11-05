@@ -74,8 +74,11 @@ type "##lbfilter" amb
 wait_idle 20
 expect "Library/Amber"
 right_click "Library/Amber"
+wait 0.2
 expect "Rename...##litsphere"
 key escape
+wait 0.2
+expect_not "Rename...##litsphere"
 # The filter also finds Lit Spheres by their plain words (aliases, not names in the UI).
 type "##lbfilter" material capture
 expect "Library/Chrome"
