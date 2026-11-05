@@ -42,7 +42,8 @@ expect_status https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201
 wait 0.4
 expect_value support_card_open == 0
 
-# Help > Support (here Preferences > Support) shows it any time; the yearly Member checkout is in the footer.
+# Preferences > Support > Show the memberships shows it any time (the card closes the palette, so it is reopened
+# each time); the yearly Member checkout is in the footer.
 click "Preferences##palette.preferences"
 click "Support##preferences.support"
 expect "I'm already a member##prefs.member_verify"
@@ -53,6 +54,8 @@ click "Member, $48 a year##card.member_yearly"
 expect_value support_requests == 2
 expect_status https://buy.stripe.com/aFa5kD4eHfhE2an6il4F206
 wait 0.4
+click "Preferences##palette.preferences"
+click "Support##preferences.support"
 click "Show the memberships"
 wait 0.8
 click "Studio membership##card.studio"
@@ -61,12 +64,16 @@ expect_status https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204
 wait 0.4
 
 # Not now and Esc close it.
+click "Preferences##palette.preferences"
+click "Support##preferences.support"
 click "Show the memberships"
 wait 0.8
 expect_no_text Maybe later
 click "Not now##card.later"
 wait 0.4
 expect_value support_card_open == 0
+click "Preferences##palette.preferences"
+click "Support##preferences.support"
 click "Show the memberships"
 wait 0.8
 key Escape
@@ -74,6 +81,8 @@ wait 0.4
 expect_value support_card_open == 0
 
 # "I'm already a member" starts the GitHub sign-in (the small card shows its steps); signed in, never again.
+click "Preferences##palette.preferences"
+click "Support##preferences.support"
 click "Show the memberships"
 wait 0.8
 click "I'm already a member##card.supporter_already"
@@ -86,5 +95,7 @@ expect_value supporter == 1
 expect_value member_signed_in == 1
 support_card first_run
 expect_value support_card_open == 0
+click "Preferences##palette.preferences"
+click "Support##preferences.support"
 expect_text Thank you for being a member! No membership cards show.
 expect_value support_requests == 3

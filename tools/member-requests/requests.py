@@ -232,7 +232,7 @@ def selftest(cli):
         item("bark", name="Bark Ridges", type="brush", file="bark.sfbrush", requested_by="@ada", approved=True, data=brush)
         item("pending", name="Later", type="alpha", file="later.png", requested_by="bob", approved=False)
         item("macro", name="Clean Up", type="macro", file="clean.sfmacro", requested_by="cy", approved=True,
-             data=b"# name: Clean Up\nsmooth strength=0.2\n")
+             data=b"# name: Clean Up\nmask_clear\n")
         items = load_items(root, "2026-11")
         check([r["name"] for r, _ in items] == ["Bark Ridges", "Clean Up"], f"approved items only: {items}")
         check(items[0][0]["requested_by"] == "ada", "the @ is dropped from the handle")

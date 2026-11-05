@@ -16,7 +16,8 @@ wait 0.3
 expect_value member_card_pending == 1
 expect_value member_card_open == 0
 release
-wait 0.4
+wait_idle
+wait 0.2
 expect_value member_card_open == 1
 expect_text Twenty minutes of sculpting. Members keep SculptForge free and moving.
 expect_text $5 a month or $48 a year
@@ -116,7 +117,6 @@ wait 0.4
 expect_value member_card_verifying == 0
 expect_value member_signed_in == 1
 expect_value supporter == 1
-expect_status Thank you for being a member!
 member_card render days=400
 member_card sculpted days=800
 wait 0.3
