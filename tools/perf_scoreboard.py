@@ -7,7 +7,7 @@
 
 Each result is a `sculptforge --benchmark <scene> --benchmark-out <file>` JSON. Prints one markdown row per brush
 phase (committed lag p50 / p99, release, orbit fps, memory); with several results for the same scene and phase
-(interleaved repeats) the cells show the range."""
+(interleaved repeats) the cells show the median and the range."""
 import json
 import sys
 
@@ -15,11 +15,14 @@ PHASES = [("clay small", "25 px"), ("clay large", "120 px"), ("240 px brush", "2
 
 
 def rng(values, fmt="{:.0f}"):
-    values = [v for v in values if v is not None]
+    """The value, or with repeats the median (and the range when they differ)."""
+    values = sorted(v for v in values if v is not None)
     if not values:
         return "-"
-    lo, hi = min(values), max(values)
-    return fmt.format(lo) if fmt.format(lo) == fmt.format(hi) else fmt.format(lo) + "-" + fmt.format(hi)
+    lo, hi, mid = values[0], values[-1], values[len(values) // 2]
+    if fmt.format(lo) == fmt.format(hi):
+        return fmt.format(lo)
+    return fmt.format(mid) + " (" + fmt.format(lo) + "-" + fmt.format(hi) + ")"
 
 
 def main():
