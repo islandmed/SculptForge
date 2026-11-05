@@ -41,6 +41,9 @@ figure is raw minus that floor.
 - Defaults of the build under test (no toggles), 6 s strokes, each run started at load < 2 on the laptop, at least
   two interleaved runs per cell; a cell shows the median.
 - Rows from `python3 tools/perf_scoreboard.py TIER results/*.json`.
+- From 11-04 every laptop run is offscreen (`SDL_VIDEO_DRIVER=offscreen`, the same GPU, no window or compositor).
+  The beta.2 baseline below was windowed, so each candidate is re-measured against main offscreen, interleaved, and
+  the baseline rows are replaced by those offscreen runs.
 
 ## Shipping today: main 0.11.0-beta.2 defaults (11-04)
 
