@@ -3033,6 +3033,22 @@ constexpr Entry kTraditionalChinese[] = {
     {"Texel Density", "紋素密度"},
     {"Trim Sheet", "裝飾貼圖"},
     {"Unwrap Selected", "展開所選"},
+    // --- Brush palette (tools/i18n/coverage.py) ---
+    {"Filter brushes", "篩選筆刷"},
+    {"Alphas", "Alpha"},
+    {"Built-in", "內建"},
+    {"Custom", "自訂"},
+    {"Custom brushes", "自訂筆刷"},
+    {"Larger brush by 1 px", "筆刷放大 1 px"},
+    {"Smaller brush by 1 px", "筆刷縮小 1 px"},
+    {"On", "開啟"},
+    {"Use global", "使用全域"},
+    {"Reset Brush to Default", "重設筆刷為預設"},
+    {"Save Brush Settings", "儲存筆刷設定"},
+    {"Sort: Recent", "排序：最近"},
+    {"Stamp rotation", "印章旋轉"},
+    {"Vector displacement", "向量位移"},
+    {"World Size", "世界尺寸"},
 };
 
 } // namespace

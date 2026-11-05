@@ -76,7 +76,6 @@ expect_text "紋素密度"
 shot zh-uv-editor
 key alt+u
 click "筆刷##palette.brush"
-click "向量位移##brush.vdm"
 click "Horn##vdm0"
 expect "跟隨筆畫方向##vdm.follow_stroke"
 expect_text "角度抖動"

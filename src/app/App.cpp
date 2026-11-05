@@ -3333,7 +3333,7 @@ void App::drawBrushLab() {
         chatLog_.clear();
     }
     ImGui::SameLine();
-    if (ImGui::SmallButton("Paste brush")) pasteBrush();
+    if (ImGui::SmallButton(tr("Paste brush"))) pasteBrush();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip("Install a brush someone shared: a brush code (sfbrush1:...) or .sfbrush text on the "
                           "clipboard (Ctrl+V in the viewport)");

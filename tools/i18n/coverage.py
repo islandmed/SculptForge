@@ -50,6 +50,7 @@ DYNAMIC = {
     "PanelUvEditor.cpp mode, colour and image labels": ["Vertex", "Edge", "Face", "Island", "Islands", "Stretch",
                                                          "Density", "Plain", "No Image", "Checker", "Texture"],
     "PanelUvEditor.cpp sections": ["Unwrap", "Pack", "Texel Density", "Trim Sheet", "Edit", "Display"],
+    "Pickers.cpp sections and core/ListSort.h listSortLabel": ["Built-in", "Custom", "Recent", "Pack"],
     "core/RadialMenu.cpp radialButtonLabel": ["None", "Middle mouse button", "Mouse back button", "Mouse forward button",
                                               "Pen lower button", "Pen upper button", "Pen third button",
                                               "Right mouse button"],
@@ -160,6 +161,15 @@ def literal(arg):
     return None
 
 
+def choices(arg):
+    """The argument's strings: a plain literal, or each side of a ternary of literals (c ? "On" : "Off")."""
+    if literal(arg) is not None:
+        return [literal(arg)]
+    if "?" in [t[1] for t in arg] and "+" not in [t[1] for t in arg]:
+        return literals_in(arg)
+    return []
+
+
 def literals_in(arg):
     """Every literal in an argument: both sides of a ternary, a nested {...} list."""
     return [t[1] for t in arg if t[0] == "str"]
@@ -245,6 +255,18 @@ def wrappers(files):
     return toks, calls
 
 
+def brush_settings():
+    """I18n.cpp's kBrushSettingActions: "brush.*" ids that are settings, so trAction translates their labels."""
+    text = (SRC / "I18n.cpp").read_text(encoding="utf-8")
+    block = text[text.index("kBrushSettingActions[]"):]
+    return tuple(re.findall(r'"([^"]+)"', block[:block.index("};")]))
+
+
+def keeps_name(action_id):
+    """trAction's rule: a brush keeps its name."""
+    return action_id.startswith("brush.") and not action_id.startswith(brush_settings())
+
+
 def scan_file(path, found, toks, calls):
     name = path.name
 
@@ -257,7 +279,7 @@ def scan_file(path, found, toks, calls):
 
     def add_action(args, line):  # an Action's fields in order: id, label, icon, description, palette, ...
         if len(args) >= 5:
-            if not (literal(args[0]) or "").startswith("brush."):
+            if not keeps_name(literal(args[0]) or ""):
                 add(literal(args[1]), line)
             add(literal(args[3]), line)
             add(literal(args[4]), line, "path")
@@ -298,9 +320,10 @@ def scan_file(path, found, toks, calls):
                 aid = literal(args[f["id"]]) if 0 <= f["id"] < len(args) else None
                 for field in ACTION_FIELDS:
                     if field in f and f[field] < len(args):
-                        if field == "label" and aid and aid.startswith("brush."):
+                        if field == "label" and aid and keeps_name(aid):
                             continue
-                        add(literal(args[f[field]]), line, "path" if field == "palette" else "label")
+                        for text in choices(args[f[field]]):
+                            add(text, line, "path" if field == "palette" else "label")
         # actions_.add({"id", "Label", icon, "description", "palette", ...})
         if k == "id" and v == "add" and prev == "." and nxt == "(" and i + 2 < len(toks) and toks[i + 2][1] == "{" \
                 and toks[i - 2][1] in ("actions_", "reg"):
@@ -318,7 +341,7 @@ def scan_file(path, found, toks, calls):
                     if toks[b][1] == "id" and toks[b - 1][1] == "." and toks[b - 2][1] == obj and toks[b + 1][1] == "=":
                         idv = literal([toks[b + 2]]) if toks[b + 3][1] == ";" else None
                         break
-            if not (idv and idv.startswith("brush.")) and obj != "g_help":
+            if not (idv and keeps_name(idv)) and obj != "g_help":
                 add(literal(val), line, "path" if v == "palette" else "label")
         if k == "id" and v in TABLES and nxt == "[":
             j = i

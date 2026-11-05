@@ -215,7 +215,7 @@ constexpr Entry kSpanish[] = {
     {"Invert (Alt)", "Invertir (Alt)"},
     {"Invert", "Invertir"},
     {"Smooth keeps volume", "Smooth conserva el volumen"},
-    {"Smooth face group borders only", "Smooth solo en los bordes de grupos de caras"},
+    {"Smooth face group borders only", "Smooth solo en bordes de grupos"},
     {"Symmetry", "Simetría"},
     {"Symmetry X", "Simetría X"},
     {"Local", "Local"},
@@ -751,7 +751,7 @@ constexpr Entry kSpanish[] = {
     // --- Pickers and brushes ---
     {"Brush picker", "Selector de pinceles"},
     {"Alpha picker", "Selector de alphas"},
-    {"Community brushes", "Pinceles de la comunidad"},
+    {"Community brushes", "Comunidad"},
     {"Save to Library", "Guardar en la biblioteca"},
     {"Strength", "Fuerza"},
     {"Falloff", "Atenuación"},
@@ -3501,6 +3501,22 @@ constexpr Entry kSpanish[] = {
     {"Texel Density", "Densidad de téxeles"},
     {"Trim Sheet", "Trim sheet"},
     {"Unwrap Selected", "Desenvolver selección"},
+    // --- Brush palette (tools/i18n/coverage.py) ---
+    {"Filter brushes", "Filtrar pinceles"},
+    {"Alphas", "Alphas"},
+    {"Built-in", "Incluidos"},
+    {"Custom", "Propios"},
+    {"Custom brushes", "Pinceles propios"},
+    {"Larger brush by 1 px", "Pincel 1 px más grande"},
+    {"Smaller brush by 1 px", "Pincel 1 px más pequeño"},
+    {"On", "Activado"},
+    {"Use global", "Usar global"},
+    {"Reset Brush to Default", "Restablecer pincel"},
+    {"Save Brush Settings", "Guardar ajustes del pincel"},
+    {"Sort: Recent", "Ordenar: Recientes"},
+    {"Stamp rotation", "Rotación del sello"},
+    {"Vector displacement", "Desplazamiento vectorial"},
+    {"World Size", "Tamaño en el mundo"},
 };
 
 } // namespace

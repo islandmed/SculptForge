@@ -5,6 +5,7 @@
 // strokes, so every way of picking a brush (shelf, pickers, keys, the Library, scripts, Ctrl-held brushes) behaves
 // the same without each of them knowing about it.
 #include "app/App.h"
+#include "app/I18n.h"
 #include "app/Ui.h"
 
 #include "core/BrushLibrary.h"
@@ -166,11 +167,11 @@ void App::setPenPressure(bool size, PenPressure p) {
 
 void App::drawPenPressureSwitches(const char* id) {
     ImGui::PushID(id);
-    ImGui::TextDisabled("Pen pressure: %s", activeRecipe() ? activeRecipe()->name.c_str() : brushLabel(brush_));
-    const float labelW = ImGui::CalcTextSize("Strength").x + ImGui::GetFontSize(); // (a clear gap before the segments)
+    ImGui::TextDisabled(tr("Pen pressure: %s"), activeRecipe() ? activeRecipe()->name.c_str() : brushLabel(brush_));
+    const float labelW = std::max(ImGui::CalcTextSize(tr("Strength")).x, ImGui::CalcTextSize(tr("Size")).x) + ImGui::GetFontSize(); // (a clear gap before the segments)
     for (const bool size : {true, false}) {
         ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(size ? "Size" : "Strength");
+        ImGui::TextUnformatted(tr(size ? "Size" : "Strength"));
         ImGui::SameLine(labelW);
         if (size) ui::Segmented(*this, {"brush.pen_size_global", "brush.pen_size_on", "brush.pen_size_off"});
         else ui::Segmented(*this, {"brush.pen_strength_global", "brush.pen_strength_on", "brush.pen_strength_off"});

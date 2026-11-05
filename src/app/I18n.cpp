@@ -182,8 +182,19 @@ std::string tr(const std::string& english) {
     return tr(english.c_str());
 }
 
+// "brush.*" actions that are settings, not brushes: their labels are words like any other (tools/i18n/coverage.py
+// reads this list too).
+constexpr std::string_view kBrushSettingActions[] = {
+    "brush.pen_",          "brush.size_",          "brush.scale_size", "brush.share_size", "brush.world_size",
+    "brush.save_settings", "brush.reset_settings", "brush.paste",      "brush.recipe",     "brush.capture_view",
+    "brush.asset_activate"};
+
 const char* trAction(std::string_view actionId, const std::string& label) {
-    if (actionId.substr(0, 6) == "brush.") return label.c_str();
+    if (actionId.substr(0, 6) == "brush.") {
+        bool setting = false;
+        for (const std::string_view prefix : kBrushSettingActions) setting = setting || actionId.substr(0, prefix.size()) == prefix;
+        if (!setting) return label.c_str(); // a brush: brushes keep their names
+    }
     return tr(label.c_str());
 }
 
