@@ -338,6 +338,7 @@ private:
         bool fresh = true; // nothing uploaded yet
         bool regrid = false; // a stroke's vertex left the position grid (prepareStrokeUpload): the next sync re-sends everything
         bool outOfMemory = false; // the last full upload ran out of GPU memory: not drawn
+        int settle = 0; // views left that wait for the GPU after drawing, after a full upload (NVIDIA first-dab stall)
         UploadOrder order; // the cluster layout
         PositionGrid grid; // the positions' quantisation
         std::vector<ClusterBounds> bounds; // per cluster, for culling

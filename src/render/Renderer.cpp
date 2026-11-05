@@ -2217,6 +2217,10 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     }
     if (full) {
         s.proxyAllocated = false; // sized for the old mesh
+        // NVIDIA (RTX 3060) leaves ~1 s of work from a full upload that lands on the first stroke write; waiting for the
+        // GPU after the next few views (still the load) takes it there instead. SF_NO_UPLOAD_SETTLE=1 turns it off.
+        static const bool settle = !std::getenv("SF_NO_UPLOAD_SETTLE");
+        if (settle) s.settle = 3;
         s.proxyCount.clear();
         // (closedOriented also accepts unwelded seams, the same point twice, which the layout's check doesn't.)
         s.closed = s.order.closed() || closedOriented(mesh);
@@ -2715,6 +2719,13 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     }
     gl::BindFramebuffer(GL_FRAMEBUFFER, viewFbo_);
     draw(camera, width, height, settings, viewport);
+    bool settle = false;
+    for (MeshSlot& m : slots_)
+        if (m.settle > 0) {
+            --m.settle;
+            settle = true;
+        }
+    if (settle) gl::Finish();
     for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
     }
     gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewFbo_); // resolve: same format and size on both sides
