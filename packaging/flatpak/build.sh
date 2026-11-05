@@ -17,12 +17,20 @@ version=$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' "$root/CMak
 arch=$(flatpak --default-arch)
 work=$root/build-flatpak
 
-flatpak --user remote-add --if-not-exists flathub "$flathub"
 # --disable-rofiles-fuse: CI runners and containers often have no FUSE.
 # SF_FLATPAK_CCACHE=1: compile through the SDK's ccache, kept in $work/state/ccache (CI restores and saves that folder).
 ccache=
 [ "${SF_FLATPAK_CCACHE:-}" = 1 ] && ccache=--ccache
-flatpak-builder --user --install-deps-from=flathub --force-clean --disable-rofiles-fuse --default-branch=stable $ccache \
+# The runtime, SDK and the manifest's sources first, retried with backoff (a GitHub 504 on one archive failed 0.11.1's
+# Flatpak); the downloads stay in $work/state/downloads (CI caches it), so the build itself downloads nothing.
+for wait in 0 15 60 120 x; do
+  [ "$wait" != x ] || { echo "flatpak-builder: the downloads failed 4 times" >&2; exit 1; }
+  sleep "$wait"
+  flatpak --user remote-add --if-not-exists flathub "$flathub" &&
+  flatpak-builder --user --install-deps-from=flathub --download-only --force-clean --disable-rofiles-fuse \
+    --state-dir="$work/state" "$work/app" "$here/$id.yml" && break
+done
+flatpak-builder --user --install-deps-from=flathub --disable-download --force-clean --disable-rofiles-fuse --default-branch=stable $ccache \
   --state-dir="$work/state" --repo="$work/repo" "$work/app" "$here/$id.yml"
 bundle="$out/SculptForge-$version-$arch.flatpak"
 flatpak build-bundle --runtime-repo="$flathub" "$work/repo" "$bundle" "$id" stable

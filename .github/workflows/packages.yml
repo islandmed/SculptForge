@@ -49,6 +49,8 @@ env:
   REF: ${{ inputs.ref || github.sha }}
   CCACHE_MAXSIZE: 500M
   CCACHE_DEPEND: 'true'
+  # Downloads (cmake/Fetch.cmake, tools/ci/fetch.sh, the AppImage tools) go to .deps, cached per job by hash.
+  SF_DEPS_CACHE: .deps
   # Saved by branch runs only: never a tag, never a pull request.
   SAVE_CACHE: ${{ !startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request' }}
   # Tests that open real network connections return early here (tests/TestHarness.h networkTestsOff): a runner's
@@ -111,6 +113,12 @@ jobs:
           sudo apt-get install -y --no-install-recommends ccache xvfb libgl1-mesa-dri
           echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
           echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+      - name: Downloads (cmake/Fetch.cmake's archives and pinned tools, kept by hash by tools/ci/fetch.sh)
+        uses: actions/cache@v5
+        with:
+          path: .deps
+          key: deps-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('cmake/Fetch.cmake', 'packaging/linux/build-appimage.sh', '.github/workflows/packages.yml') }}
+          restore-keys: deps-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-
       - uses: actions/cache/restore@v5
         with:
           path: .ccache
@@ -139,7 +147,7 @@ jobs:
           # Named the AppImage way (SculptForge-1.2.3-x86_64.AppImage, no "linux"), with update information so
           # AppImageUpdate and similar tools can update it from the newest GitHub release (the .zsync file). The
           # AppDir's root gets PNG icons (AppImage managers cannot use the SVG), and appimagetool checks it (#17).
-          packaging/linux/build-appimage.sh AppDir "${TAG#v}" ${{ matrix.ld }} build
+          SF_APPIMAGE_TOOLS=.deps/appimage packaging/linux/build-appimage.sh AppDir "${TAG#v}" ${{ matrix.ld }} build
       - uses: actions/upload-artifact@v7
         with:
           name: linux-${{ matrix.arch }}
@@ -166,6 +174,12 @@ jobs:
         with: { ref: '${{ env.REF }}' }
       - name: flatpak and flatpak-builder
         run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder xvfb
+      - name: The manifest's sources (flatpak-builder's downloads, checked by their sha256 in the manifest)
+        uses: actions/cache@v5
+        with:
+          path: build-flatpak/state/downloads
+          key: flatpak-src-${{ matrix.arch }}-${{ hashFiles('packaging/flatpak/*.yml') }}
+          restore-keys: flatpak-src-${{ matrix.arch }}-
       - uses: actions/cache/restore@v5
         with:
           path: build-flatpak/state/ccache
@@ -215,16 +229,20 @@ jobs:
         # (a beta's tag names its packages without the prerelease: v0.11.0-beta.1 makes SculptForge-0.11.0-*)
         run: echo "TAG=${{ inputs.tag }}" | sed "s/^TAG=$/TAG=v$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)/; s/^\(TAG=v[0-9.]*\)-.*/\1/" >> "$GITHUB_ENV"
       - run: ./packaging/linux/install-build-deps.sh
+      - name: Downloads (cmake/Fetch.cmake's archives and pinned tools, kept by hash by tools/ci/fetch.sh)
+        uses: actions/cache@v5
+        with:
+          path: .deps
+          key: deps-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('cmake/Fetch.cmake', '.github/workflows/packages.yml') }}
+          restore-keys: deps-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-
       - name: ccache (the static release binary, pinned by hash)
         run: |
           f=ccache-4.14.2-linux-${{ matrix.ccarch }}-musl-static.tar.gz
-          curl -fsSLO "https://github.com/ccache/ccache/releases/download/v4.14.2/$f"
           case ${{ matrix.ccarch }} in
             x86_64) sum=d540ba01f160addbd3dd5e18eda9bd34005591b095c09ac8ae9d0a1b655e7ef5 ;;
             aarch64) sum=2be524bbccfc7e9ff0085d110da7dc9964de983bd92d29acf3b872e557194945 ;;
           esac
-          echo "$sum  $f" | sha256sum -c
-          tar xzf "$f" -C /opt
+          tar xzf "$(tools/ci/fetch.sh "https://github.com/ccache/ccache/releases/download/v4.14.2/$f" $sum)" -C /opt
           echo "/opt/${f%.tar.gz}" >> "$GITHUB_PATH"
           echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
           echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
@@ -236,11 +254,16 @@ jobs:
           restore-keys: |
             ccache-pkg-${{ matrix.suffix }}-${{ matrix.arch }}.
             ccache-ci-${{ matrix.cy }}.
-      - name: Python 3.13
+      - name: Python 3.13 (python-build-standalone, pinned by hash)
         run: |
-          curl -LsSf https://astral.sh/uv/0.9.5/install.sh | sh
-          ~/.local/bin/uv venv --python 3.13 /opt/py313
-          ~/.local/bin/uv pip install --python /opt/py313/bin/python numpy
+          case $(uname -m) in
+            x86_64) sum=c0ccda275948c79996e46993c2c5476ff5cca606dee530f1dea712179131b348 ;;
+            aarch64) sum=baa3d107d17e4328448e30c3c9c83cca0eb41ca7a37c10982e14d46a5c3db07d ;;
+          esac
+          f=$(tools/ci/fetch.sh "https://github.com/astral-sh/python-build-standalone/releases/download/20251014/cpython-3.13.9%2B20251014-$(uname -m)-unknown-linux-gnu-install_only_stripped.tar.gz" $sum)
+          tar xzf "$f" -C /opt # /opt/python
+          /opt/python/bin/python3.13 -m venv /opt/py313
+          /opt/py313/bin/python -m pip install --retries 8 --timeout 60 numpy
           echo "PYTHON313=/opt/py313/bin/python" >> "$GITHUB_ENV"
       - name: Build with GCC 14
         run: |
@@ -277,11 +300,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with: { ref: '${{ env.REF }}' }
+      - name: Downloads (cmake/Fetch.cmake's archives and pinned tools, kept by hash by tools/ci/fetch.sh)
+        uses: actions/cache@v5
+        with:
+          path: .deps
+          key: deps-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('cmake/Fetch.cmake', '.github/workflows/packages.yml') }}
+          restore-keys: deps-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-
       - name: ccache (the release binary, pinned by hash)
         run: |
-          curl -fsSLO https://github.com/ccache/ccache/releases/download/v4.14.2/ccache-4.14.2-darwin.tar.gz
-          echo "cf240009630b605b775c7c5c7b7105a3b196c79f31af322c1557969aa28003fc  ccache-4.14.2-darwin.tar.gz" | shasum -a 256 -c
-          tar xzf ccache-4.14.2-darwin.tar.gz -C "$RUNNER_TEMP"
+          tar xzf "$(tools/ci/fetch.sh https://github.com/ccache/ccache/releases/download/v4.14.2/ccache-4.14.2-darwin.tar.gz \
+            cf240009630b605b775c7c5c7b7105a3b196c79f31af322c1557969aa28003fc)" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/ccache-4.14.2-darwin" >> "$GITHUB_PATH"
           echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
           echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
@@ -328,14 +356,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with: { ref: '${{ env.REF }}' }
+      - name: Downloads (cmake/Fetch.cmake's archives and pinned tools, kept by hash by tools/ci/fetch.sh)
+        uses: actions/cache@v5
+        with:
+          path: .deps
+          key: deps-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('cmake/Fetch.cmake', '.github/workflows/packages.yml') }}
+          restore-keys: deps-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-
       - name: ccache (the release binary, pinned by hash, standing in for cl.exe)
+        shell: bash
+        run: tools/ci/fetch.sh https://github.com/ccache/ccache/releases/download/v4.14.2/ccache-4.14.2-windows-x86_64.zip 6993ce645e53192cec592ee23186200b574ac4c59097ecde8d9cfd681b47ae84
+      - name: ccache (unpacked, as cl.exe)
         shell: pwsh
         run: |
-          $zip = 'ccache-4.14.2-windows-x86_64.zip'
-          Invoke-WebRequest "https://github.com/ccache/ccache/releases/download/v4.14.2/$zip" -OutFile $zip
-          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne '6993CE645E53192CEC592EE23186200B574AC4C59097ECDE8D9CFD681B47AE84') {
-            throw 'ccache archive hash mismatch'
-          }
+          $zip = '.deps\6993ce645e53192cec592ee23186200b574ac4c59097ecde8d9cfd681b47ae84-ccache-4.14.2-windows-x86_64.zip'
           Expand-Archive $zip -DestinationPath $env:RUNNER_TEMP
           $dir = "$env:RUNNER_TEMP\ccache-4.14.2-windows-x86_64"
           "$dir" >> $env:GITHUB_PATH
