@@ -71,6 +71,7 @@ void usage() {
         "  --benchmark standard-15m The standard scene: a 15M triangle head, Clay S/M/L, Move, Smooth and a 240 px\n"
         "                           brush (standard-33m: 33M; standard: both). The numbers on sculptforge.app/benchmarks\n"
         "  --benchmark standard-1b  Experimental Focus Detail: a billion micro triangle head streamed from disk\n"
+        "  --benchmark-file PATH    Open the project PATH, then the same strokes and orbit\n"
         "  --focus-detail FILE      Experimental: open a Focus Detail file (.sfdetail)\n"
         "  --benchmark-sizes 5,20   Proof mode mesh sizes in millions of triangles\n"
         "  --benchmark-out FILE     Where the JSON result goes (default: sculptforge-benchmark-<time>.json here)\n"
@@ -205,6 +206,10 @@ int main(int argc, char** argv) {
             }
         }
         else if (a == "--focus-detail") options.openPath = next(); // a .sfdetail file (prototype)
+        else if (a == "--benchmark-file") { // a project from disk, the scoreboard's strokes (docs/design/perf-scoreboard.md)
+            options.benchmark = true;
+            options.benchmarkScene = "file:" + next();
+        }
         else if (a == "--benchmark-sizes") options.benchmarkSizes = next();
         else if (a == "--benchmark-out") options.benchmarkOut = next();
         else if (a == "--benchmark-video") options.benchmarkVideo = next();

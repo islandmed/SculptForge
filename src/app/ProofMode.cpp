@@ -99,6 +99,21 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
                                 }, 5};
         return {s1b};
     }
+    if (name.rfind("file:", 0) == 0) { // --benchmark-file: a project from disk (a scan, a real sculpt), the scoreboard's strokes
+        const std::string path = name.substr(5);
+        std::error_code ec;
+        const double bytes = double(std::filesystem::file_size(std::filesystem::path(std::u8string(path.begin(), path.end())), ec));
+        const ProofMeshSize s{ec ? 1.0 : bytes / 20e6, std::filesystem::path(path).stem().string(), [path](size_t) {
+                                  std::string err;
+                                  Document d;
+                                  if (!loadProject(path, d, err)) {
+                                      std::fprintf(stderr, "benchmark file %s: %s\n", path.c_str(), err.c_str());
+                                      return makeBenchHead(size_t(1) << 20);
+                                  }
+                                  return std::move(d.mesh);
+                              }, 150}; // (the file's size in 20-byte triangles, at the spheres' 150 bytes each: the memory check)
+        return {s};
+    }
     return {};
 }
 
@@ -497,7 +512,12 @@ void App::startProofMode() {
     };
     p->jsonPath = !options_.benchmarkOut.empty() ? options_.benchmarkOut : u8(dir / ("sculptforge-benchmark-" + stamp + ".json"));
     p->videoPath = !options_.benchmarkVideo.empty() ? options_.benchmarkVideo : u8(dir / ("sculptforge-benchmark-" + stamp + ".mp4"));
-    if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds);
+    if (p->scene.rfind("file:", 0) == 0) // the perf scoreboard (docs/design/perf-scoreboard.md): its three brush sizes, then orbit
+        p->phases = {{"clay small", 25.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
+                     {"clay large", 120.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
+                     {"240 px brush", 240.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
+                     {"orbit", 0.0f, 10.0}};
+    else if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds);
     else p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0}};
     p->stage = p->cli ? ProofState::Stage::Announce : ProofState::Stage::Intro;
     p->radiusBefore = radiusPx_;
