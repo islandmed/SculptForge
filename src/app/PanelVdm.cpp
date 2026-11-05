@@ -146,7 +146,8 @@ void App::dragDotTo(float x, float y) {
     p.viewFalloff = uiPrefs_.viewFalloff;
     p.focal = focalShift_;
     p.alpha = &doc_.brushAlpha;
-    p.alphaUp = screenUpVector(0.0f);
+    lastDabAngle_ = alphaStampAngle(alphaOptions_, false, {}, stampJitter_); // Angle and jitter (#136); it slides, not turns
+    p.alphaUp = screenUpVector(lastDabAngle_);
     p.vdm = doc_.brushVdm.get();
     lastDabScreen_ = glm::vec2(x, y);
     if (strokePaint_) paintAt(p); // restoreStroke reverted the previous stamp's colours too
@@ -176,6 +177,8 @@ void App::drawVdmSection() {
     }
     if (!vdmBrushActive()) {
         actionButton(*this, "brush.vdm");
+    } else {
+        drawAlphaOptions(true); // the VDM brush's own Follow / Angle / Angle jitter (#136)
     }
     drawVdmGrid(*this, GridMode::Palette);
 

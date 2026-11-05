@@ -240,6 +240,16 @@ last. Every start keeps the previous session's log as `sculptforge-previous.log`
 **attach `sculptforge-previous.log` to your report** (the new `sculptforge.log` is the session after it). It holds
 no models and no keys, only command names and messages, which may include file names.
 
+### A performance trace
+
+When SculptForge gets slow, **Help > Record a performance trace** shows where the time goes. Turn it on, do what
+feels slow (the stroke, the orbit, the remesh), then choose it again to stop. `sculptforge-trace.log` beside the
+log then lists every frame that took longer than 33 ms with its parts (events, dabs, interface, GPU uploads,
+drawing, GPU time), each stroke's timings, commands that held up the frames, background jobs starting and
+ending, the mesh size and levels, and on its first line your GPU, driver and CPU. **Attach it to your report.**
+It is off by default and costs nothing when off; it stays small (2 MB, then the older lines move to
+`sculptforge-trace-previous.log`) and never leaves your computer.
+
 ## Recovering work after a crash
 
 SculptForge autosaves unsaved work every 5 minutes by default (**Edit > Preferences > Autosave**, 0 turns it off).
@@ -287,6 +297,7 @@ good report includes:
    as script** and paste it into the report. It often reproduces the problem exactly.
 5. **After a crash, the log**: `sculptforge-previous.log` from **Help > Open log folder** (see
    [The log file](#the-log-file)).
+   **When it is slow**, a [performance trace](#a-performance-trace) of the slowdown.
 6. **A file** if the problem is with a particular model (a small `.sfproj` or the original file), and a
    screenshot for display problems.
 

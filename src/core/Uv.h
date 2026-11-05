@@ -181,11 +181,19 @@ struct UvPackOptions {
     float marginPx = 8.0f;    // texels between islands (and half of it at tile borders)
     bool rotate = true;       // turn islands to their smallest bounding box and allow 90-degree turns
     int tiles = 1;            // UDIM tiles to fill (1001, 1002, ... ten per row); ignored with `density`
+    int columns = 0;          // > 0: a grid this wide (1-10; UDIM's row is ten) from firstTile: tile k goes to
+                              // column k % columns of row k / columns (1001 + column + 10 row), with `density`
+                              // too. 0: UDIM order from firstTile, ten per row (as before the grid)
     bool equalDensity = true; // scale islands to one texel density first (off: keep their relative sizes)
     float density = 0.0f;     // > 0: keep exactly this texel density (texels per unit) and use as many tiles as
-                              // it takes (up to 100) instead of fitting `tiles`
-    int firstTile = 1001;     // where packing starts
+                              // it takes (up to uvPackMaxTiles) instead of fitting `tiles`
+    int firstTile = 1001;     // where packing starts (the grid's bottom-left tile)
 };
+// The UDIM tile number of the `k`th tile (from 0) a pack with `options` fills.
+int uvPackTile(const UvPackOptions& options, int k);
+// How many tiles a pack with `options` may fill at most: the grid's columns x the rows from firstTile up
+// (without columns, the tiles from firstTile to 1100).
+int uvPackMaxTiles(const UvPackOptions& options);
 struct UvPackResult {
     size_t islands = 0;
     int tilesUsed = 0;

@@ -32,7 +32,7 @@ struct UiPrefs {
     bool libraryAtStartup = true;
     std::string libraryFolder;  // "" = Documents/SculptForge
     bool alphabeticalPalettes = false; // strict A-Z palette bar (default: File, Edit first)
-    std::string language = "en"; // Preferences > Interface: the interface language, "en" or "es" (app/I18n.h, #44)
+    std::string language = "en"; // Preferences > Interface: the interface language, "en", "es" or "zh-TW" (app/I18n.h)
     int cameraNotch = 0;        // keep the UI out of a laptop's camera notch: 0 automatic, 1 always, 2 never
     bool turntable = false;     // rotation: false = free, about the screen axes; true = turntable (Y up)
     int inputStyle = 1;         // Preferences > Input: 0 classic, 1 SculptForge (the default for new installs:
@@ -52,6 +52,9 @@ struct UiPrefs {
     // vertical as the other styles. invertZoom turns every zoom drag around.
     bool mayaZoomHorizontal = true;
     bool invertZoom = false;
+    // The mouse wheel zooms toward the surface point under the pointer (#134) instead of the view's centre. On for
+    // the Maya style (set with the style, and the default when ui.json doesn't say); the other styles keep the centre.
+    bool wheelZoomToPointer = false;
     // Tool > Remesh (#121): Quick Remesh (Shift+R, or hold N and drag on the background, remeshes the active Part at
     // the Voxel Resolution) and Remesh after each stroke (a stroke that stretched the surface remeshes it).
     bool quickRemesh = false, remeshAfterStroke = false;
@@ -90,6 +93,8 @@ struct UiPrefs {
     // Tool > Display > Backface culling (#68): skip the back faces of every Part (faster on dense meshes; see
     // through open meshes). Off by default; a preference, projects keep their own.
     bool backfaceCulling = false;
+    // UV Editor > Pack > Columns x Rows (#135): the UDIM grid the last pack filled, the default for new projects.
+    int uvPackColumns = 1, uvPackRows = 1;
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons
     SpaceMouseSettings spaceMouse; // Preferences > Input > SpaceMouse
     // Preferences > Performance (PanelPerformance.cpp).

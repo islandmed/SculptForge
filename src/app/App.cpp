@@ -8,9 +8,11 @@
 #include "app/SpaceCamera.h"
 #include "app/UiScale.h"
 #include "app/AirStroke.h"
+#include "app/I18n.h"
 #include "app/AsyncStroke.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
+#include "core/PerfTrace.h"
 
 #include "ai/AiCommands.h"
 #include "app/Demo.h"
@@ -18,6 +20,7 @@
 #include "app/Theme.h"
 #include "app/Ui.h"
 #include "app/UiServe.h"
+#include "app/UserData.h"
 
 #include <IconsLucide.h>
 
@@ -66,6 +69,8 @@ extern const unsigned char fontMono[];
 extern const unsigned long long fontMono_size;
 extern const unsigned char fontMonoBold[];
 extern const unsigned long long fontMonoBold_size;
+extern const unsigned char fontCjk[];
+extern const unsigned long long fontCjk_size;
 extern const unsigned char appIcon[];
 extern const unsigned long long appIcon_size;
 } // namespace assets
@@ -211,12 +216,11 @@ bool App::init(const AppOptions& options) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
-    if (char* pref = SDL_GetPrefPath("SculptForge", "SculptForge")) {
-        iniPath_ = std::string(pref) + "imgui.ini";
+    if (const std::string pref = userDataDir(); !pref.empty()) {
+        iniPath_ = pref + "imgui.ini";
         io.IniFilename = iniPath_.c_str();
-        aiSettingsPath_ = std::string(pref) + "ai.json";
+        aiSettingsPath_ = pref + "ai.json";
         aiSettings_ = ai::AiSettings::load(aiSettingsPath_);
-        SDL_free(pref);
     } else {
         io.IniFilename = nullptr;
     }
@@ -413,6 +417,7 @@ int App::runUiTest(int w, int h, int fps) {
             if (finalFrame) break;
             finalFrame = true; // one more frame, for a failure screenshot
         }
+        trackModOrder(); // (the script's held keys of the last frame: Maya's Alt, then Ctrl, #134)
         demo_->update(dt);
         processPendingFiles();
         animateLayers(dt);
@@ -433,6 +438,10 @@ int App::runUiTest(int w, int h, int fps) {
         touchTick(); // a finger's press that waited for a second finger long enough goes through
 
         hardwareProfileFrameBegin(); // (only with SF_HW_PROFILE_IN_TESTS=1: tests use fixed settings)
+        // Help > Record a performance trace: run()'s phases, roughly (no events, dabs or 3D view drawn here).
+        double tracePhase[7] = {};
+        const bool tracing = perftrace::on();
+        if (tracing) tracePhase[0] = tracePhase[1] = tracePhase[2] = double(SDL_GetTicksNS()) * 1e-6;
         Demo::beginFrame();
         if (uiScaleDirty_) applyUiScale(); // (Preferences, a display-scale change: #87)
         lap(frameMs[0]);
@@ -452,6 +461,7 @@ int App::runUiTest(int w, int h, int fps) {
         ImGui::LogFinish();
         ImGui::Render();
         lap(frameMs[2]);
+        if (tracing) tracePhase[3] = double(SDL_GetTicksNS()) * 1e-6;
         updateMouseCursor();
         buildGhost(); // (the stroke preview, as run() draws it)
 
@@ -462,6 +472,10 @@ int App::runUiTest(int w, int h, int fps) {
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
         viewSamples(); // keeps Fast Navigation's view of the camera current (UI tests read view_samples)
         hardwareProfileFrameEnd();
+        if (tracing) {
+            tracePhase[4] = tracePhase[5] = tracePhase[6] = double(SDL_GetTicksNS()) * 1e-6;
+            tracePerfFrame(tracePhase);
+        }
         ++frames;
         const std::string shot = demo_->takeShotRequest();
         if (shot.empty()) continue;
@@ -606,6 +620,7 @@ int App::runRecording() {
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
         } // the demo provides all input
+        trackModOrder(); // (the script's held keys of the last frame: Maya's Alt, then Ctrl, #134)
         demo_->update(dt);
         processPendingFiles();
         animateLayers(dt);
@@ -719,6 +734,7 @@ bool App::focusKeepsDrawing(double now) const {
 bool App::wantsFrames(double now) const {
     return now < activeUntil_ || focusKeepsDrawing(now) || drag_ != Drag::None || ui::HoverAnimating() || // a hover ring easing in or out
            doc_.sculptor.strokeActive() ||
+           proofRunning() || // (not a keep-alive from the last frame: building a scene takes longer than any timeout)
            !dabQueue_.empty() || // a stroke's dabs still waiting (drainStrokeDabs) are placed a few each frame
            strokeFinishing_ || solverBusy() || // the solver thread is placing a stroke's dabs (AsyncStroke.cpp)
            backgroundBusy() || playingLayer_ >= 0 || faceTakePlaying_ ||
@@ -755,7 +771,7 @@ int App::run() {
     double phase[10] = {};
     int phases = 0;
     const auto mark = [&] {
-        if ((frameLogMs >= 0.0 || proof_) && phases < 10) phase[phases++] = double(SDL_GetTicksNS()) * 1e-6;
+        if ((frameLogMs >= 0.0 || proof_ || perftrace::on()) && phases < 10) phase[phases++] = double(SDL_GetTicksNS()) * 1e-6;
     };
     auto seconds = [] { return double(SDL_GetTicksNS()) * 1e-9; };
     // --measure-idle: let start-up settle (first frames, the Library's thumbnails), then count.
@@ -1004,6 +1020,7 @@ int App::run() {
         else drainStrokeDabs(kStrokeBudgetSeconds);
         mark();
         kelvinCatchUp(); // a long Kelvinlet move, a bounded part per frame (PanelKelvinlet.cpp)
+        trackModOrder(); // (keys that change without an event of ours, e.g. a UI test's hold)
         Uint64 now = SDL_GetTicksNS();
         float dt = float(double(now - lastTicks) * 1e-9);
         lastTicks = now;
@@ -1117,6 +1134,7 @@ int App::run() {
             SDL_Log("frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f, draw %.1f, UI draw + swap %.1f",
                     phase[6] - phase[0], phase[1] - phase[0], phase[2] - phase[1], phase[3] - phase[2], phase[4] - phase[3],
                     phase[5] - phase[4], phase[6] - phase[5]);
+        if (phases == 7 && perftrace::on()) tracePerfFrame(phase); // Help > Record a performance trace
         ++framesDrawn;
         {
             const double frameNow = seconds();
@@ -1196,7 +1214,7 @@ float App::targetUiScale() const {
 void App::applyUiScale() {
     uiScaleDirty_ = false;
     const float scale = targetUiScale();
-    if (!uiScaleChanged(uiScale_, scale)) return;
+    if (!uiScaleChanged(uiScale_, scale) && fontsCjk_ == languageNeedsCjkFont(language())) return;
     SDL_Log("UI scale %.0f%%", double(scale * 100.0f));
     uiScale_ = scale;
     ImGui::GetIO().Fonts->Clear();
@@ -1210,9 +1228,25 @@ void App::requestUiScale() {
     redrawIn(0.0);
 }
 
+// Noto Sans CJK TC (SIL OFL), cut down to the Traditional Chinese table's characters (tools/i18n/subset_cjk_font.py),
+// merged into the font added just before. In another language only the language's own name (繁體中文, the Preferences
+// button) is merged, so the atlas stays Latin-sized.
+void App::mergeCjkFont(float px) {
+    // CJK punctuation, full-width forms and the unified ideographs; the subset has only what the table uses.
+    static const ImWchar kCjkRanges[] = {0x2000, 0x206F, 0x3000, 0x30FF, 0x4E00, 0x9FFF, 0xFF00, 0xFFEF, 0};
+    static const ImWchar kNameRanges[] = {0x4E2D, 0x4E2D, 0x6587, 0x6587, 0x7E41, 0x7E41, 0x9AD4, 0x9AD4, 0}; // 中文繁體
+    ImFontConfig cjk;
+    cjk.MergeMode = true;
+    cjk.FontDataOwnedByAtlas = false;
+    cjk.OversampleH = 1; // dense glyphs: oversampling only grows the atlas
+    ImGui::GetIO().Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontCjk), int(assets::fontCjk_size), px,
+                                                &cjk, fontsCjk_ ? kCjkRanges : kNameRanges);
+}
+
 // Every font the UI uses, rasterised at `scale` for crisp text (Dear ImGui 1.91 has no dynamic font sizes).
 void App::buildUiFonts(float scale) {
     ImGuiIO& io = ImGui::GetIO();
+    fontsCjk_ = languageNeedsCjkFont(language());
     const bool recording = !options_.recordPath.empty() || !options_.uiTest.empty();
     // Inter (SIL OFL), embedded in the binary. Rasterised at the final size for crisp text.
     ImFontConfig fontConfig;
@@ -1231,6 +1265,7 @@ void App::buildUiFonts(float scale) {
         icons.GlyphOffset = ImVec2(0, 2.0f * scale);
         io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
                                        15.0f * scale, &icons, kIconRanges);
+        mergeCjkFont(15.0f * scale);
     }
     // Shell fonts: 12 px captions and 10 px right-shelf labels (with icons), large shelf icons, SemiBold titles.
     {
@@ -1244,12 +1279,14 @@ void App::buildUiFonts(float scale) {
             icons.GlyphOffset = ImVec2(0, size * 0.13f * scale);
             io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
                                            size * scale, &icons, kIconRanges);
+            mergeCjkFont(size * scale);
         };
         fontSmall_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular),
                                                     int(assets::fontRegular_size), 12.0f * scale, &fontConfig);
         addIcons(12.0f);
         fontTiny_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular),
                                                    int(assets::fontRegular_size), 10.5f * scale, &fontConfig);
+        mergeCjkFont(10.5f * scale);
         fontBold_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontSemiBold),
                                                    int(assets::fontSemiBold_size), 15.0f * scale, &fontConfig);
         addIcons(15.0f);
@@ -1273,6 +1310,7 @@ void App::buildUiFonts(float scale) {
             icons.GlyphOffset = ImVec2(0, px * 0.13f * scale);
             io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size), px * scale,
                                            &icons, kIconRanges);
+            mergeCjkFont(px * scale);
             return f;
         };
         fontMono_ = addMono(assets::fontMono, assets::fontMono_size, 15.0f);
@@ -1325,6 +1363,7 @@ void App::dispatchEvent(const SDL_Event& event) {
          event.type != SDL_EVENT_MOUSE_REMOVED) ||
         (event.type >= SDL_EVENT_PEN_PROXIMITY_IN && event.type <= SDL_EVENT_PEN_AXIS))
         lastInputAt_ = double(SDL_GetTicksNS()) * 1e-9; // (focusKeepsDrawing)
+    trackModOrder();    // (before the event: Maya's Alt, then Ctrl roll, #134)
     wintabEvent(event); // Windows Ink off: the tablet driver's pressure for its mouse events (Tablet.cpp)
     SDL_Event e = event;
     mapPenPosition(e); // a tablet in mouse mode moves the cursor relatively (#54), for the canvas and the UI
@@ -1410,7 +1449,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_MOUSE_WHEEL:
         // (Not the scroll a trackpad sends during a pinch or twist: Touch.cpp zooms for that.)
         if (!io.WantCaptureMouse && !touchPinching_ && canvasRect().contains(e.wheel.mouse_x, e.wheel.mouse_y))
-            camera_.zoom(e.wheel.y);
+            wheelZoom(e.wheel.mouse_x, e.wheel.mouse_y, e.wheel.y);
         break;
     case SDL_EVENT_KEY_DOWN:
         if (e.key.key == SDLK_SPACE && !e.key.repeat && // hold Space and drag: the camera (#43; not while typing)
@@ -1673,6 +1712,15 @@ void App::onMouseDown(float x, float y, Uint8 button) {
 // when the press started navigating.
 bool App::mayaNavigationDown(Uint8 button) {
     const SDL_Keymod keys = SDL_GetModState(); // the keyboard itself, before inputMods' Maya mapping
+    // Alt held, then Ctrl added: a left drag rolls the view (#134). Ctrl first, or both at once, stays the Ctrl+Alt
+    // mask gestures (on the model: mask; beside it: clear the mask).
+    if (button == SDL_BUTTON_LEFT && altBeforeCtrl_ && (keys & SDL_KMOD_ALT) && (keys & SDL_KMOD_CTRL) &&
+        !(keys & SDL_KMOD_SHIFT)) {
+        drag_ = Drag::Roll;
+        rollSideways_ = true;
+        rightClick_.pending = false;
+        return true;
+    }
     if (!(keys & SDL_KMOD_ALT) || ctrlDown(keys) || (keys & SDL_KMOD_SHIFT)) return false; // Alt alone navigates
     if (button == SDL_BUTTON_LEFT) drag_ = Drag::Orbit;
     else if (button == SDL_BUTTON_MIDDLE) drag_ = Drag::Pan;
@@ -1739,7 +1787,10 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     switch (drag_) {
     case Drag::Stroke: strokeTo(x, y); break;
     case Drag::Orbit: orbitBy(dx, dy); break;
-    case Drag::Roll: rollBy(x, y, dx, dy); break;
+    case Drag::Roll:
+        if (rollSideways_) camera_.setOrientation(camera_.orientation() * glm::angleAxis(dx * 0.008f, glm::vec3(0, 0, 1)));
+        else rollBy(x, y, dx, dy);
+        break;
     case Drag::Pan: camera_.pan(dx, dy, canvasHeight()); break;
     case Drag::Zoom: camera_.zoom(zoomDragAmount(dx, dy)); break;
     case Drag::MaskCanvas: maskCanvasMove(x, y); break;
@@ -1768,6 +1819,48 @@ float App::zoomDragAmount(float dx, float dy) const {
     float a = mayaStyle() && uiPrefs_.mayaZoomHorizontal ? dx : classicStyle() ? dy : -dy;
     if (uiPrefs_.invertZoom) a = -a;
     return a * 0.05f;
+}
+
+void App::trackModOrder() {
+    const SDL_Keymod now = SDL_GetModState();
+    const bool alt = (now & SDL_KMOD_ALT) != 0, ctrl = (now & SDL_KMOD_CTRL) != 0;
+    if (!alt || !ctrl) altBeforeCtrl_ = false;
+    else if (!(modOrderLast_ & SDL_KMOD_CTRL)) altBeforeCtrl_ = (modOrderLast_ & SDL_KMOD_ALT) != 0; // Ctrl just went down
+    modOrderLast_ = now;
+}
+
+// The mouse wheel: toward the view's centre, or (Preferences > Input > Wheel zooms toward the pointer, #134) toward
+// the surface point under the pointer, which stays under it: the camera and its target scale about that point.
+// Beside the model, the point at the target's depth under the pointer.
+void App::wheelZoom(float x, float y, float steps) {
+    const float before = camera_.distance;
+    camera_.zoom(steps);
+    if (!uiPrefs_.wheelZoomToPointer || before <= 0.0f) return;
+    const float f = camera_.distance / before;
+    glm::vec3 origin, dir;
+    canvasRay(x, y, origin, dir);
+    dir = glm::normalize(dir);
+    const bool canPick = !solverBusy() && previewLod_ < 0; // (mid-stroke the solver thread owns the mesh)
+    if (canPick) doc_.syncBvh();
+    RayHit hit;
+    glm::vec3 p;
+    if (canPick && pick(x, y, hit)) {
+        p = hit.position;
+    } else {
+        const glm::vec3 fwd = camera_.forward();
+        const float along = glm::dot(dir, fwd);
+        if (std::abs(along) < 1e-6f) return;
+        p = origin + dir * (glm::dot(camera_.target - origin, fwd) / along);
+    }
+    camera_.target = p + (camera_.target - p) * f;
+}
+
+void App::resetView() {
+    camera_.yaw = camera_.pitch = camera_.roll = 0.0f; // the view a new model opens with: from the front
+    camera_.ortho = false;
+    autoOrtho_ = false;
+    camera_.frame(sceneBounds());
+    status_ = "View reset";
 }
 
 void App::orbitBy(float dx, float dy) {
@@ -1804,6 +1897,7 @@ void App::rollBy(float x, float y, float dx, float dy) {
 
 void App::onMouseUp() {
     rollPending_ = false;
+    rollSideways_ = false;
     rightClick_.pending = false;
     zsMenu_.armed = false;
     orbitStarted_ = false;
@@ -1957,6 +2051,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         return !simulatedFloorTier() && std::thread::hardware_concurrency() >= 6 ? -1 : 0; // -1: by brush size
     }();
     doc_.sculptor.analyticNormals = analyticNormals == 1 || (analyticNormals == -1 && radiusPx_ >= 160.0f);
+    fusedDabs_ = 64.0;
     if (!doc_.sculptor.beginStroke(doc_.mesh,
                                    !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushLabel(strokeBrush_),
                                    strokeSculpt_ ? doc_.activeLayer : -1)) {
@@ -2028,6 +2123,8 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         beginAlongNormal(hit, radiusPx_ * camera_.worldPerPixel(hit.position, canvasHeight()));
         return;
     }
+    if (strokeType_ == StrokeType::DragRect || strokeType_ == StrokeType::DragDot)
+        stampJitter_ = alphaJitterAngle(alphaOptions_.jitter, stampSeed_);
     if (strokeType_ == StrokeType::DragRect) {
         dragAnchor_ = glm::vec2(x, y);
         dragAnchorHit_ = hit.position;
@@ -2333,7 +2430,9 @@ void App::flushGrab() {
 void App::endStroke() {
     flushGrab(); // (Move: the last samples' move)
     if (asyncStroke_) solverWait(); // (the dabs in flight; then the solver thread is idle)
+    doc_.sculptor.microBaseFuse = true; // (big dabs on a micro level's base: these go through together)
     drainStrokeDabs(0.0); // the dabs still waiting belong to this stroke
+    doc_.sculptor.microBaseFuse = false;
     doc_.sculptor.flushDetailClone(doc_.mesh, doc_.bvh, symmetry_); // a Detail Clone click
     kelvinFinish(); // the rest of a Kelvinlet move (PanelKelvinlet.cpp)
     // (a command can end a Ctrl+click before its release: finishStrokeNow clears the mask click too)
@@ -2375,7 +2474,16 @@ void App::runCommand(const std::string& name, const Args& args) {
     if (name == "save_project") storeProjectSettings();
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
     crashlog::action(name); // (failures reach the log through SDL_Log below)
+    const auto commandStart = std::chrono::steady_clock::now();
     CommandResult r = commands_.execute(doc_, name, args);
+    if (perftrace::on()) { // a command that held up the frames (remesh, Divide, micro, open...)
+        const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - commandStart).count();
+        if (ms > perf_.traceLongMs) {
+            char took[48];
+            std::snprintf(took, sizeof took, " took %.1f ms%s | ", ms, r.ok ? "" : " (failed)");
+            perftrace::line("command " + name + took + perfTraceScene());
+        }
+    }
     status_ = r.message;
     if (name.rfind("uv_", 0) == 0 || name == "texture_create" || name == "texture_delete") uvEditorChanged();
     lastCommandOk_ = r.ok;

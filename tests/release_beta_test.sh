@@ -25,7 +25,8 @@ git sparse-checkout set --no-cone /.github/workflows/ /CMakeLists.txt /CHANGELOG
     /scripts/ /changes/ /tests/ui/whats_new.sfui
 git checkout -q -B main "$(git -C "$ROOT" rev-parse HEAD)"
 # This checkout's uncommitted changes (the tree being tested), then one commit on main.
-(cd "$ROOT" && git diff --name-only HEAD -- .github/workflows CMakeLists.txt CHANGELOG.md packaging docs tools website scripts changes tests/ui/whats_new.sfui) |
+paths=(.github/workflows CMakeLists.txt CHANGELOG.md packaging docs tools website scripts changes tests/ui/whats_new.sfui)
+(cd "$ROOT" && git diff --name-only HEAD -- "${paths[@]}" && git ls-files --others --exclude-standard -- "${paths[@]}") |
     while read -r f; do
         if [ -e "$ROOT/$f" ]; then mkdir -p "$(dirname "$f")" && cp "$ROOT/$f" "$f"; else rm -f "$f"; fi
     done
@@ -43,7 +44,6 @@ testers:
   - Windows, 150% scaling: open the beta test feature and try it.
 ---
 EOF
-echo '# expect_text "Version 9.0.0"' >> tests/ui/whats_new.sfui # words_ok wants the UI test to check the version
 git add -A . && git commit -q -m "sandbox"
 git init -q --bare "$S/origin.git"
 git remote set-url origin "$S/origin.git"
@@ -106,6 +106,13 @@ grep -q '^## Version 9.0.0$' docs/guide/whats-new.md || fail "beta bump: no What
 [ ! -e changes/beta-test.md ] || fail "beta bump: the fragment is still there"
 grep -q 'open the beta test feature' release-testers-9.0.0-beta.1.md || fail "beta bump: no testers checklist"
 [ "$(git rev-parse HEAD)" = "$(git -C "$S/origin.git" rev-parse main)" ] || fail "beta bump: main not pushed"
+grep -qx 'env SF_GUIDE_VERSION 9.0.0' tests/ui/whats_new.sfui && grep -qx 'expect_text "Version 9.0.0"' tests/ui/whats_new.sfui ||
+    fail "beta bump didn't pin tests/ui/whats_new.sfui to 9.0.0"
+# Every STOPPED message ends with the exact command that resumes, --yes included.
+echo "# uncommitted" >> tests/ui/whats_new.sfui
+scripts/release.sh 9.0.0-beta.1 --only check >"$S/out.log" 2>&1 && fail "check passed with uncommitted changes"
+grep -q "then: BUILD_DIR=$BUILD_DIR scripts/release.sh 9.0.0-beta.1 --from check --yes$" "$S/out.log" || fail "STOPPED without the resume command: $(cat "$S/out.log")"
+git checkout -q -- tests/ui/whats_new.sfui
 
 quiet scripts/release.sh 9.0.0-beta.1 --only check
 grep -q 'CMakeLists.txt says 9.0.0 beta.1' "$S/out.log" || fail "beta check: $(cat "$S/out.log")"

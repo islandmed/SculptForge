@@ -53,8 +53,34 @@ expect_value uv_tiles == 2
 hover_window 0.45 0.5
 key f
 shot udim
+# A Columns x Rows grid (#135): the Pack fields show the grid a pack used, from the panel or a script.
+expect "UV Editor/##uvcolumns"
+expect "UV Editor/##uvrows"
+run uv_pack columns=10 rows=2 margin=6
+# (the biggest island sets the scale: the islands fill the tiles that holds, inside the grid)
+expect_value uv_tiles > 4
+expect_value uv_tiles <= 20
+expect_value uv_pack_columns == 10
+expect_value uv_pack_rows == 2
+expect_status "of 20 tiles used: the largest island limits the scale"
+# (the pack frames the view on the 10 x 2 grid)
+shot udim-10x2
+run uv_pack columns=4 rows=3 margin=6
+expect_value uv_tiles > 4
+expect_value uv_tiles <= 12
+expect_value uv_max_u <= 4
+remember uv_tiles grid
+expect_value uv_pack_columns == 4
+expect_value uv_pack_rows == 3
+shot udim-4x3
+# The Pack button packs with the fields: still 4 x 3.
+click "UV Editor/Pack##uv.pack"
+expect_value uv_tiles == $grid
+expect_value uv_max_u <= 4
 run uv_pack tiles=1
 expect_value uv_tiles == 1
+expect_value uv_pack_columns == 1
+expect_value uv_pack_rows == 1
 
 # Texel density: every island to 400 texels per unit at 2K.
 run uv_density op=set value=400

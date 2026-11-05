@@ -12,6 +12,7 @@
 #include "app/AsyncStroke.h"
 
 #include "core/Micro.h"
+#include "core/PerfTrace.h"
 #include "core/Sculpt.h"
 #include "core/TierConfig.h"
 
@@ -27,6 +28,9 @@ namespace {
 constexpr double kBatchSeconds = 0.033; // a batch's dabs: about this much work (the surface updates this often)
 // Background dabs (no preview to cover a batch): batches of about a frame's share of work, as the frame loop places.
 constexpr double kBackgroundBatchSeconds = 0.010;
+// A fused batch (Fast Big Brushes) takes as many dabs as about this much work: a batch shows only when it is done,
+// so on slow cores a long batch is lag, while on fast ones the dabs share the vertex walk, refit and upload.
+constexpr double kFusedBatchSeconds = 0.05;
 // Meshes from this many vertices place a stroke's dabs on the solver thread even without predictive strokes: one
 // 240 px dab there moves millions of vertices (100-300 ms at 33M triangles), more than a frame can hold.
 constexpr size_t kBackgroundDabVertices = 2'000'000;
@@ -98,6 +102,9 @@ void App::StrokeSolver::loop() {
             app.doc_.sculptor.endBatch(app.doc_.mesh, app.doc_.bvh);
             // Nothing more waiting: the exact normals behind the brush catch up (a frame's share of them).
             if (catchUp && !finalize) app.doc_.sculptor.catchUpNormals(app.doc_.mesh, app.doc_.bvh, catchUpLeaves);
+            // A share of the exact normals the brush has left behind, every batch: lifting the pen then waits for
+            // the last stretch only (they cost a tenth of what the dab-by-dab normals did over the stroke).
+            else if (!finalize) app.doc_.sculptor.catchUpBehind(app.doc_.mesh, app.doc_.bvh, 0.35);
             spent += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         }
         app.dabView_ = nullptr;
@@ -243,6 +250,13 @@ void App::commitSolverBatch() {
     if (!s.batch.empty()) {
         lastDabScreen_ = glm::vec2(s.batch.back().x, s.batch.back().y);
         if (s.dabSeconds > 0.0) dabSeconds_ = dabSeconds_ > 0.0 ? dabSeconds_ * 0.8 + s.dabSeconds * 0.2 : s.dabSeconds;
+        // The fused batch size, toward kFusedBatchSeconds of work: scaled by how far this batch was from it (down at once, up
+        // at most 2x a batch, kept fractional so it climbs back from 1 where fusing pays). It settles where a batch costs
+        // the budget; on cores where one dab alone costs more, at one dab a batch.
+        if (s.dabSeconds > 0.0 && doc_.sculptor.fusesBatches()) {
+            const double size = double(s.batch.size()), from = size >= std::floor(fusedDabs_) ? fusedDabs_ : size;
+            fusedDabs_ = std::clamp(from * std::clamp(kFusedBatchSeconds / (s.dabSeconds * size), 0.0, 2.0), 1.0, 64.0);
+        }
     }
     if (doc_.sculptor.lastFrame.valid) {
         // The surface's curvature along the stroke (signed, 1 / radius; > 0 convex), from how the area normal
@@ -332,8 +346,10 @@ void App::pumpStroke() {
     const double target = std::max(predictiveStrokes() ? kBatchSeconds : std::max(kBackgroundBatchSeconds, frameSeconds_ * 0.8),
                                    prepSeconds_);
     size_t n = dabSeconds_ > 0.0 ? size_t(std::clamp(target / dabSeconds_, 1.0, 64.0)) : 1;
-    // A big brush's batch goes through the vertices together (Fast Big Brushes): every dab waiting, at once.
-    if (strokeFinishing_ || doc_.sculptor.fusesBatches()) n = 64;
+    // A big brush's batch goes through the vertices together (Fast Big Brushes): about kFusedBatchSeconds of
+    // dabs at once (every dab left once the pen has lifted).
+    if (doc_.sculptor.fusesBatches()) n = size_t(fusedDabs_);
+    if (strokeFinishing_) n = 64;
     s.batch.clear();
     while (!dabQueue_.empty() && s.batch.size() < n) s.batch.push_back(dabQueue_.pop());
     s.finalize = strokeFinishing_ && dabQueue_.empty();
@@ -385,7 +401,8 @@ void App::finishStrokeNow() {
     strokeMask_ = false;
     maskClickPending_ = false;
     firstDabPending_ = false;
-    // Preferences > Performance shows what the stroke cost.
+    // Preferences > Performance shows what the stroke cost (and Help > Record a performance trace writes it).
+    const bool traceStroke = doc_.sculptor.timings.dabs > 0 && perftrace::on();
     if (doc_.sculptor.timings.dabs > 0) {
         perf_.lastStroke = doc_.sculptor.timings;
         perf_.lastStrokeSyncMs = perf_.strokeSyncMs;
@@ -395,6 +412,7 @@ void App::finishStrokeNow() {
     perf_.strokeSyncMs = 0.0;
     perf_.strokeFrames = 0;
     UndoRecord r = doc_.sculptor.endStroke();
+    if (traceStroke) tracePerfStroke(r.label);
     finishPaintStroke(r);
     if (r.topology && !r.topology->uvs.empty())
         status_ = "Dynamic topology removed the UVs of the remeshed Part (Undo brings them back)";

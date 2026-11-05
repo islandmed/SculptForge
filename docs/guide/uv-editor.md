@@ -94,9 +94,16 @@ texel density (**Equal density**; off keeps their sizes relative to each other),
 them. **Rotate** also allows quarter turns. SculptForge tries packing by the islands' outlines and by their boxes
 and keeps whichever holds them larger.
 
-**UDIM Tiles** spreads the islands over that many tiles, 1001, 1002 and on (ten per row, as UDIM numbers go), each
-island at the same texel density: more tiles, more texels for everything. **Pack at Density** instead keeps exactly
-the target texel density and opens as many tiles as it needs.
+**Columns** and **Rows** set the grid of UDIM tiles to fill: Columns along u (1001, 1002 and on; ten make a full UDIM
+row) and Rows up v (1011 sits above 1001). **10** Columns x **2** Rows fills 1001-1020; **4** x **3** fills
+1001-1004, 1011-1014 and 1021-1024 and never goes wider. Every island gets the same texel density: more tiles, more
+texels for everything; the view frames the grid after a pack. When the largest island sets the scale, fewer tiles
+than the grid holds get islands, and the status line says how many (Pack at Density fills more). **Pack at Density** instead keeps exactly the target texel density and opens as many tiles as
+it needs, Columns wide and then the next row up. Projects remember their grid; new ones start from the last one you
+used.
+
+Baking writes one set of maps per tile, rows included (`name_normal.1011.png`, see [Baking](baking.md)). Texture
+painting still covers tile 1001 only.
 
 ![Packed across UDIM tiles 1001 and 1002](images/uv-editor-udim.jpg)
 
@@ -160,8 +167,8 @@ commands work on the whole Part.
 
 | Command | What it does |
 | --- | --- |
-| `uv_unwrap` | Unwrap: `method=isometric` (Least Stretch), `conformal`, `facegroups` (By Face Groups), `planar`, `unfold` or `auto`; `iterations=`, `selected=`, `tiles=`, `margin=`, `rotate=`, `density=`, `pack=false` (fit in place), `keep_texture=` |
-| `uv_pack` | Pack: `margin=` (texels), `tiles=` (UDIM tiles), `first_tile=`, `rotate=`, `equal_density=`, `density=` (texels per unit, as many tiles as needed), `resolution=`, `keep_texture=` |
+| `uv_unwrap` | Unwrap: `method=isometric` (Least Stretch), `conformal`, `facegroups` (By Face Groups), `planar`, `unfold` or `auto`; `iterations=`, `selected=`, `tiles=`, `columns=`, `rows=`, `margin=`, `rotate=`, `density=`, `pack=false` (fit in place), `keep_texture=` |
+| `uv_pack` | Pack: `margin=` (texels), `columns=` and `rows=` (the UDIM grid, e.g. `columns=10 rows=2` for 1001-1020), `tiles=` (UDIM tiles, ten per row), `first_tile=`, `rotate=`, `equal_density=`, `density=` (texels per unit, as many tiles as needed), `resolution=`, `keep_texture=` |
 | `uv_seam` | Seams: `op=mark` / `clear` (the selection), `path from= to=` (shortest edge path between two vertices; `clear=true`), `facegroups`, `islands`, `angle angle=60`, `clear_all` |
 | `uv_select` | `op=all`, `none`, `invert`, `island face=`, `face face=`, `facegroup group=`, `rect u0= v0= u1= v1=`, `seams`, `mode`; `mode=vertex/edge/face/island`, `add=true` |
 | `uv_transform` | `move_u=`, `move_v=`, `rotate=` (degrees), `scale=`, `scale_u=`, `scale_v=` about the selection's centre |

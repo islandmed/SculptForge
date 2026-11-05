@@ -47,6 +47,8 @@ public:
     size_t pendingShading() const { return pendingCount_; }
     // Grid points of shading recomputed per sync at most (0 = no limit).
     size_t shadeBudget = size_t(3) << 20;
+    // The view moves (set by the Renderer before sync: Fast Navigation's proxy frames): shading gets a time cap.
+    bool viewMoving = false;
     // The last draw: the level used by each visible cluster (-1 = culled), and the target it settled on.
     float lastTargetPx = 0.0f;
 

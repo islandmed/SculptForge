@@ -182,6 +182,21 @@ def parallel_jobs(args):
     return 1
 
 
+def rerun_args(args):
+    """The options a rerun keeps: the configuration (-C X: a multi-config build runs nothing without it) and -j."""
+    keep, i = [], 0
+    while i < len(args):
+        x = args[i]
+        if x in ("-C", "--build-config", "-j", "--parallel") and i + 1 < len(args) and not args[i + 1].startswith("-"):
+            keep += [x, args[i + 1]]
+            i += 2
+            continue
+        if re.fullmatch(r"-C.+|-j\d*", x):
+            keep.append(x)
+        i += 1
+    return keep
+
+
 def run_env():
     return {k: v for k, v in os.environ.items() if k.startswith(ENV_PREFIXES) and k not in ENV_IGNORE}
 
@@ -325,7 +340,7 @@ def main(argv=None):
             flaky = []
             if failed:
                 print(f"\nrerunning {len(failed)} failed test(s) once: {' '.join(failed)}", flush=True)
-                ctest(build, ["--rerun-failed", *[x for x in args if x.startswith("-j")]], os.path.join(tmp, "b.xml"))
+                ctest(build, ["--rerun-failed", *rerun_args(args)], os.path.join(tmp, "b.xml"))
                 again = results(os.path.join(tmp, "b.xml"))
                 said = outputs(os.path.join(tmp, "b.xml"))
                 gpu_lost = [n for n in failed if again.get(n, ("fail",))[0] != "pass" and GPU_LOST.search(said.get(n, ""))]
@@ -454,6 +469,8 @@ def self_test():
         open(os.path.join(d, "slow.txt"), "w").write("# x\nui_bake 40 smaller mesh\nsculptforge_tests: lion 50.5 nightly\n")
         assert load_slow_list(os.path.join(d, "slow.txt")) == {"ui_bake": 40.0, "sculptforge_tests: lion": 50.5}
     assert parallel_jobs(["-j10"]) == 10 and parallel_jobs(["-C", "Release", "-j", "4"]) == 4 and parallel_jobs([]) == 1
+    assert rerun_args(["-C", "Release", "-j", "4", "-L", "ui"]) == ["-C", "Release", "-j", "4"]
+    assert rerun_args(["-j10", "-CRelease", "-R", "x"]) == ["-j10", "-CRelease"] and rerun_args(["-j"]) == ["-j"]
     print("run.py self-test passed")
     return 0
 

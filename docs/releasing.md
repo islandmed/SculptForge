@@ -22,14 +22,15 @@ the gates, what each step does, and how to recover.
 2. **Version and words**:
    - written by people, on main before the release: one note fragment per branch, `changes/<branch>.md`
      (changes/README.md: the What's New bullet, CHANGELOG entry and section, highlight, #testers bullets); in
-     docs/guide/whats-new.md `## Version X.Y.Z`, with tests/ui/whats_new.sfui expecting it, its ```features block
+     docs/guide/whats-new.md `## Version X.Y.Z` and its ```features block
      (date: unreleased, a tagline, highlights and cards: the app's What's New window, the guide, and the home page's
      card and lede come from it). The 3-5 feed highlights are the version's `highlight:` lines (What's New and
      fragments), or `HIGHLIGHTS=file` to override;
    - set by step `bump`: the fragments go into CHANGELOG `[Unreleased]` and What's New and are deleted
      (tools/release/assemble_notes.py); the version in CMakeLists.txt, CITATION.cff (with date-released), packaging/rez/package.py
      and the metainfo `<release>`; CHANGELOG `[Unreleased]` becomes `## [X.Y.Z] - date` under a new empty
-     `[Unreleased]`; website/guide is rebuilt. Don't bump version files by hand.
+     `[Unreleased]`; tests/ui/whats_new.sfui is pinned to the newest three sections (tools/release/pin_whats_new_test.py);
+     website/guide is rebuilt. Don't bump version files by hand.
 
    Step `check` verifies all of this, plus what the steps after the tag need (PKGBUILD format, the Homebrew tap, the
    Omarchy PR is open, the home page's version text), so nothing stops after the tag for a reason known before it.
@@ -209,8 +210,10 @@ private, in one private repository per studio.
 
 ## When a step fails
 
-The script stops with a line starting `fix:` and the command to resume (`--from <step>`). Fix that one thing, then
-resume. Every step checks what is already done first, so re-running is always safe. Fix problems as they come;
+The script stops with a line starting `fix:` and the exact command to resume (`--from <step> --yes`, with this run's
+HIGHLIGHTS and BUILD_DIR). Fix that one thing, then resume. A CI or Packages run that failed on an HTTP 5xx download
+is rerun once by step `ci` before it stops (the downloads themselves retry and are cached: cmake/Fetch.cmake,
+tools/ci/fetch.sh). Every step checks what is already done first, so re-running is always safe. Fix problems as they come;
 don't pile them up for later.
 
 | failure | do |

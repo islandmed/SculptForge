@@ -123,12 +123,17 @@ void App::syncBrushSettings() {
 void App::recipeAlpha(BrushToolSettings& s) const {
     if (doc_.activeBrush < 0 || doc_.activeBrush >= int(doc_.brushes.size())) return;
     const BrushRecipe& r = doc_.brushes[size_t(doc_.activeBrush)];
-    if (r.alpha.empty() && r.origin.pack.empty()) return;
-    s.alphaName = r.alpha.empty() ? std::string("Round") : r.alpha;
-    s.alphaPath.clear();
-    s.alphaInvert = false;
+    const bool turns = r.alphaFollow || r.alphaAngle != 0.0f || r.alphaJitter != 0.0f; // (a shared brush's own turn, #136)
+    if (r.alpha.empty() && r.origin.pack.empty() && !turns) return;
+    if (!r.alpha.empty() || !r.origin.pack.empty()) {
+        s.alphaName = r.alpha.empty() ? std::string("Round") : r.alpha;
+        s.alphaPath.clear();
+        s.alphaInvert = false;
+        s.alphaOptions.tileX = s.alphaOptions.tileY = 1;
+    }
     s.alphaOptions.followStroke = r.alphaFollow;
-    s.alphaOptions.tileX = s.alphaOptions.tileY = 1;
+    s.alphaOptions.angle = r.alphaAngle;
+    s.alphaOptions.jitter = r.alphaJitter;
 }
 
 void App::recipePenPressure(BrushToolSettings& s) const {
@@ -219,6 +224,10 @@ void App::registerAlphaOptionsCommand() {
                        o.tileX = int(std::lround(argNumber(a, "tile_x", o.tileX)));
                        o.tileY = int(std::lround(argNumber(a, "tile_y", o.tileY)));
                        syncAlphaTile();
+                       if (vdmBrushActive()) // the VDM brush's Stamp rotation (#136): no tiling there
+                           return {true, std::string("VDM: ") + (o.followStroke ? "follows the drag, " : "") + "angle " +
+                                             std::to_string(int(std::lround(o.angle))) + ", jitter " +
+                                             std::to_string(int(std::lround(o.jitter)))};
                        return {true, std::string("Alpha: ") + (o.followStroke ? "follows the stroke, " : "") + "angle " +
                                          std::to_string(int(std::lround(o.angle))) + ", jitter " +
                                          std::to_string(int(std::lround(o.jitter))) + ", tile " +
@@ -229,6 +238,18 @@ void App::registerAlphaOptionsCommand() {
 void App::saveBrushSettings() {
     syncBrushSettings(); // (the live values belong to the brush picked now)
     brushSettings_.store(brushSettingsKey_, liveBrushSettings());
+    if (BrushRecipe* r = doc_.activeBrush >= 0 && doc_.activeBrush < int(doc_.brushes.size())
+                             ? &doc_.brushes[size_t(doc_.activeBrush)]
+                             : nullptr;
+        r && (r->alphaFollow != alphaOptions_.followStroke || r->alphaAngle != alphaOptions_.angle ||
+              r->alphaJitter != alphaOptions_.jitter)) {
+        r->alphaFollow = alphaOptions_.followStroke; // the brush's .sfbrush (and so its packs and codes) keeps them (#136)
+        r->alphaAngle = alphaOptions_.angle;
+        r->alphaJitter = alphaOptions_.jitter;
+        r->clamp();
+        saveBrushEdits(doc_.activeBrush);
+        watchActiveBrush(); // (saved now: the autosave has nothing left to do)
+    }
     std::string err;
     const std::string path = brushSettingsPath();
     if (!brushSettingsOn_ || path.empty()) status_ = "Brush settings kept for this session";

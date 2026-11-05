@@ -11,10 +11,12 @@
 #include "app/App.h"
 #include "app/UiServe.h"
 #include "app/CrashLog.h"
+#include "core/PerfTrace.h"
 #include "app/LookSchemes.h"
 #include "app/Palettes.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
+#include "app/UserData.h"
 #include "core/LegacyNames.h"
 #include "core/Bake.h"
 #include "core/ListSort.h"
@@ -98,6 +100,7 @@ Json toJson(const UiPrefs& p) {
     j.set("spaceCamera", p.spaceCamera);
     j.set("emulate3Button", p.emulate3Button);
     j.set("mayaZoomHorizontal", p.mayaZoomHorizontal);
+    j.set("wheelZoomToPointer", p.wheelZoomToPointer);
     j.set("invertZoom", p.invertZoom);
     j.set("quickRemesh", p.quickRemesh);
     j.set("remeshAfterStroke", p.remeshAfterStroke);
@@ -131,6 +134,8 @@ Json toJson(const UiPrefs& p) {
     j.set("flatShading", p.flatShading);
     j.set("viewportCursor", double(p.viewportCursor));
     j.set("backfaceCulling", p.backfaceCulling);
+    j.set("uvPackColumns", double(p.uvPackColumns));
+    j.set("uvPackRows", double(p.uvPackRows));
     j.set("background", std::string(p.gradientBackground ? "gradient" : "flat"));
     Json bg = Json::array();
     for (int i = 0; i < 3; ++i) bg.push(double(p.backgroundColor[i]));
@@ -169,6 +174,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.spaceCamera = j["spaceCamera"].asBool(p.spaceCamera);
     p.emulate3Button = j["emulate3Button"].asBool(p.emulate3Button);
     p.mayaZoomHorizontal = j["mayaZoomHorizontal"].asBool(p.mayaZoomHorizontal);
+    p.wheelZoomToPointer = j["wheelZoomToPointer"].asBool(p.inputStyle == 3); // (inputStyle is read above)
     p.invertZoom = j["invertZoom"].asBool(p.invertZoom);
     p.quickRemesh = j["quickRemesh"].asBool(p.quickRemesh);
     p.remeshAfterStroke = j["remeshAfterStroke"].asBool(p.remeshAfterStroke);
@@ -218,6 +224,8 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.flatShading = j["flatShading"].asBool(p.flatShading);
     p.viewportCursor = std::clamp(int(j["viewportCursor"].asNumber(p.viewportCursor)), 0, 1);
     p.backfaceCulling = j["backfaceCulling"].asBool(p.backfaceCulling);
+    p.uvPackColumns = std::clamp(int(j["uvPackColumns"].asNumber(p.uvPackColumns)), 1, 10);
+    p.uvPackRows = std::clamp(int(j["uvPackRows"].asNumber(p.uvPackRows)), 1, 10);
     if (j["background"].isString()) p.gradientBackground = j["background"].asString() != "flat";
     p.showHints = j["showHints"].asBool(p.showHints);
     if (const Json& hints = j["hiddenHints"]; hints.size() > 0) {
@@ -323,10 +331,7 @@ constexpr Gesture kBlenderGestures[] = {
 
 void App::initUiConfig(bool deterministic) {
     uiConfigDeterministic_ = deterministic;
-    if (char* pref = SDL_GetPrefPath("SculptForge", "SculptForge")) {
-        configDir_ = pref;
-        SDL_free(pref);
-    }
+    configDir_ = userDataDir();
     layout_ = standardLayout(uiPrefs_.shellLayout);
     if (deterministic) return; // tests, renders and recordings always use the standard layout
     std::string err;
@@ -355,6 +360,7 @@ void App::addHelpFonts(float scale) {
     icons.GlyphOffset = ImVec2(0, 2.0f * scale);
     io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size), 15.0f * scale,
                                    &icons, kIconRanges);
+    mergeCjkFont(15.0f * scale);
     // ProggyClean (ships inside Dear ImGui) is a pixel font: keep it at whole multiples of 13 px.
     ImFontConfig mono;
     mono.SizePixels = 13.0f * std::max(1.0f, std::floor(scale + 0.25f));
@@ -671,6 +677,12 @@ void App::initActions() {
         ICON_LC_FILE_TEXT, nullptr, nullptr, nullptr,
         "Open the folder with sculptforge.log: what SculptForge did and, after a crash, what crashed. "
         "sculptforge-previous.log beside it is the last session's. Attach both to a problem report.");
+    add("help.perf_trace", "Record a performance trace", "Help", nullptr, [this] { togglePerfTrace(); }, ICON_LC_ACTIVITY,
+        nullptr, [] { return perftrace::on(); }, nullptr,
+        "While on, sculptforge-trace.log in the log folder records what makes SculptForge slow: every frame over 33 ms "
+        "with where its time went, strokes, uploads to the GPU, remeshes and other background jobs, the mesh size and "
+        "levels, and the GPU and driver. Turn it on, do what is slow, turn it off and attach the file to your report. "
+        "A small file on this computer only; off by default and costs nothing when off.");
     add("help.feedback", "Fixes & suggestions", "Help", nullptr,
         [] { SDL_OpenURL("https://github.com/islandmed/SculptForge/issues/new/choose"); }, ICON_LC_MESSAGE_SQUARE_PLUS,
         nullptr, nullptr, nullptr,
@@ -781,11 +793,7 @@ void App::saveRecentActions() {
 
 namespace {
 std::string windowStatePath() {
-    std::string dir;
-    if (char* pref = SDL_GetPrefPath("SculptForge", "SculptForge")) {
-        dir = pref;
-        SDL_free(pref);
-    }
+    const std::string dir = userDataDir();
     return dir.empty() ? std::string() : dir + "window.json";
 }
 } // namespace
@@ -1001,13 +1009,14 @@ bool App::readUiConfig(const std::string& path, std::string& err, bool own) {
     layout_.customize = customize;
     actions_.overridesFromJson(j["shortcuts"]);
     if (j.has("radialMenus")) applyRadialMenusJson(j["radialMenus"]); // (an older file keeps the menus there are)
-    setLanguage(languageFromCode(uiPrefs_.language));
+    setLanguage(languageFromCode(uiPrefs_.language)); // (the requestUiScale above adds the Chinese glyphs if needed)
     applyPerformancePrefs();
     applyInputStyle();
     doc_.sculptor.dyntopo.constantDetail = uiPrefs_.dyntopoConstantDetail;
     doc_.sculptor.dyntopo.smoothRemesh = uiPrefs_.dyntopoSmoothRemesh;
     renderSettings_.flatShading = uiPrefs_.flatShading;
     renderSettings_.backfaceCulling = uiPrefs_.backfaceCulling;
+    uvPackColumns_ = uiPrefs_.uvPackColumns, uvPackRows_ = uiPrefs_.uvPackRows;
     renderSettings_.gradientBackground = uiPrefs_.gradientBackground;
     renderSettings_.backgroundColor = uiPrefs_.backgroundColor;
     return true;
@@ -1452,6 +1461,7 @@ void drawInterfaceSection(App& app) {
         if (ImGui::RadioButton(label.c_str(), languageFromCode(p.language) == lang)) {
             p.language = languageCode(lang);
             setLanguage(lang);
+            app.requestUiScale(); // the fonts again, with or without the Chinese glyphs
         }
         ui::HelpText("Language", nullptr,
                      "The language of menus, palettes, shelves and messages. Brush and tool names (Quad Remesh, Forge Spheres, "

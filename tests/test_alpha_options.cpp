@@ -114,3 +114,28 @@ TEST(alpha_options_saved_per_brush) {
     clay.alphaOptions = {};
     CHECK(store.switchBrush("builtin:Clay", "builtin:Standard", clay).alphaOptions == s.alphaOptions);
 }
+
+// #136: a drag stamp's turn (Drag Stamp / Slide Stamp, alphas and VDMs): the drag's direction when it follows,
+// Angle on top, and the stroke's jitter.
+TEST(alpha_stamp_angle) {
+    AlphaOptions o;
+    const float right = glm::degrees(alphaStampAngle(o, true, glm::vec2(10.0f, 0.0f), 0.0f));
+    CHECK(std::fabs(right + 90.0f) < 0.01f); // dragged right: the top points right (as the rake)
+    CHECK(alphaStampAngle(o, false, glm::vec2(10.0f, 0.0f), 0.0f) == 0.0f);
+    o.angle = 30.0f;
+    CHECK(std::fabs(glm::degrees(alphaStampAngle(o, false, glm::vec2(10.0f, 0.0f), 0.0f)) - 30.0f) < 0.01f);
+    CHECK(std::fabs(glm::degrees(alphaStampAngle(o, true, glm::vec2(10.0f, 0.0f), 0.0f)) + 60.0f) < 0.01f);
+    CHECK(alphaStampAngle(o, true, glm::vec2(0.0f), 0.25f) == glm::radians(30.0f) + 0.25f); // no drag yet
+    // Jitter: within the range, different stamp to stamp, none at 0.
+    uint32_t seed = 7;
+    CHECK(alphaJitterAngle(0.0f, seed) == 0.0f && seed == 7);
+    const float a = alphaJitterAngle(20.0f, seed), b = alphaJitterAngle(20.0f, seed);
+    CHECK(a != b);
+    CHECK(std::fabs(a) <= glm::radians(20.0f) && std::fabs(b) <= glm::radians(20.0f));
+    // NaN from a damaged file never reaches a stamp.
+    AlphaOptions bad;
+    bad.angle = std::nanf("");
+    bad.jitter = std::nanf("");
+    bad.clamp();
+    CHECK(bad.angle == 0.0f && bad.jitter == 0.0f);
+}

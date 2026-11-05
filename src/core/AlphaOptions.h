@@ -43,5 +43,10 @@ private:
 // The dab's alpha angle (radians; App::dabAt's convention: 0 = the alpha's top at the top of the screen, counter-
 // clockwise positive) from the options, the rake's direction and the per-stroke random `seed` (xorshift, advanced).
 float alphaDabAngle(const AlphaOptions& o, const AlphaRake& rake, uint32_t& seed);
+// A random turn (radians) up to `jitterDeg` either way, advancing `seed`; 0 when jitterDeg is 0.
+float alphaJitterAngle(float jitterDeg, uint32_t& seed);
+// A drag stamp's angle (Drag Stamp, Slide Stamp: one stamp per stroke, #136): the drag's direction on screen
+// (window pixels, y down) when `followDrag`, plus Angle and the stroke's `jitter` (from alphaJitterAngle).
+float alphaStampAngle(const AlphaOptions& o, bool followDrag, glm::vec2 drag, float jitter);
 
 } // namespace sf

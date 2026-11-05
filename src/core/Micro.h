@@ -32,7 +32,7 @@
 //
 // What a scalar displacement can't do: move points sideways. Brushes that slide the surface (Move's sideways
 // part, Snake Hook, Nudge, VDM stamps with overhangs) work on real subdivision levels; on a micro level Pinch
-// sharpens the height profile instead (see microBrushSupport).
+// resamples the heights from where its pull would bring the surface (see microBrushSupport).
 #pragma once
 
 #include "core/Mesh.h"
@@ -271,7 +271,7 @@ private:
 // --- Brushes (driven by Sculptor, which calls these when the mesh has a micro level) ---
 
 // Whether a brush works on micro levels: 2 = as on a mesh, 1 = approximated (Pinch, Crease and Sharp Crease
-// sharpen instead of pulling sideways; Move moves along the normal), 0 = not at all.
+// resample the heights from where their pull would bring the surface; Move moves along the normal), 0 = not at all.
 int microBrushSupport(BrushType type);
 
 struct BrushAlpha;
@@ -284,8 +284,10 @@ public:
     // toward `alphaUp` (#92).
     void dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& center, const glm::vec3& viewDir, float radius,
              float strength, bool invert, float focal, const glm::vec3& alphaUp, bool maskBrush, float maskStrength,
-             const BrushAlpha* alpha = nullptr, const std::function<float(const glm::vec3&)>& texture = {});
-    // (texture: a brush recipe's surface pattern, 0..1 at a surface point, times the tip; #120)
+             const BrushAlpha* alpha = nullptr, const std::function<float(const glm::vec3&)>& texture = {},
+             const glm::vec3& strokeDir = glm::vec3(0.0f));
+    // (texture: a brush recipe's surface pattern, 0..1 at a surface point, times the tip; #120. strokeDir: where the
+    // stroke is heading, for Sharp Crease's pull across it; 0 = none)
     // Move: captures the points within the dab (with each mirror's signs), then moves them along their normals.
     void beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror);
     void grab(Mesh& m, const glm::vec3& delta);
@@ -306,6 +308,8 @@ public:
 
 private:
     std::vector<uint8_t> changed_;        // per candidate of the last dab: the kernel changed its grid
+    std::vector<int16_t> snap_;           // Pinch, Crease, Sharp Crease: the grids of this dab's triangles as it found them
+    std::vector<uint32_t> snapOf_;        // per base triangle: its grid in snap_ + 1 (0 = none)
     std::vector<uint32_t> stitchStamp_;   // per base triangle: dabEpoch_ when the stitch changed a point of it
     void touch(MicroMesh& mm, std::span<const uint32_t> tris);
     void widen(MicroMesh& mm, float need); // MicroMesh::widen, keeping this stroke's saved tiles in step

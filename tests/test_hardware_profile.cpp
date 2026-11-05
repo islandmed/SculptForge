@@ -689,6 +689,20 @@ TEST(hw_stroke_shade_budget) {
     CHECK(strokeShadeBudget(1u << 20, 10.0, 1e9, 300) == 300);             // at least one patch and its ring
 }
 
+TEST(hw_micro_shade_budget) {
+    // A micro level's shading per frame: still frames all of the points; strokes and a moving view 10 ms of them.
+    TierConfig t;
+    t.shadeBudgetPoints = 1u << 20;
+    t.draftBrushMode = false; // continuous normals
+    CHECK(microShadeBudget(t, false, false, 30.0, 300) == (1u << 20)); // still: the points (nothing waits)
+    CHECK(microShadeBudget(t, false, true, 30.0, 300) == 333333);      // orbit: 10 ms at 30 ns a point
+    CHECK(microShadeBudget(t, true, false, 30.0, 300) == 333333);      // stroke: the same
+    CHECK(microShadeBudget(t, false, true, 0.0, 300) == (1u << 20));   // cost not measured yet: the points
+    t.draftBrushMode = true;
+    CHECK(microShadeBudget(t, true, false, 2.0, 300) == (1u << 18));   // draft stroke: a quarter, fast enough
+    CHECK(microShadeBudget(t, false, true, 2.0, 300) == (1u << 20));   // a moving view isn't a draft stroke
+}
+
 TEST(hw_tier_config) {
     // Laptop / Budget: 2M active triangles, continuous brushes on mains, a quarter of the RAM for caches.
     const HardwareProfile laptop = mapProfile(machine("Intel", "Mesa Intel(R) Xe Graphics (TGL GT2)", 0, 16384, 8), measured(400.0, 4.0));

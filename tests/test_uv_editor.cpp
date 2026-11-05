@@ -67,6 +67,29 @@ CommandResult run(Document& doc, const char* name, Args args = {}) {
     return reg.execute(doc, name, args);
 }
 
+// `n` separate unit squares in a row (one UV island each, its UVs 0-1).
+Mesh squares(int n) {
+    Mesh m;
+    for (int i = 0; i < n; ++i) {
+        const uint32_t b = uint32_t(m.positions.size());
+        const float x = 2.0f * float(i);
+        m.positions.insert(m.positions.end(), {{x, 0, 0}, {x + 1, 0, 0}, {x + 1, 0, -1}, {x, 0, -1}});
+        m.triangles.push_back({b, b + 1, b + 2});
+        m.triangles.push_back({b, b + 2, b + 3});
+        m.uvs.insert(m.uvs.end(), {{0, 0}, {1, 0}, {1, 1}, {0, 0}, {1, 1}, {0, 1}});
+    }
+    m.recomputeAllNormals();
+    return m;
+}
+
+std::vector<int> usedTiles(const Mesh& m) {
+    std::vector<int> tiles;
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) tiles.push_back(udimTile((m.uvs[t * 3] + m.uvs[t * 3 + 1] + m.uvs[t * 3 + 2]) / 3.0f));
+    std::sort(tiles.begin(), tiles.end());
+    tiles.erase(std::unique(tiles.begin(), tiles.end()), tiles.end());
+    return tiles;
+}
+
 } // namespace
 
 TEST(uv_corner_twins_on_a_plane) {
@@ -257,6 +280,61 @@ TEST(uv_pack_one_tile_and_udim_tiles) {
     CHECK(r.ok);
     CHECK(uvsWithin(doc.mesh, glm::vec2(0.0f), glm::vec2(1.0f)));
     CHECK(islandBoxesDisjoint(doc.mesh, -15.0f / 1024.0f)); // boxes at least ~15 texels apart
+}
+
+TEST(uv_pack_udim_grid_columns_by_rows) {
+    // #135: the tile order of a Columns x Rows grid, and without columns UDIM order from first_tile as before.
+    UvPackOptions o;
+    o.columns = 4;
+    CHECK(uvPackTile(o, 0) == 1001 && uvPackTile(o, 3) == 1004 && uvPackTile(o, 4) == 1011 && uvPackTile(o, 11) == 1024);
+    CHECK(uvPackMaxTiles(o) == 40);
+    o.firstTile = 1008; // (only three columns are left in the row)
+    CHECK(uvPackTile(o, 2) == 1010 && uvPackTile(o, 3) == 1018 && uvPackMaxTiles(o) == 30);
+    o.columns = 0;
+    CHECK(uvPackTile(o, 3) == 1011 && uvPackMaxTiles(o) == 93);
+
+    // 10 x 2: twenty squares, one to a tile, fill 1001-1020.
+    Document doc = makeDoc(squares(20));
+    CommandResult r = run(doc, "uv_pack", {{"columns", 10.0}, {"rows", 2.0}, {"margin", 4.0}});
+    CHECK(r.ok);
+    CHECK(r.message.find("20 UDIM tiles") != std::string::npos);
+    std::vector<int> want;
+    for (int t = 1001; t <= 1020; ++t) want.push_back(t);
+    CHECK(usedTiles(doc.mesh) == want);
+    CHECK(uvsWithin(doc.mesh, glm::vec2(0.0f), glm::vec2(10.0f, 2.0f)));
+    CHECK(islandBoxesDisjoint(doc.mesh));
+
+    // 4 x 3 stays four wide: 1001-1004, 1011-1014, 1021-1024.
+    doc = makeDoc(squares(12));
+    CHECK(run(doc, "uv_pack", {{"columns", 4.0}, {"rows", 3.0}}).ok);
+    CHECK(usedTiles(doc.mesh) == std::vector<int>({1001, 1002, 1003, 1004, 1011, 1012, 1013, 1014, 1021, 1022, 1023, 1024}));
+    CHECK(uvsWithin(doc.mesh, glm::vec2(0.0f), glm::vec2(4.0f, 3.0f)));
+
+    // A fixed texel density spills up rows, never past the columns: 12 tiles' worth at 3 wide.
+    doc = makeDoc(squares(12));
+    r = run(doc, "uv_pack", {{"columns", 3.0}, {"rows", 1.0}, {"density", 900.0}, {"resolution", 1024.0}, {"margin", 4.0}});
+    CHECK(r.ok);
+    const std::vector<int> spill = usedTiles(doc.mesh);
+    CHECK(spill.size() == 12);
+    for (int t : spill) CHECK((t - 1001) % 10 < 3);
+    CHECK(std::abs(uvMeshDensity(doc.mesh, 1024) - 900.0f) < 9.0f);
+    // More than the grid holds: an error that names Columns.
+    doc = makeDoc(squares(12));
+    r = run(doc, "uv_pack", {{"columns", 1.0}, {"density", 900.0}, {"resolution", 1024.0}, {"first_tile", 1091.0}});
+    CHECK(!r.ok && r.message.find("Columns") != std::string::npos);
+
+    // A fit pack that can't fill the grid says so first; a full one doesn't.
+    doc = makeDoc(squares(3));
+    r = run(doc, "uv_pack", {{"columns", 10.0}, {"rows", 2.0}});
+    CHECK(r.ok && r.message.rfind("3 of 20 tiles used: the largest island limits the scale", 0) == 0);
+    doc = makeDoc(squares(4));
+    r = run(doc, "uv_pack", {{"columns", 2.0}, {"rows", 2.0}});
+    CHECK(r.ok && r.message.find("tiles used") == std::string::npos);
+
+    // Scripts' tiles= alone is as before: ten per row.
+    doc = makeDoc(squares(12));
+    CHECK(run(doc, "uv_pack", {{"tiles", 12.0}}).ok);
+    CHECK(usedTiles(doc.mesh).back() == 1012);
 }
 
 TEST(uv_pack_rectangles) {

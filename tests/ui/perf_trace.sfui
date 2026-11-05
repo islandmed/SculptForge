@@ -1,0 +1,22 @@
+# Help > Record a performance trace (#127): off by default; on, sculptforge-trace.log beside sculptforge.log gets the
+# long frames with their breakdown, strokes and long commands; off again stops it. SF_PERF_TRACE_MS 0 writes every
+# frame here (a fast GPU has no frame over 33 ms to write).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+expect_value perf_trace == 0
+env SF_PERF_TRACE_MS 0
+click "Help##palette.help"
+click "Record a performance trace##help.perf_trace"
+expect_value perf_trace == 1
+expect_status "Recording a performance trace"
+stroke 0.45 0.45 0.55 0.55
+wait_idle 10
+run subdivide
+wait_idle 10
+expect_value perf_trace_long_frames > 0
+expect_value perf_trace_strokes > 0
+expect_value perf_trace_commands > 0
+click "Help##palette.help"
+click "Record a performance trace##help.perf_trace"
+expect_value perf_trace == 0
+expect_status "Performance trace stopped"

@@ -522,7 +522,7 @@ Layout keeps it.
 | Setting | Default | What it does |
 |---|---|---|
 | **Look**, **Outlines** and **Layout** | Forge Terminal, Neutral, Subtle, SculptForge | See [Looks and layouts](#looks-and-layouts) |
-| **Language** | English | The interface language: **English** or **Español** (see below) |
+| **Language** | English | The interface language: **English**, **Español** or Traditional Chinese (see below) |
 | **Ctrl+hover help** | On | Ctrl-hover help boxes |
 | **Help box opacity** | 0.97 | How solid the help box is |
 | **Tooltip delay** | 0.5 s | How long to point at an icon-only button before its name appears |
@@ -538,7 +538,8 @@ Layout keeps it.
 **Español** the menus, the palettes, the shelves, the Library, the command palette and the Ctrl-help titles
 are in Spanish, while the names of tools and brushes stay in English, as Spanish-speaking sculptors use them (Parts,
 Quad Remesh, Forge Spheres, Library, Lit Sphere, Clay Block, Add). The command palette finds a command by its Spanish or its
-English name. Anything not translated yet (most Ctrl-help descriptions, this guide) shows in English. Scripts and
+English name. **Traditional Chinese** (the button with its Chinese name; contributed by yoyomaimai) works the same way, with Taiwan usage
+and the brush and tool names in English. Anything not translated yet (most Ctrl-help descriptions, this guide) shows in English. Scripts and
 `sculptforge-cli` commands are the same in every language.
 
 **UI scale** also applies at once: text, buttons, shelves and trays resize on the next frame; saved automatically.
