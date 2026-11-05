@@ -10,6 +10,7 @@
 #include "ai/ImageTo3DService.h"
 #include "link/HttpServer.h"
 
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <mutex>
@@ -58,6 +59,7 @@ TEST(rodin_fal_request_bodies) {
 }
 
 TEST(rodin_fal_text_to_3d_mocked) {
+    if (!ai::httpSupported()) return; // a build without libcurl
     // A fake fal.ai queue: submit, one status poll, the result, then the file download, all on 127.0.0.1.
     link::HttpServer server;
     link::HttpServer::Options o;
@@ -94,6 +96,7 @@ TEST(rodin_fal_text_to_3d_mocked) {
     const std::string stem = tempPath("sf_rodin_text");
     ai::GeneratorResult r = ai::generate3DFromText(s, "a stylised dragon head", stem);
     server.stop();
+    if (!r.ok) std::fprintf(stderr, "  rodin mock: %s\n", r.error.c_str());
     CHECK(r.ok);
     CHECK(r.outputPath == stem + ".glb");
     std::ifstream f(r.outputPath, std::ios::binary);
