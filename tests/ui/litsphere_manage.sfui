@@ -82,7 +82,7 @@ expect_not "Rename...##litsphere"
 # The filter also finds Lit Spheres by their plain words (aliases, not names in the UI).
 type "##lbfilter" material capture
 expect "Library/Chrome"
-expect "Library/Amber"
+expect "Library/Bronze"
 type "##lbfilter" chrome
 expect_not "Library/Amber"
 
