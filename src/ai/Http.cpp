@@ -54,7 +54,8 @@ std::string multipartBody(const std::vector<MultipartField>& fields, std::string
 namespace {
 
 // One request of httpGetRestricted, no redirects followed: a 3xx answer leaves its target in `location`.
-HttpResponse getOnce(const std::string& url, int stallSeconds, const std::function<bool(const char*, size_t)>& onData,
+HttpResponse getOnce(const std::string& method, const std::string& url, const std::vector<std::string>& headers,
+                     const std::string& body, int stallSeconds, const std::function<bool(const char*, size_t)>& onData,
                      const std::function<bool(uint64_t, uint64_t)>& onProgress, std::string& location);
 
 } // namespace
@@ -85,9 +86,35 @@ HttpResponse followRedirects(const std::string& url, const std::function<bool(co
 HttpResponse httpGetRestricted(const std::string& url, const std::function<bool(const std::string&)>& allowed,
                                int stallSeconds, const std::function<bool(const char*, size_t)>& onData,
                                const std::function<bool(uint64_t, uint64_t)>& onProgress) {
+    return httpGetRestricted(url, allowed, {}, stallSeconds, onData, onProgress);
+}
+
+HttpResponse httpGetRestricted(const std::string& url, const std::function<bool(const std::string&)>& allowed,
+                               const std::function<std::vector<std::string>(const std::string&)>& headersFor,
+                               int stallSeconds, const std::function<bool(const char*, size_t)>& onData,
+                               const std::function<bool(uint64_t, uint64_t)>& onProgress) {
     return followRedirects(url, allowed, [&](const std::string& u, std::string& location) {
-        return getOnce(u, stallSeconds, onData, onProgress, location);
+        return getOnce("GET", u, headersFor ? headersFor(u) : std::vector<std::string>{}, {}, stallSeconds, onData,
+                       onProgress, location);
     });
+}
+
+HttpResponse httpPostNoRedirect(const std::string& url, const std::vector<std::string>& headers, const std::string& body,
+                                int timeoutSeconds) {
+    std::string received, location;
+    HttpResponse r;
+    if (url.rfind("https://", 0) != 0) {
+        r.error = "refused to send to " + url.substr(0, 200);
+        return r;
+    }
+    r = getOnce("POST", url, headers, body, timeoutSeconds, [&](const char* d, size_t n) {
+        if (received.size() + n > (1u << 20)) return false; // (a sign-in answer is a few hundred bytes)
+        received.append(d, n);
+        return true;
+    }, {}, location);
+    if (r.status >= 300 && r.status < 400 && r.error.empty()) r.error = "unexpected redirect";
+    r.body = std::move(received);
+    return r;
 }
 
 #if defined(_WIN32)
@@ -187,7 +214,8 @@ std::string narrow(const std::wstring& w) {
     return s;
 }
 
-HttpResponse getOnce(const std::string& url, int stallSeconds, const std::function<bool(const char*, size_t)>& onData,
+HttpResponse getOnce(const std::string& method, const std::string& url, const std::vector<std::string>& headers,
+                     const std::string& body, int stallSeconds, const std::function<bool(const char*, size_t)>& onData,
                      const std::function<bool(uint64_t, uint64_t)>& onProgress, std::string& location) {
     ++gRequests;
     HttpResponse r;
@@ -218,7 +246,7 @@ HttpResponse getOnce(const std::string& url, int stallSeconds, const std::functi
         r.error = lastError("WinHttpConnect");
         return r;
     }
-    Handle request{WinHttpOpenRequest(connection.h, L"GET", fullPath.c_str(), nullptr, WINHTTP_NO_REFERER,
+    Handle request{WinHttpOpenRequest(connection.h, widen(method).c_str(), fullPath.c_str(), nullptr, WINHTTP_NO_REFERER,
                                       WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE)};
     if (!request.h) {
         r.error = lastError("WinHttpOpenRequest");
@@ -227,7 +255,11 @@ HttpResponse getOnce(const std::string& url, int stallSeconds, const std::functi
     DWORD never = WINHTTP_OPTION_REDIRECT_POLICY_NEVER; // each hop is checked by the caller
     WinHttpSetOption(request.h, WINHTTP_OPTION_REDIRECT_POLICY, &never, sizeof never);
     // (Certificate checks stay on: no WINHTTP_OPTION_SECURITY_FLAGS that would ignore errors.)
-    if (!WinHttpSendRequest(request.h, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
+    std::wstring allHeaders;
+    for (const auto& h : headers) allHeaders += widen(h) + L"\r\n";
+    if (!WinHttpSendRequest(request.h, allHeaders.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : allHeaders.c_str(), DWORD(-1L),
+                            body.empty() ? WINHTTP_NO_REQUEST_DATA : const_cast<char*>(body.data()), DWORD(body.size()),
+                            DWORD(body.size()), 0) ||
         !WinHttpReceiveResponse(request.h, nullptr)) {
         r.error = lastError("HTTP request");
         return r;
@@ -244,7 +276,7 @@ HttpResponse getOnce(const std::string& url, int stallSeconds, const std::functi
             location = narrow(loc);
         return r;
     }
-    if (status != 200) return r;
+    if (status != 200 && method == "GET") return r; // (a POST's error answer is read: it says why)
     uint64_t total = 0, received = 0;
     wchar_t len[32] = {};
     DWORD lenSize = sizeof len;
@@ -346,6 +378,7 @@ struct RestrictedSink {
     CURL* curl;
     const std::function<bool(const char*, size_t)>* onData;
     const std::function<bool(uint64_t, uint64_t)>* onProgress;
+    bool anyAnswer = false; // a POST's error answer is read too (it says why)
     bool stopped = false;
 };
 
@@ -357,7 +390,7 @@ bool finalAnswer(CURL* curl) {
 
 size_t restrictedWrite(char* data, size_t size, size_t count, void* user) {
     auto* sink = static_cast<RestrictedSink*>(user);
-    if (!finalAnswer(sink->curl)) return size * count; // a redirect's or an error's body: not the file
+    if (!sink->anyAnswer && !finalAnswer(sink->curl)) return size * count; // a redirect's or an error's body
     if (!(*sink->onData)(data, size * count)) {
         sink->stopped = true;
         return 0;
@@ -373,7 +406,8 @@ int restrictedProgress(void* user, curl_off_t total, curl_off_t now, curl_off_t,
     return 1;
 }
 
-HttpResponse getOnce(const std::string& url, int stallSeconds, const std::function<bool(const char*, size_t)>& onData,
+HttpResponse getOnce(const std::string& method, const std::string& url, const std::vector<std::string>& headers,
+                     const std::string& body, int stallSeconds, const std::function<bool(const char*, size_t)>& onData,
                      const std::function<bool(uint64_t, uint64_t)>& onProgress, std::string& location) {
     ++gRequests;
     static std::once_flag once;
@@ -384,9 +418,17 @@ HttpResponse getOnce(const std::string& url, int stallSeconds, const std::functi
         r.error = "curl_easy_init failed";
         return r;
     }
-    RestrictedSink sink{curl, &onData, &onProgress};
+    RestrictedSink sink{curl, &onData, &onProgress, method == "POST"};
+    curl_slist* list = nullptr;
+    for (const auto& h : headers) list = curl_slist_append(list, h.c_str());
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
+    if (method == "POST") {
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.data());
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, long(body.size()));
+    } else {
+        curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+    }
 #if LIBCURL_VERSION_NUM >= 0x075500
     curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "https");
 #else
@@ -412,6 +454,7 @@ HttpResponse getOnce(const std::string& url, int stallSeconds, const std::functi
     char* target = nullptr;
     if (r.status >= 300 && r.status < 400 && curl_easy_getinfo(curl, CURLINFO_REDIRECT_URL, &target) == CURLE_OK && target)
         location = target;
+    curl_slist_free_all(list);
     curl_easy_cleanup(curl);
     return r;
 }
@@ -430,8 +473,9 @@ HttpResponse httpRequestStream(const std::string&, const std::string&, const std
 
 namespace {
 
-HttpResponse getOnce(const std::string&, int, const std::function<bool(const char*, size_t)>&,
-                     const std::function<bool(uint64_t, uint64_t)>&, std::string&) {
+HttpResponse getOnce(const std::string&, const std::string&, const std::vector<std::string>&, const std::string&, int,
+                     const std::function<bool(const char*, size_t)>&, const std::function<bool(uint64_t, uint64_t)>&,
+                     std::string&) {
     ++gRequests;
     HttpResponse r;
     r.error = "This build of SculptForge has no HTTP support (libcurl was not found at build time)";

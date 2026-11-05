@@ -8,6 +8,7 @@
 
 #include "ai/Http.h"
 #include "core/Ed25519.h"
+#include "core/MemberBuilds.h"
 #include "core/SelfUpdate.h"
 #include "core/Sha256.h"
 
@@ -74,6 +75,7 @@ void writeAll(const fs::path& p, const std::string& s) { std::ofstream(p, std::i
 // Serves release files from a map, in 4 KiB pieces, like the network would; records every URL asked for.
 struct FakeReleases {
     std::map<std::string, std::string> files; // file name -> body
+    std::map<std::string, std::string> assetNames; // member asset id -> file name
     std::vector<std::string> asked;
     uint64_t claimTotal = 0; // a Content-Length that differs from the body (a cut-short download)
     Fetch fetch() {
@@ -81,11 +83,13 @@ struct FakeReleases {
                       const std::function<bool(uint64_t, uint64_t)>& onProgress) {
             asked.push_back(url);
             FetchResult r;
-            if (!isReleaseDownloadUrl(url)) {
+            if (!allowedUpdateUrl(url)) {
                 r.error = "refused";
                 return r;
             }
-            const auto it = files.find(url.substr(url.rfind('/') + 1));
+            std::string name = url.substr(url.rfind('/') + 1);
+            if (member::isMemberAssetUrl(url)) name = assetNames.count(name) ? assetNames[name] : "";
+            const auto it = files.find(name);
             if (it == files.end()) {
                 r.status = 404;
                 return r;
@@ -469,4 +473,115 @@ TEST(self_update_windows_helper) {
     const std::string i = windowsHelperScript(in, d, 1234, false);
     CHECK(i.find("\"/S /D=$root\"") != std::string::npos && i.find("Get-FileHash") < i.find("Start-Process"));
     CHECK(i.find("Start-Process -FilePath $exe") == std::string::npos); // Later: no relaunch
+}
+
+// --- Member builds (core/MemberBuilds.cpp) ---
+
+TEST(member_builds_urls_and_headers) {
+    using namespace sf::member;
+    CHECK(isMemberApiUrl("https://api.github.com/repos/islandmed/sculptforge-insiders/releases?per_page=20"));
+    CHECK(isMemberApiUrl("https://api.github.com/user"));
+    CHECK(isMemberAssetUrl("https://api.github.com/repos/islandmed/sculptforge-insiders/releases/assets/123456"));
+    for (const char* u : {"https://api.github.com/repos/islandmed/sculptforge-insiders/releases/assets/12a",
+                          "https://api.github.com/repos/islandmed/sculptforge-insiders/releases/assets/",
+                          "https://api.github.com/repos/islandmed/sculptforge-insiders/releases/assets/1/../../x",
+                          "https://api.github.com/repos/islandmed/SculptForge/releases?per_page=20",
+                          "https://api.github.com/repos/islandmed/sculptforge-insiders/contents/secrets",
+                          "https://api.github.com/user/repos", "https://api.github.com.evil.example/user",
+                          "http://api.github.com/user"})
+        CHECK(!isMemberApiUrl(u) && !allowedUpdateUrl(u));
+    // The token goes to the member API only: never to the asset host, the public release URLs or anywhere else.
+    const auto h = headersFor("https://api.github.com/repos/islandmed/sculptforge-insiders/releases/assets/5", "ghu_x");
+    CHECK(h.size() == 3 && h[0] == "Authorization: Bearer ghu_x" && h[1] == "Accept: application/octet-stream");
+    CHECK(headersFor(kReleasesUrl, "ghu_x")[1] == "Accept: application/vnd.github+json");
+    for (const char* u : {"https://release-assets.githubusercontent.com/a?sig=1", "https://objects.githubusercontent.com/a",
+                          "https://github.com/islandmed/SculptForge/releases/download/v1.0.0/SHA256SUMS.txt",
+                          "https://evil.example/x"})
+        CHECK(headersFor(u, "ghu_x").empty());
+    // A redirect from the member API to the asset host is followed, without the token (headersFor per hop).
+    std::vector<std::vector<std::string>> sent;
+    const std::string asset = std::string(kAssetUrlPrefix) + "77";
+    const ai::HttpResponse r = ai::followRedirects(asset, allowedUpdateUrl, [&](const std::string& url, std::string& loc) {
+        sent.push_back(headersFor(url, "ghu_x"));
+        ai::HttpResponse a;
+        if (url == asset) a.status = 302, loc = "https://release-assets.githubusercontent.com/x?sig=1";
+        else a.status = 200;
+        return a;
+    });
+    CHECK(r.status == 200 && sent.size() == 2 && sent[0].size() == 3 && sent[1].empty());
+}
+
+TEST(member_builds_device_flow_answers) {
+    using namespace sf::member;
+    DeviceCode c;
+    std::string err;
+    CHECK(parseDeviceCode(R"({"device_code":"3584d83530557fdd1f46af8289938c8ef79f9dc5","user_code":"WDJB-MJHT",
+        "verification_uri":"https://github.com/login/device","expires_in":900,"interval":5})", 1000, c, err));
+    CHECK(c.userCode == "WDJB-MJHT" && c.interval == 5 && c.expiresAt == 1900);
+    // Another page to open than GitHub's own: refused (the app opens kVerifyUrl only anyway).
+    CHECK(!parseDeviceCode(R"({"device_code":"abc","user_code":"WDJB-MJHT","verification_uri":"https://evil.example/login/device"})",
+                           0, c, err));
+    CHECK(!parseDeviceCode(R"({"error":"device_flow_disabled"})", 0, c, err) && err.find("switched off") != std::string::npos);
+    CHECK(pollBody("a b") == "client_id=Iv23liK7goArrLDUGKEk&device_code=a%20b&grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code");
+    CHECK(refreshBody("ghr_1").find("grant_type=refresh_token&refresh_token=ghr_1") != std::string::npos);
+    CHECK(refreshBody("x").find("client_secret") == std::string::npos); // (a device-flow app has none)
+
+    Tokens t;
+    CHECK(parseTokenReply(R"({"error":"authorization_pending"})", 0, t, err) == TokenReply::Pending);
+    CHECK(parseTokenReply(R"({"error":"slow_down","interval":10})", 0, t, err) == TokenReply::SlowDown);
+    CHECK(parseTokenReply(R"({"error":"expired_token"})", 0, t, err) == TokenReply::Expired);
+    CHECK(parseTokenReply(R"({"error":"bad_refresh_token"})", 0, t, err) == TokenReply::Expired);
+    CHECK(parseTokenReply(R"({"error":"access_denied"})", 0, t, err) == TokenReply::Denied);
+    CHECK(parseTokenReply("<html>", 0, t, err) == TokenReply::Error && err.find("ghu_") == std::string::npos);
+    CHECK(parseTokenReply(R"({"access_token":"","token_type":"bearer"})", 0, t, err) == TokenReply::Error);
+    CHECK(parseTokenReply(R"({"access_token":"ghu_abc","expires_in":28800,"refresh_token":"ghr_def",
+        "refresh_token_expires_in":15897600,"token_type":"bearer","scope":""})", 100, t, err) == TokenReply::Ok);
+    CHECK(t.access == "ghu_abc" && t.refresh == "ghr_def" && t.accessExpiresAt == 28900 && t.refreshExpiresAt == 15897700);
+    CHECK(t.usable(100) && !t.usable(28890) && t.refreshable(28890) && !t.refreshable(15897700));
+    Tokens back;
+    CHECK(tokensFromSecret(tokensToSecret(t), back) && back.access == t.access && back.refresh == t.refresh &&
+          back.accessExpiresAt == t.accessExpiresAt && back.refreshExpiresAt == t.refreshExpiresAt);
+    CHECK(!tokensFromSecret("{}", back) && !tokensFromSecret("not json", back));
+    CHECK(parseLogin(R"({"login":"some-member","id":1})") == "some-member");
+    CHECK(parseLogin(R"({"login":"<script>"})").empty());
+}
+
+TEST(member_builds_release_list) {
+    using namespace sf::member;
+    const char* list = R"([
+      {"tag_name":"v99.0.0-preview.2","draft":true,"assets":[]},
+      {"tag_name":"v99.0.0-preview.1","draft":false,"assets":[
+          {"id":11,"name":"SHA256SUMS.txt"},{"id":12,"name":"SHA256SUMS.txt.sig"},
+          {"id":13,"name":"SculptForge-99.0.0-x86_64.AppImage"},{"id":"14","name":"bad-id"},{"id":1.5,"name":"half"}]},
+      {"tag_name":"v98.0.0-preview.9","draft":false,"assets":[]},
+      {"tag_name":"v99.0.0/../x","assets":[]}, {"tag_name":"latest","assets":[]}, 7])";
+    UpdateInfo u;
+    std::string err;
+    CHECK(parseMemberReleases(list, u, err));
+    CHECK(u.version == "99.0.0-preview.1" && u.member && u.files.size() == 3); // the draft and odd entries skipped
+    CHECK(u.files["SculptForge-99.0.0-x86_64.AppImage"] == std::string(kAssetUrlPrefix) + "13");
+    CHECK(u.downloadUrl == "https://github.com/islandmed/sculptforge-insiders/releases/tag/v99.0.0-preview.1");
+    CHECK(!parseMemberReleases("[]", u, err) && !parseMemberReleases("{}", u, err));
+
+    // A member build downloads and verifies exactly like a public one: same signature, same key, versioned name.
+    Sandbox s("sf_member_download");
+    FakeReleases f = goodRelease();
+    f.assetNames = {{"11", "SHA256SUMS.txt"}, {"12", "SHA256SUMS.txt.sig"}, {"13", "SculptForge-99.0.0-x86_64.AppImage"}};
+    uint8_t k[32];
+    CHECK(parseHexKey(kTestKey, k));
+    Download d;
+    downloadUpdate("99.0.0-preview.1", s.install, k, f.fetch(), d, u.files);
+    CHECK(d.ok && d.sha256 == kPackageSha);
+    for (const auto& url : f.asked) CHECK(isMemberAssetUrl(url)); // nothing public, nothing else
+    // Tampered member files fail the same way.
+    f.files["SHA256SUMS.txt.sig"][3] ^= 1;
+    Download bad;
+    downloadUpdate("99.0.0-preview.1", s.install, k, f.fetch(), bad, u.files);
+    CHECK(!bad.ok && readAll(s.install.target) == "old version");
+    // A file list that points anywhere but the member asset URLs is not used.
+    Download elsewhere;
+    std::map<std::string, std::string> evil = u.files;
+    evil["SHA256SUMS.txt"] = "https://evil.example/SHA256SUMS.txt";
+    downloadUpdate("99.0.0-preview.1", s.install, k, f.fetch(), elsewhere, evil);
+    CHECK(!elsewhere.ok && !elsewhere.error.empty());
 }

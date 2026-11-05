@@ -36,6 +36,15 @@ HttpResponse httpRequestStream(const std::string& method, const std::string& url
 HttpResponse httpGetRestricted(const std::string& url, const std::function<bool(const std::string& url)>& allowed,
                                int stallSeconds, const std::function<bool(const char* data, size_t size)>& onData,
                                const std::function<bool(uint64_t received, uint64_t total)>& onProgress = {});
+// The same with headers chosen per hop: `headersFor(url)` (credentials only to the host they belong to, never to
+// the place a redirect points at).
+HttpResponse httpGetRestricted(const std::string& url, const std::function<bool(const std::string& url)>& allowed,
+                               const std::function<std::vector<std::string>(const std::string& url)>& headersFor,
+                               int stallSeconds, const std::function<bool(const char* data, size_t size)>& onData,
+                               const std::function<bool(uint64_t received, uint64_t total)>& onProgress = {});
+// A POST to exactly `url` (https, certificates checked, no redirects followed): sign-in endpoints.
+HttpResponse httpPostNoRedirect(const std::string& url, const std::vector<std::string>& headers, const std::string& body,
+                                int timeoutSeconds);
 // httpGetRestricted's redirect rule on its own (tests): `once` makes one request, a 3xx leaving its target in `location`.
 HttpResponse followRedirects(const std::string& url, const std::function<bool(const std::string& url)>& allowed,
                              const std::function<HttpResponse(const std::string& url, std::string& location)>& once);

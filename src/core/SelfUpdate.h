@@ -18,6 +18,7 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <string>
 
 namespace sf::update {
@@ -39,7 +40,8 @@ inline constexpr const char* kUpdatePublicKeyHex = "";
 bool isReleaseDownloadUrl(const std::string& url);
 // GitHub's release asset hosts, where the URL above redirects (https only, exact host names).
 bool isReleaseAssetHostUrl(const std::string& url);
-inline bool allowedUpdateUrl(const std::string& url) { return isReleaseDownloadUrl(url) || isReleaseAssetHostUrl(url); }
+// (Member builds add their API URLs: member::isMemberApiUrl.)
+bool allowedUpdateUrl(const std::string& url);
 // A release version safe to put in a URL ("0.12.0", "0.12.0-beta.1").
 bool safeVersion(const std::string& version);
 // The download URL of `file` in release v<version>; "" when the version or file name isn't safe.
@@ -116,8 +118,9 @@ struct Download {
 
 // SHA256SUMS.txt, its signature, then the package into a temporary file in the target's folder, hashed as it
 // arrives. Fails (removing the temporary file) on any doubt; on success `out.staged` is ready to install.
+// `memberFiles` (a member build, core/MemberBuilds.h): the files by name as member API URLs; empty: the public release.
 void downloadUpdate(const std::string& version, const Install& install, const uint8_t key[32], const Fetch& fetch,
-                    Download& out);
+                    Download& out, const std::map<std::string, std::string>& memberFiles = {});
 
 // The temporary file a package is downloaded to (dot-file next to the target, or inside the target folder).
 std::string stagingPath(const Install& install, const std::string& version);

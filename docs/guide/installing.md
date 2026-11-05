@@ -232,6 +232,14 @@ kept beside the new one (the AppImage as `<name>.AppImage.old`, the portable fol
 new version has started once, then removed; if the new version doesn't start, the old one is put back. The
 Windows installer asks for permission to change Program Files, as installing does.
 
+**Member builds.** Members get each release early. In **Edit > Preferences > Updates > Member builds**, click
+**Sign in with GitHub**: SculptForge shows a short code; open **github.com/login/device**, sign in with the GitHub
+account that accepted the invitation to the member repository, and enter the code. From then on the update check
+also offers the member builds, and **Update** installs them exactly like releases, with the same signature check.
+The sign-in can only read the member repository's releases (nothing else on your GitHub account), it is kept in your
+system's keychain (Windows Credential Manager, or the Secret Service on Linux such as GNOME Keyring or KWallet; never
+in SculptForge's settings), and **Sign out** removes it. Without a keychain the sign-in lasts until you quit.
+
 Installs that belong to a package manager are never replaced by the app: the AUR package (Omarchy's too) builds
 without the update check, a Homebrew install shows `brew upgrade --cask sculptforge`, and the Flatpak, `.deb`
 and `.rpm` files say to download the new file and open it. The macOS app shows **Download** for now.

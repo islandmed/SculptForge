@@ -108,6 +108,8 @@ void App::initProject() {
         checkUpdates_ = prefs["check_updates"].asBool(checkUpdates_);
         updateCheckedAt_ = int64_t(prefs["update_checked_at"].asNumber(0));
         if (prefs["update_skipped"].isString()) updateSkipped_ = prefs["update_skipped"].asString();
+        memberBuilds_ = prefs["member_builds"].asBool(false); // (the token itself is in the keychain only)
+        if (prefs["member_login"].isString()) memberLogin_ = prefs["member_login"].asString().substr(0, 39);
         if (prefs["update_channel"].isString())
             updateChannel_ = prefs["update_channel"].asString() == "preview" ? UpdateChannel::Preview : UpdateChannel::Stable;
         sculptSeconds_ = addSculptTime(prefs["sculpt_seconds"].asNumber(0.0), 0.0);
@@ -191,6 +193,8 @@ void App::saveProjectPrefs() {
     prefs.set("update_checked_at", double(updateCheckedAt_));
     if (!updateSkipped_.empty()) prefs.set("update_skipped", updateSkipped_);
     prefs.set("update_channel", std::string(updateChannel_ == UpdateChannel::Preview ? "preview" : "stable"));
+    prefs.set("member_builds", memberBuilds_ && !memberSessionOnly_);
+    if (memberBuilds_ && !memberSessionOnly_ && !memberLogin_.empty()) prefs.set("member_login", memberLogin_);
     prefs.set("sculpt_seconds", std::floor(sculptSeconds_)); // for the one support reminder (Support.h); stays here
     prefs.set("support_reminder_done", supportReminderDone_);
     prefs.set("support_card", supportCardPrefs_.enabled); // the support card at launch (Support.h)
@@ -725,7 +729,9 @@ void App::startUpdateCheck(bool manual) {
     std::string source = feed && *feed ? feed : kUpdateFeedUrl;
     // Detached: a slow network never holds up quitting (the job is shared, so it outlives the app if it must).
     const UpdateChannel channel = updateChannel_;
-    std::thread([job, source, channel] {
+    // Member builds only when signed in, and never in UI tests (the network).
+    const std::shared_ptr<MemberAuth> member = memberBuilds_ && options_.uiTest.empty() ? memberAuth_ : nullptr;
+    std::thread([job, source, channel, member] {
         std::string body;
         if (source.rfind("https://", 0) == 0 || source.rfind("http://", 0) == 0) {
             ai::HttpResponse r = ai::httpRequest("GET", source, {"Accept: application/json"}, {}, 15);
@@ -739,6 +745,7 @@ void App::startUpdateCheck(bool manual) {
             else job->error = "can't read " + source;
         }
         if (job->error.empty()) job->ok = parseUpdateFeed(body, job->info, job->error, channel);
+        if (member) checkMemberBuilds(*member, *job); // (PanelUpdate.cpp)
         job->done = true;
     }).detach();
 }
@@ -747,6 +754,13 @@ void App::pollUpdateCheck() {
     if (!updateJob_ || !updateJob_->done) return;
     const std::shared_ptr<UpdateJob> job = std::move(updateJob_);
     updateJob_.reset();
+    if (job->memberSignedOut) { // (the token is already gone from the keychain)
+        memberBuilds_ = false;
+        memberStatus_ = "Your member sign-in has run out: sign in again for member builds.";
+        saveProjectPrefs();
+    } else if (!job->memberError.empty()) {
+        memberStatus_ = "Couldn't check member builds: " + job->memberError;
+    }
     if (!job->ok) {
         updateStatus_ = "Couldn't check for updates: " + job->error;
         if (job->manual) status_ = updateStatus_;
@@ -840,6 +854,9 @@ void App::drawUpdatesSection() {
     ui::ActionButton(*this, "help.check_updates", ImVec2(-1, 0));
     if (updateJob_) ImGui::TextDisabled("%s", tr("Checking..."));
     else if (!updateStatus_.empty()) ImGui::TextWrapped("%s", updateStatus_.c_str());
+#if SF_UPDATE_CHECK
+    drawMemberBuildsSection(); // (PanelUpdate.cpp)
+#endif
 }
 
 } // namespace sf

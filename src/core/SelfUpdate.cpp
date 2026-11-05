@@ -4,6 +4,7 @@
 
 #include "core/Ed25519.h"
 #include "core/Json.h"
+#include "core/MemberBuilds.h"
 #include "core/Sha256.h"
 
 #include <algorithm>
@@ -79,6 +80,10 @@ bool isReleaseAssetHostUrl(const std::string& url) {
         if (url.size() > n && url.compare(0, n, host) == 0) return url.find('\\') == std::string::npos;
     }
     return false;
+}
+
+bool allowedUpdateUrl(const std::string& url) {
+    return isReleaseDownloadUrl(url) || isReleaseAssetHostUrl(url) || member::isMemberApiUrl(url);
 }
 
 bool safeVersion(const std::string& version) {
@@ -289,17 +294,27 @@ bool fetchSmall(const Fetch& fetch, const std::string& url, size_t cap, Download
 } // namespace
 
 void downloadUpdate(const std::string& version, const Install& install, const uint8_t key[32], const Fetch& fetch,
-                    Download& d) {
+                    Download& d, const std::map<std::string, std::string>& memberFiles) {
     struct Done {
         Download& d;
         ~Done() { d.done = true; }
     } done{d};
     d.ok = false;
     d.error.clear();
-    const std::string sumsUrl = releaseFileUrl(version, "SHA256SUMS.txt"), sigUrl = releaseFileUrl(version, "SHA256SUMS.txt.sig"),
-                      file = versionedAsset(install.asset, version), packageUrl = releaseFileUrl(version, file);
-    if (!selfUpdates(install.kind) || sumsUrl.empty() || packageUrl.empty()) {
+    // A public release's files by their fixed URLs; a member build's by the asset URLs its release lists.
+    const auto urlOf = [&](const std::string& name) -> std::string {
+        if (memberFiles.empty()) return releaseFileUrl(version, name);
+        const auto it = memberFiles.find(name);
+        return it != memberFiles.end() && member::isMemberAssetUrl(it->second) && safeVersion(version) ? it->second : "";
+    };
+    const std::string file = versionedAsset(install.asset, version), sumsUrl = urlOf("SHA256SUMS.txt"),
+                      sigUrl = urlOf("SHA256SUMS.txt.sig"), packageUrl = file.empty() ? "" : urlOf(file);
+    if (!selfUpdates(install.kind)) {
         d.error = "this install can't update itself";
+        return;
+    }
+    if (sumsUrl.empty() || sigUrl.empty() || packageUrl.empty()) {
+        d.error = "the release doesn't have " + (sumsUrl.empty() ? std::string("SHA256SUMS.txt") : sigUrl.empty() ? std::string("a signature") : file);
         return;
     }
     std::string sums, sig;

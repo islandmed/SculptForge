@@ -1275,6 +1275,8 @@ private:
         bool ok = false;
         UpdateInfo info;
         std::string error;
+        std::string memberError;   // the member check's problem (the public check may still have worked)
+        bool memberSignedOut = false; // the sign-in ran out or was revoked: signed out
     };
     void startUpdateCheck(bool manual);
     void pollUpdateCheck();
@@ -1313,6 +1315,23 @@ private:
     double confirmStartAt_ = 0.0; // > 0: this version was just installed; confirmed once it has run this long
     std::shared_ptr<ai::ChildProcess> restartChild_;
     double restartDeadline_ = 0.0;
+    // Member builds (PanelUpdate.cpp, core/MemberBuilds.h): GitHub sign-in (device flow) in Preferences > Updates;
+    // the update check then also lists the member repository's releases. The token is in the OS keychain only.
+    struct MemberAuth; // the tokens, shared with worker threads
+    struct MemberSignIn;
+    void drawMemberBuildsSection(); // Preferences > Updates
+    // (Worker threads.) Adds the newest member build to the job's answer when it is newer; a usable access token
+    // (from the keychain, refreshed when it has run out; false and `signedOut` when the sign-in is gone).
+    static void checkMemberBuilds(MemberAuth& auth, UpdateJob& job);
+    static bool memberAccessToken(MemberAuth& auth, std::string& token, std::string& error, bool& signedOut);
+    void startMemberSignIn();
+    void memberSignOut();
+    std::shared_ptr<MemberAuth> memberAuth_;
+    std::shared_ptr<MemberSignIn> memberSignIn_;
+    bool memberBuilds_ = false;  // signed in (and the token is in the keychain); saved in the preferences
+    std::string memberLogin_;    // the GitHub login shown ("Signed in as ..."); saved; not a secret
+    bool memberSessionOnly_ = false; // signed in, but no keychain kept it: not saved, gone at quit
+    std::string memberStatus_;
     int autosaveMinutes_ = 5; // 0 = off
     float autosaveTimer_ = 0.0f;
     uint64_t autosaveRevision_ = ~uint64_t(0);
