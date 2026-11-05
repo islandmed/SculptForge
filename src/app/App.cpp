@@ -733,6 +733,7 @@ bool App::focusKeepsDrawing(double now) const {
 bool App::wantsFrames(double now) const {
     return now < activeUntil_ || focusKeepsDrawing(now) || drag_ != Drag::None || ui::HoverAnimating() || // a hover ring easing in or out
            doc_.sculptor.strokeActive() ||
+           proofRunning() || // (not a keep-alive from the last frame: building a scene takes longer than any timeout)
            !dabQueue_.empty() || // a stroke's dabs still waiting (drainStrokeDabs) are placed a few each frame
            strokeFinishing_ || solverBusy() || // the solver thread is placing a stroke's dabs (AsyncStroke.cpp)
            backgroundBusy() || playingLayer_ >= 0 || faceTakePlaying_ ||

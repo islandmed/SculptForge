@@ -10,6 +10,7 @@ All notable changes to SculptForge are listed here. The format follows
 - Orbiting a dense scan with a micro level right after big strokes is smoother on slower computers: the shading
   that catches up after the strokes now takes a few milliseconds a frame while the view moves, and the rest when it
   stops (Lucy 112M on the low-end profile: 13 to 19 frames a second).
+- **Help > Benchmark** no longer stops at "settling" on slower computers when the scene takes a few seconds to open.
 - Move, Scale and Rotate (the Transform gizmo and the `transform` command) with a sculpt layer active now record into
   that layer, masked or not, like a stroke (#133, thanks Devon0209): the base mesh stays, the layer's weight dials
   the move in and out, undo works. With Base mesh active they move the base and every layer, as before.
