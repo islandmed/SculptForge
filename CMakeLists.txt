@@ -134,6 +134,7 @@ add_library(sculptforge_core STATIC
   third_party/tinyexr/tinyexr_impl.cpp
   src/core/LitSphere.cpp
   src/core/Trash.cpp
+  src/core/DiscordPresence.cpp
   src/core/Project.cpp
   src/core/Guide.cpp
   src/core/WhatsNew.cpp
@@ -199,7 +200,7 @@ embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedRecipes.cpp sf::assets
 target_sources(sculptforge_core PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedRecipes.cpp)
 target_include_directories(sculptforge_core PUBLIC src PRIVATE third_party/stb third_party/ufbx third_party/xatlas third_party/mikktspace third_party/tinyexr)
 if(WIN32)
-  target_link_libraries(sculptforge_core PRIVATE shell32) # core/Trash.cpp: the Recycle Bin
+  target_link_libraries(sculptforge_core PRIVATE shell32 advapi32) # core/Trash.cpp: the Recycle Bin; core/DiscordPresence.cpp: the pipe server's user
 endif()
 # Third-party C code: compile quietly.
 if(MSVC)
@@ -371,6 +372,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/QuickTour.cpp
     src/app/PanelAi.cpp
     src/app/PanelSupportCard.cpp
+    src/app/PanelIntegrations.cpp
     src/app/WhatsNewPopup.cpp
     src/app/PanelExtract.cpp
     src/app/PanelTimeline.cpp

@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cctype>
 #include <chrono>
 #include <cstdlib>
@@ -116,6 +117,12 @@ void App::initProject() {
         supportCardPrefs_.shownAt = int64_t(prefs["support_card_shown_at"].asNumber(0));
         supportCardPrefs_.laterAt = int64_t(prefs["support_card_later_at"].asNumber(0));
         if (prefs["support_card_version"].isString()) supportCardPrefs_.shownVersion = prefs["support_card_version"].asString();
+        discordPrefs_.enabled = prefs["discord_presence"].asBool(false); // Preferences > Integrations (PanelIntegrations.cpp)
+        discordPrefs_.showChallenge = prefs["discord_challenge_shown"].asBool(false);
+        discordPrefs_.showFileName = prefs["discord_file_name_shown"].asBool(false);
+        if (prefs["discord_challenge"].isString())
+            discordPrefs_.challenge = discord::sanitize(prefs["discord_challenge"].asString(), discord::kChallengeMax);
+        std::snprintf(discordChallengeBuf_, sizeof discordChallengeBuf_, "%s", discordPrefs_.challenge.c_str());
         // The look (0.10.7): what the last session used, unless ui.json names one. An install from before 0.10.7
         // remembers neither and keeps the Classic look with the Classic layout; the new-look card offers the
         // new default once (PanelSupport.cpp).
@@ -140,6 +147,7 @@ void App::initProject() {
     }
     recentFiles_ = pruneRecentFiles(std::move(recentFiles_), fileExists);
     saveProjectPrefs(); // records this version, so What's New shows once
+    updateDiscordPresence(); // on if it was left on (PanelIntegrations.cpp)
     // The support card: decided here, while starting, and never again this session (Support.h). Its picture is
     // decoded on a worker thread only if it shows.
     launchSupportCard(!hadPrefs,
@@ -188,6 +196,10 @@ void App::saveProjectPrefs() {
     prefs.set("support_card_shown_at", double(supportCardPrefs_.shownAt));
     prefs.set("support_card_later_at", double(supportCardPrefs_.laterAt));
     if (!supportCardPrefs_.shownVersion.empty()) prefs.set("support_card_version", supportCardPrefs_.shownVersion);
+    prefs.set("discord_presence", discordPrefs_.enabled); // Preferences > Integrations (PanelIntegrations.cpp)
+    prefs.set("discord_challenge_shown", discordPrefs_.showChallenge);
+    prefs.set("discord_file_name_shown", discordPrefs_.showFileName);
+    if (!discordPrefs_.challenge.empty()) prefs.set("discord_challenge", discordPrefs_.challenge);
     if (!uiConfigDeterministic_) {
         Json look = Json::object();
         lookToJson(uiPrefs_, look);

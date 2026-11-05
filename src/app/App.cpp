@@ -266,6 +266,7 @@ bool App::init(const AppOptions& options) {
 
 void App::shutdown() {
     saveWindowState();
+    discordClient_.reset(); // clears what Discord shows, then closes
     if (doc_.sculptor.strokeActive()) endStroke();
     solver_.reset(); // (its thread uses the renderer)
     flushBrushEdits();
@@ -2521,6 +2522,7 @@ void App::updateTitle() {
     std::string name = doc_.path.empty()
                            ? std::string("Untitled")
                            : std::filesystem::path(std::u8string(doc_.path.begin(), doc_.path.end())).filename().string();
+    updateDiscordPresence(); // the file name, if it's shown (sends only on a change)
     std::string title = (doc_.dirty() ? "* " : "") + name + " - SculptForge";
     if (*appPrerelease()) title += " " + appVersionLabel(); // "- SculptForge 0.11.0 Beta 1": a beta says so
     if (title == windowTitle_) return; // called every frame
