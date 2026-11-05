@@ -295,8 +295,9 @@ public:
     bool microMoveAlongNormals = false;
     // Standard, Clay and Inflate dabs whose radius spans at least this many base edges move the base vertices of a
     // micro level (the detail rides along, as with Move), not its millions of grid points: a scan's micro level
-    // has tiny base triangles (Lucy: 28M), where the per-patch work of the grid cost seconds a dab. Not with a mask
-    // or hidden faces (the grid masks per point and keeps hidden patches whole) or an alpha.
+    // has tiny base triangles (Lucy: 28M), where the per-patch work of the grid cost seconds a dab. They take the plain
+    // mesh's path (its fused batches included). Not with a mask or hidden faces (the grid masks per point and keeps
+    // hidden patches whole), an alpha, layers or dynamic topology.
     // SF_MICRO_BASE=0: always the grid (A/B).
     static constexpr float kMicroBaseSpan = 16.0f;
     bool microBaseDabs = microBaseDefault();
@@ -368,14 +369,6 @@ private:
     // This stroke's dabs on a micro level go to the base vertices (-1: not decided yet; microBaseDab).
     int microBase_ = -1;
     bool microBaseDab(const Mesh& mesh, BrushType type, const DabParams& p);
-    // The plain mesh's brush (Standard, Clay, Inflate) at the base vertices, evaluated at the micro surface's corners
-    // (base point + normal * corner height): the base moves as a plain mesh would and the patches' points follow
-    // (Phong over the corners, as N2's coarse lattice), their heights untouched.
-    void microBaseKernel(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Symmetry sym);
-    std::vector<uint32_t> baseVerts_;
-    std::vector<glm::vec3> baseMoves_;
-    std::vector<float> baseFall_;
-    std::vector<glm::vec3> baseCorner_, baseNormal_;
     bool microReady(Mesh& mesh); // the mesh has a micro level: starts the micro stroke on first use
     float strokeDiagonal_ = 0.0f;
     // The last remesh (repairDab remeshes it again when the brush squashed a triangle).
