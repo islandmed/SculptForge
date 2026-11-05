@@ -16,7 +16,7 @@ export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'
 S=$(mktemp -d)
 trap 'rm -rf "$S"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
-quiet() { "$@" >"$S/out.log" 2>&1 || { cat "$S/out.log" >&2; fail "$* exited $?"; }; }
+quiet() { "$@" >"$S/out.log" 2>&1 || { cat "$S/out.log" >&2; fail "$*"; }; }
 
 # --- the sandbox -----------------------------------------------------------------------------------------------------
 git clone -q --shared --no-checkout "$ROOT" "$S/repo"
@@ -44,6 +44,9 @@ testers:
   - Windows, 150% scaling: open the beta test feature and try it.
 ---
 EOF
+# The real tree's What's New may still hold {{NAME}} placeholders for numbers not measured yet; this test is about the
+# steps, so the sandbox fills them (the placeholder check itself is tested below).
+sed -i 's/{{[A-Z0-9_]*}}/measured/g' docs/guide/whats-new.md CHANGELOG.md
 git add -A . && git commit -q -m "sandbox"
 git init -q --bare "$S/origin.git"
 git remote set-url origin "$S/origin.git"
@@ -94,6 +97,10 @@ done
 
 # --- the beta ------------------------------------------------------------------------------------------------------
 start=$(git rev-parse HEAD)
+echo 'placeholder: {{SOME_NUMBER}}' >>CHANGELOG.md && git commit -q -am placeholder
+scripts/release.sh 9.0.0-beta.1 --only bump >"$S/out.log" 2>&1 && fail "bump passed with an unfilled placeholder"
+grep -q 'unfilled placeholders: CHANGELOG.md' "$S/out.log" || fail "no placeholder stop: $(cat "$S/out.log")"
+git reset -q --hard HEAD^
 quiet scripts/release.sh 9.0.0-beta.1 --only bump
 grep -q '^project(SculptForge VERSION 9.0.0 ' CMakeLists.txt || fail "beta bump: CMakeLists.txt is not at 9.0.0"
 grep -qx 'set(SCULPTFORGE_PRERELEASE "beta.1")' CMakeLists.txt || fail "beta bump: no prerelease beta.1"

@@ -220,7 +220,7 @@ words_ok() {
         die "docs/guide/whats-new.md has no '## Version $BASE'" "write that section at the top (Help > What's New shows it), commit, push main"
     # Numbers still waiting for a measurement are written {{NAME}}; none may ship.
     local ph
-    ph=$(grep -Hn '{{[A-Z0-9_]*}}' docs/guide/whats-new.md CHANGELOG.md changes/*.md ${HIGHLIGHTS:+"$HIGHLIGHTS"} 2>/dev/null | head -5)
+    ph=$(grep -Hn '{{[A-Z0-9_]*}}' docs/guide/whats-new.md CHANGELOG.md changes/*.md ${HIGHLIGHTS:+"$HIGHLIGHTS"} 2>/dev/null | head -5 || true)
     [ -z "$ph" ] || die "unfilled placeholders: $ph" "put the measured numbers in (or drop those lines), commit, push main"
     [ "${1:-}" = bump ] || python3 tools/release/pin_whats_new_test.py "$BASE" --check >/dev/null ||
         die "tests/ui/whats_new.sfui isn't pinned to $BASE's What's New" "run step bump (it pins it): $(resume bump)"
