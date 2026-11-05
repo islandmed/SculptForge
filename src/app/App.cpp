@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
+#include "app/BrandMark.h"
 #include "io/BridgeProtocol.h"
 #include "core/LayerStack.h"
 #include "app/ShellQuote.h"
@@ -72,6 +73,8 @@ extern const unsigned char fontCjk[];
 extern const unsigned long long fontCjk_size;
 extern const unsigned char appIcon[];
 extern const unsigned long long appIcon_size;
+extern const unsigned char appIconSmall[];
+extern const unsigned long long appIconSmall_size;
 } // namespace assets
 
 namespace {
@@ -172,12 +175,19 @@ bool App::init(const AppOptions& options) {
         else if (saved.maximized || saved.fullscreen) SDL_MaximizeWindow(window_);
     }
     {
-        Image icon;
+        // The detailed tile, with the small-size mark as the alternate for small task bar and title bar icons.
+        Image icon, small;
         std::string iconErr;
         if (Image::decode(assets::appIcon, size_t(assets::appIcon_size), icon, iconErr)) {
             if (SDL_Surface* surface = SDL_CreateSurfaceFrom(icon.width, icon.height, SDL_PIXELFORMAT_RGBA32, icon.rgba.data(),
                                                              icon.width * 4)) {
+                SDL_Surface* alt = Image::decode(assets::appIconSmall, size_t(assets::appIconSmall_size), small, iconErr)
+                                       ? SDL_CreateSurfaceFrom(small.width, small.height, SDL_PIXELFORMAT_RGBA32,
+                                                               small.rgba.data(), small.width * 4)
+                                       : nullptr;
+                if (alt) SDL_AddSurfaceAlternateImage(surface, alt);
                 SDL_SetWindowIcon(window_, surface);
+                if (alt) SDL_DestroySurface(alt);
                 SDL_DestroySurface(surface);
             }
         }
@@ -2820,7 +2830,11 @@ void App::drawUi() {
         ImGui::SetNextWindowSize(ImVec2(460 * uiScale_, 0), ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (ImGui::Begin("About SculptForge", &showAbout_, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
+            brand::markItem(64.0f * uiScale_); // the app mark, the name and version beside it
+            ImGui::SameLine(0.0f, 12.0f * uiScale_);
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (64.0f * uiScale_ - ImGui::GetTextLineHeight()) * 0.5f);
             ImGui::Text("SculptForge %s", appVersionLabel().c_str());
+            ImGui::Spacing();
             if (const StudioStart& studio = studioMode(); studio.active) { // a studio build: its logo and name
                 const StudioProfile& p = studio.profile;
                 if (!p.logo.empty())

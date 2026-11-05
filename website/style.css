@@ -43,9 +43,8 @@ p { margin: 0 0 1em; }
 .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 600; font-size: 1.1rem; }
 .brand:hover { text-decoration: none; }
-/* The cube's drawing starts 2/24 of the way into the icon: pull it out so its edge lines up with the page text
-   and the hero badge. */
-.brand img { margin-left: calc(-34px * 2 / 24); }
+/* The mark is a full tile: its edge lines up with the page text as it is. */
+.brand img { border-radius: 22%; }
 .nav nav { display: flex; gap: 22px; align-items: center; flex: none; }
 .nav nav a { color: var(--muted); font-size: 0.95rem; white-space: nowrap; }
 .nav nav a:hover { color: var(--text); text-decoration: none; }

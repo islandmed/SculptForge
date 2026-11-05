@@ -8,6 +8,7 @@
 #include "app/App.h"
 #include "io/BridgeProtocol.h"
 
+#include "app/BrandMark.h"
 #include "app/Demo.h"
 #include "app/Shell.h"
 #include "app/Theme.h"
@@ -995,9 +996,13 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f * s, 0.0f));
 
     // App mark and name.
-    ImGui::SetCursorPos(ImVec2(8.0f * s, textY));
-    ImGui::TextColored(theme::brand, ICON_LC_BOX); // the brand mark keeps its orange in every look
-    ImGui::SameLine(0.0f, 5.0f * s);
+    { // the app mark (the same in every look), a little taller than the name
+        const float m = std::round(std::min(ImGui::GetFontSize() * 1.3f, h - 4.0f * s));
+        ImGui::SetCursorPos(ImVec2(8.0f * s, std::floor((h - m) * 0.5f)));
+        brand::markItem(m);
+    }
+    ImGui::SameLine(0.0f, 6.0f * s);
+    ImGui::SetCursorPosY(textY);
     if (fontBold_) ImGui::PushFont(fontBold_);
     ImGui::TextUnformatted("SculptForge");
     if (fontBold_) ImGui::PopFont();
@@ -1388,9 +1393,13 @@ void App::drawStatusBar(const ShellGeometry& g) {
         return x + textW(f, t);
     };
 
-    // Brand: the cube in the SculptForge orange, the name.
+    // Brand: the app mark, the name.
     float x = o.x + 12.0f * s;
-    x = textAt(ImGui::GetFont(), x, theme::brand, ICON_LC_BOX) + 6.0f * s;
+    {
+        const float m = std::round(std::min(ImGui::GetFontSize() * 1.3f, h - 4.0f * s));
+        brand::mark(dl, ImVec2(std::floor(x), std::floor(o.y + (h - m) * 0.5f)), m);
+        x += m + 6.0f * s;
+    }
     const bool caps = style == Status::Terminal;
     x = textAt(bold, x, theme::textBright, caps ? "SCULPTFORGE" : "SculptForge");
     x += (style == Status::TitleBlock ? 14.0f : 18.0f) * s;

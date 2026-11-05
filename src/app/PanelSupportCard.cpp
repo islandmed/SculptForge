@@ -279,11 +279,11 @@ void App::drawSupportCard() {
     const float pad = 48.0f * k;
     float y = a.y + 40.0f * k;
     const float colW = size.x * 0.50f;
-    // Hero: the cube mark on its tile, the eyebrow and the promise.
+    // Hero: the app mark, the eyebrow and the promise.
     {
         const float m = 48.0f * k;
         const ImVec2 m0(a.x + pad, y), m1(m0.x + m, m0.y + m);
-        cubeTile(dl, m0, m, k, A);
+        markTile(dl, m0, m, A);
         const float ex = m1.x + 16.0f * k;
         paint.spaced(boldUi, 12.5f, ImVec2(ex, y + 6.0f * k), tc(accent, A), "SCULPTFORGE MEMBERSHIP", 2.2f);
         paint.text(bodyFont, 15.0f, ImVec2(ex, y + 25.0f * k), tc(dim, A), "Thank you for sculpting with SculptForge");
