@@ -215,6 +215,10 @@ int main(int argc, char** argv) {
             }
         }
         else if (a == "--focus-detail") options.openPath = next(); // a .sfdetail file (prototype)
+        else if (a == "--benchmark-file") {
+            options.benchmark = true;
+            options.benchmarkScene = "file:" + next();
+        }
         else if (a == "--benchmark-sizes") options.benchmarkSizes = next();
         else if (a == "--benchmark-out") options.benchmarkOut = next();
         else if (a == "--benchmark-video") options.benchmarkVideo = next();

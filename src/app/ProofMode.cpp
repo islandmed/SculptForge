@@ -14,6 +14,7 @@
 // its own thread), and a JSON result with the hardware and version is written at the end.
 #include "app/ProofMode.h"
 
+#include "core/Project.h"
 #include "core/FocusDetail.h"
 #include "core/Micro.h"
 
@@ -83,6 +84,21 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
     // ~150 bytes a triangle like the spheres; the head is built the same way (a cube's quads, divided).
     const ProofMeshSize s15{15, "15M", [](size_t t) { return makeBenchHead(t); }, 150};
     const ProofMeshSize s33{33, "33M", [](size_t t) { return makeBenchHead(t); }, 150};
+    if (name.rfind("file:", 0) == 0) { // --benchmark-file (perf/scoreboard): a project from disk, the scoreboard's strokes
+        const std::string path = name.substr(5);
+        std::error_code ec;
+        const double bytes = double(std::filesystem::file_size(std::filesystem::path(std::u8string(path.begin(), path.end())), ec));
+        const ProofMeshSize s{ec ? 1.0 : bytes / 20e6, std::filesystem::path(path).stem().string(), [path](size_t) {
+                                  std::string err;
+                                  Document d;
+                                  if (!loadProject(path, d, err)) {
+                                      std::fprintf(stderr, "benchmark file %s: %s\n", path.c_str(), err.c_str());
+                                      return makeBenchHead(size_t(1) << 20);
+                                  }
+                                  return std::move(d.mesh);
+                              }, 150};
+        return {s};
+    }
     if (name == "standard-15m") return {s15};
     if (name == "standard-33m") return {s33};
     if (name == "standard") return {s15, s33};
@@ -513,6 +529,11 @@ void App::startProofMode() {
         p->phases = {{"standard 40 px", 40.0f, p->strokeSeconds, BrushType::Standard, 0.5f},
                      {"standard 108 px", 108.0f, p->strokeSeconds, BrushType::Standard, 0.5f},
                      {"standard 216 px", 216.0f, p->strokeSeconds, BrushType::Standard, 0.5f}};
+    else if (p->scene.rfind("file:", 0) == 0) // the perf scoreboard's strokes (docs/design/perf-scoreboard.md)
+        p->phases = {{"clay small", 25.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
+                     {"clay large", 120.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
+                     {"240 px brush", 240.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
+                     {"orbit", 0.0f, 10.0}};
     else if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds);
     else p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0}};
     p->stage = p->cli ? ProofState::Stage::Announce : ProofState::Stage::Intro;
