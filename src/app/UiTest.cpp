@@ -879,6 +879,10 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "panel_drag_scroll_y") return double(ui::DragScrollY());  // that panel's scroll after the last one
     if (name == "drag_cursor") return double(dragCursor_); // the system cursor during the last button_drag (#88)
     if (name == "viewport_cursor") return app_.cursorKind_; // the system cursor: 0 arrow, 100 crosshair (#73)
+    if (name == "micro_wavelet_ok") { // 1: wavelet strokes off, or on and some dab took that path (N2)
+        const MicroStroke& ms = app_.doc_.sculptor.microStroke();
+        return !ms.wavelet || ms.waveletDabs > 0 ? 1.0 : 0.0;
+    }
     if (name == "wants_frames") return app_.wantsFrames(double(SDL_GetTicksNS()) * 1e-9) ? 1.0 : 0.0;
     if (name == "focus_frames") return app_.focusKeepsDrawing(double(SDL_GetTicksNS()) * 1e-9) ? 1.0 : 0.0;
     if (name == "pen_mouse_down") return app_.penMouseDown_ ? 1.0 : 0.0;

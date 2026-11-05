@@ -1,0 +1,12 @@
+# Wavelet strokes on micro levels (N2, MicroStroke::wavelet) give the picture the fine brush gives. CMakeLists runs
+# this twice, SF_MICRO_WAVELET=0 and =1, and compares the shots (tools/test/png_diff.py). The brushes are wide enough
+# for the wavelet lattice (its radius spans 64 points at spacing 4: about 512 micro edges).
+run new_sphere subdivisions=4
+orbit 30 -15
+run micro_divide level=6
+run micro_noise amplitude=0.003 scale=40
+run stroke brush=Standard points="-0.5,0.2,1 0,0.35,1 0.5,0.2,1" radius=0.7 strength=0.3
+run stroke brush=Clay points="-0.3,-0.35,1 0.35,-0.25,1" radius=0.65 strength=0.3
+wait 1
+expect_value micro_wavelet_ok == 1
+shot micro-wavelet

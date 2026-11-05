@@ -727,6 +727,18 @@ if(SCULPTFORGE_BUILD_TESTS)
     if(TEST ui_hardware_profile)
       set_tests_properties(ui_hardware_profile PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1")
     endif()
+    # Wavelet strokes (N2) against the fine brush: the same picture within png_diff's tolerance.
+    foreach(mode 0 1)
+      add_test(NAME ui_micro_wavelet_${mode} COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/micro_wavelet.sfui
+               --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/micro_wavelet_${mode})
+      set_tests_properties(ui_micro_wavelet_${mode} PROPERTIES LABELS ui TIMEOUT 300 ENVIRONMENT "SF_MICRO_WAVELET=${mode}"
+                           FIXTURES_SETUP micro_wavelet_shots)
+    endforeach()
+    add_test(NAME ui_micro_wavelet_parity COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/png_diff.py
+             ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/micro_wavelet_0/micro-wavelet.png
+             ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/micro_wavelet_1/micro-wavelet.png --crop 120 170 1210 860
+             --fraction 0.005 --max 16) # (the 3D view only; heights within 1% of the fine brush: 0.14% of pixels over 2 levels, worst 10)
+    set_tests_properties(ui_micro_wavelet_parity PROPERTIES LABELS ui TIMEOUT 120 FIXTURES_REQUIRED micro_wavelet_shots)
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     add_test(NAME ui_shell_layout_1080 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/shell_layout.sfui
              --size 1920x1080 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/shell_layout_1080)
