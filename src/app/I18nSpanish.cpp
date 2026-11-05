@@ -97,6 +97,7 @@ constexpr Entry kSpanish[] = {
     {"Camera", "Cámara"},
     {"Import / Export", "Importar / Exportar"},
     {"From an image", "A partir de una imagen"},
+    {"From Image", "Desde imagen"},
     {"Voxel Remesh", "Remallado por vóxeles"},
     {"Quick Remesh", "Remallado rápido"},
     {"Modify Topology", "Modificar topología"},

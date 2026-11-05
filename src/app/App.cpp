@@ -1348,6 +1348,7 @@ void App::buildUiFonts(float scale) {
 
 void App::handleEvent(const SDL_Event& event) {
     if (dropPenMouseEvent(event)) return; // the pen's mouse events are made here, not by SDL (#95, Tablet.cpp)
+    penNoise_ = penRestNoise(event);      // a resting pen's tilt and jitter (Tablet.cpp)
     penMouseEvents(event, true);          // a pen leaving lets go of the tip's button first
     dispatchEvent(event);
     penMouseEvents(event, false);         // the tip's mouse events, after the pen's own
@@ -1355,6 +1356,7 @@ void App::handleEvent(const SDL_Event& event) {
 
 void App::dispatchEvent(const SDL_Event& event) {
     if (strayMouseMotion(event)) return; // neither the canvas nor the UI follows a driver's stray mouse events
+    if (event.type == SDL_EVENT_MOUSE_MOTION && event.motion.which != SDL_PEN_MOUSEID) mouseSincePen_ = true;
     if (sixDofPointerEvent(event)) return; // nor a SpaceMouse that also says it is a mouse (SpaceMouse.cpp)
     if ((event.type >= SDL_EVENT_KEY_DOWN && event.type < SDL_EVENT_JOYSTICK_AXIS_MOTION &&
          event.type != SDL_EVENT_KEYMAP_CHANGED && event.type != SDL_EVENT_KEYBOARD_ADDED &&
@@ -1634,7 +1636,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         // don't sculpt it: brushes work on the active Part only.)
         // Not from a pen: quick taps of a stippling pen counted as a triple-click and switched the Part. Nor while
         // a pen hovers: a Wacom side button set to Double Click (the Intuos 3 default) and a tap made one (Discord).
-        const bool penNear = penInProximity_ && SDL_GetTicksNS() - lastPenNs_ < 1000000000ull;
+        const bool penNear = penInProximity_ && clickClockNs() - lastPenNs_ < 1000000000ull;
         if (mouseClicks_ >= 3 && !lastInputPen_ && !wintabPen_ && !penNear && !(mod & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) &&
             insertType_.empty() && doc_.partCount() > 1) {
             const int target = pickPart(x, y);
@@ -2558,7 +2560,7 @@ void App::openPath(const std::string& path) {
     if (Image::isImagePath(path)) {
         if (loadReferenceImage(path)) {
             if (ai::aiEnabled()) showImageTo3D_ = true;
-            else status_ = "Image loaded: Relief, Inflate or Stamp it from Mesh > Generate 3D";
+            else status_ = "Image loaded: Relief, Inflate or Stamp it from Mesh > From Image";
         }
     } else if (ext == ".sfbrush") {
         installBrushFile(path);

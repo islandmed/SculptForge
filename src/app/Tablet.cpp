@@ -102,6 +102,7 @@ void App::penMouseEvents(const SDL_Event& e, bool before) {
         break;
     case SDL_EVENT_PEN_MOTION:
         if (penMouseDown_ && e.pmotion.which != penMouseOwner_) break;
+        if (penNoise_ && mouseSincePen_) break; // a resting pen doesn't pull the cursor back from the mouse
         sendPenMouse(SDL_EVENT_MOUSE_MOTION, e.pmotion.x, e.pmotion.y, e.pmotion.windowID);
         if (!penMouseDown_) {
             // A hovering pen presses nothing. Should the UI still hold a left button (a driver's press whose
@@ -130,7 +131,7 @@ bool App::strayMouseMotion(const SDL_Event& e) const {
     if (!motion && !left) return false;
     if (dragFromPen_ && drag_ != Drag::None) return true;
     if (left) return penInProximity_ && (penTouching_ || clickClockNs() - lastPenTouchNs_ < 100000000ull);
-    return penInProximity_ && SDL_GetTicksNS() - lastPenNs_ < 1000000000ull;
+    return penInProximity_ && clickClockNs() - lastPenNs_ < 1000000000ull;
 }
 
 // ImGui's SDL backend also reads the system cursor every frame while no button is held (the cursor minus the window
@@ -140,7 +141,7 @@ void App::keepImGuiOnPen() {
     ImGuiIO& io = ImGui::GetIO();
     const bool soft = penSoftCursor();
     io.MouseDrawCursor = soft && !viewportCursorWanted(); // over the view the brush ring is the cursor
-    if (!soft && (!penInProximity_ || SDL_GetTicksNS() - lastPenNs_ >= 1000000000ull)) return;
+    if (!soft && (!penInProximity_ || clickClockNs() - lastPenNs_ >= 1000000000ull)) return;
     io.AddMousePosEvent(mouseX_, mouseY_);
 }
 
@@ -181,8 +182,37 @@ void App::mapPenPosition(SDL_Event& e) {
     }
 }
 
+// A pen resting in range (laid on the tablet, or held still above it) keeps sending events: tilt and rotation that
+// change by a hair, and motion of a fraction of a pixel. Each of them used to count as the pen in use, so for as
+// long as it lay there the mouse and trackpad could neither move the cursor nor click (strayMouseMotion, a second
+// after the last pen event): with a Wacom, a SpaceMouse and a trackpad on a Mac, the window seemed frozen and the
+// mirror's X out of reach (phoenix, Discord 11-05). Now only touching, buttons, coming into range, pressure and
+// motion of more than kRestPx count; the rest is noise.
+bool App::penRestNoise(const SDL_Event& e) {
+    constexpr float kRestPx = 1.5f;
+    switch (e.type) {
+    case SDL_EVENT_PEN_AXIS: return !(penTouching_ && e.paxis.axis == SDL_PEN_AXIS_PRESSURE);
+    case SDL_EVENT_PEN_MOTION:
+        // (Whether or not the mouse took the cursor since: that ends the pen's proximity, onMouseMove.)
+        if (!penTouching_ && std::hypot(e.pmotion.x - penActiveX_, e.pmotion.y - penActiveY_) < kRestPx)
+            return true;
+        penActiveX_ = e.pmotion.x;
+        penActiveY_ = e.pmotion.y;
+        return false;
+    case SDL_EVENT_PEN_DOWN:
+    case SDL_EVENT_PEN_UP:
+        penActiveX_ = e.ptouch.x;
+        penActiveY_ = e.ptouch.y;
+        return false;
+    default: return false;
+    }
+}
+
 void App::handlePenEvent(const SDL_Event& e) {
-    lastPenNs_ = SDL_GetTicksNS();
+    if (!penNoise_) {
+        lastPenNs_ = clickClockNs(); // (UI tests: the script's time, as the 1 s rules below count it)
+        mouseSincePen_ = false;
+    }
     switch (e.type) {
     case SDL_EVENT_PEN_PROXIMITY_IN:
         // A pen coming into range while a pen drag is still open: it left without saying so (some drivers never
@@ -215,7 +245,7 @@ void App::handlePenEvent(const SDL_Event& e) {
         lastPenTouchNs_ = clickClockNs();
         break;
     case SDL_EVENT_PEN_MOTION:
-        penSeen_ = penInProximity_ = true;
+        if (!penNoise_) penSeen_ = penInProximity_ = true; // (a resting pen doesn't take the cursor back)
         penId_ = e.pmotion.which;
         penTracker_.motion();
         break;
@@ -356,7 +386,7 @@ void App::wintabEvent(const SDL_Event& e) {
                         e.button.which != SDL_PEN_MOUSEID);
     if (!mouse || !wintab_.isOpen()) return;
     const Uint64 now = SDL_GetTicksNS();
-    if (penInProximity_ && now - lastPenNs_ < 1000000000ull) return; // Windows Ink is on: SDL's pen events count
+    if (penInProximity_ && clickClockNs() - lastPenNs_ < 1000000000ull) return; // Windows Ink is on: SDL's pen events count
     WintabPressure::Sample s;
     if (wintab_.poll(s)) {
         wintabNs_ = now;

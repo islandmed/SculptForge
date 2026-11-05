@@ -38,6 +38,10 @@ struct TaskMenuDef {
 };
 const TaskMenuDef* taskMenus(int& count);
 int taskMenuOf(std::string_view paletteId); // index into taskMenus, -1 when none
+// Section k's name in its menu: Mesh's "Generate 3D" is "From Image" while Preferences > AI is off (only the offline
+// Relief, Inflate and Stamp are left there).
+const char* taskSectionTitle(const TaskMenuDef& menu, int k);
+const char* taskSectionIcon(const TaskMenuDef& menu, int k); // (an image for From Image, not the AI sparkles)
 
 // ui::ActionButton's Tile look: a brush thumbnail with its name (brush actions), or a large icon over a
 // small caption (right shelf). Returns true when clicked.

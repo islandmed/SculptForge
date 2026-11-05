@@ -1679,7 +1679,7 @@ void App::drawTaskMenu() {
         for (int k = 0; k < sections; ++k) {
             const PaletteDef* p = findPalette(menu.sections[k]);
             if (!p) continue;
-            const std::string title = tr(menu.titles[k] ? menu.titles[k] : p->name);
+            const std::string title = tr(taskSectionTitle(menu, k));
             const bool current = dropdown_ == p->id;
             const bool inTray = std::count(layout_.leftTray.begin(), layout_.leftTray.end(), p->id) +
                                     std::count(layout_.rightTray.begin(), layout_.rightTray.end(), p->id) >
@@ -1691,7 +1691,7 @@ void App::drawTaskMenu() {
             if (current || hovered) dl->AddRectFilled(a, b, theme::u32(current ? theme::selection : theme::headerHover, current ? 1.0f : 0.6f));
             if (current) dl->AddRectFilled(a, ImVec2(a.x + 2.0f * s, b.y), theme::u32(theme::accent));
             const float ty = std::floor(a.y + (rowH - ImGui::GetFontSize()) * 0.5f);
-            dl->AddText(ImVec2(a.x + 10.0f * s, ty), theme::u32(current ? theme::accent : theme::textDim), p->icon);
+            dl->AddText(ImVec2(a.x + 10.0f * s, ty), theme::u32(current ? theme::accent : theme::textDim), taskSectionIcon(menu, k));
             dl->AddText(ImVec2(a.x + 34.0f * s, ty), theme::u32(current ? theme::textBright : theme::text), title.c_str());
             if (inTray) dl->AddText(ImVec2(b.x - 22.0f * s, ty), theme::u32(theme::textDim), ICON_LC_PANEL_RIGHT);
             if (clicked) {

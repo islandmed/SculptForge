@@ -1,0 +1,127 @@
+# Mirror with every input at once (phoenix, Discord 11-05: macOS, Wacom Intuos Pro + SpaceMouse Compact + trackpad,
+# "froze and wouldn't allow me to use the mirror function"). Symmetry X toggled mid-stroke, the SpaceMouse cap and
+# trackpad pinches while the pen or mouse holds a stroke, pen strokes with stray mouse events: every stroke ends,
+# is one undo step, the app keeps drawing, and X still toggles from the key and the shelf afterwards.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=5
+expect_value symmetry_x == 1
+
+# A held mouse stroke: X off and on again mid-stroke, the cap twisted (held still: Hold during strokes), a trackpad
+# pinch, then more stroke and the release.
+key f
+camera 0 0
+snapshot
+drag_path 0.3 0.45 0.5 0.5 keep
+expect_value stroking == 1
+key x
+spacemouse 0 0 0 0 0 0.8 0.2
+touch_pinch 0.5 0.5 1.5 0 0 0 trackpad
+key x
+drag_path 0.5 0.5 0.7 0.55 keep
+spacemouse_button 2
+release
+wait_idle
+expect_value stroking == 0
+expect_value symmetry_x == 1
+expect_value moved > 0
+key ctrl+z
+expect_value moved == 0
+
+# Pen strokes over and over, X toggled between them by key, the cap turning, the trackpad pinching, a stray mouse
+# event inside each stroke (Windows Ink / macOS send the pointer's own beside the pen's).
+key f
+camera 0 0
+snapshot
+pen_drag 0.35 0.45 0.65 0.5 0.3 stray 0.2 0.2
+key x
+spacemouse 0 0 0 0 0 0.6 0.1
+pen_drag 0.35 0.55 0.65 0.5 0.3 stray 0.8 0.8
+touch_pinch 0.5 0.5 0.8 10 0 0 trackpad
+key x
+pen_drag 0.4 0.4 0.6 0.6 0.3 stray 0.1 0.9
+spacemouse_button 1
+key x
+pen_drag 0.6 0.4 0.4 0.6 0.3
+key x
+wait_idle
+expect_value stroking == 0
+expect_value symmetry_x == 1
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+expect_value moved == 0
+
+# The pen laid on the tablet, still in range: a real one keeps sending a hair of tilt and sub-pixel motion. That
+# kept the mouse and trackpad from moving the cursor or clicking for as long as it lay there (the frozen window,
+# the X out of reach). A second after the pen last moved, the mouse works beside it.
+pen_rest on
+wait 1.1
+click "X##transform.symmetry_x"
+expect_value symmetry_x == 0
+click "X##transform.symmetry_x"
+expect_value symmetry_x == 1
+
+# Hold during strokes off: the cap turns the view under a pen stroke while X is toggled; still one stroke, one undo.
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+click "Hold during strokes##spacemouse.hold"
+key escape
+key f
+camera 0 0
+snapshot
+spacemouse_hold 0 0 0 0 0 0.5
+pen_drag 0.3 0.45 0.7 0.55 0.5
+key x
+pen_drag 0.3 0.55 0.7 0.45 0.5
+spacemouse_hold 0 0 0 0 0 0
+wait_idle
+expect_value stroking == 0
+expect_value symmetry_x == 0
+key ctrl+z
+key ctrl+z
+expect_value moved == 0
+wait 1.1                                         # (a second after the pen last moved: the mouse's again, #13)
+click "Preferences##palette.preferences"
+click "Hold during strokes##spacemouse.hold"
+key escape
+
+# Predictive Strokes: the dabs run on the stroke thread, which the main thread waits for at the release (the one
+# wait a stroke has). The same interleave there.
+key f3
+type "##Command palette" "predictive strokes"
+key enter
+expect_value predictive_strokes == 1
+key f
+camera 0 0
+snapshot
+drag_path 0.3 0.45 0.5 0.5 keep
+key x
+spacemouse 0 0 0 0 0 0.8 0.2
+touch_pinch 0.5 0.5 1.5 0 0 0 trackpad
+key x
+drag_path 0.5 0.5 0.7 0.55 keep
+release
+pen_drag 0.35 0.45 0.65 0.5 0.3 stray 0.2 0.2
+wait_idle
+expect_value stroking == 0
+expect_value symmetry_x == 0
+key ctrl+z
+key ctrl+z
+expect_value moved == 0
+wait 1.1                                         # (a second after the pen last moved: the mouse's again, #13)
+key f3
+type "##Command palette" "predictive strokes"
+key enter
+expect_value predictive_strokes == 0
+
+# Afterwards (the pen still resting in range) the mirror still answers the mouse: the shelf's X turns it on and off.
+click "X##transform.symmetry_x"
+expect_value symmetry_x == 1
+click "X##transform.symmetry_x"
+expect_value symmetry_x == 0
+key x
+expect_value symmetry_x == 1
+shot mirror-stress-after
+pen_rest off
+pen_out
