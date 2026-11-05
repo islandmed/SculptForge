@@ -58,6 +58,8 @@ bool rayTriangle(const glm::vec3& o, const glm::vec3& d, const glm::vec3& a, con
 
 void BVH::build(const Mesh& mesh) {
     const size_t nt = mesh.triangleCount();
+    deferred_.clear();
+    staleGrow_ = 0.0f;
     nodes_.clear();
     std::vector<uint32_t>().swap(leafCap_);
     editedLeaves_.clear();
@@ -203,7 +205,9 @@ bool BVH::raycast(const Mesh& mesh, const glm::vec3& origin, const glm::vec3& di
     while (!stack.empty()) {
         const Node& n = nodes_[stack.back()];
         stack.pop_back();
-        if (!rayBox(n.box, origin, invDir, best)) continue;
+        if (!rayBox(staleGrow_ > 0.0f ? AABB{n.box.min - glm::vec3(staleGrow_), n.box.max + glm::vec3(staleGrow_)} : n.box, origin,
+                    invDir, best))
+            continue;
         if (n.count > 0) {
             for (uint32_t i = n.first; i < n.first + n.count; ++i) {
                 if (skipHidden && mesh.triangleHidden(triIndices_[i])) continue;
@@ -245,7 +249,7 @@ void BVH::queryTriangles(const Mesh& mesh, const glm::vec3& center, float radius
     while (!stack.empty()) {
         const Node& n = nodes_[stack.back()];
         stack.pop_back();
-        if (!sphereBox(n.box, center, r2)) continue;
+        if (!sphereBox(n.box, center, (radius + staleGrow_) * (radius + staleGrow_))) continue; // (stale boxes: deferRefitQueried)
         if (n.count > 0) {
             for (uint32_t i = n.first; i < n.first + n.count; ++i) {
                 const auto& t = mesh.triangles[triIndices_[i]];
@@ -272,7 +276,7 @@ void BVH::forEachLeafInSphere(const glm::vec3& center, float radius,
     while (!stack.empty()) {
         const Node& n = nodes_[stack.back()];
         stack.pop_back();
-        if (!sphereBox(n.box, center, r2)) continue;
+        if (!sphereBox(n.box, center, (std::sqrt(r2) + staleGrow_) * (std::sqrt(r2) + staleGrow_))) continue; // (stale boxes)
         if (n.count > 0) fn(std::span<const uint32_t>(triIndices_.data() + n.first, n.count));
         else if (n.first != kNoLeaf) {
             stack.push_back(n.first);
@@ -287,13 +291,20 @@ void BVH::queryVerticesIn(const Mesh& mesh, const Shape& shape, std::vector<uint
     queryLeaves_.clear();
     if (nodes_.empty()) return;
     if (vertBits_.capacity() < mesh.vertexCount()) vertBits_.resize(mesh.vertexCount());
+    // Boxes left stale by a batched refit (setStaleGrow): grown by the most a vertex moved since, and no
+    // whole-box shortcut (a box inside the shape may hold vertices that moved out).
+    const float grow = staleGrow_;
+    auto touches = [&](const AABB& box) {
+        return grow > 0.0f ? shape.touches(AABB{box.min - glm::vec3(grow), box.max + glm::vec3(grow)}) : shape.touches(box);
+    };
+    auto containsBox = [&](const AABB& box) { return grow <= 0.0f && shape.containsBox(box); };
 
     // The units of parallel work: the subtrees the sphere touches, split breadth first until there are enough
     // of them (the same ones for any thread count).
     constexpr size_t kTasks = 128, kSerialTriangles = 16384;
     std::vector<uint32_t>& tasks = queryTasks_;
     tasks.clear();
-    if (shape.touches(nodes_[0].box)) tasks.push_back(0);
+    if (touches(nodes_[0].box)) tasks.push_back(0);
     int depth = 0; // of every inner node in `tasks` (median splits: each holds about nt >> depth triangles)
     for (bool split = true; split && tasks.size() < kTasks; ++depth) {
         split = false;
@@ -306,7 +317,7 @@ void BVH::queryVerticesIn(const Mesh& mesh, const Shape& shape, std::vector<uint
             }
             split = true;
             for (uint32_t c : {n.first, n.first + 1})
-                if (shape.touches(nodes_[c].box)) queryNext_.push_back(c);
+                if (touches(nodes_[c].box)) queryNext_.push_back(c);
         }
         tasks.swap(queryNext_);
     }
@@ -318,13 +329,13 @@ void BVH::queryVerticesIn(const Mesh& mesh, const Shape& shape, std::vector<uint
             const uint32_t ni = nodeStack.back();
             const Node& n = nodes_[ni];
             nodeStack.pop_back();
-            if (!shape.touches(n.box) || (n.count == 0 && n.first == kNoLeaf)) continue;
+            if (!touches(n.box) || (n.count == 0 && n.first == kNoLeaf)) continue;
             if (n.count == 0) {
                 nodeStack.push_back(n.first);
                 nodeStack.push_back(n.first + 1);
                 continue;
             }
-            if (shape.containsBox(n.box)) { // every corner is inside
+            if (containsBox(n.box)) { // every corner is inside
                 for (uint32_t i = n.first; i < n.first + n.count; ++i) {
                     const auto& t = mesh.triangles[triIndices_[i]];
                     found.insertLocal(t.x);
@@ -466,6 +477,20 @@ void BVH::refit(const Mesh& mesh, std::span<const uint32_t> movedVerts) {
 }
 
 void BVH::refitQueried(const Mesh& mesh) { refitLeaves(mesh, queryLeaves_); }
+
+void BVH::deferRefitQueried(float moved) {
+    deferred_.insert(deferred_.end(), queryLeaves_.begin(), queryLeaves_.end());
+    staleGrow_ += moved;
+}
+
+void BVH::flushDeferred(const Mesh& mesh) {
+    if (deferred_.empty() && staleGrow_ == 0.0f) return;
+    std::sort(deferred_.begin(), deferred_.end());
+    deferred_.erase(std::unique(deferred_.begin(), deferred_.end()), deferred_.end());
+    refitLeaves(mesh, deferred_);
+    deferred_.clear();
+    staleGrow_ = 0.0f;
+}
 
 void BVH::refitLeaves(const Mesh& mesh, std::span<const uint32_t> leaves) {
     poolFor(leaves.size(), [&](size_t b, size_t e) {

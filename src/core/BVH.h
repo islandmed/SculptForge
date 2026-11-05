@@ -52,6 +52,13 @@ public:
     // The leaves holding the vertices the last queryVertices() returned, and refit() given such leaves (from
     // one or more queries, each once: the Move brush keeps them for its whole stroke).
     std::span<const uint32_t> queriedLeaves() const { return queryLeaves_; }
+    // refitQueried() later: the leaves the last queryVertices() listed wait, and every vertex in them moved at most
+    // `moved` (summed over the waits). Until flushDeferred(), vertex queries and ray casts grow every box by that
+    // sum (and skip the whole-box shortcut), so they stay exact, only a little slower. Sculptor refits every few
+    // dabs instead of every dab (about a tenth of a big brush's time).
+    void deferRefitQueried(float moved);
+    void flushDeferred(const Mesh& mesh);
+    float staleGrow() const { return staleGrow_; }
     // The triangles of a leaf (empty for an inner node): every triangle with a vertex a query found is in one of
     // the leaves it listed.
     std::span<const uint32_t> leafTriangles(uint32_t leaf) const {
@@ -110,6 +117,8 @@ private:
     void queryVerticesIn(const Mesh& mesh, const Shape& shape, std::vector<uint32_t>& out) const;
     mutable IndexBits vertBits_;               // queryVertices: the vertices found so far
     mutable std::vector<uint32_t> queryLeaves_; // the leaves holding them, for refitQueried()
+    float staleGrow_ = 0.0f;                    // (deferRefitQueried)
+    std::vector<uint32_t> deferred_;
     mutable std::vector<uint32_t> queryTasks_, queryNext_;
     mutable std::vector<std::vector<uint32_t>> queryParts_;
     IndexBits leafBits_; // refit: the leaves to recompute

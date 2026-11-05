@@ -628,8 +628,10 @@ void Sculptor::displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::spa
     rec.values.resize(base + blockFirst_.back());
     const bool layered = !mesh.layers.empty();
     const float weight = mesh.layerTargetWeight(layer_);
+    blockMove_.assign(blockFirst_.size(), 0.0f);
     poolFor(n, [&](size_t b, size_t e) {
         size_t r = base + blockFirst_[b / kBlock];
+        float most = 0.0f;
         for (size_t i = b; i < e; ++i) {
             const float k = influence_[i];
             if (k <= 0.0f) continue;
@@ -640,9 +642,14 @@ void Sculptor::displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::spa
             }
             const glm::vec3 dk = d[i] * k;
             mesh.positions[v] += dk;
+            most = std::max(most, glm::dot(dk, dk));
             if (layered) target[v] += dk / weight;
         }
+        blockMove_[b / kBlock] = most;
     }, kBlock);
+    float most = 0.0f;
+    for (float m : blockMove_) most = std::max(most, m);
+    lastMove_ = std::max(lastMove_, std::sqrt(most));
 }
 
 void Sculptor::flushLazy(Mesh& mesh, const BVH& bvh, std::span<const uint32_t> leaves) {
@@ -1090,7 +1097,16 @@ void Sculptor::taubinShrink(const Mesh& mesh) {
 // (updateDabNormals), so where mirrors overlap they are updated once.
 void Sculptor::finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_point clock) {
     timings.kernelMs += lapMs(clock);
-    bvh.refitQueried(mesh);
+    // The boxes every few dabs, not every dab (BVH::deferRefitQueried: until then queries grow by the moves).
+    if (dynTopo_.active()) bvh.refitQueried(mesh); // (its edits renumber leaves)
+    else {
+        bvh.deferRefitQueried(lastMove_);
+        if (++deferredDabs_ >= kRefitEvery) {
+            bvh.flushDeferred(mesh);
+            deferredDabs_ = 0;
+        }
+    }
+    lastMove_ = 0.0f;
     timings.bvhMs += lapMs(clock);
     ++timings.dabs;
     timings.vertices += verts_.size();

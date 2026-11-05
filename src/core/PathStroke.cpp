@@ -211,6 +211,7 @@ int strokePath(Document& doc, const BrushRecipe* recipe, BrushType type, const P
         }
     }
     doc.sculptor.flushDetailClone(mesh, doc.bvh, stroke.symmetry); // a click with Detail Clone
+    doc.bvh.flushDeferred(mesh);
     UndoRecord record = doc.sculptor.endStroke();
     if (!record.empty()) doc.undo.push(std::move(record));
     return dabs;

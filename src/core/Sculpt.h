@@ -378,6 +378,11 @@ private:
     std::vector<uint32_t> verts_, dabVerts_; // one mirror's vertices; every mirror's (for the normals)
     ConnectedScratch connected_;             // Connected only (DabParams::connectedOnly)
     std::vector<uint32_t> dabLeaves_;        // the BVH leaves every mirror's query listed (the normals' set)
+    // Batched BVH refits (finishDab): the most any vertex moved since the dab's query, dabs whose refit waits.
+    static constexpr int kRefitEvery = 4;
+    float lastMove_ = 0.0f;
+    int deferredDabs_ = 0;
+    std::vector<float> blockMove_;
     std::vector<float> curvature_;           // strokeCurvature
     bool curvatureFilled_ = false;           // every entry current (a draft stroke packs them as they are)
     const Mesh* curvatureMesh_ = nullptr;    // the mesh curvature_ is for

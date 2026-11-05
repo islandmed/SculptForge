@@ -640,3 +640,27 @@ TEST(alpha_generated_builtins) {
     CommandResult bad = reg.execute(d, "brush_set_alpha", {{"name", std::string("star")}});
     CHECK(!bad.ok && bad.message.find("cracks") != std::string::npos);
 }
+
+TEST(batched_refit_queries_stay_exact) {
+    // Sculptor refits the BVH every few dabs (BVH::deferRefitQueried): between refits, vertex queries and ray
+    // casts must still find exactly what they would with current boxes (the moves grow every box meanwhile).
+    Document d = planeDoc();
+    d.sculptor.beginStroke(d.mesh, "Standard");
+    for (int i = 0; i < 7; ++i) { // big moves: the surface leaves its leaf boxes between refits
+        DabParams p = dabAt(glm::vec3(-0.3f + 0.1f * float(i), 0.0f, 0.0f), 0.3f, 1.0f);
+        d.sculptor.dab(d.mesh, d.bvh, BrushType::Standard, p, kNoSymmetry);
+        const glm::vec3 c(-0.25f + 0.1f * float(i), 0.15f, 0.02f);
+        std::vector<uint32_t> found;
+        d.bvh.queryVertices(d.mesh, c, 0.2f, found);
+        std::vector<uint32_t> brute;
+        for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v)
+            if (glm::distance(d.mesh.positions[v], c) <= 0.2f) brute.push_back(v);
+        CHECK(found == brute);
+        RayHit hit;
+        CHECK(d.bvh.raycast(d.mesh, glm::vec3(c.x, 2.0f, c.z), glm::vec3(0, -1, 0), hit));
+        CHECK(hit.position.y > 0.01f); // the raised surface, not the plane the stale boxes held
+    }
+    d.bvh.flushDeferred(d.mesh);
+    CHECK(d.bvh.staleGrow() == 0.0f);
+    d.undo.push(d.sculptor.endStroke());
+}

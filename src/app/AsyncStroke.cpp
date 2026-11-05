@@ -389,6 +389,7 @@ void App::finishStrokeNow() {
     doc_.sculptor.timings = {};
     perf_.strokeSyncMs = 0.0;
     perf_.strokeFrames = 0;
+    doc_.bvh.flushDeferred(doc_.mesh); // (the refits the stroke batched)
     UndoRecord r = doc_.sculptor.endStroke();
     finishPaintStroke(r);
     if (r.topology && !r.topology->uvs.empty())
@@ -627,6 +628,7 @@ bool App::verifyStroke(uint64_t before, const std::vector<glm::vec2>& dabs, cons
         }
         radiusPx_ = radius;
         doc_.sculptor.flushDraft(doc_.mesh, doc_.bvh);
+        doc_.bvh.flushDeferred(doc_.mesh);
         doc_.undo.push(doc_.sculptor.endStroke());
         return meshStateHash(doc_.mesh);
     };

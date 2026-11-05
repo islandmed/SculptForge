@@ -939,6 +939,7 @@ void registerVdmCommands(CommandRegistry& registry) {
                       if (!doc.sculptor.beginStroke(doc.mesh, "VDM", doc.activeLayer))
                           return {false, "Active layer weight is 0 - raise it to sculpt into the layer"};
                       doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Vdm, p, sym);
+                      doc.bvh.flushDeferred(doc.mesh);
                       UndoRecord r = doc.sculptor.endStroke();
                       if (!r.empty()) doc.undo.push(std::move(r));
                       return {true, "Stamped VDM '" + (doc.brushVdm ? doc.brushVdm->name : std::string("Horn")) + "'"};
