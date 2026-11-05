@@ -473,6 +473,7 @@ bool App::ghostSurface(const glm::vec3& origin, const glm::vec3& dir, glm::vec3&
 
 void App::buildGhost() {
     ghostHeadValid_ = false;
+    renderer_.setScreenStroke(GhostStroke()); // (set again below when this frame's dabs draw on the screen)
     const uint32_t id = doc_.activePartInfo().id;
     if (liveMove_.active) { // Live Move: one "dab" per mirror, the whole move so far
         GhostStroke g;
@@ -569,6 +570,16 @@ void App::buildGhost() {
             d.mirror = m;
             g.dabs.push_back(d);
         }
+    // Research (render/ScreenStroke.h; SF_SCREEN_STROKE=1): the pending dabs drawn on the view, not the geometry.
+    static const bool screenStroke = [] {
+        const char* v = std::getenv("SF_SCREEN_STROKE");
+        return v && *v == '1';
+    }();
+    if (screenStroke && ScreenStroke::supports(g) && renderSettings_.matcap >= 0 && !renderSettings_.pbr()) {
+        renderer_.setScreenStroke(g);
+        renderer_.setGhost(id, GhostStroke());
+        return;
+    }
     renderer_.setGhost(id, g);
 }
 

@@ -27,7 +27,17 @@
 #if defined(__linux__)
 #include <unistd.h>
 #include <fstream>
+#elif defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
 #endif
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <psapi.h> // (K32GetProcessMemoryInfo lives in kernel32: no extra library)
+#elif defined(__APPLE__)
+#include <mach/mach.h>
+#endif
+#include <atomic>
 
 namespace sf {
 
@@ -43,19 +53,40 @@ std::string millions(double n) { return n >= 1e6 ? fmt("%.1fM", n / 1e6) : fmt("
 
 } // namespace
 
+namespace {
+// Windows and macOS can't reset the process's peak: after resetPeakResidentBytes the peak is the most any
+// residentBytes() call saw since (proof mode samples it every frame), before it the system's own peak.
+std::atomic<size_t> g_sampledPeak{0};
+std::atomic<bool> g_peakReset{false};
+} // namespace
+
 size_t residentBytes() {
+    size_t bytes = 0;
 #if defined(__linux__)
     std::ifstream f("/proc/self/statm");
     size_t pages = 0, resident = 0;
-    if (f >> pages >> resident) return resident * size_t(sysconf(_SC_PAGESIZE));
+    if (f >> pages >> resident) bytes = resident * size_t(sysconf(_SC_PAGESIZE));
+#elif defined(_WIN32)
+    PROCESS_MEMORY_COUNTERS pmc{};
+    if (K32GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof pmc)) bytes = size_t(pmc.WorkingSetSize);
+#elif defined(__APPLE__)
+    mach_task_basic_info info{};
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, task_info_t(&info), &count) == KERN_SUCCESS)
+        bytes = size_t(info.resident_size);
 #endif
-    return 0;
+    for (size_t peak = g_sampledPeak.load(std::memory_order_relaxed);
+         bytes > peak && !g_sampledPeak.compare_exchange_weak(peak, bytes, std::memory_order_relaxed);) {
+    }
+    return bytes;
 }
 
 size_t resetPeakResidentBytes() {
 #if defined(__linux__)
     std::ofstream("/proc/self/clear_refs") << "5"; // resets the peak (VmHWM) to the current RSS
 #endif
+    g_sampledPeak.store(0, std::memory_order_relaxed);
+    g_peakReset.store(true, std::memory_order_relaxed);
     return residentBytes();
 }
 
@@ -64,8 +95,21 @@ size_t peakResidentBytes() {
     std::ifstream f("/proc/self/status");
     for (std::string line; std::getline(f, line);)
         if (line.rfind("VmHWM:", 0) == 0) return size_t(std::atoll(line.c_str() + 6)) * 1024;
-#endif
     return 0;
+#else
+    const size_t now = residentBytes();
+    if (g_peakReset.load(std::memory_order_relaxed)) return std::max(now, g_sampledPeak.load(std::memory_order_relaxed));
+#if defined(_WIN32)
+    PROCESS_MEMORY_COUNTERS pmc{};
+    if (K32GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof pmc)) return size_t(pmc.PeakWorkingSetSize);
+#elif defined(__APPLE__)
+    mach_task_basic_info info{};
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, task_info_t(&info), &count) == KERN_SUCCESS)
+        return size_t(info.resident_size_max);
+#endif
+    return now;
+#endif
 }
 
 MemoryUse documentMemory(const Document& doc) {
@@ -195,6 +239,41 @@ Mesh benchMesh(size_t triangles, bool head) {
 
 Mesh makeBenchSphere(size_t triangles) { return benchMesh(triangles, false); }
 Mesh makeBenchHead(size_t triangles) { return benchMesh(triangles, true); }
+
+Mesh makeCore200mMesh(size_t baseTriangles, int level) {
+    Mesh m = makeBenchHead(baseTriangles);
+    std::string err;
+    if (!microDivide(m, level, err, 0)) return m; // (in memory: phase 1 is the memory-only prototype)
+    microNoise(m, 0.004f, 40.0f, 1);  // forms the size of wrinkles
+    microNoise(m, 0.0008f, 400.0f, 2); // and pores
+    m.micro->clearDirty();
+    m.micro->markAllDirty();
+    return m;
+}
+
+std::string core200mScenePath(std::string& error, const std::function<void(const std::string&)>& log) {
+    namespace fs = std::filesystem;
+    const fs::path dir = MicroStore::swapFolder();
+    std::error_code ec;
+    fs::create_directories(dir, ec);
+    const fs::path path = dir / "core-200m-v1.sfproj";
+    if (fs::exists(path, ec)) return path.string(); // (renamed into place when whole)
+    if (log) log("Writing the core-200m scene (once): " + path.string());
+    Document doc;
+    doc.mesh = makeCore200mMesh();
+    if (!doc.mesh.micro) {
+        error = "core-200m: couldn't divide to micro level 5";
+        return {};
+    }
+    const fs::path tmp = fs::path(path.string() + ".tmp.sfproj");
+    if (!saveProject(tmp.string(), doc, error)) return {};
+    fs::rename(tmp, path, ec);
+    if (ec) {
+        error = "Can't write " + path.string();
+        return {};
+    }
+    return path.string();
+}
 
 namespace {
 

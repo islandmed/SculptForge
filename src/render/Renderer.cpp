@@ -8,6 +8,7 @@
 #include "core/Texture.h"
 #include "core/TextureChannels.h"
 #include "core/ThreadPool.h"
+#include "core/HardwareProfile.h"
 #include "core/TierConfig.h"
 #include "core/UploadOrder.h"
 
@@ -1087,6 +1088,13 @@ void Renderer::freeSlot(MeshSlot& s) {
     s = MeshSlot();
 }
 
+size_t Renderer::microPendingShading() const {
+    size_t total = 0;
+    for (const MeshSlot& s : slots_)
+        if (s.micro) total += s.micro->pendingShading();
+    return total;
+}
+
 size_t Renderer::gpuBytes() const {
     size_t total = 0;
     for (const MeshSlot& s : slots_) {
@@ -1101,6 +1109,7 @@ size_t Renderer::gpuBytes() const {
 }
 
 void Renderer::shutdown() {
+    screenPass_.release();
     for (auto& s : slots_) freeSlot(s);
     for (Staging& st : persist_) {
         if (st.fence) gl::DeleteSync(st.fence);
@@ -2637,7 +2646,10 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
         }
     }
     while (samples > 1 && !viewTarget(width, height, samples)) samples /= 2;
-    if (samples <= 1) {
+    screenStrokeDrawn_ = false;
+    // A screen stroke needs the view in a target it can read back: through the single-sample one when no AA.
+    const bool screen = !screenStroke_.dabs.empty() && settings.matcap >= 0 && !settings.pbr();
+    if (samples <= 1 && !(screen && viewTarget(width, height, 1))) {
         gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
         draw(camera, width, height, settings, viewport);
         return 1;
@@ -2649,6 +2661,10 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewFbo_); // resolve: same format and size on both sides
     gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, viewResolveFbo_);
     gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    if (screen)
+        screenStrokeDrawn_ = screenPass_.apply(screenStroke_, viewFbo_, viewResolveFbo_, width, height, frameView_, frameProj_,
+                                               frameViewport_, matcapTexture(settings.matcap),
+                                               lightRotation(settings.lightYaw, settings.lightPitch));
     gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewResolveFbo_); // single-sample blit: may convert to the window's format
     gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
@@ -3073,7 +3089,9 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     gl::Uniform1i(p->twoSided, 1);
     // Moving (Fast Navigation): a coarser target and half the budget, so orbiting stays smooth.
     const bool moving = settings.motionProxy;
-    const size_t full = settings.renderTriangleBudget ? settings.renderTriangleBudget : size_t(currentTierConfig().activeTriangleBudget);
+    // The tier's budget, lowered by the governed one (core/HardwareProfile.h: the frame governor, SF_HW_SIMULATE=floor).
+    size_t full = settings.renderTriangleBudget ? settings.renderTriangleBudget : size_t(currentTierConfig().activeTriangleBudget);
+    if (const uint64_t governed = renderTriangleBudget(); governed > 0) full = std::min(full, size_t(governed));
     const size_t budget = moving ? full / 2 : full;
     const float target = settings.microTargetPx * (moving ? 2.0f : 1.0f);
     // (the budget is shared by the micro Parts on screen: each gets it whole; one is the usual case)
