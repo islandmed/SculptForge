@@ -275,6 +275,8 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
     closed_ = closedOriented(mesh);
     bounds_.assign(clusters, ClusterBounds());
     clusterEdge_.assign(clusters, 0.0f);
+    clusterRadius_.assign(clusters, 0.0f);
+    clusterAngle_.assign(clusters, 0.0f);
     std::vector<uint32_t> all(clusters);
     for (uint32_t c = 0; c < clusters; ++c) all[c] = c;
     updateClusterBounds(mesh, all);
@@ -343,9 +345,28 @@ void MicroRenderer::updateClusterBounds(const Mesh& mesh, const std::vector<uint
             const float angle = std::acos(std::clamp(cosMin, -1.0f, 1.0f)) + 0.5f;
             cb.coneAngle = angle < 1.45f && float(range) * mm.step < radius * 0.5f ? angle : -1.0f;
             bounds_[c] = cb;
+            clusterRadius_[c] = radius;
+            clusterAngle_[c] = angle;
             clusterEdge_[c] = edge / float(3 * (s1 - s0)) / float(mm.n) * float(mm.n); // (base edge)
         }
     }, 16);
+}
+
+void MicroRenderer::updateClusterRanges(const Mesh& mesh, const std::vector<uint32_t>& clusters) {
+    const MicroMesh& mm = *mesh.micro;
+    const uint32_t nt = mm.baseTriangles, size = 1u << clusterShift_;
+    poolFor(clusters.size(), [&](size_t b, size_t e) {
+        for (size_t ci = b; ci < e; ++ci) {
+            const uint32_t c = clusters[ci];
+            const uint32_t s0 = c << clusterShift_, s1 = std::min(nt, s0 + size);
+            uint16_t range = 0;
+            for (uint32_t s = s0; s < s1; ++s) range = std::max(range, mm.triRange[order_[s]]);
+            ClusterBounds& cb = bounds_[c];
+            const float radius = clusterRadius_[c], angle = clusterAngle_[c];
+            cb.radius = radius + mm.bulgeMax + float(range) * mm.step;
+            cb.coneAngle = angle < 1.45f && float(range) * mm.step < radius * 0.5f ? angle : -1.0f;
+        }
+    }, 64);
 }
 
 void MicroRenderer::uploadDispTiles(const Mesh& mesh, std::vector<uint32_t>& slots, bool all) {
@@ -366,7 +387,17 @@ void MicroRenderer::uploadDispTiles(const Mesh& mesh, std::vector<uint32_t>& slo
         return;
     }
     if (slots.empty()) return;
-    std::sort(slots.begin(), slots.end());
+    if (slots.size() > 4096) { // (in slot order through a bitset: sorting millions of tiny patches cost more than sending them)
+        slotBits_.assign((size_t(baseTriangles_) + 63) / 64, 0);
+        for (uint32_t sl : slots) slotBits_[sl >> 6] |= uint64_t(1) << (sl & 63);
+        size_t k = 0;
+        for (size_t w = 0; w < slotBits_.size(); ++w)
+            for (uint64_t bits = slotBits_[w]; bits; bits &= bits - 1) slots[k++] = uint32_t(w * 64 + size_t(std::countr_zero(bits)));
+        slots.resize(k);
+    } else {
+        std::sort(slots.begin(), slots.end());
+        slots.erase(std::unique(slots.begin(), slots.end()), slots.end());
+    }
     staging_.resize(slots.size() * S * 2);
     auto* st = reinterpret_cast<int16_t*>(staging_.data());
     poolFor(slots.size(), [&](size_t b, size_t e) {
@@ -417,15 +448,19 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
     // The pending triangles, newest first (scratch_ holds this sync's dirty ones, already marked).
     std::vector<uint32_t>& seeds = scratch_;
     const size_t limit = shadeBudget ? std::max<size_t>(1, shadeBudget / (S * 3)) : SIZE_MAX; // (the ring triples it)
-    if (seeds.size() < limit)
+    const bool full = seeds.size() >= limit; // (this sync's dirty ones fill it: sorted and unique already)
+    if (full) seeds.resize(limit);
+    else if (seeds.size() < limit)
         for (size_t w = 0; w < pending_.size() && seeds.size() < limit; ++w)
             for (uint64_t bits = pending_[w]; bits && seeds.size() < limit; bits &= bits - 1) {
                 const uint32_t t = uint32_t(w * 64 + size_t(std::countr_zero(bits)));
                 seeds.push_back(t);
             }
-    std::sort(seeds.begin(), seeds.end());
-    seeds.erase(std::unique(seeds.begin(), seeds.end()), seeds.end());
-    if (seeds.size() > limit) seeds.resize(limit);
+    if (!full) {
+        std::sort(seeds.begin(), seeds.end());
+        seeds.erase(std::unique(seeds.begin(), seeds.end()), seeds.end());
+        if (seeds.size() > limit) seeds.resize(limit);
+    }
     if (seeds.empty()) return;
     const auto started = std::chrono::steady_clock::now();
     std::vector<uint32_t> sorted;
@@ -530,10 +565,13 @@ bool MicroRenderer::sync(Mesh& mesh) {
         }
         if (!scratch_.empty()) { // their clusters may reach further now
             std::vector<uint32_t> cl;
-            for (uint32_t t : scratch_) cl.push_back(slotOf_[t] >> clusterShift_);
-            std::sort(cl.begin(), cl.end());
-            cl.erase(std::unique(cl.begin(), cl.end()), cl.end());
-            updateClusterBounds(mesh, cl);
+            clusterSeen_.assign(bounds_.size(), 0);
+            for (uint32_t t : scratch_) {
+                const uint32_t c = slotOf_[t] >> clusterShift_;
+                if (!clusterSeen_[c]) clusterSeen_[c] = 1, cl.push_back(c);
+            }
+            if (baseTris.empty() && !baseEverywhere) updateClusterRanges(mesh, cl); // (only the displacement changed)
+            else updateClusterBounds(mesh, cl);
         }
         if (mm.allDirty || baseEverywhere) {
             shadePending(mesh, true);

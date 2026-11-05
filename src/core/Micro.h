@@ -302,9 +302,13 @@ public:
     uint64_t points = 0; // grid points visited
 
 private:
+    std::vector<uint8_t> changed_;        // per candidate of the last dab: the kernel changed its grid
+    std::vector<uint32_t> stitchStamp_;   // per base triangle: dabEpoch_ when the stitch changed a point of it
     void touch(MicroMesh& mm, std::span<const uint32_t> tris);
     void widen(MicroMesh& mm, float need); // MicroMesh::widen, keeping this stroke's saved tiles in step
-    void stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t> tris);
+    // `changed` (per entry of tris, or null: all): the triangles the kernel wrote; only they and those the stitch
+    // changed are marked dirty (the renderer re-sends, re-bounds and re-shades what's marked).
+    void stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t> tris, const uint8_t* changed = nullptr);
     bool active_ = false;
     float strokeStep_ = 0.0f;
     std::vector<uint32_t> tileOf_;        // per base triangle: its undo tile + 1 (0 = not yet touched)
