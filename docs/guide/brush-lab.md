@@ -70,6 +70,12 @@ description.
 
 The name field at the top of the editor renames the brush when you press <kbd>Enter</kbd>.
 
+Under the recipe sliders are the brush's pressure curve and **Pen pressure: Size** and **Strength**, each
+**Use global**, **On** or **Off**. **Use global** (the default) follows **Pressure > Size** and **Pressure >
+Strength** on the top shelf and in **Edit > Preferences > Tablet**; **On** and **Off** override them for this brush
+only. The choice is saved in the brush's `.sfbrush` file, so a shared brush keeps it (see
+[Pen pressure and tablets](sculpting.md#pen-pressure-and-tablets)).
+
 > **Tip:** to adapt a built-in recipe such as Dragon Scales, select it and move the sliders. Your version is
 > saved to your library and replaces the built-in one; delete it to get the original back.
 

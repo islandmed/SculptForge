@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/BrushSettings.h"
 #include "core/Precision.h"
+#include "core/Sculpt.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -55,6 +56,8 @@ Json BrushToolSettings::toJson() const {
         j.set("alpha_tile_x", a.tileX);
         j.set("alpha_tile_y", a.tileY);
     }
+    j.set("pen_pressure_size", penPressureId(pressureSize)); // (always written: a missing one is the brush's default)
+    j.set("pen_pressure_strength", penPressureId(pressureStrength));
     return j;
 }
 
@@ -79,6 +82,8 @@ void BrushToolSettings::applyJson(const Json& j) {
     readFloat(j, "alpha_angle_jitter", a.jitter);
     a.tileX = int(j["alpha_tile_x"].asNumber(a.tileX));
     a.tileY = int(j["alpha_tile_y"].asNumber(a.tileY));
+    pressureSize = penPressureFromId(j["pen_pressure_size"].asString(), pressureSize);
+    pressureStrength = penPressureFromId(j["pen_pressure_strength"].asString(), pressureStrength);
     clamp();
 }
 
@@ -92,6 +97,11 @@ BrushToolSettings BrushSettingsStore::switchBrush(const std::string& from, const
     BrushToolSettings next = current; // a brush not used yet: the current values, nothing jumps
     if (auto it = session_.find(to); it != session_.end()) next = it->second;
     else if (auto s = saved_.find(to); s != saved_.end()) next = s->second;
+    else {
+        const BrushToolSettings own = shipped(to); // ...except pen pressure, the brush's own (a grab brush's Size off)
+        next.pressureSize = own.pressureSize;
+        next.pressureStrength = own.pressureStrength;
+    }
     if (shareSizeIntensity) {
         next.radiusPx = current.radiusPx;
         next.strength = current.strength;
@@ -120,6 +130,9 @@ BrushToolSettings BrushSettingsStore::reset(const std::string& key) {
 BrushToolSettings BrushSettingsStore::shipped(const std::string& key) {
     BrushToolSettings s;
     if (key == "builtin:Vdm") s.stroke = StrokeType::DragRect; // stamps a VDM where you drag (PanelVdm.cpp)
+    for (BrushType t : {BrushType::Move, BrushType::KelvinGrab, BrushType::KelvinTwist, BrushType::KelvinScale,
+                        BrushType::SnakeHook, BrushType::KelvinSnake})
+        if (key == brushSettingsKey(brushName(t))) s.pressureSize = PenPressure::Off;
     return s;
 }
 
@@ -140,7 +153,7 @@ void BrushSettingsStore::applyJson(const Json& j) {
     if (!brushes.isObject()) return;
     for (const auto& [key, value] : brushes.members()) {
         if (!value.isObject()) continue;
-        BrushToolSettings s;
+        BrushToolSettings s = shipped(key); // (files before 0.11.1 have no pen pressure: the brush's default)
         s.applyJson(value);
         saved_[key] = s;
     }

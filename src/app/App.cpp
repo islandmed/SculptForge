@@ -2960,6 +2960,7 @@ void App::drawRecipeEditor(BrushRecipe& recipe) {
     }
     ImGui::PopItemWidth();
     drawPressureCurveEditor("lab_brush_curve", ImGui::GetContentRegionAvail().x); // this brush's own (Precision.cpp)
+    drawPenPressureSwitches("lab_pen"); // (#122, BrushSettingsUi.cpp)
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     if (ImGui::Button("Save .sfbrush...", ImVec2(half, 0))) saveFileDialog(FileAction::SaveBrush);
     ImGui::SameLine();
@@ -3871,7 +3872,7 @@ void App::drawBrushCursor() {
         ImDrawList* dl;
         ~PopClip() { dl->PopClipRect(); }
     } popClip{dl};
-    const float r = radiusPx_ * (pressureSize_ && lastInputPen_ ? std::max(strokePressure(), 0.05f) : 1.0f);
+    const float r = radiusPx_ * (pressureSizeOn() && lastInputPen_ ? std::max(strokePressure(), 0.05f) : 1.0f);
     const glm::vec2 at = predictedPointer(); // during a predictive stroke, where the pen will be as this frame shows
     const ImVec2 c(at.x, at.y);
     const SDL_Keymod mod = inputMods();

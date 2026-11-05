@@ -118,9 +118,9 @@ void App::snakeHookTo(float x, float y) {
     const float pressure = strokePressure();
     DabParams p;
     p.viewDir = n;
-    p.radius = radiusPx_ * (pressureSize_ ? std::max(pressure, 0.05f) : 1.0f) * camera_.worldPerPixel(grabLast_, h);
+    p.radius = radiusPx_ * (pressureSizeOn() ? std::max(pressure, 0.05f) : 1.0f) * camera_.worldPerPixel(grabLast_, h);
     p.strength = strength_;
-    p.pressure = pressureStrength_ ? pressure : 1.0f;
+    p.pressure = pressureStrengthOn() ? pressure : 1.0f;
     p.invert = strokeInvert_;
     p.focal = focalShift_;
     p.connectedOnly = uiPrefs_.connectedOnly;
@@ -153,7 +153,7 @@ void App::dragRectTo(float x, float y) {
     p.viewDir = camera_.forward();
     p.radius = len * camera_.worldPerPixel(dragAnchorHit_, canvasHeight());
     p.strength = strength_;
-    p.pressure = pressureStrength_ ? pressure : 1.0f;
+    p.pressure = pressureStrengthOn() ? pressure : 1.0f;
     p.invert = strokeInvert_;
     p.frontFacesOnly = frontFacesOnly_;
     p.connectedOnly = uiPrefs_.connectedOnly;

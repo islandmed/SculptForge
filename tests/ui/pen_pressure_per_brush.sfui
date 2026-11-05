@@ -1,0 +1,114 @@
+# #122: every brush has its own Pen pressure > Size / Strength (Use global / On / Off) in the Brush palette, Brush
+# Lab and Preferences > Tablet. Grab brushes start with Size off; the rest follow the global switches. Kept per
+# brush, saved with Save Brush Settings, put back by Reset Brush to Default; a custom brush keeps them in its recipe.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+wait 0.2
+run new_sphere subdivisions=5
+snapshot
+
+# Defaults: Use global (Size off, Strength on); grab brushes: Size off whatever the global switch says.
+click "Standard##brush.standard"
+expect_value pen_size_mode == 0
+expect_value pen_strength_mode == 0
+expect_value pen_size == 0
+expect_value pen_strength == 1
+click "Pressure > Size"
+expect_value pen_size == 1
+click "Move##brush.move"
+wait 0.1                                      # (the switch is picked up on the next frame)
+expect_value pen_size_mode == 2
+expect_value pen_size == 0
+expect_value pen_strength == 1
+click "Tendril##brush.tendril"
+wait 0.1
+expect_value pen_size_mode == 2
+click "Clay##brush.clay"
+wait 0.1
+expect_value pen_size_mode == 0
+expect_value pen_size == 1
+
+# Standard with the global Pressure > Size on: a light touch makes a small stroke...
+click "Standard##brush.standard"
+wait 0.1
+pen_stroke 0.3 0.45 0.7 0.55 0.2 0.2
+remember moved small
+key ctrl+z
+pen_out
+# ...and with this brush's Size off it draws at full size, while Clay still follows the global switch.
+click "Brush##palette.brush"
+click "Off##brush.pen_size_off"
+shot brush-palette
+expect_value pen_size_mode == 2
+expect_value pen_size == 0
+expect_status Pen pressure > Size for Standard: off
+click "Brush##palette.brush"                  # (closed again: the canvas takes the pen)
+pen_stroke 0.3 0.45 0.7 0.55 0.2 0.2
+expect_value moved > $small*1.5
+key ctrl+z
+pen_out
+click "Clay##brush.clay"
+wait 0.1
+expect_value pen_size == 1
+click "Standard##brush.standard"
+wait 0.1
+expect_value pen_size_mode == 2
+
+# Strength On for this brush with the global Pressure > Strength off: light and heavy still differ.
+click "Pressure > Strength"
+expect_value pen_strength == 0
+click "Brush##palette.brush"
+click "On##brush.pen_strength_on"
+click "Brush##palette.brush"
+expect_value pen_strength == 1
+pen_stroke 0.3 0.45 0.7 0.55 0.2 0.2
+remember moved_out light
+key ctrl+z
+pen_out
+pen_stroke 0.3 0.45 0.7 0.55 0.9 0.9
+expect_value moved_out > $light*3
+key ctrl+z
+pen_out
+click "Brush##palette.brush"
+click "Use global##brush.pen_strength_global"
+expect_value pen_strength == 0
+click "Brush##palette.brush"
+click "Pressure > Strength"
+expect_value pen_strength == 1
+
+# Save Brush Settings keeps them; Reset Brush to Default gives Use global back (Move: Size off).
+click "Brush##palette.brush"
+click "Save Brush Settings##brush.save_settings"
+expect_value brush_settings_saved == 1
+click "Reset Brush to Default##brush.reset_settings"
+expect_value pen_size_mode == 0
+expect_value brush_settings_saved == 0
+click "Brush##palette.brush"
+click "Move##brush.move"
+wait 0.1
+click "Brush##palette.brush"
+click "On##brush.pen_size_on"
+expect_value pen_size_mode == 1
+click "Reset Brush to Default##brush.reset_settings"
+expect_value pen_size_mode == 2
+click "Brush##palette.brush"
+
+# A custom brush keeps its own in its recipe, and the command sets them too.
+run brush_create name="Pen Slab" depth=0.4
+wait 0.1
+expect_value pen_strength_mode == 0
+run brush_pen_pressure strength=off size=on
+expect_value pen_strength_mode == 2
+expect_value pen_size_mode == 1
+click "Clay##brush.clay"
+wait 0.1
+expect_value pen_strength_mode == 0
+run brush_create name="Pen Slab" depth=0.4
+wait 0.1
+expect_value pen_strength_mode == 2
+
+# Preferences > Tablet shows the current brush's switches under the global ones.
+click "Preferences##palette.preferences"
+click "Tablet##preferences.tablet"
+wait 0.3
+expect "Use global##brush.pen_size_global"
+shot preferences-tablet

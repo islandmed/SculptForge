@@ -269,8 +269,15 @@ private:
     int symmetryCopiesDrawn_ = 0; // the cursor and its symmetry dots the last drawSurfaceCursor drew (UI tests: cursor_copies)
     bool invertToggle_ = false;
     bool frontFacesOnly_ = false;
-    bool pressureStrength_ = true;
+    bool pressureStrength_ = true; // the global switches (Preferences > Tablet, the shelf)
     bool pressureSize_ = false;
+    // The current brush's own (#122, kept per brush: core/BrushSettings.h): Use global, On or Off.
+    PenPressure penSize_ = PenPressure::Global;
+    PenPressure penStrength_ = PenPressure::Global;
+    bool pressureSizeOn() const { return penPressureOn(penSize_, pressureSize_); }
+    bool pressureStrengthOn() const { return penPressureOn(penStrength_, pressureStrength_); }
+    void setPenPressure(bool size, PenPressure p); // this brush's (and a custom brush's recipe)
+    void drawPenPressureSwitches(const char* id); // Pen pressure: Size / Strength [Use global | On | Off]
 
     // Input / stroke state
     Drag drag_ = Drag::None;
@@ -1805,6 +1812,9 @@ private:
     void initBrushSettings();
     void syncBrushSettings(); // every frame, outside strokes
     void recipeAlpha(BrushToolSettings& s) const; // the active recipe's own alpha (brush packs) into `s`
+    void recipePenPressure(BrushToolSettings& s) const; // the active recipe's own pen pressure (#122) into `s`
+    void shippedPenPressure(); // the current brush's own pen pressure, as shipped (or its recipe's)
+    void registerPenPressureCommand(); // brush_pen_pressure (#122)
     void syncAlphaTile();     // the brush's Tile onto the current alpha
     void registerAlphaOptionsCommand(); // brush_alpha_options (#76)
     std::string brushSettingsPath() const;
