@@ -11,6 +11,7 @@
 #include "core/Multires.h"
 #include "core/Primitives.h"
 #include "core/Texture.h"
+#include "core/Uv.h"
 
 #include <chrono>
 #include <cmath>
@@ -226,6 +227,55 @@ TEST(nightly_mesh_maps_live_update_is_faster_than_a_full_bake) {
     std::printf("  2K maps of %zu triangles: full bake %.2f s, live update of %zu tiles %.3f s\n", m.triangleCount(), full,
                 up.tiles.size(), live);
     CHECK(live < full * 0.5);
+}
+
+TEST(bake_udim_grid_ten_by_two) {
+    // #135: twenty squares packed into a 10 x 2 UDIM grid bake as tiles 1001-1020 (the second row too), each
+    // tile's own island; texture painting skips the tiles past 1001 rather than wrapping them in (only the gutter
+    // of an island touching 1001's border reaches its edge texels).
+    Mesh low;
+    for (int i = 0; i < 20; ++i) {
+        const uint32_t b = uint32_t(low.positions.size());
+        const float x = 2.0f * float(i);
+        low.positions.insert(low.positions.end(), {{x, 0, 0}, {x + 1, 0, 0}, {x + 1, 0, -1}, {x, 0, -1}});
+        low.triangles.push_back({b, b + 1, b + 2});
+        low.triangles.push_back({b, b + 2, b + 3});
+        low.uvs.insert(low.uvs.end(), {{0, 0}, {1, 0}, {1, 1}, {0, 0}, {1, 1}, {0, 1}});
+    }
+    low.recomputeAllNormals();
+    UvPackOptions po;
+    po.columns = 10;
+    po.tiles = 20;
+    po.resolution = 64;
+    UvPackResult pr;
+    std::string err;
+    CHECK(uvPack(low, buildUvTopology(low), {}, po, pr, err));
+    CHECK(pr.tilesUsed == 20);
+    std::vector<int> want;
+    for (int t = 1001; t <= 1020; ++t) want.push_back(t);
+    CHECK(udimTiles(low) == want);
+    Mesh high = low;
+    for (glm::vec3& p : high.positions) p.y = 0.01f * std::sin(p.x * 9.0f);
+    high.recomputeAllNormals();
+    BakeSettings st;
+    st.size = 64;
+    st.maps = bakeBit(BakeMap::Normal);
+    std::vector<BakeResult> results;
+    CHECK(bakeMapsUdim(low, {&high}, st, results, err));
+    CHECK(results.size() == 20);
+    for (size_t k = 0; k < results.size(); ++k) {
+        CHECK(results[k].udim == want[k]);
+        CHECK(results[k].islandTexels > 2000); // (one square nearly fills its 64 x 64 tile)
+    }
+    // Paint: tile 1001's triangles reach the texture; none from a tile two columns or more away, nor from row 2.
+    int tx0, ty0, tx1, ty1, reach = 0;
+    for (uint32_t t = 0; t < low.triangleCount(); ++t) {
+        const int tile = udimTile((low.uvs[t * 3] + low.uvs[t * 3 + 1] + low.uvs[t * 3 + 2]) / 3.0f);
+        const bool reaches = triangleTiles(low, 256, 256, t, tx0, ty0, tx1, ty1);
+        if (tile == 1001) reach += reaches;
+        else if ((tile - 1001) % 10 >= 2) CHECK(!reaches);
+    }
+    CHECK(reach == 2);
 }
 
 TEST(bake_new_maps_udim_tiles_and_levels) {

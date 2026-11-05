@@ -944,9 +944,14 @@ private:
     bool uvEditorBusy() const;
     // UI test values: uv_editor_open, uv_islands, uv_seams, uv_selected, uv_select_mode, uv_pins, uv_tiles,
     // uv_stretch_x1000, uv_flipped_x1000, uv_density, uv_max_u, uv_unwrapping, uv_unwraps, uv_tool,
-    // uv_view_triangles, uv_overlay; NaN for other names.
+    // uv_view_triangles, uv_overlay, uv_pack_columns, uv_pack_rows (the Pack fields); NaN for other names.
     double uvEditorTestValue(const std::string& name);
     std::shared_ptr<struct UvEditorState> uvEditor_;
+    // UV Editor > Pack: the UDIM grid to fill, Columns x Rows (#135). Projects keep their own; new ones and
+    // projects from before take the preference (UiPrefs::uvPackColumns / uvPackRows), which the sliders set too.
+    int uvPackColumns_ = 1, uvPackRows_ = 1;
+    // After uv_pack / uv_unwrap from anywhere (the panel, a script, the console): the fields show the grid it used.
+    void uvPackGridUsed(const Args& args);
     bool showUvEditor_ = false;
     void startAutoUv();
     void startNewTexture(); // New Texture on the top shelf / Color palette: Auto UV first when there are no UVs

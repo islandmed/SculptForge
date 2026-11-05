@@ -408,6 +408,11 @@ void App::storeProjectSettings() {
     gizmo.set("all_parts", gizmo_.all);
     gizmo.set("falloff", double(gizmo_.falloff));
     s.set("gizmo", std::move(gizmo));
+
+    Json uv = Json::object(); // UV Editor > Pack: the UDIM grid (#135)
+    uv.set("pack_columns", double(uvPackColumns_));
+    uv.set("pack_rows", double(uvPackRows_));
+    s.set("uv_editor", std::move(uv));
 }
 
 // Lenient: anything missing keeps its current value.
@@ -568,11 +573,16 @@ void App::applyProjectSettings() {
         gizmo_.undoSteps.clear();
         gizmo_.redoSteps.clear();
     }
+    // Projects from before the grid: the preference.
+    const Json& uv = s["uv_editor"];
+    uvPackColumns_ = std::clamp(int(uv["pack_columns"].asNumber(uiPrefs_.uvPackColumns)), 1, 10);
+    uvPackRows_ = std::clamp(int(uv["pack_rows"].asNumber(uiPrefs_.uvPackRows)), 1, 10);
 }
 
 void App::afterCommand(const std::string& name, const Args& args, const CommandResult& r) {
     if (!r.ok) return;
     if (name == "undo" || name == "redo") gizmoAfterUndo(name == "redo");
+    if (name == "uv_pack" || name == "uv_unwrap") uvPackGridUsed(args);
     const std::string path = argString(args, "path", doc_.path);
     const bool project = name == "open_project" || (name == "open" && isProjectPath(path));
     if (project) {

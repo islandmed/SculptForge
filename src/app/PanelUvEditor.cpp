@@ -122,6 +122,7 @@ struct UvEditorState {
     size_t selIslands = 0;
     float selDensity = 0.0f;
     glm::ivec2 tiles{1, 1};
+    glm::ivec2 frameGrid{0, 0}; // after a pack: frame the view on this grid (Columns x Rows) at the next draw
     std::vector<int> tileList;
     MeshOverlay overlay;
     // Interaction.
@@ -140,7 +141,6 @@ struct UvEditorState {
     int method = 0; // kMethods
     int iterations = 10;
     float marginPx = 8.0f;
-    int packTiles = 1;
     bool rotate = true;
     bool equalDensity = true;
     float targetDensity = 512.0f;
@@ -605,7 +605,8 @@ struct UvEditorUi {
 
     Args packArgs() {
         Args a{{"margin", double(s.marginPx)},
-               {"tiles", double(s.packTiles)},
+               {"columns", double(app.uvPackColumns_)},
+               {"rows", double(app.uvPackRows_)},
                {"rotate", s.rotate},
                {"equal_density", s.equalDensity},
                {"resolution", double(resolution())},
@@ -655,7 +656,8 @@ struct UvEditorUi {
         o.pack = method != UvUnwrapMethod::Unfold;
         o.packing.resolution = resolution();
         o.packing.marginPx = s.marginPx;
-        o.packing.tiles = s.packTiles;
+        o.packing.columns = app.uvPackColumns_;
+        o.packing.tiles = app.uvPackColumns_ * app.uvPackRows_;
         o.packing.rotate = s.rotate;
         o.packing.equalDensity = s.equalDensity;
         std::promise<bool> promise;
@@ -835,8 +837,8 @@ void App::registerUvEditorActions() {
         "uv_unwrap");
     add("uv.pack", "Pack", ICON_LC_PACKAGE, "", [this] { uvUi(*this, uvEditor_).run("uv_pack", uvUi(*this, uvEditor_).packArgs()); },
         nullptr, uvs,
-        "Pack the selected islands (or all) as large as they fit into the 0-1 tile, or across the chosen number of UDIM "
-        "tiles: turned to their smallest box, scaled to one texel density, with the margin between them.",
+        "Pack the selected islands (or all) as large as they fit into the 0-1 tile, or across the Columns x Rows grid "
+        "of UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them.",
         "uv_pack");
     add("uv.seam_mark", "Mark Seam", ICON_LC_SCISSORS, "", [runUv] { runUv("uv_seam", {{"op", std::string("mark")}}); }, nullptr,
         selected, "Mark the selected edges (or the border of the selected faces) as seams: Unwrap cuts there.", "uv_seam");
@@ -911,8 +913,8 @@ void App::registerUvEditorActions() {
             u.run("uv_pack", a);
         },
         nullptr, uvs,
-        "Pack at exactly the target texel density, using as many UDIM tiles as it takes (1001, 1002, ...): every island "
-        "keeps the same texels per unit across the tiles.",
+        "Pack at exactly the target texel density, using as many UDIM tiles as it takes (1001, 1002, ..., Columns "
+        "wide, then the next row up): every island keeps the same texels per unit across the tiles.",
         "uv_pack");
     add("uv.trim", "Assign to Strip", ICON_LC_STRETCH_HORIZONTAL, "",
         [this, runUv] {
@@ -942,6 +944,23 @@ const MeshOverlay* App::uvEditorOverlay(uint32_t part) {
     if (!showUvEditor_ || !uvEditor_ || part != doc_.activePartInfo().id) return nullptr;
     if (!uvEditor_->hasUvs || uvEditor_->part != part) return nullptr;
     return &uvEditor_->overlay;
+}
+
+void App::uvPackGridUsed(const Args& a) {
+    int columns = 0, rows = 0;
+    if (a.contains("columns") || a.contains("rows")) { // (as UvCommands.cpp's packOptions reads them)
+        columns = std::clamp(int(argNumber(a, "columns", 10)), 1, 10);
+        if (a.contains("rows")) rows = std::clamp(int(argNumber(a, "rows", 1)), 1, 10);
+        else rows = std::clamp((std::clamp(int(argNumber(a, "tiles", columns)), 1, 100) + columns - 1) / columns, 1, 10);
+    } else {
+        // tiles= alone fills ten per row: the same grid when it's under a row or whole rows; otherwise left as is.
+        const int tiles = std::clamp(int(argNumber(a, "tiles", 1)), 1, 100);
+        if (tiles > 10 && tiles % 10) return;
+        columns = std::min(tiles, 10), rows = (tiles + 9) / 10;
+    }
+    uiPrefs_.uvPackColumns = uvPackColumns_ = columns;
+    uiPrefs_.uvPackRows = uvPackRows_ = rows;
+    if (uvEditor_) uvEditor_->frameGrid = {columns, rows};
 }
 
 void App::drawUvEditor() {
@@ -1023,6 +1042,10 @@ void App::drawUvEditor() {
     if (s.zoom <= 0.0f) {
         u.frame(glm::vec2(0.0f), glm::vec2(float(s.tiles.x), float(s.tiles.y)));
         if (s.zoom <= 0.0f) s.zoom = 400.0f * scale;
+    }
+    if (s.frameGrid.x > 0 && !s.dirty) { // (the tiles in use are up to date: a density pack may spill past the rows)
+        u.frame(glm::vec2(0.0f), glm::vec2(glm::max(s.frameGrid, s.tiles)));
+        s.frameGrid = {0, 0};
     }
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImGui::InvisibleButton("##uvview", viewSize, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight |
@@ -1122,13 +1145,25 @@ void App::drawUvEditor() {
     else dl->AddRectFilled(viewMin, viewMax, IM_COL32(25, 25, 27, 255));
     dl->PushClipRect(viewMin, viewMax, true);
     // UDIM tile numbers.
-    for (int ty = 0; ty < std::max(s.tiles.y, 1) + 1; ++ty)
-        for (int tx = 0; tx < std::min(std::max(s.tiles.x, 1) + 1, 10); ++tx) {
-            const ImVec2 p = u.toScreen(glm::vec2(float(tx), float(ty) + 1.0f));
+    // (over the tiles in use and the Pack grid, one more each way)
+    const glm::ivec2 labelled = glm::max(glm::max(s.tiles, glm::ivec2(1)), glm::ivec2(uvPackColumns_, uvPackRows_));
+    for (int ty = 0; ty < labelled.y + 1; ++ty)
+        for (int tx = 0; tx < std::min(labelled.x + 1, 10); ++tx) {
             const bool used = tx < s.tiles.x && ty < s.tiles.y;
             char label[8];
             std::snprintf(label, sizeof label, "%d", 1001 + tx + 10 * ty);
-            dl->AddText(ImVec2(p.x + 5 * scale, p.y + 3 * scale), used ? IM_COL32(170, 170, 182, 210) : IM_COL32(110, 110, 118, 150), label);
+            // In the tile's top-left corner, kept inside the tile and the view (a tile at the edge still shows its
+            // number whole); none when the visible part of the tile is too small for it.
+            const ImVec2 a = u.toScreen(glm::vec2(float(tx), float(ty) + 1.0f)), b = u.toScreen(glm::vec2(float(tx) + 1.0f, float(ty)));
+            const ImVec2 size = ImGui::CalcTextSize(label);
+            const float pad = 4 * scale; // (room for the backing on both sides: small tiles of a 10-wide grid keep it)
+            const float x0 = std::max(a.x, viewMin.x) + pad, y0 = std::max(a.y, viewMin.y) + 3 * scale;
+            if (x0 + size.x + 3 * scale > std::min(b.x, viewMax.x) || y0 + size.y > std::min(b.y, viewMax.y)) continue;
+            // Tiles in use: a small dark backing keeps the number readable over the islands.
+            if (used)
+                dl->AddRectFilled(ImVec2(x0 - 3 * scale, y0 - 1 * scale), ImVec2(x0 + size.x + 3 * scale, y0 + size.y + 1 * scale),
+                                  IM_COL32(14, 14, 17, 205), 3 * scale);
+            dl->AddText(ImVec2(x0, y0), used ? IM_COL32(205, 205, 215, 240) : IM_COL32(110, 110, 118, 150), label);
         }
     // Trim strips (while the Trim Sheet section is open).
     if (s.trimOpen) {
@@ -1283,10 +1318,19 @@ void App::drawUvEditor() {
         ImGui::SetNextItemWidth(w);
         ui::SliderInside("##uvmargin", &s.marginPx, 0.0f, 64.0f, "Margin %.0f px");
         ui::HelpText("Margin", nullptr, "Texels kept free between islands (half of it at the tile borders), at the texture's size.", kPath);
-        float tiles = float(s.packTiles);
-        ImGui::SetNextItemWidth(w);
-        if (ui::SliderInside("##uvtiles", &tiles, 1.0f, 10.0f, "UDIM Tiles %.0f")) s.packTiles = int(std::round(tiles));
-        ui::HelpText("UDIM tiles", nullptr, "Pack across this many tiles (1001 onwards, along u): more tiles, more texels per island.", kPath);
+        // The UDIM grid (#135): Columns along u (UDIM's row is ten wide), Rows up v; 10 x 2 fills 1001-1020.
+        float columns = float(uvPackColumns_), rows = float(uvPackRows_);
+        ImGui::SetNextItemWidth(halfW);
+        if (ui::SliderInside("##uvcolumns", &columns, 1.0f, 10.0f, "Columns %.0f"))
+            uiPrefs_.uvPackColumns = uvPackColumns_ = std::clamp(int(std::round(columns)), 1, 10);
+        ui::HelpText("Columns", nullptr, "UDIM tiles across (along u, 1001 onwards; ten make a full UDIM row). Packing fills "
+                     "Columns x Rows tiles and never goes wider, also when it packs at a fixed texel density.", kPath);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(halfW);
+        if (ui::SliderInside("##uvrows", &rows, 1.0f, 10.0f, "Rows %.0f"))
+            uiPrefs_.uvPackRows = uvPackRows_ = std::clamp(int(std::round(rows)), 1, 10);
+        ui::HelpText("Rows", nullptr, "UDIM rows up (along v: 1011 sits above 1001). 10 Columns x 2 Rows fills 1001-1020; "
+                     "more tiles, more texels per island.", kPath);
         ui::Checkbox("Rotate##uvrot", &s.rotate);
         ui::HelpText("Rotate", nullptr, "Turn islands to their smallest box and allow quarter turns, so more fit.", kPath);
         ImGui::SameLine();
@@ -1566,6 +1610,8 @@ double App::uvEditorTestValue(const std::string& name) {
     if (name == "uv_select_mode") return double(int(doc_.uvSelection.mode));
     if (name == "uv_unwrapping") return uvEditor_ && uvEditor_->job ? 1.0 : 0.0;
     if (name == "uv_unwraps") return uvEditor_ ? double(uvEditor_->unwraps) : 0.0;
+    if (name == "uv_pack_columns") return double(uvPackColumns_); // the Pack fields
+    if (name == "uv_pack_rows") return double(uvPackRows_);
     if (name == "uv_frame_ms") return uvEditor_ ? uvEditor_->frameMs : 0.0;
     if (name == "uv_tool") return uvEditor_ ? double(uvEditor_->tool) : 0.0;
     if (name == "uv_view_triangles") return uvEditor_ ? double(uvEditor_->gpu.triangles()) : 0.0;
