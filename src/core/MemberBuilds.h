@@ -1,8 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Member builds: Insider and Studio members are read collaborators on the private repository
-// islandmed/sculptforge-insiders, where the Insider previews are published. Preferences > Updates > Member builds
+// Member builds: Member and Studio members are read collaborators on the private repository
+// islandmed/sculptforge-insiders, where the betas and early builds are published. Preferences > Updates > Member builds
 // signs in with GitHub's device flow for the GitHub App "SculptForge Member Builds", which is installed only on that
 // repository with Contents: read. Its user-to-server token reaches only repositories both the app and the user can
 // access, so it can read that repository's releases and nothing else. No server of ours, no client secret (the

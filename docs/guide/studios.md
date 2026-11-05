@@ -149,8 +149,8 @@ SculptForge is free software under the GNU General Public License, version 3 or 
 SculptForge is free for any number of artists, and nothing in the app is ever paywalled. A Studio membership
 ($150 a month, invoiced monthly) covers up to 10 artists:
 
-- **Everything in Member for each artist:** betas and early builds, the monthly feature vote, a brush and alpha
-  pack every month, #members on Discord and their names in the credits. From SculptForge 1.0, members get each
+- **Everything in Member for each artist:** betas and early builds, the monthly feature vote, Member
+  Requests, #members on Discord and their names in the credits. From SculptForge 1.0, members get each
   release about two weeks early.
 - **Priority support:** your reports reviewed within 2 business days (no fix-time guarantee).
 - Your studio's own **private channel** on Discord.

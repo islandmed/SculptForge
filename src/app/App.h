@@ -420,7 +420,7 @@ private:
     void openSupportPage();
     void openDiscordPage(); // kDiscordUrl in the browser (UI tests: the status bar only)
     void openSupportLink(const char* url); // one of the Support.h links (UI tests: the status bar only)
-    void drawSupportUi();               // the first-run welcome and the one reminder note
+    void drawSupportUi();               // the first-run welcome and the new-look note
     void drawSupportersSection();       // Help > About: the names from docs/supporters.txt, as plain text
     bool showWelcome_ = false;          // the first start (no project.json yet), or Help > Welcome
     // project.json "input_style": the key style an install started with (the welcome's "Coming from" choice, or
@@ -445,26 +445,40 @@ private:
     bool quickTourOffersInTests_ = false; // UI tests: the offer only after the script's quick_tour_offers
     std::string flashSubpalette_; // a Tool sub-palette "Show me" opened: scrolled to and flashed (Palettes.cpp)
     double flashSubpaletteStart_ = 0.0;
-    double sculptSeconds_ = 0.0;        // cumulative time in strokes (project.json)
-    bool supportReminderDone_ = false;  // the reminder was shown (or turned off) once: never again (project.json)
-    bool supportReminderOpen_ = false;
     int discordRequests_ = 0;           // UI tests: how often the Discord invite was asked for
     int supportPageRequests_ = 0;       // UI tests: how often the page was asked for (only opened when interactive)
-    // The support card at launch (PanelSupportCard.cpp): decided once while starting, never mid-session.
-    struct SupportCard; // its animation state and the background picture (loaded on a worker thread)
+    // The membership cards (Support.h, PanelSupportCard.cpp): the full card on the first start (and from Help >
+    // Support), and the small card at good moments, at most once a week, until someone becomes a member.
+    struct SupportCard; // the full card's animation state
     struct SupportCardDelete { void operator()(SupportCard* c) const; }; // (defined where SupportCard is)
     std::unique_ptr<SupportCard, SupportCardDelete> supportCard_;
     SupportCardPrefs supportCardPrefs_;          // project.json
-    SupportCardReason supportCardReason_ = SupportCardReason::None;
-    int64_t supportCardNow_ = 0;                 // the clock when this start decided on the card ("Maybe later" counts from it)
     bool supportCardTestMode() const;            // tests, renders, demos, benchmarks, CI: never
+    bool memberCardTestMode_ = false;            // UI tests: `member_card` lets the moments through
     void launchSupportCard(bool firstRun, int64_t now, bool testMode); // shows it if supportCardDue
-    void showSupportCard(SupportCardReason reason); // (also Preferences > Support > Show it now)
-    void closeSupportCard(bool supporter);
+    void showSupportCard(SupportCardReason reason); // (also Help > Support and the welcome)
+    void closeSupportCard();
     bool supportCardOpen() const;
     bool supportCardEvent(const SDL_Event& e); // input while it's open goes to it, not the canvas or shortcuts
     void drawSupportCard();
     void drawSupportPrefs();                    // Preferences > Support
+    // The small card at good moments.
+    int64_t memberClock() const;                // seconds since 1970 (UI tests: their own clock)
+    int64_t memberClockOffset_ = 0;             // UI tests: `member_card days=N`
+    void memberMoment(MemberMoment m);          // a good moment happened: the card follows if it may (Support.h)
+    void tickMemberCard(float dt);              // the sculpting time, and the card once the frame is calm
+    void drawMemberCard();
+    void memberCardChoice(MemberCardChoice c);
+    void verifyMember();                        // "I'm already a member": the member builds' GitHub sign-in
+    void memberSignInFinished(bool ok);         // (PanelUpdate.cpp, when a sign-in ends)
+    bool memberSignedIn() const { return memberBuilds_; }
+    double sessionSculptSeconds_ = 0.0;         // stroke time in this session
+    bool sculptMomentDone_ = false;             // the sculpting moment came this session
+    MemberMoment memberMomentPending_ = MemberMoment::None; // allowed, waiting for a calm frame
+    MemberMoment memberCard_ = MemberMoment::None;          // the small card showing
+    bool memberVerifying_ = false;              // the card's sign-in runs (shown in the card)
+    bool updatedThisStart_ = false;             // this start runs a newer version than the last (the update moment)
+    std::string challengeTitle_;                // the monthly challenge whose results came (latest.json)
     // Show SculptForge on Discord (PanelIntegrations.cpp, core/DiscordPresence.h): off by default, project.json.
     struct DiscordPresencePrefs {
         bool enabled = false, showChallenge = false, showFileName = false;
@@ -1320,11 +1334,13 @@ private:
     struct MemberAuth; // the tokens, shared with worker threads
     struct MemberSignIn;
     void drawMemberBuildsSection(); // Preferences > Updates
+    void drawMemberSignInSteps();   // a sign-in in progress: the code, Copy, the page, Cancel (also the membership card)
     // (Worker threads.) Adds the newest member build to the job's answer when it is newer; a usable access token
     // (from the keychain, refreshed when it has run out; false and `signedOut` when the sign-in is gone).
     static void checkMemberBuilds(MemberAuth& auth, UpdateJob& job);
     static bool memberAccessToken(MemberAuth& auth, std::string& token, std::string& error, bool& signedOut);
     void startMemberSignIn();
+    void finishMemberSignInForTest(bool ok); // UI tests' member_sign_in: the running sign-in ends (GitHub never reached)
     void memberSignOut();
     std::shared_ptr<MemberAuth> memberAuth_;
     std::shared_ptr<MemberSignIn> memberSignIn_;

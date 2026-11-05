@@ -1,0 +1,126 @@
+# The small membership card at good moments (Support.h, PanelSupportCard.cpp): after ~20 minutes of active sculpting
+# in a session, a Save Render, an update or the monthly challenge's results; at most once a week, until someone becomes
+# a member. Never mid-stroke or during a job. Not now: a week. I'm already a member: the member builds' GitHub sign-in
+# (core/MemberBuilds.h): signed in, gone for good; no sign-in, three months. UI tests never reach GitHub or a browser.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=3
+# A UI test is a test-mode start: a moment brings nothing.
+run save_render size=256 aspect=1:1
+wait 0.3
+expect_value member_card_open == 0
+
+# ~20 minutes of active sculpting: never mid-stroke; it waits for the stroke to end.
+member_card none days=0 sculpt_seconds=1199.9
+drag_path 0.3 0.5 0.5 0.5 0.7 0.5 keep S=0.6
+wait 0.3
+expect_value member_card_pending == 1
+expect_value member_card_open == 0
+release
+wait 0.4
+expect_value member_card_open == 1
+expect_text Twenty minutes of sculpting. Members keep SculptForge free and moving.
+expect_text $5 a month or $48 a year
+expect_text Member Requests
+expect_text Founding Members
+expect "Become a member##member_card.become"
+expect "Not now##member_card.not_now"
+expect "I'm already a member##member_card.already"
+expect_no_text Don't show again
+shot sculpted
+# Become a member opens the membership page (both choices); the card goes, back in a week.
+click "Become a member##member_card.become"
+expect_value support_requests == 1
+expect_status https://sculptforge.app/support.html
+expect_value member_card_open == 0
+# Once per session: more sculpting brings nothing more.
+member_card none sculpt_seconds=5000
+wait 0.3
+expect_value member_card_pending == 0
+
+# At most once a week: a Save Render three days on brings nothing; eight days on, it does.
+member_card none days=3
+run save_render size=256 aspect=1:1
+wait 0.3
+expect_value member_card_open == 0
+member_card none days=8
+run save_render size=256 aspect=1:1
+wait 0.4
+expect_value member_card_open == 1
+expect_text Nice render.
+shot saved-render
+# Not now: a week.
+click "Not now##member_card.not_now"
+expect_value member_card_open == 0
+member_card updated days=14
+wait 0.3
+expect_value member_card_open == 0
+member_card updated days=15.1
+wait 0.4
+expect_value member_card_open == 1
+expect_text is here. Members get new versions early, as betas.
+shot updated
+click "Not now##member_card.not_now"
+
+# The monthly challenge's results, from the update feed (once per challenge).
+member_card none days=23
+env SF_UPDATE_FEED $SCRIPT_DIR/data/update_challenge.json
+click "Help##palette.help"
+click "Check for updates##help.check_updates"
+wait_idle 20
+wait 0.4
+expect_value member_card_open == 1
+expect_text The Creatures challenge results are in, on Discord.
+shot challenge
+
+# I'm already a member, no sign-in (cancelled here): three months, then weekly again.
+click "I'm already a member##member_card.already"
+wait 0.3
+expect_value member_card_open == 0
+expect_value member_card_verifying == 1
+expect_text Sign in with the GitHub account that has the members' invitation.
+expect_text TEST-CODE
+expect "Open github.com/login/device##member.open"
+shot sign-in
+click "Cancel##member.cancel"
+wait 0.4
+expect_value member_card_verifying == 0
+expect_value member_signed_in == 0
+expect_value supporter == 0
+expect_status no membership cards for three months
+member_card render days=60
+wait 0.3
+expect_value member_card_open == 0
+member_card render days=114
+wait 0.4
+expect_value member_card_open == 1
+
+# Again, and GitHub says the account has no access: three months too.
+click "I'm already a member##member_card.already"
+wait 0.3
+member_sign_in fail
+wait 0.4
+expect_value member_card_verifying == 0
+expect_value supporter == 0
+member_card render days=200
+wait 0.3
+expect_value member_card_open == 0
+member_card render days=205
+wait 0.4
+expect_value member_card_open == 1
+
+# Signed in with access to the member repository: gone for good, and member builds are on.
+click "I'm already a member##member_card.already"
+wait 0.3
+member_sign_in ok
+wait 0.4
+expect_value member_card_verifying == 0
+expect_value member_signed_in == 1
+expect_value supporter == 1
+expect_status Thank you for being a member!
+member_card render days=400
+member_card sculpted days=800
+wait 0.3
+expect_value member_card_open == 0
+expect_value member_card_pending == 0
+support_card first_run
+expect_value support_card_open == 0

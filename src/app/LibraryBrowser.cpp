@@ -1283,6 +1283,7 @@ bool App::saveRender(const RenderRequest& request, std::string& message) {
     libraryScanner_.invalidate();
     message = "Saved " + utf8(fsPath(path).filename()) + " (" + std::to_string(img.width) + " x " +
               std::to_string(img.height) + (request.path.empty() ? ", Library > Image)" : ")");
+    memberMoment(MemberMoment::SavedRender); // the membership card may follow (Support.h)
     return true;
 }
 

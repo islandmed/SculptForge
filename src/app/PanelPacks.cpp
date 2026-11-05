@@ -650,7 +650,7 @@ void App::drawNewPack() {
     ImGui::InputTextMultiline("Description##newpack", packs_.description, sizeof packs_.description,
                               ImVec2(-110 * s, ImGui::GetTextLineHeight() * 3.0f));
     ui::Checkbox("Member pack (insider channel)##newpack", &packs_.insider);
-    ui::HelpText("Member pack", nullptr, "Marks the pack as the monthly pack or an Insider drop. Display only: anyone can install it.",
+    ui::HelpText("Member pack", nullptr, "Marks the pack as a members' pack (Member Requests). Display only: anyone can install it.",
                  "Library > Packs > New Pack");
     ImGui::Separator();
     const float listH = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 2.6f;
