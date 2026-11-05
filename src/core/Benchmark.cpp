@@ -196,6 +196,17 @@ Mesh benchMesh(size_t triangles, bool head) {
 Mesh makeBenchSphere(size_t triangles) { return benchMesh(triangles, false); }
 Mesh makeBenchHead(size_t triangles) { return benchMesh(triangles, true); }
 
+Mesh makeMicroBenchHead(size_t baseTriangles, int level) {
+    Mesh m = makeBenchHead(baseTriangles);
+    std::string err;
+    if (!microDivide(m, level, err, 0)) return m; // (in memory)
+    microNoise(m, 0.004f, 40.0f, 1);  // forms the size of wrinkles
+    microNoise(m, 0.0008f, 400.0f, 2); // and pores
+    m.micro->clearDirty();
+    m.micro->markAllDirty();
+    return m;
+}
+
 namespace {
 
 using Clock = std::chrono::steady_clock;

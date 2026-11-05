@@ -294,6 +294,8 @@ public:
     // micro displacement along its normals instead.
     bool microMoveAlongNormals = false;
     MicroStroke& microStroke() { return micro_; }
+    // Once a frame on a micro level: the heights of patches a wavelet stroke changed (MicroStroke::wavelet), rebuilt.
+    void flushMicro(Mesh& mesh);
     // Mirror sign vectors for the enabled symmetry axes (always starts with (1,1,1)); ignores radial and local.
     static std::vector<glm::vec3> mirrors(Symmetry sym);
     // Every copy of a stroke (core/Symmetry.h, symmetryCopies), the identity first.

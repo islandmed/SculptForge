@@ -512,6 +512,7 @@ bool microRaycast(const Mesh& m, const BVH& bvh, const glm::vec3& origin, const 
         });
         cand.resize(kMaxCandidates);
     }
+    if (mm.lazy) mm.lazy(const_cast<MicroMesh&>(mm), cand); // (heights a wavelet stroke hasn't rebuilt yet)
     const uint32_t n = mm.n, S = mm.samples;
     struct Best {
         float t = std::numeric_limits<float>::max();

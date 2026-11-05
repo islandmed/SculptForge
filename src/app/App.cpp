@@ -640,7 +640,7 @@ bool App::wantsFrames(double now) const {
            !dabQueue_.empty() || // a stroke's dabs still waiting (drainStrokeDabs) are placed a few each frame
            strokeFinishing_ || solverBusy() || // the solver thread is placing a stroke's dabs (AsyncStroke.cpp)
            backgroundBusy() || playingLayer_ >= 0 || faceTakePlaying_ ||
-           timelapseBusy() || hardwareCalibrating() || // both render a step per frame: they stop when the frames do
+           timelapseBusy() || hardwareCalibrating() || proofRunning() || // they render a step per frame: they stop when the frames do
            spaceMouseMoving() || // a held SpaceMouse cap sends no events, but the view keeps moving (SpaceMouse.cpp)
            perf_.framesStill < 10; // the view just moved: Fast Navigation's full-quality frame comes after it stops
 }
@@ -2066,6 +2066,7 @@ void App::drainStrokeDabs(double budgetSeconds) {
     } else {
         doc_.sculptor.endBatch(doc_.mesh, doc_.bvh);
     }
+    doc_.sculptor.flushMicro(doc_.mesh); // (a wavelet stroke's patches: their heights once for this frame)
     if (log) {
         const SculptTimings& t = doc_.sculptor.timings;
         SDL_Log("stroke: %llu waiting, %llu placed in %.1f ms (kernel %.1f, normals %.1f, BVH %.1f, %llu vertices), %llu left",

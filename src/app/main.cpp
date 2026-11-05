@@ -7,6 +7,7 @@
 #include "ai/AiPolicy.h"
 #include "core/FocusDetail.h"
 #include "core/Pack.h"
+#include "core/Wavelet.h"
 
 #include <SDL3/SDL_main.h>
 
@@ -157,6 +158,14 @@ int main(int argc, char** argv) {
         std::string a = argv[i];
         auto next = [&]() -> std::string { return i + 1 < argc ? argv[++i] : std::string(); };
         if (sf::parseBenchArg(argc, argv, i, bench)) continue;
+        if (std::string(argv[i]) == "--bench-wavelet") { // research (docs/design/core-200m.md N2), CPU only
+            const std::string out = i + 1 < argc && argv[i + 1][0] != '-' ? argv[++i] : std::string();
+            return sf::runWaveletBench(out);
+        }
+        if (std::string(argv[i]) == "--bench-wavelet-stroke") { // research (N2 in MicroStroke), CPU only
+            const std::string out = i + 1 < argc && argv[i + 1][0] != '-' ? argv[++i] : std::string();
+            return sf::runWaveletStrokeBench(out);
+        }
         if (a == "--calibrate") calibrate = true;
         else if (a == "--calibrate-quick") calibrate = calibrateQuick = true;
         else if (a == "--calibrate-no-save") calibrateSave = false;
@@ -195,11 +204,12 @@ int main(int argc, char** argv) {
         else if (a == "--benchmark") {
             options.benchmark = true;
             // An optional scene name: sculptforge --benchmark standard-15m
-            if (i + 1 < argc && std::string(argv[i + 1]).rfind("standard", 0) == 0) {
+            if (i + 1 < argc && (std::string(argv[i + 1]).rfind("standard", 0) == 0 || std::string(argv[i + 1]) == "micro-head")) {
                 options.benchmarkScene = argv[++i];
                 if (options.benchmarkScene != "standard" && options.benchmarkScene != "standard-15m" &&
-                    options.benchmarkScene != "standard-33m" && options.benchmarkScene != "standard-1b") {
-                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard or standard-1b)\n", argv[i]);
+                    options.benchmarkScene != "standard-33m" && options.benchmarkScene != "standard-1b" &&
+                    options.benchmarkScene != "micro-head") {
+                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard, standard-1b or micro-head)\n", argv[i]);
                     return 1;
                 }
             }

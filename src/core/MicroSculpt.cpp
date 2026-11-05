@@ -17,10 +17,12 @@
 #include "core/Sculpt.h"
 #include "core/ThreadPool.h"
 #include "core/TierConfig.h"
+#include "core/Wavelet.h"
 
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstdlib>
 
 namespace sf {
 
@@ -127,8 +129,279 @@ void MicroStroke::begin(Mesh& m) {
     grabWeight_.clear();
     grabNormal_.clear();
     baseEdge_ = mm.baseEdge;
+    mm_ = &mm;
+    coefOf_.assign(mm.baseTriangles, 0);
+    stale_.assign(mm.baseTriangles, 0);
+    coef_.clear();
+    freeSlots_.clear();
+    staleList_.clear();
+    maskedTri_.clear();
+    mm.lazy = nullptr;
+    if (wavelet)
+        mm.lazy = [alive = std::weak_ptr<char>(alive_), this](MicroMesh& level, std::span<const uint32_t> tris) {
+            if (!alive.expired()) flush(level, tris);
+        };
     mm.stroking = true;
     active_ = true;
+}
+
+bool MicroStroke::waveletDefault() {
+    static const bool on = [] {
+        const char* e = std::getenv("SF_MICRO_WAVELET"); // =0: every dab on the fine heights, as before (A/B)
+        return !(e && e[0] == '0');
+    }();
+    return on;
+}
+
+void MicroStroke::flush(Mesh& m) {
+    if (m.micro && m.micro.get() == mm_) flushAll(*mm_);
+}
+
+void MicroStroke::flushAll(MicroMesh& mm) {
+    if (staleList_.empty()) return;
+    for (uint32_t t : staleList_) stale_[t] = 0;
+    work_.swap(staleList_);
+    staleList_.clear();
+    rebuild(mm, work_);
+}
+
+void MicroStroke::flush(MicroMesh& mm, std::span<const uint32_t> tris) {
+    if (&mm != mm_ || staleList_.empty()) return;
+    work_.clear();
+    for (uint32_t t : tris)
+        if (t < stale_.size() && stale_[t]) {
+            stale_[t] = 0;
+            work_.push_back(t);
+        }
+    if (work_.empty()) return;
+    std::erase_if(staleList_, [&](uint32_t t) { return !stale_[t]; });
+    rebuild(mm, work_);
+}
+
+// The heights of `tris` from their coefficients (the inverse transform), each patch's range exact again.
+void MicroStroke::rebuild(MicroMesh& mm, std::span<const uint32_t> tris) {
+    auto clock = std::chrono::steady_clock::now();
+    const uint32_t n = mm.n, S = mm.samples;
+    poolFor(tris.size(), [&](size_t b, size_t e) {
+        for (size_t k = b; k < e; ++k) {
+            const uint32_t t = tris[k];
+            int16_t* g = mm.disp.data() + size_t(t) * S;
+            std::copy_n(coef_.data() + size_t(coefOf_[t] - 1) * S, S, g);
+            waveletInverse(g, n);
+            int r = 0;
+            for (uint32_t i = 0; i < S; ++i) r = std::max(r, std::abs(int(g[i])));
+            mm.triRange[t] = uint16_t(std::min(r, 32767));
+        }
+    }, 8);
+    for (uint32_t t : tris) {
+        mm.rangeMax = std::max(mm.rangeMax, mm.triRange[t]);
+        mm.markDirty(t);
+    }
+    ++mm.revision;
+    rebuilt += tris.size();
+    flushMs += lapMs(clock);
+}
+
+void MicroStroke::dropCoefficients(std::span<const uint32_t> tris) {
+    for (uint32_t t : tris)
+        if (coefOf_[t]) {
+            freeSlots_.push_back(coefOf_[t] - 1);
+            coefOf_[t] = 0;
+        }
+}
+
+void MicroStroke::dropAllCoefficients(MicroMesh& mm) {
+    if (coef_.empty()) return;
+    flushAll(mm);
+    std::fill(coefOf_.begin(), coefOf_.end(), 0);
+    coef_.clear();
+    freeSlots_.clear();
+}
+
+bool MicroStroke::waveletDab(const Mesh& m, MicroMesh& mm, BrushType type, const glm::vec3& center, const glm::vec3& viewDir,
+                             float r, float s, float sign, float focal) {
+    const uint32_t n = mm.n, S = mm.samples;
+    // The coarsest lattice the radius still spans kWaveletSamples points of.
+    const float microEdge = baseEdge_ / float(n);
+    uint32_t sp = 1;
+    if (microEdge > 0.0f)
+        while (sp < n / 2 && r >= kWaveletSamples * microEdge * float(2 * sp)) sp <<= 1;
+    if (sp < kWaveletMinSpacing) return false;
+    // A mask (it scales each fine point's change) or a hidden neighbour (whose shared points stay) under the brush:
+    // today's path.
+    if (maskedTri_.size() != mm.baseTriangles) maskedTri_.assign(mm.baseTriangles, 0);
+    for (uint32_t t : cand_) {
+        if (m.hasHidden()) {
+            const glm::uvec3 tr = m.triangles[t];
+            for (int k = 0; k < 3; ++k)
+                for (uint32_t u : m.vertexTriangles(tr[k]))
+                    if (m.triangleHidden(u)) return false;
+        }
+        if (!mm.hasMask()) continue;
+        if (!maskedTri_[t]) {
+            const uint8_t* mk = mm.mask.data() + size_t(t) * S;
+            maskedTri_[t] = std::any_of(mk, mk + S, [](uint8_t v) { return v != 0; }) ? 2 : 1;
+        }
+        if (maskedTri_[t] == 2) return false;
+    }
+    auto clock = std::chrono::steady_clock::now();
+    const uint32_t cm = n / sp, L = (cm + 1) * (cm + 2) / 2;
+    const size_t C = cand_.size();
+    const float r2 = r * r, invStep = 1.0f / mm.step;
+    lattice_.resize(C * L);
+    latticeState_.assign(C, 0);
+    latticeGrow_.assign(C, 0);
+    auto slot = [&](uint32_t t) { return coef_.data() + size_t(coefOf_[t] - 1) * S; };
+    // 1. The lattice's heights: a patch with coefficients turned to lattice form in place (until step 4), one
+    // without read from its heights (they're current).
+    poolFor(C, [&](size_t b, size_t e) {
+        for (size_t ci = b; ci < e; ++ci) {
+            const uint32_t t = cand_[ci];
+            const int16_t* src = mm.disp.data() + size_t(t) * S;
+            if (coefOf_[t]) {
+                int16_t* c = slot(t);
+                waveletToLattice(c, n, sp);
+                src = c;
+                latticeState_[ci] = 1;
+            }
+            int16_t* out = lattice_.data() + ci * L;
+            for (uint32_t cj = 0, k = 0; cj <= cm; ++cj)
+                for (uint32_t cii = 0; cii + cj <= cm; ++cii, ++k) out[k] = src[MicroMesh::index(cii * sp, cj * sp, n)];
+        }
+    }, 16);
+    // 2. The brush plane (Standard, Clay) as dab() finds it, on the lattice.
+    glm::vec3 areaNormal = -viewDir, areaCenter = center;
+    if (type != BrushType::Inflate) {
+        struct Sum {
+            glm::dvec3 nrm{0.0}, ctr{0.0};
+            double w = 0.0;
+        };
+        const size_t block = 8;
+        std::vector<Sum> sums((C + block - 1) / block);
+        poolFor(C, [&](size_t b, size_t e) {
+            Sum acc;
+            MicroTriangle T;
+            for (size_t ci = b; ci < e; ++ci) {
+                T.set(m, cand_[ci], n);
+                const int16_t* lat = lattice_.data() + ci * L;
+                for (uint32_t cj = 0, k = 0; cj <= cm; ++cj)
+                    for (uint32_t cii = 0; cii + cj <= cm; ++cii, ++k) {
+                        glm::vec3 p, nn;
+                        T.eval(cii * sp, cj * sp, p, nn);
+                        p += nn * (float(lat[k]) * mm.step);
+                        const float d2 = glm::dot(p - center, p - center);
+                        if (d2 >= r2) continue;
+                        const float w = brushFalloff(std::sqrt(d2), r, focal);
+                        acc.nrm += glm::dvec3(nn * w);
+                        acc.ctr += glm::dvec3(p * w);
+                        acc.w += w;
+                    }
+            }
+            sums[b / block] = acc;
+        }, block, 2);
+        Sum total;
+        for (const Sum& x : sums) total.nrm += x.nrm, total.ctr += x.ctr, total.w += x.w;
+        if (total.w > 0.0) {
+            areaCenter = glm::vec3(total.ctr / total.w);
+            const double len = glm::length(total.nrm);
+            if (len > 1e-12) areaNormal = glm::vec3(total.nrm / len);
+        }
+    }
+    // 3. The kernel on the lattice (dab()'s formulas), each new lattice height rounded as dab() rounds.
+    const size_t block = 8;
+    std::vector<uint64_t> visited((C + block - 1) / block, 0);
+    std::vector<float> clipped((C + block - 1) / block, 0.0f);
+    poolFor(C, [&](size_t b, size_t e) {
+        MicroTriangle T;
+        uint64_t count = 0;
+        float over = 0.0f;
+        for (size_t ci = b; ci < e; ++ci) {
+            T.set(m, cand_[ci], n);
+            int16_t* lat = lattice_.data() + ci * L;
+            int grow = 0;
+            for (uint32_t cj = 0, k = 0; cj <= cm; ++cj)
+                for (uint32_t cii = 0; cii + cj <= cm; ++cii, ++k) {
+                    glm::vec3 p, nn;
+                    T.eval(cii * sp, cj * sp, p, nn);
+                    p += nn * (float(lat[k]) * mm.step);
+                    const float d2 = glm::dot(p - center, p - center);
+                    if (d2 >= r2) continue;
+                    ++count;
+                    const float f = brushFalloff(std::sqrt(d2), r, focal);
+                    if (f <= 0.0f) continue;
+                    float delta = 0.0f;
+                    if (type == BrushType::Standard) delta = sign * s * r * 0.06f * f * glm::dot(areaNormal, nn);
+                    else if (type == BrushType::Inflate) delta = sign * s * r * 0.05f * f;
+                    else { // Clay
+                        const float facing = std::max(glm::dot(nn, areaNormal), 0.3f);
+                        const glm::vec3 pp = areaCenter + areaNormal * (sign * r * 0.05f * s);
+                        const float h = glm::dot(p - pp, areaNormal);
+                        if (sign * h < 0.0f) delta = -h * f * clayPull(s) / facing;
+                    }
+                    if (delta == 0.0f) continue;
+                    const float nd = float(lat[k]) + delta * invStep;
+                    if (std::abs(nd) > 32767.0f) over = std::max(over, std::abs(nd) * mm.step);
+                    const int16_t q = quantizeUnits(nd);
+                    if (q == lat[k]) continue;
+                    grow = std::max(grow, std::abs(int(q) - int(lat[k])));
+                    lat[k] = q;
+                }
+            if (grow) {
+                latticeState_[ci] |= 2;
+                latticeGrow_[ci] = uint16_t(std::min(grow, 65535));
+            }
+        }
+        visited[b / block] = count;
+        clipped[b / block] = over;
+    }, block, 2);
+    // 4. Changed patches without coefficients get a slot; each patch goes back to coefficients with its new lattice.
+    for (size_t ci = 0; ci < C; ++ci) {
+        if (!(latticeState_[ci] & 2)) continue;
+        const uint32_t t = cand_[ci];
+        if (!coefOf_[t]) {
+            uint32_t sl;
+            if (!freeSlots_.empty()) sl = freeSlots_.back(), freeSlots_.pop_back();
+            else sl = uint32_t(coef_.size() / S), coef_.resize(coef_.size() + S);
+            coefOf_[t] = sl + 1;
+        }
+        if (!stale_[t]) stale_[t] = 1, staleList_.push_back(t);
+    }
+    poolFor(C, [&](size_t b, size_t e) {
+        for (size_t ci = b; ci < e; ++ci) {
+            const uint32_t t = cand_[ci];
+            const uint8_t st = latticeState_[ci];
+            if (!st) continue; // (no coefficients, nothing changed)
+            int16_t* c = slot(t);
+            if (!(st & 1)) {
+                std::copy_n(mm.disp.data() + size_t(t) * S, S, c);
+                waveletHeightsToLattice(c, n, sp);
+            }
+            if (st & 2) {
+                const int16_t* lat = lattice_.data() + ci * L;
+                for (uint32_t cj = 0, k = 0; cj <= cm; ++cj)
+                    for (uint32_t cii = 0; cii + cj <= cm; ++cii, ++k) c[MicroMesh::index(cii * sp, cj * sp, n)] = lat[k];
+            }
+            waveletFromLattice(c, n, sp);
+        }
+    }, 16);
+    // The ranges stay upper bounds until the rebuild makes them exact: the fine points move by at most the lattice's
+    // largest change, plus a unit per finer level for the floor averages.
+    int levels = 0;
+    for (uint32_t x = sp; x > 1; x >>= 1) ++levels;
+    for (size_t ci = 0; ci < C; ++ci)
+        if (latticeState_[ci] & 2) {
+            const uint32_t t = cand_[ci];
+            mm.triRange[t] = uint16_t(std::min(int(mm.triRange[t]) + int(latticeGrow_[ci]) + levels + 1, 32767));
+            mm.rangeMax = std::max(mm.rangeMax, mm.triRange[t]);
+        }
+    for (uint64_t c : visited) points += c;
+    lastStride = sp;
+    ++waveletDabs;
+    kernelMs += lapMs(clock);
+    float over = 0.0f;
+    for (float c : clipped) over = std::max(over, c);
+    if (over > 0.0f) widen(mm, over * 1.5f);
+    return true;
 }
 
 // Saves the grids of the triangles in `tris` that this stroke hasn't touched yet.
@@ -303,6 +576,16 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     }
     touch(mm, cand_);
     findMs += lapMs(clock);
+    if (wavelet && !maskBrush && !useAlpha &&
+        (type == BrushType::Standard || type == BrushType::Inflate || type == BrushType::Clay) &&
+        waveletDab(m, mm, type, center, viewDir, r, s, sign, focal))
+        return;
+    // Any other dab works on heights: those of its triangles rebuilt first, their coefficients then out of date.
+    if (!coef_.empty()) {
+        flush(mm, cand_);
+        dropCoefficients(cand_);
+    }
+    if (maskBrush) maskedTri_.clear();
 
     // 2. The brush plane: weighted area normal and centre over every second grid point under the brush.
     glm::vec3 areaNormal(0.0f), areaCenter(0.0f);
@@ -529,6 +812,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
 }
 
 void MicroStroke::widen(MicroMesh& mm, float need) {
+    if (need > mm.rangeWorld()) dropAllCoefficients(mm); // (the heights are rescaled, which coefficients can't follow)
     const int div = mm.widen(need);
     if (div == 1) return;
     for (int16_t& v : oldDisp_) v = int16_t(int(v) / div);
@@ -539,6 +823,7 @@ void MicroStroke::beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, fl
     if (!active_ || !m.micro) return;
     MicroMesh& mm = *m.micro;
     const uint32_t n = mm.n;
+    dropAllCoefficients(mm); // (Move works on heights)
     widen(mm, float(mm.rangeMax) * mm.step + radius); // room to move a radius either way
     // Scale-adaptive like dab(): the weights on grid points `stride` apart, interpolated in between when moving.
     uint32_t stride = 1;
@@ -642,6 +927,7 @@ void MicroStroke::restore(Mesh& m) {
     if (!active_ || !m.micro || tiles_.empty()) return;
     MicroMesh& mm = *m.micro;
     const size_t S = mm.samples;
+    dropAllCoefficients(mm);
     poolFor(tiles_.size(), [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
             const size_t t = tiles_[i];
@@ -656,6 +942,11 @@ void MicroStroke::restore(Mesh& m) {
 std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
     active_ = false;
     if (m.micro) {
+        if (m.micro.get() == mm_) {
+            dropAllCoefficients(*mm_); // (the step holds heights)
+            mm_->lazy = nullptr;
+        }
+        mm_ = nullptr;
         m.micro->stroking = false;
         if (const uint64_t cap = currentTierConfig().residentCacheCapMB) m.micro->disp.trim(size_t(cap) << 20);
     }

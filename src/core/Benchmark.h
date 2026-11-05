@@ -81,6 +81,9 @@ Mesh makeBenchSphere(size_t triangles);
 // eye sockets, nose, cheekbones, jaw, ears, neck) of about `triangles` triangles, with subdivision levels. Made
 // from a formula, not a file, so every build and platform sculpts the same surface.
 Mesh makeBenchHead(size_t triangles);
+// The bench head with micro levels and procedural detail (wrinkles, pores), built in memory: `baseTriangles` base
+// triangles at micro `level` (20000 at 7: about 315 million micro triangles; --benchmark micro-head, the N2 benches).
+Mesh makeMicroBenchHead(size_t baseTriangles, int level);
 
 // Resident memory of this process in bytes (0 where unknown).
 size_t residentBytes();

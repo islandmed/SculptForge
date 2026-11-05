@@ -102,6 +102,7 @@ add_library(sculptforge_core STATIC
   src/core/MapExport.cpp
   src/core/Multires.cpp
   src/core/Micro.cpp
+  src/core/Wavelet.cpp
   src/core/MicroSculpt.cpp
   src/core/MicroCommands.cpp
   src/core/MicroStore.cpp

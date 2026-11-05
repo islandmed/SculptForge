@@ -89,6 +89,9 @@ struct MicroMesh {
     // Focus Detail (core/FocusDetail.h, prototype): set when the level streams from a detail file. Tiles outside
     // the focus hold a coarse grid; brushes and undo make the tiles they change full first (ensureFull).
     std::shared_ptr<FocusDetail> focus;
+    // N2 (MicroStroke::wavelet): while a stroke holds patches as wavelet coefficients, their heights here may lag
+    // the stroke by up to a frame; a reader that needs some now (the brush's pick: microRaycast) calls this with them.
+    std::function<void(MicroMesh&, std::span<const uint32_t> tris)> lazy;
 
     size_t microTriangles() const { return size_t(baseTriangles) * n * n; }
     size_t microVertices() const; // unique grid points (shared edges and corners counted once)
@@ -271,8 +274,45 @@ public:
     // Timings of the last dabs (ms): finding the triangles + saving undo tiles, the kernel, stitching.
     double findMs = 0, kernelMs = 0, stitchMs = 0;
     uint64_t points = 0; // grid points visited
+    // N2, wavelet strokes (docs/design/core-200m.md §7b; off by default, SF_MICRO_WAVELET=1): a Standard, Inflate or
+    // Clay dab whose radius spans >= kWaveletSamples points of a lattice >= kWaveletMinSpacing coarser keeps the patches it changes as
+    // wavelet coefficients (core/Wavelet.h) for the rest of the stroke and adds its kernel to that lattice only; the
+    // finer coefficients (the detail) ride along. Each changed patch's heights are rebuilt once (flush) when something
+    // reads them: the frame (Sculptor::flushMicro), the brush's pick (MicroMesh::lazy), any other brush, the end.
+    static constexpr float kWaveletSamples = 64.0f;
+    // ... and only on a lattice at least this much coarser than the grid (at 2 the rebuild costs what the lattice
+    // saves: measured slower than today's brush, --bench-wavelet-stroke).
+    static constexpr uint32_t kWaveletMinSpacing = 4;
+    bool wavelet = waveletDefault();
+    static bool waveletDefault();
+    // Rebuilds the heights of the patches whose coefficients are newer (all, or those among `tris`); the coefficients
+    // stay for the next dabs.
+    void flush(Mesh& m);
+    void flush(MicroMesh& mm, std::span<const uint32_t> tris);
+    double flushMs = 0;      // time spent rebuilding
+    uint64_t rebuilt = 0;    // patches rebuilt
+    uint64_t waveletDabs = 0; // dabs that took the wavelet path
 
 private:
+    // The wavelet path of dab() for the triangles in cand_ (already touched); false when it doesn't apply (a mask or
+    // a hidden neighbour under the brush, a lattice no coarser than the grid), before anything changed.
+    bool waveletDab(const Mesh& m, MicroMesh& mm, BrushType type, const glm::vec3& center, const glm::vec3& viewDir,
+                    float r, float s, float sign, float focal);
+    void rebuild(MicroMesh& mm, std::span<const uint32_t> tris);
+    void flushAll(MicroMesh& mm);
+    void dropCoefficients(std::span<const uint32_t> tris); // (flushed first)
+    void dropAllCoefficients(MicroMesh& mm);               // flushes
+    MicroMesh* mm_ = nullptr;             // the level this stroke edits
+    std::vector<uint32_t> coefOf_;        // per base triangle: its coefficient slot + 1 (0 = none)
+    std::vector<int16_t> coef_;           // slots * samples
+    std::vector<uint32_t> freeSlots_;
+    std::vector<uint8_t> stale_;          // per base triangle: its coefficients are newer than its heights
+    std::vector<uint32_t> staleList_, work_;
+    std::vector<uint8_t> maskedTri_;      // per base triangle: 0 = not looked at this stroke, 1 = no mask, 2 = some
+    std::vector<int16_t> lattice_;        // the dab's lattice heights, per candidate
+    std::vector<uint8_t> latticeState_;   // per candidate: bit 0 = had coefficients, bit 1 = changed
+    std::vector<uint16_t> latticeGrow_;   // per candidate: the largest |change| (units)
+    std::shared_ptr<char> alive_ = std::make_shared<char>(0); // (MicroMesh::lazy calls only a stroke that still exists)
     void touch(MicroMesh& mm, std::span<const uint32_t> tris);
     void widen(MicroMesh& mm, float need); // MicroMesh::widen, keeping this stroke's saved tiles in step
     void stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t> tris);

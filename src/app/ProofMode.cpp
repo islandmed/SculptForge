@@ -99,6 +99,10 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
                                 }, 5};
         return {s1b};
     }
+    if (name == "micro-head") { // the bench head at Micro 7 with wrinkles and pores, 314.6M micro triangles, built here
+        const ProofMeshSize sm{315, "315M micro", [](size_t) { return makeMicroBenchHead(20000, 7); }, 8};
+        return {sm};
+    }
     return {};
 }
 
@@ -472,6 +476,12 @@ bool App::proofSkippedScenes() const {
     return std::any_of(proof_->results.begin(), proof_->results.end(), [](const SizeResult& r) { return !r.skipped.empty(); });
 }
 
+// It draws every frame until the results: the scripted stroke may end on another thread while the frame was slow
+// (2 s on the floor E-cores), and without a frame the run never saw that and slept until the next event.
+bool App::proofRunning() const {
+    return proof_ && proof_->stage != ProofState::Stage::Intro && proof_->stage != ProofState::Stage::Results;
+}
+
 void App::startProofMode() {
     if (proof_ && proof_->stage != ProofState::Stage::Results && proof_->stage != ProofState::Stage::Intro) return;
     auto p = std::make_shared<ProofState>();
@@ -497,7 +507,10 @@ void App::startProofMode() {
     };
     p->jsonPath = !options_.benchmarkOut.empty() ? options_.benchmarkOut : u8(dir / ("sculptforge-benchmark-" + stamp + ".json"));
     p->videoPath = !options_.benchmarkVideo.empty() ? options_.benchmarkVideo : u8(dir / ("sculptforge-benchmark-" + stamp + ".mp4"));
-    if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds);
+    if (p->scene == "micro-head") // micro-level strokes (wavelet strokes, the shading budget): Standard, 108 and 216 px
+        p->phases = {{"standard 108 px", 108.0f, p->strokeSeconds, BrushType::Standard, 0.5f},
+                     {"standard 216 px", 216.0f, p->strokeSeconds, BrushType::Standard, 0.5f}};
+    else if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds);
     else p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0}};
     p->stage = p->cli ? ProofState::Stage::Announce : ProofState::Stage::Intro;
     p->radiusBefore = radiusPx_;
