@@ -2139,6 +2139,7 @@ void Renderer::drawPatches(const MeshSlot& s, GLenum mode, DrawPart part, GLint 
 void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, bool wireframe, bool pbr) {
     if (mesh.micro && microMatches(mesh)) { // a micro level draws its own way (render/MicroRenderer.h)
         if (!s.micro) s.micro = std::make_shared<MicroRenderer>();
+        s.micro->viewMoving = proxyUsed_; // (the last draw's: the view moving)
         s.outOfMemory = !s.micro->sync(mesh);
         s.drawnTriangles = s.outOfMemory ? 0 : 1; // (draw() skips empty slots)
         s.fresh = true;                           // (back to a mesh: a full upload)
