@@ -103,7 +103,7 @@ TEST(micro_dabs_use_the_alpha) {
         p.viewDir = glm::vec3(0, 0, -1);
         p.radius = 0.3f;
         p.strength = 0.5f;
-        p.focal = -1.0f; // (Focal Shift -100: the square shows hard to its corners)
+        p.focal = -1.0f; // (Falloff -100: the square shows hard to its corners)
         p.alpha = k == 1 ? &square : nullptr;
         CHECK(doc.sculptor.beginStroke(doc.mesh, "Standard"));
         for (int i = 0; i < 8; ++i) doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, p, kNone);

@@ -19,6 +19,7 @@
 #include <cfloat>
 #include <iterator>
 #include <string>
+#include <string_view>
 
 namespace sf {
 
@@ -163,7 +164,8 @@ void App::pickStrokePopupItem(int item, bool close) {
         setStrokeLatch(off ? StrokeLatch::None : latch);
         const ShapeLook& look = kShapes[int(shape)];
         if (!off)
-            status_ = std::string(look.kind) + " " + look.label + " on: " +
+            status_ = std::string(std::string_view(look.label) == "Rect" ? "Rectangle" : look.label) + " " +
+                      (latch == StrokeLatch::Mask ? "mask" : "cut") + " on: " +
                       (latch == StrokeLatch::Mask ? "drags mask without Ctrl (Ctrl unmasks)" : "drags cut without Ctrl+Shift") +
                       " until you pick it again or another brush";
         if (close) closeStrokePopup();
@@ -248,7 +250,7 @@ void App::drawStrokePopup() {
         if (latch != StrokeLatch::None && !io.WantCaptureMouse && canvasRect().contains(mouseX_, mouseY_) &&
             radial_.menu < 0 && !quickMenu_.open) {
             ImFont* font = fontSmall_ ? fontSmall_ : ImGui::GetFont();
-            std::string label = strokeLatchName(latch); // with the shape it draws: "Mask Lasso", "Cut Line"
+            std::string label = strokeLatchName(latch); // with the shape it draws: "Lasso Mask", "Cut Line"
             for (int i = 0; i < kStrokePopupShapes; ++i)
                 if (StrokeShape(i) != StrokeShape::MaskPen && strokeShapeOn(StrokeShape(i)))
                     label = std::string(kShapes[i].kind) + " " + kShapes[i].label;

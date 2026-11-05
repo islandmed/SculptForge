@@ -798,7 +798,7 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
             navigate(app, to);
         }
     }
-    // The layout holds what Store Config saves (open, rows, tab, placement).
+    // The layout holds what Save Layout keeps (open, rows, tab, placement).
     UiLayout& layout = app.layout_;
     if (!syncedLayout_) {
         syncedLayout_ = true;
@@ -1149,10 +1149,10 @@ void App::initLibraryBrowser() {
     add("ui.picker.material", "Material picker", ICON_LC_SUN, "Material", "M",
         "Pop up the materials under the cursor. Hover one to preview it on the model; click to keep it.",
         [] { openPicker(Picker::Material, ImVec2(-1, -1)); });
-    add("ui.size_popup", "Draw Size at cursor", ICON_LC_CIRCLE, "Draw", "S",
-        "A Draw Size slider under the cursor: drag it, or type a number and press Enter.",
+    add("ui.size_popup", "Size at cursor", ICON_LC_CIRCLE, "Draw", "S",
+        "A Size slider under the cursor: drag it, or type a number and press Enter.",
         [this] { PickerUi::sizePopup(*this, PickerUi::Slider::DrawSize); });
-    // U / I / O (Z Intensity, RGB Intensity, Focal Shift) are in Input.cpp.
+    // U / I / O (Intensity, Colour intensity, Falloff) are in Input.cpp.
     add("file.quicksave", "Save Snapshot", ICON_LC_SAVE, "File", "",
         "Save a timestamped snapshot of the whole scene to your library (the last 10 are kept). "
         "Your project file is not changed. Find them in the Library's Snapshots tab.",
@@ -1283,6 +1283,7 @@ bool App::saveRender(const RenderRequest& request, std::string& message) {
     libraryScanner_.invalidate();
     message = "Saved " + utf8(fsPath(path).filename()) + " (" + std::to_string(img.width) + " x " +
               std::to_string(img.height) + (request.path.empty() ? ", Library > Image)" : ")");
+    memberMoment(MemberMoment::SavedRender); // the membership card may follow (Support.h)
     return true;
 }
 

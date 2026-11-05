@@ -182,7 +182,7 @@ TEST(vdm_sample_is_bilinear_and_zero_outside) {
 }
 
 // Sculpt a known shape onto the VDM plane, capture it, stamp it on another plane at radius 1: every point lands
-// where the sculpted plane's point did (Z Intensity 50 = the map's own size).
+// where the sculpted plane's point did (Intensity 50 = the map's own size).
 TEST(vdm_capture_then_stamp_reproduces_the_shape) {
     Document plane = makeDoc(makeVdmPlane(128));
     CHECK(plane.mesh.hasUvs() && plane.mesh.hasMask());

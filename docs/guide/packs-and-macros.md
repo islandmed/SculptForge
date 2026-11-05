@@ -11,7 +11,7 @@ Use **File > Install Pack...**, drop a `.sfpack` file on the window, or click **
 
 | The review shows | |
 |---|---|
-| **Name, version and author** | As the pack's maker wrote them. **Member pack** marks the monthly members' pack. |
+| **Name, version and author** | As the pack's maker wrote them. **Member pack** marks a members' pack (Member Requests). |
 | **License** | The license name, and the license text from the pack on the right. |
 | **Contains** | How many brushes, alphas, Lit Spheres, Material Recipes, VDMs, keymaps, pie menus and macros, with every item listed by name. |
 | **Replaces the installed version** | When an older version of the same pack is installed. |
@@ -36,7 +36,7 @@ example **Clay (Member pack)**.
 | Macros | <kbd>F3</kbd>, the key editor and the pie menus, as **Name (Pack)**. |
 
 Keymaps and pie menus change how SculptForge responds, so they are only applied when you click **Apply keymap**
-or **Add pie menu**. **Store Config** keeps the result.
+or **Add pie menu**. The result saves itself.
 
 ## Library > Packs
 
@@ -57,7 +57,7 @@ menus, your changed shortcuts (as a keymap) and your macros. Tick what goes in, 
 and description, and click **Save Pack...**. The file is checked exactly as an install would check it before it
 is written.
 
-Tick **Member pack (insider channel)** for the monthly members' pack. It only changes the label shown in the
+Tick **Member pack (insider channel)** for a members' pack (Member Requests). It only changes the label shown in the
 review and the pack list; anyone can install the file.
 
 To build a pack from a folder in a script, lay the folder out like a pack (`brushes/`, `alphas/`, `litspheres/`,

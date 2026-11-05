@@ -17,14 +17,14 @@ expect_no_text Mask Pen
 hold ctrl
 key ctrl+b
 wait 0.1
-expect "Mask Lasso##held.mask.lasso"
-hover "Mask Lasso##held.mask.lasso"
+expect "Lasso Mask##held.mask.lasso"
+hover "Lasso Mask##held.mask.lasso"
 expect_help "lasso"
 shot ctrl-brush-picker
-click "Mask Lasso##held.mask.lasso"
+click "Lasso Mask##held.mask.lasso"
 hold none
 expect_value mask_shape == 1
-expect_not "Mask Lasso##held.mask.lasso"
+expect_not "Lasso Mask##held.mask.lasso"
 
 # Clicking the shelf's stroke tile with Ctrl held offers the mask's strokes.
 hold ctrl
@@ -50,7 +50,7 @@ expect_value mask_shape == 0
 # Without Ctrl the pickers are the usual ones.
 key b
 wait 0.1
-expect_not "Mask Lasso##held.mask.lasso"
+expect_not "Lasso Mask##held.mask.lasso"
 key escape
 
 # Ctrl+Shift: the selection brushes. SelectLasso from the brush picker, SelectRect from the stroke picker.

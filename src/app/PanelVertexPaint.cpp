@@ -275,7 +275,7 @@ void App::drawBackgroundControls(const char* idSuffix) {
 
 void App::setFlatShading(bool flat) {
     renderSettings_.flatShading = flat;
-    uiPrefs_.flatShading = flat; // the default for the next session (Store Config keeps it)
+    uiPrefs_.flatShading = flat; // the default for the next session (saved automatically)
 }
 
 const BrushRecipe* App::strokeRecipe() const {
@@ -284,7 +284,7 @@ const BrushRecipe* App::strokeRecipe() const {
 
 void App::paintAt(const DabParams& dab) {
     DabParams p = dab;
-    p.strength = rgbIntensity_ * dabStrengthScale_; // paint has its own strength (RGB Intensity)
+    p.strength = rgbIntensity_ * dabStrengthScale_; // paint has its own strength (Colour intensity)
     if (texturePainter_.active()) { // the brush material: colour plus the material channels it paints
         BrushMaterial m = doc_.paintMaterial;
         m.color = doc_.paintColor;

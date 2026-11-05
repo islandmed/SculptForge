@@ -21,7 +21,7 @@ struct ProjectOptions {
     bool mean = false;      // Mean: with hits on both sides, settle halfway between them
     bool geometry = true;   // project the shape
     bool vertexpaint = true;  // project the vertex paint (when a source has any)
-    int blur = 0;           // PA Blur: smoothing passes over the projected offsets
+    int blur = 0;           // Blur: smoothing passes over the projected offsets
 };
 
 struct ProjectStats {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Pop-up pickers (brush, stroke, alpha and material pop-ups), the
-// Draw Size / Strength sliders at the cursor, and the thumbnail tile.
+// Size / Strength sliders at the cursor, and the thumbnail tile.
 #include "app/Theme.h"
 #include "app/Pickers.h"
 
@@ -100,9 +100,9 @@ struct State {
     // Material hover preview: the material to go back to.
     bool previewing = false;
     int savedLitSphere = -1;
-    // Draw Size / Z Intensity / RGB Intensity / Focal Shift at the cursor.
+    // Size / Intensity / Colour intensity / Falloff at the cursor.
     int slider = -1; // PickerUi::Slider, -1 = closed
-    bool sliderSmooth = false; // Z Intensity of the Smooth brush (Shift was held)
+    bool sliderSmooth = false; // Intensity of the Smooth brush (Shift was held)
     ImVec2 sliderAt{0, 0};  // the cursor when it opened
     ImVec2 sliderPos{0, 0}; // the window's place, fixed once the knob is under sliderAt
     bool sliderPlaced = false;
@@ -164,7 +164,7 @@ void sectionHeader(const char* text) {
     ImGui::PopStyleColor();
 }
 
-// Hover "Quick Info": a large thumbnail and the description shows for palette items.
+// Hover "help box": a large thumbnail and the description shows for palette items.
 void quickInfo(ImTextureID tex, const char* glyph, const std::string& title, const std::string& text,
                const std::string& footer = {}) {
     if (!ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_NoSharedDelay) ||
@@ -865,7 +865,7 @@ void drawStrokeGrid(App& app, GridMode mode) {
     static const char* const help[] = {
         "Even dabs along the path: the classic brush stroke.",
         "Click and drag one stamp: the drag length sets its size and its direction the rotation (great with alphas).",
-        "Click and drag one stamp of the brush's Draw Size around the surface; it lands where you let go (great for VDMs).",
+        "Click and drag one stamp of the brush's Size around the surface; it lands where you let go (great for VDMs).",
         "Scattered dabs of random size and strength, for organic texture.",
         "The brush trails the cursor on a string, for smooth, steady lines.",
     };
@@ -1253,11 +1253,11 @@ void drawPickers(App& app) {
         s.previewing = false;
     }
 
-    // Draw Size (S), Z Intensity (U), RGB Intensity (I) and Focal Shift (O) at the cursor.
+    // Size (S), Intensity (U), Colour intensity (I) and Falloff (O) at the cursor.
     if (s.slider >= 0) {
         ImGui::SetNextFrameWantCaptureKeyboard(true);
         const auto which = PickerUi::Slider(s.slider);
-        // The value as shown: Draw Size in pixels, the intensities 0-100 and Focal Shift -100..100.
+        // The value as shown: Size in pixels, the intensities 0-100 and Falloff -100..100.
         struct Def {
             const char* name;
             const char* key;
@@ -1267,7 +1267,7 @@ void drawPickers(App& app) {
         };
         float* z = s.sliderSmooth ? &app.smoothStrength_ : &app.strength_;
         const Def d = which == PickerUi::Slider::DrawSize
-                          ? Def{"Draw Size", "S",
+                          ? Def{"Size", "S",
                                 "Brush radius in screen pixels. Drag, or type a number and press Enter. [ and ] also "
                                 "change it.",
                                 &app.radiusPx_, kMinDrawSizePx, kMaxDrawSizePx, 1.0f}
@@ -1279,7 +1279,7 @@ void drawPickers(App& app) {
                                                  "number and press Enter.",
                                 z, 0.01f, 1.0f, 100.0f}
                       : which == PickerUi::Slider::RgbIntensity
-                          ? Def{"RGB Intensity", "I",
+                          ? Def{"Colour intensity", "I",
                                 "How strongly painting colours the surface (1-100). Drag, or type a number and press "
                                 "Enter.",
                                 &app.rgbIntensity_, 0.01f, 1.0f, 100.0f}
@@ -1344,7 +1344,7 @@ void drawPickers(App& app) {
             }
             ImGui::LogText("%s %.0f", d.name, double(*d.value * d.shownScale));
             {
-                // The knob's centre as ImGui's slider draws it (2 px padding, GrabMinSize wide; Draw Size is logarithmic).
+                // The knob's centre as ImGui's slider draws it (2 px padding, GrabMinSize wide; Size is logarithmic).
                 const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
                 const float grab = std::min(ImGui::GetStyle().GrabMinSize, hi.x - lo.x - 4.0f);
                 const float v = std::clamp(*d.value, d.lo, d.hi);

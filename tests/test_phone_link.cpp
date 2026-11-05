@@ -561,11 +561,12 @@ TEST(face_link_over_webrtc) {
     std::string relayed;
     CHECK(aesGcmEncrypt(faceKey, msg.dump(), relayed, err));
     CHECK(link.acceptRelayMessage(relayed, err));
-    // Frames flow over the data channel.
+    // Frames flow over the data channel. The channel takes about 3 s to open on a Windows CI runner and longer while
+    // heavy tests run beside this shard (5 s was too short there): up to 20 s, stopping at the first frame.
     FaceFrame f;
     uint64_t serial = 0;
     bool got = false;
-    for (int i = 0; i < 100 && !got; ++i) {
+    for (int i = 0; i < 400 && !got; ++i) {
         phone.sendFromTestPeer(faceJson(0.75f));
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
         got = link.latestFace(f, serial);
@@ -609,7 +610,7 @@ TEST(ar_link_sends_the_model_over_webrtc) {
     CHECK(link.acceptFaceAnswer(answer, err));
     // The page asks for the model (as soon as its channel is open).
     bool asked = false;
-    for (int i = 0; i < 100 && !asked; ++i) {
+    for (int i = 0; i < 400 && !asked; ++i) { // up to 20 s (a loaded Windows CI runner: see face_link_over_webrtc)
         phone.sendFromTestPeer("{\"type\":\"ar\",\"scope\":\"scene\",\"size\":35}");
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
         for (const PhoneEvent& e : link.takeEvents())
@@ -775,7 +776,7 @@ TEST(face_link_answer_through_the_relays) {
         posted.emplace_back(topic, packed);
     }
     bool connected = false;
-    for (int i = 0; i < 200 && !connected; ++i) {
+    for (int i = 0; i < 400 && !connected; ++i) { // up to 20 s (see face_link_over_webrtc)
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
         connected = link.status().faceConnected;
         if (!connected) phone.sendFromTestPeer(faceJson(0.5f));

@@ -9,7 +9,7 @@
 //   ImGui::Button(tr("Decimate"))             "Diezmar" in Spanish
 //   ImGui::Checkbox(tr("Keep Masked##remesh")) only "Keep Masked" is translated; "##remesh" is kept as it is
 //   tr(ICON_LC_SAVE " Save")                    the icon prefix is kept, the words translated
-//   tr("Draw Size %.0f")                        an exact entry first, else "Draw Size" and " %.0f" kept
+//   tr("Size %.0f")                        an exact entry first, else "Size" and " %.0f" kept
 //   tr("Save As...")                            an exact entry first, else "Save As" + "..."
 //
 // tr() never changes anything in English (it returns its argument), so UI tests

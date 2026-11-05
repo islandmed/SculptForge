@@ -89,6 +89,48 @@ add an exception elsewhere.
     \btranspose ?all\b
 <!-- marks:end -->
 
+## Their interface's labels (#117)
+
+Their exact UI labels are theirs too: SculptForge names its controls by function. Scripts and saved files keep
+their old ids (`config.store`, `rgb_intensity`, `focal`, `subdiv_lower`...); only what people read changed.
+`tools/check_marks.py` checks these as well (case-insensitive, with the space: code identifiers don't match).
+
+| Was | Now |
+|---|---|
+| Store Config (Ctrl+Shift+I) | gone: preferences save themselves; Save Layout keeps the layout; `config.store` is Save Preferences Now, no key |
+| Restore Standard UI / Restore Custom UI | Reset Layout and Shortcuts / Revert to Saved Layout |
+| Enable Customize | Customize Shelves |
+| Save UI / Load UI | Export Interface / Import Interface |
+| Draw Size / Z Intensity / RGB Intensity / Focal Shift | Size / Intensity / Colour intensity / Falloff |
+| Popup Info / Quick Info Opacity | Ctrl+hover help / Help box opacity |
+| Lower Res / Higher Res / Del Lower / Del Higher | Lower Level / Higher Level / Delete Lower / Delete Higher |
+| Project All / PA Blur | Project Detail / Blur |
+| Mask Lasso / Mask Rect | Lasso Mask / Rectangle Mask |
+| Radial Count | Radial Copies |
+| Group Masked | Group from Mask |
+
+<!-- labels:begin -->
+    store ?config
+    restore (?:standard|custom) ui
+    enable customize
+    \b(?:save|load) ui\b
+    \bdraw size
+    \bz intensity
+    \brgb intensity
+    focal shift
+    popup info
+    quick info
+    \blower res\b
+    \bhigher res\b
+    \bdel (?:lower|higher)\b
+    \bproject all\b
+    \bpa blur\b
+    mask lasso
+    \bmask rect\b
+    radial count
+    group masked
+<!-- labels:end -->
+
 ## Old words read on load (src/core/LegacyNames.h)
 
 FNV-1a 64 of the lower-case word. `tests/test_legacy_names.cpp` checks `LegacyNames.h` against this table.

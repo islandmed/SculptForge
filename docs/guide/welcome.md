@@ -18,8 +18,8 @@ It is free software under the GNU General Public License v3.0 or later. You own 
 the GPL covers the program, not your models.
 
 SculptForge stays free and works the same for everyone; nothing is ever paywalled. A membership adds betas and
-early builds (from SculptForge 1.0, each release about two weeks early), a vote on what gets built, a monthly brush
-and alpha pack and your name in the credits (every release stays free for everyone; bug-fix and security releases
+early builds (from SculptForge 1.0, each release about two weeks early), a vote on what gets built, Member Requests
+(ask for a brush, alpha or material) and your name in the credits (every release stays free for everyone; bug-fix and security releases
 go out to everyone the same day): **Help > Support SculptForge...** opens [sculptforge.app/support.html](https://sculptforge.app/support.html) in your browser, where you can become a
 member. That is all it does: the app has no payment code, no account and no licence check. Members are thanked
 by name in **Help > About**. While SculptForge starts (the first time, after an update, and at most once a week
@@ -76,8 +76,7 @@ alphabetical palette bar. You sculpt with a left drag, hold <kbd>Alt</kbd> to su
 smooth, drag on the background to rotate, <kbd>Alt</kbd>+drag to pan, and hold <kbd>Ctrl</kbd> to mask. The
 palettes have the names you expect (Alpha, Brush, Stroke, Tool, Transform...), the Tool palette holds the
 Parts, Masking and Face Groups sub-palettes, <kbd>B</kbd> opens the brush pop-up with the same letter keys
-(B, S, T picks Standard), <kbd>,</kbd> opens the Library and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>
-stores your interface, and <kbd>S</kbd> <kbd>U</kbd> <kbd>I</kbd> <kbd>O</kbd>, <kbd>Space</kbd>, <kbd>Ctrl</kbd>+<kbd>W</kbd>
+(B, S, T picks Standard), <kbd>,</kbd> opens the Library, your preferences save themselves, and <kbd>S</kbd> <kbd>U</kbd> <kbd>I</kbd> <kbd>O</kbd>, <kbd>Space</kbd>, <kbd>Ctrl</kbd>+<kbd>W</kbd>
 and the mask keys do what your hands expect with the Classic sculpting keys on (**Edit > Preferences > Input**).
 [Quick tour for experienced sculptors](quick-tour.md) lists what is the same,
 what differs and every shortcut side by side; the [Glossary](glossary.md) explains SculptForge's terms.

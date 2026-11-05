@@ -26,7 +26,7 @@ is what removes it.
 1. Hold <kbd>Ctrl</kbd> and drag on the model. The area under the brush becomes masked.
 2. Hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and drag to erase the mask.
 
-Mask strokes use the current **Draw Size**, symmetry and, with a pen, pressure (when **Pressure > Strength**
+Mask strokes use the current **Size**, symmetry and, with a pen, pressure (when **Pressure > Strength**
 is on). How much each stroke masks is set by **Mask Strength** in **Tool > Masking** (0.01 to 1, default 1):
 lower values build up a soft, partial mask over several strokes. Mask strokes always use a round tip, whatever
 alpha you have selected, and a **Drag Stamp** stroke masks with dabs along the path instead of one stamp.
@@ -37,16 +37,16 @@ On macOS, <kbd>Cmd</kbd> works wherever this guide says <kbd>Ctrl</kbd>.
 
 To mask a large or sharply outlined area in one go, pick a mask selection shape. Holding
 <kbd>Ctrl</kbd> turns the brush on the left shelf into the mask brush: with <kbd>Ctrl</kbd> held, click the brush
-tile (or press <kbd>B</kbd>) to pick **Mask Pen**, **Mask Lasso** or **Mask Rectangle**, or click the stroke tile to pick
+tile (or press <kbd>B</kbd>) to pick **Mask Pen**, **Lasso Mask** or **Rectangle Mask**, or click the stroke tile to pick
 the stroke (**Dots**, **Lasso** or **Rect**). The same shapes sit at the top of **Tool > Masking**:
 
 | Shape | <kbd>Ctrl</kbd> + drag |
 |---|---|
 | **Mask Pen** (default) | Paints the mask with the brush, as described above. |
-| **Mask Lasso** | Draws a free-hand outline that closes back to where you started. Everything inside is masked. |
-| **Mask Rectangle** | Draws a rectangle. Everything inside is masked. |
+| **Lasso Mask** | Draws a free-hand outline that closes back to where you started. Everything inside is masked. |
+| **Rectangle Mask** | Draws a rectangle. Everything inside is masked. |
 
-With **Mask Lasso** or **Mask Rectangle**:
+With **Lasso Mask** or **Rectangle Mask**:
 
 1. Hold <kbd>Ctrl</kbd> and drag around the area. The drag can start on the model or on the background. The
    shape is drawn as you drag, white with a dark veil.
@@ -61,7 +61,7 @@ mask stroke mirrors. A shape that covers none of the model clears the mask inste
 **Mask Strength** sets how much a selection masks or unmasks, and each selection is one undo step. A lasso that
 crosses itself leaves out the areas it encloses twice.
 
-Turn on **Front faces only** (under the shape buttons, shown for Mask Lasso and Mask Rectangle) to mask only what
+Turn on **Front faces only** (under the shape buttons, shown for Lasso Mask and Rectangle Mask) to mask only what
 faces you: the far side of the model and folds turned away from you are left as they are. It follows the mirror
 image too when symmetry is on.
 
@@ -75,7 +75,7 @@ With <kbd>Ctrl</kbd> held, clicks and drags on the empty background act on the w
 | Gesture | Effect |
 |---|---|
 | <kbd>Ctrl</kbd> + click the background | Invert the mask |
-| <kbd>Ctrl</kbd> + drag on the background | Draw a mask rectangle (Mask Pen; Mask Lasso draws a lasso): what it covers is masked, mirrored by the symmetry. A shape that covers none of the model clears the mask. |
+| <kbd>Ctrl</kbd> + drag on the background | Draw a mask rectangle (Mask Pen; Lasso Mask draws a lasso): what it covers is masked, mirrored by the symmetry. A shape that covers none of the model clears the mask. |
 | <kbd>Ctrl</kbd> + drag on the background, with nothing masked | Zoom the view in the SculptForge style (the default); with the Classic sculpting keys it draws the mask rectangle above (see [Keyboard and mouse](shortcuts.md#classic-sculpting-keys)) |
 
 On the model, a <kbd>Ctrl</kbd> + click that doesn't drag works on the mask's edges, whichever
@@ -94,10 +94,10 @@ mask shape is picked:
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> | Clear Mask |
 | <kbd>Ctrl</kbd>+<kbd>I</kbd> | Invert Mask |
 | <kbd>Ctrl</kbd>+<kbd>H</kbd> | Show or hide the mask's shading (View Mask) |
-| <kbd>Ctrl</kbd>+<kbd>W</kbd> | Group Masked: the masked part becomes a new face group and the mask is cleared (see [Face Groups](face-groups.md)) |
+| <kbd>Ctrl</kbd>+<kbd>W</kbd> | Group from Mask: the masked part becomes a new face group and the mask is cleared (see [Face Groups](face-groups.md)) |
 
-A drag starts after the cursor moves a few pixels, so a slightly shaky click still inverts. With **Mask Lasso**
-or **Mask Rectangle**, a <kbd>Ctrl</kbd> + drag on the background draws that shape; to clear the mask, draw it away
+A drag starts after the cursor moves a few pixels, so a slightly shaky click still inverts. With **Lasso Mask**
+or **Rectangle Mask**, a <kbd>Ctrl</kbd> + drag on the background draws that shape; to clear the mask, draw it away
 from the model, or use **Clear**.
 
 ## The Masking panel
@@ -113,8 +113,8 @@ its hint. Every button is one undo step.
 | Button | What it does | Command |
 |---|---|---|
 | **Mask Pen** | Paint the mask with the brush; <kbd>Ctrl</kbd>+<kbd>Alt</kbd> erases. | |
-| **Mask Lasso** | Mask what is inside a free shape you draw. | `mask_lasso` |
-| **Mask Rectangle** | Mask what is inside a rectangle. | `mask_rect` |
+| **Lasso Mask** | Mask what is inside a free shape you draw. | `mask_lasso` |
+| **Rectangle Mask** | Mask what is inside a rectangle. | `mask_rect` |
 
 **Front faces only** (lasso and rectangle) masks only what faces you. **Mask Strength** is how much each stroke,
 shape or **Mask by** button masks (0.01 to 1).

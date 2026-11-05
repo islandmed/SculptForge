@@ -128,7 +128,7 @@ The new surface is made of even quads (the original&#x27;s quads are rebuilt, no
 </ul>
 <p>To remesh several Parts into one, first combine them with <strong>Merge visible...</strong> or <strong>Merge down...</strong> in <a href="parts.html#merge-parts">Parts</a>.</p>
 <h2 id="quad-remesh">Quad Remesh<a class="anchor" href="#quad-remesh" aria-label="Link to this section">#</a></h2>
-<p><strong>Tool &gt; Geometry &gt; Quad Remesh</strong> is automatic quad retopology: it rebuilds the Part as clean quads whose edge loops follow the forms, close to a target polygon count, with Keep Groups, Adaptive Size, vertex paint density and symmetry. <strong>Project All</strong> (<strong>Tool &gt; Parts &gt; Project</strong>) brings the sculpted detail back onto the new topology after you divide it. Both have their own chapter: <a href="retopology.html">Quad retopology and detail projection</a>.</p>
+<p><strong>Tool &gt; Geometry &gt; Quad Remesh</strong> is automatic quad retopology: it rebuilds the Part as clean quads whose edge loops follow the forms, close to a target polygon count, with Keep Groups, Adaptive Size, vertex paint density and symmetry. <strong>Project Detail</strong> (<strong>Tool &gt; Parts &gt; Project</strong>) brings the sculpted detail back onto the new topology after you divide it. Both have their own chapter: <a href="retopology.html">Quad retopology and detail projection</a>.</p>
 <h2 id="close-holes">Close Holes<a class="anchor" href="#close-holes" aria-label="Link to this section">#</a></h2>
 <p><strong>Tool &gt; Geometry &gt; Close Holes</strong> caps every open boundary of the active Part, such as a hole, an open bottom or the rim of an extracted shell. The new patch&#x27;s triangles are sized like the ones around the hole, and the patch follows the curve of the surface around it, so a hole in a sphere closes round, not flat. The rest of the Part is not changed. The patches get a <a href="face-groups.html">face group</a> of their own, so you can mask or hide them in one click. Close Holes makes an open scan or an extracted part watertight without a remesh. <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings the holes back.</p>
 <h2 id="decimate">Decimate<a class="anchor" href="#decimate" aria-label="Link to this section">#</a></h2>
@@ -205,7 +205,7 @@ Click <strong>Generate LOD chain</strong>.
 <h2 id="see-also">See also<a class="anchor" href="#see-also" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>
-<a href="retopology.html">Quad retopology and detail projection</a>: Quad Remesh and Project All
+<a href="retopology.html">Quad retopology and detail projection</a>: Quad Remesh and Project Detail
 </li>
 <li>
 <a href="parts.html">Parts</a>: merge pieces before a remesh, duplicate before a decimate

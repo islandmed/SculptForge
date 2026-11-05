@@ -12,11 +12,11 @@ Everything is in **Tool > Geometry**:
 |---|---|---|
 | **Divide** | <kbd>Ctrl</kbd>+<kbd>D</kbd> | Adds a level above the highest one and steps to it |
 | **Smt** | | Smooths the next Divide (on by default) |
-| **Lower Res** | <kbd>Shift</kbd>+<kbd>D</kbd> | Steps one level down |
-| **Higher Res** | <kbd>D</kbd> | Steps one level up |
+| **Lower Level** | <kbd>Shift</kbd>+<kbd>D</kbd> | Steps one level down |
+| **Higher Level** | <kbd>D</kbd> | Steps one level up |
 | **SDiv** slider | | Steps to any level (1 is the base cage) |
-| **Del Lower** | | Deletes the levels below the current one |
-| **Del Higher** | | Deletes the levels above the current one |
+| **Delete Lower** | | Deletes the levels below the current one |
+| **Delete Higher** | | Deletes the levels above the current one |
 | **Reconstruct Subdiv** | | Finds a lower level for a mesh that was subdivided elsewhere |
 
 Under the buttons the palette says where you are ("SDiv 3 of 5") and how many triangles the base and the top
@@ -73,10 +73,10 @@ What happens to your sculpting when you change level:
 
 Clearing the mask, removing a layer or deleting the paint layers does it on every level.
 
-## Del Lower and Del Higher
+## Delete Lower and Delete Higher
 
-**Del Lower** deletes the levels below the current one: the current level becomes the new base cage (SDiv 1).
-**Del Higher** deletes the levels above, and the detail sculpted on them. Both are undoable. Deleting down to a
+**Delete Lower** deletes the levels below the current one: the current level becomes the new base cage (SDiv 1).
+**Delete Higher** deletes the levels above, and the detail sculpted on them. Both are undoable. Deleting down to a
 single level leaves an ordinary mesh.
 
 ## Reconstruct Subdiv
@@ -96,8 +96,8 @@ keeping the dense mesh exactly as it was. Press it again for more levels.
 ## Undo, projects and exporting
 
 - **Undo** (<kbd>Ctrl</kbd>+<kbd>Z</kbd>) is one step per stroke at any level, and one step per level change,
-  so undo walks back through your strokes and level changes in the order you made them. Divide, Del Lower,
-  Del Higher and Reconstruct are single undo steps. Steps share the levels they didn't change, so they cost
+  so undo walks back through your strokes and level changes in the order you made them. Divide, Delete Lower,
+  Delete Higher and Reconstruct are single undo steps. Steps share the levels they didn't change, so they cost
   little memory.
 - **Projects** (`.sfproj`) save every level of every Part and open at the level you saved at. They use
   project format 5 (sculpt-layer detail relative to the surface), so older SculptForge versions ask you to update
@@ -124,8 +124,8 @@ Every control is a command you can run in the console, from a script or over MCP
 |---|---|
 | `subdiv_divide smooth=true` | Divide; `smooth=false` divides flat (Smt off) |
 | `subdiv_level level=2` | Step to a level (1 = base) |
-| `subdiv_lower`, `subdiv_higher` | Lower Res, Higher Res |
-| `subdiv_delete_lower`, `subdiv_delete_higher` | Del Lower, Del Higher |
+| `subdiv_lower`, `subdiv_higher` | Lower Level, Higher Level |
+| `subdiv_delete_lower`, `subdiv_delete_higher` | Delete Lower, Delete Higher |
 | `subdiv_reconstruct` | Reconstruct Subdiv |
 | `subdiv_info` | List the levels and their triangle counts |
 | `subdiv_export path=base.obj level=1` | Export the visible Parts at a level |

@@ -1,7 +1,7 @@
 # The brush cursor follows the surface (#25): over the model the ring lies on it, a true circle in the plane of the
 # surface there (#88: not bent over each bump), at the brush's real size; off the model it is the flat screen ring.
 # Symmetry copies show as dots, not rings (#88). Preferences > Cursor: Cursor follows surface (on by default) and
-# Hide ring while stroking (off by default), kept by Store Config.
+# Hide ring while stroking (off by default), saved automatically.
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_head
 camera 35 10

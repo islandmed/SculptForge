@@ -1,6 +1,6 @@
-# The support card at launch (Support.h, PanelSupportCard.cpp): shown on the first start, after an update and at
-# most once a week; never for a member, never in tests. Its buttons only ask for the fixed Stripe links (UI tests
-# never start a browser).
+# The full membership card (Support.h, PanelSupportCard.cpp): shown on the first start only (the small card at good
+# moments does the rest: member_card.sfui); never for a member, never in tests. Its buttons only ask for the fixed
+# Stripe links (UI tests never start a browser), except I'm already a member: the GitHub sign-in.
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 # A UI test is a test-mode start: no card.
@@ -43,71 +43,55 @@ expect_status https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201
 wait 0.4
 expect_value support_card_open == 0
 
-# At most once a week: not three days later, then again after seven.
-support_card days=3
-expect_value support_card_open == 0
-support_card days=7
-expect_value support_card_open == 1
-wait 0.8
-click "Studio membership##card.studio"
-expect_value support_requests == 2
-expect_status https://sculptforge.app/studios.html#membership
-wait 0.4
-# The yearly Member checkout, in the footer.
-support_card days=15
+# Preferences > Support > Show the memberships shows it any time (the card closes the palette, so it is reopened
+# each time); the yearly Member checkout is in the footer.
+click "Preferences##palette.preferences"
+click "Support##preferences.support"
+expect "I'm already a member##prefs.member_verify"
+click "Show the memberships"
 expect_value support_card_open == 1
 wait 0.8
 click "Member, $48 a year##card.member_yearly"
-expect_value support_requests == 3
+expect_value support_requests == 2
 expect_status https://buy.stripe.com/aFa5kD4eHfhE2an6il4F206
 wait 0.4
+click "Preferences##palette.preferences"   # (Support stays expanded)
+click "Show the memberships"
+wait 0.8
+click "Studio membership##card.studio"
+expect_value support_requests == 3
+expect_status https://sculptforge.app/studios.html#membership
+wait 0.4
 
-# The first start of a new version, with a way to What's New; Esc closes it.
-support_card updated
-expect_value support_card_open == 1
-wait_idle
-wait 1.2
-expect_text What's new
-shot updated
+# Not now and Esc close it.
+click "Preferences##palette.preferences"   # (Support stays expanded)
+click "Show the memberships"
+wait 0.8
+expect_no_text Maybe later
+click "Not now##card.later"
+wait 0.4
+expect_value support_card_open == 0
+click "Preferences##palette.preferences"   # (Support stays expanded)
+click "Show the memberships"
+wait 0.8
 key Escape
 wait 0.4
 expect_value support_card_open == 0
-expect_value support_requests == 3
 
-# Maybe later: hidden for 30 days, past the weekly showing and a new version.
-support_card days=8
-expect_value support_card_open == 1
-wait 0.8
-click "Maybe later##card.later"
-wait 0.4
-expect_value support_card_open == 0
-support_card days=29
-expect_value support_card_open == 0
-support_card updated
-expect_value support_card_open == 0
-
-# Preferences > Support: turned off, it doesn't show.
-click "Preferences##palette.preferences"
-click "Support##preferences.support"
-click "Show the support card at launch"
-expect_value support_card_enabled == 0
-support_card days=30
-expect_value support_card_open == 0
-click "Show the support card at launch"
-expect_value support_card_enabled == 1
-
-# "I'm already a member" hides it for good, after updates too.
-support_card days=30
-expect_value support_card_open == 1
+# "I'm already a member" starts the GitHub sign-in (the small card shows its steps); signed in, never again.
+click "Preferences##palette.preferences"   # (Support stays expanded)
+click "Show the memberships"
 wait 0.8
 click "I'm already a member##card.supporter_already"
 wait 0.4
 expect_value support_card_open == 0
+expect_value member_card_verifying == 1
+member_sign_in ok
+wait 0.4
 expect_value supporter == 1
-support_card days=30
-expect_value support_card_open == 0
-support_card updated
-expect_value support_card_open == 0
+expect_value member_signed_in == 1
 support_card first_run
 expect_value support_card_open == 0
+click "Preferences##palette.preferences"   # (Support stays expanded)
+expect_text Thank you for being a member! No membership cards show.
 expect_value support_requests == 3

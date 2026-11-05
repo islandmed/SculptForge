@@ -51,7 +51,7 @@ constexpr TourSlide kSlides[] = {
      nullptr, "ui.palette.draw"},
     {"Quad Remesh", "images/quick-tour/04-quad.jpg",
      "Automatic quad retopology: Tool > Remesh > Quad Remesh rebuilds a sculpt as clean quads whose edge loops follow "
-     "the forms. Set Target Polygons and leave Keep Original on. Divide the result, then Project All (Tool > Parts) "
+     "the forms. Set Target Polygons and leave Keep Original on. Divide the result, then Project Detail (Tool > Parts) "
      "brings the detail back. Draw Quad Remesh Guides to steer the loops.",
      "tool.remesh", "ui.palette.tool"},
     {"Levels, Parts and Face Groups", "images/quick-tour/05-levels.jpg",
@@ -62,7 +62,7 @@ constexpr TourSlide kSlides[] = {
     {"Masking", "images/quick-tour/06-masking.jpg",
      "Hold Ctrl and paint to mask, Ctrl+Alt to unmask. Tool > Masking inverts, blurs and grows the mask, and builds "
      "one By cavity, By face group or along the border. Press G for the stroke popup: its Shapes row picks Mask Pen, "
-     "Mask Lasso or Mask Rect for the next Ctrl stroke.",
+     "Lasso Mask or Rectangle Mask for the next Ctrl stroke.",
      "tool.masking", "ui.palette.tool"},
     {"Cut, Clip and Close Holes", "images/quick-tour/07-cut.jpg",
      "Pick a shape in Tool > Cut and draw it with Ctrl+Shift: a line, lasso, rectangle or polyline goes straight "
@@ -82,7 +82,7 @@ constexpr TourSlide kSlides[] = {
      "tool.bake", "ui.palette.tool"},
     {"SculptForge stays free", "images/wn-first-sculpt.jpg",
      "Everything in this tour is free, and stays free. If SculptForge helps your work, a membership keeps it moving: "
-     "members get betas and early builds, vote on what we build next and get a brush and alpha pack every month.",
+     "members get betas and early builds, vote on what we build next and ask for the brushes and alphas they want.",
      nullptr, nullptr},
 };
 constexpr int kSlideCount = int(std::size(kSlides));

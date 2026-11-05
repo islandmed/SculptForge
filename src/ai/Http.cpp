@@ -34,6 +34,14 @@ bool refused(const std::string& url, HttpResponse& r) {
 uint64_t httpRequestCount() { return gRequests; }
 void resetHttpRequestCount() { gRequests = 0; }
 
+bool httpSupported() {
+#if defined(_WIN32) || defined(SF_HAVE_CURL)
+    return true;
+#else
+    return false;
+#endif
+}
+
 HttpResponse httpRequest(const std::string& method, const std::string& url, const std::vector<std::string>& headers,
                          const std::string& body, int timeoutSeconds) {
     std::string received;

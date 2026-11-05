@@ -29,8 +29,8 @@ eighth of the brush radius; Detail 100 makes them about three times smaller, Det
 
 With **Constant detail** on, every stroke aims for the same size whatever the zoom and brush, set by Detail
 relative to the size of the mesh (at 50, about a hundredth of its bounding box diagonal). Use it to bring a
-whole model to an even density, or to keep the density while you change brush sizes. It is a preference: Store
-Config (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps it.
+whole model to an even density, or to keep the density while you change brush sizes. It is a preference and
+saves itself.
 
 Under the brush, edges longer than the target are split, edges much shorter are merged away, and the new
 triangles are evened out. Outside the brush nothing changes, so you can have big triangles on the back of a head
@@ -46,7 +46,7 @@ sets how much (from the discussions):
 - **Light** (50): it remeshes toward triangles one and a half times the size.
 - **Simplify** (100, the default): as before.
 
-It is a preference (Store Config keeps it) and is saved with the project; from a script,
+It is a preference (saved automatically) and is saved with the project; from a script,
 `dyntopo smooth_remesh=0`.
 
 ## What it keeps and what it doesn't
@@ -68,8 +68,8 @@ It is a preference (Store Config keeps it) and is saved with the project; from a
 ## Subdivision levels
 
 Dynamic topology works on meshes without [subdivision levels](subdivision-levels.md). On a Part
-with levels, **Dynamic** stays off and the status bar says why: go to the level you want to keep and use **Del
-Lower** and **Del Higher** in **Tool > Geometry** first. If you turn it on and then pick a Part that has
+with levels, **Dynamic** stays off and the status bar says why: go to the level you want to keep and use **Delete
+Lower** and **Delete Higher** in **Tool > Geometry** first. If you turn it on and then pick a Part that has
 levels, strokes sculpt it without remeshing.
 
 A good workflow: block in with Dynamic, then [Quad Remesh](retopology.md) or [Voxel Remesh](geometry.md) for an even

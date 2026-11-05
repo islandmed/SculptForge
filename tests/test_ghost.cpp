@@ -71,7 +71,7 @@ TEST(ghost_matches_standard_dab_on_a_plane) {
     const Error e = compare(BrushType::Standard, plane, p, Symmetry{false, false, false});
     CHECK(e.moved > 0.01f);
     CHECK(e.worst < e.moved * 1e-3f);
-    // Inverted, focal shift, X symmetry: still exact.
+    // Inverted, falloff, X symmetry: still exact.
     p.invert = true;
     p.focal = 0.4f;
     p.center.x = 0.3f;

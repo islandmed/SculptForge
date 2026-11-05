@@ -182,7 +182,7 @@ button_drag right 0.5 0.5 0.5521 0.5
 hold none
 expect_value draw_size_exact > 13
 expect_value draw_size_exact < 17
-expect_status Draw Size
+expect_status Size
 hold ctrl+shift
 button_drag right 0.5 0.5 0.4479 0.5
 hold none

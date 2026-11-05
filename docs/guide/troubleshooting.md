@@ -12,7 +12,7 @@ Quick answers:
 | The cursor jumps when the pen touches down | **Edit > Preferences > Tablet > Mouse mode (relative)** |
 | "Windows protected your PC" | **More info**, then **Run anyway** ([First launch warnings](#first-launch-warnings-on-macos-and-windows)) |
 | Text and buttons too small or too large | **Edit > Preferences > Interface > UI scale** ([details](#text-and-buttons-are-too-small-or-too-large)) |
-| Menus or shelves look wrong after an update | **Edit > Preferences > Config > Restore Standard UI** ([Reset the interface](#reset-the-interface)) |
+| Menus or shelves look wrong after an update | **Edit > Preferences > Config > Reset Layout and Shortcuts** ([Reset the interface](#reset-the-interface)) |
 | Sculpting feels slow | [The viewport is slow](#the-viewport-is-slow) |
 | Lost work after a crash | [Recovering work after a crash](#recovering-work-after-a-crash) |
 | Want the Classic layout back | **Edit > Preferences > Interface > Look > Layout > Classic** |
@@ -167,23 +167,22 @@ window.
 
 ### Text and buttons are too small or too large
 
-**Edit > Preferences > Interface > UI scale** sets the size (Automatic, 100% to 200%) and applies it at once. Press
-**Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) to keep it for the next start. **Automatic** uses
+**Edit > Preferences > Interface > UI scale** sets the size (Automatic, 100% to 200%) and applies it at once and
+keeps it for the next start. **Automatic** uses
 the scale of the monitor the window is on: on Windows that is **Settings > Display > Scale**, per monitor, and the
 interface follows when you drag the window to another monitor. On Linux under X11 it comes from the desktop's
 font DPI (Xft.dpi); if Automatic looks wrong there, pick a size.
 
-### My layout or shortcuts are gone after a restart
+### My layout is gone after a restart
 
-SculptForge never saves the layout on its own. Press **Store Config**
-(<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) to keep the current layout, shortcuts and interface
-preferences. See [The interface](interface.md).
+Shortcuts and preferences save themselves; the layout (shelves, trays, open palettes) waits for
+**Edit > Preferences > Config > Save Layout**. See [The interface](interface.md#saving-preferences-and-layouts).
 
 ### Reset the interface
 
-- **Edit > Preferences > Config > Restore Standard UI** returns to the built-in layout and default shortcuts. Press
-  **Store Config** afterwards to make it stick.
-- **Restore Custom UI** goes back to what the last Store Config saved.
+- **Edit > Preferences > Config > Reset Layout and Shortcuts** returns to the built-in layout and default shortcuts. The shortcuts
+  save themselves; press **Save Layout** afterwards to keep the layout.
+- **Revert to Saved Layout** goes back to the layout the last Save Layout kept.
 - To start completely fresh, quit SculptForge and delete `ui.json` (layout, shortcuts, interface preferences)
   and `imgui.ini` (positions of floating windows such as Brush Lab) from the settings folder below.
 
@@ -205,7 +204,7 @@ SculptForge keeps its settings in one folder per user:
 
 | File or folder | What it holds |
 |---|---|
-| `ui.json` | Layout, shortcut changes and interface preferences, written by **Store Config** |
+| `ui.json` | Shortcut changes and preferences (saved as you change them) and the layout (written by **Save Layout**) |
 | `imgui.ini` | Positions and sizes of floating windows |
 | `ai.json` | AI settings: providers, models, keys, ComfyUI address (readable only by your account) |
 | `project.json` | Recent files and the autosave interval |
@@ -222,7 +221,7 @@ Your **library folder** (projects, tools, alphas, images, splats and snapshots s
 separate: `Documents/SculptForge` by default, changeable in **Edit > Preferences > Library > Library folder**.
 
 > **Tip:** To move settings to another computer, copy `ui.json`, `ai.json` and the `brushes` folder. For a
-> shared layout, use **Edit > Preferences > Config > Save UI...** and **Load UI...** instead.
+> shared layout, use **Edit > Preferences > Config > Export Interface...** and **Import Interface...** instead.
 
 ## The log file
 
@@ -256,7 +255,7 @@ Not directly: those formats are proprietary and undocumented. Export OBJ or FBX 
 [Bridge](exporting.md#exchange-models-through-the-bridge).
 
 **Does it have subdivision levels, voxel remesh, quad remesh or UVs?**
-Yes: **Voxel Remesh**, **Quad Remesh** (with **Project All** to bring the detail back; see
+Yes: **Voxel Remesh**, **Quad Remesh** (with **Project Detail** to bring the detail back; see
 [Quad retopology](retopology.md)), **Auto UV** unwraps any model, and Divide adds subdivision levels you can
 step up and down (see [Subdivision levels](subdivision-levels.md)). **Dynamic** on the top shelf is dynamic
 topology, like dynamic topology (see [Dynamic topology](dynamic-topology.md)).

@@ -351,7 +351,8 @@ if(SCULPTFORGE_BUILD_APP)
     fontMono ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-Regular.ttf # the looks (Preferences > Interface > Look)
     fontMonoBold ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-SemiBold.ttf
     appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png
-    supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt) # Help > About (never empty: it starts with comments)
+    supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt # Help > About (never empty: it starts with comments)
+    foundingMembers ${CMAKE_CURRENT_SOURCE_DIR}/website/founding.json) # Help > About and the membership card
   include(cmake/EmbedGuide.cmake)
   embed_guide(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp ${CMAKE_CURRENT_SOURCE_DIR}/docs/guide)
   add_executable(sculptforge
@@ -741,6 +742,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME insider_drops COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/drops/drops.py selftest
                                         --cli ${SCULPTFORGE_CLI_RUNNER})
     set_tests_properties(insider_drops PROPERTIES TIMEOUT 300)
+    # Member Requests (tools/member-requests): only approved items, "Requested by" in each, no other apps' names,
+    # public a month later, and the month's pack passes the install checks.
+    add_test(NAME member_requests COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/member-requests/requests.py
+                                          selftest --cli ${SCULPTFORGE_CLI_RUNNER})
     # Release notes from note fragments (tools/release/assemble_notes.py, changes/README.md): the assembler, and
     # every fragment on this branch parses.
     add_test(NAME marks COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py

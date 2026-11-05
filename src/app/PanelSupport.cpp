@@ -1,9 +1,9 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Supporting SculptForge: Help > Support SculptForge..., the first-run welcome, the supporters in Help > About and
-// the one optional reminder after ten hours of sculpting. Each only opens kSupportUrl in the browser (Support.h);
-// the app is the same for everyone, so nothing here checks, sends or stores anything else.
+// Supporting SculptForge: Help > Support SculptForge..., the first-run welcome and the supporters and Founding
+// Members in Help > About. Each only opens kSupportUrl in the browser (Support.h); the app is the same for everyone,
+// so nothing here checks, sends or stores anything else.
 #include "app/App.h"
 #include "app/Config.h"
 #include "app/LookSchemes.h"
@@ -23,6 +23,8 @@ namespace sf {
 namespace assets {
 extern const unsigned char supporters[]; // docs/supporters.txt (CMakeLists.txt)
 extern const unsigned long long supporters_size;
+extern const unsigned char foundingMembers[]; // website/founding.json (CMakeLists.txt)
+extern const unsigned long long foundingMembers_size;
 } // namespace assets
 
 namespace {
@@ -34,6 +36,12 @@ const std::vector<std::string>& supporterNames() {
 }
 
 } // namespace
+
+const FoundingMembers& foundingMembers() {
+    static const FoundingMembers f = parseFoundingMembers(
+        std::string(reinterpret_cast<const char*>(assets::foundingMembers), size_t(assets::foundingMembers_size)));
+    return f;
+}
 
 void App::openSupportPage() {
     ++supportPageRequests_;
@@ -56,6 +64,12 @@ void App::openDiscordPage() {
 }
 
 void App::drawSupportersSection() {
+    const FoundingMembers& founding = foundingMembers();
+    if (!founding.names.empty()) {
+        ImGui::SeparatorText("Founding Members");
+        ImGui::TextWrapped("The first %d members, with our thanks for good:", founding.limit);
+        for (const std::string& name : founding.names) ImGui::BulletText("%s", name.c_str()); // (plain text, sanitised)
+    }
     ImGui::SeparatorText("Supporters");
     const std::vector<std::string>& names = supporterNames();
     if (names.empty()) {
@@ -137,7 +151,7 @@ void App::drawLookPicker() {
             uiPrefs_.look.matchOmarchy = false;
             setShellLayout(c.layout);
             lookDirty_ = true;
-            saveProjectPrefs(); // remembered for the next start, also without Store Config
+            saveProjectPrefs(); // remembered for the next start
             status_ = std::string("Look: ") + c.name + " (Preferences > Interface > Look changes it)";
         }
     }
@@ -146,6 +160,10 @@ void App::drawLookPicker() {
 void App::drawSupportUi() {
     const float s = uiScale_;
     const CanvasRect c = canvasRect();
+    // The small membership card (PanelSupportCard.cpp): the sculpting moment, and the card once the frame is calm.
+    // (Here, not in tickProject: this runs every frame, UI tests included.)
+    tickMemberCard(ImGui::GetIO().DeltaTime);
+    drawMemberCard();
     if (showWelcome_) {
         // Not modal: the app works around it, and it doesn't come back once closed.
         ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h * 0.3f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
@@ -176,7 +194,7 @@ void App::drawSupportUi() {
             ImGui::TextUnformatted("Pick a look:");
             drawLookPicker();
             // Where you come from sets the keys and the layout together (Preferences > Input and > Interface > Look
-            // change them later; both are remembered without Store Config).
+            // change them later; both are remembered on its own).
             ImGui::Spacing();
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted("Coming from:");
@@ -197,7 +215,7 @@ void App::drawSupportUi() {
                 if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
                 if (ImGui::Button(o.label)) {
                     setInputStyle(o.style);
-                    startInputStyle_ = o.style; // kept for the next start, also without Store Config
+                    startInputStyle_ = o.style; // kept for the next start
                     setShellLayout(o.layout);
                     lookDirty_ = true;
                     saveProjectPrefs();
@@ -254,8 +272,8 @@ void App::drawSupportUi() {
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
-            ImGui::TextWrapped("SculptForge is free. A membership adds betas and early builds, a vote on what we build next, a monthly pack and your name in the credits. %s", kFreeReleaseNote);
-            if (ImGui::Button("Support SculptForge##welcome")) showSupportCard(SupportCardReason::Weekly); // the memberships
+            ImGui::TextWrapped("SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (ask for a brush or an alpha) and your name in the credits. %s", kFreeReleaseNote);
+            if (ImGui::Button("Support SculptForge##welcome")) showSupportCard(SupportCardReason::Manual); // the memberships
             ImGui::SameLine();
             if (ImGui::Button("Close##welcome")) showWelcome_ = false;
         }
@@ -280,27 +298,6 @@ void App::drawSupportUi() {
         }
         ImGui::End();
         if (!open) chooseNewLook(false);
-    }
-    if (supportReminderOpen_) {
-        // The one reminder: a small note along the bottom of the canvas, no focus taken, closed for good by any button.
-        ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h - 12.0f * s), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
-        ImGui::SetNextWindowBgAlpha(0.94f);
-        const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
-                                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
-                                       ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
-        if (ImGui::Begin("##support_reminder", nullptr, flags)) {
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted("You've sculpted over ten hours in SculptForge. Members get betas early, a monthly "
-                                   "brush pack and a vote on what we build next.");
-            ImGui::SameLine();
-            if (ImGui::SmallButton("Membership...##reminder")) {
-                showSupportCard(SupportCardReason::Weekly); // the memberships, each a click from its checkout
-                supportReminderOpen_ = false;
-            }
-            ImGui::SameLine();
-            if (ImGui::SmallButton("Don't show again##reminder")) supportReminderOpen_ = false;
-        }
-        ImGui::End();
     }
 }
 

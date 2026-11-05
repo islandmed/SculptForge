@@ -1,13 +1,13 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The support card at launch: a full-window card over the app on a calm stage (a warm glow and a faint grid, drawn here,
-// no picture), the cube mark and the promise, the two memberships (Member and Studio) with their perks, in the current
-// look's colours (Theme.h). When it may show is decided once while starting
-// (supportCardDue in Support.h): the first start, the first start of each new version, then at most once a week, and
-// not for 30 days after "Maybe later"; never mid-session, never for a member, never in tests, renders, demos or CI.
-// No countdowns, no guilt, nothing pre-selected; Close is always there. Every button only
-// opens one of the fixed links in Support.h in the browser.
+// The membership cards (Support.h). The full card: a full-window card over the app on a calm stage (a warm glow and a
+// faint grid, drawn here, no picture), the cube mark and the promise, the two memberships (Member and Studio) with
+// their perks, in the current look's colours (Theme.h); on the first start only, and from Help > Support. The small
+// card: one line along the bottom of the canvas at a good moment (memberMoment), at most once a week, until someone
+// becomes a member. Never mid-stroke or during a job, never for a member, never in tests, renders, demos or CI.
+// No countdowns, no guilt, nothing pre-selected; Close is always there. Every button only opens one of the fixed
+// links in Support.h in the browser, except "I'm already a member", which is the member builds' GitHub sign-in.
 #include "app/App.h"
 #include "app/CardPaint.h"
 #include "app/Theme.h"
@@ -20,6 +20,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <ctime>
+#include <utility>
 
 namespace sf {
 
@@ -30,7 +32,6 @@ struct App::SupportCard {
     float hover[2] = {0.0f, 0.0f}; // tier cards lifted under the pointer, eased
     bool closing = false;
     double closingAt = 0.0;
-    bool supporterOnClose = false;
 };
 
 void App::SupportCardDelete::operator()(SupportCard* c) const { delete c; }
@@ -118,19 +119,17 @@ bool App::supportCardOpen() const { return supportCard_ && !supportCard_->closin
 
 
 void App::launchSupportCard(bool firstRun, int64_t now, bool testMode) {
-    supportCardNow_ = now;
     // A studio build is a Studio member's: no membership card in it (core/StudioProfile.h).
-    supportCardReason_ = isStudioBuild() ? SupportCardReason::None
-                                         : supportCardDue(supportCardPrefs_, firstRun, SCULPTFORGE_VERSION, now, testMode);
-    if (supportCardReason_ == SupportCardReason::None) return;
-    supportCardPrefs_.shownAt = now;
-    supportCardPrefs_.shownVersion = SCULPTFORGE_VERSION;
+    const SupportCardReason reason =
+        isStudioBuild() ? SupportCardReason::None : supportCardDue(supportCardPrefs_, firstRun, testMode);
+    if (reason == SupportCardReason::None) return;
+    supportCardPrefs_.shownAt = now; // (the week before a small card may show starts now)
     saveProjectPrefs(); // (recorded before it shows: a crash can't bring it back at once)
     if (showWelcome_) { // the first-run welcome follows the card
         showWelcome_ = false;
         welcomeAfterCard_ = true;
     }
-    showSupportCard(supportCardReason_);
+    showSupportCard(reason);
 }
 
 void App::showSupportCard(SupportCardReason reason) {
@@ -140,15 +139,10 @@ void App::showSupportCard(SupportCardReason reason) {
     redrawIn(0.0);
 }
 
-void App::closeSupportCard(bool supporter) {
+void App::closeSupportCard() {
     if (!supportCard_ || supportCard_->closing) return;
     supportCard_->closing = true;
     supportCard_->closingAt = nowSeconds();
-    if (supporter) {
-        supportCardPrefs_.supporter = true;
-        saveProjectPrefs();
-        status_ = "Thank you for supporting SculptForge! The support card won't show again (Preferences > Support).";
-    }
     if (welcomeAfterCard_) {
         welcomeAfterCard_ = false;
         showWelcome_ = true;
@@ -285,23 +279,6 @@ void App::drawSupportCard() {
     const float pad = 48.0f * k;
     float y = a.y + 40.0f * k;
     const float colW = size.x * 0.50f;
-    // Updated: a chip that leads to What's New (open behind the card).
-    if (supportCard_->reason == SupportCardReason::Updated) {
-        const std::string chip = std::string("SculptForge ") + SCULPTFORGE_VERSION + "  " + "\xc2\xb7" + "  What's new";
-        const ImVec2 ts = paint.measure(boldUi, 13.0f, chip.c_str());
-        const ImVec2 c0(a.x + pad, y), c1(c0.x + ts.x + 26.0f * k, y + 28.0f * k);
-        ImGui::SetCursorScreenPos(c0);
-        ImGui::InvisibleButton("What's new##card.whatsnew", ImVec2(c1.x - c0.x, c1.y - c0.y));
-        const bool hot = ImGui::IsItemHovered();
-        if (ImGui::IsItemClicked()) {
-            closeSupportCard(false);
-            showWhatsNew_ = true; // the cards, once the membership card has gone (PanelProject.cpp)
-        }
-        dl->AddRectFilled(c0, c1, tc(raised, (hot ? 1.0f : 0.8f) * A), 14.0f * k);
-        dl->AddRect(c0, c1, tc(line, (hot ? 0.3f : 0.14f) * A), 14.0f * k, 0, hair);
-        paint.text(boldUi, 13.0f, ImVec2(c0.x + 13.0f * k, c0.y + (28.0f * k - ts.y) * 0.5f), tc(ink, A), chip.c_str());
-        y += 42.0f * k;
-    }
     // Hero: the cube mark on its tile, the eyebrow and the promise.
     {
         const float m = 48.0f * k;
@@ -335,7 +312,7 @@ void App::drawSupportCard() {
         ImGui::SetCursorScreenPos(c0);
         ImGui::InvisibleButton("Close##card.close", ImVec2(d, d));
         const bool hot = ImGui::IsItemHovered();
-        if (ImGui::IsItemClicked()) closeSupportCard(false);
+        if (ImGui::IsItemClicked()) closeSupportCard();
         const ImVec2 c(c0.x + d * 0.5f, c0.y + d * 0.5f);
         dl->AddCircleFilled(c, d * 0.5f, tc(hot ? raised : bg, 0.85f * A));
         dl->AddCircle(c, d * 0.5f, tc(line, (hot ? 0.40f : 0.20f) * A), 0, hair);
@@ -349,7 +326,7 @@ void App::drawSupportCard() {
     const Tier kTiers[2] = {
         {"Member", "$5", "/ month",
          {"Betas and early builds of the next version", "The monthly feature vote: pick what we build next",
-          "A brush and alpha pack every month", "The members' channel on Discord",
+          "Member Requests: ask for a brush, alpha or material", "The members' channel on Discord",
           "Your name in the credits, in the app and on the website"},
          "Become a member", "Become a member##card.member", kSupportUrlMember, yearly ? "or $48 a year" : nullptr},
         {"Studio", "$300", "/ month",
@@ -453,7 +430,7 @@ void App::drawSupportCard() {
                    tc(featured ? theme::textOnAccent : ink, appear), tier.cta);
     }
 
-    // Footer: Member yearly (once that checkout exists), the members' Discord, "I'm already a member" and "Maybe later".
+    // Footer: Member yearly (once that checkout exists), the members' Discord, "I'm already a member" and "Not now".
     const float fy = b.y - footer * 0.5f;
     const float fa = easeOut((t - 0.1f) / 0.2f) * A;
     auto link = [&](const char* label, const char* id, ImVec2 at, const ImVec4& c, bool underline) {
@@ -503,51 +480,188 @@ void App::drawSupportCard() {
     }
     bool later = false, supporter = false;
     {
-        const char* label = "Maybe later";
+        const char* label = "Not now";
         const ImVec2 ls = paint.measure(boldUi, 15.0f, label);
         const ImVec2 c0(b.x - pad - ls.x - 44.0f * k, fy - 19.0f * k);
-        const auto [hot, hit] = pill(label, "Maybe later##card.later", c0, 0.0f);
+        const auto [hot, hit] = pill(label, "Not now##card.later", c0, 0.0f);
         later = hit;
-        if (hot) ImGui::SetTooltip("Hides this card for 30 days.");
+        if (hot) ImGui::SetTooltip("Nothing about memberships for a week.");
         const char* already = "I'm already a member";
         const ImVec2 as = paint.measure(bodyFont, 15.0f, already);
         supporter = link(already, "I'm already a member##card.supporter_already",
                          ImVec2(c0.x - 24.0f * k - as.x, std::floor(fy - as.y * 0.5f)), dim, false);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Sign in with GitHub (the member builds' sign-in): no more cards.");
     }
 
-    // Esc, or a click outside the card: closed until the next start it's due (Maybe later: 30 days).
+    // Esc, or a click outside the card: closed (the small card may follow in a week).
     const bool outside = ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered() &&
                          !ImRect(a, b).Contains(io.MousePos) && t > 0.3f;
     if (!card.closing) {
         if (clicked) {
             openSupportLink(clicked);
-            closeSupportCard(false);
+            memberCardChoice(MemberCardChoice::Become);
+            closeSupportCard();
         } else if (discord) {
             openDiscordPage(); // the card stays: a membership may still follow
         } else if (supporter) {
-            closeSupportCard(true);
+            closeSupportCard();
+            verifyMember(); // the small card shows the sign-in's steps
         } else if (later) {
-            supportCardPrefs_.laterAt = supportCardNow_;
-            saveProjectPrefs();
-            closeSupportCard(false);
+            memberCardChoice(MemberCardChoice::NotNow);
+            closeSupportCard();
         } else if (outside || ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
-            closeSupportCard(false);
+            closeSupportCard();
         }
     }
     ImGui::EndPopup();
 }
 
 void App::drawSupportPrefs() {
-    if (ImGui::Checkbox("Show the support card at launch", &supportCardPrefs_.enabled)) saveProjectPrefs();
-    ui::HelpText("Show the support card at launch", nullptr,
-                 "A card with the SculptForge memberships, shown while it starts: the first time, after "
-                 "each update, and at most once a week otherwise; Maybe later hides it for 30 days. Never while you work.",
-                 "Preferences > Support");
-    if (ImGui::Checkbox("I'm a member", &supportCardPrefs_.supporter)) saveProjectPrefs();
-    ui::HelpText("I'm a member", nullptr,
-                 "Thank you! The support card never shows. Kept on this computer only: SculptForge has no accounts.",
-                 "Preferences > Support");
-    if (ImGui::Button("Show the support card", ImVec2(-1, 0))) showSupportCard(SupportCardReason::Weekly);
+    if (supportCardPrefs_.supporter || memberSignedIn()) {
+        ImGui::TextWrapped("%s", "Thank you for being a member! No membership cards show.");
+    } else {
+        ImGui::TextWrapped("%s", "A small membership card shows at most once a week, at a good moment (never mid-stroke), "
+                                 "until you become a member.");
+        if (ImGui::Button("I'm already a member##prefs.member_verify", ImVec2(-1, 0))) verifyMember();
+        ui::HelpText("I'm already a member", nullptr,
+                     "Signs in with GitHub, as member builds do (Preferences > Updates): no more membership cards, "
+                     "and the member builds are on.",
+                     "Preferences > Support");
+    }
+    if (ImGui::Button("Show the memberships", ImVec2(-1, 0))) showSupportCard(SupportCardReason::Manual);
+}
+
+// --- The small card at good moments ---
+
+int64_t App::memberClock() const { return int64_t(std::time(nullptr)) + memberClockOffset_; }
+
+void App::memberMoment(MemberMoment m) {
+    const bool testMode = supportCardTestMode() && !memberCardTestMode_;
+    if (m == MemberMoment::None || memberCard_ != MemberMoment::None || memberVerifying_) return;
+    if (!memberMomentAllowed(supportCardPrefs_, memberSignedIn(), memberClock(), testMode)) return;
+    memberMomentPending_ = m; // (the latest moment's words)
+    redrawIn(0.0);
+}
+
+void App::tickMemberCard(float dt) {
+    const bool stroking = doc_.sculptor.strokeActive();
+    if (stroking) sessionSculptSeconds_ = addSculptTime(sessionSculptSeconds_, double(dt));
+    if (sculptMomentDue(sessionSculptSeconds_, sculptMomentDone_)) {
+        sculptMomentDone_ = true;
+        memberMoment(MemberMoment::Sculpted);
+    }
+    if (memberMomentPending_ == MemberMoment::None) return;
+    const bool otherCard = supportCard_ || showWelcome_ || quickTourOpen_ || whatsNew_ || showWhatsNew_ ||
+                           ImGui::GetTopMostPopupModal() != nullptr;
+    if (!memberCardMayOpen(stroking, backgroundBusy(), otherCard)) return; // (it waits)
+    memberCard_ = std::exchange(memberMomentPending_, MemberMoment::None);
+    supportCardPrefs_.shownAt = memberClock();
+    saveProjectPrefs(); // (recorded as it shows: a crash can't bring it back at once)
+    redrawIn(0.0);
+}
+
+void App::memberCardChoice(MemberCardChoice c) {
+    applyMemberCardChoice(supportCardPrefs_, c, memberClock());
+    if (c == MemberCardChoice::SignedIn) status_ = "Thank you for being a member! No more membership cards.";
+    if (c == MemberCardChoice::NoSignIn)
+        status_ = "No member sign-in: no membership cards for three months (Preferences > Support signs in later).";
+    memberCard_ = MemberMoment::None;
+    saveProjectPrefs();
+}
+
+void App::verifyMember() {
+    if (memberSignedIn()) { // (already signed in for member builds)
+        memberCardChoice(MemberCardChoice::SignedIn);
+        return;
+    }
+    memberVerifying_ = true;
+    memberMomentPending_ = MemberMoment::None;
+    startMemberSignIn([this](bool member) { memberSignInFinished(member); }); // (PanelUpdate.cpp: the one sign-in)
+    redrawIn(0.0);
+}
+
+void App::memberSignInFinished(bool member) {
+    memberVerifying_ = false;
+    // A member: gone for good (and member builds are on). Not signed in (cancelled, declined, no access): 3 months.
+    memberCardChoice(member ? MemberCardChoice::SignedIn : MemberCardChoice::NoSignIn);
+}
+
+void App::drawMemberCard() {
+    if (memberCard_ == MemberMoment::None && !memberVerifying_) return;
+    const float s = uiScale_;
+    const CanvasRect c = canvasRect();
+    ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h - 16.0f * s), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+    ImGui::SetNextWindowSize(ImVec2(std::min(560.0f * s, c.w - 32.0f * s), 0.0f), ImGuiCond_Always);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f * s, 14.0f * s));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 12.0f * s);
+    ImGui::PushStyleColor(ImGuiCol_Border, theme::accent);
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings |
+                                   ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
+    const bool began = ImGui::Begin("##member_card", nullptr, flags);
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(2);
+    if (began) {
+        ImFont* bold = boldFont();
+        if (memberVerifying_) {
+            if (bold) ImGui::PushFont(bold);
+            ImGui::TextWrapped("%s", "Sign in with the GitHub account that has the members' invitation.");
+            if (bold) ImGui::PopFont();
+            ImGui::TextDisabled("%s", "It can only read the member builds; Preferences > Updates signs out.");
+            ImGui::Spacing();
+            if (memberSignIn_) drawMemberSignInSteps(); // (PanelUpdate.cpp)
+            else memberSignInFinished(memberSignedIn()); // (gone without an answer: Sign out in Preferences meanwhile)
+        } else {
+            std::string line;
+            switch (memberCard_) {
+            case MemberMoment::Sculpted: line = "Twenty minutes of sculpting. Members keep SculptForge free and moving."; break;
+            case MemberMoment::SavedRender: line = "Nice render. Members keep SculptForge free and moving."; break;
+            case MemberMoment::Updated:
+                line = std::string("SculptForge ") + appVersionLabel() + " is here. Members get new versions early, as betas.";
+                break;
+            case MemberMoment::Challenge:
+                line = challengeTitle_.empty() ? std::string("The monthly challenge results are in, on Discord.")
+                                               : "The " + challengeTitle_ + " challenge results are in, on Discord.";
+                break;
+            case MemberMoment::None: break;
+            }
+            if (bold) ImGui::PushFont(bold);
+            ImGui::TextWrapped("%s", line.c_str());
+            if (bold) ImGui::PopFont();
+            ImGui::PushStyleColor(ImGuiCol_Text, theme::textDim);
+            ImGui::TextWrapped("%s", "$5 a month or $48 a year: betas early, the feature vote, Member Requests and your "
+                                     "name in the credits. Nothing in the app is ever paywalled.");
+            ImGui::PopStyleColor();
+            const FoundingMembers& founding = foundingMembers();
+            if (founding.open()) {
+                ImGui::PushStyleColor(ImGuiCol_Text, theme::accentHover);
+                ImGui::TextWrapped("The first %d members are Founding Members: a badge, their name in the credits and "
+                                   "their price locked for good.", founding.limit);
+                ImGui::PopStyleColor();
+            }
+            ImGui::Spacing();
+            ImGui::PushStyleColor(ImGuiCol_Button, theme::accent);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::accentHover);
+            ImGui::PushStyleColor(ImGuiCol_Text, theme::textOnAccent);
+            const bool become = ImGui::Button("Become a member##member_card.become");
+            ImGui::PopStyleColor(3);
+            ImGui::SameLine();
+            const bool notNow = ImGui::Button("Not now##member_card.not_now");
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Nothing about memberships for a week.");
+            ImGui::SameLine();
+            const bool already = ImGui::Button("I'm already a member##member_card.already");
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Sign in with GitHub (the member builds' sign-in): no more cards.");
+            if (become) {
+                openSupportPage(); // both choices (monthly, yearly) on the membership page
+                memberCardChoice(MemberCardChoice::Become);
+            } else if (notNow) {
+                memberCardChoice(MemberCardChoice::NotNow);
+            } else if (already) {
+                memberCard_ = MemberMoment::None;
+                verifyMember();
+            }
+        }
+    }
+    ImGui::End();
 }
 
 } // namespace sf

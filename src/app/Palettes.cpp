@@ -372,8 +372,8 @@ void App::drawPalette_Draw() {
     drawZIntensitySlider("##strength");
     ImGui::SetNextItemWidth(-1);
     float rgb = rgbIntensity_ * 100.0f;
-    if (ui::SliderInside("##rgbintensity", &rgb, 1.0f, 100.0f, "RGB Intensity %.0f")) rgbIntensity_ = rgb / 100.0f;
-    ui::HelpText("RGB Intensity", "I", "How strongly painting colours the surface (1-100); Ctrl+click to type.", "Draw");
+    if (ui::SliderInside("##rgbintensity", &rgb, 1.0f, 100.0f, "Colour intensity %.0f")) rgbIntensity_ = rgb / 100.0f;
+    ui::HelpText("Colour intensity", "I", "How strongly painting colours the surface (1-100); Ctrl+click to type.", "Draw");
     ImGui::SetNextItemWidth(-1);
     float focal = focalShift_ * 100.0f;
     if (ui::SliderInside("##focalshift", &focal, -100.0f, 100.0f, "Falloff %.0f")) focalShift_ = focal / 100.0f;
@@ -395,7 +395,7 @@ void App::drawPalette_Draw() {
         doc_.sculptor.dyntopo.constantDetail = uiPrefs_.dyntopoConstantDetail;
     ui::HelpText("Constant detail", nullptr,
                  "Off (the default): the triangle size follows the brush size on screen, as in Dynamic Topology. On: one "
-                 "size for the whole mesh, set by Detail. A preference (Store Config keeps it).",
+                 "size for the whole mesh, set by Detail. A preference (saved automatically).",
                  "Draw > Dynamic topology");
     {
         float remesh = doc_.sculptor.dyntopo.smoothRemesh * 100.0f;
@@ -408,7 +408,7 @@ void App::drawPalette_Draw() {
         ui::HelpText("Smooth remesh", nullptr,
                      "How much Smooth (Shift) changes the topology while Dynamic is on. 100 (the default): it also "
                      "simplifies, merging triangles toward twice the size. Lower: it remeshes less. 0: Smooth only "
-                     "smooths and the triangles stay as they are. A preference (Store Config keeps it).",
+                     "smooths and the triangles stay as they are. A preference (saved automatically).",
                      "Draw > Dynamic topology");
         const float third = (ImGui::GetContentRegionAvail().x - 2.0f * ImGui::GetStyle().ItemSpacing.x) / 3.0f;
         const struct {
@@ -882,7 +882,7 @@ void App::drawPalette_Tool() {
         ui::HelpText("Backface culling", nullptr,
                      "Don't draw the back faces of the model: faster on dense meshes, and you see through the openings "
                      "of open meshes (a scan, a garment) instead of their inside. Brushes then work only on faces you "
-                     "can see. Off by default; Store Config keeps it, projects keep their own.",
+                     "can see. Off by default; saved automatically, projects keep their own.",
                      "Tool > Display");
         ImGui::ColorEdit3(tr("Material colour"), &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
         ui::HelpText("Material colour", nullptr, "Colour of the Studio material (the clay colour).", "Tool > Display");
@@ -895,8 +895,8 @@ void App::drawRadialSymmetryControls() {
     segmented(*this, {"transform.symmetry_radial", "transform.symmetry_local"});
     ImGui::BeginDisabled(!symmetry_.radialEnabled);
     ImGui::SetNextItemWidth(-FLT_MIN);
-    tray::SliderInt("##radialcount", &symmetry_.radial, 2, Symmetry::kMaxRadial, tr("Radial Count %d"));
-    ui::HelpText("Radial Count", nullptr,
+    tray::SliderInt("##radialcount", &symmetry_.radial, 2, Symmetry::kMaxRadial, tr("Radial Copies %d"));
+    ui::HelpText("Radial Copies", nullptr,
                  "How many copies radial symmetry makes of every stroke, turned evenly around the axis (2 to 64). With "
                  "X, Y or Z on too, each mirror image gets its copies.",
                  "Transform > Symmetry");

@@ -1,4 +1,4 @@
-# The Classic sculpting keys (docs/guide/quick-tour.md): U / I / O at the cursor, Smooth's own Z Intensity, the classic brush
+# The Classic sculpting keys (docs/guide/quick-tour.md): U / I / O at the cursor, Smooth's own Intensity, the classic brush
 # letters, L, V, Space QuickMenu, the mask keys (Ctrl+A, Ctrl+Shift+A, Ctrl+I, Ctrl+H), Ctrl+click to blur and
 # Ctrl+Alt+click to sharpen the mask, Ctrl+W, Ctrl+Shift+click on a partly hidden mesh, Shift-constrained
 # straight strokes, Shift+click / release Shift / drag to roll, and the classic / SculptForge input styles.
@@ -9,7 +9,7 @@ expect_value input_style == 1
 input_style classic
 expect_value input_style == 0
 
-# --- U / I / O: Z Intensity, RGB Intensity and Focal Shift at the cursor (typed  0-100) ---
+# --- U / I / O: Intensity, Colour intensity and Falloff at the cursor (typed  0-100) ---
 mouse_move 0.5 0.5
 key u
 expect_text Intensity 50
@@ -18,7 +18,7 @@ key 5
 key enter
 expect_value z_intensity == 25
 key i
-expect_text RGB Intensity 100
+expect_text Colour intensity 100
 shot rgb-popup
 key escape
 expect_value rgb_intensity == 100
@@ -43,7 +43,7 @@ key 0
 key enter
 expect_value focal_shift == 0
 
-# Smooth keeps its own Z Intensity: with Shift held, U shows and sets Smooth's value.
+# Smooth keeps its own Intensity: with Shift held, U shows and sets Smooth's value.
 hold shift
 key u
 expect_text Smooth Intensity 50
@@ -56,7 +56,7 @@ expect_value z_intensity == 25
 
 # The Draw palette shows the new sliders, with Ctrl-hover help.
 click "Draw##palette.draw"
-expect_text RGB Intensity 100
+expect_text Colour intensity 100
 expect_text Falloff 0
 hold ctrl
 hover "##focalshift"
@@ -210,7 +210,7 @@ expect_value camera_roll != 0
 shot rolled
 key f
 
-# --- Preferences > Input: the SculptForge style brings back 1-0 brushes, I = Z Intensity, Ctrl+drag zoom ---
+# --- Preferences > Input: the SculptForge style brings back 1-0 brushes, I = Falloff (#117), Ctrl+drag zoom ---
 click "Preferences##palette.preferences"
 click "Input##preferences.input"
 hold ctrl
@@ -223,6 +223,9 @@ expect_value input_style == 1
 key 3
 expect_value brush_type == 2
 key i
+expect_text Falloff
+key escape
+key u
 # 3 picked Smooth, so U shows its own value.
 expect_text Smooth Intensity 80
 key escape

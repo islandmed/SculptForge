@@ -126,7 +126,7 @@ void App::afterVdmCommand(const std::string& name, const CommandResult& r) {
     }
 }
 
-// DragDot: one stamp of the Draw Size under the cursor; dragging slides it over the surface, and it stays where
+// DragDot: one stamp at the brush size under the cursor; dragging slides it over the surface, and it stays where
 // the button comes up.
 void App::dragDotTo(float x, float y) {
     doc_.sculptor.restoreStroke(doc_.mesh, doc_.bvh);

@@ -52,7 +52,7 @@ TEST(action_registry_keys_and_overrides) {
     CHECK(reg.handleKey(SDLK_Y, SDL_KMOD_LCTRL) && wire == 2 && redo == 2);
     CHECK(!reg.handleKey(SDLK_W, SDL_KMOD_NONE));
 
-    // Overrides round-trip through JSON (Store Config) and clear (Restore Standard UI).
+    // Overrides round-trip through JSON (saved automatically) and clear (Reset Layout and Shortcuts).
     const Json saved = reg.overridesToJson();
     reg.clearOverrides();
     CHECK(reg.shortcutText("view.wireframe") == "W / Shift+F" && !reg.hasOverride("edit.redo"));

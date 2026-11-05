@@ -20,11 +20,15 @@ SKIP_PREFIXES = ("third_party/",)  # vendored code, as its authors wrote it
 
 
 def load_marks(text=None):
-    """The patterns between <!-- marks:begin --> and <!-- marks:end --> in docs/legal/trademarks.md."""
+    """The patterns between <!-- marks:begin --> and <!-- marks:end --> (and labels:begin / labels:end) in
+    docs/legal/trademarks.md."""
     if text is None:
         text = (ROOT / TRADEMARKS).read_text(encoding="utf-8")
-    block = text.split("<!-- marks:begin -->", 1)[1].split("<!-- marks:end -->", 1)[0]
-    marks = [line.strip() for line in block.splitlines() if line.strip()]
+    marks = []
+    for name in ("marks", "labels"):  # the marks, then their interface's exact labels (#117)
+        if f"<!-- {name}:begin -->" in text:
+            block = text.split(f"<!-- {name}:begin -->", 1)[1].split(f"<!-- {name}:end -->", 1)[0]
+            marks += [line.strip() for line in block.splitlines() if line.strip()]
     if not marks:
         raise SystemExit(f"check_marks: no patterns in {TRADEMARKS}")
     return re.compile("|".join(f"(?:{m})" for m in marks), re.IGNORECASE)
@@ -101,6 +105,10 @@ def self_test():
         assert not mark_re.search(today), today
     assert not mark_re.search("Lit Sphere, Part, Face group, Library, Vertex Paint, Bridge, Forge Spheres, Classic")
     assert not mark_re.search("immediate dimmed trimmed Gozo, format capability, parts_list, bridge_send")
+    # their labels (#117), split here because this file is scanned too
+    assert all(mark_re.search(a + b) for a, b in zip(("press Store", "the Focal", "Lower"), (" Config", " Shift slider", " Res")))
+    assert not mark_re.search("drawSize focalShift_ RgbIntensity config.store subdiv_lower projectAll lower resolution")
+    assert not mark_re.search("Save Layout, Size, Intensity, Colour intensity, Falloff, Lower Level, Lasso Mask")
     assert problems_in("a\n" + words[0][0] + " b\nc", mark_re) == [(2, words[0][0] + " b")]
     assert load_marks("x <!-- marks:begin -->\n  ab?c\n<!-- marks:end -->").search("AC")
     print("check_marks self-test ok")

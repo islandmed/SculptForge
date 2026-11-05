@@ -4,7 +4,7 @@
 // Precision work (pores, wrinkles, jewellery, hard-surface trims): the pieces of the brush that are not tied to a
 // window, so they can be tested without one. Steady Stroke itself is LazyMouse in core/Stroke.h (a point on a
 // string); here are the precision drag (Shift+Alt mid-stroke: the brush moves at a quarter of the pen's speed),
-// fine Draw Size steps, dab spacing for tiny brushes, the filter that keeps the surface pick from wobbling on dense
+// fine Size steps, dab spacing for tiny brushes, the filter that keeps the surface pick from wobbling on dense
 // meshes, and the point-based pressure curve each brush keeps (Brush Lab and Preferences > Tablet).
 #pragma once
 
@@ -17,7 +17,7 @@
 
 namespace sf {
 
-// Draw Size (the brush radius in screen pixels) limits.
+// Size (the brush radius in screen pixels) limits.
 constexpr float kMinDrawSizePx = 0.5f;
 constexpr float kMaxDrawSizePx = 800.0f;
 // Model units are metres (STL export writes 1000 mm per unit), so World Size shows millimetres.
