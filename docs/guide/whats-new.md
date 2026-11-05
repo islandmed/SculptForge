@@ -8,14 +8,54 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.11.1
 
 ```features
-date: unreleased
+date: 2026-11-05
 tagline: Dense scans with micro levels keep up with the pen, and one-click updates on Windows and Linux.
 highlight: Dense scans keep up: orbit after a big stroke on a 112M scan, 0.7 to 51 fps
+highlight: One-click update, signed and checked
+highlight: Remesh with one key, or after each stroke
+highlight: Preferences save themselves
 title: Dense scans, fast
 line: Lucy 112M on an RTX 3060: orbit right after a big stroke, 0.7 to 51 frames a second.
 image: images/wn-0111-lucy.jpg
 action: guide:performance.md#working-with-big-meshes
 ```
+
+- **Organise your Lit Spheres**: right-click one of your own in the material picker, **Render > Materials** or the
+  Library and choose **Rename...** or **Move to folder**; sub-folders of the Lit Spheres folder show as headings. Drop
+  an image onto the Library's Material tab to load it. Search for "material capture" finds them too.
+- **Founding Members and Member Requests**: the first 100 members are **Founding Members** for good (a badge, their
+  name in the credits, their price locked for as long as they stay), and each month every member can ask for a brush,
+  an alpha or a material in **#member-requests** on Discord: we make it, credited to them. A small membership card
+  shows now and then at a good moment (never mid-stroke, at most once a week); members sign in once with **I'm already
+  a member** and it never shows again.
+- **Membership, simplified**: two memberships instead of four. **Member** ($5 a month or $48 a year) gets betas and
+  early builds, the monthly feature vote, Member Requests, #members and a name in the credits; **Studio** ($150 a
+  month) covers up to 10 artists, with priority support and a private channel. Help > Support SculptForge... shows
+  both. Every release stays free for everyone.
+- **One-click update**: on the Linux AppImage and on Windows (installer or portable zip) the update banner has an
+  **Update** button: it downloads the new version in the background, checks its signature and checksum, and installs
+  it on **Restart now** or when you quit (**Later**). The old version is kept until the new one has started, and put
+  back if it doesn't. Package-manager installs show what to run instead.
+- **Member builds in the app**: members sign in with GitHub in **Edit > Preferences > Updates > Member builds** (a
+  code to enter on github.com/login/device) and get the early builds through the same Update button.
+- **Big meshes are faster: a one-time tip**: the first time you open a scene over about 20 million triangles, a note
+  along the bottom of the view says what got faster and names the two settings that help most on big meshes
+  (**Preferences > Performance > Background Preview** and **View resolution**), with a button that opens them. It
+  shows once and never again.
+- **Pen pressure per brush**: **Brush > Pen pressure** sets Size and Strength to **Use global**, **On** or **Off** for
+  the brush you hold (also in Brush Lab and **Edit > Preferences > Tablet**). Grab brushes start with Size off.
+- **Quick Remesh**: turn it on in **Tool > Remesh**, then press **Shift+R**, or hold **N** and drag on the background,
+  to remesh the active Part in the background while you keep sculpting. **Remesh after each stroke** does it by itself
+  when a stroke stretched the surface.
+- **Rodin 2.5 in Generate 3D**: **Generate 3D > fal.ai > Model** now offers Hyper3D **Rodin 2.5** and **Rodin 2.5
+  Fast**, from an image or a description, with your fal.ai key.
+- **Studio mode** for studio builds: no outside connections, updates only from the studio's own channel.
+- **Touch and trackpad navigation**: two fingers pinch to zoom and twist to roll the view; the SpaceMouse holds still
+  while you sculpt.
+- **Preferences save themselves**: key style, shortcuts, tablet, interface, performance and radial menus are kept a
+  moment after every change, with nothing to press. The layout (shelves, trays) is kept with **Edit > Preferences >
+  Config > Save Layout**. Thanks fenixpoints (#117).
+- **I is Falloff** with SculptForge keys (U stays Intensity); the Classic sculpting keys are unchanged.
 
 ## Version 0.11.0
 

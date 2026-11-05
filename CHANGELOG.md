@@ -6,6 +6,128 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-11-05
+
+### Added
+- **Rename and organise your Lit Spheres** (#124, thanks Pumaman101): **Rename...** and **Move to folder** (existing
+  folders, **New folder...**) in the right-click menu of the material picker, **Render > Materials** and the Library's
+  Material tab rename or move the image in the Lit Spheres folder; a name in use is refused, nothing is overwritten,
+  and projects that use a renamed one still find it (by its pixels). Sub-folders of the Lit Spheres folder (one level)
+  are headings in all three lists. Pack, studio-folder and project-only Lit Spheres show the items greyed out with the
+  reason. Scripts: `rename_litsphere`, `move_litsphere`.
+- Dropping an image onto the Library's Material tab loads it as a Lit Sphere (#124); dropped on the canvas it does
+  what it did before.
+- **Founding Members**: the first 100 members keep a Founding Member badge, their name in the credits (Help > About,
+  the website's Members page) and their price for good; the membership page counts the places left
+  (website/founding.json).
+- **One-click update** (the update banner's **Update** button) for the Linux AppImage and the Windows installer and
+  portable zip: background download with progress and Cancel, then Restart now or Later (installs at quit). Files come
+  only from SculptForge's GitHub releases (every redirect checked, TLS verified); the release's SHA256SUMS.txt must
+  carry an Ed25519 signature under the key built into the app, and the package must match its checksum, before
+  anything is written in place or run. The AppImage is replaced in one atomic rename with the old file kept as `.old`
+  until the new version has started; a new version that doesn't start is rolled back. Flatpak, .deb/.rpm, AUR and
+  Homebrew installs are never replaced (the banner names the command or says to download). macOS keeps the Download
+  button for now. See the guide's Installing > Updating.
+- **Member builds** (Preferences > Updates): GitHub sign-in with the device flow for the "SculptForge Member Builds"
+  app, which can only read the member repository's releases; the token lives in the OS keychain (Windows Credential
+  Manager, Secret Service on Linux; macOS later), never in settings or logs, and Sign out removes it. The update check
+  then also lists the member releases; they are verified exactly like public ones.
+- **Big-mesh tip**: shown once, the first time a scene holds more than about 20 million triangles (micro levels
+  counted): what got faster on dense meshes and the settings that matter (Background Preview, View resolution), with
+  **Performance settings** and **Got it**. Never during a stroke, a benchmark, the welcome, What's New or the quick
+  tour; stored in project.json as soon as it shows, so it never comes back.
+- **Pen pressure per brush** (#122, requested by Zoldyck-Kill): every brush has its own **Pen pressure: Size** and
+  **Strength** switches, **Use global** / **On** / **Off**, in **Brush > Pen pressure**, Brush Lab and **Edit >
+  Preferences > Tablet**. **Use global** follows Pressure > Size / Strength as before; **On** and **Off** override
+  them for that brush. Kept per brush with its other settings (**Save Brush Settings** keeps them, **Reset Brush to
+  Default** puts back the default) and in a custom brush's `.sfbrush`. Move, KelvinGrab, KelvinTwist, KelvinScale,
+  Tendril and Elastic Tendril start with Size off; older saved settings load as Use global. Command:
+  `brush_pen_pressure size=on|off|global strength=on|off|global`.
+- **Quick Remesh** (Tool > Remesh, #121, thanks Zoldyck-Kill): with it on, Shift+R, or N held while clicking or
+  dragging on the background, remeshes the active Part at the Voxel Remesh resolution in the background (progress bar
+  and Cancel as the button; Keep Masked and Keep Texture apply). One undo step per remesh; a stroke or undo made while
+  it runs is never overwritten (it remeshes again). Both keys are free in every key style and change in Preferences >
+  Hotkeys; on the model a press stays a brush stroke.
+- **Remesh after each stroke** (Tool > Remesh, off by default, #121): after pen-up, a stroke that stretched edges past
+  1.6 times their length remeshes the active Part in the background; sculpting never waits for it. Not on Parts with
+  subdivision levels, sculpt layers or a painted texture.
+- **Rodin 2.5 (Hyper3D) via fal.ai** (#123, thanks ElgoogUdiab): **Generate 3D > fal.ai > Model** lists **Rodin 2.5**
+  and **Rodin 2.5 Fast**. Image and text both work; the untextured GLB goes through the usual import and remesh. Uses
+  your fal.ai key (`FAL_KEY`), nothing else is contacted. Commands: `image_to_3d service=fal
+  model=fal-ai/hyper3d/rodin/v2.5`, `text_to_3d service=fal model=fal-ai/hyper3d/rodin/v2.5` (other fal models keep
+  Hunyuan3D 3.1 Rapid for text).
+- **Studio mode**: `--studio studio.json` (or a studio build) starts SculptForge with no outside connections: no
+  public update check, AI services, community gallery or Discord presence, and network sockets only on this computer.
+  Only the studio's own update channel or mirror is reached. `--offline` (or `SF_OFFLINE=1`) does the same with
+  nothing allowed. See the user guide's "Offline deployment".
+- **Touch screens and trackpads**: two fingers over the model pinch to zoom and twist to roll the view, and on a touch
+  screen slide to pan; they never sculpt. One finger on a touch screen still sculpts. Thanks to phoenix (Discord) for
+  the report.
+- **Hold during strokes** (Preferences > Input > SpaceMouse, on by default): while you sculpt, paint or mask, the
+  SpaceMouse leaves the view alone and its buttons do nothing, so a hand on the cap never moves the model under the
+  pen or mouse. Pointer events from a SpaceMouse that the system also lists as a mouse are ignored. Thanks to phoenix
+  (Discord).
+
+### Changed
+- **Faster builds from source**: on Linux the build links with mold when it is installed and precompiles the standard
+  library and glm headers; app code the tests also run is a static library both link, so it compiles once. Packagers:
+  `-DSCULPTFORGE_MOLD=OFF` keeps the system linker (the release packages do), `-DSCULPTFORGE_PCH=OFF` turns the
+  precompiled headers off. See docs/build-speed.md.
+- The command search and the Library filter also find Lit Spheres by "material capture" and "material image".
+- Membership: **Member Requests** (one request per member per month: brushes, alphas, materials, small tweaks;
+  "Requested by @name" on each item; out to members at month end, free for everyone a month later) replace the monthly
+  brush and alpha pack, on the website, in the app, the guide and the README.
+- The membership card: the full card shows on the first start only (and from Help > Support); after that a small card
+  along the bottom of the canvas comes at a good moment (about 20 minutes of active sculpting in a session, a Save
+  Render, the first start after an update, the monthly challenge's results), at most once a week, never mid-stroke or
+  during a job. **Become a member**, **Not now** (a week) and **I'm already a member**, which signs in with GitHub
+  like member builds: a member never sees it again (and gets member builds); no sign-in hides it for three months.
+  Signed-in members never see it. The 10-hour reminder and the old "Maybe later" are gone.
+- Memberships: Member ($5 / month or $48 / year) and Studio ($150 / month, up to 10 artists) replace Supporter,
+  Insider, Studio and the one-time payment, on the website, in the support card, the Quick tour, the welcome note, the
+  update banner ("Members get betas early") and the guide.
+- Betas are a member perk: `X.Y.Z-beta.N` is published in the private members' repository and posted in
+- **Release packages on staging**: the merge batch builds the release packages on the `staging` branch beside CI, and
+  main reuses them. A release batch carries the version bump, so the release promotes packages that were already built
+  and tested for the exact tagged commit: tag to published takes about 5 minutes instead of about 25.
+- **Studio membership**: $300 a month for up to 10 artists (+$25 per extra artist; Founding Studio $150 for the first
+  10 studios), now with the studio's own isolated build, a pinned version with security fixes, an offline signed
+  installer and up to 3 custom items a month.
+- **Testing flow** (docs/testing-flow.md): each change is tested once per tier instead of four times. T0 is
+  `tools/test/impacted.py`, the tests a change can break, from the build graph. T1 is the whole suite once per merge
+  batch on a GPU machine, in parallel with T2, CI on the `staging` branch; main fast-forwards only when both pass, and
+  CI on main reuses that run. T3 is a nightly label and workflow for benchmarks and heavy meshes. `tools/test/run.py`
+  wraps ctest with a content-hash test cache, one rerun for flaky tests (logged in tests/flaky.md), and a 20-second
+  budget per test. A release bump that only adds paperwork reuses CI instead of waiting for it again.
+- **Preferences save themselves** (#117, thanks fenixpoints): the key style, shortcuts, tablet, interface, performance
+  and other preferences, and the radial menus, are written to ui.json half a second after they change (and at quit),
+  through a temporary file. The layout is kept only by the new **Save Layout** (Edit > Preferences > Config). The old
+  save command and its Ctrl+Shift+I key are gone; keymaps and macros that name its id (`config.store`) still load, as
+  **Save Preferences Now** in the command palette.
+- **SculptForge keys: I is Falloff** (as O); U stays Intensity. The Classic sculpting keys keep S size, U intensity, I
+  colour intensity, O falloff (#117).
+- **Plain names** for controls that carried another application's labels: Size, Intensity, Colour intensity, Falloff,
+  Ctrl+hover help, Help box opacity, Customize Shelves, Reset Layout and Shortcuts, Revert to Saved Layout, Export /
+  Import Interface, Lower / Higher Level, Delete Lower / Higher, Project Detail, Lasso Mask, Rectangle Mask, Radial
+  Copies and Group from Mask. Script commands, their parameters and saved files are unchanged.
+
+### Fixed
+- Pinch and two-finger rotate did nothing on macOS trackpads and touch screens. Thanks to phoenix (Discord).
+- **Big brushes on scans with micro detail**: on a micro level over a dense scan, a large Standard, Clay or Inflate
+  brush now moves the base surface the way it does on a plain mesh, and the micro detail rides along untouched (one
+  undo step, as before). A big Clay stroke there could freeze the app for seconds, throw spikes hundreds of units long
+  and coarsen the whole level's detail; orbiting after such strokes could drop below one frame a second. Masks, hidden
+  faces and alphas keep the detail brush.
+- Orbiting a dense model right after sculpting no longer hitches on slower processors. The lighter copy that is drawn
+  while the view moves was rebuilt in batches that a slow CPU took about 160 ms to finish, so the first frames of the
+  orbit froze. Batches are now sized to fit a few milliseconds a frame. After a stroke the copy is also brought up to
+  date while the view is still, so the next orbit starts with it ready (15M triangles, simulated integrated-graphics
+  profile on slow cores: worst orbit frame 166 -> 24 ms).
+
+### Security
+- Release checksums (SHA256SUMS.txt) are now signed with Ed25519 (SHA256SUMS.txt.sig, a 64-byte raw signature); the
+  release workflow checks the signing secret against the key compiled into the app.
+
 ## [0.11.0] - 2026-11-04
 
 ### Added
