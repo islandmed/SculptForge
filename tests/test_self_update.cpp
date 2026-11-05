@@ -13,6 +13,7 @@
 #include "core/Sha256.h"
 
 #include <algorithm>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -403,9 +404,24 @@ TEST(self_update_refuses_bad_releases) {
     Download d;
     download(s, f, d);
     CHECK(f.asked.size() == 2);
-    // No key compiled in yet: the release key's constant parses (once set) or is empty (Update button off).
-    uint8_t k[32];
-    CHECK(std::string(kUpdatePublicKeyHex).empty() || parseHexKey(kUpdatePublicKeyHex, k));
+}
+
+// The release key compiled into the app (Tony's, 11-05): 64 hex characters, a point on the curve, and the verifier
+// accepts what is signed under a key and only that key (the sign side with the throwaway test key: the release's
+// private half never leaves the UPDATE_SIGNING_KEY secret).
+TEST(self_update_release_key) {
+    const std::string hex = kUpdatePublicKeyHex;
+    CHECK(hex.size() == 64);
+    CHECK(std::all_of(hex.begin(), hex.end(), [](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); }));
+    uint8_t release[32], test[32];
+    CHECK(parseHexKey(hex, release) && ed25519PublicKeyValid(release));
+    CHECK(parseHexKey(kTestKey, test) && ed25519PublicKeyValid(test));
+    const std::string sig = unhex(kSumsSig);
+    CHECK(sumsSignatureValid(kSums, sig, test));     // signed with a key: accepted under it
+    CHECK(!sumsSignatureValid(kSums, sig, release)); // and under no other, the release key included
+    // A key that is no curve point is refused: y = 2 has no x on the curve ((y^2 - 1) / (d y^2 + 1) is no square).
+    uint8_t bogus[32] = {2};
+    CHECK(!ed25519PublicKeyValid(bogus) && !sumsSignatureValid(kSums, sig, bogus));
 }
 
 TEST(self_update_cancel_and_tamper) {

@@ -32,6 +32,6 @@ testers:
     shows your login; Check for updates offers the newest member build; Sign out, restart: still signed out.
   - Flatpak or .deb install: the banner says to update with the package manager instead of showing Update.
 ---
-The Update button stays hidden until the release signing key exists (kUpdatePublicKeyHex in
-src/core/SelfUpdate.h and the UPDATE_SIGNING_KEY secret; steps in REPORT.md). Tester checks need a signed release
+The release signing key exists (11-05; kUpdatePublicKeyHex in
+src/core/SelfUpdate.h, secret UPDATE_SIGNING_KEY). Tester checks need a signed release
 newer than the build under test.

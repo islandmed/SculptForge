@@ -289,6 +289,11 @@ void sha512(const void* data, size_t size, uint8_t out[64]) {
         for (int k = 0; k < 8; ++k) out[w * 8 + k] = uint8_t(h[w] >> (56 - 8 * k));
 }
 
+bool ed25519PublicKeyValid(const uint8_t publicKey[32]) {
+    gf q[4];
+    return unpackNegated(q, publicKey);
+}
+
 bool ed25519Verify(const uint8_t signature[64], const void* message, size_t size, const uint8_t publicKey[32]) {
     gf p[4], q[4];
     if (!belowOrder(signature + 32) || !unpackNegated(q, publicKey)) return false;
