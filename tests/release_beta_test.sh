@@ -60,7 +60,7 @@ case "\$*" in
   "auth status"*) echo "Logged in to github.com account islandmed" ;;
   "secret list"*) printf 'INSIDERS_REPO_TOKEN\t2026-11-05T00:00:00Z\n' ;;
   "repo view islandmed/sculptforge-insiders"*) echo "islandmed/sculptforge-insiders" ;;
-  "release view"*) echo SHA256SUMS.txt ;;
+  "release view"*) printf 'SHA256SUMS.txt\nSHA256SUMS.txt.sig\n' ;; # (signed: the app has an update key)
   "release download"*) exit 1 ;;
   *homebrew-tap*) printf '  version "0.10.10"\n' | base64 ;;
   "pr view 1800"*) echo "OPEN islandmed sculptforge-bump" ;;

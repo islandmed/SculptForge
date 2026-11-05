@@ -106,8 +106,14 @@ TEST(studio_mode_sends_nothing_outside) {
         CHECK(r.status == 0);
         CHECK(r.error.find("Studio mode") != std::string::npos);
     }
+    // The updater's and member sign-in's requests too (one-click update, core/SelfUpdate.h).
+    const ai::HttpResponse g = ai::httpGetRestricted(
+        "https://github.com/islandmed/SculptForge/releases/download/v1/x", [](const std::string&) { return true; }, 2,
+        [](const char*, size_t) { return true; });
+    CHECK(g.status == 0 && g.error.find("Studio mode") != std::string::npos);
+    CHECK(ai::httpPostNoRedirect("https://github.com/login/device/code", {}, "", 2).status == 0);
     CHECK(ai::httpRequestCount() == before); // no request was started
-    CHECK(net::blockedCount() == 5);
+    CHECK(net::blockedCount() == 7);
     // The studio's own channel is let through (it gets as far as the transport).
     ai::httpRequest("GET", "https://127.0.0.1:9/channel/latest.json", {}, {}, 2);
     CHECK(ai::httpRequestCount() == before + 1);
