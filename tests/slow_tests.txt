@@ -24,10 +24,11 @@ ui_pbr_channels                                                     22  re-measu
 ui_vdm                                                              21  re-measure with SF_THREADS
 ui_shell_layout                                                     21  re-measure with SF_THREADS
 ui_windows_dpi_2560                                                 21  re-measure with SF_THREADS
-ui_ui_scale_900                                                     21  re-measure with SF_THREADS
+ui_ui_scale_900                                                     24  7 s alone, 27-36 s in the full -j10 run (load, 11-05): re-measure with SF_THREADS
 ui_dyntopo                                                          21  re-measure with SF_THREADS
 ui_multires                                                         20  re-measure with SF_THREADS
 ui_kelvinlet_capture                                               34  7 s alone, 11-34 s in the full -j10 run (load): re-measure with SF_THREADS
+ui_brush_falloff_options                                           23  5 s alone, 22-33 s in the full -j10 run (load, 11-05): re-measure with SF_THREADS
 sculptforge_tests: qremesh_guide_loop_round_an_eye                  49  guide loops on a full face: a coarser face
 sculptforge_tests: texture_layer_undo_stores_only_what_changed      42  4k texture layers: 1k shows the same
 sculptforge_tests: inbox0106_smooth_keeps_quad_remesh_regular_lion  29  the lion head: a smaller quad mesh
