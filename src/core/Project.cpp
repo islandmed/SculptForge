@@ -717,7 +717,8 @@ Json writeOpenCache(Writer& w, const std::string& prefix, const Mesh& m, const B
         if (ok) { // (all read before any is added: a failed copy leaves nothing behind)
             for (size_t i = 0; i < bytes.size(); ++i) {
                 const OpenCacheSource::Array& a = src->arrays[i];
-                Json d = w.add(prefix + a.name + ".pack", Scalar::U8, 1, bytes[i].size(), std::move(bytes[i]));
+                const size_t size = bytes[i].size(); // (before the move: argument order is unspecified)
+                Json d = w.add(prefix + a.name + ".pack", Scalar::U8, 1, size, std::move(bytes[i]));
                 d.set("values", a.values);
                 d.set("hash", a.hash);
                 j.set(a.name, std::move(d));
