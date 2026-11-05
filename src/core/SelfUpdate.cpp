@@ -563,6 +563,7 @@ std::string windowsHelperScript(const Install& install, const Download& d, unsig
         s += "$p = Start-Process -FilePath $exe -PassThru\n";
         s += "Start-Sleep -Seconds 20\n";
         s += "if ($p.HasExited -and $p.ExitCode -ne 0) {\n"
+             "  Remove-Item -LiteralPath \"$root.failed\" -Recurse -Force -ErrorAction SilentlyContinue\n"
              "  Move-Item -LiteralPath $root -Destination \"$root.failed\"; Move-Item -LiteralPath $old -Destination $root\n"
              "  Start-Process -FilePath $exe }\n";
     }
