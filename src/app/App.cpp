@@ -412,6 +412,7 @@ int App::runUiTest(int w, int h, int fps) {
             if (finalFrame) break;
             finalFrame = true; // one more frame, for a failure screenshot
         }
+        trackModOrder(); // (the script's held keys of the last frame: Maya's Alt, then Ctrl, #134)
         demo_->update(dt);
         processPendingFiles();
         animateLayers(dt);
@@ -605,6 +606,7 @@ int App::runRecording() {
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
         } // the demo provides all input
+        trackModOrder(); // (the script's held keys of the last frame: Maya's Alt, then Ctrl, #134)
         demo_->update(dt);
         processPendingFiles();
         animateLayers(dt);
@@ -1003,6 +1005,7 @@ int App::run() {
         else drainStrokeDabs(kStrokeBudgetSeconds);
         mark();
         kelvinCatchUp(); // a long Kelvinlet move, a bounded part per frame (PanelKelvinlet.cpp)
+        trackModOrder(); // (keys that change without an event of ours, e.g. a UI test's hold)
         Uint64 now = SDL_GetTicksNS();
         float dt = float(double(now - lastTicks) * 1e-9);
         lastTicks = now;
@@ -1324,6 +1327,7 @@ void App::dispatchEvent(const SDL_Event& event) {
          event.type != SDL_EVENT_MOUSE_REMOVED) ||
         (event.type >= SDL_EVENT_PEN_PROXIMITY_IN && event.type <= SDL_EVENT_PEN_AXIS))
         lastInputAt_ = double(SDL_GetTicksNS()) * 1e-9; // (focusKeepsDrawing)
+    trackModOrder();    // (before the event: Maya's Alt, then Ctrl roll, #134)
     wintabEvent(event); // Windows Ink off: the tablet driver's pressure for its mouse events (Tablet.cpp)
     SDL_Event e = event;
     mapPenPosition(e); // a tablet in mouse mode moves the cursor relatively (#54), for the canvas and the UI
@@ -1409,7 +1413,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_MOUSE_WHEEL:
         // (Not the scroll a trackpad sends during a pinch or twist: Touch.cpp zooms for that.)
         if (!io.WantCaptureMouse && !touchPinching_ && canvasRect().contains(e.wheel.mouse_x, e.wheel.mouse_y))
-            camera_.zoom(e.wheel.y);
+            wheelZoom(e.wheel.mouse_x, e.wheel.mouse_y, e.wheel.y);
         break;
     case SDL_EVENT_KEY_DOWN:
         if (e.key.key == SDLK_SPACE && !e.key.repeat && // hold Space and drag: the camera (#43; not while typing)
@@ -1672,6 +1676,15 @@ void App::onMouseDown(float x, float y, Uint8 button) {
 // when the press started navigating.
 bool App::mayaNavigationDown(Uint8 button) {
     const SDL_Keymod keys = SDL_GetModState(); // the keyboard itself, before inputMods' Maya mapping
+    // Alt held, then Ctrl added: a left drag rolls the view (#134). Ctrl first, or both at once, stays the Ctrl+Alt
+    // mask gestures (on the model: mask; beside it: clear the mask).
+    if (button == SDL_BUTTON_LEFT && altBeforeCtrl_ && (keys & SDL_KMOD_ALT) && (keys & SDL_KMOD_CTRL) &&
+        !(keys & SDL_KMOD_SHIFT)) {
+        drag_ = Drag::Roll;
+        rollSideways_ = true;
+        rightClick_.pending = false;
+        return true;
+    }
     if (!(keys & SDL_KMOD_ALT) || ctrlDown(keys) || (keys & SDL_KMOD_SHIFT)) return false; // Alt alone navigates
     if (button == SDL_BUTTON_LEFT) drag_ = Drag::Orbit;
     else if (button == SDL_BUTTON_MIDDLE) drag_ = Drag::Pan;
@@ -1738,7 +1751,10 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     switch (drag_) {
     case Drag::Stroke: strokeTo(x, y); break;
     case Drag::Orbit: orbitBy(dx, dy); break;
-    case Drag::Roll: rollBy(x, y, dx, dy); break;
+    case Drag::Roll:
+        if (rollSideways_) camera_.setOrientation(camera_.orientation() * glm::angleAxis(dx * 0.008f, glm::vec3(0, 0, 1)));
+        else rollBy(x, y, dx, dy);
+        break;
     case Drag::Pan: camera_.pan(dx, dy, canvasHeight()); break;
     case Drag::Zoom: camera_.zoom(zoomDragAmount(dx, dy)); break;
     case Drag::MaskCanvas: maskCanvasMove(x, y); break;
@@ -1767,6 +1783,48 @@ float App::zoomDragAmount(float dx, float dy) const {
     float a = mayaStyle() && uiPrefs_.mayaZoomHorizontal ? dx : classicStyle() ? dy : -dy;
     if (uiPrefs_.invertZoom) a = -a;
     return a * 0.05f;
+}
+
+void App::trackModOrder() {
+    const SDL_Keymod now = SDL_GetModState();
+    const bool alt = (now & SDL_KMOD_ALT) != 0, ctrl = (now & SDL_KMOD_CTRL) != 0;
+    if (!alt || !ctrl) altBeforeCtrl_ = false;
+    else if (!(modOrderLast_ & SDL_KMOD_CTRL)) altBeforeCtrl_ = (modOrderLast_ & SDL_KMOD_ALT) != 0; // Ctrl just went down
+    modOrderLast_ = now;
+}
+
+// The mouse wheel: toward the view's centre, or (Preferences > Input > Wheel zooms toward the pointer, #134) toward
+// the surface point under the pointer, which stays under it: the camera and its target scale about that point.
+// Beside the model, the point at the target's depth under the pointer.
+void App::wheelZoom(float x, float y, float steps) {
+    const float before = camera_.distance;
+    camera_.zoom(steps);
+    if (!uiPrefs_.wheelZoomToPointer || before <= 0.0f) return;
+    const float f = camera_.distance / before;
+    glm::vec3 origin, dir;
+    canvasRay(x, y, origin, dir);
+    dir = glm::normalize(dir);
+    const bool canPick = !solverBusy() && previewLod_ < 0; // (mid-stroke the solver thread owns the mesh)
+    if (canPick) doc_.syncBvh();
+    RayHit hit;
+    glm::vec3 p;
+    if (canPick && pick(x, y, hit)) {
+        p = hit.position;
+    } else {
+        const glm::vec3 fwd = camera_.forward();
+        const float along = glm::dot(dir, fwd);
+        if (std::abs(along) < 1e-6f) return;
+        p = origin + dir * (glm::dot(camera_.target - origin, fwd) / along);
+    }
+    camera_.target = p + (camera_.target - p) * f;
+}
+
+void App::resetView() {
+    camera_.yaw = camera_.pitch = camera_.roll = 0.0f; // the view a new model opens with: from the front
+    camera_.ortho = false;
+    autoOrtho_ = false;
+    camera_.frame(sceneBounds());
+    status_ = "View reset";
 }
 
 void App::orbitBy(float dx, float dy) {
@@ -1803,6 +1861,7 @@ void App::rollBy(float x, float y, float dx, float dy) {
 
 void App::onMouseUp() {
     rollPending_ = false;
+    rollSideways_ = false;
     rightClick_.pending = false;
     zsMenu_.armed = false;
     orbitStarted_ = false;

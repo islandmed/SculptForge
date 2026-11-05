@@ -43,15 +43,16 @@ camera.
 | To | Do this |
 |---|---|
 | Rotate | Left-drag on the background, or right-drag anywhere on the canvas; add <kbd>Shift</kbd> to snap to an axis view |
-| Roll (turn about the view axis) | <kbd>Shift</kbd>+click the background, let go of <kbd>Shift</kbd>, then drag |
+| Roll (turn about the view axis) | <kbd>Shift</kbd>+click the background, let go of <kbd>Shift</kbd>, then drag (Maya style: hold <kbd>Alt</kbd>, add <kbd>Ctrl</kbd>, left-drag sideways) |
 | Pan | <kbd>Alt</kbd>+left-drag on the background, <kbd>Alt</kbd>+right-drag, or middle-drag |
-| Zoom | Mouse wheel; <kbd>Alt</kbd>+left-drag on the background, then let go of <kbd>Alt</kbd> and keep dragging; <kbd>Ctrl</kbd>+right-drag; <kbd>Ctrl</kbd>+middle-drag; <kbd>Ctrl</kbd>+left-drag on the background when nothing is masked (not with the Classic sculpting keys) |
+| Zoom | Mouse wheel (toward the middle of the view, or toward the pointer with **Edit > Preferences > Input > Wheel zooms toward the pointer**, on in the Maya style); <kbd>Alt</kbd>+left-drag on the background, then let go of <kbd>Alt</kbd> and keep dragging; <kbd>Ctrl</kbd>+right-drag; <kbd>Ctrl</kbd>+middle-drag; <kbd>Ctrl</kbd>+left-drag on the background when nothing is masked (not with the Classic sculpting keys) |
 | Frame the model | <kbd>F</kbd> (Blender style: <kbd>Home</kbd>), or **Frame** on the right shelf |
 | Front, right, top view | <kbd>Numpad 1</kbd>, <kbd>Numpad 3</kbd>, <kbd>Numpad 7</kbd>; <kbd>Ctrl</kbd> for the back, left and bottom |
 | Front, side, top or bottom view with the mouse | Click an end of the axis gizmo in the canvas corner |
 | Orthographic on or off | <kbd>Numpad 5</kbd> |
 | Turn in 15 degree steps | <kbd>Numpad 4</kbd> / <kbd>Numpad 6</kbd> (around), <kbd>Numpad 8</kbd> / <kbd>Numpad 2</kbd> (over); <kbd>Numpad 9</kbd>: the other side |
-| Frame the active Part | <kbd>Numpad .</kbd> |
+| Frame the active Part | <kbd>Numpad .</kbd> (Maya style: also <kbd>Alt</kbd>+<kbd>F</kbd>) |
+| Reset the view | Maya style: <kbd>Alt</kbd>+<kbd>H</kbd> (front, upright, everything in view); any style: **Reset view** in the Controls window (<kbd>F1</kbd>), where you can give it a key |
 | Frame one Part | <kbd>Shift</kbd>+<kbd>Alt</kbd>+click it, or triple-click another Part (it becomes the active Part) |
 | Sculpt from the background | Turn on **Edit > Preferences > Input > Start strokes off the model**, **View > Lock camera**, or press <kbd>Shift</kbd>+<kbd>L</kbd>: a left-drag that starts beside the model sculpts once it reaches the surface |
 | Move the camera with Space held | Turn on **Edit > Preferences > Input > Hold Space and drag to move the camera**, then hold <kbd>Space</kbd>: left-drag rotates, right- or middle-drag pans, <kbd>Ctrl</kbd>+drag zooms, anywhere on the canvas (on the model too) |
@@ -217,7 +218,8 @@ These live on the right shelf and in the **View** menu:
 
 > **Not yet:** SculptForge has no rotation around the point under the cursor (the
 > camera always orbits its target, which Frame sets to the scene centre), no floor grid and no saved camera
-> views. Pan the target onto the area you're working on to orbit around it.
+> views. Pan the target onto the area you're working on to orbit around it, or zoom there with the wheel and
+> **Wheel zooms toward the pointer** on: that moves the target toward the point under the pointer too.
 
 ## See also
 

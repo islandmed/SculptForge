@@ -2127,6 +2127,14 @@ private:
         glm::vec2 origin{0.0f};
     } straight_;
     bool rollPending_ = false; // Shift+press on the background: let go of Shift before moving to roll the view
+    bool rollSideways_ = false; // Maya style Alt, then Ctrl+left drag (#134): left / right rolls the view
+    // Maya style (#134): Alt went down before Ctrl (Alt held, then Ctrl added) rolls on Alt+Ctrl+left drag; Ctrl first
+    // (or both at once) keeps the Ctrl+Alt mask gestures. trackModOrder follows the keys, per event and per frame.
+    SDL_Keymod modOrderLast_ = SDL_KMOD_NONE;
+    bool altBeforeCtrl_ = false;
+    void trackModOrder();
+    void wheelZoom(float x, float y, float steps); // Preferences > Input > Wheel zooms toward the pointer
+    void resetView();                              // the view.reset action (Maya keys: Alt+H, #134)
     float rollStartX_ = 0.0f, rollStartY_ = 0.0f;
     glm::vec2 lastDabScreen_{0.0f}; // window pixels of the last dab (UI tests: last_dab_x / last_dab_y)
     bool maskClickPending_ = false; // Ctrl+press on the model: a click blurs (Alt: sharpens), a drag paints

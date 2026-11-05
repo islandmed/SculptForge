@@ -6,6 +6,14 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Maya style view keys** (#134, thanks RodTDai): hold Alt, then add Ctrl, and a left drag rolls the view (left /
+  right); Alt+F frames the active Part; Alt+H resets the view (front, upright, perspective, everything in view). Ctrl
+  first (or both together) still masks with Ctrl+Alt, on the model and beside it.
+- **Edit > Preferences > Input > Wheel zooms toward the pointer** (#134): the wheel zooms toward the point of the model
+  under the pointer, which stays put. On with the Maya style; the other styles keep zooming toward the middle (the box
+  turns it on in any style). **Reset view** is also an action in the Controls window, for a key of your own.
+
 ## [0.11.1] - 2026-11-05
 
 ### Added

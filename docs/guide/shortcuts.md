@@ -164,7 +164,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Bottom view | <kbd>Ctrl</kbd>+<kbd>Numpad 7</kbd> | Look up at the model from below (orthographic). |
 | Draw | <kbd>Q</kbd> | Draw mode: brushes sculpt and paint (leaves the Gizmo). |
 | Frame | <kbd>F</kbd> | Fit the whole model in the view. |
-| Frame Part | <kbd>Numpad .</kbd> | Fit the active Part in the view (Blender: View Selected). |
+| Frame Part | <kbd>Numpad .</kbd> | Fit the active Part in the view (Blender: View Selected; Maya keys: Alt+F). |
 | Front view | <kbd>Numpad 1</kbd> | Look at the model from the front (orthographic). |
 | Left view | <kbd>Ctrl</kbd>+<kbd>Numpad 3</kbd> | Look at the model's left side (orthographic). |
 | Move | <kbd>W</kbd> | Gizmo, Move: drag an arrow to move along an axis, a square to move in a plane, the centre to move in the view. Masked parts stay; Shift snaps to the grid; Alt+drag moves only the gizmo. W again: back to Draw. |
@@ -303,11 +303,22 @@ long as <kbd>Alt</kbd> is the only key held:
 |---|---|
 | Rotate | <kbd>Alt</kbd>+left-drag |
 | Pan | <kbd>Alt</kbd>+middle-drag |
-| Zoom | <kbd>Alt</kbd>+right-drag **sideways**: right zooms in, left zooms out, as Maya's own dolly |
+| Zoom | <kbd>Alt</kbd>+right-drag **sideways**: right zooms in, left zooms out, as Maya's own dolly; the mouse wheel zooms toward the pointer |
+| Roll (turn about the view axis) | Hold <kbd>Alt</kbd>, then add <kbd>Ctrl</kbd>, and left-drag left or right |
+| Frame the active Part | <kbd>Alt</kbd>+<kbd>F</kbd> (also <kbd>Numpad .</kbd>) |
+| Reset the view | <kbd>Alt</kbd>+<kbd>H</kbd>: from the front, upright, in perspective, the whole model in view |
 | Invert the brush (subtract) | Hold <kbd>Ctrl</kbd> while sculpting |
 | Paint a mask / erase it | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+drag / <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+drag |
 | Smooth | Hold <kbd>Shift</kbd> while sculpting |
 | Visibility gestures | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>, as in the other styles |
+
+The roll needs <kbd>Alt</kbd> first: press <kbd>Ctrl</kbd> first (or both together) and <kbd>Ctrl</kbd>+<kbd>Alt</kbd>
+masks as before, on the model, and clears the mask beside it.
+
+**Edit > Preferences > Input > Wheel zooms toward the pointer** (#134) keeps the point of the model under the pointer
+where it is while the wheel zooms; beside the model it zooms toward the pointer at the model's depth. Choosing the Maya
+style turns it on and the other styles turn it off (they zoom toward the middle of the view); the box changes it in
+any style.
 
 Maya's default dolly follows a sideways drag, so that is the default here too. **Edit > Preferences > Input > Zoom
 drag** switches it to **Up and down** (drag up to zoom in) if you set Maya up that way. **Invert zoom**, in every
