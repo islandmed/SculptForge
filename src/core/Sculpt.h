@@ -266,6 +266,10 @@ public:
     // endStroke). Brushes whose offset depends on more than the vertex's place (Smooth, Layer, Morph) and the
     // remesher always take the exact path, and so do regions below the threshold (small brushes are unchanged).
     bool adaptiveDabs = false;
+    // The same adaptive path (sampled plane, normals from the brush's own derivative, exact ones behind the brush and
+    // at the end) without fused batches: on by default (perf plan item 2: the normals were half of a big brush's
+    // time). Fused batches stay with adaptiveDabs (Fast Big Brushes, Experimental).
+    bool analyticNormals = true;
     static constexpr size_t kAdaptiveMinVertices = 150'000;
     static constexpr size_t kAreaSamples = 65'536;
     // Whether adaptive dabs moved leaves whose exact normals are still to come, and catching up with up to
