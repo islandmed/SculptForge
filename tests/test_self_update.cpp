@@ -585,3 +585,38 @@ TEST(member_builds_release_list) {
     downloadUpdate("99.0.0-preview.1", s.install, k, f.fetch(), elsewhere, evil);
     CHECK(!elsewhere.ok && !elsewhere.error.empty());
 }
+
+// The real thing, once: a public release file through GitHub's redirect to its asset host, with the restricted
+// client (every hop allowed, certificates checked). Catches GitHub moving its asset host away from the allowlist.
+TEST(self_update_live_github_redirect) {
+    if (networkTestsOff()) return;
+    std::string body;
+    const ai::HttpResponse r = ai::httpGetRestricted(
+        releaseFileUrl("0.11.0", "SHA256SUMS.txt"), allowedUpdateUrl, 30, [&](const char* d, size_t n) {
+            body.append(d, n);
+            return body.size() < kMaxSumsBytes;
+        });
+    if (r.status == 0) { // (offline machine: nothing to learn here)
+        std::fprintf(stderr, "self_update_live_github_redirect: no connection (%s)\n", r.error.c_str());
+        return;
+    }
+    CHECK(r.status == 200 && r.error.empty());
+    CHECK(sumFor(body, "SculptForge-0.11.0-windows-x86_64.zip").size() == 64);
+}
+
+#if defined(_WIN32)
+#include "core/Keychain.h"
+// Windows Credential Manager: store, read back, replace, erase (a test entry, not the member sign-in's).
+TEST(self_update_keychain_windows) {
+    const std::string account = "test-self-update";
+    keychain::erase(account);
+    std::string got;
+    CHECK(!keychain::load(account, got));
+    CHECK(keychain::store(account, "{\"access\":\"ghu_test\"}"));
+    CHECK(keychain::load(account, got) && got == "{\"access\":\"ghu_test\"}");
+    CHECK(keychain::store(account, "second"));
+    CHECK(keychain::load(account, got) && got == "second");
+    CHECK(keychain::erase(account) && !keychain::load(account, got));
+    CHECK(keychain::erase(account)); // (nothing there: still fine)
+}
+#endif
