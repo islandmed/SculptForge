@@ -335,7 +335,10 @@ bool App::drawSelfUpdate(const UpdateInfo& u, bool& close) {
             if (ImGui::Button(tr("Hide##update.hide"))) close = true;
             return true;
         }
-        if (ImGui::Button(tr("Restart now##update.restart"))) restartIntoUpdate();
+        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+        const bool restart = ImGui::Button(tr("Restart now##update.restart"));
+        ImGui::PopStyleColor();
+        if (restart) restartIntoUpdate();
         ImGui::SameLine();
         if (ImGui::Button(tr("Later##update.later"))) installAtQuit_ = true;
         ui::HelpText("Later", nullptr, "Install it when you quit SculptForge; the next start is the new version.",
@@ -366,9 +369,11 @@ bool App::drawSelfUpdate(const UpdateInfo& u, bool& close) {
         }
     }
     if (selfUpdateOffered(u)) {
-        if (ImGui::Button((std::string(tr(selfUpdateStage_ == SelfUpdateStage::Failed && thisVersion ? "Try again" : "Update")) +
-                           "##update.update").c_str()))
-            startSelfUpdate(u);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); // the main action
+        const bool clicked = ImGui::Button(
+            (std::string(tr(selfUpdateStage_ == SelfUpdateStage::Failed && thisVersion ? "Try again" : "Update")) + "##update.update").c_str());
+        ImGui::PopStyleColor();
+        if (clicked) startSelfUpdate(u);
         ui::HelpText("Update", nullptr,
                      "Download the new version from SculptForge's GitHub releases, check its signature and checksum, "
                      "and install it. The current version is kept until the new one has started.",
@@ -567,7 +572,10 @@ void App::drawMemberBuildsSection() {
             if (guide_.bodyBoldFont()) ImGui::PopFont();
             ImGui::SameLine();
             if (ImGui::Button(tr("Copy##member.copy"))) SDL_SetClipboardText(code.c_str());
-            if (ImGui::Button(tr("Open github.com/login/device##member.open"))) SDL_OpenURL(member::kVerifyUrl);
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); // the next step
+            const bool open = ImGui::Button(tr("Open github.com/login/device##member.open"));
+            ImGui::PopStyleColor();
+            if (open) SDL_OpenURL(member::kVerifyUrl); // (always this page, whatever GitHub's answer said)
             ImGui::TextDisabled("%s", tr("Waiting for GitHub..."));
         }
         if (ImGui::Button(tr("Cancel##member.cancel"))) {
