@@ -77,6 +77,7 @@ Json toJson(const SpaceMouseSettings& s) {
     j.set("invert", invert);
     j.set("turntable", s.turntable);
     j.set("dominant", s.dominant);
+    j.set("holdWhileStroking", s.holdWhileStroking);
     Json buttons = Json::array();
     for (const std::string& b : s.buttons) buttons.push(b);
     j.set("buttons", buttons);
@@ -94,6 +95,7 @@ void fromJson(const Json& j, SpaceMouseSettings& s) {
         for (size_t i = 0; i < s.invert.size() && i < inv.size(); ++i) s.invert[i] = inv[i].asBool(s.invert[i]);
     s.turntable = j["turntable"].asBool(s.turntable);
     s.dominant = j["dominant"].asBool(s.dominant);
+    s.holdWhileStroking = j["holdWhileStroking"].asBool(s.holdWhileStroking);
     if (const Json& b = j["buttons"]; b.isArray())
         for (size_t i = 0; i < s.buttons.size() && i < b.size(); ++i)
             if (b[i].isString()) s.buttons[i] = b[i].asString();

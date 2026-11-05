@@ -236,6 +236,14 @@
 //   mouse_move U V           a plain mouse (not the pen) moves to a point on the model, e.g. the stray mouse
 //                            events Windows Ink sends beside the pen's
 //
+// Touch (Touch.cpp): fingers as SDL sends them, each step a frame.
+//   touch_pinch U V SCALE TWIST DX DY [trackpad] [late]   two fingers about a point on the model, 120 px apart, over
+//                            0.4 s: their span grows SCALE times, they turn TWIST degrees (clockwise > 0) and their
+//                            midpoint moves DX DY pixels. Touch screen (SDL's mouse events for the first finger too)
+//                            or trackpad; late: the first finger lands alone and drags 40 px first (a stroke starts)
+//   touch_stroke U0 V0 U1 V1 one finger on the touch screen from one point on the model to another (sculpts)
+//   expect_value touch_fingers (fingers down now)
+//
 // Simulated 3Dconnexion SpaceMouse: an SDL virtual joystick with a SpaceMouse Compact's USB ids (256F:C635), six
 // axes and two buttons, found and opened by the app as a real one would be (SpaceMouse.cpp, hot-plug included).
 //   spacemouse TX TY TZ RX RY RZ [S]   plug it in if needed, hold the cap at these axis values (-1..1, the device's
@@ -919,6 +927,7 @@ double Demo::query(const std::string& name, bool& known) const {
         const glm::vec3 f = glm::abs(app_.camera_.forward());
         return std::max({f.x, f.y, f.z}) > 0.99999f ? 1.0 : 0.0;
     }
+    if (name == "touch_fingers") return double(app_.touch_.fingers());
     if (name == "spacemouse_connected") return app_.spaceMouse_ ? 1.0 : 0.0;
     if (name == "spacemouse_moving") return app_.spaceMouseMoving() ? 1.0 : 0.0;
     if (name == "camera_distance") return app_.camera_.distance;
@@ -2210,6 +2219,92 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             mouseMotion(p.x, p.y);
         });
         wait(0.05f);
+    } else if (verb == "touch_pinch" || verb == "touch_stroke") {
+        // Fingers as SDL sends them, on a touch screen with the mouse events SDL makes from the first finger (before
+        // that finger's own event), or on a trackpad (no mouse events; the pointer rests over the model).
+        if (!need(verb == "touch_pinch" ? 6 : 4)) return false;
+        struct Touch {
+            ImVec2 centre, end;
+            float scale = 1.0f, twist = 0.0f, dx = 0.0f, dy = 0.0f;
+            bool pad = false, late = false, stroke = false;
+        };
+        auto tc = std::make_shared<Touch>();
+        tc->stroke = verb == "touch_stroke";
+        const float u0 = num(1, 0.5f), v0 = num(2, 0.5f);
+        float u1 = 0.0f, v1 = 0.0f;
+        if (tc->stroke) {
+            u1 = num(3, 0.5f);
+            v1 = num(4, 0.5f);
+        } else {
+            tc->scale = num(3, 1.0f);
+            tc->twist = glm::radians(num(4, 0.0f));
+            tc->dx = num(5, 0.0f);
+            tc->dy = num(6, 0.0f);
+            for (size_t i = 7; i < w.size(); ++i) {
+                if (w[i] == "trackpad") tc->pad = true;
+                else if (w[i] == "late") tc->late = true;
+            }
+        }
+        run([this, tc, u0, v0, u1, v1] {
+            tc->centre = onModel(u0, v0);
+            tc->end = tc->stroke ? onModel(u1, v1) : tc->centre;
+        });
+        steps_.push_back([this, tc](float t) {
+            int ww = 0, wh = 0;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            const SDL_TouchID device = tc->pad ? App::kUiTestTrackpad : App::kUiTestTouchScreen;
+            auto finger = [&](SDL_EventType type, SDL_FingerID id, ImVec2 p) {
+                SDL_Event e{};
+                e.type = type;
+                e.tfinger.touchID = device;
+                e.tfinger.fingerID = id;
+                // (a trackpad's own 0..1 square, as wide as App::kTrackpadAspect: the twist keeps its angle)
+                e.tfinger.x = tc->pad ? p.x / float(wh) / 1.5f : p.x / float(ww);
+                e.tfinger.y = p.y / float(wh);
+                e.tfinger.pressure = type == SDL_EVENT_FINGER_UP ? 0.0f : 1.0f;
+                e.tfinger.windowID = SDL_GetWindowID(app_.window_);
+                app_.handleEvent(e);
+            };
+            auto first = [&](SDL_EventType type, ImVec2 p) { // the first finger, with SDL's mouse events for it
+                if (!tc->pad) {
+                    mouseMotion(p.x, p.y, SDL_TOUCH_MOUSEID);
+                    if (type == SDL_EVENT_FINGER_DOWN) mouseButton(true, SDL_BUTTON_LEFT, SDL_TOUCH_MOUSEID);
+                    if (type == SDL_EVENT_FINGER_UP) mouseButton(false, SDL_BUTTON_LEFT, SDL_TOUCH_MOUSEID);
+                }
+                finger(type, 1, p);
+            };
+            constexpr float kSeconds = 0.4f, kLate = 0.25f, kSpan = 120.0f;
+            if (tc->stroke) {
+                const float k = std::min(t / kSeconds, 1.0f);
+                const ImVec2 p(tc->centre.x + (tc->end.x - tc->centre.x) * k, tc->centre.y + (tc->end.y - tc->centre.y) * k);
+                first(t == 0.0f ? SDL_EVENT_FINGER_DOWN : SDL_EVENT_FINGER_MOTION, p);
+                if (t >= kSeconds) first(SDL_EVENT_FINGER_UP, p);
+                return t >= kSeconds;
+            }
+            // late: the first finger lands alone and drags (a stroke begins), the second lands kLate later.
+            const float start = tc->late ? kLate : 0.0f;
+            const float k = std::clamp((t - start) / kSeconds, 0.0f, 1.0f);
+            const float span = kSpan * std::pow(tc->scale, k), a = tc->twist * k;
+            const ImVec2 c(tc->centre.x + tc->dx * k, tc->centre.y + tc->dy * k);
+            const ImVec2 off(std::cos(a) * span * 0.5f, std::sin(a) * span * 0.5f);
+            ImVec2 pa(c.x - off.x, c.y - off.y);
+            const ImVec2 pb(c.x + off.x, c.y + off.y);
+            if (tc->late && t < start) pa = ImVec2(pa.x, pa.y - 40.0f * (1.0f - t / start)); // dragging down to pa
+            if (t == 0.0f) {
+                if (tc->pad) mouseMotion(c.x, c.y); // the pointer over the model
+                first(SDL_EVENT_FINGER_DOWN, tc->late ? ImVec2(pa.x, pa.y - 40.0f) : pa);
+                if (!tc->late) finger(SDL_EVENT_FINGER_DOWN, 2, pb);
+                return false;
+            }
+            first(SDL_EVENT_FINGER_MOTION, pa);
+            if (tc->late && t >= start && !app_.touch_.gesture()) finger(SDL_EVENT_FINGER_DOWN, 2, pb);
+            if (t >= start) finger(SDL_EVENT_FINGER_MOTION, 2, pb);
+            if (t < start + kSeconds) return false;
+            first(SDL_EVENT_FINGER_UP, pa);
+            finger(SDL_EVENT_FINGER_UP, 2, pb);
+            return true;
+        });
+        wait(0.15f);
     } else if (verb == "spacemouse" || verb == "spacemouse_hold") {
         if (!need(6)) return false;
         std::array<float, 6> v{};
