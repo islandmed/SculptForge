@@ -28,6 +28,7 @@
 #include "render/GL.h"
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 namespace sf {
@@ -82,7 +83,7 @@ private:
     uint32_t n_ = 1, samples_ = 3;
     float step_ = 0.0f;
     bool closed_ = false;
-    std::vector<uint32_t> order_;   // slot -> base triangle
+    std::shared_ptr<const std::vector<uint32_t>> order_; // slot -> base triangle (shared with MicroMesh::slotOrder)
     std::vector<uint32_t> slotOf_;  // base triangle -> slot
     uint32_t clusterShift_ = 8;
     std::vector<ClusterBounds> bounds_;

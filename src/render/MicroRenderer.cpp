@@ -228,13 +228,13 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
             if (t >= nt || slotOf_[t] != 0xFFFFFFFFu) reused = false;
             else slotOf_[t] = s;
         }
-        if (reused) order_ = *saved;
+        if (reused) order_ = saved;
     }
     if (!reused) {
-        order_ = microSlotOrder(mesh);
+        order_ = std::make_shared<const std::vector<uint32_t>>(microSlotOrder(mesh));
         slotOf_.resize(nt);
-        for (uint32_t s = 0; s < nt; ++s) slotOf_[order_[s]] = s;
-        mesh.micro->slotOrder = std::make_shared<const std::vector<uint32_t>>(order_);
+        for (uint32_t s = 0; s < nt; ++s) slotOf_[(*order_)[s]] = s;
+        mesh.micro->slotOrder = order_;
     }
     openStage(reused ? "layout: saved slot order" : "layout: morton sort");
     const uint32_t clusterSize = std::clamp(65536u >> (2 * mm.level), 16u, 1024u);
@@ -246,7 +246,7 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
     std::vector<uint32_t> tri(size_t(nt) * 8);
     poolFor(nt, [&](size_t b, size_t e) {
         for (size_t s = b; s < e; ++s) {
-            const uint32_t t = order_[s];
+            const uint32_t t = (*order_)[s];
             const glm::uvec3 tr = mesh.triangles[t];
             uint32_t* o = tri.data() + s * 8;
             const uint32_t partner = mesh.quadPartnerAt(t);
@@ -337,7 +337,7 @@ void MicroRenderer::updateClusterBounds(const Mesh& mesh, const std::vector<uint
             float edge = 0.0f;
             uint16_t range = 0;
             for (uint32_t s = s0; s < s1; ++s) {
-                const uint32_t t = order_[s];
+                const uint32_t t = (*order_)[s];
                 const glm::uvec3 tr = mesh.triangles[t];
                 for (int k = 0; k < 3; ++k) {
                     box.expand(mesh.positions[tr[k]]);
@@ -353,7 +353,7 @@ void MicroRenderer::updateClusterBounds(const Mesh& mesh, const std::vector<uint
             const float al = glm::length(axis);
             axis = al > 0.0f ? axis / al : glm::vec3(0, 0, 1);
             for (uint32_t s = s0; s < s1; ++s) {
-                const glm::uvec3 tr = mesh.triangles[order_[s]];
+                const glm::uvec3 tr = mesh.triangles[(*order_)[s]];
                 for (int k = 0; k < 3; ++k) {
                     radius = std::max(radius, glm::distance(mesh.positions[tr[k]], cb.center));
                     cosMin = std::min(cosMin, glm::dot(mesh.normals[tr[k]], axis));
@@ -381,7 +381,7 @@ void MicroRenderer::updateClusterRanges(const Mesh& mesh, const std::vector<uint
             const uint32_t c = clusters[ci];
             const uint32_t s0 = c << clusterShift_, s1 = std::min(nt, s0 + size);
             uint16_t range = 0;
-            for (uint32_t s = s0; s < s1; ++s) range = std::max(range, mm.triRange[order_[s]]);
+            for (uint32_t s = s0; s < s1; ++s) range = std::max(range, mm.triRange[(*order_)[s]]);
             ClusterBounds& cb = bounds_[c];
             const float radius = clusterRadius_[c], angle = clusterAngle_[c];
             cb.radius = radius + mm.bulgeMax + float(range) * mm.step;
@@ -400,7 +400,7 @@ void MicroRenderer::uploadDispTiles(const Mesh& mesh, std::vector<uint32_t>& slo
                                                                   GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
             if (!dst) continue;
             poolFor(c.slots, [&](size_t b, size_t e) {
-                for (size_t s = b; s < e; ++s) std::memcpy(dst + s * S, mm.disp.data() + size_t(order_[c.firstSlot + s]) * S, S * 2);
+                for (size_t s = b; s < e; ++s) std::memcpy(dst + s * S, mm.disp.data() + size_t((*order_)[c.firstSlot + s]) * S, S * 2);
             }, 1024);
             gl::UnmapBuffer(GL_TEXTURE_BUFFER);
         }
@@ -422,7 +422,7 @@ void MicroRenderer::uploadDispTiles(const Mesh& mesh, std::vector<uint32_t>& slo
     staging_.resize(slots.size() * S * 2);
     auto* st = reinterpret_cast<int16_t*>(staging_.data());
     poolFor(slots.size(), [&](size_t b, size_t e) {
-        for (size_t i = b; i < e; ++i) std::memcpy(st + i * S, mm.disp.data() + size_t(order_[slots[i]]) * S, S * 2);
+        for (size_t i = b; i < e; ++i) std::memcpy(st + i * S, mm.disp.data() + size_t((*order_)[slots[i]]) * S, S * 2);
     }, 256);
     for (size_t i = 0; i < slots.size();) {
         const uint32_t chunk = slots[i] / chunkSlots_;
@@ -507,7 +507,7 @@ void MicroRenderer::shadeInitial(const Mesh& mesh) {
     std::vector<uint32_t>& seeds = scratch_;
     auto runSeeds = [&](uint32_t r0, uint32_t r1) {
         seeds.resize(r1 - r0);
-        for (uint32_t s = r0; s < r1; ++s) seeds[s - r0] = order_[s];
+        for (uint32_t s = r0; s < r1; ++s) seeds[s - r0] = (*order_)[s];
         std::sort(seeds.begin(), seeds.end());
     };
     // Straight into the GPU copy: these slots draw unshaded until the run is done (no shading fetched there), so

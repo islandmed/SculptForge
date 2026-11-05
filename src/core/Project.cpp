@@ -1417,6 +1417,7 @@ bool readProjectInto(const std::string& path, LoadedProject& out, std::string& e
                 }
                 openStage("micro read+unpack");
                 hint.edgeNeighbors = microEdgesFromSlots(s.mesh, cache.microEdges);
+                std::vector<uint32_t>().swap(cache.microEdges); // (3 per base triangle: not held through the attach)
                 const bool savedEdges = !hint.edgeNeighbors.empty();
                 hint.bulgeMax = cache.microBulge;
                 hint.baseEdge = cache.microBaseEdge;
