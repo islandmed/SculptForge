@@ -232,7 +232,6 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
         slotOf_.resize(nt);
         for (uint32_t s = 0; s < nt; ++s) slotOf_[order_[s]] = s;
         mesh.micro->slotOrder = std::make_shared<const std::vector<uint32_t>>(order_);
-        mesh.micro->slotOrderKey = openCacheGeometryKey(mesh);
     }
     openStage(reused ? "layout: saved slot order" : "layout: morton sort");
     const uint32_t clusterSize = std::clamp(65536u >> (2 * mm.level), 16u, 1024u);

@@ -15,6 +15,7 @@
 
 #include <cstring>
 #include <filesystem>
+#include <map>
 #include <string>
 
 using namespace sf;
@@ -56,8 +57,7 @@ void checkLikeRebuilt(Document& loaded, const Document& original) {
         const bool r1 = loaded.bvh.raycast(loaded.mesh, dir * -5.0f, dir, h1), r2 = built.raycast(loaded.mesh, dir * -5.0f, dir, h2);
         CHECK(r1 == r2);
         if (r1 && r2) {
-            CHECK(h1.triangle == h2.triangle);
-            CHECK(h1.t == h2.t);
+            CHECK(h1.t == h2.t); // (the same nearest hit; on a shared edge either triangle may hold it)
             ++hits;
         }
     }
@@ -228,25 +228,80 @@ TEST(open_cache_packing_round_trips_and_rejects_bad_bytes) {
     CHECK(openCacheUnpack(empty.data(), empty.size(), 0, back) && back.empty());
 }
 
-TEST(open_cache_slot_order_follows_its_positions) {
+TEST(open_cache_slot_order_is_the_renderers) {
     SmallCacheThreshold small;
     Document doc = cachedDoc();
     const size_t nt = doc.mesh.triangleCount();
-    auto order = std::make_shared<std::vector<uint32_t>>(nt);
-    for (uint32_t t = 0; t < nt; ++t) (*order)[t] = uint32_t(nt - 1 - t); // (any permutation: the renderer's stand-in)
-    doc.mesh.micro->slotOrder = order;
-    doc.mesh.micro->slotOrderKey = openCacheGeometryKey(doc.mesh);
     const std::string path = tempPath("sf_open_cache_order.sfproj");
     std::string err;
+    // None made yet (no renderer): the canonical one.
+    CHECK(saveProject(path, doc, err));
+    Document first;
+    CHECK(loadProject(path, first, err));
+    CHECK(first.mesh.micro && first.mesh.micro->slotOrder && *first.mesh.micro->slotOrder == microSlotOrder(doc.mesh));
+    // The renderer's, as it is (buildLayout takes it back exactly), even after the base moved.
+    auto order = std::make_shared<std::vector<uint32_t>>(nt);
+    for (uint32_t t = 0; t < nt; ++t) (*order)[t] = uint32_t(nt - 1 - t);
+    doc.mesh.micro->slotOrder = order;
+    doc.mesh.positions[0] += glm::vec3(0.01f);
+    doc.mesh.openCacheSource.reset(); // (the save above made it the source: compute this time)
     CHECK(saveProject(path, doc, err));
     Document loaded;
     CHECK(loadProject(path, loaded, err));
     CHECK(loaded.mesh.micro && loaded.mesh.micro->slotOrder && *loaded.mesh.micro->slotOrder == *order);
-    // Made from other positions (the base moved since): the saved one is made again from these.
-    doc.mesh.positions[0] += glm::vec3(0.01f);
-    CHECK(saveProject(path, doc, err));
-    Document moved;
-    CHECK(loadProject(path, moved, err));
-    CHECK(moved.mesh.micro && moved.mesh.micro->slotOrder && *moved.mesh.micro->slotOrder == microSlotOrder(doc.mesh));
     std::filesystem::remove(path);
+}
+
+namespace {
+std::map<std::string, std::vector<uint8_t>> cacheEntries(const std::string& path) {
+    std::vector<ZipEntry> entries;
+    std::string err;
+    std::map<std::string, std::vector<uint8_t>> out;
+    if (readStoredZip(path, entries, err))
+        for (ZipEntry& e : entries)
+            if (e.name.find("/cache/") != std::string::npos) out[e.name] = e.data;
+    return out;
+}
+} // namespace
+
+TEST(open_cache_is_copied_on_save_until_the_topology_changes) {
+    SmallCacheThreshold small;
+    Document doc = cachedDoc();
+    const std::string a = tempPath("sf_open_cache_a.sfproj"), b = tempPath("sf_open_cache_b.sfproj"),
+                      c = tempPath("sf_open_cache_c.sfproj");
+    std::string err;
+    // An autosave of a mesh without a source writes none (it would be worked out now).
+    CHECK(saveProject(a, doc, err, true));
+    CHECK(cacheEntries(a).empty());
+    CHECK(saveProject(a, doc, err));
+    CHECK(!cacheEntries(a).empty());
+    CHECK(doc.mesh.openCacheSource != nullptr);
+    Document loaded;
+    CHECK(loadProject(a, loaded, err));
+    CHECK(loaded.mesh.openCacheSource != nullptr && loaded.mesh.openCacheSource->path == a);
+    // Sculpting keeps the topology: the next save (an autosave too) copies the same bytes.
+    loaded.mesh.positions[3] += glm::vec3(0.02f);
+    CHECK(saveProject(b, loaded, err, true));
+    CHECK(cacheEntries(b).size() == cacheEntries(a).size());
+    bool same = true;
+    const auto ea = cacheEntries(a), eb = cacheEntries(b);
+    for (const auto& [name, bytes] : ea) same = same && eb.count(name) && eb.at(name) == bytes;
+    CHECK(same);
+    Document again;
+    CHECK(loadProject(b, again, err));
+    CHECK(lastOpenCacheUse.topology && lastOpenCacheUse.bvh && lastOpenCacheUse.microEdges);
+    checkLikeRebuilt(again, loaded);
+    // A topology change drops the source: an autosave then writes none, a save works it out again.
+    again.mesh.rebuildTopology();
+    CHECK(again.mesh.openCacheSource == nullptr);
+    CHECK(saveProject(c, again, err, true));
+    CHECK(cacheEntries(c).empty());
+    // A source file changed since: not copied from (worked out instead).
+    Document fromB;
+    CHECK(loadProject(b, fromB, err));
+    CHECK(fromB.mesh.openCacheSource != nullptr);
+    rewrite(b, [](std::string&, std::vector<ZipEntry>&) {}); // (written again: another modification time)
+    CHECK(saveProject(c, fromB, err, true));
+    CHECK(cacheEntries(c).empty());
+    for (const std::string& p : {a, b, c}) std::filesystem::remove(p);
 }

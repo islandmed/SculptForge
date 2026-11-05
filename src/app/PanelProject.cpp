@@ -270,7 +270,7 @@ void App::tickProject(float dt) {
     autosaveTimer_ = 0.0f;
     storeProjectSettings();
     std::string err;
-    if (saveProject(autosavePath(prefDir_), doc_, err)) {
+    if (saveProject(autosavePath(prefDir_), doc_, err, true)) {
         autosaveRevision_ = revision;
         autosaveWritten_ = true;
         SDL_Log("Autosaved to %s", autosavePath(prefDir_).c_str());

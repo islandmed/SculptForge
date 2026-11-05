@@ -674,81 +674,139 @@ std::vector<uint32_t> microEdgesFromSlots(const Mesh& m, const std::vector<uint3
 
 uint64_t geometryKey(const Mesh& m) { return openCacheGeometryKey(m); }
 
-// `bvh`: the mesh's, if it is up to date (null: none saved).
-Json writeOpenCache(Writer& w, const std::string& prefix, const Mesh& m, const BVH* bvh) {
+// The file's size and modification time (for OpenCacheSource: unchanged since the cache in it was checked).
+bool fileStamp(const std::string& path, uint64_t& size, int64_t& modified) {
+    std::error_code ec;
+    const auto p = fsPath(path);
+    size = uint64_t(std::filesystem::file_size(p, ec));
+    if (ec) return false;
+    modified = int64_t(std::filesystem::last_write_time(p, ec).time_since_epoch().count());
+    return !ec;
+}
+
+// The arrays a cache entry of a part names (all but micro_shape): what OpenCacheSource carries.
+constexpr const char* kOpenCacheArrays[] = {"vt_offsets", "vt_list", "adj_offsets", "adj_list", "bvh_nodes",
+                                            "bvh_tris", "micro_edges", "micro_slot_order"};
+
+// `bvh`: the mesh's, if it is up to date (null: none saved). `compute` false (autosave): only a cache copied from
+// the file the mesh came from (OpenCacheSource), never one worked out on the spot.
+Json writeOpenCache(Writer& w, const std::string& prefix, const Mesh& m, const BVH* bvh, bool compute) {
     if constexpr (std::endian::native != std::endian::little) return Json(); // (the hashes are of little-endian bytes)
     if (m.triangleCount() < openCacheMinTriangles || !openCacheEnabled()) return Json();
     Json j = Json::object();
     j.set("version", kOpenCacheVersion);
-    j.set("key", hex64(openCacheKey(m)));
     bool any = false;
-    auto put = [&](const char* name, const std::vector<uint32_t>& v, bool) {
-        any = true;
-        std::vector<uint8_t> packed = openCachePack(v);
-        const size_t bytes = packed.size();
-        Json d = w.add(prefix + name + ".pack", Scalar::U8, 1, bytes, std::move(packed));
-        d.set("values", double(v.size()));
-        d.set("hash", hex64(openCacheHash(v)));
-        j.set(name, std::move(d));
-    };
-    // (a subdivision level's adjacency is implicit: nothing to save, nothing to rebuild)
-    if (const std::vector<uint32_t>*vo = nullptr, *vl = nullptr, *ao = nullptr, *al = nullptr; m.topologyTables(vo, vl, ao, al)) {
-        put("vt_offsets", *vo, false);
-        put("vt_list", *vl, false);
-        put("adj_offsets", *ao, false);
-        put("adj_list", *al, false);
-    }
-    if (bvh && bvh->nodeCount() && bvh->leafOf(0) != ~0u) {
-        std::vector<uint32_t> nodes, tris;
-        bvh->exportStructure(nodes, tris);
-        if (tris.size() == m.triangleCount()) {
-            put("bvh_nodes", nodes, true);
-            put("bvh_tris", tris, true);
+    // Copied: sculpting changes none of these (a topology change drops the source), so the bytes already checked
+    // in the last file are this mesh's.
+    if (const auto src = m.openCacheSource) {
+        uint64_t size = 0;
+        int64_t modified = 0;
+        std::ifstream f;
+        if (fileStamp(src->path, size, modified) && size == src->size && modified == src->modified)
+            f.open(fsPath(src->path), std::ios::binary);
+        bool ok = bool(f) && !src->arrays.empty();
+        std::vector<std::vector<uint8_t>> bytes(src->arrays.size());
+        for (size_t i = 0; i < bytes.size() && ok; ++i) {
+            bytes[i].resize(size_t(src->arrays[i].bytes));
+            f.seekg(std::streamoff(src->arrays[i].offset));
+            ok = bool(f.read(reinterpret_cast<char*>(bytes[i].data()), std::streamsize(bytes[i].size())));
+        }
+        if (ok) { // (all read before any is added: a failed copy leaves nothing behind)
+            for (size_t i = 0; i < bytes.size(); ++i) {
+                const OpenCacheSource::Array& a = src->arrays[i];
+                Json d = w.add(prefix + a.name + ".pack", Scalar::U8, 1, bytes[i].size(), std::move(bytes[i]));
+                d.set("values", a.values);
+                d.set("hash", a.hash);
+                j.set(a.name, std::move(d));
+            }
+            j.set("key", hex64(src->key));
+            any = true;
         }
     }
-    // Each edge's neighbour as where it sits among the triangles of the edge's first corner (+ which of its
-    // edges), 0 for none: a byte apiece, decoded against the topology (microEdgesFromSlots).
-    if (m.micro && microMatches(m) && m.micro->edgeNeighbor.size() == m.triangleCount() * 3) {
-        const std::vector<uint32_t>& en = m.micro->edgeNeighbor;
-        std::vector<uint32_t> slots(en.size(), 0);
-        std::atomic<bool> ok = true;
-        poolFor(m.triangleCount(), [&](size_t b, size_t e) {
-            for (size_t t = b; t < e; ++t)
-                for (int k = 0; k < 3; ++k) {
-                    const uint32_t nb = en[t * 3 + size_t(k)];
-                    if (nb == MicroMesh::kNone) continue;
-                    const IndexRing ring = m.vertexTriangles(m.triangles[t][k]);
-                    const auto it = std::find(ring.begin(), ring.end(), nb >> 2);
-                    if (it == ring.end()) ok = false;
-                    else slots[t * 3 + size_t(k)] = (uint32_t(it - ring.begin()) << 2 | (nb & 3)) + 1;
-                }
-        }, 1 << 14);
-        if (ok) put("micro_edges", slots, true);
+    if (!any) {
+        if (!compute) return Json();
+        j.set("key", hex64(openCacheKey(m)));
+        auto put = [&](const char* name, const std::vector<uint32_t>& v) {
+            any = true;
+            std::vector<uint8_t> packed = openCachePack(v);
+            const size_t bytes = packed.size();
+            Json d = w.add(prefix + name + ".pack", Scalar::U8, 1, bytes, std::move(packed));
+            d.set("values", double(v.size()));
+            d.set("hash", hex64(openCacheHash(v)));
+            j.set(name, std::move(d));
+        };
+        // (a subdivision level's adjacency is implicit: nothing to save, nothing to rebuild)
+        if (const std::vector<uint32_t>*vo = nullptr, *vl = nullptr, *ao = nullptr, *al = nullptr; m.topologyTables(vo, vl, ao, al)) {
+            put("vt_offsets", *vo);
+            put("vt_list", *vl);
+            put("adj_offsets", *ao);
+            put("adj_list", *al);
+        }
+        if (bvh && bvh->nodeCount() && bvh->leafOf(0) != ~0u) {
+            std::vector<uint32_t> nodes, tris;
+            bvh->exportStructure(nodes, tris);
+            if (tris.size() == m.triangleCount()) {
+                put("bvh_nodes", nodes);
+                put("bvh_tris", tris);
+            }
+        }
+        // Each edge's neighbour as where it sits among the triangles of the edge's first corner (+ which of its
+        // edges), 0 for none: a byte apiece, decoded against the topology (microEdgesFromSlots).
+        if (m.micro && microMatches(m) && m.micro->edgeNeighbor.size() == m.triangleCount() * 3) {
+            const std::vector<uint32_t>& en = m.micro->edgeNeighbor;
+            std::vector<uint32_t> slots(en.size(), 0);
+            std::atomic<bool> ok = true;
+            poolFor(m.triangleCount(), [&](size_t b, size_t e) {
+                for (size_t t = b; t < e; ++t)
+                    for (int k = 0; k < 3; ++k) {
+                        const uint32_t nb = en[t * 3 + size_t(k)];
+                        if (nb == MicroMesh::kNone) continue;
+                        const IndexRing ring = m.vertexTriangles(m.triangles[t][k]);
+                        const auto it = std::find(ring.begin(), ring.end(), nb >> 2);
+                        if (it == ring.end()) ok = false;
+                        else slots[t * 3 + size_t(k)] = (uint32_t(it - ring.begin()) << 2 | (nb & 3)) + 1;
+                    }
+            }, 1 << 14);
+            if (ok) put("micro_edges", slots);
+        }
+        // The renderer's slot order as it is (buildLayout takes it back exactly), else made now (the same function).
+        if (m.micro && microMatches(m))
+            put("micro_slot_order", m.micro->slotOrder && m.micro->slotOrder->size() == m.triangleCount() ? *m.micro->slotOrder
+                                                                                                         : microSlotOrder(m));
     }
-    if (m.micro && microMatches(m)) { // (exact float bits)
-        any = true;
+    if (m.micro && microMatches(m)) { // (exact float bits; from the shape as saved, as attaching it would: the
+                                      // level's own values date from its Divide)
         Json shape = Json::object();
-        const uint64_t key = geometryKey(m);
-        shape.set("key", hex64(key));
-        // (from the shape as saved, as attaching it would: the level's own values date from its Divide)
+        shape.set("key", hex64(geometryKey(m)));
         shape.set("bulge", hex64(std::bit_cast<uint32_t>(microBulgeMax(m, m.micro->n))));
         shape.set("base_edge", hex64(std::bit_cast<uint32_t>(microBaseEdge(m))));
         j.set("micro_shape", std::move(shape));
-        // The renderer's slot order, if it was made from these positions (it is kept while the base moves), else
-        // made now (the same function).
-        if (m.micro->slotOrder && m.micro->slotOrderKey == key && m.micro->slotOrder->size() == m.triangleCount())
-            put("micro_slot_order", *m.micro->slotOrder, true);
-        else
-            put("micro_slot_order", microSlotOrder(m), true);
     }
     return any ? j : Json();
+}
+
+// After a save or load: where `m`'s cache arrays (`oc`, its manifest entry) sit in `path` (index: the archive's).
+void rememberOpenCacheSource(const Mesh& m, const std::string& path, const Json& oc, const std::map<std::string, ZipFileEntry>& index) {
+    m.openCacheSource.reset();
+    bool ok = false;
+    auto src = std::make_shared<OpenCacheSource>();
+    src->path = path;
+    src->key = parseHex64(oc["key"], ok);
+    if (!ok || !fileStamp(path, src->size, src->modified)) return;
+    for (const char* name : kOpenCacheArrays) {
+        const Json& d = oc[name];
+        if (!d.isObject()) continue;
+        const auto it = index.find(d["file"].asString());
+        if (it == index.end()) return;
+        src->arrays.push_back({name, it->second.offset, it->second.size, d["values"].asNumber(), d["hash"].asString()});
+    }
+    if (!src->arrays.empty()) m.openCacheSource = std::move(src);
 }
 
 struct OpenCacheData {
     std::vector<uint32_t> vtOffsets, vtList, adjOffsets, adjList, bvhNodes, bvhTris, microEdges, slotOrder;
     bool topology = false;
     float microBulge = -1.0f, microBaseEdge = -1.0f; // (MicroAttachHint) for these positions, or < 0
-    uint64_t geometryKey = 0;                           // (when micro_shape matched)
 };
 
 
@@ -788,14 +846,13 @@ bool readOpenCache(Reader& r, const Json& oc, const Mesh& m, OpenCacheData& out)
     if (!out.topology) out.vtOffsets.clear(), out.vtList.clear(), out.adjOffsets.clear(), out.adjList.clear();
     if (!(get("bvh_nodes", out.bvhNodes, size_t(-1), nt * 4) && get("bvh_tris", out.bvhTris, nt, nt))) out.bvhNodes.clear(), out.bvhTris.clear();
     if (!get("micro_edges", out.microEdges, nt * 3, nt * 3)) out.microEdges.clear();
+    if (!get("micro_slot_order", out.slotOrder, nt, nt)) out.slotOrder.clear(); // (the renderer checks it's a permutation)
     if (const Json& shape = oc["micro_shape"]; shape.isObject()) {
         bool k = false, b = false, e = false;
         const uint64_t key = parseHex64(shape["key"], k), bulge = parseHex64(shape["bulge"], b), edge = parseHex64(shape["base_edge"], e);
         if (k && b && e && bulge <= 0xFFFFFFFFu && edge <= 0xFFFFFFFFu && key == openCacheGeometryKey(m, meshKey)) {
-            out.geometryKey = key;
             out.microBulge = std::bit_cast<float>(uint32_t(bulge));
             out.microBaseEdge = std::bit_cast<float>(uint32_t(edge));
-            if (!get("micro_slot_order", out.slotOrder, nt, nt)) out.slotOrder.clear(); // (the renderer checks it's a permutation)
         }
     }
     return true;
@@ -1053,7 +1110,8 @@ bool isProjectPath(const std::string& path) {
     return ext == kProjectExtension;
 }
 
-bool saveProject(const std::string& path, const Document& doc, std::string& error) {
+bool saveProject(const std::string& path, const Document& doc, std::string& error, bool autosave) {
+    std::vector<std::pair<int, Json>> caches; // (the parts' open caches, to remember where they went)
     Writer w;
     Json manifest = Json::object();
     manifest.set("format", kFormatName);
@@ -1096,9 +1154,12 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
             version.need(7);
         }
         // Big meshes: what opening would rebuild (no format change: older builds skip the key).
-        if (Json oc = writeOpenCache(w, "parts/" + std::to_string(i) + "/cache/", doc.partMesh(i), active && !doc.bvhDirty ? &doc.bvh : nullptr);
-            oc.isObject())
+        if (Json oc = writeOpenCache(w, "parts/" + std::to_string(i) + "/cache/", doc.partMesh(i), active && !doc.bvhDirty ? &doc.bvh : nullptr,
+                                     !autosave);
+            oc.isObject()) {
+            caches.emplace_back(i, oc);
             st.set("open_cache", std::move(oc));
+        }
         const std::string& bridgeName = active ? doc.bridgeName : s.bridgeName;
         if (!bridgeName.empty()) st.set("bridge_name", bridgeName);
         const std::vector<QRemeshGuide>& guides = active ? doc.qremeshGuides : s.qremeshGuides;
@@ -1179,6 +1240,15 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         error = "Cannot write " + path;
         return false;
     }
+    // The next save copies these caches from here (OpenCacheSource).
+    if (!caches.empty()) {
+        std::vector<ZipFileEntry> list;
+        std::string why;
+        std::map<std::string, ZipFileEntry> index;
+        if (readStoredZipIndex(path, list, why))
+            for (auto& e : list) index[e.name] = std::move(e);
+        for (const auto& [i, oc] : caches) rememberOpenCacheSource(doc.partMesh(i), path, oc, index);
+    }
     return true;
 }
 
@@ -1244,8 +1314,9 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             readOpenCache(r, sj["open_cache"], s.mesh, cache);
             OpenCacheUse& used = lastOpenCacheUse;
             if (&s == &parts.front()) used = {};
+            OpenCacheUse mine; // (this Part's)
             openStage("open cache read");
-            if (!cache.bvhNodes.empty() && s.bvh.adoptStructure(s.mesh, cache.bvhNodes, std::move(cache.bvhTris))) s.built = used.bvh = true;
+            if (!cache.bvhNodes.empty() && s.bvh.adoptStructure(s.mesh, cache.bvhNodes, std::move(cache.bvhTris))) s.built = used.bvh = mine.bvh = true;
             std::vector<uint32_t>().swap(cache.bvhNodes);
             openStage("open cache BVH");
             // The BVH builds (on the pool) while the levels and topology load (off it), then the normals.
@@ -1257,7 +1328,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             openStage("paint/texture/subdiv");
             if (cache.topology && s.mesh.adoptTopology(std::move(cache.vtOffsets), std::move(cache.vtList), std::move(cache.adjOffsets),
                                                        std::move(cache.adjList)))
-                used.topology = true;
+                used.topology = mine.topology = true;
             else
                 s.mesh.rebuildTopology();
             openStage("topology");
@@ -1309,13 +1380,14 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
                 hint.baseEdge = cache.microBaseEdge;
                 if (!microAttach(s.mesh, level, float(mj["step"].asNumber(0)), std::move(disp), std::move(mask), error, &hint))
                     return false;
-                used.microEdges = savedEdges && hint.edgeNeighbors.empty(); // (left empty: taken)
+                used.microEdges = mine.microEdges = savedEdges && hint.edgeNeighbors.empty(); // (left empty: taken)
                 if (!cache.slotOrder.empty()) { // (keyed with micro_shape: these positions)
                     s.mesh.micro->slotOrder = std::make_shared<const std::vector<uint32_t>>(std::move(cache.slotOrder));
-                    s.mesh.micro->slotOrderKey = cache.geometryKey;
                 }
                 openStage("microAttach");
             }
+            // Everything the cache holds was taken: the next save copies it from this file.
+            if (mine.topology && mine.bvh && (!s.mesh.micro || mine.microEdges)) rememberOpenCacheSource(s.mesh, path, sj["open_cache"], r.files);
             // (the micro level reads and attaches while the BVH builds: both only read the mesh)
             s.finishBvh();
             openStage("finishBvh");

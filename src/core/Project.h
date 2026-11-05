@@ -45,7 +45,8 @@ bool isProjectPath(const std::string& path);
 // Writes `doc` (every Part with its name, visibility, mesh, attributes,
 // layers, active layer and Bridge name; the active Part; splats, brush library
 // and doc.projectSettings) to `path`. Does not change the document.
-bool saveProject(const std::string& path, const Document& doc, std::string& error);
+// `autosave`: no open cache that would have to be worked out now (core/OpenCache.h: only one copied over).
+bool saveProject(const std::string& path, const Document& doc, std::string& error, bool autosave = false);
 // Replaces the scene with the project at `path`. On failure `doc` is untouched.
 // Restores the active Part, sets doc.path, gives every Part an empty
 // edit history and marks the document clean.

@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string>
 #include <vector>
 
 namespace sf {
@@ -26,6 +27,22 @@ bool openCacheEnabled();
 // Meshes from this many triangles save one (about 45 bytes a triangle, 2-3x the mesh: worth it where rebuilding takes
 // seconds). Tests lower it.
 extern size_t openCacheMinTriangles;
+
+// A project file holding a mesh's topology-keyed cache arrays (all but micro_shape), validated when they were
+// read or written: a save copies them byte for byte while the file is unchanged (size, modification time).
+struct OpenCacheSource {
+    std::string path;
+    uint64_t size = 0;
+    int64_t modified = 0;
+    uint64_t key = 0; // openCacheKey of the mesh
+    struct Array {
+        std::string name; // e.g. "vt_list"
+        uint64_t offset = 0, bytes = 0;
+        double values = 0;
+        std::string hash;
+    };
+    std::vector<Array> arrays;
+};
 
 // What the last loadProject took from a cache (tests, SF_OPEN_PROFILE).
 struct OpenCacheUse {

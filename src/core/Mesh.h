@@ -23,6 +23,7 @@ struct MultiresStack;
 struct SubdivTopology;
 struct ImplicitAdjacency;
 struct MicroMesh;
+struct OpenCacheSource;
 struct SelectionSetList;
 
 // The vertices or triangles around a vertex (Mesh::neighbors, Mesh::vertexTriangles), in ascending order: a view
@@ -203,6 +204,9 @@ public:
     // copy-on-write by copies of the mesh (mutableMicro). Null = none. sanitizeAttributes() drops it if the
     // triangle or vertex count changes.
     std::shared_ptr<MicroMesh> micro;
+    // Where this mesh's topology-keyed open cache already sits in a project file (core/OpenCache.h): a save copies it
+    // from there. Dropped whenever the topology is rebuilt or edited. (Saving sets it: a cache, hence mutable.)
+    mutable std::shared_ptr<const OpenCacheSource> openCacheSource;
 
     // Forge Spheres (core/Forge Spheres.h): not empty = a Forge Sphere Part, whose triangles are made from this armature (the
     // spheres and their links, or the skin while `Forge SpherePreview`). Copies, undo steps and projects carry it.

@@ -177,6 +177,7 @@ void Mesh::sanitizeAttributes() {
 }
 
 void Mesh::rebuildTopology() {
+    openCacheSource.reset();
     sanitizeAttributes();
     for (auto* v : {&adjEnds_, &adjCaps_, &vtEnds_, &vtCaps_}) std::vector<uint32_t>().swap(*v);
     const size_t nv = positions.size();
@@ -238,6 +239,7 @@ void Mesh::rebuildTopology() {
 }
 
 bool Mesh::beginDynamicAdjacency() {
+    openCacheSource.reset();
     const size_t nv = positions.size();
     if (implicit_ || adjOffsets_.size() != nv + 1 || vtOffsets_.size() != nv + 1) return false;
     if (dynamicAdjacency()) return true;
