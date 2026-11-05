@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Drawing helpers for the full-window cards (the support card, What's New): easing, colours of the current look,
-// soft glows, the cube mark and text drawn straight to a draw list (also logged so UI tests find it).
+// soft glows, the brand mark and text drawn straight to a draw list (also logged so UI tests find it).
 #pragma once
 
+#include "app/BrandMark.h"
 #include "app/Theme.h"
 
 #include <imgui.h>
@@ -76,28 +77,11 @@ inline void glow(ImDrawList* dl, ImVec2 a, ImVec2 b, float rounding, float sprea
     glow(dl, a, b, rounding, spread, theme::rgb(hex), alpha, layers);
 }
 
-// The cube mark of the logo (assets/branding/sculptforge-icon.svg: Lucide's "box"), `size` wide at `at`.
-inline void cubeMark(ImDrawList* dl, ImVec2 at, float size, ImU32 c) {
-    const float u = size / 24.0f;
-    auto p = [&](float x, float y) { return ImVec2(at.x + x * u, at.y + y * u); };
-    const ImVec2 outline[6] = {p(12, 2), p(21, 7), p(21, 17), p(12, 22), p(3, 17), p(3, 7)};
-    const float w = 2.2f * u;
-    dl->AddPolyline(outline, 6, c, ImDrawFlags_Closed, w);
-    const ImVec2 top[3] = {p(3.3f, 7), p(12, 12), p(20.7f, 7)};
-    dl->AddPolyline(top, 3, c, 0, w);
-    dl->AddLine(p(12, 22), p(12, 12), c, w);
-}
-
-// The cube mark on its dark tile with an orange glow, `m` wide at `m0` (the cards' headers).
-inline void cubeTile(ImDrawList* dl, ImVec2 m0, float m, float k, float alpha) {
+// The app mark with a soft orange glow, `m` wide at `m0` (the cards' headers).
+inline void markTile(ImDrawList* dl, ImVec2 m0, float m, float alpha) {
     const ImVec2 m1(m0.x + m, m0.y + m);
-    glow(dl, m0, m1, m * 0.25f, m * 0.375f, kBrandOrange, 0.35f * alpha, 8);
-    const int v0 = dl->VtxBuffer.Size;
-    dl->AddRectFilled(m0, m1, col(0xffffff, alpha), m * 0.25f);
-    ImGui::ShadeVertsLinearColorGradientKeepAlpha(dl, v0, dl->VtxBuffer.Size, m0, ImVec2(m0.x, m1.y), col(0x23232a, 1.0f),
-                                                  col(0x0e0e11, 1.0f));
-    dl->AddRect(m0, m1, col(kBrandOrange, 0.45f * alpha), m * 0.25f, 0, std::max(1.0f, k));
-    cubeMark(dl, ImVec2(m0.x + m * 0.19f, m0.y + m * 0.19f), m * 0.62f, col(kBrandOrange, alpha));
+    glow(dl, m0, m1, m * 0.22f, m * 0.375f, kBrandOrange, 0.3f * alpha, 8);
+    brand::mark(dl, m0, m, alpha);
 }
 
 } // namespace sf::card

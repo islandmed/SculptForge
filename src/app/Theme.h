@@ -55,7 +55,7 @@ inline ImVec4 canvasBorder = rgb(0x0d0d0d);
 inline ImVec4 tile = rgb(0x2b2b2b);      // thumbnail placeholders
 inline float markWidth = 2.0f;           // the accent underline / side bar, unscaled pixels
 
-// The SculptForge orange of the cube logo: the brand mark only, the same in every look.
+// The SculptForge orange of the app mark: the same in every look.
 constexpr ImVec4 brand = rgb(0xf0882e);
 // Tiled looks (Preferences > Interface > Look): the wallpaper showing in the gaps between the tiles, a tile's thin
 // border and the focused tile's border.

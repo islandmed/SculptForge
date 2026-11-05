@@ -660,7 +660,7 @@ def home_whats_new(page: "WhatsNewPage") -> str:
         pic, clip = (first["image"], first.get("clip", "")) if first else ("", "")
         img = (f'<div class="wn-pic"><img src="guide/{html.escape(pic)}" alt="" width="600" height="340" loading="lazy" '
                f'decoding="async"></div>') if pic else \
-            '<div class="wn-pic wn-pic-mark"><img src="img/logo.svg?v=2" alt="" width="64" height="64"></div>'
+            '<div class="wn-pic wn-pic-mark"><img src="img/logo-128.png?v=3" alt="" width="64" height="64"></div>'
         if clip:  # the first card's clip plays on the home page too, its picture as the poster
             img = (f'<div class="wn-pic"><video src="guide/{html.escape(clip)}" poster="guide/{html.escape(pic)}" width="600" '
                    f'height="340" muted loop playsinline autoplay></video></div>')
@@ -781,14 +781,14 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <meta name="description" content="{desc}">
   <meta name="theme-color" content="#111114">
   <meta name="color-scheme" content="dark">
-  <link rel="icon" type="image/svg+xml" href="../img/favicon.svg?v=2">
-  <link rel="icon" type="image/png" href="../img/favicon-64.png?v=2">
-  <link rel="apple-touch-icon" href="../img/icon-256.png?v=2">
+  <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=3">
+  <link rel="icon" type="image/png" sizes="64x64" href="../img/favicon-64.png?v=3">
+  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png?v=3">
   <link rel="canonical" href="{url}">
   <meta property="og:type" content="article">
   <meta property="og:title" content="{html.escape(title)}">
   <meta property="og:description" content="{desc}">
-  <meta property="og:image" content="{SITE}img/social-preview.png?v=4">
+  <meta property="og:image" content="{SITE}img/social-preview.png?v=5">
   <meta property="og:url" content="{url}">
   <link rel="stylesheet" href="../style.css?v=19">
   <script src="../motion.js?v=11" defer></script>
@@ -799,7 +799,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <div class="scroll-progress" aria-hidden="true"></div>
   <header class="nav">
     <div class="wrap nav-inner">
-      <a class="brand" href="../index.html"><img src="../img/logo.svg?v=2" alt="" width="34" height="34"><span>SculptForge</span></a>
+      <a class="brand" href="../index.html"><img src="../img/logo-128.png?v=3" alt="" width="34" height="34"><span>SculptForge</span></a>
       <nav aria-label="Main">
         <a href="../index.html#features">Features</a>
         <a href="../index.html#demos">Demos</a>
@@ -836,7 +836,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <footer class="footer">
     <div class="wrap footer-grid">
       <div>
-        <a class="brand" href="../index.html"><img src="../img/logo.svg?v=2" alt="" width="28" height="28"><span>SculptForge</span></a>
+        <a class="brand" href="../index.html"><img src="../img/logo-128.png?v=3" alt="" width="28" height="28"><span>SculptForge</span></a>
         <p class="fine">Copyright © 2026 The SculptForge contributors.<br>The SculptForge User Guide is part of
           SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
       </div>
@@ -995,7 +995,7 @@ def supporters_html() -> str:
   <title>Members</title>
   <meta name="description" content="The members who keep SculptForge free and open source for everyone.">
   <meta name="color-scheme" content="dark light">
-  <link rel="icon" type="image/svg+xml" href="img/favicon.svg?v=2">
+  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png?v=3">
   <link rel="canonical" href="{SITE}supporters.html">
   <link rel="stylesheet" href="style.css?v=18">
   <style>
@@ -1007,7 +1007,7 @@ def supporters_html() -> str:
 <body>
   <header class="nav">
     <div class="wrap nav-inner">
-      <a class="brand" href="index.html"><img src="img/logo.svg?v=2" alt="" width="34" height="34"><span>SculptForge</span></a>
+      <a class="brand" href="index.html"><img src="img/logo-128.png?v=3" alt="" width="34" height="34"><span>SculptForge</span></a>
       <nav aria-label="Main">
         <a href="guide/index.html">Guide</a>
         <a href="studios.html">Studios</a>
