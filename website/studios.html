@@ -120,6 +120,10 @@
     .member .actions { display: grid; gap: 12px; }
     .member .actions .btn { display: block; text-align: center; padding: 14px 20px; }
     .member .actions p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+    .member .per-artist { margin: 0 0 14px; color: var(--muted); }
+    .faq { max-width: 760px; }
+    .faq h3 { margin: 22px 0 6px; font-size: 1.05rem; }
+    .faq p { margin: 0; color: var(--muted); }
 
     .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     @keyframes rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
@@ -228,7 +232,7 @@
             no accounts and no telemetry. It runs on Linux, Windows and macOS, works offline, and talks to Blender,
             Maya, Unreal and other sculpting apps.</p>
           <div class="stage-ctas">
-            <a class="btn btn-hot" href="#membership">Studio membership</a>
+            <a class="btn btn-hot" href="#membership">Your studio build</a>
             <a class="btn btn-ghost" href="#pipeline">Pipeline details</a>
           </div>
         </div>
@@ -303,26 +307,60 @@
         <div class="member">
           <div>
             <p class="eyebrow">Studio membership</p>
-            <h2 id="member-title">Put a little of the licence budget back into the tool</h2>
-            <p class="price">$150<span>/ month</span></p>
+            <h2 id="member-title">Your studio's own SculptForge build</h2>
+            <p class="price">$300<span>/ month</span></p>
+            <p class="per-artist">for up to 10 artists, then $25 a month for each extra artist</p>
             <ul>
-              <li><strong>Up to 10 artists</strong>, each with everything in Member: betas and early builds, the
-                monthly feature vote, a monthly brush and alpha pack, #members and your names in the credits</li>
-              <li><strong>Priority support</strong>: your reports reviewed within 2 business days (no fix-time
-                guarantee)</li>
-              <li>Your studio's own <strong>private channel</strong> on Discord</li>
-              <li>Invoiced monthly; cancel anytime</li>
+              <li><strong>Your own build</strong>: your brushes, alphas, Lit Spheres, keymaps, macros, preferences, paths
+                and logo built in</li>
+              <li><strong>Isolated</strong>: a private release channel for your studio, and no outside connections by
+                default (no public update feed, no AI services, no Discord presence; SculptForge has no telemetry).
+                Updates come only from your channel or your internal mirror</li>
+              <li><strong>Pinned version</strong>: you choose when to move. Security fixes are backported to the
+                current release and one long-term support (LTS) line</li>
+              <li><strong>Offline signed installer</strong> with checksums for IT</li>
+              <li><strong>Support</strong>: a first response within 2 business days (a response, not a fix), up to 3
+                custom items a month, your requests first on the roadmap, and a private Discord channel</li>
+              <li>Everything in Member for each artist; invoiced monthly; cancel anytime</li>
             </ul>
           </div>
           <div class="actions">
-            <a class="btn btn-hot" href="https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204" rel="noopener">Become a Studio member</a>
-            <a class="btn btn-ghost" href="mailto:hello@sculptforge.app?subject=SculptForge%20for%20studios">Email us</a>
-            <p>More than 10 artists, or questions first: write to
+            <a class="btn btn-hot" href="mailto:hello@sculptforge.app?subject=SculptForge%20Studio%20membership">Start a Studio membership</a>
+            <a class="btn btn-ghost" href="https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204" rel="noopener">Founding Studio: $150 / month</a>
+            <p><strong>Founding Studio</strong>: the first 10 studios pay $150 a month for up to 10 artists, locked for
+              as long as they stay subscribed. Questions first: write to
               <a href="mailto:hello@sculptforge.app">hello@sculptforge.app</a>.
-              <a href="guide/studios.html#studio-onboarding">Studio onboarding</a> explains what to send. Payments go
-              through Stripe; cancel anytime in the customer portal. Memberships are subscriptions to SculptForge
-              benefits. <a href="support.html">All memberships</a>.</p>
+              <a href="guide/studios.html#your-studio-build">Your studio build</a> explains what to send. Payments go
+              through Stripe; cancel anytime in the customer portal. SculptForge releases stay free for everyone and
+              nothing in the app is paywalled. <a href="support.html">All memberships</a>.</p>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="faq" aria-labelledby="faq-title">
+      <div class="wrap">
+        <p class="eyebrow">Studio questions</p>
+        <h2 id="faq-title">Plain answers</h2>
+        <div class="faq">
+          <h3>Is our build's code secret?</h3>
+          <p>No. SculptForge is GPL-3.0, and so is your build: its source comes with it and is yours to share if you
+            wish. There are no exclusive or secret features. What stays private is yours: your brushes, alphas,
+            settings and files, which never go into public builds or packs, and your network, which your build never
+            reaches out of.</p>
+          <h3>What does "no outside connections" cover?</h3>
+          <p>Your build opens no connection to the internet or your local network by default: no update check
+            against our website, no AI services, no community gallery, no Discord presence. Its only connection is to
+            your own release channel or internal mirror, plus anything you ask us to allow (for example your own
+            ComfyUI server).</p>
+          <h3>Which versions get security fixes?</h3>
+          <p>The current release and one LTS line. Your studio is always on one of those two; when an LTS line ends,
+            we help you move to the next one.</p>
+          <h3>What counts as a custom item?</h3>
+          <p>A brush, alpha, macro, keymap or pipeline preset, up to 3 a month. Bigger features are quoted
+            separately before any work starts.</p>
+          <h3>What if we have more than 10 artists?</h3>
+          <p>$25 a month for each extra artist. Every artist gets everything in Member.</p>
         </div>
       </div>
     </section>

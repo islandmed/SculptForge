@@ -119,7 +119,9 @@ bool App::supportCardOpen() const { return supportCard_ && !supportCard_->closin
 
 void App::launchSupportCard(bool firstRun, int64_t now, bool testMode) {
     supportCardNow_ = now;
-    supportCardReason_ = supportCardDue(supportCardPrefs_, firstRun, SCULPTFORGE_VERSION, now, testMode);
+    // A studio build is a Studio member's: no membership card in it (core/StudioProfile.h).
+    supportCardReason_ = isStudioBuild() ? SupportCardReason::None
+                                         : supportCardDue(supportCardPrefs_, firstRun, SCULPTFORGE_VERSION, now, testMode);
     if (supportCardReason_ == SupportCardReason::None) return;
     supportCardPrefs_.shownAt = now;
     supportCardPrefs_.shownVersion = SCULPTFORGE_VERSION;
@@ -160,7 +162,7 @@ void App::openSupportLink(const char* url) {
         status_ = std::string("Support SculptForge: ") + url;
         return;
     }
-    status_ = SDL_OpenURL(url) ? std::string("Opened the Stripe checkout in your browser")
+    status_ = SDL_OpenURL(url) ? std::string("Opened ") + url + " in your browser"
                                : std::string("Couldn't open ") + url + ": " + SDL_GetError();
 }
 
@@ -350,10 +352,12 @@ void App::drawSupportCard() {
           "A brush and alpha pack every month", "The members' channel on Discord",
           "Your name in the credits, in the app and on the website"},
          "Become a member", "Become a member##card.member", kSupportUrlMember, yearly ? "or $48 a year" : nullptr},
-        {"Studio", "$150", "/ month",
-         {"Up to 10 artists, each with everything in Member", "Priority support: reviewed within 2 business days",
-          "Your studio's own private channel on Discord", nullptr, nullptr},
-         "Studio membership", "Studio membership##card.studio", kSupportUrlStudio, "invoiced monthly"},
+        {"Studio", "$300", "/ month",
+         {"Up to 10 artists (+$25 / month each after), each with everything in Member",
+          "Your studio's own build: brushes, alphas, Lit Spheres, keymaps, logo",
+          "Isolated: a private release channel, no outside connections",
+          "First response within 2 business days; up to 3 custom items a month", nullptr},
+         "Studio membership", "Studio membership##card.studio", kStudioPageUrl, "Founding Studio: $150, first 10 studios"},
     };
     const float gap = 22.0f * k, footer = 62.0f * k, tierH = 350.0f * k;
     const float tierW = (size.x - pad * 2.0f - gap) / 2.0f;

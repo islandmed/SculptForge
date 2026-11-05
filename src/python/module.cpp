@@ -19,6 +19,7 @@
 #include "core/Multires.h"
 #include "core/Script.h"
 #include "core/SelectionSets.h"
+#include "core/StudioProfile.h"
 
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
@@ -123,6 +124,8 @@ PYBIND11_MODULE(sculptforge, m) {
     m.doc() = "SculptForge: free, open-source digital sculpting - Python API for pipelines";
     m.attr("__version__") = SCULPTFORGE_VERSION;
     py::register_exception<CommandError>(m, "CommandError", PyExc_RuntimeError);
+    // Studio mode (SF_STUDIO_PROFILE, SF_OFFLINE=1 or a studio build; core/StudioProfile.h), as in the app.
+    sf::ai::setStudioAiAllowed(startStudioMode("", "", false).profile.ai);
 
     py::class_<Document>(m, "Document", "A scene: the sculpt mesh (with layers), Gaussian splats and edit history.")
         .def(py::init([] {

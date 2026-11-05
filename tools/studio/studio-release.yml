@@ -1,0 +1,93 @@
+# Template: the release workflow of ONE studio's private repository (docs/releasing.md "Studio builds").
+# Copy to <studio repo>/.github/workflows/release.yml. The studio repo holds only studio/ (studio.json, packs, logo,
+# ui.json); the code is public SculptForge at the tag the studio is pinned to (the current release or the LTS line).
+# Run it by hand: Actions > Studio release > Run workflow, with the SculptForge tag.
+name: Studio release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: SculptForge tag to build (the current release or the studio's LTS line), e.g. v0.11.1
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            package: linux-x86_64
+          - os: windows-2025
+            package: windows-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: islandmed/SculptForge
+          ref: ${{ inputs.tag }}
+          path: sf
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: own
+          persist-credentials: false
+      - name: Check the profile
+        shell: bash
+        run: python3 sf/tools/studio/check_profile.py own/studio/studio.json
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgl-dev libcurl4-openssl-dev libwayland-dev libxkbcommon-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxtst-dev
+      - name: Build (the studio profile baked in)
+        shell: bash
+        run: |
+          cmake -S sf -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF -DSCULPTFORGE_BUILD_TESTS=OFF \
+            -DSCULPTFORGE_UPDATE_CHECK=ON -DSCULPTFORGE_STUDIO_PROFILE="$GITHUB_WORKSPACE/own/studio/studio.json"
+          cmake --build build --config Release --parallel
+      - name: Package
+        shell: bash
+        run: |
+          id=$(python3 -c "import json;print(json.load(open('own/studio/studio.json'))['id'])")
+          name="SculptForge-${{ inputs.tag }}-$id-${{ matrix.package }}"
+          if [ "$RUNNER_OS" = Windows ]; then gen=ZIP; else gen=TGZ; fi
+          (cd build && cpack -G $gen -C Release -D CPACK_PACKAGE_FILE_NAME="$name")
+          mkdir dist && mv build/"$name".* dist/
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.package }}
+          path: dist/*
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: studio-release # required reviewer; holds UPDATE_SIGNING_KEY (never at repository level)
+    permissions:
+      contents: write # this studio repository's releases only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: islandmed/SculptForge
+          ref: ${{ inputs.tag }}
+          path: sf
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums and signature (the same key and check as public releases)
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt && cd ..
+          sf/tools/release/sign_sums.sh dist sf
+      - name: Private release in this repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ inputs.tag }}" dist/* -R "$GITHUB_REPOSITORY" --title "SculptForge ${{ inputs.tag }}" --notes "Studio build of SculptForge ${{ inputs.tag }}; source: https://github.com/islandmed/SculptForge/tree/${{ inputs.tag }} plus studio/ in this repository."

@@ -3,6 +3,7 @@
 #include "core/StudioProfile.h"
 
 #include "core/Json.h"
+#include "core/Pack.h"
 #include "core/UpdateCheck.h"
 
 #include <cstdlib>
@@ -16,6 +17,13 @@ namespace fs = std::filesystem;
 
 namespace {
 
+// UTF-8 strings <-> paths (Windows paths are UTF-16).
+fs::path fsp(const std::string& s) { return fs::path(std::u8string(s.begin(), s.end())); }
+std::string str(const fs::path& p) {
+    const std::u8string u = p.generic_u8string();
+    return std::string(u.begin(), u.end());
+}
+
 bool idOk(const std::string& id) {
     if (id.empty() || id.size() > 64) return false;
     for (char c : id)
@@ -28,12 +36,13 @@ bool isUrl(const std::string& s) { return s.rfind("https://", 0) == 0 || s.rfind
 // A relative path inside DIR (no absolute path, no "..").
 bool relativeOk(const std::string& p) {
     if (p.empty() || p[0] == '/' || p[0] == '\\' || p.find(':') != std::string::npos) return false;
-    for (const auto& part : fs::path(p)) if (part == "..") return false;
+    for (const auto& part : fsp(p))
+        if (part == "..") return false;
     return true;
 }
 
 std::string resolve(const std::string& dir, const std::string& p) {
-    return dir.empty() ? p : (fs::path(dir) / p).lexically_normal().generic_string();
+    return dir.empty() ? p : str((fsp(dir) / fsp(p)).lexically_normal());
 }
 
 StudioStart gStudio;
@@ -69,7 +78,7 @@ bool parseStudioProfile(const std::string& text, const std::string& dir, StudioP
             if (!net::parseUrl(s, u)) return (error = std::string(what) + ": not a plain http(s) URL", false);
             to = s;
         } else {
-            to = fs::path(s).is_absolute() ? s : resolve(dir, s);
+            to = fsp(s).is_absolute() ? s : resolve(dir, s);
         }
         return true;
     };
@@ -103,10 +112,10 @@ bool parseStudioProfile(const std::string& text, const std::string& dir, StudioP
 }
 
 bool loadStudioProfile(const std::string& path, StudioProfile& out, std::string& error) {
-    std::ifstream f(fs::u8path(path), std::ios::binary);
+    std::ifstream f(fsp(path), std::ios::binary);
     if (!f) return (error = "can't read " + path, false);
     const std::string text{std::istreambuf_iterator<char>(f), {}};
-    if (!parseStudioProfile(text, fs::u8path(path).parent_path().generic_string(), out, error)) return false;
+    if (!parseStudioProfile(text, str(fsp(path).parent_path()), out, error)) return false;
     out.source = path;
     return true;
 }
@@ -126,10 +135,10 @@ bool isStudioBuild() { return *builtInStudioProfile() != '\0'; }
 std::string findInstalledStudioDir(const std::string& exeDir) {
     if (exeDir.empty()) return {};
     std::error_code ec;
-    fs::path dir = fs::u8path(exeDir);
+    fs::path dir = fsp(exeDir);
     for (int up = 0; up < 4; ++up) {
         for (const char* sub : {"studio", "share/sculptforge/studio", "Resources/studio"})
-            if (fs::is_regular_file(dir / sub / "studio.json", ec)) return (dir / sub).lexically_normal().generic_string();
+            if (fs::is_regular_file(dir / sub / "studio.json", ec)) return str((dir / sub).lexically_normal());
         if (!dir.has_parent_path() || dir.parent_path() == dir) break;
         dir = dir.parent_path();
     }
@@ -175,8 +184,31 @@ StudioStart startStudioMode(const std::string& exeDir, const std::string& overri
         setenv("SCULPTFORGE_BRUSH_PATH", value.c_str(), 1);
 #endif
     }
+    if (found) installStudioPacks(s.profile, s.messages);
     gStudio = s;
     return s;
+}
+
+void installStudioPacks(const StudioProfile& p, std::vector<std::string>& messages) {
+    if (packsSafeMode()) return; // --no-packs
+    std::vector<InstalledPack> installed = listInstalledPacks();
+    for (const std::string& path : p.packs) {
+        PackReview review;
+        std::string error;
+        if (!reviewPack(path, review, error)) {
+            messages.push_back("Studio pack " + path + ": " + error);
+            continue;
+        }
+        bool current = false;
+        for (const InstalledPack& i : installed)
+            current = current || (i.manifest.id == review.manifest.id && i.manifest.version == review.manifest.version);
+        if (current) continue; // installed already, this version
+        if (review.needsNewerApp) {
+            messages.push_back("Studio pack " + path + " needs a newer SculptForge");
+            continue;
+        }
+        if (!installPack(review, error)) messages.push_back("Studio pack " + path + ": " + error);
+    }
 }
 
 const StudioStart& studioMode() { return gStudio; }

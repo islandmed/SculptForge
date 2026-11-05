@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // A studio profile (studio.json, docs/studios.md "Your studio build"): what a custom studio build bakes in and how
-// it reaches the network. Release tooling (tools/studio/bake_profile.py, -DSCULPTFORGE_STUDIO_PROFILE=...) checks
+// it reaches the network. Release tooling (tools/studio/check_profile.py, -DSCULPTFORGE_STUDIO_PROFILE=...) checks
 // the profile, compiles it into the binaries and installs its folder (packs, preferences, logo) next to the
 // assets. A studio build is in studio mode whatever happens to the files: offline, with only its own update
 // channel or mirror allowed (core/NetworkPolicy.h).
@@ -75,6 +75,8 @@ struct StudioStart {
 // build whose profile is missing or broken still starts offline, with nothing allowed (it fails closed).
 // EXE_DIR is where the binary is (for the installed studio folder); OVERRIDE_PATH is --studio's file.
 StudioStart startStudioMode(const std::string& exeDir, const std::string& overridePath, bool forceOffline);
+// Installs the profile's packs that aren't installed at their version yet (core/Pack.h: the same checks as any pack).
+void installStudioPacks(const StudioProfile& p, std::vector<std::string>& messages);
 // The studio folder next to the installed assets, or "".
 std::string findInstalledStudioDir(const std::string& exeDir);
 // The process's studio state (what startStudioMode found).

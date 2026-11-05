@@ -42,6 +42,7 @@
 #include "core/SurfaceCursor.h"
 #include "core/SpaceMouse.h"
 #include "core/Tablet.h"
+#include "core/StudioProfile.h"
 #include "core/UpdateCheck.h"
 #include "core/ViewCapture.h"
 #include "core/WhatsNew.h"

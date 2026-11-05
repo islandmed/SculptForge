@@ -326,7 +326,13 @@ void App::initUiConfig(bool deterministic) {
     layout_ = standardLayout(uiPrefs_.shellLayout);
     if (deterministic) return; // tests, renders and recordings always use the standard layout
     std::string err;
-    if (fileExists(uiConfigPath()) && !readUiConfig(uiConfigPath(), err)) SDL_Log("%s", err.c_str());
+    if (fileExists(uiConfigPath())) {
+        if (!readUiConfig(uiConfigPath(), err)) SDL_Log("%s", err.c_str());
+    } else if (const std::string& studio = studioMode().profile.preferences; !studio.empty() && fileExists(studio)) {
+        // A studio build's first start: the studio's layout, keys and scale (core/StudioProfile.h); saved as the
+        // artist's own from the first change on.
+        if (!readUiConfig(studio, err)) SDL_Log("Studio preferences: %s", err.c_str());
+    }
 }
 
 void App::addHelpFonts(float scale) {

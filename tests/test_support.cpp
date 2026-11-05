@@ -86,9 +86,16 @@ TEST(support_card_links_match_the_website) {
     CHECK(page.find("data-yearly=\"" + yearly + "\"") != std::string::npos);
     CHECK(page.find(kFreeReleaseNote) != std::string::npos); // the same honest wording on both
     CHECK(page.find(std::string("href=\"") + kDiscordUrl + "\"") != std::string::npos); // the same community invite
-    // Retired: the Insider tier, one-time payments and the founding Studio offer.
+    // Retired: the Insider tier and one-time payments. Studio v4 (11-05): $300 for up to 10 artists, +$25 each after,
+    // Founding Studio $150 through the existing checkout; the old wording that contradicts it is gone.
     for (const std::string& p : {page, studios})
-        for (const char* old : {"Insider", "One-time", "one-time", "Founding", "$300", "$20"}) CHECK(p.find(old) == std::string::npos);
+        for (const char* old : {"Insider", "One-time", "one-time", "$20", "whole company", "no seat count", "5 custom items"})
+            CHECK(p.find(old) == std::string::npos);
+    for (const std::string& p : {page, studios})
+        for (const char* now : {"$300", "Founding Studio", "$150", "3 custom items", "no outside connections"})
+            CHECK(p.find(now) != std::string::npos);
+    CHECK(studios.find("GPL-3.0") != std::string::npos && studios.find("no exclusive or secret features") != std::string::npos);
+    CHECK(std::string(kStudioPageUrl) == "https://sculptforge.app/studios.html#membership");
 }
 
 TEST(support_card_timing) {

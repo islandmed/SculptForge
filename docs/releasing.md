@@ -158,6 +158,37 @@ What keeps the insiders token from leaking; `tools/release/check_workflows.py` (
 - islandmed/sculptforge-insiders: private, members invited with `permission=pull` only, ruleset on `main`: no force
   push, no deletion.
 
+## Studio builds
+
+A Studio member's build is public SculptForge at a pinned tag with the studio's profile baked in (docs/guide/studios.md
+"Your studio build"; src/core/StudioProfile.h). The code is the public, GPL code; only the studio's own files are
+private, in one private repository per studio.
+
+```
+<private org>/studio-<id>          private; the studio's IT invited with permission=pull
+  studio/studio.json               the profile (tools/studio/check_profile.py checks it)
+  studio/packs/<id>.sfpack         brushes, alphas, Lit Spheres, keymaps, macros (made with File > New Pack)
+  studio/ui.json, studio/logo.png  first-start interface settings, branding
+  .github/workflows/release.yml    tools/studio/studio-release.yml, copied
+```
+
+- **Build:** Actions > Studio release > Run workflow with the tag (the current release, or the studio's LTS line). It
+  checks out islandmed/SculptForge at that tag and the studio repo, runs `check_profile.py`, builds with
+  `-DSCULPTFORGE_STUDIO_PROFILE=studio/studio.json` (the profile is compiled in, the folder is installed as
+  `share/sculptforge/studio`), packages Linux tar.gz and Windows zip, and publishes a private release in the studio
+  repository with `SHA256SUMS.txt` and `SHA256SUMS.txt.sig`. Add macOS when a studio asks for it.
+- **Signing:** the same key as public releases. `UPDATE_SIGNING_KEY` is a secret of the environment `studio-release` in
+  each studio repository (required reviewer islandmed; never at repository level); `tools/release/sign_sums.sh`
+  refuses a key that isn't the app's `kUpdatePublicKeyHex`. Give the studio's IT the public key as a PEM to check
+  installers offline.
+- **Updates:** the build reads only `updates.feed` / `updates.mirror` from its profile. For each new studio release,
+  write a `latest.json` (the public feed's format, core/UpdateCheck.h) to the studio's channel; the studio copies it to
+  its mirror when it wants to move. One-click update stays off in studio builds (it downloads only public releases).
+- **Security fixes:** backported only to the current release and ONE LTS line (`lts/X.Y` branches, tagged
+  `vX.Y.Z`); every studio is on one of the two. Rebuild each studio on the new tag the day the fix ships.
+- **Privacy:** a studio's files never go into public builds, packs or the public repository, and are never run (data
+  only). Studio mode is tested: `ctest -R studio` (no request or socket leaves the machine).
+
 ## When a step fails
 
 The script stops with a line starting `fix:` and the command to resume (`--from <step>`). Fix that one thing, then

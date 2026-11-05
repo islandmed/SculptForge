@@ -11,6 +11,7 @@
 #include "core/Wavelet.h"
 #include "core/FocusDetail.h"
 #include "core/Pack.h"
+#include "core/StudioProfile.h"
 
 #include <SDL3/SDL_main.h>
 
@@ -55,6 +56,8 @@ void usage() {
         "  --fullscreen             Start filling the screen (F11 toggles)\n"
         "  --no-ai                  Start with every AI feature off and locked (as SF_AI=off)\n"
         "  --no-packs               Safe mode: start without any installed pack (Library > Packs)\n"
+        "  --studio FILE            Start in studio mode with this studio profile (studio.json; docs/studios.md)\n"
+        "  --offline                Studio mode without a profile: no outside connection at all\n"
         "  --blender                Load what the Blender add-on sent (it starts SculptForge this way)\n"
         "  --bench                  Run the performance benchmark (with GPU upload and orbit timings) and exit\n"
         "  --bench-sizes 4,16,32    Benchmark sizes in millions of triangles\n"
@@ -165,6 +168,8 @@ static int runMain(int argc, char** argv) {
     bool optimistic = false; // --bench-optimistic (research, docs/design/core-200m.md N1)
     sf::OptimisticBenchOptions optimisticOptions;
     bool calibrate = false, calibrateQuick = false, calibrateSave = true;
+    std::string studioProfile;
+    bool offline = false;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         auto next = [&]() -> std::string { return i + 1 < argc ? argv[++i] : std::string(); };
@@ -196,6 +201,8 @@ static int runMain(int argc, char** argv) {
         else if (a == "--fullscreen") options.fullscreen = true;
         else if (a == "--no-ai") sf::ai::setAiForcedOff(true); // as SF_AI=off (ai/AiPolicy.h)
         else if (a == "--no-packs") sf::setPacksSafeMode(true); // safe mode: no installed pack is loaded
+        else if (a == "--studio") studioProfile = next();             // core/StudioProfile.h
+        else if (a == "--offline") offline = true;
         else if (a == "--blender") options.blender = true;
         else if (a == "--ui-out") options.uiOutDir = next();
         else if (a == "--log-dir") logDir = next();
@@ -280,6 +287,13 @@ static int runMain(int argc, char** argv) {
         options.height *= options.supersample;
     }
     sf::crashlog::start(logDir); // after isolateSettings: a UI test logs into its own folder
+    { // studio mode: the network policy, brush shares and packs (after isolateSettings: tests install into their folder)
+        const char* base = SDL_GetBasePath();
+        const sf::StudioStart& studio = sf::startStudioMode(base ? base : "", studioProfile, offline);
+        sf::ai::setStudioAiAllowed(studio.profile.ai);
+        for (const std::string& m : studio.messages) SDL_Log("%s", m.c_str());
+        if (studio.active) SDL_Log("Studio mode%s: no outside connections", studio.profile.name.empty() ? "" : (" (" + studio.profile.name + ")").c_str());
+    }
     if (!crashTest.empty()) crashOnPurpose(crashTest);
     auto app = std::make_unique<sf::App>();
     if (!app->init(options)) {

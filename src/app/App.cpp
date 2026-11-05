@@ -2609,6 +2609,8 @@ void App::updateTitle() {
     updateDiscordPresence(); // the file name, if it's shown (sends only on a change)
     std::string title = (doc_.dirty() ? "* " : "") + name + " - SculptForge";
     if (*appPrerelease()) title += " " + appVersionLabel(); // "- SculptForge 0.11.0 Beta 1": a beta says so
+    if (const StudioStart& studio = studioMode(); studio.active && !studio.profile.title.empty())
+        title += " - " + studio.profile.title; // a studio build's own title
     if (title == windowTitle_) return; // called every frame
     windowTitle_ = title;
     SDL_SetWindowTitle(window_, title.c_str());
@@ -2681,6 +2683,13 @@ void App::drawUi() {
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (ImGui::Begin("About SculptForge", &showAbout_, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
             ImGui::Text("SculptForge %s", appVersionLabel().c_str());
+            if (const StudioStart& studio = studioMode(); studio.active) { // a studio build: its logo and name
+                const StudioProfile& p = studio.profile;
+                if (!p.logo.empty())
+                    if (const ImTextureID logo = thumbs_.file(p.logo)) ImGui::Image(logo, ImVec2(96 * uiScale_, 96 * uiScale_));
+                ImGui::TextWrapped("%s", p.name.empty() ? "Studio mode" : ("Studio build for " + p.name).c_str());
+                ImGui::TextDisabled("Offline: no outside connections. Updates come only from your studio's channel.");
+            }
             ImGui::TextWrapped("Free and open-source digital sculpting.");
             ImGui::Spacing();
             ImGui::TextWrapped("%s", ai::kPrivacyLine); // also on the site (website/index.html) and in docs/ai-services.md

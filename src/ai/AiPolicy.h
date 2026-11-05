@@ -22,6 +22,8 @@ inline constexpr const char* kPrivacyLine =
 enum class AiOverride { None, Off, On };
 AiOverride aiEnvOverride();
 void setAiForcedOff(bool off); // --no-ai: as SF_AI=off for this process
+// Studio mode locks AI off unless its profile says "ai": true (core/StudioProfile.h).
+void setStudioAiAllowed(bool on);
 // True when the environment or --no-ai decides, so the saved choice can't change it.
 bool aiPolicyLocked();
 // The effective switch: the environment (or --no-ai) wins over the saved preference.

@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "link/Socket.h"
 
+#include "core/NetworkPolicy.h"
+
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
@@ -92,6 +94,7 @@ bool Socket::waitReadable(int timeoutMs) const {
 bool Socket::openMulticast(const std::string& group, uint16_t port, const std::string& bindAddress, int ttl,
                            std::string& error) {
     close();
+    if (!net::multicastAllowed(&error)) return false; // studio mode (core/NetworkPolicy.h)
     if (!initSockets()) {
         error = "Networking is unavailable";
         return false;
@@ -204,6 +207,7 @@ std::string hostName() {
 
 bool Socket::listen(const std::string& address, uint16_t port, uint16_t& boundPort, std::string& error, int backlog) {
     close();
+    if (!net::socketAllowed(address, &error)) return false; // studio mode: loopback only
     if (!initSockets()) {
         error = "Networking is unavailable";
         return false;
@@ -255,6 +259,7 @@ bool Socket::accept(Socket& client, int timeoutMs, std::string* from) {
 
 bool Socket::connect(const std::string& address, uint16_t port, std::string& error) {
     close();
+    if (!net::socketAllowed(address, &error)) return false; // studio mode: loopback only
     if (!initSockets()) {
         error = "Networking is unavailable";
         return false;
