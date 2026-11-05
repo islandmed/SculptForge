@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <sstream>
 
 namespace sf::whatsnew {
 
@@ -49,6 +50,24 @@ std::pair<std::string, std::string> splitHighlight(std::string_view h) {
     return {std::string(trim(h.substr(0, colon))), std::string(trim(h.substr(colon + 1)))};
 }
 
+bool parseFrames(std::string_view value, Card& c) {
+    std::istringstream in{std::string(value)};
+    std::string path, grid;
+    int fps = 0;
+    if (!(in >> path >> grid >> fps) || fps < 1 || fps > 30) return false;
+    std::string rest;
+    if (in >> rest) return false;
+    const size_t x = grid.find('x');
+    if (x == std::string::npos) return false;
+    const int cols = std::atoi(grid.substr(0, x).c_str()), rows = std::atoi(grid.substr(x + 1).c_str());
+    if (cols < 1 || rows < 1 || cols * rows < 2 || cols > 32 || rows > 32) return false;
+    c.frames = path;
+    c.frameCols = cols;
+    c.frameRows = rows;
+    c.frameFps = fps;
+    return true;
+}
+
 bool parseFeatures(std::string_view text, Version& v, std::string& error) {
     size_t lineNo = 0;
     while (!text.empty()) {
@@ -66,6 +85,20 @@ bool parseFeatures(std::string_view text, Version& v, std::string& error) {
         const std::string value(trim(line.substr(colon + 1)));
         if (key == "title") {
             v.cards.push_back({value, "", "", "", ""});
+            continue;
+        }
+        if (key == "clip" || key == "frames") {
+            if (v.cards.empty()) {
+                error = "line " + std::to_string(lineNo) + ": '" + std::string(key) + "' before the card's 'title'";
+                return false;
+            }
+            Card& c = v.cards.back();
+            if (key == "clip") {
+                c.clip = value;
+            } else if (!parseFrames(value, c)) {
+                error = "line " + std::to_string(lineNo) + ": frames wants 'path COLSxROWS FPS'";
+                return false;
+            }
             continue;
         }
         if (key == "line" || key == "image" || key == "action" || key == "link") {

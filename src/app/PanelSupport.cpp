@@ -144,6 +144,7 @@ void App::drawLookPicker() {
 }
 
 void App::drawSupportUi() {
+    tickBigMeshTip(); // (here, not in tickProject: this runs every frame, UI tests included)
     const float s = uiScale_;
     const CanvasRect c = canvasRect();
     if (showWelcome_) {
@@ -280,6 +281,34 @@ void App::drawSupportUi() {
         }
         ImGui::End();
         if (!open) chooseNewLook(false);
+    }
+    if (bigMeshTipOpen_ && !showWelcome_ && !supportCardOpen() && !whatsNew_ && !quickTourOpen_) {
+        // The one big-mesh tip (BigMeshTip.h): a note along the bottom of the canvas, no focus taken, shown once.
+        ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h - 12.0f * s), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+        ImGui::SetNextWindowSize(ImVec2(std::min(500.0f * s, c.w - 32.0f * s), 0.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowBgAlpha(0.96f);
+        const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize |
+                                       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+        bool open = true;
+        if (ImGui::Begin("Big meshes are faster now##bigmesh", &open, flags)) {
+            ImGui::TextWrapped("On a dense scan with micro levels, big brushes now keep up with the pen and the view turns "
+                               "smoothly right after a stroke.");
+            ImGui::Spacing();
+            ImGui::TextWrapped("Two settings in Preferences > Performance help most on big meshes:");
+            ImGui::Bullet();
+            ImGui::TextWrapped("Background Preview (experimental): a big brush shows under the pen while it's still being worked out.");
+            ImGui::Bullet();
+            ImGui::TextWrapped("View resolution 75%%: draws about half the pixels, for integrated graphics and big screens.");
+            ImGui::Spacing();
+            if (ImGui::Button("Performance settings##bigmesh")) {
+                openPerformancePrefs();
+                open = false;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Got it##bigmesh")) open = false;
+        }
+        ImGui::End();
+        if (!open) bigMeshTipOpen_ = false;
     }
     if (supportReminderOpen_) {
         // The one reminder: a small note along the bottom of the canvas, no focus taken, closed for good by any button.

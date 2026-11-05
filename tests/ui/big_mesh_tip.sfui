@@ -1,0 +1,32 @@
+# The one big-mesh tip (app/BigMeshTip.h): the first scene over ~20M triangles shows a note that dense meshes got
+# faster, with the settings that matter; dismissed, it never comes back. A small threshold stands in for 20M here.
+env SF_BIG_MESH_TIP_TRIANGLES 10000
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=2
+wait 0.3
+expect_value triangles < 10000
+expect_value big_mesh_tip_open == 0
+expect_value big_mesh_tip_done == 0
+
+# Over the threshold: the tip shows (once, written to project.json at once).
+run new_sphere subdivisions=5
+wait 0.3
+expect_value triangles >= 10000
+expect_value big_mesh_tip_open == 1
+expect_value big_mesh_tip_done == 1
+expect_text "Big meshes are faster now"
+expect_text "Background Preview"
+shot big_mesh_tip
+
+# Performance settings opens Preferences > Performance and closes the tip.
+click "Performance settings##bigmesh"
+wait 0.3
+expect_value big_mesh_tip_open == 0
+expect_value performance_prefs_open == 1
+shot big_mesh_tip_prefs
+
+# Never again: another big mesh, no tip.
+run new_sphere subdivisions=2
+run new_sphere subdivisions=5
+wait 0.3
+expect_value big_mesh_tip_open == 0

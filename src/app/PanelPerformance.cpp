@@ -9,9 +9,13 @@
 #include "app/I18n.h"
 
 #include "core/Benchmark.h"
+#include "core/Micro.h"
 #include "core/HardwareProfile.h"
 #include "core/ThreadPool.h"
 
+#include <imgui.h>
+
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -150,6 +154,28 @@ void App::registerPerformanceUiActions() {
         "behind the brush and when you lift the pen. Small brushes, Smooth, Layer, Inflate, Nudge, Clay Block, "
         "alphas and masked areas are placed dab by dab as before. Try it on a heavy mesh and tell us how it feels.");
     registerPerformanceProfileUiActions(); // Re-calibrate, the frame governor (PanelPerformanceProfile.cpp)
+}
+
+size_t App::sceneTrianglesWithMicro() const {
+    size_t triangles = 0;
+    for (int i = 0; i < doc_.partCount(); ++i)
+        if (doc_.parts[size_t(i)].visible) {
+            const Mesh& m = doc_.partMesh(i);
+            const size_t micro = microTriangleCount(m);
+            triangles += micro ? micro : m.triangleCount();
+        }
+    return triangles;
+}
+
+void App::openPerformancePrefs() {
+    auto& open = layout_.openSubpalettes;
+    if (uiPrefs_.oneSubpalette) // as a click on its header would: the other Preferences sections close
+        open.erase(std::remove_if(open.begin(), open.end(), [](const std::string& o) { return o.rfind("preferences.", 0) == 0; }),
+                   open.end());
+    if (std::find(open.begin(), open.end(), "preferences.performance") == open.end()) open.push_back("preferences.performance");
+    flashSubpalette_ = "preferences.performance";
+    flashSubpaletteStart_ = ImGui::GetTime();
+    if (const Action* a = actions_.find("ui.palette.preferences"); a && a->run) a->run();
 }
 
 void App::applyPerformancePrefs() { ThreadPool::shared().setSerial(!uiPrefs_.multithreading); }

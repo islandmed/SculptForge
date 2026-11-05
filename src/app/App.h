@@ -455,6 +455,12 @@ private:
     double sculptSeconds_ = 0.0;        // cumulative time in strokes (project.json)
     bool supportReminderDone_ = false;  // the reminder was shown (or turned off) once: never again (project.json)
     bool supportReminderOpen_ = false;
+    // The one big-mesh tip (BigMeshTip.h): the first scene over ~20M triangles; shown once, never again (project.json).
+    bool bigMeshTipDone_ = false;
+    bool bigMeshTipOpen_ = false;
+    size_t sceneTrianglesWithMicro() const; // visible base triangles, micro levels counted in full
+    void openPerformancePrefs();            // Preferences > Performance, opened and flashed
+    void tickBigMeshTip();                  // every frame (drawSupportUi): shows the tip when due
     int discordRequests_ = 0;           // UI tests: how often the Discord invite was asked for
     int supportPageRequests_ = 0;       // UI tests: how often the page was asked for (only opened when interactive)
     // The support card at launch (PanelSupportCard.cpp): decided once while starting, never mid-session.

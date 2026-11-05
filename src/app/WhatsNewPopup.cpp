@@ -307,7 +307,22 @@ void App::drawWhatsNew() {
     };
     auto picture = [&](const whatsnew::Card& c, ImVec2 p0, ImVec2 p1, ImDrawFlags corners, float appear) {
         ImVec2 texSize;
-        const ImTextureID tex = c.image.empty() ? ImTextureID(0) : guide_.image(c.image, &texSize);
+        // A clip (frames:): one picture of COLS x ROWS frames, played in a loop while the window is open.
+        ImTextureID tex = c.frames.empty() ? ImTextureID(0) : guide_.image(c.frames, &texSize);
+        if (tex) {
+            const int count = c.frameCols * c.frameRows;
+            const int frame = int((nowSeconds() - pop.openedAt) * c.frameFps) % count;
+            const ImVec2 cell(1.0f / float(c.frameCols), 1.0f / float(c.frameRows));
+            const ImVec2 f0(float(frame % c.frameCols) * cell.x, float(frame / c.frameCols) * cell.y);
+            ImVec2 uv0, uv1;
+            coverUv(texSize.x * cell.x / std::max(1.0f, texSize.y * cell.y), (p1.x - p0.x) / std::max(1.0f, p1.y - p0.y), uv0, uv1);
+            uv0 = ImVec2(f0.x + uv0.x * cell.x, f0.y + uv0.y * cell.y);
+            uv1 = ImVec2(f0.x + uv1.x * cell.x, f0.y + uv1.y * cell.y);
+            dl->AddImageRounded(tex, p0, p1, uv0, uv1, col(0xffffff, appear), 12.0f * k, corners);
+            redrawIn(1.0 / double(c.frameFps));
+            return;
+        }
+        tex = c.image.empty() ? ImTextureID(0) : guide_.image(c.image, &texSize);
         if (!tex) { // no picture: a quiet tile with the cube mark
             dl->AddRectFilled(p0, p1, tc(raised, appear), 12.0f * k, corners);
             const float m = std::min(p1.x - p0.x, p1.y - p0.y) * 0.3f;

@@ -746,6 +746,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "dropdown_open") return app_.dropdown_.empty() ? 0.0 : 1.0;
     if (name == "new_look_card_open") return app_.newLookCard_ ? 1.0 : 0.0; // "SculptForge has a new look" (0.10.7)
     if (name == "support_card_open") return app_.supportCardOpen() ? 1.0 : 0.0; // the support card at launch
+    // The one big-mesh tip (BigMeshTip.h): open now, shown once (project.json), Preferences > Performance open.
+    if (name == "big_mesh_tip_open") return app_.bigMeshTipOpen_ ? 1.0 : 0.0;
+    if (name == "big_mesh_tip_done") return app_.bigMeshTipDone_ ? 1.0 : 0.0;
+    if (name == "performance_prefs_open") {
+        const auto& open = app_.layout_.openSubpalettes;
+        return std::find(open.begin(), open.end(), "preferences.performance") != open.end() ? 1.0 : 0.0;
+    }
     // What's New (WhatsNewPopup.cpp): open (1 while shown), its cards, Try it clicks; the guide chapter's contents
     // entries (versions in full, then groups) and its open sections.
     if (name == "whats_new_open") return app_.whatsNewOpen() ? 1.0 : 0.0;
