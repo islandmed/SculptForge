@@ -134,7 +134,7 @@ def main():
     if "--self-test" in sys.argv:
         return self_test()
     root = Path(__file__).resolve().parents[2] / ".github" / "workflows"
-    files = {p.name: p.read_text() for p in sorted(root.glob("*.yml"))}
+    files = {p.name: p.read_text(encoding="utf-8") for p in sorted(root.glob("*.yml"))}
     errs = check(files)
     for e in errs:
         print(e)
