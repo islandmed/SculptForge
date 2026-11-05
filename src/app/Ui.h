@@ -44,7 +44,7 @@ void CentredGlyph(ImDrawList* drawList, ImFont* font, ImVec2 a, ImVec2 b, ImU32 
 // Ctrl-hover help for the last item.
 void HelpText(const char* title, const char* shortcut, const char* description, const char* path = nullptr);
 void HelpAction(App& app, const char* actionId);
-// classic slider with its label drawn inside the frame ("Draw Size 60"), a quiet fill and a thin neutral bar
+// classic slider with its label drawn inside the frame ("Size 60"), a quiet fill and a thin neutral bar
 // along the bottom (the accent only while dragging).
 bool SliderInside(const char* id, float* v, float lo, float hi, const char* format, ImGuiSliderFlags flags = 0);
 

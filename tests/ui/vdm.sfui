@@ -56,7 +56,7 @@ hold none
 expect_value moved_out < 0
 key ctrl+z
 
-# DragDot: the stamp has the Draw Size and lands where the drag ends.
+# DragDot: the stamp has the Size and lands where the drag ends.
 click "Scales##vdm2"
 expect_status VDM: Scales
 click "Stroke##palette.stroke"

@@ -16,7 +16,7 @@ namespace sf {
 enum class StrokeType {
     Dots,      // evenly spaced dabs along the cursor path
     DragRect,  // click-drag stamps one dab: drag length = size, drag direction = alpha rotation
-    DragDot,   // click-drag slides one dab of the brush's Draw Size over the surface until release
+    DragDot,   // click-drag slides one dab of the brush's Size over the surface until release
     Spray,     // scattered dabs with random size, strength and rotation
     LazyMouse, // dabs follow a point dragged behind the cursor on a string (smooth lines)
     Count

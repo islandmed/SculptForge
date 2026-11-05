@@ -76,8 +76,7 @@ alphabetical palette bar. You sculpt with a left drag, hold <kbd>Alt</kbd> to su
 smooth, drag on the background to rotate, <kbd>Alt</kbd>+drag to pan, and hold <kbd>Ctrl</kbd> to mask. The
 palettes have the names you expect (Alpha, Brush, Stroke, Tool, Transform...), the Tool palette holds the
 Parts, Masking and Face Groups sub-palettes, <kbd>B</kbd> opens the brush pop-up with the same letter keys
-(B, S, T picks Standard), <kbd>,</kbd> opens the Library and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>
-stores your interface, and <kbd>S</kbd> <kbd>U</kbd> <kbd>I</kbd> <kbd>O</kbd>, <kbd>Space</kbd>, <kbd>Ctrl</kbd>+<kbd>W</kbd>
+(B, S, T picks Standard), <kbd>,</kbd> opens the Library, your preferences save themselves, and <kbd>S</kbd> <kbd>U</kbd> <kbd>I</kbd> <kbd>O</kbd>, <kbd>Space</kbd>, <kbd>Ctrl</kbd>+<kbd>W</kbd>
 and the mask keys do what your hands expect with the Classic sculpting keys on (**Edit > Preferences > Input**).
 [Quick tour for experienced sculptors](quick-tour.md) lists what is the same,
 what differs and every shortcut side by side; the [Glossary](glossary.md) explains SculptForge's terms.

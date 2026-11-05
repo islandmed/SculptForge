@@ -1,8 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Multiresolution subdivision levels, classic (Tool > Geometry: Divide, Lower Res / Higher Res, SDiv,
-// Del Lower / Del Higher, Reconstruct Subdiv, Smt).
+// Multiresolution subdivision levels, classic (Tool > Geometry: Divide, Lower Level / Higher Level, SDiv,
+// Delete Lower / Delete Higher, Reconstruct Subdiv, Smt).
 //
 // A Part's mesh may carry a stack of levels (Mesh::multires). Level 0 is the base cage; each higher level
 // is the one below subdivided (Catmull-Clark when the mesh has quads, so quads stay quads; Loop on pure
@@ -31,7 +31,7 @@
 //
 // The stack is shared copy-on-write (std::shared_ptr): copying a Mesh for an undo snapshot or an export is
 // cheap, and changing one level only copies that level. Stepping levels is one undo step (UndoRecord::
-// subdiv), and so are Divide, Del Lower, Del Higher and Reconstruct: each keeps the previous stack, which
+// subdiv), and so are Divide, Delete Lower, Delete Higher and Reconstruct: each keeps the previous stack, which
 // shares every level the operation didn't touch.
 #pragma once
 

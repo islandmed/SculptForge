@@ -383,7 +383,7 @@ void registerFaceGroupCommands(CommandRegistry& reg) {
                  std::vector<uint32_t> groups = groupsFromMask(doc.mesh, &n);
                  if (n == 0) return {false, "Nothing is masked"};
                  const uint32_t id = nextFaceGroupId(doc.mesh);
-                 commitFaceGroups(doc, groups, "Group Masked");
+                 commitFaceGroups(doc, groups, "Group from Mask");
                  return {true, "Face Group " + std::to_string(id) + " with " + std::to_string(n) + " masked triangles"};
              }});
 

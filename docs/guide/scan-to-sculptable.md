@@ -38,7 +38,7 @@ have. `splat_test_capture kind=object` loads a mug with a thin handle instead.
 | **Face loops** | When the capture is a head: find the eyes, nose, mouth and chin and give Quad Remesh edge loops round the eyes and mouth and along the nasolabial folds, mirrored across the face (see below) |
 | **Review** | Stop after the scan to check the face landmarks and the loops before remeshing |
 | **Vertex Paint / Texture** | Where the capture's colours go: the vertices (vertex paint), or a 2K texture on automatic UVs (sharp colour on a light mesh, for games and exports) |
-| **Keep scan** | Keep the dense voxel surface as a hidden "<name> Scan" Part, to Project All more detail from later |
+| **Keep scan** | Keep the dense voxel surface as a hidden "<name> Scan" Part, to Project Detail more detail from later |
 | **Crop Box** | Only the splats inside the box count (see below) |
 | **More > Min Opacity** | Splats fainter than this are ignored (haze and floaters are usually faint). Default 0.2 |
 | **More > Close Gaps** | Seal gaps up to this many voxels between splats. Default 2 |
@@ -101,7 +101,7 @@ splats are shown; click **Crop Box** again to turn it off.
    distance. Splats behind the surface, inside the subject, are faded out: trained captures fill the inside with
    splats of any colour.
 3. **Topology.** Quad Remesh rebuilds the scan as quads at the budget's polygon count, along the face guides, with
-   symmetry. **Sculpt** then divides it twice and projects the scan onto the top level (as Project All does).
+   symmetry. **Sculpt** then divides it twice and projects the scan onto the top level (as Project Detail does).
 
 ## Speed
 
@@ -171,6 +171,6 @@ them), so you can copy it into a batch script.
 ## See also
 
 - [Gaussian splats](splats.md): loading, placing and saving captures
-- [Quad retopology and detail projection](retopology.md): Quad Remesh, Quad Remesh Guides and Project All
+- [Quad retopology and detail projection](retopology.md): Quad Remesh, Quad Remesh Guides and Project Detail
 - [Subdivision levels](subdivision-levels.md): sculpting the **Sculpt** preset's levels
 - [Texture painting](texture-painting.md): painting on the **Texture** result

@@ -12,8 +12,7 @@ your saved style is kept.
 ## Changing shortcuts
 
 Every key below can be reassigned: hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and click a button, then press the new
-key, or use **Edit > Preferences > Hotkeys**. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> (Store Config) to
-keep your changes. See [Customizing the interface](interface.md#customizing-the-interface).
+key, or use **Edit > Preferences > Hotkeys**. Your changes save themselves. See [Customizing the interface](interface.md#customizing-the-interface).
 
 On macOS, <kbd>Cmd</kbd> works wherever a shortcut says <kbd>Ctrl</kbd>. Single-letter shortcuts don't fire
 while you type in a text field.
@@ -54,9 +53,9 @@ generated from SculptForge's action registry, the same source as the Controls wi
 
 | Action | Keys | What it does |
 |---|---|---|
-| Draw Size at cursor | <kbd>S</kbd> | A Draw Size slider under the cursor: drag it, or type a number and press Enter. |
-| Falloff at cursor | <kbd>O</kbd> | A Falloff slider under the cursor: below 0 a broad, hard brush tip, above 0 a soft point (-100..100). The inner ring of the brush cursor shows it. |
-| Intensity at cursor | <kbd>U</kbd> or <kbd>I</kbd> | A Intensity slider under the cursor: drag it, or type a number (1-100) and press Enter. Hold Shift (or pick Smooth) to set Smooth's own Intensity. |
+| Size at cursor | <kbd>S</kbd> | A Size slider under the cursor: drag it, or type a number and press Enter. |
+| Falloff at cursor | <kbd>O</kbd> or <kbd>I</kbd> | A Falloff slider under the cursor: below 0 a broad, hard brush tip, above 0 a soft point (-100..100). The inner ring of the brush cursor shows it. |
+| Intensity at cursor | <kbd>U</kbd> | An Intensity slider under the cursor: drag it, or type a number (1-100) and press Enter. Hold Shift (or pick Smooth) to set Smooth's own Intensity. |
 | Larger brush | <kbd>]</kbd> | Make the brush 10% larger (hold to repeat; Shift+] steps one pixel). |
 | Larger brush by 1 px | <kbd>Shift</kbd>+<kbd>]</kbd> | Make the brush one pixel larger (half a pixel below 2 px). |
 | Paint | <kbd>P</kbd> | Paint colour without sculpting. Alt paints back to white, Shift still smooths. |
@@ -88,7 +87,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 |---|---|---|
 | Command palette | <kbd>F3</kbd> or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> | Search every command, brush and setting by name and run it. Commands that need parameters open in the console. |
 | Controls | <kbd>F1</kbd> | Every shortcut and mouse gesture, generated from the commands themselves. |
-| Quick Menu | <kbd>Space</kbd> | The Quick Menu under the cursor: brush, stroke, alpha, material, colour, Draw Size, Falloff and the intensities. Hold Space and let go to close it, or tap Space to keep it open. |
+| Quick Menu | <kbd>Space</kbd> | The Quick Menu under the cursor: brush, stroke, alpha, material, colour, Size, Falloff and the intensities. Hold Space and let go to close it, or tap Space to keep it open. |
 | User Guide | <kbd>Shift</kbd>+<kbd>F1</kbd> | The SculptForge user guide: every tool explained, with search. Hold Ctrl over a control and press F1 to open the chapter about it. |
 
 ### Library
@@ -113,13 +112,12 @@ generated from SculptForge's action registry, the same source as the Controls wi
 
 | Action | Keys | What it does |
 |---|---|---|
-| Load UI... | <kbd>Ctrl</kbd>+<kbd>L</kbd> | Load a layout file someone shared (or you saved with Save UI). |
+| Import Interface... | <kbd>Ctrl</kbd>+<kbd>L</kbd> | Load a layout file someone shared (or you saved with Export Interface). |
 | Radial menu 1: Brushes | <kbd>T</kbd> | Hold the key, flick toward an item and let go to run it; or tap the key and click one. Edit it in Preferences > Input > Radial Menus. |
 | Radial menu 2: Masking | <kbd>Y</kbd> | Hold the key, flick toward an item and let go to run it; or tap the key and click one. Edit it in Preferences > Input > Radial Menus. |
 | Radial menu 3: Strokes | <kbd>J</kbd> | Hold the key, flick toward an item and let go to run it; or tap the key and click one. Edit it in Preferences > Input > Radial Menus. |
-| Save UI... | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | Save the layout, shortcuts and interface preferences to a file you can share. |
+| Export Interface... | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | Save the layout, shortcuts and interface preferences to a file you can share. |
 | Shelves | <kbd>Tab</kbd> | Hide or show the shelves and trays around the canvas. |
-| Store Config | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | Keep the current layout, shortcuts and interface preferences for future sessions. SculptForge never saves them on its own. |
 
 ### Render
 
@@ -149,10 +147,10 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Clear Mask | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> | Unmask everything (also: Ctrl+drag on the background, away from the model). |
 | Divide | <kbd>Ctrl</kbd>+<kbd>D</kbd> | Add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to shape big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smt off divides without smoothing. |
 | Duplicate Part | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> | Copy the active Part, with its layers and attributes, and make the copy active (also in the Parts list's right-click menu). |
-| Group Masked | <kbd>Ctrl</kbd>+<kbd>W</kbd> | Turn the masked part into a new face group and clear the mask. With nothing masked, everything visible becomes one group. |
-| Higher Res | <kbd>D</kbd> | Step one subdivision level up (more polygons, for detail). Edits made below carry the detail along. |
+| Group from Mask | <kbd>Ctrl</kbd>+<kbd>W</kbd> | Turn the masked part into a new face group and clear the mask. With nothing masked, everything visible becomes one group. |
+| Higher Level | <kbd>D</kbd> | Step one subdivision level up (more polygons, for detail). Edits made below carry the detail along. |
 | Invert Mask | <kbd>Ctrl</kbd>+<kbd>I</kbd> | Mask what is unmasked and unmask what is masked (also: Ctrl+click the background). |
-| Lower Res | <kbd>Shift</kbd>+<kbd>D</kbd> | Step one subdivision level down (fewer polygons, for big forms). The detail of the higher levels is kept. |
+| Lower Level | <kbd>Shift</kbd>+<kbd>D</kbd> | Step one subdivision level down (fewer polygons, for big forms). The detail of the higher levels is kept. |
 | Mask All | <kbd>Ctrl</kbd>+<kbd>A</kbd> | Mask the whole visible Part. |
 | Preview | <kbd>A</kbd> | Show the skin Make Mesh would build instead of the spheres. Turn it off to edit the spheres again. |
 
@@ -214,7 +212,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Blur / sharpen the mask | <kbd>Ctrl</kbd>+click / <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click the model |
 | Invert the mask | <kbd>Ctrl</kbd>+click the background |
 | Clear the mask | <kbd>Ctrl</kbd>+drag on the background with something masked (with **Mask Pen**), or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> |
-| Mask inside a lasso or rectangle | <kbd>Ctrl</kbd>+drag with **Mask Lasso** or **Mask Rectangle** picked in **Tool > Masking** (add <kbd>Alt</kbd>: unmask) |
+| Mask inside a lasso or rectangle | <kbd>Ctrl</kbd>+drag with **Lasso Mask** or **Rectangle Mask** picked in **Tool > Masking** (add <kbd>Alt</kbd>: unmask) |
 | Isolate a face group | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click it (again: invert the visibility; with something hidden already: hide it) |
 | Hide a face group | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+click it |
 | Show everything | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click the background |
@@ -226,7 +224,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Pan, zoom or orbit with a button | Drag on **Move**, **Zoom** or **Rotate** on the right shelf |
 | Help on any control | Hold <kbd>Ctrl</kbd> and point at it (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>: scripting parameters) |
 | Assign a shortcut | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click any button, then press the key |
-| Move or remove shelf items | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+drag (with **Enable Customize** on) |
+| Move or remove shelf items | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+drag (with **Customize Shelves** on) |
 | Tablet pressure | Used automatically when a pen is detected (**Pressure > Strength** / **Pressure > Size**) |
 | Open files | Drop a model (`.obj`, `.glb` ...), project, brush (`.sfbrush`), splat capture or image onto the window |
 
@@ -279,14 +277,14 @@ Some keys only mean something while a pop-up or panel has the keyboard.
 
 ## Classic sculpting keys
 
-With **Edit > Preferences > Input > Style** on **Classic**, the keys and gestures work. Store Config
-(<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps the choice. Compared with the table above, these change:
+With **Edit > Preferences > Input > Style** on **Classic**, the keys and gestures work. The choice
+saves itself. Compared with the table above, these change:
 
 | To | SculptForge style | classic |
 |---|---|---|
 | Pick one of the first ten brushes | <kbd>1</kbd> to <kbd>9</kbd>, <kbd>0</kbd> (Standard, Clay, Smooth, Move ...) | No key: the number keys are free |
 | Save Snapshot | No key | <kbd>9</kbd> |
-| Slider at the cursor on <kbd>I</kbd> | Intensity (as <kbd>U</kbd>) | RGB Intensity |
+| Slider at the cursor on <kbd>I</kbd> | Falloff (as <kbd>O</kbd>) | Colour intensity |
 | <kbd>Ctrl</kbd>+drag on the background with nothing masked | Zooms | Draws a mask rectangle (one that misses the model clears the mask) |
 | Zoom drags (<kbd>Ctrl</kbd>+right-drag, <kbd>Alt</kbd>+drag then release) | Up zooms in | Up zooms out |
 
@@ -358,7 +356,7 @@ at the top of the Controls window. SculptForge switches to the Blender style and
 and Sculpt keymaps, the keys of every action it has an equivalent for: the views, the brushes above, the radius
 and strength, the mask, hiding, subdivision levels, undo and redo. Mouse buttons and keys for things
 SculptForge doesn't have are left alone; the status bar says how many keys it took. The file is read as text and
-never run. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> (Store Config) keeps the keys; **Restore Standard UI**
+never run. The keys save themselves; **Reset Layout and Shortcuts**
 goes back to the defaults.
 
 ## Classic sculpting keys that work differently

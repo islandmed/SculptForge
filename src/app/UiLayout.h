@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The layout of the classic shell (shelves, trays, Library, console): the
-// shared contract between the shell, Library and config code, and what Store
-// Config writes to ui.json.
+// shared contract between the shell, Library and config code, and what Save
+// Layout writes to ui.json.
 #pragma once
 
 #include "core/Json.h"

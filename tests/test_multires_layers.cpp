@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Sculpt layers on subdivision levels 3D Layers: a layer recorded at the top level survives stepping
-// down and up, Divide, Reconstruct Subdiv, Del Lower / Del Higher, saving and loading, and stays togglable and
+// down and up, Divide, Reconstruct Subdiv, Delete Lower / Delete Higher, saving and loading, and stays togglable and
 // blendable at every level; layers added or sculpted at a low level show at the top; undo across levels; blend
 // shapes export from the current level.
 #include "TestHarness.h"
@@ -288,7 +288,7 @@ TEST(layers_levels_delete_lower_and_higher) {
     CHECK(maxDistance(d.mesh.positions, top) < 1e-5f);
     CHECK(maxDistance(d.mesh.layers[0].delta, delta) < 1e-5f);
     CHECK(layerMismatch(d.mesh) < 1e-5f);
-    // Del Higher at SDiv 2: that level, layer included, becomes the top.
+    // Delete Higher at SDiv 2: that level, layer included, becomes the top.
     CHECK(run(d, "subdiv_level", {{"level", 2.0}}).ok);
     const std::vector<glm::vec3> mid = d.mesh.positions, midDelta = d.mesh.layers[0].delta;
     CHECK(run(d, "subdiv_delete_higher").ok);

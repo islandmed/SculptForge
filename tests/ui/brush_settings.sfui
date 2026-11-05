@@ -1,4 +1,4 @@
-# #78: every brush keeps its own Draw Size, Z Intensity, alpha... Picking another brush and coming back brings its
+# #78: every brush keeps its own Size, Intensity, alpha... Picking another brush and coming back brings its
 # values back; Save Brush Settings keeps them for the next start; Reset Brush to Default puts back the shipped ones;
 # Preferences > Input > Share size and intensity across brushes keeps size and intensity as before.
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves

@@ -137,7 +137,7 @@ void App::drawLookPicker() {
             uiPrefs_.look.matchOmarchy = false;
             setShellLayout(c.layout);
             lookDirty_ = true;
-            saveProjectPrefs(); // remembered for the next start, also without Store Config
+            saveProjectPrefs(); // remembered for the next start
             status_ = std::string("Look: ") + c.name + " (Preferences > Interface > Look changes it)";
         }
     }
@@ -176,7 +176,7 @@ void App::drawSupportUi() {
             ImGui::TextUnformatted("Pick a look:");
             drawLookPicker();
             // Where you come from sets the keys and the layout together (Preferences > Input and > Interface > Look
-            // change them later; both are remembered without Store Config).
+            // change them later; both are remembered on its own).
             ImGui::Spacing();
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted("Coming from:");
@@ -197,7 +197,7 @@ void App::drawSupportUi() {
                 if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
                 if (ImGui::Button(o.label)) {
                     setInputStyle(o.style);
-                    startInputStyle_ = o.style; // kept for the next start, also without Store Config
+                    startInputStyle_ = o.style; // kept for the next start
                     setShellLayout(o.layout);
                     lookDirty_ = true;
                     saveProjectPrefs();

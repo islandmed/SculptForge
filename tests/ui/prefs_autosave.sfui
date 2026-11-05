@@ -1,0 +1,50 @@
+# Preferences save themselves (#117): every change reaches ui.json a moment later, with no command to run; the
+# layout waits for Save Layout. An older ui.json whose keymap names Store Config's old id loads as before.
+run ui_look look=classic layout=classic        # the classic palette bar: Preferences is a palette
+run new_sphere
+
+# A preference and a shortcut, changed and then a restart: both are still there.
+expect_value timeline_top == 1
+click "Preferences##palette.preferences"
+click "Interface##preferences.interface"
+click "Bottom##view.timeline_bottom"
+key escape
+expect_value timeline_top == 0
+wait_value ui_config == 1 5
+restart
+expect_value timeline_top == 0
+expect_shortcut ui.focal_popup O / I
+expect_shortcut ui.strength_popup U
+
+# The layout is not saved by itself: a console left open comes back closed; Save Layout keeps it.
+key backtick
+expect_value console_open == 1
+restart
+expect_value console_open == 0
+key backtick
+key f3
+type "##Command palette" "save layout"
+key enter
+expect_status "Layout saved"
+restart
+expect_value console_open == 1
+expect_value timeline_top == 0
+
+# Ctrl+Shift+I does nothing any more (no Store Config); the old id is Save Preferences Now in the palette.
+expect_shortcut config.store
+expect_no_text "Store Config"
+key f3
+type "##Command palette" "save preferences now"
+key enter
+expect_status "Preferences saved"
+shot palette
+
+# A ui.json from 0.11.0 with the old binding on config.store and its own keys loads: the binding is kept, the
+# rest of its shortcuts and preferences too.
+restart data/prefs/ui_0_11_0.json
+expect_shortcut view.frame Ctrl+Alt+F
+expect_shortcut config.store Ctrl+Shift+I
+expect_value timeline_top == 0
+expect_value console_open == 0
+key ctrl+shift+i
+expect_status "Preferences saved"

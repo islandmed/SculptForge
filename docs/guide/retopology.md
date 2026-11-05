@@ -1,7 +1,7 @@
 # Quad retopology and detail projection
 
 **Quad Remesh** rebuilds a sculpt as clean, all-quad topology whose edge loops follow the forms.
-**Project All** then moves a mesh onto the surface of other Parts, so the detail of the original
+**Project Detail** then moves a mesh onto the surface of other Parts, so the detail of the original
 sculpt comes back onto the new topology. Together they turn a dense, messy sculpt
 (a voxel remesh, a scan, an AI-generated model) into a light quad mesh you can divide, sculpt on, unwrap and
 animate.
@@ -16,7 +16,7 @@ animate.
    replaces the button, and **Cancel** stops it. The result replaces the Part, and the sculpt as it was is
    kept as a hidden Part called "*name* Original" right below it.
 3. Divide the new mesh two or three times (**Tool > Geometry > Subdivide**, <kbd>Ctrl</kbd>+<kbd>D</kbd>).
-4. Show the original again (the eye in **Tool > Parts**) and click **Project All** under **Tool > Parts >
+4. Show the original again (the eye in **Tool > Parts**) and click **Project Detail** under **Tool > Parts >
    Project**. The divided quads snap onto the sculpt and take its vertex paint.
 5. Hide or delete the original. You now have the same sculpt on clean quads.
 
@@ -39,7 +39,7 @@ Both steps are single undo steps (<kbd>Ctrl</kbd>+<kbd>Z</kbd>).
 | **Detect Edges** | Hard edges get an edge loop, so boxes and bevels stay crisp (on by default). Quad Remesh 2 takes faces meeting at more than about 60 degrees along a line at least a few quads long (a scan's or a sculpt's deep creases are left to the flow); the legacy method any edge over 50 degrees |
 | **Use Vertex Paint** | Paint where you want density: red areas get up to four times the quads, blue areas down to a quarter, white areas are unchanged |
 | **Symmetry** | Remesh one half and mirror it, welded on the seam, for exactly symmetric topology (on by default). It mirrors on the axis chosen in **Sculpt > Symmetry & Gizmo** (X if none), across the model's own middle plane: the world's centre plane when the model is symmetric about it, otherwise the plane through the model's middle, so a model moved away from the centre works too. A model that isn't mirror-symmetric is remeshed whole instead, and the status line says "Symmetry off: the model isn't mirror-symmetric"; one that is nearly symmetric (a bump on one side) gets mirrored topology that follows each side's own surface |
-| **Keep Original** | Keep the Part as it was, hidden, below the new one, ready for Project All. Off: the Part is replaced (undo brings it back) |
+| **Keep Original** | Keep the Part as it was, hidden, below the new one, ready for Project Detail. Off: the Part is replaced (undo brings it back) |
 | **Keep Masked** | Masked areas keep their triangles exactly, as a fixed piece: only the unmasked part is remeshed (the target counts its quads), and it's joined to the masked part along the mask's edge with a strip of triangles, so the model stays closed. If the mask's edge can't be joined up, the status line says so and nothing changes (off by default; `qremesh keep_masked=true`) |
 | **Keep Texture** | Shown when the Part has a painted texture (on by default): Auto UV the result and project the texture onto it. Off: the texture is dropped |
 | **Quad Remesh Guides** | Picks the guides brush: draw curves on the model for the edge loops to follow. See [Quad Remesh Guides](#quad-remesh-guides) |
@@ -190,15 +190,15 @@ more edges sits by a guide, it tries again with a different start for the field 
 a sphere with a circular guide around an "eye", the edges near the curve are within about 2 to 8 degrees of its
 direction (about 22 degrees without the guide), and the loop closes.
 
-## Project All
+## Project Detail
 
-**Tool > Parts > Project > Project All** projects every other *visible* Part onto the active one. Each vertex
+**Tool > Parts > Project > Project Detail** projects every other *visible* Part onto the active one. Each vertex
 looks along its normal, both ways, and moves to the nearest surface it finds within **Dist**; if there is none
 straight along the normal, it takes the closest point within **Dist**.
 
 | Control | What it does |
 |---|---|
-| **Project All** | Projects the visible Parts onto the active one (one undo step) |
+| **Project Detail** | Projects the visible Parts onto the active one (one undo step) |
 | **Dist** | How far to search, as a fraction of the Part's size (bounding-box diagonal). Default 0.02. Raise it if parts don't pick up the detail; lower it where two surfaces are close together (lips, eyelids, fingers) |
 | **PA Blur** | Smooths the projected result this many times, to soften noise from the source |
 | **Mean** | Where there is surface on both sides of a vertex, settle halfway between them instead of on the nearest |
@@ -208,10 +208,10 @@ straight along the normal, it takes the closest point within **Dist**.
 - **The mask protects:** fully masked vertices don't move; partly masked ones move part of the way. Mask the
   areas you have already fixed and project again with a different **Dist**.
 - Hidden faces of the source are ignored, and hidden parts of the target don't move.
-- Project All is fast enough to use on dense meshes: about 0.6 seconds to project 1.25 million vertices from a
+- Project Detail is fast enough to use on dense meshes: about 0.6 seconds to project 1.25 million vertices from a
   1.3-million-triangle sculpt.
 
-> **Tip:** Project after each division, not only at the end: divide once, Project All, divide again, Project All.
+> **Tip:** Project after each division, not only at the end: divide once, Project Detail, divide again, Project Detail.
 > Each pass starts closer to the sculpt, so a small **Dist** is enough and thin parts don't jump to the wrong
 > surface.
 

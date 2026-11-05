@@ -31,8 +31,8 @@ click "Wireframe##display"
 click "Geometry##tool.geometry"
 shot reconstructed-cage
 
-# Del Higher at the base leaves the plain 108-triangle cage to start from.
-click "Geometry/Del Higher"
+# Delete Higher at the base leaves the plain 108-triangle cage to start from.
+click "Geometry/Delete Higher"
 expect_value sdiv_levels == 0
 expect_value triangles == 108
 
@@ -127,15 +127,15 @@ click "Parts##tool.part"
 expect_text "SDiv 1/5"
 shot part-list
 
-# Del Lower at level 2 makes it the new base; Del Higher drops the top.
+# Delete Lower at level 2 makes it the new base; Delete Higher drops the top.
 click "Geometry##tool.geometry"
 key d
-click "Geometry/Del Lower"
+click "Geometry/Delete Lower"
 expect_value sdiv == 1
 expect_value sdiv_levels == 4
 expect_value triangles == 432
-click "Geometry/Higher Res"
-click "Geometry/Del Higher"
+click "Geometry/Higher Level"
+click "Geometry/Delete Higher"
 expect_value sdiv_levels == 2
 key ctrl+z
 expect_value sdiv_levels == 4

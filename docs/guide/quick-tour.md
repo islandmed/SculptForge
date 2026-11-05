@@ -23,7 +23,7 @@ words too, and says which one it matched:
 |---|---|
 | `remesh`, `voxel`, `block out` | **Voxel Remesh** |
 | `retopo`, `retopology`, `quads` | **Quad Remesh** |
-| `subdivide`, `multires`, `levels` | **Divide**, **Lower Res**, **Higher Res** |
+| `subdivide`, `multires`, `levels` | **Divide**, **Lower Level**, **Higher Level** |
 | `groups` | **Face Groups** |
 | `clip`, `trim`, `slice` | **Tool > Cut** |
 | `folders`, `objects` | **Tool > Parts** |
@@ -54,7 +54,7 @@ fingers out of a ball without remeshing. **Wire** (<kbd>Shift</kbd>+<kbd>F</kbd>
 ![Tool > Remesh with Quad Remesh at its top](images/quick-tour/04-quad.jpg)
 
 Automatic quad retopology: **Tool > Remesh > Quad Remesh** rebuilds a sculpt as clean quads whose edge loops follow
-the forms. Set **Target Polygons** and leave **Keep Original** on. Divide the result, then **Project All**
+the forms. Set **Target Polygons** and leave **Keep Original** on. Divide the result, then **Project Detail**
 (**Tool > Parts**) brings the detail back. Draw **Quad Remesh Guides** to steer the loops. See
 [Quad retopology](retopology.md).
 
@@ -74,7 +74,7 @@ See [Subdivision levels](subdivision-levels.md).
 
 Hold <kbd>Ctrl</kbd> and paint to mask, <kbd>Ctrl</kbd>+<kbd>Alt</kbd> to unmask. **Tool > Masking** inverts,
 blurs and grows the mask, and builds one **By cavity**, **By face group** or along the border. Press <kbd>G</kbd>
-for the stroke popup: its **Shapes** row picks **Mask Pen**, **Mask Lasso** or **Mask Rect** for the next
+for the stroke popup: its **Shapes** row picks **Mask Pen**, **Lasso Mask** or **Rectangle Mask** for the next
 <kbd>Ctrl</kbd> stroke. See [Masking](masking.md).
 
 ## Cut, Clip and Close Holes

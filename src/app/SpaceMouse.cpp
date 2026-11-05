@@ -7,8 +7,8 @@
 // it, macOS, Windows without 3DxWare hiding it). The cap's six axes move the
 // camera every frame about the same pivot the mouse orbits around; the buttons
 // run actions (Frame and Front view by default). The math and the settings are
-// in core/SpaceMouse.h; Preferences > Input > SpaceMouse edits them, Store
-// Config keeps them. User guide: docs/guide/navigation.md.
+// in core/SpaceMouse.h; Preferences > Input > SpaceMouse edits them, and
+// they save themselves. User guide: docs/guide/navigation.md.
 #include "app/App.h"
 #include "app/Ui.h"
 #include "app/I18n.h"

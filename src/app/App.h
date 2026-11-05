@@ -313,7 +313,7 @@ private:
     struct DabSettings {
         float radiusPx = 60.0f, strength = 0.5f, smoothStrength = 0.5f, focal = 0.0f, maskStrength = 1.0f;
         float sprayScatter = 1.0f;
-        float worldRadius = 0.0f; // World Size: the brush radius in model units (0: Draw Size in pixels)
+        float worldRadius = 0.0f; // World Size: the brush radius in model units (0: Size in pixels)
         PressurePoints pressureCurve; // the brush's own (after the tablet's global curve)
         bool smoothKeepVolume = false; // Smooth keeps the volume (smoothKeepVolume_, or the alternate smooth)
         bool smoothGroupBorders = false; // Smooth moves face group borders only (smoothGroupBorders_, #81)
@@ -419,7 +419,7 @@ private:
     void drawSupportersSection();       // Help > About: the names from docs/supporters.txt, as plain text
     bool showWelcome_ = false;          // the first start (no project.json yet), or Help > Welcome
     // project.json "input_style": the key style an install started with (the welcome's "Coming from" choice, or
-    // SculptForge for a new install), used while ui.json (Store Config) names none; -1: an install from before it,
+    // SculptForge for a new install), used while ui.json (saved automatically) names none; -1: an install from before it,
     // which keeps the Classic sculpting keys it had.
     int startInputStyle_ = -1;
     // "SculptForge has a new look" (0.10.7, PanelSupport.cpp): once, for an install from before it that kept the
@@ -644,7 +644,7 @@ private:
     void runCut(const char* shape, const std::vector<ImVec2>& path, bool closed, bool flip);
     void drawCutOverlay();
     void drawCutSection();
-    bool maskFrontFacesOnly_ = false; // Mask Lasso / Rectangle: only vertices facing the viewer (#91.3)
+    bool maskFrontFacesOnly_ = false; // Lasso Mask / Rectangle: only vertices facing the viewer (#91.3)
     int cutMode_ = 0;         // 0 Away, 1 In, 2 Add, 3 Clip (core/Cut.h)
     float cutDepth_ = 0.1f;   // In / Add: fraction of the Part's size
     std::vector<ImVec2> cutPolyline_; // window pixels of the Polyline being placed
@@ -691,14 +691,14 @@ private:
     bool steadyOn() const { return steadyStroke_ || strokeType_ == StrokeType::LazyMouse; }
     glm::vec2 steadyCursor_{0.0f}; // where the pointer is (the string's far end) during a steady stroke
     void steadyCatchUp(); // on release: the brush point runs on to the pointer
-    // World Size: Draw Size kept in model units, so the brush stays the same size on the surface as you zoom.
+    // World Size: Size kept in model units, so the brush stays the same size on the surface as you zoom.
     bool worldSize_ = false;
     float worldRadius_ = 0.0f;   // model units (shown in mm)
     float worldSyncedPx_ = 0.0f; // radiusPx_ as worldSize sync last set it (a different value: the user set it)
     float cursorWorldPerPx_ = 0.0f; // at the surface under the pointer (0: not seen yet)
     void syncWorldSize();           // every frame, outside strokes
-    std::string drawSizeLabel() const; // "Draw Size %.1f px  0.42 mm" (an ImGui slider format)
-    std::string drawSizeStatus() const; // "Draw Size 3.5 px (0.42 mm)"
+    std::string drawSizeLabel() const; // "Size %.1f px  0.42 mm" (an ImGui slider format)
+    std::string drawSizeStatus() const; // "Size 3.5 px (0.42 mm)"
     void drawPrecisionCursor(ImDrawList* dl, ImVec2 cursor, float radius, ImU32 col);
     void drawPrecisionOptions(); // the Stroke picker: Steady Stroke, its radius and catch-up, Precision Intensity
     glm::vec3 cursorSurface_{0.0f}; // the surface point last under the cursor (World Size measures there)
@@ -711,7 +711,7 @@ private:
     bool precisionActive_ = false;
     float precisionIntensity_ = 0.1f;
     bool precisionHeld() const;
-    // Ctrl+Shift+right-drag: scrubs the Draw Size finely (Drag::SizeScrub).
+    // Ctrl+Shift+right-drag: scrubs the Size finely (Drag::SizeScrub).
     float sizeScrubStart_ = 0.0f, sizeScrubDx_ = 0.0f;
     // The surface pick under each dab, filtered along its ray so dense meshes don't wobble the stroke.
     PickSmoother pickSmoother_;
@@ -1449,7 +1449,7 @@ private:
     float morphAmount_ = 1.0f;
     bool renamingSet_ = false;
     char setRenameBuffer_[64] = "";
-    void drawGeometrySection(); // PanelGeometry.cpp: Divide, SDiv, Lower / Higher Res, Del Lower / Higher, Reconstruct
+    void drawGeometrySection(); // PanelGeometry.cpp: Divide, SDiv, Lower / Higher Level, Delete Lower / Higher, Reconstruct
     bool smt_ = true;           // Tool > Geometry > Smt: Divide smooths
     float sdivSlider_ = 1.0f;   // the SDiv slider while dragged (1-based)
     float microSlider_ = 4.0f;  // Tool > Geometry > Micro: the micro level the next Divide to micro makes
@@ -1549,8 +1549,11 @@ public:
     void openCommandPalette() { palette_.open(); }
     void setConsoleOpen(bool open);
     void consolePrefill(const std::string& text); // opens the console with TEXT typed
-    // Store Config (Ctrl+Shift+I) / Restore Standard UI / Restore Custom UI / Save UI... / Load UI... (Ctrl+L)
-    void storeConfig();
+    // Save Layout / Reset Layout and Shortcuts / Revert to Saved Layout / Export Interface... / Import Interface...
+    // (Ctrl+L). The preferences, shortcuts and radial menus save themselves (autosavePrefs, #117).
+    void saveLayout();
+    void savePrefsNow(); // config.store: write them at once
+    void restartPrefsForTest(const std::string& uiJson = {}); // the UI test step `restart`: save, back to the defaults, read ui.json again
     void restoreStandardUi();
     void restoreCustomUi();
     void saveUiDialog();
@@ -1595,8 +1598,14 @@ private:
     std::string insertMeshKey_, insertMeshValue_;
     glm::vec3 insertAt_{0.0f}, insertNormal_{0.0f, 1.0f, 0.0f};
     float insertX_ = 0.0f, insertY_ = 0.0f, insertPx_ = 0.0f;
-    bool readUiConfig(const std::string& path, std::string& err);
+    // own: our ui.json (its layout becomes storedLayout_; it may have none), not a shared file.
+    bool readUiConfig(const std::string& path, std::string& err, bool own = false);
     bool writeUiConfig(const std::string& path, std::string& err);
+    static bool writeJsonAtomic(const std::string& path, const Json& j, std::string& err); // temp file, then rename
+    std::string prefsKey() const;          // the shortcuts, preferences and radial menus, to notice changes
+    bool saveUiPrefs(std::string& err);     // ui.json with them and storedLayout_
+    void autosavePrefs(bool flush = false); // every frame: saves a moment after a change (flush: now, at quit)
+    void noteLayoutStored();                // layout_ is what ui.json keeps now
     std::string layoutKey() const; // the layout without per-session state, to notice edits
     void watchLayoutChanges();
     void saveRecentActions();
@@ -1609,6 +1618,10 @@ private:
     std::string configDir_;           // <prefs>/ (ui.json, console_history.txt, recent_actions.txt)
     std::string capturingShortcut_;   // action id waiting for a key
     std::string layoutBaseline_;      // layoutKey() as last stored / loaded / restored
+    Json storedLayout_;               // the layout ui.json keeps (Save Layout); null: none yet, the standard one
+    std::string prefsSavedKey_;       // prefsKey() as last saved (or read at the start)
+    bool prefsKeyKnown_ = false, actionsReady_ = false;
+    double prefsCheckedAt_ = 0.0, prefsSaveAt_ = 0.0; // the last look; when a pending change is written (0: none)
     bool layoutHintShown_ = false;
     int layoutCheckFrame_ = 0;
     bool uiConfigDeterministic_ = false; // UI tests, renders, recordings: standard layout, nothing read
@@ -1706,11 +1719,11 @@ private:
     } gizmo_;
     // ---- end Transform gizmo ----
     // ---- Classic sculpting keys (Input.cpp, docs/guide/quick-tour.md) ----
-    // Preferences > Input (the classic or SculptForge key style), the Space QuickMenu, the intensities and Focal
-    // Shift (U / I / O), the classic mask and face group keys, Shift-constrained straight strokes and the
+    // Preferences > Input (the classic or SculptForge key style), the Space QuickMenu, the intensities and
+    // Falloff (U / I / O), the classic mask and face group keys, Shift-constrained straight strokes and the
     // Shift+click, release Shift, drag roll.
     void registerInputActions();
-    void applyInputStyle(); // the style's default shortcuts (1-0 brushes or 9 QuickSave; I = RGB or Z Intensity)
+    void applyInputStyle(); // the style's default shortcuts (1-0 brushes or 9 QuickSave; I = RGB or Intensity)
     bool classicStyle() const { return uiPrefs_.inputStyle == 0; }
     bool blenderStyle() const { return uiPrefs_.inputStyle == 2; }
     bool mayaStyle() const { return uiPrefs_.inputStyle == 3; } // #32: Alt+left/middle/right orbit/pan/zoom
@@ -1767,7 +1780,7 @@ private:
     bool hintShown(const char* id) const;
     void drawViewportHint(const char* id, const char* text, ImU32 colour, float top);
     void drawHintsSection();
-    // Z Intensity (0-100 on screen): Smooth's own while Shift is held or Smooth is the brush.
+    // Intensity (0-100 on screen): Smooth's own while Shift is held or Smooth is the brush.
     void drawZIntensitySlider(const char* id);
     void openQuickMenu();
     void quickMenuKeyUp();   // Space released: a hold closes the menu, a tap leaves it open
@@ -1780,16 +1793,16 @@ private:
     // Straight strokes: Shift pressed after a stroke started constrains it to a line from where Shift went down,
     // snapped to 45 degree steps on screen. Returns the point to draw towards.
     glm::vec2 constrainStroke(float x, float y);
-    float smoothStrength_ = 0.5f; // Smooth's own Z Intensity (Shift+stroke, or the Smooth brush)
+    float smoothStrength_ = 0.5f; // Smooth's own Intensity (Shift+stroke, or the Smooth brush)
     bool smoothKeepVolume_ = false; // Brush > Smooth keeps volume: a Taubin smooth instead of the plain one (#40)
     bool smoothGroupBorders_ = false; // Brush > Smooth face group borders only: straightens the borders (#81)
     // the classic alternate smooth (#40): a stroke begun with Shift held that lets go of Shift while still pressing
     // smooths the other way (keeping the volume, or plainly when Smooth keeps volume) for the rest of the stroke.
     bool strokeAltSmooth_ = false;
-    float rgbIntensity_ = 1.0f;   // paint strength (RGB Intensity, 100 by default)
-    float focalShift_ = 0.0f;     // -1..1 (Focal Shift -100..100)
+    float rgbIntensity_ = 1.0f;   // paint strength (Colour intensity, 100 by default)
+    float focalShift_ = 0.0f;     // -1..1 (Falloff -100..100)
     // Per-brush settings (#78, BrushSettingsUi.cpp, core/BrushSettings.h): each frame, a brush switch stores the
-    // brush left and brings back the picked brush's own Draw Size, Z Intensity, Falloff, RGB Intensity, stroke and
+    // brush left and brings back the picked brush's own Size, Intensity, Falloff, Colour intensity, stroke and
     // alpha. Save Brush Settings writes them (<app data>/brush-settings.json) so they load at startup; Reset Brush
     // to Default puts back the shipped values. Off in demo videos and benchmarks (their scripts set every value).
 public:
@@ -1916,7 +1929,7 @@ private:
     // Up to eight pie menus of up to eight actions each. A menu's key (action radial.menuN, set in the keymap like
     // any other) or its mouse / pen button, held: the pie shows at the cursor, a flick toward a slot and letting go
     // runs that action. Tapped: the pie stays open; click a slot (or beside the pie, or Esc, to close it). Edited in
-    // Preferences > Input > Radial Menus; Store Config keeps them in ui.json ("radialMenus").
+    // Preferences > Input > Radial Menus; saved automatically in ui.json ("radialMenus").
     enum class RadialHold { None, Key, Mouse, Pen };
     void registerRadialActions();
     void refreshRadialActions(); // the radial.menuN actions' labels follow the menus' names

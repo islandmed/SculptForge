@@ -150,7 +150,7 @@
 <p class="wn-earlier">Earlier versions</p>
 <section class="wn-group" id="versions-0101-to-0109"><header class="wn-band wn-band-small"><h2>0.10.1 to 0.10.9<a class="anchor" href="#versions-0101-to-0109" aria-label="Link to these versions">#</a></h2></header><ul class="wn-highlights"><li><strong>Your first sculpt in 10 minutes</strong>: a beginner lesson from sphere to a rendered owl</li><li><strong>A new look</strong>: Forge Terminal with menus by task, a status bar and a one-row tool shelf</li><li><strong>PBR viewport</strong>: the texture&#x27;s material lit by an environment, as fast as Lit Sphere</li><li><strong>UV Editor</strong>: seams, unwrapping, UDIM packing and live stretch on the model</li><li><strong>Keep Masked remeshing</strong>: the masked part keeps its triangles and detail exactly</li><li><strong>Micro levels</strong>: about a billion sculptable triangles in under 2 GB of memory</li></ul><details class="wn-all"><summary>All changes</summary><div class="wn-body"><h3 id="version-0109" class="wn-ver">Version 0.10.9<time datetime="2026-11-02">2026-11-02</time></h3><ul>
 <li>
-<strong>Each brush keeps its own settings</strong>: Draw Size, Intensity, Falloff, RGB Intensity, stroke and alpha follow the brush, custom and Community brushes included. <strong>Brush &gt; Save Brush Settings</strong> keeps them for the next start, <strong>Reset Brush to Default</strong> puts back the shipped values, and <strong>Preferences &gt; Input &gt; Share size and intensity across brushes</strong> keeps the old way (#78). See <a href="sculpting.html#each-brush-keeps-its-own-settings">Sculpting</a>.
+<strong>Each brush keeps its own settings</strong>: Size, Intensity, Falloff, Colour intensity, stroke and alpha follow the brush, custom and Community brushes included. <strong>Brush &gt; Save Brush Settings</strong> keeps them for the next start, <strong>Reset Brush to Default</strong> puts back the shipped values, and <strong>Preferences &gt; Input &gt; Share size and intensity across brushes</strong> keeps the old way (#78). See <a href="sculpting.html#each-brush-keeps-its-own-settings">Sculpting</a>.
 </li>
 <li>
 <strong>Alpha options</strong> (<strong>Alpha</strong> palette): <strong>Follow stroke direction</strong> turns the alpha along the stroke, smoothed as Blender&#x27;s Rake does; <strong>Angle</strong> and <strong>Angle jitter</strong> turn it by a fixed or a random amount; <strong>Tile</strong> repeats it inside the brush. They work with custom and Community brushes too, and each brush keeps its own (#76). See <a href="sculpting.html#alpha-options">Alpha options</a>.
@@ -200,7 +200,7 @@
 <strong>Focus Detail (experimental)</strong>: sculpt a head of a billion micro triangles from one compressed file. Detail loads where you look and where the brush is heading, and the rest shows a lighter version. Saving writes only what you changed. Try it with <code>sculptforge --benchmark standard-1b</code> (Linux and macOS for now).
 </li>
 <li>
-<strong>Precision work</strong> for pores, wrinkles, jewellery and trims: <strong>Steady Stroke</strong> (<kbd>L</kbd>) with every stroke type and a catch-up on release; <strong>World Size</strong>, so the brush keeps its size in mm on the surface as you zoom; Draw Size down to 0.5 px with <kbd>Shift</kbd>+<kbd>[</kbd> / <kbd>]</kbd> for 1 px steps; hold <kbd>Shift</kbd>+<kbd>Alt</kbd> while drawing to move the brush at a quarter of the pen&#x27;s speed; and a pressure curve for each brush with a <strong>Fine detail</strong> preset. The brush centre now sits exactly under the cursor at any zoom. See <a href="sculpting.html#precision-work">Precision work</a>.
+<strong>Precision work</strong> for pores, wrinkles, jewellery and trims: <strong>Steady Stroke</strong> (<kbd>L</kbd>) with every stroke type and a catch-up on release; <strong>World Size</strong>, so the brush keeps its size in mm on the surface as you zoom; Size down to 0.5 px with <kbd>Shift</kbd>+<kbd>[</kbd> / <kbd>]</kbd> for 1 px steps; hold <kbd>Shift</kbd>+<kbd>Alt</kbd> while drawing to move the brush at a quarter of the pen&#x27;s speed; and a pressure curve for each brush with a <strong>Fine detail</strong> preset. The brush centre now sits exactly under the cursor at any zoom. See <a href="sculpting.html#precision-work">Precision work</a>.
 </li>
 <li>
 <strong>UI scale works live</strong>: <strong>Preferences &gt; Interface &gt; UI scale</strong> (100% to 200%) resizes text and panels at once, no restart. <strong>Automatic</strong> follows the monitor the window is on, so on Windows moving it between a 100% and a 150% monitor rescales it right away (#87). See <a href="interface.html#interface-preferences">The interface</a>.
@@ -245,7 +245,7 @@
 <strong>Cut</strong>: one tool that cuts the active Part with a <strong>Line</strong>, <strong>Lasso</strong>, <strong>Rectangle</strong> or <strong>Polyline</strong>. <strong>Away</strong> removes what the shape covers and closes the cut with a flat cap, <strong>In</strong> cuts a flat-bottomed pocket and <strong>Add</strong> raises the shape out of the surface. The result stays watertight and follows the symmetry. Hold <kbd>Ctrl</kbd>+<kbd>Shift</kbd> and pick a Cut shape, or open <strong>Tool &gt; Cut</strong>. See <a href="cut.html">Cut</a> (#101, #91).
 </li>
 <li>
-<strong>Mask: Front faces only</strong>: Mask Lasso and Mask Rectangle can leave the far side alone (<a href="masking.html#mask-with-a-lasso-or-rectangle">Masking</a>, #91).
+<strong>Mask: Front faces only</strong>: Lasso Mask and Rectangle Mask can leave the far side alone (<a href="masking.html#mask-with-a-lasso-or-rectangle">Masking</a>, #91).
 </li>
 <li>
 <strong>Duplicate Part</strong> has a shortcut: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> (<a href="parts.html">Parts</a>).
@@ -277,7 +277,7 @@
 <strong>New memberships</strong>: Supporters get the credits (in the app and on the website), the monthly pack and a vote; Insiders also get daily drops and preview builds about a week early; Studio covers the whole company with a custom studio build (Founding Studio: the first 10 studios lock in $150 a month). Every release stays free for everyone; bug-fix and security releases go out to everyone the same day.
 </li>
 <li>
-<strong>Full alphas on custom brushes</strong>: at Focal Shift -100, Clay Slab and the other custom and Community brushes now show the whole alpha to its corners, as the built-in brushes do (#75).
+<strong>Full alphas on custom brushes</strong>: at Falloff -100, Clay Slab and the other custom and Community brushes now show the whole alpha to its corners, as the built-in brushes do (#75).
 </li>
 <li>
 <strong>A new look</strong>: new installs start in <strong>Forge Terminal</strong> with the Tokyo Night colours and the <strong>SculptForge layout</strong>: menus by task (File, Edit, Sculpt, Paint, Mesh, View, Render, Help) holding every palette, a status bar and a one-row tool shelf. If you are updating, nothing changes until you say so: a card offers <strong>Try it</strong> or <strong>Keep my layout</strong>. Experienced sculptor? <strong>Preferences &gt; Interface &gt; Look &gt; Classic layout</strong> (or the button in the welcome) brings back the palette bar and the two-row shelf. Six more colour schemes, Match my desktop theme, Phosphor, Blueprint and the Classic look are there too. See <a href="interface.html#looks-and-layouts">The interface</a>.
@@ -377,10 +377,10 @@
 <strong>Start strokes off the model</strong> (#62): an option in <strong>Preferences &gt; Input</strong>, off by default, and <kbd>Shift</kbd>+<kbd>L</kbd> to turn it on and off. With it on, a left-drag that starts on the background sculpts once it reaches the model instead of turning the view. See <a href="navigation.html#mouse-and-pen">Navigation</a>.
 </li>
 <li>
-<strong>Radial and local symmetry</strong> (#63): <strong>R</strong> in <strong>Transform &gt; Symmetry</strong> (and on the top shelf) repeats every stroke around the X, Y or Z axis, 2 to 64 times (<strong>Radial Count</strong>), together with the X / Y / Z mirrors. Every brush, mask, vertex paint and texture stroke, the mask and select shapes, Dynamic Topology and Insert follow it, and the brush cursor shows on every copy. <strong>Local</strong> puts the planes and the axis through the active Part&#x27;s centre. Saved with the project and scriptable (<code>radial</code>, <code>radial_axis</code>, <code>local</code>). See <a href="sculpting.html#radial-symmetry">Sculpting</a>.
+<strong>Radial and local symmetry</strong> (#63): <strong>R</strong> in <strong>Transform &gt; Symmetry</strong> (and on the top shelf) repeats every stroke around the X, Y or Z axis, 2 to 64 times (<strong>Radial Copies</strong>), together with the X / Y / Z mirrors. Every brush, mask, vertex paint and texture stroke, the mask and select shapes, Dynamic Topology and Insert follow it, and the brush cursor shows on every copy. <strong>Local</strong> puts the planes and the axis through the active Part&#x27;s centre. Saved with the project and scriptable (<code>radial</code>, <code>radial_axis</code>, <code>local</code>). See <a href="sculpting.html#radial-symmetry">Sculpting</a>.
 </li>
 <li>
-<strong>The Sculpt Timeline is at the top of the viewport</strong> (#63), away from the brushes on the bottom shelf. <strong>Preferences &gt; Interface &gt; Timeline position</strong> puts it back at the bottom; Store Config keeps the choice. See <a href="timeline.html">Sculpt Timeline</a>.
+<strong>The Sculpt Timeline is at the top of the viewport</strong> (#63), away from the brushes on the bottom shelf. <strong>Preferences &gt; Interface &gt; Timeline position</strong> puts it back at the bottom; saved automatically. See <a href="timeline.html">Sculpt Timeline</a>.
 </li>
 </ul><h3 id="version-0104" class="wn-ver">Version 0.10.4<time datetime="2026-11-01">2026-11-01</time></h3><h4 id="from-your-requests-on-github-1">From your requests on GitHub<a class="anchor" href="#from-your-requests-on-github-1" aria-label="Link to this section">#</a></h4>
 <ul>
@@ -512,7 +512,7 @@ Dynamic topology with symmetry now adds detail on the mirrored side too when the
 <h4 id="mirror-and-weld">Mirror And Weld<a class="anchor" href="#mirror-and-weld" aria-label="Link to this section">#</a></h4>
 <p><strong>Tool &gt; Geometry &gt; Modify Topology &gt; Mirror And Weld</strong> mirrors one side of a model onto the other across X, Y or Z and welds the seam into one watertight mesh, keeping face groups and vertex paint. <strong>Tool &gt; Deformation &gt; Mirror</strong> flips a Part. See <a href="geometry.html#mirror-and-weld">Mirror And Weld</a>.</p>
 <h4 id="a-flat-background">A flat background<a class="anchor" href="#a-flat-background" aria-label="Link to this section">#</a></h4>
-<p><strong>Preferences &gt; Display &gt; Background</strong> (also in the Render palette) switches the view from the gradient to a flat colour you pick. Store Config keeps it, and projects keep their own. See <a href="interface.html#the-background">The background</a>.</p>
+<p><strong>Preferences &gt; Display &gt; Background</strong> (also in the Render palette) switches the view from the gradient to a flat colour you pick. Saved automatically; projects keep their own. See <a href="interface.html#the-background">The background</a>.</p>
 <h4 id="flatpak">Flatpak<a class="anchor" href="#flatpak" aria-label="Link to this section">#</a></h4>
 <p>SculptForge comes as a Flatpak for x86_64 and ARM64 Linux: one file on the releases page that runs in Flatpak&#x27;s sandbox on any distribution, installed with <code>flatpak install --user ./SculptForge-linux-x86_64.flatpak</code>. It can open projects and models anywhere in your home folder, works with pen tablets and a SpaceMouse, and the Blender bridge finds it by itself. See <a href="installing.html#flatpak">Installing SculptForge</a>.</p>
 <h4 id="fixes-1">Fixes<a class="anchor" href="#fixes-1" aria-label="Link to this section">#</a></h4>
@@ -590,7 +590,7 @@ Idle, SculptForge no longer keeps your graphics card busy: it draws a new frame 
 <strong>Classic zoom direction.</strong> With the Classic input style, dragging up zooms out on every zoom drag. See <a href="navigation.html">Navigation</a>.
 </li>
 <li>
-<strong>Ctrl and Ctrl+Shift brushes.</strong> Hold <kbd>Ctrl</kbd> and the left shelf shows the mask brush; with <kbd>Ctrl</kbd> held the Brush and Stroke pickers pick Mask Pen, Mask Lasso or Mask Rectangle. <kbd>Ctrl</kbd>+<kbd>Shift</kbd> does the same for Select Rectangle and Select Lasso. See <a href="masking.html">Masking</a>.
+<strong>Ctrl and Ctrl+Shift brushes.</strong> Hold <kbd>Ctrl</kbd> and the left shelf shows the mask brush; with <kbd>Ctrl</kbd> held the Brush and Stroke pickers pick Mask Pen, Lasso Mask or Rectangle Mask. <kbd>Ctrl</kbd>+<kbd>Shift</kbd> does the same for Select Rectangle and Select Lasso. See <a href="masking.html">Masking</a>.
 </li>
 <li>
 <strong>Group by UVs.</strong> One face group per UV island, in <strong>Tool &gt; Face Groups</strong>. See <a href="face-groups.html">Face Groups and visibility</a>.
@@ -605,7 +605,7 @@ Idle, SculptForge no longer keeps your graphics card busy: it draws a new frame 
 <h4 id="vector-displacement-brushes">Vector displacement brushes<a class="anchor" href="#vector-displacement-brushes" aria-label="Link to this section">#</a></h4>
 <p>One drag stamps a whole shape, overhangs and all: the new <strong>VDM</strong> brush presses a vector displacement map, so a horn can lean over, an ear can curl and scales can overlap, which no alpha can do. Four maps come with it (Horn, Ear Curl, Scales, Nostril); make your own by sculpting on a <strong>VDM Plane</strong> and clicking <strong>Create VDM</strong>, or load the EXRs Blender&#x27;s VDM Brush Baker makes (and export yours for Blender). The new <strong>Slide Stamp</strong> stroke slides a stamp into place. See <a href="sculpting.html#vector-displacement-brushes">Vector displacement brushes</a>.</p>
 <h4 id="classic-sculpting-keys-in-blenders-sculpt-mode">Classic sculpting keys in Blender&#x27;s Sculpt Mode<a class="anchor" href="#classic-sculpting-keys-in-blenders-sculpt-mode" aria-label="Link to this section">#</a></h4>
-<p>The Blender add-on has a new preference, <strong>The Classic sculpting keys in Sculpt Mode</strong>: S, U and O for Draw Size, Strength and Falloff, B for the brushes by name, Space for the quick menu, Alt to dig in, Ctrl to mask, Ctrl+Shift to hide, D and Shift+D for subdivision levels, and more. See <a href="blender.html#classic-sculpting-keys-in-sculpt-mode">Working with Blender</a>.</p>
+<p>The Blender add-on has a new preference, <strong>The Classic sculpting keys in Sculpt Mode</strong>: S, U and O for Size, Strength and Falloff, B for the brushes by name, Space for the quick menu, Alt to dig in, Ctrl to mask, Ctrl+Shift to hide, D and Shift+D for subdivision levels, and more. See <a href="blender.html#classic-sculpting-keys-in-sculpt-mode">Working with Blender</a>.</p>
 <h4 id="draw-the-edge-loops-you-want">Draw the edge loops you want<a class="anchor" href="#draw-the-edge-loops-you-want" aria-label="Link to this section">#</a></h4>
 <p><strong>Quad Remesh Guides</strong> work: draw curves on the sculpt, around the eyes, the mouth or a joint, and Quad Remesh puts an edge loop on each one and turns the flow around it to follow. A curve that ends where it started becomes a loop that closes cleanly, symmetry mirrors what you draw, and <strong>Curves Strength</strong> sets how far around a curve the flow follows it. Guides are kept with each Part and saved in the project. See <a href="retopology.html#quad-remesh-guides">Quad Remesh Guides</a>.</p>
 <h4 id="sculpt-layers-on-every-subdivision-level">Sculpt layers on every subdivision level<a class="anchor" href="#sculpt-layers-on-every-subdivision-level" aria-label="Link to this section">#</a></h4>
@@ -614,16 +614,16 @@ Idle, SculptForge no longer keeps your graphics card busy: it draws a new frame 
 <p>SculptForge now follows the Classic sculpting keys and gestures by default. A professional sculptor tried an earlier version and put it down because it didn&#x27;t feel; this release goes through every habit of the first hour. <a href="quick-tour.html">Quick tour for experienced sculptors</a> lists what&#x27;s the same, what&#x27;s different and every shortcut side by side.</p>
 <ul>
 <li>
-<strong>S, U, I, O</strong> open Draw Size, Intensity, RGB Intensity and Falloff under the cursor, and <kbd>Space</kbd> opens the Quick Menu with all of them plus the brush, stroke, alpha and material.
+<strong>S, U, I, O</strong> open Size, Intensity, Colour intensity and Falloff under the cursor, and <kbd>Space</kbd> opens the Quick Menu with all of them plus the brush, stroke, alpha and material.
 </li>
 <li>
-<strong>Falloff</strong> shapes the brush falloff, shown as the cursor&#x27;s inner ring. <strong>RGB Intensity</strong> gives painting a strength of its own, and <strong>Smooth keeps its own Intensity</strong>, so a gentle brush still smooths properly.
+<strong>Falloff</strong> shapes the brush falloff, shown as the cursor&#x27;s inner ring. <strong>Colour intensity</strong> gives painting a strength of its own, and <strong>Smooth keeps its own Intensity</strong>, so a gentle brush still smooths properly.
 </li>
 <li>
 <strong>brush letters</strong>: B C B Clay Block, B D S Sharp Crease, B M V Move, B I N Inflate...
 </li>
 <li>
-<strong>Masking</strong>: <kbd>Ctrl</kbd>+click the model blurs the mask, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click sharpens it; <kbd>Ctrl</kbd>+<kbd>A</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>, <kbd>Ctrl</kbd>+<kbd>I</kbd>, <kbd>Ctrl</kbd>+<kbd>H</kbd> and <kbd>Ctrl</kbd>+<kbd>W</kbd> (group masked) work.
+<strong>Masking</strong>: <kbd>Ctrl</kbd>+click the model blurs the mask, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click sharpens it; <kbd>Ctrl</kbd>+<kbd>A</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>, <kbd>Ctrl</kbd>+<kbd>I</kbd>, <kbd>Ctrl</kbd>+<kbd>H</kbd> and <kbd>Ctrl</kbd>+<kbd>W</kbd> (group from mask) work.
 </li>
 <li>
 <strong>Strokes and the view</strong>: <kbd>Shift</kbd> pressed mid-stroke draws a straight line; <kbd>Shift</kbd>+click, let go and drag rolls the view; <kbd>Shift</kbd>+<kbd>Alt</kbd>+click frames a Part; <kbd>L</kbd> toggles Lazy Stroke and <kbd>V</kbd> swaps colours.
@@ -682,13 +682,13 @@ Opening a big model or dividing it sends it to the graphics card about 40% faste
 <strong>Divide</strong> (<kbd>Ctrl</kbd>+<kbd>D</kbd>) adds a level and keeps the ones below. Quads stay quads (Catmull-Clark); <strong>Smt</strong> off divides without smoothing.
 </li>
 <li>
-<strong>Lower Res</strong> / <strong>Higher Res</strong> (<kbd>Shift</kbd>+<kbd>D</kbd> / <kbd>D</kbd>) and the <strong>SDiv</strong> slider step between levels. Detail sculpted high rides along when you reshape low, and edits high show up softened below. Stepping back and forth is instant, even at millions of polygons.
+<strong>Lower Level</strong> / <strong>Higher Level</strong> (<kbd>Shift</kbd>+<kbd>D</kbd> / <kbd>D</kbd>) and the <strong>SDiv</strong> slider step between levels. Detail sculpted high rides along when you reshape low, and edits high show up softened below. Stepping back and forth is instant, even at millions of polygons.
 </li>
 <li>
 Mask, vertex paint, paint layers, face groups, hidden faces, UVs and sculpt layers follow the levels.
 </li>
 <li>
-<strong>Del Lower</strong>, <strong>Del Higher</strong> and <strong>Reconstruct Subdiv</strong> (find the lower levels of a model subdivided elsewhere). Undo walks back through strokes and level changes; projects save every level; the Parts list shows &quot;SDiv 3/5&quot;.
+<strong>Delete Lower</strong>, <strong>Delete Higher</strong> and <strong>Reconstruct Subdiv</strong> (find the lower levels of a model subdivided elsewhere). Undo walks back through strokes and level changes; projects save every level; the Parts list shows &quot;SDiv 3/5&quot;.
 </li>
 <li>
 <kbd>Ctrl</kbd>+<kbd>D</kbd> now divides with levels; the old one-way <strong>Subdivide</strong> is still in <strong>Tool &gt; Geometry</strong>.
@@ -741,7 +741,7 @@ Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
 <strong>Quad Remesh</strong> (<strong>Tool &gt; Geometry</strong>, like quad remesh) rebuilds a sculpt as clean quads whose edge loops follow the forms, near a <strong>Target Polygons</strong> count, in the background. <strong>Keep Groups</strong>, <strong>Adaptive Size</strong>, <strong>Use Vertex Paint</strong>, <strong>Symmetry</strong> and <strong>Half / Same / Double</strong> work.
 </li>
 <li>
-<strong>Project All</strong> (<strong>Tool &gt; Parts &gt; Project</strong>) puts the sculpted detail and vertex paint back onto the divided quads, with <strong>Dist</strong>, <strong>Mean</strong> and <strong>PA Blur</strong>, and respects the mask.
+<strong>Project Detail</strong> (<strong>Tool &gt; Parts &gt; Project</strong>) puts the sculpted detail and vertex paint back onto the divided quads, with <strong>Dist</strong>, <strong>Mean</strong> and <strong>PA Blur</strong>, and respects the mask.
 </li>
 </ul>
 <p>See <a href="retopology.html">Quad retopology and detail projection</a>.</p>
@@ -827,7 +827,7 @@ Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
 <h4 id="mask-and-isolate-with-a-lasso-or-rectangle">Mask and isolate with a lasso or rectangle<a class="anchor" href="#mask-and-isolate-with-a-lasso-or-rectangle" aria-label="Link to this section">#</a></h4>
 <ul>
 <li>
-<strong>Mask Lasso and Mask Rectangle.</strong> Pick the shape at the top of <strong>Tool &gt; Masking</strong>, then <kbd>Ctrl</kbd>+drag to mask everything inside it; add <kbd>Alt</kbd> to unmask. The drag can start on the model or beside it.
+<strong>Lasso Mask and Rectangle Mask.</strong> Pick the shape at the top of <strong>Tool &gt; Masking</strong>, then <kbd>Ctrl</kbd>+drag to mask everything inside it; add <kbd>Alt</kbd> to unmask. The drag can start on the model or beside it.
 </li>
 <li>
 <strong>Select Lasso.</strong> In <strong>Tool &gt; Visibility</strong>, pick <strong>Select Lasso</strong> next to Select Rectangle, then <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag a free-hand shape to keep only what&#x27;s inside (add <kbd>Alt</kbd> to hide it instead).

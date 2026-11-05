@@ -1,4 +1,4 @@
-# The S slider (Draw Size; U / I / O work the same) opens with its knob right under the cursor, and
+# The S slider (Size; U / I / O work the same) opens with its knob right under the cursor, and
 # stays open while it is dragged, until release, a click elsewhere or Esc (#9). CMake runs this script again on a
 # window whose UI is scaled 1.5x (ui_size_popup_scaled), like Windows at 150%.
 run new_sphere subdivisions=4

@@ -68,7 +68,7 @@ Deleting a layer is undoable.
 With [subdivision levels](subdivision-levels.md) a layer works the way 3D Layers do: record it at the
 top level for the fine detail of an expression, and it stays with the Part whatever level you work on.
 
-- **Each layer has its own detail on every level.** Step down with **Lower Res** (<kbd>Shift</kbd>+<kbd>D</kbd>)
+- **Each layer has its own detail on every level.** Step down with **Lower Level** (<kbd>Shift</kbd>+<kbd>D</kbd>)
   and a lower level shows the broad part of the layer, exactly as it would show the same strokes made in the base.
   Step back up and the layer is there as you recorded it, to the last vertex.
 - **Weights are shared by all levels.** Turn a layer off (weight 0) or blend it at a low level and the top shows
@@ -78,8 +78,8 @@ top level for the fine detail of an expression, and it stays with the Part whate
   level above it too.
 - **Reshape the base at a low level** (or turn it with the [Gizmo](gizmo.md)) and each layer's detail rides on
   the new shape: its offsets turn with the surface instead of pointing the old way.
-- **Divide** carries the layers to the new level. **Reconstruct Subdiv** keeps them, exact at the top. **Del Lower**
-  and **Del Higher** keep the current level's layers as they are.
+- **Divide** carries the layers to the new level. **Reconstruct Subdiv** keeps them, exact at the top. **Delete Lower**
+  and **Delete Higher** keep the current level's layers as they are.
 - **Deleting a layer** removes it from every level. Undo steps back through strokes, level changes and divisions
   with their layers.
 - **Projects** keep every level's layers. **Exports** write the current level with its layers as blend shapes, so

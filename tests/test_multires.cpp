@@ -3,7 +3,7 @@
 //
 // Multiresolution subdivision levels (core/Multires.h): Divide keeps quads, detail survives stepping up and
 // down bit-for-bit, low-level edits carry the high-level detail along, high-level edits show up below, mask /
-// face groups / UVs / paint / sculpt layers follow the levels, undo steps across levels, Del Lower / Del
+// face groups / UVs / paint / sculpt layers follow the levels, undo steps across levels, Delete Lower / Delete
 // Higher / Reconstruct, projects keep every level, and exports can write the base.
 #include "TestHarness.h"
 

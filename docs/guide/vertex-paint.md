@@ -24,7 +24,7 @@ paint layers with blend modes, and the Lit Sphere materials that change how the 
 
 1. Press <kbd>P</kbd>, click **Paint** on the top shelf, or pick **Paint** on the bottom shelf.
 2. Choose a colour (see below).
-3. Stroke over the model. Draw Size, the stroke type and the alpha work as they do for sculpting; **RGB Intensity** (<kbd>I</kbd>) sets how strongly the colour goes on.
+3. Stroke over the model. Size, the stroke type and the alpha work as they do for sculpting; **Colour intensity** (<kbd>I</kbd>) sets how strongly the colour goes on.
 
 While the Paint brush is active:
 
@@ -226,8 +226,8 @@ most when blocking out forms on a low-poly base mesh.
 
 Shading works with every material, vertex paint, textures and the mask. Like the material, it only changes the view:
 exports are unaffected. Projects save the scene's shading and each Part's own; projects from before open with
-your preferred shading. The scene's shading you choose is also the preference for the next session once you
-**Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>). Smooth and Flat have no default shortcut, so no
+your preferred shading. The scene's shading you choose is also the preference for the next session (it saves
+itself). Smooth and Flat have no default shortcut, so no
 classic key changes meaning; assign one under **Edit > Preferences > Hotkeys** if you switch often.
 
 > **Not yet:** loading your own Lit Sphere images, and physically based materials or BPR-style renders.
@@ -263,5 +263,5 @@ paint_layer_add name=Dirt blend=multiply opacity=0.8; paint_from_cavity color=4a
 
 - [Masking](masking.md): protect areas from painting
 - [Sculpt layers and blend shapes](layers.md): the shape counterpart of paint layers
-- [Sculpting and brushes](sculpting.md): Draw Size, Falloff, strokes and alphas also apply to painting
+- [Sculpting and brushes](sculpting.md): Size, Falloff, strokes and alphas also apply to painting
 - [Exporting](exporting.md): which formats carry vertex colours

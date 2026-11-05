@@ -85,7 +85,7 @@ TEST(i18n_keeps_ids_icons_and_tails) {
     CHECK(std::string(tr("Save As...")) == "Guardar como...");
     CHECK(std::string(tr("Open...##file.open")) == "Abrir...##file.open");
     CHECK(std::string(tr("Shelf tiles:")) == "Fichas del estante:");
-    CHECK(std::string(tr("Draw Size %.0f")) == "Tamaño de dibujo %.0f");
+    CHECK(std::string(tr("Size %.0f")) == "Tamaño de dibujo %.0f");
     CHECK(std::string(tr("Resolution %.0f")) == "Resolución %.0f");
     // An exact entry wins over the pieces.
     CHECK(std::string(tr("Every %d min")) == "Cada %d min");

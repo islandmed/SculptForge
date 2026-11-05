@@ -74,7 +74,7 @@ std::string fileUrl(const std::string& path) {
 
 } // namespace
 
-// Where a brush comes from, in words (list tooltips, picker Quick Info).
+// Where a brush comes from, in words (list tooltips, picker help box).
 std::string brushOriginText(const BrushRecipe& b) {
     switch (b.origin.source) {
     case BrushSource::Builtin:

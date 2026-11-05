@@ -1,6 +1,6 @@
 # Library (comma key): tabs, history, loading models, appending Parts, materials,
 # brushes, QuickSave; then the classic pickers: the brush pop-up (B, type letters,
-# press the orange key), the material pop-up (M) and Draw Size / Z Intensity at the cursor (S / U).
+# press the orange key), the material pop-up (M) and Size / Intensity at the cursor (S / U).
 run new_plane resolution=8
 expect_value triangles == 128
 expect_value library_open == 0   # (the window; "Library" is also the top-shelf button)
@@ -130,20 +130,20 @@ click "Materials/Bronze"
 expect_status Material: Bronze
 expect_not "Materials/Red Wax"
 
-# Draw Size / Z Intensity at the cursor: type a number and press Enter.
+# Size / Intensity at the cursor: type a number and press Enter.
 key s
 expect "##cursorvalue"
-expect_text Draw Size 60
+expect_text Size 60
 key 1
 key 2
 key 0
 key enter
 key s
-expect_text Draw Size 120
+expect_text Size 120
 key escape
 key u
 expect "##cursorvalue"
 expect_text Intensity 50
 shot strength-popup
 key escape
-expect_not "##cursorvalue"   # (the top shelf always shows its own Z Intensity slider)
+expect_not "##cursorvalue"   # (the top shelf always shows its own Intensity slider)

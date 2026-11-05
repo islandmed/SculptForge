@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Per-brush settings (#78): each brush keeps its own Draw Size, Z Intensity, Focal Shift, RGB Intensity, stroke and
+// Per-brush settings (#78): each brush keeps its own Size, Intensity, Falloff, Colour intensity, stroke and
 // alpha. Picking another brush remembers the one left and brings back what the picked one had this session (or what
 // Save Brush Settings stored for it, <app data>/brush-settings.json); a brush not used yet takes the current values,
 // so nothing jumps the first time. Reset Brush to Default puts back the shipped values.
@@ -17,9 +17,9 @@
 namespace sf {
 
 struct BrushToolSettings {
-    float radiusPx = 60.0f;     // Draw Size (pixels)
-    float strength = 0.5f;      // Z Intensity, 0..1
-    float focal = 0.0f;         // Focal Shift, -1..1
+    float radiusPx = 60.0f;     // Size (pixels)
+    float strength = 0.5f;      // Intensity, 0..1
+    float focal = 0.0f;         // Falloff, -1..1
     float rgbIntensity = 1.0f;  // paint strength, 0..1
     StrokeType stroke = StrokeType::Dots;
     float sprayScatter = 1.0f;  // Spray's scatter (fraction of the brush size)
@@ -41,7 +41,7 @@ std::string brushSettingsKey(const std::string& builtinName, const std::string& 
 
 class BrushSettingsStore {
 public:
-    // Preferences > Brushes > Share size and intensity across brushes: Draw Size and Z Intensity stay as they are
+    // Preferences > Brushes > Share size and intensity across brushes: Size and Intensity stay as they are
     // when switching (the behaviour before 0.10.8); the rest still follows the brush.
     bool shareSizeIntensity = false;
 

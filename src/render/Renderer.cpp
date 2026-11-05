@@ -78,7 +78,7 @@ uniform ivec2 uGhostKind;    // kernel (sf::GhostKind), inverted
 uniform float uGhostFocal;
 uniform float uGhostEdge;    // the mesh's edge length under the brush (the cavity term's scale)
 vec3 ghostStart;             // the vertex as uploaded (Live Move measures its falloff there)
-// The falloff and its first two derivatives in the distance (brushFalloff with Focal Shift).
+// The falloff and its first two derivatives in the distance (brushFalloff with Falloff).
 vec3 ghostFalloff(float d, float r) {
     float u = clamp(1.0 - d / r, 0.0, 1.0);
     if (u <= 0.0) return vec3(0.0);
@@ -2218,7 +2218,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
         uploadFaces(s, mesh, wantUvs, indicesDone);
         s.vertexCapacity = nv;
         // A mesh too big for the GPU's memory isn't drawn (rather than taking the driver down); the next full
-        // upload (e.g. after Lower Res or a decimation) tries again.
+        // upload (e.g. after Lower Level or a decimation) tries again.
         s.outOfMemory = false;
         for (int i = 0; i < 16; ++i) {
             const GLenum e = gl::GetError();

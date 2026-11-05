@@ -291,7 +291,7 @@ except Live Move's commit (one grab with the summed move instead of one per fram
    transpose), per symmetry mirror, and one `Sculptor::grab` with the whole move is applied when the stroke ends.
    Falls back to the old path with masks, hidden faces, sculpt layers, micro levels, connected-only or view
    falloff. Test `live_move_matches_the_grab`: the preview matches the grab to 1e-5, one grab matches the
-   per-frame grabs to 1e-6 (X symmetry, focal shift).
+   per-frame grabs to 1e-6 (X symmetry, falloff).
 3. **Persistent upload** (Fast Upload, `SF_PERSISTENT_UPLOAD=1`, idea 4): two persistently mapped, coherent staging buffers
    (48 MB each, `glBufferStorage`); the solver thread packs straight into one, the GL thread issues
    `glCopyBufferSubData` for each range and a fence; a buffer is reused only after its fence. Batches larger than

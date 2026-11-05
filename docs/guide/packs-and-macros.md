@@ -36,7 +36,7 @@ example **Clay (Member pack)**.
 | Macros | <kbd>F3</kbd>, the key editor and the pie menus, as **Name (Pack)**. |
 
 Keymaps and pie menus change how SculptForge responds, so they are only applied when you click **Apply keymap**
-or **Add pie menu**. **Store Config** keeps the result.
+or **Add pie menu**. The result saves itself.
 
 ## Library > Packs
 

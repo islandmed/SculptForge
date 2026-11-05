@@ -552,7 +552,7 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
         const float textW = ImGui::CalcTextSize(itemLabel.c_str(), nullptr, true).x + 2.0f * ImGui::GetStyle().FramePadding.x;
         clipped = size.x > 0.0f && textW > size.x + 0.5f;
     } else if (look == Look::IconLabel) {
-        // Drawn by hand so the item keeps the plain label as its name ("Store Config", not glyph + label).
+        // Drawn by hand so the item keeps the plain label as its name ("Save Layout", not glyph + label).
         const std::string text = std::string(icon) + "  " + label;
         const ImGuiStyle& st = ImGui::GetStyle();
         const ImVec2 ts = ImGui::CalcTextSize(text.c_str());

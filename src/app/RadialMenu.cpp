@@ -430,7 +430,7 @@ bool App::importRadialMenu(const std::string& path) {
     refreshRadialActions();
     status_ = "Radial menu " + std::to_string(at + 1) + " imported" +
               (dropped ? " (" + std::to_string(dropped) + " unknown items left out)" : std::string()) +
-              " - Store Config keeps it";
+              "";
     return true;
 }
 
@@ -659,10 +659,10 @@ void App::drawRadialMenusSection() {
     if (ImGui::Button("Restore default menus##radial.defaults", ImVec2(-FLT_MIN, 0))) {
         resetRadialMenus();
         radialEdit_ = RadialEdit();
-        status_ = "Default radial menus restored - Store Config (Ctrl+Shift+I) keeps them";
+        status_ = "Default radial menus restored";
     }
     ui::HelpText("Restore default menus", nullptr, "Back to the three built-in menus: Brushes (T), Masking (Y) and Strokes (J).", path);
-    ImGui::TextColored(col(ui::color::textDim), "Store Config keeps them");
+    ImGui::TextColored(col(ui::color::textDim), "Your menus save themselves");
 }
 
 } // namespace sf

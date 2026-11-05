@@ -98,7 +98,7 @@ To remesh several Parts into one, first combine them with **Merge visible...** o
 
 **Tool > Geometry > Quad Remesh** is automatic quad retopology: it rebuilds the Part as
 clean quads whose edge loops follow the forms, close to a target polygon count, with Keep Groups, Adaptive Size,
-vertex paint density and symmetry. **Project All** (**Tool > Parts > Project**) brings the sculpted detail back onto
+vertex paint density and symmetry. **Project Detail** (**Tool > Parts > Project**) brings the sculpted detail back onto
 the new topology after you divide it. Both have their own chapter: [Quad retopology and detail
 projection](retopology.md).
 
@@ -215,7 +215,7 @@ The command line accepts a wider remesh range (32-512) than the palette slider.
 
 ## See also
 
-- [Quad retopology and detail projection](retopology.md): Quad Remesh and Project All
+- [Quad retopology and detail projection](retopology.md): Quad Remesh and Project Detail
 - [Parts](parts.md): merge pieces before a remesh, duplicate before a decimate
 - [Sculpt layers and blend shapes](layers.md)
 - [Exporting](exporting.md): LOD chains, FBX for Unreal, Send to Unreal

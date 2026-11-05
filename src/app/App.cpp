@@ -295,6 +295,7 @@ void App::shutdown() {
         return;
     }
     saveWindowState();
+    autosavePrefs(true); // a change still waiting for its moment
     discordClient_.reset(); // clears what Discord shows, then closes
     if (doc_.sculptor.strokeActive()) endStroke();
     solver_.reset(); // (its thread uses the renderer)
@@ -1546,7 +1547,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     }
     if (button == SDL_BUTTON_RIGHT && ctrlDown(SDL_GetModState()) && (SDL_GetModState() & SDL_KMOD_SHIFT) &&
         !(SDL_GetModState() & SDL_KMOD_ALT)) { // in every input style (Ctrl+right-drag still zooms)
-        drag_ = Drag::SizeScrub; // Ctrl+Shift+right-drag: Draw Size, finely (Precision.cpp)
+        drag_ = Drag::SizeScrub; // Ctrl+Shift+right-drag: Size, finely (Precision.cpp)
         sizeScrubStart_ = radiusPx_;
         sizeScrubDx_ = 0.0f;
         rightClick_.pending = false;
@@ -2235,7 +2236,7 @@ void App::dabAt(float x, float y, float pressure) {
     p.pickDir = cam.ortho ? cam.forward() : hit.position - cam.position();
     p.pickNormal = glm::length(hit.normal) > 0.0f ? glm::normalize(hit.normal) : glm::vec3(0.0f);
     p.radius = baseRadius * (st.pressureSize ? std::max(pressure, 0.05f) : 1.0f) * dabRadiusScale_;
-    // Smooth keeps its own Z Intensity, whether picked or held with Shift.
+    // Smooth keeps its own Intensity, whether picked or held with Shift.
     p.strength = (st.brush == BrushType::Smooth ? st.smoothStrength : st.strength) * dabStrengthScale_;
     p.keepVolume = st.brush == BrushType::Smooth && st.smoothKeepVolume;
     p.groupBorders = st.brush == BrushType::Smooth && st.smoothGroupBorders;
@@ -2735,7 +2736,7 @@ void App::drawLayersContents() {
             runCommand("layer_set_active", {{"index", double(i)}});
         ui::HelpText(layer.name.c_str(), nullptr,
                      "Select to sculpt into this layer. With subdivision levels, record at any level: a "
-                     "layer keeps its own detail on every level and follows Lower Res / Higher Res and Divide.",
+                     "layer keeps its own detail on every level and follows Lower Level / Higher Level and Divide.",
                      kLayersPath);
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 52 * scale);
         const bool playing = playingLayer_ == i;
@@ -3698,10 +3699,10 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col, bool ring
     if (solverBusy() || (asyncStroke_ && drag_ == Drag::Stroke)) return false;
     RayHit hit;
     if (!pick(mouseX_, mouseY_, hit)) return false; // one ray, as a press would cast
-    // The world radius a dab here gets (App::firstDab / the brushes: Draw Size times world size of a pixel).
+    // The world radius a dab here gets (App::firstDab / the brushes: Size times world size of a pixel).
     const float radius = radiusPx * camera_.worldPerPixel(hit.position, canvasHeight());
     if (!(radius > 0.0f) || !std::isfinite(radius)) return false;
-    // A steady normal over the brush's area (32 rays), then the ring and the Focal Shift ring as true circles in
+    // A steady normal over the brush's area (32 rays), then the ring and the Falloff ring as true circles in
     // that plane (#88): no per-point pressing, so bumps can't bend or break the ring. Never a pass over the mesh.
     const glm::vec3 n = surfaceCursorNormal(doc_.mesh, doc_.bvh, hit, radius);
     surfaceCursorCircle(hit.position, n, radius, 64, cursorRing_);
@@ -3901,7 +3902,7 @@ void App::drawBrushCursor() {
     if (!surfaceCursorShown_) {
         if (ring) {
             dl->AddCircle(c, r, col, 64, 1.5f);
-            // The inner ring is Focal Shift: where the falloff drops to half.
+            // The inner ring is Falloff: where the falloff drops to half.
             dl->AddCircle(c, r * focalRingFraction(focalShift_), IM_COL32(255, 255, 255, 90), 48, 1.0f);
         } else {
             dl->AddCircleFilled(c, 2.0f * uiScale_, col);

@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Tool > Geometry: subdivision levels (Lower Res / Higher Res, SDiv, Del Lower / Del Higher,
+// Tool > Geometry: subdivision levels (Lower Level / Higher Level, SDiv, Delete Lower / Delete Higher,
 // Reconstruct Subdiv, Divide with Smt). The levels themselves live in core/Multires.
 #include "app/App.h"
 #include "app/Ui.h"

@@ -128,7 +128,7 @@ Both replace the active Part with the pieces. Because a merge keeps each origina
 **Extract**, in **Tool > Parts**, makes a new Part from the masked part of the active one: a helmet from the
 top of a head, a strap, a sleeve, a piece of armour that fits the surface exactly. It works:
 
-1. Mask the part (hold <kbd>Ctrl</kbd> and paint, or use **Mask Rectangle** / **Mask Lasso**; see [Masking](masking.md)).
+1. Mask the part (hold <kbd>Ctrl</kbd> and paint, or use **Rectangle Mask** / **Lasso Mask**; see [Masking](masking.md)).
 2. Click **Extract**. The shell appears as a preview, a Part just below the active one.
 3. Change **Thick**, **E Smt**, **Double**, **TCorne** or **TBorder** and the preview follows. Click **Accept** to keep it.
 

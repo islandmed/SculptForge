@@ -70,7 +70,7 @@ rendering/animation (use Blender).
 - ✅ Multiresolution: subdivision levels you can step up/down while keeping detail (v0.5)
 - ✅ Dynamic topology (local remeshing under the brush, dynamic topology style) (v0.8)
 - ✅ Alphas (round, square, noise or any grayscale image) and stroke types (dots, drag-rect, spray, lazy mouse)
-- ✅ Mask Lasso / Mask Rectangle and Select Lasso (v0.4); 📋 stencils, MaskCurve
+- ✅ Lasso Mask / Rectangle Mask and Select Lasso (v0.4); 📋 stencils, MaskCurve
 - ✅ More brushes: Clay Block, Sharp Crease, Tendril, Trim (dynamic), Layer, Nudge
 - ✅ Lit Sphere materials (seven built in, with a high-contrast Sculpt default since v0.4), with cavity shading on top
 - 📋 Ambient occlusion shading
@@ -94,7 +94,7 @@ Ranked by what sculptors cite most on sculpting forums:
 
 - ✅ Multiresolution subdivision levels (step up and down, keep detail, reconstruct)
 - ✅ quad remesh-class quad retopology (Quad Remesh: target count, Adaptive Size, Keep Groups, vertex paint density,
-  symmetry) plus Project All detail transfer (v0.5); ✅ curve guides (Quad Remesh Guides, v0.8)
+  symmetry) plus Project Detail detail transfer (v0.5); ✅ curve guides (Quad Remesh Guides, v0.8)
 - ✅ Automatic UV unwrapping (Auto UV, xatlas) and texture painting on UV maps (v0.4.2)
 - ✅ Normal / displacement / AO / cavity / colour map baking with MikkTSpace tangents and a viewport preview (v0.5)
 - ✅ Performance at 20-100M polygons, multithreaded brushes, fast undo (benchmark, partial GPU uploads, Fast
