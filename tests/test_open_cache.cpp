@@ -289,7 +289,9 @@ TEST(open_cache_is_copied_on_save_until_the_topology_changes) {
     CHECK(same);
     Document again;
     CHECK(loadProject(b, again, err));
-    CHECK(lastOpenCacheUse.topology && lastOpenCacheUse.bvh && lastOpenCacheUse.microEdges);
+    CHECK(lastOpenCacheUse.topology);
+    CHECK(lastOpenCacheUse.bvh);
+    CHECK(lastOpenCacheUse.microEdges);
     checkLikeRebuilt(again, loaded);
     // A topology change drops the source: an autosave then writes none, a save works it out again.
     again.mesh.rebuildTopology();

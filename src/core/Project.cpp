@@ -820,26 +820,34 @@ bool readOpenCache(Reader& r, const Json& oc, const Mesh& m, OpenCacheData& out)
     if (!oc.isObject() || int(oc["version"].asNumber(0)) != kOpenCacheVersion || !openCacheEnabled()) return false;
     bool ok = false;
     const uint64_t meshKey = openCacheKey(m);
-    if (parseHex64(oc["key"], ok) != meshKey || !ok) return false;
+    if (parseHex64(oc["key"], ok) != meshKey || !ok) {
+        if (std::getenv("SF_OPEN_PROFILE")) std::fprintf(stderr, "open cache: another mesh's (key)\n");
+        return false;
+    }
     const size_t nv = m.vertexCount(), nt = m.triangleCount();
     // (sizes from the descriptor, bounded: the checks after reading decide the rest)
+    static const bool tell = std::getenv("SF_OPEN_PROFILE") != nullptr;
+    auto refuse = [&](const char* name, const char* why) {
+        if (tell) std::fprintf(stderr, "open cache: %s not used (%s)\n", name, why);
+        return false;
+    };
     auto get = [&](const char* name, std::vector<uint32_t>& v, size_t expect, size_t limit) {
         const Json& d = oc[name];
         if (!d.isObject()) return false;
         const double c = d["values"].asNumber(-1), bytes = d["count"].asNumber(-1);
-        if (!(c >= 0) || c > double(limit) || (expect != size_t(-1) && c != double(expect))) return false;
-        if (!(bytes >= 8) || bytes > c * 5.0 + 8.0 * (c / kOpenCacheBlock + 3.0)) return false; // (at most 5 bytes a value)
+        if (!(c >= 0) || c > double(limit) || (expect != size_t(-1) && c != double(expect))) return refuse(name, "count");
+        if (!(bytes >= 8) || bytes > c * 5.0 + 8.0 * (c / kOpenCacheBlock + 3.0)) return refuse(name, "size"); // (at most 5 bytes a value)
         std::vector<uint8_t> packed;
         const std::string saved = r.error;
         if (!r.bytes(d, name, size_t(bytes), packed) || !openCacheUnpack(packed.data(), packed.size(), size_t(c), v)) {
             r.error = saved;
             v.clear();
-            return false;
+            return refuse(name, "unreadable");
         }
         bool hok = false;
         if (parseHex64(d["hash"], hok) != openCacheHash(v) || !hok) {
             v.clear();
-            return false;
+            return refuse(name, "hash");
         }
         return true;
     };
