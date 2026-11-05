@@ -2963,6 +2963,54 @@ constexpr Entry kTraditionalChinese[] = {
     {"The alphabetical palette bar and the two-row top shelf, as experienced sculptors expect.",
      "依字母排列的調色盤列與雙列頂部工具列，符合資深雕刻者的習慣。"},
     {"Palettes", "調色盤"},
+    // --- Config.cpp (tools/i18n/coverage.py) ---
+    {"Press a key for '%s'", "請按下「%s」的按鍵"},
+    {"Now:", "目前："},
+    {"none", "無"},
+    {"Esc cancels, Backspace clears. A key that's taken moves here.",
+     "Esc 取消，Backspace 清除。已被使用的按鍵會移到這裡。"},
+    {"No shortcut matches \"%s\".", "沒有符合「%s」的快速鍵。"},
+    {"Double-click a row, or Ctrl+Alt+click any button, to assign a key.",
+     "按兩下某一列，或 Ctrl+Alt+按一下任何按鈕，即可指派按鍵。"},
+    // --- Input.cpp (tools/i18n/coverage.py) ---
+    {"With Alt", "搭配 Alt"},
+    {"With Ctrl", "搭配 Ctrl"},
+    // --- PanelUvEditor.cpp (tools/i18n/coverage.py) ---
+    {"On model", "模型上"},
+    {"Seams (%zu edges)", "接縫（%zu 條邊）"},
+    {"Select", "選取"},
+    // --- RadialMenu.cpp (tools/i18n/coverage.py) ---
+    {"Right-drag opens this menu. Turn the view with %s.", "右鍵拖曳會開啟此選單。以 %s 旋轉視圖。"},
+    {"Action's own", "動作本身的"},
+    {"Change action", "變更動作"},
+    {"Add item", "新增項目"},
+    {"No matching actions", "沒有符合的動作"},
+    {"Your menus save themselves", "你的選單會自動儲存"},
+    // --- SpaceMouse.cpp (tools/i18n/coverage.py) ---
+    {"No SpaceMouse found", "找不到 SpaceMouse"},
+    {"Last button pressed: %d", "最後按下的按鈕：%d"},
+    // --- Tablet.cpp (tools/i18n/coverage.py) ---
+    {"Pressure: no pen seen yet", "壓力：尚未偵測到繪圖筆"},
+    {"Pressure: on", "壓力：已啟用"},
+    {"Pressure: not detected", "壓力：未偵測到"},
+    {"Pressure: touch the tablet to check", "壓力：請觸碰繪圖板以檢查"},
+    {"Troubleshooting", "疑難排解"},
+    {"No pen seen yet", "尚未偵測到繪圖筆"},
+    {"Tilt: not reported by this pen", "傾斜：此繪圖筆不回報"},
+    {"Pressure curve (all brushes)", "壓力曲線（所有筆刷）"},
+    // --- UserGuide.cpp (tools/i18n/coverage.py) ---
+    {"SculptForge is free and open source, and stays that way. If it helps your work, you can support its development.",
+     "SculptForge 是自由且開放原始碼的軟體，並將一直如此。如果它對你的工作有幫助，歡迎支持它的開發。"},
+    {"Nothing in the guide matches \"%s\".", "指南中沒有符合「%s」的內容。"},
+    // --- core/RadialMenu.cpp (tools/i18n/coverage.py) ---
+    {"None", "無"},
+    {"Middle mouse button", "滑鼠中鍵"},
+    {"Mouse back button", "滑鼠上一頁鍵"},
+    {"Mouse forward button", "滑鼠下一頁鍵"},
+    {"Pen lower button", "繪圖筆下方按鈕"},
+    {"Pen upper button", "繪圖筆上方按鈕"},
+    {"Pen third button", "繪圖筆第三個按鈕"},
+    {"Right mouse button", "滑鼠右鍵"},
 };
 
 } // namespace

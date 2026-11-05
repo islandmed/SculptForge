@@ -8,6 +8,7 @@ which of them the table has no translation for.
     tools/i18n/coverage.py --missing    also every missing string (es, zh-TW, or --lang es)
     tools/i18n/coverage.py --check      exit 1 unless every language is at 100% (ctest i18n_coverage)
     tools/i18n/coverage.py --json       the strings and what each language lacks, for scripts
+    tools/i18n/coverage.py --raw        literals ImGui shows without tr(): not translatable until wrapped in tr()
 
 The strings are found in src/app/*.cpp, the label paths tr() is used through:
   - a literal passed to tr(), trPath() (each "A > B" step) or a wrapper that calls tr() on it (WRAPPERS below:
@@ -41,8 +42,23 @@ EXTRA = {"SliderInt": {4}, "HelpText": {3}}
 PATHS = {"trPath": {0}, "HelpText": {3}}  # arguments that are "A > B" paths
 NOT_FUNCTIONS = {"if", "for", "while", "switch", "catch", "return", "sizeof", "decltype", "alignof", "defined"}
 # Struct tables whose fields are shown through tr(): table name -> field indices (a nested {...} field: each literal).
+# Strings tr() gets from a variable the search can't follow: the code that picks them, then the strings.
+DYNAMIC = {
+    "Input.cpp along-normal key": ["With Alt", "With Ctrl"],
+    "Tablet.cpp pressureStatus": ["Pressure: no pen seen yet", "Pressure: on", "Pressure: not detected",
+                                  "Pressure: touch the tablet to check"],
+    "core/RadialMenu.cpp radialButtonLabel": ["None", "Middle mouse button", "Mouse back button", "Mouse forward button",
+                                              "Pen lower button", "Pen upper button", "Pen third button",
+                                              "Right mouse button"],
+}
 TABLES = {"kPalettes": [1], "kMenus": [1, 3], "kHints": [1]}
 ACTION_FIELDS = ("label", "description", "palette")
+# ImGui calls whose text is shown as it is: a literal handed to one of them never reaches tr() (--raw lists them).
+RAW_IMGUI = {"Button": [0], "SmallButton": [0], "Text": [0], "TextDisabled": [0], "TextWrapped": [0],
+             "TextUnformatted": [0], "TextColored": [1], "SeparatorText": [0], "Selectable": [0], "MenuItem": [0],
+             "BeginMenu": [0], "Checkbox": [0], "CollapsingHeader": [0], "TreeNode": [0], "Combo": [0, 2],
+             "RadioButton": [0], "SetTooltip": [0], "BulletText": [0], "Begin": [0], "BeginTabItem": [0],
+             "SliderFloat": [0, 4], "SliderInt": [0, 4], "InputText": [0]}
 
 ICON = "\x00ICON\x00"  # stands for an ICON_LC_* macro inside a label
 TOKEN = re.compile(
@@ -321,8 +337,29 @@ def collect():
     toks, calls = wrappers(files)
     for path in files:
         scan_file(path, found, toks[path], calls[path])
+    for where, texts in DYNAMIC.items():
+        for t in texts:
+            found.setdefault(t, set()).add(where)
     # Not words: printf formats alone, ids, punctuation, numbers.
     return {s: w for s, w in found.items() if words(s)}
+
+
+def raw_labels():
+    """(file, line, call, text) for every literal shown through ImGui without tr()."""
+    out = []
+    for path in sorted(SRC.glob("*.cpp")):
+        if path.name in SKIP_FILES:
+            continue
+        toks = tokens(path.read_text(encoding="utf-8"))
+        for i, (k, v, line) in enumerate(toks):
+            if k == "id" and v in RAW_IMGUI and i > 1 and toks[i - 1][1] == "::" and toks[i - 2][1] == "ImGui" \
+                    and i + 1 < len(toks) and toks[i + 1][1] == "(":
+                args, _ = split_args(toks, i + 1)
+                for a in RAW_IMGUI[v]:
+                    s = literal(args[a]) if a < len(args) else None
+                    if s and words(s):
+                        out.append((path.name, line, v, s))
+    return out
 
 
 def words(s):
@@ -383,8 +420,15 @@ def main():
     ap.add_argument("--lang", choices=list(LANGS), help="only this language")
     ap.add_argument("--check", action="store_true", help="exit 1 unless every language is at 100%%")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--raw", action="store_true", help="list the literals ImGui shows without tr() (not translatable yet)")
     args = ap.parse_args()
 
+    if args.raw:
+        raw = raw_labels()
+        for f, line, call, s in raw:
+            print(f"{f}:{line}: ImGui::{call} {s.replace(ICON, '<icon>')!r}")
+        print(f"{len(raw)} labels shown without tr()")
+        return 0
     strings = collect()
     keep = load_keep()
     stale = sorted(k for k in keep if not any(visible(s) == k or s == k for s in strings))

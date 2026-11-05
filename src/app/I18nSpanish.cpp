@@ -3428,6 +3428,56 @@ constexpr Entry kSpanish[] = {
     {"The alphabetical palette bar and the two-row top shelf, as experienced sculptors expect.",
      "La barra de paletas alfabética y el estante superior de dos filas, como esperan los escultores con experiencia."},
     {"Palettes", "Paletas"},
+    // --- Config.cpp (tools/i18n/coverage.py) ---
+    {"Press a key for '%s'", "Pulsa una tecla para '%s'"},
+    {"Now:", "Ahora:"},
+    {"none", "ninguna"},
+    {"Esc cancels, Backspace clears. A key that's taken moves here.",
+     "Esc cancela, Retroceso borra. Una tecla ocupada pasa aquí."},
+    {"No shortcut matches \"%s\".", "Ningún atajo coincide con \"%s\"."},
+    {"Double-click a row, or Ctrl+Alt+click any button, to assign a key.",
+     "Doble clic en una fila, o Ctrl+Alt+clic en cualquier botón, para asignar una tecla."},
+    // --- Input.cpp (tools/i18n/coverage.py) ---
+    {"With Alt", "Con Alt"},
+    {"With Ctrl", "Con Ctrl"},
+    // --- PanelUvEditor.cpp (tools/i18n/coverage.py) ---
+    {"On model", "En el modelo"},
+    {"Seams (%zu edges)", "Costuras (%zu aristas)"},
+    {"Select", "Seleccionar"},
+    // --- RadialMenu.cpp (tools/i18n/coverage.py) ---
+    {"Right-drag opens this menu. Turn the view with %s.",
+     "Arrastrar con el derecho abre este menú. Gira la vista con %s."},
+    {"Action's own", "La de la acción"},
+    {"Change action", "Cambiar acción"},
+    {"Add item", "Añadir elemento"},
+    {"No matching actions", "Ninguna acción coincide"},
+    {"Your menus save themselves", "Tus menús se guardan solos"},
+    // --- SpaceMouse.cpp (tools/i18n/coverage.py) ---
+    {"No SpaceMouse found", "No se encontró ningún SpaceMouse"},
+    {"Last button pressed: %d", "Último botón pulsado: %d"},
+    // --- Tablet.cpp (tools/i18n/coverage.py) ---
+    {"Pressure: no pen seen yet", "Presión: aún no se ha visto ningún lápiz"},
+    {"Pressure: on", "Presión: activada"},
+    {"Pressure: not detected", "Presión: no detectada"},
+    {"Pressure: touch the tablet to check", "Presión: toca la tableta para comprobarla"},
+    {"Troubleshooting", "Solución de problemas"},
+    {"No pen seen yet", "Ningún lápiz aún"},
+    {"Tilt: not reported by this pen", "Inclinación: este lápiz no la informa"},
+    {"Pressure curve (all brushes)", "Curva de presión (todos los pinceles)"},
+    // --- UserGuide.cpp (tools/i18n/coverage.py) ---
+    {"SculptForge is free and open source, and stays that way. If it helps your work, you can support its development.",
+     "SculptForge es libre y de código abierto, y seguirá siéndolo. Si te ayuda en tu trabajo, puedes apoyar su "
+     "desarrollo."},
+    {"Nothing in the guide matches \"%s\".", "Nada en la guía coincide con \"%s\"."},
+    // --- core/RadialMenu.cpp (tools/i18n/coverage.py) ---
+    {"None", "Ninguno"},
+    {"Middle mouse button", "Botón central del ratón"},
+    {"Mouse back button", "Botón atrás del ratón"},
+    {"Mouse forward button", "Botón adelante del ratón"},
+    {"Pen lower button", "Botón inferior del lápiz"},
+    {"Pen upper button", "Botón superior del lápiz"},
+    {"Pen third button", "Tercer botón del lápiz"},
+    {"Right mouse button", "Botón derecho del ratón"},
 };
 
 } // namespace

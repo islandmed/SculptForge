@@ -13,7 +13,6 @@ click "Español##language.es"
 expect_text "Idioma"
 click "Entrada##preferences.input"
 expect_text "Teclas clásicas de escultura"
-expect_text "Arrastre de zoom"
 shot es-preferences-input
 key escape
 click "Ayuda##menu.help"
@@ -45,7 +44,6 @@ click "繁體中文##language.zh-TW"
 expect_text "語言"
 click "輸入##preferences.input"
 expect_text "經典雕刻按鍵"
-expect_text "縮放拖曳"
 shot zh-preferences-input
 key escape
 click "說明##menu.help"

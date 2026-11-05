@@ -991,7 +991,7 @@ void App::drawUvEditor() {
 
     // Toolbar: selection mode, colours, image, the model overlay, frame.
     ImGui::AlignTextToFramePadding();
-    ImGui::TextDisabled("Select");
+    ImGui::TextDisabled("%s", tr("Select"));
     ImGui::SameLine();
     ui::Segmented(*this, {"uv.mode_vertex", "uv.mode_edge", "uv.mode_face", "uv.mode_island"}, 248 * scale);
     // The rest of the toolbar wraps onto a second line when the window is narrow.
@@ -1018,7 +1018,7 @@ void App::drawUvEditor() {
     ui::HelpText("Image", nullptr, "Behind the layout: nothing, a checker, or the painted texture (tile 1001).", kPath);
     nextOnLine(ImGui::CalcTextSize("Model").x + ImGui::GetFrameHeight() * 2, 14 * scale);
     ImGui::AlignTextToFramePadding();
-    ImGui::TextDisabled("On model");
+    ImGui::TextDisabled("%s", tr("On model"));
     ImGui::SameLine();
     if (ui::Checkbox("Colours##uvmodel", &s.modelColors)) s.colorsDirty = true;
     ui::HelpText("Colours on the model", nullptr,
@@ -1297,7 +1297,7 @@ void App::drawUvEditor() {
         ImGui::PopStyleColor(3);
         ui::HelpAction(*this, "uv.unwrap");
         ImGui::Spacing();
-        ImGui::TextDisabled("Seams (%zu edges)", uvSeamCount(m));
+        ImGui::TextDisabled(tr("Seams (%zu edges)"), uvSeamCount(m));
         ui::ActionButton(*this, "uv.tool_seams", ImVec2(halfW, 0), ui::Look::IconLabel);
         ImGui::SameLine();
         ui::ActionButton(*this, "uv.tool_select", ImVec2(-1, 0), ui::Look::IconLabel);
