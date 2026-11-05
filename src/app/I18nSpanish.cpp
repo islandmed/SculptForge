@@ -1779,6 +1779,12 @@ constexpr Entry kSpanish[] = {
     {"Turn the alpha by a fixed angle in degrees (counter-clockwise); Ctrl+click to type.",
      "Gira el alpha un ángulo fijo en grados (en sentido antihorario); Ctrl+clic para escribir."},
     {"Angle jitter %.0f", "Variación de ángulo %.0f"},
+    {"The stamp turns with you: with Drag Stamp its top points the way you drag; in a dots stroke it turns along "
+     "the stroke. Off, Drag Stamp only sets the size and the stamp keeps Angle's turn. Slide Stamp never turns "
+     "while you slide it.",
+     "El sello gira contigo: con Drag Stamp su parte de arriba apunta hacia donde arrastras; en un trazo de puntos "
+     "gira a lo largo del trazo. Desactivado, Drag Stamp solo fija el tamaño y el sello conserva el giro de Ángulo. "
+     "Slide Stamp nunca gira mientras lo deslizas."},
     {"Angle jitter", "Variación de ángulo"},
     {"Turn each dab by a random angle, up to this many degrees either way: breaks up repeats in skin, rock and noise "
      "alphas.",

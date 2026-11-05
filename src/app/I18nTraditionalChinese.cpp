@@ -1543,6 +1543,11 @@ constexpr Entry kTraditionalChinese[] = {
     {"Turn the alpha by a fixed angle in degrees (counter-clockwise); Ctrl+click to type.",
      "將 Alpha 旋轉固定角度（逆時針，單位為度）；按住 Ctrl 並按一下即可輸入。"},
     {"Angle jitter %.0f", "角度抖動 %.0f"},
+    {"The stamp turns with you: with Drag Stamp its top points the way you drag; in a dots stroke it turns along "
+     "the stroke. Off, Drag Stamp only sets the size and the stamp keeps Angle's turn. Slide Stamp never turns "
+     "while you slide it.",
+     "印章會跟著你轉動：使用 Drag Stamp 時，其頂端指向你拖曳的方向；在點狀筆畫中則沿筆畫轉動。關閉時，Drag Stamp 只"
+     "設定大小，印章保持「角度」的旋轉。Slide Stamp 滑動時永不轉動。"},
     {"Angle jitter", "角度抖動"},
     {"Turn each dab by a random angle, up to this many degrees either way: breaks up repeats in skin, rock and noise "
      "alphas.",
