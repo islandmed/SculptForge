@@ -16,7 +16,9 @@
   lines, appended to --flaky-log), not cached, and does not fail the run. A test labelled `flaky` that fails twice is
   reported but never fails the run either (it never blocks a release; fix it or delete it).
 * Budget: a non-nightly test that took longer than --budget seconds (default $SF_TEST_BUDGET or 20; 0 = off) fails
-  the run, with the list. Make it wait on events instead of fixed frames, split it, or label it nightly.
+  the run, with the list. Make it wait on events instead of fixed frames, split it, or label it nightly. An
+  over-budget ctest entry runs once more alone first (--no-alone: not): only a test over budget alone counts, so a
+  busy machine's parallel run doesn't fail an innocent UI test.
 Exit code: 0 green, 1 a real failure or a test over budget, 2 ctest itself could not run, 4 only GPU-lost failures
 (the output says the graphics device went away: the machine, not the code).
 """
@@ -247,6 +249,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--build", default="build")
     ap.add_argument("--cache", default=os.environ.get("SF_TEST_CACHE", ""))
+    ap.add_argument("--no-alone", action="store_true", help="count over-budget tests without rerunning them alone")
     ap.add_argument("--budget", type=float, default=float(os.environ.get("SF_TEST_BUDGET", "20")))
     ap.add_argument("--flaky-log", default="")
     ap.add_argument("--slow-list", default="tests/slow_tests.txt",
@@ -371,6 +374,19 @@ def main(argv=None):
     slow = [(d, n) for d, n in slow if (d, n) not in listed]
     for d, n in listed:
         print(f"known slow: {n} {d:.1f} s (tests/slow_tests.txt: {known[n]:g} s; make it fast, then delete its line)")
+    # Over budget in a parallel run can be the machine's load (each full run a different UI test): once more, alone.
+    # Only a test still over its budget alone counts. (sculptforge_tests cases are timed inside their shard: not rerun.)
+    if slow and not a.no_alone:
+        with tempfile.TemporaryDirectory() as tmp2:
+            for d, n in list(slow):
+                if n.startswith("sculptforge_tests"):
+                    continue
+                ctest(build, ["-R", f"^{re.escape(n)}$"], os.path.join(tmp2, "alone.xml"))
+                s2, d2 = results(os.path.join(tmp2, "alone.xml")).get(n, ("fail", d))
+                limit = 1.5 * known[n] * scale if n in known else a.budget
+                if s2 == "pass" and d2 <= limit:
+                    slow.remove((d, n))
+                    print(f"over budget under load only: {n} {d:.1f} s in the run, {d2:.1f} s alone (not counted)")
     for d, n in slow:
         why = f"1.5x its {known[n] * scale:g} s in tests/slow_tests.txt" if n in known else f"the {a.budget:g} s budget"
         print(f"over budget: {n} {d:.1f} s, over {why} (wait on events, use a smaller mesh, split it, or label it nightly)")
