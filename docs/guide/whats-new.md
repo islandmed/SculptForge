@@ -10,9 +10,9 @@ three versions in full, then the older ones in groups. Every detail is in the
 ```features
 date: unreleased
 tagline: Dense scans with micro levels keep up with the pen, and one-click updates on Windows and Linux.
-highlight: Dense scans keep up: orbit after a big stroke on a 112M scan, under 1 to 47 fps
+highlight: Dense scans keep up: orbit after a big stroke on a 112M scan, 0.7 to 51 fps
 title: Dense scans, fast
-line: Lucy 112M on an RTX 3060: orbit right after a big stroke, under 1 to 47 frames a second.
+line: Lucy 112M on an RTX 3060: orbit right after a big stroke, 0.7 to 51 frames a second.
 image: images/wn-0111-lucy.jpg
 clip: images/wn-0111-lucy.mp4
 frames: images/wn-0111-lucy-frames.jpg 6x10 6
