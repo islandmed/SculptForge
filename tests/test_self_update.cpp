@@ -13,6 +13,7 @@
 #include "core/Sha256.h"
 
 #include <algorithm>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -343,6 +344,7 @@ TEST(self_update_downloads_and_installs) {
     CHECK(d.ok && d.error.empty() && d.sha256 == kPackageSha && d.received == package().size());
     CHECK(f.asked.size() == 3 && f.asked[2] == releaseFileUrl("99.0.0", "SculptForge-99.0.0-x86_64.AppImage"));
     CHECK(fs::path(d.staged).parent_path() == fs::path(s.install.target).parent_path()); // next to it: one rename
+    CHECK(fs::path(d.staged).filename() == ".download-99.0.0-SculptForge-linux-x86_64.AppImage"); // (extension last)
     CHECK(readAll(s.install.target) == "old version"); // nothing in place yet
     std::string error;
     CHECK(installAppImage(s.install, d, "99.0.0", "1.0.0", s.note, error));
@@ -402,9 +404,24 @@ TEST(self_update_refuses_bad_releases) {
     Download d;
     download(s, f, d);
     CHECK(f.asked.size() == 2);
-    // No key compiled in yet: the release key's constant parses (once set) or is empty (Update button off).
-    uint8_t k[32];
-    CHECK(std::string(kUpdatePublicKeyHex).empty() || parseHexKey(kUpdatePublicKeyHex, k));
+}
+
+// The release key compiled into the app (Tony's, 11-05): 64 hex characters, a point on the curve, and the verifier
+// accepts what is signed under a key and only that key (the sign side with the throwaway test key: the release's
+// private half never leaves the UPDATE_SIGNING_KEY secret).
+TEST(self_update_release_key) {
+    const std::string hex = kUpdatePublicKeyHex;
+    CHECK(hex.size() == 64);
+    CHECK(std::all_of(hex.begin(), hex.end(), [](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); }));
+    uint8_t release[32], test[32];
+    CHECK(parseHexKey(hex, release) && ed25519PublicKeyValid(release));
+    CHECK(parseHexKey(kTestKey, test) && ed25519PublicKeyValid(test));
+    const std::string sig = unhex(kSumsSig);
+    CHECK(sumsSignatureValid(kSums, sig, test));     // signed with a key: accepted under it
+    CHECK(!sumsSignatureValid(kSums, sig, release)); // and under no other, the release key included
+    // A key that is no curve point is refused: y = 2 has no x on the curve ((y^2 - 1) / (d y^2 + 1) is no square).
+    uint8_t bogus[32] = {2};
+    CHECK(!ed25519PublicKeyValid(bogus) && !sumsSignatureValid(kSums, sig, bogus));
 }
 
 TEST(self_update_cancel_and_tamper) {
@@ -473,6 +490,8 @@ TEST(self_update_windows_helper) {
     const std::string i = windowsHelperScript(in, d, 1234, false);
     CHECK(i.find("\"/S /D=$root\"") != std::string::npos && i.find("Get-FileHash") < i.find("Start-Process"));
     CHECK(i.find("Start-Process -FilePath $exe") == std::string::npos); // Later: no relaunch
+    const std::string ir = windowsHelperScript(in, d, 1234, true);
+    CHECK(ir.find("catch { $code = -1 }") < ir.find("Start-Process -FilePath $exe")); // declined prompt: old one again
 }
 
 // --- Member builds (core/MemberBuilds.cpp) ---
@@ -585,3 +604,38 @@ TEST(member_builds_release_list) {
     downloadUpdate("99.0.0-preview.1", s.install, k, f.fetch(), elsewhere, evil);
     CHECK(!elsewhere.ok && !elsewhere.error.empty());
 }
+
+// The real thing, once: a public release file through GitHub's redirect to its asset host, with the restricted
+// client (every hop allowed, certificates checked). Catches GitHub moving its asset host away from the allowlist.
+TEST(self_update_live_github_redirect) {
+    if (sf::test::networkTestsOff()) return;
+    std::string body;
+    const ai::HttpResponse r = ai::httpGetRestricted(
+        releaseFileUrl("0.11.0", "SHA256SUMS.txt"), allowedUpdateUrl, 30, [&](const char* d, size_t n) {
+            body.append(d, n);
+            return body.size() < kMaxSumsBytes;
+        });
+    if (r.status == 0) { // (offline machine: nothing to learn here)
+        std::fprintf(stderr, "self_update_live_github_redirect: no connection (%s)\n", r.error.c_str());
+        return;
+    }
+    CHECK(r.status == 200 && r.error.empty());
+    CHECK(sumFor(body, "SculptForge-0.11.0-windows-x86_64.zip").size() == 64);
+}
+
+#if defined(_WIN32)
+#include "core/Keychain.h"
+// Windows Credential Manager: store, read back, replace, erase (a test entry, not the member sign-in's).
+TEST(self_update_keychain_windows) {
+    const std::string account = "test-self-update";
+    keychain::erase(account);
+    std::string got;
+    CHECK(!keychain::load(account, got));
+    CHECK(keychain::store(account, "{\"access\":\"ghu_test\"}"));
+    CHECK(keychain::load(account, got) && got == "{\"access\":\"ghu_test\"}");
+    CHECK(keychain::store(account, "second"));
+    CHECK(keychain::load(account, got) && got == "second");
+    CHECK(keychain::erase(account) && !keychain::load(account, got));
+    CHECK(keychain::erase(account)); // (nothing there: still fine)
+}
+#endif

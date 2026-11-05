@@ -15,6 +15,9 @@ namespace sf {
 void sha512(const void* data, size_t size, uint8_t out[64]);
 
 // True when `signature` (R || S, 64 bytes) signs `message` under `publicKey` (32 bytes).
+// True when `publicKey` encodes a point on the curve (a key a signature could ever check out under).
+bool ed25519PublicKeyValid(const uint8_t publicKey[32]);
+
 bool ed25519Verify(const uint8_t signature[64], const void* message, size_t size, const uint8_t publicKey[32]);
 
 } // namespace sf

@@ -264,7 +264,9 @@ Install detectInstall(const InstallProbe& probe) {
 // --- The download ---
 
 std::string stagingPath(const Install& install, const std::string& version) {
-    const std::string name = "." + install.asset + ".download-" + version;
+    // The asset's own extension stays last: Windows opens the installer by it (Start-Process), and Windows
+    // PowerShell's Expand-Archive takes only names ending in .zip.
+    const std::string name = ".download-" + version + "-" + install.asset;
     if (!install.stagingDir.empty()) return pathString(fsPath(install.stagingDir) / name);
     if (install.kind == InstallKind::WindowsPortable) return pathString(fsPath(install.target) / name);
     return pathString(fsPath(install.target).parent_path() / name); // next to the AppImage: one rename away
@@ -536,10 +538,12 @@ std::string windowsHelperScript(const Install& install, const Download& d, unsig
          "  Remove-Item -LiteralPath $staged -Force; exit 2 }\n";
     if (!portable) {
         // NSIS: /S silent, /D= the folder (last, unquoted). Windows asks for permission when the folder needs it.
-        s += "$p = Start-Process -FilePath $staged -ArgumentList \"/S /D=$root\" -Wait -PassThru\n";
+        // Declining the permission prompt throws: the version that was there is started again, nothing changed.
+        s += "try { $p = Start-Process -FilePath $staged -ArgumentList \"/S /D=$root\" -Wait -PassThru; $code = $p.ExitCode }\n"
+             "catch { $code = -1 }\n";
         s += "Remove-Item -LiteralPath $staged -Force -ErrorAction SilentlyContinue\n";
-        s += "if ($p.ExitCode -ne 0) { exit 3 }\n";
-        if (relaunch) s += "Start-Process -FilePath $exe\n";
+        if (relaunch) s += "if (Test-Path -LiteralPath $exe) { Start-Process -FilePath $exe }\n";
+        s += "if ($code -ne 0) { exit 3 }\n";
         s += "Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue\n";
         return s;
     }
@@ -563,6 +567,7 @@ std::string windowsHelperScript(const Install& install, const Download& d, unsig
         s += "$p = Start-Process -FilePath $exe -PassThru\n";
         s += "Start-Sleep -Seconds 20\n";
         s += "if ($p.HasExited -and $p.ExitCode -ne 0) {\n"
+             "  Remove-Item -LiteralPath \"$root.failed\" -Recurse -Force -ErrorAction SilentlyContinue\n"
              "  Move-Item -LiteralPath $root -Destination \"$root.failed\"; Move-Item -LiteralPath $old -Destination $root\n"
              "  Start-Process -FilePath $exe }\n";
     }

@@ -25,7 +25,7 @@ Fail at any step: the temporary file is deleted, nothing in place changes, nothi
 
 ## Installing
 
-- **Linux AppImage**: download to `.<asset>.download-<version>` next to the AppImage (same filesystem), `chmod 755`,
+- **Linux AppImage**: download to `.download-<version>-<asset>` next to the AppImage (same filesystem), `chmod 755`,
   hard-link the current file to `<name>.old`, write `update_pending.json` in the preferences folder, then one
   `rename()` over the AppImage. The running app keeps its open file.
 - **Windows**: a PowerShell helper (written to %TEMP%, deletes itself) waits for the app to exit, re-checks the hash,

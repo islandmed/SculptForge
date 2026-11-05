@@ -28,10 +28,10 @@ inline constexpr uint64_t kMaxPackageBytes = uint64_t(1) << 30; // 1 GiB (an App
 inline constexpr size_t kMaxSumsBytes = 256 * 1024;
 inline constexpr int kMaxUnconfirmedStarts = 3; // a new version that never got going this often is rolled back
 
-// The public half of the release signing key (Ed25519, 32 bytes as hex). Empty: no key yet, and the Update button
-// stays off (the banner's Download link still works). The private half is the repository secret UPDATE_SIGNING_KEY,
+// The public half of the release signing key (Ed25519, 32 bytes as hex; created 11-05). Empty would mean no key: the
+// Update button off (the banner's Download link still works). The private half is the repository secret UPDATE_SIGNING_KEY,
 // used only by .github/workflows/release.yml.
-inline constexpr const char* kUpdatePublicKeyHex = "";
+inline constexpr const char* kUpdatePublicKeyHex = "f6f8f8e9e02123a759a974bffaa07db8ebaa0c70ba746a0a86c644eba6a68642";
 
 // --- Where files may come from ---
 
@@ -122,7 +122,8 @@ struct Download {
 void downloadUpdate(const std::string& version, const Install& install, const uint8_t key[32], const Fetch& fetch,
                     Download& out, const std::map<std::string, std::string>& memberFiles = {});
 
-// The temporary file a package is downloaded to (dot-file next to the target, or inside the target folder).
+// The temporary file a package is downloaded to: ".download-<version>-<asset>" (the asset's extension last) next to
+// the target, inside the portable folder, or in the installer's staging folder.
 std::string stagingPath(const Install& install, const std::string& version);
 
 // --- Installing, the first start, rolling back ---
