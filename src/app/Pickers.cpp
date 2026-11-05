@@ -1115,6 +1115,7 @@ void litsphereMenu(App& app, int index, const std::function<void()>& beforeRemov
         ImGui::EndMenu();
     }
     ImGui::Separator();
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) ImGui::CloseCurrentPopup(); // (also while typing: nothing applied)
     if (ImGui::MenuItem("Remove##litsphere")) {
         if (beforeRemove) beforeRemove();
         app.runCommand("remove_litsphere", {{"name", name}});
