@@ -97,7 +97,7 @@ constexpr Entry kSpanish[] = {
     {"Camera", "Cámara"},
     {"Import / Export", "Importar / Exportar"},
     {"From an image", "A partir de una imagen"},
-    {"Voxel Remesh", "Remallado por vóxeles"},
+    {"Voxel Remesh", "Remallado vóxel"},
     {"Quick Remesh", "Remallado rápido"},
     {"Modify Topology", "Modificar topología"},
     {"Game Ready", "Listo para juegos"},
@@ -272,7 +272,7 @@ constexpr Entry kSpanish[] = {
     {"Open log folder", "Abrir la carpeta de registros"},
     {"Record a performance trace", "Grabar una traza de rendimiento"},
     {"Fixes & suggestions", "Correcciones y sugerencias"},
-    {"Benchmark (proof mode)", "Prueba de rendimiento (modo prueba)"},
+    {"Benchmark (proof mode)", "Benchmark (modo prueba)"},
     {"Support SculptForge", "Apoya a SculptForge"},
     {"About SculptForge", "Acerca de SculptForge"},
     {"Welcome", "Bienvenida"},
@@ -2635,7 +2635,7 @@ constexpr Entry kSpanish[] = {
     {"Voxel Remesh and Quad Remesh keep a painted texture: the new mesh gets Auto UVs and the texture (every layer) "
      "is projected onto it from the old surface, in the same undo step. Off: the texture is dropped. Merging Parts "
      "keeps textures too. Shown under Remesh and Quad Remesh when the Part has a texture.",
-     "Remallado por vóxeles y Quad Remesh conservan una textura pintada: la malla nueva recibe UV automáticas y la "
+     "Remallado vóxel y Quad Remesh conservan una textura pintada: la malla nueva recibe UV automáticas y la "
      "textura (todas las capas) se proyecta sobre ella desde la superficie anterior, en el mismo paso de deshacer. "
      "Desactivado: la textura se descarta. Unir Piezas también conserva las texturas. Se muestra bajo Remallado y "
      "Quad Remesh cuando la Pieza tiene textura."},
@@ -3403,7 +3403,7 @@ constexpr Entry kSpanish[] = {
     {"Save the Gaussian splats (PLY, glTF or USD).", "Guarda los splats gaussianos (PLY, glTF o USD)."},
     {"Close SculptForge (asks to save changes first).", "Cierra SculptForge (pregunta antes si guardar los cambios)."},
     {"Rebuild as an even, watertight surface (like Voxel Remesh): merges parts, fixes scans and generated models.",
-     "Reconstruye como superficie uniforme y estanca (como Remallado por vóxeles): une partes, arregla escaneos y "
+     "Reconstruye como superficie uniforme y estanca (como Remallado vóxel): une partes, arregla escaneos y "
      "modelos generados."},
     {"With Tool > Remesh > Quick Remesh on: remesh the active Part at the Voxel Remesh resolution, in the background.",
      "Con Herramienta > Remallado > Remallado rápido activado: remalla la Pieza activa a la resolución de Remallado "

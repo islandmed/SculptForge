@@ -29,6 +29,8 @@ shot es-remesh
 click "Remallado##tool.remesh"
 key alt+u
 expect_value uv_editor_open == 1
+run uv_unwrap
+wait_idle 120
 run uv_pack columns=4 rows=3 margin=6
 expect_text "Columnas"
 expect_text "Densidad objetivo"
