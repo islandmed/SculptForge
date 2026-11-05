@@ -1605,7 +1605,7 @@ private:
     friend class UserGuide; // reads the UI scale, writes the status line
     UserGuide guide_;
     // ---- end User Guide (G) ----
-    // ---- Gizmo 3D (Gizmo.cpp, core/MeshTransform.h): W Move, E Scale, R Rotate, Q back to Draw ----
+    // ---- Transform gizmo (Gizmo.cpp, core/MeshTransform.h): W Move, E Scale, R Rotate, Q back to Draw ----
 public:
     enum class GizmoMode { Off, Move, Scale, Rotate };
     enum class GizmoHandle {
@@ -1625,9 +1625,9 @@ private:
     bool gizmoMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
     void gizmoDragTo(float x, float y);
     void gizmoRelease();
-    void drawGizmo();          // the handles over the canvas, and the Gizmo 3D panel
+    void drawGizmo();          // the handles over the canvas, and the Transform gizmo panel
     void drawGizmoPanel();
-    void drawGizmoContents(bool compact); // Transform palette > Gizmo 3D and the floating panel
+    void drawGizmoContents(bool compact); // Transform palette > Transform gizmo and the floating panel
     void updateGizmoPivot();   // follows the moving part's centre until the pivot is placed
     void resetGizmoPivot();
     void snapGizmoPivot(const RayHit& hit, int part);
@@ -1682,7 +1682,7 @@ private:
         // Numeric entry (the panel): applied as one transform about the pivot.
         float move[3] = {0, 0, 0}, rotate[3] = {0, 0, 0}, scale = 100.0f;
     } gizmo_;
-    // ---- end Gizmo 3D ----
+    // ---- end Transform gizmo ----
     // ---- Classic sculpting keys (Input.cpp, docs/guide/quick-tour.md) ----
     // Preferences > Input (the classic or SculptForge key style), the Space QuickMenu, the intensities and Focal
     // Shift (U / I / O), the classic mask and face group keys, Shift-constrained straight strokes and the

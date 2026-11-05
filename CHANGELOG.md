@@ -1566,8 +1566,8 @@ adjacency that saves the memory).
 - Projects save every level (project format 4). The Part list shows "SDiv n/m".
 - Ctrl+D now runs Divide; the one-way Subdivide stays in Tool > Geometry and as `subdivide`.
 
-### Gizmo 3D (moving, scaling, rotating and posing)
-- Gizmo 3D modes: W Move, E Scale, R Rotate, Q back to Draw (top shelf, Transform palette, F3).
+### Transform gizmo (moving, scaling, rotating and posing)
+- Transform gizmo modes: W Move, E Scale, R Rotate, Q back to Draw (top shelf, Transform palette, F3).
   Move has axis arrows, plane squares and a view-plane centre; Rotate has axis rings and a view ring; Scale has
   axis boxes and a uniform centre. Shift snaps (15 degrees, a round grid step, 10%). The amount shows beside the
   gizmo while dragging. Dragging off the handles still navigates; Ctrl still masks.
@@ -1579,7 +1579,7 @@ adjacency that saves the memory).
   Alt+click the model or To Surface to put it on the surface, Reset; World or Surface axes (Y along the normal,
   turning with rotations). The gizmo follows undo / redo of its own steps and is saved in projects (`gizmo` key,
   no format bump).
-- Gizmo 3D panel: pivot, options and numeric Move / Rotate / Scale with Apply; All Parts (Transpose All, one
+- Transform gizmo panel: pivot, options and numeric Move / Rotate / Scale with Apply; All Parts (Transpose All, one
   undo step per Part).
 - `transform` command (translate, rotate, scale, pivot, orient, masked, falloff, symmetry, all); each gizmo drag
   is echoed to the console as the command that repeats it.
@@ -1670,7 +1670,7 @@ adjacency that saves the memory).
 - Subdivision levels: Voxel Remesh, Decimate, QRemesh, Subdivide, Delete Hidden and merging or splitting Parts
   say in the status line that they removed the levels and which one became the new base ("Subdivision levels
   removed: SDiv 3 of 5 kept as the new base"); undo restores every level (now covered by tests).
-- Subdivision levels: a sculpt layer's fine detail now turns and bends with a low level rotated with the Gizmo 3D
+- Subdivision levels: a sculpt layer's fine detail now turns and bends with a low level rotated with the Transform gizmo
   or reshaped (layer details are stored relative to the surface). Project format 5; format 4 projects are
   converted when they open.
 - Subdivision levels: only the active Part keeps its recently visited levels cached; selecting another Part
@@ -1693,7 +1693,7 @@ adjacency that saves the memory).
   loaded parallel ctest.
 
 ### Changed
-- Wireframe (PolyF) is Shift+F only: W is now the Gizmo 3D's Move.
+- Wireframe (PolyF) is Shift+F only: W is now the Transform gizmo's Move.
 
 ## [0.4.2] - 2026-10-23
 

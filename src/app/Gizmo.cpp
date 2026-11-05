@@ -1,12 +1,12 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Gizmo 3D (Move W / Scale E / Rotate R, Q back to Draw): a gizmo at the pivot with axis arrows, plane
+// Transform gizmo (Move W / Scale E / Rotate R, Q back to Draw): a gizmo at the pivot with axis arrows, plane
 // squares and a free-move centre (Move), rings and a view ring (Rotate), axis boxes and a uniform centre (Scale).
 // Dragging a handle transforms the active Part, or only its unmasked part (posing), through a
 // TransformSession (core/MeshTransform.h): every frame recomputes from the drag's start, so nothing drifts, and
 // the release makes one undo step per Part. Shift snaps (15 degrees, the grid, 10%), Alt+drag moves the pivot
-// or turns the axes only, Alt+click on the model puts the pivot there. The Gizmo 3D panel adds numeric entry.
+// or turns the axes only, Alt+click on the model puts the pivot there. The Transform gizmo panel adds numeric entry.
 #include "app/App.h"
 #include "app/Ui.h"
 

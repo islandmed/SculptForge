@@ -84,6 +84,7 @@ add an exception elsewhere.
     \bnomad\b
     sculptgl
     3d-?coat
+    gizmo ?3d
 <!-- marks:end -->
 
 ## Old words read on load (src/core/LegacyNames.h)

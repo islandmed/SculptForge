@@ -1,4 +1,4 @@
-# Gizmo 3D (W Move, E Scale, R Rotate, Q Draw): each mode's handles, axis-locked moves, Shift snapping, Alt+drag
+# Transform gizmo (W Move, E Scale, R Rotate, Q Draw): each mode's handles, axis-locked moves, Shift snapping, Alt+drag
 # moving only the gizmo, scaling, posing a capsule arm at the elbow (mask, pivot, soft falloff), undo / redo,
 # numeric entry, All Parts.
 run new_sphere subdivisions=5 ; transform scale=3,0.7,0.7 pivot=origin ; part_rename to=Arm

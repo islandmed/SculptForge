@@ -368,7 +368,7 @@ void App::storeProjectSettings() {
     sym.set("local", symmetry_.local); // around the active Part's centre
     s.set("symmetry", std::move(sym));
 
-    Json gizmo = Json::object(); // Gizmo 3D (Gizmo.cpp): where the pivot is and the options
+    Json gizmo = Json::object(); // Transform gizmo (Gizmo.cpp): where the pivot is and the options
     gizmo.set("pivot", vec3Json(gizmo_.pivot));
     gizmo.set("pivot_placed", gizmo_.pivotPlaced);
     gizmo.set("orient_surface", gizmo_.orientSurface);

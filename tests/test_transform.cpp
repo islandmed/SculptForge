@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Transforms (core/MeshTransform.h, the Gizmo 3D and the `transform` command): exact results, masked parts with a
+// Transforms (core/MeshTransform.h, the Transform gizmo and the `transform` command): exact results, masked parts with a
 // smooth falloff, sculpt layers, symmetry, All Parts, attributes left alone and bit-for-bit undo.
 #include "TestHarness.h"
 

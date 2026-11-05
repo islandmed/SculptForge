@@ -30,11 +30,11 @@
 //                            or a rectangle from the first point to the last. keep: leave the button down
 //                            (for a shot mid-drag); `release` lets go, with the modifiers held then
 //   release                  release the left button
-//   gizmo_drag HANDLE DX DY [S] [keep]  left-drag a Gizmo 3D handle by DX DY pixels with the held modifiers (alt: the
+//   gizmo_drag HANDLE DX DY [S] [keep]  left-drag a Transform gizmo handle by DX DY pixels with the held modifiers (alt: the
 //                            gizmo only; shift: snapping). HANDLE: move_x move_y move_z plane_yz plane_xz plane_xy
 //                            move_view rotate_x rotate_y rotate_z rotate_view scale_x scale_y scale_z scale_uniform;
 //                            keep: leave the button down (a shot mid-drag), then `release`
-//   gizmo_hover HANDLE       move the mouse onto a Gizmo 3D handle (it lights up, for screenshots)
+//   gizmo_hover HANDLE       move the mouse onto a Transform gizmo handle (it lights up, for screenshots)
 //   stroke_popup_item ITEM [click] [S]  glide onto an item of the open stroke popup (dots drag_stamp slide_stamp spray
 //                            lazy add sub smooth mask select mask_pen mask_lasso mask_rect cut_line cut_lasso cut_rect
 //                            cut_polyline, or outside: just right of the panel); click: press and let go;

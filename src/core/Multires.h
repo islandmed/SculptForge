@@ -24,7 +24,7 @@
 //    so detail painted at a high level survives an edit somewhere else at a low level;
 //  - sculpt layers are their own displacement channels, subdivided with the same stencils; their per-level
 //    detail is stored in the same local frame as the shape's, so a sculpt layer's fine offsets turn and bend
-//    with a low level that is rotated (Gizmo 3D) or reshaped (project format 5; older files are converted);
+//    with a low level that is rotated (Transform gizmo) or reshaped (project format 5; older files are converted);
 //  - the painted texture lives in UV space and is shared by every level.
 // Stepping between levels that weren't edited copies the stored level back, so up / down round trips are
 // bit-for-bit.

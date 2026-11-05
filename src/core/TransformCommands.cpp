@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The `transform` command (core/MeshTransform.h): what a Gizmo 3D drag does, for scripts, the console and AI.
+// The `transform` command (core/MeshTransform.h): what a Transform gizmo drag does, for scripts, the console and AI.
 #include "core/Commands.h"
 #include "core/MeshTransform.h"
 #include "core/PathStroke.h"

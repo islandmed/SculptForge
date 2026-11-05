@@ -1060,7 +1060,7 @@ See [Subdivision levels](subdivision-levels.md).
 
 ### Gizmo: move, scale, rotate and pose
 
-Gizmo 3D, with the same keys: <kbd>W</kbd> Move, <kbd>E</kbd> Scale, <kbd>R</kbd> Rotate, <kbd>Q</kbd>
+Transform gizmo, with the same keys: <kbd>W</kbd> Move, <kbd>E</kbd> Scale, <kbd>R</kbd> Rotate, <kbd>Q</kbd>
 back to Draw (also on the top shelf and in the **Transform** palette).
 
 - **Handles over the model.** Arrows, plane squares and a free-move centre; axis rings and a view ring; axis

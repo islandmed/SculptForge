@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Moving, rotating and scaling a Part, or only its unmasked part (Gizmo 3D / Transpose): the core
+// Moving, rotating and scaling a Part, or only its unmasked part (Transform gizmo / Transpose): the core
 // of the app's Gizmo mode (W Move, E Scale, R Rotate) and of the `transform` command.
 //
 // A transform is a translation, a rotation and a per-axis scale about a pivot, with the rotation and scale
