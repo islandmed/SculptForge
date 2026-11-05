@@ -146,6 +146,7 @@ def self_test():
     with tempfile.TemporaryDirectory() as d:
         g = lambda *a: git("-c", "user.name=t", "-c", "user.email=t@example.org", "-c", "commit.gpgsign=false", *a, cwd=d)
         g("init", "-q", "-b", "main")
+        g("config", "core.autocrlf", "false")  # Windows' git would convert the files written below
 
         def write(name, lines):
             with open(os.path.join(d, name), "w") as f:
