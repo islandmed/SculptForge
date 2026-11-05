@@ -121,7 +121,7 @@ def self_test():
         "no publisher": ({"release.yml": GOOD.replace(TOKEN, "github.token")}, 1),
         "prt": ({"release.yml": GOOD, "x.yml": "on:\n  pull_request_target:\njobs:\n  a:\n    steps: []\n"}, 1),
         "repo-level reader": ({"release.yml": GOOD, "x.yml": f"jobs:\n  a:\n    env:\n      T: ${{{{ {TOKEN} }}}}\n"}, 1),
-        "env reader ok": ({"release.yml": GOOD, "x.yml": f"jobs:\n  a:\n    environment: member-drops\n    env:\n      T: ${{{{ {TOKEN} }}}}\n"}, 0),
+        "env reader ok": ({"release.yml": GOOD, "x.yml": f"jobs:\n  a:\n    environment: other-env\n    env:\n      T: ${{{{ {TOKEN} }}}}\n"}, 0),
     }
     bad = [f"{k}: {check(f)}" for k, (f, n) in cases.items() if bool(check(f)) != bool(n)]
     for b in bad:

@@ -142,12 +142,11 @@ the guide from the newest tag without a `-` (pages.yml). A second beta is `0.12.
 What keeps the insiders token from leaking; `tools/release/check_workflows.py` (run by release.sh check and ctest
 `release_workflows`) fails when the workflow side of it breaks.
 
-- `INSIDERS_REPO_TOKEN` exists only as an **environment secret**, never at repository level:
-  - `member-release` (release.yml `publish-members`): deployment only from tags `v*`, required reviewer islandmed
-    (self-review allowed: solo maintainer). A workflow_dispatch from a branch can't use it.
-  - `member-drops` (insider-drop.yml, the daily drop): deployment only from `main`, no reviewer (it runs on a schedule).
-  - Set or rotate (never echo it): `wl-paste -n | gh secret set INSIDERS_REPO_TOKEN --env member-release -R islandmed/SculptForge`
-    (same with `--env member-drops`).
+- `INSIDERS_REPO_TOKEN` exists only as a secret of the environment **`member-release`**, never at repository level:
+  deployment only from tags `v*`, required reviewer islandmed (self-review allowed: solo maintainer). Only release.yml's
+  `publish-members` uses it; a workflow_dispatch from a branch can't. Set or rotate (never echo it):
+  `wl-paste -n | gh secret set INSIDERS_REPO_TOKEN --env member-release -R islandmed/SculptForge`.
+  (The daily-drop workflow and the preview-build workflow were retired with the Insider tier; betas are the members' builds.)
 - release.yml: top-level `permissions: contents: read`; `publish-members` reads only, runs only for betas, and passes
   the token as an env var to its one publishing step; every `uses:` pinned to a full commit SHA with the version in a
   comment (update by resolving the new tag: `gh api repos/OWNER/REPO/git/ref/tags/vX.Y.Z --jq .object.sha`); checkouts
