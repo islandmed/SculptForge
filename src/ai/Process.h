@@ -33,6 +33,8 @@ public:
     // Waits for it to end; returns the exit code.
     int wait();
     bool started() const { return started_; }
+    // Lets it run on after this object (and this app) is gone: the updater's relaunch.
+    void detach();
 
 private:
     bool started_ = false;

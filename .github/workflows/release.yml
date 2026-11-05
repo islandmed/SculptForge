@@ -273,6 +273,10 @@ jobs:
         run: python3 -m zipfile -c dist/sculptforge_maya.zip integrations/maya/sculptforge_maya.py integrations/maya/README.md
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Sign the checksums (one-click update checks SHA256SUMS.txt.sig, src/core/SelfUpdate.h)
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: tools/release/sign_sums.sh dist
       - name: Release notes from CHANGELOG
         run: |
           awk -v h="## [${TAG#v}]" 'index($0, h) == 1 {flag=1;next} /^## \[/{flag=0} flag' CHANGELOG.md > notes.md
@@ -316,6 +320,10 @@ jobs:
           python3 -m zipfile -c dist/sculptforge_maya.zip integrations/maya/sculptforge_maya.py integrations/maya/README.md
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Sign the checksums (one-click update checks SHA256SUMS.txt.sig, src/core/SelfUpdate.h)
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: tools/release/sign_sums.sh dist
       - name: Release notes (CHANGELOG's [Unreleased])
         run: |
           printf '%s\n\n' "**Members' beta.** Thank you for being a member! Please report problems in #members on Discord (or a GitHub issue) with your OS, this version (Help > About) and your graphics card." > notes.md
