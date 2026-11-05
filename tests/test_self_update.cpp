@@ -608,7 +608,7 @@ TEST(member_builds_release_list) {
 // The real thing, once: a public release file through GitHub's redirect to its asset host, with the restricted
 // client (every hop allowed, certificates checked). Catches GitHub moving its asset host away from the allowlist.
 TEST(self_update_live_github_redirect) {
-    if (networkTestsOff()) return;
+    if (sf::test::networkTestsOff()) return;
     std::string body;
     const ai::HttpResponse r = ai::httpGetRestricted(
         releaseFileUrl("0.11.0", "SHA256SUMS.txt"), allowedUpdateUrl, 30, [&](const char* d, size_t n) {
