@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ai/Http.h"
 
+#include "core/NetworkPolicy.h"
+
 #include <atomic>
 #include <chrono>
 #include <random>
@@ -19,6 +21,14 @@ namespace sf::ai {
 
 namespace {
 std::atomic<uint64_t> gRequests{0};
+
+// Studio mode (core/NetworkPolicy.h): a URL off the studio's list is refused before anything is sent or counted.
+bool refused(const std::string& url, HttpResponse& r) {
+    std::string why;
+    if (net::urlAllowed(url, &why)) return false;
+    r.error = why;
+    return true;
+}
 }
 
 uint64_t httpRequestCount() { return gRequests; }
@@ -76,8 +86,9 @@ struct Handle {
 HttpResponse httpRequestStream(const std::string& method, const std::string& url, const std::vector<std::string>& headers,
                                const std::string& body, int timeoutSeconds,
                                const std::function<bool(const char*, size_t)>& onData) {
-    ++gRequests;
     HttpResponse r;
+    if (refused(url, r)) return r;
+    ++gRequests;
     std::wstring wurl = widen(url);
     URL_COMPONENTS uc{};
     uc.dwStructSize = sizeof uc;
@@ -102,6 +113,10 @@ HttpResponse httpRequestStream(const std::string& method, const std::string& url
     }
     const int ms = timeoutSeconds * 1000;
     WinHttpSetTimeouts(session.h, ms, ms, ms, ms);
+    if (net::offlineMode()) { // studio mode: a redirect could leave the studio's list
+        DWORD never = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
+        WinHttpSetOption(session.h, WINHTTP_OPTION_REDIRECT_POLICY, &never, sizeof never);
+    }
     Handle connection{WinHttpConnect(session.h, host, uc.nPort, 0)};
     if (!connection.h) {
         r.error = lastError("WinHttpConnect");
@@ -160,11 +175,11 @@ size_t writeCallback(char* data, size_t size, size_t count, void* user) {
 HttpResponse httpRequestStream(const std::string& method, const std::string& url, const std::vector<std::string>& headers,
                                const std::string& body, int timeoutSeconds,
                                const std::function<bool(const char*, size_t)>& onData) {
+    HttpResponse r;
+    if (refused(url, r)) return r;
     ++gRequests;
     static std::once_flag once;
     std::call_once(once, [] { curl_global_init(CURL_GLOBAL_DEFAULT); });
-
-    HttpResponse r;
     CURL* curl = curl_easy_init();
     if (!curl) {
         r.error = "curl_easy_init failed";
@@ -181,7 +196,7 @@ HttpResponse httpRequestStream(const std::string& method, const std::string& url
     } else {
         curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
     }
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, net::offlineMode() ? 0L : 1L); // studio mode: no redirects off its list
     curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &sink);
@@ -198,10 +213,11 @@ HttpResponse httpRequestStream(const std::string& method, const std::string& url
 
 #else
 
-HttpResponse httpRequestStream(const std::string&, const std::string&, const std::vector<std::string>&, const std::string&, int,
+HttpResponse httpRequestStream(const std::string&, const std::string& url, const std::vector<std::string>&, const std::string&, int,
                                const std::function<bool(const char*, size_t)>&) {
-    ++gRequests;
     HttpResponse r;
+    if (refused(url, r)) return r;
+    ++gRequests;
     r.error = "This build of SculptForge has no HTTP support (libcurl was not found at build time)";
     return r;
 }
