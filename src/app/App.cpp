@@ -2828,10 +2828,13 @@ void App::drawUi() {
         ImGui::SetNextWindowSize(ImVec2(460 * uiScale_, 0), ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (ImGui::Begin("About SculptForge", &showAbout_, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
-            brand::markItem(64.0f * uiScale_); // the app mark, the name and version beside it
+            brand::markItem(64.0f * uiScale_); // the app mark; beside it the name, version and what it is
             ImGui::SameLine(0.0f, 12.0f * uiScale_);
-            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (64.0f * uiScale_ - ImGui::GetTextLineHeight()) * 0.5f);
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (64.0f * uiScale_ - 2.0f * ImGui::GetTextLineHeightWithSpacing()) * 0.5f);
+            ImGui::BeginGroup();
             ImGui::Text("SculptForge %s", appVersionLabel().c_str());
+            ImGui::TextUnformatted("Free and open-source digital sculpting.");
+            ImGui::EndGroup();
             ImGui::Spacing();
             if (const StudioStart& studio = studioMode(); studio.active) { // a studio build: its logo and name
                 const StudioProfile& p = studio.profile;
@@ -2843,8 +2846,6 @@ void App::drawUi() {
                 ImGui::PopStyleColor();
                 ImGui::Spacing();
             }
-            ImGui::TextWrapped("Free and open-source digital sculpting.");
-            ImGui::Spacing();
             ImGui::TextWrapped("%s", ai::kPrivacyLine); // also on the site (website/index.html) and in docs/ai-services.md
             ImGui::Spacing();
             ImGui::TextWrapped("Copyright (C) 2026 The SculptForge contributors. This program is free software: you can "
