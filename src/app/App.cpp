@@ -2051,6 +2051,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     haveLastDab_ = false;
     doc_.sculptor.draftStrokes = draftStrokes() && asyncStrokeAllowed(); // (AsyncStroke.cpp)
     doc_.sculptor.adaptiveDabs = fastBigBrushes();
+    fusedDabs_ = 64.0;
     if (!doc_.sculptor.beginStroke(doc_.mesh,
                                    !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushLabel(strokeBrush_),
                                    strokeSculpt_ ? doc_.activeLayer : -1)) {
@@ -2429,7 +2430,9 @@ void App::flushGrab() {
 void App::endStroke() {
     flushGrab(); // (Move: the last samples' move)
     if (asyncStroke_) solverWait(); // (the dabs in flight; then the solver thread is idle)
+    doc_.sculptor.microBaseFuse = true; // (big dabs on a micro level's base: these go through together)
     drainStrokeDabs(0.0); // the dabs still waiting belong to this stroke
+    doc_.sculptor.microBaseFuse = false;
     doc_.sculptor.flushDetailClone(doc_.mesh, doc_.bvh, symmetry_); // a Detail Clone click
     kelvinFinish(); // the rest of a Kelvinlet move (PanelKelvinlet.cpp)
     // (a command can end a Ctrl+click before its release: finishStrokeNow clears the mask click too)

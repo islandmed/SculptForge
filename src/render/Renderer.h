@@ -361,6 +361,7 @@ private:
         std::vector<uint32_t> drawnOrder; // the mesh triangle of each drawn triangle (meshes with UVs only)
         size_t drawnTriangles = 0;
         size_t vertexCapacity = 0;
+        std::vector<uint16_t> sentCurvature; // per vertex, the cavity bits it last went up with (kKeepCurvature)
         std::vector<uint64_t> blockHash; // per UploadOrder block: hashes of its packed positions, and the rest
         std::vector<AABB> blockBox;      // per UploadOrder block: its vertices' box as last packed
         // Clusters whose culling bounds a stroke upload set from blockBox (a sphere round the box, no normal cone,

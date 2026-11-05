@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <limits>
 #include <functional>
 #include <memory>
 #include <span>
@@ -168,6 +169,10 @@ float alphaFalloff(float dist, float radius, float focal);
 
 // Where brush time goes (core/Benchmark.h, Help > Performance): milliseconds summed over dabs since the
 // counters were last zeroed. kernel = finding the vertices and moving / masking / painting them.
+// A stroke curvature entry meaning "send the cavity term the GPU already has" (Renderer::prepareStrokeUpload): a
+// scale-adaptive dab moves a vertex without walking its ring, and the exact term follows with the exact normals.
+inline constexpr float kKeepCurvature = std::numeric_limits<float>::quiet_NaN();
+
 struct SculptTimings {
     double kernelMs = 0.0, normalsMs = 0.0, bvhMs = 0.0;
     double remeshMs = 0.0; // dynamic topology (core/Dyntopo.h)
@@ -272,6 +277,9 @@ public:
     // `maxLeaves` of them (in leaf order). The app calls it when no dabs are waiting (the pen rests or slows).
     bool normalsPending() const { return lazyCount_ > 0; }
     void catchUpNormals(Mesh& mesh, const BVH& bvh, size_t maxLeaves);
+    // After each batch: the exact normals of up to `share` x as many leaves as the batch moved, of those the brush
+    // has left (the oldest first), so lifting the pen only waits for the last stretch of the stroke.
+    void catchUpBehind(Mesh& mesh, const BVH& bvh, double share);
     // The last dab was big enough for a fused batch (the app then hands the solver every dab waiting at once).
     bool fusesBatches() const { return adaptiveDabs && lastFusable_ && lastRegion_ >= kAdaptiveMinVertices; }
     // Fused batches (SculptBatch.cpp): between beginBatch and endBatch, the dabs of a big brush (adaptive, one of
@@ -281,7 +289,10 @@ public:
     // area plane comes from an even sample of the region, moved along dab by dab; each dab's centre, picked on
     // the surface as the batch began, is moved along by the dabs before it. The normals, the BVH and the GPU's
     // copy follow once a batch instead of once a dab. Any other dab places the waiting ones first.
-    void beginBatch() { batching_ = true; }
+    void beginBatch() {
+        batching_ = true;
+        lastLazyLeaves_.clear();
+    }
     void endBatch(Mesh& mesh, BVH& bvh);
     size_t batchWaiting() const { return pending_.size(); }
     bool draftActive() const { return draft_; }
@@ -300,6 +311,10 @@ public:
     // SF_MICRO_BASE=0: always the grid (A/B).
     static constexpr float kMicroBaseSpan = 16.0f;
     bool microBaseDabs = microBaseDefault();
+    // Set by the app while it places the dabs still waiting when the pen lifts: those big micro dabs go through the
+    // plain mesh's path, fused (SculptBatch.cpp), not one base pass each (a 240 px stroke's release on Lucy 112M:
+    // 2.2 -> 1.4 s on a 3060). In the stroke the base kernel stays (fused there, 120 px fell behind: p99 344 -> 590 ms).
+    bool microBaseFuse = false;
     static bool microBaseDefault();
     MicroStroke& microStroke() { return micro_; }
     // Mirror sign vectors for the enabled symmetry axes (always starts with (1,1,1)); ignores radial and local.
@@ -405,8 +420,10 @@ private:
     // Adaptive dabs: the leaves they moved (exact normals to come), the mesh and BVH they are of (endStroke
     // flushes them when the app didn't), the leaves of the last dab,
     // and per vertex the stroke whose cavity term curvature_ holds (taken once, before the stroke moved it).
-    IndexBits lazyLeaves_;       // (a set: a leaf many dabs moved is listed once)
-    size_t lazyCount_ = 0;       // leaves added since the set was last emptied (0: none pending)
+    std::vector<uint32_t> lazyLeaves_;  // pending, oldest first (each once: lazyFlag_)
+    size_t lazyHead_ = 0;               // lazyLeaves_[lazyHead_..] are the pending ones
+    std::vector<uint8_t> lazyFlag_;     // per BVH node: 1 pending, 2 pending and moved by the last batch
+    size_t lazyCount_ = 0;              // pending leaves
     std::vector<uint32_t> lastLazyLeaves_;
     void addLazyLeaves(const BVH& bvh, std::span<const uint32_t> leaves);
     void dropLazy(); // (empties the set without the normals)
