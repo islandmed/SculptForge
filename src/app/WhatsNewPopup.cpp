@@ -314,11 +314,17 @@ void App::drawWhatsNew() {
             const int frame = int((nowSeconds() - pop.openedAt) * c.frameFps) % count;
             const ImVec2 cell(1.0f / float(c.frameCols), 1.0f / float(c.frameRows));
             const ImVec2 f0(float(frame % c.frameCols) * cell.x, float(frame / c.frameCols) * cell.y);
-            ImVec2 uv0, uv1;
-            coverUv(texSize.x * cell.x / std::max(1.0f, texSize.y * cell.y), (p1.x - p0.x) / std::max(1.0f, p1.y - p0.y), uv0, uv1);
-            uv0 = ImVec2(f0.x + uv0.x * cell.x, f0.y + uv0.y * cell.y);
-            uv1 = ImVec2(f0.x + uv1.x * cell.x, f0.y + uv1.y * cell.y);
-            dl->AddImageRounded(tex, p0, p1, uv0, uv1, col(0xffffff, appear), 12.0f * k, corners);
+            const ImVec2 f1(f0.x + cell.x, f0.y + cell.y);
+            // Fitted, not cropped (a clip's labels sit at its edges): letterboxed on the clips' own dark grey.
+            const float aspect = texSize.x * cell.x / std::max(1.0f, texSize.y * cell.y);
+            const float bw = p1.x - p0.x, bh = p1.y - p0.y;
+            const float w = std::min(bw, bh * aspect), h = w / aspect;
+            const ImVec2 q0(std::floor(p0.x + (bw - w) * 0.5f), std::floor(p0.y + (bh - h) * 0.5f));
+            dl->AddRectFilled(p0, p1, col(0x2e2e2e, appear), 12.0f * k, corners);
+            if (w >= bw - 1.0f && h >= bh - 1.0f)
+                dl->AddImageRounded(tex, p0, p1, f0, f1, col(0xffffff, appear), 12.0f * k, corners);
+            else
+                dl->AddImage(tex, q0, ImVec2(q0.x + w, q0.y + h), f0, f1, col(0xffffff, appear));
             redrawIn(1.0 / double(c.frameFps));
             return;
         }

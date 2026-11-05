@@ -13,8 +13,8 @@
 //   action: look:new                      (what Try it does; see App::runWhatsNewAction)
 //   link: interface.md#looks-and-layouts  (optional: where the website's card links; guide: actions link there anyway)
 //   clip: images/wn-0111-lucy.mp4         (optional: the website plays it in the card, the image as its poster)
-//   frames: images/wn-0111-lucy-frames.jpg 8x6 5   (optional: the app plays the same clip from one picture of
-//                                          8 x 6 frames, left to right then down, at 5 frames a second)
+//   frames: images/wn-0111-lucy-frames.jpg 8x10 8  (optional: the app plays the same clip from one picture of
+//                                          8 x 10 frames, left to right then down, at 8 a second; fitted, not cropped)
 //   ```
 //
 // and the prose notes below it are the details. The popup (app/WhatsNewPopup.cpp), the guide chapter

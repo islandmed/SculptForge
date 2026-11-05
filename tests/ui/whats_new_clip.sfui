@@ -1,0 +1,17 @@
+# What's New clips (core/WhatsNew.h frames:): a card plays its frame sheet in a loop. Pinned to 0.11.1, whose first
+# card is the Lucy clip, so it stays valid after later releases.
+env SF_WHATS_NEW_VERSION 0.11.1
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+click "Help##palette.help"
+click "What's New##help.whats_new"
+wait 0.6
+expect_value whats_new_open == 1
+expect_value whats_new_cards >= 1
+expect_text "Dense scans, fast"
+shot whats_new_clip_a
+wait 1.3
+shot whats_new_clip_b
+key escape
+wait 0.5
+expect_value whats_new_open == 0
