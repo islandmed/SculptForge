@@ -4,19 +4,33 @@ One table for every performance claim in the beta.3 push. A number goes here onl
 method below. Claims in notes, the site or the guide quote this table, and quote the floor first. Owner: core200m
 (it updates the table as branches land). Public text states our own numbers only, never another app's.
 
-## Targets
+## Targets (Tony, 11-04: performance is the #1 priority until they're met)
 
-| Measure | Target | Where it comes from |
-|---|---|---|
-| Committed lag p50, beyond the spacing floor | <= 16 ms | docs/design/core-200m.md, the two latencies |
-| Committed lag p99 | < 33 ms | two frames at 60 Hz |
-| Release (pen up to the stroke fully in the mesh) | < 100 ms | feels instant |
-| Orbit | >= 60 fps | the display |
-| 200M micro triangles on a 16 GB integrated-GPU laptop | opens, sculpts, orbits | perf-moonshots §0 |
+Our own numbers only. Each must hold on the floor tier first, then the E-core floor, the laptop and the Windows 3060.
 
-The spacing floor: a dab lands every 0.15 x radius of pointer travel, so at the scripted pointer speed the newest dab
-is on average ~18 ms old at 240 px before any work runs (perf-moonshots §0). Raw lag is reported; the adjusted
-figure is raw minus that floor.
+| | Target |
+|---|---|
+| (a) Base mesh 15-30M | committed lag p50 < 50 ms and p99 < 100 ms at 120 and 240 px; release < 100 ms |
+| (b) Micro levels 100-450M (Lucy 112M / 448M, core-200m) | the same lag targets; orbit >= 30 fps right after strokes; first frame < 3 s |
+| (c) First dab | no stall: < 50 ms (NVIDIA first-dab stall) |
+
+## Gap to the targets (11-04)
+
+p50 / p99 / release in ms (240 px, the worse of 120 and 240 px); x = how far off the p50 target. E-core and laptop
+for 15M and core-200m are the beta.2 baseline below; Lucy is the laptop run of 11-04 (offscreen) with
+fix/micro-pick-reach. Floor iGPU: no machine.
+
+| Target | Scene | E-core floor | Laptop | Windows 3060 | Owner / lever |
+|---|---|---|---|---|---|
+| (a) | 15M head | 552 / 2036 / 3355 (11x) | 405 / 577 / 230 (8x) | 447 / 737 / 249 (9x) | betaboost: Fast Big Brushes, batches capped by time |
+| (a) | Lucy 28M | - | 359 / 623 / 900 (7x) | running | betaboost (same path) |
+| (b) lag | core-200m | 1498 / 1735 / 4675 (30x) | 319 / 511 / 452 (6x) | 440 / 565 / 827 (9x) | n2stroke: N2 + big brushes on the base level |
+| (b) lag | Lucy 112M / 448M | - | 1700-2656 / 3240-3448 / 10-11 s (34-53x) | running | n2stroke: base-level edits (the 256x rescale); core200m: picks (fix/micro-pick-reach) |
+| (b) orbit | core-200m | 10 fps (3x) | 27 fps (1.1x) | 32 fps (met) | core200m: micro renderer and catch-up |
+| (b) orbit | Lucy 112M / 448M | - | 1.6-1.7 fps (18x) | running | core200m: micro renderer GPU cost on a dense base (63-70 ms/frame before any stroke) |
+| (b) first frame | core-200m | - | 0.7 s (met) | 0.7 s (met) | - |
+| (b) first frame | Lucy 112M / 448M | - | 9.0 / 11.1 s (3-4x) | running | core200m: micro open path on a dense base |
+| (c) | first dab, NVIDIA | - | - | betaboost's numbers | betaboost |
 
 ## Tiers, in the order a claim must pass them
 

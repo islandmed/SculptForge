@@ -291,7 +291,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
         std::fill(vertStamp_.begin(), vertStamp_.end(), 0);
         dabEpoch_ = 1;
     }
-    bvh.queryTriangles(m, center, r * reach + mm.bulgeMax + float(mm.rangeMax) * mm.step, cand_);
+    microQueryTriangles(m, bvh, center, r * reach, cand_); // (each node grown by the displacement under it)
     std::erase_if(cand_, [&](uint32_t t) { return m.triangleHidden(t) || !triangleNear(m, mm, t, center, r * reach); });
     if (cand_.empty()) return;
     for (uint32_t t : cand_) dabStamp_[t] = dabEpoch_;
@@ -548,7 +548,7 @@ void MicroStroke::beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, fl
     lastStride = stride;
     const uint32_t cm = n / stride, cs = (cm + 1) * (cm + 2) / 2;
     std::vector<uint32_t> cand;
-    bvh.queryTriangles(m, center, radius + mm.bulgeMax + float(mm.rangeMax) * mm.step, cand);
+    microQueryTriangles(m, bvh, center, radius, cand);
     std::erase_if(cand, [&](uint32_t t) { return m.triangleHidden(t) || !triangleNear(m, mm, t, center, radius); });
     touch(mm, cand);
     GrabMirror gm;
