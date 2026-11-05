@@ -506,7 +506,7 @@ overhang, as nothing made with a height ever can.
   and each stamp is one undo step. Sculpt layers record it like any stroke.
 - The **Dots** stroke works too: each dab adds the shape again, for rows of studs or scales.
 
-#### Stamp rotation
+### Stamp rotation
 
 While the VDM brush is the brush, **Stamp rotation** sits under the map's preview, with the same three options as
 [Alpha options](#alpha-options):
