@@ -83,7 +83,7 @@ jobs:
       - name: Build
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DSCULPTFORGE_MOLD=OFF
           cmake --build build --parallel 4
           ccache -s
       - if: env.SAVE_CACHE == 'true'
@@ -206,7 +206,7 @@ jobs:
         run: |
           source /opt/rh/gcc-toolset-14/enable
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DSCULPTFORGE_MOLD=OFF \
             -DSCULPTFORGE_BUILD_PYTHON=ON -DPython_EXECUTABLE="$PYTHON313" -DSCULPTFORGE_PYTHON_INSTALL_DIR=lib/sculptforge/python
           cmake --build build --parallel 4
           ccache -s
