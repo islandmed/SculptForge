@@ -82,6 +82,25 @@ void main() {
     int slot = uSlotBase + instance;
     localSlot = slot - uChunkSlot;
     vSlot = localSlot;
+    if (uLevel == 0) {
+        // The base triangle alone (a cluster far away, a scan's millions of tiny patches): each vertex is one
+        // corner, where the weights below are (1, 0, 0) and the bulge 0, so the same point from one base vertex.
+        uvec4 t0 = texelFetch(uTris, slot * 2);
+        int corner = int(ij.x) + 2 * int(ij.y);
+        int vi = int(corner == 0 ? t0.x : corner == 1 ? t0.y : t0.z);
+        vec3 bp = texelFetch(uBase, vi * 2).xyz, bn = texelFetch(uBase, vi * 2 + 1).xyz;
+        float bl = length(bn);
+        vec3 nrm = bl > 1e-20 ? bn / bl : vec3(0.0, 0.0, 1.0);
+        int I0 = int(ij.x) * uN, J0 = int(ij.y) * uN;
+        float d0 = float(texelFetch(uDisp, localSlot * uSamples + sampleIndex(I0, J0)).r) * uStep;
+        vIJ = vec2(float(I0), float(J0));
+        vec4 p0 = uView * vec4(bp + nrm * d0, 1.0);
+#ifdef FLAT
+        vViewPos = p0.xyz;
+#endif
+        gl_Position = uProj * p0;
+        return;
+    }
     uvec4 tv = texelFetch(uTris, slot * 2);
     uvec4 nb = texelFetch(uTris, slot * 2 + 1);
     uint v[3] = uint[3](tv.x, tv.y, tv.z);
