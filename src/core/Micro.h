@@ -233,6 +233,9 @@ void microNoise(Mesh& m, float amplitude, float frequency, uint32_t seed = 1);
 // Ray against the micro surface: the base triangle hit (BVH) and its neighbourhood within the displacement range,
 // at full micro resolution. hit.triangle is the base triangle; hit.position / normal are on the micro surface.
 bool microRaycast(const Mesh& m, const BVH& bvh, const glm::vec3& origin, const glm::vec3& dir, RayHit& hit);
+// After the base moved under a micro level (brushes on the base: Sculptor::microBaseDab, Move): its bulge bound
+// raised to what the base's triangles now need.
+void microRaiseBulge(Mesh& m);
 // The base triangles whose displaced surface may come within `radius` of `center` (each BVH node grown by the
 // largest displacement and bulge under it, MicroMesh::Reach), for the caller's exact test per triangle.
 void microQueryTriangles(const Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, std::vector<uint32_t>& out);
@@ -302,9 +305,13 @@ public:
     uint64_t points = 0; // grid points visited
 
 private:
+    std::vector<uint8_t> changed_;        // per candidate of the last dab: the kernel changed its grid
+    std::vector<uint32_t> stitchStamp_;   // per base triangle: dabEpoch_ when the stitch changed a point of it
     void touch(MicroMesh& mm, std::span<const uint32_t> tris);
     void widen(MicroMesh& mm, float need); // MicroMesh::widen, keeping this stroke's saved tiles in step
-    void stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t> tris);
+    // `changed` (per entry of tris, or null: all): the triangles the kernel wrote; only they and those the stitch
+    // changed are marked dirty (the renderer re-sends, re-bounds and re-shades what's marked).
+    void stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t> tris, const uint8_t* changed = nullptr);
     bool active_ = false;
     float strokeStep_ = 0.0f;
     std::vector<uint32_t> tileOf_;        // per base triangle: its undo tile + 1 (0 = not yet touched)

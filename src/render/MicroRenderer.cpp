@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <atomic>
 #include <bit>
 #include <cmath>
 #include <cstring>
@@ -82,6 +83,25 @@ void main() {
     int slot = uSlotBase + instance;
     localSlot = slot - uChunkSlot;
     vSlot = localSlot;
+    if (uLevel == 0) {
+        // The base triangle alone (a cluster far away, a scan's millions of tiny patches): each vertex is one
+        // corner, where the weights below are (1, 0, 0) and the bulge 0, so the same point from one base vertex.
+        uvec4 t0 = texelFetch(uTris, slot * 2);
+        int corner = int(ij.x) + 2 * int(ij.y);
+        int vi = int(corner == 0 ? t0.x : corner == 1 ? t0.y : t0.z);
+        vec3 bp = texelFetch(uBase, vi * 2).xyz, bn = texelFetch(uBase, vi * 2 + 1).xyz;
+        float bl = length(bn);
+        vec3 nrm = bl > 1e-20 ? bn / bl : vec3(0.0, 0.0, 1.0);
+        int I0 = int(ij.x) * uN, J0 = int(ij.y) * uN;
+        float d0 = float(texelFetch(uDisp, localSlot * uSamples + sampleIndex(I0, J0)).r) * uStep;
+        vIJ = vec2(float(I0), float(J0));
+        vec4 p0 = uView * vec4(bp + nrm * d0, 1.0);
+#ifdef FLAT
+        vViewPos = p0.xyz;
+#endif
+        gl_Position = uProj * p0;
+        return;
+    }
     uvec4 tv = texelFetch(uTris, slot * 2);
     uvec4 nb = texelFetch(uTris, slot * 2 + 1);
     uint v[3] = uint[3](tv.x, tv.y, tv.z);
@@ -275,6 +295,8 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
     closed_ = closedOriented(mesh);
     bounds_.assign(clusters, ClusterBounds());
     clusterEdge_.assign(clusters, 0.0f);
+    clusterRadius_.assign(clusters, 0.0f);
+    clusterAngle_.assign(clusters, 0.0f);
     std::vector<uint32_t> all(clusters);
     for (uint32_t c = 0; c < clusters; ++c) all[c] = c;
     updateClusterBounds(mesh, all);
@@ -343,9 +365,28 @@ void MicroRenderer::updateClusterBounds(const Mesh& mesh, const std::vector<uint
             const float angle = std::acos(std::clamp(cosMin, -1.0f, 1.0f)) + 0.5f;
             cb.coneAngle = angle < 1.45f && float(range) * mm.step < radius * 0.5f ? angle : -1.0f;
             bounds_[c] = cb;
+            clusterRadius_[c] = radius;
+            clusterAngle_[c] = angle;
             clusterEdge_[c] = edge / float(3 * (s1 - s0)) / float(mm.n) * float(mm.n); // (base edge)
         }
     }, 16);
+}
+
+void MicroRenderer::updateClusterRanges(const Mesh& mesh, const std::vector<uint32_t>& clusters) {
+    const MicroMesh& mm = *mesh.micro;
+    const uint32_t nt = mm.baseTriangles, size = 1u << clusterShift_;
+    poolFor(clusters.size(), [&](size_t b, size_t e) {
+        for (size_t ci = b; ci < e; ++ci) {
+            const uint32_t c = clusters[ci];
+            const uint32_t s0 = c << clusterShift_, s1 = std::min(nt, s0 + size);
+            uint16_t range = 0;
+            for (uint32_t s = s0; s < s1; ++s) range = std::max(range, mm.triRange[order_[s]]);
+            ClusterBounds& cb = bounds_[c];
+            const float radius = clusterRadius_[c], angle = clusterAngle_[c];
+            cb.radius = radius + mm.bulgeMax + float(range) * mm.step;
+            cb.coneAngle = angle < 1.45f && float(range) * mm.step < radius * 0.5f ? angle : -1.0f;
+        }
+    }, 64);
 }
 
 void MicroRenderer::uploadDispTiles(const Mesh& mesh, std::vector<uint32_t>& slots, bool all) {
@@ -366,7 +407,17 @@ void MicroRenderer::uploadDispTiles(const Mesh& mesh, std::vector<uint32_t>& slo
         return;
     }
     if (slots.empty()) return;
-    std::sort(slots.begin(), slots.end());
+    if (slots.size() > 4096) { // (in slot order through a bitset: sorting millions of tiny patches cost more than sending them)
+        slotBits_.assign((size_t(baseTriangles_) + 63) / 64, 0);
+        for (uint32_t sl : slots) slotBits_[sl >> 6] |= uint64_t(1) << (sl & 63);
+        size_t k = 0;
+        for (size_t w = 0; w < slotBits_.size(); ++w)
+            for (uint64_t bits = slotBits_[w]; bits; bits &= bits - 1) slots[k++] = uint32_t(w * 64 + size_t(std::countr_zero(bits)));
+        slots.resize(k);
+    } else {
+        std::sort(slots.begin(), slots.end());
+        slots.erase(std::unique(slots.begin(), slots.end()), slots.end());
+    }
     staging_.resize(slots.size() * S * 2);
     auto* st = reinterpret_cast<int16_t*>(staging_.data());
     poolFor(slots.size(), [&](size_t b, size_t e) {
@@ -417,15 +468,19 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
     // The pending triangles, newest first (scratch_ holds this sync's dirty ones, already marked).
     std::vector<uint32_t>& seeds = scratch_;
     const size_t limit = shadeBudget ? std::max<size_t>(1, shadeBudget / (S * 3)) : SIZE_MAX; // (the ring triples it)
-    if (seeds.size() < limit)
+    const bool full = seeds.size() >= limit; // (this sync's dirty ones fill it: sorted and unique already)
+    if (full) seeds.resize(limit);
+    else if (seeds.size() < limit)
         for (size_t w = 0; w < pending_.size() && seeds.size() < limit; ++w)
             for (uint64_t bits = pending_[w]; bits && seeds.size() < limit; bits &= bits - 1) {
                 const uint32_t t = uint32_t(w * 64 + size_t(std::countr_zero(bits)));
                 seeds.push_back(t);
             }
-    std::sort(seeds.begin(), seeds.end());
-    seeds.erase(std::unique(seeds.begin(), seeds.end()), seeds.end());
-    if (seeds.size() > limit) seeds.resize(limit);
+    if (!full) {
+        std::sort(seeds.begin(), seeds.end());
+        seeds.erase(std::unique(seeds.begin(), seeds.end()), seeds.end());
+        if (seeds.size() > limit) seeds.resize(limit);
+    }
     if (seeds.empty()) return;
     const auto started = std::chrono::steady_clock::now();
     std::vector<uint32_t> sorted;
@@ -482,45 +537,50 @@ bool MicroRenderer::sync(Mesh& mesh) {
         uploadDispTiles(mesh, scratch_, true);
         shadePending(mesh, true);
     } else {
-        // The base cage moved (dual-scale Move, a transform, undo of either): the detail rides along on the GPU (it
-        // is relative to the base); what changes is the base, the bounds and the shading around moved vertices.
+        // The base cage moved (dual-scale Move, big brushes on a dense base, a transform, undo of any): the detail
+        // rides along on the GPU (it is relative to the base); what changes is the base, the bounds and the shading
+        // around moved vertices. Their triangles in a bitset (millions on a scan: no lists to sort).
         bool baseEverywhere = false;
-        std::vector<uint32_t> baseTris;
+        const size_t words = mm.dirtyBits.size();
+        baseBits_.assign(words, 0);
+        bool anyBase = false;
         if (baseMoved) {
-            size_t moved = 0;
             const uint32_t b0 = mesh.dirtyBegin, b1 = std::min<uint32_t>(mesh.dirtyEnd, uint32_t(mesh.vertexCount()));
-            for (uint32_t v = b0; v < b1; ++v)
-                if (mesh.vertexDirty(v)) ++moved;
-            baseEverywhere = moved * 4 > mesh.vertexCount();
+            std::atomic<size_t> moved{0};
+            poolFor(size_t(b1 - b0), [&](size_t b, size_t e) {
+                size_t count = 0;
+                for (size_t i = b; i < e; ++i) {
+                    const uint32_t v = b0 + uint32_t(i);
+                    if (!mesh.vertexDirty(v)) continue;
+                    ++count;
+                    for (uint32_t t : mesh.vertexTriangles(v))
+                        std::atomic_ref<uint64_t>(baseBits_[t >> 6]).fetch_or(uint64_t(1) << (t & 63), std::memory_order_relaxed);
+                }
+                moved.fetch_add(count, std::memory_order_relaxed);
+            }, 1 << 14);
+            anyBase = moved.load() > 0;
+            baseEverywhere = moved.load() * 4 > mesh.vertexCount();
             if (baseEverywhere) {
                 uploadBase(mesh);
                 bytes_ -= mesh.vertexCount() * 2 * sizeof(glm::vec4);
-                std::vector<uint32_t> all(bounds_.size());
-                for (uint32_t c = 0; c < all.size(); ++c) all[c] = c;
-                updateClusterBounds(mesh, all);
-            } else {
+            } else if (anyBase) {
                 std::vector<glm::vec4> part(size_t(b1 - b0) * 2);
-                for (uint32_t v = b0; v < b1; ++v) {
-                    part[size_t(v - b0) * 2] = glm::vec4(mesh.positions[v], 1.0f);
-                    part[size_t(v - b0) * 2 + 1] = glm::vec4(mesh.normals[v], 0.0f);
-                    if (mesh.vertexDirty(v))
-                        for (uint32_t t : mesh.vertexTriangles(v)) baseTris.push_back(t);
-                }
+                poolFor(size_t(b1 - b0), [&](size_t b, size_t e) {
+                    for (size_t i = b; i < e; ++i) {
+                        part[i * 2] = glm::vec4(mesh.positions[b0 + i], 1.0f);
+                        part[i * 2 + 1] = glm::vec4(mesh.normals[b0 + i], 0.0f);
+                    }
+                }, 1 << 16);
                 gl::BindBuffer(GL_TEXTURE_BUFFER, baseData_);
                 gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(size_t(b0) * 2 * sizeof(glm::vec4)), GLsizeiptr(part.size() * sizeof(glm::vec4)),
                                   part.data());
                 gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
             }
         }
-        // This sync's dirty triangles.
+        // This sync's triangles whose heights changed: their tiles go to the GPU (a moved base sends no heights).
         scratch_.clear();
-        for (size_t w = 0; w < mm.dirtyBits.size(); ++w)
+        for (size_t w = 0; w < words; ++w)
             for (uint64_t bits = mm.dirtyBits[w]; bits; bits &= bits - 1) scratch_.push_back(uint32_t(w * 64 + size_t(std::countr_zero(bits))));
-        if (!baseTris.empty()) {
-            scratch_.insert(scratch_.end(), baseTris.begin(), baseTris.end());
-            std::sort(scratch_.begin(), scratch_.end());
-            scratch_.erase(std::unique(scratch_.begin(), scratch_.end()), scratch_.end());
-        }
         if (mm.allDirty || mm.rescaled) {
             uploadDispTiles(mesh, scratch_, true);
         } else if (!scratch_.empty()) {
@@ -528,14 +588,31 @@ bool MicroRenderer::sync(Mesh& mesh) {
             for (size_t i = 0; i < scratch_.size(); ++i) slots[i] = slotOf_[scratch_[i]];
             uploadDispTiles(mesh, slots, false);
         }
-        if (!scratch_.empty()) { // their clusters may reach further now
-            std::vector<uint32_t> cl;
-            for (uint32_t t : scratch_) cl.push_back(slotOf_[t] >> clusterShift_);
-            std::sort(cl.begin(), cl.end());
-            cl.erase(std::unique(cl.begin(), cl.end()), cl.end());
-            updateClusterBounds(mesh, cl);
+        // Bounds: the clusters whose base moved in full, those whose heights alone changed by their range.
+        if (!scratch_.empty() || anyBase) {
+            std::vector<uint32_t> moved, heights;
+            clusterSeen_.assign(bounds_.size(), 0);
+            for (size_t w = 0; w < words; ++w)
+                for (uint64_t bits = baseBits_[w]; bits; bits &= bits - 1) {
+                    const uint32_t c = slotOf_[uint32_t(w * 64 + size_t(std::countr_zero(bits)))] >> clusterShift_;
+                    if (clusterSeen_[c] != 1) clusterSeen_[c] = 1, moved.push_back(c);
+                }
+            for (uint32_t t : scratch_) {
+                const uint32_t c = slotOf_[t] >> clusterShift_;
+                if (!clusterSeen_[c]) clusterSeen_[c] = 2, heights.push_back(c);
+            }
+            if (!moved.empty()) updateClusterBounds(mesh, moved);
+            if (!heights.empty()) updateClusterRanges(mesh, heights);
         }
-        if (mm.allDirty || baseEverywhere) {
+        // Their shading follows within the frame's budget (moved base included: a stroke that moves a quarter of a
+        // scan's base no longer re-shades all of it at once).
+        if (anyBase)
+            for (size_t w = 0; w < words; ++w)
+                if (const uint64_t add = baseBits_[w] & ~pending_[w]) {
+                    pending_[w] |= add;
+                    pendingCount_ += size_t(std::popcount(add));
+                }
+        if (mm.allDirty) {
             shadePending(mesh, true);
         } else {
             for (uint32_t t : scratch_) {

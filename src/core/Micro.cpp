@@ -296,6 +296,24 @@ float triangleBulge(const MicroTriangle& T) {
 
 } // namespace
 
+void microRaiseBulge(Mesh& m) {
+    if (!m.micro) return;
+    MicroMesh& mm = *m.micro;
+    const uint32_t nt = mm.baseTriangles, n = mm.n;
+    const size_t block = 1 << 14;
+    std::vector<float> bulge((nt + block - 1) / block, 0.0f);
+    poolFor(nt, [&](size_t b, size_t e) {
+        MicroTriangle T;
+        float g = 0.0f;
+        for (size_t t = b; t < e; ++t) {
+            T.set(m, uint32_t(t), n);
+            g = std::max(g, triangleBulge(T));
+        }
+        bulge[b / block] = g;
+    }, block);
+    for (float g : bulge) mm.bulgeMax = std::max(mm.bulgeMax, g);
+}
+
 bool microWantsOutOfCore(size_t points) {
     if (const char* e = std::getenv("SF_MICRO_OUT_OF_CORE"); e && *e) return std::string(e) == "1";
     if (const size_t limit = currentTierConfig().outOfCorePoints) return points > limit;
@@ -546,7 +564,13 @@ bool microRaycast(const Mesh& m, const BVH& bvh, const glm::vec3& origin, const 
     RayHit base;
     if (!bvh.raycast(m, origin, dir, base)) return false;
     std::vector<uint32_t> cand;
+    const auto traceStart = std::chrono::steady_clock::now();
     microRayTriangles(m, bvh, origin, dir, cand);
+    static const bool trace = [] { const char* e = std::getenv("SF_MICRO_TRACE"); return e && e[0] == '1'; }();
+    if (trace)
+        std::fprintf(stderr, "micropick %zu candidates in %.1f ms (pad root %.4f, bulgeMax %.4f)\n", cand.size(),
+                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - traceStart).count(),
+                     mm.reach.pad.empty() ? 0.0 : double(mm.reach.pad[0]), double(mm.bulgeMax));
     // Only the triangles whose own reach (their bulge and displacement range) the ray passes through.
     const glm::vec3 inv(1.0f / (std::abs(dir.x) > 1e-20f ? dir.x : 1e-20f), 1.0f / (std::abs(dir.y) > 1e-20f ? dir.y : 1e-20f),
                         1.0f / (std::abs(dir.z) > 1e-20f ? dir.z : 1e-20f));

@@ -54,6 +54,8 @@ private:
     void buildLayout(const Mesh& mesh);
     void uploadBase(const Mesh& mesh);
     void updateClusterBounds(const Mesh& mesh, const std::vector<uint32_t>& clusters);
+    // The same after only displacement changed (the base didn't move): the clusters' displacement range only.
+    void updateClusterRanges(const Mesh& mesh, const std::vector<uint32_t>& clusters);
     void ensurePatches(int level);
     void uploadDispTiles(const Mesh& mesh, std::vector<uint32_t>& slots, bool all);
     void shadePending(const Mesh& mesh, bool all);
@@ -69,6 +71,9 @@ private:
     uint32_t clusterShift_ = 8;
     std::vector<ClusterBounds> bounds_;
     std::vector<float> clusterEdge_; // average base edge per cluster
+    // Per cluster, from the base alone: the sphere's radius and the normal cone's angle before the displacement's
+    // share (updateClusterRanges: a micro edit only changes that share).
+    std::vector<float> clusterRadius_, clusterAngle_;
     AABB box_;
     struct Chunk {
         uint32_t firstSlot = 0, slots = 0;
@@ -91,6 +96,8 @@ private:
     double shadeNsPerPoint_ = 0.0;  // what shading a grid point (and sending it) took lately (TierConfig::strokeShadeMs)
     size_t pendingCount_ = 0;
     std::vector<uint32_t> scratch_, written_, stageIndex_;
+    std::vector<uint8_t> clusterSeen_;
+    std::vector<uint64_t> slotBits_, baseBits_;
     std::vector<uint8_t> staging_;
     std::vector<uint32_t> levels_;
     std::vector<int8_t> want_;
