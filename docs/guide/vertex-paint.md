@@ -217,6 +217,8 @@ with the sphere filling it (a non-square image is cropped to its centre; big one
 
 ![A Lit Sphere loaded from an image (Gold) in Render > Materials](images/custom-lit-spheres.jpg)
 
+![Right-click a Lit Sphere for Rename... and Move to folder; the Metals folder is a heading in the list](images/lit-sphere-folders.jpg)
+
 Your Lit Spheres appear in the material picker (<kbd>M</kbd>), **Render > Materials** and the Library, after the
 built-in ones, those in folders under their folder's name. A project that uses one carries a copy of the image, so it opens with the same look on another
 computer (or after you delete the file). Loading an image with the same name again replaces it. EXR images are
