@@ -63,9 +63,9 @@ wait_idle 300
 expect_status "texture kept"
 expect_value quad_percent == 100
 expect_value texture_size == 1024
-click "Wire##view.polyf"
+click "Wire##view.wire"
 shot qremeshed
-click "Wire##view.polyf"
+click "Wire##view.wire"
 key ctrl+z
 expect_value triangles == $before_remesh
 click "QRemesh/Keep Texture##qremesh"

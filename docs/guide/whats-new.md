@@ -1069,7 +1069,7 @@ back to Draw (also on the top shelf and in the **Transform** palette).
   pivot there, raise **Falloff** for a soft joint, turn the arm. With X symmetry both arms move together.
 - **Pivot tools**: <kbd>Alt</kbd>+drag the gizmo to move it alone, **Reset**, **To Surface**, World or Surface
   axes.
-- **Numeric entry** in the Gizmo panel, **All Parts** (Transpose All), one undo step per drag, sculpt
+- **Numeric entry** in the Gizmo panel, **All Parts** (move, rotate and scale all Parts together), one undo step per drag, sculpt
   layers move with the surface, and the `transform` command for scripts.
 - Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
 

@@ -43,7 +43,7 @@ UiLayout standardLayout() {
                    "widget.color"};
     l.rightShelf = {"edit.undo",  "edit.redo",       "sep",
                     "view.frame", "widget.nav.move", "widget.nav.zoom", "widget.nav.rotate", "sep",
-                    "view.polyf", "view.facegroups", "view.mask",       "view.vertexpaint",    "sep",
+                    "view.wire", "view.facegroups", "view.mask",       "view.vertexpaint",    "sep",
                     "part.solo", "view.splats"};
     l.bottomShelf = {"brush.standard", "brush.clay",    "brush.clayblock", "brush.sharpcrease", "brush.move",
                      "brush.smooth",   "brush.inflate", "brush.pinch",       "brush.flatten",     "brush.crease",
@@ -67,7 +67,7 @@ UiLayout standardLayout(int shellLayout) {
                   "transform.symmetry_x", "transform.symmetry_y", "transform.symmetry_z", "transform.symmetry_radial"};
     l.rightShelf = {"edit.undo",  "edit.redo",       "sep",
                     "view.frame", "widget.nav.move", "widget.nav.zoom", "widget.nav.rotate", "sep",
-                    "view.polyf", "view.facegroups", "view.mask",       "view.vertexpaint",    "sep",
+                    "view.wire", "view.facegroups", "view.mask",       "view.vertexpaint",    "sep",
                     "part.solo", "view.splats"};
     return l;
 }

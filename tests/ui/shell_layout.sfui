@@ -7,7 +7,7 @@ expect "Parts/Append"            # right tray: the Tool palette with its Part su
 expect_value right_tray == 1
 expect_value left_tray == -1
 expect "Clay##brush.clay"           # bottom shelf: quick brushes
-expect "Wire##view.polyf"          # right shelf
+expect "Wire##view.wire"          # right shelf
 expect "##tile.brush"               # left shelf
 expect "##drawsize"                 # top shelf
 expect_not "Brush Lab/Create"       # floating windows stay closed: nothing covers the model
@@ -17,9 +17,9 @@ shot standard
 click "Clay##brush.clay"
 stroke 0.35 0.4 0.65 0.6
 expect_value can_undo == 1
-click "Wire##view.polyf"
+click "Wire##view.wire"
 expect_value wireframe == 1
-click "Wire##view.polyf"
+click "Wire##view.wire"
 expect_value wireframe == 0
 click "Groups##view.facegroups"
 expect_value show_facegroups == 1

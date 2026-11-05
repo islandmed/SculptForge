@@ -59,7 +59,7 @@ x:0 8      96                                                              1240 
   |  |Clay  |                                                                    | [Rotat] | |   [Append][Dup]...|
   |  | +--+ |                                                                    | [Persp] | | > Layers          |
   |  | |St| |                          CANVAS                                    | [Floor] | | > Geometry        |
-  |  | +--+ |                     (3D view, gradient bg)                         | [PolyF] | | > Remesh          |
+  |  | +--+ |                     (3D view, gradient bg)                         | [Wire]  | | > Remesh          |
   |  |Dots  |                        1144 x 790                                  | [Grps ] | | > Masking         |
   |  | +--+ |                                                                    | [Mask ] | | > Face groups      |
   |  | |Al| |                                                                    | [Paint] | | > Visibility      |

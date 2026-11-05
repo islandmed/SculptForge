@@ -85,6 +85,8 @@ add an exception elsewhere.
     sculptgl
     3d-?coat
     gizmo ?3d
+    \bpoly ?f(?:rame)?\b
+    \btranspose ?all\b
 <!-- marks:end -->
 
 ## Old words read on load (src/core/LegacyNames.h)
@@ -105,6 +107,7 @@ FNV-1a 64 of the lower-case word. `tests/test_legacy_names.cpp` checks `LegacyNa
 | W10 | `zadd` | `raise` | `0x4265616148F33BEC` |
 | W11 | `zsub` | `lower` | `0xDE377B61A12DA42D` |
 | W12 | `goz` | `bridge` | `0xD4F75918FABCC503` |
+| W13 | `polyf` | `wire` | `0x90F1043555FF3A33` |
 
 ## The Bridge format's bytes (src/io/BridgeProtocol.h)
 

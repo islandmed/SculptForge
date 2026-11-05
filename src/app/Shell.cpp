@@ -280,7 +280,7 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     ImFont* caption = look == int(ui::Look::IconLabel) ? app.fontTiny_ : app.fontSmall_;
     const float capH = caption ? caption->FontSize + 2.0f * s : 14.0f * s;
     if (look == int(ui::Look::IconLabel)) {
-        // Right-shelf toggles are options (Mask, Paint, PolyF): on is a raised grey with an accent bar down the
+        // Right-shelf toggles are options (Mask, Paint, Wire): on is a raised grey with an accent bar down the
         // side that faces the canvas, off is quiet; only a mode action gets the accent fill.
         const bool mode = ui::IsModeAction(a.id);
         // Off: the fill eases into the accent-tinted hover (ui::DrawHover adds the look's ring).
@@ -493,7 +493,7 @@ void App::registerShellActions() {
     // View (right shelf, Render palette). Frame keeps F; its short label fits the right shelf.
     add({"view.frame", "Frame", ICON_LC_SCAN, "Fit the whole model in the view.", "Transform", "F", "",
          [this] { camera_.frame(sceneBounds()); }, nullptr, nullptr});
-        flag("view.polyf", "Wire", ICON_LC_GRID_3X3, "Render", "", &renderSettings_.wireframe,
+        flag("view.wire", "Wire", ICON_LC_GRID_3X3, "Render", "", &renderSettings_.wireframe,
          "Wireframe: show the polygons of the active Part (Shift+F).");
     flag("view.facegroups", "Groups", ICON_LC_SHAPES, "Render", "", &renderSettings_.showFaceGroups,
          "Colour each face group of the active Part.");

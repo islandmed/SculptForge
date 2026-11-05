@@ -20,9 +20,9 @@ wait_idle 120
 expect_status Remeshed to
 expect_value triangles != $before
 expect_value masked >= $kept
-click "Wire##view.polyf"
+click "Wire##view.wire"
 shot voxel_keep_masked
-click "Wire##view.polyf"
+click "Wire##view.wire"
 key ctrl+z
 expect_value triangles == $before
 
@@ -42,5 +42,5 @@ wait_idle 120
 expect_status quads
 expect_value quads > 100
 expect_value masked >= $kept
-click "Wire##view.polyf"
+click "Wire##view.wire"
 shot qremesh_keep_masked

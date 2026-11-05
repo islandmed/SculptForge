@@ -44,9 +44,9 @@ expect_value colored > 0
 expect_value qremesh_guide_loops == 6
 camera 0 0
 shot result
-click "Wire##view.polyf"
-shot result-polyf
-click "Wire##view.polyf"
+click "Wire##view.wire"
+shot result-wire
+click "Wire##view.wire"
 
 # Review: Film density, stop after the scan to check the landmarks.
 click "Show##splats"
@@ -80,9 +80,9 @@ expect_value quad_percent >= 97
 expect_value parts == 5
 expect_value visible_parts == 2
 camera 0 0
-click "Wire##view.polyf"
-shot film-polyf
-click "Wire##view.polyf"
+click "Wire##view.wire"
+shot film-wire
+click "Wire##view.wire"
 
 # Place by hand: Review again, then click the eight landmarks on the scan.
 click "Make sculptable/Make sculptable"

@@ -33,7 +33,7 @@ struct Word {
     std::string_view title; // ... and capitalised (UPPER is made from `lower`)
 };
 
-// Longest first where one could contain another. W1..W12 in docs/legal/trademarks.md.
+// Longest first where one could contain another. W1..W13 in docs/legal/trademarks.md.
 inline constexpr Word kWords[] = {
     {0xBCFC81F111856264ull, 11, "sharpcrease", "SharpCrease"}, // W8
     {0xC1D54DDDFE279385ull, 11, "clayblock", "ClayBlock"},     // W9
@@ -44,6 +44,7 @@ inline constexpr Word kWords[] = {
     {0x7A3173B83AFDBBD0ull, 7, "forgesphere", "ForgeSphere"},  // W3
     {0x77AF1E52C70C5CDBull, 6, "classic", "Classic"},          // W1
     {0xEB424D5C1B5FCC43ull, 6, "litsphere", "LitSphere"},      // W6
+    {0x90F1043555FF3A33ull, 5, "wire", "Wire"},                // W13 (the view.wire action id)
     {0x4265616148F33BECull, 4, "raise", "Raise"},              // W10
     {0xDE377B61A12DA42Dull, 4, "lower", "Lower"},              // W11
     {0xD4F75918FABCC503ull, 3, "bridge", "Bridge"},            // W12

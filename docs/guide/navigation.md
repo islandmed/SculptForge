@@ -184,7 +184,7 @@ unusual scale.
 These live on the right shelf and in the **View** menu:
 
 - **Wire** (<kbd>Shift</kbd>+<kbd>F</kbd>): shows the polygons of the active Part over
-  the surface, PolyFrame. Quads show as quads (see [Quads and triangles](geometry.md#quads-and-triangles)).
+  the surface as a wireframe. Quads show as quads (see [Quads and triangles](geometry.md#quads-and-triangles)).
   Useful for judging mesh density before you subdivide or remesh.
 - **Groups**: colours each face group.
 - **Mask**: darkens masked areas.

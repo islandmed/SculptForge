@@ -1579,8 +1579,8 @@ adjacency that saves the memory).
   Alt+click the model or To Surface to put it on the surface, Reset; World or Surface axes (Y along the normal,
   turning with rotations). The gizmo follows undo / redo of its own steps and is saved in projects (`gizmo` key,
   no format bump).
-- Transform gizmo panel: pivot, options and numeric Move / Rotate / Scale with Apply; All Parts (Transpose All, one
-  undo step per Part).
+- Transform gizmo panel: pivot, options and numeric Move / Rotate / Scale with Apply; All Parts (move, rotate and scale
+  all Parts together, one undo step per Part).
 - `transform` command (translate, rotate, scale, pivot, orient, masked, falloff, symmetry, all); each gizmo drag
   is echoed to the console as the command that repeats it.
 - One undo step per drag that restores positions bit for bit. Sculpt layers move with the surface (the base and
@@ -1693,7 +1693,7 @@ adjacency that saves the memory).
   loaded parallel ctest.
 
 ### Changed
-- Wireframe (PolyF) is Shift+F only: W is now the Transform gizmo's Move.
+- Wireframe (the polygon frame overlay) is Shift+F only: W is now the Transform gizmo's Move.
 
 ## [0.4.2] - 2026-10-23
 
@@ -1749,7 +1749,7 @@ Shaped by feedback from a working professional modeler and a survey of sculpting
   cavity shading, so small strokes stay readable. Projects keep the material they were saved with.
 
 ### Quads
-- Models opened through the Bridge, OBJ, FBX, PLY or USD keep their quads: PolyF shows them as quads and
+- Models opened through the Bridge, OBJ, FBX, PLY or USD keep their quads: the wireframe overlay shows them as quads and
   OBJ / FBX / PLY / USD / Bridge files export writes them back as quads, through sculpting, layers, undo, Parts and
   projects.
 - Subdivide turns each quad into four quads, voxel remesh produces an even quad grid, and the

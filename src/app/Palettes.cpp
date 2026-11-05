@@ -907,7 +907,7 @@ void App::drawPalette_Transform() {
     segmented(*this, {"transform.symmetry_x", "transform.symmetry_y", "transform.symmetry_z"});
     drawRadialSymmetryControls();
     actionRow(*this, {"view.frame", "part.solo"});
-    actionRow(*this, {"view.polyf"});
+    actionRow(*this, {"view.wire"});
 }
 
 } // namespace sf

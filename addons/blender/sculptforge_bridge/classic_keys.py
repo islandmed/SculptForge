@@ -219,7 +219,7 @@ def key_table():
         ("Ctrl+Shift+Alt+drag", "hide what's inside", "paint.hide_show", "LEFTMOUSE", True, True, True, "PRESS",
          {"action": "HIDE", "area": "INSIDE"}),  # (Blender spells this enum item "Inside": see _set)
         ("X", "Symmetry X", toggle, "X", False, False, False, "PRESS", {"data_path": "object.data.use_mirror_x"}),
-        ("Shift+F", "PolyFrame (wireframe)", toggle, "F", False, True, False, "PRESS",
+        ("Shift+F", "Wireframe overlay", toggle, "F", False, True, False, "PRESS",
          {"data_path": "space_data.overlay.show_wireframes"}),
         ("F", "Frame the model", "view3d.view_all", "F", False, False, False, "PRESS", {}),
         ("P", "Perspective on / off", "view3d.view_persportho", "P", False, False, False, "PRESS", {}),
