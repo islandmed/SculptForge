@@ -662,3 +662,31 @@ TEST(wavelet_round_trip_and_coarse_edit) {
     for (uint32_t k = 0; k < S; ++k) worst = std::max(worst, std::abs(int(g[k]) - int(orig[k]) - 500));
     CHECK(worst <= 3); // (floor averages round at most once per finer level: 3 levels below spacing 8)
 }
+
+TEST(micro_dab_marks_only_what_changed) {
+    // A dab marks dirty (what the renderer re-sends, re-bounds and re-shades) every patch whose heights changed,
+    // and not the candidates it left alone: a Clay dab's plane misses much of what it covers (on a scan's micro
+    // level, millions of tiny patches).
+    Document doc = microDoc(2, 200000);
+    MicroMesh& mm = *doc.mesh.micro;
+    Symmetry sym;
+    sym.x = false;
+    doc.sculptor.beginStroke(doc.mesh, "Clay");
+    doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Clay, dabAt(glm::vec3(0, 0, 1), 0.3f), sym); // (some height to level)
+    const std::vector<int16_t> before = mm.disp;
+    mm.clearDirty();
+    doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Clay, dabAt(glm::vec3(0.05f, 0, 1), 0.3f), sym);
+    doc.undo.push(doc.sculptor.endStroke());
+    const uint32_t S = mm.samples;
+    size_t changed = 0, marked = 0, missed = 0;
+    for (uint32_t t = 0; t < mm.baseTriangles; ++t) {
+        const bool moved = !std::equal(before.begin() + size_t(t) * S, before.begin() + size_t(t + 1) * S, mm.disp.begin() + size_t(t) * S);
+        const bool dirty = mm.dirtyBits[t >> 6] >> (t & 63) & 1;
+        changed += moved, marked += dirty, missed += moved && !dirty;
+    }
+    std::printf("  clay dab: %zu patches changed, %zu marked\n", changed, marked);
+    CHECK(changed > 100);
+    CHECK(missed == 0);
+    CHECK(marked <= changed + changed / 10); // (the ones changed, give or take a stitched edge)
+    CHECK(watertight(doc.mesh));
+}
