@@ -224,6 +224,10 @@ void App::registerAlphaOptionsCommand() {
                        o.tileX = int(std::lround(argNumber(a, "tile_x", o.tileX)));
                        o.tileY = int(std::lround(argNumber(a, "tile_y", o.tileY)));
                        syncAlphaTile();
+                       if (vdmBrushActive()) // the VDM brush's Stamp rotation (#136): no tiling there
+                           return {true, std::string("VDM: ") + (o.followStroke ? "follows the drag, " : "") + "angle " +
+                                             std::to_string(int(std::lround(o.angle))) + ", jitter " +
+                                             std::to_string(int(std::lround(o.jitter)))};
                        return {true, std::string("Alpha: ") + (o.followStroke ? "follows the stroke, " : "") + "angle " +
                                          std::to_string(int(std::lround(o.angle))) + ", jitter " +
                                          std::to_string(int(std::lround(o.jitter))) + ", tile " +

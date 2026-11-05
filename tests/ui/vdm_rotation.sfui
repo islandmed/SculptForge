@@ -45,6 +45,7 @@ key ctrl+z
 
 # Angle jitter: each stamp its own turn, within the range around Angle.
 run brush_alpha_options follow_stroke=false angle=0 angle_jitter=90
+expect_status VDM: angle 0, jitter 90
 stroke 0.5 0.5 0.62 0.5
 remember last_dab_angle first
 expect_value last_dab_angle >= -90
