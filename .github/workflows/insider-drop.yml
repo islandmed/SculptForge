@@ -11,7 +11,9 @@
 # the drop is built, uploaded as the run's artifact drop-<date> for the coordinator to review and committed to the
 # insider repository marked held, but not posted or bundled. Run this workflow by hand with that date and
 # approve=true to release it: the committed drop (the one reviewed, not a new one) is posted and joins the bundle.
-# Only this repository's own code runs; no pull request or issue input reaches it.
+# Only this repository's own code runs; no pull request or issue input reaches it. INSIDERS_REPO_TOKEN lives only in
+# the GitHub Environment "member-drops" (deployment: main only), so a run from any other branch can't read it; the
+# token reaches the insider checkout and the push step only (never left in a git config the build could read).
 name: Insider drop
 
 on:
@@ -40,6 +42,7 @@ jobs:
   drop:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    environment: member-drops
     env:
       HOLD_UNTIL: "2026-11-09" # the first real drops wait for the coordinator's approval
       HAS_INSIDERS: ${{ secrets.INSIDERS_REPO_TOKEN != '' }}
@@ -48,7 +51,7 @@ jobs:
       CCACHE_MAXSIZE: 500M
       CCACHE_DEPEND: 'true'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Dates
         env:
           IN_DATE: ${{ inputs.date }}
@@ -71,11 +74,12 @@ jobs:
           echo "$DATE: $MODE"
       - name: Insider repository
         if: env.HAS_INSIDERS == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: islandmed/sculptforge-insiders
           token: ${{ secrets.INSIDERS_REPO_TOKEN }}
           path: insiders
+          persist-credentials: false
       - name: Already done today?
         if: env.MODE != 'approve'
         run: |
@@ -87,7 +91,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends ccache xvfb libgl1-mesa-dri
       - name: Compiler cache (restore; CI's Linux cache)
         if: env.MODE != 'approve' || env.MONTH != ''
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .ccache
           key: ccache-ci-linux-x86_64.${{ github.sha }}
@@ -108,7 +112,7 @@ jobs:
               $([ "$MODE" = hold ] && echo --hold)
       - name: Drop for review (artifact)
         if: env.SKIP_DROP != '1' && env.MODE != 'approve'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: drop-${{ env.DATE }}
           path: ${{ runner.temp }}/out/${{ env.DATE }}
@@ -140,6 +144,8 @@ jobs:
           python3 tools/drops/drops.py post "$B" --webhook-env DISCORD_MEMBERS_WEBHOOK
       - name: Commit to the insider repository
         if: env.HAS_INSIDERS == 'true'
+        env:
+          INSIDERS_TOKEN: ${{ secrets.INSIDERS_REPO_TOKEN }}
         run: |
           if [ "$MODE" != approve ] && [ -f "$RUNNER_TEMP/out/$DATE/gate.json" ]; then
             mkdir -p "insiders/$DROP_DIR" && cp -r "$RUNNER_TEMP/out/$DATE/." "insiders/$DROP_DIR/"
@@ -149,7 +155,9 @@ jobs:
           if git diff --cached --quiet; then echo "nothing to commit"; exit 0; fi
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit -qm "Drop $DATE ($MODE)${MONTH:+, Insider Pack $MONTH}"
-          git push -q
+          auth=$(printf 'x-access-token:%s' "$INSIDERS_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" push -q
       - name: Public pack listing (schedule and release)
         if: env.HAS_INSIDERS == 'true'
         run: |
