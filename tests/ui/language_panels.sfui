@@ -55,6 +55,7 @@ expect "快速導覽##help.quick_tour"
 shot zh-help-menu
 key escape
 run ui_look layout=classic
+click "幾何##tool.geometry"
 click "重新網格化##tool.remesh"
 expect "Quick Remesh##remesh.quick"
 expect "每筆畫後重新網格化##remesh.after_stroke"
