@@ -57,7 +57,7 @@ struct PhoneLinkOptions {
     std::string inboxRoot;        // the Captures folder (created on first use)
     uint16_t port = kPhoneLinkPort;
     bool localNetworkOnly = true;
-    std::string desktopName;      // shown on the phone ("Tony's PC")
+    std::string desktopName;      // shown on the phone ("Studio PC")
     std::string version;          // SculptForge version, shown on the phone
     std::string siteUrl;          // face page; empty = kPhoneLinkSiteUrl (or SCULPTFORGE_LINK_URL)
     std::string relayUrl;         // empty = kPhoneLinkRelayUrl (or SCULPTFORGE_LINK_RELAY); "off" = none;

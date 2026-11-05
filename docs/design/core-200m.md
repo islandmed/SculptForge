@@ -160,7 +160,7 @@ Every number twice: this laptop and the floor profile (`SF_HW_SIMULATE=floor`), 
 
 Nothing here merges into a release without the floor-tier numbers.
 
-## 7b. The novel track (Tony, 11-03: beyond the known playbook)
+## 7b. The novel track (11-03: beyond the known playbook)
 
 Sections 1-6 are the known playbook done well (multiresolution offsets, cluster LOD to a pixel budget, a cached
 screen, scale-adaptive dabs). The novel track changes *what a stroke is*, not only how fast it runs. Each item is a

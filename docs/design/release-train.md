@@ -6,7 +6,7 @@ one-command releases (`scripts/release.sh`). v2 is about shipping more often wit
 they want it, risky features ship dark, and hardware we can't run in CI is checked by people before a release.
 
 Every item below adds no port, no listener and no code from the network. Where an item touches the network or
-accounts it says so, and needs Tony's OK before it is built.
+accounts it says so, and needs the maintainer's OK before it is built.
 
 ## 1. Channels: Stable, Preview, Nightly
 
@@ -40,8 +40,8 @@ opens the download page (no download or install from the app: that would be new 
 
 **Insiders.** Insider builds (private sculptforge-insiders repo) stay separate from Preview: the public wording is
 "Insiders will get each release about two weeks early, starting with SculptForge 1.0." Before 1.0, Preview is the
-public release candidate. Open question for Tony: from 1.0 on, is Preview for Insiders only (then the channel shows
-only to signed-in members, which needs an account check: not before Tony decides), or public with Insiders getting
+public release candidate. Open question: from 1.0 on, is Preview for Insiders only (then the channel shows
+only to signed-in members, which needs an account check: not before the maintainer decides), or public with Insiders getting
 features two weeks earlier through feature flags (section 2)?
 
 ## 2. Feature flags
@@ -56,7 +56,7 @@ Risky or unfinished features merge early and ship dark instead of waiting on lon
 - A flag is deleted within two releases of going on by default; `ctest flags_have_owners` fails on a flag older
   than that (a date in the table).
 - No remote flags: switching features from the feed would be remote configuration of every install (attack surface,
-  and surprising). If ever wanted, Tony decides.
+  and surprising). If ever wanted, the maintainer decides.
 
 ## 3. Hardware matrix gate
 
@@ -90,7 +90,7 @@ For "the pen does something weird" reports that we can't reproduce.
 
 ## 5. Screenshot-diff approval
 
-Tony's polish bar: every visible change is looked at before merge.
+The polish bar: every visible change is looked at before merge.
 
 - The UI tests already save screenshots (`shot` in tests/ui/*.sfui, uploaded as `ui-shots-*` artifacts). Main's
   Linux x86_64 shots (Mesa llvmpipe, deterministic enough) become the baseline artifact for each main commit.

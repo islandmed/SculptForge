@@ -4,13 +4,13 @@ Research branch `research/perf-moonshots` (2026-11-01). Goal: the cost of a stro
 and the brush footprint, never with the total polygon count. This note surveys recent work, rates eight ideas,
 reports three prototypes measured with `--benchmark standard-33m`, and recommends what to ship.
 
-Starting point (Tony's clean 33M run, M1 Pro, Asahi, Mesa GL 4.6, unified memory): orbit 89 fps; Clay small p99
+Starting point (a clean 33M run, M1 Pro, Asahi, Mesa GL 4.6, unified memory): orbit 89 fps; Clay small p99
 38 ms; Clay large p99 119 ms; 240 px brush p99 338 ms; Move 18 fps. The branch is built on `perf/bigbrush-p99`
 (dabs of meshes from 2M vertices go to the solver thread without the preview), which already takes the stroke
 p99s to about 30 ms; what it leaves is the surface trailing the pen (each 240 px dab at 33M still costs
 100-200 ms of CPU) and Move, which never used the solver path.
 
-## 0. Hard requirement: the floor tier (Tony, 11-03)
+## 0. Hard requirement: the floor tier (11-03)
 
 Weak GPUs must get great performance too, not only big cards. Every idea, prototype and default below is held to
 this; an experiment that misses it stays off for that tier or doesn't ship.
@@ -33,7 +33,7 @@ this; an experiment that misses it stays off for that tier or doesn't ship.
    octahedral normals, implicit adjacency), and micro levels (1.25 bytes per triangle) above ~8M.
 5. **Benchmarks.** Every number is reported twice: this laptop and the **iGPU-simulated floor profile** (below),
    with p99 frame time and stroke latency at 5, 20 and 50M triangles. A beta must not regress the floor tier.
-6. **The floor decides; a big GPU never does (Tony, 11-03).** Performance must never be gated by an expensive GPU:
+6. **The floor decides; a big GPU never does (11-03).** Performance must never be gated by an expensive GPU:
    that is the value proposition. Every perf claim and every beta gate is judged on the floor tier first (the
    simulated profile and this laptop), and only then on the RTX 3060, as a sanity check. The 3060 PC is for test
    speed and Windows driver checks, not the target. A result that meets its target only on the 3060 has not met it.
@@ -396,7 +396,7 @@ here), which is the canvas track's job (§7) and CPU dab throughput (core-200m N
   data (3) belongs with the Sculpt Timeline; coarse-first (2) and learned prediction (7) don't pay once the
   preview is on.
 
-## 7. Canvas track (the cached screen; Tony, 11-03)
+## 7. Canvas track (the cached screen; 11-03)
 
 Generic techniques, designed here from first principles (clean room: no decompiling, no copied code or docs). Goal:
 a dab costs about the brush's pixels, whatever the mesh size, so the floor tier sculpts 20M like a small mesh.

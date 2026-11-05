@@ -29,7 +29,7 @@ TEST(memory_check_margin) {
 }
 
 TEST(memory_benchmark_scene_skipped) {
-    setAvailableMemoryOverride(size_t(1.3 * double(kGB))); // Tony's machine: 1.3 GB free
+    setAvailableMemoryOverride(size_t(1.3 * double(kGB))); // a real report: 1.3 GB free
     CHECK(availableMemoryBytes() == size_t(1.3 * double(kGB)));
     const MemoryCheck c33 = checkMemory(sceneNeed(33));
     CHECK(!c33.enough);
