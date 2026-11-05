@@ -127,6 +127,19 @@ The new surface is made of even quads (the original&#x27;s quads are rebuilt, no
 </li>
 </ul>
 <p>To remesh several Parts into one, first combine them with <strong>Merge visible...</strong> or <strong>Merge down...</strong> in <a href="parts.html#merge-parts">Parts</a>.</p>
+<h3 id="quick-remesh">Quick Remesh<a class="anchor" href="#quick-remesh" aria-label="Link to this section">#</a></h3>
+<p>Remesh as you sculpt, without going to the palette (#121). Turn on <strong>Tool &gt; Remesh &gt; Quick Remesh</strong>, then:</p>
+<ul>
+<li>
+press <kbd>Shift</kbd>+<kbd>R</kbd>, or
+</li>
+<li>
+hold <kbd>N</kbd> and click or drag on the background (anywhere off the model; on the model it stays a brush stroke).
+</li>
+</ul>
+<p>Either one remeshes the active Part at the <strong>Resolution</strong> above, with <strong>Keep Masked</strong> and <strong>Keep Texture</strong> as set there. It runs in the background with the same progress bar and <strong>Cancel</strong>, so you can keep sculpting; the status bar says when it&#x27;s done and how many triangles the Part has now. Each remesh is one undo step. If you sculpt or undo while it runs, it doesn&#x27;t throw that work away: it remeshes the Part again as it is now.</p>
+<p>Both keys change in <strong>Edit &gt; Preferences &gt; Hotkeys</strong> (<em>Quick Remesh</em> and <em>Quick Remesh (hold and drag)</em>). Neither <kbd>Shift</kbd>+<kbd>R</kbd> nor <kbd>N</kbd> is used by any key style, and holding <kbd>N</kbd> changes no other drag on the background: without it, a drag there turns, pans or zooms the view, or draws the mask and hide shapes, exactly as your key style says. With Quick Remesh off, the keys only tell you where to turn it on.</p>
+<p><strong>Remesh after each stroke</strong> (off by default) does it for you: when you lift the pen after a stroke that stretched the surface (edges pulled to more than 1.6 times their length, as a long Move or Snake Hook pull does), the active Part is remeshed in the background. Strokes that don&#x27;t stretch anything, and masking or painting, never remesh. Sculpting never waits for it. It skips Parts with subdivision levels, sculpt layers or a painted texture (Keep Texture), where a remesh would bake or drop them; use the button or <kbd>Shift</kbd>+<kbd>R</kbd> there.</p>
 <h2 id="quad-remesh">Quad Remesh<a class="anchor" href="#quad-remesh" aria-label="Link to this section">#</a></h2>
 <p><strong>Tool &gt; Geometry &gt; Quad Remesh</strong> is automatic quad retopology: it rebuilds the Part as clean quads whose edge loops follow the forms, close to a target polygon count, with Keep Groups, Adaptive Size, vertex paint density and symmetry. <strong>Project Detail</strong> (<strong>Tool &gt; Parts &gt; Project</strong>) brings the sculpted detail back onto the new topology after you divide it. Both have their own chapter: <a href="retopology.html">Quad retopology and detail projection</a>.</p>
 <h2 id="close-holes">Close Holes<a class="anchor" href="#close-holes" aria-label="Link to this section">#</a></h2>
