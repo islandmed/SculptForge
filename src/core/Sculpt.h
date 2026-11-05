@@ -311,6 +311,10 @@ public:
     // SF_MICRO_BASE=0: always the grid (A/B).
     static constexpr float kMicroBaseSpan = 16.0f;
     bool microBaseDabs = microBaseDefault();
+    // Set by the app while it places the dabs still waiting when the pen lifts: those big micro dabs go through the
+    // plain mesh's path, fused (SculptBatch.cpp), not one base pass each (a 240 px stroke's release on Lucy 112M:
+    // 2.2 -> 1.4 s on a 3060). In the stroke the base kernel stays (fused there, 120 px fell behind: p99 344 -> 590 ms).
+    bool microBaseFuse = false;
     static bool microBaseDefault();
     MicroStroke& microStroke() { return micro_; }
     // Mirror sign vectors for the enabled symmetry axes (always starts with (1,1,1)); ignores radial and local.

@@ -424,7 +424,7 @@ bool Sculptor::microBaseDab(const Mesh& mesh, BrushType type, const DabParams& p
         const MicroMesh& mm = *mesh.micro;
         microBase_ = microBaseDabs && (type == BrushType::Standard || type == BrushType::Clay || type == BrushType::Inflate) &&
                              !mm.hasMask() && mesh.mask.empty() && !mesh.hasHidden() && !(p.alpha && !p.alpha->empty()) &&
-                             mesh.layers.empty() && mm.baseEdge > 0.0f &&
+                             mesh.layers.empty() && !dyntopo.enabled && mm.baseEdge > 0.0f &&
                              p.radius >= kMicroBaseSpan * mm.baseEdge
                          ? 1
                          : 0;
@@ -910,10 +910,12 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
     }
     // A micro level: a big dab moves the base below it (microBaseKernel), the grid takes the rest (core/MicroSculpt.cpp).
     if (microReady(mesh) && microBaseDab(mesh, type, p)) {
-        microBaseKernel(mesh, bvh, type, p, sym);
-        return;
-    }
-    if (microReady(mesh)) {
+        if (!microBaseFuse) {
+            microBaseKernel(mesh, bvh, type, p, sym);
+            return;
+        }
+        // (the dabs left at the pen's lift: on through the plain path below, fused)
+    } else if (microReady(mesh)) {
         const double k0 = micro_.findMs + micro_.kernelMs, s0 = micro_.stitchMs;
         const uint64_t pts = micro_.points;
         for (const SymCopy& m : copies(sym))
