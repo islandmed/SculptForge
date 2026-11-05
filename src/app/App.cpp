@@ -19,6 +19,7 @@
 #include "app/Theme.h"
 #include "app/Ui.h"
 #include "app/UiServe.h"
+#include "app/UserData.h"
 
 #include <IconsLucide.h>
 
@@ -214,12 +215,11 @@ bool App::init(const AppOptions& options) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
-    if (char* pref = SDL_GetPrefPath("SculptForge", "SculptForge")) {
-        iniPath_ = std::string(pref) + "imgui.ini";
+    if (const std::string pref = userDataDir(); !pref.empty()) {
+        iniPath_ = pref + "imgui.ini";
         io.IniFilename = iniPath_.c_str();
-        aiSettingsPath_ = std::string(pref) + "ai.json";
+        aiSettingsPath_ = pref + "ai.json";
         aiSettings_ = ai::AiSettings::load(aiSettingsPath_);
-        SDL_free(pref);
     } else {
         io.IniFilename = nullptr;
     }

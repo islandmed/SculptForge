@@ -107,6 +107,7 @@ void isolateSettings() {
     const std::string d = dir.string();
 #if defined(_WIN32)
     _putenv_s("APPDATA", d.c_str());
+    _putenv_s("SF_USER_DATA_DIR", d.c_str()); // (SDL_GetPrefPath ignores APPDATA: app/UserData.h)
 #else
     setenv("XDG_DATA_HOME", d.c_str(), 1);
     setenv("XDG_CONFIG_HOME", d.c_str(), 1);

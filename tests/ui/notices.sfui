@@ -1,0 +1,53 @@
+# Notices over the 3D view last (Discord 11-02, ThinkingPolygons: "This is meant to be my default, I don't need to see
+# it there forever"). Restored from 0.10.9 (the ea476e34 merge dropped it) for today's viewport hints: hints.sfui has
+# Don't show again and Preferences > Hints; this one checks they stay that way after a restart (ui.json, the
+# preferences' autosave) and that a hint goes with its mode.
+run ui_look look=forge scheme=neutral layout=sculptforge
+run new_sphere subdivisions=3
+expect_value air_strokes == 0                 # off (the default): no hint
+expect_no_text Strokes start off the model
+
+# Turned on: the hint shows; turned off again: it goes.
+key f3
+type "##Command palette" "Start strokes off the model"
+key enter
+expect_value air_strokes == 1
+expect "Don't show again##hint.air_strokes"
+key f3
+type "##Command palette" "Start strokes off the model"
+key enter
+expect_value air_strokes == 0
+expect_not "Don't show again##hint.air_strokes"
+expect_no_text Strokes start off the model
+
+# Don't show again hides it for good: still hidden after a restart, with the mode on.
+key f3
+type "##Command palette" "Start strokes off the model"
+key enter
+click "Don't show again##hint.air_strokes"
+expect_status "Hint hidden"
+wait_value ui_config == 1 5
+restart
+wait 0.2
+expect_value air_strokes == 1
+expect_not "Don't show again##hint.air_strokes"
+expect_no_text Strokes start off the model
+shot hidden-after-restart
+
+# Preferences > Hints: Show all hints again brings it back; Show hints in the viewport off hides every hint, and that
+# lasts a restart too.
+click "Edit##menu.edit"
+click "Preferences##section.preferences"
+click "Hints##preferences.hints"
+click "Show all hints again##hints.reset"
+expect "Don't show again##hint.air_strokes"
+click "Show hints in the viewport##hints.show"
+expect_not "Don't show again##hint.air_strokes"
+shot hints-off
+key escape
+wait_value ui_config == 1 5
+restart
+wait 0.2
+expect_value air_strokes == 1
+expect_not "Don't show again##hint.air_strokes"
+expect_no_text Strokes start off the model

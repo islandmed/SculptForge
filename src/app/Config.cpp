@@ -16,6 +16,7 @@
 #include "app/Palettes.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
+#include "app/UserData.h"
 #include "core/LegacyNames.h"
 #include "core/Bake.h"
 #include "core/ListSort.h"
@@ -330,10 +331,7 @@ constexpr Gesture kBlenderGestures[] = {
 
 void App::initUiConfig(bool deterministic) {
     uiConfigDeterministic_ = deterministic;
-    if (char* pref = SDL_GetPrefPath("SculptForge", "SculptForge")) {
-        configDir_ = pref;
-        SDL_free(pref);
-    }
+    configDir_ = userDataDir();
     layout_ = standardLayout(uiPrefs_.shellLayout);
     if (deterministic) return; // tests, renders and recordings always use the standard layout
     std::string err;
@@ -795,11 +793,7 @@ void App::saveRecentActions() {
 
 namespace {
 std::string windowStatePath() {
-    std::string dir;
-    if (char* pref = SDL_GetPrefPath("SculptForge", "SculptForge")) {
-        dir = pref;
-        SDL_free(pref);
-    }
+    const std::string dir = userDataDir();
     return dir.empty() ? std::string() : dir + "window.json";
 }
 } // namespace

@@ -14,6 +14,7 @@
 #include "core/SplatCapture.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
+#include "app/UserData.h"
 
 #include "ai/Http.h"
 
@@ -86,10 +87,7 @@ bool App::interactive() const { return options_.renderPath.empty() && options_.r
 
 void App::initProject() {
     if (!interactive()) return;
-    if (char* pref = SDL_GetPrefPath("SculptForge", "SculptForge")) {
-        prefDir_ = pref;
-        SDL_free(pref);
-    }
+    prefDir_ = userDataDir();
     if (prefDir_.empty()) return;
     std::ifstream f(fsPath(prefDir_ + "project.json"), std::ios::binary);
     Json prefs;
