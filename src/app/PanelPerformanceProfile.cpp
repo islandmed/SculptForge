@@ -15,6 +15,7 @@
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
 #include "app/Ui.h"
+#include "app/UserData.h"
 
 #include "core/FrameGovernor.h"
 #include "core/HardwareProfile.h"
@@ -561,10 +562,7 @@ void App::togglePerfTrace() {
     if (const size_t slash = folder.find_last_of("/\\"); slash != std::string::npos) folder.resize(slash + 1);
     else folder.clear();
     if (folder.empty()) {
-        if (char* pref = SDL_GetPrefPath("SculptForge", "SculptForge")) {
-            folder = pref;
-            SDL_free(pref);
-        }
+        folder = userDataDir();
     }
     HardwareInfo hw;
     if (hwProfile_) hw = hwProfile_->profile.hardware;
