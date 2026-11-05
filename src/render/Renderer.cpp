@@ -2139,7 +2139,7 @@ void Renderer::drawPatches(const MeshSlot& s, GLenum mode, DrawPart part, GLint 
 void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, bool wireframe, bool pbr) {
     if (mesh.micro && microMatches(mesh)) { // a micro level draws its own way (render/MicroRenderer.h)
         if (!s.micro) s.micro = std::make_shared<MicroRenderer>();
-        s.micro->initialShadeMs = microProgressiveShading ? 40.0 : 0.0;
+        s.micro->initialShadeMs = microProgressiveShading ? 150.0 : 0.0; // (overlaps the GPU's frame; less while the view moves)
         s.outOfMemory = !s.micro->sync(mesh);
         s.drawnTriangles = s.outOfMemory ? 0 : 1; // (draw() skips empty slots)
         s.fresh = true;                           // (back to a mesh: a full upload)
@@ -3167,6 +3167,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     if (const uint64_t governed = renderTriangleBudget(); governed > 0) full = std::min(full, size_t(governed));
     const size_t budget = moving ? full / 2 : full;
     const float target = settings.microTargetPx * (moving ? 2.0f : 1.0f);
+    s.micro->viewMoving = moving;
     // (the budget is shared by the micro Parts on screen: each gets it whole; one is the usual case)
     const_cast<MeshSlot&>(s).microDrawn = s.micro->draw(p->id, frameCull_, frameProj_, frameViewport_, budget, target);
     lastDrawn_ += s.microDrawn;

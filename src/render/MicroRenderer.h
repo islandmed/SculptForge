@@ -50,8 +50,10 @@ public:
     size_t pendingShading() const { return pendingCount_ + size_t(baseTriangles_ - initialSlot_) * samples_; }
     // Grid points of shading recomputed per sync at most (0 = no limit).
     size_t shadeBudget = size_t(3) << 20;
-    // Time a frame gives the first shading after opening (0 = all of it before the first frame).
-    double initialShadeMs = 0.0;
+    // Time a frame gives the first shading after opening (0 = all of it before the first frame); while the view
+    // moves, initialShadeMovingMs.
+    double initialShadeMs = 0.0, initialShadeMovingMs = 30.0;
+    bool viewMoving = false;
     // The last draw: the level used by each visible cluster (-1 = culled), and the target it settled on.
     float lastTargetPx = 0.0f;
 
@@ -65,7 +67,8 @@ private:
     void uploadDispTiles(const Mesh& mesh, std::vector<uint32_t>& slots, bool all);
     void shadePending(const Mesh& mesh, bool all);
     // Shades `seeds` (and their vertex ring) into `stage`; `sorted` lists the triangles written, in slot order.
-    void shadeSeeds(const Mesh& mesh, std::vector<uint32_t>& seeds, std::vector<uint8_t>& stage, std::vector<uint32_t>& sorted);
+    void shadeSeeds(const Mesh& mesh, std::vector<uint32_t>& seeds, std::vector<uint8_t>& stage, std::vector<uint32_t>& sorted,
+                    bool grow = true);
     // Sends what shadeSeeds staged (and clears `sorted`).
     void sendStaged(const std::vector<uint8_t>& stage, std::vector<uint32_t>& sorted);
     // The first shading after opening: the next slots in order, within initialShadeMs (sent now, or by the next sync).

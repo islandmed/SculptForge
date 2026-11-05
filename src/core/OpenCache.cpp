@@ -6,12 +6,22 @@
 #include "core/ThreadPool.h"
 
 #include <atomic>
+#include <cstdlib>
 #include <cstring>
+#include <string>
 
 namespace sf {
 
 size_t openCacheMinTriangles = 8'000'000;
 OpenCacheUse lastOpenCacheUse;
+
+bool openCacheEnabled() {
+    static const bool on = [] {
+        const char* e = std::getenv("SF_OPEN_CACHE");
+        return !(e && std::string(e) == "0");
+    }();
+    return on;
+}
 
 namespace {
 
@@ -58,6 +68,85 @@ uint64_t openCacheHash(const void* data, size_t bytes) {
     uint64_t h = mix(bytes ^ kMul);
     for (uint64_t v : part) h = mix((h ^ v) * kMul);
     return h;
+}
+
+std::vector<uint8_t> openCachePack(const std::vector<uint32_t>& values) {
+    const size_t blocks = (values.size() + kOpenCacheBlock - 1) / kOpenCacheBlock;
+    std::vector<std::vector<uint8_t>> parts(blocks);
+    poolFor(blocks, [&](size_t b, size_t e) {
+        for (size_t k = b; k < e; ++k) {
+            std::vector<uint8_t>& o = parts[k];
+            const size_t v0 = k * kOpenCacheBlock, v1 = std::min(values.size(), v0 + kOpenCacheBlock);
+            o.reserve((v1 - v0) * 2);
+            uint32_t prev = 0;
+            for (size_t i = v0; i < v1; ++i) {
+                const int32_t d = int32_t(values[i] - prev);
+                uint32_t z = (uint32_t(d) << 1) ^ uint32_t(d >> 31);
+                prev = values[i];
+                while (z >= 0x80) o.push_back(uint8_t(z | 0x80)), z >>= 7;
+                o.push_back(uint8_t(z));
+            }
+        }
+    }, 1);
+    const size_t header = 8 + (blocks + 1) * 8;
+    size_t total = header;
+    for (const auto& p : parts) total += p.size();
+    std::vector<uint8_t> out(total);
+    auto put32 = [&](size_t at, uint32_t v) { for (int i = 0; i < 4; ++i) out[at + size_t(i)] = uint8_t(v >> (8 * i)); };
+    auto put64 = [&](size_t at, uint64_t v) { for (int i = 0; i < 8; ++i) out[at + size_t(i)] = uint8_t(v >> (8 * i)); };
+    put32(0, kOpenCacheBlock);
+    put32(4, uint32_t(blocks));
+    uint64_t at = 0;
+    for (size_t k = 0; k < blocks; ++k) {
+        put64(8 + k * 8, at);
+        std::memcpy(out.data() + header + at, parts[k].data(), parts[k].size());
+        at += parts[k].size();
+    }
+    put64(8 + blocks * 8, at);
+    return out;
+}
+
+bool openCacheUnpack(const uint8_t* data, size_t n, size_t count, std::vector<uint32_t>& out) {
+    auto get32 = [&](size_t at) { uint32_t v = 0; for (int i = 0; i < 4; ++i) v |= uint32_t(data[at + size_t(i)]) << (8 * i); return v; };
+    auto get64 = [&](size_t at) { uint64_t v = 0; for (int i = 0; i < 8; ++i) v |= uint64_t(data[at + size_t(i)]) << (8 * i); return v; };
+    if (n < 8 || get32(0) != kOpenCacheBlock) return false;
+    const size_t blocks = get32(4);
+    if (blocks != (count + kOpenCacheBlock - 1) / kOpenCacheBlock || (n - 8) / 8 < blocks + 1) return false;
+    const size_t header = 8 + (blocks + 1) * 8;
+    std::vector<uint64_t> off(blocks + 1);
+    for (size_t k = 0; k <= blocks; ++k) off[k] = get64(8 + k * 8);
+    if (off[0] != 0 || off[blocks] != n - header) return false;
+    for (size_t k = 0; k < blocks; ++k)
+        if (off[k + 1] < off[k]) return false;
+    out.resize(count);
+    std::atomic<bool> ok = true;
+    const uint8_t* body = data + header;
+    poolFor(blocks, [&](size_t b, size_t e) {
+        for (size_t k = b; k < e && ok.load(std::memory_order_relaxed); ++k) {
+            const uint8_t* p = body + off[k];
+            const uint8_t* const end = body + off[k + 1];
+            const size_t v0 = k * kOpenCacheBlock, v1 = std::min(count, v0 + kOpenCacheBlock);
+            uint32_t prev = 0;
+            for (size_t i = v0; i < v1; ++i) {
+                uint32_t z = 0;
+                for (int shift = 0;; shift += 7) {
+                    if (p == end || shift > 28 || (shift == 28 && *p > 0x0F)) {
+                        ok = false;
+                        break;
+                    }
+                    const uint8_t c = *p++;
+                    z |= uint32_t(c & 0x7F) << shift;
+                    if (!(c & 0x80)) break;
+                }
+                if (!ok) break;
+                prev += uint32_t(int32_t(z >> 1) ^ -int32_t(z & 1));
+                out[i] = prev;
+            }
+            if (p != end) ok = false;
+        }
+    }, 1);
+    if (!ok) out.clear();
+    return ok;
 }
 
 uint64_t openCacheKey(const Mesh& mesh) {

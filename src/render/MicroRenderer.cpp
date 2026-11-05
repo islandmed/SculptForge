@@ -526,22 +526,66 @@ void MicroRenderer::shadeInitial(const Mesh& mesh, bool send) {
     const size_t S = samples_;
     // Points this frame: initialShadeMs at the measured cost (the ring around a run adds a little), whole clusters.
     const double ns = shadeNsPerPoint_ > 0.0 ? shadeNsPerPoint_ : 25.0;
-    const size_t points = size_t(std::max(1.0, initialShadeMs * 1e6 / ns));
+    const double ms = viewMoving ? std::min(initialShadeMs, initialShadeMovingMs) : initialShadeMs;
+    const size_t points = size_t(std::max(1.0, ms * 1e6 / ns));
     const uint32_t size = 1u << clusterShift_;
     uint32_t slots = uint32_t(std::clamp<size_t>(points / S, size, size_t(1) << 22)) & ~(size - 1);
+    // Once the cost is measured: the rest at once if it takes under 2.5 s (a smaller level then costs one extra
+    // frame in all, not many frames' overhead, even on a busy CPU), else in frame-sized runs (a dense scan).
+    if (shadeNsPerPoint_ > 0.0 && !viewMoving && double(baseTriangles_ - initialSlot_) * double(S) * ns < 2.5e9)
+        slots = baseTriangles_ - initialSlot_;
     const uint32_t end = std::min(baseTriangles_, initialSlot_ + std::max(slots, size));
     std::vector<uint32_t>& seeds = scratch_;
     seeds.resize(end - initialSlot_);
     for (uint32_t s = initialSlot_; s < end; ++s) seeds[s - initialSlot_] = order_[s];
     std::sort(seeds.begin(), seeds.end());
     if (!initialSorted_.empty()) sendStaged(initialStage_, initialSorted_);
-    shadeSeeds(mesh, seeds, initialStage_, initialSorted_);
-    if (send) sendStaged(initialStage_, initialSorted_);
+    // Straight into the GPU copy: these slots draw unshaded until the run is done (no shading fetched there), so
+    // their range is mapped without waiting for the GPU (and without a staging copy, which cost as much as the
+    // shading on a small level).
+    const uint32_t c0 = initialSlot_ / chunkSlots_, c1 = (end - 1) / chunkSlots_;
+    std::vector<uint32_t*> mapped(c1 - c0 + 1, nullptr);
+    std::vector<uint32_t> from(c1 - c0 + 1, 0);
+    bool ok = true;
+    for (uint32_t c = c0; c <= c1; ++c) {
+        const Chunk& ch = chunks_[c];
+        const uint32_t s0 = std::max(initialSlot_, ch.firstSlot), s1 = std::min(end, ch.firstSlot + ch.slots);
+        from[c - c0] = s0;
+        gl::BindBuffer(GL_TEXTURE_BUFFER, ch.shade);
+        mapped[c - c0] = static_cast<uint32_t*>(gl::MapBufferRange(
+            GL_TEXTURE_BUFFER, GLintptr(size_t(s0 - ch.firstSlot) * S * 4), GLsizeiptr(size_t(s1 - s0) * S * 4),
+            GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT));
+        ok = ok && mapped[c - c0];
+    }
+    if (ok) {
+        const auto started = std::chrono::steady_clock::now();
+        shader_.shade(mesh, seeds, false, written_, [&](uint32_t t) -> uint32_t* {
+            const uint32_t s = slotOf_[t], c = s / chunkSlots_ - c0;
+            return mapped[c] + size_t(s - from[c]) * S;
+        }, {}, false); // (runs in slot order: each triangle once)
+        if (!written_.empty()) {
+            const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() /
+                              double(written_.size() * S);
+            shadeNsPerPoint_ = shadeNsPerPoint_ > 0.0 ? shadeNsPerPoint_ * 0.7 + ns * 0.3 : ns;
+            if (std::getenv("SF_OPEN_PROFILE"))
+                std::fprintf(stderr, "first shading: %u slots, %.1f ns a point, %.0f ms\n", end - initialSlot_, ns,
+                             ns * double(written_.size() * S) * 1e-6);
+        }
+    }
+    for (uint32_t c = c0; c <= c1; ++c) {
+        gl::BindBuffer(GL_TEXTURE_BUFFER, chunks_[c].shade);
+        if (mapped[c - c0]) gl::UnmapBuffer(GL_TEXTURE_BUFFER);
+    }
+    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+    if (!ok) { // (mapping failed: through a staging copy)
+        shadeSeeds(mesh, seeds, initialStage_, initialSorted_, false);
+        if (send) sendStaged(initialStage_, initialSorted_);
+    }
     initialSlot_ = end;
 }
 
 void MicroRenderer::shadeSeeds(const Mesh& mesh, std::vector<uint32_t>& seeds, std::vector<uint8_t>& stage,
-                               std::vector<uint32_t>& sorted) {
+                               std::vector<uint32_t>& sorted, bool grow) {
     const MicroMesh& mm = *mesh.micro;
     const size_t S = mm.samples;
     written_.clear();
@@ -556,7 +600,7 @@ void MicroRenderer::shadeSeeds(const Mesh& mesh, std::vector<uint32_t>& seeds, s
         std::sort(sorted.begin(), sorted.end(), [&](uint32_t a, uint32_t b) { return slotOf_[a] < slotOf_[b]; });
         for (size_t i = 0; i < sorted.size(); ++i) stageIndex_[sorted[i]] = uint32_t(i);
         stage.resize(sorted.size() * S * 4);
-    });
+    }, grow);
     if (!written_.empty()) { // the cost per point, smoothed (a stroke's shading budget in time follows it)
         const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() /
                           double(written_.size() * S);

@@ -78,6 +78,8 @@ private:
 // Tile codec (projects): each tile of `samples` values as its minimum (int16), a bit width b (0-16) and the
 // values minus the minimum in b bits each. An untouched tile (all zero) is 3 bytes.
 void microPackTiles(const int16_t* values, size_t tiles, uint32_t samples, std::vector<uint8_t>& out);
-bool microUnpackTiles(const uint8_t* data, size_t size, size_t tiles, uint32_t samples, int16_t* out);
+// `ranges` (optional, one per tile): an upper bound of each tile's largest |value|, from its header alone
+// (MicroMesh::triRange without reading the values back).
+bool microUnpackTiles(const uint8_t* data, size_t size, size_t tiles, uint32_t samples, int16_t* out, uint16_t* ranges = nullptr);
 
 } // namespace sf

@@ -6,6 +6,7 @@
 #include "TestHarness.h"
 
 #include "core/Benchmark.h"
+#include "core/Json.h"
 #include "core/Micro.h"
 #include "core/Primitives.h"
 #include "core/OpenCache.h"
@@ -93,17 +94,32 @@ std::string hex64(uint64_t v) {
     return buf;
 }
 
-// Changes one uint32 of a cache array and its hash in the manifest (as a crafted file would): only the checks
-// on the values can catch it.
+// Changes one value of a cache array, packs it again and puts its hash and size in the manifest (as a crafted
+// file would): only the checks on the values can catch it.
 constexpr uint32_t kCopyFirst = 0xFFFFFFFEu; // (craft: the array's first value)
-void craft(std::string& manifest, std::vector<ZipEntry>& entries, const std::string& file, size_t index, uint32_t value) {
-    ZipEntry* e = entryNamed(entries, file);
+void craft(std::string& manifest, std::vector<ZipEntry>& entries, const std::string& key, size_t index, uint32_t value) {
+    Json m;
+    std::string err;
+    CHECK(Json::parse(manifest, m, err));
+    Json parts = m["parts"], p0 = parts[0], oc = p0["open_cache"], d = oc[key];
+    ZipEntry* e = entryNamed(entries, d["file"].asString());
     CHECK(e != nullptr);
     if (!e) return;
-    if (value == kCopyFirst) std::memcpy(&value, e->data.data(), 4);
-    const std::string before = hex64(openCacheHash(e->data.data(), e->data.size()));
-    std::memcpy(e->data.data() + index * 4, &value, 4);
-    replaceAll(manifest, before, hex64(openCacheHash(e->data.data(), e->data.size())));
+    std::vector<uint32_t> v;
+    CHECK(openCacheUnpack(e->data.data(), e->data.size(), size_t(d["values"].asNumber()), v));
+    if (index >= v.size()) return;
+    if (value == kCopyFirst) value = v[0];
+    v[index] = value;
+    e->data = openCachePack(v);
+    d.set("count", double(e->data.size()));
+    d.set("hash", hex64(openCacheHash(v)));
+    oc.set(key, d);
+    p0.set("open_cache", oc);
+    Json list = Json::array();
+    list.push(p0);
+    for (size_t i = 1; i < parts.size(); ++i) list.push(parts[i]);
+    m.set("parts", list);
+    manifest = m.dump();
 }
 
 } // namespace
@@ -150,9 +166,9 @@ TEST(open_cache_damaged_bytes_are_ignored) {
     std::string err;
     CHECK(saveProject(path, doc, err));
     rewrite(path, [&](std::string&, std::vector<ZipEntry>& entries) { // (the hash in the manifest stays: a damaged file)
-        ZipEntry* e = entryNamed(entries, "parts/0/cache/adj_list.bin");
+        ZipEntry* e = entryNamed(entries, "parts/0/cache/adj_list.pack");
         CHECK(e != nullptr);
-        if (e) e->data[e->data.size() / 2] ^= 0x40;
+        if (e) e->data[e->data.size() / 2] ^= 0x01; // (still decodes: only the hash catches it)
     });
     Document loaded;
     CHECK(loadProject(path, loaded, err));
@@ -174,13 +190,13 @@ TEST(open_cache_crafted_tables_are_rejected) {
         size_t index;
         uint32_t value;
     };
-    for (const Case c : {Case{"parts/0/cache/vt_list.bin", 5, nt + 7},          // out of range
-                         Case{"parts/0/cache/vt_list.bin", nt * 3 / 2, 0},      // in range, not that vertex's triangle
-                         Case{"parts/0/cache/adj_offsets.bin", 3, 0xFFFFFFF0u}, // offsets past the list
-                         Case{"parts/0/cache/adj_list.bin", 4, 0xFFFFFFFFu},    // a vertex that doesn't exist
-                         Case{"parts/0/cache/bvh_tris.bin", 1, kCopyFirst},     // a triangle twice
-                         Case{"parts/0/cache/bvh_nodes.bin", 0, 0},             // the root its own child
-                         Case{"parts/0/cache/micro_edges.bin", 2, 5u << 2}}) {  // an edge it doesn't share
+    for (const Case c : {Case{"vt_list", 5, nt + 7},          // out of range
+                         Case{"vt_list", nt * 3 / 2, 0},      // in range, not that vertex's triangle
+                         Case{"adj_offsets", 3, 0xFFFFFFF0u}, // offsets past the list
+                         Case{"adj_list", 4, 0xFFFFFFFFu},    // a vertex that doesn't exist
+                         Case{"bvh_tris", 1, kCopyFirst},     // a triangle twice
+                         Case{"bvh_nodes", 0, 0},             // the root its own child
+                         Case{"micro_edges", 2, 5u << 2}}) {  // an edge it doesn't share
         CHECK(saveProject(path, doc, err));
         rewrite(path, [&](std::string& manifest, std::vector<ZipEntry>& entries) { craft(manifest, entries, c.file, c.index, c.value); });
         Document loaded;
@@ -192,4 +208,22 @@ TEST(open_cache_crafted_tables_are_rejected) {
         checkLikeRebuilt(loaded, doc);
     }
     std::filesystem::remove(path);
+}
+
+TEST(open_cache_packing_round_trips_and_rejects_bad_bytes) {
+    std::vector<uint32_t> v;
+    for (uint32_t i = 0; i < 200000; ++i) v.push_back(i % 7 == 0 ? 0xFFFFFFFFu : i * 3 + (i & 5)); // (jumps both ways)
+    const std::vector<uint8_t> packed = openCachePack(v);
+    CHECK(packed.size() < v.size() * 3);
+    std::vector<uint32_t> back;
+    CHECK(openCacheUnpack(packed.data(), packed.size(), v.size(), back));
+    CHECK(back == v);
+    CHECK(!openCacheUnpack(packed.data(), packed.size() - 1, v.size(), back)); // truncated
+    CHECK(!openCacheUnpack(packed.data(), packed.size(), v.size() - 1, back)); // another count
+    CHECK(!openCacheUnpack(packed.data(), 7, v.size(), back));                 // no header
+    std::vector<uint8_t> bad = packed;
+    bad[bad.size() - 1] |= 0x80; // the last value runs past its block
+    CHECK(!openCacheUnpack(bad.data(), bad.size(), v.size(), back));
+    std::vector<uint8_t> empty = openCachePack({});
+    CHECK(openCacheUnpack(empty.data(), empty.size(), 0, back) && back.empty());
 }

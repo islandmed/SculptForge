@@ -234,7 +234,7 @@ void microPackTiles(const int16_t* values, size_t tiles, uint32_t samples, std::
     }, 4096);
 }
 
-bool microUnpackTiles(const uint8_t* data, size_t size, size_t tiles, uint32_t samples, int16_t* out) {
+bool microUnpackTiles(const uint8_t* data, size_t size, size_t tiles, uint32_t samples, int16_t* out, uint16_t* ranges) {
     std::vector<size_t> offset(tiles + 1, 0);
     for (size_t t = 0; t < tiles; ++t) {
         if (offset[t] + 3 > size) return false;
@@ -252,8 +252,10 @@ bool microUnpackTiles(const uint8_t* data, size_t size, size_t tiles, uint32_t s
             if (!w) {
                 // (`out` starts zeroed; writing zeros into an out-of-core file's holes would make them real)
                 if (lo != 0) std::fill(v, v + samples, int16_t(lo));
+                if (ranges) ranges[t] = uint16_t(std::min(std::abs(int(int16_t(lo))), 32767));
                 continue;
             }
+            int r = 0;
             uint64_t acc = 0;
             uint32_t have = 0;
             size_t pos = 3;
@@ -261,9 +263,11 @@ bool microUnpackTiles(const uint8_t* data, size_t size, size_t tiles, uint32_t s
             for (uint32_t k = 0; k < samples; ++k) {
                 while (have < w) acc |= uint64_t(in[pos++]) << have, have += 8;
                 v[k] = int16_t(lo + int(acc & mask));
+                r = std::max(r, std::abs(int(v[k])));
                 acc >>= w;
                 have -= w;
             }
+            if (ranges) ranges[t] = uint16_t(std::min(r, 32767));
         }
     }, 4096);
     return true;

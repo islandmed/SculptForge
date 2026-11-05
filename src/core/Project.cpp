@@ -644,17 +644,53 @@ uint64_t parseHex64(const Json& j, bool& ok) {
     return ok ? std::strtoull(s.c_str(), nullptr, 16) : 0;
 }
 
+// The saved edge slots (writeOpenCache) as MicroMesh::edgeNeighbor, against `m`'s topology; empty if one doesn't
+// fit (microAttach then builds them; what does fit is still checked by microAdoptEdgeNeighbors).
+std::vector<uint32_t> microEdgesFromSlots(const Mesh& m, const std::vector<uint32_t>& slots) {
+    const size_t nt = m.triangleCount();
+    if (slots.size() != nt * 3) return {};
+    std::vector<uint32_t> out(slots.size());
+    std::atomic<bool> ok = true;
+    poolFor(nt, [&](size_t b, size_t e) {
+        for (size_t t = b; t < e; ++t)
+            for (int k = 0; k < 3; ++k) {
+                const uint32_t v = slots[t * 3 + size_t(k)];
+                if (v == 0) {
+                    out[t * 3 + size_t(k)] = MicroMesh::kNone;
+                    continue;
+                }
+                const IndexRing ring = m.vertexTriangles(m.triangles[t][k]);
+                const uint32_t p = (v - 1) >> 2, f = (v - 1) & 3;
+                if (p >= ring.size() || f > 2) {
+                    ok = false;
+                    continue;
+                }
+                out[t * 3 + size_t(k)] = ring.begin()[p] << 2 | f;
+            }
+    }, 1 << 14);
+    if (!ok) out.clear();
+    return out;
+}
+
+// Positions and triangles (a micro level's base shape: MicroMesh::bulgeMax, baseEdge follow from them).
+uint64_t geometryKey(const Mesh& m) {
+    return openCacheKey(m) ^ (openCacheHash(m.positions.data(), m.positions.size() * sizeof(glm::vec3)) * 0x9E3779B97F4A7C15ull);
+}
+
 // `bvh`: the mesh's, if it is up to date (null: none saved).
 Json writeOpenCache(Writer& w, const std::string& prefix, const Mesh& m, const BVH* bvh) {
     if constexpr (std::endian::native != std::endian::little) return Json(); // (the hashes are of little-endian bytes)
-    if (m.triangleCount() < openCacheMinTriangles) return Json();
+    if (m.triangleCount() < openCacheMinTriangles || !openCacheEnabled()) return Json();
     Json j = Json::object();
     j.set("version", kOpenCacheVersion);
     j.set("key", hex64(openCacheKey(m)));
     bool any = false;
-    auto put = [&](const char* name, const std::vector<uint32_t>& v, bool owned) {
+    auto put = [&](const char* name, const std::vector<uint32_t>& v, bool) {
         any = true;
-        Json d = owned ? w.ownedUints(prefix + name + ".bin", v) : w.uints(prefix + name + ".bin", v.data(), v.size(), 1);
+        std::vector<uint8_t> packed = openCachePack(v);
+        const size_t bytes = packed.size();
+        Json d = w.add(prefix + name + ".pack", Scalar::U8, 1, bytes, std::move(packed));
+        d.set("values", double(v.size()));
         d.set("hash", hex64(openCacheHash(v)));
         j.set(name, std::move(d));
     };
@@ -673,21 +709,49 @@ Json writeOpenCache(Writer& w, const std::string& prefix, const Mesh& m, const B
             put("bvh_tris", tris, true);
         }
     }
-    if (m.micro && microMatches(m) && m.micro->edgeNeighbor.size() == m.triangleCount() * 3)
-        put("micro_edges", m.micro->edgeNeighbor, false);
+    // Each edge's neighbour as where it sits among the triangles of the edge's first corner (+ which of its
+    // edges), 0 for none: a byte apiece, decoded against the topology (microEdgesFromSlots).
+    if (m.micro && microMatches(m) && m.micro->edgeNeighbor.size() == m.triangleCount() * 3) {
+        const std::vector<uint32_t>& en = m.micro->edgeNeighbor;
+        std::vector<uint32_t> slots(en.size(), 0);
+        std::atomic<bool> ok = true;
+        poolFor(m.triangleCount(), [&](size_t b, size_t e) {
+            for (size_t t = b; t < e; ++t)
+                for (int k = 0; k < 3; ++k) {
+                    const uint32_t nb = en[t * 3 + size_t(k)];
+                    if (nb == MicroMesh::kNone) continue;
+                    const IndexRing ring = m.vertexTriangles(m.triangles[t][k]);
+                    const auto it = std::find(ring.begin(), ring.end(), nb >> 2);
+                    if (it == ring.end()) ok = false;
+                    else slots[t * 3 + size_t(k)] = (uint32_t(it - ring.begin()) << 2 | (nb & 3)) + 1;
+                }
+        }, 1 << 14);
+        if (ok) put("micro_edges", slots, true);
+    }
+    if (m.micro && microMatches(m)) { // (exact float bits)
+        any = true;
+        Json shape = Json::object();
+        shape.set("key", hex64(geometryKey(m)));
+        // (from the shape as saved, as attaching it would: the level's own values date from its Divide)
+        shape.set("bulge", hex64(std::bit_cast<uint32_t>(microBulgeMax(m, m.micro->n))));
+        shape.set("base_edge", hex64(std::bit_cast<uint32_t>(microBaseEdge(m))));
+        j.set("micro_shape", std::move(shape));
+    }
     return any ? j : Json();
 }
 
 struct OpenCacheData {
     std::vector<uint32_t> vtOffsets, vtList, adjOffsets, adjList, bvhNodes, bvhTris, microEdges;
     bool topology = false;
+    float microBulge = -1.0f, microBaseEdge = -1.0f; // (MicroAttachHint) for these positions, or < 0
 };
+
 
 // Reads `oc` for `m` (already read: its triangles are the key's): false (nothing to use) if it is missing, of
 // another version or mesh, or any array's bytes don't match their hash. A bad cache is never an error.
 bool readOpenCache(Reader& r, const Json& oc, const Mesh& m, OpenCacheData& out) {
     if constexpr (std::endian::native != std::endian::little) return false;
-    if (!oc.isObject() || int(oc["version"].asNumber(0)) != kOpenCacheVersion) return false;
+    if (!oc.isObject() || int(oc["version"].asNumber(0)) != kOpenCacheVersion || !openCacheEnabled()) return false;
     bool ok = false;
     if (parseHex64(oc["key"], ok) != openCacheKey(m) || !ok) return false;
     const size_t nv = m.vertexCount(), nt = m.triangleCount();
@@ -695,11 +759,12 @@ bool readOpenCache(Reader& r, const Json& oc, const Mesh& m, OpenCacheData& out)
     auto get = [&](const char* name, std::vector<uint32_t>& v, size_t expect, size_t limit) {
         const Json& d = oc[name];
         if (!d.isObject()) return false;
-        const double c = d["count"].asNumber(-1);
+        const double c = d["values"].asNumber(-1), bytes = d["count"].asNumber(-1);
         if (!(c >= 0) || c > double(limit) || (expect != size_t(-1) && c != double(expect))) return false;
-        v.resize(size_t(c));
+        if (!(bytes >= 8) || bytes > c * 5.0 + 8.0 * (c / kOpenCacheBlock + 3.0)) return false; // (at most 5 bytes a value)
+        std::vector<uint8_t> packed;
         const std::string saved = r.error;
-        if (!r.uints(d, name, v.size(), 1, v.data())) {
+        if (!r.bytes(d, name, size_t(bytes), packed) || !openCacheUnpack(packed.data(), packed.size(), size_t(c), v)) {
             r.error = saved;
             v.clear();
             return false;
@@ -717,6 +782,14 @@ bool readOpenCache(Reader& r, const Json& oc, const Mesh& m, OpenCacheData& out)
     if (!out.topology) out.vtOffsets.clear(), out.vtList.clear(), out.adjOffsets.clear(), out.adjList.clear();
     if (!(get("bvh_nodes", out.bvhNodes, size_t(-1), nt * 4) && get("bvh_tris", out.bvhTris, nt, nt))) out.bvhNodes.clear(), out.bvhTris.clear();
     if (!get("micro_edges", out.microEdges, nt * 3, nt * 3)) out.microEdges.clear();
+    if (const Json& shape = oc["micro_shape"]; shape.isObject()) {
+        bool k = false, b = false, e = false;
+        const uint64_t key = parseHex64(shape["key"], k), bulge = parseHex64(shape["bulge"], b), edge = parseHex64(shape["base_edge"], e);
+        if (k && b && e && bulge <= 0xFFFFFFFFu && edge <= 0xFFFFFFFFu && key == geometryKey(m)) {
+            out.microBulge = std::bit_cast<float>(uint32_t(bulge));
+            out.microBaseEdge = std::bit_cast<float>(uint32_t(edge));
+        }
+    }
     return true;
 }
 
@@ -1193,6 +1266,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
                 const uint32_t samples = (n + 1) * (n + 2) / 2;
                 MicroStore disp;
                 std::vector<uint8_t> mask;
+                MicroAttachHint hint;
                 if (const Json& pj = mj["displacement_packed"]; pj.isObject()) { // tiles packed (MicroStore.h)
                     std::vector<uint8_t> packed;
                     const size_t bytes = countOf(pj["count"]);
@@ -1203,7 +1277,8 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
                     std::string why;
                     if (microWantsOutOfCore(count)) disp.assignMapped(count, why);
                     else disp.assign(count, 0);
-                    if (!microUnpackTiles(packed.data(), packed.size(), s.mesh.triangleCount(), samples, disp.data())) {
+                    hint.triRange.resize(s.mesh.triangleCount()); // (the bounds from the tile headers: no second pass)
+                    if (!microUnpackTiles(packed.data(), packed.size(), s.mesh.triangleCount(), samples, disp.data(), hint.triRange.data())) {
                         error = "Project micro displacement is damaged";
                         return false;
                     }
@@ -1220,11 +1295,13 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
                     return false;
                 }
                 openStage("micro read+unpack");
-                const bool savedEdges = !cache.microEdges.empty();
-                if (!microAttach(s.mesh, level, float(mj["step"].asNumber(0)), std::move(disp), std::move(mask), error,
-                                 cache.microEdges.empty() ? nullptr : &cache.microEdges))
+                hint.edgeNeighbors = microEdgesFromSlots(s.mesh, cache.microEdges);
+                const bool savedEdges = !hint.edgeNeighbors.empty();
+                hint.bulgeMax = cache.microBulge;
+                hint.baseEdge = cache.microBaseEdge;
+                if (!microAttach(s.mesh, level, float(mj["step"].asNumber(0)), std::move(disp), std::move(mask), error, &hint))
                     return false;
-                used.microEdges = savedEdges && cache.microEdges.empty(); // (left empty: taken)
+                used.microEdges = savedEdges && hint.edgeNeighbors.empty(); // (left empty: taken)
                 openStage("microAttach");
             }
             // (the micro level reads and attaches while the BVH builds: both only read the mesh)
