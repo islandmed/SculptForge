@@ -70,17 +70,13 @@
           </ul>
         </div>
         <figure class="hero-video">
-          <video id="hero-video" poster="media/poster-showcase.jpg?v=4" autoplay muted loop playsinline preload="metadata"
-                 aria-label="Weathering a detailed lion head and turning it to stone in SculptForge">
-            <source src="media/showcase-mobile.mp4?v=4" type="video/mp4" media="(max-width: 620px)">
-            <source src="media/showcase-4k.mp4?v=4" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/showcase.mp4?v=4" type="video/mp4">
-          </video>
+          <video id="hero-video" poster="media/poster-showcase.jpg?v=4" muted playsinline preload="none"
+                 aria-label="A detailed lion head sculpted in SculptForge"></video>
           <script>
             if (matchMedia("(max-width: 620px)").matches)
               document.getElementById("hero-video").poster = "media/poster-showcase-mobile.jpg?v=4";
           </script>
-          <figcaption>Real recording of SculptForge, scripted demo rendered at 4K.</figcaption>
+          <figcaption>A lion head sculpted in SculptForge.</figcaption>
         </figure>
       </div>
     </section>
@@ -261,35 +257,27 @@ rez-env sculptforge -- sculptforge troll.usda \
     <section id="demos" class="section alt">
       <div class="wrap">
         <h2>See it in action</h2>
-        <p class="section-lede">Every clip is a real, unedited recording of the app, made with its built-in demo
-          recorder. Waits for AI models are sped up and labelled on screen.</p>
+        <p class="section-lede">New clips, recorded on the current version, are on their way.</p>
 
         <div class="demo">
-          <video aria-label="Brush Lab designing a dry cracked mud brush from a text prompt" src="media/brush-lab.mp4" poster="media/poster-brush-lab.jpg" muted loop playsinline preload="none" data-inview tabindex="0"></video>
           <div>
             <h3>Brush Lab: the AI brush creator</h3>
             <p>Type "dry cracked mud", and AI designs the brush. Then ask for "deeper cracks, sharper edges". It's
-              free out of the box with no key. This clip uses a small open model running on the same machine, so
-              nothing leaves the computer.</p>
+              free out of the box with no key. A small open model can run on the same machine, so nothing leaves the computer.</p>
           </div>
         </div>
 
         <div class="demo reverse">
-          <video aria-label="An owl knight concept sketch becoming a full 3D model, then sculpted" src="media/image-to-3d.mp4?v=1" poster="media/poster-image-to-3d.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0"></video>
           <div>
             <h3>From a sketch to a sculptable model in about 20 seconds</h3>
             <p>One concept sketch became a full 3D owl knight, with shields, belt and pouches, a back
               and real depth. It was made with the free Hunyuan3D 2.1 model, then voxel-remeshed into one clean
-              surface ready to sculpt. The wait is sped up in the clip and labelled. You can also type a
+              surface ready to sculpt. You can also type a
               description instead of using an image.</p>
           </div>
         </div>
 
         <div class="demo">
-          <video aria-label="Sculpting a snarl on a lion as a blend shape, generating LODs and sending to Unreal" poster="media/poster-game-ready.jpg?v=4" muted loop playsinline preload="none" data-inview tabindex="0">
-            <source src="media/game-ready-4k.mp4?v=4" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/game-ready.mp4?v=4" type="video/mp4">
-          </video>
           <div>
             <h3>Blend shapes, LODs and Unreal</h3>
             <p>Sculpt a snarl on its own layer and play it back. Generate a LOD chain in one click: even the
@@ -299,10 +287,6 @@ rez-env sculptforge -- sculptforge troll.usda \
         </div>
 
         <div class="demo reverse">
-          <video aria-label="Converting between a sculpt and Gaussian splats" poster="media/poster-splats.jpg?v=4" muted loop playsinline preload="none" data-inview tabindex="0">
-            <source src="media/splats-4k.mp4?v=4" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/splats.mp4?v=4" type="video/mp4">
-          </video>
           <div>
             <h3>Gaussian splats, both ways</h3>
             <p>Turn a sculpt into Gaussian splats for web viewers and engines, and turn splat captures into

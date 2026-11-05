@@ -29,7 +29,7 @@
 </p>
 
 <p align="center">
-  <a href="https://sculptforge.app/#demos"><img src="docs/images/sculpt-demo.gif" width="800" alt="Weathering a detailed lion head with symmetry and turning it to stone in SculptForge"></a>
+  <a href="https://sculptforge.app/#demos"><img src="docs/images/showcase.jpg" width="800" alt="A detailed lion head sculpted in SculptForge"></a>
 </p>
 
 SculptForge is a free, open-source, focused sculpting app with the brushes, symmetry and
@@ -149,16 +149,6 @@ paint come along).
   sculpt, convert and export.
 - Headless thumbnail and turntable rendering, plus a scripted demo recorder (`--demo … --record`).
 
-<table>
-  <tr>
-    <td><img src="docs/images/screenshot-brush-lab.jpg" alt="Brush Lab: an AI-designed cracked-mud brush carved into a plane"></td>
-    <td><img src="docs/images/screenshot-game-ready.jpg" alt="LOD chain preview with wireframe and the Game Ready panel"></td>
-  </tr>
-  <tr>
-    <td align="center"><sub>Brush Lab: "dry cracked mud", designed by a local model</sub></td>
-    <td align="center"><sub>One-click LODs, blend shapes and Send to Unreal</sub></td>
-  </tr>
-</table>
 
 ## For studios and pipelines
 

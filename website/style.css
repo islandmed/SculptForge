@@ -117,6 +117,7 @@ p { margin: 0 0 1em; }
 
 .demo { display: grid; grid-template-columns: 1.4fr 1fr; gap: 40px; align-items: center; margin-bottom: 64px; }
 .demo:last-child { margin-bottom: 0; }
+.demo:not(:has(video, img)) { grid-template-columns: 1fr; max-width: 720px; }
 .demo.reverse > :first-child { order: 2; }
 .demo video { width: 100%; border-radius: var(--radius); border: 1px solid var(--border); background: #000; }
 .demo p { color: var(--muted); }
