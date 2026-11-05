@@ -145,6 +145,7 @@ expect_value moved == 0
 pen_stroke 0.3 0.45 0.7 0.55 0.6 0.6
 expect_value moved_out > 0
 key ctrl+z
+pen_out
 click "Preferences##palette.preferences"
 click "Hold during strokes##spacemouse.hold"
 key escape
