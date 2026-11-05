@@ -1,12 +1,12 @@
 {
-  "version": "0.11.0",
+  "version": "0.11.1",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Sixty new brushes in six built-in packs, A-Z sorting everywhere, and pattern brushes that keep their pattern on micro levels",
-    "A Masking panel: mask by cavity, peaks, colour, facing and more",
-    "Quick tour (Help > Quick tour): ten short slides that show you where everything is",
-    "Show SculptForge on Discord (opt-in, Preferences > Integrations), with your monthly challenge theme",
-    "Windows portable zip starts on a fresh PC, Move with pen pressure grabs at full size again, and Cmd/Ctrl+, opens Preferences"
+    "Big scans keep up: on an RTX 3060, orbiting Lucy (112M) right after a stroke went from 0.7 to 51 fps, and big brushes on micro levels no longer freeze",
+    "Quick Remesh (Tool > Remesh): Shift+R or hold N to remesh the active Part, or remesh after each stroke",
+    "One-click update on Windows and the Linux AppImage, signed and checked; preferences now save themselves",
+    "Pen pressure per brush (Brush > Pen pressure), touch and trackpad navigation, and Lit Spheres you can rename and sort into folders",
+    "Rodin 2.5 in Generate 3D (fal.ai), plus Founding Members and Member Requests for members"
   ]
 }
