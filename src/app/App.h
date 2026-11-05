@@ -2318,6 +2318,7 @@ private:
     int runTimelapseCli();                    // sculptforge FILE --timelapse out.mp4
     void startProofMode();                    // Help > Benchmark, sculptforge --benchmark
     bool proofSkippedScenes() const;          // the benchmark skipped a scene: too little free memory
+    bool proofRunning() const;                // a benchmark is measuring (not its intro or results): every frame is wanted
     void proofBeforeSwap(int fbW, int fbH);   // the interactive loop, after drawing a frame, before showing it
     void drawProofUi();
     // ---- end Sculpt Timeline ----
