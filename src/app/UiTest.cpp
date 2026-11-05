@@ -49,6 +49,9 @@
 //   camera_distance D        put the camera D model units from the point it looks at (extreme zoom)
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
 //   drop FILE                as if FILE were dropped onto the window (relative to the script's folder)
+//   restart [FILE]           as quitting and starting again, for the preferences, shortcuts and layout: ui.json
+//                            is saved (what waits), the defaults come back, then ui.json is read as at the start;
+//                            FILE (beside the script) replaces ui.json first (an older version's settings)
 //   env NAME VALUE           set an environment variable; $SCRIPT_DIR is the script's folder
 //   input_style STYLE        classic, sculptforge (the default), blender or maya, as Preferences > Input sets it
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
@@ -87,7 +90,7 @@
 //                            the active Part with one triangle: 0 = watertight),
 //                            edited_parts (Parts with undo history), user_brushes (brushes in the
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
-//                            one in --ui-out/brush-library), ui_config (1 once Store Config wrote ui.json),
+//                            one in --ui-out/brush-library), ui_config (1 once ui.json is written: the preferences save themselves, or Save Layout),
 //                            console_open, command_palette_open, customize, shelves_visible,
 //                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, offscreen_items (past the window edge), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
@@ -95,7 +98,7 @@
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
 //                            moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
 //                            selection_shown (1 while a rectangle / lasso selection is drawn), symmetry_x,
-//                            symmetry_radial (the radial count, 0 off), radial_axis (0 X, 1 Y, 2 Z), symmetry_local,
+//                            symmetry_radial (the radial copies, 0 off), radial_axis (0 X, 1 Y, 2 Z), symmetry_local,
 //                            symmetry_copies (copies every stroke makes), cursor_copies (brush cursors drawn),
 //                            symmetry_pivot_x (local symmetry's centre), timeline_top (1: the strip at the top),
 //                            timeline_y / axis_gizmo_y (their tops / centre, fractions of the canvas from its top),
@@ -509,7 +512,7 @@ double Demo::query(const std::string& name, bool& known) const {
         const int k = name.back() == 'r' ? 0 : name.back() == 'g' ? 1 : 2;
         return sum[k] / double(px.size() / 4);
     }
-    // classic feel (Input.cpp): the intensities and Focal Shift as shown (0-100, -100..100).
+    // classic feel (Input.cpp): the intensities and Falloff as shown (0-100, -100..100).
     if (name == "z_intensity") return std::round(app_.strength_ * 100.0f);
     if (name == "smooth_keep_volume") return app_.smoothKeepVolume_ ? 1.0 : 0.0;
     if (name == "smooth_group_borders") return app_.smoothGroupBorders_ ? 1.0 : 0.0;
@@ -1773,6 +1776,18 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return false;
         }
         run([this, style] { app_.setInputStyle(style); });
+    } else if (verb == "restart") {
+        // restart [FILE]: as quitting and starting again, for the preferences (#117): what waits is saved, everything
+        // goes back to the defaults, then ui.json is read as at the start. FILE (beside the script) replaces ui.json
+        // first: a start with an older version's settings.
+        std::string from;
+        if (w.size() > 1) {
+            const auto file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) /
+                              std::filesystem::path(std::u8string(w[1].begin(), w[1].end()));
+            const auto u8 = file.lexically_normal().u8string();
+            from.assign(u8.begin(), u8.end());
+        }
+        run([this, from] { app_.restartPrefsForTest(from); });
     } else if (verb == "env") {
         if (!need(2)) return false;
         std::string value = restOf(lineText_, 2);

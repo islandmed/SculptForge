@@ -631,7 +631,7 @@ TEST(texture_dab_sharpness_does_not_depend_on_mesh_density) {
         DabParams p = dab(glm::vec3(0.013f, 0, -0.021f), 0.1f);
         p.alpha = &square;
         p.alphaUp = glm::vec3(0, 0, 1);
-        p.focal = -1.0f; // (Focal Shift -100 keeps the alpha hard to its edge; 0 would soften it, #60)
+        p.focal = -1.0f; // (Falloff -100 keeps the alpha hard to its edge; 0 would soften it, #60)
         CHECK(painter.dab(m, bvh, p, glm::vec3(0.0f), Symmetry{false, false, false}) > 0);
         UndoRecord rec;
         painter.end(rec);

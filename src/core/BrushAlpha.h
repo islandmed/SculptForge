@@ -34,7 +34,7 @@ struct BrushAlpha {
     bool empty() const { return values.empty(); }
     // u, v in brush-local -1..1 (v points up); 0 outside the stamp.
     float sample(float u, float v) const;
-    // What a dab uses: sample() x alphaFalloff (Focal Shift, -1..1; #60). Empty = brushFalloff with `focal`.
+    // What a dab uses: sample() x alphaFalloff (Falloff, -1..1; #60). Empty = brushFalloff with `focal`.
     float stamp(float u, float v, float focal) const;
 
     static BrushAlpha round();

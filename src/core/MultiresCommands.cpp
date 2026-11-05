@@ -60,7 +60,7 @@ void registerSubdivCommands(CommandRegistry& reg) {
                  return result(ok, msg);
              }});
 
-    reg.add({"subdiv_lower", "Lower Res (Shift+D): step one subdivision level down.", {},
+    reg.add({"subdiv_lower", "Lower Level (Shift+D): step one subdivision level down.", {},
              [](Document& doc, const Args&) -> CommandResult {
                  if (!doc.mesh.multires) return {false, "This Part has no subdivision levels (Divide adds them)"};
                  if (subdivCurrentLevel(doc.mesh) == 0) return {false, "Already at the lowest level (SDiv 1)"};
@@ -69,7 +69,7 @@ void registerSubdivCommands(CommandRegistry& reg) {
                  return result(ok, msg);
              }});
 
-    reg.add({"subdiv_higher", "Higher Res (D): step one subdivision level up.", {},
+    reg.add({"subdiv_higher", "Higher Level (D): step one subdivision level up.", {},
              [](Document& doc, const Args&) -> CommandResult {
                  if (!doc.mesh.multires) return {false, "This Part has no subdivision levels (Divide adds them)"};
                  if (subdivCurrentLevel(doc.mesh) + 1 >= subdivLevelCount(doc.mesh))
@@ -80,7 +80,7 @@ void registerSubdivCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"subdiv_delete_lower",
-             "Del Lower: delete the subdivision levels below the current one; the current level becomes the base cage.",
+             "Delete Lower: delete the subdivision levels below the current one; the current level becomes the base cage.",
              {}, [](Document& doc, const Args&) -> CommandResult {
                  std::string msg;
                  const bool ok = deleteLowerUndoable(doc, msg);
@@ -88,7 +88,7 @@ void registerSubdivCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"subdiv_delete_higher",
-             "Del Higher: delete the subdivision levels above the current one (and the detail sculpted on them).", {},
+             "Delete Higher: delete the subdivision levels above the current one (and the detail sculpted on them).", {},
              [](Document& doc, const Args&) -> CommandResult {
                  std::string msg;
                  const bool ok = deleteHigherUndoable(doc, msg);

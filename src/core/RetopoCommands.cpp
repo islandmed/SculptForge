@@ -161,13 +161,13 @@ void registerRetopoCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"project_all",
-             "Project All (Part palette): move the active Part's vertices onto the surface of the other visible "
+             "Project Detail (Part palette): move the active Part's vertices onto the surface of the other visible "
              "Parts and take their vertex paint, e.g. after Quad Remesh and a few subdivisions, to get the sculpted detail "
              "back. Respects the mask (masked vertices stay). One undo step.",
              {{"distance", T::Number, "Dist: how far each vertex searches along its normal, as a fraction of the "
                                       "Part's bounding-box diagonal (0.001-1). Default 0.02.", false},
               {"mean", T::Bool, "Mean: with surface on both sides, settle halfway between them. Default false.", false},
-              {"blur", T::Number, "PA Blur: smoothing passes over the projected offsets (0-20). Default 0.", false},
+              {"blur", T::Number, "Blur: smoothing passes over the projected offsets (0-20). Default 0.", false},
               {"geometry", T::Bool, "Project the shape. Default true.", false},
               {"vertexpaint", T::Bool, "Project the vertex paint (when a source has any). Default true.", false},
               {"source", T::String, "Project only from the Part with this name (default: all visible ones).", false}},
@@ -182,7 +182,7 @@ void registerRetopoCommands(CommandRegistry& reg) {
                  if (a.contains("source")) {
                      source = doc.findPart(argString(a, "source"));
                      if (source < 0) return {false, "No Part called '" + argString(a, "source") + "'"};
-                     if (source == doc.activePart) return {false, "Project All can't project a Part onto itself"};
+                     if (source == doc.activePart) return {false, "Project Detail can't project a Part onto itself"};
                  }
                  std::string msg;
                  const bool ok = projectAll(doc, o, msg, source);

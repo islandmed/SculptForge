@@ -519,7 +519,7 @@ bool App::applyPackKeymap(const std::string& file) {
         ++applied;
     }
     status_ = "Keymap " + (k.name.empty() ? utf8(fsPath(file).stem()) : k.name) + ": " + std::to_string(applied) +
-              " keys" + (skipped ? " (" + std::to_string(skipped) + " unknown left out)" : "") + " - Store Config keeps them";
+              " keys" + (skipped ? " (" + std::to_string(skipped) + " unknown left out)" : "") + "";
     return applied > 0;
 }
 
@@ -531,7 +531,7 @@ void App::drawPackKeymapRows() {
         if (ImGui::SmallButton((std::string(tr("Apply")) + " " + k.label() + "##" + k.file).c_str())) applyPackKeymap(k.file);
         ui::HelpText("Apply keymap", nullptr,
                      "Take the keys of this keymap from an installed pack (only actions SculptForge knows; a key another "
-                     "action had moves here). Store Config keeps them.",
+                     "action had moves here). Saved automatically.",
                      "Preferences > Input");
     }
 }

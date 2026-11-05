@@ -45,7 +45,7 @@ Turn **Mask** off in the Gizmo panel to move the whole Part whatever the mask.
 
 ## Posing a limb
 
-1. Mask what should stay: for an arm, everything but the arm (<kbd>Ctrl</kbd>+paint, or **Mask Lasso**).
+1. Mask what should stay: for an arm, everything but the arm (<kbd>Ctrl</kbd>+paint, or **Lasso Mask**).
 2. Press <kbd>R</kbd>. The gizmo jumps to the centre of the unmasked arm.
 3. Put the pivot at the joint: hold <kbd>Alt</kbd> and click the model at the shoulder or elbow. (Or click
    **To Surface**, then click the model.)

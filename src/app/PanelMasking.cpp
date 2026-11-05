@@ -151,8 +151,8 @@ App::HeldBrush App::heldBrush() const {
 std::vector<App::HeldBrushItem> App::heldBrushItems(HeldBrush held) {
     if (held == HeldBrush::Mask)
         return {{"mask.pen", "Mask Pen", "Dots", ICON_LC_PEN_TOOL, SelectShape::Pen},
-                {"mask.lasso", "Mask Lasso", "Lasso", ICON_LC_LASSO, SelectShape::Lasso},
-                {"mask.rect", "Mask Rectangle", "Rect", ICON_LC_SQUARE_DASHED, SelectShape::Rect}};
+                {"mask.lasso", "Lasso Mask", "Lasso", ICON_LC_LASSO, SelectShape::Lasso},
+                {"mask.rect", "Rectangle Mask", "Rect", ICON_LC_SQUARE_DASHED, SelectShape::Rect}};
     if (held == HeldBrush::Select)
         return {{"select.rect", "Select Rectangle", "Rect", ICON_LC_SQUARE_DASHED, SelectShape::Rect},
                 {"select.lasso", "Select Lasso", "Lasso", ICON_LC_LASSO, SelectShape::Lasso},
@@ -408,9 +408,9 @@ void App::drawMaskingSection() {
     const Shape shapes[] = {
         {"mask.pen", "Mask Pen##mask.pen", MaskArt::Pen, SelectShape::Pen,
          "Ctrl+drag paints the mask with the brush; Ctrl+Alt+drag erases it. Ctrl+click on the model blurs it."},
-        {"mask.lasso", "Mask Lasso##mask.lasso", MaskArt::Lasso, SelectShape::Lasso,
+        {"mask.lasso", "Lasso Mask##mask.lasso", MaskArt::Lasso, SelectShape::Lasso,
          "Ctrl+drag draws a lasso (any free shape): what is inside gets masked (Ctrl+Alt: unmasked)."},
-        {"mask.rect", "Mask Rectangle##mask.rect", MaskArt::Rect, SelectShape::Rect,
+        {"mask.rect", "Rectangle Mask##mask.rect", MaskArt::Rect, SelectShape::Rect,
          "Ctrl+drag draws a rectangle: what is inside gets masked (Ctrl+Alt: unmasked)."},
     };
     for (const Shape& sh : shapes) {
@@ -424,7 +424,7 @@ void App::drawMaskingSection() {
     if (maskShape_ != SelectShape::Pen) { // #91.3
         ImGui::Checkbox(tr("Front faces only##mask"), &maskFrontFacesOnly_);
         ui::HelpText("Front faces only", nullptr,
-                     tr("Mask Lasso and Mask Rectangle mask only what faces you: the far side and folds turned away "
+                     tr("Lasso Mask and Rectangle Mask mask only what faces you: the far side and folds turned away "
                         "stay as they are."),
                      "Tool > Masking");
     }

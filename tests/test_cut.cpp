@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Cut (#101, #91): every shape and mode on a sphere, a low-poly cube and a two-Part scene; watertight results,
-// attributes, symmetry, perspective views, open meshes and undo. Also Mask Lasso "Front faces only" (#91.3).
+// attributes, symmetry, perspective views, open meshes and undo. Also Lasso Mask "Front faces only" (#91.3).
 #include "TestHarness.h"
 
 #include "core/Commands.h"

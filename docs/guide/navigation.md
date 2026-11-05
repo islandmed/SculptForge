@@ -71,7 +71,7 @@ model, so strokes that begin at the silhouette never turn the view by accident. 
 the mask. To move the view, right-drag (a pen's lower button is a right click by default), <kbd>Alt</kbd>+drag to pan,
 middle-drag, or hold <kbd>Space</kbd> if **Hold Space and drag to move the camera** is on; with the Blender or Maya
 style, <kbd>Alt</kbd>+left-drag rotates as before. With a pen that has no buttons and the Classic or SculptForge style,
-press <kbd>Shift</kbd>+<kbd>L</kbd> to turn it off while you rotate, or turn on Hold Space. Mask Lasso, Mask Rectangle and the
+press <kbd>Shift</kbd>+<kbd>L</kbd> to turn it off while you rotate, or turn on Hold Space. Lasso Mask, Rectangle Mask and the
 <kbd>Ctrl</kbd>+<kbd>Shift</kbd> hide and show shapes work as before.
 
 "Background" means any part of the canvas where the cursor isn't over the model. A left-drag that starts on
@@ -143,7 +143,7 @@ pen while they turn the view, and that works best, but you don't have to.
   axis views, Orthographic, Undo, Redo or Nothing.
 - **SpaceMouse defaults** puts everything back.
 
-Store Config (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps these settings.
+These settings save themselves.
 
 **If SculptForge doesn't see it** (Preferences says "No SpaceMouse found"):
 

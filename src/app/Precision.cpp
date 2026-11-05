@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Precision work, the app side of core/Precision.h: Steady Stroke with every stroke type (and its catch-up on
-// release), World Size (Draw Size kept in model units, shown in mm), the precision drag (Shift+Alt mid-stroke),
+// release), World Size (Size kept in model units, shown in mm), the precision drag (Shift+Alt mid-stroke),
 // the size readout by the brush, and each brush's own pressure curve (Brush Lab, Preferences > Tablet).
 #include "app/App.h"
 
@@ -37,7 +37,7 @@ void App::steadyCatchUp() {
 }
 
 // ---------------------------------------------------------------------------
-// World Size and the Draw Size readout
+// World Size and the Size readout
 // ---------------------------------------------------------------------------
 
 void App::syncWorldSize() {
@@ -78,14 +78,14 @@ float shownMm(float radiusPx, float worldRadius, bool worldSize, float wpp) {
 } // namespace
 
 std::string App::drawSizeLabel() const {
-    std::string s = radiusPx_ < 10.0f ? "Draw Size %.1f px" : "Draw Size %.0f px";
+    std::string s = radiusPx_ < 10.0f ? "Size %.1f px" : "Size %.0f px";
     if (cursorWorldPerPx_ > 0.0f) s += "  " + mmText(shownMm(radiusPx_, worldRadius_, worldSize_, cursorWorldPerPx_));
     return s;
 }
 
 std::string App::drawSizeStatus() const {
     char buf[96];
-    std::snprintf(buf, sizeof buf, radiusPx_ < 10.0f ? "Draw Size %.1f px" : "Draw Size %.0f px", double(radiusPx_));
+    std::snprintf(buf, sizeof buf, radiusPx_ < 10.0f ? "Size %.1f px" : "Size %.0f px", double(radiusPx_));
     std::string s = buf;
     if (cursorWorldPerPx_ > 0.0f) s += " (" + mmText(shownMm(radiusPx_, worldRadius_, worldSize_, cursorWorldPerPx_)) + ")";
     return s;
@@ -93,7 +93,7 @@ std::string App::drawSizeStatus() const {
 
 void App::drawSizeSlider(const char* id, const char* helpPath, const char* help) {
     ui::SliderInside(id, &radiusPx_, kMinDrawSizePx, kMaxDrawSizePx, drawSizeLabel().c_str(), ImGuiSliderFlags_Logarithmic);
-    ui::HelpText("Draw Size", "S", help, helpPath);
+    ui::HelpText("Size", "S", help, helpPath);
 }
 
 void App::drawPrecisionCursor(ImDrawList* dl, ImVec2 c, float r, ImU32 col) {
@@ -126,7 +126,7 @@ void App::drawPrecisionCursor(ImDrawList* dl, ImVec2 c, float r, ImU32 col) {
         sizeReadoutUntil_ = ImGui::GetTime() + 1.5;
     }
     if (drag_ == Drag::SizeScrub || worldSize_ || ImGui::GetTime() < sizeReadoutUntil_) {
-        const std::string text = drawSizeStatus().substr(10); // without "Draw Size "
+        const std::string text = drawSizeStatus().substr(10); // without "Size "
         const ImVec2 at(c.x + std::max(r, 6.0f * s) + 6.0f * s, c.y - ImGui::GetFontSize() * 0.5f);
         dl->AddText(ImVec2(at.x + 1, at.y + 1), IM_COL32(0, 0, 0, 160), text.c_str());
         dl->AddText(at, IM_COL32(240, 240, 240, 230), text.c_str());

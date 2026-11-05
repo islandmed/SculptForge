@@ -59,15 +59,15 @@ expect_no_text "Target Polygons 3"
 run subdivide levels=2
 run part_visibility index=1 visible=true
 click "Parts##tool.part"
-expect "Project/Project All"
+expect "Project/Project Detail"
 hold ctrl
-hover "Project/Project All"
+hover "Project/Project Detail"
 expect_help "nearest surface within Dist"
 hover "Project/##pdist"
 expect_help "fraction of the Part's size"
 hold none
 snapshot
-click "Project/Project All"
+click "Project/Project Detail"
 expect_status "vertices projected"
 expect_value moved > 20000
 run part_visibility index=1 visible=false

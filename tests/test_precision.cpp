@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Precision work (core/Precision.h): fine Draw Size steps, dab spacing for tiny brushes, the precision drag, the
+// Precision work (core/Precision.h): fine Size steps, dab spacing for tiny brushes, the precision drag, the
 // pick filter, Steady Stroke's string and the point-based pressure curve. tests/ui/precision.sfui drives the same
 // in the app (every stroke type, World Size across zoom levels, the keys, Shift+Alt, a curve per brush).
 #include "TestHarness.h"

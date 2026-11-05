@@ -60,7 +60,7 @@ paint come along).
   Classic layout with alphabetical palettes in one click (Preferences > Interface > Look)
 - Shelves around the canvas, palettes holding every tool, a Library (`,`) of thumbnails, the
   brush picker (`B`, type letters to pick), hold-Ctrl help on every button, a command palette (F3) and a script
-  console (`` ` ``), and a fully customizable layout with Store Config. See [docs/ui-design.md](docs/ui-design.md).
+  console (`` ` ``), and a fully customizable layout; preferences save themselves. See [docs/ui-design.md](docs/ui-design.md).
 - A built-in **user guide** (Help > User Guide, Shift+F1) with search, also on the
   [website](https://sculptforge.app/guide/); hold Ctrl over any control and press F1 to open its
   chapter. Source: [docs/guide](docs/guide/index.md).
@@ -86,7 +86,7 @@ paint come along).
 - **Project files** (`.sfproj`) that keep everything, with an unsaved-changes prompt, recent files and autosave.
 - Unlimited undo, Loop subdivision, **voxel remesh** (voxel remesh) and quadric decimation.
 - **Quad Remesh** quad retopology (quad remesh: target count, Adaptive Size, Keep Groups, vertex paint density,
-  symmetry) and **Project All** to bring the sculpted detail back onto the new topology.
+  symmetry) and **Project Detail** to bring the sculpted detail back onto the new topology.
 - **Sculpt layers** that work as blend shapes, with live weights and playback.
 
 **Free built-in AI: Brush Lab (describe a brush, AI builds it)**

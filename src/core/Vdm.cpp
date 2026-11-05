@@ -682,7 +682,7 @@ void Sculptor::dabVdmSingle(Mesh& mesh, BVH& bvh, const DabParams& p, float hand
     const glm::vec3 right = glm::cross(up, n) * handedness;
 
     const float r = p.radius;
-    // Z Intensity 50 (the default) presses the map at its own size; 100 doubles it. Alt digs the shape in
+    // Intensity 50 (the default) presses the map at its own size; 100 doubles it. Alt digs the shape in
     // (Blender's convention: X and Y stay, Z flips).
     const float amount = 2.0f * std::clamp(p.strength, 0.0f, 1.0f) * std::clamp(p.pressure, 0.0f, 1.0f) * r;
     const float zSign = p.invert ? -1.0f : 1.0f;

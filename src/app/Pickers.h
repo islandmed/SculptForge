@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // classic pop-up pickers: brush grid (B; type letters to choose), stroke,
-// alpha and material (M) grids, and the Draw Size / Strength sliders at the
+// alpha and material (M) grids, and the Size / Strength sliders at the
 // cursor (S / I). Also the thumbnail tile every grid and the Library draw.
 #pragma once
 
@@ -53,8 +53,8 @@ struct PickerUi {
     static bool isActive(const App& app, const BrushItem& item);
     static void select(App& app, const BrushItem& item);
     static ImTextureID thumbnail(App& app, const BrushItem& item);
-    // Opens a slider under the mouse (S / U / I / O): Draw Size, Z Intensity (Smooth's own while Shift is
-    // held or Smooth is the brush), RGB Intensity or Focal Shift.
+    // Opens a slider under the mouse (S / U / I / O): Size, Intensity (Smooth's own while Shift is
+    // held or Smooth is the brush), Colour intensity or Falloff.
     enum class Slider { DrawSize, ZIntensity, RgbIntensity, FocalShift };
     static void sizePopup(App& app, Slider which);
     // The open slider's knob (its current value) in window coordinates, as last drawn; false when none is open.

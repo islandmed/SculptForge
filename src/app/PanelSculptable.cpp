@@ -399,7 +399,7 @@ void App::drawSculptableSection() {
                  kPath);
     ImGui::Checkbox("Keep scan", &s.keepScan);
     ui::HelpText("Keep scan", nullptr,
-                 "Keep the dense voxel surface as a hidden \"<name> Scan\" Part, to Project All more detail from later.",
+                 "Keep the dense voxel surface as a hidden \"<name> Scan\" Part, to Project Detail more detail from later.",
                  kPath);
     ImGui::SameLine();
     ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent

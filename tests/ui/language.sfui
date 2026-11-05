@@ -13,7 +13,7 @@ expect "Preferencias##palette.preferences"
 expect "Interfaz##preferences.interface"
 expect "Entrada##preferences.input"
 expect_text "Escala de la interfaz"
-expect_no_text "Popup Info opacity"
+expect_no_text "Help box opacity"
 shot preferencias
 key escape
 
@@ -67,4 +67,4 @@ expect_no_text "Idioma"
 key escape
 expect "Geometry##tool.geometry"
 expect "Draw##tool.draw"
-expect_text "Draw Size"
+expect_text "Size"

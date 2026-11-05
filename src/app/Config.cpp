@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Default actions and shortcuts, Store Config / Restore / Save / Load UI,
+// Default actions and shortcuts, the preferences' autosave, Save Layout / Revert / Export / Import Interface,
 // the Preferences > Config / Interface / Hotkeys / Library sections, the F1
 // Controls sheet (generated from the action registry) and classic
 // shortcut assignment.
@@ -276,7 +276,7 @@ constexpr Gesture kGestures[] = {
     {"Paint mask", "Hold Ctrl while stroking (Ctrl+Alt erases)"},
     {"Invert mask", "Ctrl + click the background"},
     {"Clear mask", "Ctrl + drag on the background (Mask Pen)"},
-    {"Mask a lasso or rectangle", "Ctrl + drag with Mask Lasso / Mask Rectangle (Tool > Masking; Ctrl+Alt unmasks)"},
+    {"Mask a lasso or rectangle", "Ctrl + drag with Lasso Mask / Rectangle Mask (Tool > Masking; Ctrl+Alt unmasks)"},
     {"Isolate face group", "Ctrl+Shift + click it (again: invert)"},
     {"Hide face group", "Ctrl+Shift+Alt + click it"},
     {"Show all", "Ctrl+Shift + click the background"},
@@ -326,7 +326,7 @@ void App::initUiConfig(bool deterministic) {
     layout_ = standardLayout(uiPrefs_.shellLayout);
     if (deterministic) return; // tests, renders and recordings always use the standard layout
     std::string err;
-    if (fileExists(uiConfigPath()) && !readUiConfig(uiConfigPath(), err)) SDL_Log("%s", err.c_str());
+    if (fileExists(uiConfigPath()) && !readUiConfig(uiConfigPath(), err, true)) SDL_Log("%s", err.c_str());
 }
 
 void App::addHelpFonts(float scale) {
@@ -390,16 +390,16 @@ void App::initActions() {
     add("geometry.smt", "Smt", "Tool > Geometry", nullptr, [this] { smt_ = !smt_; }, nullptr, nullptr,
         [this] { return smt_; }, nullptr,
         "Smooth the next Divide (on by default). Off: the new level keeps the hard edges and flat faces of the one below.");
-    add("geometry.lower_res", "Lower Res", "Tool > Geometry", "Shift+D", [this] { runCommand("subdiv_lower"); },
+    add("geometry.lower_res", "Lower Level", "Tool > Geometry", "Shift+D", [this] { runCommand("subdiv_lower"); },
         ICON_LC_CHEVRON_DOWN, "subdiv_lower", nullptr, [this] { return subdivCurrentLevel(doc_.mesh) > 0; },
         "Step one subdivision level down (fewer polygons, for big forms). The detail of the higher levels is kept.");
-    add("geometry.higher_res", "Higher Res", "Tool > Geometry", "D", [this] { runCommand("subdiv_higher"); },
+    add("geometry.higher_res", "Higher Level", "Tool > Geometry", "D", [this] { runCommand("subdiv_higher"); },
         ICON_LC_CHEVRON_UP, "subdiv_higher", nullptr,
         [this] { return subdivCurrentLevel(doc_.mesh) + 1 < subdivLevelCount(doc_.mesh); },
         "Step one subdivision level up (more polygons, for detail). Edits made below carry the detail along.");
-    add("geometry.del_lower", "Del Lower", "Tool > Geometry", nullptr, [this] { runCommand("subdiv_delete_lower"); }, nullptr,
+    add("geometry.del_lower", "Delete Lower", "Tool > Geometry", nullptr, [this] { runCommand("subdiv_delete_lower"); }, nullptr,
         "subdiv_delete_lower", nullptr, [this] { return subdivCurrentLevel(doc_.mesh) > 0; });
-    add("geometry.del_higher", "Del Higher", "Tool > Geometry", nullptr, [this] { runCommand("subdiv_delete_higher"); }, nullptr,
+    add("geometry.del_higher", "Delete Higher", "Tool > Geometry", nullptr, [this] { runCommand("subdiv_delete_higher"); }, nullptr,
         "subdiv_delete_higher", nullptr,
         [this] { return subdivCurrentLevel(doc_.mesh) + 1 < subdivLevelCount(doc_.mesh); });
     add("geometry.reconstruct", "Reconstruct Subdiv", "Tool > Geometry", nullptr, [this] { runCommand("subdiv_reconstruct"); },
@@ -555,11 +555,11 @@ void App::initActions() {
     // Per-brush settings (#78, BrushSettingsUi.cpp).
     add("brush.save_settings", "Save Brush Settings", "Brush", nullptr, [this] { saveBrushSettings(); }, ICON_LC_SAVE,
         nullptr, nullptr, nullptr,
-        "Every brush keeps its own Draw Size, Z Intensity, Falloff, RGB Intensity, stroke and alpha while you work. "
+        "Every brush keeps its own Size, Intensity, Falloff, Colour intensity, stroke and alpha while you work. "
         "This saves the current brush's, so it starts with them every time SculptForge opens.");
     add("brush.reset_settings", "Reset Brush to Default", "Brush", nullptr, [this] { resetBrushSettings(); },
         ICON_LC_ROTATE_CCW, nullptr, nullptr, nullptr,
-        "Put the current brush's Draw Size, Z Intensity, Falloff, RGB Intensity, stroke and alpha back to the values "
+        "Put the current brush's Size, Intensity, Falloff, Colour intensity, stroke and alpha back to the values "
         "SculptForge ships with, and forget what Save Brush Settings stored for it.");
     // Pen pressure per brush (#122, BrushSettingsUi.cpp): segments of Brush, Brush Lab and Preferences > Tablet.
     for (const bool size : {true, false})
@@ -582,8 +582,8 @@ void App::initActions() {
     add("brush.share_size", "Share size and intensity across brushes", "Preferences > Input", nullptr,
         [this] { setShareBrushSize(!brushSettings_.shareSizeIntensity); }, nullptr, nullptr,
         [this] { return brushSettings_.shareSizeIntensity; }, nullptr,
-        "On: Draw Size and Z Intensity stay as they are when you pick another brush (as before 0.10.8); Falloff, "
-        "RGB Intensity, the stroke and the alpha still follow each brush. Off (the default): every brush keeps its own.");
+        "On: Size and Intensity stay as they are when you pick another brush (as before 0.10.8); Falloff, "
+        "Colour intensity, the stroke and the alpha still follow each brush. Off (the default): every brush keeps its own.");
     add("brush.size_down", "Smaller brush", "Draw", "[", [this] { radiusPx_ = drawSizeStep(radiusPx_, -1, false); }, nullptr,
         nullptr, nullptr, nullptr, "Make the brush 10% smaller (hold to repeat; Shift+[ steps one pixel).");
     add("brush.size_up", "Larger brush", "Draw", "]", [this] { radiusPx_ = drawSizeStep(radiusPx_, 1, false); }, nullptr,
@@ -690,21 +690,29 @@ void App::initActions() {
         nullptr, "Empty the console log (the session script is kept).");
 
     // --- Config (Preferences > Config) ---
-    add("config.store", "Store Config", "Preferences > Config", "Ctrl+Shift+I", [this] { storeConfig(); }, ICON_LC_SAVE, nullptr,
+    // Preferences save themselves (#117); the layout is kept by Save Layout. config.store (Ctrl+Shift+I before
+    // 0.11.1) stays as an id, so keymaps and macros that name it still load: it saves the preferences at once.
+    add("config.save_layout", "Save Layout", "Preferences > Config", nullptr, [this] { saveLayout(); }, ICON_LC_SAVE, nullptr,
         nullptr, nullptr,
-        "Keep the current layout, shortcuts and interface preferences for future sessions. SculptForge never "
-        "saves them on its own.");
-    add("config.restore_standard", "Restore Standard UI", "Preferences > Config", nullptr, [this] { restoreStandardUi(); },
+        "Keep the current layout (shelves, trays, open palettes) for future sessions. Preferences and shortcuts save "
+        "themselves.");
+    add("config.store", "Save Preferences Now", "Preferences > Config", nullptr, [this] { savePrefsNow(); }, ICON_LC_SAVE,
+        nullptr, nullptr, nullptr,
+        "Write the preferences and shortcuts to disk now. Not needed: they save themselves a moment after every change.");
+    add("config.restore_standard", "Reset Layout and Shortcuts", "Preferences > Config", nullptr, [this] { restoreStandardUi(); },
         ICON_LC_ROTATE_CCW, nullptr, nullptr, nullptr,
-        "Go back to the built-in layout and default shortcuts. Store Config afterwards to make it stick.");
-    add("config.restore_custom", "Restore Custom UI", "Preferences > Config", nullptr, [this] { restoreCustomUi(); },
+        "Go back to the built-in layout, shortcuts and radial menus. The shortcuts save themselves; Save Layout keeps "
+        "the layout.");
+    add("config.restore_custom", "Revert to Saved Layout", "Preferences > Config", nullptr, [this] { restoreCustomUi(); },
         ICON_LC_ARCHIVE_RESTORE, nullptr, nullptr, [this] { return fileExists(uiConfigPath()); },
-        "Go back to the layout and shortcuts saved by the last Store Config.");
-    add("config.load", "Load UI...", "Preferences > Config", "Ctrl+L", [this] { loadUiDialog(); }, ICON_LC_FOLDER_INPUT, nullptr,
-        nullptr, nullptr, "Load a layout file someone shared (or you saved with Save UI).");
-    add("config.save", "Save UI...", "Preferences > Config", nullptr, [this] { saveUiDialog(); }, ICON_LC_FOLDER_OUTPUT, nullptr,
-        nullptr, nullptr, "Save the layout, shortcuts and interface preferences to a file you can share.");
-    add("config.customize", "Enable Customize", "Preferences > Config", nullptr,
+        "Go back to the layout the last Save Layout kept.");
+    add("config.load", "Import Interface...", "Preferences > Config", "Ctrl+L", [this] { loadUiDialog(); },
+        ICON_LC_FOLDER_INPUT, nullptr, nullptr, nullptr,
+        "Load a layout and shortcuts file someone shared (or you saved with Export Interface).");
+    add("config.save", "Export Interface...", "Preferences > Config", nullptr, [this] { saveUiDialog(); },
+        ICON_LC_FOLDER_OUTPUT, nullptr, nullptr, nullptr,
+        "Save the layout, shortcuts and interface preferences to a file you can share.");
+    add("config.customize", "Customize Shelves", "Preferences > Config", nullptr,
         [this] {
             layout_.customize = !layout_.customize;
             status_ = layout_.customize ? "Customize: Ctrl+Alt+drag to move or remove items" : "Customize off";
@@ -747,6 +755,7 @@ void App::initActions() {
         actions_.setRecent(std::move(recent));
     }
     layoutBaseline_ = layoutKey();
+    actionsReady_ = true;
 }
 
 void App::saveRecentActions() {
@@ -841,16 +850,116 @@ bool App::writeUiConfig(const std::string& path, std::string& err) {
     j.set("shortcuts", actions_.overridesToJson());
     j.set("prefs", toJson(uiPrefs_));
     j.set("radialMenus", toJson(radialMenus_));
-    std::ofstream f(fsPath(path), std::ios::binary | std::ios::trunc);
-    f << j.dump(true) << "\n";
-    if (!f) {
-        err = "Could not write " + path;
+    return writeJsonAtomic(path, j, err);
+}
+
+// Preferences save themselves (#117): ui.json gets the shortcuts, the preferences and the radial menus a moment
+// after they change, with the layout as Save Layout last kept it (storedLayout_; none yet: the standard one).
+bool App::writeJsonAtomic(const std::string& path, const Json& j, std::string& err) {
+    std::error_code ec;
+    const std::string tmp = path + ".tmp";
+    {
+        std::ofstream f(fsPath(tmp), std::ios::binary | std::ios::trunc);
+        f << j.dump(true) << "\n";
+        if (!f) {
+            err = "Could not write " + path;
+            return false;
+        }
+    }
+    std::filesystem::rename(fsPath(tmp), fsPath(path), ec);
+    if (ec) {
+        err = "Could not write " + path + ": " + ec.message();
         return false;
     }
     return true;
 }
 
-bool App::readUiConfig(const std::string& path, std::string& err) {
+std::string App::prefsKey() const {
+    Json j = Json::object();
+    j.set("shortcuts", actions_.overridesToJson());
+    j.set("prefs", toJson(uiPrefs_));
+    j.set("radialMenus", toJson(radialMenus_));
+    return j.dump();
+}
+
+bool App::saveUiPrefs(std::string& err) {
+    Json j = Json::object();
+    j.set("version", 1.0);
+    if (storedLayout_.isObject()) j.set("layout", storedLayout_);
+    j.set("shortcuts", actions_.overridesToJson());
+    j.set("prefs", toJson(uiPrefs_));
+    j.set("radialMenus", toJson(radialMenus_));
+    if (!writeJsonAtomic(uiConfigPath(), j, err)) return false;
+    prefsSavedKey_ = prefsKey();
+    prefsSaveAt_ = 0.0;
+    return true;
+}
+
+void App::autosavePrefs(bool flush) {
+    // Renders and recordings use the standard layout and the user's own settings folder: they never write it. UI
+    // tests do (their folder is a fresh one).
+    if (uiConfigPath().empty() || !actionsReady_ || (uiConfigDeterministic_ && options_.uiTest.empty())) return;
+    const double now = double(SDL_GetTicksNS()) * 1e-9;
+    if (!flush && now - prefsCheckedAt_ < 0.25) return; // a few looks a second while the app draws
+    prefsCheckedAt_ = now;
+    std::string key = prefsKey();
+    if (!prefsKeyKnown_) { // the first look: what the start read (or the defaults) is already on disk
+        prefsKeyKnown_ = true;
+        prefsSavedKey_ = std::move(key);
+        return;
+    }
+    if (key == prefsSavedKey_) {
+        prefsSaveAt_ = 0.0;
+        return;
+    }
+    if (prefsSaveAt_ == 0.0) { // debounced: a slider being dragged is written once it settles (or every half second)
+        prefsSaveAt_ = now + 0.5;
+        redrawIn(0.5); // (a frame then, even if the app is idle by then)
+    }
+    if (!flush && now < prefsSaveAt_) return;
+    std::string err;
+    if (!saveUiPrefs(err)) {
+        SDL_Log("%s", err.c_str());
+        prefsSavedKey_ = std::move(key); // (no retry every frame; the next change tries again)
+        prefsSaveAt_ = 0.0;
+    }
+}
+
+void App::restartPrefsForTest(const std::string& uiJson) {
+    autosavePrefs(true);
+    if (!uiJson.empty() && !uiConfigPath().empty()) {
+        std::error_code ec;
+        std::filesystem::copy_file(fsPath(uiJson), fsPath(uiConfigPath()), std::filesystem::copy_options::overwrite_existing, ec);
+        if (ec) status_ = "restart: " + ec.message();
+    }
+    UiPrefs defaults;
+    defaults.mayaFolder = uiPrefs_.mayaFolder; // (maya.json, not ui.json)
+    defaults.mayaAutoReceive = uiPrefs_.mayaAutoReceive;
+    uiPrefs_ = defaults;
+    actions_.clearOverrides();
+    resetRadialMenus();
+    const bool customize = layout_.customize;
+    layout_ = standardLayout(uiPrefs_.shellLayout);
+    layout_.customize = customize;
+    storedLayout_ = Json();
+    std::string err;
+    if (fileExists(uiConfigPath()) && !readUiConfig(uiConfigPath(), err, true)) status_ = err;
+    applyInputStyle();
+    layoutBaseline_ = layoutKey();
+    prefsSavedKey_ = prefsKey();
+    prefsSaveAt_ = 0.0;
+    ImGui::ClearActiveID(); // a new start has no text field in use (the console's would take the next keys)
+    ImGui::SetWindowFocus(nullptr);
+}
+
+void App::savePrefsNow() {
+    std::string err;
+    if (uiConfigPath().empty()) status_ = "Can't save the preferences: no settings folder";
+    else if (!saveUiPrefs(err)) status_ = err;
+    else status_ = "Preferences saved (they also save themselves)";
+}
+
+bool App::readUiConfig(const std::string& path, std::string& err, bool own) {
     std::ifstream f(fsPath(path), std::ios::binary);
     if (!f) {
         err = "Could not read " + path;
@@ -862,15 +971,18 @@ bool App::readUiConfig(const std::string& path, std::string& err) {
         return false;
     }
     j = legacy::modernizeKeys(j); // keys an older version wrote
-    if (!j.isObject() || !j["layout"].isObject()) {
+    // Our own ui.json may have no layout yet (the preferences save themselves; the layout waits for Save Layout).
+    const bool hasLayout = j.isObject() && j["layout"].isObject();
+    if (!j.isObject() || (!hasLayout && !(own && j["prefs"].isObject()))) {
         err = path + " is not a SculptForge UI configuration";
         return false;
     }
     // The prefs first: they name the shell layout, whose standard shelves fill in what the file didn't store.
     UiPrefs prefs = uiPrefs_;
     fromJson(j["prefs"], prefs);
-    UiLayout layout;
-    if (!fromJson(j["layout"], layout, err, prefs.shellLayout)) return false;
+    UiLayout layout = standardLayout(prefs.shellLayout);
+    if (hasLayout && !fromJson(j["layout"], layout, err, prefs.shellLayout)) return false;
+    if (own) storedLayout_ = hasLayout ? j["layout"] : Json();
     uiPrefs_ = std::move(prefs);
     lookDirty_ = true;
     requestUiScale(); // its UI scale
@@ -891,16 +1003,23 @@ bool App::readUiConfig(const std::string& path, std::string& err) {
     return true;
 }
 
-void App::storeConfig() {
+void App::saveLayout() {
     std::string err;
     if (uiConfigPath().empty()) {
-        status_ = "Can't store the UI configuration: no settings folder";
+        status_ = "Can't save the layout: no settings folder";
     } else if (!writeUiConfig(uiConfigPath(), err)) {
         status_ = err;
     } else {
-        status_ = "UI configuration stored";
-        layoutBaseline_ = layoutKey();
+        status_ = "Layout saved";
+        noteLayoutStored();
+        prefsSavedKey_ = prefsKey();
+        prefsSaveAt_ = 0.0;
     }
+}
+
+void App::noteLayoutStored() {
+    storedLayout_ = toJson(layout_);
+    layoutBaseline_ = layoutKey();
 }
 
 void App::restoreStandardUi() {
@@ -910,18 +1029,18 @@ void App::restoreStandardUi() {
     actions_.clearOverrides();
     resetRadialMenus();
     layoutBaseline_ = layoutKey();
-    status_ = "Standard UI restored - Store Config (Ctrl+Shift+I) to keep it";
+    status_ = "Standard layout and shortcuts restored - Save Layout keeps the layout";
 }
 
 void App::restoreCustomUi() {
     std::string err;
     if (!fileExists(uiConfigPath())) {
-        status_ = "No stored UI configuration yet - Store Config (Ctrl+Shift+I) first";
-    } else if (!readUiConfig(uiConfigPath(), err)) {
+        status_ = "No saved layout yet - Save Layout first";
+    } else if (!readUiConfig(uiConfigPath(), err, true)) {
         status_ = err;
     } else {
         layoutBaseline_ = layoutKey();
-        status_ = "Custom UI restored";
+        status_ = "Saved layout restored";
     }
 }
 
@@ -1008,7 +1127,7 @@ void App::drawViewportHint(const char* id, const char* text, ImU32 colour, float
         const std::string button = std::string(tr("Don't show again")) + "##hint." + id;
         if (ImGui::SmallButton(button.c_str())) {
             uiPrefs_.hiddenHints.insert(id);
-            status_ = "Hint hidden (Preferences > Hints shows it again; Store Config keeps it)";
+            status_ = "Hint hidden (Preferences > Hints shows it again)";
         }
     }
     ImGui::End();
@@ -1019,7 +1138,7 @@ void App::drawHintsSection() {
     ui::Checkbox("Show hints in the viewport##hints.show", &uiPrefs_.showHints);
     ui::HelpText("Show hints in the viewport", nullptr,
                  "The short notes SculptForge shows over the 3D view (a mode that is on, the next step of a tool). Off "
-                 "hides them all; each also has its own Don't show again. Store Config keeps it.",
+                 "hides them all; each also has its own Don't show again.",
                  "Preferences > Hints");
     ImGui::BeginDisabled(!uiPrefs_.showHints);
     for (const HintInfo& h : kHints) {
@@ -1038,10 +1157,11 @@ void App::drawHintsSection() {
 }
 
 void App::watchLayoutChanges() {
+    autosavePrefs();
     if (layoutHintShown_ || uiConfigDeterministic_ || ++layoutCheckFrame_ % 20 != 0) return;
     if (layoutKey() == layoutBaseline_) return;
     layoutHintShown_ = true; // once per session (never saves the layout by itself)
-    status_ = "Layout changed - Ctrl+Shift+I to keep it";
+    status_ = "Layout changed - Preferences > Config > Save Layout keeps it";
 }
 
 // ---------------------------------------------------------------------------
@@ -1094,11 +1214,11 @@ bool App::captureShortcutKey(SDL_Keycode key, SDL_Keymod mod) {
         status_ = "Shortcut unchanged";
     } else if (key == SDLK_BACKSPACE || key == SDLK_DELETE) {
         actions_.setShortcut(capturingShortcut_, "");
-        status_ = label + ": no shortcut - Store Config (Ctrl+Shift+I) to keep it";
+        status_ = label + ": no shortcut";
     } else {
         const std::string chord = chordText(chordFromEvent(key, mod));
         const std::string lost = actions_.assignShortcut(capturingShortcut_, chord);
-        status_ = label + ": " + chord + (lost.empty() ? "" : " (was " + lost + ")") + " - Store Config (Ctrl+Shift+I) to keep it";
+        status_ = label + ": " + chord + (lost.empty() ? "" : " (was " + lost + ")");
     }
     capturingShortcut_.clear();
     return true;
@@ -1119,10 +1239,10 @@ void App::drawHelpConsoleUi() {
             std::string err;
             if (kind == kSaveUi) {
                 if (fsPath(path).extension().empty()) path += ".json";
-                status_ = writeUiConfig(path, err) ? "UI layout saved to " + path : err;
+                status_ = writeUiConfig(path, err) ? "Interface exported to " + path : err;
             } else if (kind == kLoadUi) {
                 if (readUiConfig(path, err)) {
-                    status_ = "UI layout loaded - Store Config (Ctrl+Shift+I) to keep it";
+                    status_ = "Interface loaded - Save Layout keeps its layout";
                 } else {
                     status_ = err;
                 }
@@ -1144,7 +1264,7 @@ void App::drawHelpConsoleUi() {
                 if (ensureUserLibrary(path, libErr)) { // the Library's User folder, from now on
                     library_.user = path;
                     libraryScanner_.invalidate();
-                    status_ = "Library folder: " + path + " (Store Config keeps it)";
+                    status_ = "Library folder: " + path;
                 } else {
                     status_ = libErr;
                 }
@@ -1293,9 +1413,9 @@ namespace config {
 void drawConfigSection(App& app) {
     const ImVec2 full(-FLT_MIN, 0);
     bool customize = app.layout().customize;
-    if (ImGui::Checkbox(tr("Enable Customize"), &customize)) app.actions().find("config.customize")->run();
+    if (ImGui::Checkbox(tr("Customize Shelves"), &customize)) app.actions().find("config.customize")->run();
     ui::HelpAction(app, "config.customize");
-    ui::ActionButton(app, "config.store", full, ui::Look::IconLabel);
+    ui::ActionButton(app, "config.save_layout", full, ui::Look::IconLabel);
     ui::ActionButton(app, "config.restore_custom", full, ui::Look::IconLabel);
     ui::ActionButton(app, "config.restore_standard", full, ui::Look::IconLabel);
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
@@ -1304,7 +1424,7 @@ void drawConfigSection(App& app) {
     ui::ActionButton(app, "config.load", ImVec2(half, 0), ui::Look::IconLabel);
     ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextUnformatted(tr("Changes to the layout and shortcuts last until you quit. Store Config keeps them."));
+    ImGui::TextUnformatted(tr("Preferences and shortcuts save themselves. Layout changes last until you quit; Save Layout keeps them."));
     ImGui::PopTextWrapPos();
     ImGui::PopStyleColor();
 }
@@ -1325,18 +1445,18 @@ void drawInterfaceSection(App& app) {
         }
         ui::HelpText("Language", nullptr,
                      "The language of menus, palettes, shelves and messages. Brush and tool names (Quad Remesh, Forge Spheres, "
-                     "Clay Block...) stay as they are. Store Config keeps it for the next start.",
+                     "Clay Block...) stay as they are.",
                      "Preferences > Interface");
     }
-    ImGui::Checkbox(tr("Popup Info (Ctrl+hover help)"), &p.popupInfo);
-    ui::HelpText("Popup Info", nullptr,
+    ImGui::Checkbox(tr("Ctrl+hover help"), &p.popupInfo);
+    ui::HelpText("Ctrl+hover help", nullptr,
                  "Hold Ctrl and point at any control to see what it does and its shortcut. Ctrl+Alt shows a command's "
                  "scripting parameters.",
                  "Preferences > Interface");
     ImGui::BeginDisabled(!p.popupInfo);
     ImGui::SetNextItemWidth(-FLT_MIN);
-    ui::SliderInside("##help_opacity", &p.helpOpacity, 0.3f, 1.0f, "Popup Info opacity %.2f");
-    ui::HelpText("Popup Info opacity", nullptr, "How solid the Ctrl-help box is.",
+    ui::SliderInside("##help_opacity", &p.helpOpacity, 0.3f, 1.0f, "Help box opacity %.2f");
+    ui::HelpText("Help box opacity", nullptr, "How solid the Ctrl-help box is.",
                  "Preferences > Interface");
     ImGui::EndDisabled();
     ImGui::SetNextItemWidth(-FLT_MIN);
@@ -1396,7 +1516,7 @@ void drawInterfaceSection(App& app) {
     }
     ui::HelpText("UI scale", nullptr,
                  "Size of text and controls, applied at once. Automatic follows the display the window is on (Windows: "
-                 "Settings > Display > Scale, per monitor). Store Config keeps it for the next start.",
+                 "Settings > Display > Scale, per monitor).",
                  "Preferences > Interface");
     static const char* kRotation[] = {"Free", "Turntable"};
     ImGui::SetNextItemWidth(-FLT_MIN);
@@ -1467,7 +1587,7 @@ void drawHotkeysSection(App& app) {
     }
     if (ImGui::Button(tr(ICON_LC_ROTATE_CCW "  Default shortcuts"), ImVec2(-FLT_MIN, 0))) {
         reg.clearOverrides();
-        app.status_ = "Default shortcuts restored - Store Config (Ctrl+Shift+I) to keep them";
+        app.status_ = "Default shortcuts restored";
     }
     ui::HelpText("Default shortcuts", nullptr, "Undo every shortcut change.", "Preferences > Hotkeys");
 }

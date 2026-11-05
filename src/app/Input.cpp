@@ -1,9 +1,9 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The Classic sculpting keys (docs/guide/quick-tour.md): the keys SculptForge lacked (U Intensity, I RGB
-// Intensity, O Focal Shift, Space QuickMenu, L LazyMouse, V switch colour, Ctrl+A / Ctrl+Shift+A / Ctrl+I /
-// Ctrl+H for the mask, Ctrl+W group masked), Preferences > Input with the classic and SculptForge key styles,
+// The Classic sculpting keys (docs/guide/quick-tour.md): the keys SculptForge lacked (U Intensity, I Colour
+// intensity, O Falloff, Space QuickMenu, L LazyMouse, V switch colour, Ctrl+A / Ctrl+Shift+A / Ctrl+I /
+// Ctrl+H for the mask, Ctrl+W group from mask), Preferences > Input with the classic and SculptForge key styles,
 // the QuickMenu itself and Shift-constrained straight strokes. The mouse gestures live with the rest of the
 // input in App.cpp (roll, Ctrl+click blur / sharpen in PanelMasking.cpp).
 //
@@ -70,20 +70,20 @@ void App::registerInputActions() {
         actions_.add(std::move(a));
     };
 
-    // The sliders at the cursor (S is Draw Size, in Library.cpp).
+    // The sliders at the cursor (S is Size, in Library.cpp).
     add("ui.strength_popup", "Intensity at cursor", ICON_LC_CIRCLE_DOT, "Draw", "U",
-        "A Intensity slider under the cursor: drag it, or type a number (1-100) and press Enter. Hold Shift (or "
+        "An Intensity slider under the cursor: drag it, or type a number (1-100) and press Enter. Hold Shift (or "
         "pick Smooth) to set Smooth's own Intensity.",
         [this] { PickerUi::sizePopup(*this, PickerUi::Slider::ZIntensity); });
-    add("ui.rgb_popup", "RGB Intensity at cursor", ICON_LC_PALETTE, "Draw", "I",
-        "An RGB Intensity slider under the cursor: how strongly painting colours the surface (1-100).",
+    add("ui.rgb_popup", "Colour intensity at cursor", ICON_LC_PALETTE, "Draw", "I",
+        "An Colour intensity slider under the cursor: how strongly painting colours the surface (1-100).",
         [this] { PickerUi::sizePopup(*this, PickerUi::Slider::RgbIntensity); });
     add("ui.focal_popup", "Falloff at cursor", ICON_LC_CIRCLE_DASHED, "Draw", "O",
         "A Falloff slider under the cursor: below 0 a broad, hard brush tip, above 0 a soft point (-100..100). The "
         "inner ring of the brush cursor shows it.",
         [this] { PickerUi::sizePopup(*this, PickerUi::Slider::FocalShift); });
     add("ui.quickmenu", "Quick Menu", ICON_LC_LAYOUT_GRID, "Help", "Space",
-        "The Quick Menu under the cursor: brush, stroke, alpha, material, colour, Draw Size, Falloff and the "
+        "The Quick Menu under the cursor: brush, stroke, alpha, material, colour, Size, Falloff and the "
         "intensities. Hold Space and let go to close it, or tap Space to keep it open.",
         [this] { openQuickMenu(); }, [this] { return quickMenu_.open; });
 
@@ -128,7 +128,7 @@ void App::registerInputActions() {
         static const char* const help[] = {
             "Stroke type Dots: even dabs along the path, the classic brush stroke.",
             "Stroke type Drag Stamp: click and drag one stamp; the drag sets its size and rotation.",
-            "Stroke type Slide Stamp: drag one stamp of the brush's Draw Size over the surface; it lands where you let go.",
+            "Stroke type Slide Stamp: drag one stamp of the brush's Size over the surface; it lands where you let go.",
             "Stroke type Spray: scattered dabs of random size and strength, for organic texture.",
             "Stroke type Lazy Stroke: the brush trails the cursor on a string, for smooth, steady lines.",
         };
@@ -160,7 +160,7 @@ void App::registerInputActions() {
         "Mask what is unmasked and unmask what is masked (also: Ctrl+click the background).",
         [this] { runCommand("mask_invert"); });
     actions_.setDefaultShortcut("view.mask", "Ctrl+H"); // View Mask
-    add("facegroup.group_masked", "Group Masked", ICON_LC_SHAPES, "Tool > Face Groups", "Ctrl+W",
+    add("facegroup.group_masked", "Group from Mask", ICON_LC_SHAPES, "Tool > Face Groups", "Ctrl+W",
         "Turn the masked part into a new face group and clear the mask. With nothing masked, "
         "everything visible becomes one group.",
         [this] { groupMasked(); });
@@ -175,11 +175,11 @@ void App::registerInputActions() {
 
     // Preferences > Input: the key style.
     add("input.style_classic", "Classic sculpting keys", nullptr, "Preferences > Input", "",
-        "The classic sculpting keys and gestures: I is RGB Intensity, 9 saves a snapshot, the number keys don't pick brushes, and "
+        "The classic sculpting keys and gestures: I is Colour intensity, 9 saves a snapshot, the number keys don't pick brushes, and "
         "Ctrl+drag on the background only clears the mask.",
         [this] { setInputStyle(0); }, [this] { return uiPrefs_.inputStyle == 0; });
     add("input.style_sculptforge", "SculptForge", nullptr, "Preferences > Input", "",
-        "SculptForge's own keys (the default): 1-9 and 0 pick the first ten brushes, I is Intensity (as is U), "
+        "SculptForge's own keys (the default): 1-9 and 0 pick the first ten brushes, I is Falloff (as is O), U Intensity, "
         "and Ctrl+drag on the background zooms when nothing is masked.",
         [this] { setInputStyle(1); }, [this] { return uiPrefs_.inputStyle == 1; });
     add("input.style_blender", "Blender", nullptr, "Preferences > Input", "",
@@ -246,7 +246,7 @@ void App::registerInputActions() {
     add("input.import_blender", "Import Blender keymap...", ICON_LC_FILE_INPUT, "Preferences > Input", "",
         "Use the keys from a keymap you exported in Blender (Preferences > Keymap > Export, a .py file). Switches "
         "to the Blender style, then takes the navigation and sculpt keys SculptForge has an equivalent for. The "
-        "file is only read, never run. Store Config keeps the result.",
+        "file is only read, never run. Saved automatically.",
         [this] { importBlenderKeymapDialog(); });
 
     // Blender style: the mask brush and Sculpt mode's visibility keys.
@@ -354,7 +354,8 @@ void App::applyInputStyle() {
     };
     static const Keys kKeys[] = {
         {"file.quicksave", {"9", "", ""}},
-        {"ui.strength_popup", {"U", "U / I", "Shift+F / U"}},
+        {"ui.strength_popup", {"U", "U", "Shift+F / U"}},
+        {"ui.focal_popup", {"O", "O / I", "O"}}, // SculptForge keys: I is Falloff (#117), U stays Intensity
         {"ui.rgb_popup", {"I", "", ""}},
         {"ui.size_popup", {"S", "S", "F"}},
         {"view.frame", {"F", "F", "Home"}},
@@ -498,7 +499,7 @@ bool App::importBlenderKeymap(const std::string& path) {
     }
     status_ = "Blender keymap: " + std::to_string(keymap.bindings.size()) + " keys for " +
               std::to_string(assigned.size()) + " actions (" + std::to_string(keymap.skipped) +
-              " Blender keys have no SculptForge equivalent). Store Config keeps them.";
+              " Blender keys have no SculptForge equivalent). Saved automatically.";
     lastCommandOk_ = true;
     return true;
 }
@@ -591,7 +592,7 @@ void App::drawCursorSection() {
         ui::HelpText("Viewport cursor", nullptr,
                      "The pointer over the 3D view: a crosshair (the default, as in most sculpting apps; it stays "
                      "while the view turns) or the arrow. Panels, menus and popups always show the arrow (or their "
-                     "own resize and text cursors). Store Config keeps it.",
+                     "own resize and text cursors). Saved automatically.",
                      "Preferences > Cursor");
     }
     bool surfaceCursor = uiPrefs_.cursorFollowsSurface;
@@ -735,7 +736,7 @@ void App::drawQuickMenu() {
         ImGui::EndGroup();
         ImGui::SameLine(0.0f, 8.0f * s);
         ImGui::BeginGroup();
-        const float sw = 180.0f * s; // "Draw Size 60 px  289 mm" whole
+        const float sw = 180.0f * s; // "Size 60 px  289 mm" whole
         ImGui::SetNextItemWidth(sw);
         drawSizeSlider("##qm_drawsize", "Quick Menu", "Brush radius in screen pixels (0.5 to 800), and in mm on the surface.");
         float focal = focalShift_ * 100.0f;
@@ -751,8 +752,8 @@ void App::drawQuickMenu() {
         ui::HelpText("Intensity", "U", "How strongly the brush changes the surface.", "Quick Menu");
         float rgb = rgbIntensity_ * 100.0f;
         ImGui::SetNextItemWidth(sw);
-        if (ui::SliderInside("##qm_rgb", &rgb, 1.0f, 100.0f, "RGB Intensity %.0f")) rgbIntensity_ = rgb / 100.0f;
-        ui::HelpText("RGB Intensity", "I", "How strongly painting colours the surface.", "Quick Menu");
+        if (ui::SliderInside("##qm_rgb", &rgb, 1.0f, 100.0f, "Colour intensity %.0f")) rgbIntensity_ = rgb / 100.0f;
+        ui::HelpText("Colour intensity", "I", "How strongly painting colours the surface.", "Quick Menu");
         ImGui::EndGroup();
         ui::Segmented(*this, {"draw.raise", "draw.lower"}, 2 * tile + ImGui::GetStyle().ItemSpacing.x);
         ImGui::SameLine();

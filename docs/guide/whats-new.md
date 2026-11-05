@@ -131,7 +131,7 @@ image: images/wn-whats-new.jpg
 action: guide:whats-new.md
 ```
 
-- **Each brush keeps its own settings**: Draw Size, Intensity, Falloff, RGB Intensity, stroke and alpha follow
+- **Each brush keeps its own settings**: Size, Intensity, Falloff, Colour intensity, stroke and alpha follow
   the brush, custom and Community brushes included. **Brush > Save Brush Settings** keeps them for the next start,
   **Reset Brush to Default** puts back the shipped values, and **Preferences > Input > Share size and intensity
   across brushes** keeps the old way (#78). See [Sculpting](sculpting.md#each-brush-keeps-its-own-settings).
@@ -185,7 +185,7 @@ action: guide:whats-new.md
   what you changed. Try it with `sculptforge --benchmark standard-1b` (Linux and macOS for now).
 - **Precision work** for pores, wrinkles, jewellery and trims: **Steady Stroke** (<kbd>L</kbd>) with every stroke
   type and a catch-up on release; **World Size**, so the brush keeps its size in mm on the surface as you zoom;
-  Draw Size down to 0.5 px with <kbd>Shift</kbd>+<kbd>[</kbd> / <kbd>]</kbd> for 1 px steps; hold
+  Size down to 0.5 px with <kbd>Shift</kbd>+<kbd>[</kbd> / <kbd>]</kbd> for 1 px steps; hold
   <kbd>Shift</kbd>+<kbd>Alt</kbd> while drawing to move the brush at a quarter of the pen's speed; and a pressure
   curve for each brush with a **Fine detail** preset. The brush centre now sits exactly under the cursor at any
   zoom. See [Precision work](sculpting.md#precision-work).
@@ -224,7 +224,7 @@ action: guide:whats-new.md
   removes what the shape covers and closes the cut with a flat cap, **In** cuts a flat-bottomed pocket and **Add**
   raises the shape out of the surface. The result stays watertight and follows the symmetry. Hold
   <kbd>Ctrl</kbd>+<kbd>Shift</kbd> and pick a Cut shape, or open **Tool > Cut**. See [Cut](cut.md) (#101, #91).
-- **Mask: Front faces only**: Mask Lasso and Mask Rectangle can leave the far side alone
+- **Mask: Front faces only**: Lasso Mask and Rectangle Mask can leave the far side alone
   ([Masking](masking.md#mask-with-a-lasso-or-rectangle), #91).
 - **Duplicate Part** has a shortcut: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> ([Parts](parts.md)).
 - **Brush previews fixed**: the shelf shows Tendril and Elastic Tendril as long horns pulled out past the ball, as
@@ -269,7 +269,7 @@ image: images/wn-memberships.jpg
 action: card:membership
 link: https://sculptforge.app/support.html
 title: Full alphas, every brush
-line: Custom and Community brushes show the whole alpha at Focal Shift -100 (#75).
+line: Custom and Community brushes show the whole alpha at Falloff -100 (#75).
 image: images/wn-full-alpha.jpg
 action: brush:Clay Slab
 link: sculpting.md
@@ -290,7 +290,7 @@ link: performance.md#proof-mode-see-it-for-yourself
   Insiders also get daily drops and preview builds about a week early; Studio covers the whole company with a
   custom studio build (Founding Studio: the first 10 studios lock in $150 a month). Every release stays free for
   everyone; bug-fix and security releases go out to everyone the same day.
-- **Full alphas on custom brushes**: at Focal Shift -100, Clay Slab and the other custom and Community brushes now
+- **Full alphas on custom brushes**: at Falloff -100, Clay Slab and the other custom and Community brushes now
   show the whole alpha to its corners, as the built-in brushes do (#75).
 - **A new look**: new installs start in **Forge Terminal** with the Tokyo Night colours and the **SculptForge
   layout**: menus by task (File, Edit, Sculpt, Paint, Mesh, View, Render, Help) holding every palette, a status
@@ -435,12 +435,12 @@ link: uv-editor.md
   <kbd>Shift</kbd>+<kbd>L</kbd> to turn it on and off. With it on, a left-drag that starts on the background
   sculpts once it reaches the model instead of turning the view. See [Navigation](navigation.md#mouse-and-pen).
 - **Radial and local symmetry** (#63): **R** in **Transform > Symmetry** (and on the top shelf) repeats every
-  stroke around the X, Y or Z axis, 2 to 64 times (**Radial Count**), together with the X / Y / Z mirrors. Every
+  stroke around the X, Y or Z axis, 2 to 64 times (**Radial Copies**), together with the X / Y / Z mirrors. Every
   brush, mask, vertex paint and texture stroke, the mask and select shapes, Dynamic Topology and Insert follow it,
   and the brush cursor shows on every copy. **Local** puts the planes and the axis through the active Part's centre.
   Saved with the project and scriptable (`radial`, `radial_axis`, `local`). See [Sculpting](sculpting.md#radial-symmetry).
 - **The Sculpt Timeline is at the top of the viewport** (#63), away from the brushes on the bottom shelf. **Preferences >
-  Interface > Timeline position** puts it back at the bottom; Store Config keeps the choice. See
+  Interface > Timeline position** puts it back at the bottom; saved automatically. See
   [Sculpt Timeline](timeline.md).
 
 ## Version 0.10.4
@@ -650,7 +650,7 @@ Mirror** flips a Part. See [Mirror And Weld](geometry.md#mirror-and-weld).
 ### A flat background
 
 **Preferences > Display > Background** (also in the Render palette) switches the view from the gradient to a
-flat colour you pick. Store Config keeps it, and projects keep their own. See
+flat colour you pick. Saved automatically; projects keep their own. See
 [The background](interface.md#the-background).
 
 ### Flatpak
@@ -864,7 +864,7 @@ Fixes from a professional sculptor's testing, and a way to bring a library over.
 - **Classic zoom direction.** With the Classic input style, dragging up zooms out on every zoom drag.
   See [Navigation](navigation.md).
 - **Ctrl and Ctrl+Shift brushes.** Hold <kbd>Ctrl</kbd> and the left shelf shows the mask brush; with
-  <kbd>Ctrl</kbd> held the Brush and Stroke pickers pick Mask Pen, Mask Lasso or Mask Rectangle. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>
+  <kbd>Ctrl</kbd> held the Brush and Stroke pickers pick Mask Pen, Lasso Mask or Rectangle Mask. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>
   does the same for Select Rectangle and Select Lasso. See [Masking](masking.md).
 - **Group by UVs.** One face group per UV island, in **Tool > Face Groups**. See [Face Groups and visibility](face-groups.md).
 
@@ -909,7 +909,7 @@ into place. See [Vector displacement brushes](sculpting.md#vector-displacement-b
 
 ### Classic sculpting keys in Blender's Sculpt Mode
 
-The Blender add-on has a new preference, **The Classic sculpting keys in Sculpt Mode**: S, U and O for Draw Size,
+The Blender add-on has a new preference, **The Classic sculpting keys in Sculpt Mode**: S, U and O for Size,
 Strength and Falloff, B for the brushes by name, Space for the quick menu, Alt to dig in,
 Ctrl to mask, Ctrl+Shift to hide, D and Shift+D for subdivision levels, and more. See
 [Working with Blender](blender.md#classic-sculpting-keys-in-sculpt-mode).
@@ -944,14 +944,14 @@ put it down because it didn't feel; this release goes through every habit of the
 [Quick tour for experienced sculptors](quick-tour.md) lists what's the same, what's different and every shortcut side by
 side.
 
-- **S, U, I, O** open Draw Size, Intensity, RGB Intensity and Falloff under the cursor, and
+- **S, U, I, O** open Size, Intensity, Colour intensity and Falloff under the cursor, and
   <kbd>Space</kbd> opens the Quick Menu with all of them plus the brush, stroke, alpha and material.
-- **Falloff** shapes the brush falloff, shown as the cursor's inner ring. **RGB Intensity** gives painting a
+- **Falloff** shapes the brush falloff, shown as the cursor's inner ring. **Colour intensity** gives painting a
   strength of its own, and **Smooth keeps its own Intensity**, so a gentle brush still smooths properly.
 - **brush letters**: B C B Clay Block, B D S Sharp Crease, B M V Move, B I N Inflate...
 - **Masking**: <kbd>Ctrl</kbd>+click the model blurs the mask, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click sharpens it;
   <kbd>Ctrl</kbd>+<kbd>A</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>, <kbd>Ctrl</kbd>+<kbd>I</kbd>,
-  <kbd>Ctrl</kbd>+<kbd>H</kbd> and <kbd>Ctrl</kbd>+<kbd>W</kbd> (group masked) work.
+  <kbd>Ctrl</kbd>+<kbd>H</kbd> and <kbd>Ctrl</kbd>+<kbd>W</kbd> (group from mask) work.
 - **Strokes and the view**: <kbd>Shift</kbd> pressed mid-stroke draws a straight line; <kbd>Shift</kbd>+click,
   let go and drag rolls the view; <kbd>Shift</kbd>+<kbd>Alt</kbd>+click frames a Part; <kbd>L</kbd> toggles
   Lazy Stroke and <kbd>V</kbd> swaps colours.
@@ -1052,11 +1052,11 @@ without losing anything.
 
 - **Divide** (<kbd>Ctrl</kbd>+<kbd>D</kbd>) adds a level and keeps the ones below. Quads stay quads
   (Catmull-Clark); **Smt** off divides without smoothing.
-- **Lower Res** / **Higher Res** (<kbd>Shift</kbd>+<kbd>D</kbd> / <kbd>D</kbd>) and the **SDiv** slider step
+- **Lower Level** / **Higher Level** (<kbd>Shift</kbd>+<kbd>D</kbd> / <kbd>D</kbd>) and the **SDiv** slider step
   between levels. Detail sculpted high rides along when you reshape low, and edits high show up softened below.
   Stepping back and forth is instant, even at millions of polygons.
 - Mask, vertex paint, paint layers, face groups, hidden faces, UVs and sculpt layers follow the levels.
-- **Del Lower**, **Del Higher** and **Reconstruct Subdiv** (find the lower levels of a model subdivided
+- **Delete Lower**, **Delete Higher** and **Reconstruct Subdiv** (find the lower levels of a model subdivided
   elsewhere). Undo walks back through strokes and level changes; projects save every level; the Parts list
   shows "SDiv 3/5".
 - <kbd>Ctrl</kbd>+<kbd>D</kbd> now divides with levels; the old one-way **Subdivide** is still in
@@ -1105,8 +1105,8 @@ See [Baking normal and displacement maps](baking.md).
 - **Quad Remesh** (**Tool > Geometry**, like quad remesh) rebuilds a sculpt as clean quads whose edge loops follow
   the forms, near a **Target Polygons** count, in the background. **Keep Groups**, **Adaptive Size**,
   **Use Vertex Paint**, **Symmetry** and **Half / Same / Double** work.
-- **Project All** (**Tool > Parts > Project**) puts the sculpted detail and vertex paint back onto the divided
-  quads, with **Dist**, **Mean** and **PA Blur**, and respects the mask.
+- **Project Detail** (**Tool > Parts > Project**) puts the sculpted detail and vertex paint back onto the divided
+  quads, with **Dist**, **Mean** and **Blur**, and respects the mask.
 
 See [Quad retopology and detail projection](retopology.md).
 
@@ -1210,7 +1210,7 @@ See [Navigating the view](navigation.md).
 
 ### Mask and isolate with a lasso or rectangle
 
-- **Mask Lasso and Mask Rectangle.** Pick the shape at the top of **Tool > Masking**, then <kbd>Ctrl</kbd>+drag to
+- **Lasso Mask and Rectangle Mask.** Pick the shape at the top of **Tool > Masking**, then <kbd>Ctrl</kbd>+drag to
   mask everything inside it; add <kbd>Alt</kbd> to unmask. The drag can start on the model or beside it.
 - **Select Lasso.** In **Tool > Visibility**, pick **Select Lasso** next to Select Rectangle, then
   <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag a free-hand shape to keep only what's inside (add <kbd>Alt</kbd> to

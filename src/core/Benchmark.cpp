@@ -842,18 +842,18 @@ std::string runBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
             log("  subdivision levels");
             t = Clock::now();
             subdivSetLevel(m, top - 1, err, &doc.bvh);
-            md << "| Lower Res (to " << millions(double(m.triangleCount())) << ", after edits) | " << fmt("%.0f", msSince(t)) << " |\n";
+            md << "| Lower Level (to " << millions(double(m.triangleCount())) << ", after edits) | " << fmt("%.0f", msSince(t)) << " |\n";
             if (gpu && gpu->upload) gpu->upload(m);
             t = Clock::now();
             subdivSetLevel(m, top, err, &doc.bvh);
-            md << "| Higher Res (back up) | " << fmt("%.0f", msSince(t)) << " |\n";
+            md << "| Higher Level (back up) | " << fmt("%.0f", msSince(t)) << " |\n";
             if (gpu && gpu->upload) gpu->upload(m);
             t = Clock::now();
             subdivSetLevel(m, top - 1, err, &doc.bvh);
-            md << "| Lower Res again (no edits) | " << fmt("%.0f", msSince(t)) << " |\n";
+            md << "| Lower Level again (no edits) | " << fmt("%.0f", msSince(t)) << " |\n";
             t = Clock::now();
             subdivSetLevel(m, top, err, &doc.bvh);
-            md << "| Higher Res again (no edits) | " << fmt("%.0f", msSince(t)) << " |\n";
+            md << "| Higher Level again (no edits) | " << fmt("%.0f", msSince(t)) << " |\n";
             if (gpu && gpu->upload) gpu->upload(m);
         }
         if (o.projectRoundTrip) {

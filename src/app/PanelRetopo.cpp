@@ -63,7 +63,7 @@ void App::registerRetopoUiActions() {
         [this] { return !qremesh_ && doc_.mesh.triangleCount() > 0; },
         "Automatic quad retopology: rebuilds the Part as clean, all-quad topology whose "
         "edge loops follow the forms, close to Target Polygons. Runs in the background (Cancel stops it); undoable. "
-        "Then divide it and use Part > Project > Project All to bring the detail back.",
+        "Then divide it and use Part > Project > Project Detail to bring the detail back.",
         "qremesh");
     {
         Action a;
@@ -85,7 +85,7 @@ void App::registerRetopoUiActions() {
     add("geometry.qremesh_guides_clear", "Clear", kQRemeshPath, [this] { runCommand("qremesh_guides_clear"); },
         [this] { return !doc_.qremeshGuides.empty(); }, "Delete every Quad Remesh guide curve of this Part.",
         "qremesh_guides_clear");
-    add("part.project_all", "Project All", kProjectPath, [this] {
+    add("part.project_all", "Project Detail", kProjectPath, [this] {
             runCommand("project_all", {{"distance", double(retopo_.projectDist)}, {"mean", retopo_.projectMean},
                                        {"blur", double(retopo_.projectBlur)}, {"geometry", retopo_.projectGeometry},
                                        {"vertexpaint", retopo_.projectVertexPaint}});
@@ -97,7 +97,7 @@ void App::registerRetopoUiActions() {
         },
         "Project the shape and vertex paint of every other visible Part onto this one: each vertex moves along its "
         "normal to the nearest surface within Dist. The mask holds vertices back. Typical use: Quad Remesh a copy, divide "
-        "it a few times, show the original, Project All.",
+        "it a few times, show the original, Project Detail.",
         "project_all");
 }
 
@@ -405,7 +405,7 @@ void App::drawQRemeshContents() {
     ImGui::Checkbox(tr("Keep Original"), &retopo_.keepOriginal);
     ui::HelpText("Keep Original", nullptr,
                  "Keep the Part as it was, hidden, right below the new one (\"<name> Original\"), ready to "
-                 "Project All its detail back. Off: replace it (undo brings it back).",
+                 "Project Detail its detail back. Off: replace it (undo brings it back).",
                  kQRemeshPath);
     ImGui::SameLine();
     ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
@@ -435,7 +435,7 @@ void App::drawQRemeshReport() {
     ui::HelpText("Quality Report", nullptr,
                  "How clean the new topology is: poles are vertices with other than four edges (fewer is cleaner), "
                  "corners off square measure how far quad corners are from 90 degrees, and the distance is how far the "
-                 "new surface strays from the sculpt (in % of its size; Project All brings fine detail back).",
+                 "new surface strays from the sculpt (in % of its size; Project Detail brings fine detail back).",
                  kQRemeshPath);
 }
 
@@ -681,8 +681,8 @@ void App::drawProjectContents() {
                  "size. Raise it if parts don't pick up the detail; lower it where surfaces are close together.",
                  kProjectPath);
     ImGui::SetNextItemWidth(half);
-    tray::SliderInt("##pblur", &retopo_.projectBlur, 0, 10, "PA Blur %d");
-    ui::HelpText("PA Blur", nullptr, "Smooth the projected result this many times (softens noise from the source).",
+    tray::SliderInt("##pblur", &retopo_.projectBlur, 0, 10, "Blur %d");
+    ui::HelpText("Blur", nullptr, "Smooth the projected result this many times (softens noise from the source).",
                  kProjectPath);
     ImGui::SameLine();
     ImGui::Checkbox(tr("Mean"), &retopo_.projectMean);

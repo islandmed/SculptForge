@@ -1,4 +1,4 @@
-# #60: Focal Shift shapes brushes with an alpha. The same Square-alpha dab moves the whole square at
+# #60: Falloff shapes brushes with an alpha. The same Square-alpha dab moves the whole square at
 # -100, a rounded mound at 0 and only a small point at +100 (moved_sum: the summed movement).
 run new_sphere subdivisions=5
 run brush_set_alpha name=square

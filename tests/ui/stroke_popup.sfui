@@ -127,7 +127,7 @@ expect_value stroke_latch == 2
 expect_value mask_shape == 2
 expect_value stroke_popup_open == 1
 key escape
-expect_status Mask Rect on
+expect_status Rectangle mask on
 hover_model 0.5 0.5
 shot mask_rect_latched
 expect_value masked == 0

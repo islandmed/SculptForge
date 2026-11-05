@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "layout": {},
+  "shortcuts": {
+    "config.store": "Ctrl+Shift+I",
+    "view.frame": "Ctrl+Alt+F"
+  },
+  "prefs": {
+    "inputStyle": "sculptforge",
+    "timelinePosition": "bottom"
+  }
+}

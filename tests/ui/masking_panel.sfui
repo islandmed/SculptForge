@@ -6,8 +6,8 @@ camera 0 0
 key f
 click "Masking"
 expect "Mask Pen##mask.pen"
-expect "Mask Lasso##mask.lasso"
-expect "Mask Rectangle##mask.rect"
+expect "Lasso Mask##mask.lasso"
+expect "Rectangle Mask##mask.rect"
 expect "By cavity##mask"
 expect "By peaks##mask"
 expect "By face group##mask"
@@ -22,7 +22,7 @@ expect "Invert##mask"
 expect "Clear##mask"
 expect "All##mask"
 hold ctrl
-hover "Mask Lasso##mask.lasso"
+hover "Lasso Mask##mask.lasso"
 expect_help free shape
 hover "By facing##mask"
 expect_help faces the camera
@@ -31,7 +31,7 @@ wait_idle 30
 shot masking_panel
 
 # Shapes pick the Ctrl+drag shape.
-click "Mask Lasso##mask.lasso"
+click "Lasso Mask##mask.lasso"
 expect "Front faces only##mask"
 click "Mask Pen##mask.pen"
 expect_not "Front faces only##mask"

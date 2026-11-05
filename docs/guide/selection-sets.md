@@ -72,7 +72,7 @@ A set remembers the level it was stored at, and restores at any level of the sam
   where it is.
 
 So you can store a mask at SDiv 1, sculpt at SDiv 5 and restore the mask there, or keep a high-resolution face group
-set and use it at the base cage. Sets survive **Divide**, **Del Lower**, **Del Higher** and **Reconstruct
+set and use it at the base cage. Sets survive **Divide**, **Delete Lower**, **Delete Higher** and **Reconstruct
 Subdiv** as long as the level they were stored at still exists.
 
 ## Morph targets

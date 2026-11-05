@@ -46,7 +46,7 @@ struct SymCopy {
 };
 
 // Every copy of a stroke the symmetry makes: each mirror image (in Sculptor::mirrors' order) times each radial
-// turn, duplicates dropped (X and Z mirrors with an even radial count repeat a half turn), the identity first.
+// turn, duplicates dropped (X and Z mirrors with an even radial copies repeat a half turn), the identity first.
 // Defined in Sculpt.cpp.
 std::vector<SymCopy> symmetryCopies(const Symmetry& sym);
 // For each copy, the index of its inverse in the same list (a mirror is its own; a turn's is the opposite turn).

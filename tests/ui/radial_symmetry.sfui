@@ -1,4 +1,4 @@
-# Radial and local symmetry (#63): the R toggle on the top shelf and in Transform > Symmetry, Radial Count and the
+# Radial and local symmetry (#63): the R toggle on the top shelf and in Transform > Symmetry, Radial Copies and the
 # axis, every copy's brush cursor, strokes that land on every copy, mask rectangles that follow them, projects
 # that keep the settings, and Local about the Part's own centre.
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
@@ -17,10 +17,10 @@ expect_value symmetry_radial == 8
 expect_value radial_axis == 1
 expect_value symmetry_copies == 16
 
-# The Transform palette: Radial Count and the axis.
+# The Transform palette: Radial Copies and the axis.
 click "Transform##palette.transform"
 expect "##radialcount"
-expect_text "Radial Count 8"
+expect_text "Radial Copies 8"
 expect "Y axis##transform.radial_axis_y"
 shot transform-palette
 key escape
