@@ -717,89 +717,40 @@ std::vector<glm::vec3> microSurface(const Mesh& m) {
 
 } // namespace
 
-TEST(micro_base_stroke_matches_exact) {
-    // A big Standard, Inflate or Clay brush on a micro level over a dense base (a scan's) moves the base vertices,
-    // the detail riding along (Sculptor::microBaseDab): the surface lands within a few percent of the stroke's height
-    // of the grid brush (every grid point), the detail is untouched (no smearing), one undo step brings back every
-    // vertex and height bit-exactly, and redo the stroke.
+TEST(micro_base_stroke_is_the_plain_brush) {
+    // A big Standard, Inflate or Clay brush on a micro level over a dense base (a scan's) moves the base vertices
+    // (Sculptor::microBaseDab): as the plain brush moves the same mesh without the level (no detail: the corners are
+    // the vertices), the detail riding along untouched (its heights bit-identical), one undo step
+    // bringing every vertex and height back bit-exactly, redo the stroke.
     for (BrushType type : {BrushType::Standard, BrushType::Inflate, BrushType::Clay}) {
         for (bool detail : {false, true}) {
-            Document grid = microDoc(2, 200000), base = microDoc(2, 200000);
-            if (detail)
-                for (Document* d : {&grid, &base}) microNoise(d->mesh, 0.002f, 60.0f, 7);
-            grid.sculptor.microBaseDabs = false;
-            base.sculptor.microBaseDabs = true;
-            const std::vector<glm::vec3> before = microSurface(base.mesh), positions = base.mesh.positions;
+            Document plain = makeDoc(makeBenchSphere(200000)), base = microDoc(2, 200000);
+            plain.sculptor.adaptiveDabs = false; // (its plane from every vertex, as the base path's)
+            if (detail) microNoise(base.mesh, 0.002f, 60.0f, 7);
+            const std::vector<glm::vec3> positions = base.mesh.positions;
             const std::vector<int16_t> heights = base.mesh.micro->disp;
-            for (Document* d : {&grid, &base}) baseTestStroke(*d, type, 0.3f);
-            CHECK(base.mesh.micro->disp == heights); // (the detail is untouched: it rides on the base)
-            CHECK(base.mesh.positions != positions);
-            CHECK(grid.sculptor.microStroke().points > 0);
-            const std::vector<glm::vec3> g = microSurface(grid.mesh), b = microSurface(base.mesh);
-            double height = 0, worst = 0, sum = 0;
-            size_t moved = 0;
-            for (size_t k = 0; k < g.size(); ++k) {
-                const double h = glm::distance(g[k], before[k]);
-                height = std::max(height, h);
-                if (h == 0.0 && b[k] == before[k]) continue;
-                ++moved;
-                const double e = glm::distance(g[k], b[k]);
-                worst = std::max(worst, e), sum += e;
+            const std::vector<glm::vec3> surface = microSurface(base.mesh);
+            for (Document* d : {&plain, &base}) baseTestStroke(*d, type, 0.3f);
+            CHECK(base.mesh.micro->disp == heights);
+            CHECK(base.sculptor.microStroke().points == 0); // (not one grid point visited)
+            double height = 0, worst = 0;
+            for (size_t v = 0; v < positions.size(); ++v) {
+                height = std::max(height, double(glm::distance(plain.mesh.positions[v], positions[v])));
+                worst = std::max(worst, double(glm::distance(plain.mesh.positions[v], base.mesh.positions[v])));
             }
-            // where the worst ones are: by the grid stroke's height there (the rim of the stroke, or its middle)
-            size_t rim = 0, bad = 0;
-            for (size_t k = 0; k < g.size(); ++k) {
-                const double e = glm::distance(g[k], b[k]);
-                if (e < worst * 0.5) continue;
-                ++bad;
-                rim += glm::distance(g[k], before[k]) < height * 0.25;
-            }
-            std::printf("  base stroke %d%s: height %.4f, error max %.1f%% mean %.2f%% (%zu points over half the worst, %zu at the rim)\n", int(type),
-                        detail ? " (detail)" : "", height, 100.0 * worst / height, 100.0 * sum / double(std::max<size_t>(moved, 1)) / height, bad, rim);
+            std::printf("  base stroke %d%s: height %.4f, off the plain brush by %.4f%% at most\n", int(type), detail ? " (detail)" : "",
+                        height, 100.0 * worst / height);
             CHECK(height > 0.005);
-            // (A stroke drifts from the grid's by a few percent: the base's normals follow its moved vertices, the
-            // grid keeps pushing along the base's original ones. One dab, below, lands on it.)
-            CHECK(sum / double(std::max<size_t>(moved, 1)) <= height * (type == BrushType::Clay ? 0.08 : 0.04));
-            const std::vector<glm::vec3> after = b;
+            // (within a few percent: the plain brush picks and re-normals its region its own way, dab after dab; the
+            // detail's corner heights tilt the brush plane a little more)
+            CHECK(worst <= height * (detail ? 0.08 : 0.03));
+            const std::vector<glm::vec3> after = microSurface(base.mesh);
             CHECK(base.undo.undo(base.mesh, base.bvh));
-            CHECK(base.mesh.positions == positions && base.mesh.micro->disp == heights && microSurface(base.mesh) == before);
+            CHECK(base.mesh.positions == positions && base.mesh.micro->disp == heights && microSurface(base.mesh) == surface);
             CHECK(base.undo.redo(base.mesh, base.bvh));
             CHECK(microSurface(base.mesh) == after);
             CHECK(watertight(base.mesh));
         }
-    }
-}
-
-TEST(micro_base_dab_matches_grid) {
-    // One big dab on the base lands on the grid brush's (the same kernel at the corners; the points between follow).
-    for (BrushType type : {BrushType::Standard, BrushType::Inflate, BrushType::Clay}) {
-        Document grid = microDoc(2, 200000), base = microDoc(2, 200000);
-        grid.sculptor.microBaseDabs = false;
-        base.sculptor.microBaseDabs = true;
-        const std::vector<glm::vec3> before = microSurface(base.mesh);
-        Symmetry sym;
-        sym.x = false;
-        for (Document* d : {&grid, &base}) {
-            d->sculptor.beginStroke(d->mesh, "Stroke");
-            d->sculptor.dab(d->mesh, d->bvh, type, dabAt(glm::vec3(0, 0.05f, std::sqrt(1.0f - 0.0025f)), 0.3f, 0.4f), sym);
-            d->undo.push(d->sculptor.endStroke());
-        }
-        CHECK(grid.mesh.positions != base.mesh.positions); // (each took its own path)
-        const std::vector<glm::vec3> g = microSurface(grid.mesh), b = microSurface(base.mesh);
-        double height = 0, worst = 0, sum = 0;
-        size_t moved = 0;
-        for (size_t k = 0; k < g.size(); ++k) {
-            const double h = glm::distance(g[k], before[k]);
-            height = std::max(height, h);
-            if (h == 0.0 && b[k] == before[k]) continue;
-            ++moved;
-            const double e = glm::distance(g[k], b[k]);
-            worst = std::max(worst, e), sum += e;
-        }
-        std::printf("  base dab %d: height %.4f, error max %.2f%% mean %.3f%%\n", int(type), height, 100 * worst / height, 100 * sum / double(moved) / height);
-        CHECK(height > 0.002);
-        CHECK(sum / double(moved) <= height * 0.01);
-        CHECK(worst <= height * 0.06);
     }
 }
 

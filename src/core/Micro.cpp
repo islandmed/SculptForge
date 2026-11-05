@@ -564,7 +564,13 @@ bool microRaycast(const Mesh& m, const BVH& bvh, const glm::vec3& origin, const 
     RayHit base;
     if (!bvh.raycast(m, origin, dir, base)) return false;
     std::vector<uint32_t> cand;
+    const auto traceStart = std::chrono::steady_clock::now();
     microRayTriangles(m, bvh, origin, dir, cand);
+    static const bool trace = [] { const char* e = std::getenv("SF_MICRO_TRACE"); return e && e[0] == '1'; }();
+    if (trace)
+        std::fprintf(stderr, "micropick %zu candidates in %.1f ms (pad root %.4f, bulgeMax %.4f)\n", cand.size(),
+                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - traceStart).count(),
+                     mm.reach.pad.empty() ? 0.0 : double(mm.reach.pad[0]), double(mm.bulgeMax));
     // Only the triangles whose own reach (their bulge and displacement range) the ray passes through.
     const glm::vec3 inv(1.0f / (std::abs(dir.x) > 1e-20f ? dir.x : 1e-20f), 1.0f / (std::abs(dir.y) > 1e-20f ? dir.y : 1e-20f),
                         1.0f / (std::abs(dir.z) > 1e-20f ? dir.z : 1e-20f));

@@ -482,22 +482,26 @@ void Sculptor::microBaseKernel(Mesh& mesh, BVH& bvh, BrushType type, const DabPa
                 if (len > 1e-12) areaNormal = glm::vec3(nsum / len);
             }
         }
+        // The plain mesh's kernels (SculptKernel.h: Standard and Clay along the plane's normal, Inflate along the
+        // vertex's): the grid's own Clay moves each point along its normal by up to 3x the gap to the plane, which on
+        // a scan's noisy normals and deep folds overshoots, dab after dab, into spikes hundreds of units long.
+        PlaneKernel plane;
+        plane.type = type;
+        plane.center = c;
+        plane.viewDir = view;
+        plane.areaNormal = areaNormal;
+        plane.areaCenter = areaCenter;
+        plane.r = r;
+        plane.s = s;
+        plane.sign = sign;
+        plane.focal = p.focal;
+        plane.invert = p.invert;
         baseMoves_.assign(nv, glm::vec3(0.0f));
         poolFor(nv, [&](size_t b, size_t e) {
             for (size_t i = b; i < e; ++i) {
                 const float f = baseFall_[i];
                 if (f <= 0.0f) continue;
-                const glm::vec3 nn = baseNormal_[i], q = baseCorner_[i];
-                float delta = 0.0f;
-                if (type == BrushType::Standard) delta = sign * s * r * 0.06f * f * glm::dot(areaNormal, nn);
-                else if (type == BrushType::Inflate) delta = sign * s * r * 0.05f * f;
-                else { // Clay (MicroStroke::dab)
-                    const float facing = std::max(glm::dot(nn, areaNormal), 0.3f);
-                    const glm::vec3 pp = areaCenter + areaNormal * (sign * r * 0.05f * s);
-                    const float h = glm::dot(q - pp, areaNormal);
-                    if (sign * h < 0.0f) delta = -h * f * clayPull(s) / facing;
-                }
-                baseMoves_[i] = nn * delta;
+                baseMoves_[i] = type == BrushType::Inflate ? baseNormal_[i] * (sign * s * r * 0.05f * f) : plane.offsetWith(baseCorner_[i], f);
             }
         }, 4096);
         size_t k = 0;
