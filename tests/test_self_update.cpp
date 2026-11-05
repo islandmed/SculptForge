@@ -490,6 +490,8 @@ TEST(self_update_windows_helper) {
     const std::string i = windowsHelperScript(in, d, 1234, false);
     CHECK(i.find("\"/S /D=$root\"") != std::string::npos && i.find("Get-FileHash") < i.find("Start-Process"));
     CHECK(i.find("Start-Process -FilePath $exe") == std::string::npos); // Later: no relaunch
+    const std::string ir = windowsHelperScript(in, d, 1234, true);
+    CHECK(ir.find("catch { $code = -1 }") < ir.find("Start-Process -FilePath $exe")); // declined prompt: old one again
 }
 
 // --- Member builds (core/MemberBuilds.cpp) ---
