@@ -357,6 +357,8 @@ const std::vector<ServiceModel>& falModels() {
         {"fal-ai/hunyuan-3d/v3.1/pro/image-to-3d", "Hunyuan3D 3.1 Pro (Tencent)"},
         {"fal-ai/hunyuan-3d/v3.1/rapid/image-to-3d", "Hunyuan3D 3.1 Rapid (Tencent) - fast"},
         {"fal-ai/meshy/v6/image-to-3d", "Meshy 6"},
+        {"fal-ai/hyper3d/rodin/v2.5", "Rodin 2.5 (Hyper3D) - image or text"},
+        {"fal-ai/hyper3d/rodin/v2.5/fast", "Rodin 2.5 Fast (Hyper3D) - low poly, cheaper"},
     };
     return models;
 }
@@ -461,7 +463,30 @@ const std::vector<HfPreset>& hfPresets() {
     return presets;
 }
 
+bool rodinModel(std::string_view id) { return id.find("hyper3d/rodin") != std::string_view::npos; }
+
+std::string falTextModel(const std::string& falModel) {
+    return rodinModel(falModel) ? falModel : std::string("fal-ai/hunyuan-3d/v3.1/rapid/text-to-3d");
+}
+
+namespace {
+// Rodin's fields: a list of images, the mesh as GLB, no material (we sculpt the shape; skips texturing).
+Json rodinBody() {
+    Json body = Json::object();
+    body.set("geometry_file_format", "glb");
+    body.set("material", "None");
+    return body;
+}
+} // namespace
+
 std::string falSubmitBody(const std::string& model, const std::string& dataUri) {
+    if (rodinModel(model)) {
+        Json body = rodinBody();
+        Json images = Json::array();
+        images.push(dataUri);
+        body.set("image_urls", images);
+        return body.dump();
+    }
     Json body = Json::object();
     const bool hunyuan = model.find("hunyuan") != std::string::npos;
     body.set(hunyuan ? "input_image_url" : "image_url", dataUri);
@@ -546,7 +571,12 @@ std::string meshyTextBody(const std::string& model, const std::string& prompt) {
     return body.dump();
 }
 
-std::string falTextBody(const std::string& prompt) {
+std::string falTextBody(const std::string& prompt, const std::string& model) {
+    if (rodinModel(model)) {
+        Json body = rodinBody();
+        body.set("prompt", prompt.substr(0, 800));
+        return body.dump();
+    }
     Json body = Json::object();
     body.set("prompt", prompt.substr(0, 200));
     body.set("enable_geometry", true); // shape only
@@ -563,7 +593,7 @@ GeneratorResult generate3DFromText(const AiSettings& s, const std::string& promp
     }
     if (s.generatorService == "meshy") return runMeshyRequest(s, "/openapi/v2/text-to-3d", meshyTextBody(s.meshyModel, prompt), outputStem, progress);
     if (s.generatorService == "fal")
-        return runFalRequest(s, "fal-ai/hunyuan-3d/v3.1/rapid/text-to-3d", falTextBody(prompt), outputStem, progress);
+        return runFalRequest(s, falTextModel(s.falModel), falTextBody(prompt, s.falModel), outputStem, progress);
     if (s.generatorService == "comfyui") return comfy::run(s, {}, {}, prompt, outputStem, progress);
     if (s.generatorService == "command" || s.generatorService == "inflate") {
         result.error = "Text to 3D needs Hugging Face (free), fal.ai, Meshy or ComfyUI - pick one of those services";
