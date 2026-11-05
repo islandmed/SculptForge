@@ -90,7 +90,8 @@ private:
     std::vector<uint64_t> pending_; // per base triangle: shading out of date
     double shadeNsPerPoint_ = 0.0;  // what shading a grid point (and sending it) took lately (TierConfig::strokeShadeMs)
     size_t pendingCount_ = 0;
-    std::vector<uint32_t> scratch_, written_, stageIndex_;
+    std::vector<uint32_t> scratch_, written_, stageIndex_, pendingOrder_;
+    std::vector<float> shadeKey_; // per cluster: the order pending shading goes in (visible and near first)
     std::vector<uint8_t> staging_;
     std::vector<uint32_t> levels_;
     std::vector<int8_t> want_;

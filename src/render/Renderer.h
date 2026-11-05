@@ -235,6 +235,8 @@ public:
 
     // Bytes of GPU buffers and textures the mesh slots hold.
     size_t gpuBytes() const;
+    // Micro levels' base triangles whose shading is still pending (the benchmark waits for it after a stroke).
+    size_t microPendingShading() const;
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
     size_t lastDrawnTriangles() const { return lastDrawn_; }
     // The last syncScene left motion proxies to build (a few milliseconds of them a frame; the rest draw in full).

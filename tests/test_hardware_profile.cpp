@@ -689,6 +689,17 @@ TEST(hw_stroke_shade_budget) {
     CHECK(strokeShadeBudget(1u << 20, 10.0, 1e9, 300) == 300);             // at least one patch and its ring
 }
 
+TEST(hw_catch_up_shade_budget) {
+    // After a stroke: about catchUpShadeMs a frame at the measured cost, up to 8x the points budget.
+    CHECK(TierConfig().catchUpShadeMs == 12.0);
+    CHECK(catchUpShadeBudget(1u << 19, 12.0, 0.0, 300) == (1u << 19));  // cost not measured yet: the points
+    CHECK(catchUpShadeBudget(1u << 19, 0.0, 20.0, 300) == (1u << 19));  // off
+    CHECK(catchUpShadeBudget(1u << 19, 12.0, 20.0, 300) == 600000);     // a slow CPU: 12 ms at 20 ns a point
+    CHECK(catchUpShadeBudget(1u << 19, 12.0, 4.0, 300) == 3000000);     // a fast one: more a frame, done sooner
+    CHECK(catchUpShadeBudget(1u << 19, 12.0, 0.1, 300) == (1u << 22));  // at most 8x the points
+    CHECK(catchUpShadeBudget(1u << 19, 12.0, 1e9, 300) == 300);         // at least one patch and its ring
+}
+
 TEST(hw_tier_config) {
     // Laptop / Budget: 2M active triangles, continuous brushes on mains, a quarter of the RAM for caches.
     const HardwareProfile laptop = mapProfile(machine("Intel", "Mesa Intel(R) Xe Graphics (TGL GT2)", 0, 16384, 8), measured(400.0, 4.0));

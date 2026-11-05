@@ -368,6 +368,8 @@ struct PhaseResult {
     float radiusPx = 0;
     double seconds = 0, pathPx = 0, releaseMs = 0; // releaseMs: lifting the pen (the dabs still queued, the undo step)
     double releaseDoneMs = 0; // until the stroke has ended (predictive strokes: the solver thread's last dabs on screen)
+    double releaseShadedMs = 0; // ... and until a micro level's pending shading is done too
+    double catchUpWorstMs = 0;  // the longest frame in between
     size_t dabs = 0, samples = 0;
     std::vector<double> frameMs, lagMs, lagPx;
     std::vector<double> previewLagPx; // the predictive preview's head behind the pointer (the surface's without it)
@@ -507,8 +509,9 @@ void App::startProofMode() {
     };
     p->jsonPath = !options_.benchmarkOut.empty() ? options_.benchmarkOut : u8(dir / ("sculptforge-benchmark-" + stamp + ".json"));
     p->videoPath = !options_.benchmarkVideo.empty() ? options_.benchmarkVideo : u8(dir / ("sculptforge-benchmark-" + stamp + ".mp4"));
-    if (p->scene == "micro-head") // micro-level strokes (wavelet strokes, the shading budget): Standard, 108 and 216 px
-        p->phases = {{"standard 108 px", 108.0f, p->strokeSeconds, BrushType::Standard, 0.5f},
+    if (p->scene == "micro-head") // micro-level strokes (wavelet strokes, the shading budget): Standard, 40, 108 and 216 px
+        p->phases = {{"standard 40 px", 40.0f, p->strokeSeconds, BrushType::Standard, 0.5f},
+                     {"standard 108 px", 108.0f, p->strokeSeconds, BrushType::Standard, 0.5f},
                      {"standard 216 px", 216.0f, p->strokeSeconds, BrushType::Standard, 0.5f}};
     else if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds);
     else p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0}};
@@ -863,8 +866,13 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         PhaseResult& ph = p.results.back().phases.back();
         if (p.releasing) { // (frames while the last dabs land aren't the stroke's)
             if (doc_.sculptor.strokeActive()) break;
+            const double since = (nowSeconds() - p.releaseAt) * 1000.0;
+            if (ph.releaseDoneMs == 0) ph.releaseDoneMs = since;
+            else ph.catchUpWorstMs = std::max(ph.catchUpWorstMs, frameMs);
+            // Micro levels: then until the shading the stroke left pending is done (at most 30 s).
+            if (doc_.mesh.micro && renderer_.microPendingShading() > 0 && since < 30000.0) break;
+            ph.releaseShadedMs = since;
             p.releasing = false;
-            ph.releaseDoneMs = (nowSeconds() - p.releaseAt) * 1000.0;
             strokeProbe_ = nullptr;
             ph.dabs = p.dabs.size();
             nextPhase();
@@ -1036,6 +1044,8 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     j.set("path_px", std::round(ph.pathPx));
                     j.set("release_ms", std::round(ph.releaseMs * 10) / 10);
                     j.set("release_done_ms", std::round(ph.releaseDoneMs * 10) / 10);
+                    j.set("release_shaded_ms", std::round(ph.releaseShadedMs * 10) / 10);
+                    j.set("catch_up_worst_frame_ms", std::round(ph.catchUpWorstMs * 10) / 10);
                     j.set("preview_lag_px", percentilesJson(percentiles(ph.previewLagPx)));
                     j.set("pointer_speed_px_s", ph.seconds > 0 ? std::round(ph.pathPx / ph.seconds) : 0.0);
                 }

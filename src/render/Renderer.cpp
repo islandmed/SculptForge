@@ -3684,6 +3684,11 @@ bool Renderer::renderPartThumbnail(uint32_t id, float yaw, float pitch, int size
     return ok;
 }
 
+size_t Renderer::microPendingShading() const {
+    size_t total = 0;
+    for (const MeshSlot& s : slots_)
+        if (s.micro) total += s.micro->pendingShading();
+    return total;
+}
+
 } // namespace sf
-
-

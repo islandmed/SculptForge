@@ -8,6 +8,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <algorithm>
+#include <cstdlib>
 #include <chrono>
 #include <bit>
 #include <cmath>
@@ -385,6 +386,15 @@ void MicroRenderer::uploadDispTiles(const Mesh& mesh, std::vector<uint32_t>& slo
     gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
 }
 
+// SF_MICRO_CATCHUP=0: pending shading in triangle order at the points budget, as before (A/B).
+static bool catchUpOrder() {
+    static const bool on = [] {
+        const char* e = std::getenv("SF_MICRO_CATCHUP");
+        return !(e && e[0] == '0');
+    }();
+    return on;
+}
+
 // Shading for the base triangles marked pending: all of it (`all`), or up to shadeBudget grid points of it.
 void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
     const MicroMesh& mm = *mesh.micro;
@@ -417,7 +427,18 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
     // The pending triangles, newest first (scratch_ holds this sync's dirty ones, already marked).
     std::vector<uint32_t>& seeds = scratch_;
     const size_t limit = shadeBudget ? std::max<size_t>(1, shadeBudget / (S * 3)) : SIZE_MAX; // (the ring triples it)
-    if (seeds.size() < limit)
+    if (catchUpOrder() && seeds.size() < limit && shadeKey_.size() == bounds_.size() && pendingCount_ > limit - seeds.size()) {
+        // More pending than this frame shades: the patches the view shows first, nearest first (the last draw's
+        // clusters), so what's on screen is shaded soonest after a stroke and the rest follows unseen.
+        std::vector<uint32_t>& all = pendingOrder_;
+        all.clear();
+        for (size_t w = 0; w < pending_.size(); ++w)
+            for (uint64_t bits = pending_[w]; bits; bits &= bits - 1) all.push_back(uint32_t(w * 64 + size_t(std::countr_zero(bits))));
+        const size_t take = std::min(all.size(), limit - seeds.size());
+        auto key = [&](uint32_t t) { return shadeKey_[slotOf_[t] >> clusterShift_]; };
+        std::nth_element(all.begin(), all.begin() + std::ptrdiff_t(take), all.end(), [&](uint32_t a, uint32_t b) { return key(a) < key(b); });
+        seeds.insert(seeds.end(), all.begin(), all.begin() + std::ptrdiff_t(take));
+    } else if (seeds.size() < limit)
         for (size_t w = 0; w < pending_.size() && seeds.size() < limit; ++w)
             for (uint64_t bits = pending_[w]; bits && seeds.size() < limit; bits &= bits - 1) {
                 const uint32_t t = uint32_t(w * 64 + size_t(std::countr_zero(bits)));
@@ -550,6 +571,9 @@ bool MicroRenderer::sync(Mesh& mesh) {
             // While a stroke runs, also no more than strokeShadeMs of it (at least one patch and its ring), so a
             // slower CPU doesn't spend the frame the dabs need on shading; the rest follows as before.
             if (mm.stroking) shadeBudget = strokeShadeBudget(shadeBudget, tier.strokeShadeMs, shadeNsPerPoint_, size_t(mm.samples) * 3);
+            // After it (a stroke's catch-up, an undo), about catchUpShadeMs a frame: more points where they're cheap,
+            // so the shading finishes sooner, and no long frame where they're not.
+            else if (catchUpOrder()) shadeBudget = catchUpShadeBudget(shadeBudget, tier.catchUpShadeMs, shadeNsPerPoint_, size_t(mm.samples) * 3);
             if (pendingCount_) shadePending(mesh, false);
         }
     }
@@ -588,6 +612,10 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
         const float dist = ortho ? 1.0f : std::max(glm::distance(cull.eye, b.center) - b.radius, std::max(cull.nearDistance, 1e-6f));
         pxEdge[c] = clusterEdge_[c] * scale / dist; // a base edge in pixels
     }
+    // The order pending shading goes in (shadePending): what this view shows, nearest first, then the rest.
+    shadeKey_.resize(clusters);
+    for (uint32_t c = 0; c < clusters; ++c)
+        shadeKey_[c] = (visible[c] ? 0.0f : 1e30f) + glm::distance(cull.eye, bounds_[c].center);
     auto choose = [&](float target) {
         size_t total = 0;
         for (uint32_t c = 0; c < clusters; ++c) {
