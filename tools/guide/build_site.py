@@ -1092,7 +1092,7 @@ def main() -> int:
         SUPPORTERS_PAGE.write_text(supporters_html(), encoding="utf-8")
         if wn:
             write_home(wn, False)
-        urls = [SITE, SITE + "brushes.html", SITE + "press.html",
+        urls = [SITE, SITE + "brushes.html", SITE + "press.html", SITE + "fast/",
                 SITE + "studios.html", SITE + "support.html", SITE + "supporters.html"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]
         (ROOT / "website" / "sitemap.xml").write_text(
             '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'

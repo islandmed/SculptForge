@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Press kit - SculptForge</title>
-  <meta name="description" content="SculptForge press kit: facts, short and long descriptions, screenshots and logos for the free, open-source digital sculpting app.">
+  <meta name="description" content="SculptForge press kit: fact sheet, measured numbers with the method, 4K screenshots, logos and contact for the free, open-source digital sculpting app.">
   <meta name="theme-color" content="#111114">
   <meta name="color-scheme" content="dark">
   <link rel="icon" type="image/svg+xml" href="img/favicon.svg?v=2">
@@ -45,64 +45,96 @@
       <div class="wrap">
         <p class="eyebrow">Press kit</p>
         <h1>SculptForge <span class="accent">for press and creators</span></h1>
-        <p class="lede">Everything you need to write about or show SculptForge: the facts, ready-to-use descriptions,
-          screenshots and logos. All images may be used in coverage of SculptForge.</p>
+        <p class="lede">The facts, the measured numbers and how we got them, 4K screenshots, logos and a contact.
+          Every image here may be used in coverage of SculptForge.</p>
       </div>
     </section>
 
     <section class="section alt">
       <div class="wrap">
-        <h2>Facts</h2>
+        <h2>Fact sheet</h2>
         <ul>
-          <li><strong>What:</strong> a free, open-source digital sculpting application, a free, open-source sculpting app</li>
-          <li><strong>Platforms:</strong> Windows 10 and 11, macOS 11 or later (Apple silicon and Intel), Linux (x86_64 and ARM64; AppImage, .deb, .rpm, AUR)</li>
-          <li><strong>Install:</strong> <a href="https://github.com/islandmed/SculptForge/releases/latest">GitHub releases</a>,
+          <li><strong>What:</strong> a free, open-source digital sculpting app for artists, students and studios</li>
+          <li><strong>Current version:</strong> 0.11.2 ({{RELEASE_DATE}}) &middot;
+            <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></li>
+          <li><strong>Platforms:</strong> Windows 10 and 11, macOS 11 or later (Apple silicon and Intel), Linux (x86_64 and
+            ARM64: AppImage, .deb, .rpm, AUR)</li>
+          <li><strong>Install:</strong> <a href="index.html#download">sculptforge.app</a>,
+            <a href="https://github.com/islandmed/SculptForge/releases/latest">GitHub releases</a>,
             <code>brew install --cask islandmed/tap/sculptforge</code> on macOS</li>
-          <li><strong>Licence:</strong> GNU GPL v3.0 or later; no account, no subscription, no telemetry</li>
-          <li><strong>Built with:</strong> C++20, SDL3, OpenGL, Dear ImGui</li>
-          <li><strong>Studio builds:</strong> VFX Reference Platform CY2026 and CY2027</li>
+          <li><strong>License:</strong> GNU GPL v3.0 or later. No account, no subscription, no telemetry, works offline</li>
+          <li><strong>Price model:</strong> the app is free for everyone, with nothing paywalled. Optional
+            <a href="support.html">memberships</a> (Member: $5 a month or $48 a year; Studio for teams) fund development
+            and bring betas, a vote on features and member requests</li>
+          <li><strong>Team:</strong> Med and contributors</li>
+          <li><strong>Built with:</strong> C++20, SDL3, OpenGL, Dear ImGui. Studio builds for VFX Reference Platform CY2026 and CY2027</li>
           <li><strong>Links:</strong> <a href="https://sculptforge.app/">sculptforge.app</a> &middot;
             <a href="https://github.com/islandmed/SculptForge">source code</a> &middot;
-            <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a> &middot;
-            <a href="guide/index.html">user guide</a></li>
+            <a href="guide/index.html">user guide</a> &middot;
+            <a href="fast/">How fast?</a> &middot;
+            <a href="https://discord.gg/gWrYkEmQhH">Discord</a></li>
         </ul>
       </div>
     </section>
 
     <section class="section">
       <div class="wrap">
-        <h2>Short description</h2>
-        <p>SculptForge is a free, open-source digital sculpting app for Windows, macOS and Linux, with keymaps for
-          artists coming from the other app, Blender or Maya.</p>
-        <h2>Long description</h2>
-        <p>SculptForge is a free, open-source (GPL) digital sculpting application for artists, students and studios.
-          It offers a the Classic sculpting keys (and Blender and Maya styles), and covers the whole sculpting workflow: Parts, subdivision levels
-          and sculpt layers, dynamic topology, voxel remeshing and Quad Remesh retopology, vertex paint with
-          layers, normal and displacement map baking, and facial blend shapes. It exchanges models with the other app (Bridge),
-          Blender (a two-way bridge), Unreal Engine and OpenUSD, exports STL for 3D printing, and can turn a phone
-          scan or a single image into a sculptable model. It runs natively on Linux as well as Windows and macOS,
-          with builds for the VFX Reference Platform.</p>
+        <h2 id="numbers">In numbers</h2>
+        <p class="section-lede">Measured, not estimated. Each number links to the method so you can repeat it.</p>
+        <ul>
+          <li><strong>{{ORBIT_FPS_0110}} &rarr; {{ORBIT_FPS_0112}} fps</strong> orbiting a {{ORBIT_SCENE}} scan right after
+            a stroke, 0.11.0 vs 0.11.2, {{ORBIT_TIER}} (<a href="fast/#orbit">method</a>)</li>
+          <li><strong>{{LAG_P99_0110}} &rarr; {{LAG_P99_0112}} ms</strong> worst-case (p99) stroke lag at {{LAG_BRUSH}},
+            {{LAG_SCENE}}, {{LAG_TIER}} (<a href="fast/#strokes">method</a>)</li>
+          <li><strong>{{DOWNLOADS_TOTAL}}</strong> downloads of the app from GitHub releases as of {{DOWNLOADS_DATE}}
+            (<a href="stats/">live count</a>)</li>
+          <li><strong>{{GITHUB_STARS}}</strong> GitHub stars and <strong>{{CONTRIBUTORS}}</strong> contributors as of {{STARS_DATE}}</li>
+          <li><strong>{{RELEASES_COUNT}}</strong> releases since 0.1.0 on 20 October 2026</li>
+        </ul>
+        <p class="fine">Speed numbers come from SculptForge's own benchmark (<code>sculptforge --benchmark</code>) on
+          the machine named. We publish our own numbers only, never another app's.</p>
       </div>
     </section>
 
     <section class="section alt">
       <div class="wrap">
-        <h2>Screenshots</h2>
-        <p class="section-lede">1920&times;1080. Click for the full-size image.</p>
-        <p><a href="press/sculptforge-lion.jpg"><img src="press/sculptforge-lion.jpg" alt="SculptForge with a sculpted lion head" width="1920" height="1080" style="width:100%;height:auto;border-radius:8px"></a></p>
-        <p><a href="press/sculptforge-lion-close.jpg"><img src="press/sculptforge-lion-close.jpg" alt="Close-up of the lion head sculpt in SculptForge" width="1920" height="1080" style="width:100%;height:auto;border-radius:8px"></a></p>
-        <p>More: <a href="media/screenshot-showcase.jpg">showcase</a>, <a href="media/screenshot-game-ready.jpg">game-ready</a>,
-          <a href="media/screenshot-splats.jpg">phone scan</a>. Videos: <a href="media/showcase.mp4">showcase</a>,
-          <a href="media/sculpt.mp4">sculpting</a>, <a href="media/game-ready.mp4">game-ready</a>.</p>
-        <h2>Logos</h2>
-        <p><a href="press/sculptforge-logo.svg">Logo (SVG)</a> &middot; <a href="press/sculptforge-icon-256.png">App icon (PNG, 256 px)</a></p>
+        <h2>Short description</h2>
+        <p>SculptForge is a free, open-source digital sculpting app for Windows, macOS and Linux. It sculpts dense scans
+          with micro-detail levels, runs offline with no account, and fits into Blender, Unreal and USD pipelines.</p>
+        <h2>Long description</h2>
+        <p>SculptForge is a free, open-source (GPL) digital sculpting application for artists, students and studios.
+          It covers the whole sculpting workflow: Parts, subdivision and micro-detail levels, sculpt layers, dynamic
+          topology, voxel remeshing with one-key Quick Remesh, quad retopology, UVs with UDIM tiles, vertex paint with
+          layers, vector displacement stamps, and normal and displacement map baking. Three key styles (Classic,
+          Blender and Maya) let artists keep the habits they have. It sends models to and from Blender with a free
+          add-on, updates assets in a running Unreal Editor, exports glTF, FBX, OpenUSD, OBJ and STL, and builds for
+          the VFX Reference Platform. Optional AI tools (brushes from a description, a model from an image) can be
+          switched off entirely. It is developed in the open by Med and contributors.</p>
       </div>
     </section>
 
     <section class="section">
       <div class="wrap">
+        <h2>Screenshots</h2>
+        <p class="section-lede">3840&times;2160, from 0.11.2. Click for the full-size image.</p>
+        <!-- {{STILLS}}: the 4K stills from ~/Work/sf-launch/video/stills/ (launchvideo), one <p><a><img></a></p> each,
+             saved as press/sculptforge-0112-<name>.jpg. The older lion shots were removed: they showed the old
+             interface's labels (IP rules). -->
+        <p>{{STILLS}}</p>
+        <p>Video: {{HERO_VIDEO_LINK}}</p>
+        <h2>Logos</h2>
+        <p><a href="press/sculptforge-logo.svg">Logo (SVG)</a> &middot; <a href="press/sculptforge-icon-256.png">App icon (PNG, 256 px)</a>.
+          Please use these as they are: no recolouring or effects.</p>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="wrap">
         <h2>Contact</h2>
-        <p>Reply to the email you received, or <a href="https://github.com/islandmed/SculptForge/issues">open an issue on GitHub</a>.</p>
+        <p>Email <a href="mailto:hello@sculptforge.app?subject=Press">hello@sculptforge.app</a> (subject "Press"); we answer
+          within two working days. Review builds, a video call walkthrough or an interview with Med on request.
+          Bugs and questions from readers: <a href="https://github.com/islandmed/SculptForge/issues">GitHub issues</a> or
+          the <a href="https://discord.gg/gWrYkEmQhH">Discord</a>.</p>
       </div>
     </section>
   </main>
@@ -117,6 +149,7 @@
       <div class="links">
         <a href="guide/index.html">User Guide</a>
         <a href="brushes.html">Community brushes</a>
+        <a href="fast/">How fast?</a>
         <a href="benchmarks/">Benchmarks: 15M and 33M</a>
         <a href="press.html">Press kit</a>
         <a href="support.html">Membership</a>
