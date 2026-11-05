@@ -39,6 +39,7 @@ All notable changes to SculptForge are listed here. The format follows
   (`SF_BG_GHOST=0/1`). **Fast Upload**: stroke uploads are packed into persistently mapped staging buffers
   (GL_ARB_buffer_storage) and copied on the GPU (`SF_PERSISTENT_UPLOAD=0/1`). The research behind them, including a
   design for focus detail on billion-polygon assets, is in docs/design/perf-moonshots.md.
+- **Cmd+, / Ctrl+, opens Preferences** (#111, suggested by fenixpoints).
 
 ### Changed
 - **Tool > Masking** is one panel of buttons with pictures and a hint each: Shapes, Mask by and Adjust, with their
@@ -52,10 +53,27 @@ All notable changes to SculptForge are listed here. The format follows
   the `SCULPTFORGE_LITSPHERE_PATH` variable). Scripts, macros, keymaps, radial menus, packs, projects and preferences
   from older versions still load: their old names are read once and mapped to the new ones. The old command-line flag
   and environment variable names are no longer read.
+- **Micro levels on slower computers**: while a stroke runs, the shading of what it changed takes at most about 10 ms
+  a frame (measured on the computer), so big strokes keep up with the pen; the rest of the shading follows right
+  after, as before.
 
 ### Removed
 - The library export plug-in for another sculpting app and opening its library files through it. A folder of numbered
   Bridge files still opens as one scene.
+
+### Fixed
+- **Pattern brushes on micro levels** (#120, reported by RodTDai): a brush recipe on a micro level was a plain
+  Standard dab, without its surface pattern (Dragon Scales, Skin Pores, Cracks...) and building up even when the
+  recipe carves. It now keeps the pattern and its depth's sign there; planes, pinch and drag still don't apply to
+  micro levels.
+- **Windows portable zip starts on a fresh PC** (#109, reported by git-tiger): the Visual C++ runtime (msvcp140,
+  vcruntime140, vcruntime140_1) now ships next to sculptforge.exe in the zip and the installer; before, a PC without
+  the Visual C++ Redistributable couldn't start it. When SculptForge can't start (no OpenGL 3.3, an old graphics
+  driver) it now says why in a message box, with the log's path, instead of quietly exiting.
+- **Move with Pressure > Size on a pen** (#122, reported by Zoldyck-Kill): Move and the Kelvinlet grab brushes set the
+  area they grab at the press, when a pen barely touches, so with Pressure > Size on they grabbed only a few percent
+  of the brush and seemed not to work. They now always grab with the full brush size; Pressure > Strength still
+  applies.
 
 ## [0.10.11] - 2026-11-03
 
