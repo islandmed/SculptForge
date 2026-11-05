@@ -437,6 +437,24 @@ double Demo::query(const std::string& name, bool& known) const {
         // (rows as saved: top first)
         return 0.2126 * lastShot_[i] + 0.7152 * lastShot_[i + 1] + 0.0722 * lastShot_[i + 2];
     }
+    if (name.rfind("edges@", 0) == 0) { // edges@X0,Y0,X1,Y1: mean luma step between neighbouring pixels of the last shot there
+        float x0 = 0.0f, y0 = 0.0f, x1 = 0.0f, y1 = 0.0f;
+        if (std::sscanf(name.c_str() + 6, "%f,%f,%f,%f", &x0, &y0, &x1, &y1) != 4) {
+            known = false;
+            return 0.0;
+        }
+        if (lastShot_.empty()) return -1.0;
+        auto luma = [&](int x, int y) {
+            const size_t i = size_t(y) * size_t(lastShotW_) * 4 + size_t(x) * 4;
+            return 0.2126 * lastShot_[i] + 0.7152 * lastShot_[i + 1] + 0.0722 * lastShot_[i + 2];
+        };
+        const int ax = std::clamp(int(x0 * float(lastShotW_)), 0, lastShotW_ - 2), bx = std::clamp(int(x1 * float(lastShotW_)), ax + 1, lastShotW_ - 1);
+        const int ay = std::clamp(int(y0 * float(lastShotH_)), 0, lastShotH_ - 2), by = std::clamp(int(y1 * float(lastShotH_)), ay + 1, lastShotH_ - 1);
+        double sum = 0.0;
+        for (int y = ay; y < by; ++y)
+            for (int x = ax; x < bx; ++x) sum += std::abs(luma(x + 1, y) - luma(x, y)) + std::abs(luma(x, y + 1) - luma(x, y));
+        return sum / double((bx - ax) * (by - ay));
+    }
     if (name == "triangles") return double(m.triangleCount());
     if (name == "vertices") return double(m.vertexCount());
     if (name == "layers") return double(m.layers.size());

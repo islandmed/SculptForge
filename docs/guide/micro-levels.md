@@ -36,8 +36,8 @@ These brushes work on micro levels: **Standard**, **Clay**, **Clay Block**, **Sm
 stroke is one undo step.
 
 - A micro level stores one height per point, so it moves the surface in and out, never sideways. **Pinch**,
-  **Crease** and **Sharp Crease** sharpen the height profile instead of pulling points together (the result
-  looks the same for creases and folds).
+  **Crease** and **Sharp Crease** pull the height profile together instead of the points (the result looks the
+  same for creases and folds), and stay clean at full strength.
 - **Move** reshapes the level below the micro level (the base) and the micro detail rides along on it, in its own
   frame: drag an ear back without smearing the pores. To move the micro surface itself along its normals, tick
   **Move along normals**.

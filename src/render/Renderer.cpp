@@ -319,13 +319,16 @@ flat in int vPrimBase;
 // Micro-displacement levels (render/MicroRenderer.cpp): the full-resolution shading grid of the base triangle,
 // interpolated on the micro triangle under the pixel (normal, curvature, mask), whatever level the geometry drew.
 flat in int vSlot;
+flat in int vEdges;
 in vec2 vIJ;
 uniform samplerBuffer uShade;
 uniform int uN;
 uniform int uSamples;
 uniform mat4 uView;
+uniform int uMicroWire; // 1: the wireframe of the base (the level below the micro level) on the micro surface
 vec4 gNC;
 float gMask;
+float gWire = 0.0;
 vec4 shadeAt(int i, int j) { return texelFetch(uShade, vSlot * uSamples + j * (uN + 1) - (j * (j - 1)) / 2 + i); }
 vec3 octNormal(vec2 v) {
     vec2 e = v * 2.0 - 1.0;
@@ -358,6 +361,16 @@ void microFetch() {
     float c = dot(c3, w);
     gNC = vec4(mat3(uView) * normalize(n), c * abs(c));
     gMask = dot(vec3(s0.w, s1.w, s2.w), w);
+    if (uMicroWire == 1) {
+        // The base triangle's barycentric weights, in pixels from each edge: about a pixel wide line on its edges.
+        vec3 b = vec3(float(uN) - vIJ.x - vIJ.y, vIJ.x, vIJ.y) / float(uN);
+        vec3 px = b / max(fwidth(b), vec3(1e-6));
+        float d = 1e9;
+        if ((vEdges & 1) != 0) d = min(d, px.z); // edge 0: corners 0 -> 1
+        if ((vEdges & 2) != 0) d = min(d, px.x); // edge 1: 1 -> 2
+        if ((vEdges & 4) != 0) d = min(d, px.y); // edge 2: 2 -> 0
+        gWire = 1.0 - smoothstep(0.0, 1.0, d);
+    }
 }
 #define vNormalCurv gNC
 #undef V_MASK
@@ -386,7 +399,11 @@ uniform int uTwoSided;        // 1: back faces shade with the normal turned towa
 out vec4 fragColor;
 vec4 finish(vec3 c) {
     if (uDim == 1) c = mix(c, vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), 0.25) * 0.72;
-    return vec4(pow(c, vec3(1.0 / 2.2)), uAlpha);
+    vec3 g = pow(c, vec3(1.0 / 2.2));
+#ifdef MICRO
+    g = mix(g, vec3(0.05, 0.05, 0.08), 0.5775 * gWire); // (the wireframe program's colour and opacity)
+#endif
+    return vec4(g, uAlpha);
 }
 // Keep in sync with sf::face groupColor.
 vec3 groupColor(uint id) {
@@ -947,6 +964,7 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.lightRot = at("uLightRot");
     p.lightLevels = at("uLightLevels");
     p.alpha = at("uAlpha");
+    p.microWire = at("uMicroWire");
     p.primBase = at("uPrimBase");
     p.hasPaint = at("uHasPaint");
     p.normalFlipY = at("uNormalFlipY");
@@ -2976,7 +2994,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         gl::DepthMask(GL_FALSE);
         for (const DrawItem& item : drawList_) {
             const MeshSlot* s = item.active ? findSlot(item.id) : nullptr;
-            if (!s || s->drawnTriangles == 0 || s->micro) continue; // (micro levels: no wireframe)
+            if (!s || s->drawnTriangles == 0 || s->micro) continue; // (micro levels: drawMicro draws theirs)
             gl::Uniform3fv(gl::GetUniformLocation(wireProgram_, "uGridOrigin"), 1, glm::value_ptr(s->grid.origin));
             gl::Uniform1f(gl::GetUniformLocation(wireProgram_, "uGridStep"), s->grid.step);
             cull(*s, frameCull_);
@@ -3139,6 +3157,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     gl::Uniform1i(p->showMask, active && settings.showMask ? 1 : 0);
     gl::Uniform1i(p->groups, active && settings.showFaceGroups ? 2 : 0);
     gl::Uniform1i(p->dim, !active && settings.dimInactive ? 1 : 0);
+    gl::Uniform1i(p->microWire, active && settings.wireframe ? 1 : 0); // (#128: the wireframe pass skips micro levels)
     setLightUniforms(*p, settings);
     gl::Uniform1i(p->twoSided, 1);
     // Moving (Fast Navigation): a coarser target and half the budget, so orbiting stays smooth.
