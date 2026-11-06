@@ -216,9 +216,10 @@ void App::drawWhatsNew() {
     const float pad = 36.0f * k;
     // Header: the app mark, the eyebrow (version and date), the title and the tagline.
     {
-        const float m = 52.0f * k, y = a.y + 32.0f * k;
-        markTile(dl, ImVec2(a.x + pad, y), m, A);
-        const float x = a.x + pad + m + 18.0f * k;
+        // The mark as tall as the text beside it (eyebrow to tagline), above the cards (they start at 124).
+        const float m = 88.0f * k, y = a.y + 32.0f * k;
+        markTile(dl, ImVec2(a.x + pad, a.y + 26.0f * k), m, A);
+        const float x = a.x + pad + m + 20.0f * k;
         const std::string eyebrow = "SCULPTFORGE " + v.version;
         const float ew = paint.spaced(boldUi, 11.5f, ImVec2(x, y - 1.0f * k), tc(accent, A), eyebrow.c_str(), 1.8f);
         if (!v.date.empty() && v.date != "unreleased")
