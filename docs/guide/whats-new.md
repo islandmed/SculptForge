@@ -5,6 +5,17 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.6
+
+```features
+date: unreleased
+tagline: Studio controls for AI: a managed policy, an audit log, keys in the system keychain and single sign-on, plus shelves that hide when they're empty.
+highlight: Studio controls: one policy file decides which AI tools and providers are allowed
+highlight: An audit log of every AI step, and API keys kept in the system keychain
+highlight: Sign in with your studio's identity provider (device sign-in, no browser plug-in)
+highlight: Empty shelves stay out of the way outside Customize Shelves
+```
+
 ## Version 0.11.5
 
 ```features
