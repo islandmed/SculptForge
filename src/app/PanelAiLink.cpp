@@ -92,7 +92,7 @@ Json liveTools() {
         "(0,0 = top left, 1,1 = bottom right), projected onto the model (points off the model are skipped). Use "
         "viewport_image to see where things are. One undo step.",
         {{"points", schemaProp("string", "\"u,v u,v ...\" in 0..1 viewport coordinates (at least one on the model).")},
-         {"brush", schemaProp("string", "Brush name (Standard, Clay, Clay Buildup, Crease, Inflate, Smooth, Pinch...). Default: the active brush.")},
+         {"brush", schemaProp("string", "Brush name (Standard, Clay, Clay Block, Crease, Inflate, Smooth, Pinch...). Default: the active brush.")},
          {"radius", schemaProp("number", "Brush radius as a fraction of the viewport's height (default 0.04).")},
          {"strength", schemaProp("number", "0-1 (default 0.5).")},
          {"invert", schemaProp("boolean", "Carve instead of build (like holding Alt).")},
@@ -102,6 +102,16 @@ Json liveTools() {
 
 bool isLiveTool(const std::string& name) {
     return name == "viewport_image" || name == "view_set" || name == "view_turntable" || name == "stroke_screen";
+}
+
+// Commands that start a new scene (Document::setMesh: the edit history is cleared).
+bool replacesScene(const std::string& name) {
+    static const char* const kNames[] = {"new_sphere", "new_plane", "new_head", "new_starter_mesh", "new_bench_sphere",
+                                         "open", "open_obj", "open_project", "calibrate", "bridge_import", "bridge_receive",
+                                         "blender_receive", "maya_receive"};
+    for (const char* n : kNames)
+        if (name == n) return true;
+    return false;
 }
 
 std::string degrees(float radians) {
@@ -358,7 +368,10 @@ void App::pollAiLink() {
                 break;
             }
             s.session->policy.projectDir = macroProjectDir();
-            const link::AiDecision d = s.session->policy.classify(isLiveTool(name) ? nullptr : cmd, name, step.call.args);
+            link::AiDecision d = s.session->policy.classify(isLiveTool(name) ? nullptr : cmd, name, step.call.args);
+            // A new scene clears the history: unsaved work couldn't be undone back.
+            if (d.verdict == link::AiVerdict::Allow && doc_.dirty() && replacesScene(name))
+                d = {link::AiVerdict::Confirm, "Replaces the scene: your unsaved changes would be lost"};
             if (d.verdict == link::AiVerdict::Deny) {
                 s.send(link::AiLinkSession::resultReply(step.call.id, false, d.reason));
             } else if (d.verdict == link::AiVerdict::Confirm) {
