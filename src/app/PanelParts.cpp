@@ -714,8 +714,9 @@ void App::drawPartFolderRow(int fi, float rowH, ImVec2 cellPad, PartFolderAction
         if (!visible) ImGui::PopStyleColor();
         partDropTarget(f.name, fa);
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-            ImGui::SetTooltip(tr("Folder %s: %d Part%s\nClick to %s, double-click to rename, drag Parts onto it"),
-                              f.name.c_str(), members, members == 1 ? "" : "s", f.collapsed ? "open" : "fold");
+            ImGui::SetTooltip("%s (%d)\n%s", f.name.c_str(), members,
+                              f.collapsed ? tr("Click to open, double-click to rename, drag Parts onto it")
+                                          : tr("Click to fold, double-click to rename, drag Parts onto it"));
         if (ImGui::BeginPopupContextItem("##folder row")) {
             ImGui::TextDisabled("%s", f.name.c_str());
             if (ImGui::MenuItem(tr("Rename"))) {

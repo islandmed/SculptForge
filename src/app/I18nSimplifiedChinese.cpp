@@ -1139,6 +1139,17 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Masked parts stay where they are and partly masked parts move partly (on by default). Off: the whole Part moves "
      "whatever the mask.",
      "遮罩部分维持原位，部分遮罩的区域则部分移动（默认打开）。关闭：无论遮罩如何，整个部件都会移动。"},
+    {"Folder", "文件夹"},
+    {"Hide its Parts", "隐藏其中的部件"},
+    {"Show its Parts", "显示其中的部件"},
+    {"Move with the gizmo", "用操纵器移动"},
+    {"New folder", "新建文件夹"},
+    {"New folder with the active Part (drag Parts onto a folder to add them)", "用当前部件新建文件夹（把部件拖到文件夹上即可加入）"},
+    {"Out of the folder", "移出文件夹"},
+    {"Remove folder (keep its Parts)", "删除文件夹（保留其中的部件）"},
+    {"Click to open, double-click to rename, drag Parts onto it", "单击展开，双击重命名，可把部件拖到这里"},
+    {"Click to fold, double-click to rename, drag Parts onto it", "单击折叠，双击重命名，可把部件拖到这里"},
+    {"Transform the visible Parts in the active Part's folder together (Parts list folders). Each Part gets its own undo step.", "一起变换当前部件所在文件夹中的可见部件（部件列表中的文件夹）。每个部件各有自己的撤销步骤。"},
     {"Transform every visible Part together. Each Part gets its own undo step.",
      "一起变换所有可见部件。每个部件各有自己的撤销步骤。"},
     {"Where the gizmo sits: rotation and scaling turn about this point. It follows the centre of what moves until you "
