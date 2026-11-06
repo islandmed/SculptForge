@@ -197,6 +197,8 @@ std::string handleMcpMessage(const CommandRegistry& registry, Document& doc, con
     return errorReply(id, -32601, "Method not found: " + method).dump();
 }
 
+Json mcpToolList(const CommandRegistry& registry) { return toolList(registry)["tools"]; }
+
 int runMcpServer(const CommandRegistry& registry, std::istream& in, std::ostream& out) {
     if (std::string why; !policy::mcpAllowed(&why)) {
         std::cerr << "sculptforge: " << why << "\n";

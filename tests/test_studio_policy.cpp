@@ -201,6 +201,8 @@ TEST(studio_policy_gates_ai_providers_and_endpoints) {
 TEST(studio_policy_mcp_categories) {
     StudioState state("mcp_categories");
     CHECK(policy::mcpCategories("mesh_info", {}) == std::vector<std::string>{"info"});
+    CHECK(policy::mcpCategories("viewport_image", {}) == std::vector<std::string>{"info"});
+    CHECK(policy::mcpCategories("stroke_screen", {"points"}) == std::vector<std::string>{"edit"});
     CHECK(policy::mcpCategories("remesh", {"resolution"}) == std::vector<std::string>{"edit"});
     CHECK(policy::mcpCategories("export_glb", {"path"}) == std::vector<std::string>{"files"});
     CHECK(policy::mcpCategories("macro_run", {"name"}) == std::vector<std::string>{"scripts"});

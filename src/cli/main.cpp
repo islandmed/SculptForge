@@ -8,6 +8,7 @@
 #include "ai/Oidc.h"
 #include "ai/Secrets.h"
 #include "ai/SplatTrainer.h"
+#include "cli/McpAttach.h"
 #include "cli/McpServer.h"
 #include "core/Benchmark.h"
 #include "core/AuditLog.h"
@@ -39,6 +40,7 @@ void usage() {
         "  -l, --list                 List available commands\n"
         "      --schema               Print commands as LLM tool definitions (JSON)\n"
         "      --mcp                  Run as an MCP server on stdio (Claude Code, Claude Desktop, any MCP client)\n"
+        "      --mcp --attach         ... that drives the open SculptForge window instead (live mode: Preferences > AI)\n"
         "  -q, --quiet                Only print errors\n"
         "      --no-ai                Leave the AI commands out (as SF_AI=off; Preferences > AI turns them off for good)\n"
         "      --no-packs             Safe mode: leave every installed pack out (pack_install still works)\n"
@@ -170,6 +172,9 @@ int main(int argc, char** argv) {
             std::puts("Signed out");
             return 0;
         } else if (a == "--mcp") {
+            // --attach: drive the open app (live mode, cli/McpAttach.h) instead of a scene of our own.
+            for (int j = i + 1; j < argc; ++j)
+                if (std::string(argv[j]) == "--attach") return sf::runMcpAttach(std::cin, std::cout);
             return sf::runMcpServer(registry, std::cin, std::cout);
         } else if (a == "--schema") {
             std::puts(registry.toolSchemaJson().c_str());

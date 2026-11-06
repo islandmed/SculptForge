@@ -155,6 +155,7 @@ Json AiSettings::toJson() const {
     j.set("comfyImageWorkflow", comfyImageWorkflow);
     j.set("comfyTextWorkflow", comfyTextWorkflow);
     j.set("enabled", enabled);
+    j.set("liveControl", liveControl);
     return j;
 }
 
@@ -196,6 +197,7 @@ AiSettings AiSettings::fromJson(const Json& j) {
     s.comfyImageWorkflow = j["comfyImageWorkflow"].asString();
     s.comfyTextWorkflow = j["comfyTextWorkflow"].asString();
     s.enabled = j["enabled"].asBool(true);
+    s.liveControl = j["liveControl"].asBool(false);
     return s;
 }
 

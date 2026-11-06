@@ -483,6 +483,7 @@ int App::runUiTest(int w, int h, int fps) {
         pollBlender(); // (demo recordings leave the user's Blender bridge alone)
         pollMaya(); // (tests and recordings never read the user's Maya folder: maya.json isn't loaded)
         pollPhone();
+        pollAiLink(); // live mode (PanelAiLink.cpp)
         pollAutoUv();
         pollUvEditor();
         pollBake();
@@ -1112,6 +1113,7 @@ int App::run() {
             pollBlender();
             pollMaya();
             pollPhone();
+            pollAiLink(); // live mode (PanelAiLink.cpp): an AI tool's next step
             pollAutoUv();
             pollUvEditor();
             pollBake();
@@ -2612,6 +2614,7 @@ void SDLCALL onFileChosen(void* userdata, const char* const* files, int) {
 } // namespace
 
 void App::queueFile(FileAction action, std::string path) {
+    aiLinkPicked(path); // the user chose it: a connected AI tool may use it without asking (PanelAiLink.cpp)
     if (action != FileAction::OpenObj && action != FileAction::LoadBrush && action != FileAction::OpenImage &&
         action != FileAction::AppendPart && action != FileAction::ComfyWorkflow && action != FileAction::InsertMesh &&
         !path.empty() &&
@@ -2956,6 +2959,7 @@ void App::drawUi() {
     guide_.draw(*this);  // Help > User Guide
     drawPacksUi();       // pack review, New Pack, macro confirmation and editor (PanelPacks.cpp)
     drawMemoryConfirm(); // "Not enough free memory" before a big mesh (MemoryConfirm.cpp)
+    drawAiLink();        // live mode: Approve / Allow dialogs, the "AI connected" badge (PanelAiLink.cpp)
     drawConnectAi();     // Help > Connect an AI tool (PanelConnectAi.cpp)
     drawHelpConsoleUi(); // console, command palette, Controls (F1), Ctrl-hover help: last, on top
     drawWhatsNew();      // What's New after an update or from the Help menu (WhatsNewPopup.cpp)

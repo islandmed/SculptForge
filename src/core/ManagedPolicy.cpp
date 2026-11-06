@@ -353,9 +353,13 @@ std::vector<std::string> mcpCategories(std::string_view name, const std::vector<
     if (in(kNetwork)) c.push_back("network");
     if (in(kScripts)) c.push_back("scripts");
     bool files = in(kBridges);
-    for (const std::string& p : paramNames) files = files || p == "path" || p == "folder" || p == "file";
+    for (const std::string& p : paramNames) // (link/AiLinkSession.cpp isPathParam: the same names)
+        files = files || p == "path" || p == "file" || p == "folder" || p == "out" || p == "dir" || p == "directory" ||
+                p == "output";
     if (files) c.push_back("files");
-    const bool info = name == "mesh_info" || name.ends_with("_info") || name.ends_with("_list") || name == "brush_library";
+    // Looking (the viewport as an image, the camera) reads the scene; stroke_screen edits it.
+    const bool info = name == "mesh_info" || name.ends_with("_info") || name.ends_with("_list") || name == "brush_library" ||
+                      name == "viewport_image" || name == "view_turntable" || name == "view_set";
     if (c.empty()) c.push_back(info ? "info" : "edit");
     return c;
 }

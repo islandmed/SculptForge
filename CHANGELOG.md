@@ -6,6 +6,15 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Live mode: an AI tool sculpts in the open window while you watch.** Turn on **Edit > Preferences > AI > Let AI
+  tools control this window** (off by default) and connect Claude Code or any MCP client with
+  `sculptforge-cli --mcp --attach`. You approve each connection (a 6-digit code), an **AI connected** badge has
+  Disconnect, every step lands in Undo labelled **AI:**, and files outside the project, overwrites, scripts and the
+  network ask you first. The AI can see its work (`viewport_image`, `view_turntable`, `view_set`), draw strokes in
+  screen space (`stroke_screen`), block out forms from Forge Spheres in one call (`blockout`) and check proportions
+  (`measure`, `scene_overview`). Local only: a socket / pipe just your user can open, no network port.
+
 ## [0.11.2] - 2026-11-05
 
 ### Fixed

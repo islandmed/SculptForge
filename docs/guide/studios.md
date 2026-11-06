@@ -297,7 +297,7 @@ code 2 when it is broken); use it to check a file before you deploy it.
 | `network.allow` | More URL prefixes that stay reachable while the network is off |
 | `network.localNetwork` | `true`: the Unreal link and phone capture may use the studio network while the network is off |
 | `mcp.enabled` | `false`: no AI tool can connect (`sculptforge-cli --mcp` refuses to start, and **Help > Connect an AI tool** is gone) |
-| `mcp.live` | `"never"`: AI tools work only on their own scene and can never control an open SculptForge window |
+| `mcp.live` | `"never"`: AI tools work only on their own scene and can never control an open SculptForge window (the window never listens for them; **Let AI tools control this window** is locked off) |
 | `mcp.categories` | The kinds of command AI tools may use: `info` (read the scene), `edit` (change it in memory), `files` (open, save, export, bridges), `scripts` (macros), `network` (brush gallery, Unreal), `ai` (AI generation). Left out: all |
 | `audit.path`, `audit.maxMB`, `audit.keep` | Where the [audit log](#audit-log) goes, when it rotates (10 MB) and how many old files it keeps (5) |
 | `audit.required` | `true`: an AI action whose audit line can't be written (the share is down) is refused |
@@ -315,8 +315,9 @@ policy locks settings. When both turn the network off, both allow lists apply.
 
 ### Audit log
 
-Every AI action is one line of JSON in a local file: each command an AI tool (MCP) runs, refused ones included, and
-every Brush Lab and Generate 3D request, from the app, `sculptforge-cli` and Python.
+Every AI action is one line of JSON in a local file: each command an AI tool (MCP) runs, refused ones included (`"tool":
+"mcp"`, or `"mcp-live"` when it controls an open window), and every Brush Lab and Generate 3D request (`"ai"`), from
+the app, `sculptforge-cli` and Python.
 
 ```json
 {"time":"2026-11-05T14:03:22.120Z","user":"ana","host":"ws042","client":"mcp:claude-code 2.1.0","tool":"mcp",
