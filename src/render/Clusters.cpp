@@ -298,6 +298,122 @@ bool clusterProxy(const Mesh& mesh, const UploadOrder& order, uint32_t c, size_t
     return true;
 }
 
+bool clusterLodChain(const Mesh& mesh, const UploadOrder& order, uint32_t c, size_t maxIndices, std::vector<uint16_t>& out,
+                     ClusterLod& lod, ClusterBounds& bounds) {
+    out.clear();
+    lod = ClusterLod();
+    const uint32_t n = order.clusterTriangles(c);
+    const UploadOrder::Cluster& cl = order.clusters()[c];
+    const auto fromGpu = order.fromGpu();
+    thread_local std::vector<uint16_t> local, rep;
+    thread_local std::vector<uint8_t> pinned;
+    local.resize(size_t(n) * 3);
+    order.localTriangles(mesh, c, local.data());
+    const uint32_t nl = cl.vertexCount;
+    pinned.assign(nl, 0);
+    AABB box;
+    for (uint32_t l = 0; l < nl; ++l) {
+        const uint32_t v = fromGpu[cl.firstVertex + l];
+        pinned[l] = order.shared(v);
+        box.expand(mesh.positions[v]);
+    }
+    auto pos = [&](uint32_t l) { return mesh.positions[fromGpu[cl.firstVertex + l]]; };
+    const bool hidden = mesh.hidden.size() == mesh.triangleCount();
+    double edges = 0.0;
+    size_t counted = 0;
+    for (uint32_t i = 0; i < n; i += 7) {
+        const uint16_t* t = local.data() + size_t(i) * 3;
+        edges += glm::distance(pos(t[0]), pos(t[1])) + glm::distance(pos(t[1]), pos(t[2]));
+        counted += 2;
+    }
+    if (!counted || !box.valid()) return false;
+    float cell = float(edges / double(counted)) * 2.0f; // (about a quarter of the triangles at the first level)
+    if (!(cell > 0.0f)) return false;
+    thread_local CellTable cells;
+    thread_local std::vector<uint32_t> cellOfVertex;
+    cellOfVertex.resize(nl);
+    rep.resize(nl);
+    const float span = glm::length(box.max - box.min);
+    size_t previous = 0; // the triangles of the level before (the cluster's own at first)
+    for (uint32_t i = 0; i < n; ++i) previous += !(hidden && mesh.hidden[order.triangle(c, i)]);
+    glm::vec3 sum(0.0f);
+    for (; lod.levels < ClusterLod::kMaxLevels; cell *= 2.0f) {
+        cells.clear();
+        const float inv = 1.0f / cell;
+        for (uint32_t l = 0; l < nl; ++l) {
+            if (pinned[l]) continue;
+            const glm::vec3 p = pos(l);
+            const glm::vec3 q = glm::floor((p - box.min) * inv);
+            const glm::vec3 centre = box.min + (q + 0.5f) * cell;
+            const uint64_t key = uint64_t(uint32_t(q.x)) | (uint64_t(uint32_t(q.y)) << 21) | (uint64_t(uint32_t(q.z)) << 42);
+            const float d = glm::distance(p, centre);
+            bool found = false;
+            const uint32_t h = cells.slot(key, found);
+            if (!found) {
+                cells.stamps[h] = cells.stamp;
+                cells.keys[h] = key;
+                cells.reps[h] = uint16_t(l);
+                cells.dists[h] = d;
+            } else if (d < cells.dists[h]) {
+                cells.reps[h] = uint16_t(l);
+                cells.dists[h] = d;
+            }
+            cellOfVertex[l] = h;
+        }
+        float error = 0.0f;
+        for (uint32_t l = 0; l < nl; ++l) {
+            rep[l] = pinned[l] ? uint16_t(l) : cells.reps[cellOfVertex[l]];
+            if (rep[l] != l) error = std::max(error, glm::distance(pos(l), pos(rep[l])));
+        }
+        const size_t at = out.size();
+        for (uint32_t i = 0; i < n; ++i) {
+            if (hidden && mesh.hidden[order.triangle(c, i)]) continue;
+            const uint16_t* t = local.data() + size_t(i) * 3;
+            const uint16_t a = rep[t[0]], b = rep[t[1]], d = rep[t[2]];
+            if (a == b || b == d || a == d) continue;
+            out.insert(out.end(), {a, b, d});
+        }
+        const size_t tris = (out.size() - at) / 3;
+        if (tris * 10 > previous * 7 || out.size() > maxIndices) { // no real gain (the seams), or no room
+            out.resize(at);
+            if (lod.levels == 0 && tris * 10 > previous * 7 && cell < span) continue; // (the first grid too fine: coarser)
+            break;
+        }
+        for (size_t k = at; k < out.size(); k += 3) {
+            const glm::vec3 p0 = pos(out[k]);
+            const glm::vec3 cr = glm::cross(pos(out[k + 1]) - p0, pos(out[k + 2]) - p0);
+            const float l2 = glm::dot(cr, cr);
+            if (l2 > 0.0f && std::isfinite(l2)) sum += cr / std::sqrt(l2);
+        }
+        lod.first[lod.levels] = uint32_t(at);
+        lod.count[lod.levels] = uint32_t(out.size() - at);
+        lod.error[lod.levels] = std::max(error, lod.levels > 0 ? lod.error[lod.levels - 1] : 0.0f);
+        ++lod.levels;
+        previous = tris;
+        if (tris < 8 || cell > span) break;
+    }
+    if (lod.levels == 0) return false;
+    // One normal cone for every level (whichever is drawn, culling stays safe).
+    const float sl = glm::length(sum);
+    float minDot = 1.0f;
+    bool faces = false;
+    for (size_t k = 0; k < out.size() && sl > 1e-6f; k += 3) {
+        const glm::vec3 p0 = pos(out[k]);
+        const glm::vec3 cr = glm::cross(pos(out[k + 1]) - p0, pos(out[k + 2]) - p0);
+        const float l2 = glm::dot(cr, cr);
+        if (!(l2 > 0.0f) || !std::isfinite(l2)) continue;
+        minDot = std::min(minDot, glm::dot(cr / std::sqrt(l2), sum / sl));
+        faces = true;
+    }
+    bounds.axis = glm::vec3(0.0f, 0.0f, 1.0f);
+    bounds.coneAngle = -1.0f;
+    if (faces && minDot > 0.0f) {
+        bounds.axis = sum / sl;
+        bounds.coneAngle = std::acos(std::min(minDot, 1.0f));
+    }
+    return true;
+}
+
 bool closedOriented(const Mesh& mesh) {
     const size_t nv = mesh.vertexCount(), nt = mesh.triangleCount();
     if (nt == 0) return false;

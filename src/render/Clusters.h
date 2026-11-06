@@ -73,6 +73,22 @@ ClusterBounds clusterBounds(const Mesh& mesh, const UploadOrder& order, uint32_t
 bool clusterProxy(const Mesh& mesh, const UploadOrder& order, uint32_t c, size_t maxTriangles, std::vector<uint16_t>& out,
                   ClusterBounds& bounds);
 
+// A cluster's coarse levels (docs/design/micro-coarse-lod.md: Clark 1976, Rossignac-Borrel 1993): versions of it on
+// grids twice as coarse each time, built as clusterProxy builds one (vertices snapped to one per cell, seam vertices
+// kept, so any mix of levels between neighbours stays closed), each with its error: how far its farthest vertex
+// moved. The renderer picks per cluster the coarsest level whose error stays under a pixel or so on screen.
+struct ClusterLod {
+    static constexpr int kMaxLevels = 6;
+    int levels = 0;
+    uint32_t first[kMaxLevels] = {}, count[kMaxLevels] = {}; // in the chain's index list (indices, not triangles)
+    float error[kMaxLevels] = {};                            // world units; grows with the level
+};
+// The levels of cluster c, at most maxIndices indices in all, as indices into the cluster's vertex range. Stops
+// when a level would keep more than 70% of the one before (the seams hold the rest) or fewer than 8 triangles.
+// `bounds` gets a normal cone holding every level's triangles. False (and no levels): not even the first fits.
+bool clusterLodChain(const Mesh& mesh, const UploadOrder& order, uint32_t c, size_t maxIndices, std::vector<uint16_t>& out,
+                     ClusterLod& lod, ClusterBounds& bounds);
+
 // Every directed edge a->b has as many b->a: the mesh is the closed, consistently wound boundary of a volume
 // (it may intersect itself). Wound outwards (a positive signed volume: the sum of ClusterBounds::volume), every
 // back face then lies behind a front face from outside. (Strictly: where no part of the surface is turned

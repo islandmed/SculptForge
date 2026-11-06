@@ -24,6 +24,8 @@
 #include <thread>
 #include <unordered_map>
 #include <cstdlib>
+#include <cstdio>
+#include <string>
 #include <limits>
 #include <vector>
 
@@ -1205,7 +1207,7 @@ size_t Renderer::gpuBytes() const {
     for (const MeshSlot& s : slots_) {
         for (size_t b : s.bytes) total += b;
         total += s.patchBytes;
-        if (s.proxyAllocated) total += (s.order.triangleCount() / 4) * 3 * sizeof(uint16_t);
+        if (s.proxyAllocated) total += (s.order.triangleCount() / proxyShare()) * 3 * sizeof(uint16_t);
         if (s.paintTexture) total += size_t(s.textureW) * size_t(s.textureH) * 4 * 4 / 3; // with mipmaps
         total += size_t(std::popcount(s.pbrPlanes)) * size_t(s.textureW) * size_t(s.textureH) * 4 * 4 / 3;
         if (s.micro) total += s.micro->gpuBytes();
@@ -1815,6 +1817,7 @@ void Renderer::buildProxies(MeshSlot& s, const Mesh& mesh) {
     const size_t nc = s.order.clusters().size();
     s.proxyStale.resize(nc, 1);
     s.proxyCount.resize(nc, 0);
+    s.proxyLod.resize(nc);
     s.proxyBounds.resize(nc);
     cullScratch_.clear();
     for (uint32_t c = 0; c < nc; ++c) {
@@ -1827,7 +1830,7 @@ void Renderer::buildProxies(MeshSlot& s, const Mesh& mesh) {
     if (cullScratch_.empty()) return;
     if (!s.proxyAllocated) {
         gl::BindVertexArray(s.proxyVao);
-        gl::BufferData(GL_ELEMENT_ARRAY_BUFFER, GLsizeiptr((s.order.triangleCount() / 4) * 3 * sizeof(uint16_t)), nullptr, GL_STATIC_DRAW);
+        gl::BufferData(GL_ELEMENT_ARRAY_BUFFER, GLsizeiptr((s.order.triangleCount() / proxyShare()) * 3 * sizeof(uint16_t)), nullptr, GL_STATIC_DRAW);
         gl::BindVertexArray(0);
         s.proxyAllocated = true;
     }
@@ -1835,7 +1838,8 @@ void Renderer::buildProxies(MeshSlot& s, const Mesh& mesh) {
     // moving frame stalled the view (180-300 ms at 33M). Stale clusters draw in full detail until theirs is built.
     // Batches are sized from the measured cost per cluster: a fixed 1024 took 157 ms a frame on two slow cores.
     // Still frames (proxyPrebuild_) get less, as nothing waits for them.
-    const double budgetMs = proxyUsed_ ? 8.0 : 4.0;
+    // (SF_COARSE_LOD=1, the spike: all of it at once, when the mesh is first drawn, timed)
+    const double budgetMs = coarseLod_ ? 1e9 : proxyUsed_ ? 8.0 : 4.0;
     constexpr size_t kProxyBatchMin = 16, kProxyBatchMax = 1024; // clusters per parallel batch
     const auto start = std::chrono::steady_clock::now();
     auto elapsedMs = [&] { return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(); };
@@ -1855,7 +1859,14 @@ void Renderer::buildProxies(MeshSlot& s, const Mesh& mesh) {
             for (size_t i = i0; i < i1; ++i) {
                 const uint32_t c = cullScratch_[at + i];
                 ClusterBounds b = s.bounds[c];
-                if (!clusterProxy(mesh, s.order, c, s.order.clusterTriangles(c) / 4, built[i], b)) built[i].clear();
+                ClusterLod& lod = s.proxyLod[c];
+                if (coarseLod_) { // (the spike: every level)
+                    if (!clusterLodChain(mesh, s.order, c, size_t(s.order.clusterTriangles(c) / 2) * 3, built[i], lod, b)) built[i].clear();
+                } else { // the motion proxy alone, as one level
+                    lod = ClusterLod();
+                    if (!clusterProxy(mesh, s.order, c, s.order.clusterTriangles(c) / 4, built[i], b)) built[i].clear();
+                    else lod.levels = 1, lod.count[0] = uint32_t(built[i].size());
+                }
                 s.proxyBounds[c] = b;
             }
         }, 1, 2);
@@ -1864,7 +1875,7 @@ void Renderer::buildProxies(MeshSlot& s, const Mesh& mesh) {
             s.proxyCount[c] = uint32_t(built[i].size());
             s.proxyStale[c] = 0;
             if (!built[i].empty())
-                gl::BufferSubData(GL_ELEMENT_ARRAY_BUFFER, GLintptr(size_t(s.order.firstTriangle(c) / 4) * 3 * sizeof(uint16_t)),
+                gl::BufferSubData(GL_ELEMENT_ARRAY_BUFFER, GLintptr(size_t(s.order.firstTriangle(c) / proxyShare()) * 3 * sizeof(uint16_t)),
                                   GLsizeiptr(built[i].size() * sizeof(uint16_t)), built[i].data());
         }
         at += n;
@@ -1872,6 +1883,12 @@ void Renderer::buildProxies(MeshSlot& s, const Mesh& mesh) {
         proxyMsPerCluster_ = proxyMsPerCluster_ > 0.0 ? 0.7 * proxyMsPerCluster_ + 0.3 * perCluster : perCluster;
     }
     gl::BindVertexArray(0);
+    if (coarseLod_) {
+        size_t indices = 0;
+        for (uint32_t c : cullScratch_) indices += s.proxyCount[c];
+        std::fprintf(stderr, "coarse lod: %zu clusters built in %.0f ms (%zu triangles in all levels, %.0f MB)\n", cullScratch_.size(),
+                     elapsedMs(), indices / 3, double(indices * sizeof(uint16_t)) / 1048576.0);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -2279,6 +2296,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     if (full) {
         s.proxyAllocated = false; // sized for the old mesh
         s.proxyCount.clear();
+        s.proxyLod.clear();
         // (closedOriented also accepts unwelded seams, the same point twice, which the layout's check doesn't.)
         s.closed = s.order.closed() || closedOriented(mesh);
         uploadFaces(s, mesh, wantUvs, indicesDone);
@@ -2307,7 +2325,8 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     // Small meshes draw in full while the view moves too (their proxy would save little).
     constexpr size_t kProxyMinTriangles = size_t(1) << 18;
     if (syncLog) lapMs(lap);
-    if ((proxyUsed_ || (proxyPrebuild_ && s.proxyAllocated)) && !s.outOfMemory && s.drawnTriangles >= kProxyMinTriangles)
+    const bool overBudget = coarseLod_ && lodBudget_ > 0 && s.drawnTriangles > lodBudget_;
+    if ((proxyUsed_ || overBudget || (proxyPrebuild_ && s.proxyAllocated)) && !s.outOfMemory && s.drawnTriangles >= kProxyMinTriangles)
         buildProxies(s, mesh);
     if (syncLog) proxyMs = lapMs(lap);
     syncTexture(s, mesh, pbr);
@@ -2855,6 +2874,9 @@ void Renderer::endCapture(std::vector<uint8_t>& rgba) {
 
 void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, const RenderSettings& settings,
                     const Viewport& viewport) {
+    static const bool coarseOn = std::getenv("SF_COARSE_LOD") && std::string(std::getenv("SF_COARSE_LOD")) == "1";
+    coarseLod_ = coarseOn;
+    if (!settings.motionProxy) lodBudget_ = triangleBudget(settings); // (sync builds the levels of meshes over it)
     // SF_FRAME_LOG=ms (App.cpp): a draw slower than that says where its time went (lit spheres, environment, Parts).
     static const double drawLogMs = std::getenv("SF_FRAME_LOG") ? std::atof(std::getenv("SF_FRAME_LOG")) : -1.0;
     const auto drawStart = std::chrono::steady_clock::now();
@@ -3084,12 +3106,28 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
 // The clusters of `s` inside the view, less those facing away when that can't open a hole: the mesh is closed
 // and wound consistently (closedOriented) with nothing hidden, the eye is outside its bounds, and no cluster
 // reaches into the near plane's slab (a cut-open front would show the back faces behind it).
-void Renderer::cull(const MeshSlot& s, const CullView& frame, bool proxy) {
+void Renderer::cull(const MeshSlot& s, const CullView& frame, bool proxy, float lodPx, size_t budget) {
     drawClusters_.clear();
     proxyClusters_.clear();
-    proxy = proxy && s.proxyCount.size() == s.drawCount.size() && s.proxyBounds.size() == s.drawCount.size();
+    proxyLevel_.clear();
+    proxy = proxy && s.proxyCount.size() == s.drawCount.size() && s.proxyBounds.size() == s.drawCount.size() &&
+            s.proxyLod.size() == s.drawCount.size();
     CullView v = frame;
     const glm::vec3 e = v.eye;
+    // Coarse levels (lodPx > 0): the visible clusters first, then the threshold, then each one's level.
+    lodScratch_.clear();
+    auto keep = [&](uint32_t c) {
+        const bool ready = proxy && s.proxyCount[c] > 0 && !s.proxyStale[c];
+        const bool fullShows = !facingAway(v, s.bounds[c]);
+        const bool coarseShows = ready && !facingAway(v, s.proxyBounds[c]);
+        if (!ready) {
+            if (fullShows) drawClusters_.push_back(c);
+        } else if (lodPx <= 0.0f) { // the motion proxy
+            if (coarseShows) proxyClusters_.push_back(c), proxyLevel_.push_back(0);
+        } else if (fullShows || coarseShows) {
+            lodScratch_.push_back({c, 0.0f, fullShows, coarseShows});
+        }
+    };
     // Backface culling on (#68): back faces go on any mesh from any view, the GPU skipping each one and whole
     // clusters facing away going first (in perspective: an orthographic view has no eye to judge them from).
     if (forceBackfaces_) {
@@ -3098,12 +3136,9 @@ void Renderer::cull(const MeshSlot& s, const CullView& frame, bool proxy) {
         const size_t n = std::min(s.bounds.size(), s.drawCount.size());
         for (uint32_t c = 0; c < n; ++c) {
             if (s.drawCount[c] == 0 || !insideFrustum(v, s.bounds[c])) continue;
-            if (proxy && s.proxyCount[c] > 0 && !s.proxyStale[c]) {
-                if (!facingAway(v, s.proxyBounds[c])) proxyClusters_.push_back(c);
-            } else if (!facingAway(v, s.bounds[c])) {
-                drawClusters_.push_back(c);
-            }
+            keep(c);
         }
+        pickLevels(s, v, lodPx, budget);
         return;
     }
     v.backfaces = !keepBackfaces_ && !v.ortho && s.closed && s.volume > 0.0 && !s.anyHidden && s.box.valid() &&
@@ -3132,10 +3167,56 @@ void Renderer::cull(const MeshSlot& s, const CullView& frame, bool proxy) {
         if (s.drawCount[c] == 0) continue;
         const ClusterBounds& b = s.bounds[c];
         if (!insideFrustum(v, b)) continue;
-        if (proxy && s.proxyCount[c] > 0 && !s.proxyStale[c]) {
-            if (!facingAway(v, s.proxyBounds[c])) proxyClusters_.push_back(c);
-        } else if (!facingAway(v, b)) {
-            drawClusters_.push_back(c);
+        keep(c);
+    }
+    pickLevels(s, v, lodPx, budget);
+}
+
+// Clark 1976 / QSplat: per cluster the coarsest level whose error, projected at the cluster's nearest point, stays
+// under `px` pixels; `px` is raised (x1.5) until the triangles drawn fit `budget`, and when everything fits in
+// full detail, everything is drawn in full.
+void Renderer::pickLevels(const MeshSlot& s, const CullView& v, float px, size_t budget) {
+    if (lodScratch_.empty()) return;
+    // Pixels per world unit at distance 1 (perspective), or anywhere (orthographic).
+    const bool ortho = frameProj_[3][3] == 1.0f;
+    const float unit = 0.5f * frameViewport_.w * frameProj_[1][1];
+    size_t fixed = 0, full = 0;
+    for (uint32_t c : drawClusters_) fixed += size_t(s.drawCount[c]) / 3;
+    for (LodPick& k : lodScratch_) {
+        const ClusterBounds& b = s.bounds[k.c];
+        const float d = std::max(glm::dot(b.center - v.eye, v.forward) - b.radius, std::max(v.nearDistance, 1e-6f));
+        k.scale = ortho ? unit : unit / d;
+        if (k.fullShows) full += size_t(s.drawCount[k.c]) / 3;
+    }
+    auto level = [&](const LodPick& k, float t) {
+        const ClusterLod& lod = s.proxyLod[k.c];
+        int pick = -1;
+        while (pick + 1 < lod.levels && lod.error[pick + 1] * k.scale <= t) ++pick;
+        return pick;
+    };
+    float t = px;
+    if (budget == 0 || fixed + full > budget) {
+        for (int round = 0; round < 24; ++round, t *= 1.5f) {
+            size_t total = fixed;
+            for (const LodPick& k : lodScratch_) {
+                const int l = level(k, t);
+                if (l < 0) total += k.fullShows ? size_t(s.drawCount[k.c]) / 3 : 0;
+                else total += k.coarseShows ? s.proxyLod[k.c].count[l] / 3 : 0;
+            }
+            if (budget == 0 || total <= budget) break;
+        }
+        lodPx_ = t;
+    } else {
+        t = 0.0f; // (all of it fits: full detail)
+        lodPx_ = 0.0f;
+    }
+    for (const LodPick& k : lodScratch_) {
+        const int l = t > 0.0f ? level(k, t) : -1;
+        if (l < 0) {
+            if (k.fullShows) drawClusters_.push_back(k.c);
+        } else if (k.coarseShows) {
+            proxyClusters_.push_back(k.c);
+            proxyLevel_.push_back(uint8_t(l));
         }
     }
 }
@@ -3149,7 +3230,7 @@ void Renderer::drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clus
     drawBases_.clear();
     const auto layout = s.order.clusters();
     size_t indices = 0;
-    for (uint32_t c : clusters) {
+    for (const uint32_t& c : clusters) {
         GLsizei count = 0;
         size_t first = 0;
         switch (part) {
@@ -3161,10 +3242,13 @@ void Renderer::drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clus
             count = GLsizei(s.lineCount[c]);
             first = s.lineFirst[c];
             break;
-        case DrawPart::Proxy:
-            count = GLsizei(s.proxyCount[c]);
-            first = size_t(s.order.firstTriangle(c) / 4) * 3;
+        case DrawPart::Proxy: { // (clusters is proxyClusters_: its level in proxyLevel_)
+            const ClusterLod& lod = s.proxyLod[c];
+            const int l = std::min<int>(proxyLevel_[size_t(&c - clusters.data())], lod.levels - 1);
+            count = GLsizei(lod.count[l]);
+            first = size_t(s.order.firstTriangle(c) / proxyShare()) * 3 + lod.first[l];
             break;
+        }
         }
         drawCounts_.push_back(count);
         drawOffsets_.push_back(reinterpret_cast<const void*>(first * sizeof(uint16_t)));
@@ -3193,6 +3277,14 @@ static glm::vec3 materialTintShift(const RenderSettings& settings, bool hasColor
     return settings.materialTint - glm::vec3(1.0f);
 }
 
+// The triangles a frame may draw: the tier's budget, lowered by the governed one (core/HardwareProfile.h: the frame
+// governor, SF_HW_SIMULATE=floor); half of it while the view moves (Fast Navigation), so orbiting stays smooth.
+size_t Renderer::triangleBudget(const RenderSettings& settings) const {
+    size_t full = settings.renderTriangleBudget ? settings.renderTriangleBudget : size_t(currentTierConfig().activeTriangleBudget);
+    if (const uint64_t governed = renderTriangleBudget(); governed > 0) full = std::min(full, size_t(governed));
+    return settings.motionProxy ? full / 2 : full;
+}
+
 void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
     const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0));
     if (!p) return;
@@ -3218,10 +3310,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     gl::Uniform1i(p->twoSided, 1);
     // Moving (Fast Navigation): a coarser target and half the budget, so orbiting stays smooth.
     const bool moving = settings.motionProxy;
-    // The tier's budget, lowered by the governed one (core/HardwareProfile.h: the frame governor, SF_HW_SIMULATE=floor).
-    size_t full = settings.renderTriangleBudget ? settings.renderTriangleBudget : size_t(currentTierConfig().activeTriangleBudget);
-    if (const uint64_t governed = renderTriangleBudget(); governed > 0) full = std::min(full, size_t(governed));
-    const size_t budget = moving ? full / 2 : full;
+    const size_t budget = triangleBudget(settings);
     const float target = settings.microTargetPx * (moving ? 2.0f : 1.0f);
     // (the budget is shared by the micro Parts on screen: each gets it whole; one is the usual case)
     const_cast<MeshSlot&>(s).microDrawn = s.micro->draw(p->id, frameCull_, frameProj_, frameViewport_, budget, target);
@@ -3323,7 +3412,13 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     // While the view moves, the motion proxy where it is built: not with per-triangle data, which follows the
     // full triangles, nor under the wireframe, whose edges would sink into it.
     const bool perTriangle = features & (kPrim | kTextured | kNormalMap); // (not kFlat: no per-triangle data)
-    cull(s, frameCull_, settings.motionProxy && !perTriangle && !(active && settings.wireframe));
+    const bool coarseAllowed = !perTriangle && !(active && settings.wireframe);
+    // Coarse levels (coarseLod_, SF_COARSE_LOD=1): a mesh over the budget, or any big one while the view moves.
+    const size_t budget = triangleBudget(settings);
+    if (coarseLod_ && coarseAllowed && (settings.motionProxy || s.drawnTriangles > budget))
+        cull(s, frameCull_, true, kCoarseLodPx * (settings.motionProxy ? 2.0f : 1.0f), budget);
+    else
+        cull(s, frameCull_, settings.motionProxy && coarseAllowed);
     // The back faces left in clusters along the silhouette: the GPU skips them too when they can't show.
     if (cullBackfaces_ || xrayCull_) gl::Enable(GL_CULL_FACE);
     if (xrayCull_) gl::CullFace(xrayCull_);
