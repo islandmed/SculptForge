@@ -257,13 +257,12 @@ void App::takeBeforeSwap(int fbW, int fbH) {
 void App::drawTakeHud() {
     TakeState& t = *take_;
     if (t.stage == TakeState::Stage::Done) return;
-    // Top left of the canvas, as proof mode's (burned into the video: it is part of the frame).
+    // As proof mode's (burned into the video: it is part of the frame).
     const float sc = uiScale_;
     const CanvasRect c = canvasRect();
     ImDrawList* dl = ImGui::GetForegroundDrawList();
     ImFont* font = ImGui::GetFont();
     const float bigSize = ImGui::GetFontSize() * 1.35f, smallSize = ImGui::GetFontSize() * 1.05f;
-    const ImVec2 at(c.x + 14 * sc, c.y + 14 * sc);
     const std::string brand = std::string("SculptForge ") + SCULPTFORGE_VERSION + " (" + SF_GIT_COMMIT + ")  -  benchmark take";
     const char* lines[] = {brand.c_str(), t.hud[0].c_str(), t.hud[1].c_str(), t.hud[2].c_str()};
     float w = 0, h = 0;
@@ -272,6 +271,10 @@ void App::drawTakeHud() {
         w = std::max(w, s.x);
         h += s.y + 3 * sc;
     }
+    // Bottom left of the canvas: the top has the timeline strip and the axes, and a take's strokes are mostly in the
+    // middle (above the timeline strip when that is at the bottom).
+    const float bottom = timelineStripY_ > c.y && timelineTopInset_ <= 0.0f ? timelineStripY_ : c.y + c.h;
+    const ImVec2 at(c.x + 14 * sc, bottom - h - 14 * sc);
     dl->AddRectFilled(ImVec2(at.x - 10 * sc, at.y - 8 * sc), ImVec2(at.x + w + 10 * sc, at.y + h + 6 * sc), IM_COL32(12, 12, 14, 215), 6 * sc);
     float y = at.y;
     for (int i = 0; i < 4; ++i) {

@@ -143,7 +143,7 @@ sculptforge --benchmark-script take.sfui [project.sfproj] --benchmark-video take
   in the clip as it is for a person. `stroke` sends its pointer samples at 240 a second (each frame, the samples
   since the last one), like proof mode; `pen_stroke` sends 4 a frame. A step's own end is checked once a frame, so
   waits are at least as long as written.
-- The proof mode HUD (version, commit, frame times over the last second, stroke lag, GPU) and the script's pointer
+- The proof mode HUD (bottom left: version, commit, frame times over the last second, stroke lag, GPU) and the script's pointer
   are drawn on top, and the frames go to the MP4 the same way as proof mode's: read back through pixel buffers,
   encoded by ffmpeg on its own thread at a constant 30 fps (a frame repeats while the app is slower), so the video
   is as long as the take. `--benchmark-no-video` records none; `--benchmark-vsync` keeps vertical sync on.
