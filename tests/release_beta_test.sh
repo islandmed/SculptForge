@@ -103,7 +103,10 @@ EOF
 printf '#!/bin/sh\nexit 0\n' > "$S/bin/cmake"
 printf '#!/bin/sh\nexit 0\n' > "$S/bin/ctest"
 chmod +x "$S/bin/"*
-export PATH="$S/bin:$PATH" HOME="$S/home" BUILD_DIR="$S/build" YES=1
+# The public gallery as published (no GitHub API call: shared CI runners hit its rate limit): this tree's own files.
+python3 -c 'import json, sys; sys.path.insert(0, sys.argv[1]); import check_published as c; print(json.dumps(c.local_tree()))' \
+    "$ROOT/tools/brush-gallery" > "$S/gallery.json"
+export PATH="$S/bin:$PATH" HOME="$S/home" BUILD_DIR="$S/build" YES=1 SF_GALLERY_PUBLIC="$S/gallery.json"
 unset HIGHLIGHTS
 
 before() { git show "$1:$2"; }

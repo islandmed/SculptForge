@@ -14,6 +14,7 @@ Standard library only.
 
 import hashlib
 import json
+import os
 import sys
 import urllib.request
 from pathlib import Path
@@ -34,8 +35,15 @@ def local_tree():
 
 
 def public_tree():
+    # SF_GALLERY_PUBLIC=<file>: the public tree from a JSON file of {path: blob sha} (the release test's sandbox,
+    # which mustn't depend on GitHub's API: an unauthenticated call from a shared CI runner hits its rate limit).
+    if os.environ.get("SF_GALLERY_PUBLIC"):
+        return json.loads(Path(os.environ["SF_GALLERY_PUBLIC"]).read_text())
     url = f"https://api.github.com/repos/{PUBLIC}/git/trees/main?recursive=1"
-    with urllib.request.urlopen(urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"}), timeout=30) as r:
+    headers = {"Accept": "application/vnd.github+json"}
+    if token := os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN"):
+        headers["Authorization"] = f"Bearer {token}"
+    with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=30) as r:
         tree = json.load(r)["tree"]
     return {t["path"]: t["sha"] for t in tree if t["type"] == "blob"}
 
@@ -67,7 +75,12 @@ def main(argv):
         assert not marks(check_marks.load_marks())
         print("check_published self-test ok")
         return 0
-    problems = marks(check_marks.load_marks()) + differences(local_tree(), public_tree())
+    try:
+        public = public_tree()
+    except (OSError, ValueError, KeyError) as e:  # (urllib's errors are OSErrors)
+        print(f"can't read {PUBLIC}'s files: {e}")
+        return 2
+    problems = marks(check_marks.load_marks()) + differences(local_tree(), public)
     for p in problems:
         print(p)
     if problems:
