@@ -472,6 +472,9 @@ you keep them with **Save Layout**.
 
 Right-clicking a shelf item and choosing **Remove from shelf** works without Customize mode.
 
+A shelf you empty is hidden when Customize Shelves is off, and the canvas takes its room. Turn Customize Shelves
+back on and the empty shelf returns, outlined, so you can drag buttons onto it again.
+
 ### Assign shortcuts
 
 - Hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and **click** any button (with Customize off), then press the key you

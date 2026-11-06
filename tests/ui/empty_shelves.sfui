@@ -1,0 +1,44 @@
+# Empty shelves (#139): a shelf with nothing on it is hidden outside Customize Shelves and the canvas takes its room;
+# while customizing it is back, so buttons can be dropped onto it again. A saved layout with an empty shelf loads.
+run new_sphere
+restart data/prefs/ui_empty_shelves.json
+wait 0.2
+expect_value customize == 0
+expect_value shelf_shown_1 == 0       # the saved empty left shelf: hidden
+expect_value shelf_shown_2 == 1       # the right shelf: Wire and a separator
+expect "Wire##view.wire"
+remember canvas_width before
+shot loaded
+
+# Customize: the empty left shelf comes back (the canvas gives it room); empty the right shelf too.
+key f3
+type "##Command palette" "customize shelves"
+key enter
+expect_value customize == 1
+expect_value shelf_shown_1 == 1
+expect_value canvas_width < $before
+right_click "Wire##view.wire"
+click "Remove from shelf"
+expect_not "Wire##view.wire"
+expect_value shelf_shown_2 == 1       # still there while customizing (only a separator left)
+shot customizing
+
+# Customize off: both empty shelves go and the canvas is wider than with the right shelf.
+key f3
+type "##Command palette" "customize shelves"
+key enter
+expect_value customize == 0
+expect_value shelf_shown_1 == 0
+expect_value shelf_shown_2 == 0
+expect_value shelf_shown_0 == 1
+expect_value shelf_shown_3 == 1
+expect_value canvas_width > $before+40
+shot hidden
+
+# Back into Customize: the shelves return, ready for a drop.
+key f3
+type "##Command palette" "customize shelves"
+key enter
+expect_value shelf_shown_1 == 1
+expect_value shelf_shown_2 == 1
+expect_value canvas_width < $before

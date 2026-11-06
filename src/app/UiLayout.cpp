@@ -99,6 +99,10 @@ Json toJson(const UiLayout& l) {
     return j;
 }
 
+bool shelfEmpty(const std::vector<std::string>& items) {
+    return std::all_of(items.begin(), items.end(), [](const std::string& id) { return id == "sep" || id == "row"; });
+}
+
 bool fromJson(const Json& j, UiLayout& l, std::string& error, int shellLayout) {
     if (!j.isObject()) {
         error = "The UI configuration is not a JSON object";
