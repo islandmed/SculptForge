@@ -68,8 +68,21 @@ die() {
     exit 1
 }
 sha256() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
-commit() { git -c user.name="$AUTHOR_NAME" -c user.email="$AUTHOR_EMAIL" commit -q "$@"; }
-gitp() { git -c credential.helper= -c credential.helper='!gh auth git-credential' "$@"; }
+# lockretry CMD...: CMD again once, 3 s later, when it failed only on a git lock another worktree held (0.11.9: a batch
+# merge's MERGE_RR.lock stopped the site step). Its output goes to stderr.
+lockretry() {
+    local out rc
+    out=$("$@" 2>&1) && rc=0 || rc=$?
+    if [ $rc -ne 0 ] && grep -Eq '\.lock.*: File exists|Unable to create .*\.lock' <<<"$out"; then
+        echo "   a git lock was held (another worktree?): trying again in 3 s" >&2
+        sleep 3
+        out=$("$@" 2>&1) && rc=0 || rc=$?
+    fi
+    [ -z "$out" ] || printf '%s\n' "$out" >&2
+    return $rc
+}
+commit() { lockretry git -c user.name="$AUTHOR_NAME" -c user.email="$AUTHOR_EMAIL" commit -q "$@"; }
+gitp() { lockretry git -c credential.helper= -c credential.helper='!gh auth git-credential' "$@"; }
 confirm() {
     [ -n "${YES:-}" ] && return 0
     read -r -p "$1 [y/N] " a
@@ -637,8 +650,17 @@ website_run() {
 step_site() {
     release_ready
     on_main
-    if feed_done; then
-        ok "website/latest.json already says $V"
+    # A run stopped after committing the feed but before pushing it (0.11.9: a .git lock) leaves main ahead of
+    # origin/main: push that first. And judge the feed by origin/main, what the site deploys, not the local file.
+    local ahead
+    ahead=$(git rev-list --count origin/main..HEAD)
+    if [ "$ahead" -gt 0 ]; then
+        push_main
+        ok "pushed the $ahead commit(s) on main a stopped run had made"
+        git fetch -q origin main
+    fi
+    if git show origin/main:website/latest.json 2>/dev/null | grep -F "\"version\": \"$V\"" >/dev/null; then
+        ok "origin/main's website/latest.json already says $V"
     else
         highlights_ok || die "the update feed needs this release's highlights" "$highlights_fix --from site"
         card_ok || die "website/index.html has no 'new in $V' card and lede in What's new" "$card_fix"
@@ -667,7 +689,7 @@ PY
         rm -f website/index.html.bak
         grep -qF "\"softwareVersion\": \"$V\"" website/index.html && grep -qF "Version $V. All builds" website/index.html ||
             die "website/index.html's version text didn't update" "set softwareVersion and the 'Version X.Y.Z. All builds' line by hand, commit, run again"
-        git add website/latest.json website/index.html
+        lockretry git add website/latest.json website/index.html
         commit -m "Website: $V is the current release (feed, download text)"
         push_main
         ok "pushed the feed and home page"
