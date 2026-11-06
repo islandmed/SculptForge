@@ -440,9 +440,11 @@ void App::drawPalette_Draw() {
             }
         }
     }
-    if (doc_.sculptor.dyntopo.enabled && !dyntopoBlocker(doc_.mesh).empty())
-        hint(*this, "This Part has subdivision levels, so strokes don't remesh it: delete the lower (or higher) levels "
-             "first.");
+    if (doc_.sculptor.dyntopo.enabled && !dyntopoBlocker(doc_.mesh).empty() && doc_.mesh.multires) {
+        hint(*this, "This Part has subdivision levels, so strokes don't remesh it. Freeze Levels keeps the level shown "
+             "as one plain mesh (Ctrl+Z brings the levels back).");
+        actionRow(*this, {"draw.dynamic_freeze"});
+    }
     // Focal length (#26): the perspective view's lens in mm on a 36 x 24 mm frame (vertical field of view);
     // saved with the project as the camera's fov_y.
     tray::GroupLabel(*this, "Camera");
@@ -708,8 +710,44 @@ void App::drawPalette_Render() {
     drawBackgroundControls("render");
     ImGui::TextDisabled("%s", tr("View resolution"));
     ui::Segmented(*this, {"perf.res_100", "perf.res_75", "perf.res_50"});
+    drawViewsSection();
     actionRow(*this, {"view.frame", "view.fullscreen"});
     actionRow(*this, {"ui.library", "ui.console"}); // (the SculptForge layout's View menu: they left the shelf)
+}
+
+void App::drawViewsSection() {
+    tray::GroupLabel(*this, "Views");
+    Demo::pushScope("Views");
+    segmented(*this, {"view.front", "view.back", "view.left", "view.right", "view.top", "view.bottom"});
+    const float saveW = ImGui::CalcTextSize(tr("Save View")).x + 2.0f * ImGui::GetStyle().FramePadding.x;
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - saveW - ImGui::GetStyle().ItemSpacing.x);
+    const bool enter = ImGui::InputTextWithHint("##viewname", tr("name (optional)"), savedViewName_, sizeof savedViewName_,
+                                                ImGuiInputTextFlags_EnterReturnsTrue);
+    ImGui::SameLine();
+    if (ui::ActionButton(*this, "view.save_view", ImVec2(-1, 0)) || enter) {
+        if (enter) saveView(savedViewName_);
+    }
+    int remove = -1;
+    for (size_t i = 0; i < savedViews_.size(); ++i) {
+        ImGui::PushID(int(i));
+        const float x = ImGui::GetFrameHeight();
+        const bool last = int(i) == lastSavedView_;
+        if (last) ImGui::PushStyleColor(ImGuiCol_Button, theme::toggleOn);
+        if (ImGui::Button(savedViews_[i].name.c_str(), ImVec2(ImGui::GetContentRegionAvail().x - x - 2.0f, 0))) restoreView(int(i));
+        if (last) ImGui::PopStyleColor();
+        ui::HelpText("Saved view", nullptr, "Go to this saved view (Numpad 0 goes to the last one used).", "View > Views");
+        ImGui::SameLine(0.0f, 2.0f);
+        if (ImGui::Button("x##del", ImVec2(-1, 0))) remove = int(i);
+        ui::HelpText("Delete view", nullptr, "Forget this saved view.", "View > Views");
+        ImGui::PopID();
+    }
+    if (remove >= 0) {
+        savedViews_.erase(savedViews_.begin() + remove);
+        if (lastSavedView_ == remove) lastSavedView_ = -1;
+        else if (lastSavedView_ > remove) --lastSavedView_;
+        doc_.modified = true;
+    }
+    Demo::popScope();
 }
 
 void App::drawPalette_Script() {
@@ -793,6 +831,9 @@ void App::drawPalette_Tool() {
         tray::Section section;
         Demo::pushScope("Geometry");
         drawGeometrySection();
+        // Apart from Divide and Micro: these change the mesh itself and keep no levels.
+        ImGui::Spacing();
+        tray::GroupLabel(*this, "Change the Mesh (no levels)");
         actionRow(*this, {"geometry.subdivide", "geometry.close_holes"});
         const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
         if (ImGui::Button(tr("Decimate"), ImVec2(half, 0))) {

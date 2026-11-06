@@ -1,0 +1,66 @@
+# What a 0.10.6 video review and a Discord tester hit: Dynamic on the divided default sphere was a dead end
+# (now Freeze Levels), Extract greyed out without saying why, no saved camera views, a near-black mask under a
+# dense wireframe, and Delete Lower / Delete Higher deleting levels without asking.
+run new_sphere
+run subdiv_divide
+run subdiv_divide
+expect_value sdiv_levels == 3
+remember triangles top
+key f
+camera 0 0
+
+# Dynamic on a Part with levels: the offer, not a dead end. Cancel leaves everything as it was.
+click "Dynamic##draw.dynamic"
+expect_value dynamic == 0
+expect_text "subdivision levels"
+shot dynamic_offer
+click "Dynamic/Cancel"
+expect_value sdiv_levels == 3
+click "Dynamic##draw.dynamic"
+click "Dynamic/Freeze Levels and Turn On Dynamic"
+expect_value dynamic == 1
+expect_value sdiv_levels == 0
+expect_value triangles == $top
+expect_status "Dynamic topology on"
+# Small Clay and Standard strokes with X symmetry, at Draw Size 19 (the review's settings).
+expect_value symmetry_x == 1                  # (X symmetry is on by default)
+draw_size 19
+click "Clay##brush.clay"
+stroke 0.30 0.40 0.45 0.45
+click "Standard##brush.standard"
+stroke 0.30 0.60 0.45 0.62
+expect_value triangles != $top            # (Dynamic resized the triangles under the strokes)
+zoom 2.5
+shot small_strokes_dynamic
+key f
+# Ctrl+Z: the strokes, then the levels come back.
+key ctrl+z
+key ctrl+z
+key ctrl+z
+expect_value sdiv_levels == 3
+click "Dynamic##draw.dynamic"
+expect_value dynamic == 0
+
+# The mask: a readable tint with a soft edge, the wireframe still visible over it; Mask darkness is a preference.
+run mask_rect y0=0.2
+expect_value masked > 0
+click "Wire##view.polyf"
+expect_value mask_darkness == 70
+shot mask_wire
+click "Wire##view.polyf"
+run mask_clear
+
+# Extract without a mask says what it needs.
+expect_text "Mask first (Ctrl+drag)"
+
+# Saved views: save one, turn away, Numpad 0 comes back to it.
+camera 30 20
+key ctrl+alt+numpad0
+expect_value saved_views == 1
+expect_status "View saved: View 1"
+camera 0 0
+key numpad0
+expect_value camera_yaw > 29.9
+expect_value camera_yaw < 30.1
+key numpad3
+expect_value camera_yaw > 89.9

@@ -228,9 +228,10 @@ constexpr Entry kSpanish[] = {
     {"Top of viewport", "Arriba del visor"},
     {"How strongly painting colours the surface (1-100); Ctrl+click to type.",
      "Con qué fuerza colorea la pintura la superficie (1-100); Ctrl+clic para escribirlo."},
-    {"This Part has subdivision levels, so strokes don't remesh it: delete the lower (or higher) levels first.",
-     "Esta pieza tiene niveles de subdivisión, así que los trazos no la remallan: borra antes los niveles "
-     "inferiores (o superiores)."},
+    {"This Part has subdivision levels, so strokes don't remesh it. Freeze Levels keeps the level shown as one plain "
+     "mesh (Ctrl+Z brings the levels back).",
+     "Esta pieza tiene niveles de subdivisión, así que los trazos no la remallan. Congelar niveles conserva el nivel "
+     "visible como una sola malla (Ctrl+Z recupera los niveles)."},
 
     // --- Edit, File, Help ---
     {"Undo", "Deshacer"},
@@ -381,6 +382,11 @@ constexpr Entry kSpanish[] = {
     // --- Geometry ---
     {"Divide", "Dividir"},
     {"Subdivide", "Subdividir"},
+    {"Subdivide (removes levels)", "Subdividir (quita los niveles)"},
+    {"Divide (keeps levels)", "Dividir (conserva los niveles)"},
+    {"Change the Mesh (no levels)", "Cambiar la malla (sin niveles)"},
+    {"Micro Detail", "Detalle micro"},
+    {"Subdivide and Remove Levels", "Subdividir y quitar los niveles"},
     {"Lower Level", "Res. menor"},
     {"Higher Level", "Res. mayor"},
     {"Delete Lower", "Borrar inferiores"},

@@ -132,6 +132,7 @@ class App {
 
 public:
     App();
+    void setMaskDarkness(float k); // 0-1: the preference and the view (Preferences > Interface, Tool > Masking)
     ~App();
     bool init(const AppOptions& options);
     const std::string& startError() const { return startError_; } // why init failed, for the message box (#109)
@@ -190,6 +191,15 @@ private:
     // Dynamic topology (dynamic topology, core/Dyntopo.h): turns it on or off (not on a mesh with
     // subdivision levels), saying so in the status bar; the Detail slider.
     void setDynamic(bool on);
+    // Dynamic on a Part with subdivision levels: Freeze Levels (one undo step), then Dynamic on.
+    void freezeLevelsAndDynamic();
+    void drawDynamicOffer(); // the pop-up setDynamic opens instead of a dead-end message
+    bool openDynamicOffer_ = false;
+    // Delete Lower / Delete Higher from the interface: a confirmation naming the levels that go (scripts run directly).
+    void confirmLevelDelete(const std::string& command);
+    std::string pendingLevelDelete_;
+    bool openLevelDelete_ = false;
+    bool openSubdivideConfirm_ = false; // Subdivide on a Part with levels: confirm first (Shell.cpp)
     void drawDetailSlider(const char* id);
 
     void runCommand(const std::string& name, const Args& args = {});
@@ -1858,6 +1868,17 @@ private:
     // every style. Import Blender keymap reads a keymap exported from Blender (BlenderKeymap.h).
     void registerViewActions();
     void viewAxis(float yawDegrees, float pitchDegrees); // Numpad 1 / 3 / 7: orthographic until turned
+    // Saved views (View > Views): named cameras, kept in the project (projectSettings "views").
+    struct SavedView {
+        std::string name;
+        Camera camera;
+    };
+    std::vector<SavedView> savedViews_;
+    int lastSavedView_ = -1; // Numpad 0 restores it
+    char savedViewName_[48] = "";
+    void saveView(const std::string& name = {}); // a free name ("View 3") when empty; the same name replaces
+    void restoreView(int index);
+    void drawViewsSection(); // Palettes.cpp, in View
     void viewOrbitStep(float yawDegrees, float pitchDegrees);
     void frameActivePart();
     // Focus Detail (prototype, FocusDetailApp.cpp): open a .sfdetail file; once a frame, the camera and brush.
