@@ -203,7 +203,7 @@ TEST(ai_link_socket_permissions_and_disconnect) {
     std::string err;
     const std::string endpoint = aiLinkEndpoint(err);
     CHECK(!endpoint.empty());
-    CHECK(aiLinkFileMode(run + "/sculptforge") == 0700);
+    CHECK(aiLinkFileMode(std::filesystem::path(endpoint).parent_path().string()) == 0700);
 
     AiLinkListener listener;
     CHECK(listener.open(endpoint, err));
@@ -252,6 +252,27 @@ TEST(ai_link_socket_permissions_and_disconnect) {
     CHECK(aiLinkFileMode(endpoint) == -1);
     AiLinkConn c3;
     CHECK(!aiLinkConnect(c3, endpoint, err));
+    if (old) setenv("XDG_RUNTIME_DIR", saved.c_str(), 1);
+    else unsetenv("XDG_RUNTIME_DIR");
+}
+
+TEST(ai_link_long_runtime_folder_still_listens) {
+    // macOS: $TMPDIR (and so test folders) is long, and a socket path must fit sun_path (104 bytes there).
+    const std::string run = scratchDir("sf_ai_link_long_runtime_folder_padding_padding_padding_padding_padding_padding");
+    const char* old = std::getenv("XDG_RUNTIME_DIR");
+    const std::string saved = old ? old : "";
+    setenv("XDG_RUNTIME_DIR", run.c_str(), 1);
+    std::string err;
+    const std::string endpoint = aiLinkEndpoint(err);
+    CHECK(!endpoint.empty() && endpoint.size() < 100);
+    CHECK(aiLinkFileMode(std::filesystem::path(endpoint).parent_path().string()) == 0700);
+    AiLinkListener listener;
+    CHECK(listener.open(endpoint, err));
+    AiLinkConn client, server;
+    CHECK(aiLinkConnect(client, endpoint, err));
+    CHECK(listener.accept(server, 2000));
+    listener.close();
+    std::filesystem::remove(std::filesystem::path(endpoint).parent_path());
     if (old) setenv("XDG_RUNTIME_DIR", saved.c_str(), 1);
     else unsetenv("XDG_RUNTIME_DIR");
 }

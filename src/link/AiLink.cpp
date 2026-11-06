@@ -193,6 +193,11 @@ std::string aiLinkEndpoint(std::string& error) {
         while (base.size() > 1 && base.back() == '/') base.pop_back();
         dir = base + "/sculptforge-" + std::to_string(::getuid());
     }
+    // A Unix socket path must fit sun_path (104 bytes on macOS, whose $TMPDIR and test folders are long): then a
+    // short owner-only folder in /tmp, one per original folder so isolated runs never share the user's socket.
+    if (dir.size() + sizeof("/ai-live.sock") > sizeof(sockaddr_un{}.sun_path))
+        dir = "/tmp/sf-live-" + std::to_string(::getuid()) + "-" +
+              std::to_string(std::hash<std::string>{}(dir) % 1000000007u);
     if (!safeDir(dir, error)) return {};
     return dir + "/ai-live.sock";
 #endif
