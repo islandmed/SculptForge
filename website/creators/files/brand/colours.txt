@@ -1,0 +1,26 @@
+SculptForge colours (from docs/brand.md and the website)
+
+THE MARK (the orange cube; never recolour)
+Brand orange        #F28C3C   RGB 242 140  60   site accent, cube left face
+Cube top face       #FFB877   RGB 255 184 119
+Cube right face     #B8561A   RGB 184  86  26   also the accent for text on light backgrounds
+Cube seams          #141416   RGB  20  20  22   also the ink for text on light backgrounds
+Tile, top           #26252A   RGB  38  37  42   tile gradient, top to bottom
+Tile, bottom        #121114   RGB  18  17  20
+Tile rim            #FFFFFF at 14 % opacity (48 px and up)
+
+SURFACES
+Night (site background)   #0F0F12   RGB  15  15  18
+Night, raised             #15151A   RGB  21  21  26
+Panel                     #1B1B21   RGB  27  27  33
+Line on night             #2A2A31   RGB  42  42  49
+Text on night             #ECECF1   RGB 236 236 241
+Muted text on night       #A3A3AD   RGB 163 163 173
+Studio paper              #F3F0E9   RGB 243 240 233   the clay render backdrop; print pieces
+
+PAIRINGS THAT READ
+Text #ECECF1 on #0F0F12; accent #F28C3C on #0F0F12.
+Text #141416 on #F3F0E9; accent text #B8561A on #F3F0E9 (#F28C3C on paper is for rules and marks, not text).
+
+TYPE
+Inter (SIL Open Font License), Regular 400 and SemiBold 600. The wordmark is Inter SemiBold.

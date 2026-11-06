@@ -1,0 +1,19 @@
+SculptForge creator kit: how you may use it
+
+Everything in this kit (footage, stills, the test scene, the fact sheet, the logo files) is free to use in
+reviews, videos, streams, articles and thumbnails about SculptForge. No need to ask first.
+
+Credit is appreciated, not required:  SculptForge, sculptforge.app
+
+- Cut, crop, speed-ramp and grade the footage as you like. Clips run at real speed unless their file name or
+  the clip list says otherwise; if you change the speed, please say so on screen.
+- Use the logo files as supplied (see brand/sculptforge-brand-usage.pdf). Please don't redraw or recolour the
+  cube.
+- Using the kit doesn't imply that SculptForge endorses you or your channel, or that you endorse SculptForge.
+  Say what you think, good and bad.
+- The lion head model is a Poly Haven scan, released under CC0 (no credit required). We credit it anyway:
+  "Lion head: Poly Haven (CC0)".
+- SculptForge itself is free software under the GNU GPL v3.0 or later. Everything you make with it is yours.
+
+Questions, or a feature you'd like to show: hello@sculptforge.app
+Product names mentioned in the kit are trademarks of their respective owners.

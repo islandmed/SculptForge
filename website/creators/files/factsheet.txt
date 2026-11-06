@@ -1,0 +1,59 @@
+SculptForge — fact sheet
+Version 0.11.7, November 2026
+
+WHAT IT IS
+SculptForge is a free, open-source digital sculpting application for Windows, macOS and Linux. It covers the
+whole sculpting job: Parts, subdivision and micro levels, sculpt layers, dynamic topology, voxel and quad
+remeshing, vertex paint, map baking and facial shapes, with bridges to Blender, Unreal Engine and OpenUSD.
+Classic sculpting keys, Blender and Maya keymaps are built in.
+
+KEY FACTS
+Licence        GNU GPL v3.0 or later. No account, no subscription, no licence server.
+Price          Free. Optional memberships fund development; the app is the same for everyone.
+Platforms      Windows 10 and 11 (x86_64): installer and portable zip
+               macOS 11 or later: universal app (Apple silicon and Intel), Homebrew cask
+               Linux (x86_64 and ARM64): AppImage, Flatpak, .deb, .rpm, tarball, AUR
+Studio builds  VFX Reference Platform CY2026 and CY2027 (Linux)
+Built with     C++20, SDL3, OpenGL
+Made by        Med and contributors (independent, open source)
+
+NEW IN 0.11 (0.11.0 to 0.11.7)
+- Dense scans draw a lighter preview while the view moves and full detail when it stops, so orbiting stays
+  responsive on entry-level machines. (0.11.7)
+- Live mode: an AI tool you connect works in your open window, only after you approve it. It sees the
+  viewport, turns the view and adds strokes; every step is one undo. (0.11.4, 0.11.5)
+- Studio controls: one policy file sets which AI tools and providers are allowed, an audit log of every AI
+  step, keys in the system keychain, sign-in with the studio's identity provider. (0.11.6)
+- Quick Remesh (Shift+R, or hold N), or after every stroke; open parts stay solid. (0.11.1, 0.11.3)
+- Big scans keep up: orbiting right after a stroke no longer stalls, and big brushes on dense scans finish
+  sooner after the pen lifts. (0.11.1, 0.11.2)
+- Sculpt layers record Move, Scale and Rotate, with a weight to dial them in and out. Vector displacement
+  stamps rotate with the drag. (0.11.2)
+- Sixty new brushes in six packs, and a Masking panel: cavity, peaks, colour, facing. (0.11.0)
+- Maya-style view keys, saved camera views, UDIMs packed in columns and rows, pen pressure per brush,
+  touch and trackpad navigation. (0.11.1 to 0.11.3)
+- Signed one-click updates on Windows and the Linux AppImage. Interface in Simplified and Traditional
+  Chinese. (0.11.1 to 0.11.5)
+
+HONEST LIMITS
+- The biggest brushes on very dense meshes still trail the pen on every machine we test, fast desktops
+  included: the stroke lands, but late.
+- On entry-level machines a dense scan shows a lighter preview while you orbit; full detail returns when
+  the view rests.
+- Opening a scan with micro levels takes seconds, not an instant.
+- The very largest scans need more memory than an 8 GB laptop with integrated graphics has.
+- Our entry-level results come from a simulated low-end budget on our own machines. Results from real
+  integrated-graphics laptops are welcome.
+- SculptForge is pre-1.0: frequent releases, and the occasional rough edge. Report them on GitHub or Discord.
+- AI features use a tool or provider you choose and connect yourself. Nothing AI runs until you turn it on.
+
+LINKS
+Website        https://sculptforge.app
+Guide          https://sculptforge.app/guide/
+Discord        https://discord.gg/gWrYkEmQhH
+Source         https://github.com/islandmed/SculptForge
+Creator kit    https://sculptforge.app/creators/
+Press contact  hello@sculptforge.app
+
+SculptForge is an independent open-source project by Med and contributors. Product names are trademarks of
+their respective owners. Lion head: Poly Haven scan (CC0), rendered in SculptForge.
