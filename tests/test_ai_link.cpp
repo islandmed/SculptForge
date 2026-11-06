@@ -18,6 +18,9 @@
 #include <random>
 #include <sstream>
 #include <thread>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 using namespace sf;
 using namespace sf::link;
@@ -288,7 +291,9 @@ TEST(ai_link_long_runtime_folder_still_listens) {
 TEST(ai_link_attach_end_to_end) {
     // sculptforge-cli --mcp --attach against a stand-in app: live_connect waits, the code pairs, tools are forwarded.
     const std::string run = scratchDir("sf_ai_link_attach");
-    const std::string endpoint = run + "/live.sock";
+    // (a long worktree's test folder overflows sun_path, 108 bytes: then a short name, as liveEndpoint falls back)
+    std::string endpoint = run + "/live.sock";
+    if (endpoint.size() >= 100) endpoint = "/tmp/sf-attach-" + std::to_string(::getpid()) + ".sock";
     AiLinkListener listener;
     std::string err;
     CHECK(listener.open(endpoint, err));
@@ -322,6 +327,8 @@ TEST(ai_link_attach_end_to_end) {
     CHECK(o.find("ran mesh_info") != std::string::npos);
     CHECK(o.find("notifications/tools/list_changed") != std::string::npos);
     CHECK(o.rfind("Not connected to SculptForge") > o.find("ran mesh_info")); // after Disconnect, refused again
+    std::error_code ec;
+    std::filesystem::remove(endpoint, ec);
 }
 #endif
 
