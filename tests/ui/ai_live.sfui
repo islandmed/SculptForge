@@ -93,7 +93,8 @@ expect_value undo_ai == 1
 run ui_policy json="{\"format\":\"sculptforge-policy\",\"version\":1,\"organization\":\"Acme Animation\",\"mcp\":{\"live\":\"never\"}}"
 wait_value ai_link_state == 0 5
 ai_client close
-expect_text "Managed by your studio"              # (Preferences > AI is still open)
+click "Preferences##palette.preferences"
+expect_text Managed by your studio
 shot ai-live-managed
 run ui_policy json=""
 wait_value ai_link_state == 1 5
