@@ -132,7 +132,7 @@ void App::dragDotTo(float x, float y) {
     doc_.sculptor.restoreStroke(doc_.mesh, doc_.bvh);
     RayHit hit;
     if (!pick(x, y, hit)) return;
-    const float pressure = strokePressure();
+    const float pressure = stampPressure_.hold(strokePressure()); // (not the lift's falling pressure, #146)
     DabParams p;
     p.center = hit.position;
     p.viewDir = camera_.forward();

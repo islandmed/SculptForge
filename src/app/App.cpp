@@ -2225,8 +2225,10 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         beginAlongNormal(hit, radiusPx_ * camera_.worldPerPixel(hit.position, canvasHeight()));
         return;
     }
-    if (strokeType_ == StrokeType::DragRect || strokeType_ == StrokeType::DragDot)
+    if (strokeType_ == StrokeType::DragRect || strokeType_ == StrokeType::DragDot) {
         stampJitter_ = alphaJitterAngle(alphaOptions_.jitter, stampSeed_);
+        stampPressure_.reset();
+    }
     if (strokeType_ == StrokeType::DragRect) {
         dragAnchor_ = glm::vec2(x, y);
         dragAnchorHit_ = hit.position;

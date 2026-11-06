@@ -216,8 +216,9 @@
 // Simulated graphics tablet: real SDL3 pen events, each followed by the mouse event SDL 3.2 synthesizes
 // from it (SDL_PEN_MOUSEID), in SDL's order (the app ignores those and makes its own, #95). The touch comes before its first pressure sample, as
 // with Windows Ink, and every frame carries 4 pen samples (a 240 Hz pen at 60 fps).
-//   pen_stroke U0 V0 U1 V1 P0 P1 [eraser] [leave] [S]   pen stroke across the model with pressure P0 -> P1;
-//                            eraser: the eraser end; leave: the pen leaves proximity before lifting
+//   pen_stroke U0 V0 U1 V1 P0 P1 [eraser] [leave] [tail] [S]   pen stroke across the model with pressure P0 -> P1;
+//                            eraser: the eraser end; leave: the pen leaves proximity before lifting; tail: as a real
+//                            tablet lifts, the last 8 samples (2 frames) move on a few pixels with the pressure falling to 0
 //   pen_drag_item LABEL DX DY P0 P1 [stray X Y] [lost] [S]   pen stroke through the item's centre, DX DY pixels long
 //                            (a short one is a tap with a little jitter); stray: as for pen_drag; lost: SDL drops
 //                            the pen while it touches (out of proximity without lifting, then sdl_pen_mouse stuck
@@ -2302,18 +2303,19 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "pen_stroke") {
         if (!need(6)) return false;
         const float u0 = num(1, 0), v0 = num(2, 0), u1 = num(3, 0), v1 = num(4, 0), p0 = num(5, 1), p1 = num(6, 1);
-        bool eraser = false, leave = false;
+        bool eraser = false, leave = false, tail = false;
         float seconds = 0.6f;
         for (size_t i = 7; i < w.size(); ++i) {
             if (w[i] == "eraser") eraser = true;
             else if (w[i] == "leave") leave = true;
+            else if (w[i] == "tail") tail = true;
             else seconds = num(i, seconds);
         }
         auto ends = std::make_shared<std::pair<ImVec2, ImVec2>>();
         run([this, ends, u0, v0, u1, v1] { *ends = {onModel(u0, v0), onModel(u1, v1)}; });
         penStroke([ends](float u) {
             return ImVec2(ends->first.x + (ends->second.x - ends->first.x) * u, ends->first.y + (ends->second.y - ends->first.y) * u);
-        }, p0, p1, eraser, leave, seconds);
+        }, p0, p1, eraser, leave, seconds, {}, tail);
         wait(0.1f);
     } else if (verb == "pen_drag_item") {
         if (!need(5)) return false;
@@ -2775,7 +2777,7 @@ void Demo::penButtonEvent(int button, bool down) {
 }
 
 void Demo::penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bool eraser, bool leave, float seconds,
-                     std::function<void()> afterSample) {
+                     std::function<void()> afterSample, bool tail) {
     // Hover to the start, touch down, then 4 samples a frame along the path, then lift (or leave).
     auto from = std::make_shared<ImVec2>();
     steps_.push_back([this, path, from, afterSample](float t) {
@@ -2790,24 +2792,40 @@ void Demo::penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bo
         return t >= 0.25f;
     });
     auto last = std::make_shared<float>(-1.0f);
-    steps_.push_back([this, path, p0, p1, eraser, leave, seconds, last, afterSample](float t) {
+    auto tailFrame = std::make_shared<int>(0);
+    steps_.push_back([this, path, p0, p1, eraser, leave, seconds, last, afterSample, tail, tailFrame](float t) {
         if (*last < 0.0f) {
             penTouch(true, eraser);
             penPressure(p0); // the first pressure sample comes after the touch
             *last = 0.0f;
             return false;
         }
-        const float u = std::min(t / seconds, 1.0f);
         constexpr int kSamples = 4;
-        for (int k = 1; k <= kSamples; ++k) {
-            const float uu = *last + (u - *last) * float(k) / float(kSamples);
-            penPressure(p0 + (p1 - p0) * uu);
-            const ImVec2 p = path(uu);
-            penMove(p.x, p.y);
-            if (afterSample) afterSample();
+        if (*last < 1.0f) {
+            const float u = std::min(t / seconds, 1.0f);
+            for (int k = 1; k <= kSamples; ++k) {
+                const float uu = *last + (u - *last) * float(k) / float(kSamples);
+                penPressure(p0 + (p1 - p0) * uu);
+                const ImVec2 p = path(uu);
+                penMove(p.x, p.y);
+                if (afterSample) afterSample();
+            }
+            *last = u;
+            if (u < 1.0f) return false;
+            if (tail) return false; // (the lift's samples come in the next frames)
         }
-        *last = u;
-        if (u < 1.0f) return false;
+        if (tail) { // the lift: 8 more samples on past the end, the pressure falling to 0
+            const ImVec2 a = path(0.98f), b = path(1.0f);
+            const float dx = b.x - a.x, dy = b.y - a.y, len = std::max(std::hypot(dx, dy), 1e-3f);
+            for (int k = 1; k <= kSamples; ++k) {
+                const int i = *tailFrame * kSamples + k;
+                penPressure(p1 * (1.0f - float(i) / float(2 * kSamples)));
+                penMove(b.x + dx / len * 0.5f * float(i), b.y + dy / len * 0.5f * float(i));
+                if (afterSample) afterSample();
+            }
+            if (++*tailFrame < 2) return false;
+            *tailFrame = 0;
+        }
         if (leave) {
             penProximity(false); // out of range without lifting first
         } else {
