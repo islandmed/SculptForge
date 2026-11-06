@@ -13,14 +13,17 @@
   <meta property="og:type" content="website">
   <meta property="og:title" content="SculptForge - the free, open-source sculpting app for VFX, animation and games">
   <meta property="og:description" content="Sculpting for VFX, animation and games, with classic sculpting keys available. VFX Reference Platform CY2026 and CY2027 builds, OpenUSD, a Python API and Send to Unreal. Free built-in AI: describe a brush and get it, or turn a sketch into a model.">
-  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=5">
+  <meta property="og:image" content="https://sculptforge.app/img/social-lion.png?v=1">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="675">
   <meta property="og:url" content="https://sculptforge.app/">
   <link rel="canonical" href="https://sculptforge.app/">
   <script type="application/ld+json">
-  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.11.3", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=5", "sameAs": ["https://github.com/islandmed/SculptForge"]}
+  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.11.3", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-lion.png?v=1", "sameAs": ["https://github.com/islandmed/SculptForge"]}
   </script>
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="style.css?v=19">
+  <meta name="twitter:image" content="https://sculptforge.app/img/social-lion.png?v=1">
+  <link rel="stylesheet" href="style.css?v=20">
   <script src="motion.js?v=11" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
@@ -49,8 +52,8 @@
     <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <a class="new-badge" href="#whats-new"><span>New in 0.11</span>
-            Quad Remesh 2, elastic Kelvinlet brushes, hundreds of millions of polygons →</a>
+          <a class="new-badge" href="#live-mode"><span>New in 0.11.5</span>
+            Live mode: your AI tool blocks out, you sculpt →</a>
           <p class="eyebrow">The free, open-source sculpting app</p>
           <h1><span class="nowrap">Sculpt it.</span> <span class="nowrap">Forge it.</span><br><span class="accent">Ship it.</span></h1>
           <p class="lede">Digital sculpting for <strong>VFX, animation and game studios</strong> on Linux, macOS and
@@ -82,6 +85,38 @@
           </script>
           <figcaption>Real-time recording: pull, then Quick Remesh (Shift+R) and keep sculpting.</figcaption>
         </figure>
+      </div>
+    </section>
+
+    <section id="live-mode" class="section live">
+      <div class="wrap two-col live-grid">
+        <figure class="live-video">
+          <video id="live-video" poster="media/poster-live-mode.jpg?v=1" autoplay muted loop playsinline preload="metadata"
+                 aria-label="Claude Code blocks out a dragon head in the open SculptForge window, then an artist pass with SculptForge brushes refines it">
+            <source src="media/live-mode.webm?v=1" type="video/webm">
+            <source src="media/live-mode.mp4?v=1" type="video/mp4">
+          </video>
+          <figcaption>A real session: Claude Code blocks out the head (sped up), then a refinement pass with
+            SculptForge brushes (scripted strokes).</figcaption>
+        </figure>
+        <div class="live-copy">
+          <p class="eyebrow">New in 0.11.5 &middot; Live mode</p>
+          <h2>Your AI blocks out the baseline. You do the art.</h2>
+          <p>Connect an AI tool such as Claude Code and it works in the window you already have open while you watch. It
+            blocks out the big forms, looks at them from every side and corrects itself. Then the sculpt is yours, with
+            your brushes. SculptForge is made for artists: the AI gives you a starting point.</p>
+          <ul class="checks">
+            <li><strong>Nothing happens until you approve.</strong> SculptForge shows a code and waits for your click.</li>
+            <li><strong>Every step is one undo,</strong> labelled &ldquo;AI:&rdquo;, so you can step back through its work.</li>
+            <li><strong>It asks first</strong> before touching files outside your project, running scripts or using the network.</li>
+            <li><strong>Local only:</strong> no network port, one tool at a time, and Disconnect whenever you like.</li>
+          </ul>
+          <p><a class="btn" href="guide/scripting.html#live-mode-an-ai-tool-sculpts-in-the-open-window">Set up live mode &rarr;</a></p>
+          <figure class="live-still">
+            <img src="img/lion-crisp.jpg?v=1" alt="A lion head in terracotta clay on a plinth" width="900" height="900" loading="lazy" decoding="async">
+            <figcaption>Poly Haven scan (CC0), sculpted and rendered in SculptForge.</figcaption>
+          </figure>
+        </div>
       </div>
     </section>
 

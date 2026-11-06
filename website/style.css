@@ -661,3 +661,21 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
   .code-block .copy { opacity: 1; }
 }
 .guide-page .nav .wrap, .guide-page .footer .wrap { max-width: 1360px; }
+
+/* Live mode (0.11.5): the AI blocks out, the artist sculpts. Video left, copy right; stacked on phones. */
+.live { border-top: 1px solid var(--border); }
+.live-grid { grid-template-columns: 1.25fr 1fr; align-items: center; }
+.live-video { margin: 0; }
+.live-video video { width: 100%; display: block; border-radius: var(--radius); border: 1px solid var(--border);
+  background: #111; aspect-ratio: 16 / 10; object-fit: cover; }
+.live-video figcaption, .live-still figcaption { color: var(--muted); font-size: 0.8rem; margin-top: 10px; }
+.live-copy h2 { margin-top: 0.2em; }
+.live-still { margin: 24px 0 0; display: flex; align-items: center; gap: 14px; }
+.live-still img { width: 96px; height: 96px; object-fit: cover; border-radius: 10px; background: #f3efe9; flex: none; }
+.live-still figcaption { margin: 0; }
+@media (max-width: 960px) {
+  .live-grid { grid-template-columns: 1fr; gap: 28px; }
+  .live-video { margin: 0 -16px; }
+  .live-video video { border-radius: 0; border-left: 0; border-right: 0; }
+  .live-video figcaption { padding: 0 16px; }
+}
