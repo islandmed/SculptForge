@@ -17,6 +17,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <unordered_map>
+#include <vector>
 
 namespace sf {
 
@@ -73,24 +75,42 @@ ClusterBounds clusterBounds(const Mesh& mesh, const UploadOrder& order, uint32_t
 bool clusterProxy(const Mesh& mesh, const UploadOrder& order, uint32_t c, size_t maxTriangles, std::vector<uint16_t>& out,
                   ClusterBounds& bounds);
 
-// Coarse levels below the mesh (spike, SF_COARSE_LOD=1; docs/design/micro-coarse-lod.md, Rossignac-Borrel 1993):
-// nested grids over the whole mesh, the first cell twice the mean edge, each next level twice as coarse; a cell's
-// point is the mean of the vertices in it (its normal their normals' sum). Every cluster gets per level its triangles
-// mapped to cells (degenerate and repeated ones dropped) and its error, the farthest any of its vertices moved. Two
-// clusters at one level share their cells' points: no cracks between them. A cluster's chain stops when a level
-// would keep more than 80% of the one before.
+// Coarse levels below the mesh (docs/design/micro-coarse-lod.md; Clark 1976, Rossignac-Borrel 1993): nested grids
+// over the whole mesh, the first cell four times the mean edge, each next level twice as coarse; a cell's point is the
+// mean of the vertices in it (its normal their normals' sum). Every cluster gets per level its triangles mapped to
+// cells (degenerate and repeated ones dropped) and its error, the farthest any of its vertices is from its cell's
+// point. Two clusters at one level share their cells' points: no cracks between them. A cluster's chain stops when a
+// level would keep more than 80% of the one before.
 struct CoarseLevels {
-    static constexpr int kMaxLevels = 6;
+    static constexpr int kMaxLevels = 5;
     struct Lod {
-        int levels = 0;
-        uint32_t first[kMaxLevels] = {}, count[kMaxLevels] = {}; // in `indices` (indices, not triangles)
-        float error[kMaxLevels] = {};                            // world units
+        int levels = 0; // 0: none (drawn in full)
+        uint32_t first[kMaxLevels] = {}, count[kMaxLevels] = {}, capacity[kMaxLevels] = {}; // in `indices`
+        float error[kMaxLevels] = {};                                                    // world units
     };
+    struct Level {
+        std::vector<uint64_t> keys; // the cells' grid coordinates (packed), sorted; cell i is point base + i
+        uint32_t base = 0;
+        std::unordered_map<uint64_t, uint32_t> added; // cells edits moved vertices into since the build: key -> point
+    };
+    glm::vec3 origin{0.0f};
+    float cell = 0.0f; // level 0's
+    std::vector<Level> levels;
     std::vector<glm::vec3> positions, normals; // every level's cell points, one level after the other
-    std::vector<uint32_t> indices;             // into positions
+    std::vector<uint32_t> indices;             // into positions; each level of each cluster with room to grow
     std::vector<Lod> clusters;
+    // The cell of point p at a level (cell id into positions), or ~0u: no such cell (p left every cell made).
+    uint32_t cellOf(const glm::vec3& p, int level) const;
+    uint32_t cellOrAdd(const glm::vec3& p, int level); // (a new cell for p if there is none)
 };
 CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order);
+// After an edit: the levels of the `dirty` clusters again, and the points of every cell their vertices are in (or
+// were in), from all the vertices in those cells (the clusters whose bounds reach them). A cluster that no longer
+// fits its room, or whose vertices moved into a cell the build didn't make, loses its levels (drawn in full until
+// the next build). `points` gets the cells whose points changed; returns the clusters whose levels changed.
+std::vector<uint32_t> updateCoarseLevels(CoarseLevels& levels, const Mesh& mesh, const UploadOrder& order,
+                                         const std::vector<ClusterBounds>& bounds, const std::vector<uint32_t>& dirty,
+                                         std::vector<uint32_t>& points);
 
 // Every directed edge a->b has as many b->a: the mesh is the closed, consistently wound boundary of a volume
 // (it may intersect itself). Wound outwards (a positive signed volume: the sum of ClusterBounds::volume), every

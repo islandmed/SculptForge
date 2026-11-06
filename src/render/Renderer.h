@@ -357,11 +357,13 @@ private:
         std::vector<uint8_t> proxyStale;     // to rebuild before use
         std::vector<ClusterBounds> proxyBounds; // the proxy's normal cone
         bool proxyAllocated = false;
-        // Coarse levels (spike, SF_COARSE_LOD=1: buildCoarseLevels at the first sync over the budget). Any edit to
-        // the mesh drops them (the normal draw again): no rebuild in the spike.
+        // Coarse levels (buildCoarseLevels at the first sync over the budget, again after a new layout). Clusters an
+        // edit moved draw in full (coarseDirty) until the first sync without new edits updates their levels.
         GLuint coarseVao = 0, coarseVertices = 0, coarseIndices = 0;
-        std::vector<CoarseLevels::Lod> coarse;
-        bool coarseValid = false, coarseTried = false;
+        std::unique_ptr<CoarseLevels> coarse;
+        std::vector<uint8_t> coarseDirty;
+        std::vector<uint32_t> coarsePending; // the dirty clusters, to update
+        bool coarseTried = false, coarseEdited = false; // (coarseEdited: this sync marked some)
         std::vector<uint32_t> drawnOrder; // the mesh triangle of each drawn triangle (meshes with UVs only)
         size_t drawnTriangles = 0;
         size_t vertexCapacity = 0;
@@ -415,13 +417,16 @@ private:
     bool proxyPending_ = false; // (proxiesPending)
     bool proxyPrebuild_ = false; // (setProxyPrebuild)
     double proxyMsPerCluster_ = 0.0; // measured, so a frame's batches fit its budget on slow cores too
-    // Spike (SF_COARSE_LOD=1, off by default; docs/design/micro-coarse-lod.md): plain meshes over the triangle budget
-    // draw per cluster a coarse level (render/Clusters.h: CoarseLevels), at rest too: the coarsest whose error stays
-    // under kCoarseLodPx on screen, raised until the budget holds; full detail when it all fits.
-    const bool coarseLod_ = std::getenv("SF_COARSE_LOD") && std::string(std::getenv("SF_COARSE_LOD")) == "1";
+    // Coarse levels (docs/design/micro-coarse-lod.md; SF_COARSE_LOD=0 turns them off): plain meshes over the triangle
+    // budget draw per cluster a coarse level (render/Clusters.h: CoarseLevels), at rest too: the coarsest whose error
+    // stays under kCoarseLodPx on screen, raised until the budget holds; full detail when it all fits.
+    const bool coarseLod_ = !(std::getenv("SF_COARSE_LOD") && std::string(std::getenv("SF_COARSE_LOD")) == "0");
+    void markCoarseDirty(MeshSlot& s, uint32_t c);
+    void updateCoarse(MeshSlot& s, const Mesh& mesh);
     static constexpr float kCoarseLodPx = 0.75f;
     size_t lodBudget_ = 0; // the last still draw's triangle budget: sync builds the coarse levels of meshes over it
     void buildCoarse(MeshSlot& s, const Mesh& mesh);
+    void uploadCoarsePoints(MeshSlot& s);
     size_t triangleBudget(const RenderSettings& settings) const;
     // The ghost (setGhost), drawn on the slot ghostId_.
     GhostStroke ghost_;

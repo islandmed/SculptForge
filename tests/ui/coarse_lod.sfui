@@ -1,0 +1,30 @@
+# Coarse levels (docs/design/micro-coarse-lod.md): a plain mesh over the triangle budget draws each cluster at a
+# coarse level, so a frame stays within the budget, at rest and while the view moves. A stroke draws the clusters it
+# moved in full detail; the frame after it updates their levels, and the budget holds again.
+run ui_look look=classic layout=classic
+# (the budget is the hardware tier's; a small one here, set before the mesh as at startup)
+env SF_TRIANGLE_BUDGET 40000
+run new_sphere subdivisions=6
+camera 0 0
+wait 0.6
+expect_value drawn_triangles <= 40000
+expect_value drawn_triangles > 2000
+shot coarse-still
+camera 35 20
+wait 0.6
+expect_value drawn_triangles <= 40000
+shot coarse-turned
+
+# A stroke: the clusters it moved draw in full while it runs; the levels are updated after it.
+camera 0 0
+wait 0.6
+drag_path 0.42 0.45 0.58 0.45 0.58 0.55
+wait 0.6
+expect_value drawn_triangles <= 40000
+shot coarse-after-stroke
+
+# A budget the mesh fits in: all of it in full detail.
+env SF_TRIANGLE_BUDGET 100000000
+wait 0.6
+expect_value drawn_triangles > 60000
+shot full-detail
