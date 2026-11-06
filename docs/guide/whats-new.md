@@ -17,6 +17,24 @@ highlight: Paint colour stays visible while you orbit or paint dense models
 highlight: Hyper3D Rodin, direct: generate a model from an image or a description with your own Hyper3D key (thanks @ElgoogUdiab, #123)
 ```
 
+- **Line Gradient**: **Color > Line Gradient**, then drag across the model: the paint colour runs into a second colour
+  (or fades out) along the line; drag its ends to adjust it. Thanks @Devon0209 (#99).
+- **Part folders**: in **Tool > Parts**, group Parts in folders (drag them in and out), fold, rename, hide or move a
+  whole folder at once.
+- **Hyper3D Rodin, direct**: **Generate 3D > Hyper3D Rodin (direct)** runs Rodin Gen-2.5 on Hyper3D's own service with
+  your own Hyper3D key, from an image or a description, in five tiers from Extreme Low to Extreme High. It stays off
+  until you add your key, which is kept in the system keychain; your image or description goes to Hyper3D only, and
+  generations are billed to your Hyper3D account. Rodin through fal.ai stays as it was.
+- **Paint stays while the view moves**: on dense meshes, vertex paint, paint layers and the mask no longer vanish
+  while you orbit or paint and pop back at rest.
+- **Input style keys after a restart**: the Blender, Classic and Maya styles keep every key when SculptForge starts
+  again (F for the Size slider in the Blender style, 9 for a Snapshot with the Classic keys).
+- **Auto UV never freezes the app**: the `uv_auto` command from the console, a script or an AI tool now unwraps in the
+  background like the **Tool > Texture Map > Auto UV** button, which gains a **Cancel** button beside its progress.
+- **Faster Pack**: **UV Editor > Pack** across a UDIM grid takes well under a second on most models (it could freeze
+  the app for half a minute), runs in the background with a progress bar and **Cancel**, and lays islands out tighter.
+  Unwrap runs in the background too.
+
 ## Version 0.11.8
 
 ```features

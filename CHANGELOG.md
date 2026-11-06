@@ -6,6 +6,49 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.9] - 2026-11-06
+
+### Added
+- **Line Gradient** (Color, #99, requested by @Devon0209): a screen-space colour ramp for vertex paint and textures,
+  its ends adjustable before you keep it (Enter; Esc takes it back); respects the mask, one undo step. Script:
+  `paint_gradient`.
+- **Part folders** (#96, thanks @ebarranco): folders in the Parts list; drag Parts in and out, fold, rename, hide and
+  show, and move a whole folder with the gizmo's new **Folder** option. Saved in projects; older versions open them
+  without folders.
+- **Hyper3D Rodin (direct)** in Generate 3D and the `image_to_3d` / `text_to_3d` commands (`service=hyper3d`, `model=`
+  a Gen-2.5 tier): Hyper3D's own API with your key (system keychain only; no environment variable, no shared or trial
+  key). One pinned https host for the API, the key sent nowhere else; the GLB only from Hyper3D's domains, capped at
+  200 MB and checked before import, kept in a private temporary folder deleted after import; polling backs off to 30
+  s. Studios: provider id `hyper3d` in the policy, one audit log line per generation. Thanks to ElgoogUdiab for
+  suggesting it (#123); re-implemented in house from Hyper3D's public API documentation.
+- **Cancel** for Auto UV (Tool > Texture Map), beside its progress bar.
+
+### Changed
+- The console keeps one line for a job's progress ("Auto UV: 42%") instead of one line per percent.
+
+### Fixed
+- Dense meshes over the triangle budget lost their vertex colour (paint layers included) and mask while the view moved
+  (the coarse level 0.11.7 draws then had none) and showed them again at rest. The coarse level now carries each
+  cell's mean colour and mask from the full mesh, updated when a paint stroke ends.
+- The input style's keys for the Size slider, the Material picker and Save Snapshot came back as the Classic defaults
+  after a restart (Blender style: F no longer showed the Size slider, S and M opened the Size slider and the Material
+  picker) until the style was picked again in Preferences > Input; your own rebinds were not affected (#147, thanks
+  @Velisariy).
+- Auto UV from the console, a script or an AI tool (`uv_auto`) froze the app while it unwrapped: about 10 s on a
+  327k-triangle sculpt. It now runs on the same worker as the Auto UV button, so frames keep drawing (longest frame
+  under 100 ms, floor tier included). The next statement on the line, the AI tool's reply and a UI test's next step
+  wait for the UVs, so `uv_auto; texture_create` still works in one go. Macros keep running it in place.
+- UV Editor > Pack froze the app on UDIM grids (about 18 s for a 10 x 2 grid on the lion head on a laptop, 11 s for 4
+  x 3): the shape packer's search now runs several densities at once, coarse first, stops as soon as an island can't
+  be kept whole, and keeps its quarter-resolution layout instead of packing everything again at full size. 10 x 2 on
+  the lion: 18 s -> 0.04 s. Pack, Pack at Density and every Unwrap now run on a worker thread with a progress bar and
+  Cancel under the view.
+- Packing could shrink some islands and lay them over their neighbours: the shape packer's quarter turns mirror an
+  island, which the fit back onto the island couldn't follow. Islands are now only turned to their smallest box first;
+  layouts are up to 6% denser and no longer overlap.
+- Pack's status line could report more than 100% of the space used (an island bigger than a tile is shrunk to fit
+  one); it is now measured.
+
 ## [0.11.8] - 2026-11-06
 
 ### Changed
