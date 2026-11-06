@@ -56,6 +56,29 @@ TEST(shell_bottom_shelf_tile_sizes) {
     CHECK(fromJson(toJson(l), back, err) && back.shelfTiles == 2);
 }
 
+TEST(shell_empty_shelves_hide_outside_customize) { // #139
+    UiLayout l = standardLayout();
+    l.rightShelf = {"sep"}; // separators alone count as empty
+    l.leftShelf.clear();
+    ShellGeometry g = computeShell(l, 1600, 960, 1.0f);
+    CHECK(near(g.rightShelf.w, 0) && near(g.leftShelf.w, 0));
+    CHECK(rectIs(g.canvas, 8, 110, 1284, 772)); // the canvas takes both shelves' room
+    l.customize = true; // back while customizing, to drop items onto
+    g = computeShell(l, 1600, 960, 1.0f);
+    CHECK(rectIs(g.rightShelf, 1240, 110, 52, 772));
+    CHECK(rectIs(g.canvas, 96, 110, 1144, 772));
+    l.customize = false;
+    l.topShelf = {"row"};
+    l.bottomShelf.clear();
+    g = computeShell(l, 1600, 960, 1.0f);
+    CHECK(near(g.topShelf.h, 0) && near(g.bottomShelf.h, 0));
+    CHECK(rectIs(g.canvas, 8, 46, 1284, 914));
+    UiLayout back; // a saved layout with empty shelves loads with them empty
+    std::string err;
+    CHECK(fromJson(toJson(l), back, err) && back.leftShelf.empty() && back.bottomShelf.empty());
+    CHECK(computeShell(l, 1600, 960, 1.0f, 0.0f, sculptForgeMetrics(8.0f)).canvas.w > 1200.0f); // tiles
+}
+
 TEST(shell_standard_layout_1920x1080) {
     const ShellGeometry g = computeShell(standardLayout(), 1920, 1080, 1.0f);
     CHECK(rectIs(g.canvas, 96, 110, 1444, 892)); // §2.3: the extra width goes to the canvas

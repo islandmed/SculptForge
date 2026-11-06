@@ -972,10 +972,9 @@ void App::drawShell() {
     else drawTitleStrip(shell_);
     if (layout_.paletteBarVisible && !sculptForgeLayout()) drawPaletteBar(shell_);
     if (shell_.shelves) {
-        drawShelf(kShelfTop, shell_.topShelf);
-        drawShelf(kShelfLeft, shell_.leftShelf);
-        drawShelf(kShelfRight, shell_.rightShelf);
-        drawShelf(kShelfBottom, shell_.bottomShelf);
+        const CanvasRect* shelves[] = {&shell_.topShelf, &shell_.leftShelf, &shell_.rightShelf, &shell_.bottomShelf};
+        for (int k : {kShelfTop, kShelfLeft, kShelfRight, kShelfBottom})
+            if (shelves[k]->w > 0.0f && shelves[k]->h > 0.0f) drawShelf(k, *shelves[k]); // empty: hidden (#139)
         if (shell_.leftTray.w > 0.0f) drawTray(false, shell_.leftTray);
         if (shell_.rightTray.w > 0.0f) drawTray(true, shell_.rightTray);
         drawDivider(false, shell_.leftDivider);

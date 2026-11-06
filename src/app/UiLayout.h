@@ -39,6 +39,10 @@ struct UiLayout {
     bool customize = false; // runtime only, never stored
 };
 
+// A shelf with nothing on it but separators and line breaks: hidden outside Customize Shelves, so the canvas takes
+// its space, and back while customizing so items can be dropped onto it again (#139).
+bool shelfEmpty(const std::vector<std::string>& items);
+
 UiLayout standardLayout(); // the built-in default
 UiLayout standardLayout(int shellLayout); // 0 the Classic layout (the same), 1 the SculptForge layout
 Json toJson(const UiLayout& layout);
