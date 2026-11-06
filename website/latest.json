@@ -1,12 +1,10 @@
 {
-  "version": "0.11.3",
+  "version": "0.11.4",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Connect your AI tool in one window",
-    "Saved camera views and a readable mask",
-    "Quick Remesh and Voxel Remesh keep open parts solid",
-    "The UV Editor fits at large UI scales",
-    "The new orange SF app icon"
+    "Live mode: an AI tool works in your open window, only after you approve it",
+    "Your AI tool sees the viewport, turns the view and adds strokes, and every step is one undo",
+    "Fixes: rare wrong shading after strokes"
   ]
 }
