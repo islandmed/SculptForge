@@ -24,6 +24,7 @@
 #include <IconsLucide.h>
 #include <imgui.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstring>
@@ -41,6 +42,16 @@ namespace {
 constexpr double kApprovalSeconds = 120.0; // an unanswered Approve dialog says no
 
 double seconds() { return double(SDL_GetTicksNS()) * 1e-9; }
+
+// The dialogs look like the app's others (Save changes?, Delete brush): text wrapped at one width, the answer first
+// and the refusal second, both buttons one width (110 px, wider only if a translation needs it).
+constexpr float kDialogWrap = 360.0f;
+float dialogButtonWidth(const char* const (&labels)[2], float scale) {
+    float w = 110.0f * scale;
+    for (const char* l : labels)
+        w = std::max(w, ImGui::CalcTextSize(l, nullptr, true).x + 2.0f * ImGui::GetStyle().FramePadding.x);
+    return w;
+}
 
 Json schemaProp(const char* type, const char* description) {
     Json p = Json::object();
@@ -263,6 +274,10 @@ void App::aiLinkPicked(const std::string& path) {
     aiLinkPickedPaths_.push_back(path);
 }
 
+std::string App::aiLinkClient() const {
+    return aiLink_ && aiLink_->session ? aiLink_->session->client() : std::string();
+}
+
 int App::aiLinkStateValue() const {
     if (!aiLink_) return 0;
     if (!aiLink_->session) return 1;
@@ -276,10 +291,10 @@ void App::drawAiLinkPrefs() {
     if (ImGui::Checkbox(tr("Let AI tools control this window##prefs.ai_live"), &on)) setAiLiveControl(on);
     ui::HelpAction(*this, "prefs.ai_live");
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("%s", tr("An AI tool on this computer (sculptforge-cli --mcp --attach) can ask to sculpt here while "
-                                "you watch. You approve each connection; it can see the viewport, and what it sees goes "
-                                "to that tool's AI service. Files outside the project, scripts and the network ask "
-                                "you first. Nothing listens on the network."));
+    ImGui::TextWrapped("%s", tr("An AI tool on this computer can ask to work in this window while you watch. You approve "
+                                "it with a 6-digit code. Every step lands in Undo. Files outside the project, scripts and "
+                                "the network ask you first. What it sees goes to that tool's AI service. Nothing listens "
+                                "on the network. To set up your tool: Help > Connect an AI tool."));
     ImGui::PopStyleColor();
     if (aiLink_ && !aiLink_->error.empty()) ImGui::TextColored(theme::danger, "%s", aiLink_->error.c_str());
 }
@@ -628,36 +643,28 @@ void App::drawAiLink() {
         ImGui::SetNextWindowPos(centre, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (std::exchange(s.focusDialog, false)) ImGui::SetNextWindowFocus();
         bool open = true;
-        if (ImGui::Begin(tr("Let an AI tool control this window?###ailinkapprove"), &open, dialog)) {
-            ImGui::PushTextWrapPos(460 * sc);
+        if (ImGui::Begin(tr("Let an AI tool control this window?###ailinkapprove"), nullptr, dialog)) {
+            ImGui::PushTextWrapPos(kDialogWrap * sc);
             ImGui::TextWrapped(tr("\"%s\" on this computer asks to sculpt in this window."), s.session->client().c_str());
-            ImGui::Spacing();
-            ImGui::TextUnformatted(tr("Code"));
+            ImGui::TextUnformatted(tr("Click Approve, or tell your AI tool this code:"));
             const std::string& code = s.session->code();
-            ImGui::PushFont(nullptr);
-            ImGui::SetWindowFontScale(2.2f);
+            if (fontCardTitle_) ImGui::PushFont(fontCardTitle_); // (digits at display size, not a scaled-up 15 px)
             ImGui::TextColored(theme::accent, "%s %s", code.substr(0, 3).c_str(), code.substr(3).c_str());
-            ImGui::SetWindowFontScale(1.0f);
-            ImGui::PopFont();
-            ImGui::TextWrapped("%s", tr("Click Approve, or tell your AI tool this code. Approval lasts until it disconnects."));
-            ImGui::Spacing();
-            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-            ImGui::TextWrapped("%s", tr("It can run SculptForge's commands and see the viewport; what it sees goes to that "
-                                        "tool's AI service. Every step is in Undo. Files outside the project, scripts "
-                                        "and the network ask you first."));
-            ImGui::PopStyleColor();
+            if (fontCardTitle_) ImGui::PopFont();
+            ImGui::TextDisabled("%s", tr("Approval lasts until it disconnects. Every step lands in Undo. Files outside the "
+                                         "project, scripts and the network ask you first. What it sees goes to that "
+                                         "tool's AI service."));
             ImGui::PopTextWrapPos();
             ImGui::Spacing();
-            ImGui::PushStyleColor(ImGuiCol_Button, theme::accent);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::accentHover);
-            ImGui::PushStyleColor(ImGuiCol_Text, theme::textOnAccent);
-            const bool approve = ImGui::Button(tr("Approve##ailink"), ImVec2(140 * sc, 0));
-            ImGui::PopStyleColor(3);
+            const char* labels[] = {tr("Approve##ailink"), tr("Deny##ailink")};
+            const ImVec2 size(dialogButtonWidth(labels, sc), 0);
+            const bool approve = ImGui::Button(labels[0], size);
             ImGui::SameLine();
-            if (ImGui::Button(tr("Deny##ailink"), ImVec2(120 * sc, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) open = false;
+            if (ImGui::Button(labels[1], size) || ImGui::IsKeyPressed(ImGuiKey_Escape)) open = false;
             if (approve) {
                 s.send(s.session->approve());
                 s.approving = false;
+                showConnectAi_ = false; // its steps are done; the badge takes over
                 status_ = std::string(tr("AI connected: ")) + s.session->client();
                 consoleEcho("ai_live", {}, {true, "AI connected: " + s.session->client()});
             }
@@ -702,19 +709,22 @@ void App::drawAiLink() {
     if (std::exchange(s.focusDialog, false)) ImGui::SetNextWindowFocus();
     bool open = true;
     bool allow = false;
-    if (ImGui::Begin(tr("Allow this AI step?###ailinkconfirm"), &open, dialog)) {
-        ImGui::PushTextWrapPos(480 * sc);
+    if (ImGui::Begin(tr("Allow this AI step?###ailinkconfirm"), nullptr, dialog)) {
+        ImGui::PushTextWrapPos(kDialogWrap * sc);
         ImGui::TextWrapped(tr("%s wants to run:"), s.session->client().c_str());
+        if (fontMono_) ImGui::PushFont(fontMono_);
         ImGui::TextColored(theme::accent, "%s", s.confirm->call.name.c_str());
         const std::string args = link::describeArgs(s.confirm->call.args);
         if (!args.empty()) ImGui::TextWrapped("%s", args.c_str());
-        ImGui::Spacing();
+        if (fontMono_) ImGui::PopFont();
         ImGui::TextColored(theme::danger, "%s", s.confirm->reason.c_str());
         ImGui::PopTextWrapPos();
         ImGui::Spacing();
-        allow = ImGui::Button(tr("Allow once##ailink"), ImVec2(140 * sc, 0));
+        const char* labels[] = {tr("Allow once##ailink"), tr("Deny##ailinkconfirm")};
+        const ImVec2 size(dialogButtonWidth(labels, sc), 0);
+        allow = ImGui::Button(labels[0], size);
         ImGui::SameLine();
-        if (ImGui::Button(tr("Deny##ailinkconfirm"), ImVec2(120 * sc, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) open = false;
+        if (ImGui::Button(labels[1], size) || ImGui::IsKeyPressed(ImGuiKey_Escape)) open = false;
     }
     ImGui::End();
     if (allow) {

@@ -440,7 +440,7 @@ private:
     bool showHelp_ = false;
     bool showAbout_ = false;
     bool showConnectAi_ = false; // Help > Connect an AI tool (PanelConnectAi.cpp; only while AI is on)
-    int connectPlan_ = 0;        // its "I have a ... subscription" choice (connect::Plan)
+    std::string connectClient_ = "claude_code"; // its "Pick your tool" choice (a connect::Client id)
     void drawConnectAi();
     // Supporting SculptForge (Support.h): the app only ever opens the membership page or its Stripe checkout links in the
     // browser; nothing else changes.
@@ -571,6 +571,7 @@ private:
     void aiLinkDisconnect(const std::string& why); // the kill switch: closes the connection now
     void aiLinkPicked(const std::string& path);    // a file the user chose: an AI tool may use it without asking
     int aiLinkStateValue() const;  // UI tests: 0 off, 1 listening, 2 waiting for approval, 3 connected, 4 asking
+    std::string aiLinkClient() const; // the connected (or asking) tool's name, "" without one
     std::vector<std::string> aiLinkPickedPaths_; // files the user chose this run (each connection starts with them)
     void aiLinkExecute(const link::AiLinkCall& call);
     uint32_t activePartInfoId() const;

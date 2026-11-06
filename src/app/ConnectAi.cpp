@@ -38,7 +38,7 @@ struct Row {
 // Display order inside each plan. A client's snippets are built in clients() from its id.
 constexpr Row kAiClients[] = {
     {"claude_desktop", "Claude Desktop", Plan::Claude,
-     "Download the bundle for your system and install it in Claude Desktop under Settings > Extensions > Advanced settings. Or add SculptForge to its configuration file and restart it.",
+     "Add this to its configuration file (Settings > Developer > Edit Config), then restart Claude Desktop.",
      "https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop"},
     {"claude_code", "Claude Code", Plan::Claude, "Run once in a terminal; it signs in with your Claude plan.",
      "https://code.claude.com/docs/en/mcp"},
@@ -122,7 +122,7 @@ std::string commandLine(const Launch& l, Os os) {
 
 // One field per line, so an entry fits the window (and reads like the vendors' examples).
 std::string serverEntry(const Launch& l, const char* extra = nullptr) {
-    return std::string("    \"sculptforge\": {\n") + (extra ? std::string("      ") + extra + ",\n" : std::string()) +
+    return std::string("    ") + jsonString(l.name) + ": {\n" + (extra ? std::string("      ") + extra + ",\n" : std::string()) +
            "      \"command\": " + jsonString(l.command) + ",\n      \"args\": " + jsonArray(l.args) + "\n    }";
 }
 
@@ -144,25 +144,25 @@ std::vector<Snippet> snippetsFor(const std::string& id, const Launch& l, Os os) 
                                                     : "~/.config/Claude/claude_desktop_config.json";
         return {file(where, mcpServers)};
     }
-    if (id == "claude_code") return {terminal("claude mcp add --scope user sculptforge -- " + cmd)};
+    if (id == "claude_code") return {terminal("claude mcp add --scope user " + l.name + " -- " + cmd)};
     if (id == "codex")
-        return {terminal("codex mcp add sculptforge -- " + cmd),
+        return {terminal("codex mcp add " + l.name + " -- " + cmd),
                 file(home(os, "~/.codex/config.toml", "%USERPROFILE%\\.codex\\config.toml"),
-                     "[mcp_servers.sculptforge]\ncommand = " + jsonString(l.command) + "\nargs = " + jsonArray(l.args))};
+                     "[mcp_servers." + l.name + "]\ncommand = " + jsonString(l.command) + "\nargs = " + jsonArray(l.args))};
     if (id == "antigravity")
         return {file(home(os, "~/.gemini/config/mcp_config.json", "%USERPROFILE%\\.gemini\\config\\mcp_config.json"), mcpServers)};
     if (id == "gemini_cli") {
         std::string args;
         for (const std::string& a : l.args) args += " " + shellWord(a, os);
-        return {terminal("gemini mcp add --scope user sculptforge " + shellWord(l.command, os) + args)};
+        return {terminal("gemini mcp add --scope user " + l.name + " " + shellWord(l.command, os) + args)};
     }
     if (id == "grok_build")
-        return {terminal("grok mcp add sculptforge -- " + cmd),
+        return {terminal("grok mcp add " + l.name + " -- " + cmd),
                 file(home(os, "~/.grok/config.toml", "%USERPROFILE%\\.grok\\config.toml"),
-                     "[mcp_servers.sculptforge]\ncommand = " + jsonString(l.command) + "\nargs = " + jsonArray(l.args))};
+                     "[mcp_servers." + l.name + "]\ncommand = " + jsonString(l.command) + "\nargs = " + jsonArray(l.args))};
     if (id == "cursor") return {file(home(os, "~/.cursor/mcp.json", "%USERPROFILE%\\.cursor\\mcp.json"), mcpServers)};
     if (id == "vscode") {
-        const std::string entry = "{\"name\": \"sculptforge\", \"type\": \"stdio\", \"command\": " + jsonString(l.command) +
+        const std::string entry = "{\"name\": " + jsonString(l.name) + ", \"type\": \"stdio\", \"command\": " + jsonString(l.command) +
                                   ", \"args\": " + jsonArray(l.args) + "}";
         std::vector<Snippet> out;
         if (os != Os::Windows) out.push_back(terminal("code --add-mcp " + shellWord(entry, os))); // (cmd.exe quoting of JSON is not worth it)
@@ -175,32 +175,32 @@ std::vector<Snippet> snippetsFor(const std::string& id, const Launch& l, Os os) 
         return {file(home(os, "~/.config/zed/settings.json", "zed: open settings file"),
                      wrapped("context_servers", serverEntry(l)))};
     if (id == "windsurf")
-        return {terminal("devin mcp add -s user sculptforge -- " + cmd),
+        return {terminal("devin mcp add -s user " + l.name + " -- " + cmd),
                 file(home(os, "~/.config/devin/mcp_config.json", "%APPDATA%\\devin\\mcp_config.json"), mcpServers)};
-    if (id == "copilot_cli") return {terminal("copilot mcp add sculptforge -- " + cmd)};
+    if (id == "copilot_cli") return {terminal("copilot mcp add " + l.name + " -- " + cmd)};
     if (id == "cline")
-        return {terminal("cline mcp add sculptforge --yes -- " + cmd), file("MCP Servers > Configure", mcpServers)};
+        return {terminal("cline mcp add " + l.name + " --yes -- " + cmd), file("MCP Servers > Configure", mcpServers)};
     if (id == "continue") {
         std::string yaml = "name: SculptForge\nversion: 0.0.1\nschema: v1\nmcpServers:\n  - name: SculptForge\n    type: stdio\n"
                            "    command: " + jsonString(l.command) + "\n    args:\n";
         for (const std::string& a : l.args) yaml += "      - " + jsonString(a) + "\n";
         yaml.pop_back();
-        return {file(".continue/mcpServers/sculptforge.yaml", yaml)};
+        return {file(".continue/mcpServers/" + l.name + ".yaml", yaml)};
     }
     if (id == "kiro") return {file(home(os, "~/.kiro/settings/mcp.json", "%USERPROFILE%\\.kiro\\settings\\mcp.json"), mcpServers)};
     if (id == "amazon_q")
-        return {terminal("q mcp add --name sculptforge --command " + shellWord(l.command, os) + " --args " +
+        return {terminal("q mcp add --name " + l.name + " --command " + shellWord(l.command, os) + " --args " +
                          shellWord(jsonArray(l.args), os))};
     if (id == "warp") return {file("Settings > Agents > MCP servers > Add", mcpServers)};
     if (id == "goose") {
-        std::string yaml = "extensions:\n  sculptforge:\n    name: SculptForge\n    type: stdio\n    cmd: " +
+        std::string yaml = "extensions:\n  " + l.name + ":\n    name: SculptForge\n    type: stdio\n    cmd: " +
                            jsonString(l.command) + "\n    args: " + jsonArray(l.args) + "\n    enabled: true\n    timeout: 300";
         return {file(home(os, "~/.config/goose/config.yaml", "Goose's config.yaml (goose configure)"), yaml)};
     }
     if (id == "opencode") {
         std::vector<std::string> all{l.command};
         all.insert(all.end(), l.args.begin(), l.args.end());
-        return {file("opencode.json", "{\n  \"$schema\": \"https://opencode.ai/config.json\",\n  \"mcp\": {\n    \"sculptforge\": "
+        return {file("opencode.json", "{\n  \"$schema\": \"https://opencode.ai/config.json\",\n  \"mcp\": {\n    " + jsonString(l.name) + ": "
                                       "{\"type\": \"local\", \"command\": " + jsonArray(all) + ", \"enabled\": true}\n  }\n}")};
     }
     if (id == "rovo_dev")
@@ -210,7 +210,7 @@ std::vector<Snippet> snippetsFor(const std::string& id, const Launch& l, Os os) 
     if (id == "jan") {
         std::string args;
         for (const std::string& a : l.args) args += (args.empty() ? "" : " ") + a;
-        return {{K::Fields, {}, "Server Name: sculptforge\nCommand: " + l.command + "\nArguments: " + args}};
+        return {{K::Fields, {}, "Server Name: " + l.name + "\nCommand: " + l.command + "\nArguments: " + args}};
     }
     if (id == "agents_sdk")
         return {file("agent.py",
@@ -218,7 +218,7 @@ std::vector<Snippet> snippetsFor(const std::string& id, const Launch& l, Os os) 
                      "from agents import Agent, Runner\n"
                      "from agents.mcp import MCPServerStdio\n\n"
                      "async def main():\n"
-                     "    async with MCPServerStdio(name=\"SculptForge\", client_session_timeout_seconds=60,\n"
+                     "    async with MCPServerStdio(name=" + jsonString(l.name) + ", client_session_timeout_seconds=60,\n"
                      "                              params={\"command\": " + jsonString(l.command) + ", \"args\": " +
                          jsonArray(l.args) + "}) as sf:\n"
                      "        agent = Agent(name=\"Sculptor\", instructions=\"Use SculptForge's tools.\", mcp_servers=[sf])\n"
