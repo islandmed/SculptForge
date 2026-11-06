@@ -999,8 +999,11 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 ph.previewLagPx.push_back(p.samples.back().s - p.samples[nearest].s);
             }
             // ... then the new samples go to the input handler, as the next frame's events would.
-            for (; p.sent < p.samples.size(); ++p.sent)
+            for (; p.sent < p.samples.size(); ++p.sent) {
+                inputSeconds_ = p.samples[p.sent].t; // (its timestamp, as a tablet's event carries)
                 onMouseMove(p.samples[p.sent].p.x, p.samples[p.sent].p.y, 0.0f, 0.0f, false);
+            }
+            inputSeconds_ = -1.0;
             if (u >= 1.0) {
                 const double up = nowSeconds();
                 onMouseUp(); // places the dabs still waiting, ends the stroke (undo step, timeline)

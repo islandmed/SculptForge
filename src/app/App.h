@@ -318,10 +318,15 @@ private:
     // Dabs are placed along the pointer's path (strokePath_), queued, and worked through for a limited time per
     // frame in the interactive loop, so a stroke on a huge mesh keeps its curve (core/StrokePath.h).
     StrokePath strokePath_;
+    DabPacer dabPacer_; // which dabs are placed under load, on the input's clock (core/StrokePath.h)
     DabQueue dabQueue_;
+    double inputSeconds_ = -1.0;       // the motion event being handled: its timestamp (< 0: none, now)
+    double strokeInputAt_ = -1.0;      // the stroke's previous sample: its timestamp (< 0: none yet)
+    size_t strokeBacklogLimitFor(double dabSeconds) const; // strokeBacklogLimit with this app's settings (strokeTo)
+    void paceDabs(bool finish = false); // the pacer's decided dabs into the queue (finish: the stroke ends)
     double fusedDabs_ = 64.0; // how many dabs a fused batch takes (AsyncStroke.cpp: sized to kFusedBatchSeconds)
     double lastDabsQueued_ = 0.0; // when pumpStroke last handed the solver dabs (catch-up waits for a pause)
-    std::vector<PathDab> strokeScratch_;
+    std::vector<PathDab> strokeScratch_, strokePaced_;
     std::vector<glm::vec2>* strokeProbe_ = nullptr; // --measure-stroke: where each dab went (screen)
     std::vector<float>* strokeRadiusProbe_ = nullptr; // ... and its brush radius (px)
     double dabSeconds_ = 0.0;         // what a dab of this stroke costs (running average), for the backlog limit

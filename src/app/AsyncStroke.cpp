@@ -248,6 +248,7 @@ void App::commitSolverBatch() {
     if (strokeRadiusProbe_) strokeRadiusProbe_->insert(strokeRadiusProbe_->end(), s.radiusProbe.begin(), s.radiusProbe.end());
     if (s.prepSeconds > 0.0) prepSeconds_ = prepSeconds_ > 0.0 ? prepSeconds_ * 0.7 + s.prepSeconds * 0.3 : s.prepSeconds;
     if (!s.batch.empty()) {
+        dabPacer_.measure(s.dabSeconds, s.batch.size()); // (the first dabs fix the stroke's cost: DabPacer)
         lastDabScreen_ = glm::vec2(s.batch.back().x, s.batch.back().y);
         if (s.dabSeconds > 0.0) dabSeconds_ = dabSeconds_ > 0.0 ? dabSeconds_ * 0.8 + s.dabSeconds * 0.2 : s.dabSeconds;
         // The fused batch size, toward kFusedBatchSeconds of work: scaled by how far this batch was from it (down at once, up

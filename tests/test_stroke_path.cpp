@@ -205,3 +205,183 @@ TEST(stroke_backlog_keeps_a_heavy_brush_near_the_pointer) {
     while (!q.empty()) last = q.pop();
     CHECK(last.x == 29.0f);
 }
+
+namespace {
+
+// One stroke as the app runs it: a 240 Hz pen's samples (timestamped) reach strokeTo once a frame, the pacer
+// decides, the queue is thinned past the stall margin (App::paceDabs), and a worker places queued dabs at
+// `cost` seconds each until the next frame (the solver thread). `frames` are the frame times; pacer = false is
+// the frame-time thinning of 0.11.8 (DabQueue::thin at the backlog limit after each sample).
+struct Replay {
+    std::vector<PathDab> placed;
+    std::vector<float> surface; // a stand-in mesh: heights on a grid, each dab adding its falloff x pressure
+};
+
+// `jitter`: what each placed dab really costs, as a factor of `cost` by its index (a real machine's noise).
+Replay replayStroke(const std::vector<double>& frames, double cost, bool pacer, double (*jitter)(size_t) = nullptr) {
+    constexpr double kHz = 240.0, kSeconds = 1.2;
+    constexpr float kSpacing = 36.0f; // a 240 px brush at 0.15
+    auto sampleAt = [](double t) { // an S-curve across the canvas, pressure rising then falling
+        const double u = t / kSeconds;
+        return PathDab{float(200.0 + 900.0 * u), float(400.0 + 200.0 * std::sin(6.2831853 * u)), float(0.3 + 0.7 * std::sin(3.14159265 * u))};
+    };
+    StrokePath path;
+    DabPacer pace;
+    DabQueue queue;
+    Replay r;
+    PathDab prev = sampleAt(0.0);
+    path.reset(prev.x, prev.y);
+    pace.add(prev, 0.0);
+    double measured = 0.0, workerFree = 0.0, lastT = 0.0;
+    size_t sent = 1;
+    std::vector<PathDab> dabs, kept;
+    auto decide = [&](bool finish) { // App::paceDabs
+        const size_t limit = strokeBacklogLimit(pace.cost(), -1, 0.05, 4, 0.15);
+        kept.clear();
+        if (finish) pace.finish(limit, kept);
+        else pace.decide(limit, kept);
+        for (const PathDab& d : kept) queue.push(d);
+        if (!finish && measured > 0.0) queue.thin(strokeBacklogLimit(measured, -1, 0.05, 4, 0.15) + size_t(0.3 / measured));
+    };
+    if (pacer) decide(false);
+    else queue.push(prev);
+    for (size_t f = 0; f < frames.size(); ++f) {
+        const double now = frames[f];
+        for (; double(sent) / kHz <= std::min(now, kSeconds); ++sent) { // the samples since the last frame
+            const double t = double(sent) / kHz;
+            const PathDab s = sampleAt(t);
+            dabs.clear();
+            path.addSample(s.x, s.y, prev.pressure, s.pressure, kSpacing, true, dabs);
+            for (const PathDab& d : dabs) {
+                if (pacer) pace.add(d, lastT + (t - lastT) * d.at);
+                else queue.push(d);
+            }
+            if (pacer) decide(false);
+            else queue.thin(measured > 0.0 ? strokeBacklogLimit(measured, -1, 0.05, 4, 0.15) : 4);
+            prev = s;
+            lastT = t;
+        }
+        if (now >= kSeconds && sent > size_t(kSeconds * kHz)) { // released: every dab left
+            if (pacer) decide(true);
+            while (!queue.empty()) r.placed.push_back(queue.pop());
+            break;
+        }
+        if (pacer) decide(false); // (the frame loop: dabs that waited for the first cost)
+        // the worker, handed dabs this frame, places them until the next frame begins
+        const double until = f + 1 < frames.size() ? frames[f + 1] : now;
+        workerFree = std::max(workerFree, now);
+        while (!queue.empty() && workerFree < until) {
+            const double c = cost * (jitter ? jitter(r.placed.size()) : 1.0);
+            r.placed.push_back(queue.pop());
+            workerFree += c;
+            measured = measured > 0.0 ? measured * 0.8 + c * 0.2 : c;
+            pace.measure(c);
+        }
+    }
+    r.surface.assign(64 * 32, 0.0f);
+    for (const PathDab& d : r.placed)
+        for (int j = 0; j < 32; ++j)
+            for (int i = 0; i < 64; ++i) {
+                const float dx = (float(i) * 20.0f - d.x) / 120.0f, dy = (float(j) * 25.0f - d.y) / 120.0f;
+                const float q = 1.0f - (dx * dx + dy * dy);
+                if (q > 0.0f) r.surface[size_t(j * 64 + i)] += q * q * d.pressure;
+            }
+    return r;
+}
+
+std::vector<double> framesAt(double hz, double stallAt = -1.0, double stall = 0.0) {
+    std::vector<double> t;
+    for (double now = 0.0; now < 1.5; now += 1.0 / hz) {
+        if (stallAt >= 0.0 && now >= stallAt && stall > 0.0) {
+            now += stall;
+            stall = 0.0;
+        }
+        t.push_back(now);
+    }
+    t.push_back(1.5);
+    return t;
+}
+
+} // namespace
+
+TEST(stroke_dabs_do_not_depend_on_the_frame_rate) {
+    // dab-normals: one scripted stroke placed 32-56 dabs from run to run (the frame-time thinning). Now the same
+    // input gives the same dabs at 30, 60 and 144 Hz and through a 250 ms stall, for slow dabs (70 ms: a 240 px
+    // brush on a 28M scan, floor tier, which skips dabs) and quick ones (2 ms, which keep every dab).
+    const float diag = std::hypot(1920.0f, 1080.0f);
+    for (double cost : {0.07, 0.002}) {
+        const Replay ref = replayStroke(framesAt(60.0), cost, true);
+        CHECK(ref.placed.size() > 10);
+        for (const std::vector<double>& frames : {framesAt(30.0), framesAt(144.0), framesAt(60.0, 0.5, 0.25)}) {
+            const Replay r = replayStroke(frames, cost, true);
+            CHECK(r.placed.size() == ref.placed.size());
+            if (r.placed.size() != ref.placed.size()) continue;
+            float worst = 0.0f, worstPressure = 0.0f, worstHeight = 0.0f;
+            for (size_t i = 0; i < r.placed.size(); ++i) {
+                worst = std::max(worst, std::hypot(r.placed[i].x - ref.placed[i].x, r.placed[i].y - ref.placed[i].y));
+                worstPressure = std::max(worstPressure, std::abs(r.placed[i].pressure - ref.placed[i].pressure));
+            }
+            for (size_t i = 0; i < r.surface.size(); ++i) worstHeight = std::max(worstHeight, std::abs(r.surface[i] - ref.surface[i]));
+            CHECK(worst <= 1e-4f * diag);
+            CHECK(worstPressure <= 1e-5f);
+            CHECK(worstHeight <= 1e-5f);
+        }
+    }
+    // The slow brush skips dabs (it stays within the backlog limit of the pointer), the quick one keeps them all.
+    const Replay slow = replayStroke(framesAt(60.0), 0.07, true), quick = replayStroke(framesAt(60.0), 0.002, true);
+    CHECK(slow.placed.size() < quick.placed.size());
+    // ... and the frame-time thinning it replaces gave a different stroke at each frame rate (other dabs kept: the
+    // same count, a different volume) and fewer dabs through a stall.
+    auto volume = [](const Replay& r) {
+        double v = 0.0;
+        for (float h : r.surface) v += h;
+        return v;
+    };
+    const Replay at30 = replayStroke(framesAt(30.0), 0.07, false), at144 = replayStroke(framesAt(144.0), 0.07, false);
+    CHECK(std::abs(volume(at30) - volume(at144)) > 1.0);
+    CHECK(replayStroke(framesAt(60.0, 0.5, 0.25), 0.07, false).placed.size() < replayStroke(framesAt(60.0), 0.07, false).placed.size());
+}
+
+TEST(stroke_pacer_keeps_the_last_dab) {
+    // Skipped dabs never include the stroke's end: finish keeps the last dab (the stroke ends where the pointer did).
+    DabPacer p;
+    std::vector<PathDab> out;
+    for (size_t i = 0; i < DabPacer::kCalibrationDabs; ++i) p.measure(0.1);
+    for (int i = 0; i < 10; ++i) p.add(PathDab{float(i), 0.0f, 1.0f}, 0.001 * i);
+    p.finish(1, out);
+    CHECK(!out.empty() && out.front().x == 0.0f && out.back().x == 9.0f);
+    CHECK(out.size() < 10);
+    // Until the first dabs' cost is known only they are decided (kept); limit 0 keeps every dab.
+    DabPacer q;
+    out.clear();
+    for (int i = 0; i < 8; ++i) q.add(PathDab{float(i), 0.0f, 1.0f}, 0.01 * i);
+    q.decide(2, out);
+    CHECK(out.size() == DabPacer::kCalibrationDabs && q.pending() == 8 - DabPacer::kCalibrationDabs);
+    q.decide(0, out);
+    CHECK(out.size() == 8);
+}
+
+TEST(stroke_cost_is_rounded_so_noise_does_not_move_dabs) {
+    // Half-octave steps: costs a little apart agree, a step apart don't.
+    CHECK(std::abs(DabPacer::roundCost(0.07) - 0.0625) < 1e-12);
+    CHECK(DabPacer::roundCost(0.066) == DabPacer::roundCost(0.074));
+    CHECK(DabPacer::roundCost(0.05) != DabPacer::roundCost(0.07));
+    CHECK(DabPacer::roundCost(0.0) == 0.0);
+    // The median of the first dabs: one slow outlier (a cold cache) doesn't move it.
+    DabPacer p;
+    p.measure(0.30);
+    p.measure(0.070, 3);
+    CHECK(p.cost() == DabPacer::roundCost(0.070));
+    p.measure(1.0); // (fixed for the stroke)
+    CHECK(p.cost() == DabPacer::roundCost(0.070));
+    // One stroke, two machines' worth of noise in what each dab costs, the same rounding step: the same dabs, at
+    // 30 and 144 Hz too. (A live cost moved skipped dabs with every difference: the bench's 32-56 dabs.)
+    auto a = [](size_t i) { return 1.0 + 0.06 * std::sin(double(i) * 1.7); };
+    auto b = [](size_t i) { return 0.95 + 0.08 * std::cos(double(i) * 0.9); };
+    const Replay ra = replayStroke(framesAt(30.0), 0.07, true, a), rb = replayStroke(framesAt(144.0), 0.07, true, b);
+    CHECK(ra.placed.size() == rb.placed.size() && ra.placed.size() > 10);
+    bool same = ra.placed.size() == rb.placed.size();
+    for (size_t i = 0; same && i < ra.placed.size(); ++i)
+        same = ra.placed[i].x == rb.placed[i].x && ra.placed[i].y == rb.placed[i].y && ra.placed[i].pressure == rb.placed[i].pressure;
+    CHECK(same);
+}

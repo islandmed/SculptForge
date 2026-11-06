@@ -778,6 +778,9 @@ constexpr float kRightClickSlop = 4.0f;        // pixels a right press may move 
 constexpr double kStrokeBacklogSeconds = 0.05; // queued dabs beyond this much work are thinned (strokeTo)
 constexpr size_t kStrokeBacklogMinDabs = 4;    // ... but never fewer dabs than this waiting
 constexpr double kStrokeBacklogFloorSeconds = 0.15; // ... unless that is more than this much work (at least one)
+// The queue itself is only thinned past the limit by this much more work: DabPacer keeps it within the limit while
+// the dabs cost what they were measured to, so this only catches a misjudged cost, not a stall of a few frames.
+constexpr double kStrokeStallSeconds = 0.3;
 
 } // namespace
 
@@ -1112,6 +1115,7 @@ int App::run() {
             }
         }
         flushGrab(); // Move: the pointer's moves since the last frame, as one
+        if (dabPacer_.pending() > 0) paceDabs(); // (dabs that waited for the stroke's cost)
         if (asyncStroke_) pumpStroke();
         else drainStrokeDabs(kStrokeBudgetSeconds);
         mark();
@@ -1555,7 +1559,9 @@ void App::dispatchEvent(const SDL_Event& event) {
         onMouseUp();
         break;
     case SDL_EVENT_MOUSE_MOTION:
+        inputSeconds_ = double(e.motion.timestamp) * 1e-9; // (the dabs' times: DabPacer)
         onMouseMove(e.motion.x, e.motion.y, e.motion.xrel, e.motion.yrel, e.motion.which == SDL_PEN_MOUSEID);
+        inputSeconds_ = -1.0;
         break;
     case SDL_EVENT_MOUSE_WHEEL:
         // (Not the scroll a trackpad sends during a pinch or twist: Touch.cpp zooms for that.)
@@ -2037,6 +2043,7 @@ void App::onMouseUp() {
     }
     if (drag_ == Drag::Stroke && !maskClickPending_) steadyCatchUp(); // Steady Stroke: on to the pointer (Precision.cpp)
     if (drag_ == Drag::SizeScrub) status_ = drawSizeStatus();
+    if (drag_ == Drag::Stroke && !maskClickPending_) paceDabs(true); // (the stroke ends where the pointer did)
     if (drag_ == Drag::Stroke && maskClickPending_) maskClickRelease(); // Ctrl+click: blur / sharpen the mask
     else if (drag_ == Drag::Stroke && asyncStroke_) {
         // Predictive strokes: letting go doesn't wait for the dabs still to place; the solver carries on and
@@ -2183,7 +2190,9 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     lastX_ = x;
     lastY_ = y;
     strokePath_.reset(x, y);
+    dabPacer_.reset();
     dabQueue_.clear();
+    strokeInputAt_ = -1.0;
     dabSeconds_ = prepSeconds_ = 0.0; // measured again: the mesh and the brush may have changed
     // Predictive strokes (AsyncStroke.cpp): the solver thread, the ghost's first estimate (the picked triangle);
     // the stroke's own copies of the recipe and the alpha, which the solver thread reads (DabSettings).
@@ -2335,8 +2344,14 @@ void App::strokeTo(float x, float y) {
         }
         firstDabPending_ = false;
         lastStrokePressure_ = strokePressure();
-        if (asyncStroke_) dabQueue_.push({lastX_, lastY_, lastStrokePressure_}); // (the solver thread places it)
-        else dabAt(lastX_, lastY_, lastStrokePressure_);
+        if (interactiveStrokes_) { // (queued: the solver thread or the frame loop places it)
+            dabPacer_.add({lastX_, lastY_, lastStrokePressure_}, inputSeconds_ >= 0.0 ? inputSeconds_ : double(SDL_GetTicksNS()) * 1e-9);
+            paceDabs();
+        } else if (asyncStroke_) {
+            dabQueue_.push({lastX_, lastY_, lastStrokePressure_});
+        } else {
+            dabAt(lastX_, lastY_, lastStrokePressure_);
+        }
     }
 
     // Place dabs at even screen-space spacing along the cursor path. Every input sample counts (pens
@@ -2350,30 +2365,53 @@ void App::strokeTo(float x, float y) {
     strokeScratch_.clear();
     // (a Shift line stays straight: no curve through its corner)
     strokePath_.addSample(x, y, p0, p1, spacing, interactiveStrokes_ && !straight_.active, strokeScratch_);
-    for (const PathDab& d : strokeScratch_) dabQueue_.push(d);
     lastX_ = x;
     lastY_ = y;
     lastStrokePressure_ = p1;
     if (interactiveStrokes_) {
-        // Too far behind the pointer: place every second waiting dab only (a wider spacing under load). The limit
-        // is in time, not dabs: what the last dabs cost says how many are kStrokeBacklogSeconds of work, and never
-        // fewer than kStrokeBacklogMinDabs. A light mesh places hundreds of dabs a frame, so a small brush moved
-        // fast keeps its spacing (several input samples arrive before each frame); on a heavy mesh the brush stays
-        // near the pointer (a floor of 24 dabs was a second of work behind it at 21M triangles, and releasing
-        // placed all of them). SF_STROKE_BACKLOG=0 never drops dabs; a number is a fixed limit in dabs.
-        static const long fixedLimit = [] {
-            const char* env = std::getenv("SF_STROKE_BACKLOG");
-            return env && *env ? std::max(0L, std::strtol(env, nullptr, 10)) : -1L;
-        }();
-        // Slow dabs keep a shorter floor: about kStrokeBacklogFloorSeconds of them (SF_BACKLOG_FLOOR_MS; 0 = always 4).
-        static const double floorSeconds = [] {
-            const char* env = std::getenv("SF_BACKLOG_FLOOR_MS");
-            return env && *env ? std::max(0.0, std::strtod(env, nullptr)) / 1000.0 : kStrokeBacklogFloorSeconds;
-        }();
-        dabQueue_.thin(strokeBacklogLimit(dabSeconds_, fixedLimit, kStrokeBacklogSeconds, kStrokeBacklogMinDabs, floorSeconds));
+        // Each dab's time, between the two samples' timestamps; the pacer decides which are placed (DabPacer: the
+        // same input gives the same dabs whatever the frame rate).
+        const double t1 = inputSeconds_ >= 0.0 ? inputSeconds_ : double(SDL_GetTicksNS()) * 1e-9;
+        const double t0 = strokeInputAt_ >= 0.0 && strokeInputAt_ <= t1 ? strokeInputAt_ : t1;
+        strokeInputAt_ = t1;
+        for (const PathDab& d : strokeScratch_) dabPacer_.add(d, t0 + (t1 - t0) * double(d.at));
+        paceDabs();
     } else {
+        for (const PathDab& d : strokeScratch_) dabQueue_.push(d);
         drainStrokeDabs(0.0); // scripts, UI tests and recordings place every dab at once, as before
     }
+}
+
+size_t App::strokeBacklogLimitFor(double dabSeconds) const {
+    // Too far behind the pointer: dabs are skipped (a wider spacing under load). The limit is in time, not dabs:
+    // what the last dabs cost says how many are kStrokeBacklogSeconds of work, and never fewer than
+    // kStrokeBacklogMinDabs (slow dabs: about kStrokeBacklogFloorSeconds of them, at least one). A light mesh places
+    // hundreds of dabs a frame, so a small brush moved fast keeps its spacing; on a heavy mesh the brush stays near
+    // the pointer (a floor of 24 dabs was a second of work behind it at 21M triangles, and releasing placed all of
+    // them). SF_STROKE_BACKLOG=0 never skips dabs; a number is a fixed limit in dabs. SF_BACKLOG_FLOOR_MS: the
+    // floor's time (0 = always 4).
+    static const long fixedLimit = [] {
+        const char* env = std::getenv("SF_STROKE_BACKLOG");
+        return env && *env ? std::max(0L, std::strtol(env, nullptr, 10)) : -1L;
+    }();
+    static const double floorSeconds = [] {
+        const char* env = std::getenv("SF_BACKLOG_FLOOR_MS");
+        return env && *env ? std::max(0.0, std::strtod(env, nullptr)) / 1000.0 : kStrokeBacklogFloorSeconds;
+    }();
+    return strokeBacklogLimit(dabSeconds, fixedLimit, kStrokeBacklogSeconds, kStrokeBacklogMinDabs, floorSeconds);
+}
+
+void App::paceDabs(bool finish) {
+    // The pacer's limit comes from the stroke's fixed cost (DabPacer::cost), so it is the same from run to run too.
+    const size_t limit = strokeBacklogLimitFor(dabPacer_.cost());
+    strokePaced_.clear();
+    if (finish) dabPacer_.finish(limit, strokePaced_);
+    else dabPacer_.decide(limit, strokePaced_);
+    for (const PathDab& d : strokePaced_) dabQueue_.push(d);
+    // A misjudged cost (the dabs got slower since): the queue still stays within about kStrokeStallSeconds more of
+    // work at what they cost now (every second dab dropped).
+    if (const size_t live = strokeBacklogLimitFor(dabSeconds_); live > 0 && dabSeconds_ > 0.0 && !finish)
+        dabQueue_.thin(live + size_t(std::min(kStrokeStallSeconds / dabSeconds_, 1e6)));
 }
 
 void App::drainStrokeDabs(double budgetSeconds) {
@@ -2393,6 +2431,7 @@ void App::drainStrokeDabs(double budgetSeconds) {
         // what a dab costs on this mesh with this brush (the backlog limit in strokeTo)
         const double cost = std::chrono::duration<double>(std::chrono::steady_clock::now() - dabStart).count();
         dabSeconds_ = dabSeconds_ > 0.0 ? dabSeconds_ * 0.8 + cost * 0.2 : cost;
+        dabPacer_.measure(cost); // (the first dabs fix the stroke's cost: DabPacer)
         if (budgetSeconds > 0.0 &&
             std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() >= budgetSeconds)
             break; // at least one dab per call, so a stroke always moves on
@@ -2402,6 +2441,7 @@ void App::drainStrokeDabs(double budgetSeconds) {
         doc_.sculptor.endBatch(doc_.mesh, doc_.bvh);
         const double cost = std::chrono::duration<double>(std::chrono::steady_clock::now() - batchStart).count() / double(fused);
         dabSeconds_ = dabSeconds_ > 0.0 ? dabSeconds_ * 0.8 + cost * 0.2 : cost;
+        dabPacer_.measure(cost, fused);
     } else {
         doc_.sculptor.endBatch(doc_.mesh, doc_.bvh);
     }
@@ -2549,6 +2589,7 @@ void App::flushGrab() {
 void App::endStroke() {
     flushGrab(); // (Move: the last samples' move)
     if (asyncStroke_) solverWait(); // (the dabs in flight; then the solver thread is idle)
+    paceDabs(true); // (any still undecided)
     doc_.sculptor.microBaseFuse = true; // (big dabs on a micro level's base: these go through together)
     drainStrokeDabs(0.0); // the dabs still waiting belong to this stroke
     doc_.sculptor.microBaseFuse = false;
