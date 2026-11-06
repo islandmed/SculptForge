@@ -1,15 +1,15 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The brand in the UI (assets/branding, made by tools/brand/make_icons.py): the SF mark is the app icon (the title
-// bars, like the window icon); the bust is the illustration (About, What's New, the support card).
+// The brand in the UI (assets/branding, made by tools/brand/make_icons.py; docs/brand.md): the cube is the app icon
+// (the title bars, like the window icon); the bust is the illustration (About, What's New, the support card).
 #pragma once
 
 #include <imgui.h>
 
 namespace sf::brand {
 
-// The SF app icon `size` px wide at `at` (screen pixels); its small cut up to 32 px. Needs the GL context (draws
+// The cube app icon `size` px wide at `at` (screen pixels); its small cut up to 32 px. Needs the GL context (draws
 // from a texture uploaded on first use); without a texture it draws nothing.
 void appMark(ImDrawList* dl, ImVec2 at, float size, float alpha = 1.0f);
 void appMarkItem(float size, float alpha = 1.0f); // as an ImGui item at the cursor

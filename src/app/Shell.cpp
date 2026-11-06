@@ -1002,7 +1002,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f * s, 0.0f));
 
     // App mark and name.
-    { // the SF app icon (the same in every look), a little taller than the name
+    { // the cube app icon (the same in every look), a little taller than the name
         const float m = std::round(std::min(ImGui::GetFontSize() * 1.3f, h - 4.0f * s));
         ImGui::SetCursorPos(ImVec2(8.0f * s, std::floor((h - m) * 0.5f)));
         brand::appMarkItem(m);
@@ -1403,7 +1403,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
         return x + textW(f, t);
     };
 
-    // Brand: the SF app icon, the name.
+    // Brand: the cube app icon, the name.
     float x = o.x + 12.0f * s;
     {
         const float m = std::round(std::min(ImGui::GetFontSize() * 1.3f, h - 4.0f * s));

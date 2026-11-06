@@ -185,7 +185,7 @@ bool App::init(const AppOptions& options) {
         else if (saved.maximized || saved.fullscreen) SDL_MaximizeWindow(window_);
     }
     {
-        // The SF app icon, with its small cut as the alternate for small task bar and title bar icons.
+        // The cube app icon, with its small cut as the alternate for small task bar and title bar icons.
         Image icon, small;
         std::string iconErr;
         if (Image::decode(assets::appIcon, size_t(assets::appIcon_size), icon, iconErr)) {
