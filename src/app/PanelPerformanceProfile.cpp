@@ -47,10 +47,11 @@ struct HwProfileUi {
     FrameGovernor governor;
     GpuFrameTimer timer;
     uint64_t frame = 0;
-    double frameStartMs = 0.0;
+    double frameStartMs = 0.0, drawStartMs = -1.0; // (drawStartMs: the 3D view's draw began; -1: not this frame)
     struct Pending {
         uint64_t frame;
         FrameSample sample;
+        double cpuBeforeDrawMs; // the GPU waited through it inside the frame's timer query
     };
     std::deque<Pending> pending;   // frames waiting for their GPU time
     uint64_t revision = 0;         // performanceSettingsRevision() when last applied
@@ -240,7 +241,12 @@ void App::hardwareProfileFrameBegin() {
         activeUntil_ = std::max(activeUntil_, double(SDL_GetTicksNS()) * 1e-9 + 0.3); // keep the frames coming
     }
     hw.frameStartMs = nowMs();
+    hw.drawStartMs = -1.0;
     if (!hw.calibrator) hw.timer.begin();
+}
+
+void App::hardwareProfileDrawStart() {
+    if (hwProfile_) hwProfile_->drawStartMs = nowMs();
 }
 
 void App::hardwareProfileFrameEnd() {
@@ -258,17 +264,18 @@ void App::hardwareProfileFrameEnd() {
     hw.lastCpuMs = sample.cpuMs;
     bool changed = false;
     if (hw.timer.available()) {
-        hw.pending.push_back({frame, sample});
+        hw.pending.push_back({frame, sample, hw.drawStartMs >= 0.0 ? hw.drawStartMs - hw.frameStartMs : sample.cpuMs});
         uint64_t doneFrame = 0;
         double gpuMs = 0.0;
         while (hw.timer.poll(doneFrame, gpuMs)) {
             while (!hw.pending.empty() && hw.pending.front().frame < doneFrame) hw.pending.pop_front(); // lost
             if (!hw.pending.empty() && hw.pending.front().frame == doneFrame) {
                 FrameSample s = hw.pending.front().sample;
+                const double cpuBeforeDrawMs = hw.pending.front().cpuBeforeDrawMs;
                 hw.pending.pop_front();
                 s.gpuMs = gpuMs;
                 hw.lastGpuMs = gpuMs;
-                renderer_.noteGpuFrame(gpuMs, s.drawnTriangles);
+                renderer_.noteGpuFrame(gpuMs, s.drawnTriangles, cpuBeforeDrawMs);
                 if (proof_ && proofGpuMs_.size() < 4096) proofGpuMs_.push_back(gpuMs);
                 changed = hw.governor.addFrame(s) || changed;
             }

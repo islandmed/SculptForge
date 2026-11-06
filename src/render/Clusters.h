@@ -122,6 +122,14 @@ void coarseAttributes(CoarseLevels& levels, const Mesh& mesh, std::vector<uint32
 // Whether the cells' colours and mask are there exactly where the mesh has them.
 bool coarseAttributesMatch(const CoarseLevels& levels, const Mesh& mesh);
 
+// The measured GPU time per drawn triangle (ms; 0 = none yet), a moving average of whole-frame timer queries, after
+// one more frame: `gpuMs` for `triangles`, of which `cpuBeforeDrawMs` the CPU spent before the 3D view's first draw
+// (the UI, an action, the upload: the GPU waits through it inside the query). Frames too small to say, and samples
+// over four times the estimate (a first draw linking its shaders, a stall) move it by at most that much: one slow
+// frame never decides that a mesh's full detail can't be drawn at rest (#151: a paint layer added on a 4M mesh left
+// it on its coarse level until a restart, as coarse frames never measure the full mesh again).
+double nextGpuMsPerTriangle(double estimate, double gpuMs, double cpuBeforeDrawMs, uint64_t triangles);
+
 // Every directed edge a->b has as many b->a: the mesh is the closed, consistently wound boundary of a volume
 // (it may intersect itself). Wound outwards (a positive signed volume: the sum of ClusterBounds::volume), every
 // back face then lies behind a front face from outside. (Strictly: where no part of the surface is turned

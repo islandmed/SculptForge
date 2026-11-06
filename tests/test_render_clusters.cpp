@@ -513,3 +513,31 @@ TEST(coarse_levels_carry_colour_and_mask) {
     updateCoarseLevels(L, m, order, {0u});
     CHECK(L.colors.empty() && L.mask.empty());
 }
+
+TEST(coarse_still_frame_estimate_survives_a_slow_frame) {
+    // #151: a paint layer added on a 4.28M-triangle top level left the mesh on its coarse level at rest until a
+    // restart. The frame that added it spent ~400 ms on the CPU (the layer, the upload, the coarse levels) while the
+    // GPU timer, which brackets the whole frame, waited: 400 ms over 4.28M triangles put the full-detail still frame
+    // past its 100 ms budget, and coarse frames never measure the full mesh again.
+    const uint64_t top = 4279936;
+    double e = 0.0;
+    for (int i = 0; i < 10; ++i) e = nextGpuMsPerTriangle(e, 6.0, 0.5, top); // a 3080 Ti class GPU: ~6 ms a frame
+    const double settled = e;
+    CHECK(double(top) * settled < 10.0);
+    // The slow frame, a few times over (the add, then the coarse levels catching up): the CPU's part isn't counted.
+    for (int i = 0; i < 4; ++i) e = nextGpuMsPerTriangle(e, 420.0, 410.0, top);
+    CHECK(double(top) * e < 100.0);
+    CHECK(e < 1.5 * settled);
+    // A spike inside the draw itself (a first draw linking its shaders): one frame moves it by at most 1.6 times.
+    e = nextGpuMsPerTriangle(settled, 2000.0, 0.5, top);
+    CHECK(e <= 1.6 * settled * 1.0001);
+    CHECK(double(top) * e < 100.0);
+    // A GPU that really is that slow still gets there after a few frames.
+    e = settled;
+    for (int i = 0; i < 30; ++i) e = nextGpuMsPerTriangle(e, 300.0, 0.5, top);
+    CHECK(double(top) * e > 100.0);
+    // Frames too small to say, or with no GPU time left after the CPU's, leave it alone.
+    CHECK(nextGpuMsPerTriangle(settled, 50.0, 0.5, 100000) == settled);
+    CHECK(nextGpuMsPerTriangle(settled, 50.0, 60.0, top) == settled);
+    CHECK(nextGpuMsPerTriangle(0.0, 6.0, 0.5, top) > 0.0);
+}
