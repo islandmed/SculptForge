@@ -306,8 +306,7 @@ void App::drawAiLinkPrefs() {
         bool off = false;
         ImGui::Checkbox(tr("Let AI tools control this window##prefs.ai_live"), &off);
         ImGui::EndDisabled();
-        ImGui::SameLine();
-        ui::ManagedBadge();
+        ui::ManagedBadge(); // (its own line: the narrow Preferences window would clip it)
         return;
     }
     bool on = aiSettings_.liveControl;
