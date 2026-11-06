@@ -279,7 +279,7 @@ void App::drawSupportCard() {
     const float pad = 48.0f * k;
     float y = a.y + 40.0f * k;
     const float colW = size.x * 0.50f;
-    // Hero: the app mark, the eyebrow and the promise.
+    // Hero: the bust, the eyebrow and the promise.
     {
         const float m = 48.0f * k;
         const ImVec2 m0(a.x + pad, y), m1(m0.x + m, m0.y + m);

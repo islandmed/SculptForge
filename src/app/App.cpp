@@ -176,7 +176,7 @@ bool App::init(const AppOptions& options) {
         else if (saved.maximized || saved.fullscreen) SDL_MaximizeWindow(window_);
     }
     {
-        // The detailed tile, with the small-size mark as the alternate for small task bar and title bar icons.
+        // The SF app icon, with its small cut as the alternate for small task bar and title bar icons.
         Image icon, small;
         std::string iconErr;
         if (Image::decode(assets::appIcon, size_t(assets::appIcon_size), icon, iconErr)) {
@@ -2125,7 +2125,8 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     if (!lods_.empty() || previewLod_ >= 0) clearLods();
     beginPaintStroke();
     if (doc_.sculptor.dyntopo.enabled && strokeSculpt_ && !dyntopoBlocker(doc_.mesh).empty())
-        status_ = "Dynamic is on, but this Part has subdivision levels: sculpting without remeshing";
+        status_ = "Dynamic is on, but this Part has subdivision levels: sculpting without remeshing (Draw > Freeze "
+                  "Levels + Dynamic)";
     lastX_ = x;
     lastY_ = y;
     strokePath_.reset(x, y);
@@ -2828,6 +2829,7 @@ void App::drawUi() {
     // An Extract preview goes once its source changes or another Part is picked (strokes aren't commands).
     if (doc_.extractPreview.id && !doc_.sculptor.strokeActive()) doc_.dropExtractPreview(true);
     drawProjectPopups();
+    drawDynamicOffer();
     if (hideUi_) return; // demos: clean beauty shots
     // Draw order (ui-spec §12): shells, Library, floating windows, then pop-ups and help.
     drawShell();
@@ -2886,7 +2888,7 @@ void App::drawUi() {
         ImGui::SetNextWindowSize(ImVec2(460 * uiScale_, 0), ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (ImGui::Begin("About SculptForge", &showAbout_, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
-            brand::markItem(64.0f * uiScale_); // the app mark; beside it the name, version and what it is
+            brand::bustItem(64.0f * uiScale_); // the bust; beside it the name, version and what it is
             ImGui::SameLine(0.0f, 12.0f * uiScale_);
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (64.0f * uiScale_ - 2.0f * ImGui::GetTextLineHeightWithSpacing()) * 0.5f);
             ImGui::BeginGroup();

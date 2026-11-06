@@ -55,14 +55,18 @@ void copyButton(std::string& status, const std::string& text, const std::string&
     }
 }
 
-// The text exactly as it is pasted: monospace, read-only, selectable.
+// The text exactly as it is pasted: monospace in a framed box, never wrapped (a wrapped command pastes wrong); a line
+// wider than the window scrolls sideways. Copy takes the whole text.
 void codeBox(const std::string& text, const std::string& id, ImFont* mono) {
-    int lines = 1;
-    for (const char c : text) lines += c == '\n';
     if (mono) ImGui::PushFont(mono);
-    const float h = float(lines) * ImGui::GetTextLineHeight() + 2.0f * ImGui::GetStyle().FramePadding.y + 2.0f;
-    ImGui::InputTextMultiline(("##code" + id).c_str(), const_cast<char*>(text.c_str()), text.size() + 1,
-                              ImVec2(-1.0f, h), ImGuiInputTextFlags_ReadOnly);
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const ImVec2 textSize = ImGui::CalcTextSize(text.c_str());
+    const bool wide = textSize.x + 2.0f * style.FramePadding.x > ImGui::GetContentRegionAvail().x;
+    const float h = textSize.y + 2.0f * style.FramePadding.y + (wide ? style.ScrollbarSize : 0.0f);
+    if (ImGui::BeginChild(("##code" + id).c_str(), ImVec2(-1.0f, h), ImGuiChildFlags_FrameStyle,
+                          ImGuiWindowFlags_HorizontalScrollbar))
+        ImGui::TextUnformatted(text.c_str());
+    ImGui::EndChild();
     if (mono) ImGui::PopFont();
 }
 

@@ -17,6 +17,7 @@
 #include "app/I18n.h"
 #include "core/LitSphere.h"
 #include "core/Micro.h"
+#include "core/Multires.h"
 #include "core/VertexPaint.h"
 #include "core/Texture.h"
 
@@ -436,6 +437,11 @@ void App::registerShellActions() {
          "under the brush become triangles and UVs are dropped (Undo brings them back).",
          "Draw", "", "dyntopo", [this] { setDynamic(!doc_.sculptor.dyntopo.enabled); },
          [this] { return doc_.sculptor.dyntopo.enabled; }, nullptr});
+    add({"draw.dynamic_freeze", "Freeze Levels + Dynamic", nullptr,
+         "Keep the subdivision level shown as a plain mesh, delete the other levels and turn Dynamic on (one undo "
+         "step for the levels: Ctrl+Z brings them back).",
+         "Draw", "", "dyntopo", [this] { freezeLevelsAndDynamic(); }, nullptr,
+         [this] { return bool(doc_.mesh.multires); }});
     // Masking and visibility selection shapes (Tool > Masking, Tool > Visibility), named.
     auto shape = [this](std::string id, std::string label, std::string palette, SelectShape* target, SelectShape value,
                         std::string description) {
@@ -996,10 +1002,10 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f * s, 0.0f));
 
     // App mark and name.
-    { // the app mark (the same in every look), a little taller than the name
+    { // the SF app icon (the same in every look), a little taller than the name
         const float m = std::round(std::min(ImGui::GetFontSize() * 1.3f, h - 4.0f * s));
         ImGui::SetCursorPos(ImVec2(8.0f * s, std::floor((h - m) * 0.5f)));
-        brand::markItem(m);
+        brand::appMarkItem(m);
     }
     ImGui::SameLine(0.0f, 6.0f * s);
     ImGui::SetCursorPosY(textY);
@@ -1393,11 +1399,11 @@ void App::drawStatusBar(const ShellGeometry& g) {
         return x + textW(f, t);
     };
 
-    // Brand: the app mark, the name.
+    // Brand: the SF app icon, the name.
     float x = o.x + 12.0f * s;
     {
         const float m = std::round(std::min(ImGui::GetFontSize() * 1.3f, h - 4.0f * s));
-        brand::mark(dl, ImVec2(std::floor(x), std::floor(o.y + (h - m) * 0.5f)), m);
+        brand::appMark(dl, ImVec2(std::floor(x), std::floor(o.y + (h - m) * 0.5f)), m);
         x += m + 6.0f * s;
     }
     const bool caps = style == Status::Terminal;
@@ -2336,11 +2342,123 @@ void App::setDynamic(bool on) {
         const std::string why = dyntopoBlocker(doc_.mesh);
         if (!why.empty()) {
             status_ = why;
+            // Levels: offer to freeze them right there (a review hit a dead end here on the default sphere).
+            if (doc_.mesh.multires) openDynamicOffer_ = true;
             return;
         }
     }
     doc_.sculptor.dyntopo.enabled = on;
     status_ = dyntopoSummary(doc_.sculptor.dyntopo);
+}
+
+void App::freezeLevelsAndDynamic() {
+    if (!doc_.mesh.multires) {
+        setDynamic(true);
+        return;
+    }
+    runCommand("dyntopo", {{"enabled", true}, {"freeze_levels", true}});
+}
+
+void App::setMaskDarkness(float k) { uiPrefs_.maskDarkness = renderSettings_.maskDarkness = std::clamp(k, 0.0f, 1.0f); }
+
+void App::confirmLevelDelete(const std::string& command) {
+    pendingLevelDelete_ = command;
+    openLevelDelete_ = true;
+}
+
+void App::drawDynamicOffer() {
+    // Delete Lower / Delete Higher: say which levels go before they do.
+    static constexpr const char* kDelete = "##level_delete";
+    if (openLevelDelete_) {
+        openLevelDelete_ = false;
+        ImGui::OpenPopup(kDelete);
+    }
+    if (ImGui::BeginPopup(kDelete)) {
+        Demo::pushScope("Delete Levels");
+        const int levels = subdivLevelCount(doc_.mesh), current = subdivCurrentLevel(doc_.mesh);
+        const bool lower = pendingLevelDelete_ == "subdiv_delete_lower";
+        const int gone = lower ? current : levels - 1 - current;
+        if (gone <= 0 || pendingLevelDelete_.empty()) {
+            ImGui::CloseCurrentPopup();
+        } else {
+            if (lower)
+                ImGui::Text(tr("Delete SDiv 1 to %d? SDiv %d becomes the base mesh."), current, current + 1);
+            else
+                ImGui::Text(tr("Delete SDiv %d to %d and the detail sculpted on them?"), current + 2, levels);
+            ImGui::TextDisabled("%s", tr("Ctrl+Z brings them back."));
+            ImGui::Spacing();
+            if (ImGui::Button(tr(lower ? "Delete Lower Levels" : "Delete Higher Levels"))) {
+                ImGui::CloseCurrentPopup();
+                runCommand(pendingLevelDelete_);
+                pendingLevelDelete_.clear();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(tr("Cancel##level_delete")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                ImGui::CloseCurrentPopup();
+                pendingLevelDelete_.clear();
+            }
+        }
+        Demo::popScope();
+        ImGui::EndPopup();
+    }
+
+    // Subdivide on a Part with levels removes them: ask (Don't ask again turns it off; Preferences keep it).
+    static constexpr const char* kSubdivide = "##subdivide_confirm";
+    if (openSubdivideConfirm_) {
+        openSubdivideConfirm_ = false;
+        ImGui::OpenPopup(kSubdivide);
+    }
+    if (ImGui::BeginPopup(kSubdivide)) {
+        Demo::pushScope("Subdivide");
+        if (!doc_.mesh.multires) {
+            ImGui::CloseCurrentPopup();
+        } else {
+            ImGui::Text(tr("This removes your %d subdivision levels. Undo brings them back."), subdivLevelCount(doc_.mesh));
+            ImGui::TextDisabled(tr("SDiv %d becomes one plain mesh, then it is subdivided. Divide (keeps levels) adds a "
+                                   "level instead."),
+                                subdivCurrentLevel(doc_.mesh) + 1);
+            bool ask = !uiPrefs_.confirmSubdivide;
+            if (ImGui::Checkbox(tr("Don't ask again##subdivide"), &ask)) uiPrefs_.confirmSubdivide = !ask;
+            ImGui::Spacing();
+            if (ImGui::Button(tr("Subdivide and Remove Levels"))) {
+                ImGui::CloseCurrentPopup();
+                runCommand("subdivide");
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(tr("Cancel##subdivide")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                uiPrefs_.confirmSubdivide = true; // (Cancel doesn't stop the asking)
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        Demo::popScope();
+        ImGui::EndPopup();
+    }
+
+    static constexpr const char* kPopup = "##dynamic_offer";
+    if (openDynamicOffer_) {
+        openDynamicOffer_ = false;
+        ImGui::OpenPopup(kPopup);
+    }
+    // A plain pop-up (not modal): a click anywhere else closes it.
+    if (!ImGui::BeginPopup(kPopup)) return;
+    Demo::pushScope("Dynamic");
+    if (!doc_.mesh.multires) {
+        ImGui::CloseCurrentPopup();
+    } else {
+        ImGui::Text(tr("This Part has %d subdivision levels (%s)."), subdivLevelCount(doc_.mesh),
+                    subdivLevelText(doc_.mesh).c_str());
+        ImGui::TextDisabled("%s", tr("Dynamic needs one plain mesh: Freeze keeps the level shown and removes the "
+                                     "others (Ctrl+Z brings them back)."));
+        ImGui::Spacing();
+        if (ImGui::Button(tr("Freeze Levels and Turn On Dynamic"))) {
+            ImGui::CloseCurrentPopup();
+            freezeLevelsAndDynamic();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(tr("Cancel")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+    }
+    Demo::popScope();
+    ImGui::EndPopup();
 }
 
 void App::drawDetailSlider(const char* id) {

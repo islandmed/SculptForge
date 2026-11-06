@@ -49,7 +49,7 @@ key shift+f1
 # Ctrl-hover help names the chapter; F1 (Ctrl still held) opens it.
 click "Tool/Geometry"
 hold ctrl
-hover "Subdivide"
+hover "Subdivide (removes levels)"
 expect_help Learn more: Subdivide, remesh, decimate and LODs
 key f1
 hold none

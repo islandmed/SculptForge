@@ -32,7 +32,7 @@ expect "Piezas##tool.part"
 click "Geometría##tool.geometry"
 expect_value sdiv_levels == 0
 expect_text "Sin niveles de subdivisión"
-click "Dividir##geometry.divide"
+click "Dividir (conserva los niveles)##geometry.divide"
 expect_value sdiv_levels == 2
 expect "Res. menor##geometry.lower_res"
 shot geometria
@@ -55,7 +55,7 @@ hold none
 # The command palette finds commands by their Spanish names too.
 key f3
 type "##Command palette" Dividir
-expect "Dividir##pal.geometry.divide"
+expect "Dividir (conserva los niveles)##pal.geometry.divide"
 key escape
 
 # Back to English: the same items with their English labels.
@@ -83,7 +83,7 @@ expect "工具##palette.tool"
 expect "繪製##tool.draw"
 expect "Clay Block##brush.clayblock"
 click "幾何##tool.geometry"
-click "細分##geometry.divide"
+click "細分（保留層級）##geometry.divide"
 expect_value sdiv_levels == 3
 shot zh_geometry
 click "幾何##tool.geometry"

@@ -11,10 +11,12 @@
 
 namespace sf {
 namespace assets {
-extern const unsigned char appIcon[]; // the detailed tile, 256 px
+extern const unsigned char appIcon[]; // the SF app icon, 256 px
 extern const unsigned long long appIcon_size;
-extern const unsigned char appIconSmall[]; // the small-size mark, 64 px
+extern const unsigned char appIconSmall[]; // its small cut, 32 px
 extern const unsigned long long appIconSmall_size;
+extern const unsigned char bustMark[]; // the bust illustration, 256 px
+extern const unsigned long long bustMark_size;
 } // namespace assets
 
 namespace brand {
@@ -25,7 +27,7 @@ struct MarkTexture {
     bool tried = false;
 };
 
-// Uploaded once, with mipmaps (the tile is drawn from 48 px to a few hundred).
+// Uploaded once, with mipmaps (drawn from about 16 px to a few hundred).
 unsigned texture(MarkTexture& t, const unsigned char* bytes, unsigned long long size) {
     if (t.tried) return t.tex;
     t.tried = true;
@@ -46,22 +48,35 @@ unsigned texture(MarkTexture& t, const unsigned char* bytes, unsigned long long 
     return t.tex;
 }
 
-} // namespace
-
-void mark(ImDrawList* dl, ImVec2 at, float size, float alpha) {
-    static MarkTexture detailed, small;
-    const unsigned tex = size >= 40.0f ? texture(detailed, assets::appIcon, assets::appIcon_size)
-                                       : texture(small, assets::appIconSmall, assets::appIconSmall_size);
+void draw(ImDrawList* dl, unsigned tex, ImVec2 at, float size, float alpha) {
     if (!tex) return;
     dl->AddImage(ImTextureID(uintptr_t(tex)), at, ImVec2(at.x + size, at.y + size), ImVec2(0, 0), ImVec2(1, 1),
                  ImGui::GetColorU32(ImVec4(1, 1, 1, alpha)));
 }
 
-void markItem(float size, float alpha) {
+void item(void (*paint)(ImDrawList*, ImVec2, float, float), float size, float alpha) {
     const ImVec2 at = ImGui::GetCursorScreenPos();
     ImGui::Dummy(ImVec2(size, size));
-    mark(ImGui::GetWindowDrawList(), at, size, alpha);
+    paint(ImGui::GetWindowDrawList(), at, size, alpha);
 }
+
+} // namespace
+
+void appMark(ImDrawList* dl, ImVec2 at, float size, float alpha) {
+    static MarkTexture full, small;
+    draw(dl,
+         size > 32.0f ? texture(full, assets::appIcon, assets::appIcon_size)
+                      : texture(small, assets::appIconSmall, assets::appIconSmall_size),
+         at, size, alpha);
+}
+
+void bust(ImDrawList* dl, ImVec2 at, float size, float alpha) {
+    static MarkTexture tex;
+    draw(dl, texture(tex, assets::bustMark, assets::bustMark_size), at, size, alpha);
+}
+
+void appMarkItem(float size, float alpha) { item(appMark, size, alpha); }
+void bustItem(float size, float alpha) { item(bust, size, alpha); }
 
 } // namespace brand
 } // namespace sf

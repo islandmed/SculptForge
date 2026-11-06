@@ -383,6 +383,7 @@ uniform vec3 uBaseColor;
 uniform vec3 uTintShift; // the material tint less 1 (0, the default, is no tint): the active colour, no vertex paint
 uniform int uPaint;      // 1: vertex colours replace the base colour
 uniform int uShowMask;   // 1: darken masked areas
+uniform float uMaskDarkness; // RenderSettings::maskDarkness, 0..1
 uniform int uGroups;     // 0: off, 1: per-triangle ids from uGroupIds, 2: everything is group 0, 3: per-triangle
                          // colours (0xBBGGRR) from uGroupIds (the UV Editor's overlay)
 uniform usamplerBuffer uGroupIds;
@@ -398,6 +399,13 @@ uniform float uAlpha;         // X-Ray: the see-through Parts' opacity (1 = opaq
 uniform int uTwoSided;        // 1: back faces shade with the normal turned towards the viewer; 0: the motion proxy,
                               // whose folds face backwards on the outside of the surface
 out vec4 fragColor;
+// Masked areas: a cool dark tint that keeps the form readable (darkest at 1). The vertex mask is eased so its
+// edge is a soft band rather than a hard, stepped one along the triangles.
+vec3 maskTint(vec3 c, float m) {
+    float k = smoothstep(0.0, 1.0, clamp(m, 0.0, 1.0)) * uMaskDarkness;
+    vec3 tinted = c * vec3(0.20, 0.22, 0.30) + vec3(0.006, 0.008, 0.016);
+    return mix(c, tinted, k);
+}
 vec4 finish(vec3 c) {
     if (uDim == 1) c = mix(c, vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), 0.25) * 0.72;
     vec3 g = pow(c, vec3(1.0 / 2.2));
@@ -561,7 +569,7 @@ void main() {
         if (uHasEmissive == 1) emissive = texture(uEmissiveTex, vUv).rgb;
 #endif
         vec3 c = toneMapped(pbrShade(albedo, n, v, rough, metal, ao, curvature, emissive));
-        if (uShowMask == 1) c *= 1.0 - 0.75 * clamp(V_MASK, 0.0, 1.0);
+        if (uShowMask == 1) c = maskTint(c, V_MASK);
         fragColor = finish(c);
         return;
     }
@@ -578,7 +586,7 @@ void main() {
         float mcrease = smoothstep(0.03, 0.18, curvature);
         float mridge = smoothstep(0.03, 0.2, -curvature);
         vec3 c = mc * tint * (1.0 - uLitSphereCavity.x * mcrease) * (1.0 + uLitSphereCavity.y * mridge);
-        if (uShowMask == 1) c *= 1.0 - 0.75 * clamp(V_MASK, 0.0, 1.0);
+        if (uShowMask == 1) c = maskTint(c, V_MASK);
         fragColor = finish(c);
         return;
     }
@@ -600,7 +608,7 @@ void main() {
     c += albedo * ridge * 0.3 * diff;                           // ridges catch the key light
     c += vec3(spec) * (1.0 - crease) + rim * vec3(0.8, 0.85, 1.0);
     c = c * uLightLevels.x + albedo * uLightLevels.y * 0.6;
-    if (uShowMask == 1) c *= 1.0 - 0.75 * clamp(V_MASK, 0.0, 1.0);
+    if (uShowMask == 1) c = maskTint(c, V_MASK);
     fragColor = finish(c);
 }
 )";
@@ -623,6 +631,36 @@ const char* kWireFS = R"(#version 330 core
 uniform float uAlpha;
 out vec4 fragColor;
 void main() { fragColor = vec4(0.05, 0.05, 0.08, uAlpha); }
+)";
+
+// The edge list's variant: edges shorter than a few pixels on screen fade out, so a dense mesh (1M+ triangles on a
+// sphere) shows its wireframe as a light veil instead of a dark moire that hides the form and the mask.
+const char* kWireLineGS = R"(#version 330 core
+layout(lines) in;
+layout(line_strip, max_vertices = 2) out;
+uniform vec2 uViewportPx;
+uniform float uAlpha;
+out float gAlpha;
+void main() {
+    vec4 a = gl_in[0].gl_Position, b = gl_in[1].gl_Position;
+    float fade = 1.0;
+    if (a.w > 0.0 && b.w > 0.0) {
+        float px = length((b.xy / b.w - a.xy / a.w) * 0.5 * uViewportPx);
+        fade = mix(0.18, 1.0, smoothstep(2.0, 7.0, px));
+    }
+    gAlpha = uAlpha * fade;
+    gl_Position = a;
+    EmitVertex();
+    gl_Position = b;
+    EmitVertex();
+    EndPrimitive();
+}
+)";
+
+const char* kWireLineFS = R"(#version 330 core
+in float gAlpha;
+out vec4 fragColor;
+void main() { fragColor = vec4(0.05, 0.05, 0.08, gAlpha); }
 )";
 
 // checkVertexIdBase: does gl_VertexID include the base vertex of glDrawElementsBaseVertex (it should)?
@@ -889,6 +927,8 @@ bool Renderer::init(std::string& error) {
         }
     wireProgram_ = link(kWireVS, kWireFS, error);
     if (!wireProgram_) return false;
+    wireLineProgram_ = link(kWireVS, kWireLineFS, error, nullptr, kWireLineGS);
+    if (!wireLineProgram_) return false;
     bgProgram_ = link(kBgVS, kBgFS, error);
     if (!bgProgram_) return false;
     splatProgram_ = link(kSplatVS, kSplatFS, error);
@@ -959,6 +999,7 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.tintShift = at("uTintShift");
     p.paint = at("uPaint");
     p.showMask = at("uShowMask");
+    p.maskDarkness = at("uMaskDarkness");
     p.groups = at("uGroups");
     p.litsphere = at("uLitSphere");
     p.litsphereCavity = at("uLitSphereCavity");
@@ -1199,6 +1240,7 @@ void Renderer::shutdown() {
         p = MeshProgram();
     }
     deleteProgram(wireProgram_);
+    deleteProgram(wireLineProgram_);
     deleteProgram(bgProgram_);
     deleteProgram(splatProgram_);
     gl::DeleteBuffers(1, &splatData_);
@@ -2993,32 +3035,39 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     gl::ActiveTexture(GL_TEXTURE0);
 
     if (settings.wireframe) { // the active Part only
-        gl::UseProgram(wireProgram_);
-        gl::UniformMatrix4fv(gl::GetUniformLocation(wireProgram_, "uView"), 1, GL_FALSE, glm::value_ptr(view));
-        gl::UniformMatrix4fv(gl::GetUniformLocation(wireProgram_, "uProj"), 1, GL_FALSE, glm::value_ptr(proj));
+        // Two programs: edge lists fade their sub-pixel edges (kWireLineGS); triangle outlines draw as before.
+        auto use = [&](GLuint prog, const MeshSlot& slot) {
+            gl::UseProgram(prog);
+            gl::UniformMatrix4fv(gl::GetUniformLocation(prog, "uView"), 1, GL_FALSE, glm::value_ptr(view));
+            gl::UniformMatrix4fv(gl::GetUniformLocation(prog, "uProj"), 1, GL_FALSE, glm::value_ptr(proj));
+            gl::Uniform3fv(gl::GetUniformLocation(prog, "uGridOrigin"), 1, glm::value_ptr(slot.grid.origin));
+            gl::Uniform1f(gl::GetUniformLocation(prog, "uGridStep"), slot.grid.step);
+            if (prog == wireLineProgram_)
+                gl::Uniform2f(gl::GetUniformLocation(prog, "uViewportPx"), float(fbWidth), float(fbHeight));
+            return prog;
+        };
         gl::Enable(GL_BLEND);
         gl::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         gl::DepthMask(GL_FALSE);
         for (const DrawItem& item : drawList_) {
             const MeshSlot* s = item.active ? findSlot(item.id) : nullptr;
             if (!s || s->drawnTriangles == 0 || s->micro) continue; // (micro levels: drawMicro draws theirs)
-            gl::Uniform3fv(gl::GetUniformLocation(wireProgram_, "uGridOrigin"), 1, glm::value_ptr(s->grid.origin));
-            gl::Uniform1f(gl::GetUniformLocation(wireProgram_, "uGridStep"), s->grid.step);
             cull(*s, frameCull_);
             if (!s->patches.empty() && s->patchVao) { // dynamic topology's patches
                 const bool lines = s->patchLinesOn;
-                gl::Uniform1f(gl::GetUniformLocation(wireProgram_, "uAlpha"), lines ? 0.5775f : 0.35f);
+                const GLuint prog = use(lines ? wireLineProgram_ : wireProgram_, *s);
+                gl::Uniform1f(gl::GetUniformLocation(prog, "uAlpha"), lines ? 0.5775f : 0.35f);
                 if (!lines) gl::PolygonMode(GL_FRONT_AND_BACK, GL_LINE);
                 gl::BindVertexArray(lines ? s->patchLineVao : s->patchVao);
                 drawPatches(*s, lines ? GL_LINES : GL_TRIANGLES, lines ? DrawPart::Lines : DrawPart::Triangles, -1);
                 if (!lines) gl::PolygonMode(GL_FRONT_AND_BACK, GL_FILL);
             }
             if (s->linesValid) {
-                gl::Uniform1f(gl::GetUniformLocation(wireProgram_, "uAlpha"), 0.5775f); // 1 - (1 - 0.35)^2
+                gl::Uniform1f(gl::GetUniformLocation(use(wireLineProgram_, *s), "uAlpha"), 0.5775f); // 1 - (1 - 0.35)^2
                 gl::BindVertexArray(s->lineVao);
                 drawClusters(*s, drawClusters_, GL_LINES, DrawPart::Lines, -1);
             } else { // edges not built (a mesh not synced for the wireframe): outline the triangles
-                gl::Uniform1f(gl::GetUniformLocation(wireProgram_, "uAlpha"), 0.35f);
+                gl::Uniform1f(gl::GetUniformLocation(use(wireProgram_, *s), "uAlpha"), 0.35f);
                 gl::PolygonMode(GL_FRONT_AND_BACK, GL_LINE);
                 gl::BindVertexArray(s->vao);
                 drawClusters(*s, drawClusters_, GL_TRIANGLES, DrawPart::Triangles, -1);
@@ -3162,6 +3211,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     gl::Uniform2f(p->litsphereCavity, cavity.crease, cavity.ridge);
     gl::Uniform1i(p->paint, 0);
     gl::Uniform1i(p->showMask, active && settings.showMask ? 1 : 0);
+    gl::Uniform1f(p->maskDarkness, std::clamp(settings.maskDarkness, 0.0f, 1.0f));
     gl::Uniform1i(p->groups, active && settings.showFaceGroups ? 2 : 0);
     gl::Uniform1i(p->dim, !active && settings.dimInactive ? 1 : 0);
     gl::Uniform1i(p->microWire, active && settings.wireframe ? 1 : 0); // (#128: the wireframe pass skips micro levels)
@@ -3258,6 +3308,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::ActiveTexture(GL_TEXTURE0);
     gl::Uniform1i(p->paint, settings.showVertexPaint && s.hasColors ? 1 : 0);
     gl::Uniform1i(p->showMask, active && settings.showMask && s.hasMask ? 1 : 0);
+    gl::Uniform1f(p->maskDarkness, std::clamp(settings.maskDarkness, 0.0f, 1.0f));
     gl::Uniform1i(p->groups, groups);
     gl::Uniform1i(p->dim, !active && settings.dimInactive ? 1 : 0);
     setLightUniforms(*p, settings);

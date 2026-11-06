@@ -4,6 +4,7 @@
 // Tool > Geometry: subdivision levels (Lower Level / Higher Level, SDiv, Delete Lower / Delete Higher,
 // Reconstruct Subdiv, Divide with Smt). The levels themselves live in core/Multires.
 #include "app/App.h"
+#include "app/Palettes.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
 
@@ -65,8 +66,10 @@ void App::drawGeometrySection() {
         ImGui::TextDisabled("%s", tr("No subdivision levels - Divide adds them"));
     }
 
-    // Micro: displacement levels above the highest level (core/Micro.h). One row: the level slider and Divide to
-    // Micro (or Bake / Delete once there is one), so the section stays as tall as before.
+    // Micro: displacement levels above the highest level (core/Micro.h), in a group of its own: Divide and Delete
+    // Lower / Delete Higher change the levels, Micro only adds detail on top (a tester mixed them up side by side).
+    ImGui::Spacing();
+    tray::GroupLabel(*this, "Micro Detail");
     const bool micro = hasMicro(m);
     if (micro) microSlider_ = float(microLevel(m));
     const float sliderW = std::floor(ImGui::GetContentRegionAvail().x * 0.42f);

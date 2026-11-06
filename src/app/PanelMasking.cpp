@@ -429,6 +429,11 @@ void App::drawMaskingSection() {
                      "Tool > Masking");
     }
     ImGui::SetNextItemWidth(-1);
+    if (float k = uiPrefs_.maskDarkness; ui::SliderInside("##maskdarkness", &k, 0.0f, 1.0f, "Mask Darkness %.2f"))
+        setMaskDarkness(k);
+    ui::HelpText("Mask Darkness", nullptr, "How dark masked areas show (also in Preferences > Interface).",
+                 "Tool > Masking");
+    ImGui::SetNextItemWidth(-1);
     ui::SliderInside("##maskstrength", &maskStrength_, 0.01f, 1.0f, "Mask Strength %.2f");
 
     // Mask by: whole-mesh masks from the shape, the paint, the groups and the border. Each replaces the mask.

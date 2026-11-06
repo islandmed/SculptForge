@@ -5,6 +5,7 @@
 // (Tool > Deformation). The work is done by the extract / mirror_and_weld / mirror commands (core/ExtractMirror.h).
 #include "app/App.h"
 #include "app/Demo.h"
+#include "app/I18n.h"
 #include "app/Palettes.h"
 #include "app/Ui.h"
 
@@ -34,8 +35,17 @@ void App::drawExtractContents() {
     ui::ActionButton(*this, "part.extract", ImVec2(half, 0));
     ui::HelpAction(*this, "part.extract");
     ImGui::SameLine();
-    ui::ActionButton(*this, "part.extract_accept", ImVec2(-1, 0));
-    ui::HelpAction(*this, "part.extract_accept");
+    // Extract works on the mask: without one, say so where Accept would be (a review read the greyed-out buttons
+    // as unclickable); the row keeps its height.
+    if (!doc_.mesh.hasMask() && !doc_.extractPreviewCurrent()) {
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("%s", tr("Mask first (Ctrl+drag)"));
+        ui::HelpText("Extract", nullptr, "Extract makes a shell from the masked area: mask it first (Ctrl+drag on the model).",
+                     "Tool > Parts > Extract");
+    } else {
+        ui::ActionButton(*this, "part.extract_accept", ImVec2(-1, 0));
+        ui::HelpAction(*this, "part.extract_accept");
+    }
 
     // The settings: changing one while the preview shows extracts again, so the preview follows.
     bool changed = false;
