@@ -136,7 +136,7 @@ struct UiPrefs {
     // File > Maya (#42). Kept in <prefs>/maya.json, never in ui.json, so a shared UI layout can't point the bridge
     // at a folder: it is set only by the user's own pick (App::setMayaFolder).
     std::string mayaFolder;        // "" = the bridge is off
-    bool mayaAutoReceive = false;  // Get automatically: check that folder's manifest once a second
+    bool mayaAutoReceive = false;  // Get automatically (on once a folder is chosen): check its manifest once a second
 };
 
 Json toJson(const UiPrefs& prefs);

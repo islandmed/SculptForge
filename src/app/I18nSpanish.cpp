@@ -1100,9 +1100,10 @@ constexpr Entry kSpanish[] = {
      "nombre (se puede deshacer) o pasa a ser una nueva."},
     {"Exchange folder...", "Carpeta de intercambio..."},
     {"Choose the folder SculptForge and Maya exchange meshes through (pick the same one in Maya's shelf script). "
-     "SculptForge reads and writes only there, and only when you send or get.",
+     "SculptForge reads and writes only there: when you send or get, and when Maya sends while Get automatically is on.",
      "Elige la carpeta por la que SculptForge y Maya intercambian mallas (elige la misma en el script del estante de "
-     "Maya). SculptForge solo lee y escribe ahí, y solo cuando envías o recibes."},
+     "Maya). SculptForge solo lee y escribe ahí: cuando envías o recibes, y cuando Maya envía con Recibir "
+     "automáticamente activado."},
     {"Add the brush on the clipboard: a brush code someone shared, or the text of a .sfbrush file.",
      "Añade el pincel del portapapeles: un código de pincel que alguien compartió, o el texto de un archivo .sfbrush."},
     {"Every brush keeps its own Size, Intensity, Falloff, Colour intensity, stroke and alpha while you work. This "
@@ -2067,10 +2068,10 @@ constexpr Entry kSpanish[] = {
     // --- PanelMaya.cpp (tools/i18n/coverage.py) ---
     {"Get automatically", "Recibir automáticamente"},
     {"Load what Maya sends as soon as it arrives: SculptForge checks the exchange folder's manifest once a second "
-     "(its modification time and size only). Off by default; off: use Get from Maya.",
+     "(its modification time and size only). On once you choose the folder; off: use Get from Maya.",
      "Carga lo que envía Maya en cuanto llega: SculptForge comprueba el manifiesto de la carpeta de intercambio una "
-     "vez por segundo (solo su fecha de modificación y su tamaño). Desactivado por defecto; desactivado: usa Recibir "
-     "de Maya."},
+     "vez por segundo (solo su fecha de modificación y su tamaño). Activado al elegir la carpeta; desactivado: usa "
+     "Recibir de Maya."},
     {"Turn the Maya bridge off", "Desactivar el puente con Maya"},
     {"Forget the exchange folder; nothing in it is deleted.",
      "Olvida la carpeta de intercambio; no se borra nada de ella."},

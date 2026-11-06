@@ -11,13 +11,17 @@ space, Maya's own units, one object per file); a small JSON manifest per directi
     <folder>/sculptforge_to_maya/manifest.json + r<rev>_<k>.obj   written by SculptForge (File > Maya > Send to Maya)
 
 Get from SculptForge replaces each object's mesh by name, keeping its transform, parent and shading groups, as
-one undo step; objects Maya doesn't have yet are created. Plain maya.cmds (and maya.mel for the shelf); no other
-modules. Install: see README.md beside this file, or run install_shelf() once.
+one undo step; objects Maya doesn't have yet are created. Auto (on by default) does the Get by itself when
+SculptForge sends: once a second a background thread looks at the modification time and size of SculptForge's
+manifest (nothing else in the folder), and only when they change is the Get run, in Maya's main thread. Plain
+maya.cmds (maya.mel for the shelf, maya.utils for Auto) and the standard library. Install: see README.md beside
+this file, or run install_shelf() once.
 """
 
 import json
 import os
 import re
+import threading
 
 FORMAT = "sculptforge-maya"
 VERSION = 1
@@ -30,6 +34,9 @@ MAX_FILE_NAME = 64
 
 FOLDER_VAR = "sculptforgeExchangeFolder"
 REVISION_VAR = "sculptforgeLastRevision"
+AUTO_VAR = "sculptforgeAutoGet"
+AUTO_BUTTON = "sculptforgeAutoButton"
+POLL_SECONDS = 1.0
 SHELF = "SculptForge"
 IMPORT_NAMESPACE = "sculptforge_get"
 OBJ_EXPORT_OPTIONS = "groups=0;ptgroups=0;materials=0;smoothing=0;normals=0"
@@ -171,6 +178,50 @@ def remove_old_sends(box, keep_prefix):
                 pass  # open elsewhere: the next send tries again
 
 
+def manifest_stamp(box):
+    """The modification time and size of <box>/manifest.json, or None when there is none: what Auto checks once a
+    second (cheap, and safe from any thread); the manifest itself is read only when this changes."""
+    try:
+        st = os.lstat(os.path.join(box, "manifest.json"))
+    except OSError:
+        return None
+    return (st.st_mtime_ns, st.st_size)
+
+
+class Watcher(object):
+    """Auto: watches one box's manifest from a daemon thread and hands `on_change` to `defer` (Maya's
+    executeDeferred: the main thread, when Maya is idle) when it changed. What is there when it starts is old
+    news: Get loads it."""
+
+    def __init__(self, box, defer, on_change):
+        self.box = box
+        self.defer = defer
+        self.on_change = on_change
+        self.seen = manifest_stamp(box)
+        self.stopped = threading.Event()
+        self.thread = None
+
+    def poll(self):
+        """One check: True when the manifest is there and changed since the last check."""
+        stamp = manifest_stamp(self.box)
+        if stamp is None or stamp == self.seen:
+            return False
+        self.seen = stamp
+        return True
+
+    def _run(self):
+        while not self.stopped.wait(POLL_SECONDS):
+            if self.poll():
+                self.defer(self.on_change)
+
+    def start(self):
+        self.thread = threading.Thread(target=self._run, name="SculptForge Auto Get", daemon=True)
+        self.thread.start()
+
+    def stop(self):
+        self.stopped.set()
+
+
 def unique_names(names):
     out = []
     for name in names:
@@ -213,6 +264,7 @@ def choose_folder():
     folder = picked[0]
     cmds.optionVar(sv=(FOLDER_VAR, folder))
     _message("exchange folder: " + folder)
+    start_auto_get()
     return folder
 
 
@@ -293,6 +345,7 @@ def send_to_sculptforge():
     write_atomically(os.path.join(box, "manifest.json"),
                      write_manifest(objects, revision, cmds.about(version=True), cmds.currentUnit(q=True, linear=True)))
     remove_old_sends(box, prefix)
+    start_auto_get()
     return _message("sent %d mesh%s to SculptForge" % (len(objects), "" if len(objects) == 1 else "es"))
 
 
@@ -348,6 +401,7 @@ def get_from_sculptforge():
     if not folder:
         return _message("no exchange folder chosen", warning=True)
     box = os.path.join(folder, TO_MAYA)
+    start_auto_get()
     try:
         manifest = read_manifest(box) if os.path.isdir(box) and not os.path.islink(box) else None
     except ValueError as e:
@@ -380,8 +434,73 @@ def get_from_sculptforge():
     return _message("got %d mesh%s from SculptForge" % (len(done), "" if len(done) == 1 else "es"))
 
 
+# ---- Auto: Get by itself when SculptForge sends ----
+
+_watcher = None
+
+
+def auto_get_on():
+    """Auto is on unless turned off with the shelf's Auto button."""
+    cmds = _cmds()
+    return not cmds.optionVar(exists=AUTO_VAR) or bool(cmds.optionVar(q=AUTO_VAR))
+
+
+def _auto_get_new():
+    """Main thread, after the manifest changed: Get, unless that revision is already loaded (or Auto went off)."""
+    cmds = _cmds()
+    folder = exchange_folder(ask=False)
+    if not auto_get_on() or not folder:
+        return
+    try:
+        manifest = read_manifest(os.path.join(folder, TO_MAYA))
+    except ValueError:
+        manifest = None  # half written, or not valid: Get says why; the next change is checked again
+    if not manifest or not manifest["objects"]:
+        return
+    if cmds.optionVar(exists=REVISION_VAR) and cmds.optionVar(q=REVISION_VAR) == manifest["revision"]:
+        return
+    get_from_sculptforge()
+
+
+def start_auto_get():
+    """Starts watching what SculptForge sends (Send, Get and Folder call this: Auto runs from the first use of the
+    shelf in a Maya session). Stops when Auto is off or there is no folder."""
+    global _watcher
+    folder = exchange_folder(ask=False) if auto_get_on() else ""
+    box = os.path.join(folder, TO_MAYA) if folder else ""
+    if _watcher and _watcher.box == box:
+        return _watcher
+    if _watcher:
+        _watcher.stop()
+        _watcher = None
+    if box:
+        import maya.utils
+        _watcher = Watcher(box, maya.utils.executeDeferred, _auto_get_new)
+        _watcher.start()
+    return _watcher
+
+
+def _auto_label():
+    return "Auto" if auto_get_on() else "Manual"
+
+
+def toggle_auto_get():
+    """The shelf's Auto button: Get by itself when SculptForge sends (on), or only with Get (off)."""
+    cmds = _cmds()
+    cmds.optionVar(iv=(AUTO_VAR, 0 if auto_get_on() else 1))
+    start_auto_get()
+    try:
+        if cmds.shelfButton(AUTO_BUTTON, exists=True):
+            cmds.shelfButton(AUTO_BUTTON, edit=True, label=_auto_label(), imageOverlayLabel=_auto_label())
+    except Exception:
+        pass
+    if auto_get_on():
+        return _message("Auto on: what SculptForge sends loads by itself")
+    return _message("Auto off: click Get to load what SculptForge sends")
+
+
 def install_shelf():
-    """Creates the SculptForge shelf: Send, Get and Folder buttons. Run once, after putting this file in a
+    """Creates the SculptForge shelf: Send, Get, Auto and Folder buttons. Run once, after putting this file in a
     folder on Maya's script path (README.md)."""
     cmds = _cmds()
     import maya.mel as mel
@@ -392,14 +511,17 @@ def install_shelf():
     buttons = [
         ("Send", "Send the selected meshes to SculptForge", "send_to_sculptforge"),
         ("Get", "Get what SculptForge sent (replaces meshes by name)", "get_from_sculptforge"),
+        (_auto_label(), "Auto: get what SculptForge sends by itself (click to turn on or off)", "toggle_auto_get"),
         ("Folder", "Choose the exchange folder (the same one as in SculptForge)", "choose_folder"),
     ]
     for label, tip, func in buttons:
-        cmds.shelfButton(parent=shelf, label=label, imageOverlayLabel=label, annotation=tip,
+        name = [AUTO_BUTTON] if func == "toggle_auto_get" else []
+        cmds.shelfButton(*name, parent=shelf, label=label, imageOverlayLabel=label, annotation=tip,
                          image="pythonFamily.png", sourceType="python",
                          command="import sculptforge_maya\nsculptforge_maya.%s()" % func)
     try:
         mel.eval("saveAllShelves $gShelfTopLevel")
     except Exception:
         pass
+    start_auto_get()
     return _message("SculptForge shelf installed")

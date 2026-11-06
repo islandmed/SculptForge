@@ -16,7 +16,8 @@ there. The bridge is off until you choose the folder.
 2. Copy `sculptforge_maya.py` into your Maya scripts folder: `Documents\maya\scripts\` on Windows,
    `~/Library/Preferences/Autodesk/maya/scripts/` on macOS, `~/maya/scripts/` on Linux.
 3. In Maya open the **Script Editor**, and in a **Python** tab run `import sculptforge_maya` and then
-   `sculptforge_maya.install_shelf()`. A **SculptForge** shelf appears with **Send**, **Get** and **Folder**.
+   `sculptforge_maya.install_shelf()`. A **SculptForge** shelf appears with **Send**, **Get**, **Auto** and
+   **Folder**. (Updating from an older shelf: copy the new file and run `install_shelf()` again.)
 
 The script uses plain `maya.cmds` and Maya's own OBJ exporter; it needs Maya 2022 or newer.
 
@@ -26,21 +27,27 @@ The script uses plain `maya.cmds` and Maya's own OBJ exporter; it needs Maya 202
    empty `Documents/SculptForge Maya`.
 2. In Maya click **Folder** on the SculptForge shelf and pick the same folder.
 
-**File > Maya** shows the folder; **Turn the Maya bridge off** forgets it (nothing in it is deleted).
+**File > Maya** shows the folder; **Turn the Maya bridge off** forgets it (nothing in it is deleted). While the
+bridge is on, the top bar has a **Send to Maya** button.
 
 ## A round trip
 
 1. In Maya select one or more meshes and click **Send** on the SculptForge shelf.
-2. In SculptForge choose **File > Maya > Get from Maya**. Each mesh becomes a Part with its Maya name; a
-   Part with that name already there is replaced (one undo step on that Part).
+2. SculptForge loads them by itself. Each mesh becomes a Part with its Maya name; a Part with that name already
+   there is replaced (one undo step on that Part).
 3. Sculpt, paint, divide, remesh: anything SculptForge does.
-4. Choose **File > Maya > Send to Maya**. Every visible Part goes.
-5. In Maya click **Get**. Each object that came from Maya gets the new mesh and keeps its transform, parent and
-   shading groups; a Part you added in SculptForge becomes a new object. The whole Get is one undo step in
-   Maya.
+4. Click **Send to Maya** in the top bar (or **File > Maya > Send to Maya**). Every visible Part goes.
+5. Maya loads them by itself. Each object that came from Maya gets the new mesh and keeps its transform,
+   parent and shading groups; a Part you added in SculptForge becomes a new object. The whole Get is one undo
+   step in Maya.
 
-**Get automatically** (in **File > Maya**, off by default) loads what Maya sends as soon as it arrives:
-SculptForge checks the folder's manifest once a second.
+Both sides pick up a send by checking the other side's manifest once a second (its modification time and size
+only), and only for sends made after the bridge started: something sent earlier waits for a manual Get.
+
+- In SculptForge, **File > Maya > Get automatically** is on once you choose the folder; turn it off to load
+  only with **Get from Maya**.
+- In Maya, **Auto** on the shelf is on by default and starts with the first Send, Get or Folder click in a Maya
+  session; click it to switch to **Manual**, where only **Get** loads.
 
 ## What comes across
 
@@ -78,5 +85,7 @@ The commands are `maya_send folder=<folder>` and `maya_receive folder=<folder>` 
 - **"Nothing has been sent from Maya yet"**: check that both apps use the same folder (open **File > Maya** in
   SculptForge; click **Folder** in Maya to see or change it).
 - **Get in Maya says nothing has been sent**: choose **File > Maya > Send to Maya** in SculptForge first.
+- **Maya doesn't load a send by itself**: Auto starts with the first click on the shelf in a Maya session; click
+  **Get** once (or **Send**), and check that the button says **Auto**, not **Manual**.
 - **A mesh came in as a new object instead of replacing one**: Get matches the transform's name; renaming the
   object in Maya or the Part's Maya name breaks the link.
