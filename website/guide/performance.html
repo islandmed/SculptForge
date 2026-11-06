@@ -53,6 +53,7 @@
       <article class="guide-article">
 <h1 id="performance-and-big-meshes">Performance and big meshes</h1>
 <p>SculptForge is built to sculpt tens of millions of polygons. Brushes, normal updates and the picking structure run on every core of your processor, a stroke sends the graphics card only the part of the mesh it changed, and undo stores only the vertices a stroke touched, so it stays quick however big the model is. This chapter explains what to expect, the settings in <strong>Edit &gt; Preferences &gt; Performance</strong>, and how to get the most out of a big sculpt.</p>
+<p>What we&#x27;re building next, and how each piece works: <a href="https://sculptforge.app/performance/" rel="noopener">Performance: what we&#x27;re building</a>.</p>
 <figure class="shot"><a href="images/performance-panel.jpg" class="zoom"><img src="images/performance-panel.jpg" alt="Edit &gt; Preferences &gt; Performance after a stroke: antialiasing, Fast Navigation, multithreading, what the stroke cost per dab, and memory" width="535" height="780" loading="lazy" decoding="async"></a><figcaption>Edit &gt; Preferences &gt; Performance after a stroke: antialiasing, Fast Navigation, multithreading, what the stroke cost per dab, and memory</figcaption></figure>
 <h2 id="what-to-expect">What to expect<a class="anchor" href="#what-to-expect" aria-label="Link to this section">#</a></h2>
 <p>On a 2021 laptop (Apple M1 Pro, 10 cores, integrated GPU), with X symmetry on and a medium Size:</p>
@@ -150,6 +151,7 @@ sculptforge --benchmark --benchmark-sizes 5,20,33 --benchmark-out spheres.json</
           SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
       </div>
       <div class="links">
+        <a href="../performance/">Performance</a>
         <a href="index.html">User guide</a>
         <a href="../supporters.html">Members</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>

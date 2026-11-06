@@ -6,6 +6,8 @@ undo stores only the vertices a stroke touched, so it stays quick however big th
 explains what to expect, the settings in **Edit > Preferences > Performance**, and how to get the most out of a big
 sculpt.
 
+What we're building next, and how each piece works: [Performance: what we're building](https://sculptforge.app/performance/).
+
 ![Edit > Preferences > Performance after a stroke: antialiasing, Fast Navigation, multithreading, what the stroke cost per dab, and memory](images/performance-panel.jpg)
 
 ## What to expect
