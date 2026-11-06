@@ -114,6 +114,8 @@
 //                            style_window_min (ImGui's minimum window height, unscaled px: 32 in every look),
 //                            tablet_mouse_mode (Preferences > Tablet > Mouse mode),
 //                            ui_mouse_x / ui_mouse_y (where ImGui sees the pointer), backface_culling, drawn_triangles,
+//                            floor_grid (View > Display > Floor grid), floor_grid_drawn (the 3D view drawn once more
+//                            now: 1 if it drew the grid),
 //                            viewport_cursor (the system cursor: 0 arrow, 1 text, 7 hand, 100 crosshair; #73),
 //                            panel_drag_scrolls (left / middle drags that scrolled a panel, #100), panel_drag_scroll_y,
 //                            drag_cursor (the same, at the end of the last button_drag, before letting go; #88),
@@ -1090,6 +1092,11 @@ double Demo::query(const std::string& name, bool& known) const {
         return n;
     }
     if (name == "backface_culling") return app_.renderSettings_.backfaceCulling ? 1.0 : 0.0;
+    if (name == "floor_grid") return app_.renderSettings_.floorGrid ? 1.0 : 0.0;
+    if (name == "floor_grid_drawn") { // the 3D view drawn once more now: 1 if it drew the floor grid
+        app_.benchmarkDrawMs(0);
+        return app_.renderer_.floorGridDrawn() ? 1.0 : 0.0;
+    }
     if (name == "xray") return app_.renderSettings_.xray ? 1.0 : 0.0;
     if (name == "view_resolution") return double(app_.uiPrefs_.viewResolution);
     if (name == "light_yaw") return double(app_.renderSettings_.lightYaw);

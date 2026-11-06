@@ -1709,6 +1709,12 @@ constexpr Entry kSpanish[] = {
     {"Tool > Remesh", "Herramienta > Remallado"},
     {"Cut", "Cortar"},
     {"Selection Sets", "Conjuntos de selección"},
+    {"Floor grid", "Cuadrícula del suelo"},
+    {"A faint grid on the floor through the world origin (Y up), fading into the distance: where the model stands, "
+     "and a reference for perspective and lining up Parts. Off by default; saved automatically.",
+     "Una cuadrícula tenue en el suelo, por el origen del mundo (Y hacia arriba), que se desvanece a lo "
+     "lejos: dónde se apoya el modelo, y una referencia para la perspectiva y para alinear Piezas. Desactivada por "
+     "defecto; se guarda automáticamente."},
     {"Backface culling", "Ocultar caras traseras"},
     {"Don't draw the back faces of the model: faster on dense meshes, and you see through the openings of open meshes "
      "(a scan, a garment) instead of their inside. Brushes then work only on faces you can see. Off by default; "

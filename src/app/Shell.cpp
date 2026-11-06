@@ -527,6 +527,11 @@ void App::registerShellActions() {
         };
         actions_.add(std::move(a));
     }
+    add({"view.floor_grid", "Floor grid", ICON_LC_GRID_2X2,
+         "A faint grid on the floor through the world origin (Y up), fading into the distance: where the model "
+         "stands, and a reference for perspective and lining up Parts. Off by default; saved automatically.",
+         "Render", "", "", [this] { uiPrefs_.floorGrid = renderSettings_.floorGrid = !renderSettings_.floorGrid; },
+         [this] { return renderSettings_.floorGrid; }, nullptr});
     flag("view.vertexpaint", "Paint", ICON_LC_PALETTE, "Render", "", &renderSettings_.showVertexPaint,
          "Show vertex paint colours (off: plain material).");
     // Shading (Material palette, Tool > Display): the scene's, and the active Part's own.

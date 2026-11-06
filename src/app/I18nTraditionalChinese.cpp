@@ -1480,6 +1480,11 @@ constexpr Entry kTraditionalChinese[] = {
     {"Tool > Remesh", "工具 > 重新網格化"},
     {"Cut", "切割"},
     {"Selection Sets", "選取集"},
+    {"Floor grid", "地面網格"},
+    {"A faint grid on the floor through the world origin (Y up), fading into the distance: where the model stands, "
+     "and a reference for perspective and lining up Parts. Off by default; saved automatically.",
+     "一個穿過世界原點（Y 軸向上）的淡淡地面網格，向遠處漸隱：顯示模型站在哪裡，也是判斷透視和對齊部件的參考。預設關閉；"
+     "自動儲存。"},
     {"Backface culling", "背面剔除"},
     {"Don't draw the back faces of the model: faster on dense meshes, and you see through the openings of open meshes "
      "(a scan, a garment) instead of their inside. Brushes then work only on faces you can see. Off by default; "
