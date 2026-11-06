@@ -339,8 +339,13 @@ preflight() {
     pk=packaging/arch/PKGBUILD
     grep -q '^pkgver=' "$pk" && grep -q '^pkgrel=' "$pk" && grep -Eq "^sha256sums=\('[0-9a-f]{64}'" "$pk" ||
         die "$pk lacks the pkgver=, pkgrel= or sha256sums=('<64 hex>' line that step aur rewrites" "restore them, commit"
-    (cd packaging/arch && makepkg --printsrcinfo 2>/dev/null | cmp -s - .SRCINFO) ||
-        die "packaging/arch/.SRCINFO doesn't match the PKGBUILD (or makepkg is missing)" "(cd packaging/arch && makepkg --printsrcinfo > .SRCINFO), commit"
+    # .SRCINFO names the same version, release and source checksum (the full comparison is CI's, arch.yml)
+    for f in pkgver pkgrel; do
+        grep -qx "$(printf '\t%s = %s' "$f" "$(sed -n "s/^$f=//p" "$pk")")" packaging/arch/.SRCINFO ||
+            die "packaging/arch/.SRCINFO's $f differs from the PKGBUILD's" "(cd packaging/arch && makepkg --printsrcinfo > .SRCINFO), commit"
+    done
+    grep -qF "$(printf '\tsha256sums = %s' "$(sed -n "s/^sha256sums=('\([0-9a-f]*\)'.*/\1/p" "$pk")")" packaging/arch/.SRCINFO ||
+        die "packaging/arch/.SRCINFO's source checksum differs from the PKGBUILD's" "(cd packaging/arch && makepkg --printsrcinfo > .SRCINFO), commit"
     if [ -f "$AUR_FLAG" ]; then
         GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=15" git ls-remote "$AUR_REPO" >/dev/null 2>&1 ||
             die "the AUR doesn't accept this machine's SSH key ($AUR_REPO), and $AUR_FLAG turns the AUR push on" "ssh -T aur@aur.archlinux.org to see why (key in My Account on aur.archlinux.org), or remove $AUR_FLAG to skip the AUR"
