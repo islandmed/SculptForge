@@ -1,12 +1,13 @@
 # Image-to-3D generators
 
-**Image to 3D → Full 3D model** offers six sources:
+**Image to 3D → Full 3D model** offers seven sources:
 
 | Service | What it is | Setup |
 |---|---|---|
 | **Hugging Face** (default, free) | The official public demos of Hunyuan3D 2.1 / 2 / 2 mini Turbo (Tencent), TRELLIS.2 (Microsoft) and Stable Fast 3D (Stability AI), on Hugging Face's shared ZeroGPU hardware | Nothing. A free token from huggingface.co/settings/tokens (read access), or `HF_TOKEN`, raises the daily GPU allowance; TRELLIS.2 needs one |
 | **fal.ai** | Hosted reconstruction models, billed per generation: TRELLIS.2 (Microsoft), Hunyuan3D 3.1 Pro/Rapid (Tencent), Meshy 6, Hyper3D Rodin 2.5 (image or text) - or any other fal model id | Key from fal.ai/dashboard/keys, or `FAL_KEY` |
 | **Meshy** | Meshy's own API (`meshy-7.1` by default) | Key from meshy.ai, or `MESHY_API_KEY` |
+| **Hyper3D Rodin (direct)** | Hyper3D's own API: Rodin Gen-2.5, image or text, in five tiers (Extreme Low to Extreme High), billed to your Hyper3D account | Your key from hyper3d.ai (API dashboard), saved in the system keychain; no environment variable. See [ai-services.md](ai-services.md#paid-services) |
 | **ComfyUI** | Any workflow on your own ComfyUI, on this computer or a studio GPU server: Hunyuan3D, TRELLIS, your own graph. See [comfyui.md](comfyui.md) | The server address and an API-format workflow (bundled ones included) |
 | **My generator command** | Anything you run locally (see below) | A command line |
 | **Offline blockout** | Inflates the outline into a rounded blob. Fine for simple shapes, not characters | Nothing |

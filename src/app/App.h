@@ -638,7 +638,7 @@ private:
     float projectDepth_ = 0.02f;
     bool projectInvert_ = false;
     char generatorCommand_[1024] = "";
-    char falKey_[256] = "", falModel_[256] = "", meshyKey_[256] = "", hfToken_[256] = "";
+    char falKey_[256] = "", falModel_[256] = "", meshyKey_[256] = "", hfToken_[256] = "", hyper3dKey_[256] = "";
     // ComfyUI: "Test connection" result, bundled workflows, the chosen file's problem (UI format...)
     char comfyUrl_[256] = "";
     struct ComfyCheck {

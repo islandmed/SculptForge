@@ -18,6 +18,7 @@ struct GeneratorResult {
     std::string outputPath;
     std::string error;
     std::string note; // shown with the result, e.g. which model ran instead of the chosen one
+    std::string privateDir; // set: outputPath is inside it; the caller deletes the folder after import (ai/Hyper3D.h)
 };
 
 std::string defaultGeneratorCommand(const std::string& cliPath);

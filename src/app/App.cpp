@@ -22,6 +22,7 @@
 #include "core/AuditLog.h"
 #include "core/Keychain.h"
 #include "core/ManagedPolicy.h"
+#include "ai/Hyper3D.h"
 #include "ai/Providers.h"
 #include "app/Demo.h"
 #include "app/Shell.h"
@@ -3571,6 +3572,7 @@ void App::startGenerator() {
     aiSettings_.falKey = falKey_;
     aiSettings_.falModel = falModel_;
     aiSettings_.meshyKey = meshyKey_;
+    aiSettings_.hyper3dKey = hyper3dKey_;
     aiSettings_.hfToken = hfToken_;
     aiSettings_.comfyUrl = comfyUrl_;
     // With no workflow chosen, ComfyUI runs the bundled one the panel shows (not saved, so updates reach it).
@@ -3620,6 +3622,13 @@ void App::pollGenerator() {
     GeneratedModel g = pendingGenerator_.get();
     const ai::GeneratorResult& r = g.result;
     const std::string note = r.note.empty() ? std::string() : " - " + r.note;
+    struct PrivateDir { // (Hyper3D: the downloaded file's own folder, gone once the model is in)
+        std::string path;
+        ~PrivateDir() {
+            std::error_code ec;
+            if (!path.empty()) std::filesystem::remove_all(std::filesystem::path(std::u8string(path.begin(), path.end())), ec);
+        }
+    } privateDir{r.privateDir};
     if (!r.ok) {
         status_ = "Image to 3D failed: " + r.error + note;
         return;
@@ -3825,8 +3834,9 @@ void App::drawImageTo3D() {
                    : "Builds the whole model - limbs, face, back - from one picture with a reconstruction model, then "
                      "makes it sculptable. Characters on a transparent background work best.");
     static const char* services[] = {"Hugging Face - free models", "fal.ai - paid, your key", "Meshy - paid, your key",
-                                     "ComfyUI - your server", "My generator command", "Offline blockout (inflate silhouette)"};
-    static const char* serviceIds[] = {"huggingface", "fal", "meshy", "comfyui", "command", "inflate"};
+                                     "Hyper3D Rodin (direct) - paid, your key", "ComfyUI - your server", "My generator command",
+                                     "Offline blockout (inflate silhouette)"};
+    static const char* serviceIds[] = {"huggingface", "fal", "meshy", "hyper3d", "comfyui", "command", "inflate"};
     constexpr int kServices = int(std::size(serviceIds));
     int service = 0;
     for (int i = 0; i < kServices; ++i)
@@ -3834,6 +3844,10 @@ void App::drawImageTo3D() {
     ImGui::SetNextItemWidth(-1);
     if (ImGui::Combo("##service", &service, services, kServices)) aiSettings_.generatorService = serviceIds[service];
     const std::string serviceId = serviceIds[service];
+    if (std::string why; serviceId != "inflate" && !policy::aiProviderAllowed(serviceId, &why)) { // (studio policy)
+        ui::ManagedBadge();
+        hint(why.c_str());
+    }
     ImGui::PushItemWidth(-labelW);
     if (serviceId == "huggingface") {
         const auto& presets = ai::hfPresets();
@@ -3880,6 +3894,24 @@ void App::drawImageTo3D() {
         ImGui::InputText("API key", meshyKey_, sizeof meshyKey_, ImGuiInputTextFlags_Password);
         if (!meshyKey_[0])
             hint(std::getenv("MESHY_API_KEY") ? "Using MESHY_API_KEY from the environment." : "Get a key at meshy.ai (API settings)");
+    } else if (serviceId == "hyper3d") {
+        const auto& tiers = ai::hyper3d::tiers();
+        const std::string tier = ai::hyper3d::resolvedTier(aiSettings_.hyper3dTier);
+        const char* preview = tiers[0].label;
+        for (const auto& t : tiers)
+            if (tier == t.id) preview = t.label;
+        if (ImGui::BeginCombo(tr("Tier"), preview)) {
+            for (const auto& t : tiers)
+                if (ImGui::Selectable(t.label, tier == t.id)) aiSettings_.hyper3dTier = t.id;
+            ImGui::EndCombo();
+        }
+        ImGui::InputText(tr("API key##hyper3d"), hyper3dKey_, sizeof hyper3dKey_, ImGuiInputTextFlags_Password);
+        if (!hyper3dKey_[0])
+            hint(aiSettings_.resolvedHyper3dKey().empty()
+                     ? tr("Off until you add your own key: hyper3d.ai > API dashboard (a Creator plan or higher).")
+                     : tr("Using your key from the system keychain."));
+        hint(tr("Sends your image or description to Hyper3D (api.hyper3d.com), which builds the model. Each generation "
+                "is billed to your Hyper3D account. Basic API access covers Extreme Low and Low."));
     } else if (serviceId == "comfyui") {
         drawComfyUi();
     } else if (serviceId == "command") {
@@ -3927,6 +3959,7 @@ void App::drawImageTo3D() {
         aiSettings_.falKey = falKey_;
         aiSettings_.falModel = falModel_;
         aiSettings_.meshyKey = meshyKey_;
+        aiSettings_.hyper3dKey = hyper3dKey_;
         aiSettings_.hfToken = hfToken_;
         aiSettings_.comfyUrl = comfyUrl_;
         std::string err;
