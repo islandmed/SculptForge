@@ -14,6 +14,7 @@
 #include "render/ScreenStroke.h"
 
 #include <cstdint>
+#include <cstdlib>
 #include <functional>
 #include <list>
 #include <memory>
@@ -350,14 +351,17 @@ private:
         std::vector<uint32_t> primBase;    // per cluster: its first drawn triangle
         std::vector<uint32_t> lineFirst, lineCount; // per cluster: its edges in lineBuffer (in indices)
         bool linesValid = false;
-        // Coarse levels (clusterLodChain; the first is the motion proxy): per cluster up to half of its triangles
-        // in all, at (firstTriangle / 2) * 3.
+        // Motion proxy (clusterProxy): per cluster up to a quarter of its triangles, at (firstTriangle / 4) * 3.
         GLuint proxyVao = 0, proxyBuffer = 0;
-        std::vector<uint32_t> proxyCount;    // indices, every level; 0: none (the cluster draws in full)
-        std::vector<ClusterLod> proxyLod;    // the levels in that range
+        std::vector<uint32_t> proxyCount;    // indices; 0: none (the cluster draws in full)
         std::vector<uint8_t> proxyStale;     // to rebuild before use
         std::vector<ClusterBounds> proxyBounds; // the proxy's normal cone
         bool proxyAllocated = false;
+        // Coarse levels (spike, SF_COARSE_LOD=1: buildCoarseLevels at the first sync over the budget). Any edit to
+        // the mesh drops them (the normal draw again): no rebuild in the spike.
+        GLuint coarseVao = 0, coarseVertices = 0, coarseIndices = 0;
+        std::vector<CoarseLevels::Lod> coarse;
+        bool coarseValid = false, coarseTried = false;
         std::vector<uint32_t> drawnOrder; // the mesh triangle of each drawn triangle (meshes with UVs only)
         size_t drawnTriangles = 0;
         size_t vertexCapacity = 0;
@@ -411,8 +415,14 @@ private:
     bool proxyPending_ = false; // (proxiesPending)
     bool proxyPrebuild_ = false; // (setProxyPrebuild)
     double proxyMsPerCluster_ = 0.0; // measured, so a frame's batches fit its budget on slow cores too
-    size_t lodBudget_ = 0;    // the last draw's triangle budget: sync builds the coarse levels of meshes over it
-    float lodPx_ = 0.0f;      // the last coarse frame's error threshold (pixels), so the next starts near it
+    // Spike (SF_COARSE_LOD=1, off by default; docs/design/micro-coarse-lod.md): plain meshes over the triangle budget
+    // draw per cluster a coarse level (render/Clusters.h: CoarseLevels), at rest too: the coarsest whose error stays
+    // under kCoarseLodPx on screen, raised until the budget holds; full detail when it all fits.
+    const bool coarseLod_ = std::getenv("SF_COARSE_LOD") && std::string(std::getenv("SF_COARSE_LOD")) == "1";
+    static constexpr float kCoarseLodPx = 0.75f;
+    size_t lodBudget_ = 0; // the last still draw's triangle budget: sync builds the coarse levels of meshes over it
+    void buildCoarse(MeshSlot& s, const Mesh& mesh);
+    size_t triangleBudget(const RenderSettings& settings) const;
     // The ghost (setGhost), drawn on the slot ghostId_.
     GhostStroke ghost_;
     uint32_t ghostId_ = 0;
@@ -457,31 +467,26 @@ private:
     int envIndex_ = -1, envFailedIndex_ = -1;
     SH9 envSh_;
     glm::mat3 frameViewToEnv_{1.0f};
-    // The clusters of `s` to draw this frame: in full (drawClusters_), and where built and `proxy`, at a coarse
-    // level (proxyClusters_, the level in proxyLevel_): the motion proxy (lodPx <= 0), or per cluster the coarsest
-    // level whose error stays under lodPx pixels, raised until at most `budget` triangles are drawn.
-    void cull(const MeshSlot& s, const CullView& view, bool proxy = false, float lodPx = 0.0f, size_t budget = 0);
+    // The clusters of `s` to draw this frame: in full (drawClusters_), and with `proxy` as their motion proxy
+    // where it is built (proxyClusters_).
+    void cull(const MeshSlot& s, const CullView& view, bool proxy = false);
+    // The coarse-level cull (spike): every visible cluster in full (drawClusters_) or at a level (coarseClusters_,
+    // coarseLevel_): per cluster the coarsest whose error stays under `px` pixels, `px` raised until `budget` holds.
+    void cullCoarse(const MeshSlot& s, const CullView& view, float px, size_t budget);
+    std::vector<uint32_t> coarseClusters_;
+    std::vector<uint8_t> coarseLevel_;
+    struct LodPick {
+        uint32_t c;
+        float scale; // pixels per world unit at the cluster's nearest point
+        bool fullShows;
+    };
+    std::vector<LodPick> lodScratch_;
+    std::vector<uint8_t> coarseShown_;
     void drawSlot(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);
     enum class DrawPart { Triangles, Lines, Proxy };
     void drawPatches(const MeshSlot& s, GLenum mode, DrawPart part, GLint primBaseLocation);
     void drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clusters, GLenum mode, DrawPart part, GLint primBaseLocation);
     std::vector<uint32_t> proxyClusters_;
-    std::vector<uint8_t> proxyLevel_;
-    struct LodPick {
-        uint32_t c;
-        float scale; // pixels per world unit at the cluster's nearest point
-        bool fullShows, coarseShows;
-    };
-    std::vector<LodPick> lodScratch_;
-    void pickLevels(const MeshSlot& s, const CullView& v, float px, size_t budget);
-    size_t triangleBudget(const RenderSettings& settings) const;
-    // Spike (SF_COARSE_LOD=1, off by default; docs/design/micro-coarse-lod.md): plain meshes over the triangle budget
-    // draw their clusters' coarse levels (render/Clusters.h: ClusterLod), at rest too: the coarsest whose error stays
-    // under kCoarseLodPx on screen, raised until the budget holds. Off: the motion proxy while moving, as before.
-    bool coarseLod_ = false;
-    static constexpr float kCoarseLodPx = 0.75f;
-    // A cluster's part of the proxy buffer: 1/proxyShare of its triangles, at (firstTriangle / proxyShare) * 3.
-    uint32_t proxyShare() const { return coarseLod_ ? 2 : 4; }
     std::vector<GLsizei> drawCounts_;
     std::vector<const void*> drawOffsets_;
     std::vector<GLint> drawBases_;
