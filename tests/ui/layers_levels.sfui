@@ -12,6 +12,7 @@ click "Geometry/Reconstruct Subdiv"
 click "Geometry/Reconstruct Subdiv"
 click "Geometry/Reconstruct Subdiv"
 click "Geometry/Delete Higher"
+click "Delete Levels/Delete Higher Levels"
 expect_value triangles == 108
 key ctrl+d
 key ctrl+d

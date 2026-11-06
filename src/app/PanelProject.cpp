@@ -132,6 +132,7 @@ void App::initProject() {
         // new default once (PanelSupport.cpp).
         newLookCardDone_ = prefs["new_look_card_done"].asBool(false);
         quickTourDone_ = prefs["quick_tour_done"].asBool(false);
+        uiPrefs_.confirmSubdivide = prefs["confirm_subdivide"].asBool(uiPrefs_.confirmSubdivide); // (Don't ask again)
         if (!uiPrefs_.lookSaved && !uiConfigDeterministic_) {
             UiPrefs saved = uiPrefs_;
             if (!lookFromJson(prefs["ui_look"], saved)) {
@@ -213,6 +214,7 @@ void App::saveProjectPrefs() {
     }
     prefs.set("new_look_card_done", newLookCardDone_);
     prefs.set("quick_tour_done", quickTourDone_);
+    prefs.set("confirm_subdivide", uiPrefs_.confirmSubdivide);
     std::ofstream(fsPath(prefDir_ + "project.json"), std::ios::binary | std::ios::trunc) << prefs.dump(true);
 }
 
@@ -314,6 +316,20 @@ void App::storeProjectSettings() {
     cam.set("roll", double(camera_.roll));
     cam.set("fov_y", double(camera_.fovY));
     s.set("camera", std::move(cam));
+    Json views = Json::array();
+    for (const SavedView& v : savedViews_) {
+        Json o = Json::object();
+        o.set("name", v.name);
+        o.set("target", vec3Json(v.camera.target));
+        o.set("distance", double(v.camera.distance));
+        o.set("yaw", double(v.camera.yaw));
+        o.set("pitch", double(v.camera.pitch));
+        o.set("roll", double(v.camera.roll));
+        o.set("fov_y", double(v.camera.fovY));
+        o.set("ortho", v.camera.ortho);
+        views.push(std::move(o));
+    }
+    s.set("views", std::move(views));
 
     Json render = Json::object();
     render.set("wireframe", renderSettings_.wireframe);
@@ -427,6 +443,24 @@ void App::applyProjectSettings() {
         camera_.distance = std::max(camera_.distance, 1e-4f);
         camera_.fovY = std::clamp(camera_.fovY, 0.05f, 3.0f);
     }
+    savedViews_.clear();
+    lastSavedView_ = -1;
+    if (const Json& views = s["views"]; views.isArray())
+        for (size_t i = 0; i < views.size(); ++i) {
+            const Json& o = views[i];
+            if (!o.isObject() || !o["name"].isString()) continue;
+            SavedView v{o["name"].asString(), camera_};
+            readVec3(o["target"], v.camera.target);
+            readFloat(o, "distance", v.camera.distance);
+            readFloat(o, "yaw", v.camera.yaw);
+            readFloat(o, "pitch", v.camera.pitch);
+            readFloat(o, "roll", v.camera.roll);
+            readFloat(o, "fov_y", v.camera.fovY);
+            readBool(o, "ortho", v.camera.ortho);
+            v.camera.distance = std::max(v.camera.distance, 1e-4f);
+            v.camera.fovY = std::clamp(v.camera.fovY, 0.05f, 3.0f);
+            savedViews_.push_back(std::move(v));
+        }
     if (const Json& r = s["render"]; r.isObject()) {
         readBool(r, "wireframe", renderSettings_.wireframe);
         readVec3(r["base_color"], renderSettings_.baseColor);

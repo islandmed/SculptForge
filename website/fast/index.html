@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How fast is SculptForge?</title>
+  <meta name="description" content="SculptForge 0.11.2 measured: stroke lag and orbit speed on dense scans, on a low-end budget first, with the exact steps to repeat every number on your own computer.">
+  <meta property="og:title" content="How fast is SculptForge? Measured, with the steps to repeat it">
+  <meta property="og:description" content="Stroke lag and orbit speed of SculptForge 0.11.0 and 0.11.2 on the same machines, low-end budget first. One command reproduces it.">
+  <meta property="og:url" content="https://sculptforge.app/fast/">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=4">
+  <link rel="canonical" href="https://sculptforge.app/fast/">
+  <link rel="icon" type="image/svg+xml" href="../img/favicon.svg?v=2">
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <style>
+    @font-face { font-family: "Inter"; src: url("../fonts/Inter-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+    @font-face { font-family: "Inter"; src: url("../fonts/Inter-SemiBold.ttf") format("truetype"); font-weight: 600 700; font-display: swap; }
+    :root {
+      color-scheme: dark;
+      --bg: #0f0f12; --panel: #1b1b21; --border: #2a2a31;
+      --text: #ececf1; --muted: #a3a3ad; --accent: #f28c3c; --accent-2: #ffb06a; --good: #7fc28a; --warn: #e2b155; --bad: #e5604a;
+    }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) { color-scheme: light; --bg: #f6f6f8; --panel: #ffffff; --border: #dcdce2; --text: #18181c; --muted: #5d5d66; --accent-2: #b5560f; --good: #2f7d3b; --warn: #8a6400; --bad: #b8321e; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text);
+           font: 400 16px/1.55 "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 1160px; margin: 0 auto; padding: 24px 16px 64px; }
+    h1 { font-size: clamp(1.7rem, 4vw, 2.4rem); line-height: 1.15; margin: 8px 0 8px; letter-spacing: -0.015em; }
+    h2 { font-size: 1.25rem; margin: 40px 0 10px; }
+    a { color: var(--accent-2); }
+    .muted { color: var(--muted); }
+    .small { font-size: 0.86rem; }
+    .lede { font-size: 1.08rem; max-width: 760px; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin: 16px 0; }
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; padding: 0; margin: 16px 0; list-style: none; counter-reset: s; }
+    .steps li { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; counter-increment: s; min-width: 0; }
+    .steps li::before { content: counter(s); display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+                        background: var(--accent); color: #111; font-weight: 700; margin-right: 8px; }
+    .steps strong { font-size: 1.02rem; }
+    .steps p { margin: 8px 0 0; }
+    .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; }
+    select { font: inherit; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; }
+    .scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+    table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 0.9rem; }
+    th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; vertical-align: top; }
+    tbody tr:last-child td { border-bottom: 0; }
+    th { color: var(--muted); font-weight: 600; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.04em; background: var(--panel); }
+    td.num, th.num { text-align: right; }
+    td.machine { white-space: normal; min-width: 220px; max-width: 320px; }
+    details summary { cursor: pointer; color: var(--muted); font-size: 0.82rem; }
+    details dl { margin: 6px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 0.82rem; }
+    details dt { color: var(--muted); }
+    details dd { margin: 0; overflow-wrap: anywhere; }
+    .ok { color: var(--good); } .meh { color: var(--warn); } .slow { color: var(--bad); }
+    code, pre { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 0.9em; }
+    code { padding: 1px 6px; }
+    pre { padding: 10px 12px; overflow-x: auto; margin: 8px 0 0; }
+    pre code { border: 0; padding: 0; background: none; }
+    .empty { padding: 24px; text-align: center; white-space: normal; }
+    .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 12px; }
+    .grid2 .card { margin: 0; min-width: 0; }
+    footer { border-top: 1px solid var(--border); margin-top: 48px; padding-top: 16px; }
+  </style>
+  <style>
+    .tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 12px; margin: 16px 0; }
+    .tiers .card { margin: 0; }
+    .tag { display: inline-block; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+           padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+    .big { font-size: 1.6rem; font-weight: 700; color: var(--accent-2); font-variant-numeric: tabular-nums; }
+    td.better { color: var(--good); font-weight: 600; }
+    ol.plain { padding-left: 20px; } ol.plain li { margin: 6px 0; }
+  </style>
+</head>
+<body>
+<main>
+  <p class="small"><a href="../index.html">SculptForge</a> / <a href="../benchmarks/">Benchmarks</a> / How fast?</p>
+  <h1>How fast is SculptForge 0.11.2?</h1>
+  <p class="lede muted">Measured with SculptForge's own benchmark on the same machines, the slowest one first. Every
+    number on this page comes with the steps to repeat it. If your computer gives a different answer,
+    <a href="../benchmarks/#submit">send it to us</a>; we list results that disagree with ours too.</p>
+
+  <div class="card">
+    <p><strong>The measured numbers are being re-checked and come with the next update.</strong> We found that our
+      test scans had no sculpted detail, which makes some timings look better than real work, so we're measuring
+      again on scans with real surface detail before we publish anything. What 0.11.2 changes, in words: big
+      brushes on dense scans finish sooner after you lift the pen, they follow the pen more closely on faster
+      computers, and orbiting a very dense scan right after a stroke is smoother.</p>
+  </div>
+
+  <h2 id="machines">The machines, slowest first</h2>
+  <p class="small">A speed claim counts only if it holds on the first tier that has a number. Today no real
+    integrated-graphics laptop is in the set; until a tester reports one, the low-end budget is simulated (below)
+    and every result says which tier it is.</p>
+  <div class="tiers">
+    <div class="card small"><strong>Low-end budget, simulated</strong><p>An Apple M1 Pro laptop running Linux, limited
+      to a low-end machine's budgets and OpenGL 3.3 (<code>SF_HW_SIMULATE=floor</code>), on its fast cores, or on its
+      two efficiency cores for the harshest CPU case.</p></div>
+    <div class="card small"><strong>Laptop</strong><p>The same Apple M1 Pro laptop (32 GB shared memory), Linux, no
+      limits.</p></div>
+    <div class="card small"><strong>Desktop</strong><p>Windows, AMD Ryzen 5 5600X, NVIDIA RTX 3060, 32 GB.</p></div>
+    <div class="card small"><strong>Integrated graphics laptop</strong><p>No machine yet. Have one? Run the steps below
+      and send the file.</p></div>
+  </div>
+
+  <h2 id="limits">What's still slow</h2>
+  <ul class="small">
+    <!-- KNOWN_LIMITS: launchkit draft from the scoreboard + floorlucy; the coordinator checks before release -->
+    <li>Big brushes (120 and 240 px) on very dense meshes still trail the pen on every machine we test, the desktop
+      included: the stroke lands, but late.</li>
+    <li>On the biggest brushes (240 px) the stroke now follows the pen more closely while you draw; the cost is a
+      slightly longer finish after you lift the pen on fast GPUs.</li>
+    <li>On the low-end budget, orbiting a 112 million triangle scan right after a stroke is still below a smooth
+      30 frames a second: the whole base mesh is drawn every frame. Making that cheaper is being researched.</li>
+    <li>Opening a scan with a micro level takes seconds, not instantly, on every machine (measured on the
+      subdivided Lucy, with no sculpted detail; a file with sculpted micro detail can take longer).</li>
+    <li>Lucy at 112 million triangles needs more memory than an 8 GB integrated-graphics laptop has; on those,
+      the largest Lucy that fits is the 28 million triangle version.</li>
+  </ul>
+
+  <h2 id="repeat">Repeat it on your computer</h2>
+  <ol class="steps">
+    <li><strong>Install 0.11.2</strong>
+      <p>From the <a href="../index.html#download">download page</a> (free, no account). For the comparison, also
+        unpack <a href="https://github.com/islandmed/SculptForge/releases/tag/v0.11.0">0.11.0</a> (the portable zip or
+        AppImage runs beside the installed version). Close builds, games and renders.</p></li>
+    <li><strong>Get the test scene</strong>
+      <p>The built-in heads need nothing. For Lucy, download <code>lucy.tar.gz</code> (about 320 MB) from the
+        <a href="https://graphics.stanford.edu/data/3Dscanrep/">Stanford 3D Scanning Repository</a> and build the test
+        scenes with the command-line tool that comes with SculptForge (below). We don't redistribute the scan.</p></li>
+    <li><strong>Run the same strokes</strong>
+      <p>Each run opens the scene, draws scripted Clay strokes at 25, 120 and 240 px through the real pen code, then
+        orbits, and writes a JSON result and a video.</p></li>
+  </ol>
+  <div class="card">
+    <strong>The exact commands</strong>
+    <pre><code># the built-in 15 million triangle head (identical on every computer)
+sculptforge --benchmark standard-15m --benchmark-out head-0.11.2.json
+
+# Lucy: build the test scenes once from Stanford's lucy.ply (28 million triangles; 112 million with a micro level)
+tar xzf lucy.tar.gz
+sculptforge-cli -c "open path=lucy.ply; save_project path=lucy-28m.sfproj"
+sculptforge-cli -c "open path=lucy.ply; micro_divide level=1; save_project path=lucy-112m.sfproj"
+
+# Lucy: the same strokes and orbit on the scene
+sculptforge --benchmark-file lucy-112m.sfproj --benchmark-out lucy-0.11.2.json
+
+# the head with 0.11.0 (path to the unpacked 0.11.0)
+./sculptforge-0.11.0/sculptforge --benchmark standard-15m --benchmark-out head-0.11.0.json
+
+# optional: the simulated low-end budget we report first
+SF_HW_SIMULATE=floor SF_GOVERNOR=0 sculptforge --benchmark-file lucy-28m.sfproj --benchmark-out lucy-floor.json</code></pre>
+    <p class="small muted">On macOS the command-line tool is <code>SculptForge.app/Contents/MacOS/sculptforge-cli</code>; on
+      Windows it is <code>sculptforge-cli.exe</code> in the install folder. On Windows, set the variables first in a Command Prompt (<code>set SF_HW_SIMULATE=floor</code>)
+      and run <code>sculptforge.exe</code> from the install folder. Run each build at least twice, alternating, and
+      take the median. 0.11.0 has no <code>--benchmark-file</code> (it came in 0.11.1), so our 0.11.0 Lucy rows use
+      0.11.0 with only the benchmark's own commits added: the patch that lets 0.11.0 load a project file for the benchmark (no app code changed).</p>
+  </div>
+  <h3>Reading the result</h3>
+  <ul class="small">
+    <li><strong>Stroke lag</strong> (<code>lag_ms</code>): from the pen sample to the frame on screen that shows its
+      dab. p50 is the typical dab, p99 the slow ones you feel.</li>
+    <li><strong>Release</strong> (<code>release_done_ms</code>): from pen up to the whole stroke in the mesh and shaded.</li>
+    <li><strong>Orbit</strong>: frames per second while the view turns after the strokes, while the shading catches up.</li>
+    <li><strong>Memory</strong>: peak RAM plus GPU buffers.</li>
+  </ul>
+  <p class="small">Full method, every tier and the raw numbers:
+    <a href="https://github.com/islandmed/SculptForge/blob/main/docs/design/perf-scoreboard.md">the performance scoreboard</a>.
+    Format of the JSON file: <a href="https://github.com/islandmed/SculptForge/blob/main/docs/benchmark.md">docs/benchmark.md</a>.
+    Send yours: <a href="../benchmarks/#submit">submit a result</a>.</p>
+
+  <h2>Comparing with other apps</h2>
+  <p class="small">This page lists SculptForge's numbers only. We don't run, publish or test other sculpting
+    applications. Lucy is a public scan, so you can open the same model elsewhere and judge for yourself.</p>
+  <footer>
+    <p class="muted small">Lucy: Stanford 3D Scanning Repository. SculptForge is an independent open-source project
+      by Med and contributors. Product names are trademarks of their respective owners.</p>
+  </footer>
+</main>
+</body>
+</html>

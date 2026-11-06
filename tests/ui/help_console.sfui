@@ -7,14 +7,14 @@ expect_value triangles == 1280
 # Ctrl+Alt+hover shows a command's scripting parameters.
 key f1
 type Controls/##controls_filter divide
-expect Controls/Divide
+expect "Controls/Divide (keeps levels)"
 hold ctrl
-hover Controls/Divide
+hover "Controls/Divide (keeps levels)"
 expect_help "subdivision level"
 expect_help Ctrl+D
 shot help_ctrl_hover
 hold ctrl+alt
-hover Controls/Divide
+hover "Controls/Divide (keeps levels)"
 expect_help "Smt: smooth the new level"
 shot help_ctrl_alt_hover
 hold none

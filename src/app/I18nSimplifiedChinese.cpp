@@ -3164,7 +3164,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Freeze Levels + Dynamic", "固定层级 + 动态"},
     {"Freeze Levels and Turn On Dynamic", "固定层级并开启动态"},
     {"Go back to the view saved or restored last (View > Views).", "回到最后保存或还原的视图（视图 > 视图）。"},
-    {"Go to this saved view (小键盘 0 goes to the last one used).", "跳转到此已保存的视图（小键盘 0 跳转到最后使用的视图）。"},
+    {"Go to this saved view (Numpad 0 goes to the last one used).", "跳转到此已保存的视图（小键盘 0 跳转到最后使用的视图）。"},
     {"How dark masked areas show (also in Preferences > Interface).", "遮罩区域显示的暗度（也可在偏好设置 > 界面中设置）。"},
     {"How dark masked areas show: 0 = not at all, 1 = nearly black. The default keeps the form readable under the mask.", "遮罩区域显示的暗度：0 = 完全不变暗，1 = 接近全黑。默认值让遮罩下的形体仍清晰可辨。"},
     {"Keep the subdivision level shown as a plain mesh, delete the other levels and turn Dynamic on (one undo step for the levels: Ctrl+Z brings them back).", "将当前显示的细分层级保留为单一网格，删除其他层级并开启动态（层级为一个撤销步骤：Ctrl+Z 可撤销）。"},
