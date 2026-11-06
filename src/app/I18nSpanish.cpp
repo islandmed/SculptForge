@@ -843,6 +843,24 @@ constexpr Entry kSpanish[] = {
     {"Fill", "Rellenar"},
     {"Fill layer", "Rellenar capa"},
     {"Fill masked", "Rellenar enmascarado"},
+    {"Line Gradient", "Degradado lineal"},
+    {"End", "Final"},
+    {"Swap", "Intercambiar"},
+    {"Drag a line across the model.", "Arrastra una línea sobre el modelo."},
+    {"Drag its ends to adjust. Enter keeps it, Esc takes it back.", "Arrastra sus extremos para ajustarlo. Intro lo conserva, Esc lo deshace."},
+    {"Swap the paint colour and the End colour.", "Intercambia el color de pintura y el color final."},
+    {"The colour at the end of the line. The start is the paint colour above.",
+     "El color al final de la línea. El inicio es el color de pintura de arriba."},
+    {"Fade the paint colour out instead: the paint underneath shows through towards the end of the line.",
+     "En su lugar, desvanece el color de pintura: la pintura de debajo se ve cada vez más hacia el final de "
+     "la línea."},
+    {"Drag a line across the model: the paint colour at its start runs into the End colour (or fades to "
+     "clear) at its end, in screen space, into vertex paint or the texture. Drag either end to adjust it; "
+     "Enter keeps it, Esc takes it back. Respects the mask; one undo step.",
+     "Arrastra una línea sobre el modelo: el color de pintura de su inicio pasa al color final (o se "
+     "desvanece) en su extremo, en el espacio de la pantalla, en la pintura de vértices o en la textura. "
+     "Arrastra cualquiera de los extremos para ajustarlo; Intro lo conserva, Esc lo deshace. Respeta la "
+     "máscara; un solo paso de deshacer."},
     {"Fill the unmasked area (the whole mesh if nothing is masked)",
      "Rellena la zona sin máscara (toda la malla si no hay nada enmascarado)"},
     {"Cavity", "Cavidad"},

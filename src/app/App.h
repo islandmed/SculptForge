@@ -164,7 +164,7 @@ public:
 
 private:
     enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, PartClick, Select, Gizmo, Guide, Sculptable, ForgeSphere, Insert, Capture,
-                      AirStroke, UvTool, SizeScrub, QuickRemesh }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
+                      AirStroke, UvTool, SizeScrub, QuickRemesh, Gradient }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
 
     void handleEvent(const SDL_Event& e); // the pen's mouse events first (penMouseEvents), then dispatchEvent
     void dispatchEvent(const SDL_Event& e);
@@ -912,6 +912,34 @@ private:
         std::string error;
         char name[64] = "Captured";
     } capture_;
+    // Line Gradient (#99, LineGradient.cpp): Color > Line Gradient arms it; a drag on the view paints a colour ramp
+    // (paint_gradient) whose two ends stay draggable, each change painting it again in place of the same undo step.
+    // Enter, a camera move or any other edit keeps it; Esc takes it back.
+    void registerLineGradientActions();
+    bool gradientMouseDown(float x, float y, SDL_Keymod mod); // true when it takes the click
+    void gradientMouseMove(float x, float y);
+    void gradientMouseUp();
+    bool gradientKey(SDL_Keycode key); // Enter / Esc
+    void applyGradient();
+    void endGradientEdit();
+    void drawGradientOverlay();
+    void drawLineGradientControls(); // Color palette
+    bool gradientUiValue(const std::string& name, double& out) const; // UI test values
+    struct GradientUi {
+        bool armed = false;
+        bool placed = false;          // painted, and its ends can still move
+        int handle = -1;              // being dragged: 0 the start, 1 the end, 2 a new line
+        glm::vec2 a{0.0f}, b{0.0f};   // window pixels
+        glm::vec2 grabOffset{0.0f};   // from the pointer to the handle it grabbed
+        glm::vec3 to{0.0f};           // the End colour (linear)
+        bool toClear = false;
+        uint64_t revision = 0;        // the undo history right after it was painted
+        glm::mat4 view{1.0f};         // the camera and canvas it was painted in
+        glm::vec4 canvas{0.0f};
+        glm::vec2 appliedA{0.0f}, appliedB{0.0f};
+        glm::vec3 appliedFrom{0.0f}, appliedTo{0.0f};
+        bool appliedClear = false;
+    } gradient_;
     glm::vec3 kelvinCenter_{0.0f};
     float kelvinRadius_ = 0.0f, kelvinLastX_ = 0.0f;
     glm::vec3 kelvinTarget_{0.0f}; // KelvinGrab: where the cursor wants the grabbed point

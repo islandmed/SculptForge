@@ -743,6 +743,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "stroke_type") return double(int(app_.strokeType_)); // 0 Dots, 1 DragRect, 2 DragDot, 3 Spray, 4 LazyMouse
     if (name == "stroke_continuous") return app_.strokeContinuous_ ? 1.0 : 0.0; // Continuous (#31)
     if (name == "vdms") return double(app_.doc_.vdms.size());
+    if (double gv = 0.0; app_.gradientUiValue(name, gv)) return gv; // gradient_armed, gradient_placed (LineGradient.cpp)
     if (double kv = 0.0; app_.kelvinUiValue(name, kv)) return kv; // capture_*, kelvin_* (PanelKelvinlet.cpp)
     // Facial shapes (PanelFace.cpp): landmarks placed, placing them, a take playing, and face_<shape>: that layer's weight.
     if (name == "face_landmarks") return double(app_.faceLandmarks_.count());

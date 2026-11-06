@@ -50,6 +50,21 @@ enum class PaintArea { All, Unmasked, Masked };
 // ignores it. Hidden faces are never painted. Not undoable by itself.
 size_t paintFill(Mesh& mesh, const glm::vec3& color, PaintArea area = PaintArea::Unmasked, float amount = 1.0f);
 
+// Line Gradient (#99): a straight colour ramp dragged across the screen. Where each vertex lies along the line from
+// `a` to `b` (normalised device coordinates under `viewProj`): 0 at a, 1 at b, beyond the ends below 0 or above 1.
+// `aspect` (view width / height) keeps the bands square to the line as seen on screen. NaN behind the camera.
+std::vector<float> gradientPositions(const Mesh& mesh, const glm::mat4& viewProj, glm::vec2 a, glm::vec2 b, float aspect);
+// The ramp: `from` at the start to `to` at the end (blended as display colours), or with `toClear` `from` fading out.
+struct LineGradient {
+    glm::vec3 from{1.0f}, to{1.0f}; // linear
+    bool toClear = false;
+    // The colour (rgb) and how much of it goes on (a) at position t, clamped to the ends.
+    glm::vec4 at(float t) const;
+};
+// Paints the gradient over the vertices at their positions `t` (gradientPositions), in `area` as paintFill (hidden
+// faces never). Not undoable by itself.
+size_t paintGradient(Mesh& mesh, const std::vector<float>& t, const LineGradient& g, PaintArea area = PaintArea::Unmasked);
+
 // Per-vertex cavity amount 0..1 (1 = deep crease), from the same signed
 // curvature the viewport's cavity shading uses, blurred `smoothing` times.
 std::vector<float> cavityMap(const Mesh& mesh, int smoothing = 2);

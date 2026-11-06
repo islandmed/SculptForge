@@ -9,6 +9,7 @@
 
 #include "core/Commands.h"
 #include "core/Parts.h"
+#include "core/ScreenSelect.h"
 #include "core/Texture.h"
 #include "core/Undo.h"
 #include "io/PlyIO.h"
@@ -17,6 +18,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <memory>
 #include <sstream>
 
@@ -154,6 +156,42 @@ size_t paintFill(Mesh& mesh, const glm::vec3& color, PaintArea area, float amoun
         const float w = areaWeight(mesh, v, area) * amount;
         if (w <= 0.0f) continue;
         paintVertex(mesh, v, color, w);
+        ++changed;
+    }
+    mesh.markAllDirty();
+    return changed;
+}
+
+std::vector<float> gradientPositions(const Mesh& mesh, const glm::mat4& viewProj, glm::vec2 a, glm::vec2 b, float aspect) {
+    // On screen (x scaled by the aspect), so the bands cross the line at right angles as the user sees them.
+    const glm::vec2 s(std::max(aspect, 1e-4f), 1.0f);
+    const glm::vec2 d = (b - a) * s;
+    const float len2 = std::max(glm::dot(d, d), 1e-12f);
+    std::vector<float> t(mesh.vertexCount(), std::numeric_limits<float>::quiet_NaN());
+    for (uint32_t v = 0; v < mesh.vertexCount(); ++v) {
+        glm::vec2 p;
+        if (projectToNdc(viewProj, mesh.positions[v], p)) t[v] = glm::dot((p - a) * s, d) / len2;
+    }
+    return t;
+}
+
+glm::vec4 LineGradient::at(float t) const {
+    t = std::clamp(t, 0.0f, 1.0f);
+    if (toClear) return glm::vec4(from, 1.0f - t);
+    return glm::vec4(srgbToLinear(glm::mix(linearToSrgb(from), linearToSrgb(to), t)), 1.0f);
+}
+
+size_t paintGradient(Mesh& mesh, const std::vector<float>& t, const LineGradient& g, PaintArea area) {
+    if (mesh.vertexCount() == 0 || t.size() != mesh.vertexCount()) return 0;
+    if (!paintLayerEditable(mesh, mesh.paintLayers.empty() ? -1 : mesh.activePaintLayer)) return 0;
+    mesh.ensureColors();
+    size_t changed = 0;
+    for (uint32_t v = 0; v < mesh.vertexCount(); ++v) {
+        if (std::isnan(t[v]) || (mesh.hasHidden() && mesh.vertexHidden(v))) continue;
+        const glm::vec4 c = g.at(t[v]);
+        const float w = areaWeight(mesh, v, area) * c.w;
+        if (w <= 0.0f) continue;
+        paintVertex(mesh, v, glm::vec3(c), w);
         ++changed;
     }
     mesh.markAllDirty();
@@ -339,6 +377,65 @@ void registerPaintCommands(CommandRegistry& registry) {
                       const size_t n = paintFill(doc.mesh, c, area, float(argNumber(a, "strength", 1.0)));
                       doc.modified = true;
                       return {true, "Filled " + std::to_string(n) + " vertices with " + colorToHex(c)};
+                  }});
+
+    registry.add({"paint_gradient",
+                  "Line Gradient (#99): paint a straight colour ramp across the model as seen in a view, from one colour "
+                  "at the start of a screen line to another (or to nothing) at its end; before the start and after the "
+                  "end the end colours carry on. Into the active paint layer (of the texture when the Part paints into "
+                  "one), one undo step. The mask is respected like paint_fill; hidden faces are never painted.",
+                  {{"x0", T::Number, "Line start x (-1..1, normalised in the view). Default -1.", false},
+                   {"y0", T::Number, "Line start y (-1..1, y up). Default 0.", false},
+                   {"x1", T::Number, "Line end x. Default 1.", false},
+                   {"y1", T::Number, "Line end y. Default 0.", false},
+                   {"color", T::String, std::string(kColorHelp) + " The start colour. Default: the current paint colour.", false},
+                   {"to", T::String, "The end colour (any color form), or clear: the start colour fades out. Default clear.", false},
+                   {"area", T::String, "unmasked (default), masked or all, as paint_fill.", false},
+                   {"aspect", T::Number, "The view's width / height, so the bands cross the line squarely on screen. Default 1.", false},
+                   {"view_proj", T::String, "Optional 16 numbers: column-major view-projection matrix (default: the front view).", false}},
+                  [](Document& doc, const Args& a) -> CommandResult {
+                      Mesh& m = doc.mesh;
+                      if (m.vertexCount() == 0) return {false, "There is no mesh to paint"};
+                      LineGradient g;
+                      g.from = doc.paintColor;
+                      std::string err;
+                      if (!colorArg(a, g.from, err) && !err.empty()) return {false, err};
+                      const std::string to = argString(a, "to", "clear");
+                      g.toClear = to == "clear" || to == "transparent" || to == "none";
+                      if (!g.toClear && !parseColor(to, g.to)) return {false, "Unknown colour '" + to + "' (or clear)"};
+                      const std::string areaName = argString(a, "area", "unmasked");
+                      PaintArea area;
+                      if (areaName == "unmasked") area = PaintArea::Unmasked;
+                      else if (areaName == "masked") area = PaintArea::Masked;
+                      else if (areaName == "all") area = PaintArea::All;
+                      else return {false, "area must be unmasked, masked or all"};
+                      if (area == PaintArea::Masked && !m.hasMask()) return {false, "Nothing is masked"};
+                      glm::mat4 vp;
+                      if (!viewProjArg(m, a, vp, err)) return {false, err};
+                      const glm::vec2 p0(float(argNumber(a, "x0", -1.0)), float(argNumber(a, "y0", 0.0)));
+                      const glm::vec2 p1(float(argNumber(a, "x1", 1.0)), float(argNumber(a, "y1", 0.0)));
+                      if (glm::distance(p0, p1) < 1e-4f) return {false, "The line needs two different ends"};
+                      if (std::string why = paintBlocked(m); !why.empty()) return {false, why};
+                      const std::vector<float> t = gradientPositions(m, vp, p0, p1, float(argNumber(a, "aspect", 1.0)));
+                      const std::string ends = colorToHex(g.from) + " to " + (g.toClear ? std::string("clear") : colorToHex(g.to));
+                      if (paintsTexture(m)) {
+                          std::vector<float> w(m.vertexCount()), tv(t);
+                          for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+                              w[v] = std::isnan(t[v]) ? 0.0f : area == PaintArea::Unmasked ? 1.0f - m.maskAt(v)
+                                                             : area == PaintArea::Masked     ? m.maskAt(v)
+                                                                                             : 1.0f;
+                              if (std::isnan(tv[v])) tv[v] = 0.0f;
+                          }
+                          UndoRecord r = captureTexture(m, "Line Gradient");
+                          const size_t n = textureFillBy(m, tv, w, [&g](float x) { return g.at(x); });
+                          finishTextureUndo(r, m);
+                          doc.undo.push(std::move(r));
+                          return {true, "Line Gradient " + ends + " on " + std::to_string(n) + " texels"};
+                      }
+                      doc.undo.push(colorUndo(m, "Line Gradient"));
+                      const size_t n = paintGradient(m, t, g, area);
+                      doc.modified = true;
+                      return {true, "Line Gradient " + ends + " on " + std::to_string(n) + " vertices"};
                   }});
 
     registry.add({"paint_clear", "Remove all vertex paint from the mesh, paint layers included (undoable).", {},

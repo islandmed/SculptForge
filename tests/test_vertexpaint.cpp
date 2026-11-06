@@ -182,6 +182,44 @@ TEST(vertexpaint_fill_and_clear_commands) {
     CHECK(reg.execute(doc, "set_color", {{"r", 255.0}, {"g", 0.0}, {"b", 0.0}}).ok && near(doc.paintColor, kRed));
 }
 
+// Line Gradient (#99): left to right across the front view, the mask respected, one undo step per gradient.
+TEST(vertexpaint_line_gradient) {
+    CommandRegistry reg;
+    Document doc = makeDoc(makeIcosphere(3));
+    Mesh& m = doc.mesh;
+    const uint32_t left = nearestVertex(m, {-1, 0, 0}), right = nearestVertex(m, {1, 0, 0}), mid = nearestVertex(m, {0, 0, 1});
+    CHECK(!reg.execute(doc, "paint_gradient", {{"x0", 0.2}, {"y0", 0.1}, {"x1", 0.2}, {"y1", 0.1}}).ok); // no line
+    CHECK(!reg.execute(doc, "paint_gradient", {{"to", std::string("not a colour")}}).ok);
+    CHECK(!m.hasColors());
+
+    CHECK(reg.execute(doc, "paint_gradient", {{"color", std::string("#ff0000")}, {"to", std::string("#0000ff")}}).ok);
+    CHECK(near(m.colors[left], kRed) && near(m.colors[right], glm::vec3(0, 0, 1)));
+    const glm::vec3 half = srgbToLinear(glm::vec3(0.5f, 0.0f, 0.5f)); // blended as display colours
+    CHECK(near(m.colors[mid], half, 0.05f));
+    CHECK(near(m.colors[nearestVertex(m, {0, 0, -1})], m.colors[mid], 0.05f)); // a ramp through the whole Part
+    CHECK(reg.execute(doc, "undo").ok && !m.hasColors());
+    CHECK(reg.execute(doc, "redo").ok && near(m.colors[left], kRed));
+
+    // To clear: the start colour fades out over what is there; masked vertices keep their paint.
+    m.ensureMask();
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) m.mask[v] = m.positions[v].y > 0.5f ? 1.0f : 0.0f;
+    const uint32_t top = nearestVertex(m, {0, 1, 0});
+    const glm::vec3 topBefore = m.colors[top];
+    CHECK(reg.execute(doc, "paint_gradient", {{"color", std::string("#00ff00")}, {"x0", 0.0}, {"y0", -1.0}, {"x1", 0.0}, {"y1", 1.0}}).ok);
+    CHECK(near(m.colors[nearestVertex(m, {0, -1, 0})], glm::vec3(0, 1, 0)));
+    CHECK(near(m.colors[top], topBefore));
+    CHECK(m.colors[mid].y > 0.1f && m.colors[mid].y < 0.9f && m.colors[mid].x > 0.05f); // half green over the old ramp
+    CHECK(reg.execute(doc, "undo").ok && near(m.colors[mid], half, 0.05f));
+
+    // Masked only, and hidden faces are never painted.
+    CHECK(reg.execute(doc, "paint_gradient", {{"color", std::string("white")}, {"to", std::string("white")}, {"area", std::string("masked")}}).ok);
+    CHECK(near(m.colors[top], glm::vec3(1.0f)) && near(m.colors[left], kRed));
+    m.ensureHidden();
+    for (uint32_t t : m.vertexTriangles(left)) m.hidden[t] = 1;
+    CHECK(reg.execute(doc, "paint_gradient", {{"color", std::string("black")}, {"to", std::string("black")}, {"area", std::string("all")}}).ok);
+    CHECK(near(m.colors[left], kRed) && near(m.colors[right], glm::vec3(0.0f)) && near(m.colors[top], glm::vec3(0.0f)));
+}
+
 TEST(vertexpaint_fill_skips_hidden) {
     Mesh m = makeIcosphere(2);
     m.ensureHidden();
@@ -271,7 +309,7 @@ TEST(vertexpaint_export_ply_and_usd) {
 TEST(vertexpaint_commands_in_schema) {
     CommandRegistry reg;
     const std::string schema = reg.toolSchemaJson();
-    for (const char* name : {"set_color", "paint_fill", "paint_clear", "paint_from_cavity", "export_ply"}) {
+    for (const char* name : {"set_color", "paint_fill", "paint_gradient", "paint_clear", "paint_from_cavity", "export_ply"}) {
         CHECK(reg.find(name) != nullptr);
         CHECK(schema.find(std::string("\"") + name + "\"") != std::string::npos);
     }
