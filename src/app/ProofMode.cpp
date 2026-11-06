@@ -404,6 +404,9 @@ struct PhaseResult {
     std::vector<double> gpuMs;    // GPU time of the phase's frames (GL_TIME_ELAPSED; empty without timer queries)
     size_t screenStrokeFrames = 0; // frames the view showed pending dabs on the screen (render/ScreenStroke.h)
     std::vector<double> split[6]; // each frame by part (App::frameSplitMs_, the frame before: the swap comes after)
+    SculptTimings stroke;         // the stroke's own work (solver thread: kernel, normals, BVH), when it ended
+    double strokeSyncMs = 0;      // its uploads to the GPU (main thread, over strokeFrames frames)
+    int strokeFrames = 0;
 };
 
 struct SizeResult {
@@ -924,6 +927,9 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             if (doc_.sculptor.strokeActive()) break;
             p.releasing = false;
             ph.releaseDoneMs = (nowSeconds() - p.releaseAt) * 1000.0;
+            ph.stroke = perf_.lastStroke;
+            ph.strokeSyncMs = perf_.lastStrokeSyncMs;
+            ph.strokeFrames = perf_.lastStrokeFrames;
             strokeProbe_ = nullptr;
             ph.dabs = p.dabs.size();
             nextPhase();
@@ -1120,6 +1126,17 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     j.set("path_px", std::round(ph.pathPx));
                     j.set("release_ms", std::round(ph.releaseMs * 10) / 10);
                     j.set("release_done_ms", std::round(ph.releaseDoneMs * 10) / 10);
+                    if (ph.stroke.dabs > 0) { // where the stroke's time went, beside frame_split_ms (which is the main thread's)
+                        Json t = Json::object();
+                        t.set("kernel", std::round(ph.stroke.kernelMs * 10) / 10);
+                        t.set("normals", std::round(ph.stroke.normalsMs * 10) / 10);
+                        t.set("bvh", std::round(ph.stroke.bvhMs * 10) / 10);
+                        t.set("dynamic_topology", std::round(ph.stroke.remeshMs * 10) / 10);
+                        t.set("uploads", std::round(ph.strokeSyncMs * 10) / 10);
+                        t.set("upload_frames", double(ph.strokeFrames));
+                        t.set("vertices_moved", double(ph.stroke.vertices));
+                        j.set("stroke_work_ms", t);
+                    }
                     j.set("preview_lag_px", percentilesJson(percentiles(ph.previewLagPx)));
                     j.set("pointer_speed_px_s", ph.seconds > 0 ? std::round(ph.pathPx / ph.seconds) : 0.0);
                 }
