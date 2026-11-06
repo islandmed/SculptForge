@@ -877,6 +877,8 @@ constexpr Entry kTraditionalChinese[] = {
      "將微細分層級轉為新部件中的一般網格（用於匯出或需要真實幾何的工具）。"},
     {"Write the micro level as a 32-bit EXR displacement map over the base UVs (next to the project).",
      "將微細分層級寫成基底 UV 上的 32 位元 EXR 位移貼圖（放在專案旁）。"},
+    {"Sculpting: %s", "正在雕刻：%s"},
+    {"No Part under the cursor", "游標下沒有部件"},
     {"Sculpt the Part under the cursor", "雕刻游標下的部件"},
     {"Make the Part under the pointer the one you sculpt, without moving the view (each Part keeps its mask). "
      "The same key as Blender's; Preferences > Hotkeys changes it.",

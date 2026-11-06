@@ -1032,6 +1032,8 @@ constexpr Entry kSpanish[] = {
      "necesitan geometría real)."},
     {"Write the micro level as a 32-bit EXR displacement map over the base UVs (next to the project).",
      "Escribe el nivel micro como mapa de desplazamiento EXR de 32 bits sobre las UV base (junto al proyecto)."},
+    {"Sculpting: %s", "Esculpiendo: %s"},
+    {"No Part under the cursor", "No hay ninguna Pieza bajo el cursor"},
     {"Sculpt the Part under the cursor", "Esculpir la Pieza bajo el cursor"},
     {"Make the Part under the pointer the one you sculpt, without moving the view (each Part keeps its mask). "
      "The same key as Blender's; Preferences > Hotkeys changes it.",

@@ -154,14 +154,16 @@ void App::sculptPartUnderCursor() {
     const bool overCanvas = !ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouseX_, mouseY_);
     const int target = overCanvas ? pickPart(mouseX_, mouseY_) : -1;
     if (target < 0) {
-        status_ = "No Part under the cursor";
+        status_ = tr("No Part under the cursor");
         return;
     }
     if (target != doc_.activePart) {
         runCommand("part_select", {{"index", double(target)}});
         if (!lastCommandOk_) return;
     }
-    status_ = "Sculpting: " + doc_.activePartInfo().name;
+    char line[256];
+    std::snprintf(line, sizeof line, tr("Sculpting: %s"), doc_.activePartInfo().name.c_str());
+    status_ = line;
 }
 
 App::JobPart::JobPart(App& a, int index) : app(a) {
