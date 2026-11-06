@@ -395,6 +395,8 @@ private:
     std::vector<glm::vec3> baseMoves_;
     std::vector<float> baseFall_;
     std::vector<glm::vec3> baseCorner_, baseNormal_;
+    std::vector<uint32_t> baseSlot_; // baseWouldFold's: per vertex, its index in the dab's list
+    bool baseWouldFold(const Mesh& mesh, const std::vector<uint32_t>& verts, const std::vector<glm::vec3>& moves);
     bool microReady(Mesh& mesh); // the mesh has a micro level: starts the micro stroke on first use
     float strokeDiagonal_ = 0.0f;
     // The last remesh (repairDab remeshes it again when the brush squashed a triangle).
