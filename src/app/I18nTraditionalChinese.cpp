@@ -3192,7 +3192,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"Tier", "等級"},
     {"Off until you add your own key: hyper3d.ai > API dashboard (a Creator plan or higher).", "在你加入自己的金鑰前保持關閉：hyper3d.ai > API dashboard（需 Creator 或更高方案）。"},
     {"Using your key from the system keychain.", "正在使用系統鑰匙圈中的金鑰。"},
-    {"Sends your image or description to Hyper3D (api.hyper3d.com), which builds the model. Each generation is billed to your Hyper3D account. Basic API access covers Extreme Low and Low.", "將你的圖片或描述傳送到 Hyper3D（api.hyper3d.com）建立模型。每次生成都由你的 Hyper3D 帳戶計費。基本 API 存取涵蓋 Extreme Low 與 Low。"},
+    {"Sends your image or description to Hyper3D (api.hyper3d.com), which builds the model. Each generation is billed to your Hyper3D account. Basic API access covers Extreme Low and Low.", "將你的圖片或描述傳送到 Hyper3D（api.hyper3d.com）建立模型。每次生成都由你的 Hyper3D 帳號計費。基本 API 存取包含 Extreme Low 與 Low。"},
     {"Audit log", "稽核記錄"},
     {"Connecting...", "連線中..."},
     {"Copy code", "複製代碼"},
