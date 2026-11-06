@@ -213,6 +213,11 @@ private:
     void openFileDialog();
     void saveFileDialog(FileAction action);
     AABB sceneBounds() const; // mesh plus the main body of any splats
+    // Floor grid (#115): keeps RenderSettings::floorHeight at the lowest point of the visible Parts. Measured again
+    // only when the history, the Parts or their visibility changed and no stroke or drag is running (so the floor
+    // doesn't follow each dab); App.cpp.
+    void updateFloorHeight();
+    uint64_t floorKey_ = 0;
     bool onScreen(const AABB& box) const; // whole box inside the viewport
     void processPendingFiles();
 
