@@ -1308,6 +1308,7 @@ void App::drawHelpConsoleUi() {
             }
         }
     }
+    console_.update(*this);
     console_.watchStatus(status_);
     if (layout_.consoleOpen) console_.draw(*this, consoleRect());
     palette_.draw(*this, paletteArea());

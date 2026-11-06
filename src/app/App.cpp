@@ -2593,7 +2593,9 @@ void App::runCommand(const std::string& name, const Args& args) {
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
     crashlog::action(name); // (failures reach the log through SDL_Log below)
     const auto commandStart = std::chrono::steady_clock::now();
-    CommandResult r = commands_.execute(doc_, name, args);
+    // Auto UV unwraps on a worker (seconds on big meshes): the frame never waits for it. A running macro keeps the
+    // synchronous command, as its next steps read the UVs at once.
+    CommandResult r = name == "uv_auto" && macros_.runDepth == 0 ? startAutoUvCommand(args) : commands_.execute(doc_, name, args);
     if (perftrace::on()) { // a command that held up the frames (remesh, Divide, micro, open...)
         const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - commandStart).count();
         if (ms > perf_.traceLongMs) {

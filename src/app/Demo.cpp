@@ -216,6 +216,12 @@ void Demo::update(float dt) {
                 mouse_.y, int(buttonDown_));
     stride_ = 1;
     if (penResting_) penRestNoise(); // (UiTest.cpp)
+    {
+        const auto now = std::chrono::steady_clock::now();
+        if (lastFrame_.time_since_epoch().count() != 0)
+            longestFrameMs_ = std::max(longestFrameMs_, std::chrono::duration<double, std::milli>(now - lastFrame_).count());
+        lastFrame_ = now;
+    }
     if (!stepLines_.empty()) { // SF_UI_PROFILE: the frame just drawn belongs to the step that was running
         const auto now = std::chrono::steady_clock::now();
         if (lastUpdate_.time_since_epoch().count() != 0 && step_ < stepLines_.size())
@@ -226,6 +232,12 @@ void Demo::update(float dt) {
         if (!steps_[step_](stepTime_)) {
             stepTime_ += dt;
             return;
+        }
+        // (a step that finishes here, like a run line, is charged its own time: not the next line's frame)
+        if (step_ < stepLines_.size()) {
+            const auto now = std::chrono::steady_clock::now();
+            lineSeconds_[size_t(stepLines_[step_])] += std::chrono::duration<double>(now - lastUpdate_).count();
+            lastUpdate_ = now;
         }
         ++step_;
         stepTime_ = 0.0f;

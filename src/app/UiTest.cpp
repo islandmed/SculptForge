@@ -147,6 +147,8 @@
 //                            roughness differs from the default), shown_mean_r (mean red the viewport is sent),
 //                            layer_channel_<id> (1 when the active texture layer has channel <id> on, e.g. roughness)
 //                            auto_uv_running, qremesh_running (QRemesh working in the background),
+//                            longest_frame_ms (the longest real time between two frames since the last read; resets),
+//                            time_limit_scale (timeLimit()'s factor: 4 on CI or in a parallel ctest, else 1),
 //                            voxel_remesh_running, quick_remesh / remesh_after_stroke (Tool > Remesh, #121), stroke_stretched,
 //                            qremesh_guides (guide curves on the active Part), qremesh_guide_loops (closed ones),
 //                            guides_mode (1 while the QRemesh Guides brush is picked),
@@ -307,6 +309,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <utility>
 #include <thread>
 #include <mutex>
 #include <atomic>
@@ -567,6 +570,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "texture_layers") return hasTexture(m) ? double(m.texture->layers.size()) : 0.0;
     if (name == "active_texture_layer") return hasTexture(m) && !m.texture->layers.empty() ? double(m.texture->activeLayer) : -1.0;
     if (name == "auto_uv_running") return app_.autoUv_ ? 1.0 : 0.0;
+    if (name == "longest_frame_ms") return std::exchange(longestFrameMs_, 0.0); // since the last read (it resets)
+    if (name == "time_limit_scale") { // timeLimit()'s factor (tests/TestHarness.h): 4 on CI and in a parallel ctest
+        if (const char* strict = std::getenv("SF_BENCH_LIMITS"); strict && std::string(strict) == "1") return 1.0;
+        if (std::getenv("CI") || std::getenv("GITHUB_ACTIONS")) return 4.0;
+        const char* scale = std::getenv("SF_TIME_LIMIT_SCALE");
+        return std::max(1.0, scale ? std::atof(scale) : 1.0);
+    }
     if (const double v = app_.bakeTestValue(name); !std::isnan(v)) return v;
     if (const double v = app_.uvEditorTestValue(name); !std::isnan(v)) return v;
     if (const double v = app_.pbrTestValue(name); !std::isnan(v)) return v; // material_channels, channel_view, ...
@@ -2119,17 +2129,32 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             at += scriptDir_.size();
         }
         if (!parseScript(text, statements, error)) return false;
-        run([this, line, statements] {
-            for (const auto& st : statements) {
+        // A command that works on a worker (uv_auto: App::commandRunning) holds the script, frames still drawing,
+        // until its result is in, like the console and an AI tool wait for it.
+        auto next = std::make_shared<size_t>(0);
+        steps_.push_back([this, line, statements, next](float t) {
+            if (*next > 0 && app_.commandRunning()) {
+                SDL_Delay(5); // real work runs in real time
+                if (t > 600.0f) fail(line, statements[*next - 1].command + " still running after 600 s");
+                return t > 600.0f;
+            }
+            if (CommandResult r; *next > 0 && app_.takeCommandResult(r) && !r.ok) {
+                fail(line, statements[*next - 1].command + " failed: " + r.message);
+                return true;
+            }
+            while (*next < statements.size()) {
+                const ScriptStatement& st = statements[(*next)++];
                 Args args = st.args; // $LIBRARY: the test's own library folder (known once the app runs)
                 for (auto& [key, value] : args)
                     if (auto* sv = std::get_if<std::string>(&value)) *sv = expandLibrary(*sv);
                 app_.runCommand(st.command, args);
                 if (!app_.lastCommandOk_) {
                     fail(line, st.command + " failed: " + app_.status_);
-                    return;
+                    return true;
                 }
+                if (app_.commandRunning()) return false;
             }
+            return true;
         });
     } else if (verb == "run_fails") { // run_fails COMMAND ARGS...: the command must be refused
         if (!need(1)) return false;
