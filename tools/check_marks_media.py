@@ -40,7 +40,8 @@ SKIP_PREFIXES = check_marks.SKIP_PREFIXES
 
 def media_files():
     files = check_marks.tracked_files() or []
-    return [p for p in files if p.lower().endswith(IMAGES + VIDEOS) and not p.startswith(SKIP_PREFIXES)]
+    # a sparse checkout (release_script_beta's sandbox) lists files it doesn't have: not on disk, nothing to read
+    return [p for p in files if p.lower().endswith(IMAGES + VIDEOS) and not p.startswith(SKIP_PREFIXES) and (ROOT / p).is_file()]
 
 
 def hits_in(text, mark_re):
@@ -159,7 +160,7 @@ def main(argv):
         for n, (p, hits) in enumerate(pool.map(work, todo), 1):
             cache[keys[p]] = hits if explicit else counts(hits)
             print(f"[{n}/{len(todo)}] {p}: {'HIT' if hits else 'clean'}", file=sys.stderr)
-    if not explicit:
+    if todo and not explicit:  # a check that read nothing new writes nothing (release.sh preflight wants a clean tree)
         live = set(keys.values())
         # a flagged file stays flagged after it's replaced: a release tag's guide still has it (media_takedown.py)
         save_cache({k: v for k, v in cache.items() if k in live or v})
