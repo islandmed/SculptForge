@@ -326,18 +326,18 @@ void App::drawHardwareProfileOverlay() {
                      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
                          ImGuiWindowFlags_AlwaysAutoResize)) {
         if (fontBold_) ImGui::PushFont(fontBold_);
-        ImGui::TextUnformatted("Getting to know this computer");
+        ImGui::TextUnformatted(tr("Getting to know this computer"));
         if (fontBold_) ImGui::PopFont();
-        dim("A two-second check of the GPU, the CPU and memory, so big scenes stay smooth. Once, then again only when "
-            "the graphics card, its driver or SculptForge changes. Nothing leaves this computer.");
+        dim(tr("A two-second check of the GPU, the CPU and memory, so big scenes stay smooth. Once, then again only when "
+            "the graphics card, its driver or SculptForge changes. Nothing leaves this computer."));
         ImGui::ProgressBar(hw.calibrator->progress(), ImVec2(-1.0f, 0.0f), hw.calibrator->stageName());
         const bool esc = ImGui::IsKeyPressed(ImGuiKey_Escape, false);
-        if (ImGui::Button("Skip") || esc) {
+        if (ImGui::Button(tr("Skip")) || esc) {
             hw.calibrator->skip();
             finishCalibration();
         }
         ImGui::SameLine();
-        ImGui::TextDisabled("Esc");
+        ImGui::TextDisabled(tr("Esc"));
     }
     ImGui::End();
 }
@@ -386,7 +386,7 @@ void App::registerPerformanceProfileUiActions() {
 }
 
 void App::drawPerformanceProfileSection() {
-    ImGui::TextUnformatted("Hardware profile");
+    ImGui::TextUnformatted(tr("Hardware profile"));
     ui::HelpText("Hardware profile", nullptr,
                  "SculptForge measures this computer on first launch (and when the graphics card, its driver or the "
                  "version changes) and picks settings to match: how many triangles the view draws per frame, when big "
@@ -394,7 +394,7 @@ void App::drawPerformanceProfileSection() {
                  "limits, threads. Nothing is sent anywhere.",
                  kPath);
     if (!hwProfile_) {
-        dim("Off in this run: tests, renders and recordings use fixed settings.");
+        dim(tr("Off in this run: tests, renders and recordings use fixed settings."));
         ImGui::Spacing();
         return;
     }
@@ -415,7 +415,7 @@ void App::drawPerformanceProfileSection() {
                              : h.vramMB ? formatMegabytes(h.vramMB)
                                         : std::string("memory unknown");
     if (fontBold_) ImGui::PushFont(fontBold_);
-    ImGui::TextWrapped("Detected %s, %s -> %s", h.glRenderer.empty() ? "an unknown GPU" : h.glRenderer.c_str(), vram.c_str(),
+    ImGui::TextWrapped(tr("Detected %s, %s -> %s"), h.glRenderer.empty() ? "an unknown GPU" : h.glRenderer.c_str(), vram.c_str(),
                        tierName(p.tier));
     if (fontBold_) ImGui::PopFont();
     // Why (the reason without the "Detected ... -> tier" the line above already says).
@@ -461,7 +461,7 @@ void App::drawPerformanceProfileSection() {
     ImGui::LogText("%s", set.c_str());
 
     bool governor = p.overrides.governor;
-    if (ImGui::Checkbox("Frame Governor", &governor)) actions_.find("perf.governor")->run();
+    if (ImGui::Checkbox(tr("Frame Governor"), &governor)) actions_.find("perf.governor")->run();
     ui::HelpAction(*this, "perf.governor");
     if (governor && hw.governor.decisions() > 0) {
         const char* action = hw.governor.lastAction() == FrameGovernor::Action::Lowered  ? "drawing less"
@@ -470,16 +470,16 @@ void App::drawPerformanceProfileSection() {
         dim("Moving view: " + fmt("%.1f ms", hw.governor.lastCostMs()) + " of " + fmt("%.1f ms", hw.governor.targetMs()) + " per frame (" +
             (hw.lastGpuMs >= 0.0 ? "GPU timer" : "CPU time") + "), " + action);
     } else if (governor) {
-        dim("Learns from frames while the view moves.");
+        dim(tr("Learns from frames while the view moves."));
     }
-    if (ImGui::Button("Re-calibrate")) actions_.find("perf.recalibrate")->run();
+    if (ImGui::Button(tr("Re-calibrate"))) actions_.find("perf.recalibrate")->run();
     ui::HelpAction(*this, "perf.recalibrate");
 
     // --- Manual overrides ---
-    if (ImGui::TreeNode("Manual overrides")) {
+    if (ImGui::TreeNode(tr("Manual overrides"))) {
         ProfileOverrides o = p.overrides;
         bool edited = false;
-        const char* tiers[] = {"Tier: automatic", "Software (safe mode)", "Laptop / Budget", "Workstation"};
+        const char* tiers[] = {tr("Tier: automatic"), tr("Software (safe mode)"), tr("Laptop / Budget"), tr("Workstation")};
         int tierIndex = 0;
         ProfileTier forced;
         if (!o.tier.empty() && tierFromName(o.tier, forced)) tierIndex = int(forced) + 1;
@@ -502,20 +502,20 @@ void App::drawPerformanceProfileSection() {
             ImGui::TextUnformatted(label);
             ImGui::PopID();
         };
-        number("View budget (M triangles)", o.renderTriangleBudget, p.automatic.renderTriangleBudget, 1e6, "M");
-        number("Motion proxy from (M triangles)", o.motionProxyThreshold, p.automatic.motionProxyThreshold, 1e6, "M");
-        number("GPU memory budget (GB)", o.vramBudgetMB, p.automatic.vramBudgetMB, 1024.0, "GB");
-        number("Uploads per frame (MB)", o.uploadBudgetMBPerFrame, p.automatic.uploadBudgetMBPerFrame, 1.0, "MB");
-        number("Subdivision limit (M triangles)", o.maxSubdivisionTriangles, p.automatic.maxSubdivisionTriangles, 1e6, "M");
+        number(tr("View budget (M triangles)"), o.renderTriangleBudget, p.automatic.renderTriangleBudget, 1e6, "M");
+        number(tr("Motion proxy from (M triangles)"), o.motionProxyThreshold, p.automatic.motionProxyThreshold, 1e6, "M");
+        number(tr("GPU memory budget (GB)"), o.vramBudgetMB, p.automatic.vramBudgetMB, 1024.0, "GB");
+        number(tr("Uploads per frame (MB)"), o.uploadBudgetMBPerFrame, p.automatic.uploadBudgetMBPerFrame, 1.0, "MB");
+        number(tr("Subdivision limit (M triangles)"), o.maxSubdivisionTriangles, p.automatic.maxSubdivisionTriangles, 1e6, "M");
         {
             uint64_t threads = uint64_t(o.threads);
-            number("Threads (next start)", threads, uint64_t(p.automatic.threads), 1.0, "");
+            number(tr("Threads (next start)"), threads, uint64_t(p.automatic.threads), 1.0, "");
             o.threads = int(threads);
         }
-        const char* draftNames[] = {"Draft brushes: automatic", "Draft brushes: always", "Draft brushes: never"};
+        const char* draftNames[] = {tr("Draft brushes: automatic"), tr("Draft brushes: always"), tr("Draft brushes: never")};
         ImGui::SetNextItemWidth(-1.0f);
         if (ImGui::Combo("##perf.draft", &o.draftBrush, draftNames, 3)) edited = true;
-        const char* fpsNames[] = {"Target: automatic", "30 fps", "60 fps", "120 fps", "144 fps"};
+        const char* fpsNames[] = {tr("Target: automatic"), tr("30 fps"), tr("60 fps"), tr("120 fps"), tr("144 fps")};
         const int fpsValues[] = {0, 30, 60, 120, 144};
         int fpsIndex = 0;
         for (int i = 0; i < 5; ++i)
@@ -525,7 +525,7 @@ void App::drawPerformanceProfileSection() {
             o.targetFps = fpsValues[fpsIndex];
             edited = true;
         }
-        if (o.any() && ImGui::Button("Back to automatic")) {
+        if (o.any() && ImGui::Button(tr("Back to automatic"))) {
             const bool governorWas = o.governor;
             o = ProfileOverrides{};
             o.governor = governorWas;

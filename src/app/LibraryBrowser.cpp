@@ -548,7 +548,7 @@ void LibraryBrowser::contextMenu(App& app, const AssetEntry& e) {
     ImGui::TextDisabled("%s", e.name.c_str());
     ImGui::Separator();
     const bool mesh = e.kind == AssetKind::Mesh || e.kind == AssetKind::Project || e.kind == AssetKind::Primitive;
-    if (ImGui::MenuItem(e.kind == AssetKind::Folder || e.kind == AssetKind::Up ? "Open folder" : "Open"))
+    if (ImGui::MenuItem(tr(e.kind == AssetKind::Folder || e.kind == AssetKind::Up ? "Open folder" : "Open")))
         activate(app, e, false);
     if (mesh && ImGui::MenuItem(tr("Append as Part"), "Shift+double-click")) activate(app, e, true);
     if (e.kind == AssetKind::Image) {
@@ -766,7 +766,7 @@ void LibraryBrowser::drawHeader(App& app, float width) {
     ImGui::SetCursorScreenPos(ImVec2(std::max(leftEnd + 8.0f, groupRight - groupW()), origin.y));
     ImGui::PushClipRect(ImVec2(leftEnd, origin.y), ImVec2(groupRight, origin.y + kHeader * scale), true);
     if (quickTab) {
-        if (ImGui::Button(compact ? ICON_LC_SAVE "###QuickSave now" : ICON_LC_SAVE "  Save now###QuickSave now"))
+        if (ImGui::Button(tr(compact ? ICON_LC_SAVE "###QuickSave now" : ICON_LC_SAVE "  Save now###QuickSave now")))
             app.quickSave();
         ui::HelpAction(app, "file.quicksave");
         ImGui::SameLine(0, 8 * scale);
@@ -793,14 +793,14 @@ void LibraryBrowser::drawHeader(App& app, float width) {
     ui::DelayedTooltip("Capture from phone");
     ui::HelpAction(app, "file.capture_phone");
     ImGui::SameLine(0, 8 * scale);
-    if (ImGui::Button(compact ? ICON_LC_FOLDER_PLUS "###Open folder"
-                              : ICON_LC_FOLDER_PLUS "  Open folder...###Open folder"))
+    if (ImGui::Button(tr(compact ? ICON_LC_FOLDER_PLUS "###Open folder"
+                              : ICON_LC_FOLDER_PLUS "  Open folder...###Open folder")))
         SDL_ShowOpenFolderDialog(onFolderChosen, this, app.window_, nullptr, false);
     ui::HelpText("Open folder", nullptr, "Add a folder of your own to the Library (shown at the root of every tab).",
                  "Library");
     ImGui::SameLine(0, 8 * scale);
-    if (ImGui::Button(compactFeedback ? ICON_LC_MESSAGE_SQUARE_PLUS "###Fixes & suggestions"
-                              : ICON_LC_MESSAGE_SQUARE_PLUS "  Fixes & suggestions###Fixes & suggestions")) {
+    if (ImGui::Button(tr(compactFeedback ? ICON_LC_MESSAGE_SQUARE_PLUS "###Fixes & suggestions"
+                              : ICON_LC_MESSAGE_SQUARE_PLUS "  Fixes & suggestions###Fixes & suggestions"))) {
         if (app.interactive()) app.actions_.find("help.feedback")->run();
         app.status_ = "Submit a request for a fix or a suggestion: "
                       "https://github.com/islandmed/SculptForge/issues/new/choose";
@@ -862,7 +862,7 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     const bool visible =
-        ImGui::Begin("Library", nullptr,
+        ImGui::Begin(tr("Library"), nullptr,
                      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
                          ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoScrollWithMouse);
     ImGui::PopStyleVar(3);
@@ -1051,7 +1051,7 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
             ImGui::TextDisabled("%s", e.name.c_str());
             ImGui::Separator();
             bool done = false;
-            if (ai::aiEnabled() && ImGui::MenuItem(ICON_LC_SPARKLES "  Generate 3D...")) app.openPath(e.path), done = true;
+            if (ai::aiEnabled() && ImGui::MenuItem(tr(ICON_LC_SPARKLES "  Generate 3D..."))) app.openPath(e.path), done = true;
             if (ImGui::MenuItem(tr("Relief from image"))) {
                 app.confirmDiscard([&app, p = e.path] { app.runCommand("image_relief", {{"path", p}}); });
                 done = true;
@@ -1102,7 +1102,7 @@ void LibraryBrowser::drawPreferences(App& app) {
                  "Open the Library on the Project tab when SculptForge starts.",
                  "Preferences > Library");
     ImGui::SetNextItemWidth(-1);
-    ImGui::SliderInt("##lbrowspref", &layout.libraryRows, 1, 4, "Rows %d");
+    ImGui::SliderInt("##lbrowspref", &layout.libraryRows, 1, 4, tr("Rows %d"));
     ui::HelpText("Rows", nullptr, "Rows of thumbnails in the Library strip.", "Preferences > Library");
     int placement = layout.libraryBottom ? 1 : 0;
     ImGui::TextUnformatted(tr("Placement"));
@@ -1114,7 +1114,7 @@ void LibraryBrowser::drawPreferences(App& app) {
                  "Preferences > Library");
     ImGui::TextDisabled("%s", tr("Library folder"));
     ImGui::TextWrapped("%s", app.library_.user.empty() ? "(none)" : app.library_.user.c_str());
-    if (!app.library_.user.empty() && ImGui::Button(ICON_LC_FOLDER_OPEN "  Show library folder"))
+    if (!app.library_.user.empty() && ImGui::Button(tr(ICON_LC_FOLDER_OPEN "  Show library folder")))
         SDL_OpenURL(("file://" + app.library_.user).c_str());
 }
 

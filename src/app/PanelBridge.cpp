@@ -49,26 +49,26 @@ void App::runBridgeCommand(const std::string& name, const Args& args) {
 
 void App::drawBridgeMenu() {
     if (!bridgeInitialised_) pollBridge(); // sets up the dialogs
-    if (!ImGui::BeginMenu("Bridge")) return;
+    if (!ImGui::BeginMenu(tr("Bridge"))) return;
     const std::string root = bridgeFolder_[0] ? std::string(bridgeFolder_) : bridgeDefaultRoot();
     const bool bridge = !root.empty();
-    if (ImGui::MenuItem("Send")) {
+    if (ImGui::MenuItem(tr("Send"))) {
         runBridgeCommand("bridge_send");
         if (bridge) bridgeAutoReceive_ = true; // a round trip comes back the same way
     }
     if (!bridge && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", bridgeUnavailableMessage().c_str());
-    if (ImGui::MenuItem("Receive")) runBridgeCommand("bridge_receive");
+    if (ImGui::MenuItem(tr("Receive"))) runBridgeCommand("bridge_receive");
     if (!bridge && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", bridgeUnavailableMessage().c_str());
-    if (ImGui::MenuItem("Receive automatically", nullptr, &bridgeAutoReceive_, bridge) && bridgeAutoReceive_)
+    if (ImGui::MenuItem(tr("Receive automatically"), nullptr, &bridgeAutoReceive_, bridge) && bridgeAutoReceive_)
         bridgeListTime_ = fileTime(bridgeObjectListPath(root));
-    if (bridge) ImGui::TextDisabled("Bridge folder: %s", root.c_str());
-    else ImGui::TextDisabled("No default bridge folder on this system;\nBridge files still import and export.");
+    if (bridge) ImGui::TextDisabled(tr("Bridge folder: %s"), root.c_str());
+    else ImGui::TextDisabled(tr("No default bridge folder on this system;\nBridge files still import and export."));
     ImGui::SetNextItemWidth(260.0f * uiScale_);
-    ImGui::InputTextWithHint("##bridgefolder", "Custom bridge folder (optional)", bridgeFolder_, sizeof(bridgeFolder_));
+    ImGui::InputTextWithHint("##bridgefolder", tr("Custom bridge folder (optional)"), bridgeFolder_, sizeof(bridgeFolder_));
     ImGui::Separator();
-    if (ImGui::MenuItem("Import Bridge file..."))
+    if (ImGui::MenuItem(tr("Import Bridge file...")))
         SDL_ShowOpenFileDialog(onBridgeFileChosen, &bridgeDialogs_[int(BridgeFile::Import)], window_, kBridgeFilters, 2, nullptr, false);
-    if (ImGui::MenuItem("Export Bridge file..."))
+    if (ImGui::MenuItem(tr("Export Bridge file...")))
         SDL_ShowSaveFileDialog(onBridgeFileChosen, &bridgeDialogs_[int(BridgeFile::Export)], window_, kBridgeFilters, 2, nullptr);
     ImGui::EndMenu();
 }

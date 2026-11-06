@@ -1,0 +1,43 @@
+# Generate 3D in Simplified Chinese and Spanish (merge-0106-4b found it mostly English in zh-CN): the tabs, the
+# service list, the hints, the remesh choices, Generate 3D model and Quick shapes all go through tr(). Product and
+# model names stay English. The ImGui labels the panel shows are all translated: i18n_raw_labels fails on any that
+# skips tr(); this is the screen check, at 1x.
+run ui_look look=classic layout=classic
+click "Preferences##palette.preferences"
+click "Interface##preferences.interface"
+click "简体中文##language.zh-CN"
+click "偏好设置##palette.preferences"
+drop ../../assets/demo/teddy-sketch.png
+wait_for "生成 3D 模型" 5
+expect_text 从图片
+expect_text 完整 3D 模型（AI 重建）
+expect_text Hunyuan3D 2.1 (Tencent) - 免费，无需令牌
+expect_text 约 32768 个四边面，再加 1 个细分级别
+expect_text 快速形状（离线）
+expect_no_text From image
+expect_no_text Generate 3D model
+expect_no_text Quick shapes
+expect_no_text Hugging Face - free models
+shot zh-cn-generate-image
+click "从文本"
+wait 0.2
+expect_text 文本转 3D（AI）
+expect_no_text Describe one object
+shot zh-cn-generate-text
+click "从图片"
+
+click "偏好设置##palette.preferences"
+click "界面##preferences.interface"
+click "Español##language.es"
+click "Preferencias##palette.preferences"
+wait 0.2
+expect_text Desde imagen
+expect_text Generar modelo 3D
+expect_text Formas rápidas (sin conexión)
+expect_no_text Quick shapes
+shot es-generate-image
+
+# Back to English for the next test.
+click "Preferencias##palette.preferences"
+click "Interfaz##preferences.interface"
+click "English##language.en"

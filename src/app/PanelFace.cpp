@@ -281,16 +281,16 @@ void App::drawFaceOverlay() {
 
 void App::drawFaceContents() {
     const float s = uiScale_;
-    dimText("The 52 Apple ARKit blend shapes for rigs and live face capture, fitted to this head.");
+    dimText(tr("The 52 Apple ARKit blend shapes for rigs and live face capture, fitted to this head."));
     actionButton(*this, "face.generate");
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
-    const char* symmetry[] = {"Auto", "On", "Off"};
-    ImGui::Combo("Symmetry##face", &faceSymmetry_, symmetry, 3);
+    const char* symmetry[] = {tr("Auto"), tr("On"), tr("Off")};
+    ImGui::Combo(tr("Symmetry##face"), &faceSymmetry_, symmetry, 3);
     ui::HelpText("Symmetry", nullptr,
                  "Auto: Left and Right shapes are made exact mirror images when the sculpt is symmetric about X = 0. "
                  "On: always (asymmetric spots take the average). Off: each side as fitted.",
                  kFacePath);
-    ImGui::Checkbox("Parts too##face", &faceParts_);
+    ImGui::Checkbox(tr("Parts too##face"), &faceParts_);
     ui::HelpText("Parts too", nullptr,
                  "Eyes (Parts named Eye...) turn for the eyeLook shapes, Teeth / Tongue follow the jaw below the "
                  "bite (and tongueOut), and other Parts on the face (brows, lashes, a beard) follow the skin.",
@@ -308,14 +308,14 @@ void App::drawFaceContents() {
     ImGui::TextDisabled("%s", placed);
     if (faceLandmarks_.count()) {
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 40 * s);
-        if (ImGui::SmallButton("Clear##facelm")) runAction(actions_, "face.landmarks_clear");
+        if (ImGui::SmallButton(tr("Clear##facelm"))) runAction(actions_, "face.landmarks_clear");
         ui::HelpAction(*this, "face.landmarks_clear");
     }
 
     // Face test.
     tray::GroupLabel(*this, "Face test");
     const bool shapes = hasFaceShapes();
-    if (!shapes) dimText("Generate the shapes first.");
+    if (!shapes) dimText(tr("Generate the shapes first."));
     ImGui::BeginDisabled(!shapes);
     const auto& presets = facePresets();
     const float cell = (ImGui::GetContentRegionAvail().x - 3 * ImGui::GetStyle().ItemSpacing.x) / 4.0f;
@@ -357,16 +357,16 @@ void App::drawFaceContents() {
     actionButton(*this, "face.take_load");
     if (!faceTake_.empty()) {
         ImGui::TextDisabled("%s: %.1f / %.1f s", faceTake_.name.c_str(), double(faceTakeTime_), double(faceTake_.duration()));
-        if (ImGui::Button(faceTakePlaying_ ? "Pause##facetake" : "Play##facetake", ImVec2(half, 0))) runAction(actions_, "face.take_play");
+        if (ImGui::Button(tr(faceTakePlaying_ ? "Pause##facetake" : "Play##facetake"), ImVec2(half, 0))) runAction(actions_, "face.take_play");
         ui::HelpAction(*this, "face.take_play");
         ImGui::SameLine();
-        ImGui::Checkbox("Loop##facetake", &faceTakeLoop_);
+        ImGui::Checkbox(tr("Loop##facetake"), &faceTakeLoop_);
         ui::HelpText("Loop", nullptr, "Play the take again from the start when it ends.", kFacePath);
         actionButton(*this, "face.take_bake");
     }
     MorphAnimation baked;
     if (bakedFaceAnimation(doc_, baked)) {
-        ImGui::TextDisabled("Baked: %s (%.1f s, exports with GLB / USD)", baked.name.c_str(), double(baked.duration()));
+        ImGui::TextDisabled(tr("Baked: %s (%.1f s, exports with GLB / USD)"), baked.name.c_str(), double(baked.duration()));
         actionButton(*this, "face.take_clear");
     }
 }

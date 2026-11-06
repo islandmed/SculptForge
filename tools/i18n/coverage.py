@@ -9,8 +9,12 @@ which of them the table has no translation for.
     tools/i18n/coverage.py --check      exit 1 unless every language is at 100% (ctest i18n_coverage)
     tools/i18n/coverage.py --json       the strings and what each language lacks, for scripts
     tools/i18n/coverage.py --raw        literals ImGui shows without tr(): not translatable until wrapped in tr()
-    tools/i18n/coverage.py --raw-check  exit 1 if a literal shown without tr() is not in raw_allow.txt, or a line there
-                                        no longer matches one (ctest i18n_raw_labels): new labels can't skip tr()
+    tools/i18n/coverage.py --raw-check  exit 1 if a literal shown without tr() is not in raw_allow.txt (names that stay
+                                        English only, each also in keep_english.txt), or a line there no longer matches
+                                        one (ctest i18n_raw_labels): every other label goes through tr()
+A raw label is a literal (or either side of a ternary) handed to an ImGui call (RAW_IMGUI), to Combo through a
+`const char* items[] = {...}` array, or to a function of the file that shows its parameter as it is (raw_wrappers():
+a local hint(text) calling ImGui::TextWrapped("%s", text)).
 
 The strings are found in src/app/*.cpp, the label paths tr() is used through:
   - a literal passed to tr(), trPath() (each "A > B" step) or a wrapper that calls tr() on it (WRAPPERS below:
@@ -61,6 +65,14 @@ DYNAMIC = {
         "Writes %s (outside the project folder and the files you picked)",
         "Reads %s (outside the project folder and the files you picked)", "Saves over the project",
         "Replaces the scene: your unsaved changes would be lost"],
+    "ai/ImageTo3DService.cpp hfPresets, falModels labels and kHunyuanLicenceNote (App::drawImageTo3D)": [
+        "Hunyuan3D 2.1 (Tencent) - free, no token", "TRELLIS.2 (Microsoft, MIT) - Best detail (needs token)",
+        "Hunyuan3D 2 mini Turbo (Tencent) - free, fastest", "Hunyuan3D 2 (Tencent) - free",
+        "Stable Fast 3D (Stability AI) - free, quick and simple", "TRELLIS.2 (Microsoft) - detailed, open model",
+        "Hunyuan3D 3.1 Pro (Tencent)", "Hunyuan3D 3.1 Rapid (Tencent) - fast", "Meshy 6", "Rodin 2.5 (Hyper3D)",
+        "Rodin 2.5 Fast (Hyper3D) - cheaper",
+        "Hunyuan3D models are under the Tencent Hunyuan Community License, which doesn't cover use in the EU, UK or "
+        "South Korea. There, choose TRELLIS.2 (free token) or another model."],
     "ai/AiPolicy.h kPrivacyLine (PanelAi.cpp)": [
         "Your art is never uploaded or used for training. AI features run only when you use them and can be turned off."],
     "core/RadialMenu.cpp radialButtonLabel": ["None", "Middle mouse button", "Mouse back button", "Mouse forward button",
@@ -74,7 +86,11 @@ RAW_IMGUI = {"Button": [0], "SmallButton": [0], "Text": [0], "TextDisabled": [0]
              "TextUnformatted": [0], "TextColored": [1], "SeparatorText": [0], "Selectable": [0], "MenuItem": [0],
              "BeginMenu": [0], "Checkbox": [0], "CollapsingHeader": [0], "TreeNode": [0], "Combo": [0, 2],
              "RadioButton": [0], "SetTooltip": [0], "BulletText": [0], "Begin": [0], "BeginTabItem": [0],
-             "SliderFloat": [0, 4], "SliderInt": [0, 4], "InputText": [0], "InputTextWithHint": [1]}
+             "SliderFloat": [0, 4], "SliderInt": [0, 4], "InputText": [0], "InputTextWithHint": [1],
+             "BeginCombo": [0, 1], "ProgressBar": [2], "BeginPopupModal": [0], "LabelText": [0, 1], "InputInt": [0],
+             "InputFloat": [0], "DragFloat": [0, 4], "DragInt": [0, 4], "ColorEdit3": [0], "ColorEdit4": [0],
+             "SliderFloat2": [0, 4], "SliderFloat3": [0, 4], "DragFloat2": [0, 4], "DragFloat3": [0, 4],
+             "MenuItemEx": [1], "BeginChild": [], "TextLink": [0], "TextLinkOpenURL": [0]}
 
 ICON = "\x00ICON\x00"  # stands for an ICON_LC_* macro inside a label
 TOKEN = re.compile(
@@ -177,8 +193,10 @@ def choices(arg):
     """The argument's strings: a plain literal, or each side of a ternary of literals (c ? "On" : "Off")."""
     if literal(arg) is not None:
         return [literal(arg)]
-    if "?" in [t[1] for t in arg] and "+" not in [t[1] for t in arg]:
-        return literals_in(arg)
+    if len(arg) > 1 and arg[0][0] == "id" and arg[1][1] == "(" and split_args(arg, 1)[1] == len(arg):
+        return []  # a call: tr(c ? "On" : "Off"), getenv("X")
+    if "?" in [t[1] for t in arg] and "+" not in [t[1] for t in arg]:  # not a call's argument: getenv("FAL_KEY")
+        return [t[1] for j, t in enumerate(arg) if t[0] == "str" and not (j and arg[j - 1][1] in ("(", ","))]
     return []
 
 
@@ -382,21 +400,68 @@ def collect():
     return {s: w for s, w in found.items() if words(s)}
 
 
+def raw_wrappers(toks, defs):
+    """The file's functions and lambdas that show a parameter through ImGui as it is (a local hint(text) that calls
+    ImGui::TextWrapped("%s", text)): name -> parameter indices. A literal handed to one of them is a raw label too."""
+    found = {}
+    for name, params, start, end, _ in defs:
+        for i in range(start, end):
+            k, v, _ = toks[i]
+            if not (k == "id" and v in RAW_IMGUI and toks[i - 1][1] == "::" and toks[i - 2][1] == "ImGui"
+                    and toks[i + 1][1] == "("):
+                continue
+            args, _ = split_args(toks, i + 1)
+            slots = set(RAW_IMGUI[v])
+            for a in RAW_IMGUI[v]:  # "%s", text: the argument after a format of only "%s"
+                if a < len(args) and literal(args[a]) == "%s":
+                    slots.add(a + 1)
+            for a in slots:
+                if a < len(args):
+                    words_ = [t[1] for t in args[a] if t[1] not in (".", "c_str", "(", ")")]
+                    if len(words_) == 1 and words_[0] in params:
+                        found.setdefault(name, set()).add(params.index(words_[0]))
+    return found
+
+
+def arrays(toks):
+    """name -> literals of the file's `const char* name[] = {...}` arrays (Combo items)."""
+    out = {}
+    for i, (k, v, _) in enumerate(toks):
+        if k == "id" and i + 4 < len(toks) and toks[i - 1][1] == "*" \
+                and [t[1] for t in toks[i + 1:i + 5]] == ["[", "]", "=", "{"]:
+            out[v] = [literal(a) for a in split_args(toks, i + 4)[0] if literal(a) is not None]
+    return out
+
+
 def raw_labels():
-    """(file, line, call, text) for every literal shown through ImGui without tr()."""
+    """(file, line, call, text) for every literal shown through ImGui without tr(): a literal (or either side of a
+    ternary) handed to an ImGui call, to a Combo through an array, or to the file's own function that shows it raw."""
     out = []
     for path in sorted(SRC.glob("*.cpp")):
         if path.name in SKIP_FILES:
             continue
         toks = tokens(path.read_text(encoding="utf-8"))
+        local = raw_wrappers(toks, definitions(toks))
+        arrs = arrays(toks)
         for i, (k, v, line) in enumerate(toks):
-            if k == "id" and v in RAW_IMGUI and i > 1 and toks[i - 1][1] == "::" and toks[i - 2][1] == "ImGui" \
-                    and i + 1 < len(toks) and toks[i + 1][1] == "(":
-                args, _ = split_args(toks, i + 1)
-                for a in RAW_IMGUI[v]:
-                    s = literal(args[a]) if a < len(args) else None
+            if k != "id" or i + 1 >= len(toks) or toks[i + 1][1] != "(" or toks[i - 1][1] in (".", "->"):
+                continue
+            imgui = toks[i - 1][1] == "::" and toks[i - 2][1] == "ImGui"
+            if imgui and v in RAW_IMGUI:
+                slots, call = RAW_IMGUI[v], v
+            elif not imgui and toks[i - 1][1] != "::" and v in local:
+                slots, call = sorted(local[v]), v
+            else:
+                continue
+            args, _ = split_args(toks, i + 1)
+            for a in slots:
+                if a >= len(args):
+                    continue
+                ids = [t[1] for t in args[a]]
+                texts = arrs.get(ids[0], []) if imgui and v == "Combo" and len(ids) == 1 else choices(args[a])
+                for s in texts:
                     if s and words(s):
-                        out.append((path.name, line, v, s))
+                        out.append((path.name, line, ("ImGui::" if imgui else "") + call, s))
     return out
 
 
@@ -445,32 +510,28 @@ def translates(table, text):
 
 def raw_key(f, call, s):
     """A raw_allow.txt line: file, ImGui call and the literal as JSON, tab-separated (no line number: edits move it)."""
-    return f"{f}\tImGui::{call}\t{json.dumps(s.replace(ICON, '<icon>'), ensure_ascii=False)}"
+    return f"{f}\t{call}\t{json.dumps(s.replace(ICON, '<icon>'), ensure_ascii=False)}"
 
 
-def raw_check(write=False):
-    found = {raw_key(f, call, s) for f, _, call, s in raw_labels()}
+def raw_check():
+    """Every literal ImGui shows goes through tr(), except a name in raw_allow.txt that keep_english.txt also keeps: no
+    backlog, so an untranslated label fails the test and is listed."""
+    found = {raw_key(f, call, s): s for f, _, call, s in raw_labels()}
     lines = RAW_ALLOW.read_text(encoding="utf-8").splitlines() if RAW_ALLOW.exists() else []
     allowed = {ln for ln in lines if ln.strip() and not ln.startswith("#")}
-    if write:  # keeps the comments and the intentional section, rewrites the backlog
-        head = []
-        for ln in lines:
-            head.append(ln)
-            if ln.startswith("# --- backlog"):
-                break
-        backlog = sorted(found - {ln for ln in head if not ln.startswith("#")})
-        RAW_ALLOW.write_text("\n".join(head + backlog) + "\n", encoding="utf-8")
-        print(f"raw_allow.txt: {len(backlog)} backlog lines")
-        return 0
-    new, stale = sorted(found - allowed), sorted(allowed - found)
+    keep = load_keep()
+    not_names = sorted(ln for ln in allowed if visible(json.loads(ln.split("\t")[2]).replace("<icon>", ICON)) not in keep)
+    new, stale = sorted(set(found) - allowed), sorted(allowed - set(found))
     for ln in new:
         print(f"shown without tr(): {ln}")
     for ln in stale:
         print(f"raw_allow.txt line no label matches any more (delete it): {ln}")
-    print(f"{len(found)} labels shown without tr(), {len(new)} new, {len(stale)} stale allow-list lines")
-    if new or stale:
-        print("i18n_raw_labels: wrap new labels in tr() and translate them (coverage.py --missing); a name that stays "
-              "English everywhere goes in raw_allow.txt's intentional section")
+    for ln in not_names:
+        print(f"raw_allow.txt line is not a name in keep_english.txt (wrap it in tr() instead): {ln}")
+    print(f"{len(found)} labels shown without tr(), {len(new)} not allowed, {len(stale)} stale allow-list lines")
+    if new or stale or not_names:
+        print("i18n_raw_labels: wrap each label in tr() and translate it in every table (coverage.py --missing); only a "
+              "name that stays English everywhere (keep_english.txt) may skip tr() through raw_allow.txt")
         return 1
     return 0
 
@@ -492,16 +553,15 @@ def main():
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--raw", action="store_true", help="list the literals ImGui shows without tr() (not translatable yet)")
     ap.add_argument("--raw-check", action="store_true", help="exit 1 on a raw literal not in raw_allow.txt (or a stale line)")
-    ap.add_argument("--raw-write", action="store_true", help="rewrite raw_allow.txt's backlog to what is raw now")
     args = ap.parse_args()
 
-    if args.raw_check or args.raw_write:
-        return raw_check(write=args.raw_write)
+    if args.raw_check:
+        return raw_check()
 
     if args.raw:
         raw = raw_labels()
         for f, line, call, s in raw:
-            print(f"{f}:{line}: ImGui::{call} {s.replace(ICON, '<icon>')!r}")
+            print(f"{f}:{line}: {call} {s.replace(ICON, '<icon>')!r}")
         print(f"{len(raw)} labels shown without tr()")
         return 0
     strings = collect()

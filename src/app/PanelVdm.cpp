@@ -182,54 +182,54 @@ void App::drawVdmSection() {
     }
     drawVdmGrid(*this, GridMode::Palette);
 
-    ImGui::SeparatorText("Load");
+    ImGui::SeparatorText(tr("Load"));
     actionButton(*this, "vdm.load");
-    ImGui::Checkbox("Swap Y/Z##vdm", &vdmImport_.swapYZ);
+    ImGui::Checkbox(tr("Swap Y/Z##vdm"), &vdmImport_.swapYZ);
     ui::HelpText("Swap Y/Z", nullptr,
                  "For maps that store the surface normal in G instead of B (Y-up apps). Blender's maps and ours need "
                  "nothing; maps from other apps depend on how they were exported, so try this if a stamp comes "
                  "out lying on its side.",
                  "Brush > Vector Displacement");
     ImGui::SameLine();
-    ImGui::Checkbox("Flip X##vdm", &vdmImport_.flipX);
+    ImGui::Checkbox(tr("Flip X##vdm"), &vdmImport_.flipX);
     ui::HelpText("Flip X", nullptr, "Mirror the map's sideways (R) channel when loading: for a stamp that comes out mirrored.",
                  "Brush > Vector Displacement");
     ImGui::SameLine();
-    ImGui::Checkbox("Flip Y##vdm", &vdmImport_.flipY);
+    ImGui::Checkbox(tr("Flip Y##vdm"), &vdmImport_.flipY);
     ui::HelpText("Flip Y", nullptr, "Mirror the map's up (G) channel when loading: for a stamp that leans the wrong way.",
                  "Brush > Vector Displacement");
-    ImGui::Checkbox("Flip Z##vdm", &vdmImport_.flipZ);
+    ImGui::Checkbox(tr("Flip Z##vdm"), &vdmImport_.flipZ);
     ui::HelpText("Flip Z", nullptr, "Negate the map's height (B) when loading: for a map that digs in where it should rise.",
                  "Brush > Vector Displacement");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(-1);
-    ImGui::SliderFloat("##vdmscale", &vdmImport_.scale, 0.1f, 10.0f, "Scale %.2f", ImGuiSliderFlags_Logarithmic);
+    ImGui::SliderFloat("##vdmscale", &vdmImport_.scale, 0.1f, 10.0f, tr("Scale %.2f"), ImGuiSliderFlags_Logarithmic);
     ui::HelpText("Scale", nullptr,
                  "Multiply a loaded map's vectors: for maps saved in other units than the brush radius (1 = as stored).",
                  "Brush > Vector Displacement");
 
-    ImGui::SeparatorText("Create");
+    ImGui::SeparatorText(tr("Create"));
     ImGui::SetNextItemWidth(-1);
-    ImGui::SliderInt("##vdmplane", &vdmPlaneRes_, 64, 1024, "Plane Res %d");
+    ImGui::SliderInt("##vdmplane", &vdmPlaneRes_, 64, 1024, tr("Plane Res %d"));
     ui::HelpText("Plane Res", nullptr,
                  "Quads per side of a new VDM plane. 256 is a good start; divide it (Ctrl+D) for finer detail.",
                  "Brush > Vector Displacement");
     actionButton(*this, "vdm.new_plane");
     ImGui::SetNextItemWidth(-1);
-    ImGui::InputTextWithHint("##vdmname", "Name of the new VDM", vdmName_, sizeof vdmName_);
+    ImGui::InputTextWithHint("##vdmname", tr("Name of the new VDM"), vdmName_, sizeof vdmName_);
     ui::HelpText("VDM name", nullptr, "What Create VDM calls the new map (a map of the same name is replaced).",
                  "Brush > Vector Displacement");
     ImGui::SetNextItemWidth(-1);
-    ImGui::SliderInt("##vdmsize", &vdmCaptureSize_, 64, 1024, "Map Size %d px");
+    ImGui::SliderInt("##vdmsize", &vdmCaptureSize_, 64, 1024, tr("Map Size %d px"));
     ui::HelpText("Map Size", nullptr,
                  "Pixels a side of the map Create VDM makes. 256 holds most shapes; 512 for fine detail (Blender suggests "
                  "512 or less).",
                  "Brush > Vector Displacement");
     actionButton(*this, "vdm.create");
     actionButton(*this, "vdm.export");
-    hint("Stamp with Drag Stamp (drag sets size and turn) or Slide Stamp. Intensity 50 presses the map at its own size; "
+    hint(tr("Stamp with Drag Stamp (drag sets size and turn) or Slide Stamp. Intensity 50 presses the map at its own size; "
          "Alt digs it in. A VDM moves points sideways, so it needs a dense mesh: divide first, and stamp at the "
-         "highest subdivision level.");
+         "highest subdivision level."));
 }
 
 } // namespace sf

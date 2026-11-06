@@ -434,7 +434,7 @@ void App::drawQRemeshContents() {
     const float third = (full - 2.0f * style.ItemSpacing.x) / 3.0f;
 
     if (qremesh_) {
-        ImGui::ProgressBar(qremesh_->progress->load(), ImVec2(half, 0), "Remeshing...");
+        ImGui::ProgressBar(qremesh_->progress->load(), ImVec2(half, 0), tr("Remeshing..."));
         ui::HelpText("Quad Remesh", nullptr, "Remeshing in the background. The result replaces the Part when it's done.",
                      kQRemeshPath);
         ImGui::SameLine();
@@ -448,7 +448,7 @@ void App::drawQRemeshContents() {
     }
 
     {
-        static const char* methods[] = {"Quad Remesh 2", "Legacy"};
+        const char* methods[] = {tr("Quad Remesh 2"), tr("Legacy")};
         ImGui::SetNextItemWidth(-1);
         ImGui::Combo("##qmethod", &retopo_.method, methods, 2);
         ui::HelpText("Method", nullptr,

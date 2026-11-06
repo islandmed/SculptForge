@@ -317,7 +317,7 @@ void App::drawPackReview() {
         }
         ImGui::Text("%s %s", tr("Author:"), m.author.c_str());
         ImGui::Text("%s %s", tr("License:"), m.license.c_str());
-        ImGui::TextDisabled("%s  -  %s unpacked", utf8(fsPath(packs_.reviewPath).filename()).c_str(),
+        ImGui::TextDisabled(tr("%s  -  %s unpacked"), utf8(fsPath(packs_.reviewPath).filename()).c_str(),
                             r->bytes >= 1024 * 1024 ? (std::to_string(r->bytes / (1024 * 1024)) + " MB").c_str()
                                                     : (std::to_string(std::max<uint64_t>(1, r->bytes / 1024)) + " KB").c_str());
         if (!m.description.empty()) ImGui::TextWrapped("%s", m.description.c_str());
@@ -413,7 +413,7 @@ void App::drawPacksTab(float height) {
         std::array<int, kPackItemTypes> counts{};
         for (const PackItem& it : m.contents) ++counts[size_t(it.type)];
         ImGui::SameLine();
-        ImGui::TextDisabled("by %s  -  %s  -  %s", m.author.c_str(), m.license.c_str(), packCountsText(counts).c_str());
+        ImGui::TextDisabled(tr("by %s  -  %s  -  %s"), m.author.c_str(), m.license.c_str(), packCountsText(counts).c_str());
         ImGui::SameLine();
         const bool expanded = packs_.expanded == m.id;
         if (ImGui::SmallButton((std::string(expanded ? tr("Hide") : tr("Details")) + "##" + m.id).c_str()))
@@ -463,7 +463,7 @@ void App::drawPacksTab(float height) {
         ImGui::PushID(mac.path.c_str());
         ImGui::TextUnformatted(mac.name.c_str());
         ImGui::SameLine();
-        ImGui::TextDisabled("%d commands", int(mac.statements.size()));
+        ImGui::TextDisabled(tr("%d commands"), int(mac.statements.size()));
         ImGui::SameLine();
         if (ImGui::SmallButton((std::string(tr("Run")) + "##run" + mac.path).c_str())) requestMacroRun(mac);
         ImGui::SameLine();
@@ -632,7 +632,7 @@ void App::drawNewPack() {
         ImGui::InputText(label, buf, size);
         ui::HelpText(label, nullptr, help, "Library > Packs > New Pack");
     };
-    field("Name##newpack", packs_.name, sizeof packs_.name, "The pack's name, shown next to every item it brings.");
+    field(tr("Name##newpack"), packs_.name, sizeof packs_.name, "The pack's name, shown next to every item it brings.");
     if (!packs_.id[0] && packs_.name[0]) {
         std::string id;
         for (unsigned char c : std::string(packs_.name))
@@ -641,11 +641,11 @@ void App::drawNewPack() {
         while (!id.empty() && id.back() == '-') id.pop_back();
         std::snprintf(packs_.id, sizeof packs_.id, "%s", id.substr(0, 64).c_str());
     }
-    field("Id##newpack", packs_.id, sizeof packs_.id,
+    field(tr("Id##newpack"), packs_.id, sizeof packs_.id,
           "Its folder name: lower-case letters, digits, '.', '_' or '-'. A newer version keeps the same id.");
-    field("Version##newpack", packs_.version, sizeof packs_.version, "1.0, 1.1, 2.0 ...");
-    field("Author##newpack", packs_.author, sizeof packs_.author, "Who made it (shown when it's installed).");
-    field("License##newpack", packs_.license, sizeof packs_.license, "For example CC-BY-4.0, CC0-1.0 or your own terms.");
+    field(tr("Version##newpack"), packs_.version, sizeof packs_.version, "1.0, 1.1, 2.0 ...");
+    field(tr("Author##newpack"), packs_.author, sizeof packs_.author, "Who made it (shown when it's installed).");
+    field(tr("License##newpack"), packs_.license, sizeof packs_.license, "For example CC-BY-4.0, CC0-1.0 or your own terms.");
     ImGui::SetNextItemWidth(-110 * s);
     ImGui::InputTextMultiline("Description##newpack", packs_.description, sizeof packs_.description,
                               ImVec2(-110 * s, ImGui::GetTextLineHeight() * 3.0f));
@@ -679,7 +679,7 @@ void App::drawNewPack() {
     ui::HelpText("Save Pack", nullptr, "Write the .sfpack, checked exactly as an install would check it.",
                  "Library > Packs > New Pack");
     ImGui::SameLine();
-    ImGui::TextDisabled("%d items", chosen);
+    ImGui::TextDisabled(tr("%d items"), chosen);
     ImGui::SameLine();
     if (ImGui::Button(tr("Cancel##newpack"), ImVec2(100 * s, 0))) open = false;
     ImGui::End();
@@ -821,7 +821,7 @@ void App::drawMacroEditor() {
         return;
     }
     ImGui::SetNextItemWidth(-80 * s);
-    ImGui::InputText("Name##macroname", macros_.name, sizeof macros_.name);
+    ImGui::InputText(tr("Name##macroname"), macros_.name, sizeof macros_.name);
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     ImGui::TextWrapped("%s", tr("One command per line, as in the console (# starts a comment). Files: a path inside "
                                 "the project folder, or ? to pick one when it runs."));

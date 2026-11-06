@@ -374,9 +374,9 @@ void App::drawBakeContents() {
 
     // What the maps go onto.
     if (!m.hasUvs()) {
-        ImGui::TextDisabled("No UVs: Tool > Texture Map > Auto UV");
+        ImGui::TextDisabled(tr("No UVs: Tool > Texture Map > Auto UV"));
     } else {
-        ImGui::TextDisabled("Onto %s (%zu tris, UVs)", doc_.activePartInfo().name.c_str(), m.triangleCount());
+        ImGui::TextDisabled(tr("Onto %s (%zu tris, UVs)"), doc_.activePartInfo().name.c_str(), m.triangleCount());
     }
     ui::HelpText("Low-poly", nullptr,
                  "Maps are baked onto the active Part's UVs: make the low-poly active (it needs UVs from import or "
@@ -393,7 +393,7 @@ void App::drawBakeContents() {
         }
     if (!found) b.source = 0;
     ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Source");
+    ImGui::TextUnformatted(tr("Source"));
     ImGui::SameLine();
     ImGui::SetNextItemWidth(-1);
     const bool hasLevels = subdivLevelCount(m) >= 2, hasMicroLevel = hasMicro(m);
@@ -402,9 +402,9 @@ void App::drawBakeContents() {
     if (b.levelSource == 1) current = "Own top subdivision level";
     if (b.levelSource == 2) current = "Own micro level";
     if (ImGui::BeginCombo("##bakesource", current.c_str())) {
-        if (hasLevels && ImGui::Selectable("Own top subdivision level##level", b.levelSource == 1)) b.levelSource = 1, b.source = 0;
-        if (hasMicroLevel && ImGui::Selectable("Own micro level##micro", b.levelSource == 2)) b.levelSource = 2, b.source = 0;
-        if (ImGui::Selectable("All visible Parts", b.source == 0 && !b.levelSource)) b.source = 0, b.levelSource = 0;
+        if (hasLevels && ImGui::Selectable(tr("Own top subdivision level##level"), b.levelSource == 1)) b.levelSource = 1, b.source = 0;
+        if (hasMicroLevel && ImGui::Selectable(tr("Own micro level##micro"), b.levelSource == 2)) b.levelSource = 2, b.source = 0;
+        if (ImGui::Selectable(tr("All visible Parts"), b.source == 0 && !b.levelSource)) b.source = 0, b.levelSource = 0;
         for (int i = 0; i < doc_.partCount(); ++i) {
             if (i == doc_.activePart) continue;
             const Part& st = doc_.parts[size_t(i)];
@@ -464,7 +464,7 @@ void App::drawBakeContents() {
                  kPath);
 
     // Ray distances.
-    ImGui::Checkbox("Auto distance", &b.settings.autoDistance);
+    ImGui::Checkbox(tr("Auto distance"), &b.settings.autoDistance);
     ui::HelpText("Auto distance", nullptr,
                  "Measure how far the high-poly lies in front of and behind the low-poly before baking, and cast rays just "
                  "that far. Turn it off to set Front and Rear yourself (e.g. when rays hit a nearby part).",
@@ -492,7 +492,7 @@ void App::drawBakeContents() {
                  "are mipmapped in an engine. 8 is plenty for 2K; use more for 4K and 8K.",
                  kPath);
     ImGui::SameLine();
-    const char* greens[] = {"OpenGL (Y+)", "DirectX (Y-)"};
+    const char* greens[] = {tr("OpenGL (Y+)"), tr("DirectX (Y-)")};
     int green = b.settings.flipGreen ? 1 : 0;
     ImGui::SetNextItemWidth(-1);
     if (ImGui::Combo("##bakegreen", &green, greens, 2)) b.settings.flipGreen = green == 1;
@@ -516,8 +516,8 @@ void App::drawBakeContents() {
 
     // Output.
     ImGui::SetNextItemWidth(-ImGui::GetFrameHeight() - style.ItemSpacing.x);
-    ImGui::InputTextWithHint("##bakefolder", lastExportFolder_.empty() ? "Output folder (default: project / library)"
-                                                                       : "Output folder (default: last export's)",
+    ImGui::InputTextWithHint("##bakefolder", tr(lastExportFolder_.empty() ? "Output folder (default: project / library)"
+                                                                       : "Output folder (default: last export's)"),
                              b.folder, sizeof b.folder);
     ui::HelpText("Output folder", nullptr,
                  "Where the maps are written, as <Part>_normal.png, _ao.png, _displacement.png (+ .exr) and so on. "
@@ -525,7 +525,7 @@ void App::drawBakeContents() {
                  kPath);
     ImGui::SameLine();
     ui::ActionButton(*this, "bake.choose_folder", ImVec2(ImGui::GetFrameHeight(), 0), ui::Look::Icon);
-    ImGui::Checkbox("EXR displacement", &b.exr);
+    ImGui::Checkbox(tr("EXR displacement"), &b.exr);
     ui::HelpText("EXR displacement", nullptr,
                  "Also write the displacement as a 32-bit float OpenEXR in world units (for renderers that take real "
                  "distances). The 16-bit PNG is always written.",
@@ -533,7 +533,7 @@ void App::drawBakeContents() {
 
     // Bake / progress.
     if (b.job) {
-        ImGui::ProgressBar(b.job->progress->load(), ImVec2(half, 0), "Baking...");
+        ImGui::ProgressBar(b.job->progress->load(), ImVec2(half, 0), tr("Baking..."));
         ui::HelpText("Baking", nullptr, "Baking on every core in the background; you can keep working.", kPath);
         ImGui::SameLine();
         ui::ActionButton(*this, "bake.cancel", ImVec2(-1, 0));
@@ -544,15 +544,15 @@ void App::drawBakeContents() {
     // The last bake.
     if (b.result) {
         const BakeResult& r = *b.result;
-        ImGui::TextDisabled("%dx%d in %.1f s from %zu tris", r.width, r.height, r.seconds, r.sourceTriangles);
+        ImGui::TextDisabled(tr("%dx%d in %.1f s from %zu tris"), r.width, r.height, r.seconds, r.sourceTriangles);
         if (r.has(BakeMap::Displacement))
-            ImGui::TextDisabled("Displacement: mid-grey = 0, white = +%.4g", double(r.displacementScale));
+            ImGui::TextDisabled(tr("Displacement: mid-grey = 0, white = +%.4g"), double(r.displacementScale));
         if (r.missRatio() >= 0.0005f) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(ui::color::danger));
-            ImGui::TextWrapped("%.1f%% of texels found no surface: raise Front / Rear", double(100.0f * r.missRatio()));
+            ImGui::TextWrapped(tr("%.1f%% of texels found no surface: raise Front / Rear"), double(100.0f * r.missRatio()));
             ImGui::PopStyleColor();
         }
-        ImGui::Checkbox("Preview Normal Map", &b.preview);
+        ImGui::Checkbox(tr("Preview Normal Map"), &b.preview);
         ui::HelpAction(*this, "bake.preview");
         ImGui::SameLine();
         ui::ActionButton(*this, "bake.open_folder", ImVec2(-1, 0));

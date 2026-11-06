@@ -282,7 +282,7 @@ void App::drawPerformanceSection() {
                  kPath);
     const SculptTimings& t = perf_.lastStroke;
     if (t.dabs == 0) {
-        dimText("Sculpt a stroke to see what it costs.");
+        dimText(tr("Sculpt a stroke to see what it costs."));
     } else {
         const double d = double(t.dabs);
         const double upload = perf_.lastStrokeFrames ? perf_.lastStrokeSyncMs / perf_.lastStrokeFrames : 0.0;

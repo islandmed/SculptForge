@@ -106,11 +106,11 @@ void App::receiveFromMaya() {
 }
 
 void App::drawMayaMenu() {
-    if (!ImGui::BeginMenu("Maya")) return;
+    if (!ImGui::BeginMenu(tr("Maya"))) return;
     menuAction(*this, "file.send_maya");
     menuAction(*this, "file.receive_maya");
     const bool hasFolder = !uiPrefs_.mayaFolder.empty();
-    if (ImGui::MenuItem("Get automatically##maya", nullptr, &uiPrefs_.mayaAutoReceive, hasFolder)) {
+    if (ImGui::MenuItem(tr("Get automatically##maya"), nullptr, &uiPrefs_.mayaAutoReceive, hasFolder)) {
         if (uiPrefs_.mayaAutoReceive) { // from now on: what is there already waits for Get from Maya
             const std::string inbox = mayaInbox(uiPrefs_.mayaFolder);
             mayaSeenRevision_ = mayaRevision(inbox);
@@ -125,8 +125,8 @@ void App::drawMayaMenu() {
     ImGui::Separator();
     menuAction(*this, "file.maya_folder");
     if (hasFolder) {
-        ImGui::TextDisabled("Folder: %s", uiPrefs_.mayaFolder.c_str());
-        if (ImGui::MenuItem("Turn the Maya bridge off##maya")) {
+        ImGui::TextDisabled(tr("Folder: %s"), uiPrefs_.mayaFolder.c_str());
+        if (ImGui::MenuItem(tr("Turn the Maya bridge off##maya"))) {
             uiPrefs_.mayaFolder.clear();
             uiPrefs_.mayaAutoReceive = false;
             if (!uiConfigDeterministic_) saveMayaPrefs(configDir_, uiPrefs_);
@@ -135,9 +135,9 @@ void App::drawMayaMenu() {
         ui::HelpText("Turn the Maya bridge off", nullptr, "Forget the exchange folder; nothing in it is deleted.",
                      "File > Maya");
     } else {
-        ImGui::TextDisabled("Off: choose an exchange folder first.");
+        ImGui::TextDisabled(tr("Off: choose an exchange folder first."));
     }
-    ImGui::TextDisabled("Needs the SculptForge shelf script in Maya\n(Help > User Guide > Working with Maya).");
+    ImGui::TextDisabled(tr("Needs the SculptForge shelf script in Maya\n(Help > User Guide > Working with Maya)."));
     ImGui::EndMenu();
 }
 

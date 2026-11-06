@@ -48,17 +48,17 @@ void App::updateDiscordPresence() {
 
 void App::drawIntegrationsPrefs() {
     const char* path = "Preferences > Integrations";
-    bool changed = ImGui::Checkbox("Show SculptForge on Discord##prefs.discord", &discordPrefs_.enabled);
+    bool changed = ImGui::Checkbox(tr("Show SculptForge on Discord##prefs.discord"), &discordPrefs_.enabled);
     ui::HelpText("Show SculptForge on Discord", nullptr,
                  "Your Discord profile shows SculptForge, its icon and how long you've been sculpting. Sent only to "
                  "the Discord app on this computer, which shows it to your friends. Off by default.",
                  path);
     ImGui::BeginDisabled(!discordPrefs_.enabled);
-    changed |= ImGui::Checkbox("Show the monthly challenge##prefs.discord", &discordPrefs_.showChallenge);
+    changed |= ImGui::Checkbox(tr("Show the monthly challenge##prefs.discord"), &discordPrefs_.showChallenge);
     ui::HelpText("Show the monthly challenge", nullptr, "Adds \"Monthly challenge: <theme>\", with the theme you type below.", path);
     ImGui::BeginDisabled(!discordPrefs_.showChallenge);
     ImGui::SetNextItemWidth(-1);
-    if (ImGui::InputTextWithHint("##prefs.discord.challenge", "Theme (64 characters at most)", discordChallengeBuf_,
+    if (ImGui::InputTextWithHint("##prefs.discord.challenge", tr("Theme (64 characters at most)"), discordChallengeBuf_,
                                  sizeof discordChallengeBuf_)) {
         discordPrefs_.challenge = discord::sanitize(discordChallengeBuf_, discord::kChallengeMax);
     }
@@ -67,12 +67,12 @@ void App::drawIntegrationsPrefs() {
         changed = true;
     }
     ImGui::EndDisabled();
-    changed |= ImGui::Checkbox("Show the file name##prefs.discord", &discordPrefs_.showFileName);
+    changed |= ImGui::Checkbox(tr("Show the file name##prefs.discord"), &discordPrefs_.showFileName);
     ui::HelpText("Show the file name", nullptr, "Adds the name of the file you're working on (never its folder). Off by default.",
                  path);
     ImGui::EndDisabled();
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("Nothing else is sent: no folders, no user name, no model details. Needs the Discord app running.");
+    ImGui::TextWrapped(tr("Nothing else is sent: no folders, no user name, no model details. Needs the Discord app running."));
     ImGui::PopStyleColor();
     if (changed) {
         saveProjectPrefs();

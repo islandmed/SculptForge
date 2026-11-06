@@ -334,8 +334,8 @@ void App::drawTimelineUi() {
 
     // A running timelapse: a few frames each app frame, under a modal with a progress bar.
     if (s.job) {
-        ImGui::OpenPopup("Rendering timelapse");
-        if (ImGui::BeginPopupModal("Rendering timelapse", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::OpenPopup("###timelapse.rendering");
+        if (ImGui::BeginPopupModal(tr("Rendering timelapse###timelapse.rendering"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::Text("%s", s.job->path.c_str());
             ImGui::ProgressBar(float(s.job->frame) / float(std::max(1, s.job->frames)), ImVec2(360 * uiScale_, 0));
             if (ImGui::Button(tr("Cancel"))) s.job->cancelled = true;
@@ -353,10 +353,10 @@ void App::drawTimelineUi() {
             else p = "sculptforge-timelapse.mp4";
             std::snprintf(s.timelapsePath, sizeof s.timelapsePath, "%s", utf8Of(p).c_str());
         }
-        ImGui::OpenPopup("Export timelapse");
+        ImGui::OpenPopup("###timelapse.export");
         s.timelapseDialog = false;
     }
-    if (ImGui::BeginPopupModal("Export timelapse", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal(tr("Export timelapse###timelapse.export"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped(tr("The history of the active Part (%zu steps up to the cursor) played as a turntable."), t->cursor());
         ImGui::RadioButton("1080p", &s.timelapseRes, 0);
         ImGui::SameLine();
@@ -364,7 +364,7 @@ void App::drawTimelineUi() {
         ImGui::SetNextItemWidth(200 * uiScale_);
         ImGui::SliderFloat(tr("Length"), &s.timelapseSeconds, 5.0f, 90.0f, "%.0f s");
         ImGui::SetNextItemWidth(420 * uiScale_);
-        ImGui::InputText("File", s.timelapsePath, sizeof s.timelapsePath);
+        ImGui::InputText(tr("File"), s.timelapsePath, sizeof s.timelapsePath);
         if (ImGui::Button(tr("Export"))) {
             const bool k4 = s.timelapseRes == 1;
             startTimelapse(s.timelapsePath, k4 ? 3840 : 1920, k4 ? 2160 : 1080, s.timelapseSeconds, 30);
@@ -440,7 +440,7 @@ void App::drawTimelineUi() {
     ImGui::Text(tr("Step %zu of %zu"), t->cursor(), n - 1);
     if (!branches.empty()) {
         ImGui::SameLine();
-        ImGui::TextDisabled("%s %zu branch%s", ICON_LC_GIT_BRANCH, branches.size(), branches.size() == 1 ? "" : "es");
+        ImGui::TextDisabled(tr(branches.size() == 1 ? "%s %zu branch" : "%s %zu branches"), ICON_LC_GIT_BRANCH, branches.size());
     }
     if (const Timeline::Node& cur = t->node(t->cursorNode()); t->cursor() > 0) {
         ImGui::SameLine();
@@ -496,8 +496,9 @@ void App::drawTimelineUi() {
             else s.message = "Switched to the other branch (the one you left is a lane now)";
         }
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Branch from step %zu: %zu step%s, ending with \"%s\"\nClick to make it the active branch", b.from,
-                              b.length, b.length == 1 ? "" : "s", t->node(b.tip).label.c_str());
+            ImGui::SetTooltip(tr(b.length == 1 ? "Branch from step %zu: %zu step, ending with \"%s\"\nClick to make it the active branch"
+                                               : "Branch from step %zu: %zu steps, ending with \"%s\"\nClick to make it the active branch"),
+                              b.from, b.length, t->node(b.tip).label.c_str());
         ImGui::PopID();
         y += laneH + 3 * sc;
     }
@@ -546,10 +547,10 @@ void App::drawTimelineUi() {
         const int d = t->depth(hovered);
         if (node.parent == Timeline::kNone) ImGui::SetTooltip("%s", tr("Start of the history"));
         else
-            ImGui::SetTooltip("Step %d: %s (%s)\n%u %s, %s%s\nClick or drag to show the model here; right-click to re-tune", d,
+            ImGui::SetTooltip(tr("Step %d: %s (%s)\n%u %s, %s%s\nClick or drag to show the model here; right-click to re-tune"), d,
                               node.label.c_str(), kindLabel(node.kind), node.touched,
-                              node.kind == Timeline::Kind::Visibility ? "triangles" : "vertices", ago(node.time).c_str(),
-                              node.strength != 1.0f ? ("\nStrength " + std::to_string(int(std::lround(node.strength * 100))) + "%").c_str() : "");
+                              tr(node.kind == Timeline::Kind::Visibility ? "triangles" : "vertices"), ago(node.time).c_str(),
+                              node.strength != 1.0f ? ("\n" + std::string(tr("Strength")) + " " + std::to_string(int(std::lround(node.strength * 100))) + "%").c_str() : "");
     }
     // Apply the scrubber's target once a frame (coalesced while dragging).
     if (s.pendingSeek != SIZE_MAX && s.pendingSeek != t->cursor() && !stroking) {

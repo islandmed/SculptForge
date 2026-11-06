@@ -171,7 +171,7 @@ void App::drawPenPressureSwitches(const char* id) {
     const float labelW = std::max(ImGui::CalcTextSize(tr("Strength")).x, ImGui::CalcTextSize(tr("Size")).x) + ImGui::GetFontSize(); // (a clear gap before the segments)
     for (const bool size : {true, false}) {
         ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(tr(size ? "Size" : "Strength"));
+        ImGui::TextUnformatted(tr(tr(size ? "Size" : "Strength")));
         ImGui::SameLine(labelW);
         if (size) ui::Segmented(*this, {"brush.pen_size_global", "brush.pen_size_on", "brush.pen_size_off"});
         else ui::Segmented(*this, {"brush.pen_strength_global", "brush.pen_strength_on", "brush.pen_strength_off"});

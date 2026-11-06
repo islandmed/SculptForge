@@ -893,7 +893,7 @@ void App::drawGizmoPanel() {
     ImGui::SetNextWindowPos(ImVec2(c.x + 12.0f * uiScale_, c.y + c.h - 12.0f * uiScale_), ImGuiCond_FirstUseEver,
                             ImVec2(0.0f, 1.0f));
     ImGui::SetNextWindowSize(ImVec2(270.0f * uiScale_, 0.0f), ImGuiCond_Always);
-    if (ImGui::Begin("Gizmo", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings)) {
+    if (ImGui::Begin(tr("Gizmo"), nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings)) {
         drawGizmoContents(true);
     }
     ImGui::End();
@@ -902,7 +902,7 @@ void App::drawGizmoPanel() {
 void App::drawGizmoContents(bool compact) {
     ui::Segmented(*this, {"tool.draw", "tool.move", "tool.scale", "tool.rotate"});
     if (!compact && !gizmoActive()) {
-        ImGui::TextDisabled("Q W E R: Draw, Move, Scale, Rotate");
+        ImGui::TextDisabled(tr("Q W E R: Draw, Move, Scale, Rotate"));
         return;
     }
     // Pivot.
@@ -943,25 +943,25 @@ void App::drawGizmoContents(bool compact) {
             ui::HelpText(label, nullptr, help, kPath);
         }
     };
-    row("Move", "gizmo_move", gizmo_.move, 3, "%.3g", "Distance to move along X, Y and Z (the gizmo's axes) when you press Apply.");
-    row("Rotate", "gizmo_rotate", gizmo_.rotate, 3, "%.3g",
+    row(tr("Move"), "gizmo_move", gizmo_.move, 3, "%.3g", "Distance to move along X, Y and Z (the gizmo's axes) when you press Apply.");
+    row(tr("Rotate"), "gizmo_rotate", gizmo_.rotate, 3, "%.3g",
         "Degrees to turn about X, then Y, then Z (the gizmo's axes, through the pivot) when you press Apply.");
-    row("Scale", "gizmo_scale", &gizmo_.scale, 1, "%.1f%%", "Size to scale to about the pivot when you press Apply (100% = unchanged).");
+    row(tr("Scale"), "gizmo_scale", &gizmo_.scale, 1, "%.1f%%", "Size to scale to about the pivot when you press Apply (100% = unchanged).");
     const float w = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-    if (ImGui::Button("Apply", ImVec2(w, 0))) applyGizmoNumbers();
+    if (ImGui::Button(tr("Apply"), ImVec2(w, 0))) applyGizmoNumbers();
     ui::HelpText("Apply", nullptr,
                  "Move, rotate and scale by the numbers above, about the pivot, as one undo step (the transform "
                  "command). Masked parts stay; with symmetry on, a masked transform is mirrored.",
                  kPath);
     ImGui::SameLine();
-    if (ImGui::Button("Clear", ImVec2(w, 0))) {
+    if (ImGui::Button(tr("Clear"), ImVec2(w, 0))) {
         std::fill(gizmo_.move, gizmo_.move + 3, 0.0f);
         std::fill(gizmo_.rotate, gizmo_.rotate + 3, 0.0f);
         gizmo_.scale = 100.0f;
     }
     ui::HelpText("Clear", nullptr, "Set Move and Rotate back to 0 and Scale to 100%.", kPath);
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
-    ImGui::TextWrapped("Shift snaps (15 deg, grid, 10%%). Alt+drag the gizmo: move it only. Alt+click the model: pivot there.");
+    ImGui::TextWrapped(tr("Shift snaps (15 deg, grid, 10%%). Alt+drag the gizmo: move it only. Alt+click the model: pivot there."));
     ImGui::PopStyleColor();
 }
 

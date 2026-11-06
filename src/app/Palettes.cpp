@@ -520,7 +520,7 @@ void App::drawPalette_Edit() {
 void App::drawPalette_File() {
     menuAction(*this, "file.new_sphere");
     menuAction(*this, "file.new_plane");
-    if (ImGui::BeginMenu("New from Starter Mesh")) {
+    if (ImGui::BeginMenu(tr("New from Starter Mesh"))) {
         for (const StarterMesh& m : starterMeshes()) {
             if (ImGui::MenuItem((std::string(m.name) + "##starter." + m.id).c_str())) {
                 const std::string id = m.id;
@@ -565,7 +565,7 @@ void App::drawPalette_Generate() {
         hint(*this, "AI features are off (Preferences > AI): Relief, Inflate and Stamp work offline.");
     }
     tray::GroupLabel(*this, "From an image");
-    if (ImGui::Button(refImage_.empty() ? "Choose image...##generate" : "Change image...##generate", ImVec2(-1, 0))) {
+    if (ImGui::Button(tr(refImage_.empty() ? "Choose image...##generate" : "Change image...##generate"), ImVec2(-1, 0))) {
         static const SDL_DialogFileFilter filters[] = {{"Images", "png;jpg;jpeg;bmp;tga;psd;gif"}, {"All files", "*"}};
         SDL_ShowOpenFileDialog(
             [](void* user, const char* const* files, int) {
@@ -885,7 +885,7 @@ void App::drawPalette_Tool() {
         tray::GroupLabel(*this, "Voxel Remesh");
         const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
         if (voxelRemesh_) { // remeshing in the background (PanelRetopo.cpp)
-            ImGui::ProgressBar(voxelRemesh_->progress->load(), ImVec2(half, 0), "Remeshing...");
+            ImGui::ProgressBar(voxelRemesh_->progress->load(), ImVec2(half, 0), tr("Remeshing..."));
             ui::HelpText("Voxel Remesh", nullptr,
                          "Remeshing in the background (with a painted texture: Auto UV of the new surface, then the "
                          "texture projected onto it). The result replaces the Part when it's done.",

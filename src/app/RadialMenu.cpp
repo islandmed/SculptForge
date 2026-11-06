@@ -458,7 +458,7 @@ void App::drawRadialMenusSection() {
     };
     const float addW = ImGui::GetFrameHeight() * 1.2f;
     ImGui::SetNextItemWidth(-(addW + ImGui::GetStyle().ItemSpacing.x));
-    if (ImGui::BeginCombo("##radial.menu", radialEdit_.menu >= 0 ? menuTitle(radialEdit_.menu).c_str() : "No menus")) {
+    if (ImGui::BeginCombo("##radial.menu", tr(radialEdit_.menu >= 0 ? menuTitle(radialEdit_.menu).c_str() : "No menus"))) {
         for (int i = 0; i < int(radialMenus_.size()); ++i)
             if (ImGui::Selectable((menuTitle(i) + "###radialmenu" + std::to_string(i + 1)).c_str(), i == radialEdit_.menu))
                 radialEdit_.menu = i, radialEdit_.pickSlot = -2, radialEdit_.selected = -1;
@@ -487,7 +487,7 @@ void App::drawRadialMenusSection() {
         char name[kRadialNameMax + 1];
         std::snprintf(name, sizeof name, "%s", m.name.c_str());
         ImGui::SetNextItemWidth(-FLT_MIN);
-        if (ImGui::InputTextWithHint("##radial.name", "Name", name, sizeof name)) {
+        if (ImGui::InputTextWithHint("##radial.name", tr("Name"), name, sizeof name)) {
             m.name = radialCleanText(name, kRadialNameMax);
             refreshRadialActions();
         }
@@ -561,7 +561,7 @@ void App::drawRadialMenusSection() {
                 std::snprintf(label, sizeof label, "%s", slot.label.c_str());
                 const float iconW = 2.6f * rowH;
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - iconW - spacing);
-                if (ImGui::InputTextWithHint("##radial.label", a ? a->label.c_str() : "Label", label, sizeof label))
+                if (ImGui::InputTextWithHint("##radial.label", tr(a ? a->label.c_str() : "Label"), label, sizeof label))
                     slot.label = radialCleanText(label, kRadialLabelMax);
                 ui::HelpText("Label", nullptr, "What the pie shows for it; empty: the action's own name.", path);
                 ImGui::SameLine();
@@ -608,7 +608,7 @@ void App::drawRadialMenusSection() {
             ImGui::SetNextItemWidth(-FLT_MIN);
             if (radialEdit_.focusSearch) ImGui::SetKeyboardFocusHere();
             radialEdit_.focusSearch = false;
-            ImGui::InputTextWithHint("##radial.search", ICON_LC_SEARCH "  Search actions", radialEdit_.query,
+            ImGui::InputTextWithHint("##radial.search", tr(ICON_LC_SEARCH "  Search actions"), radialEdit_.query,
                                      sizeof radialEdit_.query);
             if (radialEdit_.foundQuery != radialEdit_.query || radialEdit_.foundRevision != actions_.revision()) {
                 radialEdit_.foundQuery = radialEdit_.query;

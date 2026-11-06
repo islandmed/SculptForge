@@ -422,7 +422,7 @@ void App::drawPartsContents() {
             const ImVec2 eyeSize(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeight());
             if (ImGui::InvisibleButton(("##eye " + s.name).c_str(), eyeSize)) toggleIndex = i;
             const bool eyeHovered = ImGui::IsItemHovered();
-            if (eyeHovered) ImGui::SetTooltip(s.visible ? "Hide %s" : "Show %s", s.name.c_str());
+            if (eyeHovered) ImGui::SetTooltip(tr(s.visible ? "Hide %s" : "Show %s"), s.name.c_str());
             const ImU32 eyeCol = ImGui::GetColorU32(eyeHovered    ? style.Colors[ImGuiCol_ButtonHovered]
                                                     : s.visible ? style.Colors[ImGuiCol_Text]
                                                                 : style.Colors[ImGuiCol_TextDisabled]);
@@ -522,8 +522,8 @@ void App::drawPartsContents() {
                 ImGui::EndMenu();
             }
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
-                ImGui::SetTooltip(count > 1 ? "Insert a copy of another Part into the active one"
-                                            : "Append another Part first");
+                ImGui::SetTooltip(tr(count > 1 ? "Insert a copy of another Part into the active one"
+                                            : "Append another Part first"));
             if (ImGui::MenuItem(tr("From file...##insert")))
                 SDL_ShowOpenFileDialog(onAppendChosen, &dialogRequests_[int(FileAction::InsertMesh)], window_,
                                        kInsertFilters, 2, nullptr, false);
@@ -574,7 +574,7 @@ void App::drawPartsContents() {
     if (solo) ImGui::PopStyleColor();
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-        ImGui::SetTooltip(solo ? "Show the other Parts again" : "Show only the active Part");
+        ImGui::SetTooltip(tr(solo ? "Show the other Parts again" : "Show only the active Part"));
     ImGui::SameLine();
     const bool xray = renderSettings_.xray;
     if (xray) ImGui::PushStyleColor(ImGuiCol_Button, style.Colors[ImGuiCol_ButtonActive]);

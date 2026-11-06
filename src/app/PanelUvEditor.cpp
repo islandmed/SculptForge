@@ -1061,7 +1061,7 @@ void App::drawUvEditor() {
     ImGui::SetNextWindowSizeConstraints(ImVec2(std::min(520 * scale, cr.w), std::min(360 * scale, cr.h)),
                                         ImVec2(FLT_MAX, FLT_MAX));
     ImGui::SetNextWindowBgAlpha(1.0f);
-    if (!ImGui::Begin("UV Editor", &showUvEditor_, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar)) {
+    if (!ImGui::Begin(tr("UV Editor"), &showUvEditor_, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar)) {
         ImGui::End();
         return;
     }
@@ -1410,7 +1410,7 @@ void App::drawUvEditor() {
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::accentHover);
         ImGui::PushStyleColor(ImGuiCol_Text, theme::textOnAccent);
         ImGui::BeginDisabled(s.job != nullptr || m.triangleCount() == 0);
-        if (ImGui::Button(tr(sel ? "Unwrap Selected##uvunwrap" : "Unwrap##uvunwrap"), ImVec2(w, 0))) u.unwrap();
+        if (ImGui::Button(tr(tr(sel ? "Unwrap Selected##uvunwrap" : "Unwrap##uvunwrap")), ImVec2(w, 0))) u.unwrap();
         ImGui::EndDisabled();
         ImGui::PopStyleColor(3);
         ui::HelpAction(*this, "uv.unwrap");

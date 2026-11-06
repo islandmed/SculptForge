@@ -675,7 +675,7 @@ void drawBrushGrid(App& app, GridMode mode) {
     if (popup) {
         // What was typed, or how to type.
         if (typed.empty()) {
-            ImGui::TextDisabled("Type a letter to narrow the brushes, then press its orange key");
+            ImGui::TextDisabled(tr("Type a letter to narrow the brushes, then press its orange key"));
             ImGui::SameLine();
             SortMenu("brushsortpop", app.uiPrefs_.brushSort);
         } else {
@@ -684,8 +684,8 @@ void drawBrushGrid(App& app, GridMode mode) {
                 c = char(std::toupper(static_cast<unsigned char>(c)));
             ImGui::TextColored(ImVec4(0.94f, 0.53f, 0.18f, 1.0f), "%s", shownTyped.c_str());
             ImGui::SameLine();
-            ImGui::TextDisabled(substring ? "(contains)  Backspace: undo a letter  Enter: first match"
-                                          : "Backspace: undo a letter  Enter: first match");
+            ImGui::TextDisabled(tr(substring ? "(contains)  Backspace: undo a letter  Enter: first match"
+                                          : "Backspace: undo a letter  Enter: first match"));
         }
     }
 
@@ -752,30 +752,30 @@ void drawBrushGrid(App& app, GridMode mode) {
             const std::string action = brushActionId(b);
             auto& shelf = app.layout_.bottomShelf;
             const bool onShelf = std::find(shelf.begin(), shelf.end(), action) != shelf.end();
-            if (ImGui::MenuItem("Add to bottom shelf", nullptr, false, !onShelf && b.kind != BrushItem::Kind::File)) {
+            if (ImGui::MenuItem(tr("Add to bottom shelf"), nullptr, false, !onShelf && b.kind != BrushItem::Kind::File)) {
                 shelf.insert(std::find(shelf.begin(), shelf.end(), "widget.add_brush"), action); // before [+]
                 app.status_ = "Added " + b.name + " to the bottom shelf";
             }
             if (b.kind == BrushItem::Kind::Recipe) {
                 // The same menu as the Brush palette's custom-brush list (PanelBrushLibrary.cpp).
-                if (ImGui::MenuItem("Copy brush code")) app.copyBrushCode(b.index);
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("One line of text to share in chat, email or a forum");
-                if (ImGui::MenuItem("Rename...##brush")) {
+                if (ImGui::MenuItem(tr("Copy brush code"))) app.copyBrushCode(b.index);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("One line of text to share in chat, email or a forum"));
+                if (ImGui::MenuItem(tr("Rename...##brush"))) {
                     app.brushPopup_ = App::BrushPopup::Rename;
                     app.brushPopupName_ = app.doc_.brushes[size_t(b.index)].name;
                     std::snprintf(app.brushRenameBuf_, sizeof app.brushRenameBuf_, "%s", app.brushPopupName_.c_str());
                 }
-                if (ImGui::MenuItem("Save as .sfbrush...")) {
+                if (ImGui::MenuItem(tr("Save as .sfbrush..."))) {
                     app.doc_.activeBrush = b.index;
                     app.paintMode_ = false;
                     app.saveFileDialog(App::FileAction::SaveBrush);
                 }
                 const BrushRecipe& r = app.doc_.brushes[size_t(b.index)];
-                if (ImGui::MenuItem("Delete...##brush", nullptr, false, isUserLibraryBrush(r))) {
+                if (ImGui::MenuItem(tr("Delete...##brush"), nullptr, false, isUserLibraryBrush(r))) {
                     app.brushPopup_ = App::BrushPopup::Delete;
                     app.brushPopupName_ = r.name;
                 }
-                if (ImGui::MenuItem("Reveal in folder", nullptr, false, !r.origin.path.empty()))
+                if (ImGui::MenuItem(tr("Reveal in folder"), nullptr, false, !r.origin.path.empty()))
                     app.revealBrushFile(b.index);
             }
             ImGui::EndPopup();
@@ -850,7 +850,7 @@ void drawBrushGrid(App& app, GridMode mode) {
         for (size_t i : in)
             drawItem(i, column, sec.title.c_str());
     }
-    if (shown.empty()) ImGui::TextDisabled("No brush matches \"%s\"", typed.c_str());
+    if (shown.empty()) ImGui::TextDisabled(tr("No brush matches \"%s\""), typed.c_str());
     if (popup) ImGui::EndChild();
     AssetTileHoverGlow();
 }
@@ -885,7 +885,7 @@ void drawStrokeGrid(App& app, GridMode mode) {
     }
     if (app.strokeType_ == StrokeType::Spray) {
         ImGui::SetNextItemWidth(-1);
-        ImGui::SliderFloat("##scatter", &app.sprayScatter_, 0.0f, 2.0f, "Scatter %.2f");
+        ImGui::SliderFloat("##scatter", &app.sprayScatter_, 0.0f, 2.0f, tr("Scatter %.2f"));
         ui::HelpText("Scatter", nullptr, "How far spray dabs land from the cursor, as a fraction of the brush size.",
                      "Stroke");
     }
@@ -918,7 +918,7 @@ void drawVdmGrid(App& app, GridMode mode) {
         if (!v->builtin && ImGui::BeginPopupContextItem()) {
             ImGui::TextDisabled("%s", v->name.c_str());
             ImGui::Separator();
-            if (ImGui::MenuItem("Delete##vdm")) app.runCommand("vdm_delete", {{"name", v->name}});
+            if (ImGui::MenuItem(tr("Delete##vdm"))) app.runCommand("vdm_delete", {{"name", v->name}});
             ImGui::EndPopup();
         }
     }
@@ -935,7 +935,7 @@ void drawAlphaGrid(App& app, GridMode mode) {
     const BrushAlpha& current = app.doc_.brushAlpha;
     static char filter[64] = "";
     ImGui::SetNextItemWidth(mode == GridMode::Popup ? 200.0f * app.uiScale_ : -SortMenuWidth());
-    ImGui::InputTextWithHint("##alphafilter", ICON_LC_SEARCH "  Filter alphas", filter, sizeof filter);
+    ImGui::InputTextWithHint("##alphafilter", tr(ICON_LC_SEARCH "  Filter alphas"), filter, sizeof filter);
     ImGui::SameLine();
     SortMenu("alphasort", app.uiPrefs_.alphaSort);
     const int columns = columnsFor(tile, mode);
@@ -1026,14 +1026,14 @@ void drawAlphaGrid(App& app, GridMode mode) {
         quickInfo(tex, glyph, e.name, e.help, e.path);
         ui::HelpText(e.name.c_str(), nullptr, e.help.c_str(), "Alpha");
     }
-    if (order.empty()) ImGui::TextDisabled("No alpha matches \"%s\"", filter);
+    if (order.empty()) ImGui::TextDisabled(tr("No alpha matches \"%s\""), filter);
     ImGui::Dummy(ImVec2(0, 2));
-    if (ImGui::Button(ICON_LC_FOLDER_OPEN "  Load image...", ImVec2(mode == GridMode::Popup ? 0.0f : -1.0f, 0)))
+    if (ImGui::Button(tr(ICON_LC_FOLDER_OPEN "  Load image..."), ImVec2(mode == GridMode::Popup ? 0.0f : -1.0f, 0)))
         SDL_ShowOpenFileDialog(App::onAlphaChosen, &app, app.window_, kAlphaFilters, 2, nullptr, false);
     ui::HelpText("Load image", nullptr, "Use any grayscale image as the alpha: white = full effect, black = none.",
                  "Alpha");
     if (mode == GridMode::Popup) ImGui::SameLine();
-    ImGui::Checkbox("Invert loaded image", &app.alphaInvert_);
+    ImGui::Checkbox(tr("Invert loaded image"), &app.alphaInvert_);
     ui::HelpText("Invert loaded image", nullptr, "Load image alphas as their negative (black = full effect).", "Alpha");
     AssetTileHoverGlow();
 }
@@ -1095,29 +1095,29 @@ void litsphereMenu(App& app, int index, const std::function<void()>& beforeRemov
         std::snprintf(buffer, sizeof buffer, "%s", forFolder ? "" : name.c_str());
     };
     ImGui::BeginDisabled(!locked.empty());
-    if (ImGui::Selectable("Rename...##litsphere", false, ImGuiSelectableFlags_NoAutoClosePopups)) openField(false);
+    if (ImGui::Selectable(tr("Rename...##litsphere"), false, ImGuiSelectableFlags_NoAutoClosePopups)) openField(false);
     ImGui::EndDisabled();
     lockedTip();
     field("##litsphererename", false);
     ImGui::BeginDisabled(!locked.empty());
-    const bool moveMenu = ImGui::BeginMenu("Move to folder##litsphere");
+    const bool moveMenu = ImGui::BeginMenu(tr("Move to folder##litsphere"));
     ImGui::EndDisabled();
     lockedTip();
     if (moveMenu) {
         const std::string group = c ? c->group : std::string();
-        if (ImGui::MenuItem("Lit Spheres (no folder)##litspheremove", nullptr, group.empty(), !group.empty()))
+        if (ImGui::MenuItem(tr("Lit Spheres (no folder)##litspheremove"), nullptr, group.empty(), !group.empty()))
             app.runCommand("move_litsphere", {{"name", name}, {"folder", std::string()}});
         for (const std::string& sub : app.litsphereSubfolders())
             if (ImGui::MenuItem((sub + "##litspheremove").c_str(), nullptr, sub == group, sub != group))
                 app.runCommand("move_litsphere", {{"name", name}, {"folder", sub}});
         ImGui::Separator();
-        if (ImGui::Selectable("New folder...##litsphere", false, ImGuiSelectableFlags_NoAutoClosePopups)) openField(true);
+        if (ImGui::Selectable(tr("New folder...##litsphere"), false, ImGuiSelectableFlags_NoAutoClosePopups)) openField(true);
         field("##litspherefolder", true);
         ImGui::EndMenu();
     }
     ImGui::Separator();
     if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) ImGui::CloseCurrentPopup(); // (also while typing: nothing applied)
-    if (ImGui::MenuItem("Remove##litsphere")) {
+    if (ImGui::MenuItem(tr("Remove##litsphere"))) {
         if (beforeRemove) beforeRemove();
         app.runCommand("remove_litsphere", {{"name", name}});
     }
@@ -1292,12 +1292,12 @@ void drawPickers(App& app) {
         const float scale = app.uiScale_;
         const float gridW = 6 * (64.0f * scale + 6.0f) + 20.0f + ImGui::GetStyle().ScrollbarSize;
         if (s.held != 0) { // Ctrl / Ctrl+Shift held: the mask or selection brushes (Brush and Stroke only)
-            if (beginPickerWindow(s.picker == Picker::Brush ? "Brushes##picker" : "Strokes##picker",
+            if (beginPickerWindow(tr(s.picker == Picker::Brush ? "Brushes##picker" : "Strokes##picker"),
                                   (s.held == 1 ? 3 : 4) * (64.0f * scale + 6.0f) + 20.0f)) { // Ctrl+Shift: 4 Cut shapes a row
                 const bool strokes = s.picker == Picker::Stroke;
                 pickerTitle(strokes ? ICON_LC_SPLINE : ICON_LC_BRUSH,
-                            s.held == 1 ? (strokes ? "Mask stroke (Ctrl)" : "Mask brushes (Ctrl)")
-                                        : (strokes ? "Selection stroke (Ctrl+Shift)" : "Selection brushes (Ctrl+Shift)"),
+                            tr(s.held == 1 ? (strokes ? "Mask stroke (Ctrl)" : "Mask brushes (Ctrl)")
+                                        : (strokes ? "Selection stroke (Ctrl+Shift)" : "Selection brushes (Ctrl+Shift)")),
                             nullptr);
                 ImGui::Spacing();
                 if (app.drawHeldBrushGrid(s.held == 1 ? App::HeldBrush::Mask : App::HeldBrush::Select, strokes))
@@ -1307,15 +1307,15 @@ void drawPickers(App& app) {
         } else {
             switch (s.picker) {
             case Picker::Brush:
-                if (beginPickerWindow("Brushes##picker", gridW)) {
-                    pickerTitle(ICON_LC_BRUSH, s.addToShelf ? "Add a brush to the shelf" : "Brushes", "B");
+                if (beginPickerWindow(tr("Brushes##picker"), gridW)) {
+                    pickerTitle(ICON_LC_BRUSH, tr(s.addToShelf ? "Add a brush to the shelf" : "Brushes"), "B");
                     drawBrushGrid(app, GridMode::Popup);
                 }
                 ImGui::End();
                 break;
             case Picker::Stroke:
-                if (beginPickerWindow("Strokes##picker", 4 * (64.0f * scale + 6.0f) + 20.0f)) {
-                    pickerTitle(ICON_LC_SPLINE, "Stroke", nullptr);
+                if (beginPickerWindow(tr("Strokes##picker"), 4 * (64.0f * scale + 6.0f) + 20.0f)) {
+                    pickerTitle(ICON_LC_SPLINE, tr("Stroke"), nullptr);
                     ImGui::Spacing();
                     drawStrokeGrid(app, GridMode::Popup);
                     // Continuous (#31) here too, beside the strokes, as in the Stroke palette (#43)
@@ -1325,15 +1325,15 @@ void drawPickers(App& app) {
                 ImGui::End();
                 break;
             case Picker::Alpha:
-                if (beginPickerWindow("Alphas##picker", gridW)) {
-                    pickerTitle(ICON_LC_CIRCLE_DASHED, "Alpha", nullptr);
+                if (beginPickerWindow(tr("Alphas##picker"), gridW)) {
+                    pickerTitle(ICON_LC_CIRCLE_DASHED, tr("Alpha"), nullptr);
                     drawAlphaGrid(app, GridMode::Popup);
                 }
                 ImGui::End();
                 break;
             case Picker::Material:
-                if (beginPickerWindow("Materials##picker", gridW)) {
-                    pickerTitle(ICON_LC_SUN, "Material", "M");
+                if (beginPickerWindow(tr("Materials##picker"), gridW)) {
+                    pickerTitle(ICON_LC_SUN, tr("Material"), "M");
                     ImGui::Spacing();
                     drawMaterialGrid(app, GridMode::Popup);
                 }
