@@ -155,6 +155,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Preview | <kbd>A</kbd> | Show the skin Make Mesh would build instead of the spheres. Turn it off to edit the spheres again. |
 | Quick Remesh | <kbd>Shift</kbd>+<kbd>R</kbd> | With Tool > Remesh > Quick Remesh on: remesh the active Part at the Voxel Remesh resolution, in the background. |
 | Quick Remesh (hold and drag) | <kbd>N</kbd> | With Tool > Remesh > Quick Remesh on: hold this key and click or drag on the background (not on the model) to remesh the active Part. |
+| Sculpt the Part under the cursor | <kbd>Alt</kbd>+<kbd>Q</kbd> | Make the Part under the pointer the one you sculpt, without moving the view (each Part keeps its mask). The same key as Blender's; Preferences > Hotkeys changes it. |
 
 ### Transform
 
