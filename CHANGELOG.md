@@ -6,6 +6,40 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.8] - 2026-11-06
+
+### Changed
+- The app icon is an orange cube on a dark tile (a new drawing, with a small cut for 16-32 px and the macOS grid):
+  window, taskbar, dock, .ico, .icns, Flatpak, AppImage, title bar. The bust and anvil is the brand (About, What's
+  New, site header, social previews); the SF letters are retired. docs/brand.md says which mark goes where.
+- **Library**: a single click uses a brush, alpha, VDM or material. Double-click still works and applies it once.
+  Models, projects, folders, images and splats still open with a double-click (#142, thanks @NicTanghe).
+- Maya bridge (#42, thanks @tristratos): **Get automatically** is on once an exchange folder is chosen; a **Send to
+  Maya** button sits in the top bar while the bridge is on; the Maya shelf gets **Auto** (on by default), which loads
+  what SculptForge sends by itself. Both sides check only the other side's manifest (time and size), once a second;
+  still no ports or connections. Reinstall the shelf (`install_shelf()`) to get the Auto button.
+- **Corner axes** (Draw > Camera > Axes): positive ends are filled, lettered circles (X / Y / Z), negative ends
+  smaller rings (their letter under the pointer); far ends are smaller and fainter and the nearest is drawn on top; a
+  translucent disc behind them (stronger under the pointer) keeps them readable on any background. A second click on
+  the end facing you snaps to the opposite view, a drag on the disc orbits, and the name of an exact side view shows
+  under the axes. No brush ring over the axes. Small / Medium / Large and the UI scale still apply.
+- The monthly Discord challenge posts say when it ends: entries close on the last day of the month and the winner
+  (most 🔥 votes, ties picked by the team) is picked on the 1st, together with next month's theme.
+- Micro levels: big brushes spend about a third less time preparing each frame's shading (a 240 px stroke on a 200
+  million triangle head: 11 to under 8 ms a dab on the floor tier). Each changed patch is shaded on its own; its
+  neighbours, whose shared border rarely changes, are brought up to date when the stroke ends.
+
+### Fixed
+- The guide's **Edit > Preferences** paths now say where Preferences is in the Classic layout (its own palette in the
+  palette bar), and the Classic layout's **Edit** palette has **Preferences...** too. Thanks NicTanghe (#144).
+- **Reconstruct Subdiv** (Tool > Geometry) on open meshes (a border, e.g. a UDIM-tiled panel) no longer reads the
+  mesh's corners and face centres the wrong way round, which failed with "a face point joins 1 quads" or gave a wrong
+  lower level; the lower level keeps every face's UVs across seams and UDIM tiles, and stepping back up gives back the
+  imported UVs exactly (#145, thanks @RodTDai).
+- **Drag Stamp / Slide Stamp with a pen** (#146, Huion RTP-700 on Windows): the stamp went weak or vanished when the
+  pen lifted. A tablet's last samples before the lift fall towards 0, and the stamp is pressed again at every move; it
+  now keeps the firmest pressure of the drag (Windows Ink, Wintab and Linux alike).
+
 ## [0.11.7] - 2026-11-06
 
 ### Added

@@ -17,6 +17,21 @@ highlight: Drag and Slide Stamp keep their strength when the pen lifts (#146)
 highlight: One click sends to Maya and back; SculptForge picks up Maya's exports by itself (thanks @tristratos, #42)
 ```
 
+- **Edit > Preferences...** in the Classic layout too: Preferences is its own palette there, and now Edit also opens
+  it. The guide says where Preferences is in each layout (also <kbd>Ctrl</kbd>+<kbd>,</kbd> or F3 > Preferences).
+- **New app icon**: an orange cube is the app icon in the taskbar, dock and title bar; it stays sharp at small sizes.
+  The bust and anvil stays the SculptForge brand.
+- **Library**: one click uses a brush, alpha or material. Double-click still works.
+- **Maya bridge, fewer clicks**: what Maya sends loads by itself, **Send to Maya** is one click in the top bar, and
+  the Maya shelf's new **Auto** loads what SculptForge sends. Thanks @tristratos.
+- **Easier to read view axes**: the corner axes now show **X**, **Y** and **Z** in filled circles, with smaller rings
+  for the opposite ends; the ends pointing away are smaller and fainter, on a soft disc that reads on dark and light
+  backgrounds. Click an end for that view, click it again for the opposite view, drag on the disc to orbit; an exact
+  view's name ("Front view", "Top view"...) shows under it.
+- **Reconstruct Subdiv** works on open meshes such as UV-tiled panels, and the lower level keeps each face's UVs.
+- **Drag Stamp with a pen**: a stamp (a vector displacement or any brush) dragged to size keeps its strength when you
+  lift the pen, instead of going weak or vanishing.
+
 ## Version 0.11.7
 
 ```features
