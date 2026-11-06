@@ -120,9 +120,10 @@ std::string commandLine(const Launch& l, Os os) {
     return out;
 }
 
-std::string serverEntry(const Launch& l, const char* extra = nullptr, const char* indent = "    ") {
-    return std::string(indent) + "\"sculptforge\": {" + (extra ? extra : "") + "\"command\": " + jsonString(l.command) +
-           ", \"args\": " + jsonArray(l.args) + "}";
+// One field per line, so an entry fits the window (and reads like the vendors' examples).
+std::string serverEntry(const Launch& l, const char* extra = nullptr) {
+    return std::string("    \"sculptforge\": {\n") + (extra ? std::string("      ") + extra + ",\n" : std::string()) +
+           "      \"command\": " + jsonString(l.command) + ",\n      \"args\": " + jsonArray(l.args) + "\n    }";
 }
 
 std::string wrapped(const char* key, const std::string& entry) {
@@ -136,7 +137,7 @@ Snippet file(std::string where, std::string text) { return {K::File, std::move(w
 
 std::vector<Snippet> snippetsFor(const std::string& id, const Launch& l, Os os) {
     const std::string cmd = commandLine(l, os);
-    const std::string mcpServers = wrapped("mcpServers", serverEntry(l, nullptr, "    "));
+    const std::string mcpServers = wrapped("mcpServers", serverEntry(l));
     if (id == "claude_desktop") {
         const std::string where = os == Os::Windows ? "%APPDATA%\\Claude\\claude_desktop_config.json"
                                   : os == Os::Mac   ? "~/Library/Application Support/Claude/claude_desktop_config.json"
@@ -165,10 +166,10 @@ std::vector<Snippet> snippetsFor(const std::string& id, const Launch& l, Os os) 
                                   ", \"args\": " + jsonArray(l.args) + "}";
         std::vector<Snippet> out;
         if (os != Os::Windows) out.push_back(terminal("code --add-mcp " + shellWord(entry, os))); // (cmd.exe quoting of JSON is not worth it)
-        out.push_back(file("MCP: Open User Configuration", wrapped("servers", serverEntry(l, "\"type\": \"stdio\", "))));
+        out.push_back(file("MCP: Open User Configuration", wrapped("servers", serverEntry(l, "\"type\": \"stdio\""))));
         return out;
     }
-    if (id == "visual_studio") return {file("%USERPROFILE%\\.mcp.json", wrapped("servers", serverEntry(l, "\"type\": \"stdio\", ")))};
+    if (id == "visual_studio") return {file("%USERPROFILE%\\.mcp.json", wrapped("servers", serverEntry(l, "\"type\": \"stdio\"")))};
     if (id == "jetbrains") return {file("Model Context Protocol (MCP) > Add > STDIO", mcpServers)};
     if (id == "zed")
         return {file(home(os, "~/.config/zed/settings.json", "zed: open settings file"),
@@ -204,8 +205,7 @@ std::vector<Snippet> snippetsFor(const std::string& id, const Launch& l, Os os) 
     }
     if (id == "rovo_dev")
         return {file(home(os, "~/.rovodev/mcp.json", "%USERPROFILE%\\.rovodev\\mcp.json"),
-                     wrapped("mcpServers", "    \"sculptforge\": {\"command\": " + jsonString(l.command) + ", \"args\": " +
-                                               jsonArray(l.args) + ", \"transport\": \"stdio\"}"))};
+                     wrapped("mcpServers", serverEntry(l, "\"transport\": \"stdio\"")))};
     if (id == "lm_studio") return {file("mcp.json", mcpServers)};
     if (id == "jan") {
         std::string args;

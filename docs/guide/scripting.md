@@ -250,7 +250,7 @@ models, sculpt strokes, remesh, paint and export. The AI tool starts `sculptforg
 it over standard input and output. Nothing listens on the network, and nothing is installed into the AI tool.
 
 The easy way: **Help > Connect an AI tool...** shows, for your install, the exact command or settings for each tool
-below, with Copy buttons. It is there while AI features are on (**Preferences > AI**).
+below, with Copy buttons. It is there while AI features are on (**Edit > Preferences > AI**).
 
 ### I have a subscription
 
