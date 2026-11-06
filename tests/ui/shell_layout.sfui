@@ -75,9 +75,9 @@ shot left-tray
 
 # Tool sub-palettes: one open at a time.
 click "Tool/Geometry"
-expect "Subdivide"
+expect "Subdivide (removes levels)"
 expect_not "Parts/Append"
-click "Subdivide"
+click "Subdivide (removes levels)"
 expect_value triangles == 20480
 click "Tool/Parts"
 expect "Parts/Append"

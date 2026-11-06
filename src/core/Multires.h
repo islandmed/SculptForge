@@ -241,6 +241,9 @@ bool setSubdivLevelUndoable(Document& doc, int level, std::string& message);
 bool deleteLowerUndoable(Document& doc, std::string& message);
 bool deleteHigherUndoable(Document& doc, std::string& message);
 bool reconstructUndoable(Document& doc, std::string& message);
+// Freeze levels: keep the level shown as a plain mesh and delete every other level (Delete Higher and Delete Lower in
+// one undo step), e.g. before Dynamic topology, which needs a mesh without levels.
+bool freezeLevelsUndoable(Document& doc, std::string& message);
 
 // The undo step of a level operation (UndoRecord::subdiv): the level stack before it (after folding in
 // pending edits), so applying swaps stacks and loads the other stack's current level. `plain` is the mesh

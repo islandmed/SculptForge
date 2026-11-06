@@ -641,13 +641,49 @@ bool App::guideMouseDown(float x, float y, SDL_Keymod mod) {
 }
 
 void App::guideDragTo(float x, float y) {
-    if (std::hypot(x - guidePathLast_[0], y - guidePathLast_[1]) < 2.0f * uiScale_) return;
+    // Stroke smoothing: the curve follows the pointer at a distance (a lazy mouse), so a hand's or a pen's jitter
+    // doesn't make it wobble; points every 4 px.
+    const float dx = x - guidePathLast_[0], dy = y - guidePathLast_[1], d = std::hypot(dx, dy);
+    const float lag = 6.0f * uiScale_;
+    if (d < lag + 4.0f * uiScale_) return;
+    const float k = (d - lag) / d;
+    const float sx = guidePathLast_[0] + dx * k, sy = guidePathLast_[1] + dy * k;
     RayHit hit;
-    if (!pick(x, y, hit)) return; // off the model: the curve continues where it comes back
+    if (!pick(sx, sy, hit)) return; // off the model: the curve continues where it comes back
     guidePath_.push_back(hit.position);
-    guidePathLast_[0] = x;
-    guidePathLast_[1] = y;
+    guidePathLast_[0] = sx;
+    guidePathLast_[1] = sy;
 }
+
+namespace {
+
+// Corner cutting (Chaikin), twice: the screen polyline of a guide drawn as a smooth curve, not 2 px segments.
+void smoothPolyline(std::vector<ImVec2>& pts, bool closed) {
+    for (int pass = 0; pass < 2 && pts.size() >= 3; ++pass) {
+        std::vector<ImVec2> out;
+        out.reserve(pts.size() * 2 + 2);
+        const size_t n = pts.size(), segs = closed ? n : n - 1;
+        if (!closed) out.push_back(pts[0]);
+        for (size_t i = 0; i < segs; ++i) {
+            const ImVec2 a = pts[i], b = pts[(i + 1) % n];
+            out.push_back(ImVec2(a.x * 0.75f + b.x * 0.25f, a.y * 0.75f + b.y * 0.25f));
+            out.push_back(ImVec2(a.x * 0.25f + b.x * 0.75f, a.y * 0.25f + b.y * 0.75f));
+        }
+        if (!closed) out.push_back(pts[n - 1]);
+        pts.swap(out);
+    }
+}
+
+// A guide line: a dark outline under the colour, so it reads on light and dark models alike.
+void guideLine(ImDrawList* dl, std::vector<ImVec2>& pts, bool closed, ImU32 col, float width, bool outline) {
+    if (pts.size() < 2) return;
+    smoothPolyline(pts, closed);
+    const ImDrawFlags flags = closed ? ImDrawFlags_Closed : ImDrawFlags_None;
+    if (outline) dl->AddPolyline(pts.data(), int(pts.size()), IM_COL32(12, 12, 16, (col >> IM_COL32_A_SHIFT) * 3 / 4), flags, width + 2.0f);
+    dl->AddPolyline(pts.data(), int(pts.size()), col, flags, width);
+}
+
+} // namespace
 
 void App::guideRelease() {
     std::vector<glm::vec3> path = std::move(guidePath_);
@@ -733,35 +769,52 @@ void App::drawQRemeshGuides() {
         // Solid while the brush is picked; thin and faint otherwise, so the edge loop QRemesh put there shows.
         const ImU32 front = dead ? IM_COL32(255, 90, 80, 255) : IM_COL32(255, 196, 64, guidesMode_ ? 255 : 110);
         const ImU32 back = dead ? IM_COL32(255, 90, 80, 70) : IM_COL32(255, 196, 64, guidesMode_ ? 55 : 30);
-        const float width = guidesMode_ ? 2.5f : 1.25f;
-        ImVec2 prev;
-        bool havePrev = false, prevVis = false;
-        for (size_t i = 0; i <= n; ++i) {
-            if (i == n && !guide.closed) break;
+        const float width = (guidesMode_ ? 2.5f : 1.6f) * s;
+        // Runs of points with the same visibility, each drawn as one smooth polyline.
+        std::vector<ImVec2> run;
+        bool runVis = false;
+        auto flush = [&](bool closed) {
+            if (runVis) guideLine(dl, run, closed, front, width, true);
+            else guideLine(dl, run, closed, back, 1.25f * s, false);
+            run.clear();
+        };
+        bool whole = guide.closed;
+        for (size_t i = 0; i < n; ++i) {
             ImVec2 p;
-            if (!gizmoProject(guide.points[i % n], p)) {
-                havePrev = false;
-                continue;
+            const bool on = gizmoProject(guide.points[i], p);
+            const bool vis = on && guideVisible_[g][i] != 0;
+            if (!on || (!run.empty() && vis != runVis)) {
+                whole = false;
+                if (!run.empty() && on) {
+                    const ImVec2 keep = run.back();
+                    flush(false);
+                    run.push_back(keep); // the next run starts where this one ended
+                } else {
+                    flush(false);
+                }
             }
-            const bool vis = guideVisible_[g][i % n] != 0;
-            if (havePrev) {
-                const bool both = vis && prevVis;
-                dl->AddLine(prev, p, both ? front : back, (both ? width : 1.25f) * s);
-            }
-            prev = p;
-            prevVis = vis;
-            havePrev = true;
+            if (!on) continue;
+            runVis = vis;
+            run.push_back(p);
         }
+        if (guide.closed && !whole && !run.empty() && n > 0) { // close the loop back to the first point
+            ImVec2 p0;
+            if (gizmoProject(guide.points[0], p0)) run.push_back(p0);
+        }
+        flush(whole);
     }
     // The curve being drawn, with its mirror images.
     if (drag_ == Drag::Guide && guidePath_.size() >= 2)
         for (const glm::vec3& m : Sculptor::mirrors(symmetry_)) {
             const bool own = m == glm::vec3(1.0f);
-            for (size_t i = 1; i < guidePath_.size(); ++i) {
-                ImVec2 a, b;
-                if (gizmoProject(guidePath_[i - 1] * m, a) && gizmoProject(guidePath_[i] * m, b))
-                    dl->AddLine(a, b, own ? IM_COL32(255, 230, 140, 255) : IM_COL32(255, 230, 140, 120), (own ? 2.5f : 1.5f) * s);
+            std::vector<ImVec2> pts;
+            for (const glm::vec3& q : guidePath_) {
+                ImVec2 a;
+                if (gizmoProject(q * m, a)) pts.push_back(a);
             }
+            if (drag_ == Drag::Guide && own) pts.push_back(ImVec2(mouseX_, mouseY_)); // up to the pointer (the lazy lag)
+            guideLine(dl, pts, false, own ? IM_COL32(255, 230, 140, 255) : IM_COL32(255, 230, 140, 140), (own ? 2.5f : 1.5f) * s,
+                      own);
         }
     // The guides brush's cursor: a small ring with a dot.
     if (guidesMode_ && !ImGui::GetIO().WantCaptureMouse && cr.contains(mouse.x, mouse.y)) {
