@@ -316,7 +316,7 @@ files, generate models, sculpt strokes, remesh, paint and export. It starts `scu
 talks to it over standard input and output. Nothing listens on the network, and nothing is installed into the AI
 tool. The setups below use the name `sculptforge` and `--mcp`; the Claude Desktop bundle is this server too.
 
-#### I have a subscription
+### I have a subscription
 
 | Subscription | Use | Set up |
 |---|---|---|
@@ -336,7 +336,7 @@ tool. The setups below use the name `sculptforge` and `--mcp`; the Claude Deskto
   an xAI API key. The xAI API's own MCP tool is remote-only too; your own code can use the function calling example
   below (API usage is billed by xAI).
 
-#### Where sculptforge-cli is
+### Where sculptforge-cli is
 
 | Install | Command |
 |---|---|
@@ -349,7 +349,7 @@ tool. The setups below use the name `sculptforge` and `--mcp`; the Claude Deskto
 In JSON and TOML files a Windows path is written with doubled backslashes
 (`"C:\\Program Files\\SculptForge\\bin\\sculptforge-cli.exe"`). The window does that for you.
 
-#### Claude Desktop bundle
+### Claude Desktop bundle
 
 Download the bundle for your system, then install it in Claude Desktop under **Settings > Extensions > Advanced
 settings** ([Anthropic's guide](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop)):
@@ -368,7 +368,7 @@ It carries its own copy of `sculptforge-cli`. Or add SculptForge to `claude_desk
 }
 ```
 
-#### Every other tool
+### Every other tool
 
 Most tools take the same `mcpServers` entry as Claude Desktop above. Each row links the vendor's page the format is
 from.
@@ -401,7 +401,7 @@ Remote only, so not for SculptForge: the ChatGPT app, the Grok app, and Rovo in 
 servers added by an admin; use Rovo Dev CLI). The OpenAI and xAI APIs' built-in MCP tools also reach only remote
 servers: use the Agents SDK or plain function calling below.
 
-#### Using it
+### Using it
 
 Ask for something like "make a sphere, remesh it at 128 and export it to ~/Desktop/ball.glb". File paths are on your
 machine. The headless server works on its own scene; to see the result, open the exported file in SculptForge (or
@@ -414,7 +414,7 @@ use live mode, above, to watch it work).
   bust from a reference image, a game-ready asset (retopology, UVs, baked maps and LODs for Unreal or Godot),
   rock variations, and a step-by-step lesson.
 
-#### Your own agent
+### Your own agent
 
 The [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/mcp/) starts the server itself:
 

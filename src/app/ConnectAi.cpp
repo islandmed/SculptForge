@@ -181,7 +181,7 @@ std::vector<Snippet> snippetsFor(const std::string& id, const Launch& l, Os os) 
     if (id == "cline")
         return {terminal("cline mcp add " + l.name + " --yes -- " + cmd), file("MCP Servers > Configure", mcpServers)};
     if (id == "continue") {
-        std::string yaml = "name: SculptForge\nversion: 0.0.1\nschema: v1\nmcpServers:\n  - name: SculptForge\n    type: stdio\n"
+        std::string yaml = "name: SculptForge\nversion: 0.0.1\nschema: v1\nmcpServers:\n  - name: " + l.name + "\n    type: stdio\n"
                            "    command: " + jsonString(l.command) + "\n    args:\n";
         for (const std::string& a : l.args) yaml += "      - " + jsonString(a) + "\n";
         yaml.pop_back();
