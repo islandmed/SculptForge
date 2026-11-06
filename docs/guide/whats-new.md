@@ -72,12 +72,12 @@ action: ui.uv_editor
 ```features
 date: 2026-11-05
 tagline: Dense scans with micro levels keep up with the pen, and one-click updates on Windows and Linux.
-highlight: Dense scans keep up: orbit after a big stroke on a 112M scan, 0.7 to 51 fps
+highlight: Dense scans keep up: orbit after a big stroke on a sculpted 112M scan, under 1 to 33 fps
 highlight: One-click update, signed and checked
 highlight: Remesh with one key, or after each stroke
 highlight: Preferences save themselves
 title: Dense scans, fast
-line: Lucy 112M on an RTX 3060: orbit right after a big stroke, 0.7 to 51 frames a second.
+line: Lucy 112M with sculpted detail on an RTX 3060: orbit right after a big stroke, from under 1 to 33 frames a second.
 action: guide:performance.md#working-with-big-meshes
 ```
 
