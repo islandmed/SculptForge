@@ -8,7 +8,9 @@
   tools/test/impacted.py --self-test
 
 Prints one line: the regex (`^(ui_bake|marks)$`), or `.` when the change touches the build itself (CMake files) and
-everything must run. Nightly tests are never listed (T3 runs them). -v explains every pick on stderr.
+everything must run. A CMakeLists.txt change that only registers or edits tests (add_test, set_tests_properties,
+comments) runs just those tests (--cmake-diff, or git diff when there is a .git; 11-06: one new add_test line ran the
+whole suite, 4-6 min of a T0). Nightly tests are never listed (T3 runs them). -v explains every pick on stderr.
 
 How a file maps to tests, most exact first:
   1. the build graph (build.ninja plus `ninja -t deps`, so headers count): a source or header -> the object files that
@@ -215,7 +217,64 @@ def is_app(out):
     return os.path.basename(out) in ("sculptforge", "sculptforge.exe")
 
 
-def impacted(root, build, files, verbose=False, graph=None, tests=None, history=True, log_file=None):
+TEST_COMMANDS = {"add_test", "set_tests_properties", "sculptforge_ui_test"}  # (the last adds ui_<name>)
+
+
+def cmake_owners(text):
+    """Line number (1-based) -> [command, first line, lines] of the top-level CMake command it is part of."""
+    owner, depth, cur = {}, 0, None
+    for i, line in enumerate(text.split("\n"), 1):
+        code = "" if line.lstrip().startswith("#") else re.sub(r"\s#.*$", "", line)
+        if depth == 0:
+            m = re.match(r"\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(", code)
+            cur = [m.group(1).lower(), i, []] if m else None
+        if cur is not None:
+            owner[i] = cur
+            cur[2].append(code)
+        depth = max(0, depth + code.count("(") - code.count(")"))
+        if depth == 0:
+            cur = None
+    return owner
+
+
+def test_registrations(text, diff):
+    """The tests a CMakeLists.txt diff (-U0) registers or changes, or None when it changes anything else."""
+    owner, names = cmake_owners(text), set()
+    new_line = 0
+    for d in diff.split("\n"):
+        m = re.match(r"@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", d)
+        if m:
+            new_line = int(m.group(1))
+            continue
+        if not d or d[0] not in "+-" or d.startswith(("+++", "---")):
+            continue
+        body = d[1:].strip()
+        at = new_line if d[0] == "+" else max(new_line, 1)
+        if d[0] == "+":
+            new_line += 1
+        if not body or body.startswith("#"):
+            continue
+        cmd = owner.get(at)
+        if d[0] == "-" and re.match(r"(add_test|set_tests_properties|sculptforge_ui_test)\s*\(", body):
+            continue  # a test removed or rewritten: its new lines say what runs
+        if not cmd or cmd[0] not in TEST_COMMANDS:
+            return None
+        block = " ".join(cmd[2])
+        if cmd[0] == "sculptforge_ui_test":
+            m = re.search(r"sculptforge_ui_test\s*\(\s*(\S+)", block)
+            found = ["ui_" + m.group(1)] if m else []
+        elif cmd[0] == "add_test":
+            m = re.search(r"\bNAME\s+(\S+)", block) or re.search(r"add_test\s*\(\s*(\S+)", block)
+            found = [m.group(1)] if m else []
+        else:
+            found = re.split(r"\s+", block.split("(", 1)[1].split("PROPERTIES")[0].strip())
+        if not found or any("$" in n or not n for n in found):
+            return None
+        names.update(found)
+    return names
+
+
+def impacted(root, build, files, verbose=False, graph=None, tests=None, history=True, log_file=None, cmake_diff=None):
     log = (lambda *a: print(*a, file=sys.stderr)) if verbose else (lambda *a: None)
     tests = load_tests(build) if tests is None else tests
     graph = Graph(build, root) if graph is None else graph
@@ -250,6 +309,13 @@ def impacted(root, build, files, verbose=False, graph=None, tests=None, history=
         before = len(pick)
         for glob, targets in HAND_MAP:
             if fnmatch.fnmatch(f, glob):
+                if targets == "." and f == "CMakeLists.txt" and cmake_diff is not None:
+                    path = os.path.join(root, f)
+                    regs = test_registrations(open(path, encoding="utf-8").read(), cmake_diff) if os.path.isfile(path) else None
+                    if regs is not None:
+                        for n in sorted(regs):
+                            add(n, "registered or changed in CMakeLists.txt")
+                        continue
                 if targets == ".":
                     everything = True
                 for n in targets.split():
@@ -348,6 +414,18 @@ def self_test():
         assert r("tools/guide/lib.py") == "^(guide_site|marks)$", r("tools/guide/lib.py")
         assert r("changes/x.md") == "^(marks|release_notes_fragments)$"
         assert r("CMakeLists.txt") == "."
+        cm = ("project(x)\nadd_executable(sculptforge a.cpp\n  b.cpp)\nif(T)\n  # the bake\n"
+              "  add_test(NAME ui_bake COMMAND app --ui-test\n           bake.sfui)\n"
+              "  set_tests_properties(ui_bake marks PROPERTIES TIMEOUT 60)\nendif()\n")
+        open(os.path.join(root, "CMakeLists.txt"), "w").write(cm)
+        rc = lambda diff: impacted(root, b, ["CMakeLists.txt"], graph=g, tests=tests, history=False, cmake_diff=diff)
+        assert rc("@@ -5,0 +6,2 @@\n+  add_test(NAME ui_bake COMMAND app --ui-test\n+           bake.sfui)\n") == "^(marks|ui_bake)$"
+        assert rc("@@ -7 +8 @@\n-  set_tests_properties(ui_bake PROPERTIES TIMEOUT 30)\n+  set_tests_properties(ui_bake marks PROPERTIES TIMEOUT 60)\n") == "^(marks|ui_bake)$"
+        assert rc("@@ -4,0 +5 @@\n+  # the bake\n") == "^(marks)$"
+        open(os.path.join(root, "CMakeLists.txt"), "a").write("sculptforge_ui_test(micro_levels micro_levels --size 2400x1350)\n")
+        assert rc("@@ -9,0 +10 @@\n+sculptforge_ui_test(micro_levels micro_levels --size 2400x1350)\n") == "^(marks|ui_micro_levels)$"
+        assert rc("@@ -3 +3 @@\n-  c.cpp)\n+  b.cpp)\n") == "."  # a source list: everything
+        assert rc("@@ -1 +1 @@\n-project(y)\n+project(x)\n") == "."
         assert r() == ""
         assert words("src/app/PanelMicroLevels.cpp") == {"micro", "levels"}
     print("impacted.py self-test passed")
@@ -360,6 +438,7 @@ def main():
     ap.add_argument("--base", default="origin/main")
     ap.add_argument("--files", nargs="*")
     ap.add_argument("--git-log", help="git log --no-merges --name-only --format=@@ output (a tree without .git)")
+    ap.add_argument("--cmake-diff", help="git diff -U0 of CMakeLists.txt against the base (a tree without .git)")
     ap.add_argument("-v", "--verbose", action="store_true")
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
@@ -370,7 +449,10 @@ def main():
     files = a.files if a.files is not None else changed_files(root, a.base)
     if a.verbose:
         print(f"{len(files)} changed file(s)", file=sys.stderr)
-    print(impacted(root, build, files, a.verbose, log_file=a.git_log))
+    cmake_diff = open(a.cmake_diff, encoding="utf-8").read() if a.cmake_diff else None
+    if cmake_diff is None and a.files is None and "CMakeLists.txt" in files:
+        cmake_diff = sh("git", "diff", "-U0", sh("git", "merge-base", a.base, "HEAD", cwd=root).strip() or a.base, "--", "CMakeLists.txt", cwd=root)
+    print(impacted(root, build, files, a.verbose, log_file=a.git_log, cmake_diff=cmake_diff))
     return 0
 
 
