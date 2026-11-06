@@ -1,0 +1,1 @@
+- Library: a single click now uses a brush, alpha, VDM or material (double-click still works; models, projects and folders still open with a double-click). Thanks @NicTanghe (#142).

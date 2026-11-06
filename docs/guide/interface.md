@@ -338,13 +338,13 @@ start-up (see [Preferences](#interface-preferences)).
 
 ![The Library on the Tool tab](images/library.jpg)
 
-| Tab | Shows | Double-click |
+| Tab | Shows | Double-click (a click for brushes, alphas and materials) |
 |---|---|---|
 | **Project** | Projects (`.sfproj`) in your library and recently opened projects | Open the project |
 | **Tool** | Sphere, Plane and Cube, and model files in your library | Open (replaces the scene) |
-| **Brush** | Every brush: built-in, custom and `.sfbrush` files, and the VDM brushes (built-in ones too) | Select or load the brush |
-| **Alpha** | Round, Square, Noise, the twelve built-in patterns and images in your Alphas folder | Use as the brush alpha |
-| **Material** | The Lit Spheres (your own included) and Studio | Use the material |
+| **Brush** | Every brush: built-in, custom and `.sfbrush` files, and the VDM brushes (built-in ones too) | Select or load the brush (one click) |
+| **Alpha** | Round, Square, Noise, the twelve built-in patterns and images in your Alphas folder | Use as the brush alpha (one click) |
+| **Material** | The Lit Spheres (your own included) and Studio | Use the material (one click) |
 | **Image** | Reference images in your library | A menu: Generate 3D, relief, inflate, project onto the model, use as alpha |
 | **Splats** | Gaussian splat captures (`.ply`, `.splat`) | Open the capture as a reference |
 | **Snapshots** | The autosave and your snapshots, newest first | Open it |
@@ -355,7 +355,7 @@ Working with the strip:
 - **Shift+double-click** a model, project or primitive to append it to the scene as a new Part instead of
   replacing the scene.
 - Drag sideways (or use the mouse wheel) to scroll through the strip. A drag of more than a few pixels scrubs,
-  so a plain click still selects.
+  so a plain click still selects (and uses a brush, alpha or material).
 - Drag a tile down out of the Library onto the canvas to load it, like a double-click.
 - Folders open with a double-click; the first tile inside a folder goes back up. The arrows at the top go back
   and forward through tabs and folders, and the breadcrumb shows where you are.

@@ -46,12 +46,19 @@ expect "Library/.."
 click "Library/###Back"
 expect "Library/Sphere"
 
-# Materials and brushes load with a double-click too.
+# Materials, brushes and alphas apply with a single click (#142); a double-click still works.
 click "Library/Material"
 expect "Library/Chrome"
-double_click "Library/Chrome"
+click "Library/Chrome"
 expect_status Material: Chrome
+wait_idle 60
+shot library-material-click
+double_click "Library/Bronze"
+expect_status Material: Bronze
 click "Library/Brush"
+expect "Library/Clay"
+click "Library/Clay"
+expect_status Brush: Clay
 expect "Library/Sharp Crease"
 double_click "Library/Sharp Crease"
 expect_status Brush: Sharp Crease
@@ -73,6 +80,14 @@ shot library-3-rows
 click "Library/1"
 click "Library/###Back"
 expect "Library/Chrome"
+
+# Alphas too: a click sets the brush alpha.
+click "Library/Alpha"
+expect "Library/Square"
+click "Library/Square"
+expect_status Alpha 'Square'
+wait_idle 60
+shot library-alpha-click
 
 # QuickSave: a timestamped copy in the library's QuickSave folder, listed newest first.
 click "Library/Snapshots"
