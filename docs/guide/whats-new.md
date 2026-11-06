@@ -5,6 +5,16 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.4
+
+```features
+date: unreleased
+tagline: Let your AI assistant sculpt in your open window, and fixes.
+highlight: Live mode: an AI tool works in your open window, only after you approve it
+highlight: Your AI tool sees the viewport, turns the view and adds strokes, and every step is one undo
+highlight: Fixes: rare wrong shading after strokes
+```
+
 ## Version 0.11.3
 
 ```features
