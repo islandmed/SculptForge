@@ -636,6 +636,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"Apply", "套用"},
     {"Reset", "重設"},
     {"Preview", "預覽"},
+    {"Preview detail", "預覽細節"},
     {"Finish", "完成"},
     {"Close", "關閉"},
     {"OK", "確定"},

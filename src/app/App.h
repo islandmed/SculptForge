@@ -1095,9 +1095,11 @@ private:
     int viewSamples();
     void applyPerformancePrefs();
     void notePerformanceFrame(double syncMs); // after syncScene: upload time, GPU memory warnings
+    void noteStillness();                     // after viewSamples: RenderSettings::stillSeconds, stroking
     struct PerfState {
         glm::mat4 lastView{0.0f};
         int framesStill = 0;          // frames since the view last moved
+        double stillSince = 0.0;      // when it last moved (ImGui::GetTime)
         bool fastNow = false;         // this frame draws without antialiasing (fast navigation)
         bool proxyPrebuild = false;   // still frames build stale motion proxies (Renderer::setProxyPrebuild)
         bool proxyNow = false;        // this frame draws big meshes' motion proxy (fast navigation)

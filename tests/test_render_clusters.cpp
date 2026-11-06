@@ -14,8 +14,10 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <chrono>
 #include <cmath>
 #include <map>
+#include <set>
 #include <random>
 
 using namespace sf;
@@ -349,4 +351,116 @@ TEST(motion_proxy_is_closed_and_light) {
     order.build(h);
     ClusterBounds b;
     CHECK(clusterProxy(h, order, 0, order.clusterTriangles(0), proxy, b) && proxy.empty());
+}
+
+namespace {
+
+// Every cell point the mean of its vertices where they are now (the build's membership: a vertex's level-0 cell,
+// then its parents up the levels), brute force over the whole mesh.
+bool cellPointsAreMeans(const CoarseLevels& L, const Mesh& m, float& worst) {
+    std::vector<glm::dvec3> sum(L.positions.size(), glm::dvec3(0.0));
+    std::vector<uint32_t> n(L.positions.size(), 0);
+    for (size_t v = 0; v < m.vertexCount(); ++v)
+        for (uint32_t k = L.vertexCell[v]; k != ~0u; k = L.parent[k]) sum[k] += glm::dvec3(m.positions[v]), ++n[k];
+    worst = 0.0f;
+    for (size_t k = 0; k < sum.size(); ++k)
+        if (n[k]) worst = std::max(worst, glm::distance(L.positions[k], glm::vec3(sum[k] / double(n[k]))));
+    return worst < L.cell * 1e-4f;
+}
+
+Mesh detailedSphere(size_t triangles) {
+    Mesh m = makeBenchSphere(triangles);
+    for (size_t v = 0; v < m.vertexCount(); ++v) {
+        const glm::vec3 p = m.positions[v];
+        m.positions[v] = p * (1.0f + 0.02f * std::sin(p.x * 31.0f) * std::sin(p.z * 29.0f));
+    }
+    m.recomputeAllNormals();
+    return m;
+}
+
+} // namespace
+
+TEST(coarse_levels_closed_at_each_level_and_light) {
+    // Coarse levels (buildCoarseLevels) on one grid per level for the whole mesh: with every cluster at one level the
+    // surface stays closed (neighbours share their cells' points), each level lighter than the one before.
+    Mesh m = detailedSphere(1000000);
+    UploadOrder order;
+    order.build(m);
+    const CoarseLevels L = buildCoarseLevels(m, order);
+    CHECK(L.clusters.size() == order.clusters().size());
+    float worst = 0.0f;
+    CHECK(cellPointsAreMeans(L, m, worst));
+    size_t first = 0, coarsest = 0, minLevels = CoarseLevels::kMaxLevels;
+    bool shrinking = true;
+    for (const CoarseLevels::Lod& l : L.clusters) {
+        minLevels = std::min(minLevels, size_t(l.levels));
+        if (l.levels == 0) continue;
+        first += l.count[0] / 3;
+        coarsest += l.count[l.levels - 1] / 3;
+        for (int k = 1; k < l.levels; ++k) shrinking = shrinking && l.count[k] <= l.count[k - 1] && l.error[k] >= l.error[k - 1];
+    }
+    std::printf("  coarse levels: %zu cells; level 0 %zu, coarsest %zu of %zu triangles; every cluster has %zu levels or more\n",
+                L.positions.size(), first, coarsest, m.triangleCount(), minLevels);
+    CHECK(shrinking);
+    CHECK(minLevels >= 1);
+    CHECK(first * 8 < m.triangleCount());
+    // No cracks: every edge of the level's distinct triangles is shared by two of them or more (a cluster drops
+    // the repeats of a triangle, so counting oriented edges exactly would be too strict).
+    for (int level = 0; level < int(minLevels); ++level) {
+        std::set<std::array<uint32_t, 3>> tris;
+        for (const CoarseLevels::Lod& l : L.clusters)
+            for (uint32_t i = l.first[level]; i < l.first[level] + l.count[level]; i += 3)
+                tris.insert({L.indices[i], L.indices[i + 1], L.indices[i + 2]});
+        std::map<std::pair<uint32_t, uint32_t>, int> edges;
+        for (const auto& t : tris)
+            for (int k = 0; k < 3; ++k) ++edges[std::minmax(t[size_t(k)], t[size_t((k + 1) % 3)])];
+        size_t open = 0;
+        for (const auto& [e, n] : edges) open += n < 2;
+        if (open) std::printf("  level %d: %zu of %zu edges with one triangle\n", level, open, edges.size());
+        CHECK(open == 0);
+    }
+}
+
+TEST(coarse_levels_follow_edits) {
+    // After a stroke (some vertices pushed out), updateCoarseLevels moves the points of the cells those vertices are
+    // in and of their cells up the levels: every cell point is again the mean of its vertices, everywhere; the
+    // triangles stay as built (closed); updating again changes nothing.
+    Mesh m = detailedSphere(300000);
+    UploadOrder order;
+    order.build(m);
+    CoarseLevels L = buildCoarseLevels(m, order);
+    const std::vector<glm::vec3> before(L.positions);
+    const glm::vec3 centre = glm::normalize(glm::vec3(0.3f, 0.8f, 0.5f)) * glm::length(m.positions[0]);
+    const float radius = glm::length(m.positions[0]) * 0.2f;
+    std::vector<uint8_t> moved(m.vertexCount(), 0);
+    for (size_t v = 0; v < m.vertexCount(); ++v) {
+        const float d = glm::distance(m.positions[v], centre);
+        if (d >= radius) continue;
+        m.positions[v] += m.normals[v] * (radius * 0.08f * (1.0f - d / radius)); // (a clay-like push, over a cell)
+        moved[v] = 1;
+    }
+    std::vector<uint32_t> dirty;
+    for (uint32_t c = 0; c < order.clusters().size(); ++c) {
+        const auto& cl = order.clusters()[c];
+        for (uint32_t l = 0; l < cl.vertexCount; ++l)
+            if (moved[order.fromGpu()[cl.firstVertex + l]]) {
+                dirty.push_back(c);
+                break;
+            }
+    }
+    const auto start = std::chrono::steady_clock::now();
+    const std::vector<uint32_t> changed = updateCoarseLevels(L, m, order, dirty);
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    float worst = 0.0f;
+    const bool means = cellPointsAreMeans(L, m, worst);
+    size_t pointsMoved = 0;
+    for (size_t k = 0; k < before.size(); ++k) pointsMoved += before[k] != L.positions[k];
+    std::printf("  coarse update: %zu dirty clusters, %zu cells recomputed (%zu moved) in %.1f ms; worst point off by %g cells\n",
+                dirty.size(), changed.size(), pointsMoved, ms, double(worst / L.cell));
+    CHECK(!dirty.empty());
+    CHECK(pointsMoved > 0);
+    CHECK(means);
+    const std::vector<glm::vec3> after(L.positions);
+    updateCoarseLevels(L, m, order, dirty);
+    CHECK(L.positions == after);
 }

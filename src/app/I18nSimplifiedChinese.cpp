@@ -636,6 +636,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Apply", "应用"},
     {"Reset", "重置"},
     {"Preview", "预览"},
+    {"Preview detail", "预览细节"},
     {"Finish", "完成"},
     {"Close", "关闭"},
     {"OK", "确定"},
