@@ -67,6 +67,19 @@ off in the viewport without deleting them.
 > **Tip:** To paint a base colour and then dirt in the creases: **Fill** with the base colour, then **Cavity**. For
 > a different cavity colour or strength, use the command (below).
 
+## Line Gradient
+
+**Line Gradient** (under **Clear**) paints a straight colour ramp across the model as you see it: turn it on, then drag
+a line over the view. The paint colour at the start of the line runs into the **End** colour at its end; past the ends
+the two colours carry on. Tick **Clear** to fade the paint colour out instead, so the paint underneath shows through
+towards the end. The swap button swaps the two colours.
+
+The line stays on screen with a handle at each end until you keep it: drag a handle, or change a colour, and the
+gradient is painted again in place of the last one. <kbd>Enter</kbd> keeps it (so does turning the view or any other
+edit), <kbd>Esc</kbd> takes it back. Each gradient is one undo step. It respects the mask like **Fill**, never paints
+hidden faces, and goes into the texture when the Part paints into one. With it on, <kbd>Ctrl</kbd> still masks and
+<kbd>Shift</kbd> still smooths; turn it off with its button or <kbd>Esc</kbd>.
+
 ## Paint layers
 
 Paint layers stack vertex paint the way Photoshop stacks image layers. Each layer has its own name, visibility,
@@ -250,6 +263,7 @@ classic key changes meaning; assign one under **Edit > Preferences > Hotkeys** i
 |---|---|
 | `set_color color=#c08060` | Set the paint colour: `rrggbb`, `#rrggbb` (quote it in scripts), `r,g,b` or a name such as `white`, `skin`, `bone` |
 | `paint_fill area=unmasked` | Fill; `area` is `unmasked` (default), `masked` or `all`; `strength` 0-1 |
+| `paint_gradient x0=-1 y0=0 x1=1 y1=0 to=clear` | Line Gradient from the paint colour (or `color`) at the start to `to` (a colour, or `clear`) at the end; the line in -1..1 view coordinates (`view_proj`, default the front view); `area` as `paint_fill` |
 | `paint_from_cavity color=#202020 strength=0.7 smoothing=2` | Cavity paint (defaults: dark brown, 0.7, 2 blur passes) |
 | `paint_clear` | Remove all vertex paint, paint layers included |
 | `paint_layer_add name=Dirt blend=multiply opacity=0.8` | Add a paint layer above the active one and paint on it |

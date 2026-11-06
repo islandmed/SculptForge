@@ -1724,6 +1724,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     if (button == SDL_BUTTON_LEFT) {
         if (axisGizmoMouseDown(x, y)) return;   // the axis gizmo's ends snap to a side view (#43)
         if (forgesphereMouseDown(x, y, mod)) return; // a Forge Sphere Part takes clicks on it (PanelForge Spheres.cpp)
+        if (gradientMouseDown(x, y, nav)) return; // Line Gradient: a new line or an end handle (LineGradient.cpp)
         if (facegroupMouseDown(x, y, mod)) return;
         if (maskSelectMouseDown(x, y, mod)) return;
         if (gizmoMouseDown(x, y, mod)) return; // Transform gizmo handles, pivot clicks (Gizmo.cpp)
@@ -1902,6 +1903,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::UvTool: uvToolDragTo(x, y); break;
     case Drag::Sculptable: sculptableMouseMove(x, y); break;
     case Drag::Capture: captureMouseMove(x, y); break;
+    case Drag::Gradient: gradientMouseMove(x, y); break;
     case Drag::ForgeSphere: forgesphereDragTo(x, y); break;
     case Drag::AirStroke: airStrokeTo(x, y); break;
     case Drag::QuickRemesh: break; // (remeshes when let go)
@@ -2040,6 +2042,7 @@ void App::onMouseUp() {
     if (drag_ == Drag::UvTool) uvToolRelease();
     if (drag_ == Drag::Sculptable) sculptableMouseUp();
     if (drag_ == Drag::Capture) captureMouseUp();
+    if (drag_ == Drag::Gradient) gradientMouseUp();
     if (drag_ == Drag::ForgeSphere) forgesphereRelease();
     if (drag_ == Drag::AirStroke) airStrokeRelease();
     gizmoRelease();
@@ -2050,6 +2053,7 @@ void App::onMouseUp() {
 
 void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
     if (cutPolylineKey(key)) return; // Enter ends a Cut Polyline, Esc drops it (PanelCut.cpp)
+    if (gradientKey(key)) return;    // Enter keeps a Line Gradient, Esc takes it back (LineGradient.cpp)
     if (key == SDLK_ESCAPE && radial_.menu >= 0) {
         closeRadialMenu();
         return;
@@ -2909,6 +2913,7 @@ void App::drawUi() {
     drawSplatTrainOverlay(); // splat training progress (PanelSplatTrain.cpp)
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
     drawCaptureOverlay();    // Capture from view: the square, the result window (PanelKelvinlet.cpp)
+    drawGradientOverlay();   // Line Gradient: the line and its end handles (LineGradient.cpp)
     if (uiPrefs_.showAxes) drawAxisGizmo(); // X / Y / Z in the canvas corner (#31)
     if (uiPrefs_.showViewFigure) drawViewFigure();
     drawAirStrokeIndicator(); // Start strokes off the model is on (#62, Input.cpp)
@@ -2929,6 +2934,7 @@ void App::drawUi() {
     if (!sliderRing) sizeRingPreview_ = false;
     if (((!ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y)) || drag_ == Drag::Stroke || sliderRing) &&
         !hideBrushCursor_ && radial_.menu < 0 && !strokePopup_.open && drag_ != Drag::Select && drag_ != Drag::Guide && // (no ring under a pie or the stroke popup)
+        (!gradient_.armed || ctrlDown(inputMods()) || (inputMods() & SDL_KMOD_SHIFT)) && // (nor while a Line Gradient takes the drags)
         aiLinkStateValue() != 2 && aiLinkStateValue() != 4 && // (nor over a live-mode question: it is drawn above windows)
         (!ringOff || drag_ == Drag::Stroke || ctrlDown(inputMods())))
         drawBrushCursor();

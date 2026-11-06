@@ -161,7 +161,7 @@ turn on **Edit > Preferences > Interface > Palettes strictly A-Z (strict order)*
 | **Edit** | Edit | Undo and Redo (with the name of the step), Paste brush |
 | **Alpha** | Sculpt > Alpha | The brush alphas: Round, Square, Noise and twelve patterns (Pores, Cracks, Scales...), images from your library, Load image, Invert loaded image |
 | **Brush** | Sculpt > Brush | AI Brush (Brush Lab), Community brushes, Paste brush, your custom brushes, Front faces only, Invert (Alt), the recipe editor for a custom brush, and every brush as a thumbnail grid with a filter |
-| **Color** | Paint | The Paint brush, RGB while sculpting, the paint colour and swatches, Fill, Fill masked, Cavity, Clear, Show vertex paint |
+| **Color** | Paint | The Paint brush, RGB while sculpting, the paint colour and swatches, Fill, Fill masked, Cavity, Clear, Line Gradient, Show vertex paint |
 | **Draw** | Sculpt > Draw & Tablet | Size, Intensity, Colour intensity, Falloff, Sculpt/Paint, Add/Sub, Rgb, Front, and the tablet options (Pressure > strength, Pressure > size) with a pen readout |
 | **Generate** | Mesh > Generate 3D (Mesh > From Image while Edit > Preferences > AI is off) | Generate 3D (image or text to 3D), Relief, Inflate and Stamp from an image, and the AI brush provider settings; with AI off only Relief, Inflate and Stamp |
 | **Material** | Render > Materials | The Lit Sphere materials (Soft Clay, the default, first), your own (**Load Lit Sphere...**) and Studio, Base colour, Smooth / Flat shading for the scene and the active Part |

@@ -555,6 +555,7 @@ void App::drawPalette_Color() {
     if (ImGui::Button(tr("Clear"), ImVec2(half, 0))) runCommand("paint_clear");
     ImGui::EndDisabled();
     ui::HelpText("Clear", nullptr, "Remove all vertex paint from the Part, paint layers included (undoable).", "Color");
+    drawLineGradientControls(); // LineGradient.cpp
     ImGui::Checkbox(tr("Show vertex paint"), &renderSettings_.showVertexPaint);
     ImGui::Checkbox(tr("Colour tints the material"), &renderSettings_.colorTintsMaterial);
     ui::HelpText("Colour tints the material", nullptr,

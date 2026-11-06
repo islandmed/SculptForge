@@ -1754,6 +1754,31 @@ size_t textureFill(Mesh& m, const glm::vec3& color, const std::vector<float>& vw
     return changed;
 }
 
+size_t textureFillBy(Mesh& m, const std::vector<float>& tv, const std::vector<float>& vw,
+                     const std::function<glm::vec4(float)>& shade) {
+    if (!hasTexture(m) || vw.size() != m.vertexCount() || tv.size() != m.vertexCount()) return 0;
+    PaintTexture& tex = mutableTexture(m);
+    const int layer = tex.layers.empty() ? -1 : tex.activeLayer;
+    if (!textureLayerEditable(tex, layer)) return 0;
+    std::vector<uint8_t>& target = tex.target(layer);
+    const bool onLayer = layer >= 0;
+    size_t changed = 0;
+    bakeTexels(m, tex, [&](uint32_t t, float b0, float b1, float b2, int x, int y) {
+        const glm::uvec3& v = m.triangles[t];
+        const float wgt = std::clamp(vw[v.x] * b0 + vw[v.y] * b1 + vw[v.z] * b2, 0.0f, 1.0f);
+        if (wgt <= 0.0f) return;
+        const glm::vec4 c = shade(tv[v.x] * b0 + tv[v.y] * b1 + tv[v.z] * b2);
+        if (c.w * wgt <= 0.0f) return;
+        uint8_t* px = &target[(size_t(y) * size_t(tex.width) + size_t(x)) * 4];
+        uint8_t orig[4];
+        std::memcpy(orig, px, 4);
+        paintTexel(px, orig, onLayer, glm::vec3(c), c.w * wgt, false);
+        ++changed;
+    });
+    compositeTextureAll(tex);
+    return changed;
+}
+
 void vertexpaintToTexture(Mesh& m) {
     if (!hasTexture(m)) return;
     PaintTexture& tex = mutableTexture(m);

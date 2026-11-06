@@ -411,6 +411,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelBrushLibrary.cpp
     src/app/PanelBrushGallery.cpp
     src/app/PanelVertexPaint.cpp
+    src/app/LineGradient.cpp
     src/app/PanelPacks.cpp
     src/app/MemoryConfirm.cpp
     src/app/PanelPaintLayers.cpp

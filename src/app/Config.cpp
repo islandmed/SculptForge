@@ -760,6 +760,7 @@ void App::initActions() {
     // the same id and own P (Paint), the symmetry toggles and Tab.
     registerShellActions();
     registerTextureUiActions(); // Tool > Texture Map, the Vertex / Texture paint target (PanelTexture.cpp)
+    registerLineGradientActions(); // Color > Line Gradient (LineGradient.cpp)
     registerPbrUiActions();     // material channels, solo view, map export (PanelPbr.cpp)
     registerGizmoActions();     // Q W E R: Draw, and the Transform gizmo's Move, Scale, Rotate (Gizmo.cpp)
     registerBakeUiActions();    // Tool > Bake (PanelBake.cpp)
