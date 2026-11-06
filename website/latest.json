@@ -1,12 +1,12 @@
 {
-  "version": "0.11.2",
+  "version": "0.11.3",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Big brushes on dense scans finish sooner after you lift the pen, and follow the pen more closely on faster computers",
-    "Micro levels: Sharp Crease, Crease and Pinch cut clean grooves at full strength, and Wire shows the level below",
-    "Move, Scale and Rotate record into the active sculpt layer, its weight dials them in and out; VDM stamps turn (follow the drag, an angle, jitter)",
-    "Maya style view keys (Alt+Ctrl roll, Alt+F, Alt+H, wheel zooms toward the pointer) and UDIMs packed in Columns x Rows",
-    "Traditional Chinese interface, and Help > Record a performance trace to show us where a slow moment goes"
+    "Connect your AI tool in one window",
+    "Saved camera views and a readable mask",
+    "Quick Remesh and Voxel Remesh keep open parts solid",
+    "The UV Editor fits at large UI scales",
+    "The new orange SF app icon"
   ]
 }
