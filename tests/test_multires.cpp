@@ -427,6 +427,118 @@ TEST(multires_reconstruct_finds_lower_levels) {
     CHECK(subdivLevelText(d.mesh) == "SDiv 1/2");
 }
 
+// #145: `coarse` (all quads) gets UDIM UVs, every quad in its own tile (so every edge is a seam), is divided once
+// and imported as a plain mesh; Reconstruct must find `coarse` again with each face's corner UVs (not UVs from
+// across seams or tiles), and stepping back up must give back the imported UVs exactly.
+static void checkReconstructKeepsUvs(Mesh coarse, bool flip = false) {
+    std::vector<uint32_t> quadOf(coarse.triangleCount());
+    uint32_t quads = 0;
+    for (uint32_t t = 0; t < coarse.triangleCount(); ++t) {
+        const uint32_t q = coarse.quadPartnerAt(t);
+        quadOf[t] = q != Mesh::kNoQuad && q < t ? quadOf[q] : quads++;
+    }
+    coarse.uvs.resize(coarse.triangleCount() * 3);
+    for (size_t t = 0; t < coarse.triangleCount(); ++t)
+        for (int c = 0; c < 3; ++c) {
+            const uint32_t q = quadOf[t], v = coarse.triangles[t][c];
+            const uint32_t h = (q * 2654435761u) ^ (v * 40503u + 977u);
+            coarse.uvs[t * 3 + size_t(c)] = glm::vec2(float(q % 10), float(q / 10)) +
+                                            glm::vec2(0.05f + 0.9f * float(h % 1000) / 1000.0f, 0.05f + 0.9f * float(h / 1000 % 1000) / 1000.0f);
+        }
+    Document src = makeDoc(std::move(coarse));
+    CHECK(run(src, "subdiv_divide").ok);
+    Mesh plain = subdivLevelMesh(src.mesh, 1);
+    // An imported mesh numbers its vertices its own way (here: backwards), not base corners first.
+    const uint32_t nf = uint32_t(plain.vertexCount());
+    std::reverse(plain.positions.begin(), plain.positions.end());
+    for (glm::uvec3& t : plain.triangles) t = glm::uvec3(nf - 1) - t;
+    // ... and may split its quads along the other diagonal (edge point to edge point, not corner to face point).
+    for (uint32_t t = 0; flip && t < plain.triangleCount(); ++t) {
+        const uint32_t u = plain.quadPartnerAt(t);
+        if (u == Mesh::kNoQuad || u < t) continue;
+        const glm::uvec3 a = plain.triangles[t], b = plain.triangles[u];
+        auto uvOf = [&](uint32_t v) {
+            for (uint32_t x : {t, u})
+                for (int c = 0; c < 3; ++c)
+                    if (plain.triangles[x][c] == v) return plain.uvs[size_t(x) * 3 + size_t(c)];
+            return glm::vec2(0.0f);
+        };
+        int k = 0; // a's corner off the shared diagonal
+        for (int c = 0; c < 3; ++c)
+            if (b.x != a[c] && b.y != a[c] && b.z != a[c]) k = c;
+        uint32_t w = b.x; // b's corner off it
+        for (int c = 0; c < 3; ++c)
+            if (b[c] != a.x && b[c] != a.y && b[c] != a.z) w = b[c];
+        const uint32_t q[4] = {a[k], a[(k + 1) % 3], w, a[(k + 2) % 3]};
+        const glm::vec2 uv[4] = {uvOf(q[0]), uvOf(q[1]), uvOf(q[2]), uvOf(q[3])};
+        plain.triangles[t] = {q[0], q[1], q[2]};
+        plain.triangles[u] = {q[0], q[2], q[3]};
+        for (int c = 0; c < 3; ++c) {
+            plain.uvs[size_t(t) * 3 + size_t(c)] = uv[c];
+            plain.uvs[size_t(u) * 3 + size_t(c)] = uv[c == 0 ? 0 : c + 1];
+        }
+    }
+    plain.recomputeAllNormals();
+    const std::vector<glm::vec2> fineUvs = plain.uvs;
+    const std::vector<glm::uvec3> fineTris = plain.triangles;
+    const std::vector<glm::vec3> finePositions = plain.positions;
+    Document d = makeDoc(std::move(plain));
+    CHECK(run(d, "subdiv_reconstruct").ok);
+    CHECK(subdivLevelText(d.mesh) == "SDiv 1/2");
+    const Mesh base = subdivLevelMesh(src.mesh, 0);
+    CHECK(d.mesh.triangleCount() == base.triangleCount() && d.mesh.vertexCount() == base.vertexCount());
+    CHECK(d.mesh.uvs.size() == d.mesh.triangleCount() * 3);
+    if (d.mesh.uvs.size() != d.mesh.triangleCount() * 3 || d.mesh.vertexCount() != base.vertexCount()) return;
+    // The base sits on the fine level's corners, which a divided level numbers as the base vertices.
+    std::vector<uint32_t> baseIndex(d.mesh.vertexCount(), UINT32_MAX);
+    for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v)
+        for (uint32_t b = 0; b < base.vertexCount(); ++b)
+            if (d.mesh.positions[v] == finePositions[nf - 1 - b]) baseIndex[v] = b;
+    // Every base triangle lies in one original quad and has that quad's corner UVs.
+    size_t wrong = 0;
+    for (size_t t = 0; t < d.mesh.triangleCount(); ++t) {
+        bool found = false;
+        for (uint32_t b = 0; b < base.triangleCount() && !found; ++b) {
+            const uint32_t partner = base.quadPartnerAt(b);
+            auto uvAt = [&](uint32_t v, glm::vec2& uv) {
+                for (uint32_t bt : {b, partner}) {
+                    if (bt == Mesh::kNoQuad) continue;
+                    for (int k = 0; k < 3; ++k)
+                        if (base.triangles[bt][k] == v) {
+                            uv = base.uvs[size_t(bt) * 3 + size_t(k)];
+                            return true;
+                        }
+                }
+                return false;
+            };
+            bool all = true;
+            for (int c = 0; c < 3 && all; ++c) {
+                glm::vec2 uv;
+                all = uvAt(baseIndex[d.mesh.triangles[t][c]], uv) && uv == d.mesh.uvs[t * 3 + size_t(c)];
+            }
+            found = all;
+        }
+        if (!found && wrong++ == 0)
+            std::printf("  base triangle %zu: UVs (%g,%g) (%g,%g) (%g,%g) aren't one original face's\n", t, d.mesh.uvs[t * 3].x,
+                        d.mesh.uvs[t * 3].y, d.mesh.uvs[t * 3 + 1].x, d.mesh.uvs[t * 3 + 1].y, d.mesh.uvs[t * 3 + 2].x,
+                        d.mesh.uvs[t * 3 + 2].y);
+    }
+    CHECK(wrong == 0);
+    CHECK(run(d, "subdiv_level", {{"level", 2.0}}).ok);
+    CHECK(d.mesh.triangles == fineTris);
+    CHECK(d.mesh.uvs == fineUvs);
+    CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
+    CHECK(run(d, "subdiv_level", {{"level", 2.0}}).ok);
+    CHECK(d.mesh.uvs == fineUvs);
+}
+
+TEST(multires_reconstruct_keeps_udim_uvs) {
+    checkReconstructKeepsUvs(makePlane(4));        // open: a border
+    checkReconstructKeepsUvs(makeTorus(12));       // closed, every vertex regular: four readings of the corners fit,
+    checkReconstructKeepsUvs(makeTorus(12), true); // and with these diagonals the first one tried is a shifted one
+    checkReconstructKeepsUvs(makeCube(3), true);
+}
+
 TEST(multires_project_round_trip_keeps_every_level) {
     Document d = dividedCube(3);
     CHECK(stroke(d, "0,0,2", "Standard", 0.3));
