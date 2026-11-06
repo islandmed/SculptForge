@@ -11,6 +11,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <numbers>
 #include <optional>
 #include <thread>
@@ -1826,6 +1827,20 @@ bool reconstructCatmullClark(const Mesh& m, Reconstruction& out, std::string& er
     const uint32_t nv = uint32_t(m.vertexCount());
     std::vector<uint8_t> label(nv, kUnset), polyDone(np, 0);
     std::vector<uint32_t> touched, queue;
+    // Vertices on a UV seam (corners with different UVs). A face point is inside one coarse face, so never on a
+    // seam: on a regular closed grid (e.g. a torus) several readings fit, and the wrong ones split faces across UV
+    // islands and UDIM tiles (#145).
+    std::vector<uint8_t> seam(nv, 0);
+    if (m.uvs.size() == m.triangles.size() * 3) {
+        std::vector<glm::vec2> first(nv, glm::vec2(std::numeric_limits<float>::quiet_NaN()));
+        for (size_t t = 0; t < m.triangles.size(); ++t)
+            for (int c = 0; c < 3; ++c) {
+                const uint32_t v = m.triangles[t][c];
+                const glm::vec2 uv = m.uvs[t * 3 + size_t(c)];
+                if (std::isnan(first[v].x)) first[v] = uv;
+                else if (glm::any(glm::greaterThan(glm::abs(uv - first[v]), glm::vec2(1e-6f)))) seam[v] = 1;
+            }
+    }
     auto label4 = [&](uint32_t p, std::vector<uint8_t>& lab) -> int { // labels poly p from one known O/F corner
         const uint32_t o = w->polyOffsets[p];
         for (uint32_t k = 0; k < 4; ++k) {
@@ -1849,7 +1864,7 @@ bool reconstructCatmullClark(const Mesh& m, Reconstruction& out, std::string& er
         if (polyDone[seed]) continue;
         // Four ways to label the seed quad; keep the consistent one whose face points look most like quads.
         int best = -1;
-        long bestScore = -1;
+        long bestScore = -1, bestSeams = 0;
         std::vector<uint8_t> bestLabels;
         std::vector<uint32_t> bestPolys;
         for (int option = 0; option < 4; ++option) {
@@ -1882,12 +1897,21 @@ bool reconstructCatmullClark(const Mesh& m, Reconstruction& out, std::string& er
                 }
             }
             if (!ok) continue;
-            long score = 0; // face points of valence 4 (coarse quads) first
-            for (uint32_t v : touched)
-                if (lab[v] == kF) score += (w->vertEdgeOffsets[v + 1] - w->vertEdgeOffsets[v]) == 4 ? 2 : 1;
-            if (score > bestScore) {
+            long score = 0, seams = 0; // face points off UV seams, then of valence 4 (coarse quads) first
+            for (uint32_t v : touched) {
+                if (lab[v] != kF) continue;
+                seams += seam[v];
+                // A face point is never on a border (on an open mesh, e.g. a UDIM plane, the swapped
+                // reading has more face points: #145).
+                for (uint32_t i = w->vertEdgeOffsets[v]; i < w->vertEdgeOffsets[v + 1] && ok; ++i)
+                    ok = w->edgeFaces[w->vertEdges[i]].y != kNone;
+                score += (w->vertEdgeOffsets[v + 1] - w->vertEdgeOffsets[v]) == 4 ? 2 : 1;
+            }
+            if (!ok) continue;
+            if (best < 0 || seams < bestSeams || (seams == bestSeams && score > bestScore)) {
                 best = option;
                 bestScore = score;
+                bestSeams = seams;
                 bestLabels = std::move(lab);
                 bestPolys = std::move(polys);
             }
