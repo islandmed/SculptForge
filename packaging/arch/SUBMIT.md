@@ -11,7 +11,7 @@ Public Key**: paste the public key of this laptop (`cat ~/.ssh/id_ed25519.pub`; 
 `ssh-keygen -t ed25519 -f ~/.ssh/aur` plus a `Host aur.archlinux.org` / `IdentityFile ~/.ssh/aur` /
 `User aur` block in `~/.ssh/config`).
 
-## The 4 commands (from ~/Work/Zbrush on main)
+## The 4 commands (from the main checkout, on main)
 
 ```sh
 git clone ssh://aur@aur.archlinux.org/sculptforge.git ~/Work/.sf/aur-sculptforge
