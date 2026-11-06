@@ -32,11 +32,13 @@ int checkClients(const connect::Launch& launch, connect::Os os) {
             ++problems;
         }
         for (const connect::Snippet& s : c.snippets) {
-            // The path must appear exactly as typed in a terminal, or escaped in a file.
-            const bool hasPath = s.text.find(s.kind == connect::Snippet::Kind::Terminal ? connect::shellWord(launch.command, os)
-                                             : s.kind == connect::Snippet::Kind::Fields ? launch.command
-                                                                                        : connect::jsonString(launch.command)) !=
-                                 std::string::npos;
+            // The path must appear exactly as typed in a terminal, or escaped in a file (or in JSON on a command line:
+            // code --add-mcp '{...}').
+            auto has = [&](const std::string& t) { return s.text.find(t) != std::string::npos; };
+            const bool hasPath = s.kind == connect::Snippet::Kind::Terminal
+                                     ? has(connect::shellWord(launch.command, os)) || has(connect::jsonString(launch.command))
+                                 : s.kind == connect::Snippet::Kind::Fields ? has(launch.command)
+                                                                            : has(connect::jsonString(launch.command));
             if (!hasPath || s.text.find("--mcp") == std::string::npos) {
                 std::printf("  %s: the command or --mcp is missing:\n%s\n", c.id, s.text.c_str());
                 ++problems;
