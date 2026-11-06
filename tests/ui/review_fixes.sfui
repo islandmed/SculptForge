@@ -69,8 +69,8 @@ expect_value camera_yaw > 29.9
 expect_value camera_yaw < 30.1
 key numpad3
 expect_value camera_yaw > 89.9
-# View > Views: the axis buttons and the saved view (Render palette).
-click "Render##palette.render"
+# View > Views: the axis buttons and the saved view.
+click "View##menu.view"
 expect_text "View 1"
 shot views
 key escape
