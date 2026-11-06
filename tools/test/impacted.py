@@ -64,6 +64,9 @@ ALWAYS = ["marks"]
 SMOKE = ["ui_shell_layout", "ui_sculpt_basics", "ui_idle_redraw", "ui_release_smoke"]
 # Sources whose change only matters to the app's UI (step 5); a core change reaches every test through the graph.
 APP_DIRS = ("src/app/", "src/render/", "src/link/")
+# Sources the unit tests (sculptforge_tests, all its shards) cover: a change here always runs the shards it reaches, and
+# all of them when the graph reaches none (a build folder without `ninja -t deps` yet, a header only a PCH names).
+UNIT_DIRS = ("src/core/", "src/io/")
 STOP_WORDS = {"panel", "tool", "tools", "util", "utils", "test", "impl", "main", "app", "core", "data", "file", "ui"}
 
 
@@ -287,6 +290,7 @@ def impacted(root, build, files, verbose=False, graph=None, tests=None, history=
         if name in names and name not in nightly and name not in pick:
             pick[name] = why
 
+    shards = sorted(t["name"] for t in tests if t["command"] and os.path.basename(t["command"][0]) == "sculptforge_tests")
     # Every file a test's command names, and that file's folder (a script's sibling modules).
     by_file, by_dir, by_output = defaultdict(set), defaultdict(set), defaultdict(set)
     for t in tests:
@@ -345,6 +349,9 @@ def impacted(root, build, files, verbose=False, graph=None, tests=None, history=
                     add(n, f"build graph: {f} -> {os.path.relpath(out, build)}")
         elif f.startswith(APP_DIRS):
             app_files.append(f)
+        if f.startswith(UNIT_DIRS) and not any(n in pick for n in shards):
+            for n in shards:
+                add(n, f"unit shards: {f} is core/io and the build graph reached no shard")
         if len(pick) == before and not everything and f not in app_files:
             unmapped.append(f)
 
@@ -409,6 +416,10 @@ def self_test():
         r = lambda *f: impacted(root, b, list(f), graph=g, tests=tests, history=False)
         assert r("src/core/Mesh.h") == "^(marks|sculptforge_tests_0of2|sculptforge_tests_1of2|ui_shell_layout)$", r("src/core/Mesh.h")
         assert r("src/app/PanelMicro.cpp") == "^(marks|ui_micro_levels|ui_shell_layout)$", r("src/app/PanelMicro.cpp")
+        g0 = Graph(b, root)  # no `ninja -t deps` yet: a core header reaches nothing through the graph
+        r0 = lambda *f: impacted(root, b, list(f), graph=g0, tests=tests, history=False)
+        assert r0("src/core/Mesh.h") == "^(marks|sculptforge_tests_0of2|sculptforge_tests_1of2)$", r0("src/core/Mesh.h")
+        assert r0("src/io/ObjIO.cpp") == "^(marks|sculptforge_tests_0of2|sculptforge_tests_1of2)$", r0("src/io/ObjIO.cpp")
         assert r("tests/ui/bake.sfui") == "^(marks|ui_bake)$", r("tests/ui/bake.sfui")
         assert r("tests/ui/data/feed.json") == "^(marks|ui_bake)$"
         assert r("tools/guide/lib.py") == "^(guide_site|marks)$", r("tools/guide/lib.py")
