@@ -2283,10 +2283,13 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
         ImDrawList* dl = ImGui::GetWindowDrawList();
         const float r = 15.0f * s;
-        const ImVec2 c((a.x + b.x) * 0.5f, a.y + 4.0f * s + r);
-        dl->AddCircle(c, r, theme::u32(hovered ? theme::accent : theme::textDim, hovered ? 1.0f : 0.6f), 32, 1.5f * s);
-        centredText(dl, fontIcons_, ImVec2(c.x - r, c.y - r), ImVec2(c.x + r, c.y + r),
-                    theme::u32(hovered ? theme::accent : theme::textDim), ICON_LC_PLUS);
+        const CircledPlus p = circledPlus((a.x + b.x) * 0.5f, a.y + 4.0f * s + r, r, s); // lines, not a glyph (#150)
+        dl->AddCircle(ImVec2(p.cx, p.cy), p.r, theme::u32(hovered ? theme::accent : theme::textDim, hovered ? 1.0f : 0.6f), 48,
+                      p.stroke);
+        const ImU32 fg = theme::u32(hovered ? theme::accent : theme::textDim);
+        dl->AddRectFilled(ImVec2(p.barX0, p.barY0), ImVec2(p.barX1, p.barY1), fg);
+        dl->AddRectFilled(ImVec2(p.colX0, p.colY0), ImVec2(p.colX1, p.barY0), fg); // no overlap: a dimmed + stays even
+        dl->AddRectFilled(ImVec2(p.colX0, p.barY1), ImVec2(p.colX1, p.colY1), fg);
         ui::HelpText("Add a brush", nullptr, "Put another brush (built-in or one of yours) on this shelf.", "Bottom shelf");
     } else if (item.rfind("brush.recipe.", 0) == 0 || item.rfind("recipe:", 0) == 0) {
         const std::string name = item.substr(item[0] == 'r' ? 7 : 13); // custom brush, by name

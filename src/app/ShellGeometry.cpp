@@ -14,6 +14,24 @@ float trayWidth(float stored, float logicalWindowWidth) {
     return std::clamp(stored, kTrayMinW, kTrayMaxW);
 }
 
+CircledPlus circledPlus(float cx, float cy, float r, float scale) {
+    const float s = scale > 0.0f ? scale : 1.0f;
+    CircledPlus p;
+    const float t = std::max(1.0f, std::round(1.5f * s)); // whole-pixel bars: crisp, no half-covered rows
+    // An odd width centres on a pixel's middle, an even one on a pixel edge: then both bars cover whole pixels and
+    // the circle shares their centre exactly.
+    const float half = t * 0.5f;
+    const bool odd = std::fmod(t, 2.0f) != 0.0f;
+    p.cx = odd ? std::floor(cx) + 0.5f : std::round(cx);
+    p.cy = odd ? std::floor(cy) + 0.5f : std::round(cy);
+    p.r = std::round(r);
+    p.stroke = t;
+    const float arm = std::max(2.0f, std::round(r * 0.5f)); // half the + (arms of equal length both ways)
+    p.barX0 = p.cx - arm, p.barX1 = p.cx + arm, p.barY0 = p.cy - half, p.barY1 = p.cy + half;
+    p.colX0 = p.cx - half, p.colX1 = p.cx + half, p.colY0 = p.cy - arm, p.colY1 = p.cy + arm;
+    return p;
+}
+
 WindowFit fitWindow(WindowRect win, bool stored, bool placed, float storedScale, const WindowRect& usable,
                     const WindowBorders& b, float scale) {
     WindowFit fit;

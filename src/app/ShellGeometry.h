@@ -91,4 +91,15 @@ ShellMetrics sculptForgeMetrics(float gap); // the SculptForge layout: menus in 
 ShellGeometry computeShell(const UiLayout& layout, float width, float height, float scale, float topInset = 0.0f,
                            const ShellMetrics& metrics = ShellMetrics());
 
+// A circled + (the bottom shelf's Add a brush, #150), drawn from its centre, not a font glyph: the circle's centre
+// and the bars' edges land on the pixel grid at every UI scale, so the + sits exactly in the middle. Window px.
+struct CircledPlus {
+    float cx = 0, cy = 0, r = 0; // the circle (its stroke `stroke` px wide)
+    float stroke = 1;
+    float barX0 = 0, barY0 = 0, barX1 = 0, barY1 = 0; // the horizontal bar
+    float colX0 = 0, colY0 = 0, colX1 = 0, colY1 = 0; // the vertical bar
+};
+// `cx, cy, r`: the wanted circle; `scale`: the UI scale.
+CircledPlus circledPlus(float cx, float cy, float r, float scale);
+
 } // namespace sf
