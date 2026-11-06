@@ -124,3 +124,43 @@ Field notes:
 
 The benchmarks page (`website/benchmarks/index.html`) reads `results.json` and shows one row per mesh size and
 submission: frame time and lag percentiles per phase, hardware, version.
+
+## Benchmark takes (`--benchmark-script`)
+
+Proof mode's strokes are fixed; for clips of real sculpting at real speed (b-roll with its numbers), a **take** plays a
+UI test script's input instead:
+
+```
+sculptforge --benchmark-script take.sfui [project.sfproj] --benchmark-video take.mp4 [--benchmark-out take.csv]
+```
+
+- The take is a `.sfui` script (the UI test format, `src/app/UiTest.cpp`): `stroke`, `pen_stroke`, `orbit`, `camera`,
+  `zoom`, `key`, `click`, `brush_size`, `wait` and the other input steps, plus the scene's set-up commands
+  (`run new_sphere`, `run ui_look`, `run subdivide`...). The project after it, if any, is opened first; with none the
+  take sets up its own scene. `tests/takes/sphere.sfui` is a short example.
+- It plays in **real time** in the app's own interactive loop (the one you sculpt in, `App::run`): each frame the
+  script moves on by the wall clock's time since the last frame, never by a fixed step, so a slow frame is a jump
+  in the clip as it is for a person. `stroke` sends its pointer samples at 240 a second (each frame, the samples
+  since the last one), like proof mode; `pen_stroke` sends 4 a frame. A step's own end is checked once a frame, so
+  waits are at least as long as written.
+- The proof mode HUD (bottom left: version, commit, frame times over the last second, stroke lag, GPU) and the script's pointer
+  are drawn on top, and the frames go to the MP4 the same way as proof mode's: read back through pixel buffers,
+  encoded by ffmpeg on its own thread at a constant 30 fps (a frame repeats while the app is slower), so the video
+  is as long as the take. `--benchmark-no-video` records none; `--benchmark-vsync` keeps vertical sync on.
+- The CSV has one row per frame: `frame`, `t_s` (since the take started), `frame_ms`, `stroking` (1 while a stroke
+  is held), and `lag_ms` / `lag_px` as defined above (blank when no dab is on screen to measure). Its default name
+  is the video's with `.csv`; with neither given both go in the current folder as `sculptforge-take-<name>-<time>`.
+  A summary is printed at the end (frame percentiles, the slowest frame, stroke lag).
+- It waits for the start-up to settle (a second, and no background job running) before the clock starts, and keeps
+  half a second after the script's last step so the clip ends on the result. Esc stops it early.
+
+Local only: no ports, no IPC, no update check, and no files read but the take and the project. Steps a take can't
+play in real time or that reach outside it are handled when it loads: `shot`, `snapshot`, `remember`, `print`,
+`dump_shortcuts` and every `expect*` are skipped with a warning; `run` with anything but a scene set-up command,
+`env`, `drop`, `choose_file`, `answer_dialog`, `restart`, the phone and AI client steps and the rest are refused
+and the take doesn't start (exit code 1). Settings are isolated as for any benchmark. Exit code 0 when the take
+played through and the video and CSV were written.
+
+`ctest -R bench_take_sphere` plays `tests/takes/sphere.sfui` and checks the CSV (a row per frame, the strokes'
+lag, frame times adding up to the wall clock within 5%, at least the script's length) and, with ffprobe, that the
+video is as long as the take within 5%.

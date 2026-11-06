@@ -325,6 +325,7 @@ void App::drawTimelineUi() {
         Timeline::historyDocument = &doc_;
     }
     if (proof_) drawProofUi();
+    if (take_) drawTakeHud(); // (BenchTake.cpp)
     // Keep a timeline on the active Part's history (each Part's travels with its undo stack).
     Timeline* t = Timeline::of(doc_.undo);
     if (!t && s.record) t = Timeline::attach(doc_).get();

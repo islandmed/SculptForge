@@ -11,7 +11,7 @@
 // in milliseconds from the pointer sample the newest drawn dab belongs to until the frame showing it is handed
 // to the display (SwapWindow; the display's own scan-out and the compositor come on top). A HUD shows the
 // numbers live; the frames go, HUD included, to an MP4 (read back through pixel buffers, encoded by ffmpeg on
-// its own thread), and a JSON result with the hardware and version is written at the end.
+// its own thread: BenchVideo.h), and a JSON result with the hardware and version is written at the end.
 #include "app/ProofMode.h"
 
 #include "core/Precision.h"
@@ -20,7 +20,7 @@
 #include "core/Micro.h"
 
 #include "app/App.h"
-#include "app/ShellQuote.h"
+#include "app/BenchVideo.h"
 #include "app/Theme.h"
 
 #include "core/Benchmark.h"
@@ -35,15 +35,12 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-#include <deque>
 #include <filesystem>
 #include <fstream>
-#include <mutex>
 #include <sstream>
 #include <thread>
 
@@ -226,9 +223,7 @@ namespace {
 using Clock = std::chrono::steady_clock;
 double nowSeconds() { return std::chrono::duration<double>(Clock::now().time_since_epoch()).count(); }
 
-constexpr GLenum kPixelPackBuffer = 0x88EB, kStreamRead = 0x88E1, kMapReadBit = 0x0001;
 constexpr double kPointerHz = 240.0;
-constexpr int kVideoFps = 30;
 
 struct Percentiles {
     double p50 = 0, p95 = 0, p99 = 0, max = 0, mean = 0;
@@ -259,95 +254,6 @@ Json percentilesJson(const Percentiles& p) {
     j.set("mean", r(p.mean));
     return j;
 }
-
-// Frames to ffmpeg on a thread of its own, at a constant rate (frames repeat while the app is slower).
-class VideoWriter {
-public:
-    bool start(const std::string& path, int w, int h) {
-        w_ = w, h_ = h;
-        // Bottom-up rows from glReadPixels: flipped; scaled to at most 1920 wide to keep the encoder light.
-        const std::string quoted = shellQuote(path); // (never a shell-active file name)
-        if (quoted.empty()) return false;
-        const std::string cmd = "ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgba -s " + std::to_string(w) + "x" +
-                                std::to_string(h) + " -r " + std::to_string(kVideoFps) +
-                                " -i - -vf \"vflip,scale='min(1920,iw)':-2\" -c:v libx264 -preset veryfast -crf 20 "
-                                "-pix_fmt yuv420p -movflags +faststart " + quoted;
-#if defined(_WIN32)
-        ff_ = _popen(cmd.c_str(), "wb");
-#else
-        ff_ = popen(cmd.c_str(), "w");
-#endif
-        if (!ff_) return false;
-        thread_ = std::thread([this] { loop(); });
-        return true;
-    }
-    // Takes the frame shown at `t` (seconds); drops it when the encoder is behind.
-    void push(double t, std::vector<uint8_t>&& rgba) {
-        std::lock_guard<std::mutex> lock(m_);
-        if (queue_.size() >= 4) return;
-        queue_.push_back({t, std::move(rgba)});
-        cv_.notify_one();
-    }
-    bool finish() {
-        if (!ff_) return false;
-        {
-            std::lock_guard<std::mutex> lock(m_);
-            stop_ = true;
-            cv_.notify_one();
-        }
-        thread_.join();
-#if defined(_WIN32)
-        const int status = _pclose(ff_);
-#else
-        const int status = pclose(ff_);
-#endif
-        ff_ = nullptr;
-        return status == 0 && written_ > 0;
-    }
-    int width() const { return w_; }
-    int height() const { return h_; }
-    bool running() const { return ff_ != nullptr; }
-    ~VideoWriter() {
-        if (ff_) finish();
-    }
-
-private:
-    void loop() {
-        std::vector<uint8_t> last;
-        double next = -1.0;
-        for (;;) {
-            std::pair<double, std::vector<uint8_t>> f;
-            {
-                std::unique_lock<std::mutex> lock(m_);
-                cv_.wait(lock, [&] { return stop_ || !queue_.empty(); });
-                if (queue_.empty()) break;
-                f = std::move(queue_.front());
-                queue_.pop_front();
-            }
-            if (next < 0) next = f.first;
-            // Slots up to this frame's time show the previous frame; then this one.
-            while (!last.empty() && next + 1.0 / kVideoFps <= f.first) {
-                std::fwrite(last.data(), 1, last.size(), ff_);
-                ++written_;
-                next += 1.0 / kVideoFps;
-            }
-            if (next <= f.first + 1e-9 || last.empty()) {
-                std::fwrite(f.second.data(), 1, f.second.size(), ff_);
-                ++written_;
-                next += 1.0 / kVideoFps;
-            }
-            last = std::move(f.second);
-        }
-    }
-    FILE* ff_ = nullptr;
-    int w_ = 0, h_ = 0;
-    std::thread thread_;
-    std::mutex m_;
-    std::condition_variable cv_;
-    std::deque<std::pair<double, std::vector<uint8_t>>> queue_;
-    bool stop_ = false;
-    long written_ = 0;
-};
 
 struct PhaseSpec {
     const char* name;
@@ -463,10 +369,7 @@ struct ProofState {
     std::string hudTitle, hudLine2, hudLine3;
     std::string error;
     // Video
-    VideoWriter writer;
-    GLuint pbo[3] = {0, 0, 0};
-    double pboTime[3] = {0, 0, 0};
-    int pboW = 0, pboH = 0, pboNext = 0, pboFilled = 0;
+    BenchVideo writer;
     Json hardware;
     std::string gpu;
     bool written = false;
@@ -740,40 +643,11 @@ void App::proofBeforeSwap(int fbW, int fbH) {
     // The frame about to be shown: into the video (asynchronously, through a ring of pixel buffers).
     if (p.video && p.stage != Stage::Announce && p.stage != Stage::Build) {
         const int w = fbW & ~1, h = fbH & ~1;
-        if (!p.writer.running() && p.error.find("video") == std::string::npos) {
-            if (p.writer.start(p.videoPath, w, h)) {
-                p.pboW = w, p.pboH = h;
-                gl::GenBuffers(3, p.pbo);
-                for (GLuint b : p.pbo) {
-                    gl::BindBuffer(kPixelPackBuffer, b);
-                    gl::BufferData(kPixelPackBuffer, GLsizeiptr(size_t(w) * size_t(h) * 4), nullptr, kStreamRead);
-                }
-                gl::BindBuffer(kPixelPackBuffer, 0);
-            } else {
-                p.error = "The video couldn't be recorded (ffmpeg missing?)";
-                p.video = false;
-            }
+        if (!p.writer.running() && p.error.find("video") == std::string::npos && !p.writer.start(p.videoPath, w, h)) {
+            p.error = "The video couldn't be recorded (ffmpeg missing?)";
+            p.video = false;
         }
-        if (p.writer.running() && w == p.pboW && h == p.pboH) {
-            const int slot = p.pboNext;
-            if (p.pboFilled >= 3) { // the oldest read is done by now: hand it to the encoder
-                gl::BindBuffer(kPixelPackBuffer, p.pbo[slot]);
-                if (const void* data = gl::MapBufferRange(kPixelPackBuffer, 0, GLsizeiptr(size_t(w) * size_t(h) * 4), kMapReadBit)) {
-                    std::vector<uint8_t> rgba(size_t(w) * size_t(h) * 4);
-                    std::memcpy(rgba.data(), data, rgba.size());
-                    gl::UnmapBuffer(kPixelPackBuffer);
-                    p.writer.push(p.pboTime[slot], std::move(rgba));
-                }
-            }
-            gl::BindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-            gl::BindBuffer(kPixelPackBuffer, p.pbo[slot]);
-            gl::PixelStorei(GL_PACK_ALIGNMENT, 1);
-            gl::ReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-            gl::BindBuffer(kPixelPackBuffer, 0);
-            p.pboTime[slot] = now;
-            p.pboNext = (slot + 1) % 3;
-            p.pboFilled = std::min(p.pboFilled + 1, 3);
-        }
+        p.writer.grab(now, w, h);
     }
 
     const double frameMs = (now - p.lastFrame) * 1000.0;
@@ -1047,7 +921,6 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         if (!p.vsync) SDL_GL_SetSwapInterval(1);
         if (p.writer.running()) {
             if (!p.writer.finish()) p.error += (p.error.empty() ? "" : "; ") + std::string("the video couldn't be written");
-            gl::DeleteBuffers(3, p.pbo);
         }
         Json root = Json::object();
         root.set("schema", "sculptforge-benchmark/1");

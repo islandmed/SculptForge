@@ -258,6 +258,7 @@ void Demo::mouseMotion(float x, float y, SDL_MouseID which) {
     e.motion.state = buttonDown_ ? SDL_BUTTON_LMASK : 0;
     mouse_ = ImVec2(x, y);
     app_.handleEvent(e);
+    if (pointerHook) pointerHook(x, y);
 }
 
 void Demo::mouseButton(bool down, int button, SDL_MouseID which, int clicks) {
@@ -441,6 +442,7 @@ void Demo::click(const std::string& label) {
 void Demo::stroke(std::function<ImVec2(float u)> path, float seconds, bool invert, bool hold) {
     // Glide to the start, press, follow the path, release.
     auto started = std::make_shared<bool>(false);
+    auto sent = std::make_shared<float>(0.0f); // a take: the stroke's time its last pointer sample was sent at
     auto from = std::make_shared<ImVec2>();
     steps_.push_back([this, path, from](float t) {
         const ImVec2 p = path(0.0f);
@@ -449,11 +451,20 @@ void Demo::stroke(std::function<ImVec2(float u)> path, float seconds, bool inver
         mouseMotion(from->x + (p.x - from->x) * u, from->y + (p.y - from->y) * u);
         return t >= 0.35f;
     });
-    steps_.push_back([this, path, seconds, invert, hold, started](float t) {
+    steps_.push_back([this, path, seconds, invert, hold, started, sent](float t) {
         if (!*started) {
             app_.invertToggle_ = invert;
             mouseButton(true, SDL_BUTTON_LEFT);
             *started = true;
+            *sent = 0.0f;
+        }
+        if (take_) { // a take (real time): the samples since the last frame, 240 a second, as a tablet sends them
+            constexpr float kHz = 240.0f;
+            for (float s = (std::floor(*sent * kHz) + 1.0f) / kHz; s < std::min(t, seconds); s += 1.0f / kHz) {
+                const ImVec2 q = path(s / seconds);
+                mouseMotion(q.x, q.y);
+            }
+            *sent = t;
         }
         const ImVec2 p = path(std::min(t / seconds, 1.0f));
         mouseMotion(p.x, p.y);
