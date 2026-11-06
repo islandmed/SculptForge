@@ -3346,6 +3346,11 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Your studio doesn't allow this provider: pick another", "你的工作室不允许此提供商：请选择其他提供商"},
     {"Your studio requires the sign-in for AI features.", "你的工作室要求登录后才能使用 AI 功能。"},
     // --- Labels that were shown without tr() until 11-06 (coverage.py --raw-check), Generate 3D first ---
+    {"Hyper3D Rodin (direct) - paid, your key", "Hyper3D Rodin（直连）- 付费，使用你的密钥"},
+    {"Gen-2.5 Extreme Low (fastest)", "Gen-2.5 Extreme Low（最快）"},
+    {"Gen-2.5 Extreme High (more credits)", "Gen-2.5 Extreme High（消耗更多点数）"},
+    {"Hide the Parts in %s", "隐藏 %s 中的部件"},
+    {"Show the Parts in %s", "显示 %s 中的部件"},
     {"%d frames, %.1f s",
      "%d 帧，%.1f 秒"},
     {"%s  connected",

@@ -73,6 +73,9 @@ DYNAMIC = {
         "Rodin 2.5 Fast (Hyper3D) - cheaper",
         "Hunyuan3D models are under the Tencent Hunyuan Community License, which doesn't cover use in the EU, UK or "
         "South Korea. There, choose TRELLIS.2 (free token) or another model."],
+    "ai/Hyper3D.cpp tiers() labels (App::drawImageTo3D)": [
+        "Gen-2.5 Extreme Low (fastest)", "Gen-2.5 Low", "Gen-2.5 Medium", "Gen-2.5 High",
+        "Gen-2.5 Extreme High (more credits)"],
     "ai/AiPolicy.h kPrivacyLine (PanelAi.cpp)": [
         "Your art is never uploaded or used for training. AI features run only when you use them and can be turned off."],
     "core/RadialMenu.cpp radialButtonLabel": ["None", "Middle mouse button", "Mouse back button", "Mouse forward button",

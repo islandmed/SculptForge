@@ -3344,6 +3344,11 @@ constexpr Entry kTraditionalChinese[] = {
     {"Replaces the scene: your unsaved changes would be lost",
      "會取代場景：未儲存的變更將會遺失"},
     // --- Labels that were shown without tr() until 11-06 (coverage.py --raw-check), Generate 3D first ---
+    {"Hyper3D Rodin (direct) - paid, your key", "Hyper3D Rodin（直連）- 付費，使用你的金鑰"},
+    {"Gen-2.5 Extreme Low (fastest)", "Gen-2.5 Extreme Low（最快）"},
+    {"Gen-2.5 Extreme High (more credits)", "Gen-2.5 Extreme High（耗用更多點數）"},
+    {"Hide the Parts in %s", "隱藏 %s 中的部件"},
+    {"Show the Parts in %s", "顯示 %s 中的部件"},
     {"%d frames, %.1f s",
      "%d 影格，%.1f 秒"},
     {"%s  connected",

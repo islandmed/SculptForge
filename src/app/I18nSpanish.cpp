@@ -3818,6 +3818,11 @@ constexpr Entry kSpanish[] = {
     {"Replaces the scene: your unsaved changes would be lost",
      "Reemplaza la escena: se perderían los cambios sin guardar"},
     // --- Labels that were shown without tr() until 11-06 (coverage.py --raw-check), Generate 3D first ---
+    {"Hyper3D Rodin (direct) - paid, your key", "Hyper3D Rodin (directo): de pago, tu clave"},
+    {"Gen-2.5 Extreme Low (fastest)", "Gen-2.5 Extreme Low (el más rápido)"},
+    {"Gen-2.5 Extreme High (more credits)", "Gen-2.5 Extreme High (más créditos)"},
+    {"Hide the Parts in %s", "Ocultar las piezas de %s"},
+    {"Show the Parts in %s", "Mostrar las piezas de %s"},
     {"%d frames, %.1f s",
      "%d fotogramas, %.1f s"},
     {"%s  connected",

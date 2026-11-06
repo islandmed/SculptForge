@@ -759,7 +759,7 @@ void App::drawPartFolderRow(int fi, float rowH, ImVec2 cellPad, PartFolderAction
     if (ImGui::InvisibleButton(("##eye folder " + f.name).c_str(), eyeSize)) fa.toggle = f.name;
     ImGui::EndDisabled();
     const bool eyeHovered = ImGui::IsItemHovered();
-    if (eyeHovered) ImGui::SetTooltip(visible ? "Hide the Parts in %s" : "Show the Parts in %s", f.name.c_str());
+    if (eyeHovered) ImGui::SetTooltip(tr(visible ? "Hide the Parts in %s" : "Show the Parts in %s"), f.name.c_str());
     const ImU32 eyeCol = ImGui::GetColorU32(eyeHovered ? style.Colors[ImGuiCol_ButtonHovered]
                                             : visible  ? style.Colors[ImGuiCol_Text]
                                                        : style.Colors[ImGuiCol_TextDisabled]);
