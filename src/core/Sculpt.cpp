@@ -61,7 +61,7 @@ bool brushFromName(std::string_view name, BrushType& out) {
     auto squash = [](std::string_view s) {
         std::string r;
         for (unsigned char c : s)
-            if (c != ' ' && c != '_' && c != '-') r += char(std::tolower(c));
+            if (c != ' ' && c != '_' && c != '-' && c != '.') r += char(std::tolower(c));
         return r;
     };
     std::string want = squash(name);
