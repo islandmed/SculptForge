@@ -134,6 +134,11 @@ std::string AiSettings::resolvedMeshyKey() const {
     return env ? env : "";
 }
 
+std::string AiSettings::resolvedHyper3dKey() const {
+    if (!hyper3dKey.empty()) return hyper3dKey;
+    return secrets::cached(secrets::kHyper3d);
+}
+
 Json AiSettings::toJson() const {
     Json j = Json::object();
     // (no keys: they are in the keychain, ai/Secrets.h)
@@ -151,6 +156,7 @@ Json AiSettings::toJson() const {
     j.set("falEndpoint", falEndpoint);
     j.set("meshyModel", meshyModel);
     j.set("meshyEndpoint", meshyEndpoint);
+    j.set("hyper3dTier", hyper3dTier);
     j.set("comfyUrl", comfyUrl);
     j.set("comfyImageWorkflow", comfyImageWorkflow);
     j.set("comfyTextWorkflow", comfyTextWorkflow);
@@ -193,6 +199,7 @@ AiSettings AiSettings::fromJson(const Json& j) {
     text("meshyKey", s.meshyKey);
     text("meshyModel", s.meshyModel);
     text("meshyEndpoint", s.meshyEndpoint);
+    text("hyper3dTier", s.hyper3dTier); // (never a key: the keychain only)
     text("comfyUrl", s.comfyUrl);
     s.comfyImageWorkflow = j["comfyImageWorkflow"].asString();
     s.comfyTextWorkflow = j["comfyTextWorkflow"].asString();

@@ -125,6 +125,16 @@ If no pen is detected or pressure doesn't change:
 | *Model or endpoint not found* | Check the fal model id |
 | *Rate limited* | Wait a moment and try again |
 
+### Hyper3D Rodin (direct)
+
+| Message | What to do |
+|---|---|
+| *Add your Hyper3D API key* | It stays off until you add your own key (hyper3d.ai > API dashboard) in the Generate 3D window |
+| *Hyper3D rejected the API key* | Check the key, or create a new one in the API dashboard |
+| *Your Hyper3D plan doesn't include this tier* | Basic API access covers Extreme Low and Low; choose one of those, or upgrade on hyper3d.ai |
+| *Out of credits on your Hyper3D account* | Top up on hyper3d.ai |
+| *Refused the model file* | The result came from somewhere other than Hyper3D's servers, so SculptForge didn't download it. The model isn't lost: it stays in your Hyper3D account (hyper3d.ai dashboard) under the task id in the message. If it keeps happening, [report it](https://github.com/islandmed/SculptForge/issues) |
+
 ### Brush Lab
 
 The default **Free** provider uses a hosted open model with no account. If it is unreachable and Ollama runs
@@ -135,7 +145,7 @@ requests in a short time: wait a few seconds. For setup of local models, see
 ### No connection at all
 
 AI features need internet access (except a local Ollama, LM Studio or ComfyUI). Behind a company proxy or
-firewall, ask IT to allow the service you use: huggingface.co (and `*.hf.space`), fal.ai, meshy.ai, or the
+firewall, ask IT to allow the service you use: huggingface.co (and `*.hf.space`), fal.ai, meshy.ai, api.hyper3d.com (and Hyper3D's file servers), or the
 Pollinations.ai text endpoint for the free Brush Lab model.
 
 ## ComfyUI errors

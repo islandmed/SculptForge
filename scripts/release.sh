@@ -288,7 +288,10 @@ preflight() {
     auth=$(gh auth status 2>&1 || true)
     grep -q "account $AUTHOR_NAME" <<<"$auth" || die "gh is not logged in as $AUTHOR_NAME" "gh auth login (or gh auth switch -u $AUTHOR_NAME)"
     words_ok "$mode"
-    python3 tools/brush-gallery/check_published.py >/dev/null 2>&1 || die "the public gallery (islandmed/sculptforge-brushes) check failed: $(python3 tools/brush-gallery/check_published.py 2>/dev/null | head -3)" "copy tools/brush-gallery/repo into a clone of it, commit, push its main"
+    local gallery rc=0
+    gallery=$(python3 tools/brush-gallery/check_published.py 2>/dev/null) || rc=$?
+    [ $rc -ne 2 ] || die "$(head -1 <<<"$gallery")" "check the network and gh auth status, then run again"
+    [ $rc -eq 0 ] || die "the public gallery (islandmed/sculptforge-brushes) differs from tools/brush-gallery/repo: $(head -3 <<<"$gallery")" "copy tools/brush-gallery/repo into a clone of it, commit, push its main"
     grep -q '^set(SCULPTFORGE_PRERELEASE "[a-z0-9.]*")$' CMakeLists.txt ||
         die "CMakeLists.txt lost its set(SCULPTFORGE_PRERELEASE \"\") line that step bump sets" "restore it under project() (git log -p CMakeLists.txt), commit"
     python3 -c 'import json, sys; json.load(open(sys.argv[1]))' website/latest.json 2>/dev/null || die "website/latest.json is not valid JSON" "fix it, commit"
