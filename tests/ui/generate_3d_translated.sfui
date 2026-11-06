@@ -3,10 +3,12 @@
 # model names stay English. The ImGui labels the panel shows are all translated: i18n_raw_labels fails on any that
 # skips tr(); this is the screen check, at 1x.
 run ui_look look=classic layout=classic
+ui_scale 100
 click "Preferences##palette.preferences"
 click "Interface##preferences.interface"
 click "简体中文##language.zh-CN"
-click "偏好设置##palette.preferences"
+wait 0.2
+key escape
 drop ../../assets/demo/teddy-sketch.png
 wait_for "生成 3D 模型" 5
 expect_text 从图片
@@ -26,10 +28,11 @@ expect_no_text Describe one object
 shot zh-cn-generate-text
 click "从图片"
 
+# Interface is still open from above: a second click would close it.
 click "偏好设置##palette.preferences"
-click "界面##preferences.interface"
 click "Español##language.es"
-click "Preferencias##palette.preferences"
+wait 0.2
+key escape
 wait 0.2
 expect_text Desde imagen
 expect_text Generar modelo 3D
@@ -39,5 +42,7 @@ shot es-generate-image
 
 # Back to English for the next test.
 click "Preferencias##palette.preferences"
-click "Interfaz##preferences.interface"
 click "English##language.en"
+wait 0.2
+key escape
+ui_scale auto

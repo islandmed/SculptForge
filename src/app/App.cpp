@@ -3839,7 +3839,11 @@ void App::drawImageTo3D() {
         ImGui::TextWrapped("%s", text);
         ImGui::PopStyleColor();
     };
-    const float labelW = ImGui::CalcTextSize("Resolution").x + ImGui::GetStyle().ItemInnerSpacing.x;
+    // The label column fits this language's longest label ("ID del modelo", "Token de HF"), at most 40% of the panel.
+    float labelW = 0;
+    for (const char* l : {"Resolution", "Remesh", "Model", "Model id", "HF token", "API key", "Thickness", "Detail", "Depth"})
+        labelW = std::max(labelW, ImGui::CalcTextSize(tr(l)).x);
+    labelW = std::min(labelW, ImGui::GetContentRegionAvail().x * 0.4f) + ImGui::GetStyle().ItemInnerSpacing.x;
 
     ImGui::SeparatorText(tr(textMode_ ? "Text to 3D (AI)" : "Full 3D model (AI reconstruction)"));
     hint(tr(textMode_ ? "Builds a whole model from the description with a generative 3D model, then makes it sculptable."
@@ -3942,8 +3946,12 @@ void App::drawImageTo3D() {
                               "level holding the detail. Voxel remesh: an even, watertight triangle surface. Off: the "
                               "model as the service made it."));
         if (generatedRemesh_ != int(GeneratedRemesh::Off)) ImGui::SliderInt(tr("Resolution"), &remeshResolution_, 96, 400);
-        if (generatedRemesh_ == int(GeneratedRemesh::Quad))
-            ImGui::TextDisabled(tr("About %d quads, then 1 subdivision level"), generatedQuadTarget(remeshResolution_));
+        if (generatedRemesh_ == int(GeneratedRemesh::Quad)) {
+            char quads[160];
+            std::snprintf(quads, sizeof quads, tr("About %d quads, then 1 subdivision level"),
+                          generatedQuadTarget(remeshResolution_));
+            hint(quads);
+        }
     }
     ImGui::PopItemWidth();
     if (pendingGenerator_.valid()) {
