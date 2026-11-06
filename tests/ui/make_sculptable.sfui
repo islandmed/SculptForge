@@ -1,9 +1,11 @@
 # Make sculptable (Splats palette): the built-in test head capture -> one click -> a quad Part with face loops and
 # the capture's colours next to the hidden scan; then the review: the face landmarks as dots, one dragged (its mirror
 # follows and the loops are rebuilt), Finish. The crop box toggles; F3 finds the action.
-run splat_test_capture kind=head count=150000
+# 30k surface splats (150k took 19 s + 15 s for the two runs): the same scan -> voxel -> QRemesh -> face-loop path; the
+# test head's landmarks and loops come from its shape, which 30k splats still cover densely.
+run splat_test_capture kind=head count=30000
 wait 0.5
-expect_value splats > 150000
+expect_value splats > 30000
 expect "Make sculptable/Make sculptable"
 shot capture
 
