@@ -8,6 +8,7 @@ deletes it; remove its lines once fixed.
 |---|---|---|---|
 | 2026-11-04 | sculptforge_tests_9of16 | PC (WSL, RTX 3060), ctest -j10 | 76e4be24 |
 | 2026-11-06 | ui_idle_redraw (failed its rerun too) | CI Windows (2/4), software OpenGL, runs 42231997469 + 42243212500 | 8c070932, 3959b469 |
+| 2026-11-06 | sculptforge_tests_10of16 (discord_bursts_send_the_latest) | CI macOS Packages, run 42246054273: attempt 1 failed, attempt 2 passed | fa66499d |
 
 ## Owned
 
@@ -16,3 +17,5 @@ deletes it; remove its lines once fixed.
   The CPU check counted every thread over the whole window, and one software-OpenGL frame (llvmpipe's threads) costs
   ~0.4 s of processor time on that runner: 2 frames = 10-16% "idle CPU" over the 10% cap. `--measure-idle` now
   checks the CPU between frames and prints the frames' share apart. Remove these lines after a week of green Windows.
+- **discord_bursts_send_the_latest**, CI macOS (owner sfmonitor, Discord presence): a timing check
+  (tests/test_discord_presence.cpp:537, `got.size() <= 2`) failed once on the macOS runner; the re-run passed.
