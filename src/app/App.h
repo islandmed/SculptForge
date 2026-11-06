@@ -2443,6 +2443,12 @@ private:
     // The last drawn frame's time by part (run()'s marks): events, dabs, UI, ghost + scene sync (the upload), draw,
     // UI draw + swap (where the frame waits for the GPU).
     double frameSplitMs_[6] = {};
+    GLsync lastFrameFence_ = nullptr; // the last shown frame's GPU work is done
+    void waitLastFrame(); // (the last shown frame's GPU work done: nothing of it in flight)
+    // The stroke solver is the bottleneck (a recent share of background batches not done within their wait): frames
+    // don't overlap the GPU then.
+    double solverLateShare_ = 0.0;
+    bool solverBound_ = false;
     // GPU time of frames (GL_TIME_ELAPSED, a few frames late) since Help > Benchmark last took them.
     std::vector<double> proofGpuMs_;
     // The view's resolution while it moves (experimental, docs/design/perf-moonshots.md §0): 0.75 on the simulated

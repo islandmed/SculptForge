@@ -368,8 +368,16 @@ void App::pumpStroke() {
     s.start();
     // Background dabs: a batch is waited for here up to a frame's share of work, so a light one shows in this frame
     // as in the frame loop's own path; a heavier one goes on while the frame draws, and the next frame commits it.
-    if (!previewStrokes() && dabSeconds_ > 0.0 && s.waitFor(kBackgroundBatchSeconds * 1.25) && s.done)
-        commitSolverBatch();
+    // (How often the batch isn't done in time: a stroke whose solver is the bottleneck. The frame loop then stops
+    // overlapping the GPU with it: see App::run.)
+    if (!previewStrokes() && dabSeconds_ > 0.0) {
+        const bool inTime = s.waitFor(kBackgroundBatchSeconds * 1.25);
+        solverLateShare_ += 0.1 * ((inTime ? 0.0 : 1.0) - solverLateShare_);
+        // (On above a fifth late, off below one in twenty: Lucy 28M's ~35% stays on between its late runs.)
+        if (solverLateShare_ > 0.2) solverBound_ = true;
+        else if (solverLateShare_ < 0.05) solverBound_ = false;
+        if (inTime && s.done) commitSolverBatch();
+    }
 }
 
 bool App::liveMoveEnabled() const {

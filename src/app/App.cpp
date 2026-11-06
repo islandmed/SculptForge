@@ -345,6 +345,7 @@ void App::shutdown() {
 
     spaceMouseClose();
     shutdownHardwareProfile(); // its timer queries need the GL context
+    waitLastFrame();
     if (refTexture_) gl::DeleteTextures(1, &refTexture_);
     gallery_.reset(); // its preview textures need the GL context
     thumbs_.clear();
@@ -1111,6 +1112,9 @@ int App::run() {
                 continuousDabAt_ = nowS;
             }
         }
+        // A stroke whose solver can't keep up: no overlap. The GPU drawing the last frame slows the solver (they share
+        // the memory on Apple silicon: Lucy 28M stroke frame p99 31 -> 37 ms); light strokes keep overlapping.
+        if (solverBound_ && (drag_ == Drag::Stroke || solverBusy())) waitLastFrame();
         flushGrab(); // Move: the pointer's moves since the last frame, as one
         if (asyncStroke_) pumpStroke();
         else drainStrokeDabs(kStrokeBudgetSeconds);
@@ -1225,7 +1229,12 @@ int App::run() {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         hardwareProfileFrameEnd();
         if (proof_) proofBeforeSwap(fbW, fbH); // Help > Benchmark: timing, video capture, the scripted pointer
+        // CPU and GPU overlap: the GPU draws this frame while the CPU builds the next. At most one frame in flight
+        // (the input lag doesn't grow): the last frame's GPU work is done before this one is shown.
+        waitLastFrame();
         SDL_GL_SwapWindow(window_);
+        lastFrameFence_ = gl::FenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+        gl::Flush(); // (to the GPU now: an offscreen swap sends nothing)
         mark();
         if (phases == 7) // (Help > Benchmark splits each phase's frames by these)
             for (int k = 0; k < 6; ++k) frameSplitMs_[k] = phase[k + 1] - phase[k];
@@ -4365,6 +4374,13 @@ void App::drawBrushCursor() {
         }
     }
     if (!sizeRingPreview_) drawPrecisionCursor(dl, c, r, col); // Steady Stroke's string, the precision drag, the size in mm (Precision.cpp; the pop-up shows the size itself)
+}
+
+void App::waitLastFrame() {
+    if (!lastFrameFence_) return;
+    gl::ClientWaitSync(lastFrameFence_, GL_SYNC_FLUSH_COMMANDS_BIT, 100'000'000ull); // (100 ms: never stuck)
+    gl::DeleteSync(lastFrameFence_);
+    lastFrameFence_ = nullptr;
 }
 
 } // namespace sf

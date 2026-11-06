@@ -478,7 +478,11 @@ bool GpuFrameTimer::available() {
 
 void GpuFrameTimer::begin() {
     if (!available() || active_ >= 0) return;
-    if (pending_[next_]) pending_[next_] = false; // never read in time: dropped
+    if (pending_[next_]) { // never read in time: dropped
+        pending_[next_] = false;
+        if (fences_[next_]) gl::DeleteSync(fences_[next_]);
+        fences_[next_] = nullptr;
+    }
     static const GlExtra e = loadExtra();
     e.BeginQuery(kGL_TIME_ELAPSED, queries_[next_]);
     active_ = next_;
@@ -488,6 +492,7 @@ void GpuFrameTimer::end(uint64_t frame) {
     if (active_ < 0) return;
     static const GlExtra e = loadExtra();
     e.EndQuery(kGL_TIME_ELAPSED);
+    fences_[active_] = gl::FenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
     frames_[active_] = frame;
     pending_[active_] = true;
     next_ = (active_ + 1) % kSlots;
@@ -502,9 +507,16 @@ bool GpuFrameTimer::poll(uint64_t& frame, double& ms) {
     for (int k = 0; k < kSlots; ++k) {
         const int i = (next_ + k) % kSlots;
         if (!pending_[i] || i == active_) continue;
-        uint64_t ready = 0;
-        e.GetQueryObjectui64v(queries_[i], kGL_QUERY_RESULT_AVAILABLE, &ready);
-        if (!ready) return false; // later ones aren't either
+        if (fences_[i]) { // done on the GPU? (a zero timeout: never waits)
+            const GLenum r = gl::ClientWaitSync(fences_[i], 0, 0);
+            if (r == GL_TIMEOUT_EXPIRED) return false; // later ones aren't either
+            gl::DeleteSync(fences_[i]);
+            fences_[i] = nullptr;
+        } else { // (no fence: the driver's word)
+            uint64_t ready = 0;
+            e.GetQueryObjectui64v(queries_[i], kGL_QUERY_RESULT_AVAILABLE, &ready);
+            if (!ready) return false;
+        }
         uint64_t ns = 0;
         e.GetQueryObjectui64v(queries_[i], kGL_QUERY_RESULT, &ns);
         pending_[i] = false;
@@ -520,6 +532,10 @@ void GpuFrameTimer::release() {
         static const GlExtra e = loadExtra();
         if (active_ >= 0) e.EndQuery(kGL_TIME_ELAPSED);
         e.DeleteQueries(kSlots, queries_);
+        for (auto*& f : fences_) {
+            if (f) gl::DeleteSync(f);
+            f = nullptr;
+        }
     }
     ok_ = false;
     loaded_ = false;
