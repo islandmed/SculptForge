@@ -890,7 +890,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         resetPeakResidentBytes();
         const double t0 = nowSeconds();
         // A project with a preview opens as in the app: the preview shows while another thread reads the rest.
-        if (!s.projectPath.empty() && startOpening(s.projectPath)) {
+        if (!s.projectPath.empty() && !std::getenv("SF_BENCH_FRESH_BVH") && startOpening(s.projectPath)) {
             SizeResult r;
             r.label = s.label;
             r.vramFreeBeforeKb = vramBefore;
@@ -907,7 +907,9 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         r.label = s.label;
         r.triangles = m.micro ? microTriangleCount(m) : m.triangleCount(); // (a micro level: its micro triangles)
         r.vertices = m.vertexCount();
-        BVH* bvh = s.builtBvh && s.builtBvh->nodeCount() ? s.builtBvh.get() : nullptr;
+        // (SF_BENCH_FRESH_BVH=1: build it again in setMesh, as before the loaded one was reused: an A/B for the gate)
+        static const bool fresh = std::getenv("SF_BENCH_FRESH_BVH") && std::string(std::getenv("SF_BENCH_FRESH_BVH")) == "1";
+        BVH* bvh = !fresh && s.builtBvh && s.builtBvh->nodeCount() ? s.builtBvh.get() : nullptr;
         doc_.setMesh(std::move(m), "Benchmark", bvh);
         if (s.builtBvh) *s.builtBvh = BVH();
         r.buildSeconds = nowSeconds() - t0;
