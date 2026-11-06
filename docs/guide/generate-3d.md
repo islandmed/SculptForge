@@ -76,6 +76,7 @@ Which model runs depends on the service:
 | Hugging Face | Hunyuan3D 2 mini Turbo (Tencent), or Hunyuan3D 2 if you chose it in **Model**. Any other choice uses Turbo |
 | fal.ai | Rodin 2.5 (Hyper3D) when it is the chosen **Model** (Rodin 2.5 or Rodin 2.5 Fast), otherwise Hunyuan3D 3.1 Rapid (Tencent) |
 | Meshy | Meshy's own text-to-3D model |
+| Hyper3D Rodin (direct) | Rodin Gen-2.5 at the chosen **Tier** |
 | ComfyUI | The text workflow you choose (the bundled `text-to-3d` uses FLUX.1 schnell and Hunyuan3D 2.1) |
 
 ## Services
@@ -120,7 +121,7 @@ it to refill, or pick another model.
 > in the European Union, the United Kingdom or South Korea. If you work there, choose TRELLIS.2 (free token),
 > Stable Fast 3D or a paid service. Each model has its own licence; read it before using results commercially.
 
-### fal.ai and Meshy (paid)
+### fal.ai, Meshy and Hyper3D (paid)
 
 - **fal.ai**: choose a **Model** (TRELLIS.2, Hunyuan3D 3.1 Pro, Hunyuan3D 3.1 Rapid, Meshy 6, Rodin 2.5 or
   Rodin 2.5 Fast) or type any fal model id into **Model id**. Rodin 2.5 (Hyper3D) works from an image or a
@@ -128,6 +129,12 @@ it to refill, or pick another model.
   low poly (up to about 20K triangles), fine as a blockout before remeshing. Paste your key from fal.ai/dashboard/keys into **API key**, or set
   `FAL_KEY`.
 - **Meshy**: paste your key from meshy.ai (API settings) into **API key**, or set `MESHY_API_KEY`.
+- **Hyper3D Rodin (direct)**: Rodin Gen-2.5 on Hyper3D's own service, from an image or a description. Choose
+  a **Tier** (Extreme Low is the fastest; Extreme High costs more credits) and paste your key from the API
+  dashboard at hyper3d.ai into **API key**, then **Save settings**: the key goes into the system keychain. It
+  stays off until you add a key. Your image or description goes to Hyper3D (api.hyper3d.com) and nowhere else,
+  and SculptForge asks for the shape only (GLB, no materials). Basic API access (Creator plans) covers Extreme
+  Low and Low; the other tiers need Full access.
 
 Generations are billed to your account with that service. Errors such as "The API key was rejected", "Out of
 credits on this account" or "Rate limited" come from the service.

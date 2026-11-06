@@ -1,0 +1,53 @@
+# The input style's keys survive a restart (#147, @Velisariy: Blender style, F showed the Size slider until SculptForge
+# was quit and reopened). ui.json is read before the actions are registered, and the Library's (S Size, M Material,
+# 9 Snapshot) come last: each style's keys reach them anyway, and the artist's own rebinds still win. One ui.json per
+# style, each with one rebind (data/prefs/ui_input_style_*.json).
+
+# --- Blender: F is the Size slider, M the Mask brush, no Material key; the rebound Snapshot key stays.
+restart data/prefs/ui_input_style_blender.json
+wait 0.2
+run new_sphere
+expect_value input_style == 2
+expect_shortcut ui.size_popup F
+expect_shortcut ui.picker.material
+expect_shortcut mask.brush M
+expect_shortcut view.frame Home
+expect_shortcut brush.smooth S
+expect_shortcut file.quicksave Ctrl+Alt+9
+expect_value shortcut_conflicts == 0
+hover_window 0.5 0.5
+key f
+expect_value size_popup_open == 1
+key escape
+expect_value size_popup_open == 0
+
+# --- Classic sculpting keys: S Size (rebound here: Ctrl+Alt+S), M Material, 9 Snapshot.
+restart data/prefs/ui_input_style_classic.json
+wait 0.2
+expect_value input_style == 0
+expect_shortcut ui.size_popup Ctrl+Alt+S
+expect_shortcut ui.picker.material M
+expect_shortcut file.quicksave 9
+expect_shortcut view.frame F
+expect_value shortcut_conflicts == 0
+
+# --- SculptForge: S Size, 1-0 brushes, no Snapshot key; the rebound Material key stays.
+restart data/prefs/ui_input_style_sculptforge.json
+wait 0.2
+expect_value input_style == 1
+expect_shortcut ui.size_popup S
+expect_shortcut ui.picker.material Ctrl+Alt+M
+expect_shortcut file.quicksave
+expect_shortcut brush.standard 1
+expect_value shortcut_conflicts == 0
+
+# --- Maya: the Classic sculpting keys plus Alt+F; the rebound Reset view key stays.
+restart data/prefs/ui_input_style_maya.json
+wait 0.2
+expect_value input_style == 3
+expect_shortcut ui.size_popup S
+expect_shortcut ui.picker.material M
+expect_shortcut file.quicksave 9
+expect_shortcut view.frame_selected Alt+F / Numpad .
+expect_shortcut view.reset Ctrl+Alt+H
+expect_value shortcut_conflicts == 0

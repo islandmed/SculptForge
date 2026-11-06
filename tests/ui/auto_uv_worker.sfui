@@ -1,0 +1,51 @@
+# Auto UV never holds up a frame: xatlas takes seconds on a big sculpt (10 s at 327k triangles on the PC when the
+# uv_auto command ran on the main thread: the stall slowtests saw "after texture_create"). The command from a
+# script, the console or an AI tool works on the same worker as the Auto UV button: the Texture Map panel shows its
+# progress with Cancel, frames keep drawing, and the next statement waits for the UVs.
+run new_sphere subdivisions=6
+expect_value triangles > 80000
+click "Texture Map##tool.texture"
+expect_value uvs == 0
+
+# The button: progress and Cancel while it works. Cancel takes effect at once (xatlas itself only stops between its
+# stages: the job is dropped) and leaves the Part without UVs.
+click "Texture Map/Auto UV"
+expect_value auto_uv_running == 1
+expect "Texture Map/Cancel##autouv"
+shot auto-uv-progress
+click "Texture Map/Cancel##autouv"
+wait_value auto_uv_running == 0 1
+expect_value uvs == 0
+expect_status "cancelled"
+
+# The command (a script line): frames keep drawing while it unwraps (under 100 ms; CI and parallel ctest runs get
+# timeLimit()'s slack), and texture_create after it finds the UVs.
+remember time_limit_scale scale
+run new_sphere subdivisions=5
+wait 0.3
+remember longest_frame_ms ignored
+run uv_auto resolution=1024
+expect_value uvs == 1
+expect_status "UV islands"
+run texture_create size=1024
+wait 0.3
+expect_value longest_frame_ms < $scale*100
+expect_value texture_size == 1024
+
+# The console: the line's next statement waits for the worker too.
+run new_sphere subdivisions=5
+key backtick
+expect_value console_open == 1
+click "Console/Clear console"
+wait 0.3
+remember longest_frame_ms ignored2
+type Console/##console "uv_auto resolution=1024; texture_create size=1024"
+key enter
+expect_value auto_uv_running == 1
+wait_value auto_uv_running == 0 120
+wait_value texture_size == 1024 10
+expect_value longest_frame_ms < $scale*100
+expect_text "UV islands"
+expect_text "New 1K texture"
+wait 0.2
+shot console

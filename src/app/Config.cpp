@@ -761,6 +761,7 @@ void App::initActions() {
     // the same id and own P (Paint), the symmetry toggles and Tab.
     registerShellActions();
     registerTextureUiActions(); // Tool > Texture Map, the Vertex / Texture paint target (PanelTexture.cpp)
+    registerLineGradientActions(); // Color > Line Gradient (LineGradient.cpp)
     registerPbrUiActions();     // material channels, solo view, map export (PanelPbr.cpp)
     registerGizmoActions();     // Q W E R: Draw, and the Transform gizmo's Move, Scale, Rotate (Gizmo.cpp)
     registerBakeUiActions();    // Tool > Bake (PanelBake.cpp)
@@ -978,6 +979,7 @@ void App::restartPrefsForTest(const std::string& uiJson) {
     std::string err;
     if (fileExists(uiConfigPath()) && !readUiConfig(uiConfigPath(), err, true)) status_ = err;
     applyInputStyle();
+    registerLibraryActions(); // as at a start: registered after the style is applied (#147)
     layoutBaseline_ = layoutKey();
     prefsSavedKey_ = prefsKey();
     prefsSaveAt_ = 0.0;
@@ -1306,6 +1308,7 @@ void App::drawHelpConsoleUi() {
             }
         }
     }
+    console_.update(*this);
     console_.watchStatus(status_);
     if (layout_.consoleOpen) console_.draw(*this, consoleRect());
     palette_.draw(*this, paletteArea());

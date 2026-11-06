@@ -1,0 +1,30 @@
+# Part folders (#96) in Simplified Chinese: the folder menu, a Part's Folder submenu and a folded row with a long
+# Chinese folder name, drawn with the CJK font (no "?" for a missing glyph). Labels keep their "##" ids.
+run new_sphere subdivisions=3 ; part_rename to=Head
+run part_append type=sphere ; part_rename to="Left eye" ; transform scale=0.25 pivot=origin translate=-0.65,0.3,0.85
+run part_append type=sphere ; part_rename to="Right eye" ; transform scale=0.25 pivot=origin translate=-0.05,0.3,0.85
+run part_folder_new folder=左眼和右眼的细节 ; part_set_folder name="Left eye" folder=左眼和右眼的细节
+key f
+click "Edit##menu.edit"
+click "Preferences##section.preferences"
+click "Interface##preferences.interface"
+click "简体中文##language.zh-CN"
+expect_text "语言"
+key escape
+wait 0.3
+expect "左眼和右眼的细节##folder"
+shot zh-folder-open
+run part_folder_collapse folder=左眼和右眼的细节
+expect_not "Left eye"
+shot zh-folded-long-name
+run part_folder_collapse folder=左眼和右眼的细节
+right_click "左眼和右眼的细节##folder"
+expect_text "用操纵器移动"
+expect_text "删除文件夹（保留其中的部件）"
+shot zh-folder-menu
+key escape
+wait 0.5
+right_click "Head"
+click "文件夹"
+expect_text "新建文件夹"
+shot zh-part-folder-menu

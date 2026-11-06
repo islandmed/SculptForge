@@ -701,6 +701,20 @@ constexpr Entry kTraditionalChinese[] = {
     {"Fill", "填滿"},
     {"Fill layer", "填滿圖層"},
     {"Fill masked", "填滿遮罩區域"},
+    {"Line Gradient", "線性漸層"},
+    {"End", "終點"},
+    {"Swap", "交換"},
+    {"Drag a line across the model.", "在模型上拖曳一條線。"},
+    {"Drag its ends to adjust. Enter keeps it, Esc takes it back.", "拖曳兩端即可調整。Enter 保留，Esc 撤回。"},
+    {"Swap the paint colour and the End colour.", "交換繪製顏色與終點顏色。"},
+    {"The colour at the end of the line. The start is the paint colour above.",
+     "線條終點的顏色。起點是上方的繪製顏色。"},
+    {"Fade the paint colour out instead: the paint underneath shows through towards the end of the line.",
+     "改為讓繪製顏色淡出：越接近線條終點，底下原有的顏色越明顯。"},
+    {"Drag a line across the model: the paint colour at its start runs into the End colour (or fades to "
+     "clear) at its end, in screen space, into vertex paint or the texture. Drag either end to adjust it; "
+     "Enter keeps it, Esc takes it back. Respects the mask; one undo step.",
+     "在模型上拖曳一條線：起點的繪製顏色會在終點漸變為終點顏色（或淡出），依螢幕空間計算，畫入頂點繪製或貼圖。拖曳任一端即可調整；Enter 保留，Esc 撤回。遵守遮罩；一個復原步驟。"},
     {"Fill the unmasked area (the whole mesh if nothing is masked)", "填滿未遮罩區域（若沒有任何遮罩，則填滿整個網格）"},
     {"Cavity", "凹陷"},
     {"Darken creases and cavities (respects the mask)", "加深皺褶與凹陷（遵循遮罩）"},
@@ -1139,6 +1153,17 @@ constexpr Entry kTraditionalChinese[] = {
     {"Masked parts stay where they are and partly masked parts move partly (on by default). Off: the whole Part moves "
      "whatever the mask.",
      "遮罩部分維持原位，部分遮罩的區域則部分移動（預設開啟）。關閉：無論遮罩如何，整個部件都會移動。"},
+    {"Folder", "資料夾"},
+    {"Hide its Parts", "隱藏其中的部件"},
+    {"Show its Parts", "顯示其中的部件"},
+    {"Move with the gizmo", "用操縱器移動"},
+    {"New folder", "新增資料夾"},
+    {"New folder with the active Part (drag Parts onto a folder to add them)", "以目前部件新增資料夾（將部件拖到資料夾上即可加入）"},
+    {"Out of the folder", "移出資料夾"},
+    {"Remove folder (keep its Parts)", "移除資料夾（保留其中的部件）"},
+    {"Click to open, double-click to rename, drag Parts onto it", "按一下展開，按兩下重新命名，可將部件拖到這裡"},
+    {"Click to fold, double-click to rename, drag Parts onto it", "按一下摺疊，按兩下重新命名，可將部件拖到這裡"},
+    {"Transform the visible Parts in the active Part's folder together (Parts list folders). Each Part gets its own undo step.", "一起變換目前部件所在資料夾中的可見部件（部件清單中的資料夾）。每個部件各有自己的復原步驟。"},
     {"Transform every visible Part together. Each Part gets its own undo step.",
      "一起變換所有可見部件。每個部件各有自己的復原步驟。"},
     {"Where the gizmo sits: rotation and scaling turn about this point. It follows the centre of what moves until you "
@@ -2394,16 +2419,22 @@ constexpr Entry kTraditionalChinese[] = {
     {"Unwrap with the chosen method: the selected faces (fitted where they were), or the whole Part (packed). Least "
      "Stretch keeps angles and lengths along the marked seams; Conformal keeps angles; By Face Groups cuts along the "
      "face group borders too; Planar projects each piece; Unfold flattens the current islands again in place, "
-     "keeping pins; Auto Seams finds its own. Closed pieces get cut automatically. Big meshes unwrap in the "
-     "background.",
+     "keeping pins; Auto Seams finds its own. Closed pieces get cut automatically. Runs in the background (Cancel "
+     "under the view stops it).",
      "以所選方法展開：所選的面（在原位擬合），或整個部件（並排列）。Least Stretch 沿標記的接縫保留角度與長度；"
      "Conformal 保留角度；By Face Groups 也沿面群組邊界切割；Planar 投射每個區塊；Unfold 在原位重新攤平目前的島並保留"
-     "釘選；Auto Seams 自行找出接縫。封閉的區塊會自動切開。大型網格會在背景中展開。"},
+     "釘選；Auto Seams 自行找出接縫。封閉的區塊會自動切開。在背景中執行（檢視下方的取消可停止）。"},
     {"Pack", "排列"},
     {"Pack the selected islands (or all) as large as they fit into the 0-1 tile, or across the Columns x Rows grid of "
-     "UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them.",
+     "UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them. "
+     "Runs in the background (Cancel under the view stops it).",
      "將所選的島（或全部）以能放下的最大尺寸排列到 0-1 圖塊，或排列到欄數 x 列數的 UDIM 圖塊格中：旋轉到最小外框，縮"
-     "放到相同紋素密度，並保留其間的邊距。"},
+     "放到相同紋素密度，並保留其間的邊距。在背景中執行（檢視下方的取消可停止）。"},
+    {"Packing...", "正在排列..."},
+    {"Packing: %d%%", "正在排列：%d%%"},
+    {"Unwrapping...", "正在展開..."},
+    {"Unwrapping: %d%%", "正在展開：%d%%"},
+    {"Stop the Unwrap or Pack that is running; the UVs stay as they are.", "停止正在執行的展開或排列；UV 維持原樣。"},
     {"Mark Seam", "標記接縫"},
     {"Mark the selected edges (or the border of the selected faces) as seams: Unwrap cuts there.",
      "將所選的邊（或所選面的邊界）標記為接縫：展開時會在此切開。"},
@@ -3189,6 +3220,10 @@ constexpr Entry kTraditionalChinese[] = {
     {"AI tools may use only the kinds of command your studio allows.", "AI 工具只能使用你的工作室允許的指令類型。"},
     {"AI tools work on their own scene; your studio doesn't let them control this window.", "AI 工具在自己的場景中運作；你的工作室不允許它們控制這個視窗。"},
     {"API key", "API 金鑰"},
+    {"Tier", "等級"},
+    {"Off until you add your own key: hyper3d.ai > API dashboard (a Creator plan or higher).", "在你加入自己的金鑰前保持關閉：hyper3d.ai > API dashboard（需 Creator 或更高方案）。"},
+    {"Using your key from the system keychain.", "正在使用系統鑰匙圈中的金鑰。"},
+    {"Sends your image or description to Hyper3D (api.hyper3d.com), which builds the model. Each generation is billed to your Hyper3D account. Basic API access covers Extreme Low and Low.", "將你的圖片或描述傳送到 Hyper3D（api.hyper3d.com）建立模型。每次生成都由你的 Hyper3D 帳號計費。基本 API 存取包含 Extreme Low 與 Low。"},
     {"Audit log", "稽核記錄"},
     {"Connecting...", "連線中..."},
     {"Copy code", "複製代碼"},

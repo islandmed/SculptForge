@@ -22,6 +22,7 @@
 #include "core/AuditLog.h"
 #include "core/Keychain.h"
 #include "core/ManagedPolicy.h"
+#include "ai/Hyper3D.h"
 #include "ai/Providers.h"
 #include "app/Demo.h"
 #include "app/Shell.h"
@@ -1751,6 +1752,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     if (button == SDL_BUTTON_LEFT) {
         if (axisGizmoMouseDown(x, y)) return;   // the axis gizmo's ends snap to a side view (#43)
         if (forgesphereMouseDown(x, y, mod)) return; // a Forge Sphere Part takes clicks on it (PanelForge Spheres.cpp)
+        if (gradientMouseDown(x, y, nav)) return; // Line Gradient: a new line or an end handle (LineGradient.cpp)
         if (facegroupMouseDown(x, y, mod)) return;
         if (maskSelectMouseDown(x, y, mod)) return;
         if (gizmoMouseDown(x, y, mod)) return; // Transform gizmo handles, pivot clicks (Gizmo.cpp)
@@ -1929,6 +1931,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::UvTool: uvToolDragTo(x, y); break;
     case Drag::Sculptable: sculptableMouseMove(x, y); break;
     case Drag::Capture: captureMouseMove(x, y); break;
+    case Drag::Gradient: gradientMouseMove(x, y); break;
     case Drag::ForgeSphere: forgesphereDragTo(x, y); break;
     case Drag::AirStroke: airStrokeTo(x, y); break;
     case Drag::QuickRemesh: break; // (remeshes when let go)
@@ -2067,6 +2070,7 @@ void App::onMouseUp() {
     if (drag_ == Drag::UvTool) uvToolRelease();
     if (drag_ == Drag::Sculptable) sculptableMouseUp();
     if (drag_ == Drag::Capture) captureMouseUp();
+    if (drag_ == Drag::Gradient) gradientMouseUp();
     if (drag_ == Drag::ForgeSphere) forgesphereRelease();
     if (drag_ == Drag::AirStroke) airStrokeRelease();
     gizmoRelease();
@@ -2077,6 +2081,7 @@ void App::onMouseUp() {
 
 void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
     if (cutPolylineKey(key)) return; // Enter ends a Cut Polyline, Esc drops it (PanelCut.cpp)
+    if (gradientKey(key)) return;    // Enter keeps a Line Gradient, Esc takes it back (LineGradient.cpp)
     if (key == SDLK_ESCAPE && radial_.menu >= 0) {
         closeRadialMenu();
         return;
@@ -2606,7 +2611,9 @@ void App::runCommand(const std::string& name, const Args& args) {
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
     crashlog::action(name); // (failures reach the log through SDL_Log below)
     const auto commandStart = std::chrono::steady_clock::now();
-    CommandResult r = commands_.execute(doc_, name, args);
+    // Auto UV unwraps on a worker (seconds on big meshes): the frame never waits for it. A running macro keeps the
+    // synchronous command, as its next steps read the UVs at once.
+    CommandResult r = name == "uv_auto" && macros_.runDepth == 0 ? startAutoUvCommand(args) : commands_.execute(doc_, name, args);
     if (perftrace::on()) { // a command that held up the frames (remesh, Divide, micro, open...)
         const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - commandStart).count();
         if (ms > perf_.traceLongMs) {
@@ -2938,6 +2945,7 @@ void App::drawUi() {
     drawSplatTrainOverlay(); // splat training progress (PanelSplatTrain.cpp)
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
     drawCaptureOverlay();    // Capture from view: the square, the result window (PanelKelvinlet.cpp)
+    drawGradientOverlay();   // Line Gradient: the line and its end handles (LineGradient.cpp)
     if (uiPrefs_.showAxes) drawAxisGizmo(); // X / Y / Z in the canvas corner (#31)
     if (uiPrefs_.showViewFigure) drawViewFigure();
     drawAirStrokeIndicator(); // Start strokes off the model is on (#62, Input.cpp)
@@ -2958,6 +2966,7 @@ void App::drawUi() {
     if (!sliderRing) sizeRingPreview_ = false;
     if (((!ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y)) || drag_ == Drag::Stroke || sliderRing) &&
         !hideBrushCursor_ && radial_.menu < 0 && !strokePopup_.open && drag_ != Drag::Select && drag_ != Drag::Guide && // (no ring under a pie or the stroke popup)
+        (!gradient_.armed || ctrlDown(inputMods()) || (inputMods() & SDL_KMOD_SHIFT)) && // (nor while a Line Gradient takes the drags)
         aiLinkStateValue() != 2 && aiLinkStateValue() != 4 && // (nor over a live-mode question: it is drawn above windows)
         (!ringOff || drag_ == Drag::Stroke || ctrlDown(inputMods())) &&
         (drag_ == Drag::Stroke || !overViewNavigator(mouse.x, mouse.y))) // (nor over the corner axes: a click there navigates)
@@ -3592,6 +3601,7 @@ void App::startGenerator() {
     aiSettings_.falKey = falKey_;
     aiSettings_.falModel = falModel_;
     aiSettings_.meshyKey = meshyKey_;
+    aiSettings_.hyper3dKey = hyper3dKey_;
     aiSettings_.hfToken = hfToken_;
     aiSettings_.comfyUrl = comfyUrl_;
     // With no workflow chosen, ComfyUI runs the bundled one the panel shows (not saved, so updates reach it).
@@ -3641,6 +3651,13 @@ void App::pollGenerator() {
     GeneratedModel g = pendingGenerator_.get();
     const ai::GeneratorResult& r = g.result;
     const std::string note = r.note.empty() ? std::string() : " - " + r.note;
+    struct PrivateDir { // (Hyper3D: the downloaded file's own folder, gone once the model is in)
+        std::string path;
+        ~PrivateDir() {
+            std::error_code ec;
+            if (!path.empty()) std::filesystem::remove_all(std::filesystem::path(std::u8string(path.begin(), path.end())), ec);
+        }
+    } privateDir{r.privateDir};
     if (!r.ok) {
         status_ = "Image to 3D failed: " + r.error + note;
         return;
@@ -3846,8 +3863,9 @@ void App::drawImageTo3D() {
                    : "Builds the whole model - limbs, face, back - from one picture with a reconstruction model, then "
                      "makes it sculptable. Characters on a transparent background work best.");
     static const char* services[] = {"Hugging Face - free models", "fal.ai - paid, your key", "Meshy - paid, your key",
-                                     "ComfyUI - your server", "My generator command", "Offline blockout (inflate silhouette)"};
-    static const char* serviceIds[] = {"huggingface", "fal", "meshy", "comfyui", "command", "inflate"};
+                                     "Hyper3D Rodin (direct) - paid, your key", "ComfyUI - your server", "My generator command",
+                                     "Offline blockout (inflate silhouette)"};
+    static const char* serviceIds[] = {"huggingface", "fal", "meshy", "hyper3d", "comfyui", "command", "inflate"};
     constexpr int kServices = int(std::size(serviceIds));
     int service = 0;
     for (int i = 0; i < kServices; ++i)
@@ -3855,6 +3873,10 @@ void App::drawImageTo3D() {
     ImGui::SetNextItemWidth(-1);
     if (ImGui::Combo("##service", &service, services, kServices)) aiSettings_.generatorService = serviceIds[service];
     const std::string serviceId = serviceIds[service];
+    if (std::string why; serviceId != "inflate" && !policy::aiProviderAllowed(serviceId, &why)) { // (studio policy)
+        ui::ManagedBadge();
+        hint(why.c_str());
+    }
     ImGui::PushItemWidth(-labelW);
     if (serviceId == "huggingface") {
         const auto& presets = ai::hfPresets();
@@ -3901,6 +3923,24 @@ void App::drawImageTo3D() {
         ImGui::InputText("API key", meshyKey_, sizeof meshyKey_, ImGuiInputTextFlags_Password);
         if (!meshyKey_[0])
             hint(std::getenv("MESHY_API_KEY") ? "Using MESHY_API_KEY from the environment." : "Get a key at meshy.ai (API settings)");
+    } else if (serviceId == "hyper3d") {
+        const auto& tiers = ai::hyper3d::tiers();
+        const std::string tier = ai::hyper3d::resolvedTier(aiSettings_.hyper3dTier);
+        const char* preview = tiers[0].label;
+        for (const auto& t : tiers)
+            if (tier == t.id) preview = t.label;
+        if (ImGui::BeginCombo(tr("Tier"), preview)) {
+            for (const auto& t : tiers)
+                if (ImGui::Selectable(t.label, tier == t.id)) aiSettings_.hyper3dTier = t.id;
+            ImGui::EndCombo();
+        }
+        ImGui::InputText(tr("API key##hyper3d"), hyper3dKey_, sizeof hyper3dKey_, ImGuiInputTextFlags_Password);
+        if (!hyper3dKey_[0])
+            hint(aiSettings_.resolvedHyper3dKey().empty()
+                     ? tr("Off until you add your own key: hyper3d.ai > API dashboard (a Creator plan or higher).")
+                     : tr("Using your key from the system keychain."));
+        hint(tr("Sends your image or description to Hyper3D (api.hyper3d.com), which builds the model. Each generation "
+                "is billed to your Hyper3D account. Basic API access covers Extreme Low and Low."));
     } else if (serviceId == "comfyui") {
         drawComfyUi();
     } else if (serviceId == "command") {
@@ -3948,6 +3988,7 @@ void App::drawImageTo3D() {
         aiSettings_.falKey = falKey_;
         aiSettings_.falModel = falModel_;
         aiSettings_.meshyKey = meshyKey_;
+        aiSettings_.hyper3dKey = hyper3dKey_;
         aiSettings_.hfToken = hfToken_;
         aiSettings_.comfyUrl = comfyUrl_;
         std::string err;

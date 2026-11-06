@@ -128,7 +128,18 @@ void Console::echo(const std::string& statement, const CommandResult& result, co
 void Console::watchStatus(const std::string& status) {
     if (status == lastStatus_) return;
     lastStatus_ = status;
-    if (!status.empty()) print(Kind::Status, status);
+    if (status.empty()) return;
+    // A job's progress ("Auto UV: 42%") updates its line instead of adding one per percent.
+    const auto progressPrefix = [](const std::string& s) {
+        const size_t sp = s.find_last_of(' ');
+        return !s.empty() && s.back() == '%' && sp != std::string::npos ? s.substr(0, sp) : std::string();
+    };
+    if (const std::string prefix = progressPrefix(status);
+        !prefix.empty() && !lines_.empty() && lines_.back().kind == Kind::Status && progressPrefix(lines_.back().text) == prefix) {
+        lines_.back().text = status;
+        return;
+    }
+    print(Kind::Status, status);
 }
 
 void Console::clear() {
@@ -218,15 +229,42 @@ void Console::runLine(App& app, const std::string& raw) {
         print(Kind::Error, line + "   -> " + err);
         return;
     }
-    for (const auto& st : statements) {
+    runStatements(app, std::move(statements), 0, false);
+}
+
+// Runs statements[from...]; a command that works on a worker (uv_auto) holds the rest until its result is in
+// (update()), as later statements usually depend on it.
+void Console::runStatements(App& app, std::vector<ScriptStatement> statements, size_t from, bool file) {
+    for (size_t i = from; i < statements.size(); ++i) {
+        const ScriptStatement& st = statements[i];
         if (!app.commands_.find(st.command)) {
-            print(Kind::Error, formatStatement(st.command, st.args) + "   -> Unknown command '" + st.command +
-                                   "' (Tab completes, help lists them)");
+            if (file) print(Kind::Error, "Line " + std::to_string(st.line) + ": unknown command '" + st.command + "' - stopped");
+            else
+                print(Kind::Error, formatStatement(st.command, st.args) + "   -> Unknown command '" + st.command +
+                                       "' (Tab completes, help lists them)");
             return;
         }
         app.runCommand(st.command, st.args); // echoes itself
-        if (!app.lastCommandOk_) return;      // later statements usually depend on this one
+        if (!app.lastCommandOk_) {            // later statements usually depend on this one
+            if (file) print(Kind::Error, "Line " + std::to_string(st.line) + " failed - stopped");
+            return;
+        }
+        if (app.commandRunning()) {
+            if (i + 1 < statements.size()) resume_ = Resume{std::move(statements), i + 1, file};
+            return;
+        }
     }
+}
+
+void Console::update(App& app) {
+    if (!resume_ || app.commandRunning()) return;
+    Resume r = std::move(*resume_);
+    resume_.reset();
+    if (CommandResult done; app.takeCommandResult(done) && !done.ok) {
+        if (r.file) print(Kind::Error, "Line " + std::to_string(r.statements[r.next - 1].line) + " failed - stopped");
+        return;
+    }
+    runStatements(app, std::move(r.statements), r.next, r.file);
 }
 
 void Console::runFile(App& app, const std::string& path) {
@@ -243,17 +281,7 @@ void Console::runFile(App& app, const std::string& path) {
         return;
     }
     print(Kind::Info, "Running " + fsPath(path).filename().string() + " (" + std::to_string(statements.size()) + " statements)");
-    for (const auto& st : statements) {
-        if (!app.commands_.find(st.command)) {
-            print(Kind::Error, "Line " + std::to_string(st.line) + ": unknown command '" + st.command + "' - stopped");
-            return;
-        }
-        app.runCommand(st.command, st.args);
-        if (!app.lastCommandOk_) {
-            print(Kind::Error, "Line " + std::to_string(st.line) + " failed - stopped");
-            return;
-        }
-    }
+    runStatements(app, std::move(statements), 0, true);
 }
 
 void Console::queueScriptFile(std::string path) {

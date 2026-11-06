@@ -40,18 +40,20 @@ inline Document makeDoc(Mesh m) {
     return d;
 }
 
-// `sculptforge_tests --shard K/N` (tests/test_main.cpp) runs the tests whose name hashes (FNV-1a) to K modulo N: every
-// test is in exactly one of the N shards, a test stays in its shard when others are added, and the slow tests of one
-// file (registered next to each other) don't all land in the same shards, as they did by registration index: CI
-// runs every other shard on one machine (ctest -I K,,N), and that machine got all the slow ones.
+// `sculptforge_tests --shard K/N` (tests/test_main.cpp) runs shard K of N; every test is in exactly one of the N
+// shards (sf::test::inShard). Shards are balanced by time, not by count: the tests in tests/shard_times.inc (the
+// slow ones, seconds measured on the PC; tools/test/shard_times.py writes it) go longest first to the shard with the
+// least work so far (the time-ordered greedy pass), after every other test is placed by its name's hash (FNV-1a), so
+// a quick test stays in its shard when others are added and the slow tests of one file don't land together (CI runs
+// every other shard on one machine, ctest -I K,,N; by registration index that machine got all the slow ones).
 inline std::uint32_t shardHash(const char* name) {
     std::uint32_t h = 2166136261u;
     for (const char* c = name; *c; ++c) h = (h ^ std::uint8_t(*c)) * 16777619u;
     return h ^ (h >> 16); // the low bits of FNV-1a alone follow the last character too closely
 }
-inline bool inShard(const char* name, int shard, int shards) {
-    return shards <= 1 || shardHash(name) % std::uint32_t(shards) == std::uint32_t(shard);
-}
+// A shard's expected seconds for each of N shards (tests/test_main.cpp), and inShard from it.
+std::vector<double> shardSeconds(int shards);
+bool inShard(const char* name, int shard, int shards);
 
 // A wall-clock limit for a speed check: the value given on a developer machine, four times that on a CI runner
 // (CI or GITHUB_ACTIONS set: shared, often loaded virtual machines, where Windows runners have flaked at 1.1x), and

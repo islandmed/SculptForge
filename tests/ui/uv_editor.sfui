@@ -73,10 +73,16 @@ remember uv_tiles grid
 expect_value uv_pack_columns == 4
 expect_value uv_pack_rows == 3
 shot udim-4x3
-# The Pack button packs with the fields: still 4 x 3.
+# The Pack button packs with the fields: still 4 x 3, on a worker thread (the window keeps drawing; Cancel under
+# the view), landing as one undo step with uv_pack's status line.
 click "UV Editor/Pack##uv.pack"
+wait_value uv_packs >= 1 60
+expect_value uv_unwrapping == 0
 expect_value uv_tiles == $grid
 expect_value uv_max_u <= 4
+expect_status "UDIM tiles"
+expect_value uv_pack_columns == 4
+shot pack-button
 run uv_pack tiles=1
 expect_value uv_tiles == 1
 expect_value uv_pack_columns == 1

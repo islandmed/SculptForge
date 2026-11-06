@@ -200,10 +200,12 @@ struct UvPackResult {
     float coverage = 0.0f; // UV area of the islands over the area of the tiles used
     float density = 0.0f;  // texel density after packing (the mean)
 };
+using UvProgress = std::function<bool(float fraction)>; // false: cancel
 // Packs the islands in `islands` (all when empty) of `mesh` per `options`. Islands not packed stay where they
-// are (and may then overlap the packed ones). False with `error` when nothing could be packed.
+// are (and may then overlap the packed ones). False with `error` when nothing could be packed, or "Cancelled"
+// when `progress` returned false (the UVs are then as they were). `progress` is called on the calling thread.
 bool uvPack(Mesh& mesh, const UvTopology& topo, const std::vector<uint8_t>& islands, const UvPackOptions& options,
-            UvPackResult& result, std::string& error);
+            UvPackResult& result, std::string& error, const UvProgress& progress = {});
 
 // Lower-level packing of rectangles into unit tiles (exposed for the tests): sizes in, positions and 90-degree
 // turns out; returns the tiles used (0 when something doesn't fit even alone). Rectangles already include
@@ -240,7 +242,6 @@ struct UvUnwrapResult {
     size_t extraCuts = 0;       // edges cut automatically so closed or looped pieces could flatten
     UvPackResult packing;
 };
-using UvProgress = std::function<bool(float fraction)>; // false: cancel
 // Unwraps `mesh` (its UVs, seams and pins are read; nothing is written). False with `error` on failure or cancel.
 bool uvUnwrap(const Mesh& mesh, const UvUnwrapOptions& options, UvUnwrapResult& result, std::string& error,
               const UvProgress& progress = {});

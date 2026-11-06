@@ -51,7 +51,16 @@ std::vector<uint32_t> targetCorners(const Document& doc, const UvTopology& topo)
     return all;
 }
 
-UvPackOptions packOptions(const Document& doc, const Args& a) {
+// A fit pack that left part of the grid empty says why first (the status line may cut the rest off).
+std::string gridNote(const UvPackResult& p, const UvPackOptions& o) {
+    if (o.density > 0.0f || o.tiles <= 1 || p.tilesUsed <= 0 || p.tilesUsed >= o.tiles) return {};
+    return std::to_string(p.tilesUsed) + " of " + std::to_string(o.tiles) +
+           " tiles used: the largest island limits the scale; Pack at Density fills more. ";
+}
+
+} // namespace
+
+UvPackOptions uvPackOptions(const Document& doc, const Args& a) {
     UvPackOptions o;
     o.resolution = resolutionArg(doc, a);
     o.marginPx = float(std::clamp(argNumber(a, "margin", 8.0), 0.0, 256.0));
@@ -69,22 +78,13 @@ UvPackOptions packOptions(const Document& doc, const Args& a) {
     return o;
 }
 
-// A fit pack that left part of the grid empty says why first (the status line may cut the rest off).
-std::string gridNote(const UvPackResult& p, const UvPackOptions& o) {
-    if (o.density > 0.0f || o.tiles <= 1 || p.tilesUsed <= 0 || p.tilesUsed >= o.tiles) return {};
-    return std::to_string(p.tilesUsed) + " of " + std::to_string(o.tiles) +
-           " tiles used: the largest island limits the scale; Pack at Density fills more. ";
-}
-
-std::string packNote(const UvPackResult& p, const UvPackOptions& o) {
+std::string uvPackNote(const UvPackResult& p, const UvPackOptions& o) {
     std::string s = gridNote(p, o) + plural(p.islands, "island") + " packed";
     if (p.tilesUsed > 1) s += " into " + std::to_string(p.tilesUsed) + " UDIM tiles";
     s += ", " + fmt("%.0f", double(p.coverage) * 100.0) + "% of the space used, " + fmt("%.1f", double(p.density)) +
          " texels per unit";
     return s;
 }
-
-} // namespace
 
 UvEditStep::UvEditStep(Document& doc, std::string label, bool keepTexture) : doc_(doc), texture_(keepTexture && hasTexture(doc.mesh)) {
     if (texture_) record_ = captureTexture(doc.mesh, label);
@@ -168,7 +168,7 @@ void registerUvCommands(CommandRegistry& reg) {
                      return {false, "method must be isometric, conformal, facegroups, planar, unfold or auto"};
                  o.resolution = resolutionArg(doc, a);
                  o.iterations = std::clamp(int(argNumber(a, "iterations", 10)), 0, 100);
-                 o.packing = packOptions(doc, a);
+                 o.packing = uvPackOptions(doc, a);
                  o.pack = argBool(a, "pack", o.method != UvUnwrapMethod::Unfold);
                  const bool haveSel = doc.uvSelection.valid(m) && !doc.uvSelection.empty();
                  std::vector<uint8_t> faces;
@@ -221,10 +221,10 @@ void registerUvCommands(CommandRegistry& reg) {
                  UvEditStep edit(doc, "Pack UVs", argBool(a, "keep_texture", true));
                  UvPackResult r;
                  std::string err;
-                 const UvPackOptions po = packOptions(doc, a);
+                 const UvPackOptions po = uvPackOptions(doc, a);
                  if (!uvPack(m, topo, islands, po, r, err)) return {false, err};
                  const std::string note = edit.commit();
-                 return {true, packNote(r, po) + note};
+                 return {true, uvPackNote(r, po) + note};
              }});
 
     reg.add({"uv_seam",

@@ -78,6 +78,7 @@ case "\$*" in
   "api repos/islandmed/SculptForge/actions/runs/77/artifacts"*)
     python3 -c 'import json; print(json.dumps({"artifacts": [{"name": n} for n in "linux-x86_64 linux-arm64 flatpak-x86_64 flatpak-aarch64 vfx-vfx2026-x86_64 vfx-vfx2026-arm64 vfx-vfx2027-x86_64 vfx-vfx2027-arm64 macos windows staged-sums".split()]}))' ;;
   "api repos/islandmed/SculptForge/git/ref/tags/"*) exit 1 ;; # not pushed yet
+  "api repos/islandmed/sculptforge-brushes/git/trees/main"*) python3 "$S/repo/tools/brush-gallery/check_published.py" --tree-json ;; # (published as is)
   "run list"*) echo 7 ;;
   "run view"*"-q .status"*) echo completed ;;
   "run view"*"-q .conclusion"*) echo success ;;

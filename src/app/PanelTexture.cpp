@@ -184,17 +184,32 @@ void App::startNewTexture() {
     runCommand("texture_create", {{"size", std::to_string(kSizes[std::clamp(textureSizeChoice_, 0, 3)])}});
 }
 
-void App::startAutoUv() {
+CommandResult App::startAutoUvCommand(const Args& a) {
+    if (doc_.mesh.triangleCount() == 0) return {false, "There is no mesh to unwrap"};
+    if (autoUv_) return {false, "Auto UV is already running"};
+    // (resolution as the core command reads it: core/TextureCommands.cpp)
+    const int res = a.contains("resolution") ? int(argNumber(a, "resolution", kDefaultTextureSize))
+                    : doc_.mesh.texture       ? std::max(doc_.mesh.texture->width, doc_.mesh.texture->height)
+                                              : kDefaultTextureSize;
+    startAutoUv(res, argBool(a, "keep_texture", true), true);
+    return {true, "Auto UV: unwrapping " + std::to_string(doc_.mesh.triangleCount()) + " triangles in the background"};
+}
+
+void App::startAutoUv(int resolution, bool keepTexture, bool command) {
     if (autoUv_ || doc_.mesh.triangleCount() == 0) return;
+    commandResult_.reset();
     auto job = std::make_unique<AutoUvJob>();
+    job->keepTexture = keepTexture;
+    job->command = command;
     job->progress = std::make_shared<std::atomic<float>>(0.0f);
     job->cancel = std::make_shared<std::atomic<bool>>(false);
     job->result = std::make_shared<AutoUvResult>();
     job->error = std::make_shared<std::string>();
     job->part = doc_.activePartInfo().id;
     job->triangles = doc_.mesh.triangleCount();
-    const int res = doc_.mesh.texture ? std::max(doc_.mesh.texture->width, doc_.mesh.texture->height)
-                                      : kSizes[std::clamp(textureSizeChoice_, 0, 3)];
+    const int res = resolution > 0       ? resolution
+                    : doc_.mesh.texture ? std::max(doc_.mesh.texture->width, doc_.mesh.texture->height)
+                                        : kSizes[std::clamp(textureSizeChoice_, 0, 3)];
     std::promise<bool> promise;
     job->done = promise.get_future();
     std::thread([promise = std::move(promise), positions = doc_.mesh.positions, triangles = doc_.mesh.triangles, res,
@@ -219,15 +234,32 @@ void App::pollAutoUv() {
         runCommand(kind == kExportTexture ? "texture_export" : "texture_import", {{"path", path}});
 
     if (!autoUv_) return;
-    if (autoUv_->done.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+    // Cancel: xatlas only looks at it between its stages (the charts stage is most of the time), so the job is
+    // dropped now; the detached worker owns copies of what it reads and its result goes nowhere.
+    const bool cancelled = autoUv_->cancel->load();
+    if (!cancelled && autoUv_->done.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
         status_ = "Auto UV: " + std::to_string(int(autoUv_->progress->load() * 100.0f)) + "%";
         return;
     }
     if (jobWaitsForStroke()) return; // (the result lands when the stroke ends)
     const std::unique_ptr<AutoUvJob> job = std::move(autoUv_);
     const bool makeTexture = std::exchange(textureAfterAutoUv_, false);
+    // The uv_auto command's result, for whoever waits on it (console, AI link, UI test) and the console's log.
+    auto finish = [&](bool ok, const std::string& message) {
+        status_ = message;
+        if (!job->command) return;
+        commandResult_ = CommandResult{ok, message};
+        console_.print(ok ? Console::Kind::Result : Console::Kind::Error, message);
+        console_.seenStatus(status_);
+        if (!ok) SDL_Log("uv_auto failed: %s", message.c_str());
+    };
+    if (cancelled) {
+        textureAfterAutoUv_ = false;
+        finish(false, "Auto UV was cancelled");
+        return;
+    }
     if (!job->done.get()) {
-        status_ = *job->error;
+        finish(false, *job->error);
         return;
     }
     // The Part it unwrapped may be inactive now, or changed topology meanwhile.
@@ -235,17 +267,22 @@ void App::pollAutoUv() {
     for (int i = 0; i < doc_.partCount(); ++i)
         if (doc_.parts[size_t(i)].id == job->part) index = i;
     if (index < 0 || doc_.partMesh(index).triangleCount() != job->triangles) {
-        status_ = "Auto UV skipped: the mesh changed while it was being unwrapped";
+        finish(false, "Auto UV skipped: the mesh changed while it was being unwrapped");
         return;
     }
     const JobPart part(*this, index);
     Mesh m = doc_.mesh;
     // A painted texture and its layers move onto the new UVs, in the same undo step (core/TextureTransfer.h).
-    const std::string note = setUvsKeepingTexture(m, std::move(job->result->uvs));
+    const std::string note = setUvsKeepingTexture(m, std::move(job->result->uvs), job->keepTexture);
     doc_.replaceMeshUndoable(std::move(m), "Auto UV");
     uvLinesKey_ = 0;
+    uvEditorChanged();
     updateTitle();
     const std::string islands = "Auto UV: " + std::to_string(job->result->charts) + " UV islands";
+    if (job->command) {
+        finish(true, islands + note);
+        return;
+    }
     if (makeTexture && !hasTexture(doc_.mesh)) {
         runCommand("texture_create", {{"size", std::to_string(kSizes[std::clamp(textureSizeChoice_, 0, 3)])}});
         if (hasTexture(doc_.mesh)) status_ = islands + ", new " + std::to_string(doc_.mesh.texture->width / 1024) +
@@ -262,8 +299,10 @@ void App::drawTextureMapContents() {
 
     // Status line: UVs, texture size, where paint goes.
     if (autoUv_) {
-        ImGui::ProgressBar(autoUv_->progress->load(), ImVec2(-1, 0), "Unwrapping...");
+        ImGui::ProgressBar(autoUv_->progress->load(), ImVec2(half, 0), "Unwrapping...");
         ui::HelpText("Auto UV", nullptr, "Unwrapping the Part in the background; you can keep working.", kPath);
+        ImGui::SameLine();
+        if (ImGui::Button(tr("Cancel##autouv"), ImVec2(-1, 0))) autoUv_->cancel->store(true);
     } else if (!m.hasUvs()) {
         ImGui::TextDisabled("No UVs: Auto UV makes them");
     } else if (!hasTexture(m)) {

@@ -75,6 +75,25 @@ See [Generate 3D with your own ComfyUI](comfyui.md).
 
 ## Paid services
 
-fal.ai and Meshy are paid services with their own terms of service and pricing; generations are
-billed to your account with them. Hyper3D Rodin 2.5 runs through fal.ai with your fal.ai key: the
-image or description goes to fal.ai, which runs Rodin; SculptForge never contacts Hyper3D directly. Model availability and names can change on their side.
+fal.ai, Meshy and Hyper3D are paid services with their own terms of service and pricing; generations are
+billed to your account with them. Model availability and names can change on their side.
+
+Hyper3D Rodin 2.5 can run two ways:
+
+- **fal.ai > Rodin 2.5**: with your fal.ai key. The image or description goes to fal.ai, which runs Rodin.
+- **Hyper3D Rodin (direct)**: with your own Hyper3D key, from the API dashboard at hyper3d.ai (a Creator
+  plan or higher; Basic API access covers the Extreme Low and Low tiers, the others need Full access). The
+  image or description goes to Hyper3D (`api.hyper3d.com`) and nowhere else; each generation is billed to
+  your Hyper3D account, and Hyper3D keeps results as its data retention policy says.
+
+  What SculptForge does to keep this narrow:
+  - It is off until you enter your own key. The key is kept in the system keychain, never in `ai.json`,
+    never in a log, and there is no environment variable, shared or trial key.
+  - The API address is fixed in the app: https only, certificates checked, no redirects followed. The
+    key is sent only there. The model file is accepted only over https from Hyper3D's own domains
+    (`hyper3d.com`, `hyper3d.ai`, `deemos.com`), up to 200 MB, and only when it is a well-formed GLB; it is
+    saved in a private temporary folder, read by the usual glTF importer and deleted after import.
+  - It waits politely: the first status check after 5 s, then slower, up to every 30 s, for 20 minutes at most.
+  - With **Enable AI features** off nothing is sent. Studios: the provider id is `hyper3d` in
+    `ai.providers` (and `https://api.hyper3d.com/` in `ai.endpoints` when that list is used); each
+    generation writes one audit log line (tier, image or text, prompt length; never the key or the image).

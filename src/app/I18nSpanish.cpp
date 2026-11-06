@@ -843,6 +843,24 @@ constexpr Entry kSpanish[] = {
     {"Fill", "Rellenar"},
     {"Fill layer", "Rellenar capa"},
     {"Fill masked", "Rellenar enmascarado"},
+    {"Line Gradient", "Degradado lineal"},
+    {"End", "Final"},
+    {"Swap", "Intercambiar"},
+    {"Drag a line across the model.", "Arrastra una línea sobre el modelo."},
+    {"Drag its ends to adjust. Enter keeps it, Esc takes it back.", "Arrastra sus extremos para ajustarlo. Intro lo conserva, Esc lo deshace."},
+    {"Swap the paint colour and the End colour.", "Intercambia el color de pintura y el color final."},
+    {"The colour at the end of the line. The start is the paint colour above.",
+     "El color al final de la línea. El inicio es el color de pintura de arriba."},
+    {"Fade the paint colour out instead: the paint underneath shows through towards the end of the line.",
+     "En su lugar, desvanece el color de pintura: la pintura de debajo se ve cada vez más hacia el final de "
+     "la línea."},
+    {"Drag a line across the model: the paint colour at its start runs into the End colour (or fades to "
+     "clear) at its end, in screen space, into vertex paint or the texture. Drag either end to adjust it; "
+     "Enter keeps it, Esc takes it back. Respects the mask; one undo step.",
+     "Arrastra una línea sobre el modelo: el color de pintura de su inicio pasa al color final (o se "
+     "desvanece) en su extremo, en el espacio de la pantalla, en la pintura de vértices o en la textura. "
+     "Arrastra cualquiera de los extremos para ajustarlo; Intro lo conserva, Esc lo deshace. Respeta la "
+     "máscara; un solo paso de deshacer."},
     {"Fill the unmasked area (the whole mesh if nothing is masked)",
      "Rellena la zona sin máscara (toda la malla si no hay nada enmascarado)"},
     {"Cavity", "Cavidad"},
@@ -1320,6 +1338,17 @@ constexpr Entry kSpanish[] = {
      "whatever the mask.",
      "Lo enmascarado se queda donde está y lo parcialmente enmascarado se mueve en parte (activado por defecto). "
      "Desactivado: toda la Pieza se mueve sin importar la máscara."},
+    {"Folder", "Carpeta"},
+    {"Hide its Parts", "Ocultar sus Piezas"},
+    {"Show its Parts", "Mostrar sus Piezas"},
+    {"Move with the gizmo", "Mover con el gizmo"},
+    {"New folder", "Carpeta nueva"},
+    {"New folder with the active Part (drag Parts onto a folder to add them)", "Carpeta nueva con la Pieza activa (arrastra Piezas a una carpeta para añadirlas)"},
+    {"Out of the folder", "Fuera de la carpeta"},
+    {"Remove folder (keep its Parts)", "Quitar la carpeta (conservar sus Piezas)"},
+    {"Click to open, double-click to rename, drag Parts onto it", "Clic para abrir, doble clic para renombrar, arrastra Piezas aquí"},
+    {"Click to fold, double-click to rename, drag Parts onto it", "Clic para plegar, doble clic para renombrar, arrastra Piezas aquí"},
+    {"Transform the visible Parts in the active Part's folder together (Parts list folders). Each Part gets its own undo step.", "Transforma juntas las Piezas visibles de la carpeta de la Pieza activa (carpetas de la lista de Piezas). Cada Pieza tiene su propio paso de deshacer."},
     {"Transform every visible Part together. Each Part gets its own undo step.",
      "Transforma juntas todas las Piezas visibles. Cada Pieza tiene su propio paso de deshacer."},
     {"Where the gizmo sits: rotation and scaling turn about this point. It follows the centre of what moves until you "
@@ -2767,19 +2796,25 @@ constexpr Entry kSpanish[] = {
     {"Unwrap with the chosen method: the selected faces (fitted where they were), or the whole Part (packed). Least "
      "Stretch keeps angles and lengths along the marked seams; Conformal keeps angles; By Face Groups cuts along the "
      "face group borders too; Planar projects each piece; Unfold flattens the current islands again in place, "
-     "keeping pins; Auto Seams finds its own. Closed pieces get cut automatically. Big meshes unwrap in the "
-     "background.",
+     "keeping pins; Auto Seams finds its own. Closed pieces get cut automatically. Runs in the background (Cancel "
+     "under the view stops it).",
      "Desenvuelve con el método elegido: las caras seleccionadas (ajustadas donde estaban), o toda la Pieza "
      "(empaquetada). Least Stretch conserva ángulos y longitudes a lo largo de las costuras marcadas; Conformal "
      "conserva ángulos; By Face Groups corta también por los bordes de grupos de caras; Planar proyecta cada pieza; "
      "Unfold vuelve a aplanar las islas actuales en su sitio, respetando los anclajes; Auto Seams busca sus propias "
-     "costuras. Las piezas cerradas se cortan automáticamente. Las mallas grandes se desenvuelven en segundo plano."},
+     "costuras. Las piezas cerradas se cortan automáticamente. Se ejecuta en segundo plano (Cancelar, bajo la vista, lo detiene)."},
     {"Pack", "Empaquetar"},
     {"Pack the selected islands (or all) as large as they fit into the 0-1 tile, or across the Columns x Rows grid of "
-     "UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them.",
+     "UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them. "
+     "Runs in the background (Cancel under the view stops it).",
      "Empaqueta las islas seleccionadas (o todas) lo más grandes que quepan en el mosaico 0-1, o en la rejilla "
      "Columnas x Filas de mosaicos UDIM: giradas a su caja más pequeña, escaladas a una densidad de téxeles, con el "
-     "margen entre ellas."},
+     "margen entre ellas. Se ejecuta en segundo plano (Cancelar, bajo la vista, lo detiene)."},
+    {"Packing...", "Empaquetando..."},
+    {"Packing: %d%%", "Empaquetando: %d%%"},
+    {"Unwrapping...", "Desenvolviendo..."},
+    {"Unwrapping: %d%%", "Desenvolviendo: %d%%"},
+    {"Stop the Unwrap or Pack that is running; the UVs stay as they are.", "Detiene el Desenvolver o Empaquetar en curso; las UV se quedan como están."},
     {"Mark Seam", "Marcar costura"},
     {"Mark the selected edges (or the border of the selected faces) as seams: Unwrap cuts there.",
      "Marca como costuras las aristas seleccionadas (o el borde de las caras seleccionadas): Desenvolver corta ahí."},
@@ -3665,6 +3700,10 @@ constexpr Entry kSpanish[] = {
     {"AI tools may use only the kinds of command your studio allows.", "Las herramientas de IA solo pueden usar los tipos de comando que permite tu estudio."},
     {"AI tools work on their own scene; your studio doesn't let them control this window.", "Las herramientas de IA trabajan en su propia escena; tu estudio no les permite controlar esta ventana."},
     {"API key", "Clave de API"},
+    {"Tier", "Nivel"},
+    {"Off until you add your own key: hyper3d.ai > API dashboard (a Creator plan or higher).", "Desactivado hasta que añadas tu propia clave: hyper3d.ai > API dashboard (plan Creator o superior)."},
+    {"Using your key from the system keychain.", "Usando tu clave del llavero del sistema."},
+    {"Sends your image or description to Hyper3D (api.hyper3d.com), which builds the model. Each generation is billed to your Hyper3D account. Basic API access covers Extreme Low and Low.", "Envía tu imagen o descripción a Hyper3D (api.hyper3d.com), que crea el modelo. Cada generación se cobra en tu cuenta de Hyper3D. El acceso básico a la API incluye Extreme Low y Low."},
     {"Audit log", "Registro de auditoría"},
     {"Connecting...", "Conectando..."},
     {"Copy code", "Copiar código"},

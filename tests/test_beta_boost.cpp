@@ -15,6 +15,7 @@
 #include <chrono>
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <tuple>
 
 using namespace sf;
@@ -106,9 +107,8 @@ Difference compare(const Mesh& start, const Mesh& a, const Mesh& b) {
     return r;
 }
 
-} // namespace
-
-TEST(adaptive_dabs_match_exact_strokes) {
+// Adaptive strokes against the exact ones, for the brushes that take the adaptive path, from `first` (of six), `count` of them.
+void adaptiveMatchesExact(size_t first, size_t count) {
     const Mesh head = makeBenchHead(3'000'000); // ~1.5M vertices: a 0.6 radius holds well over the threshold
     struct Case {
         BrushType type;
@@ -116,8 +116,10 @@ TEST(adaptive_dabs_match_exact_strokes) {
         float strength = 0.3f;
     };
     // (Inflate, Nudge, Clay Block, alpha brushes and masked regions take the exact path: adaptive_dabs_leave_small_brushes_alone checks it.)
-    for (const Case c : {Case{BrushType::Clay}, Case{BrushType::Standard}, Case{BrushType::Flatten},
-                         Case{BrushType::Pinch}, Case{BrushType::Crease},                          Case{BrushType::Trim}}) {
+    const Case cases[] = {Case{BrushType::Clay}, Case{BrushType::Standard}, Case{BrushType::Flatten},
+                          Case{BrushType::Pinch}, Case{BrushType::Crease}, Case{BrushType::Trim}};
+    for (size_t i = first; i < std::min(first + count, std::size(cases)); ++i) {
+        const Case c = cases[i];
         const StrokeResult exact = strokeOn(head, c.type, 0.8f, false, 16, c.alpha, c.mask, c.strength);
         const StrokeResult fast = strokeOn(head, c.type, 0.8f, true, 16, c.alpha, c.mask, c.strength);
         const Difference d = compare(head, exact.mesh, fast.mesh);
@@ -134,19 +136,24 @@ TEST(adaptive_dabs_match_exact_strokes) {
     }
 }
 
-TEST(adaptive_dabs_fused_batches_match_exact_strokes) {
-    // Batches of 2-6 dabs placed in one pass (Sculptor::beginBatch), each picked on the surface as its batch began.
+// Batches of 2-6 dabs placed in one pass (Sculptor::beginBatch), each picked on the surface as its batch began:
+// strokes of `dabs` dabs, each brush in batches of 2 and of 6 (`bothSizes`), or in one of them, taking turns; the brushes
+// from `first` (of six), `count` of them.
+void fusedBatchesMatchExact(int dabs, bool bothSizes, size_t first, size_t count) {
     const Mesh head = makeBenchHead(3'000'000);
-    for (BrushType type : {BrushType::Clay, BrushType::Standard, BrushType::Flatten, BrushType::Pinch, BrushType::Crease,
-                           BrushType::SharpCrease})
+    const BrushType types[] = {BrushType::Clay, BrushType::Standard, BrushType::Flatten, BrushType::Pinch, BrushType::Crease,
+                               BrushType::SharpCrease};
+    for (size_t i = first; i < std::min(first + count, std::size(types)); ++i) {
+        const BrushType type = types[i];
+        std::vector<glm::vec3> centres;
+        static const bool replay = std::getenv("SF_BOOST_REPLAY") != nullptr;
+        if (replay) g_record = &centres;
+        const StrokeResult exact = strokeOn(head, type, 0.8f, false, dabs); // (one exact stroke for both sizes)
+        g_record = nullptr;
         for (int batch : {2, 6}) {
-            std::vector<glm::vec3> centres;
-            static const bool replay = std::getenv("SF_BOOST_REPLAY") != nullptr;
-            if (replay) g_record = &centres;
-            const StrokeResult exact = strokeOn(head, type, 0.8f, false, 18);
-            g_record = nullptr;
+            if (!bothSizes && batch != (i % 2 ? 6 : 2)) continue;
             if (replay) g_replay = &centres;
-            const StrokeResult fused = strokeOn(head, type, 0.8f, true, 18, false, false, 0.3f, batch);
+            const StrokeResult fused = strokeOn(head, type, 0.8f, true, dabs, false, false, 0.3f, batch);
             g_replay = nullptr;
             const Difference d = compare(head, exact.mesh, fused.mesh);
             std::printf("  %-12s batches of %d: moved %.4f, within %.2g (%.2f%%), normals: mean %.3f, 99.9%% within %.2f deg; %.0f vs %.0f ms\n",
@@ -156,7 +163,23 @@ TEST(adaptive_dabs_fused_batches_match_exact_strokes) {
             CHECK(d.position <= 0.025f * d.moved); // within 2.5% (the centres are picked as the batch began)
             CHECK(d.meanDeg < 0.5);
         }
+    }
 }
+
+} // namespace
+
+// Each brush's strokes take 1-3 s (the 3M-triangle head copied and its BVH built per stroke): the cases run as two
+// tests of three brushes each, which the shards (tests/shard_times.inc) put on different processes.
+// Unbatched: the full 16-dab strokes (with 8 the Trim stroke's few moved vertices make its mean normal turn 0.6 deg).
+TEST(adaptive_dabs_match_exact_strokes) { adaptiveMatchesExact(0, 3); }
+TEST(adaptive_dabs_match_exact_strokes_2) { adaptiveMatchesExact(3, 3); }
+// Fused: strokes of 8 dabs (18 nightly). The stroke's length doesn't change the path a dab takes: the 0.8 radius on
+// the 3M-triangle head holds every dab's region over Sculptor::kAdaptiveMinVertices (adaptive_dabs_match_exact_strokes
+// checks it), and a batch of 6 still fuses (dabs 0-5, then 6-7). Each brush in one batch size, 2 and 6 taking turns,
+// so both sizes and every brush's kernel are covered; nightly runs every brush in both, at full length.
+TEST(adaptive_dabs_fused_batches_match_exact_strokes) { fusedBatchesMatchExact(8, false, 0, 3); }
+TEST(adaptive_dabs_fused_batches_match_exact_strokes_2) { fusedBatchesMatchExact(8, false, 3, 3); }
+TEST(nightly_adaptive_dabs_fused_batches_match_exact_strokes) { fusedBatchesMatchExact(18, true, 0, 6); }
 
 TEST(adaptive_dabs_analytic_normals_match_finite_differences) {
     // PlaneKernel::offsetAndNormal against the moved surface's normal from offsets a hair apart, on a bumpy patch.

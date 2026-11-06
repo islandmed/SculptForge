@@ -67,6 +67,23 @@ TEST(action_registry_keys_and_overrides) {
     CHECK(reg.recent().size() == 2 && reg.recent()[0] == "edit.undo");
 }
 
+TEST(action_registry_style_default_before_add) {
+    // #147: the input style is applied at startup before every action is registered; one added afterwards keeps
+    // the style's key, not its own default, and a user override still wins.
+    ActionRegistry reg;
+    reg.setDefaultShortcut("ui.size_popup", "F");
+    reg.add({"ui.size_popup", "Size at cursor", nullptr, "", "Draw", "S", "", [] {}, nullptr, nullptr});
+    CHECK(reg.shortcutText("ui.size_popup") == "F");
+    reg.add({"ui.size_popup", "Size at cursor", nullptr, "", "Draw", "S", "", [] {}, nullptr, nullptr}); // again
+    CHECK(reg.shortcutText("ui.size_popup") == "F");
+    reg.setDefaultShortcut("ui.size_popup", "S"); // the style changes
+    CHECK(reg.shortcutText("ui.size_popup") == "S");
+    reg.setShortcut("ui.size_popup", "Ctrl+Alt+S");
+    reg.setDefaultShortcut("ui.size_popup", "F");
+    reg.add({"ui.size_popup", "Size at cursor", nullptr, "", "Draw", "S", "", [] {}, nullptr, nullptr});
+    CHECK(reg.shortcutText("ui.size_popup") == "Ctrl+Alt+S");
+}
+
 TEST(action_registry_commands) {
     CommandRegistry commands;
     ActionRegistry reg;

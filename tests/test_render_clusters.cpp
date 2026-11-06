@@ -464,3 +464,52 @@ TEST(coarse_levels_follow_edits) {
     updateCoarseLevels(L, m, order, dirty);
     CHECK(L.positions == after);
 }
+
+TEST(coarse_levels_carry_colour_and_mask) {
+    // The cells carry their vertices' mean colour and mask (a coarse frame shows the paint as full detail does):
+    // built with the colours, gained after a Fill, updated after a stroke over some clusters, dropped with them.
+    Mesh m = detailedSphere(100000);
+    UploadOrder order;
+    order.build(m);
+    const size_t nv = m.vertexCount();
+    auto colourMeans = [&](const CoarseLevels& L) {
+        if (L.colors.size() != L.positions.size() || L.mask.size() != L.positions.size()) return false;
+        std::vector<glm::dvec3> sum(L.positions.size(), glm::dvec3(0.0));
+        std::vector<double> msum(L.positions.size(), 0.0);
+        std::vector<uint32_t> n(L.positions.size(), 0);
+        for (size_t v = 0; v < nv; ++v)
+            for (uint32_t k = L.vertexCell[v]; k != ~0u; k = L.parent[k]) sum[k] += glm::dvec3(m.colors[v]), msum[k] += m.mask[v], ++n[k];
+        float worst = 0.0f;
+        for (size_t k = 0; k < sum.size(); ++k)
+            if (n[k])
+                worst = std::max({worst, glm::distance(L.colors[k], glm::vec3(sum[k] / double(n[k]))),
+                                  std::abs(L.mask[k] - float(msum[k] / double(n[k])))});
+        return worst < 1e-4f;
+    };
+    CoarseLevels L = buildCoarseLevels(m, order);
+    CHECK(L.colors.empty() && L.mask.empty() && coarseAttributesMatch(L, m));
+    // A Fill (colours and a mask appear): no longer matching; any update recomputes every cell's.
+    m.colors.assign(nv, glm::vec3(0.1f, 0.6f, 0.2f));
+    m.mask.assign(nv, 0.0f);
+    for (size_t v = 0; v < nv; ++v) m.mask[v] = m.positions[v].y > 0.0f ? 1.0f : 0.0f;
+    CHECK(!coarseAttributesMatch(L, m));
+    updateCoarseLevels(L, m, order, {0u});
+    CHECK(coarseAttributesMatch(L, m));
+    CHECK(colourMeans(L));
+    // A red stroke over a few clusters: their cells (and up) follow.
+    std::vector<uint32_t> dirty;
+    for (uint32_t c = 0; c < order.clusters().size(); c += 7) {
+        dirty.push_back(c);
+        const auto& cl = order.clusters()[c];
+        for (uint32_t l = 0; l < cl.vertexCount; ++l) m.colors[order.fromGpu()[cl.firstVertex + l]] = glm::vec3(0.9f, 0.05f, 0.05f);
+    }
+    updateCoarseLevels(L, m, order, dirty);
+    CHECK(colourMeans(L));
+    // Built with them, the same.
+    CHECK(colourMeans(buildCoarseLevels(m, order)));
+    // Cleared: gone.
+    m.colors.clear();
+    m.mask.clear();
+    updateCoarseLevels(L, m, order, {0u});
+    CHECK(L.colors.empty() && L.mask.empty());
+}
