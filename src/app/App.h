@@ -10,6 +10,7 @@
 #include "app/CommandPalette.h"
 #include "app/Config.h"
 #include "app/Console.h"
+#include "app/I18n.h"
 #include "app/LibraryBrowser.h"
 #include "app/Pickers.h"
 #include "app/ShellGeometry.h"
@@ -256,8 +257,8 @@ private:
     float targetUiScale() const;         // what uiScale_ should be now (Preferences, the display; Config.cpp)
     void applyUiScale();                 // rebuild fonts and style live when it changed (between frames)
     void buildUiFonts(float scale);
-    void mergeCjkFont(float px);         // the Chinese glyphs into the font just added (all of them while fontsCjk_)
-    bool fontsCjk_ = false;              // the atlas has every Chinese glyph (Traditional Chinese interface)
+    void mergeCjkFont(float px);         // the Chinese glyphs into the font just added (all of them in a Chinese interface)
+    Language fontsLanguage_ = Language::English; // the language the font atlas was built for (buildUiFonts)
     ImFont* fontCaption_ = nullptr;
     ImFont* fontCaptionSub_ = nullptr;
 

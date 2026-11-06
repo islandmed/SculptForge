@@ -72,6 +72,8 @@ extern const unsigned char fontMonoBold[];
 extern const unsigned long long fontMonoBold_size;
 extern const unsigned char fontCjk[];
 extern const unsigned long long fontCjk_size;
+extern const unsigned char fontCjkSc[];
+extern const unsigned long long fontCjkSc_size;
 extern const unsigned char appIcon[];
 extern const unsigned long long appIcon_size;
 extern const unsigned char appIconSmall[];
@@ -1272,7 +1274,7 @@ float App::targetUiScale() const {
 void App::applyUiScale() {
     uiScaleDirty_ = false;
     const float scale = targetUiScale();
-    if (!uiScaleChanged(uiScale_, scale) && fontsCjk_ == languageNeedsCjkFont(language())) return;
+    if (!uiScaleChanged(uiScale_, scale) && fontsLanguage_ == language()) return;
     SDL_Log("UI scale %.0f%%", double(scale * 100.0f));
     uiScale_ = scale;
     ImGui::GetIO().Fonts->Clear();
@@ -1286,25 +1288,34 @@ void App::requestUiScale() {
     redrawIn(0.0);
 }
 
-// Noto Sans CJK TC (SIL OFL), cut down to the Traditional Chinese table's characters (tools/i18n/subset_cjk_font.py),
-// merged into the font added just before. In another language only the language's own name (繁體中文, the Preferences
-// button) is merged, so the atlas stays Latin-sized.
+// Noto Sans CJK TC and SC (SIL OFL), each cut down to its table's characters (tools/i18n/subset_cjk_font.py), merged
+// into the font added just before: in Traditional Chinese all of TC, in Simplified Chinese all of SC (mainland glyph
+// shapes). Otherwise only the languages' own names (繁體中文, 简体中文: the Preferences buttons) are merged, so the
+// atlas stays Latin-sized.
 void App::mergeCjkFont(float px) {
     // CJK punctuation, full-width forms and the unified ideographs; the subset has only what the table uses.
     static const ImWchar kCjkRanges[] = {0x2000, 0x206F, 0x3000, 0x30FF, 0x4E00, 0x9FFF, 0xFF00, 0xFFEF, 0};
-    static const ImWchar kNameRanges[] = {0x4E2D, 0x4E2D, 0x6587, 0x6587, 0x7E41, 0x7E41, 0x9AD4, 0x9AD4, 0}; // 中文繁體
-    ImFontConfig cjk;
-    cjk.MergeMode = true;
-    cjk.FontDataOwnedByAtlas = false;
-    cjk.OversampleH = 1; // dense glyphs: oversampling only grows the atlas
-    ImGui::GetIO().Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontCjk), int(assets::fontCjk_size), px,
-                                                &cjk, fontsCjk_ ? kCjkRanges : kNameRanges);
+    static const ImWchar kTraditionalName[] = {0x4E2D, 0x4E2D, 0x6587, 0x6587, 0x7E41, 0x7E41, 0x9AD4, 0x9AD4, 0}; // 中文繁體
+    static const ImWchar kSimplifiedName[] = {0x4E2D, 0x4E2D, 0x4F53, 0x4F53, 0x6587, 0x6587, 0x7B80, 0x7B80, 0};  // 中体文简
+    auto merge = [px](const unsigned char* data, unsigned long long size, const ImWchar* ranges) {
+        ImFontConfig cjk;
+        cjk.MergeMode = true;
+        cjk.FontDataOwnedByAtlas = false;
+        cjk.OversampleH = 1; // dense glyphs: oversampling only grows the atlas
+        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(data), int(size), px, &cjk, ranges);
+    };
+    // The interface's own face first: a codepoint both have (中文) keeps the glyph merged first.
+    const bool traditional = fontsLanguage_ == Language::TraditionalChinese;
+    const bool simplified = fontsLanguage_ == Language::SimplifiedChinese;
+    if (simplified) merge(assets::fontCjkSc, assets::fontCjkSc_size, kCjkRanges);
+    merge(assets::fontCjk, assets::fontCjk_size, traditional ? kCjkRanges : kTraditionalName);
+    if (!simplified) merge(assets::fontCjkSc, assets::fontCjkSc_size, kSimplifiedName);
 }
 
 // Every font the UI uses, rasterised at `scale` for crisp text (Dear ImGui 1.91 has no dynamic font sizes).
 void App::buildUiFonts(float scale) {
     ImGuiIO& io = ImGui::GetIO();
-    fontsCjk_ = languageNeedsCjkFont(language());
+    fontsLanguage_ = language();
     const bool recording = !options_.recordPath.empty() || !options_.uiTest.empty();
     // Inter (SIL OFL), embedded in the binary. Rasterised at the final size for crisp text.
     ImFontConfig fontConfig;

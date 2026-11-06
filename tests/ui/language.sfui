@@ -87,7 +87,22 @@ click "細分（保留層級）##geometry.divide"
 expect_value sdiv_levels == 3
 shot zh_geometry
 click "幾何##tool.geometry"
+
+# Simplified Chinese: from Traditional straight to Simplified (the fonts switch to the SC subset), mainland terms.
 click "偏好設定##palette.preferences"
+click "简体中文##language.zh-CN"
+expect_text "语言"
+expect "偏好设置##palette.preferences"
+shot zh_hans_preferences
+key escape
+expect "文件##palette.file"
+expect "绘制##tool.draw"
+expect "Clay Block##brush.clayblock"
+click "几何##tool.geometry"
+expect_text "细分"
+shot zh_hans_geometry
+click "几何##tool.geometry"
+click "偏好设置##palette.preferences"
 click "English##language.en"
 expect "Preferences##palette.preferences"
 key escape
