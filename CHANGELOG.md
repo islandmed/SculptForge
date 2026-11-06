@@ -6,6 +6,64 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.10] - 2026-11-06
+
+### Added
+- **Benchmark takes** (`sculptforge --benchmark-script take.sfui [project]`): a UI test script's strokes, orbits, keys
+  and waits played in real time (wall-clock pacing, 240 Hz stroke samples) in the interactive loop, with the benchmark
+  HUD, the benchmark video path and a per-frame CSV (frame ms, stroke lag) beside it. Steps a take can't play in real
+  time (shots, expectations) are skipped; steps that run commands or read other files are refused. docs/benchmark.md.
+- **Insert sets** (Parts > Append > Insert on the model): a model file with several objects (`.obj`, `.glb`) or a
+  folder of `.obj` / `.ply` / `.glb` files becomes a set to insert from, one item at a time, with a thumbnail picker;
+  `[` and `]` step to the previous / next item while inserting. Symmetry, undo and the up axis work as with one mesh.
+  Commands `insert_mesh set=<path> index=<n>` and `insert_set_items set=<path>`. Asked by a viewer on askNK's video.
+- **Sculpt the Part under the cursor** (Alt+Q in every input style, the same key as Blender's; Preferences > Hotkeys
+  changes it; in the command palette): the visible Part under the pointer becomes the active one, without moving the
+  camera; each Part keeps its mask. The status bar says "Sculpting: <Part>", or that no Part is under the cursor.
+  Asked for by @ziel9627 on Discord.
+- **Units** (Edit > Preferences > Interface, #148, thanks @Swar55): sizes show in mm, cm, m or inches: the brush size,
+  the active Part's width x height x depth under its name in Tool, and the size exports write in File > Import /
+  Export. **OBJ/PLY in** reads the numbers in OBJ and PLY files (which have no units) as mm, cm, m (the default) or
+  inches; `open`, `open_obj` and `part_append` take `unit=` for scripts, and STL files may be read as inches too.
+
+### Changed
+- **OBJ and PLY exported from an STL are now the right size: 1000x bigger than in 0.11.9.** 0.11.9 read the STL in
+  millimetres but wrote OBJ and PLY in metres, so a 50 mm part came out as 0.05 (#148, thanks @Swar55). A scene opened
+  from an STL, OBJ or PLY now writes OBJ and PLY in that file's own unit, an STL opened in another unit is written
+  back in it, and decimal sizes come back exactly (12.7 mm stays 12.7, not 12.700001). Projects remember the unit. If
+  you scaled these exports by 1000 in another app, you no longer need to.
+- **USD stages in centimetres now open at their true size: 100x smaller than in 0.11.9.** 0.11.9 ignored
+  `metersPerUnit`, so a stage from Maya or Houdini (`metersPerUnit = 0.01`) opened 100x too large: a 180 cm figure was
+  180 m. It is now 1.8 m (#148, thanks @NicTanghe). Stages in metres, and USD files SculptForge wrote, open as before.
+- Frames overlap the CPU and the GPU: the processor builds the next frame while the graphics card draws the last, at
+  most one frame ahead, so the input lag doesn't grow. Reading each frame's GPU time used to wait for the whole frame
+  on some drivers (Mesa on Apple silicon), which made CPU and GPU take turns. Floor tier, a 28M-triangle scan: orbit
+  56 to 90 fps; a 200M-triangle scene: orbit 84 to 186 fps, big-brush strokes 51 to 191 fps.
+
+### Fixed
+- **Translations**: about 430 labels showed in English in Spanish, Traditional and Simplified Chinese, most visibly
+  the whole **Generate 3D** panel in zh-CN; they now go through the translator in every language. The i18n test now
+  fails on any label that skips it (only product names may), so this can't come back unnoticed.
+- Micro levels: fewer spiky shards from Clay (and the other plane brushes: Clay Block, Flatten, Trim) where a stroke's
+  dabs pile up over rough, folded surface such as strands meeting skin, also on the symmetric side. A big brush's dab
+  that would fold the base mesh over now sculpts the detail instead, and the detail's own plane brushes no longer push
+  points they can't bring to the plane. Clay over rough, leaning strands can still leave small steps; a fuller fix is
+  coming.
+- Vertex paint ignored the brush alpha: Drag Stamp, Slide Stamp, Dots and Spray painted a soft round blob with any
+  alpha (texture painting already followed it). The paint dab now samples the alpha on the view plane, turned as
+  sculpt dabs turn it, and reaches into the stamp's corners (#152, thanks @fxrtst).
+- Adding a paint layer on a dense top subdivision level (4M+ triangles) could leave the model drawn at its coarse
+  preview level at rest, looking like level 1, through level changes and project reloads until a restart (#151, thanks
+  @fxrtst). The GPU time used to decide whether full detail fits a still frame no longer counts the CPU work of the
+  frame that added the layer, and one slow frame can no longer tip it.
+- The bottom shelf's **Add a brush** button draws its + exactly in the middle of the circle at every UI scale and on
+  Retina screens; it was a font glyph that sat off centre (#150, thanks @tristratos).
+- SpaceMouse beside a pen (Discord, @fenixpoints, the first report from a real SpaceMouse): while the cap is pushed,
+  the pointer motion and wheel a SpaceMouse driver sends for programs it doesn't know (3DxWare's defaults) no longer
+  move the cursor off the pen or zoom toward it; with Hold during strokes off, a Move, Snake Hook or KelvinGrab drag
+  no longer pulls the grabbed part across the view when the view turns under a still pen; gizmo, selection and stamp
+  drags hold the view whatever the setting. Guide: Navigation > SpaceMouse troubleshooting.
+
 ## [0.11.9] - 2026-11-06
 
 ### Added

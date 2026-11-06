@@ -14,7 +14,30 @@ highlight: Exports keep their real size: what you import in mm or cm comes back 
 highlight: Alt+Q sculpts the Part under the cursor, in every input style (thanks @ziel9627 on Discord)
 highlight: Insert sets: pick a piece from a multi-object file or folder by its thumbnail, step through them with [ and ]
 highlight: Spanish and Chinese everywhere: the Generate 3D panel and the last untranslated labels now read in your language
+highlight: Kitbash sets for Insert
 ```
+
+- **Insert sets**: **Parts > Append > Insert on the model > Insert set from file...** or **from folder...** loads a
+  kitbash set (a file with several objects, or a folder of meshes); pick one in its thumbnail window and drag it onto
+  the model, `[` and `]` step through the set.
+- **Sculpt the Part under the cursor**: point at another Part and press <kbd>Alt</kbd>+<kbd>Q</kbd> (as in Blender, in
+  every input style): it becomes the Part you sculpt, and the view stays where it is.
+- **Real-world size**: parts for 3D printing keep their size through every export. Pick the unit sizes show in (mm,
+  cm, m, in) in **Edit > Preferences > Interface > Units**; **Tool** shows the Part's size and **File** the size
+  exports write. OBJ and PLY files can be read in mm, cm, m or in (**OBJ/PLY in**). Asked for by @Swar55.
+- **Español, 繁體中文 and 简体中文** now cover the whole interface: **Generate 3D** (tabs, services, hints, Quad Remesh,
+  Generate 3D model, Quick shapes), the About box, Proof mode, the phone link, the brush gallery, Brush Lab, splat
+  training and about 400 other labels that stayed in English.
+- Fewer shards when sculpting rough micro-level surfaces (Clay strokes ending where hair or strands meet skin). Clay
+  over rough strands can still leave small steps; a fuller fix is coming.
+- **Paint with alphas**: vertex paint now follows the brush alpha with every stroke (Drag Stamp, Dots, Spray), so a
+  Cracks stamp paints cracks instead of a soft round spot. Thanks @fxrtst.
+- **Full detail after a new paint layer**: on dense meshes, adding a paint layer no longer leaves the top subdivision
+  level looking unsubdivided until a restart.
+- **SpaceMouse with a pen**: turning the cap while the pen hovers or rests on the model should no longer move the
+  cursor or the model; tell us if it does. Thanks @fenixpoints.
+- **Smoother view on big models**: the processor prepares the next frame while the graphics card draws this one, so
+  turning the view and sculpting on large meshes run at up to twice the frame rate on some computers.
 
 ## Version 0.11.9
 
