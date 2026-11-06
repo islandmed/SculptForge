@@ -33,6 +33,10 @@ a two-row top shelf; the rest is the same. See [The title strip](#the-title-stri
 **Edit > Preferences > Interface > Look** sets how the interface looks and how it is laid out. Neither changes your
 models, brushes or shortcuts.
 
+> **Classic layout:** Preferences is not under **Edit** there but its own **Preferences** palette in the palette
+> bar (**Edit > Preferences...** opens it too). In both layouts <kbd>Ctrl</kbd>+<kbd>,</kbd> (<kbd>Cmd</kbd>+<kbd>,</kbd>
+> on macOS) or <kbd>F3</kbd> > **Preferences** opens it.
+
 **Layout**:
 
 - **SculptForge** (the default for new installs): a status bar along the top with the task menus **File, Edit,
@@ -519,6 +523,10 @@ A preset changes the layout only (the console, Library and left-handed setting s
 Layout keeps it.
 
 ### Interface preferences
+
+> **Classic layout:** Preferences is not under **Edit** there but its own **Preferences** palette in the palette
+> bar (**Edit > Preferences...** opens it too). In both layouts <kbd>Ctrl</kbd>+<kbd>,</kbd> (<kbd>Cmd</kbd>+<kbd>,</kbd>
+> on macOS) or <kbd>F3</kbd> > **Preferences** opens it.
 
 **Edit > Preferences > Interface**:
 

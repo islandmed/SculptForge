@@ -54,6 +54,12 @@ expect "Draw/Add"
 expect_not "Stroke/Drag Stamp"
 key escape
 expect_not "Draw/Add"
+# Edit > Preferences... opens the Preferences palette, where people look for it first (#144).
+click "Edit##palette.edit"
+shot edit-menu
+click "Preferences...##edit.preferences"
+expect "Input##preferences.input"
+key escape
 click "Stroke##palette.stroke"
 click "Stroke/##totray"
 expect "Stroke/Drag Stamp"

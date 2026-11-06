@@ -117,6 +117,10 @@ closes it, and it doesn't come back by itself.
 Blender or Maya. Picking the Classic sculpting keys offers this tour once. See
 [Keyboard and mouse](shortcuts.md).
 
+> **Classic layout:** Preferences is not under **Edit** there but its own **Preferences** palette in the palette
+> bar (**Edit > Preferences...** opens it too). In both layouts <kbd>Ctrl</kbd>+<kbd>,</kbd> (<kbd>Cmd</kbd>+<kbd>,</kbd>
+> on macOS) or <kbd>F3</kbd> > **Preferences** opens it.
+
 ## See also
 
 - [Your first sculpt in 10 minutes](first-sculpt.md)
