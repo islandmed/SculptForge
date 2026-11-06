@@ -2029,8 +2029,9 @@ void App::onMouseUp() {
                   // the drag's direction on screen turns it about the normal
                   {"twist", insertPx_ > 4.0f ? double(glm::degrees(std::atan2(mouseY_ - insertY_, mouseX_ - insertX_))) : 0.0}};
         args = withSymmetryArgs(std::move(args));
-        if (insertType_ == "mesh") { // your own mesh: a Part's copy or a file (insert_mesh)
+        if (insertType_ == "mesh") { // your own mesh: a Part's copy, a file or a set's item (insert_mesh)
             args[insertMeshKey_] = insertMeshValue_;
+            if (insertMeshKey_ == "set") args["index"] = double(insertSet_.index);
             runCommand("insert_mesh", args);
         } else {
             args["type"] = insertType_;
@@ -2070,6 +2071,11 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
     }
     if (key == SDLK_ESCAPE && strokePopup_.open) {
         closeStrokePopup();
+        return;
+    }
+    if ((key == SDLK_LEFTBRACKET || key == SDLK_RIGHTBRACKET) && !(mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) &&
+        insertSetActive()) { // an insert set: [ and ] step through it (the drag sets the size, not the brush's)
+        selectInsertSetItem(insertSet_.index + (key == SDLK_RIGHTBRACKET ? 1 : -1));
         return;
     }
     if (key == SDLK_ESCAPE && !insertType_.empty()) { // Append > Insert (#34) off
@@ -2655,6 +2661,7 @@ void App::queueFile(FileAction action, std::string path) {
     aiLinkPicked(path); // the user chose it: a connected AI tool may use it without asking (PanelAiLink.cpp)
     if (action != FileAction::OpenObj && action != FileAction::LoadBrush && action != FileAction::OpenImage &&
         action != FileAction::AppendPart && action != FileAction::ComfyWorkflow && action != FileAction::InsertMesh &&
+        action != FileAction::InsertSet &&
         !path.empty() &&
         std::filesystem::path(std::u8string(path.begin(), path.end())).extension().empty())
         path += action == FileAction::SaveObj      ? ".obj"
@@ -2794,6 +2801,7 @@ void App::processPendingFiles() {
             status_ = "Insert " + std::filesystem::path(std::u8string(f.path.begin(), f.path.end())).filename().string() +
                       ": drag on the model (the drag sets its size). Esc stops.";
             break;
+        case FileAction::InsertSet: chooseInsertSet(f.path); break; // Insert on the model > Set (PanelParts.cpp)
         case FileAction::Count: break;
         }
     }

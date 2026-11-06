@@ -7,6 +7,7 @@
 #include "core/Commands.h"
 #include "core/Document.h"
 #include "core/LitSphere.h"
+#include "core/Parts.h"
 #include "core/PathStroke.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
@@ -269,7 +270,7 @@ ImTextureID ThumbnailCache::primitive(int primitive) {
         true);
 }
 
-ImTextureID ThumbnailCache::file(const std::string& path) {
+ThumbnailCache::Stat& ThumbnailCache::stat(const std::string& path) {
     Stat& s = stats_[path];
     const double now = ImGui::GetTime();
     if (now - s.at > kStatSeconds) {
@@ -279,6 +280,31 @@ ImTextureID ThumbnailCache::file(const std::string& path) {
         s.size = s.exists ? uint64_t(std::filesystem::file_size(fsPath(path), ec)) : 0;
         s.mtime = modifiedTime(path);
     }
+    return s;
+}
+
+ImTextureID ThumbnailCache::insertSetItem(const std::string& file, int object) {
+    if (object < 0) return this->file(file); // a folder set's file
+    const Stat& s = stat(file);
+    if (!s.exists) return ImTextureID(0);
+    const std::string key = fileThumbnailKey("setobject" + std::to_string(object), file, s.size, s.mtime, kPixels);
+    return request(
+        key,
+        [file, object] {
+            Result r;
+            Mesh m;
+            std::string name, err;
+            if (loadInsertSetItem(file, object, m, name, err)) {
+                m.recomputeAllNormals();
+                r.mesh = std::make_unique<Mesh>(std::move(m));
+            }
+            return r;
+        },
+        true);
+}
+
+ImTextureID ThumbnailCache::file(const std::string& path) {
+    const Stat& s = stat(path);
     if (!s.exists) return ImTextureID(0);
     const bool image = isImageFile(path), project = isProjectFile(path);
     const std::string kind = project ? "project" : image ? "image" : "mesh";

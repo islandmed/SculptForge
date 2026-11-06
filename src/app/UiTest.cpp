@@ -1851,13 +1851,14 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             const auto u8 = std::filesystem::absolute(std::filesystem::path(std::u8string(d.begin(), d.end()))).lexically_normal().u8string();
             app_.setMayaFolder(std::string(u8.begin(), u8.end()));
         });
-    } else if (verb == "choose_file") { // choose_file insert|append <path>: what a native file dialog would answer
+    } else if (verb == "choose_file") { // choose_file insert|insert_set|append <path>: what a native dialog would answer
         if (!need(2)) return false;
         App::FileAction action;
         if (w[1] == "insert") action = App::FileAction::InsertMesh;
+        else if (w[1] == "insert_set") action = App::FileAction::InsertSet;
         else if (w[1] == "append") action = App::FileAction::AppendPart;
         else {
-            error = "'choose_file' takes insert or append";
+            error = "'choose_file' takes insert, insert_set or append";
             return false;
         }
         auto file = std::filesystem::path(std::u8string(w[2].begin(), w[2].end()));

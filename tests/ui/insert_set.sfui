@@ -1,0 +1,35 @@
+# Insert sets (a viewer on askNK's video): a file with several objects is a set; its picker shows a thumbnail per
+# item; [ and ] step through it while inserting. kitbash_set.glb: Stud (8 triangles), Wedge (4); X symmetry is on.
+run new_sphere subdivisions=4
+key f
+remember triangles base
+choose_file insert_set data/kitbash_set.glb
+wait 0.1
+expect_status Insert Stud (1 of 2)
+wait_idle
+shot insert_set_picker
+
+# Item 0, then ] to item 1: each drag inserts the item chosen (with its mirrored copy).
+stroke 0.8 0.45 0.86 0.45
+expect_status 2 Studs (mirrored)
+expect_value triangles == $base+16
+key ]
+expect_status Insert Wedge (2 of 2)
+stroke 0.8 0.55 0.86 0.55
+expect_status 2 Wedges (mirrored)
+expect_value triangles == $base+24
+shot insert_set_items
+
+# ] wraps around, [ steps back; a click on a tile picks it.
+key ]
+expect_status Insert Stud (1 of 2)
+key [
+expect_status Insert Wedge (2 of 2)
+click "##insertset0"
+expect_status Insert Stud (1 of 2)
+key ]
+expect_status Insert Wedge (2 of 2)
+key ctrl+z
+expect_value triangles == $base+16
+key escape
+expect_status Insert off

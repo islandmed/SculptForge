@@ -51,6 +51,8 @@ public:
     ImTextureID primitive(int primitive); // Primitive (AssetLibrary.h)
     // Projects (their embedded thumbnail.png, else rendered once), meshes and images.
     ImTextureID file(const std::string& path);
+    // An insert set's item (core/Parts.h InsertSetItem): object `object` of a model file, or the whole file (-1).
+    ImTextureID insertSetItem(const std::string& file, int object);
     // Every frame on the main thread with the GL context current.
     void pump(Renderer& renderer);
 
@@ -100,6 +102,7 @@ private:
         bool exists = false;
     };
     std::unordered_map<std::string, Stat> stats_; // file stats, refreshed every 2 s
+    Stat& stat(const std::string& path);
 };
 
 } // namespace sf

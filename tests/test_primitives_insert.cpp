@@ -6,6 +6,7 @@
 #include "core/Commands.h"
 #include "core/Document.h"
 #include "core/Json.h"
+#include "core/Parts.h"
 #include "core/Primitives.h"
 #include "io/GltfIO.h"
 #include "io/ObjIO.h"
@@ -14,6 +15,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <map>
 
 #include <algorithm>
@@ -184,4 +186,63 @@ TEST(insert_mesh_from_file) {
     CHECK(!reg.execute(doc, "insert_mesh", {{"file", tempPath("sf_insert_mesh_missing.obj")}, {"x", 0.0}, {"y", 1.0}, {"z", 0.0}}).ok);
     CHECK(doc.mesh.triangleCount() == before + 12);
     for (const std::string& p : {obj, ply, glb}) std::remove(p.c_str());
+}
+
+// Insert sets: one item at a time from a multi-object file or a folder of files.
+TEST(insert_mesh_from_set) {
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 3.0}}).ok);
+    const size_t before = doc.mesh.triangleCount();
+    const Mesh tet = [] {
+        Mesh m;
+        m.positions = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+        m.triangles = {{0, 2, 1}, {0, 1, 3}, {0, 3, 2}, {1, 2, 3}};
+        m.sanitizeAttributes();
+        return m;
+    }();
+    const Mesh cube = makeCube(2, 1.0f);
+    std::string err;
+    const std::string glb = tempPath("sf_insert_set.glb");
+    CHECK(saveGlb(glb, {{"Tet", &tet}, {"Box", &cube}}, "kit", err));
+    std::vector<InsertSetItem> items;
+    CHECK(listInsertSet(glb, items, err));
+    CHECK(items.size() == 2 && items[0].name == "Tet" && items[1].name == "Box");
+    const Args at{{"x", 0.0}, {"y", 1.0}, {"z", 0.0}, {"size", 0.3}};
+    Args a = at;
+    a["set"] = glb;
+    CHECK(reg.execute(doc, "insert_mesh", a).ok);
+    CHECK(doc.mesh.triangleCount() == before + 4);
+    a["index"] = 1.0;
+    CommandResult r = reg.execute(doc, "insert_mesh", a);
+    CHECK(r.ok && r.message.find("Box") != std::string::npos);
+    CHECK(doc.mesh.triangleCount() == before + 4 + cube.triangleCount());
+    a["index"] = 2.0;
+    CHECK(!reg.execute(doc, "insert_mesh", a).ok);
+    CHECK(reg.execute(doc, "insert_set_items", {{"set", glb}}).message.find("1. Box") != std::string::npos);
+
+    // A folder: its model files by name, not its other files or subfolders.
+    const std::filesystem::path dir = std::filesystem::temp_directory_path() / "sf_insert_set_dir";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir / "sub");
+    std::filesystem::create_directories(dir / "empty");
+    CHECK(saveObj((dir / "b_box.obj").string(), cube, err));
+    CHECK(saveGlb((dir / "a_tet.glb").string(), tet, "tet", err));
+    CHECK(saveObj((dir / "sub" / "c.obj").string(), cube, err));
+    if (FILE* f = std::fopen((dir / "notes.txt").string().c_str(), "w")) std::fclose(f);
+    CHECK(listInsertSet(dir.string(), items, err));
+    CHECK(items.size() == 2 && items[0].name == "a_tet" && items[1].name == "b_box");
+    const size_t now = doc.mesh.triangleCount();
+    a["set"] = dir.string();
+    a["index"] = 0.0;
+    CHECK(reg.execute(doc, "insert_mesh", a).ok);
+    CHECK(doc.mesh.triangleCount() == now + 4);
+    CHECK(reg.execute(doc, "undo", {}).ok);
+    CHECK(doc.mesh.triangleCount() == now);
+    // Not a set: a file type Insert doesn't read, an empty folder, a missing file.
+    CHECK(!listInsertSet((dir / "notes.txt").string(), items, err));
+    CHECK(!listInsertSet((dir / "empty").string(), items, err));
+    CHECK(!listInsertSet((dir / "missing.glb").string(), items, err));
+    std::filesystem::remove_all(dir);
+    std::remove(glb.c_str());
 }

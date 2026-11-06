@@ -43,6 +43,20 @@ std::vector<Mesh> splitByFaceGroups(const Mesh& mesh);
 // One mesh per connected piece, largest first (empty if the mesh is one piece).
 std::vector<Mesh> splitIntoParts(const Mesh& mesh);
 
+// Insert sets (kitbash sets): a folder of model files, or one model file with several objects, to insert
+// from one mesh at a time (insert_mesh set=<path> index=<n>). Each item is a file in the folder (.obj, .ply,
+// .glb, .gltf; not its subfolders; by name, at most kInsertSetMaxItems) or an object in the file.
+struct InsertSetItem {
+    std::string name; // the file's stem, or the object's name ("<stem> <n>" when it has none)
+    std::string file; // the file it is in (the set itself for a multi-object file)
+    int object = -1;  // its object in that file; -1 = the whole file
+};
+constexpr int kInsertSetMaxItems = 512;
+// The set's items, without loading folder items (a multi-object file is read once to count its objects).
+bool listInsertSet(const std::string& path, std::vector<InsertSetItem>& items, std::string& error);
+// One item's mesh, and its name.
+bool loadInsertSetItem(const std::string& path, int index, Mesh& out, std::string& name, std::string& error);
+
 // part_list, part_select, part_append, part_duplicate, part_delete,
 // part_rename, part_visibility, part_solo, part_show_all, part_move,
 // part_merge_down, part_merge_visible, part_split_groups, part_split_parts.
