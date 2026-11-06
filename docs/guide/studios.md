@@ -296,7 +296,7 @@ code 2 when it is broken); use it to check a file before you deploy it.
 | `network.enabled` | `false`: studio mode (see [Offline deployment](#offline-deployment)): no outside connection except `network.allow`, `ai.endpoints`, the identity provider and your update feed |
 | `network.allow` | More URL prefixes that stay reachable while the network is off |
 | `network.localNetwork` | `true`: the Unreal link and phone capture may use the studio network while the network is off |
-| `mcp.enabled` | `false`: no AI tool can connect (`sculptforge-cli --mcp` refuses to start) |
+| `mcp.enabled` | `false`: no AI tool can connect (`sculptforge-cli --mcp` refuses to start, and **Help > Connect an AI tool** is gone) |
 | `mcp.live` | `"never"`: AI tools work only on their own scene and can never control an open SculptForge window |
 | `mcp.categories` | The kinds of command AI tools may use: `info` (read the scene), `edit` (change it in memory), `files` (open, save, export, bridges), `scripts` (macros), `network` (brush gallery, Unreal), `ai` (AI generation). Left out: all |
 | `audit.path`, `audit.maxMB`, `audit.keep` | Where the [audit log](#audit-log) goes, when it rotates (10 MB) and how many old files it keeps (5) |

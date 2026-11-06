@@ -5,6 +5,7 @@
 // signs in to, the exact command or configuration for this install with Copy buttons. Only while AI features are on
 // (Preferences > AI): the action is registered in registerAiActions() and removed with the others.
 #include "app/App.h"
+#include "core/ManagedPolicy.h"
 #include "app/ConnectAi.h"
 #include "app/I18n.h"
 
@@ -70,6 +71,10 @@ void codeBox(const std::string& text, const std::string& id, ImFont* mono) {
 
 void App::drawConnectAi() {
     if (!showConnectAi_) return;
+    if (!policy::mcpAllowed()) { // (a studio's policy turned AI tools off: core/ManagedPolicy.h)
+        showConnectAi_ = false;
+        return;
+    }
     const float s = uiScale_;
     ImGui::SetNextWindowSize(ImVec2(720 * s, 640 * s), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));

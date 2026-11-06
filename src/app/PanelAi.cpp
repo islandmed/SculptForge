@@ -89,8 +89,8 @@ void App::registerAiActions() {
          "Brush Lab: describe a brush in words and AI builds it; tweak the recipe with sliders.");
     flag("ui.generate3d", "Generate 3D", ICON_LC_WAND_SPARKLES, "Generate", &showImageTo3D_,
          "Turn an image or a description into a sculptable model (Hugging Face, fal.ai, Meshy, ComfyUI or offline).");
-    // Help > Connect an AI tool (PanelConnectAi.cpp). (Managed policy, feat/studio-ready: register it only when MCP is
-    // allowed, sf::policy::mcpAllowed().)
+    // Help > Connect an AI tool (PanelConnectAi.cpp): not when a studio's policy turns AI tools (MCP) off.
+    if (!policy::mcpAllowed()) return;
     Action connect;
     connect.id = "help.connect_ai";
     connect.label = "Connect an AI tool...";
