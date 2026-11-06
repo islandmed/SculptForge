@@ -234,7 +234,11 @@ void centredText(ImDrawList* dl, ImFont* font, ImVec2 a, ImVec2 b, ImU32 col, co
 std::string elide(ImFont* font, const std::string& text, float width) {
     if (font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, text.c_str()).x <= width) return text;
     std::string s = text;
-    while (!s.empty() && font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, (s + "...").c_str()).x > width) s.pop_back();
+    while (!s.empty() && font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, (s + "...").c_str()).x > width) {
+        // One whole UTF-8 character: its continuation bytes, then its lead byte (half a Chinese character drew as "?").
+        while (!s.empty() && (static_cast<unsigned char>(s.back()) & 0xC0) == 0x80) s.pop_back();
+        if (!s.empty()) s.pop_back();
+    }
     return s + "...";
 }
 
