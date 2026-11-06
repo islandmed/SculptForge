@@ -1,5 +1,6 @@
 # Monthly sculpt challenge on the community Discord: on the 1st it announces the month's theme (next line of
-# .github/challenges.txt), on the 24th a one-week reminder, on the last day "submissions closed, vote with 🔥".
+# .github/challenges.txt), on the 24th a one-week reminder, on the last day "submissions closed, winner picked
+# tomorrow". The team picks last month's winner by hand on the 1st (most 🔥 votes, ties picked by the team).
 # Posts go through a channel webhook stored in the DISCORD_CHALLENGE_WEBHOOK secret; without the secret the job
 # skips. No checkout of untrusted code, no other secrets; the message text comes only from this repository.
 name: Monthly challenge
@@ -62,13 +63,15 @@ jobs:
           if kind == "announce":
               text = (f"# 🏆 {month} challenge: **{name}**\n{prompt}\n\n"
                       "Post your entry in this channel any time this month (WIPs welcome in #wip-and-feedback). "
-                      "Vote with 🔥 on your favourites. The winner gets **Featured Artist** and a spot on "
-                      "sculptforge.app. Any app is fine, but we'd love to see what you make in SculptForge!")
+                      "Entries close on the last day of the month, and the winner is picked on the 1st of next month: "
+                      "most 🔥 votes wins, ties are picked by the team. Vote with 🔥 on your favourites! The winner "
+                      "gets **Featured Artist** and a spot on sculptforge.app. Any app is fine, but we'd love to see "
+                      "what you make in SculptForge!")
           elif kind == "reminder":
               text = f"⏰ One week left for the {month} challenge: **{name}**. Get those entries in!"
           else:
               text = (f"🔒 Submissions for the {month} challenge (**{name}**) are closed. Last chance to vote with 🔥. "
-                      "The winner is announced soon, and next month's theme drops tomorrow!")
+                      "Winner picked tomorrow, together with next month's theme!")
           body = json.dumps({"content": text, "username": "SculptForge Challenges",
                              "allowed_mentions": {"parse": []}}).encode()
           req = urllib.request.Request(hook, data=body, headers={"Content-Type": "application/json",
