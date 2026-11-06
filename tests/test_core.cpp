@@ -602,8 +602,11 @@ TEST(ai_free_provider_is_the_default) {
     Json missing = Json::object();
     CHECK(AiSettings::fromJson(missing).provider == AiSettings::Provider::Free);
     if (!std::getenv("ANTHROPIC_API_KEY")) {
-        AiSettings old = AiSettings::defaults(AiSettings::Provider::Anthropic);
-        AiSettings migrated = AiSettings::fromJson(old.toJson());
+        Json old = Json::object(); // an ai.json from before the free tier (and before presets)
+        old.set("provider", "anthropic");
+        old.set("endpoint", "https://api.anthropic.com/v1/messages");
+        old.set("model", "claude-opus-5-5");
+        AiSettings migrated = AiSettings::fromJson(old);
         CHECK(migrated.provider == AiSettings::Provider::Free && migrated.model == "openai");
     }
     AiSettings keyed = AiSettings::defaults(AiSettings::Provider::Anthropic);
@@ -1367,7 +1370,8 @@ TEST(free_huggingface_models) {
         chosen.hfModelChosen = true;
         chosen.hfToken = "hf_test";
         ai::AiSettings loaded = ai::AiSettings::fromJson(chosen.toJson());
-        CHECK(loaded.hfModel == "hunyuan3d-2-turbo" && loaded.hfModelChosen && loaded.resolvedHfToken() == "hf_test");
+        // (the token itself goes to the keychain, never ai.json: test_studio_policy.cpp)
+        CHECK(loaded.hfModel == "hunyuan3d-2-turbo" && loaded.hfModelChosen && loaded.hfToken.empty());
         ai::AiSettings unchosen;
         unchosen.hfModel = "trellis-2"; // saved by "Save settings" without picking a model
         CHECK(ai::AiSettings::fromJson(unchosen.toJson()).hfModel == "hunyuan3d-2.1");

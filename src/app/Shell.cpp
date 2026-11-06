@@ -499,6 +499,7 @@ void App::registerShellActions() {
         actions_.add(std::move(a));
     }
     registerAiActions(); // AI Brush, Generate 3D: only while AI is on (PanelAi.cpp)
+    registerPolicyTestCommand(); // (UI tests only)
     flag("ui.brush_gallery", "Community brushes", ICON_LC_GLOBE, "Brush", "", &showBrushGallery_,
          "Browse, search and install brushes other sculptors shared.");
 

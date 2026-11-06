@@ -8,6 +8,8 @@
 // `--nightly` (ctest entry sculptforge_tests_nightly, label nightly: T3 of docs/testing-flow.md), never in a shard.
 #include "TestHarness.h"
 
+#include "core/Keychain.h"
+
 #include <chrono>
 #include <cstdio>
 #include <cstring>
@@ -16,6 +18,7 @@
 
 int main(int argc, char** argv) {
     using namespace sf::test;
+    sf::keychain::useMemoryForTests(true); // no test reads or writes the user's keychain (AI keys, sign-ins)
     int shard = 0, shards = 1;
     bool nightly = false;
     std::vector<const char*> filters;

@@ -24,8 +24,10 @@ AiOverride aiEnvOverride();
 void setAiForcedOff(bool off); // --no-ai: as SF_AI=off for this process
 // Studio mode locks AI off unless its profile says "ai": true (core/StudioProfile.h).
 void setStudioAiAllowed(bool on);
-// True when the environment or --no-ai decides, so the saved choice can't change it.
+// True when the environment, --no-ai, studio mode or a studio's policy decides, so the saved choice can't change it.
 bool aiPolicyLocked();
+// True when a studio's policy file (core/ManagedPolicy.h) decides: the UI says "Managed by your studio".
+bool aiManaged();
 // The effective switch: the environment (or --no-ai) wins over the saved preference.
 bool aiFeaturesAllowed(bool saved);
 

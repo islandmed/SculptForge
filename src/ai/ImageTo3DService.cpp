@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ai/ImageTo3DService.h"
+#include "core/ManagedPolicy.h"
 #include "ai/AiPolicy.h"
 
 #include "ai/ComfyUI.h"
@@ -549,9 +550,23 @@ std::string findModelUrl(const Json& result, std::string* extension) {
     return url;
 }
 
+namespace {
+// The studio policy's gate (core/ManagedPolicy.h ai.providers / ai.endpoints / requireSignIn) for the chosen service.
+// "inflate" is offline and not AI: always allowed. "command" runs a local program: its provider id alone decides.
+bool serviceAllowed(const AiSettings& s, std::string& error) {
+    const std::string& svc = s.generatorService;
+    if (svc == "inflate") return true;
+    const std::string url = svc == "fal" ? s.falEndpoint : svc == "meshy" ? s.meshyEndpoint : svc == "comfyui" ? s.comfyUrl
+                            : svc == "command" ? std::string() : std::string("https://huggingface.co/");
+    if (url.empty()) return policy::aiProviderAllowed(svc, &error);
+    return aiRequestAllowed(svc == "fal" || svc == "meshy" || svc == "comfyui" ? svc : "huggingface", url, error);
+}
+} // namespace
+
 GeneratorResult generate3D(const AiSettings& s, const std::string& imagePath, const std::string& outputStem,
                            GenerationProgress* progress) {
     if (!aiEnabled()) return {false, {}, aiOffError()};
+    if (std::string why; !serviceAllowed(s, why)) return {false, {}, why};
     if (s.generatorService == "meshy") return runMeshy(s, imagePath, outputStem, progress);
     if (s.generatorService == "command") {
         status(progress, "Running your generator...");
@@ -586,6 +601,7 @@ std::string falTextBody(const std::string& prompt, const std::string& model) {
 GeneratorResult generate3DFromText(const AiSettings& s, const std::string& prompt, const std::string& outputStem,
                                    GenerationProgress* progress) {
     if (!aiEnabled()) return {false, {}, aiOffError()};
+    if (std::string why; !serviceAllowed(s, why)) return {false, {}, why};
     GeneratorResult result;
     if (prompt.find_first_not_of(" \t\r\n") == std::string::npos) {
         result.error = "Describe the model you want";

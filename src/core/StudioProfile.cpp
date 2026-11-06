@@ -3,9 +3,11 @@
 #include "core/StudioProfile.h"
 
 #include "core/Json.h"
+#include "core/ManagedPolicy.h"
 #include "core/Pack.h"
 #include "core/UpdateCheck.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -145,6 +147,29 @@ std::string findInstalledStudioDir(const std::string& exeDir) {
     return {};
 }
 
+net::NetworkPolicy withManagedPolicy(net::NetworkPolicy policy, const policy::Policy& managed) {
+    if (managed.network != policy::Lock::Off) return policy;
+    policy.offline = true;
+    auto add = [&](const std::string& u) {
+        if ((u.rfind("https://", 0) == 0 || u.rfind("http://", 0) == 0) &&
+            std::find(policy.allow.begin(), policy.allow.end(), u) == policy.allow.end())
+            policy.allow.push_back(u);
+    };
+    for (const std::string& u : managed.networkAllow) add(u);
+    for (const std::string& u : managed.aiEndpoints) add(u);
+    for (const std::string& u : managed.signInUseFor) add(u);
+    // The identity provider's whole site: its device and token endpoints are often beside the issuer path, not under
+    // it (Entra ID). Google's live on another host: list https://oauth2.googleapis.com/ in network.allow.
+    if (net::UrlParts u; managed.signInConfigured() && net::parseUrl(managed.issuer, u)) {
+        const bool defaultPort = (u.scheme == "https" && u.port == 443) || (u.scheme == "http" && u.port == 80);
+        add(u.scheme + "://" + u.host + (defaultPort ? std::string() : ":" + std::to_string(u.port)) + "/");
+    }
+    add(managed.updateFeed);
+    add(managed.updateMirror);
+    policy.localNetwork = policy.localNetwork || managed.localNetwork;
+    return policy;
+}
+
 StudioStart startStudioMode(const std::string& exeDir, const std::string& overridePath, bool forceOffline) {
     StudioStart s;
     std::string error;
@@ -167,6 +192,7 @@ StudioStart startStudioMode(const std::string& exeDir, const std::string& overri
     if (found) policy = studioNetworkPolicy(s.profile);
     // Fail closed: a studio build, --offline or SF_OFFLINE=1 is offline even without a usable profile.
     if (isStudioBuild() || forceOffline || (envOffline && std::string(envOffline) == "1")) policy.offline = true;
+    policy = withManagedPolicy(policy, policy::startPolicy(&s.messages));
     s.active = policy.offline;
     net::setNetworkPolicy(policy);
     if (found && !s.profile.brushPaths.empty()) { // read-only shares, ahead of any already set
@@ -215,6 +241,12 @@ const StudioStart& studioMode() { return gStudio; }
 
 std::string updateFeedSource(const StudioStart& s, const char* envFeed, std::string& fallback) {
     fallback.clear();
+    if (const policy::Policy& p = policy::current(); !p.updateFeed.empty() || !p.updateMirror.empty()) {
+        // The studio's policy names its own channel: only that, then its mirror.
+        if (p.updateFeed.empty()) return p.updateMirror;
+        fallback = p.updateMirror;
+        return p.updateFeed;
+    }
     if (s.active) { // only the studio's own channel, then its mirror
         if (s.profile.updateFeed.empty()) return s.profile.updateMirror;
         fallback = s.profile.updateMirror;

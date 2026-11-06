@@ -116,6 +116,7 @@ struct AppOptions {
 };
 
 class Demo;
+struct StudioSignInJob; // PanelAi.cpp: the studio sign-in on a worker (ai/Oidc.h)
 
 // Wakes the main loop from any thread (SDL_PushEvent): the app draws only when something changed (#14), so work
 // that finishes off the main thread (a file dialog's answer, a phone message) calls this to be seen at once.
@@ -541,9 +542,15 @@ private:
     // Preferences > AI (PanelAi.cpp, ai/AiPolicy.h): Enable AI features. Off removes the AI commands, the Brush Lab
     // and Generate 3D entries and closes their windows; saved in ai.json at once (not in tests). SF_AI / --no-ai lock it.
     void setAiFeatures(bool on);
+    void applyAiFeatures(bool on, bool save); // the switch itself, whatever locks it (setAiFeatures, a policy)
+    void registerPolicyTestCommand(); // ui_policy: UI tests only (tests/ui/studio_policy.sfui)
     void registerAiActions(); // ui.brush_lab, ui.generate3d: only while AI is on
     void drawAiPrefs();       // the Preferences > AI section and the first-run question
+    void drawAiStudioPrefs(); // Preferences > AI: what the studio's policy manages, the studio sign-in, the audit log
+    void storeAiKeys();
+    void applyUpdatePolicy(); // a studio policy's update check and channel (core/ManagedPolicy.h) over the saved ones       // the keys aiSettings_ holds, into the OS keychain (a worker; ai/Secrets.h)
     // Brush Lab (AI brush designer)
+    std::shared_ptr<StudioSignInJob> signInJob_; // Preferences > AI > Studio sign-in, while it runs
     bool showBrushLab_ = false; // floating; opened from the top shelf's AI Brush or the Brush palette
     bool hideUi_ = false;
     uint64_t seenSplatsVersion_ = 0;

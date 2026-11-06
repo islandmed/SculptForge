@@ -11,11 +11,10 @@ expect_not "Endpoint"
 shot ai-free
 
 click "##provider"
-click "OpenAI-compatible (OpenAI, Ollama, LM Studio...)"
-expect "Ollama"
-expect "LM Studio"
+click "Ollama (this computer)"
 expect "Find models"
 expect "Endpoint"
+expect_text Private: the model runs on this computer
 click "Run a model on this computer"
 expect_text ollama pull qwen3:4b-instruct
 shot ai-local-help
@@ -27,6 +26,7 @@ wait_idle 15
 expect_text Nothing is answering
 shot ai-not-running
 
-click "LM Studio"
-click "Ollama"
+# Another preset starts fresh.
+click "##provider"
+click "LM Studio (this computer)"
 expect_no_text Nothing is answering

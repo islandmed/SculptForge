@@ -79,14 +79,15 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 39. [Scripting and automation](scripting.md)
 40. [Packs and macros](packs-and-macros.md)
 41. [SculptForge for studios](studios.md)
+42. [Security overview for IT reviews](security.md)
 
 ## Reference
 
-42. [Keyboard and mouse](shortcuts.md)
-43. [Performance and big meshes](performance.md)
-44. [Troubleshooting: tablets, display, crashes and FAQ](troubleshooting.md)
-45. [Glossary](glossary.md)
-46. [Show SculptForge on Discord](discord.md)
+43. [Keyboard and mouse](shortcuts.md)
+44. [Performance and big meshes](performance.md)
+45. [Troubleshooting: tablets, display, crashes and FAQ](troubleshooting.md)
+46. [Glossary](glossary.md)
+47. [Show SculptForge on Discord](discord.md)
 
 ## Getting help
 
