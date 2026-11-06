@@ -210,6 +210,8 @@ constexpr Entry kTraditionalChinese[] = {
     {"New Plane", "新增平面"},
     {"New Forge Sphere", "新增 Forge Sphere"},
     {"Open", "開啟"},
+    {"Opening", "正在開啟"},
+    {"Preview: sculpting starts once it's in", "預覽：載入完成後即可雕塑"},
     {"Open Recent", "開啟最近使用的檔案"},
     {"Save", "儲存"},
     {"Save As", "另存新檔"},

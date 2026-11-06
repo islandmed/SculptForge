@@ -241,6 +241,8 @@ constexpr Entry kSpanish[] = {
     {"New Forge Sphere", "Nueva Forge Sphere"},
     {"Open", "Abrir"},
     {"Open Recent", "Abrir reciente"},
+    {"Opening", "Abriendo"},
+    {"Preview: sculpting starts once it's in", "Vista previa: podrás esculpir al terminar"},
     {"Save", "Guardar"},
     {"Save As", "Guardar como"},
     {"Import", "Importar"},
