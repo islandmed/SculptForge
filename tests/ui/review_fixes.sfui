@@ -47,16 +47,16 @@ expect_value masked > 0
 click "Wire##view.wire"
 expect_value mask_darkness == 70
 shot mask_wire
-click "Masking##tool.masking"
-expect_text "Mask Darkness"
-shot mask_darkness
-click "Masking##tool.masking"
 click "Wire##view.wire"
 run mask_clear
 
 # Extract without a mask says what it needs.
 expect_text "Mask first (Ctrl+drag)"
 shot extract_hint
+# Tool > Masking has the Mask darkness slider too.
+click "Masking##tool.masking"
+expect_text "Mask Darkness"
+shot mask_darkness
 
 # Saved views: save one, turn away, Numpad 0 comes back to it.
 camera 30 20

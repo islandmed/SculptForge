@@ -834,7 +834,8 @@ void App::drawPalette_Tool() {
         // Apart from Divide and Micro: these change the mesh itself and keep no levels.
         ImGui::Spacing();
         tray::GroupLabel(*this, "Change the Mesh (no levels)");
-        actionRow(*this, {"geometry.subdivide", "geometry.close_holes"});
+        actionRow(*this, {"geometry.subdivide"}); // (its own row: the long label needs the width)
+        actionRow(*this, {"geometry.close_holes"});
         const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
         if (ImGui::Button(tr("Decimate"), ImVec2(half, 0))) {
             Args args{{"ratio", double(decimateRatio_)}};
