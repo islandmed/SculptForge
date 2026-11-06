@@ -160,7 +160,7 @@ struct UvEditorState {
     // Seams drawn on the model.
     std::vector<uint32_t> seamCorners;
     uint64_t seamKey = ~uint64_t(0);
-    // Background unwrap.
+    // Unwrap and Pack on a worker thread (progress and Cancel under the view).
     struct Job {
         std::future<bool> done;
         std::shared_ptr<std::atomic<float>> progress;
@@ -171,9 +171,18 @@ struct UvEditorState {
         size_t triangles = 0;
         UvUnwrapMethod method = UvUnwrapMethod::Isometric;
         bool keepTexture = true;
+        // Pack: the packed copy, its result and the arguments (for the grid fields); the UVs it started from,
+        // which must still be the Part's when it lands.
+        bool pack = false;
+        std::shared_ptr<Mesh> packed;
+        std::shared_ptr<UvPackResult> packResult;
+        UvPackOptions packOptions;
+        Args packArgs;
+        std::vector<glm::vec2> uvsBefore;
     };
     std::unique_ptr<Job> job;
     int unwraps = 0; // finished (UI tests)
+    int packs = 0;   // background packs finished, landed or not (UI tests: uv_packs)
     int frames = 0;  // Frame clicks and F presses (UI tests: uv_frames)
     // The toolbar's items as drawn last frame and the window's right edge (UI tests: uv_toolbar_overlap / _clipped).
     struct Box { ImVec2 Min, Max; };
@@ -628,11 +637,6 @@ struct UvEditorUi {
         Args a = packArgs();
         a["method"] = std::string(uvUnwrapMethodId(method));
         a["iterations"] = double(s.iterations);
-        if (m.triangleCount() < 60000) { // quick enough to wait for
-            run("uv_unwrap", a);
-            ++s.unwraps;
-            return;
-        }
         auto job = std::make_unique<UvEditorState::Job>();
         job->progress = std::make_shared<std::atomic<float>>(0.0f);
         job->cancel = std::make_shared<std::atomic<bool>>(false);
@@ -684,17 +688,57 @@ struct UvEditorUi {
         app.status_ = std::string("Unwrapping (") + uvUnwrapMethodLabel(method) + ") " + std::to_string(m.triangleCount()) + " triangles...";
     }
 
+    // Pack (the button, Pack at Density): uv_pack's work on a copy of the Part on a worker thread; the result
+    // lands as uv_pack's undo step and status line would.
+    void pack(Args a) {
+        Mesh& m = mesh();
+        if (s.job || !m.hasUvs()) return;
+        auto job = std::make_unique<UvEditorState::Job>();
+        job->pack = true;
+        job->progress = std::make_shared<std::atomic<float>>(0.0f);
+        job->cancel = std::make_shared<std::atomic<bool>>(false);
+        job->error = std::make_shared<std::string>();
+        job->part = app.doc_.activePartInfo().id;
+        job->triangles = m.triangleCount();
+        job->keepTexture = argBool(a, "keep_texture", true);
+        job->packOptions = uvPackOptions(app.doc_, a);
+        job->packArgs = a;
+        job->uvsBefore = m.uvs;
+        job->packResult = std::make_shared<UvPackResult>();
+        job->packed = std::make_shared<Mesh>();
+        job->packed->positions = m.positions;
+        job->packed->triangles = m.triangles;
+        job->packed->uvs = m.uvs;
+        job->packed->uvFlags = m.uvFlags;
+        std::promise<bool> promise;
+        job->done = promise.get_future();
+        std::thread([promise = std::move(promise), copy = job->packed, sel = app.doc_.uvSelection, o = job->packOptions,
+                     progress = job->progress, cancel = job->cancel, result = job->packResult, error = job->error]() mutable {
+            const UvTopology topo = buildUvTopology(*copy);
+            const std::vector<uint8_t> islands = uvSelectedIslands(*copy, topo, sel, true);
+            const bool ok = uvPack(*copy, topo, islands, o, *result, *error, [&](float f) {
+                progress->store(f);
+                return !cancel->load();
+            });
+            promise.set_value(ok);
+            wakeMainLoop();
+        }).detach();
+        s.job = std::move(job);
+        app.status_ = "Packing...";
+    }
+
     void poll() {
         if (!s.job) return;
         if (s.job->done.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
-            app.status_ = "Unwrapping: " + std::to_string(int(s.job->progress->load() * 100.0f)) + "%";
+            app.status_ = std::string(s.job->pack ? "Packing: " : "Unwrapping: ") + std::to_string(int(s.job->progress->load() * 100.0f)) + "%";
             return;
         }
         if (app.jobWaitsForStroke()) return; // (the result lands when the stroke ends)
         const std::unique_ptr<UvEditorState::Job> job = std::move(s.job);
+        if (job->pack) return landPack(*job);
         ++s.unwraps;
         if (!job->done.get()) {
-            app.status_ = *job->error;
+            app.status_ = *job->error == "Unwrap was cancelled" || *job->error == "Cancelled" ? "Unwrap cancelled" : *job->error;
             return;
         }
         int index = -1;
@@ -710,6 +754,29 @@ struct UvEditorUi {
         const std::string note = step.commit();
         app.status_ = std::string("Unwrapped (") + uvUnwrapMethodLabel(job->method) + "): " +
                       std::to_string(job->result->islands) + " islands" + note;
+        s.dirty = true;
+    }
+
+    void landPack(UvEditorState::Job& job) {
+        ++s.packs;
+        if (!job.done.get()) {
+            app.status_ = *job.error == "Cancelled" ? "Pack cancelled: the UVs stay as they were" : *job.error;
+            return;
+        }
+        int index = -1;
+        for (int i = 0; i < app.doc_.partCount(); ++i)
+            if (app.doc_.parts[size_t(i)].id == job.part) index = i;
+        if (index < 0 || app.doc_.partMesh(index).triangleCount() != job.triangles || app.doc_.partMesh(index).uvs != job.uvsBefore) {
+            app.status_ = "Pack skipped: the UVs changed while they were being packed";
+            return;
+        }
+        const App::JobPart part(app, index);
+        UvEditStep step(app.doc_, "Pack UVs", job.keepTexture);
+        mesh().uvs = std::move(job.packed->uvs);
+        const std::string note = step.commit();
+        app.status_ = uvPackNote(*job.packResult, job.packOptions) + note;
+        app.uvEditorChanged();
+        app.uvPackGridUsed(job.packArgs);
         s.dirty = true;
     }
 
@@ -840,12 +907,14 @@ void App::registerUvEditorActions() {
         "Unwrap with the chosen method: the selected faces (fitted where they were), or the whole Part (packed). Least "
         "Stretch keeps angles and lengths along the marked seams; Conformal keeps angles; By Face Groups cuts along the "
         "face group borders too; Planar projects each piece; Unfold flattens the current islands again in place, keeping "
-        "pins; Auto Seams finds its own. Closed pieces get cut automatically. Big meshes unwrap in the background.",
+        "pins; Auto Seams finds its own. Closed pieces get cut automatically. Runs in the background (Cancel under the "
+        "view stops it).",
         "uv_unwrap");
-    add("uv.pack", "Pack", ICON_LC_PACKAGE, "", [this] { uvUi(*this, uvEditor_).run("uv_pack", uvUi(*this, uvEditor_).packArgs()); },
-        nullptr, uvs,
+    add("uv.pack", "Pack", ICON_LC_PACKAGE, "", [this] { uvUi(*this, uvEditor_).pack(uvUi(*this, uvEditor_).packArgs()); },
+        nullptr, [this] { return doc_.mesh.hasUvs() && !(uvEditor_ && uvEditor_->job); },
         "Pack the selected islands (or all) as large as they fit into the 0-1 tile, or across the Columns x Rows grid "
-        "of UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them.",
+        "of UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them. "
+        "Runs in the background (Cancel under the view stops it).",
         "uv_pack");
     add("uv.seam_mark", "Mark Seam", ICON_LC_SCISSORS, "", [runUv] { runUv("uv_seam", {{"op", std::string("mark")}}); }, nullptr,
         selected, "Mark the selected edges (or the border of the selected faces) as seams: Unwrap cuts there.", "uv_seam");
@@ -917,9 +986,9 @@ void App::registerUvEditorActions() {
             UvEditorUi u = uvUi(*this, uvEditor_);
             Args a = u.packArgs();
             a["density"] = double(uvEditor_->targetDensity);
-            u.run("uv_pack", a);
+            u.pack(a);
         },
-        nullptr, uvs,
+        nullptr, [this] { return doc_.mesh.hasUvs() && !(uvEditor_ && uvEditor_->job); },
         "Pack at exactly the target texel density, using as many UDIM tiles as it takes (1001, 1002, ..., Columns "
         "wide, then the next row up): every island keeps the same texels per unit across the tiles.",
         "uv_pack");
@@ -1275,7 +1344,8 @@ void App::drawUvEditor() {
         const ImVec2 a(viewMin.x + viewSize.x * 0.25f, viewMin.y + viewSize.y * 0.5f), b(viewMin.x + viewSize.x * 0.75f, a.y + 8 * scale);
         dl->AddRectFilled(a, b, IM_COL32(40, 40, 44, 230), 4 * scale);
         dl->AddRectFilled(a, ImVec2(a.x + (b.x - a.x) * f, b.y), theme::u32(theme::accent), 4 * scale);
-        dl->AddText(ImVec2(a.x, a.y - ImGui::GetTextLineHeight() - 4 * scale), IM_COL32(220, 220, 225, 255), "Unwrapping...");
+        dl->AddText(ImVec2(a.x, a.y - ImGui::GetTextLineHeight() - 4 * scale), IM_COL32(220, 220, 225, 255),
+                    tr(s.job->pack ? "Packing..." : "Unwrapping..."));
     }
     dl->PopClipRect();
     dl->AddRect(viewMin, viewMax, IM_COL32(60, 60, 66, 255));
@@ -1300,6 +1370,12 @@ void App::drawUvEditor() {
                           double(s.meanDensity), u.resolution() / 1024, tiles.c_str());
         else
             std::snprintf(line, sizeof line, tr("%zu seam edges marked"), uvSeamCount(m));
+        if (s.job) { // (the running Unwrap or Pack: Cancel, and how far it is)
+            if (ImGui::SmallButton((std::string(tr("Cancel")) + "##uvjobcancel").c_str())) s.job->cancel->store(true);
+            ui::HelpText("Cancel", nullptr, "Stop the Unwrap or Pack that is running; the UVs stay as they are.", kPath);
+            ImGui::SameLine();
+            std::snprintf(line, sizeof line, tr(s.job->pack ? "Packing: %d%%" : "Unwrapping: %d%%"), int(s.job->progress->load() * 100.0f));
+        }
         ImGui::TextDisabled("%s", line);
     }
 
@@ -1650,7 +1726,8 @@ double App::uvEditorTestValue(const std::string& name) {
     if (name == "uv_seams") return double(uvSeamCount(m));
     if (name == "uv_selected") return doc_.uvSelection.valid(m) ? double(doc_.uvSelection.count()) : 0.0;
     if (name == "uv_select_mode") return double(int(doc_.uvSelection.mode));
-    if (name == "uv_unwrapping") return uvEditor_ && uvEditor_->job ? 1.0 : 0.0;
+    if (name == "uv_unwrapping") return uvEditor_ && uvEditor_->job ? 1.0 : 0.0; // (an Unwrap or Pack running)
+    if (name == "uv_packs") return uvEditor_ ? double(uvEditor_->packs) : 0.0;
     if (name == "uv_unwraps") return uvEditor_ ? double(uvEditor_->unwraps) : 0.0;
     if (name == "uv_pack_columns") return double(uvPackColumns_); // the Pack fields
     if (name == "uv_pack_rows") return double(uvPackRows_);

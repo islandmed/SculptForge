@@ -1003,7 +1003,7 @@ private:
     const MeshOverlay* uvEditorOverlay(uint32_t part); // what syncScene hands the renderer for the model
     bool uvEditorBusy() const;
     // UI test values: uv_editor_open, uv_islands, uv_seams, uv_selected, uv_select_mode, uv_pins, uv_tiles,
-    // uv_stretch_x1000, uv_flipped_x1000, uv_density, uv_max_u, uv_unwrapping, uv_unwraps, uv_tool,
+    // uv_stretch_x1000, uv_flipped_x1000, uv_density, uv_max_u, uv_unwrapping, uv_unwraps, uv_packs, uv_tool,
     // uv_view_triangles, uv_overlay, uv_pack_columns, uv_pack_rows (the Pack fields); NaN for other names.
     double uvEditorTestValue(const std::string& name);
     std::shared_ptr<struct UvEditorState> uvEditor_;
