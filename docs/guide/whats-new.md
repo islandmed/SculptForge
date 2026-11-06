@@ -5,6 +5,18 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.8
+
+```features
+date: 2026-11-06
+tagline: Clearer corner axes, one-click Library, a new cube app icon, and pen stamps that keep their strength.
+highlight: Clearer corner axes: lettered, depth-shaded, click twice for the opposite view
+highlight: One click in the Library uses a brush, alpha or material (thanks @NicTanghe, #142)
+highlight: The app icon is now an orange cube
+highlight: Drag and Slide Stamp keep their strength when the pen lifts (#146)
+highlight: Big brushes on micro levels spend less time shading each frame
+```
+
 ## Version 0.11.7
 
 ```features
