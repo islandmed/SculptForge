@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "cli/McpServer.h"
 
+#include "cli/McpTools.h"
+
 #include "core/BrushLibrary.h"
 #include "core/Json.h"
 
@@ -45,6 +47,7 @@ Json toolList(const CommandRegistry& registry) {
         tool.set("inputSchema", schema);
         tools.push(tool);
     }
+    tools.push(viewportImageTool()); // drawn here (cli/McpTools.h), not a registry command
     Json result = Json::object();
     result.set("tools", tools);
     return result;
@@ -86,9 +89,13 @@ std::string handleMcpMessage(const CommandRegistry& registry, Document& doc, con
         Json caps = Json::object(), tools = Json::object();
         tools.set("listChanged", false);
         caps.set("tools", tools);
+        Json prompts = Json::object();
+        prompts.set("listChanged", false);
+        caps.set("prompts", prompts); // the recipes (cli/McpTools.h)
         result.set("capabilities", caps);
         Json info = Json::object();
         info.set("name", "sculptforge");
+        info.set("title", "SculptForge");
         info.set("version", SCULPTFORGE_VERSION);
         result.set("serverInfo", info);
         result.set("instructions",
@@ -97,13 +104,40 @@ std::string handleMcpMessage(const CommandRegistry& registry, Document& doc, con
                    "subdivide/remesh/layers/decimate, then export_glb, export_usd, export_lods or splat_save. "
                    "A scene can hold several Parts (separate meshes, see part_list): edits apply to the active "
                    "one, exports write every visible one. "
-                   "Use mesh_info and splat_info to check results. File paths are on the user's machine.");
+                   "Check each step by eye with viewport_image and by numbers with mesh_info (splat_info for "
+                   "captures); every tool call is one undo step (undo takes it back). The prompts are ready-made "
+                   "recipes (a creature head, a game-ready asset, rock variations, a lesson). File paths are on "
+                   "the user's computer.");
         return reply(id, result).dump();
     }
     if (method == "ping") return reply(id, Json::object()).dump();
     if (method == "tools/list") return reply(id, toolList(registry)).dump();
+    if (method == "prompts/list") return reply(id, mcpPromptList()).dump();
+    if (method == "prompts/get") {
+        Json result;
+        std::string error;
+        if (!mcpPromptGet(msg["params"]["name"].asString(), msg["params"]["arguments"], result, error))
+            return errorReply(id, -32602, error).dump();
+        return reply(id, result).dump();
+    }
     if (method == "tools/call") {
         const std::string name = msg["params"]["name"].asString();
+        if (name == "viewport_image") {
+            Json content;
+            std::string error;
+            const bool ok = renderViewportImage(doc, msg["params"]["arguments"], content, error);
+            if (!ok) {
+                Json text = Json::object();
+                text.set("type", "text");
+                text.set("text", error);
+                content = Json::array();
+                content.push(text);
+            }
+            Json result = Json::object();
+            result.set("content", content);
+            result.set("isError", !ok);
+            return reply(id, result).dump();
+        }
         if (!registry.find(name) || hiddenFromAgents(name)) return errorReply(id, -32602, "Unknown tool: " + name).dump();
         Args args;
         for (const auto& [key, value] : msg["params"]["arguments"].members()) {

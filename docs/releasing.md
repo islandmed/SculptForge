@@ -162,6 +162,14 @@ What keeps the insiders token from leaking; `tools/release/check_workflows.py` (
 - islandmed/sculptforge-insiders: private, members invited with `permission=pull` only, ruleset on `main`: no force
   push, no deletion.
 
+## MCP registry (by hand, the maintainer's account)
+
+Each release carries the Claude Desktop bundles (`SculptForge-<version>-<os>.mcpb`, tools/release/build_mcpb.py,
+built and run by packages.yml) and `server.json` describing them (tools/release/mcp_server_json.py). To list the
+version in the official registry (registry.modelcontextprotocol.io): download that `server.json`, then
+`mcp-publisher login github` (as islandmed) and `mcp-publisher publish server.json`. Nothing is submitted
+automatically.
+
 ## Membership upkeep (by hand)
 
 - **Founding Members:** `website/founding.json` (`limit` 100, `taken`, `names`). On each new member among the first
