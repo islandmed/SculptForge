@@ -10,6 +10,7 @@
 #include "core/NetworkPolicy.h"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -328,10 +329,17 @@ GeneratorResult run(const AiSettings& s, const std::string& imagePath, const std
     if (!listed.error.empty() || listed.status < 200 || listed.status >= 300) return fail(httpError(listed));
     std::string fileUrl;
     if (!parseDownload(listed.body, fileUrl, err)) return fail(err);
+    // A refused host: the paid result isn't lost, it stays in the user's Hyper3D account under this task id.
+    auto refusedHost = [&](const std::string& host) {
+        std::string id;
+        for (char c : taskUuid.substr(0, 64))
+            if (std::isalnum(static_cast<unsigned char>(c)) || c == '-') id += c;
+        return fail("Refused the model file: it isn't on Hyper3D's servers (" + host +
+                    "). The model stays in your Hyper3D account (hyper3d.ai dashboard), task " + id);
+    };
     if (!downloadUrlAllowed(fileUrl)) {
         net::UrlParts u;
-        return fail("Refused the model file: it isn't on Hyper3D's servers (" +
-                    (net::parseUrl(fileUrl, u) ? u.host : std::string("not an https address")) + ")");
+        return refusedHost(net::parseUrl(fileUrl, u) ? u.host : std::string("not an https address"));
     }
     if (!aiRequestAllowed("hyper3d", fileUrl, err)) return fail(err);
 
@@ -362,6 +370,11 @@ GeneratorResult run(const AiSettings& s, const std::string& imagePath, const std
         });
     if (tooBig) return fail("The model file is larger than 200 MB - refused");
     if (p && p->cancel) return fail("Cancelled");
+    if (got.error.rfind("refused to download from ", 0) == 0) { // (a redirect left Hyper3D's servers)
+        net::UrlParts u;
+        const std::string to = got.error.substr(25);
+        return refusedHost(net::parseUrl(to, u) ? u.host : std::string("not an https address"));
+    }
     if (!got.error.empty() || got.status != 200) return fail("Download failed: " + (got.error.empty() ? "HTTP " + std::to_string(got.status) : got.error));
     if (!checkGlb(bytes, err)) return fail(err);
 

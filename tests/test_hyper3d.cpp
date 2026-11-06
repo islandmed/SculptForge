@@ -393,11 +393,26 @@ TEST(hyper3d_bad_downloads_refused) {
         fake.file = glb(R"({"asset":{"version":"2.0"}})");
         GeneratorResult r = attempt(fake);
         CHECK(!r.ok && r.error.find("evil.example") != std::string::npos && fake.calls.back().method == "POST");
+        // the paid result isn't lost: the task id and where to find it
+        CHECK(r.error.find("task task-1") != std::string::npos && r.error.find("hyper3d.ai dashboard") != std::string::npos);
+        CHECK(r.error.find(kKey) == std::string::npos);
     }
     {
         FakeHyper3d fake; // plain http
         fake.fileUrl = "http://file.hyper3d.com/model.glb";
-        CHECK(!attempt(fake).ok && fake.calls.back().method == "POST");
+        GeneratorResult r = attempt(fake);
+        CHECK(!r.ok && fake.calls.back().method == "POST" && r.error.find("task task-1") != std::string::npos);
+    }
+    {
+        FakeHyper3d fake; // a redirect off Hyper3D's servers (as httpGetRestricted reports it)
+        hyper3d::setTransportForTests([&fake](const std::string& m, const std::string& u, const std::vector<std::string>& h,
+                                              const std::string& b) {
+            HttpResponse r = fake(m, u, h, b);
+            if (m == "GET") r = {0, {}, "refused to download from https://evil.example/x.glb"};
+            return r;
+        });
+        GeneratorResult r = hyper3d::run(s, {}, "a vase", nullptr);
+        CHECK(!r.ok && r.error.find("evil.example") != std::string::npos && r.error.find("task task-1") != std::string::npos);
     }
     {
         FakeHyper3d fake; // not a GLB

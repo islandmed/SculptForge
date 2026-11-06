@@ -133,7 +133,7 @@ If no pen is detected or pressure doesn't change:
 | *Hyper3D rejected the API key* | Check the key, or create a new one in the API dashboard |
 | *Your Hyper3D plan doesn't include this tier* | Basic API access covers Extreme Low and Low; choose one of those, or upgrade on hyper3d.ai |
 | *Out of credits on your Hyper3D account* | Top up on hyper3d.ai |
-| *Refused the model file* | The result came from somewhere other than Hyper3D's servers, so SculptForge didn't download it. Try again; if it keeps happening, [report it](https://github.com/islandmed/SculptForge/issues) |
+| *Refused the model file* | The result came from somewhere other than Hyper3D's servers, so SculptForge didn't download it. The model isn't lost: it stays in your Hyper3D account (hyper3d.ai dashboard) under the task id in the message. If it keeps happening, [report it](https://github.com/islandmed/SculptForge/issues) |
 
 ### Brush Lab
 
