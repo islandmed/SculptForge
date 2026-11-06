@@ -148,6 +148,7 @@
 //                            layer_channel_<id> (1 when the active texture layer has channel <id> on, e.g. roughness)
 //                            auto_uv_running, qremesh_running (QRemesh working in the background),
 //                            longest_frame_ms (the longest real time between two frames since the last read; resets),
+//                            time_limit_scale (timeLimit()'s factor: 4 on CI or in a parallel ctest, else 1),
 //                            voxel_remesh_running, quick_remesh / remesh_after_stroke (Tool > Remesh, #121), stroke_stretched,
 //                            qremesh_guides (guide curves on the active Part), qremesh_guide_loops (closed ones),
 //                            guides_mode (1 while the QRemesh Guides brush is picked),
@@ -570,6 +571,12 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "active_texture_layer") return hasTexture(m) && !m.texture->layers.empty() ? double(m.texture->activeLayer) : -1.0;
     if (name == "auto_uv_running") return app_.autoUv_ ? 1.0 : 0.0;
     if (name == "longest_frame_ms") return std::exchange(longestFrameMs_, 0.0); // since the last read (it resets)
+    if (name == "time_limit_scale") { // timeLimit()'s factor (tests/TestHarness.h): 4 on CI and in a parallel ctest
+        if (const char* strict = std::getenv("SF_BENCH_LIMITS"); strict && std::string(strict) == "1") return 1.0;
+        if (std::getenv("CI") || std::getenv("GITHUB_ACTIONS")) return 4.0;
+        const char* scale = std::getenv("SF_TIME_LIMIT_SCALE");
+        return std::max(1.0, scale ? std::atof(scale) : 1.0);
+    }
     if (const double v = app_.bakeTestValue(name); !std::isnan(v)) return v;
     if (const double v = app_.uvEditorTestValue(name); !std::isnan(v)) return v;
     if (const double v = app_.pbrTestValue(name); !std::isnan(v)) return v; // material_channels, channel_view, ...
