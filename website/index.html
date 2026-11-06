@@ -23,7 +23,7 @@
   </script>
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://sculptforge.app/img/social-lion.png?v=1">
-  <link rel="stylesheet" href="style.css?v=20">
+  <link rel="stylesheet" href="style.css?v=21">
   <script src="motion.js?v=11" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
@@ -52,35 +52,36 @@
     <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <a class="new-badge" href="#live-mode"><span>New &middot; Live mode</span>
-            Your AI tool blocks out, you sculpt &rarr;</a>
+          <a class="new-badge" href="#live-mode"><span>New &middot; Live mode</span> &rarr;</a>
           <p class="eyebrow">The free, open-source sculpting app</p>
           <h1><span class="nowrap">Sculpt it.</span> <span class="nowrap">Forge it.</span><br><span class="accent">Ship it.</span></h1>
-          <p class="lede">Digital sculpting for <strong>VFX, animation and game studios</strong> on Linux, macOS and
-            Windows, with the Classic sculpting keys (and Blender and Maya styles) for artists switching over, and no subscription. It
-            ships <strong>VFX Reference Platform</strong> builds, OpenUSD and a Python API for studio pipelines,
-            one-click game-ready LODs and Send to Unreal. New: <strong>live mode</strong> lets your own AI tool block out
-            a starting point in your open window, after you approve, and then the sculpting is yours.</p>
-          <p class="lede-short">Sculpting for VFX, animation and games, with the Classic sculpting keys available, VFX Reference Platform
-            builds, OpenUSD and Python. New: your AI tool blocks out in your window, you do the art.</p>
+          <p class="lede">Digital sculpting that keeps up with dense scans and high-resolution busts, for <strong>VFX,
+            animation and game studios</strong> on Linux, macOS and Windows. The Classic sculpting keys (and Blender and
+            Maya styles) are there for artists switching over, with no subscription. It ships <strong>VFX Reference
+            Platform</strong> builds, OpenUSD and a Python API for studio pipelines, one-click game-ready LODs and Send to
+            Unreal.</p>
+          <p class="lede-short">Sculpting that keeps up with dense scans, for VFX, animation and games, with the Classic
+            sculpting keys available.</p>
+          <p class="speed-line">On an RTX 3060, a sculpted 112-million-triangle scan orbits at 33 frames a second right
+            after a big stroke. <a href="performance/">How we measure &rarr;</a></p>
           <div class="ctas">
             <a class="btn primary" href="#download">Download</a>
             <a class="btn" href="#vfx"><span class="hide-sm">For </span>VFX &amp; animation</a>
           </div>
           <p class="first-sculpt"><a href="guide/first-sculpt.html">New to sculpting? Make your first sculpt in 10 minutes &rarr;</a></p>
           <ul class="pills" aria-label="Highlights">
-            <li>VFX Reference Platform</li><li>Live mode for your AI tool</li><li>No account</li><li>No telemetry</li><li>Windows · macOS · Linux</li>
+            <li>VFX Reference Platform</li><li>Classic sculpting keys</li><li>No account</li><li>No telemetry</li><li>Windows · macOS · Linux</li>
           </ul>
         </div>
-        <figure class="hero-video hero-live">
-          <video id="hero-video" poster="media/poster-live-mode.jpg?v=2" autoplay muted loop playsinline preload="metadata"
-                 aria-label="Claude Code blocks out a dragon head in the open SculptForge window in live mode, every step one undo, then SculptForge brushes refine it; the AI tool is connected and approved in Help, Connect an AI tool">
-            <source src="media/live-mode-mobile.mp4?v=2" type="video/mp4" media="(max-width: 620px)">
-            <source src="media/live-mode.webm?v=2" type="video/webm">
-            <source src="media/live-mode.mp4?v=2" type="video/mp4">
+        <figure class="hero-video hero-sculpt">
+          <video id="hero-video" poster="media/poster-sculpt.jpg?v=2" autoplay muted loop playsinline preload="metadata"
+                 aria-label="Sculpting a 12-million-triangle lion scan in SculptForge at real speed: Clay builds up the brows, Crease adds frown lines, Move pulls the mane, Inflate fills the muzzle, Smooth settles it, then the view turns">
+            <source src="media/sculpt-real-speed-mobile.mp4?v=1" type="video/mp4" media="(max-width: 620px)">
+            <source src="media/sculpt-real-speed.webm?v=1" type="video/webm">
+            <source src="media/sculpt-real-speed.mp4?v=1" type="video/mp4">
           </video>
-          <figcaption>Live mode, a real session (trimmed and sped up): Claude Code blocks out the head (5x), every AI step
-            is one undo, then a pass with SculptForge brushes (scripted strokes, 2x).</figcaption>
+          <figcaption>A real session at real speed, not sped up, no AI: Clay, Crease, Move, Inflate and Smooth on a
+            12-million-triangle Poly Haven lion scan (CC0), recorded on a laptop (Apple M1 Pro, Linux).</figcaption>
         </figure>
       </div>
     </section>
@@ -101,9 +102,15 @@
           </ul>
           <p><a class="btn" href="guide/scripting.html#connect-an-ai-tool">Set up live mode &rarr;</a></p>
         </div>
-        <figure class="live-still">
-          <img src="img/lion-crisp.jpg?v=1" alt="A lion head in terracotta clay on a plinth" width="900" height="900" loading="lazy" decoding="async">
-          <figcaption>Poly Haven scan (CC0), sculpted and rendered in SculptForge.</figcaption>
+        <figure class="live-video">
+          <video poster="media/poster-live-mode.jpg?v=2" autoplay muted loop playsinline preload="metadata"
+                 aria-label="Claude Code blocks out a dragon head in the open SculptForge window in live mode, every step one undo, then SculptForge brushes refine it; the AI tool is connected and approved in Help, Connect an AI tool">
+            <source src="media/live-mode-mobile.mp4?v=2" type="video/mp4" media="(max-width: 620px)">
+            <source src="media/live-mode.webm?v=2" type="video/webm">
+            <source src="media/live-mode.mp4?v=2" type="video/mp4">
+          </video>
+          <figcaption>Live mode, a real session (trimmed and sped up): Claude Code blocks out the head (5x), every AI step
+            is one undo, then a pass with SculptForge brushes (scripted strokes, 2x).</figcaption>
         </figure>
       </div>
     </section>
