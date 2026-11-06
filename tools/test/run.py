@@ -26,6 +26,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -356,10 +357,15 @@ def main(argv=None):
             for n in flaky:
                 print(f"flaky: {n} (failed, then passed on the rerun)")
             if flaky and a.flaky_log:
-                head = "" if os.path.exists(a.flaky_log) else FLAKY_HEADER
                 sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-                with open(a.flaky_log, "a", encoding="utf-8") as f:
-                    f.write(head + "".join(f"| {time.strftime('%Y-%m-%d')} | {n} | {os.uname().nodename} | {sha} |\n" for n in flaky))
+                # The machine as a description (SF_MACHINE, else OS and CPU), never its host name: the file is public.
+                machine = os.environ.get("SF_MACHINE") or f"{platform.system()} {platform.machine()}, -j{parallel_jobs(args)}"
+                rows = "".join(f"| {time.strftime('%Y-%m-%d')} | {n} | {machine} | {sha} |\n" for n in flaky)
+                text = open(a.flaky_log, encoding="utf-8").read() if os.path.exists(a.flaky_log) else FLAKY_HEADER
+                at = text.find("\n## ")  # (into the table, above the notes that follow it)
+                text = text.rstrip("\n") + "\n" + rows if at < 0 else text[:at].rstrip("\n") + "\n" + rows + text[at:]
+                with open(a.flaky_log, "w", encoding="utf-8") as f:
+                    f.write(text)
     # Record first-try passes in the cache.
     if a.cache:
         for n, (s, _) in res.items():
