@@ -15,7 +15,7 @@ taken from an icon set. It reads at 16 px, where the bust and the SF letters don
 | App title bar and status bar (`brand::appMark`) | `sculptforge-256.png`, `sculptforge-32.png` (small cut) |
 | Site favicons, apple-touch-icon | `website/favicon.ico`, `website/img/favicon-*.png`, `apple-touch-icon.png` |
 | Site header lockup: cube + "SculptForge" wordmark | inline SVG `class="brand-mark"` (pages and `tools/guide/build_site.py`) |
-| README logo, press kit icon | `sculptforge-256.png`, `website/press/sculptforge-icon-*.png` |
+| README logo, press kit icon | `website/press/sculptforge-icon-256.png`, `sculptforge-icon-1024.png` |
 | Discord Rich Presence image | `website/press/sculptforge-icon-1024.png` (by URL) |
 | Discord app icon, bot avatar and server icon, GitHub org avatar (uploaded by hand) | `make_icons.py --discord DIR`: `discord-bot-avatar-512.png`, `discord-server-icon-512.png`, `github-avatar-500.png` |
 
