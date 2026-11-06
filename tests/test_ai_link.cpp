@@ -203,7 +203,8 @@ TEST(ai_link_socket_permissions_and_disconnect) {
     std::string err;
     const std::string endpoint = aiLinkEndpoint(err);
     CHECK(!endpoint.empty());
-    CHECK(aiLinkFileMode(run + "/sculptforge") == 0700);
+    const std::string folder = std::filesystem::path(endpoint).parent_path().string(); // run/sculptforge, or the
+    CHECK(aiLinkFileMode(folder) == 0700);                                                // short /tmp one (macOS)
 
     AiLinkListener listener;
     CHECK(listener.open(endpoint, err));
@@ -240,18 +241,39 @@ TEST(ai_link_socket_permissions_and_disconnect) {
     CHECK(c2.readLine(line, 2000) == -1);
 
     // A folder opened to others is closed again; one that isn't a folder is refused.
-    std::filesystem::permissions(run + "/sculptforge", std::filesystem::perms::all);
+    std::filesystem::permissions(folder, std::filesystem::perms::all);
     listener.close();
     CHECK(!aiLinkEndpoint(err).empty());
-    CHECK(aiLinkFileMode(run + "/sculptforge") == 0700);
-    std::filesystem::remove_all(run + "/sculptforge");
-    { std::ofstream(run + "/sculptforge") << "x"; }
+    CHECK(aiLinkFileMode(folder) == 0700);
+    std::filesystem::remove_all(folder);
+    { std::ofstream(folder) << "x"; }
     CHECK(aiLinkEndpoint(err).empty());
-    std::filesystem::remove(run + "/sculptforge");
+    std::filesystem::remove(folder);
     // The socket file is gone after close; nobody's listening: the CLI says so.
     CHECK(aiLinkFileMode(endpoint) == -1);
     AiLinkConn c3;
     CHECK(!aiLinkConnect(c3, endpoint, err));
+    if (old) setenv("XDG_RUNTIME_DIR", saved.c_str(), 1);
+    else unsetenv("XDG_RUNTIME_DIR");
+}
+
+TEST(ai_link_long_runtime_folder_still_listens) {
+    // macOS: $TMPDIR (and so test folders) is long, and a socket path must fit sun_path (104 bytes there).
+    const std::string run = scratchDir("sf_ai_link_long_runtime_folder_padding_padding_padding_padding_padding_padding");
+    const char* old = std::getenv("XDG_RUNTIME_DIR");
+    const std::string saved = old ? old : "";
+    setenv("XDG_RUNTIME_DIR", run.c_str(), 1);
+    std::string err;
+    const std::string endpoint = aiLinkEndpoint(err);
+    CHECK(!endpoint.empty() && endpoint.size() < 100);
+    CHECK(aiLinkFileMode(std::filesystem::path(endpoint).parent_path().string()) == 0700);
+    AiLinkListener listener;
+    CHECK(listener.open(endpoint, err));
+    AiLinkConn client, server;
+    CHECK(aiLinkConnect(client, endpoint, err));
+    CHECK(listener.accept(server, 2000));
+    listener.close();
+    std::filesystem::remove(std::filesystem::path(endpoint).parent_path());
     if (old) setenv("XDG_RUNTIME_DIR", saved.c_str(), 1);
     else unsetenv("XDG_RUNTIME_DIR");
 }

@@ -1675,15 +1675,26 @@ void App::drawTaskMenu() {
         x = shell_.title.x + 150.0f * s;
         for (int i = 0; i < menuIndex; ++i) x += ImGui::CalcTextSize(taskMenus(count)[i].name).x + 18.0f * s;
     }
-    ImGui::SetNextWindowPos(ImVec2(std::clamp(x, 4.0f * s, vp->Size.x - w - 4.0f * s), y));
-    ImGui::SetNextWindowSizeConstraints(ImVec2(w, 0), ImVec2(w, vp->Size.y - y - 8.0f * s));
+    // A menu taller than the space under the bar scrolls, and widens by the scrollbar: content that fits the width (the
+    // Paint menu's colour picker and swatches) would otherwise get shorter under the scrollbar, stop scrolling, grow
+    // again, and the menu jittered every frame (#bug-reports 11-06, 1280x720 fullscreen).
+    const float sb = ImGui::GetStyle().ScrollbarSize;
+    ImGui::SetNextWindowPos(ImVec2(std::clamp(x, 4.0f * s, vp->Size.x - w - sb - 4.0f * s), y));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(w, 0), ImVec2(w + sb, vp->Size.y - y - 8.0f * s));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(pad, pad));
     const bool open = ImGui::BeginPopup("##palettedropdown");
     ImGui::PopStyleVar();
     if (!open) {
         dropdown_.clear();
         menuX_ = 0.0f;
+        menuRect_ = ImVec4();
         return;
+    }
+    {
+        const ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
+        const ImVec4 r(wp.x, wp.y, ws.x, ws.y);
+        if (menuRect_.z > 0.0f && (r.x != menuRect_.x || r.y != menuRect_.y || r.z != menuRect_.z || r.w != menuRect_.w)) ++menuRectChanges_;
+        menuRect_ = r;
     }
     ImDrawList* dl = ImGui::GetWindowDrawList();
     if (sections > 1) {

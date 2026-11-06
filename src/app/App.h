@@ -239,11 +239,15 @@ private:
     void sendBrushRequest(const std::string& text);
     void pollBrushRequest();
     const BrushRecipe* activeRecipe() const;
+    // The brush ring at the pointer; while the S / O pop-up is open (#138), at the point it opened from, with the
+    // size or falloff being set (dragged or typed).
     void drawBrushCursor();
-    // The brush ring lying on the surface under the pointer (#25, Preferences > Cursor > Cursor follows surface);
-    // false when the pointer is off the model (the flat screen ring is drawn instead). `ring` false: only the
-    // centre and the symmetry copies' dots (Hide ring while stroking).
-    bool drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col, bool ring);
+    // The brush ring lying on the surface under (x, y) (#25, Preferences > Cursor > Cursor follows surface);
+    // false when that point is off the model (the flat screen ring is drawn instead). `ring` false: only the
+    // centre and the symmetry copies' dots (Hide ring while stroking). `focal`: the Falloff the inner ring shows.
+    bool drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, float focal, ImU32 col, bool ring);
+    bool sizeRingPreview_ = false; // the last ring drawn was the S / O pop-up's preview (UI tests: size_ring_preview)
+    float sizeRingPreviewPx_ = 0.0f; // its radius, pixels (UI tests: size_ring_px)
     std::vector<glm::vec3> cursorRing_, cursorInner_; // scratch, kept to avoid allocating per frame
     bool surfaceCursorShown_ = false; // the last cursor drawn lay on the surface (UI tests: surface_cursor)
     bool ringShown_ = true;           // the last cursor drawn had its ring (UI tests: cursor_ring)
@@ -527,6 +531,7 @@ private:
     char discordChallengeBuf_[64 * 4 + 1] = {};  // the theme field (64 code points of UTF-8)
     bool discordPresenceAvailable() const;       // an application ID is compiled in
     void updateDiscordPresence();                // every frame: sends only when what's shown changes
+    bool discordAgentRun() const;                // agent or offscreen run: never (discord::agentRun)
     void drawIntegrationsPrefs();                // Preferences > Integrations
     bool welcomeAfterCard_ = false;             // the first-run welcome waits until the card closes
     // What's New (WhatsNewPopup.cpp): the newest version's feature cards from docs/guide/whats-new.md, once after an
@@ -1553,6 +1558,8 @@ private:
     bool lookDirty_ = false;   // uiPrefs_.look or the layout changed: applied at the start of the next shell
     CanvasRect focusRect_;     // the tile under the pointer (tiled looks highlight its border)
     float menuX_ = 0.0f;       // where the open task menu drops from
+    ImVec4 menuRect_{};        // the open task menu's rect last frame, and how often it changed while open (UI tests)
+    int menuRectChanges_ = 0;
     std::map<std::string, std::string> menuSection_; // each task menu's last section (palette id)
     void drawShelf(int shelf, const CanvasRect& rect);
     void drawShelfItem(int shelf, int index, const std::string& item, bool vertical);

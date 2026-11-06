@@ -7,7 +7,8 @@
 // no network socket, nothing listens. Outbound only: HANDSHAKE, then SET_ACTIVITY (an empty one clears it on
 // disable and quit). Whatever Discord sends back is read only to drain the connection, never interpreted: frames
 // are bounds-checked (8-byte header, 64 KiB cap) and anything malformed closes it. It runs on its own thread
-// (5 s connect timeout, 60 s back-off after a failure) and starts no thread or connection until it's switched on.
+// (5 s connect timeout, a back-off from 2 s to 60 s after a failure, one activity every 4 s at most) and starts no
+// thread or connection until it's switched on. Scripted and agent runs never start it (agentRun).
 //
 // Sent: the icon, the name SculptForge (the application's name; details stay empty), the elapsed time, and
 // optionally "Monthly challenge: <theme>" and the file name (never a path). Every string is sanitised first.
@@ -26,9 +27,17 @@
 
 namespace sf::discord {
 
-// The SculptForge application on Discord's developer portal (a public ID, not a secret; its Rich Presence asset
-// "logo" is the icon). "0" hides the feature and never connects.
+// The SculptForge application on Discord's developer portal (a public ID, not a secret). "0" hides the feature and
+// never connects.
 inline constexpr const char* kDiscordAppId = "1567737303210926130";
+// The icon: the SF mark on the site (Discord fetches an external image through its media proxy; the portal's
+// "logo" asset was a placeholder cube).
+inline constexpr const char* kLargeImageUrl = "https://sculptforge.app/press/sculptforge-icon-1024.png";
+
+// A run made by a script or an agent, never the user at the window: SDL_APP_ID=sculptforge-agent,
+// SDL_VIDEO_DRIVER=offscreen (or videoDriver "offscreen") or SF_NO_DISCORD set. It never shows anything on the
+// user's Discord, whatever the preferences say. getenv is a parameter for the tests.
+bool agentRun(const std::function<const char*(const char*)>& getenv, const char* videoDriver);
 
 // A real application ID: 1-20 digits, not "0".
 bool appIdConfigured(std::string_view id);
@@ -99,8 +108,9 @@ public:
     bool connected() const { return connected_.load(); }
     uint64_t activitiesSent() const { return sent_.load(); }
 
-    // Tests: the back-off after a failure and the connect timeout (milliseconds).
-    void setTimingForTests(int backoffMs, int connectTimeoutMs);
+    // Tests: the longest back-off after a failure, the connect timeout and the gap between two activities
+    // (milliseconds).
+    void setTimingForTests(int backoffMs, int connectTimeoutMs, int minGapMs = 0);
 
 private:
     void run();
@@ -114,7 +124,9 @@ private:
     std::atomic<bool> abort_{false};
     std::atomic<bool> connected_{false};
     std::atomic<uint64_t> sent_{0};
-    int backoffMs_ = 60000, connectTimeoutMs_ = 5000;
+    // Back-off: 2 s after a connection is lost (Discord restarting), doubling to 60 s while it stays away. Discord
+    // takes at most 5 activities in 20 s and drops the rest: one every 4 s at most, always the latest.
+    int backoffMs_ = 60000, connectTimeoutMs_ = 5000, minGapMs_ = 4000;
 };
 
 } // namespace sf::discord

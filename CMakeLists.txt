@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.11.4 LANGUAGES C CXX)
+project(SculptForge VERSION 0.11.5 LANGUAGES C CXX)
 # "beta.1" while this is a beta of that version (title bar and About: "0.11.0 Beta 1"), "" for a stable release.
 # scripts/release.sh sets it; release.yml checks the tag against both (v0.11.0-beta.1).
 set(SCULPTFORGE_PRERELEASE "")
@@ -892,6 +892,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Studio mode: About shows the studio (tests/data/studio; core/StudioProfile.h).
     sculptforge_ui_test(studio_mode studio/studio_mode --studio ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/studio/studio.json)
     sculptforge_ui_test(shell_layout_1080 shell_layout --size 1920x1080)
+    sculptforge_ui_test(menu_stable_720 menu_stable --size 1280x720)
     sculptforge_ui_test(help_console_1080 help_console --size 1920x1080)
     # The S / U / I / O slider on a UI scaled 1.5x (Windows at 150%, #9): it must still open under the cursor.
     sculptforge_ui_test(size_popup_scaled size_popup --size 2400x1350)
@@ -917,9 +918,13 @@ if(SCULPTFORGE_BUILD_TESTS)
     # A crash leaves a note in the log file (#16). Needs no window.
     add_test(NAME crash_log COMMAND ${CMAKE_COMMAND} -DAPP=$<TARGET_FILE:sculptforge>
              -DDIR=${CMAKE_CURRENT_BINARY_DIR}/crash-log-test -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/crash_log.cmake)
-    # Idle, the app draws nothing (#14): --measure-idle fails when it keeps drawing frames.
+    # Idle, the app draws nothing (#14) and uses next to no CPU: --measure-idle fails when it keeps drawing frames or
+    # its process CPU is over SF_IDLE_CPU_MAX % of one core (4 s here: a spinning loop's 100 % fails it; the 30 s
+    # nightly holds it to 2 %).
     add_test(NAME ui_idle_redraw COMMAND sculptforge --measure-idle 4)
-    set_tests_properties(ui_idle_redraw PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
+    set_tests_properties(ui_idle_redraw PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_IDLE_CPU_MAX=10")
+    add_test(NAME ui_idle_cpu_30s COMMAND sculptforge --measure-idle 30)
+    set_tests_properties(ui_idle_cpu_30s PROPERTIES LABELS "ui;nightly" TIMEOUT 120 RUN_SERIAL TRUE ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
     # sculptforge --calibrate on this machine's GPU: the JSON it prints passes the schema check (it exits 1 if not).
     add_test(NAME ui_calibrate_json COMMAND sculptforge --calibrate-quick --calibrate-no-save)
     set_tests_properties(ui_calibrate_json PROPERTIES LABELS ui TIMEOUT 60)
