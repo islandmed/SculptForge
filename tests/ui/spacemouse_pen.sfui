@@ -1,0 +1,124 @@
+# A SpaceMouse beside a pen (fenix, Discord 11-06, the first report from a real SpaceMouse): with the pen hovering
+# over the model or resting its tip on it, turning the cap made the mouse and pen cursors jump and the model fly
+# off, with Hold during strokes on or off. Replayed here with the driver's echo a SpaceMouse driver sends for an app
+# it doesn't know (3DxWare's defaults: the system pointer drifts and the wheel scrolls while the cap is pushed).
+# Either way the cursor stays on the pen, the view only orbits, and nothing moves the model.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=4
+key f
+camera 0 0
+spacemouse 0 0 0 0 0 0 0.1                     # plugged in, cap at rest
+spacemouse_echo on
+
+# Hold during strokes on (the default). The pen hovers, lying still over the model: twisting the cap for longer than
+# the second the pen keeps the cursor for turns the view about its pivot and nothing else.
+snapshot
+pen_hover 0.5 0.5
+pen_rest on
+remember cursor_x cx
+remember cursor_y cy
+remember camera_distance d0
+remember camera_pan p0
+spacemouse 0 0 0 0 0 0.8 1.5
+expect_value camera_yaw > 25
+expect_value cursor_x >= $cx-1
+expect_value cursor_x <= $cx+1
+expect_value cursor_y >= $cy-1
+expect_value cursor_y <= $cy+1
+expect_value camera_distance >= $d0-0.0001
+expect_value camera_distance <= $d0+0.0001
+expect_value camera_pan >= $p0-0.0001
+expect_value camera_pan <= $p0+0.0001
+expect_value moved == 0
+shot spacemouse_pen_hover
+
+# The tip resting on the model (a stroke, held): the view and the model stay still, and so does the cursor.
+pen_rest off
+pen_out                                        # (while the pen is in range the panels follow only the pen)
+click "Move##brush.move"
+key f
+camera 0 0
+snapshot
+pen_press 0.5 0.5
+pen_rest on
+remember cursor_x cx
+remember camera_distance d1
+spacemouse 0 0 0 0 0 0.8 1.5
+expect_value stroking == 1
+expect_value camera_yaw == 0
+expect_value camera_distance >= $d1-0.0001
+expect_value camera_distance <= $d1+0.0001
+expect_value cursor_x >= $cx-1
+expect_value cursor_x <= $cx+1
+expect_value moved_max < 0.02
+pen_lift
+key ctrl+z
+
+# Hold during strokes off.
+pen_rest off
+pen_out
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+click "Hold during strokes##spacemouse.hold"
+key escape
+
+# Hovering: as above.
+key f
+camera 0 0
+snapshot
+pen_hover 0.5 0.5
+pen_rest on
+remember cursor_x cx
+remember camera_distance d2
+spacemouse 0 0 0 0 0 0.8 1.5
+expect_value camera_yaw > 25
+expect_value cursor_x >= $cx-1
+expect_value cursor_x <= $cx+1
+expect_value camera_distance >= $d2-0.0001
+expect_value camera_distance <= $d2+0.0001
+expect_value moved == 0
+
+# Move with its tip resting on the model: the view turns under the still pen, and the grabbed part stays where it
+# was (it used to follow the pen across the turning view: the model flew off).
+key f
+camera 0 0
+snapshot
+pen_press 0.5 0.5
+pen_rest on
+spacemouse 0 0 0 0 0 0.8 1.5
+expect_value stroking == 1
+expect_value camera_yaw > 25
+expect_value moved_max < 0.02
+shot spacemouse_pen_move
+# The pen moving on from there still moves the grabbed part.
+pen_rest off
+pen_hover 0.6 0.5 0.3
+expect_value moved_max > 0.02
+pen_lift
+key ctrl+z
+
+# KelvinGrab the same.
+pen_out
+click "KelvinGrab##brush.kelvingrab"
+key f
+camera 0 0
+snapshot
+pen_press 0.5 0.5
+pen_rest on
+spacemouse 0 0 0 0 0 0.8 1.5
+expect_value camera_yaw > 25
+expect_value moved_max < 0.02
+pen_lift
+pen_rest off
+key ctrl+z
+
+# Without the cap pushed the mouse and its wheel work as ever.
+pen_out
+spacemouse_echo off
+key f
+remember camera_distance d3
+wheel 0.5 0.5 2
+expect_value camera_distance < $d3
+click "Preferences##palette.preferences"
+click "Hold during strokes##spacemouse.hold"
+key escape

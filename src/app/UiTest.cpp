@@ -241,7 +241,11 @@
 //   pen_enter U V            the pen comes into range at a point on the model (put down elsewhere, no hover)
 //   pen_out                  the pen leaves proximity
 //   pen_rest on|off          the pen lies still in range, sending tilt and sub-pixel motion every frame (a Wacom
-//                            laid on the tablet); the mouse and trackpad work beside it
+//                            laid on the tablet); the mouse and trackpad work beside it; touching (pen_press): sub-pixel
+//                            motion and pressure, as a pen resting its tip on the tablet
+//   pen_press U V [P]        the pen moves to a point on the model and touches down (pressure P, default 0.5), and
+//                            stays down until pen_lift
+//   pen_lift                 the touching pen lifts
 //   tablet_plug [NAME]       a tablet plugged in while running (default name: a generic HID mouse); its pen gets
 //                            a new id
 //   tablet_unplug            ... and unplugged
@@ -276,6 +280,8 @@
 //   spacemouse_hold TX TY TZ RX RY RZ  hold the cap there until the next spacemouse step (for steps in between,
 //                            e.g. a pen stroke while the view turns); spacemouse_hold 0 0 0 0 0 0 lets go
 //   spacemouse_button N      press and release button N (1 = left side button, 2 = right)
+//   spacemouse_echo on|off   while the cap is pushed, the system pointer drifts and the wheel scrolls every frame, as
+//                            a SpaceMouse driver does for an app it doesn't know (3DxWare's defaults; fenix 11-06)
 //   spacemouse_unplug        unplug it
 //   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view)
 //   ui_scale PERCENT | auto  Preferences > Interface > UI scale (applied live, #87); display_scale PERCENT: the display's
@@ -503,6 +509,7 @@ void Demo::detachVirtualSpaceMouse() {
     SDL_DetachVirtualJoystick(virtualSpaceMouse_);
     virtualSpaceMouse_ = 0;
     virtualSpaceMouseHandle_ = nullptr;
+    virtualAxes_ = {};
 }
 
 double Demo::query(const std::string& name, bool& known) const {
@@ -2689,6 +2696,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return t > 2.0f;
         });
         auto setAxes = [this](const std::array<float, 6>& a) {
+            virtualAxes_ = a;
             for (int i = 0; i < 6; ++i)
                 SDL_SetJoystickVirtualAxis(virtualSpaceMouseHandle_, i, Sint16(std::lround(a[size_t(i)] * 32767.0f)));
         };
@@ -2747,6 +2755,32 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "pen_out") {
         run([this] { penProximity(false); });
         wait(0.05f);
+    } else if (verb == "pen_press") {
+        if (!need(2)) return false;
+        const float u = num(1, 0.5f), v = num(2, 0.5f), pressure = num(3, 0.5f);
+        run([this, u, v] {
+            if (!penIn_) penProximity(true);
+            const ImVec2 p = onModel(u, v);
+            penMove(p.x, p.y);
+        });
+        wait(0.05f); // (the panels let go of the pointer first: ImGui's WantCaptureMouse is a frame behind)
+        run([this, pressure] {
+            penTouch(true, false);
+            penPressure(pressure);
+            penPressed_ = true;
+        });
+        wait(0.1f);
+    } else if (verb == "pen_lift") {
+        run([this] {
+            penPressed_ = false;
+            if (!penDown_) return;
+            penTouch(false, false);
+            penPressure(0.0f);
+        });
+        wait(0.1f);
+    } else if (verb == "spacemouse_echo") {
+        if (!need(1)) return false;
+        run([this, on = w[1] != "off"] { spaceMouseEcho_ = on; });
     } else if (verb == "pen_rest") {
         if (!need(1)) return false;
         run([this, on = w[1] != "off"] {
@@ -2843,10 +2877,14 @@ void Demo::penMove(float x, float y) {
 }
 
 void Demo::penRestNoise() {
-    if (!penIn_ || penDown_) return;
+    if (!penIn_ || (penDown_ && !penPressed_)) return; // (not during a pen_stroke)
     if (std::hypot(penAt_.x - penRestAt_.x, penAt_.y - penRestAt_.y) > 2.0f) penRestAt_ = penAt_; // laid down elsewhere
     const float jitter = (++penRestFrame_ & 1) ? 0.4f : -0.4f;
     penMove(penRestAt_.x + jitter, penRestAt_.y);
+    if (penDown_) { // the tip resting on the tablet: its pressure wavers a little
+        penPressure(0.5f + jitter * 0.05f);
+        return;
+    }
     SDL_Event e{};
     e.type = SDL_EVENT_PEN_AXIS;
     e.paxis.windowID = SDL_GetWindowID(app_.window_);
@@ -2856,6 +2894,21 @@ void Demo::penRestNoise() {
     e.paxis.y = penAt_.y;
     e.paxis.axis = SDL_PEN_AXIS_XTILT;
     e.paxis.value = 20.0f + jitter;
+    app_.handleEvent(e);
+}
+
+void Demo::spaceMouseEchoFrame() {
+    bool pushed = false;
+    for (float a : virtualAxes_) pushed = pushed || std::abs(a) > 0.1f;
+    if (!pushed || !virtualSpaceMouseHandle_) return;
+    // The system pointer (no device: injected input) drifts away from the pen, and the wheel zooms.
+    mouseMotion(mouse_.x + 7.0f, mouse_.y + 3.0f);
+    SDL_Event e{};
+    e.type = SDL_EVENT_MOUSE_WHEEL;
+    e.wheel.windowID = SDL_GetWindowID(app_.window_);
+    e.wheel.y = 1.0f;
+    e.wheel.mouse_x = mouse_.x;
+    e.wheel.mouse_y = mouse_.y;
     app_.handleEvent(e);
 }
 

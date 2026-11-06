@@ -104,7 +104,7 @@ void App::spaceMouseClose() {
     spaceMouseName_.clear();
     spaceMouseButtonCount_ = 0;
     spaceMouseAxes_ = {};
-    spaceMouseMoving_ = false;
+    spaceMouseMoving_ = spaceMousePushed_ = false;
 }
 
 bool App::spaceMouseDeflected() const {
@@ -131,7 +131,7 @@ void App::spaceMouseEvent(const SDL_Event& e) {
         if (!spaceMouse_ || e.jbutton.which != spaceMouseId_) break;
         spaceMouseLastButton_ = e.jbutton.button;
         const SpaceMouseSettings& s = uiPrefs_.spaceMouse;
-        if (!s.enabled || e.jbutton.button >= s.buttons.size() || spaceMouseHeldByStroke()) break;
+        if (!s.enabled || e.jbutton.button >= s.buttons.size() || spaceMouseHeld()) break;
         const std::string& id = s.buttons[e.jbutton.button];
         if (id.empty()) break;
         const Action* a = actions_.find(id);
@@ -147,14 +147,15 @@ void App::updateSpaceMouse(float dt) {
     // The first frame of a move counts as one frame, not the time since the last frame drawn (a loop that sleeps
     // while idle wakes on the axis event: the cap has only just left the centre).
     if (!spaceMouseMoving_) dt = std::min(dt, 1.0f / 60.0f);
-    spaceMouseMoving_ = false;
+    spaceMouseMoving_ = spaceMousePushed_ = false;
     if (!spaceMouse_) return;
     for (int i = 0; i < kSmAxes; ++i)
         spaceMouseAxes_[size_t(i)] = std::clamp(float(SDL_GetJoystickAxis(spaceMouse_, i)) / 32767.0f, -1.0f, 1.0f);
     for (float v : spaceMouseAxes_) spaceMouseReported_ = spaceMouseReported_ || v != 0.0f;
     const SpaceMouseSettings& s = uiPrefs_.spaceMouse;
-    if (spaceMouseHeldByStroke()) return; // (the axes above still show in Preferences)
     const SpaceMouseMotion m = spaceMouseMotion(spaceMouseAxes_, dt, s);
+    spaceMousePushed_ = m.any();
+    if (spaceMouseHeld()) return; // (the axes above still show in Preferences)
     if (!m.any()) return;
     spaceMouseMoving_ = true;
     if (m.spin != 0.0f || m.tip != 0.0f || m.roll != 0.0f) {
@@ -175,12 +176,59 @@ void App::updateSpaceMouse(float dt) {
     if (m.panX != 0.0f || m.panY != 0.0f) camera_.pan(m.panX * h, m.panY * h, h);
     if (m.zoom != 0.0f) camera_.zoom(m.zoom);
     // With Hold during strokes off, a stroke held by the pen carries on: its dabs follow the pen on screen, so the
-    // next sample sculpts where the pen now points on the turned model; nothing else about the stroke changes.
+    // next sample sculpts where the pen now points on the turned model. A grab instead stays where it is: a pen
+    // held still while the view turns moves nothing (fenix, Discord 11-06: the model flew off).
+    regrabAfterViewMove();
 }
 
-bool App::spaceMouseHeldByStroke() const {
-    return uiPrefs_.spaceMouse.holdWhileStroking &&
-           (drag_ == Drag::Stroke || drag_ == Drag::MaskCanvas || drag_ == Drag::AirStroke || strokeFinishing_);
+bool App::spaceMouseHeld() const {
+    switch (drag_) {
+    case Drag::None:
+    case Drag::Orbit: // the mouse's and the cap's navigation add up
+    case Drag::Pan:
+    case Drag::Zoom:
+    case Drag::Roll:
+        break;
+    case Drag::Stroke:
+        // A stamp dragged out (Drag Rectangle, Drag Dot) is sized and turned in the view it began in.
+        if (strokeType_ == StrokeType::DragRect || strokeType_ == StrokeType::DragDot) return true;
+        [[fallthrough]];
+    case Drag::MaskCanvas:
+    case Drag::AirStroke:
+        return uiPrefs_.spaceMouse.holdWhileStroking;
+    default: // a gizmo, a selection, a Forge Sphere, a guide...: anchored in the view the drag began in
+        return true;
+    }
+    return uiPrefs_.spaceMouse.holdWhileStroking && strokeFinishing_;
+}
+
+bool App::grabStroke() const {
+    if (drag_ != Drag::Stroke || !strokeSculpt_ || strokeRecipe()) return false;
+    return strokeBrush_ == BrushType::Move || strokeBrush_ == BrushType::SnakeHook ||
+           strokeBrush_ == BrushType::KelvinSnake || (strokeBrush_ == BrushType::KelvinGrab && kelvinStrokeBrush());
+}
+
+void App::regrabAfterViewMove() {
+    if (!grabStroke()) return;
+    // Where the grabbed point is on screen now: the pen's next motion moves it from there, by as much as the pen moves.
+    ImVec2 at;
+    if (!gizmoProject(strokeBrush_ == BrushType::KelvinGrab ? kelvinTarget_ : grabLast_, at)) return;
+    grabScreenOffset_ = glm::vec2(at.x, at.y) - grabScreen_;
+}
+
+// A SpaceMouse driver that doesn't know SculptForge (3DxWare's defaults) also moves the system pointer or scrolls the
+// wheel while the cap is pushed: the cursor jumped from the pen to wherever the driver put it, and the wheel zoomed
+// toward it (fenix, Discord 11-06). While the cap moves the view, only the pen and touch move the cursor; a mouse's
+// buttons still click.
+bool App::spaceMouseEcho(const SDL_Event& e) const {
+    SDL_MouseID which = 0;
+    if (e.type == SDL_EVENT_MOUSE_MOTION) which = e.motion.which;
+    else if (e.type == SDL_EVENT_MOUSE_WHEEL) which = e.wheel.which;
+    else return false;
+    if (which == SDL_PEN_MOUSEID || which == SDL_TOUCH_MOUSEID) return false;
+    // (The cap as it is now, too: the echo of its first push comes in the same batch of events as the push, before
+    // the frame reads the axes.)
+    return spaceMousePushed_ || spaceMouseDeflected();
 }
 
 bool App::sixDofPointerEvent(const SDL_Event& e) {

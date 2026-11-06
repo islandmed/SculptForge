@@ -176,6 +176,7 @@ These settings save themselves.
   a game controller, which is how SculptForge reads it. If SculptForge sees the SpaceMouse with 3DxWare running,
   give the buttons a job in only one of the two places, or one press does two things.
 - **macOS:** the same applies to 3DxWare for Mac: quit it (or uninstall it) and plug the SpaceMouse in again.
+  Suspending it isn't enough: suspended, it can still move the pointer and scroll while you push the cap.
 - **Linux:** if **spacenavd** is running, it normally opens the device exclusively. SculptForge may still list
   the SpaceMouse but get no motion from it. Stop it while you sculpt (`sudo systemctl stop spacenavd`). SculptForge
   reads the device through `/dev/input` as a joystick: that works when the kernel reports the cap's axes as
@@ -184,6 +185,11 @@ These settings save themselves.
 
 **If it shows up but the view doesn't move** (the live bars stay still when you push the cap), another program
 holds the device: quit 3DxWare (or spacenavd on Linux) as above, then unplug and plug the SpaceMouse back in.
+
+**If the cursor jumps or the model flies off while you turn the cap** (the pen hovering or resting on the model,
+whatever the speed and dead zone): 3DxWare is probably also driving SculptForge as it would a program it doesn't
+know, moving the pointer and scrolling the wheel. SculptForge ignores the pointer and the wheel while it reads the
+cap moving itself; if Preferences doesn't show the SpaceMouse moving, quit 3DxWare as above.
 
 **To report a problem**, open **Edit > Preferences > Input > SpaceMouse** and click **Copy device report** (shown until the cap has moved the view): it puts
 every joystick SculptForge sees on the clipboard, with its USB ids and why it was or wasn't used. Paste it into

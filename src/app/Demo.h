@@ -20,6 +20,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <array>
 #include <chrono>
 #include <functional>
 #include <map>
@@ -201,7 +202,13 @@ private:
     bool penResting_ = false;
     ImVec2 penRestAt_{0, 0};
     int penRestFrame_ = 0;
+    bool penPressed_ = false; // pen_press: down until pen_lift (pen_rest's noise then rests the tip)
     void penRestNoise();
+    // spacemouse_echo on: while the virtual cap is pushed, a SpaceMouse driver that doesn't know the app (3DxWare's
+    // defaults) moves the system pointer and scrolls the wheel every frame (fenix, Discord 11-06).
+    bool spaceMouseEcho_ = false;
+    std::array<float, 6> virtualAxes_{};
+    void spaceMouseEchoFrame();
     static constexpr SDL_MouseID kDriverMouse = 7; // the driver's own mouse device
     // `snapshot` saves the active mesh; moved* values compare against it. `remember` keeps values for $NAME.
     std::vector<glm::vec3> basePositions_, baseNormals_;
