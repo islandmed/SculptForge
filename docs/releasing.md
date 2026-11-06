@@ -205,9 +205,10 @@ automatically.
   100: give them the Discord role, `taken` + 1, and their name in `names` only if they want it listed. The website's
   counter and Members page read it live; the app compiles it in (Help > About, and the membership card's founding
   note, which stops once `taken` reaches `limit`).
-- **Monthly challenge results:** when the winners are announced, add `"challenge": {"id": "YYYY-MM", "title":
-  "<theme>"}` to `website/latest.json` (push main; the site deploys). The app's daily update check reads it once per
-  id: the small membership card's challenge moment ("The <theme> challenge results are in, on Discord").
+- **Monthly challenge results:** on the 1st, when the winner is picked (most 🔥, ties by the team), add
+  `"challenge": {"id": "YYYY-MM", "title": "<theme>"}` to `website/latest.json` (push main; the site deploys). The
+  app's daily update check reads it once per id: the small membership card's challenge moment ("The <theme>
+  challenge results are in, on Discord").
 - **Member Requests:** each approved request goes into islandmed/sculptforge-insiders as
   `requests/YYYY-MM/<slug>/request.json` + its file (+ `preview.png`), `"approved": true` once the requester has
   OK'd the preview (format: `tools/member-requests/requests.py`). On the 1st, member-requests.yml packs last month's,
