@@ -149,7 +149,8 @@ def whats_new(text, version, frags):
             raise NoteError(f"whats-new.md: Version {version} has no ```features block for the highlights")
         lines = fm.group(1).split("\n")
         last = max([i for i, l in enumerate(lines) if l.startswith(("date:", "tagline:", "highlight:"))], default=-1)
-        lines[last + 1:last + 1] = [f"highlight: {h}" for h in highlights]
+        have = {l[len("highlight:"):].strip() for l in lines if l.startswith("highlight:")}
+        lines[last + 1:last + 1] = [f"highlight: {h}" for h in dict.fromkeys(highlights) if h not in have]
         section = section[:fm.start(1)] + "\n".join(lines) + section[fm.end(1):]
     if bullets:
         # Straight after the list if the section has one, else after a blank line.
@@ -181,6 +182,7 @@ def run(root, version, mode):
         m = re.search(rf"^## Version {re.escape(version)}[ \t]*\n+```features\n(.*?)^```", wn, re.M | re.S)
         lines = re.findall(r"^highlight:[ \t]*(.+)$", m.group(1), re.M) if m else []
         lines += [h for _, f in frags for h in f.get("highlight", [])]
+        lines = list(dict.fromkeys(lines))  # a fragment's highlight already in the block counts once
         sys.stdout.write("".join(h + "\n" for h in lines))
         return 0
     if not frags:

@@ -661,3 +661,20 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
   .code-block .copy { opacity: 1; }
 }
 .guide-page .nav .wrap, .guide-page .footer .wrap { max-width: 1360px; }
+
+/* Live mode: the hero plays a real live-mode session; the section under the hero says what it is, beside the lion. */
+.hero-live video { aspect-ratio: 1280 / 734; object-fit: cover; background: #222; }
+.live { border-top: 1px solid var(--border); }
+.live-grid { grid-template-columns: 1.3fr 1fr; align-items: center; }
+.live-copy h2 { margin-top: 0.2em; }
+.live-still { margin: 0; }
+.live-still img { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; border-radius: var(--radius);
+  background: #f3efe9; }
+.live-still figcaption { color: var(--muted); font-size: 0.8rem; margin-top: 10px; text-align: center; }
+@media (max-width: 960px) {
+  .live-grid { grid-template-columns: 1fr; gap: 28px; }
+  .live-still img { max-width: 320px; }
+}
+@media (max-width: 620px) {
+  .hero-live video { aspect-ratio: 1280 / 734; object-fit: cover; }
+}

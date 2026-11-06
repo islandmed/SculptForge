@@ -59,8 +59,6 @@ highlight: Saved camera views and a readable mask
 highlight: Quick Remesh and Voxel Remesh keep open parts solid
 highlight: The UV Editor fits at large UI scales
 highlight: The new orange SF app icon
-highlight: Connect your AI tool in one window
-highlight: Saved camera views and a readable mask
 ```
 
 - The app icon is now the orange SF mark, as on the website; it reads at task bar size.
