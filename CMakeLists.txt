@@ -354,8 +354,9 @@ if(SCULPTFORGE_BUILD_APP)
     fontMono ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-Regular.ttf # the looks (Preferences > Interface > Look)
     fontMonoBold ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-SemiBold.ttf
     fontCjk ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansTC-UI.otf # Traditional Chinese (tools/i18n/subset_cjk_font.py)
-    appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png # the window icon and the in-app mark (BrandMark.cpp)
-    appIconSmall ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-small-64.png # the mark below 48 px
+    appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png # the SF app icon: window, title bar (BrandMark.cpp)
+    appIconSmall ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-32.png # its small cut (up to 32 px)
+    bustMark ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/bust/bust-256.png # the illustration: About, What's New, support card
     supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt # Help > About (never empty: it starts with comments)
     foundingMembers ${CMAKE_CURRENT_SOURCE_DIR}/website/founding.json) # Help > About and the membership card
   include(cmake/EmbedGuide.cmake)
@@ -485,7 +486,7 @@ if(SCULPTFORGE_BUILD_APP)
     endif()
   endif()
   if(APPLE)
-    # App icon: assets/branding/sculptforge.icns (tools/brand/make_icons.py: 16 and 32 px from the small-size mark).
+    # App icon: assets/branding/sculptforge.icns (tools/brand/make_icons.py: the SF mark on Apple's icon grid).
     set(ICNS ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge.icns)
     target_sources(sculptforge PRIVATE ${ICNS})
     set_source_files_properties(${ICNS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
@@ -513,7 +514,7 @@ endif()
 if(UNIX AND NOT APPLE)
   install(FILES packaging/linux/org.sculptforge.SculptForge.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
   install(FILES packaging/linux/org.sculptforge.SculptForge.metainfo.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
-  foreach(size 16 24 32 48 64 128 256 512) # (tools/brand/make_icons.py; below 48 px the small-size mark)
+  foreach(size 16 24 32 48 64 128 256 512) # (tools/brand/make_icons.py; up to 32 px the SF mark's small cut)
     install(FILES assets/branding/sculptforge-${size}.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${size}x${size}/apps
             RENAME org.sculptforge.SculptForge.png)
   endforeach()

@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
-"""Builds every SculptForge icon and logo file from the brand art.
+"""Builds every SculptForge icon and logo file.
 
-    python -I tools/brand/make_icons.py <concept.jpeg> [--small icon-small.png] [--discord DIR]
+    python -I tools/brand/make_icons.py <bust.jpeg> [--discord DIR]
 
-<concept.jpeg>: the icon art (the rounded-square tile on a dark backdrop; the tile is found from its light rim).
---small: the simplified small-size companion (same design, flat shapes) for 16/24/32 px; without it one is drawn
-here (bold orange bust merging into a dark anvil, one glowing seam).
-Writes assets/branding/ (master, sizes, .ico, .icns), website/img/ (icon-256/512, social preview),
-website/press/, docs/images/social-preview.png and, with --discord, the Discord server icon and bot avatar.
+The app icon is the SF mark (Tony 11-05: the bust doesn't read at task bar size): tools/brand/sf-mark*.svg
+(make_sf_mark.py), rendered with rsvg-convert: assets/branding/sculptforge-16..1024.png (16-32 px from
+sf-mark-small.svg), .ico, .icns (Apple's grid, sf-mark-macos(-small).svg), the site's favicons and apple-touch-icon, the
+press icons and, with --discord, the bot avatar.
+The bust (<bust.jpeg>: the concept art, a rounded-square tile on a dark backdrop, found from its light rim) is the
+illustration: assets/branding/bust/ (About, What's New, the support card), the home page's What's New cards, the
+press kit, the social previews and the Discord server icon.
 """
 import argparse
+import io
 import os
+import struct
+import subprocess
 import sys
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -123,46 +128,6 @@ def master_from_concept(path):
     return out, prof
 
 
-def draw_small(prof):
-    """The small-size companion: flat shapes that still read at 16 px."""
-    n = 512
-    m = n * SS
-    u = m / 512.0
-    img = Image.new("RGBA", (m, m), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    # Tile: dark, a touch lighter at the top (like the art).
-    grad = Image.new("RGBA", (m, m))
-    gd = ImageDraw.Draw(grad)
-    for y in range(m):
-        t = y / m
-        c = tuple(int(a + (b - a) * t) for a, b in zip((0x3c, 0x37, 0x38), (0x17, 0x15, 0x18)))
-        gd.line([(0, y), (m, y)], fill=c + (255,))
-    S = lambda pts: [(x * u, y * u) for x, y in pts]
-    orange, light, seam, iron, iron_hi = (0xE8, 0x7A, 0x34), (0xF6, 0xA5, 0x62), (0xFF, 0xD2, 0x5A), (0x6A, 0x63, 0x66), (0x8E, 0x86, 0x88)
-    # Bust: head, neck, shoulders (one silhouette).
-    d.ellipse(S([(206, 44), (306, 178)]), fill=orange)
-    d.polygon(S([(230, 160), (282, 160), (292, 236), (220, 236)]), fill=orange)
-    d.polygon(S([(98, 322), (116, 268), (176, 234), (336, 234), (396, 268), (414, 322)]), fill=orange)
-    d.ellipse(S([(98, 250), (190, 330)]), fill=orange)  # round shoulders
-    d.ellipse(S([(322, 250), (414, 330)]), fill=orange)
-    # Anvil: the face with the horn to the left, the waist, the foot.
-    d.polygon(S([(30, 322), (458, 322), (458, 374), (160, 374), (96, 352)]), fill=iron)
-    d.polygon(S([(30, 322), (458, 322), (458, 334), (60, 328)]), fill=iron_hi)
-    d.polygon(S([(206, 374), (392, 374), (350, 418), (248, 418)]), fill=iron)
-    d.polygon(S([(170, 418), (428, 418), (446, 466), (152, 466)]), fill=iron)
-    # The molten seam where the clay meets the iron, glowing.
-    seam_layer = Image.new("RGBA", (m, m), (0, 0, 0, 0))
-    ImageDraw.Draw(seam_layer).rounded_rectangle(S([(92, 308), (420, 330)]), radius=11 * u, fill=seam)
-    halo = Image.new("RGBA", (m, m), (0, 0, 0, 0))
-    ImageDraw.Draw(halo).rounded_rectangle(S([(84, 300), (428, 338)]), radius=19 * u, fill=(0xFF, 0x7A, 0x1E, 150))
-    img = Image.alpha_composite(img, halo.filter(ImageFilter.GaussianBlur(14 * u)))
-    img = Image.alpha_composite(img, seam_layer)
-    shapes = Image.alpha_composite(grad, img)
-    small = shapes.resize((n, n), Image.LANCZOS)
-    small.putalpha(rounded_mask(n, prof, inset=0.5))
-    return small
-
-
 def shrink(im, n):
     """Down to n px in halving steps (keeps detail without ringing)."""
     cur = im
@@ -201,56 +166,79 @@ def social(master, w, h, font_path, tagline):
     return img.convert("RGB")
 
 
+def sf(name, n):
+    """tools/brand/<name>.svg rendered n px wide."""
+    svg = os.path.join(ROOT, "tools", "brand", name + ".svg")
+    png = subprocess.run(["rsvg-convert", "-w", str(n), "-h", str(n), svg], check=True, capture_output=True).stdout
+    return Image.open(io.BytesIO(png)).convert("RGBA")
+
+
+def icon(n):
+    """The app icon n px wide: the small cut up to 32 px, the mark from 48."""
+    return sf("sf-mark-small" if n <= 32 else "sf-mark", n)
+
+
+def write_icns(path):
+    """macOS: every iconset slot as PNG (Pillow's writer leaves out the 16 and 32 px 1x ones), on Apple's grid."""
+    slots = (("icp4", 16), ("icp5", 32), ("ic11", 32), ("ic12", 64), ("ic07", 128), ("ic13", 256), ("ic08", 256),
+             ("ic14", 512), ("ic09", 512), ("ic10", 1024))
+    chunks = b""
+    for kind, n in slots:
+        buf = io.BytesIO()
+        sf("sf-mark-macos-small" if n <= 32 else "sf-mark-macos", n).save(buf, format="PNG", optimize=True)
+        chunks += kind.encode() + struct.pack(">I", 8 + len(buf.getvalue())) + buf.getvalue()
+    with open(path, "wb") as f:
+        f.write(b"icns" + struct.pack(">I", 8 + len(chunks)) + chunks)
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("concept")
-    ap.add_argument("--small")
+    ap.add_argument("bust")
     ap.add_argument("--discord")
     a = ap.parse_args()
 
-    master, prof = master_from_concept(a.concept)
-    if a.small:
-        small = Image.open(a.small).convert("RGBA")
-        small = small.resize((512, 512), Image.LANCZOS)
-    else:
-        small = draw_small(prof)
+    def png(im, *path):
+        im.save(os.path.join(ROOT, *path), optimize=True)
 
-    def size(n):
-        return shrink(master, n) if n >= 48 else shrink(small, n)
-
-    br = os.path.join(ROOT, "assets", "branding")
-    master.save(os.path.join(br, "sculptforge-1024.png"), optimize=True)
-    small.save(os.path.join(br, "sculptforge-small-512.png"), optimize=True)
-    shrink(small, 64).save(os.path.join(br, "sculptforge-small-64.png"), optimize=True)  # the in-app mark below 48 px
-    for n in (512, 256, 128, 64, 48, 32, 24, 16):
-        size(n).save(os.path.join(br, f"sculptforge-{n}.png"), optimize=True)
-    # Windows: every size in one .ico (each frame its own image, not a rescale of one).
-    ico = [size(n) for n in (256, 128, 64, 48, 32, 24, 16)]
-    ico[0].save(os.path.join(br, "sculptforge.ico"), format="ICO", sizes=[(i.width, i.height) for i in ico],
+    # The app icon.
+    br = os.path.join("assets", "branding")
+    for n in (1024, 512, 256, 128, 64, 48, 32, 24, 16):
+        png(icon(n), br, f"sculptforge-{n}.png")
+    ico = [icon(n) for n in (256, 128, 64, 48, 32, 24, 16)]  # Windows: each size its own frame
+    ico[0].save(os.path.join(ROOT, br, "sculptforge.ico"), format="ICO", sizes=[(i.width, i.height) for i in ico],
                 append_images=ico[1:])
-    # macOS: the iconset sizes (16 and 32 from the small companion, the rest from the master).
-    master.save(os.path.join(br, "sculptforge.icns"), format="ICNS",
-                append_images=[size(n) for n in (16, 32, 64, 128, 256, 512)])
+    write_icns(os.path.join(ROOT, br, "sculptforge.icns"))
 
-    # (The site's favicons, apple-touch-icon and header mark are the SF monogram: tools/brand/make_sf_mark.py.)
-    img = os.path.join(ROOT, "website", "img")
-    size(256).save(os.path.join(img, "icon-256.png"), optimize=True)  # the Discord announcements' avatar
-    size(512).save(os.path.join(img, "icon-512.png"), optimize=True)  # (with icon-256: the home page's What's New cards)
-    size(256).save(os.path.join(ROOT, "website", "press", "sculptforge-icon-256.png"), optimize=True)
-    master.save(os.path.join(ROOT, "website", "press", "sculptforge-icon-1024.png"), optimize=True)
+    # The site's favicons (as the app icon) and the press kit's app icon.
+    png(icon(16), "website", "img", "favicon-16.png")
+    png(icon(32), "website", "img", "favicon-32.png")
+    png(icon(64), "website", "img", "favicon-64.png")
+    fav = [icon(n) for n in (48, 32, 16)]
+    fav[0].save(os.path.join(ROOT, "website", "favicon.ico"), format="ICO", sizes=[(i.width, i.height) for i in fav],
+                append_images=fav[1:])
+    png(sf("sf-mark-square", 180).convert("RGB"), "website", "img", "apple-touch-icon.png")  # iOS rounds it
+    png(icon(256), "website", "img", "icon-256.png")  # the Discord announcements' avatar
+    png(icon(1024), "website", "press", "sculptforge-icon-1024.png")
+    png(icon(256), "website", "press", "sculptforge-icon-256.png")
 
+    # The bust: the illustration.
+    bust, _ = master_from_concept(a.bust)
+    png(bust, br, "bust", "bust-1024.png")
+    png(shrink(bust, 256), br, "bust", "bust-256.png")  # embedded (BrandMark.cpp)
+    png(shrink(bust, 256), "website", "img", "bust-256.png")  # the home page's What's New cards (with 512)
+    png(shrink(bust, 512), "website", "img", "bust-512.png")
+    png(bust, "website", "press", "sculptforge-bust-1024.png")
     font = os.path.join(ROOT, "website", "fonts", "Inter-SemiBold.ttf")
     tagline = "The free, open-source sculpting app."  # (the site's existing line)
-    social(master, 1200, 630, font, tagline).save(os.path.join(img, "social-preview.png"), optimize=True)
-    social(master, 1280, 640, font, tagline).save(os.path.join(ROOT, "docs", "images", "social-preview.png"),
-                                                  optimize=True)  # GitHub's repository social preview (uploaded by hand)
+    png(social(bust, 1200, 630, font, tagline), "website", "img", "social-preview.png")
+    png(social(bust, 1280, 640, font, tagline), "docs", "images", "social-preview.png")  # GitHub's (uploaded by hand)
 
     if a.discord:
-        # Discord crops the server icon and the bot avatar to circles: the tile sits on its own dark, inset.
+        # Discord crops both to circles. The bot's avatar is the app icon, full bleed; the server icon the bust, inset.
+        sf("sf-mark-square", 512).convert("RGB").save(os.path.join(a.discord, "discord-bot-avatar-512.png"))
         av = Image.new("RGBA", (512, 512), (0x1c, 0x1a, 0x1c, 255))
-        av.alpha_composite(shrink(master, 440), (36, 36))
-        for name in ("discord-server-icon-512.png", "discord-bot-avatar-512.png"):
-            av.convert("RGB").save(os.path.join(a.discord, name), optimize=True)
+        av.alpha_composite(shrink(bust, 440), (36, 36))
+        av.convert("RGB").save(os.path.join(a.discord, "discord-server-icon-512.png"))
     print("done")
 
 

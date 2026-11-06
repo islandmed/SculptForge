@@ -660,7 +660,7 @@ def home_whats_new(page: "WhatsNewPage") -> str:
         pic, clip = (first["image"], first.get("clip", "")) if first else ("", "")
         img = (f'<div class="wn-pic"><img src="guide/{html.escape(pic)}" alt="" width="600" height="340" loading="lazy" '
                f'decoding="async"></div>') if pic else \
-            '<div class="wn-pic wn-pic-mark"><img src="img/icon-256.png?v=3" srcset="img/icon-256.png?v=3 256w, img/icon-512.png?v=1 512w" sizes="220px" alt="" width="256" height="256"></div>'
+            '<div class="wn-pic wn-pic-mark"><img src="img/bust-256.png?v=1" srcset="img/bust-256.png?v=1 256w, img/bust-512.png?v=1 512w" sizes="220px" alt="" width="256" height="256"></div>'
         if clip:  # the first card's clip plays on the home page too, its picture as the poster
             img = (f'<div class="wn-pic"><video src="guide/{html.escape(clip)}" poster="guide/{html.escape(pic)}" width="600" '
                    f'height="340" muted loop playsinline autoplay></video></div>')
