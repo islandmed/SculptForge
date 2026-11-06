@@ -24,9 +24,12 @@ struct AiSettings {
     // key), falling back to a local Ollama if it is running.
     enum class Provider { Free, Anthropic, OpenAICompatible };
     Provider provider = Provider::Free;
+    std::string preset;   // the provider preset (ai/Providers.h: "ollama", "litellm", ...); "" = from provider/endpoint
     std::string endpoint;
     std::string model;
-    std::string apiKey; // Free: unused; empty = use ANTHROPIC_API_KEY / OPENAI_API_KEY from the environment
+    // Keys (apiKey, hfToken, falKey, meshyKey) are kept in the OS keychain (ai/Secrets.h), never in ai.json: these
+    // fields hold one typed in this session, or read from an older ai.json (moved to the keychain at start-up).
+    std::string apiKey; // Free: unused; empty = the keychain, then ANTHROPIC_API_KEY / OPENAI_API_KEY / the preset's
     std::string effort = "low";
     // Image to 3D. service: "huggingface" (free Spaces), "fal", "meshy",
     // "comfyui" (your ComfyUI server), "command" (generatorCommand with
@@ -57,7 +60,7 @@ struct AiSettings {
 
     Json toJson() const;
     static AiSettings fromJson(const Json& j);
-    // Stored in the user's config directory with owner-only permissions.
+    // Stored in the user's config directory with owner-only permissions, without the keys.
     bool save(const std::string& path, std::string& error) const;
     static AiSettings load(const std::string& path);
 };
@@ -96,6 +99,10 @@ std::string modelsUrl(const std::string& chatEndpoint);
 std::vector<std::string> listModels(const AiSettings& s, std::string& error);
 // The smallest model a local Ollama has installed, or empty if none is running.
 std::string smallestOllamaModel(std::string& error);
+
+// The studio policy's gate for one AI request (core/ManagedPolicy.h): the provider, the address and, when the policy
+// requires it, the studio sign-in. False with ERROR set (and nothing sent) when it may not go.
+bool aiRequestAllowed(const std::string& providerId, const std::string& url, std::string& error);
 
 // Blocking (run on a worker thread): sends the conversation, whose last
 // message must be the user's, and returns a recipe.

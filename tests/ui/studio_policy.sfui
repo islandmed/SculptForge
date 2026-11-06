@@ -1,0 +1,42 @@
+# A studio's policy file (core/ManagedPolicy.h, docs/guide/studios.md "IT deployment"): each locked setting says
+# "Managed by your studio"; Preferences > AI shows the studio, the studio sign-in and the audit log; providers the
+# policy doesn't allow are greyed; a broken policy fails closed (AI off). ui_policy exists only in UI tests.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run ui_policy json="{\"format\":\"sculptforge-policy\",\"version\":1,\"organization\":\"Acme Animation\",\"ai\":{\"enabled\":true,\"providers\":[\"litellm\",\"ollama\"],\"endpoints\":[\"https://llm.acme.internal/\"],\"requireSignIn\":true},\"mcp\":{\"live\":\"never\",\"categories\":[\"info\",\"edit\"]},\"signIn\":{\"issuer\":\"https://acme.okta.com/oauth2/default\",\"clientId\":\"0oa1example\"},\"updates\":{\"channel\":\"stable\"}}"
+expect_value ai_enabled == 1
+click "Preferences##palette.preferences"
+click "AI##preferences.ai"
+expect_text Managed by your studio
+expect_text Managed by Acme Animation
+expect_text Studio sign-in
+expect "Sign in with your studio account"
+expect_text Your studio requires the sign-in for AI features.
+expect_text Audit log
+expect_text AI tools work on their own scene
+expect_text SculptForge has no telemetry
+shot studio-policy-ai
+
+# Only the allowed providers can be picked.
+click "##provider"
+shot studio-policy-providers
+key escape                                     # (closes Preferences too)
+
+click "Preferences##palette.preferences"
+click "AI##preferences.ai"                     # (closed, so Updates is on screen)
+click "Updates##preferences.updates"
+expect_text Managed by your studio
+shot studio-policy-updates
+
+# A broken policy (a typo in a key) turns AI, network features and AI tools off until it is fixed.
+run ui_policy json="{\"format\":\"sculptforge-policy\",\"version\":1,\"ai\":{\"enabeld\":true}}"
+expect_value ai_enabled == 0
+expect_not "AI Brush"
+run_fails brush_ai prompt=sharp
+expect_value http_requests == 0
+click "Updates##preferences.updates"
+click "AI##preferences.ai"
+expect_text The studio policy can't be used
+shot studio-policy-broken
+
+run ui_policy json=""
+expect_value ai_enabled == 1

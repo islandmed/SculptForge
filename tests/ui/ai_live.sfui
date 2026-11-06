@@ -74,3 +74,27 @@ expect_not "Let AI tools control this window##prefs.ai_live"
 ai_client close
 run ai_features on=true
 expect_value ai_link_state == 1              # (the switch stays on: back with AI)
+
+# A studio's policy (core/ManagedPolicy.h): only some kinds of tool are listed and run (refusals are audited), and
+# "live": "never" stops the listener and locks the switch off.
+run ui_policy json="{\"format\":\"sculptforge-policy\",\"version\":1,\"mcp\":{\"categories\":[\"info\"]}}"
+expect_value ai_link_state == 1
+ai_client connect
+ai_client send {"hello":"sculptforge-live","v":1,"client":"Studio"}
+wait_value ai_link_state == 2 5
+click "Approve##ailink"
+ai_client expect paired":true
+wait_value ai_link_state == 3 5
+ai_client send {"jsonrpc":"2.0","id":8,"method":"tools/list"}
+ai_client expect viewport_image
+ai_client send {"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"stroke_screen","arguments":{"points":"0.5,0.5"}}}
+ai_client expect "doesn't allow AI tools to use stroke_screen"
+expect_value undo_ai == 1
+run ui_policy json="{\"format\":\"sculptforge-policy\",\"version\":1,\"organization\":\"Acme Animation\",\"mcp\":{\"live\":\"never\"}}"
+wait_value ai_link_state == 0 5
+ai_client close
+click "Preferences##palette.preferences"
+expect_text Managed by your studio
+shot ai-live-managed
+run ui_policy json=""
+wait_value ai_link_state == 1 5

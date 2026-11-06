@@ -118,6 +118,7 @@ struct AppOptions {
 };
 
 class Demo;
+struct StudioSignInJob; // PanelAi.cpp: the studio sign-in on a worker (ai/Oidc.h)
 
 // Wakes the main loop from any thread (SDL_PushEvent): the app draws only when something changed (#14), so work
 // that finishes off the main thread (a file dialog's answer, a phone message) calls this to be seen at once.
@@ -559,8 +560,13 @@ private:
     // Preferences > AI (PanelAi.cpp, ai/AiPolicy.h): Enable AI features. Off removes the AI commands, the Brush Lab
     // and Generate 3D entries and closes their windows; saved in ai.json at once (not in tests). SF_AI / --no-ai lock it.
     void setAiFeatures(bool on);
+    void applyAiFeatures(bool on, bool save); // the switch itself, whatever locks it (setAiFeatures, a policy)
+    void registerPolicyTestCommand(); // ui_policy: UI tests only (tests/ui/studio_policy.sfui)
     void registerAiActions(); // ui.brush_lab, ui.generate3d: only while AI is on
     void drawAiPrefs();       // the Preferences > AI section and the first-run question
+    void drawAiStudioPrefs(); // Preferences > AI: what the studio's policy manages, the studio sign-in, the audit log
+    void storeAiKeys();       // the keys aiSettings_ holds, into the OS keychain (a worker; ai/Secrets.h)
+    void applyUpdatePolicy(); // a studio policy's update check and channel (core/ManagedPolicy.h) over the saved ones
     // Live mode (PanelAiLink.cpp, link/AiLink.h): Preferences > AI > Let AI tools control this window. An AI tool
     // (sculptforge-cli --mcp --attach) connects over a local socket / pipe only this user can open, is approved in
     // a dialog (a one-time code), shows an "AI connected" badge with Disconnect while it works, and asks first
@@ -587,6 +593,7 @@ private:
     bool aiRenderView(const Camera& cam, int width, int height, Image& img, std::string& error);
     Json aiLiveTool(const std::string& name, const Args& args, bool& ok); // viewport_image, view_set, ...
     // Brush Lab (AI brush designer)
+    std::shared_ptr<StudioSignInJob> signInJob_; // Preferences > AI > Studio sign-in, while it runs
     bool showBrushLab_ = false; // floating; opened from the top shelf's AI Brush or the Brush palette
     bool hideUi_ = false;
     uint64_t seenSplatsVersion_ = 0;
@@ -1088,9 +1095,11 @@ private:
     int viewSamples();
     void applyPerformancePrefs();
     void notePerformanceFrame(double syncMs); // after syncScene: upload time, GPU memory warnings
+    void noteStillness();                     // after viewSamples: RenderSettings::stillSeconds, stroking
     struct PerfState {
         glm::mat4 lastView{0.0f};
         int framesStill = 0;          // frames since the view last moved
+        double stillSince = 0.0;      // when it last moved (ImGui::GetTime)
         bool fastNow = false;         // this frame draws without antialiasing (fast navigation)
         bool proxyPrebuild = false;   // still frames build stale motion proxies (Renderer::setProxyPrebuild)
         bool proxyNow = false;        // this frame draws big meshes' motion proxy (fast navigation)

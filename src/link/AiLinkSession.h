@@ -25,8 +25,14 @@ enum class AiVerdict { Allow, Confirm, Deny };
 
 struct AiDecision {
     AiVerdict verdict = AiVerdict::Allow;
-    std::string reason; // Confirm: what the dialog says ("Overwrites C:/x.glb"); Deny: the error
+    std::string reason; // Confirm: what the dialog says ("Overwrites C:/x.glb"); Deny: the error. English, also for the tool
+    // Confirm: the reason's English template with one %s for `subject` ("Overwrites %s"), so the app shows it through
+    // tr() (shownReason); the templates are listed in tools/i18n/coverage.py (DYNAMIC).
+    const char* format = nullptr;
+    std::string subject;
 };
+// A Confirm decision whose reason is `format` with `subject` in place of its %s.
+AiDecision confirmBecause(const char* format, const std::string& subject = {});
 
 struct AiLinkPolicy {
     std::string projectDir;          // the saved project's folder ("" when none)

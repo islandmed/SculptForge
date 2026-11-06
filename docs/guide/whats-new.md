@@ -5,6 +5,41 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.7
+
+```features
+date: 2026-11-06
+tagline: Dense scans orbit smoothly on entry-level machines, and Preferences > AI speaks Spanish and Chinese.
+highlight: Dense scans orbit smoothly on entry-level machines
+highlight: Preferences > AI in Spanish and Chinese
+highlight: Live mode's confirmations in your language
+```
+
+- **Smoother view on very dense meshes**: a scan or import with more triangles than your computer draws comfortably
+  now draws a lighter version of itself while you turn the view, and the real detail as soon as the view rests. Parts
+  you sculpt always show in full detail. Orbiting a 28-million-triangle scan on an entry-level machine is about twice
+  as smooth: its slowest frames go from 24 to 12 ms.
+
+## Version 0.11.6
+
+```features
+date: 2026-11-06
+tagline: Studio controls for AI: a managed policy, an audit log, keys in the system keychain and single sign-on, plus shelves that hide when they're empty.
+highlight: Studio controls: one policy file decides which AI tools and providers are allowed
+highlight: An audit log of every AI step, and API keys kept in the system keychain
+highlight: Sign in with your studio's identity provider (device sign-in, no browser plug-in)
+highlight: Empty shelves stay out of the way outside Customize Shelves
+highlight: Studio-ready AI: policy, audit log, single sign-on
+```
+
+- **Empty shelves hide**: a shelf you empty is hidden outside **Customize Shelves** and the canvas takes its room; it
+  comes back while customizing so you can drop buttons onto it again.
+- **Studio controls**: IT can deploy a policy file that locks AI, network features, AI providers, AI tools and updates
+  (**Managed by your studio** shows on locked settings), keep an audit log of every AI action, and sign artists in
+  with the studio account (the guide's "SculptForge for studios" page, IT deployment).
+- **AI providers**: **Edit > Preferences > AI > Provider** has presets for Anthropic, OpenAI, Ollama, LM Studio, vLLM,
+  llama.cpp, a LiteLLM studio gateway and OpenRouter. Keys now live in your system keychain.
+
 ## Version 0.11.5
 
 ```features
@@ -48,8 +83,6 @@ highlight: Saved camera views and a readable mask
 highlight: Quick Remesh and Voxel Remesh keep open parts solid
 highlight: The UV Editor fits at large UI scales
 highlight: The new orange SF app icon
-highlight: Connect your AI tool in one window
-highlight: Saved camera views and a readable mask
 ```
 
 - The app icon is now the orange SF mark, as on the website; it reads at task bar size.

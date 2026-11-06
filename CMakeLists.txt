@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.11.5 LANGUAGES C CXX)
+project(SculptForge VERSION 0.11.7 LANGUAGES C CXX)
 # "beta.1" while this is a beta of that version (title bar and About: "0.11.0 Beta 1"), "" for a stable release.
 # scripts/release.sh sets it; release.yml checks the tag against both (v0.11.0-beta.1).
 set(SCULPTFORGE_PRERELEASE "")
@@ -100,6 +100,8 @@ add_library(sculptforge_core STATIC
   src/core/SelfUpdate.cpp
   src/core/MemberBuilds.cpp
   src/core/Keychain.cpp
+  src/core/ManagedPolicy.cpp
+  src/core/AuditLog.cpp
   src/core/BrushGallery.cpp
   src/core/VertexPaint.cpp
   src/core/PaintLayer.cpp
@@ -233,6 +235,9 @@ target_link_libraries(sculptforge_core PUBLIC glm::glm Threads::Threads)
 if(UNIX AND NOT APPLE)
   target_link_libraries(sculptforge_core PRIVATE ${CMAKE_DL_LIBS}) # core/Keychain.cpp: libsecret, loaded at run time
 endif()
+if(APPLE)
+  target_link_libraries(sculptforge_core PRIVATE "-framework Security" "-framework CoreFoundation") # core/Keychain.cpp
+endif()
 # zstd for Focus Detail tiles (core/FocusDetail.h), when the system has it; without it the tiles use our own codec.
 # Not on macOS: Homebrew's zstd is single-architecture and breaks the universal (x86_64 + arm64) build.
 find_package(PkgConfig QUIET)
@@ -258,7 +263,7 @@ set_source_files_properties(third_party/xatlas/xatlas.cpp third_party/tinyexr/ti
                             PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 
 # --- Bring-your-own-AI (brush assistant). HTTPS via WinHTTP or libcurl. ---
-add_library(sculptforge_ai STATIC src/ai/Http.cpp src/ai/AiPolicy.cpp src/ai/BrushAssistant.cpp src/ai/Generator3D.cpp
+add_library(sculptforge_ai STATIC src/ai/Http.cpp src/ai/AiPolicy.cpp src/ai/Providers.cpp src/ai/Secrets.cpp src/ai/Oidc.cpp src/ai/BrushAssistant.cpp src/ai/Generator3D.cpp
   src/ai/ImageTo3DService.cpp src/ai/GradioClient.cpp src/ai/ComfyUI.cpp src/ai/AiCommands.cpp src/ai/BrushGalleryClient.cpp src/link/Socket.cpp
   src/link/UnrealLink.cpp src/ai/Process.cpp src/ai/SplatTrainer.cpp)
 # Lets a build run from its tree find the bundled ComfyUI workflows (integrations/comfyui/workflows).
@@ -755,6 +760,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Every interface label has a Spanish, a Traditional and a Simplified Chinese translation (or is a name kept in English,
     # tools/i18n/keep_english.txt): a new label without one fails here, not in a release.
     add_test(NAME i18n_coverage COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/i18n/coverage.py --check)
+    # ...and no label reaches ImGui without tr() unless tools/i18n/raw_allow.txt lists it (names that stay English, and
+    # the 11-06 backlog, which only shrinks): coverage can't see a label that never goes through tr().
+    add_test(NAME i18n_raw_labels COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/i18n/coverage.py --raw-check)
+    # The release's SBOM (tools/release/sbom.py, docs/guide/security.md): every fetched archive is a listed component.
+    add_test(NAME sbom COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/sbom.py --check)
     add_test(NAME marks_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py --self-test)
     # The same marks read off the pixels of every tracked image and video (OCR, cached by file hash), and the deploy's
     # takedown of flagged ones (tools/media_takedown.py).

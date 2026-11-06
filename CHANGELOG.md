@@ -6,6 +6,51 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.7] - 2026-11-06
+
+### Added
+- Coarse levels for dense meshes: a plain mesh over the hardware tier's triangle budget draws all of it at one lighter
+  level while the view moves (the finest that fits the budget), and in full detail once the view has rested for 150
+  ms, when one full frame fits the still-frame budget (100 ms); otherwise it stays light and the info line says
+  **Preview detail**. A stroke draws the mesh in full detail; its edits reach the lighter level right after it.
+  `SF_COARSE_LOD=0` turns it off.
+
+### Fixed
+- **Preferences > AI** and live mode's step confirmations were partly in English in Spanish and Chinese: Enable AI
+  features, its description and privacy line, the Hugging Face token field, AI services & privacy, and the reasons a
+  step asks first ("Writes ... outside the project folder", "Overwrites ...", "Connects to the network"...) are now
+  translated. A new check stops labels from reaching the screen without going through the translator.
+
+## [0.11.6] - 2026-11-06
+
+### Added
+- **Managed policy for studios** (docs/guide/studios.md "IT deployment"): `policy.json` in `/etc/sculptforge`,
+  `/Library/Application Support/SculptForge` or `C:\ProgramData\SculptForge` (or `SF_POLICY` when there is none) locks
+  AI on or off, network features, the allowed AI providers and addresses, sign-in for AI, AI tools (MCP on or off,
+  never controlling the window, allowed kinds of command), the update check, channel and feed. Locked settings say
+  **Managed by your studio**; a broken policy fails closed. `sculptforge-cli --policy` shows what it manages.
+- **AI audit log**: every AI tool (MCP) command, refused ones too, and every Brush Lab and Generate 3D request is a
+  JSON line (time, user, host, client, command, a summary of its settings, result) in a local file or a share the
+  policy names, rotated by size. No artwork, keys or long text. `sculptforge-cli --audit-log` prints the path.
+- **Studio sign-in** (Okta, Microsoft Entra ID, Google Workspace, Auth0, Keycloak): OpenID Connect device sign-in in
+  the artist's browser, no local listener; tokens in the keychain, sent only to the studio's own AI gateway. **Edit >
+  Preferences > AI > Studio sign-in**, or `sculptforge-cli --sign-in`.
+- **AI provider presets** in **Edit > Preferences > AI > Provider** (also in Brush Lab): Anthropic, OpenAI, Ollama, LM
+  Studio, vLLM, llama.cpp server, LiteLLM proxy (a studio gateway for Bedrock, Vertex AI and Azure OpenAI) and
+  OpenRouter.
+- Each release carries a CycloneDX software bill of materials (`SculptForge-<version>-sbom.cdx.json`), covered by the
+  signed checksums. A one-page security overview for IT reviews is in the guide.
+
+### Changed
+- An empty shelf is hidden when **Customize Shelves** is off, and the canvas takes its space; it returns while
+  customizing so items can be dropped back onto it. Saved layouts with empty shelves load as before (#139, thanks
+  ebarranco).
+
+### Security
+- AI keys (Brush Lab, Hugging Face, fal.ai, Meshy) are stored in the operating system's keychain (macOS Keychain,
+  Windows Credential Manager, Linux Secret Service) instead of `ai.json`; keys already in `ai.json` move there at the
+  first start. Without a keychain (`SF_KEYCHAIN=none`), a key lasts for the session; environment variables still work.
+
 ## [0.11.5] - 2026-11-06
 
 ### Added

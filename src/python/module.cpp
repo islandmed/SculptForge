@@ -17,6 +17,7 @@
 #include "core/BrushLibrary.h"
 #include "core/Commands.h"
 #include "core/Multires.h"
+#include "core/AuditLog.h"
 #include "core/Script.h"
 #include "core/SelectionSets.h"
 #include "core/StudioProfile.h"
@@ -126,6 +127,7 @@ PYBIND11_MODULE(sculptforge, m) {
     py::register_exception<CommandError>(m, "CommandError", PyExc_RuntimeError);
     // Studio mode (SF_STUDIO_PROFILE, SF_OFFLINE=1 or a studio build; core/StudioProfile.h), as in the app.
     sf::ai::setStudioAiAllowed(startStudioMode("", "", false).profile.ai);
+    sf::audit::setClient("python"); // (the AI audit log, core/AuditLog.h)
 
     py::class_<Document>(m, "Document", "A scene: the sculpt mesh (with layers), Gaussian splats and edit history.")
         .def(py::init([] {

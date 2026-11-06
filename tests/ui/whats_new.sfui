@@ -2,9 +2,9 @@
 # block); Esc closes it, Try it opens the feature, Full release notes opens the guide chapter, which shows the last
 # three versions in full and folds the older ones into groups.
 # The window is pinned to 0.10.7's five cards (SF_WHATS_NEW_VERSION), so this stays valid after each release; the guide
-# chapter below is pinned to 0.11.5 (SF_GUIDE_VERSION), so it checks 0.11.5's section before and after the release.
+# chapter below is pinned to 0.11.7 (SF_GUIDE_VERSION), so it checks 0.11.7's section before and after the release.
 env SF_WHATS_NEW_VERSION 0.10.7
-env SF_GUIDE_VERSION 0.11.5
+env SF_GUIDE_VERSION 0.11.7
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 click "Help##palette.help"
@@ -62,12 +62,12 @@ wait 0.3
 expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
+expect_text "Version 0.11.7"
+expect_text "Dense scans orbit smoothly on entry-level machines, and Preferences > AI speaks Spanish and Chinese."
+expect_text "Version 0.11.6"
+expect_text "Studio controls for AI: a managed policy, an audit log, keys in the system keychain and single sign-on, plus shelves that hide when they're empty."
 expect_text "Version 0.11.5"
 expect_text "Connecting your AI assistant now takes three steps, the interface speaks Simplified Chinese, and the brush size ring follows the pen."
-expect_text "Version 0.11.4"
-expect_text "Let your AI assistant sculpt in your open window, and fixes."
-expect_text "Version 0.11.3"
-expect_text "Connect your AI tool in one window, saved camera views, a readable mask, solid remeshes of open parts and the new SF icon."
 expect_value whats_new_contents == 6
 expect_value whats_new_expanded == 1
 shot whats-new-guide
