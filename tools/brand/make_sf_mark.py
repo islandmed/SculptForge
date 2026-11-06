@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""The SF mark, the app icon and the site's monogram (Tony 11-05): on the forge-orange tile (#f28c3c, rx 13 of 56), a dark "S" (#141416) and a
+"""RETIRED (Tony 11-06: the cube is the app icon again, docs/brand.md); kept for history, nothing shipped uses it.
+The SF mark, the app icon and the site's monogram (Tony 11-05): on the forge-orange tile (#f28c3c, rx 13 of 56), a dark "S" (#141416) and a
 white "F" in Archivo Black, 28 of 56, set apart (S centred at x 17, F at x 39, baseline 39). The letters are paths,
 so the header and favicons look the same whatever fonts load.
 
