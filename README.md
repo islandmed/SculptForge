@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="website/press/sculptforge-icon-256.png" width="112" alt="SculptForge logo">
+  <img src="website/img/bust-256.png" width="160" alt="SculptForge: a clay bust on an anvil">
 </p>
 
 <h1 align="center">SculptForge</h1>
