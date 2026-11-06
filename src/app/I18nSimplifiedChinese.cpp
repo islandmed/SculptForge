@@ -212,6 +212,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"New Plane", "添加平面"},
     {"New Forge Sphere", "添加 Forge Sphere"},
     {"Open", "打开"},
+    {"Opening", "正在打开"},
+    {"Preview: sculpting starts once it's in", "预览：加载完成后即可雕刻"},
     {"Open Recent", "打开最近使用的文件"},
     {"Save", "保存"},
     {"Save As", "另存为"},
