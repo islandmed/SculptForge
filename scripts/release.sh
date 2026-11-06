@@ -622,7 +622,10 @@ PY
         push_main
         ok "pushed the feed and home page"
     fi
-    # The Website workflow deploys main's site and the newest tag's guide; check what visitors get.
+    # The Website workflow deploys main's site and the newest tag's guide. Its run for the feed commit can sit queued
+    # longer than any fixed wait (0.11.7: past 10 minutes), so wait for that run, then check what visitors get.
+    wait_run pages.yml "$(git log -1 --format=%H -- website/latest.json)" 18 >/dev/null ||
+        echo "   no Website run found for the feed commit: waiting on the live feed alone" >&2
     wait_live https://sculptforge.app/latest.json "\"version\": \"$V\"" 600 ||
         die "sculptforge.app still serves the old feed after 10 minutes" "check the Website workflow: gh run list -R $REPO -w pages.yml -L 3; re-run it if it failed"
     ok "sculptforge.app/latest.json says $V"
