@@ -7,13 +7,20 @@ The app and brushes.html read https://github.com/islandmed/sculptforge-brushes; 
 that never reached it left a third-party mark live for weeks, so release.sh runs this. Compares git blob hashes of
 every file (no clone), then runs check_marks' patterns over repo/'s file names and text.
 
+The public tree comes from `gh api` (signed in: no anonymous rate limit on shared CI runners, and the release test's gh
+stand-in answers it), else from the anonymous REST API when gh isn't installed. A failed lookup is reported as such
+(on stdout, which release.sh shows), never as a difference.
+
     python3 check_published.py            (network; release.sh preflight)
     python3 check_published.py --self-test
+    python3 check_published.py --tree-json   repo/ as the API's tree answer (the release test's gh stand-in)
 Standard library only.
 """
 
 import hashlib
 import json
+import shutil
+import subprocess
 import sys
 import urllib.request
 from pathlib import Path
@@ -34,9 +41,16 @@ def local_tree():
 
 
 def public_tree():
-    url = f"https://api.github.com/repos/{PUBLIC}/git/trees/main?recursive=1"
-    with urllib.request.urlopen(urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"}), timeout=30) as r:
-        tree = json.load(r)["tree"]
+    path = f"repos/{PUBLIC}/git/trees/main?recursive=1"
+    if shutil.which("gh"):
+        r = subprocess.run(["gh", "api", path], capture_output=True, text=True, timeout=60)
+        if r.returncode != 0:
+            raise RuntimeError(f"gh api {path} failed: {(r.stderr or r.stdout).strip()[:200]}")
+        tree = json.loads(r.stdout)["tree"]
+    else:
+        url = f"https://api.github.com/{path}"
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"}), timeout=30) as r:
+            tree = json.load(r)["tree"]
     return {t["path"]: t["sha"] for t in tree if t["type"] == "blob"}
 
 
@@ -67,7 +81,15 @@ def main(argv):
         assert not marks(check_marks.load_marks())
         print("check_published self-test ok")
         return 0
-    problems = marks(check_marks.load_marks()) + differences(local_tree(), public_tree())
+    if "--tree-json" in argv:
+        print(json.dumps({"tree": [{"path": p, "type": "blob", "sha": s} for p, s in local_tree().items()]}))
+        return 0
+    try:
+        public = public_tree()
+    except Exception as e:  # (network, auth, rate limit: say so, not "differs")
+        print(f"could not read {PUBLIC}'s file list: {e}")
+        return 2
+    problems = marks(check_marks.load_marks()) + differences(local_tree(), public)
     for p in problems:
         print(p)
     if problems:
