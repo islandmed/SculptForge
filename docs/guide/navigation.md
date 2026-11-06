@@ -200,7 +200,7 @@ unusual scale.
 
 ## Saved views
 
-**View > Views** (the Render palette in the Classic layout) has a button for each axis view (Front, Back,
+**View > Views** has a button for each axis view (Front, Back,
 Left, Right, Top, Bottom) and your own saved cameras. Type a name (or leave it empty for "View 1", "View 2" ...)
 and click **Save View** (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Numpad 0</kbd>); saving under a name that exists
 replaces it. Click a name to go back to that view, or press <kbd>Numpad 0</kbd> for the one used last; **x** forgets
@@ -214,7 +214,7 @@ These live on the right shelf and in the **View** menu:
   the surface as a wireframe. Quads show as quads (see [Quads and triangles](geometry.md#quads-and-triangles)).
   Useful for judging mesh density before you subdivide or remesh.
 - **Groups**: colours each face group.
-- **Mask**: tints masked areas dark (how dark: **Mask darkness** in Preferences > Interface).
+- **Mask**: tints masked areas dark (how dark: **Mask darkness** in Edit > Preferences > Interface).
 - **Paint**: shows vertex paint colours (off shows the plain material).
 - **Solo**: shows only the active Part, to get at parts hidden behind others.
 - **Show Mesh** (**View** menu): hides the sculpt, for example to look at a splat capture on its own.

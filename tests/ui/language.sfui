@@ -83,7 +83,7 @@ expect "工具##palette.tool"
 expect "繪製##tool.draw"
 expect "Clay Block##brush.clayblock"
 click "幾何##tool.geometry"
-click "細分##geometry.divide"
+click "細分（保留層級）##geometry.divide"
 expect_value sdiv_levels == 3
 shot zh_geometry
 click "幾何##tool.geometry"
