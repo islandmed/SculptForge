@@ -1,0 +1,80 @@
+# Settings saved by 0.11.1 keep every mask gesture working (ebarranco, Discord 11-05: after 0.11.1 -> 0.11.2 the
+# Classic clear-mask gesture stopped; Reset Layout and Shortcuts fixed it). data/prefs/ui_0_11_1_*.json are real
+# 0.11.1 ui.json files, one per input style; each is loaded as at a start, then paint, erase, invert and clear.
+
+# --- Blender: M takes the Mask brush (Ctrl+drag unmasks), Ctrl+I inverts, Alt+M clears.
+restart data/prefs/ui_0_11_1_blender.json
+wait 0.2
+run new_sphere subdivisions=4
+key home
+camera 0 0
+expect_value masked == 0
+expect_value input_style == 2
+key m
+expect_value mask_brush == 1
+stroke 0.3 0.5 0.7 0.5
+expect_value masked > 0
+remember masked m1
+hold ctrl
+stroke 0.45 0.5 0.55 0.5
+hold none
+expect_value masked < $m1
+key m
+remember masked m2
+key ctrl+i
+expect_value masked > $m2
+key alt+m
+expect_value masked == 0
+
+# --- Classic sculpting keys: Ctrl paints, Ctrl+Alt erases, Ctrl+click on the background inverts, Ctrl+drag there clears.
+restart data/prefs/ui_0_11_1_classic.json
+wait 0.2
+run new_sphere subdivisions=4
+key f
+camera 0 0
+expect_value masked == 0
+hold ctrl
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value masked > 0
+remember masked m1
+hold ctrl+alt
+stroke 0.45 0.5 0.55 0.5
+hold none
+expect_value masked < $m1
+remember masked m2
+hold ctrl
+drag_path -0.4 0.5 -0.4 0.5
+hold none
+expect_value masked > $m2
+hold ctrl
+drag_path -0.4 0.5 -0.2 0.6
+hold none
+expect_value masked == 0
+shot classic_cleared
+
+# --- Maya: Ctrl+Alt paints, Ctrl+Alt+Shift erases, Ctrl+Alt+click on the background inverts, Ctrl+Alt+drag clears.
+restart data/prefs/ui_0_11_1_maya.json
+wait 0.2
+key f
+camera 0 0
+expect_value masked == 0
+hold ctrl+alt
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value masked > 0
+remember masked m1
+hold ctrl+alt+shift
+stroke 0.45 0.5 0.55 0.5
+hold none
+expect_value masked < $m1
+remember masked m2
+hold ctrl+alt
+drag_path -0.4 0.5 -0.4 0.5
+hold none
+expect_value masked > $m2
+hold ctrl+alt
+drag_path -0.4 0.5 -0.2 0.6
+hold none
+expect_value masked == 0
+
