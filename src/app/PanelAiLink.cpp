@@ -430,14 +430,17 @@ void App::pollAiLink() {
             link::AiDecision d = s.session->policy.classify(isLiveTool(name) ? nullptr : cmd, name, step.call.args);
             // A new scene clears the history: unsaved work couldn't be undone back.
             if (d.verdict == link::AiVerdict::Allow && doc_.dirty() && replacesScene(name))
-                d = {link::AiVerdict::Confirm, "Replaces the scene: your unsaved changes would be lost"};
+                d = link::confirmBecause("Replaces the scene: your unsaved changes would be lost");
             if (d.verdict == link::AiVerdict::Deny) {
                 auditLive(s.session->client(), name, step.call.args, false, d.reason);
                 s.send(link::AiLinkSession::resultReply(step.call.id, false, d.reason));
             } else if (d.verdict == link::AiVerdict::Confirm) {
-                s.confirm = AiLinkState::Pending{std::move(step.call), d.reason};
+                // The dialog and the status line in the interface language; the tool only ever gets English.
+                std::string shown = d.format ? tr(d.format) : d.reason;
+                if (const size_t at = shown.find("%s"); d.format && at != std::string::npos) shown.replace(at, 2, d.subject);
+                s.confirm = AiLinkState::Pending{std::move(step.call), shown};
                 s.focusDialog = true;
-                status_ = std::string(tr("Your AI tool asks: ")) + d.reason;
+                status_ = std::string(tr("Your AI tool asks: ")) + shown;
             } else {
                 aiLinkExecute(step.call);
             }
