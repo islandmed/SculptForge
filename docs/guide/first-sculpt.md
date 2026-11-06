@@ -10,7 +10,8 @@ steps.
 The lesson uses the default look: the **SculptForge layout**, with the menus **File, Edit, Sculpt, Paint, Mesh,
 View, Render, Help** along the top, a tool shelf under them, the brushes along the bottom and the **Tool** panel
 on the right. If you switched to the **Classic layout**, the **Classic layout** notes say where things
-are there. Every step can be undone with <kbd>Ctrl</kbd>+<kbd>Z</kbd>, so experiment freely.
+are there; Preferences, for one, is its own **Preferences** palette there instead of **Edit > Preferences**
+([where Preferences is](interface.md#interface-preferences)). Every step can be undone with <kbd>Ctrl</kbd>+<kbd>Z</kbd>, so experiment freely.
 
 Each brush remembers its own size. To set it, hold the cursor over the canvas, press <kbd>S</kbd>, type the number
 the step gives and press <kbd>Enter</kbd> (or drag the slider that appears). <kbd>[</kbd> and <kbd>]</kbd> make
