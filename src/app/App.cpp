@@ -28,7 +28,6 @@
 #include "app/Shell.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
-#include "app/UserGlyphs.h"
 #include "app/UiServe.h"
 #include "app/UserData.h"
 
@@ -506,7 +505,7 @@ int App::runUiTest(int w, int h, int fps) {
         const bool tracing = perftrace::on();
         if (tracing) tracePhase[0] = tracePhase[1] = tracePhase[2] = double(SDL_GetTicksNS()) * 1e-6;
         Demo::beginFrame();
-        if (uiScaleDirty_ || glyphs::pending()) applyUiScale(); // (Preferences, a display-scale change: #87; typed text's glyphs)
+        if (uiScaleDirty_) applyUiScale(); // (Preferences, a display-scale change: #87)
         lap(frameMs[0]);
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
@@ -524,8 +523,6 @@ int App::runUiTest(int w, int h, int fps) {
         ImGui::LogFinish();
         if (video) demo_->drawOverlay(); // the pointer (and the script's fades), as a demo recording draws them
         ImGui::Render();
-        glyphs::endFrame();
-        if (glyphs::pending()) redrawIn(0.0); // (the next frame draws them)
         lap(frameMs[2]);
         if (tracing) tracePhase[3] = double(SDL_GetTicksNS()) * 1e-6;
         updateMouseCursor();
@@ -723,7 +720,7 @@ int App::runRecording() {
         updateCameraAspect();
 
         Demo::beginFrame();
-        if (uiScaleDirty_ || glyphs::pending()) applyUiScale(); // (Preferences, a display-scale change: #87; typed text's glyphs)
+        if (uiScaleDirty_) applyUiScale(); // (Preferences, a display-scale change: #87)
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         keepImGuiOnPen();
@@ -735,8 +732,6 @@ int App::runRecording() {
         drawUi();
         demo_->drawOverlay();
         ImGui::Render();
-        glyphs::endFrame();
-        if (glyphs::pending()) redrawIn(0.0); // (the next frame draws them)
         updateMouseCursor();
         buildGhost(); // (the stroke preview, as run() draws it)
 
@@ -1179,7 +1174,7 @@ int App::run() {
         touchTick(); // a finger's press that waited for a second finger long enough goes through
 
         hardwareProfileFrameBegin(); // the frame governor's CPU and GPU timing
-        if (uiScaleDirty_ || glyphs::pending()) applyUiScale(); // (Preferences, a display-scale change: #87; typed text's glyphs)
+        if (uiScaleDirty_) applyUiScale(); // (Preferences, a display-scale change: #87)
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         keepImGuiOnPen();
@@ -1187,8 +1182,6 @@ int App::run() {
         drawUi();
         drawHardwareProfileOverlay();
         ImGui::Render();
-        glyphs::endFrame();
-        if (glyphs::pending()) redrawIn(0.0); // (the next frame draws them)
         updateMouseCursor();
         mark();
 
@@ -1336,11 +1329,8 @@ float App::targetUiScale() const {
 void App::applyUiScale() {
     uiScaleDirty_ = false;
     const float scale = targetUiScale();
-    if (fontsLanguage_ != language()) glyphs::discardPending(); // (its own glyphs come with the new atlas)
-    const bool newGlyphs = glyphs::resolve(language() == Language::TraditionalChinese);
-    const bool rescale = uiScaleChanged(uiScale_, scale);
-    if (!rescale && !newGlyphs && fontsLanguage_ == language()) return;
-    if (rescale) SDL_Log("UI scale %.0f%%", double(scale * 100.0f));
+    if (!uiScaleChanged(uiScale_, scale) && fontsLanguage_ == language()) return;
+    SDL_Log("UI scale %.0f%%", double(scale * 100.0f));
     uiScale_ = scale;
     ImGui::GetIO().Fonts->Clear();
     buildUiFonts(scale);
@@ -1375,20 +1365,12 @@ void App::mergeCjkFont(float px) {
     if (simplified) merge(assets::fontCjkSc, assets::fontCjkSc_size, kCjkRanges);
     merge(assets::fontCjk, assets::fontCjk_size, traditional ? kCjkRanges : kTraditionalName);
     if (!simplified) merge(assets::fontCjkSc, assets::fontCjkSc_size, kSimplifiedName);
-    glyphs::merge(px); // what people typed that the bundled fonts lack, from the system's fonts (UserGlyphs.h)
 }
 
 // Every font the UI uses, rasterised at `scale` for crisp text (Dear ImGui 1.91 has no dynamic font sizes).
 void App::buildUiFonts(float scale) {
     ImGuiIO& io = ImGui::GetIO();
     fontsLanguage_ = language();
-    { // the bundled fonts a typed character is looked for in first: the interface's Chinese face, then Inter
-        const bool tc = fontsLanguage_ == Language::TraditionalChinese;
-        const glyphs::Embedded embedded[] = {{tc ? assets::fontCjk : assets::fontCjkSc, size_t(tc ? assets::fontCjk_size : assets::fontCjkSc_size)},
-                                             {tc ? assets::fontCjkSc : assets::fontCjk, size_t(tc ? assets::fontCjkSc_size : assets::fontCjk_size)},
-                                             {assets::fontRegular, size_t(assets::fontRegular_size)}};
-        glyphs::install(embedded, 3, !options_.uiTest.empty());
-    }
     const bool recording = !options_.recordPath.empty() || !options_.uiTest.empty();
     // Inter (SIL OFL), embedded in the binary. Rasterised at the final size for crisp text.
     ImFontConfig fontConfig;
