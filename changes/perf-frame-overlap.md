@@ -8,7 +8,9 @@ changed: Frames overlap the CPU and the GPU: the processor builds the next frame
 testers:
   - Any OS, a big model (10M+ triangles): orbit and sculpt with Help > Benchmark or the performance overlay;
     frames are as fast or faster than 0.11.5 and the brush doesn't trail the pointer more.
-  - Windows (NVIDIA, AMD, Intel): orbit a big model for a minute; no stutter, no flicker, no frames shown out of order.
+  - Windows (NVIDIA, AMD, Intel): orbit a big model for a minute, vsync on, on a real monitor; no stutter, no flicker,
+    no frames shown out of order.
 ---
 Fences (GL 3.2 core, no extension): GpuFrameTimer polls a fence after each timer query (zero timeout) instead of
-GL_QUERY_RESULT_AVAILABLE; App::run waits for the previous frame's fence before the next swap and flushes after it.
+GL_QUERY_RESULT_AVAILABLE; App::run waits for the previous frame's fence before the next swap and flushes after it. A stroke whose solver falls
+behind (a fifth of its background batches late) doesn't overlap: on Apple silicon the GPU drawing slows the solver.
