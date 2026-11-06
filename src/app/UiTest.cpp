@@ -835,6 +835,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "discord_requests") return double(app_.discordRequests_); // Join the community on Discord clicks
     if (name == "support_requests") return double(app_.supportPageRequests_); // Support SculptForge clicks
     if (name == "ai_enabled") return ai::aiEnabled() ? 1.0 : 0.0; // Preferences > AI (PanelAi.cpp)
+    if (name == "connect_ai_open") return app_.showConnectAi_ ? 1.0 : 0.0; // Help > Connect an AI tool (PanelConnectAi.cpp)
     if (name == "discord_connects") return double(discord::connectAttempts()); // Show SculptForge on Discord: never in tests
     if (name == "discord_presence") return app_.discordPrefs_.enabled ? 1.0 : 0.0;
     if (name == "http_requests") return double(ai::httpRequestCount()); // every request this process started

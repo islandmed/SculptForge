@@ -55,7 +55,7 @@ DYNAMIC = {
                                               "Pen lower button", "Pen upper button", "Pen third button",
                                               "Right mouse button"],
 }
-TABLES = {"kPalettes": [1], "kMenus": [1, 3], "kHints": [1]}
+TABLES = {"kPalettes": [1], "kMenus": [1, 3], "kHints": [1], "kAiClients": [3], "kPlanNotes": [1]}
 ACTION_FIELDS = ("label", "description", "palette")
 # ImGui calls whose text is shown as it is: a literal handed to one of them never reaches tr() (--raw lists them).
 RAW_IMGUI = {"Button": [0], "SmallButton": [0], "Text": [0], "TextDisabled": [0], "TextWrapped": [0],

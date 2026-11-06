@@ -228,14 +228,22 @@ sculptforge model.glb --render review/model.png --turntable 8 --size 1024x1024
 
 Run `sculptforge-cli --list` for every command.
 
-### Let an AI agent sculpt (MCP)
+### Use with AI tools
+
+SculptForge's tools work from Claude, ChatGPT (Codex CLI), Gemini (Antigravity CLI), Grok (Grok Build), Cursor,
+VS Code, JetBrains, Zed and other MCP clients: the AI tool starts `sculptforge-cli --mcp` on your computer (stdio;
+nothing listens on the network). In the app, **Help > Connect an AI tool...** shows the exact command or settings for
+your install, with Copy buttons. Claude Desktop also installs it from a bundle (`SculptForge-*.mcpb` on each
+[release](https://github.com/islandmed/SculptForge/releases/latest)).
 
 ```sh
-claude mcp add sculptforge -- /path/to/sculptforge-cli --mcp      # Claude Code
+claude mcp add --scope user sculptforge -- /path/to/sculptforge-cli --mcp      # Claude Code
+codex mcp add sculptforge -- /path/to/sculptforge-cli --mcp                     # Codex CLI (sign in with ChatGPT)
 ```
 
-For Claude Desktop or other MCP clients, add a stdio server whose command is `sculptforge-cli` with the
-argument `--mcp`. The agent gets every command as a tool and works on one live scene per session.
+Every command is a tool, plus `viewport_image` (a picture of the scene) and ready-made recipes (MCP prompts). Every
+client, your own agent and plain function calling (`sculptforge-cli --schema`):
+[the guide](docs/guide/scripting.md#ai-agents-mcp).
 
 ## Controls
 

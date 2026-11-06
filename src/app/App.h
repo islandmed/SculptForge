@@ -429,6 +429,9 @@ private:
     bool lastCommandOk_ = true; // result of the last runCommand (UI tests check it)
     bool showHelp_ = false;
     bool showAbout_ = false;
+    bool showConnectAi_ = false; // Help > Connect an AI tool (PanelConnectAi.cpp; only while AI is on)
+    int connectPlan_ = 0;        // its "I have a ... subscription" choice (connect::Plan)
+    void drawConnectAi();
     // Supporting SculptForge (Support.h): the app only ever opens the membership page or its Stripe checkout links in the
     // browser; nothing else changes.
     void openSupportPage();

@@ -148,10 +148,13 @@ jobs:
           # AppImageUpdate and similar tools can update it from the newest GitHub release (the .zsync file). The
           # AppDir's root gets PNG icons (AppImage managers cannot use the SVG), and appimagetool checks it (#17).
           SF_APPIMAGE_TOOLS=.deps/appimage packaging/linux/build-appimage.sh AppDir "${TAG#v}" ${{ matrix.ld }} build
+      - name: Claude Desktop bundle (.mcpb; build_mcpb.py also runs its server)
+        run: python3 tools/release/build_mcpb.py --cli build/sculptforge-cli --version auto --platform linux --out "build/SculptForge-{version}-linux-${{ matrix.arch }}.mcpb"
       - uses: actions/upload-artifact@v7
         with:
           name: linux-${{ matrix.arch }}
           path: |
+            build/*.mcpb
             build/*.deb
             build/*.tar.gz
             build/*.AppImage
@@ -343,10 +346,14 @@ jobs:
             echo "hdiutil: Resource busy (try $attempt of 3)"; sleep 15
           done
           exit 1
+      - name: Claude Desktop bundle (.mcpb; build_mcpb.py also runs its server)
+        run: python3 tools/release/build_mcpb.py --cli build/sculptforge-cli --version auto --platform darwin --out "build/SculptForge-{version}-darwin-universal.mcpb"
       - uses: actions/upload-artifact@v7
         with:
           name: macos
-          path: build/*.dmg
+          path: |
+            build/*.dmg
+            build/*.mcpb
 
   windows:
     name: Windows x64 (installer, .zip)
@@ -402,9 +409,12 @@ jobs:
         run: ctest --test-dir build -C Release --output-on-failure -LE ui -j 4
       - name: Package
         run: cd build && cpack -C Release -G "NSIS;ZIP"
+      - name: Claude Desktop bundle (.mcpb; build_mcpb.py also runs its server)
+        run: python tools/release/build_mcpb.py --cli build/Release/sculptforge-cli.exe --version auto --platform win32 --out "build/SculptForge-{version}-windows-x86_64.mcpb"
       - uses: actions/upload-artifact@v7
         with:
           name: windows
           path: |
             build/*.exe
             build/*.zip
+            build/*.mcpb
