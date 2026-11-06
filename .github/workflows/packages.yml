@@ -465,6 +465,8 @@ jobs:
   sums:
     name: Record checksums
     needs: [linux, flatpak, vfx, macos, windows]
+    # Explicit: job reuse is skipped outside a push to main, and a skipped ancestor would skip this job too.
+    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.flatpak.result == 'success' && needs.vfx.result == 'success' && needs.macos.result == 'success' && needs.windows.result == 'success' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v8
