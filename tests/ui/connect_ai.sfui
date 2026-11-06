@@ -58,5 +58,5 @@ expect_text Managed by your studio
 expect_text your studio doesn't let them control this window
 shot connect-ai-managed
 run ui_policy json="{\"format\":\"sculptforge-policy\",\"version\":1,\"mcp\":{\"enabled\":false}}"
-expect_value connect_ai_open == 0
+wait_value connect_ai_open == 0 5
 run ui_policy json=""

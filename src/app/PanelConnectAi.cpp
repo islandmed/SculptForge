@@ -193,16 +193,18 @@ void App::drawConnectAi() {
         else ImGui::TextDisabled("%s", tr("Off"));
     }
 
-    // 3. What the user will see, in the order it happens.
-    ImGui::SeparatorText(tr("3. What happens next"));
-    for (const char* line : {tr("Ask your AI tool for something (below). SculptForge shows a 6-digit code: click "
-                                "Approve, or tell the AI the code."),
-                             tr("While it works, the AI connected badge sits at the bottom right. Disconnect stops it."),
-                             tr("Every step lands in Undo as \"AI: ...\", so you can step back."),
-                             tr("It asks you first before files outside the project, scripts and the network."),
-                             tr("It sees the viewport; what it sees goes to that tool's AI service.")}) {
-        ImGui::Bullet();
-        ImGui::TextWrapped("%s", line);
+    // 3. What the user will see, in the order it happens (live mode only: a studio may have locked it off).
+    if (live) {
+        ImGui::SeparatorText(tr("3. What happens next"));
+        for (const char* line : {tr("Ask your AI tool for something (below). SculptForge shows a 6-digit code: click "
+                                    "Approve, or tell the AI the code."),
+                                 tr("While it works, the AI connected badge sits at the bottom right. Disconnect stops it."),
+                                 tr("Every step lands in Undo as \"AI: ...\", so you can step back."),
+                                 tr("It asks you first before files outside the project, scripts and the network."),
+                                 tr("It sees the viewport; what it sees goes to that tool's AI service.")}) {
+            ImGui::Bullet();
+            ImGui::TextWrapped("%s", line);
+        }
     }
 
     ImGui::SeparatorText(tr("Try asking"));
