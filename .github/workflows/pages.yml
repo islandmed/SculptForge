@@ -43,6 +43,13 @@ jobs:
       # No image or video that shows a mark goes out, whichever commit it came from (tools/marks_media_flagged.txt).
       - name: Media takedown
         run: python3 tools/media_takedown.py website
+      # The apt and dnf repositories (sculptforge.app/apt and /rpm): the latest published release's signed metadata
+      # and its .deb and .rpm files, each checked against that release's SHA256SUMS.txt (docs/design/package-repos.md).
+      # Nothing until a release carries the metadata (it needs the REPO_SIGNING_KEY secret).
+      - name: Package repositories
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: tools/publish/package_repos_fetch.sh "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" -q .tag_name)" website
       # The credits page always matches docs/supporters.txt on main.
       - name: Supporters page
         run: python3 tools/guide/build_site.py --supporters
