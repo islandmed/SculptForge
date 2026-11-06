@@ -3308,6 +3308,18 @@ constexpr Entry kTraditionalChinese[] = {
      "會覆蓋儲存專案"},
     {"Replaces the scene: your unsaved changes would be lost",
      "會取代場景：未儲存的變更將會遺失"},
+    // Brush sets (#143)
+    {"Brush set", "筆刷組"},
+    {"Delete brush set", "刪除筆刷組"},
+    {"Delete this brush set. The brushes and the shelf stay as they are.", "刪除這個筆刷組。筆刷和底部工具列保持不變。"},
+    {"Keep the bottom shelf's brushes and their keys as a named set (Wood, Metal, Stone...). Switch between sets in one step from the Brush palette's Brush set menu, the bottom shelf's right-click menu or here.", "將底部工具列的筆刷及其快速鍵儲存為具名的筆刷組（金屬、石頭……）。可在筆刷調色盤的「筆刷組」選單、底部工具列的右鍵選單或這裡一步切換。"},
+    {"Name, e.g. Wood, Metal or Stone", "名稱，例如 金屬、石頭"},
+    {"Named bottom shelves with their keys (Wood, Metal, Stone...): pick one to swap the shelf's brushes and their keys in one step. Save keeps the shelf as it is now, with its keys, as a set. Sets live in your brush library; F3 finds them too.", "具名的底部工具列及其快速鍵（金屬、石頭……）：選一個即可一步替換工具列上的筆刷和快速鍵。「儲存」會把目前的工具列連同快速鍵存成一組。筆刷組存放在你的筆刷庫中；F3 也能找到它們。"},
+    {"No brush sets yet", "還沒有筆刷組"},
+    {"Only the set goes: the brushes and the shelf stay as they are.", "只會刪除這個組：筆刷和工具列保持不變。"},
+    {"Save Shelf as Brush Set", "將工具列儲存為筆刷組"},
+    {"none yet", "尚無"},
+    {"this shelf (not saved)", "目前的工具列（未儲存）"},
 };
 
 } // namespace

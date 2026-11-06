@@ -104,7 +104,7 @@ void App::registerBrushSets() {
     save.icon = ICON_LC_BOOKMARK_PLUS;
     save.palette = "Brush";
     save.description = "Keep the bottom shelf's brushes and their keys as a named set (Wood, Metal, Stone...). Switch "
-                       "between sets in one step from Brush > Brush set, the bottom shelf's right-click menu or here.";
+                       "between sets in one step from the Brush palette's Brush set menu, the bottom shelf's right-click menu or here.";
     save.run = [this] { openBrushSetSave(); };
     actions_.add(std::move(save));
     refreshBrushSets();

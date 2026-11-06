@@ -3310,6 +3310,18 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Using the key from the environment.", "使用环境变量中的密钥。"},
     {"Your studio doesn't allow this provider: pick another", "你的工作室不允许此提供商：请选择其他提供商"},
     {"Your studio requires the sign-in for AI features.", "你的工作室要求登录后才能使用 AI 功能。"},
+    // Brush sets (#143)
+    {"Brush set", "笔刷组"},
+    {"Delete brush set", "删除笔刷组"},
+    {"Delete this brush set. The brushes and the shelf stay as they are.", "删除这个笔刷组。笔刷和底部工具栏保持不变。"},
+    {"Keep the bottom shelf's brushes and their keys as a named set (Wood, Metal, Stone...). Switch between sets in one step from the Brush palette's Brush set menu, the bottom shelf's right-click menu or here.", "将底部工具栏的笔刷及其快捷键保存为命名的笔刷组（金属、石头……）。可在笔刷面板的“笔刷组”菜单、底部工具栏的右键菜单或这里一步切换。"},
+    {"Name, e.g. Wood, Metal or Stone", "名称，例如 金属、石头"},
+    {"Named bottom shelves with their keys (Wood, Metal, Stone...): pick one to swap the shelf's brushes and their keys in one step. Save keeps the shelf as it is now, with its keys, as a set. Sets live in your brush library; F3 finds them too.", "命名的底部工具栏及其快捷键（金属、石头……）：选一个即可一步替换工具栏上的笔刷和快捷键。“保存”会把当前的工具栏连同快捷键存成一组。笔刷组存放在你的笔刷库中；F3 也能找到它们。"},
+    {"No brush sets yet", "还没有笔刷组"},
+    {"Only the set goes: the brushes and the shelf stay as they are.", "只会删除这个组：笔刷和工具栏保持不变。"},
+    {"Save Shelf as Brush Set", "将工具栏保存为笔刷组"},
+    {"none yet", "尚无"},
+    {"this shelf (not saved)", "当前的工具栏（未保存）"},
 };
 
 } // namespace

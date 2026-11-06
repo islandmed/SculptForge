@@ -3778,6 +3778,18 @@ constexpr Entry kSpanish[] = {
      "Guarda sobre el proyecto"},
     {"Replaces the scene: your unsaved changes would be lost",
      "Reemplaza la escena: se perderían los cambios sin guardar"},
+    // Brush sets (#143)
+    {"Brush set", "Conjunto de pinceles"},
+    {"Delete brush set", "Eliminar conjunto de pinceles"},
+    {"Delete this brush set. The brushes and the shelf stay as they are.", "Elimina este conjunto de pinceles. Los pinceles y el estante quedan como están."},
+    {"Keep the bottom shelf's brushes and their keys as a named set (Wood, Metal, Stone...). Switch between sets in one step from the Brush palette's Brush set menu, the bottom shelf's right-click menu or here.", "Guarda los pinceles del estante inferior y sus teclas como un conjunto con nombre (Madera, Metal, Piedra...). Cambia de conjunto en un paso desde el menú Conjunto de pinceles de la paleta Pincel, el menú del clic derecho del estante inferior o aquí."},
+    {"Name, e.g. Wood, Metal or Stone", "Nombre, p. ej. Madera, Metal o Piedra"},
+    {"Named bottom shelves with their keys (Wood, Metal, Stone...): pick one to swap the shelf's brushes and their keys in one step. Save keeps the shelf as it is now, with its keys, as a set. Sets live in your brush library; F3 finds them too.", "Estantes inferiores con nombre y sus teclas (Madera, Metal, Piedra...): elige uno para cambiar los pinceles del estante y sus teclas en un paso. Guardar conserva el estante tal como está, con sus teclas, como conjunto. Los conjuntos se guardan en tu biblioteca de pinceles; F3 también los encuentra."},
+    {"No brush sets yet", "Aún no hay conjuntos de pinceles"},
+    {"Only the set goes: the brushes and the shelf stay as they are.", "Solo se elimina el conjunto: los pinceles y el estante quedan como están."},
+    {"Save Shelf as Brush Set", "Guardar estante como conjunto de pinceles"},
+    {"none yet", "ninguno todavía"},
+    {"this shelf (not saved)", "este estante (sin guardar)"},
 };
 
 } // namespace
