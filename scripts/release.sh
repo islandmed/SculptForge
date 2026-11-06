@@ -227,7 +227,7 @@ stage_fix() { echo "stage $V: in the merger's batch checkout, scripts/release.sh
 # The home page's "new in X.Y.Z" card and "New in X.Y.Z:" lede in #whats-new, written by build_site.py (step bump) from
 # the version's ```features block in whats-new.md, which needs a date and a tagline.
 card_ok() { grep -qF "<small>new in $V</small>" website/index.html && grep -qF "class=\"section-lede\">New in $V:" website/index.html; }
-features_ok() { awk -v v="## Version $BASE" '$0==v{f=1;next} f&&/^## /{exit} f' docs/guide/whats-new.md | grep -q '^tagline: .'; }
+features_ok() { awk -v v="## Version $BASE" '$0==v{f=1;next} f&&/^## /{exit} f' docs/guide/whats-new.md | grep '^tagline: .' >/dev/null; }
 card_fix="give '## Version $V' in docs/guide/whats-new.md a \`\`\`features block (date: unreleased, tagline: ..., highlight: ..., cards), commit, push main, run again"
 feed_done() { grep -qF "\"version\": \"$V\"" website/latest.json; }
 prerelease_is() { grep -qx "set(SCULPTFORGE_PRERELEASE \"$1\")" CMakeLists.txt; }
@@ -304,12 +304,12 @@ preflight() {
         ! grep -q '^UPDATE_SIGNING_KEY\b' "$work/secrets" ||
             die "UPDATE_SIGNING_KEY is a repository secret: any workflow on any branch could read it" \
                 "the owner moves it (the PEM from Drive \"SculptForge keys\"): gh secret set UPDATE_SIGNING_KEY --env release -R $REPO < key.pem (member-release has it already), then gh secret delete UPDATE_SIGNING_KEY -R $REPO"
-        gh secret list --env "$env" -R "$REPO" 2>/dev/null | grep -q '^UPDATE_SIGNING_KEY\b' ||
+        gh secret list --env "$env" -R "$REPO" 2>/dev/null | grep '^UPDATE_SIGNING_KEY\b' >/dev/null ||
             die "the $env environment has no UPDATE_SIGNING_KEY: release.yml couldn't sign SHA256SUMS.txt" \
                 "the owner sets it (the PEM from Drive \"SculptForge keys\"): gh secret set UPDATE_SIGNING_KEY --env $env -R $REPO < key.pem"
     fi
     if [ -n "$PRE" ]; then # a beta: members only, through the private repository; nothing of the site, no packages
-        gh secret list --env member-release -R "$REPO" 2>/dev/null | grep -q '^INSIDERS_REPO_TOKEN\b' ||
+        gh secret list --env member-release -R "$REPO" 2>/dev/null | grep '^INSIDERS_REPO_TOKEN\b' >/dev/null ||
             die "the member-release environment has no INSIDERS_REPO_TOKEN, so release.yml can't publish the beta to $INSIDERS_REPO" \
                 "the owner pastes it (fine-grained token, only $INSIDERS_REPO, Contents: read and write): wl-paste -n | gh secret set INSIDERS_REPO_TOKEN --env member-release -R $REPO"
         gh repo view "$INSIDERS_REPO" >/dev/null 2>&1 || die "can't see $INSIDERS_REPO" "gh auth status: log in as the owner of $INSIDERS_REPO"
