@@ -9,6 +9,8 @@ which of them the table has no translation for.
     tools/i18n/coverage.py --check      exit 1 unless every language is at 100% (ctest i18n_coverage)
     tools/i18n/coverage.py --json       the strings and what each language lacks, for scripts
     tools/i18n/coverage.py --raw        literals ImGui shows without tr(): not translatable until wrapped in tr()
+    tools/i18n/coverage.py --raw-check  exit 1 if a literal shown without tr() is not in raw_allow.txt, or a line there
+                                        no longer matches one (ctest i18n_raw_labels): new labels can't skip tr()
 
 The strings are found in src/app/*.cpp, the label paths tr() is used through:
   - a literal passed to tr(), trPath() (each "A > B" step) or a wrapper that calls tr() on it (WRAPPERS below:
@@ -29,6 +31,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src" / "app"
 KEEP = Path(__file__).resolve().parent / "keep_english.txt"
+RAW_ALLOW = Path(__file__).resolve().parent / "raw_allow.txt"
 LANGS = {"es": SRC / "I18nSpanish.cpp", "zh-TW": SRC / "I18nTraditionalChinese.cpp",
          "zh-CN": SRC / "I18nSimplifiedChinese.cpp"}
 SKIP_FILES = {"I18n.cpp", "I18nSpanish.cpp", "I18nTraditionalChinese.cpp", "I18nSimplifiedChinese.cpp"}
@@ -52,6 +55,14 @@ DYNAMIC = {
                                                          "Density", "Plain", "No Image", "Checker", "Texture"],
     "PanelUvEditor.cpp sections": ["Unwrap", "Pack", "Texel Density", "Trim Sheet", "Edit", "Display"],
     "Pickers.cpp sections and core/ListSort.h listSortLabel": ["Built-in", "Custom", "Recent", "Pack"],
+    "link/AiLinkSession.cpp and PanelAiLink.cpp confirm reasons (AiDecision::format, shown through tr())": [
+        "Connects to the network", "Runs a macro or script", "Runs outside programs (splat training)",
+        "Deletes a file from your library", "Writes a program or settings file: %s", "Overwrites %s",
+        "Writes %s (outside the project folder and the files you picked)",
+        "Reads %s (outside the project folder and the files you picked)", "Saves over the project",
+        "Replaces the scene: your unsaved changes would be lost"],
+    "ai/AiPolicy.h kPrivacyLine (PanelAi.cpp)": [
+        "Your art is never uploaded or used for training. AI features run only when you use them and can be turned off."],
     "core/RadialMenu.cpp radialButtonLabel": ["None", "Middle mouse button", "Mouse back button", "Mouse forward button",
                                               "Pen lower button", "Pen upper button", "Pen third button",
                                               "Right mouse button"],
@@ -63,7 +74,7 @@ RAW_IMGUI = {"Button": [0], "SmallButton": [0], "Text": [0], "TextDisabled": [0]
              "TextUnformatted": [0], "TextColored": [1], "SeparatorText": [0], "Selectable": [0], "MenuItem": [0],
              "BeginMenu": [0], "Checkbox": [0], "CollapsingHeader": [0], "TreeNode": [0], "Combo": [0, 2],
              "RadioButton": [0], "SetTooltip": [0], "BulletText": [0], "Begin": [0], "BeginTabItem": [0],
-             "SliderFloat": [0, 4], "SliderInt": [0, 4], "InputText": [0]}
+             "SliderFloat": [0, 4], "SliderInt": [0, 4], "InputText": [0], "InputTextWithHint": [1]}
 
 ICON = "\x00ICON\x00"  # stands for an ICON_LC_* macro inside a label
 TOKEN = re.compile(
@@ -432,6 +443,38 @@ def translates(table, text):
     return core(t)
 
 
+def raw_key(f, call, s):
+    """A raw_allow.txt line: file, ImGui call and the literal as JSON, tab-separated (no line number: edits move it)."""
+    return f"{f}\tImGui::{call}\t{json.dumps(s.replace(ICON, '<icon>'), ensure_ascii=False)}"
+
+
+def raw_check(write=False):
+    found = {raw_key(f, call, s) for f, _, call, s in raw_labels()}
+    lines = RAW_ALLOW.read_text(encoding="utf-8").splitlines() if RAW_ALLOW.exists() else []
+    allowed = {ln for ln in lines if ln.strip() and not ln.startswith("#")}
+    if write:  # keeps the comments and the intentional section, rewrites the backlog
+        head = []
+        for ln in lines:
+            head.append(ln)
+            if ln.startswith("# --- backlog"):
+                break
+        backlog = sorted(found - {ln for ln in head if not ln.startswith("#")})
+        RAW_ALLOW.write_text("\n".join(head + backlog) + "\n", encoding="utf-8")
+        print(f"raw_allow.txt: {len(backlog)} backlog lines")
+        return 0
+    new, stale = sorted(found - allowed), sorted(allowed - found)
+    for ln in new:
+        print(f"shown without tr(): {ln}")
+    for ln in stale:
+        print(f"raw_allow.txt line no label matches any more (delete it): {ln}")
+    print(f"{len(found)} labels shown without tr(), {len(new)} new, {len(stale)} stale allow-list lines")
+    if new or stale:
+        print("i18n_raw_labels: wrap new labels in tr() and translate them (coverage.py --missing); a name that stays "
+              "English everywhere goes in raw_allow.txt's intentional section")
+        return 1
+    return 0
+
+
 def load_keep():
     keep = set()
     if KEEP.exists():
@@ -448,7 +491,12 @@ def main():
     ap.add_argument("--check", action="store_true", help="exit 1 unless every language is at 100%%")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--raw", action="store_true", help="list the literals ImGui shows without tr() (not translatable yet)")
+    ap.add_argument("--raw-check", action="store_true", help="exit 1 on a raw literal not in raw_allow.txt (or a stale line)")
+    ap.add_argument("--raw-write", action="store_true", help="rewrite raw_allow.txt's backlog to what is raw now")
     args = ap.parse_args()
+
+    if args.raw_check or args.raw_write:
+        return raw_check(write=args.raw_write)
 
     if args.raw:
         raw = raw_labels()

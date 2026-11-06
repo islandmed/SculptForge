@@ -7,6 +7,7 @@
 // AI network entry point refuses. Saved in ai.json at once, so the CLI, Python and MCP server follow it.
 // SF_AI=off (or --no-ai) locks it for studios.
 #include "app/App.h"
+#include "app/I18n.h"
 #include "app/Ui.h"
 
 #include "ai/AiCommands.h"
@@ -126,18 +127,18 @@ void App::drawAiPrefs() {
     const bool locked = ai::aiPolicyLocked();
     bool on = ai::aiEnabled();
     ImGui::BeginDisabled(locked);
-    if (ImGui::Checkbox("Enable AI features##prefs.ai", &on)) setAiFeatures(on);
+    if (ImGui::Checkbox(tr("Enable AI features##prefs.ai"), &on)) setAiFeatures(on);
     ImGui::EndDisabled();
     ui::HelpAction(*this, "prefs.ai_features");
-    if (locked) ImGui::TextDisabled("Set by this computer (SF_AI or --no-ai).");
+    if (locked) ImGui::TextDisabled("%s", tr("Set by this computer (SF_AI or --no-ai)."));
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("AI Brush and Generate 3D. Off: they are hidden and SculptForge makes no AI network calls.");
-    ImGui::TextWrapped("%s", ai::kPrivacyLine);
+    ImGui::TextWrapped("%s", tr("AI Brush and Generate 3D. Off: they are hidden and SculptForge makes no AI network calls."));
+    ImGui::TextWrapped("%s", tr(ai::kPrivacyLine));
     ImGui::PopStyleColor();
     ImGui::Spacing();
     drawAiLinkPrefs(); // live mode (PanelAiLink.cpp)
     ImGui::Spacing();
-    if (ImGui::SmallButton("AI services & privacy##prefs.ai"))
+    if (ImGui::SmallButton(tr("AI services & privacy##prefs.ai")))
         SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md");
 }
 

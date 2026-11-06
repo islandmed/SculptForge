@@ -2939,7 +2939,7 @@ void App::drawUi() {
             if (ImGui::Button("Third-party notices"))
                 SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/THIRD_PARTY_NOTICES.md");
             ImGui::SameLine();
-            if (ImGui::Button("AI services & privacy"))
+            if (ImGui::Button(tr("AI services & privacy")))
                 SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md");
             ImGui::Spacing();
             drawSupportersSection(); // PanelSupport.cpp
@@ -3577,12 +3577,12 @@ void App::showHunyuanNoticeOnce() {
 
 void App::drawAiPrefsSection() {
     ImGui::SetNextItemWidth(-1);
-    ImGui::InputTextWithHint("##hftoken", "Hugging Face token (hf_...)", hfToken_, sizeof hfToken_, ImGuiInputTextFlags_Password);
+    ImGui::InputTextWithHint("##hftoken", tr("Hugging Face token (hf_...)"), hfToken_, sizeof hfToken_, ImGuiInputTextFlags_Password);
     ui::HelpText("Hugging Face token", nullptr,
                  "Free at huggingface.co/settings/tokens (read access). Raises the free daily allowance in "
                  "Generate 3D, and TRELLIS.2 needs it. Empty = the HF_TOKEN environment variable.",
                  "Preferences > AI");
-    if (ImGui::Button("Save", ImVec2(-1, 0))) {
+    if (ImGui::Button(tr("Save##hftoken"), ImVec2(-1, 0))) {
         // Saves the token into the settings as they are on disk, so other unsaved panel edits stay unsaved.
         aiSettings_.hfToken = hfToken_;
         ai::AiSettings saved = aiSettingsPath_.empty() ? aiSettings_ : ai::AiSettings::load(aiSettingsPath_);

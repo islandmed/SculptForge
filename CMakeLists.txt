@@ -755,6 +755,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Every interface label has a Spanish, a Traditional and a Simplified Chinese translation (or is a name kept in English,
     # tools/i18n/keep_english.txt): a new label without one fails here, not in a release.
     add_test(NAME i18n_coverage COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/i18n/coverage.py --check)
+    # ...and no label reaches ImGui without tr() unless tools/i18n/raw_allow.txt lists it (names that stay English, and
+    # the 11-06 backlog, which only shrinks): coverage can't see a label that never goes through tr().
+    add_test(NAME i18n_raw_labels COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/i18n/coverage.py --raw-check)
     add_test(NAME marks_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py --self-test)
     # The same marks read off the pixels of every tracked image and video (OCR, cached by file hash), and the deploy's
     # takedown of flagged ones (tools/media_takedown.py).
