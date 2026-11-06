@@ -36,6 +36,8 @@ CACHE_VERSION = 2  # bump when the OCR or the patterns change in a way that shou
 IMAGES = (".png", ".jpg", ".jpeg", ".webp", ".avif", ".bmp", ".tif", ".tiff")
 VIDEOS = (".mp4", ".webm", ".mov", ".mkv", ".gif", ".m4v")
 SKIP_PREFIXES = check_marks.SKIP_PREFIXES
+# scans whose terms bar commercial use (assets/demo/CREDITS.md): no tracked image or video of them
+RESTRICTED = re.compile(r"lucy|stanford|xyzrgb|armadillo|happy.?buddha|st.?matthew", re.I)
 
 
 def media_files():
@@ -134,6 +136,7 @@ def main(argv):
             assert not hits_in(f"Brush  {today}  25", mark_re), today
         assert not hits_in("Forge Spheres  Lit Sphere  Part  Face group  Library  Vertex Paint  Strength", mark_re)
         assert counts([[None, ["a", "b"]], [3, ["c"]]]) == [[None, 2], [3, 1]]
+        assert RESTRICTED.search("docs/guide/images/wn-0111-Lucy.jpg") and not RESTRICTED.search("wn-0111-dense.jpg")
         print("check_marks_media self-test ok")
         return 0
     jobs = int(argv[argv.index("--jobs") + 1]) if "--jobs" in argv else 3
@@ -166,6 +169,8 @@ def main(argv):
         save_cache({k: v for k, v in cache.items() if k in live or v})
     pending = set() if explicit else {l.strip() for l in PENDING.read_text().splitlines() if l.strip() and not l.startswith("#")}
     errors, waiting = [], 0
+    errors += [f"{p}: a scan whose terms bar commercial use (assets/demo/CREDITS.md); use the CC0 lion head"
+               for p in paths if not explicit and RESTRICTED.search(Path(p).name)]
     for p in paths:
         if p in pending:
             waiting += bool(cache[keys[p]])

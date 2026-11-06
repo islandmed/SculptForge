@@ -7,9 +7,9 @@
   <meta name="description" content="SculptForge is a free, open-source sculpting app for VFX, animation and game studios: VFX Reference Platform CY2026 and CY2027 builds, OpenUSD, a Python API, Send to Unreal, Gaussian splats and free built-in AI (an AI brush creator and image or text to 3D), on Linux, macOS and Windows.">
   <meta name="theme-color" content="#111114">
   <meta name="color-scheme" content="dark">
-  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png?v=3">
-  <link rel="icon" type="image/png" sizes="64x64" href="img/favicon-64.png?v=3">
-  <link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=3">
+  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png?v=5">
+  <link rel="icon" type="image/png" sizes="64x64" href="img/favicon-64.png?v=5">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=5">
   <meta property="og:type" content="website">
   <meta property="og:title" content="SculptForge - the free, open-source sculpting app for VFX, animation and games">
   <meta property="og:description" content="Sculpting for VFX, animation and games, with classic sculpting keys available. VFX Reference Platform CY2026 and CY2027 builds, OpenUSD, a Python API and Send to Unreal. Free built-in AI: describe a brush and get it, or turn a sketch into a model.">
@@ -28,7 +28,7 @@
   <div class="scroll-progress" aria-hidden="true"></div>
   <header class="nav">
     <div class="wrap nav-inner">
-      <a class="brand" href="#top"><img src="img/logo-128.png?v=3" alt="" width="34" height="34"><span>SculptForge</span></a>
+      <a class="brand" href="#top"><svg class="sf-mark" viewBox="0 0 56 56" width="34" height="34" aria-hidden="true" focusable="false"><rect x="1" y="1" width="54" height="54" rx="13" fill="#f28c3c"/><path fill="#141416" d="M25.57 25.34V25.67H19.77V25.56Q19.77 24.72 19.16 24.16Q18.54 23.6 17.28 23.6Q16.05 23.6 15.39 23.96Q14.73 24.33 14.73 24.86Q14.73 25.62 15.63 25.98Q16.52 26.34 18.51 26.74Q20.84 27.21 22.33 27.73Q23.83 28.25 24.95 29.42Q26.07 30.6 26.1 32.62Q26.1 36.03 23.79 37.68Q21.48 39.34 17.62 39.34Q13.11 39.34 10.6 37.82Q8.1 36.31 8.1 32.48H13.95Q13.95 33.93 14.7 34.42Q15.46 34.91 17.06 34.91Q18.23 34.91 19 34.66Q19.77 34.41 19.77 33.62Q19.77 32.92 18.92 32.57Q18.06 32.22 16.13 31.83Q13.78 31.33 12.24 30.78Q10.7 30.24 9.55 28.98Q8.4 27.72 8.4 25.56Q8.4 22.4 10.85 20.9Q13.3 19.4 17.06 19.4Q20.75 19.4 23.13 20.9Q25.51 22.4 25.57 25.34Z"/><path fill="#ffffff" d="M31.73 19.74H47.3V24.36H37.92V27.66H45.99V32.08H37.92V39H31.73Z"/></svg><span>SculptForge</span></a>
       <nav aria-label="Main">
         <a href="#whats-new">What's new</a>
         <a href="#features">Features</a>
@@ -99,14 +99,14 @@
       <div class="wrap">
         <h2>What's new in 0.11</h2>
         <!-- whats-new:start (tools/guide/build_site.py writes this from docs/guide/whats-new.md: edit that) -->
-        <p class="section-lede">New in 0.11.1: Dense scans with micro levels keep up with the pen, and one-click updates on Windows and Linux. <a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
+        <p class="section-lede">New in 0.11.2: Faster pen-up on dense scans, clean creases on micro levels, moves that go into sculpt layers, Maya style view keys and a UDIM grid. <a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
         <div class="wn-home">
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-0111"><div class="wn-pic"><img src="guide/images/wn-0111-lucy.jpg" alt="" width="600" height="340" loading="lazy" decoding="async"></div><div class="wn-card-body"><h3>Dense scans keep up <small>new in 0.11.1</small></h3><p>Dense scans with micro levels keep up with the pen, and one-click updates on Windows and Linux.</p><ul><li>Dense scans, fast</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-0110"><div class="wn-pic wn-pic-mark"><img src="img/logo-128.png?v=3" alt="" width="64" height="64"></div><div class="wn-card-body"><h3>Experimental <small>new in 0.11.0</small></h3><p>Sixty new brushes in six packs, a Masking panel, a quick tour for experienced sculptors, and experimental options for very dense meshes.</p><ul><li>Sixty new brushes in six built-in packs</li><li>Mask by peaks, colour and facing in a new Masking panel</li><li>A quick tour for experienced sculptors</li><li>Live Move and Background Preview for very dense meshes</li><li>Show SculptForge on Discord (opt-in)</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-01011"><div class="wn-pic wn-pic-mark"><img src="img/logo-128.png?v=3" alt="" width="64" height="64"></div><div class="wn-card-body"><h3>Classic sculpting keys and the Bridge <small>new in 0.10.11</small></h3><p>Voxel Remesh 3-4x faster, high-DPI laptops that fit the screen, the right tray in every look, and a Preview channel for betas.</p><ul><li>Voxel Remesh 3-4x faster, never freezes the app</li><li>SculptForge&#x27;s own names throughout</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-0112"><div class="wn-pic"><img src="guide/images/wn-0112-micro.jpg" alt="" width="600" height="340" loading="lazy" decoding="async"></div><div class="wn-card-body"><h3>Clean creases on micro levels, Transforms into a layer, Turn your VDM stamps <small>new in 0.11.2</small></h3><p>Faster pen-up on dense scans, clean creases on micro levels, moves that go into sculpt layers, Maya style view keys and a UDIM grid.</p><ul><li>Clean creases on micro levels</li><li>Transforms into a layer</li><li>Turn your VDM stamps</li><li>UDIMs in Columns x Rows</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-0111"><div class="wn-pic wn-pic-mark"><img src="img/icon-256.png?v=3" srcset="img/icon-256.png?v=3 256w, img/icon-512.png?v=1 512w" sizes="220px" alt="" width="256" height="256"></div><div class="wn-card-body"><h3>Dense scans keep up <small>new in 0.11.1</small></h3><p>Dense scans with micro levels keep up with the pen, and one-click updates on Windows and Linux.</p><ul><li>Dense scans, fast</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-0110"><div class="wn-pic wn-pic-mark"><img src="img/icon-256.png?v=3" srcset="img/icon-256.png?v=3 256w, img/icon-512.png?v=1 512w" sizes="220px" alt="" width="256" height="256"></div><div class="wn-card-body"><h3>Experimental <small>new in 0.11.0</small></h3><p>Sixty new brushes in six packs, a Masking panel, a quick tour for experienced sculptors, and experimental options for very dense meshes.</p><ul><li>Sixty new brushes in six built-in packs</li><li>Mask by peaks, colour and facing in a new Masking panel</li><li>A quick tour for experienced sculptors</li><li>Live Move and Background Preview for very dense meshes</li><li>Show SculptForge on Discord (opt-in)</li></ul></div></a></article>
         </div>
         <div class="wn-home-groups">
-          <a class="wn-home-group" href="guide/whats-new.html#versions-0101-to-01010"><h3>0.10.1 to 0.10.10</h3><ul><li>Your first sculpt in 10 minutes</li><li>A new look</li><li>PBR viewport</li><li>UV Editor</li><li>Keep Masked remeshing</li><li>Micro levels</li></ul><span>All changes &rarr;</span></a>
+          <a class="wn-home-group" href="guide/whats-new.html#versions-010x"><h3>0.10.x</h3><ul><li>Your first sculpt in 10 minutes</li><li>A new look</li><li>PBR viewport</li><li>UV Editor</li><li>Keep Masked remeshing</li><li>Micro levels</li></ul><span>All changes &rarr;</span></a>
           <a class="wn-home-group" href="guide/whats-new.html#versions-09x"><h3>0.9.x</h3><ul><li>Faster big brushes</li><li>Extract</li><li>Mirror And Weld</li><li>Forge Spheres</li><li>Blender keys</li><li>Scan to sculptable</li></ul><span>All changes &rarr;</span></a>
           <a class="wn-home-group" href="guide/whats-new.html#versions-08-and-earlier"><h3>0.8 and earlier</h3><ul><li>Dynamic topology</li><li>Vector displacement brushes</li><li>Blender bridge</li><li>Half the memory</li><li>Subdivision levels</li><li>Map baking</li></ul><span>All changes &rarr;</span></a>
         </div>
@@ -400,7 +400,7 @@ rez-env sculptforge -- sculptforge troll.usda \
   <footer class="footer">
     <div class="wrap footer-grid">
       <div>
-        <a class="brand" href="#top"><img src="img/logo-128.png?v=3" alt="" width="28" height="28"><span>SculptForge</span></a>
+        <a class="brand" href="#top"><svg class="sf-mark" viewBox="0 0 56 56" width="28" height="28" aria-hidden="true" focusable="false"><rect x="1" y="1" width="54" height="54" rx="13" fill="#f28c3c"/><path fill="#141416" d="M25.57 25.34V25.67H19.77V25.56Q19.77 24.72 19.16 24.16Q18.54 23.6 17.28 23.6Q16.05 23.6 15.39 23.96Q14.73 24.33 14.73 24.86Q14.73 25.62 15.63 25.98Q16.52 26.34 18.51 26.74Q20.84 27.21 22.33 27.73Q23.83 28.25 24.95 29.42Q26.07 30.6 26.1 32.62Q26.1 36.03 23.79 37.68Q21.48 39.34 17.62 39.34Q13.11 39.34 10.6 37.82Q8.1 36.31 8.1 32.48H13.95Q13.95 33.93 14.7 34.42Q15.46 34.91 17.06 34.91Q18.23 34.91 19 34.66Q19.77 34.41 19.77 33.62Q19.77 32.92 18.92 32.57Q18.06 32.22 16.13 31.83Q13.78 31.33 12.24 30.78Q10.7 30.24 9.55 28.98Q8.4 27.72 8.4 25.56Q8.4 22.4 10.85 20.9Q13.3 19.4 17.06 19.4Q20.75 19.4 23.13 20.9Q25.51 22.4 25.57 25.34Z"/><path fill="#ffffff" d="M31.73 19.74H47.3V24.36H37.92V27.66H45.99V32.08H37.92V39H31.73Z"/></svg><span>SculptForge</span></a>
         <p class="fine">Copyright © 2026 The SculptForge contributors.<br>Licensed under the
           <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
       </div>

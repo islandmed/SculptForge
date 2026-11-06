@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-11-05
+
 ### Fixed
 - Orbiting a dense scan with a micro level right after big strokes is smoother on slower computers: the shading
   that catches up after the strokes now takes a few milliseconds a frame while the view moves, and the rest when it
@@ -14,6 +16,20 @@ All notable changes to SculptForge are listed here. The format follows
 - Move, Scale and Rotate (the Transform gizmo and the `transform` command) with a sculpt layer active now record into
   that layer, masked or not, like a stroke (#133, thanks Devon0209): the base mesh stays, the layer's weight dials
   the move in and out, undo works. With Base mesh active they move the base and every layer, as before.
+- **Micro levels: Sharp Crease, Crease and Pinch** at high intensity left prominent random noise. They now pull the
+  height profile together the way the brushes pull a mesh, resampling the heights from where the pull brings the
+  surface, so nothing grows from dab to dab; big brushes stay clean too (#125, reported by RodTDai).
+- **Wire** on a micro level showed nothing; it now draws the edges of the level below the micro level (quad diagonals
+  left out, as on a mesh) on the micro surface (#128, reported by RodTDai).
+- With **Edit > Preferences > AI > Enable AI features** off, the Mesh menu still showed a **Generate 3D** section; it
+  is now **From Image** and holds only the offline Relief, Inflate and Stamp (the AI entries were already gone). The
+  status messages after opening an image point there too (reported by ebarranco on Discord).
+- A pen lying still in range (laid on the tablet, or held still above it) kept sending a hair of tilt and sub-pixel
+  motion, and each event counted as the pen in use: the mouse and trackpad could neither move the cursor nor click for
+  as long as it lay there, and the pen pulled the cursor back to itself. With a Wacom, a SpaceMouse and a trackpad on
+  a Mac the window seemed frozen and the mirror's X out of reach (reported by phoenix on Discord). Only touching,
+  buttons, coming into range, pressure and real movement count now.
+
 ### Added
 - **Rotation for vector displacement stamps** (#136, thanks DonnieAlex): with the VDM brush, **Sculpt > Brush > Vector
   Displacement > Stamp rotation** has Follow stroke direction (Drag Stamp turns with the drag; off, the drag only
@@ -26,6 +42,18 @@ All notable changes to SculptForge are listed here. The format follows
 - **Edit > Preferences > Input > Wheel zooms toward the pointer** (#134): the wheel zooms toward the point of the model
   under the pointer, which stays put. On with the Maya style; the other styles keep zooming toward the middle (the box
   turns it on in any style). **Reset view** is also an action in the Controls window, for a key of your own.
+- **Help > Record a performance trace** (#127, thanks RodTDai): while on, `sculptforge-trace.log` beside
+  `sculptforge.log` records every frame over 33 ms with where its time went (events, dabs, UI, GPU uploads, drawing,
+  GPU time), each stroke's timings, commands that held up the frames, background jobs starting and ending, the mesh
+  size, subdivision and micro level, and the GPU, driver and CPU. Off by default and costs nothing when off; two files
+  of 2 MB at most (`sculptforge-trace-previous.log`); a local file only, nothing is sent anywhere.
+- **Traditional Chinese interface** (#114, translation by yoyomaimai): Preferences > Interface > Language (the button
+  with its Chinese name; saved as `zh-TW`). About 740 labels, Taiwan usage, brush and tool names kept in English;
+  anything not translated yet stays in English. The Chinese glyphs come from a small embedded subset of Noto Sans CJK
+  TC (SIL OFL), loaded only while the interface is in Chinese.
+- The title bar's triangle count adds the micro triangles of the visible Parts while there are any ("20.5k + 5.24M
+  micro"), and so does the classic look's ActiveTris readout (#125).
+
 ### Changed
 - Micro levels: a big brush stroke on a dense scan finishes sooner after the pen lifts. The dabs still waiting at the
   lift go through the plain mesh's own batched path (exactly what the plain brush does), and the stroke stays one undo
@@ -34,6 +62,16 @@ All notable changes to SculptForge are listed here. The format follows
   **Rows** (1-10) grid, so a 10 x 2 layout fills 1001-1020 and 4 x 3 stays four tiles wide. Pack at Density spills
   within the Columns too. Projects keep their grid; new ones take the last one used. Scripts: `uv_pack` and
   `uv_unwrap` take `columns=` and `rows=` (`tiles=` works as before).
+- New icon and logo.
+- **Spanish and Traditional Chinese cover the whole interface**: about 950 labels and help texts added to each (UV
+  Editor, Quick Remesh, Preferences > Input, Packs, Bake, Fill layers, Forge Spheres, SpaceMouse...), from 47% and 44%
+  of the interface to 100%. A new test keeps it there: a label without both translations fails the build.
+- **Tool > Remesh > Voxel Remesh**: the Resolution slider goes from 32 to 512 (was 64 to 400), as the `remesh
+  resolution=` command does (asked by fxrtst on Discord). 512 is safe on 8 GB: a 28M-triangle scan in about 8 s (14 s
+  on 4 cores) into about 760k triangles; a round 2M sculpt in about 3 s into about 2.5M triangles, 2.2 GB at the peak.
+- **Big brushes keep up better on 6+ core machines**: with a brush of 160 px or more, the lighting now follows the
+  brush's own shape while you drag, and the exact shading lands behind it and at pen-up, so big strokes stay closer to
+  the pen. Machines with fewer cores keep the previous behaviour.
 
 ## [0.11.1] - 2026-11-05
 

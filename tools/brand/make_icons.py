@@ -6,7 +6,7 @@
 <concept.jpeg>: the icon art (the rounded-square tile on a dark backdrop; the tile is found from its light rim).
 --small: the simplified small-size companion (same design, flat shapes) for 16/24/32 px; without it one is drawn
 here (bold orange bust merging into a dark anvil, one glowing seam).
-Writes assets/branding/ (master, sizes, .ico, .icns), website/img/ (favicons, header logo, social previews),
+Writes assets/branding/ (master, sizes, .ico, .icns), website/img/ (icon-256/512, social preview),
 website/press/, docs/images/social-preview.png and, with --discord, the Discord server icon and bot avatar.
 """
 import argparse
@@ -232,19 +232,10 @@ def main():
     master.save(os.path.join(br, "sculptforge.icns"), format="ICNS",
                 append_images=[size(n) for n in (16, 32, 64, 128, 256, 512)])
 
+    # (The site's favicons, apple-touch-icon and header mark are the SF monogram: tools/brand/make_sf_mark.py.)
     img = os.path.join(ROOT, "website", "img")
-    size(32).save(os.path.join(img, "favicon-32.png"), optimize=True)
-    size(16).save(os.path.join(img, "favicon-16.png"), optimize=True)
-    size(64).save(os.path.join(img, "favicon-64.png"), optimize=True)
-    size(256).save(os.path.join(img, "icon-256.png"), optimize=True)
-    size(128).save(os.path.join(img, "logo-128.png"), optimize=True)  # the header mark (34 px at up to 3x)
-    fav = [size(n) for n in (48, 32, 16)]
-    fav[0].save(os.path.join(ROOT, "website", "favicon.ico"), format="ICO", sizes=[(i.width, i.height) for i in fav],
-                append_images=fav[1:])
-    # Apple touch icon: opaque 180 px (iOS rounds the corners itself), the tile's dark filling the corners.
-    touch = Image.new("RGBA", (180, 180), (0x22, 0x20, 0x22, 255))
-    touch.alpha_composite(shrink(master, 180))
-    touch.convert("RGB").save(os.path.join(img, "apple-touch-icon.png"), optimize=True)
+    size(256).save(os.path.join(img, "icon-256.png"), optimize=True)  # the Discord announcements' avatar
+    size(512).save(os.path.join(img, "icon-512.png"), optimize=True)  # (with icon-256: the home page's What's New cards)
     size(256).save(os.path.join(ROOT, "website", "press", "sculptforge-icon-256.png"), optimize=True)
     master.save(os.path.join(ROOT, "website", "press", "sculptforge-icon-1024.png"), optimize=True)
 
