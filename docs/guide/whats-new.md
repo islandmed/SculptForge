@@ -8,7 +8,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.11.2
 
 ```features
-date: unreleased
+date: 2026-11-05
 tagline: Faster pen-up on dense scans, clean creases on micro levels, moves that go into sculpt layers, Maya style view keys and a UDIM grid.
 highlight: Big brushes on dense scans finish sooner after you lift the pen
 highlight: Clean Sharp Crease, Crease and Pinch on micro levels
@@ -50,6 +50,22 @@ action: ui.uv_editor
   so a 10 x 2 layout fills 1001-1020 and 4 x 3 stays four tiles wide. Thanks RodTDai (#135).
 - **Benchmark on slower computers**: **Help > Benchmark** no longer stops at "settling" when the scene takes a few
   seconds to open.
+- New icon and logo.
+- **Spanish and Traditional Chinese, complete**: every menu, panel, tooltip and Ctrl-help text is now translated in
+  both languages (UV Editor, Quick Remesh, Preferences > Input, Packs, Bake and the rest).
+- **Record a performance trace** (Help menu, #127): turn it on, do what feels slow, turn it off and attach
+  sculptforge-trace.log (Help > Open log folder) to your report.
+- **Traditional Chinese**: **Preferences > Interface > Language** has Traditional Chinese: it puts the menus,
+  palettes, shelves and messages in Traditional Chinese (thanks yoyomaimai). Brush and tool names stay in English.
+- **Clean creases on micro levels**: **Sharp Crease**, **Crease** and **Pinch** at full strength no longer leave
+  random noise on a micro level. The title bar counts the micro triangles beside the triangles, and **Wire** shows the
+  level below the micro level on the micro surface.
+- **AI off means off in the menus too**: with **Edit > Preferences > AI > Enable AI features** off, the Mesh menu's
+  section is **From Image** (Relief, Inflate, Stamp) instead of Generate 3D.
+- **Voxel Remesh up to 512**: the **Tool > Remesh** Resolution slider now goes from 32 to 512, as the `remesh` command
+  does.
+- **A pen resting on the tablet no longer blocks the mouse or trackpad**: lay the pen down and the cursor, the shelf
+  buttons (the mirror's X too) and the menus answer the mouse at once.
 
 ## Version 0.11.1
 
