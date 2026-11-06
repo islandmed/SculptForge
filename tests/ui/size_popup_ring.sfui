@@ -1,0 +1,57 @@
+# #138: while the S pop-up is open (dragged or typed), the brush ring stays on the model where it was opened and
+# shows the new size live; O shows the Falloff ring the same way.
+run new_sphere subdivisions=4
+key f
+camera 0 0
+
+# Opened over the model: the ring lies on the surface there, at the current size.
+mouse_move 0.5 0.5
+remember draw_size s0
+key s
+expect_value size_popup_open == 1
+expect_value size_ring_preview == 1
+expect_value surface_cursor == 1
+expect_value size_ring_px == $s0
+shot opened
+
+# Dragging the knob away: the ring stays at the opening point and grows with the size, live.
+drag_path 0.5 0.5 0.9 0.5 keep
+expect_value size_popup_open == 1
+expect_value draw_size > $s0
+remember draw_size s1
+expect_value size_ring_px == $s1
+expect_value size_ring_preview == 1
+expect_value surface_cursor == 1
+shot dragging
+release
+expect_value size_popup_open == 0
+
+# Typing a size: the ring shows it before Enter applies it.
+mouse_move 0.5 0.5
+key s
+key 4
+key 0
+expect_value size_ring_px == 40
+expect_value draw_size == $s1
+shot typed
+key enter
+expect_value size_popup_open == 0
+expect_value draw_size == 40
+
+# Falloff (O): the inner ring follows the number typed; the ring keeps the brush size.
+mouse_move 0.5 0.5
+key o
+expect_value size_ring_preview == 1
+expect_value size_ring_px == 40
+key 8
+key 0
+shot falloff
+key escape
+expect_value size_popup_open == 0
+
+# Opened beside the model: the flat ring there.
+hover_window 0.2 0.75
+key s
+expect_value size_ring_preview == 1
+expect_value surface_cursor == 0
+key escape

@@ -120,6 +120,7 @@
 //                            stroke_continuous (Stroke > Continuous, 1 on),
 //                            stroking (1 while a stroke is open), cursor_x / cursor_y (the brush cursor, pixels),
 //                            surface_cursor (1 when the brush ring last drawn lay on the surface, #25),
+//                            size_ring_preview / size_ring_px (the ring the S / O pop-up shows where it opened, #138),
 //                            cursor_ring (1 when the last brush cursor drawn had its ring; 0: the dot only, #88),
 //                            hide_ring_while_stroking (Preferences > Cursor, 1 on),
 //                            cursor_follows_surface (Preferences > Input, 1 on),
@@ -1002,6 +1003,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "cursor_x") return app_.mouseX_;
     if (name == "cursor_y") return app_.mouseY_;
     if (name == "surface_cursor") return app_.surfaceCursorShown_ ? 1.0 : 0.0;
+    if (name == "size_ring_preview") return app_.sizeRingPreview_ ? 1.0 : 0.0; // the S / O pop-up's ring (#138)
+    if (name == "size_ring_px") return double(app_.sizeRingPreviewPx_);
     if (name == "cursor_ring") return app_.ringShown_ ? 1.0 : 0.0;
     if (name == "hide_ring_while_stroking") return app_.uiPrefs_.hideRingWhileStroking ? 1.0 : 0.0;
     if (name == "cursor_follows_surface") return app_.uiPrefs_.cursorFollowsSurface ? 1.0 : 0.0;
