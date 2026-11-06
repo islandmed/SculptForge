@@ -1,0 +1,34 @@
+# Library (#142): a single click uses a brush, alpha or material; a double-click still works and applies once;
+# a model still needs a double-click (a click only selects it). Also run on a UI scaled 1.5x (library_click_scaled).
+run new_plane resolution=8
+expect_value triangles == 128
+key ,
+expect_value library_open == 1
+
+click "Library/Tool"
+expect "Library/Sphere"
+click "Library/Sphere"
+expect_value triangles == 128   # a click selects a model, it does not replace the scene
+
+click "Library/Material"
+expect "Library/Chrome"
+click "Library/Chrome"
+expect_status Material: Chrome
+double_click "Library/Bronze"
+expect_status Material: Bronze
+wait_idle 60
+shot library-click-material
+
+click "Library/Brush"
+expect "Library/Clay"
+click "Library/Clay"
+expect_status Brush: Clay
+wait_idle 60
+shot library-click-brush
+
+click "Library/Alpha"
+expect "Library/Square"
+click "Library/Square"
+expect_status Alpha 'Square'
+wait_idle 60
+shot library-click-alpha
