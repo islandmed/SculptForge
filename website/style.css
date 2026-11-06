@@ -679,3 +679,20 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
   .speed-line { order: 3; font-size: 0.9rem; margin: -0.6em 0 1.2em; }
   .hero-sculpt video { aspect-ratio: 720 / 866; }
 }
+
+/* Community band under the hero; the feature set in threes; AI as one compact section lower down. */
+.community { border-top: 1px solid var(--border); background: radial-gradient(900px 400px at 85% 0%, rgba(242, 140, 60, 0.08), transparent 60%); }
+.community .ctas { margin: 28px 0 0; }
+#feature-set .grid { grid-template-columns: repeat(3, 1fr); }
+.ai-compact { padding: 56px 0; border-top: 1px solid var(--border); }
+.ai-compact .section-lede { margin-bottom: 18px; }
+.ai-list { color: #cfcfd6; padding-left: 1.2em; max-width: 52em; }
+.ai-list li { margin-bottom: 0.5em; }
+@media (max-width: 960px) {
+  #feature-set .grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 620px) {
+  .community-grid { display: grid; grid-template-columns: 1fr; overflow: visible; gap: 10px; margin: 0; padding: 0; }
+  .community-grid .card { padding: 16px 18px; }
+  .community .ctas .btn { white-space: nowrap; padding: 12px 14px; }
+}
