@@ -584,9 +584,11 @@ step_release() {
     ok "$n assets, SHA256SUMS.txt included"
 }
 
-# website_run SHA: waits for the Website run of SHA's push. When its deploy job fails (0.11.7: GitHub's Pages service
-# timed out), one fresh run of the workflow on main: a rerun of the failed job can't deploy, the first attempt's
-# github-pages artifact is still there ("Multiple artifacts named github-pages").
+# website_run SHA: waits for the Website run of SHA's push. When its deploy job fails, a fresh run of the workflow
+# on main (a rerun of the failed job can't deploy: the first attempt's github-pages artifact is still there,
+# "Multiple artifacts named github-pages"). GitHub's Pages service can answer "try again later" for a while with
+# its status page green (0.11.8: three runs in 15 minutes, the fourth 10 minutes later worked): then it waits
+# 10 minutes before each fresh run, up to 3 of them. Any other deploy failure gets one fresh run.
 website_run() {
     local id="" tries=18 c last attempt
     while [ -z "$id" ] && [ "$tries" -gt 0 ]; do
@@ -595,17 +597,26 @@ website_run() {
         [ -n "$id" ] || sleep 10
     done
     [ -n "$id" ] || { echo "   no Website run found for ${1:0:8}: waiting on the live feed alone" >&2; return 0; }
-    for attempt in 1 2; do
+    for attempt in 1 2 3 4; do
         if [ "$(gh run view "$id" -R "$REPO" --json status -q .status)" != completed ]; then
             echo "   waiting for the Website run $id ..." >&2
             gh run watch "$id" -R "$REPO" --exit-status >/dev/null 2>&1 || true
         fi
         c=$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)
         [ "$c" = success ] && return 0
-        [ "$attempt" = 1 ] && gh run view "$id" -R "$REPO" --json jobs -q '.jobs[] | select(.conclusion == "failure") | .name' 2>/dev/null |
+        gh run view "$id" -R "$REPO" --json jobs -q '.jobs[] | select(.conclusion == "failure") | .name' 2>/dev/null |
             grep -x deploy >/dev/null ||
             die "the Website run $id: $c (https://github.com/$REPO/actions/runs/$id)" "fix it on main or start it again: gh workflow run pages.yml -R $REPO --ref main; then run again with --from site"
-        echo "   the Website's deploy failed (run $id): starting a fresh run on main" >&2
+        [ "$attempt" -lt 4 ] ||
+            die "GitHub Pages still fails to deploy after 3 fresh runs (last: https://github.com/$REPO/actions/runs/$id)" "wait, then: gh workflow run pages.yml -R $REPO --ref main; then run again with --from site"
+        if gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | grep -i "try again later" >/dev/null; then
+            echo "   GitHub Pages said 'try again later' (run $id): waiting 10 minutes, then a fresh run ($attempt of 3)" >&2
+            sleep 600
+        elif [ "$attempt" -gt 1 ]; then
+            die "the Website's deploy failed again (https://github.com/$REPO/actions/runs/$id)" "check the run's deploy log, fix it on main, then run again with --from site"
+        else
+            echo "   the Website's deploy failed (run $id): starting a fresh run on main" >&2
+        fi
         last=$(gh run list -R "$REPO" -w pages.yml -e workflow_dispatch -b main -L 1 --json databaseId -q '.[0].databaseId')
         gh workflow run pages.yml -R "$REPO" --ref main >/dev/null ||
             die "can't start the Website workflow" "gh workflow run pages.yml -R $REPO --ref main; then run again with --from site"
