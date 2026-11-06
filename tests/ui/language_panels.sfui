@@ -103,14 +103,12 @@ click "文件##menu.file"
 shot zh-hans-file-menu
 key escape
 run ui_look layout=classic
-click "几何##tool.geometry"
 shot zh-hans-geometry
 click "重新网格化##tool.remesh"
 expect "Quick Remesh##remesh.quick"
 expect "每笔触后重新网格化##remesh.after_stroke"
 shot zh-hans-remesh
 click "重新网格化##tool.remesh"
-click "几何##tool.geometry"
 key alt+u
 expect_value uv_editor_open == 1
 run uv_pack columns=4 rows=3 margin=6

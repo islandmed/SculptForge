@@ -950,7 +950,7 @@ constexpr Entry kSimplifiedChinese[] = {
      "存的内容。"},
     {"On: Size and Intensity stay as they are when you pick another brush (as before 0.10.8); Falloff, Colour "
      "intensity, the stroke and the alpha still follow each brush. Off (the default): every brush keeps its own.",
-     "打开：切换到其他笔刷时大小与强度维持不变（与 0.10.8 之前相同）；衰减、色彩强度、笔触与 Alpha 仍跟随各笔刷。关闭"
+     "开启：切换到其他笔刷时大小与强度维持不变（与 0.10.8 之前相同）；衰减、色彩强度、笔触与 Alpha 仍跟随各笔刷。关闭"
      "（默认）：每个笔刷保有自己的设置。"},
     {"Make the brush 10% smaller (hold to repeat; Shift+[ steps one pixel).",
      "将笔刷缩小 10%（按住可重复；Shift+[ 每次一个像素）。"},
@@ -1004,7 +1004,7 @@ constexpr Entry kSimplifiedChinese[] = {
      "with where its time went, strokes, uploads to the GPU, remeshes and other background jobs, the mesh size and "
      "levels, and the GPU and driver. Turn it on, do what is slow, turn it off and attach the file to your report. A "
      "small file on this computer only; off by default and costs nothing when off.",
-     "打开时，日志文件夹中的 sculptforge-trace.log 会记录让 SculptForge 变慢的原因：每个超过 33 ms 的帧及其时间花在哪"
+     "开启时，日志文件夹中的 sculptforge-trace.log 会记录让 SculptForge 变慢的原因：每个超过 33 ms 的帧及其时间花在哪"
      "里、笔触、上传到 GPU、重新网格化与其他背景工作、网格大小与层级，以及 GPU 与驱动程序。打开它、运行变慢的操作、关"
      "闭后将文件附加到报告中。文件很小且只存在这台电脑；默认关闭，关闭时不会有任何负担。"},
     {"Submit a request for a fix or a suggestion: opens the bug report and feature request forms in your browser.",
@@ -1056,7 +1056,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Hover and focus highlights change colour only: no easing, and tiles don't lift or grow.",
      "停留与焦点的醒目提示只改变颜色：没有缓动，图块也不会浮起或放大。"},
     {"Off: File and Edit come first in the palette bar and Help last, the rest A to Z. On: every palette A to Z.",
-     "关闭：调色板栏中“文件”与“编辑”在最前、“帮助”在最后，其余按 A 至 Z 排列。打开：所有调色板按 A 至 Z 排列。"},
+     "关闭：调色板栏中“文件”与“编辑”在最前、“帮助”在最后，其余按 A 至 Z 排列。开启：所有调色板按 A 至 Z 排列。"},
     {"Size of text and controls, applied at once. Automatic follows the display the window is on (Windows: Settings > "
      "Display > Scale, per monitor).",
      "文本与控件的大小，立即应用。“自动”会按窗口所在的显示器而定（Windows：设置 > 显示器 > 缩放，按各显示器）。"},
@@ -1092,7 +1092,7 @@ constexpr Entry kSimplifiedChinese[] = {
      "nothing lights up under the pointer. Off: no borders, the gaps alone separate the panels. On: clear borders, "
      "the panel under the pointer a faint step lighter.",
      "Forge Terminal、Phosphor 与 Blueprint 中面板周围的边框。细微（默认）：淡淡的，指针下不会亮起。关闭：没有边框，"
-     "仅以间隙分隔面板。打开：清楚的边框，指针下的面板略亮一阶。"},
+     "仅以间隙分隔面板。开启：清楚的边框，指针下的面板略亮一阶。"},
     {"How strong the panel borders are (0-100%), on top of Outlines: 100% draws them as Subtle or On does, lower "
      "fades them into the panels (#98). Ctrl+click to type.",
      "面板边框的强度 (0-100%)，以“轮廓线”为基础：100% 会以细微或打开的样子绘制，较低则淡入面板 (#98)。按住 Ctrl "
@@ -1259,8 +1259,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Lock the camera for left-drags: a drag that starts on the background sculpts once it reaches the model instead "
      "of turning the view (Preferences > Input > Start strokes off the model, #62). The status bar shows CAMERA "
      "LOCKED while it is on. Right-drag or Alt+drag still move the view. Shift+L turns it on and off.",
-     "锁定相机以处理左键拖动：从背景开始的拖动在碰到模型时会开始雕刻，而不是旋转视图（偏好设置 > 输入 > 在模型外开始"
-     "笔触，#62）。打开时状态栏会显示“相机已锁定”。右键拖动或 Alt+拖动仍可移动视图。Shift+L 可切换开关。"},
+     "锁定相机的左键拖动：从背景开始的拖动在碰到模型时会开始雕刻，而不是旋转视图（偏好设置 > 输入 > 在模型外开始"
+     "笔触，#62）。开启时状态栏会显示“相机已锁定”。右键拖动或 Alt+拖动仍可移动视图。Shift+L 可切换开关。"},
     {"The brush ring lies on the model under the pointer: a circle at the brush's real size there, turned to the form "
      "of the surface (averaged over the brush, so fine bumps don't make it wobble), with a short line along the "
      "surface's direction. With symmetry on, a dot shows where each mirrored or radial copy lands. Off the model, "
@@ -1415,7 +1415,7 @@ constexpr Entry kSimplifiedChinese[] = {
      "笔刷衰减：低于 0 为宽而硬的笔尖，高于 0 为柔和的尖端。笔刷光标的内环显示笔刷以一半强度作用的位置。"},
     {"Off (the default): the triangle size follows the brush size on screen, as in Dynamic Topology. On: one size for "
      "the whole mesh, set by Detail. A preference (saved automatically).",
-     "关闭（默认）：三角面大小跟随屏幕上的笔刷大小，如同动态拓扑。打开：整个网格使用单一大小，由“细节”设置。这是偏"
+     "关闭（默认）：三角面大小跟随屏幕上的笔刷大小，如同动态拓扑。开启：整个网格使用单一大小，由“细节”设置。这是偏"
      "好设置（自动保存）。"},
     {"Smooth remesh", "平滑时重新网格化"},
     {"How much Smooth (Shift) changes the topology while Dynamic is on. 100 (the default): it also simplifies, "
@@ -1610,7 +1610,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Remove the baked take, so exports are a still pose again.", "移除已烘焙的录制片段，让导出再次成为静态姿势。"},
     {"Auto: Left and Right shapes are made exact mirror images when the sculpt is symmetric about X = 0. On: always "
      "(asymmetric spots take the average). Off: each side as fitted.",
-     "自动：雕刻相对 X = 0 对称时，Left 与 Right 形状会成为完全镜像。打开：始终如此（不对称处取平均）。关闭：每侧维持"
+     "自动：雕刻相对 X = 0 对称时，Left 与 Right 形状会成为完全镜像。开启：始终如此（不对称处取平均）。关闭：每侧维持"
      "拟合结果。"},
     {"Eyes (Parts named Eye...) turn for the eyeLook shapes, Teeth / Tongue follow the jaw below the bite (and "
      "tongueOut), and other Parts on the face (brows, lashes, a beard) follow the skin.",
@@ -2864,7 +2864,7 @@ constexpr Entry kSimplifiedChinese[] = {
      "SculptForge 最后检测到的数位笔，以及是否在感应范围内或正在接触。"},
     {"Turn on if the tablet driver is set to Mouse mode: the pen moves the cursor by how far it moves, and lifting it "
      "and putting it down elsewhere leaves the cursor where it was. Off (Pen mode): the cursor is where the pen is.",
-     "若数位板驱动程序设为鼠标模式请打开：笔按移动距离移动光标，抬起后放到别处时光标维持原位。关闭（笔模式）：光标就"
+     "若数位板驱动程序设为鼠标模式请开启：笔按移动距离移动光标，抬起后放到别处时光标维持原位。关闭（笔模式）：光标就"
      "在笔的位置。"},
     {"The pen's pressure as the tablet reports it, and after the pressure curve below (what brushes get).",
      "数位板报告的笔压，以及经过下方压力曲线后的值（笔刷收到的值）。"},
@@ -3044,7 +3044,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Custom brushes", "自定义笔刷"},
     {"Larger brush by 1 px", "笔刷放大 1 px"},
     {"Smaller brush by 1 px", "笔刷缩小 1 px"},
-    {"On", "打开"},
+    {"On", "开启"},
     {"Use global", "使用全局"},
     {"Reset Brush to Default", "重置笔刷为默认"},
     {"Save Brush Settings", "保存笔刷设置"},
