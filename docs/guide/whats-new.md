@@ -14,7 +14,7 @@ highlight: Clearer corner axes: lettered, depth-shaded, click twice for the oppo
 highlight: One click in the Library uses a brush, alpha or material (thanks @NicTanghe, #142)
 highlight: The app icon is now an orange cube
 highlight: Drag and Slide Stamp keep their strength when the pen lifts (#146)
-highlight: Big brushes on micro levels spend less time shading each frame
+highlight: One click sends to Maya and back; SculptForge picks up Maya's exports by itself (thanks @tristratos, #42)
 ```
 
 ## Version 0.11.7
