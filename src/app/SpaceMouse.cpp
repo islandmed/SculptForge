@@ -216,7 +216,7 @@ void App::drawSpaceMouseSection() {
         ImGui::SameLine();
         ImGui::TextUnformatted(spaceMouseName_.c_str());
     } else {
-        ImGui::TextUnformatted(ICON_LC_JOYSTICK "  No SpaceMouse found");
+        ImGui::TextUnformatted(tr(ICON_LC_JOYSTICK "  No SpaceMouse found"));
         ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
         ImGui::PushTextWrapPos(0.0f);
 #if defined(_WIN32) || defined(__APPLE__)
@@ -243,7 +243,7 @@ void App::drawSpaceMouseSection() {
         }
         ImGui::PopTextWrapPos();
         ImGui::PopStyleColor();
-        if (ImGui::SmallButton(ICON_LC_COPY "  Copy device report##spacemouse.report")) {
+        if (ImGui::SmallButton(tr(ICON_LC_COPY "  Copy device report##spacemouse.report"))) {
             std::string r = std::string("SculptForge ") + SCULPTFORGE_VERSION + ", " + SDL_GetPlatform() + ", SDL " +
                             std::to_string(SDL_MAJOR_VERSION) + "." + std::to_string(SDL_MINOR_VERSION) + "." +
                             std::to_string(SDL_MICRO_VERSION) + "\nSpaceMouse: " +
@@ -352,8 +352,9 @@ void App::drawSpaceMouseSection() {
                      path);
     }
     if (spaceMouse_ && spaceMouseLastButton_ >= 0)
-        ImGui::TextColored(col(ui::color::textDim), "Last button pressed: %d", spaceMouseLastButton_ + 1);
-    if (ImGui::SmallButton(ICON_LC_ROTATE_CCW "  SpaceMouse defaults##spacemouse.defaults")) s = SpaceMouseSettings();
+        ImGui::TextColored(col(ui::color::textDim), tr("Last button pressed: %d"), spaceMouseLastButton_ + 1);
+    if (ImGui::SmallButton(tr(ICON_LC_ROTATE_CCW "  SpaceMouse defaults##spacemouse.defaults")))
+        s = SpaceMouseSettings();
     ui::HelpText("SpaceMouse defaults", nullptr,
                  "On, speed 1, dead zone 8%, nothing inverted, free rotation, held during strokes, all axes at once; left "
                  "button Frame, right button Front view.",

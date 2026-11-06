@@ -214,11 +214,12 @@ void App::drawWhatsNew() {
 
     const whatsnew::Version& v = pop.version;
     const float pad = 36.0f * k;
-    // Header: the app mark, the eyebrow (version and date), the title and the tagline.
+    // Header: the bust, the eyebrow (version and date), the title and the tagline.
     {
-        const float m = 52.0f * k, y = a.y + 32.0f * k;
-        markTile(dl, ImVec2(a.x + pad, y), m, A);
-        const float x = a.x + pad + m + 18.0f * k;
+        // The mark as tall as the text beside it (eyebrow to tagline), above the cards (they start at 124).
+        const float m = 88.0f * k, y = a.y + 32.0f * k;
+        markTile(dl, ImVec2(a.x + pad, a.y + 26.0f * k), m, A);
+        const float x = a.x + pad + m + 20.0f * k;
         const std::string eyebrow = "SCULPTFORGE " + v.version;
         const float ew = paint.spaced(boldUi, 11.5f, ImVec2(x, y - 1.0f * k), tc(accent, A), eyebrow.c_str(), 1.8f);
         if (!v.date.empty() && v.date != "unreleased")
@@ -329,10 +330,10 @@ void App::drawWhatsNew() {
             return;
         }
         tex = c.image.empty() ? ImTextureID(0) : guide_.image(c.image, &texSize);
-        if (!tex) { // no picture: a quiet tile with the app mark
+        if (!tex) { // no picture: a quiet tile with the bust
             dl->AddRectFilled(p0, p1, tc(raised, appear), 12.0f * k, corners);
             const float m = std::min(p1.x - p0.x, p1.y - p0.y) * 0.3f;
-            brand::mark(dl, ImVec2((p0.x + p1.x - m) * 0.5f, (p0.y + p1.y - m) * 0.5f), m, 0.6f * appear);
+            brand::bust(dl, ImVec2((p0.x + p1.x - m) * 0.5f, (p0.y + p1.y - m) * 0.5f), m, 0.6f * appear);
             return;
         }
         ImVec2 uv0, uv1;

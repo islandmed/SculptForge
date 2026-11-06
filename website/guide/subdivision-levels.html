@@ -7,9 +7,9 @@
   <meta name="description" content="Subdivision levels let you sculpt one model at several resolutions: block in the big forms on a light version of the mesh, add pores and wrinkles on a dense one, and go back down to change the silhouette without losing the detail. Every Part has its own levels.">
   <meta name="theme-color" content="#111114">
   <meta name="color-scheme" content="dark">
-  <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=3">
-  <link rel="icon" type="image/png" sizes="64x64" href="../img/favicon-64.png?v=3">
-  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png?v=3">
+  <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=5">
+  <link rel="icon" type="image/png" sizes="64x64" href="../img/favicon-64.png?v=5">
+  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png?v=5">
   <link rel="canonical" href="https://sculptforge.app/guide/subdivision-levels.html">
   <meta property="og:type" content="article">
   <meta property="og:title" content="Subdivision levels - SculptForge User Guide">
@@ -25,7 +25,7 @@
   <div class="scroll-progress" aria-hidden="true"></div>
   <header class="nav">
     <div class="wrap nav-inner">
-      <a class="brand" href="../index.html"><img src="../img/logo-128.png?v=3" alt="" width="34" height="34"><span>SculptForge</span></a>
+      <a class="brand" href="../index.html"><svg class="sf-mark" viewBox="0 0 56 56" width="34" height="34" aria-hidden="true" focusable="false"><rect x="1" y="1" width="54" height="54" rx="13" fill="#f28c3c"/><path fill="#141416" d="M25.57 25.34V25.67H19.77V25.56Q19.77 24.72 19.16 24.16Q18.54 23.6 17.28 23.6Q16.05 23.6 15.39 23.96Q14.73 24.33 14.73 24.86Q14.73 25.62 15.63 25.98Q16.52 26.34 18.51 26.74Q20.84 27.21 22.33 27.73Q23.83 28.25 24.95 29.42Q26.07 30.6 26.1 32.62Q26.1 36.03 23.79 37.68Q21.48 39.34 17.62 39.34Q13.11 39.34 10.6 37.82Q8.1 36.31 8.1 32.48H13.95Q13.95 33.93 14.7 34.42Q15.46 34.91 17.06 34.91Q18.23 34.91 19 34.66Q19.77 34.41 19.77 33.62Q19.77 32.92 18.92 32.57Q18.06 32.22 16.13 31.83Q13.78 31.33 12.24 30.78Q10.7 30.24 9.55 28.98Q8.4 27.72 8.4 25.56Q8.4 22.4 10.85 20.9Q13.3 19.4 17.06 19.4Q20.75 19.4 23.13 20.9Q25.51 22.4 25.57 25.34Z"/><path fill="#ffffff" d="M31.73 19.74H47.3V24.36H37.92V27.66H45.99V32.08H37.92V39H31.73Z"/></svg><span>SculptForge</span></a>
       <nav aria-label="Main">
         <a href="../index.html#features">Features</a>
         <a href="../index.html#demos">Demos</a>
@@ -125,7 +125,7 @@ The vertices of the new lower level sit on the dense mesh&#x27;s corner vertices
 <strong>Tools that rebuild the mesh</strong> (Voxel Remesh, Decimate, Quad Remesh, Subdivide, Delete hidden, merging and splitting Parts) work on the level you are on, including what you just sculpted there, and make a new mesh without levels: that level becomes the new base. The status line says so, e.g. <em>Subdivision levels removed: SDiv 3 of 5 kept as the new base (undo restores them)</em>. <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings every level back, at the level you were on. Merging and splitting Parts can&#x27;t be undone, so step to the level you want to keep first, or save before.
 </li>
 </ul>
-<aside class="callout callout-note"><p><strong>Note:</strong> <strong>Subdivide</strong> (in <strong>Tool &gt; Geometry</strong>, below Divide) is still there: it replaces the mesh with a denser one and keeps no levels. Use Divide unless you want exactly that.</p></aside>
+<aside class="callout callout-note"><p><strong>Note:</strong> <strong>Subdivide (removes levels)</strong> (in <strong>Tool &gt; Geometry</strong>, under <strong>Change the Mesh (no levels)</strong>, apart from Divide and Micro) replaces the mesh with a denser one and keeps no levels. On a Part with levels it asks first (&quot;This removes your N subdivision levels&quot;); <strong>Don&#x27;t ask again</strong> turns that off. <strong>Delete Lower</strong> and <strong>Delete Higher</strong> ask too. Use <strong>Divide (keeps levels)</strong> unless you want exactly that.</p></aside>
 <h2 id="commands">Commands<a class="anchor" href="#commands" aria-label="Link to this section">#</a></h2>
 <p>Every control is a command you can run in the console, from a script or over MCP (see <a href="scripting.html">Scripting</a>):</p>
 <div class="table-wrap"><table><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody><tr><td><code>subdiv_divide smooth=true</code></td><td>Divide; <code>smooth=false</code> divides flat (Smt off)</td></tr><tr><td><code>subdiv_level level=2</code></td><td>Step to a level (1 = base)</td></tr><tr><td><code>subdiv_lower</code>, <code>subdiv_higher</code></td><td>Lower Level, Higher Level</td></tr><tr><td><code>subdiv_delete_lower</code>, <code>subdiv_delete_higher</code></td><td>Delete Lower, Delete Higher</td></tr><tr><td><code>subdiv_reconstruct</code></td><td>Reconstruct Subdiv</td></tr><tr><td><code>subdiv_info</code></td><td>List the levels and their triangle counts</td></tr><tr><td><code>subdiv_export path=base.obj level=1</code></td><td>Export the visible Parts at a level</td></tr></tbody></table></div>
@@ -145,7 +145,7 @@ The vertices of the new lower level sit on the dense mesh&#x27;s corner vertices
   <footer class="footer">
     <div class="wrap footer-grid">
       <div>
-        <a class="brand" href="../index.html"><img src="../img/logo-128.png?v=3" alt="" width="28" height="28"><span>SculptForge</span></a>
+        <a class="brand" href="../index.html"><svg class="sf-mark" viewBox="0 0 56 56" width="28" height="28" aria-hidden="true" focusable="false"><rect x="1" y="1" width="54" height="54" rx="13" fill="#f28c3c"/><path fill="#141416" d="M25.57 25.34V25.67H19.77V25.56Q19.77 24.72 19.16 24.16Q18.54 23.6 17.28 23.6Q16.05 23.6 15.39 23.96Q14.73 24.33 14.73 24.86Q14.73 25.62 15.63 25.98Q16.52 26.34 18.51 26.74Q20.84 27.21 22.33 27.73Q23.83 28.25 24.95 29.42Q26.07 30.6 26.1 32.62Q26.1 36.03 23.79 37.68Q21.48 39.34 17.62 39.34Q13.11 39.34 10.6 37.82Q8.1 36.31 8.1 32.48H13.95Q13.95 33.93 14.7 34.42Q15.46 34.91 17.06 34.91Q18.23 34.91 19 34.66Q19.77 34.41 19.77 33.62Q19.77 32.92 18.92 32.57Q18.06 32.22 16.13 31.83Q13.78 31.33 12.24 30.78Q10.7 30.24 9.55 28.98Q8.4 27.72 8.4 25.56Q8.4 22.4 10.85 20.9Q13.3 19.4 17.06 19.4Q20.75 19.4 23.13 20.9Q25.51 22.4 25.57 25.34Z"/><path fill="#ffffff" d="M31.73 19.74H47.3V24.36H37.92V27.66H45.99V32.08H37.92V39H31.73Z"/></svg><span>SculptForge</span></a>
         <p class="fine">Copyright © 2026 The SculptForge contributors.<br>The SculptForge User Guide is part of
           SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
       </div>

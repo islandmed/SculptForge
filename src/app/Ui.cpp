@@ -201,15 +201,49 @@ void DrawOnMark(ImDrawList* dl, ImVec2 a, ImVec2 b, bool side) {
 }
 
 void Segmented(App& app, std::initializer_list<const char*> actionIds, float width) {
+    // Equal segments when every label fits its share; else each as wide as its label (in the interface language),
+    // the slack shared out, and onto a second row when one row can't hold them all, so no label is cut off.
     const float total = width > 0.0f ? width : ImGui::GetContentRegionAvail().x;
-    const float w = (total - float(actionIds.size() - 1)) / float(actionIds.size());
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1.0f, ImGui::GetStyle().ItemSpacing.y));
-    bool first = true;
-    for (const char* id : actionIds) {
-        if (!first) ImGui::SameLine();
-        first = false;
-        ActionButton(app, id, ImVec2(w, 0));
-        HelpAction(app, id);
+    const float gap = 1.0f, pad = 2.0f * ImGui::GetStyle().FramePadding.x;
+    std::vector<const char*> ids(actionIds);
+    std::vector<float> need;
+    for (const char* id : ids) {
+        const Action* a = app.actions().find(id);
+        const std::string label = a ? std::string(trAction(a->id, a->label)) : std::string();
+        need.push_back(ImGui::CalcTextSize(label.c_str(), nullptr, true).x + pad);
+    }
+    const float equal = (total - gap * float(ids.size() - 1)) / float(ids.size());
+    std::vector<std::pair<size_t, size_t>> rows; // [begin, end) of each row
+    if (*std::max_element(need.begin(), need.end()) <= equal) {
+        rows.push_back({0, ids.size()});
+    } else {
+        size_t begin = 0;
+        float used = 0.0f;
+        for (size_t i = 0; i < ids.size(); ++i) {
+            const float add = need[i] + (i > begin ? gap : 0.0f);
+            if (i > begin && used + add > total) {
+                rows.push_back({begin, i});
+                begin = i;
+                used = need[i];
+            } else {
+                used += add;
+            }
+        }
+        rows.push_back({begin, ids.size()});
+    }
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(gap, ImGui::GetStyle().ItemSpacing.y));
+    for (const auto& [begin, end] : rows) {
+        const size_t n = end - begin;
+        float sum = 0.0f;
+        for (size_t i = begin; i < end; ++i) sum += need[i];
+        const bool same = rows.size() == 1 && need[begin] <= equal &&
+                          *std::max_element(need.begin() + long(begin), need.begin() + long(end)) <= equal;
+        const float slack = std::max(0.0f, total - gap * float(n - 1) - sum) / float(n);
+        for (size_t i = begin; i < end; ++i) {
+            if (i > begin) ImGui::SameLine();
+            ActionButton(app, ids[i], ImVec2(same ? equal : need[i] + slack, 0));
+            HelpAction(app, ids[i]);
+        }
     }
     ImGui::PopStyleVar();
 }

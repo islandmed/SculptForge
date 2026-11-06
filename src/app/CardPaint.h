@@ -35,7 +35,7 @@ inline ImU32 tc(const ImVec4& c, float alpha) { return theme::u32(c, std::clamp(
 inline ImVec4 mix(const ImVec4& x, const ImVec4& y, float t) {
     return ImVec4(lerp(x.x, y.x, t), lerp(x.y, y.y, t), lerp(x.z, y.z, t), lerp(x.w, y.w, t));
 }
-// The orange of the cube logo: the brand mark, the same in every look.
+// The SculptForge orange (the SF mark's tile): the same in every look.
 constexpr unsigned kBrandOrange = 0xf0882e;
 
 // Text drawn straight to the draw list, also logged so UI tests can find it (expect_text).
@@ -77,11 +77,11 @@ inline void glow(ImDrawList* dl, ImVec2 a, ImVec2 b, float rounding, float sprea
     glow(dl, a, b, rounding, spread, theme::rgb(hex), alpha, layers);
 }
 
-// The app mark with a soft orange glow, `m` wide at `m0` (the cards' headers).
+// The bust illustration with a soft orange glow, `m` wide at `m0` (the cards' headers).
 inline void markTile(ImDrawList* dl, ImVec2 m0, float m, float alpha) {
     const ImVec2 m1(m0.x + m, m0.y + m);
     glow(dl, m0, m1, m * 0.22f, m * 0.375f, kBrandOrange, 0.3f * alpha, 8);
-    brand::mark(dl, m0, m, alpha);
+    brand::bust(dl, m0, m, alpha);
 }
 
 } // namespace sf::card

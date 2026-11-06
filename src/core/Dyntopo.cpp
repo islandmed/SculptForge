@@ -109,7 +109,7 @@ float dyntopoEdgeLength(const DyntopoSettings& s, float radius, float diagonal) 
 
 std::string dyntopoBlocker(const Mesh& mesh) {
     if (mesh.multires)
-        return "Dynamic topology needs a mesh without subdivision levels: delete the lower (or higher) levels first";
+        return "Dynamic topology needs a mesh without subdivision levels: Freeze Levels keeps the level shown and removes the others";
     if (mesh.triangleCount() == 0) return "The mesh has no triangles";
     return {};
 }

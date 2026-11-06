@@ -660,7 +660,7 @@ def home_whats_new(page: "WhatsNewPage") -> str:
         pic, clip = (first["image"], first.get("clip", "")) if first else ("", "")
         img = (f'<div class="wn-pic"><img src="guide/{html.escape(pic)}" alt="" width="600" height="340" loading="lazy" '
                f'decoding="async"></div>') if pic else \
-            '<div class="wn-pic wn-pic-mark"><img src="img/logo-128.png?v=3" alt="" width="64" height="64"></div>'
+            '<div class="wn-pic wn-pic-mark"><img src="img/bust-256.png?v=1" srcset="img/bust-256.png?v=1 256w, img/bust-512.png?v=1 512w" sizes="220px" alt="" width="256" height="256"></div>'
         if clip:  # the first card's clip plays on the home page too, its picture as the poster
             img = (f'<div class="wn-pic"><video src="guide/{html.escape(clip)}" poster="guide/{html.escape(pic)}" width="600" '
                    f'height="340" muted loop playsinline autoplay></video></div>')
@@ -781,9 +781,9 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <meta name="description" content="{desc}">
   <meta name="theme-color" content="#111114">
   <meta name="color-scheme" content="dark">
-  <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=3">
-  <link rel="icon" type="image/png" sizes="64x64" href="../img/favicon-64.png?v=3">
-  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png?v=3">
+  <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=5">
+  <link rel="icon" type="image/png" sizes="64x64" href="../img/favicon-64.png?v=5">
+  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png?v=5">
   <link rel="canonical" href="{url}">
   <meta property="og:type" content="article">
   <meta property="og:title" content="{html.escape(title)}">
@@ -799,7 +799,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <div class="scroll-progress" aria-hidden="true"></div>
   <header class="nav">
     <div class="wrap nav-inner">
-      <a class="brand" href="../index.html"><img src="../img/logo-128.png?v=3" alt="" width="34" height="34"><span>SculptForge</span></a>
+      <a class="brand" href="../index.html"><svg class="sf-mark" viewBox="0 0 56 56" width="34" height="34" aria-hidden="true" focusable="false"><rect x="1" y="1" width="54" height="54" rx="13" fill="#f28c3c"/><path fill="#141416" d="M25.57 25.34V25.67H19.77V25.56Q19.77 24.72 19.16 24.16Q18.54 23.6 17.28 23.6Q16.05 23.6 15.39 23.96Q14.73 24.33 14.73 24.86Q14.73 25.62 15.63 25.98Q16.52 26.34 18.51 26.74Q20.84 27.21 22.33 27.73Q23.83 28.25 24.95 29.42Q26.07 30.6 26.1 32.62Q26.1 36.03 23.79 37.68Q21.48 39.34 17.62 39.34Q13.11 39.34 10.6 37.82Q8.1 36.31 8.1 32.48H13.95Q13.95 33.93 14.7 34.42Q15.46 34.91 17.06 34.91Q18.23 34.91 19 34.66Q19.77 34.41 19.77 33.62Q19.77 32.92 18.92 32.57Q18.06 32.22 16.13 31.83Q13.78 31.33 12.24 30.78Q10.7 30.24 9.55 28.98Q8.4 27.72 8.4 25.56Q8.4 22.4 10.85 20.9Q13.3 19.4 17.06 19.4Q20.75 19.4 23.13 20.9Q25.51 22.4 25.57 25.34Z"/><path fill="#ffffff" d="M31.73 19.74H47.3V24.36H37.92V27.66H45.99V32.08H37.92V39H31.73Z"/></svg><span>SculptForge</span></a>
       <nav aria-label="Main">
         <a href="../index.html#features">Features</a>
         <a href="../index.html#demos">Demos</a>
@@ -836,7 +836,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <footer class="footer">
     <div class="wrap footer-grid">
       <div>
-        <a class="brand" href="../index.html"><img src="../img/logo-128.png?v=3" alt="" width="28" height="28"><span>SculptForge</span></a>
+        <a class="brand" href="../index.html"><svg class="sf-mark" viewBox="0 0 56 56" width="28" height="28" aria-hidden="true" focusable="false"><rect x="1" y="1" width="54" height="54" rx="13" fill="#f28c3c"/><path fill="#141416" d="M25.57 25.34V25.67H19.77V25.56Q19.77 24.72 19.16 24.16Q18.54 23.6 17.28 23.6Q16.05 23.6 15.39 23.96Q14.73 24.33 14.73 24.86Q14.73 25.62 15.63 25.98Q16.52 26.34 18.51 26.74Q20.84 27.21 22.33 27.73Q23.83 28.25 24.95 29.42Q26.07 30.6 26.1 32.62Q26.1 36.03 23.79 37.68Q21.48 39.34 17.62 39.34Q13.11 39.34 10.6 37.82Q8.1 36.31 8.1 32.48H13.95Q13.95 33.93 14.7 34.42Q15.46 34.91 17.06 34.91Q18.23 34.91 19 34.66Q19.77 34.41 19.77 33.62Q19.77 32.92 18.92 32.57Q18.06 32.22 16.13 31.83Q13.78 31.33 12.24 30.78Q10.7 30.24 9.55 28.98Q8.4 27.72 8.4 25.56Q8.4 22.4 10.85 20.9Q13.3 19.4 17.06 19.4Q20.75 19.4 23.13 20.9Q25.51 22.4 25.57 25.34Z"/><path fill="#ffffff" d="M31.73 19.74H47.3V24.36H37.92V27.66H45.99V32.08H37.92V39H31.73Z"/></svg><span>SculptForge</span></a>
         <p class="fine">Copyright © 2026 The SculptForge contributors.<br>The SculptForge User Guide is part of
           SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
       </div>
@@ -995,7 +995,7 @@ def supporters_html() -> str:
   <title>Members</title>
   <meta name="description" content="The members who keep SculptForge free and open source for everyone.">
   <meta name="color-scheme" content="dark light">
-  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png?v=3">
+  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png?v=5">
   <link rel="canonical" href="{SITE}supporters.html">
   <link rel="stylesheet" href="style.css?v=18">
   <style>
@@ -1007,7 +1007,7 @@ def supporters_html() -> str:
 <body>
   <header class="nav">
     <div class="wrap nav-inner">
-      <a class="brand" href="index.html"><img src="img/logo-128.png?v=3" alt="" width="34" height="34"><span>SculptForge</span></a>
+      <a class="brand" href="index.html"><svg class="sf-mark" viewBox="0 0 56 56" width="34" height="34" aria-hidden="true" focusable="false"><rect x="1" y="1" width="54" height="54" rx="13" fill="#f28c3c"/><path fill="#141416" d="M25.57 25.34V25.67H19.77V25.56Q19.77 24.72 19.16 24.16Q18.54 23.6 17.28 23.6Q16.05 23.6 15.39 23.96Q14.73 24.33 14.73 24.86Q14.73 25.62 15.63 25.98Q16.52 26.34 18.51 26.74Q20.84 27.21 22.33 27.73Q23.83 28.25 24.95 29.42Q26.07 30.6 26.1 32.62Q26.1 36.03 23.79 37.68Q21.48 39.34 17.62 39.34Q13.11 39.34 10.6 37.82Q8.1 36.31 8.1 32.48H13.95Q13.95 33.93 14.7 34.42Q15.46 34.91 17.06 34.91Q18.23 34.91 19 34.66Q19.77 34.41 19.77 33.62Q19.77 32.92 18.92 32.57Q18.06 32.22 16.13 31.83Q13.78 31.33 12.24 30.78Q10.7 30.24 9.55 28.98Q8.4 27.72 8.4 25.56Q8.4 22.4 10.85 20.9Q13.3 19.4 17.06 19.4Q20.75 19.4 23.13 20.9Q25.51 22.4 25.57 25.34Z"/><path fill="#ffffff" d="M31.73 19.74H47.3V24.36H37.92V27.66H45.99V32.08H37.92V39H31.73Z"/></svg><span>SculptForge</span></a>
       <nav aria-label="Main">
         <a href="guide/index.html">Guide</a>
         <a href="studios.html">Studios</a>

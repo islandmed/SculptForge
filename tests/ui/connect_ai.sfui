@@ -1,0 +1,42 @@
+# Help > Connect an AI tool (PanelConnectAi.cpp): the subscription picker and, for this install, each tool's command or
+# settings. Only while AI features are on (Preferences > AI). UI tests never start a browser: no docs or bundle clicks.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+run ai_features on=true
+click "Help##palette.help"
+expect "Connect an AI tool...##help.connect_ai"
+click "Connect an AI tool...##help.connect_ai"
+expect_value connect_ai_open == 1
+expect_text "This install:"
+expect_text "sculptforge-cli"
+# Claude first: Claude Desktop and Claude Code.
+expect_text "Claude Desktop"
+expect_text "claude mcp add --scope user sculptforge --"
+shot connect_claude
+click "ChatGPT##plan1"
+expect_text "codex mcp add sculptforge --"
+expect_text "The ChatGPT app only connects to remote (HTTPS) servers"
+shot connect_chatgpt
+click "Gemini##plan2"
+expect_text "Antigravity CLI"
+expect_text "mcp_config.json"
+shot connect_gemini
+click "Grok##plan3"
+expect_text "grok mcp add sculptforge --"
+shot connect_grok
+click "Other tools##plan4"
+expect_text "Cursor"
+expect_text "context_servers"
+expect_text "Rovo Dev CLI"
+shot connect_other
+# Copy puts the exact text on the clipboard.
+click "Copy##install"
+expect_status Copied to the clipboard
+expect_clipboard sculptforge-cli
+# AI off: the window closes and Help no longer offers it.
+run ai_features on=false
+expect_value connect_ai_open == 0
+click "Help##palette.help"
+expect_not "Connect an AI tool...##help.connect_ai"
+key Escape
+run ai_features on=true

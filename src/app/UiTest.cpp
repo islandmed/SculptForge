@@ -45,6 +45,7 @@
 //   button_drag middle|right X0 Y0 X1 Y1 [S]  drag with that button in window fractions (with the held modifiers)
 //   expect_shortcut ACTION KEYS  the action's effective keys, e.g. expect_shortcut view.front Numpad 1
 //   camera YAW PITCH         set the view's angles in degrees (0 0 = the front view), e.g. for guide screenshots
+//   brush_size PX            set Size (the brush radius, screen pixels)
 //   zoom FACTOR / look X Y Z  move the camera FACTOR times closer / turn it about (and look at) the point X Y Z
 //   camera_distance D        put the camera D model units from the point it looks at (extreme zoom)
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
@@ -88,7 +89,8 @@
 //                            "SculptForge has a new look" card),
 //                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
 //                            extract_preview (1 while an Extract preview waits for Accept), open_edges (edges of
-//                            the active Part with one triangle: 0 = watertight),
+//                            the active Part with one triangle: 0 = watertight), solid_volume (the active Part's
+//                            volume with its open borders capped),
 //                            edited_parts (Parts with undo history), user_brushes (brushes in the
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once ui.json is written: the preferences save themselves, or Save Layout),
@@ -121,6 +123,7 @@
 //                            cursor_ring (1 when the last brush cursor drawn had its ring; 0: the dot only, #88),
 //                            hide_ring_while_stroking (Preferences > Cursor, 1 on),
 //                            cursor_follows_surface (Preferences > Input, 1 on),
+//                            saved_views (View > Views), mask_darkness (0-100),
 //                            camera_yaw / camera_pitch / camera_roll (degrees),
 //                            camera_up (the view's up vector . world Y), camera_aligned (1 when looking along a world
 //                            axis), camera_distance, camera_pan (target offset);
@@ -277,6 +280,7 @@
 #include "app/Ui.h"
 
 #include "core/BrushLibrary.h"
+#include "core/CloseHoles.h"
 #include "core/ListSort.h"
 #include "core/LitSphere.h"
 #include "core/Multires.h"
@@ -712,6 +716,8 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "dynamic") return app_.doc_.sculptor.dyntopo.enabled ? 1.0 : 0.0;
     if (name == "dynamic_detail") return std::round(app_.doc_.sculptor.dyntopo.detail * 100.0f);
+    if (name == "saved_views") return double(app_.savedViews_.size());
+    if (name == "mask_darkness") return std::round(app_.renderSettings_.maskDarkness * 100.0f);
     if (name == "brush_type") return app_.doc_.activeBrush >= 0 || app_.paintMode_ ? -1.0 : double(int(app_.brush_));
     if (name == "last_dab_x") return app_.lastDabScreen_.x;
     if (name == "last_dab_y") return app_.lastDabScreen_.y;
@@ -801,6 +807,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "discord_requests") return double(app_.discordRequests_); // Join the community on Discord clicks
     if (name == "support_requests") return double(app_.supportPageRequests_); // Support SculptForge clicks
     if (name == "ai_enabled") return ai::aiEnabled() ? 1.0 : 0.0; // Preferences > AI (PanelAi.cpp)
+    if (name == "connect_ai_open") return app_.showConnectAi_ ? 1.0 : 0.0; // Help > Connect an AI tool (PanelConnectAi.cpp)
     if (name == "discord_connects") return double(discord::connectAttempts()); // Show SculptForge on Discord: never in tests
     if (name == "discord_presence") return app_.discordPrefs_.enabled ? 1.0 : 0.0;
     if (name == "http_requests") return double(ai::httpRequestCount()); // every request this process started
@@ -847,6 +854,22 @@ double Demo::query(const std::string& name, bool& known) const {
         for (const auto& t : m.triangles)
             for (int k = 0; k < 3; ++k) ++edges[{std::min(t[k], t[(k + 1) % 3]), std::max(t[k], t[(k + 1) % 3])}];
         return double(std::count_if(edges.begin(), edges.end(), [](const auto& e) { return e.second == 1; }));
+    }
+    if (name == "solid_volume") { // the active Part's volume with its open borders capped (as Voxel Remesh caps them)
+        Mesh capped;
+        capped.positions = m.positions;
+        capped.triangles = m.triangles;
+        CloseHolesOptions o;
+        o.refine = false;
+        o.newGroup = false;
+        CloseHolesStats stats;
+        std::string error;
+        closeHoles(capped, o, stats, error);
+        double v = 0.0;
+        for (const glm::uvec3& t : capped.triangles)
+            v += glm::dot(glm::dvec3(capped.positions[t.x]),
+                          glm::cross(glm::dvec3(capped.positions[t.y]), glm::dvec3(capped.positions[t.z])));
+        return v / 6.0;
     }
     if (name == "visible_parts")
         return double(std::count_if(doc.parts.begin(), doc.parts.end(), [](const Part& s) { return s.visible; }));
@@ -1627,6 +1650,10 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         run([this, d = num(1, 4)] { app_.camera_.distance = std::max(float(d), 1e-4f); });
         wait(0.1f);
+    } else if (verb == "brush_size") { // brush_size PX: Size (the brush radius in screen pixels), as the S slider
+        if (!need(1)) return false;
+        run([this, px = num(1, 50)] { app_.radiusPx_ = std::clamp(float(px), 2.0f, 800.0f); });
+        wait(0.05f);
     } else if (verb == "look") { // look X Y Z: the camera turns about (and looks at) this point
         if (!need(3)) return false;
         run([this, x = num(1, 0), y = num(2, 0), z = num(3, 0)] { app_.camera_.target = glm::vec3(float(x), float(y), float(z)); });

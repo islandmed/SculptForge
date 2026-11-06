@@ -136,6 +136,8 @@ Json toJson(const UiPrefs& p) {
     j.set("backfaceCulling", p.backfaceCulling);
     j.set("uvPackColumns", double(p.uvPackColumns));
     j.set("uvPackRows", double(p.uvPackRows));
+    j.set("maskDarkness", double(p.maskDarkness));
+    j.set("confirmSubdivide", p.confirmSubdivide);
     j.set("background", std::string(p.gradientBackground ? "gradient" : "flat"));
     Json bg = Json::array();
     for (int i = 0; i < 3; ++i) bg.push(double(p.backgroundColor[i]));
@@ -226,6 +228,8 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.backfaceCulling = j["backfaceCulling"].asBool(p.backfaceCulling);
     p.uvPackColumns = std::clamp(int(j["uvPackColumns"].asNumber(p.uvPackColumns)), 1, 10);
     p.uvPackRows = std::clamp(int(j["uvPackRows"].asNumber(p.uvPackRows)), 1, 10);
+    p.maskDarkness = std::clamp(float(j["maskDarkness"].asNumber(p.maskDarkness)), 0.0f, 1.0f);
+    p.confirmSubdivide = j["confirmSubdivide"].asBool(p.confirmSubdivide);
     if (j["background"].isString()) p.gradientBackground = j["background"].asString() != "flat";
     p.showHints = j["showHints"].asBool(p.showHints);
     if (const Json& hints = j["hiddenHints"]; hints.size() > 0) {
@@ -392,16 +396,26 @@ void App::initActions() {
         [this] { return doc_.undo.canUndo(); });
     add("edit.redo", "Redo", "Edit", "Ctrl+Shift+Z / Ctrl+Y", [this] { runCommand("redo"); }, ICON_LC_REDO_2, "redo", nullptr,
         [this] { return doc_.undo.canRedo(); });
-    add("geometry.subdivide", "Subdivide", "Tool > Geometry", nullptr, [this] { runCommand("subdivide"); }, nullptr, "subdivide");
+    // Subdivide bakes: it keeps no levels, and on a Part with levels it removes them. Named and placed apart from
+    // Divide, and it asks first on a Part with levels (Discord 11-02: "I keep pressing the wrong one").
+    add("geometry.subdivide", "Subdivide (removes levels)", "Tool > Geometry", nullptr,
+        [this] {
+            if (doc_.mesh.multires && uiPrefs_.confirmSubdivide) openSubdivideConfirm_ = true;
+            else runCommand("subdivide");
+        },
+        nullptr, "subdivide", nullptr, nullptr,
+        "Destructive: four times the polygons as one plain mesh, with no lower levels to step back to. On a Part "
+        "with subdivision levels it removes them (it asks first; Ctrl+Z brings them back). To keep levels, use "
+        "Divide (keeps levels) instead.");
     add("geometry.close_holes", "Close Holes", "Tool > Geometry", nullptr, [this] { runCommand("close_holes"); },
         ICON_LC_CIRCLE_DOT, "close_holes", nullptr, nullptr,
         "Cap every open boundary of the active Part (a hole, an open bottom, the rim of an extracted shell) with a "
         "new patch sized like the polygons around it, so remeshing and sculpting see a closed surface. The rest of "
         "the Part stays as it is; the patches get a face group of their own (#103).");
     // Subdivision levels (Tool > Geometry; core/Multires.h).
-    add("geometry.divide", "Divide", "Tool > Geometry", "Ctrl+D", [this] { runCommand("subdiv_divide", {{"smooth", smt_}}); },
+    add("geometry.divide", "Divide (keeps levels)", "Tool > Geometry", "Ctrl+D", [this] { runCommand("subdiv_divide", {{"smooth", smt_}}); },
         ICON_LC_GRID_2X2, "subdiv_divide", nullptr, nullptr,
-        "Add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to "
+        "Non-destructive: add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to "
         "shape big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smt off divides without smoothing.");
     add("geometry.smt", "Smt", "Tool > Geometry", nullptr, [this] { smt_ = !smt_; }, nullptr, nullptr,
         [this] { return smt_; }, nullptr,
@@ -413,9 +427,9 @@ void App::initActions() {
         ICON_LC_CHEVRON_UP, "subdiv_higher", nullptr,
         [this] { return subdivCurrentLevel(doc_.mesh) + 1 < subdivLevelCount(doc_.mesh); },
         "Step one subdivision level up (more polygons, for detail). Edits made below carry the detail along.");
-    add("geometry.del_lower", "Delete Lower", "Tool > Geometry", nullptr, [this] { runCommand("subdiv_delete_lower"); }, nullptr,
+    add("geometry.del_lower", "Delete Lower", "Tool > Geometry", nullptr, [this] { confirmLevelDelete("subdiv_delete_lower"); }, nullptr,
         "subdiv_delete_lower", nullptr, [this] { return subdivCurrentLevel(doc_.mesh) > 0; });
-    add("geometry.del_higher", "Delete Higher", "Tool > Geometry", nullptr, [this] { runCommand("subdiv_delete_higher"); }, nullptr,
+    add("geometry.del_higher", "Delete Higher", "Tool > Geometry", nullptr, [this] { confirmLevelDelete("subdiv_delete_higher"); }, nullptr,
         "subdiv_delete_higher", nullptr,
         [this] { return subdivCurrentLevel(doc_.mesh) + 1 < subdivLevelCount(doc_.mesh); });
     add("geometry.reconstruct", "Reconstruct Subdiv", "Tool > Geometry", nullptr, [this] { runCommand("subdiv_reconstruct"); },
@@ -1017,6 +1031,7 @@ bool App::readUiConfig(const std::string& path, std::string& err, bool own) {
     renderSettings_.flatShading = uiPrefs_.flatShading;
     renderSettings_.backfaceCulling = uiPrefs_.backfaceCulling;
     uvPackColumns_ = uiPrefs_.uvPackColumns, uvPackRows_ = uiPrefs_.uvPackRows;
+    renderSettings_.maskDarkness = uiPrefs_.maskDarkness;
     renderSettings_.gradientBackground = uiPrefs_.gradientBackground;
     renderSettings_.backgroundColor = uiPrefs_.backgroundColor;
     return true;
@@ -1308,14 +1323,17 @@ void App::drawHelpConsoleUi() {
                          ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
                              ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs)) {
             ImGui::PushFont(helpTitleFont());
-            ImGui::Text(ICON_LC_KEYBOARD "  Press a key for '%s'", a ? a->label.c_str() : capturingShortcut_.c_str());
+            ImGui::Text(tr(ICON_LC_KEYBOARD "  Press a key for '%s'"),
+                        a ? a->label.c_str() : capturingShortcut_.c_str());
             ImGui::PopFont();
             const std::string now = actions_.shortcutText(capturingShortcut_);
-            ImGui::TextColored(col(ui::color::textDim), "Now:");
+            ImGui::TextColored(col(ui::color::textDim), "%s", tr("Now:"));
             ImGui::SameLine();
-            if (now.empty()) ImGui::TextColored(col(ui::color::textDim), "none");
+            if (now.empty())
+                ImGui::TextColored(col(ui::color::textDim), "%s", tr("none"));
             else ui::Keycaps(now);
-            ImGui::TextColored(col(ui::color::textDim), "Esc cancels, Backspace clears. A key that's taken moves here.");
+            ImGui::TextColored(col(ui::color::textDim), "%s",
+                               tr("Esc cancels, Backspace clears. A key that's taken moves here."));
         }
         ImGui::End();
         ImGui::PopStyleColor(2);
@@ -1371,7 +1389,7 @@ void App::drawControlsWindow() {
                 const std::string top = a.palette.substr(0, a.palette.find(" > "));
                 groups[top.empty() ? "General" : top].push_back(&a);
             }
-            if (groups.empty()) ImGui::TextColored(col(ui::color::textDim), "No shortcut matches \"%s\".", filter);
+            if (groups.empty()) ImGui::TextColored(col(ui::color::textDim), tr("No shortcut matches \"%s\"."), filter);
             for (auto& [group, list] : groups) {
                 std::stable_sort(list.begin(), list.end(), [](const Action* x, const Action* y) { return x->label < y->label; });
                 ImGui::SeparatorText(group.c_str());
@@ -1396,7 +1414,8 @@ void App::drawControlsWindow() {
                 ImGui::Spacing();
             }
             ImGui::EndChild();
-            ImGui::TextColored(col(ui::color::textDim), "Double-click a row, or Ctrl+Alt+click any button, to assign a key.");
+            ImGui::TextColored(col(ui::color::textDim), "%s",
+                               tr("Double-click a row, or Ctrl+Alt+click any button, to assign a key."));
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem(tr("Mouse & pen"))) {
@@ -1483,6 +1502,13 @@ void drawInterfaceSection(App& app) {
     ui::SliderInside("##tooltip_delay", &p.tooltipDelay, 0.0f, 2.0f, "Tooltip delay %.1f s");
     ui::HelpText("Tooltip delay", nullptr,
                  "How long to point at an icon-only button (or a clipped label) before its name appears.",
+                 "Preferences > Interface");
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    if (ui::SliderInside("##mask_darkness", &p.maskDarkness, 0.0f, 1.0f, "Mask darkness %.2f"))
+        app.setMaskDarkness(p.maskDarkness);
+    ui::HelpText("Mask darkness", nullptr,
+                 "How dark masked areas show: 0 = not at all, 1 = nearly black. The default keeps the form readable "
+                 "under the mask.",
                  "Preferences > Interface");
     ImGui::Checkbox(tr("Reduce motion"), &p.reduceMotion);
     ui::HelpText("Reduce motion", nullptr,
@@ -1636,7 +1662,7 @@ void drawLibraryBrowserSection(App& app) {
     ImGui::SameLine();
     if (ImGui::RadioButton(tr("Bottom"), l.libraryBottom)) l.libraryBottom = true;
     ui::HelpText("Library at the bottom", nullptr, "Library opens above the bottom shelf.", "Preferences > Library");
-    ImGui::TextColored(col(ui::color::textDim), "Library folder");
+    ImGui::TextColored(col(ui::color::textDim), "%s", tr("Library folder"));
     const std::string shown = p.libraryFolder.empty() ? std::string("Documents/SculptForge (default)") : p.libraryFolder;
     if (ImGui::Button((std::string(ICON_LC_FOLDER_OPEN "  ") + shown + "##libfolder").c_str(), ImVec2(-FLT_MIN, 0)))
         SDL_ShowOpenFolderDialog(onUiFileChosen, &g_requests[kLibraryFolder], app.window_, nullptr, false);

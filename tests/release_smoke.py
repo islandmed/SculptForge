@@ -4,12 +4,17 @@
 #
 # Release smoke test for a packaged sculptforge-cli (.github/workflows/release.yml runs it on every installed or
 # unpacked package before anything is published; ctest runs it on the build tree): open a model, sculpt one stroke,
-# save a project, open that project again and check that it holds the sculpted mesh.
+# save a project, open that project again and check that it holds the sculpted mesh. Then the MCP server (--mcp): the
+# handshake, the tools and recipes, a tool call and a viewport_image picture, as an AI client would.
 #
 #   python3 tests/release_smoke.py --cli path/to/sculptforge-cli [--out DIR]
+#   python3 tests/release_smoke.py --mcp-only --cli "SculptForge.AppImage --cli"   only the MCP check, through any
+#                                       command that ends up in sculptforge-cli (the AppImage, a .mcpb's server)
 import argparse
+import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -32,11 +37,57 @@ def vertices(path):
         return [line for line in f if line.startswith("v ")]
 
 
+def mcp_check(command):
+    """The MCP server as a client sees it: returns a list of failures."""
+    lines = [
+        {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+         "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "smoke", "version": "1"}}},
+        {"jsonrpc": "2.0", "method": "notifications/initialized"},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+        {"jsonrpc": "2.0", "id": 3, "method": "prompts/list"},
+        {"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "new_sphere", "arguments": {"subdivisions": 3}}},
+        {"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "viewport_image", "arguments": {"size": 256}}},
+    ]
+    p = subprocess.run(command + ["--mcp"], input="".join(json.dumps(m) + "\n" for m in lines),
+                       capture_output=True, text=True, timeout=120)
+    if p.returncode != 0:
+        return [f"--mcp exited with {p.returncode}: {p.stderr.strip()[-500:]}"]
+    replies = {}
+    for line in p.stdout.splitlines():  # stdout is the protocol: every line must be JSON-RPC
+        try:
+            r = json.loads(line)
+        except ValueError:
+            return [f"--mcp wrote a line that isn't JSON: {line[:200]}"]
+        replies[r.get("id")] = r
+    failures = []
+    init = replies.get(1, {}).get("result", {})
+    if init.get("serverInfo", {}).get("name") != "sculptforge" or "prompts" not in init.get("capabilities", {}):
+        failures.append(f"initialize: {replies.get(1)}")
+    tools = {t["name"] for t in replies.get(2, {}).get("result", {}).get("tools", [])}
+    if not {"remesh", "export_glb", "viewport_image"} <= tools:
+        failures.append(f"tools/list lacks remesh, export_glb or viewport_image ({len(tools)} tools)")
+    if len(replies.get(3, {}).get("result", {}).get("prompts", [])) < 5:
+        failures.append(f"prompts/list: {replies.get(3)}")
+    if replies.get(4, {}).get("result", {}).get("isError", True):
+        failures.append(f"new_sphere: {replies.get(4)}")
+    image = (replies.get(5, {}).get("result", {}).get("content") or [{}])[0]
+    if image.get("type") != "image" or len(image.get("data", "")) < 1000:
+        failures.append(f"viewport_image gave no picture: {str(replies.get(5))[:300]}")
+    return failures
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cli", required=True)
     ap.add_argument("--out")
+    ap.add_argument("--mcp-only", action="store_true")
     a = ap.parse_args()
+    if a.mcp_only:
+        failures = mcp_check(shlex.split(a.cli, posix=os.name != "nt"))
+        for f in failures:
+            print("FAILED:", f)
+        print("MCP smoke: " + ("FAILED" if failures else "OK"))
+        return 1 if failures else 0
     out = a.out or tempfile.mkdtemp(prefix="sf-release-smoke-")
     os.makedirs(out, exist_ok=True)
     before, after, again = (os.path.join(out, n) for n in ("before.obj", "after.obj", "reopened.obj"))
@@ -62,11 +113,12 @@ def main():
         failures.append("the stroke moved no vertex")
     if va != vr:
         failures.append("the reopened project's mesh differs from the one saved")
+    failures += mcp_check([a.cli])
     for f in failures:
         print("FAILED:", f)
     if failures:
         return 1
-    print(f"release smoke: OK ({moved} vertices moved by the stroke, project {os.path.getsize(project)} bytes)")
+    print(f"release smoke: OK ({moved} vertices moved by the stroke, project {os.path.getsize(project)} bytes; MCP server OK)")
     return 0
 
 

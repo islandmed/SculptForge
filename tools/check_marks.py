@@ -60,9 +60,34 @@ def read_text(path):
     return data.decode("utf-8", errors="replace")
 
 
+# A string literal that goes on in the next one ("...Store "\n    "Config..."): C, C++ and Python join them.
+LITERAL_BREAK = re.compile(r'"[ \t]*\r?\n[ \t]*"')
+
+
 def problems_in(text, mark_re):
-    """(line, snippet) for every line with a mark."""
-    return [(n, line.strip()) for n, line in enumerate(text.splitlines(), 1) if mark_re.search(line)]
+    """(line, snippet) for every line with a mark, and for a mark split across adjacent string literals."""
+    lines = text.splitlines()
+    found = [(n, line.strip()) for n, line in enumerate(lines, 1) if mark_re.search(line)]
+    joined, starts, pos = [], [], 0  # the text with the breaks taken out, and where each piece began
+    for m in LITERAL_BREAK.finditer(text):
+        joined.append(text[pos:m.start()])
+        starts.append(pos)
+        pos = m.end()
+    if not starts:
+        return found
+    joined.append(text[pos:])
+    starts.append(pos)
+    flat, seen = "".join(joined), {n for n, _ in found}
+    offsets = [0]
+    for piece in joined[:-1]:
+        offsets.append(offsets[-1] + len(piece))
+    for m in mark_re.finditer(flat):
+        k = max(i for i, o in enumerate(offsets) if o <= m.start())
+        n = text.count("\n", 0, starts[k] + m.start() - offsets[k]) + 1
+        if n not in seen:
+            seen.add(n)
+            found.append((n, lines[n - 1].strip()))
+    return sorted(found)
 
 
 def scan(mark_re):
@@ -110,6 +135,7 @@ def self_test():
     assert not mark_re.search("drawSize focalShift_ RgbIntensity config.store subdiv_lower projectAll lower resolution")
     assert not mark_re.search("Save Layout, Size, Intensity, Colour intensity, Falloff, Lower Level, Lasso Mask")
     assert problems_in("a\n" + words[0][0] + " b\nc", mark_re) == [(2, words[0][0] + " b")]
+    assert problems_in('x\n  "press Store "\n  "Config keeps it"', mark_re) == [(2, '"press Store "')]
     assert load_marks("x <!-- marks:begin -->\n  ab?c\n<!-- marks:end -->").search("AC")
     print("check_marks self-test ok")
 

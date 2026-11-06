@@ -177,7 +177,7 @@ bool App::init(const AppOptions& options) {
         else if (saved.maximized || saved.fullscreen) SDL_MaximizeWindow(window_);
     }
     {
-        // The detailed tile, with the small-size mark as the alternate for small task bar and title bar icons.
+        // The SF app icon, with its small cut as the alternate for small task bar and title bar icons.
         Image icon, small;
         std::string iconErr;
         if (Image::decode(assets::appIcon, size_t(assets::appIcon_size), icon, iconErr)) {
@@ -414,6 +414,30 @@ int App::runUiTest(int w, int h, int fps) {
         into += std::chrono::duration<double, std::milli>(now - last).count();
         last = now;
     };
+    // --ui-record: every frame to ffmpeg, paced to real time (background jobs run at their real speed in the video);
+    // frames that take longer than 1/fps can't keep up, so the log says how much faster than real time the video ran.
+    FILE* video = nullptr;
+    if (!options_.uiRecordPath.empty()) {
+        if (shellQuote(options_.uiRecordPath).empty()) {
+            SDL_Log("--ui-record: choose a file name without \" %% ! ^ & | < > in it");
+            return 1;
+        }
+        const std::string cmd = "ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgba -s " + std::to_string(w) + "x" +
+                                std::to_string(h) + " -r " + std::to_string(fps) +
+                                " -i - -c:v libx264 -preset slow -crf 16 -pix_fmt yuv420p -movflags +faststart " +
+                                shellQuote(options_.uiRecordPath);
+#if defined(_WIN32)
+        video = _popen(cmd.c_str(), "wb");
+#else
+        video = popen(cmd.c_str(), "w");
+#endif
+        if (!video) {
+            SDL_Log("Cannot start ffmpeg");
+            return 1;
+        }
+    }
+    const auto recordStart = std::chrono::steady_clock::now();
+    int lateFrames = 0;
     while (frames < fps * 60 * 30) {
         if (timed && (frames == 1 || frames == 5 || frames == 20)) {
             std::fprintf(stderr, "frames to %2d: polls %.1f, new frame %.1f, UI %.1f, scene %.1f ms\n", frames, frameMs[0],
@@ -471,6 +495,7 @@ int App::runUiTest(int w, int h, int fps) {
         drawHardwareProfileOverlay();
         if (ImGuiContext* g = ImGui::GetCurrentContext()) demo_->setFrameText(g->LogBuffer.c_str());
         ImGui::LogFinish();
+        if (video) demo_->drawOverlay(); // the pointer (and the script's fades), as a demo recording draws them
         ImGui::Render();
         lap(frameMs[2]);
         if (tracing) tracePhase[3] = double(SDL_GetTicksNS()) * 1e-6;
@@ -490,7 +515,7 @@ int App::runUiTest(int w, int h, int fps) {
         }
         ++frames;
         const std::string shot = demo_->takeShotRequest();
-        if (shot.empty()) continue;
+        if (shot.empty() && !video) continue;
         if (!renderer_.beginCapture(w, h, err)) {
             SDL_Log("%s", err.c_str());
             return 1;
@@ -498,6 +523,14 @@ int App::runUiTest(int w, int h, int fps) {
         renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         renderer_.endCapture(rgba);
+        if (video) {
+            fwrite(rgba.data(), 1, rgba.size(), video);
+            const auto due = recordStart + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                               std::chrono::duration<double>(double(frames) * double(dt)));
+            if (std::chrono::steady_clock::now() < due) std::this_thread::sleep_until(due);
+            else ++lateFrames;
+        }
+        if (shot.empty()) continue;
         Image img;
         img.width = w;
         img.height = h;
@@ -516,6 +549,19 @@ int App::runUiTest(int w, int h, int fps) {
         SDL_Log("Screenshot %s", shot.c_str());
     }
     for (auto& write : shotWrites) write.get(); // every screenshot on disk before the verdict
+    if (video) {
+#if defined(_WIN32)
+        const int status = _pclose(video);
+#else
+        const int status = pclose(video);
+#endif
+        const double wall = std::chrono::duration<double>(std::chrono::steady_clock::now() - recordStart).count();
+        const double length = double(frames) * double(dt);
+        SDL_Log("Recorded %d frames (%.1f s) to %s in %.1f s: background jobs play at %.2fx, %d frames late%s", frames,
+                length, options_.uiRecordPath.c_str(), wall, wall / std::max(length, 1e-3), lateFrames,
+                status == 0 ? "" : " (ffmpeg failed)");
+        if (status != 0) return 1;
+    }
     demo_->printProfile();
     for (const auto& f : demo_->failures()) std::fprintf(stderr, "FAIL %s\n", f.c_str());
     if (demo_->failures().empty())
@@ -2089,7 +2135,8 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     if (!lods_.empty() || previewLod_ >= 0) clearLods();
     beginPaintStroke();
     if (doc_.sculptor.dyntopo.enabled && strokeSculpt_ && !dyntopoBlocker(doc_.mesh).empty())
-        status_ = "Dynamic is on, but this Part has subdivision levels: sculpting without remeshing";
+        status_ = "Dynamic is on, but this Part has subdivision levels: sculpting without remeshing (Draw > Freeze "
+                  "Levels + Dynamic)";
     lastX_ = x;
     lastY_ = y;
     strokePath_.reset(x, y);
@@ -2804,6 +2851,7 @@ void App::drawUi() {
     // An Extract preview goes once its source changes or another Part is picked (strokes aren't commands).
     if (doc_.extractPreview.id && !doc_.sculptor.strokeActive()) doc_.dropExtractPreview(true);
     drawProjectPopups();
+    drawDynamicOffer();
     if (hideUi_) return; // demos: clean beauty shots
     // Draw order (ui-spec §12): shells, Library, floating windows, then pop-ups and help.
     drawShell();
@@ -2863,7 +2911,7 @@ void App::drawUi() {
         ImGui::SetNextWindowSize(ImVec2(460 * uiScale_, 0), ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (ImGui::Begin("About SculptForge", &showAbout_, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
-            brand::markItem(64.0f * uiScale_); // the app mark; beside it the name, version and what it is
+            brand::bustItem(64.0f * uiScale_); // the bust; beside it the name, version and what it is
             ImGui::SameLine(0.0f, 12.0f * uiScale_);
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (64.0f * uiScale_ - 2.0f * ImGui::GetTextLineHeightWithSpacing()) * 0.5f);
             ImGui::BeginGroup();
@@ -2911,6 +2959,7 @@ void App::drawUi() {
     guide_.draw(*this);  // Help > User Guide
     drawPacksUi();       // pack review, New Pack, macro confirmation and editor (PanelPacks.cpp)
     drawMemoryConfirm(); // "Not enough free memory" before a big mesh (MemoryConfirm.cpp)
+    drawConnectAi();     // Help > Connect an AI tool (PanelConnectAi.cpp)
     drawHelpConsoleUi(); // console, command palette, Controls (F1), Ctrl-hover help: last, on top
     drawWhatsNew();      // What's New after an update or from the Help menu (WhatsNewPopup.cpp)
     drawSupportCard();   // the support card at launch, over everything (PanelSupportCard.cpp)
@@ -3385,7 +3434,7 @@ void App::drawBrushLab() {
         chatLog_.clear();
     }
     ImGui::SameLine();
-    if (ImGui::SmallButton("Paste brush")) pasteBrush();
+    if (ImGui::SmallButton(tr("Paste brush"))) pasteBrush();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip("Install a brush someone shared: a brush code (sfbrush1:...) or .sfbrush text on the "
                           "clipboard (Ctrl+V in the viewport)");

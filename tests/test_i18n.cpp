@@ -28,11 +28,13 @@ struct LanguageScope {
     ~LanguageScope() { setLanguage(saved); }
 };
 
-// The printf conversions of a format string, in order ("%d", "%.1f", "%%" ...).
+// The printf conversions of a format string, in order ("%d", "%.1f", "%%" ...). A '%' right after a digit ("10% smaller",
+// in help text no one hands to printf) is a plain percent sign; "50%%" is still a conversion.
 std::vector<std::string> conversions(std::string_view s) {
     std::vector<std::string> out;
     for (size_t i = 0; i < s.size(); ++i) {
         if (s[i] != '%') continue;
+        if (i > 0 && s[i - 1] >= '0' && s[i - 1] <= '9' && (i + 1 >= s.size() || s[i + 1] != '%')) continue;
         size_t j = i + 1;
         while (j < s.size() && std::string_view("-+ #0123456789.*hlzjt").find(s[j]) != std::string_view::npos) ++j;
         if (j < s.size()) out.emplace_back(s.substr(i, j - i + 1));
@@ -123,6 +125,8 @@ TEST(i18n_spanish_lookup_and_fallback) {
     // Brush names are never translated, even where the word has an entry ("Move" the tool is "Mover").
     const std::string move = "Move";
     CHECK(std::string(trAction("brush.move", move)) == "Move");
+    const std::string on = "On"; // a brush setting, not a brush: translated
+    CHECK(std::string(trAction("brush.pen_size_on", on)) == "Activado");
     CHECK(std::string(trAction("tool.move", move)) == "Mover");
     CHECK(trPath("Tool > Geometry") == "Herramienta > Geometría");
     CHECK(trPath("Tool > Frobnicate") == "Herramienta > Frobnicate");
@@ -238,5 +242,7 @@ TEST(i18n_chinese_lookup_keeps_ids_and_brush_names) {
     CHECK(std::string(tr("Frobnicate")) == "Frobnicate"); // no entry: English
     const std::string move = "Move";
     CHECK(std::string(trAction("brush.move", move)) == "Move");
+    const std::string on = "On"; // a brush setting, not a brush: translated
+    CHECK(std::string(trAction("brush.pen_size_on", on)) == "\u958b\u555f");
     CHECK(trPath("Tool > Geometry") == "\u5de5\u5177 > \u5e7e\u4f55");
 }

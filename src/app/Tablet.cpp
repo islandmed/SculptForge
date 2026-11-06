@@ -361,9 +361,10 @@ const char* App::pressureStatus() const {
 
 void App::drawPressureStatus() {
     const bool ok = penSeen_ && penTracker_.hasPressure();
-    ImGui::TextColored(col(ok ? ui::color::accent : ui::color::textDim), "%s", pressureStatus());
+    ImGui::TextColored(col(ok ? ui::color::accent : ui::color::textDim), "%s", tr(pressureStatus()));
     ImGui::SameLine();
-    if (ImGui::SmallButton(ICON_LC_CIRCLE_HELP "  Troubleshooting##pressure_help")) guide_.open("troubleshooting.md#pen-tablets");
+    if (ImGui::SmallButton(tr(ICON_LC_CIRCLE_HELP "  Troubleshooting##pressure_help")))
+        guide_.open("troubleshooting.md#pen-tablets");
 #if defined(_WIN32)
     ui::HelpText("Pressure", nullptr,
                  "No pressure? In Wacom Tablet Properties > Mapping, switch \"Use Windows Ink\" (on for most tablets, "
@@ -494,7 +495,7 @@ void App::drawTabletSection() {
 
     // --- Device ---
     if (!penSeen_) {
-        ImGui::TextUnformatted(ICON_LC_PEN_LINE "  No pen seen yet");
+        ImGui::TextUnformatted(tr(ICON_LC_PEN_LINE "  No pen seen yet"));
         ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
         ImGui::PushTextWrapPos(0.0f);
 #if defined(_WIN32)
@@ -544,7 +545,7 @@ void App::drawTabletSection() {
         ImGui::Text(tr("Tilt  X %+.0f" "\xc2\xb0" "   Y %+.0f" "\xc2\xb0"), penTiltX_, penTiltY_);
         ui::HelpText("Tilt", nullptr, "The pen's tilt, as the tablet reports it (brushes don't use it yet).", path);
     } else if (penSeen_) {
-        ImGui::TextColored(col(ui::color::textDim), "Tilt: not reported by this pen");
+        ImGui::TextColored(col(ui::color::textDim), "%s", tr("Tilt: not reported by this pen"));
     }
 
     // --- Draw-test area: the stroke's width follows the pressure, the line along the bottom plots it ---
@@ -597,7 +598,7 @@ void App::drawTabletSection() {
 
     // --- Global pressure curve ---
     ImGui::Spacing();
-    ImGui::TextColored(col(ui::color::textDim), "Pressure curve (all brushes)");
+    ImGui::TextColored(col(ui::color::textDim), "%s", tr("Pressure curve (all brushes)"));
     const float graphW = width, graphH = 96.0f * s;
     const ImVec2 g0 = ImGui::GetCursorScreenPos(), g1(g0.x + graphW, g0.y + graphH);
     ImGui::Dummy(ImVec2(graphW, graphH));
@@ -701,7 +702,7 @@ void App::drawTabletSection() {
                 {PenAction::RightClick, PenAction::Invert, PenAction::Smooth, PenAction::RotateView, PenAction::PanView,
                  PenAction::None},
                 kButtonHelp[b]);
-    if (ImGui::SmallButton(ICON_LC_ROTATE_CCW "  Tablet defaults")) {
+    if (ImGui::SmallButton(tr(ICON_LC_ROTATE_CCW "  Tablet defaults"))) {
         const PressureCurve keep = t.curve;
         const bool mouseMode = t.mouseMode; // (follows the driver's setting, not a preference)
         t = TabletSettings();

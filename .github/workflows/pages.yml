@@ -89,6 +89,9 @@ jobs:
           fi
       - name: Supporters page
         run: python3 tools/guide/build_site.py --supporters
+      # The mirror is public too: the same takedown as the deploy (tools/marks_media_flagged.txt).
+      - name: Media takedown
+        run: python3 tools/media_takedown.py website
       - name: Push website/ to islandmed/islandmed.github.io
         env:
           KEY: ${{ secrets.MIRROR_DEPLOY_KEY }}

@@ -145,7 +145,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Action | Keys | What it does |
 |---|---|---|
 | Clear Mask | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> | Unmask everything (also: Ctrl+drag on the background, away from the model). |
-| Divide | <kbd>Ctrl</kbd>+<kbd>D</kbd> | Add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to shape big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smt off divides without smoothing. |
+| Divide (keeps levels) | <kbd>Ctrl</kbd>+<kbd>D</kbd> | Non-destructive: add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to shape big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smt off divides without smoothing. |
 | Duplicate Part | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> | Copy the active Part, with its layers and attributes, and make the copy active (also in the Parts list's right-click menu). |
 | Group from Mask | <kbd>Ctrl</kbd>+<kbd>W</kbd> | Turn the masked part into a new face group and clear the mask. With nothing masked, everything visible becomes one group. |
 | Higher Level | <kbd>D</kbd> | Step one subdivision level up (more polygons, for detail). Edits made below carry the detail along. |
@@ -174,8 +174,10 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Orbit right | <kbd>Numpad 6</kbd> | Turn the view 15 degrees to the right around the model. |
 | Orbit up | <kbd>Numpad 8</kbd> | Turn the view 15 degrees up over the model. |
 | Orthographic | <kbd>Numpad 5</kbd> | Switch between a perspective and an orthographic view (no foreshortening: sizes don't shrink with depth). |
+| Restore View | <kbd>Numpad 0</kbd> | Go back to the view saved or restored last (View > Views). |
 | Right view | <kbd>Numpad 3</kbd> | Look at the model's right side (orthographic). |
 | Rotate | <kbd>R</kbd> | Gizmo, Rotate: drag a ring to turn about that axis, the outer ring to turn in the view. Mask the body and put the pivot at a joint to pose a limb. Shift snaps to 15 degrees. R again: back to Draw. |
+| Save View | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Numpad 0</kbd> | Remember this camera as a named view (View > Views; the name field names it). Saved with the project. |
 | Scale | <kbd>E</kbd> | Gizmo, Scale: drag a box to stretch along an axis or the centre to scale evenly (right or up: bigger). Shift snaps to 10% steps. E again: back to Draw. |
 | Top view | <kbd>Numpad 7</kbd> | Look down on the model (orthographic). |
 | X | <kbd>X</kbd> | Mirror strokes across X (left and right). |

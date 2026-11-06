@@ -23,6 +23,10 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <vector>
+#ifndef _WIN32
+#include <unistd.h> // execv (--cli)
+#endif
 
 namespace {
 
@@ -52,6 +56,7 @@ void usage() {
         "  --supersample N          Render recordings N times larger and downsample (sharper, allows zoom-ins)\n"
         "  --ui-test FILE.sfui      Run a UI test script headless and exit (0 = pass); settings are isolated\n"
         "  --ui-out DIR             Where UI tests save screenshots\n"
+        "  --ui-record out.mp4      Also record the UI test, every frame in real time with the pointer drawn (needs ffmpeg)\n"
         "  --ui-serve [--threads N] Warm UI test server: one window, then one test per stdin line (tools/test/warm_ui.py)\n"
         "  --fullscreen             Start filling the screen (F11 toggles)\n"
         "  --no-ai                  Start with every AI feature off and locked (as SF_AI=off)\n"
@@ -206,6 +211,7 @@ static int runMain(int argc, char** argv) {
         else if (a == "--offline") offline = true;
         else if (a == "--blender") options.blender = true;
         else if (a == "--ui-out") options.uiOutDir = next();
+        else if (a == "--ui-record") options.uiRecordPath = next();
         else if (a == "--log-dir") logDir = next();
         else if (a == "--crash-test") crashTest = next();
         else if (a == "--measure-idle") options.measureIdle = std::max(0.5f, float(std::atof(next().c_str())));
@@ -326,7 +332,25 @@ static int runMain(int argc, char** argv) {
     return finishIsolated(code);
 }
 
+#ifndef _WIN32
+// --cli ARGS...: runs sculptforge-cli beside this program with ARGS. An AppImage has one entry point, so this is how an
+// MCP client starts its server ("SculptForge.AppImage --cli --mcp", Help > Connect an AI tool). Only our own program.
+static int execCli(int argc, char** argv) {
+    const char* base = SDL_GetBasePath();
+    const std::string cli = std::string(base ? base : "") + "sculptforge-cli";
+    std::vector<char*> args{const_cast<char*>(cli.c_str())};
+    for (int i = 2; i < argc; ++i) args.push_back(argv[i]);
+    args.push_back(nullptr);
+    execv(cli.c_str(), args.data());
+    std::fprintf(stderr, "sculptforge: couldn't start %s\n", cli.c_str());
+    return 127;
+}
+#endif
+
 int main(int argc, char** argv) {
+#ifndef _WIN32
+    if (argc >= 2 && std::string(argv[1]) == "--cli") return execCli(argc, argv);
+#endif
     if (argc >= 2 && std::string(argv[1]) == "--ui-serve") return sf::runUiServer(argc - 1, argv + 1, runMain);
     return runMain(argc, argv);
 }

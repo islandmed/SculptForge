@@ -34,6 +34,7 @@ struct RenderSettings {
     glm::vec3 materialTint{1.0f};
     bool showTexture = true;     // with showVertex paint: a Part's painted texture (core/Texture.h) multiplies in
     bool showMask = true;        // masked areas render darker
+    float maskDarkness = 0.7f;   // how dark: 0 = no tint .. 1 = darkest (Preferences > Interface > Mask darkness)
     bool showFaceGroups = false; // colour each face group (see face groupColor)
     int litsphere = defaultLitSphere(); // built-in Lit Sphere material (core/Lit Sphere.h), Soft Clay; -1 = studio clay lighting
     bool showMesh = true;
@@ -277,7 +278,7 @@ public:
 private:
     void drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWidth, int fbHeight, float opacity);
 
-    GLuint wireProgram_ = 0, bgProgram_ = 0, splatProgram_ = 0;
+    GLuint wireProgram_ = 0, wireLineProgram_ = 0, bgProgram_ = 0, splatProgram_ = 0;
     // Splats: per-splat data in a texture buffer, drawn as instanced quads in back-to-front order.
     GLuint splatVao_ = 0, splatData_ = 0, splatTexture_ = 0, splatOrder_ = 0;
     GLsizei splatCount_ = 0;
@@ -481,8 +482,8 @@ private:
     struct MeshProgram {
         GLuint id = 0;
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
-              showMask = -1, groups = -1, litsphere = -1, litsphereCavity = -1, dim = -1, primBase = -1, hasPaint = -1,
-              normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1, lightRot = -1,
+              showMask = -1, maskDarkness = -1, groups = -1, litsphere = -1, litsphereCavity = -1, dim = -1, primBase = -1,
+              hasPaint = -1, normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1, lightRot = -1,
               lightLevels = -1, alpha = -1, microWire = -1;
         GLint hasOrm = -1, hasEmissive = -1, hasMatNormal = -1, envLevels = -1, exposure = -1, toneMap = -1, material = -1,
               pbrCavity = -1, viewToEnv = -1, sh = -1;

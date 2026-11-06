@@ -9,7 +9,7 @@ expect_value triangles == 27648
 orbit 140 -70
 key f
 click "Geometry##tool.geometry"
-expect "Geometry/Divide"
+expect "Geometry/Divide (keeps levels)"
 expect "Geometry/Smt"
 expect_value sdiv_levels == 0
 expect_text "No subdivision levels"
@@ -33,11 +33,13 @@ shot reconstructed-cage
 
 # Delete Higher at the base leaves the plain 108-triangle cage to start from.
 click "Geometry/Delete Higher"
+expect_text "Delete SDiv 2 to"
+click "Delete Levels/Delete Higher Levels"
 expect_value sdiv_levels == 0
 expect_value triangles == 108
 
 # Divide (Ctrl+D or the button): every level has four times the quads.
-click "Geometry/Divide"
+click "Geometry/Divide (keeps levels)"
 expect_value sdiv_levels == 2
 expect_value sdiv == 2
 expect_value triangles == 432
@@ -131,11 +133,17 @@ shot part-list
 click "Geometry##tool.geometry"
 key d
 click "Geometry/Delete Lower"
+# It asks first (Discord 11-02: destructive steps confirm before levels go).
+expect_text "Delete SDiv 1 to 1?"
+click "Delete Levels/Delete Lower Levels"
 expect_value sdiv == 1
 expect_value sdiv_levels == 4
 expect_value triangles == 432
 click "Geometry/Higher Level"
 click "Geometry/Delete Higher"
+expect_text "Delete SDiv 3 to 4"
+shot delete-levels-confirm
+click "Delete Levels/Delete Higher Levels"
 expect_value sdiv_levels == 2
 key ctrl+z
 expect_value sdiv_levels == 4
