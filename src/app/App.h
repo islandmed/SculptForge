@@ -526,6 +526,7 @@ private:
     char discordChallengeBuf_[64 * 4 + 1] = {};  // the theme field (64 code points of UTF-8)
     bool discordPresenceAvailable() const;       // an application ID is compiled in
     void updateDiscordPresence();                // every frame: sends only when what's shown changes
+    bool discordAgentRun() const;                // agent or offscreen run: never (discord::agentRun)
     void drawIntegrationsPrefs();                // Preferences > Integrations
     bool welcomeAfterCard_ = false;             // the first-run welcome waits until the card closes
     // What's New (WhatsNewPopup.cpp): the newest version's feature cards from docs/guide/whats-new.md, once after an
