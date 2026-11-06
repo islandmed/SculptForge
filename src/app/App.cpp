@@ -863,6 +863,9 @@ int App::run() {
     const double started = seconds();
     uint64_t framesDrawn = 0, wakeUps = 0, framesAtMeasure = 0, wakesAtMeasure = 0;
     double cpuAtMeasure = 0.0; // processor time of every thread (the driver's included)
+    // ...of which the frames drawn while measuring: the idle check is about the time between them (software OpenGL,
+    // CI's Windows runners, spends about 0.4 s of processor time on one frame: two such frames were "10% idle CPU").
+    double cpuInFrames = 0.0, cpuFrameStart = 0.0;
     bool measuring = false;
     // Input while measuring (a pointer crossing the window on a shared desktop) restarts the count once it has
     // passed: idle means no input. After kMeasureGiveUp seconds it counts whatever comes (the test's timeout).
@@ -916,12 +919,16 @@ int App::run() {
                 framesAtMeasure = framesDrawn;
                 wakesAtMeasure = wakeUps;
                 cpuAtMeasure = processCpuSeconds();
+                cpuInFrames = 0.0;
             } else if (measuring && t0 >= measureFrom + options_.measureIdle) {
                 const double fps = double(framesDrawn - framesAtMeasure) / double(options_.measureIdle);
-                const double cpu = 100.0 * (processCpuSeconds() - cpuAtMeasure) / double(options_.measureIdle);
-                std::printf("Idle: %llu frames, %llu wake-ups in %.1f s: %.2f fps, CPU %.1f%% of one core (%s redraw)\n",
+                const double cpuAll = 100.0 * (processCpuSeconds() - cpuAtMeasure) / double(options_.measureIdle);
+                const double cpuFrames = 100.0 * cpuInFrames / double(options_.measureIdle);
+                const double cpu = std::max(0.0, cpuAll - cpuFrames); // between frames
+                std::printf("Idle: %llu frames, %llu wake-ups in %.1f s: %.2f fps, CPU %.1f%% of one core between frames"
+                            " (+%.1f%% drawing them) (%s redraw)\n",
                             (unsigned long long)(framesDrawn - framesAtMeasure), (unsigned long long)(wakeUps - wakesAtMeasure),
-                            double(options_.measureIdle), fps, cpu, continuous ? "continuous" : "on-demand");
+                            double(options_.measureIdle), fps, cpu, cpuFrames, continuous ? "continuous" : "on-demand");
                 if (measureRestarts > 0) std::printf("  (restarted %d times after input)\n", measureRestarts);
                 std::fflush(stdout);
                 // Idle is 0 fps; a pointer crossing the window draws about a second's worth. Every frame is 60+.
@@ -1151,6 +1158,7 @@ int App::run() {
             draw = false; // minimised: the next event (restore) draws again
             continue;
         }
+        if (measuring) cpuFrameStart = processCpuSeconds();
         updateCameraAspect();
         // The SpaceMouse moves the view by its held axes every frame (frame-rate independent); while it does,
         // spaceMouseMoving() is true and a loop that waits for events when idle must keep drawing.
@@ -1226,6 +1234,7 @@ int App::run() {
                     phase[5] - phase[4], phase[6] - phase[5]);
         if (phases == 7 && perftrace::on()) tracePerfFrame(phase); // Help > Record a performance trace
         ++framesDrawn;
+        if (measuring) cpuInFrames += processCpuSeconds() - cpuFrameStart;
         {
             const double frameNow = seconds();
             static double lastSwap = 0.0;
