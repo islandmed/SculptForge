@@ -7,10 +7,10 @@ Which mark goes where: docs/brand.md. The app icon is the cube (Tony 11-06): too
 (make_cube_mark.py), rendered with rsvg-convert: assets/branding/sculptforge-16..1024.png (16-32 px from
 cube-mark-small.svg), .ico, .icns (Apple's grid, cube-mark-macos(-small).svg), the site's favicons and apple-touch-icon,
 the press icons (also Discord Rich Presence's image) and, with --discord DIR, the files uploaded by hand: the Discord bot
-avatar, the GitHub avatar (cube) and the Discord server icon (bust). The SF letters (make_sf_mark.py) are retired.
+avatar and server icon and the GitHub avatar (all the cube). The SF letters (make_sf_mark.py) are retired.
 The bust (<bust.jpeg>: the concept art, a rounded-square tile on a dark backdrop, found from its light rim) is the
 illustration: assets/branding/bust/ (About, What's New, the support card), the home page's What's New cards, the
-press kit, the social previews and the Discord server icon.
+press kit and the social previews.
 """
 import argparse
 import io
@@ -236,13 +236,10 @@ def main():
     png(social(bust, 1280, 640, font, tagline), "docs", "images", "social-preview.png")  # GitHub's (uploaded by hand)
 
     if a.discord:
-        # Discord and GitHub crop to circles. The bot's and GitHub's avatars are the cube, full bleed; the server icon
-        # the bust, inset.
-        sf("cube-mark-square", 512).convert("RGB").save(os.path.join(a.discord, "discord-bot-avatar-512.png"))
-        sf("cube-mark-square", 500).convert("RGB").save(os.path.join(a.discord, "github-avatar-500.png"))
-        av = Image.new("RGBA", (512, 512), (0x1c, 0x1a, 0x1c, 255))
-        av.alpha_composite(shrink(bust, 440), (36, 36))
-        av.convert("RGB").save(os.path.join(a.discord, "discord-server-icon-512.png"))
+        # Discord and GitHub crop to circles: the bot avatar, the server icon and the GitHub avatar are the cube, full
+        # bleed (Tony 11-06).
+        for name, n in (("discord-bot-avatar", 512), ("discord-server-icon", 512), ("github-avatar", 500)):
+            sf("cube-mark-square", n).convert("RGB").save(os.path.join(a.discord, f"{name}-{n}.png"))
     print("done")
 
 

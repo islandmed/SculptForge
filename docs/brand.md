@@ -17,7 +17,7 @@ taken from an icon set. It reads at 16 px, where the bust and the SF letters don
 | Site header lockup: cube + "SculptForge" wordmark | inline SVG `class="brand-mark"` (pages and `tools/guide/build_site.py`) |
 | README logo, press kit icon | `sculptforge-256.png`, `website/press/sculptforge-icon-*.png` |
 | Discord Rich Presence image | `website/press/sculptforge-icon-1024.png` (by URL) |
-| Discord bot avatar, GitHub org avatar (uploaded by hand) | `make_icons.py --discord DIR`: `discord-bot-avatar-512.png`, `github-avatar-500.png` |
+| Discord app icon, bot avatar and server icon, GitHub org avatar (uploaded by hand) | `make_icons.py --discord DIR`: `discord-bot-avatar-512.png`, `discord-server-icon-512.png`, `github-avatar-500.png` |
 
 - **Cuts:** `cube-mark.svg` from 48 px; `cube-mark-small.svg` for 16-32 px (bigger cube, thicker seams, no rim);
   `cube-mark-macos*.svg` on Apple's icon grid; `cube-mark-square.svg` full bleed for circle or rounded masks.
@@ -28,7 +28,8 @@ taken from an icon set. It reads at 16 px, where the bust and the SF letters don
 
 ## Bust + anvil: the illustration (personality)
 
-The clay bust melting into an anvil. Too detailed for small sizes; used large where it can be seen.
+The clay bust melting into an anvil: splash/About, What's New and site cards, social preview art. Too detailed for
+small sizes; used large where it can be seen.
 
 | Where | File |
 |---|---|
@@ -36,7 +37,6 @@ The clay bust melting into an anvil. Too detailed for small sizes; used large wh
 | Site What's New cards | `website/img/bust-256.png`, `bust-512.png` |
 | Social previews (site, GitHub) | `website/img/social-preview.png`, `docs/images/social-preview.png` |
 | Press kit | `website/press/sculptforge-bust-1024.png` |
-| Discord server icon (uploaded by hand) | `discord-server-icon-512.png` |
 
 Never below 96 px, never as the app icon.
 
