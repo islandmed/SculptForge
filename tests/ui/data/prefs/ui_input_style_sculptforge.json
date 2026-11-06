@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "shortcuts": {
+    "ui.picker.material": "Ctrl+Alt+M"
+  },
+  "prefs": {
+    "inputStyle": "sculptforge"
+  }
+}

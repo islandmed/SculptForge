@@ -978,6 +978,7 @@ void App::restartPrefsForTest(const std::string& uiJson) {
     std::string err;
     if (fileExists(uiConfigPath()) && !readUiConfig(uiConfigPath(), err, true)) status_ = err;
     applyInputStyle();
+    registerLibraryActions(); // as at a start: registered after the style is applied (#147)
     layoutBaseline_ = layoutKey();
     prefsSavedKey_ = prefsKey();
     prefsSaveAt_ = 0.0;

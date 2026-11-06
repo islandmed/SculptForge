@@ -1908,6 +1908,7 @@ private:
     // Falloff (U / I / O), the classic mask and face group keys, Shift-constrained straight strokes and the
     // Shift+click, release Shift, drag roll.
     void registerInputActions();
+    void registerLibraryActions(); // the Library's and pickers' actions (LibraryBrowser.cpp)
     void applyInputStyle(); // the style's default shortcuts (1-0 brushes or 9 QuickSave; I = RGB or Intensity)
     bool classicStyle() const { return uiPrefs_.inputStyle == 0; }
     bool blenderStyle() const { return uiPrefs_.inputStyle == 2; }

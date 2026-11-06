@@ -59,7 +59,8 @@ public:
     std::string shortcutText(std::string_view id) const; // effective chord after user overrides
     void setShortcut(std::string_view id, std::string chord); // user override ("" clears)
     // Changes an action's default chord (Preferences > Input switches between the classic and SculptForge
-    // defaults); user overrides still win.
+    // defaults); user overrides still win. Remembered for an action added later (#147: the style is applied
+    // before every action is registered, and add() would otherwise bring back the action's own default).
     void setDefaultShortcut(std::string_view id, std::string chord);
     Json overridesToJson() const;
     void overridesFromJson(const Json& j);
@@ -87,6 +88,7 @@ private:
     const std::vector<Chord>& chordsOf(size_t index) const;
     std::vector<Action> actions_;
     std::vector<std::pair<std::string, std::string>> overrides_; // id -> chord
+    std::vector<std::pair<std::string, std::string>> styleDefaults_; // id -> chord, from setDefaultShortcut
     std::vector<std::string> recent_;
     unsigned revision_ = 0;
     mutable unsigned chordsRevision_ = ~0u;
