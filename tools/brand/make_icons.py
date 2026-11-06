@@ -6,11 +6,11 @@
 Which mark goes where: docs/brand.md. The app icon is the cube (Tony 11-06): tools/brand/cube-mark*.svg
 (make_cube_mark.py), rendered with rsvg-convert: assets/branding/sculptforge-16..1024.png (16-32 px from
 cube-mark-small.svg), .ico, .icns (Apple's grid, cube-mark-macos(-small).svg), the site's favicons and apple-touch-icon,
-the press icons (also Discord Rich Presence's image) and, with --discord DIR, the files uploaded by hand: the Discord bot
-avatar and server icon and the GitHub avatar (all the cube). The SF letters (make_sf_mark.py) are retired.
+the press icons (also Discord Rich Presence's image). The SF letters (make_sf_mark.py) are retired.
 The bust (<bust.jpeg>: the concept art, a rounded-square tile on a dark backdrop, found from its light rim) is the
-illustration: assets/branding/bust/ (About, What's New, the support card), the home page's What's New cards, the
-press kit and the social previews.
+brand: assets/branding/bust/ (About, What's New, the support card), the site header's lockup and What's New cards,
+the press kit, the social previews and, with --discord DIR, the files uploaded by hand (Discord bot avatar and server
+icon, GitHub avatar).
 """
 import argparse
 import io
@@ -229,6 +229,8 @@ def main():
     png(shrink(bust, 256), br, "bust", "bust-256.png")  # embedded (BrandMark.cpp)
     png(shrink(bust, 256), "website", "img", "bust-256.png")  # the home page's What's New cards (with 512)
     png(shrink(bust, 512), "website", "img", "bust-512.png")
+    for n in (44, 88, 132):  # the site header's brand lockup (44 px, 1x-3x)
+        png(shrink(bust, n), "website", "img", f"bust-mark-{n}.png")
     png(bust, "website", "press", "sculptforge-bust-1024.png")
     font = os.path.join(ROOT, "website", "fonts", "Inter-SemiBold.ttf")
     tagline = "The free, open-source sculpting app."  # (the site's existing line)
@@ -236,10 +238,13 @@ def main():
     png(social(bust, 1280, 640, font, tagline), "docs", "images", "social-preview.png")  # GitHub's (uploaded by hand)
 
     if a.discord:
-        # Discord and GitHub crop to circles: the bot avatar, the server icon and the GitHub avatar are the cube, full
-        # bleed (Tony 11-06).
+        # Discord and GitHub crop to circles: the bot avatar, the server icon and the GitHub avatar are the bust (the
+        # brand, Tony 11-06), inset on the dark backdrop.
         for name, n in (("discord-bot-avatar", 512), ("discord-server-icon", 512), ("github-avatar", 500)):
-            sf("cube-mark-square", n).convert("RGB").save(os.path.join(a.discord, f"{name}-{n}.png"))
+            av = Image.new("RGBA", (n, n), (0x1c, 0x1a, 0x1c, 255))
+            k = round(n * 440 / 512)
+            av.alpha_composite(shrink(bust, k), ((n - k) // 2, (n - k) // 2))
+            av.convert("RGB").save(os.path.join(a.discord, f"{name}-{n}.png"))
     print("done")
 
 
