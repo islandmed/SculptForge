@@ -777,6 +777,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The Claude Desktop bundle and its MCP registry entry (tools/release/build_mcpb.py, mcp_server_json.py): packed
     # from the built CLI and its server run from the unpacked bundle, as packages.yml does on every OS.
     add_test(NAME mcpb_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/build_mcpb.py --self-test)
+    add_test(NAME reply_drafts_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/reply_drafts.py --self-test)
     add_test(NAME mcp_server_json_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/mcp_server_json.py --self-test)
     if(NOT CMAKE_CROSSCOMPILING)
       if(WIN32)

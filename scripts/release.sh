@@ -31,7 +31,7 @@
 # either stops in seconds before the tag or runs through to the end.
 # Each step looks at the live state first and skips what is already done, so running it again is always safe.
 # When something is wrong it stops and prints the fix; fix it, then run again with --from <that step>.
-# It never posts issue replies: it writes drafts for a person to read and post.
+# It never posts issue replies: it writes drafts (release-replies-X.Y.Z.md) that sfmonitor reads and posts.
 # Betas (a member perk): steps bump check ci tag release status. bump sets CMakeLists.txt to X.Y.Z with
 # SCULPTFORGE_PRERELEASE "beta.N" (the app says "X.Y.Z Beta N"; CHANGELOG, CITATION, metainfo and the home page stay
 # at the stable release). release.yml publishes the beta in the private repository $INSIDERS_REPO (members are
@@ -751,29 +751,13 @@ PY
 
 step_replies() {
     release_ready
-    local out="release-replies-$V.md" issues
+    local out="release-replies-$V.md"
     awk -v h="## [$V]" 'index($0, h) == 1 {f = 1; next} /^## \[/ {f = 0} f' CHANGELOG.md > "$work/section"
-    issues=$(grep -o '#[0-9]\+' "$work/section" | tr -d '#' | sort -un || true)  # no issues named is fine
-    {
-        echo "# Draft replies for SculptForge $V (read, edit, then post by hand; nothing here was posted)"
-        echo
-        for n in $issues; do
-            local title state lines
-            read -r state title < <(gh issue view "$n" -R "$REPO" --json state,title -q '.state + " " + .title' 2>/dev/null || echo "MISSING ?")
-            [ "$state" = MISSING ] && continue
-            lines=$(grep -m3 "#$n\b" "$work/section" | sed 's/^- //' || true)
-            echo "## #$n $title ($state)"
-            echo
-            echo "Fixed in SculptForge $V, out now: https://github.com/$REPO/releases/tag/$T"
-            echo "(Help > Check for updates in the app, or https://sculptforge.app/#download)"
-            echo
-            echo "$lines"
-            echo
-            echo "Thanks for reporting it."
-            echo
-        done
-    } > "$out"
-    ok "drafts for $(echo "$issues" | wc -w) issues in $out: read them, then post with gh issue comment / close"
+    # Whole entries, the reporter's @handle, a REVIEW line where the entry may not cover the issue; issues that
+    # already have our reply for $V are left out (tools/release/reply_drafts.py).
+    python3 tools/release/reply_drafts.py "$V" "$work/section" "$REPO" "$T" > "$out" 2> "$work/drafts" ||
+        die "couldn't write the reply drafts" "python3 tools/release/reply_drafts.py --self-test"
+    ok "$(cat "$work/drafts") in $out: sfmonitor posts these (it reads them first)"
 }
 
 step_status() {
@@ -794,7 +778,7 @@ step_status() {
     winget=$(gh pr view 464465 -R microsoft/winget-pkgs --json state -q .state 2>/dev/null || echo unknown)
     echo "   winget-pkgs#464465: $winget (update it once it merges; waits on the CLA)"
     echo "   Release:  https://github.com/$REPO/releases/tag/$T"
-    echo "   Remember: post the replies in release-replies-$V.md after reading them, then update the handoff note."
+    echo "   Replies:  sfmonitor posts release-replies-$V.md (after reading it). Then update the handoff note."
 }
 
 started=
