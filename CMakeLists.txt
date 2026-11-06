@@ -77,6 +77,7 @@ add_library(sculptforge_core STATIC
   src/core/Json.cpp
   src/core/BrushRecipe.cpp
   src/core/BrushPacks.cpp
+  src/core/BrushSets.cpp
   src/core/BrushSettings.cpp
   src/core/AlphaOptions.cpp
   src/core/BrushLibrary.cpp
@@ -412,6 +413,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelBrushGallery.cpp
     src/app/PanelVertexPaint.cpp
     src/app/PanelPacks.cpp
+    src/app/PanelBrushSets.cpp
     src/app/MemoryConfirm.cpp
     src/app/PanelPaintLayers.cpp
     src/app/PanelTexture.cpp

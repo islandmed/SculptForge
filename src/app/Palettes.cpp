@@ -331,6 +331,7 @@ void App::drawPalette_Brush() {
     actionRow(*this, {"brush.paste"});
     actionRow(*this, {"brush.save_settings"}); // this brush's own settings (#78); one per row so the labels fit
     actionRow(*this, {"brush.reset_settings"});
+    drawBrushSetRow(); // named bottom shelves with their keys (PanelBrushSets.cpp, #143)
     drawCustomBrushes();
     drawPenPressureSwitches("brush_pen"); // this brush's own (#122)
     ImGui::Checkbox(tr("Front faces only"), &frontFacesOnly_);
