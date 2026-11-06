@@ -749,6 +749,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # public a month later, and the month's pack passes the install checks.
     add_test(NAME member_requests COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/member-requests/requests.py
                                           selftest --cli ${SCULPTFORGE_CLI_RUNNER})
+    # Creator referral statements (tools/affiliate/report.py, docs/affiliates.md): 15% for the first 12 months, from a
+    # fake Stripe export.
+    add_test(NAME affiliate_report COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/affiliate/report.py selftest)
     # Release notes from note fragments (tools/release/assemble_notes.py, changes/README.md): the assembler, and
     # every fragment on this branch parses.
     add_test(NAME marks COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py
