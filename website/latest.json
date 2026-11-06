@@ -1,11 +1,10 @@
 {
-  "version": "0.11.6",
+  "version": "0.11.7",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Studio controls: one policy file decides which AI tools and providers are allowed",
-    "An audit log of every AI step, and API keys kept in the system keychain",
-    "Sign in with your studio's identity provider (device sign-in, no browser plug-in)",
-    "Empty shelves stay out of the way outside Customize Shelves"
+    "Dense scans orbit smoothly on entry-level machines",
+    "Preferences > AI in Spanish and Chinese",
+    "Live mode's confirmations in your language"
   ]
 }
