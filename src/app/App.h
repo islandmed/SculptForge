@@ -1766,8 +1766,12 @@ private:
     bool rememberWindow_ = false;
     void drawAxisGizmo();
     std::array<AxisGizmoEnd, 6> axisGizmoLayout() const; // the gizmo's ends on screen now (AxisGizmo.h)
-    bool axisGizmoMouseDown(float x, float y);          // a click on an end: that side view (#43)
+    glm::vec2 axisGizmoCentre() const;                  // the centre of its disc
+    bool axisGizmoMouseDown(float x, float y);          // a click on an end: that side view (#43); on the disc: orbit
     float axisGizmoUnit() const;                        // UI scale times Draw > Camera > Gizmo size
+    float axisGizmoLabelHeight() const;                 // the room under the disc for the view's name
+    bool overViewNavigator(float x, float y) const;     // on the axes' disc or the View Figure (no brush ring there)
+    bool viewBackgroundLight() const;                   // the 3D view's background is light (the gizmo's disc darkens)
     glm::vec2 viewFigureCentre() const;                 // Draw > Camera > View Figure: where it sits, how big
     float viewFigureRadius() const;
     void drawViewFigure();

@@ -18,9 +18,13 @@ shrink with depth. The front, side and top views (<kbd>Numpad 1</kbd>, <kbd>3</k
 orthographic until you rotate again, as in Blender.
 
 The X / Y / Z gizmo in the top left of the canvas (**Sculpt > Draw & Tablet > Camera > Axes**) shows the world axes as the camera
-sees them. Click an end to look from that side, as in Blender: **X** the right view, **Y** the top, **Z** the front,
-and the plain dot at the other end of each axis the left, bottom or back view. These are orthographic like the
-numpad views. The end under the pointer gets a ring.
+sees them, on a soft disc that keeps them readable on dark and light backgrounds. The positive ends are filled
+circles with their letter, the negative ends smaller rings; the ends pointing away from you are smaller and fainter,
+and the nearest is drawn on top. Click an end to look from that side, as in Blender: **X** the right view, **Y** the
+top, **Z** the front, and the ring at the other end of each axis the left, bottom or back view. Click the same end
+again for the opposite view (Front, then Back). These are orthographic like the numpad views. The end under the
+pointer gets a ring (a negative end shows its letter), and on an exact side view its name shows under the axes.
+Drag on the disc between the ends to orbit.
 
 **Sculpt > Draw & Tablet > Camera > Gizmo size** makes the axes **Small**, **Medium** (the default) or **Large**; they grow with the
 UI scale too, and clicking an end works at every size. **View Figure** (beside **Axes**, off until you turn it on)
