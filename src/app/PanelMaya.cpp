@@ -3,9 +3,10 @@
 //
 // File > Maya (#42): the file-exchange bridge to the SculptForge shelf script for Maya (io/MayaBridge.h,
 // integrations/maya). Off until the user picks an exchange folder with the native folder dialog; SculptForge
-// then reads and writes only inside that folder, only when the user sends or gets, or (Get automatically, off
-// by default) after a once-a-second modification-time check of that folder's one manifest. No sockets, no
-// ports, and nothing from the folder is ever run.
+// then reads and writes only inside that folder, only when the user sends or gets, or (Get automatically, on
+// once a folder is chosen) after a once-a-second modification-time check of that folder's one manifest. No
+// sockets, no ports, and nothing from the folder is ever run. While the bridge is on, the top bar has a Send to
+// Maya button (Shell.cpp).
 #include "app/App.h"
 #include "app/Ui.h"
 
@@ -40,8 +41,9 @@ void menuAction(App& app, const char* id) {
     ui::HelpAction(app, id);
 }
 
-// <prefs>/maya.json: {"folder": "...", "auto": false}. Read strictly: a small file, a string path to an existing
-// folder (else the bridge stays off).
+// <prefs>/maya.json: {"folder": "...", "auto_get": true}. Read strictly: a small file, a string path to an existing
+// folder (else the bridge stays off). Get automatically is on unless the user turned it off: "auto_get", not the
+// old "auto", which every earlier version wrote as false (its default was off).
 void loadMayaPrefs(const std::string& configDir, UiPrefs& p) {
     if (configDir.empty()) return;
     std::ifstream f(fsPath(configDir + "maya.json"), std::ios::binary);
@@ -52,14 +54,14 @@ void loadMayaPrefs(const std::string& configDir, UiPrefs& p) {
     if (text.size() > 16384 || !Json::parse(text, j, err) || !j.isObject()) return;
     if (j["folder"].isString() && j["folder"].asString().size() < 4096 && isFolder(j["folder"].asString()))
         p.mayaFolder = j["folder"].asString();
-    p.mayaAutoReceive = !p.mayaFolder.empty() && j["auto"].asBool(false);
+    p.mayaAutoReceive = !p.mayaFolder.empty() && j["auto_get"].asBool(true);
 }
 
 void saveMayaPrefs(const std::string& configDir, const UiPrefs& p) {
     if (configDir.empty()) return;
     Json j = Json::object();
     j.set("folder", p.mayaFolder);
-    j.set("auto", p.mayaAutoReceive);
+    j.set("auto_get", p.mayaAutoReceive);
     std::ofstream f(fsPath(configDir + "maya.json"), std::ios::binary | std::ios::trunc);
     f << j.dump(true) << "\n";
 }
@@ -71,6 +73,7 @@ void App::setMayaFolder(const std::string& folder) {
         status_ = "Not a folder: " + folder;
         return;
     }
+    if (uiPrefs_.mayaFolder.empty()) uiPrefs_.mayaAutoReceive = true; // the bridge turns on with Get automatically
     uiPrefs_.mayaFolder = folder;
     // What is already there is old news: Get from Maya loads it, Get automatically waits for the next send.
     const std::string inbox = mayaInbox(folder);
@@ -117,7 +120,7 @@ void App::drawMayaMenu() {
     }
     ui::HelpText("Get automatically", nullptr,
                  "Load what Maya sends as soon as it arrives: SculptForge checks the exchange folder's manifest once a "
-                 "second (its modification time and size only). Off by default; off: use Get from Maya.",
+                 "second (its modification time and size only). On once you choose the folder; off: use Get from Maya.",
                  "File > Maya");
     ImGui::Separator();
     menuAction(*this, "file.maya_folder");

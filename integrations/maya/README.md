@@ -25,8 +25,8 @@ servers, and neither app runs anything it finds in the folder. Meshes travel as 
    sculptforge_maya.install_shelf()
    ```
 
-   A **SculptForge** shelf appears with three buttons: **Send**, **Get** and **Folder**. You only do this once;
-   Maya keeps the shelf.
+   A **SculptForge** shelf appears with four buttons: **Send**, **Get**, **Auto** and **Folder**. You only do
+   this once; Maya keeps the shelf. (Updating: copy the new file and run `install_shelf()` again.)
 
 ## Use
 
@@ -34,11 +34,16 @@ servers, and neither app runs anything it finds in the folder. Meshes travel as 
    example `Documents/SculptForge Maya`). In Maya click **Folder** on the SculptForge shelf and pick the same
    folder.
 2. In Maya select one or more meshes and click **Send**.
-3. In SculptForge choose **File > Maya > Get from Maya** (or turn on **Get automatically**, which checks the
-   folder once a second). Each mesh becomes a Part with its Maya name.
-4. Sculpt, then choose **File > Maya > Send to Maya**.
-5. In Maya click **Get**. Each object that came from Maya gets its new mesh, keeping its transform, parent and
-   shading groups; a Part you added in SculptForge becomes a new object. The whole Get is one undo step.
+3. SculptForge loads them by itself (**Get automatically**, on once the folder is chosen; or **File > Maya >
+   Get from Maya**). Each mesh becomes a Part with its Maya name.
+4. Sculpt, then click **Send to Maya** in SculptForge's top bar.
+5. Maya loads them by itself (**Auto**; with **Manual**, click **Get**). Each object that came from Maya gets
+   its new mesh, keeping its transform, parent and shading groups; a Part you added in SculptForge becomes a new
+   object. The whole Get is one undo step.
+
+**Auto** is on by default and starts with the first Send, Get or Folder click in a Maya session: a background
+thread looks at the modification time and size of SculptForge's manifest once a second and nothing else, and
+the Get itself runs in Maya's main thread. Something sent before it started waits for **Get**.
 
 ## What comes across
 

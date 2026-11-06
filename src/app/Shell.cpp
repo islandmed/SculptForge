@@ -1029,11 +1029,13 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     const ImGuiStyle& st = ImGui::GetStyle();
     auto buttonW = [&](const char* label) { return ImGui::CalcTextSize(label, nullptr, true).x + st.FramePadding.x * 2.0f; };
     const bool quickSave = actions_.find("file.quicksave") != nullptr;
+    const bool maya = !uiPrefs_.mayaFolder.empty(); // the Maya bridge is on (#42): one click sends back
     const float searchW = 150.0f * s;
     const float windowButtonW = buttonH + 6.0f * s; // minimise and close, at the far right 
     float rightW = searchW + buttonW(tr(ICON_LC_MENU " Menus")) + 3.0f * (buttonH + 2.0f * s) + 18.0f * s +
                    10.0f * s + 2.0f * windowButtonW + 2.0f * s;
     if (quickSave) rightW += buttonW(tr("Save Snapshot")) + 8.0f * s;
+    if (maya) rightW += buttonW((std::string(ICON_LC_SEND "  ") + tr("Send to Maya")).c_str()) + 8.0f * s;
     const float rightX = g.title.w - 8.0f * s - rightW;
 
     // Info readout and the status message, elided to fit: secondary, so in the 12 px font.
@@ -1102,6 +1104,10 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     ImGui::PushStyleColor(ImGuiCol_Button, theme::toggleOff);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::toggleOffHover);
     ImGui::PushStyleColor(ImGuiCol_Text, theme::textOff);
+    if (maya) {
+        ui::ActionButton(*this, "file.send_maya", ImVec2(0, buttonH), ui::Look::IconLabel);
+        ImGui::SameLine(0.0f, 8.0f * s);
+    }
     if (quickSave) {
         ui::ActionButton(*this, "file.quicksave", ImVec2(0, buttonH));
         ImGui::SameLine(0.0f, 8.0f * s);
@@ -1487,6 +1493,13 @@ void App::drawStatusBar(const ShellGeometry& g) {
     const float wsW = buttonH + 4.0f * s;
     const float presetsX = right - 3.0f * wsW - 2.0f * s;
     right = presetsX - 14.0f * s;
+    // The Maya bridge is on (#42): Send to Maya, one click, left of the workspaces; never over the menus (a narrow
+    // window, #105, keeps File > Maya > Send to Maya).
+    const std::string mayaLabel = std::string(ICON_LC_SEND) + " " + (caps ? upper(tr("Send to Maya")) : std::string(tr("Send to Maya")));
+    const float mayaW = textW(monoSmall, mayaLabel) + 16.0f * s;
+    const float mayaX = right - mayaW;
+    const bool maya = !uiPrefs_.mayaFolder.empty() && mayaX > menusEnd;
+    if (maya) right = mayaX - 10.0f * s;
 
     // Modules: mode, brush, document, triangles, frame rate.
     std::vector<StatusModule> mods;
@@ -1593,6 +1606,23 @@ void App::drawStatusBar(const ShellGeometry& g) {
             const std::string text = (style == Status::Terminal ? "> " : "") + msg;
             textAt(monoSmall, menusEnd, error ? theme::danger : theme::textDim, elide(monoSmall, text, avail));
         }
+    }
+
+    if (maya) {
+        ImGui::SetCursorScreenPos(ImVec2(mayaX, o.y + (h - buttonH) * 0.5f));
+        const bool clicked = ImGui::InvisibleButton((std::string(tr("Send to Maya")) + "##file.send_maya").c_str(), ImVec2(mayaW, buttonH));
+        const bool hovered = ImGui::IsItemHovered();
+        const ImVec2 p = ImGui::GetItemRectMin();
+        dl->AddRectFilled(p, ImVec2(p.x + mayaW, p.y + buttonH), theme::u32(hovered ? theme::frameHover : theme::frame));
+        if (theme::look.tiled) dl->AddRect(p, ImVec2(p.x + mayaW, p.y + buttonH), theme::u32(theme::tileBorder));
+        textAt(monoSmall, p.x + 8.0f * s, hovered ? theme::textBright : theme::text, mayaLabel);
+        if (clicked) {
+            if (const Action* a = actions_.find("file.send_maya"); a && a->run) {
+                actions_.touch(a->id);
+                a->run();
+            }
+        }
+        ui::HelpAction(*this, "file.send_maya");
     }
 
     // Layout presets 1 2 3, drawn as workspaces.

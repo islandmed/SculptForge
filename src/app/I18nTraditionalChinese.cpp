@@ -936,9 +936,9 @@ constexpr Entry kTraditionalChinese[] = {
      "載入 Maya 最後透過工具架的 Send to SculptForge 傳送的內容。每個物件會取代同名的部件（可復原）或成為新部件。"},
     {"Exchange folder...", "交換資料夾..."},
     {"Choose the folder SculptForge and Maya exchange meshes through (pick the same one in Maya's shelf script). "
-     "SculptForge reads and writes only there, and only when you send or get.",
-     "選擇 SculptForge 與 Maya 交換網格的資料夾（在 Maya 的工具架指令碼中選同一個）。SculptForge 只在該處讀寫，且只在"
-     "你傳送或取得時進行。"},
+     "SculptForge reads and writes only there: when you send or get, and when Maya sends while Get automatically is on.",
+     "選擇 SculptForge 與 Maya 交換網格的資料夾（在 Maya 的工具架指令碼中選同一個）。SculptForge 只在該處讀寫：在"
+     "你傳送或取得時，以及開啟「自動取得」後 Maya 傳送時。"},
     {"Add the brush on the clipboard: a brush code someone shared, or the text of a .sfbrush file.",
      "加入剪貼簿中的筆刷：別人分享的筆刷代碼，或 .sfbrush 檔案的文字。"},
     {"Every brush keeps its own Size, Intensity, Falloff, Colour intensity, stroke and alpha while you work. This "
@@ -1795,8 +1795,8 @@ constexpr Entry kTraditionalChinese[] = {
     // --- PanelMaya.cpp (tools/i18n/coverage.py) ---
     {"Get automatically", "自動取得"},
     {"Load what Maya sends as soon as it arrives: SculptForge checks the exchange folder's manifest once a second "
-     "(its modification time and size only). Off by default; off: use Get from Maya.",
-     "Maya 傳來的內容一到就載入：SculptForge 每秒檢查一次交換資料夾的清單檔（只看修改時間與大小）。預設關閉；關閉時："
+     "(its modification time and size only). On once you choose the folder; off: use Get from Maya.",
+     "Maya 傳來的內容一到就載入：SculptForge 每秒檢查一次交換資料夾的清單檔（只看修改時間與大小）。選好資料夾後即開啟；關閉時："
      "請使用「從 Maya 取得」。"},
     {"Turn the Maya bridge off", "關閉 Maya 橋接"},
     {"Forget the exchange folder; nothing in it is deleted.", "忘記交換資料夾；其中的內容不會被刪除。"},

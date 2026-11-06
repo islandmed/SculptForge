@@ -579,7 +579,8 @@ void App::initActions() {
     add("file.maya_folder", "Exchange folder...", "File > Maya", nullptr, [this] { chooseMayaFolder(); },
         ICON_LC_FOLDER_OPEN, nullptr, nullptr, nullptr,
         "Choose the folder SculptForge and Maya exchange meshes through (pick the same one in Maya's shelf script). "
-        "SculptForge reads and writes only there, and only when you send or get.");
+        "SculptForge reads and writes only there: when you send or get, and when Maya sends while Get "
+        "automatically is on.");
     add("brush.paste", "Paste brush", "Brush", "Ctrl+V", [this] { pasteBrush(); }, ICON_LC_CLIPBOARD_PASTE, nullptr, nullptr,
         nullptr, "Add the brush on the clipboard: a brush code someone shared, or the text of a .sfbrush file.");
     // Per-brush settings (#78, BrushSettingsUi.cpp).
