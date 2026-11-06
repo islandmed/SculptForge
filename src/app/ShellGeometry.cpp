@@ -26,7 +26,8 @@ CircledPlus circledPlus(float cx, float cy, float r, float scale) {
     p.cy = odd ? std::floor(cy) + 0.5f : std::round(cy);
     p.r = std::round(r);
     p.stroke = t;
-    const float arm = std::max(2.0f, std::round(r * 0.5f)); // half the + (arms of equal length both ways)
+    // Half the +'s length: whole arms plus half the bar, so its ends land on pixel edges like its sides.
+    const float arm = std::max(2.0f, std::round(r * 0.5f)) + half;
     p.barX0 = p.cx - arm, p.barX1 = p.cx + arm, p.barY0 = p.cy - half, p.barY1 = p.cy + half;
     p.colX0 = p.cx - half, p.colX1 = p.cx + half, p.colY0 = p.cy - arm, p.colY1 = p.cy + arm;
     return p;
