@@ -417,7 +417,14 @@ private:
     bool penSeen_ = false;
     BrushType strokeBrush_ = BrushType::Standard;
     bool strokeInvert_ = false;
-    glm::vec3 grabPlanePoint_{0.0f}, grabLast_{0.0f};
+    glm::vec3 grabLast_{0.0f};
+    // A grab (Move, Snake Hook, KelvinGrab) follows the pen's motion on screen, not where the pen points: when the view
+    // turns under a still pen (a SpaceMouse with Hold during strokes off), the grabbed point stays where it is in the
+    // world and the pen carries on from it (fenix, Discord 11-06: the model flew off as the cap turned).
+    // grabScreen_: the pen's last position the grab used; grabScreenOffset_: from it to the grabbed point on screen.
+    glm::vec2 grabScreen_{0.0f}, grabScreenOffset_{0.0f};
+    bool grabStroke() const;     // a Move / Snake Hook / KelvinGrab stroke under way
+    void regrabAfterViewMove();  // the view moved mid-grab: the grabbed point stays put (grabScreenOffset_)
     // Live Move (Preferences > Performance, experimental; docs/design/perf-moonshots.md): a Move drag on a plain mesh
     // isn't applied frame by frame; the GPU draws it (render/Ghost.h, GhostKind::Move) from the grab's start, and
     // the whole move is applied once when the stroke ends (finishStrokeNow): one grab instead of one a frame.
@@ -2405,8 +2412,13 @@ private:
     // pointer events never reach the canvas or the UI (phoenix, Discord 11-05). Names cached per mouse id.
     bool sixDofPointerEvent(const SDL_Event& e);
     std::unordered_map<SDL_MouseID, bool> sixDofMice_;
-    // The view held still and the buttons ignored while a stroke runs (SpaceMouseSettings::holdWhileStroking).
-    bool spaceMouseHeldByStroke() const;
+    // The view held still and the buttons ignored while a stroke runs (SpaceMouseSettings::holdWhileStroking), and
+    // always during a drag anchored in the view it began in (a gizmo, a selection, a stamp...).
+    bool spaceMouseHeld() const;
+    // The cap is pushed past the dead zone (SpaceMouse on) at the last read, held or not: the system pointer's motion
+    // and wheel meanwhile are the driver's echo of it (3DxWare's mouse emulation), not the user (spaceMouseEcho).
+    bool spaceMousePushed_ = false;
+    bool spaceMouseEcho(const SDL_Event& e) const;
     // ---- end SpaceMouse ----
     // ---- Touch (Touch.cpp, core/TouchGesture.h, docs/guide/navigation.md) ----
     // Two fingers on a touch screen pan, pinch-zoom and twist the view; on a trackpad they pinch-zoom and twist

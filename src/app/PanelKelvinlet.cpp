@@ -55,7 +55,7 @@ void App::kelvinBegin(const RayHit& hit) {
     // Full brush size, as Move: the press pressure of a pen is near zero, so Pressure > Size would shrink the grab (#122).
     kelvinCenter_ = hit.position;
     kelvinRadius_ = radiusPx_ * camera_.worldPerPixel(hit.position, canvasHeight());
-    grabPlanePoint_ = grabLast_ = kelvinTarget_ = hit.position;
+    grabLast_ = kelvinTarget_ = hit.position;
     kelvinPending_ = 0.0f;
     kelvinLastX_ = lastX_;
     lastDabScreen_ = glm::vec2(lastX_, lastY_);
@@ -74,7 +74,7 @@ void App::kelvinTo(float x, float y) {
         const float denom = glm::dot(dir, n);
         if (strokeAlongNormal_) kelvinTarget_ = alongNormalTarget(x, y);
         else if (std::abs(denom) < 1e-6f) return;
-        else kelvinTarget_ = origin + dir * (glm::dot(grabPlanePoint_ - origin, n) / denom);
+        else kelvinTarget_ = origin + dir * (glm::dot(kelvinTarget_ - origin, n) / denom); // (through the grabbed point)
     } else {
         // Twist / Scale: the drag's sideways distance in brush radii (Alt reverses).
         const float dx = (x - kelvinLastX_) / std::max(radiusPx_, 1.0f) * kelvinAmount_ * (strokeInvert_ ? -1.0f : 1.0f);

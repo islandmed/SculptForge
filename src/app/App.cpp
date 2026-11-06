@@ -1468,6 +1468,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     if (strayMouseMotion(event)) return; // neither the canvas nor the UI follows a driver's stray mouse events
     if (event.type == SDL_EVENT_MOUSE_MOTION && event.motion.which != SDL_PEN_MOUSEID) mouseSincePen_ = true;
     if (sixDofPointerEvent(event)) return; // nor a SpaceMouse that also says it is a mouse (SpaceMouse.cpp)
+    if (spaceMouseEcho(event)) return;     // nor the pointer a SpaceMouse driver moves while the cap is pushed
     if ((event.type >= SDL_EVENT_KEY_DOWN && event.type < SDL_EVENT_JOYSTICK_AXIS_MOTION &&
          event.type != SDL_EVENT_KEYMAP_CHANGED && event.type != SDL_EVENT_KEYBOARD_ADDED &&
          event.type != SDL_EVENT_KEYBOARD_REMOVED && event.type != SDL_EVENT_MOUSE_ADDED &&
@@ -2144,6 +2145,8 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     dabAccuracy_ = {};
     precisionActive_ = false;
     steadyCursor_ = glm::vec2(x, y);
+    grabScreen_ = glm::vec2(x, y);
+    grabScreenOffset_ = glm::vec2(0.0f);
     pickSmoother_.reset();
     strokeInvert_ = invertToggle_ != (((inputMods() & SDL_KMOD_ALT) != 0) || (erasing() && eraserAction() == PenAction::Invert));
     // Shift still smooths geometry while the Paint brush is active.
@@ -2224,7 +2227,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
             !doc_.mesh.hasHidden() && doc_.mesh.layers.empty() && !doc_.sculptor.dyntopo.enabled &&
             &displayedMesh() == &doc_.mesh)
             liveMove_ = {true, p.center, glm::vec3(0.0f), p.radius, std::clamp(p.strength * 2.0f, 0.0f, 1.0f)};
-        grabPlanePoint_ = grabLast_ = hit.position;
+        grabLast_ = hit.position;
         beginAlongNormal(hit, p.radius);
         return;
     }
@@ -2235,7 +2238,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     }
     lazyMouse_.reset(glm::vec2(x, y));
     if ((strokeBrush_ == BrushType::SnakeHook || strokeBrush_ == BrushType::KelvinSnake) && !recipe && strokeSculpt_) {
-        grabPlanePoint_ = grabLast_ = hit.position; // the pulled tip (see snakeHookTo)
+        grabLast_ = hit.position; // the pulled tip (see snakeHookTo)
         beginAlongNormal(hit, radiusPx_ * camera_.worldPerPixel(hit.position, canvasHeight()));
         return;
     }
@@ -2279,6 +2282,11 @@ void App::strokeTo(float x, float y) {
         x = p.x;
         y = p.y;
     }
+    if (grabStroke()) { // by the pen's motion from the grabbed point (regrabAfterViewMove)
+        grabScreen_ = glm::vec2(x, y);
+        x += grabScreenOffset_.x;
+        y += grabScreenOffset_.y;
+    }
     const BrushRecipe* recipe = strokeRecipe();
     if (strokeBrush_ == BrushType::Move && !recipe && strokeSculpt_ && strokeAlongNormal_) {
         const glm::vec3 p = alongNormalTarget(x, y);
@@ -2293,7 +2301,7 @@ void App::strokeTo(float x, float y) {
         glm::vec3 n = camera_.forward();
         float denom = glm::dot(dir, n);
         if (std::abs(denom) < 1e-6f) return;
-        float t = glm::dot(grabPlanePoint_ - origin, n) / denom;
+        float t = glm::dot(grabLast_ - origin, n) / denom; // (the plane through the grabbed point, facing the view)
         glm::vec3 p = origin + dir * t;
         if (liveMove_.active) liveMove_.delta += p - grabLast_;
         else queueGrab(p - grabLast_);
