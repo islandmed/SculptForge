@@ -57,3 +57,23 @@ TEST(ui_scale_matrix_shell_sizes) {
     CHECK(near(g.rightShelf.w, base.rightShelf.w * 2.0f, 1.0f));
     CHECK(near(g.title.h, base.title.h * 2.0f, 1.0f));
 }
+
+TEST(ui_scale_circled_plus_is_centred) {
+    // #150: the bottom shelf's Add a brush + sat off centre in its circle (a font glyph). Drawn from lines now: at
+    // every scale, and wherever the tile lands (fractional item rects), the bars cover whole pixels, have equal arms
+    // both ways and share the circle's centre.
+    const auto whole = [](float v) { return near(v, std::round(v), 1e-4f); };
+    for (float s : {1.0f, 1.25f, 1.5f, 1.75f, 2.0f})
+        for (float x : {100.0f, 100.3f, 100.5f, 100.75f})
+            for (float y : {40.0f, 40.2f, 40.5f, 40.9f}) {
+                const CircledPlus p = circledPlus(x, y + 4.0f * s + 15.0f * s, 15.0f * s, s);
+                CHECK(p.stroke >= 1.0f && whole(p.stroke));
+                for (float e : {p.barX0, p.barX1, p.barY0, p.barY1, p.colX0, p.colX1, p.colY0, p.colY1}) CHECK(whole(e));
+                CHECK(near((p.barX0 + p.barX1) * 0.5f, p.cx, 1e-4f) && near((p.barY0 + p.barY1) * 0.5f, p.cy, 1e-4f));
+                CHECK(near((p.colX0 + p.colX1) * 0.5f, p.cx, 1e-4f) && near((p.colY0 + p.colY1) * 0.5f, p.cy, 1e-4f));
+                CHECK(near(p.barX1 - p.barX0, p.colY1 - p.colY0, 1e-4f)); // as wide as tall
+                CHECK(near(p.barY1 - p.barY0, p.stroke, 1e-4f) && near(p.colX1 - p.colX0, p.stroke, 1e-4f));
+                CHECK(std::abs(p.cx - x) <= 0.5f && std::abs(p.cy - (y + 19.0f * s)) <= 0.5f); // moved at most half a px
+                CHECK(p.barX1 - p.barX0 < 2.0f * p.r); // inside the circle
+            }
+}
