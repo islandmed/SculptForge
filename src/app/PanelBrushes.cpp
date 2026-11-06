@@ -5,6 +5,7 @@
 // stroke handling of the SnakeHook brush and the DragRect stroke.
 #include "app/Theme.h"
 #include "app/App.h"
+#include "app/I18n.h"
 #include "app/Ui.h"
 
 #include <iterator>
@@ -76,7 +77,7 @@ void App::drawAlphaOptions(bool vdm) {
     AlphaOptions& o = alphaOptions_;
     const char* where = vdm ? "Brush > Vector Displacement" : "Alpha";
     if (vdm) {
-        ImGui::SeparatorText("Stamp rotation");
+        ImGui::SeparatorText(tr("Stamp rotation"));
         ui::Checkbox("Follow stroke direction##vdm.follow_stroke", &o.followStroke);
         ui::HelpText("Follow stroke direction", nullptr,
                      "The stamp turns with you: with Drag Stamp its top points the way you drag; in a dots stroke it "

@@ -6,6 +6,7 @@
 // (copy code, save, rename, delete, reveal), pasting brushes from the
 // clipboard, and saving Brush Lab edits to the user library automatically.
 #include "app/App.h"
+#include "app/I18n.h"
 
 #include "app/Pickers.h"
 #include "core/BrushLibrary.h"
@@ -210,7 +211,7 @@ void App::revealBrushFile(int index) {
 }
 
 void App::drawCustomBrushes() {
-    ImGui::SeparatorText("Custom brushes");
+    ImGui::SeparatorText(tr("Custom brushes"));
     enum class Action { None, Copy, Save, Rename, Delete, Reveal } action = Action::None;
     int actionIndex = -1;
     if (ImGui::BeginListBox("##custom", ImVec2(-1, ImGui::GetTextLineHeightWithSpacing() * 5.5f))) {

@@ -8,6 +8,7 @@
 // geometry and the strict JSON reading are in core/RadialMenu.h.
 #include "app/App.h"
 #include "app/CommandPalette.h"
+#include "app/I18n.h"
 #include "app/Ui.h"
 
 #include <IconsLucide.h>
@@ -441,7 +442,7 @@ bool App::importRadialMenu(const std::string& path) {
 void App::drawRadialMenusSection() {
     const char* path = "Preferences > Input > Radial Menus";
     ImGui::Spacing();
-    ImGui::SeparatorText("Radial Menus");
+    ImGui::SeparatorText(tr("Radial Menus"));
     ui::HelpText("Radial Menus", nullptr,
                  "Pie menus of your own: hold a menu's key (or its mouse or pen button), flick toward an item and let "
                  "go to run it. Tap the key instead and the pie stays open: click an item, or beside the pie to close "
@@ -491,7 +492,7 @@ void App::drawRadialMenusSection() {
             refreshRadialActions();
         }
         // Key (the keymap's, like any action's) and button.
-        ImGui::TextDisabled("Key");
+        ImGui::TextDisabled("%s", tr("Key"));
         ImGui::SameLine();
         const std::string id = radialActionId(mi);
         const std::string key = actions_.shortcutText(id);
@@ -503,9 +504,9 @@ void App::drawRadialMenusSection() {
                      path);
         ImGui::SameLine();
         ImGui::SetNextItemWidth(-FLT_MIN);
-        if (ImGui::BeginCombo("##radial.button", radialButtonLabel(m.button))) {
+        if (ImGui::BeginCombo("##radial.button", tr(radialButtonLabel(m.button)))) {
             for (int b = 0; b < int(RadialButton::Count); ++b)
-                if (ImGui::Selectable(radialButtonLabel(RadialButton(b)), int(m.button) == b)) m.button = RadialButton(b);
+                if (ImGui::Selectable(tr(radialButtonLabel(RadialButton(b))), int(m.button) == b)) m.button = RadialButton(b);
             ImGui::EndCombo();
         }
         ui::HelpText("Button", nullptr,
@@ -522,7 +523,7 @@ void App::drawRadialMenusSection() {
                                                       "beside the model sculpts)"
                                                     : "Shift+right-drag, or a left-drag beside the model";
             ImGui::PushTextWrapPos(0.0f);
-            ImGui::TextDisabled("Right-drag opens this menu. Turn the view with %s.", how);
+            ImGui::TextDisabled(tr("Right-drag opens this menu. Turn the view with %s."), how);
             ImGui::PopTextWrapPos();
         }
 
@@ -566,7 +567,7 @@ void App::drawRadialMenusSection() {
                 ImGui::SameLine();
                 ImGui::SetNextItemWidth(iconW);
                 if (ImGui::BeginCombo("##radial.icon", glyph ? glyph : "-")) {
-                    if (ImGui::Selectable("Action's own###radial.icon_none", slot.icon.empty())) slot.icon.clear();
+                    if (ImGui::Selectable(tr("Action's own###radial.icon_none"), slot.icon.empty())) slot.icon.clear();
                     for (const RadialIcon& ic : kRadialIcons)
                         if (ImGui::Selectable((std::string(ic.glyph) + "  " + ic.name + "###radial.icon." + ic.name).c_str(),
                                               slot.icon == ic.name))
@@ -574,7 +575,7 @@ void App::drawRadialMenusSection() {
                     ImGui::EndCombo();
                 }
                 ui::HelpText("Icon", nullptr, "The icon the pie shows for it.", path);
-                if (ImGui::Button(ICON_LC_SEARCH "  Change action###radial.change", ImVec2(-FLT_MIN, 0))) {
+                if (ImGui::Button(tr(ICON_LC_SEARCH "  Change action###radial.change"), ImVec2(-FLT_MIN, 0))) {
                     radialEdit_.pickSlot = radialEdit_.pickSlot == i ? -2 : i;
                     radialEdit_.query[0] = 0;
                     radialEdit_.focusSearch = true;
@@ -595,7 +596,8 @@ void App::drawRadialMenusSection() {
                 break;
             }
         }
-        if (int(m.slots.size()) < kRadialSlots && ImGui::Button(ICON_LC_PLUS "  Add item###radial.add_slot", ImVec2(-FLT_MIN, 0))) {
+        if (int(m.slots.size()) < kRadialSlots &&
+            ImGui::Button(tr(ICON_LC_PLUS "  Add item###radial.add_slot"), ImVec2(-FLT_MIN, 0))) {
             radialEdit_.pickSlot = radialEdit_.pickSlot == -1 ? -2 : -1;
             radialEdit_.query[0] = 0;
             radialEdit_.focusSearch = true;
@@ -629,22 +631,22 @@ void App::drawRadialMenusSection() {
                 }
                 if (ImGui::IsItemHovered() && !a.palette.empty()) ImGui::SetTooltip("%s", a.palette.c_str());
             }
-            if (found.empty()) ImGui::TextDisabled("No matching actions");
+            if (found.empty()) ImGui::TextDisabled("%s", tr("No matching actions"));
         }
 
         // Import / export / clear.
         ImGui::Spacing();
         const float third = (ImGui::GetContentRegionAvail().x - 2.0f * ImGui::GetStyle().ItemSpacing.x) / 3.0f;
-        if (ImGui::Button("Export...##radial.export", ImVec2(third, 0))) exportRadialMenuDialog(mi);
+        if (ImGui::Button(tr("Export...##radial.export"), ImVec2(third, 0))) exportRadialMenuDialog(mi);
         ui::HelpText("Export", nullptr, "Save this menu as a .json file to share or keep (action names only).", path);
         ImGui::SameLine();
-        if (ImGui::Button("Import...##radial.import", ImVec2(third, 0))) importRadialMenuDialog();
+        if (ImGui::Button(tr("Import...##radial.import"), ImVec2(third, 0))) importRadialMenuDialog();
         ui::HelpText("Import", nullptr,
                      "Load a menu someone exported. Only action names are read; ones this version doesn't have are "
                      "left out. Goes into this menu if it's empty, otherwise into a new one.",
                      path);
         ImGui::SameLine();
-        if (ImGui::Button("Clear##radial.clear", ImVec2(third, 0))) {
+        if (ImGui::Button(tr("Clear##radial.clear"), ImVec2(third, 0))) {
             m = RadialMenu();
             while (!radialMenus_.empty() && radialMenus_.back().slots.empty() && radialMenus_.back().name.empty())
                 radialMenus_.pop_back(); // empty menus at the end go; one in the middle keeps its place (and key)
@@ -653,16 +655,16 @@ void App::drawRadialMenusSection() {
         }
         ui::HelpText("Clear", nullptr, "Empty this menu. Its key stays; an empty menu does nothing.", path);
         ImGui::PopID();
-    } else if (ImGui::Button("Import...##radial.import", ImVec2(-FLT_MIN, 0))) {
+    } else if (ImGui::Button(tr("Import...##radial.import"), ImVec2(-FLT_MIN, 0))) {
         importRadialMenuDialog();
     }
-    if (ImGui::Button("Restore default menus##radial.defaults", ImVec2(-FLT_MIN, 0))) {
+    if (ImGui::Button(tr("Restore default menus##radial.defaults"), ImVec2(-FLT_MIN, 0))) {
         resetRadialMenus();
         radialEdit_ = RadialEdit();
         status_ = "Default radial menus restored";
     }
     ui::HelpText("Restore default menus", nullptr, "Back to the three built-in menus: Brushes (T), Masking (Y) and Strokes (J).", path);
-    ImGui::TextColored(col(ui::color::textDim), "Your menus save themselves");
+    ImGui::TextColored(col(ui::color::textDim), "%s", tr("Your menus save themselves"));
 }
 
 } // namespace sf

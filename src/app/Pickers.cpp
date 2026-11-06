@@ -7,6 +7,7 @@
 #include "app/Pickers.h"
 
 #include "app/App.h"
+#include "app/I18n.h"
 #include "app/UiServe.h"
 #include "app/AssetLibrary.h"
 #include "app/Ui.h"
@@ -160,7 +161,7 @@ int columnsFor(float tile, GridMode mode) {
 void sectionHeader(const char* text) {
     ImGui::Dummy(ImVec2(0, 2));
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::SeparatorText(text);
+    ImGui::SeparatorText(tr(text));
     ImGui::PopStyleColor();
 }
 
@@ -326,7 +327,7 @@ bool AssetTile(const char* id, ImTextureID texture, const char* glyph, const std
 
 float SortMenuWidth() { // the widest Sort button and the gap before it
     const ImGuiStyle& st = ImGui::GetStyle();
-    return ImGui::CalcTextSize("Sort: Recent").x + st.FramePadding.x * 2.0f + st.ItemSpacing.x + 2.0f;
+    return ImGui::CalcTextSize(tr("Sort: Recent")).x + st.FramePadding.x * 2.0f + st.ItemSpacing.x + 2.0f;
 }
 
 int brushRecentRank(const std::string& id) { return recentRank(st().recent, id); }
@@ -340,7 +341,7 @@ int builtinBrushPackRank(const std::string& pack) {
 bool SortMenu(const char* id, std::string& pref, bool packs) {
     const ListSort cur = listSortFromId(pref);
     char label[64];
-    std::snprintf(label, sizeof label, "Sort: %s##%s", listSortLabel(cur), id);
+    std::snprintf(label, sizeof label, tr("Sort: %s##%s"), tr(listSortLabel(cur)), id);
     if (ImGui::SmallButton(label)) ImGui::OpenPopup(id);
     ui::HelpText("Sort", nullptr,
                  packs ? "The order of this list: A-Z (the default), the most recently used first, or grouped by pack."
@@ -624,7 +625,7 @@ void drawBrushGrid(App& app, GridMode mode) {
 
     if (!popup) {
         ImGui::SetNextItemWidth(-SortMenuWidth());
-        ImGui::InputTextWithHint("##brushfilter", ICON_LC_SEARCH "  Filter brushes", paletteFilter,
+        ImGui::InputTextWithHint("##brushfilter", tr(ICON_LC_SEARCH "  Filter brushes"), paletteFilter,
                                  sizeof paletteFilter);
         ImGui::SameLine();
         SortMenu("brushsort", app.uiPrefs_.brushSort);

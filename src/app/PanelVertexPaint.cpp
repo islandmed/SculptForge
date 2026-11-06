@@ -394,8 +394,8 @@ void App::drawBackgroundControls(const char* idSuffix) {
     const std::string label = std::string("Background colour##") + idSuffix;
     if (ImGui::ColorEdit3(label.c_str(), &c.x, ImGuiColorEditFlags_NoInputs)) setBackground(false, c);
     ui::HelpText("Background colour", nullptr,
-                 "The view's flat background colour. Choosing one switches the background to Flat Colour. Store "
-                 "Config keeps it for the next session; projects keep their own.",
+                 "The view's flat background colour. Choosing one switches the background to Flat Colour. It is "
+                 "saved automatically for the next session; projects keep their own.",
                  "Preferences > Display");
 }
 

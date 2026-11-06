@@ -1308,14 +1308,17 @@ void App::drawHelpConsoleUi() {
                          ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
                              ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs)) {
             ImGui::PushFont(helpTitleFont());
-            ImGui::Text(ICON_LC_KEYBOARD "  Press a key for '%s'", a ? a->label.c_str() : capturingShortcut_.c_str());
+            ImGui::Text(tr(ICON_LC_KEYBOARD "  Press a key for '%s'"),
+                        a ? a->label.c_str() : capturingShortcut_.c_str());
             ImGui::PopFont();
             const std::string now = actions_.shortcutText(capturingShortcut_);
-            ImGui::TextColored(col(ui::color::textDim), "Now:");
+            ImGui::TextColored(col(ui::color::textDim), "%s", tr("Now:"));
             ImGui::SameLine();
-            if (now.empty()) ImGui::TextColored(col(ui::color::textDim), "none");
+            if (now.empty())
+                ImGui::TextColored(col(ui::color::textDim), "%s", tr("none"));
             else ui::Keycaps(now);
-            ImGui::TextColored(col(ui::color::textDim), "Esc cancels, Backspace clears. A key that's taken moves here.");
+            ImGui::TextColored(col(ui::color::textDim), "%s",
+                               tr("Esc cancels, Backspace clears. A key that's taken moves here."));
         }
         ImGui::End();
         ImGui::PopStyleColor(2);
@@ -1371,7 +1374,7 @@ void App::drawControlsWindow() {
                 const std::string top = a.palette.substr(0, a.palette.find(" > "));
                 groups[top.empty() ? "General" : top].push_back(&a);
             }
-            if (groups.empty()) ImGui::TextColored(col(ui::color::textDim), "No shortcut matches \"%s\".", filter);
+            if (groups.empty()) ImGui::TextColored(col(ui::color::textDim), tr("No shortcut matches \"%s\"."), filter);
             for (auto& [group, list] : groups) {
                 std::stable_sort(list.begin(), list.end(), [](const Action* x, const Action* y) { return x->label < y->label; });
                 ImGui::SeparatorText(group.c_str());
@@ -1396,7 +1399,8 @@ void App::drawControlsWindow() {
                 ImGui::Spacing();
             }
             ImGui::EndChild();
-            ImGui::TextColored(col(ui::color::textDim), "Double-click a row, or Ctrl+Alt+click any button, to assign a key.");
+            ImGui::TextColored(col(ui::color::textDim), "%s",
+                               tr("Double-click a row, or Ctrl+Alt+click any button, to assign a key."));
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem(tr("Mouse & pen"))) {
@@ -1636,7 +1640,7 @@ void drawLibraryBrowserSection(App& app) {
     ImGui::SameLine();
     if (ImGui::RadioButton(tr("Bottom"), l.libraryBottom)) l.libraryBottom = true;
     ui::HelpText("Library at the bottom", nullptr, "Library opens above the bottom shelf.", "Preferences > Library");
-    ImGui::TextColored(col(ui::color::textDim), "Library folder");
+    ImGui::TextColored(col(ui::color::textDim), "%s", tr("Library folder"));
     const std::string shown = p.libraryFolder.empty() ? std::string("Documents/SculptForge (default)") : p.libraryFolder;
     if (ImGui::Button((std::string(ICON_LC_FOLDER_OPEN "  ") + shown + "##libfolder").c_str(), ImVec2(-FLT_MIN, 0)))
         SDL_ShowOpenFolderDialog(onUiFileChosen, &g_requests[kLibraryFolder], app.window_, nullptr, false);

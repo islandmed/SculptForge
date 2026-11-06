@@ -1,0 +1,23 @@
+# Interface strings that stay in English in every language (tools/i18n/coverage.py): names of brushes, tools
+# and products, file formats, units. One visible label per line, exactly as the code has it.
+AI
+Smt
+TCorne
+TBorder
+Kelvinlet
+PNG
+JPG
+Rgb
+Mask Pen
+Lasso Mask
+Rectangle Mask
+Select Rectangle
+Select Lasso
+Cut Line
+Cut Lasso
+Cut Rectangle
+Cut Polyline
+VDM
+SpaceMouse
+Lit Sphere
+PBR

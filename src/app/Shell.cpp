@@ -552,8 +552,8 @@ void App::registerShellActions() {
          "set_background", [this] { runCommand("set_background", {{"mode", std::string("gradient")}}); },
          [this] { return renderSettings_.gradientBackground; }, nullptr});
     add({"view.background_flat", "Flat Colour", nullptr,
-         "The view's background is one solid colour (pick it below), without the gradient. A preference: Store "
-         "Config keeps it; projects keep their own.",
+         "The view's background is one solid colour (pick it below), without the gradient. A preference, saved "
+         "automatically; projects keep their own.",
          "Preferences > Display", "", "set_background",
          [this] { runCommand("set_background", {{"mode", std::string("flat")}}); },
          [this] { return !renderSettings_.gradientBackground; }, nullptr});
@@ -642,7 +642,7 @@ void App::registerShellActions() {
          nullptr, nullptr});
     add({"geometry.to_splats", "Sculpt to Splats", nullptr, "Turn the sculpt into Gaussian splats.", "Splats", "",
          "mesh_to_splats", [this] { runCommand("mesh_to_splats"); }, nullptr, nullptr});
-    add({"color.fill", "Fill", ICON_LC_PAINT_BUCKET, "Fill the unmasked area with the colour (FillObject).", "Color", "",
+    add({"color.fill", "Fill", ICON_LC_PAINT_BUCKET, "Fill the unmasked area with the colour.", "Color", "",
          "paint_fill", [this] { runCommand("paint_fill", {{"color", colorToHex(doc_.paintColor)}}); }, nullptr, nullptr});
 
     // The shell itself.

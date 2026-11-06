@@ -3,6 +3,7 @@
 #include "app/UserGuide.h"
 
 #include "app/App.h"
+#include "app/I18n.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
 #include "core/Image.h"
@@ -647,7 +648,7 @@ void UserGuide::drawToolbar(App& app) {
         hits_ = book_.search(query_);
     }
     ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - webW);
-    if (ImGui::Button(ICON_LC_GLOBE "  Open in browser##guide_web")) SDL_OpenURL(websiteUrl().c_str());
+    if (ImGui::Button(tr(ICON_LC_GLOBE "  Open in browser##guide_web"))) SDL_OpenURL(websiteUrl().c_str());
     ui::HelpText("Open in browser", nullptr, "Read this page on the SculptForge website.", "Help > User Guide");
     ImGui::Dummy(ImVec2(0, 2.0f * s));
 }
@@ -657,7 +658,7 @@ void UserGuide::drawContents(App& app) {
     ImGui::Dummy(ImVec2(0, 4.0f * s));
     ImGui::Indent(6.0f * s);
     const float w = ImGui::GetContentRegionAvail().x - 6.0f * s;
-    if (ImGui::Selectable("Contents##guide.toc.index", place_.chapter < 0, 0, ImVec2(w, 0))) {
+    if (ImGui::Selectable(tr("Contents##guide.toc.index"), place_.chapter < 0, 0, ImVec2(w, 0))) {
         if (place_.chapter >= 0) navigate("index.md");
     }
     std::string group;
@@ -711,7 +712,7 @@ void UserGuide::drawSearchResults(App& app) {
     const float w = ImGui::GetContentRegionAvail().x - 6.0f * s;
     if (hits_.empty()) {
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + w);
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(kDim), "Nothing in the guide matches \"%s\".", query_);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(kDim), tr("Nothing in the guide matches \"%s\"."), query_);
         ImGui::PopTextWrapPos();
     } else {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(kDim), "%zu result%s%s", hits_.size(), hits_.size() == 1 ? "" : "s",
@@ -1264,13 +1265,13 @@ void UserGuide::drawPage(App& app) {
         ImGui::SetCursorScreenPos(ImVec2(origin.x, y0 + 14.0f * s));
         if (bodyFont()) ImGui::PushFont(bodyFont());
         ImGui::PushTextWrapPos(origin.x + width);
-        ImGui::TextUnformatted("SculptForge is free and open source, and stays that way. If it helps your work, "
-                               "you can support its development.");
+        ImGui::TextUnformatted(tr("SculptForge is free and open source, and stays that way. If it helps your work, "
+                                  "you can support its development."));
         ImGui::PopTextWrapPos();
         if (bodyFont()) ImGui::PopFont();
         ImGui::Spacing();
         ImGui::SetCursorScreenPos(ImVec2(origin.x, ImGui::GetCursorScreenPos().y));
-        if (ImGui::Button("Support SculptForge##whats_new")) app.openSupportPage();
+        if (ImGui::Button(tr("Support SculptForge##whats_new"))) app.openSupportPage();
         y = ImGui::GetCursorScreenPos().y - origin.y;
     }
     ImGui::SetCursorScreenPos(start);

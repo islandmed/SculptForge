@@ -17,6 +17,7 @@
 // Every operation goes through the uv_* commands (core/UvCommands.cpp) or one UvEditStep (core/UvEdit.h), so it
 // is one undo step and scriptable; big unwraps run in the background.
 #include "app/App.h"
+#include "app/I18n.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
 
@@ -991,7 +992,7 @@ void App::drawUvEditor() {
 
     // Toolbar: selection mode, colours, image, the model overlay, frame.
     ImGui::AlignTextToFramePadding();
-    ImGui::TextDisabled("Select");
+    ImGui::TextDisabled("%s", tr("Select"));
     ImGui::SameLine();
     ui::Segmented(*this, {"uv.mode_vertex", "uv.mode_edge", "uv.mode_face", "uv.mode_island"}, 248 * scale);
     // The rest of the toolbar wraps onto a second line when the window is narrow.
@@ -1006,7 +1007,9 @@ void App::drawUvEditor() {
     };
     nextOnLine(130 * scale, 14 * scale);
     ImGui::SetNextItemWidth(130 * scale);
-    if (ImGui::Combo("##uvcolor", &s.color, kColorLabels, 4)) s.colorsDirty = true;
+    const char* colorLabels[4];
+    for (int i = 0; i < 4; ++i) colorLabels[i] = tr(kColorLabels[i]);
+    if (ImGui::Combo("##uvcolor", &s.color, colorLabels, 4)) s.colorsDirty = true;
     ui::HelpText("Colours", nullptr,
                  "What the faces show, here and on the model: Islands (a colour each), Stretch (green: true to the surface; "
                  "yellow to red: stretched or squashed; magenta: folded over), Density (texel density; blue: fewer texels than the "
@@ -1014,11 +1017,13 @@ void App::drawUvEditor() {
                  kPath);
     nextOnLine(110 * scale, style.ItemSpacing.x);
     ImGui::SetNextItemWidth(110 * scale);
-    ImGui::Combo("##uvimage", &s.image, kImageLabels, 3);
+    const char* imageLabels[3];
+    for (int i = 0; i < 3; ++i) imageLabels[i] = tr(kImageLabels[i]);
+    ImGui::Combo("##uvimage", &s.image, imageLabels, 3);
     ui::HelpText("Image", nullptr, "Behind the layout: nothing, a checker, or the painted texture (tile 1001).", kPath);
     nextOnLine(ImGui::CalcTextSize("Model").x + ImGui::GetFrameHeight() * 2, 14 * scale);
     ImGui::AlignTextToFramePadding();
-    ImGui::TextDisabled("On model");
+    ImGui::TextDisabled("%s", tr("On model"));
     ImGui::SameLine();
     if (ui::Checkbox("Colours##uvmodel", &s.modelColors)) s.colorsDirty = true;
     ui::HelpText("Colours on the model", nullptr,
@@ -1256,11 +1261,11 @@ void App::drawUvEditor() {
         for (size_t i = 0; i < s.tileList.size() && i < 6; ++i) tiles += (i ? ", " : "") + std::to_string(s.tileList[i]);
         if (s.tileList.size() > 6) tiles += "...";
         if (s.hasUvs)
-            std::snprintf(line, sizeof line, "%u islands  |  %zu selected  |  stretch %.3f%s  |  %.0f tx/u at %dK  |  %s",
-                          s.topo.islandCount, nsel, double(s.meanStretch), s.flipped > 0.001f ? " (folds)" : "",
+            std::snprintf(line, sizeof line, tr("%u islands  |  %zu selected  |  stretch %.3f%s  |  %.0f tx/u at %dK  |  %s"),
+                          s.topo.islandCount, nsel, double(s.meanStretch), s.flipped > 0.001f ? tr(" (folds)") : "",
                           double(s.meanDensity), u.resolution() / 1024, tiles.c_str());
         else
-            std::snprintf(line, sizeof line, "%zu seam edges marked", uvSeamCount(m));
+            std::snprintf(line, sizeof line, tr("%zu seam edges marked"), uvSeamCount(m));
         ImGui::TextDisabled("%s", line);
     }
 
@@ -1269,7 +1274,10 @@ void App::drawUvEditor() {
     ImGui::BeginChild("##uvside", ImVec2(sideW, avail.y), false);
     const float w = ImGui::GetContentRegionAvail().x;
     const float halfW = (w - style.ItemSpacing.x) * 0.5f;
-    auto section = [&](const char* title, bool open) { return ImGui::CollapsingHeader(title, open ? ImGuiTreeNodeFlags_DefaultOpen : 0); };
+    auto section = [&](const char* title, bool open) { // the id stays English, so the open state survives a language change
+        return ImGui::CollapsingHeader((std::string(tr(title)) + "###uvsection." + title).c_str(),
+                                       open ? ImGuiTreeNodeFlags_DefaultOpen : 0);
+    };
     if (section("Unwrap", true)) {
         const char* labels[6];
         for (int i = 0; i < 6; ++i) labels[i] = uvUnwrapMethodLabel(kMethods[i]);
@@ -1292,12 +1300,12 @@ void App::drawUvEditor() {
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::accentHover);
         ImGui::PushStyleColor(ImGuiCol_Text, theme::textOnAccent);
         ImGui::BeginDisabled(s.job != nullptr || m.triangleCount() == 0);
-        if (ImGui::Button(sel ? "Unwrap Selected##uvunwrap" : "Unwrap##uvunwrap", ImVec2(w, 0))) u.unwrap();
+        if (ImGui::Button(tr(sel ? "Unwrap Selected##uvunwrap" : "Unwrap##uvunwrap"), ImVec2(w, 0))) u.unwrap();
         ImGui::EndDisabled();
         ImGui::PopStyleColor(3);
         ui::HelpAction(*this, "uv.unwrap");
         ImGui::Spacing();
-        ImGui::TextDisabled("Seams (%zu edges)", uvSeamCount(m));
+        ImGui::TextDisabled(tr("Seams (%zu edges)"), uvSeamCount(m));
         ui::ActionButton(*this, "uv.tool_seams", ImVec2(halfW, 0), ui::Look::IconLabel);
         ImGui::SameLine();
         ui::ActionButton(*this, "uv.tool_select", ImVec2(-1, 0), ui::Look::IconLabel);
@@ -1352,7 +1360,7 @@ void App::drawUvEditor() {
         }
         ui::HelpText("Texture size", nullptr, "The texture size densities and margins are measured at (the Part's texture's when it has one).", kPath);
         ImGui::SameLine();
-        ImGui::TextDisabled("%s %.0f", s.selIslands ? "Selected" : "Mean", double(s.selDensity));
+        ImGui::TextDisabled("%s %.0f", tr(s.selIslands ? "Selected" : "Mean"), double(s.selDensity));
         ImGui::SetNextItemWidth(halfW);
         ImGui::InputFloat("##uvtarget", &s.targetDensity, 0.0f, 0.0f, "%.0f tx/u");
         s.targetDensity = std::clamp(s.targetDensity, 1.0f, 65536.0f);
