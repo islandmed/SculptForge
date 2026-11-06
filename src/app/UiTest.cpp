@@ -280,7 +280,8 @@
 //                            content scale changes, with SDL's event (Windows DPI, another monitor); logical_width W: the display scale that makes the window W logical px wide (#105)
 //   expect_value ui_scale (percent built now), font_height (default font, px), frame_height, panel_width (right
 //                            shelf, px), title_height, glyphs_missing (glyphs drawn as "?" in the last frame),
-//                            glyphs_merged (typed characters taken from other fonts: SF_FALLBACK_FONTS, the system's)
+//                            glyphs_merged (typed characters taken from other fonts: SF_FALLBACK_FONTS, the system's),
+//                            font_atlas_kpx (the font atlas texture, thousands of pixels)
 //   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 classic, 1 SculptForge)
 #include "app/App.h"
 #include "ai/Http.h"
@@ -1005,6 +1006,10 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "ui_scale") return std::round(double(app_.uiScale_) * 100.0); // percent, as built now (#87)
     if (name == "glyphs_missing") return double(glyphs::missingLastFrame()); // drawn as "?" in the last frame
     if (name == "glyphs_merged") return double(glyphs::mergedCount());       // typed characters taken from other fonts
+    if (name == "font_atlas_kpx") { // the font atlas texture, thousands of pixels (its size: memory, upload time)
+        const ImFontAtlas* a = ImGui::GetIO().Fonts;
+        return std::round(double(a->TexWidth) * double(a->TexHeight) / 1000.0);
+    }
     if (name == "font_height") { // the default UI font's size in pixels, as rasterised in the atlas
         const ImGuiIO& io = ImGui::GetIO();
         const ImFont* f = io.FontDefault ? io.FontDefault : io.Fonts->Fonts.empty() ? nullptr : io.Fonts->Fonts[0];

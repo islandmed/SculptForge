@@ -48,9 +48,10 @@ constexpr int kMaxMerged = 2000;         // characters merged at most: the atlas
 constexpr uintmax_t kMaxFileBytes = 160u << 20; // a system font file read whole (PingFang is ~80 MB)
 
 struct Source {
-    std::vector<unsigned char> owned; // a system font file (the embedded ones point into the binary)
+    std::shared_ptr<const std::vector<unsigned char>> file; // a system font file, shared by its faces (embedded: none)
     const unsigned char* data = nullptr;
     size_t size = 0;
+    std::string path;
     int index = 0; // the face in a collection (.ttc)
     stbtt_fontinfo info{};
     std::vector<ImWchar> found;  // characters this source gives, sorted
@@ -100,17 +101,24 @@ Source* loadFile(const Candidate& c) {
     State& s = state();
     const std::string key = c.path + "#" + std::to_string(c.index);
     if (!s.opened.insert(key).second) return nullptr;
-    const std::filesystem::path path(std::u8string(c.path.begin(), c.path.end()));
-    std::error_code ec;
-    const uintmax_t bytes = std::filesystem::file_size(path, ec);
-    if (ec || bytes < 12 || bytes > kMaxFileBytes) return nullptr;
-    std::vector<unsigned char> data(static_cast<size_t>(bytes));
-    std::ifstream in(path, std::ios::binary);
-    if (!in.read(reinterpret_cast<char*>(data.data()), std::streamsize(data.size()))) return nullptr;
-    auto src = makeSource(data.data(), data.size(), c.index);
-    if (!src) return nullptr;
-    src->owned = std::move(data); // (the vector's buffer moves with it: data stays valid)
-    SDL_Log("User text font: %s", c.path.c_str());
+    std::shared_ptr<const std::vector<unsigned char>> file;
+    for (const auto& src : s.sources) // another face of a collection already read (Noto Sans CJK: SC, then KR)
+        if (src->file && src->path == c.path) file = src->file;
+    if (!file) {
+        const std::filesystem::path path(std::u8string(c.path.begin(), c.path.end()));
+        std::error_code ec;
+        const uintmax_t bytes = std::filesystem::file_size(path, ec);
+        if (ec || bytes < 12 || bytes > kMaxFileBytes) return nullptr;
+        auto data = std::make_shared<std::vector<unsigned char>>(static_cast<size_t>(bytes));
+        std::ifstream in(path, std::ios::binary);
+        if (!in.read(reinterpret_cast<char*>(data->data()), std::streamsize(data->size()))) return nullptr;
+        file = std::move(data);
+    }
+    auto src = makeSource(file->data(), file->size(), c.index);
+    if (!src) return nullptr; // (also a colour-bitmap-only font, e.g. Noto Color Emoji: stb_truetype draws outlines)
+    src->file = std::move(file);
+    src->path = c.path;
+    SDL_Log("User text font: %s (face %d)", c.path.c_str(), c.index);
     s.sources.push_back(std::move(src));
     return s.sources.back().get();
 }
@@ -135,8 +143,8 @@ std::vector<Candidate> systemCandidates(bool traditional, size_t& tested) {
     out.push_back({dir + zh[traditional ? 1 : 0]});
     out.push_back({dir + zh[traditional ? 0 : 1]});
     for (const char* f : {"YuGothR.ttc", "meiryo.ttc", "malgun.ttf", "simsun.ttc", "simsunb.ttf", "mingliub.ttc",
-                          "segoeui.ttf", "seguisym.ttf"})
-        out.push_back({dir + f}); // Yu Gothic, Meiryo, Malgun Gothic, SimSun (+ Ext-B), Segoe UI (+ Symbol)
+                          "segoeui.ttf", "seguiemj.ttf", "seguisym.ttf"})
+        out.push_back({dir + f}); // Yu Gothic, Meiryo, Malgun Gothic, SimSun (+ Ext-B), Segoe UI (+ Emoji, its outlines, + Symbol)
 #elif defined(__APPLE__)
     out.push_back({"/System/Library/Fonts/PingFang.ttc", traditional ? 1 : 0}); // (faces: SC, TC, HK...; older macOS)
     out.push_back({traditional ? "/System/Library/Fonts/STHeiti Light.ttc" : "/System/Library/Fonts/Hiragino Sans GB.ttc"});
@@ -203,7 +211,8 @@ bool systemMatch(ImWchar c, bool traditional, Candidate& out) {
         return f;
     }();
     if (!fc.ok) return false;
-    const char* name = traditional ? "sans-serif:lang=zh-tw" : "sans-serif:lang=zh-cn";
+    // (color=false: a colour emoji font is bitmaps only, which stb_truetype can't draw; an outline one can)
+    const char* name = traditional ? "sans-serif:lang=zh-tw:color=false" : "sans-serif:lang=zh-cn:color=false";
     Pattern* p = fc.nameParse(reinterpret_cast<const unsigned char*>(name));
     if (!p) return false;
     CharSet* cs = fc.charSetCreate();
