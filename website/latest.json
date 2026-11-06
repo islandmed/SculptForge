@@ -1,10 +1,12 @@
 {
-  "version": "0.11.7",
+  "version": "0.11.8",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Dense scans orbit smoothly on entry-level machines",
-    "Preferences > AI in Spanish and Chinese",
-    "Live mode's confirmations in your language"
+    "Clearer corner axes: lettered, depth-shaded, click twice for the opposite view",
+    "One click in the Library uses a brush, alpha or material (thanks @NicTanghe, #142)",
+    "The app icon is now an orange cube",
+    "Drag and Slide Stamp keep their strength when the pen lifts (#146)",
+    "One click sends to Maya and back; SculptForge picks up Maya's exports by itself (thanks @tristratos, #42)"
   ]
 }
