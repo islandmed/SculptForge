@@ -48,6 +48,9 @@ INSIDERS_REPO=islandmed/sculptforge-insiders # members' betas (release.yml publi
 MEMBER_ENV=member-release
 AUTHOR_NAME=islandmed
 AUTHOR_EMAIL=232726012+islandmed@users.noreply.github.com # never a personal address in outside repos
+# The AUR push (step aur) is on once this file exists on the releasing machine (packaging/arch/SUBMIT.md makes it).
+AUR_FLAG=${AUR_FLAG:-$HOME/Work/.sf/aur-publish}
+AUR_REPO=ssh://aur@aur.archlinux.org/sculptforge.git
 OMARCHY_PR=1800
 STEPS=(bump check ci tag release site aur brew omarchy replies status)
 
@@ -336,6 +339,12 @@ preflight() {
     pk=packaging/arch/PKGBUILD
     grep -q '^pkgver=' "$pk" && grep -q '^pkgrel=' "$pk" && grep -Eq "^sha256sums=\('[0-9a-f]{64}'" "$pk" ||
         die "$pk lacks the pkgver=, pkgrel= or sha256sums=('<64 hex>' line that step aur rewrites" "restore them, commit"
+    (cd packaging/arch && makepkg --printsrcinfo 2>/dev/null | cmp -s - .SRCINFO) ||
+        die "packaging/arch/.SRCINFO doesn't match the PKGBUILD (or makepkg is missing)" "(cd packaging/arch && makepkg --printsrcinfo > .SRCINFO), commit"
+    if [ -f "$AUR_FLAG" ]; then
+        GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=15" git ls-remote "$AUR_REPO" >/dev/null 2>&1 ||
+            die "the AUR doesn't accept this machine's SSH key ($AUR_REPO), and $AUR_FLAG turns the AUR push on" "ssh -T aur@aur.archlinux.org to see why (key in My Account on aur.archlinux.org), or remove $AUR_FLAG to skip the AUR"
+    fi
     # brew
     [ -x tools/publish/setup-channels.sh ] || die "tools/publish/setup-channels.sh is missing or not executable" "git checkout origin/main -- tools/publish/setup-channels.sh"
     gh_file islandmed/homebrew-tap Casks/sculptforge.rb | grep '^ *version "' >/dev/null ||
@@ -690,6 +699,7 @@ step_aur() {
     sum=$(tarball_sha)
     if grep -q "^pkgver=$V\$" packaging/arch/PKGBUILD && grep -qF "'$sum'" packaging/arch/PKGBUILD; then
         ok "packaging/arch/PKGBUILD already builds $V ($sum)"
+        aur_push
         return
     fi
     python3 - "$V" "$sum" <<'PY'
@@ -704,10 +714,31 @@ open(p, "w", encoding="utf-8").write(t)
 PY
     grep -q "^pkgver=$V\$" packaging/arch/PKGBUILD && grep -qF "'$sum'" packaging/arch/PKGBUILD ||
         die "couldn't update packaging/arch/PKGBUILD" "set pkgver=$V, pkgrel=1 and the first sha256sums entry to $sum by hand, commit, run again"
-    git add packaging/arch/PKGBUILD
+    (cd packaging/arch && makepkg --printsrcinfo > .SRCINFO) || die "makepkg --printsrcinfo failed" "run it in packaging/arch by hand, commit, run again"
+    git add packaging/arch/PKGBUILD packaging/arch/.SRCINFO
     commit -m "AUR PKGBUILD builds $V"
     push_main
     ok "PKGBUILD at $V, source checksum $sum (computed here)"
+    aur_push
+}
+
+# aur_push: the PKGBUILD and .SRCINFO from main to the AUR, when $AUR_FLAG exists (off until the package is submitted).
+aur_push() {
+    if [ ! -f "$AUR_FLAG" ]; then
+        echo "   AUR push off ($AUR_FLAG absent; packaging/arch/SUBMIT.md publishes the package first)"
+        return
+    fi
+    rm -rf "$work/aur"
+    GIT_SSH_COMMAND="ssh -o BatchMode=yes" git clone -q "$AUR_REPO" "$work/aur" 2>/dev/null ||
+        die "can't clone $AUR_REPO" "ssh -T aur@aur.archlinux.org to check the key, run again"
+    if [ -f "$work/aur/.SRCINFO" ] && grep -qx "$(printf '\tpkgver = %s' "$V")" "$work/aur/.SRCINFO"; then
+        ok "AUR already at $V"; return
+    fi
+    cp packaging/arch/PKGBUILD packaging/arch/.SRCINFO "$work/aur/"
+    (cd "$work/aur" && git add PKGBUILD .SRCINFO && commit -m "sculptforge $V" &&
+        GIT_SSH_COMMAND="ssh -o BatchMode=yes" git push -q origin HEAD:master) ||
+        die "pushing sculptforge $V to the AUR failed" "ssh -T aur@aur.archlinux.org to check the key, run again"
+    ok "AUR at $V"
 }
 
 step_brew() {
