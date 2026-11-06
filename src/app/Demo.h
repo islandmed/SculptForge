@@ -60,6 +60,13 @@ public:
 
     // UI tests (UiTest.cpp). Steps that fail stop the run; failures() lists why.
     bool loadScript(const std::string& path, std::string& error);
+    // A benchmark take (sculptforge --benchmark-script, BenchTake.cpp): the script played in real time in the
+    // interactive loop. Only the steps a person could do in real time load: shots and expectations are skipped with a
+    // warning, steps that run commands or read other files (run, env, drop, choose_file, restart...) are refused.
+    // `stroke` sends its pointer samples at 240 a second (each frame: those since the last), as a tablet does.
+    bool loadTake(const std::string& path, std::string& error);
+    // Called with every pointer position the script sends (after the app has handled it): the take's stroke lag.
+    std::function<void(float x, float y)> pointerHook;
     bool testing() const { return testing_; }
     const std::vector<std::string>& failures() const { return failures_; }
     int stepsRun() const { return int(step_); }
@@ -171,6 +178,7 @@ private:
     ImVec2 viewCenter(const View& v) const;
 
     bool testing_ = false;
+    bool take_ = false; // loadTake: real-time pointer samples, no shots or expectations
     std::vector<std::string> failures_;
     std::string frameText_, shotRequest_, shotDir_, scriptName_, lineText_;
     std::vector<uint8_t> lastShot_;

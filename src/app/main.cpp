@@ -88,6 +88,9 @@ void usage() {
         "  --benchmark core-200m    Research: a 200 million micro triangle head in memory (open, strokes, orbit)\n"
         "  --benchmark core-100m    The same at 100 million micro triangles\n"
         "  --benchmark-file PATH    Open the project PATH, then the same strokes and orbit\n"
+        "  --benchmark-script T.sfui  Play a take (a UI test script's strokes, orbits, keys and waits) in real time\n"
+        "                           with the HUD; writes an MP4 and a per-frame CSV (frame ms, stroke lag) and exits.\n"
+        "                           A project to open goes after it: --benchmark-script take.sfui head.sfproj\n"
         "  --focus-detail FILE      Experimental: open a Focus Detail file (.sfdetail)\n"
         "  --benchmark-sizes 5,20   Proof mode mesh sizes in millions of triangles\n"
         "  --benchmark-out FILE     Where the JSON result goes (default: sculptforge-benchmark-<time>.json here)\n"
@@ -242,6 +245,10 @@ static int runMain(int argc, char** argv) {
         else if (a == "--benchmark-file") { // a project from disk, the scoreboard's strokes (docs/design/perf-scoreboard.md)
             options.benchmark = true;
             options.benchmarkScene = "file:" + next();
+        }
+        else if (a == "--benchmark-script") { // a take in real time (BenchTake.cpp)
+            options.benchmark = true;
+            options.benchmarkScript = next();
         }
         else if (a == "--benchmark-sizes") options.benchmarkSizes = next();
         else if (a == "--benchmark-out") options.benchmarkOut = next();

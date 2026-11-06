@@ -1,0 +1,12 @@
+# A short benchmark take on a sphere (sculptforge --benchmark-script; test bench_take_sphere): two strokes and an
+# orbit, played in real time. The shot and the expectation are skipped (a take checks and shoots nothing).
+run new_sphere subdivisions=5
+camera 0 0
+wait 0.3
+stroke 0.3 0.4 0.7 0.6 1.5
+wait 0.3
+orbit 300 0
+stroke 0.3 0.6 0.7 0.4 1.0
+shot skipped_in_a_take
+expect_value moved > 0
+wait 0.3

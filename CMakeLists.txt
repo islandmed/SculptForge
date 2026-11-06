@@ -446,6 +446,8 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelExtract.cpp
     src/app/PanelTimeline.cpp
     src/app/ProofMode.cpp
+    src/app/BenchVideo.cpp
+    src/app/BenchTake.cpp
     src/app/Tablet.cpp
     src/app/Wintab.cpp
     src/app/SpaceMouse.cpp
@@ -465,14 +467,14 @@ if(SCULPTFORGE_BUILD_APP)
   target_compile_definitions(sculptforge PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}"
                                                  SCULPTFORGE_PRERELEASE="${SCULPTFORGE_PRERELEASE}"
                                                  SF_UPDATE_CHECK=$<BOOL:${SCULPTFORGE_UPDATE_CHECK}>)
-  # The commit a build came from, for proof mode's results (src/app/ProofMode.cpp); taken when CMake configures.
+  # The commit a build came from, for proof mode's results and HUD (src/app/ProofMode.cpp, BenchTake.cpp); taken when CMake configures.
   find_package(Git QUIET)
   if(GIT_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
     execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
                     OUTPUT_VARIABLE SF_GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
   endif()
   if(SF_GIT_COMMIT)
-    set_source_files_properties(src/app/ProofMode.cpp PROPERTIES COMPILE_DEFINITIONS "SF_GIT_COMMIT=\"${SF_GIT_COMMIT}\"")
+    set_source_files_properties(src/app/ProofMode.cpp src/app/BenchTake.cpp PROPERTIES COMPILE_DEFINITIONS "SF_GIT_COMMIT=\"${SF_GIT_COMMIT}\"")
   endif()
   if(MSVC)
     target_compile_options(sculptforge PRIVATE /W4 /utf-8 /permissive-)
@@ -941,6 +943,14 @@ if(SCULPTFORGE_BUILD_TESTS)
     # pointer's circle (#19).
     add_test(NAME ui_stroke_path COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
     set_tests_properties(ui_stroke_path PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
+    # A benchmark take (--benchmark-script, src/app/BenchTake.cpp) on a sphere: played in real time, a CSV row per
+    # frame with the strokes' lag, and a video as long as the take (within 5%).
+    if(Python3_Interpreter_FOUND)
+      add_test(NAME bench_take_sphere COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/takes/check_take.py
+                                            $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_SOURCE_DIR}/tests/takes/sphere.sfui
+                                            ${CMAKE_CURRENT_BINARY_DIR}/bench-take --min-seconds 5)
+      set_tests_properties(bench_take_sphere PROPERTIES LABELS ui TIMEOUT 240 RUN_SERIAL TRUE)
+    endif()
     # Background dabs (a heavy mesh's stroke on the solver thread, no preview), forced on a light sphere: replaying
     # the stroke in the frame loop gives the same mesh, bit for bit, and its undo the mesh it started from.
     add_test(NAME ui_stroke_background COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)

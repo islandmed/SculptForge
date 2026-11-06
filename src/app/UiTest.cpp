@@ -2141,6 +2141,17 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             at += scriptDir_.size();
         }
         if (!parseScript(text, statements, error)) return false;
+        if (take_) { // a take: only commands that set up the scene (no files, no jobs that aren't the take's own)
+            static const std::set<std::string> setup = {
+                "new_sphere", "new_plane", "new_head", "new_bench_sphere", "new_starter_mesh", "ui_look", "subdivide",
+                "subdiv_divide", "subdiv_level", "dyntopo", "set_color", "set_material", "set_shading", "viewport_shading",
+                "mask_clear", "mask_rect", "part_select", "part_visibility", "transform", "layer_set_weight", "undo", "redo"};
+            for (const auto& st : statements)
+                if (!setup.count(st.command)) {
+                    error = "'run " + st.command + "' can't be used in a benchmark take (only the scene's set-up commands)";
+                    return false;
+                }
+        }
         // A command that works on a worker (uv_auto: App::commandRunning) holds the script, frames still drawing,
         // until its result is in, like the console and an AI tool wait for it.
         auto next = std::make_shared<size_t>(0);
@@ -2977,6 +2988,11 @@ void Demo::testKeyNow(SDL_Keycode key, SDL_Keymod mods) {
     app_.handleEvent(e);
 }
 
+bool Demo::loadTake(const std::string& path, std::string& error) {
+    take_ = true;
+    return loadScript(path, error);
+}
+
 bool Demo::loadScript(const std::string& path, std::string& error) {
     std::ifstream f(std::filesystem::path(std::u8string(path.begin(), path.end())));
     if (!f) {
@@ -3008,6 +3024,27 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
         auto words = splitWords(line);
         if (words.empty()) continue;
         lineText_ = line;
+        if (take_) { // a benchmark take: only what a person does in real time
+            const std::string& verb = words[0];
+            static const std::set<std::string> skipped = {"shot", "snapshot", "remember", "print", "dump_shortcuts"};
+            if (skipped.count(verb) || verb.rfind("expect", 0) == 0) {
+                SDL_Log("%s:%d: '%s' skipped (a take checks and shoots nothing)", scriptName_.c_str(), n, verb.c_str());
+                continue;
+            }
+            static const std::set<std::string> allowed = {
+                "click", "double_click", "right_click", "hover", "hover_model", "hover_window", "type", "key", "key_down",
+                "key_up", "hold", "stroke", "view_drag", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
+                "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
+                "drag_item", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "look",
+                "run", "wait", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
+                "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "wheel", "mouse_move",
+                "touch_stroke", "touch_pinch", "classic_keys", "input_style"};
+            if (!allowed.count(verb)) {
+                error = scriptName_ + ":" + std::to_string(n) + ": '" + verb +
+                        "' can't be used in a benchmark take (only input, the camera and waits play in real time)";
+                return false;
+            }
+        }
         std::string err;
         if (!parseStep(n, words, err)) {
             error = scriptName_ + ":" + std::to_string(n) + ": " + err;

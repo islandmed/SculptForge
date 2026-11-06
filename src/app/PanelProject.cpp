@@ -165,7 +165,8 @@ void App::initProject() {
 #if SF_UPDATE_CHECK
     const int64_t now = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     applyUpdatePolicy();
-    if (checkUpdates_ && options_.uiTest.empty() && !std::getenv("SF_NO_UPDATE_CHECK") && updateCheckDue(updateCheckedAt_, now))
+    if (checkUpdates_ && options_.uiTest.empty() && options_.benchmarkScript.empty() && // (a take: local only)
+        !std::getenv("SF_NO_UPDATE_CHECK") && updateCheckDue(updateCheckedAt_, now))
         startUpdateCheck(false);
 #endif
 

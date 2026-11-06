@@ -116,6 +116,9 @@ struct AppOptions {
     std::string benchmarkSizes, benchmarkOut, benchmarkVideo;
     bool benchmarkNoVideo = false, benchmarkVsync = false;
     float benchmarkStrokeSeconds = 6.0f;
+    // --benchmark-script take.sfui: the take (a UI test script's input) played in real time with the benchmark HUD,
+    // video and a per-frame CSV (BenchTake.cpp); benchmark is set too (isolated settings, --size 1920x1080).
+    std::string benchmarkScript;
 };
 
 class Demo;
@@ -2461,6 +2464,14 @@ private:
     bool proofRunning() const;                // a benchmark is measuring (not its intro or results): every frame is wanted
     void proofBeforeSwap(int fbW, int fbH);   // the interactive loop, after drawing a frame, before showing it
     void drawProofUi();
+    // sculptforge --benchmark-script (BenchTake.cpp): a .sfui take played in real time, timed, filmed.
+    std::shared_ptr<struct TakeState> take_;
+    int takeExitCode_ = 0;
+    bool startTake();                       // false: the take didn't load (refused steps); the reason is logged
+    bool takeRunning() const;               // the take is playing: every frame is wanted, the real pointer kept out
+    void takeBeforeFrame();                 // before the UI is built: the script's next input, at the wall clock's pace
+    void takeBeforeSwap(int fbW, int fbH);  // after drawing, before showing: timing, lag, video; the end
+    void drawTakeHud();                     // from drawUi: the HUD and the script's pointer
     // ---- end Sculpt Timeline ----
 };
 

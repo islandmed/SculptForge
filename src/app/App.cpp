@@ -274,7 +274,7 @@ bool App::init(const AppOptions& options) {
     uiScale_ = targetUiScale(); // the style follows in applyLook below
     buildUiFonts(uiScale_);
     timer.step("ImGui, settings, fonts");
-    if (recording) {
+    if (recording || !options.benchmarkScript.empty()) { // (a benchmark take: the same scripts)
         ImGui::GetCurrentContext()->TestEngineHookItems = true; // lets the demo find buttons by label
         io.IniFilename = nullptr;                               // fixed, reproducible layout
     }
@@ -818,7 +818,7 @@ bool App::focusKeepsDrawing(double now) const {
 bool App::wantsFrames(double now) const {
     return now < activeUntil_ || focusKeepsDrawing(now) || drag_ != Drag::None || ui::HoverAnimating() || // a hover ring easing in or out
            doc_.sculptor.strokeActive() ||
-           proofRunning() || // (not a keep-alive from the last frame: building a scene takes longer than any timeout)
+           proofRunning() || takeRunning() || // (not a keep-alive from the last frame: building a scene takes longer than any timeout)
            !dabQueue_.empty() || // a stroke's dabs still waiting (drainStrokeDabs) are placed a few each frame
            strokeFinishing_ || solverBusy() || // the solver thread is placing a stroke's dabs (AsyncStroke.cpp)
            backgroundBusy() || playingLayer_ >= 0 || faceTakePlaying_ ||
@@ -841,7 +841,9 @@ int App::run() {
     if (!options_.renderPath.empty()) return renderHeadless();
     if (!options_.recordPath.empty() || !options_.uiTest.empty()) return runRecording();
     if (!options_.timelapsePath.empty()) return runTimelapseCli(); // (PanelTimeline.cpp)
-    if (options_.benchmark) startProofMode();                     // runs in this loop (ProofMode.cpp)
+    if (!options_.benchmarkScript.empty()) { // a take, in real time in this loop (BenchTake.cpp)
+        if (!startTake()) return 1;
+    } else if (options_.benchmark) startProofMode(); // runs in this loop (ProofMode.cpp)
     if (g_wakeEvent == 0) g_wakeEvent = SDL_RegisterEvents(1);
     // Dabs are queued and placed within a time budget each frame (strokeTo). SF_STROKE_IMMEDIATE=1 places them all
     // as each pointer sample arrives, as before 0.9.6 (for comparison).
@@ -945,9 +947,9 @@ int App::run() {
         // Input keeps the frames coming a little while (hover highlights, tooltips after their delay); other
         // events (the window shown, moved, focused) need a frame or two.
         const auto onEvent = [&](const SDL_Event& ev) {
-            if (strokeProbe_ && ((ev.type >= SDL_EVENT_MOUSE_MOTION && ev.type <= SDL_EVENT_MOUSE_WHEEL) ||
-                                 (ev.type >= SDL_EVENT_PEN_PROXIMITY_IN && ev.type <= SDL_EVENT_PEN_AXIS)))
-                return; // --measure-stroke: the real pointer stays out of the scripted stroke
+            if ((strokeProbe_ || takeRunning()) && ((ev.type >= SDL_EVENT_MOUSE_MOTION && ev.type <= SDL_EVENT_MOUSE_WHEEL) ||
+                                                    (ev.type >= SDL_EVENT_PEN_PROXIMITY_IN && ev.type <= SDL_EVENT_PEN_AXIS)))
+                return; // --measure-stroke, a take: the real pointer stays out of the scripted stroke
             handleEvent(ev);
             if (ev.type == SDL_EVENT_KEYMAP_CHANGED || ev.type == SDL_EVENT_KEYBOARD_ADDED ||
                 ev.type == SDL_EVENT_KEYBOARD_REMOVED || ev.type == SDL_EVENT_MOUSE_ADDED ||
@@ -991,6 +993,7 @@ int App::run() {
         phases = 0;
         mark();
         while (SDL_PollEvent(&e)) onEvent(e);
+        if (take_) takeBeforeFrame(); // a take's input since the last frame, at the wall clock's pace
         mark();
         // (The window must have settled too: a window manager that maximises it late, on a busy machine, changes
         // the canvas and with it the brush's size in the world mid-stroke.)
@@ -1225,6 +1228,7 @@ int App::run() {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         hardwareProfileFrameEnd();
         if (proof_) proofBeforeSwap(fbW, fbH); // Help > Benchmark: timing, video capture, the scripted pointer
+        if (take_) takeBeforeSwap(fbW, fbH);   // --benchmark-script: the same for a take
         SDL_GL_SwapWindow(window_);
         mark();
         if (phases == 7) // (Help > Benchmark splits each phase's frames by these)
@@ -1277,6 +1281,7 @@ int App::run() {
                     int(drag_ != Drag::None), int(backgroundBusy()), int(perf_.framesStill < 10));
     }
     finishProject();
+    if (take_) return takeExitCode_;
     return options_.benchmark && proofSkippedScenes() ? 2 : 0; // (--benchmark: a scene skipped for memory)
 }
 
