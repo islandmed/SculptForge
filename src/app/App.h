@@ -1518,6 +1518,8 @@ private:
     bool lookDirty_ = false;   // uiPrefs_.look or the layout changed: applied at the start of the next shell
     CanvasRect focusRect_;     // the tile under the pointer (tiled looks highlight its border)
     float menuX_ = 0.0f;       // where the open task menu drops from
+    ImVec4 menuRect_{};        // the open task menu's rect last frame, and how often it changed while open (UI tests)
+    int menuRectChanges_ = 0;
     std::map<std::string, std::string> menuSection_; // each task menu's last section (palette id)
     void drawShelf(int shelf, const CanvasRect& rect);
     void drawShelfItem(int shelf, int index, const std::string& item, bool vertical);
