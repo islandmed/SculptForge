@@ -13,7 +13,7 @@ tagline: Folders for your Parts, a Line Gradient for paint, and Auto UV that nev
 highlight: Folders in Tool > Parts: drag Parts in, fold, hide and move them together (thanks @ebarranco, #96)
 highlight: Line Gradient: drag a colour ramp across the model (thanks @Devon0209, #99)
 highlight: Auto UV runs in the background and can be cancelled
-highlight: Your input style's shortcuts work right after a restart (thanks @Velisariy, #147)
+highlight: Paint colour stays visible while you orbit or paint dense models
 highlight: Hyper3D Rodin, direct: generate a model from an image or a description with your own Hyper3D key (thanks @ElgoogUdiab, #123)
 ```
 
