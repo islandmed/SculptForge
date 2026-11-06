@@ -1020,7 +1020,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     ImGui::SameLine(0.0f, 6.0f * s);
     ImGui::SetCursorPosY(textY);
     if (fontBold_) ImGui::PushFont(fontBold_);
-    ImGui::TextUnformatted("SculptForge");
+    ImGui::TextUnformatted(tr("SculptForge"));
     if (fontBold_) ImGui::PopFont();
 
     // Document name; click saves.
@@ -2445,7 +2445,7 @@ void App::drawDynamicOffer() {
                 ImGui::Text(tr("Delete SDiv %d to %d and the detail sculpted on them?"), current + 2, levels);
             ImGui::TextDisabled("%s", tr("Ctrl+Z brings them back."));
             ImGui::Spacing();
-            if (ImGui::Button(tr(lower ? "Delete Lower Levels" : "Delete Higher Levels"))) {
+            if (ImGui::Button(tr(tr(lower ? "Delete Lower Levels" : "Delete Higher Levels")))) {
                 ImGui::CloseCurrentPopup();
                 runCommand(pendingLevelDelete_);
                 pendingLevelDelete_.clear();

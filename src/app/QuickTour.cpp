@@ -145,11 +145,11 @@ void App::drawQuickTour() {
                                        ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
         if (ImGui::Begin("##quicktour_offer", nullptr, flags)) {
             ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted("New to SculptForge? A two-minute tour shows where everything is.");
+            ImGui::TextUnformatted(tr("New to SculptForge? A two-minute tour shows where everything is."));
             ImGui::SameLine();
-            if (ImGui::SmallButton("Take the tour##quicktour.offer")) showQuickTour(0);
+            if (ImGui::SmallButton(tr("Take the tour##quicktour.offer"))) showQuickTour(0);
             ImGui::SameLine();
-            if (ImGui::SmallButton("No thanks##quicktour.offer")) {
+            if (ImGui::SmallButton(tr("No thanks##quicktour.offer"))) {
                 quickTourOffer_ = false;
                 quickTourDone_ = true;
                 saveProjectPrefs();
@@ -171,16 +171,16 @@ void App::drawQuickTour() {
                                        ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
         if (ImGui::Begin("##quicktour_aside", nullptr, flags)) {
             ImGui::AlignTextToFramePadding();
-            ImGui::Text("Quick tour %d / %d: %s", i + 1, kSlideCount, slide.title);
+            ImGui::Text(tr("Quick tour %d / %d: %s"), i + 1, kSlideCount, slide.title);
             ImGui::SameLine();
-            if (ImGui::SmallButton("Back to the tour##quicktour")) quickTourAside_ = false;
+            if (ImGui::SmallButton(tr("Back to the tour##quicktour"))) quickTourAside_ = false;
             ImGui::SameLine();
-            if (ImGui::SmallButton("Next##quicktour.aside")) {
+            if (ImGui::SmallButton(tr("Next##quicktour.aside"))) {
                 quickTourSlide_ = std::min(i + 1, kSlideCount - 1);
                 quickTourAside_ = false;
             }
             ImGui::SameLine();
-            if (ImGui::SmallButton("Close##quicktour.aside")) closeQuickTour();
+            if (ImGui::SmallButton(tr("Close##quicktour.aside"))) closeQuickTour();
         }
         ImGui::End();
         return;
@@ -192,7 +192,7 @@ void App::drawQuickTour() {
     ImGui::SetNextWindowSize(ImVec2(w, 0.0f), ImGuiCond_Always);
     bool open = true;
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize;
-    if (ImGui::Begin("New to SculptForge? A quick tour##quicktour", &open, flags)) {
+    if (ImGui::Begin(tr("New to SculptForge? A quick tour##quicktour"), &open, flags)) {
         // The picture: a screenshot of the part of SculptForge the slide is about, in a band of one height.
         const float iw = ImGui::GetContentRegionAvail().x, band = std::floor(std::min(iw * 0.577f, 360.0f * s));
         const ImVec2 at = ImGui::GetCursorScreenPos();
@@ -226,16 +226,16 @@ void App::drawQuickTour() {
         const ImVec4 accent = ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive);
         if (last) {
             ImGui::PushStyleColor(ImGuiCol_Button, accent);
-            if (ImGui::Button(ICON_LC_HEART "  See memberships##quicktour")) openSupportPage();
+            if (ImGui::Button(tr(ICON_LC_HEART "  See memberships##quicktour"))) openSupportPage();
             ImGui::PopStyleColor();
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Opens sculptforge.app/support.html in your browser.");
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Opens sculptforge.app/support.html in your browser."));
             ImGui::SameLine();
-            if (ImGui::Button("Maybe later##quicktour")) closeQuickTour(); // and it never comes back by itself
+            if (ImGui::Button(tr("Maybe later##quicktour"))) closeQuickTour(); // and it never comes back by itself
         } else if (slide.action) {
             ImGui::PushStyleColor(ImGuiCol_Button, accent);
-            if (ImGui::Button(ICON_LC_EYE "  Show me##quicktour")) quickTourShowMe(i);
+            if (ImGui::Button(tr(ICON_LC_EYE "  Show me##quicktour"))) quickTourShowMe(i);
             ImGui::PopStyleColor();
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Opens it in SculptForge; the tour waits at the bottom.");
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Opens it in SculptForge; the tour waits at the bottom."));
         }
         // Back and Next at the right.
         const ImGuiStyle& st = ImGui::GetStyle();
@@ -244,7 +244,7 @@ void App::drawQuickTour() {
                          st.ItemSpacing.x;
         ImGui::SameLine(std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - bw));
         ImGui::BeginDisabled(i == 0);
-        if (ImGui::Button("Back##quicktour")) quickTourSlide_ = i - 1;
+        if (ImGui::Button(tr("Back##quicktour"))) quickTourSlide_ = i - 1;
         ImGui::EndDisabled();
         ImGui::SameLine();
         if (ImGui::Button(next)) {

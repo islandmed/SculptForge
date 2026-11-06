@@ -263,17 +263,17 @@ void App::drawKelvinletSection() {
     ui::SliderInside("##clonespacing", &k.cloneSpacing, 0.25f, 3.0f, "Clone Spacing %.2f");
     ui::HelpText("Clone Spacing", nullptr,
                  "Detail Clone: the distance between stamps along the stroke, in stamp widths (1 = edge to edge).", help);
-    ImGui::Checkbox("Clone follows stroke", &k.cloneFollowStroke);
+    ImGui::Checkbox(tr("Clone follows stroke"), &k.cloneFollowStroke);
     ui::HelpText("Clone follows stroke", nullptr,
                  "Detail Clone: each stamp's top turns with the stroke (a row of scales or rivets along a curve); off, "
                  "every stamp keeps the screen's up.",
                  help);
     ImGui::Dummy(ImVec2(0, 2.0f * uiScale_));
     ui::ActionButton(*this, "brush.capture_view", ImVec2(ImGui::GetContentRegionAvail().x, 0));
-    hint("KelvinGrab moves like Move with elastic, volume-keeping falloff. KelvinTwist and KelvinScale act where you "
+    hint(tr("KelvinGrab moves like Move with elastic, volume-keeping falloff. KelvinTwist and KelvinScale act where you "
          "press: drag right to turn clockwise or swell, left to turn back or pinch. KelvinSnake pulls tapering horns. "
          "Detail Clone stamps the VDM brush's map along the stroke: capture one from the model with Capture from "
-         "view.");
+         "view."));
 }
 
 void App::registerKelvinletActions() {
@@ -413,7 +413,7 @@ void App::drawCaptureWindow() {
     ImGui::SetNextWindowSize(ImVec2(340.0f * s, 0.0f), ImGuiCond_Appearing);
     const CanvasRect cr = canvasRect();
     ImGui::SetNextWindowPos(ImVec2(cr.x + cr.w - 360.0f * s, cr.y + 60.0f * s), ImGuiCond_Appearing);
-    if (!ImGui::Begin("Capture from view##capture", &capture_.open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (!ImGui::Begin(tr("Capture from view##capture"), &capture_.open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::End();
         return;
     }
@@ -428,12 +428,12 @@ void App::drawCaptureWindow() {
         ImGui::TextDisabled("%s", label);
         ImGui::EndGroup();
     };
-    preview(capture_.alpha.empty() ? ImTextureID(0) : thumbs_.alpha(capture_.alpha), "Height alpha");
+    preview(capture_.alpha.empty() ? ImTextureID(0) : thumbs_.alpha(capture_.alpha), tr("Height alpha"));
     ImGui::SameLine();
-    preview(capture_.vdm ? thumbs_.vdm(capture_.vdm) : ImTextureID(0), "Vector displacement");
+    preview(capture_.vdm ? thumbs_.vdm(capture_.vdm) : ImTextureID(0), tr("Vector displacement"));
     if (!capture_.error.empty()) ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.4f, 1.0f), "%s", capture_.error.c_str());
     else
-        ImGui::TextDisabled("%zu points, height %.3g, reach %.2f radii", capture_.vdmInfo.vertices,
+        ImGui::TextDisabled(tr("%zu points, height %.3g, reach %.2f radii"), capture_.vdmInfo.vertices,
                             capture_.alphaInfo.depthRange, capture_.vdmInfo.maxOffset);
 
     bool again = false;
@@ -461,16 +461,16 @@ void App::drawCaptureWindow() {
     if (ImGui::SliderInt("##capres", &ri, 0, 3, (std::to_string(kRes[ri]) + " px").c_str())) o.resolution = kRes[ri];
     again |= ImGui::IsItemDeactivatedAfterEdit();
     ui::HelpText("Resolution", nullptr, "Pixels a side of the alpha and the map (512 or less suits most details).", help);
-    again |= ImGui::Checkbox("Fit plane", &o.fitPlane);
+    again |= ImGui::Checkbox(tr("Fit plane"), &o.fitPlane);
     ui::HelpText("Fit plane", nullptr,
                  "Height alpha: measure from a plane fitted to the surface (a tilted surface captures level) instead of "
                  "the screen's plane.",
                  help);
     ImGui::SameLine();
-    again |= ImGui::Checkbox("Invert##capture", &o.invert);
+    again |= ImGui::Checkbox(tr("Invert##capture"), &o.invert);
     ui::HelpText("Invert", nullptr, "Height alpha: white = deepest (for carving brushes).", help);
     ImGui::SetNextItemWidth(-1);
-    if (ImGui::InputTextWithHint("##capname", "Name", capture_.name, sizeof capture_.name)) {
+    if (ImGui::InputTextWithHint("##capname", tr("Name"), capture_.name, sizeof capture_.name)) {
         if (!capture_.alpha.empty()) capture_.alpha.name = capture_.name;
     }
     ui::HelpText("Name", nullptr, "What the alpha and the VDM are called in your library (the same name replaces).", help);
@@ -493,7 +493,7 @@ void App::drawCaptureWindow() {
     };
     const float w2 = std::floor((ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f);
     ImGui::BeginDisabled(!ok);
-    if (ImGui::Button("Use as Alpha##capture", ImVec2(w2, 0))) {
+    if (ImGui::Button(tr("Use as Alpha##capture"), ImVec2(w2, 0))) {
         Args a = args();
         a["fit_plane"] = o.fitPlane;
         a["invert"] = o.invert;
@@ -501,7 +501,7 @@ void App::drawCaptureWindow() {
     }
     ui::HelpText("Use as Alpha", nullptr, "Make the height capture the brush alpha (it shapes every brush's stamp).", help);
     ImGui::SameLine();
-    if (ImGui::Button("Use as VDM##capture", ImVec2(w2, 0))) {
+    if (ImGui::Button(tr("Use as VDM##capture"), ImVec2(w2, 0))) {
         Args a = args();
         a["save"] = false;
         runCommand("capture_vdm", a);
@@ -510,7 +510,7 @@ void App::drawCaptureWindow() {
         paintMode_ = false;
     }
     ui::HelpText("Use as VDM", nullptr, "Make the capture the VDM brush's map and pick the VDM brush (Drag Stamp stamps it).", help);
-    if (ImGui::Button("Detail Clone##capture", ImVec2(w2, 0))) {
+    if (ImGui::Button(tr("Detail Clone##capture"), ImVec2(w2, 0))) {
         Args a = args();
         a["save"] = false;
         runCommand("capture_vdm", a);
@@ -520,7 +520,7 @@ void App::drawCaptureWindow() {
     }
     ui::HelpText("Detail Clone", nullptr, "Paint copies of the captured detail along your strokes, each turned to follow the stroke.", help);
     ImGui::SameLine();
-    if (ImGui::Button("Save to Library##capture", ImVec2(w2, 0))) {
+    if (ImGui::Button(tr("Save to Library##capture"), ImVec2(w2, 0))) {
         // The VDM into the brush library, the alpha into the Library's Alphas folder.
         Args a = args();
         a["save"] = true;
@@ -542,7 +542,7 @@ void App::drawCaptureWindow() {
                  "picker, Brush > Vector Displacement and the Library's Brush tab), with thumbnails.",
                  help);
     ImGui::EndDisabled();
-    if (ImGui::Button("Capture again##capture", ImVec2(-1, 0))) {
+    if (ImGui::Button(tr("Capture again##capture"), ImVec2(-1, 0))) {
         capture_.armed = true;
         status_ = "Capture: drag a square over the model (Shift: circle)";
     }

@@ -299,17 +299,18 @@ void App::drawTextureMapContents() {
 
     // Status line: UVs, texture size, where paint goes.
     if (autoUv_) {
-        ImGui::ProgressBar(autoUv_->progress->load(), ImVec2(half, 0), "Unwrapping...");
+        ImGui::ProgressBar(autoUv_->progress->load(), ImVec2(half, 0), tr("Unwrapping..."));
         ui::HelpText("Auto UV", nullptr, "Unwrapping the Part in the background; you can keep working.", kPath);
         ImGui::SameLine();
         if (ImGui::Button(tr("Cancel##autouv"), ImVec2(-1, 0))) autoUv_->cancel->store(true);
     } else if (!m.hasUvs()) {
-        ImGui::TextDisabled("No UVs: Auto UV makes them");
+        ImGui::TextDisabled(tr("No UVs: Auto UV makes them"));
     } else if (!hasTexture(m)) {
-        ImGui::TextDisabled("UVs, no texture yet");
+        ImGui::TextDisabled(tr("UVs, no texture yet"));
     } else {
         const PaintTexture& t = *m.texture;
-        ImGui::TextDisabled("%dx%d texture, %d layer%s", t.width, t.height, int(t.layers.size()) + 1, t.layers.empty() ? "" : "s");
+        ImGui::TextDisabled(tr(t.layers.empty() ? "%dx%d texture, %d layer" : "%dx%d texture, %d layers"), t.width, t.height,
+                            int(t.layers.size()) + 1);
     }
 
     ui::ActionButton(*this, "texture.auto_uv", ImVec2(half, 0));
@@ -328,7 +329,7 @@ void App::drawTextureMapContents() {
 
     if (hasTexture(m)) {
         ImGui::AlignTextToFramePadding();
-        ImGui::TextDisabled("Paint into");
+        ImGui::TextDisabled(tr("Paint into"));
         ImGui::SameLine();
         ui::Segmented(*this, {"draw.paint_vertex", "draw.paint_texture"});
     }
@@ -341,7 +342,7 @@ void App::drawTextureMapContents() {
     ui::ActionButton(*this, "texture.delete", ImVec2(half, 0));
     if (hasTexture(m)) {
         ImGui::SameLine();
-        ImGui::Checkbox("Show texture", &renderSettings_.showTexture);
+        ImGui::Checkbox(tr("Show texture"), &renderSettings_.showTexture);
         ui::HelpAction(*this, "view.texture");
     }
 

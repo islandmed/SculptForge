@@ -485,12 +485,12 @@ void App::drawSupportCard() {
         const ImVec2 c0(b.x - pad - ls.x - 44.0f * k, fy - 19.0f * k);
         const auto [hot, hit] = pill(label, "Not now##card.later", c0, 0.0f);
         later = hit;
-        if (hot) ImGui::SetTooltip("Nothing about memberships for a week.");
+        if (hot) ImGui::SetTooltip(tr("Nothing about memberships for a week."));
         const char* already = "I'm already a member";
         const ImVec2 as = paint.measure(bodyFont, 15.0f, already);
         supporter = link(already, "I'm already a member##card.supporter_already",
                          ImVec2(c0.x - 24.0f * k - as.x, std::floor(fy - as.y * 0.5f)), dim, false);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Sign in with GitHub (the member builds' sign-in): no more cards.");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Sign in with GitHub (the member builds' sign-in): no more cards."));
     }
 
     // Esc, or a click outside the card: closed (the small card may follow in a week).
@@ -522,13 +522,13 @@ void App::drawSupportPrefs() {
     } else {
         ImGui::TextWrapped("%s", "A small membership card shows at most once a week, at a good moment (never mid-stroke), "
                                  "until you become a member.");
-        if (ImGui::Button("I'm already a member##prefs.member_verify", ImVec2(-1, 0))) verifyMember();
+        if (ImGui::Button(tr("I'm already a member##prefs.member_verify"), ImVec2(-1, 0))) verifyMember();
         ui::HelpText("I'm already a member", nullptr,
                      "Signs in with GitHub, as member builds do (Preferences > Updates): no more membership cards, "
                      "and the member builds are on.",
                      "Preferences > Support");
     }
-    if (ImGui::Button("Show the memberships", ImVec2(-1, 0))) showSupportCard(SupportCardReason::Manual);
+    if (ImGui::Button(tr("Show the memberships"), ImVec2(-1, 0))) showSupportCard(SupportCardReason::Manual);
 }
 
 // --- The small card at good moments ---
@@ -634,22 +634,22 @@ void App::drawMemberCard() {
             const FoundingMembers& founding = foundingMembers();
             if (founding.open()) {
                 ImGui::PushStyleColor(ImGuiCol_Text, theme::accentHover);
-                ImGui::TextWrapped("The first %d members are Founding Members: a badge, their name in the credits and "
-                                   "their price locked for good.", founding.limit);
+                ImGui::TextWrapped(tr("The first %d members are Founding Members: a badge, their name in the credits and "
+                                   "their price locked for good."), founding.limit);
                 ImGui::PopStyleColor();
             }
             ImGui::Spacing();
             ImGui::PushStyleColor(ImGuiCol_Button, theme::accent);
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::accentHover);
             ImGui::PushStyleColor(ImGuiCol_Text, theme::textOnAccent);
-            const bool become = ImGui::Button("Become a member##member_card.become");
+            const bool become = ImGui::Button(tr("Become a member##member_card.become"));
             ImGui::PopStyleColor(3);
             ImGui::SameLine();
-            const bool notNow = ImGui::Button("Not now##member_card.not_now");
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Nothing about memberships for a week.");
+            const bool notNow = ImGui::Button(tr("Not now##member_card.not_now"));
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Nothing about memberships for a week."));
             ImGui::SameLine();
-            const bool already = ImGui::Button("I'm already a member##member_card.already");
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Sign in with GitHub (the member builds' sign-in): no more cards.");
+            const bool already = ImGui::Button(tr("I'm already a member##member_card.already"));
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Sign in with GitHub (the member builds' sign-in): no more cards."));
             if (become) {
                 openSupportPage(); // both choices (monthly, yearly) on the membership page
                 memberCardChoice(MemberCardChoice::Become);

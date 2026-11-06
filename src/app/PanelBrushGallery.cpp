@@ -193,7 +193,7 @@ void App::drawBrushGallery() {
     ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSizeConstraints(ImVec2(360 * scale, 300 * scale), ImVec2(FLT_MAX, FLT_MAX));
     ImGui::SetNextWindowBgAlpha(1.0f); // a browsing window: nothing behind it should show through
-    if (!ImGui::Begin("Community brushes", &showBrushGallery_, ImGuiWindowFlags_NoCollapse)) {
+    if (!ImGui::Begin(tr("Community brushes"), &showBrushGallery_, ImGuiWindowFlags_NoCollapse)) {
         ImGui::End();
         return;
     }
@@ -205,7 +205,7 @@ void App::drawBrushGallery() {
     const float spacing = ImGui::GetStyle().ItemSpacing.x;
     ImGui::SetNextItemWidth(std::max(80.0f, ImGui::GetContentRegionAvail().x - tagW - refreshW - shareW - 3 * spacing));
     ImGui::SetNextItemAllowOverlap();
-    ImGui::InputTextWithHint("##gallerysearch", "Search brushes (scales, skin, stone...)", g.search, sizeof g.search);
+    ImGui::InputTextWithHint("##gallerysearch", tr("Search brushes (scales, skin, stone...)"), g.search, sizeof g.search);
     if (g.search[0]) { // a clear button inside the field's right end
         const ImVec2 end = ImGui::GetItemRectMax(), start = ImGui::GetItemRectMin();
         const float h = end.y - start.y;
@@ -213,50 +213,50 @@ void App::drawBrushGallery() {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
         if (ImGui::Button("x##clearsearch", ImVec2(h, h))) g.search[0] = '\0';
         ImGui::PopStyleColor();
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Clear the search");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Clear the search"));
     } // SameLine below continues after the field (the button ends where it does)
     ImGui::SameLine();
     ImGui::SetNextItemWidth(tagW);
-    if (ImGui::BeginCombo("##gallerytag", g.tag.empty() ? "All tags" : g.tag.c_str())) {
-        if (ImGui::Selectable("All tags", g.tag.empty())) g.tag.clear();
+    if (ImGui::BeginCombo("##gallerytag", tr(g.tag.empty() ? "All tags" : g.tag.c_str()))) {
+        if (ImGui::Selectable(tr("All tags"), g.tag.empty())) g.tag.clear();
         for (const auto& t : g.tags)
             if (ImGui::Selectable(t.c_str(), g.tag == t)) g.tag = t;
         ImGui::EndCombo();
     }
     ImGui::SameLine();
     ImGui::BeginDisabled(running(g.pendingIndex));
-    if (ImGui::Button("Refresh")) refreshBrushGallery();
+    if (ImGui::Button(tr("Refresh"))) refreshBrushGallery();
     ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::Button("Share yours")) {
+    if (ImGui::Button(tr("Share yours"))) {
         if (interactive()) SDL_OpenURL(kBrushGalleryShareUrl);
         status_ = std::string("Share a brush: ") + kBrushGalleryShareUrl;
     }
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Save your brush from Brush Lab, then open a pull request on the gallery.\nOpens %s",
+        ImGui::SetTooltip(tr("Save your brush from Brush Lab, then open a pull request on the gallery.\nOpens %s"),
                           kBrushGalleryShareUrl);
 
     // State line: loading, offline, error.
     const ImVec4 warnColor(0.95f, 0.70f, 0.30f, 1.0f), errorColor(1.0f, 0.45f, 0.40f, 1.0f);
     if (running(g.pendingIndex) && !g.loaded) {
-        hint("Loading the brush gallery...");
+        hint(tr("Loading the brush gallery..."));
     } else if (!g.error.empty() && !g.loaded) {
         ImGui::Spacing();
         ImGui::PushStyleColor(ImGuiCol_Text, errorColor);
-        ImGui::TextWrapped("Can't reach the brush gallery: %s", g.error.c_str());
+        ImGui::TextWrapped(tr("Can't reach the brush gallery: %s"), g.error.c_str());
         ImGui::PopStyleColor();
-        hint(galleryLocalPath(g.location).empty()
+        hint(tr(galleryLocalPath(g.location).empty()
                  ? "Check your internet connection and try again. Brushes you already installed keep working."
-                 : "Check that the gallery folder exists and has an index.json. Brushes you already installed keep working.");
-        if (ImGui::Button("Try again")) refreshBrushGallery();
+                 : "Check that the gallery folder exists and has an index.json. Brushes you already installed keep working."));
+        if (ImGui::Button(tr("Try again"))) refreshBrushGallery();
     } else if (g.loaded) {
         if (g.offline) {
             ImGui::PushStyleColor(ImGuiCol_Text, warnColor);
-            ImGui::TextWrapped("Offline - showing the gallery from your last visit (%s).", g.offlineReason.c_str());
+            ImGui::TextWrapped(tr("Offline - showing the gallery from your last visit (%s)."), g.offlineReason.c_str());
             ImGui::PopStyleColor();
         } else if (!g.error.empty()) {
             ImGui::PushStyleColor(ImGuiCol_Text, errorColor);
-            ImGui::TextWrapped("Refresh failed: %s", g.error.c_str());
+            ImGui::TextWrapped(tr("Refresh failed: %s"), g.error.c_str());
             ImGui::PopStyleColor();
         }
         if (!g.installError.empty()) {
@@ -279,7 +279,7 @@ void App::drawBrushGallery() {
 
     const float footer = ImGui::GetFrameHeightWithSpacing() + ImGui::GetTextLineHeightWithSpacing();
     if (ImGui::BeginChild("##gallerygrid", ImVec2(0, -footer), ImGuiChildFlags_None)) {
-        if (g.loaded && shown.empty()) hint(g.index.brushes.empty() ? "The gallery is empty." : "No brushes match your search.");
+        if (g.loaded && shown.empty()) hint(tr(g.index.brushes.empty() ? "The gallery is empty." : "No brushes match your search."));
         const float avail = ImGui::GetContentRegionAvail().x;
         const float minCard = 190 * scale;
         const int columns = std::max(1, int((avail + spacing) / (minCard + spacing)));
@@ -371,18 +371,18 @@ void App::drawBrushGallery() {
         std::snprintf(g.sourceEdit, sizeof g.sourceEdit, "%s", ai::brushGallerySetting().c_str());
         g.sourceEditInit = true;
     }
-    hint("Brushes are data only (no code), shared under CC0. Installed brushes join your library.");
+    hint(tr("Brushes are data only (no code), shared under CC0. Installed brushes join your library."));
     if (ai::brushGalleryFromEnvironment()) {
         hint(("Gallery: " + g.location + " (from SCULPTFORGE_BRUSH_GALLERY)").c_str());
     } else {
         ImGui::AlignTextToFramePadding();
-        ImGui::TextDisabled("Gallery");
+        ImGui::TextDisabled(tr("Gallery"));
         ImGui::SameLine();
         ImGui::SetNextItemWidth(-ImGui::CalcTextSize("Use").x - ImGui::GetStyle().FramePadding.x * 2 - spacing);
-        ImGui::InputTextWithHint("##gallerysource", "Community gallery (or a URL / folder for a studio mirror)",
+        ImGui::InputTextWithHint("##gallerysource", tr("Community gallery (or a URL / folder for a studio mirror)"),
                                  g.sourceEdit, sizeof g.sourceEdit);
         ImGui::SameLine();
-        if (ImGui::Button("Use")) {
+        if (ImGui::Button(tr("Use"))) {
             std::string err;
             if (ai::saveBrushGallerySetting(g.sourceEdit, err)) refreshBrushGallery();
             else status_ = err;

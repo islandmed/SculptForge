@@ -680,7 +680,7 @@ void App::drawFileMenuProjectItems() {
     if (ImGui::MenuItem(tr("Save"), "Ctrl+S")) saveProjectAs(false);
     if (ImGui::MenuItem(tr("Save As..."), "Ctrl+Shift+S")) saveProjectAs(true);
     ImGui::SetNextItemWidth(120.0f * uiScale_);
-    ImGui::SliderInt(tr("Autosave (min)"), &autosaveMinutes_, 0, 60, autosaveMinutes_ ? "%d" : "off");
+    ImGui::SliderInt(tr("Autosave (min)"), &autosaveMinutes_, 0, 60, tr(autosaveMinutes_ ? "%d" : "off"));
     if (ImGui::IsItemDeactivatedAfterEdit()) saveProjectPrefs();
 }
 

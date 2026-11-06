@@ -66,16 +66,16 @@ void App::openDiscordPage() {
 void App::drawSupportersSection() {
     const FoundingMembers& founding = foundingMembers();
     if (!founding.names.empty()) {
-        ImGui::SeparatorText("Founding Members");
-        ImGui::TextWrapped("The first %d members, with our thanks for good:", founding.limit);
+        ImGui::SeparatorText(tr("Founding Members"));
+        ImGui::TextWrapped(tr("The first %d members, with our thanks for good:"), founding.limit);
         for (const std::string& name : founding.names) ImGui::BulletText("%s", name.c_str()); // (plain text, sanitised)
     }
-    ImGui::SeparatorText("Supporters");
+    ImGui::SeparatorText(tr("Supporters"));
     const std::vector<std::string>& names = supporterNames();
     if (names.empty()) {
-        ImGui::TextDisabled("Be the first: sculptforge.app/support.html");
+        ImGui::TextDisabled(tr("Be the first: sculptforge.app/support.html"));
     } else {
-        ImGui::TextWrapped("Thank you to everyone who supports SculptForge:");
+        ImGui::TextWrapped(tr("Thank you to everyone who supports SculptForge:"));
         // Plain text only (TextUnformatted: no format strings, markup or links), sanitised by parseSupporters.
         const float rows = float(std::min<size_t>(names.size(), 8));
         if (ImGui::BeginChild("##supporters", ImVec2(0, rows * ImGui::GetTextLineHeightWithSpacing() + 4.0f * uiScale_),
@@ -88,7 +88,7 @@ void App::drawSupportersSection() {
         ImGui::EndChild();
     }
     ImGui::TextWrapped("%s", kFreeReleaseNote);
-    if (ImGui::Button("Support SculptForge##about")) openSupportPage();
+    if (ImGui::Button(tr("Support SculptForge##about"))) openSupportPage();
 }
 
 void App::chooseNewLook(bool tryIt) {
@@ -170,35 +170,35 @@ void App::drawSupportUi() {
         ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h * 0.3f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         ImGui::SetNextWindowSize(ImVec2(500.0f * s, 0.0f), ImGuiCond_Appearing);
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize;
-        if (ImGui::Begin("Welcome to SculptForge", &showWelcome_, flags)) {
+        if (ImGui::Begin(tr("Welcome to SculptForge"), &showWelcome_, flags)) {
             // New to sculpting: the lesson first, big (docs/guide/first-sculpt.md).
             ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-            if (ImGui::Button(ICON_LC_GRADUATION_CAP "  Start the 10-minute lesson##welcome.lesson", ImVec2(-1, 40.0f * s))) {
+            if (ImGui::Button(tr(ICON_LC_GRADUATION_CAP "  Start the 10-minute lesson##welcome.lesson"), ImVec2(-1, 40.0f * s))) {
                 guide_.open("first-sculpt.md");
                 showWelcome_ = false;
             }
             ImGui::PopStyleColor();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Your first sculpt: a cute owl head from this sphere, step by step, in about ten minutes.");
+                ImGui::SetTooltip(tr("Your first sculpt: a cute owl head from this sphere, step by step, in about ten minutes."));
             // Sculpted before: the quick tour (QuickTour.cpp), where everything is in ten slides.
-            if (ImGui::Button(ICON_LC_COMPASS "  Sculpted before? Take the quick tour##welcome.tour", ImVec2(-1, 0)))
+            if (ImGui::Button(tr(ICON_LC_COMPASS "  Sculpted before? Take the quick tour##welcome.tour"), ImVec2(-1, 0)))
                 showQuickTour(0);
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Ten short slides: remeshing, dynamic topology, retopology, levels, masking, cut, "
-                                  "brushes and baking, each with a Show me button.");
+                ImGui::SetTooltip(tr("Ten short slides: remeshing, dynamic topology, retopology, levels, masking, cut, "
+                                  "brushes and baking, each with a Show me button."));
             ImGui::Spacing();
-            ImGui::TextWrapped("Hold Ctrl over any control to see what it does. The User Guide (Shift+F1) explains every "
-                               "tool, and the quick tour shows what is where.");
+            ImGui::TextWrapped(tr("Hold Ctrl over any control to see what it does. The User Guide (Shift+F1) explains every "
+                               "tool, and the quick tour shows what is where."));
             // The look (0.10.9, #U6): three cards, the first the default. Existing installs never see this window
             // unless they open Help > Welcome, so nobody's look changes by itself.
             ImGui::Spacing();
-            ImGui::TextUnformatted("Pick a look:");
+            ImGui::TextUnformatted(tr("Pick a look:"));
             drawLookPicker();
             // Where you come from sets the keys and the layout together (Preferences > Input and > Interface > Look
             // change them later; both are remembered on its own).
             ImGui::Spacing();
             ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted("Coming from:");
+            ImGui::TextUnformatted(tr("Coming from:"));
             struct Origin {
                 const char* label;
                 int style, layout;
@@ -228,30 +228,30 @@ void App::drawSupportUi() {
             }
             // A base mesh to start from (core/StarterMeshes.h), instead of the sphere.
             ImGui::Spacing();
-            if (ImGui::Button(ICON_LC_USER_ROUND "  Start from a head##welcome")) {
+            if (ImGui::Button(tr(ICON_LC_USER_ROUND "  Start from a head##welcome"))) {
                 confirmDiscard([this] { runCommand("new_starter_mesh", {{"name", std::string("human-head")}}); });
                 showWelcome_ = false;
             }
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("A neutral human head with clean quads and eye and mouth loops, ready for a portrait.");
+                ImGui::SetTooltip(tr("A neutral human head with clean quads and eye and mouth loops, ready for a portrait."));
             ImGui::SameLine();
-            if (ImGui::Button("More starter meshes##welcome")) {
+            if (ImGui::Button(tr("More starter meshes##welcome"))) {
                 showStarterMeshes();
                 showWelcome_ = false;
             }
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Bust, full body, hand, foot, ear, eye, stylised and creature heads, torso and "
-                                  "bevelled primitives: Library > Tool > Starter meshes.");
+                ImGui::SetTooltip(tr("Bust, full body, hand, foot, ear, eye, stylised and creature heads, torso and "
+                                  "bevelled primitives: Library > Tool > Starter meshes."));
             // AI (Preferences > AI changes it later; saved at once).
             ImGui::Spacing();
             ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted("AI features:");
+            ImGui::TextUnformatted(tr("AI features:"));
             for (const bool choice : {true, false}) {
                 ImGui::SameLine();
                 const bool on = ai::aiEnabled() == choice;
                 if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
                 ImGui::BeginDisabled(ai::aiPolicyLocked());
-                if (ImGui::Button(choice ? "On##welcome.ai" : "Off##welcome.ai")) setAiFeatures(choice);
+                if (ImGui::Button(tr(choice ? "On##welcome.ai" : "Off##welcome.ai"))) setAiFeatures(choice);
                 ImGui::EndDisabled();
                 if (on) ImGui::PopStyleColor();
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
@@ -262,21 +262,21 @@ void App::drawSupportUi() {
             ImGui::TextWrapped("%s", ai::kPrivacyLine);
             ImGui::PopStyleColor();
             ImGui::Spacing();
-            if (ImGui::Button("Open the User Guide##welcome")) {
+            if (ImGui::Button(tr("Open the User Guide##welcome"))) {
                 guide_.open();
                 showWelcome_ = false;
             }
             ImGui::SameLine();
-            if (ImGui::Button("Join the community on Discord##welcome")) openDiscordPage();
+            if (ImGui::Button(tr("Join the community on Discord##welcome"))) openDiscordPage();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Questions, tips and work in progress: opens the invite in your browser.");
+                ImGui::SetTooltip(tr("Questions, tips and work in progress: opens the invite in your browser."));
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
-            ImGui::TextWrapped("SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (ask for a brush or an alpha) and your name in the credits. %s", kFreeReleaseNote);
-            if (ImGui::Button("Support SculptForge##welcome")) showSupportCard(SupportCardReason::Manual); // the memberships
+            ImGui::TextWrapped(tr("SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (ask for a brush or an alpha) and your name in the credits. %s"), kFreeReleaseNote);
+            if (ImGui::Button(tr("Support SculptForge##welcome"))) showSupportCard(SupportCardReason::Manual); // the memberships
             ImGui::SameLine();
-            if (ImGui::Button("Close##welcome")) showWelcome_ = false;
+            if (ImGui::Button(tr("Close##welcome"))) showWelcome_ = false;
         }
         ImGui::End();
     }
@@ -288,14 +288,14 @@ void App::drawSupportUi() {
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize |
                                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing;
         bool open = true;
-        if (ImGui::Begin("SculptForge has a new look##newlook", &open, flags)) {
-            ImGui::TextWrapped("Neutral grey panels with one orange accent, and the SculptForge layout: menus by task, a "
-                               "status bar and a one-row tool shelf. Your layout stays as it is unless you try it.");
+        if (ImGui::Begin(tr("SculptForge has a new look##newlook"), &open, flags)) {
+            ImGui::TextWrapped(tr("Neutral grey panels with one orange accent, and the SculptForge layout: menus by task, a "
+                               "status bar and a one-row tool shelf. Your layout stays as it is unless you try it."));
             ImGui::Spacing();
-            if (ImGui::Button("Try it##newlook")) chooseNewLook(true);
+            if (ImGui::Button(tr("Try it##newlook"))) chooseNewLook(true);
             ImGui::SameLine();
-            if (ImGui::Button("Keep my layout##newlook")) chooseNewLook(false);
-            ImGui::TextDisabled("Either way: Preferences > Interface > Look changes it later.");
+            if (ImGui::Button(tr("Keep my layout##newlook"))) chooseNewLook(false);
+            ImGui::TextDisabled(tr("Either way: Preferences > Interface > Look changes it later."));
         }
         ImGui::End();
         if (!open) chooseNewLook(false);
@@ -308,22 +308,22 @@ void App::drawSupportUi() {
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize |
                                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
         bool open = true;
-        if (ImGui::Begin("Big meshes are faster now##bigmesh", &open, flags)) {
-            ImGui::TextWrapped("On a dense scan with micro levels, big brushes now keep up with the pen and the view turns "
-                               "smoothly right after a stroke.");
+        if (ImGui::Begin(tr("Big meshes are faster now##bigmesh"), &open, flags)) {
+            ImGui::TextWrapped(tr("On a dense scan with micro levels, big brushes now keep up with the pen and the view turns "
+                               "smoothly right after a stroke."));
             ImGui::Spacing();
-            ImGui::TextWrapped("Two settings in Preferences > Performance help most on big meshes:");
+            ImGui::TextWrapped(tr("Two settings in Preferences > Performance help most on big meshes:"));
             ImGui::Bullet();
-            ImGui::TextWrapped("Background Preview (experimental): a big brush shows under the pen while it's still being worked out.");
+            ImGui::TextWrapped(tr("Background Preview (experimental): a big brush shows under the pen while it's still being worked out."));
             ImGui::Bullet();
-            ImGui::TextWrapped("View resolution 75%%: draws about half the pixels, for integrated graphics and big screens.");
+            ImGui::TextWrapped(tr("View resolution 75%%: draws about half the pixels, for integrated graphics and big screens."));
             ImGui::Spacing();
-            if (ImGui::Button("Performance settings##bigmesh")) {
+            if (ImGui::Button(tr("Performance settings##bigmesh"))) {
                 openPerformancePrefs();
                 open = false;
             }
             ImGui::SameLine();
-            if (ImGui::Button("Got it##bigmesh")) open = false;
+            if (ImGui::Button(tr("Got it##bigmesh"))) open = false;
         }
         ImGui::End();
         if (!open) bigMeshTipOpen_ = false;

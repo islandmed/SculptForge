@@ -115,7 +115,7 @@ void App::drawForgeSpheresContents() {
     if (!forgesphereActive()) {
         ui::ActionButton(*this, "forgesphere.new", ImVec2(full, 0));
         ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextDisabled("Block out a base mesh from connected spheres, then Make Mesh to sculpt it.");
+        ImGui::TextDisabled(tr("Block out a base mesh from connected spheres, then Make Mesh to sculpt it."));
         ImGui::PopTextWrapPos();
         return;
     }
@@ -137,7 +137,7 @@ void App::drawForgeSpheresContents() {
     ImGui::TextDisabled("%zu %s", doc_.mesh.forgespheres.size(), doc_.mesh.forgespheres.size() == 1 ? "sphere" : "spheres");
     if (const int sel = forgesphereSelection(); sel >= 0) {
         ImGui::SameLine();
-        ImGui::TextDisabled(sel == 0 ? "(root selected)" : "(sphere %d selected)", sel);
+        ImGui::TextDisabled(tr(sel == 0 ? "(root selected)" : "(sphere %d selected)"), sel);
     }
     tray::GroupLabel(*this, "Make Mesh");
     ui::ActionButton(*this, "forgesphere.make_mesh", ImVec2(half, 0));
@@ -364,11 +364,11 @@ void App::drawForgeSphereMenu() {
         return;
     }
     Demo::pushScope("Forge Sphere menu");
-    ImGui::TextDisabled(i == 0 ? "Root sphere" : "Sphere %d", i);
+    ImGui::TextDisabled(tr(i == 0 ? "Root sphere" : "Sphere %d"), i);
     ImGui::Separator();
-    if (ImGui::MenuItem("Delete Sphere", nullptr, false, i > 0)) forgesphereEdit(ForgeSphereEdit::Delete, i);
-    if (ImGui::MenuItem("Insert Between", nullptr, false, i > 0)) forgesphereEdit(ForgeSphereEdit::Insert, i);
-    if (ImGui::MenuItem("Set as Root", nullptr, false, i > 0)) forgesphereEdit(ForgeSphereEdit::SetRoot, i);
+    if (ImGui::MenuItem(tr("Delete Sphere"), nullptr, false, i > 0)) forgesphereEdit(ForgeSphereEdit::Delete, i);
+    if (ImGui::MenuItem(tr("Insert Between"), nullptr, false, i > 0)) forgesphereEdit(ForgeSphereEdit::Insert, i);
+    if (ImGui::MenuItem(tr("Set as Root"), nullptr, false, i > 0)) forgesphereEdit(ForgeSphereEdit::SetRoot, i);
     Demo::popScope();
     ImGui::EndPopup();
 }

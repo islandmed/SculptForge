@@ -531,7 +531,7 @@ void UserGuide::draw(App& app) {
     ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h * 0.5f), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSizeConstraints(ImVec2(520.0f * s, 320.0f * s), ImVec2(FLT_MAX, FLT_MAX));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f * s, 8.0f * s));
-    const bool visible = ImGui::Begin("User Guide", &open_, ImGuiWindowFlags_NoCollapse);
+    const bool visible = ImGui::Begin(tr("User Guide"), &open_, ImGuiWindowFlags_NoCollapse);
     ImGui::PopStyleVar();
     if (!visible) {
         ImGui::End();
@@ -635,7 +635,7 @@ void UserGuide::drawToolbar(App& app) {
         ImGui::SetKeyboardFocusHere();
         focusSearch_ = false;
     }
-    ImGui::InputTextWithHint("##guide_search", ICON_LC_SEARCH "  Search the guide (Ctrl+F)", query_, sizeof query_,
+    ImGui::InputTextWithHint("##guide_search", tr(ICON_LC_SEARCH "  Search the guide (Ctrl+F)"), query_, sizeof query_,
                              ImGuiInputTextFlags_EscapeClearsAll);
     ui::HelpText("Search", "Ctrl+F", "Find every place in the guide that mentions all of these words.", "Help > User Guide");
     if (query_[0]) {
@@ -715,8 +715,8 @@ void UserGuide::drawSearchResults(App& app) {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(kDim), tr("Nothing in the guide matches \"%s\"."), query_);
         ImGui::PopTextWrapPos();
     } else {
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(kDim), "%zu result%s%s", hits_.size(), hits_.size() == 1 ? "" : "s",
-                           hits_.size() >= 50 ? " (best 50)" : "");
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(kDim), tr(hits_.size() >= 50 ? "%zu results (best 50)" : hits_.size() == 1 ? "%zu result" : "%zu results"),
+                           hits_.size());
     }
     ImFont* small = app.smallFont() ? app.smallFont() : ImGui::GetFont();
     ImFont* bold = app.boldFont() ? app.boldFont() : ImGui::GetFont();

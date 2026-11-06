@@ -21,3 +21,23 @@ VDM
 SpaceMouse
 Lit Sphere
 PBR
+%.0f / %.0f ms, %.0f / %.0f px
+%.0f ms
+%.1f ms
+30 fps
+60 fps
+120 fps
+144 fps
+Bridge
+COLMAP
+Esc
+Hunyuan3D 3.1 Pro (Tencent)
+Meshy 6
+Rodin 2.5 (Hyper3D)
+Unreal Engine
+Unreal, Unity, Godot, Blender, three.js
+ffmpeg
+http://%s
+Gen-2.5 Low
+Gen-2.5 Medium
+Gen-2.5 High

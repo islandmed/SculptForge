@@ -248,7 +248,7 @@ void App::drawCustomBrushes() {
                 if (!b.description.empty()) ImGui::TextUnformatted(b.description.c_str());
                 ImGui::TextDisabled("%s", brushOriginText(b).c_str());
                 if (!b.origin.path.empty()) ImGui::TextDisabled("%s", b.origin.path.c_str());
-                ImGui::TextDisabled("Right-click to share, rename or delete");
+                ImGui::TextDisabled(tr("Right-click to share, rename or delete"));
                 ImGui::PopTextWrapPos();
                 ImGui::EndTooltip();
             }
@@ -259,14 +259,14 @@ void App::drawCustomBrushes() {
                 }
                 ImGui::TextDisabled("%s", b.name.c_str());
                 ImGui::Separator();
-                if (ImGui::MenuItem("Copy brush code")) action = Action::Copy;
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("One line of text to share in chat, email or a forum");
-                if (ImGui::MenuItem("Save .sfbrush...")) action = Action::Save;
-                if (ImGui::MenuItem("Rename...##brush")) action = Action::Rename;
-                if (ImGui::MenuItem("Delete...##brush", nullptr, false, isUserLibraryBrush(b))) action = Action::Delete;
+                if (ImGui::MenuItem(tr("Copy brush code"))) action = Action::Copy;
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("One line of text to share in chat, email or a forum"));
+                if (ImGui::MenuItem(tr("Save .sfbrush..."))) action = Action::Save;
+                if (ImGui::MenuItem(tr("Rename...##brush"))) action = Action::Rename;
+                if (ImGui::MenuItem(tr("Delete...##brush"), nullptr, false, isUserLibraryBrush(b))) action = Action::Delete;
                 if (!isUserLibraryBrush(b) && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-                    ImGui::SetTooltip("Only brushes in your own library can be deleted");
-                if (ImGui::MenuItem("Reveal in folder", nullptr, false, !b.origin.path.empty())) action = Action::Reveal;
+                    ImGui::SetTooltip(tr("Only brushes in your own library can be deleted"));
+                if (ImGui::MenuItem(tr("Reveal in folder"), nullptr, false, !b.origin.path.empty())) action = Action::Reveal;
                 if (action != Action::None) actionIndex = i;
                 ImGui::EndPopup();
             }
@@ -321,14 +321,14 @@ void App::drawBrushLibraryPopups() {
             doc_.brushes[size_t(index)].origin.source != BrushSource::Session &&
             doc_.brushes[size_t(index)].origin.source != BrushSource::Project) {
             ImGui::PushTextWrapPos(300 * scale);
-            ImGui::TextDisabled("The %s brush stays as it is; the renamed copy goes into your library.",
+            ImGui::TextDisabled(tr("The %s brush stays as it is; the renamed copy goes into your library."),
                                 brushSourceName(doc_.brushes[size_t(index)].origin.source));
             ImGui::PopTextWrapPos();
         }
         if (!error.empty()) ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "%s", error.c_str());
-        ok |= ImGui::Button("Rename", buttonSize);
+        ok |= ImGui::Button(tr("Rename"), buttonSize);
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", buttonSize) || ImGui::IsKeyPressed(ImGuiKey_Escape) || index < 0) ImGui::CloseCurrentPopup();
+        if (ImGui::Button(tr("Cancel"), buttonSize) || ImGui::IsKeyPressed(ImGuiKey_Escape) || index < 0) ImGui::CloseCurrentPopup();
         else if (ok) {
             runCommand("brush_rename", {{"name", brushPopupName_}, {"to", std::string(brushRenameBuf_)}});
             if (lastCommandOk_) ImGui::CloseCurrentPopup();
@@ -341,20 +341,20 @@ void App::drawBrushLibraryPopups() {
     if (ImGui::BeginPopupModal(kDeletePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         if (index >= 0) {
             const BrushRecipe& b = doc_.brushes[size_t(index)];
-            ImGui::Text("Delete '%s' from your brush library?", b.name.c_str());
+            ImGui::Text(tr("Delete '%s' from your brush library?"), b.name.c_str());
             ImGui::PushTextWrapPos(340 * scale);
             if (b.origin.overrides != BrushSource::Session)
-                ImGui::TextDisabled("The %s brush of the same name is used again.", brushSourceName(b.origin.overrides));
+                ImGui::TextDisabled(tr("The %s brush of the same name is used again."), brushSourceName(b.origin.overrides));
             else
-                ImGui::TextDisabled("Its .sfbrush file is removed. Copy its brush code first if you might want it back.");
+                ImGui::TextDisabled(tr("Its .sfbrush file is removed. Copy its brush code first if you might want it back."));
             ImGui::PopTextWrapPos();
         }
-        if (ImGui::Button("Delete", buttonSize) && index >= 0) {
+        if (ImGui::Button(tr("Delete"), buttonSize) && index >= 0) {
             runCommand("brush_delete", {{"name", brushPopupName_}});
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", buttonSize) || ImGui::IsKeyPressed(ImGuiKey_Escape) || index < 0) ImGui::CloseCurrentPopup();
+        if (ImGui::Button(tr("Cancel"), buttonSize) || ImGui::IsKeyPressed(ImGuiKey_Escape) || index < 0) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
 }

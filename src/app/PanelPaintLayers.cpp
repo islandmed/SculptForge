@@ -196,12 +196,12 @@ void App::drawPaintLayersContents() {
             if (l) {
                 ImGui::TableSetColumnIndex(2);
                 if (iconToggle(("##lock " + name).c_str(), ICON_LC_LOCK, l->locked,
-                               l->locked ? "Unlock (allow painting)" : "Lock against painting"))
+                               tr(l->locked ? "Unlock (allow painting)" : "Lock against painting")))
                     toggleLock = i;
                 ui::HelpText("Lock", nullptr, "Lock the layer: the Paint brush, fills, clears and merges leave it alone.", kPath);
                 ImGui::TableSetColumnIndex(3);
                 if (iconToggle(("##eye " + name).c_str(), l->visible ? ICON_LC_EYE : ICON_LC_EYE_OFF, l->visible,
-                               l->visible ? "Hide layer" : "Show layer"))
+                               tr(l->visible ? "Hide layer" : "Show layer")))
                     toggleVisible = i;
                 ui::HelpText("Visibility", nullptr, "Show or hide the layer. Hidden layers don't show or export.", kPath);
             }
@@ -285,7 +285,7 @@ void App::drawPaintLayersContents() {
 
     const float third = (ImGui::GetContentRegionAvail().x - 2 * style.ItemSpacing.x) / 3.0f;
     ImGui::BeginDisabled(mesh.vertexCount() == 0);
-    if (ImGui::Button(ICON_LC_PLUS " New", ImVec2(third, 0))) runCommand("paint_layer_add");
+    if (ImGui::Button(tr(ICON_LC_PLUS " New"), ImVec2(third, 0))) runCommand("paint_layer_add");
     ImGui::EndDisabled();
     ui::HelpText("New paint layer", nullptr, "Add a transparent paint layer above the active one and paint on it.", kPath);
     ImGui::SameLine();
@@ -324,7 +324,7 @@ void App::drawPaintLayersContents() {
                  kPath);
 
     ImGui::BeginDisabled(mesh.vertexCount() == 0 || (cur && cur->locked));
-    if (ImGui::Button(cur ? "Clear layer" : "Clear Base", ImVec2(half, 0))) runCommand("paint_layer_clear");
+    if (ImGui::Button(tr(cur ? "Clear layer" : "Clear Base"), ImVec2(half, 0))) runCommand("paint_layer_clear");
     ImGui::EndDisabled();
     ui::HelpText("Clear", nullptr, "Clear the active layer: a layer becomes transparent, Base white. Undoable.", kPath);
     ImGui::SameLine();

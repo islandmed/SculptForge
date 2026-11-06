@@ -167,7 +167,7 @@ void App::drawFillLayerControls() {
     ImGui::Spacing();
     ImGui::TextDisabled("%s", tr("Fill Layers"));
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
-    if (ImGui::Button(ICON_LC_PLUS " Fill Layer##fill", ImVec2(half, 0)))
+    if (ImGui::Button(tr(ICON_LC_PLUS " Fill Layer##fill"), ImVec2(half, 0)))
         run("fill_layer", {{"name", std::string("Fill")}, {"color", colorToHex(doc_.paintColor)}});
     ui::HelpText("New Fill Layer", nullptr,
                  "Add a Fill layer: a material over the whole Part through a mask you build from effects (Edge Wear, "
@@ -253,9 +253,9 @@ void App::drawFillLayerControls() {
         ImGui::SliderFloat(id, &v, 0.0f, 1.0f, fmt);
         if (ImGui::IsItemDeactivatedAfterEdit()) run("fill_layer", withLayer({{"action", std::string("set")}, {key, double(v)}}));
     };
-    materialSlider("##fillrough", "roughness", f.material.roughness, "Roughness %.2f", Channel::Roughness);
-    materialSlider("##fillmetal", "metallic", f.material.metallic, "Metallic %.2f", Channel::Metallic);
-    materialSlider("##fillheight", "height", f.material.height, "Height %.2f", Channel::Height);
+    materialSlider("##fillrough", "roughness", f.material.roughness, tr("Roughness %.2f"), Channel::Roughness);
+    materialSlider("##fillmetal", "metallic", f.material.metallic, tr("Metallic %.2f"), Channel::Metallic);
+    materialSlider("##fillheight", "height", f.material.height, tr("Height %.2f"), Channel::Height);
 
     // Mask effects, top to bottom.
     ImGui::TextDisabled("%s", tr("Mask"));
@@ -294,22 +294,22 @@ void App::drawFillLayerControls() {
         };
         switch (e.kind) {
         case MaskEffectKind::Generator:
-            slider("##level", "level", e.level, 0.0f, 1.0f, "Level %.2f");
-            slider("##soft", "softness", e.softness, 0.0f, 1.0f, "Softness %.2f");
-            slider("##breakup", "breakup", e.breakup, 0.0f, 2.0f, "Break-up %.2f");
-            slider("##scale", "scale", e.scale, 0.002f, 0.3f, "Noise size %.3f");
+            slider("##level", "level", e.level, 0.0f, 1.0f, tr("Level %.2f"));
+            slider("##soft", "softness", e.softness, 0.0f, 1.0f, tr("Softness %.2f"));
+            slider("##breakup", "breakup", e.breakup, 0.0f, 2.0f, tr("Break-up %.2f"));
+            slider("##scale", "scale", e.scale, 0.002f, 0.3f, tr("Noise size %.3f"));
             break;
         case MaskEffectKind::Noise:
-            slider("##scale", "scale", e.scale, 0.002f, 0.3f, "Size %.3f");
-            slider("##contrast", "contrast", e.contrast, 0.0f, 4.0f, "Contrast %.2f");
+            slider("##scale", "scale", e.scale, 0.002f, 0.3f, tr("Size %.3f"));
+            slider("##contrast", "contrast", e.contrast, 0.0f, 4.0f, tr("Contrast %.2f"));
             break;
         case MaskEffectKind::Levels:
-            slider("##inlow", "in_low", e.inLow, 0.0f, 1.0f, "In low %.2f");
-            slider("##inhigh", "in_high", e.inHigh, 0.0f, 1.0f, "In high %.2f");
-            slider("##gamma", "gamma", e.gamma, 0.1f, 4.0f, "Gamma %.2f");
+            slider("##inlow", "in_low", e.inLow, 0.0f, 1.0f, tr("In low %.2f"));
+            slider("##inhigh", "in_high", e.inHigh, 0.0f, 1.0f, tr("In high %.2f"));
+            slider("##gamma", "gamma", e.gamma, 0.1f, 4.0f, tr("Gamma %.2f"));
             break;
-        case MaskEffectKind::Blur: slider("##radius", "radius", e.radius, 0.0f, 32.0f, "Radius %.0f px"); break;
-        case MaskEffectKind::Fill: slider("##value", "value", e.value, 0.0f, 1.0f, "Value %.2f"); break;
+        case MaskEffectKind::Blur: slider("##radius", "radius", e.radius, 0.0f, 32.0f, tr("Radius %.0f px")); break;
+        case MaskEffectKind::Fill: slider("##value", "value", e.value, 0.0f, 1.0f, tr("Value %.2f")); break;
         case MaskEffectKind::Paint: ImGui::TextDisabled("%s", tr("Paint on the model with this layer active (Alt erases)")); break;
         default: break;
         }

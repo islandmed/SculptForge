@@ -134,7 +134,7 @@ void App::drawTextureChannelsContents() {
         }
     } runPending{*this, pending};
     const ImGuiStyle& style = ImGui::GetStyle();
-    ImGui::SeparatorText("Material Channels");
+    ImGui::SeparatorText(tr("Material Channels"));
     // Channel toggles, two per row.
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
     int column = 0;
@@ -159,7 +159,7 @@ void App::drawTextureChannelsContents() {
     const char* viewLabel = doc_.channelView == Channel::BaseColor ? "Normal view" : channelFormat(doc_.channelView).label;
     ImGui::SetNextItemWidth(-1);
     if (ImGui::BeginCombo("##channelview", viewLabel)) {
-        if (ImGui::Selectable("Normal view", doc_.channelView == Channel::BaseColor))
+        if (ImGui::Selectable(tr("Normal view"), doc_.channelView == Channel::BaseColor))
             pending.push_back({"channel_view", {{"channel", std::string("off")}}});
         for (Channel c : kMaterialChannels) {
             if (!channelEnabled(t, c)) continue;
@@ -201,7 +201,7 @@ void App::drawBrushMaterialContents() {
     if (!paintsTexture(m) || !hasMaterialChannels(*m.texture)) return;
     const PaintTexture& t = *m.texture;
     const ImGuiStyle& style = ImGui::GetStyle();
-    ImGui::SeparatorText("Material");
+    ImGui::SeparatorText(tr("Material"));
     BrushMaterial& mat = doc_.paintMaterial;
     // Material swatches: every enabled channel at once.
     const float sw = (ImGui::GetContentRegionAvail().x - 3 * style.ItemSpacing.x) / 4.0f;
@@ -218,7 +218,7 @@ void App::drawBrushMaterialContents() {
             status_ = std::string("Brush material: ") + s.name;
         }
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s: roughness %.2f, metallic %.0f", s.name, double(s.roughness), double(s.metallic));
+            ImGui::SetTooltip(tr("%s: roughness %.2f, metallic %.0f"), s.name, double(s.roughness), double(s.metallic));
         ImGui::PopID();
         if (i % 4 != 3) ImGui::SameLine();
     }
@@ -312,14 +312,14 @@ Args App::drawLayerChannelChips(int layer) {
         ImGui::PopStyleVar();
         ImGui::PopStyleColor(2);
         if (ImGui::IsItemHovered() && !ui::CtrlHeld())
-            ImGui::SetTooltip("%s: %s, %s, %d%%\nClick: on / off. Right-click: blend and opacity.", channelFormat(c).label,
+            ImGui::SetTooltip(tr("%s: %s, %s, %d%%\nClick: on / off. Right-click: blend and opacity."), channelFormat(c).label,
                               on ? "on" : "off", channelBlendLabel(blend), int(std::lround(opacity * 100.0f)));
         ui::HelpText("Layer channel", nullptr,
                      "Whether this layer affects the channel. Right-click for the channel's blend mode (Normal "
                      "Combine lays normal detail onto the normals below) and opacity.",
                      kLayersPath);
         if (ImGui::BeginPopupContextItem("##chipmenu")) {
-            ImGui::TextDisabled("%s on '%s'", channelFormat(c).label, l.name.c_str());
+            ImGui::TextDisabled(tr("%s on '%s'"), channelFormat(c).label, l.name.c_str());
             const int modes = c == Channel::Normal ? kChannelBlendCount : kBlendModeCount;
             for (int b = 0; b < modes; ++b)
                 if (ImGui::MenuItem(channelBlendLabel(uint8_t(b)), nullptr, b == blend) && b != blend)
@@ -328,7 +328,7 @@ Args App::drawLayerChannelChips(int layer) {
             ImGui::Separator();
             float pct = opacity * 100.0f;
             ImGui::SetNextItemWidth(ImGui::GetFontSize() * 10.0f);
-            ImGui::SliderFloat("##chipopacity", &pct, 0.0f, 100.0f, "Opacity %.0f%%");
+            ImGui::SliderFloat("##chipopacity", &pct, 0.0f, 100.0f, tr("Opacity %.0f%%"));
             if (ImGui::IsItemDeactivatedAfterEdit())
                 run = {{"index", double(layer)}, {"channel", std::string(channelFormat(c).id)}, {"opacity", double(pct / 100.0f)}};
             ImGui::EndPopup();

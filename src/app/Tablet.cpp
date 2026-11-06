@@ -509,7 +509,7 @@ void App::drawTabletSection() {
     } else {
         ImGui::TextColored(col(ui::color::accent), ICON_LC_PEN_LINE);
         ImGui::SameLine();
-        ImGui::TextUnformatted(penName_.empty() ? "Pen detected" : penName_.c_str());
+        ImGui::TextUnformatted(tr(penName_.empty() ? "Pen detected" : penName_.c_str()));
         ui::HelpText("Pen", nullptr, "The pen SculptForge last saw, and whether it is in range or touching.", path);
         std::string info = penTouching_ ? (penEraser_ ? "eraser touching" : "touching") : penInProximity_ ? "in range" : "away";
         const char* sep = " \xc2\xb7 "; // middle dot
@@ -537,7 +537,7 @@ void App::drawTabletSection() {
     char overlay[64];
     std::snprintf(overlay, sizeof overlay, "Pressure %.2f  " ICON_LC_ARROW_RIGHT "  %.2f", raw, curved);
     ImGui::PushStyleColor(ImGuiCol_PlotHistogram, col(ui::color::accent));
-    ImGui::ProgressBar(penSeen_ ? curved : 0.0f, ImVec2(-FLT_MIN, 0), penSeen_ ? overlay : "Pressure -");
+    ImGui::ProgressBar(penSeen_ ? curved : 0.0f, ImVec2(-FLT_MIN, 0), tr(penSeen_ ? overlay : "Pressure -"));
     ImGui::PopStyleColor();
     ui::HelpText("Pressure meter", nullptr,
                  "The pen's pressure as the tablet reports it, and after the pressure curve below (what brushes get).", path);
@@ -690,7 +690,7 @@ void App::drawTabletSection() {
         }
         ui::HelpText(label, nullptr, help, path);
     };
-    mapping("Eraser", t.eraser, {PenAction::Invert, PenAction::Smooth, PenAction::EraseMask, PenAction::None},
+    mapping(tr("Eraser"), t.eraser, {PenAction::Invert, PenAction::Smooth, PenAction::EraseMask, PenAction::None},
             "What the pen's eraser end does. Invert: brushes subtract, like holding Alt (with Ctrl it erases mask). "
             "Erase mask: removes mask wherever it draws.");
     static const char* kButtonHelp[kPenButtons] = {

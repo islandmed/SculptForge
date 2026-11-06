@@ -481,18 +481,18 @@ void App::drawProofUi() {
     ProofState& p = *proof_;
     const float sc = uiScale_;
     if (p.stage == ProofState::Stage::Intro) {
-        ImGui::OpenPopup("Benchmark (proof mode)");
-        if (ImGui::BeginPopupModal("Benchmark (proof mode)", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::OpenPopup("###proof.benchmark");
+        if (ImGui::BeginPopupModal(tr("Benchmark (proof mode)###proof.benchmark"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::PushTextWrapPos(520 * sc);
-            ImGui::TextWrapped("Proof mode measures how responsive sculpting is on this computer. For each mesh size it "
+            ImGui::TextWrapped(tr("Proof mode measures how responsive sculpting is on this computer. For each mesh size it "
                                "builds a sphere with subdivision levels, then plays a scripted pen stroke through the "
                                "same code your pen goes through (240 samples a second), with a normal and a large brush, "
-                               "and turns the view.");
+                               "and turns the view."));
             ImGui::Spacing();
             static const char* const kScenes[] = {"Standard 15M: a 15 million triangle head",
                                                   "Standard 33M: a 33 million triangle head",
                                                   "Standard 15M and 33M", "Spheres: 5M, 20M, 33M (100M with the memory)"};
-            ImGui::TextUnformatted("Scene");
+            ImGui::TextUnformatted(tr("Scene"));
             for (int i = 0; i < 4; ++i)
                 if (ImGui::RadioButton(kScenes[i], p.sceneChoice == i)) {
                     p.sceneChoice = i;
@@ -503,8 +503,8 @@ void App::drawProofUi() {
                                      {"still", -1.0f, 0.6}};
                 }
             if (!p.scene.empty())
-                ImGui::TextDisabled("Clay at 25, 60 and 120 px, Move, Smooth, a 240 px brush, then an orbit: the scene the "
-                                    "website's table uses (same as sculptforge --benchmark %s)", p.scene.c_str());
+                ImGui::TextDisabled(tr("Clay at 25, 60 and 120 px, Move, Smooth, a 240 px brush, then an orbit: the scene the "
+                                    "website's table uses (same as sculptforge --benchmark %s)"), p.scene.c_str());
             { // What each scene needs free (a scene without it is skipped), against what is free now.
                 const size_t free = availableMemoryBytes();
                 std::string need, shortOf;
@@ -514,29 +514,29 @@ void App::drawProofUi() {
                     need += (need.empty() ? "" : ", ") + s.label + " about " + gb;
                     if (!c.enough) shortOf += (shortOf.empty() ? "" : ", ") + s.label;
                 }
-                ImGui::TextDisabled("%s of memory free now (%s)", free ? formatGigabytes(free).c_str() : "Unknown amount",
+                ImGui::TextDisabled(tr("%s of memory free now (%s)"), free ? formatGigabytes(free).c_str() : "Unknown amount",
                                     need.c_str());
                 if (!shortOf.empty())
-                    ImGui::TextColored(theme::danger, "Not enough free memory for %s: it will be skipped. Close other apps first.",
+                    ImGui::TextColored(theme::danger, tr("Not enough free memory for %s: it will be skipped. Close other apps first."),
                                        shortOf.c_str());
             }
             ImGui::Spacing();
-            ImGui::TextWrapped("A live display shows the frame rate, frame times (median, 95th, 99th percentile), how far "
+            ImGui::TextWrapped(tr("A live display shows the frame rate, frame times (median, 95th, 99th percentile), how far "
                                "the stroke trails the pointer, and memory. The result is saved as JSON beside a video "
-                               "of the run:");
+                               "of the run:"));
             ImGui::TextDisabled("%s", p.jsonPath.c_str());
-            ImGui::Checkbox("Record a video of the run (needs ffmpeg)", &p.video);
-            ImGui::Checkbox("Keep vertical sync on (frame rate capped at the display's)", &p.vsync);
+            ImGui::Checkbox(tr("Record a video of the run (needs ffmpeg)"), &p.video);
+            ImGui::Checkbox(tr("Keep vertical sync on (frame rate capped at the display's)"), &p.vsync);
             ImGui::Spacing();
-            ImGui::TextColored(theme::accent, "The current scene is replaced. Save your work first.");
-            ImGui::TextDisabled("Press Esc to stop the run.");
+            ImGui::TextColored(theme::accent, tr("The current scene is replaced. Save your work first."));
+            ImGui::TextDisabled(tr("Press Esc to stop the run."));
             ImGui::PopTextWrapPos();
-            if (ImGui::Button("Start")) {
+            if (ImGui::Button(tr("Start"))) {
                 p.stage = ProofState::Stage::Announce;
                 ImGui::CloseCurrentPopup();
             }
             ImGui::SameLine();
-            if (ImGui::Button("Cancel")) {
+            if (ImGui::Button(tr("Cancel"))) {
                 ImGui::CloseCurrentPopup();
                 proof_.reset();
             }
@@ -547,7 +547,7 @@ void App::drawProofUi() {
     if (p.stage == ProofState::Stage::Results) {
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         bool open = true;
-        if (ImGui::Begin("Benchmark results", &open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
+        if (ImGui::Begin(tr("Benchmark results"), &open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
             if (!p.error.empty()) ImGui::TextColored(theme::danger, "%s", p.error.c_str());
             if (ImGui::BeginTable("##proof", 8, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
                 for (const char* h : {"Mesh", "Phase", "fps", "frame p50", "frame p95", "frame p99", "worst stall", "trails pointer p50 / p95"})
@@ -564,29 +564,29 @@ void App::drawProofUi() {
                         ImGui::TableNextColumn();
                         ImGui::Text("%.0f", ph.seconds > 0 ? double(ph.frameMs.size()) / ph.seconds : 0.0);
                         ImGui::TableNextColumn();
-                        ImGui::Text("%.1f ms", f.p50);
+                        ImGui::Text(tr("%.1f ms"), f.p50);
                         ImGui::TableNextColumn();
-                        ImGui::Text("%.1f ms", f.p95);
+                        ImGui::Text(tr("%.1f ms"), f.p95);
                         ImGui::TableNextColumn();
-                        ImGui::Text("%.1f ms", f.p99);
+                        ImGui::Text(tr("%.1f ms"), f.p99);
                         ImGui::TableNextColumn();
-                        ImGui::Text("%.0f ms", worstStallMs(ph.frameMs, ph.releaseMs));
+                        ImGui::Text(tr("%.0f ms"), worstStallMs(ph.frameMs, ph.releaseMs));
                         ImGui::TableNextColumn();
                         if (ph.lagMs.empty()) ImGui::TextDisabled("-");
-                        else ImGui::Text("%.0f / %.0f ms, %.0f / %.0f px", l.p50, l.p95, lp.p50, lp.p95);
+                        else ImGui::Text(tr("%.0f / %.0f ms, %.0f / %.0f px"), l.p50, l.p95, lp.p50, lp.p95);
                     }
                 ImGui::EndTable();
             }
-            ImGui::TextDisabled("Result: %s", p.jsonPath.c_str());
-            if (p.video) ImGui::TextDisabled("Video: %s", p.videoPath.c_str());
-            if (ImGui::Button("Open folder")) {
+            ImGui::TextDisabled(tr("Result: %s"), p.jsonPath.c_str());
+            if (p.video) ImGui::TextDisabled(tr("Video: %s"), p.videoPath.c_str());
+            if (ImGui::Button(tr("Open folder"))) {
                 const std::string dir = std::filesystem::path(p.jsonPath).parent_path().string();
                 SDL_OpenURL(("file://" + dir).c_str());
             }
             ImGui::SameLine();
-            if (ImGui::Button("How to share results")) SDL_OpenURL("https://sculptforge.app/benchmarks/");
+            if (ImGui::Button(tr("How to share results"))) SDL_OpenURL("https://sculptforge.app/benchmarks/");
             ImGui::SameLine();
-            if (ImGui::Button("Close")) open = false;
+            if (ImGui::Button(tr("Close"))) open = false;
         }
         ImGui::End();
         if (!open) {

@@ -530,7 +530,7 @@ void App::drawMaskingSection() {
         ImGui::SetNextItemWidth(-1);
         ui::SliderInside("##maskcolortol", &maskColorTolerance_, 0.01f, 1.0f, "Colour tolerance %.2f");
         ImGui::SetNextItemWidth(half);
-        const char* facing[] = {"Faces the camera", "Faces up", "Faces down"};
+        const char* facing[] = {tr("Faces the camera"), tr("Faces up"), tr("Faces down")};
         ImGui::Combo("##maskfacing", &maskFacingDir_, facing, 3);
         ImGui::SameLine();
         ImGui::SetNextItemWidth(-1);

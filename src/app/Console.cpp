@@ -394,7 +394,7 @@ void Console::draw(App& app, const CanvasRect& rect) {
                                    ImGuiWindowFlags_NoFocusOnAppearing;
     if (bringToFront_) ImGui::SetNextWindowFocus();
     bringToFront_ = false;
-    const bool visible = ImGui::Begin("Console", nullptr, flags);
+    const bool visible = ImGui::Begin(tr("Console"), nullptr, flags);
     ImGui::PopStyleColor();
     ImGui::PopStyleVar(4);
     if (!visible) {
@@ -478,7 +478,7 @@ void Console::draw(App& app, const CanvasRect& rect) {
         }
     }
     if (lines_.empty())
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::color::textDim), "Type help and press Enter to list the commands.");
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::color::textDim), tr("Type help and press Enter to list the commands."));
     if (scrollToBottom_ && (atBottom || focusInput_)) ImGui::SetScrollHereY(1.0f);
     scrollToBottom_ = false;
     ImGui::EndChild();
@@ -501,7 +501,7 @@ void Console::draw(App& app, const CanvasRect& rect) {
     const ImGuiInputTextFlags inputFlags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion |
                                            ImGuiInputTextFlags_CallbackHistory | ImGuiInputTextFlags_CallbackCharFilter |
                                            ImGuiInputTextFlags_CallbackAlways;
-    const bool entered = ImGui::InputTextWithHint("##console", "help, or a command such as  remesh resolution=200", input_,
+    const bool entered = ImGui::InputTextWithHint("##console", tr("help, or a command such as  remesh resolution=200"), input_,
                                                   sizeof input_, inputFlags, &Console::inputCallback, this);
     ImGui::PopStyleColor(3);
     ImGui::PopFont();

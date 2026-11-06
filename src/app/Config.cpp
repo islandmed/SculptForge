@@ -1375,7 +1375,7 @@ void App::drawControlsWindow() {
     const float s = uiScale_;
     ImGui::SetNextWindowSize(ImVec2(560.0f * s, 640.0f * s), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
-    if (!ImGui::Begin("Controls", &showHelp_, ImGuiWindowFlags_NoCollapse)) {
+    if (!ImGui::Begin(tr("Controls"), &showHelp_, ImGuiWindowFlags_NoCollapse)) {
         ImGui::End();
         return;
     }
@@ -1387,7 +1387,7 @@ void App::drawControlsWindow() {
     ui::ActionButton(*this, "input.import_blender", ImVec2(-FLT_MIN, 0), ui::Look::IconLabel);
     char (&filter)[96] = g_controlsFilter;
     ImGui::SetNextItemWidth(-FLT_MIN);
-    ImGui::InputTextWithHint("##controls_filter", ICON_LC_SEARCH "  Filter shortcuts and gestures", filter, sizeof filter);
+    ImGui::InputTextWithHint("##controls_filter", tr(ICON_LC_SEARCH "  Filter shortcuts and gestures"), filter, sizeof filter);
     const std::string f = lower(filter);
     auto matches = [&](const std::string& a, const std::string& b, const std::string& c) {
         return f.empty() || lower(a).find(f) != std::string::npos || lower(b).find(f) != std::string::npos ||
