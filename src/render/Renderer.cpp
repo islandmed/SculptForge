@@ -1187,6 +1187,8 @@ void Renderer::freeSlot(MeshSlot& s) {
     if (s.coarseVao) {
         gl::DeleteBuffers(1, &s.coarseVertices);
         gl::DeleteBuffers(1, &s.coarseIndices);
+        gl::DeleteBuffers(1, &s.coarseColors);
+        gl::DeleteBuffers(1, &s.coarseMask);
         gl::DeleteVertexArrays(1, &s.coarseVao);
     }
     s.micro.reset();
@@ -2319,6 +2321,22 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     if (syncLog) lapMs(lap);
     if ((proxyUsed_ || (proxyPrebuild_ && s.proxyAllocated)) && !s.outOfMemory && s.drawnTriangles >= kProxyMinTriangles)
         buildProxies(s, mesh);
+    // Colour and mask edits move no point, so they mark the coarse levels here (as moves do in updateBounds): the
+    // edited clusters draw in full until the edits stop, then their cells take the new values. Colours or a mask
+    // appearing or going: every cluster.
+    if (s.coarse && !full) {
+        const bool attributes = (nv > 0 && mesh.colors.size() == nv) || (nv > 0 && mesh.mask.size() == nv) ||
+                                !s.coarse->colors.empty() || !s.coarse->mask.empty();
+        if (!coarseAttributesMatch(*s.coarse, mesh)) {
+            if (s.coarsePending.size() < s.coarseDirty.size()) // (once: then the next quiet sync updates them)
+                for (uint32_t c = 0; c < s.coarseDirty.size(); ++c) markCoarseDirty(s, c);
+        } else if (attributes && ranged) {
+            for (const auto& [b, e] : dirtyRuns_) {
+                if (b >= e) continue;
+                for (uint32_t c = s.order.clusterOfSlot(b), c1 = s.order.clusterOfSlot(e - 1); c <= c1; ++c) markCoarseDirty(s, c);
+            }
+        }
+    }
     if (coarseLod_ && !s.coarseTried && !s.outOfMemory && s.drawnTriangles > (lodBudget_ ? lodBudget_ : triangleBudget(RenderSettings())))
         buildCoarse(s, mesh);
     if (s.coarse && !s.coarsePending.empty() && !s.coarseEdited && !stroking_) updateCoarse(s, mesh); // (the stroke is over)
@@ -3264,12 +3282,15 @@ void Renderer::buildCoarse(MeshSlot& s, const Mesh& mesh) {
         gl::GenVertexArrays(1, &s.coarseVao);
         gl::GenBuffers(1, &s.coarseVertices);
         gl::GenBuffers(1, &s.coarseIndices);
+        gl::GenBuffers(1, &s.coarseColors);
+        gl::GenBuffers(1, &s.coarseMask);
     }
     s.coarse = std::move(levels);
     s.coarseDirty.assign(s.coarse->clusters.size(), 0);
     s.coarsePending.clear();
     gl::BindVertexArray(s.coarseVao);
     uploadCoarsePoints(s);
+    uploadCoarseAttributes(s);
     gl::EnableVertexAttribArray(0);
     gl::VertexAttribIPointer(0, 2, GL_UNSIGNED_INT, sizeof(PackedVertex), nullptr);
     gl::EnableVertexAttribArray(1);
@@ -3302,6 +3323,34 @@ void Renderer::uploadCoarsePoints(MeshSlot& s) {
     gl::BufferData(GL_ARRAY_BUFFER, GLsizeiptr(packed.size() * sizeof(PackedVertex)), packed.data(), GL_STATIC_DRAW);
 }
 
+// The cells' colours and mask as the full mesh's go up (whole: a few MB), or the arrays off where it has none.
+void Renderer::uploadCoarseAttributes(MeshSlot& s) {
+    const CoarseLevels& L = *s.coarse;
+    if (!L.colors.empty()) {
+        std::vector<uint32_t> packed(L.colors.size());
+        poolFor(packed.size(), [&](size_t i0, size_t i1) {
+            for (size_t i = i0; i < i1; ++i) packed[i] = packColor(L.colors[i]);
+        });
+        gl::BindBuffer(GL_ARRAY_BUFFER, s.coarseColors);
+        gl::BufferData(GL_ARRAY_BUFFER, GLsizeiptr(packed.size() * sizeof(uint32_t)), packed.data(), GL_STATIC_DRAW);
+        gl::VertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, 4, nullptr);
+        gl::EnableVertexAttribArray(2);
+    } else {
+        gl::DisableVertexAttribArray(2);
+    }
+    if (!L.mask.empty()) {
+        std::vector<uint8_t> packed(L.mask.size());
+        for (size_t i = 0; i < packed.size(); ++i) packed[i] = packMask(L.mask[i]);
+        gl::BindBuffer(GL_ARRAY_BUFFER, s.coarseMask);
+        gl::BufferData(GL_ARRAY_BUFFER, GLsizeiptr(packed.size()), packed.data(), GL_STATIC_DRAW);
+        gl::VertexAttribPointer(3, 1, GL_UNSIGNED_BYTE, GL_TRUE, 1, nullptr);
+        gl::EnableVertexAttribArray(3);
+    } else {
+        gl::DisableVertexAttribArray(3);
+    }
+    gl::BindBuffer(GL_ARRAY_BUFFER, s.coarseVertices); // (the points' attributes are set up against it)
+}
+
 void Renderer::noteGpuFrame(double gpuMs, uint64_t drawnTriangles) {
     if (!(gpuMs > 0.2) || drawnTriangles < 500000) return; // (small frames are mostly fixed costs)
     const double v = gpuMs / double(drawnTriangles);
@@ -3329,7 +3378,7 @@ void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
     const auto start = std::chrono::steady_clock::now();
     const std::vector<uint32_t> changed = updateCoarseLevels(*s.coarse, mesh, s.order, s.coarsePending);
     gl::BindVertexArray(s.coarseVao);
-    if (!changed.empty()) uploadCoarsePoints(s);
+    if (!changed.empty()) uploadCoarsePoints(s), uploadCoarseAttributes(s);
     gl::BindVertexArray(0);
     gl::BindBuffer(GL_ARRAY_BUFFER, 0);
     for (uint32_t c : s.coarsePending) s.coarseDirty[c] = 0;
@@ -3547,8 +3596,8 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     }
     if (coarse && !coarseClusters_.empty()) { // the spike's coarse levels: one multi-draw, 32-bit indices
         gl::BindVertexArray(s.coarseVao);
-        gl::VertexAttrib4f(2, 1.0f, 1.0f, 1.0f, 1.0f);
-        gl::VertexAttrib1f(3, 0.0f);
+        if (s.coarse->colors.empty()) gl::VertexAttrib4f(2, 1.0f, 1.0f, 1.0f, 1.0f);
+        if (s.coarse->mask.empty()) gl::VertexAttrib1f(3, 0.0f);
         gl::Uniform1i(p->twoSided, 0);
         drawCounts_.clear();
         drawOffsets_.clear();

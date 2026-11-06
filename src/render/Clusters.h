@@ -95,6 +95,10 @@ struct CoarseLevels {
     float cell = 0.0f; // level 0's
     std::vector<Level> levels;
     std::vector<glm::vec3> positions, normals; // every level's cell points, one level after the other
+    // Per cell the mean of its vertices' colours (linear) and mask, as the full mesh shows them; empty when the mesh
+    // has none (colours: vertex paint and the paint layers' composite).
+    std::vector<glm::vec3> colors;
+    std::vector<float> mask;
     std::vector<uint32_t> indices;             // into positions (the renderer frees them once on the GPU)
     std::vector<Lod> clusters;
     // Membership is the build's: an edit moves the cells' points (the means of their vertices where they are now),
@@ -112,6 +116,11 @@ CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order);
 // vertices where they are now, and of their cells up the levels. Returns the cells changed.
 std::vector<uint32_t> updateCoarseLevels(CoarseLevels& levels, const Mesh& mesh, const UploadOrder& order,
                                          const std::vector<uint32_t>& dirty);
+// The cells' colours and mask from the mesh's: of the level-0 cells `cells0` (cell ids into positions; empty: all)
+// and their cells up the levels. Where the mesh gained or lost colours or a mask since, every cell's.
+void coarseAttributes(CoarseLevels& levels, const Mesh& mesh, std::vector<uint32_t> cells0 = {});
+// Whether the cells' colours and mask are there exactly where the mesh has them.
+bool coarseAttributesMatch(const CoarseLevels& levels, const Mesh& mesh);
 
 // Every directed edge a->b has as many b->a: the mesh is the closed, consistently wound boundary of a volume
 // (it may intersect itself). Wound outwards (a positive signed volume: the sum of ClusterBounds::volume), every
