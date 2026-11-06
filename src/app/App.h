@@ -1497,6 +1497,7 @@ private:
     bool jobWaitsForStroke() const;
     Uint64 clickClockNs() const; // the status bar names the new active Part and how it was chosen
     uint32_t renamingPart_ = 0; // Part id being renamed inline (0: none)
+    uint32_t renamingFolder_ = 0; // Part folder id being renamed inline (0: none; #96)
     uint32_t listedActivePart_ = 0; // the list scrolls to the active Part when it changes
     // Part thumbnails (#43): rendered from each Part's GPU buffers while the Parts panel shows, one per frame
     // at most, a change once it has settled (PartThumbnails.h); GL textures by Part id.
@@ -1635,6 +1636,16 @@ private:
     float microSlider_ = 4.0f;  // Tool > Geometry > Micro: the micro level the next Divide to micro makes
     bool sdivHeld_ = false;
     void drawPartsContents();
+    // Parts list folders (#96): what a frame's folder rows asked for, run after the list (by folder name).
+    struct PartFolderActions {
+        std::string toggle, collapse, remove, gizmo, rename, renameTo;
+        int part = -1;      // a Part put into folder partTo ("" = out of its folder)
+        std::string partTo;
+    };
+    void drawPartFolderRow(int folder, float rowH, ImVec2 cellPad, PartFolderActions& fa);
+    void partDropTarget(const std::string& folder, PartFolderActions& fa);
+    std::string partFolderName(uint32_t id) const;
+    void startFolderRename(); // the folder just made: its name ready to type
     // PanelExtract.cpp: Tool > Part > Extract, Tool > Geometry > Modify Topology (Mirror And Weld) and
     // Tool > Deformation (Mirror).
     void drawExtractContents();
@@ -1866,7 +1877,7 @@ private:
         bool pivotPlaced = false;   // Alt+drag, snap or a drag moved it: stop following the centre
         bool orientSurface = false; // axes from the surface the pivot was snapped to (else world)
         glm::mat3 frame{1.0f};      // the surface axes (turn with rotations)
-        bool useMask = true, all = false;
+        bool useMask = true, all = false, folder = false; // folder: the active Part's folder moves together (#96)
         float falloff = 0.0f;       // fraction of the size (core/MeshTransform.h)
         bool snapNext = false;      // "Pivot to Surface": the next click on the model places the pivot
         uint64_t centreKey = ~uint64_t(0), maskKey = 0;

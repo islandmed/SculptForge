@@ -101,6 +101,9 @@ example to turn a whole character with its eyes, teeth and clothes. The pivot is
 Part gets its own undo step: undo goes back in the active Part, and selecting another Part undoes its
 part.
 
+**Folder**, beside it, moves the visible Parts in the active Part's [folder](parts.md#folders) together, for
+example both eyes. Right-click a folder's header in the Parts list > **Move with the gizmo** turns it on for you.
+
 ## What a transform keeps
 
 A transform only changes where the vertices are. Face Groups, quads, UVs, vertex paint, textures, the mask and

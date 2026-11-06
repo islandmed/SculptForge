@@ -37,6 +37,7 @@ struct Part {
     std::string name;
     bool visible = true;
     Shading shading = Shading::Default; // per-Part override of the scene's shading
+    uint32_t folder = 0;                // the PartFolder it's in (its id), 0 = none
     // Inactive Parts only (empty while active).
     Mesh mesh;
     BVH bvh;
@@ -46,6 +47,14 @@ struct Part {
     bool bvhDirty = false;
     uint64_t cleanRevision = 0;
     std::vector<QRemeshGuide> qremeshGuides; // QRemesh Guides (core/QRemeshGuides.h)
+};
+
+// A folder in the Parts list (#96): a name the list groups its Parts under, so they hide, show and move
+// together. Display and organisation only; saved in projects (optional keys, older versions ignore them).
+struct PartFolder {
+    uint32_t id = 0; // stable for the session; Part::folder points here
+    std::string name;
+    bool collapsed = false; // the list shows only its header
 };
 
 // An undo step that added Part `id` at list position `at` (UndoRecord::part): `stashed` holds the Part
@@ -166,6 +175,21 @@ struct Document {
     // Removes the preview Part (if any); `staleOnly`: only when it's no longer current.
     void dropExtractPreview(bool staleOnly = false);
 
+    // --- Part folders (#96). Not undoable either; changes set `modified`.
+    std::vector<PartFolder> partFolders;
+    // Adds a folder (its name made unique) and returns its id.
+    uint32_t addPartFolder(const std::string& name);
+    // Index of the folder with this id / name (exact match), or -1.
+    int partFolderIndex(uint32_t id) const;
+    int findPartFolder(const std::string& name) const;
+    // Removes a folder; its Parts stay, outside any folder.
+    void removePartFolder(uint32_t id);
+    // Puts Part `i` into folder `id` (0 = out of any folder). Joining a folder moves the Part to just below the
+    // folder's last Part, so a folder's Parts stay together in the list; returns the Part's new index.
+    int setPartFolder(int i, uint32_t id);
+    // A folder name not used yet ("Folder", "Folder 2", ...).
+    std::string uniqueFolderName(const std::string& wanted) const;
+
     // A name not used by any Part yet ("Eye", "Eye 2", ...).
     std::string uniquePartName(const std::string& wanted) const;
     // Bounds of every visible Part.
@@ -185,6 +209,7 @@ struct Document {
 private:
     uint64_t cleanRevision_ = 0, cleanSplatsVersion_ = 0;
     uint32_t nextPartId_ = 2;
+    uint32_t nextFolderId_ = 1;
 };
 
 } // namespace sf

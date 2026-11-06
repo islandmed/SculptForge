@@ -187,14 +187,21 @@ CommandResult notFound(const Args& a) {
     return {false, a.contains("name") ? "No Part named '" + argString(a, "name") + "'" : std::string("No such Part")};
 }
 
+// The folder named by folder= (#96), or -1.
+int targetFolder(const Document& doc, const Args& a) { return doc.findPartFolder(argString(a, "folder")); }
+
+CommandResult folderNotFound(const Args& a) { return {false, "No folder named '" + argString(a, "folder") + "'"}; }
+
 // Replaces Part `index` by `pieces`, named after it ("Body 1", "Body 2", ...); the first piece is selected.
 void replaceWithPieces(Document& doc, int index, std::vector<Mesh> pieces) {
     notePartLevelsDropped(doc, index); // the pieces are cut from the current level
     const std::string base = doc.parts[size_t(index)].name;
     const bool visible = doc.parts[size_t(index)].visible;
+    const uint32_t folder = doc.parts[size_t(index)].folder;
     for (size_t k = 0; k < pieces.size(); ++k) {
         const int at = doc.addPart(std::move(pieces[k]), base + " " + std::to_string(k + 1), false, index + 1 + int(k));
         doc.parts[size_t(at)].visible = visible;
+        doc.parts[size_t(at)].folder = folder;
     }
     doc.selectPart(index + 1);
     doc.removePart(index);
@@ -321,7 +328,14 @@ void registerPartCommands(CommandRegistry& reg) {
                      if (subdivLevelCount(doc.partMesh(i))) out += ", " + subdivLevelText(doc.partMesh(i));
                      if (i == doc.activePart) out += ", active";
                      if (!s.visible) out += ", hidden";
+                     if (const int f = doc.partFolderIndex(s.folder); f >= 0) out += ", in " + doc.partFolders[size_t(f)].name;
                      out += ")";
+                 }
+                 for (const PartFolder& f : doc.partFolders) {
+                     int n = 0;
+                     for (const Part& s : doc.parts) n += s.folder == f.id ? 1 : 0;
+                     out += "\nFolder " + f.name + " (" + std::to_string(n) + " Part" + (n == 1 ? "" : "s") +
+                            (f.collapsed ? ", collapsed" : "") + ")";
                  }
                  return {true, out};
              }});
@@ -477,8 +491,10 @@ void registerPartCommands(CommandRegistry& reg) {
                  if (i < 0) return notFound(a);
                  Mesh copy = doc.partMesh(i);
                  const Shading shading = doc.parts[size_t(i)].shading;
+                 const uint32_t folder = doc.parts[size_t(i)].folder;
                  const int added = doc.addPart(std::move(copy), doc.parts[size_t(i)].name + " copy", true, i + 1);
                  doc.parts[size_t(added)].shading = shading;
+                 doc.parts[size_t(added)].folder = folder; // (right below it: the folder stays together)
                  return {true, "Duplicated as " + doc.parts[size_t(added)].name};
              }});
 
@@ -530,6 +546,90 @@ void registerPartCommands(CommandRegistry& reg) {
                  if (s.shading != mode) doc.modified = true;
                  s.shading = mode;
                  return {true, s.name + " shading: " + shadingName(mode)};
+             }});
+
+    // Folders (#96): group Parts in the list; hide, show and move (transform folder=true) a folder at once.
+    const ParamSpec folderParam{"folder", T::String, "Folder name.", true};
+    reg.add({"part_folder_new", "Make a folder in the Parts list and put a Part in it (the active one by default).",
+             {{"folder", T::String, "Its name (default Folder; made unique).", false},
+              {"empty", T::Bool, "Make it empty instead. Default false.", false}, indexParam, nameParam},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const int i = targetPart(doc, a);
+                 if (i < 0) return notFound(a);
+                 const uint32_t id = doc.addPartFolder(argString(a, "folder", "Folder"));
+                 const std::string& folder = doc.partFolders.back().name;
+                 if (argBool(a, "empty", false)) return {true, "Made folder " + folder};
+                 const int at = doc.setPartFolder(i, id);
+                 return {true, "Made folder " + folder + " with " + doc.parts[size_t(at)].name};
+             }});
+
+    reg.add({"part_set_folder", "Put a Part into a folder, or take it out (folder empty).",
+             {{"folder", T::String, "Folder name; empty = out of its folder.", true}, indexParam, nameParam},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const int i = targetPart(doc, a);
+                 if (i < 0) return notFound(a);
+                 const std::string name = doc.parts[size_t(i)].name;
+                 if (argString(a, "folder").empty()) {
+                     doc.setPartFolder(i, 0);
+                     return {true, name + " is out of its folder"};
+                 }
+                 const int f = targetFolder(doc, a);
+                 if (f < 0) return folderNotFound(a);
+                 doc.setPartFolder(i, doc.partFolders[size_t(f)].id);
+                 return {true, name + " is in " + doc.partFolders[size_t(f)].name};
+             }});
+
+    reg.add({"part_folder_rename", "Rename a Part folder.",
+             {folderParam, {"to", T::String, "The new name.", true}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const int f = targetFolder(doc, a);
+                 if (f < 0) return folderNotFound(a);
+                 std::string to = argString(a, "to");
+                 if (to.empty()) return {false, "The name can't be empty"};
+                 PartFolder& folder = doc.partFolders[size_t(f)];
+                 if (folder.name != to) to = doc.uniqueFolderName(to);
+                 folder.name = to;
+                 doc.modified = true;
+                 return {true, "Folder renamed to " + to};
+             }});
+
+    reg.add({"part_folder_visibility", "Show or hide every Part in a folder.",
+             {folderParam, {"visible", T::Bool, "true to show, false to hide. Default: hide if any is shown, else show.", false}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const int f = targetFolder(doc, a);
+                 if (f < 0) return folderNotFound(a);
+                 const PartFolder& folder = doc.partFolders[size_t(f)];
+                 bool anyShown = false;
+                 for (const Part& s : doc.parts) anyShown |= s.folder == folder.id && s.visible;
+                 const bool show = argBool(a, "visible", !anyShown);
+                 int n = 0;
+                 for (Part& s : doc.parts)
+                     if (s.folder == folder.id) {
+                         s.visible = show;
+                         ++n;
+                     }
+                 if (n == 0) return {false, folder.name + " has no Parts"};
+                 doc.modified = true;
+                 return {true, folder.name + (show ? " shown" : " hidden")};
+             }});
+
+    reg.add({"part_folder_collapse", "Fold a Part folder in the list (only its header shows), or open it.",
+             {folderParam, {"collapsed", T::Bool, "true to fold, false to open. Default: toggle.", false}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const int f = targetFolder(doc, a);
+                 if (f < 0) return folderNotFound(a);
+                 PartFolder& folder = doc.partFolders[size_t(f)];
+                 folder.collapsed = argBool(a, "collapsed", !folder.collapsed); // (a view state: not an unsaved change)
+                 return {true, folder.name + (folder.collapsed ? " folded" : " opened")};
+             }});
+
+    reg.add({"part_folder_delete", "Remove a Part folder. Its Parts stay, outside any folder.", {folderParam},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const int f = targetFolder(doc, a);
+                 if (f < 0) return folderNotFound(a);
+                 const std::string name = doc.partFolders[size_t(f)].name;
+                 doc.removePartFolder(doc.partFolders[size_t(f)].id);
+                 return {true, "Removed folder " + name + " (its Parts stay)"};
              }});
 
     reg.add({"part_solo", "Show only the active Part, or (when it already is the only one shown) show all again.", {},

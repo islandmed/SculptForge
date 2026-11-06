@@ -1,0 +1,24 @@
+# Part folders (#96) on a HiDPI screen (CMake: 3200x1800 at 200 %): the header, its menu, folded, the header's menu, a Part's Folder menu.
+ui_scale 200
+run new_sphere subdivisions=4 ; part_rename to=Head
+run part_append type=sphere ; part_rename to="Left eye" ; transform scale=0.25 pivot=origin translate=-0.65,0.3,0.85
+run part_append type=cube ; part_rename to=Body ; transform translate=0,-1.6,0
+run part_append type=sphere ; part_rename to="Right eye" ; transform scale=0.25 pivot=origin translate=-0.05,0.3,0.85
+run part_folder_new folder=Eyes ; part_set_folder name="Left eye" folder=Eyes
+key f
+expect "Parts/Eyes##folder"
+expect "Parts/Left eye"
+shot folders
+run part_folder_collapse folder=Eyes
+expect_not "Parts/Left eye"
+shot folded
+run part_folder_collapse folder=Eyes
+right_click "Parts/Eyes##folder"
+expect "Move with the gizmo"
+shot folder-menu
+key escape
+wait 0.5
+right_click "Parts/Body"
+click "Folder"
+expect "Eyes##to folder"
+shot part-folder-menu

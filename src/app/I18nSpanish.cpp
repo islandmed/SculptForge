@@ -1320,6 +1320,17 @@ constexpr Entry kSpanish[] = {
      "whatever the mask.",
      "Lo enmascarado se queda donde está y lo parcialmente enmascarado se mueve en parte (activado por defecto). "
      "Desactivado: toda la Pieza se mueve sin importar la máscara."},
+    {"Folder", "Carpeta"},
+    {"Hide its Parts", "Ocultar sus Piezas"},
+    {"Show its Parts", "Mostrar sus Piezas"},
+    {"Move with the gizmo", "Mover con el gizmo"},
+    {"New folder", "Carpeta nueva"},
+    {"New folder with the active Part (drag Parts onto a folder to add them)", "Carpeta nueva con la Pieza activa (arrastra Piezas a una carpeta para añadirlas)"},
+    {"Out of the folder", "Fuera de la carpeta"},
+    {"Remove folder (keep its Parts)", "Quitar la carpeta (conservar sus Piezas)"},
+    {"Click to open, double-click to rename, drag Parts onto it", "Clic para abrir, doble clic para renombrar, arrastra Piezas aquí"},
+    {"Click to fold, double-click to rename, drag Parts onto it", "Clic para plegar, doble clic para renombrar, arrastra Piezas aquí"},
+    {"Transform the visible Parts in the active Part's folder together (Parts list folders). Each Part gets its own undo step.", "Transforma juntas las Piezas visibles de la carpeta de la Pieza activa (carpetas de la lista de Piezas). Cada Pieza tiene su propio paso de deshacer."},
     {"Transform every visible Part together. Each Part gets its own undo step.",
      "Transforma juntas todas las Piezas visibles. Cada Pieza tiene su propio paso de deshacer."},
     {"Where the gizmo sits: rotation and scaling turn about this point. It follows the centre of what moves until you "
