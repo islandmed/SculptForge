@@ -1,5 +1,5 @@
 ---
-whats_new: **Smoother view on very dense meshes**: a scan or import with more triangles than your computer draws comfortably now draws a lighter version of itself while you turn the view, and the real detail as soon as the view rests. Parts you sculpt always show in full detail. Orbiting a 28-million-triangle scan on an entry-level laptop goes from about 70 to about 180 frames a second.
+whats_new: **Smoother view on very dense meshes**: a scan or import with more triangles than your computer draws comfortably now draws a lighter version of itself while you turn the view, and the real detail as soon as the view rests. Parts you sculpt always show in full detail. Orbiting a 28-million-triangle scan on an entry-level machine is about twice as smooth: its slowest frames go from 24 to 12 ms.
 highlight: Dense scans orbit smoothly on entry-level machines
 added: Coarse levels for dense meshes: a plain mesh over the hardware tier's triangle budget draws all of it at one
   lighter level while the view moves (the finest that fits the budget), and in full detail once the view has rested
