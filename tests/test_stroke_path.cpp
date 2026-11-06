@@ -189,6 +189,12 @@ TEST(stroke_backlog_keeps_a_heavy_brush_near_the_pointer) {
     CHECK(strokeBacklogLimit(0.0) == 4);        // not measured yet
     CHECK(strokeBacklogLimit(0.045, 0) == 0);   // SF_STROKE_BACKLOG=0: never thinned
     CHECK(strokeBacklogLimit(0.0001, 10) == 10); // a fixed limit
+    // A floor in time: slow dabs keep fewer waiting (at least one), quick ones the usual floor.
+    CHECK(strokeBacklogLimit(0.07, -1, 0.05, 4, 0.1) == 1);
+    CHECK(strokeBacklogLimit(0.04, -1, 0.05, 4, 0.1) == 2);
+    CHECK(strokeBacklogLimit(0.02, -1, 0.05, 4, 0.1) == 4);
+    CHECK(strokeBacklogLimit(0.0001, -1, 0.05, 4, 0.1) == 500);
+    CHECK(strokeBacklogLimit(0.0, -1, 0.05, 4, 0.1) == 4);
     // Thinned to the limit, the newest dab stays.
     DabQueue q;
     for (int i = 0; i < 30; ++i) q.push(PathDab{float(i), 0.0f, 1.0f});
