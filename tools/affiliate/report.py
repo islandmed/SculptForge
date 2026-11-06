@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # SculptForge - open source digital sculpting
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Creator referral statement (docs/affiliates.md): per referral code, the membership payments made in one month by
-members who joined through that creator's link, and the 15% owed, for the first 12 months of each membership.
+"""Creator referral statement (docs/affiliates.md): per referral code, the YEARLY membership payments made in one
+month by members who joined through that creator's link, and the 15% owed: the first year of each yearly
+membership only. Monthly plans never count.
 
-website/ref.js adds client_reference_id=<code> to the Stripe checkout links; Stripe keeps it on the checkout
-session. Renewals carry no code, so a member's code and start date come from their first coded payment (CSV) or
-checkout session (API), and every later payment by the same customer counts until 12 months after that start.
-Refunds are taken off; Stripe's fees are not (the share is of what the member paid).
+website/ref.js adds client_reference_id=<code> to the yearly Stripe checkout links only; Stripe keeps it on the
+checkout session. A member's code and start date come from their first coded payment (CSV) or checkout session
+(API); their yearly payments count until 12 months after that start (so the first year's payment, plus any
+yearly upgrade inside that year; not the renewal). Refunds are taken off; Stripe's fees are not (the share is of
+what the member paid).
 
     report.py --month 2026-11 --csv payments.csv   # Dashboard > Payments > Export, with the customer and the
                                                    # client_reference_id (or a "ref" metadata) column
@@ -16,8 +18,10 @@ Refunds are taken off; Stripe's fees are not (the share is of what the member pa
     report.py selftest                             # ctest affiliate_report: a fake export
 
 CSV columns are found by name, case-insensitive: date (Created date (UTC) / Created (UTC) / created), Amount,
-Amount Refunded, Currency, Status, Customer ID (or Customer Email) and the code (any column with
-client_reference_id in its name, or ref / affiliate (metadata)). Amounts in the export are in major units ($5.00).
+Amount Refunded, Currency, Status, Customer ID (or Customer Email), the code (any column with client_reference_id
+in its name, or ref / affiliate (metadata)) and, if the export has one, the billing interval (any column with
+"interval" in its name: year / month). Without an interval column a payment is yearly when its amount is a yearly
+price (YEARLY_PRICES). Amounts in the export are in major units ($48.00).
 """
 
 import argparse
@@ -35,6 +39,7 @@ from decimal import Decimal, ROUND_HALF_UP
 SHARE = Decimal("0.15")
 MONTHS = 12
 CODE = re.compile(r"^[a-z0-9_-]{1,32}$")  # the same rule as website/ref.js
+YEARLY_PRICES = {Decimal("48.00")}  # Member yearly; add a Studio yearly price when one exists (and in ref.js)
 
 
 def add_months(t, n):
@@ -74,7 +79,7 @@ def pick(headers, *names, contains=None):
 
 
 def payments_from_csv(text):
-    """[(customer, time, amount, currency, code or None)] for the successful payments of a Stripe export."""
+    """[(customer, time, amount, currency, code or None, yearly)] for the successful payments of a Stripe export."""
     rows = list(csv.DictReader(io.StringIO(text)))
     if not rows:
         return []
@@ -87,6 +92,7 @@ def payments_from_csv(text):
         "status": pick(h, "status"),
         "customer": pick(h, "customer id", "customer", "customer email"),
         "code": pick(h, "ref (metadata)", "affiliate (metadata)", "client_reference_id", contains="client_reference_id"),
+        "interval": pick(h, "interval", contains="interval"),
     }
     for k in ("date", "amount", "customer"):
         if not col[k]:
@@ -98,10 +104,12 @@ def payments_from_csv(text):
         cust = r[col["customer"]].strip()
         if not cust:
             continue
-        amount = money(r[col["amount"]]) - (money(r[col["refunded"]]) if col["refunded"] else 0)
+        paid = money(r[col["amount"]])
+        amount = paid - (money(r[col["refunded"]]) if col["refunded"] else 0)
         code = r[col["code"]].strip().lower() if col["code"] else ""
+        yearly = (r[col["interval"]].strip().lower() in ("year", "yearly", "annual")) if col["interval"] else paid in YEARLY_PRICES
         out.append((cust, parse_time(r[col["date"]]), amount,
-                    (r[col["currency"]].strip().lower() if col["currency"] else "usd"), code or None))
+                    (r[col["currency"]].strip().lower() if col["currency"] else "usd"), code or None, yearly))
     return out
 
 
@@ -121,36 +129,40 @@ def stripe_get(key, path, params):
 
 
 def payments_from_api(key):
-    """The same list from the API: coded checkout sessions, then every paid invoice of those customers."""
+    """The same list from the API: coded checkout sessions, then every paid invoice of those customers (yearly when
+    its subscription lines bill per year)."""
     out = []
     for s in stripe_get(key, "checkout/sessions", {"status": "complete"}):
         if s.get("client_reference_id") and s.get("customer"):
             out.append((s["customer"], parse_time(str(s["created"])), Decimal(0), (s.get("currency") or "usd"),
-                        s["client_reference_id"].lower()))
+                        s["client_reference_id"].lower(), False))
     for cust in sorted({p[0] for p in out}):
         for inv in stripe_get(key, "invoices", {"customer": cust, "status": "paid"}):
             paid = (inv.get("status_transitions") or {}).get("paid_at") or inv["created"]
             amount = Decimal(inv.get("amount_paid", 0)) - Decimal(inv.get("post_payment_credit_notes_amount", 0))
-            out.append((cust, parse_time(str(paid)), amount / 100, inv.get("currency", "usd"), None))
+            lines = (inv.get("lines") or {}).get("data") or []
+            yearly = bool(lines) and all(((l.get("price") or l.get("plan") or {}).get("recurring") or {}).get("interval",
+                     (l.get("plan") or {}).get("interval")) == "year" for l in lines)
+            out.append((cust, parse_time(str(paid)), amount / 100, inv.get("currency", "usd"), None, yearly))
     return out
 
 
 def statement(payments, month):
-    """{code: {currency: [count, gross]}} for the payments in month (YYYY-MM) inside each membership's first 12
-    months; skipped: invalid codes."""
+    """{code: {currency: [count, gross]}} for the yearly payments in month (YYYY-MM) inside each membership's first
+    12 months; skipped: monthly payments, invalid codes."""
     y, m = map(int, month.split("-"))
     lo = dt.datetime(y, m, 1)
     hi = add_months(lo, 1)
     start = {}  # customer -> (first coded time, code)
-    for cust, t, _, _, code in sorted(payments, key=lambda p: p[1]):
+    for cust, t, _, _, code, _ in sorted(payments, key=lambda p: p[1]):
         if code and cust not in start:
             if CODE.match(code):
                 start[cust] = (t, code)
             else:
                 print(f"report.py: ignored invalid code {code!r} ({cust})", file=sys.stderr)
     out = {}
-    for cust, t, amount, cur, _ in payments:
-        if cust not in start or not (lo <= t < hi) or amount <= 0:
+    for cust, t, amount, cur, _, yearly in payments:
+        if cust not in start or not yearly or not (lo <= t < hi) or amount <= 0:
             continue
         t0, code = start[cust]
         if not (t0 <= t < add_months(t0, MONTHS)):
@@ -163,10 +175,10 @@ def statement(payments, month):
 
 def render(month, st):
     cents = Decimal("0.01")
-    lines = [f"SculptForge creator statement, {month} ({int(SHARE * 100)}% of membership payments, first "
-             f"{MONTHS} months of each membership)", ""]
+    lines = [f"SculptForge creator statement, {month} ({int(SHARE * 100)}% of the first year of each yearly "
+             f"membership)", ""]
     if not st:
-        lines.append("No referred membership payments this month.")
+        lines.append("No referred yearly membership payments this month.")
     for code in sorted(st):
         for cur, (n, gross) in sorted(st[code].items()):
             owed = (gross * SHARE).quantize(cents, ROUND_HALF_UP)
@@ -176,28 +188,37 @@ def render(month, st):
 
 
 SAMPLE = """id,Created date (UTC),Amount,Amount Refunded,Currency,Status,Customer ID,Customer Email,client_reference_id (metadata)
-py_1,2026-11-07 10:00:00,5.00,0.00,usd,Paid,cus_A,a@example.com,asknk
-py_2,2026-12-07 10:00:00,5.00,0.00,usd,Paid,cus_A,a@example.com,
-py_3,2027-11-07 09:59:59,5.00,0.00,usd,Paid,cus_A,a@example.com,
-py_4,2027-12-07 10:00:00,5.00,0.00,usd,Paid,cus_A,a@example.com,
-py_5,2026-12-01 00:00:00,48.00,0.00,usd,Paid,cus_B,b@example.com,AskNK
-py_6,2026-12-02 00:00:00,5.00,5.00,usd,Paid,cus_C,c@example.com,asknk
-py_7,2026-12-03 00:00:00,5.00,0.00,usd,Failed,cus_D,d@example.com,asknk
-py_8,2026-12-04 00:00:00,5.00,0.00,usd,Paid,cus_E,e@example.com,
-py_9,2026-12-05 00:00:00,150.00,0.00,usd,Paid,cus_F,f@example.com,<script>
-py_10,2026-12-06 00:00:00,5.00,0.00,usd,Paid,cus_G,g@example.com,other_creator
+py_1,2026-11-07 10:00:00,48.00,0.00,usd,Paid,cus_A,a@example.com,asknk
+py_2,2027-11-07 10:00:00,48.00,0.00,usd,Paid,cus_A,a@example.com,
+py_3,2026-12-01 00:00:00,48.00,0.00,usd,Paid,cus_B,b@example.com,AskNK
+py_4,2026-12-02 00:00:00,48.00,48.00,usd,Paid,cus_C,c@example.com,asknk
+py_5,2026-12-03 00:00:00,48.00,0.00,usd,Failed,cus_D,d@example.com,asknk
+py_6,2026-12-04 00:00:00,48.00,0.00,usd,Paid,cus_E,e@example.com,
+py_7,2026-12-05 00:00:00,48.00,0.00,usd,Paid,cus_F,f@example.com,<script>
+py_8,2026-12-06 00:00:00,48.00,0.00,usd,Paid,cus_G,g@example.com,other_creator
+py_9,2026-12-07 00:00:00,5.00,0.00,usd,Paid,cus_H,h@example.com,asknk
+py_10,2027-01-07 00:00:00,5.00,0.00,usd,Paid,cus_H,h@example.com,
+py_11,2026-12-08 00:00:00,150.00,0.00,usd,Paid,cus_I,i@example.com,asknk
+"""
+
+INTERVAL_SAMPLE = """Created (UTC),Amount,Currency,Status,Customer ID,client_reference_id,Plan Interval
+2026-12-01 00:00:00,60.00,usd,succeeded,cus_X,asknk,year
+2026-12-02 00:00:00,48.00,usd,succeeded,cus_Y,asknk,month
 """
 
 
 def selftest():
     p = payments_from_csv(SAMPLE)
-    # December: cus_A renewal, cus_B yearly (code case folded); refunded, failed, uncoded and invalid codes don't count.
-    assert statement(p, "2026-12") == {"asknk": {"usd": [2, Decimal("53.00")]},
-                                       "other_creator": {"usd": [1, Decimal("5.00")]}}, statement(p, "2026-12")
-    assert statement(p, "2026-11") == {"asknk": {"usd": [1, Decimal("5.00")]}}
-    assert statement(p, "2027-11") == {"asknk": {"usd": [1, Decimal("5.00")]}}  # month 12, one second before the end
-    assert statement(p, "2027-12") == {}  # month 13: no longer referred
-    assert "asknk" in render("2026-12", statement(p, "2026-12")) and "7.95 USD" in render("2026-12", statement(p, "2026-12"))
+    # December: cus_B yearly (code case folded). Refunded, failed, uncoded, invalid codes, monthly ($5, cus_H) and
+    # Studio monthly ($150, cus_I) don't count.
+    assert statement(p, "2026-12") == {"asknk": {"usd": [1, Decimal("48.00")]},
+                                       "other_creator": {"usd": [1, Decimal("48.00")]}}, statement(p, "2026-12")
+    assert statement(p, "2026-11") == {"asknk": {"usd": [1, Decimal("48.00")]}}
+    assert statement(p, "2027-01") == {}  # cus_H's monthly renewal
+    assert statement(p, "2027-11") == {}  # cus_A's renewal: the second year
+    assert "7.20 USD" in render("2026-12", statement(p, "2026-12"))
+    # With an interval column, the interval decides, not the price.
+    assert statement(payments_from_csv(INTERVAL_SAMPLE), "2026-12") == {"asknk": {"usd": [1, Decimal("60.00")]}}
     assert add_months(dt.datetime(2026, 1, 31), 1) == dt.datetime(2026, 2, 28)
     print("affiliate report selftest: ok")
 

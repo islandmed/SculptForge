@@ -1,8 +1,11 @@
 // SculptForge website: creator referral codes (docs/affiliates.md). A page opened with ?ref=<code> remembers the
 // code for 30 days in this browser (localStorage; no cookies, nothing sent anywhere) and adds
-// client_reference_id=<code> to the Stripe checkout links, so the creator who sent you gets credit. A code is
-// 1-32 of a-z 0-9 _ -; anything else is ignored. Without a code, or without JavaScript, links stay as they are.
+// client_reference_id=<code> to the yearly Stripe checkout links (referrals count on yearly plans only), so the
+// creator who sent you gets credit. A code is 1-32 of a-z 0-9 _ -; anything else is ignored. Monthly links, and
+// every link without a code or without JavaScript, stay as they are.
 (() => {
+  // The yearly checkouts (Payment Link ids): Member $48 / year. Add a Studio yearly link here when it exists.
+  const YEARLY = new Set(["aFa5kD4eHfhE2an6il4F206"]);
   const KEY = "sf-ref", DAYS = 30, valid = (c) => typeof c === "string" && /^[a-z0-9_-]{1,32}$/.test(c);
   let code = null;
   try {
@@ -17,11 +20,11 @@
     }
   } catch (e) { /* storage blocked or bad data: no code */ }
   if (!code) return;
-  // Tag a link to Stripe checkout; also its yearly variant (support.html swaps href to data-yearly).
+  // Tag a yearly Stripe checkout link; also a link's yearly variant (support.html swaps href to data-yearly).
   const tag = (url) => {
     try {
       const u = new URL(url, location.href);
-      if (u.protocol !== "https:" || u.hostname !== "buy.stripe.com") return url;
+      if (u.protocol !== "https:" || u.hostname !== "buy.stripe.com" || !YEARLY.has(u.pathname.slice(1))) return url;
       u.searchParams.set("client_reference_id", code);
       return u.href;
     } catch (e) { return url; }
