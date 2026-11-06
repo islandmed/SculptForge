@@ -64,7 +64,8 @@ the RTX 3060 runs in this doc (eb2f2aa) predate that fix: sanity checks only, po
 
 **Frame split.** `--benchmark` now writes `frame_split_ms` per phase (p50 / p95 / p99 of the main thread's
 events, sculpt, UI, upload = ghost + scene sync, draw = GL calls, swap_wait = UI draw + swap, where the frame
-waits for the GPU). It decides whether a native backend (D3D11/12, Metal) behind a thin render interface should
+waits for the GPU), with `gpu_ms` from GL timer queries beside it; stroke phases add `stroke_work_ms`, the
+stroke's own totals: solver-thread kernel, normals, BVH, dynamic topology, and the main thread's uploads). It decides whether a native backend (D3D11/12, Metal) behind a thin render interface should
 move earlier: only if draw + swap_wait dominate on the floor profile at 20M while sculpt and upload are within
 budget. Run: `--benchmark --benchmark-sizes 5,20,50`, with and without `SF_HW_SIMULATE=floor`. For A/Bs add
 `SF_GOVERNOR=0`: otherwise the frame governor may lower the budget in some runs and not others (core-200m saw
