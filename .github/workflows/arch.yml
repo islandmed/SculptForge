@@ -1,8 +1,8 @@
 name: Arch package
 
 # packaging/arch/PKGBUILD (the AUR package) built from scratch in a clean Arch container, as an AUR user's makepkg
-# would: the release tag it names, Arch's own SDL3 and curl, check() included. namcap must find no errors in the
-# PKGBUILD or the package, and .SRCINFO must be what `makepkg --printsrcinfo` prints. Runs when packaging/arch
+# would: the release tag it names, Arch's own SDL3 and curl; the package installed, sculptforge-cli answering. namcap
+# must find no errors in the PKGBUILD or the package, and .SRCINFO must be what `makepkg --printsrcinfo` prints. Runs when packaging/arch
 # changes (scripts/release.sh step aur bumps it on main each release) and by hand.
 # The image is pinned by digest (update: the docker-content-digest of archlinux:base-devel).
 
@@ -36,7 +36,7 @@ jobs:
       - name: .SRCINFO matches the PKGBUILD
         working-directory: /home/builder/pkg
         run: su builder -c 'makepkg --printsrcinfo' | diff -u .SRCINFO -
-      - name: makepkg (dependencies from the Arch repositories, check() runs)
+      - name: makepkg (dependencies from the Arch repositories)
         working-directory: /home/builder/pkg
         run: su builder -c 'MAKEFLAGS=-j4 makepkg --syncdeps --noconfirm --cleanbuild'
       - name: namcap
@@ -45,3 +45,9 @@ jobs:
           namcap -i PKGBUILD | tee namcap.txt
           namcap -i ./*.pkg.tar.zst | tee -a namcap.txt
           ! grep -E '^[^ ]+ E: ' namcap.txt
+      - name: Installed, the command-line tool answers
+        working-directory: /home/builder/pkg
+        run: |
+          pacman -U --noconfirm ./sculptforge-*.pkg.tar.zst
+          test -x /usr/bin/sculptforge
+          sculptforge-cli --schema > schema.json && grep -q '"open"' schema.json

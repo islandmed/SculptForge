@@ -25,6 +25,7 @@ build() {
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DSCULPTFORGE_USE_SYSTEM_SDL=ON \
     -DSCULPTFORGE_UPDATE_CHECK=OFF \
+    -DSCULPTFORGE_BUILD_TESTS=OFF \
     -DSCULPTFORGE_WEBRTC=OFF \
     -DSCULPTFORGE_MOLD=OFF \
     -DFETCHCONTENT_FULLY_DISCONNECTED=ON \
@@ -33,9 +34,8 @@ build() {
   cmake --build build
 }
 
-check() {
-  ctest --test-dir build --output-on-failure -LE ui
-}
+# No check(): the test suite needs the repository (demo assets, git history) that the tag tarball leaves out; the
+# release workflow runs it on these sources and smoke-tests the packages before the tag is published.
 
 package() {
   DESTDIR="$pkgdir" cmake --install build

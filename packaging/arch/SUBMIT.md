@@ -1,7 +1,7 @@
 # Publishing sculptforge to the AUR (maintainer, once)
 
-What's ready: `PKGBUILD` (builds the release tag against Arch's SDL3 and curl, offline, `check()` runs the tests;
-namcap-clean and built in a clean Arch container by `.github/workflows/arch.yml`) and its `.SRCINFO`. The name
+What's ready: `PKGBUILD` (builds the release tag against Arch's SDL3 and curl, offline; built in a clean Arch
+container, namcap-clean, installed and smoke-tested by `.github/workflows/arch.yml`) and its `.SRCINFO`. The name
 `sculptforge` is free on the AUR (https://aur.archlinux.org/packages/sculptforge was 404 on 2026-11-06).
 
 ## Before: an AUR account (browser, a minute)
