@@ -500,7 +500,6 @@ void MicroRenderer::shadeInitial(const Mesh& mesh) {
     if (initialNsPerPoint_ > 0.0 && !viewMoving && double(baseTriangles_ - initialSlot_) * double(S) * ns < 2.5e9)
         slots = baseTriangles_ - initialSlot_;
     const uint32_t end = std::min(baseTriangles_, initialSlot_ + std::max(slots, size));
-    if (!initialSorted_.empty()) sendStaged(initialStage_, initialSorted_);
     // In runs of kRun slots, each shaded alone (MicroShader's working memory follows a run: one call for a whole
     // dense level held gigabytes after it was done).
     constexpr uint32_t kRun = 1u << 16;
@@ -510,54 +509,38 @@ void MicroRenderer::shadeInitial(const Mesh& mesh) {
         for (uint32_t s = r0; s < r1; ++s) seeds[s - r0] = (*order_)[s];
         std::sort(seeds.begin(), seeds.end());
     };
-    // Straight into the GPU copy: these slots draw unshaded until the run is done (no shading fetched there), so
-    // their range is mapped without waiting for the GPU (and without a staging copy, which cost as much as the
-    // shading on a small level).
-    const uint32_t c0 = initialSlot_ / chunkSlots_, c1 = (end - 1) / chunkSlots_;
-    std::vector<uint32_t*> mapped(c1 - c0 + 1, nullptr);
-    std::vector<uint32_t> from(c1 - c0 + 1, 0);
-    bool ok = true;
-    for (uint32_t c = c0; c <= c1; ++c) {
-        const Chunk& ch = chunks_[c];
-        const uint32_t s0 = std::max(initialSlot_, ch.firstSlot), s1 = std::min(end, ch.firstSlot + ch.slots);
-        from[c - c0] = s0;
-        gl::BindBuffer(GL_TEXTURE_BUFFER, ch.shade);
-        mapped[c - c0] = static_cast<uint32_t*>(gl::MapBufferRange(
-            GL_TEXTURE_BUFFER, GLintptr(size_t(s0 - ch.firstSlot) * S * 4), GLsizeiptr(size_t(s1 - s0) * S * 4),
-            GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT));
-        ok = ok && mapped[c - c0];
-    }
-    if (ok) {
-        const auto started = std::chrono::steady_clock::now();
-        size_t shaded = 0;
-        for (uint32_t r0 = initialSlot_; r0 < end; r0 += kRun) {
-            runSeeds(r0, std::min(end, r0 + kRun));
-            shader_.shade(mesh, seeds, false, written_, [&](uint32_t t) -> uint32_t* {
-                const uint32_t s = slotOf_[t], c = s / chunkSlots_ - c0;
-                return mapped[c] + size_t(s - from[c]) * S;
-            }, {}, false); // (runs in slot order: each triangle once)
-            shaded += written_.size();
+    // Each run shaded into one staging block (its slots are consecutive: no sorting or scattering), then sent with one
+    // BufferSubData per chunk it covers. (Mapping the shade buffers' ranges every frame instead made NVIDIA's driver
+    // move them to system memory: the 3060 then took twice as long for every later upload, orbit and strokes too.)
+    std::vector<uint32_t>& stage = runStage_;
+    const auto started = std::chrono::steady_clock::now();
+    size_t shaded = 0;
+    for (uint32_t r0 = initialSlot_; r0 < end; r0 += kRun) {
+        const uint32_t r1 = std::min(end, r0 + kRun);
+        runSeeds(r0, r1);
+        stage.resize(size_t(r1 - r0) * S);
+        shader_.shade(mesh, seeds, false, written_, [&](uint32_t t) -> uint32_t* {
+            return stage.data() + size_t(slotOf_[t] - r0) * S;
+        }, {}, false); // (runs in slot order: each triangle once)
+        shaded += written_.size();
+        for (uint32_t c = r0 / chunkSlots_; c <= (r1 - 1) / chunkSlots_; ++c) {
+            const Chunk& ch = chunks_[c];
+            const uint32_t s0 = std::max(r0, ch.firstSlot), s1 = std::min(r1, ch.firstSlot + ch.slots);
+            if (s0 >= s1) continue;
+            gl::BindBuffer(GL_TEXTURE_BUFFER, ch.shade);
+            gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(size_t(s0 - ch.firstSlot) * S * 4), GLsizeiptr(size_t(s1 - s0) * S * 4),
+                              stage.data() + size_t(s0 - r0) * S);
         }
-        if (shaded) {
-            const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() /
-                              double(shaded * S);
-            initialNsPerPoint_ = initialNsPerPoint_ > 0.0 ? initialNsPerPoint_ * 0.7 + ns * 0.3 : ns;
-            if (std::getenv("SF_OPEN_PROFILE"))
-                std::fprintf(stderr, "first shading: %u slots, %.1f ns a point, %.0f ms\n", end - initialSlot_, ns,
-                             ns * double(shaded * S) * 1e-6);
-        }
-    }
-    for (uint32_t c = c0; c <= c1; ++c) {
-        gl::BindBuffer(GL_TEXTURE_BUFFER, chunks_[c].shade);
-        if (mapped[c - c0]) gl::UnmapBuffer(GL_TEXTURE_BUFFER);
     }
     gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
-    if (!ok) // (mapping failed: through a staging copy, sent at once)
-        for (uint32_t r0 = initialSlot_; r0 < end; r0 += kRun) {
-            runSeeds(r0, std::min(end, r0 + kRun));
-            shadeSeeds(mesh, seeds, initialStage_, initialSorted_, false);
-            sendStaged(initialStage_, initialSorted_);
-        }
+    if (shaded) {
+        const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() /
+                          double(shaded * S);
+        initialNsPerPoint_ = initialNsPerPoint_ > 0.0 ? initialNsPerPoint_ * 0.7 + ns * 0.3 : ns;
+        if (std::getenv("SF_OPEN_PROFILE"))
+            std::fprintf(stderr, "first shading: %u slots, %.1f ns a point, %.0f ms\n", end - initialSlot_, ns,
+                         ns * double(shaded * S) * 1e-6);
+    }
     initialSlot_ = end;
 }
 
@@ -629,14 +612,12 @@ bool MicroRenderer::sync(Mesh& mesh) {
         uploadDispTiles(mesh, scratch_, true);
         openStage("uploadBase+disp");
         initialSlot_ = 0;
-        initialSorted_.clear();
         if (initialShadeMs <= 0.0) shadePending(mesh, true), initialSlot_ = baseTriangles_;
         openStage("shade (first part)");
     } else {
         // The base cage moved (dual-scale Move, big brushes on a dense base, a transform, undo of any): the detail
         // rides along on the GPU (it is relative to the base); what changes is the base, the bounds and the shading
         // around moved vertices. Their triangles in a bitset (millions on a scan: no lists to sort).
-        if (!initialSorted_.empty()) sendStaged(initialStage_, initialSorted_); // (last frame's first shading, before edits)
         bool baseEverywhere = false;
         const size_t words = mm.dirtyBits.size();
         baseBits_.assign(words, 0);

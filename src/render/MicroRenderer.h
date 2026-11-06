@@ -114,8 +114,8 @@ private:
     double initialNsPerPoint_ = 0.0; // the same for the first shading (no ring, mapped: cheaper; kept out of a stroke's budget)
     size_t pendingCount_ = 0;
     uint32_t initialSlot_ = 0; // slots below this have had their first shading (the clusters past it draw unshaded)
-    std::vector<uint8_t> initialStage_;
-    std::vector<uint32_t> initialSorted_, sorted_;
+    std::vector<uint32_t> sorted_;
+    std::vector<uint32_t> runStage_; // shadeInitial's run, before it is sent
     const Mesh* synced_ = nullptr; // the mesh of this frame's sync, until draw() used it (the first shading)
     bool stroking_ = false;
     std::vector<uint32_t> scratch_, written_, stageIndex_;
