@@ -77,7 +77,7 @@ WN_SIZE = (600, 340)
 FEATURE_CROPS = {
     "bake": ("bake/high-and-baked-low", (0, 0, 1600, 960), MAX_WIDTH),
     "bake-mesh-maps": ("bake/bake-palette", (1280, 280, 1600, 720), 320),
-    "blender-menu": ("blender_bridge/menu", (130, 0, 1010, 580), 880),
+    "blender-menu": ("blender_bridge/menu", (130, 0, 1010, 610), 880),
     "capture-from-view": ("kelvinlet_capture/capture_window", (440, 140, 1200, 640), 760),
     "fill-layer-panel": ("fill_layers/fill-layer-panel", (1280, 60, 1600, 960), 320),
     "gizmo-pose": ("gizmo/posing-mid-drag", (110, 200, 1000, 860), 890),
