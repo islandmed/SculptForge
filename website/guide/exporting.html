@@ -76,7 +76,23 @@ STL is written in millimetres with Z up, as slicers expect: a 0.3 m sculpt print
 PLY keeps positions as they are (no unit conversion).
 </li>
 <li>
+USD files in other units (<code>metersPerUnit</code>, e.g. centimetres from Maya or Houdini) open at their real size.
+</li>
+<li>
 For Unreal, <strong>Height</strong> sets the real-world size directly (see below).
+</li>
+</ul>
+<h3 id="real-world-size-and-units">Real-world size and units<a class="anchor" href="#real-world-size-and-units" aria-label="Link to this section">#</a></h3>
+<p>A part keeps the size it was opened with through every export:</p>
+<ul>
+<li>
+OBJ, PLY and STL have no units. A scene opened from one of them remembers its unit: exporting OBJ or PLY writes that unit back (an STL opened in millimetres exports a 50 mm OBJ, not 0.05), and an STL written from an STL keeps its numbers. Decimal sizes come back exactly (12.7 stays 12.7). Projects remember the unit.
+</li>
+<li>
+<strong>Edit &gt; Preferences &gt; Interface &gt; OBJ/PLY in</strong> says what OBJ and PLY numbers mean: <strong>m</strong> (the default; Blender and game tools), or <strong>mm</strong> for files made for 3D printing, <strong>cm</strong> or <strong>in</strong>. STL is always read as millimetres. From scripts: <code>open path=part.obj unit=mm</code> (<code>open_obj</code> and <code>part_append</code> take <code>unit=</code> too; <code>unit=in</code> reads an inch STL).
+</li>
+<li>
+<strong>Edit &gt; Preferences &gt; Interface &gt; Units</strong> picks the unit sizes show in: mm, cm, m or in. The active Part&#x27;s width x height x depth shows under its name in <strong>Tool</strong>, the size the exports write in <strong>File</strong> (Import / Export), and the brush size by the brush ring.
 </li>
 </ul>
 <h2 id="export-a-model">Export a model<a class="anchor" href="#export-a-model" aria-label="Link to this section">#</a></h2>
