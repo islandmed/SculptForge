@@ -155,6 +155,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Preview | <kbd>A</kbd> | Show the skin Make Mesh would build instead of the spheres. Turn it off to edit the spheres again. |
 | Quick Remesh | <kbd>Shift</kbd>+<kbd>R</kbd> | With Tool > Remesh > Quick Remesh on: remesh the active Part at the Voxel Remesh resolution, in the background. |
 | Quick Remesh (hold and drag) | <kbd>N</kbd> | With Tool > Remesh > Quick Remesh on: hold this key and click or drag on the background (not on the model) to remesh the active Part. |
+| Sculpt the Part under the cursor | <kbd>Alt</kbd>+<kbd>Q</kbd> | Make the Part under the pointer the one you sculpt, without moving the view (each Part keeps its mask). The same key as Blender's; Preferences > Hotkeys changes it. |
 
 ### Transform
 
@@ -222,6 +223,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Show everything | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click the background |
 | Hide outside a rectangle or lasso | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag (add <kbd>Alt</kbd>: hide inside); **Select Rectangle** or **Select Lasso** in **Tool > Visibility** |
 | Select a Part | <kbd>Alt</kbd>+click it in the view (<kbd>Shift</kbd>+<kbd>Alt</kbd>+click, or a triple-click on another Part: select and frame it) |
+| Sculpt the Part under the cursor | <kbd>Alt</kbd>+<kbd>Q</kbd> (every input style; the view stays put) |
 | Move, scale or rotate with the Gizmo | <kbd>W</kbd>, <kbd>E</kbd> or <kbd>R</kbd>, then drag a handle; hold <kbd>Shift</kbd> to snap (15 degrees, the grid, 10%) |
 | Move the gizmo only | <kbd>Alt</kbd>+drag a gizmo handle |
 | Put the gizmo's pivot on the model | <kbd>Alt</kbd>+click the model in Move, Scale or Rotate mode |

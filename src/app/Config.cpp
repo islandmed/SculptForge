@@ -458,6 +458,10 @@ void App::initActions() {
         ICON_LC_COPY, "part_duplicate", nullptr, nullptr,
         "Copy the active Part, with its layers and attributes, and make the copy active (also in the Parts list's "
         "right-click menu).");
+    add("part.sculpt_under_cursor", "Sculpt the Part under the cursor", "Tool > Parts", "Alt+Q",
+        [this] { sculptPartUnderCursor(); }, ICON_LC_MOUSE_POINTER_CLICK, nullptr, nullptr, nullptr,
+        "Make the Part under the pointer the one you sculpt, without moving the view (each Part keeps its mask). "
+        "The same key as Blender's; Preferences > Hotkeys changes it.");
     // Tool > Part > Extract, Tool > Geometry > Modify Topology, Tool > Deformation (PanelExtract.cpp).
     add("part.extract", "Extract", "Tool > Parts", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
         [this] { return doc_.mesh.hasMask(); },

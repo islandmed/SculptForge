@@ -30,6 +30,7 @@ and they catch up a moment after you stop changing a Part (not during a stroke).
 | To | Do this |
 |---|---|
 | Select a Part | Click its row, or <kbd>Alt</kbd>+click it in the viewport; triple-click another Part in the viewport to select it and frame it |
+| Sculpt the Part under the cursor | Point at it and press <kbd>Alt</kbd>+<kbd>Q</kbd> (every input style, as in Blender): it becomes the active Part, the view stays put and each Part keeps its mask |
 | Rename it | Double-click the row (or right-click > **Rename**), type, press <kbd>Enter</kbd> |
 | Hide or show it | Click the eye at the end of the row |
 | Duplicate or delete it | Right-click the row > **Duplicate** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>) or **Delete...** |

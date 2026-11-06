@@ -1050,6 +1050,12 @@ constexpr Entry kSpanish[] = {
      "necesitan geometría real)."},
     {"Write the micro level as a 32-bit EXR displacement map over the base UVs (next to the project).",
      "Escribe el nivel micro como mapa de desplazamiento EXR de 32 bits sobre las UV base (junto al proyecto)."},
+    {"Sculpting: %s", "Esculpiendo: %s"},
+    {"No Part under the cursor", "No hay ninguna Pieza bajo el cursor"},
+    {"Sculpt the Part under the cursor", "Esculpir la Pieza bajo el cursor"},
+    {"Make the Part under the pointer the one you sculpt, without moving the view (each Part keeps its mask). "
+     "The same key as Blender's; Preferences > Hotkeys changes it.",
+     "Hace que la Pieza bajo el puntero sea la que esculpes, sin mover la vista (cada Pieza conserva su máscara). La misma tecla que en Blender; se cambia en Preferencias > Atajos de teclado."},
     {"Duplicate Part", "Duplicar Pieza"},
     {"Copy the active Part, with its layers and attributes, and make the copy active (also in the Parts list's "
      "right-click menu).",

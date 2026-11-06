@@ -149,6 +149,25 @@ void App::partSelected(const char* how) {
     status_ = "Active Part: " + doc_.activePartInfo().name + " (" + how + ")";
 }
 
+// The Part-under-cursor key (Alt+Q in every input style, like Blender's Alt+Q; Discord user Ziel): the visible
+// Part under the pointer becomes the one sculpted. The camera stays, and each Part keeps its own mask.
+void App::sculptPartUnderCursor() {
+    if (drag_ != Drag::None) return; // mid-stroke or mid-drag: switching would split it across two Parts
+    const bool overCanvas = !ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouseX_, mouseY_);
+    const int target = overCanvas ? pickPart(mouseX_, mouseY_) : -1;
+    if (target < 0) {
+        status_ = tr("No Part under the cursor");
+        return;
+    }
+    if (target != doc_.activePart) {
+        runCommand("part_select", {{"index", double(target)}});
+        if (!lastCommandOk_) return;
+    }
+    char line[256];
+    std::snprintf(line, sizeof line, tr("Sculpting: %s"), doc_.activePartInfo().name.c_str());
+    status_ = line;
+}
+
 App::JobPart::JobPart(App& a, int index) : app(a) {
     if (index < 0 || index == app.doc_.activePart) return;
     back = app.doc_.activePartInfo().id;
