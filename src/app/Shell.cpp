@@ -230,11 +230,15 @@ void centredText(ImDrawList* dl, ImFont* font, ImVec2 a, ImVec2 b, ImU32 col, co
     ui::CentredGlyph(dl, font ? font : ImGui::GetFont(), a, b, col, text);
 }
 
-// Text clipped to `width` with an ellipsis.
+// Text clipped to `width` with an ellipsis, by whole characters (a Chinese name cut mid-character drew U+FFFD).
 std::string elide(ImFont* font, const std::string& text, float width) {
     if (font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, text.c_str()).x <= width) return text;
     std::string s = text;
-    while (!s.empty() && font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, (s + "...").c_str()).x > width) s.pop_back();
+    while (!s.empty() && font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, (s + "...").c_str()).x > width) {
+        unsigned char c = 0;
+        do c = static_cast<unsigned char>(s.back()), s.pop_back(); // continuation bytes, then the lead byte
+        while (!s.empty() && (c & 0xC0) == 0x80);
+    }
     return s + "...";
 }
 
