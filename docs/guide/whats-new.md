@@ -8,13 +8,22 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.11.6
 
 ```features
-date: unreleased
+date: 2026-11-06
 tagline: Studio controls for AI: a managed policy, an audit log, keys in the system keychain and single sign-on, plus shelves that hide when they're empty.
 highlight: Studio controls: one policy file decides which AI tools and providers are allowed
 highlight: An audit log of every AI step, and API keys kept in the system keychain
 highlight: Sign in with your studio's identity provider (device sign-in, no browser plug-in)
 highlight: Empty shelves stay out of the way outside Customize Shelves
+highlight: Studio-ready AI: policy, audit log, single sign-on
 ```
+
+- **Empty shelves hide**: a shelf you empty is hidden outside **Customize Shelves** and the canvas takes its room; it
+  comes back while customizing so you can drop buttons onto it again.
+- **Studio controls**: IT can deploy a policy file that locks AI, network features, AI providers, AI tools and updates
+  (**Managed by your studio** shows on locked settings), keep an audit log of every AI action, and sign artists in
+  with the studio account (the guide's "SculptForge for studios" page, IT deployment).
+- **AI providers**: **Edit > Preferences > AI > Provider** has presets for Anthropic, OpenAI, Ollama, LM Studio, vLLM,
+  llama.cpp, a LiteLLM studio gateway and OpenRouter. Keys now live in your system keychain.
 
 ## Version 0.11.5
 
