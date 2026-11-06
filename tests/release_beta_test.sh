@@ -7,7 +7,9 @@
 # so nothing reaches GitHub, the website or the build. It releases 9.0.0-beta.1 (steps bump check status: members
 # only, nothing public),
 # then promotes it to 9.0.0 (bump check site) with the beta tag present, and checks what each one may and may not
-# touch (docs/releasing.md, "Betas").
+# touch (docs/releasing.md, "Betas"). Those two take the old path (--rebuild: bump pushed to main). Then build once,
+# promote: 9.0.1 staged (--stage) and promoted, with the refusals (a dispatched or a stranger's staging run, the
+# signing key at repository level).
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -59,9 +61,26 @@ mkdir -p "$S/bin" "$S/home" "$S/build"
 touch "$S/build/CTestTestfile.cmake"
 cat > "$S/bin/gh" <<EOF
 #!/usr/bin/env bash
+# staging's Packages run for the asked commit (tools/release/staged_run.py): STAGED_EVENT, STAGED_ACTOR vary it.
+runs() {
+  sha=\$(sed -n 's/.*head_sha=\([0-9a-f]*\).*/\1/p' <<<"\$1")
+  printf '{"workflow_runs": [{"id": 77, "path": ".github/workflows/packages.yml", "head_sha": "%s", "head_branch": "staging",
+    "event": "%s", "status": "completed", "conclusion": "success", "created_at": "%s",
+    "head_repository": {"full_name": "islandmed/SculptForge"}, "repository": {"full_name": "islandmed/SculptForge"},
+    "actor": {"login": "%s"}, "triggering_actor": {"login": "islandmed"}}]}\n' \
+    "\$sha" "\${STAGED_EVENT:-push}" "\$(date -u +%FT%TZ)" "\${STAGED_ACTOR:-islandmed}"
+}
 case "\$*" in
   "auth status"*) echo "Logged in to github.com account islandmed" ;;
-  "secret list"*) printf 'INSIDERS_REPO_TOKEN\t2026-11-05T00:00:00Z\n' ;;
+  "secret list --env"*) printf 'INSIDERS_REPO_TOKEN\t2026-11-05T00:00:00Z\nUPDATE_SIGNING_KEY\t2026-11-05T00:00:00Z\n' ;;
+  "secret list"*) printf 'DISCORD_MEMBERS_WEBHOOK\t2026-11-05T00:00:00Z\n'; [ -z "\${SECRET_AT_REPO:-}" ] || printf 'UPDATE_SIGNING_KEY\t2026-11-05T00:00:00Z\n' ;;
+  "api repos/islandmed/SculptForge/actions/workflows/packages.yml/runs"*) runs "\$2" ;;
+  "api repos/islandmed/SculptForge/actions/runs/77/artifacts"*)
+    python3 -c 'import json; print(json.dumps({"artifacts": [{"name": n} for n in "linux-x86_64 linux-arm64 flatpak-x86_64 flatpak-aarch64 vfx-vfx2026-x86_64 vfx-vfx2026-arm64 vfx-vfx2027-x86_64 vfx-vfx2027-arm64 macos windows staged-sums".split()]}))' ;;
+  "api repos/islandmed/SculptForge/git/ref/tags/"*) exit 1 ;; # not pushed yet
+  "run list"*) echo 7 ;;
+  "run view"*"-q .status"*) echo completed ;;
+  "run view"*"-q .conclusion"*) echo success ;;
   "repo view islandmed/sculptforge-insiders"*) echo "islandmed/sculptforge-insiders" ;;
   "release view"*) printf 'SHA256SUMS.txt\nSHA256SUMS.txt.sig\n' ;; # (signed: the app has an update key)
   "release download"*) exit 1 ;;
@@ -98,10 +117,12 @@ done
 # --- the beta ------------------------------------------------------------------------------------------------------
 start=$(git rev-parse HEAD)
 echo 'placeholder: {{SOME_NUMBER}}' >>CHANGELOG.md && git commit -q -am placeholder
-scripts/release.sh 9.0.0-beta.1 --only bump >"$S/out.log" 2>&1 && fail "bump passed with an unfilled placeholder"
+scripts/release.sh 9.0.0-beta.1 --rebuild --only bump >"$S/out.log" 2>&1 && fail "bump passed with an unfilled placeholder"
 grep -q 'unfilled placeholders: CHANGELOG.md' "$S/out.log" || fail "no placeholder stop: $(cat "$S/out.log")"
 git reset -q --hard HEAD^
-quiet scripts/release.sh 9.0.0-beta.1 --only bump
+scripts/release.sh 9.0.0-beta.1 --only bump >"$S/out.log" 2>&1 && fail "bump on main without --rebuild (promote mode) bumped"
+grep -q -- '--stage' "$S/out.log" || fail "promote mode's bump doesn't point at --stage: $(cat "$S/out.log")"
+quiet scripts/release.sh 9.0.0-beta.1 --rebuild --only bump
 grep -q '^project(SculptForge VERSION 9.0.0 ' CMakeLists.txt || fail "beta bump: CMakeLists.txt is not at 9.0.0"
 grep -qx 'set(SCULPTFORGE_PRERELEASE "beta.1")' CMakeLists.txt || fail "beta bump: no prerelease beta.1"
 for f in $stable_files; do
@@ -123,7 +144,7 @@ git checkout -q -- tests/ui/whats_new.sfui
 
 quiet scripts/release.sh 9.0.0-beta.1 --only check
 grep -q 'CMakeLists.txt says 9.0.0 beta.1' "$S/out.log" || fail "beta check: $(cat "$S/out.log")"
-quiet scripts/release.sh 9.0.0-beta.1 --only bump # again: nothing left to do
+quiet scripts/release.sh 9.0.0-beta.1 --rebuild --only bump # again: nothing left to do
 grep -q 'already says' "$S/out.log" || fail "beta bump is not idempotent: $(cat "$S/out.log")"
 
 # A beta is members only: nothing of the site or the update feed changes.
@@ -147,7 +168,7 @@ open(p, "w", encoding="utf-8").write(t.replace(head, head + "tagline: The beta, 
 EOF
 grep -q '^tagline: The beta, finished.$' docs/guide/whats-new.md || fail "test setup: couldn't add the tagline"
 git commit -q -am "What's New 9.0.0 tagline" && git push -q origin main
-quiet scripts/release.sh 9.0.0 --only bump
+quiet scripts/release.sh 9.0.0 --rebuild --only bump
 grep -qx 'set(SCULPTFORGE_PRERELEASE "")' CMakeLists.txt || fail "stable bump didn't clear the prerelease"
 grep -q '^## \[9.0.0\] - ' CHANGELOG.md || fail "stable bump: no CHANGELOG [9.0.0]"
 grep -qx 'version: 9.0.0' CITATION.cff || fail "stable bump: CITATION.cff not at 9.0.0"
@@ -162,4 +183,53 @@ feed = json.load(open("website/latest.json"))
 assert feed["version"] == "9.0.0" and feed["highlights"] == ["One", "Two", "Three"], feed
 assert "preview" not in feed.get("channels", {}), "the passed beta is still on the Preview channel"
 EOF
-echo "release.sh beta and promotion: ok"
+
+git push -q origin main
+
+# --- build once, promote: 9.0.1 staged, then promoted ----------------------------------------------------------------
+cat > changes/promote-test.md <<'EOF'
+---
+whats_new: **Promote test**: built once.
+highlight: First highlight of 9.0.1
+highlight: Second highlight of 9.0.1
+highlight: Third highlight of 9.0.1
+fixed: **Promote test**: built once.
+---
+EOF
+python3 - <<'EOF'
+p = "docs/guide/whats-new.md"
+t = open(p, encoding="utf-8").read()
+i = t.index("## Version 9.0.0")
+open(p, "w", encoding="utf-8").write(t[:i] + "## Version 9.0.1\n\n```features\ndate: unreleased\ntagline: Built once.\n```\n\n" + t[i:])
+EOF
+git add changes docs/guide/whats-new.md && git commit -q -m "9.0.1 notes" && git push -q origin main
+# The merger's batch checkout (detached, main merged in); a stand-in merge queue lands it on staging and main.
+cat > "$S/bin/mq" <<EOF
+#!/usr/bin/env bash
+echo "\$*" > "$S/mq.args"
+git push -q origin "\${@: -1}:refs/heads/staging" "\${@: -1}:refs/heads/main"
+EOF
+chmod +x "$S/bin/mq"
+git switch -q --detach
+MERGE_QUEUE=$S/bin/mq STAGE_WITH= quiet scripts/release.sh 9.0.1 --stage
+staged=$(git rev-parse HEAD)
+[ "$(git -C "$S/origin.git" rev-parse staging)" = "$staged" ] || fail "--stage didn't put the bump on staging"
+grep -q "^staging $staged\$" "$S/mq.args" || fail "--stage ran the merge queue as: $(cat "$S/mq.args")"
+grep -q '^## \[9.0.1\]' CHANGELOG.md || fail "--stage: no CHANGELOG [9.0.1] in the staged commit"
+git switch -q main && git merge -q --ff-only origin/main
+quiet scripts/release.sh 9.0.1 --only bump # promoting: main already carries it
+grep -q 'already carries 9.0.1' "$S/out.log" || fail "promote bump: $(cat "$S/out.log")"
+SECRET_AT_REPO=1 scripts/release.sh 9.0.1 --only check >"$S/out.log" 2>&1 && fail "check passed with UPDATE_SIGNING_KEY at repository level"
+grep -q 'UPDATE_SIGNING_KEY is a repository secret' "$S/out.log" || fail "no signing-key stop: $(cat "$S/out.log")"
+quiet scripts/release.sh 9.0.1 --only check
+STAGED_EVENT=workflow_dispatch scripts/release.sh 9.0.1 --only ci >"$S/out.log" 2>&1 && fail "ci accepted a dispatched staging run"
+grep -q 'no Packages run on staging' "$S/out.log" || fail "dispatched run: $(cat "$S/out.log")"
+STAGED_ACTOR=mallory scripts/release.sh 9.0.1 --only ci >"$S/out.log" 2>&1 && fail "ci accepted a stranger's staging run"
+grep -q "can't be promoted: .*mallory" "$S/out.log" || fail "stranger's run: $(cat "$S/out.log")"
+STAGED_ACTOR=mallory scripts/release.sh 9.0.1 --only tag >"$S/out.log" 2>&1 && fail "tag accepted a stranger's staging run"
+git -C "$S/origin.git" rev-parse -q --verify v9.0.1 >/dev/null && fail "a refused promotion pushed the tag"
+quiet scripts/release.sh 9.0.1 --only ci
+grep -q "Packages run 77 built and tested 9.0.1" "$S/out.log" || fail "promote ci: $(cat "$S/out.log")"
+quiet scripts/release.sh 9.0.1 --only tag
+[ "$(git -C "$S/origin.git" rev-parse 'v9.0.1^{commit}')" = "$staged" ] || fail "v9.0.1 doesn't tag the staged commit"
+echo "release.sh beta, promotion, build once: ok"
