@@ -139,6 +139,8 @@ constexpr Entry kSpanish[] = {
     {"close", "cerrar"},
 
     // --- Ctrl-help box ---
+    {"No UVs yet: pick a method and Unwrap (or mark seams first)", "Aún no hay UV: elige un método y Desenvolver (o marca costuras primero)"},
+    {"No mesh", "Sin malla"},
     {"No description yet.", "Aún sin descripción."},
     {"Not available right now.", "No disponible ahora mismo."},
     {"Learn more: %s", "Más información: %s"},

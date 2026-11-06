@@ -1,0 +1,15 @@
+# The UV Editor's "No UVs yet" hint wraps inside the view at any UI scale (it was cut off on both sides at 240 % in a
+# small window, 11-05).
+run new_sphere subdivisions=3
+ui_scale 100
+key alt+u
+expect_value uv_editor_open == 1
+expect_value uv_islands == 0
+shot hint_100
+key alt+u
+ui_scale 240
+key alt+u
+expect_value uv_islands == 0
+shot hint_240
+key alt+u
+ui_scale 100

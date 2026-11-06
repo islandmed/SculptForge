@@ -128,6 +128,8 @@ constexpr Entry kTraditionalChinese[] = {
     {"edit in console", "在主控台中編輯"},
     {"close", "關閉"},
     // --- Ctrl-help box ---
+    {"No UVs yet: pick a method and Unwrap (or mark seams first)", "尚無 UV：選擇一種方法並展開（或先標記接縫）"},
+    {"No mesh", "沒有網格"},
     {"No description yet.", "目前沒有說明。"},
     {"Not available right now.", "目前無法使用。"},
     {"Learn more: %s", "深入瞭解：%s"},

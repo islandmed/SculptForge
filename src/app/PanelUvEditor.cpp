@@ -1229,12 +1229,14 @@ void App::drawUvEditor() {
                     IM_COL32(240, 136, 46, 220), 0, 0, 1.0f * scale);
     }
     if (!s.hasUvs) {
-        const char* msg = m.triangleCount() ? "No UVs yet: pick a method and Unwrap (or mark seams first)" : "No mesh";
-        const ImVec2 ts = ImGui::CalcTextSize(msg);
-        const ImVec2 at(viewMin.x + (viewSize.x - ts.x) * 0.5f, viewMin.y + viewSize.y * 0.5f - ts.y);
+        const char* msg = tr(m.triangleCount() ? "No UVs yet: pick a method and Unwrap (or mark seams first)" : "No mesh");
+        // Wrapped to the view (a narrow view, a big UI scale or a longer translation), centred in it.
+        const float wrap = std::max(viewSize.x - 48 * scale, 32 * scale);
+        const ImVec2 ts = ImGui::CalcTextSize(msg, nullptr, false, wrap);
+        const ImVec2 at(viewMin.x + (viewSize.x - ts.x) * 0.5f, viewMin.y + (viewSize.y - ts.y) * 0.5f);
         dl->AddRectFilled(ImVec2(at.x - 12 * scale, at.y - 8 * scale), ImVec2(at.x + ts.x + 12 * scale, at.y + ts.y + 8 * scale),
                           IM_COL32(24, 24, 27, 235), 6 * scale);
-        dl->AddText(at, IM_COL32(215, 215, 220, 255), msg);
+        dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(), at, IM_COL32(215, 215, 220, 255), msg, nullptr, wrap);
     }
     if (s.job) {
         const float f = s.job->progress->load();
