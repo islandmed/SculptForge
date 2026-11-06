@@ -150,9 +150,13 @@ bool automatedRun() {
 int finishIsolated(int code) {
     // The isolated folder (settings, the log, autosaves: a benchmark's 33M mesh is over a gigabyte) goes with a run
     // that passed; a failed one keeps it, log included, to look at.
-    if (code == 0 && !g_isolatedDir.empty()) {
-        std::error_code ec;
+    if (g_isolatedDir.empty()) return code;
+    std::error_code ec;
+    if (code == 0) {
         std::filesystem::remove_all(g_isolatedDir, ec);
+        if (ec) std::fprintf(stderr, "sculptforge: couldn't remove the test folder %s: %s\n", g_isolatedDir.string().c_str(), ec.message().c_str());
+    } else {
+        std::fprintf(stderr, "sculptforge: exit %d, test folder kept for a look: %s\n", code, g_isolatedDir.string().c_str());
     }
     return code;
 }
