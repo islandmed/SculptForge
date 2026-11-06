@@ -132,6 +132,8 @@
     <!-- KNOWN_LIMITS: launchkit draft from the scoreboard + floorlucy; the coordinator checks before release -->
     <li>Big brushes (120 and 240 px) on very dense meshes still trail the pen on every machine we test, the desktop
       included: the stroke lands, but late.</li>
+    <li>On the biggest brushes (240 px) the stroke now follows the pen more closely while you draw; the cost is a
+      slightly longer finish after you lift the pen on fast GPUs.</li>
     <li>On the low-end budget, orbiting a 112 million triangle scan right after a stroke is still below a smooth
       30 frames a second: the whole base mesh is drawn every frame. Drawing less of it far from the camera is the next step.</li>
     <li>Opening a scan with a micro level takes seconds, not instantly, on every machine (measured on the
