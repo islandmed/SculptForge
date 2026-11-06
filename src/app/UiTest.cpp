@@ -41,7 +41,10 @@
 //                            pen: with the pen, hovering (its tip taps for click)
 //   drag_landmark N DX DY [S] left-drag Make sculptable's face landmark N (0-7, FaceLandmarks order) by DX DY pixels
 //   orbit DX DY              right-drag on the background, in pixels (with the held modifiers)
-//   axis_click +x|-x|+y|-y|+z|-z  click that end of the axis gizmo in the canvas corner (it snaps to that side view)
+//   axis_click +x|-x|+y|-y|+z|-z  click that end of the axis gizmo in the canvas corner (it snaps to that side view;
+//                            again on the end facing you: the opposite side)
+//   axis_drag DX DY          left-drag from a spot on the axis gizmo's disc clear of its ends, by DX DY unscaled pixels
+//   axis_hover +x|...|-z|disc  rest the pointer on that end of the axis gizmo, or on its disc clear of the ends
 //   button_drag middle|right X0 Y0 X1 Y1 [S]  drag with that button in window fractions (with the held modifiers)
 //   expect_shortcut ACTION KEYS  the action's effective keys, e.g. expect_shortcut view.front Numpad 1
 //   camera YAW PITCH         set the view's angles in degrees (0 0 = the front view), e.g. for guide screenshots
@@ -105,6 +108,7 @@
 //                            symmetry_copies (copies every stroke makes), cursor_copies (brush cursors drawn),
 //                            symmetry_pivot_x (local symmetry's centre), timeline_top (1: the strip at the top),
 //                            timeline_y / axis_gizmo_y (their tops / centre, fractions of the canvas from its top),
+//                            axis_view (the side view named under the axis gizmo: 0-5 = +x +y +z -x -y -z, -1 none),
 //                            style_window_min (ImGui's minimum window height, unscaled px: 32 in every look),
 //                            tablet_mouse_mode (Preferences > Tablet > Mouse mode),
 //                            ui_mouse_x / ui_mouse_y (where ImGui sees the pointer), backface_culling, drawn_triangles,
@@ -976,6 +980,8 @@ double Demo::query(const std::string& name, bool& known) const {
     // Draw > Camera > Gizmo size and View Figure: the axes' length in unscaled px (34 at Medium), the figure shown.
     if (name == "axis_gizmo_length") return double(34.0f * app_.axisGizmoUnit() / std::max(app_.uiScale_, 0.01f));
     if (name == "view_figure") return app_.uiPrefs_.showViewFigure ? 1.0 : 0.0;
+    // The side view the axis gizmo names under it (0-5: +X +Y +Z -X -Y -Z, as axis_click), -1 between views.
+    if (name == "axis_view") return double(axisGizmoAligned(app_.axisGizmoLayout()));
     if (name == "timeline_y" || name == "axis_gizmo_y") {
         const auto c = app_.canvasRect();
         if (name == "timeline_y")
@@ -1330,6 +1336,54 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         stroke([at](float) { return *at; }, 0.2f);
         run([this] { SDL_SetModState(held_); });
         wait(0.1f);
+    } else if (verb == "axis_drag" || verb == "axis_hover") {
+        // axis_drag DX DY: a left-drag starting on the gizmo's disc where no end is (it orbits the view);
+        // axis_hover END|disc: the pointer resting on an end or the disc (the hover look, for shots)
+        if (!need(verb == "axis_drag" ? 2 : 1)) return false;
+        static const char* const names[6] = {"+x", "+y", "+z", "-x", "-y", "-z"};
+        int end = -1;
+        if (verb == "axis_hover" && w[1] != "disc") {
+            const auto found = std::find_if(std::begin(names), std::end(names), [&](const char* n) { return w[1] == n; });
+            if (found == std::end(names)) {
+                error = "axis_hover takes +x, -x, +y, -y, +z, -z or disc";
+                return false;
+            }
+            end = int(found - std::begin(names));
+        }
+        const float dx = verb == "axis_drag" ? num(1, 0.0f) : 0.0f, dy = verb == "axis_drag" ? num(2, 0.0f) : 0.0f;
+        auto from = std::make_shared<ImVec2>();
+        run([this, from, end] {
+            const auto ends = app_.axisGizmoLayout();
+            const float unit = app_.axisGizmoUnit();
+            if (end >= 0) {
+                *from = ImVec2(ends[size_t(end)].at.x, ends[size_t(end)].at.y);
+                return;
+            }
+            // The spot on the disc farthest from every end, three quarters of the way out.
+            const glm::vec2 c = app_.axisGizmoCentre();
+            float best = -1.0f;
+            for (int i = 0; i < 24; ++i) {
+                const float a = float(i) * 6.2831853f / 24.0f;
+                const glm::vec2 p = c + glm::vec2(std::cos(a), std::sin(a)) * (kAxisGizmoDisc * 0.75f * unit);
+                float nearest = 1e9f;
+                for (const AxisGizmoEnd& e : ends) nearest = std::min(nearest, glm::length(e.at - p));
+                if (nearest > best) {
+                    best = nearest;
+                    *from = ImVec2(p.x, p.y);
+                }
+            }
+        });
+        if (verb == "axis_hover") {
+            run([this, from] { mouseMotion(from->x, from->y); });
+            wait(0.15f);
+        } else {
+            stroke([this, from, dx, dy](float u) {
+                const float s = app_.uiScale_;
+                return ImVec2(from->x + dx * s * u, from->y + dy * s * u);
+            }, 0.4f);
+            run([this] { SDL_SetModState(held_); });
+            wait(0.1f);
+        }
     } else if (verb == "view_figure_click") {
         // view_figure_click [DX DY]: click the View Figure (Draw > Camera), DX DY its radii from the centre
         const float dx = num(1, 0.0f), dy = num(2, 0.0f);

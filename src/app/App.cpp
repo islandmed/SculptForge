@@ -2930,7 +2930,8 @@ void App::drawUi() {
     if (((!ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y)) || drag_ == Drag::Stroke || sliderRing) &&
         !hideBrushCursor_ && radial_.menu < 0 && !strokePopup_.open && drag_ != Drag::Select && drag_ != Drag::Guide && // (no ring under a pie or the stroke popup)
         aiLinkStateValue() != 2 && aiLinkStateValue() != 4 && // (nor over a live-mode question: it is drawn above windows)
-        (!ringOff || drag_ == Drag::Stroke || ctrlDown(inputMods())))
+        (!ringOff || drag_ == Drag::Stroke || ctrlDown(inputMods())) &&
+        (drag_ == Drag::Stroke || !overViewNavigator(mouse.x, mouse.y))) // (nor over the corner axes: a click there navigates)
         drawBrushCursor();
     drawSelectionOverlay();
     drawBrushLibraryPopups();
@@ -4071,32 +4072,57 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, fl
     return true;
 }
 
-std::array<AxisGizmoEnd, 6> App::axisGizmoLayout() const {
-    // Top left of the canvas, below the timeline strip when that is at the top (timelineTopInset_).
+glm::vec2 App::axisGizmoCentre() const {
+    // Top left of the canvas, below the timeline strip when that is at the top (timelineTopInset_); the disc's edge
+    // 10 px from the canvas edges.
     const CanvasRect canvas = canvasRect();
-    const float s = 34.0f * axisGizmoUnit();
-    return axisGizmoEnds(glm::mat3(camera_.view()),
-                         glm::vec2(canvas.x + s + 18.0f * uiScale_, canvas.y + timelineTopInset_ + s + 18.0f * uiScale_), s);
+    const float r = kAxisGizmoDisc * axisGizmoUnit() + 10.0f * uiScale_;
+    return glm::vec2(canvas.x + r, canvas.y + timelineTopInset_ + r);
+}
+
+std::array<AxisGizmoEnd, 6> App::axisGizmoLayout() const {
+    return axisGizmoEnds(glm::mat3(camera_.view()), axisGizmoCentre(), kAxisGizmoLength * axisGizmoUnit());
 }
 
 float App::axisGizmoUnit() const { return uiScale_ * axisGizmoScale(uiPrefs_.axisGizmoSize); }
 
-float App::viewFigureRadius() const { return 34.0f * axisGizmoUnit(); }
+float App::axisGizmoLabelHeight() const { return ImGui::GetFontSize() * 0.85f + 8.0f * uiScale_; }
+
+bool App::viewBackgroundLight() const {
+    // The corner of the view: the gradient's edge, or the flat colour (both display sRGB).
+    const glm::vec3 c = renderSettings_.gradientBackground ? renderSettings_.gradientEdge : renderSettings_.backgroundColor;
+    return glm::dot(c, glm::vec3(0.2126f, 0.7152f, 0.0722f)) > 0.5f;
+}
+
+float App::viewFigureRadius() const { return kAxisGizmoLength * axisGizmoUnit(); }
 
 glm::vec2 App::viewFigureCentre() const {
-    // In the axes' place when they are off, else just below them.
+    // In the axes' place when they are off, else just below them (and the view's name under them).
     const CanvasRect canvas = canvasRect();
     const float r = viewFigureRadius();
-    const float top = canvas.y + timelineTopInset_ + 18.0f * uiScale_;
-    const float below = uiPrefs_.showAxes ? 2.0f * 34.0f * axisGizmoUnit() + 14.0f * uiScale_ : 0.0f;
-    return glm::vec2(canvas.x + 18.0f * uiScale_ + 34.0f * axisGizmoUnit(), top + below + r);
+    const float x = canvas.x + 18.0f * uiScale_ + r;
+    if (!uiPrefs_.showAxes) return glm::vec2(x, canvas.y + timelineTopInset_ + 18.0f * uiScale_ + r);
+    const glm::vec2 c = axisGizmoCentre();
+    return glm::vec2(x, c.y + kAxisGizmoDisc * axisGizmoUnit() + axisGizmoLabelHeight() + r);
+}
+
+bool App::overViewNavigator(float x, float y) const {
+    if (uiPrefs_.showAxes && axisGizmoOnDisc(axisGizmoCentre(), kAxisGizmoDisc * axisGizmoUnit(), x, y)) return true;
+    return uiPrefs_.showViewFigure && glm::length(glm::vec2(x, y) - viewFigureCentre()) <= viewFigureRadius();
 }
 
 bool App::axisGizmoMouseDown(float x, float y) {
-    // A click on an end snaps to that side view, orthographic (#43, as in Blender's navigation gizmo); a click on
-    // the View Figure to the side view nearest the current one.
+    // A click on an end snaps to that side view, orthographic (#43, as in Blender's navigation gizmo), a second click
+    // on it to the opposite side; a drag on the disc behind the ends orbits; a click on the View Figure snaps to
+    // the side view nearest the current one.
     const auto ends = axisGizmoLayout();
-    int hit = uiPrefs_.showAxes ? axisGizmoHit(ends, x, y, 9.0f * axisGizmoUnit()) : -1;
+    const float unit = axisGizmoUnit();
+    int hit = uiPrefs_.showAxes ? axisGizmoSnapEnd(ends, axisGizmoHit(ends, x, y, kAxisGizmoHitRadius * unit)) : -1;
+    if (hit < 0 && uiPrefs_.showAxes && axisGizmoOnDisc(axisGizmoCentre(), kAxisGizmoDisc * unit, x, y)) {
+        drag_ = Drag::Orbit;
+        rightClick_.pending = false;
+        return true;
+    }
     if (hit < 0 && uiPrefs_.showViewFigure &&
         glm::length(glm::vec2(x, y) - viewFigureCentre()) <= viewFigureRadius())
         hit = axisGizmoFacing(ends);
@@ -4106,33 +4132,78 @@ bool App::axisGizmoMouseDown(float x, float y) {
 }
 
 void App::drawAxisGizmo() {
-    // The world axes as the camera sees them, under the UI: red X, green Y, blue Z, a labelled ball at the
-    // positive end and a plain one at the negative end; the ends pointing away are drawn first and dimmer. A click
-    // on an end snaps to that side (axisGizmoMouseDown); the end under the mouse gets a ring.
+    // The world axes as the camera sees them, under the UI, on a soft disc that reads on any background (stronger
+    // under the pointer): red X, green Y, blue Z; the positive ends are filled circles with their letter, the
+    // negative ends smaller rings (their letter under the pointer). Drawn back to front: the ends pointing away are
+    // smaller and fainter, the near ones on top. A click on an end snaps to that side (axisGizmoMouseDown), a
+    // second click to the opposite side; the end under the pointer gets a ring. On an exact side view its name
+    // shows under the disc.
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
     const float unit = axisGizmoUnit();
     auto ends = axisGizmoLayout();
-    const glm::vec2 c = (ends[0].at + ends[3].at) * 0.5f;
+    const glm::vec2 c = axisGizmoCentre();
+    const ImVec2 centre(c.x, c.y);
+    const float discR = kAxisGizmoDisc * unit;
     const ImVec2 mouse = ImGui::GetIO().MousePos;
-    const int hover = ImGui::GetIO().WantCaptureMouse ? -1 : axisGizmoHit(ends, mouse.x, mouse.y, 9.0f * unit);
+    const bool free = !ImGui::GetIO().WantCaptureMouse;
+    const int hover = free ? axisGizmoHit(ends, mouse.x, mouse.y, kAxisGizmoHitRadius * unit) : -1;
+    const bool onDisc = free && (hover >= 0 || axisGizmoOnDisc(c, discR, mouse.x, mouse.y));
+    const bool light = viewBackgroundLight();
+    const int aligned = axisGizmoAligned(ends);
     const AxisGizmoEnd hovered = hover >= 0 ? ends[size_t(hover)] : AxisGizmoEnd{};
+
+    // The disc: lighter than a dark background, darker than a light one; a hairline edge gives it a shape.
+    const ImU32 tint = light ? IM_COL32(0, 0, 0, 0) : IM_COL32(255, 255, 255, 0);
+    auto withAlpha = [](ImU32 col, float a) {
+        return (col & 0x00ffffffu) | (ImU32(std::clamp(a, 0.0f, 1.0f) * 255.0f + 0.5f) << 24);
+    };
+    dl->AddCircleFilled(centre, discR, withAlpha(tint, onDisc ? 0.17f : light ? 0.08f : 0.07f), 48);
+    dl->AddCircle(centre, discR, withAlpha(tint, onDisc ? 0.22f : 0.10f), 48, 1.0f * uiScale_);
+
     std::sort(ends.begin(), ends.end(), [](const AxisGizmoEnd& a, const AxisGizmoEnd& b) { return a.depth < b.depth; });
-    static constexpr ImU32 colours[3] = {IM_COL32(230, 80, 80, 255), IM_COL32(110, 200, 90, 255), IM_COL32(80, 140, 240, 255)};
+    static constexpr ImU32 colours[3] = {IM_COL32(236, 84, 92, 255), IM_COL32(124, 196, 64, 255), IM_COL32(64, 140, 236, 255)};
     static constexpr const char* names[3] = {"X", "Y", "Z"};
+    ImFont* font = fontBold_ ? fontBold_ : ImGui::GetFont();
+    // The letters shrink with the circles (Small) but never grow past the UI font.
+    const float fontSize = ImGui::GetFontSize() * 0.92f * std::min(1.0f, unit / std::max(uiScale_, 0.01f));
+    auto letter = [&](ImVec2 at, int axis, ImU32 col) {
+        const ImVec2 ts = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, names[axis]);
+        dl->AddText(font, fontSize, ImVec2(std::round(at.x - ts.x * 0.5f), std::round(at.y - ts.y * 0.5f)), col, names[axis]);
+    };
     for (const AxisGizmoEnd& e : ends) {
         const ImVec2 tip(e.at.x, e.at.y);
-        ImU32 col = e.depth < -0.2f ? (colours[e.axis] & 0x00ffffffu) | 0x90000000u : colours[e.axis];
-        if (e.negative) col = (col & 0xff000000u) | ((col & 0x00fefefeu) >> 1); // the negative end: darker
-        else dl->AddLine(ImVec2(c.x, c.y), tip, col, 2.0f * unit);
-        dl->AddCircleFilled(tip, (e.negative ? 5.5f : 7.0f) * unit, col);
-        if (hover >= 0 && e.axis == hovered.axis && e.negative == hovered.negative)
-            dl->AddCircle(tip, 9.0f * unit, IM_COL32(255, 255, 255, 220), 0, 1.5f * unit);
-        if (e.negative) continue;
-        // The letter shrinks with the ball (Small) but never grows past the UI font.
-        const float fontSize = ImGui::GetFontSize() * std::min(1.0f, unit / std::max(uiScale_, 0.01f));
-        const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, names[e.axis]);
-        dl->AddText(ImGui::GetFont(), fontSize, ImVec2(tip.x - ts.x * 0.5f, tip.y - ts.y * 0.5f), IM_COL32(20, 20, 22, 255),
-                    names[e.axis]);
+        const float alpha = axisGizmoEndAlpha(e.depth);
+        const float r = axisGizmoEndRadius(e, unit);
+        const ImU32 col = withAlpha(colours[e.axis], alpha);
+        const bool isHover = hover >= 0 && e.axis == hovered.axis && e.negative == hovered.negative;
+        if (e.negative) {
+            // A ring: the axis colour round a dim fill, so it reads as "the other end" on any background.
+            dl->AddCircleFilled(tip, r, isHover ? col : withAlpha(colours[e.axis], 0.28f * alpha), 24);
+            dl->AddCircle(tip, r, col, 24, 1.6f * unit);
+            if (isHover) letter(tip, e.axis, IM_COL32(16, 16, 20, 255));
+        } else {
+            // The shaft stops at the circle's edge, so its letter stays clean.
+            const glm::vec2 d = e.at - c;
+            const float len = glm::length(d);
+            if (len > r + 1.0f) {
+                const glm::vec2 end = c + d * ((len - r) / len);
+                dl->AddLine(centre, ImVec2(end.x, end.y), col, 2.0f * unit);
+            }
+            dl->AddCircleFilled(tip, r, col, 24);
+            letter(tip, e.axis, withAlpha(IM_COL32(16, 16, 20, 255), alpha));
+        }
+        if (isHover) dl->AddCircle(tip, r + 2.0f * unit, light ? IM_COL32(20, 20, 24, 220) : IM_COL32(255, 255, 255, 230), 24, 1.5f * unit);
+    }
+
+    // The view's name on an exact side view ("Front view"), small, under the disc.
+    if (aligned >= 0) {
+        const AxisGizmoView v = axisGizmoView(aligned % 3, aligned >= 3);
+        const char* text = tr(v.label);
+        const float size = ImGui::GetFontSize() * 0.85f;
+        const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(size, FLT_MAX, 0.0f, text);
+        const ImVec2 at(std::round(c.x - ts.x * 0.5f), std::round(c.y + discR + 4.0f * uiScale_));
+        dl->AddText(ImGui::GetFont(), size, ImVec2(at.x + 1.0f, at.y + 1.0f), light ? IM_COL32(255, 255, 255, 110) : IM_COL32(0, 0, 0, 150), text);
+        dl->AddText(ImGui::GetFont(), size, at, light ? IM_COL32(30, 30, 34, 230) : IM_COL32(232, 232, 236, 220), text);
     }
 }
 

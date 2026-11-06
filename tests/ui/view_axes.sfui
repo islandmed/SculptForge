@@ -1,0 +1,132 @@
+# The corner view axes (Tony 11-06, "the view figure needs more distinguishing features"): filled X / Y / Z circles,
+# smaller rings for the negative ends, far ends smaller and fainter, a soft disc behind them. A click on an end snaps
+# to that view, a second click to the opposite one, a drag on the disc orbits; the exact view's name shows under it.
+# Shots: dark and light backgrounds, UI scale 100 / 150 / 200 %, Small / Medium / Large, several views.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=4
+key f
+expect_value axis_gizmo_length == 34
+expect_value axis_view == 2
+shot front_dark_100_medium
+
+# A click on +Z while looking from +Z: the back view; again on +Z (now pointing away): the front.
+axis_click +z
+expect_value axis_view == 5
+expect_value camera_aligned == 1
+expect_value camera_pitch == 0
+shot back_dark_100_medium
+axis_click +z
+expect_value axis_view == 2
+expect_value camera_yaw == 0
+
+# +Y: the top; +Y again: the bottom; -Y (now facing you): the top again.
+axis_click +y
+expect_value axis_view == 1
+expect_value camera_pitch == -90
+shot top_dark_100_medium
+axis_click +y
+expect_value axis_view == 4
+expect_value camera_pitch == 90
+axis_click -y
+expect_value axis_view == 1
+
+# Every end from a three-quarter view snaps to its own side.
+camera 35 -25
+expect_value axis_view == -1
+shot three_quarter_dark_100_medium
+axis_hover +x
+shot three_quarter_hover_x
+axis_hover -z
+shot three_quarter_hover_neg_z
+axis_hover disc
+shot three_quarter_hover_disc
+axis_click -x
+expect_value axis_view == 3
+expect_value camera_yaw == -90
+camera 35 -25
+axis_click -z
+expect_value axis_view == 5
+camera 35 -25
+axis_click +x
+expect_value axis_view == 0
+
+# A drag on the disc (clear of the ends) orbits: the view leaves the side view and turns.
+axis_drag 40 0
+expect_value axis_view == -1
+expect_value camera_aligned == 0
+
+shot after_disc_drag
+
+# Sizes x UI scale: a click on an end still lands at every size.
+camera 35 -25
+click "Draw##palette.draw"
+click "Small##view.gizmo_small"
+key escape
+shot three_quarter_dark_100_small
+click "Draw##palette.draw"
+click "Large##view.gizmo_large"
+key escape
+shot three_quarter_dark_100_large
+axis_click +y
+expect_value axis_view == 1
+ui_scale 150
+expect_value ui_scale == 150
+camera 35 -25
+click "Draw##palette.draw"
+click "Medium##view.gizmo_medium"
+key escape
+shot three_quarter_dark_150_medium
+axis_click -x
+expect_value axis_view == 3
+shot left_dark_150_medium
+ui_scale 200
+camera 35 -25
+shot three_quarter_dark_200_medium
+axis_click +z
+expect_value axis_view == 2
+shot front_dark_200_medium
+click "Draw##palette.draw"
+click "Small##view.gizmo_small"
+key escape
+camera 35 -25
+shot three_quarter_dark_200_small
+axis_click +x
+expect_value axis_view == 0
+click "Draw##palette.draw"
+click "Large##view.gizmo_large"
+key escape
+camera 35 -25
+shot three_quarter_dark_200_large
+axis_drag -30 20
+expect_value axis_view == -1
+
+# A light background: the disc darkens instead, the name stays readable.
+ui_scale 100
+click "Draw##palette.draw"
+click "Medium##view.gizmo_medium"
+key escape
+run set_background color=215,215,218
+camera 35 -25
+shot three_quarter_light_100_medium
+axis_hover +y
+shot three_quarter_light_hover_y
+axis_click +y
+expect_value axis_view == 1
+shot top_light_100_medium
+ui_scale 150
+camera 35 -25
+shot three_quarter_light_150_medium
+ui_scale 200
+axis_click +z
+shot front_light_200_medium
+expect_value axis_view == 2
+
+# With the View Figure on, it sits below the axes and the view's name.
+ui_scale 100
+run set_background mode=gradient
+click "Draw##palette.draw"
+click "View Figure##draw.view_figure"
+key escape
+shot with_view_figure
+view_figure_click
+expect_value camera_aligned == 1
