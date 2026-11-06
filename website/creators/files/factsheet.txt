@@ -5,7 +5,7 @@ WHAT IT IS
 SculptForge is a free, open-source digital sculpting application for Windows, macOS and Linux. It covers the
 whole sculpting job: Parts, subdivision and micro levels, sculpt layers, dynamic topology, voxel and quad
 remeshing, vertex paint, map baking and facial shapes, with bridges to Blender, Unreal Engine and OpenUSD.
-Classic sculpting keys, Blender and Maya keymaps are built in.
+Classic sculpting keys, Blender and industry-standard keymaps are built in.
 
 KEY FACTS
 Licence        GNU GPL v3.0 or later. No account, no subscription, no licence server.
@@ -30,7 +30,7 @@ NEW IN 0.11 (0.11.0 to 0.11.7)
 - Sculpt layers record Move, Scale and Rotate, with a weight to dial them in and out. Vector displacement
   stamps rotate with the drag. (0.11.2)
 - Sixty new brushes in six packs, and a Masking panel: cavity, peaks, colour, facing. (0.11.0)
-- Maya-style view keys, saved camera views, UDIMs packed in columns and rows, pen pressure per brush,
+- Industry-standard view keys, saved camera views, UDIMs packed in columns and rows, pen pressure per brush,
   touch and trackpad navigation. (0.11.1 to 0.11.3)
 - Signed one-click updates on Windows and the Linux AppImage. Interface in Simplified and Traditional
   Chinese. (0.11.1 to 0.11.5)
