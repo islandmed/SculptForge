@@ -312,7 +312,7 @@ set_source_files_properties(third_party/qrcodegen/qrcodegen.cpp ${CMAKE_CURRENT_
 
 # --- Headless command-line tool (pipelines, build farms, AI agents) ---
 # The MCP server (src/cli/McpServer.cpp) is a library of its own: the tool and the tests link it, nobody compiles it twice.
-add_library(sculptforge_mcp STATIC src/cli/McpServer.cpp)
+add_library(sculptforge_mcp STATIC src/cli/McpServer.cpp src/cli/McpTools.cpp)
 target_compile_definitions(sculptforge_mcp PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
 target_link_libraries(sculptforge_mcp PUBLIC sculptforge_core sculptforge_ai)
 add_executable(sculptforge-cli src/cli/main.cpp)
@@ -324,7 +324,7 @@ target_link_libraries(sculptforge-cli PRIVATE sculptforge_core sculptforge_ai sc
 if(SCULPTFORGE_BUILD_APP OR SCULPTFORGE_BUILD_TESTS)
   add_library(sculptforge_appshared STATIC src/app/AssetLibrary.cpp src/app/BrushPreview.cpp src/app/UiLayout.cpp
     src/app/ShellGeometry.cpp src/app/LookSchemes.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp
-    src/app/I18nTraditionalChinese.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
+    src/app/I18nTraditionalChinese.cpp src/app/ConnectAi.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
   target_link_libraries(sculptforge_appshared PUBLIC sculptforge_core)
   if(MSVC)
     target_compile_options(sculptforge_appshared PRIVATE /W4 /utf-8 /permissive-)
@@ -427,6 +427,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelSupport.cpp
     src/app/QuickTour.cpp
     src/app/PanelAi.cpp
+    src/app/PanelConnectAi.cpp
     src/app/PanelSupportCard.cpp
     src/app/PanelIntegrations.cpp
     src/app/WhatsNewPopup.cpp
@@ -755,6 +756,22 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME media_takedown_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/media_takedown.py --self-test)
     # The public gallery repository matches tools/brush-gallery/repo (the live compare is in release.sh: network).
     add_test(NAME gallery_published_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/brush-gallery/check_published.py --self-test)
+    # The Claude Desktop bundle and its MCP registry entry (tools/release/build_mcpb.py, mcp_server_json.py): packed
+    # from the built CLI and its server run from the unpacked bundle, as packages.yml does on every OS.
+    add_test(NAME mcpb_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/build_mcpb.py --self-test)
+    add_test(NAME mcp_server_json_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/mcp_server_json.py --self-test)
+    if(NOT CMAKE_CROSSCOMPILING)
+      if(WIN32)
+        set(SF_MCPB_PLATFORM win32)
+      elseif(APPLE)
+        set(SF_MCPB_PLATFORM darwin)
+      else()
+        set(SF_MCPB_PLATFORM linux)
+      endif()
+      add_test(NAME mcpb_bundle COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/build_mcpb.py
+               --cli $<TARGET_FILE:sculptforge-cli> --version auto --platform ${SF_MCPB_PLATFORM}
+               --out ${CMAKE_CURRENT_BINARY_DIR}/mcpb-test/SculptForge-test.mcpb)
+    endif()
     add_test(NAME release_notes COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --self-test)
     add_test(NAME release_notes_fragments COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --check)
     # The members' publishing path stays locked down: release.yml's actions pinned to commit SHAs, INSIDERS_REPO_TOKEN only
@@ -871,6 +888,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     if(TEST ui_ui_scale)
       set_tests_properties(ui_ui_scale PROPERTIES LABELS "ui;dpi")
     endif()
+    # The UV Editor toolbar on a 4K screen (scales 1.0, 1.5 and 2.4): wrapped, nothing cut off, each control its own click.
+    sculptforge_ui_test(uv_editor_scales_4k uv_editor_scales --size 3840x2160)
     # The Library on a 1280x720 screen (#80): its close button stays on screen.
     sculptforge_ui_test(library_small_screen_720 library_small_screen --size 1280x720)
     # #107: every look's right tray on a 1280x720 screen; #105: a Windows laptop at 150-200 % (2560x1600 at 200 % is

@@ -593,6 +593,7 @@ void App::drawPalette_Help() {
     menuAction(*this, "help.whats_new");
     menuAction(*this, "help.check_updates");
     menuAction(*this, "ui.command_palette");
+    menuAction(*this, "help.connect_ai"); // only while AI is on (PanelAi.cpp registers it)
     menuAction(*this, "help.website");
     menuAction(*this, "help.discord");
     menuAction(*this, "help.report");

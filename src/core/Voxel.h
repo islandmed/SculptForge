@@ -55,7 +55,8 @@ std::vector<float> insideDistanceField(const Mesh& mesh, const VoxelGrid& grid, 
 void rasterizeMeshShell(const Mesh& mesh, VoxelGrid& grid);
 
 // Rebuilds the mesh as an even, watertight surface (`resolution` cells across
-// its longest side). Overlapping parts are merged. Sculpt layers are baked.
+// its longest side). Overlapping parts are merged. Sculpt layers are baked. Open borders (a neck, a cut) are capped
+// first; a mesh that still isn't solid gives an empty result and `error` says why (never a surface full of holes).
 // Mask and colours transfer from the nearest original vertex; face groups,
 // hidden flags and UVs reset (all visible, group 0, no UVs); the original's
 // quads are dropped and the result is all quads of its own. `progress` (0..1) returning false cancels (empty result).

@@ -2934,6 +2934,7 @@ void App::drawUi() {
     guide_.draw(*this);  // Help > User Guide
     drawPacksUi();       // pack review, New Pack, macro confirmation and editor (PanelPacks.cpp)
     drawMemoryConfirm(); // "Not enough free memory" before a big mesh (MemoryConfirm.cpp)
+    drawConnectAi();     // Help > Connect an AI tool (PanelConnectAi.cpp)
     drawHelpConsoleUi(); // console, command palette, Controls (F1), Ctrl-hover help: last, on top
     drawWhatsNew();      // What's New after an update or from the Help menu (WhatsNewPopup.cpp)
     drawSupportCard();   // the support card at launch, over everything (PanelSupportCard.cpp)

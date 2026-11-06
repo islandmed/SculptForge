@@ -58,6 +58,24 @@ def environment(lines):
     return None
 
 
+def paths(body, key):
+    """The globs of `key:` (path / subject-path) in the job's upload-artifact / attest step: inline or a `|` block."""
+    want = "upload-artifact" if key == "path" else "attest-build-provenance"
+    out, lines = set(), "\n".join(s for s in re.split(r"\n(?=\s*- )", body) if want in s).splitlines()
+    for i, line in enumerate(lines):
+        m = re.match(rf"^(\s+){key}:\s*(.*?)\s*$", line)
+        if not m:
+            continue
+        if m.group(2) and m.group(2) != "|":
+            out.add(m.group(2))
+            continue
+        for nxt in lines[i + 1:]:
+            if len(nxt) - len(nxt.lstrip()) <= len(m.group(1)) or not nxt.strip():
+                break
+            out.add(nxt.strip())
+    return out
+
+
 def check(files):
     """files: {name: text}. Returns the list of problems."""
     errs = []
@@ -77,6 +95,9 @@ def check(files):
             body = "\n".join(lines)
             if job != "sums" and "upload-artifact" in body and not ATTEST.search(body):
                 errs.append(f"packages.yml: job {job} uploads packages without a pinned actions/attest-build-provenance step")
+            elif job != "sums" and "upload-artifact" in body and paths(body, "path") != paths(body, "subject-path"):
+                errs.append(f"packages.yml: job {job} attests {sorted(paths(body, 'subject-path'))} but uploads {sorted(paths(body, 'path'))}"
+                            " (verify refuses an unattested file)")
     rel = files.get("release.yml")
     if rel is None:
         return errs + ["release.yml: missing"]
@@ -160,7 +181,15 @@ jobs:
       id-token: write
     steps:
       - uses: actions/upload-artifact@v7
+        with:
+          path: |
+            build/*.deb
+            build/*.mcpb
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            build/*.deb
+            build/*.mcpb
   sums:
     steps:
       - uses: actions/upload-artifact@v7
@@ -176,6 +205,7 @@ def self_test():
         "packages good": ({"release.yml": GOOD, "packages.yml": PACKAGES}, 0),
         "packages unattested": ({"release.yml": GOOD, "packages.yml": PACKAGES.replace("attest-build-provenance", "x")}, 1),
         "packages attest unpinned": ({"release.yml": GOOD, "packages.yml": PACKAGES.replace("@4d101475d8b20a2381f78447822ac1eab6504dd8", "@v4")}, 1),
+        "packages attests less": ({"release.yml": GOOD, "packages.yml": PACKAGES.replace("            build/*.mcpb\n  sums:", "  sums:")}, 1),
         "packages secret": ({"release.yml": GOOD, "packages.yml": PACKAGES + "        env: { K: '${{ secrets.X }}' }\n"}, 1),
         "signing key outside env": ({"release.yml": GOOD.replace("    environment: release\n", "")}, 1),
         "signing key at repo level elsewhere": ({"release.yml": GOOD, "x.yml": f"jobs:\n  a:\n    env:\n      K: ${{{{ {SIGNING} }}}}\n"}, 1),

@@ -23,6 +23,10 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <vector>
+#ifndef _WIN32
+#include <unistd.h> // execv (--cli)
+#endif
 
 namespace {
 
@@ -328,7 +332,25 @@ static int runMain(int argc, char** argv) {
     return finishIsolated(code);
 }
 
+#ifndef _WIN32
+// --cli ARGS...: runs sculptforge-cli beside this program with ARGS. An AppImage has one entry point, so this is how an
+// MCP client starts its server ("SculptForge.AppImage --cli --mcp", Help > Connect an AI tool). Only our own program.
+static int execCli(int argc, char** argv) {
+    const char* base = SDL_GetBasePath();
+    const std::string cli = std::string(base ? base : "") + "sculptforge-cli";
+    std::vector<char*> args{const_cast<char*>(cli.c_str())};
+    for (int i = 2; i < argc; ++i) args.push_back(argv[i]);
+    args.push_back(nullptr);
+    execv(cli.c_str(), args.data());
+    std::fprintf(stderr, "sculptforge: couldn't start %s\n", cli.c_str());
+    return 127;
+}
+#endif
+
 int main(int argc, char** argv) {
+#ifndef _WIN32
+    if (argc >= 2 && std::string(argv[1]) == "--cli") return execCli(argc, argv);
+#endif
     if (argc >= 2 && std::string(argv[1]) == "--ui-serve") return sf::runUiServer(argc - 1, argv + 1, runMain);
     return runMain(argc, argv);
 }

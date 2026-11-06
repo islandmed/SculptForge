@@ -55,6 +55,18 @@ void App::registerAiActions() {
          "Brush Lab: describe a brush in words and AI builds it; tweak the recipe with sliders.");
     flag("ui.generate3d", "Generate 3D", ICON_LC_WAND_SPARKLES, "Generate", &showImageTo3D_,
          "Turn an image or a description into a sculptable model (Hugging Face, fal.ai, Meshy, ComfyUI or offline).");
+    // Help > Connect an AI tool (PanelConnectAi.cpp). (Managed policy, feat/studio-ready: register it only when MCP is
+    // allowed, sf::policy::mcpAllowed().)
+    Action connect;
+    connect.id = "help.connect_ai";
+    connect.label = "Connect an AI tool...";
+    connect.icon = ICON_LC_PLUG;
+    connect.palette = "Help";
+    connect.description = "Use SculptForge from Claude, ChatGPT (Codex), Gemini, Grok, Cursor, VS Code and other AI "
+                          "tools: the exact command or settings for this install, with Copy buttons. The tool starts "
+                          "SculptForge on this computer; nothing listens on the network.";
+    connect.run = [this] { showConnectAi_ = true; };
+    actions_.add(std::move(connect));
 }
 
 void App::setAiFeatures(bool on) {
@@ -76,6 +88,8 @@ void App::setAiFeatures(bool on) {
         for (const std::string& name : ai::aiCommandNames()) actions_.removePrefix("cmd." + name);
         actions_.removePrefix("ui.brush_lab");
         actions_.removePrefix("ui.generate3d");
+        actions_.removePrefix("help.connect_ai");
+        showConnectAi_ = false;
         showBrushLab_ = false;
         showImageTo3D_ = false;
     }

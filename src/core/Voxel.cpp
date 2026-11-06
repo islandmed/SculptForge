@@ -5,7 +5,9 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <numeric>
 
+#include "core/CloseHoles.h"
 #include "core/ThreadPool.h"
 
 namespace sf {
@@ -111,6 +113,66 @@ void blurAxis(std::vector<float>& f, const glm::ivec3& dims, int axis) {
 }
 
 // Closest point to `p` on triangle abc (Ericson, Real-Time Collision Detection 5.1.5).
+// An edge with one triangle (undirected, so flipped triangles don't hide it).
+bool hasOpenEdges(const Mesh& mesh) {
+    std::vector<uint64_t> edges;
+    edges.reserve(mesh.triangleCount() * 3);
+    for (const glm::uvec3& t : mesh.triangles)
+        for (int k = 0; k < 3; ++k) {
+            const uint32_t a = t[k], b = t[(k + 1) % 3];
+            edges.push_back(uint64_t(std::min(a, b)) << 32 | std::max(a, b));
+        }
+    std::sort(edges.begin(), edges.end());
+    for (size_t i = 0; i < edges.size();) {
+        size_t j = i + 1;
+        while (j < edges.size() && edges[j] == edges[i]) ++j;
+        if (j - i == 1) return true;
+        i = j;
+    }
+    return false;
+}
+
+// Drops the pieces of a surface-nets mesh (quads as triangle pairs t, t + 1) with fewer than `maxTriangles`
+// triangles, when a bigger one is left: single-voxel specks where a sign flips next to a cap.
+void dropSpecks(Mesh& m, size_t maxTriangles) {
+    std::vector<uint32_t> parent(m.vertexCount());
+    std::iota(parent.begin(), parent.end(), 0u);
+    auto find = [&](uint32_t a) {
+        while (parent[a] != a) a = parent[a] = parent[parent[a]];
+        return a;
+    };
+    for (const glm::uvec3& t : m.triangles) {
+        parent[find(t.y)] = find(t.x);
+        parent[find(t.z)] = find(t.x);
+    }
+    std::vector<uint32_t> size(m.vertexCount(), 0);
+    for (const glm::uvec3& t : m.triangles) ++size[find(t.x)];
+    if (std::count_if(size.begin(), size.end(), [&](uint32_t c) { return c >= maxTriangles; }) == 0) return;
+    std::vector<glm::uvec3> kept;
+    kept.reserve(m.triangles.size());
+    for (const glm::uvec3& t : m.triangles)
+        if (size[find(t.x)] >= maxTriangles) kept.push_back(t);
+    if (kept.size() == m.triangles.size()) return;
+    std::vector<uint32_t> remap(m.vertexCount(), ~0u);
+    std::vector<glm::vec3> positions;
+    for (glm::uvec3& t : kept)
+        for (int k = 0; k < 3; ++k) {
+            uint32_t& r = remap[t[k]];
+            if (r == ~0u) {
+                r = uint32_t(positions.size());
+                positions.push_back(m.positions[t[k]]);
+            }
+            t[k] = r;
+        }
+    Mesh out;
+    out.positions = std::move(positions);
+    out.triangles = std::move(kept);
+    for (uint32_t t = 0; t + 1 < out.triangles.size(); t += 2) out.pairQuad(t, t + 1); // (a piece drops whole quads)
+    out.rebuildTopology();
+    out.recomputeAllNormals();
+    m = std::move(out);
+}
+
 glm::vec3 closestOnTriangle(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c) {
     const glm::vec3 ab = b - a, ac = c - a, ap = p - a;
     const float d1 = glm::dot(ab, ap), d2 = glm::dot(ac, ap);
@@ -505,8 +567,23 @@ std::vector<float> insideDistanceField(const Mesh& mesh, const VoxelGrid& grid, 
     return f;
 }
 
-Mesh voxelRemesh(const Mesh& mesh, int resolution, std::string* error, const std::function<bool(float)>& progress) {
+Mesh voxelRemesh(const Mesh& source, int resolution, std::string* error, const std::function<bool(float)>& progress) {
     VoxelGrid grid;
+    // An open Part (a starter head's neck, an extracted shell): the flood fill would pour in through the opening and
+    // leave only a thin, holed shell. Its borders are capped first, on a copy of just the positions and triangles.
+    Mesh capped;
+    const bool open = hasOpenEdges(source);
+    if (open) {
+        capped.positions = source.positions;
+        capped.triangles = source.triangles;
+        CloseHolesOptions o;
+        o.refine = false; // (the voxels smooth the cap; no new vertices to carry attributes to)
+        o.newGroup = false;
+        CloseHolesStats stats;
+        std::string ignored;
+        closeHoles(capped, o, stats, ignored);
+    }
+    const Mesh& mesh = open ? capped : source;
     if (mesh.triangleCount() == 0 || !makeVoxelGrid(mesh.bounds(), resolution, 4, grid)) {
         if (error) *error = mesh.triangleCount() == 0 ? "The mesh is empty" : "Resolution too high for this mesh";
         return {};
@@ -521,18 +598,35 @@ Mesh voxelRemesh(const Mesh& mesh, int resolution, std::string* error, const std
     std::vector<uint8_t> solid = solidifyShell(grid, 0.5f, 1, true);
     std::vector<float>().swap(grid.values);
     if (!step(0.25f)) return {};
+    if (open) {
+        // Still open after capping (a border cut by non-manifold or flipped edges, a cap that folds): the outside
+        // reached the inside and the solid is little more than the shell. Nothing is better than a surface full of holes.
+        double volume = 0.0;
+        for (const glm::uvec3& t : mesh.triangles)
+            volume += glm::dot(glm::dvec3(mesh.positions[t.x]),
+                               glm::cross(glm::dvec3(mesh.positions[t.y]), glm::dvec3(mesh.positions[t.z])));
+        const double cells = std::abs(volume) / 6.0 / (double(grid.cell) * grid.cell * grid.cell);
+        const size_t inside = size_t(std::count(solid.begin(), solid.end(), uint8_t(1)));
+        if (cells > 64.0 && double(inside) < 0.5 * cells) {
+            if (error)
+                *error = "Remesh: the Part has open borders that couldn't be capped, so it isn't a closed solid and the "
+                         "remesh would be full of holes; the Part is unchanged. Close it first (Tool > Geometry > Close Holes)";
+            return {};
+        }
+    }
     // Mesh the signed distance to the original surface (positive inside), not the blocky occupancy: the result
     // lands on the original surface with no voxel terracing.
     const std::vector<float> field = insideDistanceField(mesh, grid, solid, 3.0f);
     std::vector<uint8_t>().swap(solid);
     if (!step(0.6f)) return {};
     Mesh out = meshFromField(grid, field, 0.0f, 2);
+    if (open) dropSpecks(out, 64); // (a few voxels: never detail at a remesh resolution)
     if (out.triangleCount() == 0 && error) *error = "Remesh produced no surface";
     if (!step(0.9f)) return {};
     // Mask and vertex paint follow the nearest original vertex; face groups, hidden
     // flags and UVs don't survive a rebuild (everything becomes visible group 0).
     // The original's quads don't either: the new surface is all quads of its own.
-    transferVertexAttributes(mesh, out);
+    transferVertexAttributes(source, out);
     step(1.0f);
     return out;
 }

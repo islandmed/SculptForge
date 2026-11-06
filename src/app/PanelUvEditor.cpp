@@ -174,6 +174,11 @@ struct UvEditorState {
     };
     std::unique_ptr<Job> job;
     int unwraps = 0; // finished (UI tests)
+    int frames = 0;  // Frame clicks and F presses (UI tests: uv_frames)
+    // The toolbar's items as drawn last frame and the window's right edge (UI tests: uv_toolbar_overlap / _clipped).
+    struct Box { ImVec2 Min, Max; };
+    std::vector<Box> toolbarItems;
+    float toolbarRight = 0.0f;
     double frameMs = 0.0; // what the last frame of the window cost on the CPU (UI tests: uv_frame_ms)
 };
 
@@ -373,6 +378,7 @@ struct UvEditorUi {
         s.zoom = std::min(s.viewSize.x / size.x, s.viewSize.y / size.y) * 0.88f;
     }
     void frameAll() {
+        ++s.frames;
         const Mesh& m = mesh();
         if (!s.selCorners.empty() && !app.doc_.uvSelection.empty()) {
             frame(s.selLo, s.selHi);
@@ -981,11 +987,20 @@ void App::drawUvEditor() {
     const CanvasRect cr = canvasRect();
     ImGui::SetNextWindowPos(ImVec2(cr.x + cr.w * 0.34f, cr.y + 6 * scale), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(cr.w * 0.66f - 6 * scale, cr.h - 12 * scale), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSizeConstraints(ImVec2(520 * scale, 360 * scale), ImVec2(FLT_MAX, FLT_MAX));
+    // Never bigger than the canvas (a small window at a big UI scale), and pulled back inside the screen.
+    const ImVec2 screen = ImGui::GetIO().DisplaySize;
+    ImGui::SetNextWindowSizeConstraints(ImVec2(std::min(520 * scale, cr.w), std::min(360 * scale, cr.h)),
+                                        ImVec2(FLT_MAX, FLT_MAX));
     ImGui::SetNextWindowBgAlpha(1.0f);
     if (!ImGui::Begin("UV Editor", &showUvEditor_, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar)) {
         ImGui::End();
         return;
+    }
+    {
+        const ImVec2 pos = ImGui::GetWindowPos(), size = ImGui::GetWindowSize();
+        const ImVec2 to(std::max(0.0f, std::min(pos.x, screen.x - size.x)), std::max(0.0f, std::min(pos.y, screen.y - size.y)));
+        if (to.x != pos.x || to.y != pos.y) ImGui::SetWindowPos(to);
+        if (size.x > screen.x || size.y > screen.y) ImGui::SetWindowSize(ImVec2(std::min(size.x, screen.x), std::min(size.y, screen.y)));
     }
     Mesh& m = doc_.mesh;
     const ImGuiStyle& style = ImGui::GetStyle();
@@ -994,9 +1009,14 @@ void App::drawUvEditor() {
     ImGui::AlignTextToFramePadding();
     ImGui::TextDisabled("%s", tr("Select"));
     ImGui::SameLine();
+    const ImVec2 segmentsMin = ImGui::GetCursorScreenPos();
     ui::Segmented(*this, {"uv.mode_vertex", "uv.mode_edge", "uv.mode_face", "uv.mode_island"}, 248 * scale);
-    // The rest of the toolbar wraps onto a second line when the window is narrow.
-    const float frameW = 74 * scale;
+    s.toolbarItems.assign(1, {segmentsMin, ImGui::GetItemRectMax()});
+    auto toolbarItem = [&] { s.toolbarItems.push_back({ImGui::GetItemRectMin(), ImGui::GetItemRectMax()}); };
+    // The rest of the toolbar wraps onto more lines when the window is narrow or the interface is scaled up (4K at
+    // 2.4): every item measured as drawn, in the interface language, with room kept for Frame at the right.
+    const float frameW = std::max(74 * scale, ImGui::CalcTextSize(tr("Frame")).x + ImGui::GetFrameHeight() +
+                                                  style.FramePadding.x * 2);
     const float rowStart = ImGui::GetCursorPosX();
     auto nextOnLine = [&](float itemW, float gap) {
         ImGui::SameLine(0, gap);
@@ -1005,11 +1025,15 @@ void App::drawUvEditor() {
             ImGui::SetCursorPosX(rowStart);
         }
     };
+    auto checkboxW = [&](const char* label) {
+        return ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize(tr(label), nullptr, true).x;
+    };
     nextOnLine(130 * scale, 14 * scale);
     ImGui::SetNextItemWidth(130 * scale);
     const char* colorLabels[4];
     for (int i = 0; i < 4; ++i) colorLabels[i] = tr(kColorLabels[i]);
     if (ImGui::Combo("##uvcolor", &s.color, colorLabels, 4)) s.colorsDirty = true;
+    toolbarItem();
     ui::HelpText("Colours", nullptr,
                  "What the faces show, here and on the model: Islands (a colour each), Stretch (green: true to the surface; "
                  "yellow to red: stretched or squashed; magenta: folded over), Density (texel density; blue: fewer texels than the "
@@ -1020,21 +1044,29 @@ void App::drawUvEditor() {
     const char* imageLabels[3];
     for (int i = 0; i < 3; ++i) imageLabels[i] = tr(kImageLabels[i]);
     ImGui::Combo("##uvimage", &s.image, imageLabels, 3);
+    toolbarItem();
     ui::HelpText("Image", nullptr, "Behind the layout: nothing, a checker, or the painted texture (tile 1001).", kPath);
-    nextOnLine(ImGui::CalcTextSize("Model").x + ImGui::GetFrameHeight() * 2, 14 * scale);
+    // "On model" stays with its first checkbox; the second wraps on its own.
+    nextOnLine(ImGui::CalcTextSize(tr("On model")).x + style.ItemSpacing.x + checkboxW("Colours##uvmodel"), 14 * scale);
     ImGui::AlignTextToFramePadding();
     ImGui::TextDisabled("%s", tr("On model"));
     ImGui::SameLine();
     if (ui::Checkbox("Colours##uvmodel", &s.modelColors)) s.colorsDirty = true;
+    toolbarItem();
     ui::HelpText("Colours on the model", nullptr,
                  "Show the same colours on the model (islands, stretch, density and the selection), live while you edit.",
                  kPath);
-    ImGui::SameLine();
+    nextOnLine(checkboxW("Checker##uvchecker"), style.ItemSpacing.x);
     if (ui::Checkbox("Checker##uvchecker", &s.modelChecker)) s.colorsDirty = true;
+    toolbarItem();
     ui::HelpText("Checker on the model", nullptr,
                  "A checker on the model's UVs (tinted per UDIM tile): squares that stay square mean no stretch.", kPath);
-    ImGui::SameLine(ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - frameW);
+    // Frame at the right end of the last line (there is always room: nextOnLine kept it).
+    ImGui::SameLine(std::max(ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - frameW,
+                             ImGui::GetCursorPosX()));
     ui::ActionButton(*this, "uv.frame", ImVec2(frameW, 0));
+    toolbarItem();
+    s.toolbarRight = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
 
     // Sidebar on the right, the view in the rest.
     const float sideW = 236 * scale;
@@ -1229,12 +1261,14 @@ void App::drawUvEditor() {
                     IM_COL32(240, 136, 46, 220), 0, 0, 1.0f * scale);
     }
     if (!s.hasUvs) {
-        const char* msg = m.triangleCount() ? "No UVs yet: pick a method and Unwrap (or mark seams first)" : "No mesh";
-        const ImVec2 ts = ImGui::CalcTextSize(msg);
-        const ImVec2 at(viewMin.x + (viewSize.x - ts.x) * 0.5f, viewMin.y + viewSize.y * 0.5f - ts.y);
+        const char* msg = tr(m.triangleCount() ? "No UVs yet: pick a method and Unwrap (or mark seams first)" : "No mesh");
+        // Wrapped to the view (a narrow view, a big UI scale or a longer translation), centred in it.
+        const float wrap = std::max(viewSize.x - 48 * scale, 32 * scale);
+        const ImVec2 ts = ImGui::CalcTextSize(msg, nullptr, false, wrap);
+        const ImVec2 at(viewMin.x + (viewSize.x - ts.x) * 0.5f, viewMin.y + (viewSize.y - ts.y) * 0.5f);
         dl->AddRectFilled(ImVec2(at.x - 12 * scale, at.y - 8 * scale), ImVec2(at.x + ts.x + 12 * scale, at.y + ts.y + 8 * scale),
                           IM_COL32(24, 24, 27, 235), 6 * scale);
-        dl->AddText(at, IM_COL32(215, 215, 220, 255), msg);
+        dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(), at, IM_COL32(215, 215, 220, 255), msg, nullptr, wrap);
     }
     if (s.job) {
         const float f = s.job->progress->load();
@@ -1621,6 +1655,22 @@ double App::uvEditorTestValue(const std::string& name) {
     if (name == "uv_pack_columns") return double(uvPackColumns_); // the Pack fields
     if (name == "uv_pack_rows") return double(uvPackRows_);
     if (name == "uv_frame_ms") return uvEditor_ ? uvEditor_->frameMs : 0.0;
+    if (name == "uv_frames") return uvEditor_ ? double(uvEditor_->frames) : 0.0; // Frame clicks and F presses
+    if (name == "uv_model_colors") return uvEditor_ && uvEditor_->modelColors ? 1.0 : 0.0;
+    if (name == "uv_model_checker") return uvEditor_ && uvEditor_->modelChecker ? 1.0 : 0.0;
+    if (name == "uv_toolbar_overlap" || name == "uv_toolbar_clipped") { // toolbar items on top of each other / cut off
+        double n = 0;
+        if (!uvEditor_) return n;
+        const auto& r = uvEditor_->toolbarItems;
+        for (size_t i = 0; i < r.size(); ++i) {
+            if (name == "uv_toolbar_clipped") n += r[i].Max.x > uvEditor_->toolbarRight + 0.5f;
+            else
+                for (size_t j = i + 1; j < r.size(); ++j)
+                    n += r[i].Min.x < r[j].Max.x - 0.5f && r[j].Min.x < r[i].Max.x - 0.5f && r[i].Min.y < r[j].Max.y - 0.5f &&
+                         r[j].Min.y < r[i].Max.y - 0.5f;
+        }
+        return n;
+    }
     if (name == "uv_tool") return uvEditor_ ? double(uvEditor_->tool) : 0.0;
     if (name == "uv_view_triangles") return uvEditor_ ? double(uvEditor_->gpu.triangles()) : 0.0;
     if (name == "uv_overlay") return uvEditorOverlay(doc_.activePartInfo().id) && !uvEditor_->overlay.colors.empty() ? 1.0 : 0.0;
