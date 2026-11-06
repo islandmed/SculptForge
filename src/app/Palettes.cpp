@@ -503,6 +503,18 @@ void App::drawPalette_Edit() {
     ImGui::EndDisabled();
     ui::HelpAction(*this, "edit.redo");
     menuAction(*this, "brush.paste");
+    // The Classic layout has Preferences as its own palette; Edit is where people look first (#144).
+    if (!sculptForgeLayout()) {
+        ImGui::Separator();
+        const std::string shortcut = actions().shortcutText("ui.palette.preferences");
+        const std::string label = std::string(tr("Preferences")) + "...##edit.preferences";
+        const Action* a = actions().find("ui.palette.preferences");
+        if (ImGui::MenuItem(label.c_str(), shortcut.empty() ? nullptr : shortcut.c_str()) && a && a->run) {
+            actions().touch(a->id);
+            a->run();
+        }
+        ui::HelpAction(*this, "ui.palette.preferences");
+    }
 }
 
 void App::drawPalette_File() {
@@ -659,7 +671,10 @@ void App::drawPalette_Preferences() {
     if (subpalette("preferences.ai", "AI")) {
         tray::Section section;
         drawAiPrefs(); // the switch (PanelAi.cpp)
+        drawAiStudioPrefs(); // what the studio's policy manages, the studio sign-in, the audit log (PanelAi.cpp)
         if (ai::aiEnabled()) {
+            ImGui::SeparatorText(tr("Provider"));
+            drawAiSettings(); // the brush provider: presets, endpoint, key (keychain)
             ImGui::Spacing();
             drawAiPrefsSection(); // the Hugging Face token
         }

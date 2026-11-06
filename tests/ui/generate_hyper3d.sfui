@@ -1,0 +1,37 @@
+# Generate 3D > Hyper3D Rodin (direct) (ai/Hyper3D.h, #123): the tier picker, the key field and what is sent to whom;
+# without a key Generate refuses before anything is sent; a studio policy that doesn't list "hyper3d" shows the
+# Managed badge and refuses too. Nothing is generated (no key, no network).
+run ui_look look=classic layout=classic        # written for the Classic look
+drop ../../assets/demo/teddy-sketch.png
+wait_for "Generate 3D" 5
+click "Generate 3D/##service"
+expect_text Hyper3D Rodin (direct) - paid, your key
+click "Hyper3D Rodin (direct) - paid, your key"
+wait 0.2
+expect_text Off until you add your own key
+expect_text Sends your image or description to Hyper3D (api.hyper3d.com)
+expect_text billed to your Hyper3D account
+shot generate-hyper3d-image
+
+click "Generate 3D/Tier"
+expect_text Gen-2.5 Extreme Low (fastest)
+expect_text Gen-2.5 Extreme High (more credits)
+shot generate-hyper3d-tiers
+click "Gen-2.5 Medium"
+wait 0.2
+expect_text Gen-2.5 Medium
+
+click "Generate 3D/Generate 3D model"
+wait 0.5
+expect_text Add your Hyper3D API key
+
+click "Generate 3D/From text"
+wait 0.2
+expect_text Sends your image or description to Hyper3D
+shot generate-hyper3d-text
+
+run ui_policy json="{\"format\":\"sculptforge-policy\",\"version\":1,\"organization\":\"Acme Animation\",\"ai\":{\"enabled\":true,\"providers\":[\"fal\",\"huggingface\"]}}"
+wait 0.2
+expect_text doesn't allow this AI provider (hyper3d)
+shot generate-hyper3d-managed
+run ui_policy json=""

@@ -217,20 +217,29 @@ class FakeCmds(types.ModuleType):
     def deleteUI(self, name, layout=False):
         self.option_vars["_shelves"].pop(name)
 
-    def shelfButton(self, parent=None, command="", sourceType="", **kw):
-        self.option_vars["_shelves"][parent].append((sourceType, command))
+    def shelfButton(self, *name, parent=None, command="", sourceType="", exists=False, edit=False, **kw):
+        if exists:
+            return any(name and b[2] == name[0] for b in self.option_vars.get("_shelves", {}).get("SculptForge", []))
+        if edit:
+            return
+        self.option_vars["_shelves"][parent].append((sourceType, command, name[0] if name else kw.get("label")))
 
 
 def install_fake_maya(folder):
     cmds = FakeCmds(folder)
     mel = types.ModuleType("maya.mel")
     mel.eval = lambda text: "ShelfLayout"
+    utils = types.ModuleType("maya.utils")
+    cmds.deferred = []
+    utils.executeDeferred = cmds.deferred.append  # Maya runs these in its main thread when idle; tests by hand
     maya = types.ModuleType("maya")
     maya.cmds = cmds
     maya.mel = mel
+    maya.utils = utils
     sys.modules["maya"] = maya
     sys.modules["maya.cmds"] = cmds
     sys.modules["maya.mel"] = mel
+    sys.modules["maya.utils"] = utils
     return cmds
 
 
@@ -239,8 +248,9 @@ def test_shelf(sm):
     sm.install_shelf()
     sm.install_shelf()  # again: replaces the shelf
     buttons = cmds.option_vars["_shelves"][sm.SHELF]
-    check(len(buttons) == 3 and all(t == "python" for t, _ in buttons), "the shelf has three Python buttons")
-    for _, command in buttons:
+    check(len(buttons) == 4 and all(t == "python" for t, _, _ in buttons), "the shelf has four Python buttons")
+    check(any(n == sm.AUTO_BUTTON for _, _, n in buttons), "the Auto button has its name (its label shows on / off)")
+    for _, command, _ in buttons:
         func = command.split("sculptforge_maya.")[1].rstrip("()")
         check(callable(getattr(sm, func, None)), "shelf button calls sculptforge_maya.%s" % func)
 
@@ -393,6 +403,64 @@ def test_send_and_get(sm, tmp, cli):
     check(cmds.warnings and cmds.nodes == before, "get: a traversal attempt is refused and nothing changes")
 
 
+def write_sculptforge_send(sm, out, revision, names):
+    """What SculptForge's maya_send writes: the OBJs, then the manifest."""
+    os.makedirs(out, exist_ok=True)
+    objects = []
+    for k, name in enumerate(names):
+        file_name = "r%d_%03d.obj" % (revision, k)
+        with open(os.path.join(out, file_name), "w") as f:
+            f.write(CUBE_OBJ.replace("# Maya OBJ export", "# SculptForge r%d" % revision))
+        objects.append((name, file_name))
+    sm.write_atomically(os.path.join(out, "manifest.json"),
+                        sm.write_manifest(objects, revision).replace('"maya"', '"sculptforge"'))
+
+
+def test_auto(sm, tmp):
+    """Auto: what SculptForge sends after the shelf is used loads by itself (in Maya's main thread); what was
+    there before waits for Get; Auto off leaves it to Get. Only the manifest's time and size are checked."""
+    folder = os.path.join(tmp, "auto")
+    os.makedirs(folder)
+    cmds = install_fake_maya(folder)
+    sm.POLL_SECONDS = 3600  # the thread never ticks here: the test polls by hand
+    cmds.add_mesh("|pCube1", CUBE_OBJ)
+    out = os.path.join(folder, sm.TO_MAYA)
+    write_sculptforge_send(sm, out, 1, ["pCube1"])  # sent before Maya's shelf was used: old news
+    cmds.selection = ["|pCube1"]
+    sm.send_to_sculptforge()
+    w = sm._watcher
+    check(w is not None and w.thread.daemon and w.box == out, "auto: on by default, watching SculptForge's box only")
+    check(not w.poll() and not cmds.deferred, "auto: what was there before isn't loaded")
+
+    write_sculptforge_send(sm, out, 2, ["pCube1"])
+    os.utime(os.path.join(out, "manifest.json"), ns=(1, 2_000_000_000))  # (coarse clocks: a time of its own)
+    check(w.poll() and not w.poll(), "auto: a new send is seen once")
+    w.defer(w.on_change)
+    check(len(cmds.deferred) == 1, "auto: the Get is handed to Maya's main thread")
+    cmds.deferred.pop()()
+    shape = cmds.nodes["|pCube1|pCube1Shape"]
+    check("# SculptForge r2" in shape["obj"], "auto: the new send replaced pCube1's mesh")
+    check(cmds.option_vars.get(sm.REVISION_VAR) == 2, "auto: the revision is remembered")
+    shape["obj"] = CUBE_OBJ
+    sm._auto_get_new()  # the same revision again (a touch of the manifest): not loaded twice
+    check(cmds.nodes["|pCube1|pCube1Shape"]["obj"] == CUBE_OBJ, "auto: a revision already loaded isn't loaded again")
+
+    with open(os.path.join(out, "manifest.json"), "w") as f:
+        f.write('{"format": "sculptforge-maya", "ver')  # half written / not valid: nothing happens, no warning
+    cmds.warnings = []
+    sm._auto_get_new()
+    check(not cmds.warnings and cmds.nodes["|pCube1|pCube1Shape"]["obj"] == CUBE_OBJ, "auto: a bad manifest is skipped")
+
+    sm.toggle_auto_get()
+    check(not sm.auto_get_on() and sm._watcher is None and w.stopped.is_set(), "auto off: the thread stops")
+    write_sculptforge_send(sm, out, 3, ["pCube1"])
+    sm._auto_get_new()
+    check(cmds.nodes["|pCube1|pCube1Shape"]["obj"] == CUBE_OBJ, "auto off: nothing loads by itself")
+    sm.toggle_auto_get()
+    check(sm.auto_get_on() and sm._watcher is not None and not sm._watcher.poll(), "auto on again: from now on")
+    sm._watcher.stop()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cli", help="sculptforge-cli, for the round trip through SculptForge")
@@ -402,6 +470,7 @@ def main():
     try:
         test_format(sm, tmp)
         test_send_and_get(sm, tmp, args.cli)
+        test_auto(sm, tmp)
         test_shelf(sm)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

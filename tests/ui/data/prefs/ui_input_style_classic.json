@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "shortcuts": {
+    "ui.size_popup": "Ctrl+Alt+S"
+  },
+  "prefs": {
+    "inputStyle": "classic"
+  }
+}

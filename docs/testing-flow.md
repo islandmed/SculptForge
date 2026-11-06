@@ -78,6 +78,10 @@ Every tier runs ctest through `tools/test/run.py --build build [-- ctest args]`:
   each. A listed test may grow to 1.5× its seconds (scaled by budget ÷ 20 on CI), so the list can only shrink. A
   slow test should wait on events rather than fixed frames, use a smaller mesh or texture, be split, or be labelled
   nightly.
+- **Shards by time**: `tests/shard_times.inc` lists the TEST cases of 0.5 s or more with their PC seconds; the
+  shards take them longest first, each to the shard with the least work so far (tests/test_main.cpp). When a test
+  gets much faster or slower, re-run `tools/test/shard_times.py /tmp/sf-pc-*-times.tsv` (`--override` your branch's
+  times file with `--match` for the tests you changed).
 - **Where the time goes**: `SF_UI_PROFILE=1` makes a UI test print its slowest script lines with real seconds
   (`SF_PC_ENV=SF_UI_PROFILE=1 ~/Work/.sf/pc.sh . -R ui_bake`).
 - **Parallel runs** (`ctest -jN`, N > 1): timing checks get CI's slack (`SF_TIME_LIMIT_SCALE=4`, `timeLimit()` in

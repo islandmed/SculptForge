@@ -41,7 +41,10 @@
 //                            pen: with the pen, hovering (its tip taps for click)
 //   drag_landmark N DX DY [S] left-drag Make sculptable's face landmark N (0-7, FaceLandmarks order) by DX DY pixels
 //   orbit DX DY              right-drag on the background, in pixels (with the held modifiers)
-//   axis_click +x|-x|+y|-y|+z|-z  click that end of the axis gizmo in the canvas corner (it snaps to that side view)
+//   axis_click +x|-x|+y|-y|+z|-z  click that end of the axis gizmo in the canvas corner (it snaps to that side view;
+//                            again on the end facing you: the opposite side)
+//   axis_drag DX DY          left-drag from a spot on the axis gizmo's disc clear of its ends, by DX DY unscaled pixels
+//   axis_hover +x|...|-z|disc  rest the pointer on that end of the axis gizmo, or on its disc clear of the ends
 //   button_drag middle|right X0 Y0 X1 Y1 [S]  drag with that button in window fractions (with the held modifiers)
 //   expect_shortcut ACTION KEYS  the action's effective keys, e.g. expect_shortcut view.front Numpad 1
 //   camera YAW PITCH         set the view's angles in degrees (0 0 = the front view), e.g. for guide screenshots
@@ -58,7 +61,9 @@
 //   input_style STYLE        classic, sculptforge (the default), blender or maya, as Preferences > Input sets it
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
 //                            directory), e.g. to stage what another program would write (the Blender bridge);
-//                            $LIBRARY in DST (and in env values) is the test's Library library folder
+//                            $LIBRARY in DST (and in env values) is the test's Library library folder; a
+//                            Bridge file stored with the fixture header gets the format's bytes back (the
+//                            repository never holds them, docs/legal/trademarks.md)
 //   support_card first_run [test_mode]   the full membership card's launch decision (Support.h)
 //   member_card MOMENT [days=N] [sculpt_seconds=S]   a good moment for the small membership card (sculpted, render,
 //                            updated, challenge, none); member_sign_in ok|fail ends the GitHub sign-in it started
@@ -105,6 +110,7 @@
 //                            symmetry_copies (copies every stroke makes), cursor_copies (brush cursors drawn),
 //                            symmetry_pivot_x (local symmetry's centre), timeline_top (1: the strip at the top),
 //                            timeline_y / axis_gizmo_y (their tops / centre, fractions of the canvas from its top),
+//                            axis_view (the side view named under the axis gizmo: 0-5 = +x +y +z -x -y -z, -1 none),
 //                            style_window_min (ImGui's minimum window height, unscaled px: 32 in every look),
 //                            tablet_mouse_mode (Preferences > Tablet > Mouse mode),
 //                            ui_mouse_x / ui_mouse_y (where ImGui sees the pointer), backface_culling, drawn_triangles,
@@ -141,6 +147,8 @@
 //                            roughness differs from the default), shown_mean_r (mean red the viewport is sent),
 //                            layer_channel_<id> (1 when the active texture layer has channel <id> on, e.g. roughness)
 //                            auto_uv_running, qremesh_running (QRemesh working in the background),
+//                            longest_frame_ms (the longest real time between two frames since the last read; resets),
+//                            time_limit_scale (timeLimit()'s factor: 4 on CI or in a parallel ctest, else 1),
 //                            voxel_remesh_running, quick_remesh / remesh_after_stroke (Tool > Remesh, #121), stroke_stretched,
 //                            qremesh_guides (guide curves on the active Part), qremesh_guide_loops (closed ones),
 //                            guides_mode (1 while the QRemesh Guides brush is picked),
@@ -216,8 +224,9 @@
 // Simulated graphics tablet: real SDL3 pen events, each followed by the mouse event SDL 3.2 synthesizes
 // from it (SDL_PEN_MOUSEID), in SDL's order (the app ignores those and makes its own, #95). The touch comes before its first pressure sample, as
 // with Windows Ink, and every frame carries 4 pen samples (a 240 Hz pen at 60 fps).
-//   pen_stroke U0 V0 U1 V1 P0 P1 [eraser] [leave] [S]   pen stroke across the model with pressure P0 -> P1;
-//                            eraser: the eraser end; leave: the pen leaves proximity before lifting
+//   pen_stroke U0 V0 U1 V1 P0 P1 [eraser] [leave] [tail] [S]   pen stroke across the model with pressure P0 -> P1;
+//                            eraser: the eraser end; leave: the pen leaves proximity before lifting; tail: as a real
+//                            tablet lifts, the last 8 samples (2 frames) move on a few pixels with the pressure falling to 0
 //   pen_drag_item LABEL DX DY P0 P1 [stray X Y] [lost] [S]   pen stroke through the item's centre, DX DY pixels long
 //                            (a short one is a tap with a little jitter); stray: as for pen_drag; lost: SDL drops
 //                            the pen while it touches (out of proximity without lifting, then sdl_pen_mouse stuck
@@ -293,12 +302,14 @@
 #include "core/SelectionSets.h"
 #include "core/ThreadPool.h"
 #include "core/Timeline.h"
+#include "io/BridgeProtocol.h"
 #include "link/AiLink.h"
 #include "link/HttpServer.h"
 
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <utility>
 #include <thread>
 #include <mutex>
 #include <atomic>
@@ -309,14 +320,43 @@
 #include <filesystem>
 #include <fstream>
 #include <future>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <set>
 #include <sstream>
+#include <string_view>
+#include <vector>
 
 namespace sf {
 
 namespace {
+
+// copy: Bridge files under `dst` stored with the fixture header and name prefix get the format's own bytes back.
+void restoreBridgeFixtures(const std::filesystem::path& dst) {
+    namespace fs = std::filesystem;
+    static constexpr std::string_view kFixtureHeader = "SFBRIDGE FIXTURE HEADER 01", kFixturePrefix = "SFOBJCT_";
+    static_assert(kFixtureHeader.size() == sizeof(bridgefile::kHeader) - 1 &&
+                  kFixturePrefix.size() == sizeof(bridgefile::kNamePrefix) - 1);
+    std::error_code ec;
+    std::vector<fs::path> files;
+    if (fs::is_regular_file(dst, ec)) files.push_back(dst);
+    else
+        for (fs::recursive_directory_iterator it(dst, ec), end; !ec && it != end; it.increment(ec))
+            if (it->is_regular_file(ec)) files.push_back(it->path());
+    for (const fs::path& p : files) {
+        std::string bytes;
+        {
+            std::ifstream in(p, std::ios::binary);
+            bytes.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+        }
+        if (bytes.compare(0, kFixtureHeader.size(), kFixtureHeader) != 0) continue;
+        bytes.replace(0, kFixtureHeader.size(), bridgefile::kHeader);
+        if (const size_t at = bytes.find(kFixturePrefix); at != std::string::npos)
+            bytes.replace(at, kFixturePrefix.size(), bridgefile::kNamePrefix);
+        std::ofstream(p, std::ios::binary | std::ios::trunc).write(bytes.data(), std::streamsize(bytes.size()));
+    }
+}
 
 // ai_client: the scripted AI tool's connection and what it has received (a reader thread fills `lines`).
 struct AiTestClient {
@@ -481,6 +521,18 @@ double Demo::query(const std::string& name, bool& known) const {
         // (rows as saved: top first)
         return 0.2126 * lastShot_[i] + 0.7152 * lastShot_[i + 1] + 0.0722 * lastShot_[i + 2];
     }
+    if (name.rfind("rgb_", 0) == 0 && name.size() > 5 && name[5] == '@') { // rgb_r@X,Y (or _g, _b): that channel 0-255 there
+        const int k = name[4] == 'r' ? 0 : name[4] == 'g' ? 1 : name[4] == 'b' ? 2 : -1;
+        float fx = 0.0f, fy = 0.0f;
+        if (k < 0 || std::sscanf(name.c_str() + 6, "%f,%f", &fx, &fy) != 2) {
+            known = false;
+            return 0.0;
+        }
+        if (lastShot_.empty()) return -1.0;
+        const int x = std::clamp(int(fx * float(lastShotW_)), 0, lastShotW_ - 1);
+        const int y = std::clamp(int(fy * float(lastShotH_)), 0, lastShotH_ - 1);
+        return double(lastShot_[size_t(y) * size_t(lastShotW_) * 4 + size_t(x) * 4 + size_t(k)]);
+    }
     if (name.rfind("edges@", 0) == 0) { // edges@X0,Y0,X1,Y1: mean luma step between neighbouring pixels of the last shot there
         float x0 = 0.0f, y0 = 0.0f, x1 = 0.0f, y1 = 0.0f;
         if (std::sscanf(name.c_str() + 6, "%f,%f,%f,%f", &x0, &y0, &x1, &y1) != 4) {
@@ -530,6 +582,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "texture_layers") return hasTexture(m) ? double(m.texture->layers.size()) : 0.0;
     if (name == "active_texture_layer") return hasTexture(m) && !m.texture->layers.empty() ? double(m.texture->activeLayer) : -1.0;
     if (name == "auto_uv_running") return app_.autoUv_ ? 1.0 : 0.0;
+    if (name == "longest_frame_ms") return std::exchange(longestFrameMs_, 0.0); // since the last read (it resets)
+    if (name == "time_limit_scale") { // timeLimit()'s factor (tests/TestHarness.h): 4 on CI and in a parallel ctest
+        if (const char* strict = std::getenv("SF_BENCH_LIMITS"); strict && std::string(strict) == "1") return 1.0;
+        if (std::getenv("CI") || std::getenv("GITHUB_ACTIONS")) return 4.0;
+        const char* scale = std::getenv("SF_TIME_LIMIT_SCALE");
+        return std::max(1.0, scale ? std::atof(scale) : 1.0);
+    }
     if (const double v = app_.bakeTestValue(name); !std::isnan(v)) return v;
     if (const double v = app_.uvEditorTestValue(name); !std::isnan(v)) return v;
     if (const double v = app_.pbrTestValue(name); !std::isnan(v)) return v; // material_channels, channel_view, ...
@@ -706,6 +765,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "stroke_type") return double(int(app_.strokeType_)); // 0 Dots, 1 DragRect, 2 DragDot, 3 Spray, 4 LazyMouse
     if (name == "stroke_continuous") return app_.strokeContinuous_ ? 1.0 : 0.0; // Continuous (#31)
     if (name == "vdms") return double(app_.doc_.vdms.size());
+    if (double gv = 0.0; app_.gradientUiValue(name, gv)) return gv; // gradient_armed, gradient_placed (LineGradient.cpp)
     if (double kv = 0.0; app_.kelvinUiValue(name, kv)) return kv; // capture_*, kelvin_* (PanelKelvinlet.cpp)
     // Facial shapes (PanelFace.cpp): landmarks placed, placing them, a take playing, and face_<shape>: that layer's weight.
     if (name == "face_landmarks") return double(app_.faceLandmarks_.count());
@@ -827,6 +887,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "shelves_visible") return app_.layout_.shelvesVisible ? 1.0 : 0.0;
     if (name == "right_tray_open") return app_.layout_.rightTrayOpen ? 1.0 : 0.0;
     if (name == "left_tray_open") return app_.layout_.leftTrayOpen ? 1.0 : 0.0;
+    if (name == "canvas_width") return double(app_.shell_.canvas.w / std::max(app_.uiScale_, 0.01f)); // logical px
+    // A shelf drawn (not hidden for being empty outside Customize Shelves, #139): 0 top, 1 left, 2 right, 3 bottom.
+    if (name.rfind("shelf_shown_", 0) == 0) {
+        const CanvasRect* r[] = {&app_.shell_.topShelf, &app_.shell_.leftShelf, &app_.shell_.rightShelf, &app_.shell_.bottomShelf};
+        const int k = std::atoi(name.c_str() + 12);
+        return k >= 0 && k < 4 && r[k]->w > 0.0f && r[k]->h > 0.0f ? 1.0 : 0.0;
+    }
     if (name == "right_tray_shown") return app_.shell_.rightTray.w > 0.0f ? 1.0 : 0.0; // drawn, not just set open (#107)
     if (name == "menu_rect_changes") { // times the open task menu moved or resized since the last read (a jitter is many)
         const int n = app_.menuRectChanges_;
@@ -969,6 +1036,8 @@ double Demo::query(const std::string& name, bool& known) const {
     // Draw > Camera > Gizmo size and View Figure: the axes' length in unscaled px (34 at Medium), the figure shown.
     if (name == "axis_gizmo_length") return double(34.0f * app_.axisGizmoUnit() / std::max(app_.uiScale_, 0.01f));
     if (name == "view_figure") return app_.uiPrefs_.showViewFigure ? 1.0 : 0.0;
+    // The side view the axis gizmo names under it (0-5: +X +Y +Z -X -Y -Z, as axis_click), -1 between views.
+    if (name == "axis_view") return double(axisGizmoAligned(app_.axisGizmoLayout()));
     if (name == "timeline_y" || name == "axis_gizmo_y") {
         const auto c = app_.canvasRect();
         if (name == "timeline_y")
@@ -1033,6 +1102,11 @@ double Demo::query(const std::string& name, bool& known) const {
         app_.benchmarkDrawMs(0);
         return double(app_.renderer_.lastDrawnTriangles());
     }
+    if (name == "coarse_clusters") { // the 3D view drawn once more now: the clusters it drew at a coarse level
+        app_.benchmarkDrawMs(0);
+        return double(app_.renderer_.coarseDrawnClusters());
+    }
+    if (name == "coarse_pending") return double(app_.renderer_.coarsePendingClusters()); // edited, levels not updated yet
     if (name == "panel_drag_scrolls") return double(ui::DragScrolls()); // #100: drags that scrolled a panel
     if (name == "panel_drag_scroll_y") return double(ui::DragScrollY());  // that panel's scroll after the last one
     if (name == "drag_cursor") return double(dragCursor_); // the system cursor during the last button_drag (#88)
@@ -1318,6 +1392,54 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         stroke([at](float) { return *at; }, 0.2f);
         run([this] { SDL_SetModState(held_); });
         wait(0.1f);
+    } else if (verb == "axis_drag" || verb == "axis_hover") {
+        // axis_drag DX DY: a left-drag starting on the gizmo's disc where no end is (it orbits the view);
+        // axis_hover END|disc: the pointer resting on an end or the disc (the hover look, for shots)
+        if (!need(verb == "axis_drag" ? 2 : 1)) return false;
+        static const char* const names[6] = {"+x", "+y", "+z", "-x", "-y", "-z"};
+        int end = -1;
+        if (verb == "axis_hover" && w[1] != "disc") {
+            const auto found = std::find_if(std::begin(names), std::end(names), [&](const char* n) { return w[1] == n; });
+            if (found == std::end(names)) {
+                error = "axis_hover takes +x, -x, +y, -y, +z, -z or disc";
+                return false;
+            }
+            end = int(found - std::begin(names));
+        }
+        const float dx = verb == "axis_drag" ? num(1, 0.0f) : 0.0f, dy = verb == "axis_drag" ? num(2, 0.0f) : 0.0f;
+        auto from = std::make_shared<ImVec2>();
+        run([this, from, end] {
+            const auto ends = app_.axisGizmoLayout();
+            const float unit = app_.axisGizmoUnit();
+            if (end >= 0) {
+                *from = ImVec2(ends[size_t(end)].at.x, ends[size_t(end)].at.y);
+                return;
+            }
+            // The spot on the disc farthest from every end, three quarters of the way out.
+            const glm::vec2 c = app_.axisGizmoCentre();
+            float best = -1.0f;
+            for (int i = 0; i < 24; ++i) {
+                const float a = float(i) * 6.2831853f / 24.0f;
+                const glm::vec2 p = c + glm::vec2(std::cos(a), std::sin(a)) * (kAxisGizmoDisc * 0.75f * unit);
+                float nearest = 1e9f;
+                for (const AxisGizmoEnd& e : ends) nearest = std::min(nearest, glm::length(e.at - p));
+                if (nearest > best) {
+                    best = nearest;
+                    *from = ImVec2(p.x, p.y);
+                }
+            }
+        });
+        if (verb == "axis_hover") {
+            run([this, from] { mouseMotion(from->x, from->y); });
+            wait(0.15f);
+        } else {
+            stroke([this, from, dx, dy](float u) {
+                const float s = app_.uiScale_;
+                return ImVec2(from->x + dx * s * u, from->y + dy * s * u);
+            }, 0.4f);
+            run([this] { SDL_SetModState(held_); });
+            wait(0.1f);
+        }
     } else if (verb == "view_figure_click") {
         // view_figure_click [DX DY]: click the View Figure (Draw > Camera), DX DY its radii from the centre
         const float dx = num(1, 0.0f), dy = num(2, 0.0f);
@@ -1794,6 +1916,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (dst.has_parent_path()) fs::create_directories(dst.parent_path(), ec);
             fs::copy(src, dst, fs::copy_options::recursive | fs::copy_options::overwrite_existing, ec);
             if (ec) SDL_Log("copy %s: %s", src.string().c_str(), ec.message().c_str());
+            restoreBridgeFixtures(dst);
         });
     } else if (verb == "ai_client") {
         if (!need(1)) return false;
@@ -2018,17 +2141,32 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             at += scriptDir_.size();
         }
         if (!parseScript(text, statements, error)) return false;
-        run([this, line, statements] {
-            for (const auto& st : statements) {
+        // A command that works on a worker (uv_auto: App::commandRunning) holds the script, frames still drawing,
+        // until its result is in, like the console and an AI tool wait for it.
+        auto next = std::make_shared<size_t>(0);
+        steps_.push_back([this, line, statements, next](float t) {
+            if (*next > 0 && app_.commandRunning()) {
+                SDL_Delay(5); // real work runs in real time
+                if (t > 600.0f) fail(line, statements[*next - 1].command + " still running after 600 s");
+                return t > 600.0f;
+            }
+            if (CommandResult r; *next > 0 && app_.takeCommandResult(r) && !r.ok) {
+                fail(line, statements[*next - 1].command + " failed: " + r.message);
+                return true;
+            }
+            while (*next < statements.size()) {
+                const ScriptStatement& st = statements[(*next)++];
                 Args args = st.args; // $LIBRARY: the test's own library folder (known once the app runs)
                 for (auto& [key, value] : args)
                     if (auto* sv = std::get_if<std::string>(&value)) *sv = expandLibrary(*sv);
                 app_.runCommand(st.command, args);
                 if (!app_.lastCommandOk_) {
                     fail(line, st.command + " failed: " + app_.status_);
-                    return;
+                    return true;
                 }
+                if (app_.commandRunning()) return false;
             }
+            return true;
         });
     } else if (verb == "run_fails") { // run_fails COMMAND ARGS...: the command must be refused
         if (!need(1)) return false;
@@ -2290,18 +2428,19 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "pen_stroke") {
         if (!need(6)) return false;
         const float u0 = num(1, 0), v0 = num(2, 0), u1 = num(3, 0), v1 = num(4, 0), p0 = num(5, 1), p1 = num(6, 1);
-        bool eraser = false, leave = false;
+        bool eraser = false, leave = false, tail = false;
         float seconds = 0.6f;
         for (size_t i = 7; i < w.size(); ++i) {
             if (w[i] == "eraser") eraser = true;
             else if (w[i] == "leave") leave = true;
+            else if (w[i] == "tail") tail = true;
             else seconds = num(i, seconds);
         }
         auto ends = std::make_shared<std::pair<ImVec2, ImVec2>>();
         run([this, ends, u0, v0, u1, v1] { *ends = {onModel(u0, v0), onModel(u1, v1)}; });
         penStroke([ends](float u) {
             return ImVec2(ends->first.x + (ends->second.x - ends->first.x) * u, ends->first.y + (ends->second.y - ends->first.y) * u);
-        }, p0, p1, eraser, leave, seconds);
+        }, p0, p1, eraser, leave, seconds, {}, tail);
         wait(0.1f);
     } else if (verb == "pen_drag_item") {
         if (!need(5)) return false;
@@ -2763,7 +2902,7 @@ void Demo::penButtonEvent(int button, bool down) {
 }
 
 void Demo::penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bool eraser, bool leave, float seconds,
-                     std::function<void()> afterSample) {
+                     std::function<void()> afterSample, bool tail) {
     // Hover to the start, touch down, then 4 samples a frame along the path, then lift (or leave).
     auto from = std::make_shared<ImVec2>();
     steps_.push_back([this, path, from, afterSample](float t) {
@@ -2778,24 +2917,40 @@ void Demo::penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bo
         return t >= 0.25f;
     });
     auto last = std::make_shared<float>(-1.0f);
-    steps_.push_back([this, path, p0, p1, eraser, leave, seconds, last, afterSample](float t) {
+    auto tailFrame = std::make_shared<int>(0);
+    steps_.push_back([this, path, p0, p1, eraser, leave, seconds, last, afterSample, tail, tailFrame](float t) {
         if (*last < 0.0f) {
             penTouch(true, eraser);
             penPressure(p0); // the first pressure sample comes after the touch
             *last = 0.0f;
             return false;
         }
-        const float u = std::min(t / seconds, 1.0f);
         constexpr int kSamples = 4;
-        for (int k = 1; k <= kSamples; ++k) {
-            const float uu = *last + (u - *last) * float(k) / float(kSamples);
-            penPressure(p0 + (p1 - p0) * uu);
-            const ImVec2 p = path(uu);
-            penMove(p.x, p.y);
-            if (afterSample) afterSample();
+        if (*last < 1.0f) {
+            const float u = std::min(t / seconds, 1.0f);
+            for (int k = 1; k <= kSamples; ++k) {
+                const float uu = *last + (u - *last) * float(k) / float(kSamples);
+                penPressure(p0 + (p1 - p0) * uu);
+                const ImVec2 p = path(uu);
+                penMove(p.x, p.y);
+                if (afterSample) afterSample();
+            }
+            *last = u;
+            if (u < 1.0f) return false;
+            if (tail) return false; // (the lift's samples come in the next frames)
         }
-        *last = u;
-        if (u < 1.0f) return false;
+        if (tail) { // the lift: 8 more samples on past the end, the pressure falling to 0
+            const ImVec2 a = path(0.98f), b = path(1.0f);
+            const float dx = b.x - a.x, dy = b.y - a.y, len = std::max(std::hypot(dx, dy), 1e-3f);
+            for (int k = 1; k <= kSamples; ++k) {
+                const int i = *tailFrame * kSamples + k;
+                penPressure(p1 * (1.0f - float(i) / float(2 * kSamples)));
+                penMove(b.x + dx / len * 0.5f * float(i), b.y + dy / len * 0.5f * float(i));
+                if (afterSample) afterSample();
+            }
+            if (++*tailFrame < 2) return false;
+            *tailFrame = 0;
+        }
         if (leave) {
             penProximity(false); // out of range without lifting first
         } else {

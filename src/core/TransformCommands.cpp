@@ -65,6 +65,7 @@ CommandResult runTransform(Document& doc, const Args& a) {
     const bool useMask = argBool(a, "masked", true);
     const float falloff = std::clamp(float(argNumber(a, "falloff", 0)), 0.0f, 1.0f);
     const bool all = argBool(a, "all", false);
+    const uint32_t folder = argBool(a, "folder", false) ? doc.activePartInfo().folder : 0; // #96
     Symmetry sym{false, false, false};
     for (char c : lower(argString(a, "symmetry"))) {
         if (c == 'x') sym.x = true;
@@ -75,7 +76,8 @@ CommandResult runTransform(Document& doc, const Args& a) {
 
     std::vector<int> targets;
     for (int i = 0; i < doc.partCount(); ++i)
-        if (all ? doc.parts[size_t(i)].visible || i == doc.activePart : i == doc.activePart) targets.push_back(i);
+        if (i == doc.activePart || (doc.parts[size_t(i)].visible && (all || (folder && doc.parts[size_t(i)].folder == folder))))
+            targets.push_back(i);
 
     MeshTransform t;
     t.translate = translate;
@@ -137,7 +139,9 @@ void registerTransformCommands(CommandRegistry& reg) {
                "Mirror a masked transform across these planes through the origin, e.g. x: the unmasked part on the "
                "other side of the plane takes the mirrored transform (both arms pose together).",
                false},
-              {"all", T::Bool, "Transform every visible Part. Default false.", false}},
+              {"all", T::Bool, "Transform every visible Part. Default false.", false},
+              {"folder", T::Bool, "Transform the visible Parts in the active Part's folder together. Default false.",
+               false}},
              runTransform});
 }
 

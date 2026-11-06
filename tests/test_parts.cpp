@@ -186,3 +186,60 @@ TEST(part_append_file) {
     CHECK(!reg.execute(doc, "part_append", {{"type", std::string("teapot")}}).ok);
     std::filesystem::remove(path);
 }
+
+TEST(part_folders) {
+    // #96: folders group Parts in the list; hide, show and move them together.
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 2.0}}).ok);
+    CHECK(reg.execute(doc, "part_rename", {{"to", std::string("Head")}}).ok);
+    for (const char* name : {"Eye L", "Body", "Eye R"}) {
+        CHECK(reg.execute(doc, "part_append", {{"type", std::string("sphere")}}).ok);
+        CHECK(reg.execute(doc, "part_rename", {{"to", std::string(name)}}).ok);
+    }
+    doc.markClean();
+    // A new folder takes the active Part (Eye R); a Part joining it goes right below the folder's last Part.
+    CommandResult r = reg.execute(doc, "part_folder_new", {{"folder", std::string("Eyes")}});
+    CHECK(r.ok && doc.partFolders.size() == 1 && doc.partFolders[0].name == "Eyes");
+    CHECK(doc.activePartInfo().name == "Eye R" && doc.activePartInfo().folder == doc.partFolders[0].id);
+    CHECK(doc.dirty());
+    CHECK(reg.execute(doc, "part_set_folder", {{"name", std::string("Eye L")}, {"folder", std::string("Eyes")}}).ok);
+    CHECK(doc.parts[0].name == "Head" && doc.parts[1].name == "Body" && doc.parts[2].name == "Eye R" &&
+          doc.parts[3].name == "Eye L");
+    CHECK(doc.activePartInfo().name == "Eye R"); // the active Part follows the move
+    CHECK(!reg.execute(doc, "part_set_folder", {{"index", 0.0}, {"folder", std::string("Nope")}}).ok);
+    // Names stay unique.
+    CHECK(reg.execute(doc, "part_folder_new", {{"folder", std::string("Eyes")}, {"empty", true}}).ok);
+    CHECK(doc.partFolders.size() == 2 && doc.partFolders[1].name == "Eyes 2");
+    CHECK(reg.execute(doc, "part_folder_rename", {{"folder", std::string("Eyes 2")}, {"to", std::string("Props")}}).ok);
+    CHECK(doc.partFolders[1].name == "Props");
+    CHECK(reg.execute(doc, "part_list").message.find("Eye L (") != std::string::npos);
+    CHECK(reg.execute(doc, "part_list").message.find("in Eyes") != std::string::npos);
+    CHECK(reg.execute(doc, "part_list").message.find("Folder Eyes (2 Parts)") != std::string::npos);
+
+    // Hide and show the whole folder.
+    CHECK(reg.execute(doc, "part_folder_visibility", {{"folder", std::string("Eyes")}}).ok);
+    CHECK(!doc.parts[2].visible && !doc.parts[3].visible && doc.parts[0].visible && doc.parts[1].visible);
+    CHECK(reg.execute(doc, "part_folder_visibility", {{"folder", std::string("Eyes")}}).ok);
+    CHECK(doc.parts[2].visible && doc.parts[3].visible);
+    CHECK(!reg.execute(doc, "part_folder_visibility", {{"folder", std::string("Props")}}).ok); // empty
+    CHECK(reg.execute(doc, "part_folder_collapse", {{"folder", std::string("Eyes")}}).ok && doc.partFolders[0].collapsed);
+
+    // transform folder=true moves the folder's visible Parts, nothing else.
+    const glm::vec3 head = doc.partMesh(0).bounds().center(), eyeL = doc.partMesh(3).bounds().center();
+    const glm::vec3 eyeR = doc.mesh.bounds().center();
+    r = reg.execute(doc, "transform", {{"translate", std::string("0,1,0")}, {"folder", true}});
+    CHECK(r.ok && r.message.find("in 2 Parts") != std::string::npos);
+    CHECK(std::abs(doc.mesh.bounds().center().y - eyeR.y - 1.0f) < 1e-4f);
+    CHECK(std::abs(doc.partMesh(3).bounds().center().y - eyeL.y - 1.0f) < 1e-4f);
+    CHECK(glm::length(doc.partMesh(0).bounds().center() - head) < 1e-6f);
+
+    // Duplicates and split pieces stay in the folder; out of it, and removing the folder keeps the Parts.
+    CHECK(reg.execute(doc, "part_duplicate").ok && doc.activePartInfo().folder == doc.partFolders[0].id);
+    CHECK(reg.execute(doc, "part_set_folder", {{"folder", std::string()}}).ok && doc.activePartInfo().folder == 0);
+    CHECK(reg.execute(doc, "part_folder_delete", {{"folder", std::string("Eyes")}}).ok);
+    CHECK(doc.partFolders.size() == 1 && doc.partCount() == 5);
+    for (const Part& s : doc.parts) CHECK(s.folder == 0);
+    // A new scene has no folders.
+    CHECK(reg.execute(doc, "new_sphere").ok && doc.partFolders.empty());
+}

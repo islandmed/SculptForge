@@ -14,6 +14,7 @@
 #include "render/ScreenStroke.h"
 
 #include <cstdint>
+#include <cstdlib>
 #include <functional>
 #include <list>
 #include <memory>
@@ -42,6 +43,8 @@ struct RenderSettings {
     float splatOpacity = 1.0f; // global fade for using a capture as reference
     bool dimInactive = true;   // Parts other than the active one render slightly darker
     bool motionProxy = false;  // the view is moving (Fast Navigation): draw big meshes' lighter proxy (render/Clusters.h)
+    double stillSeconds = 0.0; // how long the view has been still (0 while it moves): coarse levels give way to full detail
+    bool stroking = false;     // a stroke runs (its dabs still landing): coarse levels stay
     bool flatShading = false;  // the scene's shading (Material palette): faceted; Parts can override (core/Document.h)
     // Backface culling (#68, Tool > Display): back faces are never drawn, on any mesh (closed or not, from any
     // view). Off: they are skipped only where they can't show (a closed mesh seen from outside, Renderer::cull).
@@ -249,6 +252,19 @@ public:
     size_t microPendingShading() const;
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
     size_t lastDrawnTriangles() const { return lastDrawn_; }
+    // Coarse levels (tests): the clusters the last frame drew at a coarse level, and the edited clusters whose levels
+    // are still to be updated (drawn in full until then).
+    size_t coarseDrawnClusters() const { return lastCoarseClusters_; }
+    size_t coarsePendingClusters() const;
+    // At rest (still 150 ms, no stroke) an over-budget mesh draws in full detail when one full frame fits the still-frame
+    // budget (100 ms, from the measured GPU time per triangle); else it stays coarse (coarsePreviewOnly: the info line
+    // says so). coarseStillWanted: the last frame drew coarse and full detail follows once the view has been still long
+    // enough (the app draws until then).
+    bool coarsePreviewOnly() const { return previewOnly_; }
+    bool coarseStillWanted() const { return stillWanted_; }
+    void noteGpuFrame(double gpuMs, uint64_t drawnTriangles); // (the frame governor's GPU timer)
+    void setTriangleRate(double millionsPerSecond) { triangleRateM_ = millionsPerSecond; } // (calibration; 0 = unknown)
+    void setStroking(bool on) { stroking_ = on; } // a stroke runs: sync leaves the edited clusters' levels until it ends
     // The last syncScene left motion proxies to build (a few milliseconds of them a frame; the rest draw in full).
     bool proxiesPending() const { return proxyPending_; }
     // Build stale motion proxies on still frames too (after a stroke, so the next orbit starts with them), at a
@@ -356,6 +372,13 @@ private:
         std::vector<uint8_t> proxyStale;     // to rebuild before use
         std::vector<ClusterBounds> proxyBounds; // the proxy's normal cone
         bool proxyAllocated = false;
+        // Coarse levels (buildCoarseLevels at the first sync over the budget, again after a new layout). Clusters an
+        // edit moved draw in full (coarseDirty) until the first sync without new edits updates their levels.
+        GLuint coarseVao = 0, coarseVertices = 0, coarseIndices = 0, coarseColors = 0, coarseMask = 0; // (colours RGBA8, mask R8)
+        std::unique_ptr<CoarseLevels> coarse;
+        std::vector<uint8_t> coarseDirty;
+        std::vector<uint32_t> coarsePending; // the dirty clusters, to update
+        bool coarseTried = false, coarseEdited = false; // (coarseEdited: this sync marked some)
         std::vector<uint32_t> drawnOrder; // the mesh triangle of each drawn triangle (meshes with UVs only)
         size_t drawnTriangles = 0;
         size_t vertexCapacity = 0;
@@ -409,6 +432,17 @@ private:
     bool proxyPending_ = false; // (proxiesPending)
     bool proxyPrebuild_ = false; // (setProxyPrebuild)
     double proxyMsPerCluster_ = 0.0; // measured, so a frame's batches fit its budget on slow cores too
+    // Coarse levels (docs/design/micro-coarse-lod.md; SF_COARSE_LOD=0 turns them off): plain meshes over the triangle
+    // budget draw every visible cluster at one coarse level (render/Clusters.h: CoarseLevels), the finest that fits the
+    // budget; full detail when it all fits.
+    const bool coarseLod_ = !(std::getenv("SF_COARSE_LOD") && std::string(std::getenv("SF_COARSE_LOD")) == "0");
+    void markCoarseDirty(MeshSlot& s, uint32_t c);
+    void updateCoarse(MeshSlot& s, const Mesh& mesh);
+    size_t lodBudget_ = 0; // the last still draw's triangle budget: sync builds the coarse levels of meshes over it
+    void buildCoarse(MeshSlot& s, const Mesh& mesh);
+    void uploadCoarsePoints(MeshSlot& s);
+    void uploadCoarseAttributes(MeshSlot& s); // the cells' colours and mask (with the coarse VAO bound)
+    size_t triangleBudget(const RenderSettings& settings) const;
     // The ghost (setGhost), drawn on the slot ghostId_.
     GhostStroke ghost_;
     uint32_t ghostId_ = 0;
@@ -456,6 +490,15 @@ private:
     // The clusters of `s` to draw this frame: in full (drawClusters_), and with `proxy` as their motion proxy
     // where it is built (proxyClusters_).
     void cull(const MeshSlot& s, const CullView& view, bool proxy = false);
+    // The coarse-level cull: every visible cluster in full (drawClusters_) if that fits `budget`, else at one level
+    // (coarseClusters_, coarseLevel_), the finest that fits.
+    void cullCoarse(const MeshSlot& s, const CullView& view, size_t budget);
+    std::vector<uint32_t> coarseClusters_;
+    size_t lastCoarseClusters_ = 0;
+    bool previewOnly_ = false, stillWanted_ = false, stroking_ = false;
+    double gpuMsPerTriangle_ = 0.0; // measured (moving average), 0 = not yet
+    double triangleRateM_ = 0.0;    // calibrated, million triangles a second (0 = unknown)
+    std::vector<uint8_t> coarseLevel_;
     void drawSlot(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);
     enum class DrawPart { Triangles, Lines, Proxy };
     void drawPatches(const MeshSlot& s, GLenum mode, DrawPart part, GLint primBaseLocation);

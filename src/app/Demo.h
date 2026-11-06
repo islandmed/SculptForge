@@ -124,7 +124,8 @@ private:
     void penTouch(bool down, bool eraser);          // PEN_DOWN / PEN_UP (+ left button)
     void penButtonEvent(int button, bool down);     // PEN_BUTTON_DOWN / UP (+ SDL 3.4's mouse button)
     void penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bool eraser, bool leave, float seconds,
-                   std::function<void()> afterSample = {}); // afterSample: e.g. a driver's stray mouse event
+                   std::function<void()> afterSample = {}, // afterSample: e.g. a driver's stray mouse event
+                   bool tail = false); // tail: the pressure falls to 0 over the last samples before the lift (#146)
 
     // World -> screen in window coordinates.
     ImVec2 project(const glm::vec3& p) const;
@@ -140,6 +141,9 @@ private:
     std::vector<std::string> scriptLines_;    // the script's lines, for the report
     std::vector<double> lineSeconds_;         // real seconds spent on each line
     std::chrono::steady_clock::time_point lastUpdate_{};
+    // The longest real time between two frames since it was last read (UI tests: longest_frame_ms; reading resets it).
+    std::chrono::steady_clock::time_point lastFrame_{};
+    mutable double longestFrameMs_ = 0.0;
     int stride_ = 1;
     ImVec2 mouse_{960, 540};
     bool buttonDown_ = false;

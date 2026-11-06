@@ -6,6 +6,128 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.9] - 2026-11-06
+
+### Added
+- **Line Gradient** (Color, #99, requested by @Devon0209): a screen-space colour ramp for vertex paint and textures,
+  its ends adjustable before you keep it (Enter; Esc takes it back); respects the mask, one undo step. Script:
+  `paint_gradient`.
+- **Part folders** (#96, thanks @ebarranco): folders in the Parts list; drag Parts in and out, fold, rename, hide and
+  show, and move a whole folder with the gizmo's new **Folder** option. Saved in projects; older versions open them
+  without folders.
+- **Hyper3D Rodin (direct)** in Generate 3D and the `image_to_3d` / `text_to_3d` commands (`service=hyper3d`, `model=`
+  a Gen-2.5 tier): Hyper3D's own API with your key (system keychain only; no environment variable, no shared or trial
+  key). One pinned https host for the API, the key sent nowhere else; the GLB only from Hyper3D's domains, capped at
+  200 MB and checked before import, kept in a private temporary folder deleted after import; polling backs off to 30
+  s. Studios: provider id `hyper3d` in the policy, one audit log line per generation. Thanks to ElgoogUdiab for
+  suggesting it (#123); re-implemented in house from Hyper3D's public API documentation.
+- **Cancel** for Auto UV (Tool > Texture Map), beside its progress bar.
+
+### Changed
+- The console keeps one line for a job's progress ("Auto UV: 42%") instead of one line per percent.
+
+### Fixed
+- Dense meshes over the triangle budget lost their vertex colour (paint layers included) and mask while the view moved
+  (the coarse level 0.11.7 draws then had none) and showed them again at rest. The coarse level now carries each
+  cell's mean colour and mask from the full mesh, updated when a paint stroke ends.
+- The input style's keys for the Size slider, the Material picker and Save Snapshot came back as the Classic defaults
+  after a restart (Blender style: F no longer showed the Size slider, S and M opened the Size slider and the Material
+  picker) until the style was picked again in Preferences > Input; your own rebinds were not affected (#147, thanks
+  @Velisariy).
+- Auto UV from the console, a script or an AI tool (`uv_auto`) froze the app while it unwrapped: about 10 s on a
+  327k-triangle sculpt. It now runs on the same worker as the Auto UV button, so frames keep drawing (longest frame
+  under 100 ms, floor tier included). The next statement on the line, the AI tool's reply and a UI test's next step
+  wait for the UVs, so `uv_auto; texture_create` still works in one go. Macros keep running it in place.
+- UV Editor > Pack froze the app on UDIM grids (about 18 s for a 10 x 2 grid on the lion head on a laptop, 11 s for 4
+  x 3): the shape packer's search now runs several densities at once, coarse first, stops as soon as an island can't
+  be kept whole, and keeps its quarter-resolution layout instead of packing everything again at full size. 10 x 2 on
+  the lion: 18 s -> 0.04 s. Pack, Pack at Density and every Unwrap now run on a worker thread with a progress bar and
+  Cancel under the view.
+- Packing could shrink some islands and lay them over their neighbours: the shape packer's quarter turns mirror an
+  island, which the fit back onto the island couldn't follow. Islands are now only turned to their smallest box first;
+  layouts are up to 6% denser and no longer overlap.
+- Pack's status line could report more than 100% of the space used (an island bigger than a tile is shrunk to fit
+  one); it is now measured.
+
+## [0.11.8] - 2026-11-06
+
+### Changed
+- The app icon is an orange cube on a dark tile (a new drawing, with a small cut for 16-32 px and the macOS grid):
+  window, taskbar, dock, .ico, .icns, Flatpak, AppImage, title bar. The bust and anvil is the brand (About, What's
+  New, site header, social previews); the SF letters are retired. docs/brand.md says which mark goes where.
+- **Library**: a single click uses a brush, alpha, VDM or material. Double-click still works and applies it once.
+  Models, projects, folders, images and splats still open with a double-click (#142, thanks @NicTanghe).
+- Maya bridge (#42, thanks @tristratos): **Get automatically** is on once an exchange folder is chosen; a **Send to
+  Maya** button sits in the top bar while the bridge is on; the Maya shelf gets **Auto** (on by default), which loads
+  what SculptForge sends by itself. Both sides check only the other side's manifest (time and size), once a second;
+  still no ports or connections. Reinstall the shelf (`install_shelf()`) to get the Auto button.
+- **Corner axes** (Draw > Camera > Axes): positive ends are filled, lettered circles (X / Y / Z), negative ends
+  smaller rings (their letter under the pointer); far ends are smaller and fainter and the nearest is drawn on top; a
+  translucent disc behind them (stronger under the pointer) keeps them readable on any background. A second click on
+  the end facing you snaps to the opposite view, a drag on the disc orbits, and the name of an exact side view shows
+  under the axes. No brush ring over the axes. Small / Medium / Large and the UI scale still apply.
+- The monthly Discord challenge posts say when it ends: entries close on the last day of the month and the winner
+  (most 🔥 votes, ties picked by the team) is picked on the 1st, together with next month's theme.
+- Micro levels: big brushes spend about a third less time preparing each frame's shading (a 240 px stroke on a 200
+  million triangle head: 11 to under 8 ms a dab on the floor tier). Each changed patch is shaded on its own; its
+  neighbours, whose shared border rarely changes, are brought up to date when the stroke ends.
+
+### Fixed
+- The guide's **Edit > Preferences** paths now say where Preferences is in the Classic layout (its own palette in the
+  palette bar), and the Classic layout's **Edit** palette has **Preferences...** too. Thanks NicTanghe (#144).
+- **Reconstruct Subdiv** (Tool > Geometry) on open meshes (a border, e.g. a UDIM-tiled panel) no longer reads the
+  mesh's corners and face centres the wrong way round, which failed with "a face point joins 1 quads" or gave a wrong
+  lower level; the lower level keeps every face's UVs across seams and UDIM tiles, and stepping back up gives back the
+  imported UVs exactly (#145, thanks @RodTDai).
+- **Drag Stamp / Slide Stamp with a pen** (#146, Huion RTP-700 on Windows): the stamp went weak or vanished when the
+  pen lifted. A tablet's last samples before the lift fall towards 0, and the stamp is pressed again at every move; it
+  now keeps the firmest pressure of the drag (Windows Ink, Wintab and Linux alike).
+
+## [0.11.7] - 2026-11-06
+
+### Added
+- Coarse levels for dense meshes: a plain mesh over the hardware tier's triangle budget draws all of it at one lighter
+  level while the view moves (the finest that fits the budget), and in full detail once the view has rested for 150
+  ms, when one full frame fits the still-frame budget (100 ms); otherwise it stays light and the info line says
+  **Preview detail**. A stroke draws the mesh in full detail; its edits reach the lighter level right after it.
+  `SF_COARSE_LOD=0` turns it off.
+
+### Fixed
+- **Preferences > AI** and live mode's step confirmations were partly in English in Spanish and Chinese: Enable AI
+  features, its description and privacy line, the Hugging Face token field, AI services & privacy, and the reasons a
+  step asks first ("Writes ... outside the project folder", "Overwrites ...", "Connects to the network"...) are now
+  translated. A new check stops labels from reaching the screen without going through the translator.
+
+## [0.11.6] - 2026-11-06
+
+### Added
+- **Managed policy for studios** (docs/guide/studios.md "IT deployment"): `policy.json` in `/etc/sculptforge`,
+  `/Library/Application Support/SculptForge` or `C:\ProgramData\SculptForge` (or `SF_POLICY` when there is none) locks
+  AI on or off, network features, the allowed AI providers and addresses, sign-in for AI, AI tools (MCP on or off,
+  never controlling the window, allowed kinds of command), the update check, channel and feed. Locked settings say
+  **Managed by your studio**; a broken policy fails closed. `sculptforge-cli --policy` shows what it manages.
+- **AI audit log**: every AI tool (MCP) command, refused ones too, and every Brush Lab and Generate 3D request is a
+  JSON line (time, user, host, client, command, a summary of its settings, result) in a local file or a share the
+  policy names, rotated by size. No artwork, keys or long text. `sculptforge-cli --audit-log` prints the path.
+- **Studio sign-in** (Okta, Microsoft Entra ID, Google Workspace, Auth0, Keycloak): OpenID Connect device sign-in in
+  the artist's browser, no local listener; tokens in the keychain, sent only to the studio's own AI gateway. **Edit >
+  Preferences > AI > Studio sign-in**, or `sculptforge-cli --sign-in`.
+- **AI provider presets** in **Edit > Preferences > AI > Provider** (also in Brush Lab): Anthropic, OpenAI, Ollama, LM
+  Studio, vLLM, llama.cpp server, LiteLLM proxy (a studio gateway for Bedrock, Vertex AI and Azure OpenAI) and
+  OpenRouter.
+- Each release carries a CycloneDX software bill of materials (`SculptForge-<version>-sbom.cdx.json`), covered by the
+  signed checksums. A one-page security overview for IT reviews is in the guide.
+
+### Changed
+- An empty shelf is hidden when **Customize Shelves** is off, and the canvas takes its space; it returns while
+  customizing so items can be dropped back onto it. Saved layouts with empty shelves load as before (#139, thanks
+  ebarranco).
+
+### Security
+- AI keys (Brush Lab, Hugging Face, fal.ai, Meshy) are stored in the operating system's keychain (macOS Keychain,
+  Windows Credential Manager, Linux Secret Service) instead of `ai.json`; keys already in `ai.json` move there at the
+  first start. Without a keychain (`SF_KEYCHAIN=none`), a key lasts for the session; environment variables still work.
+
 ## [0.11.5] - 2026-11-06
 
 ### Added

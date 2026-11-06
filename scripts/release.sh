@@ -31,7 +31,7 @@
 # either stops in seconds before the tag or runs through to the end.
 # Each step looks at the live state first and skips what is already done, so running it again is always safe.
 # When something is wrong it stops and prints the fix; fix it, then run again with --from <that step>.
-# It never posts issue replies: it writes drafts for a person to read and post.
+# It never posts issue replies: it writes drafts (release-replies-X.Y.Z.md) that sfmonitor reads and posts.
 # Betas (a member perk): steps bump check ci tag release status. bump sets CMakeLists.txt to X.Y.Z with
 # SCULPTFORGE_PRERELEASE "beta.N" (the app says "X.Y.Z Beta N"; CHANGELOG, CITATION, metainfo and the home page stay
 # at the stable release). release.yml publishes the beta in the private repository $INSIDERS_REPO (members are
@@ -288,7 +288,10 @@ preflight() {
     auth=$(gh auth status 2>&1 || true)
     grep -q "account $AUTHOR_NAME" <<<"$auth" || die "gh is not logged in as $AUTHOR_NAME" "gh auth login (or gh auth switch -u $AUTHOR_NAME)"
     words_ok "$mode"
-    python3 tools/brush-gallery/check_published.py >/dev/null 2>&1 || die "the public gallery (islandmed/sculptforge-brushes) differs from tools/brush-gallery/repo: $(python3 tools/brush-gallery/check_published.py 2>/dev/null | head -3)" "copy tools/brush-gallery/repo into a clone of it, commit, push its main"
+    local gallery rc=0
+    gallery=$(python3 tools/brush-gallery/check_published.py 2>/dev/null) || rc=$?
+    [ $rc -ne 2 ] || die "$(head -1 <<<"$gallery")" "check the network and gh auth status, then run again"
+    [ $rc -eq 0 ] || die "the public gallery (islandmed/sculptforge-brushes) differs from tools/brush-gallery/repo: $(head -3 <<<"$gallery")" "copy tools/brush-gallery/repo into a clone of it, commit, push its main"
     grep -q '^set(SCULPTFORGE_PRERELEASE "[a-z0-9.]*")$' CMakeLists.txt ||
         die "CMakeLists.txt lost its set(SCULPTFORGE_PRERELEASE \"\") line that step bump sets" "restore it under project() (git log -p CMakeLists.txt), commit"
     python3 -c 'import json, sys; json.load(open(sys.argv[1]))' website/latest.json 2>/dev/null || die "website/latest.json is not valid JSON" "fix it, commit"
@@ -584,6 +587,53 @@ step_release() {
     ok "$n assets, SHA256SUMS.txt included"
 }
 
+# website_run SHA: waits for the Website run of SHA's push. When its deploy job fails, a fresh run of the workflow
+# on main (a rerun of the failed job can't deploy: the first attempt's github-pages artifact is still there,
+# "Multiple artifacts named github-pages"). GitHub's Pages service can answer "try again later" for a while with
+# its status page green (0.11.8: three runs in 15 minutes, the fourth 10 minutes later worked): then it waits
+# 10 minutes before each fresh run, up to 3 of them. Any other deploy failure gets one fresh run.
+website_run() {
+    local id="" tries=18 c last attempt
+    while [ -z "$id" ] && [ "$tries" -gt 0 ]; do
+        id=$(gh run list -R "$REPO" -w pages.yml -c "$1" -e push -b main -L 1 --json databaseId -q '.[0].databaseId')
+        tries=$((tries - 1))
+        [ -n "$id" ] || sleep 10
+    done
+    [ -n "$id" ] || { echo "   no Website run found for ${1:0:8}: waiting on the live feed alone" >&2; return 0; }
+    for attempt in 1 2 3 4; do
+        if [ "$(gh run view "$id" -R "$REPO" --json status -q .status)" != completed ]; then
+            echo "   waiting for the Website run $id ..." >&2
+            gh run watch "$id" -R "$REPO" --exit-status >/dev/null 2>&1 || true
+        fi
+        c=$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)
+        [ "$c" = success ] && return 0
+        gh run view "$id" -R "$REPO" --json jobs -q '.jobs[] | select(.conclusion == "failure") | .name' 2>/dev/null |
+            grep -x deploy >/dev/null ||
+            die "the Website run $id: $c (https://github.com/$REPO/actions/runs/$id)" "fix it on main or start it again: gh workflow run pages.yml -R $REPO --ref main; then run again with --from site"
+        [ "$attempt" -lt 4 ] ||
+            die "GitHub Pages still fails to deploy after 3 fresh runs (last: https://github.com/$REPO/actions/runs/$id)" "wait, then: gh workflow run pages.yml -R $REPO --ref main; then run again with --from site"
+        if gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | grep -i "try again later" >/dev/null; then
+            echo "   GitHub Pages said 'try again later' (run $id): waiting 10 minutes, then a fresh run ($attempt of 3)" >&2
+            sleep 600
+        elif [ "$attempt" -gt 1 ]; then
+            die "the Website's deploy failed again (https://github.com/$REPO/actions/runs/$id)" "check the run's deploy log, fix it on main, then run again with --from site"
+        else
+            echo "   the Website's deploy failed (run $id): starting a fresh run on main" >&2
+        fi
+        last=$(gh run list -R "$REPO" -w pages.yml -e workflow_dispatch -b main -L 1 --json databaseId -q '.[0].databaseId')
+        gh workflow run pages.yml -R "$REPO" --ref main >/dev/null ||
+            die "can't start the Website workflow" "gh workflow run pages.yml -R $REPO --ref main; then run again with --from site"
+        id="" tries=18
+        while [ -z "$id" ] && [ "$tries" -gt 0 ]; do
+            sleep 10
+            id=$(gh run list -R "$REPO" -w pages.yml -e workflow_dispatch -b main -L 1 --json databaseId -q '.[0].databaseId')
+            [ "$id" != "$last" ] || id=""
+            tries=$((tries - 1))
+        done
+        [ -n "$id" ] || die "the fresh Website run didn't start within 3 minutes" "gh run list -R $REPO -w pages.yml -L 3; then run again with --from site"
+    done
+}
+
 step_site() {
     release_ready
     on_main
@@ -622,7 +672,9 @@ PY
         push_main
         ok "pushed the feed and home page"
     fi
-    # The Website workflow deploys main's site and the newest tag's guide; check what visitors get.
+    # The Website workflow deploys main's site and the newest tag's guide. Its run for the feed commit can sit queued
+    # longer than any fixed wait (0.11.7: past 10 minutes), so wait for that run, then check what visitors get.
+    website_run "$(git log -1 --format=%H -- website/latest.json)"
     wait_live https://sculptforge.app/latest.json "\"version\": \"$V\"" 600 ||
         die "sculptforge.app still serves the old feed after 10 minutes" "check the Website workflow: gh run list -R $REPO -w pages.yml -L 3; re-run it if it failed"
     ok "sculptforge.app/latest.json says $V"
@@ -702,29 +754,13 @@ PY
 
 step_replies() {
     release_ready
-    local out="release-replies-$V.md" issues
+    local out="release-replies-$V.md"
     awk -v h="## [$V]" 'index($0, h) == 1 {f = 1; next} /^## \[/ {f = 0} f' CHANGELOG.md > "$work/section"
-    issues=$(grep -o '#[0-9]\+' "$work/section" | tr -d '#' | sort -un || true)  # no issues named is fine
-    {
-        echo "# Draft replies for SculptForge $V (read, edit, then post by hand; nothing here was posted)"
-        echo
-        for n in $issues; do
-            local title state lines
-            read -r state title < <(gh issue view "$n" -R "$REPO" --json state,title -q '.state + " " + .title' 2>/dev/null || echo "MISSING ?")
-            [ "$state" = MISSING ] && continue
-            lines=$(grep -m3 "#$n\b" "$work/section" | sed 's/^- //' || true)
-            echo "## #$n $title ($state)"
-            echo
-            echo "Fixed in SculptForge $V, out now: https://github.com/$REPO/releases/tag/$T"
-            echo "(Help > Check for updates in the app, or https://sculptforge.app/#download)"
-            echo
-            echo "$lines"
-            echo
-            echo "Thanks for reporting it."
-            echo
-        done
-    } > "$out"
-    ok "drafts for $(echo "$issues" | wc -w) issues in $out: read them, then post with gh issue comment / close"
+    # Whole entries, the reporter's @handle, a REVIEW line where the entry may not cover the issue; issues that
+    # already have our reply for $V are left out (tools/release/reply_drafts.py).
+    python3 tools/release/reply_drafts.py "$V" "$work/section" "$REPO" "$T" > "$out" 2> "$work/drafts" ||
+        die "couldn't write the reply drafts" "python3 tools/release/reply_drafts.py --self-test"
+    ok "$(cat "$work/drafts") in $out: sfmonitor posts these (it reads them first)"
 }
 
 step_status() {
@@ -745,7 +781,7 @@ step_status() {
     winget=$(gh pr view 464465 -R microsoft/winget-pkgs --json state -q .state 2>/dev/null || echo unknown)
     echo "   winget-pkgs#464465: $winget (update it once it merges; waits on the CLA)"
     echo "   Release:  https://github.com/$REPO/releases/tag/$T"
-    echo "   Remember: post the replies in release-replies-$V.md after reading them, then update the handoff note."
+    echo "   Replies:  sfmonitor posts release-replies-$V.md (after reading it). Then update the handoff note."
 }
 
 started=

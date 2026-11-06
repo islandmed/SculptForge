@@ -1,0 +1,58 @@
+# #146 (Huion RTP-700, Windows): a VDM stamp dragged to size went weak on pen up. A tablet's last samples before it
+# lifts fall towards 0, and Drag Stamp re-presses the stamp at every move: the stamp now keeps the drag's firmest
+# pressure (StampPressure, core/Tablet.h), for Drag Stamp and Slide Stamp. The pen here is SDL's (Windows Ink and
+# Linux); Wintab feeds the same pressure (test_tablet.cpp).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=6
+click "Brush##palette.brush"
+click "Brush/##totray"
+wait 0.3
+click "Vector Displacement##brush.vdm"
+click "Horn##vdm0"
+expect_value stroke_type == 1
+expect_value pen_strength == 1
+
+# Drag Stamp, lifted cleanly: the stamp as the drag showed it.
+snapshot
+pen_stroke 0.72 0.5 0.8 0.36 0.8 0.8
+expect_value moved > 300
+remember moved_sum firm
+wait_idle 30
+shot drag-clean
+key ctrl+z
+
+# A light pen makes a weaker stamp (pressure counts, so the checks below mean something).
+snapshot
+pen_stroke 0.72 0.5 0.8 0.36 0.3 0.3
+expect_value moved_sum < $firm*0.6
+key ctrl+z
+
+# Lifted as a real tablet lifts, the pressure falling to 0 over the last samples: the stamp stays as strong.
+snapshot
+pen_stroke 0.72 0.5 0.8 0.36 0.8 0.8 tail
+expect_value moved > 300
+expect_value moved_sum > $firm*0.95
+expect_value stroking == 0
+expect_value can_undo == 1
+wait_idle 30
+shot drag-tail
+key ctrl+z
+
+# Slide Stamp: the same at the lift.
+pen_out
+click "Stroke##palette.stroke"
+click "Slide Stamp##stroke"
+key escape
+expect_value stroke_type == 2
+snapshot
+pen_stroke 0.3 0.4 0.62 0.55 0.8 0.8
+remember moved_sum slide
+expect_value moved > 300
+key ctrl+z
+snapshot
+pen_stroke 0.3 0.4 0.62 0.55 0.8 0.8 tail
+expect_value moved_sum > $slide*0.95
+wait_idle 30
+shot slide-tail
+key ctrl+z
+pen_out

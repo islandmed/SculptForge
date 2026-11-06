@@ -1,8 +1,8 @@
 # The Maya bridge (File > Maya, #42): off until an exchange folder is chosen (here: what the native folder
-# dialog would answer), then Get from Maya loads what the shelf script sent, Send to Maya writes the Parts
-# back, and with Get automatically on a second send from Maya replaces the Part by name (undoable) and adds
-# the new object. The sends are staged from tests/ui/data/maya into a folder in the working directory (the build
-# folder under ctest).
+# dialog would answer). Then Get automatically is on and the top bar has Send to Maya: what was in the folder
+# waits for Get from Maya, a second send from Maya replaces the Part by name by itself (undoable) and adds the
+# new object, and one click sends the Parts back. The sends are staged from tests/ui/data/maya into a folder in
+# the working directory (the build folder under ctest).
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 copy data/maya/send1 sf_ui_maya/maya_to_sculptforge
@@ -23,14 +23,18 @@ hover "Exchange folder...##file.maya_folder"
 expect_help "only there"
 hold none
 
-# What File > Maya > Exchange folder's dialog answers. Nothing loads by itself (Get automatically is off).
+# What File > Maya > Exchange folder's dialog answers. Get automatically turns on, but what was already there
+# waits for Get from Maya; the top bar gets Send to Maya.
 choose_file maya_folder sf_ui_maya
-wait 0.2
+wait 0.3
 expect_status "Maya exchange folder:"
 expect_value parts == 1
+expect "Send to Maya##file.send_maya"
+shot topbar_on
 hover "Maya"
 wait 0.2
 expect_text Folder:
+shot menu_on
 click "Get from Maya##file.receive_maya"
 expect_status "Received 1 object from Maya"
 expect_value parts == 1
@@ -39,10 +43,6 @@ expect_value quads > 0
 shot received
 
 # Get automatically: the next send from Maya loads by itself.
-click "File##palette.file"
-hover "Maya"
-wait 0.2
-click "Get automatically##maya"
 copy data/maya/send2 sf_ui_maya/maya_to_sculptforge
 wait 0.3
 expect_status "Received 2 objects from Maya"
@@ -51,12 +51,49 @@ expect_text pCube2
 expect_value can_undo == 1
 shot updated
 
-# Send to Maya: both Parts, under their Maya names.
+# Send to Maya: one click in the top bar, both Parts, under their Maya names.
+click "Send to Maya##file.send_maya"
+expect_status "Sent 2 objects to Maya"
+
+# The Forge look's status bar has it too, at 1x and on a HiDPI display (150 %); a window
+# too narrow for it (200 %: 800 logical px) keeps the menus whole and File > Maya > Send to Maya.
+run ui_look look=forge layout=sculptforge
+wait 0.3
+expect "Send to Maya##file.send_maya"
+shot forge_bar
+click "Send to Maya##file.send_maya"
+expect_status "Sent 2 objects to Maya"
+display_scale 150
+wait 0.5
+expect "Send to Maya##file.send_maya"
+shot forge_bar_hidpi
+display_scale 200
+wait 0.5
+expect_not "Send to Maya##file.send_maya"
+shot forge_bar_narrow
+run ui_look look=classic layout=classic
+wait 0.3
+shot classic_bar_hidpi
+display_scale 100
+wait 0.3
+
+# Get automatically off: Maya's next send waits for Get from Maya; the bridge off: no Send to Maya in the bar.
 click "File##palette.file"
 hover "Maya"
 wait 0.2
-click "Send to Maya##file.send_maya"
-expect_status "Sent 2 objects to Maya"
+click "Get automatically##maya"
+copy data/maya/send1 sf_ui_maya/maya_to_sculptforge
+wait 0.3
+expect_no_text Received 1 object from Maya
+expect_value parts == 2
+click "File##palette.file"
+hover "Maya"
+wait 0.2
+click "Turn the Maya bridge off##maya"
+wait 0.2
+expect_status "Maya bridge off"
+expect_not "Send to Maya##file.send_maya"
+
 # Both receives into pCube1 are undo steps: the update, then the first one (which replaced the fresh sphere).
 key ctrl+z
 expect_value can_undo == 1

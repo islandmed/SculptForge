@@ -10,6 +10,7 @@
 
 #include <glm/glm.hpp>
 
+#include <cmath>
 #include <cstring>
 
 using namespace sf;
@@ -79,4 +80,74 @@ TEST(view_figure_snaps_to_the_nearest_side) {
     c.pitch = glm::radians(-60.0f);
     facing = axisGizmoFacing(axisGizmoEnds(glm::mat3(c.view()), glm::vec2(0.0f), 30.0f));
     CHECK(std::strcmp(axisGizmoView(facing % 3, facing >= 3).action, "view.top") == 0);
+}
+
+TEST(axis_gizmo_click_on_each_end_snaps_to_its_view_then_the_opposite) {
+    // From a three-quarter view a click on each end picks that end's view; from there a second click on the same
+    // spot (now that end faces you) picks the opposite view.
+    for (int i = 0; i < 6; ++i) {
+        Camera c;
+        c.yaw = glm::radians(35.0f);
+        c.pitch = glm::radians(-25.0f);
+        auto ends = axisGizmoEnds(glm::mat3(c.view()), glm::vec2(100.0f, 100.0f), 34.0f);
+        const int first = axisGizmoSnapEnd(ends, axisGizmoHit(ends, ends[size_t(i)].at.x, ends[size_t(i)].at.y, 10.0f));
+        CHECK(first == i);
+        const AxisGizmoView v = axisGizmoView(i % 3, i >= 3);
+        c.yaw = glm::radians(v.yaw);
+        c.pitch = glm::radians(v.pitch);
+        ends = axisGizmoEnds(glm::mat3(c.view()), glm::vec2(100.0f, 100.0f), 34.0f);
+        CHECK(axisGizmoAligned(ends) == i);
+        CHECK(axisGizmoSnapEnd(ends, axisGizmoHit(ends, ends[size_t(i)].at.x, ends[size_t(i)].at.y, 10.0f)) == (i + 3) % 6);
+    }
+    CHECK(axisGizmoSnapEnd(axisGizmoEnds(glm::mat3(1.0f), glm::vec2(0.0f), 34.0f), -1) == -1);
+}
+
+TEST(axis_gizmo_names_only_exact_side_views) {
+    Camera c; // the front view
+    CHECK(axisGizmoAligned(axisGizmoEnds(glm::mat3(c.view()), glm::vec2(0.0f), 34.0f)) == 2);
+    CHECK(std::strcmp(axisGizmoView(2, false).label, "Front view") == 0);
+    CHECK(std::strcmp(axisGizmoView(1, false).label, "Top view") == 0);
+    c.yaw = glm::radians(3.0f);
+    CHECK(axisGizmoAligned(axisGizmoEnds(glm::mat3(c.view()), glm::vec2(0.0f), 34.0f)) == -1);
+}
+
+TEST(axis_gizmo_far_ends_are_smaller_and_fainter) {
+    Camera c;
+    c.yaw = glm::radians(30.0f);
+    c.pitch = glm::radians(-20.0f);
+    const auto ends = axisGizmoEnds(glm::mat3(c.view()), glm::vec2(0.0f), 34.0f);
+    for (int i = 0; i < 3; ++i) {
+        // The near end of each axis is drawn bigger and more opaque than the same kind of end pointing away.
+        AxisGizmoEnd near = ends[size_t(i)], far = near;
+        near.depth = std::abs(near.depth);
+        far.depth = -near.depth;
+        if (near.depth > 0.05f) {
+            CHECK(axisGizmoEndRadius(near, 1.0f) > axisGizmoEndRadius(far, 1.0f));
+            CHECK(axisGizmoEndAlpha(near.depth) > axisGizmoEndAlpha(far.depth));
+        }
+        // A positive end (filled, lettered) is always bigger than a negative one (a ring) at the same depth.
+        AxisGizmoEnd neg = ends[size_t(i)];
+        neg.negative = true;
+        CHECK(axisGizmoEndRadius(ends[size_t(i)], 1.0f) > axisGizmoEndRadius(neg, 1.0f));
+    }
+    CHECK(axisGizmoEndAlpha(-1.0f) >= 0.45f); // still visible from behind
+}
+
+TEST(axis_gizmo_disc_holds_every_end_at_every_size) {
+    // The disc behind the gizmo (a drag there orbits) covers each end's circle, at every size and UI scale, so a
+    // press on the gizmo either hits an end or lands on the disc.
+    Camera c;
+    for (float yaw : {0.0f, 30.0f, 90.0f, 135.0f})
+        for (int size = 0; size < 3; ++size)
+            for (float uiScale : {1.0f, 1.5f, 2.0f}) {
+                c.yaw = glm::radians(yaw);
+                c.pitch = glm::radians(-20.0f);
+                const float unit = uiScale * axisGizmoScale(size);
+                const glm::vec2 centre(300.0f, 300.0f);
+                const auto ends = axisGizmoEnds(glm::mat3(c.view()), centre, kAxisGizmoLength * unit);
+                for (const AxisGizmoEnd& e : ends)
+                    CHECK(glm::length(e.at - centre) + kAxisGizmoHitRadius * unit <= kAxisGizmoDisc * unit + 0.01f);
+                CHECK(axisGizmoOnDisc(centre, kAxisGizmoDisc * unit, 300.0f + 44.0f * unit, 300.0f));
+                CHECK(!axisGizmoOnDisc(centre, kAxisGizmoDisc * unit, 300.0f + 49.0f * unit, 300.0f));
+            }
 }

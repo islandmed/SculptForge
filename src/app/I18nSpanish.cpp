@@ -770,6 +770,7 @@ constexpr Entry kSpanish[] = {
     {"Apply", "Aplicar"},
     {"Reset", "Restablecer"},
     {"Preview", "Vista previa"},
+    {"Preview detail", "Detalle de vista previa"},
     {"Finish", "Terminar"},
     {"Close", "Cerrar"},
     {"OK", "Aceptar"},
@@ -842,6 +843,24 @@ constexpr Entry kSpanish[] = {
     {"Fill", "Rellenar"},
     {"Fill layer", "Rellenar capa"},
     {"Fill masked", "Rellenar enmascarado"},
+    {"Line Gradient", "Degradado lineal"},
+    {"End", "Final"},
+    {"Swap", "Intercambiar"},
+    {"Drag a line across the model.", "Arrastra una línea sobre el modelo."},
+    {"Drag its ends to adjust. Enter keeps it, Esc takes it back.", "Arrastra sus extremos para ajustarlo. Intro lo conserva, Esc lo deshace."},
+    {"Swap the paint colour and the End colour.", "Intercambia el color de pintura y el color final."},
+    {"The colour at the end of the line. The start is the paint colour above.",
+     "El color al final de la línea. El inicio es el color de pintura de arriba."},
+    {"Fade the paint colour out instead: the paint underneath shows through towards the end of the line.",
+     "En su lugar, desvanece el color de pintura: la pintura de debajo se ve cada vez más hacia el final de "
+     "la línea."},
+    {"Drag a line across the model: the paint colour at its start runs into the End colour (or fades to "
+     "clear) at its end, in screen space, into vertex paint or the texture. Drag either end to adjust it; "
+     "Enter keeps it, Esc takes it back. Respects the mask; one undo step.",
+     "Arrastra una línea sobre el modelo: el color de pintura de su inicio pasa al color final (o se "
+     "desvanece) en su extremo, en el espacio de la pantalla, en la pintura de vértices o en la textura. "
+     "Arrastra cualquiera de los extremos para ajustarlo; Intro lo conserva, Esc lo deshace. Respeta la "
+     "máscara; un solo paso de deshacer."},
     {"Fill the unmasked area (the whole mesh if nothing is masked)",
      "Rellena la zona sin máscara (toda la malla si no hay nada enmascarado)"},
     {"Cavity", "Cavidad"},
@@ -1099,9 +1118,10 @@ constexpr Entry kSpanish[] = {
      "nombre (se puede deshacer) o pasa a ser una nueva."},
     {"Exchange folder...", "Carpeta de intercambio..."},
     {"Choose the folder SculptForge and Maya exchange meshes through (pick the same one in Maya's shelf script). "
-     "SculptForge reads and writes only there, and only when you send or get.",
+     "SculptForge reads and writes only there: when you send or get, and when Maya sends while Get automatically is on.",
      "Elige la carpeta por la que SculptForge y Maya intercambian mallas (elige la misma en el script del estante de "
-     "Maya). SculptForge solo lee y escribe ahí, y solo cuando envías o recibes."},
+     "Maya). SculptForge solo lee y escribe ahí: cuando envías o recibes, y cuando Maya envía con Recibir "
+     "automáticamente activado."},
     {"Add the brush on the clipboard: a brush code someone shared, or the text of a .sfbrush file.",
      "Añade el pincel del portapapeles: un código de pincel que alguien compartió, o el texto de un archivo .sfbrush."},
     {"Every brush keeps its own Size, Intensity, Falloff, Colour intensity, stroke and alpha while you work. This "
@@ -1318,6 +1338,17 @@ constexpr Entry kSpanish[] = {
      "whatever the mask.",
      "Lo enmascarado se queda donde está y lo parcialmente enmascarado se mueve en parte (activado por defecto). "
      "Desactivado: toda la Pieza se mueve sin importar la máscara."},
+    {"Folder", "Carpeta"},
+    {"Hide its Parts", "Ocultar sus Piezas"},
+    {"Show its Parts", "Mostrar sus Piezas"},
+    {"Move with the gizmo", "Mover con el gizmo"},
+    {"New folder", "Carpeta nueva"},
+    {"New folder with the active Part (drag Parts onto a folder to add them)", "Carpeta nueva con la Pieza activa (arrastra Piezas a una carpeta para añadirlas)"},
+    {"Out of the folder", "Fuera de la carpeta"},
+    {"Remove folder (keep its Parts)", "Quitar la carpeta (conservar sus Piezas)"},
+    {"Click to open, double-click to rename, drag Parts onto it", "Clic para abrir, doble clic para renombrar, arrastra Piezas aquí"},
+    {"Click to fold, double-click to rename, drag Parts onto it", "Clic para plegar, doble clic para renombrar, arrastra Piezas aquí"},
+    {"Transform the visible Parts in the active Part's folder together (Parts list folders). Each Part gets its own undo step.", "Transforma juntas las Piezas visibles de la carpeta de la Pieza activa (carpetas de la lista de Piezas). Cada Pieza tiene su propio paso de deshacer."},
     {"Transform every visible Part together. Each Part gets its own undo step.",
      "Transforma juntas todas las Piezas visibles. Cada Pieza tiene su propio paso de deshacer."},
     {"Where the gizmo sits: rotation and scaling turn about this point. It follows the centre of what moves until you "
@@ -2066,10 +2097,10 @@ constexpr Entry kSpanish[] = {
     // --- PanelMaya.cpp (tools/i18n/coverage.py) ---
     {"Get automatically", "Recibir automáticamente"},
     {"Load what Maya sends as soon as it arrives: SculptForge checks the exchange folder's manifest once a second "
-     "(its modification time and size only). Off by default; off: use Get from Maya.",
+     "(its modification time and size only). On once you choose the folder; off: use Get from Maya.",
      "Carga lo que envía Maya en cuanto llega: SculptForge comprueba el manifiesto de la carpeta de intercambio una "
-     "vez por segundo (solo su fecha de modificación y su tamaño). Desactivado por defecto; desactivado: usa Recibir "
-     "de Maya."},
+     "vez por segundo (solo su fecha de modificación y su tamaño). Activado al elegir la carpeta; desactivado: usa "
+     "Recibir de Maya."},
     {"Turn the Maya bridge off", "Desactivar el puente con Maya"},
     {"Forget the exchange folder; nothing in it is deleted.",
      "Olvida la carpeta de intercambio; no se borra nada de ella."},
@@ -2765,19 +2796,25 @@ constexpr Entry kSpanish[] = {
     {"Unwrap with the chosen method: the selected faces (fitted where they were), or the whole Part (packed). Least "
      "Stretch keeps angles and lengths along the marked seams; Conformal keeps angles; By Face Groups cuts along the "
      "face group borders too; Planar projects each piece; Unfold flattens the current islands again in place, "
-     "keeping pins; Auto Seams finds its own. Closed pieces get cut automatically. Big meshes unwrap in the "
-     "background.",
+     "keeping pins; Auto Seams finds its own. Closed pieces get cut automatically. Runs in the background (Cancel "
+     "under the view stops it).",
      "Desenvuelve con el método elegido: las caras seleccionadas (ajustadas donde estaban), o toda la Pieza "
      "(empaquetada). Least Stretch conserva ángulos y longitudes a lo largo de las costuras marcadas; Conformal "
      "conserva ángulos; By Face Groups corta también por los bordes de grupos de caras; Planar proyecta cada pieza; "
      "Unfold vuelve a aplanar las islas actuales en su sitio, respetando los anclajes; Auto Seams busca sus propias "
-     "costuras. Las piezas cerradas se cortan automáticamente. Las mallas grandes se desenvuelven en segundo plano."},
+     "costuras. Las piezas cerradas se cortan automáticamente. Se ejecuta en segundo plano (Cancelar, bajo la vista, lo detiene)."},
     {"Pack", "Empaquetar"},
     {"Pack the selected islands (or all) as large as they fit into the 0-1 tile, or across the Columns x Rows grid of "
-     "UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them.",
+     "UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them. "
+     "Runs in the background (Cancel under the view stops it).",
      "Empaqueta las islas seleccionadas (o todas) lo más grandes que quepan en el mosaico 0-1, o en la rejilla "
      "Columnas x Filas de mosaicos UDIM: giradas a su caja más pequeña, escaladas a una densidad de téxeles, con el "
-     "margen entre ellas."},
+     "margen entre ellas. Se ejecuta en segundo plano (Cancelar, bajo la vista, lo detiene)."},
+    {"Packing...", "Empaquetando..."},
+    {"Packing: %d%%", "Empaquetando: %d%%"},
+    {"Unwrapping...", "Desenvolviendo..."},
+    {"Unwrapping: %d%%", "Desenvolviendo: %d%%"},
+    {"Stop the Unwrap or Pack that is running; the UVs stay as they are.", "Detiene el Desenvolver o Empaquetar en curso; las UV se quedan como están."},
     {"Mark Seam", "Marcar costura"},
     {"Mark the selected edges (or the border of the selected faces) as seams: Unwrap cuts there.",
      "Marca como costuras las aristas seleccionadas (o el borde de las caras seleccionadas): Desenvolver corta ahí."},
@@ -3544,7 +3581,8 @@ constexpr Entry kSpanish[] = {
     {"Deny", "Denegar"},
     {"Disconnect AI tool", "Desconectar herramienta de IA"},
     {"Disconnect", "Desconectar"},
-    {"Let AI tools control this window", "Permitir que herramientas de IA controlen esta ventana"},
+    {"It can run SculptForge's commands and see the viewport; what it sees goes to that tool's AI service. Every step is in Undo. Files outside the project, scripts and the network ask you first.", "Puede ejecutar los comandos de SculptForge y ver el visor; lo que ve va al servicio de IA de esa herramienta. Cada paso queda en Deshacer. Los archivos fuera del proyecto, los scripts y la red te preguntan antes."},
+    {"Let AI tools control this window", "Permitir que la IA controle esta ventana"},
     {"Let an AI tool control this window?", "¿Permitir que una herramienta de IA controle esta ventana?"},
     {"Live mode can't start: ", "El modo en vivo no puede iniciarse: "},
     {"Live mode: an AI tool on this computer (sculptforge-cli --mcp --attach) can ask to sculpt in this window while you watch. You approve each connection; files outside the project, scripts and the network ask first. Nothing listens on the network.", "Modo en vivo: una herramienta de IA de este equipo (sculptforge-cli --mcp --attach) puede pedir esculpir en esta ventana mientras miras. Apruebas cada conexión; los archivos fuera del proyecto, los scripts y la red preguntan antes. Nada escucha en la red."},
@@ -3656,6 +3694,65 @@ constexpr Entry kSpanish[] = {
      "Tu propio código con la API de xAI: sculptforge-cli --schema da las definiciones de las herramientas (ejemplos en la guía del usuario, Scripting > AI agents). xAI factura el uso de la API."},
     {"xAI's coding agent (the grok command). Run once in a terminal; it signs in with your xAI account in the browser.",
      "El agente de programación de xAI (el comando grok). Ejecútalo una vez en una terminal; inicia sesión con tu cuenta de xAI en el navegador."},
+    // --- Studio controls: Preferences > AI (PanelAi.cpp, ai/Providers.cpp, core/ManagedPolicy.cpp) ---
+    {"AI tools (MCP)", "Herramientas de IA (MCP)"},
+    {"AI tools can't connect: your studio turned them off.", "Las herramientas de IA no pueden conectarse: tu estudio las desactivó."},
+    {"AI tools may use only the kinds of command your studio allows.", "Las herramientas de IA solo pueden usar los tipos de comando que permite tu estudio."},
+    {"AI tools work on their own scene; your studio doesn't let them control this window.", "Las herramientas de IA trabajan en su propia escena; tu estudio no les permite controlar esta ventana."},
+    {"API key", "Clave de API"},
+    {"Tier", "Nivel"},
+    {"Off until you add your own key: hyper3d.ai > API dashboard (a Creator plan or higher).", "Desactivado hasta que añadas tu propia clave: hyper3d.ai > API dashboard (plan Creator o superior)."},
+    {"Using your key from the system keychain.", "Usando tu clave del llavero del sistema."},
+    {"Sends your image or description to Hyper3D (api.hyper3d.com), which builds the model. Each generation is billed to your Hyper3D account. Basic API access covers Extreme Low and Low.", "Envía tu imagen o descripción a Hyper3D (api.hyper3d.com), que crea el modelo. Cada generación se cobra en tu cuenta de Hyper3D. El acceso básico a la API incluye Extreme Low y Low."},
+    {"Audit log", "Registro de auditoría"},
+    {"Connecting...", "Conectando..."},
+    {"Copy code", "Copiar código"},
+    {"Copy path", "Copiar ruta"},
+    {"Endpoint", "Endpoint"},
+    {"Every AI action (AI tools, AI Brush, Generate 3D) is recorded on this computer: time, tool, command and settings, never your artwork or keys.", "Cada acción de IA (herramientas de IA, AI Brush, Generar 3D) se registra en este equipo: hora, herramienta, comando y ajustes, nunca tus obras ni tus claves."},
+    {"Find models", "Buscar modelos"},
+    {"In your browser, sign in and enter this code:", "En tu navegador, inicia sesión y escribe este código:"},
+    {"Managed by", "Gestionado por"},
+    {"Managed by your studio", "Gestionado por tu estudio"},
+    {"Model", "Modelo"},
+    {"Open the sign-in page", "Abrir la página de inicio de sesión"},
+    {"Provider", "Proveedor"},
+    {"Requests go only to the endpoint above. Keys are kept in your system keychain (never in a settings file); leave empty to use the environment (ANTHROPIC_API_KEY, OPENAI_API_KEY). For private, offline use, pick Ollama or LM Studio.", "Las solicitudes van solo al endpoint de arriba. Las claves se guardan en el llavero del sistema (nunca en un archivo de ajustes); déjala vacía para usar el entorno (ANTHROPIC_API_KEY, OPENAI_API_KEY). Para un uso privado y sin conexión, elige Ollama o LM Studio."},
+    {"Saved in your system keychain.", "Guardada en el llavero del sistema."},
+    {"SculptForge has no telemetry: nothing about you or your work is collected.", "SculptForge no tiene telemetría: no se recopila nada sobre ti ni sobre tu trabajo."},
+    {"Sign in with your studio account", "Iniciar sesión con la cuenta del estudio"},
+    {"Signed in as", "Sesión iniciada como"},
+    {"Signed out of your studio account", "Sesión de la cuenta del estudio cerrada"},
+    {"Signs in through your studio's own login page in your browser. Nothing on this computer listens for it; the sign-in is kept in your system keychain.", "Inicia sesión con la página de acceso de tu estudio en tu navegador. Nada en este equipo queda a la escucha; la sesión se guarda en el llavero del sistema."},
+    {"Studio sign-in", "Inicio de sesión del estudio"},
+    {"The studio policy can't be used, so AI, network features and AI tools are off:", "La política del estudio no se puede usar, así que la IA, las funciones de red y las herramientas de IA están desactivadas:"},
+    {"Uses your studio sign-in (Preferences > AI > Studio sign-in)", "Usa el inicio de sesión del estudio (Preferencias > IA > Inicio de sesión del estudio)"},
+    {"Using the key from the environment.", "Se usa la clave del entorno."},
+    {"Your studio requires the sign-in for AI features.", "Tu estudio exige iniciar sesión para usar la IA."},
+    {"Free - no account or key", "Gratis - sin cuenta ni clave"},
+    {"Anthropic (Claude)", "Anthropic (Claude)"},
+    {"OpenAI", "OpenAI"},
+    {"Ollama (this computer)", "Ollama (este equipo)"},
+    {"LM Studio (this computer)", "LM Studio (este equipo)"},
+    {"vLLM server", "Servidor vLLM"},
+    {"llama.cpp server", "Servidor llama.cpp"},
+    {"LiteLLM proxy (studio gateway)", "Proxy LiteLLM (pasarela del estudio)"},
+    {"OpenRouter", "OpenRouter"},
+    {"Other OpenAI-compatible server", "Otro servidor compatible con OpenAI"},
+    {"An open model hosted by Pollinations.ai. Only your brush description and settings are sent.", "Un modelo abierto alojado por Pollinations.ai. Solo se envían la descripción y los ajustes del pincel."},
+    {"Your Anthropic API key (console.anthropic.com).", "Tu clave de API de Anthropic (console.anthropic.com)."},
+    {"Your OpenAI API key (platform.openai.com); then Find models.", "Tu clave de API de OpenAI (platform.openai.com); luego, Buscar modelos."},
+    {"Private: the model runs on this computer. No key.", "Privado: el modelo se ejecuta en este equipo. Sin clave."},
+    {"Private: start LM Studio's server (Developer tab), then Find models. No key.", "Privado: inicia el servidor de LM Studio (pestaña Developer) y luego Buscar modelos. Sin clave."},
+    {"A vLLM server (vllm serve <model>): this computer or a GPU server at your studio.", "Un servidor vLLM (vllm serve <modelo>): este equipo o un servidor GPU de tu estudio."},
+    {"llama-server -m model.gguf: this computer or a server at your studio. No key.", "llama-server -m model.gguf: este equipo o un servidor de tu estudio. Sin clave."},
+    {"Your studio's gateway: one address for every model your studio allows (Bedrock, Vertex AI, Azure OpenAI and others behind it). A virtual key, or your studio sign-in.", "La pasarela de tu estudio: una dirección para todos los modelos que permite tu estudio (Bedrock, Vertex AI, Azure OpenAI y otros detrás). Una clave virtual o el inicio de sesión del estudio."},
+    {"Many models through one key (openrouter.ai/keys).", "Muchos modelos con una sola clave (openrouter.ai/keys)."},
+    {"Any server with an OpenAI-style /v1/chat/completions endpoint.", "Cualquier servidor con un endpoint /v1/chat/completions al estilo de OpenAI."},
+    {"Your studio's policy doesn't allow AI requests to this address", "La política de tu estudio no permite solicitudes de IA a esta dirección"},
+    {"AI features are turned off by your studio's policy", "La política de tu estudio desactivó las funciones de IA"},
+    {"Rate limited to a request every few seconds; if it can't be reached, a running Ollama is used instead.", "Limitado a una solicitud cada pocos segundos; si no se puede conectar, se usa Ollama si está en marcha."},
+    {"Your studio doesn't allow this provider: pick another", "Tu estudio no permite este proveedor: elige otro"},
     // Review fixes (fix/review-voidart-2)
     {"Ctrl+Z brings them back.", "Ctrl+Z los recupera."},
     {"Delete Higher Levels", "Borrar niveles superiores"},
@@ -3689,6 +3786,37 @@ constexpr Entry kSpanish[] = {
     {"This removes your %d subdivision levels. Undo brings them back.", "Esto quita tus %d niveles de subdivisión. Deshacer los recupera."},
     {"Views", "Vistas"},
     {"name (optional)", "nombre (opcional)"},
+    // --- Preferences > AI and live mode's confirm reasons (fix/i18n-ai-prefs) ---
+    {"AI Brush and Generate 3D. Off: they are hidden and SculptForge makes no AI network calls.",
+     "Pincel IA y Generar 3D. Desactivado: se ocultan y SculptForge no hace ninguna llamada de red de IA."},
+    {"AI services & privacy",
+     "Servicios de IA y privacidad"},
+    {"Set by this computer (SF_AI or --no-ai).",
+     "Lo fija este equipo (SF_AI o --no-ai)."},
+    {"Your art is never uploaded or used for training. AI features run only when you use them and can be turned off.",
+     "Tu arte nunca se sube ni se usa para entrenar. Las funciones de IA solo se ejecutan cuando las usas y se pueden desactivar."},
+    {"Hugging Face token (hf_...)",
+     "Token de Hugging Face (hf_...)"},
+    {"Connects to the network",
+     "Se conecta a la red"},
+    {"Runs a macro or script",
+     "Ejecuta una macro o un script"},
+    {"Runs outside programs (splat training)",
+     "Ejecuta programas externos (entrenamiento de splats)"},
+    {"Deletes a file from your library",
+     "Borra un archivo de tu biblioteca"},
+    {"Writes a program or settings file: %s",
+     "Escribe un programa o un archivo de configuración: %s"},
+    {"Overwrites %s",
+     "Sobrescribe %s"},
+    {"Writes %s (outside the project folder and the files you picked)",
+     "Escribe %s (fuera de la carpeta del proyecto y de los archivos que elegiste)"},
+    {"Reads %s (outside the project folder and the files you picked)",
+     "Lee %s (fuera de la carpeta del proyecto y de los archivos que elegiste)"},
+    {"Saves over the project",
+     "Guarda sobre el proyecto"},
+    {"Replaces the scene: your unsaved changes would be lost",
+     "Reemplaza la escena: se perderían los cambios sin guardar"},
 };
 
 } // namespace

@@ -347,6 +347,8 @@ jobs:
           cp "dist/sculptforge_bridge-$V.zip" dist/sculptforge_bridge.zip
       - name: Maya shelf script (Python source and its README; nothing to build)
         run: python3 -m zipfile -c dist/sculptforge_maya.zip integrations/maya/sculptforge_maya.py integrations/maya/README.md
+      - name: Software bill of materials (CycloneDX; covered by the checksums and their signature)
+        run: python3 tools/release/sbom.py --version "${TAG#v}" --out "dist/SculptForge-${TAG#v}-sbom.cdx.json"
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
       - name: Sign the checksums (one-click update checks SHA256SUMS.txt.sig, src/core/SelfUpdate.h)

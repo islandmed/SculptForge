@@ -95,6 +95,12 @@ bool AiLinkPolicy::allowedPath(const std::string& path) const {
     return false;
 }
 
+AiDecision confirmBecause(const char* format, const std::string& subject) {
+    AiDecision d{AiVerdict::Confirm, format, format, subject};
+    if (const size_t at = d.reason.find("%s"); at != std::string::npos) d.reason.replace(at, 2, subject);
+    return d;
+}
+
 AiDecision AiLinkPolicy::classify(const Command* cmd, const std::string& name, const Args& args) const {
     if (hidden(name)) return {AiVerdict::Deny, "Unknown tool: " + name};
     if (!cmd) return {}; // a live-window tool: the viewport, the camera, screen strokes
@@ -103,12 +109,12 @@ AiDecision AiLinkPolicy::classify(const Command* cmd, const std::string& name, c
                                            "brush_gallery_search", "brush_gallery_install", "unreal_editors",
                                            "unreal_send"};
     for (const char* n : kNetwork)
-        if (name == n) return {AiVerdict::Confirm, "Connects to the network"};
-    if (args.contains("url")) return {AiVerdict::Confirm, "Connects to the network"};
+        if (name == n) return confirmBecause("Connects to the network");
+    if (args.contains("url")) return confirmBecause("Connects to the network");
     if (name == "macro_run" || name.rfind("script", 0) == 0 || name.rfind("python", 0) == 0)
-        return {AiVerdict::Confirm, "Runs a macro or script"};
-    if (name == "splat_train") return {AiVerdict::Confirm, "Runs outside programs (splat training)"};
-    if (name == "brush_delete" || name == "vdm_delete") return {AiVerdict::Confirm, "Deletes a file from your library"};
+        return confirmBecause("Runs a macro or script");
+    if (name == "splat_train") return confirmBecause("Runs outside programs (splat training)");
+    if (name == "brush_delete" || name == "vdm_delete") return confirmBecause("Deletes a file from your library");
 
     const bool writer = writes(name);
     for (const auto& [key, value] : args) {
@@ -117,18 +123,19 @@ AiDecision AiLinkPolicy::classify(const Command* cmd, const std::string& name, c
         if (!s || s->empty()) continue;
         const fs::path p = resolved(*s, projectDir);
         const std::string shown = p.empty() ? *s : fromPath(p);
-        if (writer && !p.empty() && runnable(p)) return {AiVerdict::Confirm, "Writes a program or settings file: " + shown};
+        if (writer && !p.empty() && runnable(p)) return confirmBecause("Writes a program or settings file: %s", shown);
         std::error_code ec;
         if (writer && !p.empty() && fs::exists(p, ec) && !fs::is_directory(p, ec))
-            return {AiVerdict::Confirm, "Overwrites " + shown};
+            return confirmBecause("Overwrites %s", shown);
         if (!allowedPath(*s))
-            return {AiVerdict::Confirm, std::string(writer ? "Writes " : "Reads ") + shown +
-                                            " (outside the project folder and the files you picked)"};
+            return confirmBecause(writer ? "Writes %s (outside the project folder and the files you picked)"
+                                         : "Reads %s (outside the project folder and the files you picked)",
+                                  shown);
     }
     if (name == "save_project") {
         const auto it = args.find("path");
         if (it == args.end() || std::get_if<std::string>(&it->second) == nullptr || std::get<std::string>(it->second).empty())
-            return {AiVerdict::Confirm, "Saves over the project"};
+            return confirmBecause("Saves over the project");
     }
     return {};
 }

@@ -46,3 +46,17 @@ click "Help##palette.help"
 expect_not "Connect an AI tool...##help.connect_ai"
 key Escape
 run ai_features on=true
+
+# A studio's policy (core/ManagedPolicy.h): "live": "never" locks step 2 (the tool gets its own scene, no --attach);
+# MCP off closes the guide and Help no longer offers it.
+run ui_policy json="{\"format\":\"sculptforge-policy\",\"version\":1,\"organization\":\"Acme Animation\",\"mcp\":{\"live\":\"never\"}}"
+click "Help##palette.help"
+click "Connect an AI tool...##help.connect_ai"
+expect_value connect_ai_open == 1
+expect_value ai_link_state == 0
+expect_text Managed by your studio
+expect_text your studio doesn't let them control this window
+shot connect-ai-managed
+run ui_policy json="{\"format\":\"sculptforge-policy\",\"version\":1,\"mcp\":{\"enabled\":false}}"
+wait_value connect_ai_open == 0 5
+run ui_policy json=""

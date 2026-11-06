@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The test runner itself: CI runs sculptforge_tests as several shards at once (--shard K/N), which must
-// together run every test exactly once.
+// together run every test exactly once, balanced by time (tests/shard_times.inc).
 #include "TestHarness.h"
 
+#include <algorithm>
+#include <numeric>
 #include <vector>
 
 TEST(test_shards_cover_every_test_once) {
@@ -28,5 +30,11 @@ TEST(test_shards_cover_every_test_once) {
             for (int k = 0; k < shards; ++k) n[std::size_t(k)] += inShard(t.name, k, shards) ? 1 : 0;
         const double share = double(tests.size()) / shards;
         for (std::size_t c : n) CHECK(double(c) <= share * (shards == 16 ? 2.0 : 1.3));
+        // And by time: no shard expects more than 1.2 times the mean.
+        const std::vector<double> sec = sf::test::shardSeconds(shards);
+        const double mean = std::accumulate(sec.begin(), sec.end(), 0.0) / shards;
+        const double most = *std::max_element(sec.begin(), sec.end());
+        std::printf("  %d shards: %.1f s expected each, the most %.1f s\n", shards, mean, most);
+        CHECK(most <= 1.2 * mean);
     }
 }

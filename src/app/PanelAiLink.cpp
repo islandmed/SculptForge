@@ -18,6 +18,8 @@
 #include "app/Ui.h"
 #include "cli/McpServer.h"
 #include "cli/McpTools.h"
+#include "core/AuditLog.h"
+#include "core/ManagedPolicy.h"
 #include "link/AiLink.h"
 #include "link/AiLinkSession.h"
 
@@ -26,6 +28,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <deque>
@@ -115,6 +118,28 @@ bool isLiveTool(const std::string& name) {
     return name == "viewport_image" || name == "view_set" || name == "view_turntable" || name == "stroke_screen";
 }
 
+// A studio's policy (core/ManagedPolicy.h) may allow only some kinds of tool: the rest are neither listed nor run.
+bool policyAllowsTool(const Command* cmd, const std::string& name, std::string* why = nullptr) {
+    std::vector<std::string> params;
+    if (cmd)
+        for (const auto& p : cmd->params) params.push_back(p.name);
+    return policy::mcpToolAllowed(name, params, why);
+}
+
+// One line in the audit log (core/AuditLog.h) per live-mode call, refusals too.
+void auditLive(const std::string& client, const std::string& name, const Args& args, bool ok, const std::string& message,
+               int64_t ms = -1) {
+    audit::Entry entry;
+    entry.client = "mcp-live:" + client;
+    entry.tool = "mcp-live";
+    entry.command = name;
+    entry.args = audit::summarizeArgs(args);
+    entry.ok = ok;
+    entry.message = message;
+    entry.ms = ms;
+    audit::record(entry);
+}
+
 // Commands that start a new scene (Document::setMesh: the edit history is cleared).
 bool replacesScene(const std::string& name) {
     static const char* const kNames[] = {"new_sphere", "new_plane", "new_head", "new_starter_mesh", "new_bench_sphere",
@@ -163,6 +188,15 @@ struct App::AiLinkState {
         std::string reason;
     };
     std::optional<Pending> confirm;
+    // A call whose command works on a worker (uv_auto: App::commandRunning): its reply, and the next call, wait for it.
+    struct Running {
+        link::AiLinkCall call;
+        uint32_t part = 0;
+        size_t undoCount = 0;
+        uint64_t revision = 0;
+        std::chrono::steady_clock::time_point start;
+    };
+    std::optional<Running> running;
     std::string error; // why the listener isn't running
     int commands = 0;  // tool calls run this connection
 
@@ -227,6 +261,10 @@ void App::AiLinkStateDeleter::operator()(AiLinkState* s) const {
 // ---------------------------------------------------------------------------
 
 void App::setAiLiveControl(bool on) {
+    if (std::string why; on && !policy::mcpLiveAllowed(&why)) {
+        status_ = why;
+        return;
+    }
     aiSettings_.liveControl = on;
     std::string err;
     if (!uiConfigDeterministic_ && !aiSettingsPath_.empty() && !aiSettings_.save(aiSettingsPath_, err)) status_ = err;
@@ -237,7 +275,7 @@ void App::setAiLiveControl(bool on) {
 }
 
 void App::syncAiLink() {
-    const bool want = ai::aiEnabled() && aiSettings_.liveControl;
+    const bool want = ai::aiEnabled() && aiSettings_.liveControl && policy::mcpLiveAllowed(); // (a policy: never listen)
     if (want == bool(aiLink_)) return;
     if (!want) {
         if (aiLink_ && aiLink_->session) consoleEcho("ai_live", {}, {true, "AI tool disconnected"});
@@ -287,6 +325,14 @@ int App::aiLinkStateValue() const {
 
 void App::drawAiLinkPrefs() {
     if (!ai::aiEnabled()) return;
+    if (!policy::mcpLiveAllowed()) { // the studio's policy says never: the switch stays off and nothing listens
+        ImGui::BeginDisabled();
+        bool off = false;
+        ImGui::Checkbox(tr("Let AI tools control this window##prefs.ai_live"), &off);
+        ImGui::EndDisabled();
+        ui::ManagedBadge(); // (its own line: the narrow Preferences window would clip it)
+        return;
+    }
     bool on = aiSettings_.liveControl;
     if (ImGui::Checkbox(tr("Let AI tools control this window##prefs.ai_live"), &on)) setAiLiveControl(on);
     ui::HelpAction(*this, "prefs.ai_live");
@@ -315,6 +361,7 @@ void App::pollAiLink() {
     for (auto& e : events) {
         if (e.kind == AiLinkState::Event::Kind::Connected) {
             s.session = std::make_unique<link::AiLinkSession>(link::makePairingCode());
+            s.running.reset();
             s.session->policy.projectDir = macroProjectDir();
             for (const std::string& p : aiLinkPickedPaths_) s.session->policy.addPicked(p);
             s.waiting.clear();
@@ -329,6 +376,7 @@ void App::pollAiLink() {
             s.session.reset();
             s.waiting.clear();
             s.confirm.reset();
+            s.running.reset();
             s.approving = false;
         } else if (s.session) {
             s.waiting.push_back(std::move(e.line));
@@ -341,8 +389,18 @@ void App::pollAiLink() {
         aiLinkDisconnect(tr("AI connection request timed out"));
         return;
     }
-    // One message at a time; none while a dialog waits for the user.
-    while (!s.waiting.empty() && !s.confirm && s.session && s.session->state() != link::AiLinkSession::State::Closed) {
+    if (s.running && !commandRunning()) { // its worker is done: the reply goes out now
+        const AiLinkState::Running r = std::move(*s.running);
+        s.running.reset();
+        CommandResult done{lastCommandOk_, status_};
+        takeCommandResult(done);
+        labelAiUndo(r.part, r.undoCount, r.revision);
+        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - r.start).count();
+        auditLive(s.session->client(), r.call.name, r.call.args, done.ok, done.message, int64_t(ms));
+        s.send(link::AiLinkSession::resultReply(r.call.id, done.ok, done.message));
+    }
+    // One message at a time; none while a dialog waits for the user or a command works on a worker.
+    while (!s.waiting.empty() && !s.confirm && !s.running && s.session && s.session->state() != link::AiLinkSession::State::Closed) {
         const bool wasPairing = s.session->state() == link::AiLinkSession::State::Pairing;
         const std::string line = std::move(s.waiting.front());
         s.waiting.pop_front();
@@ -368,9 +426,10 @@ void App::pollAiLink() {
         case K::ListTools: {
             Json tools = Json::array();
             const Json commands = mcpToolList(commands_), live = liveTools();
-            for (const Json& t : commands.items())
+            for (const Json& t : commands.items()) // (mcpToolList leaves out what the policy doesn't allow)
                 if (!link::AiLinkPolicy::hidden(t["name"].asString())) tools.push(t);
-            for (const Json& t : live.items()) tools.push(t);
+            for (const Json& t : live.items())
+                if (policyAllowsTool(nullptr, t["name"].asString())) tools.push(t);
             s.send(link::AiLinkSession::listReply(step.call.id, std::move(tools)));
             break;
         }
@@ -382,17 +441,27 @@ void App::pollAiLink() {
                 s.send(link::AiLinkSession::resultReply(step.call.id, false, "Unknown tool: " + name));
                 break;
             }
+            if (std::string why; !policyAllowsTool(isLiveTool(name) ? nullptr : cmd, name, &why) ||
+                                 (audit::required() && !audit::writable(&why))) {
+                auditLive(s.session->client(), name, step.call.args, false, why);
+                s.send(link::AiLinkSession::resultReply(step.call.id, false, why));
+                break;
+            }
             s.session->policy.projectDir = macroProjectDir();
             link::AiDecision d = s.session->policy.classify(isLiveTool(name) ? nullptr : cmd, name, step.call.args);
             // A new scene clears the history: unsaved work couldn't be undone back.
             if (d.verdict == link::AiVerdict::Allow && doc_.dirty() && replacesScene(name))
-                d = {link::AiVerdict::Confirm, "Replaces the scene: your unsaved changes would be lost"};
+                d = link::confirmBecause("Replaces the scene: your unsaved changes would be lost");
             if (d.verdict == link::AiVerdict::Deny) {
+                auditLive(s.session->client(), name, step.call.args, false, d.reason);
                 s.send(link::AiLinkSession::resultReply(step.call.id, false, d.reason));
             } else if (d.verdict == link::AiVerdict::Confirm) {
-                s.confirm = AiLinkState::Pending{std::move(step.call), d.reason};
+                // The dialog and the status line in the interface language; the tool only ever gets English.
+                std::string shown = d.format ? tr(d.format) : d.reason;
+                if (const size_t at = shown.find("%s"); d.format && at != std::string::npos) shown.replace(at, 2, d.subject);
+                s.confirm = AiLinkState::Pending{std::move(step.call), shown};
                 s.focusDialog = true;
-                status_ = std::string(tr("Your AI tool asks: ")) + d.reason;
+                status_ = std::string(tr("Your AI tool asks: ")) + shown;
             } else {
                 aiLinkExecute(step.call);
             }
@@ -405,9 +474,14 @@ void App::pollAiLink() {
 void App::aiLinkExecute(const link::AiLinkCall& call) {
     AiLinkState& s = *aiLink_;
     ++s.commands;
+    const auto start = std::chrono::steady_clock::now();
+    const auto elapsedMs = [&] {
+        return int64_t(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+    };
     if (isLiveTool(call.name)) {
         bool ok = true;
         Json content = aiLiveTool(call.name, call.args, ok);
+        auditLive(s.session->client(), call.name, call.args, ok, ok ? "" : "failed", elapsedMs()); // (never the image)
         s.send(link::AiLinkSession::contentReply(call.id, std::move(content), !ok));
         return;
     }
@@ -416,7 +490,12 @@ void App::aiLinkExecute(const link::AiLinkCall& call) {
     const size_t before = doc_.undo.undoCount();
     const uint64_t revision = doc_.undo.revision();
     runCommand(call.name, call.args);
+    if (lastCommandOk_ && commandRunning()) {
+        s.running = AiLinkState::Running{call, part, before, revision, start};
+        return;
+    }
     labelAiUndo(part, before, revision);
+    auditLive(s.session->client(), call.name, call.args, lastCommandOk_, status_, elapsedMs());
     s.send(link::AiLinkSession::resultReply(call.id, lastCommandOk_, status_));
 }
 
@@ -735,6 +814,7 @@ void App::drawAiLink() {
             if (const std::string f = argString(p.call.args, key); !f.empty()) aiLinkPicked(f);
         aiLinkExecute(p.call);
     } else if (!open) {
+        auditLive(s.session->client(), s.confirm->call.name, s.confirm->call.args, false, "Declined by the user");
         s.send(link::AiLinkSession::declinedReply(s.confirm->call.id, s.confirm->call.name));
         s.confirm.reset();
         status_ = tr("AI step declined");

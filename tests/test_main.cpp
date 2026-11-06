@@ -8,14 +8,80 @@
 // `--nightly` (ctest entry sculptforge_tests_nightly, label nightly: T3 of docs/testing-flow.md), never in a shard.
 #include "TestHarness.h"
 
+#include "core/Keychain.h"
+
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <exception>
+#include <map>
+#include <string>
+#include <unordered_map>
 #include <vector>
+
+namespace sf::test {
+namespace {
+
+struct ShardTime {
+    const char* name;
+    double seconds;
+};
+// The slow tests' seconds (tools/test/shard_times.py). Tests not listed count as kUntimedSeconds.
+constexpr ShardTime kShardTimes[] = {
+#include "shard_times.inc"
+};
+constexpr double kUntimedSeconds = 0.1;
+
+struct ShardPlan {
+    std::unordered_map<std::string, int> shardOf; // the timed tests' shards (the others: by hash)
+    std::vector<double> seconds;
+};
+
+const ShardPlan& shardPlan(int shards) {
+    static std::map<int, ShardPlan> plans;
+    auto [it, fresh] = plans.try_emplace(shards);
+    ShardPlan& plan = it->second;
+    if (!fresh) return plan;
+    plan.seconds.assign(std::size_t(shards), 0.0);
+    std::unordered_map<std::string, double> timed;
+    for (const ShardTime& t : kShardTimes) timed[t.name] = t.seconds;
+    std::vector<std::pair<double, const char*>> slow; // (seconds, name) of the registered timed tests
+    for (const TestCase& t : registry()) {
+        if (std::strncmp(t.name, "nightly_", 8) == 0) continue; // (no shard runs them)
+        if (const auto f = timed.find(t.name); f != timed.end()) {
+            slow.emplace_back(f->second, t.name);
+        } else {
+            plan.seconds[shardHash(t.name) % std::uint32_t(shards)] += kUntimedSeconds;
+        }
+    }
+    std::sort(slow.begin(), slow.end(), [](const auto& a, const auto& b) {
+        return a.first != b.first ? a.first > b.first : std::strcmp(a.second, b.second) < 0;
+    });
+    for (const auto& [sec, name] : slow) {
+        const auto least = std::min_element(plan.seconds.begin(), plan.seconds.end());
+        *least += sec;
+        plan.shardOf[name] = int(least - plan.seconds.begin());
+    }
+    return plan;
+}
+
+} // namespace
+
+std::vector<double> shardSeconds(int shards) { return shardPlan(std::max(shards, 1)).seconds; }
+
+bool inShard(const char* name, int shard, int shards) {
+    if (shards <= 1) return true;
+    const ShardPlan& plan = shardPlan(shards);
+    if (const auto f = plan.shardOf.find(name); f != plan.shardOf.end()) return f->second == shard;
+    return shardHash(name) % std::uint32_t(shards) == std::uint32_t(shard);
+}
+
+} // namespace sf::test
 
 int main(int argc, char** argv) {
     using namespace sf::test;
+    sf::keychain::useMemoryForTests(true); // no test reads or writes the user's keychain (AI keys, sign-ins)
     int shard = 0, shards = 1;
     bool nightly = false;
     std::vector<const char*> filters;

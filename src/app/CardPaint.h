@@ -35,7 +35,7 @@ inline ImU32 tc(const ImVec4& c, float alpha) { return theme::u32(c, std::clamp(
 inline ImVec4 mix(const ImVec4& x, const ImVec4& y, float t) {
     return ImVec4(lerp(x.x, y.x, t), lerp(x.y, y.y, t), lerp(x.z, y.z, t), lerp(x.w, y.w, t));
 }
-// The SculptForge orange (the SF mark's tile): the same in every look.
+// The SculptForge orange: the same in every look.
 constexpr unsigned kBrandOrange = 0xf0882e;
 
 // Text drawn straight to the draw list, also logged so UI tests can find it (expect_text).

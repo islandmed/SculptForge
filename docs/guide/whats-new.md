@@ -5,6 +5,98 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.9
+
+```features
+date: 2026-11-06
+tagline: Folders for your Parts, a Line Gradient for paint, and Auto UV that never freezes the app.
+highlight: Folders in Tool > Parts: drag Parts in, fold, hide and move them together (thanks @ebarranco, #96)
+highlight: Line Gradient: drag a colour ramp across the model (thanks @Devon0209, #99)
+highlight: Auto UV runs in the background and can be cancelled
+highlight: Paint colour stays visible while you orbit or paint dense models
+highlight: Hyper3D Rodin, direct: generate a model from an image or a description with your own Hyper3D key (thanks @ElgoogUdiab, #123)
+```
+
+- **Line Gradient**: **Color > Line Gradient**, then drag across the model: the paint colour runs into a second colour
+  (or fades out) along the line; drag its ends to adjust it. Thanks @Devon0209 (#99).
+- **Part folders**: in **Tool > Parts**, group Parts in folders (drag them in and out), fold, rename, hide or move a
+  whole folder at once.
+- **Hyper3D Rodin, direct**: **Generate 3D > Hyper3D Rodin (direct)** runs Rodin Gen-2.5 on Hyper3D's own service with
+  your own Hyper3D key, from an image or a description, in five tiers from Extreme Low to Extreme High. It stays off
+  until you add your key, which is kept in the system keychain; your image or description goes to Hyper3D only, and
+  generations are billed to your Hyper3D account. Rodin through fal.ai stays as it was.
+- **Paint stays while the view moves**: on dense meshes, vertex paint, paint layers and the mask no longer vanish
+  while you orbit or paint and pop back at rest.
+- **Input style keys after a restart**: the Blender, Classic and Maya styles keep every key when SculptForge starts
+  again (F for the Size slider in the Blender style, 9 for a Snapshot with the Classic keys).
+- **Auto UV never freezes the app**: the `uv_auto` command from the console, a script or an AI tool now unwraps in the
+  background like the **Tool > Texture Map > Auto UV** button, which gains a **Cancel** button beside its progress.
+- **Faster Pack**: **UV Editor > Pack** across a UDIM grid takes well under a second on most models (it could freeze
+  the app for half a minute), runs in the background with a progress bar and **Cancel**, and lays islands out tighter.
+  Unwrap runs in the background too.
+
+## Version 0.11.8
+
+```features
+date: 2026-11-06
+tagline: Clearer corner axes, one-click Library, a new cube app icon, and pen stamps that keep their strength.
+highlight: Clearer corner axes: lettered, depth-shaded, click twice for the opposite view
+highlight: One click in the Library uses a brush, alpha or material (thanks @NicTanghe, #142)
+highlight: The app icon is now an orange cube
+highlight: Drag and Slide Stamp keep their strength when the pen lifts (#146)
+highlight: One click sends to Maya and back; SculptForge picks up Maya's exports by itself (thanks @tristratos, #42)
+```
+
+- **Edit > Preferences...** in the Classic layout too: Preferences is its own palette there, and now Edit also opens
+  it. The guide says where Preferences is in each layout (also <kbd>Ctrl</kbd>+<kbd>,</kbd> or F3 > Preferences).
+- **New app icon**: an orange cube is the app icon in the taskbar, dock and title bar; it stays sharp at small sizes.
+  The bust and anvil stays the SculptForge brand.
+- **Library**: one click uses a brush, alpha or material. Double-click still works.
+- **Maya bridge, fewer clicks**: what Maya sends loads by itself, **Send to Maya** is one click in the top bar, and
+  the Maya shelf's new **Auto** loads what SculptForge sends. Thanks @tristratos.
+- **Easier to read view axes**: the corner axes now show **X**, **Y** and **Z** in filled circles, with smaller rings
+  for the opposite ends; the ends pointing away are smaller and fainter, on a soft disc that reads on dark and light
+  backgrounds. Click an end for that view, click it again for the opposite view, drag on the disc to orbit; an exact
+  view's name ("Front view", "Top view"...) shows under it.
+- **Reconstruct Subdiv** works on open meshes such as UV-tiled panels, and the lower level keeps each face's UVs.
+- **Drag Stamp with a pen**: a stamp (a vector displacement or any brush) dragged to size keeps its strength when you
+  lift the pen, instead of going weak or vanishing.
+
+## Version 0.11.7
+
+```features
+date: 2026-11-06
+tagline: Dense scans orbit smoothly on entry-level machines, and Preferences > AI speaks Spanish and Chinese.
+highlight: Dense scans orbit smoothly on entry-level machines
+highlight: Preferences > AI in Spanish and Chinese
+highlight: Live mode's confirmations in your language
+```
+
+- **Smoother view on very dense meshes**: a scan or import with more triangles than your computer draws comfortably
+  now draws a lighter version of itself while you turn the view, and the real detail as soon as the view rests. Parts
+  you sculpt always show in full detail. Orbiting a 28-million-triangle scan on an entry-level machine is about twice
+  as smooth: its slowest frames go from 24 to 12 ms.
+
+## Version 0.11.6
+
+```features
+date: 2026-11-06
+tagline: Studio controls for AI: a managed policy, an audit log, keys in the system keychain and single sign-on, plus shelves that hide when they're empty.
+highlight: Studio controls: one policy file decides which AI tools and providers are allowed
+highlight: An audit log of every AI step, and API keys kept in the system keychain
+highlight: Sign in with your studio's identity provider (device sign-in, no browser plug-in)
+highlight: Empty shelves stay out of the way outside Customize Shelves
+highlight: Studio-ready AI: policy, audit log, single sign-on
+```
+
+- **Empty shelves hide**: a shelf you empty is hidden outside **Customize Shelves** and the canvas takes its room; it
+  comes back while customizing so you can drop buttons onto it again.
+- **Studio controls**: IT can deploy a policy file that locks AI, network features, AI providers, AI tools and updates
+  (**Managed by your studio** shows on locked settings), keep an audit log of every AI action, and sign artists in
+  with the studio account (the guide's "SculptForge for studios" page, IT deployment).
+- **AI providers**: **Edit > Preferences > AI > Provider** has presets for Anthropic, OpenAI, Ollama, LM Studio, vLLM,
+  llama.cpp, a LiteLLM studio gateway and OpenRouter. Keys now live in your system keychain.
+
 ## Version 0.11.5
 
 ```features
@@ -48,8 +140,6 @@ highlight: Saved camera views and a readable mask
 highlight: Quick Remesh and Voxel Remesh keep open parts solid
 highlight: The UV Editor fits at large UI scales
 highlight: The new orange SF app icon
-highlight: Connect your AI tool in one window
-highlight: Saved camera views and a readable mask
 ```
 
 - The app icon is now the orange SF mark, as on the website; it reads at task bar size.

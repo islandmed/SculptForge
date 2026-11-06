@@ -9,6 +9,7 @@
 
 #include <cmath>
 #include <string>
+#include <vector>
 
 using namespace sf;
 
@@ -114,6 +115,41 @@ TEST(pen_pressure_tracker_guards_stroke_start) {
     CHECK(near(t.raw(), 0.15f));
     t.sample(5.0f);
     CHECK(near(t.raw(), 1.0f));
+}
+
+TEST(stamp_pressure_keeps_the_drag_strength_at_the_lift) {
+    // #146: Drag Stamp / Slide Stamp re-press the stamp at every move with the pressure then. The samples a pen
+    // sends as it lifts fall to 0, and the stamp went weak or vanished at release. Each feed, as the app gets it
+    // (pressure samples through PenPressureTracker, then the curve, then StampPressure::hold):
+    const PressureCurve curve = PressureCurve::soft();
+    auto drag = [&](const std::vector<float>& samples, bool touchUpFirst) {
+        PenPressureTracker t;
+        StampPressure held;
+        held.reset();
+        t.touchDown();
+        float last = 0.0f;
+        for (size_t i = 0; i < samples.size(); ++i) {
+            if (touchUpFirst && i + 1 == samples.size()) t.touchUp(); // Wintab: the packet with the tip up carries 0
+            t.sample(samples[i]);
+            t.motion();
+            last = held.hold(curve.apply(t.pressure()));
+        }
+        return last;
+    };
+    const float firm = curve.apply(0.8f);
+    // Windows Ink (SDL pen events): the pressure ramps down over the last samples, then PEN_UP.
+    CHECK(near(drag({0.2f, 0.6f, 0.8f, 0.8f, 0.8f, 0.5f, 0.2f, 0.05f, 0.0f}, false), firm));
+    // Wintab: the driver's last packet has the tip up and pressure 0, and the mouse moves with it.
+    CHECK(near(drag({0.8f, 0.8f, 0.8f, 0.3f, 0.0f}, true), firm));
+    // Linux (libinput / X11 via SDL): the pressure axis reports 0 before the tip-up event.
+    CHECK(near(drag({0.8f, 0.8f, 0.01f, 0.0f}, false), firm));
+    // A drag that presses harder as it goes gets stronger (the stamp follows the pen up, never down).
+    CHECK(near(drag({0.1f, 0.4f, 0.9f}, false), curve.apply(0.9f)));
+    // A new drag starts afresh.
+    StampPressure held;
+    CHECK(near(held.hold(0.9f), 0.9f));
+    held.reset();
+    CHECK(near(held.hold(0.3f), 0.3f));
 }
 
 TEST(pen_cursor_mouse_mode_moves_relatively) {

@@ -366,7 +366,8 @@ std::vector<PhaseSpec> standardPhases(double seconds) {
             {"move", 80.0f, seconds, BrushType::Move, 0.25f, 0.4f},
             {"smooth", 60.0f, seconds, BrushType::Smooth, 0.5f},
             {"240 px brush", 240.0f, seconds, BrushType::Clay, 0.35f},
-            {"orbit", 0.0f, 3.0}};
+            {"orbit", 0.0f, 3.0},
+            {"still", -1.0f, 0.6}};
 }
 
 const char* proofBrushName(BrushType b) {
@@ -402,6 +403,7 @@ struct PhaseResult {
     std::vector<double> previewLagPx; // the predictive preview's head behind the pointer (the surface's without it)
     std::vector<double> drawn;    // triangles each frame drew (Renderer::lastDrawnTriangles)
     std::vector<double> gpuMs;    // GPU time of the phase's frames (GL_TIME_ELAPSED; empty without timer queries)
+    std::vector<double> coarse;   // clusters each frame drew at a coarse level (0: full detail)
     size_t screenStrokeFrames = 0; // frames the view showed pending dabs on the screen (render/ScreenStroke.h)
     std::vector<double> split[6]; // each frame by part (App::frameSplitMs_, the frame before: the swap comes after)
     SculptTimings stroke;         // the stroke's own work (solver thread: kernel, normals, BVH), when it ended
@@ -544,9 +546,11 @@ void App::startProofMode() {
         p->phases = {{"clay small", 25.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
                      {"clay large", 120.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
                      {"240 px brush", 240.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
-                     {"orbit", 0.0f, 10.0}};
+                     {"orbit", 0.0f, 10.0},
+                     {"still", -1.0f, 0.6}}; // (the view at rest: coarse levels give way to full detail, Renderer::coarsePreviewOnly)
     else if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds);
-    else p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0}};
+    else p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0},
+                      {"still", -1.0f, 0.6}};
     // SF_BENCH_PHASES=smooth,240: only the phases whose names contain one of these (each on the fresh mesh's
     // shape, not on what the phases before it left).
     if (const char* only = std::getenv("SF_BENCH_PHASES"); only && *only) {
@@ -589,7 +593,8 @@ void App::drawProofUi() {
                     p.scene = i == 0 ? "standard-15m" : i == 1 ? "standard-33m" : i == 2 ? "standard" : "";
                     p.sizes = p.scene.empty() ? proofDefaultSizes(availableMemoryBytes()) : proofStandardScene(p.scene);
                     if (!p.scene.empty()) p.phases = standardPhases(p.strokeSeconds);
-                    else p.phases = {{"stroke", 60.0f, p.strokeSeconds}, {"large brush stroke", 240.0f, p.strokeSeconds}, {"orbit", 0.0f, 3.0}};
+                    else p.phases = {{"stroke", 60.0f, p.strokeSeconds}, {"large brush stroke", 240.0f, p.strokeSeconds}, {"orbit", 0.0f, 3.0},
+                                     {"still", -1.0f, 0.6}};
                 }
             if (!p.scene.empty())
                 ImGui::TextDisabled("Clay at 25, 60 and 120 px, Move, Smooth, a 240 px brush, then an orbit: the scene the "
@@ -939,12 +944,14 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             ph.frameMs.push_back(frameMs);
             for (int k = 0; k < 6; ++k) ph.split[k].push_back(frameSplitMs_[k]);
             ph.drawn.push_back(double(renderer_.lastDrawnTriangles()));
+            ph.coarse.push_back(double(renderer_.coarseDrawnClusters()));
             ph.screenStrokeFrames += renderer_.screenStrokeDrawn() ? 1 : 0;
             ph.gpuMs.insert(ph.gpuMs.end(), proofGpuMs_.begin(), proofGpuMs_.end());
             proofGpuMs_.clear();
         }
         const double u = std::min(1.0, (now - p.stageStart) / spec.seconds);
-        if (spec.radiusPx <= 0) { // orbit: the view turns, as a drag would
+        if (spec.radiusPx < 0) { // still: the view at rest (nothing moves)
+        } else if (spec.radiusPx <= 0) { // orbit: the view turns, as a drag would
             camera_.yaw = float(6.2831853 * u);
             perf_.framesStill = 0;
         } else if (p.pressed) {
@@ -991,6 +998,13 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 ph.seconds = now - p.stageStart;
                 p.releasing = true; // (the phase ends when the stroke has: see the top of this stage)
                 p.releaseAt = up;
+                // SF_ORBIT_AT_PENUP=1 (claims check, bench branch only): the orbit starts at pen-up, while the stroke's last dabs land.
+                if (const char* e = std::getenv("SF_ORBIT_AT_PENUP"); e && *e != '0' && p.phaseIndex + 1 < p.phases.size() &&
+                                                                      p.phases[p.phaseIndex + 1].radiusPx <= 0) {
+                    p.releasing = false;
+                    ph.dabs = p.dabs.size();
+                    nextPhase();
+                }
                 break;
             }
         } else {
@@ -1100,6 +1114,11 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     for (int k = 0; k < 6; ++k) split.set(names[k], percentilesJson(percentiles(ph.split[k])));
                     j.set("frame_split_ms", split);
                     j.set("triangles_drawn", percentilesJson(percentiles(ph.drawn)));
+                    if (ph.radiusPx < 0 && !ph.drawn.empty()) { // still: what its last frame drew (after the 150 ms wait)
+                        j.set("detail", ph.coarse.empty() || ph.coarse.back() == 0 ? "full" : "coarse");
+                        j.set("still_triangles", ph.drawn.back());
+                        if (!ph.gpuMs.empty()) j.set("still_gpu_ms", std::round(ph.gpuMs.back() * 100) / 100);
+                    }
                     if (!ph.gpuMs.empty()) { // (the GPU's own work, no compositor; fewer than "frames": results that came too late)
                         j.set("gpu_ms", percentilesJson(percentiles(ph.gpuMs)));
                         j.set("gpu_frames", double(ph.gpuMs.size()));

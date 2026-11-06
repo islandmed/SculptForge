@@ -636,6 +636,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Apply", "应用"},
     {"Reset", "重置"},
     {"Preview", "预览"},
+    {"Preview detail", "预览细节"},
     {"Finish", "完成"},
     {"Close", "关闭"},
     {"OK", "确定"},
@@ -700,6 +701,20 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Fill", "填满"},
     {"Fill layer", "填满图层"},
     {"Fill masked", "填满遮罩区域"},
+    {"Line Gradient", "线性渐变"},
+    {"End", "终点"},
+    {"Swap", "交换"},
+    {"Drag a line across the model.", "在模型上拖动一条线。"},
+    {"Drag its ends to adjust. Enter keeps it, Esc takes it back.", "拖动两端即可调整。Enter 保留，Esc 撤回。"},
+    {"Swap the paint colour and the End colour.", "交换绘制颜色与终点颜色。"},
+    {"The colour at the end of the line. The start is the paint colour above.",
+     "线条终点的颜色。起点是上方的绘制颜色。"},
+    {"Fade the paint colour out instead: the paint underneath shows through towards the end of the line.",
+     "改为让绘制颜色淡出：越接近线条终点，下面原有的颜色越明显。"},
+    {"Drag a line across the model: the paint colour at its start runs into the End colour (or fades to "
+     "clear) at its end, in screen space, into vertex paint or the texture. Drag either end to adjust it; "
+     "Enter keeps it, Esc takes it back. Respects the mask; one undo step.",
+     "在模型上拖动一条线：起点的绘制颜色会在终点渐变为终点颜色（或淡出），按屏幕空间计算，画入顶点绘制或贴图。拖动任一端即可调整；Enter 保留，Esc 撤回。遵守遮罩；一个撤销步骤。"},
     {"Fill the unmasked area (the whole mesh if nothing is masked)", "填满未遮罩区域（若没有任何遮罩，则填满整个网格）"},
     {"Cavity", "凹陷"},
     {"Darken creases and cavities (respects the mask)", "加深皱褶与凹陷（遵循遮罩）"},
@@ -935,9 +950,9 @@ constexpr Entry kSimplifiedChinese[] = {
      "加载 Maya 最后通过工具架的 Send to SculptForge 发送的内容。每个对象会替换同名的部件（可撤销）或成为新部件。"},
     {"Exchange folder...", "交换文件夹..."},
     {"Choose the folder SculptForge and Maya exchange meshes through (pick the same one in Maya's shelf script). "
-     "SculptForge reads and writes only there, and only when you send or get.",
-     "选择 SculptForge 与 Maya 交换网格的文件夹（在 Maya 的工具架脚本中选同一个）。SculptForge 只在该处读写，且只在"
-     "你发送或获取时进行。"},
+     "SculptForge reads and writes only there: when you send or get, and when Maya sends while Get automatically is on.",
+     "选择 SculptForge 与 Maya 交换网格的文件夹（在 Maya 的工具架脚本中选同一个）。SculptForge 只在该处读写：在"
+     "你发送或获取时，以及开启“自动获取”后 Maya 发送时。"},
     {"Add the brush on the clipboard: a brush code someone shared, or the text of a .sfbrush file.",
      "加入剪贴板中的笔刷：别人分享的笔刷代码，或 .sfbrush 文件的文本。"},
     {"Every brush keeps its own Size, Intensity, Falloff, Colour intensity, stroke and alpha while you work. This "
@@ -1138,6 +1153,17 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Masked parts stay where they are and partly masked parts move partly (on by default). Off: the whole Part moves "
      "whatever the mask.",
      "遮罩部分维持原位，部分遮罩的区域则部分移动（默认打开）。关闭：无论遮罩如何，整个部件都会移动。"},
+    {"Folder", "文件夹"},
+    {"Hide its Parts", "隐藏其中的部件"},
+    {"Show its Parts", "显示其中的部件"},
+    {"Move with the gizmo", "用操纵器移动"},
+    {"New folder", "新建文件夹"},
+    {"New folder with the active Part (drag Parts onto a folder to add them)", "用当前部件新建文件夹（把部件拖到文件夹上即可加入）"},
+    {"Out of the folder", "移出文件夹"},
+    {"Remove folder (keep its Parts)", "删除文件夹（保留其中的部件）"},
+    {"Click to open, double-click to rename, drag Parts onto it", "单击展开，双击重命名，可把部件拖到这里"},
+    {"Click to fold, double-click to rename, drag Parts onto it", "单击折叠，双击重命名，可把部件拖到这里"},
+    {"Transform the visible Parts in the active Part's folder together (Parts list folders). Each Part gets its own undo step.", "一起变换当前部件所在文件夹中的可见部件（部件列表中的文件夹）。每个部件各有自己的撤销步骤。"},
     {"Transform every visible Part together. Each Part gets its own undo step.",
      "一起变换所有可见部件。每个部件各有自己的撤销步骤。"},
     {"Where the gizmo sits: rotation and scaling turn about this point. It follows the centre of what moves until you "
@@ -1794,8 +1820,8 @@ constexpr Entry kSimplifiedChinese[] = {
     // --- PanelMaya.cpp (tools/i18n/coverage.py) ---
     {"Get automatically", "自动获取"},
     {"Load what Maya sends as soon as it arrives: SculptForge checks the exchange folder's manifest once a second "
-     "(its modification time and size only). Off by default; off: use Get from Maya.",
-     "Maya 传来的内容一到就加载：SculptForge 每秒检查一次交换文件夹的列表文件（只看修改时间与大小）。默认关闭；关闭时："
+     "(its modification time and size only). On once you choose the folder; off: use Get from Maya.",
+     "Maya 传来的内容一到就加载：SculptForge 每秒检查一次交换文件夹的列表文件（只看修改时间与大小）。选好文件夹后即开启；关闭时："
      "请使用“从 Maya 获取”。"},
     {"Turn the Maya bridge off", "关闭 Maya 桥接"},
     {"Forget the exchange folder; nothing in it is deleted.", "忘记交换文件夹；其中的内容不会被删除。"},
@@ -2393,16 +2419,22 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Unwrap with the chosen method: the selected faces (fitted where they were), or the whole Part (packed). Least "
      "Stretch keeps angles and lengths along the marked seams; Conformal keeps angles; By Face Groups cuts along the "
      "face group borders too; Planar projects each piece; Unfold flattens the current islands again in place, "
-     "keeping pins; Auto Seams finds its own. Closed pieces get cut automatically. Big meshes unwrap in the "
-     "background.",
+     "keeping pins; Auto Seams finds its own. Closed pieces get cut automatically. Runs in the background (Cancel "
+     "under the view stops it).",
      "以所选方法展开：所选的面（在原位拟合），或整个部件（并打包）。Least Stretch 沿标记的接缝保留角度与长度"
      "；Conformal 保留角度；By Face Groups 也沿面组边界切割；Planar 投影每个区块；Unfold 在原位重新摊平当前岛并保留"
-     "固定；Auto Seams 自行找出接缝。封闭的区块会自动切开。大型网格会在后台展开。"},
+     "固定；Auto Seams 自行找出接缝。封闭的区块会自动切开。在后台运行（视图下方的取消可停止）。"},
     {"Pack", "打包"},
     {"Pack the selected islands (or all) as large as they fit into the 0-1 tile, or across the Columns x Rows grid of "
-     "UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them.",
+     "UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them. "
+     "Runs in the background (Cancel under the view stops it).",
      "将所选的岛（或全部）以能放下的最大尺寸打包到 0-1 图块，或打包到列数 x 行数的 UDIM 图块格中：旋转到最小包围框，缩"
-     "放到相同纹素密度，并保留其间的边距。"},
+     "放到相同纹素密度，并保留其间的边距。在后台运行（视图下方的取消可停止）。"},
+    {"Packing...", "正在打包..."},
+    {"Packing: %d%%", "正在打包：%d%%"},
+    {"Unwrapping...", "正在展开..."},
+    {"Unwrapping: %d%%", "正在展开：%d%%"},
+    {"Stop the Unwrap or Pack that is running; the UVs stay as they are.", "停止正在运行的展开或打包；UV 维持原样。"},
     {"Mark Seam", "标记接缝"},
     {"Mark the selected edges (or the border of the selected faces) as seams: Unwrap cuts there.",
      "将所选的边（或所选面的边界）标记为接缝：展开时会在此切开。"},
@@ -3223,6 +3255,37 @@ constexpr Entry kSimplifiedChinese[] = {
      "立即停止 AI 工具。其步骤保留在“撤销”中。"},
     {"Your AI tool asks: ",
      "你的 AI 工具请求： "},
+    // --- Preferences > AI and live mode's confirm reasons (fix/i18n-ai-prefs) ---
+    {"AI Brush and Generate 3D. Off: they are hidden and SculptForge makes no AI network calls.",
+     "AI 笔刷与生成 3D 模型。关闭：两者都会隐藏，SculptForge 不会进行任何 AI 网络连接。"},
+    {"AI services & privacy",
+     "AI 服务与隐私"},
+    {"Set by this computer (SF_AI or --no-ai).",
+     "由这台电脑设置（SF_AI 或 --no-ai）。"},
+    {"Your art is never uploaded or used for training. AI features run only when you use them and can be turned off.",
+     "你的作品绝不会被上传或用于训练。AI 功能只在你使用时运行，也可以关闭。"},
+    {"Hugging Face token (hf_...)",
+     "Hugging Face 令牌（hf_...）"},
+    {"Connects to the network",
+     "会连接到网络"},
+    {"Runs a macro or script",
+     "会运行宏或脚本"},
+    {"Runs outside programs (splat training)",
+     "会运行外部程序（splat 训练）"},
+    {"Deletes a file from your library",
+     "会删除资源库中的文件"},
+    {"Writes a program or settings file: %s",
+     "会写入程序或配置文件：%s"},
+    {"Overwrites %s",
+     "会覆盖 %s"},
+    {"Writes %s (outside the project folder and the files you picked)",
+     "会写入项目文件夹与你所选文件以外的位置：%s"},
+    {"Reads %s (outside the project folder and the files you picked)",
+     "会读取项目文件夹与你所选文件以外的位置：%s"},
+    {"Saves over the project",
+     "会覆盖保存项目"},
+    {"Replaces the scene: your unsaved changes would be lost",
+     "会替换场景：未保存的更改将会丢失"},
     // The in-app guide (Help > Connect an AI tool, PanelConnectAi.cpp) and its dialogs, in the guide's words
     {"1. Pick your tool", "1. 选择你的工具"},
     {"2. Let it work in this window", "2. 让它在此窗口中工作"},
@@ -3245,6 +3308,43 @@ constexpr Entry kSimplifiedChinese[] = {
     {"The AI blocks out a starting point and shows you options; you do the art.", "AI 先做出起点并提供选项；作品由你完成。"},
     {"Try asking", "试着这样问"},
     {"While it works, the AI connected badge sits at the bottom right. Disconnect stops it.", "工作期间，“AI 已连接”标记会显示在右下角。单击“断开连接”即可停止。"},
+    // --- Studio controls: Preferences > AI (PanelAi.cpp, ai/Providers.cpp, core/ManagedPolicy.cpp) ---
+    {"AI tools (MCP)", "AI 工具（MCP）"},
+    {"AI tools can't connect: your studio turned them off.", "AI 工具无法连接：你的工作室已将其关闭。"},
+    {"AI tools may use only the kinds of command your studio allows.", "AI 工具只能使用你的工作室允许的命令类型。"},
+    {"AI tools work on their own scene; your studio doesn't let them control this window.", "AI 工具在自己的场景中工作；你的工作室不允许它们控制这个窗口。"},
+    {"API key", "API 密钥"},
+    {"Tier", "等级"},
+    {"Off until you add your own key: hyper3d.ai > API dashboard (a Creator plan or higher).", "在你添加自己的密钥前保持关闭：hyper3d.ai > API dashboard（需 Creator 或更高等级）。"},
+    {"Using your key from the system keychain.", "正在使用系统中保存的密钥。"},
+    {"Sends your image or description to Hyper3D (api.hyper3d.com), which builds the model. Each generation is billed to your Hyper3D account. Basic API access covers Extreme Low and Low.", "将你的图片或描述发送到 Hyper3D（api.hyper3d.com）生成模型。每次生成均由你的 Hyper3D 账户计费。基础 API 访问包含 Extreme Low 和 Low。"},
+    {"Audit log", "审计日志"},
+    {"Connecting...", "正在连接..."},
+    {"Copy code", "复制代码"},
+    {"Copy path", "复制路径"},
+    {"Endpoint", "端点"},
+    {"Every AI action (AI tools, AI Brush, Generate 3D) is recorded on this computer: time, tool, command and settings, never your artwork or keys.", "每个 AI 操作（AI 工具、AI 笔刷、生成 3D 模型）都会记录在这台电脑上：时间、工具、命令和设置，绝不包含你的作品或密钥。"},
+    {"Find models", "查找模型"},
+    {"In your browser, sign in and enter this code:", "请在浏览器中登录并输入此代码："},
+    {"Managed by", "管理者："},
+    {"Managed by your studio", "由你的工作室管理"},
+    {"Model", "模型"},
+    {"Open the sign-in page", "打开登录页面"},
+    {"Provider", "提供商"},
+    {"Rate limited to a request every few seconds; if it can't be reached, a running Ollama is used instead.", "每隔几秒才能发出一次请求；如果无法连接，会改用正在运行的 Ollama。"},
+    {"Requests go only to the endpoint above. Keys are kept in your system keychain (never in a settings file); leave empty to use the environment (ANTHROPIC_API_KEY, OPENAI_API_KEY). For private, offline use, pick Ollama or LM Studio.", "请求只会发送到上方的端点。密钥保存在系统钥匙圈中（绝不存放在设置文件里）；留空则使用环境变量（ANTHROPIC_API_KEY、OPENAI_API_KEY）。如需私密、离线使用，请选择 Ollama 或 LM Studio。"},
+    {"Saved in your system keychain.", "已保存在系统钥匙圈中。"},
+    {"SculptForge has no telemetry: nothing about you or your work is collected.", "SculptForge 没有遥测：不会收集任何关于你或你作品的数据。"},
+    {"Sign in with your studio account", "使用工作室账号登录"},
+    {"Signed in as", "已登录："},
+    {"Signed out of your studio account", "已退出工作室账号"},
+    {"Signs in through your studio's own login page in your browser. Nothing on this computer listens for it; the sign-in is kept in your system keychain.", "通过你的工作室在浏览器中的登录页面登录。这台电脑上没有任何程序在等待连接；登录信息保存在系统钥匙圈中。"},
+    {"Studio sign-in", "工作室登录"},
+    {"The studio policy can't be used, so AI, network features and AI tools are off:", "无法使用工作室策略，因此 AI、网络功能和 AI 工具都已关闭："},
+    {"Uses your studio sign-in (Preferences > AI > Studio sign-in)", "使用你的工作室登录（偏好设置 > AI > 工作室登录）"},
+    {"Using the key from the environment.", "使用环境变量中的密钥。"},
+    {"Your studio doesn't allow this provider: pick another", "你的工作室不允许此提供商：请选择其他提供商"},
+    {"Your studio requires the sign-in for AI features.", "你的工作室要求登录后才能使用 AI 功能。"},
 };
 
 } // namespace

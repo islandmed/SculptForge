@@ -38,9 +38,11 @@ concurrency:
 # The release packages are built by packages.yml (on pushes to main), the Flatpak check for pull requests is flatpak.yml.
 
 jobs:
-  # Pushes and pull requests that change only the website (not its phone page, website/link, which is built into the
-  # app), docs no build or test reads (docs/guide and docs/supporters.txt are built in), note fragments or release
-  # paperwork skip the build and test jobs; their required checks then pass as skipped.
+  # Site-lane changes (every file on tools/ci/site_lane.txt) skip the build and test jobs on every event, the merge
+  # queue's staging dispatch too (diffed against main); the Trademarks job always runs. Pushes and pull requests that
+  # change only the website (not its phone page, website/link, which is built into the app), docs no build or test
+  # reads (docs/guide and docs/supporters.txt are built in), note fragments or release paperwork skip them as well;
+  # their required checks then pass as skipped.
   # `full`: the slow platform checks (VFX Reference Platform containers, Blender add-on in Blender) run on main, in the
   # merge queue's batch run (scripts/merge-queue.sh), on a dispatch with full=true and on a pull request labelled full-ci; other branch runs skip them.
   changes:
@@ -70,9 +72,19 @@ jobs:
           base=$BASE
           [ "$EVENT" = push ] && base=$BEFORE
           code=true
-          if [ "$EVENT" != workflow_dispatch ] && [ -n "$base" ] && [ "$base" != 0000000000000000000000000000000000000000 ]; then
+          # A dispatch (the merge queue's staging batch, scripts/merge-queue.sh) is diffed against main.
+          [ "$EVENT" = workflow_dispatch ] && base=main
+          if [ -n "$base" ] && [ "$base" != 0000000000000000000000000000000000000000 ]; then
             # (the compare API lists at most 300 files: more than that counts as a code change)
-            if files=$(gh api "repos/$REPO/compare/$base...$HEAD" --jq '.files | if length >= 300 then error("many") else .[].filename end'); then
+            files=$(gh api "repos/$REPO/compare/$base...$HEAD" --jq '.files | if length >= 300 then error("many") else .[].filename end') || files=""
+            # Site lane: every file on tools/ci/site_lane.txt (the list ~/Work/.sf/lane.sh reads too), read from the base,
+            # never from the change itself (a pull request can't widen it for its own run).
+            lane=$(gh api "repos/$REPO/contents/tools/ci/site_lane.txt?ref=$base" -H 'Accept: application/vnd.github.raw') &&
+              lane=$(grep -v -e '^#' -e '^[[:space:]]*$' <<< "$lane") || lane="" # (a blank line would match every file)
+            if [ -n "$files" ] && [ -n "$lane" ] && ! grep -qvE -f <(echo "$lane") <<< "$files"; then
+              echo "::notice::site lane only (tools/ci/site_lane.txt): no build or tests"
+              code=false
+            elif [ -n "$files" ] && [ "$EVENT" != workflow_dispatch ]; then
               code=false
               while IFS= read -r f; do
                 case "$f" in

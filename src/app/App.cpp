@@ -17,6 +17,13 @@
 #include "core/PerfTrace.h"
 
 #include "ai/AiCommands.h"
+#include "ai/Oidc.h"
+#include "ai/Secrets.h"
+#include "core/AuditLog.h"
+#include "core/Keychain.h"
+#include "core/ManagedPolicy.h"
+#include "ai/Hyper3D.h"
+#include "ai/Providers.h"
 #include "app/Demo.h"
 #include "app/Shell.h"
 #include "app/Theme.h"
@@ -179,7 +186,7 @@ bool App::init(const AppOptions& options) {
         else if (saved.maximized || saved.fullscreen) SDL_MaximizeWindow(window_);
     }
     {
-        // The SF app icon, with its small cut as the alternate for small task bar and title bar icons.
+        // The cube app icon, with its small cut as the alternate for small task bar and title bar icons.
         Image icon, small;
         std::string iconErr;
         if (Image::decode(assets::appIcon, size_t(assets::appIcon_size), icon, iconErr)) {
@@ -237,8 +244,24 @@ bool App::init(const AppOptions& options) {
     } else {
         io.IniFilename = nullptr;
     }
+    if (!options.uiTest.empty()) policy::resetPolicyForTests(); // (a UI test's ui_policy never reaches the next one)
     // Preferences > AI: tests, renders and videos start with AI on whatever this computer chose (SF_AI still wins).
     ai::setAiEnabled(ai::aiFeaturesAllowed(headless || !options.demo.empty() || aiSettings_.enabled));
+    // AI keys and the studio sign-in are in the OS keychain (ai/Secrets.h, ai/Oidc.h), read on a worker so no frame
+    // waits on an unlock prompt. Tests, renders and benchmarks never touch the user's keychain.
+    audit::setClient("app");
+    ai::secrets::setLazy(false);
+    if (headless || !options.uiTest.empty() || !options.demo.empty() || options.benchmark) {
+        keychain::useMemoryForTests(true);
+    } else {
+        std::thread([path = aiSettingsPath_] {
+            std::string message;
+            if (!path.empty()) ai::secrets::migrateLegacyKeys(path, message);
+            if (!message.empty()) SDL_Log("%s", message.c_str());
+            ai::secrets::preload();
+            ai::oidc::loadSaved();
+        }).detach();
+    }
     ai::registerAiCommands(commands_, [this] { return aiSettings_; });
     registerPaintUiCommands();
     registerViewUiCommands(); // light, xray, view_resolution, save_render (PanelView.cpp)
@@ -511,6 +534,7 @@ int App::runUiTest(int w, int h, int fps) {
         syncScene();
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
         viewSamples(); // keeps Fast Navigation's view of the camera current (UI tests read view_samples)
+        noteStillness();
         hardwareProfileFrameEnd();
         if (tracing) {
             tracePhase[4] = tracePhase[5] = tracePhase[6] = double(SDL_GetTicksNS()) * 1e-6;
@@ -802,7 +826,8 @@ bool App::wantsFrames(double now) const {
            timelapseBusy() || hardwareCalibrating() || // both render a step per frame: they stop when the frames do
            spaceMouseMoving() || // a held SpaceMouse cap sends no events, but the view keeps moving (SpaceMouse.cpp)
            perf_.framesStill < 10 || // the view just moved: Fast Navigation's full-quality frame comes after it stops
-           (perf_.proxyPrebuild && renderer_.proxiesPending()); // motion proxies left to build, a few ms a frame
+           (perf_.proxyPrebuild && renderer_.proxiesPending()) || // motion proxies left to build, a few ms a frame
+           renderer_.coarseStillWanted(); // coarse levels: the full-detail still frame comes once the view rests
 }
 
 uint64_t App::frameKey() const {
@@ -840,6 +865,9 @@ int App::run() {
     const double started = seconds();
     uint64_t framesDrawn = 0, wakeUps = 0, framesAtMeasure = 0, wakesAtMeasure = 0;
     double cpuAtMeasure = 0.0; // processor time of every thread (the driver's included)
+    // ...of which the frames drawn while measuring: the idle check is about the time between them (software OpenGL,
+    // CI's Windows runners, spends about 0.4 s of processor time on one frame: two such frames were "10% idle CPU").
+    double cpuInFrames = 0.0, cpuFrameStart = 0.0;
     bool measuring = false;
     // Input while measuring (a pointer crossing the window on a shared desktop) restarts the count once it has
     // passed: idle means no input. After kMeasureGiveUp seconds it counts whatever comes (the test's timeout).
@@ -893,12 +921,16 @@ int App::run() {
                 framesAtMeasure = framesDrawn;
                 wakesAtMeasure = wakeUps;
                 cpuAtMeasure = processCpuSeconds();
+                cpuInFrames = 0.0;
             } else if (measuring && t0 >= measureFrom + options_.measureIdle) {
                 const double fps = double(framesDrawn - framesAtMeasure) / double(options_.measureIdle);
-                const double cpu = 100.0 * (processCpuSeconds() - cpuAtMeasure) / double(options_.measureIdle);
-                std::printf("Idle: %llu frames, %llu wake-ups in %.1f s: %.2f fps, CPU %.1f%% of one core (%s redraw)\n",
+                const double cpuAll = 100.0 * (processCpuSeconds() - cpuAtMeasure) / double(options_.measureIdle);
+                const double cpuFrames = 100.0 * cpuInFrames / double(options_.measureIdle);
+                const double cpu = std::max(0.0, cpuAll - cpuFrames); // between frames
+                std::printf("Idle: %llu frames, %llu wake-ups in %.1f s: %.2f fps, CPU %.1f%% of one core between frames"
+                            " (+%.1f%% drawing them) (%s redraw)\n",
                             (unsigned long long)(framesDrawn - framesAtMeasure), (unsigned long long)(wakeUps - wakesAtMeasure),
-                            double(options_.measureIdle), fps, cpu, continuous ? "continuous" : "on-demand");
+                            double(options_.measureIdle), fps, cpu, cpuFrames, continuous ? "continuous" : "on-demand");
                 if (measureRestarts > 0) std::printf("  (restarted %d times after input)\n", measureRestarts);
                 std::fflush(stdout);
                 // Idle is 0 fps; a pointer crossing the window draws about a second's worth. Every frame is 60+.
@@ -1131,6 +1163,7 @@ int App::run() {
             draw = false; // minimised: the next event (restore) draws again
             continue;
         }
+        if (measuring) cpuFrameStart = processCpuSeconds();
         updateCameraAspect();
         // The SpaceMouse moves the view by its held axes every frame (frame-rate independent); while it does,
         // spaceMouseMoving() is true and a loop that waits for events when idle must keep drawing.
@@ -1164,6 +1197,7 @@ int App::run() {
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
         const int samples = viewSamples();
         renderSettings_.motionProxy = perf_.proxyNow; // big meshes draw their lighter proxy while the view moves
+        noteStillness();
         renderSettings_.materialTint = materialTintFor(doc_.paintColor); // (Color > Colour tints the material)
         renderSettings_.resolutionScale = float(uiPrefs_.viewResolution) / 100.0f; // (#80; only the window's view)
         if (perf_.movingNow) // while the view moves, the floor tier draws fewer pixels; full resolution when it stops
@@ -1210,6 +1244,7 @@ int App::run() {
                     phase[5] - phase[4], phase[6] - phase[5]);
         if (phases == 7 && perftrace::on()) tracePerfFrame(phase); // Help > Record a performance trace
         ++framesDrawn;
+        if (measuring) cpuInFrames += processCpuSeconds() - cpuFrameStart;
         {
             const double frameNow = seconds();
             static double lastSwap = 0.0;
@@ -1708,6 +1743,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     if (button == SDL_BUTTON_LEFT) {
         if (axisGizmoMouseDown(x, y)) return;   // the axis gizmo's ends snap to a side view (#43)
         if (forgesphereMouseDown(x, y, mod)) return; // a Forge Sphere Part takes clicks on it (PanelForge Spheres.cpp)
+        if (gradientMouseDown(x, y, nav)) return; // Line Gradient: a new line or an end handle (LineGradient.cpp)
         if (facegroupMouseDown(x, y, mod)) return;
         if (maskSelectMouseDown(x, y, mod)) return;
         if (gizmoMouseDown(x, y, mod)) return; // Transform gizmo handles, pivot clicks (Gizmo.cpp)
@@ -1886,6 +1922,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::UvTool: uvToolDragTo(x, y); break;
     case Drag::Sculptable: sculptableMouseMove(x, y); break;
     case Drag::Capture: captureMouseMove(x, y); break;
+    case Drag::Gradient: gradientMouseMove(x, y); break;
     case Drag::ForgeSphere: forgesphereDragTo(x, y); break;
     case Drag::AirStroke: airStrokeTo(x, y); break;
     case Drag::QuickRemesh: break; // (remeshes when let go)
@@ -2024,6 +2061,7 @@ void App::onMouseUp() {
     if (drag_ == Drag::UvTool) uvToolRelease();
     if (drag_ == Drag::Sculptable) sculptableMouseUp();
     if (drag_ == Drag::Capture) captureMouseUp();
+    if (drag_ == Drag::Gradient) gradientMouseUp();
     if (drag_ == Drag::ForgeSphere) forgesphereRelease();
     if (drag_ == Drag::AirStroke) airStrokeRelease();
     gizmoRelease();
@@ -2034,6 +2072,7 @@ void App::onMouseUp() {
 
 void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
     if (cutPolylineKey(key)) return; // Enter ends a Cut Polyline, Esc drops it (PanelCut.cpp)
+    if (gradientKey(key)) return;    // Enter keeps a Line Gradient, Esc takes it back (LineGradient.cpp)
     if (key == SDLK_ESCAPE && radial_.menu >= 0) {
         closeRadialMenu();
         return;
@@ -2209,8 +2248,10 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         beginAlongNormal(hit, radiusPx_ * camera_.worldPerPixel(hit.position, canvasHeight()));
         return;
     }
-    if (strokeType_ == StrokeType::DragRect || strokeType_ == StrokeType::DragDot)
+    if (strokeType_ == StrokeType::DragRect || strokeType_ == StrokeType::DragDot) {
         stampJitter_ = alphaJitterAngle(alphaOptions_.jitter, stampSeed_);
+        stampPressure_.reset();
+    }
     if (strokeType_ == StrokeType::DragRect) {
         dragAnchor_ = glm::vec2(x, y);
         dragAnchorHit_ = hit.position;
@@ -2561,7 +2602,9 @@ void App::runCommand(const std::string& name, const Args& args) {
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
     crashlog::action(name); // (failures reach the log through SDL_Log below)
     const auto commandStart = std::chrono::steady_clock::now();
-    CommandResult r = commands_.execute(doc_, name, args);
+    // Auto UV unwraps on a worker (seconds on big meshes): the frame never waits for it. A running macro keeps the
+    // synchronous command, as its next steps read the UVs at once.
+    CommandResult r = name == "uv_auto" && macros_.runDepth == 0 ? startAutoUvCommand(args) : commands_.execute(doc_, name, args);
     if (perftrace::on()) { // a command that held up the frames (remesh, Divide, micro, open...)
         const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - commandStart).count();
         if (ms > perf_.traceLongMs) {
@@ -2893,6 +2936,7 @@ void App::drawUi() {
     drawSplatTrainOverlay(); // splat training progress (PanelSplatTrain.cpp)
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
     drawCaptureOverlay();    // Capture from view: the square, the result window (PanelKelvinlet.cpp)
+    drawGradientOverlay();   // Line Gradient: the line and its end handles (LineGradient.cpp)
     if (uiPrefs_.showAxes) drawAxisGizmo(); // X / Y / Z in the canvas corner (#31)
     if (uiPrefs_.showViewFigure) drawViewFigure();
     drawAirStrokeIndicator(); // Start strokes off the model is on (#62, Input.cpp)
@@ -2913,8 +2957,10 @@ void App::drawUi() {
     if (!sliderRing) sizeRingPreview_ = false;
     if (((!ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y)) || drag_ == Drag::Stroke || sliderRing) &&
         !hideBrushCursor_ && radial_.menu < 0 && !strokePopup_.open && drag_ != Drag::Select && drag_ != Drag::Guide && // (no ring under a pie or the stroke popup)
+        (!gradient_.armed || ctrlDown(inputMods()) || (inputMods() & SDL_KMOD_SHIFT)) && // (nor while a Line Gradient takes the drags)
         aiLinkStateValue() != 2 && aiLinkStateValue() != 4 && // (nor over a live-mode question: it is drawn above windows)
-        (!ringOff || drag_ == Drag::Stroke || ctrlDown(inputMods())))
+        (!ringOff || drag_ == Drag::Stroke || ctrlDown(inputMods())) &&
+        (drag_ == Drag::Stroke || !overViewNavigator(mouse.x, mouse.y))) // (nor over the corner axes: a click there navigates)
         drawBrushCursor();
     drawSelectionOverlay();
     drawBrushLibraryPopups();
@@ -2961,7 +3007,7 @@ void App::drawUi() {
             if (ImGui::Button("Third-party notices"))
                 SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/THIRD_PARTY_NOTICES.md");
             ImGui::SameLine();
-            if (ImGui::Button("AI services & privacy"))
+            if (ImGui::Button(tr("AI services & privacy")))
                 SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md");
             ImGui::Spacing();
             drawSupportersSection(); // PanelSupport.cpp
@@ -3245,16 +3291,36 @@ bool App::beginPanel(const char* name, bool* open, float width) {
 
 void App::drawAiSettings() {
     using P = ai::AiSettings::Provider;
-    const char* providers[] = {"Free - no account or key", "Anthropic (Claude) - your key",
-                               "OpenAI-compatible (OpenAI, Ollama, LM Studio...)"};
-    int provider = int(aiSettings_.provider);
+    // Presets (ai/Providers.h): one click fills the endpoint and a model. A studio's policy may allow only some
+    // (core/ManagedPolicy.h ai.providers): the others are greyed with "Managed by your studio".
+    const std::string current = ai::providerId(aiSettings_);
+    const ai::ProviderPreset* chosen = ai::findProviderPreset(current);
     ImGui::SetNextItemWidth(-1);
-    if (ImGui::Combo("##provider", &provider, providers, 3)) {
-        // Only the brush provider changes; the image-to-3D settings stay.
-        const ai::AiSettings d = ai::AiSettings::defaults(P(provider));
-        aiSettings_.provider = d.provider;
-        aiSettings_.endpoint = d.endpoint;
-        aiSettings_.model = d.model;
+    if (ImGui::BeginCombo("##provider", chosen ? tr(chosen->label) : current.c_str())) {
+        for (const ai::ProviderPreset& p : ai::providerPresets()) {
+            const bool allowed = policy::aiProviderAllowed(p.id);
+            ImGui::BeginDisabled(!allowed);
+            if (ImGui::Selectable(tr(p.label), current == p.id)) {
+                // Only the brush provider changes; the image-to-3D settings stay.
+                aiSettings_ = ai::withPreset(aiSettings_, p.id);
+                modelsChecked_ = false;
+            }
+            ImGui::EndDisabled();
+            if (!allowed && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("%s", ui::ManagedByText().c_str());
+        }
+        ImGui::EndCombo();
+    }
+    if (!policy::current().aiProviders.empty()) ui::ManagedBadge();
+    if (std::string why; !policy::aiProviderAllowed(current, &why)) { // (saved before the policy came)
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.6f, 0.4f, 1));
+        ImGui::TextWrapped("%s", tr(policy::current().ai == policy::Lock::Off ? why : std::string("Your studio doesn't allow this provider: pick another")).c_str());
+        ImGui::PopStyleColor();
+    }
+    if (chosen) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+        ImGui::TextWrapped("%s", tr(chosen->note));
+        ImGui::PopStyleColor();
     }
     auto textField = [](const char* label, std::string& value, ImGuiInputTextFlags flags = 0) {
         char buf[512];
@@ -3263,20 +3329,8 @@ void App::drawAiSettings() {
         if (ImGui::InputText(label, buf, sizeof buf, flags)) value = buf;
     };
     if (aiSettings_.provider == P::OpenAICompatible) {
-        // One-click presets for the two common local servers.
-        const float third = (ImGui::GetContentRegionAvail().x - 2 * ImGui::GetStyle().ItemSpacing.x) / 3;
-        if (ImGui::Button("Ollama", ImVec2(third, 0))) {
-            aiSettings_.endpoint = "http://localhost:11434/v1/chat/completions";
-            modelsChecked_ = false;
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("LM Studio", ImVec2(third, 0))) {
-            aiSettings_.endpoint = "http://localhost:1234/v1/chat/completions";
-            modelsChecked_ = false;
-        }
-        ImGui::SameLine();
         ImGui::BeginDisabled(pendingModels_.valid());
-        if (ImGui::Button(pendingModels_.valid() ? "Checking..." : "Find models", ImVec2(third, 0))) {
+        if (ImGui::Button(pendingModels_.valid() ? tr("Checking...") : tr("Find models"), ImVec2(-1, 0))) {
             auto promise = std::make_shared<std::promise<ModelList>>();
             pendingModels_ = promise->get_future();
             std::thread([promise, settings = aiSettings_] {
@@ -3296,18 +3350,37 @@ void App::drawAiSettings() {
         }
     }
     if (aiSettings_.provider != P::Free) {
-        textField("Endpoint", aiSettings_.endpoint);
+        textField(tr("Endpoint"), aiSettings_.endpoint);
+        if (std::string why; !aiSettings_.endpoint.empty() && !policy::aiEndpointAllowed(aiSettings_.endpoint, &why)) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.6f, 0.4f, 1));
+            ImGui::TextWrapped("%s", tr(why).c_str());
+            ImGui::PopStyleColor();
+        }
         if (aiSettings_.provider == P::OpenAICompatible && modelsChecked_ && !localModels_.models.empty()) {
             ImGui::SetNextItemWidth(-ImGui::CalcTextSize("Endpoint").x - ImGui::GetStyle().ItemInnerSpacing.x);
-            if (ImGui::BeginCombo("Model", aiSettings_.model.c_str())) {
+            if (ImGui::BeginCombo(tr("Model"), aiSettings_.model.c_str())) {
                 for (const auto& m : localModels_.models)
                     if (ImGui::Selectable(m.c_str(), m == aiSettings_.model)) aiSettings_.model = m;
                 ImGui::EndCombo();
             }
         } else {
-            textField("Model", aiSettings_.model);
+            textField(tr("Model"), aiSettings_.model);
         }
-        textField("API key", aiSettings_.apiKey, ImGuiInputTextFlags_Password);
+        if (ai::oidc::usesSignIn(aiSettings_.endpoint)) {
+            // The studio gateway takes the studio sign-in instead of a key (ai/Oidc.h).
+            ImGui::TextDisabled("%s", tr("Uses your studio sign-in (Preferences > AI > Studio sign-in)"));
+        } else {
+            textField(tr("API key"), aiSettings_.apiKey, ImGuiInputTextFlags_Password);
+            const ai::ProviderPreset* p = ai::findProviderPreset(current);
+            const char* env = p && *p->keyEnv ? p->keyEnv : nullptr;
+            if (aiSettings_.apiKey.empty()) {
+                const char* where = !ai::secrets::cached(ai::secrets::presetAccount(current)).empty()
+                                        ? tr("Saved in your system keychain.")
+                                    : env && std::getenv(env) ? tr("Using the key from the environment.")
+                                                              : nullptr;
+                if (where) ImGui::TextDisabled("%s", where);
+            }
+        }
     }
     if (aiSettings_.provider == P::OpenAICompatible && modelsChecked_) {
         const bool ok = localModels_.error.empty();
@@ -3319,19 +3392,20 @@ void App::drawAiSettings() {
             ImGui::TextWrapped("%s", localModels_.error.c_str());
         ImGui::PopStyleColor();
     }
-    if (aiSettings_.provider == P::OpenAICompatible && ImGui::TreeNode("Run a model on this computer")) {
+    if ((current == "ollama" || current == "lmstudio" || current == "openai-compatible") &&
+        ImGui::TreeNode("Run a model on this computer")) {
         // Steps for the platform we're on; the guide covers the others.
 #if defined(_WIN32)
         ImGui::TextWrapped("1. Install Ollama from ollama.com/download, or in PowerShell:\n"
                            "      winget install Ollama.Ollama\n"
                            "2. Download the model (in PowerShell):\n"
                            "      ollama pull qwen3:4b-instruct\n"
-                           "3. Ollama runs in the system tray. Click Ollama above, then Find models.");
+                           "3. Ollama runs in the system tray. Pick Ollama above, then Find models.");
 #elif defined(__APPLE__)
         ImGui::TextWrapped("1. Install Ollama from ollama.com/download and drag it to Applications.\n"
                            "2. Download the model (in Terminal):\n"
                            "      ollama pull qwen3:4b-instruct\n"
-                           "3. Ollama runs in the menu bar. Click Ollama above, then Find models.");
+                           "3. Ollama runs in the menu bar. Pick Ollama above, then Find models.");
 #else
         ImGui::TextWrapped("1. Install Ollama (or use your package manager, e.g. sudo pacman -S ollama):\n"
                            "      curl -fsSL https://ollama.com/install.sh | sh\n"
@@ -3339,7 +3413,7 @@ void App::drawAiSettings() {
                            "      sudo systemctl enable --now ollama\n"
                            "3. Download the model:\n"
                            "      ollama pull qwen3:4b-instruct\n"
-                           "4. Click Ollama above, then Find models.");
+                           "4. Pick Ollama above, then Find models.");
 #endif
         ImGui::TextWrapped("The 2.5 GB model needs about 4 GB of free memory and works without a graphics card "
                            "(10-20 s per brush on a laptop CPU, a few seconds with a GPU).");
@@ -3357,16 +3431,16 @@ void App::drawAiSettings() {
         std::string err;
         status_ = aiSettingsPath_.empty() || !aiSettings_.save(aiSettingsPath_, err) ? "Could not save AI settings " + err
                                                                                      : "AI settings saved";
+        storeAiKeys();
     }
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     if (aiSettings_.provider == P::Free)
-        ImGui::TextWrapped("Free: an open model (GPT-OSS 20B) hosted by Pollinations.ai, no sign-up. Only your "
-                           "brush description and settings are sent. Rate limited to a request every few seconds; "
-                           "if it can't be reached, a running Ollama is used instead.");
+        ImGui::TextWrapped("%s", tr("Rate limited to a request every few seconds; if it can't be reached, a running "
+                                    "Ollama is used instead."));
     else
-        ImGui::TextWrapped("Requests go only to the endpoint above. Keys are stored on this computer only "
-                           "(owner-readable ai.json); leave empty to use ANTHROPIC_API_KEY / OPENAI_API_KEY. "
-                           "For private, offline use, run Ollama and pick OpenAI-compatible.");
+        ImGui::TextWrapped("%s", tr("Requests go only to the endpoint above. Keys are kept in your system keychain "
+                                    "(never in a settings file); leave empty to use the environment (ANTHROPIC_API_KEY, "
+                                    "OPENAI_API_KEY). For private, offline use, pick Ollama or LM Studio."));
     ImGui::PopStyleColor();
 }
 
@@ -3518,6 +3592,7 @@ void App::startGenerator() {
     aiSettings_.falKey = falKey_;
     aiSettings_.falModel = falModel_;
     aiSettings_.meshyKey = meshyKey_;
+    aiSettings_.hyper3dKey = hyper3dKey_;
     aiSettings_.hfToken = hfToken_;
     aiSettings_.comfyUrl = comfyUrl_;
     // With no workflow chosen, ComfyUI runs the bundled one the panel shows (not saved, so updates reach it).
@@ -3567,6 +3642,13 @@ void App::pollGenerator() {
     GeneratedModel g = pendingGenerator_.get();
     const ai::GeneratorResult& r = g.result;
     const std::string note = r.note.empty() ? std::string() : " - " + r.note;
+    struct PrivateDir { // (Hyper3D: the downloaded file's own folder, gone once the model is in)
+        std::string path;
+        ~PrivateDir() {
+            std::error_code ec;
+            if (!path.empty()) std::filesystem::remove_all(std::filesystem::path(std::u8string(path.begin(), path.end())), ec);
+        }
+    } privateDir{r.privateDir};
     if (!r.ok) {
         status_ = "Image to 3D failed: " + r.error + note;
         return;
@@ -3597,14 +3679,22 @@ void App::showHunyuanNoticeOnce() {
     saved.save(aiSettingsPath_, err);
 }
 
+void App::storeAiKeys() {
+    // Into the keychain on a worker (an unlock prompt never holds up a frame); ai.json never has them.
+    std::thread([settings = aiSettings_] {
+        if (!ai::secrets::storeKeys(settings))
+            SDL_Log("AI keys: no keychain on this computer, so they last until SculptForge quits (or set them in the environment)");
+    }).detach();
+}
+
 void App::drawAiPrefsSection() {
     ImGui::SetNextItemWidth(-1);
-    ImGui::InputTextWithHint("##hftoken", "Hugging Face token (hf_...)", hfToken_, sizeof hfToken_, ImGuiInputTextFlags_Password);
+    ImGui::InputTextWithHint("##hftoken", tr("Hugging Face token (hf_...)"), hfToken_, sizeof hfToken_, ImGuiInputTextFlags_Password);
     ui::HelpText("Hugging Face token", nullptr,
                  "Free at huggingface.co/settings/tokens (read access). Raises the free daily allowance in "
                  "Generate 3D, and TRELLIS.2 needs it. Empty = the HF_TOKEN environment variable.",
                  "Preferences > AI");
-    if (ImGui::Button("Save", ImVec2(-1, 0))) {
+    if (ImGui::Button(tr("Save##hftoken"), ImVec2(-1, 0))) {
         // Saves the token into the settings as they are on disk, so other unsaved panel edits stay unsaved.
         aiSettings_.hfToken = hfToken_;
         ai::AiSettings saved = aiSettingsPath_.empty() ? aiSettings_ : ai::AiSettings::load(aiSettingsPath_);
@@ -3612,6 +3702,7 @@ void App::drawAiPrefsSection() {
         std::string err;
         status_ = !aiSettingsPath_.empty() && saved.save(aiSettingsPath_, err) ? "Hugging Face token saved"
                                                                                : "Save failed " + err;
+        storeAiKeys();
     }
 }
 
@@ -3763,8 +3854,9 @@ void App::drawImageTo3D() {
                    : "Builds the whole model - limbs, face, back - from one picture with a reconstruction model, then "
                      "makes it sculptable. Characters on a transparent background work best.");
     static const char* services[] = {"Hugging Face - free models", "fal.ai - paid, your key", "Meshy - paid, your key",
-                                     "ComfyUI - your server", "My generator command", "Offline blockout (inflate silhouette)"};
-    static const char* serviceIds[] = {"huggingface", "fal", "meshy", "comfyui", "command", "inflate"};
+                                     "Hyper3D Rodin (direct) - paid, your key", "ComfyUI - your server", "My generator command",
+                                     "Offline blockout (inflate silhouette)"};
+    static const char* serviceIds[] = {"huggingface", "fal", "meshy", "hyper3d", "comfyui", "command", "inflate"};
     constexpr int kServices = int(std::size(serviceIds));
     int service = 0;
     for (int i = 0; i < kServices; ++i)
@@ -3772,6 +3864,10 @@ void App::drawImageTo3D() {
     ImGui::SetNextItemWidth(-1);
     if (ImGui::Combo("##service", &service, services, kServices)) aiSettings_.generatorService = serviceIds[service];
     const std::string serviceId = serviceIds[service];
+    if (std::string why; serviceId != "inflate" && !policy::aiProviderAllowed(serviceId, &why)) { // (studio policy)
+        ui::ManagedBadge();
+        hint(why.c_str());
+    }
     ImGui::PushItemWidth(-labelW);
     if (serviceId == "huggingface") {
         const auto& presets = ai::hfPresets();
@@ -3818,6 +3914,24 @@ void App::drawImageTo3D() {
         ImGui::InputText("API key", meshyKey_, sizeof meshyKey_, ImGuiInputTextFlags_Password);
         if (!meshyKey_[0])
             hint(std::getenv("MESHY_API_KEY") ? "Using MESHY_API_KEY from the environment." : "Get a key at meshy.ai (API settings)");
+    } else if (serviceId == "hyper3d") {
+        const auto& tiers = ai::hyper3d::tiers();
+        const std::string tier = ai::hyper3d::resolvedTier(aiSettings_.hyper3dTier);
+        const char* preview = tiers[0].label;
+        for (const auto& t : tiers)
+            if (tier == t.id) preview = t.label;
+        if (ImGui::BeginCombo(tr("Tier"), preview)) {
+            for (const auto& t : tiers)
+                if (ImGui::Selectable(t.label, tier == t.id)) aiSettings_.hyper3dTier = t.id;
+            ImGui::EndCombo();
+        }
+        ImGui::InputText(tr("API key##hyper3d"), hyper3dKey_, sizeof hyper3dKey_, ImGuiInputTextFlags_Password);
+        if (!hyper3dKey_[0])
+            hint(aiSettings_.resolvedHyper3dKey().empty()
+                     ? tr("Off until you add your own key: hyper3d.ai > API dashboard (a Creator plan or higher).")
+                     : tr("Using your key from the system keychain."));
+        hint(tr("Sends your image or description to Hyper3D (api.hyper3d.com), which builds the model. Each generation "
+                "is billed to your Hyper3D account. Basic API access covers Extreme Low and Low."));
     } else if (serviceId == "comfyui") {
         drawComfyUi();
     } else if (serviceId == "command") {
@@ -3865,11 +3979,13 @@ void App::drawImageTo3D() {
         aiSettings_.falKey = falKey_;
         aiSettings_.falModel = falModel_;
         aiSettings_.meshyKey = meshyKey_;
+        aiSettings_.hyper3dKey = hyper3dKey_;
         aiSettings_.hfToken = hfToken_;
         aiSettings_.comfyUrl = comfyUrl_;
         std::string err;
         status_ = !aiSettingsPath_.empty() && aiSettings_.save(aiSettingsPath_, err) ? "Image to 3D settings saved"
                                                                                         : "Save failed " + err;
+        storeAiKeys();
     }
 
     if (textMode_) {
@@ -4017,32 +4133,59 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, fl
     return true;
 }
 
-std::array<AxisGizmoEnd, 6> App::axisGizmoLayout() const {
-    // Top left of the canvas, below the timeline strip when that is at the top (timelineTopInset_).
+glm::vec2 App::axisGizmoCentre() const {
+    // Top left of the canvas, below the timeline strip when that is at the top (timelineTopInset_); the disc's edge
+    // 10 px from the canvas edges.
     const CanvasRect canvas = canvasRect();
-    const float s = 34.0f * axisGizmoUnit();
-    return axisGizmoEnds(glm::mat3(camera_.view()),
-                         glm::vec2(canvas.x + s + 18.0f * uiScale_, canvas.y + timelineTopInset_ + s + 18.0f * uiScale_), s);
+    const float r = kAxisGizmoDisc * axisGizmoUnit() + 10.0f * uiScale_;
+    return glm::vec2(canvas.x + r, canvas.y + timelineTopInset_ + r);
+}
+
+std::array<AxisGizmoEnd, 6> App::axisGizmoLayout() const {
+    return axisGizmoEnds(glm::mat3(camera_.view()), axisGizmoCentre(), kAxisGizmoLength * axisGizmoUnit());
 }
 
 float App::axisGizmoUnit() const { return uiScale_ * axisGizmoScale(uiPrefs_.axisGizmoSize); }
 
-float App::viewFigureRadius() const { return 34.0f * axisGizmoUnit(); }
+float App::axisGizmoLabelHeight() const { return ImGui::GetFontSize() * 0.85f + 8.0f * uiScale_; }
+
+bool App::viewBackgroundLight() const {
+    // The corner of the view: the gradient's edge, or the flat colour (both display sRGB).
+    const glm::vec3 c = renderSettings_.gradientBackground ? renderSettings_.gradientEdge : renderSettings_.backgroundColor;
+    return glm::dot(c, glm::vec3(0.2126f, 0.7152f, 0.0722f)) > 0.5f;
+}
+
+float App::viewFigureRadius() const { return kAxisGizmoLength * axisGizmoUnit(); }
 
 glm::vec2 App::viewFigureCentre() const {
-    // In the axes' place when they are off, else just below them.
+    // In the axes' place when they are off, else just below them (and the view's name under them).
     const CanvasRect canvas = canvasRect();
     const float r = viewFigureRadius();
-    const float top = canvas.y + timelineTopInset_ + 18.0f * uiScale_;
-    const float below = uiPrefs_.showAxes ? 2.0f * 34.0f * axisGizmoUnit() + 14.0f * uiScale_ : 0.0f;
-    return glm::vec2(canvas.x + 18.0f * uiScale_ + 34.0f * axisGizmoUnit(), top + below + r);
+    const float x = canvas.x + 18.0f * uiScale_ + r;
+    if (!uiPrefs_.showAxes) return glm::vec2(x, canvas.y + timelineTopInset_ + 18.0f * uiScale_ + r);
+    const glm::vec2 c = axisGizmoCentre();
+    return glm::vec2(x, c.y + kAxisGizmoDisc * axisGizmoUnit() + axisGizmoLabelHeight() + r);
+}
+
+bool App::overViewNavigator(float x, float y) const {
+    if (uiPrefs_.showAxes && axisGizmoOnDisc(axisGizmoCentre(), kAxisGizmoDisc * axisGizmoUnit(), x, y)) return true;
+    return uiPrefs_.showViewFigure && glm::length(glm::vec2(x, y) - viewFigureCentre()) <= viewFigureRadius();
 }
 
 bool App::axisGizmoMouseDown(float x, float y) {
-    // A click on an end snaps to that side view, orthographic (#43, as in Blender's navigation gizmo); a click on
-    // the View Figure to the side view nearest the current one.
+    // A click on an end snaps to that side view, orthographic (#43, as in Blender's navigation gizmo), a second click
+    // on it to the opposite side; a plain drag on the disc behind the ends orbits; a click on the View Figure snaps to
+    // the side view nearest the current one.
     const auto ends = axisGizmoLayout();
-    int hit = uiPrefs_.showAxes ? axisGizmoHit(ends, x, y, 9.0f * axisGizmoUnit()) : -1;
+    const float unit = axisGizmoUnit();
+    int hit = uiPrefs_.showAxes ? axisGizmoSnapEnd(ends, axisGizmoHit(ends, x, y, kAxisGizmoHitRadius * unit)) : -1;
+    // Only a plain press: Alt / Ctrl / Shift drags starting there keep their meaning (pan, mask, roll...).
+    const bool plain = !((SDL_GetModState() | keyMods()) & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI));
+    if (hit < 0 && plain && uiPrefs_.showAxes && axisGizmoOnDisc(axisGizmoCentre(), kAxisGizmoDisc * unit, x, y)) {
+        drag_ = Drag::Orbit;
+        rightClick_.pending = false;
+        return true;
+    }
     if (hit < 0 && uiPrefs_.showViewFigure &&
         glm::length(glm::vec2(x, y) - viewFigureCentre()) <= viewFigureRadius())
         hit = axisGizmoFacing(ends);
@@ -4052,33 +4195,78 @@ bool App::axisGizmoMouseDown(float x, float y) {
 }
 
 void App::drawAxisGizmo() {
-    // The world axes as the camera sees them, under the UI: red X, green Y, blue Z, a labelled ball at the
-    // positive end and a plain one at the negative end; the ends pointing away are drawn first and dimmer. A click
-    // on an end snaps to that side (axisGizmoMouseDown); the end under the mouse gets a ring.
+    // The world axes as the camera sees them, under the UI, on a soft disc that reads on any background (stronger
+    // under the pointer): red X, green Y, blue Z; the positive ends are filled circles with their letter, the
+    // negative ends smaller rings (their letter under the pointer). Drawn back to front: the ends pointing away are
+    // smaller and fainter, the near ones on top. A click on an end snaps to that side (axisGizmoMouseDown), a
+    // second click to the opposite side; the end under the pointer gets a ring. On an exact side view its name
+    // shows under the disc.
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
     const float unit = axisGizmoUnit();
     auto ends = axisGizmoLayout();
-    const glm::vec2 c = (ends[0].at + ends[3].at) * 0.5f;
+    const glm::vec2 c = axisGizmoCentre();
+    const ImVec2 centre(c.x, c.y);
+    const float discR = kAxisGizmoDisc * unit;
     const ImVec2 mouse = ImGui::GetIO().MousePos;
-    const int hover = ImGui::GetIO().WantCaptureMouse ? -1 : axisGizmoHit(ends, mouse.x, mouse.y, 9.0f * unit);
+    const bool free = !ImGui::GetIO().WantCaptureMouse;
+    const int hover = free ? axisGizmoHit(ends, mouse.x, mouse.y, kAxisGizmoHitRadius * unit) : -1;
+    const bool onDisc = free && (hover >= 0 || axisGizmoOnDisc(c, discR, mouse.x, mouse.y));
+    const bool light = viewBackgroundLight();
+    const int aligned = axisGizmoAligned(ends);
     const AxisGizmoEnd hovered = hover >= 0 ? ends[size_t(hover)] : AxisGizmoEnd{};
+
+    // The disc: lighter than a dark background, darker than a light one; a hairline edge gives it a shape.
+    const ImU32 tint = light ? IM_COL32(0, 0, 0, 0) : IM_COL32(255, 255, 255, 0);
+    auto withAlpha = [](ImU32 col, float a) {
+        return (col & 0x00ffffffu) | (ImU32(std::clamp(a, 0.0f, 1.0f) * 255.0f + 0.5f) << 24);
+    };
+    dl->AddCircleFilled(centre, discR, withAlpha(tint, onDisc ? 0.17f : light ? 0.08f : 0.07f), 48);
+    dl->AddCircle(centre, discR, withAlpha(tint, onDisc ? 0.22f : 0.10f), 48, 1.0f * uiScale_);
+
     std::sort(ends.begin(), ends.end(), [](const AxisGizmoEnd& a, const AxisGizmoEnd& b) { return a.depth < b.depth; });
-    static constexpr ImU32 colours[3] = {IM_COL32(230, 80, 80, 255), IM_COL32(110, 200, 90, 255), IM_COL32(80, 140, 240, 255)};
+    static constexpr ImU32 colours[3] = {IM_COL32(236, 84, 92, 255), IM_COL32(124, 196, 64, 255), IM_COL32(64, 140, 236, 255)};
     static constexpr const char* names[3] = {"X", "Y", "Z"};
+    ImFont* font = fontBold_ ? fontBold_ : ImGui::GetFont();
+    // The letters shrink with the circles (Small) but never grow past the UI font.
+    const float fontSize = ImGui::GetFontSize() * 0.92f * std::min(1.0f, unit / std::max(uiScale_, 0.01f));
+    auto letter = [&](ImVec2 at, int axis, ImU32 col) {
+        const ImVec2 ts = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, names[axis]);
+        dl->AddText(font, fontSize, ImVec2(std::round(at.x - ts.x * 0.5f), std::round(at.y - ts.y * 0.5f)), col, names[axis]);
+    };
     for (const AxisGizmoEnd& e : ends) {
         const ImVec2 tip(e.at.x, e.at.y);
-        ImU32 col = e.depth < -0.2f ? (colours[e.axis] & 0x00ffffffu) | 0x90000000u : colours[e.axis];
-        if (e.negative) col = (col & 0xff000000u) | ((col & 0x00fefefeu) >> 1); // the negative end: darker
-        else dl->AddLine(ImVec2(c.x, c.y), tip, col, 2.0f * unit);
-        dl->AddCircleFilled(tip, (e.negative ? 5.5f : 7.0f) * unit, col);
-        if (hover >= 0 && e.axis == hovered.axis && e.negative == hovered.negative)
-            dl->AddCircle(tip, 9.0f * unit, IM_COL32(255, 255, 255, 220), 0, 1.5f * unit);
-        if (e.negative) continue;
-        // The letter shrinks with the ball (Small) but never grows past the UI font.
-        const float fontSize = ImGui::GetFontSize() * std::min(1.0f, unit / std::max(uiScale_, 0.01f));
-        const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, names[e.axis]);
-        dl->AddText(ImGui::GetFont(), fontSize, ImVec2(tip.x - ts.x * 0.5f, tip.y - ts.y * 0.5f), IM_COL32(20, 20, 22, 255),
-                    names[e.axis]);
+        const float alpha = axisGizmoEndAlpha(e.depth);
+        const float r = axisGizmoEndRadius(e, unit);
+        const ImU32 col = withAlpha(colours[e.axis], alpha);
+        const bool isHover = hover >= 0 && e.axis == hovered.axis && e.negative == hovered.negative;
+        if (e.negative) {
+            // A ring: the axis colour round a dim fill, so it reads as "the other end" on any background.
+            dl->AddCircleFilled(tip, r, isHover ? col : withAlpha(colours[e.axis], 0.28f * alpha), 24);
+            dl->AddCircle(tip, r, col, 24, 1.6f * unit);
+            if (isHover) letter(tip, e.axis, IM_COL32(16, 16, 20, 255));
+        } else {
+            // The shaft stops at the circle's edge, so its letter stays clean.
+            const glm::vec2 d = e.at - c;
+            const float len = glm::length(d);
+            if (len > r + 1.0f) {
+                const glm::vec2 end = c + d * ((len - r) / len);
+                dl->AddLine(centre, ImVec2(end.x, end.y), col, 2.0f * unit);
+            }
+            dl->AddCircleFilled(tip, r, col, 24);
+            letter(tip, e.axis, withAlpha(IM_COL32(16, 16, 20, 255), alpha));
+        }
+        if (isHover) dl->AddCircle(tip, r + 2.0f * unit, light ? IM_COL32(20, 20, 24, 220) : IM_COL32(255, 255, 255, 230), 24, 1.5f * unit);
+    }
+
+    // The view's name on an exact side view ("Front view"), small, under the disc.
+    if (aligned >= 0) {
+        const AxisGizmoView v = axisGizmoView(aligned % 3, aligned >= 3);
+        const char* text = tr(v.label);
+        const float size = ImGui::GetFontSize() * 0.85f;
+        const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(size, FLT_MAX, 0.0f, text);
+        const ImVec2 at(std::round(c.x - ts.x * 0.5f), std::round(c.y + discR + 4.0f * uiScale_));
+        dl->AddText(ImGui::GetFont(), size, ImVec2(at.x + 1.0f, at.y + 1.0f), light ? IM_COL32(255, 255, 255, 110) : IM_COL32(0, 0, 0, 150), text);
+        dl->AddText(ImGui::GetFont(), size, at, light ? IM_COL32(30, 30, 34, 230) : IM_COL32(232, 232, 236, 220), text);
     }
 }
 

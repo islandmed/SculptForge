@@ -449,6 +449,12 @@ ImTextureID LibraryBrowser::thumbnail(App& app, const AssetEntry& e) {
 // Actions
 // ---------------------------------------------------------------------------
 
+// Kinds a single click applies (nothing to lose); the rest open, replace or navigate on a double-click.
+static bool appliesOnClick(AssetKind k) {
+    return k == AssetKind::BrushType || k == AssetKind::Recipe || k == AssetKind::BrushFile || k == AssetKind::Vdm ||
+           k == AssetKind::Alpha || k == AssetKind::AlphaFile || k == AssetKind::Material;
+}
+
 void LibraryBrowser::activate(App& app, const AssetEntry& e, bool append) {
     switch (e.kind) {
     case AssetKind::Up: {
@@ -964,8 +970,13 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
         const bool clicked = AssetTile(id.c_str(), tex, glyphFor(e.kind), e.name, tile, selected);
         if (ImGui::IsItemActivated()) pressTile_ = int(i);
         if (clicked && !scrubbed_) selected_ = key;
+        // Brushes, alphas, VDMs and materials apply on a click (#142); the second click of a double-click
+        // does not apply again. Files and folders still need a double-click (they replace or navigate).
+        const bool oneClick = appliesOnClick(e.kind);
+        if (clicked && !scrubbed_ && oneClick && io.MouseClickedLastCount[ImGuiMouseButton_Left] < 2)
+            activate(app, e, false);
         const bool doubleClicked = ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
-        if (doubleClicked && !scrubbed_) {
+        if (doubleClicked && !scrubbed_ && !oneClick) {
             selected_ = key;
             activate(app, e, (SDL_GetModState() & SDL_KMOD_SHIFT) != 0);
         }
@@ -982,6 +993,7 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
             : e.kind == AssetKind::Mesh || e.kind == AssetKind::Primitive || e.kind == AssetKind::Project
                 ? "Double-click to open (replaces the scene); Shift+double-click appends it as a Part."
             : e.kind == AssetKind::Image ? "Double-click for what to do with the image."
+            : oneClick                   ? "Click to use it."
                                          : "Double-click to use it.";
         if (e.size) details += "\n" + sizeText(e.size) + ", modified " + dateText(e.mtime);
         ui::HelpText(e.name.c_str(), nullptr, details.c_str(), e.path.empty() ? "Library" : e.path.c_str());
@@ -1186,6 +1198,16 @@ void App::initLibraryBrowser() {
         return ok;
     });
 
+    registerLibraryActions();
+
+    // classic opens the Library at startup on the Project tab (never in tests, renders or recordings).
+    if (uiPrefs_.libraryAtStartup && interactive() && options_.uiTest.empty() && options_.openPath.empty() &&
+        !options_.blender)
+        libraryBrowser_.show(LibraryTab::Project);
+}
+
+// After initActions (and after the input style was first applied): the style's keys still reach them (#147).
+void App::registerLibraryActions() {
     auto add = [this](const char* id, const char* label, const char* icon, const char* palette, const char* shortcut,
                       const char* description, std::function<void()> run, std::function<bool()> checked = nullptr) {
         Action a;
@@ -1231,11 +1253,6 @@ void App::initLibraryBrowser() {
         "status bar names the file. Material sets its size (twice the view by default), shape (the view's, 1:1, "
         "16:9, 9:16, 4:3) and format (PNG or JPG).",
         [this] { runSaveRender(); });
-
-    // classic opens the Library at startup on the Project tab (never in tests, renders or recordings).
-    if (uiPrefs_.libraryAtStartup && interactive() && options_.uiTest.empty() && options_.openPath.empty() &&
-        !options_.blender)
-        libraryBrowser_.show(LibraryTab::Project);
 }
 
 void App::drawLibraryBrowserUi() {

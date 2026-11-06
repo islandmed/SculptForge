@@ -91,6 +91,29 @@ Hidden Parts aren't drawn, can't be selected with <kbd>Alt</kbd>+click, and are 
 > **Note:** Part visibility is different from hiding part of a mesh with face groups or a rectangle. That hides
 > faces inside one Part; see [Face Groups and visibility](face-groups.md).
 
+## Folders
+
+Folders group Parts in the list, for example the eyes and teeth of a head, so you can hide, show and move them
+together.
+
+| To | Do this |
+|---|---|
+| Make a folder | Click the folder button under the list: a new folder holds the active Part; type its name and press <kbd>Enter</kbd> |
+| Put a Part in a folder | Drag its row onto the folder's header (or onto a Part already in it), or right-click the row > **Folder** > the folder's name |
+| Take a Part out | Drag it onto a Part outside folders, or right-click it > **Folder** > **Out of the folder** |
+| Fold or open a folder | Click its header |
+| Rename it | Double-click the header (or right-click > **Rename**) |
+| Hide or show all its Parts | Click the eye on the header |
+| Move, turn or scale it | Right-click the header > **Move with the gizmo** |
+| Remove it | Right-click the header > **Remove folder (keep its Parts)** |
+
+A Part that joins a folder moves to just below the folder's last Part, so a folder's Parts stay together. When the
+folder holding the active Part is folded, its header shows the accent bar. **Move with the gizmo** makes one of
+the folder's Parts active and turns on the gizmo's **Folder** option, so every visible Part in the folder moves
+together; see [All Parts and Folder](gizmo.md#all-parts). Duplicates and the pieces of a split stay in their
+Part's folder. Folders are saved in the project; older versions of SculptForge open the file and simply show no
+folders.
+
 ## Reorder Parts
 
 The up and down arrow buttons under the list move the active Part one place up or down. The order matters for
@@ -157,7 +180,7 @@ delete can't be undone.
 
 | Format | What happens to Parts |
 |---|---|
-| Project (`.sfproj`) | Every Part is saved with its name, visibility, attributes, layers and active layer |
+| Project (`.sfproj`) | Every Part is saved with its name, visibility, folder, attributes, layers and active layer |
 | OBJ | Each visible Part is an `o` object; on import, `o` objects become Parts and `g` groups become face groups |
 | glTF / GLB | One node and mesh per visible Part, both ways |
 | FBX | One model per visible Part (with LODs, an LOD group each), both ways |
@@ -185,6 +208,11 @@ used.
 | `part_visibility visible=false` | Show or hide (toggles when `visible` is left out) |
 | `part_solo` / `part_show_all` | Solo the active Part / show every Part |
 | `part_move direction=up` | Move a Part up or down the list |
+| `part_folder_new folder=Eyes` | Make a folder holding a Part (`empty=true`: an empty one) |
+| `part_set_folder name=EyeL folder=Eyes` | Put a Part into a folder (`folder=` empty: out of its folder) |
+| `part_folder_visibility folder=Eyes` | Hide or show a folder's Parts (toggles when `visible` is left out) |
+| `part_folder_collapse` / `part_folder_rename` / `part_folder_delete` | Fold or open, rename, remove a folder (`folder=`) |
+| `transform translate=0,0.1,0 folder=true` | Transform the visible Parts in the active Part's folder |
 | `part_merge_down` / `part_merge_visible` | Merge |
 | `part_split_groups` / `part_split_parts` | Split |
 | `extract thickness=0.02 smooth=5 double=false` | Preview an Extract shell from the mask; `tcorne` / `tborder` for a triangle rim; `accept=true` keeps it at once |

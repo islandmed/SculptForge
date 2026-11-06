@@ -11,7 +11,7 @@
 
 namespace sf {
 namespace assets {
-extern const unsigned char appIcon[]; // the SF app icon, 256 px
+extern const unsigned char appIcon[]; // the cube app icon, 256 px
 extern const unsigned long long appIcon_size;
 extern const unsigned char appIconSmall[]; // its small cut, 32 px
 extern const unsigned long long appIconSmall_size;

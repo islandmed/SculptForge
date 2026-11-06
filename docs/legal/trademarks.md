@@ -33,8 +33,12 @@ every pull request and push to main must pass).
 
 ## The patterns
 
-`tools/check_marks.py` reads this block (case-insensitive regular expressions, one per line). Add a mark here; never
-add an exception elsewhere.
+`tools/check_marks.py` reads this block (case-insensitive regular expressions, one per line). A space in a pattern
+also matches a hyphen, underscore, dot or several spaces, and words joined by `-` `_` `.` are also read squashed, so
+spelling variants hit too. It reads binary files as well: zip archives and zlib streams member by member, and the
+strings of SculptForge's own formats (projects, brushes, packs, Bridge files). Bridge test files are stored with a
+neutral header that the UI test's `copy` replaces with the format's bytes. Add a mark here; never add an exception
+elsewhere.
 
 <!-- marks:begin -->
     z ?brush

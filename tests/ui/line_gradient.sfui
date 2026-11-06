@@ -1,0 +1,97 @@
+# Line Gradient (#99): Color > Line Gradient, then a drag across the view paints a colour ramp from the paint colour
+# to the End colour (or to clear). Its ends stay draggable, every change replacing the same undo step; Enter keeps
+# it, Esc takes it back. The mask is respected.
+run ui_look look=classic layout=classic        # the classic palette bar: Color drops down from it
+run new_sphere subdivisions=5
+run set_color color=f0a020
+shot before
+click "Color##palette.color"
+click "Line Gradient##paint.line_gradient"
+expect_value gradient_armed == 1
+expect "Clear##gradient"
+shot palette
+
+# Ctrl-hover help explains it.
+hold ctrl
+hover "Line Gradient##paint.line_gradient"
+expect_help "Drag a line"
+hold none
+
+# Closing the drop-down (the tool stays on), then a drag across the sphere: orange at the start,
+# black (the End colour) at the end.
+click "Color##palette.color"
+expect_not "Clear##gradient"
+expect_value gradient_armed == 1
+drag_path 0.05 0.15 0.95 0.85 keep
+wait 0.1
+shot dragging
+release
+wait 0.2
+expect_value gradient_placed == 1
+expect_value colored == 1
+expect_value can_undo == 1
+remember paint_mean_r first
+shot sphere
+
+# Its end handle moves: the same gradient, painted again (still one undo step).
+drag_path 0.95 0.85 0.6 0.55
+wait 0.2
+expect_value gradient_placed == 1
+expect_value paint_mean_r < $first
+remember paint_mean_r moved
+hover_window 0.5 0.95
+shot handle-moved
+key enter
+expect_value gradient_placed == 0
+key ctrl+z
+expect_value colored == 0
+key ctrl+shift+z
+expect_value paint_mean_r == $moved
+
+# Esc takes the gradient being adjusted back.
+drag_path 0.5 0.05 0.5 0.95
+wait 0.2
+expect_value gradient_placed == 1
+expect_value paint_mean_r != $moved
+key escape
+expect_value gradient_placed == 0
+expect_value paint_mean_r == $moved
+
+# The mask: a blue fade to clear across the sphere leaves the masked top as it was.
+run mask_rect y0=0.3
+run set_color color=2a6be0
+click "Color##palette.color"
+click "Clear##gradient"
+click "Color##palette.color"
+drag_path 0.0 0.5 1.0 0.5
+wait 0.2
+expect_value gradient_placed == 1
+expect_value paint_mean_b > 20
+shot masked
+key enter
+run mask_clear
+hover_window 0.5 0.95
+shot masked-result
+
+# At 200 % the handles and the palette scale with the UI.
+display_scale 200
+wait 0.3
+run mask_rect y0=0.3
+drag_path 0.15 0.9 0.85 0.3 keep
+wait 0.1
+shot dragging-hidpi
+release
+wait 0.2
+expect_value gradient_placed == 1
+hover_window 0.3 0.75
+shot hidpi
+key escape
+expect_value gradient_placed == 0
+expect_value gradient_armed == 1
+click "Color##palette.color"
+hover "Clear##gradient"
+wait 0.2
+shot palette-hidpi
+click "Line Gradient##paint.line_gradient"
+expect_value gradient_armed == 0
+expect_not "Clear##gradient"

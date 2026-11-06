@@ -78,6 +78,7 @@ case "\$*" in
   "api repos/islandmed/SculptForge/actions/runs/77/artifacts"*)
     python3 -c 'import json; print(json.dumps({"artifacts": [{"name": n} for n in "linux-x86_64 linux-arm64 flatpak-x86_64 flatpak-aarch64 vfx-vfx2026-x86_64 vfx-vfx2026-arm64 vfx-vfx2027-x86_64 vfx-vfx2027-arm64 macos windows staged-sums".split()]}))' ;;
   "api repos/islandmed/SculptForge/git/ref/tags/"*) exit 1 ;; # not pushed yet
+  "api repos/islandmed/sculptforge-brushes/git/trees/main"*) python3 "$S/repo/tools/brush-gallery/check_published.py" --tree-json ;; # (published as is)
   "run list"*) echo 7 ;;
   "run view"*"-q .status"*) echo completed ;;
   "run view"*"-q .conclusion"*) echo success ;;
@@ -103,7 +104,10 @@ EOF
 printf '#!/bin/sh\nexit 0\n' > "$S/bin/cmake"
 printf '#!/bin/sh\nexit 0\n' > "$S/bin/ctest"
 chmod +x "$S/bin/"*
-export PATH="$S/bin:$PATH" HOME="$S/home" BUILD_DIR="$S/build" YES=1
+# The public gallery as published (no GitHub API call: shared CI runners hit its rate limit): this tree's own files.
+python3 -c 'import json, sys; sys.path.insert(0, sys.argv[1]); import check_published as c; print(json.dumps(c.local_tree()))' \
+    "$ROOT/tools/brush-gallery" > "$S/gallery.json"
+export PATH="$S/bin:$PATH" HOME="$S/home" BUILD_DIR="$S/build" YES=1 SF_GALLERY_PUBLIC="$S/gallery.json"
 unset HIGHLIGHTS
 
 before() { git show "$1:$2"; }

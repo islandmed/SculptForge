@@ -30,7 +30,7 @@ namespace sf::discord {
 // The SculptForge application on Discord's developer portal (a public ID, not a secret). "0" hides the feature and
 // never connects.
 inline constexpr const char* kDiscordAppId = "1567737303210926130";
-// The icon: the SF mark on the site (Discord fetches an external image through its media proxy; the portal's
+// The icon: the cube app icon on the site (Discord fetches an external image through its media proxy; the portal's
 // "logo" asset was a placeholder cube).
 inline constexpr const char* kLargeImageUrl = "https://sculptforge.app/press/sculptforge-icon-1024.png";
 

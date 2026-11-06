@@ -690,10 +690,11 @@ uint32_t encodeShade(glm::vec3 nrm, float curvature, uint8_t mask) {
             e = glm::vec2((1.0f - std::abs(nrm.y)) * (nrm.x >= 0.0f ? 1.0f : -1.0f),
                           (1.0f - std::abs(nrm.x)) * (nrm.y >= 0.0f ? 1.0f : -1.0f));
     }
-    auto q = [](float v) { return uint32_t(std::clamp(std::lround((v * 0.5f + 0.5f) * 255.0f), 0L, 255L)); };
+    // (rounding by +0.5 and truncation: the values are >= 0 there, and lround costs more than the rest of a point)
+    auto q = [](float v) { return uint32_t(std::clamp((v * 0.5f + 0.5f) * 255.0f + 0.5f, 0.0f, 255.0f)); };
     const float c = std::clamp(curvature, -1.0f, 1.0f);
     const float s = (c >= 0.0f ? 1.0f : -1.0f) * std::sqrt(std::abs(c));
-    const uint32_t cq = uint32_t(std::clamp(std::lround(s * 127.0f) + 128L, 1L, 255L));
+    const uint32_t cq = uint32_t(std::clamp(s * 127.0f + 128.5f, 1.0f, 255.0f));
     return q(e.x) | q(e.y) << 8 | cq << 16 | uint32_t(mask) << 24;
 }
 
@@ -722,30 +723,76 @@ struct GridWork {
             const uint32_t row = MicroMesh::index(0, j, n), next = MicroMesh::index(0, j + 1, n);
             for (uint32_t i = 0; i + j < n; ++i) {
                 const uint32_t a = row + i, b = row + i + 1, c = next + i;
-                const glm::vec3 f = glm::cross(pos[b] - pos[a], pos[c] - pos[a]);
-                nsum[a] += f, nsum[b] += f, nsum[c] += f;
-                // the lattice edges a-b, a-c, b-c (each once: every edge belongs to one upward triangle)
-                const float da = g[a], db = g[b], dc = g[c];
-                dsum[a] += db + dc, dsum[b] += da + dc, dsum[c] += da + db;
-                cnt[a] += 2.0f, cnt[b] += 2.0f, cnt[c] += 2.0f;
-                if (i + j + 1 < n) {
-                    const uint32_t d = next + i + 1;
-                    const glm::vec3 f2 = glm::cross(pos[d] - pos[b], pos[c] - pos[b]);
-                    nsum[b] += f2, nsum[d] += f2, nsum[c] += f2;
-                }
+                face(a, b, c, g, true);
+                if (i + j + 1 < n) face(b, next + i + 1, c, g, false);
             }
         }
+    }
+    // The sums at some edge points only (a triangle of the outer ring: the points it shares with the ones written):
+    // edges e (bit e: its points between the corners) and corners c (bit 3 + c). The micro triangles touching
+    // them alone, added in the same order as compute(), so those sums come out bit-identical to a whole grid's
+    // at a fraction of its cost.
+    void computePart(const Mesh& m, const MicroMesh& mm, uint32_t tri, unsigned parts) {
+        const uint32_t n = mm.n, S = mm.samples;
+        pos.resize(S);
+        nsum.resize(S);
+        dsum.resize(S);
+        cnt.resize(S);
+        need.assign(S, 0);
+        for (int e = 0; e < 3; ++e) {
+            uint32_t i, j;
+            if (parts & (8u << e)) MicroMesh::edgePoint(e, 0, n, i, j), need[MicroMesh::index(i, j, n)] = 1;
+            if (parts & (1u << e))
+                for (uint32_t k = 1; k < n; ++k) MicroMesh::edgePoint(e, k, n, i, j), need[MicroMesh::index(i, j, n)] = 1;
+        }
+        MicroTriangle T;
+        T.set(m, tri, n);
+        const int16_t* g = mm.disp.data() + size_t(tri) * S;
+        auto at = [&](uint32_t i, uint32_t j) { // (each point once, the first time a triangle needs it)
+            const uint32_t idx = MicroMesh::index(i, j, n);
+            if (need[idx] & 2) return idx;
+            need[idx] |= 2;
+            glm::vec3 s, nn;
+            T.eval(i, j, s, nn);
+            pos[idx] = s + nn * (float(g[idx]) * mm.step);
+            nsum[idx] = glm::vec3(0.0f), dsum[idx] = 0.0f, cnt[idx] = 0.0f; // (the others aren't read)
+            return idx;
+        };
+        // (the micro triangles that can touch an edge: row 0, and the first and the last two of every other row)
+        for (uint32_t j = 0; j < n; ++j) {
+            const uint32_t row = MicroMesh::index(0, j, n), next = MicroMesh::index(0, j + 1, n), last = n - j;
+            for (uint32_t i = 0; i < last; i = j == 0 || i + 3 >= last ? i + 1 : last - 2) {
+                const uint32_t a = row + i, b = row + i + 1, c = next + i;
+                if ((need[a] | need[b] | need[c]) & 1) face(at(i, j), at(i + 1, j), at(i, j + 1), g, true);
+                if (i + j + 1 < n && ((need[b] | need[next + i + 1] | need[c]) & 1)) face(at(i + 1, j), at(i + 1, j + 1), at(i, j + 1), g, false);
+            }
+        }
+    }
+
+private:
+    std::vector<uint8_t> need; // computePart: 1 = a wanted sum, 2 = its position computed
+    // Micro triangle a b c (counter-clockwise) into the sums of its corners; `up` also adds its lattice edges a-b,
+    // a-c, b-c (each once: every edge belongs to one upward triangle).
+    void face(uint32_t a, uint32_t b, uint32_t c, const int16_t* g, bool up) {
+        const glm::vec3 f = glm::cross(pos[b] - pos[a], pos[c] - pos[a]);
+        nsum[a] += f, nsum[b] += f, nsum[c] += f;
+        if (!up) return;
+        const float da = g[a], db = g[b], dc = g[c];
+        dsum[a] += db + dc, dsum[b] += da + dc, dsum[c] += da + db;
+        cnt[a] += 2.0f, cnt[b] += 2.0f, cnt[c] += 2.0f;
     }
 };
 
 } // namespace
 
 void MicroShader::shade(const Mesh& m, std::span<const uint32_t> dirty, bool all, std::vector<uint32_t>& written,
-                        const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare) {
+                        const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare, bool grow,
+                        std::vector<uint32_t>* outer) {
     written.clear();
+    if (outer) outer->clear();
     if (!m.micro) return;
     if (!all) {
-        shadeSet(m, dirty, true, written, out, prepare);
+        shadeSet(m, dirty, grow, written, out, prepare, grow ? nullptr : outer);
         return;
     }
     // Everything: in runs of triangles (neighbours by index on levels made by Divide), each with the ring its
@@ -761,7 +808,7 @@ void MicroShader::shade(const Mesh& m, std::span<const uint32_t> dirty, bool all
 }
 
 void MicroShader::shadeSet(const Mesh& m, std::span<const uint32_t> dirty, bool grow, std::vector<uint32_t>& written,
-                           const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare) {
+                           const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare, std::vector<uint32_t>* outer) {
     const MicroMesh& mm = *m.micro;
     const uint32_t n = mm.n, S = mm.samples, nt = mm.baseTriangles;
     if (mm.edgeNeighbor.size() != size_t(nt) * 3) return; // (ensureTopology first)
@@ -807,6 +854,7 @@ void MicroShader::shadeSet(const Mesh& m, std::span<const uint32_t> dirty, bool 
     }
     const uint32_t v2 = ++epoch_;
     vertexRing(ring_, ring2_, inR2, v2);
+    if (outer) outer->insert(outer->end(), ring2_.begin(), ring2_.end());
     for (size_t i = 0; i < ring_.size(); ++i) slot_[ring_[i]] = uint32_t(i);
     for (size_t i = 0; i < ring2_.size(); ++i) slot_[ring2_[i]] = uint32_t(ring_.size() + i);
     if (prepare) prepare(ring_);
@@ -821,17 +869,25 @@ void MicroShader::shadeSet(const Mesh& m, std::span<const uint32_t> dirty, bool 
         return std::max(e / (3.0f * float(n)), 1e-20f);
     };
     auto finish = [&](const glm::vec3& ns, float ds, float c, float d, float h, uint8_t mk) {
-        const float len = glm::length(ns);
-        const glm::vec3 nn = len > 0.0f ? ns / len : glm::vec3(0.0f, 0.0f, 1.0f);
         const float curv = c > 0.0f ? (ds / c - d) * mm.step / h : 0.0f;
-        return encodeShade(nn, curv, mk);
+        return encodeShade(ns, curv, mk); // (unnormalized: the encoding divides by its L1 length; zero = +z either way)
     };
     // Phase 1: every R2 triangle's edge partials; R triangles' interior points written.
     poolFor(slots, [&](size_t b, size_t e) {
         thread_local GridWork w;
         for (size_t s = b; s < e; ++s) {
             const uint32_t tri = tileOf(s);
-            w.compute(m, mm, tri);
+            if (s < ring_.size()) {
+                w.compute(m, mm, tri);
+            } else { // the outer ring: the sums at the points it shares with R (whose vertices are marked v2)
+                const glm::uvec3 tv = m.triangles[tri];
+                unsigned parts = 0;
+                for (int k = 0; k < 3; ++k) {
+                    const bool here = vstamp_[tv[k]] == v2, next = vstamp_[tv[(k + 1) % 3]] == v2;
+                    parts |= (here ? 8u << k : 0u) | (here && next ? 1u << k : 0u);
+                }
+                w.computePart(m, mm, tri, parts);
+            }
             float* part = partial_.data() + s * edgePoints * kPartialFloats;
             for (int ed = 0; ed < 3; ++ed)
                 for (uint32_t k = 0; k < n; ++k) {

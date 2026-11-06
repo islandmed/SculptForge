@@ -1,7 +1,10 @@
 # Fill layers and Material Recipes (Tool > Paint Layers): a recipe laid on a sculpted Part reads its Mesh Maps
 # (baked in the background), the PBR view shows worn metal, a Fill layer's mask effects change from the panel, and
 # sculpting re-bakes only the tiles near the stroke (live), so the wear follows the new form.
-run new_sphere subdivisions=6
+# A 20k-triangle sphere (subdivisions 5; 6 is 82k): a frame after texture_create took 15 s at 82k on the PC. The
+# strokes, the recipe's worker-thread Mesh Maps bake (at the 1024 texture's size, the least texture_create makes),
+# the live tile re-bake and every check are the same.
+run new_sphere subdivisions=5
 run stroke brush=Crease points="-0.6,0.35,1 0,0.55,1 0.6,0.35,1" radius=0.07 strength=1
 run stroke brush=Inflate points="-0.35,-0.3,1" radius=0.3 strength=1
 run stroke brush=Clay points="0.25,-0.5,1 0.55,-0.05,1" radius=0.1 strength=1

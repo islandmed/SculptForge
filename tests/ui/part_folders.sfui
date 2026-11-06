@@ -1,0 +1,77 @@
+# Part folders (#96): make one from the active Part, drag Parts in and out, fold and open it, hide and show it,
+# rename it, move the whole folder with the gizmo; projects keep the folders. Shots at 1x (HiDPI: part_folders_hidpi).
+run new_sphere subdivisions=4 ; part_rename to=Head
+run part_append type=sphere ; part_rename to="Left eye" ; transform scale=0.25 pivot=origin translate=-0.65,0.3,0.85
+run part_append type=cube ; part_rename to=Body ; transform translate=0,-1.6,0
+run part_append type=sphere ; part_rename to="Right eye" ; transform scale=0.25 pivot=origin translate=-0.05,0.3,0.85
+key f
+expect_value parts == 4
+expect_value active_part == 3
+
+# The folder button makes a folder holding the active Part, its name ready to type.
+click "Parts/###part_folder_new"
+expect_status Made folder Folder with Right eye
+type "Parts/##rename folder" Eyes
+key enter
+expect_status Folder renamed to Eyes
+expect "Parts/Eyes##folder"
+shot new-folder
+
+# Drag the left eye onto the folder's header: it joins and moves below the right eye.
+drag_item "Parts/Left eye" 0 70
+expect_status Left eye is in Eyes
+expect_value active_part == 2
+shot dragged-in
+
+# The folder's eye hides and shows both eyes; the Body stays.
+click "Parts/##eye folder Eyes"
+expect_status Eyes hidden
+expect_value visible_parts == 2
+shot folder-hidden
+click "Parts/##eye folder Eyes"
+expect_value visible_parts == 4
+
+# Click the header to fold it (the accent bar says the active Part is inside), again to open it.
+click "Parts/Eyes##folder"
+expect_status Eyes folded
+expect_not "Parts/Left eye"
+shot folded
+wait 0.5
+click "Parts/Eyes##folder"
+expect_status Eyes opened
+expect "Parts/Left eye"
+wait 0.5
+
+# Move with the gizmo: both eyes move, nothing else.
+click "Parts/Left eye"
+remember center_y left0
+click "Parts/Body"
+remember center_y body0
+right_click "Parts/Eyes##folder"
+click "Move with the gizmo"
+expect_value gizmo_mode == 1
+expect_status Move Eyes
+gizmo_drag move_y 0 -40
+shot gizmo-moved
+key w
+click "Parts/Left eye"
+expect_value center_y > $left0
+click "Parts/Body"
+expect_value center_y == $body0
+
+# Right-click a Part > Folder > Out of the folder.
+wait 0.5
+right_click "Parts/Right eye"
+click "Folder"
+click "Out of the folder"
+expect_status Right eye is out of its folder
+shot out-of-folder
+
+# Saved and opened again: the folder and its Part come back.
+run save_project path=sf_ui_part_folders.sfproj
+run new_sphere
+expect_not "Parts/Eyes##folder"
+run open_project path=sf_ui_part_folders.sfproj
+expect "Parts/Eyes##folder"
+expect "Parts/Left eye"
+

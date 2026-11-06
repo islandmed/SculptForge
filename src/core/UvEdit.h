@@ -7,7 +7,9 @@
 // layout so the model looks the same (core/TextureTransfer.h), the old texture in the same step.
 #pragma once
 
+#include "core/Commands.h"
 #include "core/Document.h"
+#include "core/Uv.h"
 
 #include <string>
 
@@ -28,5 +30,10 @@ private:
     bool texture_;
     UndoRecord record_;
 };
+
+// The uv_pack command's options from its arguments, and the status line it ends with (core/UvCommands.cpp; the
+// UV Editor's Pack, which runs on a worker thread, uses them too).
+UvPackOptions uvPackOptions(const Document& doc, const Args& args);
+std::string uvPackNote(const UvPackResult& result, const UvPackOptions& options);
 
 } // namespace sf

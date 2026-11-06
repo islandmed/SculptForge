@@ -43,6 +43,10 @@ hold ctrl
 hover "Keep Texture##remesh"
 expect_help "projected"
 hold none
+# The Voxel Remesh resolution slider at its least, 32 (default 200: 376k triangles, whose Auto UV and projection took
+# 27 s of this script on the PC): the same background remesh, Auto UV of the new surface and texture projection, on a
+# few thousand triangles. (The source sphere is 5k triangles already; the remesh's output is what costs.)
+drag_item "##voxres" -400 0
 remember triangles before_remesh
 click "Voxel Remesh##geometry.remesh"
 wait_idle 300

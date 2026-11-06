@@ -2,11 +2,9 @@
 # full suite, 2026-11-04). A listed test passes up to 1.5x its seconds here; an unlisted one over 20 s fails the run.
 # Make it fast (wait on events, a smaller mesh or texture, split it) or label it nightly, then delete its line.
 # name                                                          seconds  plan
-ui_uv_editor                                                       116  unwrap of the full lion head (35 s in one step): a smaller model for T1, the lion nightly
+ui_uv_editor                                                       40  packs < 1 s now (fix/uv-pack-speed); left: the lion's Least Stretch unwrap (10 s, line 30) and UI steps: a smaller model for T1, the lion nightly
+marks                                                              21  the whole tree incl. binaries since fix/marks-normalize (19-20 s on the laptop): cache results by file hash like check_marks_media, or scan only changed files in T0
 insider_drops                                                      100  tools/drops selftest: profile it; split the network-free checks from the packaging ones
-ui_fill_layers                                                      71  now 1024 textures (was 2048): re-measure; Paint Layers bakes Mesh Maps at open (29 s)
-ui_texture_transfer                                                 71  transfers on a dense sphere: smaller source mesh
-ui_make_sculptable                                                  66  two make-sculptable runs on a 150k capture (19 s + 15 s): a 30k capture
 ui_retopo                                                           63  one wait_idle of 23 s (line 103: QRemesh of the sculpt): a lower target
 ui_first_sculpt                                                     48  the lesson end to end (225 lines, no single long step): split into two scripts
 ui_texture_paint                                                    40  profile with SF_UI_PROFILE=1
@@ -38,10 +36,12 @@ sculptforge_tests: qremesh_sculpt_target_counts                     26  fewer ta
 sculptforge_tests: texture_transfer_auto_uv_of_a_dense_sphere_does_not_fold 24  a less dense sphere
 sculptforge_tests: fill_layer_effect_chain_and_channels                24  re-measure with SF_THREADS (21-24 s)
 sculptforge_tests: qremesh_guide_loop_across_the_symmetry_plane      22  a coarser mesh (21-22 s)
-sculptforge_tests: adaptive_dabs_fused_batches_match_exact_strokes   80  new on main 11-04 (adaptive dabs): fewer or shorter strokes, or nightly
-sculptforge_tests: adaptive_dabs_match_exact_strokes                41  new on main 11-04 (adaptive dabs): fewer or shorter strokes
 sculptforge_tests: adaptive_dabs_leave_small_brushes_alone          21  new on main 11-04 (adaptive dabs)
 # Moved to nightly (TEST(nightly_*)), 11-04: inbox0106_keep_masked_voxel_on_a_real_model (82 s),
 # uv_unwrap_lion_head_by_sharp_edges (54 s), mesh_maps_live_update_is_faster_than_a_full_bake (30 s),
 # uv_editor_million_triangles_stay_interactive (29 s), face_weights_timing_on_a_500k_head (20 s),
 # dyntopo_random_strokes_stay_valid (25 s, stress).
+# 11-06 (fix/slow-tests): nightly_adaptive_dabs_fused_batches_match_exact_strokes (35 s: 18-dab strokes, every brush in
+# batches of 2 and 6; T0 runs 8-dab strokes, each brush in one size, as two tests). adaptive_dabs_match_exact_strokes
+# is split in two (8 s each, full length). ui_texture_transfer (Voxel Remesh at resolution 32), ui_fill_layers (a 20k
+# sphere), ui_make_sculptable (a 30k capture): 9-16 s now.

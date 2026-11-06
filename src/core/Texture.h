@@ -290,6 +290,10 @@ void bakeTexels(const Mesh& mesh, PaintTexture& tex, const BakeFn& fn, bool skip
 // Blends `color` into the target layer of every texel with the weight interpolated from `vertexWeight`
 // (per vertex 0..1). Returns the number of texels changed.
 size_t textureFill(Mesh& mesh, const glm::vec3& color, const std::vector<float>& vertexWeight);
+// Like textureFill with a colour per texel: `shade(t)` (rgb, and a weight in a) of the vertex value `t`
+// interpolated over the texel, times the interpolated `vertexWeight` (Line Gradient).
+size_t textureFillBy(Mesh& mesh, const std::vector<float>& t, const std::vector<float>& vertexWeight,
+                     const std::function<glm::vec4(float)>& shade);
 // Bakes the vertex paint (Mesh::colors, composited) into the active texture layer (opaque).
 void vertexpaintToTexture(Mesh& mesh);
 // Sets the vertex paint (active paint layer) of every vertex to the texture's colour at its UVs (seams average).

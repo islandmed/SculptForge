@@ -361,6 +361,48 @@ TEST(micro_shading_partial_matches_full) {
     CHECK(outward >= total * 9 / 10);
 }
 
+// A stroke's shading writes the changed triangles alone (MicroRenderer: their neighbours wait for the stroke's
+// end): those come out exact, the neighbours after them complete it, and until then they're off by the falloff tail.
+TEST(micro_shading_alone_then_outer) {
+    Document doc = microDoc(3, 5000);
+    microNoise(doc.mesh, 0.01f, 10.0f);
+    const MicroMesh& mm = *doc.mesh.micro;
+    const size_t S = mm.samples;
+    std::vector<uint32_t> before(size_t(mm.baseTriangles) * S, 0), full(before.size(), 0);
+    MicroShader shader;
+    std::vector<uint32_t> written, outer;
+    auto into = [&](std::vector<uint32_t>& v) { return [&v, S](uint32_t t) { return v.data() + size_t(t) * S; }; };
+    shader.shade(doc.mesh, {}, true, written, into(before));
+    Symmetry sym;
+    doc.sculptor.beginStroke(doc.mesh, "Standard");
+    doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, dabAt(glm::vec3(0, 0, 1), 0.2f, 1.0f), sym);
+    UndoRecord r = doc.sculptor.endStroke();
+    std::vector<uint32_t> dirty = r.micro->tris;
+    std::sort(dirty.begin(), dirty.end());
+    shader.shade(doc.mesh, {}, true, written, into(full));
+    std::vector<uint32_t> part = before;
+    shader.shade(doc.mesh, dirty, false, written, into(part), {}, false, &outer);
+    CHECK(written.size() == dirty.size());
+    CHECK(!outer.empty());
+    for (uint32_t t : dirty) CHECK(std::equal(part.begin() + std::ptrdiff_t(t * S), part.begin() + std::ptrdiff_t((t + 1) * S),
+                                              full.begin() + std::ptrdiff_t(t * S)));
+    // The stale neighbours: a few points along the shared border, by little.
+    int worst = 0;
+    size_t off = 0;
+    for (uint32_t t : outer)
+        for (size_t k = 0; k < S; ++k) {
+            const uint32_t a = part[t * S + k], b = full[t * S + k];
+            if (a == b) continue;
+            ++off;
+            for (int c = 0; c < 16; c += 8) worst = std::max(worst, std::abs(int((a >> c) & 255) - int((b >> c) & 255)));
+        }
+    std::printf("  %zu changed, %zu outer, %zu stale points, worst normal code off by %d\n", dirty.size(), outer.size(), off, worst);
+    CHECK(off < outer.size() * 3 * mm.n);
+    CHECK(worst <= 8);
+    shader.shade(doc.mesh, outer, false, written, into(part), {}, false, nullptr);
+    CHECK(part == full);
+}
+
 TEST(micro_bake_mesh_is_closed_and_matches) {
     Document doc = microDoc(3, 3000);
     microNoise(doc.mesh, 0.01f, 10.0f);
