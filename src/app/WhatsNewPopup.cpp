@@ -214,7 +214,7 @@ void App::drawWhatsNew() {
 
     const whatsnew::Version& v = pop.version;
     const float pad = 36.0f * k;
-    // Header: the app mark, the eyebrow (version and date), the title and the tagline.
+    // Header: the bust, the eyebrow (version and date), the title and the tagline.
     {
         // The mark as tall as the text beside it (eyebrow to tagline), above the cards (they start at 124).
         const float m = 88.0f * k, y = a.y + 32.0f * k;
@@ -330,10 +330,10 @@ void App::drawWhatsNew() {
             return;
         }
         tex = c.image.empty() ? ImTextureID(0) : guide_.image(c.image, &texSize);
-        if (!tex) { // no picture: a quiet tile with the app mark
+        if (!tex) { // no picture: a quiet tile with the bust
             dl->AddRectFilled(p0, p1, tc(raised, appear), 12.0f * k, corners);
             const float m = std::min(p1.x - p0.x, p1.y - p0.y) * 0.3f;
-            brand::mark(dl, ImVec2((p0.x + p1.x - m) * 0.5f, (p0.y + p1.y - m) * 0.5f), m, 0.6f * appear);
+            brand::bust(dl, ImVec2((p0.x + p1.x - m) * 0.5f, (p0.y + p1.y - m) * 0.5f), m, 0.6f * appear);
             return;
         }
         ImVec2 uv0, uv1;

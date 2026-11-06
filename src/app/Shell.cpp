@@ -1002,10 +1002,10 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f * s, 0.0f));
 
     // App mark and name.
-    { // the app mark (the same in every look), a little taller than the name
+    { // the SF app icon (the same in every look), a little taller than the name
         const float m = std::round(std::min(ImGui::GetFontSize() * 1.3f, h - 4.0f * s));
         ImGui::SetCursorPos(ImVec2(8.0f * s, std::floor((h - m) * 0.5f)));
-        brand::markItem(m);
+        brand::appMarkItem(m);
     }
     ImGui::SameLine(0.0f, 6.0f * s);
     ImGui::SetCursorPosY(textY);
@@ -1399,11 +1399,11 @@ void App::drawStatusBar(const ShellGeometry& g) {
         return x + textW(f, t);
     };
 
-    // Brand: the app mark, the name.
+    // Brand: the SF app icon, the name.
     float x = o.x + 12.0f * s;
     {
         const float m = std::round(std::min(ImGui::GetFontSize() * 1.3f, h - 4.0f * s));
-        brand::mark(dl, ImVec2(std::floor(x), std::floor(o.y + (h - m) * 0.5f)), m);
+        brand::appMark(dl, ImVec2(std::floor(x), std::floor(o.y + (h - m) * 0.5f)), m);
         x += m + 6.0f * s;
     }
     const bool caps = style == Status::Terminal;
