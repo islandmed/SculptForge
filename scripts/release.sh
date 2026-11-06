@@ -163,12 +163,9 @@ wait_run() {
         gh run watch "$id" -R "$REPO" --exit-status >/dev/null || true
     fi
     conclusion=$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)
-    # A job that died on a GitHub/CDN 5xx while downloading (0.11.1: seven 504s in Packages) is rerun once, then judged;
-    # so is the Website's deploy job, whose failures are GitHub's Pages service timing out (0.11.7).
-    if [ "$conclusion" = failure ] && [ -z "$rerun_done" ] &&
-        { { [ "$wf" = pages.yml ] && gh run view "$id" -R "$REPO" --json jobs -q '.jobs[] | select(.conclusion == "failure") | .name' 2>/dev/null | grep -x deploy >/dev/null; } ||
-          gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | server_error; }; then
-        echo "   $wf run $id failed (a GitHub service error): rerunning its failed jobs once" >&2
+    # A job that died on a GitHub/CDN 5xx while downloading (0.11.1: seven 504s in Packages) is rerun once, then judged.
+    if [ "$conclusion" = failure ] && [ -z "$rerun_done" ] && gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | server_error; then
+        echo "   $wf run $id failed on an HTTP 5xx download: rerunning its failed jobs once" >&2
         rerun_done=1
         gh run rerun "$id" --failed -R "$REPO" >/dev/null 2>&1 || true
         sleep 10
@@ -587,6 +584,42 @@ step_release() {
     ok "$n assets, SHA256SUMS.txt included"
 }
 
+# website_run SHA: waits for the Website run of SHA's push. When its deploy job fails (0.11.7: GitHub's Pages service
+# timed out), one fresh run of the workflow on main: a rerun of the failed job can't deploy, the first attempt's
+# github-pages artifact is still there ("Multiple artifacts named github-pages").
+website_run() {
+    local id="" tries=18 c last attempt
+    while [ -z "$id" ] && [ "$tries" -gt 0 ]; do
+        id=$(gh run list -R "$REPO" -w pages.yml -c "$1" -e push -b main -L 1 --json databaseId -q '.[0].databaseId')
+        tries=$((tries - 1))
+        [ -n "$id" ] || sleep 10
+    done
+    [ -n "$id" ] || { echo "   no Website run found for ${1:0:8}: waiting on the live feed alone" >&2; return 0; }
+    for attempt in 1 2; do
+        if [ "$(gh run view "$id" -R "$REPO" --json status -q .status)" != completed ]; then
+            echo "   waiting for the Website run $id ..." >&2
+            gh run watch "$id" -R "$REPO" --exit-status >/dev/null 2>&1 || true
+        fi
+        c=$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)
+        [ "$c" = success ] && return 0
+        [ "$attempt" = 1 ] && gh run view "$id" -R "$REPO" --json jobs -q '.jobs[] | select(.conclusion == "failure") | .name' 2>/dev/null |
+            grep -x deploy >/dev/null ||
+            die "the Website run $id: $c (https://github.com/$REPO/actions/runs/$id)" "fix it on main or start it again: gh workflow run pages.yml -R $REPO --ref main; then run again with --from site"
+        echo "   the Website's deploy failed (run $id): starting a fresh run on main" >&2
+        last=$(gh run list -R "$REPO" -w pages.yml -e workflow_dispatch -b main -L 1 --json databaseId -q '.[0].databaseId')
+        gh workflow run pages.yml -R "$REPO" --ref main >/dev/null ||
+            die "can't start the Website workflow" "gh workflow run pages.yml -R $REPO --ref main; then run again with --from site"
+        id="" tries=18
+        while [ -z "$id" ] && [ "$tries" -gt 0 ]; do
+            sleep 10
+            id=$(gh run list -R "$REPO" -w pages.yml -e workflow_dispatch -b main -L 1 --json databaseId -q '.[0].databaseId')
+            [ "$id" != "$last" ] || id=""
+            tries=$((tries - 1))
+        done
+        [ -n "$id" ] || die "the fresh Website run didn't start within 3 minutes" "gh run list -R $REPO -w pages.yml -L 3; then run again with --from site"
+    done
+}
+
 step_site() {
     release_ready
     on_main
@@ -627,8 +660,7 @@ PY
     fi
     # The Website workflow deploys main's site and the newest tag's guide. Its run for the feed commit can sit queued
     # longer than any fixed wait (0.11.7: past 10 minutes), so wait for that run, then check what visitors get.
-    wait_run pages.yml "$(git log -1 --format=%H -- website/latest.json)" 18 >/dev/null ||
-        echo "   no Website run found for the feed commit: waiting on the live feed alone" >&2
+    website_run "$(git log -1 --format=%H -- website/latest.json)"
     wait_live https://sculptforge.app/latest.json "\"version\": \"$V\"" 600 ||
         die "sculptforge.app still serves the old feed after 10 minutes" "check the Website workflow: gh run list -R $REPO -w pages.yml -L 3; re-run it if it failed"
     ok "sculptforge.app/latest.json says $V"
