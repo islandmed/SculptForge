@@ -219,23 +219,37 @@ TEST(units_gltf_fbx_usd_keep_the_size) {
 }
 
 TEST(units_usd_meters_per_unit) {
-    // A centimetre stage (Maya, Houdini): 5 x 5 x 19.95 cm comes in as 0.05 x 0.05 x 0.1995 m, not 100x.
-    const std::string path = tempPath("sf_units_cm.usda");
-    std::ostringstream s;
-    s << "#usda 1.0\n(\n    metersPerUnit = 0.01\n    upAxis = \"Y\"\n)\n\ndef Mesh \"Box\"\n{\n    point3f[] points = [";
-    const auto tris = boxTriangles(scaled(kBox, 0.1f));
-    for (size_t i = 0; i < tris.size(); ++i) s << (i ? ", " : "") << "(" << tris[i].x << ", " << tris[i].y << ", " << tris[i].z << ")";
-    s << "]\n    int[] faceVertexCounts = [";
-    for (size_t i = 0; i < tris.size() / 3; ++i) s << (i ? ", " : "") << 3;
-    s << "]\n    int[] faceVertexIndices = [";
-    for (size_t i = 0; i < tris.size(); ++i) s << (i ? ", " : "") << i;
-    s << "]\n}\n";
-    std::ofstream(std::filesystem::path(path), std::ios::binary) << s.str();
-    CommandRegistry reg;
-    Document doc;
-    CHECK(reg.execute(doc, "open", {{"path", path}}).ok);
-    CHECK(near(meshBounds(doc.mesh), scaled(kBox, 0.001f)));
-    std::filesystem::remove(path);
+    // Hand-written stages in centimetres (Maya, Houdini: metersPerUnit = 0.01) and in metres, with the same numbers:
+    // -12.7 .. 199.5 cm comes in as exactly the floats nearest -0.127 .. 1.995 m (not 100x), metres as written, and
+    // both come back the same after export_usd and reopening (#148, @NicTanghe).
+    for (double metersPerUnit : {0.01, 1.0}) {
+        const std::string path = tempPath(metersPerUnit == 1.0 ? "sf_units_m.usda" : "sf_units_cm.usda");
+        const std::string out = tempPath("sf_units_usd_back.usda");
+        std::ostringstream s;
+        s << "#usda 1.0\n(\n    metersPerUnit = " << metersPerUnit << "\n    upAxis = \"Y\"\n)\n\ndef Mesh \"Box\"\n{\n"
+          << "    point3f[] points = [";
+        const auto tris = boxTriangles(kBox);
+        for (size_t i = 0; i < tris.size(); ++i) s << (i ? ", " : "") << "(" << tris[i].x << ", " << tris[i].y << ", " << tris[i].z << ")";
+        s << "]\n    int[] faceVertexCounts = [";
+        for (size_t i = 0; i < tris.size() / 3; ++i) s << (i ? ", " : "") << 3;
+        s << "]\n    int[] faceVertexIndices = [";
+        for (size_t i = 0; i < tris.size(); ++i) s << (i ? ", " : "") << i;
+        s << "]\n}\n";
+        std::ofstream(std::filesystem::path(path), std::ios::binary) << s.str();
+        const double per = 1.0 / metersPerUnit;
+        const Box expected{{fromFileUnits(kBox.lo.x, per), fromFileUnits(kBox.lo.y, per), fromFileUnits(kBox.lo.z, per)},
+                           {fromFileUnits(kBox.hi.x, per), fromFileUnits(kBox.hi.y, per), fromFileUnits(kBox.hi.z, per)}};
+        CommandRegistry reg;
+        Document doc;
+        CHECK(reg.execute(doc, "open", {{"path", path}}).ok);
+        CHECK(same(meshBounds(doc.mesh), expected));
+        CHECK(reg.execute(doc, "export_usd", {{"path", out}}).ok);
+        Document back;
+        CHECK(reg.execute(back, "open", {{"path", out}}).ok);
+        CHECK(same(meshBounds(back.mesh), expected));
+        std::filesystem::remove(path);
+        std::filesystem::remove(out);
+    }
 }
 
 TEST(units_project_keeps_the_file_unit) {

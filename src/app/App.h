@@ -1725,6 +1725,13 @@ public:
     // Preferences > Interface > Units (core/Units.h): the unit sizes show in.
     const LengthUnit& lengthUnit() const;
     void drawExportSizeLine(); // File > Import / Export: the size exports write (Palettes.cpp)
+    // The active Part's and the visible Parts' bounds for the size readouts (#148): walked again only when the undo
+    // revision, the active Part, its vertex count or the Parts and their visibility changed, never every frame.
+    struct SizeBounds {
+        uint64_t key = ~uint64_t(0);
+        AABB part, visible;
+    } sizeBounds_;
+    const SizeBounds& sizeBounds();
     const CommandRegistry& commands() const { return commands_; }
     ImFont* helpTitleFont() const { return fontHelpTitle_ ? fontHelpTitle_ : ImGui::GetFont(); }
     ImFont* consoleFont() const { return fontConsole_ ? fontConsole_ : ImGui::GetFont(); }

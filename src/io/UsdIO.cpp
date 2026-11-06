@@ -3,6 +3,7 @@
 #include "io/UsdIO.h"
 
 #include "core/SelectionSets.h"
+#include "core/Units.h"
 #include "io/TextureExport.h"
 #include "io/Zip.h"
 
@@ -1012,10 +1013,14 @@ bool readUsdaText(const std::string& text, bool split, std::vector<MeshObject>& 
     std::map<std::string, size_t> byPath;
     for (size_t i = 0; i < prims.size(); ++i) byPath[prims[i].path] = i;
 
-    // World transforms (parents come first in `prims`), in metres with Y up.
-    const glm::mat4 up = glm::scale(parser.upAxis == "Z" ? glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1, 0, 0))
-                                                         : glm::mat4(1.0f),
-                                    glm::vec3(float(parser.metersPerUnit)));
+    // World transforms (parents come first in `prims`), Y up, in the stage's unit. Mesh points go to metres through
+    // double (fromFileUnits), so 12.7 cm is the float nearest 0.127 m; splats take the unit in their transform.
+    const glm::mat4 up = parser.upAxis == "Z" ? glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1, 0, 0))
+                                              : glm::mat4(1.0f);
+    const double perUnit = 1.0 / parser.metersPerUnit; // file numbers per metre
+    const auto toMetres = [perUnit](glm::vec3 v) {
+        return glm::vec3(fromFileUnits(v.x, perUnit), fromFileUnits(v.y, perUnit), fromFileUnits(v.z, perUnit));
+    };
     std::vector<glm::mat4> world(prims.size());
     for (size_t i = 0; i < prims.size(); ++i) {
         bool reset = false;
@@ -1082,7 +1087,7 @@ bool readUsdaText(const std::string& text, bool split, std::vector<MeshObject>& 
                 return layers.back();
             };
             const uint32_t baseIndex = uint32_t(m.positions.size());
-            for (const auto& q : pts) m.positions.push_back(glm::vec3(world[i] * glm::vec4(q, 1.0f)));
+            for (const auto& q : pts) m.positions.push_back(toMetres(glm::vec3(world[i] * glm::vec4(q, 1.0f))));
             // Texture coordinates: primvars:st, else the first texCoord2 primvar; face-varying (per face corner)
             // or per point, optionally indexed (<name>:indices).
             std::string stName = "primvars:st";
@@ -1163,7 +1168,7 @@ bool readUsdaText(const std::string& text, bool split, std::vector<MeshObject>& 
                     for (size_t o = 0; o < offsets.size(); ++o) {
                         const size_t v = pointIndices ? (o < pointIndices->nums.size() ? indexValue(pointIndices->nums[o], pts.size()) : pts.size())
                                                       : o;
-                        if (v < pts.size()) layer.delta[baseIndex + v] = linear * offsets[o];
+                        if (v < pts.size()) layer.delta[baseIndex + v] = toMetres(linear * offsets[o]);
                     }
                 }
             }
@@ -1190,7 +1195,7 @@ bool readUsdaText(const std::string& text, bool split, std::vector<MeshObject>& 
                     const float len = glm::length(r);
                     cloud.rotations[k] = len > 0.0f ? r / len : glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
                 }
-            cloud.transform = world[i];
+            cloud.transform = glm::scale(glm::mat4(1.0f), glm::vec3(float(parser.metersPerUnit))) * world[i];
             cloud.name = p.path.substr(p.path.rfind('/') + 1);
             splatsFound = true;
         }

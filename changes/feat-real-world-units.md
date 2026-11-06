@@ -12,7 +12,7 @@ fixed: Exports keep the size a part was opened with (#148, @Swar55): a scene ope
   STL opened in another unit is written back in it, and decimal sizes round-trip exactly (12.7 mm stays 12.7, not
   12.700001). Projects remember the unit.
 fixed: USD files in centimetres (`metersPerUnit = 0.01`, as Maya and Houdini write) open at their real size instead
-  of 100x too large.
+  of 100x too large, to the exact millimetre (#148, thanks @NicTanghe).
 testers:
   - Open an STL from your slicer (e.g. a 20 mm calibration cube): Tool shows 20 x 20 x 20 mm. File > Export OBJ and
     Export STL, open both in the slicer: both are 20 mm.
