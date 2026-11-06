@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "shortcuts": {
+    "file.quicksave": "Ctrl+Alt+9"
+  },
+  "prefs": {
+    "inputStyle": "blender"
+  }
+}

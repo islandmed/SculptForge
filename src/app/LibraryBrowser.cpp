@@ -1186,6 +1186,16 @@ void App::initLibraryBrowser() {
         return ok;
     });
 
+    registerLibraryActions();
+
+    // classic opens the Library at startup on the Project tab (never in tests, renders or recordings).
+    if (uiPrefs_.libraryAtStartup && interactive() && options_.uiTest.empty() && options_.openPath.empty() &&
+        !options_.blender)
+        libraryBrowser_.show(LibraryTab::Project);
+}
+
+// After initActions (and after the input style was first applied): the style's keys still reach them (#147).
+void App::registerLibraryActions() {
     auto add = [this](const char* id, const char* label, const char* icon, const char* palette, const char* shortcut,
                       const char* description, std::function<void()> run, std::function<bool()> checked = nullptr) {
         Action a;
@@ -1231,11 +1241,6 @@ void App::initLibraryBrowser() {
         "status bar names the file. Material sets its size (twice the view by default), shape (the view's, 1:1, "
         "16:9, 9:16, 4:3) and format (PNG or JPG).",
         [this] { runSaveRender(); });
-
-    // classic opens the Library at startup on the Project tab (never in tests, renders or recordings).
-    if (uiPrefs_.libraryAtStartup && interactive() && options_.uiTest.empty() && options_.openPath.empty() &&
-        !options_.blender)
-        libraryBrowser_.show(LibraryTab::Project);
 }
 
 void App::drawLibraryBrowserUi() {
