@@ -1,11 +1,11 @@
 {
-  "version": "0.11.5",
+  "version": "0.11.6",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Help > Connect an AI tool: three steps, copyable commands for your tool, example prompts",
-    "The interface in Simplified Chinese",
-    "The brush size ring previews on the mesh while you resize",
-    "Discord status clears when you quit and shows the new SF icon"
+    "Studio controls: one policy file decides which AI tools and providers are allowed",
+    "An audit log of every AI step, and API keys kept in the system keychain",
+    "Sign in with your studio's identity provider (device sign-in, no browser plug-in)",
+    "Empty shelves stay out of the way outside Customize Shelves"
   ]
 }
