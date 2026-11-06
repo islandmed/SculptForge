@@ -1,0 +1,33 @@
+# Real-world size (#148): a 50 x 20 x 12.5 mm print part (STL, Z up) shows its size in Tool and File > Export size,
+# in the unit picked in Preferences > Interface > Units; at 100% and 200% UI scale.
+run ui_look look=classic layout=classic
+run open path=$SCRIPT_DIR/../data/print_part_50mm.stl
+ui_scale 100
+wait_idle 30
+click "Tool##palette.tool"
+expect_text 50 x 12.5 x 20 mm
+shot tool-size-1x
+click "File##palette.file"
+expect_text Export size: 50 x 12.5 x 20 mm
+shot file-export-size-1x
+click "Preferences##palette.preferences"
+click "Interface##preferences.interface"
+expect "mm##units.mm"
+expect "m##file_units.m"
+click "in##units.in"
+shot units-prefs-1x
+click "Tool##palette.tool"
+expect_text 1.969 x 0.4921 x 0.7874 in
+click "Preferences##palette.preferences"
+click "cm##units.cm"
+click "Tool##palette.tool"
+expect_text 5 x 1.25 x 2 cm
+
+ui_scale 200
+wait_idle 30
+shot tool-size-hidpi
+click "File##palette.file"
+expect_text Export size: 5 x 1.25 x 2 cm
+shot file-export-size-hidpi
+click "Preferences##palette.preferences"
+shot units-prefs-hidpi

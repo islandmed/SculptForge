@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Precision work, the app side of core/Precision.h: Steady Stroke with every stroke type (and its catch-up on
-// release), World Size (Size kept in model units, shown in mm), the precision drag (Shift+Alt mid-stroke),
+// release), World Size (Size kept in model units, shown in the Units preference), the precision drag (Shift+Alt mid-stroke),
 // the size readout by the brush, and each brush's own pressure curve (Brush Lab, Preferences > Tablet).
 #include "app/App.h"
 
 #include "app/Theme.h"
 #include "app/Ui.h"
+#include "core/Units.h"
 
 #include <imgui_internal.h>
 
@@ -65,21 +66,28 @@ namespace {
 
 std::filesystem::path utf8Path(const std::string& s) { return std::filesystem::path(std::u8string(s.begin(), s.end())); }
 
-std::string mmText(float mm) {
+// "0.42 mm", "12.5 mm", "289 mm" (or cm, m, in).
+std::string sizeText(float metres, const LengthUnit& unit) {
+    const double v = double(metres) * unit.perMetre;
     char buf[32];
-    std::snprintf(buf, sizeof buf, mm < 1.0f ? "%.2f mm" : mm < 100.0f ? "%.1f mm" : "%.0f mm", double(mm));
+    std::snprintf(buf, sizeof buf, v < 1.0 ? "%.2f %s" : v < 100.0 ? "%.1f %s" : "%.0f %s", v, unit.id);
     return buf;
 }
 
-float shownMm(float radiusPx, float worldRadius, bool worldSize, float wpp) {
-    return (worldSize && worldRadius > 0.0f ? worldRadius : radiusPx * wpp) * kMmPerUnit;
+float shownRadius(float radiusPx, float worldRadius, bool worldSize, float wpp) {
+    return worldSize && worldRadius > 0.0f ? worldRadius : radiusPx * wpp;
 }
 
 } // namespace
 
+const LengthUnit& App::lengthUnit() const {
+    const LengthUnit* u = findLengthUnit(uiPrefs_.lengthUnit);
+    return u ? *u : millimetres();
+}
+
 std::string App::drawSizeLabel() const {
     std::string s = radiusPx_ < 10.0f ? "Size %.1f px" : "Size %.0f px";
-    if (cursorWorldPerPx_ > 0.0f) s += "  " + mmText(shownMm(radiusPx_, worldRadius_, worldSize_, cursorWorldPerPx_));
+    if (cursorWorldPerPx_ > 0.0f) s += "  " + sizeText(shownRadius(radiusPx_, worldRadius_, worldSize_, cursorWorldPerPx_), lengthUnit());
     return s;
 }
 
@@ -87,7 +95,7 @@ std::string App::drawSizeStatus() const {
     char buf[96];
     std::snprintf(buf, sizeof buf, radiusPx_ < 10.0f ? "Size %.1f px" : "Size %.0f px", double(radiusPx_));
     std::string s = buf;
-    if (cursorWorldPerPx_ > 0.0f) s += " (" + mmText(shownMm(radiusPx_, worldRadius_, worldSize_, cursorWorldPerPx_)) + ")";
+    if (cursorWorldPerPx_ > 0.0f) s += " (" + sizeText(shownRadius(radiusPx_, worldRadius_, worldSize_, cursorWorldPerPx_), lengthUnit()) + ")";
     return s;
 }
 

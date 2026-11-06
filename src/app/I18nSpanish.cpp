@@ -554,6 +554,13 @@ constexpr Entry kSpanish[] = {
 
     // --- Preferences > Interface ---
     {"Language", "Idioma"},
+    {"Units", "Unidades"},
+    {"OBJ/PLY in", "OBJ/PLY en"},
+    {"Part size", "Tamaño de la parte"},
+    {"Export size", "Tamaño al exportar"},
+    {"The unit sizes show in: the brush size, the Part size in Tool and the export size in File. SculptForge works in metres; this only changes how sizes read.", "La unidad en que se muestran los tamaños: el tamaño del pincel, el tamaño de la parte en Tool y el tamaño al exportar en File. SculptForge trabaja en metros; esto solo cambia cómo se leen los tamaños."},
+    {"OBJ and PLY files have no units. Their numbers are read in this unit (mm for most 3D printing files, m for Blender and game tools), and exporting OBJ or PLY writes them back in the unit they were opened with, so a part keeps its size. STL is always millimetres.", "Los archivos OBJ y PLY no tienen unidades. Sus números se leen en esta unidad (mm para la mayoría de archivos de impresión 3D, m para Blender y herramientas de juegos), y al exportar OBJ o PLY se escriben en la unidad con la que se abrieron, así la parte conserva su tamaño. STL siempre está en milímetros."},
+    {"The active Part's width x height x depth (X, Y, Z). The unit is set in Preferences > Interface > Units; STL exports write it in millimetres.", "Ancho x alto x profundidad de la parte activa (X, Y, Z). La unidad se elige en Preferences > Interface > Units; las exportaciones STL la escriben en milímetros."},
     {"The language of menus, palettes, shelves and messages. Brush and tool names (Quad Remesh, Forge Spheres, "
      "Clay Block...) stay as they are.",
      "El idioma de los menús, las paletas, los estantes y los mensajes. Los nombres de pinceles y herramientas "

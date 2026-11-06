@@ -190,10 +190,12 @@ void registerBridgeCommands(CommandRegistry& reg) {
 
     reg.add({"export_stl",
              "Export the visible Parts as one binary STL mesh for 3D printing, in millimetres with Z up (what "
-             "slicers expect): 1 unit = 1 m in SculptForge becomes 1000 mm.",
+             "slicers expect): 1 unit = 1 m in SculptForge becomes 1000 mm. A scene opened from an STL is written in "
+             "that STL's unit (open's `unit`), so it comes back out with the numbers it went in with.",
              {{"path", T::String, "Output .stl path (UTF-8).", true},
               {"height_mm", T::Number, "Print height in millimetres: scales the model to this height (overrides scale).", false},
-              {"scale", T::Number, "File units per SculptForge unit. Default 1000 (metres to millimetres).", false},
+              {"scale", T::Number, "File units per SculptForge unit. Default 1000 (metres to millimetres), or the "
+                                   "unit of the STL the scene was opened from.", false},
               {"z_up", T::Bool, "Turn Y up into Z up, so the model stands upright on the print bed. Default true.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string path = argString(a, "path");
@@ -202,14 +204,14 @@ void registerBridgeCommands(CommandRegistry& reg) {
                  const Mesh& mesh = doc.partCount() == 1 ? doc.mesh : (merged = mergedVisibleMesh(doc));
                  StlExportOptions o;
                  o.heightMm = float(argNumber(a, "height_mm", 0.0));
-                 o.scale = float(argNumber(a, "scale", 1000.0));
+                 o.scale = argNumber(a, "scale", doc.unitlessExportScale("stl"));
                  o.zUp = argBool(a, "z_up", true);
                  if (!saveStl(path, mesh, err, o)) return {false, err};
-                 // In millimetres, the printed size as a slicer shows it: width x depth x height.
+                 // The size as a slicer shows it (width x depth x height): STL numbers are read as millimetres.
                  std::string size;
-                 if (o.zUp && (o.heightMm > 0.0f || o.scale == 1000.0f)) {
+                 if (o.zUp) {
                      const glm::vec3 e = mesh.bounds().extent();
-                     const float s = o.heightMm > 0.0f ? o.heightMm / e.y : o.scale;
+                     const double s = o.heightMm > 0.0f ? double(o.heightMm) / e.y : o.scale;
                      char text[96];
                      std::snprintf(text, sizeof(text), ", %.1f x %.1f x %.1f mm", e.x * s, e.z * s, e.y * s);
                      size = text;

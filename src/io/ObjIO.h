@@ -27,7 +27,8 @@ bool loadObj(const std::string& path, std::vector<MeshObject>& out, std::string&
 
 bool saveObj(const std::string& path, const Mesh& mesh, std::string& error);
 // Several objects are written as `o name` blocks; a single one as a plain mesh.
-// Face groups (two or more) are written as `g` groups.
-bool saveObj(const std::string& path, const std::vector<MeshObjectRef>& objects, std::string& error);
+// Face groups (two or more) are written as `g` groups. `scale`: file units per SculptForge unit (metre); OBJ
+// has no units, so 1 writes the numbers as they are and 1000 writes millimetres (Document::unitlessScale).
+bool saveObj(const std::string& path, const std::vector<MeshObjectRef>& objects, std::string& error, double scale = 1.0);
 
 } // namespace sf

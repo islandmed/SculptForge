@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "io/ObjIO.h"
 
+#include "core/Units.h"
+
 #include "io/TextureExport.h"
 
 #include <algorithm>
@@ -282,7 +284,7 @@ bool saveObj(const std::string& path, const Mesh& mesh, std::string& error) {
     return saveObj(path, std::vector<MeshObjectRef>{{"", &mesh}}, error);
 }
 
-bool saveObj(const std::string& path, const std::vector<MeshObjectRef>& objects, std::string& error) {
+bool saveObj(const std::string& path, const std::vector<MeshObjectRef>& objects, std::string& error, double scale) {
     if (objects.empty()) {
         error = "Nothing to export";
         return false;
@@ -360,7 +362,7 @@ bool saveObj(const std::string& path, const std::vector<MeshObjectRef>& objects,
         }
         const bool colors = mesh.colors.size() == mesh.positions.size() && mesh.hasColors();
         for (size_t i = 0; i < mesh.positions.size(); ++i) {
-            const glm::vec3& v = mesh.positions[i];
+            const glm::vec3 v = toFileUnits(mesh.positions[i], scale); // (core/Units.h: 12.7 mm comes back as 12.7)
             int n;
             if (colors) {
                 const glm::vec3 c = linearToSrgb(mesh.colors[i]);

@@ -463,6 +463,13 @@ constexpr Entry kTraditionalChinese[] = {
     // --- Preferences > Config ---
     // --- Preferences > Interface ---
     {"Language", "語言"},
+    {"Units", "單位"},
+    {"OBJ/PLY in", "OBJ/PLY 單位"},
+    {"Part size", "部件尺寸"},
+    {"Export size", "匯出尺寸"},
+    {"The unit sizes show in: the brush size, the Part size in Tool and the export size in File. SculptForge works in metres; this only changes how sizes read.", "尺寸顯示所用的單位：筆刷大小、Tool 中的部件尺寸，以及 File 中的匯出尺寸。SculptForge 以公尺運作；這只改變尺寸的顯示方式。"},
+    {"OBJ and PLY files have no units. Their numbers are read in this unit (mm for most 3D printing files, m for Blender and game tools), and exporting OBJ or PLY writes them back in the unit they were opened with, so a part keeps its size. STL is always millimetres.", "OBJ 和 PLY 檔案沒有單位。其數值以此單位讀取（大多數 3D 列印檔案用 mm，Blender 和遊戲工具用 m），匯出 OBJ 或 PLY 時會以開啟時的單位寫回，因此部件保持原尺寸。STL 一律為公釐。"},
+    {"The active Part's width x height x depth (X, Y, Z). The unit is set in Preferences > Interface > Units; STL exports write it in millimetres.", "目前部件的寬 x 高 x 深（X、Y、Z）。單位在 Preferences > Interface > Units 設定；STL 匯出以公釐寫入。"},
     {"Tooltip delay", "工具提示延遲"},
     {"One sub-palette open", "一次只開啟一個子調色盤"},
     {"Reduce motion", "減少動態效果"},

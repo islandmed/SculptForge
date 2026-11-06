@@ -396,7 +396,8 @@ void registerPaintCommands(CommandRegistry& registry) {
                   }});
 
     registry.add({"export_ply",
-                  "Export the visible Parts as one binary PLY mesh with vertex colours (vertex paint), for scan tools, MeshLab, Blender.",
+                  "Export the visible Parts as one binary PLY mesh with vertex colours (vertex paint), for scan tools, MeshLab, Blender. "
+                  "In metres, or the units of the STL/OBJ/PLY the scene was opened from.",
                   {{"path", T::String, "Output .ply path (UTF-8).", true}},
                   [](Document& doc, const Args& a) -> CommandResult {
                       const std::string path = argString(a, "path");
@@ -404,7 +405,7 @@ void registerPaintCommands(CommandRegistry& registry) {
                       Mesh merged; // no copy for a single Part
                       const Mesh& mesh = doc.partCount() == 1 ? doc.mesh : (merged = mergedVisibleMesh(doc));
                       if (mesh.triangleCount() == 0) return {false, "Nothing visible to export"};
-                      if (!savePlyMesh(path, mesh, err)) return {false, err};
+                      if (!savePlyMesh(path, mesh, err, doc.unitlessExportScale("ply"))) return {false, err};
                       return {true, "Exported " + path + (mesh.hasColors() ? " (with vertex paint)" : "")};
                   }});
     registerPaintLayerCommands(registry); // paint_layer_* (core/PaintLayer.cpp)

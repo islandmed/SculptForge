@@ -32,7 +32,7 @@ bool saveDotSplat(const std::string& path, const SplatCloud& splats, std::string
 
 // Writes a mesh (binary little-endian: positions, normals and, when the mesh
 // has vertex paint, uchar red/green/blue in sRGB; quads where Mesh::quadPartners
-// keeps them, else triangles) that loadPly reads back.
-bool savePlyMesh(const std::string& path, const Mesh& mesh, std::string& error);
+// keeps them, else triangles) that loadPly reads back. `scale`: file units per SculptForge unit, as saveObj.
+bool savePlyMesh(const std::string& path, const Mesh& mesh, std::string& error, double scale = 1.0);
 
 } // namespace sf

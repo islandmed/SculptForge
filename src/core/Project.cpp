@@ -19,6 +19,7 @@
 #include <atomic>
 #include <bit>
 #include <cctype>
+#include <cmath>
 #include <cstring>
 #include <deque>
 #include <filesystem>
@@ -55,7 +56,8 @@ ProjectThumbnailProvider& thumbnailProvider() {
 // version 1); every other key belongs to
 // Document::projectSettings (camera, render, brush, symmetry, ...).
 const char* const kCoreKeys[] = {"format", "version", "app_version", "mesh", "layers", "active_layer",
-                                 "parts", "active_part", "brushes", "active_brush", "splats", "attachments"};
+                                 "parts", "active_part", "brushes", "active_brush", "splats", "attachments",
+                                 "unitless_scale", "unitless_format"};
 
 std::filesystem::path fsPath(const std::string& p) { return std::filesystem::path(std::u8string(p.begin(), p.end())); }
 
@@ -981,6 +983,11 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
     if (doc.projectSettings.isObject())
         for (const auto& [key, value] : doc.projectSettings.members())
             if (!isCoreKey(key)) manifest.set(key, value);
+    // The unit-less file the scene came from (Document::unitlessScale). Optional: older readers ignore it.
+    if (doc.unitlessScale > 0.0) {
+        manifest.set("unitless_scale", doc.unitlessScale);
+        manifest.set("unitless_format", doc.unitlessFormat);
+    }
 
     manifest.set("version", version.version);
     const std::string text = manifest.dump(true);
@@ -1161,6 +1168,11 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
         s.qremeshGuides = std::move(parts[i].qremeshGuides);
     }
     doc.selectPart(activePart);
+    if (const double scale = manifest["unitless_scale"].asNumber(0.0); scale > 0.0 && std::isfinite(scale)) {
+        doc.unitlessScale = scale;
+        const std::string& format = manifest["unitless_format"].asString();
+        doc.unitlessFormat = format == "stl" || format == "obj" || format == "ply" ? format : "";
+    }
     doc.splats = std::move(splats);
     doc.splatsChanged();
     if (!skippedSets.empty())

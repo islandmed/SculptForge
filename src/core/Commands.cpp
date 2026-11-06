@@ -29,6 +29,7 @@
 #include "core/FaceGroups.h"
 #include "core/SelectionSets.h"
 #include "core/Parts.h"
+#include "core/Units.h"
 #include "core/VertexPaint.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
@@ -118,6 +119,28 @@ std::string jsonEscape(const std::string& s) {
     return out;
 }
 
+// The `unit` argument of open / open_obj (core/Units.h): numbers per metre in an STL, OBJ or PLY. Empty: the
+// format's convention (STL millimetres, OBJ and PLY metres). Null with `err` set for an unknown unit.
+const LengthUnit* fileUnitArg(const Args& a, const std::string& ext, std::string& err) {
+    const std::string id = argString(a, "unit");
+    if (id.empty()) return ext == ".stl" ? &millimetres() : &metres();
+    const LengthUnit* u = findLengthUnit(id);
+    if (!u) err = "Unknown unit '" + id + "' (mm, cm, m or in)";
+    return u;
+}
+
+// File numbers to metres, rounded once from double (so writing them back at `perMetre` gives the numbers again).
+void fileUnitsToMetres(Mesh& m, double perMetre) {
+    if (perMetre == 1.0) return;
+    for (glm::vec3& p : m.positions) p = glm::vec3(glm::dvec3(p) / perMetre);
+    for (auto& layer : m.layers)
+        for (glm::vec3& d : layer.delta) d = glm::vec3(glm::dvec3(d) / perMetre);
+}
+
+constexpr const char* kUnitArgHelp = "Unit of the numbers in a unit-less file (STL, OBJ, PLY): mm, cm, m or in. Default "
+                                     "mm for STL, m for OBJ and PLY. Exports to the same kind of file write that unit "
+                                     "back, so the part keeps its size.";
+
 } // namespace
 
 CommandRegistry::CommandRegistry() {
@@ -158,15 +181,20 @@ CommandRegistry::CommandRegistry() {
 
     add({"open_obj",
          "Load a Wavefront OBJ file, replacing the current scene.",
-         {{"path", T::String, "File path (UTF-8).", true}},
+         {{"path", T::String, "File path (UTF-8).", true}, {"unit", T::String, kUnitArgHelp, false}},
          [](Document& doc, const Args& a) -> CommandResult {
              std::string path = argString(a, "path");
              std::vector<MeshObject> objects;
              std::string err;
+             const LengthUnit* unit = fileUnitArg(a, ".obj", err);
+             if (!unit) return {false, err};
              if (!loadObj(path, objects, err)) return {false, err};
+             for (auto& o : objects) fileUnitsToMetres(o.mesh, unit->perMetre);
              const size_t count = objects.size();
              setSceneObjects(doc, std::move(objects), fileStem(path));
              doc.path = path;
+             doc.unitlessScale = unit->perMetre;
+             doc.unitlessFormat = "obj";
              return {true, "Loaded " + path + (count > 1 ? " (" + std::to_string(count) + " Parts)" : "")};
          }});
 
@@ -176,7 +204,7 @@ CommandRegistry::CommandRegistry() {
          "glTF morph targets and FBX/USD blend shapes become sculpt layers. Files with several objects (OBJ `o`, "
          "glTF nodes, FBX models, USD meshes) open as one Part each. SculptForge projects (.sfproj) "
          "restore the whole scene.",
-         {{"path", T::String, "File path (UTF-8).", true}},
+         {{"path", T::String, "File path (UTF-8).", true}, {"unit", T::String, kUnitArgHelp, false}},
          [](Document& doc, const Args& a) -> CommandResult {
              std::string path = argString(a, "path");
              if (isProjectPath(path)) return openProjectCommand(doc, path);
@@ -186,19 +214,26 @@ CommandRegistry::CommandRegistry() {
              SplatCloud splats;
              std::string err;
              BridgeInfo bridge;
+             const LengthUnit* unit = fileUnitArg(a, ext, err);
+             if (!unit) return {false, err};
+             const bool unitless = ext == ".stl" || ext == ".ply" || ext == ".obj";
              bool ok;
              if (ext == ".glb" || ext == ".gltf") ok = loadGltf(path, objects, err, &splats);
              else if (ext == ".usda" || ext == ".usd" || ext == ".usdz") ok = loadUsd(path, objects, splats, err);
              else if (ext == ".splat") ok = loadDotSplat(path, splats, err);
              else if (ext == ".fbx") ok = loadFbx(path, objects, err);
              else if (ext == bridgefile::kExtLower) ok = loadBridge(path, m, err, &bridge);
-             else if (ext == ".stl") ok = loadStl(path, m, err);
+             else if (ext == ".stl") ok = loadStl(path, m, err, unit->perMetre);
              else if (ext == ".sculptforge") ok = loadBridgeFolder(path, objects, err); // numbered Bridge files
              else if (ext == ".ply") {
                  PlyContent content;
                  ok = loadPly(path, m, splats, content, err);
              } else ok = loadObj(path, objects, err);
              if (!ok) return {false, err};
+             if (ext == ".obj" || ext == ".ply") {
+                 fileUnitsToMetres(m, unit->perMetre);
+                 for (auto& o : objects) fileUnitsToMetres(o.mesh, unit->perMetre);
+             }
              if (m.triangleCount() > 0) objects.push_back({"", std::move(m)});
              std::erase_if(objects, [](const MeshObject& o) { return o.mesh.triangleCount() == 0; });
              std::string msg = "Opened " + std::filesystem::path(path).filename().string();  // file name only: status shows in screen recordings
@@ -214,6 +249,10 @@ CommandRegistry::CommandRegistry() {
                  setSceneObjects(doc, std::move(objects), ext == bridgefile::kExtLower && !bridge.name.empty() ? bridge.name : fileStem(path));
                  doc.path = ext == ".obj" ? path : std::string(); // other formats are exported explicitly
                  if (ext == bridgefile::kExtLower) doc.bridgeName = bridge.name;
+                 if (unitless) { // exports write this unit back (Document::unitlessScale)
+                     doc.unitlessScale = unit->perMetre;
+                     doc.unitlessFormat = ext.substr(1);
+                 }
                  msg += " (" + (count > 1 ? std::to_string(count) + " Parts, " : std::string()) + std::to_string(tris) +
                         " triangles" + (quads == 0 ? "" : ", " + std::to_string(quads) + " quads") + (layers == 0 ? "" : ", " + std::to_string(layers) + " layers") + ")";
              }
@@ -331,7 +370,8 @@ CommandRegistry::CommandRegistry() {
          "Export the visible Parts as a Wavefront OBJ file (one `o` object each, face groups as `g` groups). OBJ "
          "cannot hold the mask, visibility, sculpt layers or splats, so this is an export: the document keeps its "
          "path and unsaved-changes state. UVs are kept; a textured Part also writes <name>.mtl and its PNG beside "
-         "the file.",
+         "the file. Positions are in metres, or in the units of the STL/OBJ/PLY the scene was opened from (an STL's "
+         "millimetres stay millimetres).",
          {{"path", T::String, "File path (UTF-8). Defaults to the current document path unless that is a project.", false}},
          [](Document& doc, const Args& a) -> CommandResult {
              std::string path = argString(a, "path", isProjectPath(doc.path) ? std::string() : doc.path);
@@ -340,7 +380,7 @@ CommandRegistry::CommandRegistry() {
              std::string err;
              const auto objects = visiblePartObjects(doc);
              if (objects.empty()) return {false, "Nothing visible to export"};
-             if (!saveObj(path, objects, err)) return {false, err};
+             if (!saveObj(path, objects, err, doc.unitlessExportScale("obj"))) return {false, err};
              return {true, "Saved " + path + objectCountText(objects)};
          }});
 

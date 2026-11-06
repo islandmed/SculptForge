@@ -100,6 +100,14 @@ struct Document {
     bool bvhDirty = false; // set after whole-mesh deformations (e.g. layer weights)
     // Part name of a mesh that came  (Bridge), so sending it back updates that Part.
     std::string bridgeName;
+    // The unit-less file (STL, OBJ, PLY; core/Units.h) the scene was opened from: numbers per metre in it (1000
+    // for millimetres) and its format ("stl", "obj", "ply"). OBJ and PLY exports write in that unit, STL exports
+    // too when it was an STL (else millimetres), so a part comes out at the size and numbers it went in with.
+    // 0 / empty = no such file: each format's default (OBJ, PLY metres; STL millimetres).
+    double unitlessScale = 0.0;
+    std::string unitlessFormat;
+    // File units per metre for an export to `format` ("stl", "obj", "ply") under the rules above.
+    double unitlessExportScale(const std::string& format) const;
     // QRemesh Guides of the active Part: curves QRemesh's edge loops follow (core/QRemeshGuides.h). Not part
     // of undo (Delete Last / Clear remove them); editing them sets `modified`.
     std::vector<QRemeshGuide> qremeshGuides;

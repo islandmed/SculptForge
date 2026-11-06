@@ -663,6 +663,7 @@ public:
 
     std::vector<Prim> prims;
     std::string upAxis = "Y";
+    double metersPerUnit = 1.0; // the stage's unit (0.01: centimetres, as Maya and Houdini often write)
     std::string error;
 
     bool parse() {
@@ -708,6 +709,11 @@ private:
                 advance();
                 if (isPunct("=")) advance();
                 if (tok_.kind == Token::String) upAxis = std::string(tok_.text);
+                advance();
+            } else if (isIdent("metersPerUnit")) {
+                advance();
+                if (isPunct("=")) advance();
+                if (tok_.kind == Token::Number && tok_.number > 0.0 && std::isfinite(tok_.number)) metersPerUnit = tok_.number;
                 advance();
             } else if (isPunct("(") || isPunct("[") || isPunct("{")) {
                 skipBalanced();
@@ -1006,9 +1012,10 @@ bool readUsdaText(const std::string& text, bool split, std::vector<MeshObject>& 
     std::map<std::string, size_t> byPath;
     for (size_t i = 0; i < prims.size(); ++i) byPath[prims[i].path] = i;
 
-    // World transforms (parents come first in `prims`).
-    const glm::mat4 up = parser.upAxis == "Z" ? glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1, 0, 0))
-                                              : glm::mat4(1.0f);
+    // World transforms (parents come first in `prims`), in metres with Y up.
+    const glm::mat4 up = glm::scale(parser.upAxis == "Z" ? glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1, 0, 0))
+                                                         : glm::mat4(1.0f),
+                                    glm::vec3(float(parser.metersPerUnit)));
     std::vector<glm::mat4> world(prims.size());
     for (size_t i = 0; i < prims.size(); ++i) {
         bool reset = false;

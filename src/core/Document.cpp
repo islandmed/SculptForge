@@ -26,6 +26,8 @@ void Document::setMesh(Mesh m, std::string name, BVH* built) {
     activeLayer = -1;
     bvhDirty = false;
     bridgeName.clear();
+    unitlessScale = 0.0;
+    unitlessFormat.clear();
     qremeshGuides.clear();
     parts.clear();
     parts.emplace_back();
@@ -239,6 +241,11 @@ void Document::replaceMeshUndoable(Mesh m, std::string label) {
     undo.push(std::move(r));
     modified = true;
     if (activeLayer >= static_cast<int>(mesh.layers.size())) activeLayer = -1;
+}
+
+double Document::unitlessExportScale(const std::string& format) const {
+    if (format == "stl") return unitlessFormat == "stl" && unitlessScale > 0.0 ? unitlessScale : 1000.0;
+    return unitlessScale > 0.0 ? unitlessScale : 1.0;
 }
 
 } // namespace sf
