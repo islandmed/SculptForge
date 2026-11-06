@@ -221,12 +221,14 @@ void App::regrabAfterViewMove() {
 // toward it (fenix, Discord 11-06). While the cap moves the view, only the pen and touch move the cursor; a mouse's
 // buttons still click.
 bool App::spaceMouseEcho(const SDL_Event& e) const {
-    if (!spaceMousePushed_) return false;
     SDL_MouseID which = 0;
     if (e.type == SDL_EVENT_MOUSE_MOTION) which = e.motion.which;
     else if (e.type == SDL_EVENT_MOUSE_WHEEL) which = e.wheel.which;
     else return false;
-    return which != SDL_PEN_MOUSEID && which != SDL_TOUCH_MOUSEID;
+    if (which == SDL_PEN_MOUSEID || which == SDL_TOUCH_MOUSEID) return false;
+    // (The cap as it is now, too: the echo of its first push comes in the same batch of events as the push, before
+    // the frame reads the axes.)
+    return spaceMousePushed_ || spaceMouseDeflected();
 }
 
 bool App::sixDofPointerEvent(const SDL_Event& e) {

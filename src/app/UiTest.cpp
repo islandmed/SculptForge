@@ -2747,10 +2747,13 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "pen_press") {
         if (!need(2)) return false;
         const float u = num(1, 0.5f), v = num(2, 0.5f), pressure = num(3, 0.5f);
-        run([this, u, v, pressure] {
+        run([this, u, v] {
             if (!penIn_) penProximity(true);
             const ImVec2 p = onModel(u, v);
             penMove(p.x, p.y);
+        });
+        wait(0.05f); // (the panels let go of the pointer first: ImGui's WantCaptureMouse is a frame behind)
+        run([this, pressure] {
             penTouch(true, false);
             penPressure(pressure);
             penPressed_ = true;
