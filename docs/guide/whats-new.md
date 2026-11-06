@@ -8,14 +8,38 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.11.3
 
 ```features
-date: unreleased
+date: 2026-11-05
 tagline: Connect your AI tool in one window, saved camera views, a readable mask, solid remeshes of open parts and the new SF icon.
 highlight: Connect your AI tool in one window
 highlight: Saved camera views and a readable mask
 highlight: Quick Remesh and Voxel Remesh keep open parts solid
 highlight: The UV Editor fits at large UI scales
 highlight: The new orange SF app icon
+highlight: Connect your AI tool in one window
+highlight: Saved camera views and a readable mask
 ```
+
+- The app icon is now the orange SF mark, as on the website; it reads at task bar size.
+- **Help > Connect an AI tool**: use SculptForge from Claude, ChatGPT (Codex CLI), Gemini (Antigravity CLI), Grok
+  (Grok Build), Cursor, VS Code and more. Pick your subscription; the window shows the exact command or settings for
+  your install, with Copy buttons. Claude Desktop installs it from a bundle on each release.
+- **Remeshing an open Part stays solid**: **Quick Remesh** and **Tool > Remesh > Voxel Remesh** cap open borders (the
+  Stylised Head's neck, a cut) before remeshing, so the result is one closed surface, not a shell full of holes. A
+  Part that can't be made solid stays as it is, and the status bar says why.
+- **UV Editor at large UI scales**: the toolbar wraps on a 4K screen at 240 %, so **On model: Colours / Checker** and
+  **Frame** are all visible and each takes its own click.
+- **Dynamic on a subdivided model**: turning on **Dynamic** on a Part with subdivision levels now offers **Freeze
+  Levels and Turn On Dynamic**: the level you see becomes one plain mesh (Ctrl+Z brings the levels back).
+- **Saved views**: **View > Views** has Front, Back, Left, Right, Top and Bottom (Numpad 1, 3, 7; Ctrl for the other
+  side) and **Save View** for your own named camera angles; Numpad 0 goes back to the last one. They are saved with
+  the project.
+- **A readable mask**: masked areas show a soft, dark tint instead of near-black, with **Mask darkness** in
+  Preferences > Interface and Tool > Masking. Dense wireframes no longer turn into a dark moire.
+- **Easier to see**: options that are on stand out in every colour scheme, and Quad Remesh guide curves draw smooth
+  with an outline.
+- **Safer levels**: in Tool > Geometry, **Divide (keeps levels)** and **Subdivide (removes levels)** no longer sit
+  together, Micro has its own group, and Subdivide, Delete Lower and Delete Higher ask before removing levels (with
+  **Don't ask again** for Subdivide).
 
 ## Version 0.11.2
 

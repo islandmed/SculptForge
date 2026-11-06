@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.11.2 LANGUAGES C CXX)
+project(SculptForge VERSION 0.11.3 LANGUAGES C CXX)
 # "beta.1" while this is a beta of that version (title bar and About: "0.11.0 Beta 1"), "" for a stable release.
 # scripts/release.sh sets it; release.yml checks the tag against both (v0.11.0-beta.1).
 set(SCULPTFORGE_PRERELEASE "")
