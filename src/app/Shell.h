@@ -27,6 +27,8 @@ struct PaletteDef {
 };
 const PaletteDef* palettes(int& count); // alphabetical
 const PaletteDef* findPalette(std::string_view id);
+// A palette's name on its panel: Generate is "From Image" while Preferences > AI is off (Relief, Inflate, Stamp).
+const char* paletteTitle(const PaletteDef& p);
 
 // The SculptForge layout's menus, grouped by task (File, Edit, Sculpt, Paint, Mesh, View, Render, Help). Each holds
 // whole palettes as its sections, so every palette (and so every item) has exactly one menu.
@@ -38,6 +40,10 @@ struct TaskMenuDef {
 };
 const TaskMenuDef* taskMenus(int& count);
 int taskMenuOf(std::string_view paletteId); // index into taskMenus, -1 when none
+// Section k's name in its menu: Mesh's "Generate 3D" is "From Image" while Preferences > AI is off (only the offline
+// Relief, Inflate and Stamp are left there).
+const char* taskSectionTitle(const TaskMenuDef& menu, int k);
+const char* taskSectionIcon(const TaskMenuDef& menu, int k); // (an image for From Image, not the AI sparkles)
 
 // ui::ActionButton's Tile look: a brush thumbnail with its name (brush actions), or a large icon over a
 // small caption (right shelf). Returns true when clicked.

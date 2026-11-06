@@ -215,6 +215,7 @@ void Demo::update(float dt) {
         SDL_Log("t=%.2f step=%zu brushlab=(%.0f,%.0f) mouse=(%.0f,%.0f) down=%d", clock_, step_, w->Pos.x, w->Pos.y, mouse_.x,
                 mouse_.y, int(buttonDown_));
     stride_ = 1;
+    if (penResting_) penRestNoise(); // (UiTest.cpp)
     if (!stepLines_.empty()) { // SF_UI_PROFILE: the frame just drawn belongs to the step that was running
         const auto now = std::chrono::steady_clock::now();
         if (lastUpdate_.time_since_epoch().count() != 0 && step_ < stepLines_.size())

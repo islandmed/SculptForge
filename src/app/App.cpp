@@ -1,8 +1,10 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
+#include "app/BrandMark.h"
 #include "io/BridgeProtocol.h"
 #include "core/LayerStack.h"
+#include "core/HardwareProfile.h"
 #include "app/ShellQuote.h"
 #include "app/SpaceCamera.h"
 #include "app/UiScale.h"
@@ -73,6 +75,8 @@ extern const unsigned char fontCjk[];
 extern const unsigned long long fontCjk_size;
 extern const unsigned char appIcon[];
 extern const unsigned long long appIcon_size;
+extern const unsigned char appIconSmall[];
+extern const unsigned long long appIconSmall_size;
 } // namespace assets
 
 namespace {
@@ -173,12 +177,19 @@ bool App::init(const AppOptions& options) {
         else if (saved.maximized || saved.fullscreen) SDL_MaximizeWindow(window_);
     }
     {
-        Image icon;
+        // The detailed tile, with the small-size mark as the alternate for small task bar and title bar icons.
+        Image icon, small;
         std::string iconErr;
         if (Image::decode(assets::appIcon, size_t(assets::appIcon_size), icon, iconErr)) {
             if (SDL_Surface* surface = SDL_CreateSurfaceFrom(icon.width, icon.height, SDL_PIXELFORMAT_RGBA32, icon.rgba.data(),
                                                              icon.width * 4)) {
+                SDL_Surface* alt = Image::decode(assets::appIconSmall, size_t(assets::appIconSmall_size), small, iconErr)
+                                       ? SDL_CreateSurfaceFrom(small.width, small.height, SDL_PIXELFORMAT_RGBA32,
+                                                               small.rgba.data(), small.width * 4)
+                                       : nullptr;
+                if (alt) SDL_AddSurfaceAlternateImage(surface, alt);
                 SDL_SetWindowIcon(window_, surface);
+                if (alt) SDL_DestroySurface(alt);
                 SDL_DestroySurface(surface);
             }
         }
@@ -1354,6 +1365,7 @@ void App::buildUiFonts(float scale) {
 
 void App::handleEvent(const SDL_Event& event) {
     if (dropPenMouseEvent(event)) return; // the pen's mouse events are made here, not by SDL (#95, Tablet.cpp)
+    penNoise_ = penRestNoise(event);      // a resting pen's tilt and jitter (Tablet.cpp)
     penMouseEvents(event, true);          // a pen leaving lets go of the tip's button first
     dispatchEvent(event);
     penMouseEvents(event, false);         // the tip's mouse events, after the pen's own
@@ -1361,6 +1373,7 @@ void App::handleEvent(const SDL_Event& event) {
 
 void App::dispatchEvent(const SDL_Event& event) {
     if (strayMouseMotion(event)) return; // neither the canvas nor the UI follows a driver's stray mouse events
+    if (event.type == SDL_EVENT_MOUSE_MOTION && event.motion.which != SDL_PEN_MOUSEID) mouseSincePen_ = true;
     if (sixDofPointerEvent(event)) return; // nor a SpaceMouse that also says it is a mouse (SpaceMouse.cpp)
     if ((event.type >= SDL_EVENT_KEY_DOWN && event.type < SDL_EVENT_JOYSTICK_AXIS_MOTION &&
          event.type != SDL_EVENT_KEYMAP_CHANGED && event.type != SDL_EVENT_KEYBOARD_ADDED &&
@@ -1640,7 +1653,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         // don't sculpt it: brushes work on the active Part only.)
         // Not from a pen: quick taps of a stippling pen counted as a triple-click and switched the Part. Nor while
         // a pen hovers: a Wacom side button set to Double Click (the Intuos 3 default) and a tap made one (Discord).
-        const bool penNear = penInProximity_ && SDL_GetTicksNS() - lastPenNs_ < 1000000000ull;
+        const bool penNear = penInProximity_ && clickClockNs() - lastPenNs_ < 1000000000ull;
         if (mouseClicks_ >= 3 && !lastInputPen_ && !wintabPen_ && !penNear && !(mod & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) &&
             insertType_.empty() && doc_.partCount() > 1) {
             const int target = pickPart(x, y);
@@ -2051,6 +2064,15 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     haveLastDab_ = false;
     doc_.sculptor.draftStrokes = draftStrokes() && asyncStrokeAllowed(); // (AsyncStroke.cpp)
     doc_.sculptor.adaptiveDabs = fastBigBrushes();
+    // Big brushes where the CPU has room: the exact normals the analytic ones defer land at the pen-up. On a 4-core
+    // floor machine that cost more than it saved (E-core floor, 120 px release 0.5 -> 1.3 s), and at 120 px even on
+    // the 3060 (release +190 ms for -45 ms lag); from 160 px on 6+ threads it wins (3060 240 px p50 428 -> 283 ms,
+    // release +50). SF_ANALYTIC_NORMALS=0/1 forces it (A/B).
+    static const int analyticNormals = [] {
+        if (const char* e = std::getenv("SF_ANALYTIC_NORMALS")) return e[0] != '0' ? 1 : 0;
+        return !simulatedFloorTier() && std::thread::hardware_concurrency() >= 6 ? -1 : 0; // -1: by brush size
+    }();
+    doc_.sculptor.analyticNormals = analyticNormals == 1 || (analyticNormals == -1 && radiusPx_ >= 160.0f);
     fusedDabs_ = 64.0;
     if (!doc_.sculptor.beginStroke(doc_.mesh,
                                    !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushLabel(strokeBrush_),
@@ -2572,7 +2594,7 @@ void App::openPath(const std::string& path) {
     if (Image::isImagePath(path)) {
         if (loadReferenceImage(path)) {
             if (ai::aiEnabled()) showImageTo3D_ = true;
-            else status_ = "Image loaded: Relief, Inflate or Stamp it from Mesh > Generate 3D";
+            else status_ = "Image loaded: Relief, Inflate or Stamp it from Mesh > From Image";
         }
     } else if (ext == ".sfbrush") {
         installBrushFile(path);
@@ -2841,7 +2863,14 @@ void App::drawUi() {
         ImGui::SetNextWindowSize(ImVec2(460 * uiScale_, 0), ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (ImGui::Begin("About SculptForge", &showAbout_, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
+            brand::markItem(64.0f * uiScale_); // the app mark; beside it the name, version and what it is
+            ImGui::SameLine(0.0f, 12.0f * uiScale_);
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (64.0f * uiScale_ - 2.0f * ImGui::GetTextLineHeightWithSpacing()) * 0.5f);
+            ImGui::BeginGroup();
             ImGui::Text("SculptForge %s", appVersionLabel().c_str());
+            ImGui::TextUnformatted("Free and open-source digital sculpting.");
+            ImGui::EndGroup();
+            ImGui::Spacing();
             if (const StudioStart& studio = studioMode(); studio.active) { // a studio build: its logo and name
                 const StudioProfile& p = studio.profile;
                 if (!p.logo.empty())
@@ -2852,8 +2881,6 @@ void App::drawUi() {
                 ImGui::PopStyleColor();
                 ImGui::Spacing();
             }
-            ImGui::TextWrapped("Free and open-source digital sculpting.");
-            ImGui::Spacing();
             ImGui::TextWrapped("%s", ai::kPrivacyLine); // also on the site (website/index.html) and in docs/ai-services.md
             ImGui::Spacing();
             ImGui::TextWrapped("Copyright (C) 2026 The SculptForge contributors. This program is free software: you can "

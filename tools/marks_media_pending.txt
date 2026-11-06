@@ -1,0 +1,1 @@
+# Shots that show a mark, waiting to be re-recorded on current main (tools/check_marks_media.py). Only shrinks.

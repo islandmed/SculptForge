@@ -7,17 +7,17 @@
   <meta name="description" content="SculptForge is a free, open-source sculpting app for VFX, animation and game studios: VFX Reference Platform CY2026 and CY2027 builds, OpenUSD, a Python API, Send to Unreal, Gaussian splats and free built-in AI (an AI brush creator and image or text to 3D), on Linux, macOS and Windows.">
   <meta name="theme-color" content="#111114">
   <meta name="color-scheme" content="dark">
-  <link rel="icon" type="image/svg+xml" href="img/favicon.svg?v=2">
-  <link rel="icon" type="image/png" href="img/favicon-64.png?v=2">
-  <link rel="apple-touch-icon" href="img/icon-256.png?v=2">
+  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png?v=3">
+  <link rel="icon" type="image/png" sizes="64x64" href="img/favicon-64.png?v=3">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=3">
   <meta property="og:type" content="website">
   <meta property="og:title" content="SculptForge - the free, open-source sculpting app for VFX, animation and games">
   <meta property="og:description" content="Sculpting for VFX, animation and games, with classic sculpting keys available. VFX Reference Platform CY2026 and CY2027 builds, OpenUSD, a Python API and Send to Unreal. Free built-in AI: describe a brush and get it, or turn a sketch into a model.">
-  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=4">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=5">
   <meta property="og:url" content="https://sculptforge.app/">
   <link rel="canonical" href="https://sculptforge.app/">
   <script type="application/ld+json">
-  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.11.1", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=4", "sameAs": ["https://github.com/islandmed/SculptForge"]}
+  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.11.1", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=5", "sameAs": ["https://github.com/islandmed/SculptForge"]}
   </script>
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="style.css?v=19">
@@ -28,7 +28,7 @@
   <div class="scroll-progress" aria-hidden="true"></div>
   <header class="nav">
     <div class="wrap nav-inner">
-      <a class="brand" href="#top"><img src="img/logo.svg?v=2" alt="" width="34" height="34"><span>SculptForge</span></a>
+      <a class="brand" href="#top"><img src="img/logo-128.png?v=3" alt="" width="34" height="34"><span>SculptForge</span></a>
       <nav aria-label="Main">
         <a href="#whats-new">What's new</a>
         <a href="#features">Features</a>
@@ -70,17 +70,13 @@
           </ul>
         </div>
         <figure class="hero-video">
-          <video id="hero-video" poster="media/poster-showcase.jpg?v=4" autoplay muted loop playsinline preload="metadata"
-                 aria-label="Weathering a detailed lion head and turning it to stone in SculptForge">
-            <source src="media/showcase-mobile.mp4?v=4" type="video/mp4" media="(max-width: 620px)">
-            <source src="media/showcase-4k.mp4?v=4" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/showcase.mp4?v=4" type="video/mp4">
-          </video>
+          <video id="hero-video" poster="media/poster-showcase.jpg?v=4" muted playsinline preload="none"
+                 aria-label="A detailed lion head sculpted in SculptForge"></video>
           <script>
             if (matchMedia("(max-width: 620px)").matches)
               document.getElementById("hero-video").poster = "media/poster-showcase-mobile.jpg?v=4";
           </script>
-          <figcaption>Real recording of SculptForge, scripted demo rendered at 4K.</figcaption>
+          <figcaption>A lion head sculpted in SculptForge.</figcaption>
         </figure>
       </div>
     </section>
@@ -106,8 +102,8 @@
         <p class="section-lede">New in 0.11.1: Dense scans with micro levels keep up with the pen, and one-click updates on Windows and Linux. <a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
         <div class="wn-home">
           <article class="wn-home-card"><a href="guide/whats-new.html#version-0111"><div class="wn-pic"><img src="guide/images/wn-0111-lucy.jpg" alt="" width="600" height="340" loading="lazy" decoding="async"></div><div class="wn-card-body"><h3>Dense scans keep up <small>new in 0.11.1</small></h3><p>Dense scans with micro levels keep up with the pen, and one-click updates on Windows and Linux.</p><ul><li>Dense scans, fast</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-0110"><div class="wn-pic wn-pic-mark"><img src="img/logo.svg?v=2" alt="" width="64" height="64"></div><div class="wn-card-body"><h3>Experimental <small>new in 0.11.0</small></h3><p>Sixty new brushes in six packs, a Masking panel, a quick tour for experienced sculptors, and experimental options for very dense meshes.</p><ul><li>Sixty new brushes in six built-in packs</li><li>Mask by peaks, colour and facing in a new Masking panel</li><li>A quick tour for experienced sculptors</li><li>Live Move and Background Preview for very dense meshes</li><li>Show SculptForge on Discord (opt-in)</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-01011"><div class="wn-pic wn-pic-mark"><img src="img/logo.svg?v=2" alt="" width="64" height="64"></div><div class="wn-card-body"><h3>Classic sculpting keys and the Bridge <small>new in 0.10.11</small></h3><p>Voxel Remesh 3-4x faster, high-DPI laptops that fit the screen, the right tray in every look, and a Preview channel for betas.</p><ul><li>Voxel Remesh 3-4x faster, never freezes the app</li><li>SculptForge&#x27;s own names throughout</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-0110"><div class="wn-pic wn-pic-mark"><img src="img/logo-128.png?v=3" alt="" width="64" height="64"></div><div class="wn-card-body"><h3>Experimental <small>new in 0.11.0</small></h3><p>Sixty new brushes in six packs, a Masking panel, a quick tour for experienced sculptors, and experimental options for very dense meshes.</p><ul><li>Sixty new brushes in six built-in packs</li><li>Mask by peaks, colour and facing in a new Masking panel</li><li>A quick tour for experienced sculptors</li><li>Live Move and Background Preview for very dense meshes</li><li>Show SculptForge on Discord (opt-in)</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-01011"><div class="wn-pic wn-pic-mark"><img src="img/logo-128.png?v=3" alt="" width="64" height="64"></div><div class="wn-card-body"><h3>Classic sculpting keys and the Bridge <small>new in 0.10.11</small></h3><p>Voxel Remesh 3-4x faster, high-DPI laptops that fit the screen, the right tray in every look, and a Preview channel for betas.</p><ul><li>Voxel Remesh 3-4x faster, never freezes the app</li><li>SculptForge&#x27;s own names throughout</li></ul></div></a></article>
         </div>
         <div class="wn-home-groups">
           <a class="wn-home-group" href="guide/whats-new.html#versions-0101-to-01010"><h3>0.10.1 to 0.10.10</h3><ul><li>Your first sculpt in 10 minutes</li><li>A new look</li><li>PBR viewport</li><li>UV Editor</li><li>Keep Masked remeshing</li><li>Micro levels</li></ul><span>All changes &rarr;</span></a>
@@ -261,35 +257,27 @@ rez-env sculptforge -- sculptforge troll.usda \
     <section id="demos" class="section alt">
       <div class="wrap">
         <h2>See it in action</h2>
-        <p class="section-lede">Every clip is a real, unedited recording of the app, made with its built-in demo
-          recorder. Waits for AI models are sped up and labelled on screen.</p>
+        <p class="section-lede">New clips, recorded on the current version, are on their way.</p>
 
         <div class="demo">
-          <video aria-label="Brush Lab designing a dry cracked mud brush from a text prompt" src="media/brush-lab.mp4" poster="media/poster-brush-lab.jpg" muted loop playsinline preload="none" data-inview tabindex="0"></video>
           <div>
             <h3>Brush Lab: the AI brush creator</h3>
             <p>Type "dry cracked mud", and AI designs the brush. Then ask for "deeper cracks, sharper edges". It's
-              free out of the box with no key. This clip uses a small open model running on the same machine, so
-              nothing leaves the computer.</p>
+              free out of the box with no key. A small open model can run on the same machine, so nothing leaves the computer.</p>
           </div>
         </div>
 
         <div class="demo reverse">
-          <video aria-label="An owl knight concept sketch becoming a full 3D model, then sculpted" src="media/image-to-3d.mp4?v=1" poster="media/poster-image-to-3d.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0"></video>
           <div>
             <h3>From a sketch to a sculptable model in about 20 seconds</h3>
             <p>One concept sketch became a full 3D owl knight, with shields, belt and pouches, a back
               and real depth. It was made with the free Hunyuan3D 2.1 model, then voxel-remeshed into one clean
-              surface ready to sculpt. The wait is sped up in the clip and labelled. You can also type a
+              surface ready to sculpt. You can also type a
               description instead of using an image.</p>
           </div>
         </div>
 
         <div class="demo">
-          <video aria-label="Sculpting a snarl on a lion as a blend shape, generating LODs and sending to Unreal" poster="media/poster-game-ready.jpg?v=4" muted loop playsinline preload="none" data-inview tabindex="0">
-            <source src="media/game-ready-4k.mp4?v=4" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/game-ready.mp4?v=4" type="video/mp4">
-          </video>
           <div>
             <h3>Blend shapes, LODs and Unreal</h3>
             <p>Sculpt a snarl on its own layer and play it back. Generate a LOD chain in one click: even the
@@ -299,10 +287,6 @@ rez-env sculptforge -- sculptforge troll.usda \
         </div>
 
         <div class="demo reverse">
-          <video aria-label="Converting between a sculpt and Gaussian splats" poster="media/poster-splats.jpg?v=4" muted loop playsinline preload="none" data-inview tabindex="0">
-            <source src="media/splats-4k.mp4?v=4" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/splats.mp4?v=4" type="video/mp4">
-          </video>
           <div>
             <h3>Gaussian splats, both ways</h3>
             <p>Turn a sculpt into Gaussian splats for web viewers and engines, and turn splat captures into
@@ -416,7 +400,7 @@ rez-env sculptforge -- sculptforge troll.usda \
   <footer class="footer">
     <div class="wrap footer-grid">
       <div>
-        <a class="brand" href="#top"><img src="img/logo.svg?v=2" alt="" width="28" height="28"><span>SculptForge</span></a>
+        <a class="brand" href="#top"><img src="img/logo-128.png?v=3" alt="" width="28" height="28"><span>SculptForge</span></a>
         <p class="fine">Copyright © 2026 The SculptForge contributors.<br>Licensed under the
           <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
       </div>

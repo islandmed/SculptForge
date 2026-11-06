@@ -215,9 +215,14 @@ highlights_ok() {
 highlights_fix="write 3-5 one-line highlights (what users get) to a file and run again with HIGHLIGHTS=that-file"
 # The words people write for What's New: the guide section and (after step bump wrote it) the UI test's pin to it.
 words_ok() {
+    python3 tools/check_marks_media.py >/dev/null 2>&1 || die "an image or video shows a mark: $(python3 tools/check_marks_media.py 2>/dev/null | grep -v '^check_marks_media:' | head -3)" "swap in a clean capture from current main (python3 tools/check_marks_media.py lists them), commit, push main"
     python3 tools/release/assemble_notes.py --check >/dev/null || die "a note fragment in changes/ doesn't parse: $(python3 tools/release/assemble_notes.py --check 2>&1)" "fix it (changes/README.md has the format), commit, push main"
     grep -q "^## Version ${BASE//./\\.}\$" docs/guide/whats-new.md || grep -qs '^whats_new:' changes/*.md ||
         die "docs/guide/whats-new.md has no '## Version $BASE'" "write that section at the top (Help > What's New shows it), commit, push main"
+    # Numbers still waiting for a measurement are written {{NAME}}; none may ship.
+    local ph
+    ph=$(grep -Hn '{{[A-Z0-9_]*}}' docs/guide/whats-new.md CHANGELOG.md changes/*.md ${HIGHLIGHTS:+"$HIGHLIGHTS"} 2>/dev/null | head -5 || true)
+    [ -z "$ph" ] || die "unfilled placeholders: $ph" "put the measured numbers in (or drop those lines), commit, push main"
     [ "${1:-}" = bump ] || python3 tools/release/pin_whats_new_test.py "$BASE" --check >/dev/null ||
         die "tests/ui/whats_new.sfui isn't pinned to $BASE's What's New" "run step bump (it pins it): $(resume bump)"
 }
@@ -257,6 +262,7 @@ preflight() {
     auth=$(gh auth status 2>&1 || true)
     grep -q "account $AUTHOR_NAME" <<<"$auth" || die "gh is not logged in as $AUTHOR_NAME" "gh auth login (or gh auth switch -u $AUTHOR_NAME)"
     words_ok "$mode"
+    python3 tools/brush-gallery/check_published.py >/dev/null 2>&1 || die "the public gallery (islandmed/sculptforge-brushes) differs from tools/brush-gallery/repo: $(python3 tools/brush-gallery/check_published.py 2>/dev/null | head -3)" "copy tools/brush-gallery/repo into a clone of it, commit, push its main"
     grep -q '^set(SCULPTFORGE_PRERELEASE "[a-z0-9.]*")$' CMakeLists.txt ||
         die "CMakeLists.txt lost its set(SCULPTFORGE_PRERELEASE \"\") line that step bump sets" "restore it under project() (git log -p CMakeLists.txt), commit"
     python3 -c 'import json, sys; json.load(open(sys.argv[1]))' website/latest.json 2>/dev/null || die "website/latest.json is not valid JSON" "fix it, commit"

@@ -66,8 +66,11 @@ Use it to:
 - even out stretched triangles after heavy Move or Tendril work;
 - clean up scans, splat conversions and AI-generated models before sculpting.
 
-The **Resolution** slider next to the button sets how many voxels span the longest side of the model (64 to 400 in
-the palette, default 200). Higher keeps more detail and makes more triangles.
+The **Resolution** slider next to the button sets how many voxels span the longest side of the model (32 to 512, as
+the `remesh` command; default 200). Higher keeps more detail and makes more triangles. 512 is safe on an 8 GB
+computer: a 28M-triangle scan remeshes at 512 in about 8 s (14 s on 4 cores) into about 760,000 triangles; a round
+2M-triangle sculpt, which fills its box, in about 3 s (5 s on 4 cores) into about 2.5 million triangles, with about
+2 GB of memory at its peak.
 
 ![Wireframe of a model before and after a voxel remesh](images/remesh.jpg)
 

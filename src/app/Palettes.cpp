@@ -87,6 +87,23 @@ int taskMenuOf(std::string_view paletteId) {
     return -1;
 }
 
+const char* paletteTitle(const PaletteDef& p) {
+    return std::string_view(p.id) == "generate" && !ai::aiEnabled() ? "From Image" : p.name;
+}
+
+const char* taskSectionTitle(const TaskMenuDef& menu, int k) {
+    if (std::string_view(menu.sections[k]) == "generate" && !ai::aiEnabled()) return "From Image";
+    if (menu.titles[k]) return menu.titles[k];
+    const PaletteDef* p = findPalette(menu.sections[k]);
+    return p ? p->name : menu.sections[k];
+}
+
+const char* taskSectionIcon(const TaskMenuDef& menu, int k) {
+    if (std::string_view(menu.sections[k]) == "generate" && !ai::aiEnabled()) return ICON_LC_IMAGE;
+    const PaletteDef* p = findPalette(menu.sections[k]);
+    return p ? p->icon : "";
+}
+
 namespace {
 
 // The hairline under each sub-palette header: opaque, a clear step above panelBg so the closed list reads as rows.
@@ -821,7 +838,7 @@ void App::drawPalette_Tool() {
         }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(-1);
-        tray::SliderInt("##voxres", &voxelResolution_, 64, 400, "Resolution %d");
+        tray::SliderInt("##voxres", &voxelResolution_, 32, 512, "Resolution %d"); // as the remesh command (fxrtst 11-05)
         ui::HelpText("Resolution", nullptr, "Voxels across the model: higher keeps more detail and makes more triangles.",
                      "Tool > Remesh");
         if (voxelRemesh_) {

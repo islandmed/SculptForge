@@ -173,7 +173,7 @@ void App::handlePhoneCapture(const link::PhoneEvent& e) {
             return;
         }
         if (!ai::aiEnabled()) { // Preferences > AI is off: the photo stays the reference image
-            status_ = "Photo received (" + where + "): Relief, Inflate or Stamp it from Mesh > Generate 3D";
+            status_ = "Photo received (" + where + "): Relief, Inflate or Stamp it from Mesh > From Image";
             return;
         }
         showImageTo3D_ = true;

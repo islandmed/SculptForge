@@ -3,7 +3,7 @@ name: Website
 on:
   push:
     branches: [main]
-    paths: ['website/**', 'docs/supporters.txt', '.github/workflows/pages.yml']
+    paths: ['website/**', 'docs/supporters.txt', '.github/workflows/pages.yml', 'tools/marks_media_flagged.txt']
   workflow_dispatch:
 
 permissions:
@@ -40,6 +40,9 @@ jobs:
             rm -rf website/guide
             git archive "$tag" website/guide website/sitemap.xml | tar -x
           fi
+      # No image or video that shows a mark goes out, whichever commit it came from (tools/marks_media_flagged.txt).
+      - name: Media takedown
+        run: python3 tools/media_takedown.py website
       # The credits page always matches docs/supporters.txt on main.
       - name: Supporters page
         run: python3 tools/guide/build_site.py --supporters

@@ -355,7 +355,8 @@ if(SCULPTFORGE_BUILD_APP)
     fontMono ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-Regular.ttf # the looks (Preferences > Interface > Look)
     fontMonoBold ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-SemiBold.ttf
     fontCjk ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansTC-UI.otf # Traditional Chinese (tools/i18n/subset_cjk_font.py)
-    appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png
+    appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png # the window icon and the in-app mark (BrandMark.cpp)
+    appIconSmall ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-small-64.png # the mark below 48 px
     supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt # Help > About (never empty: it starts with comments)
     foundingMembers ${CMAKE_CURRENT_SOURCE_DIR}/website/founding.json) # Help > About and the membership card
   include(cmake/EmbedGuide.cmake)
@@ -386,6 +387,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Thumbnails.cpp
     src/app/Pickers.cpp
     src/app/UserGuide.cpp
+    src/app/BrandMark.cpp
     src/app/PanelMasking.cpp
     src/app/PanelCut.cpp
     src/app/PanelView.cpp
@@ -484,20 +486,8 @@ if(SCULPTFORGE_BUILD_APP)
     endif()
   endif()
   if(APPLE)
-    # App icon: build an .icns from the 1024 px PNG with Apple's own tools.
-    set(ICONSET ${CMAKE_CURRENT_BINARY_DIR}/SculptForge.iconset)
-    set(ICNS ${CMAKE_CURRENT_BINARY_DIR}/SculptForge.icns)
-    set(ICON_SRC ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-1024.png)
-    set(ICON_COMMANDS COMMAND ${CMAKE_COMMAND} -E make_directory ${ICONSET})
-    foreach(size 16 32 128 256 512)
-      math(EXPR size2 "${size} * 2")
-      list(APPEND ICON_COMMANDS
-        COMMAND sips -z ${size} ${size} ${ICON_SRC} --out ${ICONSET}/icon_${size}x${size}.png
-        COMMAND sips -z ${size2} ${size2} ${ICON_SRC} --out ${ICONSET}/icon_${size}x${size}@2x.png)
-    endforeach()
-    add_custom_command(OUTPUT ${ICNS} ${ICON_COMMANDS}
-      COMMAND iconutil -c icns ${ICONSET} -o ${ICNS}
-      DEPENDS ${ICON_SRC} VERBATIM)
+    # App icon: assets/branding/sculptforge.icns (tools/brand/make_icons.py: 16 and 32 px from the small-size mark).
+    set(ICNS ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge.icns)
     target_sources(sculptforge PRIVATE ${ICNS})
     set_source_files_properties(${ICNS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
     set_target_properties(sculptforge PROPERTIES
@@ -505,7 +495,7 @@ if(SCULPTFORGE_BUILD_APP)
       OUTPUT_NAME "SculptForge"
       MACOSX_BUNDLE_BUNDLE_NAME "SculptForge"
       MACOSX_BUNDLE_GUI_IDENTIFIER "org.sculptforge.SculptForge"
-      MACOSX_BUNDLE_ICON_FILE "SculptForge.icns"
+      MACOSX_BUNDLE_ICON_FILE "sculptforge.icns"
       MACOSX_BUNDLE_COPYRIGHT "Copyright (C) 2026 The SculptForge contributors. GPL-3.0-or-later."
       MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
       MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}")
@@ -524,12 +514,10 @@ endif()
 if(UNIX AND NOT APPLE)
   install(FILES packaging/linux/org.sculptforge.SculptForge.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
   install(FILES packaging/linux/org.sculptforge.SculptForge.metainfo.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
-  install(FILES assets/branding/sculptforge-icon.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
-          RENAME org.sculptforge.SculptForge.svg)
-  install(FILES assets/branding/sculptforge-256.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps
-          RENAME org.sculptforge.SculptForge.png)
-  install(FILES assets/branding/sculptforge-512.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps
-          RENAME org.sculptforge.SculptForge.png)
+  foreach(size 16 24 32 48 64 128 256 512) # (tools/brand/make_icons.py; below 48 px the small-size mark)
+    install(FILES assets/branding/sculptforge-${size}.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${size}x${size}/apps
+            RENAME org.sculptforge.SculptForge.png)
+  endforeach()
 endif()
 if(APPLE)
   set(SF_DOC_DIR .)
@@ -757,6 +745,14 @@ if(SCULPTFORGE_BUILD_TESTS)
     # website/brushes.html #packs matches src/core/BrushPacks.cpp: every brush, its preview and the guide links.
     add_test(NAME website_brush_packs COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/brush-packs/sync_website.py --check)
     add_test(NAME marks_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py --self-test)
+    # The same marks read off the pixels of every tracked image and video (OCR, cached by file hash), and the deploy's
+    # takedown of flagged ones (tools/media_takedown.py).
+    add_test(NAME marks_media COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks_media.py
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME marks_media_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks_media.py --self-test)
+    add_test(NAME media_takedown_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/media_takedown.py --self-test)
+    # The public gallery repository matches tools/brush-gallery/repo (the live compare is in release.sh: network).
+    add_test(NAME gallery_published_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/brush-gallery/check_published.py --self-test)
     add_test(NAME release_notes COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --self-test)
     add_test(NAME release_notes_fragments COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --check)
     # The members' publishing path stays locked down: release.yml's actions pinned to commit SHAs, INSIDERS_REPO_TOKEN only

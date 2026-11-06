@@ -2239,7 +2239,13 @@ private:
     float penMouseX_ = 0.0f, penMouseY_ = 0.0f; // the pen's last position (window pixels, before mouse mode)
     PenCursor penCursor_; // where the pen puts the cursor (Preferences > Tablet > Mouse mode)
     bool penInProximity_ = false, penTouching_ = false, penEraser_ = false;
-    Uint64 lastPenNs_ = 0; // when the last pen event arrived (see onMouseMove)
+    Uint64 lastPenNs_ = 0; // when the pen last did something (see onMouseMove; not a resting pen's noise)
+    // A pen resting in range (laid on the tablet, held still above it) still sends tilt and sub-pixel motion: that
+    // noise doesn't count as the pen in use, so the mouse and trackpad work beside it (phoenix 11-05, Tablet.cpp).
+    bool penRestNoise(const SDL_Event& e);
+    bool penNoise_ = false;        // the event being handled is such noise
+    bool mouseSincePen_ = false;   // the mouse moved the cursor since the pen last did something
+    float penActiveX_ = 0.0f, penActiveY_ = 0.0f; // where it did (window pixels)
     Uint64 lastPenTouchNs_ = 0; // when the pen tip last touched down or lifted (strayMouseMotion)
     uint32_t penButtons_ = 0; // bit N: pen button N is held
     int penNavButton_ = 0;    // the pen button driving a view drag (0: none)
