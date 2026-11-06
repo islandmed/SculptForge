@@ -7,12 +7,15 @@ added: **Units** (Edit > Preferences > Interface, #148, thanks @Swar55): sizes s
   the active Part's width x height x depth under its name in Tool, and the size exports write in File > Import /
   Export. **OBJ/PLY in** reads the numbers in OBJ and PLY files (which have no units) as mm, cm, m (the default) or
   inches; `open`, `open_obj` and `part_append` take `unit=` for scripts, and STL files may be read as inches too.
-fixed: Exports keep the size a part was opened with (#148, @Swar55): a scene opened from an STL, OBJ or PLY writes
-  OBJ and PLY in that file's unit (an STL opened in millimetres used to come out of OBJ export 1000x smaller), an
-  STL opened in another unit is written back in it, and decimal sizes round-trip exactly (12.7 mm stays 12.7, not
-  12.700001). Projects remember the unit.
-fixed: USD files in centimetres (`metersPerUnit = 0.01`, as Maya and Houdini write) open at their real size instead
-  of 100x too large, to the exact millimetre (#148, thanks @NicTanghe).
+fixed: **OBJ and PLY exported from an STL are now the right size: 1000x bigger than in 0.11.9.** 0.11.9 read the
+  STL in millimetres but wrote OBJ and PLY in metres, so a 50 mm part came out as 0.05 (#148, thanks @Swar55). A scene
+  opened from an STL, OBJ or PLY now writes OBJ and PLY in that file's own unit, an STL opened in another unit is
+  written back in it, and decimal sizes come back exactly (12.7 mm stays 12.7, not 12.700001). Projects remember the
+  unit. If you scaled these exports by 1000 in another app, you no longer need to.
+fixed: **USD stages in centimetres now open at their true size: 100x smaller than in 0.11.9.** 0.11.9 ignored
+  `metersPerUnit`, so a stage from Maya or Houdini (`metersPerUnit = 0.01`) opened 100x too large: a 180 cm figure
+  was 180 m. It is now 1.8 m (#148, thanks @NicTanghe). Stages in metres, and USD files SculptForge wrote, open as
+  before.
 testers:
   - Open an STL from your slicer (e.g. a 20 mm calibration cube): Tool shows 20 x 20 x 20 mm. File > Export OBJ and
     Export STL, open both in the slicer: both are 20 mm.

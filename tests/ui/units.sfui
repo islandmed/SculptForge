@@ -31,3 +31,12 @@ expect_text Export size: 5 x 1.25 x 2 cm
 shot file-export-size-hidpi
 click "Preferences##palette.preferences"
 shot units-prefs-hidpi
+
+# Simplified Chinese: the Units rows translated, the unit names stay (mm, cm, m, in).
+ui_scale 100
+wait_idle 30
+click "简体中文##language.zh-CN"
+expect_text 单位
+expect "mm##units.mm"
+shot units-prefs-zh-cn-1x
+click "English##language.en"
