@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The interface language (#44, app/I18n.h): exact lookups, the English fallback, labels whose "##id" must not
-// change, icon prefixes and printf tails, and Spanish and Traditional Chinese tables that are safe to hand to printf
+// change, icon prefixes and printf tails, and Spanish, Traditional and Simplified Chinese tables that are safe to hand to printf
 // and that the UI fonts can draw.
 #include "TestHarness.h"
 
@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <iterator>
 #include <set>
@@ -172,14 +173,23 @@ TEST(i18n_language_codes) {
     CHECK(languageFromCode("zh_TW") == Language::TraditionalChinese);
     CHECK(languageFromCode("zh-HK") == Language::TraditionalChinese);
     CHECK(languageFromCode("zh-Hant-TW") == Language::TraditionalChinese);
-    CHECK(languageFromCode("zh-CN") == Language::English); // Simplified: no table yet
-    CHECK(languageFromCode("zh") == Language::English);
+    CHECK(std::string(languageCode(Language::SimplifiedChinese)) == "zh-CN");
+    CHECK(languageFromCode("zh-CN") == Language::SimplifiedChinese);
+    CHECK(languageFromCode("zh_CN") == Language::SimplifiedChinese);
+    CHECK(languageFromCode("zh-SG") == Language::SimplifiedChinese);
+    CHECK(languageFromCode("zh-Hans") == Language::SimplifiedChinese);
+    CHECK(languageFromCode("zh-Hans-CN") == Language::SimplifiedChinese);
+    CHECK(languageFromCode("zh") == Language::SimplifiedChinese);
+    CHECK(languageFromCode("zh-Hant-HK") == Language::TraditionalChinese);
+    CHECK(languageFromCode("zh-MO") == Language::TraditionalChinese);
     CHECK(languageFromCode("esperanto") == Language::English);
     CHECK(languageFromCode(languageCode(Language::TraditionalChinese)) == Language::TraditionalChinese);
+    CHECK(languageFromCode(languageCode(Language::SimplifiedChinese)) == Language::SimplifiedChinese);
+    CHECK(std::string(languageName(Language::SimplifiedChinese)) == "\u7b80\u4f53\u4e2d\u6587");
 }
 
 TEST(i18n_tables_are_well_formed) {
-  for (const Language lang : {Language::Spanish, Language::TraditionalChinese}) {
+  for (const Language lang : {Language::Spanish, Language::TraditionalChinese, Language::SimplifiedChinese}) {
     std::set<std::string_view> seen;
     int problems = 0;
     for (const i18n::Entry& e : i18n::table(lang)) {
@@ -220,19 +230,28 @@ TEST(i18n_spanish_table_fits_the_font) {
 }
 
 TEST(i18n_chinese_table_fits_the_font) {
-    // Chinese text is Inter, the icons, and assets/fonts/NotoSansTC-UI.otf merged in (App::mergeCjkFont): a subset with
-    // only the characters the table uses. A character it lacks draws as "?": run tools/i18n/subset_cjk_font.py.
-    const std::set<unsigned> cjk = fontCodepoints(std::string(SF_TEST_DATA_DIR) + "/../../assets/fonts/NotoSansTC-UI.otf");
-    CHECK(cjk.size() > 500);
-    std::set<unsigned> missing;
-    for (const i18n::Entry& e : i18n::traditionalChineseTable())
-        for (const unsigned cp : codepoints(e.translated))
-            if (!inLatinFont(cp) && !cjk.count(cp) && missing.insert(cp).second)
-                std::printf("  U+%04X is not in NotoSansTC-UI.otf: \"%s\"\n", cp, e.translated);
-    // The Preferences button shows the language's own name in every language (App::mergeCjkFont's kNameRanges).
-    for (const unsigned cp : codepoints(languageName(Language::TraditionalChinese)))
-        if (!cjk.count(cp)) missing.insert(cp);
-    CHECK(missing.empty());
+    // Chinese text is Inter, the icons, and a Noto Sans CJK subset merged in (App::mergeCjkFont): NotoSansTC-UI.otf for
+    // Traditional, NotoSansSC-UI.otf for Simplified, each with only the characters its table uses. A character it lacks
+    // draws as "?": run tools/i18n/subset_cjk_font.py.
+    const std::string fonts = std::string(SF_TEST_DATA_DIR) + "/../../assets/fonts/";
+    struct Face {
+        Language language;
+        const char* file;
+    };
+    for (const Face face : {Face{Language::TraditionalChinese, "NotoSansTC-UI.otf"},
+                            Face{Language::SimplifiedChinese, "NotoSansSC-UI.otf"}}) {
+        const std::set<unsigned> cjk = fontCodepoints(fonts + face.file);
+        CHECK(cjk.size() > 500);
+        std::set<unsigned> missing;
+        for (const i18n::Entry& e : i18n::table(face.language))
+            for (const unsigned cp : codepoints(e.translated))
+                if (!inLatinFont(cp) && !cjk.count(cp) && missing.insert(cp).second)
+                    std::printf("  U+%04X is not in %s: \"%s\"\n", cp, face.file, e.translated);
+        // The Preferences button shows the language's own name in every language (App::mergeCjkFont's name ranges).
+        for (const unsigned cp : codepoints(languageName(face.language)))
+            if (!cjk.count(cp)) missing.insert(cp);
+        CHECK(missing.empty());
+    }
 }
 
 TEST(i18n_chinese_lookup_keeps_ids_and_brush_names) {
@@ -245,4 +264,22 @@ TEST(i18n_chinese_lookup_keeps_ids_and_brush_names) {
     const std::string on = "On"; // a brush setting, not a brush: translated
     CHECK(std::string(trAction("brush.pen_size_on", on)) == "\u958b\u555f");
     CHECK(trPath("Tool > Geometry") == "\u5de5\u5177 > \u5e7e\u4f55");
+}
+
+TEST(i18n_simplified_chinese_lookup) {
+    LanguageScope scope(Language::SimplifiedChinese);
+    CHECK(std::string(tr("Preferences##palette.preferences")) == "\u504f\u597d\u8bbe\u7f6e##palette.preferences"); // 偏好设置
+    CHECK(std::string(tr("Undo")) == "\u64a4\u9500");                                                     // 撤销
+    CHECK(std::string(trAction("brush.move", std::string("Move"))) == "Move");
+    CHECK(trPath("Tool > Geometry") == "\u5de5\u5177 > \u51e0\u4f55"); // 工具 > 几何
+    // Mainland words, not the Taiwan ones the table was converted from.
+    int taiwanese = 0;
+    for (const i18n::Entry& e : i18n::simplifiedChineseTable())
+        for (const char* tw : {"\u9884\u8bbe\u503c", "\u5de5\u5177\u5217", "\u62d6\u66f3", "\u6309\u4e00\u4e0b",
+                               "\u7b97\u7ed8", "\u5feb\u901f\u952e"}) // 预设值 工具列 拖曳 按一下 算绘 快速键
+            if (std::strstr(e.translated, tw)) {
+                std::printf("  Taiwan term in: \"%s\"\n", e.translated);
+                ++taiwanese;
+            }
+    CHECK(taiwanese == 0);
 }

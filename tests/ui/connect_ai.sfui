@@ -1,5 +1,7 @@
-# Help > Connect an AI tool (PanelConnectAi.cpp): the subscription picker and, for this install, each tool's command or
-# settings. Only while AI features are on (Preferences > AI). UI tests never start a browser: no docs or bundle clicks.
+# Help > Connect an AI tool (PanelConnectAi.cpp): the in-app guide in three steps. 1. pick your tool: for this install,
+# the live-mode server's exact command or settings (--mcp --attach, listed as sculptforge-live); 2. the live-mode
+# switch, right there; 3. what happens next; example prompts with Copy. Only while AI features are on (Preferences > AI).
+# UI tests never start a browser: no docs clicks.
 run ui_look look=classic layout=classic
 run new_sphere subdivisions=3
 run ai_features on=true
@@ -7,32 +9,36 @@ click "Help##palette.help"
 expect "Connect an AI tool...##help.connect_ai"
 click "Connect an AI tool...##help.connect_ai"
 expect_value connect_ai_open == 1
-expect_text "This install:"
-expect_text "sculptforge-cli"
-# Claude first: Claude Desktop and Claude Code.
-expect_text "Claude Desktop"
-expect_text "claude mcp add --scope user sculptforge --"
-shot connect_claude
-click "ChatGPT##plan1"
-expect_text "codex mcp add sculptforge --"
-expect_text "The ChatGPT app only connects to remote (HTTPS) servers"
-shot connect_chatgpt
-click "Gemini##plan2"
-expect_text "Antigravity CLI"
-expect_text "mcp_config.json"
-shot connect_gemini
-click "Grok##plan3"
-expect_text "grok mcp add sculptforge --"
-shot connect_grok
-click "Other tools##plan4"
-expect_text "Cursor"
-expect_text "context_servers"
-expect_text "Rovo Dev CLI"
+# Claude Code first.
+expect_text "1. Pick your tool"
+expect_text "claude mcp add --scope user sculptforge-live --"
+expect_text "--mcp --attach"
+expect_text "2. Let it work in this window"
+expect_text "3. What happens next"
+expect_text "Try asking"
+shot connect_claude_code
+click "Claude Desktop##ai_tool.claude_desktop"
+expect_text "claude_desktop_config.json"
+expect_text "sculptforge-live"
+shot connect_claude_desktop
+click "Cursor##ai_tool.cursor"
+expect_text "mcp.json"
+click "Other tools##ai_tool.other"
+expect_text "codex mcp add sculptforge-live --"
 shot connect_other
 # Copy puts the exact text on the clipboard.
-click "Copy##install"
+click "Copy##prompt0"
 expect_status Copied to the clipboard
-expect_clipboard sculptforge-cli
+expect_clipboard "creature head"
+click "Copy##0"
+expect_clipboard "codex mcp add sculptforge-live"
+# Step 2 is live mode's own switch: on here is on in Preferences > AI.
+expect_value ai_link_state == 0
+click "Let AI tools control this window##connect.ai_live"
+expect_value ai_link_state == 1
+expect_text "On: your AI tool can ask to connect."
+click "Let AI tools control this window##connect.ai_live"
+expect_value ai_link_state == 0
 # AI off: the window closes and Help no longer offers it.
 run ai_features on=false
 expect_value connect_ai_open == 0

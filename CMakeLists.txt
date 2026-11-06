@@ -327,7 +327,7 @@ target_link_libraries(sculptforge-cli PRIVATE sculptforge_core sculptforge_ai sc
 if(SCULPTFORGE_BUILD_APP OR SCULPTFORGE_BUILD_TESTS)
   add_library(sculptforge_appshared STATIC src/app/AssetLibrary.cpp src/app/BrushPreview.cpp src/app/UiLayout.cpp
     src/app/ShellGeometry.cpp src/app/LookSchemes.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp
-    src/app/I18nTraditionalChinese.cpp src/app/ConnectAi.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
+    src/app/I18nTraditionalChinese.cpp src/app/I18nSimplifiedChinese.cpp src/app/ConnectAi.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
   target_link_libraries(sculptforge_appshared PUBLIC sculptforge_core)
   if(MSVC)
     target_compile_options(sculptforge_appshared PRIVATE /W4 /utf-8 /permissive-)
@@ -357,6 +357,7 @@ if(SCULPTFORGE_BUILD_APP)
     fontMono ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-Regular.ttf # the looks (Preferences > Interface > Look)
     fontMonoBold ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-SemiBold.ttf
     fontCjk ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansTC-UI.otf # Traditional Chinese (tools/i18n/subset_cjk_font.py)
+    fontCjkSc ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansSC-UI.otf # Simplified Chinese (the same tool)
     appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png # the SF app icon: window, title bar (BrandMark.cpp)
     appIconSmall ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-32.png # its small cut (up to 32 px)
     bustMark ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/bust/bust-256.png # the illustration: About, What's New, support card
@@ -751,7 +752,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME raw_literal_size COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/dev/check_literals.py)
     # website/brushes.html #packs matches src/core/BrushPacks.cpp: every brush, its preview and the guide links.
     add_test(NAME website_brush_packs COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/brush-packs/sync_website.py --check)
-    # Every interface label has a Spanish and a Traditional Chinese translation (or is a name kept in English,
+    # Every interface label has a Spanish, a Traditional and a Simplified Chinese translation (or is a name kept in English,
     # tools/i18n/keep_english.txt): a new label without one fails here, not in a release.
     add_test(NAME i18n_coverage COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/i18n/coverage.py --check)
     add_test(NAME marks_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py --self-test)
