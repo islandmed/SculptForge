@@ -28,6 +28,27 @@ void App::registerAiActions() {
     sw.checked = [] { return ai::aiEnabled(); };
     sw.enabled = [] { return !ai::aiPolicyLocked(); };
     actions_.add(std::move(sw));
+    if (!actions_.find("prefs.ai_live")) { // live mode (PanelAiLink.cpp): its switch and the kill switch
+        Action live;
+        live.id = "prefs.ai_live";
+        live.label = "Let AI tools control this window";
+        live.palette = "Preferences > AI";
+        live.description = "Live mode: an AI tool on this computer (sculptforge-cli --mcp --attach) can ask to sculpt in this "
+                           "window while you watch. You approve each connection; files outside the project, scripts and "
+                           "the network ask first. Nothing listens on the network.";
+        live.run = [this] { setAiLiveControl(!aiSettings_.liveControl); };
+        live.checked = [this] { return aiSettings_.liveControl; };
+        live.enabled = [] { return ai::aiEnabled(); };
+        actions_.add(std::move(live));
+        Action cut;
+        cut.id = "ai.live_disconnect";
+        cut.label = "Disconnect AI tool";
+        cut.palette = "Preferences > AI";
+        cut.description = "Stop the AI tool controlling this window now (its steps stay in Undo).";
+        cut.run = [this] { aiLinkDisconnect("AI tool disconnected"); };
+        cut.enabled = [this] { return aiLinkStateValue() >= 2; };
+        actions_.add(std::move(cut));
+    }
     commands_.remove("ai_features"); // (called again when AI is turned back on)
     commands_.add({"ai_features", "Turn the AI features on or off (Preferences > AI > Enable AI features).",
                    {{"on", ParamSpec::Type::Bool, "true: on, false: off.", true}},
@@ -93,6 +114,7 @@ void App::setAiFeatures(bool on) {
         showBrushLab_ = false;
         showImageTo3D_ = false;
     }
+    syncAiLink(); // AI off: live mode stops and any AI tool is disconnected
     std::string err;
     if (!uiConfigDeterministic_ && !aiSettingsPath_.empty() && !aiSettings_.save(aiSettingsPath_, err))
         status_ = "AI features " + std::string(on ? "on" : "off") + ", but " + err;
@@ -112,6 +134,9 @@ void App::drawAiPrefs() {
     ImGui::TextWrapped("AI Brush and Generate 3D. Off: they are hidden and SculptForge makes no AI network calls.");
     ImGui::TextWrapped("%s", ai::kPrivacyLine);
     ImGui::PopStyleColor();
+    ImGui::Spacing();
+    drawAiLinkPrefs(); // live mode (PanelAiLink.cpp)
+    ImGui::Spacing();
     if (ImGui::SmallButton("AI services & privacy##prefs.ai"))
         SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md");
 }
