@@ -520,6 +520,15 @@ MicroRenderer::GpuShade MicroRenderer::gpuShadeModeDefault() {
     return mode;
 }
 
+double MicroRenderer::gpuShadeTargetMsDefault() {
+    static const double ms = [] {
+        const char* e = std::getenv("SF_MICRO_GPU_SHADE_MS");
+        const double v = e ? std::atof(e) : 0.0;
+        return v > 0.0 ? v : 4.0;
+    }();
+    return ms;
+}
+
 size_t MicroRenderer::gpuShadeBudget() const {
     const size_t least = size_t(samples_) * 3, most = size_t(8) << 20;
     if (!(gsNsPerPoint_ > 0.0)) return size_t(2) << 20; // (not measured yet)

@@ -884,9 +884,12 @@ if(SCULPTFORGE_BUILD_TESTS)
     # pc.sh leaves out. ui_micro_levels: its first micro-displacement frame makes D3D12 remove the device (a segfault,
     # and every UI test running beside it loses its GL context); it passes on CI's llvmpipe and on the same PC's native
     # NVIDIA driver (2026-11-03, v0.10.11, 128 frames), so it is the translation layer, not SculptForge.
-    if(TEST ui_micro_levels)
-      set_tests_properties(ui_micro_levels PROPERTIES LABELS "ui;no_d3d12")
-    endif()
+    # ui_micro_gpu_shade (the same script, run below with each shading path too): the same micro frame, the same removal.
+    foreach(t ui_micro_levels ui_micro_gpu_shade)
+      if(TEST ${t})
+        set_tests_properties(${t} PROPERTIES LABELS "ui;no_d3d12")
+      endif()
+    endforeach()
     # The hardware profile panel with a real calibration (tests/ui/hardware_profile.sfui).
     if(TEST ui_hardware_profile)
       set_tests_properties(ui_hardware_profile PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1")
@@ -897,13 +900,13 @@ if(SCULPTFORGE_BUILD_TESTS)
       foreach(mode 0 1) # (CPU, GPU)
         add_test(NAME ui_micro_gpu_shade_${mode} COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/micro_gpu_shade.sfui
                  --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/micro_gpu_shade_${mode})
-        set_tests_properties(ui_micro_gpu_shade_${mode} PROPERTIES LABELS ui TIMEOUT 300 ENVIRONMENT "SF_MICRO_GPU_SHADE=${mode}"
+        set_tests_properties(ui_micro_gpu_shade_${mode} PROPERTIES LABELS "ui;no_d3d12" TIMEOUT 300 ENVIRONMENT "SF_MICRO_GPU_SHADE=${mode}"
                              FIXTURES_SETUP micro_gpu_shade_shots)
       endforeach()
       add_test(NAME ui_micro_gpu_shade_parity COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/png_diff.py
                ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/micro_gpu_shade_0/micro-gpu-shade.png
                ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/micro_gpu_shade_1/micro-gpu-shade.png --crop 120 170 1210 860) # (the 3D view only: the brush shelf's thumbnails render on their own time)
-      set_tests_properties(ui_micro_gpu_shade_parity PROPERTIES LABELS ui TIMEOUT 120 FIXTURES_REQUIRED micro_gpu_shade_shots)
+      set_tests_properties(ui_micro_gpu_shade_parity PROPERTIES LABELS "ui;no_d3d12" TIMEOUT 120 FIXTURES_REQUIRED micro_gpu_shade_shots)
     endif()
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     # Studio mode: About shows the studio (tests/data/studio; core/StudioProfile.h).

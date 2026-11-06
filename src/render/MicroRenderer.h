@@ -63,7 +63,8 @@ public:
     static inline std::function<void()> resumeFrameTimer;
     GpuShade gpuShadeMode = gpuShadeModeDefault();
     bool gpuShade = gpuShadeDefault();
-    double gpuShadeTargetMs = 4.0;
+    double gpuShadeTargetMs = gpuShadeTargetMsDefault(); // (SF_MICRO_GPU_SHADE_MS, else 4)
+    static double gpuShadeTargetMsDefault();
     size_t gpuShadeBudget() const;
     double lastGpuShadeMs = 0.0;  // GPU time of the last pass (timer query, read a sync later), 0 if unknown
     uint64_t gpuShadedPoints = 0; // grid points the GPU shaded so far
