@@ -65,10 +65,10 @@ A part keeps the size it was opened with through every export:
 - OBJ, PLY and STL have no units. A scene opened from one of them remembers its unit: exporting OBJ or PLY writes
   that unit back (an STL opened in millimetres exports a 50 mm OBJ, not 0.05), and an STL written from an STL
   keeps its numbers. Decimal sizes come back exactly (12.7 stays 12.7). Projects remember the unit.
-- **Preferences > Interface > OBJ/PLY in** says what OBJ and PLY numbers mean: **m** (the default; Blender and game
+- **Edit > Preferences > Interface > OBJ/PLY in** says what OBJ and PLY numbers mean: **m** (the default; Blender and game
   tools), or **mm** for files made for 3D printing, **cm** or **in**. STL is always read as millimetres. From
   scripts: `open path=part.obj unit=mm` (`open_obj` and `part_append` take `unit=` too; `unit=in` reads an inch STL).
-- **Preferences > Interface > Units** picks the unit sizes show in: mm, cm, m or in. The active Part's width x
+- **Edit > Preferences > Interface > Units** picks the unit sizes show in: mm, cm, m or in. The active Part's width x
   height x depth shows under its name in **Tool**, the size the exports write in **File** (Import / Export), and the
   brush size by the brush ring.
 
