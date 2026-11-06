@@ -10,6 +10,8 @@
 #include "app/ConnectAi.h"
 #include "app/I18n.h"
 #include "app/Theme.h"
+#include "app/Ui.h"
+#include "core/ManagedPolicy.h"
 
 #include <IconsLucide.h>
 #include <imgui.h>
@@ -80,6 +82,10 @@ void codeBox(const std::string& text, const std::string& id, ImFont* mono) {
 
 void App::drawConnectAi() {
     if (!showConnectAi_) return;
+    if (!policy::mcpAllowed()) { // (a studio's policy turned AI tools off: core/ManagedPolicy.h)
+        showConnectAi_ = false;
+        return;
+    }
     // The Approve or Allow dialog takes its place while it is open: never two dialogs stacked.
     if (const int live = aiLinkStateValue(); live == 2 || live == 4) return;
     const float s = uiScale_;
@@ -96,8 +102,11 @@ void App::drawConnectAi() {
     }
     const connect::Os os = thisOs();
     connect::Launch launch = thisInstall();
-    launch.args.push_back("--attach"); // live mode: the tool works in this window (headless --mcp: the user guide)
-    launch.name = "sculptforge-live";
+    const bool live = policy::mcpLiveAllowed(); // (a studio's policy may say never: then the tool gets its own scene)
+    if (live) {
+        launch.args.push_back("--attach"); // live mode: the tool works in this window (headless --mcp: the user guide)
+        launch.name = "sculptforge-live";
+    }
     const std::vector<connect::Client> all = connect::clients(launch, os);
     // The radio buttons and the switch on the button colour: an empty one must not vanish into the window (Classic).
     ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::GetStyleColorVec4(ImGuiCol_Button));
@@ -168,23 +177,34 @@ void App::drawConnectAi() {
 
     // 2. The live-mode switch itself (the same one as Preferences > AI).
     ImGui::SeparatorText(tr("2. Let it work in this window"));
-    bool on = aiSettings_.liveControl;
-    if (ImGui::Checkbox(tr("Let AI tools control this window##connect.ai_live"), &on)) setAiLiveControl(on);
-    ImGui::SameLine();
-    if (aiLinkStateValue() >= 3) ImGui::TextColored(theme::accent, tr("AI connected: %s"), aiLinkClient().c_str());
-    else if (aiLink_) ImGui::TextDisabled("%s", tr("On: your AI tool can ask to connect."));
-    else ImGui::TextDisabled("%s", tr("Off"));
+    if (!live) {
+        ImGui::BeginDisabled();
+        bool off = false;
+        ImGui::Checkbox(tr("Let AI tools control this window##connect.ai_live"), &off);
+        ImGui::EndDisabled();
+        ui::ManagedBadge();
+        ImGui::TextWrapped("%s", tr("AI tools work on their own scene; your studio doesn't let them control this window."));
+    } else {
+        bool on = aiSettings_.liveControl;
+        if (ImGui::Checkbox(tr("Let AI tools control this window##connect.ai_live"), &on)) setAiLiveControl(on);
+        ImGui::SameLine();
+        if (aiLinkStateValue() >= 3) ImGui::TextColored(theme::accent, tr("AI connected: %s"), aiLinkClient().c_str());
+        else if (aiLink_) ImGui::TextDisabled("%s", tr("On: your AI tool can ask to connect."));
+        else ImGui::TextDisabled("%s", tr("Off"));
+    }
 
-    // 3. What the user will see, in the order it happens.
-    ImGui::SeparatorText(tr("3. What happens next"));
-    for (const char* line : {tr("Ask your AI tool for something (below). SculptForge shows a 6-digit code: click "
-                                "Approve, or tell the AI the code."),
-                             tr("While it works, the AI connected badge sits at the bottom right. Disconnect stops it."),
-                             tr("Every step lands in Undo as \"AI: ...\", so you can step back."),
-                             tr("It asks you first before files outside the project, scripts and the network."),
-                             tr("It sees the viewport; what it sees goes to that tool's AI service.")}) {
-        ImGui::Bullet();
-        ImGui::TextWrapped("%s", line);
+    // 3. What the user will see, in the order it happens (live mode only: a studio may have locked it off).
+    if (live) {
+        ImGui::SeparatorText(tr("3. What happens next"));
+        for (const char* line : {tr("Ask your AI tool for something (below). SculptForge shows a 6-digit code: click "
+                                    "Approve, or tell the AI the code."),
+                                 tr("While it works, the AI connected badge sits at the bottom right. Disconnect stops it."),
+                                 tr("Every step lands in Undo as \"AI: ...\", so you can step back."),
+                                 tr("It asks you first before files outside the project, scripts and the network."),
+                                 tr("It sees the viewport; what it sees goes to that tool's AI service.")}) {
+            ImGui::Bullet();
+            ImGui::TextWrapped("%s", line);
+        }
     }
 
     ImGui::SeparatorText(tr("Try asking"));

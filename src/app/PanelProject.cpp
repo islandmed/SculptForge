@@ -9,6 +9,7 @@
 #include "app/Support.h"
 #include "app/BigMeshTip.h"
 #include "app/LookSchemes.h"
+#include "core/ManagedPolicy.h"
 #include "app/CrashLog.h"
 #include "core/LegacyNames.h"
 #include "core/SplatCapture.h"
@@ -113,6 +114,7 @@ void App::initProject() {
         if (prefs["member_login"].isString()) memberLogin_ = prefs["member_login"].asString().substr(0, 39);
         if (prefs["update_channel"].isString())
             updateChannel_ = prefs["update_channel"].asString() == "preview" ? UpdateChannel::Preview : UpdateChannel::Stable;
+        applyUpdatePolicy();
         // The membership cards (Support.h). ("support_card": false, the old switch, and "supporter" from before
         // 0.11.1 are honoured as they were: a member said so.)
         supportCardPrefs_.supporter = prefs["supporter"].asBool(false) || !prefs["support_card"].asBool(true);
@@ -162,6 +164,7 @@ void App::initProject() {
 
 #if SF_UPDATE_CHECK
     const int64_t now = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    applyUpdatePolicy();
     if (checkUpdates_ && options_.uiTest.empty() && !std::getenv("SF_NO_UPDATE_CHECK") && updateCheckDue(updateCheckedAt_, now))
         startUpdateCheck(false);
 #endif
@@ -898,18 +901,33 @@ void App::drawUpdateBanner() {
     ImGui::End();
 }
 
+void App::applyUpdatePolicy() {
+    // A studio's policy (core/ManagedPolicy.h "updates") locks these.
+    const policy::Policy& p = policy::current();
+    if (p.updateCheck != policy::Lock::Unset) checkUpdates_ = p.updateCheck == policy::Lock::On;
+    if (!p.updateChannel.empty()) updateChannel_ = p.updateChannel == "preview" ? UpdateChannel::Preview : UpdateChannel::Stable;
+}
+
 void App::drawUpdatesSection() {
 #if SF_UPDATE_CHECK
+    const policy::Policy& managed = policy::current();
+    const bool checkLocked = managed.updateCheck != policy::Lock::Unset, channelLocked = !managed.updateChannel.empty();
+    ImGui::BeginDisabled(checkLocked);
     if (ImGui::Checkbox(tr("Check for updates"), &checkUpdates_)) saveProjectPrefs();
+    ImGui::EndDisabled();
+    if (checkLocked) ui::ManagedBadge();
     ui::HelpText("Check for updates", nullptr,
                  "Once a day at startup, download a small file from the SculptForge website that names the newest "
                  "version, and show a banner when there is a newer one. Nothing about you or your computer is sent.",
                  "Preferences > Updates");
     ImGui::TextUnformatted(tr("Update channel"));
     int channel = updateChannel_ == UpdateChannel::Preview ? 1 : 0;
+    ImGui::BeginDisabled(channelLocked);
     bool changed = ImGui::RadioButton((std::string(tr("Stable")) + "##prefs.update_stable").c_str(), &channel, 0);
     ImGui::SameLine();
     changed |= ImGui::RadioButton((std::string(tr("Preview (betas)")) + "##prefs.update_preview").c_str(), &channel, 1);
+    ImGui::EndDisabled();
+    if (channelLocked) ui::ManagedBadge();
     ui::HelpText("Update channel", nullptr,
                  "Stable offers only finished releases. Preview also offers the betas the update feed names. Betas "
                  "are a member perk: members get them from the private members' repository and the #members channel "

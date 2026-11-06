@@ -659,7 +659,10 @@ void App::drawPalette_Preferences() {
     if (subpalette("preferences.ai", "AI")) {
         tray::Section section;
         drawAiPrefs(); // the switch (PanelAi.cpp)
+        drawAiStudioPrefs(); // what the studio's policy manages, the studio sign-in, the audit log (PanelAi.cpp)
         if (ai::aiEnabled()) {
+            ImGui::SeparatorText(tr("Provider"));
+            drawAiSettings(); // the brush provider: presets, endpoint, key (keychain)
             ImGui::Spacing();
             drawAiPrefsSection(); // the Hugging Face token
         }

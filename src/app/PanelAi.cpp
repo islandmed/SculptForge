@@ -7,14 +7,48 @@
 // AI network entry point refuses. Saved in ai.json at once, so the CLI, Python and MCP server follow it.
 // SF_AI=off (or --no-ai) locks it for studios.
 #include "app/App.h"
+#include "app/I18n.h"
 #include "app/Ui.h"
 
 #include "ai/AiCommands.h"
+#include "ai/Oidc.h"
+#include "core/AuditLog.h"
+#include "core/ManagedPolicy.h"
 
 #include <IconsLucide.h>
 #include <imgui.h>
 
+#include <atomic>
+#include <filesystem>
+#include <fstream>
+#include <mutex>
+#include <thread>
+
 namespace sf {
+
+void App::registerPolicyTestCommand() {
+    // UI tests only (never registered otherwise, so no script or AI tool can change a studio's policy): a policy as
+    // if IT had deployed it, for tests/ui/studio_policy.sfui. The next script starts without one.
+    if (options_.uiTest.empty()) return;
+    policy::resetPolicyForTests();
+    commands_.add({"ui_policy", "UI tests: apply a studio policy (policy.json text; \"\" removes it).",
+                   {{"json", ParamSpec::Type::String, "The policy file's text.", true}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       const std::string text = argString(a, "json");
+                       if (text.empty()) {
+                           policy::resetPolicyForTests();
+                       } else { // through a file, as IT deploys it (a broken one fails closed with its error)
+                           const std::filesystem::path path = audit::logPath() + ".policy.json"; // (the test's folder)
+                           std::error_code ec;
+                           std::filesystem::create_directories(path.parent_path(), ec);
+                           std::ofstream(path, std::ios::binary) << text;
+                           policy::setPolicyForTests(policy::loadPolicyFile(path.string(), "ui_policy"));
+                       }
+                       applyAiFeatures(ai::aiFeaturesAllowed(true), false); // (UI tests start with AI on)
+                       applyUpdatePolicy();
+                       return {true, policy::describe(policy::current())};
+                   }});
+}
 
 void App::registerAiActions() {
     // The switch itself: always there, so the command palette finds "AI" to turn it back on.
@@ -38,7 +72,7 @@ void App::registerAiActions() {
                            "the network ask first. Nothing listens on the network.";
         live.run = [this] { setAiLiveControl(!aiSettings_.liveControl); };
         live.checked = [this] { return aiSettings_.liveControl; };
-        live.enabled = [] { return ai::aiEnabled(); };
+        live.enabled = [] { return ai::aiEnabled() && policy::mcpLiveAllowed(); };
         actions_.add(std::move(live));
         Action cut;
         cut.id = "ai.live_disconnect";
@@ -76,8 +110,8 @@ void App::registerAiActions() {
          "Brush Lab: describe a brush in words and AI builds it; tweak the recipe with sliders.");
     flag("ui.generate3d", "Generate 3D", ICON_LC_WAND_SPARKLES, "Generate", &showImageTo3D_,
          "Turn an image or a description into a sculptable model (Hugging Face, fal.ai, Meshy, ComfyUI or offline).");
-    // Help > Connect an AI tool (PanelConnectAi.cpp). (Managed policy, feat/studio-ready: register it only when MCP is
-    // allowed, sf::policy::mcpAllowed().)
+    // Help > Connect an AI tool (PanelConnectAi.cpp): not when a studio's policy turns AI tools (MCP) off.
+    if (!policy::mcpAllowed()) return;
     Action connect;
     connect.id = "help.connect_ai";
     connect.label = "Connect an AI tool...";
@@ -95,6 +129,10 @@ void App::setAiFeatures(bool on) {
         status_ = ai::aiOffError();
         return;
     }
+    applyAiFeatures(on, true);
+}
+
+void App::applyAiFeatures(bool on, bool save) {
     const bool changed = on != ai::aiEnabled();
     aiSettings_.enabled = on;
     ai::setAiEnabled(on);
@@ -115,6 +153,7 @@ void App::setAiFeatures(bool on) {
         showImageTo3D_ = false;
     }
     syncAiLink(); // AI off: live mode stops and any AI tool is disconnected
+    if (!save) return;
     std::string err;
     if (!uiConfigDeterministic_ && !aiSettingsPath_.empty() && !aiSettings_.save(aiSettingsPath_, err))
         status_ = "AI features " + std::string(on ? "on" : "off") + ", but " + err;
@@ -129,7 +168,8 @@ void App::drawAiPrefs() {
     if (ImGui::Checkbox("Enable AI features##prefs.ai", &on)) setAiFeatures(on);
     ImGui::EndDisabled();
     ui::HelpAction(*this, "prefs.ai_features");
-    if (locked) ImGui::TextDisabled("Set by this computer (SF_AI or --no-ai).");
+    if (ai::aiManaged()) ui::ManagedBadge();
+    else if (locked) ImGui::TextDisabled("Set by this computer (SF_AI or --no-ai).");
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     ImGui::TextWrapped("AI Brush and Generate 3D. Off: they are hidden and SculptForge makes no AI network calls.");
     ImGui::TextWrapped("%s", ai::kPrivacyLine);
@@ -139,6 +179,120 @@ void App::drawAiPrefs() {
     ImGui::Spacing();
     if (ImGui::SmallButton("AI services & privacy##prefs.ai"))
         SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md");
+}
+
+// The studio sign-in runs on a worker (ai/Oidc.h: discovery, the device code, polling); the panel shows the code.
+struct StudioSignInJob {
+    std::mutex mutex;
+    ai::oidc::DeviceCode code; // (userCode and the URIs only are shown)
+    bool haveCode = false;
+    bool opened = false; // the sign-in page, opened once from the UI thread
+    std::string error;
+    std::atomic<bool> done{false}, ok{false}, cancel{false};
+};
+
+void App::drawAiStudioPrefs() {
+    const policy::Policy& p = policy::current();
+    auto hint = [](const std::string& text) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+        ImGui::TextWrapped("%s", text.c_str());
+        ImGui::PopStyleColor();
+    };
+    if (p.present) {
+        ImGui::TextUnformatted((std::string(ICON_LC_BUILDING_2 " ") + ui::ManagedByText()).c_str());
+        if (p.broken) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.6f, 0.4f, 1));
+            ImGui::TextWrapped("%s %s", tr("The studio policy can't be used, so AI, network features and AI tools are off:"),
+                               p.error.c_str());
+            ImGui::PopStyleColor();
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("%s", p.source.c_str());
+    }
+    // The studio sign-in (only when the policy names an identity provider).
+    if (p.signInConfigured()) {
+        ImGui::SeparatorText(tr("Studio sign-in"));
+        const auto state = ai::oidc::state();
+        if (signInJob_ && signInJob_->done) {
+            if (!signInJob_->ok && !signInJob_->cancel) status_ = signInJob_->error;
+            signInJob_.reset();
+        }
+        if (signInJob_) {
+            std::lock_guard lock(signInJob_->mutex);
+            if (signInJob_->haveCode) {
+                const auto& c = signInJob_->code;
+                if (!signInJob_->opened) {
+                    SDL_OpenURL((c.verificationUriComplete.empty() ? c.verificationUri : c.verificationUriComplete).c_str());
+                    signInJob_->opened = true;
+                }
+                ImGui::TextWrapped("%s", tr("In your browser, sign in and enter this code:"));
+                ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_CheckMark), "%s", signInJob_->code.userCode.c_str());
+                ImGui::SameLine();
+                if (ImGui::SmallButton(tr("Copy code"))) ImGui::SetClipboardText(signInJob_->code.userCode.c_str());
+                if (ImGui::SmallButton(tr("Open the sign-in page")))
+                    SDL_OpenURL((signInJob_->code.verificationUriComplete.empty() ? signInJob_->code.verificationUri
+                                                                                  : signInJob_->code.verificationUriComplete)
+                                    .c_str());
+                ImGui::SameLine();
+                hint(signInJob_->code.verificationUri);
+            } else {
+                ImGui::TextDisabled("%s", tr("Connecting..."));
+            }
+            if (ImGui::Button(tr("Cancel"), ImVec2(-1, 0))) signInJob_->cancel = true;
+        } else if (state == ai::oidc::State::SignedIn) {
+            ImGui::TextWrapped("%s %s", tr("Signed in as"), ai::oidc::signedInAs().c_str());
+            if (ImGui::Button(tr("Sign out"), ImVec2(-1, 0))) {
+                ai::oidc::signOut(); // (a keychain erase: quick, and the artist asked for it)
+                status_ = tr("Signed out of your studio account");
+            }
+        } else {
+            if (ImGui::Button(tr("Sign in with your studio account"), ImVec2(-1, 0))) {
+                auto job = std::make_shared<StudioSignInJob>();
+                signInJob_ = job;
+                std::thread([job] {
+                    std::string error;
+                    const bool ok = ai::oidc::signIn(
+                        [job](const ai::oidc::DeviceCode& c) {
+                            {
+                                std::lock_guard lock(job->mutex);
+                                job->code = c;
+                                job->code.deviceCode.clear(); // (never shown, never kept by the panel)
+                                job->haveCode = true;
+                            }
+                            return !job->cancel;
+                        },
+                        [job] { return job->cancel.load(); }, error);
+                    {
+                        std::lock_guard lock(job->mutex);
+                        job->error = error;
+                    }
+                    job->ok = ok;
+                    job->done = true;
+                }).detach();
+            }
+            if (p.requireSignIn) hint(tr("Your studio requires the sign-in for AI features."));
+        }
+        hint(tr("Signs in through your studio's own login page in your browser. Nothing on this computer listens for it; "
+                "the sign-in is kept in your system keychain."));
+    }
+    // What is recorded, and where (core/AuditLog.h).
+    ImGui::SeparatorText(tr("Audit log"));
+    hint(tr("Every AI action (AI tools, AI Brush, Generate 3D) is recorded on this computer: time, tool, command and "
+            "settings, never your artwork or keys."));
+    const std::string path = audit::logPath();
+    ImGui::TextWrapped("%s", path.c_str());
+    if (ImGui::SmallButton(tr("Copy path##audit"))) ImGui::SetClipboardText(path.c_str());
+    if (!p.auditPath.empty()) {
+        ImGui::SameLine();
+        ui::ManagedBadge();
+    }
+    if (p.present && (p.mcp == policy::Lock::Off || !p.mcpCategories.empty() || !p.mcpLiveAllowed)) {
+        ImGui::SeparatorText(tr("AI tools (MCP)"));
+        hint(p.mcp == policy::Lock::Off ? tr("AI tools can't connect: your studio turned them off.")
+             : !p.mcpLiveAllowed        ? tr("AI tools work on their own scene; your studio doesn't let them control this window.")
+                                        : tr("AI tools may use only the kinds of command your studio allows."));
+        ui::ManagedBadge();
+    }
+    hint(tr("SculptForge has no telemetry: nothing about you or your work is collected."));
 }
 
 } // namespace sf
