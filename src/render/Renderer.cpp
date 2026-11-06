@@ -3328,8 +3328,11 @@ void Renderer::uploadCoarsePoints(MeshSlot& s) {
 }
 
 void Renderer::noteGpuFrame(double gpuMs, uint64_t drawnTriangles) {
-    if (!(gpuMs > 0.0) || drawnTriangles < 500000) return; // (small frames are mostly fixed costs)
+    if (!(gpuMs > 0.2) || drawnTriangles < 500000) return; // (small frames are mostly fixed costs)
     const double v = gpuMs / double(drawnTriangles);
+    // (A frame whose GPU time can't hold those triangles didn't draw them: UI tests draw the 3D view only for their
+    // shots, the timer measures every frame. More than 1e11 triangles a second is no measurement.)
+    if (v < 1e-8) return;
     gpuMsPerTriangle_ = gpuMsPerTriangle_ > 0.0 ? 0.8 * gpuMsPerTriangle_ + 0.2 * v : v;
 }
 
