@@ -52,7 +52,7 @@
     <main class="guide-main" id="top">
       <article class="guide-article">
 <h1 id="scripting-and-automation">Scripting and automation</h1>
-<p>Every operation in SculptForge is a named command with parameters. The same commands run from the console inside the app, from script files, from the <code>sculptforge-cli</code> tool on a build farm, from Python, and from AI agents through the Model Context Protocol (MCP). This chapter explains the script language, the console, both command-line programs, the Python module and MCP setup.</p>
+<p>Every operation in SculptForge is a named command with parameters. The same commands run from the console inside the app, from script files, from the <code>sculptforge-cli</code> tool on a build farm, from Python, and from AI agents through the Model Context Protocol (MCP). This chapter explains the script language, the console, both command-line programs, the Python module and connecting AI tools.</p>
 <h2 id="the-script-language">The script language<a class="anchor" href="#the-script-language" aria-label="Link to this section">#</a></h2>
 <p>A script is a list of statements. Each statement is a command name followed by <code>name=value</code> parameters:</p>
 <div class="code-block"><pre class="code"><code class="language-text">new_sphere subdivisions=5
@@ -177,17 +177,100 @@ print([c[&quot;name&quot;] for c in sf.commands()])            # every command w
 <div class="table-wrap"><table><thead><tr><th>Function or property</th><th>What it does</th></tr></thead><tbody><tr><td><code>sf.run(doc, command, **params)</code></td><td>Runs one command and returns its message</td></tr><tr><td><code>sf.run_script(doc, script)</code></td><td>Runs a script in the syntax above and returns the messages</td></tr><tr><td><code>sf.commands()</code></td><td>Lists every command with its parameters</td></tr><tr><td><code>sf.tool_schema()</code></td><td>The commands as LLM tool definitions (JSON)</td></tr><tr><td><code>doc.vertices</code>, <code>doc.base_vertices</code>, <code>doc.normals</code>, <code>doc.triangles</code></td><td>Mesh arrays of the active Part (copies)</td></tr><tr><td><code>doc.mask</code>, <code>doc.colors</code>, <code>doc.facegroups</code>, <code>doc.hidden</code></td><td>Attribute arrays you can read and assign (<code>None</code> if absent)</td></tr><tr><td><code>doc.layers</code>, <code>doc.layer_delta(i)</code></td><td>Sculpt layers as <code>(name, weight)</code> and their per-vertex offsets</td></tr><tr><td><code>doc.parts</code>, <code>doc.active_part</code></td><td>The Parts list and the active Part</td></tr><tr><td><code>doc.splat_count</code></td><td>Number of loaded Gaussian splats</td></tr></tbody></table></div>
 <p>Failures raise <code>sculptforge.CommandError</code>. Long operations release the GIL, so you can run them on worker threads.</p>
 <h2 id="ai-agents-mcp">AI agents (MCP)<a class="anchor" href="#ai-agents-mcp" aria-label="Link to this section">#</a></h2>
-<p><code>sculptforge-cli --mcp</code> runs SculptForge as an MCP server. An AI agent (Claude Code, Claude Desktop or any MCP client) gets every command as a tool and works on one scene for the session: it can open files, generate models, sculpt strokes, remesh, paint and export.</p>
-<p>Claude Code:</p>
-<div class="code-block"><pre class="code"><code class="language-sh">claude mcp add sculptforge -- /path/to/sculptforge-cli --mcp</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
-<p>Claude Desktop or another client: add a stdio server whose command is the full path to <code>sculptforge-cli</code> and whose argument is <code>--mcp</code>. For Claude Desktop that is an entry in its configuration file like this:</p>
+<p><code>sculptforge-cli --mcp</code> runs SculptForge as an MCP server. An AI tool (Claude, Codex, Gemini, Grok, Cursor, VS Code and others) gets every command as a tool and works on one scene for the session: it can open files, generate models, sculpt strokes, remesh, paint and export. The AI tool starts <code>sculptforge-cli</code> on your computer and talks to it over standard input and output. Nothing listens on the network, and nothing is installed into the AI tool.</p>
+<p>The easy way: <strong>Help &gt; Connect an AI tool...</strong> shows, for your install, the exact command or settings for each tool below, with Copy buttons. It is there while AI features are on (<strong>Edit &gt; Preferences &gt; AI</strong>).</p>
+<h3 id="i-have-a-subscription">I have a subscription<a class="anchor" href="#i-have-a-subscription" aria-label="Link to this section">#</a></h3>
+<div class="table-wrap"><table><thead><tr><th>Subscription</th><th>Use</th><th>Set up</th></tr></thead><tbody><tr><td>Claude (Pro, Max, Ultra)</td><td>Claude Desktop or Claude Code</td><td>Claude Desktop: install the bundle (below). Claude Code: <code>claude mcp add --scope user sculptforge -- /path/to/sculptforge-cli --mcp</code></td></tr><tr><td>ChatGPT (Plus, Pro, Business, Edu, Enterprise)</td><td>Codex CLI</td><td><code>codex mcp add sculptforge -- /path/to/sculptforge-cli --mcp</code>, then <strong>Sign in with ChatGPT</strong></td></tr><tr><td>Google (free, Google AI Pro, Google AI Ultra)</td><td>Antigravity CLI</td><td>add SculptForge to <code>~/.gemini/config/mcp_config.json</code> (below), then sign in with Google</td></tr><tr><td>Grok / xAI</td><td>Grok Build</td><td><code>grok mcp add sculptforge -- /path/to/sculptforge-cli --mcp</code></td></tr></tbody></table></div>
+<ul>
+<li>
+<strong>Claude</strong>: Claude Code uses your plan when you sign in with your Claude account; if <code>ANTHROPIC_API_KEY</code> is set it uses that key and API billing instead. Claude on the web and on phones can&#x27;t start programs on your computer.
+</li>
+<li>
+<strong>ChatGPT</strong>: the ChatGPT app only connects to remote (HTTPS) MCP servers. SculptForge doesn&#x27;t run one, on purpose: nothing of yours listens on the network. Use Codex CLI, or the OpenAI Agents SDK or API below.
+</li>
+<li>
+<strong>Gemini</strong>: since June 2026 personal Google accounts use Antigravity CLI; Gemini CLI is for Gemini Code Assist Standard and Enterprise and for API keys.
+</li>
+<li>
+<strong>Grok</strong>: the Grok app (web, phone, X) can&#x27;t reach programs on your computer, only public HTTPS servers. Grok Build signs in with your xAI account in the browser (xAI&#x27;s documentation doesn&#x27;t say which plans that includes) or takes an xAI API key. The xAI API&#x27;s own MCP tool is remote-only too; your own code can use the function calling example below (API usage is billed by xAI).
+</li>
+</ul>
+<h3 id="where-sculptforge-cli-is">Where sculptforge-cli is<a class="anchor" href="#where-sculptforge-cli-is" aria-label="Link to this section">#</a></h3>
+<div class="table-wrap"><table><thead><tr><th>Install</th><th>Command</th></tr></thead><tbody><tr><td>Windows</td><td><code>C:\Program Files\SculptForge\bin\sculptforge-cli.exe --mcp</code></td></tr><tr><td>macOS</td><td><code>/Applications/SculptForge.app/Contents/MacOS/sculptforge-cli --mcp</code></td></tr><tr><td>Linux .deb, .rpm, AUR</td><td><code>/usr/bin/sculptforge-cli --mcp</code></td></tr><tr><td>AppImage</td><td><code>/path/to/SculptForge.AppImage --cli --mcp</code> (<code>--cli</code> runs the CLI inside the AppImage)</td></tr><tr><td>Flatpak</td><td><code>flatpak run --command=sculptforge-cli org.sculptforge.SculptForge --mcp</code></td></tr></tbody></table></div>
+<p>In JSON and TOML files a Windows path is written with doubled backslashes (<code>&quot;C:\\Program Files\\SculptForge\\bin\\sculptforge-cli.exe&quot;</code>). The window does that for you.</p>
+<h3 id="claude-desktop-bundle">Claude Desktop bundle<a class="anchor" href="#claude-desktop-bundle" aria-label="Link to this section">#</a></h3>
+<p>Download the bundle for your system, then install it in Claude Desktop under <strong>Settings &gt; Extensions &gt; Advanced settings</strong> (<a href="https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop" rel="noopener">Anthropic&#x27;s guide</a>): <a href="https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-windows-x86_64.mcpb" rel="noopener">Windows</a>, <a href="https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-macos.mcpb" rel="noopener">macOS</a>, <a href="https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-x86_64.mcpb" rel="noopener">Linux x86_64</a>, <a href="https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-arm64.mcpb" rel="noopener">Linux ARM64</a>. It carries its own copy of <code>sculptforge-cli</code>. Or add SculptForge to <code>claude_desktop_config.json</code> (Windows <code>%APPDATA%\Claude\</code>, macOS <code>~/Library/Application Support/Claude/</code>, Linux <code>~/.config/Claude/</code>) and restart:</p>
 <div class="code-block"><pre class="code"><code class="language-text">{
   &quot;mcpServers&quot;: {
     &quot;sculptforge&quot;: { &quot;command&quot;: &quot;/path/to/sculptforge-cli&quot;, &quot;args&quot;: [&quot;--mcp&quot;] }
   }
 }</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
-<p>Then ask for something like &quot;make a sphere, remesh it at 128 and export it to ~/Desktop/ball.glb&quot;. File paths are on your machine. The agent works headless; to see the result, open the exported file in SculptForge.</p>
-<p><code>sculptforge-cli --schema</code> prints the same tool definitions as JSON, for wiring SculptForge into your own agent.</p>
+<h3 id="every-other-tool">Every other tool<a class="anchor" href="#every-other-tool" aria-label="Link to this section">#</a></h3>
+<p>Most tools take the same <code>mcpServers</code> entry as Claude Desktop above. Each row links the vendor&#x27;s page the format is from.</p>
+<div class="table-wrap"><table><thead><tr><th>Tool</th><th>Set up</th></tr></thead><tbody><tr><td><a href="https://cursor.com/docs/context/mcp" rel="noopener">Cursor</a></td><td>the <code>mcpServers</code> entry in <code>~/.cursor/mcp.json</code> (or <code>.cursor/mcp.json</code> in a project)</td></tr><tr><td><a href="https://code.visualstudio.com/docs/agent-customization/mcp-servers" rel="noopener">VS Code (Copilot agent mode)</a></td><td><code>code --add-mcp &#x27;{&quot;name&quot;:&quot;sculptforge&quot;,&quot;type&quot;:&quot;stdio&quot;,&quot;command&quot;:&quot;/path/to/sculptforge-cli&quot;,&quot;args&quot;:[&quot;--mcp&quot;]}&#x27;</code>, or <strong>MCP: Open User Configuration</strong> and add <code>&quot;servers&quot;: {&quot;sculptforge&quot;: {&quot;type&quot;: &quot;stdio&quot;, &quot;command&quot;: &quot;...&quot;, &quot;args&quot;: [&quot;--mcp&quot;]}}</code></td></tr><tr><td><a href="https://learn.microsoft.com/en-us/visualstudio/ide/mcp-servers" rel="noopener">Visual Studio</a></td><td>the same <code>servers</code> entry in <code>%USERPROFILE%\.mcp.json</code>; Copilot Chat in Agent mode</td></tr><tr><td><a href="https://www.jetbrains.com/help/ai-assistant/mcp.html" rel="noopener">JetBrains AI Assistant</a></td><td><strong>Settings &gt; Tools &gt; AI Assistant &gt; Model Context Protocol (MCP)</strong>: Add, STDIO, paste the <code>mcpServers</code> entry</td></tr><tr><td><a href="https://zed.dev/docs/ai/mcp" rel="noopener">Zed</a></td><td>in its settings file (<code>zed: open settings file</code>): <code>&quot;context_servers&quot;: {&quot;sculptforge&quot;: {&quot;command&quot;: &quot;...&quot;, &quot;args&quot;: [&quot;--mcp&quot;]}}</code></td></tr><tr><td><a href="https://docs.devin.ai/cli/extensibility/mcp/configuration" rel="noopener">Windsurf (Devin Local)</a></td><td><code>devin mcp add -s user sculptforge -- /path/to/sculptforge-cli --mcp</code>, or the <code>mcpServers</code> entry in <code>~/.config/devin/mcp_config.json</code> (Windows <code>%APPDATA%\devin\</code>)</td></tr><tr><td><a href="https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md" rel="noopener">Gemini CLI</a></td><td><code>gemini mcp add --scope user sculptforge /path/to/sculptforge-cli --mcp</code></td></tr><tr><td><a href="https://antigravity.google/docs/mcp/" rel="noopener">Antigravity CLI</a></td><td>the <code>mcpServers</code> entry in <code>~/.gemini/config/mcp_config.json</code></td></tr><tr><td><a href="https://learn.chatgpt.com/docs/extend/mcp" rel="noopener">Codex CLI</a></td><td><code>codex mcp add ...</code> as above, or in <code>~/.codex/config.toml</code>: <code>[mcp_servers.sculptforge]</code>, <code>command = &quot;/path/to/sculptforge-cli&quot;</code>, <code>args = [&quot;--mcp&quot;]</code></td></tr><tr><td><a href="https://docs.x.ai/build/features/mcp-servers" rel="noopener">Grok Build</a></td><td><code>grok mcp add ...</code> as above, or the same TOML table in <code>~/.grok/config.toml</code></td></tr><tr><td><a href="https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers" rel="noopener">GitHub Copilot CLI</a></td><td><code>copilot mcp add sculptforge -- /path/to/sculptforge-cli --mcp</code></td></tr><tr><td><a href="https://docs.cline.bot/mcp/configuring-mcp-servers" rel="noopener">Cline</a></td><td><code>cline mcp add sculptforge --yes -- /path/to/sculptforge-cli --mcp</code>, or the <code>mcpServers</code> entry under <strong>MCP Servers &gt; Configure</strong></td></tr><tr><td><a href="https://docs.continue.dev/customize/deep-dives/mcp" rel="noopener">Continue</a></td><td>a file in <code>.continue/mcpServers/</code> with <code>mcpServers:</code> <code>- name: SculptForge</code>, <code>type: stdio</code>, <code>command: ...</code>, <code>args: [&quot;--mcp&quot;]</code> (agent mode)</td></tr><tr><td><a href="https://kiro.dev/docs/mcp/configuration/" rel="noopener">Kiro</a></td><td>the <code>mcpServers</code> entry in <code>~/.kiro/settings/mcp.json</code></td></tr><tr><td><a href="https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-line-mcp-config-CLI.html" rel="noopener">Amazon Q Developer CLI</a></td><td><code>q mcp add --name sculptforge --command /path/to/sculptforge-cli --args &#x27;[&quot;--mcp&quot;]&#x27;</code></td></tr><tr><td><a href="https://docs.warp.dev/knowledge-and-collaboration/mcp" rel="noopener">Warp</a></td><td><strong>Settings &gt; Agents &gt; MCP servers &gt; Add</strong>, paste the <code>mcpServers</code> entry</td></tr><tr><td><a href="https://goose-docs.ai/docs/getting-started/using-extensions" rel="noopener">Goose</a></td><td><code>goose configure</code> &gt; Add Extension &gt; Command-Line Extension, or in <code>~/.config/goose/config.yaml</code> under <code>extensions:</code> an entry with <code>type: stdio</code>, <code>cmd: ...</code>, <code>args: [&quot;--mcp&quot;]</code></td></tr><tr><td><a href="https://opencode.ai/docs/mcp-servers/" rel="noopener">opencode</a></td><td>in <code>opencode.json</code>: <code>&quot;mcp&quot;: {&quot;sculptforge&quot;: {&quot;type&quot;: &quot;local&quot;, &quot;command&quot;: [&quot;/path/to/sculptforge-cli&quot;, &quot;--mcp&quot;]}}</code></td></tr><tr><td><a href="https://support.atlassian.com/rovo/docs/connect-to-an-mcp-server-in-rovo-dev-cli/" rel="noopener">Rovo Dev CLI</a></td><td>the <code>mcpServers</code> entry plus <code>&quot;transport&quot;: &quot;stdio&quot;</code> in <code>~/.rovodev/mcp.json</code> (<code>acli rovodev mcp</code> opens it)</td></tr><tr><td><a href="https://lmstudio.ai/docs/app/mcp" rel="noopener">LM Studio</a></td><td><strong>Program</strong> tab &gt; <strong>Install &gt; Edit mcp.json</strong>, paste the <code>mcpServers</code> entry</td></tr><tr><td><a href="https://docs.jan.ai/desktop/mcp" rel="noopener">Jan</a></td><td><strong>Settings &gt; MCP Servers &gt; +</strong>: command <code>/path/to/sculptforge-cli</code>, arguments <code>--mcp</code></td></tr></tbody></table></div>
+<p>Remote only, so not for SculptForge: the ChatGPT app, the Grok app, and Rovo in Atlassian&#x27;s web apps (public HTTPS servers added by an admin; use Rovo Dev CLI). The OpenAI and xAI APIs&#x27; built-in MCP tools also reach only remote servers: use the Agents SDK or plain function calling below.</p>
+<h3 id="using-it">Using it<a class="anchor" href="#using-it" aria-label="Link to this section">#</a></h3>
+<p>Ask for something like &quot;make a sphere, remesh it at 128 and export it to ~/Desktop/ball.glb&quot;. File paths are on your machine. The agent works headless on its own scene; to see the result, open the exported file in SculptForge.</p>
+<ul>
+<li>
+<strong>viewport_image</strong> gives the agent a picture of the scene (a clay-shaded view of the visible Parts, any angle) to check each step by eye. Every tool call is one undo step, so the agent can take back what went wrong.
+</li>
+<li>
+<strong>Recipes</strong>: the server offers ready-made prompts that walk an agent through a whole job. In Claude Desktop and other tools that show MCP prompts, pick one from the prompt menu: a creature head from a description, a stylised bust from a reference image, a game-ready asset (retopology, UVs, baked maps and LODs for Unreal or Godot), rock variations, and a step-by-step lesson.
+</li>
+</ul>
+<h3 id="your-own-agent">Your own agent<a class="anchor" href="#your-own-agent" aria-label="Link to this section">#</a></h3>
+<p>The <a href="https://openai.github.io/openai-agents-python/mcp/" rel="noopener">OpenAI Agents SDK</a> starts the server itself:</p>
+<div class="code-block"><pre class="code"><code class="language-python">import asyncio
+from agents import Agent, Runner
+from agents.mcp import MCPServerStdio
+
+async def main():
+    async with MCPServerStdio(name=&quot;SculptForge&quot;, client_session_timeout_seconds=60,
+                              params={&quot;command&quot;: &quot;/path/to/sculptforge-cli&quot;, &quot;args&quot;: [&quot;--mcp&quot;]}) as sf:
+        agent = Agent(name=&quot;Sculptor&quot;, instructions=&quot;Use SculptForge&#x27;s tools.&quot;, mcp_servers=[sf])
+        print((await Runner.run(agent, &quot;Make a sphere, remesh it at 128 and export ball.glb&quot;)).final_output)
+
+asyncio.run(main())</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+<p>For plain function calling with any model API, <code>sculptforge-cli --schema</code> prints every tool as JSON (<code>name</code>, <code>description</code>, <code>input_schema</code>: the Claude API takes it as it is). APIs limit how many tools one request may carry, so pick the ones the job needs. This helper turns them into function definitions and runs each call in one SculptForge session (through <code>--mcp</code>, so the scene is kept between calls):</p>
+<div class="code-block"><pre class="code"><code class="language-python"># sf_tools.py
+import json, subprocess
+CLI = &quot;/path/to/sculptforge-cli&quot;
+WANTED = {&quot;new_sphere&quot;, &quot;remesh&quot;, &quot;subdivide&quot;, &quot;stroke&quot;, &quot;decimate&quot;, &quot;mesh_info&quot;, &quot;export_glb&quot;, &quot;undo&quot;}
+TOOLS = [{&quot;type&quot;: &quot;function&quot;, &quot;name&quot;: t[&quot;name&quot;], &quot;description&quot;: t[&quot;description&quot;], &quot;parameters&quot;: t[&quot;input_schema&quot;]}
+         for t in json.loads(subprocess.run([CLI, &quot;--schema&quot;], capture_output=True, text=True).stdout)
+         if t[&quot;name&quot;] in WANTED]
+_sf = subprocess.Popen([CLI, &quot;--mcp&quot;], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+def call(name, arguments):
+    _sf.stdin.write(json.dumps({&quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: 1, &quot;method&quot;: &quot;tools/call&quot;,
+                                &quot;params&quot;: {&quot;name&quot;: name, &quot;arguments&quot;: arguments}}) + &quot;\n&quot;)
+    _sf.stdin.flush()
+    return json.loads(_sf.stdout.readline())[&quot;result&quot;][&quot;content&quot;][0][&quot;text&quot;]</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+<p><a href="https://developers.openai.com/api/docs/guides/function-calling" rel="noopener">OpenAI API</a> (Responses API). For the <a href="https://docs.x.ai/docs/guides/function-calling" rel="noopener">xAI API</a> use the same code with <code>OpenAI(api_key=os.environ[&quot;XAI_API_KEY&quot;], base_url=&quot;https://api.x.ai/v1&quot;)</code> and a Grok model:</p>
+<div class="code-block"><pre class="code"><code class="language-python">import json
+from openai import OpenAI
+from sf_tools import TOOLS, call
+client = OpenAI()
+items = [{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Make a sphere, remesh it at 128 and export it to ball.glb&quot;}]
+while True:
+    r = client.responses.create(model=&quot;gpt-6-astra&quot;, tools=TOOLS, input=items)
+    items += r.output
+    calls = [i for i in r.output if i.type == &quot;function_call&quot;]
+    if not calls: break
+    items += [{&quot;type&quot;: &quot;function_call_output&quot;, &quot;call_id&quot;: c.call_id,
+               &quot;output&quot;: call(c.name, json.loads(c.arguments))} for c in calls]
+print(r.output_text)</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+<p><a href="https://aistudio.google.com/docs/function-calling" rel="noopener">Gemini API</a> (the <code>google-genai</code> package):</p>
+<div class="code-block"><pre class="code"><code class="language-python">from google import genai
+from sf_tools import TOOLS, call
+client = genai.Client()
+interaction = client.interactions.create(model=&quot;gemini-3.8-flash&quot;, tools=TOOLS,
+                                         input=&quot;Make a sphere, remesh it at 128 and export it to ball.glb&quot;)
+for step in interaction.steps:
+    if step.type == &quot;function_call&quot;:
+        print(step.name, call(step.name, step.arguments))
+# Send each result back as Google&#x27;s guide shows to let the model continue.</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+<p>Never point a tool at a web app&#x27;s session or cookies: use each vendor&#x27;s own app, CLI or API as above.</p>
 <h2 id="see-also">See also<a class="anchor" href="#see-also" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>
