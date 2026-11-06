@@ -288,12 +288,12 @@ void App::drawBrushSetMenu() {
     for (size_t i = 0; i < brushSets_.list.size(); ++i) {
         const BrushSet& set = brushSets_.list[i];
         const int n = countBrushes(set.shelf);
-        const std::string count = std::to_string(n) + (n == 1 ? " brush" : " brushes");
+        char count[64];
+        std::snprintf(count, sizeof count, n == 1 ? tr("%d brush") : tr("%d brushes"), n);
         const std::string label = set.name + "##brushset" + std::to_string(i);
-        if (ImGui::MenuItem(label.c_str(), count.c_str(), int(i) == current)) runCommand("brush_set", {{"name", set.name}});
+        if (ImGui::MenuItem(label.c_str(), count, int(i) == current)) runCommand("brush_set", {{"name", set.name}});
         ui::HelpText(set.name.c_str(), actions_.shortcutText("brushset.use." + slug(set.name)).c_str(),
-                     ("Switch the bottom shelf to this set's " + count + " and give them the set's keys.").c_str(),
-                     "Brush > Brush set");
+                     "Switch the bottom shelf to this set's brushes and give them the set's keys.", "Brush > Brush set");
     }
     ImGui::Separator();
     if (ImGui::MenuItem(tr("Save Shelf as Brush Set...##brushsetmenu"))) openBrushSetSave();
@@ -334,13 +334,16 @@ void App::drawBrushSetRow() {
 }
 
 void App::drawBrushSetSave() {
+    // (Translated titles: the popup's id follows the language, opened and drawn under the same one.)
+    const char* savePopup = tr(kSavePopup);
+    const char* deletePopup = tr(kDeletePopup);
     if (brushSets_.saveOpen) {
-        ImGui::OpenPopup(kSavePopup);
+        ImGui::OpenPopup(savePopup);
         brushSets_.saveOpen = false;
         brushSets_.saveFocus = true;
     }
     if (brushSets_.deleteOpen) {
-        ImGui::OpenPopup(kDeletePopup);
+        ImGui::OpenPopup(deletePopup);
         brushSets_.deleteOpen = false;
     }
     const float s = uiScale_;
@@ -348,7 +351,7 @@ void App::drawBrushSetSave() {
     const ImVec2 button(110 * s, 0);
 
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(kSavePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
+    if (ImGui::BeginPopupModal(savePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
         std::string& error = brushSets_.error;
         if (brushSets_.saveFocus) {
             error.clear();
@@ -360,13 +363,13 @@ void App::drawBrushSetSave() {
                                            sizeof brushSets_.name, ImGuiInputTextFlags_EnterReturnsTrue);
         const int brushes = countBrushes(layout_.bottomShelf);
         ImGui::PushTextWrapPos(320 * s);
-        ImGui::TextDisabled("%s", ("The bottom shelf's " + std::to_string(brushes) +
-                                   " brushes, in order, and their keys. Switching to the set later puts both back.")
-                                      .c_str());
+        ImGui::TextDisabled(tr("The bottom shelf's %d brushes, in order, and their keys. Switching to the set later puts "
+                               "both back."),
+                            brushes);
         const std::string name = trimmed(brushSets_.name);
         const int existing = name.empty() ? -1 : findSet(brushSets_.list, name);
         if (existing >= 0 && brushSets_.list[size_t(existing)].name == name)
-            ImGui::TextColored(ImVec4(0.94f, 0.53f, 0.18f, 1.0f), "%s", ("Replaces the set " + name + ".").c_str());
+            ImGui::TextColored(ImVec4(0.94f, 0.53f, 0.18f, 1.0f), tr("Replaces the set %s."), name.c_str());
         ImGui::PopTextWrapPos();
         if (!error.empty()) ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "%s", error.c_str());
         ImGui::BeginDisabled(name.empty());
@@ -384,8 +387,8 @@ void App::drawBrushSetSave() {
     }
 
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(kDeletePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
-        ImGui::Text("%s", ("Delete the brush set " + brushSets_.deleting + "?").c_str());
+    if (ImGui::BeginPopupModal(deletePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
+        ImGui::Text(tr("Delete the brush set %s?"), brushSets_.deleting.c_str());
         ImGui::TextDisabled("%s", tr("Only the set goes: the brushes and the shelf stay as they are."));
         bool close = false;
         if (ImGui::Button(tr("Delete##brushsetdelete_ok"), button)) {

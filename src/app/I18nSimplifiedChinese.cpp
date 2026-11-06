@@ -3322,6 +3322,14 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Save Shelf as Brush Set", "将工具栏保存为笔刷组"},
     {"none yet", "尚无"},
     {"this shelf (not saved)", "当前的工具栏（未保存）"},
+    {"%d brush", "%d 个笔刷"},
+    {"%d brushes", "%d 个笔刷"},
+    {"Save Brush Set", "保存笔刷组"},
+    {"Delete Brush Set?", "删除笔刷组？"},
+    {"The bottom shelf's %d brushes, in order, and their keys. Switching to the set later puts both back.", "底部工具栏的%d个笔刷（按顺序）及其快捷键。切换到此组时两者都会恢复。"},
+    {"Replaces the set %s.", "将替换笔刷组 %s。"},
+    {"Delete the brush set %s?", "删除笔刷组 %s？"},
+    {"Switch the bottom shelf to this set's brushes and give them the set's keys.", "将底部工具栏换成这个组的笔刷，并应用这个组的快捷键。"},
 };
 
 } // namespace

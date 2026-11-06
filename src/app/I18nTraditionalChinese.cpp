@@ -3320,6 +3320,14 @@ constexpr Entry kTraditionalChinese[] = {
     {"Save Shelf as Brush Set", "將工具列儲存為筆刷組"},
     {"none yet", "尚無"},
     {"this shelf (not saved)", "目前的工具列（未儲存）"},
+    {"%d brush", "%d 個筆刷"},
+    {"%d brushes", "%d 個筆刷"},
+    {"Save Brush Set", "儲存筆刷組"},
+    {"Delete Brush Set?", "刪除筆刷組？"},
+    {"The bottom shelf's %d brushes, in order, and their keys. Switching to the set later puts both back.", "底部工具列的%d個筆刷（依順序）及其快速鍵。切換到此組時兩者都會恢復。"},
+    {"Replaces the set %s.", "將取代筆刷組 %s。"},
+    {"Delete the brush set %s?", "刪除筆刷組 %s？"},
+    {"Switch the bottom shelf to this set's brushes and give them the set's keys.", "將底部工具列換成這個組的筆刷，並套用這個組的快速鍵。"},
 };
 
 } // namespace

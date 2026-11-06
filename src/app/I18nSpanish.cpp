@@ -3790,6 +3790,14 @@ constexpr Entry kSpanish[] = {
     {"Save Shelf as Brush Set", "Guardar estante como conjunto de pinceles"},
     {"none yet", "ninguno todavía"},
     {"this shelf (not saved)", "este estante (sin guardar)"},
+    {"%d brush", "%d pincel"},
+    {"%d brushes", "%d pinceles"},
+    {"Save Brush Set", "Guardar conjunto de pinceles"},
+    {"Delete Brush Set?", "¿Eliminar conjunto de pinceles?"},
+    {"The bottom shelf's %d brushes, in order, and their keys. Switching to the set later puts both back.", "Los %d pinceles del estante inferior, en orden, y sus teclas. Al cambiar a este conjunto más tarde vuelven ambos."},
+    {"Replaces the set %s.", "Reemplaza el conjunto %s."},
+    {"Delete the brush set %s?", "¿Eliminar el conjunto de pinceles %s?"},
+    {"Switch the bottom shelf to this set's brushes and give them the set's keys.", "Cambia el estante inferior a los pinceles de este conjunto y les da sus teclas."},
 };
 
 } // namespace
