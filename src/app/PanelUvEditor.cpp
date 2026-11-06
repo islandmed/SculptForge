@@ -690,7 +690,7 @@ struct UvEditorUi {
 
     // Pack (the button, Pack at Density): uv_pack's work on a copy of the Part on a worker thread; the result
     // lands as uv_pack's undo step and status line would.
-    void pack(Args a) {
+    void packInBackground(Args a) {
         Mesh& m = mesh();
         if (s.job || !m.hasUvs()) return;
         auto job = std::make_unique<UvEditorState::Job>();
@@ -910,7 +910,7 @@ void App::registerUvEditorActions() {
         "pins; Auto Seams finds its own. Closed pieces get cut automatically. Runs in the background (Cancel under the "
         "view stops it).",
         "uv_unwrap");
-    add("uv.pack", "Pack", ICON_LC_PACKAGE, "", [this] { uvUi(*this, uvEditor_).pack(uvUi(*this, uvEditor_).packArgs()); },
+    add("uv.pack", "Pack", ICON_LC_PACKAGE, "", [this] { uvUi(*this, uvEditor_).packInBackground(uvUi(*this, uvEditor_).packArgs()); },
         nullptr, [this] { return doc_.mesh.hasUvs() && !(uvEditor_ && uvEditor_->job); },
         "Pack the selected islands (or all) as large as they fit into the 0-1 tile, or across the Columns x Rows grid "
         "of UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them. "
@@ -986,7 +986,7 @@ void App::registerUvEditorActions() {
             UvEditorUi u = uvUi(*this, uvEditor_);
             Args a = u.packArgs();
             a["density"] = double(uvEditor_->targetDensity);
-            u.pack(a);
+            u.packInBackground(a);
         },
         nullptr, [this] { return doc_.mesh.hasUvs() && !(uvEditor_ && uvEditor_->job); },
         "Pack at exactly the target texel density, using as many UDIM tiles as it takes (1001, 1002, ..., Columns "
