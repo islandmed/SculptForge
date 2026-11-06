@@ -15,11 +15,20 @@ wait 0.6
 expect_value drawn_triangles <= 40000
 shot coarse-turned
 
-# A stroke: the clusters it moved draw in full while it runs; the levels are updated after it.
+# A stroke: the clusters it moved draw in full while it runs (pending); after it their levels are updated and every
+# cluster is coarse again, the budget held. (Unit test coarse_levels_follow_edits checks the updated cells' points.)
 camera 0 0
 wait 0.6
-drag_path 0.42 0.45 0.58 0.45 0.58 0.55
+remember coarse_clusters before
+expect_value coarse_pending == 0
+stroke 0.42 0.45 0.58 0.55 0.6 hold
+expect_value coarse_pending > 0
+expect_value coarse_clusters < $before
+shot coarse-during-stroke
+release
 wait 0.6
+expect_value coarse_pending == 0
+expect_value coarse_clusters == $before
 expect_value drawn_triangles <= 40000
 shot coarse-after-stroke
 

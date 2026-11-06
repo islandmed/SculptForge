@@ -2967,6 +2967,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
                            : glm::vec4(0.0f, 0.0f, float(targetWidth), float(targetHeight));
     frameCull_ = CullView::from(view, proj);
     lastDrawn_ = 0;
+    lastCoarseClusters_ = 0;
     gl::Enable(GL_DEPTH_TEST);
     gl::DepthFunc(GL_LEQUAL);
     if (drawList_.empty() || !settings.showMesh) {
@@ -3295,6 +3296,12 @@ void Renderer::uploadCoarsePoints(MeshSlot& s) {
     gl::BufferData(GL_ARRAY_BUFFER, GLsizeiptr(packed.size() * sizeof(PackedVertex)), packed.data(), GL_STATIC_DRAW);
 }
 
+size_t Renderer::coarsePendingClusters() const {
+    size_t n = 0;
+    for (const MeshSlot& s : slots_) n += s.coarsePending.size();
+    return n;
+}
+
 void Renderer::markCoarseDirty(MeshSlot& s, uint32_t c) {
     if (!s.coarse || c >= s.coarseDirty.size()) return;
     s.coarseEdited = true;
@@ -3458,6 +3465,8 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
         std::fprintf(stderr, "coarse lod: not drawn (per-triangle %d, wireframe %d, drawn %zu, budget %zu)\n", int(perTriangle),
                      int(active && settings.wireframe), s.drawnTriangles, budget);
     if (coarse) cullCoarse(s, frameCull_, budget);
+    else coarseClusters_.clear();
+    lastCoarseClusters_ += coarseClusters_.size();
     else cull(s, frameCull_, settings.motionProxy && coarseAllowed);
     // The back faces left in clusters along the silhouette: the GPU skips them too when they can't show.
     if (cullBackfaces_ || xrayCull_) gl::Enable(GL_CULL_FACE);

@@ -250,6 +250,10 @@ public:
     size_t microPendingShading() const;
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
     size_t lastDrawnTriangles() const { return lastDrawn_; }
+    // Coarse levels (tests): the clusters the last frame drew at a coarse level, and the edited clusters whose levels
+    // are still to be updated (drawn in full until then).
+    size_t coarseDrawnClusters() const { return lastCoarseClusters_; }
+    size_t coarsePendingClusters() const;
     // The last syncScene left motion proxies to build (a few milliseconds of them a frame; the rest draw in full).
     bool proxiesPending() const { return proxyPending_; }
     // Build stale motion proxies on still frames too (after a stroke, so the next orbit starts with them), at a
@@ -478,6 +482,7 @@ private:
     // (coarseClusters_, coarseLevel_), the finest that fits.
     void cullCoarse(const MeshSlot& s, const CullView& view, size_t budget);
     std::vector<uint32_t> coarseClusters_;
+    size_t lastCoarseClusters_ = 0;
     std::vector<uint8_t> coarseLevel_;
     void drawSlot(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);
     enum class DrawPart { Triangles, Lines, Proxy };
