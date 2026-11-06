@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/VertexPaint.h"
+#include "core/BrushAlpha.h"
 #include "core/LayerStack.h"
 #include "core/MaterialRecipe.h"
 #include "core/MeshMaps.h"
@@ -125,14 +126,24 @@ size_t paintDab(Sculptor& sculptor, Mesh& mesh, const BVH& bvh, const DabParams&
     static thread_local std::vector<uint32_t> verts;
     auto clock = std::chrono::steady_clock::now();
     size_t changed = 0;
+    // An alpha shapes the dab as it does a sculpt dab and a texture dab (#152): on the view plane, turned by alphaUp,
+    // reaching into its square's corners.
+    const bool useAlpha = p.alpha && !p.alpha->empty();
     for (const SymCopy& m : Sculptor::copies(sym)) {
         const glm::vec3 center = m.point(p.center), viewDir = m.dir(p.viewDir);
+        glm::vec3 aUp = m.dir(p.alphaUp);
+        aUp -= viewDir * glm::dot(aUp, viewDir);
+        aUp = glm::length(aUp) > 1e-6f ? glm::normalize(aUp) : glm::vec3(0, 1, 0);
+        const glm::vec3 aRight = glm::cross(aUp, -viewDir);
         static thread_local ConnectedScratch connected;
-        brushRegion(mesh, bvh, center, viewDir, p.radius, p.connectedOnly, p.viewFalloff, verts, connected);
+        brushRegion(mesh, bvh, center, viewDir, p.radius * (useAlpha ? kAlphaReach : 1.0f), p.connectedOnly, p.viewFalloff,
+                    verts, connected);
         for (uint32_t v : verts) {
             if (p.frontFacesOnly && v < mesh.normals.size() && glm::dot(mesh.normals[v], viewDir) > 0.0f) continue;
-            const float w = brushFalloff(brushDistance(mesh.positions[v], center, viewDir, p.viewFalloff), p.radius, p.focal) * s *
-                            vertexInfluence(mesh, v);
+            const glm::vec3 o = mesh.positions[v] - center;
+            const float f = useAlpha ? p.alpha->stamp(glm::dot(o, aRight) / p.radius, glm::dot(o, aUp) / p.radius, p.focal)
+                                     : brushFalloff(brushDistance(mesh.positions[v], center, viewDir, p.viewFalloff), p.radius, p.focal);
+            const float w = f * s * vertexInfluence(mesh, v);
             if (w <= 0.0f) continue;
             sculptor.recordColor(mesh, v);
             paintVertex(mesh, v, color, w, p.invert); // Alt paints Base back to white, erases a layer

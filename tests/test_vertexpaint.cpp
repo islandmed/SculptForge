@@ -5,6 +5,7 @@
 // export) and the built-in Lit Sphere materials.
 #include "TestHarness.h"
 
+#include "core/BrushAlpha.h"
 #include "core/Commands.h"
 #include "core/Image.h"
 #include "core/LitSphere.h"
@@ -550,4 +551,47 @@ TEST(vertexpaint_restore_stroke_marks_colors_dirty) {
     CHECK(m.colors[centre] == glm::vec3(1.0f));
     CHECK(m.dirtyBegin <= centre && centre < m.dirtyEnd);
     doc.undo.push(doc.sculptor.endStroke());
+}
+
+TEST(vertexpaint_dab_follows_the_alpha) {
+    // #152: a paint dab with an alpha (Drag Stamp, Dots, Spray) is shaped by it, not a round blob, on both sides.
+    Document doc = makeDoc(makeIcosphere(6));
+    Mesh& m = doc.mesh;
+    BrushAlpha half; // white on its left half, black on its right
+    half.name = "Half";
+    half.width = half.height = 8;
+    for (int y = 0; y < 8; ++y)
+        for (int x = 0; x < 8; ++x) half.values.push_back(x < 4 ? 1.0f : 0.0f);
+    DabParams p = paintParams({1, 0, 0}, 0.4f);
+    p.alpha = &half;
+    p.alphaUp = {0, 1, 0};
+    const glm::vec3 right = glm::cross(p.alphaUp, -p.viewDir); // the stamp's right on the view plane
+    CHECK(doc.sculptor.beginStroke(m, "Paint"));
+    CHECK(paintDab(doc.sculptor, m, doc.bvh, p, kRed, Symmetry{}) > 0);
+    const uint32_t left = nearestVertex(m, glm::normalize(glm::vec3(1, 0, 0) - right * 0.15f));
+    const uint32_t rightV = nearestVertex(m, glm::normalize(glm::vec3(1, 0, 0) + right * 0.15f));
+    CHECK(m.colors[left].y < 0.5f);             // under the white half: painted
+    CHECK(m.colors[rightV] == glm::vec3(1.0f)); // under the black half: untouched (a round dab paints it)
+    // The X mirror copy is shaped too (oriented as the sculpt and texture dabs orient it): one side painted, one not.
+    const glm::vec3 a = m.colors[nearestVertex(m, glm::normalize(glm::vec3(-1, 0, 0) - right * 0.15f))];
+    const glm::vec3 b = m.colors[nearestVertex(m, glm::normalize(glm::vec3(-1, 0, 0) + right * 0.15f))];
+    CHECK((a.y < 0.5f && b == glm::vec3(1.0f)) || (b.y < 0.5f && a == glm::vec3(1.0f)));
+    doc.undo.push(doc.sculptor.endStroke());
+
+    // Cracks on a dense sphere: a pattern of painted and unpainted vertices inside the dab, not a solid blob.
+    Document d2 = makeDoc(makeIcosphere(6));
+    BrushAlpha cracks;
+    CHECK(BrushAlpha::builtin("Cracks", cracks));
+    DabParams c = paintParams({0, 0, 1}, 0.5f);
+    c.alpha = &cracks;
+    CHECK(d2.sculptor.beginStroke(d2.mesh, "Paint"));
+    paintDab(d2.sculptor, d2.mesh, d2.bvh, c, kRed, Symmetry{false, false, false});
+    size_t inside = 0, painted = 0;
+    for (uint32_t v = 0; v < d2.mesh.vertexCount(); ++v) {
+        if (glm::distance(d2.mesh.positions[v], glm::vec3(0, 0, 1)) > 0.25f) continue;
+        ++inside;
+        painted += d2.mesh.colors[v].y < 0.95f;
+    }
+    CHECK(inside > 100 && painted > inside / 20 && painted < inside * 9 / 10);
+    d2.undo.push(d2.sculptor.endStroke());
 }

@@ -18,6 +18,9 @@
 #include <random>
 #include <sstream>
 #include <thread>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 using namespace sf;
 using namespace sf::link;
