@@ -163,9 +163,12 @@ wait_run() {
         gh run watch "$id" -R "$REPO" --exit-status >/dev/null || true
     fi
     conclusion=$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)
-    # A job that died on a GitHub/CDN 5xx while downloading (0.11.1: seven 504s in Packages) is rerun once, then judged.
-    if [ "$conclusion" = failure ] && [ -z "$rerun_done" ] && gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | server_error; then
-        echo "   $wf run $id failed on an HTTP 5xx download: rerunning its failed jobs once" >&2
+    # A job that died on a GitHub/CDN 5xx while downloading (0.11.1: seven 504s in Packages) is rerun once, then judged;
+    # so is the Website's deploy job, whose failures are GitHub's Pages service timing out (0.11.7).
+    if [ "$conclusion" = failure ] && [ -z "$rerun_done" ] &&
+        { { [ "$wf" = pages.yml ] && gh run view "$id" -R "$REPO" --json jobs -q '.jobs[] | select(.conclusion == "failure") | .name' 2>/dev/null | grep -x deploy >/dev/null; } ||
+          gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | server_error; }; then
+        echo "   $wf run $id failed (a GitHub service error): rerunning its failed jobs once" >&2
         rerun_done=1
         gh run rerun "$id" --failed -R "$REPO" >/dev/null 2>&1 || true
         sleep 10
