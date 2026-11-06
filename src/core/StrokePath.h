@@ -145,9 +145,14 @@ private:
 // costs now (dabSeconds, 0 = not measured yet), never fewer than `minDabs`; `fixed` >= 0 is a fixed limit
 // instead (SF_STROKE_BACKLOG). A light mesh keeps hundreds of dabs (a fast small brush keeps its spacing); a heavy
 // one only a few, so the brush stays near the pointer and releasing doesn't place a second of waiting dabs.
-inline size_t strokeBacklogLimit(double dabSeconds, long fixed = -1, double backlogSeconds = 0.05, size_t minDabs = 4) {
+// `floorSeconds` > 0: where dabs are slow, the floor is only as many as that much work (at least one): `minDabs`
+// dabs of 70 ms each (a 240 px brush on a 28M scan, floor tier) were a third of a second behind the pointer.
+inline size_t strokeBacklogLimit(double dabSeconds, long fixed = -1, double backlogSeconds = 0.05, size_t minDabs = 4,
+                                 double floorSeconds = 0.0) {
     if (fixed >= 0) return size_t(fixed);
     size_t limit = minDabs;
+    if (floorSeconds > 0.0 && dabSeconds > 0.0)
+        limit = std::clamp(size_t(std::min(floorSeconds / dabSeconds, 1e6)), size_t(1), minDabs);
     if (dabSeconds > 0.0) limit = std::max(limit, size_t(std::min(backlogSeconds / dabSeconds, 1e6)));
     return limit;
 }

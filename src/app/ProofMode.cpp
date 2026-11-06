@@ -937,6 +937,18 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             ph.strokeFrames = perf_.lastStrokeFrames;
             strokeProbe_ = nullptr;
             ph.dabs = p.dabs.size();
+            // SF_BENCH_DUMP=<prefix>: the positions after each stroke (<prefix>-<phase>.bin, raw floats), to compare
+            // what two settings' strokes made (a result check beside the timings).
+            // SF_BENCH_DUMP_PHASES="clay large,smooth": only those.
+            const char* only = std::getenv("SF_BENCH_DUMP_PHASES");
+            if (const char* dump = std::getenv("SF_BENCH_DUMP");
+                dump && *dump && (!only || std::string(",").append(only).append(",").find(std::string(",") + spec.name + ",") != std::string::npos)) {
+                std::string file = std::string(dump) + "-" + spec.name + ".bin";
+                std::replace(file.begin(), file.end(), ' ', '_');
+                if (std::ofstream out(file, std::ios::binary); out)
+                    out.write(reinterpret_cast<const char*>(doc_.mesh.positions.data()),
+                              std::streamsize(doc_.mesh.positions.size() * sizeof(glm::vec3)));
+            }
             nextPhase();
             break;
         }
