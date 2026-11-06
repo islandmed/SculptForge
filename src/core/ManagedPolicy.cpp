@@ -341,7 +341,8 @@ std::vector<std::string> mcpCategories(std::string_view name, const std::vector<
     static const char* kNetwork[] = {"brush_gallery_search", "brush_gallery_install", "unreal_editors", "unreal_send",
                                      "export_unreal"};
     static const char* kScripts[] = {"macro_run", "run_script", "python"};
-    static const char* kBridges[] = {"goz_send", "blender_send", "blender_receive", "maya_send", "maya_receive"};
+    static const char* kBridges[] = {"bridge_send", "bridge_receive", "bridge_import", "bridge_export",
+                                     "blender_send", "blender_receive", "maya_send",     "maya_receive"};
     static const char* kAi[] = {"brush_ai", "image_to_3d", "text_to_3d", "comfyui_check"};
     auto in = [&](const auto& list) {
         for (const char* n : list)
