@@ -25,6 +25,7 @@
 #include "render/GL.h"
 
 #include <cstdint>
+#include <span>
 #include <vector>
 
 namespace sf {
@@ -44,7 +45,7 @@ public:
     size_t gpuBytes() const;
     bool closed() const { return closed_; }
     // Grid points whose shading still waits for a frame (budget), for tests and the benchmark.
-    size_t pendingShading() const { return pendingCount_; }
+    size_t pendingShading() const { return pendingCount_ + staleCount_; }
     // Grid points of shading recomputed per sync at most (0 = no limit).
     size_t shadeBudget = size_t(3) << 20;
     // The view moves (set by the Renderer before sync: Fast Navigation's proxy frames): shading gets a time cap.
@@ -61,6 +62,7 @@ private:
     void ensurePatches(int level);
     void uploadDispTiles(const Mesh& mesh, std::vector<uint32_t>& slots, bool all);
     void shadePending(const Mesh& mesh, bool all);
+    size_t shadeSeeds(const Mesh& mesh, std::span<const uint32_t> seeds, std::vector<uint32_t>* outer);
 
     uint64_t serial_ = 0;
     uint32_t baseTriangles_ = 0, baseVertices_ = 0;
@@ -95,6 +97,10 @@ private:
     size_t bytes_ = 0;
     MicroShader shader_;
     std::vector<uint64_t> pending_; // per base triangle: shading out of date
+    std::vector<uint64_t> stale_;   // ... only where a neighbour changed (shared edges and corners: shadePending)
+    size_t staleCount_ = 0;
+    bool deferStale = false;        // a stroke runs: stale_ waits for its end
+    std::vector<uint32_t> outer_;
     double shadeNsPerPoint_ = 0.0;  // what shading a grid point (and sending it) took lately (TierConfig::strokeShadeMs)
     size_t pendingCount_ = 0;
     std::vector<uint32_t> scratch_, written_, stageIndex_;
