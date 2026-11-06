@@ -662,19 +662,20 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
 }
 .guide-page .nav .wrap, .guide-page .footer .wrap { max-width: 1360px; }
 
-/* Live mode: the hero plays a real live-mode session; the section under the hero says what it is, beside the lion. */
-.hero-live video { aspect-ratio: 1280 / 734; object-fit: cover; background: #222; }
+/* The hero plays a real sculpting session at real speed; live mode is the first section under it, beside the bust. */
+.hero-sculpt video { aspect-ratio: 1280 / 924; object-fit: cover; background: #222; }
+.speed-line { color: var(--muted); font-size: 0.95rem; max-width: 36em; margin: 0.4em 0 0; }
+.speed-line a { white-space: nowrap; }
 .live { border-top: 1px solid var(--border); }
 .live-grid { grid-template-columns: 1.3fr 1fr; align-items: center; }
 .live-copy h2 { margin-top: 0.2em; }
 .live-still { margin: 0; }
-.live-still img { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; border-radius: var(--radius);
-  background: #f3efe9; }
-.live-still figcaption { color: var(--muted); font-size: 0.8rem; margin-top: 10px; text-align: center; }
+.live-still img { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; }
 @media (max-width: 960px) {
   .live-grid { grid-template-columns: 1fr; gap: 28px; }
   .live-still img { max-width: 320px; }
 }
 @media (max-width: 620px) {
-  .hero-live video { aspect-ratio: 1280 / 734; object-fit: cover; }
+  .speed-line { order: 3; font-size: 0.9rem; margin: -0.6em 0 1.2em; }
+  .hero-sculpt video { aspect-ratio: 720 / 866; }
 }
