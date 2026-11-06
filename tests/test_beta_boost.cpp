@@ -46,6 +46,7 @@ StrokeResult strokeOn(const Mesh& head, BrushType type, float radius, bool adapt
             for (int x = 0; x < 64; ++x) stamp.values[size_t(y) * 64 + x] = 0.5f + 0.5f * std::sin(0.3f * float(x)) * std::cos(0.2f * float(y));
     }
     d.sculptor.adaptiveDabs = adaptive;
+    d.sculptor.analyticNormals = adaptive; // (the exact path: neither)
     d.sculptor.beginStroke(d.mesh, brushName(type));
     StrokeResult out;
     const auto t0 = std::chrono::steady_clock::now();
@@ -237,6 +238,7 @@ TEST(adaptive_dabs_normals_during_the_stroke) {
     auto run = [&](bool adaptive) {
         Document d = makeDoc(head);
         d.sculptor.adaptiveDabs = adaptive;
+        d.sculptor.analyticNormals = adaptive;
         d.sculptor.beginStroke(d.mesh, "Clay");
         for (int i = 0; i < 8; ++i) {
             DabParams p;
