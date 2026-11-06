@@ -5,6 +5,93 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.6
+
+```features
+date: 2026-11-06
+tagline: Studio controls for AI: a managed policy, an audit log, keys in the system keychain and single sign-on, plus shelves that hide when they're empty.
+highlight: Studio controls: one policy file decides which AI tools and providers are allowed
+highlight: An audit log of every AI step, and API keys kept in the system keychain
+highlight: Sign in with your studio's identity provider (device sign-in, no browser plug-in)
+highlight: Empty shelves stay out of the way outside Customize Shelves
+highlight: Studio-ready AI: policy, audit log, single sign-on
+```
+
+- **Empty shelves hide**: a shelf you empty is hidden outside **Customize Shelves** and the canvas takes its room; it
+  comes back while customizing so you can drop buttons onto it again.
+- **Studio controls**: IT can deploy a policy file that locks AI, network features, AI providers, AI tools and updates
+  (**Managed by your studio** shows on locked settings), keep an audit log of every AI action, and sign artists in
+  with the studio account (the guide's "SculptForge for studios" page, IT deployment).
+- **AI providers**: **Edit > Preferences > AI > Provider** has presets for Anthropic, OpenAI, Ollama, LM Studio, vLLM,
+  llama.cpp, a LiteLLM studio gateway and OpenRouter. Keys now live in your system keychain.
+
+## Version 0.11.5
+
+```features
+date: 2026-11-06
+tagline: Connecting your AI assistant now takes three steps, the interface speaks Simplified Chinese, and the brush size ring follows the pen.
+highlight: Help > Connect an AI tool: three steps, copyable commands for your tool, example prompts
+highlight: The interface in Simplified Chinese
+highlight: The brush size ring previews on the mesh while you resize
+highlight: Discord status clears when you quit and shows the new SF icon
+highlight: Connect an AI tool in three steps
+```
+
+- **Help > Connect an AI tool** is now the one guide to working with an AI tool, on one screen: pick your tool and
+  copy its command, turn on **Let AI tools control this window** right there, see what happens next (the 6-digit code,
+  the **AI connected** badge, **AI:** steps in Undo, what asks you first), and copy an example prompt. The AI blocks
+  out a starting point; you do the art.
+- **The brush ring shows the new size while you set it**: with the **S** pop-up open, dragging or typing a size draws
+  the ring at that size on the model, where you pressed S; **O** shows the Falloff ring the same way.
+- **Simplified Chinese**: **Preferences > Interface > Language** has a Simplified Chinese button, with mainland terms
+  and glyph shapes.
+- **Paint menu**: no longer jitters on short screens (1280x720 fullscreen); a menu taller than the screen scrolls
+  smoothly.
+
+## Version 0.11.4
+
+```features
+date: 2026-11-05
+tagline: Let your AI assistant sculpt in your open window, and fixes.
+highlight: Live mode: an AI tool works in your open window, only after you approve it
+highlight: Your AI tool sees the viewport, turns the view and adds strokes, and every step is one undo
+highlight: Fixes: rare wrong shading after strokes
+```
+
+## Version 0.11.3
+
+```features
+date: 2026-11-05
+tagline: Connect your AI tool in one window, saved camera views, a readable mask, solid remeshes of open parts and the new SF icon.
+highlight: Connect your AI tool in one window
+highlight: Saved camera views and a readable mask
+highlight: Quick Remesh and Voxel Remesh keep open parts solid
+highlight: The UV Editor fits at large UI scales
+highlight: The new orange SF app icon
+```
+
+- The app icon is now the orange SF mark, as on the website; it reads at task bar size.
+- **Help > Connect an AI tool**: use SculptForge from Claude, ChatGPT (Codex CLI), Gemini (Antigravity CLI), Grok
+  (Grok Build), Cursor, VS Code and more. Pick your subscription; the window shows the exact command or settings for
+  your install, with Copy buttons. Claude Desktop installs it from a bundle on each release.
+- **Remeshing an open Part stays solid**: **Quick Remesh** and **Tool > Remesh > Voxel Remesh** cap open borders (the
+  Stylised Head's neck, a cut) before remeshing, so the result is one closed surface, not a shell full of holes. A
+  Part that can't be made solid stays as it is, and the status bar says why.
+- **UV Editor at large UI scales**: the toolbar wraps on a 4K screen at 240 %, so **On model: Colours / Checker** and
+  **Frame** are all visible and each takes its own click.
+- **Dynamic on a subdivided model**: turning on **Dynamic** on a Part with subdivision levels now offers **Freeze
+  Levels and Turn On Dynamic**: the level you see becomes one plain mesh (Ctrl+Z brings the levels back).
+- **Saved views**: **View > Views** has Front, Back, Left, Right, Top and Bottom (Numpad 1, 3, 7; Ctrl for the other
+  side) and **Save View** for your own named camera angles; Numpad 0 goes back to the last one. They are saved with
+  the project.
+- **A readable mask**: masked areas show a soft, dark tint instead of near-black, with **Mask darkness** in
+  Preferences > Interface and Tool > Masking. Dense wireframes no longer turn into a dark moire.
+- **Easier to see**: options that are on stand out in every colour scheme, and Quad Remesh guide curves draw smooth
+  with an outline.
+- **Safer levels**: in Tool > Geometry, **Divide (keeps levels)** and **Subdivide (removes levels)** no longer sit
+  together, Micro has its own group, and Subdivide, Delete Lower and Delete Higher ask before removing levels (with
+  **Don't ask again** for Subdivide).
+
 ## Version 0.11.2
 
 ```features
@@ -72,12 +159,12 @@ action: ui.uv_editor
 ```features
 date: 2026-11-05
 tagline: Dense scans with micro levels keep up with the pen, and one-click updates on Windows and Linux.
-highlight: Dense scans keep up: orbit after a big stroke on a 112M scan, 0.7 to 51 fps
+highlight: Dense scans keep up: orbit after a big stroke on a sculpted 112M scan, under 1 to 33 fps
 highlight: One-click update, signed and checked
 highlight: Remesh with one key, or after each stroke
 highlight: Preferences save themselves
 title: Dense scans, fast
-line: Lucy 112M on an RTX 3060: orbit right after a big stroke, 0.7 to 51 frames a second.
+line: Lucy 112M with sculpted detail on an RTX 3060: orbit right after a big stroke, from under 1 to 33 frames a second.
 action: guide:performance.md#working-with-big-meshes
 ```
 

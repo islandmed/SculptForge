@@ -1,0 +1,4 @@
+# ThreadSanitizer suppressions for tools/test/tsan.sh: only reports inside system libraries we don't call directly.
+# libdbus: two of its own mutexes in opposite orders when SDL closes its D-Bus connection at exit
+# (dbus_connection_close from SDL_Quit; our code never calls libdbus). Not ours to fix.
+deadlock:libdbus-1.so

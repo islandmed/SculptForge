@@ -86,6 +86,21 @@ TEST(connect_ai_every_client_has_a_working_snippet) {
     CHECK(connect::bundleUrl(connect::Os::Mac).find(".mcpb") != std::string::npos);
 }
 
+// The window's live-mode server (--mcp --attach) is listed as sculptforge-live in every client, beside a headless
+// "sculptforge" entry the user may already have.
+TEST(connect_ai_live_server_is_named) {
+    const connect::Launch live{"/usr/bin/sculptforge-cli", {"--mcp", "--attach"}, "sculptforge-live"};
+    CHECK(checkClients(live, connect::Os::Linux) == 0);
+    int unnamed = 0;
+    for (const connect::Client& c : connect::clients(live, connect::Os::Linux))
+        for (const connect::Snippet& s : c.snippets)
+            if (s.text.find("sculptforge-live") == std::string::npos || s.text.find("--attach") == std::string::npos) {
+                std::printf("  %s: no sculptforge-live or --attach:\n%s\n", c.id, s.text.c_str());
+                ++unnamed;
+            }
+    CHECK(unnamed == 0);
+}
+
 TEST(mcp_recipes_are_prompts) {
     CommandRegistry reg;
     Document d;

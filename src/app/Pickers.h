@@ -63,6 +63,9 @@ struct PickerUi {
     static void sizePopup(App& app, Slider which);
     // The open slider's knob (its current value) in window coordinates, as last drawn; false when none is open.
     static bool sliderKnob(ImVec2& knob);
+    // While Size (S) or Falloff (O) is open (#138): where it opened (window coordinates), which, and the value it is
+    // setting: the number being typed (not applied before Enter), else the current one. False otherwise.
+    static bool sliderPreview(const App& app, ImVec2& at, Slider& which, float& value);
 };
 
 // The sort menu of an asset list: a small "A-Z v" button that opens A-Z, Recent and (with `packs`) Pack. `pref`

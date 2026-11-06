@@ -4,15 +4,17 @@
 // Preferences > Integrations > Show SculptForge on Discord (off by default; core/DiscordPresence.h): the icon, the
 // name SculptForge and the elapsed time, and on request the monthly challenge's theme and the file's name. Only
 // to the Discord app on this computer; it shows it to the user's friends. Tests, scripts, renders and CI never
-// connect (supportCardTestMode).
+// connect (supportCardTestMode), nor do runs by agents (discord::agentRun).
 #include "app/App.h"
 #include "app/Ui.h"
 #include "core/NetworkPolicy.h"
 
+#include <SDL3/SDL_video.h>
 #include <imgui.h>
 
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 
 namespace sf {
 
@@ -21,8 +23,15 @@ void App::DiscordClientDelete::operator()(discord::Client* c) const { delete c; 
 // Never in studio mode (core/NetworkPolicy.h): no Discord presence in a studio build.
 bool App::discordPresenceAvailable() const { return net::localIpcAllowed() && discord::appIdConfigured(discord::kDiscordAppId); }
 
+bool App::discordAgentRun() const {
+    static const bool agent = discord::agentRun([](const char* n) { return std::getenv(n); }, SDL_GetCurrentVideoDriver());
+    return agent;
+}
+
 void App::updateDiscordPresence() {
-    if (!discordPresenceAvailable() || supportCardTestMode()) return;
+    // Scripted and agent runs (benchmarks, offscreen checks, the Windows PC's runs) use the user's preferences too:
+    // they never show up on the user's Discord.
+    if (!discordPresenceAvailable() || supportCardTestMode() || discordAgentRun()) return;
     if (!discordPrefs_.enabled && !discordClient_) return; // never switched on: no thread, no connection
     if (!discordClient_) discordClient_.reset(new discord::Client(discord::kDiscordAppId));
     if (discordStart_ == 0)

@@ -1,12 +1,11 @@
 {
-  "version": "0.11.2",
+  "version": "0.11.6",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Big brushes on dense scans finish sooner after you lift the pen, and follow the pen more closely on faster computers",
-    "Micro levels: Sharp Crease, Crease and Pinch cut clean grooves at full strength, and Wire shows the level below",
-    "Move, Scale and Rotate record into the active sculpt layer, its weight dials them in and out; VDM stamps turn (follow the drag, an angle, jitter)",
-    "Maya style view keys (Alt+Ctrl roll, Alt+F, Alt+H, wheel zooms toward the pointer) and UDIMs packed in Columns x Rows",
-    "Traditional Chinese interface, and Help > Record a performance trace to show us where a slow moment goes"
+    "Studio controls: one policy file decides which AI tools and providers are allowed",
+    "An audit log of every AI step, and API keys kept in the system keychain",
+    "Sign in with your studio's identity provider (device sign-in, no browser plug-in)",
+    "Empty shelves stay out of the way outside Customize Shelves"
   ]
 }

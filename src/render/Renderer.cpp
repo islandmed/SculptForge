@@ -415,7 +415,8 @@ vec4 finish(vec3 c) {
 #endif
     return vec4(g, uAlpha);
 }
-// Keep in sync with sf::face groupColor.
+)" // (two literals: MSVC stops at ~16K characters a literal, C2026; tools/dev/check_literals.py)
+R"(// Keep in sync with sf::face groupColor.
 vec3 groupColor(uint id) {
     uint h = id * 0x9E3779B1u;
     h ^= h >> 15;
@@ -1524,7 +1525,9 @@ void Renderer::uploadVertices(MeshSlot& s, const Mesh& mesh, bool full) {
             if (v < nv) { // (else a vertex dynamic topology removed, which only patched clusters named)
                 inside &= packVertex(s.grid, mesh.positions[v], normals ? mesh.normals[v] : glm::vec3(0.0f, 0.0f, 1.0f),
                                      curvatureAt(mesh, v), pv);
-                sent[v] = uint16_t(pv.normal >> 22);
+                // Only the vertex's first slot writes: its copies in other clusters may be packed on another thread
+                // at the same time (the same value, but a data race; ThreadSanitizer, 11-05).
+                if (s.order.toGpu(v) == i) sent[v] = uint16_t(pv.normal >> 22);
                 box.expand(mesh.positions[v]);
             }
             out[i - b] = pv;
@@ -3682,7 +3685,7 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
                     inside &= packVertex(grid, mesh.positions[v], mesh.normals[v], keep && sent ? 0.0f : c, pv);
                     if (sent) {
                         if (keep) pv.normal = (pv.normal & 0x003FFFFFu) | uint32_t(sent[v]) << 22;
-                        else sent[v] = uint16_t(pv.normal >> 22);
+                        else if (s.order.toGpu(v) == i) sent[v] = uint16_t(pv.normal >> 22); // (first slot only, as uploadVertices)
                     }
                     box.expand(mesh.positions[v]);
                 }

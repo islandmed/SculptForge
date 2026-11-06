@@ -3,13 +3,21 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Releases SculptForge X.Y.Z from main and brings every channel to it in lock step (docs/releasing.md).
+# Build once, promote: the packages are built and tested once, on `staging`, carrying X.Y.Z; the release publishes
+# exactly those files.
 #
-#   HIGHLIGHTS=notes.txt scripts/release.sh X.Y.Z --yes   every step, in order (the normal way: one command)
+#   scripts/release.sh X.Y.Z --stage                     1. in the merger's batch checkout: the bump commit on top of the
+#                     batch, then scripts/merge-queue.sh staging (STAGE_WITH, default '~/Work/.sf/t1.sh .', runs here
+#                     beside CI); main fast-forwards to it and packages.yml builds X.Y.Z on the push to staging
+#   HIGHLIGHTS=notes.txt scripts/release.sh X.Y.Z --yes   2. on main: promotes. Checks main is the staged commit, waits for
+#                     and checks staging's Packages run (tools/release/staged_run.py), tags that exact commit; release.yml
+#                     verifies checksums and attestations, smoke-tests, signs and publishes; then site, feed, packages
+#   scripts/release.sh X.Y.Z --rebuild --yes             the old way (fallback): bump pushed to main, the release builds
+#                     its packages from the tag (about 40 minutes more)
 #   scripts/release.sh X.Y.Z --from site                  resume at a step (after fixing what stopped it)
 #   scripts/release.sh X.Y.Z --only replies              one step
-#   scripts/release.sh X.Y.Z --only bump --staged        the bump commit only, not pushed: the merger puts it on top of
-#                     the release batch (RELEASE=X.Y.Z ~/Work/.sf/merge-batch.sh), so `staging` builds the packages of
-#                     the exact commit to tag while CI runs, and the release later only smoke-tests and publishes them
+#   scripts/release.sh X.Y.Z --only bump --staged        the bump commit only, not pushed (what --stage does first;
+#                     RELEASE=X.Y.Z ~/Work/.sf/merge-batch.sh uses it before its own staging run)
 #   scripts/release.sh X.Y.Z-beta.N --yes  a beta (also -rc.N): a members-only pre-release in the private repository
 #                     islandmed/sculptforge-insiders, announced in #members (see "Betas" below and docs/releasing.md)
 #   HIGHLIGHTS=file   the update feed's 3-5 highlight lines, one per line (default: the version's highlight: lines in
@@ -17,9 +25,10 @@
 #   (the home page's What's New area is written by tools/guide/build_site.py from docs/guide/whats-new.md: the
 #   version's ```features block, its tagline and pictures; CARD is no longer used)
 #
-# Steps: bump check ci tag release site aur brew omarchy replies status
-# bump sets every version file, rebuilds the guide and pushes main; check then verifies everything the later steps
-# need, so a release either stops in seconds before the tag or runs through to the end.
+# Steps: bump check ci tag release site aur brew omarchy replies status (--stage: bump stage)
+# bump sets every version file and rebuilds the guide (--stage: committed in the batch; --rebuild: pushed to main;
+# promoting: only checks main already has it); check then verifies everything the later steps need, so a release
+# either stops in seconds before the tag or runs through to the end.
 # Each step looks at the live state first and skips what is already done, so running it again is always safe.
 # When something is wrong it stops and prints the fix; fix it, then run again with --from <that step>.
 # It never posts issue replies: it writes drafts for a person to read and post.
@@ -36,6 +45,7 @@ set -euo pipefail
 
 REPO=islandmed/SculptForge
 INSIDERS_REPO=islandmed/sculptforge-insiders # members' betas (release.yml publishes there with INSIDERS_REPO_TOKEN)
+MEMBER_ENV=member-release
 AUTHOR_NAME=islandmed
 AUTHOR_EMAIL=232726012+islandmed@users.noreply.github.com # never a personal address in outside repos
 OMARCHY_PR=1800
@@ -47,8 +57,8 @@ ok() { printf '   ok: %s\n' "$*"; }
 # resume STEP: the exact command that continues at STEP, with this run's HIGHLIGHTS, BUILD_DIR and --yes (a stopped
 # release is one the owner already said ship it for; without --yes, step tag would stop again at "not confirmed").
 resume() {
-    printf '%s%sscripts/release.sh %s --from %s --yes' "${HIGHLIGHTS_GIVEN:+HIGHLIGHTS=$HIGHLIGHTS_GIVEN }" \
-        "${BUILD_DIR:+BUILD_DIR=$BUILD_DIR }" "$V" "$1"
+    printf '%s%sscripts/release.sh %s%s --from %s --yes' "${HIGHLIGHTS_GIVEN:+HIGHLIGHTS=$HIGHLIGHTS_GIVEN }" \
+        "${BUILD_DIR:+BUILD_DIR=$BUILD_DIR }" "$V" "${MODE_FLAG:-}" "$1"
 }
 # die "what is wrong" "the exact fix"
 die() {
@@ -68,23 +78,25 @@ confirm() {
 
 V=${1:-}
 [[ "$V" =~ ^([0-9]+\.[0-9]+\.[0-9]+)(-((beta|rc)\.[0-9]+))?$ ]] ||
-    { echo "usage: scripts/release.sh X.Y.Z[-beta.N|-rc.N] [--from STEP | --only STEP] [--yes] [--staged]"; exit 2; }
+    { echo "usage: scripts/release.sh X.Y.Z[-beta.N|-rc.N] [--stage | --rebuild] [--from STEP | --only STEP] [--yes] [--staged]"; exit 2; }
 BASE=${BASH_REMATCH[1]} PRE=${BASH_REMATCH[3]} # 0.11.0-beta.1: BASE 0.11.0, PRE beta.1; a stable release: PRE ""
 [ -z "$PRE" ] || STEPS=(bump check ci tag release status)
 RELEASE_REPO=$REPO; [ -z "$PRE" ] || RELEASE_REPO=$INSIDERS_REPO # where release.yml publishes this version
 shift
-FROM=bump ONLY= STAGED=
+FROM=bump ONLY= STAGED= MODE=promote MODE_FLAG=
 while [ $# -gt 0 ]; do
     case $1 in
         --from) FROM=$2; shift 2 ;;
         --only) ONLY=$2; shift 2 ;;
         --yes) YES=1; shift ;;
         --staged) STAGED=1; shift ;;
+        --stage) [ $MODE = promote ] || { echo "--stage and --rebuild exclude each other"; exit 2; }; MODE=stage MODE_FLAG=" --stage" STAGED=1 STEPS=(bump stage); shift ;;
+        --rebuild) [ $MODE = promote ] || { echo "--stage and --rebuild exclude each other"; exit 2; }; MODE=rebuild MODE_FLAG=" --rebuild"; shift ;;
         *) echo "unknown argument $1"; exit 2 ;;
     esac
 done
 [[ " ${STEPS[*]} " == *" ${ONLY:-$FROM} "* ]] || { echo "unknown step ${ONLY:-$FROM}; steps: ${STEPS[*]}"; exit 2; }
-[ -z "$STAGED" ] || [ "$ONLY" = bump ] || { echo "--staged goes with --only bump (the later steps run on main after it lands)"; exit 2; }
+[ -z "$STAGED" ] || [ "$ONLY" = bump ] || [ $MODE = stage ] || { echo "--staged goes with --only bump (the later steps run on main after it lands)"; exit 2; }
 T=v$V
 TODAY=$(date +%F)
 CURRENT=setup
@@ -109,10 +121,10 @@ push_main() {
 release_ready() {
     gh release view "$T" -R "$RELEASE_REPO" --json assets -q '.assets[].name' > "$work/assets" 2>/dev/null ||
         die "no GitHub release $T yet" "run the earlier steps: $(resume tag)"
-    grep -qx SHA256SUMS.txt "$work/assets" || die "release $T has no SHA256SUMS.txt (unfinished)" "re-run the Release workflow: gh workflow run release.yml -R $REPO -f tag=$T"
+    grep -qx SHA256SUMS.txt "$work/assets" || die "release $T has no SHA256SUMS.txt (unfinished)" "re-run the Release workflow: gh workflow run release.yml -R $REPO --ref $T -f tag=$T"
     # One-click update (src/core/SelfUpdate.h): once the app has a key, every release must carry the signature.
     if grep -q 'kUpdatePublicKeyHex = "[0-9a-f]\{64\}"' src/core/SelfUpdate.h 2>/dev/null; then
-        grep -qx SHA256SUMS.txt.sig "$work/assets" || die "release $T has no SHA256SUMS.txt.sig: apps can't update to it in one click" "check the UPDATE_SIGNING_KEY secret, then re-run the Release workflow: gh workflow run release.yml -R $REPO -f tag=$T"
+        grep -qx SHA256SUMS.txt.sig "$work/assets" || die "release $T has no SHA256SUMS.txt.sig: apps can't update to it in one click" "check the UPDATE_SIGNING_KEY secret, then re-run the Release workflow: gh workflow run release.yml -R $REPO --ref $T -f tag=$T"
     fi
 }
 # Downloads one release asset and checks it against SHA256SUMS.txt with a checksum computed here. Prints the sum.
@@ -196,12 +208,26 @@ wait_live() {
 # gh_file OWNER/REPO PATH [REF]: a file's contents from GitHub ("" when it can't be read).
 gh_file() { gh api "repos/$1/contents/$2${3:+?ref=$3}" -q .content 2>/dev/null | base64 -d 2>/dev/null || true; }
 
+# bumped: CMakeLists.txt (and for a stable release CHANGELOG) already say this version: step bump has been made.
+bumped() {
+    grep -q "^project(SculptForge VERSION ${BASE//./\\.}[ )]" CMakeLists.txt && prerelease_is "$PRE" &&
+        { [ -n "$PRE" ] || grep -q "^## \[${V//./\\.}\]" CHANGELOG.md; }
+}
+# staged_run SHA [--wait]: the id of staging's Packages run that this release may promote (tools/release/staged_run.py:
+# a push to staging by islandmed for exactly SHA, successful, at most SF_STAGED_MAX_DAYS (7) days old, artifacts
+# present). Its exit status: 0 found, 3 there is no staging run for SHA, 1 none may be promoted (why in $work/staged.err).
+staged_run() {
+    python3 tools/release/staged_run.py --repo "$REPO" --sha "$1" --actors "$AUTHOR_NAME" --max-days "${SF_STAGED_MAX_DAYS:-7}" \
+        ${2:+"$2"} 2>"$work/staged.err"
+}
+stage_fix() { echo "stage $V: in the merger's batch checkout, scripts/release.sh $V --stage (bump, staging, main), then $(resume ci); or build from the tag instead: ${1:-$(MODE_FLAG=" --rebuild" resume bump)}"; }
+
 # --- preconditions: what the steps after the tag need, checked before anything is tagged --------------------------
 
 # The home page's "new in X.Y.Z" card and "New in X.Y.Z:" lede in #whats-new, written by build_site.py (step bump) from
 # the version's ```features block in whats-new.md, which needs a date and a tagline.
 card_ok() { grep -qF "<small>new in $V</small>" website/index.html && grep -qF "class=\"section-lede\">New in $V:" website/index.html; }
-features_ok() { awk -v v="## Version $BASE" '$0==v{f=1;next} f&&/^## /{exit} f' docs/guide/whats-new.md | grep -q '^tagline: .'; }
+features_ok() { awk -v v="## Version $BASE" '$0==v{f=1;next} f&&/^## /{exit} f' docs/guide/whats-new.md | grep '^tagline: .' >/dev/null; }
 card_fix="give '## Version $V' in docs/guide/whats-new.md a \`\`\`features block (date: unreleased, tagline: ..., highlight: ..., cards), commit, push main, run again"
 feed_done() { grep -qF "\"version\": \"$V\"" website/latest.json; }
 prerelease_is() { grep -qx "set(SCULPTFORGE_PRERELEASE \"$1\")" CMakeLists.txt; }
@@ -269,8 +295,21 @@ preflight() {
     # The members' publishing path: release.yml's actions pinned to commit SHAs, INSIDERS_REPO_TOKEN only in the
     # member-release environment (docs/releasing.md, "Secrets").
     out=$(python3 tools/release/check_workflows.py 2>&1) || die "the release workflows aren't locked down: $out" "fix .github/workflows (docs/releasing.md, \"Secrets\"), commit, push main"
+    # The update signing key: only in the protected environments (deployments from tags v*), never at repository
+    # level, where every workflow on every branch (staging's packages included) could read it.
+    if [ "$mode" != bump ]; then
+        local env=release
+        [ -z "$PRE" ] || env=$MEMBER_ENV
+        gh secret list -R "$REPO" >"$work/secrets" 2>/dev/null || die "can't list the repository's secrets" "gh auth status (the owner's account)"
+        ! grep -q '^UPDATE_SIGNING_KEY\b' "$work/secrets" ||
+            die "UPDATE_SIGNING_KEY is a repository secret: any workflow on any branch could read it" \
+                "the owner moves it (the PEM from Drive \"SculptForge keys\"): gh secret set UPDATE_SIGNING_KEY --env release -R $REPO < key.pem (member-release has it already), then gh secret delete UPDATE_SIGNING_KEY -R $REPO"
+        gh secret list --env "$env" -R "$REPO" 2>/dev/null | grep '^UPDATE_SIGNING_KEY\b' >/dev/null ||
+            die "the $env environment has no UPDATE_SIGNING_KEY: release.yml couldn't sign SHA256SUMS.txt" \
+                "the owner sets it (the PEM from Drive \"SculptForge keys\"): gh secret set UPDATE_SIGNING_KEY --env $env -R $REPO < key.pem"
+    fi
     if [ -n "$PRE" ]; then # a beta: members only, through the private repository; nothing of the site, no packages
-        gh secret list --env member-release -R "$REPO" 2>/dev/null | grep -q '^INSIDERS_REPO_TOKEN\b' ||
+        gh secret list --env member-release -R "$REPO" 2>/dev/null | grep '^INSIDERS_REPO_TOKEN\b' >/dev/null ||
             die "the member-release environment has no INSIDERS_REPO_TOKEN, so release.yml can't publish the beta to $INSIDERS_REPO" \
                 "the owner pastes it (fine-grained token, only $INSIDERS_REPO, Contents: read and write): wl-paste -n | gh secret set INSIDERS_REPO_TOKEN --env member-release -R $REPO"
         gh repo view "$INSIDERS_REPO" >/dev/null 2>&1 || die "can't see $INSIDERS_REPO" "gh auth status: log in as the owner of $INSIDERS_REPO"
@@ -313,6 +352,12 @@ preflight() {
 # Sets every version file to X.Y.Z, rebuilds the guide and the home page's What's New area, pushes main (--staged:
 # commits on top of the checked-out batch and pushes nothing; scripts/merge-queue.sh staging lands it).
 step_bump() {
+    if [ $MODE = promote ] && [ -z "$STAGED" ]; then # the bump was staged with the packages: main must already have it
+        on_main
+        bumped || die "main is not at $V yet: the bump goes through staging with the packages it names" "$(stage_fix)"
+        ok "main $(git rev-parse --short HEAD) already carries $V (staged)"
+        return
+    fi
     if [ -n "$STAGED" ]; then
         [ -z "$(git status --porcelain --untracked-files=no)" ] || die "uncommitted changes" "commit them first (git status)"
         git fetch -q origin main --tags
@@ -426,10 +471,24 @@ PY
     ok "version files at $V, guide rebuilt, pushed main $(git rev-parse --short HEAD)"
 }
 
+# --stage: the batch with the bump on top goes through staging (CI there, STAGE_WITH here); main fast-forwards to it
+# and packages.yml builds the packages of X.Y.Z on the push to staging, which the release then promotes.
+step_stage() {
+    local sha with=${STAGE_WITH-}
+    sha=$(git rev-parse HEAD)
+    bumped || die "HEAD ${sha:0:8} is not at $V" "run the bump first: $(resume bump)"
+    [ -n "${STAGE_WITH+x}" ] || { [ -x "$HOME/Work/.sf/t1.sh" ] && with="$HOME/Work/.sf/t1.sh ."; }
+    "${MERGE_QUEUE:-scripts/merge-queue.sh}" staging ${with:+--with "$with"} "$sha" ||
+        die "staging ${sha:0:8} is red, or main moved (above)" "fix the batch (main moved: merge origin/main), then $(resume bump)"
+    ok "main is the staged ${sha:0:8} ($V); packages.yml is building its packages on the staging push"
+    echo "   next, on main: ${HIGHLIGHTS_GIVEN:+HIGHLIGHTS=$HIGHLIGHTS_GIVEN }scripts/release.sh $V --yes (waits for that run, then promotes it)"
+}
+
 step_check() {
     on_main
     preflight
     local bump="run step bump: scripts/release.sh $V --only bump (it sets every version file)"
+    [ $MODE = rebuild ] || bump=$(stage_fix "scripts/release.sh $V --rebuild --only bump, then $(MODE_FLAG=" --rebuild" resume check)")
     grep -q "^project(SculptForge VERSION ${BASE//./\\.}[ )]" CMakeLists.txt || die "CMakeLists.txt is not at $BASE" "$bump"
     prerelease_is "$PRE" || die "CMakeLists.txt's SCULPTFORGE_PRERELEASE is not \"$PRE\"" "$bump"
     if [ -n "$PRE" ]; then
@@ -469,17 +528,30 @@ step_ci() {
         wait_run ci.yml "$sha" 18 >/dev/null || die "no CI run on main for $sha after 3 minutes" "push main first (git push origin main), or check Actions, then run again"
         ok "CI passed on $sha"
     fi
-    if wait_run packages.yml "$sha" >/dev/null; then
-        ok "the Packages run passed: the release will promote its tested packages"
-    else
-        echo "   note: no Packages run for $sha (only website or paperwork changed since?): the release builds its own (about 20 min)"
+    if [ $MODE = rebuild ]; then
+        echo "   note: --rebuild: the Release workflow builds the packages from the tag (about 40 min)"
+        return
     fi
+    local run rc=0
+    echo "   staging's Packages run for ${sha:0:8} (waits while it runs) ..."
+    run=$(staged_run "$sha" --wait) || rc=$?
+    case $rc in
+        0) ok "staging's Packages run $run built and tested $V for ${sha:0:8}: the release promotes exactly its packages" ;;
+        3) die "no Packages run on staging for ${sha:0:8}" "$(stage_fix)" ;;
+        *) die "staging's Packages runs for ${sha:0:8} can't be promoted: $(tail -1 "$work/staged.err")" \
+               "a failed run that was a runner hiccup: gh run rerun <id> --failed -R $REPO, then $(resume ci); otherwise $(stage_fix)" ;;
+    esac
 }
 
 step_tag() {
     if gh api "repos/$REPO/git/ref/tags/$T" >/dev/null 2>&1; then ok "$T is already pushed"; return; fi
     local sha
     sha=$(git rev-parse HEAD)
+    if [ $MODE = promote ]; then # the tag goes on exactly the staged commit, which main is
+        git fetch -q origin main
+        [ "$sha" = "$(git rev-parse origin/main)" ] || die "HEAD ${sha:0:8} is not origin/main $(git rev-parse --short origin/main)" "git switch main && git merge --ff-only origin/main; if main moved past the staged commit, stage again: $(stage_fix)"
+        staged_run "$sha" >/dev/null || die "${sha:0:8} has no promotable staging Packages run: $(tail -1 "$work/staged.err")" "$(stage_fix)"
+    fi
     confirm "Tag $T at $(git log -1 --format='%h %s' "$sha") and push it? This publishes SculptForge $V${PRE:+ for members, in $INSIDERS_REPO}." ||
         die "not confirmed" "run again and answer y (or YES=1) once the owner has said ship it for $V"
     git rev-parse -q --verify "refs/tags/$T" >/dev/null || git tag "$T" "$sha"
@@ -499,7 +571,7 @@ step_release() {
             [ -n "$id" ] && break
             sleep 10
         done
-        [ -n "$id" ] || die "no Release run for $T after 5 minutes" "gh workflow run release.yml -R $REPO -f tag=$T"
+        [ -n "$id" ] || die "no Release run for $T after 5 minutes" "gh workflow run release.yml -R $REPO --ref $T -f tag=$T"
         echo "   waiting for Release run $id (https://github.com/$REPO/actions/runs/$id) ..."
         gh run watch "$id" -R "$REPO" --exit-status >/dev/null ||
             die "Release run $id failed (https://github.com/$REPO/actions/runs/$id)" \
@@ -508,7 +580,7 @@ step_release() {
     release_ready
     local n
     n=$(wc -l < "$work/assets")
-    [ "$n" -ge 30 ] || die "release $T has only $n assets" "re-run the Release workflow: gh workflow run release.yml -R $REPO -f tag=$T"
+    [ "$n" -ge 30 ] || die "release $T has only $n assets" "re-run the Release workflow: gh workflow run release.yml -R $REPO --ref $T -f tag=$T"
     ok "$n assets, SHA256SUMS.txt included"
 }
 

@@ -1,21 +1,24 @@
 name: Packages
 
 # The release packages (.deb, AppImage, .tar.gz, Flatpak, .rpm and VFX Reference Platform tarballs, .dmg, Windows
-# installer and .zip), each built and tested exactly as a release ships them. It runs on every push to main that
-# changes the app, so a tagged release can promote the packages of the commit it tags instead of building them again
-# (.github/workflows/release.yml); the release workflow also calls it to build from scratch when there are none.
+# installer and .zip), each built and tested exactly as a release ships them. It runs on every push to staging and main
+# that changes the app, so a tagged release promotes the staging run's packages of the commit it tags instead of
+# building them again (.github/workflows/release.yml); release.yml also calls it to build from the tag (--rebuild).
 #
-# Integrity: the release promotes only artifacts of a successful run of THIS workflow for exactly the tagged commit,
-# either on a push to main or dispatched on `staging` by scripts/merge-queue.sh (checked in release.yml); main's push
-# then reuses the staging run (job reuse). Compiler caches are restored here but saved only by branch runs (pushes
-# to main, maintainers' own dispatches): never from a tag (a release that calls this builds from main's cache and
-# writes nothing) and never from a pull request (this workflow doesn't run on pull requests). See ci.yml for ccache.
+# Integrity: the release promotes only artifacts of a successful run of THIS workflow triggered by a maintainer's push
+# to `staging` (scripts/merge-queue.sh staging) for exactly the tagged commit (tools/release/staged_run.py, in
+# release.yml and scripts/release.sh); main's push then reuses the staging run (job reuse). Every package gets a GitHub
+# artifact attestation (job permissions id-token/attestations: write, nothing else) and job sums records their SHA-256;
+# release.yml checks both before publishing (tools/release/verify_staged.py). Artifacts are kept 14 days.
+# Compiler caches are restored here but saved only by branch runs (pushes to main or staging, maintainers' own
+# dispatches): never from a tag (a release that calls this builds from main's cache and writes nothing) and
+# never from a pull request (this workflow doesn't run on pull requests). See ci.yml for ccache.
 # Runners: repository variables SF_RUNNER_* (Settings > Secrets and variables > Actions > Variables) name other
 # runners for these build-and-test jobs; unset, they are GitHub's standard ones. No job here gets a secret.
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging] # staging: the merge queue's batch, the release's packages (built once, promoted unchanged)
     paths: # everything but the website (its phone page, website/link, is built into the app) and release paperwork
       - '**'
       - '!website/**'
@@ -59,7 +62,7 @@ env:
 
 jobs:
   reuse:
-    # A batch that went through `staging` (scripts/merge-queue.sh staging) had this workflow dispatched there for the
+    # A batch that went through `staging` (scripts/merge-queue.sh staging) ran this workflow there on the push, for the
     # same commit; main's push then reuses that run instead of building it all again, and the release promotes the
     # staging run's packages (release.yml, job locate). In progress: wait for it. Failed, cancelled or none: build.
     name: Reuse the staging run
@@ -78,7 +81,7 @@ jobs:
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
         run: |
-          id=$(gh api "repos/$REPO/actions/workflows/packages.yml/runs?head_sha=$SHA&event=workflow_dispatch&branch=staging&per_page=5" \
+          id=$(gh api "repos/$REPO/actions/workflows/packages.yml/runs?head_sha=$SHA&event=push&branch=staging&per_page=5" \
                --jq '[.workflow_runs[] | select(.head_sha == "'"$SHA"'" and .head_branch == "staging"
                      and .path == ".github/workflows/packages.yml" and .head_repository.full_name == "'"$REPO"'")][0].id // empty')
           [ -n "$id" ] || { echo "No Packages run on staging for $SHA: building here"; exit 0; }
@@ -95,6 +98,10 @@ jobs:
     name: Linux ${{ matrix.arch }} (.deb, AppImage, .tar.gz)
     needs: reuse
     if: ${{ !cancelled() && needs.reuse.outputs.run-id == '' }}
+    permissions: # the attestation: a signed statement of what this run built
+      contents: read
+      id-token: write
+      attestations: write
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -159,12 +166,25 @@ jobs:
             build/*.tar.gz
             build/*.AppImage
             build/*.AppImage.zsync
+          retention-days: 14
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            build/*.deb
+            build/*.tar.gz
+            build/*.AppImage
+            build/*.AppImage.zsync
+            build/*.mcpb
 
   # Built in the freedesktop SDK (packaging/flatpak/build.sh), installed, and UI tests run inside the sandbox.
   flatpak:
     name: Flatpak ${{ matrix.arch }}
     needs: reuse
     if: ${{ !cancelled() && needs.reuse.outputs.run-id == '' }}
+    permissions: # the attestation: a signed statement of what this run built
+      contents: read
+      id-token: write
+      attestations: write
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -208,11 +228,19 @@ jobs:
         with:
           name: flatpak-${{ matrix.arch }}
           path: dist/*.flatpak
+          retention-days: 14
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*.flatpak
 
   vfx:
     name: ${{ matrix.label }} ${{ matrix.arch }}
     needs: reuse
     if: ${{ !cancelled() && needs.reuse.outputs.run-id == '' }}
+    permissions: # the attestation: a signed statement of what this run built
+      contents: read
+      id-token: write
+      attestations: write
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.image }}
     strategy:
@@ -294,11 +322,21 @@ jobs:
           path: |
             build/*.rpm
             build/*.tar.gz
+          retention-days: 14
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            build/*.rpm
+            build/*.tar.gz
 
   macos:
     name: macOS (universal .dmg)
     needs: reuse
     if: ${{ !cancelled() && needs.reuse.outputs.run-id == '' }}
+    permissions: # the attestation: a signed statement of what this run built
+      contents: read
+      id-token: write
+      attestations: write
     runs-on: ${{ vars.SF_RUNNER_MAC || 'macos-15' }}
     steps:
       - uses: actions/checkout@v7
@@ -354,11 +392,21 @@ jobs:
           path: |
             build/*.dmg
             build/*.mcpb
+          retention-days: 14
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            build/*.dmg
+            build/*.mcpb
 
   windows:
     name: Windows x64 (installer, .zip)
     needs: reuse
     if: ${{ !cancelled() && needs.reuse.outputs.run-id == '' }}
+    permissions: # the attestation: a signed statement of what this run built
+      contents: read
+      id-token: write
+      attestations: write
     runs-on: ${{ vars.SF_RUNNER_WIN || 'windows-2022' }}
     steps:
       - uses: actions/checkout@v7
@@ -418,3 +466,31 @@ jobs:
             build/*.exe
             build/*.zip
             build/*.mcpb
+          retention-days: 14
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            build/*.exe
+            build/*.zip
+            build/*.mcpb
+
+  # The SHA-256 of every package this run built, as an artifact of its own: release.yml publishes these files only if
+  # each one still has exactly this checksum and its attestation (tools/release/verify_staged.py).
+  sums:
+    name: Record checksums
+    needs: [linux, flatpak, vfx, macos, windows]
+    # Explicit: job reuse is skipped outside a push to main, and a skipped ancestor would skip this job too.
+    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.flatpak.result == 'success' && needs.vfx.result == 'success' && needs.macos.result == 'success' && needs.windows.result == 'success' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+          pattern: '{linux,flatpak,vfx,macos,windows}*'
+      - run: cd dist && sha256sum * > ../SHA256SUMS.staged.txt && cat ../SHA256SUMS.staged.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: staged-sums
+          path: SHA256SUMS.staged.txt
+          retention-days: 14

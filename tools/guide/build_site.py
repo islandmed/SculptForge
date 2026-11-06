@@ -841,6 +841,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
           SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
       </div>
       <div class="links">
+        <a href="../performance/">Performance</a>
         <a href="index.html">User guide</a>
         <a href="../supporters.html">Members</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
@@ -1029,6 +1030,7 @@ def supporters_html() -> str:
   <footer class="footer">
     <div class="wrap footer-grid">
       <div class="links">
+        <a href="performance/">Performance</a>
         <a href="index.html">Home</a>
         <a href="support.html">Membership</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
@@ -1093,7 +1095,8 @@ def main() -> int:
         if wn:
             write_home(wn, False)
         urls = [SITE, SITE + "brushes.html", SITE + "press.html",
-                SITE + "studios.html", SITE + "support.html", SITE + "supporters.html"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]
+                SITE + "studios.html", SITE + "support.html", SITE + "supporters.html",
+                SITE + "performance/"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]
         (ROOT / "website" / "sitemap.xml").write_text(
             '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
             + "".join(f"  <url><loc>{html.escape(u)}</loc></url>\n" for u in urls) + "</urlset>\n", encoding="utf-8")

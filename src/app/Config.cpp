@@ -1476,6 +1476,10 @@ void drawInterfaceSection(App& app) {
     for (int i = 0; i < kLanguageCount; ++i) {
         const Language lang = Language(i);
         ImGui::SameLine();
+        // Four names don't fit a narrow tray in one row: a button that would run past the edge starts the next one.
+        const float width = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x +
+                            ImGui::CalcTextSize(languageName(lang)).x;
+        if (ImGui::GetContentRegionAvail().x < width) ImGui::NewLine();
         const std::string label = std::string(languageName(lang)) + "##language." + languageCode(lang);
         if (ImGui::RadioButton(label.c_str(), languageFromCode(p.language) == lang)) {
             p.language = languageCode(lang);

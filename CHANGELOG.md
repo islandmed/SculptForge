@@ -6,6 +6,143 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.6] - 2026-11-06
+
+### Added
+- **Managed policy for studios** (docs/guide/studios.md "IT deployment"): `policy.json` in `/etc/sculptforge`,
+  `/Library/Application Support/SculptForge` or `C:\ProgramData\SculptForge` (or `SF_POLICY` when there is none) locks
+  AI on or off, network features, the allowed AI providers and addresses, sign-in for AI, AI tools (MCP on or off,
+  never controlling the window, allowed kinds of command), the update check, channel and feed. Locked settings say
+  **Managed by your studio**; a broken policy fails closed. `sculptforge-cli --policy` shows what it manages.
+- **AI audit log**: every AI tool (MCP) command, refused ones too, and every Brush Lab and Generate 3D request is a
+  JSON line (time, user, host, client, command, a summary of its settings, result) in a local file or a share the
+  policy names, rotated by size. No artwork, keys or long text. `sculptforge-cli --audit-log` prints the path.
+- **Studio sign-in** (Okta, Microsoft Entra ID, Google Workspace, Auth0, Keycloak): OpenID Connect device sign-in in
+  the artist's browser, no local listener; tokens in the keychain, sent only to the studio's own AI gateway. **Edit >
+  Preferences > AI > Studio sign-in**, or `sculptforge-cli --sign-in`.
+- **AI provider presets** in **Edit > Preferences > AI > Provider** (also in Brush Lab): Anthropic, OpenAI, Ollama, LM
+  Studio, vLLM, llama.cpp server, LiteLLM proxy (a studio gateway for Bedrock, Vertex AI and Azure OpenAI) and
+  OpenRouter.
+- Each release carries a CycloneDX software bill of materials (`SculptForge-<version>-sbom.cdx.json`), covered by the
+  signed checksums. A one-page security overview for IT reviews is in the guide.
+
+### Changed
+- An empty shelf is hidden when **Customize Shelves** is off, and the canvas takes its space; it returns while
+  customizing so items can be dropped back onto it. Saved layouts with empty shelves load as before (#139, thanks
+  ebarranco).
+
+### Security
+- AI keys (Brush Lab, Hugging Face, fal.ai, Meshy) are stored in the operating system's keychain (macOS Keychain,
+  Windows Credential Manager, Linux Secret Service) instead of `ai.json`; keys already in `ai.json` move there at the
+  first start. Without a keychain (`SF_KEYCHAIN=none`), a key lasts for the session; environment variables still work.
+
+## [0.11.5] - 2026-11-06
+
+### Added
+- While the **S** (Size) pop-up is open, the brush ring stays on the model at the point where it was opened and shows
+  the size being set, live while dragging and before Enter while typing a number (#138). **O** (Falloff) draws the
+  inner Falloff ring the same way. The ring lies under the pop-up so its number stays readable.
+- **Simplified Chinese interface** (Preferences > Interface > Language): the Traditional Chinese translation by
+  yoyomaimai (#114) in simplified characters, reviewed for mainland usage (鼠标, 软件, 文件, 视图, 菜单, 设置, 工具栏, 默认 and 预设, 撤销,
+  rows and columns), every label covered. Brush and tool names stay in English. The characters come from a small
+  built-in Noto Sans SC subset (SIL OFL), so nothing needs installing. zh-CN, zh-SG and zh-Hans codes select it;
+  zh-TW, zh-HK and zh-MO keep Traditional.
+
+### Changed
+- **Help > Connect an AI tool** is the in-app guide to live mode: 1. pick your tool (Claude Code, Claude Desktop,
+  Cursor, or any other in the list) with the exact command or settings for this install, now for the live-mode server
+  (`sculptforge-cli --mcp --attach`, listed as `sculptforge-live` beside a headless `sculptforge` entry); 2. the
+  live-mode switch; 3. what happens next; four example prompts with Copy. The plan notes moved to a **Plans and
+  sign-in** tooltip; the headless server and the Claude Desktop bundle are in the user guide.
+- The live-mode dialogs (**Let an AI tool control this window?**, **Allow this AI step?**) look like the app's other
+  dialogs: one text width, two buttons of one width (the answer first), no close box (Deny or Escape), the code in a
+  large font instead of a scaled-up small one. While the approval is open the Connect window steps aside, so two
+  dialogs never stack; after Approve it closes and the badge takes over.
+- **Show SculptForge on Discord** shows the new SF icon.
+
+### Fixed
+- **Show SculptForge on Discord** stays up to date. Changes made in quick succession (opening files, typing the
+  challenge) used to be dropped by Discord after the fifth in 20 seconds. Now the latest always arrives. After Discord
+  restarts, your status is back within seconds instead of a minute.
+- Discord no longer shows SculptForge while it isn't running. Runs by scripts and test tools (benchmarks, offscreen
+  checks) never show it, whatever the preferences say. On Linux, a process SculptForge starts (an AI worker) can no
+  longer keep the connection, and the status, open after SculptForge quits.
+- `--measure-idle` reported about 100 % of one core on Windows while the app sat idle: it timed itself with the C
+  library's clock, which on Windows counts wall time, not processor time. It now reads the process's real CPU time on
+  every OS. Measured from outside on Windows (RTX 3060), idle 0.11.1 and 0.11.2 (a sphere open) use 0.00 % of a core,
+  and Linux uses 0.7 %: there was no busy loop. The idle tests now also fail if the app uses more than 2 % of a core
+  over 30 s.
+- The **Paint** menu jittered on a short screen (reported at 1280x720 fullscreen, thanks ebarranco): taller than the
+  space under the menu bar, it scrolled, its colour picker shrank under the scrollbar, the menu stopped scrolling and
+  grew again, every frame. A menu that scrolls now widens by its scrollbar instead.
+
+## [0.11.4] - 2026-11-05
+
+### Added
+- **Live mode: an AI tool sculpts in the open window while you watch.** Turn on **Edit > Preferences > AI > Let AI
+  tools control this window** (off by default) and connect Claude Code or any MCP client with
+  `sculptforge-cli --mcp --attach`. You approve each connection (a 6-digit code), an **AI connected** badge has
+  Disconnect, every step lands in Undo labelled **AI:**, and files outside the project, overwrites, scripts and the
+  network ask you first. The AI can see its work (`viewport_image`, `view_turntable`, `view_set`), draw strokes in
+  screen space (`stroke_screen`), block out forms from Forge Spheres in one call (`blockout`) and check proportions
+  (`measure`, `scene_overview`). Local only: a socket / pipe just your user can open, no network port.
+
+### Fixed
+- **Shading after strokes**: a data race in the GPU vertex upload (several threads writing the same vertex's cavity
+  bits) could leave rare wrong shading after a stroke. Each vertex is now written once.
+
+## [0.11.3] - 2026-11-05
+
+### Added
+- **Help > Connect an AI tool** (while AI features are on): an "I have a subscription" picker (Claude, ChatGPT,
+  Gemini, Grok, other tools) and, for this install, the exact command or configuration for Claude Desktop, Claude
+  Code, Codex CLI, Antigravity CLI, Gemini CLI, Grok Build, Cursor, VS Code, Visual Studio, JetBrains AI Assistant,
+  Zed, Windsurf (Devin Local), GitHub Copilot CLI, Cline, Continue, Kiro, Amazon Q Developer CLI, Warp, Goose,
+  opencode, Rovo Dev CLI, LM Studio, Jan and the OpenAI Agents SDK, each checked against the vendor's documentation,
+  with Copy buttons. Remote-only apps (the ChatGPT and Grok apps, Rovo on the web) are named as such: SculptForge runs
+  no network server.
+- A Claude Desktop bundle (`SculptForge-*.mcpb`) for Windows, macOS and Linux on every release, and `server.json` for
+  the official MCP registry.
+- The MCP server (`sculptforge-cli --mcp`) gains `viewport_image` (a clay-shaded picture of the scene from any angle,
+  to check each step) and recipes as MCP prompts: a creature head, a stylised bust from a reference image, a
+  game-ready asset (retopology, UVs, bake, LODs), rock variations and a step-by-step lesson. Its server info carries a
+  title and clearer instructions.
+- AppImage: `SculptForge.AppImage --cli ...` runs the command-line tool inside it (so MCP clients can start it).
+- Guide (Scripting > AI agents): every client's setup, your own agent, and plain function calling with
+  `sculptforge-cli --schema` for the OpenAI, Gemini and xAI APIs.
+- Freeze Levels (`subdiv_freeze`, `dyntopo freeze_levels=true`): turning on Dynamic on a Part with subdivision levels
+  offers to keep the level shown as one plain mesh and turn Dynamic on, one undo step, instead of a dead-end message.
+  The Draw palette shows the same button while Dynamic waits on levels.
+- View > Views: Front, Back, Left, Right, Top and Bottom buttons (Numpad 1 / 3 / 7, Ctrl for the opposite side, in
+  every input style), and named saved views: Save View (Ctrl+Alt+Numpad 0), click a name to go back, Numpad 0 for the
+  last one. Saved with the project.
+- Mask darkness (Preferences > Interface and Tool > Masking).
+
+### Changed
+- The app icon is the orange SF mark (as on sculptforge.app) in the task bar, Dock, Start menu, launchers and the
+  title bar; the bust stays as the illustration in Help > About, What's New and the membership card.
+- Masked areas show as a cool dark tint with a soft edge instead of near-black, so the form stays readable.
+- The wireframe fades edges shorter than a few pixels: a dense mesh shows a light veil, not a dark moire.
+- Options that are on (toggles) have an accent-tinted fill in every colour scheme, not just a lighter grey.
+- Quad Remesh guide curves draw smooth, with stroke smoothing while drawing and a dark outline for contrast.
+- Tool > Geometry (from Discord): **Divide (keeps levels)** and **Subdivide (removes levels)** are named for what they
+  do and sit apart: Micro in its own Micro Detail group, Subdivide under Change the Mesh (no levels). On a Part with
+  levels, Subdivide asks first ("This removes your N subdivision levels"), with Don't ask again; Delete Lower and
+  Delete Higher ask too (Ctrl+Z still brings the levels back).
+- Tool > Parts > Extract says to mask first when there's no mask, instead of only greying out its buttons.
+
+### Fixed
+- **Quick Remesh** and **Tool > Remesh > Voxel Remesh** of an open Part (the Stylised Head starter, open at the neck,
+  especially after a Move pull near the neck) gave a thin shell full of holes: the outside flowed in through the
+  opening. Open borders are now capped before the voxels are made (only for the remesh; the Part's own surface is not
+  touched), and a Part that still isn't a closed solid (borders that can't be capped) is left unchanged with a message
+  pointing to **Tool > Geometry > Close Holes**, instead of a broken result.
+- **UV Editor** at UI scale 2.4 (a 4K screen): the **On model: Colours / Checker** row was cut off and **Frame** was
+  drawn over it, so clicking Frame toggled Colours. The toolbar now measures each control (in the interface language)
+  and wraps onto more lines when it needs to; every control is where it is drawn.
+- **UV Editor**: the "No UVs yet: pick a method and Unwrap" hint was cut off on both sides in a narrow view or at a
+  big UI scale (240 %); it now wraps inside the view, and it is translated.
+
 ## [0.11.2] - 2026-11-05
 
 ### Fixed

@@ -1,4 +1,4 @@
-# The newest panels in Spanish and Traditional Chinese (tools/i18n/coverage.py keeps both tables at 100%): Preferences >
+# The newest panels in Spanish, Traditional and Simplified Chinese (tools/i18n/coverage.py keeps every table at 100%): Preferences >
 # Input, the Help menu, Tool > Remesh with Quick Remesh, the UV Editor's Pack and the VDM brush's rotation, translated and laid out without
 # clipping. The "##" ids stay, so the same items are found in every language.
 run ui_look look=forge scheme=neutral layout=sculptforge
@@ -82,10 +82,51 @@ expect_text "角度抖動"
 shot zh-vdm-rotation
 key escape
 
-# Back to English: the same items with their English labels.
+# 简体中文: the same panels, mainland terms, the SC glyphs (the fonts are built again on the switch).
 run ui_look layout=sculptforge
 click "編輯##menu.edit"
 click "偏好設定##section.preferences"
+click "界面##preferences.interface"
+click "简体中文##language.zh-CN"
+expect_text "语言"
+shot zh-hans-preferences-interface
+click "输入##preferences.input"
+expect_text "经典雕刻按键"
+shot zh-hans-preferences-input
+key escape
+click "帮助##menu.help"
+expect "你的第一个雕刻作品（10 分钟）##help.first_sculpt"
+expect "快速导览##help.quick_tour"
+shot zh-hans-help-menu
+key escape
+click "文件##menu.file"
+shot zh-hans-file-menu
+key escape
+run ui_look layout=classic
+shot zh-hans-geometry
+click "重新网格化##tool.remesh"
+expect "Quick Remesh##remesh.quick"
+expect "每笔触后重新网格化##remesh.after_stroke"
+shot zh-hans-remesh
+click "重新网格化##tool.remesh"
+key alt+u
+expect_value uv_editor_open == 1
+run uv_pack columns=4 rows=3 margin=6
+expect_text "列数"
+expect_text "纹素密度"
+shot zh-hans-uv-editor
+key alt+u
+click "笔刷##palette.brush"
+click "Horn##vdm0"
+expect "跟随笔触方向##vdm.follow_stroke"
+expect_text "角度抖动"
+shot zh-hans-vdm-rotation
+key escape
+
+# Back to English: the same items with their English labels.
+run ui_look layout=sculptforge
+click "编辑##menu.edit"
+click "偏好设置##section.preferences"
 click "界面##preferences.interface"
 click "English##language.en"
 expect_text "Language"

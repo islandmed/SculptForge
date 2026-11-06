@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SculptForge - the free, open-source sculpting app for VFX, animation and games</title>
-  <meta name="description" content="SculptForge is a free, open-source sculpting app for VFX, animation and game studios: VFX Reference Platform CY2026 and CY2027 builds, OpenUSD, a Python API, Send to Unreal, Gaussian splats and free built-in AI (an AI brush creator and image or text to 3D), on Linux, macOS and Windows.">
+  <meta name="description" content="SculptForge is a free, open-source sculpting app for VFX, animation and game studios: VFX Reference Platform CY2026 and CY2027 builds, OpenUSD, a Python API, Send to Unreal, Gaussian splats and live mode, where your AI tool blocks out a starting point in your open window, on Linux, macOS and Windows.">
   <meta name="theme-color" content="#111114">
   <meta name="color-scheme" content="dark">
   <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png?v=5">
@@ -12,15 +12,18 @@
   <link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=5">
   <meta property="og:type" content="website">
   <meta property="og:title" content="SculptForge - the free, open-source sculpting app for VFX, animation and games">
-  <meta property="og:description" content="Sculpting for VFX, animation and games, with classic sculpting keys available. VFX Reference Platform CY2026 and CY2027 builds, OpenUSD, a Python API and Send to Unreal. Free built-in AI: describe a brush and get it, or turn a sketch into a model.">
-  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=5">
+  <meta property="og:description" content="Sculpting for VFX, animation and games, with classic sculpting keys available. VFX Reference Platform CY2026 and CY2027 builds, OpenUSD, a Python API and Send to Unreal. New: live mode, your AI tool blocks out in your window and you do the art.">
+  <meta property="og:image" content="https://sculptforge.app/img/social-lion.png?v=1">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="675">
   <meta property="og:url" content="https://sculptforge.app/">
   <link rel="canonical" href="https://sculptforge.app/">
   <script type="application/ld+json">
-  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.11.2", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=5", "sameAs": ["https://github.com/islandmed/SculptForge"]}
+  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.11.6", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-lion.png?v=1", "sameAs": ["https://github.com/islandmed/SculptForge"]}
   </script>
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="style.css?v=19">
+  <meta name="twitter:image" content="https://sculptforge.app/img/social-lion.png?v=1">
+  <link rel="stylesheet" href="style.css?v=20">
   <script src="motion.js?v=11" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
@@ -49,38 +52,58 @@
     <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <a class="new-badge" href="#whats-new"><span>New in 0.11</span>
-            Quad Remesh 2, elastic Kelvinlet brushes, hundreds of millions of polygons →</a>
+          <a class="new-badge" href="#live-mode"><span>New &middot; Live mode</span>
+            Your AI tool blocks out, you sculpt &rarr;</a>
           <p class="eyebrow">The free, open-source sculpting app</p>
           <h1><span class="nowrap">Sculpt it.</span> <span class="nowrap">Forge it.</span><br><span class="accent">Ship it.</span></h1>
           <p class="lede">Digital sculpting for <strong>VFX, animation and game studios</strong> on Linux, macOS and
             Windows, with the Classic sculpting keys (and Blender and Maya styles) for artists switching over, and no subscription. It
             ships <strong>VFX Reference Platform</strong> builds, OpenUSD and a Python API for studio pipelines,
-            one-click game-ready LODs and Send to Unreal, plus <strong>free built-in AI</strong>: describe a brush and
-            Brush Lab builds it, or turn a sketch or a sentence into a model you can sculpt.</p>
+            one-click game-ready LODs and Send to Unreal. New: <strong>live mode</strong> lets your own AI tool block out
+            a starting point in your open window, after you approve, and then the sculpting is yours.</p>
           <p class="lede-short">Sculpting for VFX, animation and games, with the Classic sculpting keys available, VFX Reference Platform
-            builds, OpenUSD and Python, plus free built-in AI: an AI brush creator and sketch to 3D.</p>
+            builds, OpenUSD and Python. New: your AI tool blocks out in your window, you do the art.</p>
           <div class="ctas">
             <a class="btn primary" href="#download">Download</a>
             <a class="btn" href="#vfx"><span class="hide-sm">For </span>VFX &amp; animation</a>
           </div>
           <p class="first-sculpt"><a href="guide/first-sculpt.html">New to sculpting? Make your first sculpt in 10 minutes &rarr;</a></p>
           <ul class="pills" aria-label="Highlights">
-            <li>VFX Reference Platform</li><li>Free built-in AI</li><li>No account</li><li>No telemetry</li><li>Windows · macOS · Linux</li>
+            <li>VFX Reference Platform</li><li>Live mode for your AI tool</li><li>No account</li><li>No telemetry</li><li>Windows · macOS · Linux</li>
           </ul>
         </div>
-        <figure class="hero-video">
-          <video id="hero-video" poster="media/poster-hero-remesh.jpg?v=1" autoplay muted loop playsinline preload="metadata"
-                 aria-label="Pulling two long horns out of a sphere, then Quick Remesh gives them an even surface to keep sculpting">
-            <source src="media/hero-remesh-mobile.mp4?v=1" type="video/mp4" media="(max-width: 620px)">
-            <source src="media/hero-remesh-4k.mp4?v=1" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/hero-remesh.mp4?v=1" type="video/mp4">
+        <figure class="hero-video hero-live">
+          <video id="hero-video" poster="media/poster-live-mode.jpg?v=2" autoplay muted loop playsinline preload="metadata"
+                 aria-label="Claude Code blocks out a dragon head in the open SculptForge window in live mode, every step one undo, then SculptForge brushes refine it; the AI tool is connected and approved in Help, Connect an AI tool">
+            <source src="media/live-mode-mobile.mp4?v=2" type="video/mp4" media="(max-width: 620px)">
+            <source src="media/live-mode.webm?v=2" type="video/webm">
+            <source src="media/live-mode.mp4?v=2" type="video/mp4">
           </video>
-          <script>
-            if (matchMedia("(max-width: 620px)").matches)
-              document.getElementById("hero-video").poster = "media/poster-hero-remesh-mobile.jpg?v=1";
-          </script>
-          <figcaption>Real-time recording: pull, then Quick Remesh (Shift+R) and keep sculpting.</figcaption>
+          <figcaption>Live mode, a real session (trimmed and sped up): Claude Code blocks out the head (5x), every AI step
+            is one undo, then a pass with SculptForge brushes (scripted strokes, 2x).</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="live-mode" class="section live">
+      <div class="wrap two-col live-grid">
+        <div class="live-copy">
+          <p class="eyebrow">New &middot; Live mode</p>
+          <h2>Your AI blocks out the baseline. You do the art.</h2>
+          <p>Connect an AI tool such as Claude Code and it works in the window you already have open while you watch. It
+            blocks out the big forms, looks at them from every side and corrects itself. Then the sculpt is yours, with
+            your brushes. SculptForge is made for artists: the AI gives you a starting point.</p>
+          <ul class="checks">
+            <li><strong>Nothing happens until you approve.</strong> SculptForge shows a code and waits for your click.</li>
+            <li><strong>Every step is one undo,</strong> labelled &ldquo;AI:&rdquo;, so you can step back through its work.</li>
+            <li><strong>It asks first</strong> before touching files outside your project, running scripts or using the network.</li>
+            <li><strong>Local only:</strong> no network port, one tool at a time, and Disconnect whenever you like.</li>
+          </ul>
+          <p><a class="btn" href="guide/scripting.html#connect-an-ai-tool">Set up live mode &rarr;</a></p>
+        </div>
+        <figure class="live-still">
+          <img src="img/lion-crisp.jpg?v=1" alt="A lion head in terracotta clay on a plinth" width="900" height="900" loading="lazy" decoding="async">
+          <figcaption>Poly Haven scan (CC0), sculpted and rendered in SculptForge.</figcaption>
         </figure>
       </div>
     </section>
@@ -103,18 +126,27 @@
       <div class="wrap">
         <h2>What's new in 0.11</h2>
         <!-- whats-new:start (tools/guide/build_site.py writes this from docs/guide/whats-new.md: edit that) -->
-        <p class="section-lede">New in 0.11.2: Faster pen-up on dense scans, clean creases on micro levels, moves that go into sculpt layers, Maya style view keys and a UDIM grid. <a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
+        <p class="section-lede">New in 0.11.6: Studio controls for AI: a managed policy, an audit log, keys in the system keychain and single sign-on, plus shelves that hide when they&#x27;re empty. <a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
         <div class="wn-home">
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-0112"><div class="wn-pic"><img src="guide/images/wn-0112-micro.jpg" alt="" width="600" height="340" loading="lazy" decoding="async"></div><div class="wn-card-body"><h3>Clean creases on micro levels, Transforms into a layer, Turn your VDM stamps <small>new in 0.11.2</small></h3><p>Faster pen-up on dense scans, clean creases on micro levels, moves that go into sculpt layers, Maya style view keys and a UDIM grid.</p><ul><li>Clean creases on micro levels</li><li>Transforms into a layer</li><li>Turn your VDM stamps</li><li>UDIMs in Columns x Rows</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-0111"><div class="wn-pic wn-pic-mark"><img src="img/bust-256.png?v=1" srcset="img/bust-256.png?v=1 256w, img/bust-512.png?v=1 512w" sizes="220px" alt="" width="256" height="256"></div><div class="wn-card-body"><h3>Dense scans keep up <small>new in 0.11.1</small></h3><p>Dense scans with micro levels keep up with the pen, and one-click updates on Windows and Linux.</p><ul><li>Dense scans, fast</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-0110"><div class="wn-pic wn-pic-mark"><img src="img/bust-256.png?v=1" srcset="img/bust-256.png?v=1 256w, img/bust-512.png?v=1 512w" sizes="220px" alt="" width="256" height="256"></div><div class="wn-card-body"><h3>Experimental <small>new in 0.11.0</small></h3><p>Sixty new brushes in six packs, a Masking panel, a quick tour for experienced sculptors, and experimental options for very dense meshes.</p><ul><li>Sixty new brushes in six built-in packs</li><li>Mask by peaks, colour and facing in a new Masking panel</li><li>A quick tour for experienced sculptors</li><li>Live Move and Background Preview for very dense meshes</li><li>Show SculptForge on Discord (opt-in)</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-0116"><div class="wn-pic wn-pic-mark"><img src="img/bust-256.png?v=1" srcset="img/bust-256.png?v=1 256w, img/bust-512.png?v=1 512w" sizes="220px" alt="" width="256" height="256"></div><div class="wn-card-body"><h3>Studio controls, Studio-ready AI <small>new in 0.11.6</small></h3><p>Studio controls for AI: a managed policy, an audit log, keys in the system keychain and single sign-on, plus shelves that hide when they&#x27;re empty.</p><ul><li>One policy file decides which AI tools and providers are allowed</li><li>An audit log of every AI step, and API keys kept in the system keychain</li><li>Sign in with your studio&#x27;s identity provider (device sign-in, no browser plug-in)</li><li>Empty shelves stay out of the way outside Customize Shelves</li><li>Policy, audit log, single sign-on</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-0115"><div class="wn-pic wn-pic-mark"><img src="img/bust-256.png?v=1" srcset="img/bust-256.png?v=1 256w, img/bust-512.png?v=1 512w" sizes="220px" alt="" width="256" height="256"></div><div class="wn-card-body"><h3>Help &gt; Connect an AI tool <small>new in 0.11.5</small></h3><p>Connecting your AI assistant now takes three steps, the interface speaks Simplified Chinese, and the brush size ring follows the pen.</p><ul><li>Three steps, copyable commands for your tool, example prompts</li><li>The interface in Simplified Chinese</li><li>The brush size ring previews on the mesh while you resize</li><li>Discord status clears when you quit and shows the new SF icon</li><li>Connect an AI tool in three steps</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-0114"><div class="wn-pic wn-pic-mark"><img src="img/bust-256.png?v=1" srcset="img/bust-256.png?v=1 256w, img/bust-512.png?v=1 512w" sizes="220px" alt="" width="256" height="256"></div><div class="wn-card-body"><h3>Live mode, Fixes <small>new in 0.11.4</small></h3><p>Let your AI assistant sculpt in your open window, and fixes.</p><ul><li>An AI tool works in your open window, only after you approve it</li><li>Your AI tool sees the viewport, turns the view and adds strokes, and every step is one undo</li><li>Rare wrong shading after strokes</li></ul></div></a></article>
         </div>
         <div class="wn-home-groups">
+          <a class="wn-home-group" href="guide/whats-new.html#versions-0110-to-0113"><h3>0.11.0 to 0.11.3</h3><ul><li>Dense scans keep up</li></ul><span>All changes &rarr;</span></a>
           <a class="wn-home-group" href="guide/whats-new.html#versions-010x"><h3>0.10.x</h3><ul><li>Your first sculpt in 10 minutes</li><li>A new look</li><li>PBR viewport</li><li>UV Editor</li><li>Keep Masked remeshing</li><li>Micro levels</li></ul><span>All changes &rarr;</span></a>
-          <a class="wn-home-group" href="guide/whats-new.html#versions-09x"><h3>0.9.x</h3><ul><li>Faster big brushes</li><li>Extract</li><li>Mirror And Weld</li><li>Forge Spheres</li><li>Blender keys</li><li>Scan to sculptable</li></ul><span>All changes &rarr;</span></a>
-          <a class="wn-home-group" href="guide/whats-new.html#versions-08-and-earlier"><h3>0.8 and earlier</h3><ul><li>Dynamic topology</li><li>Vector displacement brushes</li><li>Blender bridge</li><li>Half the memory</li><li>Subdivision levels</li><li>Map baking</li></ul><span>All changes &rarr;</span></a>
+          <a class="wn-home-group" href="guide/whats-new.html#versions-09-and-earlier"><h3>0.9 and earlier</h3><ul><li>Faster big brushes</li><li>Extract</li><li>Forge Spheres</li><li>Scan to sculptable</li><li>Dynamic topology</li><li>Subdivision levels</li></ul><span>All changes &rarr;</span></a>
         </div>
         <!-- whats-new:end -->
+      </div>
+    </section>
+
+    <section id="performance" class="section">
+      <div class="wrap">
+        <h2>Performance: what we're building</h2>
+        <p class="section-lede">Speed on dense sculpts is our top priority, and it has to hold on modest computers first.
+          See what shipped, what's in progress and how each piece works. Every speed figure we publish comes from a
+          benchmark you can run yourself. <a href="performance/">See the performance page &rarr;</a></p>
       </div>
     </section>
 
@@ -382,7 +414,7 @@ rez-env sculptforge -- sculptforge troll.usda \
     <section id="download" class="section alt">
       <div class="wrap">
         <h2>Download</h2>
-        <p class="section-lede">Version 0.11.2. All builds come from the
+        <p class="section-lede">Version 0.11.6. All builds come from the
           <a href="https://github.com/islandmed/SculptForge/releases/latest">latest GitHub release</a>, with
           SHA-256 checksums. Free forever; <a href="support.html">membership</a> adds betas and early builds, Member Requests, a roadmap vote and credits.</p>
         <div class="downloads">
@@ -457,6 +489,7 @@ rez-env sculptforge -- sculptforge troll.usda \
           <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
       </div>
       <div class="links">
+        <a href="performance/">Performance</a>
         <a href="guide/index.html">User guide</a>
         <a href="benchmarks/">Benchmarks: 15M and 33M</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>

@@ -1,0 +1,298 @@
+{
+  "version": 1,
+  "layout": {
+    "version": 4,
+    "shelvesVisible": true,
+    "paletteBarVisible": true,
+    "leftHanded": false,
+    "leftTrayOpen": false,
+    "rightTrayOpen": true,
+    "leftTrayWidth": 316,
+    "rightTrayWidth": 299,
+    "leftTray": [],
+    "rightTray": [
+      "tool"
+    ],
+    "openSubpalettes": [
+      "tool.part",
+      "preferences.config"
+    ],
+    "topShelf": [
+      "draw.sculpt",
+      "draw.paint",
+      "sep",
+      "tool.draw",
+      "tool.move",
+      "tool.scale",
+      "tool.rotate",
+      "sep",
+      "draw.raise",
+      "draw.lower",
+      "draw.rgb",
+      "draw.paint_vertex",
+      "draw.paint_texture",
+      "draw.new_texture",
+      "sep",
+      "sep",
+      "draw.dynamic",
+      "widget.dyntopo_detail",
+      "sep",
+      "transform.symmetry_x",
+      "transform.symmetry_y",
+      "transform.symmetry_z",
+      "transform.symmetry_radial"
+    ],
+    "leftShelf": [
+      "widget.tile.stroke",
+      "stroke.popup",
+      "widget.tile.alpha",
+      "widget.color"
+    ],
+    "rightShelf": [
+      "sep",
+      "view.frame",
+      "widget.nav.move",
+      "widget.nav.zoom",
+      "widget.nav.rotate",
+      "sep",
+      "view.wire",
+      "view.facegroups",
+      "view.mask",
+      "view.vertexpaint",
+      "sep",
+      "part.solo",
+      "view.splats"
+    ],
+    "bottomShelf": [
+      "brush.standard",
+      "brush.clay",
+      "brush.clayblock",
+      "brush.sharpcrease",
+      "brush.move",
+      "brush.smooth",
+      "brush.inflate",
+      "brush.pinch",
+      "brush.flatten",
+      "brush.crease",
+      "brush.trim",
+      "brush.tendril",
+      "brush.layer",
+      "brush.nudge",
+      "brush.kelvingrab",
+      "brush.detailclone",
+      "brush.paint",
+      "widget.add_brush"
+    ],
+    "consoleOpen": false,
+    "consoleHeight": 160,
+    "libraryOpen": true,
+    "libraryRows": 1,
+    "libraryTab": "project",
+    "libraryBottom": false,
+    "shelfTiles": 0
+  },
+  "shortcuts": {},
+  "prefs": {
+    "popupInfo": true,
+    "helpOpacity": 0.970000029,
+    "tooltipDelay": 0.5,
+    "reduceMotion": false,
+    "oneSubpalette": true,
+    "autoCollapseLeft": true,
+    "autoCollapseRight": false,
+    "uiScale": 0,
+    "libraryAtStartup": true,
+    "libraryFolder": "",
+    "cameraNotch": 0,
+    "turntable": true,
+    "inputStyle": "classic",
+    "emulateNumpad": false,
+    "rightClickQuickMenu": true,
+    "brushSort": "az",
+    "alphaSort": "az",
+    "materialSort": "az",
+    "librarySort": "az",
+    "spaceCamera": false,
+    "emulate3Button": false,
+    "mayaZoomHorizontal": true,
+    "wheelZoomToPointer": false,
+    "invertZoom": false,
+    "quickRemesh": true,
+    "remeshAfterStroke": false,
+    "alongNormal": "invert_key",
+    "connectedOnly": false,
+    "viewFalloff": false,
+    "dyntopoSmoothRemesh": 1,
+    "airStrokes": false,
+    "cursorFollowsSurface": true,
+    "hideRingWhileStroking": false,
+    "timelinePosition": "bottom",
+    "showAxes": true,
+    "axisGizmoSize": "medium",
+    "showViewFigure": false,
+    "alphabeticalPalettes": false,
+    "look": {
+      "name": "forge",
+      "scheme": "kanagawa",
+      "matchOmarchy": false,
+      "phosphor": "green",
+      "effects": false,
+      "outlines": "subtle",
+      "outlineOpacity": 1
+    },
+    "layout": "sculptforge",
+    "language": "en",
+    "tablet": {
+      "pressureCurve": {
+        "gamma": 1,
+        "min": 0,
+        "max": 1,
+        "threshold": 0,
+        "fullAt": 1
+      },
+      "eraser": "invert",
+      "buttons": [
+        "right_click",
+        "invert",
+        "pan"
+      ],
+      "mouseMode": false
+    },
+    "spaceMouse": {
+      "enabled": true,
+      "speed": 1,
+      "deadZone": 0.0799999982,
+      "invert": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "turntable": false,
+      "dominant": false,
+      "holdWhileStroking": true,
+      "buttons": [
+        "view.frame",
+        "view.front",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ]
+    },
+    "antialiasing": 4,
+    "fastNavigation": true,
+    "viewResolution": 100,
+    "multithreading": true,
+    "predictiveStrokes": false,
+    "draftStrokes": false,
+    "liveMove": false,
+    "backgroundPreview": false,
+    "fastUpload": false,
+    "fastBigBrushes": false,
+    "dyntopoConstantDetail": false,
+    "flatShading": true,
+    "viewportCursor": 0,
+    "backfaceCulling": true,
+    "uvPackColumns": 1,
+    "uvPackRows": 1,
+    "background": "gradient",
+    "backgroundColor": [
+      0.165000007,
+      0.165000007,
+      0.172999993
+    ],
+    "showHints": true,
+    "hiddenHints": [
+      "air_strokes"
+    ]
+  },
+  "radialMenus": [
+    {
+      "name": "Brushes",
+      "button": "none",
+      "slots": [
+        {
+          "action": "brush.standard"
+        },
+        {
+          "action": "brush.clayblock"
+        },
+        {
+          "action": "brush.move"
+        },
+        {
+          "action": "brush.sharpcrease"
+        },
+        {
+          "action": "brush.inflate"
+        },
+        {
+          "action": "brush.pinch"
+        },
+        {
+          "action": "brush.flatten"
+        },
+        {
+          "action": "brush.tendril"
+        }
+      ]
+    },
+    {
+      "name": "Masking",
+      "button": "none",
+      "slots": [
+        {
+          "action": "mask.invert"
+        },
+        {
+          "action": "mask.lasso"
+        },
+        {
+          "action": "mask.clear"
+        },
+        {
+          "action": "mask.rect"
+        },
+        {
+          "action": "mask.all"
+        },
+        {
+          "action": "mask.pen"
+        },
+        {
+          "action": "view.mask",
+          "label": "View Mask"
+        },
+        {
+          "action": "facegroup.group_masked"
+        }
+      ]
+    },
+    {
+      "name": "Strokes",
+      "button": "none",
+      "slots": [
+        {
+          "action": "stroke.type.dots"
+        },
+        {
+          "action": "stroke.type.drag_stamp"
+        },
+        {
+          "action": "stroke.type.slide_stamp"
+        },
+        {
+          "action": "stroke.type.spray"
+        },
+        {
+          "action": "stroke.type.lazy"
+        }
+      ]
+    }
+  ]
+}

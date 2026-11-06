@@ -23,5 +23,7 @@ SculptForge opens files from untrusted sources (OBJ, FBX, glTF, PLY, USD/USDZ, i
 network services you configure (AI providers, Hugging Face Spaces, the Unreal Editor). Crashes or memory
 errors from malformed files, and anything that could leak API keys, are in scope.
 
-API keys you enter are stored in your user settings folder (`ai.json`) with owner-only file permissions.
-They are only ever sent to the service they belong to.
+API keys you enter, and studio sign-in tokens, are stored in the operating system's keychain (macOS Keychain,
+Windows Credential Manager, Linux Secret Service), never in settings files or logs. They are only ever sent to the
+service they belong to. SculptForge opens no network listener for AI tools (MCP is stdio only) or for sign-in (the
+device authorization grant). For IT reviews, see docs/guide/security.md.

@@ -25,6 +25,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #else
+#include <sys/resource.h>
 #include <sys/utsname.h>
 #include <unistd.h>
 #endif
@@ -228,6 +229,19 @@ uint64_t sysfsVramMB(const std::string& glVendor, const std::string& sysfsRoot) 
         best = std::max(best, mb);
     }
     return best;
+}
+
+double processCpuSeconds() {
+#if defined(_WIN32)
+    FILETIME created, exited, kernel, user;
+    if (!GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user)) return 0.0;
+    const auto ticks = [](const FILETIME& f) { return (uint64_t(f.dwHighDateTime) << 32) | f.dwLowDateTime; };
+    return double(ticks(kernel) + ticks(user)) * 1e-7; // 100 ns units
+#else
+    rusage u{};
+    if (getrusage(RUSAGE_SELF, &u) != 0) return 0.0;
+    return double(u.ru_utime.tv_sec + u.ru_stime.tv_sec) + double(u.ru_utime.tv_usec + u.ru_stime.tv_usec) * 1e-6;
+#endif
 }
 
 void probeSystem(HardwareInfo& info) {

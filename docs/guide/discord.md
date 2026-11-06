@@ -16,13 +16,14 @@ Two extras, both off until you check them:
 - **Show the file name** adds the name of the file you have open, for example `kraken.sfproj`. Only the name, never
   the folder it's in.
 
-Uncheck **Show SculptForge on Discord** and your status is cleared at once. Quitting SculptForge clears it too.
+Uncheck **Show SculptForge on Discord** and your status is cleared at once. Quitting SculptForge clears it too, and
+so does a crash. If you quit and restart Discord, your status comes back within a few seconds.
 
 ## What is sent, and where
 
 | Sent | When |
 |---|---|
-| The SculptForge icon and name | while it's on |
+| The SculptForge icon (Discord loads it from sculptforge.app) and name | while it's on |
 | The time you started (Discord shows the elapsed time) | while it's on |
 | "Monthly challenge: *theme*" | only with **Show the monthly challenge** |
 | The file's name (not its folder) | only with **Show the file name** |

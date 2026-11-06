@@ -1,0 +1,3318 @@
+// SculptForge - open source digital sculpting
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// The Simplified Chinese interface: the Traditional Chinese table (I18nTraditionalChinese.cpp, by yoyomaimai, GitHub
+// #114) converted to simplified characters with phrase mapping and reviewed for mainland usage. The English text is
+// the key (I18n.h); a label without an entry stays in English.
+//
+// Conventions (mainland usage, as in mainland 3D software):
+//   - Names of tools, brushes and products stay in English: Quad Remesh, Forge Spheres, Lit Sphere, Splats, Clay Block
+//     and every other brush, VDM, Alpha. Generic words are translated: 部件 (Part), 资源库 (Library), 顶点绘制
+//     (Vertex Paint), 面组 (Face Groups), 工具栏 (shelf), 工具箱 (tray), 调色板 (palette), 笔触 (stroke),
+//     默认 (default) and 预设 (preset), 撤销 (undo), 行/列 (rows/columns), 视图 (view), 文件 (file), 设置 (settings).
+//   - A space between Chinese and Latin text or numbers (添加 VDM 平面), full-width punctuation (，。：（）) and “” quotes,
+//     except right after a printf conversion or a literal %, where ASCII punctuation keeps the conversions the same.
+//   - printf conversions (%d, %.1f, %s, %%) stay in the same order: tests check every entry.
+//   - Every character has to be in assets/fonts/NotoSansSC-UI.otf: after changing this table, run
+//     tools/i18n/subset_cjk_font.py (a test lists what is missing).
+// The entries follow the Traditional table's order and groups, one entry per English text.
+#include "app/I18n.h"
+
+#include <iterator>
+
+namespace sf::i18n {
+
+namespace {
+
+constexpr Entry kSimplifiedChinese[] = {
+    // --- Palettes (the palette bar) and their sub-palettes ---
+    {"Alpha", "Alpha"},
+    {"Brush", "笔刷"},
+    {"Color", "色彩"},
+    {"Draw", "绘制"},
+    {"Edit", "编辑"},
+    {"File", "文件"},
+    {"Generate", "生成"},
+    {"Help", "帮助"},
+    {"Material", "材质"},
+    {"Preferences", "偏好设置"},
+    {"Render", "渲染"},
+    {"Script", "脚本"},
+    {"Splats", "Splats"},
+    {"Stroke", "笔触"},
+    {"Tool", "工具"},
+    {"Transform", "变形"},
+    // The SculptForge layout's task menus and their sections (Palettes.cpp taskMenus), Preferences > Interface > Look.
+    {"Mesh", "网格"},
+    {"View", "视图"},
+    {"Draw & Tablet", "绘制与数位板"},
+    {"Symmetry & Gizmo", "对称与操纵器"},
+    {"Vertex Paint & Color", "顶点绘制与色彩"},
+    {"Parts & Geometry", "部件与几何"},
+    {"Materials", "材质"},
+    {"Gaussian Splats", "高斯 Splat"},
+    {"Look", "外观"},
+    {"Colours:", "色彩："},
+    {"Match my desktop theme", "配合我的桌面主题"},
+    {"Uses your Omarchy theme's colours when Omarchy is installed", "安装 Omarchy 后，使用您的 Omarchy 主题颜色"},
+    {"Green", "绿色"},
+    {"Amber", "琥珀色"},
+    {"Scanlines & glow", "扫描线与光晕"},
+    {"AI brush provider", "AI 笔刷提供商"},
+    {"Autosave", "自动保存"},
+    {"Bake", "烘焙"},
+    {"Config", "设置"},
+    {"Deformation", "变形"},
+    {"Display", "显示"},
+    {"Export", "导出"},
+    {"Facial Shapes", "脸部形状"},
+    {"Geometry", "几何"},
+    {"Hotkeys", "快捷键"},
+    {"Input", "输入"},
+    {"Interface", "界面"},
+    {"Kelvinlet & Capture", "弹性形变与捕获"},
+    {"Layers", "图层"},
+    {"Library", "资源库"},
+    {"Masking", "遮罩"},
+    {"Paint Layers", "绘制图层"},
+    {"Performance", "性能"},
+    {"Face Groups", "面组"},
+    {"Remesh", "重新网格化"},
+    {"Part", "部件"},
+    {"Parts", "部件"},
+    {"Tablet", "数位板"},
+    {"Texture Map", "贴图"},
+    {"Updates", "更新"},
+    {"Vector Displacement", "矢量位移"},
+    {"Visibility", "可见性"},
+    {"Forge Spheres", "Forge Spheres"},
+    {"Edit recipe", "编辑配方"},
+    // --- Palette paths in the Ctrl-help box ("Tool > Geometry") ---
+    {"Bottom shelf", "底部工具栏"},
+    {"Left shelf", "左侧工具栏"},
+    {"Right shelf", "右侧工具栏"},
+    {"Top shelf", "顶部工具栏"},
+    {"Title", "标题"},
+    {"Layout", "布局"},
+    {"Dynamic topology", "动态拓扑"},
+    {"Camera", "相机"},
+    {"Import / Export", "导入／导出"},
+    {"From an image", "从图像创建"},
+    {"From Image", "从图像"},
+    {"Voxel Remesh", "体素重新网格化"},
+    {"Modify Topology", "修改拓扑"},
+    {"Game Ready", "适用于游戏"},
+    {"Navigation", "导航"},
+    // --- Title bar, status line, search ---
+    {"Untitled", "未命名"},
+    {"Project", "项目"},
+    {"Search", "搜索"},
+    {"Minimize", "最小化"},
+    {"Menus", "菜单"},
+    {"Snapshots", "快照"},
+    {"Save Snapshot", "保存快照"},
+    {"Base", "基底"},
+    {"   Splats ", "   Splats "},
+    {"Verts %s   Tris %s   Part %s (%d/%d)   Layer %s%s%s", "顶点 %s   三角面 %s   部件 %s (%d/%d)   图层 %s%s%s"},
+    {"Customize: Ctrl+Alt+drag to move or remove items", "自定义：按住 Ctrl+Alt 并拖动，即可移动或移除项目"},
+    {"Customize off", "自定义已关闭"},
+    {"Saved", "已保存"},
+    {"Background: Flat Colour", "背景：纯色"},
+    {"Background: Gradient", "背景：渐变"},
+    // --- Command palette ---
+    {"Search commands, brushes and settings", "搜索命令、笔刷和设置"},
+    {"Recently used", "最近使用"},
+    {"  No matching commands", "  找不到相符的命令"},
+    {" result", " 个结果"},
+    {" results", " 个结果"},
+    {"select", "选择"},
+    {"run", "运行"},
+    {"edit in console", "在控制台中编辑"},
+    {"close", "关闭"},
+    // --- Ctrl-help box ---
+    {"No description yet.", "暂无说明。"},
+    {"Not available right now.", "当前无法使用。"},
+    {"Learn more: %s", "深入了解：%s"},
+    {"Back to the palette bar", "返回调色板栏"},
+    {"Move to the tray", "移至工具箱"},
+    {"Take this palette out of the tray.", "将此调色板从工具箱中取出。"},
+    {"Keep this palette in the right tray (Shift+click: left tray), or drag the icon onto a tray.",
+     "将此调色板留在右侧工具箱（Shift+单击可移至左侧工具箱），或将图标拖动至工具箱。"},
+    {"Click to open or close. Opening one closes the others (Shift+click keeps them open; Preferences > Interface).",
+     "单击即可打开或关闭。打开其中一个会关闭其他项目（Shift+单击可让它们保持打开；偏好设置 > 界面）。"},
+    {"Click to save the project. * means it has unsaved changes.", "单击即可保存项目。* 表示有尚未保存的更改。"},
+    {"Find any command, brush or material by name and run it.", "按名称搜索任何命令、笔刷或材质，并运行。"},
+    {"Minimize the SculptForge window.", "最小化 SculptForge 窗口。"},
+    {"Left tray", "左侧工具箱"},
+    {"Right tray", "右侧工具箱"},
+    {"Shortcut for", "快捷键："},
+    // --- Shelves ---
+    {"Add a brush", "添加笔刷"},
+    {"Put another brush (built-in or one of yours) on this shelf.", "将其他笔刷（内置笔刷或自定义笔刷）加入此工具栏。"},
+    {"One of your custom brushes.", "你的其中一个自定义笔刷。"},
+    {"Remove from shelf", "从工具栏移除"},
+    {"Tile size", "图标大小"},
+    {"Small", "小"},
+    {"Medium", "中"},
+    {"Large", "大"},
+    {"The active brush. Click for the brush picker; the bottom shelf holds favourites.", "当前使用的笔刷。单击可打开笔刷选择器；底部工具栏可放置我的最爱。"},
+    {"How dabs follow the cursor: Dots, Drag Stamp, Slide Stamp, Spray or Lazy Stroke. Click to choose.",
+     "笔触印记跟随光标的方式：点状、拖动印章、滑动印章、喷洒或延迟笔触。单击即可选择。"},
+    {"The VDM brush's vector displacement map. Click to pick another.", "VDM 笔刷的矢量位移贴图。单击可选择其他贴图。"},
+    {"The brush's stamp shape (white = full effect). Click for the alpha picker.", "笔刷的印章形状（白色代表完整效果）。单击可打开 Alpha 选择器。"},
+    {"How the model is shaded in the view. Click for the material picker.", "模型在视图中的着色方式。单击可打开材质选择器。"},
+    {"Brush radius in screen pixels. [ and ] change it by 10%; Ctrl+click to type.",
+     "以屏幕像素为单位的笔刷半径。[ 和 ] 可调整 10%; 按住 Ctrl 并单击即可输入数值。"},
+    {"Brush radius in screen pixels. [ and ] change it by 10%.", "以屏幕像素为单位的笔刷半径。[ 和 ] 可调整 10%."},
+    {"ActiveTris / TotalTris", "当前三角面数／三角面总数"},
+    {"Move", "移动"},
+    {"Zoom", "缩放"},
+    {"Rotate", "旋转"},
+    {"Scale", "比例"},
+    // --- Draw and the top shelf ---
+    {"Intensity", "强度"},
+    {"Smooth Intensity", "平滑强度"},
+    {"Focal Length", "焦距"},
+    {"Detail", "细节"},
+    {"Sculpt", "雕刻"},
+    {"Paint", "绘制"},
+    {"Dynamic", "动态"},
+    {"Constant detail", "固定细节"},
+    {"Axes", "坐标轴"},
+    {"No pen detected", "未检测到笔"},
+    {"Pen pressure", "笔压"},
+    {"Pressure > Size", "笔压 > 大小"},
+    {"Pressure > Strength", "笔压 > 强度"},
+    {"Front faces only", "仅限正面"},
+    {"Ctrl+Shift+drag a Cut shape", "按住 Ctrl+Shift 并拖动以创建切割形状"},
+    {"Depth %.2f", "深度 %.2f"},
+    {"Copy the active Part (%s)", "复制当前部件 (%s)"},
+    {"How deep Cut In goes, or how far Cut Add stands out, as a share of the Part's size.",
+     "Cut In 的切入深度，或 Cut Add 的凸出距离，以部件大小的比例表示。"},
+    {"Invert (Alt)", "反转 (Alt)"},
+    {"Invert", "反转"},
+    {"Smooth keeps volume", "平滑时保留体积"},
+    {"Smooth face group borders only", "仅平滑面组边界"},
+    {"Symmetry", "对称"},
+    {"Symmetry X", "X 轴对称"},
+    {"Local", "区域"},
+    {"X axis", "X 轴"},
+    {"Y axis", "Y 轴"},
+    {"Z axis", "Z 轴"},
+    {"Timeline position", "时间轴位置"},
+    {"Top of viewport", "视口顶端"},
+    {"How strongly painting colours the surface (1-100); Ctrl+click to type.", "绘制为表面着色的强度（1-100）；按住 Ctrl 并单击即可输入数值。"},
+    {"This Part has subdivision levels, so strokes don't remesh it: delete the lower (or higher) levels first.",
+     "此部件具有细分层级，因此笔触不会对其重新网格化：请先删除较低（或较高）的层级。"},
+    // --- Edit, File, Help ---
+    {"Undo", "撤销"},
+    {"Redo", "重做"},
+    {"Paste brush", "粘贴笔刷"},
+    {"New Sphere", "添加球体"},
+    {"New Plane", "添加平面"},
+    {"New Forge Sphere", "添加 Forge Sphere"},
+    {"Open", "打开"},
+    {"Open Recent", "打开最近使用的文件"},
+    {"Save", "保存"},
+    {"Save As", "另存为"},
+    {"Import", "导入"},
+    {"Export OBJ", "导出 OBJ"},
+    {"Export STL", "导出 STL"},
+    {"Export GLB", "导出 GLB"},
+    {"Export LOD Chain", "导出 LOD 链"},
+    {"Export USD / USDZ", "导出 USD / USDZ"},
+    {"Export FBX for Unreal", "导出供 Unreal 使用的 FBX"},
+    {"Export EXR", "导出 EXR"},
+    {"Export Maps", "导出贴图"},
+    {"Export Texture", "导出纹理"},
+    {"Export Displacement", "导出位移贴图"},
+    {"Export timelapse", "导出延时视频"},
+    {"Send to Unreal", "发送至 Unreal"},
+    {"Send to Blender", "发送至 Blender"},
+    {"Receive from Blender", "从 Blender 接收"},
+    {"Save Splats", "保存 Splats"},
+    {"Capture from phone", "从手机捕获"},
+    {"Quit", "退出"},
+    {"Controls", "操作方式"},
+    {"User Guide", "使用指南"},
+    {"What's New", "新功能"},
+    {"Check for updates", "检查更新"},
+    {"Command palette", "命令面板"},
+    {"Website & documentation", "网站与帮助文档"},
+    {"Join the Discord", "加入 Discord"},
+    {"Join the community on Discord", "加入 Discord 社区"},
+    {"Report a problem", "报告问题"},
+    {"Open log folder", "打开日志文件夹"},
+    {"Fixes & suggestions", "修正与建议"},
+    {"Benchmark (proof mode)", "性能基准测试（证明模式）"},
+    {"Support SculptForge", "支持 SculptForge"},
+    {"About SculptForge", "关于 SculptForge"},
+    {"Welcome", "欢迎"},
+    // --- Generate ---
+    {"Generate 3D", "生成 3D 模型"},
+    {"Choose image", "选择图片"},
+    {"Change image", "更换图片"},
+    {"Relief", "浮雕"},
+    {"Inflate", "膨胀"},
+    {"Stamp", "压印"},
+    {"AI Brush", "AI 笔刷"},
+    {"Image or text to a sculptable 3D model: Hugging Face (free), fal.ai, Meshy, your ComfyUI server, your own command, or an offline blockout.",
+     "将图片或文本转换成可雕刻的 3D 模型：Hugging Face（免费）、fal.ai、Meshy、你的 ComfyUI 服务器、自定义命令，或脱机创建粗模。"},
+    // --- Render, Display, Material ---
+    {"Wireframe", "线框"},
+    {"Show Mesh", "显示网格"},
+    {"Show Vertex Paint", "显示顶点绘制"},
+    {"Show Mask", "显示遮罩"},
+    {"Show Face Groups", "显示面组"},
+    {"Show Splats", "显示 Splats"},
+    {"Show mesh", "显示网格"},
+    {"Show mask", "显示遮罩"},
+    {"Show face groups", "显示面组"},
+    {"Show vertex paint", "显示顶点绘制"},
+    {"Colour tints the material", "颜色会为材质染色"},
+    {"Show texture", "显示纹理"},
+    {"Show UVs", "显示 UV"},
+    {"Mask", "遮罩"},
+    {"Groups", "组"},
+    {"Material colour", "材质颜色"},
+    {"Colour of the Studio material (the clay colour).", "Studio 材质的颜色（粘土色）。"},
+    {"Frame model", "将模型居中显示"},
+    {"Frame Part", "将部件居中显示"},
+    {"Fullscreen", "全屏"},
+    {"Gradient", "渐变"},
+    {"Flat Colour", "纯色"},
+    {"Background colour", "背景颜色"},
+    {"Flat", "平面"},
+    {"Load Lit Sphere", "加载 Lit Sphere"},
+    {"Material picker", "材质选择器"},
+    {"Material swatches", "材质色板"},
+    // --- Script ---
+    {"Console", "控制台"},
+    {"Run script file", "运行脚本文件"},
+    {"Copy session as script", "将会话复制为脚本"},
+    {"Clear console", "清除控制台"},
+    {"Close the console", "关闭控制台"},
+    {"Every action is a script command: run them with --script \"subdivide; remesh resolution=200\" or the sculptforge-cli tool.",
+     "每个操作都是一条脚本命令：使用 --script \"subdivide; remesh resolution=200\" 或 sculptforge-cli 工具来运行。"},
+    // --- Stroke ---
+    {"Continuous", "连续"},
+    {"Stroke picker", "笔触选择器"},
+    {"Lazy radius", "延迟半径"},
+    // --- Tool: header, Parts ---
+    {"tris", "tris"},
+    {"Append", "附加"},
+    {"Append as Part", "附加为部件"},
+    {"Add a new Part beside the model", "在模型旁添加部件"},
+    {"Insert on the model", "插入模型"},
+    {"Duplicate", "复制"},
+    {"Rename", "重命名"},
+    {"Delete", "删除"},
+    {"Move up", "上移"},
+    {"Move down", "下移"},
+    {"Move up the list", "在列表中上移"},
+    {"Move down the list", "在列表中下移"},
+    {"Merge down", "向下合并"},
+    {"Merge the active Part with the one below it", "将当前部件与下方部件合并"},
+    {"Merge visible", "合并可见项目"},
+    {"Split parts", "分离部件"},
+    {"Split groups", "分离组"},
+    {"One Part per disconnected piece", "每个不相连的部分各自创建一个部件"},
+    {"One Part per face group", "每个面组各自创建一个部件"},
+    {"Alt+click a Part to select it", "按住 Alt 并点击部件即可选择"},
+    {"All Parts", "所有部件"},
+    {"Solo", "单独显示"},
+    {"Sphere", "球体"},
+    {"Cube", "立方体"},
+    {"Plane", "平面"},
+    {"From file", "从文件"},
+    {"Active Part's copy", "当前部件的副本"},
+    {"Not enough GPU memory to show every Part: hide some or step down a subdivision level.",
+     "GPU 内存不足，无法显示所有部件：请隐藏部分部件或降低一级细分。"},
+    {"%s\n%zu vertices, %zu triangles%s%s\nClick to select, double-click to rename", "%s\n%zu 个顶点，%zu 个三角形%s%s\n点击以选择，双击以重命名"},
+    {"Extract", "提取"},
+    {"Accept", "接受"},
+    {"Double", "双倍"},
+    {"Thick", "厚度"},
+    {"Dist", "距离"},
+    // --- Geometry ---
+    {"Divide", "细分"},
+    {"Subdivide", "细分"},
+    {"Reconstruct Subdiv", "重建细分"},
+    {"Divide to Micro", "细分至微细分"},
+    {"Delete Micro", "删除微细分"},
+    {"Bake Micro", "烘焙微细分"},
+    {"Micro Surface Noise", "微细分表面噪波"},
+    {"Micro", "微细分"},
+    {"SDiv", "细分级"},
+    {"No subdivision levels - Divide adds them", "没有细分级别——使用“细分”添加级别"},
+    {"Decimate", "减面"},
+    {"Keep", "保留"},
+    {"Keep Masked", "保留遮罩"},
+    {"Keep Groups", "保留组"},
+    {"Keep Original", "保留原始模型"},
+    {"Keep Texture", "保留纹理"},
+    {"Reduce the triangle count while keeping the shape. Sculpt layers are kept.", "在保留形状的同时减少三角形数量，并保留雕刻图层。"},
+    {"Fraction of the triangles Decimate keeps.", "减面后保留的三角形比例。"},
+    {"Mirror", "镜像"},
+    {"Mirror And Weld", "镜像并焊接"},
+    {"Close Gaps", "封闭间隙"},
+    {"Fill holes", "填补孔洞"},
+    {"Delete hidden", "删除隐藏部分"},
+    // --- Quad Remesh and Remesh ---
+    {"Quad Remesh", "四边形重拓扑"},
+    {"Quad Remesh Guides", "四边形重拓扑引导线"},
+    {"Target Polygons", "目标多边形数量"},
+    {"Adaptive Size", "自适应尺寸"},
+    {"Curves Strength", "曲线强度"},
+    {"Guides", "引导线"},
+    {"Use Vertex Paint", "使用顶点绘制"},
+    {"Detect Edges", "检测边缘"},
+    {"Half", "一半"},
+    {"Same", "相同"},
+    {"Quality Report", "质量报告"},
+    {"no curves", "没有曲线"},
+    {"%zu curves (%zu loops)", "%zu 条曲线（%zu 个循环）"},
+    {"%zu polygons", "%zu 个多边形"},
+    {"%s: %zu quads in %.1f s", "%s：%zu 个四边形，耗时 %.1f 秒"},
+    {"%zu piece(s) used the legacy method", "%zu 个部分使用了旧版方法"},
+    {"Corners off square: %.1f deg mean, %.0f deg worst 1%%", "角落偏离直角：平均 %.1f°，最差 %.0f°（最差的 1%%）"},
+    {"Poles: %zu  (3 edges %zu, 5 edges %zu, other %zu)", "极点：%zu（3 条边 %zu，5 条边 %zu，其他 %zu）"},
+    {"Distance to the sculpt: %.3f%% mean, %.2f%% max", "与雕刻表面的距离：平均 %.3f%%，最大 %.2f%%"},
+    {"Resolution", "分辨率"},
+    {"Remeshing", "正在重拓扑"},
+    {"Cancel", "取消"},
+    {"Stop the remesh; the Part stays as it is.", "停止重拓扑；部件将维持当前状态。"},
+    {"Voxels across the model: higher keeps more detail and makes more triangles.", "模型宽度方向的体素数量：数值越高，保留的细节越多，生成的三角形也越多。"},
+    {"Remesh for sculpting", "重拓扑以利雕刻"},
+    // --- Masking ---
+    {"Clear", "清除"},
+    {"All", "全部"},
+    {"Blur", "模糊"},
+    {"Sharpen", "锐化"},
+    {"Grow", "扩张"},
+    {"Shrink", "缩减"},
+    {"By cavity", "按凹陷处"},
+    {"By face group", "按面组"},
+    {"Passes", "次数"},
+    {"Mask Strength", "遮罩强度"},
+    {"Threshold", "阈值"},
+    {"Clear Mask", "清除遮罩"},
+    {"Invert Mask", "反转遮罩"},
+    {"Mask All", "全部加上遮罩"},
+    {"Mask brush", "遮罩笔刷"},
+    {"Unmask everything (Mask Pen: Ctrl + drag background)", "取消所有遮罩（遮罩笔：按住 Ctrl 并拖动背景）"},
+    {"Ctrl + click background", "Ctrl + 点击背景"},
+    {"Mask creases and folds (replaces the mask; uses the mask strength)", "遮罩皱褶与折痕（替换当前遮罩；使用遮罩强度设置）"},
+    {"Mask one face group (replaces the mask)", "遮罩单一面组（替换当前遮罩）"},
+    // --- Face Groups and Visibility ---
+    {"By normals", "按法线"},
+    {"By pieces", "按部件"},
+    {"From mask", "从遮罩创建"},
+    {"Clear groups", "清除组"},
+    {"Angle", "角度"},
+    {"Group by UVs", "按 UV 分组"},
+    {"Masked triangles become a new group", "将遮罩中的三角形创建为新组"},
+    {"New group wherever the surface turns more than the angle", "在表面转折角度大于指定角度处创建新组"},
+    {"One group per disconnected piece", "每个不相连的部件各自创建一个组"},
+    {"Visible face groups", "可见的面组"},
+    {"Hide face group under cursor", "隐藏光标下方的面组"},
+    {"Isolate face group under cursor", "隔离光标下方的面组"},
+    {"Show all", "全部显示"},
+    {"Unhide all", "全部取消隐藏"},
+    {"Invert visible", "反转可见状态"},
+    {"Hide", "隐藏"},
+    {"Show", "显示"},
+    {"Ctrl+Shift+click a group to isolate it, +Alt to hide it, on the background to show all.\nCtrl+Shift+drag hides outside the rectangle or lasso (Alt: inside).",
+     "Ctrl+Shift+单击组可将其隔离；加按 Alt 可将其隐藏；在背景单击则显示全部。\nCtrl+Shift+拖动可隐藏矩形或套索范围外的内容（加按 Alt 则隐藏范围内的内容）。"},
+    // --- Layers, paint, texture ---
+    {"New paint layer", "添加绘制图层"},
+    {"Delete layer", "删除图层"},
+    {"Opacity", "不透明度"},
+    {"Blend mode", "混合模式"},
+    {"Texture", "贴图"},
+    {"New Texture", "添加贴图"},
+    {"Import Texture", "导入贴图"},
+    {"Delete Texture", "删除贴图"},
+    {"Vertex Paint > Texture", "顶点绘制 > 贴图"},
+    {"Texture > Vertex Paint", "贴图 > 顶点绘制"},
+    {"Texture size", "贴图尺寸"},
+    {"Auto UV", "自动 UV"},
+    {"Pick colour", "采样颜色"},
+    {"Switch Color", "交换颜色"},
+    {"Main colour", "主要颜色"},
+    {"Second colour", "次要颜色"},
+    // --- Transform and the gizmo ---
+    {"Gizmo", "操纵器"},
+    {"Front view", "前视图"},
+    {"Back view", "后视图"},
+    {"Left view", "左视图"},
+    {"Right view", "右视图"},
+    {"Top view", "顶视图"},
+    {"Bottom view", "底视图"},
+    {"Opposite side", "相反侧"},
+    {"Orbit left", "向左环绕"},
+    {"Orbit right", "向右环绕"},
+    {"Orbit up", "向上环绕"},
+    {"Orbit down", "向下环绕"},
+    {"Zoom in", "放大"},
+    {"Zoom out", "缩小"},
+    {"Orthographic", "正交"},
+    {"Larger brush", "放大笔刷"},
+    {"Smaller brush", "缩小笔刷"},
+    {"Pivot", "枢轴点"},
+    // --- Preferences > Config ---
+    // --- Preferences > Interface ---
+    {"Language", "语言"},
+    {"Tooltip delay", "工具提示延迟"},
+    {"One sub-palette open", "一次只打开一个子调色板"},
+    {"Reduce motion", "减少动态效果"},
+    {"Auto collapse left tray", "自动折叠左侧工具箱"},
+    {"Auto collapse right tray", "自动折叠右侧工具箱"},
+    {"Palettes strictly A-Z", "调色板严格按 A 至 Z 排列"},
+    {"Left-handed layout", "左手操作布局"},
+    {"Shelf tiles", "工具栏图标大小"},
+    {"UI scale", "界面缩放比例"},
+    {"Automatic", "自动"},
+    {"Rotation", "旋转"},
+    {"Turntable", "转盘"},
+    {"Camera notch", "相机刘海区"},
+    {"Always reserve", "始终保留空间"},
+    {"Off", "关闭"},
+    {"Hold Ctrl and point at any control to see what it does and its shortcut. Ctrl+Alt shows a command's scripting parameters.",
+     "按住 Ctrl，将光标移至任何控件上，即可查看其功能和快捷键。按 Ctrl+Alt 可查看命令的脚本参数。"},
+    {"How long to point at an icon-only button (or a clipped label) before its name appears.",
+     "光标停留在仅含图标的按钮（或被截断的标签）上多久后，才会显示其名称。"},
+    {"Opening a sub-palette closes the others in that palette. Shift+click opens more than one.",
+     "打开子调色板时，会关闭同一调色板中的其他子调色板。按住 Shift 并单击，可同时打开多个。"},
+    {"Opening a palette in the left tray collapses the others when they would not fit.", "在左侧工具箱打开调色板时，若空间不足，其他调色板会自动折叠。"},
+    {"Opening a palette in the right tray collapses the others when they would not fit.", "在右侧工具箱打开调色板时，若空间不足，其他调色板会自动折叠。"},
+    {"Mirror the shelves and trays: tools on the left, navigation on the right.", "镜像排列工具栏和工具箱：左侧放工具，右侧放导航控件。"},
+    {"How big the brush tiles on the bottom shelf are. Small leaves the most room for the model.",
+     "设置底部工具栏上笔刷图标的大小。选择小型可为模型保留最多空间。"},
+    // --- Preferences > Input ---
+    {"Style", "操作风格"},
+    {"Blender", "Blender"},
+    {"Maya", "Maya"},
+    {"SculptForge", "SculptForge"},
+    {"Emulate Numpad", "模拟数字键盘"},
+    {"Right click opens the Quick Menu", "按鼠标右键打开快速菜单"},
+    {"Hold Space and drag to move the camera", "按住空格键并拖动以移动相机"},
+    {"Start strokes off the model", "在模型外开始笔触"},
+    {"Strokes start off the model", "笔触从模型外开始"},
+    {"Toggle strokes off the model", "切换在模型外开始笔触"},
+    {"Cursor follows surface", "光标沿着表面移动"},
+    {"Hide ring while stroking", "绘制时隐藏圆环"},
+    {"Outlines", "轮廓线"},
+    {"Don't show again", "不再显示"},
+    {"Hints", "提示"},
+    {"Show hints in the viewport", "在视口中显示提示"},
+    {"Show all hints again", "重新显示所有提示"},
+    {"Previewing an LOD", "正在预览 LOD"},
+    {"Face landmark steps", "脸部特征点步骤"},
+    {"Subtle", "细微"},
+    {"Outline opacity", "轮廓线不透明度"},
+    {"Viewport cursor", "视口光标"},
+    {"Crosshair", "十字线"},
+    {"Arrow", "箭头"},
+    {"Import Blender keymap", "导入 Blender 快捷键配置"},
+    {"Quick Menu", "快速菜单"},
+    // --- Preferences > Hotkeys ---
+    {"Filter", "筛选"},
+    {"press a key", "按下任意按键"},
+    {"Default shortcuts", "默认快捷键"},
+    // --- Preferences > Display, Library, Tablet, Performance, Updates, Autosave ---
+    {"Show at startup", "启动时显示"},
+    {"Show Library at startup", "启动时显示资源库"},
+    {"Placement", "位置"},
+    {"Top", "上方"},
+    {"Bottom", "下方"},
+    {"Rows", "行数"},
+    {"Library folder", "资源库文件夹"},
+    {"Use the default folder", "使用默认文件夹"},
+    {"Mouse & pen", "鼠标与笔"},
+    {"Mouse mode (relative)", "鼠标模式（相对）"},
+    {"Mouse mode", "鼠标模式"},
+    {"Pressure curve", "压力曲线"},
+    {"Pressure test", "压力测试"},
+    {"Pressure meter", "压力计"},
+    {"Tablet defaults", "数位板默认值"},
+    {"Tilt  X %+.0f\xc2\xb0   Y %+.0f\xc2\xb0", "倾斜  X %+.0f\xc2\xb0   Y %+.0f\xc2\xb0"},
+    {"Min", "最小值"},
+    {"Max", "最大值"},
+    {"Minimum", "最小值"},
+    {"Maximum", "最大值"},
+    {"Full at", "达到满值"},
+    {"Full pressure at", "达到最大压力"},
+    {"Curve", "曲线"},
+    {"Pen", "笔"},
+    {"Keyboard", "键盘"},
+    {"Bring the pen close to the tablet. Pressure works through the system's tablet driver.", "将笔靠近数位板。压力感应由系统的数位板驱动程序提供。"},
+    {"Bring the pen close to the tablet. Wacom: turn on \"Use Windows Ink\" in Wacom Tablet Properties > Mapping; Huion / XP-Pen: enable Windows Ink in the driver.",
+     "将笔靠近数位板。Wacom：在 Wacom Tablet Properties > Mapping 中启用 \"Use Windows Ink\"；Huion / XP-Pen：在驱动程序中启用 Windows Ink。"},
+    {"SpaceMouse (experimental)", "SpaceMouse（实验性功能）"},
+    {"Use SpaceMouse", "使用 SpaceMouse"},
+    {"SpaceMouse speed", "SpaceMouse 速度"},
+    {"SpaceMouse defaults", "SpaceMouse 默认值"},
+    {"Speed", "速度"},
+    {"Dead zone", "死区"},
+    {"Dominant axis", "主要轴"},
+    {"Lock rotation to turntable", "将旋转锁定为转盘模式"},
+    {"Plug it in. If 3DxWare is installed it may keep the device to itself: see the Navigation page of the guide.",
+     "请接上设备。如果已安装 3DxWare，它可能会独占此设备；请参阅指南中的“导航”页面。"},
+    {"Push the cap: if the bars below stay still, another program (3DxWare, spacenavd) holds the SpaceMouse. See the Navigation page of the guide.",
+     "推动控制帽：如果下方的指示条没有反应，表示 SpaceMouse 正被其他程序（3DxWare、spacenavd）占用。请参阅指南中的“导航”页面。"},
+    {"No joysticks or game controllers seen.", "找不到摇杆或游戏控制器。"},
+    {"Plug it in. SculptForge reads it as a joystick (/dev/input): you need read access to it, and spacenavd may hold it. See the Navigation page of the guide.",
+     "请接上设备。SculptForge 会将它辨识为摇杆（/dev/input）：你需要有读取权限，而且它可能正被 spacenavd 占用。请参阅指南中的“导航”页面。"},
+    {"Antialiasing", "抗锯齿"},
+    {"Anti-aliasing", "抗锯齿"},
+    {"Fast Navigation", "快速导航"},
+    {"Multithreading", "多线程"},
+    {"Predictive Strokes", "预测笔触"},
+    {"Draft Strokes", "草稿笔触"},
+    {"%d threads", "%d 个线程"},
+    {"Memory", "内存"},
+    {"Hardware profile", "硬件配置文件"},
+    {"Frame Governor", "帧速率调节器"},
+    {"Re-calibrate", "重新校准"},
+    {"Keep vertical sync on (frame rate capped at the display's)", "保持垂直同步（帧速率上限为屏幕刷新率）"},
+    {"Every %d min", "每 %d 分钟"},
+    {"Autosave off", "自动保存已关闭"},
+    {"Save a recovery copy this often (0 = off). Restored after a crash.", "按此间隔保存恢复副本（0 = 关闭）。当程序崩溃后可还原。"},
+    // --- Library ---
+    {"Image", "图像"},
+    {"Recent", "最近使用"},
+    {"Nothing here yet.", "暂无内容。"},
+    {"Nothing here yet. Projects you save (Ctrl+S) into the User folder show up here.", "暂无内容。保存（Ctrl+S）至 User 文件夹的项目会显示在这里。"},
+    {"Nothing here yet. Save Snapshot keeps timestamped copies of your scene here.", "暂无内容。使用“保存快照”后，场景的时间戳副本会保存在这里。"},
+    {"Nothing here yet. Files you open show up here.", "暂无内容。打开的文件会显示在这里。"},
+    {"Nothing here yet. Put reference images in the User folder.", "暂无内容。请将参考图像放入 User 文件夹。"},
+    {"Nothing here yet. Put Gaussian splat captures (.ply, .splat) in the User folder.",
+     "暂无内容。请将 Gaussian splat 捕获文件（.ply、.splat）放入 User 文件夹。"},
+    {"Back", "上一页"},
+    {"Forward", "下一页"},
+    {"Open folder", "打开文件夹"},
+    {"Close Library", "关闭资源库"},
+    {"Relief from image", "从图像创建浮雕"},
+    {"Inflate image", "膨胀图像"},
+    {"Project onto model", "投影至模型"},
+    {"Use as alpha", "用作 Alpha"},
+    {"Use as Alpha", "用作 Alpha"},
+    {"Use as VDM", "用作 VDM"},
+    {"Show in file manager", "在文件管理器中显示"},
+    {"Refresh thumbnail", "刷新缩略图"},
+    {"Nothing here matches \"%s\".", "找不到符合“%s”的项目。"},
+    {"Library rows", "资源库行数"},
+    {"Library at the top", "资源库置于上方"},
+    {"Library at the bottom", "资源库置于下方"},
+    {"Show the items whose names contain this text.", "只显示名称包含这段文本的项目。"},
+    {"Show only the items whose names contain this text.", "只显示名称包含这段文本的项目。"},
+    {"The previous tab or folder.", "返回上一个选项卡或文件夹。"},
+    {"Forward again after going back.", "返回后再次前进。"},
+    {"Hide the Library (comma toggles it).", "隐藏资源库（按逗号键切换显示）。"},
+    {"How many rows of thumbnails the Library shows (1-4).", "设置资源库中缩略图的行数（1-4）。"},
+    {"Your projects (.sfproj) and recently opened projects.", "你的项目（.sfproj）及最近打开的项目。"},
+    {"Models to start from or append as Parts: primitives and model files.", "可作为起始模型或添加为部件的模型：基本几何体与模型文件。"},
+    {"Every brush: built-in, custom and .sfbrush files in your library.", "所有笔刷：内置笔刷、自定义笔刷，以及资源库中的 .sfbrush 文件。"},
+    {"Brush alphas: built-in stamps and images in your Alphas folder.", "笔刷 Alpha：内置印章及 Alphas 文件夹中的图像。"},
+    {"Viewport materials: Studio and the Lit Spheres.", "视口材质：Studio 和 Lit Spheres。"},
+    {"Reference images: generate 3D, relief, inflate, project onto the model or use as an alpha.",
+     "参考图像：生成 3D 模型、创建浮雕、膨胀图像、投影至模型，或用作 Alpha。"},
+    {"Gaussian splat captures (.ply, .splat) to sculpt against.", "用于对照雕刻的 Gaussian splat 捕获文件（.ply、.splat）。"},
+    {"Snapshots and the autosave, newest first.", "快照与自动保存文件，最新的排在最前面。"},
+    {"Recently opened files of every kind.", "最近打开的各类文件。"},
+    {"Add a folder of your own to the Library (shown at the root of every tab).", "将自己的文件夹添加至资源库（会显示在每个选项卡的根目录）。"},
+    {"Browse projects, models, brushes, alphas, materials, images and splats. Double-click to load; Shift+double-click a model to append it as a Part; drag sideways to scrub.",
+     "浏览项目、模型、笔刷、Alpha、材质、图像和 splat。双击即可加载；对模型按 Shift+双击可将其添加为部件；左右拖动即可快速浏览。"},
+    // --- Pickers and brushes ---
+    {"Brush picker", "笔刷选择器"},
+    {"Alpha picker", "Alpha 选择器"},
+    {"Community brushes", "社区笔刷"},
+    {"Save to Library", "保存至资源库"},
+    {"Strength", "强度"},
+    {"Falloff", "衰减"},
+    {"Name", "名称"},
+    // --- Common words and buttons ---
+    {"Apply", "应用"},
+    {"Reset", "重置"},
+    {"Preview", "预览"},
+    {"Finish", "完成"},
+    {"Close", "关闭"},
+    {"OK", "确定"},
+    {"Yes", "是"},
+    {"No", "否"},
+    {"Lock", "锁定"},
+    {"Live", "实时"},
+    {"Mean", "平均值"},
+    {"Source", "来源"},
+    {"Method", "方法"},
+    {"Weight", "权重"},
+    {"Review", "审阅"},
+    {"Network", "网络"},
+    {"Contents", "内容"},
+    {"Video", "视频"},
+    {"Surface", "表面"},
+    {"World", "世界"},
+    {"Vertex", "顶点"},
+    {"Front", "前方"},
+    {"Rear", "后方"},
+    {"Sharpness", "锐利度"},
+    {"Padding", "内边距"},
+    {"Map size", "贴图大小"},
+    {"Map Size", "贴图大小"},
+    {"Output folder", "输出文件夹"},
+    {"Output Folder", "输出文件夹"},
+    {"Open in browser", "在浏览器中打开"},
+    {"Open Folder", "打开文件夹"},
+    // --- Project: unsaved changes, recovery, updates ---
+    {"Clear Recent", "清除最近使用项目"},
+    {"Autosave (min)", "自动保存（分钟）"},
+    {"Save changes to %s before continuing?", "继续之前要将更改保存至 %s 吗？"},
+    {"Your changes will be lost if you don't save them.", "如果不保存，更改将会遗失。"},
+    {"Don't Save", "不要保存"},
+    {"SculptForge did not close normally last time.", "SculptForge 上次未正常关闭。"},
+    {"Restore the autosaved work?", "要还原自动保存的工作内容吗？"},
+    {"What happened is in sculptforge-previous.log (Help > Open log folder);", "详细日志请见 sculptforge-previous.log（帮助 > 打开日志文件夹）；"},
+    {"please attach it if you report the problem.", "报告问题时请附上此文件。"},
+    {"Restore", "还原"},
+    {"Discard", "丢弃"},
+    {"SculptForge %s is available", "SculptForge %s 已推出"},
+    {"(you have %s)", "（你当前使用的是 %s）"},
+    {"What's new", "版本新功能"},
+    {"Download", "下载"},
+    {"Later", "稍后"},
+    {"Skip this version", "跳过此版本"},
+    {"Checking", "正在检查"},
+    {"This build gets its updates from your package manager.", "此版本的更新由你的包管理器提供。"},
+    // --- Sculpt Timeline ---
+    {"Sculpt Timeline", "雕刻时间轴"},
+    {"Step %zu of %zu", "第 %zu 步，共 %zu 步"},
+    {"Step %d: %s", "第 %d 步：%s"},
+    {"Save with project", "与项目一并保存"},
+    {"Start of the history", "历史记录起点"},
+    {"Show the model here", "在此显示模型"},
+    {"Sculpting from an earlier step starts a branch;\nthe later steps stay as a lane above.",
+     "从较早的步骤开始雕刻会创建分支；\n后续步骤则会保留在上方的时间轴轨道中。"},
+    {"The history of the active Part (%zu steps up to the cursor) played as a turntable.", "以转盘方式播放当前部件的历史记录（光标之前共 %zu 步）。"},
+    {"Length", "长度"},
+    {"Rendering timelapse", "正在渲染延时视频"},
+    // --- Color, Vertex Paint, paint layers ---
+    {"Fill", "填满"},
+    {"Fill layer", "填满图层"},
+    {"Fill masked", "填满遮罩区域"},
+    {"Fill the unmasked area (the whole mesh if nothing is masked)", "填满未遮罩区域（若没有任何遮罩，则填满整个网格）"},
+    {"Cavity", "凹陷"},
+    {"Darken creases and cavities (respects the mask)", "加深皱褶与凹陷（遵循遮罩）"},
+    {"Background", "背景"},
+    {"Shading", "着色"},
+    {"Scene", "场景"},
+    {"Colour", "色彩"},
+    {"Base colour", "基础色彩"},
+    {"Paint brush (P)", "绘制笔刷 (P)"},
+    {"Paint into", "绘制到"},
+    {"Paint layer", "绘制图层"},
+    {"Painting on: %s", "正在绘制于：%s"},
+    {"Painting on: texture, %s", "正在绘制于：纹理，%s"},
+    {"Layer channel", "图层通道"},
+    {"Channel view", "通道视图"},
+    {"RGB while sculpting", "雕刻时使用 RGB"},
+    {"Min Opacity", "最低不透明度"},
+    {"+ Add", "+ 添加"},
+    {"Group %d", "组 %d"},
+    {"Group", "组"},
+    {"(Ctrl paints, Ctrl+Alt erases)", "（Ctrl 绘制，Ctrl+Alt 擦除）"},
+    {"(Ctrl masks, Ctrl+Alt unmasks)", "（Ctrl 遮罩，Ctrl+Alt 取消遮罩）"},
+    // --- More actions (shelves, Quick Menu, palettes) ---
+    {"Shelves", "工具栏"},
+    {"Frame", "居中显示"},
+    {"Intensity at cursor", "光标处的强度"},
+    {"Falloff at cursor", "光标处的衰减"},
+    {"Last stroke", "最后一笔"},
+    {"To Surface", "到表面"},
+    {"Crop Box", "裁剪框"},
+    {"Make Mesh", "创建网格"},
+    {"Delete Last", "删除最后一个"},
+    {"Make sculptable", "转为可雕刻"},
+    {"Sculpt to Splats", "雕刻转为 Splats"},
+    {"Preview Normal Map", "预览法线贴图"},
+    {"AA Off", "关闭抗锯齿"},
+    {"AA 2x", "抗锯齿 2x"},
+    {"AA 4x", "抗锯齿 4x"},
+    {"AA 8x", "抗锯齿 8x"},
+    {"Pan X", "X 轴平移"},
+    {"Pan Y", "Y 轴平移"},
+    {"Roll", "翻滚"},
+    {"Tilt", "倾斜"},
+    {"Spin", "旋转"},
+    // --- Extract, Project, Deformation ---
+    {"E Smt", "E Smt"},
+    {"Parts too", "连同其他部件"},
+    {"This Part", "此部件"},
+    {"Move along normals", "沿法线移动"},
+    {"Mirror left and right", "左右镜像"},
+    {"Flip X", "翻转 X 轴"},
+    {"Flip Y", "翻转 Y 轴"},
+    {"Flip Z", "翻转 Z 轴"},
+    {"Swap Y/Z", "交换 Y/Z 轴"},
+    {"Squash", "压缩"},
+    {"Fit plane", "拟合平面"},
+    {"Edge Fade", "边缘淡化"},
+    {"Base Smoothing", "基础平滑"},
+    {"All pieces", "所有部分"},
+    {"Face loops", "面环"},
+    {"Low-poly", "低多边形"},
+    {"Base mesh", "基础网格"},
+    // --- Bake ---
+    {"Baking", "烘焙"},
+    {"AO rays", "AO 光线"},
+    {"AO reach", "AO 范围"},
+    {"Auto distance", "自动距离"},
+    {"Max Frontal Distance", "最大正面距离"},
+    {"Max Rear Distance", "最大背面距离"},
+    {"Normal map convention", "法线贴图惯例"},
+    {"Export preset", "导出预设"},
+    {"EXR displacement", "EXR 位移贴图"},
+    {"UV view", "UV 视图"},
+    // --- Facial shapes, Make sculptable, phone, splats ---
+    {"Generate Facial Shapes", "生成脸部形状"},
+    {"Record face take", "录制脸部表演"},
+    {"Play Take", "播放录制"},
+    {"Load Take", "加载录制"},
+    {"Bake Take", "烘焙录制"},
+    {"Clear Baked Take", "清除已烘焙的录制"},
+    {"Cancel Bake", "取消烘焙"},
+    {"Take", "录制"},
+    {"Live axes", "实时坐标轴"},
+    {"Landmarks", "特征点"},
+    {"Place Landmarks", "放置特征点"},
+    {"Auto Landmarks", "自动放置特征点"},
+    {"Clear Landmarks", "清除特征点"},
+    {"Place by hand", "手动放置"},
+    {"Good enough - stop", "够好了 - 停止"},
+    {"Try a test head", "试用测试头部"},
+    {"Face test", "脸部测试"},
+    {"From scan", "从扫描"},
+    {"Keep scan", "保留扫描"},
+    {"Generate from a photo at once", "立即从照片生成"},
+    {"Capture from view", "从视图捕获"},
+    {"Pairing code", "配对码"},
+    {"QR code", "QR 码"},
+    {"Unreal is on another computer", "Unreal 在另一台电脑上"},
+    {"Receive automatically", "自动接收"},
+    {"Update after each stroke", "每次笔触后更新"},
+    {"Record a video of the run (needs ffmpeg)", "录制运行过程视频（需要 ffmpeg）"},
+    {"Choose Brush", "选择 Brush"},
+    {"Choose COLMAP", "选择 COLMAP"},
+    {"Photos Folder", "照片文件夹"},
+    {"Find again", "重新查找"},
+    // --- VDM, Kelvinlet, brush editing ---
+    {"Create VDM", "创建 VDM"},
+    {"Load VDM", "加载 VDM"},
+    {"New VDM Plane", "添加 VDM 平面"},
+    {"VDM name", "VDM 名称"},
+    {"Plane Res", "平面分辨率"},
+    {"Normal tilt", "法线倾斜"},
+    {"Detail Clone", "细节复制"},
+    {"Clone Spacing", "复制间距"},
+    {"Clone follows stroke", "复制跟随笔触"},
+    {"Refine the selected brush", "调整选择的笔刷"},
+    {"Preset amount", "预设数量"},
+    {"preset amount", "预设数量"},
+    {"Reset to 1", "重置为 1"},
+    {"Scatter", "散布"},
+    {"Loop", "循环"},
+    {"Letter index", "字母索引"},
+    {"Load image", "加载图片"},
+    {"Invert loaded image", "反转加载的图片"},
+    {"Dark is high", "暗部高"},
+    // --- App.cpp (tools/i18n/coverage.py) ---
+    {"Strokes go into the base shape, not a layer.", "笔触会进入基底形状，而不是图层。"},
+    {"Select to sculpt into this layer. With subdivision levels, record at any level: a layer keeps its own detail on "
+     "every level and follows Lower Level / Higher Level and Divide.",
+     "选择后即可雕刻到此图层。有细分层级时，可在任何层级录制：图层在每个层级都保有自己的细节，并跟随降低层级／提高层"
+     "级与细分。"},
+    {"Animate this blend shape 0 -> 1 -> 0 (Stop sets it back to 1).",
+     "播放此混合形状 0 -> 1 -> 0 的动画（停止会将它设回 1）。"},
+    {"Delete this layer on every subdivision level (undoable).", "在每个细分层级删除此图层（可撤销）。"},
+    {"How strongly the layer shows: 0 = off, 1 = as sculpted. One weight for every subdivision level.",
+     "图层显示的强度：0 = 关闭，1 = 雕刻时的样子。所有细分层级共用一个权重。"},
+    {"Add a sculpt layer with the name typed beside it; strokes go into it.",
+     "以旁边输入的名称添加雕刻图层；笔触会进入此图层。"},
+    {"Hugging Face token", "Hugging Face 令牌"},
+    {"Free at huggingface.co/settings/tokens (read access). Raises the free daily allowance in Generate 3D, and "
+     "TRELLIS.2 needs it. Empty = the HF_TOKEN environment variable.",
+     "可在 huggingface.co/settings/tokens 免费获取（读取权限）。可提高“生成 3D 模型”的每日免费额度，TRELLIS.2 也需"
+     "要它。留空 = 使用 HF_TOKEN 环境变量。"},
+    {"Load a built-in test capture (a stylised head as Gaussian splats, with a few floaters) to try Make sculptable "
+     "without a scan of your own. splat_test_capture kind=object loads a mug instead.",
+     "加载内置的测试捕获（以高斯 Splat 呈现的风格化头部，带有少量浮点），不需要自己的扫描即可试用“转为可雕刻”。"
+     "splat_test_capture kind=object 则加载马克杯。"},
+    // --- Config.cpp (tools/i18n/coverage.py) ---
+    {"Close Holes", "封闭孔洞"},
+    {"Cap every open boundary of the active Part (a hole, an open bottom, the rim of an extracted shell) with a new "
+     "patch sized like the polygons around it, so remeshing and sculpting see a closed surface. The rest of the Part "
+     "stays as it is; the patches get a face group of their own (#103).",
+     "以新的面片封闭当前部件的每个开放边界（孔洞、开放的底部、提取外壳的边缘），面片大小与周围多边形相近，让重新网"
+     "格化与雕刻看到封闭的表面。部件的其余部分保持不变；面片会有自己的面组 (#103)。"},
+    {"Add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to shape "
+     "big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smt off divides without smoothing.",
+     "添加一个细分层级：多边形变为四倍，并保留较低层级，让你能回到低层级塑造大形，再回到细节。四边面维持四边面 "
+     "(Catmull-Clark)。关闭 Smt 时细分不会平滑。"},
+    {"Smooth the next Divide (on by default). Off: the new level keeps the hard edges and flat faces of the one below.",
+     "平滑下一次细分（默认打开）。关闭：新层级保留下层的硬边与平面。"},
+    {"Lower Level", "降低层级"},
+    {"Step one subdivision level down (fewer polygons, for big forms). The detail of the higher levels is kept.",
+     "降低一个细分层级（较少多边形，用于大形）。较高层级的细节会保留。"},
+    {"Higher Level", "提高层级"},
+    {"Step one subdivision level up (more polygons, for detail). Edits made below carry the detail along.",
+     "提高一个细分层级（较多多边形，用于细节）。在下层所做的编辑会带着细节一起变化。"},
+    {"Delete Lower", "删除较低层级"},
+    {"Delete Higher", "删除较高层级"},
+    {"Store the surface above the highest level as micro displacements: hundreds of millions of sculptable triangles "
+     "in a fraction of the memory (300M take about 0.4 GB). The Micro slider sets how fine.",
+     "将最高层级之上的表面保存为微细分位移：数亿个可雕刻三角面，只占一小部分内存（3 亿个约 0.4 GB）。“微细分”滑块"
+     "设置精细程度。"},
+    {"Turn the micro level into a regular mesh in a new Part (for export or tools that need real geometry).",
+     "将微细分层级转为新部件中的普通网格（用于导出或需要真实几何的工具）。"},
+    {"Write the micro level as a 32-bit EXR displacement map over the base UVs (next to the project).",
+     "将微细分层级写成基底 UV 上的 32 位 EXR 位移贴图（放在项目旁）。"},
+    {"Duplicate Part", "复制部件"},
+    {"Copy the active Part, with its layers and attributes, and make the copy active (also in the Parts list's "
+     "right-click menu).",
+     "复制当前部件及其图层与属性，并将副本设为当前（部件列表的右键菜单中也有）。"},
+    {"Make a shell from the masked part of the Part (a helmet, a strap, clothing), shown as a preview below it. "
+     "Change Thick, E Smt or Double and it updates; Accept keeps it as a new Part.",
+     "从部件的遮罩区域创建外壳（头盔、带子、衣物），并在下方显示预览。更改厚度、E Smt 或双倍时会实时更新；按“接受”"
+     "即保留为新部件。"},
+    {"Keep the Extract preview as a new Part below this one. Ctrl+Z takes it away again.",
+     "将提取预览保留为此部件下方的新部件。按 Ctrl+Z 可再移除。"},
+    {"Grow the extracted shell both inward and outward from the surface, instead of outward only.",
+     "让提取的外壳从表面同时向内与向外长出，而不只是向外。"},
+    {"Triangle corners: where the extracted edge turns sharply, the rim is made of triangles instead of quads.",
+     "三角形角落：提取边缘急转之处，边缘改用三角面而非四边面。"},
+    {"Triangle border: the whole rim of the extracted shell is made of triangles instead of quads.",
+     "三角形边缘：提取外壳的整圈边缘都改用三角面而非四边面。"},
+    {"Mirror the + side of the Part onto the - side across the chosen axis and weld the seam into one watertight "
+     "mesh. Face Groups and vertex paint come along. To keep the other side, Deformation > Mirror first.",
+     "沿所选轴将部件的 + 侧镜像到 - 侧，并将接缝焊接成一个封闭网格。面组与顶点绘制也会一并处理。若要保留另一侧，请"
+     "先使用变形 > 镜像。"},
+    {"Flip the Part across the chosen axis, through the origin (the plane symmetry and Mirror And Weld use).",
+     "沿所选轴经由原点翻转部件（对称与镜像并焊接所用的平面）。"},
+    {"An axis Mirror And Weld mirrors across (several: one after the other).",
+     "镜像并焊接所沿的轴（多个时：按序处理）。"},
+    {"An axis Mirror flips along (several: one after the other).", "镜像翻转所沿的轴（多个时：按序处理）。"},
+    {"New from Starter Mesh...", "从起始网格添加..."},
+    {"Start from a base mesh: human head, bust, full body, hand, foot, ear, eye, stylised and creature heads, torso, "
+     "or a bevelled box, cylinder, capsule or ring (Library > Tool > Starter meshes).",
+     "从基础网格开始：人头、半身像、全身、手、脚、耳朵、眼睛、风格化与生物头部、躯干，或倒角方块、圆柱、胶囊或圆环（"
+     "资源库 > 工具 > 起始网格）。"},
+    {"Open a project (.sfproj), a model (.obj, .glb, .fbx, .stl, .ply, .usd ...) or splats.",
+     "打开项目 (.sfproj)、模型 (.obj、.glb、.fbx、.stl、.ply、.usd ...) 或 Splat。"},
+    {"Save the project (.sfproj: every Part, layer, brush and setting). Asks for a name the first time.",
+     "保存项目（.sfproj：每个部件、图层、笔刷与设置）。第一次会询问名称。"},
+    {"Save the project under a new name.", "以新名称保存项目。"},
+    {"Export the model as glTF binary, with sculpt layers as blend shapes (morph targets).",
+     "将模型导出为二进位 glTF，雕刻图层会成为混合形状 (morph target)。"},
+    {"Save the visible Parts as one binary STL, for 3D printing.", "将可见部件保存为单一二进位 STL，用于 3D 打印。"},
+    {"Export a game-ready FBX and import it into the running Unreal Editor (Python remote execution).",
+     "导出适用于游戏的 FBX，并导入运行中的 Unreal Editor（Python 远程运行）。"},
+    {"Send the visible Parts back to Blender (the SculptForge add-on): objects that came from Blender update in "
+     "place, keeping their transform, materials and modifiers; new Parts become new objects.",
+     "将可见部件送回 Blender（SculptForge 插件）：来自 Blender 的对象会就地更新，保留其变换、材质与修改器；新部件"
+     "则成为新对象。"},
+    {"Load what Blender last sent with the add-on's Send to SculptForge. Each object updates its Part (undoable) or "
+     "becomes a new one; this happens by itself while Receive automatically is on.",
+     "加载 Blender 最后通过插件的 Send to SculptForge 发送的内容。每个对象会更新对应的部件（可撤销）或成为新部件"
+     "；打开“自动接收”时会自动进行。"},
+    {"Send to Maya", "发送到 Maya"},
+    {"Send the visible Parts to Maya (OBJ with quads and UVs) through the exchange folder you chose; Get from "
+     "SculptForge on Maya's SculptForge shelf loads them, replacing the objects they came from by name.",
+     "通过你选择的交换文件夹将可见部件发送到 Maya（含四边面与 UV 的 OBJ）；Maya 的 SculptForge 工具架上的 Get from "
+     "SculptForge 会加载它们，并按名称替换原本的对象。"},
+    {"Get from Maya", "从 Maya 获取"},
+    {"Load what Maya last sent with the shelf's Send to SculptForge. Each object replaces the Part with its name "
+     "(undoable) or becomes a new one.",
+     "加载 Maya 最后通过工具架的 Send to SculptForge 发送的内容。每个对象会替换同名的部件（可撤销）或成为新部件。"},
+    {"Exchange folder...", "交换文件夹..."},
+    {"Choose the folder SculptForge and Maya exchange meshes through (pick the same one in Maya's shelf script). "
+     "SculptForge reads and writes only there, and only when you send or get.",
+     "选择 SculptForge 与 Maya 交换网格的文件夹（在 Maya 的工具架脚本中选同一个）。SculptForge 只在该处读写，且只在"
+     "你发送或获取时进行。"},
+    {"Add the brush on the clipboard: a brush code someone shared, or the text of a .sfbrush file.",
+     "加入剪贴板中的笔刷：别人分享的笔刷代码，或 .sfbrush 文件的文本。"},
+    {"Every brush keeps its own Size, Intensity, Falloff, Colour intensity, stroke and alpha while you work. This "
+     "saves the current brush's, so it starts with them every time SculptForge opens.",
+     "工作时每个笔刷都保有自己的大小、强度、衰减、色彩强度、笔触与 Alpha。此功能会保存当前笔刷的设置，让它在每次打开 "
+     "SculptForge 时都以此开始。"},
+    {"Put the current brush's Size, Intensity, Falloff, Colour intensity, stroke and alpha back to the values "
+     "SculptForge ships with, and forget what Save Brush Settings stored for it.",
+     "将当前笔刷的大小、强度、衰减、色彩强度、笔触与 Alpha 还原为 SculptForge 的默认值，并丢弃“保存笔刷设置”为它保"
+     "存的内容。"},
+    {"On: Size and Intensity stay as they are when you pick another brush (as before 0.10.8); Falloff, Colour "
+     "intensity, the stroke and the alpha still follow each brush. Off (the default): every brush keeps its own.",
+     "开启：切换到其他笔刷时大小与强度维持不变（与 0.10.8 之前相同）；衰减、色彩强度、笔触与 Alpha 仍跟随各笔刷。关闭"
+     "（默认）：每个笔刷保有自己的设置。"},
+    {"Make the brush 10% smaller (hold to repeat; Shift+[ steps one pixel).",
+     "将笔刷缩小 10%（按住可重复；Shift+[ 每次一个像素）。"},
+    {"Make the brush 10% larger (hold to repeat; Shift+] steps one pixel).",
+     "将笔刷放大 10%（按住可重复；Shift+] 每次一个像素）。"},
+    {"Mirror strokes across the X axis (left / right).", "沿 X 轴镜像笔触（左／右）。"},
+    {"Show the mesh's polygons (quads and triangles) over the surface.",
+     "在表面上显示网格的多边形（四边面与三角面）。"},
+    {"Fit the whole model in the view.", "将整个模型置入视图。"},
+    {"Take the paint colour from the model under the cursor.", "从光标下的模型取用绘制色彩。"},
+    {"Every shortcut and mouse gesture, generated from the commands themselves.",
+     "所有快捷键与鼠标手势，直接由命令本身生成。"},
+    {"The SculptForge user guide: every tool explained, with search. Hold Ctrl over a control and press F1 to open "
+     "the chapter about it.",
+     "SculptForge 使用指南：说明每项工具，并可搜索。按住 Ctrl 停在控件上再按 F1，即可打开相关章节。"},
+    {"Your first sculpt (10 min)", "你的第一个雕刻作品（10 分钟）"},
+    {"A step-by-step lesson for complete beginners: a cute owl head from the default sphere, painted and rendered, in "
+     "about ten minutes.",
+     "给完全新手的分步教程：从默认球体做出可爱的猫头鹰头部，上色并渲染，约十分钟完成。"},
+    {"Quick tour", "快速导览"},
+    {"Ten short slides for sculptors who know another app: where remeshing, dynamic topology, retopology, levels, "
+     "masking, cut, brushes and baking are, each with a Show me button.",
+     "给熟悉其他软件的雕刻者的十张简短幻灯片：重新网格化、动态拓扑、重新拓扑、层级、遮罩、切割、笔刷与烘焙在哪里，每"
+     "张都有“示范给我看”按钮。"},
+    {"What changed in this version and the ones before it (opens once by itself after an update).",
+     "此版本与先前版本的更改（更新后会自动打开一次）。"},
+    {"Ask the SculptForge website whether a newer version is out. SculptForge also checks by itself once a day "
+     "(Preferences > Updates).",
+     "向 SculptForge 网站确认是否有新版本。SculptForge 每天也会自动检查一次（偏好设置 > 更新）。"},
+    {"Version, licence and the open-source components SculptForge is built with.",
+     "版本、许可，以及 SculptForge 所使用的开源组件。"},
+    {"SculptForge is free and stays free. A membership adds betas and early builds, Member Requests (ask for a brush "
+     "or an alpha), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in "
+     "your browser. Nothing in the app changes either way.",
+     "SculptForge 免费且将一直免费。成为会员可获得 Beta 版与抢先版本、Member Requests（请求笔刷或 Alpha）、投票决定下"
+     "一步开发内容，以及名列致谢名单：会在浏览器中打开 sculptforge.app/support.html。无论如何，应用程序本身都不会有任"
+     "何改变。"},
+    {"The official SculptForge community on Discord: questions, tips and work in progress. Opens the invite in your "
+     "browser. Bugs still go to Report a problem (GitHub issues).",
+     "SculptForge 官方 Discord 社区：提问、技巧与进行中的作品。会在浏览器中打开邀请链接。错误报告仍请使用“报告问题”"
+     "(GitHub issues)。"},
+    {"The welcome note shown the first time SculptForge starts.", "第一次启动 SculptForge 时显示的欢迎消息。"},
+    {"Open the SculptForge website and user guide in your browser.", "在浏览器中打开 SculptForge 网站与使用指南。"},
+    {"Open the issue tracker in your browser.", "在浏览器中打开问题追踪系统。"},
+    {"Open the folder with sculptforge.log: what SculptForge did and, after a crash, what crashed. "
+     "sculptforge-previous.log beside it is the last session's. Attach both to a problem report.",
+     "打开含 sculptforge.log 的文件夹：记录 SculptForge 做了什么，崩溃后则记录是什么崩溃。旁边的"
+     " sculptforge-previous.log 是上一次会话的记录。报告问题时请附上这两个文件。"},
+    {"Record a performance trace", "录制性能追踪"},
+    {"While on, sculptforge-trace.log in the log folder records what makes SculptForge slow: every frame over 33 ms "
+     "with where its time went, strokes, uploads to the GPU, remeshes and other background jobs, the mesh size and "
+     "levels, and the GPU and driver. Turn it on, do what is slow, turn it off and attach the file to your report. A "
+     "small file on this computer only; off by default and costs nothing when off.",
+     "开启时，日志文件夹中的 sculptforge-trace.log 会记录让 SculptForge 变慢的原因：每个超过 33 ms 的帧及其时间花在哪"
+     "里、笔触、上传到 GPU、重新网格化与其他背景工作、网格大小与层级，以及 GPU 与驱动程序。打开它、运行变慢的操作、关"
+     "闭后将文件附加到报告中。文件很小且只存在这台电脑；默认关闭，关闭时不会有任何负担。"},
+    {"Submit a request for a fix or a suggestion: opens the bug report and feature request forms in your browser.",
+     "提交修正请求或建议：会在浏览器中打开错误报告与功能请求表单。"},
+    {"Search every command, brush and setting by name and run it. Commands that need parameters open in the console.",
+     "按名称搜索任何命令、笔刷与设置并运行。需要参数的命令会在控制台中打开。"},
+    {"The script console: every command you run appears as a script line, and you can type commands yourself.",
+     "脚本控制台：你运行的每个命令都会以一行脚本显示，你也可以自行输入命令。"},
+    {"Run a text file of script statements, one per line (# starts a comment).",
+     "运行包含脚本语句的文本文件，每行一个（# 开头为注释）。"},
+    {"Put every command run this session on the clipboard as a script, ready to replay (a macro recorder).",
+     "将本次会话运行过的所有命令以脚本形式放到剪贴板，可直接重播（宏录制器）。"},
+    {"Empty the console log (the session script is kept).", "清空控制台日志（保留会话脚本）。"},
+    {"Save Layout", "保存布局"},
+    {"Keep the current layout (shelves, trays, open palettes) for future sessions. Preferences and shortcuts save "
+     "themselves.",
+     "保留当前布局（工具栏、工具箱、打开的调色板）供之后的会话使用。偏好设置与快捷键会自动保存。"},
+    {"Save Preferences Now", "立即保存偏好设置"},
+    {"Write the preferences and shortcuts to disk now. Not needed: they save themselves a moment after every change.",
+     "立即将偏好设置与快捷键写入磁盘。通常不需要：每次更改后它们会在片刻后自动保存。"},
+    {"Reset Layout and Shortcuts", "重置布局与快捷键"},
+    {"Go back to the built-in layout, shortcuts and radial menus. The shortcuts save themselves; Save Layout keeps "
+     "the layout.",
+     "回到内置的布局、快捷键与饼菜单。快捷键会自动保存；“保存布局”会保留布局。"},
+    {"Revert to Saved Layout", "还原为已保存的布局"},
+    {"Go back to the layout the last Save Layout kept.", "回到上一次“保存布局”所保留的布局。"},
+    {"Import Interface...", "导入界面..."},
+    {"Load a layout and shortcuts file someone shared (or you saved with Export Interface).",
+     "加载别人分享（或你用“导出界面”保存）的布局与快捷键文件。"},
+    {"Export Interface...", "导出界面..."},
+    {"Save the layout, shortcuts and interface preferences to a file you can share.",
+     "将布局、快捷键与界面偏好设置保存为可分享的文件。"},
+    {"Rearrange the shelves: Ctrl+Alt+drag any button onto a shelf to add or move it, or off the shelves to remove it.",
+     "重新排列工具栏：按住 Ctrl+Alt 将任何按钮拖到工具栏上即可添加或移动，拖出工具栏即可移除。"},
+    {"The short notes SculptForge shows over the 3D view (a mode that is on, the next step of a tool). Off hides them "
+     "all; each also has its own Don't show again.",
+     "SculptForge 在 3D 视图上显示的简短提示（已打开的模式、工具的下一步）。关闭会全部隐藏；每则提示也各有“不再显示"
+     "”。"},
+    {"Customize Shelves", "自定义工具栏"},
+    {"Preferences and shortcuts save themselves. Layout changes last until you quit; Save Layout keeps them.",
+     "偏好设置与快捷键会自动保存。布局的更改会持续到你退出程序为止；“保存布局”会保留它们。"},
+    {"The language of menus, palettes, shelves and messages. Brush and tool names (Quad Remesh, Forge Spheres, Clay "
+     "Block...) stay as they are.",
+     "菜单、调色板、工具栏与消息所使用的语言。笔刷与工命名称（Quad Remesh、Forge Spheres、Clay Block...）保持原样。"},
+    {"Ctrl+hover help", "Ctrl+悬停帮助"},
+    {"Help box opacity %.2f", "帮助框不透明度 %.2f"},
+    {"Help box opacity", "帮助框不透明度"},
+    {"How solid the Ctrl-help box is.", "Ctrl 帮助框的不透明程度。"},
+    {"Hover and focus highlights change colour only: no easing, and tiles don't lift or grow.",
+     "停留与焦点的醒目提示只改变颜色：没有缓动，图块也不会浮起或放大。"},
+    {"Off: File and Edit come first in the palette bar and Help last, the rest A to Z. On: every palette A to Z.",
+     "关闭：调色板栏中“文件”与“编辑”在最前、“帮助”在最后，其余按 A 至 Z 排列。开启：所有调色板按 A 至 Z 排列。"},
+    {"Size of text and controls, applied at once. Automatic follows the display the window is on (Windows: Settings > "
+     "Display > Scale, per monitor).",
+     "文本与控件的大小，立即应用。“自动”会按窗口所在的显示器而定（Windows：设置 > 显示器 > 缩放，按各显示器）。"},
+    {"Free: dragging turns the model about the screen's axes and can roll it over the top; press Shift while rotating "
+     "to snap to the nearest front, side, top or bottom view. Turntable: the model stays upright and turns about its "
+     "vertical axis, as in Blender or Maya.",
+     "自由：拖动会以屏幕的轴旋转模型，并可从上方翻转；旋转时按住 Shift 可贴齐最近的正面、侧面、顶部或底部视图。转盘："
+     "模型保持直立并绕垂直轴旋转，如同 Blender 或 Maya。"},
+    {"Keeps the interface below the camera notch of MacBooks (and other laptops) when SculptForge fills the screen. "
+     "Automatic asks the system (macOS) or recognises a notched MacBook display (Linux).",
+     "SculptForge 全屏时，让界面保持在 MacBook（及其他笔电）相机刘海下方。“自动”会询问系统 (macOS) 或辨识有刘海的"
+     " MacBook 屏幕 (Linux)。"},
+    {"Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default.",
+     "单击，再按下新的按键。Esc 取消，Backspace 清除。橘色：已与默认值不同。"},
+    {"Undo every shortcut change.", "撤销所有快捷键更改。"},
+    {"Open Library on the Project tab when SculptForge starts.", "启动 SculptForge 时在“项目”选项卡打开资源库。"},
+    {"How many rows of thumbnails the Library strip shows.", "资源库条显示几行缩略图。"},
+    {"Library opens along the top edge of the canvas.", "资源库沿画布上缘打开。"},
+    {"Library opens above the bottom shelf.", "资源库在底部工具栏上方打开。"},
+    {"Where your projects, tools, brushes, alphas, images, splats and Snapshots live. Library shows it as User.",
+     "你的项目、工具、笔刷、Alpha、图像、Splat 与快照存放的位置。资源库中显示为“用户”。"},
+    {"Colours", "色彩"},
+    {"Forge Terminal's colour scheme, from well-known open-source terminal themes.",
+     "Forge Terminal 的配色，取自知名的开源终端机主题。"},
+    {"Uses your Omarchy theme's colours when Omarchy is installed (read from its theme folder; SculptForge never "
+     "changes it). After switching themes, toggle this to pick up the new colours.",
+     "安装 Omarchy 时使用你的 Omarchy 主题色彩（从其主题文件夹读取；SculptForge 不会修改它）。切换主题后，"
+     "重新切换此选项即可应用新色彩。"},
+    {"Faint scanlines and a glow around the focused panel, on the interface only (never on the 3D view). Off by "
+     "default.",
+     "淡淡的扫描线与焦点面板周围的光晕，只应用于界面（不会出现在 3D 视图）。默认关闭。"},
+    {"The borders around the panels in Forge Terminal, Phosphor and Blueprint. Subtle (the default): faint, and "
+     "nothing lights up under the pointer. Off: no borders, the gaps alone separate the panels. On: clear borders, "
+     "the panel under the pointer a faint step lighter.",
+     "Forge Terminal、Phosphor 与 Blueprint 中面板周围的边框。细微（默认）：淡淡的，指针下不会亮起。关闭：没有边框，"
+     "仅以间隙分隔面板。开启：清楚的边框，指针下的面板略亮一阶。"},
+    {"How strong the panel borders are (0-100%), on top of Outlines: 100% draws them as Subtle or On does, lower "
+     "fades them into the panels (#98). Ctrl+click to type.",
+     "面板边框的强度 (0-100%)，以“轮廓线”为基础：100% 会以细微或打开的样子绘制，较低则淡入面板 (#98)。按住 Ctrl "
+     "并单击即可输入。"},
+    {"SculptForge layout", "SculptForge 布局"},
+    {"Menus by task (File, Edit, Sculpt, Paint, Mesh, View, Render, Help), a status bar and a one-row tool shelf. "
+     "Every palette is a section of one menu, and F3 finds them all.",
+     "按工作分类的菜单（文件、编辑、雕刻、绘制、网格、视图、渲染、帮助）、状态栏与单行工具栏。每个调色板都是某个菜单"
+     "中的一节，按 F3 可找到全部。"},
+    {"Classic", "经典"},
+    {"Classic layout", "经典布局"},
+    {"The alphabetical palette bar and the two-row top shelf.", "按字母排列的调色板栏与双行顶部工具栏。"},
+    // --- Console.cpp (tools/i18n/coverage.py) ---
+    {"Hide the console. The log and the session script are kept.", "隐藏控制台。日志与会话脚本会保留。"},
+    {"Runs SculptForge script: one command per line or separated by ';', parameters as name=value (quote text with "
+     "spaces). Tab completes, Up/Down recalls, help lists every command.",
+     "运行 SculptForge 脚本：每行一个命令或以 ';' 分隔，参数写成 名称=值（含空格的文本请加引号）。Tab 自动补全，上"
+     "／下键调出先前命令，help 列出所有命令。"},
+    // --- Gizmo.cpp (tools/i18n/coverage.py) ---
+    {"Draw mode: brushes sculpt and paint (leaves the Gizmo).", "绘制模式：笔刷进行雕刻与绘制（离开操纵器）。"},
+    {"Gizmo, Move: drag an arrow to move along an axis, a square to move in a plane, the centre to move in the view. "
+     "Masked parts stay; Shift snaps to the grid; Alt+drag moves only the gizmo. W again: back to Draw.",
+     "操纵器，移动：拖动箭头沿轴移动，拖动方块在平面上移动，拖动中心在视图中移动。遮罩部分保持不动；Shift 贴齐格线；"
+     "Alt+拖动只移动操纵器。再按 W：回到绘制。"},
+    {"Gizmo, Scale: drag a box to stretch along an axis or the centre to scale evenly (right or up: bigger). Shift "
+     "snaps to 10% steps. E again: back to Draw.",
+     "操纵器，缩放：拖动方块沿轴拉伸，拖动中心等比例缩放（向右或向上：放大）。Shift 以 10% 为一级贴齐。再按 E：回到绘"
+     "制。"},
+    {"Gizmo, Rotate: drag a ring to turn about that axis, the outer ring to turn in the view. Mask the body and put "
+     "the pivot at a joint to pose a limb. Shift snaps to 15 degrees. R again: back to Draw.",
+     "操纵器，旋转：拖动圆环绕该轴旋转，拖动外环在视图中旋转。遮罩身体并将枢轴点放在关节上即可摆出肢体姿势。Shift 以 "
+     "15 度贴齐。再按 R：回到绘制。"},
+    {"Put the gizmo back at the centre of what moves (the Part, or its unmasked part) with world axes.",
+     "将操纵器放回移动对象（部件或其未遮罩部分）的中心，并使用世界轴。"},
+    {"Put the pivot on the surface: click this, then click the model (or Alt+click the model at any time). With "
+     "Surface orientation the axes follow the surface there (Y along the normal).",
+     "将枢轴点放到表面上：单击此处，再单击模型（或随时 Alt+单击模型）。使用“表面”方向时，轴会跟随该处的表面（"
+     "Y 沿法线）。"},
+    {"The gizmo's axes are the world's X, Y and Z.", "操纵器的轴为世界的 X、Y 与 Z。"},
+    {"The gizmo's axes follow the surface where the pivot was snapped (Y along the normal) and turn with your "
+     "rotations, for moving a part along itself.",
+     "操纵器的轴会跟随枢轴点贴齐处的表面（Y 沿法线），并随你的旋转而转动，方便沿部件本身移动。"},
+    {"Masked parts stay where they are and partly masked parts move partly (on by default). Off: the whole Part moves "
+     "whatever the mask.",
+     "遮罩部分维持原位，部分遮罩的区域则部分移动（默认打开）。关闭：无论遮罩如何，整个部件都会移动。"},
+    {"Transform every visible Part together. Each Part gets its own undo step.",
+     "一起变换所有可见部件。每个部件各有自己的撤销步骤。"},
+    {"Where the gizmo sits: rotation and scaling turn about this point. It follows the centre of what moves until you "
+     "place it: Alt+drag the gizmo, Alt+click the model, To Surface, or type here.",
+     "操纵器所在的位置：旋转与缩放以此点为中心。在你放置它之前，它会跟随移动对象的中心：Alt+拖动操纵器、Alt+单击模"
+     "型、“到表面”，或在此输入。"},
+    {"A soft joint for posing: the movement eases in over this distance from the masked part (a share of the Part's "
+     "size), so a hard mask edge bends smoothly instead of creasing. 0: the mask as it is.",
+     "摆姿势用的柔和关节：移动会在距遮罩部分这段距离内逐渐生效（以部件大小的比例表示），让生硬的遮罩边缘平顺弯曲而不"
+     "生成折痕。0：维持遮罩原样。"},
+    {"Distance to move along X, Y and Z (the gizmo's axes) when you press Apply.",
+     "按“应用”时沿 X、Y、Z（操纵器的轴）移动的距离。"},
+    {"Degrees to turn about X, then Y, then Z (the gizmo's axes, through the pivot) when you press Apply.",
+     "按“应用”时按序绕 X、Y、Z（操纵器的轴，通过枢轴点）旋转的角度。"},
+    {"Size to scale to about the pivot when you press Apply (100% = unchanged).",
+     "按“应用”时以枢轴点为中心缩放到的大小（100% = 不变）。"},
+    {"Move, rotate and scale by the numbers above, about the pivot, as one undo step (the transform command). Masked "
+     "parts stay; with symmetry on, a masked transform is mirrored.",
+     "按上方数值以枢轴点为中心移动、旋转与缩放，作为单一撤销步骤（transform 命令）。遮罩部分保持不动；打开对称时，遮"
+     "罩变换会镜像。"},
+    {"Set Move and Rotate back to 0 and Scale to 100%.", "将移动与旋转设回 0，比例设回 100%。"},
+    // --- Input.cpp (tools/i18n/coverage.py) ---
+    {"An Intensity slider under the cursor: drag it, or type a number (1-100) and press Enter. Hold Shift (or pick "
+     "Smooth) to set Smooth's own Intensity.",
+     "光标下的强度滑块：拖动它，或输入数字 (1-100) 后按 Enter。按住 Shift（或选择 Smooth）可设置 Smooth 自己的强度。"},
+    {"Colour intensity at cursor", "光标处的色彩强度"},
+    {"An Colour intensity slider under the cursor: how strongly painting colours the surface (1-100).",
+     "光标下的色彩强度滑块：绘制为表面上色的强度 (1-100)。"},
+    {"A Falloff slider under the cursor: below 0 a broad, hard brush tip, above 0 a soft point (-100..100). The inner "
+     "ring of the brush cursor shows it.",
+     "光标下的衰减滑块：低于 0 为宽而硬的笔尖，高于 0 为柔和的尖端 (-100..100)。笔刷光标的内环会显示它。"},
+    {"The Quick Menu under the cursor: brush, stroke, alpha, material, colour, Size, Falloff and the intensities. "
+     "Hold Space and let go to close it, or tap Space to keep it open.",
+     "光标下的快速菜单：笔刷、笔触、Alpha、材质、色彩、大小、衰减与各项强度。按住空格键后放开即可关闭，或轻按空格键让"
+     "它保持打开。"},
+    {"Steady Stroke", "稳定笔触"},
+    {"Steady Stroke on or off, with every stroke type (Dots, Drag Stamp, Slide Stamp, Spray): the brush trails the "
+     "cursor on a string and only moves once the string is taut, for steady lines without hand shake.",
+     "打开或关闭稳定笔触，适用所有笔触类型（Dots、Drag Stamp、Slide Stamp、Spray）：笔刷以一条线跟在光标后方，线拉紧"
+     "时才移动，画出不受手抖影响的稳定线条。"},
+    {"Catch up on release", "放开时追上"},
+    {"Steady Stroke: when you let go, the line runs on to where the cursor is, instead of stopping a string's length "
+     "behind it.",
+     "稳定笔触：放开时，线条会延伸到光标所在处，而不是停在落后一条线长的位置。"},
+    {"Keep the brush size in model units (mm) instead of screen pixels: it stays the same on the surface as you zoom "
+     "in and out, for pores, wrinkles and trims of an exact width.",
+     "以模型单位 (mm) 而非屏幕像素保持笔刷大小：缩放时在表面上维持相同大小，适合精确宽度的毛孔、皱纹与饰边。"},
+    {"Make the brush one pixel smaller (half a pixel below 2 px), down to 0.5 px.",
+     "将笔刷缩小一个像素（低于 2 px 时为半个像素），最小 0.5 px。"},
+    {"Make the brush one pixel larger (half a pixel below 2 px).", "将笔刷放大一个像素（低于 2 px 时为半个像素）。"},
+    {"Continuous on or off: while you hold the brush still on the model it keeps adding, 30 dabs a second (build up a "
+     "bump without moving). Not for Move, Tendril or the drag strokes.",
+     "打开或关闭连续：笔刷在模型上静止时持续加入，每秒 30 个笔触（不移动也能堆出凸起）。不适用于 Move、Tendril 与拖动"
+     "类笔触。"},
+    {"Swap the main and the secondary colour.", "交换主要色彩与次要色彩。"},
+    {"Mask the whole visible Part.", "遮罩整个可见部件。"},
+    {"Unmask everything (also: Ctrl+drag on the background, away from the model).",
+     "取消所有遮罩（也可以：在远离模型的背景上 Ctrl+拖动）。"},
+    {"Mask what is unmasked and unmask what is masked (also: Ctrl+click the background).",
+     "遮罩未遮罩的部分并取消已遮罩的部分（也可以：Ctrl+单击背景）。"},
+    {"Group from Mask", "从遮罩创建组"},
+    {"Turn the masked part into a new face group and clear the mask. With nothing masked, everything visible becomes "
+     "one group.",
+     "将遮罩部分转为新的面组并清除遮罩。若没有遮罩，所有可见部分会成为一个组。"},
+    {"One face group per UV island: triangles that touch without a UV seam share a group. Only the visible part is "
+     "regrouped. Needs UVs (Tool > Texture Map > Auto UV makes some).",
+     "每个 UV 岛一个面组：相邻且无 UV 接缝的三角面属于同一组。只重新分组可见部分。需要 UV（工具 > 贴图 > 自动 UV "
+     "可生成）。"},
+    {"Classic sculpting keys", "经典雕刻按键"},
+    {"The classic sculpting keys and gestures: I is Colour intensity, 9 saves a snapshot, the number keys don't pick "
+     "brushes, and Ctrl+drag on the background only clears the mask.",
+     "经典的雕刻按键与手势：I 为色彩强度，9 保存快照，数字键不选择笔刷，在背景上 Ctrl+拖动只会清除遮罩。"},
+    {"SculptForge's own keys (the default): 1-9 and 0 pick the first ten brushes, I is Falloff (as is O), U "
+     "Intensity, and Ctrl+drag on the background zooms when nothing is masked.",
+     "SculptForge 自己的按键（默认）：1-9 与 0 选择前十个笔刷，I 为衰减（O 亦同），U 为强度，没有遮罩时在背景上 "
+     "Ctrl+拖动会缩放。"},
+    {"Blender's navigation and sculpt-mode keys: middle-drag orbits (Shift pans, Ctrl zooms), Alt+left-drag does the "
+     "same for pens and trackpads, Ctrl inverts a stroke, Shift smooths, F / Shift+F set radius and strength, V S P "
+     "I G C K pick brushes and M the mask brush, Home frames everything. Rotation switches to Turntable.",
+     "Blender 的导航与雕刻模式按键：中键拖动环绕（Shift 平移，Ctrl 缩放），Alt+左键拖动在数位笔与触摸板上效果相同，"
+     "Ctrl 反转笔触，Shift 平滑，F／Shift+F 设置半径与强度，V S P I G C K 选择笔刷，M 为遮罩笔刷，Home 将全部置入视图"
+     "。旋转会切换为转盘。"},
+    {"Maya's view controls: Alt+left-drag orbits, Alt+middle-drag pans, Alt+right-drag zooms, anywhere on the canvas; "
+     "hold Alt, then add Ctrl, and a left drag rolls the view. Alt+F frames the Part, Alt+H resets the view, the "
+     "wheel zooms toward the pointer. Ctrl inverts a stroke, Ctrl+Alt masks (Ctrl+Alt+drag on the background clears "
+     "the mask), Shift smooths, Ctrl+Shift hides and shows. The Classic sculpting keys stay for everything else.",
+     "Maya 的视图控制：在画布任何位置 Alt+左键拖动环绕、Alt+中键拖动平移、Alt+右键拖动缩放；按住 Alt 再加 Ctrl，左键"
+     "拖动可滚转视图。Alt+F 将部件置入视图，Alt+H 重置视图，滚轮朝指针缩放。Ctrl 反转笔触，Ctrl+Alt 遮罩（在背景上 "
+     "Ctrl+Alt+拖动清除遮罩），Shift 平滑，Ctrl+Shift 隐藏与显示。其余一切沿用经典雕刻按键。"},
+    {"Blender style: the number keys above the letters work as the numpad (1 front, 3 right, 7 top, 5 "
+     "orthographic...), for keyboards without one.",
+     "Blender 风格：字母上方的数字键当作小键盘使用（1 正面、3 右侧、7 顶部、5 正交...），适用于没有小键盘的键盘。"},
+    {"A right click on the canvas, without dragging, opens the Quick Menu under the cursor (Space does too). A right "
+     "drag still turns, pans or zooms the view. A pen button set to Right click works the same.",
+     "在画布上单击右键（不拖动）会在光标下打开快速菜单（空格键也可以）。右键拖动仍会旋转、平移或缩放视图。设为“"
+     "右键单击”的数位笔按钮效果相同。"},
+    {"While Space is held, a drag on the canvas moves the camera: left-drag turns it, right- or middle-drag pans, and "
+     "with Ctrl held too a drag zooms (#43). Off by default: with the Classic sculpting keys, Space opens the Quick "
+     "Menu (with this on, a right click still does). Typing a space in a text field is never taken.",
+     "按住空格键时，在画布上拖动会移动相机：左键旋转，右键或中键平移，同时按住 Ctrl 则缩放 (#43)。默认关闭：使用经典"
+     "雕刻按键时，空格键会打开快速菜单（打开此选项后，右键仍可打开）。在文本字段中输入的空格不会被拦截。"},
+    {"Emulate 3 Button Mouse", "模拟三键鼠标"},
+    {"Blender style: Alt+left-drag always turns the view (Shift pans, Ctrl zooms), as Blender's Emulate 3 Button "
+     "Mouse preference does, for pens and trackpads. Off (as Blender's default keymap, 5.1 and later): Alt+left-drag "
+     "on the model masks and Ctrl+Alt+left-drag unmasks; beside the model it still turns the view (#77).",
+     "Blender 风格：Alt+左键拖动始终旋转视图（Shift 平移，Ctrl 缩放），如同 Blender 的 Emulate 3 Button Mouse 偏好设"
+     "置，适用于数位笔与触摸板。关闭（同 Blender 5.1 以后的默认按键配置）：在模型上 Alt+左键拖动为遮罩，Ctrl+Alt+左键"
+     "拖动为取消遮罩；在模型旁边仍会旋转视图 (#77)。"},
+    {"A left-drag that starts on the background begins a brush stroke instead of turning the view; the brush touches "
+     "the model once the cursor reaches it (#62). Ctrl (mask) and Shift (smooth) work the same way, and a Ctrl+click "
+     "on the background still inverts the mask. The view still turns with a right-drag or a pen button set to Right "
+     "click, pans with Alt+drag or a middle-drag, and moves with Space held if Hold Space is on; with Maya keys, "
+     "Alt+left-drag orbits, with Blender keys beside the model. Shift+L (View > Lock camera) turns it on and off.",
+     "从背景开始的左键拖动会开始笔触而非旋转视图；光标碰到模型时笔刷才接触模型 (#62)。Ctrl（遮罩）与 Shift（平滑）"
+     "也一样，在背景上 Ctrl+单击仍会反转遮罩。视图仍可用右键拖动或设为“右键单击”的数位笔按钮旋转，用 Alt+拖动或中"
+     "键拖动平移，打开“按住空格键”时按住空格键移动；使用 Maya 按键时 Alt+左键拖动环绕，使用 Blender 按键时在模型"
+     "旁环绕。Shift+L（视图 > 锁定相机）可切换开关。"},
+    {"Lock camera", "锁定相机"},
+    {"Lock the camera for left-drags: a drag that starts on the background sculpts once it reaches the model instead "
+     "of turning the view (Preferences > Input > Start strokes off the model, #62). The status bar shows CAMERA "
+     "LOCKED while it is on. Right-drag or Alt+drag still move the view. Shift+L turns it on and off.",
+     "锁定相机的左键拖动：从背景开始的拖动在碰到模型时会开始雕刻，而不是旋转视图（偏好设置 > 输入 > 在模型外开始"
+     "笔触，#62）。开启时状态栏会显示“相机已锁定”。右键拖动或 Alt+拖动仍可移动视图。Shift+L 可切换开关。"},
+    {"The brush ring lies on the model under the pointer: a circle at the brush's real size there, turned to the form "
+     "of the surface (averaged over the brush, so fine bumps don't make it wobble), with a short line along the "
+     "surface's direction. With symmetry on, a dot shows where each mirrored or radial copy lands. Off the model, "
+     "and with this off, the ring is a flat circle on the screen.",
+     "笔刷圆环贴在指针下的模型上：以该处笔刷实际大小画出的圆，按表面形状倾斜（以笔刷范围平均，细小凹凸不会让它晃动）"
+     "，并有一条沿表面方向的短线。打开对称时，会以圆点显示每个镜像或放射副本的落点。在模型外或关闭此选项时，圆环是屏"
+     "幕上的平面圆。"},
+    {"Cursor", "光标"},
+    {"While a stroke runs, show only the dot where the brush touches (and the symmetry dots), not the ring: nothing "
+     "between you and the surface you are shaping. Off by default: the ring shows the brush size throughout.",
+     "笔触进行时只显示笔刷接触点（与对称点），不显示圆环：你与正在塑造的表面之间不会有任何遮挡。默认关闭：圆环会一直"
+     "显示笔刷大小。"},
+    {"Use the keys from a keymap you exported in Blender (Preferences > Keymap > Export, a .py file). Switches to the "
+     "Blender style, then takes the navigation and sculpt keys SculptForge has an equivalent for. The file is only "
+     "read, never run. Saved automatically.",
+     "使用你从 Blender 导出的按键配置（偏好设置 > Keymap > Export，.py 文件）。会切换到 Blender 风格，并采用 "
+     "SculptForge 有对应功能的导航与雕刻按键。文件只会读取，绝不运行。自动保存。"},
+    {"Paint the mask with a plain left drag, Ctrl+drag to unmask (Blender's Mask brush). Press it again, or pick "
+     "another brush, to go back.",
+     "以左键拖动绘制遮罩，Ctrl+拖动取消遮罩（Blender 的 Mask 笔刷）。再按一次或选择其他笔刷即可返回。"},
+    {"Hide the face group under the cursor (Blender: hide the face set).",
+     "隐藏光标下的面组（Blender：隐藏 face set）。"},
+    {"Show only the face group under the cursor; again, with it isolated, shows everything (Blender: toggle "
+     "visibility).",
+     "只显示光标下的面组；在已独立显示时再按一次则显示全部（Blender：切换可见性）。"},
+    {"Show every hidden part of the mesh.", "显示网格所有隐藏的部分。"},
+    {"Look at the model from the front (orthographic).", "从正面看模型（正交）。"},
+    {"Look at the model from behind (orthographic).", "从背面看模型（正交）。"},
+    {"Look at the model's right side (orthographic).", "看模型的右侧（正交）。"},
+    {"Look at the model's left side (orthographic).", "看模型的左侧（正交）。"},
+    {"Look down on the model (orthographic).", "从上方俯视模型（正交）。"},
+    {"Look up at the model from below (orthographic).", "从下方仰视模型（正交）。"},
+    {"Gizmo size: how big the X / Y / Z axes and the View Figure are in the corner of the canvas. Grows with the UI "
+     "scale.",
+     "操纵器大小：画布角落的 X／Y／Z 轴与视图人偶的大小。随界面缩放而放大。"},
+    {"Switch between a perspective and an orthographic view (no foreshortening: sizes don't shrink with depth).",
+     "在透视与正交视图之间切换（无透视缩短：大小不随深度缩小）。"},
+    {"Turn the view 15 degrees to the left around the model.", "绕模型将视图向左旋转 15 度。"},
+    {"Turn the view 15 degrees to the right around the model.", "绕模型将视图向右旋转 15 度。"},
+    {"Turn the view 15 degrees up over the model.", "将视图向上越过模型旋转 15 度。"},
+    {"Turn the view 15 degrees down under the model.", "将视图向下绕到模型下方旋转 15 度。"},
+    {"Look at the model from the other side.", "从另一侧看模型。"},
+    {"Move the view closer.", "将视图拉近。"},
+    {"Move the view back.", "将视图拉远。"},
+    {"Fit the active Part in the view (Blender: View Selected; Maya keys: Alt+F).",
+     "将当前部件置入视图（Blender：View Selected；Maya 按键：Alt+F）。"},
+    {"Reset view", "重置视图"},
+    {"Back to the view a new model opens with: from the front, in perspective, the whole model in view (Maya keys: "
+     "Alt+H).",
+     "回到打开新模型时的视图：正面、透视、整个模型在画面中（Maya 按键：Alt+H）。"},
+    {"Zoom drag", "缩放拖动"},
+    {"Sideways (Maya)", "左右（Maya）"},
+    {"Up and down", "上下"},
+    {"Alt+right drag zooms. Sideways (the default, as Maya's own dolly): drag right to zoom in, left to zoom out. Up "
+     "and down: drag up to zoom in, as the SculptForge style.",
+     "Alt+右键拖动可缩放。左右（默认，如 Maya 的推拉）：向右拖动拉近，向左拖动拉远。上下：向上拖动拉近，如 "
+     "SculptForge 风格。"},
+    {"Invert zoom", "反转缩放"},
+    {"Turn zoom drags around (the mouse wheel stays as it is).", "反转缩放拖动方向（鼠标滚轮维持不变）。"},
+    {"Wheel zooms toward the pointer", "滚轮朝指针缩放"},
+    {"The mouse wheel zooms toward the point of the model under the pointer, which stays under it, instead of the "
+     "middle of the view. On with Maya keys (choosing a style sets it), off with the others.",
+     "鼠标滚轮会朝指针下的模型位置缩放，该点维持在指针下，而不是朝视图中央。使用 Maya 按键时打开（选择风格时会自动设"
+     "置），其他风格则关闭。"},
+    {"Along the normal", "沿法线"},
+    {"Always", "始终"},
+    {"Never", "永不"},
+    {"Move, Tendril, Elastic Tendril and KelvinGrab: with the invert key held as the stroke begins (Alt; Ctrl in the "
+     "Blender and Maya styles), the surface moves along the average normal under the brush instead of across the "
+     "screen, so it pulls straight out of the surface or pushes straight in. Always: every stroke of those brushes "
+     "does; Never: the key does nothing for them.",
+     "Move、Tendril、Elastic Tendril 与 KelvinGrab：笔触开始时按住反转键（Alt；在 Blender 与 Maya 风格中为 Ctrl），表"
+     "面会沿笔刷下的平均法线移动，而非沿屏幕移动，因此会从表面直直拉出或推入。始终：这些笔刷的每一笔都如此；永不：该"
+     "按键对它们没有作用。"},
+    {"Share size and intensity across brushes", "笔刷之间共用大小与强度"},
+    {"Free", "自由"},
+    {"Free: the model turns about the screen's axes and can roll over the top. Turntable: it stays upright, as in "
+     "Blender or Maya.",
+     "自由：模型以屏幕的轴旋转，并可从上方翻转。转盘：模型保持直立，如同 Blender 或 Maya。"},
+    {"The pointer over the 3D view: a crosshair (the default, as in most sculpting apps; it stays while the view "
+     "turns) or the arrow. Panels, menus and popups always show the arrow (or their own resize and text cursors). "
+     "Saved automatically.",
+     "3D 视图上的指针：十字线（默认，与大多数雕刻软件相同；旋转视图时仍保留）或箭头。面板、菜单与弹出窗口始终显示箭头"
+     "（或它们自己的调整大小与文本光标）。自动保存。"},
+    {"Brush radius in screen pixels (0.5 to 800), and in mm on the surface.",
+     "以屏幕像素表示的笔刷半径（0.5 到 800），以及表面上的 mm。"},
+    {"Below 0: a broad, hard tip. Above 0: a soft point.", "低于 0：宽而硬的笔尖。高于 0：柔和的尖端。"},
+    {"How strongly the brush changes the surface.", "笔刷改变表面的强度。"},
+    {"Colour intensity %.0f", "色彩强度 %.0f"},
+    {"Colour intensity", "色彩强度"},
+    {"How strongly painting colours the surface.", "绘制为表面上色的强度。"},
+    // --- LibraryBrowser.cpp (tools/i18n/coverage.py) ---
+    {"Library tabs", "资源库选项卡"},
+    {"What the Library shows: projects, models, brushes, alphas, materials, images, splats, snapshots, recent files "
+     "and packs.",
+     "资源库显示的内容：项目、模型、笔刷、Alpha、材质、图像、Splat、快照、最近使用的文件与资源包。"},
+    {"Hide the Library (comma toggles it; Esc closes it).", "隐藏资源库（逗号键切换；Esc 关闭）。"},
+    {"Open the Library on the Project tab when SculptForge starts.", "启动 SculptForge 时在“项目”选项卡打开资源库。"},
+    {"Rows of thumbnails in the Library strip.", "资源库条中的缩略图行数。"},
+    {"Show the Library along the top or the bottom of the canvas.", "在画布上方或下方显示资源库。"},
+    {"Show or hide the Library: thumbnails of your projects, models, brushes, alphas, materials, images, splats and "
+     "Snapshots along the top of the canvas. Double-click to load.",
+     "显示或隐藏资源库：沿画布上缘排列你的项目、模型、笔刷、Alpha、材质、图像、Splat 与快照的缩略图。双击即可加载。"},
+    {"Pop up every brush under the cursor. Type the first letter of a brush, then the orange letter on its tile (B S "
+     "T = Standard).",
+     "在光标下弹出所有笔刷。输入笔刷的第一个字母，再输入其图块上的橘色字母（B S T = Standard）。"},
+    {"Pop up the stroke types: Dots, Drag Stamp, Slide Stamp, Spray and Lazy Stroke.",
+     "弹出笔触类型：Dots、Drag Stamp、Slide Stamp、Spray 与 Lazy Stroke。"},
+    {"Pop up the brush alphas: built-in stamps and images from your library.",
+     "弹出笔刷 Alpha：内置印章与资源库中的图像。"},
+    {"Pop up the materials under the cursor. Hover one to preview it on the model; click to keep it.",
+     "在光标下弹出材质。停在某个材质上即可在模型上预览；单击即可应用。"},
+    {"Size at cursor", "光标处的大小"},
+    {"A Size slider under the cursor: drag it, or type a number and press Enter.",
+     "光标下的大小滑块：拖动它，或输入数字后按 Enter。"},
+    {"Save a timestamped snapshot of the whole scene to your library (the last 10 are kept). Your project file is not "
+     "changed. Find them in the Library's Snapshots tab.",
+     "将整个场景加上时间戳的快照保存到资源库（保留最近 10 个）。你的项目文件不会更改。可在资源库的“快照”选项卡找到。"},
+    {"Save Render", "保存渲染"},
+    {"Render the view (without the interface) to an image in your library: Library > Image lists it, and the status "
+     "bar names the file. Material sets its size (twice the view by default), shape (the view's, 1:1, 16:9, 9:16, "
+     "4:3) and format (PNG or JPG).",
+     "将视图（不含界面）渲染为资源库中的图像：资源库 > 图像会列出它，状态栏会显示文件名。“材质”设置其大小（默认为视图"
+     "的两倍）、比例（视图、1:1、16:9、9:16、4:3）与格式（PNG 或 JPG）。"},
+    // --- MemoryConfirm.cpp (tools/i18n/coverage.py) ---
+    {"Not enough free memory", "可用内存不足"},
+    {"If the computer runs out of memory it can stop responding and SculptForge may close without saving. Close other "
+     "apps (or save first) before you go on.",
+     "如果电脑内存耗尽，可能会无响应，SculptForge 也可能未保存就关闭。继续之前请关闭其他应用程序（或先保存）。"},
+    {"Continue anyway", "仍要继续"},
+    // --- Palettes.cpp (tools/i18n/coverage.py) ---
+    {"Brushes subtract instead of add. Holding Alt flips it for one stroke.",
+     "笔刷改为减去而非增加。按住 Alt 可在单一笔触中反转。"},
+    {"Connected only", "仅限相连"},
+    {"View falloff", "视图衰减"},
+    {"The Smooth brush (and Shift) removes bumps without shrinking the form, instead of the plain smooth that also "
+     "flattens it. Either way, let go of Shift while still pressing a Shift-smooth stroke to switch to the other "
+     "smooth for the rest of the stroke.",
+     "Smooth 笔刷（与 Shift）会去除凹凸而不使形体缩小，而非同时压平形体的普通平滑。无论哪种，在 Shift 平滑笔触进行中"
+     "放开 Shift，笔触剩余部分就会切换为另一种平滑。"},
+    {"The Smooth brush (and Shift) straightens the borders between face groups and leaves everything else alone: a "
+     "jagged clothing edge, a cuff or a panel line becomes a clean line along the surface. Corners where three "
+     "groups meet stay where they are.",
+     "Smooth 笔刷（与 Shift）会拉直面组之间的边界，其余部分不变：锯齿状的衣物边缘、袖口或面板线会变成沿表面的干净"
+     "线条。三个组交会的角落保持原位。"},
+    {"Brush radius in screen pixels (0.5 to 800), and in mm on the surface under the cursor. [ and ] change it by "
+     "10%, Shift+[ and Shift+] by 1 px; Ctrl+Shift+right-drag scrubs it finely.",
+     "以屏幕像素表示的笔刷半径（0.5 到 800），以及光标下表面上的 mm。[ 与 ] 每次调整 10%，Shift+[ 与 Shift+] 每次 1 "
+     "px；Ctrl+Shift+右键拖动可细微调整。"},
+    {"The brush falloff: below 0 a broad, hard tip, above 0 a soft point. The brush cursor's inner ring shows where "
+     "the brush works at half strength.",
+     "笔刷衰减：低于 0 为宽而硬的笔尖，高于 0 为柔和的尖端。笔刷光标的内环显示笔刷以一半强度作用的位置。"},
+    {"Off (the default): the triangle size follows the brush size on screen, as in Dynamic Topology. On: one size for "
+     "the whole mesh, set by Detail. A preference (saved automatically).",
+     "关闭（默认）：三角面大小跟随屏幕上的笔刷大小，如同动态拓扑。开启：整个网格使用单一大小，由“细节”设置。这是偏"
+     "好设置（自动保存）。"},
+    {"Smooth remesh", "平滑时重新网格化"},
+    {"How much Smooth (Shift) changes the topology while Dynamic is on. 100 (the default): it also simplifies, "
+     "merging triangles toward twice the size. Lower: it remeshes less. 0: Smooth only smooths and the triangles "
+     "stay as they are. A preference (saved automatically).",
+     "打开“动态”时，Smooth (Shift) 改变拓扑的程度。100（默认）：也会简化，将三角面合并至约两倍大小。较低：重新网格"
+     "化较少。0：Smooth 只平滑，三角面保持不变。这是偏好设置（自动保存）。"},
+    {"The viewport's lens, as on a full-frame camera: short (15-35 mm) exaggerates perspective, long (85-300 mm) "
+     "flattens it, which helps judge proportions. Saved with the project; Ctrl+click to type.",
+     "视口的镜头，如同全片幅相机：短焦 (15-35 mm) 会夸大透视，长焦 (85-300 mm) 则压平透视，有助于判断比例。随项目保"
+     "存；按住 Ctrl 并单击即可输入。"},
+    {"Show the X / Y / Z directions in the corner of the canvas.", "在画布角落显示 X／Y／Z 方向。"},
+    {"View Figure", "视图人偶"},
+    {"Show a small shaded head in the corner of the canvas that turns with the view. Click it to look from the "
+     "nearest side (front, back, left, right, top or bottom).",
+     "在画布角落显示随视图转动的小型着色头部。单击即可从最近的一侧观看（正面、背面、左、右、上或下）。"},
+    {"Gizmo size", "操纵器大小"},
+    {"AI features are off (Preferences > AI): Relief, Inflate and Stamp work offline.",
+     "AI 功能已关闭（偏好设置 > AI）：浮雕、膨胀与压印可脱机使用。"},
+    {"A sketch, concept, logo, photo or height map (or drop one on the window).",
+     "草图、概念图、标志、照片或高度图（或拖放到窗口中）。"},
+    {"Light areas rise: logos, coins, emblems, height maps.", "亮部会隆起：标志、硬币、徽章、高度图。"},
+    {"Inflates the outline into a rounded blockout.", "将轮廓膨胀成圆润的粗模。"},
+    {"Projects the image onto the model from this view as surface detail.",
+     "从此视角将图像投影到模型上，成为表面细节。"},
+    {"Integrations", "集成"},
+    {"Support", "支持"},
+    {"X-Ray", "X 光"},
+    {"View resolution", "视图分辨率"},
+    {"Decimate leaves masked vertices where they are, so masked areas keep their triangles exactly; the rest is "
+     "decimated around them.",
+     "减面会让遮罩顶点维持原位，因此遮罩区域完整保留其三角面；其余部分则在其周围减面。"},
+    {"Remeshing in the background (with a painted texture: Auto UV of the new surface, then the texture projected "
+     "onto it). The result replaces the Part when it's done.",
+     "正在后台重新网格化（有绘制贴图时：先为新表面自动 UV，再将贴图投影上去）。完成后结果会替换部件。"},
+    {"Tool > Remesh", "工具 > 重新网格化"},
+    {"Cut", "切割"},
+    {"Selection Sets", "选择集"},
+    {"Backface culling", "背面剔除"},
+    {"Don't draw the back faces of the model: faster on dense meshes, and you see through the openings of open meshes "
+     "(a scan, a garment) instead of their inside. Brushes then work only on faces you can see. Off by default; "
+     "saved automatically, projects keep their own.",
+     "不绘制模型的背面：在高密度网格上更快，且能通过开放网格（扫描、衣物）的开口看出去，而不是看到其内部。此时笔刷只"
+     "作用于看得到的面。默认关闭；自动保存，项目会保有自己的设置。"},
+    {"Radial Copies %d", "放射副本 %d"},
+    {"Radial Copies", "放射副本"},
+    {"How many copies radial symmetry makes of every stroke, turned evenly around the axis (2 to 64). With X, Y or Z "
+     "on too, each mirror image gets its copies.",
+     "放射对称为每一笔触创建的副本数量，平均分布在轴周围（2 到 64）。同时打开 X、Y 或 Z 时，每个镜像也会有自己的副本"
+     "。"},
+    // --- PanelAi.cpp (tools/i18n/coverage.py) ---
+    {"Enable AI features", "启用 AI 功能"},
+    {"Brush Lab: describe a brush in words and AI builds it; tweak the recipe with sliders.",
+     "Brush Lab：用文本描述笔刷，AI 就会创建它；再以滑块微调配方。"},
+    {"Turn an image or a description into a sculptable model (Hugging Face, fal.ai, Meshy, ComfyUI or offline).",
+     "将图像或描述转为可雕刻的模型（Hugging Face、fal.ai、Meshy、ComfyUI 或脱机）。"},
+    // --- PanelBake.cpp (tools/i18n/coverage.py) ---
+    {"Bake the chosen maps from the source Part(s), or this Part's own top subdivision or micro level, onto its UVs, "
+     "in the background. Maps are saved as PNGs (displacement also as a 32-bit EXR, position as a 16-bit PNG) in the "
+     "output folder, one set per UDIM tile when the UVs use them, and the normal map shows on the model.",
+     "在后台将所选贴图从来源部件，或此部件自己的最高细分层级或微细分层级，烘焙到其 UV 上。贴图以 PNG 保存在输出文件"
+     "夹（位移另存为 32 位 EXR，位置为 16 位 PNG），UV 使用 UDIM 时每个图块一组，法线贴图会显示在模型上。"},
+    {"Stop the bake that is running. Nothing is written.", "停止运行中的烘焙。不会写入任何文件。"},
+    {"Show the baked tangent-space normal map on the low-poly in the viewport (decoded with the same MikkTSpace "
+     "tangents a game engine uses), to check it against the high-poly. Turn it off to see the bare low-poly.",
+     "在视口中将烘焙好的切线空间法线贴图显示在低模上（使用与游戏引擎相同的 MikkTSpace 切线解码），以便与高模比对。关"
+     "闭即可看到原始低模。"},
+    {"Open the folder the last bake wrote its maps to.", "打开上次烘焙写入贴图的文件夹。"},
+    {"Choose the folder baked maps are written to. Empty: beside your last export, else the project's folder, else "
+     "Bakes in your library folder.",
+     "选择烘焙贴图的写入文件夹。留空：上次导出的位置旁，否则为项目文件夹，再否则为资源库文件夹中的 Bakes。"},
+    {"Maps are baked onto the active Part's UVs: make the low-poly active (it needs UVs from import or from Auto UV "
+     "in Tool > Texture Map), and keep the high-poly Part(s) visible.",
+     "贴图会烘焙到当前部件的 UV 上：将低模设为当前（需要导入时的 UV，或工具 > 贴图中的自动 UV），并让高模部件保持可"
+     "见。"},
+    {"The high-poly to bake from: one Part, or every visible Part except the active one (the low-poly), or this "
+     "Part's own top subdivision level baked onto its lowest level, or its micro level baked onto its base. Hidden "
+     "faces of the source are ignored. UVs outside 0..1 bake as UDIM tiles (name.1001.png, ...).",
+     "要烘焙的高模来源：单一部件，或除当前部件（低模）外的所有可见部件，或将此部件的最高细分层级烘焙到最低层级，或将"
+     "其微细分层级烘焙到基底。来源的隐藏面会被忽略。0..1 以外的 UV 会烘焙为 UDIM 图块（name.1001.png, ...）。"},
+    {"Width and height of the maps: 1K, 2K (the default), 4K or 8K. Bake time and memory grow with the area (an 8K "
+     "bake holds about 200 MB per map while it runs).",
+     "贴图的宽度与高度：1K、2K（默认）、4K 或 8K。烘焙时间与内存随面积增加（8K 烘焙运行时每张贴图约占 200 MB）。"},
+    {"AA %.0fx", "抗锯齿 %.0fx"},
+    {"Supersampling: n x n rays per texel, averaged. 1 is fastest; 2 (the default) gives clean edges; 4 costs 16 rays "
+     "per texel.",
+     "超采样：每个纹素 n x n 条光线取平均。1 最快；2（默认）边缘干净；4 每个纹素需 16 条光线。"},
+    {"Measure how far the high-poly lies in front of and behind the low-poly before baking, and cast rays just that "
+     "far. Turn it off to set Front and Rear yourself (e.g. when rays hit a nearby part).",
+     "烘焙前先测量高模位于低模前后的距离，并只投影到该距离。关闭即可自行设置前方与后方（例如光线碰到附近的部件时）。"},
+    {"How far in front of the low-poly rays start, as a percentage of the model's size (its bounding-box diagonal). "
+     "Raise it when details that stick out come out flat or missing.",
+     "光线从低模前方多远开始，以模型大小（其边界框对角线）的百分比表示。凸出的细节变平或遗失时请调高。"},
+    {"How far behind the low-poly rays look, as a percentage of the model's size. Raise it when carved detail is "
+     "missing; lower it when rays reach the far side of thin parts.",
+     "光线往低模后方看多远，以模型大小的百分比表示。雕刻凹陷的细节遗失时请调高；光线碰到薄部件另一侧时请调低。"},
+    {"Texels filled around each UV island with the island's edge colours, so seams don't show once the maps are "
+     "mipmapped in an engine. 8 is plenty for 2K; use more for 4K and 8K.",
+     "以 UV 岛边缘色彩填满每个岛周围的纹素，让贴图在引擎中生成 mipmap 后不会露出接缝。2K 用 8 就够；4K 与 8K 请用更多"
+     "。"},
+    {"OpenGL (green up) suits Blender, Unity, Godot and Substance. DirectX (green down) is Unreal's native "
+     "convention; Send to Unreal flips an OpenGL map on import, so either works there.",
+     "OpenGL（绿色朝上）适用于 Blender、Unity、Godot 与 Substance。DirectX（绿色朝下）是 Unreal 的原生惯例；“发送至 "
+     "Unreal”会在导入时翻转 OpenGL 贴图，所以两者在那里都可用。"},
+    {"Rays per texel for ambient occlusion: more is smoother and slower.",
+     "环境光屏蔽每个纹素的光线数：越多越平滑也越慢。"},
+    {"How far away geometry still occludes, as a percentage of the model's size. Short: only creases darken. Long: "
+     "whole cavities and the insides of shapes darken too.",
+     "多远的几何仍会生成屏蔽，以模型大小的百分比表示。短：只有折痕变暗。长：整个凹洞与形体内侧也会变暗。"},
+    {"Where the maps are written, as <Part>_normal.png, _ao.png, _displacement.png (+ .exr) and so on. Empty: beside "
+     "your last export, else the project's folder, else Bakes in your library folder.",
+     "贴图的写入位置，文件名如 <Part>_normal.png、_ao.png、_displacement.png（+ .exr）等。留空：上次导出的位置旁，否则"
+     "为项目文件夹，再否则为资源库文件夹中的 Bakes。"},
+    {"Also write the displacement as a 32-bit float OpenEXR in world units (for renderers that take real distances). "
+     "The 16-bit PNG is always written.",
+     "另将位移以世界单位写成 32 位浮点 OpenEXR（适用于使用实际距离的渲染器）。16 位 PNG 始终会写入。"},
+    {"Baking on every core in the background; you can keep working.", "正在后台使用所有核心烘焙；你可以继续工作。"},
+    // --- PanelBlender.cpp (tools/i18n/coverage.py) ---
+    {"Load what Blender sends as soon as it arrives (checked once a second). Off: use Receive from Blender.",
+     "Blender 传来的内容一到就加载（每秒检查一次）。关闭：请使用“从 Blender 接收”。"},
+    // --- PanelBrushes.cpp (tools/i18n/coverage.py) ---
+    {"Follow stroke direction", "跟随笔触方向"},
+    {"The alpha turns with the stroke: its top points the way you are drawing, for scales, stitches and hair that "
+     "line up along the stroke. Small wobbles are smoothed out (the direction is taken every 20 pixels, as Blender's "
+     "Rake does). Angle still adds its turn.",
+     "Alpha 会随笔触转动：其顶端指向你绘制的方向，适合沿笔触排列的鳞片、缝线与毛发。细小的晃动会被平滑（每 20 像素取"
+     "一次方向，如同 Blender 的 Rake）。“角度”仍会加上其旋转。"},
+    {"Turn the alpha by a fixed angle in degrees (counter-clockwise); Ctrl+click to type.",
+     "将 Alpha 旋转固定角度（逆时针，单位为度）；按住 Ctrl 并单击即可输入。"},
+    {"Angle jitter %.0f", "角度抖动 %.0f"},
+    {"The stamp turns with you: with Drag Stamp its top points the way you drag; in a dots stroke it turns along "
+     "the stroke. Off, Drag Stamp only sets the size and the stamp keeps Angle's turn. Slide Stamp never turns "
+     "while you slide it.",
+     "印章会跟着你转动：使用 Drag Stamp 时，其顶端指向你拖动的方向；在点状笔触中则沿笔触转动。关闭时，Drag Stamp 只"
+     "设置大小，印章保持“角度”的旋转。Slide Stamp 滑动时永不转动。"},
+    {"Angle jitter", "角度抖动"},
+    {"Turn each dab by a random angle, up to this many degrees either way: breaks up repeats in skin, rock and noise "
+     "alphas.",
+     "将每个笔触随机旋转，向两侧最多此角度：打破皮肤、岩石与噪波 Alpha 的重复感。"},
+    {"Tile across %.0f", "横向重复 %.0f"},
+    {"Tile across", "横向重复"},
+    {"Repeat the alpha this many times across the brush (1 = once).", "在笔刷横向重复 Alpha 的次数（1 = 一次）。"},
+    {"Tile down %.0f", "纵向重复 %.0f"},
+    {"Tile down", "纵向重复"},
+    {"Repeat the alpha this many times down the brush (1 = once).", "在笔刷纵向重复 Alpha 的次数（1 = 一次）。"},
+    // --- PanelCut.cpp (tools/i18n/coverage.py) ---
+    {"Depth", "深度"},
+    // --- PanelExtract.cpp (tools/i18n/coverage.py) ---
+    {"Smooths the extracted edge, which otherwise follows the mask's triangles in steps (0 = as masked).",
+     "平滑提取的边缘，否则它会沿着遮罩三角面呈阶梯状（0 = 维持遮罩原样）。"},
+    {"Thickness of the shell, as a fraction of the Part's size (0.015 is 1.5%). Negative grows it inward; 0 makes a "
+     "single-sided surface.",
+     "外壳的厚度，以部件大小的比例表示（0.015 为 1.5%）。负值向内长；0 会创建单面表面。"},
+    {"Deformation > Smooth smooths without shrinking the form (Taubin smoothing) instead of the plain smooth, which "
+     "also shrinks it.",
+     "变形 > 平滑会在不缩小形体的情况下平滑（Taubin 平滑），而非同时使形体缩小的普通平滑。"},
+    // --- PanelFace.cpp (tools/i18n/coverage.py) ---
+    {"Give the active Part (a humanoid head, looking down +Z in the front view) the 52 Apple ARKit blend shapes as "
+     "sculpt layers: eyeBlinkLeft, jawOpen, mouthSmileRight and the rest, fitted to this head's proportions. Then "
+     "fix any of them by sculpting into its layer (Tool > Layers), test them with the presets below, export them as "
+     "morph targets (GLB, USD, FBX, Blender) or drive them live from your phone. The landmarks you placed (at least "
+     "3) guide the fit; otherwise it finds the face by itself. Eyes, teeth and tongue Parts (by name) and Parts on "
+     "the face get the shapes they need. Running it again replaces the 52 layers (undo brings back the old ones and "
+     "the fixes sculpted into them).",
+     "为当前部件（人形头部，在正视图中朝向 +Z）加入 52 个 Apple ARKit 混合形状作为雕刻图层：eyeBlinkLeft、jawOpen、m"
+     "outhSmileRight 等，并按此头部的比例拟合。之后可在其图层中雕刻修正任何形状（工具 > 图层），用下方的预设测试，导出"
+     "为 morph target（GLB、USD、FBX、Blender），或用手机实时驱动。你放置的特征点（至少 3 个）会引导拟合；否则会自动"
+     "找出脸部。眼睛、牙齿与舌头部件（按名称）以及脸上的部件会得到所需的形状。再次运行会替换这 52 个图层（可撤销恢复"
+     "旧图层及其中雕刻的修正）。"},
+    {"Guide the fit for heads it gets wrong (stylised proportions, a turned head, a bust with big shoulders): click "
+     "the eye corners, the nose tip, the mouth corners and the chin on the sculpt, in the order the canvas asks. "
+     "Right and left are the character's own (its right eye is on your left in the front view). Click a dot again "
+     "later to move it. 3 are enough to start; all 8 fit best. Auto places them all for you to check.",
+     "为拟合失准的头部提供引导（风格化比例、转向的头、肩膀宽大的半身像）：按画布要求的顺序，在雕刻上单击眼角、鼻尖"
+     "、嘴角与下巴。左右以角色本身为准（正视图中角色的右眼在你的左边）。之后再单击圆点即可移动。3 个就能开始；8 个"
+     "全放拟合最佳。“自动”会替你全部放好供你检查。"},
+    {"Find the landmarks automatically (the same fit Generate makes without landmarks) and show them, so you can "
+     "check where the eye and mouth corners landed and move any that are off before generating.",
+     "自动找出特征点（与没有特征点时“生成”所做的拟合相同）并显示，让你在生成前检查眼角与嘴角的位置，并移动偏离的点"
+     "。"},
+    {"Remove the landmarks: Generate then finds the face by itself.", "移除特征点：之后“生成”会自动找出脸部。"},
+    {"Play a recorded face take on the facial shapes: the JSON frames the phone link records ({\"type\":\"face\", "
+     "\"t\":ms, \"weights\":{...}} as an array, {\"frames\":[...]} or JSON Lines).",
+     "在脸部形状上播放录制的脸部录制片段：手机链接录制的 JSON 帧（{\"type\":\"face\", \"t\":ms, \"weights\":{...}} 数组"
+     "、{\"frames\":[...]} 或 JSON Lines）。"},
+    {"Play or pause the loaded take (it loops while Loop is on).",
+     "播放或暂停已加载的录制片段（打开“循环”时会重复播放）。"},
+    {"Bake the loaded take into keyframes at 30 fps: Export GLB writes them as a glTF animation of the morph target "
+     "weights, Export USD as time samples (Blender, Maya, Unreal, Omniverse play them). Saved with the project.",
+     "将已加载的录制片段以 30 fps 烘焙为关键帧：“导出 GLB”会写成 morph target 权重的 glTF 动画，“导出 USD”则写成时"
+     "间采样（Blender、Maya、Unreal、Omniverse 可播放）。随项目保存。"},
+    {"Remove the baked take, so exports are a still pose again.", "移除已烘焙的录制片段，让导出再次成为静态姿势。"},
+    {"Auto: Left and Right shapes are made exact mirror images when the sculpt is symmetric about X = 0. On: always "
+     "(asymmetric spots take the average). Off: each side as fitted.",
+     "自动：雕刻相对 X = 0 对称时，Left 与 Right 形状会成为完全镜像。开启：始终如此（不对称处取平均）。关闭：每侧维持"
+     "拟合结果。"},
+    {"Eyes (Parts named Eye...) turn for the eyeLook shapes, Teeth / Tongue follow the jaw below the bite (and "
+     "tongueOut), and other Parts on the face (brows, lashes, a beard) follow the skin.",
+     "眼睛（名为 Eye... 的部件）会随 eyeLook 形状转动，Teeth／Tongue 会在咬合线下方跟随下腭（以及 tongueOut），脸上的"
+     "其他部件（眉毛、睫毛、胡子）会跟随皮肤。"},
+    {"How strongly the presets above are applied (click a preset again to see it).",
+     "上方预设应用的强度（再单击预设即可查看）。"},
+    {"This ARKit shape's weight (it drives the same-named layer on every Part). To fix the shape, select its layer in "
+     "Tool > Layers, set the weight to 1 and sculpt.",
+     "此 ARKit 形状的权重（驱动每个部件上同名的图层）。若要修正形状，请在工具 > 图层中选择其图层，将权重置为 1 后雕刻"
+     "。"},
+    {"Play the take again from the start when it ends.", "录制片段结束时从头再播放一次。"},
+    // --- PanelFill.cpp (tools/i18n/coverage.py) ---
+    {"Fill Layers", "填充图层"},
+    {"New Fill Layer", "添加填充图层"},
+    {"Add a Fill layer: a material over the whole Part through a mask you build from effects (Edge Wear, Dirt, "
+     "Gradient, Thickness, Light Direction, Noise, a painted mask, Levels, Blur, Invert). Change it any time; it "
+     "follows the sculpt.",
+     "添加填充图层：通过你以效果创建的遮罩，将材质覆盖整个部件（Edge Wear、Dirt、Gradient、Thickness、Light "
+     "Direction、Noise、绘制遮罩、Levels、Blur、Invert）。可随时修改；会跟随雕刻。"},
+    {"Material Recipe", "材质配方"},
+    {"Lay a ready-made stack of Fill layers on the Part: Worn Metal, Painted Edges, Dirt and Dust, Rusted Iron. They "
+     "read the Part's Mesh Maps, so each model wears where it would. Undoable.",
+     "在部件上应用现成的填充图层堆栈：Worn Metal、Painted Edges、Dirt and Dust、Rusted Iron。它们读取部件的 Mesh "
+     "Maps，让每个模型在该磨损的地方磨损。可撤销。"},
+    {"Baking Mesh Maps...", "正在烘焙 Mesh Maps..."},
+    {"No Mesh Maps yet", "尚无 Mesh Maps"},
+    {"Mesh Maps", "Mesh Maps"},
+    {"Ambient occlusion, curvature, thickness, position, world normal and ID of the Part on its texture's UVs, which "
+     "Fill layers read. Baked in the background when a Fill layer needs them; with Live on, the tiles near what you "
+     "sculpt are baked again after each stroke.",
+     "部件在其贴图 UV 上的环境光屏蔽、曲率、厚度、位置、世界法线与 ID，供填充图层读取。填充图层需要时会在后台烘焙；"
+     "打开“实时”时，每一笔触后会重新烘焙你雕刻处附近的图块。"},
+    {"Fill colour", "填充色彩"},
+    {"The base colour the Fill layer lays down.", "填充图层铺上的基础色彩。"},
+    {"Paint on the model with this layer active (Alt erases)", "以此图层为当前在模型上绘制（Alt 擦除）"},
+    {"Add mask effect", "添加遮罩效果"},
+    {"Add an effect to the bottom of the mask stack. Generators read the Mesh Maps: Edge Wear (convex edges), Dirt "
+     "(crevices), Gradient, Thickness (thin parts), Light Direction (surfaces facing up). Noise is in 3D, so it has "
+     "no UV seams. Paint lets you paint the mask with the Paint brush.",
+     "在遮罩堆栈底部加入效果。生成器读取 Mesh Maps：Edge Wear（凸出边缘）、Dirt（缝隙）、Gradient、Thickness（薄的部"
+     "分）、Light Direction（朝上的表面）。Noise 是 3D 的，因此没有 UV 接缝。Paint 让你用 Paint 笔刷绘制遮罩。"},
+    // --- PanelForgeSpheres.cpp (tools/i18n/coverage.py) ---
+    {"Add a Forge Sphere Part: one root sphere to block out a body, creature or plant from. Drag on a sphere to grow "
+     "limbs from it, Move and Scale them into proportion, check the skin with Preview (A), then Make Mesh.",
+     "添加 Forge Sphere 部件：一个根球体，用来打出身体、生物或植物的粗模。在球体上拖动即可长出肢体，用移动与缩放调整"
+     "比例，以预览 (A) 检查外皮，再“创建网格”。"},
+    {"Drag on a sphere to grow a new sphere from it (how far you drag sets its size). Click a link between two "
+     "spheres to add a joint there, and drag to place it. Alt+click a sphere to delete it.",
+     "在球体上拖动即可从它长出新球体（拖动距离决定大小）。单击两球体间的链接可在该处加入关节，拖动即可放置。Alt+"
+     "单击球体即可删除。"},
+    {"Drag a sphere to move it; the links stretch to follow. Symmetry moves its mirror twin too.",
+     "拖动球体即可移动；链接会伸展跟随。对称时其镜像也会一起移动。"},
+    {"Drag a sphere up or right to make it bigger, down or left to make it smaller.",
+     "将球体向上或向右拖动可放大，向下或向左拖动可缩小。"},
+    {"Drag places child", "拖动放置子球"},
+    {"Draw: dragging on a sphere moves the new sphere away from it (one drag places a limb joint) instead of sizing "
+     "it. Off, hold Ctrl while you drag for the same.",
+     "绘制：在球体上拖动会让新球体远离它（一次拖动放置一个肢体关节），而不是调整大小。关闭时，拖动时按住 Ctrl 效果相"
+     "同。"},
+    {"Delete Selected", "删除所选"},
+    {"Delete the selected sphere (the one you last clicked or added, outlined in orange) and everything growing from "
+     "it. The root stays.",
+     "删除所选球体（你最后单击或添加的那个，以橘色包围框标记）及从它长出的一切。根球体保留。"},
+    {"Insert Between", "插入中间"},
+    {"Add a joint halfway along the link from the selected sphere to the one it grows from.",
+     "在所选球体与其母球体之间链接的中点加入关节。"},
+    {"Set as Root", "设为根"},
+    {"Make the selected sphere the root: the armature keeps its shape and grows from there (the links on the way turn "
+     "around).",
+     "将所选球体设为根：骨架保持形状并从该处长出（途中的链接会反向）。"},
+    {"Show the skin Make Mesh would build instead of the spheres. Turn it off to edit the spheres again.",
+     "显示“创建网格”将创建的外皮，而非球体。关闭即可再次编辑球体。"},
+    {"Build the skin as a new, sculptable Part right below (watertight quads, one face group per link), like Make "
+     "Adaptive Skin. The Forge Sphere Part is hidden and kept: show it to change the proportions and make a new mesh.",
+     "在正下方将外皮创建为新的可雕刻部件（封闭四边面，每个链接一个面组），类似 Make Adaptive Skin。Forge Sphere 部"
+     "件会被隐藏并保留：显示它即可修改比例并创建新网格。"},
+    {"How dense Make Mesh's skin is: cells across the model's longest side. 128 suits a blockout; raise it for thin "
+     "fingers or tails.",
+     "“创建网格”外皮的密度：沿模型最长边的格数。128 适合粗模；细手指或尾巴请调高。"},
+    {"Forge Sphere insert", "插入 Forge Sphere"},
+    {"Forge Sphere add", "添加 Forge Sphere"},
+    // --- PanelGeometry.cpp (tools/i18n/coverage.py) ---
+    {"The subdivision level to sculpt at: 1 is the base cage, the highest has the finest detail. D / Shift+D step up "
+     "/ down. Detail is kept on every level.",
+     "要雕刻的细分层级：1 为基础笼，最高层级细节最精细。D／Shift+D 提高／降低。每个层级都会保留细节。"},
+    {"Micro levels above the highest subdivision level: each 4x the triangles, stored as one 16-bit displacement per "
+     "point (no mesh), so 300 million triangles take about 0.4 GB and sculpt in real time. Move reshapes the level "
+     "below and the detail rides along.",
+     "最高细分层级之上的微细分层级：每级三角面为 4 倍，每个点以一个 16 位位移保存（没有网格），因此 3 亿个三角面约"
+     "占 0.4 GB，并可实时雕刻。Move 会改变下层形状，细节随之移动。"},
+    // --- PanelIntegrations.cpp (tools/i18n/coverage.py) ---
+    {"Show SculptForge on Discord", "在 Discord 上显示 SculptForge"},
+    {"Your Discord profile shows SculptForge, its icon and how long you've been sculpting. Sent only to the Discord "
+     "app on this computer, which shows it to your friends. Off by default.",
+     "你的 Discord 个人数据会显示 SculptForge、其图标与你已雕刻多久。只发送给这台电脑上的 Discord 应用程序，由它显示"
+     "给你的朋友。默认关闭。"},
+    {"Show the monthly challenge", "显示每月挑战"},
+    {"Adds \"Monthly challenge: <theme>\", with the theme you type below.",
+     "加入“Monthly challenge: <theme>”，主题为你在下方输入的内容。"},
+    {"Show the file name", "显示文件名称"},
+    {"Adds the name of the file you're working on (never its folder). Off by default.",
+     "加入你正在处理的文件名称（绝不含文件夹）。默认关闭。"},
+    // --- PanelKelvinlet.cpp (tools/i18n/coverage.py) ---
+    {"How the Kelvinlet brushes' material keeps its volume (Poisson's ratio): 0 is rubbery (it stretches without "
+     "bulging), 100 is incompressible clay (pressing in bulges the surface up around the thumb, pulling out draws "
+     "the sides in).",
+     "Kelvinlet 笔刷材质保持体积的方式（帕松比）：0 像橡胶（拉伸时不隆起），100 是不可压缩的粘土（压下时拇指周围表面"
+     "隆起，拉出时两侧内缩）。"},
+    {"A tighter, more pointed peak at the brush centre with the same soft reach (a smaller inner scale of the "
+     "multi-scale Kelvinlet): for pulling points and tips.",
+     "笔刷中心更集中、更尖的峰值，柔和范围不变（多尺度 Kelvinlet 的内部尺度较小）：用于拉出尖端与末梢。"},
+    {"Detail Clone: the distance between stamps along the stroke, in stamp widths (1 = edge to edge).",
+     "Detail Clone：沿笔触的印章间距，以印章宽度为单位（1 = 边缘相接）。"},
+    {"Detail Clone: each stamp's top turns with the stroke (a row of scales or rivets along a curve); off, every "
+     "stamp keeps the screen's up.",
+     "Detail Clone：每个印章的顶端随笔触转动（沿曲线排列的一排鳞片或铆钉）；关闭时，每个印章都保持屏幕的上方。"},
+    {"Alpha and VDM from the viewport: drag a square over any sculpted detail (Shift for a circle) and capture it as "
+     "a grayscale height alpha and as a vector displacement brush, ready to stamp with the VDM brush or along "
+     "strokes with Detail Clone, and to save in your library.",
+     "从视口捕获 Alpha 与 VDM：在任何雕刻细节上拖出方形（Shift 为圆形），捕获为灰阶高度 Alpha 与矢量位移笔刷，可用 "
+     "VDM 笔刷压印或以 Detail Clone 沿笔触使用，也可保存到资源库。"},
+    {"What counts as the detail: the capture is the surface minus a smoothed copy of itself. 0 measures from a flat "
+     "plane (the whole shape); higher takes away more of the broad form, so a detail on a curved arm or cheek "
+     "captures flat. The VDM keeps each point's sideways offset too (overhangs).",
+     "何者算是细节：捕获结果为表面减去其平滑后的副本。0 从平面量起（整个形状）；越高去除越多大形，因此弯曲手臂或脸颊"
+     "上的细节会捕获成平的。VDM 也会保留每个点的侧向位移（悬垂）。"},
+    {"Fades the capture out toward its border, so stamps blend into any surface.",
+     "让捕获结果向边缘淡出，使印章能融入任何表面。"},
+    {"Pixels a side of the alpha and the map (512 or less suits most details).",
+     "Alpha 与贴图每边的像素数（大多数细节 512 以下即可）。"},
+    {"Height alpha: measure from a plane fitted to the surface (a tilted surface captures level) instead of the "
+     "screen's plane.",
+     "高度 Alpha：从贴合表面的平面量起（倾斜表面会捕获成水平），而非屏幕平面。"},
+    {"Height alpha: white = deepest (for carving brushes).", "高度 Alpha：白色 = 最深（用于雕刻凹陷的笔刷）。"},
+    {"What the alpha and the VDM are called in your library (the same name replaces).",
+     "Alpha 与 VDM 在资源库中的名称（同名会替换）。"},
+    {"Make the height capture the brush alpha (it shapes every brush's stamp).",
+     "将高度捕获设为笔刷 Alpha（决定每个笔刷印章的形状）。"},
+    {"Make the capture the VDM brush's map and pick the VDM brush (Drag Stamp stamps it).",
+     "将拾取设为 VDM 笔刷的贴图并选择 VDM 笔刷（以 Drag Stamp 压印）。"},
+    {"Paint copies of the captured detail along your strokes, each turned to follow the stroke.",
+     "沿着你的笔触绘制捕获细节的副本，每个都转向跟随笔触。"},
+    {"Keep both: the alpha as a PNG in your Library Alphas folder, the VDM in your brush library (Alpha picker, Brush "
+     "> Vector Displacement and the Library's Brush tab), with thumbnails.",
+     "两者都保留：Alpha 以 PNG 存入资源库的 Alphas 文件夹，VDM 存入笔刷资源库（Alpha 选择器、笔刷 > 矢量位移与资源库的“"
+     "笔刷”选项卡），并附缩略图。"},
+    // --- PanelMasking.cpp (tools/i18n/coverage.py) ---
+    {"Shapes", "形状"},
+    {"Lasso Mask and Rectangle Mask mask only what faces you: the far side and folds turned away stay as they are.",
+     "Lasso Mask 与 Rectangle Mask 只遮罩面向你的部分：背面与背向你的皱褶保持不变。"},
+    {"Mask by", "遮罩依据"},
+    {"By peaks", "按凸起"},
+    {"Mask ridges, peaks and sharp edges (replaces the mask; uses the mask strength)",
+     "遮罩棱线、凸起与锐利边缘（替换遮罩；使用遮罩强度）"},
+    {"By colour", "按色彩"},
+    {"Mask where the vertex paint is close to the main colour (the left shelf's swatch); Tolerance sets how close.",
+     "遮罩顶点绘制接近主要色彩（左侧工具栏的色板）之处；“容差”设置接近程度。"},
+    {"By facing", "按朝向"},
+    {"Mask what faces the camera (or faces up or down; Facing below), within the angle: e.g. the front of a face, or "
+     "the top of a rock.",
+     "在角度范围内遮罩面向相机（或朝上、朝下；见下方“朝向”）的部分：例如脸的正面或岩石顶部。"},
+    {"By border", "按边界"},
+    {"Mask the open edges of the mesh and the edge rings inside them, so sculpting never moves the border. Replaces "
+     "the mask and uses the mask strength. A closed mesh has no open edges.",
+     "遮罩网格的开放边缘及其内侧的边环，让雕刻绝不会移动边界。会替换遮罩并使用遮罩强度。封闭网格没有开放边缘。"},
+    {"Adjust", "调整"},
+    {"Mask by options", "遮罩依据选项"},
+    {"Cavity / peaks threshold %.2f", "凹陷／凸起阈值 %.2f"},
+    {"How deep a crease (By cavity) or how sharp a ridge (By peaks) must be: 0 takes anything, higher only the "
+     "strongest.",
+     "折痕需要多深（按凹陷）或棱线需要多锐利（按凸起）：0 全部纳入，越高只取最明显的。"},
+    {"Face group %d", "面组 %d"},
+    {"Colour tolerance %.2f", "色彩容差 %.2f"},
+    {"Border rings %d", "边界环数 %d"},
+    {"Face Group borders", "面组边界"},
+    {"By border also masks where face groups meet.", "“按边界”也会遮罩面组交会处。"},
+    {"Soft", "柔和"},
+    {"By border fades the mask from the border towards the innermost ring.",
+     "“按边界”会让遮罩从边界向最内侧的环淡出。"},
+    // --- PanelMaya.cpp (tools/i18n/coverage.py) ---
+    {"Get automatically", "自动获取"},
+    {"Load what Maya sends as soon as it arrives: SculptForge checks the exchange folder's manifest once a second "
+     "(its modification time and size only). Off by default; off: use Get from Maya.",
+     "Maya 传来的内容一到就加载：SculptForge 每秒检查一次交换文件夹的列表文件（只看修改时间与大小）。默认关闭；关闭时："
+     "请使用“从 Maya 获取”。"},
+    {"Turn the Maya bridge off", "关闭 Maya 桥接"},
+    {"Forget the exchange folder; nothing in it is deleted.", "忘记交换文件夹；其中的内容不会被删除。"},
+    // --- PanelPacks.cpp (tools/i18n/coverage.py) ---
+    {"Install Pack...", "安装资源包..."},
+    {"Install a SculptForge pack (.sfpack): brushes, alphas, Lit Spheres, Material Recipes, VDMs, keymaps, pie menus "
+     "and macros. A review shows exactly what's inside, its license and its author before anything is installed. "
+     "Packs hold data only: nothing in one ever runs.",
+     "安装 SculptForge 资源包 (.sfpack)：笔刷、Alpha、Lit Sphere、材质配方、VDM、按键配置、饼菜单与宏。安装前会先查看"
+     "，清楚显示内容、许可与作者。资源包只含数据：其中的任何内容都不会运行。"},
+    {"New Pack...", "添加资源包..."},
+    {"Make a pack from your own brushes, alphas, Lit Spheres, Material Recipe, VDMs, pie menus, shortcuts and macros, "
+     "to share as one .sfpack file.",
+     "以你自己的笔刷、Alpha、Lit Sphere、材质配方、VDM、饼菜单、快捷键与宏创建资源包，以单一 .sfpack 文件分享。"},
+    {"Packs", "资源包"},
+    {"Library > Packs: the installed packs. Switch one off or remove it, apply its keymap, add its pie menus.",
+     "资源库 > 资源包：已安装的资源包。可禁用或移除、应用其按键配置、加入其饼菜单。"},
+    {"Record Macro", "录制宏"},
+    {"Start recording: the commands you run (menus, buttons, the console) are kept as a macro until you press it "
+     "again. Files inside the project folder are kept as relative paths, any other file is asked for when the macro "
+     "runs.",
+     "开始录制：你运行的命令（菜单、按钮、控制台）会保存为宏，直到你再按一次。项目文件夹内的文件以相对路径保存，"
+     "其他文件则在运行宏时询问。"},
+    {"Macro Editor", "宏编辑器"},
+    {"Write or change a macro: SculptForge commands, one per line, checked as you type. Only SculptForge's own "
+     "commands, nothing that reaches the network, and files only inside the project folder or picked when it runs.",
+     "编写或修改宏：SculptForge 命令，每行一个，输入时实时检查。只限 SculptForge 自己的命令，不含任何连网操作，文件"
+     "只限项目文件夹内或运行时选择的文件。"},
+    {"Macros", "宏"},
+    {"Install Pack", "安装资源包"},
+    {"This pack can't be installed", "无法安装此资源包"},
+    {"Nothing was installed. SculptForge only installs packs that pass every check: plain data files of the kinds a "
+     "pack may hold, listed in its pack.json, within safe sizes, with nothing that could leave the pack's folder.",
+     "未安装任何内容。SculptForge 只安装通过所有检查的资源包：资源包允许类型的纯数据文件，列于其 pack.json 中，大小安全，且"
+     "没有任何可能离开资源包文件夹的内容。"},
+    {"Member pack", "会员资源包"},
+    {"Author:", "作者："},
+    {"License:", "许可："},
+    {"Replaces the installed version", "替换已安装的版本"},
+    {"Contains:", "内容："},
+    {"No license text in the pack (see License above).", "资源包中没有许可文本（请见上方的许可）。"},
+    {"Packs hold data only: nothing in this one runs on install or when a project opens. Its macros list their "
+     "commands and ask before they first run.",
+     "资源包只含数据：此资源包的任何内容都不会在安装或打开项目时运行。其宏会列出命令，并在第一次运行前询问。"},
+    {"Keymaps and pie menus are only applied when you choose to (Library > Packs).",
+     "按键配置与饼菜单只在你选择时才应用（资源库 > 资源包）。"},
+    {"Install", "安装"},
+    {"Copy the pack into SculptForge's packs folder and add its items to the lists.",
+     "将资源包复制到 SculptForge 的资源包文件夹，并将其项目加入列表。"},
+    {"Stop Recording", "停止录制"},
+    {"Safe mode (--no-packs): no pack is loaded this session", "安全模式 (--no-packs)：本次会话不加载任何资源包"},
+    {"No packs installed. Drop a .sfpack on the window or use Install Pack...",
+     "尚未安装资源包。将 .sfpack 拖放到窗口中，或使用“安装资源包...”"},
+    {"Pack on", "启用资源包"},
+    {"Off: its items leave the lists until you switch it on again (nothing is deleted).",
+     "关闭：其项目会从列表中移除，直到你再次启用（不会删除任何内容）。"},
+    {"Details", "详细信息"},
+    {"Remove", "移除"},
+    {"Delete the pack and everything it brought. Your own files are never touched.",
+     "删除资源包及其带来的所有内容。你自己的文件绝不会被改动。"},
+    {"Apply keymap", "应用按键配置"},
+    {"Add pie menu", "加入饼菜单"},
+    {"Run", "运行"},
+    {"Your macros", "你的宏"},
+    {"Pack keymaps", "资源包按键配置"},
+    {"Take the keys of this keymap from an installed pack (only actions SculptForge knows; a key another action had "
+     "moves here). Saved automatically.",
+     "从已安装资源包的此按键配置取用按键（只限 SculptForge 识别的录制片段；原属其他录制片段的按键会移到这里）。自动保存。"},
+    {"New Pack", "添加资源包"},
+    {"The pack's name, shown next to every item it brings.", "资源包名称，会显示在它带来的每个项目旁。"},
+    {"Id", "ID"},
+    {"Its folder name: lower-case letters, digits, '.', '_' or '-'. A newer version keeps the same id.",
+     "其文件夹名称：小写字母、数字、'.'、'_' 或 '-'。新版本沿用相同的 ID。"},
+    {"Version", "版本"},
+    {"Author", "作者"},
+    {"Who made it (shown when it's installed).", "制作者（安装时显示）。"},
+    {"License", "许可"},
+    {"For example CC-BY-4.0, CC0-1.0 or your own terms.", "例如 CC-BY-4.0、CC0-1.0 或你自己的条款。"},
+    {"Member pack (insider channel)", "会员资源包（Insider 频道）"},
+    {"Marks the pack as a members' pack (Member Requests). Display only: anyone can install it.",
+     "将资源包标记为会员资源包 (Member Requests)。仅供显示：任何人都能安装。"},
+    {"Nothing of your own yet: save brushes, put alphas and Lit Spheres in your Library folders, record a macro...",
+     "还没有你自己的内容：保存笔刷、将 Alpha 与 Lit Sphere 放进资源库文件夹、录制宏..."},
+    {"Save Pack...", "保存资源包..."},
+    {"Save Pack", "保存资源包"},
+    {"Write the .sfpack, checked exactly as an install would check it.",
+     "写出 .sfpack，并以与安装时完全相同的方式检查。"},
+    {"Run Macro?", "要运行宏吗？"},
+    {"Your macro", "你的宏"},
+    {"Files it uses stay inside the project folder.", "它使用的文件都在项目文件夹内。"},
+    {"Run it now. You won't be asked again for this macro unless it changes.",
+     "立即运行。除非此宏有更改，否则不会再询问你。"},
+    {"One command per line, as in the console (# starts a comment). Files: a path inside the project folder, or ? to "
+     "pick one when it runs.",
+     "每行一个命令，与控制台相同（# 开头为注释）。文件：项目文件夹内的路径，或用 ? 在运行时选择。"},
+    {"Recording macro", "正在录制宏"},
+    // --- PanelPaintLayers.cpp (tools/i18n/coverage.py) ---
+    {"Lock the layer: the Paint brush, fills, clears and merges leave it alone.",
+     "锁定图层：Paint 笔刷、填满、清除与合并都不会影响它。"},
+    {"Show or hide the layer. Hidden layers don't show or export.", "显示或隐藏图层。隐藏的图层不会显示或导出。"},
+    {"How the active layer mixes with the layers below, with Photoshop's maths: Multiply darkens, Screen lightens, "
+     "Overlay adds contrast (50% grey changes nothing), Add brightens, ...",
+     "当前图层与下方图层的混合方式，采用 Photoshop 的运算：色彩增值变暗、滤色变亮、覆盖增加对比（50% 灰不生成变化）、"
+     "相加变亮，..."},
+    {"How strongly the active layer shows (0-100%). Painting keeps its own coverage.",
+     "当前图层的显示强度 (0-100%)。绘制保有其自身的覆盖度。"},
+    {"Add a transparent paint layer above the active one and paint on it.",
+     "在当前图层上方添加透明绘制图层并在上面绘制。"},
+    {"Copy the active layer (Base becomes an opaque layer) to a new layer above it.",
+     "将当前图层复制到其上方的新图层（基底会变成不透明图层）。"},
+    {"Delete the active layer (undoable). Base can't be deleted.", "删除当前图层（可撤销）。基底无法删除。"},
+    {"Move the active layer up the stack (it then covers the layer it passed).",
+     "将当前图层在堆栈中上移（之后会覆盖它越过的图层）。"},
+    {"Move the active layer down the stack (Base stays at the bottom).",
+     "将当前图层在堆栈中下移（基底维持在最底部）。"},
+    {"Merge the active layer into the one below it (Base for the lowest layer), keeping how it looks.",
+     "将当前图层合并到下方图层（最下层则合并到基底），并保留其外观。"},
+    {"Flatten", "平面化"},
+    {"Bake every visible layer into Base and remove the layers (hidden layers are discarded).",
+     "将所有可见图层烘焙到基底并移除图层（隐藏的图层会被丢弃）。"},
+    {"Clear the active layer: a layer becomes transparent, Base white. Undoable.",
+     "清除当前图层：普通图层变为透明，基底变为白色。可撤销。"},
+    {"Fill the active layer with the current colour (respects the mask, like Color > Fill).",
+     "以当前色彩填满当前图层（遵守遮罩，如同色彩 > 填满）。"},
+    // --- PanelParts.cpp (tools/i18n/coverage.py) ---
+    {"Draw the other Parts solid again", "将其他部件恢复为实体显示"},
+    {"See through the other Parts to the active one", "通过其他部件看到当前部件"},
+    // --- PanelPbr.cpp (tools/i18n/coverage.py) ---
+    {"Write the texture's channels as image files for an engine or DCC, with the export preset chosen beside the "
+     "button (Unreal, Unity URP / HDRP, glTF, Godot, Blender, USD).",
+     "将贴图的各通道写成图像文件，供引擎或 DCC 使用，采用按钮旁所选的导出预设（Unreal、Unity URP／HDRP、glTF、Godot、"
+     "Blender、USD）。"},
+    {"Show one channel on its own on the model: roughness, metallic, height, AO and opacity in grey, the normal as "
+     "its colours (with the height's normal in it), emission in colour. Painting updates it live.",
+     "在模型上单独显示一个通道：粗糙度、金属度、高度、AO 与不透明度以灰阶显示，法线以其色彩显示（含高度生成的法线），"
+     "自发光以彩色显示。绘制时实时更新。"},
+    {"Which files Export Maps writes and how channels are packed. Your own presets are JSON files (export_maps "
+     "preset=path/to/preset.json; see the guide's Export presets page).",
+     "“导出贴图”会写出哪些文件，以及通道如何封装。你自己的预设是 JSON 文件（export_maps preset=path/to/preset.json；"
+     "请参阅指南的 Export presets 页面）。"},
+    {"Set the brush's colour, roughness and metallic at once, and make it paint those channels.",
+     "一次设置笔刷的色彩、粗糙度与金属度，并让它绘制这些通道。"},
+    {"Which way painted normals lean (x, y); 0, 0 paints a flat normal.",
+     "绘制法线的倾斜方向 (x, y)；0, 0 绘制平坦法线。"},
+    {"Whether this layer affects the channel. Right-click for the channel's blend mode (Normal Combine lays normal "
+     "detail onto the normals below) and opacity.",
+     "此图层是否影响该通道。按右键可设置通道的混合模式（Normal Combine 会将法线细节叠加到下方的法线上）与不透明度。"},
+    // --- PanelPerformance.cpp (tools/i18n/coverage.py) ---
+    {"While you rotate, pan or zoom a big scene (over the hardware profile's motion proxy threshold, which the frame "
+     "governor adjusts; 10 million triangles without a profile), draw a lighter version without antialiasing, so the "
+     "view keeps up; it is full detail again as soon as the view stops.",
+     "旋转、平移或缩放大型场景时（超过硬件配置文件的运动代理阈值，由帧调节器调整；没有配置文件时为 1000 万个三角面），"
+     "绘制不含抗锯齿的较轻版本，让视图保持流畅；视图一停止就恢复完整细节。"},
+    {"Run brushes, normal and BVH updates and project saving on every core. Turn it off only to compare speeds or "
+     "rule it out when troubleshooting: the results are the same either way.",
+     "在所有核心上运行笔刷、法线与 BVH 更新及项目保存。只在比较速度或排除问题时关闭：两种方式结果都相同。"},
+    {"Sculpt strokes work out the brush on their own thread while the view keeps drawing at full speed, and show the "
+     "dabs still being worked out as a preview on the surface, with the cursor and the stroke's head drawn where the "
+     "pen is about to be. On a heavy mesh the surface moves under the pen at once and lifting the pen is instant. "
+     "The finished sculpt is exactly the same either way.",
+     "雕刻笔触在独立线程上计算笔刷，视图则持续全速绘制，并将仍在计算中的笔触以预览方式显示在表面上，光标与笔触前端"
+     "会画在笔即将到达的位置。在大型网格上，表面会立即在笔下移动，抬笔也是实时的。两种方式最终的雕刻结果完全相同。"},
+    {"Live Move (Experimental)", "实时移动（实验性）"},
+    {"Experimental. The Move brush's drag is drawn by the graphics card from where the surface started, so it follows "
+     "the pen at the view's frame rate whatever the mesh size; the move itself is applied once, exactly, when you "
+     "lift the pen. Not with masks, hidden parts, sculpt layers, micro levels, Connected Only or View falloff (Move "
+     "works as before there).",
+     "实验性功能。Move 笔刷的拖动由显卡从表面起始状态绘制，因此无论网格多大，都能以视图的帧率跟上笔；实际移动会在抬"
+     "笔时精确应用一次。不适用于遮罩、隐藏部分、雕刻图层、微细分层级、仅限相连或视图衰减（这些情况下 Move 与以往相"
+     "同）。"},
+    {"Background Preview (Experimental)", "背景预览（实验性）"},
+    {"Experimental. On meshes of 2 million vertices or more, big brushes are worked out on their own thread; with "
+     "this on, the dabs still being worked out are shown as a preview on the surface (as Predictive Strokes does), "
+     "so the stroke stays under the pen. The finished sculpt is exactly the same either way.",
+     "实验性功能。在 200 万个顶点以上的网格上，大笔刷会在独立线程上计算；打开此选项时，仍在计算中的笔触会以预览方式"
+     "显示在表面上（如同预测笔触），让笔触保持在笔下。两种方式最终的雕刻结果完全相同。"},
+    {"Fast Upload (Experimental)", "快速上传（实验性）"},
+    {"Experimental. While you sculpt, the changed part of the mesh goes to the graphics card through memory both can "
+     "see, and the card copies it into place itself, instead of the driver copying it during the frame. The sculpt "
+     "and the view are exactly the same either way; needs a driver with buffer storage (OpenGL 4.4).",
+     "实验性功能。雕刻时，网格中更改的部分会通过双方都能访问的内存传到显卡，由显卡自行复制到位，而不是在帧中由驱"
+     "动程序复制。两种方式的雕刻与视图完全相同；需要支持 buffer storage 的驱动程序 (OpenGL 4.4)。"},
+    {"With Predictive Strokes: while you sculpt, the brush only moves the surface and shades the moved part from its "
+     "facets; the smooth shading, the cavities and the rest are worked out once when you lift the pen. Lighter on "
+     "laptops and on battery: the hardware profile turns it on there by itself (its Draft brushes setting); this "
+     "turns it on everywhere. Brushes that follow the surface's direction (Inflate, the plane brushes) use its "
+     "direction from the stroke's start, so the result can differ slightly from a full stroke.",
+     "搭配预测笔触：雕刻时笔刷只移动表面，并以其面片为移动部分着色；平滑着色、凹陷等其余部分会在抬笔时计算一次。在笔"
+     "电与使用电池时较省资源：硬件配置文件会在这些情况自动打开（其草稿笔刷设置）；此选项则在所有情况打开。跟随表面方"
+     "向的笔刷（Inflate、平面类笔刷）使用笔触起点的方向，因此结果可能与完整笔触略有不同。"},
+    {"Fast Big Brushes (Experimental)", "快速大笔刷（实验性）"},
+    {"Experimental. Big brushes on dense meshes: a dab that reaches more than 150,000 vertices finds its plane from a "
+     "sample of them and turns the shading along with the move it makes, and the dabs waiting for a frame are placed "
+     "together in one pass. Every vertex still moves by the brush itself; the exact shading follows behind the brush "
+     "and when you lift the pen. Small brushes, Smooth, Layer, Inflate, Nudge, Clay Block, alphas and masked areas "
+     "are placed dab by dab as before. Try it on a heavy mesh and tell us how it feels.",
+     "实验性功能。高密度网格上的大笔刷：影响超过 150,000 个顶点的笔触会从采样的顶点求出平面，并随其移动一并旋转着色，"
+     "等待帧的笔触会在一次处理中一起放置。每个顶点仍由笔刷本身移动；精确着色会在笔刷之后及抬笔时跟上。小笔刷、S"
+     "mooth、Layer、Inflate、Nudge、Clay Block、Alpha 与遮罩区域仍与以往一样逐笔放置。请在大型网格上试试，并告诉我们感"
+     "觉如何。"},
+    {"Samples per pixel in the 3D view: more smooths edges, fewer is faster on huge meshes.",
+     "3D 视图中每个像素的采样数：较多边缘较平滑，较少在超大网格上较快。"},
+    {"Draw the 3D view at a share of the window's resolution and scale it up: 75% draws about half the pixels, 50% a "
+     "quarter. For slow or integrated GPUs and big screens; Save Render stays sharp (#80).",
+     "以窗口分辨率的一部分绘制 3D 视图再放大：75% 约绘制一半的像素，50% 约四分之一。适用于较慢或内置的 GPU 与大屏幕；"
+     "“保存渲染”仍保持清晰 (#80)。"},
+    {"What the last brush stroke cost, per dab (one step of the brush, all symmetry sides): finding and moving the "
+     "vertices, updating their normals and the BVH (the picking structure), and sending the change to the GPU (per "
+     "frame). Under 16 ms keeps up with a 60 Hz display.",
+     "上一笔触每个笔触（笔刷的一步，含所有对称侧）的耗时：查找并移动顶点、更新其法线与 BVH（选择结构），以及将更改"
+     "发送到 GPU（每帧）。低于 16 ms 即可跟上 60 Hz 显示器。"},
+    {"What the scene holds: the meshes with their topology, the BVHs, the subdivision levels kept for stepping "
+     "between them, the undo history (Edit keeps up to 1 GB, dropping the oldest steps), painted textures with their "
+     "layers and material channels (only painted 64x64 tiles of a channel use memory), and the GPU buffers of the "
+     "visible Parts.",
+     "场景包含的内容：网格与其拓扑、BVH、为了切换而保留的细分层级、撤销历史（编辑最多保留 1 GB，会丢弃最旧的步骤）"
+     "、含图层与材质通道的绘制贴图（通道中只有绘制过的 64x64 图块会占用内存），以及可见部件的 GPU 缓冲区。"},
+    // --- PanelPerformanceProfile.cpp (tools/i18n/coverage.py) ---
+    {"Measure this computer again (about 2 seconds): the GPU's triangle throughput and upload speed, brush speed and "
+     "memory bandwidth, then pick the performance profile. Your overrides are kept.",
+     "重新测量这台电脑（约 2 秒）：GPU 的三角面处理量与上传速度、笔刷速度与内存带宽，然后选择性能配置文件。你的自定义值"
+     "会保留。"},
+    {"Hold the view at the target frame rate (60 fps, or 120 on a 120 Hz display) by drawing big scenes' lighter "
+     "motion proxy sooner or later while the view moves. Only what you see changes, never the model.",
+     "视图移动时，通过提早或延后使用大型场景的较轻运动代理，让视图维持目标帧率（60 fps，120 Hz 显示器为 120）。只改"
+     "变你看到的画面，绝不改变模型。"},
+    {"SculptForge measures this computer on first launch (and when the graphics card, its driver or the version "
+     "changes) and picks settings to match: how many triangles the view draws per frame, when big scenes switch to "
+     "their lighter motion proxy, GPU memory and upload budgets, texture and subdivision limits, threads. Nothing is "
+     "sent anywhere.",
+     "SculptForge 会在第一次启动时（以及显卡、驱动程序或版本更改时）测量这台电脑，并选择相符的设置：视图每帧绘制"
+     "多少三角面、大型场景何时切换为较轻的运动代理、GPU 内存与上传预算、贴图与细分上限、线程数。不会发送任何数据"
+     "。"},
+    // --- PanelPhone.cpp (tools/i18n/coverage.py) ---
+    {"Use your phone as SculptForge's camera: scan the QR code to send scans, photos and splat files, see the sculpt "
+     "on your desk in AR, and drive a face with your own. No app to install; phone and computer on the same Wi-Fi.",
+     "把手机当作 SculptForge 的相机：扫描 QR 码即可发送扫描、照片与 Splat 文件，在桌上以 AR 查看雕刻，并用你的脸驱动"
+     "脸部。无须安装应用程序；手机与电脑连上同一个 Wi-Fi 即可。"},
+    {"Record the live face feed into a take (Captures/<time>-face/take.jsonl, one frame of ARKit weights per line) "
+     "for playback and export. Again: stop.",
+     "将实时脸部信号录制为录制片段（Captures/<time>-face/take.jsonl，每行一个 ARKit 权重帧），以供播放与导出。再按一次"
+     "：停止。"},
+    {"Point your phone's camera at it and tap the link: the capture page opens, paired with this window. A new code "
+     "is made every time the window opens.",
+     "用手机相机对准它并点击链接：捕获页面会打开，并与此窗口配对。每次打开窗口都会生成新代码。"},
+    {"For a phone that can't scan: open the address in its browser and type these 6 digits. After 5 wrong tries the "
+     "code changes.",
+     "若手机无法扫描：在其浏览器中打开网址并输入这 6 位数字。输入错误 5 次后代码会更改。"},
+    {"This computer has several network addresses. If the phone can't open the page, pick the one on the Wi-Fi the "
+     "phone uses (often 192.168.x.x).",
+     "这台电脑有多个网络地址。如果手机无法打开页面，请选择手机所用 Wi-Fi 上的地址（通常是 192.168.x.x）。"},
+    {"A photo sent from the phone starts Image to 3D straight away with the service chosen there (free Hugging Face "
+     "by default). Off: it opens in Image to 3D and waits for Generate.",
+     "从手机传来的照片会立即以手机上选择的服务开始“图像转 3D”（默认为免费的 Hugging Face）。关闭：会在“图像转 3D”"
+     "中打开并等待“生成”。"},
+    {"While the phone shows the model, sculpting re-exports it (at most every few seconds); the phone offers the new "
+     "version.",
+     "手机显示模型期间，雕刻会重新导出模型（最多每几秒一次）；手机会提供新版本。"},
+    {"Swap the left and right expressions (and the head's turn), if the character winks with the wrong eye.",
+     "交换左右表情（与头部转向），用于角色眨错眼睛时。"},
+    // --- PanelProject.cpp (tools/i18n/coverage.py) ---
+    {"Members get betas early.", "会员可抢先获取 Beta 版。"},
+    {"Become a member", "成为会员"},
+    {"Once a day at startup, download a small file from the SculptForge website that names the newest version, and "
+     "show a banner when there is a newer one. Nothing about you or your computer is sent.",
+     "每天启动时一次，从 SculptForge 网站下载一个标记最新版本的小文件，有较新版本时显示横幅。不会发送任何关于你或你电"
+     "脑的信息。"},
+    {"Update channel", "更新通道"},
+    {"Stable", "稳定版"},
+    {"Preview (betas)", "预览（Beta 版）"},
+    {"Stable offers only finished releases. Preview also offers the betas the update feed names. Betas are a member "
+     "perk: members get them from the private members' repository and the #members channel on Discord. When the "
+     "stable release passes a beta, Preview offers that.",
+     "稳定版只提供正式发布版本。预览另外也提供更新来源列出的 Beta 版。Beta 版是会员福利：会员可从私人会员仓库与 "
+     "Discord 的 #members 频道获取。当稳定版超越某个 Beta 版时，预览会改为提供稳定版。"},
+    // --- PanelRetopo.cpp (tools/i18n/coverage.py) ---
+    {"Automatic quad retopology: rebuilds the Part as clean, all-quad topology whose edge loops follow the forms, "
+     "close to Target Polygons. Runs in the background (Cancel stops it); undoable. Then divide it and use Part > "
+     "Project > Project Detail to bring the detail back.",
+     "自动四边面重新拓扑：将部件重建为干净、全四边面的拓扑，其边环顺着形体走，面数接近目标多边形数量。在后台运行（"
+     "“取消”可停止）；可撤销。之后细分它，再用部件 > 投影 > Project Detail 找回细节。"},
+    {"The Quad Remesh Guides brush: drag on the model to draw a curve for Quad Remesh's edge loops to follow, around "
+     "an eye, the mouth or a joint. A curve that ends where it started becomes a loop. Symmetry mirrors it; "
+     "Alt+click a curve to delete it. Pick any brush to sculpt again.",
+     "Quad Remesh Guides 笔刷：在模型上拖动画出曲线，让 Quad Remesh 的边环沿着它走，例如眼睛、嘴巴或关节周围。终点"
+     "回到起点的曲线会成为环。对称会镜像它；Alt+单击曲线即可删除。选择任何笔刷即可继续雕刻。"},
+    {"Delete the last Quad Remesh guide curve drawn (with its mirror copies).",
+     "删除最后画的 Quad Remesh 导引曲线（含其镜像副本）。"},
+    {"Delete every Quad Remesh guide curve of this Part.", "删除此部件的所有 Quad Remesh 导引曲线。"},
+    {"Project Detail", "Project Detail"},
+    {"Project the shape and vertex paint of every other visible Part onto this one: each vertex moves along its "
+     "normal to the nearest surface within Dist. The mask holds vertices back. Typical use: Quad Remesh a copy, "
+     "divide it a few times, show the original, Project Detail.",
+     "将所有其他可见部件的形状与顶点绘制投影到此部件上：每个顶点沿法线移动到距离范围内最近的表面。遮罩可固定顶点。典"
+     "型用法：对副本运行 Quad Remesh，细分几次，显示原始模型，再 Project Detail。"},
+    {"Quick Remesh", "Quick Remesh"},
+    {"Remesh after each stroke", "每笔触后重新网格化"},
+    {"After a stroke that stretched the surface (edges pulled to more than 1.6 times their length), the active Part "
+     "is remeshed at the Resolution above in the background. Sculpting never waits: a stroke made meanwhile remeshes "
+     "again. Each remesh is one undo step. Not on a Part with subdivision levels, sculpt layers or a painted texture.",
+     "笔触拉伸表面后（边被拉长到原长的 1.6 倍以上），当前部件会在后台以上方的分辨率重新网格化。雕刻不需要等待：期间"
+     "进行的笔触会再次重新网格化。每次重新网格化为一个撤销步骤。不适用于有细分层级、雕刻图层或绘制贴图的部件。"},
+    {"Remeshing in the background. The result replaces the Part when it's done.",
+     "正在后台重新网格化。完成后结果会替换部件。"},
+    {"Stop Quad Remesh; the Part stays as it is.", "停止 Quad Remesh；部件维持原样。"},
+    {"Quad Remesh 2 (default): a curvature-aligned layout solved as one integer grid over the whole model, so poles "
+     "appear only where the form needs them and edge loops run unbroken; open guide curves become exact edge loops. "
+     "Legacy: the method of SculptForge 0.9 (more poles, a split look).",
+     "Quad Remesh 2（默认）：以整个模型为单一整数网格求解的曲率对齐布线，极点只出现在形体需要之处，边环不中断；开放的"
+     "导引曲线会成为精确的边环。旧版：SculptForge 0.9 的方法（极点较多，看起来较零碎）。"},
+    {"About how many quads Quad Remesh makes (Ctrl+click to type a number). Half / Same / Double set it from the "
+     "Part's current polygon count.",
+     "Quad Remesh 大约生成的四边面数量（按住 Ctrl 并单击可输入数字）。一半／相同／双倍会按部件当前多边形数量设置"
+     "。"},
+    {"Target half the Part's current polygon count.", "目标为部件当前多边形数量的一半。"},
+    {"Target the Part's current polygon count (to clean up topology without changing its density).",
+     "目标为部件当前多边形数量（在不改变密度的情况下整理拓扑）。"},
+    {"Target twice the Part's current polygon count.", "目标为部件当前多边形数量的两倍。"},
+    {"0: quads all about the same size. Higher: smaller quads where the surface curves, bigger ones on flat areas "
+     "(the count stays near the target).",
+     "0：四边面大小大致相同。较高：表面弯曲处四边面较小，平坦处较大（数量维持在目标附近）。"},
+    {"Edge loops follow the face group borders exactly and the result keeps the face groups. Paint groups where you "
+     "want loops (around the eyes, the mouth) to guide the flow.",
+     "边环会精确沿着面组边界，结果也会保留面组。在你想要边环的地方（眼睛、嘴巴周围）绘制组，即可引导布线。"},
+    {"Hard edges get an edge loop, so they stay sharp (Quad Remesh 2: faces meeting at more than about 60 degrees "
+     "along a line at least a few quads long; legacy: more than 50 degrees).",
+     "硬边会得到一条边环，因此保持锐利（Quad Remesh 2：沿着至少数个四边面长的线，以超过约 60 度相接的面；旧版：超过 "
+     "50 度）。"},
+    {"Paint where you want density: red areas get up to 4 times the quads, blue areas down to a quarter, white is "
+     "unchanged.",
+     "在你想要密度的地方绘制：红色区域最多 4 倍四边面，蓝色区域最少四分之一，白色不变。"},
+    {"Keep the Part as it was, hidden, right below the new one (\"<name> Original\"), ready to Project Detail its "
+     "detail back. Off: replace it (undo brings it back).",
+     "将原部件隐藏保留在新部件正下方（“<name> Original”），随时可用 Project Detail 找回细节。关闭：直接替换（可撤销"
+     "恢复）。"},
+    {"How clean the new topology is: poles are vertices with other than four edges (fewer is cleaner), corners off "
+     "square measure how far quad corners are from 90 degrees, and the distance is how far the new surface strays "
+     "from the sculpt (as a percentage of its size; Project Detail brings fine detail back).",
+     "新拓扑的干净程度：极点是边数不为四的顶点（越少越干净），非直角角落衡量四边面角落偏离 90 度的程度，距离则是新表"
+     "面偏离雕刻的程度（以其大小的百分比表示；Project Detail 可找回细部细节）。"},
+    {"How far around each guide curve the edge flow follows it: 0 = only the edge loop on the curve, 100 = about six "
+     "quads to each side. The loop on the curve is always made.",
+     "布线在每条导引曲线周围跟随的范围：0 = 只有曲线上的边环，100 = 每侧约六个四边面。曲线上的边环一定会创建。"},
+    {"How far each vertex looks for the source surface, along its normal, as a fraction of the Part's size. Raise it "
+     "if parts don't pick up the detail; lower it where surfaces are close together.",
+     "每个顶点沿法线查找来源表面的距离，以部件大小的比例表示。若有部分没获取细节请调高；表面彼此靠近处请调低。"},
+    {"Smooth the projected result this many times (softens noise from the source).",
+     "将投影结果平滑这么多次（减轻来源的噪波）。"},
+    {"Where the source is found on both sides of a vertex, settle halfway between instead of on the nearest.",
+     "当来源位于顶点两侧时，停在中间而非最近的一侧。"},
+    {"Project the shape (into the active sculpt layer).", "投影形状（到当前雕刻图层）。"},
+    {"Vertex Paint", "顶点绘制"},
+    {"Project the vertex paint (into the active paint layer) when a source has any.",
+     "来源有顶点绘制时将其投影（到当前绘制图层）。"},
+    // --- PanelSculptable.cpp (tools/i18n/coverage.py) ---
+    {"Turn the capture into a clean, sculptable Part with its colours, in one go: a watertight surface (floaters "
+     "dropped, holes filled), quad topology at the chosen polygon budget with edge loops round the eyes and mouth "
+     "when it is a face, and vertex paint or a texture. The splats stay (hidden). Runs in the background; Cancel "
+     "stops it.",
+     "一次将捕获转为干净、可雕刻且带有色彩的部件：封闭表面（去除浮点、填补孔洞）、按所选多边形预算的四边面拓扑（脸"
+     "部时在眼睛与嘴巴周围有边环），以及顶点绘制或贴图。Splat 会保留（隐藏）。在后台运行；“取消”可停止。"},
+    {"Quad Remesh the scan along the face guides you checked, then colour it: the sculptable Part appears next to the "
+     "scan (which is hidden).",
+     "按你勾选的脸部导引对扫描运行 Quad Remesh，然后上色：可雕刻部件会出现在扫描旁（扫描会被隐藏）。"},
+    {"Place the face landmarks yourself, one click each: the eye corners, the nose tip, the mouth corners and the "
+     "chin (the panel says which is next). For faces the automatic search misses.",
+     "自行放置脸部特征点，每点单击：眼角、鼻尖、嘴角与下巴（面板会告诉你下一个是哪个）。适用于自动搜索找不到的脸。"},
+    {"Only the splats inside the box count: drag the box's face handles in the viewport to cut away the ground, the "
+     "background or a stand.",
+     "只计算方块内的 Splat：在视口中拖动方块各面的控制点，即可裁掉地面、背景或支架。"},
+    {"Working in the background; the new Part appears when it's done.", "正在后台处理；完成后会出现新部件。"},
+    {"Stop Make sculptable; nothing changes.", "停止“转为可雕刻”；不会有任何更改。"},
+    {"Leave the review without remeshing (the scan Part stays as it is).",
+     "不重新网格化即离开查看（扫描部件维持原样）。"},
+    {"Look for the face again from the current view (turn the view to face it first).",
+     "从当前视图重新查找脸部（请先转动视图正对脸部）。"},
+    {"How finely the surface follows the capture: voxels across the subject. Higher keeps thinner parts and more "
+     "detail but takes longer (about 5 s at 384 for a million splats).",
+     "表面贴合捕获的精细程度：横跨主体的体素数。越高保留越细的部分与越多细节，但耗时较长（100 万个 Splat 在 384 时约 "
+     "5 秒）。"},
+    {"When the capture is a head, find the eyes, nose, mouth and chin as seen from the current view and give Quad "
+     "Remesh edge loops round the eyes and mouth and along the nasolabial folds, mirrored across the face (animation "
+     "topology). Turn the view to face it first.",
+     "捕获为头部时，从当前视图找出眼睛、鼻子、嘴巴与下巴，并为 Quad Remesh 提供眼睛与嘴巴周围及沿法令纹的边环，左右镜"
+     "像（动画用拓扑）。请先转动视图正对脸部。"},
+    {"Stop after the scan to check the face landmarks and the loops: drag a dot to move it, or place them by hand, "
+     "then Finish.",
+     "扫描后暂停，以检查脸部特征点与边环：拖动圆点即可移动，或手动放置，再按“完成”。"},
+    {"The capture's colours go into the vertices (vertex paint): more polygons, more colour detail.",
+     "捕获的色彩会写入顶点（顶点绘制）：多边形越多，色彩细节越多。"},
+    {"Auto UV the result and bake the capture's colours into a 2K texture (sharp colour on a light mesh, for games "
+     "and exports).",
+     "为结果自动 UV，并将捕获的色彩烘焙到 2K 贴图（轻量网格上的清晰色彩，适用于游戏与导出）。"},
+    {"Keep the dense voxel surface as a hidden \"<name> Scan\" Part, to Project Detail more detail from later.",
+     "将高密度体素表面保留为隐藏的“<name> Scan”部件，以便之后用 Project Detail 获取更多细节。"},
+    {"Splats fainter than this are ignored (haze and floaters are usually faint).",
+     "比此值更淡的 Splat 会被忽略（雾气与浮点通常很淡）。"},
+    {"Seal gaps up to this many voxels between splats.", "封闭 Splat 之间最多这么多体素的间隙。"},
+    {"Fill big holes such as the open bottom of a subject standing on a table (space boxed in on five sides counts as "
+     "inside). Turn off for open cavities like a cup.",
+     "填补大型孔洞，例如放在桌上的主体开放的底部（五面封闭的空间视为内部）。开放的凹洞（如杯子）请关闭。"},
+    {"Keep every solid piece instead of only the largest (floaters come back too).",
+     "保留每个实心区块，而不只是最大的（浮点也会回来）。"},
+    // --- PanelSelectionSets.cpp (tools/i18n/coverage.py) ---
+    {"Set name", "集合名称"},
+    {"Name of the set Store makes; storing again with the same name replaces it.",
+     "“保存”创建的集合名称；以相同名称再次保存会替换它。"},
+    {"Store", "保存"},
+    {"Store the checked channels of this Part as a named set (one undo step). Sets restore at any subdivision level "
+     "and are saved in the project.",
+     "将此部件勾选的通道保存为命名集合（一个撤销步骤）。集合可在任何细分层级还原，并保存在项目中。"},
+    {"From Visible", "从可见部分"},
+    {"Quick set: store the faces shown right now (Visible, Visible 2, ...).",
+     "快速集合：保存当前显示的面（Visible、Visible 2、...）。"},
+    {"Restore mode", "还原模式"},
+    {"How Restore meets the current mask and visibility: Replace them, or Union, Intersect or Subtract the set's. "
+     "Combine uses the same mode (not Replace) to make a new set from two.",
+     "“还原”与当前遮罩及可见性的结合方式：替换，或与集合的进行联集、交集或相减。“合并”使用相同模式（替换除外）从"
+     "两个集合创建新集合。"},
+    {"No sets yet: Store saves one.", "尚无集合：按“保存”创建一个。"},
+    {"Put the selected set's channels back (not its shape: Morph to Set does that), carried to the current "
+     "subdivision level. One undo step.",
+     "还原所选集合的通道（不含形状：那是“变形至集合”的功能），并带到当前细分层级。一个撤销步骤。"},
+    {"Delete the selected set (undo brings it back).", "删除所选集合（可撤销恢复）。"},
+    {"Combine", "合并"},
+    {"Make a new set from the selected one and this one by their mask and visibility, with the mode above (Union, "
+     "Intersect or Subtract).",
+     "按遮罩与可见性，以上方的模式（联集、交集或相减）从所选集合与此集合创建新集合。"},
+    {"Clear Morph Target", "清除 Morph 目标"},
+    {"Morph Target", "Morph 目标"},
+    {"Make this set's shape the Morph brush's target and pick the Morph brush: strokes pull the surface back toward "
+     "the stored shape (Alt pushes away), at any subdivision level.",
+     "将此集合的形状设为 Morph 笔刷的目标并选择 Morph 笔刷：笔触会将表面拉回保存的形状（Alt 则推开），可在任何细分层"
+     "级使用。"},
+    {"Morph to Set", "变形至集合"},
+    {"Move the whole surface toward the set's shape by the amount below, within the mask. One undo step.",
+     "在遮罩范围内，按下方的量将整个表面移向集合的形状。一个撤销步骤。"},
+    {"Amount %.2f", "量 %.2f"},
+    {"Store with Shape checked to morph toward a set.", "勾选“形状”再保存，即可变形至集合。"},
+    // --- PanelSplatTrain.cpp (tools/i18n/coverage.py) ---
+    {"Train a Gaussian splat from a video of an object (walk slowly all the way around it). The sharpest frame of "
+     "each moment is used. The splat shows in the viewport after a few hundred steps and sharpens live.",
+     "从物体的视频训练高斯 Splat（慢慢绕物体走一整圈）。每个时刻会使用最清晰的帧。数百步后 Splat 会出现在视口中，并"
+     "实时变得更清晰。"},
+    {"Train a Gaussian splat from a folder: photos taken all around an object, a phone-link capture, or a COLMAP / "
+     "nerfstudio dataset (which already has camera positions).",
+     "从文件夹训练高斯 Splat：环绕物体拍摄的照片、手机链接的捕获，或 COLMAP／nerfstudio 数据集（已含相机位置）。"},
+    {"Stop training now and keep what it has learned (the newest checkpoint) as the result.",
+     "立即停止训练，并保留当前学到的内容（最新的检查点）作为结果。"},
+    {"Stop training. Nothing is saved; the last preview stays in the viewport until you Clear the splats.",
+     "停止训练。不会保存任何内容；最后的预览会留在视口中，直到你清除 Splat。"},
+    {"Use a Brush trainer you already have (brush_app): for example one you built yourself with cargo on Linux ARM, "
+     "where there is no ready-made download.",
+     "使用你已有的 Brush 训练器 (brush_app)：例如你在 Linux ARM 上用 cargo 自行构建的版本，那里没有现成的下载。"},
+    {"Use a COLMAP program you already have (it finds where each photo was taken).",
+     "使用你已有的 COLMAP 程序（它会找出每张照片的拍摄位置）。"},
+    {"Download it once from its GitHub release; nothing else is sent.",
+     "从其 GitHub 发布版本下载一次；不会发送其他任何数据。"},
+    // --- PanelSupportCard.cpp (tools/i18n/coverage.py) ---
+    {"I'm already a member", "我已经是会员"},
+    {"Signs in with GitHub, as member builds do (Preferences > Updates): no more membership cards, and the member "
+     "builds are on.",
+     "以 GitHub 登录，与会员版本相同（偏好设置 > 更新）：不再显示会员卡片，并打开会员版本。"},
+    // --- PanelTexture.cpp (tools/i18n/coverage.py) ---
+    {"Paint into the vertices (vertex paint): the colour resolution is the mesh's. Shown when the Part has a texture "
+     "(Tool > Texture Map).",
+     "绘制到顶点（顶点绘制）：色彩分辨率取决于网格。部件有贴图时显示（工具 > 贴图）。"},
+    {"Paint into the Part's texture: the colour resolution comes from the texture, not the mesh. The Paint brush, Rgb "
+     "sculpting, fills and Paint Layers all work on it.",
+     "绘制到部件的贴图：色彩分辨率来自贴图而非网格。Paint 笔刷、Rgb 雕刻、填满与绘制图层都作用于贴图。"},
+    {"Start texture painting: give the Part a texture (the size chosen in Tool > Texture Map, 2K by default) so paint "
+     "goes into texels instead of vertices, and the detail comes from the texture, not the mesh. Without UVs, Auto "
+     "UV unwraps the model first (in the background, with its progress in the status bar).",
+     "开始贴图绘制：为部件加上贴图（大小在工具 > 贴图中选择，默认 2K），让绘制写入纹素而非顶点，细节来自贴图而非网"
+     "格。没有 UV 时，自动 UV 会先展开模型（在后台进行，进度显示在状态栏）。"},
+    {"Show the painted texture on the model (multiplied over the material, like vertex paint).",
+     "在模型上显示绘制的贴图（以色彩增值叠在材质上，与顶点绘制相同）。"},
+    {"Unwrap the Part automatically: cut it into UV islands and pack them, so any sculpt can carry a texture. "
+     "Replaces existing UVs (undoable). Runs in the background; big meshes can take a minute or more.",
+     "自动展开部件：切割成 UV 岛并打包，让任何雕刻都能带有贴图。会替换现有的 UV（可撤销）。在后台运行；大型网格可能"
+     "需要一分钟以上。"},
+    {"Give the Part a texture of the chosen size to paint into (white). Needs UVs: Auto UV makes them. Replaces an "
+     "existing texture (undoable).",
+     "为部件加上所选大小的贴图以供绘制（白色）。需要 UV：自动 UV 可生成。会替换现有贴图（可撤销）。"},
+    {"Show the texture with the UV layout drawn over it, below these buttons.",
+     "在这些按钮下方显示叠有 UV 布局的贴图。"},
+    {"Bake the vertex paint (all paint layers) into the active texture layer. Makes a 2K texture if there is none.",
+     "将顶点绘制（所有绘制图层）烘焙到当前贴图图层。若没有贴图会创建 2K 贴图。"},
+    {"Copy the texture into the vertex paint of every vertex (detail finer than the mesh is lost).",
+     "将贴图复制到每个顶点的顶点绘制（比网格更细的细节会遗失）。"},
+    {"Save the texture (every visible layer composited) as a PNG image.",
+     "将贴图（合成所有可见图层）保存为 PNG 图像。"},
+    {"Load an image as the Part's texture (replacing its layers; undoable).",
+     "加载图像作为部件的贴图（替换其图层；可撤销）。"},
+    {"Remove the Part's texture (undoable). Painting goes back to the vertices.",
+     "移除部件的贴图（可撤销）。绘制会回到顶点。"},
+    {"Voxel Remesh and Quad Remesh keep a painted texture: the new mesh gets Auto UVs and the texture (every layer) "
+     "is projected onto it from the old surface, in the same undo step. Off: the texture is dropped. Merging Parts "
+     "keeps textures too. Shown under Remesh and Quad Remesh when the Part has a texture.",
+     "体素重新网格化与 Quad Remesh 会保留绘制贴图：新网格会自动 UV，贴图（所有图层）会从旧表面投影上去，属于同一个撤"
+     "销步骤。关闭：丢弃贴图。合并部件也会保留贴图。部件有贴图时显示于重新网格化与 Quad Remesh 下方。"},
+    {"Keep the painted texture: the new mesh gets Auto UVs and the texture (every layer) is projected onto it from "
+     "the old surface, in the same undo step (it adds the Auto UV time). Off: the texture is dropped. Scripts: "
+     "keep_texture=false.",
+     "保留绘制贴图：新网格会自动 UV，贴图（所有图层）会从旧表面投影上去，属于同一个撤销步骤（会增加自动 UV 的时间）"
+     "。关闭：丢弃贴图。脚本：keep_texture=false。"},
+    {"Unwrapping the Part in the background; you can keep working.", "正在后台展开部件；你可以继续工作。"},
+    {"Size of a new texture: 1K, 2K (the default), 4K or 8K texels square. Bigger holds finer paint and uses more "
+     "memory (8K: 256 MB per layer).",
+     "新贴图的大小：边长 1K、2K（默认）、4K 或 8K 纹素。越大可容纳越细的绘制，也使用越多内存（8K：每个图层 256 MB）"
+     "。"},
+    {"The texture with the Part's UV layout over it (island borders on big meshes). Paint on the model; the texture "
+     "fills in here.",
+     "叠有部件 UV 布局的贴图（大型网格只显示岛边界）。在模型上绘制；贴图会在此处填入。"},
+    // --- PanelTimeline.cpp (tools/i18n/coverage.py) ---
+    {"Show or hide the history strip along the top or bottom of the canvas (Preferences > Interface > Timeline "
+     "position): every stroke and operation as a tick. Drag to see the model at any point, click to go there; "
+     "sculpting from an earlier point keeps the old continuation as a branch. Right-click a stroke to change its "
+     "strength.",
+     "在画布上方或下方显示或隐藏历史记录条（偏好设置 > 界面 > 时间轴位置）：每个笔触与操作都是一个刻度。拖动即可查"
+     "看任何时间点的模型，单击即可跳转；从较早的时间点继续雕刻时，原本的后续会保留为分支。在笔触上按右键可更改其强度"
+     "。"},
+    {"Timeline position: the Sculpt Timeline strip runs along the top of the viewport, below the top shelf and away "
+     "from the brushes on the bottom shelf (the default). Saved automatically.",
+     "时间轴位置：雕刻时间轴条位于视口顶端，在顶部工具栏下方，远离底部工具栏的笔刷（默认）。自动保存。"},
+    {"Timeline position: the Sculpt Timeline strip runs along the bottom of the viewport, above the brush shelf. "
+     "Saved automatically.",
+     "时间轴位置：雕刻时间轴条位于视口底部，在笔刷工具栏上方。自动保存。"},
+    {"Render the history of the active Part as a turntable timelapse video (1080p or 4K MP4, no captions).",
+     "将当前部件的历史记录渲染为转盘延时视频（1080p 或 4K MP4，无字幕）。"},
+    {"Measure how responsive sculpting is on this computer: the standard scene (a 15 or 33 million triangle head; "
+     "Clay small, medium and large, Move, Smooth and a 240 px brush) through the same code a pen uses, with a live "
+     "display of frame times and how far the stroke trails the pointer. Writes a video and a JSON result you can "
+     "share. Replaces the scene.",
+     "测量这台电脑上雕刻的响应速度：标准场景（1500 万或 3300 万个三角面的头部；小、中、大 Clay、Move、Smooth 与 240"
+     " px 笔刷），使用与数位笔相同的代码，并实时显示帧时间与笔触落后指针的距离。会写出可分享的视频与 JSON 结果。会"
+     "替换场景。"},
+    {"Open the history strip.", "打开历史记录条。"},
+    {"Also save the history beside the project as <name>.sfhist (strokes, masks, vertex paint, visibility; a topology "
+     "change cuts it). Opening the project brings it back.",
+     "另将历史记录以 <name>.sfhist 保存在项目旁（笔触、遮罩、顶点绘制、可见性；拓扑更改会使其中断）。打开项目时会一并"
+     "加载。"},
+    {"Render this history as a turntable timelapse video.", "将此历史记录渲染为转盘延时视频。"},
+    {"Fold the timeline into a tab.", "将时间轴折叠为选项卡。"},
+    {"How strongly this stroke shows: 1 = as sculpted, 0 = gone, 2 = twice as strong. Later strokes are not redone: "
+     "where they overlap this one they keep their own displacement on top.",
+     "此笔触的显示强度：1 = 雕刻时的样子，0 = 消失，2 = 两倍强。之后的笔触不会重做：与此笔触重叠之处会保留它们自己的"
+     "位移在上方。"},
+    // --- PanelUpdate.cpp (tools/i18n/coverage.py) ---
+    {"Downloading the update...", "正在下载更新..."},
+    {"It installs when you quit.", "退出程序时安装。"},
+    {"Restart now", "立即重新启动"},
+    {"Install it when you quit SculptForge; the next start is the new version.",
+     "退出 SculptForge 时安装；下次启动即为新版本。"},
+    {"Update banner", "更新横幅"},
+    {"Starting SculptForge %s...", "正在启动 SculptForge %s..."},
+    {"The update didn't work: %s.", "更新失败：%s."},
+    {"Nothing was changed. Download it from the website instead, or try again.",
+     "未更改任何内容。请改从网站下载，或再试一次。"},
+    {"Update with your package manager (%s)", "使用包管理器更新 (%s)"},
+    {"Copy", "复制"},
+    {"Download the new package from the website and open it.", "从网站下载新的安装包并打开。"},
+    {"Try again", "再试一次"},
+    {"Update", "更新"},
+    {"Download the new version from SculptForge's GitHub releases, check its signature and checksum, and install it. "
+     "The current version is kept until the new one has started.",
+     "从 SculptForge 的 GitHub 发布版本下载新版本，检查签章与总和检查码后安装。当前版本会保留到新版本成功启动为止。"},
+    {"Asking GitHub...", "正在询问 GitHub..."},
+    {"On GitHub, enter this code:", "请在 GitHub 输入此代码："},
+    {"Open github.com/login/device", "打开 github.com/login/device"},
+    {"Waiting for GitHub...", "正在等待 GitHub..."},
+    {"Member builds", "会员版本"},
+    {"Member and Studio members get each release early. Sign in with the GitHub account that has the invitation to "
+     "the member repository: SculptForge then also offers the member builds, checked with the same signature as "
+     "every release. The sign-in can only read that repository's releases; it is kept in your system's keychain and "
+     "Sign out removes it.",
+     "Member 与 Studio 会员可抢先获取每个版本。请以收到会员仓库邀请的 GitHub 账号登录：SculptForge 之后也会提供会员版"
+     "本，并以与所有版本相同的签章检查。此登录只能读取该仓库的发布版本；它保存在系统的钥匙圈中，按“退出登录”即可移"
+     "除。"},
+    {"Signed in with GitHub.", "已以 GitHub 登录。"},
+    {"Signed in as %s on GitHub.", "已以 %s 身份登录 GitHub。"},
+    {"Sign out", "退出登录"},
+    {"Sign in with GitHub", "以 GitHub 登录"},
+    // --- PanelUvEditor.cpp (tools/i18n/coverage.py) ---
+    {"UV Editor", "UV 编辑器"},
+    {"Open the UV Editor: the Part's UV layout in 2D over the UDIM tiles. Select vertices, edges, faces or islands "
+     "(here or on the model), move, rotate and scale them, mark seams, unwrap, pack, set texel density and lay "
+     "islands into trim sheet strips. Stretch and texel density show live on the model while you edit.",
+     "打开 UV 编辑器：在 UDIM 图块上以 2D 显示部件的 UV 布局。可选择顶点、边、面或岛（在此或在模型上），移动、旋转与"
+     "缩放，标记接缝、展开、打包、设置纹素密度，并将岛放入装饰贴图的条带。编辑时，拉伸与纹素密度会实时显示在模型上。"},
+    {"Select UV vertices, edges, faces or whole islands (1-4 while the pointer is over the UV view). The selection "
+     "converts when you switch.",
+     "选择 UV 顶点、边、面或整个岛（指针在 UV 视图上时按 1-4）。切换时选择范围会跟着转换。"},
+    {"Unwrap", "展开"},
+    {"Unwrap with the chosen method: the selected faces (fitted where they were), or the whole Part (packed). Least "
+     "Stretch keeps angles and lengths along the marked seams; Conformal keeps angles; By Face Groups cuts along the "
+     "face group borders too; Planar projects each piece; Unfold flattens the current islands again in place, "
+     "keeping pins; Auto Seams finds its own. Closed pieces get cut automatically. Big meshes unwrap in the "
+     "background.",
+     "以所选方法展开：所选的面（在原位拟合），或整个部件（并打包）。Least Stretch 沿标记的接缝保留角度与长度"
+     "；Conformal 保留角度；By Face Groups 也沿面组边界切割；Planar 投影每个区块；Unfold 在原位重新摊平当前岛并保留"
+     "固定；Auto Seams 自行找出接缝。封闭的区块会自动切开。大型网格会在后台展开。"},
+    {"Pack", "打包"},
+    {"Pack the selected islands (or all) as large as they fit into the 0-1 tile, or across the Columns x Rows grid of "
+     "UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them.",
+     "将所选的岛（或全部）以能放下的最大尺寸打包到 0-1 图块，或打包到列数 x 行数的 UDIM 图块格中：旋转到最小包围框，缩"
+     "放到相同纹素密度，并保留其间的边距。"},
+    {"Mark Seam", "标记接缝"},
+    {"Mark the selected edges (or the border of the selected faces) as seams: Unwrap cuts there.",
+     "将所选的边（或所选面的边界）标记为接缝：展开时会在此切开。"},
+    {"Clear Seam", "清除接缝"},
+    {"Clear the seams on the selected edges (or the border of the selected faces).",
+     "清除所选边（或所选面的边界）上的接缝。"},
+    {"Mark every face group border as a seam.", "将每个面组边界标记为接缝。"},
+    {"Island Borders", "岛边界"},
+    {"Mark every current UV island border as a seam (keeps an imported layout's cuts for Unwrap).",
+     "将当前每个 UV 岛的边界标记为接缝（为展开保留导入布局的切口）。"},
+    {"Sharp Edges", "锐利边"},
+    {"Mark every edge sharper than the angle as a seam (hard-surface models).",
+     "将比该角度更锐利的每条边标记为接缝（硬表面模型）。"},
+    {"Clear All", "全部清除"},
+    {"Clear every marked seam.", "清除所有标记的接缝。"},
+    {"Seam Tool", "接缝工具"},
+    {"Draw seams on the model: drag along the edges you want cut (each stretch follows the shortest edge path); "
+     "Alt+drag clears them. Seams show in red on the model while the UV Editor is open.",
+     "在模型上绘制接缝：沿你要切开的边拖动（每段会沿最短的边路径）；Alt+拖动可清除。UV 编辑器打开时，接缝会以红色显示"
+     "在模型上。"},
+    {"Select in 3D", "在 3D 中选择"},
+    {"Select on the model: click or drag over it to select faces, islands, vertices or edges (the UV Editor's mode); "
+     "Alt removes. The selection shows in both views.",
+     "在模型上选择：在模型上单击或拖动即可选择面、岛、顶点或边（按 UV 编辑器的模式）；Alt 取消选择。选择范围会同时"
+     "显示在两个视图中。"},
+    {"Pin", "固定"},
+    {"Pin the selected UVs: Unfold and Unwrap keep them where they are (P over the UV view).",
+     "固定所选的 UV：Unfold 与展开会让它们维持原位（在 UV 视图上按 P）。"},
+    {"Unpin", "取消固定"},
+    {"Unpin the selected UVs (Alt+P over the UV view).", "取消固定所选的 UV（在 UV 视图上按 Alt+P）。"},
+    {"Weld", "焊接"},
+    {"Weld the selected vertices: where they meet across a seam they become one UV each (the seam goes). W over the "
+     "UV view.",
+     "焊接所选顶点：在接缝两侧相接处各自合为一个 UV（接缝消失）。在 UV 视图上按 W。"},
+    {"Split", "分离"},
+    {"Split the selection off: the selected edges, or the border of the selected faces, become seams so the faces "
+     "move on their own (Y over the UV view).",
+     "分离选择范围：所选的边或所选面的边界会成为接缝，让这些面可以独立移动（在 UV 视图上按 Y）。"},
+    {"Straighten", "拉直"},
+    {"Line the selected vertices up on one horizontal or vertical line (an edge loop, a border).",
+     "将所选顶点排成一条水平或垂直线（边环、边界）。"},
+    {"Flip U", "翻转 U"},
+    {"Mirror the selected islands (or all) left to right.", "将所选的岛（或全部）左右镜像。"},
+    {"Flip V", "翻转 V"},
+    {"Mirror the selected islands (or all) top to bottom.", "将所选的岛（或全部）上下镜像。"},
+    {"Rotate 90", "旋转 90"},
+    {"Turn the selection (or everything) a quarter turn counter-clockwise.",
+     "将选择范围（或全部）逆时针旋转四分之一圈。"},
+    {"Set", "设置"},
+    {"Scale the selected islands (or all) to the target texel density.", "将所选的岛（或全部）缩放到目标纹素密度。"},
+    {"Match", "统一"},
+    {"Give the selected islands (or all) one texel density: their mean, so their sizes match on the surface.",
+     "让所选的岛（或全部）使用相同的纹素密度：取其平均值，使它们在表面上的大小一致。"},
+    {"Pick", "拾取"},
+    {"Take the target texel density from the selected islands (or the whole Part).",
+     "从所选的岛（或整个部件）获取目标纹素密度。"},
+    {"Pack at Density", "按密度打包"},
+    {"Pack at exactly the target texel density, using as many UDIM tiles as it takes (1001, 1002, ..., Columns wide, "
+     "then the next row up): every island keeps the same texels per unit across the tiles.",
+     "精确按目标纹素密度打包，使用所需数量的 UDIM 图块（1001、1002、...，宽度为列数，然后往上一行）：每个岛在所有图块"
+     "上保持相同的每单位纹素数。"},
+    {"Assign to Strip", "分配到条带"},
+    {"Lay the selected islands into the chosen trim sheet strip: turned lengthwise, scaled to the strip's height and "
+     "lined up along u. The texture stays put, so the islands pick up the strip's look.",
+     "将所选的岛放入所选的装饰贴图条带：沿长边转向，缩放到条带的高度并沿 u 对齐。贴图不动，因此岛会呈现该条带的外观。"},
+    {"Fit the selection (or the whole layout) in the UV view (F over it).",
+     "将选择范围（或整个布局）置入 UV 视图（在其上按 F）。"},
+    {"What the faces show, here and on the model: Islands (a colour each), Stretch (green: true to the surface; "
+     "yellow to red: stretched or squashed; magenta: folded over), Density (texel density; blue: fewer texels than "
+     "the mean, red: more) or Plain.",
+     "面所显示的内容（此处与模型上）：岛（每个一种颜色）、拉伸（绿色：与表面一致；黄到红：拉伸或挤压；洋红：翻折）、"
+     "密度（纹素密度；蓝色：低于平均，红色：高于平均）或单色。"},
+    {"Behind the layout: nothing, a checker, or the painted texture (tile 1001).",
+     "布局后方：无、棋盘格或绘制的贴图（图块 1001）。"},
+    {"Colours on the model", "在模型上显示色彩"},
+    {"Show the same colours on the model (islands, stretch, density and the selection), live while you edit.",
+     "在模型上显示相同的色彩（岛、拉伸、密度与选择范围），编辑时实时更新。"},
+    {"Checker", "棋盘格"},
+    {"Checker on the model", "模型上的棋盘格"},
+    {"A checker on the model's UVs (tinted per UDIM tile): squares that stay square mean no stretch.",
+     "模型 UV 上的棋盘格（按 UDIM 图块着色）：方格保持方正表示没有拉伸。"},
+    {"Click to select (Shift adds, Ctrl removes), drag a box; drag the box handles to move, scale (corners) or rotate "
+     "(the knob). Keys over the view: 1-4 modes, A all, Alt+A none, Ctrl+I invert, G / R / S move, rotate, scale (X "
+     "/ Y lock an axis, Ctrl snaps), F frame, P / Alt+P pin, W weld, Y split. Wheel zooms, right or middle drag pans.",
+     "单击即可选择（Shift 加选，Ctrl 减选），拖动出方框；拖动方框控制点可移动、缩放（角落）或旋转（旋钮）。视图上的按"
+     "键：1-4 模式，A 全选，Alt+A 全不选，Ctrl+I 反转，G／R／S 移动、旋转、缩放（X／Y 锁定轴，Ctrl 贴齐），F 置入视图"
+     "，P／Alt+P 固定，W 焊接，Y 分离。滚轮缩放，右键或中键拖动平移。"},
+    {"Least Stretch: angles and lengths, along the marked seams (the default). Conformal (LSCM): angles only. By Face "
+     "Groups: also cuts along the face group borders. Planar: each piece projected flat. Unfold Islands: the current "
+     "islands flattened again where they are, keeping pins. Auto Seams: finds its own seams.",
+     "Least Stretch：沿标记的接缝保留角度与长度（默认）。Conformal (LSCM)：只保留角度。By Face Groups：也沿面组边界"
+     "切割。Planar：每个区块投影摊平。Unfold Islands：在原位重新摊平当前岛，并保留固定。Auto Seams：自行找出接缝。"},
+    {"Refine %.0f", "精修 %.0f"},
+    {"Refine", "精修"},
+    {"Least-stretch steps after the conformal start: more keeps lengths better (0 = conformal).",
+     "在 Conformal 起始之后的最小拉伸步数：越多越能保持长度（0 = Conformal）。"},
+    {"%.0f deg", "%.0f 度"},
+    {"Sharp angle", "锐利角度"},
+    {"Sharp Edges marks the edges whose faces meet at more than this angle.",
+     "“锐利边”会标记两侧面以超过此角度相接的边。"},
+    {"Margin %.0f px", "边距 %.0f px"},
+    {"Margin", "边距"},
+    {"Texels kept free between islands (half of it at the tile borders), at the texture's size.",
+     "岛之间保留的空白纹素（图块边缘为一半），以贴图大小计算。"},
+    {"Columns %.0f", "列数 %.0f"},
+    {"Columns", "列数"},
+    {"UDIM tiles across (along u, 1001 onwards; ten make a full UDIM row). Packing fills Columns x Rows tiles and "
+     "never goes wider, also when it packs at a fixed texel density.",
+     "横向的 UDIM 图块数（沿 u，从 1001 开始；十个为完整的一行 UDIM）。打包会填满列数 x 行数个图块，绝不会更宽，以固"
+     "定纹素密度打包时也是如此。"},
+    {"UDIM rows up (along v: 1011 sits above 1001). 10 Columns x 2 Rows fills 1001-1020; more tiles, more texels per "
+     "island.",
+     "往上的 UDIM 行数（沿 v：1011 位于 1001 上方）。10 列 x 2 行会填满 1001-1020；图块越多，每个岛的纹素越多。"},
+    {"Turn islands to their smallest box and allow quarter turns, so more fit.",
+     "将岛旋转到最小包围框并允许四分之一圈旋转，以放入更多岛。"},
+    {"Equal density", "相同密度"},
+    {"Scale the islands to one texel density before packing (off: they keep their sizes relative to each other).",
+     "打包前将岛缩放到相同的纹素密度（关闭：保持彼此的相对大小）。"},
+    {"The texture size densities and margins are measured at (the Part's texture's when it has one).",
+     "用来计算密度与边距的贴图大小（部件有贴图时使用其大小）。"},
+    {"Target density", "目标密度"},
+    {"Texels per unit of surface length that Set and Pack at Density give the islands.",
+     "“设置”与“按密度打包”为岛设置的每单位表面长度纹素数。"},
+    {"Strips", "条带"},
+    {"The sheet's horizontal strips: a count (4 equal strips), heights from the top (0.5,0.25,0.25), or v ranges "
+     "(0-0.5;0.5-1). They show over tile 1001.",
+     "贴图上的水平条带：数量（4 条等宽条带）、从上方起算的高度 (0.5,0.25,0.25)，或 v 范围 (0-0.5;0.5-1)。显示在图块 "
+     "1001 上。"},
+    {"Fit width", "符合宽度"},
+    {"Squeeze or stretch the row to fill u 0-1 exactly; off keeps the islands' proportions (trims repeat in u).",
+     "压缩或拉伸该行以刚好填满 u 0-1；关闭时保持岛的比例（装饰在 u 方向重复）。"},
+    {"Checker %.0f per tile", "每个图块 %.0f 格棋盘"},
+    {"Paint stays on the model", "绘制保留在模型上"},
+    {"When the Part has a painted texture, every UV edit moves the paint with it (re-projected onto the new layout in "
+     "the same undo step), so the model looks the same. Off: the texture stays put and the model shows the UVs' new "
+     "place on it (what trim sheets want).",
+     "部件有绘制贴图时，每次编辑 UV 都会连同绘制一起移动（在同一个撤销步骤中重新投影到新布局），让模型外观不变。关闭"
+     "：贴图不动，模型会显示 UV 在贴图上的新位置（装饰贴图需要这样）。"},
+    // --- PanelVdm.cpp (tools/i18n/coverage.py) ---
+    {"Load a vector displacement map for the VDM brush: a 32- or 16-bit OpenEXR from Blender's VDM Brush Baker (or "
+     "any EXR whose RGB are X right, Y up, Z out of the surface, in brush radii) or a .sfvdm. It is kept in your "
+     "brush library. You can also drop an .exr on the window.",
+     "为 VDM 笔刷加载矢量位移贴图：Blender 的 VDM Brush Baker 生成的 32 或 16 位 OpenEXR（或任何 RGB 为 X 向右、Y "
+     "向上、Z 朝表面外、以笔刷半径为单位的 EXR），或 .sfvdm。会保存在笔刷资源库中。也可以将 .exr 拖放到窗口中。"},
+    {"Add a flat VDM plane to sculpt a new brush on: seen from the top, its border masked so it stays put; the other "
+     "Parts are hidden. Sculpt anything (overhangs welcome), then Create VDM.",
+     "添加平坦的 VDM 平面以雕刻新笔刷：从顶部观看，边界已遮罩以保持不动；其他部件会被隐藏。雕刻任何形状（欢迎悬垂结构"
+     "），再按“创建 VDM”。"},
+    {"Turn the sculpted VDM plane into a vector displacement brush: how far every point moved from the flat grid "
+     "becomes the map, saved in your brush library and picked as the VDM brush's map Needs the VDM plane (its UVs "
+     "record where each point started).",
+     "将雕刻好的 VDM 平面转为矢量位移笔刷：每个点相对平坦网格的位移成为贴图，保存在笔刷资源库中，并设为 VDM 笔刷的贴"
+     "图。需要 VDM 平面（其 UV 记录每个点的起始位置）。"},
+    {"Save the VDM brush's map as a 32-bit float OpenEXR, for Blender: add it as the texture of a Draw brush with "
+     "Area Plane mapping and Vector Displacement on (Help > User Guide > Sculpting > Vector displacement brushes).",
+     "将 VDM 笔刷的贴图保存为 32 位浮点 OpenEXR，供 Blender 使用：将其设为 Draw 笔刷的贴图，使用 Area Plane 映射并"
+     "打开 Vector Displacement（帮助 > 使用指南 > Sculpting > Vector displacement brushes）。"},
+    {"For maps that store the surface normal in G instead of B (Y-up apps). Blender's maps and ours need nothing; "
+     "maps from other apps depend on how they were exported, so try this if a stamp comes out lying on its side.",
+     "适用于将表面法线存在 G 而非 B 的贴图（Y 轴朝上的软件）。Blender 与我们的贴图不需要；其他软件的贴图取决于导出方"
+     "式，若印章侧躺请试试此选项。"},
+    {"Mirror the map's sideways (R) channel when loading: for a stamp that comes out mirrored.",
+     "加载时镜像贴图的侧向 (R) 通道：用于印章左右相反时。"},
+    {"Mirror the map's up (G) channel when loading: for a stamp that leans the wrong way.",
+     "加载时镜像贴图的向上 (G) 通道：用于印章倾向错误方向时。"},
+    {"Negate the map's height (B) when loading: for a map that digs in where it should rise.",
+     "加载时反转贴图的高度 (B)：用于该隆起却凹陷的贴图。"},
+    {"Multiply a loaded map's vectors: for maps saved in other units than the brush radius (1 = as stored).",
+     "将已加载贴图的矢量相乘：用于以笔刷半径以外单位保存的贴图（1 = 按原样）。"},
+    {"Quads per side of a new VDM plane. 256 is a good start; divide it (Ctrl+D) for finer detail.",
+     "新 VDM 平面每边的四边面数。256 是不错的起点；细分 (Ctrl+D) 可得到更细的细节。"},
+    {"What Create VDM calls the new map (a map of the same name is replaced).",
+     "“创建 VDM”为新贴图取的名称（同名贴图会被替换）。"},
+    {"Pixels a side of the map Create VDM makes. 256 holds most shapes; 512 for fine detail (Blender suggests 512 or "
+     "less).",
+     "“创建 VDM”所生成贴图每边的像素数。256 足以应付大多数形状；细节用 512（Blender 建议 512 以下）。"},
+    // --- PanelVertexPaint.cpp (tools/i18n/coverage.py) ---
+    {"The view's flat background colour. Choosing one switches the background to Flat Colour. It is saved "
+     "automatically for the next session; projects keep their own.",
+     "视图的纯色背景色彩。选择颜色会将背景切换为纯色。会自动保存到下一次会话；项目会保有自己的设置。"},
+    {"Sculpt brushes also paint the colour", "雕刻笔刷也会绘制色彩"},
+    {"The paint layer the Paint brush and fills write into. Add and arrange layers in Tool > Paint Layers.",
+     "Paint 笔刷与填满所写入的绘制图层。可在工具 > 绘制图层中添加与排列图层。"},
+    {"Remove all vertex paint from the Part, paint layers included (undoable).",
+     "移除部件的所有顶点绘制，包括绘制图层（可撤销）。"},
+    {"On a Part with no vertex paint, the colour above tints its Lit Sphere material, so you can try a skin, stone or "
+     "metal tone without painting. Grey and black leave the material as it is. Vertex paint, once there, shows "
+     "instead.",
+     "在没有顶点绘制的部件上，上方的色彩会为其 Lit Sphere 材质着色，让你不必绘制就能试试皮肤、石头或金属的色调。灰色"
+     "与黑色会让材质维持原样。有顶点绘制时则显示顶点绘制。"},
+    {"Use a Lit Sphere image of your own: a lit sphere filling a square PNG, JPG or EXR. It joins the list and is "
+     "kept in Documents/SculptForge/Lit Spheres; images you put in that folder show up when a material list opens. "
+     "Right-click one of your Lit Spheres to remove it.",
+     "使用你自己的 Lit Sphere 图像：填满正方形 PNG、JPG 或 EXR 的打光球体。它会加入列表并保存在 "
+     "Documents/SculptForge/Lit Spheres；放进该文件夹的图像会在打开材质列表时出现。在你的 Lit Sphere 上按右键即可移除"
+     "。"},
+    {"Viewport Shading", "视口着色"},
+    {"Environment", "环境"},
+    {"The light around the model: Studio (generated), Photo Studio, Small Studio and Outdoor Sky. HDR files (.hdr, "
+     ".exr) in the folders of SCULPTFORGE_HDRI_PATH are listed after them.",
+     "模型周围的光线：Studio（生成）、Photo Studio、Small Studio 与 Outdoor Sky。SCULPTFORGE_HDRI_PATH 文件夹中的 "
+     "HDR 文件 (.hdr、.exr) 会列在它们之后。"},
+    {"Brightness of the light in stops: +1 doubles it.", "以级数表示的光线亮度：+1 为两倍。"},
+    {"Exposure %+.1f EV", "曝光 %+.1f EV"},
+    {"Turns the environment about the up axis, moving the highlights.", "绕向上轴旋转环境，移动高光位置。"},
+    {"Tone map", "色调映射"},
+    {"How bright light maps to the screen: ACES (filmic contrast), AgX (softer, keeps bright colours from going "
+     "flat), Reinhard (gentle) or None.",
+     "明亮光线映射到屏幕的方式：ACES（电影感对比）、AgX（较柔和，避免明亮色彩变平）、Reinhard（温和）或无。"},
+    {"Show environment", "显示环境"},
+    {"Show the environment behind the model instead of the background.", "在模型后方显示环境，而非背景。"},
+    {"How soft the environment behind the model is.", "模型后方环境的柔和程度。"},
+    {"Roughness of Parts without a material texture (their colour comes from vertex paint or the base colour).",
+     "没有材质贴图的部件的粗糙度（其色彩来自顶点绘制或基础色）。"},
+    {"Roughness %.2f", "粗糙度 %.2f"},
+    {"Metallic of Parts without a material texture.", "没有材质贴图的部件的金属度。"},
+    {"Metallic %.2f", "金属度 %.2f"},
+    {"How much the sculpt's creases darken, so detail reads under even light. 0 is plain PBR.",
+     "雕刻折痕变暗的程度，让细节在均匀光线下也清楚可见。0 为纯 PBR。"},
+    // --- PanelView.cpp (tools/i18n/coverage.py) ---
+    {"See through the other Parts to the active one (again: solid). With only the active Part shown, it is "
+     "see-through itself (#80, #91).",
+     "通过其他部件看到当前部件（再按一次：实体）。只显示当前部件时，它本身会变透明 (#80, #91)。"},
+    {"Save Render writes a PNG (lossless).", "“保存渲染”写出 PNG（无损）。"},
+    {"Save Render writes a JPG (smaller files, for sharing).", "“保存渲染”写出 JPG（文件较小，方便分享）。"},
+    {"Size", "大小"},
+    {"Save Render's longer side: twice the view (at most 4096 pixels), or 1080, 1920, 2048 or 4096 pixels.",
+     "“保存渲染”的长边：视图的两倍（最多 4096 像素），或 1080、1920、2048、4096 像素。"},
+    {"Light", "光线"},
+    {"Light direction", "光线方向"},
+    {"Drag on the ball to move the light around the model (the dot is the light); double-click puts it back where the "
+     "material has it. Lit Sphere and studio shading.",
+     "在球上拖动即可绕模型移动光线（圆点即光源）；双击可回到材质的原始位置。适用 Lit Sphere 与摄影棚着色。"},
+    {"How bright the light is: 1 is the material as made.", "光线亮度：1 为材质原本的样子。"},
+    {"Ambient", "环境光"},
+    {"Even light from everywhere that lifts the shadows, so the dark side still reads.",
+     "来自各方向的均匀光线，提亮阴影，让暗面仍清楚可见。"},
+    {"Ambient %.2f", "环境光 %.2f"},
+    {"The material's own light again: direction, intensity and no ambient.",
+     "回到材质自己的光线：方向、强度，且无环境光。"},
+    {"PBR: Viewport Shading's rotation and exposure", "PBR：视口着色的旋转与曝光"},
+    // --- Pickers.cpp (tools/i18n/coverage.py) ---
+    {"Sort", "排序"},
+    {"quad remesh Guides: draw curves on the model for Quad Remesh's edge loops to follow (a curve that ends where it "
+     "started makes a loop). Alt+click a curve to delete it.",
+     "Quad Remesh 导引：在模型上画曲线，让 Quad Remesh 的边环沿着它走（终点回到起点的曲线会形成环）。Alt+单击曲线即"
+     "可删除。"},
+    {"Brushes whose names start with this letter. Click to show only them.",
+     "名称以此字母开头的笔刷。单击即可只显示这些笔刷。"},
+    {"Brush packs", "笔刷资源包"},
+    {"How far spray dabs land from the cursor, as a fraction of the brush size.",
+     "Spray 笔触落在距光标多远处，以笔刷大小的比例表示。"},
+    {"Stamp this vector displacement map with the VDM brush (Drag Stamp).",
+     "以 VDM 笔刷压印此矢量位移贴图 (Drag Stamp)。"},
+    {"Use any grayscale image as the alpha: white = full effect, black = none.",
+     "使用任何灰阶图像作为 Alpha：白色 = 完整效果，黑色 = 无效果。"},
+    {"Load image alphas as their negative (black = full effect).", "以负片加载图像 Alpha（黑色 = 完整效果）。"},
+    {"The vertex paint colour (C over the model picks one).", "顶点绘制色彩（在模型上按 C 可吸取）。"},
+    {"Click to swap with the second colour.", "单击即可与第二色彩交换。"},
+    {"Click to swap it with the main colour.", "单击即可与主要色彩交换。"},
+    // --- Precision.cpp (tools/i18n/coverage.py) ---
+    {"Steady radius %.0f px", "稳定半径 %.0f px"},
+    {"Steady radius", "稳定半径"},
+    {"Length of the string the brush trails on: longer = steadier lines.",
+     "笔刷拖在后面的那条线的长度：越长线条越稳定。"},
+    {"Precision Intensity %.0f", "精确强度 %.0f"},
+    {"Precision Intensity", "精确强度"},
+    {"Hold Shift+Alt while drawing: the brush moves at a quarter of the pen's speed for careful placement, and dabs "
+     "at this intensity. Let go and it glides back under the pen.",
+     "绘制时按住 Shift+Alt：笔刷以笔的四分之一速度移动以便精确放置，并以此强度落下笔触。放开后会滑回笔下。"},
+    {"Brush pressure curve", "笔刷压力曲线"},
+    {"How pen pressure (left to right) becomes this brush's pressure (bottom to top), after the tablet's curve. Each "
+     "brush keeps its own. Drag a point; double-click the curve to add one (up to 5); right-click a point to remove "
+     "it.",
+     "笔压（左到右）在经过数位板曲线后如何转换为此笔刷的压力（下到上）。每个笔刷各有自己的曲线。拖动点即可调整；在"
+     "曲线上双击可添加点（最多 5 个）；在点上按右键可移除。"},
+    // --- RadialMenu.cpp (tools/i18n/coverage.py) ---
+    {"Radial Menus", "饼菜单"},
+    {"Pie menus of your own: hold a menu's key (or its mouse or pen button), flick toward an item and let go to run "
+     "it. Tap the key instead and the pie stays open: click an item, or beside the pie to close it. Up to 8 menus of "
+     "8 items; an item is anything the command palette (F3) finds.",
+     "你自己的饼菜单：按住菜单的按键（或其鼠标、数位笔按钮），朝项目方向一拨再放开即可运行。若只是轻按按键，菜单会"
+     "保持打开：单击项目，或单击菜单旁边即可关闭。最多 8 个菜单，每个 8 个项目；项目可以是命令面板 (F3) 能找到的"
+     "任何东西。"},
+    {"Add menu", "添加菜单"},
+    {"A new radial menu (up to 8). Give it a key, then items.", "新的饼菜单（最多 8 个）。先指定按键，再加入项目。"},
+    {"Key", "按键"},
+    {"Click, then press the key that opens this menu (Esc cancels, Backspace clears). A key another action has moves "
+     "here. Preferences > Hotkeys lists it too.",
+     "单击，再按下打开此菜单的按键（Esc 取消，Backspace 清除）。原属其他操作的按键会移到这里。偏好设置 > 快捷键也会"
+     "列出它。"},
+    {"Button", "按钮"},
+    {"A mouse or pen button that opens this menu while held, besides the key. It then stops doing what it did before "
+     "(a pen button's Preferences > Tablet mapping, the middle button's pan, the right button's turn). Mouse buttons "
+     "open it only when no modifier key is held: Alt+middle still pans, Alt+right still zooms (Maya style), "
+     "Shift+right still turns the view.",
+     "按住时打开此菜单的鼠标或数位笔按钮，与按键并用。之后它不再运行原本的功能（数位笔按钮在偏好设置 > 数位板中的对应"
+     "、中键的平移、右键的旋转）。鼠标按钮只在未按住修饰键时打开菜单：Alt+中键仍为平移，Alt+右键仍为缩放（Maya 风格）"
+     "，Shift+右键仍会旋转视图。"},
+    {"Item", "项目"},
+    {"Click to change its label, icon or action.", "单击即可更改其标签、图标或操作。"},
+    {"Label", "标签"},
+    {"What the pie shows for it; empty: the action's own name.", "菜单为它显示的文本；留空：使用操作本身的名称。"},
+    {"Icon", "图标"},
+    {"The icon the pie shows for it.", "菜单为它显示的图标。"},
+    {"Save this menu as a .json file to share or keep (action names only).",
+     "将此菜单保存为 .json 文件以分享或保留（只含操作名称）。"},
+    {"Load a menu someone exported. Only action names are read; ones this version doesn't have are left out. Goes "
+     "into this menu if it's empty, otherwise into a new one.",
+     "加载别人导出的菜单。只读取操作名称；此版本没有的会跳过。若此菜单是空的就放入此菜单，否则放入新菜单。"},
+    {"Empty this menu. Its key stays; an empty menu does nothing.", "清空此菜单。按键会保留；空菜单不会有任何作用。"},
+    {"Restore default menus", "还原默认菜单"},
+    {"Back to the three built-in menus: Brushes (T), Masking (Y) and Strokes (J).",
+     "回到三个内置菜单：笔刷 (T)、遮罩 (Y) 与笔触 (J)。"},
+    // --- Shell.cpp (tools/i18n/coverage.py) ---
+    {"Sculpt brushes also paint the colour.", "雕刻笔刷也会绘制色彩。"},
+    {"Front faces only: brushes leave the far side of thin parts alone.", "仅限正面：笔刷不会影响薄部件的另一侧。"},
+    {"Brushes only reach the surface joined to the point under the cursor, within the brush size: the other leg, the "
+     "next finger or a lip across a gap stay as they are (Blender's Connected Only). Saved with the preferences and "
+     "the project.",
+     "笔刷只影响与光标下的点相连、且在笔刷大小内的表面：另一条腿、旁边的手指或隔着缝隙的嘴唇都保持不变（Blender 的 "
+     "Connected Only）。随偏好设置与项目保存。"},
+    {"The brush falloff is measured on screen: everything inside the brush circle is reached, through the model and "
+     "out the back, as a cylinder along the view (Blender's Projected from View). Turn on Connected only too to keep "
+     "it to one piece.",
+     "笔刷衰减以屏幕测量：笔刷圆圈内的一切都会受影响，会穿过模型到背面，如同沿视线方向的圆柱（Blender 的 Projected "
+     "from View）。同时打开“仅限相连”即可限制在单一区块。"},
+    {"Ctrl+drag paints the mask with the brush; Ctrl+Alt+drag erases it. Ctrl+drag on the background clears it.",
+     "Ctrl+拖动以笔刷绘制遮罩；Ctrl+Alt+拖动擦除遮罩。在背景上 Ctrl+拖动可清除遮罩。"},
+    {"Ctrl+drag draws a lasso and masks everything inside it; Ctrl+Alt+drag unmasks. The far side is included.",
+     "Ctrl+拖动画出套索并遮罩其中的一切；Ctrl+Alt+拖动取消遮罩。包含背面。"},
+    {"Ctrl+drag draws a rectangle and masks everything inside it; Ctrl+Alt+drag unmasks. The far side is included.",
+     "Ctrl+拖动画出矩形并遮罩其中的一切；Ctrl+Alt+拖动取消遮罩。包含背面。"},
+    {"Ctrl+Shift+drag a rectangle to keep what's inside and hide the rest; add Alt to hide the inside.",
+     "按住 Ctrl+Shift 拖动矩形，保留其中的部分并隐藏其余；加按 Alt 则隐藏内部。"},
+    {"Ctrl+Shift+drag a lasso to keep what's inside and hide the rest; add Alt to hide the inside.",
+     "按住 Ctrl+Shift 拖动套索，保留其中的部分并隐藏其余；加按 Alt 则隐藏内部。"},
+    {"Ctrl+Shift+drag a line: the shaded side is cut (Alt: the other side). Away removes it through the whole Part "
+     "and closes the cut flat; In steps it down by Depth; Add raises it; Clip presses it flat onto the line.",
+     "按住 Ctrl+Shift 拖动一条线：切割阴影侧（Alt：另一侧）。移除会穿过整个部件去除并以平面封闭切口；凹入会按深度降低"
+     "；增加会使其隆起；裁平会将其压平到线上。"},
+    {"Ctrl+Shift+drag a lasso: Away cuts a hole through the Part, In a pocket Depth deep, Add raises the shape, Clip "
+     "presses what lies outside it onto its outline.",
+     "按住 Ctrl+Shift 拖动套索：移除会在部件上切出贯穿的孔，凹入会挖出深度为“深度”的凹槽，增加会让形状隆起，裁平会"
+     "将外侧部分压平到其轮廓上。"},
+    {"Ctrl+Shift+drag a rectangle: Away cuts a hole through the Part, In a pocket Depth deep, Add a block, Clip "
+     "presses what lies outside it onto its edges.",
+     "按住 Ctrl+Shift 拖动矩形：移除会在部件上切出贯穿的孔，凹入会挖出深度为“深度”的凹槽，增加会加出方块，裁平会将"
+     "外侧部分压平到其边缘上。"},
+    {"Ctrl+Shift+click points: click the first point to cut the polygon, double-click or Enter to cut along an open "
+     "bent line (Alt: the other side), Esc to drop it.",
+     "按住 Ctrl+Shift 并单击各点：单击第一个点即可切割多边形，双击或 Enter 可沿开放折线切割（Alt：另一侧），"
+     "Esc 放弃。"},
+    {"Away", "移除"},
+    {"Remove what the shape covers, through the whole Part, and close the cut with a flat cap.",
+     "去除形状覆盖的部分（贯穿整个部件），并以平面封盖封闭切口。"},
+    {"In", "凹入"},
+    {"Cut a flat-bottomed pocket Depth deep where the shape covers the Part.",
+     "在形状覆盖部件之处切出平底、深度为“深度”的凹槽。"},
+    {"Add", "增加"},
+    {"Add the shape, extruded Depth out of the surface, joined to the Part.",
+     "加上形状，从表面挤出“深度”的距离，并与部件相连。"},
+    {"Clip", "裁平"},
+    {"Remove nothing: press the shaded side of a line, or everything outside a lasso or rectangle, flat onto the "
+     "shape's outline, through the whole Part (#102). Hard-surface planes and clean silhouettes; the mask holds "
+     "parts back.",
+     "不移除任何东西：将线的阴影侧，或套索、矩形外的一切，贯穿整个部件压平到形状的轮廓上 (#102)。适合硬表面平面与干净"
+     "的剪影；遮罩可固定部分区域。"},
+    {"Pen pressure scales the brush strength.", "笔压调整笔刷强度。"},
+    {"Pen pressure scales the brush size.", "笔压调整笔刷大小。"},
+    {"Mirror strokes across X (left and right).", "沿 X 镜像笔触（左与右）。"},
+    {"Mirror strokes across Y (top and bottom).", "沿 Y 镜像笔触（上与下）。"},
+    {"Mirror strokes across Z (front and back).", "沿 Z 镜像笔触（前与后）。"},
+    {"Radial symmetry: repeat strokes around an axis (Radial Copies copies, Transform palette).",
+     "放射对称：绕轴重复笔触（副本数为“放射副本”，在变形调色板中）。"},
+    {"Local symmetry: mirror and turn strokes about the active Part's centre instead of the world origin.",
+     "区域对称：以当前部件的中心而非世界原点镜像与旋转笔触。"},
+    {"Browse, search and install brushes other sculptors shared.", "浏览、搜索并安装其他雕刻者分享的笔刷。"},
+    {"Wire", "线框"},
+    {"Wireframe: show the polygons of the active Part (Shift+F).", "线框：显示当前部件的多边形 (Shift+F)。"},
+    {"Colour each face group of the active Part.", "为当前部件的每个面组上色。"},
+    {"Show or hide the mask (masked areas drawn darker). Hiding it keeps the mask: masked areas stay protected from "
+     "brushes until you clear it.",
+     "显示或隐藏遮罩（遮罩区域会画得较暗）。隐藏时遮罩仍保留：在你清除之前，遮罩区域仍受保护不受笔刷影响。"},
+    {"Show vertex paint colours (off: plain material).", "显示顶点绘制色彩（关闭：纯材质）。"},
+    {"Draw the sculpt.", "绘制雕刻。"},
+    {"Open this menu. Its sections are the palettes of the Classic layout.",
+     "打开此菜单。其各节即经典布局的调色板。"},
+    {"Camera locked", "相机已锁定"},
+    {"Find any command, palette, brush or material by name and run it.",
+     "按名称查找任何命令、调色板、笔刷或材质并运行。"},
+    {"Click to open or close the tray, drag to resize it. Palettes go in trays from their header icon.",
+     "单击即可打开或关闭工具箱，拖动可调整大小。调色板可通过其标题图标放入工具箱。"},
+    {"Shell", "界面"},
+    {"Brush radius in screen pixels (0.5 to 800), and in mm on the surface under the cursor. [ and ] change it by "
+     "10%, Shift+[ and Shift+] by 1 px, Ctrl+Shift+right-drag scrubs it finely; Ctrl+click to type.",
+     "以屏幕像素表示的笔刷半径（0.5 到 800），以及光标下表面上的 mm。[ 与 ] 每次调整 10%, Shift+[ 与 Shift+] 每次 1"
+     " px，Ctrl+Shift+右键拖动可细微调整；按住 Ctrl 并单击即可输入。"},
+    {"Triangles you can see and sculpt (visible Parts, hidden parts left out) and in the whole scene. Micro: the "
+     "micro triangles of the visible Parts' micro levels (Geometry > Micro).",
+     "可见且可雕刻的三角面数（可见部件，不含隐藏部分）以及整个场景的三角面数。微细分：可见部件微细分层级中的微三角面"
+     "（几何 > 微细分）。"},
+    {"Ctrl held: the mask brush (Ctrl+Shift: the selection brush). Click, or press B with Ctrl held, to pick Mask "
+     "Pen, Lasso Mask or Rectangle Mask (Select Rectangle or Select Lasso).",
+     "按住 Ctrl：遮罩笔刷（Ctrl+Shift：选择笔刷）。单击，或按住 Ctrl 再按 B，即可选择 Mask Pen、Lasso Mask 或 "
+     "Rectangle Mask（Select Rectangle 或 Select Lasso）。"},
+    {"Ctrl held: the mask's stroke, Dots (Mask Pen), Lasso or Rect (Ctrl+Shift: the selection's). Click with Ctrl "
+     "held to choose.",
+     "按住 Ctrl：遮罩的笔触，Dots (Mask Pen)、Lasso 或 Rect（Ctrl+Shift：选择的笔触）。按住 Ctrl 再单击即可选择。"},
+    // --- SpaceMouse.cpp (tools/i18n/coverage.py) ---
+    {"Copy device report", "复制设备报告"},
+    {"Copies what SculptForge sees (each joystick's name, USB ids and why it was or wasn't used) to paste into a bug "
+     "report.",
+     "复制 SculptForge 检测到的内容（每个摇杆的名称、USB ID 以及是否使用的原因），以贴到错误报告中。"},
+    {"Experimental. A 3Dconnexion SpaceMouse moves the view with one hand while the other holds the pen: push, pull "
+     "and twist the cap to pan, zoom and turn the model about the pivot. Read directly as a USB device, without "
+     "3Dconnexion's driver; tested only with simulated input so far.",
+     "实验性功能。3Dconnexion SpaceMouse 让你一手移动视图、另一手握笔：推、拉与扭转控制帽即可平移、缩放，并绕枢轴点旋"
+     "转模型。直接以 USB 设备读取，不需要 3Dconnexion 的驱动程序；当前只以模拟输入测试过。"},
+    {"Experimental. Off: the SpaceMouse is ignored.", "实验性功能。关闭：忽略 SpaceMouse。"},
+    {"How fast the view moves for the same push on the cap.", "对控制帽施加相同推力时视图移动的速度。"},
+    {"How far the cap must move before the view does, so a hand resting on it or a slightly off-centre cap doesn't "
+     "drift the view.",
+     "控制帽需移动多少视图才会跟着动，让放在上面的手或略微偏离中心的控制帽不会使视图飘移。"},
+    {"The model stays upright: twisting turns it about the world's up axis, tilting looks over or under it, and "
+     "rolling the cap does nothing.",
+     "模型保持直立：扭转会绕世界的向上轴旋转，倾斜可从上方或下方观看，滚转控制帽则不起作用。"},
+    {"Hold during strokes", "笔触期间保持"},
+    {"While you sculpt, paint or mask, the SpaceMouse leaves the view alone and its buttons do nothing, so a hand "
+     "resting on the cap never moves the model under the pen. Off: the view turns mid-stroke.",
+     "在雕刻、绘制或遮罩时，SpaceMouse 不会移动视图，其按钮也不起作用，因此放在控制帽上的手绝不会让笔下的模型移动。关"
+     "闭：笔触进行中视图也会旋转。"},
+    {"Only the direction you push the most moves the view: a twist doesn't also pan a little.",
+     "只有推力最大的方向会移动视图：扭转时不会顺带平移一点。"},
+    {"Move the view the other way for this push or turn of the cap.", "对控制帽的此推力或扭转，反向移动视图。"},
+    {"What the SpaceMouse reports now: Pan X, Zoom, Pan Y, Tilt, Roll, Spin. Grey: inside the dead zone.",
+     "SpaceMouse 当前报告的值：Pan X、Zoom、Pan Y、Tilt、Roll、Spin。灰色：位于死区内。"},
+    {"On, speed 1, dead zone 8%, nothing inverted, free rotation, held during strokes, all axes at once; left button "
+     "Frame, right button Front view.",
+     "打开，速度 1，死区 8%, 不反转，自由旋转，笔触期间保持，所有轴同时作用；左键为置入视图，右键为正视图。"},
+    // --- StrokePopup.cpp (tools/i18n/coverage.py) ---
+    {"Stroke popup", "笔触弹出窗口"},
+    {"A grid at the cursor with the stroke types, the modifiers (Add / Sub, Smooth, Mask, Select) and the mask and "
+     "Cut shapes. Hold the key, point at one and let go; or tap the key and click. Smooth, Mask, Select and the "
+     "shapes stay on without holding Shift or Ctrl, until you pick them again or another brush.",
+     "在光标处显示的方格，含笔触类型、修饰（Add／Sub、Smooth、Mask、Select）与遮罩及切割形状。按住按键、指向其中一个"
+     "后放开；或轻按按键再单击。Smooth、Mask、Select 与形状不需按住 Shift 或 Ctrl 就会保持打开，直到你再次选择它们或"
+     "选择其他笔刷。"},
+    // --- Tablet.cpp (tools/i18n/coverage.py) ---
+    {"Pressure", "压力"},
+    {"No pressure? In Wacom Tablet Properties > Mapping, switch \"Use Windows Ink\" (on for most tablets, off for "
+     "some older drivers), then bring the pen back. Without pressure the pen draws at full strength.",
+     "没有压力？在 Wacom Tablet Properties > Mapping 中切换“Use Windows Ink”（大多数数位板打开，部分较旧的驱动程序"
+     "关闭），再将笔移回来。没有压力时笔会以全强度绘制。"},
+    {"Whether the pen reports pressure. Without it the pen draws at full strength; check the tablet in your desktop's "
+     "tablet settings.",
+     "数位笔是否报告压力。没有压力时笔会以全强度绘制；请在桌面环境的数位板设居中检查数位板。"},
+    {"The pen SculptForge last saw, and whether it is in range or touching.",
+     "SculptForge 最后检测到的数位笔，以及是否在感应范围内或正在接触。"},
+    {"Turn on if the tablet driver is set to Mouse mode: the pen moves the cursor by how far it moves, and lifting it "
+     "and putting it down elsewhere leaves the cursor where it was. Off (Pen mode): the cursor is where the pen is.",
+     "若数位板驱动程序设为鼠标模式请开启：笔按移动距离移动光标，抬起后放到别处时光标维持原位。关闭（笔模式）：光标就"
+     "在笔的位置。"},
+    {"The pen's pressure as the tablet reports it, and after the pressure curve below (what brushes get).",
+     "数位板报告的笔压，以及经过下方压力曲线后的值（笔刷收到的值）。"},
+    {"The pen's tilt, as the tablet reports it (brushes don't use it yet).",
+     "数位板报告的笔倾斜角度（笔刷尚未使用）。"},
+    {"Draw here with the pen: the stroke is as thick as the brush pressure, and the line at the bottom plots it along "
+     "the stroke.",
+     "在此用笔绘制：笔触粗细等于笔刷压力，下方的线会沿笔触绘出压力变化。"},
+    {"How pen pressure (left to right) becomes brush pressure (bottom to top), before each brush's own curve. The dot "
+     "is the pen right now.",
+     "笔压（左到右）在应用各笔刷自己的曲线之前如何转换为笔刷压力（下到上）。圆点为笔当前状态。"},
+    {"Below 1: soft, a light touch gives a lot. Above 1: firm, press harder.",
+     "低于 1：较软，轻触就有很大效果。高于 1：较硬，需更用力按压。"},
+    {"Brush pressure at the lightest touch.", "最轻触碰时的笔刷压力。"},
+    {"Brush pressure when pressing fully.", "完全按压时的笔刷压力。"},
+    {"Pen pressure below this counts as the lightest touch (ignores a resting hand).",
+     "低于此值的笔压视为最轻触碰（忽略放在上面的手）。"},
+    {"Pen pressure that already counts as pressing fully (for a light hand).",
+     "达到此值即视为完全按压的笔压（适合手劲较轻的人）。"},
+    {"Eraser", "橡皮擦"},
+    {"What the pen's eraser end does. Invert: brushes subtract, like holding Alt (with Ctrl it erases mask). Erase "
+     "mask: removes mask wherever it draws.",
+     "笔尾橡皮擦的功能。反转：笔刷改为减去，如同按住 Alt（搭配 Ctrl 则擦除遮罩）。擦除遮罩：在绘制处移除遮罩。"},
+    {"Eraser: Invert; lower button: Right-click; upper button: Invert (Alt); third button: Pan view. The curve and "
+     "Mouse mode stay.",
+     "橡皮擦：反转；下方按钮：右键单击；上方按钮：反转 (Alt)；第三个按钮：平移视图。曲线与鼠标模式保持不变。"},
+    {"These settings save themselves.", "这些设置会自动保存。"},
+    // --- UserGuide.cpp (tools/i18n/coverage.py) ---
+    {"Go back to the page you were reading.", "回到你正在阅读的页面。"},
+    {"Back (Alt+Left)", "上一页 (Alt+Left)"},
+    {"Go forward again.", "再次前进。"},
+    {"Forward (Alt+Right)", "下一页 (Alt+Right)"},
+    {"The guide's first page: every chapter.", "指南的第一页：所有章节。"},
+    {"Find every place in the guide that mentions all of these words.", "查找指南中提到所有这些字词的每个地方。"},
+    {"Clear the search", "清除搜索"},
+    {"Read this page on the SculptForge website.", "在 SculptForge 网站上阅读此页面。"},
+    // --- Shell.cpp (tools/i18n/coverage.py) ---
+    {"Brushes change the shape. Turn on Rgb to paint colour at the same time.",
+     "笔刷改变形状。打开 Rgb 即可同时绘制色彩。"},
+    {"Paint colour without sculpting. Alt paints back to white, Shift still smooths.",
+     "只绘制色彩而不雕刻。Alt 会绘回白色，Shift 仍为平滑。"},
+    {"Brushes add to the surface. Hold Alt to subtract for one stroke.",
+     "笔刷向表面增加。按住 Alt 可在单一笔触中减去。"},
+    {"Sub", "减少"},
+    {"Brushes subtract from the surface. Hold Alt to add for one stroke.",
+     "笔刷从表面减去。按住 Alt 可在单一笔触中增加。"},
+    {"Dynamic topology: brushes add triangles where they need detail and remove them where they don't, so you can "
+     "pull out horns or fingers without stretching. Detail sets how small the triangles get; zoom in or shrink the "
+     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles and UVs "
+     "are dropped (Undo brings them back).",
+     "动态拓扑：笔刷在需要细节处加入三角面，不需要处则移除，让你拉出角或手指而不会拉伸。“细节”设置三角面的大小；拉"
+     "近视图或缩小笔刷可得到更细的三角面。需要没有细分层级的网格；笔刷下的四边面会变成三角面，UV 会被丢弃（可撤销恢复"
+     "）。"},
+    {"Lit Sphere shading (the default): the chosen material sphere or the studio lights, made for reading forms while "
+     "sculpting.",
+     "Lit Sphere 着色（默认）：所选的材质球或摄影棚灯光，便于雕刻时判读形体。"},
+    {"PBR shading: the texture's material channels (base colour, roughness, metallic, normal, height, AO, emissive) "
+     "lit by an environment, as a game engine or renderer shows them. Meshes without a material use the roughness "
+     "and metallic set here.",
+     "PBR 着色：贴图的材质通道（基础色、粗糙度、金属度、法线、高度、AO、自发光）由环境照亮，如同游戏引擎或渲染器的呈"
+     "现。没有材质的网格使用此处设置的粗糙度与金属度。"},
+    {"Smooth", "平滑"},
+    {"Smooth shading (the default): normals blend across polygons, so the surface reads as one form.",
+     "平滑着色（默认）：法线在多边形之间混合，让表面看起来是一个整体形体。"},
+    {"Flat shading: every polygon shows its own face, so the mesh's structure and each stroke's effect on it read "
+     "clearly. Parts set to Smooth or Flat keep their own. A preference, saved automatically.",
+     "平面着色：每个多边形都显示自己的面，让网格结构与每一笔触的效果清楚可见。设为平滑或平面的部件保有自己的设置。这"
+     "是偏好设置，自动保存。"},
+    {"The view's background is the charcoal radial gradient (the default).", "视图背景为炭灰色放射渐变（默认）。"},
+    {"The view's background is one solid colour (pick it below), without the gradient. A preference, saved "
+     "automatically; projects keep their own.",
+     "视图背景为单一纯色（在下方选择），没有渐变。这是偏好设置，自动保存；项目会保有自己的设置。"},
+    {"Fill the screen with SculptForge (again: back to a window).", "让 SculptForge 填满屏幕（再按一次：回到窗口）。"},
+    {"Show the Gaussian splat capture.", "显示高斯 Splat 捕获。"},
+    {"Show only the active Part (again: show the others).", "只显示当前部件（再按一次：显示其他部件）。"},
+    {"Drag on this button to pan the view (or Alt+drag the background).",
+     "在此按钮上拖动即可平移视图（或 Alt+拖动背景）。"},
+    {"Drag up and down on this button to zoom (or use the mouse wheel).",
+     "在此按钮上上下拖动即可缩放（或使用鼠标滚轮）。"},
+    {"Drag on this button to orbit the view (or drag the background).", "在此按钮上拖动即可环绕视图（或拖动背景）。"},
+    {"Add a model file as a new Part.", "将模型文件加入为新部件。"},
+    {"Save the visible Parts as Wavefront OBJ.", "将可见部件保存为 Wavefront OBJ。"},
+    {"One GLB per level of detail.", "每个细节层级一个 GLB。"},
+    {"OpenUSD for Apple, Omniverse and film pipelines.", "适用于 Apple、Omniverse 与电影流程的 OpenUSD。"},
+    {"FBX sized and named for Unreal Engine, with LODs.", "按 Unreal Engine 调整大小与命名的 FBX，含 LOD。"},
+    {"Save the Gaussian splats (PLY, glTF or USD).", "保存高斯 Splat（PLY、glTF 或 USD）。"},
+    {"Close SculptForge (asks to save changes first).", "关闭 SculptForge（会先询问是否保存更改）。"},
+    {"Rebuild as an even, watertight surface (like Voxel Remesh): merges parts, fixes scans and generated models.",
+     "重建为均匀、封闭的表面（类似体素重新网格化）：合并各部分，修复扫描与生成的模型。"},
+    {"With Tool > Remesh > Quick Remesh on: remesh the active Part at the Voxel Remesh resolution, in the background.",
+     "打开工具 > 重新网格化 > Quick Remesh 时：在后台以体素重新网格化的分辨率重新网格化当前部件。"},
+    {"Quick Remesh (hold and drag)", "Quick Remesh（按住并拖动）"},
+    {"With Tool > Remesh > Quick Remesh on: hold this key and click or drag on the background (not on the model) to "
+     "remesh the active Part.",
+     "打开工具 > 重新网格化 > Quick Remesh 时：按住此键并在背景上（不是模型上）单击或拖动，即可重新网格化当前部件。"},
+    {"Turn the sculpt into Gaussian splats.", "将雕刻转为高斯 Splat。"},
+    {"Fill the unmasked area with the colour.", "以该色彩填满未遮罩的区域。"},
+    {"Hide or show the shelves and trays around the canvas.", "隐藏或显示画布周围的工具栏与工具箱。"},
+    {"Show or hide the palette bar under the title.", "显示或隐藏标题下方的调色板栏。"},
+    {"Open or close the left tray (or click its divider).", "打开或关闭左侧工具箱（或单击其分隔线）。"},
+    {"Open or close the right tray (or click its divider).", "打开或关闭右侧工具箱（或单击其分隔线）。"},
+    {"Menus by task (File, Edit, Sculpt, Paint, Mesh, View, Render, Help), a status bar and a one-row tool shelf.",
+     "按工作分类的菜单（文件、编辑、雕刻、绘制、网格、视图、渲染、帮助）、状态栏与单行工具栏。"},
+    {"The alphabetical palette bar and the two-row top shelf, as experienced sculptors expect.",
+     "按字母排列的调色板栏与双行顶部工具栏，符合资深雕刻者的习惯。"},
+    {"Palettes", "调色板"},
+    // --- Config.cpp (tools/i18n/coverage.py) ---
+    {"Press a key for '%s'", "请按下“%s”的按键"},
+    {"Now:", "当前："},
+    {"none", "无"},
+    {"Esc cancels, Backspace clears. A key that's taken moves here.",
+     "Esc 取消，Backspace 清除。已被使用的按键会移到这里。"},
+    {"No shortcut matches \"%s\".", "没有符合“%s”的快捷键。"},
+    {"Double-click a row, or Ctrl+Alt+click any button, to assign a key.",
+     "双击某一行，或 Ctrl+Alt+单击任何按钮，即可分配按键。"},
+    // --- Input.cpp (tools/i18n/coverage.py) ---
+    {"With Alt", "搭配 Alt"},
+    {"With Ctrl", "搭配 Ctrl"},
+    // --- PanelUvEditor.cpp (tools/i18n/coverage.py) ---
+    {"On model", "模型上"},
+    {"Seams (%zu edges)", "接缝（%zu 条边）"},
+    {"Select", "选择"},
+    // --- RadialMenu.cpp (tools/i18n/coverage.py) ---
+    {"Right-drag opens this menu. Turn the view with %s.", "右键拖动会打开此菜单。以 %s 旋转视图。"},
+    {"Action's own", "操作本身的"},
+    {"Change action", "更改操作"},
+    {"Add item", "添加项目"},
+    {"No matching actions", "没有符合的操作"},
+    {"Your menus save themselves", "你的菜单会自动保存"},
+    // --- SpaceMouse.cpp (tools/i18n/coverage.py) ---
+    {"No SpaceMouse found", "找不到 SpaceMouse"},
+    {"Last button pressed: %d", "最后按下的按钮：%d"},
+    // --- Tablet.cpp (tools/i18n/coverage.py) ---
+    {"Pressure: no pen seen yet", "压力：尚未检测到数位笔"},
+    {"Pressure: on", "压力：已启用"},
+    {"Pressure: not detected", "压力：未检测到"},
+    {"Pressure: touch the tablet to check", "压力：请触碰数位板以检查"},
+    {"Troubleshooting", "故障排除"},
+    {"No pen seen yet", "尚未检测到数位笔"},
+    {"Tilt: not reported by this pen", "倾斜：此数位笔不报告"},
+    {"Pressure curve (all brushes)", "压力曲线（所有笔刷）"},
+    // --- UserGuide.cpp (tools/i18n/coverage.py) ---
+    {"SculptForge is free and open source, and stays that way. If it helps your work, you can support its development.",
+     "SculptForge 是自由且开源的软件，并将一直如此。如果它对你的工作有帮助，欢迎支持它的开发。"},
+    {"Nothing in the guide matches \"%s\".", "指南中没有符合“%s”的内容。"},
+    // --- core/RadialMenu.cpp (tools/i18n/coverage.py) ---
+    {"None", "无"},
+    {"Middle mouse button", "鼠标中键"},
+    {"Mouse back button", "鼠标后退键"},
+    {"Mouse forward button", "鼠标前进键"},
+    {"Pen lower button", "数位笔下方按钮"},
+    {"Pen upper button", "数位笔上方按钮"},
+    {"Pen third button", "数位笔第三个按钮"},
+    {"Right mouse button", "鼠标右键"},
+    // --- PanelUvEditor.cpp (tools/i18n/coverage.py) ---
+    {" (folds)", " （翻折）"},
+    {"%zu seam edges marked", "已标记 %zu 条接缝边"},
+    {"%u islands  |  %zu selected  |  stretch %.3f%s  |  %.0f tx/u at %dK  |  %s",
+     "%u 个岛  |  已选择 %zu  |  拉伸 %.3f%s  |  %.0f tx/u（%dK）  |  %s"},
+    {"Density", "密度"},
+    {"Edge", "边"},
+    {"Face", "面"},
+    {"Island", "岛"},
+    {"Islands", "岛"},
+    {"No Image", "无图像"},
+    {"Plain", "单色"},
+    {"Selected", "已选择"},
+    {"Stretch", "拉伸"},
+    {"Texel Density", "纹素密度"},
+    {"Trim Sheet", "装饰贴图"},
+    {"Unwrap Selected", "展开所选"},
+    // --- Brush palette (tools/i18n/coverage.py) ---
+    {"Filter brushes", "筛选笔刷"},
+    {"Alphas", "Alpha"},
+    {"Built-in", "内置"},
+    {"Custom", "自定义"},
+    {"Custom brushes", "自定义笔刷"},
+    {"Larger brush by 1 px", "笔刷放大 1 px"},
+    {"Smaller brush by 1 px", "笔刷缩小 1 px"},
+    {"On", "开启"},
+    {"Use global", "使用全局"},
+    {"Reset Brush to Default", "重置笔刷为默认"},
+    {"Save Brush Settings", "保存笔刷设置"},
+    {"Sort: Recent", "排序：最近"},
+    {"Stamp rotation", "印章旋转"},
+    {"Vector displacement", "矢量位移"},
+    {"World Size", "世界尺寸"},
+    // --- Added on main after the conversion (UV Editor, Help > Connect an AI tool) ---
+    {"No UVs yet: pick a method and Unwrap (or mark seams first)", "尚无 UV：选择一种方法并展开（或先标记接缝）"},
+    {"No mesh", "没有网格"},
+    {"Add to Cursor's global MCP file (or .cursor/mcp.json in a project).",
+     "添加 Cursor 的全局 MCP 文件（或项目中的 .cursor/mcp.json）。"},
+    {"Add to Kiro's user MCP file.",
+     "添加 Kiro 的用户 MCP 文件。"},
+    {"Add to Rovo Dev's MCP file (acli rovodev mcp opens it).",
+     "添加 Rovo Dev 的 MCP 文件（acli rovodev mcp 会打开它）。"},
+    {"Add to Zed's settings file (command palette: zed: open settings file).",
+     "添加 Zed 的配置文件（命令面板：zed: open settings file）。"},
+    {"Add to opencode.json.",
+     "添加 opencode.json。"},
+    {"Add to the global MCP file, then use it from Copilot Chat in Agent mode.",
+     "添加全局 MCP 文件，然后在 Copilot Chat 的 Agent 模式中使用。"},
+    {"Add to:",
+     "添加："},
+    {"Add under extensions in Goose's configuration file (or goose configure > Add Extension > Command-Line Extension).",
+     "添加 Goose 配置文件的 extensions 下（或 goose configure > Add Extension > Command-Line Extension）。"},
+    {"Claude Code uses your Pro, Max or Ultra plan when you sign in with your Claude account. If ANTHROPIC_API_KEY is set, it uses that key and API billing instead.",
+     "以 Claude 账号登录时，Claude Code 会使用你的 Pro、Max 或 Ultra 订阅。若设置了 ANTHROPIC_API_KEY，则改用该密钥并按 API 计费。"},
+    {"Claude on the web and on phones can't start programs on your computer: use Claude Desktop or Claude Code.",
+     "网页版与手机版 Claude 无法启动你电脑上的程序：请使用 Claude Desktop 或 Claude Code。"},
+    {"Connect an AI tool",
+     "连接 AI 工具"},
+    {"Connect an AI tool...",
+     "连接 AI 工具..."},
+    {"Copied to the clipboard",
+     "已复制到剪贴板"},
+    {"Fields:",
+     "字段："},
+    {"For Gemini Code Assist Standard or Enterprise, or a Gemini API key. Run once in a terminal.",
+     "适用于 Gemini Code Assist Standard 或 Enterprise，或 Gemini API 密钥。在终端运行一次。"},
+    {"Google's CLI for personal Google accounts (free, Google AI Pro and Ultra). Add this to its MCP file, then sign in with Google.",
+     "Google 为个人 Google 账号（免费、Google AI Pro 与 Ultra）提供的 CLI。将此添加其 MCP 文件，然后以 Google 登录。"},
+    {"In a terminal:",
+     "在终端中："},
+    {"Other tools",
+     "其他工具"},
+    {"Program tab > Install > Edit mcp.json, then paste this.",
+     "Program 选项卡 > Install > Edit mcp.json，然后粘贴这段。"},
+    {"Rovo in Atlassian's web apps only takes public HTTPS servers added by an admin: use Rovo Dev CLI.",
+     "Atlassian 网页应用中的 Rovo 只接受由管理员添加的公开 HTTPS 服务器：请使用 Rovo Dev CLI。"},
+    {"Run once in a terminal (Cline CLI), or paste into Cline's MCP settings (MCP Servers > Configure).",
+     "在终端运行一次（Cline CLI），或粘贴到 Cline 的 MCP 设置（MCP Servers > Configure）。"},
+    {"Run once in a terminal, or add to the user MCP file.",
+     "在终端运行一次，或添加用户 MCP 文件。"},
+    {"Run once in a terminal, or open the command MCP: Open User Configuration and add the entry.",
+     "在终端运行一次，或打开命令 MCP: Open User Configuration 并添加此条目。"},
+    {"Run once in a terminal, then choose Sign in with ChatGPT when Codex starts.",
+     "在终端运行一次，然后在 Codex 启动时选择 Sign in with ChatGPT。"},
+    {"Run once in a terminal.",
+     "在终端运行一次。"},
+    {"Run once in a terminal; it signs in with your Claude plan.",
+     "在终端运行一次；它会以你的 Claude 订阅登录。"},
+    {"Save as a file in your workspace's .continue/mcpServers folder; tools work in agent mode.",
+     "保存为工作区 .continue/mcpServers 文件夹中的文件；工具在 agent 模式下运行。"},
+    {"Settings > Agents > MCP servers > Add, then paste this.",
+     "Settings > Agents > MCP servers > Add，然后粘贴这段。"},
+    {"Settings > MCP Servers > +, then fill in these fields.",
+     "Settings > MCP Servers > +，然后填入这些字段。"},
+    {"Settings > Tools > AI Assistant > Model Context Protocol (MCP): Add, choose STDIO and paste this.",
+     "Settings > Tools > AI Assistant > Model Context Protocol (MCP)：Add，选择 STDIO 并粘贴这段。"},
+    {"Since June 2026 personal Google accounts (free, Google AI Pro, Google AI Ultra) use Antigravity CLI; Gemini CLI is for Gemini Code Assist and API keys.",
+     "自 2026 年 6 月起，个人 Google 账号（免费、Google AI Pro、Google AI Ultra）使用 Antigravity CLI；Gemini CLI 则用于 Gemini Code Assist 与 API 密钥。"},
+    {"The ChatGPT app only connects to remote (HTTPS) servers, and SculptForge doesn't run one: nothing of yours listens on the network. Codex CLI runs on your computer and signs in with your ChatGPT plan.",
+     "ChatGPT 应用只连接远程（HTTPS）服务器，而 SculptForge 不运行这种服务器：你的电脑上没有任何东西在网络上监听。Codex CLI 在你的电脑上运行，并以你的 ChatGPT 订阅登录。"},
+    {"The Grok app (web, phone, X) can't reach programs on your computer, only public HTTPS servers: use Grok Build. xAI's documentation doesn't say which plans Grok Build's sign-in includes; it also takes an xAI API key.",
+     "Grok 应用（网页、手机、X）无法连接到你电脑上的程序，只能连接公开的 HTTPS 服务器：请使用 Grok Build。xAI 的文档没有说明 Grok Build 的登录包含哪些订阅；它也接受 xAI API 密钥。"},
+    {"Their documentation",
+     "官方文档"},
+    {"Turn this off in Preferences > AI.",
+     "可在偏好设置 > AI 中关闭。"},
+    {"User guide: AI agents",
+     "用户指南：AI 代理"},
+    {"Your own agent in Python (uses the OpenAI API with an API key).",
+     "你自己的 Python 代理（以 API 密钥使用 OpenAI API）。"},
+    {"Your own code with the OpenAI, Gemini or xAI API: sculptforge-cli --schema prints every tool as JSON (examples in the user guide, Scripting > AI agents).",
+     "以 OpenAI、Gemini 或 xAI API 编写你自己的程序：sculptforge-cli --schema 会把每个工具输出为 JSON（示例见用户指南，Scripting > AI agents）。"},
+    {"Your own code with the xAI API: sculptforge-cli --schema gives the tool definitions (examples in the user guide, Scripting > AI agents). API usage is billed by xAI.",
+     "以 xAI API 编写你自己的程序：sculptforge-cli --schema 提供工具定义（示例见用户指南，Scripting > AI agents）。API 用量由 xAI 计费。"},
+    {"xAI's coding agent (the grok command). Run once in a terminal; it signs in with your xAI account in the browser.",
+     "xAI 的编程代理（grok 命令）。在终端运行一次；它会在浏览器中以你的 xAI 账号登录。"},
+    // --- Batch 4 (Divide/Subdivide levels, saved views, mask darkness) ---
+    {"Change the Mesh (no levels)", "更改网格（无层级）"},
+    {"Ctrl+Z brings them back.", "Ctrl+Z 可撤销。"},
+    {"Delete Higher Levels", "删除较高层级"},
+    {"Delete Lower Levels", "删除较低层级"},
+    {"Delete SDiv %d to %d and the detail sculpted on them?", "删除 SDiv %d 至 %d 及其上雕刻的细节？"},
+    {"Delete SDiv 1 to %d? SDiv %d becomes the base mesh.", "删除 SDiv 1 至 %d？SDiv %d 成为基础网格。"},
+    {"Delete view", "删除视图"},
+    {"Destructive: four times the polygons as one plain mesh, with no lower levels to step back to. On a Part with subdivision levels it removes them (it asks first; Ctrl+Z brings them back). To keep levels, use Divide (keeps levels) instead.", "破坏性：多边形变为四倍，成为单一网格，没有可返回的较低层级。在有细分层级的部件上会移除层级（会先询问；Ctrl+Z 可撤销）。若要保留层级，请改用“细分（保留层级）”。"},
+    {"Divide (keeps levels)", "细分（保留层级）"},
+    {"Don't ask again", "不再询问"},
+    {"Dynamic needs one plain mesh: Freeze keeps the level shown and removes the others (Ctrl+Z brings them back).", "动态需要单一网格：固定会保留当前显示的层级并移除其他层级（Ctrl+Z 可撤销）。"},
+    {"Extract makes a shell from the masked area: mask it first (Ctrl+drag on the model).", "提取会从遮罩区域创建外壳：请先遮罩（在模型上 Ctrl+拖动）。"},
+    {"Forget this saved view.", "忘记此已保存的视图。"},
+    {"Freeze Levels + Dynamic", "固定层级 + 动态"},
+    {"Freeze Levels and Turn On Dynamic", "固定层级并开启动态"},
+    {"Go back to the view saved or restored last (View > Views).", "回到最后保存或还原的视图（视图 > 视图）。"},
+    {"Go to this saved view (Numpad 0 goes to the last one used).", "跳转到此已保存的视图（小键盘 0 跳转到最后使用的视图）。"},
+    {"How dark masked areas show (also in Preferences > Interface).", "遮罩区域显示的暗度（也可在偏好设置 > 界面中设置）。"},
+    {"How dark masked areas show: 0 = not at all, 1 = nearly black. The default keeps the form readable under the mask.", "遮罩区域显示的暗度：0 = 完全不变暗，1 = 接近全黑。默认值让遮罩下的形体仍清晰可辨。"},
+    {"Keep the subdivision level shown as a plain mesh, delete the other levels and turn Dynamic on (one undo step for the levels: Ctrl+Z brings them back).", "将当前显示的细分层级保留为单一网格，删除其他层级并开启动态（层级为一个撤销步骤：Ctrl+Z 可撤销）。"},
+    {"Mask Darkness", "遮罩暗度"},
+    {"Mask Darkness %.2f", "遮罩暗度 %.2f"},
+    {"Mask darkness", "遮罩暗度"},
+    {"Mask darkness %.2f", "遮罩暗度 %.2f"},
+    {"Mask first (Ctrl+drag)", "请先遮罩（Ctrl+拖动）"},
+    {"Micro Detail", "微细节"},
+    {"Non-destructive: add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to shape big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smt off divides without smoothing.", "非破坏性：添加一个细分层级：多边形变为四倍，并保留较低层级，可降到低层级塑造大形再回到细节。四边形维持四边形（Catmull-Clark）。关闭 Smt 则细分而不平滑。"},
+    {"Remember this camera as a named view (View > Views; the name field names it). Saved with the project.", "将此相机记为命名视图（视图 > 视图；名称字段为其命名）。随项目保存。"},
+    {"Restore View", "还原视图"},
+    {"Save View", "保存视图"},
+    {"Saved view", "已保存的视图"},
+    {"Subdivide (removes levels)", "细分（移除层级）"},
+    {"Subdivide and Remove Levels", "细分并移除层级"},
+    {"This Part has %d subdivision levels (%s).", "此部件有 %d 个细分层级（%s）。"},
+    {"This Part has subdivision levels, so strokes don't remesh it. Freeze Levels keeps the level shown as one plain mesh (Ctrl+Z brings the levels back).", "此部件有细分层级，因此笔触不会重新网格化。固定层级会将当前显示的层级保留为单一网格（Ctrl+Z 可撤销层级）。"},
+    {"This removes your %d subdivision levels. Undo brings them back.", "这会移除你的 %d 个细分层级。撤销可恢复。"},
+    {"Views", "视图"},
+    {"name (optional)", "名称（可选）"},
+    // --- Live mode (Preferences > AI, mcp-live) ---
+    {"\"%s\" on this computer asks to sculpt in this window.",
+     "这台电脑上的“%s”请求在此窗口中雕刻。"},
+    {"%d steps",
+     "%d 个步骤"},
+    {"%s wants to run:",
+     "%s 想要运行："},
+    {"AI connected: ",
+     "AI 已连接： "},
+    {"AI connected: %s",
+     "AI 已连接：%s"},
+    {"AI connection declined",
+     "已取消 AI 连接"},
+    {"AI connection request timed out",
+     "AI 连接请求超时"},
+    {"AI step declined",
+     "已取消 AI 步骤"},
+    {"AI tool disconnected",
+     "AI 工具已断开连接"},
+    {"AI tools can ask to control this window (Preferences > AI)",
+     "AI 工具可请求控制此窗口（偏好设置 > AI）"},
+    {"AI tools can't control this window",
+     "AI 工具无法控制此窗口"},
+    {"Allow once",
+     "允许一次"},
+    {"Allow this AI step?",
+     "允许此 AI 步骤？"},
+    {"Approve",
+     "批准"},
+    {"Deny",
+     "拒绝"},
+    {"Disconnect AI tool",
+     "断开 AI 工具"},
+    {"Disconnect",
+     "断开连接"},
+    {"Let AI tools control this window",
+     "允许 AI 工具控制此窗口"},
+    {"Let an AI tool control this window?",
+     "允许 AI 工具控制此窗口？"},
+    {"Live mode can't start: ",
+     "实时模式无法启动： "},
+    {"Live mode: an AI tool on this computer (sculptforge-cli --mcp --attach) can ask to sculpt in this window while you watch. You approve each connection; files outside the project, scripts and the network ask first. Nothing listens on the network.",
+     "实时模式：这台电脑上的 AI 工具（sculptforge-cli --mcp --attach）可请求在你观看时在此窗口雕刻。每次连接都需经你批准；项目外的文件、脚本和网络会先询问。不会在网络上监听。"},
+    {"Stop the AI tool controlling this window now (its steps stay in Undo).",
+     "立即停止控制此窗口的 AI 工具（其步骤保留在“撤销”中）。"},
+    {"Stop the AI tool now. Its steps stay in Undo.",
+     "立即停止 AI 工具。其步骤保留在“撤销”中。"},
+    {"Your AI tool asks: ",
+     "你的 AI 工具请求： "},
+    // --- Preferences > AI and live mode's confirm reasons (fix/i18n-ai-prefs) ---
+    {"AI Brush and Generate 3D. Off: they are hidden and SculptForge makes no AI network calls.",
+     "AI 笔刷与生成 3D 模型。关闭：两者都会隐藏，SculptForge 不会进行任何 AI 网络连接。"},
+    {"AI services & privacy",
+     "AI 服务与隐私"},
+    {"Set by this computer (SF_AI or --no-ai).",
+     "由这台电脑设置（SF_AI 或 --no-ai）。"},
+    {"Your art is never uploaded or used for training. AI features run only when you use them and can be turned off.",
+     "你的作品绝不会被上传或用于训练。AI 功能只在你使用时运行，也可以关闭。"},
+    {"Hugging Face token (hf_...)",
+     "Hugging Face 令牌（hf_...）"},
+    {"Connects to the network",
+     "会连接到网络"},
+    {"Runs a macro or script",
+     "会运行宏或脚本"},
+    {"Runs outside programs (splat training)",
+     "会运行外部程序（splat 训练）"},
+    {"Deletes a file from your library",
+     "会删除资源库中的文件"},
+    {"Writes a program or settings file: %s",
+     "会写入程序或配置文件：%s"},
+    {"Overwrites %s",
+     "会覆盖 %s"},
+    {"Writes %s (outside the project folder and the files you picked)",
+     "会写入项目文件夹与你所选文件以外的位置：%s"},
+    {"Reads %s (outside the project folder and the files you picked)",
+     "会读取项目文件夹与你所选文件以外的位置：%s"},
+    {"Saves over the project",
+     "会覆盖保存项目"},
+    {"Replaces the scene: your unsaved changes would be lost",
+     "会替换场景：未保存的更改将会丢失"},
+    // The in-app guide (Help > Connect an AI tool, PanelConnectAi.cpp) and its dialogs, in the guide's words
+    {"1. Pick your tool", "1. 选择你的工具"},
+    {"2. Let it work in this window", "2. 让它在此窗口中工作"},
+    {"3. What happens next", "3. 接下来会发生什么"},
+    {"Add this to its configuration file (Settings > Developer > Edit Config), then restart Claude Desktop.", "将此添加到其配置文件（Settings > Developer > Edit Config），然后重新启动 Claude Desktop。"},
+    {"An AI tool on this computer can ask to work in this window while you watch. You approve it with a 6-digit code. Every step lands in Undo. Files outside the project, scripts and the network ask you first. What it sees goes to that tool's AI service. Nothing listens on the network. To set up your tool: Help > Connect an AI tool.", "这台电脑上的 AI 工具可请求在你观看时在此窗口中工作。你用 6 位数代码批准它。每个步骤都会进入“撤销”。项目外的文件、脚本和网络都会先询问你。它看到的内容会发送到该工具的 AI 服务。不会在网络上监听。设置你的工具：帮助 > 连接 AI 工具。"},
+    {"Approval lasts until it disconnects. Every step lands in Undo. Files outside the project, scripts and the network ask you first. What it sees goes to that tool's AI service.", "批准在其断开连接前有效。每个步骤都会进入“撤销”。项目外的文件、脚本和网络都会先询问你。它看到的内容会发送到该工具的 AI 服务。"},
+    {"Ask your AI tool for something (below). SculptForge shows a 6-digit code: click Approve, or tell the AI the code.", "向你的 AI 工具提出请求（示例在下方）。SculptForge 会显示 6 位数代码：单击“批准”，或把代码告诉 AI。"},
+    {"Block out a creature head with horns for me to sculpt.", "帮我做出一个有角的生物头部大形，让我来雕刻。"},
+    {"Click Approve, or tell your AI tool this code:", "单击“批准”，或把这组代码告诉你的 AI 工具："},
+    {"Every step lands in Undo as \"AI: ...\", so you can step back.", "每个步骤都会以“AI: ...”进入“撤销”，你可以一步步撤销。"},
+    {"It asks you first before files outside the project, scripts and the network.", "使用项目外的文件、脚本和网络前，它会先询问你。"},
+    {"It sees the viewport; what it sees goes to that tool's AI service.", "它能看到视口；它看到的内容会发送到该工具的 AI 服务。"},
+    {"Let an AI tool (Claude Code, Claude Desktop, Cursor and others) work in this window while you watch: pick your tool, copy its command, turn on live mode. The AI blocks out a starting point; you do the art. Nothing listens on the network.", "让 AI 工具（Claude Code、Claude Desktop、Cursor 等）在你观看时在此窗口中工作：选择你的工具、复制其命令、开启实时模式。AI 先做出起点；作品由你完成。不会在网络上监听。"},
+    {"Look at my model from all sides and tell me what to fix.", "从各个角度看看我的模型，告诉我该修改什么。"},
+    {"Make three rock variations I can refine.", "做三种岩石变化，让我再修饰。"},
+    {"On: your AI tool can ask to connect.", "开启：你的 AI 工具可以请求连接。"},
+    {"Plans and sign-in", "订阅与登录"},
+    {"Teach me: walk me through sculpting an ear, step by step.", "教我：一步一步带我雕刻耳朵。"},
+    {"The AI blocks out a starting point and shows you options; you do the art.", "AI 先做出起点并提供选项；作品由你完成。"},
+    {"Try asking", "试着这样问"},
+    {"While it works, the AI connected badge sits at the bottom right. Disconnect stops it.", "工作期间，“AI 已连接”标记会显示在右下角。单击“断开连接”即可停止。"},
+    // --- Studio controls: Preferences > AI (PanelAi.cpp, ai/Providers.cpp, core/ManagedPolicy.cpp) ---
+    {"AI tools (MCP)", "AI 工具（MCP）"},
+    {"AI tools can't connect: your studio turned them off.", "AI 工具无法连接：你的工作室已将其关闭。"},
+    {"AI tools may use only the kinds of command your studio allows.", "AI 工具只能使用你的工作室允许的命令类型。"},
+    {"AI tools work on their own scene; your studio doesn't let them control this window.", "AI 工具在自己的场景中工作；你的工作室不允许它们控制这个窗口。"},
+    {"API key", "API 密钥"},
+    {"Audit log", "审计日志"},
+    {"Connecting...", "正在连接..."},
+    {"Copy code", "复制代码"},
+    {"Copy path", "复制路径"},
+    {"Endpoint", "端点"},
+    {"Every AI action (AI tools, AI Brush, Generate 3D) is recorded on this computer: time, tool, command and settings, never your artwork or keys.", "每个 AI 操作（AI 工具、AI 笔刷、生成 3D 模型）都会记录在这台电脑上：时间、工具、命令和设置，绝不包含你的作品或密钥。"},
+    {"Find models", "查找模型"},
+    {"In your browser, sign in and enter this code:", "请在浏览器中登录并输入此代码："},
+    {"Managed by", "管理者："},
+    {"Managed by your studio", "由你的工作室管理"},
+    {"Model", "模型"},
+    {"Open the sign-in page", "打开登录页面"},
+    {"Provider", "提供商"},
+    {"Rate limited to a request every few seconds; if it can't be reached, a running Ollama is used instead.", "每隔几秒才能发出一次请求；如果无法连接，会改用正在运行的 Ollama。"},
+    {"Requests go only to the endpoint above. Keys are kept in your system keychain (never in a settings file); leave empty to use the environment (ANTHROPIC_API_KEY, OPENAI_API_KEY). For private, offline use, pick Ollama or LM Studio.", "请求只会发送到上方的端点。密钥保存在系统钥匙圈中（绝不存放在设置文件里）；留空则使用环境变量（ANTHROPIC_API_KEY、OPENAI_API_KEY）。如需私密、离线使用，请选择 Ollama 或 LM Studio。"},
+    {"Saved in your system keychain.", "已保存在系统钥匙圈中。"},
+    {"SculptForge has no telemetry: nothing about you or your work is collected.", "SculptForge 没有遥测：不会收集任何关于你或你作品的数据。"},
+    {"Sign in with your studio account", "使用工作室账号登录"},
+    {"Signed in as", "已登录："},
+    {"Signed out of your studio account", "已退出工作室账号"},
+    {"Signs in through your studio's own login page in your browser. Nothing on this computer listens for it; the sign-in is kept in your system keychain.", "通过你的工作室在浏览器中的登录页面登录。这台电脑上没有任何程序在等待连接；登录信息保存在系统钥匙圈中。"},
+    {"Studio sign-in", "工作室登录"},
+    {"The studio policy can't be used, so AI, network features and AI tools are off:", "无法使用工作室策略，因此 AI、网络功能和 AI 工具都已关闭："},
+    {"Uses your studio sign-in (Preferences > AI > Studio sign-in)", "使用你的工作室登录（偏好设置 > AI > 工作室登录）"},
+    {"Using the key from the environment.", "使用环境变量中的密钥。"},
+    {"Your studio doesn't allow this provider: pick another", "你的工作室不允许此提供商：请选择其他提供商"},
+    {"Your studio requires the sign-in for AI features.", "你的工作室要求登录后才能使用 AI 功能。"},
+};
+
+} // namespace
+
+std::span<const Entry> simplifiedChineseTable() { return {kSimplifiedChinese, std::size(kSimplifiedChinese)}; }
+
+} // namespace sf::i18n

@@ -255,6 +255,7 @@ bool checkServer(const std::string& url, ServerInfo& info, std::string& error, i
         return false;
     }
     const std::string base = normalizeUrl(url);
+    if (!aiRequestAllowed("comfyui", base + "/system_stats", error)) return false; // (a studio's policy)
     HttpResponse r = httpRequest("GET", base + "/system_stats", {}, {}, timeoutSeconds);
     if (!r.error.empty()) {
         error = unreachable(base, r.error);
@@ -575,6 +576,7 @@ GeneratorResult run(const AiSettings& s, const std::string& workflowPath, const 
                     const std::string& prompt, const std::string& outputStem, GenerationProgress* p,
                     std::optional<uint64_t> seed) {
     if (!aiEnabled()) return {false, {}, aiOffError()};
+    if (std::string why; !aiRequestAllowed("comfyui", normalizeUrl(s.comfyUrl) + "/prompt", why)) return {false, {}, why};
     GeneratorResult result;
     const bool text = imagePath.empty();
     const std::string kind = text ? "text" : "image";

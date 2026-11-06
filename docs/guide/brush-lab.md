@@ -82,18 +82,25 @@ only. The choice is saved in the brush's `.sfbrush` file, so a shared brush keep
 ## Choose an AI provider
 
 Brush Lab works out of the box with no account or key. Open the **AI provider** section of Brush Lab (also in
-**Mesh > Generate 3D > AI brush provider**) to choose another service.
+**Mesh > Generate 3D > AI brush provider** and **Edit > Preferences > AI > Provider**) to choose another service.
+Each choice fills in the address and a model:
 
 | Provider | What you need | Notes |
 |---|---|---|
 | **Free - no account or key** (default) | Nothing | An open model (GPT-OSS 20B) hosted by Pollinations.ai. Only your description and settings are sent. Rate limited to about one request every few seconds. If it can't be reached, a running local Ollama is used instead. |
-| **Anthropic (Claude) - your key** | An Anthropic API key | Uses `claude-opus-5-5` by default. **Effort** (low, medium, high) trades speed for more considered brushes. |
-| **OpenAI-compatible (OpenAI, Ollama, LM Studio...)** | An endpoint, a model name and, for hosted services, a key | Any server that speaks the OpenAI chat completions API, including local models. |
+| **Anthropic (Claude)** | An Anthropic API key | Uses `claude-opus-5-5` by default. **Effort** (low, medium, high) trades speed for more considered brushes. |
+| **OpenAI** | An OpenAI API key | Click **Find models** to pick one. |
+| **Ollama (this computer)**, **LM Studio (this computer)** | The app running on your computer | Private and offline, no key. See below. |
+| **vLLM server**, **llama.cpp server** | A server on your computer or at your studio | Change the address to your server's. |
+| **LiteLLM proxy (studio gateway)** | Your studio's gateway address | One address for every model your studio allows; a key from your studio, or your studio sign-in. See [IT deployment](studios.md#ai-providers). |
+| **OpenRouter** | An OpenRouter key | Many models through one key. |
+| **Other OpenAI-compatible server** | An endpoint, a model name and, for hosted services, a key | Any server that speaks the OpenAI chat completions API. |
 
-For Anthropic and OpenAI-compatible providers you can edit the **Endpoint**, **Model** and **API key** fields.
-Leave the key empty to use the `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` environment variable. Click
-**Save settings** to keep your choice; settings and keys are stored only on your computer, in `ai.json` in the
-SculptForge settings folder (readable only by you). Requests go only to the endpoint you set.
+You can edit the **Endpoint**, **Model** and **API key** fields. Leave the key empty to use the
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `OPENROUTER_API_KEY` environment variable. Click **Save settings** to keep
+your choice. Keys are kept in your system's keychain (macOS Keychain, Windows Credential Manager, or the Secret
+Service on Linux), never in a settings file. Requests go only to the endpoint you set. If your studio manages
+SculptForge, some providers may be greyed out with **Managed by your studio**.
 
 ### Run a model on your own computer
 
@@ -101,11 +108,10 @@ For private, offline use with no rate limits, run a local model with Ollama or L
 
 1. Install [Ollama](https://ollama.com/download) and download the recommended model:
    `ollama pull qwen3:4b-instruct` (2.5 GB, works without a graphics card).
-2. In **AI provider**, choose **OpenAI-compatible (OpenAI, Ollama, LM Studio...)**.
-3. Click **Ollama** (or **LM Studio**) to fill in the local endpoint.
-4. Click **Find models**. SculptForge checks the connection, shows "Connected" with the number of installed
+2. In **AI provider**, choose **Ollama (this computer)** (or **LM Studio (this computer)**).
+3. Click **Find models**. SculptForge checks the connection, shows "Connected" with the number of installed
    models, and lets you pick one from the **Model** list.
-5. Click **Save settings**.
+4. Click **Save settings**.
 
 The **Run a model on this computer** section in the panel shows the install steps for your operating system.
 The model needs about 4 GB of free memory; expect 10-20 seconds per brush on a laptop CPU and a few seconds

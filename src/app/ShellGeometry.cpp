@@ -123,16 +123,18 @@ ShellGeometry computeShell(const UiLayout& l, float W, float H, float s, float t
     }
     const float span = std::max(0.0f, right - left);
 
-    const float topH = g.shelves ? (m.topShelfH + m.grow) * s : 0.0f;
-    const float bottomH = g.shelves ? (bottomShelfSize(l.shelfTiles).shelfH + m.grow) * s : 0.0f;
+    // An empty shelf takes no room outside Customize Shelves (#139).
+    auto shown = [&](const std::vector<std::string>& items) { return g.shelves && (l.customize || !shelfEmpty(items)); };
+    const float topH = shown(l.topShelf) ? (m.topShelfH + m.grow) * s : 0.0f;
+    const float bottomH = shown(l.bottomShelf) ? (bottomShelfSize(l.shelfTiles).shelfH + m.grow) * s : 0.0f;
     g.topShelf = {left, top, span, topH};
     g.bottomShelf = {left, H - bottomH, span, bottomH};
     const float consoleH = l.consoleOpen ? std::clamp(l.consoleHeight, kConsoleMinH, kConsoleMaxH) * s : 0.0f;
     g.console = {left, g.bottomShelf.y - consoleH, span, consoleH};
 
     const float y0 = top + topH, y1 = std::max(y0, g.console.y);
-    const float leftW = g.shelves ? ((g.narrow ? kLeftShelfNarrowW : kLeftShelfW) + m.grow) * s : 0.0f;
-    const float rightW = g.shelves ? (kRightShelfW + m.grow) * s : 0.0f;
+    const float leftW = shown(l.leftShelf) ? ((g.narrow ? kLeftShelfNarrowW : kLeftShelfW) + m.grow) * s : 0.0f;
+    const float rightW = shown(l.rightShelf) ? (kRightShelfW + m.grow) * s : 0.0f;
     g.leftShelf = {left, y0, leftW, y1 - y0};
     g.rightShelf = {right - rightW, y0, rightW, y1 - y0};
     g.canvas = {left + leftW, y0, std::max(1.0f, span - leftW - rightW), std::max(1.0f, y1 - y0)};
