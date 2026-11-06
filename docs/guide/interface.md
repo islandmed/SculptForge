@@ -33,9 +33,9 @@ a two-row top shelf; the rest is the same. See [The title strip](#the-title-stri
 **Edit > Preferences > Interface > Look** sets how the interface looks and how it is laid out. Neither changes your
 models, brushes or shortcuts.
 
-> **Where Preferences is:** **Edit > Preferences** in the SculptForge layout; in the Classic layout, its own
-> **Preferences** palette in the palette bar (also **Edit > Preferences...**). In both, <kbd>Ctrl</kbd>+<kbd>,</kbd>
-> (<kbd>Cmd</kbd>+<kbd>,</kbd> on macOS) or <kbd>F3</kbd> > **Preferences** opens it.
+> **Classic layout:** Preferences is not under **Edit** there but its own **Preferences** palette in the palette
+> bar (**Edit > Preferences...** opens it too). In both layouts <kbd>Ctrl</kbd>+<kbd>,</kbd> (<kbd>Cmd</kbd>+<kbd>,</kbd>
+> on macOS) or <kbd>F3</kbd> > **Preferences** opens it.
 
 **Layout**:
 
@@ -524,9 +524,9 @@ Layout keeps it.
 
 ### Interface preferences
 
-> **Where Preferences is:** **Edit > Preferences** in the SculptForge layout; in the Classic layout, its own
-> **Preferences** palette in the palette bar (also **Edit > Preferences...**). In both, <kbd>Ctrl</kbd>+<kbd>,</kbd>
-> (<kbd>Cmd</kbd>+<kbd>,</kbd> on macOS) or <kbd>F3</kbd> > **Preferences** opens it.
+> **Classic layout:** Preferences is not under **Edit** there but its own **Preferences** palette in the palette
+> bar (**Edit > Preferences...** opens it too). In both layouts <kbd>Ctrl</kbd>+<kbd>,</kbd> (<kbd>Cmd</kbd>+<kbd>,</kbd>
+> on macOS) or <kbd>F3</kbd> > **Preferences** opens it.
 
 **Edit > Preferences > Interface**:
 
