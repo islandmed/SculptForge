@@ -65,6 +65,19 @@ int findSet(const std::vector<BrushSet>& list, const std::string& name) {
     return -1;
 }
 
+// printf into a std::string (the messages below come in English and in the interface language).
+template <class... A> std::string format(const char* f, A... args) {
+    if constexpr (sizeof...(A) == 0) return f;
+    char buf[512];
+    std::snprintf(buf, sizeof buf, f, args...);
+    return buf;
+}
+
+std::string countText(int n, const char* one, const char* many, bool translated) {
+    const char* f = n == 1 ? one : many;
+    return format(translated ? tr(f) : f, n);
+}
+
 std::string trimmed(const std::string& s) {
     const size_t a = s.find_first_not_of(" \t"), b = s.find_last_not_of(" \t");
     return a == std::string::npos ? std::string() : s.substr(a, b - a + 1);
@@ -159,7 +172,7 @@ void App::syncShelfBrushActions() {
     if (!brushSets_.pending.empty()) {
         std::string msg;
         applyBrushSet(std::exchange(brushSets_.pending, std::string()), msg);
-        status_ = msg;
+        status_ = brushSets_.shown;
     }
     if (layout_.bottomShelf == brushSets_.shelfSeen) return;
     brushSets_.shelfSeen = layout_.bottomShelf;
@@ -205,11 +218,31 @@ void App::syncShelfBrushActions() {
     }
 }
 
+// The result in English (the command's message: scripts, the console, the AI link) and in the interface language
+// (brushSets_.shown, for the status bar when the step came from the interface).
+template <class... A> void App::say(std::string& message, const char* english, A... args) {
+    message = format(english, args...);
+    brushSets_.shown = format(tr(english), args...);
+}
+
+void App::sayCounts(std::string& message, const char* english, const std::string& name, int brushes, int keys) {
+    message = format(english, name.c_str(), countText(brushes, "%d brush", "%d brushes", false).c_str(),
+                     countText(keys, "%d key", "%d keys", false).c_str());
+    brushSets_.shown = format(tr(english), name.c_str(), countText(brushes, "%d brush", "%d brushes", true).c_str(),
+                              countText(keys, "%d key", "%d keys", true).c_str());
+}
+
+void App::runBrushSetCommand(const std::string& command, const std::string& name) {
+    brushSets_.shown.clear();
+    runCommand(command, {{"name", name}});
+    if (!brushSets_.shown.empty()) status_ = brushSets_.shown; // in the interface language
+}
+
 bool App::applyBrushSet(const std::string& name, std::string& message) {
     const int i = findSet(brushSets_.list, name);
     if (i < 0) {
-        message = brushSets_.list.empty() ? "No brush sets yet: Save Shelf as Brush Set makes one"
-                                          : "No brush set called " + name;
+        if (brushSets_.list.empty()) say(message, "No brush sets yet: Save Shelf as Brush Set makes one");
+        else say(message, "No brush set called %s", name.c_str());
         return false;
     }
     const BrushSet set = brushSets_.list[size_t(i)];
@@ -226,15 +259,14 @@ bool App::applyBrushSet(const std::string& name, std::string& message) {
         ++keys;
     }
     uiPrefs_.brushSet = set.name;
-    message = "Brush set: " + set.name + " (" + std::to_string(countBrushes(set.shelf)) + " brushes, " +
-              std::to_string(keys) + (keys == 1 ? " key)" : " keys)");
+    sayCounts(message, "Brush set: %s (%s, %s)", set.name, countBrushes(set.shelf), keys);
     return true;
 }
 
 bool App::saveShelfAsBrushSet(const std::string& rawName, std::string& message) {
     const std::string name = trimmed(rawName);
     if (name.empty() || name.size() > kMaxBrushSetName) {
-        message = "A brush set's name must be 1 to 64 characters";
+        say(message, "A brush set's name must be 1 to 64 characters");
         return false;
     }
     BrushSet set;
@@ -247,32 +279,32 @@ bool App::saveShelfAsBrushSet(const std::string& rawName, std::string& message) 
     const bool replaced = std::any_of(brushSets_.list.begin(), brushSets_.list.end(), [&](const BrushSet& b) { return b.name == name; });
     std::string err;
     if (!saveBrushSet(brushSetsDir(), set, err)) {
-        message = err;
+        message = brushSets_.shown = err;
         return false;
     }
     refreshBrushSets();
     uiPrefs_.brushSet = name;
     const int keys = int(std::count_if(set.keys.begin(), set.keys.end(), [](const auto& k) { return !k.second.empty(); }));
-    message = std::string(replaced ? "Brush set updated: " : "Brush set saved: ") + name + " (" +
-              std::to_string(countBrushes(set.shelf)) + " brushes, " + std::to_string(keys) + (keys == 1 ? " key)" : " keys)");
+    sayCounts(message, replaced ? "Brush set updated: %s (%s, %s)" : "Brush set saved: %s (%s, %s)", name, countBrushes(set.shelf),
+              keys);
     return true;
 }
 
 bool App::deleteBrushSet(const std::string& name, std::string& message) {
     const int i = findSet(brushSets_.list, name);
     if (i < 0) {
-        message = "No brush set called " + name;
+        say(message, "No brush set called %s", name.c_str());
         return false;
     }
     const std::string gone = brushSets_.list[size_t(i)].name;
     std::string err;
     if (!deleteBrushSetFile(brushSets_.list[size_t(i)], err)) {
-        message = err;
+        message = brushSets_.shown = err;
         return false;
     }
     if (uiPrefs_.brushSet == gone) uiPrefs_.brushSet.clear();
     refreshBrushSets();
-    message = "Brush set deleted: " + gone + " (the shelf stays as it is)";
+    say(message, "Brush set deleted: %s (the shelf stays as it is)", gone.c_str());
     return true;
 }
 
@@ -291,7 +323,7 @@ void App::drawBrushSetMenu() {
         char count[64];
         std::snprintf(count, sizeof count, n == 1 ? tr("%d brush") : tr("%d brushes"), n);
         const std::string label = set.name + "##brushset" + std::to_string(i);
-        if (ImGui::MenuItem(label.c_str(), count, int(i) == current)) runCommand("brush_set", {{"name", set.name}});
+        if (ImGui::MenuItem(label.c_str(), count, int(i) == current)) runBrushSetCommand("brush_set", set.name);
         ui::HelpText(set.name.c_str(), actions_.shortcutText("brushset.use." + slug(set.name)).c_str(),
                      "Switch the bottom shelf to this set's brushes and give them the set's keys.", "Brush > Brush set");
     }
@@ -379,7 +411,7 @@ void App::drawBrushSetSave() {
         if (ImGui::Button(tr("Cancel##brushsetsave_cancel"), button) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             ImGui::CloseCurrentPopup();
         } else if (ok && !name.empty()) {
-            runCommand("brush_set_save", {{"name", name}});
+            runBrushSetCommand("brush_set_save", name);
             if (lastCommandOk_) ImGui::CloseCurrentPopup();
             else error = status_;
         }
@@ -392,7 +424,7 @@ void App::drawBrushSetSave() {
         ImGui::TextDisabled("%s", tr("Only the set goes: the brushes and the shelf stay as they are."));
         bool close = false;
         if (ImGui::Button(tr("Delete##brushsetdelete_ok"), button)) {
-            runCommand("brush_set_delete", {{"name", brushSets_.deleting}});
+            runBrushSetCommand("brush_set_delete", brushSets_.deleting);
             close = true;
         }
         ImGui::SameLine();

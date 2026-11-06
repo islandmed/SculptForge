@@ -3328,6 +3328,15 @@ constexpr Entry kTraditionalChinese[] = {
     {"Replaces the set %s.", "將取代筆刷組 %s。"},
     {"Delete the brush set %s?", "刪除筆刷組 %s？"},
     {"Switch the bottom shelf to this set's brushes and give them the set's keys.", "將底部工具列換成這個組的筆刷，並套用這個組的快速鍵。"},
+    {"%d key", "%d 個快速鍵"},
+    {"%d keys", "%d 個快速鍵"},
+    {"Brush set: %s (%s, %s)", "筆刷組：%s（%s，%s）"},
+    {"Brush set saved: %s (%s, %s)", "已儲存筆刷組：%s（%s，%s）"},
+    {"Brush set updated: %s (%s, %s)", "已更新筆刷組：%s（%s，%s）"},
+    {"Brush set deleted: %s (the shelf stays as it is)", "已刪除筆刷組：%s（工具列保持不變）"},
+    {"No brush set called %s", "沒有名為 %s 的筆刷組"},
+    {"No brush sets yet: Save Shelf as Brush Set makes one", "還沒有筆刷組：「將工具列儲存為筆刷組」可建立一個"},
+    {"A brush set's name must be 1 to 64 characters", "筆刷組名稱須為 1 到 64 個字元"},
 };
 
 } // namespace

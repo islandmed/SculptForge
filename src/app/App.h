@@ -2143,6 +2143,9 @@ private:
     bool applyBrushSet(const std::string& name, std::string& message);
     bool saveShelfAsBrushSet(const std::string& name, std::string& message);
     bool deleteBrushSet(const std::string& name, std::string& message);
+    template <class... A> void say(std::string& message, const char* english, A... args);
+    void sayCounts(std::string& message, const char* english, const std::string& name, int brushes, int keys);
+    void runBrushSetCommand(const std::string& command, const std::string& name); // then the status in the interface language
     void openBrushSetSave();
     void drawBrushSetSave(); // the Save Shelf as Brush Set window
     struct BrushSetsUi {
@@ -2151,6 +2154,7 @@ private:
         bool saveOpen = false, saveFocus = false, deleteOpen = false;
         char name[65] = "";
         std::string error;    // why the last Save didn't work
+        std::string shown;    // the last brush set step's result in the interface language (the status bar)
         std::string deleting; // the set Delete asks about
         std::string pending;  // a set's action ran: switched to at the start of the next frame
     } brushSets_;

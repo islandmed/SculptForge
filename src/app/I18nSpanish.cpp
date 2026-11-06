@@ -3798,6 +3798,15 @@ constexpr Entry kSpanish[] = {
     {"Replaces the set %s.", "Reemplaza el conjunto %s."},
     {"Delete the brush set %s?", "¿Eliminar el conjunto de pinceles %s?"},
     {"Switch the bottom shelf to this set's brushes and give them the set's keys.", "Cambia el estante inferior a los pinceles de este conjunto y les da sus teclas."},
+    {"%d key", "%d tecla"},
+    {"%d keys", "%d teclas"},
+    {"Brush set: %s (%s, %s)", "Conjunto de pinceles: %s (%s, %s)"},
+    {"Brush set saved: %s (%s, %s)", "Conjunto de pinceles guardado: %s (%s, %s)"},
+    {"Brush set updated: %s (%s, %s)", "Conjunto de pinceles actualizado: %s (%s, %s)"},
+    {"Brush set deleted: %s (the shelf stays as it is)", "Conjunto de pinceles eliminado: %s (el estante queda como está)"},
+    {"No brush set called %s", "No hay ningún conjunto de pinceles llamado %s"},
+    {"No brush sets yet: Save Shelf as Brush Set makes one", "Aún no hay conjuntos de pinceles: Guardar estante como conjunto de pinceles crea uno"},
+    {"A brush set's name must be 1 to 64 characters", "El nombre de un conjunto de pinceles debe tener de 1 a 64 caracteres"},
 };
 
 } // namespace

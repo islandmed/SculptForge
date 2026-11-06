@@ -3330,6 +3330,15 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Replaces the set %s.", "将替换笔刷组 %s。"},
     {"Delete the brush set %s?", "删除笔刷组 %s？"},
     {"Switch the bottom shelf to this set's brushes and give them the set's keys.", "将底部工具栏换成这个组的笔刷，并应用这个组的快捷键。"},
+    {"%d key", "%d 个快捷键"},
+    {"%d keys", "%d 个快捷键"},
+    {"Brush set: %s (%s, %s)", "笔刷组：%s（%s，%s）"},
+    {"Brush set saved: %s (%s, %s)", "已保存笔刷组：%s（%s，%s）"},
+    {"Brush set updated: %s (%s, %s)", "已更新笔刷组：%s（%s，%s）"},
+    {"Brush set deleted: %s (the shelf stays as it is)", "已删除笔刷组：%s（工具栏保持不变）"},
+    {"No brush set called %s", "没有名为 %s 的笔刷组"},
+    {"No brush sets yet: Save Shelf as Brush Set makes one", "还没有笔刷组：“将工具栏保存为笔刷组”可创建一个"},
+    {"A brush set's name must be 1 to 64 characters", "笔刷组名称须为 1 到 64 个字符"},
 };
 
 } // namespace
