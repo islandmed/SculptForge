@@ -4115,12 +4115,14 @@ bool App::overViewNavigator(float x, float y) const {
 
 bool App::axisGizmoMouseDown(float x, float y) {
     // A click on an end snaps to that side view, orthographic (#43, as in Blender's navigation gizmo), a second click
-    // on it to the opposite side; a drag on the disc behind the ends orbits; a click on the View Figure snaps to
+    // on it to the opposite side; a plain drag on the disc behind the ends orbits; a click on the View Figure snaps to
     // the side view nearest the current one.
     const auto ends = axisGizmoLayout();
     const float unit = axisGizmoUnit();
     int hit = uiPrefs_.showAxes ? axisGizmoSnapEnd(ends, axisGizmoHit(ends, x, y, kAxisGizmoHitRadius * unit)) : -1;
-    if (hit < 0 && uiPrefs_.showAxes && axisGizmoOnDisc(axisGizmoCentre(), kAxisGizmoDisc * unit, x, y)) {
+    // Only a plain press: Alt / Ctrl / Shift drags starting there keep their meaning (pan, mask, roll...).
+    const bool plain = !((SDL_GetModState() | keyMods()) & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI));
+    if (hit < 0 && plain && uiPrefs_.showAxes && axisGizmoOnDisc(axisGizmoCentre(), kAxisGizmoDisc * unit, x, y)) {
         drag_ = Drag::Orbit;
         rightClick_.pending = false;
         return true;

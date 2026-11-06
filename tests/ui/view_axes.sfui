@@ -130,3 +130,11 @@ key escape
 shot with_view_figure
 view_figure_click
 expect_value camera_aligned == 1
+
+# Alt+drag starting on the disc still pans (only a plain drag there orbits).
+camera 35 -25
+remember camera_pan p0
+hold alt
+axis_drag 0 60
+hold none
+expect_value camera_pan > $p0
