@@ -442,6 +442,7 @@ private:
     bool showAbout_ = false;
     bool showConnectAi_ = false; // Help > Connect an AI tool (PanelConnectAi.cpp; only while AI is on)
     std::string connectClient_ = "claude_code"; // its "Pick your tool" choice (a connect::Client id)
+    float connectScale_ = 0.0f;                 // the UI scale it was last placed for
     void drawConnectAi();
     // Supporting SculptForge (Support.h): the app only ever opens the membership page or its Stripe checkout links in the
     // browser; nothing else changes.

@@ -45,7 +45,7 @@ double seconds() { return double(SDL_GetTicksNS()) * 1e-9; }
 
 // The dialogs look like the app's others (Save changes?, Delete brush): text wrapped at one width, the answer first
 // and the refusal second, both buttons one width (110 px, wider only if a translation needs it).
-constexpr float kDialogWrap = 360.0f;
+constexpr float kDialogWrap = 400.0f;
 float dialogButtonWidth(const char* const (&labels)[2], float scale) {
     float w = 110.0f * scale;
     for (const char* l : labels)
@@ -640,7 +640,7 @@ void App::drawAiLink() {
                                     ImGuiWindowFlags_AlwaysAutoResize;
 
     if (s.approving && s.session->state() == link::AiLinkSession::State::Pairing) {
-        ImGui::SetNextWindowPos(centre, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowPos(centre, ImGuiCond_Always, ImVec2(0.5f, 0.5f)); // (Appearing: an auto-sized window has no size yet)
         if (std::exchange(s.focusDialog, false)) ImGui::SetNextWindowFocus();
         bool open = true;
         if (ImGui::Begin(tr("Let an AI tool control this window?###ailinkapprove"), nullptr, dialog)) {
@@ -705,7 +705,7 @@ void App::drawAiLink() {
     ImGui::PopStyleVar();
 
     if (!s.confirm) return;
-    ImGui::SetNextWindowPos(centre, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowPos(centre, ImGuiCond_Always, ImVec2(0.5f, 0.5f)); // (Appearing: an auto-sized window has no size yet)
     if (std::exchange(s.focusDialog, false)) ImGui::SetNextWindowFocus();
     bool open = true;
     bool allow = false;

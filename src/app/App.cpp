@@ -2892,6 +2892,7 @@ void App::drawUi() {
                          uvToolActive();
     if (((!ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y)) || drag_ == Drag::Stroke) &&
         !hideBrushCursor_ && radial_.menu < 0 && !strokePopup_.open && drag_ != Drag::Select && drag_ != Drag::Guide && // (no ring under a pie or the stroke popup)
+        aiLinkStateValue() != 2 && aiLinkStateValue() != 4 && // (nor over a live-mode question: it is drawn above windows)
         (!ringOff || drag_ == Drag::Stroke || ctrlDown(inputMods())))
         drawBrushCursor();
     drawSelectionOverlay();

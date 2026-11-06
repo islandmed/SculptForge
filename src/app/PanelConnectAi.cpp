@@ -18,6 +18,7 @@
 #include <filesystem>
 #include <iterator>
 #include <string>
+#include <utility>
 
 namespace sf {
 
@@ -79,12 +80,15 @@ void codeBox(const std::string& text, const std::string& id, ImFont* mono) {
 
 void App::drawConnectAi() {
     if (!showConnectAi_) return;
-    if (aiLinkStateValue() == 2) return; // the Approve dialog takes its place (never two dialogs stacked)
+    // The Approve or Allow dialog takes its place while it is open: never two dialogs stacked.
+    if (const int live = aiLinkStateValue(); live == 2 || live == 4) return;
     const float s = uiScale_;
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     const float w = std::min(640.0f * s, vp->WorkSize.x - 32.0f * s);
     ImGui::SetNextWindowSizeConstraints(ImVec2(w, 0), ImVec2(w, vp->WorkSize.y - 32.0f * s));
-    ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    // Centred when it opens and again when the UI scale changes (it would hang off the window's edge).
+    const bool rescaled = std::exchange(connectScale_, s) != s;
+    ImGui::SetNextWindowPos(vp->GetCenter(), rescaled ? ImGuiCond_Always : ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (!ImGui::Begin((std::string(tr("Connect an AI tool")) + "###connect_ai").c_str(), &showConnectAi_,
                       ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::End();
@@ -95,6 +99,9 @@ void App::drawConnectAi() {
     launch.args.push_back("--attach"); // live mode: the tool works in this window (headless --mcp: the user guide)
     launch.name = "sculptforge-live";
     const std::vector<connect::Client> all = connect::clients(launch, os);
+    // The radio buttons and the switch on the button colour: an empty one must not vanish into the window (Classic).
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::GetStyleColorVec4(ImGuiCol_Button));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
     ImGui::TextWrapped("%s", tr("The AI blocks out a starting point and shows you options; you do the art."));
 
     // 1. The tool: the three most asked for as buttons, every other one in a list.
@@ -148,7 +155,7 @@ void App::drawConnectAi() {
     if (ImGui::SmallButton((std::string(ICON_LC_BOOK_OPEN " ") + tr("Their documentation")).c_str())) SDL_OpenURL(c.docs);
     if (const std::vector<const char*> notes = connect::planNotes(c.plan); !notes.empty()) {
         ImGui::SameLine();
-        ImGui::TextDisabled("%s", tr("Plans and sign-in"));
+        ImGui::TextDisabled(ICON_LC_INFO " %s", tr("Plans and sign-in"));
         if (ImGui::IsItemHovered()) {
             ImGui::BeginTooltip();
             ImGui::PushTextWrapPos(420.0f * s);
@@ -192,6 +199,7 @@ void App::drawConnectAi() {
         ImGui::TextWrapped("%s", prompt.c_str());
     }
 
+    ImGui::PopStyleColor(2);
     ImGui::Separator();
     if (ImGui::Button(tr("User guide: AI agents"))) guide_.open("scripting.md");
     ImGui::SameLine();
