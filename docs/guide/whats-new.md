@@ -10,7 +10,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 ```features
 date: unreleased
 tagline: Faster pen-up on dense scans, clean creases on micro levels, moves that go into sculpt layers, Maya style view keys and a UDIM grid.
-highlight: {{PERF_HIGHLIGHT}}
+highlight: Big brushes on dense scans finish sooner after you lift the pen
 highlight: Clean Sharp Crease, Crease and Pinch on micro levels
 highlight: Move, Scale and Rotate into a sculpt layer
 highlight: Maya style view keys, and UDIMs in Columns x Rows
@@ -34,7 +34,7 @@ action: ui.uv_editor
 ```
 
 - **Faster pen-up on dense scans**: with a micro level, a big brush stroke on a dense scan finishes sooner after you
-  lift the pen. {{PEN_UP}}
+  lift the pen.
 - **Smoother orbit after big strokes**: orbiting a dense scan with a micro level right after big strokes is smoother
   on slower computers; the shading catches up while the view moves and finishes when it stops.
 - **Transforms into a sculpt layer**: with a layer active in **Tool > Layers**, Move, Scale and Rotate (the Transform
