@@ -5,6 +5,18 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.9
+
+```features
+date: 2026-11-06
+tagline: Folders for your Parts, a Line Gradient for paint, and Auto UV that never freezes the app.
+highlight: Folders in Tool > Parts: drag Parts in, fold, hide and move them together (thanks @ebarranco, #96)
+highlight: Line Gradient: drag a colour ramp across the model (thanks @Devon0209, #99)
+highlight: Auto UV runs in the background and can be cancelled
+highlight: Your input style's shortcuts work right after a restart (thanks @Velisariy, #147)
+highlight: Hyper3D Rodin, direct: generate a model from an image or a description with your own Hyper3D key (thanks @ElgoogUdiab, #123)
+```
+
 ## Version 0.11.8
 
 ```features
