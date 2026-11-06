@@ -127,7 +127,8 @@ TEST(radial_json_drops_unknown_and_wrong_types) {
 TEST(radial_json_caps_counts) {
     // A huge array of slots and of menus: only the caps are kept, the rest counted as dropped.
     std::string text = R"({"name": "big", "slots": [)";
-    for (int i = 0; i < 100000; ++i) text += std::string(i ? "," : "") + R"({"action": "brush.clay"})";
+    // (10000: far over the caps, and quick under a loaded -j10 run; 100000 took 23 s there)
+    for (int i = 0; i < 10000; ++i) text += std::string(i ? "," : "") + R"({"action": "brush.clay"})";
     text += "]}";
     Json j;
     std::string err;
@@ -136,7 +137,7 @@ TEST(radial_json_caps_counts) {
     int dropped = 0;
     CHECK(radialMenuFromJson(j, vocab(), m, &dropped));
     CHECK(m.slots.size() == size_t(kRadialSlots));
-    CHECK(dropped == 100000 - kRadialSlots);
+    CHECK(dropped == 10000 - kRadialSlots);
 
     Json menus = Json::array();
     for (int i = 0; i < 50; ++i) menus.push(j);
