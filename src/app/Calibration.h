@@ -13,6 +13,7 @@
 #pragma once
 
 #include "core/HardwareProfile.h"
+#include "render/GL.h"
 
 #include <string>
 
@@ -46,7 +47,9 @@ private:
 };
 
 // GPU time of each frame through GL timer queries (GL_TIME_ELAPSED), read a few frames later so the CPU never
-// waits for the GPU. Unavailable (available() false) where the driver has no timer queries.
+// waits for the GPU: a fence after each query says when it is done (asking the query itself, even only whether it
+// is available, waited for the whole frame's GPU work on Mesa's Apple driver: CPU and GPU took turns). Unavailable
+// (available() false) where the driver has no timer queries.
 class GpuFrameTimer {
 public:
     bool available();          // loads the entry points on first use (needs the context)
@@ -58,6 +61,7 @@ public:
 private:
     static constexpr int kSlots = 4;
     unsigned queries_[kSlots] = {};
+    GLsync fences_[kSlots] = {}; // signalled when the slot's query is done
     uint64_t frames_[kSlots] = {};
     bool pending_[kSlots] = {};
     int next_ = 0, active_ = -1;
