@@ -17,6 +17,12 @@
 #include "core/PerfTrace.h"
 
 #include "ai/AiCommands.h"
+#include "ai/Oidc.h"
+#include "ai/Secrets.h"
+#include "core/AuditLog.h"
+#include "core/Keychain.h"
+#include "core/ManagedPolicy.h"
+#include "ai/Providers.h"
 #include "app/Demo.h"
 #include "app/Shell.h"
 #include "app/Theme.h"
@@ -237,8 +243,24 @@ bool App::init(const AppOptions& options) {
     } else {
         io.IniFilename = nullptr;
     }
+    if (!options.uiTest.empty()) policy::resetPolicyForTests(); // (a UI test's ui_policy never reaches the next one)
     // Preferences > AI: tests, renders and videos start with AI on whatever this computer chose (SF_AI still wins).
     ai::setAiEnabled(ai::aiFeaturesAllowed(headless || !options.demo.empty() || aiSettings_.enabled));
+    // AI keys and the studio sign-in are in the OS keychain (ai/Secrets.h, ai/Oidc.h), read on a worker so no frame
+    // waits on an unlock prompt. Tests, renders and benchmarks never touch the user's keychain.
+    audit::setClient("app");
+    ai::secrets::setLazy(false);
+    if (headless || !options.uiTest.empty() || !options.demo.empty() || options.benchmark) {
+        keychain::useMemoryForTests(true);
+    } else {
+        std::thread([path = aiSettingsPath_] {
+            std::string message;
+            if (!path.empty()) ai::secrets::migrateLegacyKeys(path, message);
+            if (!message.empty()) SDL_Log("%s", message.c_str());
+            ai::secrets::preload();
+            ai::oidc::loadSaved();
+        }).detach();
+    }
     ai::registerAiCommands(commands_, [this] { return aiSettings_; });
     registerPaintUiCommands();
     registerViewUiCommands(); // light, xray, view_resolution, save_render (PanelView.cpp)
@@ -512,6 +534,7 @@ int App::runUiTest(int w, int h, int fps) {
         syncScene();
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
         viewSamples(); // keeps Fast Navigation's view of the camera current (UI tests read view_samples)
+        noteStillness();
         hardwareProfileFrameEnd();
         if (tracing) {
             tracePhase[4] = tracePhase[5] = tracePhase[6] = double(SDL_GetTicksNS()) * 1e-6;
@@ -803,7 +826,8 @@ bool App::wantsFrames(double now) const {
            timelapseBusy() || hardwareCalibrating() || // both render a step per frame: they stop when the frames do
            spaceMouseMoving() || // a held SpaceMouse cap sends no events, but the view keeps moving (SpaceMouse.cpp)
            perf_.framesStill < 10 || // the view just moved: Fast Navigation's full-quality frame comes after it stops
-           (perf_.proxyPrebuild && renderer_.proxiesPending()); // motion proxies left to build, a few ms a frame
+           (perf_.proxyPrebuild && renderer_.proxiesPending()) || // motion proxies left to build, a few ms a frame
+           renderer_.coarseStillWanted(); // coarse levels: the full-detail still frame comes once the view rests
 }
 
 uint64_t App::frameKey() const {
@@ -1162,6 +1186,7 @@ int App::run() {
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
         const int samples = viewSamples();
         renderSettings_.motionProxy = perf_.proxyNow; // big meshes draw their lighter proxy while the view moves
+        noteStillness();
         renderSettings_.materialTint = materialTintFor(doc_.paintColor); // (Color > Colour tints the material)
         renderSettings_.resolutionScale = float(uiPrefs_.viewResolution) / 100.0f; // (#80; only the window's view)
         if (perf_.movingNow) // while the view moves, the floor tier draws fewer pixels; full resolution when it stops
@@ -2962,7 +2987,7 @@ void App::drawUi() {
             if (ImGui::Button("Third-party notices"))
                 SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/THIRD_PARTY_NOTICES.md");
             ImGui::SameLine();
-            if (ImGui::Button("AI services & privacy"))
+            if (ImGui::Button(tr("AI services & privacy")))
                 SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md");
             ImGui::Spacing();
             drawSupportersSection(); // PanelSupport.cpp
@@ -3246,16 +3271,36 @@ bool App::beginPanel(const char* name, bool* open, float width) {
 
 void App::drawAiSettings() {
     using P = ai::AiSettings::Provider;
-    const char* providers[] = {"Free - no account or key", "Anthropic (Claude) - your key",
-                               "OpenAI-compatible (OpenAI, Ollama, LM Studio...)"};
-    int provider = int(aiSettings_.provider);
+    // Presets (ai/Providers.h): one click fills the endpoint and a model. A studio's policy may allow only some
+    // (core/ManagedPolicy.h ai.providers): the others are greyed with "Managed by your studio".
+    const std::string current = ai::providerId(aiSettings_);
+    const ai::ProviderPreset* chosen = ai::findProviderPreset(current);
     ImGui::SetNextItemWidth(-1);
-    if (ImGui::Combo("##provider", &provider, providers, 3)) {
-        // Only the brush provider changes; the image-to-3D settings stay.
-        const ai::AiSettings d = ai::AiSettings::defaults(P(provider));
-        aiSettings_.provider = d.provider;
-        aiSettings_.endpoint = d.endpoint;
-        aiSettings_.model = d.model;
+    if (ImGui::BeginCombo("##provider", chosen ? tr(chosen->label) : current.c_str())) {
+        for (const ai::ProviderPreset& p : ai::providerPresets()) {
+            const bool allowed = policy::aiProviderAllowed(p.id);
+            ImGui::BeginDisabled(!allowed);
+            if (ImGui::Selectable(tr(p.label), current == p.id)) {
+                // Only the brush provider changes; the image-to-3D settings stay.
+                aiSettings_ = ai::withPreset(aiSettings_, p.id);
+                modelsChecked_ = false;
+            }
+            ImGui::EndDisabled();
+            if (!allowed && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("%s", ui::ManagedByText().c_str());
+        }
+        ImGui::EndCombo();
+    }
+    if (!policy::current().aiProviders.empty()) ui::ManagedBadge();
+    if (std::string why; !policy::aiProviderAllowed(current, &why)) { // (saved before the policy came)
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.6f, 0.4f, 1));
+        ImGui::TextWrapped("%s", tr(policy::current().ai == policy::Lock::Off ? why : std::string("Your studio doesn't allow this provider: pick another")).c_str());
+        ImGui::PopStyleColor();
+    }
+    if (chosen) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+        ImGui::TextWrapped("%s", tr(chosen->note));
+        ImGui::PopStyleColor();
     }
     auto textField = [](const char* label, std::string& value, ImGuiInputTextFlags flags = 0) {
         char buf[512];
@@ -3264,20 +3309,8 @@ void App::drawAiSettings() {
         if (ImGui::InputText(label, buf, sizeof buf, flags)) value = buf;
     };
     if (aiSettings_.provider == P::OpenAICompatible) {
-        // One-click presets for the two common local servers.
-        const float third = (ImGui::GetContentRegionAvail().x - 2 * ImGui::GetStyle().ItemSpacing.x) / 3;
-        if (ImGui::Button("Ollama", ImVec2(third, 0))) {
-            aiSettings_.endpoint = "http://localhost:11434/v1/chat/completions";
-            modelsChecked_ = false;
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("LM Studio", ImVec2(third, 0))) {
-            aiSettings_.endpoint = "http://localhost:1234/v1/chat/completions";
-            modelsChecked_ = false;
-        }
-        ImGui::SameLine();
         ImGui::BeginDisabled(pendingModels_.valid());
-        if (ImGui::Button(pendingModels_.valid() ? "Checking..." : "Find models", ImVec2(third, 0))) {
+        if (ImGui::Button(pendingModels_.valid() ? tr("Checking...") : tr("Find models"), ImVec2(-1, 0))) {
             auto promise = std::make_shared<std::promise<ModelList>>();
             pendingModels_ = promise->get_future();
             std::thread([promise, settings = aiSettings_] {
@@ -3297,18 +3330,37 @@ void App::drawAiSettings() {
         }
     }
     if (aiSettings_.provider != P::Free) {
-        textField("Endpoint", aiSettings_.endpoint);
+        textField(tr("Endpoint"), aiSettings_.endpoint);
+        if (std::string why; !aiSettings_.endpoint.empty() && !policy::aiEndpointAllowed(aiSettings_.endpoint, &why)) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.6f, 0.4f, 1));
+            ImGui::TextWrapped("%s", tr(why).c_str());
+            ImGui::PopStyleColor();
+        }
         if (aiSettings_.provider == P::OpenAICompatible && modelsChecked_ && !localModels_.models.empty()) {
             ImGui::SetNextItemWidth(-ImGui::CalcTextSize("Endpoint").x - ImGui::GetStyle().ItemInnerSpacing.x);
-            if (ImGui::BeginCombo("Model", aiSettings_.model.c_str())) {
+            if (ImGui::BeginCombo(tr("Model"), aiSettings_.model.c_str())) {
                 for (const auto& m : localModels_.models)
                     if (ImGui::Selectable(m.c_str(), m == aiSettings_.model)) aiSettings_.model = m;
                 ImGui::EndCombo();
             }
         } else {
-            textField("Model", aiSettings_.model);
+            textField(tr("Model"), aiSettings_.model);
         }
-        textField("API key", aiSettings_.apiKey, ImGuiInputTextFlags_Password);
+        if (ai::oidc::usesSignIn(aiSettings_.endpoint)) {
+            // The studio gateway takes the studio sign-in instead of a key (ai/Oidc.h).
+            ImGui::TextDisabled("%s", tr("Uses your studio sign-in (Preferences > AI > Studio sign-in)"));
+        } else {
+            textField(tr("API key"), aiSettings_.apiKey, ImGuiInputTextFlags_Password);
+            const ai::ProviderPreset* p = ai::findProviderPreset(current);
+            const char* env = p && *p->keyEnv ? p->keyEnv : nullptr;
+            if (aiSettings_.apiKey.empty()) {
+                const char* where = !ai::secrets::cached(ai::secrets::presetAccount(current)).empty()
+                                        ? tr("Saved in your system keychain.")
+                                    : env && std::getenv(env) ? tr("Using the key from the environment.")
+                                                              : nullptr;
+                if (where) ImGui::TextDisabled("%s", where);
+            }
+        }
     }
     if (aiSettings_.provider == P::OpenAICompatible && modelsChecked_) {
         const bool ok = localModels_.error.empty();
@@ -3320,19 +3372,20 @@ void App::drawAiSettings() {
             ImGui::TextWrapped("%s", localModels_.error.c_str());
         ImGui::PopStyleColor();
     }
-    if (aiSettings_.provider == P::OpenAICompatible && ImGui::TreeNode("Run a model on this computer")) {
+    if ((current == "ollama" || current == "lmstudio" || current == "openai-compatible") &&
+        ImGui::TreeNode("Run a model on this computer")) {
         // Steps for the platform we're on; the guide covers the others.
 #if defined(_WIN32)
         ImGui::TextWrapped("1. Install Ollama from ollama.com/download, or in PowerShell:\n"
                            "      winget install Ollama.Ollama\n"
                            "2. Download the model (in PowerShell):\n"
                            "      ollama pull qwen3:4b-instruct\n"
-                           "3. Ollama runs in the system tray. Click Ollama above, then Find models.");
+                           "3. Ollama runs in the system tray. Pick Ollama above, then Find models.");
 #elif defined(__APPLE__)
         ImGui::TextWrapped("1. Install Ollama from ollama.com/download and drag it to Applications.\n"
                            "2. Download the model (in Terminal):\n"
                            "      ollama pull qwen3:4b-instruct\n"
-                           "3. Ollama runs in the menu bar. Click Ollama above, then Find models.");
+                           "3. Ollama runs in the menu bar. Pick Ollama above, then Find models.");
 #else
         ImGui::TextWrapped("1. Install Ollama (or use your package manager, e.g. sudo pacman -S ollama):\n"
                            "      curl -fsSL https://ollama.com/install.sh | sh\n"
@@ -3340,7 +3393,7 @@ void App::drawAiSettings() {
                            "      sudo systemctl enable --now ollama\n"
                            "3. Download the model:\n"
                            "      ollama pull qwen3:4b-instruct\n"
-                           "4. Click Ollama above, then Find models.");
+                           "4. Pick Ollama above, then Find models.");
 #endif
         ImGui::TextWrapped("The 2.5 GB model needs about 4 GB of free memory and works without a graphics card "
                            "(10-20 s per brush on a laptop CPU, a few seconds with a GPU).");
@@ -3358,16 +3411,16 @@ void App::drawAiSettings() {
         std::string err;
         status_ = aiSettingsPath_.empty() || !aiSettings_.save(aiSettingsPath_, err) ? "Could not save AI settings " + err
                                                                                      : "AI settings saved";
+        storeAiKeys();
     }
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     if (aiSettings_.provider == P::Free)
-        ImGui::TextWrapped("Free: an open model (GPT-OSS 20B) hosted by Pollinations.ai, no sign-up. Only your "
-                           "brush description and settings are sent. Rate limited to a request every few seconds; "
-                           "if it can't be reached, a running Ollama is used instead.");
+        ImGui::TextWrapped("%s", tr("Rate limited to a request every few seconds; if it can't be reached, a running "
+                                    "Ollama is used instead."));
     else
-        ImGui::TextWrapped("Requests go only to the endpoint above. Keys are stored on this computer only "
-                           "(owner-readable ai.json); leave empty to use ANTHROPIC_API_KEY / OPENAI_API_KEY. "
-                           "For private, offline use, run Ollama and pick OpenAI-compatible.");
+        ImGui::TextWrapped("%s", tr("Requests go only to the endpoint above. Keys are kept in your system keychain "
+                                    "(never in a settings file); leave empty to use the environment (ANTHROPIC_API_KEY, "
+                                    "OPENAI_API_KEY). For private, offline use, pick Ollama or LM Studio."));
     ImGui::PopStyleColor();
 }
 
@@ -3598,14 +3651,22 @@ void App::showHunyuanNoticeOnce() {
     saved.save(aiSettingsPath_, err);
 }
 
+void App::storeAiKeys() {
+    // Into the keychain on a worker (an unlock prompt never holds up a frame); ai.json never has them.
+    std::thread([settings = aiSettings_] {
+        if (!ai::secrets::storeKeys(settings))
+            SDL_Log("AI keys: no keychain on this computer, so they last until SculptForge quits (or set them in the environment)");
+    }).detach();
+}
+
 void App::drawAiPrefsSection() {
     ImGui::SetNextItemWidth(-1);
-    ImGui::InputTextWithHint("##hftoken", "Hugging Face token (hf_...)", hfToken_, sizeof hfToken_, ImGuiInputTextFlags_Password);
+    ImGui::InputTextWithHint("##hftoken", tr("Hugging Face token (hf_...)"), hfToken_, sizeof hfToken_, ImGuiInputTextFlags_Password);
     ui::HelpText("Hugging Face token", nullptr,
                  "Free at huggingface.co/settings/tokens (read access). Raises the free daily allowance in "
                  "Generate 3D, and TRELLIS.2 needs it. Empty = the HF_TOKEN environment variable.",
                  "Preferences > AI");
-    if (ImGui::Button("Save", ImVec2(-1, 0))) {
+    if (ImGui::Button(tr("Save##hftoken"), ImVec2(-1, 0))) {
         // Saves the token into the settings as they are on disk, so other unsaved panel edits stay unsaved.
         aiSettings_.hfToken = hfToken_;
         ai::AiSettings saved = aiSettingsPath_.empty() ? aiSettings_ : ai::AiSettings::load(aiSettingsPath_);
@@ -3613,6 +3674,7 @@ void App::drawAiPrefsSection() {
         std::string err;
         status_ = !aiSettingsPath_.empty() && saved.save(aiSettingsPath_, err) ? "Hugging Face token saved"
                                                                                : "Save failed " + err;
+        storeAiKeys();
     }
 }
 
@@ -3871,6 +3933,7 @@ void App::drawImageTo3D() {
         std::string err;
         status_ = !aiSettingsPath_.empty() && aiSettings_.save(aiSettingsPath_, err) ? "Image to 3D settings saved"
                                                                                         : "Save failed " + err;
+        storeAiKeys();
     }
 
     if (textMode_) {

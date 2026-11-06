@@ -4,6 +4,10 @@
 #include "ai/AiPolicy.h"
 
 #include "ai/Http.h"
+#include "ai/Oidc.h"
+#include "ai/Providers.h"
+#include "ai/Secrets.h"
+#include "core/ManagedPolicy.h"
 #include "core/BrushLibrary.h"
 
 #include <cstdlib>
@@ -100,18 +104,24 @@ const char* AiSettings::providerName(Provider provider) {
 std::string AiSettings::resolvedKey() const {
     if (provider == Provider::Free) return {};
     if (!apiKey.empty()) return apiKey;
-    const char* env = std::getenv(provider == Provider::Anthropic ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY");
+    const std::string id = providerId(*this);
+    if (std::string k = secrets::cached(secrets::presetAccount(id)); !k.empty()) return k;
+    const ProviderPreset* p = findProviderPreset(id);
+    const char* name = p && *p->keyEnv ? p->keyEnv : provider == Provider::Anthropic ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY";
+    const char* env = std::getenv(name);
     return env ? env : "";
 }
 
 std::string AiSettings::resolvedFalKey() const {
     if (!falKey.empty()) return falKey;
+    if (std::string k = secrets::cached(secrets::kFal); !k.empty()) return k;
     const char* env = std::getenv("FAL_KEY");
     return env ? env : "";
 }
 
 std::string AiSettings::resolvedHfToken() const {
     if (!hfToken.empty()) return hfToken;
+    if (std::string k = secrets::cached(secrets::kHuggingFace); !k.empty()) return k;
     for (const char* name : {"HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"})
         if (const char* env = std::getenv(name)) return env;
     return {};
@@ -119,27 +129,26 @@ std::string AiSettings::resolvedHfToken() const {
 
 std::string AiSettings::resolvedMeshyKey() const {
     if (!meshyKey.empty()) return meshyKey;
+    if (std::string k = secrets::cached(secrets::kMeshy); !k.empty()) return k;
     const char* env = std::getenv("MESHY_API_KEY");
     return env ? env : "";
 }
 
 Json AiSettings::toJson() const {
     Json j = Json::object();
+    // (no keys: they are in the keychain, ai/Secrets.h)
     j.set("provider", providerName(provider));
+    j.set("preset", providerId(*this)); // (also marks a file from 0.11.4 on: see fromJson)
     j.set("endpoint", endpoint);
     j.set("model", model);
-    j.set("apiKey", apiKey);
     j.set("effort", effort);
     j.set("generatorService", generatorService);
     j.set("generatorCommand", generatorCommand);
-    j.set("hfToken", hfToken);
     j.set("hfModel", hfModel);
     j.set("hfModelChosen", hfModelChosen);
     j.set("hunyuanNoticeShown", hunyuanNoticeShown);
-    j.set("falKey", falKey);
     j.set("falModel", falModel);
     j.set("falEndpoint", falEndpoint);
-    j.set("meshyKey", meshyKey);
     j.set("meshyModel", meshyModel);
     j.set("meshyEndpoint", meshyEndpoint);
     j.set("comfyUrl", comfyUrl);
@@ -153,15 +162,17 @@ Json AiSettings::toJson() const {
 AiSettings AiSettings::fromJson(const Json& j) {
     // Settings saved before the free tier existed defaulted to Anthropic; without
     // a key they never worked, so those move to Free.
+    // (Files with a "preset" are newer: their key is in the keychain, not missing.)
     Provider p = providerFromName(j["provider"].asString());
-    if (p == Provider::Anthropic && j["apiKey"].asString().empty() && !std::getenv("ANTHROPIC_API_KEY") &&
+    if (p == Provider::Anthropic && !j.has("preset") && j["apiKey"].asString().empty() && !std::getenv("ANTHROPIC_API_KEY") &&
         j["endpoint"].asString() == kAnthropicUrl)
         p = Provider::Free;
     AiSettings s = defaults(p);
     const bool keepEndpoint = p == providerFromName(j["provider"].asString());
     if (keepEndpoint && !j["endpoint"].asString().empty()) s.endpoint = j["endpoint"].asString();
     if (keepEndpoint && !j["model"].asString().empty()) s.model = j["model"].asString();
-    s.apiKey = j["apiKey"].asString();
+    if (keepEndpoint && findProviderPreset(j["preset"].asString())) s.preset = j["preset"].asString();
+    s.apiKey = j["apiKey"].asString(); // (an older ai.json's key: moved to the keychain, ai/Secrets.h)
     if (!j["effort"].asString().empty()) s.effort = j["effort"].asString();
     s.generatorCommand = j["generatorCommand"].asString();
     auto text = [&](const char* key, std::string& field) {
@@ -281,6 +292,12 @@ std::string requestUrl(const AiSettings& s) { return s.endpoint; }
 std::vector<std::string> requestHeaders(const AiSettings& s) {
     std::vector<std::string> h = {"Content-Type: application/json"};
     const std::string key = s.resolvedKey();
+    // The studio sign-in goes to the studio's own gateway (core/ManagedPolicy.h signIn.useFor), instead of a key.
+    if (const std::string bearer = oidc::bearerHeaderFor(requestUrl(s)); !bearer.empty()) {
+        h.push_back(bearer);
+        if (s.provider == AiSettings::Provider::Anthropic) h.push_back("anthropic-version: 2023-06-01");
+        return h;
+    }
     if (s.provider == AiSettings::Provider::Anthropic) {
         h.push_back("x-api-key: " + key);
         h.push_back("anthropic-version: 2023-06-01");
@@ -390,6 +407,7 @@ std::vector<std::string> listModels(const AiSettings& s, std::string& error) {
         error = aiOffError();
         return out;
     }
+    if (!aiRequestAllowed(providerId(s), modelsUrl(s.endpoint), error)) return out;
     HttpResponse r = httpRequest("GET", modelsUrl(s.endpoint), requestHeaders(s), {}, 5);
     if (!r.error.empty()) {
         error = "Nothing is answering at " + s.endpoint + " - is Ollama or LM Studio running? (" + r.error + ")";
@@ -411,6 +429,7 @@ std::string smallestOllamaModel(std::string& error) {
         error = aiOffError();
         return {};
     }
+    if (!aiRequestAllowed("ollama", "http://localhost:11434/api/tags", error)) return {};
     HttpResponse r = httpRequest("GET", "http://localhost:11434/api/tags", {}, {}, 2);
     Json j;
     if (r.status != 200 || !Json::parse(r.body, j, error)) return {};
@@ -426,6 +445,14 @@ std::string smallestOllamaModel(std::string& error) {
     return best;
 }
 
+bool aiRequestAllowed(const std::string& id, const std::string& url, std::string& error) {
+    if (!aiEnabled()) return (error = aiOffError(), false);
+    if (!policy::aiProviderAllowed(id, &error) || !policy::aiEndpointAllowed(url, &error)) return false;
+    if (policy::current().requireSignIn && oidc::state() != oidc::State::SignedIn)
+        return (error = "Sign in with your studio account first (Preferences > AI > Studio sign-in)", false);
+    return true;
+}
+
 BrushSuggestion requestBrush(const AiSettings& s, const std::vector<ChatMessage>& history,
                              std::string* rawAssistantJson) {
     if (!aiEnabled()) {
@@ -433,7 +460,8 @@ BrushSuggestion requestBrush(const AiSettings& s, const std::vector<ChatMessage>
         out.error = aiOffError();
         return out;
     }
-    if (s.provider == AiSettings::Provider::Anthropic && s.resolvedKey().empty()) {
+    if (BrushSuggestion out; !aiRequestAllowed(providerId(s), requestUrl(s), out.error)) return out;
+    if (s.provider == AiSettings::Provider::Anthropic && s.resolvedKey().empty() && !oidc::usesSignIn(requestUrl(s))) {
         BrushSuggestion out;
         out.error = "No Anthropic API key - add one in AI settings or set ANTHROPIC_API_KEY, or switch to Free.";
         return out;

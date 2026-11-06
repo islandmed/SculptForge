@@ -187,6 +187,7 @@ int App::viewSamples() {
     if (view != perf_.lastView) {
         perf_.lastView = view;
         perf_.framesStill = 0;
+        perf_.stillSince = ImGui::GetTime(); // (the frame clock: scripted time in tests)
     } else if (perf_.framesStill < 1000) {
         ++perf_.framesStill;
     }
@@ -200,6 +201,14 @@ int App::viewSamples() {
     perf_.fastNow = aa > 1 && perf_.proxyNow;
     perf_.samplesWanted = perf_.fastNow ? 1 : aa;
     return perf_.samplesWanted;
+}
+
+// How long the view has been still and whether a stroke runs: coarse levels give way to full detail at rest
+// (Renderer::coarsePreviewOnly).
+void App::noteStillness() {
+    renderSettings_.stillSeconds = perf_.movingNow ? 0.0 : ImGui::GetTime() - perf_.stillSince;
+    renderSettings_.stroking = doc_.sculptor.strokeActive() || strokeFinishing_ || !dabQueue_.empty();
+    renderer_.setStroking(renderSettings_.stroking);
 }
 
 void App::notePerformanceFrame(double syncMs) {

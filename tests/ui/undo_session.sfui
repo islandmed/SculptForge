@@ -1,0 +1,132 @@
+# Undo history through a typical "sculpt a creature" session (Discord report 11-06: "the undo history not working"):
+# strokes with several brushes, a mask, dynamic topology, Divide, a second Part, the strip folded, save and reopen.
+# Every Ctrl+Z / Ctrl+Shift+Z / strip seek must move the shape back and the timeline with it.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+expect_value timeline_steps == 0
+
+# Strokes with three brushes; Ctrl+Z takes each back exactly.
+snapshot
+click "Clay##brush.clay"
+stroke 0.35 0.40 0.60 0.45
+click "Standard##brush.standard"
+stroke 0.40 0.55 0.62 0.60
+click "Inflate##brush.inflate"
+stroke 0.30 0.30 0.50 0.35
+expect_value timeline_steps == 3
+expect_value moved > 0
+key ctrl+z
+key ctrl+z
+key ctrl+z
+expect_value moved == 0
+expect_value timeline_cursor == 0
+key ctrl+shift+z
+key ctrl+shift+z
+key ctrl+shift+z
+expect_value timeline_cursor == 3
+expect_value moved > 0
+
+# A mask, then a stroke: undo the stroke, then the mask.
+run mask_all
+expect_value masked > 0
+run mask_clear
+click "Standard##brush.standard"
+snapshot
+stroke 0.55 0.35 0.65 0.55
+expect_value timeline_steps == 6
+key ctrl+z
+expect_value moved == 0
+key ctrl+z
+expect_value masked > 0
+key ctrl+z
+expect_value masked == 0
+expect_value timeline_cursor == 3
+# Branch from here, then click back through the strip's command.
+stroke 0.45 0.45 0.55 0.55
+expect_value timeline_steps == 4
+expect_value timeline_branches == 1
+
+# Back to the tip, Ctrl+Z / Ctrl+Shift+Z after a seek.
+run timeline_seek index=4
+snapshot
+stroke 0.40 0.60 0.50 0.65
+expect_value timeline_steps == 5
+key ctrl+z
+expect_value moved == 0
+expect_value timeline_cursor == 4
+key ctrl+shift+z
+expect_value timeline_cursor == 5
+
+# Dynamic topology: a stroke that adds triangles, undone.
+run dyntopo enabled=true
+remember triangles tris0
+stroke 0.35 0.45 0.65 0.50
+expect_value triangles != $tris0
+key ctrl+z
+expect_value triangles == $tris0
+key ctrl+shift+z
+expect_value triangles != $tris0
+run dyntopo enabled=false
+
+# Divide, a stroke on the top level, undo both.
+remember triangles tris1
+key ctrl+d
+expect_value triangles > $tris1
+snapshot
+stroke 0.40 0.40 0.60 0.60
+expect_value moved > 0
+key ctrl+z
+expect_value moved == 0
+key ctrl+z
+expect_value triangles == $tris1
+key ctrl+shift+z
+key ctrl+shift+z
+expect_value can_undo == 1
+
+# A second Part: each keeps its own history.
+remember timeline_steps steps0
+run part_duplicate
+expect_value parts == 2
+expect_value timeline_steps == 0
+snapshot
+stroke 0.40 0.40 0.60 0.60
+expect_value timeline_steps == 1
+run part_select index=0
+expect_value timeline_steps == $steps0
+snapshot
+stroke 0.30 0.50 0.50 0.55
+key ctrl+z
+expect_value moved == 0
+run part_select index=1
+expect_value timeline_steps == 1
+snapshot
+key ctrl+z
+expect_value moved > 0
+expect_value timeline_cursor == 0
+key ctrl+shift+z
+expect_value timeline_cursor == 1
+run part_select index=0
+key ctrl+z
+expect_value timeline_cursor == $steps0-1
+
+# Save with the history, reopen: the saved strokes undo on the reopened project (a topology change such as Divide
+# would cut the saved history there, so this starts a fresh sculpt).
+run new_sphere subdivisions=5
+stroke 0.35 0.40 0.60 0.45
+stroke 0.40 0.55 0.62 0.60
+click "Save with project"
+run save_project path=undo_session.sfproj
+run new_sphere subdivisions=3
+run open_project path=undo_session.sfproj
+expect_status "with its history"
+expect_value timeline_steps == 2
+snapshot
+stroke 0.40 0.45 0.60 0.55
+expect_value moved > 0
+key ctrl+z
+expect_value moved == 0
+expect_value can_undo == 1
+key ctrl+z
+expect_value moved > 0
+expect_value timeline_cursor == 1
+shot reopened

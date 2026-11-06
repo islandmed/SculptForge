@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ai/AiPolicy.h"
 
+#include "core/ManagedPolicy.h"
 #include "core/NetworkPolicy.h"
 
 #include <algorithm>
@@ -16,7 +17,10 @@ std::atomic<bool> gEnabled{true};
 std::atomic<bool> gForcedOff{false};
 std::atomic<bool> gStudioAllows{false};
 // Studio mode turns AI off and locks it, unless the studio's profile asks for it ("ai": true).
-bool studioOff() { return net::offlineMode() && !gStudioAllows; }
+// A managed policy (core/ManagedPolicy.h) that turns AI on allows it in studio mode too (its endpoints are reachable).
+bool studioOff() { return net::offlineMode() && !gStudioAllows && policy::current().ai != policy::Lock::On; }
+bool managedOff() { return policy::current().ai == policy::Lock::Off; }
+bool managedOn() { return policy::current().ai == policy::Lock::On; }
 } // namespace
 
 void setStudioAiAllowed(bool on) { gStudioAllows = on; }
@@ -33,10 +37,15 @@ AiOverride aiEnvOverride() {
 
 void setAiForcedOff(bool off) { gForcedOff = off; }
 
-bool aiPolicyLocked() { return gForcedOff || studioOff() || aiEnvOverride() != AiOverride::None; }
+bool aiPolicyLocked() {
+    return gForcedOff || studioOff() || managedOff() || managedOn() || aiEnvOverride() != AiOverride::None;
+}
+
+bool aiManaged() { return managedOff() || managedOn(); }
 
 bool aiFeaturesAllowed(bool saved) {
-    if (gForcedOff || studioOff()) return false;
+    if (gForcedOff || studioOff() || managedOff()) return false;
+    if (managedOn()) return true; // the studio's policy wins over SF_AI and the saved choice
     switch (aiEnvOverride()) {
     case AiOverride::Off: return false;
     case AiOverride::On: return true;
@@ -49,6 +58,7 @@ void setAiEnabled(bool on) { gEnabled = on; }
 bool aiEnabled() { return gEnabled; }
 
 std::string aiOffError() {
+    if (managedOff()) return "AI features are turned off by your studio's policy";
     if (studioOff()) return "AI features are off in this studio build";
     return aiPolicyLocked() ? "AI features are turned off on this computer (SF_AI=off or --no-ai)"
                             : "AI features are off (Preferences > AI > Enable AI features)";

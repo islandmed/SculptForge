@@ -827,6 +827,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "shelves_visible") return app_.layout_.shelvesVisible ? 1.0 : 0.0;
     if (name == "right_tray_open") return app_.layout_.rightTrayOpen ? 1.0 : 0.0;
     if (name == "left_tray_open") return app_.layout_.leftTrayOpen ? 1.0 : 0.0;
+    if (name == "canvas_width") return double(app_.shell_.canvas.w / std::max(app_.uiScale_, 0.01f)); // logical px
+    // A shelf drawn (not hidden for being empty outside Customize Shelves, #139): 0 top, 1 left, 2 right, 3 bottom.
+    if (name.rfind("shelf_shown_", 0) == 0) {
+        const CanvasRect* r[] = {&app_.shell_.topShelf, &app_.shell_.leftShelf, &app_.shell_.rightShelf, &app_.shell_.bottomShelf};
+        const int k = std::atoi(name.c_str() + 12);
+        return k >= 0 && k < 4 && r[k]->w > 0.0f && r[k]->h > 0.0f ? 1.0 : 0.0;
+    }
     if (name == "right_tray_shown") return app_.shell_.rightTray.w > 0.0f ? 1.0 : 0.0; // drawn, not just set open (#107)
     if (name == "menu_rect_changes") { // times the open task menu moved or resized since the last read (a jitter is many)
         const int n = app_.menuRectChanges_;
@@ -1033,6 +1040,11 @@ double Demo::query(const std::string& name, bool& known) const {
         app_.benchmarkDrawMs(0);
         return double(app_.renderer_.lastDrawnTriangles());
     }
+    if (name == "coarse_clusters") { // the 3D view drawn once more now: the clusters it drew at a coarse level
+        app_.benchmarkDrawMs(0);
+        return double(app_.renderer_.coarseDrawnClusters());
+    }
+    if (name == "coarse_pending") return double(app_.renderer_.coarsePendingClusters()); // edited, levels not updated yet
     if (name == "panel_drag_scrolls") return double(ui::DragScrolls()); // #100: drags that scrolled a panel
     if (name == "panel_drag_scroll_y") return double(ui::DragScrollY());  // that panel's scroll after the last one
     if (name == "drag_cursor") return double(dragCursor_); // the system cursor during the last button_drag (#88)

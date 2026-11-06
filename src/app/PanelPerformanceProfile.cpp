@@ -193,6 +193,8 @@ void App::applyHardwareProfile(const HardwareProfile& p, bool announce) {
     }
     hw.profile.settings.targetFps = s.targetFps;
     setCurrentPerformanceSettings(s);
+    // (the still frame's cost before any is measured: the calibrated rate; the simulated floor tier keeps its budget's)
+    renderer_.setTriangleRate(floor ? 0.0 : hw.profile.calibration.trianglesPerSecondM);
     GovernorConfig cfg;
     cfg.targetFps = s.targetFps;
     cfg.minBudget = std::max<uint64_t>(250'000, s.renderTriangleBudget / 8);
@@ -266,6 +268,7 @@ void App::hardwareProfileFrameEnd() {
                 hw.pending.pop_front();
                 s.gpuMs = gpuMs;
                 hw.lastGpuMs = gpuMs;
+                renderer_.noteGpuFrame(gpuMs, s.drawnTriangles);
                 if (proof_ && proofGpuMs_.size() < 4096) proofGpuMs_.push_back(gpuMs);
                 changed = hw.governor.addFrame(s) || changed;
             }

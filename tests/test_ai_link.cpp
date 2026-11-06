@@ -157,6 +157,13 @@ TEST(ai_link_policy) {
     // No project: a relative path can't be placed, so it asks.
     AiLinkPolicy none;
     CHECK(none.classify(reg.find("export_glb"), "export_glb", {{"path", std::string("a.glb")}}).verdict == AiVerdict::Confirm);
+    // The reason the tool gets stays English; the app shows the template through tr() with the path filled in.
+    const AiDecision out = none.classify(reg.find("export_glb"), "export_glb", {{"path", std::string("/elsewhere/a.glb")}});
+    CHECK(out.format != nullptr && std::string(out.format).find("%s") != std::string::npos);
+    CHECK(out.reason.find("a.glb") != std::string::npos);
+    CHECK(out.reason.find("%s") == std::string::npos);
+    CHECK(out.reason.find("outside the project folder") != std::string::npos);
+    CHECK(out.subject.find("a.glb") != std::string::npos);
 }
 
 TEST(ai_link_message_parser_fuzz) {

@@ -7,6 +7,9 @@
 #include "app/I18n.h"
 #include "app/Shell.h"
 #include "app/Theme.h"
+#include "core/ManagedPolicy.h"
+
+#include <IconsLucide.h>
 
 #include <imgui_internal.h>
 
@@ -141,6 +144,21 @@ void HelpText(const char* title, const char* shortcut, const char* description, 
     g_help.description = description ? tr(description) : "";
     g_help.path = path ? path : "";
     g_help.disabled = (ImGui::GetItemFlags() & ImGuiItemFlags_Disabled) != 0;
+}
+
+std::string ManagedByText() {
+    const std::string& org = policy::current().organization;
+    return org.empty() ? std::string(tr(policy::kManagedLabel)) : std::string(tr("Managed by")) + " " + org;
+}
+
+void ManagedBadge() {
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+    ImGui::TextUnformatted((std::string(ICON_LC_LOCK " ") + tr("Managed by your studio")).c_str());
+    ImGui::PopStyleColor();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+        const policy::Policy& p = policy::current();
+        ImGui::SetTooltip("%s\n%s", ManagedByText().c_str(), p.source.c_str());
+    }
 }
 
 bool IsModeAction(std::string_view id) {

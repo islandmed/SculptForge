@@ -23,6 +23,7 @@
 #include <cmath>
 #include <thread>
 #include <unordered_map>
+#include <cstdio>
 #include <cstdlib>
 #include <limits>
 #include <vector>
@@ -1183,6 +1184,11 @@ void Renderer::freeSlot(MeshSlot& s) {
     gl::DeleteVertexArrays(1, &s.vao);
     gl::DeleteVertexArrays(1, &s.lineVao);
     gl::DeleteVertexArrays(1, &s.proxyVao);
+    if (s.coarseVao) {
+        gl::DeleteBuffers(1, &s.coarseVertices);
+        gl::DeleteBuffers(1, &s.coarseIndices);
+        gl::DeleteVertexArrays(1, &s.coarseVao);
+    }
     s.micro.reset();
     if (s.patchVao) {
         for (GLuint* b : {&s.patchVertices, &s.patchIndices, &s.patchLines, &s.patchColors, &s.patchMask, &s.patchGroupData})
@@ -1577,7 +1583,7 @@ void Renderer::updateBounds(MeshSlot& s, const Mesh& mesh, bool all, bool comput
         }
     }
     s.proxyStale.resize(clusters.size(), 1);
-    for (uint32_t c : cullScratch_) s.proxyStale[c] = 1;
+    for (uint32_t c : cullScratch_) s.proxyStale[c] = 1, markCoarseDirty(s, c);
     if (computed) cullScratch_.clear();
     poolFor(cullScratch_.size(), [&](size_t i0, size_t i1) {
         for (size_t i = i0; i < i1; ++i) {
@@ -2281,6 +2287,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     }
     if (full) {
         s.proxyAllocated = false; // sized for the old mesh
+        s.coarse.reset(), s.coarseTried = false, s.coarseDirty.clear(), s.coarsePending.clear();
         s.proxyCount.clear();
         // (closedOriented also accepts unwelded seams, the same point twice, which the layout's check doesn't.)
         s.closed = s.order.closed() || closedOriented(mesh);
@@ -2312,6 +2319,10 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     if (syncLog) lapMs(lap);
     if ((proxyUsed_ || (proxyPrebuild_ && s.proxyAllocated)) && !s.outOfMemory && s.drawnTriangles >= kProxyMinTriangles)
         buildProxies(s, mesh);
+    if (coarseLod_ && !s.coarseTried && !s.outOfMemory && s.drawnTriangles > (lodBudget_ ? lodBudget_ : triangleBudget(RenderSettings())))
+        buildCoarse(s, mesh);
+    if (s.coarse && !s.coarsePending.empty() && !s.coarseEdited && !stroking_) updateCoarse(s, mesh); // (the stroke is over)
+    s.coarseEdited = false;
     if (syncLog) proxyMs = lapMs(lap);
     syncTexture(s, mesh, pbr);
     syncNormalMap(s, mesh, normalMap);
@@ -2858,6 +2869,7 @@ void Renderer::endCapture(std::vector<uint8_t>& rgba) {
 
 void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, const RenderSettings& settings,
                     const Viewport& viewport) {
+    if (!settings.motionProxy) lodBudget_ = triangleBudget(settings); // (sync builds coarse levels of meshes over it)
     // SF_FRAME_LOG=ms (App.cpp): a draw slower than that says where its time went (lit spheres, environment, Parts).
     static const double drawLogMs = std::getenv("SF_FRAME_LOG") ? std::atof(std::getenv("SF_FRAME_LOG")) : -1.0;
     const auto drawStart = std::chrono::steady_clock::now();
@@ -2958,6 +2970,8 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
                            : glm::vec4(0.0f, 0.0f, float(targetWidth), float(targetHeight));
     frameCull_ = CullView::from(view, proj);
     lastDrawn_ = 0;
+    lastCoarseClusters_ = 0;
+    previewOnly_ = stillWanted_ = false;
     gl::Enable(GL_DEPTH_TEST);
     gl::DepthFunc(GL_LEQUAL);
     if (drawList_.empty() || !settings.showMesh) {
@@ -3143,6 +3157,40 @@ void Renderer::cull(const MeshSlot& s, const CullView& frame, bool proxy) {
     }
 }
 
+// Clark 1976: the detail from what the screen can hold. Everything in full detail if it fits the budget; else every
+// visible cluster at one level, the finest that fits (the coarsest if none does): one level for all keeps the surface
+// closed (render/Clusters.h). Clusters an edit moved draw in full until updated (their seams may gap until then).
+void Renderer::cullCoarse(const MeshSlot& s, const CullView& frame, size_t budget) {
+    cull(s, frame, false); // (the visible clusters, in full)
+    coarseClusters_.clear();
+    coarseLevel_.clear();
+    size_t full = 0;
+    for (uint32_t c : drawClusters_) full += size_t(s.drawCount[c]) / 3;
+    if (full <= budget) return;
+    // (clusters facing away stay out: the coarse ones go to the GPU's culling as the full ones)
+    const CoarseLevels& L = *s.coarse;
+    int pick = int(L.levels.size()) - 1;
+    for (int level = 0; level < int(L.levels.size()); ++level) {
+        size_t total = 0;
+        for (uint32_t c : drawClusters_)
+            total += s.coarseDirty[c] || L.clusters[c].levels <= level ? size_t(s.drawCount[c]) / 3 : L.clusters[c].count[level] / 3;
+        if (total <= budget) {
+            pick = level;
+            break;
+        }
+    }
+    size_t kept = 0;
+    for (uint32_t c : drawClusters_) {
+        if (s.coarseDirty[c] || L.clusters[c].levels <= pick) {
+            drawClusters_[kept++] = c;
+        } else {
+            coarseClusters_.push_back(c);
+            coarseLevel_.push_back(uint8_t(pick));
+        }
+    }
+    drawClusters_.resize(kept);
+}
+
 // Draws `clusters` of `s` (the VAO for `part` bound): their triangles, the wireframe's edges, or their motion
 // proxies. One multi-draw, or with per-triangle data on a driver whose gl_VertexID lacks the base vertex, one
 // draw per cluster with its first drawn triangle in `primBaseLocation`.
@@ -3196,6 +3244,101 @@ static glm::vec3 materialTintShift(const RenderSettings& settings, bool hasColor
     return settings.materialTint - glm::vec3(1.0f);
 }
 
+// The triangles a frame may draw: the tier's budget, lowered by the governed one (core/HardwareProfile.h: the frame
+// governor, SF_HW_SIMULATE=floor); half of it while the view moves (Fast Navigation), so orbiting stays smooth.
+size_t Renderer::triangleBudget(const RenderSettings& settings) const {
+    size_t full = settings.renderTriangleBudget ? settings.renderTriangleBudget : size_t(currentTierConfig().activeTriangleBudget);
+    if (const char* forced = std::getenv("SF_TRIANGLE_BUDGET"); forced && std::atoll(forced) > 0) full = size_t(std::atoll(forced)); // (tests)
+    if (const uint64_t governed = renderTriangleBudget(); governed > 0) full = std::min(full, size_t(governed));
+    return settings.motionProxy ? full / 2 : full;
+}
+
+// The coarse levels (render/Clusters.h): built at once, timed; their own vertices and 32-bit indices.
+void Renderer::buildCoarse(MeshSlot& s, const Mesh& mesh) {
+    s.coarseTried = true;
+    const auto start = std::chrono::steady_clock::now();
+    auto levels = std::make_unique<CoarseLevels>(buildCoarseLevels(mesh, s.order));
+    const double buildMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    if (levels->clusters.size() != s.order.clusters().size() || levels->indices.empty()) return;
+    if (!s.coarseVao) {
+        gl::GenVertexArrays(1, &s.coarseVao);
+        gl::GenBuffers(1, &s.coarseVertices);
+        gl::GenBuffers(1, &s.coarseIndices);
+    }
+    s.coarse = std::move(levels);
+    s.coarseDirty.assign(s.coarse->clusters.size(), 0);
+    s.coarsePending.clear();
+    gl::BindVertexArray(s.coarseVao);
+    uploadCoarsePoints(s);
+    gl::EnableVertexAttribArray(0);
+    gl::VertexAttribIPointer(0, 2, GL_UNSIGNED_INT, sizeof(PackedVertex), nullptr);
+    gl::EnableVertexAttribArray(1);
+    gl::VertexAttribIPointer(1, 1, GL_UNSIGNED_INT, sizeof(PackedVertex), reinterpret_cast<const void*>(2 * sizeof(uint32_t)));
+    gl::BindBuffer(GL_ELEMENT_ARRAY_BUFFER, s.coarseIndices);
+    gl::BufferData(GL_ELEMENT_ARRAY_BUFFER, GLsizeiptr(s.coarse->indices.size() * sizeof(uint32_t)), s.coarse->indices.data(), GL_STATIC_DRAW);
+    const size_t indexCount = s.coarse->indices.size();
+    std::vector<uint32_t>().swap(s.coarse->indices); // (on the GPU; an edit moves points, never triangles)
+    gl::BindVertexArray(0);
+    gl::BindBuffer(GL_ARRAY_BUFFER, 0);
+    if (std::getenv("SF_COARSE_LOG")) {
+        size_t first = 0, coarsest = 0, withLevels = 0;
+        for (const CoarseLevels::Lod& l : s.coarse->clusters)
+            if (l.levels > 0) first += l.count[0] / 3, coarsest += l.count[l.levels - 1] / 3, ++withLevels;
+        std::fprintf(stderr, "coarse lod: %zu of %zu clusters, built in %.0f ms; %zu cells, %zu indices (%.0f MB); level 0 %zu, coarsest %zu of %zu triangles\n",
+                     withLevels, s.coarse->clusters.size(), buildMs, s.coarse->positions.size(), indexCount,
+                     double(s.coarse->positions.size() * sizeof(PackedVertex) + indexCount * 4) / 1048576.0, first, coarsest,
+                     s.order.triangleCount());
+    }
+}
+
+// The cells' points, packed on the mesh's position grid (whole: a few MB).
+void Renderer::uploadCoarsePoints(MeshSlot& s) {
+    const CoarseLevels& L = *s.coarse;
+    std::vector<PackedVertex> packed(L.positions.size());
+    poolFor(packed.size(), [&](size_t i0, size_t i1) {
+        for (size_t i = i0; i < i1; ++i) packVertex(s.grid, L.positions[i], L.normals[i], 0.0f, packed[i]);
+    });
+    gl::BindBuffer(GL_ARRAY_BUFFER, s.coarseVertices);
+    gl::BufferData(GL_ARRAY_BUFFER, GLsizeiptr(packed.size() * sizeof(PackedVertex)), packed.data(), GL_STATIC_DRAW);
+}
+
+void Renderer::noteGpuFrame(double gpuMs, uint64_t drawnTriangles) {
+    if (!(gpuMs > 0.2) || drawnTriangles < 500000) return; // (small frames are mostly fixed costs)
+    const double v = gpuMs / double(drawnTriangles);
+    // (A frame whose GPU time can't hold those triangles didn't draw them: UI tests draw the 3D view only for their
+    // shots, the timer measures every frame. More than 1e11 triangles a second is no measurement.)
+    if (v < 1e-8) return;
+    gpuMsPerTriangle_ = gpuMsPerTriangle_ > 0.0 ? 0.8 * gpuMsPerTriangle_ + 0.2 * v : v;
+}
+
+size_t Renderer::coarsePendingClusters() const {
+    size_t n = 0;
+    for (const MeshSlot& s : slots_) n += s.coarsePending.size();
+    return n;
+}
+
+void Renderer::markCoarseDirty(MeshSlot& s, uint32_t c) {
+    if (!s.coarse || c >= s.coarseDirty.size()) return;
+    s.coarseEdited = true;
+    if (!s.coarseDirty[c]) s.coarseDirty[c] = 1, s.coarsePending.push_back(c);
+}
+
+// After a stroke: the points of the cells the edited clusters' vertices are in, and up the levels
+// (updateCoarseLevels), sent up whole (a few MB).
+void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
+    const auto start = std::chrono::steady_clock::now();
+    const std::vector<uint32_t> changed = updateCoarseLevels(*s.coarse, mesh, s.order, s.coarsePending);
+    gl::BindVertexArray(s.coarseVao);
+    if (!changed.empty()) uploadCoarsePoints(s);
+    gl::BindVertexArray(0);
+    gl::BindBuffer(GL_ARRAY_BUFFER, 0);
+    for (uint32_t c : s.coarsePending) s.coarseDirty[c] = 0;
+    if (std::getenv("SF_COARSE_LOG"))
+        std::fprintf(stderr, "coarse lod: %zu clusters, %zu points updated in %.1f ms\n", s.coarsePending.size(), changed.size(),
+                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+    s.coarsePending.clear();
+}
+
 void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
     const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0));
     if (!p) return;
@@ -3221,10 +3364,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     gl::Uniform1i(p->twoSided, 1);
     // Moving (Fast Navigation): a coarser target and half the budget, so orbiting stays smooth.
     const bool moving = settings.motionProxy;
-    // The tier's budget, lowered by the governed one (core/HardwareProfile.h: the frame governor, SF_HW_SIMULATE=floor).
-    size_t full = settings.renderTriangleBudget ? settings.renderTriangleBudget : size_t(currentTierConfig().activeTriangleBudget);
-    if (const uint64_t governed = renderTriangleBudget(); governed > 0) full = std::min(full, size_t(governed));
-    const size_t budget = moving ? full / 2 : full;
+    const size_t budget = triangleBudget(settings);
     const float target = settings.microTargetPx * (moving ? 2.0f : 1.0f);
     // (the budget is shared by the micro Parts on screen: each gets it whole; one is the usual case)
     const_cast<MeshSlot&>(s).microDrawn = s.micro->draw(p->id, frameCull_, frameProj_, frameViewport_, budget, target);
@@ -3326,7 +3466,38 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     // While the view moves, the motion proxy where it is built: not with per-triangle data, which follows the
     // full triangles, nor under the wireframe, whose edges would sink into it.
     const bool perTriangle = features & (kPrim | kTextured | kNormalMap); // (not kFlat: no per-triangle data)
-    cull(s, frameCull_, settings.motionProxy && !perTriangle && !(active && settings.wireframe));
+    const bool coarseAllowed = !perTriangle && !(active && settings.wireframe);
+    const size_t budget = coarseLod_ ? triangleBudget(settings) : 0;
+    // (While a stroke's edits wait for their levels, all of it in full: edited clusters in full beside coarse ones
+    // would leave seams, and squeeze the rest to the coarsest level.)
+    bool coarse = coarseLod_ && coarseAllowed && s.coarse && s.coarse->clusters.size() == s.drawCount.size() &&
+                  s.coarsePending.empty() && (settings.motionProxy || s.drawnTriangles > budget);
+    // At rest the real detail, if one full frame fits the still-frame budget (a single slow frame is fine).
+    if (static const bool log = std::getenv("SF_COARSE_LOG") != nullptr; log && coarse)
+        std::fprintf(stderr, "coarse lod: still %.2f s, moving %d, stroking %d, pending %zu, per triangle %.3g ms\n", settings.stillSeconds,
+                     int(settings.motionProxy), int(settings.stroking), s.coarsePending.size(), gpuMsPerTriangle_);
+    if (coarse && !settings.motionProxy && !settings.stroking && s.coarsePending.empty()) {
+        constexpr double kStillDelay = 0.15;
+        double stillMs = 100.0;
+        if (const char* e = std::getenv("SF_STILL_FRAME_MS"); e && std::atof(e) > 0.0) stillMs = std::atof(e); // (tests)
+        // (no frame measured yet: the calibrated rate, else the budget as half a 60 Hz frame's worth of triangles)
+        const double perTriangle = gpuMsPerTriangle_ > 0.0 ? gpuMsPerTriangle_
+                                   : triangleRateM_ > 0.0 ? 1e-3 / triangleRateM_
+                                                          : (1000.0 / 60.0 * 0.5) / double(std::max<size_t>(budget, 1));
+        if (double(s.drawnTriangles) * perTriangle > stillMs) previewOnly_ = true;
+        else if (settings.stillSeconds >= kStillDelay) coarse = false;
+        else stillWanted_ = true;
+    }
+    if (static const bool log = std::getenv("SF_COARSE_LOG") != nullptr; log && s.coarse && !coarse)
+        std::fprintf(stderr, "coarse lod: not drawn (per-triangle %d, wireframe %d, drawn %zu, budget %zu)\n", int(perTriangle),
+                     int(active && settings.wireframe), s.drawnTriangles, budget);
+    if (coarse) {
+        cullCoarse(s, frameCull_, budget);
+    } else {
+        coarseClusters_.clear();
+        cull(s, frameCull_, settings.motionProxy && coarseAllowed);
+    }
+    lastCoarseClusters_ += coarseClusters_.size();
     // The back faces left in clusters along the silhouette: the GPU skips them too when they can't show.
     if (cullBackfaces_ || xrayCull_) gl::Enable(GL_CULL_FACE);
     if (xrayCull_) gl::CullFace(xrayCull_);
@@ -3372,6 +3543,26 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
             gl::ActiveTexture(GL_TEXTURE0);
         }
         drawPatches(s, GL_TRIANGLES, DrawPart::Triangles, perTriangle ? p->primBase : -1);
+        gl::BindVertexArray(s.vao);
+    }
+    if (coarse && !coarseClusters_.empty()) { // the spike's coarse levels: one multi-draw, 32-bit indices
+        gl::BindVertexArray(s.coarseVao);
+        gl::VertexAttrib4f(2, 1.0f, 1.0f, 1.0f, 1.0f);
+        gl::VertexAttrib1f(3, 0.0f);
+        gl::Uniform1i(p->twoSided, 0);
+        drawCounts_.clear();
+        drawOffsets_.clear();
+        size_t indices = 0;
+        for (size_t i = 0; i < coarseClusters_.size(); ++i) {
+            const CoarseLevels::Lod& l = s.coarse->clusters[coarseClusters_[i]];
+            drawCounts_.push_back(GLsizei(l.count[coarseLevel_[i]]));
+            drawOffsets_.push_back(reinterpret_cast<const void*>(size_t(l.first[coarseLevel_[i]]) * sizeof(uint32_t)));
+            indices += l.count[coarseLevel_[i]];
+        }
+        lastDrawn_ += indices / 3;
+        drawBases_.assign(drawCounts_.size(), 0);
+        gl::MultiDrawElementsBaseVertex(GL_TRIANGLES, drawCounts_.data(), GL_UNSIGNED_INT, drawOffsets_.data(), GLsizei(drawCounts_.size()),
+                                        drawBases_.data());
         gl::BindVertexArray(s.vao);
     }
     if (!proxyClusters_.empty()) {
@@ -3641,7 +3832,7 @@ void Renderer::commitStrokeUpload(StrokeUpload& up) {
         s.proxyStale.resize(s.bounds.size(), 1);
         for (size_t i = 0; i < up.movedClusters.size(); ++i) {
             s.bounds[up.movedClusters[i]] = up.bounds[i];
-            s.proxyStale[up.movedClusters[i]] = 1;
+            s.proxyStale[up.movedClusters[i]] = 1, markCoarseDirty(s, up.movedClusters[i]);
         }
         s.looseClusters.insert(s.looseClusters.end(), up.movedClusters.begin(), up.movedClusters.end());
         s.looseMark.resize(s.bounds.size(), 0);

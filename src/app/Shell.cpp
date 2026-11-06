@@ -505,6 +505,7 @@ void App::registerShellActions() {
         actions_.add(std::move(a));
     }
     registerAiActions(); // AI Brush, Generate 3D: only while AI is on (PanelAi.cpp)
+    registerPolicyTestCommand(); // (UI tests only)
     flag("ui.brush_gallery", "Community brushes", ICON_LC_GLOBE, "Brush", "", &showBrushGallery_,
          "Browse, search and install brushes other sculptors shared.");
 
@@ -972,10 +973,9 @@ void App::drawShell() {
     else drawTitleStrip(shell_);
     if (layout_.paletteBarVisible && !sculptForgeLayout()) drawPaletteBar(shell_);
     if (shell_.shelves) {
-        drawShelf(kShelfTop, shell_.topShelf);
-        drawShelf(kShelfLeft, shell_.leftShelf);
-        drawShelf(kShelfRight, shell_.rightShelf);
-        drawShelf(kShelfBottom, shell_.bottomShelf);
+        const CanvasRect* shelves[] = {&shell_.topShelf, &shell_.leftShelf, &shell_.rightShelf, &shell_.bottomShelf};
+        for (int k : {kShelfTop, kShelfLeft, kShelfRight, kShelfBottom})
+            if (shelves[k]->w > 0.0f && shelves[k]->h > 0.0f) drawShelf(k, *shelves[k]); // empty: hidden (#139)
         if (shell_.leftTray.w > 0.0f) drawTray(false, shell_.leftTray);
         if (shell_.rightTray.w > 0.0f) drawTray(true, shell_.rightTray);
         drawDivider(false, shell_.leftDivider);
@@ -1054,6 +1054,10 @@ void App::drawTitleStrip(const ShellGeometry& g) {
                       ? doc_.mesh.layers[size_t(doc_.activeLayer)].name.c_str()
                       : tr("Base"),
                   doc_.splats.empty() ? "" : tr("   Splats "), doc_.splats.empty() ? "" : shortCount(doc_.splats.size()).c_str());
+    if (renderer_.coarsePreviewOnly()) { // (a mesh over the triangle budget whose full detail won't fit a still frame)
+        std::strncat(info, "   ", sizeof info - std::strlen(info) - 1);
+        std::strncat(info, tr("Preview detail"), sizeof info - std::strlen(info) - 1);
+    }
     // The frame rate gets a fixed-width slot, refreshed twice a second: a number that changes width every frame
     // would make everything after it (the status message) jitter.
     if (ImGui::GetTime() - fpsShownAt_ > 0.5 || fpsShown_ < 0.0f) {
