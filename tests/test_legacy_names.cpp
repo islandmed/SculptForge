@@ -74,6 +74,13 @@ TEST(legacy_names_read_old_files_and_scripts) {
     BrushType t = BrushType::Standard;
     CHECK(brushFromName(old.at("sharpcrease"), t) && t == BrushType::SharpCrease);
     CHECK(brushFromName(capitalised(old.at("clayblock")), t) && t == BrushType::ClayBlock);
+    // ... spelled with a space, hyphen, underscore or dot between its words, in any case.
+    const std::string clay = old.at("clayblock");
+    for (const char* sep : {" ", "  ", "-", "_", "."}) {
+        t = BrushType::Standard;
+        CHECK(brushFromName(capitalised(clay.substr(0, 4)) + sep + capitalised(clay.substr(4)), t) &&
+              t == BrushType::ClayBlock);
+    }
 
     // JSON keys (projects, ui.json); values stay as they are.
     Json j = Json::object();

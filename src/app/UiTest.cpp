@@ -58,7 +58,9 @@
 //   input_style STYLE        classic, sculptforge (the default), blender or maya, as Preferences > Input sets it
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
 //                            directory), e.g. to stage what another program would write (the Blender bridge);
-//                            $LIBRARY in DST (and in env values) is the test's Library library folder
+//                            $LIBRARY in DST (and in env values) is the test's Library library folder; a
+//                            Bridge file stored with the fixture header gets the format's bytes back (the
+//                            repository never holds them, docs/legal/trademarks.md)
 //   support_card first_run [test_mode]   the full membership card's launch decision (Support.h)
 //   member_card MOMENT [days=N] [sculpt_seconds=S]   a good moment for the small membership card (sculpted, render,
 //                            updated, challenge, none); member_sign_in ok|fail ends the GitHub sign-in it started
@@ -293,6 +295,7 @@
 #include "core/SelectionSets.h"
 #include "core/ThreadPool.h"
 #include "core/Timeline.h"
+#include "io/BridgeProtocol.h"
 #include "link/AiLink.h"
 #include "link/HttpServer.h"
 
@@ -309,14 +312,43 @@
 #include <filesystem>
 #include <fstream>
 #include <future>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <set>
 #include <sstream>
+#include <string_view>
+#include <vector>
 
 namespace sf {
 
 namespace {
+
+// copy: Bridge files under `dst` stored with the fixture header and name prefix get the format's own bytes back.
+void restoreBridgeFixtures(const std::filesystem::path& dst) {
+    namespace fs = std::filesystem;
+    static constexpr std::string_view kFixtureHeader = "SFBRIDGE FIXTURE HEADER 01", kFixturePrefix = "SFOBJCT_";
+    static_assert(kFixtureHeader.size() == sizeof(bridgefile::kHeader) - 1 &&
+                  kFixturePrefix.size() == sizeof(bridgefile::kNamePrefix) - 1);
+    std::error_code ec;
+    std::vector<fs::path> files;
+    if (fs::is_regular_file(dst, ec)) files.push_back(dst);
+    else
+        for (fs::recursive_directory_iterator it(dst, ec), end; !ec && it != end; it.increment(ec))
+            if (it->is_regular_file(ec)) files.push_back(it->path());
+    for (const fs::path& p : files) {
+        std::string bytes;
+        {
+            std::ifstream in(p, std::ios::binary);
+            bytes.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+        }
+        if (bytes.compare(0, kFixtureHeader.size(), kFixtureHeader) != 0) continue;
+        bytes.replace(0, kFixtureHeader.size(), bridgefile::kHeader);
+        if (const size_t at = bytes.find(kFixturePrefix); at != std::string::npos)
+            bytes.replace(at, kFixturePrefix.size(), bridgefile::kNamePrefix);
+        std::ofstream(p, std::ios::binary | std::ios::trunc).write(bytes.data(), std::streamsize(bytes.size()));
+    }
+}
 
 // ai_client: the scripted AI tool's connection and what it has received (a reader thread fills `lines`).
 struct AiTestClient {
@@ -1806,6 +1838,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (dst.has_parent_path()) fs::create_directories(dst.parent_path(), ec);
             fs::copy(src, dst, fs::copy_options::recursive | fs::copy_options::overwrite_existing, ec);
             if (ec) SDL_Log("copy %s: %s", src.string().c_str(), ec.message().c_str());
+            restoreBridgeFixtures(dst);
         });
     } else if (verb == "ai_client") {
         if (!need(1)) return false;
