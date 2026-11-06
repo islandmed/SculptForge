@@ -1054,6 +1054,10 @@ void App::drawTitleStrip(const ShellGeometry& g) {
                       ? doc_.mesh.layers[size_t(doc_.activeLayer)].name.c_str()
                       : tr("Base"),
                   doc_.splats.empty() ? "" : tr("   Splats "), doc_.splats.empty() ? "" : shortCount(doc_.splats.size()).c_str());
+    if (renderer_.coarsePreviewOnly()) { // (a mesh over the triangle budget whose full detail won't fit a still frame)
+        std::strncat(info, "   ", sizeof info - std::strlen(info) - 1);
+        std::strncat(info, tr("Preview detail"), sizeof info - std::strlen(info) - 1);
+    }
     // The frame rate gets a fixed-width slot, refreshed twice a second: a number that changes width every frame
     // would make everything after it (the status message) jitter.
     if (ImGui::GetTime() - fpsShownAt_ > 0.5 || fpsShown_ < 0.0f) {

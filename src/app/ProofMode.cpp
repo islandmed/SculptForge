@@ -402,6 +402,7 @@ struct PhaseResult {
     std::vector<double> previewLagPx; // the predictive preview's head behind the pointer (the surface's without it)
     std::vector<double> drawn;    // triangles each frame drew (Renderer::lastDrawnTriangles)
     std::vector<double> gpuMs;    // GPU time of the phase's frames (GL_TIME_ELAPSED; empty without timer queries)
+    std::vector<double> coarse;   // clusters each frame drew at a coarse level (0: full detail)
     size_t screenStrokeFrames = 0; // frames the view showed pending dabs on the screen (render/ScreenStroke.h)
     std::vector<double> split[6]; // each frame by part (App::frameSplitMs_, the frame before: the swap comes after)
     SculptTimings stroke;         // the stroke's own work (solver thread: kernel, normals, BVH), when it ended
@@ -544,7 +545,8 @@ void App::startProofMode() {
         p->phases = {{"clay small", 25.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
                      {"clay large", 120.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
                      {"240 px brush", 240.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
-                     {"orbit", 0.0f, 10.0}};
+                     {"orbit", 0.0f, 10.0},
+                     {"still", -1.0f, 0.6}}; // (the view at rest: coarse levels give way to full detail, Renderer::coarsePreviewOnly)
     else if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds);
     else p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0}};
     // SF_BENCH_PHASES=smooth,240: only the phases whose names contain one of these (each on the fresh mesh's
@@ -939,12 +941,14 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             ph.frameMs.push_back(frameMs);
             for (int k = 0; k < 6; ++k) ph.split[k].push_back(frameSplitMs_[k]);
             ph.drawn.push_back(double(renderer_.lastDrawnTriangles()));
+            ph.coarse.push_back(double(renderer_.coarseDrawnClusters()));
             ph.screenStrokeFrames += renderer_.screenStrokeDrawn() ? 1 : 0;
             ph.gpuMs.insert(ph.gpuMs.end(), proofGpuMs_.begin(), proofGpuMs_.end());
             proofGpuMs_.clear();
         }
         const double u = std::min(1.0, (now - p.stageStart) / spec.seconds);
-        if (spec.radiusPx <= 0) { // orbit: the view turns, as a drag would
+        if (spec.radiusPx < 0) { // still: the view at rest (nothing moves)
+        } else if (spec.radiusPx <= 0) { // orbit: the view turns, as a drag would
             camera_.yaw = float(6.2831853 * u);
             perf_.framesStill = 0;
         } else if (p.pressed) {
@@ -1100,6 +1104,11 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     for (int k = 0; k < 6; ++k) split.set(names[k], percentilesJson(percentiles(ph.split[k])));
                     j.set("frame_split_ms", split);
                     j.set("triangles_drawn", percentilesJson(percentiles(ph.drawn)));
+                    if (ph.radiusPx < 0 && !ph.drawn.empty()) { // still: what its last frame drew (after the 150 ms wait)
+                        j.set("detail", ph.coarse.empty() || ph.coarse.back() == 0 ? "full" : "coarse");
+                        j.set("still_triangles", ph.drawn.back());
+                        if (!ph.gpuMs.empty()) j.set("still_gpu_ms", std::round(ph.gpuMs.back() * 100) / 100);
+                    }
                     if (!ph.gpuMs.empty()) { // (the GPU's own work, no compositor; fewer than "frames": results that came too late)
                         j.set("gpu_ms", percentilesJson(percentiles(ph.gpuMs)));
                         j.set("gpu_frames", double(ph.gpuMs.size()));

@@ -14,6 +14,7 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <chrono>
 #include <cmath>
 #include <map>
 #include <set>
@@ -354,13 +355,13 @@ TEST(motion_proxy_is_closed_and_light) {
 
 namespace {
 
-// Every cell point the mean of the mesh's vertices in that cell (brute force over the whole mesh).
+// Every cell point the mean of its vertices where they are now (the build's membership: a vertex's level-0 cell,
+// then its parents up the levels), brute force over the whole mesh.
 bool cellPointsAreMeans(const CoarseLevels& L, const Mesh& m, float& worst) {
     std::vector<glm::dvec3> sum(L.positions.size(), glm::dvec3(0.0));
     std::vector<uint32_t> n(L.positions.size(), 0);
-    for (const glm::vec3& p : m.positions)
-        for (int level = 0; level < int(L.levels.size()); ++level)
-            if (const uint32_t k = L.cellOf(p, level); k != ~0u) sum[k] += glm::dvec3(p), ++n[k];
+    for (size_t v = 0; v < m.vertexCount(); ++v)
+        for (uint32_t k = L.vertexCell[v]; k != ~0u; k = L.parent[k]) sum[k] += glm::dvec3(m.positions[v]), ++n[k];
     worst = 0.0f;
     for (size_t k = 0; k < sum.size(); ++k)
         if (n[k]) worst = std::max(worst, glm::distance(L.positions[k], glm::vec3(sum[k] / double(n[k]))));
@@ -421,21 +422,21 @@ TEST(coarse_levels_closed_at_each_level_and_light) {
 }
 
 TEST(coarse_levels_follow_edits) {
-    // After a stroke (some vertices pushed out), updateCoarseLevels gives the edited clusters' levels and the points of
-    // the cells they touch: every cell point is again the mean of its vertices, everywhere, neighbours included.
+    // After a stroke (some vertices pushed out), updateCoarseLevels moves the points of the cells those vertices are
+    // in and of their cells up the levels: every cell point is again the mean of its vertices, everywhere; the
+    // triangles stay as built (closed); updating again changes nothing.
     Mesh m = detailedSphere(300000);
     UploadOrder order;
     order.build(m);
     CoarseLevels L = buildCoarseLevels(m, order);
-    std::vector<ClusterBounds> bounds(order.clusters().size());
-    for (uint32_t c = 0; c < bounds.size(); ++c) bounds[c] = clusterBounds(m, order, c);
+    const std::vector<glm::vec3> before(L.positions);
     const glm::vec3 centre = glm::normalize(glm::vec3(0.3f, 0.8f, 0.5f)) * glm::length(m.positions[0]);
     const float radius = glm::length(m.positions[0]) * 0.2f;
     std::vector<uint8_t> moved(m.vertexCount(), 0);
     for (size_t v = 0; v < m.vertexCount(); ++v) {
         const float d = glm::distance(m.positions[v], centre);
         if (d >= radius) continue;
-        m.positions[v] += m.normals[v] * (radius * 0.04f * (1.0f - d / radius)); // (a clay-like push, under a cell)
+        m.positions[v] += m.normals[v] * (radius * 0.08f * (1.0f - d / radius)); // (a clay-like push, over a cell)
         moved[v] = 1;
     }
     std::vector<uint32_t> dirty;
@@ -447,21 +448,19 @@ TEST(coarse_levels_follow_edits) {
                 break;
             }
     }
-    for (uint32_t c : dirty) bounds[c] = clusterBounds(m, order, c);
-    std::vector<uint32_t> points;
-    const std::vector<uint32_t> changed = updateCoarseLevels(L, m, order, bounds, dirty, points);
+    const auto start = std::chrono::steady_clock::now();
+    const std::vector<uint32_t> changed = updateCoarseLevels(L, m, order, dirty);
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     float worst = 0.0f;
     const bool means = cellPointsAreMeans(L, m, worst);
-    size_t kept = 0;
-    for (uint32_t c : dirty) kept += L.clusters[c].levels > 0;
-    std::printf("  coarse update: %zu dirty clusters (%zu keep their levels), %zu points; worst point off by %g cells\n", dirty.size(),
-                kept, points.size(), double(worst / L.cell));
+    size_t pointsMoved = 0;
+    for (size_t k = 0; k < before.size(); ++k) pointsMoved += before[k] != L.positions[k];
+    std::printf("  coarse update: %zu dirty clusters, %zu cells recomputed (%zu moved) in %.1f ms; worst point off by %g cells\n",
+                dirty.size(), changed.size(), pointsMoved, ms, double(worst / L.cell));
     CHECK(!dirty.empty());
-    CHECK(changed.size() == dirty.size());
+    CHECK(pointsMoved > 0);
     CHECK(means);
-    CHECK(kept * 2 >= dirty.size());
-    // The edited clusters' triangles match a fresh mapping on the same cells (re-updating changes nothing).
-    const std::vector<uint32_t> before(L.indices);
-    updateCoarseLevels(L, m, order, bounds, dirty, points);
-    CHECK(L.indices == before);
+    const std::vector<glm::vec3> after(L.positions);
+    updateCoarseLevels(L, m, order, dirty);
+    CHECK(L.positions == after);
 }

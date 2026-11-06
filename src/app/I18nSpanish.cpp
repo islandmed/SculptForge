@@ -770,6 +770,7 @@ constexpr Entry kSpanish[] = {
     {"Apply", "Aplicar"},
     {"Reset", "Restablecer"},
     {"Preview", "Vista previa"},
+    {"Preview detail", "Detalle de vista previa"},
     {"Finish", "Terminar"},
     {"Close", "Cerrar"},
     {"OK", "Aceptar"},

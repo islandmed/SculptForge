@@ -43,6 +43,8 @@ struct RenderSettings {
     float splatOpacity = 1.0f; // global fade for using a capture as reference
     bool dimInactive = true;   // Parts other than the active one render slightly darker
     bool motionProxy = false;  // the view is moving (Fast Navigation): draw big meshes' lighter proxy (render/Clusters.h)
+    double stillSeconds = 0.0; // how long the view has been still (0 while it moves): coarse levels give way to full detail
+    bool stroking = false;     // a stroke runs (its dabs still landing): coarse levels stay
     bool flatShading = false;  // the scene's shading (Material palette): faceted; Parts can override (core/Document.h)
     // Backface culling (#68, Tool > Display): back faces are never drawn, on any mesh (closed or not, from any
     // view). Off: they are skipped only where they can't show (a closed mesh seen from outside, Renderer::cull).
@@ -254,6 +256,15 @@ public:
     // are still to be updated (drawn in full until then).
     size_t coarseDrawnClusters() const { return lastCoarseClusters_; }
     size_t coarsePendingClusters() const;
+    // At rest (still 150 ms, no stroke) an over-budget mesh draws in full detail when one full frame fits the still-frame
+    // budget (100 ms, from the measured GPU time per triangle); else it stays coarse (coarsePreviewOnly: the info line
+    // says so). coarseStillWanted: the last frame drew coarse and full detail follows once the view has been still long
+    // enough (the app draws until then).
+    bool coarsePreviewOnly() const { return previewOnly_; }
+    bool coarseStillWanted() const { return stillWanted_; }
+    void noteGpuFrame(double gpuMs, uint64_t drawnTriangles); // (the frame governor's GPU timer)
+    void setTriangleRate(double millionsPerSecond) { triangleRateM_ = millionsPerSecond; } // (calibration; 0 = unknown)
+    void setStroking(bool on) { stroking_ = on; } // a stroke runs: sync leaves the edited clusters' levels until it ends
     // The last syncScene left motion proxies to build (a few milliseconds of them a frame; the rest draw in full).
     bool proxiesPending() const { return proxyPending_; }
     // Build stale motion proxies on still frames too (after a stroke, so the next orbit starts with them), at a
@@ -483,6 +494,9 @@ private:
     void cullCoarse(const MeshSlot& s, const CullView& view, size_t budget);
     std::vector<uint32_t> coarseClusters_;
     size_t lastCoarseClusters_ = 0;
+    bool previewOnly_ = false, stillWanted_ = false, stroking_ = false;
+    double gpuMsPerTriangle_ = 0.0; // measured (moving average), 0 = not yet
+    double triangleRateM_ = 0.0;    // calibrated, million triangles a second (0 = unknown)
     std::vector<uint8_t> coarseLevel_;
     void drawSlot(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);
     enum class DrawPart { Triangles, Lines, Proxy };

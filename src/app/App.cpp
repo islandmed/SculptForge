@@ -532,6 +532,7 @@ int App::runUiTest(int w, int h, int fps) {
         syncScene();
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
         viewSamples(); // keeps Fast Navigation's view of the camera current (UI tests read view_samples)
+        noteStillness();
         hardwareProfileFrameEnd();
         if (tracing) {
             tracePhase[4] = tracePhase[5] = tracePhase[6] = double(SDL_GetTicksNS()) * 1e-6;
@@ -823,7 +824,8 @@ bool App::wantsFrames(double now) const {
            timelapseBusy() || hardwareCalibrating() || // both render a step per frame: they stop when the frames do
            spaceMouseMoving() || // a held SpaceMouse cap sends no events, but the view keeps moving (SpaceMouse.cpp)
            perf_.framesStill < 10 || // the view just moved: Fast Navigation's full-quality frame comes after it stops
-           (perf_.proxyPrebuild && renderer_.proxiesPending()); // motion proxies left to build, a few ms a frame
+           (perf_.proxyPrebuild && renderer_.proxiesPending()) || // motion proxies left to build, a few ms a frame
+           renderer_.coarseStillWanted(); // coarse levels: the full-detail still frame comes once the view rests
 }
 
 uint64_t App::frameKey() const {
@@ -1182,6 +1184,7 @@ int App::run() {
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
         const int samples = viewSamples();
         renderSettings_.motionProxy = perf_.proxyNow; // big meshes draw their lighter proxy while the view moves
+        noteStillness();
         renderSettings_.materialTint = materialTintFor(doc_.paintColor); // (Color > Colour tints the material)
         renderSettings_.resolutionScale = float(uiPrefs_.viewResolution) / 100.0f; // (#80; only the window's view)
         if (perf_.movingNow) // while the view moves, the floor tier draws fewer pixels; full resolution when it stops

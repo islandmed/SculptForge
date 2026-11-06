@@ -355,7 +355,6 @@ bool clusterOnCells(const CoarseLevels& L, const Mesh& mesh, const UploadOrder& 
     return true;
 }
 
-uint32_t roomFor(size_t indices) { return uint32_t(indices + indices / 4 + 48); } // (an edit may add a few)
 
 } // namespace
 
@@ -363,18 +362,7 @@ uint32_t CoarseLevels::cellOf(const glm::vec3& p, int level) const {
     const Level& l = levels[size_t(level)];
     const uint64_t key = cellKey(*this, p, level);
     const auto it = std::lower_bound(l.keys.begin(), l.keys.end(), key);
-    if (it != l.keys.end() && *it == key) return l.base + uint32_t(it - l.keys.begin());
-    const auto found = l.added.find(key);
-    return found != l.added.end() ? found->second : ~0u;
-}
-
-uint32_t CoarseLevels::cellOrAdd(const glm::vec3& p, int level) {
-    if (const uint32_t k = cellOf(p, level); k != ~0u) return k;
-    const uint32_t k = uint32_t(positions.size());
-    levels[size_t(level)].added.emplace(cellKey(*this, p, level), k);
-    positions.push_back(p);
-    normals.push_back(glm::vec3(0.0f, 0.0f, 1.0f));
-    return k;
+    return it != l.keys.end() && *it == key ? l.base + uint32_t(it - l.keys.begin()) : ~0u;
 }
 
 CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order) {
@@ -441,6 +429,47 @@ CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order) {
         if (cells < 64) break;
     }
     cellOfVertex = {};
+    // Membership (the build's, kept): each vertex's level-0 cell, each level-0 cell's vertices, the parents and
+    // children up the levels, and the weights.
+    const uint32_t cells0 = uint32_t(L.levels[0].keys.size()), base0 = L.levels[0].base, cellCount = uint32_t(L.positions.size());
+    L.vertexCell.resize(nv);
+    poolFor(nv, [&](size_t v0, size_t v1) {
+        for (size_t v = v0; v < v1; ++v) L.vertexCell[v] = L.cellOf(mesh.positions[v], 0);
+    });
+    L.memberFirst.assign(size_t(cells0) + 1, 0);
+    for (uint32_t k : L.vertexCell) ++L.memberFirst[k - base0 + 1];
+    for (uint32_t k = 0; k < cells0; ++k) L.memberFirst[k + 1] += L.memberFirst[k];
+    L.members.resize(nv);
+    {
+        std::vector<uint32_t> at(L.memberFirst.begin(), L.memberFirst.end() - 1);
+        for (uint32_t v = 0; v < uint32_t(nv); ++v) L.members[at[L.vertexCell[v] - base0]++] = v;
+    }
+    L.parent.assign(cellCount, ~0u);
+    L.weight.assign(cellCount, 0);
+    for (uint32_t k = 0; k < cells0; ++k) L.weight[base0 + k] = L.memberFirst[k + 1] - L.memberFirst[k];
+    for (size_t level = 0; level + 1 < L.levels.size(); ++level) {
+        const CoarseLevels::Level& lv = L.levels[level];
+        const CoarseLevels::Level& up = L.levels[level + 1];
+        for (size_t i = 0; i < lv.keys.size(); ++i) {
+            const uint64_t k = lv.keys[i];
+            const uint64_t pk = packCell(glm::uvec3(uint32_t(k & 0x1FFFFF), uint32_t((k >> 21) & 0x1FFFFF), uint32_t(k >> 42)) / 2u);
+            const auto it = std::lower_bound(up.keys.begin(), up.keys.end(), pk);
+            if (it == up.keys.end() || *it != pk) continue;
+            const uint32_t child = lv.base + uint32_t(i), par = up.base + uint32_t(it - up.keys.begin());
+            L.parent[child] = par;
+            L.weight[par] += L.weight[child];
+        }
+    }
+    L.childFirst.assign(size_t(cellCount) + 1, 0);
+    for (uint32_t k = 0; k < cellCount; ++k)
+        if (L.parent[k] != ~0u) ++L.childFirst[L.parent[k] + 1];
+    for (uint32_t k = 0; k < cellCount; ++k) L.childFirst[k + 1] += L.childFirst[k];
+    L.children.resize(L.childFirst[cellCount]);
+    {
+        std::vector<uint32_t> at(L.childFirst.begin(), L.childFirst.end() - 1);
+        for (uint32_t k = 0; k < cellCount; ++k)
+            if (L.parent[k] != ~0u) L.children[at[L.parent[k]]++] = k;
+    }
     // Per cluster, its levels while they pay.
     std::vector<std::vector<uint32_t>> lists(nc);
     poolFor(nc, [&](size_t c0, size_t c1) {
@@ -453,11 +482,9 @@ CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order) {
                 if (!clusterOnCells(L, mesh, order, uint32_t(c), level, tris, error)) break; // (every level: one is drawn for all)
                 lod.first[lod.levels] = uint32_t(lists[c].size());
                 lod.count[lod.levels] = uint32_t(tris.size() * 3);
-                lod.capacity[lod.levels] = roomFor(tris.size() * 3);
                 lod.error[lod.levels] = std::max(error, lod.levels > 0 ? lod.error[lod.levels - 1] : 0.0f);
                 ++lod.levels;
                 for (const auto& m : tris) lists[c].insert(lists[c].end(), m.begin(), m.end());
-                lists[c].resize(lod.first[lod.levels - 1] + lod.capacity[lod.levels - 1], 0);
                 previous = tris.size();
             }
             lists[c].shrink_to_fit();
@@ -476,104 +503,68 @@ CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order) {
 }
 
 std::vector<uint32_t> updateCoarseLevels(CoarseLevels& L, const Mesh& mesh, const UploadOrder& order,
-                                         const std::vector<ClusterBounds>& bounds, const std::vector<uint32_t>& dirty,
-                                         std::vector<uint32_t>& points) {
-    points.clear();
+                                         const std::vector<uint32_t>& dirty) {
     std::vector<uint32_t> changed;
-    if (L.levels.empty() || dirty.empty()) return changed;
-    const auto fromGpu = order.fromGpu();
     const size_t nv = mesh.vertexCount();
-    // The region the edit touched: the dirty clusters' vertices now, and the points of the cells their levels used.
-    AABB reach;
-    for (uint32_t c : dirty) {
-        const auto& cl = order.clusters()[c];
-        for (uint32_t l = 0; l < cl.vertexCount; ++l)
-            if (const uint32_t v = fromGpu[cl.firstVertex + l]; v < nv) reach.expand(mesh.positions[v]);
-        const CoarseLevels::Lod& lod = L.clusters[c];
-        for (int level = 0; level < lod.levels; ++level)
-            for (uint32_t i = lod.first[level]; i < lod.first[level] + lod.count[level]; ++i) reach.expand(L.positions[L.indices[i]]);
-    }
-    if (!reach.valid()) return changed;
-    // Cells for the vertices an edit moved where the build had none (pushed out of the surface, most often).
-    for (uint32_t c : dirty) {
-        const auto& cl = order.clusters()[c];
-        for (uint32_t l = 0; l < cl.vertexCount; ++l)
-            if (const uint32_t v = fromGpu[cl.firstVertex + l]; v < nv)
-                for (int level = 0; level < int(L.levels.size()); ++level) L.cellOrAdd(mesh.positions[v], level);
-    }
-    // The cells to recompute: at every level, each one whose box meets the region grown by a cell.
+    if (L.levels.empty() || dirty.empty() || L.vertexCell.size() != nv) return changed;
+    const auto fromGpu = order.fromGpu();
+    const uint32_t base0 = L.levels[0].base;
+    // The level-0 cells of the dirty clusters' vertices (the build's cells: membership doesn't change).
+    const size_t cells0 = L.levels[0].keys.size();
+    std::vector<uint8_t> flagged(cells0, 0);
+    poolFor(dirty.size(), [&](size_t d0, size_t d1) {
+        for (size_t d = d0; d < d1; ++d) {
+            const auto& cl = order.clusters()[dirty[d]];
+            for (uint32_t l = 0; l < cl.vertexCount; ++l)
+                if (const uint32_t v = fromGpu[cl.firstVertex + l]; v < nv)
+                    std::atomic_ref<uint8_t>(flagged[L.vertexCell[v] - base0]).store(1, std::memory_order_relaxed);
+        }
+    }, 16);
     std::vector<uint32_t> cells;
-    AABB around = reach; // (the vertices that can be in those cells)
-    for (int level = 0; level < int(L.levels.size()); ++level) {
-        const CoarseLevels::Level& lv = L.levels[size_t(level)];
-        const float size = L.cell * float(1u << level);
-        const glm::vec3 lo = glm::clamp(glm::floor((reach.min - glm::vec3(size) - L.origin) / size), glm::vec3(0.0f), glm::vec3(float(0x1FFFFF)));
-        const glm::vec3 hi = glm::clamp(glm::floor((reach.max + glm::vec3(size) - L.origin) / size), glm::vec3(0.0f), glm::vec3(float(0x1FFFFF)));
-        around.expand(L.origin + lo * size);
-        around.expand(L.origin + (hi + 1.0f) * size);
-        for (uint32_t z = uint32_t(lo.z); z <= uint32_t(hi.z); ++z)
-            for (uint32_t y = uint32_t(lo.y); y <= uint32_t(hi.y); ++y) {
-                auto it = std::lower_bound(lv.keys.begin(), lv.keys.end(), packCell(glm::uvec3(uint32_t(lo.x), y, z)));
-                const uint64_t end = packCell(glm::uvec3(uint32_t(hi.x), y, z));
-                for (; it != lv.keys.end() && *it <= end; ++it) cells.push_back(lv.base + uint32_t(it - lv.keys.begin()));
-            }
-        for (const auto& [key, k] : lv.added) cells.push_back(k); // (few)
-    }
-    std::sort(cells.begin(), cells.end());
-    if (cells.empty()) return changed;
-    reach = around;
-    // Every vertex in those cells: from the clusters whose bounds reach them (each mesh vertex once, as the build;
-    // a seam vertex has a copy in each of its clusters).
-    std::vector<uint32_t> verts;
-    for (uint32_t c = 0; c < uint32_t(order.clusters().size()) && c < bounds.size(); ++c) {
-        const ClusterBounds& b = bounds[c];
-        if (b.radius < 0.0f) continue;
-        const glm::vec3 nearest = glm::clamp(b.center, reach.min, reach.max);
-        if (glm::distance(nearest, b.center) > b.radius) continue;
-        const auto& cl = order.clusters()[c];
-        for (uint32_t l = 0; l < cl.vertexCount; ++l)
-            if (const uint32_t v = fromGpu[cl.firstVertex + l]; v < nv) verts.push_back(v);
-    }
-    std::sort(verts.begin(), verts.end());
-    verts.erase(std::unique(verts.begin(), verts.end()), verts.end());
-    std::vector<glm::dvec3> sum(cells.size(), glm::dvec3(0.0));
-    std::vector<glm::vec3> nsum(cells.size(), glm::vec3(0.0f));
-    std::vector<uint32_t> weight(cells.size(), 0);
+    for (size_t k = 0; k < cells0; ++k)
+        if (flagged[k]) cells.push_back(base0 + uint32_t(k));
     const bool hasNormals = mesh.normals.size() == nv;
-    for (uint32_t v : verts)
-        for (int level = 0; level < int(L.levels.size()); ++level) {
-            const uint32_t k = L.cellOf(mesh.positions[v], level);
-            const auto it = std::lower_bound(cells.begin(), cells.end(), k);
-            if (k == ~0u || it == cells.end() || *it != k) continue;
-            const size_t i = size_t(it - cells.begin());
-            sum[i] += glm::dvec3(mesh.positions[v]);
-            if (hasNormals) nsum[i] += mesh.normals[v];
-            ++weight[i];
+    // Each one the mean of its vertices where they are now; then each level's cells above them from their children.
+    poolFor(cells.size(), [&](size_t i0, size_t i1) {
+        for (size_t i = i0; i < i1; ++i) {
+            const uint32_t k = cells[i] - base0;
+            glm::dvec3 sum(0.0);
+            glm::vec3 nsum(0.0f);
+            for (uint32_t m = L.memberFirst[k]; m < L.memberFirst[k + 1]; ++m) {
+                sum += glm::dvec3(mesh.positions[L.members[m]]);
+                if (hasNormals) nsum += mesh.normals[L.members[m]];
+            }
+            const uint32_t w = L.memberFirst[k + 1] - L.memberFirst[k];
+            if (w) L.positions[cells[i]] = glm::vec3(sum / double(w));
+            const float l = glm::length(nsum);
+            if (l > 1e-12f) L.normals[cells[i]] = nsum / l;
         }
-    for (size_t i = 0; i < cells.size(); ++i) {
-        if (weight[i] == 0) continue; // (an emptied cell: no triangle maps to it any more)
-        L.positions[cells[i]] = glm::vec3(sum[i] / double(weight[i]));
-        const float l = glm::length(nsum[i]);
-        L.normals[cells[i]] = l > 1e-12f ? nsum[i] / l : glm::vec3(0.0f, 0.0f, 1.0f);
-        points.push_back(cells[i]);
-    }
-    // The dirty clusters' levels on the cells, in their room.
-    std::vector<std::array<uint32_t, 3>> tris;
-    for (uint32_t c : dirty) {
-        CoarseLevels::Lod& lod = L.clusters[c];
-        bool ok = lod.levels > 0;
-        for (int level = 0; level < lod.levels && ok; ++level) {
-            float error = 0.0f;
-            ok = clusterOnCells(L, mesh, order, c, level, tris, error) && tris.size() * 3 <= lod.capacity[level];
-            if (!ok) break;
-            std::fill(L.indices.begin() + lod.first[level], L.indices.begin() + lod.first[level] + lod.capacity[level], 0u);
-            for (size_t i = 0; i < tris.size(); ++i)
-                std::copy(tris[i].begin(), tris[i].end(), L.indices.begin() + lod.first[level] + i * 3);
-            lod.count[level] = uint32_t(tris.size() * 3);
-            lod.error[level] = std::max(error, level > 0 ? lod.error[level - 1] : 0.0f);
-        }
-        if (!ok) lod.levels = 0; // (drawn in full until the next build)
-        changed.push_back(c);
+    }, 1024);
+    changed = cells;
+    for (size_t level = 1; level < L.levels.size() && !cells.empty(); ++level) {
+        std::vector<uint32_t> up;
+        up.reserve(cells.size());
+        for (uint32_t k : cells)
+            if (L.parent[k] != ~0u) up.push_back(L.parent[k]);
+        std::sort(up.begin(), up.end());
+        up.erase(std::unique(up.begin(), up.end()), up.end());
+        poolFor(up.size(), [&](size_t i0, size_t i1) {
+            for (size_t i = i0; i < i1; ++i) {
+                const uint32_t p = up[i];
+                glm::dvec3 sum(0.0);
+                glm::vec3 nsum(0.0f);
+                for (uint32_t j = L.childFirst[p]; j < L.childFirst[p + 1]; ++j) {
+                    const uint32_t ch = L.children[j];
+                    sum += glm::dvec3(L.positions[ch]) * double(L.weight[ch]);
+                    nsum += L.normals[ch] * float(L.weight[ch]);
+                }
+                if (L.weight[p]) L.positions[p] = glm::vec3(sum / double(L.weight[p]));
+                const float l = glm::length(nsum);
+                if (l > 1e-12f) L.normals[p] = nsum / l;
+            }
+        }, 1024);
+        changed.insert(changed.end(), up.begin(), up.end());
+        cells = std::move(up);
     }
     return changed;
 }
