@@ -287,7 +287,14 @@ TEST(ai_link_long_runtime_folder_still_listens) {
 
 TEST(ai_link_attach_end_to_end) {
     // sculptforge-cli --mcp --attach against a stand-in app: live_connect waits, the code pairs, tools are forwarded.
-    const std::string run = scratchDir("sf_ai_link_attach");
+    // A shard's TMPDIR in a deep worktree overflows sun_path (108 bytes): then a short folder of /tmp.
+    std::string run = scratchDir("sf_ai_link_attach");
+    if (run.size() + sizeof("/live.sock") > 100) {
+        run = "/tmp/sf_ai_attach_" + std::to_string(std::hash<std::string>{}(run) % 1000000007u);
+        std::error_code ec;
+        std::filesystem::remove_all(run, ec);
+        std::filesystem::create_directories(run, ec);
+    }
     const std::string endpoint = run + "/live.sock";
     AiLinkListener listener;
     std::string err;
@@ -322,6 +329,8 @@ TEST(ai_link_attach_end_to_end) {
     CHECK(o.find("ran mesh_info") != std::string::npos);
     CHECK(o.find("notifications/tools/list_changed") != std::string::npos);
     CHECK(o.rfind("Not connected to SculptForge") > o.find("ran mesh_info")); // after Disconnect, refused again
+    std::error_code ec;
+    std::filesystem::remove_all(run, ec);
 }
 #endif
 
