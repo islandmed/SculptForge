@@ -33,10 +33,12 @@ Table makeMap(std::span<const i18n::Entry> entries) {
 }
 const Table* tableMap(Language language) {
     static const Table spanish = makeMap(i18n::spanishTable());
-    static const Table chinese = makeMap(i18n::traditionalChineseTable());
+    static const Table traditional = makeMap(i18n::traditionalChineseTable());
+    static const Table simplified = makeMap(i18n::simplifiedChineseTable());
     switch (language) {
     case Language::Spanish: return &spanish;
-    case Language::TraditionalChinese: return &chinese;
+    case Language::TraditionalChinese: return &traditional;
+    case Language::SimplifiedChinese: return &simplified;
     default: return nullptr;
     }
 }
@@ -112,6 +114,7 @@ const char* languageCode(Language language) {
     switch (language) {
     case Language::Spanish: return "es";
     case Language::TraditionalChinese: return "zh-TW";
+    case Language::SimplifiedChinese: return "zh-CN";
     default: return "en";
     }
 }
@@ -120,10 +123,11 @@ Language languageFromCode(std::string_view code) {
     auto is = [&](std::string_view c) { return code == c || (code.size() > c.size() && code.substr(0, c.size()) == c &&
                                                              (code[c.size()] == '-' || code[c.size()] == '_')); };
     if (is("es")) return Language::Spanish;
-    // Traditional script: zh-TW, zh-HK, zh-MO and zh-Hant-*. Simplified (zh, zh-CN, zh-Hans) has no table yet: English.
+    // Traditional script: zh-TW, zh-HK, zh-MO and zh-Hant-*. Simplified: zh-CN, zh-SG, zh-Hans-* and a bare zh.
     if (is("zh-TW") || is("zh_TW") || is("zh-HK") || is("zh_HK") || is("zh-MO") || is("zh_MO") || is("zh-Hant") ||
         is("zh_Hant"))
         return Language::TraditionalChinese;
+    if (is("zh")) return Language::SimplifiedChinese;
     return Language::English;
 }
 
@@ -131,11 +135,14 @@ const char* languageName(Language language) {
     switch (language) {
     case Language::Spanish: return "Español";
     case Language::TraditionalChinese: return "繁體中文";
+    case Language::SimplifiedChinese: return "简体中文";
     default: return "English";
     }
 }
 
-bool languageNeedsCjkFont(Language language) { return language == Language::TraditionalChinese; }
+bool languageNeedsCjkFont(Language language) {
+    return language == Language::TraditionalChinese || language == Language::SimplifiedChinese;
+}
 
 namespace i18n {
 
@@ -143,6 +150,7 @@ std::span<const Entry> table(Language language) {
     switch (language) {
     case Language::Spanish: return spanishTable();
     case Language::TraditionalChinese: return traditionalChineseTable();
+    case Language::SimplifiedChinese: return simplifiedChineseTable();
     default: return {};
     }
 }
