@@ -5,6 +5,18 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.3
+
+```features
+date: unreleased
+tagline: Connect your AI tool in one window, saved camera views, a readable mask, solid remeshes of open parts and the new SF icon.
+highlight: Connect your AI tool in one window
+highlight: Saved camera views and a readable mask
+highlight: Quick Remesh and Voxel Remesh keep open parts solid
+highlight: The UV Editor fits at large UI scales
+highlight: The new orange SF app icon
+```
+
 ## Version 0.11.2
 
 ```features
