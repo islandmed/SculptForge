@@ -8,7 +8,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.11.4
 
 ```features
-date: unreleased
+date: 2026-11-05
 tagline: Let your AI assistant sculpt in your open window, and fixes.
 highlight: Live mode: an AI tool works in your open window, only after you approve it
 highlight: Your AI tool sees the viewport, turns the view and adds strokes, and every step is one undo

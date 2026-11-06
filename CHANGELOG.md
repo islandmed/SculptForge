@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.4] - 2026-11-05
+
 ### Added
 - **Live mode: an AI tool sculpts in the open window while you watch.** Turn on **Edit > Preferences > AI > Let AI
   tools control this window** (off by default) and connect Claude Code or any MCP client with
