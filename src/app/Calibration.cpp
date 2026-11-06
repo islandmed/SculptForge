@@ -469,7 +469,7 @@ bool GpuFrameTimer::available() {
         const GlExtra e = loadExtra();
         ok_ = e.timer();
         if (ok_) {
-            e.GenQueries(kSlots, queries_);
+            e.GenQueries(kSlots * kParts, &queries_[0][0]);
             while (gl::GetError() != GL_NO_ERROR) {}
         }
     }
@@ -484,14 +484,33 @@ void GpuFrameTimer::begin() {
         fences_[next_] = nullptr;
     }
     static const GlExtra e = loadExtra();
-    e.BeginQuery(kGL_TIME_ELAPSED, queries_[next_]);
+    e.BeginQuery(kGL_TIME_ELAPSED, queries_[next_][0]);
     active_ = next_;
+    parts_[active_] = 1;
+    paused_ = false;
+}
+
+bool GpuFrameTimer::pause() {
+    if (active_ < 0) return true; // (no frame query open: free to time)
+    if (paused_ || parts_[active_] >= kParts) return false;
+    static const GlExtra e = loadExtra();
+    e.EndQuery(kGL_TIME_ELAPSED);
+    paused_ = true;
+    return true;
+}
+
+void GpuFrameTimer::resume() {
+    if (active_ < 0 || !paused_) return;
+    static const GlExtra e = loadExtra();
+    e.BeginQuery(kGL_TIME_ELAPSED, queries_[active_][parts_[active_]++]);
+    paused_ = false;
 }
 
 void GpuFrameTimer::end(uint64_t frame) {
     if (active_ < 0) return;
     static const GlExtra e = loadExtra();
-    e.EndQuery(kGL_TIME_ELAPSED);
+    if (!paused_) e.EndQuery(kGL_TIME_ELAPSED);
+    paused_ = false;
     fences_[active_] = gl::FenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
     frames_[active_] = frame;
     pending_[active_] = true;
@@ -514,11 +533,15 @@ bool GpuFrameTimer::poll(uint64_t& frame, double& ms) {
             fences_[i] = nullptr;
         } else { // (no fence: the driver's word)
             uint64_t ready = 0;
-            e.GetQueryObjectui64v(queries_[i], kGL_QUERY_RESULT_AVAILABLE, &ready);
+            e.GetQueryObjectui64v(queries_[i][parts_[i] - 1], kGL_QUERY_RESULT_AVAILABLE, &ready);
             if (!ready) return false;
         }
         uint64_t ns = 0;
-        e.GetQueryObjectui64v(queries_[i], kGL_QUERY_RESULT, &ns);
+        for (int k = 0; k < parts_[i]; ++k) {
+            uint64_t part = 0;
+            e.GetQueryObjectui64v(queries_[i][k], kGL_QUERY_RESULT, &part);
+            ns += part;
+        }
         pending_[i] = false;
         frame = frames_[i];
         ms = double(ns) * 1e-6;
@@ -530,8 +553,8 @@ bool GpuFrameTimer::poll(uint64_t& frame, double& ms) {
 void GpuFrameTimer::release() {
     if (ok_) {
         static const GlExtra e = loadExtra();
-        if (active_ >= 0) e.EndQuery(kGL_TIME_ELAPSED);
-        e.DeleteQueries(kSlots, queries_);
+        if (active_ >= 0 && !paused_) e.EndQuery(kGL_TIME_ELAPSED);
+        e.DeleteQueries(kSlots * kParts, &queries_[0][0]);
         for (auto*& f : fences_) {
             if (f) gl::DeleteSync(f);
             f = nullptr;

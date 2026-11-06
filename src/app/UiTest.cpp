@@ -108,6 +108,7 @@
 //                            style_window_min (ImGui's minimum window height, unscaled px: 32 in every look),
 //                            tablet_mouse_mode (Preferences > Tablet > Mouse mode),
 //                            ui_mouse_x / ui_mouse_y (where ImGui sees the pointer), backface_culling, drawn_triangles,
+//                            micro_gpu_shade_ok (1: micro GPU shading off, or on and never fallen back to the CPU),
 //                            viewport_cursor (the system cursor: 0 arrow, 1 text, 7 hand, 100 crosshair; #73),
 //                            panel_drag_scrolls (left / middle drags that scrolled a panel, #100), panel_drag_scroll_y,
 //                            drag_cursor (the same, at the end of the last button_drag, before letting go; #88),
@@ -1045,6 +1046,7 @@ double Demo::query(const std::string& name, bool& known) const {
         return double(app_.renderer_.coarseDrawnClusters());
     }
     if (name == "coarse_pending") return double(app_.renderer_.coarsePendingClusters()); // edited, levels not updated yet
+    if (name == "micro_gpu_shade_ok") return app_.renderer_.microGpuShadeOk() ? 1.0 : 0.0;
     if (name == "panel_drag_scrolls") return double(ui::DragScrolls()); // #100: drags that scrolled a panel
     if (name == "panel_drag_scroll_y") return double(ui::DragScrollY());  // that panel's scroll after the last one
     if (name == "drag_cursor") return double(dragCursor_); // the system cursor during the last button_drag (#88)

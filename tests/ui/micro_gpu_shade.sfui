@@ -1,0 +1,16 @@
+# Micro levels shaded on the GPU (MicroRenderer::gpuShade, two fragment-shader passes) give the same picture as the
+# CPU's MicroShader. CMakeLists runs this script twice, with SF_MICRO_GPU_SHADE=0 and =1, and compares the two shots
+# (tools/test/png_diff.py); run plainly it checks the CPU path only. Scripted strokes place every dab at once, so both
+# runs sculpt the same surface.
+run new_sphere subdivisions=5
+orbit 30 -15
+run micro_divide level=4
+run micro_noise amplitude=0.003 scale=40
+key b
+key s
+key t
+stroke 0.3 0.4 0.7 0.45
+stroke 0.35 0.55 0.65 0.6
+wait 1
+expect_value micro_gpu_shade_ok == 1
+shot micro-gpu-shade

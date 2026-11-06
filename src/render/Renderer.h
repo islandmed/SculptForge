@@ -265,6 +265,9 @@ public:
     void noteGpuFrame(double gpuMs, uint64_t drawnTriangles); // (the frame governor's GPU timer)
     void setTriangleRate(double millionsPerSecond) { triangleRateM_ = millionsPerSecond; } // (calibration; 0 = unknown)
     void setStroking(bool on) { stroking_ = on; } // a stroke runs: sync leaves the edited clusters' levels until it ends
+    // Micro levels' GPU shading (MicroRenderer::gpuShade): 1 when it is off, or on and shaded on the GPU without
+    // falling back; 0 when it is on but the CPU shaded (tests/ui/micro_gpu_shade.sfui).
+    bool microGpuShadeOk() const;
     // The last syncScene left motion proxies to build (a few milliseconds of them a frame; the rest draw in full).
     bool proxiesPending() const { return proxyPending_; }
     // Build stale motion proxies on still frames too (after a stroke, so the next orbit starts with them), at a

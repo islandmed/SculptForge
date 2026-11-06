@@ -55,13 +55,19 @@ public:
     bool available();          // loads the entry points on first use (needs the context)
     void begin();              // before the frame's GL work
     void end(uint64_t frame);  // after it; `frame` tags the result
+    // Around GL work that times itself (a query can't open inside another): the frame's time goes on in a new part
+    // after resume(), and poll() sums the parts. False when it can't (no room for another part): then don't time.
+    bool pause();
+    void resume();
     bool poll(uint64_t& frame, double& ms); // an earlier frame's GPU time, if one is ready (never waits)
     void release();            // deletes the queries (needs the context)
 
 private:
-    static constexpr int kSlots = 4;
-    unsigned queries_[kSlots] = {};
-    GLsync fences_[kSlots] = {}; // signalled when the slot's query is done
+    static constexpr int kSlots = 4, kParts = 4;
+    unsigned queries_[kSlots][kParts] = {};
+    int parts_[kSlots] = {};
+    bool paused_ = false;
+    GLsync fences_[kSlots] = {}; // signalled when the slot's queries are done
     uint64_t frames_[kSlots] = {};
     bool pending_[kSlots] = {};
     int next_ = 0, active_ = -1;
