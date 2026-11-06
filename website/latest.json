@@ -1,10 +1,11 @@
 {
-  "version": "0.11.4",
+  "version": "0.11.5",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Live mode: an AI tool works in your open window, only after you approve it",
-    "Your AI tool sees the viewport, turns the view and adds strokes, and every step is one undo",
-    "Fixes: rare wrong shading after strokes"
+    "Help > Connect an AI tool: three steps, copyable commands for your tool, example prompts",
+    "The interface in Simplified Chinese",
+    "The brush size ring previews on the mesh while you resize",
+    "Discord status clears when you quit and shows the new SF icon"
   ]
 }
