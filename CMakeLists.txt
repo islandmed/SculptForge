@@ -363,7 +363,7 @@ if(SCULPTFORGE_BUILD_APP)
     fontMonoBold ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-SemiBold.ttf
     fontCjk ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansTC-UI.otf # Traditional Chinese (tools/i18n/subset_cjk_font.py)
     fontCjkSc ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansSC-UI.otf # Simplified Chinese (the same tool)
-    appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png # the SF app icon: window, title bar (BrandMark.cpp)
+    appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png # the cube app icon: window, title bar (BrandMark.cpp)
     appIconSmall ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-32.png # its small cut (up to 32 px)
     bustMark ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/bust/bust-256.png # the illustration: About, What's New, support card
     supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt # Help > About (never empty: it starts with comments)

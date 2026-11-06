@@ -82,7 +82,7 @@ TEST(discord_activity_sends_the_name_only) {
     CHECK(act.isObject());
     CHECK(!act.has("details")); // Discord shows the application's name: SculptForge
     CHECK(!act.has("state"));
-    // The SF mark by URL (Discord's RPC docs: an external https image in large_image, through its media proxy).
+    // The app icon by URL (Discord's RPC docs: an external https image in large_image, through its media proxy).
     CHECK(act["assets"]["large_image"].asString() == "https://sculptforge.app/press/sculptforge-icon-1024.png");
     CHECK(act["assets"]["large_text"].asString() == "SculptForge");
     CHECK(act["timestamps"]["start"].asNumber() == 1793750400.0); // seconds, as in the docs' SET_ACTIVITY example
