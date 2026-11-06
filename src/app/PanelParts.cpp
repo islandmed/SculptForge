@@ -22,6 +22,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -546,6 +547,18 @@ void App::drawPartsContents() {
             if (ImGui::MenuItem(tr("From file...##insert")))
                 SDL_ShowOpenFileDialog(onAppendChosen, &dialogRequests_[int(FileAction::InsertMesh)], window_,
                                        kInsertFilters, 2, nullptr, false);
+            // Insert sets (kitbash sets): a file with several objects, or a folder of model files; a picker of
+            // their thumbnails, [ and ] step through them.
+            ImGui::Separator();
+            if (ImGui::MenuItem(tr("Insert set from file...")))
+                SDL_ShowOpenFileDialog(onAppendChosen, &dialogRequests_[int(FileAction::InsertSet)], window_,
+                                       kInsertFilters, 2, nullptr, false);
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+                ImGui::SetTooltip("%s", tr("A model file with several objects: insert them one at a time"));
+            if (ImGui::MenuItem(tr("Insert set from folder...")))
+                SDL_ShowOpenFolderDialog(onAppendChosen, &dialogRequests_[int(FileAction::InsertSet)], window_, nullptr, false);
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+                ImGui::SetTooltip("%s", tr("A folder of .obj, .ply or .glb files: insert them one at a time"));
             ImGui::EndMenu();
         }
         if (ImGui::MenuItem(tr("From file...")))
@@ -788,7 +801,66 @@ void App::drawPartFolderRow(int fi, float rowH, ImVec2 cellPad, PartFolderAction
     ImGui::PopID();
 }
 
+void App::chooseInsertSet(const std::string& path) {
+    InsertSetState set;
+    std::string error;
+    if (!listInsertSet(path, set.items, error)) {
+        status_ = error;
+        return;
+    }
+    set.path = path;
+    insertSet_ = std::move(set);
+    insertType_ = "mesh";
+    insertMeshKey_ = "set";
+    insertMeshValue_ = path;
+    selectInsertSetItem(0);
+}
+
+void App::selectInsertSetItem(int index) {
+    const int n = int(insertSet_.items.size());
+    if (!n) return;
+    insertSet_.index = ((index % n) + n) % n;
+    status_ = "Insert " + insertSet_.items[size_t(insertSet_.index)].name + " (" + std::to_string(insertSet_.index + 1) +
+              " of " + std::to_string(n) + "): drag on the model; [ and ] step through the set. Esc stops.";
+}
+
+// The insert set's picker: a thumbnail per item, the one a drag inserts outlined; open while inserting from a set.
+void App::drawInsertSetPicker() {
+    if (!insertSetActive()) return;
+    const float s = uiScale_, tile = 72.0f * s;
+    const CanvasRect c = canvasRect();
+    // Bottom left of the canvas: clear of the timeline strip and the view figure at the top.
+    ImGui::SetNextWindowPos(ImVec2(c.x + 12.0f * s, c.y + c.h - 12.0f * s), ImGuiCond_Appearing, ImVec2(0.0f, 1.0f));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(tile * 2.5f, 0), ImVec2(tile * 5.6f, c.h * 0.7f));
+    bool open = true;
+    const std::string title = std::string(tr("Insert set")) + "###insertset";
+    if (ImGui::Begin(title.c_str(), &open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing)) {
+        const auto set = std::filesystem::path(std::u8string(insertSet_.path.begin(), insertSet_.path.end())).lexically_normal();
+        const std::string name = (set.has_filename() ? set.filename() : set.parent_path().filename()).string();
+        ImGui::TextDisabled("%s  (%d)", name.c_str(), int(insertSet_.items.size()));
+        const float spacing = ImGui::GetStyle().ItemSpacing.x;
+        const int perRow = std::clamp(int(insertSet_.items.size()), 1, 5);
+        for (size_t i = 0; i < insertSet_.items.size(); ++i) {
+            const InsertSetItem& it = insertSet_.items[i];
+            if (i % size_t(perRow)) ImGui::SameLine(0, spacing);
+            const std::string id = "##insertset" + std::to_string(i);
+            if (AssetTile(id.c_str(), thumbs_.insertSetItem(it.file, it.object), ICON_LC_BOX, it.name, tile,
+                          int(i) == insertSet_.index))
+                selectInsertSetItem(int(i));
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", it.name.c_str());
+        }
+        AssetTileHoverGlow();
+        ImGui::TextDisabled("%s", tr("[ / ] previous / next   Esc stops"));
+    }
+    ImGui::End();
+    if (!open) {
+        insertType_.clear();
+        status_ = "Insert off";
+    }
+}
+
 void App::drawPartPopups() {
+    drawInsertSetPicker();
     const std::string popup = partConfirm_.title + "###" + partConfirm_.command;
     if (openPartConfirm_) {
         ImGui::OpenPopup(popup.c_str());

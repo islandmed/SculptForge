@@ -27,6 +27,7 @@
 #include "link/AiLinkSession.h"
 #include "core/Macro.h"
 #include "core/Pack.h"
+#include "core/Parts.h"
 #include "core/Document.h"
 #include "core/DiscordPresence.h"
 #include "core/Face.h"
@@ -158,7 +159,7 @@ public:
     static void glWindowAttributes(); // OpenGL 3.3 core, before a window is made
     void requestUiScale(); // Preferences > Interface > UI scale changed: rebuilt live before the next frame (#87)
 
-    enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, AppendPart, ComfyWorkflow, LoadLitSphere, InsertMesh, Count };
+    enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, AppendPart, ComfyWorkflow, LoadLitSphere, InsertMesh, InsertSet, Count };
     struct DialogRequest {
         App* app;
         FileAction action;
@@ -1849,8 +1850,19 @@ private:
     // Insert on the model (#34): the primitive chosen in Append > Insert; a drag on the surface places it.
     // "mesh" inserts your own mesh instead: insertMeshKey_ is "part" (a Part's name) or "file" (a path
     // chosen in the file dialog), insertMeshValue_ the name or path (insert_mesh).
+    // insertMeshKey_ "set": one item of an insert set (a folder or a multi-object file; core/Parts.h), chosen
+    // in the picker window or stepped with [ and ] while inserting.
     std::string insertType_;
     std::string insertMeshKey_, insertMeshValue_;
+    struct InsertSetState {
+        std::string path;
+        std::vector<InsertSetItem> items;
+        int index = 0;
+    } insertSet_;
+    void chooseInsertSet(const std::string& path); // the file or folder dialog's answer
+    void selectInsertSetItem(int index);           // wraps around
+    bool insertSetActive() const { return insertType_ == "mesh" && insertMeshKey_ == "set" && !insertSet_.items.empty(); }
+    void drawInsertSetPicker();
     glm::vec3 insertAt_{0.0f}, insertNormal_{0.0f, 1.0f, 0.0f};
     float insertX_ = 0.0f, insertY_ = 0.0f, insertPx_ = 0.0f;
     // own: our ui.json (its layout becomes storedLayout_; it may have none), not a shared file.

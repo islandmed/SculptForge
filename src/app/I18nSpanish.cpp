@@ -369,6 +369,12 @@ constexpr Entry kSpanish[] = {
     {"Plane", "Plano"},
     {"From file", "Desde archivo"},
     {"Active Part's copy", "Copia de la pieza activa"},
+    {"Insert set from file...", "Conjunto para insertar desde archivo..."},
+    {"Insert set from folder...", "Conjunto para insertar desde carpeta..."},
+    {"A model file with several objects: insert them one at a time", "Un archivo de modelo con varios objetos: insértalos de uno en uno"},
+    {"A folder of .obj, .ply or .glb files: insert them one at a time", "Una carpeta de archivos .obj, .ply o .glb: insértalos de uno en uno"},
+    {"Insert set", "Conjunto para insertar"},
+    {"[ / ] previous / next   Esc stops", "[ / ] anterior / siguiente   Esc termina"},
     {"Not enough GPU memory to show every Part: hide some or step down a subdivision level.",
      "No hay memoria de GPU suficiente para mostrar todas las piezas: oculta alguna o baja un nivel de "
      "subdivisión."},

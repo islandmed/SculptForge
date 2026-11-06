@@ -62,6 +62,12 @@ Click **Append** and choose:
   **From file...** and pick an `.obj`, `.ply` or `.glb` file; then drag as with the shapes. The mesh is centred,
   scaled so its largest side matches the drag, and stood on the surface along its own up (+Y) axis. Esc stops
   inserting. (Command: `insert_mesh part=<name>` or `insert_mesh file=<path>`.)
+  To insert from a **kitbash set**, choose **Insert set from file...** (one `.obj` or `.glb` with several objects)
+  or **Insert set from folder...** (its `.obj`, `.ply` and `.glb` files, by name; not its subfolders). The **Insert set**
+  window shows a thumbnail of each item: click one, then drag on the model as above. While inserting, `]` steps to
+  the next item and `[` to the previous one (around the set; brush size keys come back once you stop). Esc or the
+  window's close button stops. (Commands: `insert_set_items set=<path>` lists them;
+  `insert_mesh set=<path> index=<n>` inserts item `n`, 0 being the first.)
 - **From file...**: a model (`.obj`, `.fbx`, `.glb`, `.gltf`, `.ply`, `.stl`, Bridge files, `.usda`, `.usd`, `.usdz`) or
   a project (`.sfproj`). A file with several objects adds one Part per object.
 

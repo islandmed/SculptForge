@@ -231,6 +231,91 @@ bool loadInsertMesh(const std::string& path, Mesh& out, std::string& error) {
     return ok;
 }
 
+std::string lowerExtension(const std::string& path) {
+    std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
+    for (char& ch : ext) ch = char(std::tolower(static_cast<unsigned char>(ch)));
+    return ext;
+}
+bool insertableExtension(const std::string& ext) { return ext == ".obj" || ext == ".ply" || ext == ".glb" || ext == ".gltf"; }
+
+// A multi-object file's objects (OBJ `o` blocks, glTF nodes); a PLY is one object.
+bool loadInsertObjects(const std::string& path, std::vector<MeshObject>& out, std::string& error) {
+    const std::string ext = lowerExtension(path);
+    out.clear();
+    bool ok = false;
+    if (ext == ".obj") ok = loadObj(path, out, error);
+    else if (ext == ".glb" || ext == ".gltf") ok = loadGltf(path, out, error);
+    else {
+        MeshObject one;
+        ok = loadInsertMesh(path, one.mesh, error);
+        if (ok) out.push_back(std::move(one));
+    }
+    if (!ok && error.empty()) error = "Couldn't read " + path;
+    out.erase(std::remove_if(out.begin(), out.end(), [](const MeshObject& o) { return o.mesh.triangleCount() == 0; }), out.end());
+    return ok;
+}
+
+} // namespace
+
+bool listInsertSet(const std::string& path, std::vector<InsertSetItem>& items, std::string& error) {
+    items.clear();
+    const std::filesystem::path dir(std::u8string(path.begin(), path.end()));
+    std::error_code ec;
+    if (std::filesystem::is_directory(dir, ec)) {
+        std::vector<std::string> files;
+        for (auto it = std::filesystem::directory_iterator(dir, ec); !ec && it != std::filesystem::directory_iterator();
+             it.increment(ec)) {
+            std::error_code e2;
+            if (!it->is_regular_file(e2)) continue;
+            const auto u8 = it->path().u8string();
+            std::string file(u8.begin(), u8.end());
+            if (insertableExtension(lowerExtension(file))) files.push_back(std::move(file));
+        }
+        std::sort(files.begin(), files.end());
+        if (files.size() > size_t(kInsertSetMaxItems)) files.resize(size_t(kInsertSetMaxItems));
+        for (const std::string& f : files) items.push_back({fileStem(f), f, -1});
+        if (items.empty()) error = path + " has no .obj, .ply or .glb files";
+        return !items.empty();
+    }
+    if (!insertableExtension(lowerExtension(path))) {
+        error = "An insert set is a folder, or an .obj, .ply or .glb file";
+        return false;
+    }
+    std::vector<MeshObject> objects;
+    if (!loadInsertObjects(path, objects, error)) return false;
+    const std::string stem = fileStem(path);
+    for (size_t i = 0; i < objects.size() && i < size_t(kInsertSetMaxItems); ++i)
+        items.push_back({objects[i].name.empty() ? stem + " " + std::to_string(i + 1) : objects[i].name, path, int(i)});
+    if (items.empty()) error = path + " has no mesh to insert";
+    return !items.empty();
+}
+
+bool loadInsertSetItem(const std::string& path, int index, Mesh& out, std::string& name, std::string& error) {
+    std::vector<InsertSetItem> items;
+    const std::filesystem::path dir(std::u8string(path.begin(), path.end()));
+    std::error_code ec;
+    if (std::filesystem::is_directory(dir, ec)) {
+        if (!listInsertSet(path, items, error)) return false;
+        if (index < 0 || index >= int(items.size()))
+            return error = "The set has " + std::to_string(items.size()) + " items (index 0-" + std::to_string(items.size() - 1) + ")", false;
+        name = items[size_t(index)].name;
+        return loadInsertMesh(items[size_t(index)].file, out, error);
+    }
+    if (!insertableExtension(lowerExtension(path))) {
+        error = "An insert set is a folder, or an .obj, .ply or .glb file";
+        return false;
+    }
+    std::vector<MeshObject> objects; // (one read: listing it again would read the file twice)
+    if (!loadInsertObjects(path, objects, error)) return false;
+    if (index < 0 || index >= int(objects.size()) || index >= kInsertSetMaxItems)
+        return error = "The set has " + std::to_string(objects.size()) + " items (index 0-" + std::to_string(int(objects.size()) - 1) + ")", false;
+    name = objects[size_t(index)].name.empty() ? fileStem(path) + " " + std::to_string(index + 1) : objects[size_t(index)].name;
+    out = std::move(objects[size_t(index)].mesh);
+    return true;
+}
+
+namespace {
+
 // The shape of `source` for inserting: its triangles and quads only (no mask, paint, UVs, layers or levels),
 // centred on its bounds and scaled so its largest side is `size`. False if it has no triangles.
 bool normalizedPiece(const Mesh& source, float size, Mesh& out) {
@@ -454,17 +539,20 @@ void registerPartCommands(CommandRegistry& reg) {
 
     std::vector<ParamSpec> meshParams{
         {"part", T::String, "insert a copy of this Part (by name)", false},
-        {"file", T::String, "insert the mesh in this model file (.obj, .ply or .glb)", false}};
+        {"file", T::String, "insert the mesh in this model file (.obj, .ply or .glb)", false},
+        {"set", T::String, "insert one item of this insert set: a folder of model files, or a file with several objects", false},
+        {"index", T::Number, "with set=: which item (0 = the first; insert_set_items lists them)", false}};
     meshParams.insert(meshParams.end(), placeParams.begin(), placeParams.end());
     reg.add({"insert_mesh",
              "Insert your own mesh into the active Part where the surface is (#34), placed like insert_primitive: "
-             "a copy of another Part or a model file, scaled so its largest side is `size`, its up (+Y) axis "
+             "a copy of another Part, a model file, or one item of an insert set (a folder or a multi-object file), scaled so its largest side is `size`, its up (+Y) axis "
              "along the surface normal, as one new face group; one undoable step.",
              meshParams,
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string blocked = dyntopoBlocker(doc.mesh);
                  if (!blocked.empty()) return {false, "Can't insert: " + blocked};
-                 if (a.contains("part") == a.contains("file")) return {false, "Give part= or file="};
+                 if (int(a.contains("part")) + int(a.contains("file")) + int(a.contains("set")) != 1)
+                     return {false, "Give part=, file= or set="};
                  Mesh source;
                  std::string label;
                  if (a.contains("part")) {
@@ -472,6 +560,10 @@ void registerPartCommands(CommandRegistry& reg) {
                      const int i = doc.findPart(label);
                      if (i < 0) return {false, "No Part named '" + label + "'"};
                      source = doc.partMesh(i);
+                 } else if (a.contains("set")) {
+                     std::string error;
+                     if (!loadInsertSetItem(argString(a, "set"), int(argNumber(a, "index", 0.0)), source, label, error))
+                         return {false, error};
                  } else {
                      const std::string path = argString(a, "file");
                      std::string error;
@@ -482,6 +574,19 @@ void registerPartCommands(CommandRegistry& reg) {
                  if (!normalizedPiece(source, float(std::max(argNumber(a, "size", 0.2), 1e-4)), piece))
                      return {false, label + " has no mesh to insert"};
                  return insertPiece(doc, std::move(piece), a, label);
+             }});
+
+    reg.add({"insert_set_items",
+             "List the items of an insert set (a folder of .obj / .ply / .glb files, or one file with several "
+             "objects), in the order insert_mesh set=<path> index=<n> numbers them.",
+             {{"set", T::String, "the folder or file", true}},
+             [](Document&, const Args& a) -> CommandResult {
+                 std::vector<InsertSetItem> items;
+                 std::string error;
+                 if (!listInsertSet(argString(a, "set"), items, error)) return {false, error};
+                 std::string out = std::to_string(items.size()) + " item" + (items.size() == 1 ? "" : "s") + ":";
+                 for (size_t i = 0; i < items.size(); ++i) out += "\n" + std::to_string(i) + ". " + items[i].name;
+                 return {true, out};
              }});
 
     reg.add({"part_duplicate", "Copy a Part (with its layers and attributes) and make the copy active.",
