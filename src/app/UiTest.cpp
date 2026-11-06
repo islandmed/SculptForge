@@ -77,7 +77,7 @@
 //   expect_clipboard TEXT    the clipboard contains TEXT (after a copy)
 //   click_part NAME [U V [N]] left-click Part NAME in the viewport (with the held modifiers, e.g.
 //                            hold alt to select it); U V: fractions of its on-screen bounds; N clicks in a row
-//                            (3 = a triple-click)
+//                            (3 = a triple-click; 0 = only point at it, e.g. for a key that acts under the cursor)
 //   expect_value NAME OP N   triangles, vertices, layers, brushes, masked, hidden, groups, colored,
 //                            can_undo, dirty, splats, show_face groups, show_mask, show_mesh, wireframe,
 //                            flat_shading (the scene's: 1 Flat), gradient_background (1 Gradient, 0 Flat Colour),
@@ -1432,7 +1432,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         const std::string name = w[1];
         const float u = num(2, 0.5f), v = num(3, 0.5f);
-        const int times = std::clamp(int(num(4, 1.0f)), 1, 3); // click_part NAME U V 3: a triple-click
+        const int times = std::clamp(int(num(4, 1.0f)), 0, 3); // click_part NAME U V 3: a triple-click; 0: hover only
         const bool pen = w.back() == "pen" || (w.size() > 5 && w[5] == "pen"); // taps with the pen tip instead
         const float hold = pen && w.size() > 6 ? num(6, 0.0f) : 0.0f;        // ... held this long
         steps_.push_back([this, line, name, u, v, times, pen, hold](float t) {

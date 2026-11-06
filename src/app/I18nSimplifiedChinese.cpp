@@ -877,6 +877,10 @@ constexpr Entry kSimplifiedChinese[] = {
      "将微细分层级转为新部件中的普通网格（用于导出或需要真实几何的工具）。"},
     {"Write the micro level as a 32-bit EXR displacement map over the base UVs (next to the project).",
      "将微细分层级写成基底 UV 上的 32 位 EXR 位移贴图（放在项目旁）。"},
+    {"Sculpt the Part under the cursor", "雕刻光标下的部件"},
+    {"Make the Part under the pointer the one you sculpt, without moving the view (each Part keeps its mask). "
+     "The same key as Blender's; Preferences > Hotkeys changes it.",
+     "将指针下的部件设为当前雕刻的部件，视图不动（每个部件保留各自的遮罩）。与 Blender 的按键相同；可在“偏好设置 > 快捷键”中更改。"},
     {"Duplicate Part", "复制部件"},
     {"Copy the active Part, with its layers and attributes, and make the copy active (also in the Parts list's "
      "right-click menu).",

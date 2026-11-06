@@ -1,0 +1,83 @@
+# Sculpt the Part under the cursor (Discord user Ziel): Alt+Q, as in Blender, makes the visible Part under the pointer
+# the active one, in every input style. The view doesn't move and each Part keeps its mask; with no Part under the
+# pointer nothing changes and the status bar says so.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=4 ; part_rename to=Body
+run part_append type=sphere name=Ball
+input_style blender
+expect_value input_style == 2
+expect_value shortcut_conflicts == 0
+expect_shortcut part.sculpt_under_cursor Alt+Q
+key home
+expect_value parts == 2
+
+# The Body is active and masked; the Ball has no mask.
+run part_select index=0 ; mask_all
+expect_value active_part == 0
+remember masked bodymask
+expect_value masked > 0
+remember camera_yaw yaw0
+remember camera_pitch pitch0
+remember camera_distance dist0
+
+# Alt+Q over the second Part: it is the one sculpted now; the view stays.
+click_part Ball 0.5 0.5 0
+key alt+q
+expect_value active_part == 1
+expect_status Sculpting: Ball
+expect_value masked == 0
+expect_value camera_yaw == $yaw0
+expect_value camera_pitch == $pitch0
+expect_value camera_distance == $dist0
+shot blender-alt-q-ball
+
+# Back to the Body: its mask is as it was.
+click_part Body 0.5 0.5 0
+key alt+q
+expect_value active_part == 0
+expect_status Sculpting: Body
+expect_value masked == $bodymask
+expect_value camera_distance == $dist0
+shot blender-alt-q-body
+
+# Again over the active Part: it stays, and says so.
+key alt+q
+expect_value active_part == 0
+expect_status Sculpting: Body
+
+# Nothing under the pointer (the background or a panel): no switch.
+hover_window 0.5 0.06
+key alt+q
+expect_value active_part == 0
+expect_status No Part under the cursor
+shot blender-alt-q-nothing
+
+# The command palette finds it, with its key.
+key f3
+type "##Command palette" "part under the cursor"
+expect_text "Sculpt the Part under the cursor"
+shot command-palette
+key esc
+
+# The other input styles: the same free key (no conflicts); Alt+Q no longer falls back to Q (Draw).
+input_style classic
+expect_value shortcut_conflicts == 0
+expect_shortcut part.sculpt_under_cursor Alt+Q
+expect_shortcut tool.draw Q
+click_part Ball 0.5 0.5 0
+key alt+q
+expect_value active_part == 1
+expect_status Sculpting: Ball
+input_style sculptforge
+expect_value shortcut_conflicts == 0
+expect_shortcut part.sculpt_under_cursor Alt+Q
+click_part Body 0.5 0.5 0
+key alt+q
+expect_value active_part == 0
+input_style maya
+expect_value shortcut_conflicts == 0
+expect_shortcut part.sculpt_under_cursor Alt+Q
+click_part Ball 0.5 0.5 0
+key alt+q
+expect_value active_part == 1
+expect_status Sculpting: Ball

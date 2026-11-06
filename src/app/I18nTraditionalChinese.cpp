@@ -877,6 +877,10 @@ constexpr Entry kTraditionalChinese[] = {
      "將微細分層級轉為新部件中的一般網格（用於匯出或需要真實幾何的工具）。"},
     {"Write the micro level as a 32-bit EXR displacement map over the base UVs (next to the project).",
      "將微細分層級寫成基底 UV 上的 32 位元 EXR 位移貼圖（放在專案旁）。"},
+    {"Sculpt the Part under the cursor", "雕刻游標下的部件"},
+    {"Make the Part under the pointer the one you sculpt, without moving the view (each Part keeps its mask). "
+     "The same key as Blender's; Preferences > Hotkeys changes it.",
+     "將指標下的部件設為目前雕刻的部件，視圖不動（每個部件保留各自的遮罩）。與 Blender 的按鍵相同；可在「偏好設定 > 快速鍵」中變更。"},
     {"Duplicate Part", "複製部件"},
     {"Copy the active Part, with its layers and attributes, and make the copy active (also in the Parts list's "
      "right-click menu).",

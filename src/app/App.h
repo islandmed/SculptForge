@@ -1481,6 +1481,7 @@ private:
     float partClickX_ = 0.0f, partClickY_ = 0.0f;
     Uint64 partClickNs_ = 0; // when the Alt press on another Part began (a long pen press isn't a click)
     void partSelected(const char* how);
+    void sculptPartUnderCursor(); // Alt+Q: the Part under the pointer becomes the active one
     // A background job's result (Auto UV, Voxel Remesh, QRemesh, Unwrap) goes onto the Part it ran on, and the
     // active Part stays the one the user is on (Discord: "the active Part switches by itself" when a job finished
     // after picking another Part). JobPart makes the job's Part active for the result; its destructor goes back
