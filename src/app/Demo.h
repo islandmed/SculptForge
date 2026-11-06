@@ -141,6 +141,9 @@ private:
     std::vector<std::string> scriptLines_;    // the script's lines, for the report
     std::vector<double> lineSeconds_;         // real seconds spent on each line
     std::chrono::steady_clock::time_point lastUpdate_{};
+    // The longest real time between two frames since it was last read (UI tests: longest_frame_ms; reading resets it).
+    std::chrono::steady_clock::time_point lastFrame_{};
+    mutable double longestFrameMs_ = 0.0;
     int stride_ = 1;
     ImVec2 mouse_{960, 540};
     bool buttonDown_ = false;

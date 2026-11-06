@@ -72,6 +72,7 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace sf::ai {
@@ -165,7 +166,7 @@ public:
 
 private:
     enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, PartClick, Select, Gizmo, Guide, Sculptable, ForgeSphere, Insert, Capture,
-                      AirStroke, UvTool, SizeScrub, QuickRemesh }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
+                      AirStroke, UvTool, SizeScrub, QuickRemesh, Gradient }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
 
     void handleEvent(const SDL_Event& e); // the pen's mouse events first (penMouseEvents), then dispatchEvent
     void dispatchEvent(const SDL_Event& e);
@@ -639,7 +640,7 @@ private:
     float projectDepth_ = 0.02f;
     bool projectInvert_ = false;
     char generatorCommand_[1024] = "";
-    char falKey_[256] = "", falModel_[256] = "", meshyKey_[256] = "", hfToken_[256] = "";
+    char falKey_[256] = "", falModel_[256] = "", meshyKey_[256] = "", hfToken_[256] = "", hyper3dKey_[256] = "";
     // ComfyUI: "Test connection" result, bundled workflows, the chosen file's problem (UI format...)
     char comfyUrl_[256] = "";
     struct ComfyCheck {
@@ -913,6 +914,34 @@ private:
         std::string error;
         char name[64] = "Captured";
     } capture_;
+    // Line Gradient (#99, LineGradient.cpp): Color > Line Gradient arms it; a drag on the view paints a colour ramp
+    // (paint_gradient) whose two ends stay draggable, each change painting it again in place of the same undo step.
+    // Enter, a camera move or any other edit keeps it; Esc takes it back.
+    void registerLineGradientActions();
+    bool gradientMouseDown(float x, float y, SDL_Keymod mod); // true when it takes the click
+    void gradientMouseMove(float x, float y);
+    void gradientMouseUp();
+    bool gradientKey(SDL_Keycode key); // Enter / Esc
+    void applyGradient();
+    void endGradientEdit();
+    void drawGradientOverlay();
+    void drawLineGradientControls(); // Color palette
+    bool gradientUiValue(const std::string& name, double& out) const; // UI test values
+    struct GradientUi {
+        bool armed = false;
+        bool placed = false;          // painted, and its ends can still move
+        int handle = -1;              // being dragged: 0 the start, 1 the end, 2 a new line
+        glm::vec2 a{0.0f}, b{0.0f};   // window pixels
+        glm::vec2 grabOffset{0.0f};   // from the pointer to the handle it grabbed
+        glm::vec3 to{0.0f};           // the End colour (linear)
+        bool toClear = false;
+        uint64_t revision = 0;        // the undo history right after it was painted
+        glm::mat4 view{1.0f};         // the camera and canvas it was painted in
+        glm::vec4 canvas{0.0f};
+        glm::vec2 appliedA{0.0f}, appliedB{0.0f};
+        glm::vec3 appliedFrom{0.0f}, appliedTo{0.0f};
+        bool appliedClear = false;
+    } gradient_;
     glm::vec3 kelvinCenter_{0.0f};
     float kelvinRadius_ = 0.0f, kelvinLastX_ = 0.0f;
     glm::vec3 kelvinTarget_{0.0f}; // KelvinGrab: where the cursor wants the grabbed point
@@ -1004,7 +1033,7 @@ private:
     const MeshOverlay* uvEditorOverlay(uint32_t part); // what syncScene hands the renderer for the model
     bool uvEditorBusy() const;
     // UI test values: uv_editor_open, uv_islands, uv_seams, uv_selected, uv_select_mode, uv_pins, uv_tiles,
-    // uv_stretch_x1000, uv_flipped_x1000, uv_density, uv_max_u, uv_unwrapping, uv_unwraps, uv_tool,
+    // uv_stretch_x1000, uv_flipped_x1000, uv_density, uv_max_u, uv_unwrapping, uv_unwraps, uv_packs, uv_tool,
     // uv_view_triangles, uv_overlay, uv_pack_columns, uv_pack_rows (the Pack fields); NaN for other names.
     double uvEditorTestValue(const std::string& name);
     std::shared_ptr<struct UvEditorState> uvEditor_;
@@ -1014,9 +1043,21 @@ private:
     // After uv_pack / uv_unwrap from anywhere (the panel, a script, the console): the fields show the grid it used.
     void uvPackGridUsed(const Args& args);
     bool showUvEditor_ = false;
-    void startAutoUv();
+    // Auto UV on a worker (xatlas takes seconds on big meshes): the button, New Texture, and the uv_auto command from
+    // the console, an AI tool or a UI test (resolution 0: the texture's size, or the size chosen under Texture Map).
+    void startAutoUv(int resolution = 0, bool keepTexture = true, bool command = false);
+    CommandResult startAutoUvCommand(const Args& args); // runCommand's uv_auto (macros keep the synchronous one)
     void startNewTexture(); // New Texture on the top shelf / Color palette: Auto UV first when there are no UVs
     void pollAutoUv();
+    // A command that runs on a worker (uv_auto): it returned at once and its result comes later. The console, the AI
+    // link and UI tests wait for it before their next statement, then take its result (once).
+    bool commandRunning() const { return autoUv_ && autoUv_->command; }
+    bool takeCommandResult(CommandResult& out) {
+        if (!commandResult_) return false;
+        out = *std::exchange(commandResult_, std::nullopt);
+        return true;
+    }
+    std::optional<CommandResult> commandResult_;
     struct AutoUvJob {
         std::future<bool> done;
         std::shared_ptr<std::atomic<float>> progress;
@@ -1025,6 +1066,8 @@ private:
         std::shared_ptr<std::string> error;
         uint32_t part = 0;            // Part id it unwraps
         size_t triangles = 0;            // the mesh must still have this many triangles when it finishes
+        bool keepTexture = true;         // a painted texture moves onto the new UVs (uv_auto keep_texture=false: not)
+        bool command = false;            // started by the uv_auto command: its result goes to commandResult_
     };
     std::unique_ptr<AutoUvJob> autoUv_;
     bool textureAfterAutoUv_ = false;    // the running Auto UV came from New Texture: make the texture after it
@@ -1498,6 +1541,7 @@ private:
     bool jobWaitsForStroke() const;
     Uint64 clickClockNs() const; // the status bar names the new active Part and how it was chosen
     uint32_t renamingPart_ = 0; // Part id being renamed inline (0: none)
+    uint32_t renamingFolder_ = 0; // Part folder id being renamed inline (0: none; #96)
     uint32_t listedActivePart_ = 0; // the list scrolls to the active Part when it changes
     // Part thumbnails (#43): rendered from each Part's GPU buffers while the Parts panel shows, one per frame
     // at most, a change once it has settled (PartThumbnails.h); GL textures by Part id.
@@ -1636,6 +1680,16 @@ private:
     float microSlider_ = 4.0f;  // Tool > Geometry > Micro: the micro level the next Divide to micro makes
     bool sdivHeld_ = false;
     void drawPartsContents();
+    // Parts list folders (#96): what a frame's folder rows asked for, run after the list (by folder name).
+    struct PartFolderActions {
+        std::string toggle, collapse, remove, gizmo, rename, renameTo;
+        int part = -1;      // a Part put into folder partTo ("" = out of its folder)
+        std::string partTo;
+    };
+    void drawPartFolderRow(int folder, float rowH, ImVec2 cellPad, PartFolderActions& fa);
+    void partDropTarget(const std::string& folder, PartFolderActions& fa);
+    std::string partFolderName(uint32_t id) const;
+    void startFolderRename(); // the folder just made: its name ready to type
     // PanelExtract.cpp: Tool > Part > Extract, Tool > Geometry > Modify Topology (Mirror And Weld) and
     // Tool > Deformation (Mirror).
     void drawExtractContents();
@@ -1877,7 +1931,7 @@ private:
         bool pivotPlaced = false;   // Alt+drag, snap or a drag moved it: stop following the centre
         bool orientSurface = false; // axes from the surface the pivot was snapped to (else world)
         glm::mat3 frame{1.0f};      // the surface axes (turn with rotations)
-        bool useMask = true, all = false;
+        bool useMask = true, all = false, folder = false; // folder: the active Part's folder moves together (#96)
         float falloff = 0.0f;       // fraction of the size (core/MeshTransform.h)
         bool snapNext = false;      // "Pivot to Surface": the next click on the model places the pivot
         uint64_t centreKey = ~uint64_t(0), maskKey = 0;
@@ -1919,6 +1973,7 @@ private:
     // Falloff (U / I / O), the classic mask and face group keys, Shift-constrained straight strokes and the
     // Shift+click, release Shift, drag roll.
     void registerInputActions();
+    void registerLibraryActions(); // the Library's and pickers' actions (LibraryBrowser.cpp)
     void applyInputStyle(); // the style's default shortcuts (1-0 brushes or 9 QuickSave; I = RGB or Intensity)
     bool classicStyle() const { return uiPrefs_.inputStyle == 0; }
     bool blenderStyle() const { return uiPrefs_.inputStyle == 2; }

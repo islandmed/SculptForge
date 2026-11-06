@@ -13,6 +13,12 @@
 #include <xatlas.h>
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <functional>
+#include <mutex>
+#include <thread>
 #include <cmath>
 #include <limits>
 #include <memory>
@@ -77,22 +83,79 @@ struct Skyline {
     }
 };
 
+using AtlasPtr = std::unique_ptr<xatlas::Atlas, void (*)(xatlas::Atlas*)>;
+
+// xatlas's progress callback: stop (false) once `stop` is set, so a cancelled pack ends within a chart.
+bool keepPacking(xatlas::ProgressCategory, int, void* stop) { return !static_cast<const std::atomic<bool>*>(stop)->load(); }
+
+// An xatlas atlas holding triangles `idx` of the UV mesh `verts` (`material`: the island of each), charts computed.
+AtlasPtr shapeAtlas(const std::vector<glm::vec2>& verts, const std::vector<uint32_t>& idx, const std::vector<uint32_t>& material,
+                    std::atomic<bool>& stop) {
+    AtlasPtr atlas(xatlas::Create(), xatlas::Destroy);
+    xatlas::SetProgressCallback(atlas.get(), keepPacking, &stop);
+    xatlas::UvMeshDecl decl;
+    decl.vertexUvData = verts.data();
+    decl.vertexStride = sizeof(glm::vec2);
+    decl.vertexCount = uint32_t(verts.size());
+    decl.indexData = idx.data();
+    decl.indexCount = uint32_t(idx.size());
+    decl.indexFormat = xatlas::IndexFormat::UInt32;
+    decl.faceMaterialData = material.data(); // (one per island: islands that overlap stay apart)
+    if (xatlas::AddUvMesh(atlas.get(), decl) != xatlas::AddMeshError::Success) return AtlasPtr(nullptr, xatlas::Destroy);
+    xatlas::ComputeCharts(atlas.get());
+    return atlas;
+}
+
+// Runs job(i) for every i in [0, n) on up to `threads` threads while the calling thread reports progress (the
+// jobs done, mapped to [from, to]). False when the progress callback asked to stop: `stop` is set, which the
+// jobs' packs watch too, so they end early.
+bool runJobs(size_t n, int threads, const std::function<void(size_t)>& job, const UvProgress& progress, std::atomic<bool>& stop,
+             float from, float to) {
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::atomic<size_t> next{0};
+    size_t done = 0;
+    auto work = [&] {
+        for (size_t i; !stop && (i = next++) < n;) {
+            job(i);
+            std::lock_guard lock(mutex);
+            ++done;
+            cv.notify_one();
+        }
+    };
+    std::vector<std::thread> pool;
+    for (size_t t = 0; t < std::min(n, size_t(std::max(threads, 1))); ++t) pool.emplace_back(work);
+    {
+        std::unique_lock lock(mutex);
+        while (done < n && !stop) {
+            const float f = from + (to - from) * float(done) / float(std::max<size_t>(n, 1));
+            lock.unlock();
+            if (progress && !progress(f)) stop = true;
+            lock.lock();
+            if (!stop) cv.wait_for(lock, std::chrono::milliseconds(25), [&] { return done >= n; });
+        }
+    }
+    for (std::thread& t : pool) t.join();
+    return !stop;
+}
+
 // The shape packer (xatlas, on the islands as a UV mesh): islands are rasterised and fitted by their outlines, so
 // far less space goes to waste than with boxes. The islands go in scaled to one density (UV area = surface area,
 // or kept relative with k = 1), so xatlas's texels per unit is the texel density itself: with `density` it packs at
-// exactly that and opens as many tiles as it needs; otherwise the largest density that fits `tiles` is found by
-// bisection at a quarter of the resolution, then packed at full resolution. False when xatlas can't (the box
-// packer takes over).
+// exactly that and opens as many tiles as it needs; otherwise the largest density that fits `tiles` is searched
+// for at a quarter of the resolution (several densities at once, one atlas per thread, at an eighth first). False
+// when xatlas can't (the box packer takes over) or `stop` was set (the progress callback cancelled).
 bool packByShape(Mesh& m, const UvTopology& topo, const std::vector<uint32_t>& list, const std::vector<uint32_t>& offsets,
                  const std::vector<uint32_t>& corners, const std::vector<float>& k, const std::vector<float>& angle,
-                 const UvPackOptions& o, UvPackResult& result) {
+                 const UvPackOptions& o, UvPackResult& result, const UvProgress& progress, std::atomic<bool>& stop) {
     const int res = std::clamp(o.resolution, 64, 16384);
     std::vector<uint32_t> vid(topo.uvVertexCount, ~0u);
     std::vector<glm::vec2> verts;
-    std::vector<uint32_t> idx, cornerOf, material;
+    std::vector<uint32_t> idx, cornerOf, material, start(list.size() + 1, 0); // start: each island's first index
     double total = 0.0;
     for (size_t p = 0; p < list.size(); ++p) {
         const uint32_t i = list[p];
+        start[p] = uint32_t(idx.size());
         glm::vec2 lo(std::numeric_limits<float>::max()), hi(std::numeric_limits<float>::lowest());
         for (uint32_t c = offsets[i]; c < offsets[i + 1]; ++c) lo = glm::min(lo, m.uvs[corners[c]]), hi = glm::max(hi, m.uvs[corners[c]]);
         const glm::vec2 mid = (lo + hi) * 0.5f;
@@ -108,72 +171,121 @@ bool packByShape(Mesh& m, const UvTopology& topo, const std::vector<uint32_t>& l
             if (idx.size() % 3 == 0) material.push_back(uint32_t(p));
         }
     }
+    start[list.size()] = uint32_t(idx.size());
     for (size_t t = 0; t + 2 < idx.size(); t += 3) // (the islands' area as they go in)
         total += 0.5 * std::abs(double(cross2(verts[idx[t + 1]] - verts[idx[t]], verts[idx[t + 2]] - verts[idx[t]])));
     if (idx.empty() || total <= 0.0) return false;
-    std::unique_ptr<xatlas::Atlas, void (*)(xatlas::Atlas*)> atlas(xatlas::Create(), xatlas::Destroy);
-    xatlas::UvMeshDecl decl;
-    decl.vertexUvData = verts.data();
-    decl.vertexStride = sizeof(glm::vec2);
-    decl.vertexCount = uint32_t(verts.size());
-    decl.indexData = idx.data();
-    decl.indexCount = uint32_t(idx.size());
-    decl.indexFormat = xatlas::IndexFormat::UInt32;
-    decl.faceMaterialData = material.data(); // (one per island: islands that overlap stay apart)
-    if (xatlas::AddUvMesh(atlas.get(), decl) != xatlas::AddMeshError::Success) return false;
-    xatlas::ComputeCharts(atlas.get());
-    auto pack = [&](float texelsPerUnit, int resolution) {
+    const int lanes = std::clamp(ThreadPool::shared().threads(), 1, 8);
+    auto pack = [&](xatlas::Atlas& atlas, float texelsPerUnit, int resolution) {
         xatlas::PackOptions po;
-        po.padding = uint32_t(std::lround(std::max(o.marginPx, 0.0f) * float(resolution) / float(res)));
+        const float margin = std::max(o.marginPx, 0.0f) * float(resolution) / float(res);
+        po.padding = uint32_t(resolution == res ? std::lround(margin) : std::ceil(margin - 1e-3f)); // (never under it, scaled up)
         po.texelsPerUnit = texelsPerUnit;
         po.resolution = uint32_t(resolution);
         po.bilinear = false;
         po.blockAlign = resolution > 1024;
-        po.rotateCharts = o.rotate; // (quarter turns, undone exactly by the fit below)
-        po.rotateChartsToAxis = false; // (turned to their smallest box above: xatlas's own turn could mirror)
-        xatlas::PackCharts(atlas.get(), po);
-        return atlas->meshCount == 1 ? int(std::max(atlas->atlasCount, 1u)) : 0;
+        // (Turned to their smallest box above. xatlas's own quarter turn swaps x and y, a mirror the fit below can't
+        // undo: those islands came out shrunk and overlapping their neighbours.)
+        po.rotateCharts = false;
+        po.rotateChartsToAxis = false;
+        xatlas::PackCharts(&atlas, po);
+        return atlas.meshCount == 1 && !stop ? int(std::max(atlas.atlasCount, 1u)) : 0;
+    };
+    // xatlas may split an island it finds folded or pinched into several charts: then the islands wouldn't stay
+    // whole, and the box packer takes over. (Charts don't depend on the density, so one small pack shows it.)
+    auto whole = [&](const xatlas::Atlas& atlas, const std::vector<uint32_t>& mat) {
+        const xatlas::Mesh& out = atlas.meshes[0];
+        for (size_t i = 3; i < out.indexCount; ++i)
+            if (mat[i / 3] == mat[(i - 1) / 3] &&
+                out.vertexArray[out.indexArray[i]].chartIndex != out.vertexArray[out.indexArray[i - 1]].chartIndex)
+                return false;
+        return true;
+    };
+    std::vector<AtlasPtr> atlas;
+    atlas.reserve(size_t(lanes));
+    for (int l = 0; l < lanes; ++l) atlas.emplace_back(nullptr, xatlas::Destroy);
+    auto lane = [&](size_t l) -> xatlas::Atlas* {
+        if (!atlas[l]) atlas[l] = shapeAtlas(verts, idx, material, stop);
+        return atlas[l].get();
     };
     const int maxTiles = uvPackMaxTiles(o), tiles = std::clamp(o.tiles, 1, maxTiles);
+    const int lowRes = std::min(std::max(res / 4, 256), res), coarseRes = std::min(std::max(res / 8, 128), res);
+    const float inv = 1.0f / float(res);
+    std::vector<glm::vec2> placed(idx.size()); // where each corner went, in UDIM space
+    // Where xatlas put each corner of `a`'s pack at `resolution`, scaled to the full resolution.
+    auto layout = [&](const xatlas::Atlas& a, int resolution, std::vector<glm::vec2>& to) {
+        const xatlas::Mesh& out = a.meshes[0];
+        const float scale = float(res) / float(resolution) * inv;
+        for (uint32_t i = 0; i < out.indexCount; ++i) {
+            const xatlas::Vertex& v = out.vertexArray[out.indexArray[i]];
+            to[i] = udimOrigin(uvPackTile(o, std::max(v.atlasIndex, 0))) + glm::vec2(v.uv[0], v.uv[1]) * scale;
+        }
+    };
     float density = o.density;
     int used = 0;
-    if (density > 0.0f) {
-        used = pack(density, res);
-        if (used == 0 || used > maxTiles) return false;
-    } else {
-        // Bisection at a quarter of the resolution (fast), then the full pack, a little smaller until it fits.
-        const int lowRes = std::max(res / 4, 256);
-        const float rel = float(lowRes) / float(res);
-        float lo = 0.0f, hi = float(std::sqrt(double(tiles) * double(res) * double(res) / total));
-        for (int it = 0; it < 12; ++it) {
-            const float mid = lo > 0.0f ? 0.5f * (lo + hi) : hi * 0.6f;
-            const int count = pack(mid * rel, lowRes);
-            if (count > 0 && count <= tiles) lo = mid;
-            else hi = mid;
-            if (lo > 0.0f && hi / lo < 1.01f) break;
-        }
-        if (lo <= 0.0f) return false;
-        density = lo;
-        for (int tries = 0; tries < 8; ++tries, density *= 0.97f)
-            if ((used = pack(density, res)) > 0 && used <= tiles) break;
-        if (used == 0 || used > tiles) return false;
+    if (!lane(0)) return false;
+    // Split check first (charts don't depend on the density): the islands into about half of one small atlas.
+    const float hi0 = float(std::sqrt(double(tiles) * double(res) * double(res) / total)); // (every tile full)
+    if (!pack(*atlas[0], hi0 * float(coarseRes) / float(res) * std::sqrt(0.5f / float(tiles)), coarseRes) || !whole(*atlas[0], material) ||
+        atlas[0]->meshes[0].indexCount != idx.size())
+        return false;
+    if (progress && !progress(0.05f)) {
+        stop = true;
+        return false;
     }
-    const xatlas::Mesh& out = atlas->meshes[0];
-    if (out.indexCount != idx.size()) return false;
-    const float inv = 1.0f / float(res);
+    if (density > 0.0f) {
+        used = pack(*atlas[0], density, res);
+        if (used == 0 || used > maxTiles) return false;
+        layout(*atlas[0], res, placed);
+    } else {
+        // The search: each round packs up to `lanes` densities (one atlas per thread) between the largest that
+        // fitted (lo) and the smallest that didn't (hi), at an eighth of the resolution until they are 5% apart,
+        // then at a quarter until 1%. The best quarter-resolution layout is the result, scaled up: xatlas marks
+        // every texel a chart touches, and the margin rounds up, so nothing comes closer than at full resolution.
+        float lo = 0.0f, hi = hi0;
+        int resolution = coarseRes;
+        std::vector<float> ds(static_cast<size_t>(lanes));
+        std::vector<int> counts(static_cast<size_t>(lanes));
+        std::vector<std::vector<glm::vec2>> laneLayout(static_cast<size_t>(lanes));
+        bool haveLayout = false;
+        for (int round = 0; round < 16; ++round) {
+            if (lo > 0.0f && hi / lo < (resolution == lowRes ? 1.01f : 1.05f)) {
+                if (resolution == lowRes) break;
+                resolution = lowRes; // (finer, so what fitted may not: the bracket opens a little)
+                lo *= 0.96f, hi *= 1.02f;
+                for (int l = 0; l < lanes; ++l) ds[size_t(l)] = lo + (hi - lo) * float(l) / float(std::max(lanes - 1, 1));
+                lo = 0.0f;
+            } else {
+                for (int l = 0; l < lanes; ++l) // (nothing fitted yet: from 40% of every tile full up)
+                    ds[size_t(l)] = lo > 0.0f ? lo + (hi - lo) * float(l + 1) / float(lanes + 1) : hi * (0.4f + 0.55f * float(l + 1) / float(lanes + 1));
+            }
+            const float f = 0.05f + 0.9f * float(std::min(round, 7)) / 8.0f;
+            if (!runJobs(size_t(lanes), lanes, [&](size_t l) {
+                    xatlas::Atlas* a = lane(l);
+                    counts[l] = a ? pack(*a, ds[l] * float(resolution) / float(res), resolution) : 0;
+                    if (resolution == lowRes && counts[l] > 0 && counts[l] <= tiles) {
+                        laneLayout[l].resize(idx.size());
+                        layout(*a, resolution, laneLayout[l]);
+                    }
+                }, progress, stop, f, f + 0.9f / 8.0f))
+                return false;
+            float newLo = lo;
+            int best = -1;
+            for (int l = 0; l < lanes; ++l)
+                if (counts[size_t(l)] > 0 && counts[size_t(l)] <= tiles && ds[size_t(l)] > newLo) newLo = ds[size_t(l)], best = l;
+            for (int l = 0; l < lanes; ++l)
+                if (!(counts[size_t(l)] > 0 && counts[size_t(l)] <= tiles) && ds[size_t(l)] > newLo) hi = std::min(hi, ds[size_t(l)]);
+            if (best >= 0) {
+                lo = newLo;
+                used = counts[size_t(best)];
+                if (resolution == lowRes) placed.swap(laneLayout[size_t(best)]), haveLayout = true;
+            }
+        }
+        if (lo <= 0.0f || !haveLayout) return false;
+        density = lo;
+    }
     // Only where xatlas put each island is taken: the move (and scale) that best maps the island onto its packed
     // copy is applied to the island's own UVs, so its shape stays exactly as it was.
-    // xatlas may split an island it finds folded or pinched into several charts: then the islands wouldn't stay
-    // whole, and the box packer takes over.
-    for (size_t i = 3; i < idx.size(); ++i)
-        if (material[i / 3] == material[(i - 1) / 3] &&
-            out.vertexArray[out.indexArray[i]].chartIndex != out.vertexArray[out.indexArray[i - 1]].chartIndex)
-            return false;
-    std::vector<glm::vec2> placed(out.indexCount);
-    for (uint32_t i = 0; i < out.indexCount; ++i) {
-        const xatlas::Vertex& v = out.vertexArray[out.indexArray[i]];
-        placed[i] = udimOrigin(uvPackTile(o, std::max(v.atlasIndex, 0))) + glm::vec2(v.uv[0], v.uv[1]) * inv;
-    }
     for (size_t b = 0; b < idx.size();) {
         size_t e = b;
         while (e < idx.size() && material[e / 3] == material[b / 3]) e += 3;
@@ -195,11 +307,16 @@ bool packByShape(Mesh& m, const UvTopology& topo, const std::vector<uint32_t>& l
         }
         b = e;
     }
-    const double uvArea = total;
+    // (Measured: xatlas shrinks an island bigger than a tile to fit one, so it isn't density^2 x their area.)
+    double uvArea = 0.0;
+    for (uint32_t i : list)
+        for (uint32_t k = topo.islandOffsets[i]; k < topo.islandOffsets[i + 1]; ++k) {
+            const glm::vec2* u = m.uvs.data() + size_t(topo.islandTriangles[k]) * 3;
+            uvArea += 0.5 * std::abs(double(cross2(u[1] - u[0], u[2] - u[0])));
+        }
     result.islands = list.size();
     result.tilesUsed = used;
-    // (UV area after packing = surface area x (density / res)^2 when the islands went in at one density.)
-    result.coverage = float(uvArea * double(density) * double(density) * double(inv) * double(inv) / double(std::max(used, 1)));
+    result.coverage = float(uvArea / double(std::max(used, 1)));
     result.density = uvMeshDensity(m, res);
     m.facesDirty = true;
     return true;
@@ -276,7 +393,7 @@ int packRectangles(const std::vector<glm::vec2>& sizes, int maxTiles, bool allow
 }
 
 bool uvPack(Mesh& m, const UvTopology& topo, const std::vector<uint8_t>& islands, const UvPackOptions& o,
-            UvPackResult& result, std::string& error) {
+            UvPackResult& result, std::string& error, const UvProgress& progress) {
     result = UvPackResult();
     const size_t nt = m.triangleCount();
     if (m.uvs.size() != nt * 3 || topo.island.size() != nt) {
@@ -337,8 +454,13 @@ bool uvPack(Mesh& m, const UvTopology& topo, const std::vector<uint8_t>& islands
         std::vector<double> a3(n);
         for (size_t p = 0; p < n; ++p) k[p] = pieces[p].k, angle[p] = pieces[p].angle, a3[p] = pieces[p].area3;
         const std::vector<glm::vec2> before = m.uvs;
-        if (packByShape(m, topo, list, offsets, corners, k, angle, o, shapeResult)) shapeUvs = m.uvs;
+        std::atomic<bool> stop{false};
+        if (packByShape(m, topo, list, offsets, corners, k, angle, o, shapeResult, progress, stop)) shapeUvs = m.uvs;
         m.uvs = before;
+        if (stop) {
+            error = "Cancelled";
+            return false;
+        }
     }
     auto useShapes = [&] {
         if (shapeUvs.empty()) return false;

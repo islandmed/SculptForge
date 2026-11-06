@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.11.8 LANGUAGES C CXX)
+project(SculptForge VERSION 0.11.9 LANGUAGES C CXX)
 # "beta.1" while this is a beta of that version (title bar and About: "0.11.0 Beta 1"), "" for a stable release.
 # scripts/release.sh sets it; release.yml checks the tag against both (v0.11.0-beta.1).
 set(SCULPTFORGE_PRERELEASE "")
@@ -265,7 +265,7 @@ set_source_files_properties(third_party/xatlas/xatlas.cpp third_party/tinyexr/ti
 
 # --- Bring-your-own-AI (brush assistant). HTTPS via WinHTTP or libcurl. ---
 add_library(sculptforge_ai STATIC src/ai/Http.cpp src/ai/AiPolicy.cpp src/ai/Providers.cpp src/ai/Secrets.cpp src/ai/Oidc.cpp src/ai/BrushAssistant.cpp src/ai/Generator3D.cpp
-  src/ai/ImageTo3DService.cpp src/ai/GradioClient.cpp src/ai/ComfyUI.cpp src/ai/AiCommands.cpp src/ai/BrushGalleryClient.cpp src/link/Socket.cpp
+  src/ai/ImageTo3DService.cpp src/ai/Hyper3D.cpp src/ai/GradioClient.cpp src/ai/ComfyUI.cpp src/ai/AiCommands.cpp src/ai/BrushGalleryClient.cpp src/link/Socket.cpp
   src/link/UnrealLink.cpp src/ai/Process.cpp src/ai/SplatTrainer.cpp)
 # Lets a build run from its tree find the bundled ComfyUI workflows (integrations/comfyui/workflows).
 target_compile_definitions(sculptforge_ai PRIVATE SF_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
@@ -412,6 +412,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelBrushLibrary.cpp
     src/app/PanelBrushGallery.cpp
     src/app/PanelVertexPaint.cpp
+    src/app/LineGradient.cpp
     src/app/PanelPacks.cpp
     src/app/MemoryConfirm.cpp
     src/app/PanelPaintLayers.cpp
@@ -778,6 +779,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The Claude Desktop bundle and its MCP registry entry (tools/release/build_mcpb.py, mcp_server_json.py): packed
     # from the built CLI and its server run from the unpacked bundle, as packages.yml does on every OS.
     add_test(NAME mcpb_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/build_mcpb.py --self-test)
+    add_test(NAME reply_drafts_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/reply_drafts.py --self-test)
     add_test(NAME mcp_server_json_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/mcp_server_json.py --self-test)
     if(NOT CMAKE_CROSSCOMPILING)
       if(WIN32)
@@ -919,6 +921,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(right_tray_looks_720 right_tray_looks --size 1280x720)
     sculptforge_ui_test(windows_dpi_2560 windows_dpi --size 2560x1600)
     sculptforge_ui_test(windows_dpi_2160 windows_dpi --size 2160x1350)
+    # Part folders (#96) at 200 % on a 3200x1800 screen (tests/ui/hidpi/: scripts only run at their HiDPI size).
+    sculptforge_ui_test(part_folders_hidpi hidpi/part_folders --size 3200x1800)
     set_tests_properties(ui_right_tray_looks_720 ui_windows_dpi_2560 ui_windows_dpi_2160 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
     sculptforge_ui_test(user_guide_1080 user_guide --size 1920x1080)
     # A crash leaves a note in the log file (#16). Needs no window.

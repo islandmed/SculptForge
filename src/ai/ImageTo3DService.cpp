@@ -6,6 +6,7 @@
 
 #include "ai/ComfyUI.h"
 #include "ai/GradioClient.h"
+#include "ai/Hyper3D.h"
 #include "ai/Http.h"
 #include "core/Image.h"
 #include "core/ImageTo3D.h"
@@ -556,6 +557,7 @@ namespace {
 bool serviceAllowed(const AiSettings& s, std::string& error) {
     const std::string& svc = s.generatorService;
     if (svc == "inflate") return true;
+    if (svc == "hyper3d") return aiRequestAllowed(svc, std::string(hyper3d::kApiBase) + "/rodin", error); // (pinned)
     const std::string url = svc == "fal" ? s.falEndpoint : svc == "meshy" ? s.meshyEndpoint : svc == "comfyui" ? s.comfyUrl
                             : svc == "command" ? std::string() : std::string("https://huggingface.co/");
     if (url.empty()) return policy::aiProviderAllowed(svc, &error);
@@ -568,6 +570,7 @@ GeneratorResult generate3D(const AiSettings& s, const std::string& imagePath, co
     if (!aiEnabled()) return {false, {}, aiOffError()};
     if (std::string why; !serviceAllowed(s, why)) return {false, {}, why};
     if (s.generatorService == "meshy") return runMeshy(s, imagePath, outputStem, progress);
+    if (s.generatorService == "hyper3d") return hyper3d::run(s, imagePath, {}, progress);
     if (s.generatorService == "command") {
         status(progress, "Running your generator...");
         return runGenerator(s.generatorCommand, imagePath, outputStem + ".glb");
@@ -607,12 +610,13 @@ GeneratorResult generate3DFromText(const AiSettings& s, const std::string& promp
         result.error = "Describe the model you want";
         return result;
     }
+    if (s.generatorService == "hyper3d") return hyper3d::run(s, {}, prompt, progress);
     if (s.generatorService == "meshy") return runMeshyRequest(s, "/openapi/v2/text-to-3d", meshyTextBody(s.meshyModel, prompt), outputStem, progress);
     if (s.generatorService == "fal")
         return runFalRequest(s, falTextModel(s.falModel), falTextBody(prompt, s.falModel), outputStem, progress);
     if (s.generatorService == "comfyui") return comfy::run(s, {}, {}, prompt, outputStem, progress);
     if (s.generatorService == "command" || s.generatorService == "inflate") {
-        result.error = "Text to 3D needs Hugging Face (free), fal.ai, Meshy or ComfyUI - pick one of those services";
+        result.error = "Text to 3D needs Hugging Face (free), fal.ai, Meshy, Hyper3D or ComfyUI - pick one of those services";
         return result;
     }
     return runHuggingFace(s, {}, prompt, outputStem, progress);

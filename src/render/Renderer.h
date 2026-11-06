@@ -374,7 +374,7 @@ private:
         bool proxyAllocated = false;
         // Coarse levels (buildCoarseLevels at the first sync over the budget, again after a new layout). Clusters an
         // edit moved draw in full (coarseDirty) until the first sync without new edits updates their levels.
-        GLuint coarseVao = 0, coarseVertices = 0, coarseIndices = 0;
+        GLuint coarseVao = 0, coarseVertices = 0, coarseIndices = 0, coarseColors = 0, coarseMask = 0; // (colours RGBA8, mask R8)
         std::unique_ptr<CoarseLevels> coarse;
         std::vector<uint8_t> coarseDirty;
         std::vector<uint32_t> coarsePending; // the dirty clusters, to update
@@ -441,6 +441,7 @@ private:
     size_t lodBudget_ = 0; // the last still draw's triangle budget: sync builds the coarse levels of meshes over it
     void buildCoarse(MeshSlot& s, const Mesh& mesh);
     void uploadCoarsePoints(MeshSlot& s);
+    void uploadCoarseAttributes(MeshSlot& s); // the cells' colours and mask (with the coarse VAO bound)
     size_t triangleBudget(const RenderSettings& settings) const;
     // The ghost (setGhost), drawn on the slot ghostId_.
     GhostStroke ghost_;

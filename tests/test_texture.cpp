@@ -454,6 +454,23 @@ TEST(texture_commands) {
     CHECK(doc.mesh.hasColors());
     CHECK(glm::all(glm::lessThan(glm::abs(doc.mesh.colors[0] - glm::vec3(1, 0, 0)), glm::vec3(0.02f))));
 
+    // Line Gradient (#99) paints texels: red at the left of the front view, blue at the right, one undo step.
+    CHECK(reg.execute(doc, "paint_gradient", {{"color", std::string("#ff0000")}, {"to", std::string("#0000ff")}}).ok);
+    {
+        const Mesh& m = doc.mesh;
+        float minX = 1e9f, maxX = -1e9f;
+        glm::vec3 atMin(0.0f), atMax(0.0f);
+        for (size_t t = 0; t < m.triangleCount(); ++t)
+            for (int k = 0; k < 3; ++k) {
+                const glm::vec3& p = m.positions[m.triangles[t][k]];
+                const glm::vec3 c = sampleTexture(*m.texture, m.uvs[t * 3 + size_t(k)]);
+                if (p.x < minX) minX = p.x, atMin = c;
+                if (p.x > maxX) maxX = p.x, atMax = c;
+            }
+        CHECK(atMin.x > 0.9f && atMin.z < 0.1f && atMax.z > 0.9f && atMax.x < 0.1f);
+    }
+    CHECK(doc.undo.undoLabel() == "Line Gradient");
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh));
     // Vertex paint > Texture bakes vertex colours (green) back.
     CHECK(reg.execute(doc, "paint_target", {{"target", std::string("vertex")}}).ok);
     CHECK(!paintsTexture(doc.mesh));

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "shortcuts": {
+    "view.reset": "Ctrl+Alt+H"
+  },
+  "prefs": {
+    "inputStyle": "maya"
+  }
+}

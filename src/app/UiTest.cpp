@@ -147,6 +147,8 @@
 //                            roughness differs from the default), shown_mean_r (mean red the viewport is sent),
 //                            layer_channel_<id> (1 when the active texture layer has channel <id> on, e.g. roughness)
 //                            auto_uv_running, qremesh_running (QRemesh working in the background),
+//                            longest_frame_ms (the longest real time between two frames since the last read; resets),
+//                            time_limit_scale (timeLimit()'s factor: 4 on CI or in a parallel ctest, else 1),
 //                            voxel_remesh_running, quick_remesh / remesh_after_stroke (Tool > Remesh, #121), stroke_stretched,
 //                            qremesh_guides (guide curves on the active Part), qremesh_guide_loops (closed ones),
 //                            guides_mode (1 while the QRemesh Guides brush is picked),
@@ -307,6 +309,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <utility>
 #include <thread>
 #include <mutex>
 #include <atomic>
@@ -518,6 +521,18 @@ double Demo::query(const std::string& name, bool& known) const {
         // (rows as saved: top first)
         return 0.2126 * lastShot_[i] + 0.7152 * lastShot_[i + 1] + 0.0722 * lastShot_[i + 2];
     }
+    if (name.rfind("rgb_", 0) == 0 && name.size() > 5 && name[5] == '@') { // rgb_r@X,Y (or _g, _b): that channel 0-255 there
+        const int k = name[4] == 'r' ? 0 : name[4] == 'g' ? 1 : name[4] == 'b' ? 2 : -1;
+        float fx = 0.0f, fy = 0.0f;
+        if (k < 0 || std::sscanf(name.c_str() + 6, "%f,%f", &fx, &fy) != 2) {
+            known = false;
+            return 0.0;
+        }
+        if (lastShot_.empty()) return -1.0;
+        const int x = std::clamp(int(fx * float(lastShotW_)), 0, lastShotW_ - 1);
+        const int y = std::clamp(int(fy * float(lastShotH_)), 0, lastShotH_ - 1);
+        return double(lastShot_[size_t(y) * size_t(lastShotW_) * 4 + size_t(x) * 4 + size_t(k)]);
+    }
     if (name.rfind("edges@", 0) == 0) { // edges@X0,Y0,X1,Y1: mean luma step between neighbouring pixels of the last shot there
         float x0 = 0.0f, y0 = 0.0f, x1 = 0.0f, y1 = 0.0f;
         if (std::sscanf(name.c_str() + 6, "%f,%f,%f,%f", &x0, &y0, &x1, &y1) != 4) {
@@ -567,6 +582,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "texture_layers") return hasTexture(m) ? double(m.texture->layers.size()) : 0.0;
     if (name == "active_texture_layer") return hasTexture(m) && !m.texture->layers.empty() ? double(m.texture->activeLayer) : -1.0;
     if (name == "auto_uv_running") return app_.autoUv_ ? 1.0 : 0.0;
+    if (name == "longest_frame_ms") return std::exchange(longestFrameMs_, 0.0); // since the last read (it resets)
+    if (name == "time_limit_scale") { // timeLimit()'s factor (tests/TestHarness.h): 4 on CI and in a parallel ctest
+        if (const char* strict = std::getenv("SF_BENCH_LIMITS"); strict && std::string(strict) == "1") return 1.0;
+        if (std::getenv("CI") || std::getenv("GITHUB_ACTIONS")) return 4.0;
+        const char* scale = std::getenv("SF_TIME_LIMIT_SCALE");
+        return std::max(1.0, scale ? std::atof(scale) : 1.0);
+    }
     if (const double v = app_.bakeTestValue(name); !std::isnan(v)) return v;
     if (const double v = app_.uvEditorTestValue(name); !std::isnan(v)) return v;
     if (const double v = app_.pbrTestValue(name); !std::isnan(v)) return v; // material_channels, channel_view, ...
@@ -743,6 +765,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "stroke_type") return double(int(app_.strokeType_)); // 0 Dots, 1 DragRect, 2 DragDot, 3 Spray, 4 LazyMouse
     if (name == "stroke_continuous") return app_.strokeContinuous_ ? 1.0 : 0.0; // Continuous (#31)
     if (name == "vdms") return double(app_.doc_.vdms.size());
+    if (double gv = 0.0; app_.gradientUiValue(name, gv)) return gv; // gradient_armed, gradient_placed (LineGradient.cpp)
     if (double kv = 0.0; app_.kelvinUiValue(name, kv)) return kv; // capture_*, kelvin_* (PanelKelvinlet.cpp)
     // Facial shapes (PanelFace.cpp): landmarks placed, placing them, a take playing, and face_<shape>: that layer's weight.
     if (name == "face_landmarks") return double(app_.faceLandmarks_.count());
@@ -2127,17 +2150,32 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             at += scriptDir_.size();
         }
         if (!parseScript(text, statements, error)) return false;
-        run([this, line, statements] {
-            for (const auto& st : statements) {
+        // A command that works on a worker (uv_auto: App::commandRunning) holds the script, frames still drawing,
+        // until its result is in, like the console and an AI tool wait for it.
+        auto next = std::make_shared<size_t>(0);
+        steps_.push_back([this, line, statements, next](float t) {
+            if (*next > 0 && app_.commandRunning()) {
+                SDL_Delay(5); // real work runs in real time
+                if (t > 600.0f) fail(line, statements[*next - 1].command + " still running after 600 s");
+                return t > 600.0f;
+            }
+            if (CommandResult r; *next > 0 && app_.takeCommandResult(r) && !r.ok) {
+                fail(line, statements[*next - 1].command + " failed: " + r.message);
+                return true;
+            }
+            while (*next < statements.size()) {
+                const ScriptStatement& st = statements[(*next)++];
                 Args args = st.args; // $LIBRARY: the test's own library folder (known once the app runs)
                 for (auto& [key, value] : args)
                     if (auto* sv = std::get_if<std::string>(&value)) *sv = expandLibrary(*sv);
                 app_.runCommand(st.command, args);
                 if (!app_.lastCommandOk_) {
                     fail(line, st.command + " failed: " + app_.status_);
-                    return;
+                    return true;
                 }
+                if (app_.commandRunning()) return false;
             }
+            return true;
         });
     } else if (verb == "run_fails") { // run_fails COMMAND ARGS...: the command must be refused
         if (!need(1)) return false;

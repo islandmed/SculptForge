@@ -204,6 +204,8 @@ std::vector<std::string> chordKeys(std::string_view chord) {
 
 void ActionRegistry::add(Action a) {
     ++revision_;
+    for (const auto& [id, chord] : styleDefaults_)
+        if (id == a.id) a.shortcut = chord;
     for (auto& existing : actions_)
         if (existing.id == a.id) {
             existing = std::move(a);
@@ -259,6 +261,9 @@ bool ActionRegistry::handleKey(SDL_Keycode key, SDL_Keymod mods) {
 }
 
 void ActionRegistry::setDefaultShortcut(std::string_view id, std::string chord) {
+    auto it = std::find_if(styleDefaults_.begin(), styleDefaults_.end(), [&](const auto& d) { return d.first == id; });
+    if (it == styleDefaults_.end()) styleDefaults_.emplace_back(std::string(id), chord);
+    else it->second = chord;
     for (auto& a : actions_)
         if (a.id == id && a.shortcut != chord) {
             a.shortcut = std::move(chord);

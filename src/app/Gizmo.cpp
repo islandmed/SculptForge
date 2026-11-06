@@ -175,6 +175,10 @@ void App::registerGizmoActions() {
     add("gizmo.all", "All Parts", ICON_LC_LAYERS, kPath, "", [this] { gizmo_.all = !gizmo_.all; },
         [this] { return gizmo_.all; },
         "Transform every visible Part together. Each Part gets its own undo step.");
+    add("gizmo.folder", "Folder", ICON_LC_FOLDER, kPath, "", [this] { gizmo_.folder = !gizmo_.folder; },
+        [this] { return gizmo_.folder; },
+        "Transform the visible Parts in the active Part's folder together (Parts list folders). Each Part gets its "
+        "own undo step.");
 }
 
 void App::setGizmoMode(GizmoMode mode) {
@@ -198,9 +202,11 @@ void App::setGizmoMode(GizmoMode mode) {
 
 std::vector<int> App::gizmoTargets() const {
     std::vector<int> out;
+    const uint32_t folder = doc_.activePartInfo().folder;
     for (int i = 0; i < doc_.partCount(); ++i) {
         const bool visible = doc_.parts[size_t(i)].visible;
-        if (i == doc_.activePart ? visible : gizmo_.all && visible) out.push_back(i);
+        const bool together = gizmo_.all || (gizmo_.folder && folder && doc_.parts[size_t(i)].folder == folder);
+        if (i == doc_.activePart ? visible : together && visible) out.push_back(i);
     }
     return out;
 }
@@ -209,8 +215,9 @@ void App::updateGizmoPivot() {
     // Recomputed only when the scene changes: a new undo step, another Part, the options.
     uint64_t key = uint64_t(doc_.activePartInfo().id) * 1000003u ^ doc_.undo.revision() * 7919u ^
                    doc_.mesh.vertexCount() * 31u ^ (gizmo_.all ? 2u : 0u) ^ (gizmo_.useMask ? 4u : 0u) ^
+                   (gizmo_.folder ? 8u + uint64_t(doc_.activePartInfo().folder) * 16u : 0u) ^
                    uint64_t(doc_.partCount()) << 48;
-    if (gizmo_.all)
+    if (gizmo_.all || gizmo_.folder)
         for (const Part& s : doc_.parts) key = key * 1099511628211ull ^ s.undo.revision() ^ (s.visible ? 1u : 0u);
     if (key == gizmo_.centreKey) return;
     gizmo_.centreKey = key;
@@ -653,6 +660,7 @@ void App::gizmoRelease() {
     if (symmetry_.z) sym += 'z';
     if (!sym.empty() && doc_.mesh.hasMask() && gizmo_.useMask) args["symmetry"] = sym;
     if (gizmo_.all) args["all"] = true;
+    else if (gizmo_.folder && doc_.activePartInfo().folder) args["folder"] = true;
     status_ = std::string(label) + " " + readout + ": " + std::to_string(moved) + " vertices";
     consoleEcho("transform", args, {true, status_});
     updateTitle();
@@ -713,6 +721,7 @@ void App::applyGizmoNumbers() {
     if (symmetry_.z) sym += 'z';
     if (!sym.empty()) args["symmetry"] = sym;
     if (gizmo_.all) args["all"] = true;
+    else if (gizmo_.folder && doc_.activePartInfo().folder) args["folder"] = true;
     const glm::vec3 pivot = gizmo_.pivot;
     const glm::mat3 frameBefore = gizmo_.frame;
     const bool surfaceBefore = gizmo_.orientSurface;
@@ -909,7 +918,7 @@ void App::drawGizmoContents(bool compact) {
                  kPath);
     ui::Segmented(*this, {"gizmo.reset_pivot", "gizmo.snap_pivot"});
     ui::Segmented(*this, {"gizmo.orient_world", "gizmo.orient_surface"});
-    ui::Segmented(*this, {"gizmo.use_mask", "gizmo.all"});
+    ui::Segmented(*this, {"gizmo.use_mask", "gizmo.folder", "gizmo.all"});
     float pct = gizmo_.falloff * 100.0f;
     ImGui::SetNextItemWidth(-1.0f);
     if (ui::SliderInside("##gizmo_falloff", &pct, 0.0f, 50.0f, "Falloff %.0f%%")) gizmo_.falloff = pct / 100.0f;

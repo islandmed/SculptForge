@@ -188,6 +188,15 @@ struct App::AiLinkState {
         std::string reason;
     };
     std::optional<Pending> confirm;
+    // A call whose command works on a worker (uv_auto: App::commandRunning): its reply, and the next call, wait for it.
+    struct Running {
+        link::AiLinkCall call;
+        uint32_t part = 0;
+        size_t undoCount = 0;
+        uint64_t revision = 0;
+        std::chrono::steady_clock::time_point start;
+    };
+    std::optional<Running> running;
     std::string error; // why the listener isn't running
     int commands = 0;  // tool calls run this connection
 
@@ -352,6 +361,7 @@ void App::pollAiLink() {
     for (auto& e : events) {
         if (e.kind == AiLinkState::Event::Kind::Connected) {
             s.session = std::make_unique<link::AiLinkSession>(link::makePairingCode());
+            s.running.reset();
             s.session->policy.projectDir = macroProjectDir();
             for (const std::string& p : aiLinkPickedPaths_) s.session->policy.addPicked(p);
             s.waiting.clear();
@@ -366,6 +376,7 @@ void App::pollAiLink() {
             s.session.reset();
             s.waiting.clear();
             s.confirm.reset();
+            s.running.reset();
             s.approving = false;
         } else if (s.session) {
             s.waiting.push_back(std::move(e.line));
@@ -378,8 +389,18 @@ void App::pollAiLink() {
         aiLinkDisconnect(tr("AI connection request timed out"));
         return;
     }
-    // One message at a time; none while a dialog waits for the user.
-    while (!s.waiting.empty() && !s.confirm && s.session && s.session->state() != link::AiLinkSession::State::Closed) {
+    if (s.running && !commandRunning()) { // its worker is done: the reply goes out now
+        const AiLinkState::Running r = std::move(*s.running);
+        s.running.reset();
+        CommandResult done{lastCommandOk_, status_};
+        takeCommandResult(done);
+        labelAiUndo(r.part, r.undoCount, r.revision);
+        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - r.start).count();
+        auditLive(s.session->client(), r.call.name, r.call.args, done.ok, done.message, int64_t(ms));
+        s.send(link::AiLinkSession::resultReply(r.call.id, done.ok, done.message));
+    }
+    // One message at a time; none while a dialog waits for the user or a command works on a worker.
+    while (!s.waiting.empty() && !s.confirm && !s.running && s.session && s.session->state() != link::AiLinkSession::State::Closed) {
         const bool wasPairing = s.session->state() == link::AiLinkSession::State::Pairing;
         const std::string line = std::move(s.waiting.front());
         s.waiting.pop_front();
@@ -469,6 +490,10 @@ void App::aiLinkExecute(const link::AiLinkCall& call) {
     const size_t before = doc_.undo.undoCount();
     const uint64_t revision = doc_.undo.revision();
     runCommand(call.name, call.args);
+    if (lastCommandOk_ && commandRunning()) {
+        s.running = AiLinkState::Running{call, part, before, revision, start};
+        return;
+    }
     labelAiUndo(part, before, revision);
     auditLive(s.session->client(), call.name, call.args, lastCommandOk_, status_, elapsedMs());
     s.send(link::AiLinkSession::resultReply(call.id, lastCommandOk_, status_));

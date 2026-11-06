@@ -56,7 +56,7 @@ ProjectThumbnailProvider& thumbnailProvider() {
 // version 1); every other key belongs to
 // Document::projectSettings (camera, render, brush, symmetry, ...).
 const char* const kCoreKeys[] = {"format", "version", "app_version", "mesh", "layers", "active_layer",
-                                 "parts", "active_part", "brushes", "active_brush", "splats", "attachments",
+                                 "parts", "active_part", "part_folders", "brushes", "active_brush", "splats", "attachments",
                                  "unitless_scale", "unitless_format"};
 
 std::filesystem::path fsPath(const std::string& p) { return std::filesystem::path(std::u8string(p.begin(), p.end())); }
@@ -851,6 +851,7 @@ struct LoadedPart {
     std::vector<QRemeshGuide> qremeshGuides;
     bool visible = true;
     Shading shading = Shading::Default;
+    int folder = -1; // index into the manifest's part_folders (#96)
     int activeLayer = -1;
     Mesh mesh;
     // A big mesh's BVH is built on its own thread once the positions and triangles are read (they don't change
@@ -900,6 +901,7 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         st.set("name", s.name);
         st.set("visible", s.visible);
         if (s.shading != Shading::Default) st.set("shading", shadingName(s.shading)); // (no format change: optional)
+        if (const int f = doc.partFolderIndex(s.folder); f >= 0) st.set("folder", f); // (#96: optional, as shading)
         writeMesh(w, "parts/" + std::to_string(i) + "/", doc.partMesh(i), st);
         st.set("active_layer", active ? doc.activeLayer : s.activeLayer);
         if (hasPaintLayers(doc.partMesh(i)))
@@ -939,6 +941,16 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
     }
     manifest.set("parts", std::move(parts));
     manifest.set("active_part", doc.activePart);
+    if (!doc.partFolders.empty()) { // Parts list folders (#96); no format change: older readers ignore them
+        Json folders = Json::array();
+        for (const PartFolder& f : doc.partFolders) {
+            Json fj = Json::object();
+            fj.set("name", f.name);
+            if (f.collapsed) fj.set("collapsed", true);
+            folders.push(std::move(fj));
+        }
+        manifest.set("part_folders", std::move(folders));
+    }
 
     Json brushes = Json::array();
     for (const auto& b : doc.brushes) brushes.push(b.toJson());
@@ -1061,6 +1073,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             if (s.name.empty()) s.name = "Part";
             s.visible = sj["visible"].asBool(true);
             if (sj["shading"].isString()) parseShading(sj["shading"].asString(), s.shading); // unknown: Default
+            s.folder = int(sj["folder"].asNumber(-1));
             s.bridgeName = sj["bridge_name"].asString();
             s.qremeshGuides = qremeshGuidesFromJson(sj["qremesh_guides"]);
             if (!readMesh(r, sj["mesh"], sj["layers"], s.mesh, error, false, false)) return false;
@@ -1166,6 +1179,16 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
         s.activeLayer = validLayer(parts[i].activeLayer, s.mesh);
         s.bridgeName = parts[i].bridgeName;
         s.qremeshGuides = std::move(parts[i].qremeshGuides);
+    }
+    // Folders (#96): a Part pointing at a folder that isn't there is simply outside any folder.
+    if (const Json& folders = manifest["part_folders"]; folders.isArray() && folders.size() <= kMaxProjectParts) {
+        std::vector<uint32_t> ids;
+        for (const Json& fj : folders.items()) {
+            ids.push_back(doc.addPartFolder(fj["name"].isString() ? fj["name"].asString() : std::string("Folder")));
+            doc.partFolders.back().collapsed = fj["collapsed"].asBool(false);
+        }
+        for (size_t i = 0; i < parts.size(); ++i)
+            if (parts[i].folder >= 0 && parts[i].folder < int(ids.size())) doc.parts[i].folder = ids[size_t(parts[i].folder)];
     }
     doc.selectPart(activePart);
     if (const double scale = manifest["unitless_scale"].asNumber(0.0); scale > 0.0 && std::isfinite(scale)) {

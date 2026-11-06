@@ -29,6 +29,7 @@ void Document::setMesh(Mesh m, std::string name, BVH* built) {
     unitlessScale = 0.0;
     unitlessFormat.clear();
     qremeshGuides.clear();
+    partFolders.clear();
     parts.clear();
     parts.emplace_back();
     parts.back().id = nextPartId_++;
@@ -172,6 +173,61 @@ std::string Document::uniquePartName(const std::string& wanted) const {
     for (int n = 2;; ++n) {
         std::string candidate = wanted + " " + std::to_string(n);
         if (findPart(candidate) < 0) return candidate;
+    }
+}
+
+uint32_t Document::addPartFolder(const std::string& name) {
+    PartFolder f;
+    f.id = nextFolderId_++;
+    f.name = uniqueFolderName(name.empty() ? "Folder" : name);
+    partFolders.push_back(std::move(f));
+    modified = true;
+    return partFolders.back().id;
+}
+
+int Document::partFolderIndex(uint32_t id) const {
+    for (size_t i = 0; i < partFolders.size(); ++i)
+        if (partFolders[i].id == id) return int(i);
+    return -1;
+}
+
+int Document::findPartFolder(const std::string& name) const {
+    for (size_t i = 0; i < partFolders.size(); ++i)
+        if (partFolders[i].name == name) return int(i);
+    return -1;
+}
+
+void Document::removePartFolder(uint32_t id) {
+    const int f = partFolderIndex(id);
+    if (f < 0) return;
+    for (Part& s : parts)
+        if (s.folder == id) s.folder = 0;
+    partFolders.erase(partFolders.begin() + f);
+    modified = true;
+}
+
+int Document::setPartFolder(int i, uint32_t id) {
+    if (i < 0 || i >= partCount() || (id && partFolderIndex(id) < 0)) return i;
+    if (parts[size_t(i)].folder == id) return i;
+    parts[size_t(i)].folder = id;
+    modified = true;
+    int last = -1; // the folder's last other Part
+    for (int k = 0; k < partCount(); ++k)
+        if (k != i && id && parts[size_t(k)].folder == id) last = k;
+    if (last < 0) return i;
+    const uint32_t activeId = activePartInfo().id;
+    const int to = last < i ? last + 1 : last; // where it lands once taken out
+    if (to < i) std::rotate(parts.begin() + to, parts.begin() + i, parts.begin() + i + 1);
+    else if (to > i) std::rotate(parts.begin() + i, parts.begin() + i + 1, parts.begin() + to + 1);
+    activePart = partIndex(activeId);
+    return to;
+}
+
+std::string Document::uniqueFolderName(const std::string& wanted) const {
+    if (findPartFolder(wanted) < 0) return wanted;
+    for (int n = 2;; ++n) {
+        std::string candidate = wanted + " " + std::to_string(n);
+        if (findPartFolder(candidate) < 0) return candidate;
     }
 }
 
