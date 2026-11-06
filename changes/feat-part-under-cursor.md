@@ -4,7 +4,7 @@ whats_new: **Sculpt the Part under the cursor**: point at another Part and press
 added: **Sculpt the Part under the cursor** (Alt+Q in every input style, the same key as Blender's; Preferences > Hotkeys
   changes it; in the command palette): the visible Part under the pointer becomes the active one, without moving the
   camera; each Part keeps its mask. The status bar says "Sculpting: <Part>", or that no Part is under the cursor.
-  Asked for by Discord user Ziel.
+  Asked for by @ziel9627 on Discord.
 testers:
   - Any OS, Blender input style: append a second Part, point at it, press Alt+Q; the status bar says "Sculpting:" and
     its name, the Parts list highlights it, the view doesn't move. Alt+Q over the background: "No Part under the cursor".
