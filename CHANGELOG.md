@@ -6,6 +6,21 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.7] - 2026-11-06
+
+### Added
+- Coarse levels for dense meshes: a plain mesh over the hardware tier's triangle budget draws all of it at one lighter
+  level while the view moves (the finest that fits the budget), and in full detail once the view has rested for 150
+  ms, when one full frame fits the still-frame budget (100 ms); otherwise it stays light and the info line says
+  **Preview detail**. A stroke draws the mesh in full detail; its edits reach the lighter level right after it.
+  `SF_COARSE_LOD=0` turns it off.
+
+### Fixed
+- **Preferences > AI** and live mode's step confirmations were partly in English in Spanish and Chinese: Enable AI
+  features, its description and privacy line, the Hugging Face token field, AI services & privacy, and the reasons a
+  step asks first ("Writes ... outside the project folder", "Overwrites ...", "Connects to the network"...) are now
+  translated. A new check stops labels from reaching the screen without going through the translator.
+
 ## [0.11.6] - 2026-11-06
 
 ### Added

@@ -15,6 +15,11 @@ highlight: Preferences > AI in Spanish and Chinese
 highlight: Live mode's confirmations in your language
 ```
 
+- **Smoother view on very dense meshes**: a scan or import with more triangles than your computer draws comfortably
+  now draws a lighter version of itself while you turn the view, and the real detail as soon as the view rests. Parts
+  you sculpt always show in full detail. Orbiting a 28-million-triangle scan on an entry-level machine is about twice
+  as smooth: its slowest frames go from 24 to 12 ms.
+
 ## Version 0.11.6
 
 ```features
