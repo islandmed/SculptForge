@@ -1,0 +1,71 @@
+# UV Editor toolbar at UI scales 1.0, 1.5 and 2.4 (a 4K screen at 240 %; launch clips 11-05): the "On model: Colours /
+# Checker" row and Frame wrap instead of being cut off or drawn over each other, and each control takes its own
+# click (Frame used to land on Colours). CMake also runs it at 3840x2160 (ui_uv_editor_scales_4k).
+run new_sphere subdivisions=3
+run uv_seam op=angle angle=50
+
+ui_scale 100
+key alt+u
+expect_value uv_editor_open == 1
+expect_value uv_toolbar_overlap == 0
+expect_value uv_toolbar_clipped == 0
+expect_value uv_model_colors == 1
+expect_value uv_model_checker == 1
+remember uv_frames f
+click "UV Editor/Colours##uvmodel"
+expect_value uv_model_colors == 0
+expect_value uv_model_checker == 1
+click "UV Editor/Checker##uvchecker"
+expect_value uv_model_checker == 0
+expect_value uv_model_colors == 0
+click "UV Editor/Frame"
+expect_value uv_frames == $f+1
+expect_value uv_model_colors == 0
+expect_value uv_model_checker == 0
+click "UV Editor/Colours##uvmodel"
+click "UV Editor/Checker##uvchecker"
+shot scale_100
+key alt+u
+expect_value uv_editor_open == 0
+
+ui_scale 150
+key alt+u
+expect_value uv_editor_open == 1
+expect_value uv_toolbar_overlap == 0
+expect_value uv_toolbar_clipped == 0
+remember uv_frames f
+click "UV Editor/Colours##uvmodel"
+expect_value uv_model_colors == 0
+expect_value uv_model_checker == 1
+click "UV Editor/Checker##uvchecker"
+expect_value uv_model_checker == 0
+click "UV Editor/Frame"
+expect_value uv_frames == $f+1
+expect_value uv_model_colors == 0
+expect_value uv_model_checker == 0
+click "UV Editor/Colours##uvmodel"
+click "UV Editor/Checker##uvchecker"
+shot scale_150
+key alt+u
+
+ui_scale 240
+key alt+u
+expect_value uv_editor_open == 1
+expect_value uv_toolbar_overlap == 0
+expect_value uv_toolbar_clipped == 0
+remember uv_frames f
+click "UV Editor/Colours##uvmodel"
+expect_value uv_model_colors == 0
+expect_value uv_model_checker == 1
+click "UV Editor/Checker##uvchecker"
+expect_value uv_model_checker == 0
+click "UV Editor/Frame"
+expect_value uv_frames == $f+1
+expect_value uv_model_colors == 0
+expect_value uv_model_checker == 0
+click "UV Editor/Colours##uvmodel"
+click "UV Editor/Checker##uvchecker"
+expect_value uv_model_colors == 1
+expect_value uv_model_checker == 1
+shot scale_240
+ui_scale 100
