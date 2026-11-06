@@ -32,6 +32,9 @@ struct UiPrefs {
     bool libraryAtStartup = true;
     std::string libraryFolder;  // "" = Documents/SculptForge
     bool alphabeticalPalettes = false; // strict A-Z palette bar (default: File, Edit first)
+    // Preferences > Interface > Units (#148; core/Units.h ids): the unit sizes show in (brush ring, Part size, export
+    // sizes, Measure), and the unit the numbers in OBJ and PLY files are read in (STL is millimetres by convention).
+    std::string lengthUnit = "mm", fileUnit = "m";
     std::string language = "en"; // Preferences > Interface: the interface language, "en", "es" or "zh-TW" (app/I18n.h)
     int cameraNotch = 0;        // keep the UI out of a laptop's camera notch: 0 automatic, 1 always, 2 never
     bool turntable = false;     // rotation: false = free, about the screen axes; true = turntable (Y up)

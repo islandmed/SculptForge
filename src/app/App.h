@@ -123,6 +123,7 @@ struct AppOptions {
 };
 
 class Demo;
+struct LengthUnit; // core/Units.h
 struct StudioSignInJob; // PanelAi.cpp: the studio sign-in on a worker (ai/Oidc.h)
 
 // Wakes the main loop from any thread (SDL_PushEvent): the app draws only when something changed (#14), so work
@@ -805,7 +806,7 @@ private:
     float worldSyncedPx_ = 0.0f; // radiusPx_ as worldSize sync last set it (a different value: the user set it)
     float cursorWorldPerPx_ = 0.0f; // at the surface under the pointer (0: not seen yet)
     void syncWorldSize();           // every frame, outside strokes
-    std::string drawSizeLabel() const; // "Size %.1f px  0.42 mm" (an ImGui slider format)
+    std::string drawSizeLabel() const; // "Size %.1f px  0.42 mm" (an ImGui slider format; the Units preference)
     std::string drawSizeStatus() const; // "Size 3.5 px (0.42 mm)"
     void drawPrecisionCursor(ImDrawList* dl, ImVec2 cursor, float radius, ImU32 col);
     void drawPrecisionOptions(); // the Stroke picker: Steady Stroke, its radius and catch-up, Precision Intensity
@@ -1792,6 +1793,16 @@ private:
     // ---- Help/Console/Config (C): actions, help, command palette, console, config ----
 public:
     UiPrefs& uiPrefs() { return uiPrefs_; }
+    // Preferences > Interface > Units (core/Units.h): the unit sizes show in.
+    const LengthUnit& lengthUnit() const;
+    void drawExportSizeLine(); // File > Import / Export: the size exports write (Palettes.cpp)
+    // The active Part's and the visible Parts' bounds for the size readouts (#148): walked again only when the undo
+    // revision, the active Part, its vertex count or the Parts and their visibility changed, never every frame.
+    struct SizeBounds {
+        uint64_t key = ~uint64_t(0);
+        AABB part, visible;
+    } sizeBounds_;
+    const SizeBounds& sizeBounds();
     const CommandRegistry& commands() const { return commands_; }
     ImFont* helpTitleFont() const { return fontHelpTitle_ ? fontHelpTitle_ : ImGui::GetFont(); }
     ImFont* consoleFont() const { return fontConsole_ ? fontConsole_ : ImGui::GetFont(); }

@@ -2640,9 +2640,21 @@ void App::runCommand(const std::string& name, const Args& args) {
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
     crashlog::action(name); // (failures reach the log through SDL_Log below)
     const auto commandStart = std::chrono::steady_clock::now();
+    // OBJ and PLY have no units: read them in the Preferences > Interface > OBJ/PLY in unit unless the call says.
+    Args withUnit;
+    if ((name == "open" || name == "open_obj" || name == "part_append") && !args.contains("unit")) {
+        const std::string path = argString(args, "path");
+        std::string ext = path.size() >= 4 ? path.substr(path.size() - 4) : "";
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+        if (ext == ".obj" || ext == ".ply") {
+            withUnit = args;
+            withUnit["unit"] = uiPrefs_.fileUnit;
+        }
+    }
     // Auto UV unwraps on a worker (seconds on big meshes): the frame never waits for it. A running macro keeps the
     // synchronous command, as its next steps read the UVs at once.
-    CommandResult r = name == "uv_auto" && macros_.runDepth == 0 ? startAutoUvCommand(args) : commands_.execute(doc_, name, args);
+    CommandResult r = name == "uv_auto" && macros_.runDepth == 0 ? startAutoUvCommand(args)
+                                                                 : commands_.execute(doc_, name, withUnit.empty() ? args : withUnit);
     if (perftrace::on()) { // a command that held up the frames (remesh, Divide, micro, open...)
         const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - commandStart).count();
         if (ms > perf_.traceLongMs) {

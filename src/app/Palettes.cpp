@@ -17,6 +17,7 @@
 #include "app/I18n.h"
 #include "core/LitSphere.h"
 #include "core/StarterMeshes.h"
+#include "core/Units.h"
 
 #include <IconsLucide.h>
 
@@ -517,6 +518,33 @@ void App::drawPalette_Edit() {
     }
 }
 
+const App::SizeBounds& App::sizeBounds() {
+    if (doc_.sculptor.strokeActive() || solverBusy()) return sizeBounds_; // (holds still during a stroke)
+    uint64_t key = doc_.undo.revision() * 0x9E3779B97F4A7C15ull ^ (uint64_t(doc_.activePart) << 40) ^
+                   uint64_t(doc_.mesh.vertexCount()) ^ (uint64_t(doc_.parts.size()) << 56);
+    for (size_t i = 0; i < doc_.parts.size(); ++i)
+        if (!doc_.parts[i].visible) key ^= 0xC2B2AE3D27D4EB4Full * (i + 1);
+    if (key != sizeBounds_.key) sizeBounds_ = {key, doc_.mesh.bounds(), doc_.visibleBounds()};
+    return sizeBounds_;
+}
+
+// File > Import / Export (#148): the size the exports write, in the Units preference, and the unit STL, OBJ and PLY
+// numbers are written in (the unit-less file the scene was opened from, else each format's convention).
+void App::drawExportSizeLine() {
+    const AABB b = sizeBounds().visible;
+    if (!b.valid()) return;
+    ImGui::TextDisabled("%s", (std::string(tr("Export size")) + ": " + formatSize(b.extent(), lengthUnit())).c_str());
+    const LengthUnit* stl = unitForScale(doc_.unitlessExportScale("stl"));
+    const LengthUnit* obj = unitForScale(doc_.unitlessExportScale("obj"));
+    const std::string from = doc_.unitlessFormat.empty() ? std::string()
+                                                         : " (as the " + doc_.unitlessFormat + " it was opened from)";
+    const std::string help = "The visible Parts' width x height x depth. Every export keeps this size: STL writes " +
+                             std::string(stl ? stl->id : "custom units") + ", OBJ and PLY write " +
+                             std::string(obj ? obj->id : "custom units") + from +
+                             ", glTF and USD metres, FBX centimetres. Units: Preferences > Interface.";
+    ui::HelpText("Export size", nullptr, help.c_str(), "File");
+}
+
 void App::drawPalette_File() {
     menuAction(*this, "file.new_sphere");
     menuAction(*this, "file.new_plane");
@@ -536,6 +564,7 @@ void App::drawPalette_File() {
     menuAction(*this, "file.open");
     drawFileMenuProjectItems(); // Open Recent, Save, Save As, autosave
     tray::GroupLabel(*this, "Import / Export");
+    drawExportSizeLine();
     menuAction(*this, "file.import");
     menuAction(*this, "file.export_obj");
     menuAction(*this, "file.export_stl");
@@ -797,6 +826,14 @@ void App::drawPalette_Tool() {
         std::snprintf(tris, sizeof tris, "%zu tris", doc_.mesh.triangleCount());
         ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize(tris).x);
         ImGui::TextDisabled("%s", tris);
+        // The Part's size, width x height x depth, in the Units preference (#148).
+        if (const AABB b = sizeBounds().part; b.valid()) {
+            ImGui::TextDisabled("%s", formatSize(b.extent(), lengthUnit()).c_str());
+            ui::HelpText("Part size", nullptr,
+                         "The active Part's width x height x depth (X, Y, Z). The unit is set in Preferences > Interface > "
+                         "Units; STL exports write it in millimetres.",
+                         "Tool");
+        }
         actionRow(*this, {"file.open", "file.save", "file.import"});
         ImGui::Dummy(ImVec2(0, 2.0f * s));
     }

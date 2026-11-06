@@ -19,3 +19,6 @@ deletes it; remove its lines once fixed.
   checks the CPU between frames and prints the frames' share apart. Remove these lines after a week of green Windows.
 - **discord_bursts_send_the_latest**, CI macOS (owner sfmonitor, Discord presence): a timing check
   (tests/test_discord_presence.cpp:537, `got.size() <= 2`) failed once on the macOS runner; the re-run passed.
+| 2026-11-06 | ui_stroke_background | Omedchy | ed1b0099 |
+| 2026-11-06 | ui_stroke_background_preview | Omedchy | ed1b0099 |
+| 2026-11-06 | ui_stroke_persistent_upload | Omedchy | ed1b0099 |

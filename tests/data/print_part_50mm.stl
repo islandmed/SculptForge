@@ -1,0 +1,86 @@
+solid print_part_50mm
+  facet normal 0 0 0
+    outer loop
+      vertex 0 0 0
+      vertex 0 20 0
+      vertex 50 20 0
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0 0 0
+      vertex 50 20 0
+      vertex 50 0 0
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0 0 12.5
+      vertex 50 0 12.5
+      vertex 50 20 12.5
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0 0 12.5
+      vertex 50 20 12.5
+      vertex 0 20 12.5
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0 0 0
+      vertex 50 0 0
+      vertex 50 0 12.5
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0 0 0
+      vertex 50 0 12.5
+      vertex 0 0 12.5
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0 20 0
+      vertex 0 20 12.5
+      vertex 50 20 12.5
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0 20 0
+      vertex 50 20 12.5
+      vertex 50 20 0
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0 0 0
+      vertex 0 0 12.5
+      vertex 0 20 12.5
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0 0 0
+      vertex 0 20 12.5
+      vertex 0 20 0
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 50 0 0
+      vertex 50 20 0
+      vertex 50 20 12.5
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 50 0 0
+      vertex 50 20 12.5
+      vertex 50 0 12.5
+    endloop
+  endfacet
+endsolid print_part_50mm

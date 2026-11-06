@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "io/FbxIO.h"
 
+#include "core/Units.h"
+
 #include "io/TextureExport.h"
 
 #include "ufbx.h"
@@ -207,7 +209,10 @@ Node makeGeometry(int64_t id, const std::string& name, const Mesh& mesh, float s
     const auto& base = mesh.basePositions();
     std::vector<double> verts;
     verts.reserve(base.size() * 3);
-    for (const auto& p : base) verts.insert(verts.end(), {double(p.x * scale), double(p.y * scale), double(p.z * scale)});
+    for (const auto& p : base) { // (core/Units.h: a centimetre file read in comes back with its numbers)
+        const glm::vec3 f = toFileUnits(p, scale);
+        verts.insert(verts.end(), {double(f.x), double(f.y), double(f.z)});
+    }
     g.add("Vertices").f64s(verts);
 
     // Polygons: quads where the mesh keeps them (Mesh::quadPartners), else triangles; the last corner is negated.

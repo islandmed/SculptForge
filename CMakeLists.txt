@@ -63,6 +63,7 @@ add_library(sculptforge_core STATIC
   src/core/SelectionSets.cpp
   src/core/ScreenSelect.cpp
   src/core/Parts.cpp
+  src/core/Units.cpp
   src/core/ExtractMirror.cpp
   src/core/MeshTransform.cpp
   src/core/Deform.cpp

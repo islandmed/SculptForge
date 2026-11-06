@@ -23,6 +23,7 @@
 #include "core/Micro.h"
 #include "core/Multires.h"
 #include "core/Script.h"
+#include "core/Units.h"
 
 #include <IconsLucide.h>
 #include <imgui_internal.h>
@@ -118,6 +119,8 @@ Json toJson(const UiPrefs& p) {
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
     lookToJson(p, j);
     j.set("language", p.language);
+    j.set("lengthUnit", p.lengthUnit);
+    j.set("fileUnit", p.fileUnit);
     j.set("tablet", toJson(p.tablet));
     j.set("spaceMouse", toJson(p.spaceMouse));
     j.set("antialiasing", double(p.antialiasing));
@@ -207,6 +210,8 @@ void fromJson(const Json& j, UiPrefs& p) {
         p.shellLayout = 0;
     }
     if (j["language"].isString()) p.language = languageCode(languageFromCode(j["language"].asString()));
+    if (const LengthUnit* u = findLengthUnit(j["lengthUnit"].asString())) p.lengthUnit = u->id;
+    if (const LengthUnit* u = findLengthUnit(j["fileUnit"].asString())) p.fileUnit = u->id;
     fromJson(j["tablet"], p.tablet);
     fromJson(j["spaceMouse"], p.spaceMouse);
     const int aa = int(j["antialiasing"].asNumber(p.antialiasing));
@@ -1502,6 +1507,23 @@ void drawInterfaceSection(App& app) {
                      "Clay Block...) stay as they are.",
                      "Preferences > Interface");
     }
+    // Units (#148): sizes show in this unit; OBJ and PLY files are read in the second (core/Units.h).
+    auto unitRow = [&](const char* label, std::string& value, const char* id, const char* help) {
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(tr(label));
+        for (const LengthUnit& u : lengthUnits()) {
+            ImGui::SameLine();
+            if (ImGui::RadioButton((std::string(u.id) + "##" + id + "." + u.id).c_str(), value == u.id)) value = u.id;
+            ui::HelpText(label, nullptr, help, "Preferences > Interface");
+        }
+    };
+    unitRow("Units", p.lengthUnit, "units",
+            "The unit sizes show in: the brush size, the Part size in Tool and the export size in File. "
+            "SculptForge works in metres; this only changes how sizes read.");
+    unitRow("OBJ/PLY in", p.fileUnit, "file_units",
+            "OBJ and PLY files have no units. Their numbers are read in this unit (mm for most 3D printing files, m for "
+            "Blender and game tools), and exporting OBJ or PLY writes them back in the unit they were opened with, so "
+            "a part keeps its size. STL is always millimetres.");
     ImGui::Checkbox(tr("Ctrl+hover help"), &p.popupInfo);
     ui::HelpText("Ctrl+hover help", nullptr,
                  "Hold Ctrl and point at any control to see what it does and its shortcut. Ctrl+Alt shows a command's "

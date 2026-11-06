@@ -440,6 +440,7 @@ void registerPartCommands(CommandRegistry& reg) {
              "It becomes the active Part.",
              {{"type", T::String, "'sphere' (default), 'cube', 'plane', 'cylinder', 'cone', 'torus', 'capsule', 'icosphere' or 'quadsphere'.", false},
               {"path", T::String, "Model file to append instead of a primitive (.obj, .glb, .fbx, .ply, .stl, .usd...).", false},
+              {"unit", T::String, "Unit of the numbers in an STL, OBJ or PLY file (mm, cm, m, in), as open's.", false},
               {"name", T::String, "Name for the new Part.", false},
               {"size", T::Number, "Primitive size relative to the largest visible Part (0.05-2). Default 0.35.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
@@ -450,7 +451,9 @@ void registerPartCommands(CommandRegistry& reg) {
                      // each object in the file becomes its own Part.
                      Document scratch;
                      const std::string path = argString(a, "path");
-                     CommandResult r = CommandRegistry().execute(scratch, "open", {{"path", path}});
+                     Args openArgs{{"path", path}};
+                     if (a.contains("unit")) openArgs["unit"] = argString(a, "unit");
+                     CommandResult r = CommandRegistry().execute(scratch, "open", openArgs);
                      if (!r.ok) return r;
                      if (scratch.partCount() == 1) {
                          if (scratch.mesh.triangleCount() == 0) return {false, path + " has no mesh to append"};

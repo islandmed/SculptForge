@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "io/StlIO.h"
 
+#include "core/Units.h"
+
 #include <cmath>
 #include <cstring>
 #include <filesystem>
@@ -37,13 +39,20 @@ void putF32(std::vector<uint8_t>& out, float f) {
 constexpr char kLegacyHeader[] = "SculptForge binary STL";
 constexpr char kHeader[] = "SculptForge binary STL, millimetres, Z up";
 
-// Millimetres with Z up (the file) to metres with Y up (the sculpt).
-glm::vec3 fromPrintSpace(glm::vec3 p) { return glm::vec3(p.x, p.z, -p.y) * 0.001f; }
+// Millimetres (or `perMetre`) with Z up (the file) to metres with Y up (the sculpt). Divided in double and rounded
+// once, so writing it back (saveStl, or OBJ at Document::unitlessScale) gives the file's numbers.
+glm::vec3 fromPrintSpace(glm::vec3 p, double perMetre) {
+    return glm::vec3(fromFileUnits(p.x, perMetre), fromFileUnits(p.z, perMetre), fromFileUnits(-p.y, perMetre));
+}
 
 // Turns a triangle soup into a welded mesh.
-bool finish(Mesh& soup, Mesh& out, std::string& error, bool printSpace) {
+bool finish(Mesh& soup, Mesh& out, std::string& error, bool printSpace, double perMetre) {
+    if (!(perMetre > 0.0) || !std::isfinite(perMetre)) {
+        error = "The unit scale must be a positive number";
+        return false;
+    }
     if (printSpace)
-        for (glm::vec3& p : soup.positions) p = fromPrintSpace(p);
+        for (glm::vec3& p : soup.positions) p = fromPrintSpace(p, perMetre);
     for (uint32_t i = 0; i + 2 < soup.positions.size(); i += 3) soup.triangles.push_back({i, i + 1, i + 2});
     if (soup.triangles.empty()) {
         error = "STL file has no triangles";
@@ -60,7 +69,7 @@ bool finish(Mesh& soup, Mesh& out, std::string& error, bool printSpace) {
 
 } // namespace
 
-bool parseStl(std::span<const uint8_t> data, Mesh& out, std::string& error) {
+bool parseStl(std::span<const uint8_t> data, Mesh& out, std::string& error, double perMetre) {
     Mesh soup;
     // Binary: 80-byte header, uint32 count, 50 bytes per triangle. Some
     // binary files also start with "solid", so the size decides.
@@ -73,7 +82,7 @@ bool parseStl(std::span<const uint8_t> data, Mesh& out, std::string& error) {
                 const uint8_t* p = data.data() + 84 + t * 50 + 12; // skip the facet normal
                 for (int c = 0; c < 3; ++c, p += 12) soup.positions.push_back({readF32(p), readF32(p + 4), readF32(p + 8)});
             }
-            return finish(soup, out, error, !legacy);
+            return finish(soup, out, error, !legacy, perMetre);
         }
     }
     const std::string text(reinterpret_cast<const char*>(data.data()), data.size());
@@ -92,10 +101,10 @@ bool parseStl(std::span<const uint8_t> data, Mesh& out, std::string& error) {
         }
         soup.positions.push_back(p);
     }
-    return finish(soup, out, error, true);
+    return finish(soup, out, error, true, perMetre);
 }
 
-bool loadStl(const std::string& path, Mesh& out, std::string& error) {
+bool loadStl(const std::string& path, Mesh& out, std::string& error, double perMetre) {
     std::ifstream f(utf8Path(path), std::ios::binary);
     if (!f) {
         error = "Cannot open " + path;
@@ -103,7 +112,7 @@ bool loadStl(const std::string& path, Mesh& out, std::string& error) {
     }
     std::vector<uint8_t> data((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     std::string err;
-    if (!parseStl(data, out, err)) {
+    if (!parseStl(data, out, err, perMetre)) {
         error = err + ": " + path;
         return false;
     }
@@ -115,24 +124,24 @@ bool saveStl(const std::string& path, const Mesh& mesh, std::string& error, cons
         error = "Nothing to export: the mesh is empty";
         return false;
     }
-    float scale = options.scale;
+    double scale = options.scale;
     if (options.heightMm > 0.0f) {
         const float height = mesh.bounds().extent().y;
         if (!(height > 0.0f)) {
             error = "Cannot set a height: the mesh is flat";
             return false;
         }
-        scale = options.heightMm / height;
+        scale = double(options.heightMm) / height;
     }
     if (!(scale > 0.0f) || !std::isfinite(scale)) {
         error = "The scale must be a positive number";
         return false;
     }
-    auto toFile = [&](glm::vec3 p) { return (options.zUp ? glm::vec3(p.x, -p.z, p.y) : p) * scale; };
+    auto toFile = [&](glm::vec3 p) { return toFileUnits(options.zUp ? glm::vec3(p.x, -p.z, p.y) : p, scale); };
     std::vector<uint8_t> bytes;
     bytes.reserve(84 + mesh.triangleCount() * 50);
     // The header says millimetres only when the file is in millimetres with Z up.
-    const bool printSpace = options.zUp && (options.heightMm > 0.0f || options.scale == 1000.0f);
+    const bool printSpace = options.zUp && (options.heightMm > 0.0f || options.scale == 1000.0);
     const std::string header = printSpace ? kHeader : "SculptForge binary STL, custom scale";
     bytes.insert(bytes.end(), header.begin(), header.end());
     bytes.resize(80, 0);

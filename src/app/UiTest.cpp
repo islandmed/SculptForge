@@ -1173,7 +1173,8 @@ double Demo::query(const std::string& name, bool& known) const {
 
 void Demo::testClick(int line, const std::string& label, int button, bool doubleClick) {
     // Find the item (give the UI a moment to appear), glide there, press and release.
-    steps_.push_back([this, line, label](float t) {
+    const auto clipAt = std::make_shared<ImVec4>(); // the item's panel when the mouse glided there
+    steps_.push_back([this, line, label, clipAt](float t) {
         ImVec2 to;
         bool visible = false;
         if (!findItem(label, to, &visible)) {
@@ -1199,12 +1200,25 @@ void Demo::testClick(int line, const std::string& label, int button, bool double
             if (t > 1.0f) fail(line, "\"" + label + "\" is not visible (off screen or scrolled out of view)");
             return t > 1.0f;
         }
+        findItem(label, to, &visible, clipAt.get());
         mouseMotion(to.x, to.y);
         return true;
     });
-    steps_.push_back([this, button, doubleClick](float t) {
+    steps_.push_back([this, label, clipAt, button, doubleClick](float t) {
         // A frame of hover first, so ImGui registers the item as hovered before the press.
         if (t == 0.0f) return false;
+        // A panel still settling (after the wheel, or a sub-palette closing above) carries the item up or down:
+        // follow it and hover again before pressing, so the press lands on the item, not on the row now under the
+        // old spot. Only within the same panel and column: a label shared by an open menu's entry and another
+        // item must not lead the mouse off the menu.
+        ImVec2 to;
+        ImVec4 clip;
+        bool visible = false;
+        if (t < 1.0f && findItem(label, to, &visible, &clip) && visible && std::abs(to.x - mouse_.x) <= 1.0f &&
+            std::abs(to.y - mouse_.y) > 1.0f && clip.x == clipAt->x && clip.z == clipAt->z) {
+            mouseMotion(to.x, to.y);
+            return false;
+        }
         mouseButton(true, button);
         mouseButton(false, button);
         if (doubleClick) {
