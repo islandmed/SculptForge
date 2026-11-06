@@ -8,13 +8,25 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.11.5
 
 ```features
-date: unreleased
+date: 2026-11-06
 tagline: Connecting your AI assistant now takes three steps, the interface speaks Simplified Chinese, and the brush size ring follows the pen.
 highlight: Help > Connect an AI tool: three steps, copyable commands for your tool, example prompts
 highlight: The interface in Simplified Chinese
 highlight: The brush size ring previews on the mesh while you resize
 highlight: Discord status clears when you quit and shows the new SF icon
+highlight: Connect an AI tool in three steps
 ```
+
+- **Help > Connect an AI tool** is now the one guide to working with an AI tool, on one screen: pick your tool and
+  copy its command, turn on **Let AI tools control this window** right there, see what happens next (the 6-digit code,
+  the **AI connected** badge, **AI:** steps in Undo, what asks you first), and copy an example prompt. The AI blocks
+  out a starting point; you do the art.
+- **The brush ring shows the new size while you set it**: with the **S** pop-up open, dragging or typing a size draws
+  the ring at that size on the model, where you pressed S; **O** shows the Falloff ring the same way.
+- **Simplified Chinese**: **Preferences > Interface > Language** has a Simplified Chinese button, with mainland terms
+  and glyph shapes.
+- **Paint menu**: no longer jitters on short screens (1280x720 fullscreen); a menu taller than the screen scrolls
+  smoothly.
 
 ## Version 0.11.4
 
