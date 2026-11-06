@@ -901,6 +901,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(size_popup_scaled size_popup --size 2400x1350)
     # The stroke popup on a UI scaled 1.5x: it opens under the cursor and its items are where they're drawn.
     sculptforge_ui_test(stroke_popup_scaled stroke_popup --size 2400x1350)
+    # Library single click (#142) on a UI scaled 1.5x: tiles still take one click.
+    sculptforge_ui_test(library_click_scaled library_click --size 2400x1350)
     # UI scale (#87) at 1600x900, where Automatic in a test is exactly 100 %; label "dpi": release.sh step check runs them before the tag.
     sculptforge_ui_test(ui_scale_900 ui_scale --size 1600x900)
     set_tests_properties(ui_ui_scale_900 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
