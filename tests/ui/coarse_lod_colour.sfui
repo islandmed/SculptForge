@@ -1,0 +1,74 @@
+# Coarse levels keep the paint (0.11.7 regression, found on a 12M scan): an over-budget mesh drawn at its coarse
+# level while the view moves shows the same vertex colour and mask as full detail, the cells' means of the fine
+# mesh's. A paint stroke draws the clusters it touched in full while it runs; their cells take the new colour after.
+# (Face groups and textures draw in full: per-triangle data never takes the coarse path.)
+run ui_look look=classic layout=classic
+# (window fractions: 0.41,0.51 is the view centre, 0.38 above the stroke; small budgets, as in coarse_lod; a still
+# frame never fits, so every frame here is the coarse one)
+env SF_TRIANGLE_BUDGET 40000
+env SF_STILL_FRAME_MS 0.001
+run new_sphere subdivisions=6
+camera 0 0
+wait 0.6
+expect_value coarse_clusters > 0
+shot plain
+
+# Fill green: the coarse frame is green (it was the plain material: the coarse draw had no colours).
+run set_color color=20c040
+run paint_fill color=20c040
+wait 0.6
+expect_value colored == 1
+expect_value coarse_pending == 0
+expect_value coarse_clusters > 0
+shot filled-coarse
+remember rgb_r@0.41,0.51 ref1
+expect_value rgb_g@0.41,0.51 > $ref1+40
+remember rgb_b@0.41,0.51 ref2
+expect_value rgb_g@0.41,0.51 > $ref2+40
+# moving: orbit, still coarse, still green
+camera 35 20
+wait 0.6
+expect_value coarse_clusters > 0
+shot filled-orbit
+remember rgb_r@0.41,0.51 ref3
+expect_value rgb_g@0.41,0.51 > $ref3+40
+
+# A red paint stroke across the middle: in full while it runs, then its cells are red in the coarse frame.
+camera 0 0
+wait 0.6
+remember coarse_clusters before
+run set_color color=e02020
+key p
+stroke 0.3 0.5 0.7 0.5 0.6 hold
+wait 0.3
+expect_value coarse_pending > 0
+release
+wait 0.6
+expect_value coarse_pending == 0
+expect_value coarse_clusters == $before
+shot painted-coarse
+remember rgb_g@0.41,0.51 ref4
+expect_value rgb_r@0.41,0.51 > $ref4+40
+# the green away from the stroke stays
+remember rgb_r@0.41,0.38 ref5
+expect_value rgb_g@0.41,0.38 > $ref5+40
+
+# Mask: the masked area darkens in the coarse frame as in full detail.
+remember luma@0.41,0.38 unmasked
+run mask_rect x0=-1 y0=-1 x1=1 y1=1
+wait 0.6
+expect_value coarse_pending == 0
+expect_value coarse_clusters > 0
+shot masked-coarse
+expect_value luma@0.41,0.38 < $unmasked-15
+
+# At rest in full detail: the same colours (the reference).
+run mask_clear
+env SF_STILL_FRAME_MS 100000
+wait 1.2
+expect_value coarse_clusters == 0
+shot full-detail
+remember rgb_g@0.41,0.51 ref6
+expect_value rgb_r@0.41,0.51 > $ref6+40
+remember rgb_r@0.41,0.38 ref7
+expect_value rgb_g@0.41,0.38 > $ref7+40

@@ -518,6 +518,18 @@ double Demo::query(const std::string& name, bool& known) const {
         // (rows as saved: top first)
         return 0.2126 * lastShot_[i] + 0.7152 * lastShot_[i + 1] + 0.0722 * lastShot_[i + 2];
     }
+    if (name.rfind("rgb_", 0) == 0 && name.size() > 5 && name[5] == '@') { // rgb_r@X,Y (or _g, _b): that channel 0-255 there
+        const int k = name[4] == 'r' ? 0 : name[4] == 'g' ? 1 : name[4] == 'b' ? 2 : -1;
+        float fx = 0.0f, fy = 0.0f;
+        if (k < 0 || std::sscanf(name.c_str() + 6, "%f,%f", &fx, &fy) != 2) {
+            known = false;
+            return 0.0;
+        }
+        if (lastShot_.empty()) return -1.0;
+        const int x = std::clamp(int(fx * float(lastShotW_)), 0, lastShotW_ - 1);
+        const int y = std::clamp(int(fy * float(lastShotH_)), 0, lastShotH_ - 1);
+        return double(lastShot_[size_t(y) * size_t(lastShotW_) * 4 + size_t(x) * 4 + size_t(k)]);
+    }
     if (name.rfind("edges@", 0) == 0) { // edges@X0,Y0,X1,Y1: mean luma step between neighbouring pixels of the last shot there
         float x0 = 0.0f, y0 = 0.0f, x1 = 0.0f, y1 = 0.0f;
         if (std::sscanf(name.c_str() + 6, "%f,%f,%f,%f", &x0, &y0, &x1, &y1) != 4) {

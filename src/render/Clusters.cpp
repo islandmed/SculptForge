@@ -470,6 +470,7 @@ CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order) {
         for (uint32_t k = 0; k < cellCount; ++k)
             if (L.parent[k] != ~0u) L.children[at[L.parent[k]]++] = k;
     }
+    coarseAttributes(L, mesh);
     // Per cluster, its levels while they pay.
     std::vector<std::vector<uint32_t>> lists(nc);
     poolFor(nc, [&](size_t c0, size_t c1) {
@@ -541,6 +542,7 @@ std::vector<uint32_t> updateCoarseLevels(CoarseLevels& L, const Mesh& mesh, cons
         }
     }, 1024);
     changed = cells;
+    coarseAttributes(L, mesh, cells);
     for (size_t level = 1; level < L.levels.size() && !cells.empty(); ++level) {
         std::vector<uint32_t> up;
         up.reserve(cells.size());
@@ -567,6 +569,70 @@ std::vector<uint32_t> updateCoarseLevels(CoarseLevels& L, const Mesh& mesh, cons
         cells = std::move(up);
     }
     return changed;
+}
+
+bool coarseAttributesMatch(const CoarseLevels& L, const Mesh& mesh) {
+    const size_t nv = mesh.vertexCount();
+    return (nv > 0 && mesh.colors.size() == nv) == !L.colors.empty() && (nv > 0 && mesh.mask.size() == nv) == !L.mask.empty();
+}
+
+void coarseAttributes(CoarseLevels& L, const Mesh& mesh, std::vector<uint32_t> cells) {
+    const size_t nv = mesh.vertexCount(), count = L.positions.size();
+    if (L.levels.empty() || L.vertexCell.size() != nv) return;
+    const bool colors = nv > 0 && mesh.colors.size() == nv, mask = nv > 0 && mesh.mask.size() == nv;
+    if (!colors && !mask) {
+        std::vector<glm::vec3>().swap(L.colors);
+        std::vector<float>().swap(L.mask);
+        return;
+    }
+    const uint32_t base0 = L.levels[0].base, cells0 = uint32_t(L.levels[0].keys.size());
+    if (!coarseAttributesMatch(L, mesh)) cells.clear(); // (every cell's)
+    if (cells.empty()) {
+        cells.resize(cells0);
+        for (uint32_t k = 0; k < cells0; ++k) cells[k] = base0 + k;
+    }
+    if (colors) L.colors.resize(count, glm::vec3(1.0f));
+    else std::vector<glm::vec3>().swap(L.colors);
+    if (mask) L.mask.resize(count, 0.0f);
+    else std::vector<float>().swap(L.mask);
+    poolFor(cells.size(), [&](size_t i0, size_t i1) {
+        for (size_t i = i0; i < i1; ++i) {
+            const uint32_t k = cells[i] - base0;
+            glm::vec3 csum(0.0f);
+            float msum = 0.0f;
+            for (uint32_t m = L.memberFirst[k]; m < L.memberFirst[k + 1]; ++m) {
+                if (colors) csum += mesh.colors[L.members[m]];
+                if (mask) msum += mesh.mask[L.members[m]];
+            }
+            const float w = float(std::max(L.memberFirst[k + 1] - L.memberFirst[k], 1u));
+            if (colors) L.colors[cells[i]] = csum / w;
+            if (mask) L.mask[cells[i]] = msum / w;
+        }
+    }, 1024);
+    for (size_t level = 1; level < L.levels.size() && !cells.empty(); ++level) {
+        std::vector<uint32_t> up;
+        up.reserve(cells.size());
+        for (uint32_t k : cells)
+            if (L.parent[k] != ~0u) up.push_back(L.parent[k]);
+        std::sort(up.begin(), up.end());
+        up.erase(std::unique(up.begin(), up.end()), up.end());
+        poolFor(up.size(), [&](size_t i0, size_t i1) {
+            for (size_t i = i0; i < i1; ++i) {
+                const uint32_t p = up[i];
+                glm::vec3 csum(0.0f);
+                float msum = 0.0f;
+                for (uint32_t j = L.childFirst[p]; j < L.childFirst[p + 1]; ++j) {
+                    const uint32_t ch = L.children[j];
+                    if (colors) csum += L.colors[ch] * float(L.weight[ch]);
+                    if (mask) msum += L.mask[ch] * float(L.weight[ch]);
+                }
+                const float w = float(std::max(L.weight[p], 1u));
+                if (colors) L.colors[p] = csum / w;
+                if (mask) L.mask[p] = msum / w;
+            }
+        }, 1024);
+        cells = std::move(up);
+    }
 }
 
 bool closedOriented(const Mesh& mesh) {
