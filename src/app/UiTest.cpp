@@ -88,7 +88,8 @@
 //                            "SculptForge has a new look" card),
 //                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
 //                            extract_preview (1 while an Extract preview waits for Accept), open_edges (edges of
-//                            the active Part with one triangle: 0 = watertight),
+//                            the active Part with one triangle: 0 = watertight), solid_volume (the active Part's
+//                            volume with its open borders capped),
 //                            edited_parts (Parts with undo history), user_brushes (brushes in the
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once ui.json is written: the preferences save themselves, or Save Layout),
@@ -273,6 +274,7 @@
 #include "app/Ui.h"
 
 #include "core/BrushLibrary.h"
+#include "core/CloseHoles.h"
 #include "core/ListSort.h"
 #include "core/LitSphere.h"
 #include "core/Multires.h"
@@ -842,6 +844,22 @@ double Demo::query(const std::string& name, bool& known) const {
         for (const auto& t : m.triangles)
             for (int k = 0; k < 3; ++k) ++edges[{std::min(t[k], t[(k + 1) % 3]), std::max(t[k], t[(k + 1) % 3])}];
         return double(std::count_if(edges.begin(), edges.end(), [](const auto& e) { return e.second == 1; }));
+    }
+    if (name == "solid_volume") { // the active Part's volume with its open borders capped (as Voxel Remesh caps them)
+        Mesh capped;
+        capped.positions = m.positions;
+        capped.triangles = m.triangles;
+        CloseHolesOptions o;
+        o.refine = false;
+        o.newGroup = false;
+        CloseHolesStats stats;
+        std::string error;
+        closeHoles(capped, o, stats, error);
+        double v = 0.0;
+        for (const glm::uvec3& t : capped.triangles)
+            v += glm::dot(glm::dvec3(capped.positions[t.x]),
+                          glm::cross(glm::dvec3(capped.positions[t.y]), glm::dvec3(capped.positions[t.z])));
+        return v / 6.0;
     }
     if (name == "visible_parts")
         return double(std::count_if(doc.parts.begin(), doc.parts.end(), [](const Part& s) { return s.visible; }));

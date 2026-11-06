@@ -866,6 +866,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     if(TEST ui_ui_scale)
       set_tests_properties(ui_ui_scale PROPERTIES LABELS "ui;dpi")
     endif()
+    # The UV Editor toolbar on a 4K screen (scales 1.0, 1.5 and 2.4): wrapped, nothing cut off, each control its own click.
+    sculptforge_ui_test(uv_editor_scales_4k uv_editor_scales --size 3840x2160)
     # The Library on a 1280x720 screen (#80): its close button stays on screen.
     sculptforge_ui_test(library_small_screen_720 library_small_screen --size 1280x720)
     # #107: every look's right tray on a 1280x720 screen; #105: a Windows laptop at 150-200 % (2560x1600 at 200 % is
