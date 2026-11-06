@@ -1,12 +1,12 @@
 {
-  "version": "0.11.8",
+  "version": "0.11.9",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Clearer corner axes: lettered, depth-shaded, click twice for the opposite view",
-    "One click in the Library uses a brush, alpha or material (thanks @NicTanghe, #142)",
-    "The app icon is now an orange cube",
-    "Drag and Slide Stamp keep their strength when the pen lifts (#146)",
-    "One click sends to Maya and back; SculptForge picks up Maya's exports by itself (thanks @tristratos, #42)"
+    "Folders in Tool > Parts: drag Parts in, fold, hide and move them together (thanks @ebarranco, #96)",
+    "Line Gradient: drag a colour ramp across the model (thanks @Devon0209, #99)",
+    "Auto UV runs in the background and can be cancelled",
+    "Paint colour stays visible while you orbit or paint dense models",
+    "Hyper3D Rodin, direct: generate a model from an image or a description with your own Hyper3D key (thanks @ElgoogUdiab, #123)"
   ]
 }
