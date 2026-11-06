@@ -2419,16 +2419,22 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Unwrap with the chosen method: the selected faces (fitted where they were), or the whole Part (packed). Least "
      "Stretch keeps angles and lengths along the marked seams; Conformal keeps angles; By Face Groups cuts along the "
      "face group borders too; Planar projects each piece; Unfold flattens the current islands again in place, "
-     "keeping pins; Auto Seams finds its own. Closed pieces get cut automatically. Big meshes unwrap in the "
-     "background.",
+     "keeping pins; Auto Seams finds its own. Closed pieces get cut automatically. Runs in the background (Cancel "
+     "under the view stops it).",
      "以所选方法展开：所选的面（在原位拟合），或整个部件（并打包）。Least Stretch 沿标记的接缝保留角度与长度"
      "；Conformal 保留角度；By Face Groups 也沿面组边界切割；Planar 投影每个区块；Unfold 在原位重新摊平当前岛并保留"
-     "固定；Auto Seams 自行找出接缝。封闭的区块会自动切开。大型网格会在后台展开。"},
+     "固定；Auto Seams 自行找出接缝。封闭的区块会自动切开。在后台运行（视图下方的取消可停止）。"},
     {"Pack", "打包"},
     {"Pack the selected islands (or all) as large as they fit into the 0-1 tile, or across the Columns x Rows grid of "
-     "UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them.",
+     "UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them. "
+     "Runs in the background (Cancel under the view stops it).",
      "将所选的岛（或全部）以能放下的最大尺寸打包到 0-1 图块，或打包到列数 x 行数的 UDIM 图块格中：旋转到最小包围框，缩"
-     "放到相同纹素密度，并保留其间的边距。"},
+     "放到相同纹素密度，并保留其间的边距。在后台运行（视图下方的取消可停止）。"},
+    {"Packing...", "正在打包..."},
+    {"Packing: %d%%", "正在打包：%d%%"},
+    {"Unwrapping...", "正在展开..."},
+    {"Unwrapping: %d%%", "正在展开：%d%%"},
+    {"Stop the Unwrap or Pack that is running; the UVs stay as they are.", "停止正在运行的展开或打包；UV 维持原样。"},
     {"Mark Seam", "标记接缝"},
     {"Mark the selected edges (or the border of the selected faces) as seams: Unwrap cuts there.",
      "将所选的边（或所选面的边界）标记为接缝：展开时会在此切开。"},

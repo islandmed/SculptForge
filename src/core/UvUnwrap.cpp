@@ -704,7 +704,7 @@ bool uvUnwrap(const Mesh& m, const UvUnwrapOptions& o, UvUnwrapResult& result, s
                 for (uint32_t t : list) isl[topo.island[t]] = 1;
             UvPackOptions po = o.packing;
             if (faces) po.tiles = 1, po.density = 0.0f;
-            if (!uvPack(tmp, topo, isl, po, result.packing, error)) return false;
+            if (!uvPack(tmp, topo, isl, po, result.packing, error, [&](float f) { return report(0.9f + 0.1f * f); })) return false;
             if (faces && hadUvs) { // into the old place of the selection
                 glm::vec2 lo(1e30f), hi(-1e30f);
                 for (uint32_t t : list)
@@ -941,7 +941,8 @@ bool uvUnwrap(const Mesh& m, const UvUnwrapOptions& o, UvUnwrapResult& result, s
         UvPackOptions po = o.packing;
         po.resolution = o.resolution;
         if (faces && hadUvs) po.tiles = 1, po.density = 0.0f;
-        if (std::find(isl.begin(), isl.end(), uint8_t(1)) != isl.end() && !uvPack(tmp, pt, isl, po, result.packing, error))
+        if (std::find(isl.begin(), isl.end(), uint8_t(1)) != isl.end() &&
+            !uvPack(tmp, pt, isl, po, result.packing, error, [&](float f) { return report(0.9f + 0.1f * f); }))
             return false;
         if (faces && hadUvs) { // the selection's new islands go where its old ones were
             glm::vec2 lo(1e30f), hi(-1e30f);

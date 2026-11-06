@@ -2419,16 +2419,22 @@ constexpr Entry kTraditionalChinese[] = {
     {"Unwrap with the chosen method: the selected faces (fitted where they were), or the whole Part (packed). Least "
      "Stretch keeps angles and lengths along the marked seams; Conformal keeps angles; By Face Groups cuts along the "
      "face group borders too; Planar projects each piece; Unfold flattens the current islands again in place, "
-     "keeping pins; Auto Seams finds its own. Closed pieces get cut automatically. Big meshes unwrap in the "
-     "background.",
+     "keeping pins; Auto Seams finds its own. Closed pieces get cut automatically. Runs in the background (Cancel "
+     "under the view stops it).",
      "以所選方法展開：所選的面（在原位擬合），或整個部件（並排列）。Least Stretch 沿標記的接縫保留角度與長度；"
      "Conformal 保留角度；By Face Groups 也沿面群組邊界切割；Planar 投射每個區塊；Unfold 在原位重新攤平目前的島並保留"
-     "釘選；Auto Seams 自行找出接縫。封閉的區塊會自動切開。大型網格會在背景中展開。"},
+     "釘選；Auto Seams 自行找出接縫。封閉的區塊會自動切開。在背景中執行（檢視下方的取消可停止）。"},
     {"Pack", "排列"},
     {"Pack the selected islands (or all) as large as they fit into the 0-1 tile, or across the Columns x Rows grid of "
-     "UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them.",
+     "UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them. "
+     "Runs in the background (Cancel under the view stops it).",
      "將所選的島（或全部）以能放下的最大尺寸排列到 0-1 圖塊，或排列到欄數 x 列數的 UDIM 圖塊格中：旋轉到最小外框，縮"
-     "放到相同紋素密度，並保留其間的邊距。"},
+     "放到相同紋素密度，並保留其間的邊距。在背景中執行（檢視下方的取消可停止）。"},
+    {"Packing...", "正在排列..."},
+    {"Packing: %d%%", "正在排列：%d%%"},
+    {"Unwrapping...", "正在展開..."},
+    {"Unwrapping: %d%%", "正在展開：%d%%"},
+    {"Stop the Unwrap or Pack that is running; the UVs stay as they are.", "停止正在執行的展開或排列；UV 維持原樣。"},
     {"Mark Seam", "標記接縫"},
     {"Mark the selected edges (or the border of the selected faces) as seams: Unwrap cuts there.",
      "將所選的邊（或所選面的邊界）標記為接縫：展開時會在此切開。"},

@@ -2,7 +2,7 @@
 # full suite, 2026-11-04). A listed test passes up to 1.5x its seconds here; an unlisted one over 20 s fails the run.
 # Make it fast (wait on events, a smaller mesh or texture, split it) or label it nightly, then delete its line.
 # name                                                          seconds  plan
-ui_uv_editor                                                       116  not the unwrap (12 s): the 10x2, 4x3 and Pack-button UDIM shape packs (29+16+13 s, uvPack/xatlas); a decimated lion packs as slowly and misses "largest island limits the scale": make the pack fast
+ui_uv_editor                                                       40  packs < 1 s now (fix/uv-pack-speed); left: the lion's Least Stretch unwrap (10 s, line 30) and UI steps: a smaller model for T1, the lion nightly
 insider_drops                                                      100  tools/drops selftest: profile it; split the network-free checks from the packaging ones
 ui_retopo                                                           63  one wait_idle of 23 s (line 103: QRemesh of the sculpt): a lower target
 ui_first_sculpt                                                     48  the lesson end to end (225 lines, no single long step): split into two scripts

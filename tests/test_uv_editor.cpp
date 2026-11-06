@@ -16,6 +16,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <thread>
 
 using namespace sf;
 
@@ -80,6 +81,46 @@ Mesh squares(int n) {
     }
     m.recomputeAllNormals();
     return m;
+}
+
+// `n` L-shaped islands of different sizes and arm lengths, every other one standing, flat in the y = 0 plane; their
+// UVs are the shape itself (counter-clockwise). Enough for the shape packer, and long enough that it wants to turn some.
+Mesh lShapes(int n) {
+    Mesh m;
+    for (int i = 0; i < n; ++i) {
+        const float s = 0.5f + 0.25f * float(i % 5), x0 = 12.0f * float(i), arm = 1.0f + 1.5f * float(i % 4);
+        glm::vec2 v[] = {{0, 0}, {1 + arm, 0}, {1 + arm, 1}, {0, 1}, {1, 1}, {1, 2 + arm * 0.5f}, {0, 2 + arm * 0.5f}};
+        if (i % 2)
+            for (glm::vec2& p : v) p = glm::vec2(-p.y, p.x);
+        const uint32_t b = uint32_t(m.positions.size());
+        for (const glm::vec2& p : v) m.positions.push_back(glm::vec3(x0 + p.x * s, 0.0f, -p.y * s));
+        const uint32_t tris[][3] = {{0, 1, 2}, {0, 2, 4}, {0, 4, 3}, {3, 4, 5}, {3, 5, 6}};
+        for (const auto& t : tris) {
+            m.triangles.push_back({b + t[0], b + t[1], b + t[2]});
+            for (uint32_t j : t) m.uvs.push_back(v[j] * 0.1f);
+        }
+    }
+    m.recomputeAllNormals();
+    return m;
+}
+
+double uvCross(glm::vec2 a, glm::vec2 b) { return double(a.x) * double(b.y) - double(a.y) * double(b.x); }
+
+// Two UV triangles overlap by more than `eps` (no separating axis among their edges).
+bool uvTrianglesOverlap(const glm::vec2* a, const glm::vec2* b, float eps) {
+    for (int k = 0; k < 2; ++k) {
+        const glm::vec2 *p = k ? b : a, *o = k ? a : b;
+        for (int e = 0; e < 3; ++e) {
+            const glm::vec2 d = p[(e + 1) % 3] - p[e], n = glm::normalize(glm::vec2(-d.y, d.x));
+            float pLo = 1e30f, pHi = -1e30f, oLo = 1e30f, oHi = -1e30f;
+            for (int j = 0; j < 3; ++j) {
+                pLo = std::min(pLo, glm::dot(n, p[j])), pHi = std::max(pHi, glm::dot(n, p[j]));
+                oLo = std::min(oLo, glm::dot(n, o[j])), oHi = std::max(oHi, glm::dot(n, o[j]));
+            }
+            if (pHi < oLo + eps || oHi < pLo + eps) return false;
+        }
+    }
+    return true;
 }
 
 std::vector<int> usedTiles(const Mesh& m) {
@@ -335,6 +376,78 @@ TEST(uv_pack_udim_grid_columns_by_rows) {
     doc = makeDoc(squares(12));
     CHECK(run(doc, "uv_pack", {{"tiles", 12.0}}).ok);
     CHECK(usedTiles(doc.mesh).back() == 1012);
+}
+
+TEST(uv_pack_by_shape_keeps_islands_apart_unmirrored_and_at_one_density) {
+    // xatlas's quarter turn swaps u and v (a mirror): islands it turned were fitted back shrunk and on top of their
+    // neighbours. Islands are now only turned to their smallest box before xatlas sees them.
+    for (int tiles : {1, 4}) {
+        Mesh m = lShapes(24);
+        const UvTopology topo = buildUvTopology(m);
+        std::vector<double> before(m.triangleCount());
+        for (size_t t = 0; t < m.triangleCount(); ++t) before[t] = uvCross(m.uvs[t * 3 + 1] - m.uvs[t * 3], m.uvs[t * 3 + 2] - m.uvs[t * 3]);
+        UvPackOptions o;
+        o.tiles = tiles;
+        o.columns = tiles > 1 ? 2 : 0;
+        UvPackResult r;
+        std::string err;
+        CHECK(uvPack(m, topo, {}, o, r, err));
+        CHECK(r.tilesUsed == tiles);
+        CHECK(r.coverage > 0.45f && r.coverage <= 1.0f); // (measured: the islands' UV area over the tiles)
+        std::vector<double> uvArea(topo.islandCount, 0.0), area(topo.islandCount, 0.0);
+        size_t mirrored = 0, overlaps = 0;
+        for (size_t t = 0; t < m.triangleCount(); ++t) {
+            const double c = uvCross(m.uvs[t * 3 + 1] - m.uvs[t * 3], m.uvs[t * 3 + 2] - m.uvs[t * 3]);
+            if ((c > 0.0) != (before[t] > 0.0)) ++mirrored;
+            uvArea[topo.island[t]] += 0.5 * std::abs(c);
+            const glm::uvec3 tri = m.triangles[t];
+            area[topo.island[t]] += 0.5 * double(glm::length(glm::cross(m.positions[tri.y] - m.positions[tri.x], m.positions[tri.z] - m.positions[tri.x])));
+            for (size_t u = t + 1; u < m.triangleCount(); ++u)
+                if (topo.island[t] != topo.island[u] && uvTrianglesOverlap(&m.uvs[t * 3], &m.uvs[u * 3], 1e-5f)) ++overlaps;
+        }
+        CHECK(mirrored == 0);
+        CHECK(overlaps == 0);
+        if (tiles == 1) { // (across tiles the largest island may be shrunk to fit one)
+            std::vector<double> d;
+            for (uint32_t i = 0; i < topo.islandCount; ++i) d.push_back(std::sqrt(uvArea[i] / area[i]));
+            std::vector<double> sorted = d;
+            std::sort(sorted.begin(), sorted.end());
+            for (double x : d) CHECK(std::abs(x / sorted[sorted.size() / 2] - 1.0) < 0.025);
+        }
+    }
+}
+
+TEST(uv_pack_reports_progress_and_cancels) {
+    Mesh m = lShapes(24);
+    const UvTopology topo = buildUvTopology(m);
+    UvPackOptions o;
+    o.tiles = 4;
+    o.columns = 2;
+    UvPackResult r;
+    std::string err;
+    // Progress comes on the calling thread, rising.
+    const std::thread::id caller = std::this_thread::get_id();
+    std::vector<float> seen;
+    bool otherThread = false;
+    CHECK(uvPack(m, topo, {}, o, r, err, [&](float f) {
+        otherThread |= std::this_thread::get_id() != caller;
+        seen.push_back(f);
+        return true;
+    }));
+    CHECK(!otherThread);
+    CHECK(seen.size() >= 2);
+    CHECK(std::is_sorted(seen.begin(), seen.end()));
+    CHECK(seen.back() <= 1.0f);
+    // Cancelled at once, or part way: false, "Cancelled", the UVs as they were.
+    for (int after : {0, 3}) {
+        Mesh c = lShapes(24);
+        const std::vector<glm::vec2> uvs = c.uvs;
+        int calls = 0;
+        err.clear();
+        CHECK(!uvPack(c, topo, {}, o, r, err, [&](float) { return calls++ < after; }));
+        CHECK(err == "Cancelled");
+        CHECK(c.uvs == uvs);
+    }
 }
 
 TEST(uv_pack_rectangles) {

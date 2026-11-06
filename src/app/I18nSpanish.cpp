@@ -2796,19 +2796,25 @@ constexpr Entry kSpanish[] = {
     {"Unwrap with the chosen method: the selected faces (fitted where they were), or the whole Part (packed). Least "
      "Stretch keeps angles and lengths along the marked seams; Conformal keeps angles; By Face Groups cuts along the "
      "face group borders too; Planar projects each piece; Unfold flattens the current islands again in place, "
-     "keeping pins; Auto Seams finds its own. Closed pieces get cut automatically. Big meshes unwrap in the "
-     "background.",
+     "keeping pins; Auto Seams finds its own. Closed pieces get cut automatically. Runs in the background (Cancel "
+     "under the view stops it).",
      "Desenvuelve con el método elegido: las caras seleccionadas (ajustadas donde estaban), o toda la Pieza "
      "(empaquetada). Least Stretch conserva ángulos y longitudes a lo largo de las costuras marcadas; Conformal "
      "conserva ángulos; By Face Groups corta también por los bordes de grupos de caras; Planar proyecta cada pieza; "
      "Unfold vuelve a aplanar las islas actuales en su sitio, respetando los anclajes; Auto Seams busca sus propias "
-     "costuras. Las piezas cerradas se cortan automáticamente. Las mallas grandes se desenvuelven en segundo plano."},
+     "costuras. Las piezas cerradas se cortan automáticamente. Se ejecuta en segundo plano (Cancelar, bajo la vista, lo detiene)."},
     {"Pack", "Empaquetar"},
     {"Pack the selected islands (or all) as large as they fit into the 0-1 tile, or across the Columns x Rows grid of "
-     "UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them.",
+     "UDIM tiles: turned to their smallest box, scaled to one texel density, with the margin between them. "
+     "Runs in the background (Cancel under the view stops it).",
      "Empaqueta las islas seleccionadas (o todas) lo más grandes que quepan en el mosaico 0-1, o en la rejilla "
      "Columnas x Filas de mosaicos UDIM: giradas a su caja más pequeña, escaladas a una densidad de téxeles, con el "
-     "margen entre ellas."},
+     "margen entre ellas. Se ejecuta en segundo plano (Cancelar, bajo la vista, lo detiene)."},
+    {"Packing...", "Empaquetando..."},
+    {"Packing: %d%%", "Empaquetando: %d%%"},
+    {"Unwrapping...", "Desenvolviendo..."},
+    {"Unwrapping: %d%%", "Desenvolviendo: %d%%"},
+    {"Stop the Unwrap or Pack that is running; the UVs stay as they are.", "Detiene el Desenvolver o Empaquetar en curso; las UV se quedan como están."},
     {"Mark Seam", "Marcar costura"},
     {"Mark the selected edges (or the border of the selected faces) as seams: Unwrap cuts there.",
      "Marca como costuras las aristas seleccionadas (o el borde de las caras seleccionadas): Desenvolver corta ahí."},
