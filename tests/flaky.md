@@ -16,3 +16,6 @@ deletes it; remove its lines once fixed.
   The CPU check counted every thread over the whole window, and one software-OpenGL frame (llvmpipe's threads) costs
   ~0.4 s of processor time on that runner: 2 frames = 10-16% "idle CPU" over the 10% cap. `--measure-idle` now
   checks the CPU between frames and prints the frames' share apart. Remove these lines after a week of green Windows.
+| 2026-11-06 | ui_stroke_background | Omedchy | ed1b0099 |
+| 2026-11-06 | ui_stroke_background_preview | Omedchy | ed1b0099 |
+| 2026-11-06 | ui_stroke_persistent_upload | Omedchy | ed1b0099 |
