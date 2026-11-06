@@ -1192,6 +1192,7 @@ private:
     void initHardwareProfile();
     void shutdownHardwareProfile();
     void hardwareProfileFrameBegin();
+    void hardwareProfileDrawStart(); // the 3D view's draw begins (the CPU's time before it isn't the triangles')
     void hardwareProfileFrameEnd(); // before the swap: feeds the governor, runs a calibration step
     void drawHardwareProfileOverlay(); // calibration progress over the first frames (Esc skips)
     bool hardwareCalibrating() const;  // a calibration is running (proof mode waits for it)

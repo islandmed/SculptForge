@@ -576,6 +576,18 @@ bool coarseAttributesMatch(const CoarseLevels& L, const Mesh& mesh) {
     return (nv > 0 && mesh.colors.size() == nv) == !L.colors.empty() && (nv > 0 && mesh.mask.size() == nv) == !L.mask.empty();
 }
 
+double nextGpuMsPerTriangle(double estimate, double gpuMs, double cpuBeforeDrawMs, uint64_t triangles) {
+    const double drawMs = gpuMs - std::max(cpuBeforeDrawMs, 0.0);
+    if (!(drawMs > 0.2) || triangles < 500000) return estimate; // (small frames are mostly fixed costs)
+    double v = drawMs / double(triangles);
+    // (A frame whose GPU time can't hold those triangles didn't draw them: UI tests draw the 3D view only for their
+    // shots, the timer measures every frame. More than 1e11 triangles a second is no measurement.)
+    if (v < 1e-8) return estimate;
+    if (!(estimate > 0.0)) return v;
+    v = std::min(v, 4.0 * estimate);
+    return 0.8 * estimate + 0.2 * v;
+}
+
 void coarseAttributes(CoarseLevels& L, const Mesh& mesh, std::vector<uint32_t> cells) {
     const size_t nv = mesh.vertexCount(), count = L.positions.size();
     if (L.levels.empty() || L.vertexCell.size() != nv) return;

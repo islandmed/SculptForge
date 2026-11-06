@@ -1213,6 +1213,7 @@ int App::run() {
         renderSettings_.resolutionScale = float(uiPrefs_.viewResolution) / 100.0f; // (#80; only the window's view)
         if (perf_.movingNow) // while the view moves, the floor tier draws fewer pixels; full resolution when it stops
             renderSettings_.resolutionScale = std::min(renderSettings_.resolutionScale, motionResolution());
+        hardwareProfileDrawStart();
         perf_.samplesUsed = renderer_.drawView(camera_, fbW, fbH, renderSettings_, canvasViewport(fbW, fbH), samples);
         if (snapshotEnv && *snapshotEnv && (sm.moving || sm.releasing)) {
             // Three points of the stroke, and the end (the frame the last dab reached the screen).

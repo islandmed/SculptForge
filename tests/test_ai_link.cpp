@@ -287,17 +287,16 @@ TEST(ai_link_long_runtime_folder_still_listens) {
 
 TEST(ai_link_attach_end_to_end) {
     // sculptforge-cli --mcp --attach against a stand-in app: live_connect waits, the code pairs, tools are forwarded.
-    // A shard's TMPDIR in a deep worktree overflows sun_path (108 bytes): then a short folder of /tmp.
-    std::string run = scratchDir("sf_ai_link_attach");
-    if (run.size() + sizeof("/live.sock") > 100) {
-        run = "/tmp/sf_ai_attach_" + std::to_string(std::hash<std::string>{}(run) % 1000000007u);
-        std::error_code ec;
-        std::filesystem::remove_all(run, ec);
-        std::filesystem::create_directories(run, ec);
-    }
-    const std::string endpoint = run + "/live.sock";
-    AiLinkListener listener;
+    // (The endpoint as the app makes it: a long test folder, e.g. a worktree's shard TMPDIR, would overflow sun_path.)
+    const std::string run = scratchDir("sf_ai_link_attach");
+    const char* old = std::getenv("XDG_RUNTIME_DIR");
+    const std::string saved = old ? old : "";
+    setenv("XDG_RUNTIME_DIR", run.c_str(), 1);
     std::string err;
+    const std::string endpoint = aiLinkEndpoint(err);
+    if (old) setenv("XDG_RUNTIME_DIR", saved.c_str(), 1);
+    else unsetenv("XDG_RUNTIME_DIR");
+    AiLinkListener listener;
     CHECK(listener.open(endpoint, err));
     std::thread app([&] {
         AiLinkConn conn;
@@ -329,8 +328,8 @@ TEST(ai_link_attach_end_to_end) {
     CHECK(o.find("ran mesh_info") != std::string::npos);
     CHECK(o.find("notifications/tools/list_changed") != std::string::npos);
     CHECK(o.rfind("Not connected to SculptForge") > o.find("ran mesh_info")); // after Disconnect, refused again
-    std::error_code ec;
-    std::filesystem::remove_all(run, ec);
+    listener.close();
+    std::filesystem::remove(std::filesystem::path(endpoint).parent_path());
 }
 #endif
 

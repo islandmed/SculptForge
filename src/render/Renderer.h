@@ -274,7 +274,9 @@ public:
     // enough (the app draws until then).
     bool coarsePreviewOnly() const { return previewOnly_; }
     bool coarseStillWanted() const { return stillWanted_; }
-    void noteGpuFrame(double gpuMs, uint64_t drawnTriangles); // (the frame governor's GPU timer)
+    // The frame governor's GPU timer: the whole frame's GPU time, the CPU's before the 3D view drew (render/Clusters.h:
+    // nextGpuMsPerTriangle)
+    void noteGpuFrame(double gpuMs, uint64_t drawnTriangles, double cpuBeforeDrawMs = 0.0);
     void setTriangleRate(double millionsPerSecond) { triangleRateM_ = millionsPerSecond; } // (calibration; 0 = unknown)
     void setStroking(bool on) { stroking_ = on; } // a stroke runs: sync leaves the edited clusters' levels until it ends
     // The last syncScene left motion proxies to build (a few milliseconds of them a frame; the rest draw in full).
