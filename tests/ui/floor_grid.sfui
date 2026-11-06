@@ -1,5 +1,6 @@
-# Floor grid (#115): View > Display > Floor grid (also Tool > Display and the command palette) draws a faint grid on
-# the ground plane through the world origin (y = 0), fading into the distance. Off by default; a preference.
+# Floor grid (#115): View > Floor grid (also Tool > Display and the command palette) draws a faint grid on the floor
+# the model stands on (the lowest point of the visible Parts, Y up), the X and Z axes through the origin marked,
+# fading into the distance. It is drawn before the Parts, so it never shows on the model. Off by default; a preference.
 run ui_look look=forge layout=sculptforge
 run new_sphere subdivisions=4
 camera 30 -20
@@ -18,6 +19,9 @@ key escape
 wait 0.3
 shot on
 expect_value floor_grid_drawn == 1
+# The starter sphere (centred on the origin) stands on the grid: the floor is at its bottom, not through its middle.
+expect_value floor_height < -0.9
+remember floor_height sphere_floor
 # The grid adds none of the model's triangles (it draws one quad of its own).
 expect_value drawn_triangles == $sphere_tris
 
@@ -30,16 +34,49 @@ wait 0.3
 shot far
 key f
 wait 0.3
-# From below the floor the grid draws over what is above it (a ceiling seen through), still faint.
-camera 30 20
+# From below the floor the whole model still shows: the grid only around it, never over it.
+camera 30 25
 wait 0.3
 shot below
 
-# A plane on the floor itself stays in front of the grid.
+# A model moved below the origin: the floor follows once the move ends.
+camera 30 -20
+run transform translate=0,-3,0 masked=false
+key f
+camera 30 -20
+wait 0.3
+expect_value floor_height < -3.9
+shot below-origin
+key ctrl+z
+key f
+wait 0.3
+expect_value floor_height == $sphere_floor
+
+# A gizmo drag: the floor stays put during the drag and moves when it ends.
+key w
+gizmo_drag move_y 0 70 keep
+wait 0.2
+expect_value floor_height == $sphere_floor
+release
+wait 0.3
+expect_value floor_height < -1.1
+key ctrl+z
+key w
+expect_value gizmo_mode == 0
+wait 0.3
+
+# A plane: the floor is the plane itself, which covers the grid.
 run new_plane resolution=32
 camera 20 -25
 wait 0.3
 shot plane
+
+# A real model at an angle.
+run open path=$SCRIPT_DIR/../data/marble-bust.glb
+key f
+camera 35 -15
+wait 0.5
+shot bust
 
 # HiDPI: the lines stay one pixel wide (they're drawn per pixel, not scaled).
 run new_sphere subdivisions=4

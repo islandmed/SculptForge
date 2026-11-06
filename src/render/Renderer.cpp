@@ -706,19 +706,20 @@ void main() {
 }
 )";
 
-// The floor grid (#115, View > Display > Floor grid): one quad on the ground plane y = 0 around the eye, its lines
-// drawn in the fragment shader. Three levels of 10x steps, the finest fading out as the view zooms out (uBlend) so a
-// zoom never pops; cells under a few pixels fade too (no moire at grazing angles), and all of it fades with the
-// distance from the eye. X (red) and Z (blue) mark the origin.
+// The floor grid (#115, View > Floor grid): one quad on the floor (y = RenderSettings::floorHeight) around the eye,
+// its lines drawn in the fragment shader. Three levels of 10x steps, the finest fading out as the view zooms out
+// (uBlend) so a zoom never pops; cells under a few pixels fade too (no moire at grazing angles), and all of it fades
+// with the distance from the eye. X (red) and Z (blue) mark the axes through the origin.
 const char* kFloorVS = R"(#version 330 core
 uniform mat4 uView;
 uniform mat4 uProj;
 uniform vec2 uCentre;
 uniform float uHalf;
+uniform float uFloor;
 out vec3 vWorld;
 void main() {
     vec2 c = vec2(gl_VertexID & 1, gl_VertexID >> 1) * 2.0 - 1.0;
-    vWorld = vec3(uCentre.x + c.x * uHalf, 0.0, uCentre.y + c.y * uHalf);
+    vWorld = vec3(uCentre.x + c.x * uHalf, uFloor, uCentre.y + c.y * uHalf);
     gl_Position = uProj * (uView * vec4(vWorld, 1.0));
 }
 )";
@@ -3045,8 +3046,8 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     gl::Enable(GL_DEPTH_TEST);
     gl::DepthFunc(GL_LEQUAL);
     floorGridDrawn_ = false;
+    if (settings.floorGrid) drawFloorGrid(camera, view, proj, settings); // (under everything: the Parts paint over it)
     if (drawList_.empty() || !settings.showMesh) {
-        if (settings.floorGrid) drawFloorGrid(camera, view, proj, settings);
         if (settings.showSplats) drawSplats(view, proj, fbWidth, fbHeight, settings.splatOpacity);
         gl::UseProgram(0);
         return;
@@ -3074,7 +3075,6 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0 && !seeThrough(item))
             drawSlot(*s, item.active, item.flat, settings);
     drawMark(2);
-    if (settings.floorGrid) drawFloorGrid(camera, view, proj, settings); // (over the opaque Parts, under X-Ray's)
     if (xray) {
         gl::Enable(GL_BLEND);
         gl::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -3267,9 +3267,9 @@ void Renderer::cullCoarse(const MeshSlot& s, const CullView& frame, size_t budge
 // Draws `clusters` of `s` (the VAO for `part` bound): their triangles, the wireframe's edges, or their motion
 // proxies. One multi-draw, or with per-triangle data on a driver whose gl_VertexID lacks the base vertex, one
 // draw per cluster with its first drawn triangle in `primBaseLocation`.
-// The floor grid (#115): over the opaque Parts (depth tested, never written, pushed a little behind a surface on the
-// plane itself), under see-through ones. Its cell is a power of ten of the zoom: 0.1 at the default view of a new
-// model, 1 from ten times further out.
+// The floor grid (#115): drawn right after the background, before any Part, with no depth: every Part (and splat)
+// paints over it, so it never shows on the model, from above or below. Its cell is a power of ten of the zoom: 0.1
+// at the default view of a new model, 1 from ten times further out.
 void Renderer::drawFloorGrid(const Camera& camera, const glm::mat4& view, const glm::mat4& proj,
                              const RenderSettings& settings) {
     if (thumbnailPass_) return;
@@ -3283,7 +3283,7 @@ void Renderer::drawFloorGrid(const Camera& camera, const glm::mat4& view, const 
     }
     const glm::vec3 eye = glm::vec3(glm::inverse(view)[3]);
     const float zoom = std::log10(std::max(camera.distance, 1e-4f)) - 0.3f, level = std::floor(zoom);
-    const float fade = std::max(camera.distance * 6.0f, std::abs(eye.y) * 2.0f);
+    const float fade = std::max(camera.distance * 6.0f, std::abs(eye.y - settings.floorHeight) * 2.0f);
     // Lines a little lighter than a dark background, darker than a light one.
     const glm::vec3 bg = settings.gradientBackground ? settings.gradientCentre : settings.backgroundColor;
     const float luma = glm::dot(bg, glm::vec3(0.2126f, 0.7152f, 0.0722f));
@@ -3294,23 +3294,20 @@ void Renderer::drawFloorGrid(const Camera& camera, const glm::mat4& view, const 
     gl::UniformMatrix4fv(at("uProj"), 1, GL_FALSE, glm::value_ptr(proj));
     gl::Uniform2f(at("uCentre"), eye.x, eye.z);
     gl::Uniform1f(at("uHalf"), fade);
+    gl::Uniform1f(at("uFloor"), settings.floorHeight);
     gl::Uniform3fv(at("uEye"), 1, glm::value_ptr(eye));
     gl::Uniform1f(at("uStep"), std::pow(10.0f, level - 1.0f));
     gl::Uniform1f(at("uBlend"), zoom - level);
     gl::Uniform1f(at("uFade"), fade);
     gl::Uniform3fv(at("uLine"), 1, glm::value_ptr(line));
     gl::BindVertexArray(emptyVao_);
-    gl::Enable(GL_DEPTH_TEST);
-    gl::DepthMask(GL_FALSE);
+    gl::Disable(GL_DEPTH_TEST);
     gl::Enable(GL_BLEND);
     gl::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     gl::Disable(GL_CULL_FACE);
-    gl::Enable(GL_POLYGON_OFFSET_FILL);
-    gl::PolygonOffset(2.0f, 2.0f); // (the Parts draw at 1, 1: a plane mesh at y = 0 stays in front)
     gl::DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    gl::PolygonOffset(1.0f, 1.0f);
     gl::Disable(GL_BLEND);
-    gl::DepthMask(GL_TRUE);
+    gl::Enable(GL_DEPTH_TEST);
     floorGridDrawn_ = true;
 }
 

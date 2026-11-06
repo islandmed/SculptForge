@@ -49,9 +49,11 @@ struct RenderSettings {
     // Backface culling (#68, Tool > Display): back faces are never drawn, on any mesh (closed or not, from any
     // view). Off: they are skipped only where they can't show (a closed mesh seen from outside, Renderer::cull).
     bool backfaceCulling = false;
-    // Floor grid (#115, View > Display): a faint grid on the ground plane through the world origin (y = 0, Y up),
-    // fading with distance. Off by default.
+    // Floor grid (#115, View > Floor grid): a faint grid on the floor under the model (y = floorHeight, Y up; the
+    // app keeps it at the lowest point of the visible Parts), its X and Z axes through the origin, fading with
+    // distance. Drawn under every Part. Off by default.
     bool floorGrid = false;
+    float floorHeight = 0.0f;
     // The view's background: the charcoal radial gradient (default) or one flat display (sRGB) colour (#21).
     bool gradientBackground = true;
     glm::vec3 backgroundColor{0.168f, 0.168f, 0.168f};

@@ -528,8 +528,9 @@ void App::registerShellActions() {
         actions_.add(std::move(a));
     }
     add({"view.floor_grid", "Floor grid", ICON_LC_GRID_2X2,
-         "A faint grid on the floor through the world origin (Y up), fading into the distance: where the model "
-         "stands, and a reference for perspective and lining up Parts. Off by default; saved automatically.",
+         "A faint grid on the floor the model stands on (its lowest point, Y up), fading into the distance: a "
+         "reference for perspective and lining up Parts; the red and blue lines are the X and Z axes. It moves when "
+         "a stroke or a move ends. Off by default; saved automatically.",
          "Render", "", "", [this] { uiPrefs_.floorGrid = renderSettings_.floorGrid = !renderSettings_.floorGrid; },
          [this] { return renderSettings_.floorGrid; }, nullptr});
     flag("view.vertexpaint", "Paint", ICON_LC_PALETTE, "Render", "", &renderSettings_.showVertexPaint,
