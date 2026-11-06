@@ -414,7 +414,8 @@ vec4 finish(vec3 c) {
 #endif
     return vec4(g, uAlpha);
 }
-// Keep in sync with sf::face groupColor.
+)" // (two literals: MSVC stops at ~16K characters a literal, C2026; tools/dev/check_literals.py)
+R"(// Keep in sync with sf::face groupColor.
 vec3 groupColor(uint id) {
     uint h = id * 0x9E3779B1u;
     h ^= h >> 15;
