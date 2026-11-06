@@ -17,6 +17,9 @@
 //   shading grid, so lighting keeps every micro detail even where the geometry is coarser.
 // - Brushes mark base triangles dirty; their displacement tiles are re-sent at once, their shading (and that of
 //   their neighbours) within a per-frame budget of grid points (the rest follows on the next frames).
+// - Opening (or a new level): the first frame draws at once, clusters not shaded yet lit by the Phong-interpolated
+//   base normal; their shading follows in slot order within initialShadeMs a frame (paused while a stroke runs),
+//   computed right after the frame's draws are issued (while the GPU draws them) and sent with the next sync.
 // GL 3.3 core: texture buffers, instancing, no tessellation or compute shaders (macOS stops at GL 4.1).
 #pragma once
 
@@ -25,6 +28,7 @@
 #include "render/GL.h"
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 namespace sf {
@@ -44,9 +48,13 @@ public:
     size_t gpuBytes() const;
     bool closed() const { return closed_; }
     // Grid points whose shading still waits for a frame (budget), for tests and the benchmark.
-    size_t pendingShading() const { return pendingCount_; }
+    bool firstShadingPending() const { return initialSlot_ < baseTriangles_; } // (clusters draw unshaded: Renderer's variant)
+    size_t pendingShading() const { return pendingCount_ + size_t(baseTriangles_ - initialSlot_) * samples_; }
     // Grid points of shading recomputed per sync at most (0 = no limit).
     size_t shadeBudget = size_t(3) << 20;
+    // Time a frame gives the first shading after opening (0 = all of it before the first frame); while the view
+    // moves, initialShadeMovingMs.
+    double initialShadeMs = 0.0, initialShadeMovingMs = 30.0;
     // The view moves (set by the Renderer before sync: Fast Navigation's proxy frames): shading gets a time cap.
     bool viewMoving = false;
     // The last draw: the level used by each visible cluster (-1 = culled), and the target it settled on.
@@ -61,6 +69,13 @@ private:
     void ensurePatches(int level);
     void uploadDispTiles(const Mesh& mesh, std::vector<uint32_t>& slots, bool all);
     void shadePending(const Mesh& mesh, bool all);
+    // Shades `seeds` (and their vertex ring) into `stage`; `sorted` lists the triangles written, in slot order.
+    void shadeSeeds(const Mesh& mesh, std::vector<uint32_t>& seeds, std::vector<uint8_t>& stage, std::vector<uint32_t>& sorted,
+                    bool grow = true);
+    // Sends what shadeSeeds staged (and clears `sorted`).
+    void sendStaged(const std::vector<uint8_t>& stage, std::vector<uint32_t>& sorted);
+    // The first shading after opening: the next slots in order, within initialShadeMs, written to the GPU copy.
+    void shadeInitial(const Mesh& mesh);
 
     uint64_t serial_ = 0;
     uint32_t baseTriangles_ = 0, baseVertices_ = 0;
@@ -68,7 +83,7 @@ private:
     uint32_t n_ = 1, samples_ = 3;
     float step_ = 0.0f;
     bool closed_ = false;
-    std::vector<uint32_t> order_;   // slot -> base triangle
+    std::shared_ptr<const std::vector<uint32_t>> order_; // slot -> base triangle (shared with MicroMesh::slotOrder)
     std::vector<uint32_t> slotOf_;  // base triangle -> slot
     uint32_t clusterShift_ = 8;
     std::vector<ClusterBounds> bounds_;
@@ -96,7 +111,13 @@ private:
     MicroShader shader_;
     std::vector<uint64_t> pending_; // per base triangle: shading out of date
     double shadeNsPerPoint_ = 0.0;  // what shading a grid point (and sending it) took lately (TierConfig::strokeShadeMs)
+    double initialNsPerPoint_ = 0.0; // the same for the first shading (no ring, mapped: cheaper; kept out of a stroke's budget)
     size_t pendingCount_ = 0;
+    uint32_t initialSlot_ = 0; // slots below this have had their first shading (the clusters past it draw unshaded)
+    std::vector<uint8_t> initialStage_;
+    std::vector<uint32_t> initialSorted_, sorted_;
+    const Mesh* synced_ = nullptr; // the mesh of this frame's sync, until draw() used it (the first shading)
+    bool stroking_ = false;
     std::vector<uint32_t> scratch_, written_, stageIndex_;
     std::vector<uint8_t> clusterSeen_;
     std::vector<uint64_t> slotBits_, baseBits_;
@@ -107,7 +128,7 @@ private:
     struct Uniforms {
         GLuint program = 0;
         GLint slotBase = -1, chunkSlot = -1, level = -1, n = -1, samples = -1, clusterShift = -1, step = -1, unrolled = -1,
-              corners = -1;
+              corners = -1, unshaded = -1, projInv = -1;
     } u_;
 };
 

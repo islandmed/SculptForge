@@ -19,11 +19,13 @@
 #include "ai/Http.h"
 
 #include "core/LitSphere.h"
+#include "app/Opening.h"
 #include "core/Project.h"
 
 #include <imgui.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <cctype>
@@ -82,6 +84,84 @@ void SDLCALL onProjectChosen(void* userdata, const char* const* files, int) {
 }
 
 } // namespace
+
+// --- Opening a big project with its preview (App::opening_) ---
+
+bool App::startOpening(const std::string& path, bool force, int delayMs) {
+    if (opening_) return false;
+    Mesh preview;
+    std::string err;
+    if (!loadProjectPreview(path, preview, err) && !force) return false;
+    if (doc_.sculptor.strokeActive()) endStroke();
+    auto o = std::make_unique<Opening>();
+    o->path = path;
+    o->preview = std::move(preview);
+    Opening* raw = o.get();
+    // SF_OPEN_DELAY_MS: the read takes at least that long (tests: edits while it's still opening).
+    if (delayMs <= 0 && std::getenv("SF_OPEN_DELAY_MS")) delayMs = std::atoi(std::getenv("SF_OPEN_DELAY_MS"));
+    o->reader = std::thread([raw, delayMs] {
+        if (delayMs > 0) std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
+        raw->loaded = readProject(raw->path, raw->error);
+        raw->done = true;
+        wakeMainLoop();
+    });
+    opening_ = std::move(o);
+    if (opening_->preview.triangleCount()) camera_.frame(opening_->preview.bounds());
+    status_ = "Opening " + utf8(fsPath(path).filename()) + "...";
+    return true;
+}
+
+void App::pollOpening() {
+    if (!opening_) return;
+    if (!opening_->done) {
+        // The reader needs the processor: a frame now and then (the spinner, a look around the preview), not a
+        // loop drawing flat out (on two slow cores that halved the read). Its end wakes the loop at once.
+        redrawIn(0.1);
+        SDL_Delay(20);
+        return;
+    }
+    std::unique_ptr<Opening> o = std::move(opening_);
+    o->reader.join();
+    if (!o->loaded) {
+        status_ = o->error.empty() ? "Cannot open " + o->path : o->error;
+        lastCommandOk_ = false;
+        return;
+    }
+    preloadProject(o->path, std::move(o->loaded)); // (the open command takes it: everything an open does follows)
+    runCommand("open", {{"path", o->path}});
+}
+
+bool App::editsBlocked() {
+    if (!opening_) return false;
+    status_ = "Still opening " + utf8(fsPath(opening_->path).filename()) + "...";
+    return true;
+}
+
+Mesh* App::openingPreview() { return opening_ ? &opening_->preview : nullptr; }
+
+void App::drawOpeningOverlay() {
+    if (!opening_) return;
+    const CanvasRect c = canvasRect();
+    const float s = uiScale_;
+    ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + timelineTopInset_ + 8.0f * s), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+    ImGui::SetNextWindowBgAlpha(0.72f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f * s, 5.0f * s));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, theme::rounding(4.0f * s));
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
+                                   ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove |
+                                   ImGuiWindowFlags_NoInputs;
+    if (ImGui::Begin("##opening", nullptr, flags)) {
+        static const char kSpin[] = "|/-\\";
+        const int frame = int(ImGui::GetTime() * 8.0) % 4;
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme::u32(theme::accent)));
+        ImGui::Text("%c  %s %s", kSpin[frame], tr("Opening"), utf8(fsPath(opening_->path).filename()).c_str());
+        ImGui::PopStyleColor();
+        ImGui::TextDisabled("%s", tr("Preview: sculpting starts once it's in"));
+    }
+    ImGui::End();
+    ImGui::PopStyleVar(3);
+}
 
 bool App::interactive() const { return options_.renderPath.empty() && options_.recordPath.empty() && !demo_; }
 
@@ -268,7 +348,7 @@ void App::tickProject(float dt) {
     autosaveTimer_ = 0.0f;
     storeProjectSettings();
     std::string err;
-    if (saveProject(autosavePath(prefDir_), doc_, err)) {
+    if (saveProject(autosavePath(prefDir_), doc_, err, true)) {
         autosaveRevision_ = revision;
         autosaveWritten_ = true;
         SDL_Log("Autosaved to %s", autosavePath(prefDir_).c_str());

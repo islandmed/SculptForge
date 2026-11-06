@@ -38,7 +38,10 @@
 #include "core/Mesh.h"
 #include "core/MicroStore.h"
 
+#include <chrono>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -47,6 +50,16 @@
 #include <vector>
 
 namespace sf {
+
+// SF_OPEN_PROFILE=1: how long each step of opening a project and its first upload takes (stderr).
+inline void openStage(const char* what) {
+    static const bool on = std::getenv("SF_OPEN_PROFILE") != nullptr;
+    if (!on) return;
+    static auto last = std::chrono::steady_clock::now();
+    const auto now = std::chrono::steady_clock::now();
+    std::fprintf(stderr, "open: %-28s %7.0f ms\n", what, std::chrono::duration<double, std::milli>(now - last).count());
+    last = now;
+}
 
 class BVH;
 class CommandRegistry;
@@ -75,6 +88,9 @@ struct MicroMesh {
     // Base topology this level needs (derived, not saved; rebuilt when the base changes): per triangle edge the
     // neighbouring triangle (tri << 2 | its edge), or kNone on a boundary.
     std::vector<uint32_t> edgeNeighbor;
+    // The renderer's slot order (render/MicroRenderer.h: base triangles in Morton order of their centres), derived
+    // and kept so a project can save it (core/OpenCache.h; it depends on the triangles' order, not on edits).
+    std::shared_ptr<const std::vector<uint32_t>> slotOrder;
 
     // Picks and brushes find the base triangles a displaced surface may reach through the BVH, each node grown by the
     // largest displacement under it (not the level's largest everywhere: one tall stroke made every query on a
@@ -215,7 +231,17 @@ bool microWantsOutOfCore(size_t points);
 void microDelete(Mesh& m);
 // Gives a loaded mesh (with normals) a micro level from saved data: `disp` holds baseTriangles * samples values
 // (`mask` that many or none). Works out the derived data (ranges, bulge, edge neighbours).
-bool microAttach(Mesh& m, int level, float step, MicroStore disp, std::vector<uint8_t> mask, std::string& error);
+// What microAttach computes from the base shape (MicroMesh::bulgeMax for 2^level segments, MicroMesh::baseEdge).
+float microBulgeMax(const Mesh& m, uint32_t n);
+float microBaseEdge(const Mesh& m);
+// What opening already knows (core/OpenCache.h, the packed tiles' headers), so microAttach needn't work it out.
+struct MicroAttachHint {
+    std::vector<uint32_t> edgeNeighbors; // saved ones: taken (left empty) if they check out, else built
+    std::vector<uint16_t> triRange;      // upper bounds per base triangle (from the tile headers), or empty
+    float bulgeMax = -1.0f, baseEdge = -1.0f; // saved for these positions, or < 0
+};
+bool microAttach(Mesh& m, int level, float step, MicroStore disp, std::vector<uint8_t> mask, std::string& error,
+                 MicroAttachHint* hint = nullptr);
 // A regular mesh of the micro surface at micro level `level` (<= the micro level): shared points welded, the base
 // triangles' UVs, face groups and hidden flags carried to their micro triangles, mask from the micro mask. Fails
 // when it would exceed `maxTriangles` (0 = what subdivision Divide allows on this computer).
@@ -253,8 +279,10 @@ public:
     // out(tri) gives where that triangle's `samples` values go (each written whole). `written` lists them.
     // `prepare`, if given, sees the triangles about to be written (before any out() call), once per batch.
     using Prepare = std::function<void(std::span<const uint32_t> tris)>;
+    // `grow` false: only `dirty` itself is written (whole shading of a set, e.g. the renderer's first pass in runs:
+    // the triangles around it get theirs from their own run).
     void shade(const Mesh& m, std::span<const uint32_t> dirty, bool all, std::vector<uint32_t>& written,
-               const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare = {});
+               const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare = {}, bool grow = true);
 
 private:
     // shade() for the triangles `seeds` (grown by the triangles sharing a vertex when `grow`); appends to `written`.

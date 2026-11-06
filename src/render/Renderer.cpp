@@ -322,6 +322,11 @@ flat in int vPrimBase;
 flat in int vSlot;
 flat in int vEdges;
 in vec2 vIJ;
+#ifdef MICRO_UNSHADED // (a variant while a level's first shading follows: the branch costs every frame's pixels)
+uniform int uUnshaded; // 1: the cluster's shading isn't there yet (just opened): the drawn facets light it
+uniform mat4 uProjInv;  // the inverse projection (the unshaded clusters' facets)
+#endif
+uniform vec4 uViewport; // the view's rectangle in window pixels
 uniform samplerBuffer uShade;
 uniform int uN;
 uniform int uSamples;
@@ -340,6 +345,21 @@ vec3 octNormal(vec2 v) {
     return normalize(n);
 }
 void microFetch() {
+#ifdef MICRO_UNSHADED
+    if (uUnshaded == 1) {
+        // The pixel's view-space point from its depth (no extra vertex outputs: they'd slow every frame), and the
+        // facet's normal from that point's screen-space slopes, turned towards the viewer.
+        vec4 ndc = vec4((gl_FragCoord.xy - uViewport.xy) / uViewport.zw * 2.0 - 1.0, gl_FragCoord.z * 2.0 - 1.0, 1.0);
+        vec4 q = uProjInv * ndc;
+        vec3 v = q.xyz / q.w;
+        vec3 f = cross(dFdx(v), dFdy(v));
+        f = dot(f, f) > 1e-30 ? normalize(f) : vec3(0.0, 0.0, 1.0);
+        if (dot(f, v) > 0.0) f = -f;
+        gNC = vec4(f, 0.0);
+        gMask = 0.0;
+        return;
+    }
+#endif
     float fi = clamp(vIJ.x, 0.0, float(uN)), fj = clamp(vIJ.y, 0.0, float(uN));
     int i0 = min(int(fi), uN - 1), j0 = min(int(fj), uN - 1);
     if (i0 + j0 > uN - 1) {
@@ -377,7 +397,9 @@ void microFetch() {
 #undef V_MASK
 #define V_MASK gMask
 #endif
+#ifndef MICRO
 uniform vec4 uViewport;  // the view's rectangle in window pixels
+#endif
 uniform vec2 uProjScale; // projection x and y scale
 uniform vec3 uBaseColor;
 uniform vec3 uTintShift; // the material tint less 1 (0, the default, is no tint): the active colour, no vertex paint
@@ -931,17 +953,17 @@ bool Renderer::init(std::string& error) {
 const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (features & (kTextured | kNormalMap)) features |= kTextured | kPrim;
     // (micro levels: no per-vertex paint, per-triangle data or predictive preview)
-    if (features & kMicro) features &= kMicro | kFlat | kPbr;
+    if (features & kMicro) features &= kMicro | kFlat | kPbr | kMicroUnshaded;
     MeshProgram& p = programs_[features & 255];
     if (p.id) return &p;
     std::string prefix = "#version 330 core\n";
-    if (features & kMicro) prefix += "#define MICRO\n";
+    if (features & kMicro) prefix += (features & kMicroUnshaded) ? "#define MICRO\n#define MICRO_UNSHADED\n" : "#define MICRO\n";
     if (features & kPaint) prefix += "#define PAINT\n";
     if (features & kPrim) prefix += "#define PRIM\n";
     if (features & kTextured) prefix += "#define TEXTURED\n";
     if (features & kNormalMap) prefix += "#define NORMALMAP\n";
     if (features & kFlat) prefix += "#define FLAT\n";
-    if (features & kGhost) prefix += "#define GHOST\n";
+    if ((features & kGhost) && !(features & kMicro)) prefix += "#define GHOST\n";
     if (features & kPbr) prefix += "#define PBR\n";
     const std::string vs = prefix + ((features & kMicro) ? microVertexShaderSource() : kMeshVS), fs = prefix + kMeshFS,
                       gs = prefix + kMeshGS;
@@ -2145,6 +2167,9 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     if (mesh.micro && microMatches(mesh)) { // a micro level draws its own way (render/MicroRenderer.h)
         if (!s.micro) s.micro = std::make_shared<MicroRenderer>();
         s.micro->viewMoving = proxyUsed_; // (the last draw's: the view moving)
+        // (overlaps the GPU's frame; less while the view moves. SF_MICRO_PROGRESSIVE=0: all of it in the first frame)
+        static const bool progressiveOff = std::getenv("SF_MICRO_PROGRESSIVE") && std::string(std::getenv("SF_MICRO_PROGRESSIVE")) == "0";
+        s.micro->initialShadeMs = microProgressiveShading && !progressiveOff ? 150.0 : 0.0;
         s.outOfMemory = !s.micro->sync(mesh);
         s.drawnTriangles = s.outOfMemory ? 0 : 1; // (draw() skips empty slots)
         s.fresh = true;                           // (back to a mesh: a full upload)
@@ -3145,7 +3170,8 @@ static glm::vec3 materialTintShift(const RenderSettings& settings, bool hasColor
 }
 
 void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
-    const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0));
+    const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0) |
+                                       (s.micro->firstShadingPending() ? kMicroUnshaded : 0));
     if (!p) return;
     gl::UseProgram(p->id);
     setPbrUniforms(*p, settings, false, s);
@@ -3730,7 +3756,10 @@ bool Renderer::renderMeshThumbnail(Mesh& mesh, const Camera& camera, int size, c
     // A scratch slot outside the Part id range; the scene's draw list is put back afterwards.
     constexpr uint32_t kThumbnailSlot = 0xFFFFFFF0u;
     mesh.topologyDirty = true;
+    const bool progressive = microProgressiveShading;
+    microProgressiveShading = false; // (one frame: all of the shading first)
     sync(slot(kThumbnailSlot), mesh);
+    microProgressiveShading = progressive;
     std::vector<DrawItem> scene;
     scene.swap(drawList_);
     drawList_.push_back({kThumbnailSlot, true});

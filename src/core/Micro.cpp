@@ -5,6 +5,7 @@
 // shading, baking down and displacement maps. The brushes are in MicroSculpt.cpp, the commands in
 // MicroCommands.cpp.
 #include "core/Micro.h"
+#include "core/OpenCache.h"
 #include "core/FocusDetail.h"
 
 #include "core/BakeImage.h"
@@ -412,7 +413,42 @@ bool microDivide(Mesh& m, int level, std::string& error, int outOfCore) {
     return true;
 }
 
-bool microAttach(Mesh& m, int level, float step, MicroStore disp, std::vector<uint8_t> mask, std::string& error) {
+float microBulgeMax(const Mesh& m, uint32_t n) {
+    const size_t nt = m.triangleCount(), block = 1 << 12, blocks = (nt + block - 1) / block;
+    std::vector<float> bulge(blocks, 0.0f);
+    poolFor(nt, [&](size_t b, size_t e) {
+        MicroTriangle T;
+        float g = 0.0f;
+        for (size_t t = b; t < e; ++t) {
+            T.set(m, uint32_t(t), n);
+            g = std::max(g, triangleBulge(T));
+        }
+        bulge[b / block] = g;
+    }, block);
+    float g = 0.0f;
+    for (float v : bulge) g = std::max(g, v);
+    return g;
+}
+
+float microBaseEdge(const Mesh& m) {
+    const size_t nt = m.triangleCount(), block = 1 << 12, blocks = (nt + block - 1) / block;
+    std::vector<double> sums(blocks, 0.0);
+    poolFor(nt, [&](size_t b, size_t e) {
+        double sum = 0.0;
+        for (size_t t = b; t < e; ++t) {
+            const glm::uvec3 tr = m.triangles[t];
+            sum += double(glm::distance(m.positions[tr.x], m.positions[tr.y]) + glm::distance(m.positions[tr.y], m.positions[tr.z]) +
+                          glm::distance(m.positions[tr.z], m.positions[tr.x]));
+        }
+        sums[b / block] += sum;
+    }, block);
+    double e = 0.0;
+    for (double v : sums) e += v;
+    return float(e / double(std::max<size_t>(nt * 3, 1)));
+}
+
+bool microAttach(Mesh& m, int level, float step, MicroStore disp, std::vector<uint8_t> mask, std::string& error,
+                 MicroAttachHint* hint) {
     if (level < 1 || level > MicroMesh::kMaxLevel || !(step > 0.0f) || !std::isfinite(step)) {
         error = "Project micro level is invalid";
         return false;
@@ -433,34 +469,27 @@ bool microAttach(Mesh& m, int level, float step, MicroStore disp, std::vector<ui
     mm->baseVertices = uint32_t(m.vertexCount());
     mm->disp = std::move(disp);
     mm->mask = std::move(mask);
-    mm->triRange.assign(nt, 0);
     mm->dirtyBits.assign((nt + 63) / 64, 0);
-    const size_t block = 1 << 12, blocks = (nt + block - 1) / block;
-    std::vector<float> bulge(blocks, 0.0f);
-    poolFor(nt, [&](size_t b, size_t e) {
-        MicroTriangle T;
-        float g = 0.0f;
-        for (size_t t = b; t < e; ++t) {
-            const int16_t* d = mm->disp.data() + t * S;
-            int r = 0;
-            for (uint32_t k = 0; k < S; ++k) r = std::max(r, std::abs(int(d[k])));
-            mm->triRange[t] = uint16_t(std::min(r, 32767));
-            T.set(m, uint32_t(t), n);
-            g = std::max(g, triangleBulge(T));
-        }
-        bulge[b / block] = g;
-    }, block);
-    for (float g : bulge) mm->bulgeMax = std::max(mm->bulgeMax, g);
-    {
-        double e = 0.0;
-        for (size_t t = 0; t < nt; ++t) {
-            const glm::uvec3 tr = m.triangles[t];
-            e += double(glm::distance(m.positions[tr.x], m.positions[tr.y]) + glm::distance(m.positions[tr.y], m.positions[tr.z]) +
-                        glm::distance(m.positions[tr.z], m.positions[tr.x]));
-        }
-        mm->baseEdge = float(e / double(std::max<size_t>(nt * 3, 1)));
+    const bool knownRange = hint && hint->triRange.size() == nt;
+    const bool knownShape = hint && hint->bulgeMax >= 0.0f && std::isfinite(hint->bulgeMax) && hint->baseEdge > 0.0f &&
+                            std::isfinite(hint->baseEdge);
+    if (knownRange) {
+        mm->triRange = std::move(hint->triRange);
+    } else {
+        mm->triRange.assign(nt, 0);
+        poolFor(nt, [&](size_t b, size_t e) {
+            for (size_t t = b; t < e; ++t) {
+                const int16_t* d = mm->disp.data() + t * S;
+                int r = 0;
+                for (uint32_t k = 0; k < S; ++k) r = std::max(r, std::abs(int(d[k])));
+                mm->triRange[t] = uint16_t(std::min(r, 32767));
+            }
+        }, 1 << 12);
     }
+    mm->bulgeMax = knownShape ? hint->bulgeMax : microBulgeMax(m, n);
+    mm->baseEdge = knownShape ? hint->baseEdge : microBaseEdge(m);
     for (uint16_t r : mm->triRange) mm->rangeMax = std::max(mm->rangeMax, r);
+    if (hint && !hint->edgeNeighbors.empty()) microAdoptEdgeNeighbors(m, mm->edgeNeighbor, hint->edgeNeighbors);
     mm->ensureTopology(m);
     mm->serial = MicroMesh::newSerial();
     mm->markAllDirty();
@@ -741,11 +770,11 @@ struct GridWork {
 } // namespace
 
 void MicroShader::shade(const Mesh& m, std::span<const uint32_t> dirty, bool all, std::vector<uint32_t>& written,
-                        const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare) {
+                        const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare, bool grow) {
     written.clear();
     if (!m.micro) return;
     if (!all) {
-        shadeSet(m, dirty, true, written, out, prepare);
+        shadeSet(m, dirty, grow, written, out, prepare);
         return;
     }
     // Everything: in runs of triangles (neighbours by index on levels made by Divide), each with the ring its

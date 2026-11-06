@@ -3,6 +3,7 @@
 #include "core/Project.h"
 #include "core/LegacyNames.h"
 #include "core/Micro.h"
+#include "core/OpenCache.h"
 #include "core/Timeline.h"
 
 #include "core/Multires.h"
@@ -24,6 +25,8 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <tuple>
+#include <mutex>
 #include <system_error>
 #include <thread>
 
@@ -55,7 +58,8 @@ ProjectThumbnailProvider& thumbnailProvider() {
 // version 1); every other key belongs to
 // Document::projectSettings (camera, render, brush, symmetry, ...).
 const char* const kCoreKeys[] = {"format", "version", "app_version", "mesh", "layers", "active_layer",
-                                 "parts", "active_part", "brushes", "active_brush", "splats", "attachments"};
+                                 "parts", "active_part", "brushes", "active_brush", "splats", "attachments",
+                                 "preview"};
 
 std::filesystem::path fsPath(const std::string& p) { return std::filesystem::path(std::u8string(p.begin(), p.end())); }
 
@@ -629,6 +633,243 @@ bool readTexture(Reader& r, const Json& tj, Mesh& m, std::string& error) {
 // twice ("same_as_mesh"). Format 6: a generated level (made by Divide, SubdivTopology::generated) has no
 // triangles and no child maps ("generated"), and a level without "detail" that isn't stale takes the detail that
 // fits its positions (SubdivLevel::detail).
+// --- The open cache (core/OpenCache.h): optional, ignored by builds that don't know it ---
+
+std::string hex64(uint64_t v) {
+    char buf[20];
+    std::snprintf(buf, sizeof buf, "%016llx", static_cast<unsigned long long>(v));
+    return buf;
+}
+
+uint64_t parseHex64(const Json& j, bool& ok) {
+    const std::string s = j.asString();
+    ok = s.size() == 16 && s.find_first_not_of("0123456789abcdef") == std::string::npos;
+    return ok ? std::strtoull(s.c_str(), nullptr, 16) : 0;
+}
+
+// The saved edge slots (writeOpenCache) as MicroMesh::edgeNeighbor, against `m`'s topology; empty if one doesn't
+// fit (microAttach then builds them; what does fit is still checked by microAdoptEdgeNeighbors).
+std::vector<uint32_t> microEdgesFromSlots(const Mesh& m, const std::vector<uint32_t>& slots) {
+    const size_t nt = m.triangleCount();
+    if (slots.size() != nt * 3) return {};
+    std::vector<uint32_t> out(slots.size());
+    std::atomic<bool> ok = true;
+    poolFor(nt, [&](size_t b, size_t e) {
+        for (size_t t = b; t < e; ++t)
+            for (int k = 0; k < 3; ++k) {
+                const uint32_t v = slots[t * 3 + size_t(k)];
+                if (v == 0) {
+                    out[t * 3 + size_t(k)] = MicroMesh::kNone;
+                    continue;
+                }
+                const IndexRing ring = m.vertexTriangles(m.triangles[t][k]);
+                const uint32_t p = (v - 1) >> 2, f = (v - 1) & 3;
+                if (p >= ring.size() || f > 2) {
+                    ok = false;
+                    continue;
+                }
+                out[t * 3 + size_t(k)] = ring.begin()[p] << 2 | f;
+            }
+    }, 1 << 14);
+    if (!ok) out.clear();
+    return out;
+}
+
+uint64_t geometryKey(const Mesh& m) { return openCacheGeometryKey(m); }
+
+// The file's size and modification time (for OpenCacheSource: unchanged since the cache in it was checked).
+bool fileStamp(const std::string& path, uint64_t& size, int64_t& modified) {
+    std::error_code ec;
+    const auto p = fsPath(path);
+    size = uint64_t(std::filesystem::file_size(p, ec));
+    if (ec) return false;
+    modified = int64_t(std::filesystem::last_write_time(p, ec).time_since_epoch().count());
+    return !ec;
+}
+
+// The arrays a cache entry of a part names (all but micro_shape): what OpenCacheSource carries.
+constexpr const char* kOpenCacheArrays[] = {"vt_offsets", "vt_list", "adj_offsets", "adj_list", "bvh_nodes",
+                                            "bvh_tris", "micro_edges", "micro_slot_order"};
+
+// `bvh`: the mesh's, if it is up to date (null: none saved). `compute` false (autosave): only a cache copied from
+// the file the mesh came from (OpenCacheSource), never one worked out on the spot.
+Json writeOpenCache(Writer& w, const std::string& prefix, const Mesh& m, const BVH* bvh, bool compute) {
+    if constexpr (std::endian::native != std::endian::little) return Json(); // (the hashes are of little-endian bytes)
+    if (m.triangleCount() < openCacheMinTriangles || !openCacheEnabled()) return Json();
+    Json j = Json::object();
+    j.set("version", kOpenCacheVersion);
+    bool any = false;
+    // Copied: sculpting changes none of these (a topology change drops the source), so the bytes already checked
+    // in the last file are this mesh's.
+    if (const auto src = m.openCacheSource) {
+        uint64_t size = 0;
+        int64_t modified = 0;
+        std::ifstream f;
+        if (fileStamp(src->path, size, modified) && size == src->size && modified == src->modified)
+            f.open(fsPath(src->path), std::ios::binary);
+        bool ok = bool(f) && !src->arrays.empty();
+        std::vector<std::vector<uint8_t>> bytes(src->arrays.size());
+        for (size_t i = 0; i < bytes.size() && ok; ++i) {
+            bytes[i].resize(size_t(src->arrays[i].bytes));
+            f.seekg(std::streamoff(src->arrays[i].offset));
+            ok = bool(f.read(reinterpret_cast<char*>(bytes[i].data()), std::streamsize(bytes[i].size())));
+        }
+        if (ok) { // (all read before any is added: a failed copy leaves nothing behind)
+            for (size_t i = 0; i < bytes.size(); ++i) {
+                const OpenCacheSource::Array& a = src->arrays[i];
+                const size_t size = bytes[i].size(); // (before the move: argument order is unspecified)
+                Json d = w.add(prefix + a.name + ".pack", Scalar::U8, 1, size, std::move(bytes[i]));
+                d.set("values", a.values);
+                d.set("hash", a.hash);
+                j.set(a.name, std::move(d));
+            }
+            j.set("key", hex64(src->key));
+            any = true;
+        }
+    }
+    if (!any) {
+        if (!compute) return Json();
+        j.set("key", hex64(openCacheKey(m)));
+        auto put = [&](const char* name, const std::vector<uint32_t>& v) {
+            any = true;
+            std::vector<uint8_t> packed = openCachePack(v);
+            const size_t bytes = packed.size();
+            Json d = w.add(prefix + name + ".pack", Scalar::U8, 1, bytes, std::move(packed));
+            d.set("values", double(v.size()));
+            d.set("hash", hex64(openCacheHash(v)));
+            j.set(name, std::move(d));
+        };
+        // (a subdivision level's adjacency is implicit: nothing to save, nothing to rebuild)
+        if (const std::vector<uint32_t>*vo = nullptr, *vl = nullptr, *ao = nullptr, *al = nullptr; m.topologyTables(vo, vl, ao, al)) {
+            put("vt_offsets", *vo);
+            put("vt_list", *vl);
+            put("adj_offsets", *ao);
+            put("adj_list", *al);
+        }
+        if (bvh && bvh->nodeCount() && bvh->leafOf(0) != ~0u) {
+            std::vector<uint32_t> nodes, tris;
+            bvh->exportStructure(nodes, tris);
+            if (tris.size() == m.triangleCount()) {
+                put("bvh_nodes", nodes);
+                put("bvh_tris", tris);
+            }
+        }
+        // Each edge's neighbour as where it sits among the triangles of the edge's first corner (+ which of its
+        // edges), 0 for none: a byte apiece, decoded against the topology (microEdgesFromSlots).
+        if (m.micro && microMatches(m) && m.micro->edgeNeighbor.size() == m.triangleCount() * 3) {
+            const std::vector<uint32_t>& en = m.micro->edgeNeighbor;
+            std::vector<uint32_t> slots(en.size(), 0);
+            std::atomic<bool> ok = true;
+            poolFor(m.triangleCount(), [&](size_t b, size_t e) {
+                for (size_t t = b; t < e; ++t)
+                    for (int k = 0; k < 3; ++k) {
+                        const uint32_t nb = en[t * 3 + size_t(k)];
+                        if (nb == MicroMesh::kNone) continue;
+                        const IndexRing ring = m.vertexTriangles(m.triangles[t][k]);
+                        const auto it = std::find(ring.begin(), ring.end(), nb >> 2);
+                        if (it == ring.end()) ok = false;
+                        else slots[t * 3 + size_t(k)] = (uint32_t(it - ring.begin()) << 2 | (nb & 3)) + 1;
+                    }
+            }, 1 << 14);
+            if (ok) put("micro_edges", slots);
+        }
+        // The renderer's slot order as it is (buildLayout takes it back exactly), else made now (the same function).
+        if (m.micro && microMatches(m))
+            put("micro_slot_order", m.micro->slotOrder && m.micro->slotOrder->size() == m.triangleCount() ? *m.micro->slotOrder
+                                                                                                         : microSlotOrder(m));
+    }
+    if (m.micro && microMatches(m)) { // (exact float bits; from the shape as saved, as attaching it would: the
+                                      // level's own values date from its Divide)
+        Json shape = Json::object();
+        shape.set("key", hex64(geometryKey(m)));
+        shape.set("bulge", hex64(std::bit_cast<uint32_t>(microBulgeMax(m, m.micro->n))));
+        shape.set("base_edge", hex64(std::bit_cast<uint32_t>(microBaseEdge(m))));
+        j.set("micro_shape", std::move(shape));
+    }
+    return any ? j : Json();
+}
+
+// After a save or load: where `m`'s cache arrays (`oc`, its manifest entry) sit in `path` (index: the archive's).
+void rememberOpenCacheSource(const Mesh& m, const std::string& path, const Json& oc, const std::map<std::string, ZipFileEntry>& index) {
+    m.openCacheSource.reset();
+    bool ok = false;
+    auto src = std::make_shared<OpenCacheSource>();
+    src->path = path;
+    src->key = parseHex64(oc["key"], ok);
+    if (!ok || !fileStamp(path, src->size, src->modified)) return;
+    for (const char* name : kOpenCacheArrays) {
+        const Json& d = oc[name];
+        if (!d.isObject()) continue;
+        const auto it = index.find(d["file"].asString());
+        if (it == index.end()) return;
+        src->arrays.push_back({name, it->second.offset, it->second.size, d["values"].asNumber(), d["hash"].asString()});
+    }
+    if (!src->arrays.empty()) m.openCacheSource = std::move(src);
+}
+
+struct OpenCacheData {
+    std::vector<uint32_t> vtOffsets, vtList, adjOffsets, adjList, bvhNodes, bvhTris, microEdges, slotOrder;
+    bool topology = false;
+    float microBulge = -1.0f, microBaseEdge = -1.0f; // (MicroAttachHint) for these positions, or < 0
+};
+
+
+// Reads `oc` for `m` (already read: its triangles are the key's): false (nothing to use) if it is missing, of
+// another version or mesh, or any array's bytes don't match their hash. A bad cache is never an error.
+bool readOpenCache(Reader& r, const Json& oc, const Mesh& m, OpenCacheData& out) {
+    if constexpr (std::endian::native != std::endian::little) return false;
+    if (!oc.isObject() || int(oc["version"].asNumber(0)) != kOpenCacheVersion || !openCacheEnabled()) return false;
+    bool ok = false;
+    const uint64_t meshKey = openCacheKey(m);
+    if (parseHex64(oc["key"], ok) != meshKey || !ok) {
+        if (std::getenv("SF_OPEN_PROFILE")) std::fprintf(stderr, "open cache: another mesh's (key)\n");
+        return false;
+    }
+    const size_t nv = m.vertexCount(), nt = m.triangleCount();
+    // (sizes from the descriptor, bounded: the checks after reading decide the rest)
+    static const bool tell = std::getenv("SF_OPEN_PROFILE") != nullptr;
+    auto refuse = [&](const char* name, const char* why) {
+        if (tell) std::fprintf(stderr, "open cache: %s not used (%s)\n", name, why);
+        return false;
+    };
+    auto get = [&](const char* name, std::vector<uint32_t>& v, size_t expect, size_t limit) {
+        const Json& d = oc[name];
+        if (!d.isObject()) return false;
+        const double c = d["values"].asNumber(-1), bytes = d["count"].asNumber(-1);
+        if (!(c >= 0) || c > double(limit) || (expect != size_t(-1) && c != double(expect))) return refuse(name, "count");
+        if (!(bytes >= 8) || bytes > c * 5.0 + 8.0 * (c / kOpenCacheBlock + 3.0)) return refuse(name, "size"); // (at most 5 bytes a value)
+        std::vector<uint8_t> packed;
+        const std::string saved = r.error;
+        if (!r.bytes(d, name, size_t(bytes), packed) || !openCacheUnpack(packed.data(), packed.size(), size_t(c), v)) {
+            r.error = saved;
+            v.clear();
+            return refuse(name, "unreadable");
+        }
+        bool hok = false;
+        if (parseHex64(d["hash"], hok) != openCacheHash(v) || !hok) {
+            v.clear();
+            return refuse(name, "hash");
+        }
+        return true;
+    };
+    const size_t big = std::max<size_t>(nt * 12, 1); // (a ring holds at most every other vertex; this bounds a crafted count)
+    out.topology = get("vt_offsets", out.vtOffsets, nv + 1, nv + 1) && get("vt_list", out.vtList, nt * 3, nt * 3) &&
+                   get("adj_offsets", out.adjOffsets, nv + 1, nv + 1) && get("adj_list", out.adjList, size_t(-1), big);
+    if (!out.topology) out.vtOffsets.clear(), out.vtList.clear(), out.adjOffsets.clear(), out.adjList.clear();
+    if (!(get("bvh_nodes", out.bvhNodes, size_t(-1), nt * 4) && get("bvh_tris", out.bvhTris, nt, nt))) out.bvhNodes.clear(), out.bvhTris.clear();
+    if (!get("micro_edges", out.microEdges, nt * 3, nt * 3)) out.microEdges.clear();
+    if (!get("micro_slot_order", out.slotOrder, nt, nt)) out.slotOrder.clear(); // (the renderer checks it's a permutation)
+    if (const Json& shape = oc["micro_shape"]; shape.isObject()) {
+        bool k = false, b = false, e = false;
+        const uint64_t key = parseHex64(shape["key"], k), bulge = parseHex64(shape["bulge"], b), edge = parseHex64(shape["base_edge"], e);
+        if (k && b && e && bulge <= 0xFFFFFFFFu && edge <= 0xFFFFFFFFu && key == openCacheGeometryKey(m, meshKey)) {
+            out.microBulge = std::bit_cast<float>(uint32_t(bulge));
+            out.microBaseEdge = std::bit_cast<float>(uint32_t(edge));
+        }
+    }
+    return true;
+}
+
 Json writeSubdiv(Writer& w, const std::string& prefix, const Mesh& m) {
     Json out = Json::object();
     out.set("current", subdivCurrentLevel(m));
@@ -881,7 +1122,8 @@ bool isProjectPath(const std::string& path) {
     return ext == kProjectExtension;
 }
 
-bool saveProject(const std::string& path, const Document& doc, std::string& error) {
+bool saveProject(const std::string& path, const Document& doc, std::string& error, bool autosave) {
+    std::vector<std::pair<int, Json>> caches; // (the parts' open caches, to remember where they went)
     Writer w;
     Json manifest = Json::object();
     manifest.set("format", kFormatName);
@@ -922,6 +1164,13 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
             if (mm.hasMask()) mj.set("mask", w.externalBytes(p + "mask.bin", mm.mask));
             st.set("micro", std::move(mj));
             version.need(7);
+        }
+        // Big meshes: what opening would rebuild (no format change: older builds skip the key).
+        if (Json oc = writeOpenCache(w, "parts/" + std::to_string(i) + "/cache/", doc.partMesh(i), active && !doc.bvhDirty ? &doc.bvh : nullptr,
+                                     !autosave);
+            oc.isObject()) {
+            caches.emplace_back(i, oc);
+            st.set("open_cache", std::move(oc));
         }
         const std::string& bridgeName = active ? doc.bridgeName : s.bridgeName;
         if (!bridgeName.empty()) st.set("bridge_name", bridgeName);
@@ -982,6 +1231,21 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         for (const auto& [key, value] : doc.projectSettings.members())
             if (!isCoreKey(key)) manifest.set(key, value);
 
+    // Big projects: a coarse preview the app shows while the rest opens (not autosave: it is worked out now).
+    if (!autosave && openCacheEnabled() && std::endian::native == std::endian::little) {
+        size_t total = 0;
+        for (int i = 0; i < doc.partCount(); ++i) total += doc.partMesh(i).triangleCount();
+        if (total >= openCacheMinTriangles)
+            if (Mesh pv = makeProjectPreview(doc); pv.triangleCount() > 0) {
+                Json pj = Json::object();
+                std::vector<uint8_t> pos(pv.positions.size() * 12), tri(pv.triangles.size() * 12);
+                std::memcpy(pos.data(), pv.positions.data(), pos.size());
+                std::memcpy(tri.data(), pv.triangles.data(), tri.size());
+                pj.set("positions", w.add("preview/positions.bin", Scalar::F32, 3, pv.positions.size(), std::move(pos)));
+                pj.set("triangles", w.add("preview/triangles.bin", Scalar::U32, 3, pv.triangles.size(), std::move(tri)));
+                manifest.set("preview", std::move(pj));
+            }
+    }
     manifest.set("version", version.version);
     const std::string text = manifest.dump(true);
     w.entries.insert(w.entries.begin(), ZipEntry{kManifestName, std::vector<uint8_t>(text.begin(), text.end())});
@@ -1003,10 +1267,39 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         error = "Cannot write " + path;
         return false;
     }
+    // The next save copies these caches from here (OpenCacheSource).
+    if (!caches.empty()) {
+        std::vector<ZipFileEntry> list;
+        std::string why;
+        std::map<std::string, ZipFileEntry> index;
+        if (readStoredZipIndex(path, list, why))
+            for (auto& e : list) index[e.name] = std::move(e);
+        for (const auto& [i, oc] : caches) rememberOpenCacheSource(doc.partMesh(i), path, oc, index);
+    }
     return true;
 }
 
-bool loadProject(const std::string& path, Document& doc, std::string& error) {
+// Everything a project holds, read and built, before it replaces a document (readProject / applyProject).
+struct LoadedProject {
+    std::string path;
+    Json manifest;
+    std::deque<LoadedPart> parts; // (stable addresses: BVH threads use them)
+    std::string skippedSets;      // selection sets that couldn't be read
+    int activePart = 0;
+    SplatCloud splats;
+    std::map<std::string, std::vector<uint8_t>> attachments;
+};
+
+namespace {
+
+bool readProjectInto(const std::string& path, LoadedProject& out, std::string& error) {
+    openStage("(load start)");
+    out.path = path;
+    Json& manifest = out.manifest;
+    std::deque<LoadedPart>& parts = out.parts;
+    std::string& skippedSets = out.skippedSets;
+    int& activePart = out.activePart;
+    SplatCloud& splats = out.splats;
     Reader r;
     if (!r.open(path, error)) return false;
     std::vector<uint8_t> manifestText;
@@ -1014,7 +1307,6 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
         error = path + " is not a SculptForge project (no manifest)";
         return false;
     }
-    Json manifest;
     if (!Json::parse(std::string(manifestText.begin(), manifestText.end()), manifest, error) || !manifest.isObject() ||
         manifest["format"].asString() != kFormatName) {
         error = path + " is not a SculptForge project" + (error.empty() ? "" : " (" + error + ")");
@@ -1034,9 +1326,6 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     }
 
     // Parts: version 1 has one mesh at the top level, version 2 a "parts" list.
-    std::deque<LoadedPart> parts; // (stable addresses: BVH threads use them)
-    std::string skippedSets;            // selection sets that couldn't be read
-    int activePart = 0;
     if (version < 2) {
         LoadedPart& s = parts.emplace_back();
         s.name = "Sculpt";
@@ -1057,19 +1346,36 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             s.bridgeName = sj["bridge_name"].asString();
             s.qremeshGuides = qremeshGuidesFromJson(sj["qremesh_guides"]);
             if (!readMesh(r, sj["mesh"], sj["layers"], s.mesh, error, false, false)) return false;
+            openStage("readMesh");
             s.mesh.forgespheres = forgespheresFromJson(sj["forgespheres"]);
             s.mesh.forgespherePreview = !s.mesh.forgespheres.empty() && sj["forgesphere_preview"].asBool(false);
             readSelectionSets(r, sj["selection_sets"], s.mesh, skippedSets);
+            // The open cache (core/OpenCache.h), when it is this mesh's and intact: the BVH's structure and the
+            // topology are taken from it (after their checks) instead of rebuilt.
+            OpenCacheData cache;
+            readOpenCache(r, sj["open_cache"], s.mesh, cache);
+            OpenCacheUse& used = lastOpenCacheUse;
+            if (&s == &parts.front()) used = {};
+            OpenCacheUse mine; // (this Part's)
+            openStage("open cache read");
+            if (!cache.bvhNodes.empty() && s.bvh.adoptStructure(s.mesh, cache.bvhNodes, std::move(cache.bvhTris))) s.built = used.bvh = mine.bvh = true;
+            std::vector<uint32_t>().swap(cache.bvhNodes);
+            openStage("open cache BVH");
             // The BVH builds (on the pool) while the levels and topology load (off it), then the normals.
-            s.startBvh();
+            if (!s.built) s.startBvh();
             r.parallelReads = !s.bvhBuilder.joinable();
             if (!readPaintLayers(r, sj["paint_layers"], s.mesh, error)) return false;
             if (!readTexture(r, sj["texture"], s.mesh, error)) return false;
             if (!readSubdiv(r, sj["subdiv"], s.mesh, error, version < 5)) return false;
-            s.mesh.rebuildTopology();
-            s.finishBvh();
-            r.parallelReads = true;
+            openStage("paint/texture/subdiv");
+            if (cache.topology && s.mesh.adoptTopology(std::move(cache.vtOffsets), std::move(cache.vtList), std::move(cache.adjOffsets),
+                                                       std::move(cache.adjList)))
+                used.topology = mine.topology = true;
+            else
+                s.mesh.rebuildTopology();
+            openStage("topology");
             s.mesh.recomputeAllNormals();
+            openStage("normals");
             if (const Json& mj = sj["micro"]; mj.isObject() && version >= 7) {
                 const int level = int(mj["level"].asNumber(0));
                 if (level < 1 || level > MicroMesh::kMaxLevel) {
@@ -1081,6 +1387,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
                 const uint32_t samples = (n + 1) * (n + 2) / 2;
                 MicroStore disp;
                 std::vector<uint8_t> mask;
+                MicroAttachHint hint;
                 if (const Json& pj = mj["displacement_packed"]; pj.isObject()) { // tiles packed (MicroStore.h)
                     std::vector<uint8_t> packed;
                     const size_t bytes = countOf(pj["count"]);
@@ -1091,7 +1398,8 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
                     std::string why;
                     if (microWantsOutOfCore(count)) disp.assignMapped(count, why);
                     else disp.assign(count, 0);
-                    if (!microUnpackTiles(packed.data(), packed.size(), s.mesh.triangleCount(), samples, disp.data())) {
+                    hint.triRange.resize(s.mesh.triangleCount()); // (the bounds from the tile headers: no second pass)
+                    if (!microUnpackTiles(packed.data(), packed.size(), s.mesh.triangleCount(), samples, disp.data(), hint.triRange.data())) {
                         error = "Project micro displacement is damaged";
                         return false;
                     }
@@ -1107,8 +1415,26 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
                     error = r.error;
                     return false;
                 }
-                if (!microAttach(s.mesh, level, float(mj["step"].asNumber(0)), std::move(disp), std::move(mask), error)) return false;
+                openStage("micro read+unpack");
+                hint.edgeNeighbors = microEdgesFromSlots(s.mesh, cache.microEdges);
+                std::vector<uint32_t>().swap(cache.microEdges); // (3 per base triangle: not held through the attach)
+                const bool savedEdges = !hint.edgeNeighbors.empty();
+                hint.bulgeMax = cache.microBulge;
+                hint.baseEdge = cache.microBaseEdge;
+                if (!microAttach(s.mesh, level, float(mj["step"].asNumber(0)), std::move(disp), std::move(mask), error, &hint))
+                    return false;
+                used.microEdges = mine.microEdges = savedEdges && hint.edgeNeighbors.empty(); // (left empty: taken)
+                if (!cache.slotOrder.empty()) { // (keyed with micro_shape: these positions)
+                    s.mesh.micro->slotOrder = std::make_shared<const std::vector<uint32_t>>(std::move(cache.slotOrder));
+                }
+                openStage("microAttach");
             }
+            // Everything the cache holds was taken: the next save copies it from this file.
+            if (mine.topology && mine.bvh && (!s.mesh.micro || mine.microEdges)) rememberOpenCacheSource(s.mesh, path, sj["open_cache"], r.files);
+            // (the micro level reads and attaches while the BVH builds: both only read the mesh)
+            s.finishBvh();
+            openStage("finishBvh");
+            r.parallelReads = true;
             s.activeLayer = int(sj["active_layer"].asNumber(-1));
         }
         const double active = manifest["active_part"].asNumber(0);
@@ -1116,7 +1442,6 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     }
 
     // Splats
-    SplatCloud splats;
     if (const Json& sj = manifest["splats"]; sj.isObject()) {
         const size_t n = countOf(sj["count"]);
         const int degree = int(sj["sh_degree"].asNumber(0));
@@ -1140,6 +1465,33 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
         for (size_t i = 0; i < n; ++i) splats.rotations[i] = glm::quat(rot[i * 4 + 3], rot[i * 4], rot[i * 4 + 1], rot[i * 4 + 2]);
     }
 
+    // Attachments are extras (an embedded Lit Sphere): one that can't be read is left out rather than failing the file.
+    for (const Json& f : manifest["attachments"].items()) {
+        const std::string name = legacy::modernize(f["name"].asString()); // our own folder names, e.g. Lit Spheres
+        const size_t n = countOf(f["data"]["count"]);
+        if (!validAttachmentName(name) || n == size_t(-1) || n > kMaxAttachmentSize || out.attachments.size() >= 64) continue;
+        std::vector<uint8_t> bytes;
+        r.error.clear();
+        if (r.bytes(f["data"], "attachment", n, bytes)) out.attachments[name] = std::move(bytes);
+    }
+    for (LoadedPart& part : parts) part.finishBvh();
+    return true;
+}
+
+} // namespace
+
+std::unique_ptr<LoadedProject, void (*)(LoadedProject*)> readProject(const std::string& path, std::string& error) {
+    std::unique_ptr<LoadedProject, void (*)(LoadedProject*)> loaded(new LoadedProject, [](LoadedProject* p) { delete p; });
+    if (!readProjectInto(path, *loaded, error)) loaded.reset();
+    return loaded;
+}
+
+void applyProject(LoadedProject& loaded, Document& doc) {
+    Json& manifest = loaded.manifest;
+    std::deque<LoadedPart>& parts = loaded.parts;
+    const int activePart = loaded.activePart;
+    SplatCloud& splats = loaded.splats;
+    const std::string& skippedSets = loaded.skippedSets;
     // Everything parsed: replace the scene. Part 0 is checked out first; the others are added
     // behind it, given their layer and Bridge name, and the saved active Part is selected last.
     auto validLayer = [](int layer, const Mesh& m) { return layer >= 0 && layer < int(m.layers.size()) ? layer : -1; };
@@ -1184,23 +1536,129 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     doc.projectSettings = Json::object();
     for (const auto& [key, value] : manifest.members())
         if (!isCoreKey(key)) doc.projectSettings.set(key, value);
-    // Attachments are extras (an embedded Lit Sphere): one that can't be read is left out rather than failing the file.
-    doc.projectFiles.clear();
-    for (const Json& f : manifest["attachments"].items()) {
-        const std::string name = legacy::modernize(f["name"].asString()); // our own folder names, e.g. Lit Spheres
-        const size_t n = countOf(f["data"]["count"]);
-        if (!validAttachmentName(name) || n == size_t(-1) || n > kMaxAttachmentSize || doc.projectFiles.size() >= 64) continue;
-        std::vector<uint8_t> bytes;
-        r.error.clear();
-        if (r.bytes(f["data"], "attachment", n, bytes)) doc.projectFiles[name] = std::move(bytes);
-    }
-    r.error.clear();
-    doc.path = path;
+    doc.projectFiles = std::move(loaded.attachments);
+    doc.path = loaded.path;
     doc.markClean();
-    return true;
 }
 
 void setProjectThumbnailProvider(ProjectThumbnailProvider provider) { thumbnailProvider() = std::move(provider); }
+
+
+namespace {
+std::mutex& preloadMutex() {
+    static std::mutex m;
+    return m;
+}
+std::pair<std::string, LoadedProjectPtr>& preloadSlot() {
+    static std::pair<std::string, LoadedProjectPtr> slot{std::string(), LoadedProjectPtr(nullptr, [](LoadedProject* p) { delete p; })};
+    return slot;
+}
+} // namespace
+
+void preloadProject(const std::string& path, LoadedProjectPtr loaded) {
+    std::lock_guard lock(preloadMutex());
+    preloadSlot().first = path;
+    preloadSlot().second = std::move(loaded);
+}
+
+LoadedProjectPtr takePreloadedProject(const std::string& path) {
+    std::lock_guard lock(preloadMutex());
+    auto& [p, loaded] = preloadSlot();
+    if (p != path || !loaded) return LoadedProjectPtr(nullptr, [](LoadedProject* q) { delete q; });
+    p.clear();
+    return std::move(loaded);
+}
+
+Mesh makeProjectPreview(const Document& doc, int cells) {
+    // Vertex clustering on one grid (Rossignac and Borrel, 1993): each cell's vertices become their mean, triangles
+    // between three distinct cells stay (once). A micro level's corners carry their displacement.
+    AABB box;
+    for (int i = 0; i < doc.partCount(); ++i)
+        if (doc.parts[size_t(i)].visible)
+            for (const glm::vec3& p : doc.partMesh(i).positions) box.expand(p);
+    Mesh out;
+    if (!box.valid() || cells < 2) return out;
+    const float side = std::max({box.extent().x, box.extent().y, box.extent().z, 1e-20f}) / float(cells);
+    const glm::ivec3 dims = glm::clamp(glm::ivec3(box.extent() / side) + 1, glm::ivec3(1), glm::ivec3(cells + 1));
+    std::vector<uint32_t> cellIndex(size_t(dims.x) * size_t(dims.y) * size_t(dims.z), 0xFFFFFFFFu);
+    std::vector<glm::dvec3> sums;
+    std::vector<uint32_t> counts;
+    std::vector<uint64_t> keys;
+    for (int i = 0; i < doc.partCount(); ++i) {
+        if (!doc.parts[size_t(i)].visible) continue;
+        const Mesh& m = doc.partMesh(i);
+        std::vector<glm::vec3> pos = m.positions;
+        if (m.micro && microMatches(m) && m.normals.size() == pos.size()) {
+            const MicroMesh& mm = *m.micro;
+            for (uint32_t t = 0; t < mm.baseTriangles; ++t)
+                for (uint32_t k = 0; k < 3; ++k) {
+                    const uint32_t v = m.triangles[t][int(k)], idx = k == 0 ? 0 : k == 1 ? mm.n : mm.samples - 1;
+                    pos[v] = m.positions[v] + glm::normalize(m.normals[v]) * (float(mm.disp.data()[size_t(t) * mm.samples + idx]) * mm.step);
+                }
+        }
+        std::vector<uint32_t> cluster(pos.size());
+        for (size_t v = 0; v < pos.size(); ++v) {
+            const glm::ivec3 c = glm::clamp(glm::ivec3((pos[v] - box.min) / side), glm::ivec3(0), dims - 1);
+            uint32_t& id = cellIndex[(size_t(c.z) * size_t(dims.y) + size_t(c.y)) * size_t(dims.x) + size_t(c.x)];
+            if (id == 0xFFFFFFFFu) id = uint32_t(sums.size()), sums.emplace_back(0.0), counts.push_back(0);
+            sums[id] += glm::dvec3(pos[v]);
+            ++counts[id];
+            cluster[v] = id;
+        }
+        for (const glm::uvec3& t : m.triangles) {
+            uint32_t a = cluster[t.x], b = cluster[t.y], c = cluster[t.z];
+            if (a == b || b == c || a == c) continue;
+            // (the key: the three cells in a rotation that starts at the smallest, so orientation is kept)
+            while (a > b || a > c) std::tie(a, b, c) = std::make_tuple(b, c, a);
+            keys.push_back(uint64_t(a) << 42 | uint64_t(b) << 21 | uint64_t(c));
+        }
+    }
+    if (sums.size() >= (size_t(1) << 21)) return out; // (keys hold 21 bits a cell: a finer grid than ever asked for)
+    std::sort(keys.begin(), keys.end());
+    keys.erase(std::unique(keys.begin(), keys.end()), keys.end());
+    out.positions.resize(sums.size());
+    for (size_t i = 0; i < sums.size(); ++i) out.positions[i] = glm::vec3(sums[i] / double(counts[i]));
+    out.triangles.reserve(keys.size());
+    for (uint64_t k : keys) out.triangles.emplace_back(uint32_t(k >> 42), uint32_t(k >> 21) & 0x1FFFFF, uint32_t(k) & 0x1FFFFF);
+    return out;
+}
+
+bool loadProjectPreview(const std::string& path, Mesh& out, std::string& error) {
+    Reader r;
+    if (!r.open(path, error)) return false;
+    std::vector<uint8_t> text;
+    Json manifest;
+    if (!r.entry(kManifestName, text) || !Json::parse(std::string(text.begin(), text.end()), manifest, error)) return false;
+    const Json& pj = manifest["preview"];
+    if (!pj.isObject()) return false;
+    const size_t nv = countOf(pj["positions"]["count"]), nt = countOf(pj["triangles"]["count"]);
+    constexpr size_t kMax = size_t(8) << 20; // (a preview is a few hundred thousand: anything bigger isn't one)
+    if (nv == size_t(-1) || nt == size_t(-1) || nv == 0 || nt == 0 || nv > kMax || nt > kMax) return false;
+    Mesh m;
+    m.triangles.resize(nt);
+    if (!r.vec3s(pj["positions"], "preview positions", nv, m.positions) ||
+        !r.uints(pj["triangles"], "preview triangles", nt, 3, &m.triangles[0].x)) {
+        error = r.error;
+        return false;
+    }
+    for (const glm::uvec3& t : m.triangles)
+        if (t.x >= nv || t.y >= nv || t.z >= nv) return false;
+    m.rebuildTopology();
+    m.recomputeAllNormals();
+    out = std::move(m);
+    return true;
+}
+
+bool loadProject(const std::string& path, Document& doc, std::string& error) {
+    if (auto pre = takePreloadedProject(path)) { // (read on another thread already: App's open with a preview)
+        applyProject(*pre, doc);
+        return true;
+    }
+    auto loaded = readProject(path, error);
+    if (!loaded) return false;
+    applyProject(*loaded, doc);
+    return true;
+}
 
 bool loadProjectThumbnail(const std::string& path, Image& out, std::string& error) {
     std::ifstream f(fsPath(path), std::ios::binary);
