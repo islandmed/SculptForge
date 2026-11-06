@@ -3,15 +3,22 @@ name: Release
 # A v* tag publishes a GitHub release (docs/releasing.md has the whole process; scripts/release.sh drives it).
 #
 #   locate   the tagged commit must carry the version the tag names (CMakeLists.txt's version, plus its
-#            SCULPTFORGE_PRERELEASE for a beta: v0.11.0-beta.1 tags 0.11.0 with "beta.1"). If CI succeeded on a push to
-#            main for exactly this commit and the Packages workflow (packages.yml) succeeded for it, on `staging` (the
-#            release batch carried the bump) or on that push, the release uses those packages: built and tested once,
-#            promoted unchanged. Otherwise:
-#   build    the Packages workflow runs here, from the tag (compiler cache restored from main, never saved).
+#            SCULPTFORGE_PRERELEASE for a beta: v0.11.0-beta.1 tags 0.11.0 with "beta.1"). When the Packages workflow
+#            (packages.yml) ran on a maintainer's push to `staging` for exactly this commit (scripts/release.sh --stage),
+#            the release promotes that run's packages unchanged: built and tested once. tools/release/staged_run.py
+#            picks it (push event, branch, actor, success, at most 7 days old, artifacts present) and refuses the
+#            release if no such run qualifies; CI must have passed on main for the commit. With no staging run at all:
+#   build    the Packages workflow runs here, from the tag (compiler cache restored from main, never saved): the
+#            --rebuild path.
+#   verify   every package's SHA-256 is the one its run recorded (packages.yml job sums) and its GitHub artifact
+#            attestation names packages.yml, this commit and that run (and, promoted, a push to staging):
+#            tools/release/verify_staged.py. Any mismatch refuses the release.
 #   smoke    every package installed or unpacked on a fresh runner: the app opens a model and sculpts
 #            (tests/ui/release_smoke.sfui), sculptforge-cli opens, sculpts, saves and reopens and its MCP server answers
 #            (tests/release_smoke.py), also through the AppImage (AppRun --cli) and each unpacked .mcpb bundle.
-#   publish  only after every smoke test passed: checksums, notes from CHANGELOG.md, the GitHub release. A tag with
+#   publish  only after verify and every smoke test passed (environment `release`, the only holder of
+#            UPDATE_SIGNING_KEY besides member-release: tags v* only): checksums re-checked, signed, notes from
+#            CHANGELOG.md, the GitHub release. A tag with
 #            a '-' (a beta) is a member perk, published by publish-members instead: a pre-release in the private
 #            repository islandmed/sculptforge-insiders (INSIDERS_REPO_TOKEN, held only by the environment
 #            member-release: v* tags only, maintainer approval) with CHANGELOG's [Unreleased] notes, and posted in
@@ -21,8 +28,9 @@ name: Release
 # to a full commit SHA (scripts/release.sh check enforces it). Build and smoke jobs take their
 # runner from the SF_RUNNER_* repository variables (standard GitHub runners when unset); locate and publish always run
 # on GitHub's own runners.
-# workflow_dispatch rebuilds and republishes an existing tag; dry_run does everything but publish, and promote_run
-# (dry runs only) smoke-tests the packages of any Packages run, so the pipeline can be tried from a branch.
+# workflow_dispatch republishes an existing tag (dispatch it ON the tag, `--ref vX.Y.Z`: the environment takes only
+# tags); dry_run does everything but publish, and promote_run (dry runs only) smoke-tests the packages of any Packages
+# run, unverified, so the pipeline can be tried from a branch.
 
 on:
   push:
@@ -57,6 +65,7 @@ jobs:
       run-id: ${{ steps.find.outputs.run-id }}
       sha: ${{ steps.find.outputs.sha }}
       tag: ${{ steps.find.outputs.tag }}
+      staged: ${{ steps.find.outputs.staged }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.TAG }}', fetch-depth: 20 } # the commits before the bump, for the paperwork check
@@ -91,20 +100,25 @@ jobs:
             echo "run-id=$run" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Successful runs on a push to main for exactly this commit, from this repository's own workflow files.
+          # CI: a successful run on a push to main for exactly this commit, from this repository's own workflow file.
           runs() {
             gh api "repos/$REPO/actions/workflows/$1/runs?head_sha=$sha&event=push&branch=main&status=success&per_page=5" \
               --jq '.workflow_runs[] | select(.head_sha == "'"$sha"'" and .head_branch == "main" and .event == "push"
                     and .path == ".github/workflows/'"$1"'" and .head_repository.full_name == "'"$REPO"'") | .id' | head -1
           }
+          # The packages: only the Packages run of a maintainer's push to `staging` for exactly this commit (exit 3:
+          # there is none, build here; exit 1: there are runs, none may be promoted: refuse).
+          rc=0
+          pkg=$(python3 tools/release/staged_run.py --repo "$REPO" --sha "$sha") || rc=$?
+          if [ $rc = 3 ]; then
+            echo "No Packages run on staging for $sha: building the packages here (the --rebuild path)"
+            exit 0
+          elif [ $rc != 0 ]; then
+            echo "::error::$sha has Packages runs on staging but none may be promoted (above). Fix: stage the release again (scripts/release.sh X.Y.Z --stage), or delete the tag and use scripts/release.sh X.Y.Z --rebuild."
+            exit 1
+          fi
           ci=$(runs ci.yml || true)
-          # The packages: the run on `staging` for exactly this commit (the release batch carried the bump: scripts/
-          # merge-queue.sh staging dispatches packages.yml there, and main's push run then reuses it), else main's own.
-          pkg=$(gh api "repos/$REPO/actions/workflows/packages.yml/runs?head_sha=$sha&event=workflow_dispatch&branch=staging&status=success&per_page=5" \
-                --jq '.workflow_runs[] | select(.head_sha == "'"$sha"'" and .head_branch == "staging" and .event == "workflow_dispatch"
-                      and .path == ".github/workflows/packages.yml" and .head_repository.full_name == "'"$REPO"'") | .id' | head -1 || true)
-          [ -n "$pkg" ] || pkg=$(runs packages.yml || true)
-          if [ -z "$ci" ] && [ -n "$pkg" ]; then
+          if [ -z "$ci" ]; then
             # The bump commit adds only release paperwork (tools/release/paperwork_only.py: version lines, CHANGELOG,
             # docs, site, fragments) to a main commit whose CI passed: that result stands (scripts/release.sh step ci).
             for c in $(git rev-list --first-parent -n 8 "$sha~1"); do
@@ -113,12 +127,10 @@ jobs:
               [ -n "$ci" ] && { echo "CI run $ci on $c stands for $sha (only release paperwork since)"; break; }
             done
           fi
-          if [ -n "$ci" ] && [ -n "$pkg" ]; then
-            echo "Promoting the packages of Packages run $pkg (CI run $ci passed for $sha)"
-            echo "run-id=$pkg" >> "$GITHUB_OUTPUT"
-          else
-            echo "No successful CI ($ci) and Packages ($pkg) runs on main for $sha: building the packages here"
-          fi
+          [ -n "$ci" ] || { echo "::error::no successful CI run on main for $sha: a staged commit lands on main only after CI passed"; exit 1; }
+          echo "Promoting the packages of staging's Packages run $pkg (CI run $ci passed for $sha)"
+          echo "run-id=$pkg" >> "$GITHUB_OUTPUT"
+          echo "staged=true" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build
@@ -127,10 +139,46 @@ jobs:
     permissions:
       contents: read
       actions: read # packages.yml's reuse job asks for it (it skips itself here: not a push to main)
+      id-token: write # packages.yml attests what it builds
+      attestations: write
     uses: ./.github/workflows/packages.yml
     with:
       ref: ${{ needs.locate.outputs.sha }}
       tag: ${{ needs.locate.outputs.tag }}
+
+  # Every package against its run's recorded SHA-256 and its attestation (tools/release/verify_staged.py). Dry runs
+  # too; not for promote_run (a dry run's look at any run's packages).
+  verify:
+    name: Verify checksums and attestations
+    needs: [locate, build]
+    if: ${{ !cancelled() && needs.locate.result == 'success' && (needs.build.result == 'success' || needs.build.result == 'skipped') && !(inputs.dry_run == true && inputs.promote_run != '') }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+      attestations: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ needs.locate.outputs.sha }}', persist-credentials: false, sparse-checkout: tools/release }
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+          pattern: '{linux,flatpak,vfx,macos,windows}*'
+          run-id: ${{ needs.locate.outputs.run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: staged-sums
+          path: sums
+          run-id: ${{ needs.locate.outputs.run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ needs.locate.outputs.run-id || github.run_id }}
+          SHA: ${{ needs.locate.outputs.sha }}
+          STAGED: ${{ needs.locate.outputs.staged }}
+        run: python3 tools/release/verify_staged.py dist sums/SHA256SUMS.staged.txt --repo "$GITHUB_REPOSITORY" --run "$RUN" --sha "$SHA" ${STAGED:+--staged}
 
   smoke:
     name: Smoke test ${{ matrix.name }}
@@ -243,9 +291,10 @@ jobs:
 
   publish:
     name: Publish GitHub Release
-    needs: [locate, build, smoke]
-    if: ${{ !cancelled() && needs.smoke.result == 'success' && inputs.dry_run != true && !contains(needs.locate.outputs.tag, '-') }}
+    needs: [locate, build, verify, smoke]
+    if: ${{ !cancelled() && needs.verify.result == 'success' && needs.smoke.result == 'success' && inputs.dry_run != true && !contains(needs.locate.outputs.tag, '-') }}
     runs-on: ubuntu-24.04
+    environment: release # UPDATE_SIGNING_KEY lives only here (and in member-release): deployments from tags v* only
     permissions:
       contents: write
       actions: read
@@ -259,6 +308,17 @@ jobs:
           pattern: '{linux,flatpak,vfx,macos,windows}*'
           run-id: ${{ needs.locate.outputs.run-id || github.run_id }}
           github-token: ${{ github.token }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: staged-sums
+          path: sums
+          run-id: ${{ needs.locate.outputs.run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: The same bytes job verify checked (SHA-256 as recorded, nothing added or missing)
+        env:
+          RUN: ${{ needs.locate.outputs.run-id || github.run_id }}
+          SHA: ${{ needs.locate.outputs.sha }}
+        run: python3 tools/release/verify_staged.py dist sums/SHA256SUMS.staged.txt --run "$RUN" --sha "$SHA" --sums-only && rm -r sums
       - name: Version-less copies (fixed links such as releases/latest/download/SculptForge-macos.dmg)
         run: |
           cd dist
@@ -287,6 +347,8 @@ jobs:
           cp "dist/sculptforge_bridge-$V.zip" dist/sculptforge_bridge.zip
       - name: Maya shelf script (Python source and its README; nothing to build)
         run: python3 -m zipfile -c dist/sculptforge_maya.zip integrations/maya/sculptforge_maya.py integrations/maya/README.md
+      - name: Software bill of materials (CycloneDX; covered by the checksums and their signature)
+        run: python3 tools/release/sbom.py --version "${TAG#v}" --out "dist/SculptForge-${TAG#v}-sbom.cdx.json"
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
       - name: Sign the checksums (one-click update checks SHA256SUMS.txt.sig, src/core/SelfUpdate.h)
@@ -311,8 +373,8 @@ jobs:
   # a workflow_dispatch from a branch); scripts/release.sh check enforces the environment and pinned actions.
   publish-members:
     name: Publish members' beta
-    needs: [locate, build, smoke]
-    if: ${{ !cancelled() && needs.smoke.result == 'success' && inputs.dry_run != true && contains(needs.locate.outputs.tag, '-') }}
+    needs: [locate, build, verify, smoke]
+    if: ${{ !cancelled() && needs.verify.result == 'success' && needs.smoke.result == 'success' && inputs.dry_run != true && contains(needs.locate.outputs.tag, '-') }}
     runs-on: ubuntu-24.04
     environment: member-release
     permissions:
@@ -328,6 +390,17 @@ jobs:
           pattern: '{linux,flatpak,vfx,macos,windows}*'
           run-id: ${{ needs.locate.outputs.run-id || github.run_id }}
           github-token: ${{ github.token }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: staged-sums
+          path: sums
+          run-id: ${{ needs.locate.outputs.run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: The same bytes job verify checked (SHA-256 as recorded, nothing added or missing)
+        env:
+          RUN: ${{ needs.locate.outputs.run-id || github.run_id }}
+          SHA: ${{ needs.locate.outputs.sha }}
+        run: python3 tools/release/verify_staged.py dist sums/SHA256SUMS.staged.txt --run "$RUN" --sha "$SHA" --sums-only && rm -r sums
       - name: Blender add-on and Maya shelf script
         run: |
           V=${TAG#v}

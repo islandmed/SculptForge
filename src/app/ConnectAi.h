@@ -12,10 +12,12 @@
 
 namespace sf::connect {
 
-// How a client starts the server: command plus arguments, the last one "--mcp".
+// How a client starts the server: command plus arguments ("--mcp", or "--mcp --attach" for live mode), and the name
+// the client lists it under ("sculptforge-live" for live mode, so it sits beside a headless "sculptforge").
 struct Launch {
     std::string command;
     std::vector<std::string> args;
+    std::string name = "sculptforge";
 };
 
 enum class Os { Windows, Mac, Linux };

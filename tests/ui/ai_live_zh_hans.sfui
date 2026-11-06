@@ -1,0 +1,43 @@
+# Live mode in Simplified Chinese (ai_live.sfui's flow): the Preferences switch, the Approve dialog, the badge and the
+# step confirmation, translated and laid out without clipping. The "##" ids stay, so the same items are found.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+click "Preferences##palette.preferences"
+click "Interface##preferences.interface"
+shot language-row-english                  # the four names wrap inside the narrow tray
+click "简体中文##language.zh-CN"
+expect "偏好设置##palette.preferences"
+click "AI##preferences.ai"
+expect_text "允许 AI 工具控制此窗口"
+click "允许 AI 工具控制此窗口##prefs.ai_live"
+expect_value ai_link_state == 1
+shot zh-hans-ai-live-prefs
+click "偏好设置##palette.preferences"
+
+ai_client connect
+ai_client send {"hello":"sculptforge-live","v":1,"client":"Claude Code"}
+wait_value ai_link_state == 2 5
+expect_text "允许 AI 工具控制此窗口？"
+shot zh-hans-ai-live-approve
+click "批准##ailink"
+ai_client expect paired":true
+wait_value ai_link_state == 3 5
+expect_text "AI 已连接：Claude Code"
+shot zh-hans-ai-live-badge
+
+ai_client send {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"export_glb","arguments":{"path":"/tmp/elsewhere/out.glb"}}}
+wait_value ai_link_state == 4 5
+expect_text "允许此 AI 步骤？"
+shot zh-hans-ai-live-confirm
+click "拒绝##ailinkconfirm"
+wait_value ai_link_state == 3 5
+click "断开连接##ailink"
+wait_value ai_link_state == 1 5
+ai_client close
+
+# Back to English for the next test.
+click "偏好设置##palette.preferences"
+click "界面##preferences.interface"
+click "English##language.en"
+expect "Preferences##palette.preferences"
+key escape

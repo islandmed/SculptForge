@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.11.2 LANGUAGES C CXX)
+project(SculptForge VERSION 0.11.6 LANGUAGES C CXX)
 # "beta.1" while this is a beta of that version (title bar and About: "0.11.0 Beta 1"), "" for a stable release.
 # scripts/release.sh sets it; release.yml checks the tag against both (v0.11.0-beta.1).
 set(SCULPTFORGE_PRERELEASE "")
@@ -100,6 +100,8 @@ add_library(sculptforge_core STATIC
   src/core/SelfUpdate.cpp
   src/core/MemberBuilds.cpp
   src/core/Keychain.cpp
+  src/core/ManagedPolicy.cpp
+  src/core/AuditLog.cpp
   src/core/BrushGallery.cpp
   src/core/VertexPaint.cpp
   src/core/PaintLayer.cpp
@@ -139,7 +141,7 @@ add_library(sculptforge_core STATIC
   src/core/QRemesh2Field.cpp
   src/core/QRemesh2Param.cpp
   src/core/QuadQuality.cpp
-  src/core/ForgeSpheres.cpp
+  src/core/ForgeSpheres.cpp src/core/AgentTools.cpp
   src/core/Projection.cpp
   src/core/RetopoCommands.cpp
   third_party/xatlas/xatlas.cpp
@@ -234,6 +236,9 @@ target_link_libraries(sculptforge_core PUBLIC glm::glm Threads::Threads)
 if(UNIX AND NOT APPLE)
   target_link_libraries(sculptforge_core PRIVATE ${CMAKE_DL_LIBS}) # core/Keychain.cpp: libsecret, loaded at run time
 endif()
+if(APPLE)
+  target_link_libraries(sculptforge_core PRIVATE "-framework Security" "-framework CoreFoundation") # core/Keychain.cpp
+endif()
 # zstd for Focus Detail tiles (core/FocusDetail.h), when the system has it; without it the tiles use our own codec.
 # Not on macOS: Homebrew's zstd is single-architecture and breaks the universal (x86_64 + arm64) build.
 find_package(PkgConfig QUIET)
@@ -259,7 +264,7 @@ set_source_files_properties(third_party/xatlas/xatlas.cpp third_party/tinyexr/ti
                             PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 
 # --- Bring-your-own-AI (brush assistant). HTTPS via WinHTTP or libcurl. ---
-add_library(sculptforge_ai STATIC src/ai/Http.cpp src/ai/AiPolicy.cpp src/ai/BrushAssistant.cpp src/ai/Generator3D.cpp
+add_library(sculptforge_ai STATIC src/ai/Http.cpp src/ai/AiPolicy.cpp src/ai/Providers.cpp src/ai/Secrets.cpp src/ai/Oidc.cpp src/ai/BrushAssistant.cpp src/ai/Generator3D.cpp
   src/ai/ImageTo3DService.cpp src/ai/GradioClient.cpp src/ai/ComfyUI.cpp src/ai/AiCommands.cpp src/ai/BrushGalleryClient.cpp src/link/Socket.cpp
   src/link/UnrealLink.cpp src/ai/Process.cpp src/ai/SplatTrainer.cpp)
 # Lets a build run from its tree find the bundled ComfyUI workflows (integrations/comfyui/workflows).
@@ -313,9 +318,12 @@ set_source_files_properties(third_party/qrcodegen/qrcodegen.cpp ${CMAKE_CURRENT_
 
 # --- Headless command-line tool (pipelines, build farms, AI agents) ---
 # The MCP server (src/cli/McpServer.cpp) is a library of its own: the tool and the tests link it, nobody compiles it twice.
-add_library(sculptforge_mcp STATIC src/cli/McpServer.cpp src/cli/McpTools.cpp)
+add_library(sculptforge_mcp STATIC src/cli/McpServer.cpp src/cli/McpTools.cpp src/cli/McpAttach.cpp src/link/AiLink.cpp src/link/AiLinkSession.cpp)
 target_compile_definitions(sculptforge_mcp PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
 target_link_libraries(sculptforge_mcp PUBLIC sculptforge_core sculptforge_ai)
+if(WIN32)
+  target_link_libraries(sculptforge_mcp PRIVATE advapi32) # live mode's pipe ACL (src/link/AiLink.cpp)
+endif()
 add_executable(sculptforge-cli src/cli/main.cpp)
 target_compile_definitions(sculptforge-cli PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
 target_link_libraries(sculptforge-cli PRIVATE sculptforge_core sculptforge_ai sculptforge_mcp)
@@ -325,7 +333,7 @@ target_link_libraries(sculptforge-cli PRIVATE sculptforge_core sculptforge_ai sc
 if(SCULPTFORGE_BUILD_APP OR SCULPTFORGE_BUILD_TESTS)
   add_library(sculptforge_appshared STATIC src/app/AssetLibrary.cpp src/app/BrushPreview.cpp src/app/UiLayout.cpp
     src/app/ShellGeometry.cpp src/app/LookSchemes.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp
-    src/app/I18nTraditionalChinese.cpp src/app/ConnectAi.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
+    src/app/I18nTraditionalChinese.cpp src/app/I18nSimplifiedChinese.cpp src/app/ConnectAi.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
   target_link_libraries(sculptforge_appshared PUBLIC sculptforge_core)
   if(MSVC)
     target_compile_options(sculptforge_appshared PRIVATE /W4 /utf-8 /permissive-)
@@ -355,6 +363,7 @@ if(SCULPTFORGE_BUILD_APP)
     fontMono ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-Regular.ttf # the looks (Preferences > Interface > Look)
     fontMonoBold ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-SemiBold.ttf
     fontCjk ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansTC-UI.otf # Traditional Chinese (tools/i18n/subset_cjk_font.py)
+    fontCjkSc ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansSC-UI.otf # Simplified Chinese (the same tool)
     appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png # the SF app icon: window, title bar (BrandMark.cpp)
     appIconSmall ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-32.png # its small cut (up to 32 px)
     bustMark ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/bust/bust-256.png # the illustration: About, What's New, support card
@@ -429,6 +438,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelSupport.cpp
     src/app/QuickTour.cpp
     src/app/PanelAi.cpp
+    src/app/PanelAiLink.cpp
     src/app/PanelConnectAi.cpp
     src/app/PanelSupportCard.cpp
     src/app/PanelIntegrations.cpp
@@ -450,7 +460,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/render/MicroRenderer.cpp
   )
   target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone sculptforge_appshared
-                                            sculptforge_actions imgui SDL3::SDL3)
+                                            sculptforge_mcp sculptforge_actions imgui SDL3::SDL3)
   target_include_directories(sculptforge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lucide)
   target_compile_definitions(sculptforge PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}"
                                                  SCULPTFORGE_PRERELEASE="${SCULPTFORGE_PRERELEASE}"
@@ -748,9 +758,14 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME raw_literal_size COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/dev/check_literals.py)
     # website/brushes.html #packs matches src/core/BrushPacks.cpp: every brush, its preview and the guide links.
     add_test(NAME website_brush_packs COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/brush-packs/sync_website.py --check)
-    # Every interface label has a Spanish and a Traditional Chinese translation (or is a name kept in English,
+    # Every interface label has a Spanish, a Traditional and a Simplified Chinese translation (or is a name kept in English,
     # tools/i18n/keep_english.txt): a new label without one fails here, not in a release.
     add_test(NAME i18n_coverage COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/i18n/coverage.py --check)
+    # ...and no label reaches ImGui without tr() unless tools/i18n/raw_allow.txt lists it (names that stay English, and
+    # the 11-06 backlog, which only shrinks): coverage can't see a label that never goes through tr().
+    add_test(NAME i18n_raw_labels COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/i18n/coverage.py --raw-check)
+    # The release's SBOM (tools/release/sbom.py, docs/guide/security.md): every fetched archive is a listed component.
+    add_test(NAME sbom COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/sbom.py --check)
     add_test(NAME marks_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py --self-test)
     # The same marks read off the pixels of every tracked image and video (OCR, cached by file hash), and the deploy's
     # takedown of flagged ones (tools/media_takedown.py).
@@ -783,11 +798,16 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME release_workflows COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py)
     add_test(NAME release_workflows_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py --self-test)
     add_test(NAME release_paperwork COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/paperwork_only.py --self-test)
+    # Build once, promote: only a maintainer's push run on staging is promotable (staged_run.py), and every package must
+    # match its recorded SHA-256 and attestation before publishing (verify_staged.py).
+    add_test(NAME release_staged_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/staged_run.py --self-test)
+    add_test(NAME release_verify_staged COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/verify_staged.py --self-test)
     # Step bump pins tests/ui/whats_new.sfui to the newest What's New sections (tools/release/pin_whats_new_test.py).
     add_test(NAME release_pin_whats_new COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/pin_whats_new_test.py --self-test)
     # scripts/merge-queue.sh refuses a merge or squash that throws away the other side's change (tools/ci/no_revert.py).
     add_test(NAME ci_no_revert COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/no_revert.py --self-test)
-    # scripts/release.sh's beta (X.Y.Z-beta.N) and its promotion to stable, in a sandbox with stand-ins for gh and curl.
+    # scripts/release.sh's beta (X.Y.Z-beta.N), its promotion to stable, and build once (--stage, then promote), in a
+    # sandbox with stand-ins for gh and curl.
     if(UNIX AND NOT APPLE AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
       add_test(NAME release_script_beta COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_beta_test.sh)
       set_tests_properties(release_script_beta PROPERTIES TIMEOUT 300)
@@ -876,6 +896,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Studio mode: About shows the studio (tests/data/studio; core/StudioProfile.h).
     sculptforge_ui_test(studio_mode studio/studio_mode --studio ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/studio/studio.json)
     sculptforge_ui_test(shell_layout_1080 shell_layout --size 1920x1080)
+    sculptforge_ui_test(menu_stable_720 menu_stable --size 1280x720)
     sculptforge_ui_test(help_console_1080 help_console --size 1920x1080)
     # The S / U / I / O slider on a UI scaled 1.5x (Windows at 150%, #9): it must still open under the cursor.
     sculptforge_ui_test(size_popup_scaled size_popup --size 2400x1350)
@@ -901,9 +922,13 @@ if(SCULPTFORGE_BUILD_TESTS)
     # A crash leaves a note in the log file (#16). Needs no window.
     add_test(NAME crash_log COMMAND ${CMAKE_COMMAND} -DAPP=$<TARGET_FILE:sculptforge>
              -DDIR=${CMAKE_CURRENT_BINARY_DIR}/crash-log-test -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/crash_log.cmake)
-    # Idle, the app draws nothing (#14): --measure-idle fails when it keeps drawing frames.
+    # Idle, the app draws nothing (#14) and uses next to no CPU: --measure-idle fails when it keeps drawing frames or
+    # its process CPU is over SF_IDLE_CPU_MAX % of one core (4 s here: a spinning loop's 100 % fails it; the 30 s
+    # nightly holds it to 2 %).
     add_test(NAME ui_idle_redraw COMMAND sculptforge --measure-idle 4)
-    set_tests_properties(ui_idle_redraw PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
+    set_tests_properties(ui_idle_redraw PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_IDLE_CPU_MAX=10")
+    add_test(NAME ui_idle_cpu_30s COMMAND sculptforge --measure-idle 30)
+    set_tests_properties(ui_idle_cpu_30s PROPERTIES LABELS "ui;nightly" TIMEOUT 120 RUN_SERIAL TRUE ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
     # sculptforge --calibrate on this machine's GPU: the JSON it prints passes the schema check (it exits 1 if not).
     add_test(NAME ui_calibrate_json COMMAND sculptforge --calibrate-quick --calibrate-no-save)
     set_tests_properties(ui_calibrate_json PROPERTIES LABELS ui TIMEOUT 60)

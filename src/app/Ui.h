@@ -41,6 +41,11 @@ bool Checkbox(const char* label, bool* v);
 bool GlyphButton(const char* id, const char* glyph, ImVec2 size);
 // Draws a one-icon `glyph` centred by its ink in the rect a..b (a longer text is centred by its size).
 void CentredGlyph(ImDrawList* drawList, ImFont* font, ImVec2 a, ImVec2 b, ImU32 col, const char* glyph);
+// "Managed by your studio" (with a lock) on the line after a setting a studio's policy file locks
+// (core/ManagedPolicy.h); hovering names the organisation and the policy file.
+void ManagedBadge();
+// "Managed by your studio", or "Managed by Acme Animation" with the policy's organisation, translated.
+std::string ManagedByText();
 // Ctrl-hover help for the last item.
 void HelpText(const char* title, const char* shortcut, const char* description, const char* path = nullptr);
 void HelpAction(App& app, const char* actionId);

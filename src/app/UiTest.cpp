@@ -95,7 +95,7 @@
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once ui.json is written: the preferences save themselves, or Save Layout),
 //                            console_open, command_palette_open, customize, shelves_visible,
-//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, offscreen_items (past the window edge), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
+//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, menu_rect_changes (the open task menu moved or resized since last read), offscreen_items (past the window edge), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
@@ -120,6 +120,7 @@
 //                            stroke_continuous (Stroke > Continuous, 1 on),
 //                            stroking (1 while a stroke is open), cursor_x / cursor_y (the brush cursor, pixels),
 //                            surface_cursor (1 when the brush ring last drawn lay on the surface, #25),
+//                            size_ring_preview / size_ring_px (the ring the S / O pop-up shows where it opened, #138),
 //                            cursor_ring (1 when the last brush cursor drawn had its ring; 0: the dot only, #88),
 //                            hide_ring_while_stroking (Preferences > Cursor, 1 on),
 //                            cursor_follows_surface (Preferences > Input, 1 on),
@@ -203,6 +204,13 @@
 //   phone_face NAME=W ... [frames=N]   N face messages (default 5) with these ARKit weights
 //   phone_request METHOD PATH STATUS [BODY]   any request with the session token; fails unless the answer has
 //                            STATUS (e.g. phone_request POST /api/ar 200 {"scope":"part","size":20})
+// A scripted AI tool for live mode (PanelAiLink.cpp), over the real local socket / pipe (link/AiLink.h):
+//   ai_client connect        connect to this window's live-mode endpoint (Preferences > AI > Let AI tools ...)
+//   ai_client send JSON      send one message as is (a hello, a code, a tools/call)
+//   ai_client expect TEXT [S]   wait until a reply holding TEXT has come (default 10 s)
+//   ai_client close          disconnect
+//   values: ai_link_state (0 off, 1 listening, 2 waiting for approval, 3 connected, 4 asking), ai_client_lines,
+//                            undo_ai (1: the next undo step is labelled "AI: ...")
 //                            (tools/guide/update_shortcuts.py puts it into docs/guide/shortcuts.md)
 //
 // Simulated graphics tablet: real SDL3 pen events, each followed by the mouse event SDL 3.2 synthesizes
@@ -289,11 +297,15 @@
 #include "core/SelectionSets.h"
 #include "core/ThreadPool.h"
 #include "core/Timeline.h"
+#include "link/AiLink.h"
 #include "link/HttpServer.h"
 
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <thread>
+#include <mutex>
+#include <atomic>
 #include <cctype>
 #include <chrono>
 #include <cstdlib>
@@ -309,6 +321,31 @@
 namespace sf {
 
 namespace {
+
+// ai_client: the scripted AI tool's connection and what it has received (a reader thread fills `lines`).
+struct AiTestClient {
+    link::AiLinkConn conn;
+    std::mutex mutex;
+    std::vector<std::string> lines;
+    std::thread reader;
+    std::atomic<bool> stop{false};
+    ~AiTestClient() {
+        stop = true;
+        conn.shutdown();
+        if (reader.joinable()) reader.join();
+    }
+    size_t count() {
+        std::lock_guard lock(mutex);
+        return lines.size();
+    }
+    bool received(const std::string& text) {
+        std::lock_guard lock(mutex);
+        for (const std::string& l : lines)
+            if (l.find(text) != std::string::npos) return true;
+        return false;
+    }
+};
+std::unique_ptr<AiTestClient> g_aiClient;
 
 // Splits a line into words; "double quoted" words may contain spaces.
 std::vector<std::string> splitWords(const std::string& line) {
@@ -698,6 +735,9 @@ double Demo::query(const std::string& name, bool& known) const {
             }
         return conflicts;
     }
+    if (name == "ai_link_state") return double(app_.aiLinkStateValue()); // live mode (PanelAiLink.cpp)
+    if (name == "ai_client_lines") return g_aiClient ? double(g_aiClient->count()) : 0.0;
+    if (name == "undo_ai") return app_.doc_.undo.canUndo() && app_.doc_.undo.undoLabel().rfind("AI: ", 0) == 0 ? 1.0 : 0.0;
     if (name == "mask_shape") return double(int(app_.maskShape_)); // 0 MaskPen, 1 MaskLasso, 2 MaskRect
     if (name == "hide_shape") return double(int(app_.hideShape_)); // 1 SelectLasso, 2 SelectRect
     if (name.rfind("phone_", 0) == 0) {
@@ -792,7 +832,19 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "shelves_visible") return app_.layout_.shelvesVisible ? 1.0 : 0.0;
     if (name == "right_tray_open") return app_.layout_.rightTrayOpen ? 1.0 : 0.0;
     if (name == "left_tray_open") return app_.layout_.leftTrayOpen ? 1.0 : 0.0;
+    if (name == "canvas_width") return double(app_.shell_.canvas.w / std::max(app_.uiScale_, 0.01f)); // logical px
+    // A shelf drawn (not hidden for being empty outside Customize Shelves, #139): 0 top, 1 left, 2 right, 3 bottom.
+    if (name.rfind("shelf_shown_", 0) == 0) {
+        const CanvasRect* r[] = {&app_.shell_.topShelf, &app_.shell_.leftShelf, &app_.shell_.rightShelf, &app_.shell_.bottomShelf};
+        const int k = std::atoi(name.c_str() + 12);
+        return k >= 0 && k < 4 && r[k]->w > 0.0f && r[k]->h > 0.0f ? 1.0 : 0.0;
+    }
     if (name == "right_tray_shown") return app_.shell_.rightTray.w > 0.0f ? 1.0 : 0.0; // drawn, not just set open (#107)
+    if (name == "menu_rect_changes") { // times the open task menu moved or resized since the last read (a jitter is many)
+        const int n = app_.menuRectChanges_;
+        app_.menuRectChanges_ = 0;
+        return double(n);
+    }
     if (name == "shell_narrow") return app_.shell_.narrow ? 1.0 : 0.0;
     if (name == "offscreen_items") { // items drawn past the window's edge last frame (#105); names them in the log
         const std::vector<std::string> off = Demo::offscreenItems();
@@ -993,6 +1045,11 @@ double Demo::query(const std::string& name, bool& known) const {
         app_.benchmarkDrawMs(0);
         return double(app_.renderer_.lastDrawnTriangles());
     }
+    if (name == "coarse_clusters") { // the 3D view drawn once more now: the clusters it drew at a coarse level
+        app_.benchmarkDrawMs(0);
+        return double(app_.renderer_.coarseDrawnClusters());
+    }
+    if (name == "coarse_pending") return double(app_.renderer_.coarsePendingClusters()); // edited, levels not updated yet
     if (name == "panel_drag_scrolls") return double(ui::DragScrolls()); // #100: drags that scrolled a panel
     if (name == "panel_drag_scroll_y") return double(ui::DragScrollY());  // that panel's scroll after the last one
     if (name == "drag_cursor") return double(dragCursor_); // the system cursor during the last button_drag (#88)
@@ -1007,6 +1064,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "cursor_x") return app_.mouseX_;
     if (name == "cursor_y") return app_.mouseY_;
     if (name == "surface_cursor") return app_.surfaceCursorShown_ ? 1.0 : 0.0;
+    if (name == "size_ring_preview") return app_.sizeRingPreview_ ? 1.0 : 0.0; // the S / O pop-up's ring (#138)
+    if (name == "size_ring_px") return double(app_.sizeRingPreviewPx_);
     if (name == "cursor_ring") return app_.ringShown_ ? 1.0 : 0.0;
     if (name == "hide_ring_while_stroking") return app_.uiPrefs_.hideRingWhileStroking ? 1.0 : 0.0;
     if (name == "cursor_follows_surface") return app_.uiPrefs_.cursorFollowsSurface ? 1.0 : 0.0;
@@ -1753,6 +1812,53 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             fs::copy(src, dst, fs::copy_options::recursive | fs::copy_options::overwrite_existing, ec);
             if (ec) SDL_Log("copy %s: %s", src.string().c_str(), ec.message().c_str());
         });
+    } else if (verb == "ai_client") {
+        if (!need(1)) return false;
+        const std::string what = w[1];
+        if (what == "connect") {
+            run([this, line] {
+                g_aiClient.reset();
+                auto c = std::make_unique<AiTestClient>();
+                std::string err, endpoint = link::aiLinkEndpoint(err);
+                if (endpoint.empty() || !link::aiLinkConnect(c->conn, endpoint, err)) {
+                    fail(line, "can't connect: " + err);
+                    return;
+                }
+                AiTestClient* raw = c.get();
+                c->reader = std::thread([raw] {
+                    std::string l;
+                    while (!raw->stop) {
+                        const int got = raw->conn.readLine(l, 50, link::kAiLinkMaxReplyLine);
+                        if (got < 0) break;
+                        if (got > 0) {
+                            std::lock_guard lock(raw->mutex);
+                            raw->lines.push_back(l);
+                        }
+                    }
+                });
+                g_aiClient = std::move(c);
+            });
+        } else if (what == "send") {
+            const std::string message = restOf(lineText_, 2);
+            run([this, line, message] {
+                if (!g_aiClient || !g_aiClient->conn.writeLine(message)) fail(line, "ai_client isn't connected");
+            });
+        } else if (what == "expect") {
+            if (!need(2)) return false;
+            const std::string text = w[2];
+            const float timeout = num(3, 10.0f);
+            steps_.push_back([this, line, text, timeout](float t) {
+                if (g_aiClient && g_aiClient->received(text)) return true;
+                SDL_Delay(10);
+                if (t > timeout) fail(line, "no reply with \"" + text + "\" after " + number(timeout) + " s");
+                return t > timeout;
+            });
+        } else if (what == "close") {
+            run([] { g_aiClient.reset(); });
+        } else {
+            error = "ai_client connect | send JSON | expect TEXT [S] | close";
+            return false;
+        }
     } else if (verb == "phone_upload" || verb == "phone_face" || verb == "phone_request") {
         if (!need(verb == "phone_request" ? 3 : verb == "phone_upload" ? 2 : 1)) return false;
         std::vector<std::string> args(w.begin() + 1, w.end());

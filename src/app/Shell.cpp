@@ -505,6 +505,7 @@ void App::registerShellActions() {
         actions_.add(std::move(a));
     }
     registerAiActions(); // AI Brush, Generate 3D: only while AI is on (PanelAi.cpp)
+    registerPolicyTestCommand(); // (UI tests only)
     flag("ui.brush_gallery", "Community brushes", ICON_LC_GLOBE, "Brush", "", &showBrushGallery_,
          "Browse, search and install brushes other sculptors shared.");
 
@@ -972,10 +973,9 @@ void App::drawShell() {
     else drawTitleStrip(shell_);
     if (layout_.paletteBarVisible && !sculptForgeLayout()) drawPaletteBar(shell_);
     if (shell_.shelves) {
-        drawShelf(kShelfTop, shell_.topShelf);
-        drawShelf(kShelfLeft, shell_.leftShelf);
-        drawShelf(kShelfRight, shell_.rightShelf);
-        drawShelf(kShelfBottom, shell_.bottomShelf);
+        const CanvasRect* shelves[] = {&shell_.topShelf, &shell_.leftShelf, &shell_.rightShelf, &shell_.bottomShelf};
+        for (int k : {kShelfTop, kShelfLeft, kShelfRight, kShelfBottom})
+            if (shelves[k]->w > 0.0f && shelves[k]->h > 0.0f) drawShelf(k, *shelves[k]); // empty: hidden (#139)
         if (shell_.leftTray.w > 0.0f) drawTray(false, shell_.leftTray);
         if (shell_.rightTray.w > 0.0f) drawTray(true, shell_.rightTray);
         drawDivider(false, shell_.leftDivider);
@@ -1054,6 +1054,10 @@ void App::drawTitleStrip(const ShellGeometry& g) {
                       ? doc_.mesh.layers[size_t(doc_.activeLayer)].name.c_str()
                       : tr("Base"),
                   doc_.splats.empty() ? "" : tr("   Splats "), doc_.splats.empty() ? "" : shortCount(doc_.splats.size()).c_str());
+    if (renderer_.coarsePreviewOnly()) { // (a mesh over the triangle budget whose full detail won't fit a still frame)
+        std::strncat(info, "   ", sizeof info - std::strlen(info) - 1);
+        std::strncat(info, tr("Preview detail"), sizeof info - std::strlen(info) - 1);
+    }
     // The frame rate gets a fixed-width slot, refreshed twice a second: a number that changes width every frame
     // would make everything after it (the status message) jitter.
     if (ImGui::GetTime() - fpsShownAt_ > 0.5 || fpsShown_ < 0.0f) {
@@ -1674,15 +1678,26 @@ void App::drawTaskMenu() {
         x = shell_.title.x + 150.0f * s;
         for (int i = 0; i < menuIndex; ++i) x += ImGui::CalcTextSize(taskMenus(count)[i].name).x + 18.0f * s;
     }
-    ImGui::SetNextWindowPos(ImVec2(std::clamp(x, 4.0f * s, vp->Size.x - w - 4.0f * s), y));
-    ImGui::SetNextWindowSizeConstraints(ImVec2(w, 0), ImVec2(w, vp->Size.y - y - 8.0f * s));
+    // A menu taller than the space under the bar scrolls, and widens by the scrollbar: content that fits the width (the
+    // Paint menu's colour picker and swatches) would otherwise get shorter under the scrollbar, stop scrolling, grow
+    // again, and the menu jittered every frame (#bug-reports 11-06, 1280x720 fullscreen).
+    const float sb = ImGui::GetStyle().ScrollbarSize;
+    ImGui::SetNextWindowPos(ImVec2(std::clamp(x, 4.0f * s, vp->Size.x - w - sb - 4.0f * s), y));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(w, 0), ImVec2(w + sb, vp->Size.y - y - 8.0f * s));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(pad, pad));
     const bool open = ImGui::BeginPopup("##palettedropdown");
     ImGui::PopStyleVar();
     if (!open) {
         dropdown_.clear();
         menuX_ = 0.0f;
+        menuRect_ = ImVec4();
         return;
+    }
+    {
+        const ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
+        const ImVec4 r(wp.x, wp.y, ws.x, ws.y);
+        if (menuRect_.z > 0.0f && (r.x != menuRect_.x || r.y != menuRect_.y || r.z != menuRect_.z || r.w != menuRect_.w)) ++menuRectChanges_;
+        menuRect_ = r;
     }
     ImDrawList* dl = ImGui::GetWindowDrawList();
     if (sections > 1) {

@@ -243,7 +243,13 @@ public:
             addr.sun_family = AF_UNIX;
             std::memcpy(addr.sun_path, path.c_str(), path.size() + 1);
             ++g_connectAttempts;
+#ifdef SOCK_CLOEXEC
+            // Atomic close-on-exec: a process started meanwhile (an AI worker) never inherits the connection and
+            // keeps SculptForge on Discord after SculptForge quits.
+            const int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+#else
             const int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+#endif
             if (fd < 0) return false;
             fcntl(fd, F_SETFD, FD_CLOEXEC);
             fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
@@ -394,6 +400,7 @@ std::string setActivityJson(int64_t pid, const Activity* a, uint64_t nonce) {
     args.set("pid", double(pid));
     if (a && a->show) {
         Json activity = Json::object();
+        activity.set("type", 0); // Playing: "Playing SculptForge"
         const std::string state = activityState(*a);
         if (!state.empty()) activity.set("state", state);
         if (a->start > 0) {
@@ -402,7 +409,7 @@ std::string setActivityJson(int64_t pid, const Activity* a, uint64_t nonce) {
             activity.set("timestamps", std::move(timestamps));
         }
         Json assets = Json::object();
-        assets.set("large_image", "logo");
+        assets.set("large_image", kLargeImageUrl);
         assets.set("large_text", "SculptForge");
         activity.set("assets", std::move(assets));
         args.set("activity", std::move(activity));
@@ -475,6 +482,13 @@ bool socketOwnedBy(const std::string& path, unsigned uid) {
 
 uint64_t connectAttempts() { return g_connectAttempts.load(); }
 
+bool agentRun(const std::function<const char*(const char*)>& getenv, const char* videoDriver) {
+    const auto is = [](const char* v, const char* want) { return v && std::strcmp(v, want) == 0; };
+    const char* noDiscord = getenv("SF_NO_DISCORD");
+    return is(getenv("SDL_APP_ID"), "sculptforge-agent") || is(getenv("SDL_VIDEO_DRIVER"), "offscreen") ||
+           is(videoDriver, "offscreen") || (noDiscord && *noDiscord && !is(noDiscord, "0"));
+}
+
 Client::Client(std::string appId) : appId_(std::move(appId)) {}
 
 Client::~Client() {
@@ -487,10 +501,11 @@ Client::~Client() {
     if (thread_.joinable()) thread_.join();
 }
 
-void Client::setTimingForTests(int backoffMs, int connectTimeoutMs) {
+void Client::setTimingForTests(int backoffMs, int connectTimeoutMs, int minGapMs) {
     std::lock_guard lock(mutex_);
     backoffMs_ = backoffMs;
     connectTimeoutMs_ = connectTimeoutMs;
+    minGapMs_ = minGapMs;
 }
 
 void Client::set(const Activity& a) {
@@ -510,7 +525,8 @@ void Client::run() {
     Activity sent;          // what Discord shows (show = false: nothing)
     bool sentValid = false; // sent is known (reset on every new connection)
     uint64_t nonce = 0;
-    Clock::time_point retryAt{};
+    Clock::time_point retryAt{}, nextSendAt{};
+    int failures = 0; // in a row: the back-off doubles from 2 s to backoffMs
     FrameReader reader;
     constexpr size_t kDrainCap = 256 * 1024; // per wake-up: a flood can't keep the thread reading
     constexpr int kWriteTimeoutMs = 2000;
@@ -520,7 +536,8 @@ void Client::run() {
         connected_ = false;
         sentValid = false;
         reader = FrameReader();
-        retryAt = Clock::now() + std::chrono::milliseconds(backoffMs);
+        const int64_t waitMs = std::min<int64_t>(backoffMs, int64_t(2000) << std::min(failures++, 6));
+        retryAt = Clock::now() + std::chrono::milliseconds(waitMs);
     };
     // Drains replies; false (and closed) on a malformed frame, CLOSE, or a closed connection.
     const auto drain = [&](int waitMs) {
@@ -538,7 +555,7 @@ void Client::run() {
         const bool stopping = stop_;
         const Activity want = desired_;
         dirty_ = false;
-        const int backoffMs = backoffMs_, connectTimeoutMs = connectTimeoutMs_;
+        const int backoffMs = backoffMs_, connectTimeoutMs = connectTimeoutMs_, minGapMs = minGapMs_;
         lock.unlock();
 
         if (stopping) {
@@ -565,14 +582,17 @@ void Client::run() {
                     if (r == FrameReader::Result::Bad || msLeft(deadline) == 0) break;
                 }
             }
-            if (ok) connected_ = true;
+            if (ok) connected_ = true, failures = 0;
             else drop(backoffMs);
         }
-        if (conn.isOpen() && (!sentValid || !(sent == want))) {
+        // A change to what's shown waits for its gap (Discord drops the 6th in 20 s); clearing never waits.
+        const bool due = !want.show || Clock::now() >= nextSendAt;
+        if (conn.isOpen() && (!sentValid || !(sent == want)) && due) {
             if (conn.write(encodeFrame(OpFrame, setActivityJson(processId(), &want, ++nonce)), kWriteTimeoutMs)) {
                 sent = want;
                 sentValid = true;
                 ++sent_;
+                nextSendAt = Clock::now() + std::chrono::milliseconds(minGapMs);
             } else {
                 drop(backoffMs);
             }
@@ -587,7 +607,8 @@ void Client::run() {
 
         lock.lock();
         if (stop_ || dirty_) continue;
-        if (conn.isOpen()) cv_.wait_for(lock, std::chrono::seconds(5)); // wake up to drain now and then
+        if (conn.isOpen() && (!sentValid || !(sent == desired_))) cv_.wait_until(lock, nextSendAt); // the latest, once due
+        else if (conn.isOpen()) cv_.wait_for(lock, std::chrono::seconds(5)); // wake up to drain now and then
         else if (desired_.show) cv_.wait_until(lock, retryAt);
         else cv_.wait(lock);
     }

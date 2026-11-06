@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <vector>
 
 namespace sf {
 
@@ -72,6 +73,45 @@ ClusterBounds clusterBounds(const Mesh& mesh, const UploadOrder& order, uint32_t
 // cluster's, whose vertices it uses).
 bool clusterProxy(const Mesh& mesh, const UploadOrder& order, uint32_t c, size_t maxTriangles, std::vector<uint16_t>& out,
                   ClusterBounds& bounds);
+
+// Coarse levels below the mesh (docs/design/micro-coarse-lod.md; Clark 1976, Rossignac-Borrel 1993): nested grids
+// over the whole mesh, the first cell four times the mean edge, each next level twice as coarse; a cell's point is the
+// mean of the vertices in it (its normal their normals' sum). Every cluster gets per level its triangles mapped to
+// cells (degenerate and repeated ones dropped) and its error, the farthest any of its vertices is from its cell's
+// point. Two clusters at one level share their cells' points: no cracks between them, so the renderer draws every
+// cluster at one level (levels side by side would leave gaps along the seams: a scan's clusters are ragged strips).
+struct CoarseLevels {
+    static constexpr int kMaxLevels = 5;
+    struct Lod {
+        int levels = 0; // 0: none (drawn in full)
+        uint32_t first[kMaxLevels] = {}, count[kMaxLevels] = {}; // in `indices`
+        float error[kMaxLevels] = {};                                                    // world units
+    };
+    struct Level {
+        std::vector<uint64_t> keys; // the cells' grid coordinates (packed), sorted; cell i is point base + i
+        uint32_t base = 0;
+    };
+    glm::vec3 origin{0.0f};
+    float cell = 0.0f; // level 0's
+    std::vector<Level> levels;
+    std::vector<glm::vec3> positions, normals; // every level's cell points, one level after the other
+    std::vector<uint32_t> indices;             // into positions (the renderer frees them once on the GPU)
+    std::vector<Lod> clusters;
+    // Membership is the build's: an edit moves the cells' points (the means of their vertices where they are now),
+    // never which cell a vertex is in, so the triangles stay as built and the surface stays closed.
+    std::vector<uint32_t> vertexCell;              // per mesh vertex: its level-0 cell (into positions)
+    std::vector<uint32_t> memberFirst, members;    // level-0 cell k's vertices: members[memberFirst[k - base0] ...)
+    std::vector<uint32_t> parent;                  // per cell: its cell one level up (~0u at the top)
+    std::vector<uint32_t> childFirst, children;    // per cell: its cells one level down (level 0: none)
+    std::vector<uint32_t> weight;                  // per cell: its vertices
+    // The cell of point p at a level by its grid position (cell id into positions), or ~0u: none there at the build.
+    uint32_t cellOf(const glm::vec3& p, int level) const;
+};
+CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order);
+// After an edit: the points (and normals) of the level-0 cells holding the `dirty` clusters' vertices, from those
+// vertices where they are now, and of their cells up the levels. Returns the cells changed.
+std::vector<uint32_t> updateCoarseLevels(CoarseLevels& levels, const Mesh& mesh, const UploadOrder& order,
+                                         const std::vector<uint32_t>& dirty);
 
 // Every directed edge a->b has as many b->a: the mesh is the closed, consistently wound boundary of a volume
 // (it may intersect itself). Wound outwards (a positive signed volume: the sum of ClusterBounds::volume), every

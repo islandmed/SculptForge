@@ -1,8 +1,8 @@
-# Micro levels below the base: coarse cluster levels (design note, 2026-11-04)
+# Coarse levels below the base: plain meshes and micro levels (design note, 2026-11-04)
 
-Status: design, not built. Ships behind an **off-by-default** setting until the maintainer has a freedom-to-operate
-opinion from a patent attorney. Owner: perf/micro-dense-lod. Plan item 8 (perf-plan 11-05); item 9 (first frame)
-and the level-0 vertex path (perf/micro-base) are not gated by this.
+Status: built for plain meshes in perf/coarse-lod (render/Clusters.h: CoarseLevels; Renderer::cullCoarse). The
+maintainer lifted the freedom-to-operate gate on 2026-11-05; the clean-room rules below still hold. Micro levels (item
+8 proper, below their base) are not done yet: the same grids on the displaced base corners are the next step.
 
 ## Clean-room rules for this work (mandatory)
 
@@ -57,3 +57,16 @@ can't hold. Orbit cost should follow the pixels, not the base.
 
 Lucy 112M / 448M and core-200m: orbit fps and GPU ms on the E-core floor, the laptop, the Windows 3060; triangles
 drawn vs the floor's 2M budget; png_diff against the flag off where the base edge is > 1 px (must match).
+
+## What shipped first (plain meshes, 2026-11-05)
+
+- Grids as in item 1, the first cell 4x the mean edge (a 2x level drew too much to pay for its memory), five levels
+  for every cluster; each cell's point and normal kept, so an edit can recompute them. Clusters are main's UploadOrder ones
+  (not yet n2stroke's micro layout: join there when it lands, MicroRenderer's clusters would take the same lists).
+- Selection: not per cluster (item 3) but one level for every visible cluster, the finest whose triangles fit the
+  tier's budget; everything fitting in full detail draws in full. Per-cluster levels left visible gaps along seams
+  wherever two levels met, and a scan's clusters (64-triangle chunks in the file's triangle order) are ragged strips,
+  so the seams are everywhere: one level keeps the surface closed with no balance pass or border rule. Distance-adaptive
+  levels come back with compact clusters (n2stroke's layout) and item 4's border fallback.
+- Edits: clusters a stroke moved draw in full until the first frame without new edits, which recomputes their levels
+  and every cell point within a cell of the edit (cells for vertices pushed where none were are added).

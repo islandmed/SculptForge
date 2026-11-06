@@ -109,9 +109,9 @@ Ollama listens on `http://localhost:11434`. Opening that address in a browser sh
 ## 3. Connect SculptForge
 
 1. Open **Brush Lab** and expand **AI provider**.
-2. Choose **OpenAI-compatible**.
-3. Click **Ollama** to fill in the address, then **Find models**. You should see
-   "Connected - 1 model installed", and the model appears in the **Model** list.
+2. Choose **Ollama (this computer)**: the address is filled in.
+3. Click **Find models**. You should see "Connected - 1 model installed", and the model appears in the **Model**
+   list.
 4. Click **Save settings**, then describe a brush: "dry cracked mud".
 
 Leave **API key** empty. Local servers don't need one.
@@ -134,7 +134,7 @@ if you'd rather not use a terminal.
 1. Install LM Studio and open it.
 2. Search for **Qwen3 4B Instruct** in the **Discover** tab and download it.
 3. Open the **Developer** tab, load the model and switch the server **on** (it serves on port 1234).
-4. In SculptForge choose **OpenAI-compatible → LM Studio → Find models**.
+4. In SculptForge choose **LM Studio (this computer)**, then **Find models**.
 
 ## Running the model on another computer
 

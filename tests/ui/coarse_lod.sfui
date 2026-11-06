@@ -1,0 +1,47 @@
+# Coarse levels (docs/design/micro-coarse-lod.md): a plain mesh over the triangle budget draws every visible cluster
+# at one coarse level while the view moves or a stroke runs, so a frame stays within the budget. At rest (still for
+# 150 ms) it draws in full detail when one full frame fits the still-frame budget; if it doesn't, it stays coarse and
+# the info line says "Preview detail". A stroke draws the clusters it moved in full; their levels follow after it.
+run ui_look look=classic layout=classic
+# (the budgets are the hardware tier's; small ones here, set before the mesh as at startup)
+env SF_TRIANGLE_BUDGET 40000
+env SF_STILL_FRAME_MS 0.001
+run new_sphere subdivisions=6
+camera 0 0
+wait 0.6
+expect_value drawn_triangles <= 40000
+expect_value drawn_triangles > 2000
+expect_value coarse_clusters > 0
+expect_text "Preview detail"
+shot coarse-preview
+camera 35 20
+wait 0.6
+expect_value drawn_triangles <= 40000
+shot coarse-turned
+
+# A stroke: the clusters it moved draw in full while it runs (pending); after it their levels are updated and every
+# cluster is coarse again, the budget held. (Unit test coarse_levels_follow_edits checks the updated cells' points.)
+camera 0 0
+wait 0.6
+remember coarse_clusters before
+expect_value coarse_pending == 0
+stroke 0.42 0.45 0.58 0.55 0.6 hold
+# (the dabs land on the stroke thread: the clusters they moved are uploaded a few frames on)
+wait 0.3
+expect_value coarse_pending > 0
+expect_value coarse_clusters < $before
+shot coarse-during-stroke
+release
+wait 0.6
+expect_value coarse_pending == 0
+expect_value coarse_clusters == $before
+expect_value drawn_triangles <= 40000
+shot coarse-after-stroke
+
+# A still frame that fits: at rest, full detail (the real surface), and no "Preview detail".
+env SF_STILL_FRAME_MS 100000
+wait 1.2
+expect_value coarse_clusters == 0
+expect_value drawn_triangles > 60000
+expect_no_text "Preview detail"
+shot still-full-detail
