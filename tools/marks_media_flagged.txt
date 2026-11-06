@@ -1,4 +1,5 @@
 # sha256 of every image/video that shows a mark on screen (OCR); tools/media_takedown.py takes them off the deployed site.
+# Also images whose source's terms bar their use here (f01783fc...: the Lucy scan, Stanford: no commercial use).
 078e8e1f016f0823d9bf35c322962da72e48c1457aeecd72fb07d276f898a320
 1c54f2872f76018e9bd4f333c9f1a5ca5fefe45ac4a4d16ea6ce6be7ca26e9f4
 1eed1985a6fb2f01f2b70bbb0a659e9106dd92679607cec9680f95b0c6c650fd
@@ -50,4 +51,5 @@ d9981d94d7faacd77c8a52ab73d1173dbc01720b88f7f7c0b6e243ad3dba541b
 dace5b8c1cd678eef8ea842fb24635a00ac71f065e1cc8792d30b4500a6a91ed
 dbf2e7ae16ade9bdfb50d500e2eb0c2aafb8b11f85a72c422b6240d8dc8be0a0
 e17213a2e08d9bc772663adbf5a17f24ff9da0414ef5c106a06a5d8b4e453669
+f01783fc52a87e4e595cca3ac1f3c8587467ead73fc518dbcdd3f2dc884ea756
 fc9ae496351c7b5398f96e632343126ea97a7bfe3ee992b2cd5233288fc0cc95
