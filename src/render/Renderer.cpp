@@ -3152,59 +3152,38 @@ void Renderer::cull(const MeshSlot& s, const CullView& frame, bool proxy) {
     }
 }
 
-// Clark 1976 / QSplat: per cluster the coarsest level whose error, projected at the cluster's nearest point, stays
-// under `px` pixels; `px` is raised (x1.5) until the triangles drawn fit `budget`. Everything fitting in full detail
-// draws in full. (No normal cones for the coarse levels: their back faces go to the GPU's culling.)
-void Renderer::cullCoarse(const MeshSlot& s, const CullView& frame, float px, size_t budget) {
+// Clark 1976: the detail from what the screen can hold. Everything in full detail if it fits the budget; else every
+// visible cluster at one level, the finest that fits (the coarsest if none does): one level for all keeps the surface
+// closed (render/Clusters.h). Clusters an edit moved draw in full until updated (their seams may gap until then).
+void Renderer::cullCoarse(const MeshSlot& s, const CullView& frame, size_t budget) {
     cull(s, frame, false); // (the visible clusters, in full)
     coarseClusters_.clear();
     coarseLevel_.clear();
-    lodScratch_.clear();
-    const bool ortho = frameProj_[3][3] == 1.0f;
-    const float unit = 0.5f * frameViewport_.w * frameProj_[1][1]; // pixels per world unit at distance 1
-    // (back-facing clusters cull() dropped may still be wanted coarse: the same frustum test, no cone)
     size_t full = 0;
-    const size_t nc = std::min(s.bounds.size(), s.drawCount.size());
-    std::vector<uint8_t>& shown = coarseShown_;
-    shown.assign(nc, 0);
-    for (uint32_t c : drawClusters_) shown[c] = 1;
-    for (uint32_t c = 0; c < nc; ++c) {
-        if (s.drawCount[c] == 0 || !insideFrustum(frame, s.bounds[c])) continue;
-        const ClusterBounds& b = s.bounds[c];
-        const float d = std::max(glm::dot(b.center - frame.eye, frame.forward) - b.radius, std::max(frame.nearDistance, 1e-6f));
-        lodScratch_.push_back({c, ortho ? unit : unit / d, shown[c] != 0});
-        if (shown[c]) full += size_t(s.drawCount[c]) / 3;
-    }
-    drawClusters_.clear();
-    auto level = [&](const LodPick& k, float t) {
-        const CoarseLevels::Lod& lod = s.coarse->clusters[k.c];
-        if (s.coarseDirty[k.c]) return -1; // (edited: in full until updated)
-        int pick = -1;
-        while (pick + 1 < lod.levels && lod.error[pick + 1] * k.scale <= t) ++pick;
-        return pick;
-    };
-    float t = px;
-    if (full > budget) {
-        for (int round = 0; round < 30; ++round, t *= 1.5f) {
-            size_t total = 0;
-            for (const LodPick& k : lodScratch_) {
-                const int l = level(k, t);
-                total += l < 0 ? (k.fullShows ? size_t(s.drawCount[k.c]) / 3 : 0) : s.coarse->clusters[k.c].count[l] / 3;
-            }
-            if (total <= budget) break;
+    for (uint32_t c : drawClusters_) full += size_t(s.drawCount[c]) / 3;
+    if (full <= budget) return;
+    // (clusters facing away stay out: the coarse ones go to the GPU's culling as the full ones)
+    const CoarseLevels& L = *s.coarse;
+    int pick = int(L.levels.size()) - 1;
+    for (int level = 0; level < int(L.levels.size()); ++level) {
+        size_t total = 0;
+        for (uint32_t c : drawClusters_)
+            total += s.coarseDirty[c] || L.clusters[c].levels <= level ? size_t(s.drawCount[c]) / 3 : L.clusters[c].count[level] / 3;
+        if (total <= budget) {
+            pick = level;
+            break;
         }
-    } else {
-        t = 0.0f;
     }
-    for (const LodPick& k : lodScratch_) {
-        const int l = t > 0.0f ? level(k, t) : -1;
-        if (l < 0) {
-            if (k.fullShows) drawClusters_.push_back(k.c);
+    size_t kept = 0;
+    for (uint32_t c : drawClusters_) {
+        if (s.coarseDirty[c] || L.clusters[c].levels <= pick) {
+            drawClusters_[kept++] = c;
         } else {
-            coarseClusters_.push_back(k.c);
-            coarseLevel_.push_back(uint8_t(l));
+            coarseClusters_.push_back(c);
+            coarseLevel_.push_back(uint8_t(pick));
         }
     }
+    drawClusters_.resize(kept);
 }
 
 // Draws `clusters` of `s` (the VAO for `part` bound): their triangles, the wireframe's edges, or their motion
@@ -3478,7 +3457,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     if (static const bool log = std::getenv("SF_COARSE_LOG") != nullptr; log && s.coarse && !coarse)
         std::fprintf(stderr, "coarse lod: not drawn (per-triangle %d, wireframe %d, drawn %zu, budget %zu)\n", int(perTriangle),
                      int(active && settings.wireframe), s.drawnTriangles, budget);
-    if (coarse) cullCoarse(s, frameCull_, kCoarseLodPx * (settings.motionProxy ? 2.0f : 1.0f), budget);
+    if (coarse) cullCoarse(s, frameCull_, budget);
     else cull(s, frameCull_, settings.motionProxy && coarseAllowed);
     // The back faces left in clusters along the silhouette: the GPU skips them too when they can't show.
     if (cullBackfaces_ || xrayCull_) gl::Enable(GL_CULL_FACE);

@@ -450,7 +450,7 @@ CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order) {
             size_t previous = order.clusterTriangles(uint32_t(c));
             for (int level = 0; level < int(L.levels.size()); ++level) {
                 float error = 0.0f;
-                if (!clusterOnCells(L, mesh, order, uint32_t(c), level, tris, error) || tris.empty() || tris.size() * 10 > previous * 8) break;
+                if (!clusterOnCells(L, mesh, order, uint32_t(c), level, tris, error)) break; // (every level: one is drawn for all)
                 lod.first[lod.levels] = uint32_t(lists[c].size());
                 lod.count[lod.levels] = uint32_t(tris.size() * 3);
                 lod.capacity[lod.levels] = roomFor(tris.size() * 3);
@@ -459,7 +459,6 @@ CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order) {
                 for (const auto& m : tris) lists[c].insert(lists[c].end(), m.begin(), m.end());
                 lists[c].resize(lod.first[lod.levels - 1] + lod.capacity[lod.levels - 1], 0);
                 previous = tris.size();
-                if (tris.size() < 8) break;
             }
             lists[c].shrink_to_fit();
         }

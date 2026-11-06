@@ -418,12 +418,11 @@ private:
     bool proxyPrebuild_ = false; // (setProxyPrebuild)
     double proxyMsPerCluster_ = 0.0; // measured, so a frame's batches fit its budget on slow cores too
     // Coarse levels (docs/design/micro-coarse-lod.md; SF_COARSE_LOD=0 turns them off): plain meshes over the triangle
-    // budget draw per cluster a coarse level (render/Clusters.h: CoarseLevels), at rest too: the coarsest whose error
-    // stays under kCoarseLodPx on screen, raised until the budget holds; full detail when it all fits.
+    // budget draw every visible cluster at one coarse level (render/Clusters.h: CoarseLevels), the finest that fits the
+    // budget; full detail when it all fits.
     const bool coarseLod_ = !(std::getenv("SF_COARSE_LOD") && std::string(std::getenv("SF_COARSE_LOD")) == "0");
     void markCoarseDirty(MeshSlot& s, uint32_t c);
     void updateCoarse(MeshSlot& s, const Mesh& mesh);
-    static constexpr float kCoarseLodPx = 0.75f;
     size_t lodBudget_ = 0; // the last still draw's triangle budget: sync builds the coarse levels of meshes over it
     void buildCoarse(MeshSlot& s, const Mesh& mesh);
     void uploadCoarsePoints(MeshSlot& s);
@@ -475,18 +474,11 @@ private:
     // The clusters of `s` to draw this frame: in full (drawClusters_), and with `proxy` as their motion proxy
     // where it is built (proxyClusters_).
     void cull(const MeshSlot& s, const CullView& view, bool proxy = false);
-    // The coarse-level cull (spike): every visible cluster in full (drawClusters_) or at a level (coarseClusters_,
-    // coarseLevel_): per cluster the coarsest whose error stays under `px` pixels, `px` raised until `budget` holds.
-    void cullCoarse(const MeshSlot& s, const CullView& view, float px, size_t budget);
+    // The coarse-level cull: every visible cluster in full (drawClusters_) if that fits `budget`, else at one level
+    // (coarseClusters_, coarseLevel_), the finest that fits.
+    void cullCoarse(const MeshSlot& s, const CullView& view, size_t budget);
     std::vector<uint32_t> coarseClusters_;
     std::vector<uint8_t> coarseLevel_;
-    struct LodPick {
-        uint32_t c;
-        float scale; // pixels per world unit at the cluster's nearest point
-        bool fullShows;
-    };
-    std::vector<LodPick> lodScratch_;
-    std::vector<uint8_t> coarseShown_;
     void drawSlot(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);
     enum class DrawPart { Triangles, Lines, Proxy };
     void drawPatches(const MeshSlot& s, GLenum mode, DrawPart part, GLint primBaseLocation);

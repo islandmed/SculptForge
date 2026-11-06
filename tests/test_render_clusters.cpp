@@ -396,7 +396,7 @@ TEST(coarse_levels_closed_at_each_level_and_light) {
         if (l.levels == 0) continue;
         first += l.count[0] / 3;
         coarsest += l.count[l.levels - 1] / 3;
-        for (int k = 1; k < l.levels; ++k) shrinking = shrinking && l.count[k] < l.count[k - 1] && l.error[k] >= l.error[k - 1];
+        for (int k = 1; k < l.levels; ++k) shrinking = shrinking && l.count[k] <= l.count[k - 1] && l.error[k] >= l.error[k - 1];
     }
     std::printf("  coarse levels: %zu cells; level 0 %zu, coarsest %zu of %zu triangles; every cluster has %zu levels or more\n",
                 L.positions.size(), first, coarsest, m.triangleCount(), minLevels);

@@ -60,11 +60,13 @@ drawn vs the floor's 2M budget; png_diff against the flag off where the base edg
 
 ## What shipped first (plain meshes, 2026-11-05)
 
-- Grids as in item 1, the first cell 4x the mean edge (a 2x level drew too much to pay for its memory), up to five
-  levels; each cell's point and normal kept, so an edit can recompute them. Clusters are main's UploadOrder ones
+- Grids as in item 1, the first cell 4x the mean edge (a 2x level drew too much to pay for its memory), five levels
+  for every cluster; each cell's point and normal kept, so an edit can recompute them. Clusters are main's UploadOrder ones
   (not yet n2stroke's micro layout: join there when it lands, MicroRenderer's clusters would take the same lists).
-- Selection as item 3 (0.75 px at rest, twice that while the view moves), raised x1.5 until the tier's budget holds;
-  everything fitting in full detail draws in full. No balance pass yet: clusters at different levels may leave a gap
-  of a coarse cell along their seam, under a pixel or two at the thresholds used.
+- Selection: not per cluster (item 3) but one level for every visible cluster, the finest whose triangles fit the
+  tier's budget; everything fitting in full detail draws in full. Per-cluster levels left visible gaps along seams
+  wherever two levels met, and a scan's clusters (64-triangle chunks in the file's triangle order) are ragged strips,
+  so the seams are everywhere: one level keeps the surface closed with no balance pass or border rule. Distance-adaptive
+  levels come back with compact clusters (n2stroke's layout) and item 4's border fallback.
 - Edits: clusters a stroke moved draw in full until the first frame without new edits, which recomputes their levels
   and every cell point within a cell of the edit (cells for vertices pushed where none were are added).

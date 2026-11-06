@@ -79,8 +79,8 @@ bool clusterProxy(const Mesh& mesh, const UploadOrder& order, uint32_t c, size_t
 // over the whole mesh, the first cell four times the mean edge, each next level twice as coarse; a cell's point is the
 // mean of the vertices in it (its normal their normals' sum). Every cluster gets per level its triangles mapped to
 // cells (degenerate and repeated ones dropped) and its error, the farthest any of its vertices is from its cell's
-// point. Two clusters at one level share their cells' points: no cracks between them. A cluster's chain stops when a
-// level would keep more than 80% of the one before.
+// point. Two clusters at one level share their cells' points: no cracks between them, so the renderer draws every
+// cluster at one level (levels side by side would leave gaps along the seams: a scan's clusters are ragged strips).
 struct CoarseLevels {
     static constexpr int kMaxLevels = 5;
     struct Lod {
