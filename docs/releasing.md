@@ -1,9 +1,12 @@
 # Releasing SculptForge
 
-One page for whoever coordinates a release. One command does the work:
+One page for whoever coordinates a release. Two commands do the work: the packages are built and tested once, on
+`staging`, already carrying X.Y.Z, and the release publishes exactly those files.
 
 ```sh
-HIGHLIGHTS=highlights.txt scripts/release.sh X.Y.Z --yes
+scripts/release.sh X.Y.Z --stage                               # in the merger's batch checkout: bump + staging + main
+HIGHLIGHTS=highlights.txt scripts/release.sh X.Y.Z --yes       # on main: promote (tag the staged commit, publish)
+HIGHLIGHTS=highlights.txt scripts/release.sh X.Y.Z --rebuild --yes   # fallback, the old way: build from the tag
 ```
 
 It either stops within seconds, before anything is tagged, with the fix, or runs through to the end. This page explains
@@ -14,11 +17,12 @@ the gates, what each step does, and how to recover.
 1. **Merged tree, tested once on each machine** (docs/testing-flow.md): the merger's batch goes to the branch
    `staging` (`scripts/merge-queue.sh staging --with ~/Work/.sf/t1.sh HEAD`). The whole suite runs on the PC (T1) while
    the full CI runs on staging (T2), and main fast-forwards to the batch only when both are green. Nobody runs a
-   second local full ctest. Packages (packages.yml) is built on staging too, beside CI. **The release batch carries
-   the bump**: `RELEASE=X.Y.Z [HIGHLIGHTS=f] ~/Work/.sf/merge-batch.sh <branches>` runs
-   `scripts/release.sh X.Y.Z --only bump --staged` on top of the merged batch (it commits, pushes nothing), so staging
-   builds and tests the packages of the exact commit that will be tagged. The release command afterwards finds the
-   versions already set, reuses CI and promotes those packages: tag to published is the smoke tests, about 5 minutes.
+   second local full ctest. Packages (packages.yml) runs on the push to staging, beside CI. **The release batch
+   carries the bump**: `scripts/release.sh X.Y.Z --stage` in the batch checkout commits the bump on top of it and runs
+   `scripts/merge-queue.sh staging` (with `STAGE_WITH`, default `~/Work/.sf/t1.sh .`), so staging builds and tests the
+   packages of the exact commit that will be tagged (`RELEASE=X.Y.Z ~/Work/.sf/merge-batch.sh <branches>` does the
+   same through `--only bump --staged`). The release command afterwards finds the versions already set, reuses CI and
+   promotes those packages: tag to published is verification and the smoke tests, about 5 minutes.
 2. **Version and words**:
    - written by people, on main before the release: one note fragment per branch, `changes/<branch>.md`
      (changes/README.md: the What's New bullet, CHANGELOG entry and section, highlight, #testers bullets); in
@@ -53,25 +57,49 @@ the gates, what each step does, and how to recover.
 
 ## Build once, promote
 
-A push to main runs CI and Packages; a batch that went through `staging` already ran both there, and main's runs
-reuse them. When the tag points at a commit whose CI passed on main and whose Packages passed on staging or on main,
-the Release workflow takes **that run's packages unchanged** (it checks the commit, the workflow file, the branch and
-the event). It
-smoke-tests them, then publishes. Nothing is compiled again, so a release takes a few minutes. Otherwise (for
-example, the tag is on a commit Packages skipped), Release builds the packages itself from the tag.
+`--stage` lands the bump through staging; the push to `staging` runs Packages for that commit, and main's push reuses
+the run. `scripts/release.sh X.Y.Z` then only promotes: step `bump` checks main already carries X.Y.Z, step `ci`
+waits for staging's Packages run and checks it, step `tag` tags **exactly that commit** (main must be it). The Release
+workflow takes that run's packages unchanged, verifies them, smoke-tests them, signs and publishes.
 
-Two rules make this safe:
-- **Compiler caches:** release builds restore main's caches, and nothing run from a tag or a pull request ever saves
-  one.
-- **Tokens:** only the `publish` job holds a token that can write.
+What makes a run promotable (tools/release/staged_run.py, used by release.sh steps ci and tag and by release.yml
+`locate`; refused otherwise, nothing is rebuilt silently):
+- packages.yml of this repository, triggered by a **push** to `staging` for exactly the tagged commit: never a
+  pull_request, a workflow_dispatch or a fork's run;
+- pushed and (re)run by islandmed (`actor` and `triggering_actor`);
+- concluded `success`, at most 7 days old (`SF_STAGED_MAX_DAYS`; artifacts are kept 14), every package artifact and
+  `staged-sums` still there;
+- CI passed on main for the commit (or for its parent, when the bump only added paperwork).
 
-The packages are not signed yet. When signing comes (SignPath for Windows, Apple notarization), it belongs in a step
-between smoke and publish that signs the promoted files, so promotion stays valid.
+Before anything is published (release.yml `verify`, tools/release/verify_staged.py): the downloaded files are exactly
+those packages.yml's job `sums` recorded, each with the recorded SHA-256, and each has a GitHub artifact attestation
+(actions/attest-build-provenance in every build job) that `gh attestation verify` accepts for packages.yml, this
+commit, that run and, promoted, `refs/heads/staging` and a push. `publish` re-checks the checksums of the files it
+uploads. Any mismatch stops the release.
+
+Signing happens only at promotion: `UPDATE_SIGNING_KEY` is a secret of the environments `release` (job `publish`,
+deployments from tags `v*` only) and `member-release` (betas), never of the repository, so no staging or branch run can
+read it. Step `check` refuses otherwise. packages.yml reads no secret at all (tools/release/check_workflows.py).
+
+Unreleased builds: nothing is released, drafted or put in the feed before the tag. Staging's packages exist only as
+that run's Actions artifacts (14 days). In this public repository signed-in GitHub users can download Actions
+artifacts, as they always could for main's Packages runs; the attestations (public, in Sigstore's log) carry only
+checksums and the commit.
+
+**--rebuild** (fallback): bump pushed to main, no staging run for that commit, so release.yml builds the packages from
+the tag (about 40 minutes), attests and verifies them the same way, then smoke-tests and publishes.
+
+Compiler caches: release builds restore main's caches, and nothing run from a tag or a pull request ever saves one.
+Tokens: only `publish` holds a token that can write.
+
+The packages are not code-signed yet. When signing comes (SignPath for Windows, Apple notarization), it belongs in a
+step between smoke and publish that signs the promoted files, so promotion stays valid.
 
 ## The script
 
 ```sh
-HIGHLIGHTS=highlights.txt scripts/release.sh 0.10.4 --yes   # all steps
+scripts/release.sh 0.10.4 --stage                         # bump + staging (in the batch checkout)
+HIGHLIGHTS=highlights.txt scripts/release.sh 0.10.4 --yes   # all steps (promote)
 HIGHLIGHTS=highlights.txt scripts/release.sh 0.10.4 --from site                    # resume
 scripts/release.sh 0.10.4 --only replies
 ```
@@ -81,10 +109,11 @@ The home page's What's New area (between the `whats-new` markers in website/inde
 
 | step | does | skips when |
 |---|---|---|
-| bump | refuses without What's New, its UI test, CHANGELOG entries, the version's features block and HIGHLIGHTS; then sets the version files, CHANGELOG section and the features block's date, rebuilds the guide and the home page's What's New area, commits as islandmed, pushes main | each file already at X.Y.Z |
+| bump | refuses without What's New, its UI test, CHANGELOG entries, the version's features block and HIGHLIGHTS; then sets the version files, CHANGELOG section and the features block's date, rebuilds the guide and the home page's What's New area, commits as islandmed (--stage: in the batch; --rebuild: pushes main; promoting: only checks main has it) | each file already at X.Y.Z |
+| stage | (--stage only) scripts/merge-queue.sh staging on the bumped batch: CI there, STAGE_WITH here, main fast-forwards | never |
 | check | gate 2 and every precondition of the later steps, on a clean, up-to-date main, with gh logged in as islandmed | never (read-only) |
-| ci | waits for CI and Packages on main's commit; stops if either failed | the tag exists |
-| tag | asks, then tags main and pushes the tag (this publishes) | the tag is on GitHub |
+| ci | waits for CI on main's commit and for staging's Packages run, and checks it is promotable (--rebuild: CI only) | the tag exists |
+| tag | checks main is the staged commit with a promotable run, asks, then tags it and pushes the tag (this publishes) | the tag is on GitHub |
 | release | waits for the Release run, then checks the assets and SHA256SUMS.txt | the release has SHA256SUMS.txt |
 | site | update feed (version + your highlights), home page version text, pushes; then waits for the live feed (10 min) and guide (5 min) | latest.json says X.Y.Z |
 | aur | packaging/arch/PKGBUILD: pkgver and the source checksum, computed by downloading the tag's tarball | already at X.Y.Z with that checksum |
@@ -230,7 +259,9 @@ don't pile them up for later.
 | check: a version file missing | run step bump (`--only bump`), then resume from check |
 | ci: a CI or Packages job failed | runner hiccup (network, a timeout): `gh run rerun <id> --failed`. Real failure: fix on a branch, merge, start from check |
 | release: a smoke test failed | the package is broken: fix on main, delete the tag (`git push origin :vX.Y.Z; git tag -d vX.Y.Z`), release again |
-| release: publish failed after smoke passed | `gh workflow run release.yml -f tag=vX.Y.Z` (it promotes the same packages) |
+| ci/tag: no promotable staging run | stage again (`--stage` in the batch), or a runner hiccup: rerun it; or `--rebuild` |
+| release: verify refused | something differs from what staging built: investigate before anything else; never skip it |
+| release: publish failed after smoke passed | `gh workflow run release.yml --ref vX.Y.Z -f tag=vX.Y.Z` (on the tag: the `release` environment takes only tags; it promotes the same packages) |
 | site: live site still old | check the Website workflow (`gh run list -w pages.yml`) and re-run it |
 | omarchy: the PR merged or closed | open a bump PR there and update `OMARCHY_PR` in the script |
 
@@ -240,8 +271,9 @@ don't pile them up for later.
 gh workflow run release.yml -f tag=vX.Y.Z -f dry_run=true
 ```
 
-Add `-f promote_run=<Packages run id>` to smoke-test the packages of any Packages run, e.g. one dispatched from a
-branch. A dry run never publishes.
+A dry run from a branch builds the packages (the --rebuild path) and runs `verify` on them. Add
+`-f promote_run=<Packages run id>` to smoke-test the packages of any Packages run instead (unverified). A dry run never
+publishes.
 
 ## Runners
 
