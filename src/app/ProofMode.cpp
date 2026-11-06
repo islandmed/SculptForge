@@ -564,6 +564,9 @@ void App::startProofMode() {
             return std::none_of(keep.begin(), keep.end(), [&](const std::string& k) { return !k.empty() && std::string(ph.name).find(k) != std::string::npos; });
         });
     }
+    // SF_BENCH_FLOOR_GRID=1: with View > Display > Floor grid on (#115), whatever the preferences say.
+    if (const char* grid = std::getenv("SF_BENCH_FLOOR_GRID"); grid && std::string(grid) == "1")
+        renderSettings_.floorGrid = true;
     p->stage = p->cli ? ProofState::Stage::Announce : ProofState::Stage::Intro;
     p->radiusBefore = radiusPx_;
     p->strengthBefore = strength_;
