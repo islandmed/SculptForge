@@ -366,7 +366,8 @@ std::vector<PhaseSpec> standardPhases(double seconds) {
             {"move", 80.0f, seconds, BrushType::Move, 0.25f, 0.4f},
             {"smooth", 60.0f, seconds, BrushType::Smooth, 0.5f},
             {"240 px brush", 240.0f, seconds, BrushType::Clay, 0.35f},
-            {"orbit", 0.0f, 3.0}};
+            {"orbit", 0.0f, 3.0},
+            {"still", -1.0f, 0.6}};
 }
 
 const char* proofBrushName(BrushType b) {
@@ -548,7 +549,8 @@ void App::startProofMode() {
                      {"orbit", 0.0f, 10.0},
                      {"still", -1.0f, 0.6}}; // (the view at rest: coarse levels give way to full detail, Renderer::coarsePreviewOnly)
     else if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds);
-    else p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0}};
+    else p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0},
+                      {"still", -1.0f, 0.6}};
     // SF_BENCH_PHASES=smooth,240: only the phases whose names contain one of these (each on the fresh mesh's
     // shape, not on what the phases before it left).
     if (const char* only = std::getenv("SF_BENCH_PHASES"); only && *only) {
@@ -591,7 +593,8 @@ void App::drawProofUi() {
                     p.scene = i == 0 ? "standard-15m" : i == 1 ? "standard-33m" : i == 2 ? "standard" : "";
                     p.sizes = p.scene.empty() ? proofDefaultSizes(availableMemoryBytes()) : proofStandardScene(p.scene);
                     if (!p.scene.empty()) p.phases = standardPhases(p.strokeSeconds);
-                    else p.phases = {{"stroke", 60.0f, p.strokeSeconds}, {"large brush stroke", 240.0f, p.strokeSeconds}, {"orbit", 0.0f, 3.0}};
+                    else p.phases = {{"stroke", 60.0f, p.strokeSeconds}, {"large brush stroke", 240.0f, p.strokeSeconds}, {"orbit", 0.0f, 3.0},
+                                     {"still", -1.0f, 0.6}};
                 }
             if (!p.scene.empty())
                 ImGui::TextDisabled("Clay at 25, 60 and 120 px, Move, Smooth, a 240 px brush, then an orbit: the scene the "
