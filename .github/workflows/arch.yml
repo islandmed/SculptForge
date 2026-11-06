@@ -43,11 +43,11 @@ jobs:
         working-directory: /home/builder/pkg
         run: |
           namcap -i PKGBUILD | tee namcap.txt
-          namcap -i ./*.pkg.tar.zst | tee -a namcap.txt
+          namcap -i ./sculptforge-[0-9]*.pkg.tar.zst | tee -a namcap.txt   # not -debug: its build-id links point into the main package
           ! grep -E '^[^ ]+ E: ' namcap.txt
       - name: Installed, the command-line tool answers
         working-directory: /home/builder/pkg
         run: |
-          pacman -U --noconfirm ./sculptforge-*.pkg.tar.zst
+          pacman -U --noconfirm ./sculptforge-[0-9]*.pkg.tar.zst
           test -x /usr/bin/sculptforge
           sculptforge-cli --schema > schema.json && grep -q '"open"' schema.json

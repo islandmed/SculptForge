@@ -6,7 +6,8 @@ pkgdesc="Free, open-source digital sculpting app with classic sculpting keys, fo
 arch=('x86_64' 'aarch64')
 url="https://sculptforge.app/"
 license=('GPL-3.0-or-later')
-depends=('sdl3' 'curl' 'zstd' 'gcc-libs' 'glibc' 'libglvnd')
+depends=('sdl3' 'curl' 'zstd' 'libgcc' 'libstdc++' 'glibc' 'libglvnd' 'hicolor-icon-theme')
+# libglvnd: SDL3 opens libGL at run time, so namcap can't see the need (its one warning, expected).
 makedepends=('cmake')
 optdepends=('ollama: local AI for the Brush Lab'
             'ffmpeg: recording demo videos (sculptforge --record)')

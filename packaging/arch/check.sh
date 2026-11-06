@@ -9,5 +9,5 @@ namcap -i PKGBUILD
 chroot=${SF_ARCH_CHROOT:-$HOME/.cache/sculptforge-archroot}
 [ -d "$chroot/root" ] || { mkdir -p "$chroot"; mkarchroot "$chroot/root" base-devel; }
 makechrootpkg -c -r "$chroot"
-namcap -i ./sculptforge-*.pkg.tar.*
+namcap -i ./sculptforge-[0-9]*.pkg.tar.*
 echo "check: PKGBUILD builds in a clean chroot; namcap output above (E: lines are errors)"
