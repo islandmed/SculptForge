@@ -9,9 +9,9 @@ deletes it; remove its lines once fixed.
 | 2026-11-04 | sculptforge_tests_9of16 | PC (WSL, RTX 3060), ctest -j10 | 76e4be24 |
 | 2026-11-06 | ui_idle_redraw (failed its rerun too) | CI Windows (2/4), software OpenGL, runs 42231997469 + 42243212500 | 8c070932, 3959b469 |
 | 2026-11-06 | sculptforge_tests_10of16 (discord_bursts_send_the_latest) | CI macOS Packages, run 42246054273: attempt 1 failed, attempt 2 passed | fa66499d |
-| 2026-11-06 | ui_stroke_background | Omedchy | ed1b0099 |
-| 2026-11-06 | ui_stroke_background_preview | Omedchy | ed1b0099 |
-| 2026-11-06 | ui_stroke_persistent_upload | Omedchy | ed1b0099 |
+| 2026-11-06 | ui_stroke_background | laptop (heavy.sh, -j3) | ed1b0099 |
+| 2026-11-06 | ui_stroke_background_preview | laptop (heavy.sh, -j3) | ed1b0099 |
+| 2026-11-06 | ui_stroke_persistent_upload | laptop (heavy.sh, -j3) | ed1b0099 |
 
 ## Owned
 
