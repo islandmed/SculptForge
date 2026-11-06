@@ -834,7 +834,7 @@ int App::run() {
     constexpr double kMeasureSettle = 3.0;
     const double started = seconds();
     uint64_t framesDrawn = 0, wakeUps = 0, framesAtMeasure = 0, wakesAtMeasure = 0;
-    std::clock_t cpuAtMeasure = 0; // processor time of every thread (the driver's included)
+    double cpuAtMeasure = 0.0; // processor time of every thread (the driver's included)
     bool measuring = false;
     // Input while measuring (a pointer crossing the window on a shared desktop) restarts the count once it has
     // passed: idle means no input. After kMeasureGiveUp seconds it counts whatever comes (the test's timeout).
@@ -887,17 +887,21 @@ int App::run() {
                 measuring = true;
                 framesAtMeasure = framesDrawn;
                 wakesAtMeasure = wakeUps;
-                cpuAtMeasure = std::clock();
+                cpuAtMeasure = processCpuSeconds();
             } else if (measuring && t0 >= measureFrom + options_.measureIdle) {
                 const double fps = double(framesDrawn - framesAtMeasure) / double(options_.measureIdle);
-                const double cpu = 100.0 * double(std::clock() - cpuAtMeasure) / CLOCKS_PER_SEC / double(options_.measureIdle);
+                const double cpu = 100.0 * (processCpuSeconds() - cpuAtMeasure) / double(options_.measureIdle);
                 std::printf("Idle: %llu frames, %llu wake-ups in %.1f s: %.2f fps, CPU %.1f%% of one core (%s redraw)\n",
                             (unsigned long long)(framesDrawn - framesAtMeasure), (unsigned long long)(wakeUps - wakesAtMeasure),
                             double(options_.measureIdle), fps, cpu, continuous ? "continuous" : "on-demand");
                 if (measureRestarts > 0) std::printf("  (restarted %d times after input)\n", measureRestarts);
                 std::fflush(stdout);
                 // Idle is 0 fps; a pointer crossing the window draws about a second's worth. Every frame is 60+.
-                return continuous || fps < 5.0 ? 0 : 1;
+                // And near 0 CPU (a laptop's battery): SF_IDLE_CPU_MAX percent of one core, 2 unless set.
+                const char* cpuMaxEnv = std::getenv("SF_IDLE_CPU_MAX");
+                const double cpuMax = cpuMaxEnv && *cpuMaxEnv ? std::atof(cpuMaxEnv) : 2.0;
+                if (!continuous && cpu > cpuMax) std::printf("Idle: CPU over %.1f%% of one core: something spins while idle\n", cpuMax);
+                return continuous || (fps < 5.0 && cpu <= cpuMax) ? 0 : 1;
             }
         }
         // Nothing to draw: sleep until an event, or the next poller tick.

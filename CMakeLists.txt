@@ -903,9 +903,13 @@ if(SCULPTFORGE_BUILD_TESTS)
     # A crash leaves a note in the log file (#16). Needs no window.
     add_test(NAME crash_log COMMAND ${CMAKE_COMMAND} -DAPP=$<TARGET_FILE:sculptforge>
              -DDIR=${CMAKE_CURRENT_BINARY_DIR}/crash-log-test -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/crash_log.cmake)
-    # Idle, the app draws nothing (#14): --measure-idle fails when it keeps drawing frames.
+    # Idle, the app draws nothing (#14) and uses next to no CPU: --measure-idle fails when it keeps drawing frames or
+    # its process CPU is over SF_IDLE_CPU_MAX % of one core (4 s here: a spinning loop's 100 % fails it; the 30 s
+    # nightly holds it to 2 %).
     add_test(NAME ui_idle_redraw COMMAND sculptforge --measure-idle 4)
-    set_tests_properties(ui_idle_redraw PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
+    set_tests_properties(ui_idle_redraw PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_IDLE_CPU_MAX=10")
+    add_test(NAME ui_idle_cpu_30s COMMAND sculptforge --measure-idle 30)
+    set_tests_properties(ui_idle_cpu_30s PROPERTIES LABELS "ui;nightly" TIMEOUT 120 RUN_SERIAL TRUE ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
     # sculptforge --calibrate on this machine's GPU: the JSON it prints passes the schema check (it exits 1 if not).
     add_test(NAME ui_calibrate_json COMMAND sculptforge --calibrate-quick --calibrate-no-save)
     set_tests_properties(ui_calibrate_json PROPERTIES LABELS ui TIMEOUT 60)
