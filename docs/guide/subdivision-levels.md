@@ -112,8 +112,10 @@ keeping the dense mesh exactly as it was. Press it again for more levels.
   at the level you were on. Merging and splitting Parts can't be undone, so step to the level
   you want to keep first, or save before.
 
-> **Note:** **Subdivide** (in **Tool > Geometry**, below Divide) is still there: it replaces the mesh with a
-> denser one and keeps no levels. Use Divide unless you want exactly that.
+> **Note:** **Subdivide (removes levels)** (in **Tool > Geometry**, under **Change the Mesh (no levels)**, apart
+> from Divide and Micro) replaces the mesh with a denser one and keeps no levels. On a Part with levels it asks
+> first ("This removes your N subdivision levels"); **Don't ask again** turns that off. **Delete Lower** and **Delete
+> Higher** ask too. Use **Divide (keeps levels)** unless you want exactly that.
 
 ## Commands
 

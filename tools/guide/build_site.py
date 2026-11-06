@@ -660,7 +660,7 @@ def home_whats_new(page: "WhatsNewPage") -> str:
         pic, clip = (first["image"], first.get("clip", "")) if first else ("", "")
         img = (f'<div class="wn-pic"><img src="guide/{html.escape(pic)}" alt="" width="600" height="340" loading="lazy" '
                f'decoding="async"></div>') if pic else \
-            '<div class="wn-pic wn-pic-mark"><img src="img/icon-256.png?v=3" srcset="img/icon-256.png?v=3 256w, img/icon-512.png?v=1 512w" sizes="220px" alt="" width="256" height="256"></div>'
+            '<div class="wn-pic wn-pic-mark"><img src="img/bust-256.png?v=1" srcset="img/bust-256.png?v=1 256w, img/bust-512.png?v=1 512w" sizes="220px" alt="" width="256" height="256"></div>'
         if clip:  # the first card's clip plays on the home page too, its picture as the poster
             img = (f'<div class="wn-pic"><video src="guide/{html.escape(clip)}" poster="guide/{html.escape(pic)}" width="600" '
                    f'height="340" muted loop playsinline autoplay></video></div>')
@@ -841,6 +841,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
           SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
       </div>
       <div class="links">
+        <a href="../performance/">Performance</a>
         <a href="index.html">User guide</a>
         <a href="../supporters.html">Members</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
@@ -1029,6 +1030,7 @@ def supporters_html() -> str:
   <footer class="footer">
     <div class="wrap footer-grid">
       <div class="links">
+        <a href="performance/">Performance</a>
         <a href="index.html">Home</a>
         <a href="support.html">Membership</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
@@ -1093,7 +1095,8 @@ def main() -> int:
         if wn:
             write_home(wn, False)
         urls = [SITE, SITE + "brushes.html", SITE + "press.html",
-                SITE + "studios.html", SITE + "support.html", SITE + "supporters.html"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]
+                SITE + "studios.html", SITE + "support.html", SITE + "supporters.html",
+                SITE + "performance/"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]
         (ROOT / "website" / "sitemap.xml").write_text(
             '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
             + "".join(f"  <url><loc>{html.escape(u)}</loc></url>\n" for u in urls) + "</urlset>\n", encoding="utf-8")

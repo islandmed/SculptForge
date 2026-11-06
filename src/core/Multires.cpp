@@ -2318,6 +2318,24 @@ bool deleteHigherUndoable(Document& doc, std::string& message) {
     }, message);
 }
 
+bool freezeLevelsUndoable(Document& doc, std::string& message) {
+    if (!doc.mesh.multires) {
+        message = "This Part has no subdivision levels";
+        return false;
+    }
+    const int level = subdivCurrentLevel(doc.mesh) + 1, levels = subdivLevelCount(doc.mesh);
+    return runUndoable(doc, "Freeze Levels", [&](Mesh& m, std::string& msg, BVH*) {
+        if (m.micro) {
+            msg = "This Part has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
+            return false;
+        }
+        if (m.multires && m.multires->current + 1 < int(m.multires->levels.size()) && !subdivDeleteHigher(m, msg)) return false;
+        if (m.multires && m.multires->current > 0 && !subdivDeleteLower(m, msg)) return false;
+        msg = "Froze SDiv " + std::to_string(level) + " of " + std::to_string(levels) + ": " + levelSummary(m);
+        return true;
+    }, message);
+}
+
 bool reconstructUndoable(Document& doc, std::string& message) {
     return runUndoable(doc, "Reconstruct Subdiv", [&](Mesh& m, std::string& msg, BVH* bvh) {
         if (!subdivReconstruct(m, msg, bvh)) return false;

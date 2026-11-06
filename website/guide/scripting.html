@@ -271,6 +271,26 @@ for step in interaction.steps:
         print(step.name, call(step.name, step.arguments))
 # Send each result back as Google&#x27;s guide shows to let the model continue.</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
 <p>Never point a tool at a web app&#x27;s session or cookies: use each vendor&#x27;s own app, CLI or API as above.</p>
+<h3 id="live-mode-an-ai-tool-sculpts-in-the-open-window">Live mode: an AI tool sculpts in the open window<a class="anchor" href="#live-mode-an-ai-tool-sculpts-in-the-open-window" aria-label="Link to this section">#</a></h3>
+<p>Turn on <strong>Edit &gt; Preferences &gt; AI &gt; Let AI tools control this window</strong> (off by default, and gone while AI features are off), then add the attach server to your AI tool:</p>
+<div class="code-block"><pre class="code"><code class="language-sh">claude mcp add sculptforge-live -- /path/to/sculptforge-cli --mcp --attach</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+<p>Ask it to connect (&quot;connect to SculptForge and block out a dragon head&quot;). SculptForge shows <strong>Let an AI tool control this window?</strong> with a 6-digit code: click <strong>Approve</strong>, or read the code to the AI tool. The approval lasts until it disconnects. While it works:</p>
+<ul>
+<li>
+an <strong>AI connected</strong> badge sits at the bottom right of the canvas, with <strong>Disconnect</strong> (also in the command palette: <em>Disconnect AI tool</em>). Turning the switch or AI features off disconnects it too;
+</li>
+<li>
+every step it takes is in the undo history, labelled <strong>AI:</strong>, so you can step back through its work;
+</li>
+<li>
+it asks first (<strong>Allow this AI step?</strong>) before reading or writing files outside the project folder and the files you picked, overwriting a file, saving over the project, deleting library files, running a macro or script, or anything that uses the network (Generate 3D, AI Brush, the brush gallery). Deny and it is told not to retry. Installing or switching packs and the AI switch itself are never offered;
+</li>
+<li>
+it can see: <code>viewport_image</code> returns the viewport as you see it, <code>view_turntable</code> the model from 4 to 8 sides in one picture, <code>view_set</code> turns and frames your camera, and <code>stroke_screen</code> draws a brush stroke in screen space. With <code>blockout</code> (a Forge Sphere armature in one call), <code>measure</code> and <code>scene_overview</code> it can look, think and correct. What it sees goes to that tool&#x27;s AI service, as anything you show it does.
+</li>
+</ul>
+<p>The recipes your AI tool lists as prompts (creature head, stylised bust, game-ready, rock variations, teach me) work in live mode too.</p>
+<p>How it is kept safe: the connection is a Unix socket (owner-only, in your runtime folder) or, on Windows, a named pipe only your user account can open; there is no network port. Only one AI tool can be connected at a time, requests are rate limited, and what the tool sends is data: tool names and values, never code to run.</p>
 <h2 id="see-also">See also<a class="anchor" href="#see-also" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>
@@ -301,6 +321,7 @@ for step in interaction.steps:
           SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
       </div>
       <div class="links">
+        <a href="../performance/">Performance</a>
         <a href="index.html">User guide</a>
         <a href="../supporters.html">Members</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>

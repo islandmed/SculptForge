@@ -5,6 +5,52 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.4
+
+```features
+date: 2026-11-05
+tagline: Let your AI assistant sculpt in your open window, and fixes.
+highlight: Live mode: an AI tool works in your open window, only after you approve it
+highlight: Your AI tool sees the viewport, turns the view and adds strokes, and every step is one undo
+highlight: Fixes: rare wrong shading after strokes
+```
+
+## Version 0.11.3
+
+```features
+date: 2026-11-05
+tagline: Connect your AI tool in one window, saved camera views, a readable mask, solid remeshes of open parts and the new SF icon.
+highlight: Connect your AI tool in one window
+highlight: Saved camera views and a readable mask
+highlight: Quick Remesh and Voxel Remesh keep open parts solid
+highlight: The UV Editor fits at large UI scales
+highlight: The new orange SF app icon
+highlight: Connect your AI tool in one window
+highlight: Saved camera views and a readable mask
+```
+
+- The app icon is now the orange SF mark, as on the website; it reads at task bar size.
+- **Help > Connect an AI tool**: use SculptForge from Claude, ChatGPT (Codex CLI), Gemini (Antigravity CLI), Grok
+  (Grok Build), Cursor, VS Code and more. Pick your subscription; the window shows the exact command or settings for
+  your install, with Copy buttons. Claude Desktop installs it from a bundle on each release.
+- **Remeshing an open Part stays solid**: **Quick Remesh** and **Tool > Remesh > Voxel Remesh** cap open borders (the
+  Stylised Head's neck, a cut) before remeshing, so the result is one closed surface, not a shell full of holes. A
+  Part that can't be made solid stays as it is, and the status bar says why.
+- **UV Editor at large UI scales**: the toolbar wraps on a 4K screen at 240 %, so **On model: Colours / Checker** and
+  **Frame** are all visible and each takes its own click.
+- **Dynamic on a subdivided model**: turning on **Dynamic** on a Part with subdivision levels now offers **Freeze
+  Levels and Turn On Dynamic**: the level you see becomes one plain mesh (Ctrl+Z brings the levels back).
+- **Saved views**: **View > Views** has Front, Back, Left, Right, Top and Bottom (Numpad 1, 3, 7; Ctrl for the other
+  side) and **Save View** for your own named camera angles; Numpad 0 goes back to the last one. They are saved with
+  the project.
+- **A readable mask**: masked areas show a soft, dark tint instead of near-black, with **Mask darkness** in
+  Preferences > Interface and Tool > Masking. Dense wireframes no longer turn into a dark moire.
+- **Easier to see**: options that are on stand out in every colour scheme, and Quad Remesh guide curves draw smooth
+  with an outline.
+- **Safer levels**: in Tool > Geometry, **Divide (keeps levels)** and **Subdivide (removes levels)** no longer sit
+  together, Micro has its own group, and Subdivide, Delete Lower and Delete Higher ask before removing levels (with
+  **Don't ask again** for Subdivide).
+
 ## Version 0.11.2
 
 ```features
@@ -72,12 +118,12 @@ action: ui.uv_editor
 ```features
 date: 2026-11-05
 tagline: Dense scans with micro levels keep up with the pen, and one-click updates on Windows and Linux.
-highlight: Dense scans keep up: orbit after a big stroke on a 112M scan, 0.7 to 51 fps
+highlight: Dense scans keep up: orbit after a big stroke on a sculpted 112M scan, under 1 to 33 fps
 highlight: One-click update, signed and checked
 highlight: Remesh with one key, or after each stroke
 highlight: Preferences save themselves
 title: Dense scans, fast
-line: Lucy 112M on an RTX 3060: orbit right after a big stroke, 0.7 to 51 frames a second.
+line: Lucy 112M with sculpted detail on an RTX 3060: orbit right after a big stroke, from under 1 to 33 frames a second.
 action: guide:performance.md#working-with-big-meshes
 ```
 

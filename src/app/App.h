@@ -10,6 +10,7 @@
 #include "app/CommandPalette.h"
 #include "app/Config.h"
 #include "app/Console.h"
+#include "app/I18n.h"
 #include "app/LibraryBrowser.h"
 #include "app/Pickers.h"
 #include "app/ShellGeometry.h"
@@ -134,6 +135,7 @@ class App {
 
 public:
     App();
+    void setMaskDarkness(float k); // 0-1: the preference and the view (Preferences > Interface, Tool > Masking)
     ~App();
     bool init(const AppOptions& options);
     const std::string& startError() const { return startError_; } // why init failed, for the message box (#109)
@@ -192,6 +194,15 @@ private:
     // Dynamic topology (dynamic topology, core/Dyntopo.h): turns it on or off (not on a mesh with
     // subdivision levels), saying so in the status bar; the Detail slider.
     void setDynamic(bool on);
+    // Dynamic on a Part with subdivision levels: Freeze Levels (one undo step), then Dynamic on.
+    void freezeLevelsAndDynamic();
+    void drawDynamicOffer(); // the pop-up setDynamic opens instead of a dead-end message
+    bool openDynamicOffer_ = false;
+    // Delete Lower / Delete Higher from the interface: a confirmation naming the levels that go (scripts run directly).
+    void confirmLevelDelete(const std::string& command);
+    std::string pendingLevelDelete_;
+    bool openLevelDelete_ = false;
+    bool openSubdivideConfirm_ = false; // Subdivide on a Part with levels: confirm first (Shell.cpp)
     void drawDetailSlider(const char* id);
 
     void runCommand(const std::string& name, const Args& args = {});
@@ -247,8 +258,8 @@ private:
     float targetUiScale() const;         // what uiScale_ should be now (Preferences, the display; Config.cpp)
     void applyUiScale();                 // rebuild fonts and style live when it changed (between frames)
     void buildUiFonts(float scale);
-    void mergeCjkFont(float px);         // the Chinese glyphs into the font just added (all of them while fontsCjk_)
-    bool fontsCjk_ = false;              // the atlas has every Chinese glyph (Traditional Chinese interface)
+    void mergeCjkFont(float px);         // the Chinese glyphs into the font just added (all of them in a Chinese interface)
+    Language fontsLanguage_ = Language::English; // the language the font atlas was built for (buildUiFonts)
     ImFont* fontCaption_ = nullptr;
     ImFont* fontCaptionSub_ = nullptr;
 
@@ -431,7 +442,8 @@ private:
     bool showHelp_ = false;
     bool showAbout_ = false;
     bool showConnectAi_ = false; // Help > Connect an AI tool (PanelConnectAi.cpp; only while AI is on)
-    int connectPlan_ = 0;        // its "I have a ... subscription" choice (connect::Plan)
+    std::string connectClient_ = "claude_code"; // its "Pick your tool" choice (a connect::Client id)
+    float connectScale_ = 0.0f;                 // the UI scale it was last placed for
     void drawConnectAi();
     // Supporting SculptForge (Support.h): the app only ever opens the membership page or its Stripe checkout links in the
     // browser; nothing else changes.
@@ -567,6 +579,7 @@ private:
     void aiLinkDisconnect(const std::string& why); // the kill switch: closes the connection now
     void aiLinkPicked(const std::string& path);    // a file the user chose: an AI tool may use it without asking
     int aiLinkStateValue() const;  // UI tests: 0 off, 1 listening, 2 waiting for approval, 3 connected, 4 asking
+    std::string aiLinkClient() const; // the connected (or asking) tool's name, "" without one
     std::vector<std::string> aiLinkPickedPaths_; // files the user chose this run (each connection starts with them)
     void aiLinkExecute(const link::AiLinkCall& call);
     uint32_t activePartInfoId() const;
@@ -1893,6 +1906,17 @@ private:
     // every style. Import Blender keymap reads a keymap exported from Blender (BlenderKeymap.h).
     void registerViewActions();
     void viewAxis(float yawDegrees, float pitchDegrees); // Numpad 1 / 3 / 7: orthographic until turned
+    // Saved views (View > Views): named cameras, kept in the project (projectSettings "views").
+    struct SavedView {
+        std::string name;
+        Camera camera;
+    };
+    std::vector<SavedView> savedViews_;
+    int lastSavedView_ = -1; // Numpad 0 restores it
+    char savedViewName_[48] = "";
+    void saveView(const std::string& name = {}); // a free name ("View 3") when empty; the same name replaces
+    void restoreView(int index);
+    void drawViewsSection(); // Palettes.cpp, in View
     void viewOrbitStep(float yawDegrees, float pitchDegrees);
     void frameActivePart();
     // Focus Detail (prototype, FocusDetailApp.cpp): open a .sfdetail file; once a frame, the camera and brush.

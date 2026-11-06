@@ -1,20 +1,21 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The app's mark (assets/branding, made by tools/brand/make_icons.py) drawn in the UI: the detailed tile from
-// 40 px up (the cards' headers shrink to about 44 px in small windows; the detailed tile still reads there), the
-// simplified small-size mark below (title bars).
+// The brand in the UI (assets/branding, made by tools/brand/make_icons.py): the SF mark is the app icon (the title
+// bars, like the window icon); the bust is the illustration (About, What's New, the support card).
 #pragma once
 
 #include <imgui.h>
 
 namespace sf::brand {
 
-// The mark `size` px wide at `at` (screen pixels), `alpha` faded. Needs the GL context (draws from a texture
-// uploaded on first use); without a texture it draws nothing.
-void mark(ImDrawList* dl, ImVec2 at, float size, float alpha = 1.0f);
+// The SF app icon `size` px wide at `at` (screen pixels); its small cut up to 32 px. Needs the GL context (draws
+// from a texture uploaded on first use); without a texture it draws nothing.
+void appMark(ImDrawList* dl, ImVec2 at, float size, float alpha = 1.0f);
+void appMarkItem(float size, float alpha = 1.0f); // as an ImGui item at the cursor
 
-// The mark as an ImGui item `size` px wide at the cursor (title bars, dialogs).
-void markItem(float size, float alpha = 1.0f);
+// The bust illustration, `size` px wide at `at`.
+void bust(ImDrawList* dl, ImVec2 at, float size, float alpha = 1.0f);
+void bustItem(float size, float alpha = 1.0f); // as an ImGui item at the cursor
 
 } // namespace sf::brand

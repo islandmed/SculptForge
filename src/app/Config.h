@@ -95,6 +95,10 @@ struct UiPrefs {
     bool backfaceCulling = false;
     // UV Editor > Pack > Columns x Rows (#135): the UDIM grid the last pack filled, the default for new projects.
     int uvPackColumns = 1, uvPackRows = 1;
+    // Preferences > Interface > Mask darkness (and Tool > Masking): how dark masked areas show, 0-1
+    // (RenderSettings::maskDarkness).
+    float maskDarkness = 0.7f;
+    bool confirmSubdivide = true; // Subdivide (removes levels) asks first on a Part with levels (Don't ask again)
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons
     SpaceMouseSettings spaceMouse; // Preferences > Input > SpaceMouse
     // Preferences > Performance (PanelPerformance.cpp).

@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.4] - 2026-11-05
+
 ### Added
 - **Live mode: an AI tool sculpts in the open window while you watch.** Turn on **Edit > Preferences > AI > Let AI
   tools control this window** (off by default) and connect Claude Code or any MCP client with
@@ -14,6 +16,62 @@ All notable changes to SculptForge are listed here. The format follows
   network ask you first. The AI can see its work (`viewport_image`, `view_turntable`, `view_set`), draw strokes in
   screen space (`stroke_screen`), block out forms from Forge Spheres in one call (`blockout`) and check proportions
   (`measure`, `scene_overview`). Local only: a socket / pipe just your user can open, no network port.
+
+### Fixed
+- **Shading after strokes**: a data race in the GPU vertex upload (several threads writing the same vertex's cavity
+  bits) could leave rare wrong shading after a stroke. Each vertex is now written once.
+
+## [0.11.3] - 2026-11-05
+
+### Added
+- **Help > Connect an AI tool** (while AI features are on): an "I have a subscription" picker (Claude, ChatGPT,
+  Gemini, Grok, other tools) and, for this install, the exact command or configuration for Claude Desktop, Claude
+  Code, Codex CLI, Antigravity CLI, Gemini CLI, Grok Build, Cursor, VS Code, Visual Studio, JetBrains AI Assistant,
+  Zed, Windsurf (Devin Local), GitHub Copilot CLI, Cline, Continue, Kiro, Amazon Q Developer CLI, Warp, Goose,
+  opencode, Rovo Dev CLI, LM Studio, Jan and the OpenAI Agents SDK, each checked against the vendor's documentation,
+  with Copy buttons. Remote-only apps (the ChatGPT and Grok apps, Rovo on the web) are named as such: SculptForge runs
+  no network server.
+- A Claude Desktop bundle (`SculptForge-*.mcpb`) for Windows, macOS and Linux on every release, and `server.json` for
+  the official MCP registry.
+- The MCP server (`sculptforge-cli --mcp`) gains `viewport_image` (a clay-shaded picture of the scene from any angle,
+  to check each step) and recipes as MCP prompts: a creature head, a stylised bust from a reference image, a
+  game-ready asset (retopology, UVs, bake, LODs), rock variations and a step-by-step lesson. Its server info carries a
+  title and clearer instructions.
+- AppImage: `SculptForge.AppImage --cli ...` runs the command-line tool inside it (so MCP clients can start it).
+- Guide (Scripting > AI agents): every client's setup, your own agent, and plain function calling with
+  `sculptforge-cli --schema` for the OpenAI, Gemini and xAI APIs.
+- Freeze Levels (`subdiv_freeze`, `dyntopo freeze_levels=true`): turning on Dynamic on a Part with subdivision levels
+  offers to keep the level shown as one plain mesh and turn Dynamic on, one undo step, instead of a dead-end message.
+  The Draw palette shows the same button while Dynamic waits on levels.
+- View > Views: Front, Back, Left, Right, Top and Bottom buttons (Numpad 1 / 3 / 7, Ctrl for the opposite side, in
+  every input style), and named saved views: Save View (Ctrl+Alt+Numpad 0), click a name to go back, Numpad 0 for the
+  last one. Saved with the project.
+- Mask darkness (Preferences > Interface and Tool > Masking).
+
+### Changed
+- The app icon is the orange SF mark (as on sculptforge.app) in the task bar, Dock, Start menu, launchers and the
+  title bar; the bust stays as the illustration in Help > About, What's New and the membership card.
+- Masked areas show as a cool dark tint with a soft edge instead of near-black, so the form stays readable.
+- The wireframe fades edges shorter than a few pixels: a dense mesh shows a light veil, not a dark moire.
+- Options that are on (toggles) have an accent-tinted fill in every colour scheme, not just a lighter grey.
+- Quad Remesh guide curves draw smooth, with stroke smoothing while drawing and a dark outline for contrast.
+- Tool > Geometry (from Discord): **Divide (keeps levels)** and **Subdivide (removes levels)** are named for what they
+  do and sit apart: Micro in its own Micro Detail group, Subdivide under Change the Mesh (no levels). On a Part with
+  levels, Subdivide asks first ("This removes your N subdivision levels"), with Don't ask again; Delete Lower and
+  Delete Higher ask too (Ctrl+Z still brings the levels back).
+- Tool > Parts > Extract says to mask first when there's no mask, instead of only greying out its buttons.
+
+### Fixed
+- **Quick Remesh** and **Tool > Remesh > Voxel Remesh** of an open Part (the Stylised Head starter, open at the neck,
+  especially after a Move pull near the neck) gave a thin shell full of holes: the outside flowed in through the
+  opening. Open borders are now capped before the voxels are made (only for the remesh; the Part's own surface is not
+  touched), and a Part that still isn't a closed solid (borders that can't be capped) is left unchanged with a message
+  pointing to **Tool > Geometry > Close Holes**, instead of a broken result.
+- **UV Editor** at UI scale 2.4 (a 4K screen): the **On model: Colours / Checker** row was cut off and **Frame** was
+  drawn over it, so clicking Frame toggled Colours. The toolbar now measures each control (in the interface language)
+  and wraps onto more lines when it needs to; every control is where it is drawn.
+- **UV Editor**: the "No UVs yet: pick a method and Unwrap" hint was cut off on both sides in a narrow view or at a
+  big UI scale (240 %); it now wraps inside the view, and it is translated.
 
 ## [0.11.2] - 2026-11-05
 

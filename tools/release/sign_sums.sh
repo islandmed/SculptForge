@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Signs DIST/SHA256SUMS.txt for one-click update (src/core/SelfUpdate.h): DIST/SHA256SUMS.txt.sig, a raw 64-byte
-# Ed25519 signature, made with the private key in $UPDATE_SIGNING_KEY (a PEM; the repository secret). Used by
-# release.yml for public releases and member betas alike (the same key, the same check in the app).
+# Ed25519 signature, made with the private key in $UPDATE_SIGNING_KEY (a PEM; a secret of the environments release and
+# member-release only, never the repository's). Used by release.yml at promotion, for public releases and member betas
+# alike (the same key, the same check in the app); the staging builds never see it.
 #   tools/release/sign_sums.sh DIST [SOURCE_DIR]    SOURCE_DIR: the checkout whose kUpdatePublicKeyHex must match
 # No secret: a warning while the app has no key yet, an error once it has one.
 set -euo pipefail

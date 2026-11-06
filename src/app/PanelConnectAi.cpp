@@ -1,19 +1,26 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Help > Connect an AI tool (app/ConnectAi.h): lead with "I have a ... subscription", then for each client that plan
-// signs in to, the exact command or configuration for this install with Copy buttons. Only while AI features are on
-// (Preferences > AI): the action is registered in registerAiActions() and removed with the others.
+// Help > Connect an AI tool (app/ConnectAi.h): the in-app guide to working with an AI tool, one screen in three steps:
+// 1. pick your tool, with the exact command or configuration for this install's live-mode server (--mcp --attach)
+// and Copy; 2. the live-mode switch itself; 3. what happens next (the code, the badge, AI: undo steps, what asks
+// first); then example prompts. docs/guide/scripting.md "Live mode" says the same in the same words. Only while AI
+// features are on (Preferences > AI): the action is registered in registerAiActions() and removed with the others.
 #include "app/App.h"
-#include "core/ManagedPolicy.h"
 #include "app/ConnectAi.h"
 #include "app/I18n.h"
+#include "app/Theme.h"
+#include "app/Ui.h"
+#include "core/ManagedPolicy.h"
 
 #include <IconsLucide.h>
 #include <imgui.h>
 
+#include <algorithm>
 #include <filesystem>
+#include <iterator>
 #include <string>
+#include <utility>
 
 namespace sf {
 
@@ -56,14 +63,18 @@ void copyButton(std::string& status, const std::string& text, const std::string&
     }
 }
 
-// The text exactly as it is pasted: monospace, read-only, selectable.
+// The text exactly as it is pasted: monospace in a framed box, never wrapped (a wrapped command pastes wrong); a line
+// wider than the window scrolls sideways. Copy takes the whole text.
 void codeBox(const std::string& text, const std::string& id, ImFont* mono) {
-    int lines = 1;
-    for (const char c : text) lines += c == '\n';
     if (mono) ImGui::PushFont(mono);
-    const float h = float(lines) * ImGui::GetTextLineHeight() + 2.0f * ImGui::GetStyle().FramePadding.y + 2.0f;
-    ImGui::InputTextMultiline(("##code" + id).c_str(), const_cast<char*>(text.c_str()), text.size() + 1,
-                              ImVec2(-1.0f, h), ImGuiInputTextFlags_ReadOnly);
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const ImVec2 textSize = ImGui::CalcTextSize(text.c_str());
+    const bool wide = textSize.x + 2.0f * style.FramePadding.x > ImGui::GetContentRegionAvail().x;
+    const float h = textSize.y + 2.0f * style.FramePadding.y + (wide ? style.ScrollbarSize : 0.0f);
+    if (ImGui::BeginChild(("##code" + id).c_str(), ImVec2(-1.0f, h), ImGuiChildFlags_FrameStyle,
+                          ImGuiWindowFlags_HorizontalScrollbar))
+        ImGui::TextUnformatted(text.c_str());
+    ImGui::EndChild();
     if (mono) ImGui::PopFont();
 }
 
@@ -75,73 +86,139 @@ void App::drawConnectAi() {
         showConnectAi_ = false;
         return;
     }
+    // The Approve or Allow dialog takes its place while it is open: never two dialogs stacked.
+    if (const int live = aiLinkStateValue(); live == 2 || live == 4) return;
     const float s = uiScale_;
-    ImGui::SetNextWindowSize(ImVec2(720 * s, 640 * s), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    const float w = std::min(640.0f * s, vp->WorkSize.x - 32.0f * s);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(w, 0), ImVec2(w, vp->WorkSize.y - 32.0f * s));
+    // Centred when it opens and again when the UI scale changes (it would hang off the window's edge).
+    const bool rescaled = std::exchange(connectScale_, s) != s;
+    ImGui::SetNextWindowPos(vp->GetCenter(), rescaled ? ImGuiCond_Always : ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (!ImGui::Begin((std::string(tr("Connect an AI tool")) + "###connect_ai").c_str(), &showConnectAi_,
-                      ImGuiWindowFlags_NoCollapse)) {
+                      ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::End();
         return;
     }
     const connect::Os os = thisOs();
-    const connect::Launch launch = thisInstall();
-    ImGui::TextWrapped("%s", tr("Let an AI assistant use SculptForge's tools: it starts sculptforge-cli on this computer "
-                                "and talks to it directly. Nothing listens on the network. The assistant works on its own "
-                                "scene and saves files where you ask; open them here to see the result."));
-    ImGui::Spacing();
-    std::string command = launch.command;
-    for (const std::string& a : launch.args) command += " " + a;
-    ImGui::TextDisabled("%s", tr("This install:"));
-    ImGui::SameLine();
-    ImGui::TextUnformatted(command.c_str());
-    ImGui::SameLine();
-    copyButton(status_, launch.command, "install");
-
-    ImGui::SeparatorText(tr("I have a subscription to"));
-    for (int p = 0; p < connect::kPlanCount; ++p) {
-        if (p) ImGui::SameLine();
-        const char* name = connect::planName(connect::Plan(p));
-        if (ImGui::RadioButton((std::string(p == int(connect::Plan::Other) ? tr("Other tools") : name) + "##plan" +
-                                std::to_string(p)).c_str(),
-                               connectPlan_ == p))
-            connectPlan_ = p;
+    connect::Launch launch = thisInstall();
+    const bool live = policy::mcpLiveAllowed(); // (a studio's policy may say never: then the tool gets its own scene)
+    if (live) {
+        launch.args.push_back("--attach"); // live mode: the tool works in this window (headless --mcp: the user guide)
+        launch.name = "sculptforge-live";
     }
-    const connect::Plan plan = connect::Plan(connectPlan_);
-    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    for (const char* note : connect::planNotes(plan)) ImGui::TextWrapped("%s", tr(note));
-    ImGui::PopStyleColor();
-    ImGui::Spacing();
+    const std::vector<connect::Client> all = connect::clients(launch, os);
+    // The radio buttons and the switch on the button colour: an empty one must not vanish into the window (Classic).
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::GetStyleColorVec4(ImGuiCol_Button));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
+    ImGui::TextWrapped("%s", tr("The AI blocks out a starting point and shows you options; you do the art."));
 
-    if (ImGui::BeginChild("##clients", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()), ImGuiChildFlags_None)) {
-        for (const connect::Client& c : connect::clients(launch, os)) {
-            if (c.plan != plan) continue;
-            ImGui::PushID(c.id);
-            ImGui::SeparatorText(c.name);
-            ImGui::TextWrapped("%s", tr(c.how));
-            if (std::string_view(c.id) == "claude_desktop" &&
-                ImGui::Button((std::string(ICON_LC_DOWNLOAD " ") + tr("Download the Claude Desktop bundle")).c_str()))
-                SDL_OpenURL(connect::bundleUrl(os).c_str());
-            for (size_t k = 0; k < c.snippets.size(); ++k) {
-                const connect::Snippet& sn = c.snippets[k];
-                const std::string id = std::to_string(k);
-                ImGui::TextDisabled("%s", sn.kind == connect::Snippet::Kind::Terminal ? tr("In a terminal:")
-                                          : sn.kind == connect::Snippet::Kind::Fields ? tr("Fields:")
-                                                                                      : tr("Add to:"));
-                if (!sn.file.empty()) {
-                    ImGui::SameLine();
-                    ImGui::TextUnformatted(sn.file.c_str());
-                }
-                ImGui::SameLine();
-                copyButton(status_, sn.text, id);
-                codeBox(sn.text, id, fontMono_);
-            }
-            if (ImGui::SmallButton((std::string(ICON_LC_BOOK_OPEN " ") + tr("Their documentation")).c_str()))
-                SDL_OpenURL(c.docs);
-            ImGui::PopID();
-            ImGui::Spacing();
+    // 1. The tool: the three most asked for as buttons, every other one in a list.
+    ImGui::SeparatorText(tr("1. Pick your tool"));
+    static constexpr const char* kQuick[] = {"claude_code", "claude_desktop", "cursor"};
+    const auto find = [&](std::string_view id) -> const connect::Client* {
+        for (const connect::Client& c : all)
+            if (id == c.id) return &c;
+        return nullptr;
+    };
+    if (!find(connectClient_)) connectClient_ = kQuick[0];
+    bool other = true;
+    for (const char* id : kQuick) {
+        if (const connect::Client* c = find(id)) {
+            if (ImGui::RadioButton((std::string(c->name) + "##ai_tool." + id).c_str(), connectClient_ == id))
+                connectClient_ = id;
+            other &= connectClient_ != id;
+            ImGui::SameLine();
         }
     }
-    ImGui::EndChild();
+    if (ImGui::RadioButton((std::string(tr("Other tools")) + "##ai_tool.other").c_str(), other) && !other)
+        connectClient_ = "codex";
+    other = std::find(std::begin(kQuick), std::end(kQuick), connectClient_) == std::end(kQuick);
+    const connect::Client& c = *find(connectClient_);
+    if (other) {
+        ImGui::SetNextItemWidth(std::min(320.0f * s, ImGui::GetContentRegionAvail().x));
+        if (ImGui::BeginCombo("##ai_tool.list", c.name)) {
+            for (const connect::Client& o : all) {
+                if (std::find(std::begin(kQuick), std::end(kQuick), std::string_view(o.id)) != std::end(kQuick)) continue;
+                if (ImGui::Selectable(o.name, connectClient_ == o.id)) connectClient_ = o.id;
+            }
+            ImGui::EndCombo();
+        }
+    }
+    ImGui::PushID(c.id);
+    ImGui::TextWrapped("%s", tr(c.how));
+    for (size_t k = 0; k < c.snippets.size(); ++k) {
+        const connect::Snippet& sn = c.snippets[k];
+        const std::string id = std::to_string(k);
+        ImGui::TextDisabled("%s", sn.kind == connect::Snippet::Kind::Terminal ? tr("In a terminal:")
+                                  : sn.kind == connect::Snippet::Kind::Fields ? tr("Fields:")
+                                                                              : tr("Add to:"));
+        if (!sn.file.empty()) {
+            ImGui::SameLine();
+            ImGui::TextUnformatted(sn.file.c_str());
+        }
+        ImGui::SameLine();
+        copyButton(status_, sn.text, id);
+        codeBox(sn.text, id, fontMono_);
+    }
+    if (ImGui::SmallButton((std::string(ICON_LC_BOOK_OPEN " ") + tr("Their documentation")).c_str())) SDL_OpenURL(c.docs);
+    if (const std::vector<const char*> notes = connect::planNotes(c.plan); !notes.empty()) {
+        ImGui::SameLine();
+        ImGui::TextDisabled(ICON_LC_INFO " %s", tr("Plans and sign-in"));
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(420.0f * s);
+            for (const char* note : notes) ImGui::TextWrapped("%s", tr(note));
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+    }
+    ImGui::PopID();
+
+    // 2. The live-mode switch itself (the same one as Preferences > AI).
+    ImGui::SeparatorText(tr("2. Let it work in this window"));
+    if (!live) {
+        ImGui::BeginDisabled();
+        bool off = false;
+        ImGui::Checkbox(tr("Let AI tools control this window##connect.ai_live"), &off);
+        ImGui::EndDisabled();
+        ui::ManagedBadge();
+        ImGui::TextWrapped("%s", tr("AI tools work on their own scene; your studio doesn't let them control this window."));
+    } else {
+        bool on = aiSettings_.liveControl;
+        if (ImGui::Checkbox(tr("Let AI tools control this window##connect.ai_live"), &on)) setAiLiveControl(on);
+        ImGui::SameLine();
+        if (aiLinkStateValue() >= 3) ImGui::TextColored(theme::accent, tr("AI connected: %s"), aiLinkClient().c_str());
+        else if (aiLink_) ImGui::TextDisabled("%s", tr("On: your AI tool can ask to connect."));
+        else ImGui::TextDisabled("%s", tr("Off"));
+    }
+
+    // 3. What the user will see, in the order it happens.
+    ImGui::SeparatorText(tr("3. What happens next"));
+    for (const char* line : {tr("Ask your AI tool for something (below). SculptForge shows a 6-digit code: click "
+                                "Approve, or tell the AI the code."),
+                             tr("While it works, the AI connected badge sits at the bottom right. Disconnect stops it."),
+                             tr("Every step lands in Undo as \"AI: ...\", so you can step back."),
+                             tr("It asks you first before files outside the project, scripts and the network."),
+                             tr("It sees the viewport; what it sees goes to that tool's AI service.")}) {
+        ImGui::Bullet();
+        ImGui::TextWrapped("%s", line);
+    }
+
+    ImGui::SeparatorText(tr("Try asking"));
+    const char* prompts[] = {tr("Block out a creature head with horns for me to sculpt."),
+                             tr("Look at my model from all sides and tell me what to fix."),
+                             tr("Make three rock variations I can refine."),
+                             tr("Teach me: walk me through sculpting an ear, step by step.")};
+    for (int i = 0; i < int(std::size(prompts)); ++i) {
+        const std::string prompt = prompts[i];
+        copyButton(status_, prompt, "prompt" + std::to_string(i));
+        ImGui::SameLine();
+        ImGui::TextWrapped("%s", prompt.c_str());
+    }
+
+    ImGui::PopStyleColor(2);
+    ImGui::Separator();
     if (ImGui::Button(tr("User guide: AI agents"))) guide_.open("scripting.md");
     ImGui::SameLine();
     ImGui::TextDisabled("%s", tr("Turn this off in Preferences > AI."));

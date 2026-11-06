@@ -21,7 +21,7 @@ licenses require.
 | [Inter typeface](https://github.com/rsms/inter) | 4.1 | SIL Open Font License 1.1 | User interface font, embedded in the desktop app. Vendored in assets/fonts. |
 | [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) | 2.304 | SIL Open Font License 1.1 | The monospace font of the interface looks (Preferences > Interface > Look): labels, numbers and status bar. Regular and SemiBold, embedded in the desktop app. Vendored in assets/fonts. |
 | [Archivo Black](https://github.com/Omnibus-Type/ArchivoBlack) | Google Fonts release (ofl/archivoblack) | SIL Open Font License 1.1 | The "S" and "F" of the website's SF monogram (header and favicons), converted to SVG paths by tools/brand/make_sf_mark.py; the font itself is not shipped. License in tools/brand/ArchivoBlack-OFL.txt. |
-| [Noto Sans CJK TC](https://github.com/notofonts/noto-cjk) | 2.004 | SIL Open Font License 1.1 | The Chinese glyphs of the Traditional Chinese interface: a subset with only the characters the translation uses (tools/i18n/subset_cjk_font.py), embedded in the desktop app. Vendored in assets/fonts (NotoSansTC-UI.otf, license NotoSansCJK-OFL.txt). |
+| [Noto Sans CJK TC and SC](https://github.com/notofonts/noto-cjk) | 2.004 | SIL Open Font License 1.1 | The Chinese glyphs of the Traditional and Simplified Chinese interfaces: one subset per script with only the characters the translation uses (tools/i18n/subset_cjk_font.py), embedded in the desktop app. Vendored in assets/fonts (NotoSansTC-UI.otf, NotoSansSC-UI.otf, license NotoSansCJK-OFL.txt). |
 | Colour schemes of the Forge Terminal look: [Tokyo Night](https://github.com/enkia/tokyo-night-vscode-theme), [Catppuccin](https://github.com/catppuccin/catppuccin) (Mocha), [Gruvbox](https://github.com/morhetz/gruvbox) (dark), [Nord](https://github.com/nordtheme/nord), [Rosé Pine](https://github.com/rose-pine/rose-pine-theme), [Kanagawa](https://github.com/rebelot/kanagawa.nvim), [Everforest](https://github.com/sainnhe/everforest) (dark) | colour values only | MIT License (each) | The published colour values of each scheme, as data in src/app/LookSchemes.cpp. No code from these projects is included. Credited with thanks below. |
 | [Poly Haven](https://polyhaven.com) HDRIs: Brown Photostudio 02, Studio Small 09 (Sergej Majboroda), Kloofendal 48d Partly Cloudy (Pure Sky) (Greg Zaal, sky edits by Jarod Guest) | 1K files, downsampled to 512 x 256 | CC0 1.0 (public domain) | Image-based lighting of the PBR viewport (Material > Viewport Shading). Vendored in assets/hdri and embedded. |
 | [MakeHuman](https://github.com/makehumancommunity/makehuman) base mesh hm08 | commit a8bc2d5 (base.obj, SHA-256 8e761e66...) | CC0 1.0 (public domain) | The human starter meshes (head, bust, full body, hand, foot, ear, stylised head, torso), cut and reshaped by tools/starter/build_starter_meshes.py into assets/starter (embedded). Only the CC0 mesh asset is used, no MakeHuman code (AGPL). See docs/starter-meshes.md. |
@@ -323,11 +323,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## Noto Sans CJK TC
+## Noto Sans CJK TC and SC
 
-https://github.com/notofonts/noto-cjk — SIL Open Font License 1.1. assets/fonts/NotoSansTC-UI.otf is a subset (a
-Modified Version under the license) holding only the characters the Traditional Chinese interface uses; the full
-license text is in assets/fonts/NotoSansCJK-OFL.txt.
+https://github.com/notofonts/noto-cjk — SIL Open Font License 1.1. assets/fonts/NotoSansTC-UI.otf and
+assets/fonts/NotoSansSC-UI.otf are subsets (Modified Versions under the license) holding only the characters the
+Traditional and the Simplified Chinese interfaces use; the full license text is in assets/fonts/NotoSansCJK-OFL.txt.
 
 ```
 Copyright © 2014-2021 Adobe (http://www.adobe.com/).

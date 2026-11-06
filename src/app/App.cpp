@@ -78,6 +78,8 @@ extern const unsigned char fontMonoBold[];
 extern const unsigned long long fontMonoBold_size;
 extern const unsigned char fontCjk[];
 extern const unsigned long long fontCjk_size;
+extern const unsigned char fontCjkSc[];
+extern const unsigned long long fontCjkSc_size;
 extern const unsigned char appIcon[];
 extern const unsigned long long appIcon_size;
 extern const unsigned char appIconSmall[];
@@ -182,7 +184,7 @@ bool App::init(const AppOptions& options) {
         else if (saved.maximized || saved.fullscreen) SDL_MaximizeWindow(window_);
     }
     {
-        // The detailed tile, with the small-size mark as the alternate for small task bar and title bar icons.
+        // The SF app icon, with its small cut as the alternate for small task bar and title bar icons.
         Image icon, small;
         std::string iconErr;
         if (Image::decode(assets::appIcon, size_t(assets::appIcon_size), icon, iconErr)) {
@@ -1294,7 +1296,7 @@ float App::targetUiScale() const {
 void App::applyUiScale() {
     uiScaleDirty_ = false;
     const float scale = targetUiScale();
-    if (!uiScaleChanged(uiScale_, scale) && fontsCjk_ == languageNeedsCjkFont(language())) return;
+    if (!uiScaleChanged(uiScale_, scale) && fontsLanguage_ == language()) return;
     SDL_Log("UI scale %.0f%%", double(scale * 100.0f));
     uiScale_ = scale;
     ImGui::GetIO().Fonts->Clear();
@@ -1308,25 +1310,34 @@ void App::requestUiScale() {
     redrawIn(0.0);
 }
 
-// Noto Sans CJK TC (SIL OFL), cut down to the Traditional Chinese table's characters (tools/i18n/subset_cjk_font.py),
-// merged into the font added just before. In another language only the language's own name (繁體中文, the Preferences
-// button) is merged, so the atlas stays Latin-sized.
+// Noto Sans CJK TC and SC (SIL OFL), each cut down to its table's characters (tools/i18n/subset_cjk_font.py), merged
+// into the font added just before: in Traditional Chinese all of TC, in Simplified Chinese all of SC (mainland glyph
+// shapes). Otherwise only the languages' own names (繁體中文, 简体中文: the Preferences buttons) are merged, so the
+// atlas stays Latin-sized.
 void App::mergeCjkFont(float px) {
     // CJK punctuation, full-width forms and the unified ideographs; the subset has only what the table uses.
     static const ImWchar kCjkRanges[] = {0x2000, 0x206F, 0x3000, 0x30FF, 0x4E00, 0x9FFF, 0xFF00, 0xFFEF, 0};
-    static const ImWchar kNameRanges[] = {0x4E2D, 0x4E2D, 0x6587, 0x6587, 0x7E41, 0x7E41, 0x9AD4, 0x9AD4, 0}; // 中文繁體
-    ImFontConfig cjk;
-    cjk.MergeMode = true;
-    cjk.FontDataOwnedByAtlas = false;
-    cjk.OversampleH = 1; // dense glyphs: oversampling only grows the atlas
-    ImGui::GetIO().Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontCjk), int(assets::fontCjk_size), px,
-                                                &cjk, fontsCjk_ ? kCjkRanges : kNameRanges);
+    static const ImWchar kTraditionalName[] = {0x4E2D, 0x4E2D, 0x6587, 0x6587, 0x7E41, 0x7E41, 0x9AD4, 0x9AD4, 0}; // 中文繁體
+    static const ImWchar kSimplifiedName[] = {0x4E2D, 0x4E2D, 0x4F53, 0x4F53, 0x6587, 0x6587, 0x7B80, 0x7B80, 0};  // 中体文简
+    auto merge = [px](const unsigned char* data, unsigned long long size, const ImWchar* ranges) {
+        ImFontConfig cjk;
+        cjk.MergeMode = true;
+        cjk.FontDataOwnedByAtlas = false;
+        cjk.OversampleH = 1; // dense glyphs: oversampling only grows the atlas
+        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(data), int(size), px, &cjk, ranges);
+    };
+    // The interface's own face first: a codepoint both have (中文) keeps the glyph merged first.
+    const bool traditional = fontsLanguage_ == Language::TraditionalChinese;
+    const bool simplified = fontsLanguage_ == Language::SimplifiedChinese;
+    if (simplified) merge(assets::fontCjkSc, assets::fontCjkSc_size, kCjkRanges);
+    merge(assets::fontCjk, assets::fontCjk_size, traditional ? kCjkRanges : kTraditionalName);
+    if (!simplified) merge(assets::fontCjkSc, assets::fontCjkSc_size, kSimplifiedName);
 }
 
 // Every font the UI uses, rasterised at `scale` for crisp text (Dear ImGui 1.91 has no dynamic font sizes).
 void App::buildUiFonts(float scale) {
     ImGuiIO& io = ImGui::GetIO();
-    fontsCjk_ = languageNeedsCjkFont(language());
+    fontsLanguage_ = language();
     const bool recording = !options_.recordPath.empty() || !options_.uiTest.empty();
     // Inter (SIL OFL), embedded in the binary. Rasterised at the final size for crisp text.
     ImFontConfig fontConfig;
@@ -2149,7 +2160,8 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     if (!lods_.empty() || previewLod_ >= 0) clearLods();
     beginPaintStroke();
     if (doc_.sculptor.dyntopo.enabled && strokeSculpt_ && !dyntopoBlocker(doc_.mesh).empty())
-        status_ = "Dynamic is on, but this Part has subdivision levels: sculpting without remeshing";
+        status_ = "Dynamic is on, but this Part has subdivision levels: sculpting without remeshing (Draw > Freeze "
+                  "Levels + Dynamic)";
     lastX_ = x;
     lastY_ = y;
     strokePath_.reset(x, y);
@@ -2853,6 +2865,7 @@ void App::drawUi() {
     // An Extract preview goes once its source changes or another Part is picked (strokes aren't commands).
     if (doc_.extractPreview.id && !doc_.sculptor.strokeActive()) doc_.dropExtractPreview(true);
     drawProjectPopups();
+    drawDynamicOffer();
     if (hideUi_) return; // demos: clean beauty shots
     // Draw order (ui-spec §12): shells, Library, floating windows, then pop-ups and help.
     drawShell();
@@ -2901,6 +2914,7 @@ void App::drawUi() {
                          uvToolActive();
     if (((!ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y)) || drag_ == Drag::Stroke) &&
         !hideBrushCursor_ && radial_.menu < 0 && !strokePopup_.open && drag_ != Drag::Select && drag_ != Drag::Guide && // (no ring under a pie or the stroke popup)
+        aiLinkStateValue() != 2 && aiLinkStateValue() != 4 && // (nor over a live-mode question: it is drawn above windows)
         (!ringOff || drag_ == Drag::Stroke || ctrlDown(inputMods())))
         drawBrushCursor();
     drawSelectionOverlay();
@@ -2911,7 +2925,7 @@ void App::drawUi() {
         ImGui::SetNextWindowSize(ImVec2(460 * uiScale_, 0), ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (ImGui::Begin("About SculptForge", &showAbout_, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
-            brand::markItem(64.0f * uiScale_); // the app mark; beside it the name, version and what it is
+            brand::bustItem(64.0f * uiScale_); // the bust; beside it the name, version and what it is
             ImGui::SameLine(0.0f, 12.0f * uiScale_);
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (64.0f * uiScale_ - 2.0f * ImGui::GetTextLineHeightWithSpacing()) * 0.5f);
             ImGui::BeginGroup();

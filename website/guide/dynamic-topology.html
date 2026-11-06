@@ -98,7 +98,7 @@
 </li>
 </ul>
 <h2 id="subdivision-levels">Subdivision levels<a class="anchor" href="#subdivision-levels" aria-label="Link to this section">#</a></h2>
-<p>Dynamic topology works on meshes without <a href="subdivision-levels.html">subdivision levels</a>. On a Part with levels, <strong>Dynamic</strong> stays off and the status bar says why: go to the level you want to keep and use <strong>Delete Lower</strong> and <strong>Delete Higher</strong> in <strong>Tool &gt; Geometry</strong> first. If you turn it on and then pick a Part that has levels, strokes sculpt it without remeshing.</p>
+<p>Dynamic topology works on meshes without <a href="subdivision-levels.html">subdivision levels</a>. On a Part with levels, clicking <strong>Dynamic</strong> offers <strong>Freeze Levels and Turn On Dynamic</strong>: the level you see becomes one plain mesh and the other levels go (<kbd>Ctrl</kbd>+<kbd>Z</kbd> brings them back). To keep a different level, go to it first. If you turn Dynamic on and then pick a Part that has levels, strokes sculpt it without remeshing, and the <strong>Sculpt &gt; Draw &amp; Tablet</strong> palette shows the same <strong>Freeze Levels + Dynamic</strong> button.</p>
 <p>A good workflow: block in with Dynamic, then <a href="retopology.html">Quad Remesh</a> or <a href="geometry.html">Voxel Remesh</a> for an even base, <strong>Divide</strong> for levels, and sculpt the fine detail on them.</p>
 <h2 id="undo-and-speed">Undo and speed<a class="anchor" href="#undo-and-speed" aria-label="Link to this section">#</a></h2>
 <p>Each stroke is one undo step. Undo puts every triangle back exactly, and it only keeps the part of the mesh the stroke changed, so it costs little memory even on millions of triangles (a few megabytes per stroke).</p>
@@ -138,6 +138,7 @@ dyntopo enabled=false</code></pre><button class="copy" type="button" aria-label=
           SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
       </div>
       <div class="links">
+        <a href="../performance/">Performance</a>
         <a href="index.html">User guide</a>
         <a href="../supporters.html">Members</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>

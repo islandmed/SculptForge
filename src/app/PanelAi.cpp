@@ -117,9 +117,9 @@ void App::registerAiActions() {
     connect.label = "Connect an AI tool...";
     connect.icon = ICON_LC_PLUG;
     connect.palette = "Help";
-    connect.description = "Use SculptForge from Claude, ChatGPT (Codex), Gemini, Grok, Cursor, VS Code and other AI "
-                          "tools: the exact command or settings for this install, with Copy buttons. The tool starts "
-                          "SculptForge on this computer; nothing listens on the network.";
+    connect.description = "Let an AI tool (Claude Code, Claude Desktop, Cursor and others) work in this window while "
+                          "you watch: pick your tool, copy its command, turn on live mode. The AI blocks out a starting "
+                          "point; you do the art. Nothing listens on the network.";
     connect.run = [this] { showConnectAi_ = true; };
     actions_.add(std::move(connect));
 }

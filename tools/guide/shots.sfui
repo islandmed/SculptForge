@@ -49,7 +49,7 @@ key escape
 # Help: Ctrl-hover, the command palette, the console.
 click "Tool/Geometry"
 hold ctrl
-hover "Subdivide"
+hover "Subdivide (removes levels)"
 wait 0.3
 shot ctrl-help
 hold none
