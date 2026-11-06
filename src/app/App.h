@@ -72,6 +72,7 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace sf::ai {
@@ -1013,9 +1014,21 @@ private:
     // After uv_pack / uv_unwrap from anywhere (the panel, a script, the console): the fields show the grid it used.
     void uvPackGridUsed(const Args& args);
     bool showUvEditor_ = false;
-    void startAutoUv();
+    // Auto UV on a worker (xatlas takes seconds on big meshes): the button, New Texture, and the uv_auto command from
+    // the console, an AI tool or a UI test (resolution 0: the texture's size, or the size chosen under Texture Map).
+    void startAutoUv(int resolution = 0, bool keepTexture = true, bool command = false);
+    CommandResult startAutoUvCommand(const Args& args); // runCommand's uv_auto (macros keep the synchronous one)
     void startNewTexture(); // New Texture on the top shelf / Color palette: Auto UV first when there are no UVs
     void pollAutoUv();
+    // A command that runs on a worker (uv_auto): it returned at once and its result comes later. The console, the AI
+    // link and UI tests wait for it before their next statement, then take its result (once).
+    bool commandRunning() const { return autoUv_ && autoUv_->command; }
+    bool takeCommandResult(CommandResult& out) {
+        if (!commandResult_) return false;
+        out = *std::exchange(commandResult_, std::nullopt);
+        return true;
+    }
+    std::optional<CommandResult> commandResult_;
     struct AutoUvJob {
         std::future<bool> done;
         std::shared_ptr<std::atomic<float>> progress;
@@ -1024,6 +1037,8 @@ private:
         std::shared_ptr<std::string> error;
         uint32_t part = 0;            // Part id it unwraps
         size_t triangles = 0;            // the mesh must still have this many triangles when it finishes
+        bool keepTexture = true;         // a painted texture moves onto the new UVs (uv_auto keep_texture=false: not)
+        bool command = false;            // started by the uv_auto command: its result goes to commandResult_
     };
     std::unique_ptr<AutoUvJob> autoUv_;
     bool textureAfterAutoUv_ = false;    // the running Auto UV came from New Texture: make the texture after it
