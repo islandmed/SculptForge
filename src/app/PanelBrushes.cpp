@@ -167,7 +167,7 @@ void App::dragRectTo(float x, float y) {
     const float len = glm::length(drag);
     if (len < 2.0f) return;
     const glm::quat q = camera_.orientation();
-    const float pressure = strokePressure();
+    const float pressure = stampPressure_.hold(strokePressure()); // (not the lift's falling pressure, #146)
 
     DabParams p;
     p.center = dragAnchorHit_;

@@ -837,6 +837,7 @@ private:
     float sprayScatter_ = 1.0f;          // jitter radius as a fraction of brush size
     glm::vec2 dragAnchor_{0.0f};         // DragRect: where the click landed (window pixels)
     glm::vec3 dragAnchorHit_{0.0f};
+    StampPressure stampPressure_;        // DragRect / DragDot: the drag's firmest pressure (#146)
     float dabRadiusScale_ = 1.0f, dabStrengthScale_ = 1.0f, dabAngle_ = 0.0f; // per-dab overrides
     bool alphaInvert_ = false;
     // Alpha options (#76, core/AlphaOptions.h): the Alpha palette's Follow stroke direction, Angle, Angle jitter and

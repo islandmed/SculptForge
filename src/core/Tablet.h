@@ -108,6 +108,22 @@ private:
     int silentMotions_ = 0;
 };
 
+// The pressure a re-pressed stamp uses (Drag Stamp, Slide Stamp: each move undoes the stamp and presses it again):
+// the firmest of the drag so far. A pen's last samples before it lifts fall towards 0 (every tablet does, whether
+// the pressure comes from Windows Ink, Wintab or Linux), and the stamp re-pressed with them went weak or vanished at
+// release (#146); the stamp now ends as the drag showed it.
+class StampPressure {
+public:
+    void reset() { peak_ = 0.0f; }
+    float hold(float pressure) {
+        if (pressure > peak_) peak_ = pressure;
+        return peak_;
+    }
+
+private:
+    float peak_ = 0.0f;
+};
+
 // Tablets plugged in or out while the app runs. SDL has no pen hot-plug events: a new pen is a new SDL_PenID at
 // its first proximity, and the tablet itself shows up as a mouse device (SDL_EVENT_MOUSE_ADDED / _REMOVED) with
 // the maker's name on Linux and usually on Windows. A mouse device added after launch with a generic name may be
