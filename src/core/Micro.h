@@ -252,14 +252,17 @@ public:
     // and of every base triangle sharing a vertex with one (whose shared edges and corners average with them).
     // out(tri) gives where that triangle's `samples` values go (each written whole). `written` lists them.
     // `prepare`, if given, sees the triangles about to be written (before any out() call), once per batch.
+    // `grow` false: the dirty triangles alone are written (exact: their neighbours' edge sums are read, not written);
+    // the neighbours whose shared points changed (those sharing a vertex) go to `outer`, to write later.
     using Prepare = std::function<void(std::span<const uint32_t> tris)>;
     void shade(const Mesh& m, std::span<const uint32_t> dirty, bool all, std::vector<uint32_t>& written,
-               const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare = {});
+               const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare = {}, bool grow = true,
+               std::vector<uint32_t>* outer = nullptr);
 
 private:
     // shade() for the triangles `seeds` (grown by the triangles sharing a vertex when `grow`); appends to `written`.
     void shadeSet(const Mesh& m, std::span<const uint32_t> seeds, bool grow, std::vector<uint32_t>& written,
-                  const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare);
+                  const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare, std::vector<uint32_t>* outer = nullptr);
     std::vector<uint32_t> seed_, grown_;
     std::vector<uint32_t> stamp_, slot_; // per base triangle: in a set of this call (stamp), its partials (slot)
     std::vector<uint32_t> vstamp_;       // per base vertex

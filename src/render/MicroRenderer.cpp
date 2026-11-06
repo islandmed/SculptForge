@@ -307,7 +307,8 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
     for (uint32_t c = 0; c < clusters; ++c) all[c] = c;
     updateClusterBounds(mesh, all);
     pending_.assign((size_t(nt) + 63) / 64, 0);
-    pendingCount_ = 0;
+    stale_.assign(pending_.size(), 0);
+    pendingCount_ = staleCount_ = 0;
     ensurePatches(mm.level);
 }
 
@@ -468,12 +469,17 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
         }
         gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
         std::fill(pending_.begin(), pending_.end(), 0);
-        pendingCount_ = 0;
+        std::fill(stale_.begin(), stale_.end(), 0);
+        pendingCount_ = staleCount_ = 0;
         return;
     }
-    // The pending triangles, newest first (scratch_ holds this sync's dirty ones, already marked).
+    // The pending triangles, newest first (scratch_ holds this sync's dirty ones, already marked), each written
+    // alone: the neighbours whose shared edges and corners they change become stale_, written after them, and not
+    // at all while a stroke runs (deferStale): its next dabs change most of them again, and what they'd change is
+    // the brush's falloff tail at the patch border (usually nothing: a changed shared point changes both patches).
+    // As many a frame as when each one also wrote its ring (~3 patches): shading as current as it was, for less.
+    const size_t limit = shadeBudget ? std::max<size_t>(1, shadeBudget / (S * 3)) : SIZE_MAX;
     std::vector<uint32_t>& seeds = scratch_;
-    const size_t limit = shadeBudget ? std::max<size_t>(1, shadeBudget / (S * 3)) : SIZE_MAX; // (the ring triples it)
     const bool full = seeds.size() >= limit; // (this sync's dirty ones fill it: sorted and unique already)
     if (full) seeds.resize(limit);
     else if (seeds.size() < limit)
@@ -487,8 +493,34 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
         seeds.erase(std::unique(seeds.begin(), seeds.end()), seeds.end());
         if (seeds.size() > limit) seeds.resize(limit);
     }
-    if (seeds.empty()) return;
     const auto started = std::chrono::steady_clock::now();
+    size_t shaded = 0;
+    if (!seeds.empty()) {
+        shaded += shadeSeeds(mesh, seeds, &outer_);
+        for (uint32_t t : outer_) {
+            uint64_t& w = stale_[t >> 6];
+            const uint64_t bit = uint64_t(1) << (t & 63);
+            if (!(w & bit)) w |= bit, ++staleCount_;
+        }
+    }
+    if (const size_t room = shaded < limit ? limit - shaded : 0; !deferStale && staleCount_ && room) {
+        seeds.clear();
+        for (size_t w = 0; w < stale_.size() && seeds.size() < room; ++w)
+            for (uint64_t bits = stale_[w] & ~pending_[w]; bits && seeds.size() < room; bits &= bits - 1)
+                seeds.push_back(uint32_t(w * 64 + size_t(std::countr_zero(bits))));
+        if (!seeds.empty()) shaded += shadeSeeds(mesh, seeds, nullptr);
+    }
+    if (shaded) { // the cost per point, smoothed (a stroke's shading budget in time follows it)
+        const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() /
+                          double(shaded * S);
+        shadeNsPerPoint_ = shadeNsPerPoint_ > 0.0 ? shadeNsPerPoint_ * 0.7 + ns * 0.3 : ns;
+    }
+}
+
+// Shades `seeds` (sorted) alone and sends them; `outer` gets their neighbours to write later. Returns how many.
+size_t MicroRenderer::shadeSeeds(const Mesh& mesh, std::span<const uint32_t> seeds, std::vector<uint32_t>* outer) {
+    const MicroMesh& mm = *mesh.micro;
+    const size_t S = mm.samples;
     std::vector<uint32_t> sorted;
     if (stageIndex_.size() != mm.baseTriangles) stageIndex_.assign(mm.baseTriangles, 0);
     shader_.shade(mesh, seeds, false, written_, [&](uint32_t t) -> uint32_t* {
@@ -498,7 +530,7 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
         std::sort(sorted.begin(), sorted.end(), [&](uint32_t a, uint32_t b) { return slotOf_[a] < slotOf_[b]; });
         for (size_t i = 0; i < sorted.size(); ++i) stageIndex_[sorted[i]] = uint32_t(i);
         staging_.resize(sorted.size() * S * 4);
-    });
+    }, false, outer);
     const auto* st = reinterpret_cast<const uint32_t*>(staging_.data());
     for (size_t i = 0; i < sorted.size();) {
         const uint32_t s0 = slotOf_[sorted[i]], chunk = s0 / chunkSlots_;
@@ -510,16 +542,14 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
         i = j;
     }
     gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
-    if (!written_.empty()) { // the cost per point, smoothed (a stroke's shading budget in time follows it)
-        const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() /
-                          double(written_.size() * S);
-        shadeNsPerPoint_ = shadeNsPerPoint_ > 0.0 ? shadeNsPerPoint_ * 0.7 + ns * 0.3 : ns;
-    }
-    for (uint32_t t : written_) {
-        uint64_t& w = pending_[t >> 6];
+    for (uint32_t t : written_) { // (written whole and current: neither pending nor stale)
         const uint64_t bit = uint64_t(1) << (t & 63);
+        uint64_t& w = pending_[t >> 6];
         if (w & bit) w &= ~bit, --pendingCount_;
+        uint64_t& v = stale_[t >> 6];
+        if (v & bit) v &= ~bit, --staleCount_;
     }
+    return written_.size();
 }
 
 bool MicroRenderer::sync(Mesh& mesh) {
@@ -644,7 +674,8 @@ bool MicroRenderer::sync(Mesh& mesh) {
             // stroke runs or the view moves, no more than strokeShadeMs of it (at least one patch and its ring), so a
             // slower CPU doesn't spend the frame the dabs or the orbit need on shading; the rest follows.
             shadeBudget = microShadeBudget(currentTierConfig(), mm.stroking, viewMoving, shadeNsPerPoint_, size_t(mm.samples) * 3);
-            if (pendingCount_) shadePending(mesh, false);
+            deferStale = mm.stroking;
+            if (pendingCount_ || staleCount_) shadePending(mesh, false);
         }
     }
     step_ = mm.step;
