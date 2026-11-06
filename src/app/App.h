@@ -23,6 +23,7 @@
 #include "core/BrushSettings.h"
 #include "core/Commands.h"
 #include "core/Image.h"
+#include "link/AiLinkSession.h"
 #include "core/Macro.h"
 #include "core/Pack.h"
 #include "core/Document.h"
@@ -540,6 +541,30 @@ private:
     void setAiFeatures(bool on);
     void registerAiActions(); // ui.brush_lab, ui.generate3d: only while AI is on
     void drawAiPrefs();       // the Preferences > AI section and the first-run question
+    // Live mode (PanelAiLink.cpp, link/AiLink.h): Preferences > AI > Let AI tools control this window. An AI tool
+    // (sculptforge-cli --mcp --attach) connects over a local socket / pipe only this user can open, is approved in
+    // a dialog (a one-time code), shows an "AI connected" badge with Disconnect while it works, and asks first
+    // before files outside the project, overwrites, scripts or the network. Off by default; gone while AI is off.
+    struct AiLinkState;
+    struct AiLinkStateDeleter {
+        void operator()(AiLinkState* s) const;
+    };
+    std::unique_ptr<AiLinkState, AiLinkStateDeleter> aiLink_;
+    void setAiLiveControl(bool on);
+    void syncAiLink();             // starts or stops the listener to match the switch (and the AI switch)
+    void pollAiLink();             // every frame: the connection's messages, one at a time
+    void drawAiLink();             // the Approve and Allow dialogs, the "AI connected" badge
+    void drawAiLinkPrefs();        // its switch in Preferences > AI
+    void aiLinkDisconnect(const std::string& why); // the kill switch: closes the connection now
+    void aiLinkPicked(const std::string& path);    // a file the user chose: an AI tool may use it without asking
+    int aiLinkStateValue() const;  // UI tests: 0 off, 1 listening, 2 waiting for approval, 3 connected, 4 asking
+    std::vector<std::string> aiLinkPickedPaths_; // files the user chose this run (each connection starts with them)
+    void aiLinkExecute(const link::AiLinkCall& call);
+    uint32_t activePartInfoId() const;
+    void labelAiUndo(uint32_t part, size_t undoCountBefore, uint64_t revisionBefore); // "AI: " on the new undo steps
+    bool aiApplyView(const Args& args, std::string& error); // view_set's preset / yaw / elevation / frame / zoom / ortho
+    bool aiRenderView(const Camera& cam, int width, int height, Image& img, std::string& error);
+    Json aiLiveTool(const std::string& name, const Args& args, bool& ok); // viewport_image, view_set, ...
     // Brush Lab (AI brush designer)
     bool showBrushLab_ = false; // floating; opened from the top shelf's AI Brush or the Brush palette
     bool hideUi_ = false;

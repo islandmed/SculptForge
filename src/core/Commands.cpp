@@ -1,6 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Commands.h"
+
+#include "core/AgentTools.h"
 #include "core/ViewCapture.h"
 
 #include "core/Bake.h"
@@ -648,6 +650,7 @@ CommandRegistry::CommandRegistry() {
     registerRetopoCommands(*this); // qremesh, project_all (RetopoCommands.cpp)
     registerQRemeshGuideCommands(*this); // qremesh_guide, ... (QRemeshGuides.cpp)
     registerForgeSphereCommands(*this);      // Forge Sphere_new, ... (Forge Spheres.cpp)
+    registerAgentTools(*this);               // blockout, measure, scene_overview (core/AgentTools.cpp)
     registerDeformCommands(*this);       // deform_polish, deform_relax, deform_smooth, deform_balloon (Deform.cpp)
 
     add({"stroke",

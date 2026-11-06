@@ -138,7 +138,7 @@ add_library(sculptforge_core STATIC
   src/core/QRemesh2Field.cpp
   src/core/QRemesh2Param.cpp
   src/core/QuadQuality.cpp
-  src/core/ForgeSpheres.cpp
+  src/core/ForgeSpheres.cpp src/core/AgentTools.cpp
   src/core/Projection.cpp
   src/core/RetopoCommands.cpp
   third_party/xatlas/xatlas.cpp
@@ -312,9 +312,12 @@ set_source_files_properties(third_party/qrcodegen/qrcodegen.cpp ${CMAKE_CURRENT_
 
 # --- Headless command-line tool (pipelines, build farms, AI agents) ---
 # The MCP server (src/cli/McpServer.cpp) is a library of its own: the tool and the tests link it, nobody compiles it twice.
-add_library(sculptforge_mcp STATIC src/cli/McpServer.cpp)
+add_library(sculptforge_mcp STATIC src/cli/McpServer.cpp src/cli/McpTools.cpp src/cli/McpAttach.cpp src/link/AiLink.cpp src/link/AiLinkSession.cpp)
 target_compile_definitions(sculptforge_mcp PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
 target_link_libraries(sculptforge_mcp PUBLIC sculptforge_core sculptforge_ai)
+if(WIN32)
+  target_link_libraries(sculptforge_mcp PRIVATE advapi32) # live mode's pipe ACL (src/link/AiLink.cpp)
+endif()
 add_executable(sculptforge-cli src/cli/main.cpp)
 target_compile_definitions(sculptforge-cli PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
 target_link_libraries(sculptforge-cli PRIVATE sculptforge_core sculptforge_ai sculptforge_mcp)
@@ -427,6 +430,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelSupport.cpp
     src/app/QuickTour.cpp
     src/app/PanelAi.cpp
+    src/app/PanelAiLink.cpp
     src/app/PanelSupportCard.cpp
     src/app/PanelIntegrations.cpp
     src/app/WhatsNewPopup.cpp
@@ -447,7 +451,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/render/MicroRenderer.cpp
   )
   target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone sculptforge_appshared
-                                            sculptforge_actions imgui SDL3::SDL3)
+                                            sculptforge_mcp sculptforge_actions imgui SDL3::SDL3)
   target_include_directories(sculptforge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lucide)
   target_compile_definitions(sculptforge PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}"
                                                  SCULPTFORGE_PRERELEASE="${SCULPTFORGE_PRERELEASE}"

@@ -109,10 +109,12 @@ void isolateSettings() {
 #if defined(_WIN32)
     _putenv_s("APPDATA", d.c_str());
     _wputenv_s(L"SF_USER_DATA_DIR", dir.c_str()); // (SDL_GetPrefPath ignores APPDATA: app/UserData.h; wide, any name)
+    _putenv_s("SF_AI_LIVE_DIR", d.c_str());       // live mode's pipe (link/AiLink.h): never the user's window's
 #else
     setenv("XDG_DATA_HOME", d.c_str(), 1);
     setenv("XDG_CONFIG_HOME", d.c_str(), 1);
     setenv("HOST_XDG_DATA_HOME", d.c_str(), 1); // in a Flatpak, the Blender bridge folder (io/BlenderBridge.h)
+    setenv("SF_AI_LIVE_DIR", d.c_str(), 1);     // live mode's socket (link/AiLink.h): never the user's window's
 #if defined(__APPLE__)
     setenv("HOME", d.c_str(), 1);
 #endif

@@ -1,0 +1,76 @@
+# Live mode (PanelAiLink.cpp): Preferences > AI > Let AI tools control this window. Off by default; a scripted AI
+# tool over the real local socket / pipe: refused before approval, a wrong code refused, the right code (or Approve)
+# connects, the badge shows, a step outside the project asks first, every step is in Undo labelled "AI:",
+# Disconnect cuts it, and turning AI features off stops it.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+expect_value ai_link_state == 0
+click "Preferences##palette.preferences"
+click "AI##preferences.ai"
+expect_text "Let AI tools control this window"
+click "Let AI tools control this window##prefs.ai_live"
+expect_value ai_link_state == 1
+shot ai-live-prefs
+click "Preferences##palette.preferences"
+
+# Before approval nothing runs; a wrong code is refused.
+ai_client connect
+ai_client send {"hello":"sculptforge-live","v":1,"client":"Claude Code"}
+wait_value ai_link_state == 2 5
+ai_client expect waiting
+ai_client send {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"new_sphere","arguments":{}}}
+ai_client expect -32001
+ai_client send {"pair":"000000"}
+ai_client expect attempts_left
+expect_text "Let an AI tool control this window?"
+expect_text "Claude Code"
+shot ai-live-approve
+click "Approve##ailink"
+ai_client expect paired":true
+wait_value ai_link_state == 3 5
+
+# Connected: the badge; the tools include the live ones; a step lands in Undo as "AI: ...".
+ai_client send {"jsonrpc":"2.0","id":2,"method":"tools/list"}
+ai_client expect viewport_image
+ai_client send {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"view_set","arguments":{"preset":"three_quarter","frame":"all"}}}
+ai_client expect "Camera: yaw 35"
+ai_client send {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"stroke_screen","arguments":{"points":"0.4,0.45 0.5,0.4 0.6,0.45","brush":"Clay Buildup","radius":0.06,"strength":0.8}}}
+ai_client expect id":4,
+ai_client send {"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"viewport_image","arguments":{"size":256}}}
+ai_client expect image/png
+expect_text "AI connected: Claude Code"
+expect_value undo_ai == 1
+shot ai-live-badge
+
+# Outside the project: asks first. Deny tells the tool not to retry.
+ai_client send {"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"export_glb","arguments":{"path":"/tmp/elsewhere/out.glb"}}}
+wait_value ai_link_state == 4 5
+expect_text "Allow this AI step?"
+expect_text "outside the project folder"
+shot ai-live-confirm
+click "Deny##ailinkconfirm"
+ai_client expect "declined export_glb"
+wait_value ai_link_state == 3 5
+
+# Packs and the AI switch are never offered.
+ai_client send {"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"ai_features","arguments":{"on":false}}}
+ai_client expect "Unknown tool: ai_features"
+expect_value ai_enabled == 1
+
+# The kill switch.
+click "Disconnect##ailink"
+wait_value ai_link_state == 1 5
+expect_status "AI tool disconnected"
+ai_client close
+
+# AI features off: live mode stops (and the switch is hidden).
+ai_client connect
+ai_client send {"hello":"sculptforge-live","v":1,"client":"Again"}
+wait_value ai_link_state == 2 5
+run ai_features on=false
+expect_value ai_link_state == 0
+click "Preferences##palette.preferences"
+expect_not "Let AI tools control this window##prefs.ai_live"
+ai_client close
+run ai_features on=true
+expect_value ai_link_state == 1              # (the switch stays on: back with AI)
