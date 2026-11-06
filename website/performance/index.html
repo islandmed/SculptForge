@@ -76,7 +76,7 @@
 </head>
 <body>
 <main>
-  <p class="small"><a href="../index.html">SculptForge</a> / <a href="../guide/performance.html">Performance guide</a> / <a href="../benchmarks/">Benchmarks</a></p>
+  <p class="small"><a href="../index.html">SculptForge</a> / <a href="../guide/performance.html">Performance guide</a> / <a href="../benchmarks/">Benchmarks</a> / <a href="../fast/">How fast?</a></p>
   <h1>Performance: what we're building</h1>
   <p class="lede muted">Speed on dense sculpts is our top priority, and it has to hold on modest computers first, not
     only on a fast desktop. This page lists what we're building toward that: what each piece does in plain words,
@@ -85,7 +85,8 @@
   <div class="card">
     <p><strong>About the numbers.</strong> We're re-measuring everything on scans with sculpted detail, so this page
       has no figures yet. They'll appear here once they're verified, each with the method and the machine. Until then,
-      the <a href="../benchmarks/">benchmarks page</a> has results you can repeat yourself.</p>
+      <a href="../fast/">How fast?</a> has the machines, the limits we know of and the steps to measure your own computer,
+      and the <a href="../benchmarks/">benchmarks page</a> has results you can repeat yourself.</p>
     <p class="small muted">Our low-end tier is <strong>simulated</strong>: the memory, graphics and core budgets of a
       modest integrated-graphics laptop, applied on an Apple M1 Pro laptop running Linux. We don't have a real
       low-end laptop in the test set yet; if you have one, your benchmark results are very welcome.</p>
@@ -136,12 +137,12 @@
   <section class="card item" id="analytic-normals">
     <span class="badge shipped">Shipped in 0.11.2</span>
     <h2>Lighting that follows the brush while you drag</h2>
-    <p>With a big brush (160 px or more) on a machine with six or more cores, the lighting follows the brush's shape
+    <p>With a big brush (160 px or more) on a faster computer (six or more threads), the lighting follows the brush's shape
       while you drag, so the stroke you see stays closer to the pen. The exact shading lands right behind it.</p>
     <details><summary>How it works</summary>
       <p>Each brush's falloff has a known slope, so during the stroke the new normal is computed directly from the
         old normal and that slope, without walking the neighbouring triangles. Exact normals are recomputed in the
-        background and after pen-up. Machines with fewer cores keep the previous behaviour.</p>
+        background and after pen-up. Computers with fewer threads keep the previous behaviour.</p>
     </details>
   </section>
 
@@ -174,13 +175,14 @@
   </section>
 
   <section class="card item" id="build-once">
-    <span class="badge shipped">Shipped in 0.11.1</span>
+    <span class="badge progress">In progress, for 0.11.3</span>
     <h2>Releases built once, then tested</h2>
-    <p>The packages you download are the same files our full test suite ran against, not a rebuild made afterwards.</p>
+    <p>The packages you download will be the same files our full test suite ran against, not a rebuild made
+      afterwards.</p>
     <details><summary>How it works</summary>
-      <p>Each batch of changes builds the release packages beside the continuous-integration run. The main branch
-        moves forward only when the whole suite and CI pass, and a release promotes the packages already built and
-        tested for the exact tagged commit.</p>
+      <p>Each batch of changes builds the release packages beside the continuous-integration run, and the main
+        branch moves forward only when the whole suite and CI pass. A release will then promote the packages already
+        built and tested for the exact tagged commit instead of building them again.</p>
     </details>
   </section>
 
@@ -198,7 +200,7 @@
         for a pessimistic CPU), the Apple M1 Pro laptop itself, then a Windows desktop with an NVIDIA RTX 3060.
         A gain that shows only on the desktop doesn't count.</p>
     </details>
-    <p class="small muted">Since 0.10.7. <a href="../benchmarks/">Results and how to submit yours</a>.</p>
+    <p class="small muted">Since 0.10.7. <a href="../fast/">How fast?</a> &middot; <a href="../benchmarks/">Results and how to submit yours</a>.</p>
   </section>
 
   <section class="card item" id="research">
@@ -213,7 +215,7 @@
 
   <footer class="small muted">
     <p><a href="../index.html">SculptForge</a> &middot; <a href="../guide/performance.html">Performance guide</a> &middot;
-      <a href="../benchmarks/">Benchmarks</a> &middot; <a href="https://github.com/islandmed/SculptForge">Source code</a> &middot;
+      <a href="../fast/">How fast?</a> &middot; <a href="../benchmarks/">Benchmarks</a> &middot; <a href="https://github.com/islandmed/SculptForge">Source code</a> &middot;
       <a href="https://discord.gg/gWrYkEmQhH">Discord</a></p>
     <p>SculptForge is free and open source (GPL-3.0-or-later). Made by Med and contributors.</p>
   </footer>
