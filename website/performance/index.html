@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SculptForge Performance</title>
+  <meta name="description" content="What SculptForge is building to make dense sculpts fast on modest computers: what each piece does, how it works, and whether it has shipped.">
+  <meta property="og:title" content="SculptForge performance: what we're building">
+  <meta property="og:description" content="Detail levels above the base mesh, big brushes on the base, shading within a frame budget, faster opening, and the open benchmark behind every claim.">
+  <meta property="og:url" content="https://sculptforge.app/performance/">
+  <link rel="canonical" href="https://sculptforge.app/performance/">
+  <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=5">
+  <!-- Sources: docs/design/perf-scoreboard.md, perf-moonshots.md, CHANGELOG 0.11.x. No numbers here until the
+       coordinator marks them verified (scoreboard rows, with the method). -->
+  <style>
+    @font-face { font-family: "Inter"; src: url("../fonts/Inter-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+    @font-face { font-family: "Inter"; src: url("../fonts/Inter-SemiBold.ttf") format("truetype"); font-weight: 600 700; font-display: swap; }
+    :root {
+      color-scheme: dark;
+      --bg: #0f0f12; --panel: #1b1b21; --border: #2a2a31;
+      --text: #ececf1; --muted: #a3a3ad; --accent: #f28c3c; --accent-2: #ffb06a; --good: #7fc28a; --warn: #e2b155; --bad: #e5604a;
+    }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) { color-scheme: light; --bg: #f6f6f8; --panel: #ffffff; --border: #dcdce2; --text: #18181c; --muted: #5d5d66; --accent-2: #b5560f; --good: #2f7d3b; --warn: #8a6400; --bad: #b8321e; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text);
+           font: 400 16px/1.55 "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 1160px; margin: 0 auto; padding: 24px 16px 64px; }
+    h1 { font-size: clamp(1.7rem, 4vw, 2.4rem); line-height: 1.15; margin: 8px 0 8px; letter-spacing: -0.015em; }
+    h2 { font-size: 1.25rem; margin: 40px 0 10px; }
+    a { color: var(--accent-2); }
+    .muted { color: var(--muted); }
+    .small { font-size: 0.86rem; }
+    .lede { font-size: 1.08rem; max-width: 760px; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin: 16px 0; }
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; padding: 0; margin: 16px 0; list-style: none; counter-reset: s; }
+    .steps li { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; counter-increment: s; min-width: 0; }
+    .steps li::before { content: counter(s); display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+                        background: var(--accent); color: #111; font-weight: 700; margin-right: 8px; }
+    .steps strong { font-size: 1.02rem; }
+    .steps p { margin: 8px 0 0; }
+    .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; }
+    select { font: inherit; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; }
+    .scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+    table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 0.9rem; }
+    th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; vertical-align: top; }
+    tbody tr:last-child td { border-bottom: 0; }
+    th { color: var(--muted); font-weight: 600; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.04em; background: var(--panel); }
+    td.num, th.num { text-align: right; }
+    td.machine { white-space: normal; min-width: 220px; max-width: 320px; }
+    details summary { cursor: pointer; color: var(--muted); font-size: 0.82rem; }
+    details dl { margin: 6px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 0.82rem; }
+    details dt { color: var(--muted); }
+    details dd { margin: 0; overflow-wrap: anywhere; }
+    .ok { color: var(--good); } .meh { color: var(--warn); } .slow { color: var(--bad); }
+    code, pre { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 0.9em; }
+    code { padding: 1px 6px; }
+    pre { padding: 10px 12px; overflow-x: auto; margin: 8px 0 0; }
+    pre code { border: 0; padding: 0; background: none; }
+    .empty { padding: 24px; text-align: center; white-space: normal; }
+    .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 12px; }
+    .grid2 .card { margin: 0; min-width: 0; }
+    footer { border-top: 1px solid var(--border); margin-top: 48px; padding-top: 16px; }
+    .item h2 { margin: 0 0 6px; font-size: 1.12rem; }
+    .item p { margin: 6px 0; }
+    .item details { margin-top: 8px; }
+    .item details summary { font-size: 0.9rem; color: var(--accent-2); }
+    .item details p { color: var(--text); }
+    .badge { display: inline-block; font-size: 0.74rem; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase;
+             border-radius: 999px; padding: 2px 10px; margin: 0 0 6px; border: 1px solid currentColor; }
+    .badge.shipped { color: var(--good); } .badge.progress { color: var(--warn); } .badge.research { color: var(--muted); }
+    .items { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 12px; }
+    .items .card { margin: 0; min-width: 0; }
+  </style>
+</head>
+<body>
+<main>
+  <p class="small"><a href="../index.html">SculptForge</a> / <a href="../guide/performance.html">Performance guide</a> / <a href="../benchmarks/">Benchmarks</a></p>
+  <h1>Performance: what we're building</h1>
+  <p class="lede muted">Speed on dense sculpts is our top priority, and it has to hold on modest computers first, not
+    only on a fast desktop. This page lists what we're building toward that: what each piece does in plain words,
+    how it works for the technically curious, and whether it has shipped.</p>
+
+  <div class="card">
+    <p><strong>About the numbers.</strong> We're re-measuring everything on scans with sculpted detail, so this page
+      has no figures yet. They'll appear here once they're verified, each with the method and the machine. Until then,
+      the <a href="../benchmarks/">benchmarks page</a> has results you can repeat yourself.</p>
+    <p class="small muted">Our low-end tier is <strong>simulated</strong>: the memory, graphics and core budgets of a
+      modest integrated-graphics laptop, applied on an Apple M1 Pro laptop running Linux. We don't have a real
+      low-end laptop in the test set yet; if you have one, your benchmark results are very welcome.</p>
+  </div>
+
+  <h2 id="items">The pieces</h2>
+  <div class="items">
+
+  <section class="card item" id="micro-levels">
+    <span class="badge shipped">Shipped</span>
+    <h2>Detail levels above the base mesh</h2>
+    <p>Scans and sculpts far denser than a plain mesh could hold stay editable: the finest detail is stored
+      compactly on top of a lighter base mesh instead of as a full mesh of its own.</p>
+    <details><summary>How it works</summary>
+      <p>Each point above the top subdivision level stores only a 16-bit height along the surface. The graphics card
+        rebuilds the surface from those heights as it draws. The model is split into clusters of triangles that are
+        culled, uploaded and shaded as units, so a stroke re-sends only the clusters it changed, and only the
+        clusters it changed get new shading.</p>
+    </details>
+    <p class="small muted">Since 0.10.1; reworked for big brushes in 0.11.2.</p>
+  </section>
+
+  <section class="card item" id="big-brushes-base">
+    <span class="badge shipped">Shipped in 0.11.2</span>
+    <h2>Big brushes move the base</h2>
+    <p>A very big brush on a dense scan moves the lighter base mesh directly, the way it would on a plain mesh, and
+      the fine detail rides along.</p>
+    <details><summary>How it works</summary>
+      <p>When a Standard, Clay or Inflate dab spans many base edges (and no mask, hidden faces, alpha or layers are
+        involved), it runs the plain mesh's brush code on the base. Detail heights are stored relative to the base,
+        so they follow. Moved triangles are tracked in a bitset filled in parallel, only the runs of moved vertices
+        go to the graphics card, and the dabs still waiting when you lift the pen go through the plain mesh's batched
+        path. The stroke stays one undo step.</p>
+    </details>
+  </section>
+
+  <section class="card item" id="catch-up-shading">
+    <span class="badge shipped">Shipped in 0.11.2</span>
+    <h2>Shading that catches up within a frame budget</h2>
+    <p>After big strokes on a dense scan, orbiting stays smoother while the lighting catches up: the view moves
+      first, and the shading finishes around it.</p>
+    <details><summary>How it works</summary>
+      <p>The re-shading a stroke leaves behind is split into pieces. While the view moves, each frame spends only a
+        few milliseconds on it (the same time cap a stroke uses); when the view stops, the rest is done at once.</p>
+    </details>
+  </section>
+
+  <section class="card item" id="analytic-normals">
+    <span class="badge shipped">Shipped in 0.11.2</span>
+    <h2>Lighting that follows the brush while you drag</h2>
+    <p>With a big brush (160 px or more) on a machine with six or more cores, the lighting follows the brush's shape
+      while you drag, so the stroke you see stays closer to the pen. The exact shading lands right behind it.</p>
+    <details><summary>How it works</summary>
+      <p>Each brush's falloff has a known slope, so during the stroke the new normal is computed directly from the
+        old normal and that slope, without walking the neighbouring triangles. Exact normals are recomputed in the
+        background and after pen-up. Machines with fewer cores keep the previous behaviour.</p>
+    </details>
+  </section>
+
+  <section class="card item" id="fused-batches">
+    <span class="badge progress">Experimental, off by default</span>
+    <h2>Big dabs applied together, capped by time</h2>
+    <p>When a frame falls behind a fast stroke, the dabs waiting for it are applied together in one pass instead of one
+      by one. It's in Preferences &gt; Performance as Fast Big Brushes.</p>
+    <details><summary>How it works</summary>
+      <p>Very big dabs take their plane from an even sample of the vertices under them, and the waiting dabs are fused
+        into one pass, so normals, the picking structure and the copy to the graphics card are updated once a frame
+        instead of once a dab. Since 0.11.2 each batch is capped by time, so no single frame waits too long.</p>
+      <p>It stays off by default because in our measurements it's faster on some machines and scenes and slower on
+        others. It turns on by default only when it wins on the low-end tier first.</p>
+    </details>
+  </section>
+
+  <section class="card item" id="first-frame">
+    <span class="badge progress">In progress</span>
+    <h2>Big scans open faster</h2>
+    <p>Opening a dense scan shows a saved preview at once, then the model before all of its shading is done. A cache
+      saved with the file skips rebuilding the same structures every time it opens.</p>
+    <details><summary>How it works</summary>
+      <p>The project keeps a small preview image, shown while the scene loads; edits wait until the model is in. The
+        first frame lights each cluster by its flat facets until the detailed shading arrives. The cache holds the
+        mesh's connectivity, the picking structure and the detail levels' attachment data, packed and checked
+        against a hash, and is carried over on save while the mesh's connectivity doesn't change. It makes project
+        files bigger; we're measuring by how much before it ships.</p>
+    </details>
+  </section>
+
+  <section class="card item" id="build-once">
+    <span class="badge shipped">Shipped in 0.11.1</span>
+    <h2>Releases built once, then tested</h2>
+    <p>The packages you download are the same files our full test suite ran against, not a rebuild made afterwards.</p>
+    <details><summary>How it works</summary>
+      <p>Each batch of changes builds the release packages beside the continuous-integration run. The main branch
+        moves forward only when the whole suite and CI pass, and a release promotes the packages already built and
+        tested for the exact tagged commit.</p>
+    </details>
+  </section>
+
+  <section class="card item" id="benchmark">
+    <span class="badge shipped">Shipped</span>
+    <h2>An open benchmark, low-end first</h2>
+    <p>Every speed claim comes from a benchmark you can run yourself, and it has to hold on our low-end tier before
+      it counts.</p>
+    <details><summary>How it works</summary>
+      <p><code>sculptforge --benchmark standard-15m</code> (or Help &gt; Benchmark) sculpts the same scene with the
+        same strokes and orbit on any machine and writes the results to a file. We measure lag from the pen sample to
+        the frame that shows its dab, how long a stroke takes to finish after pen-up, orbit frame rate and memory.
+        Runs start only when the machine is idle, and we compare builds in alternating runs.</p>
+      <p>Tiers, in the order a claim must pass them: the simulated low-end tier (also with only two efficiency cores,
+        for a pessimistic CPU), the Apple M1 Pro laptop itself, then a Windows desktop with an NVIDIA RTX 3060.
+        A gain that shows only on the desktop doesn't count.</p>
+    </details>
+    <p class="small muted">Since 0.10.7. <a href="../benchmarks/">Results and how to submit yours</a>.</p>
+  </section>
+
+  <section class="card item" id="research">
+    <span class="badge research">Researching</span>
+    <h2>Drawing very dense base meshes with less work</h2>
+    <p>Orbiting a scan whose base mesh alone is very dense is still the slowest case on modest
+      computers. We're researching ways to make it cheaper and will write about it here when there's something to
+      show.</p>
+  </section>
+
+  </div>
+
+  <footer class="small muted">
+    <p><a href="../index.html">SculptForge</a> &middot; <a href="../guide/performance.html">Performance guide</a> &middot;
+      <a href="../benchmarks/">Benchmarks</a> &middot; <a href="https://github.com/islandmed/SculptForge">Source code</a> &middot;
+      <a href="https://discord.gg/gWrYkEmQhH">Discord</a></p>
+    <p>SculptForge is free and open source (GPL-3.0-or-later). Made by Med and contributors.</p>
+  </footer>
+</main>
+</body>
+</html>
