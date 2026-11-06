@@ -9,7 +9,8 @@ name: Release
 #            promoted unchanged. Otherwise:
 #   build    the Packages workflow runs here, from the tag (compiler cache restored from main, never saved).
 #   smoke    every package installed or unpacked on a fresh runner: the app opens a model and sculpts
-#            (tests/ui/release_smoke.sfui), sculptforge-cli opens, sculpts, saves and reopens (tests/release_smoke.py).
+#            (tests/ui/release_smoke.sfui), sculptforge-cli opens, sculpts, saves and reopens and its MCP server answers
+#            (tests/release_smoke.py), also through the AppImage (AppRun --cli) and each unpacked .mcpb bundle.
 #   publish  only after every smoke test passed: checksums, notes from CHANGELOG.md, the GitHub release. A tag with
 #            a '-' (a beta) is a member perk, published by publish-members instead: a pre-release in the private
 #            repository islandmed/sculptforge-insiders (INSIDERS_REPO_TOKEN, held only by the environment
@@ -189,6 +190,10 @@ jobs:
             python tests/release_smoke.py --cli "$bin\sculptforge-cli.exe" --out "smoke-$(Split-Path $bin -Leaf)"
             if ($LASTEXITCODE -ne 0) { throw "the CLI smoke test failed in $bin" }
           }
+          Copy-Item (Get-ChildItem pkg/SculptForge-*-windows-x86_64.mcpb | Select-Object -First 1).FullName mcpb.zip # (Expand-Archive wants .zip)
+          Expand-Archive mcpb.zip -DestinationPath mcpb
+          python tests/release_smoke.py --mcp-only --cli "$PWD\mcpb\server\sculptforge-cli.exe"
+          if ($LASTEXITCODE -ne 0) { throw "the .mcpb bundle's server failed" }
       - name: macOS .dmg
         if: matrix.kind == 'macos'
         run: |
@@ -199,6 +204,7 @@ jobs:
           app="$RUNNER_TEMP/SculptForge.app/Contents/MacOS"
           codesign --verify --deep "$RUNNER_TEMP/SculptForge.app"
           python3 tests/release_smoke.py --cli "$app/sculptforge-cli" --out smoke
+          unzip -q pkg/*.mcpb -d mcpb && python3 tests/release_smoke.py --mcp-only --cli mcpb/server/sculptforge-cli
           "$app/sculptforge" --ui-test "$PWD/tests/ui/release_smoke.sfui" --ui-out "$PWD/shots"
       - name: Linux .deb and AppImage
         if: matrix.kind == 'linux'
@@ -215,6 +221,10 @@ jobs:
           (cd "$RUNNER_TEMP" && "$GITHUB_WORKSPACE"/pkg/*.AppImage --appimage-extract >/dev/null)
           ui "$RUNNER_TEMP/squashfs-root/AppRun" --ui-out "$PWD/shots/appimage"
           python3 tests/release_smoke.py --cli "$RUNNER_TEMP/squashfs-root/usr/bin/sculptforge-cli" --out smoke-appimage
+          echo "== AppRun --cli --mcp (what Help > Connect an AI tool gives AppImage users)"
+          python3 tests/release_smoke.py --mcp-only --cli "$RUNNER_TEMP/squashfs-root/AppRun --cli"
+          echo "== .mcpb"
+          unzip -q pkg/*.mcpb -d mcpb && python3 tests/release_smoke.py --mcp-only --cli mcpb/server/sculptforge-cli
       - name: .rpm
         if: matrix.kind == 'rpm'
         run: |
@@ -264,6 +274,12 @@ jobs:
           cp "sculptforge-$V-1.aarch64.rpm" sculptforge.aarch64.rpm
           cp "SculptForge-$V-x86_64.flatpak" SculptForge-linux-x86_64.flatpak
           cp "SculptForge-$V-aarch64.flatpak" SculptForge-linux-arm64.flatpak
+          cp "SculptForge-$V-windows-x86_64.mcpb" SculptForge-windows-x86_64.mcpb
+          cp "SculptForge-$V-darwin-universal.mcpb" SculptForge-macos.mcpb
+          cp "SculptForge-$V-linux-x86_64.mcpb" SculptForge-linux-x86_64.mcpb
+          cp "SculptForge-$V-linux-arm64.mcpb" SculptForge-linux-arm64.mcpb
+      - name: MCP registry entry (server.json for the .mcpb bundles; publishing it is the maintainer's, docs/releasing.md)
+        run: python3 tools/release/mcp_server_json.py --version "${TAG#v}" --dist dist
       - name: Blender add-on (extension and legacy zips, plus a version-less copy for the website's link)
         run: |
           V=${TAG#v}

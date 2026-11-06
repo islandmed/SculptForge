@@ -1165,8 +1165,9 @@ TEST(mcp_server_protocol) {
         schemasOk = schemasOk && t["inputSchema"]["type"].asString() == "object";
         packTools = packTools || t["name"].asString() == "pack_install" || t["name"].asString() == "pack_remove";
     }
-    // Every command but installing, removing and switching packs (the user's decision, never an agent's).
-    CHECK(hasRemesh && schemasOk && !packTools && list["result"]["tools"].size() == reg.all().size() - 4);
+    // Every command but installing, removing and switching packs (the user's decision, never an agent's), plus
+    // viewport_image (cli/McpTools.h).
+    CHECK(hasRemesh && schemasOk && !packTools && list["result"]["tools"].size() == reg.all().size() - 4 + 1);
     Json refused = call(R"({"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"pack_install","arguments":{"path":"x.sfpack"}}})");
     CHECK(refused.has("error"));
     Json ok = call(R"({"jsonrpc":"2.0","id":"a","method":"tools/call","params":{"name":"new_sphere","arguments":{"subdivisions":2}}})");
