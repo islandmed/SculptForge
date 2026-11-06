@@ -423,6 +423,7 @@ void App::storeProjectSettings() {
     gizmo.set("axis_y", vec3Json(gizmo_.frame[1]));
     gizmo.set("use_mask", gizmo_.useMask);
     gizmo.set("all_parts", gizmo_.all);
+    gizmo.set("folder_parts", gizmo_.folder);
     gizmo.set("falloff", double(gizmo_.falloff));
     s.set("gizmo", std::move(gizmo));
 
@@ -602,6 +603,7 @@ void App::applyProjectSettings() {
         }
         readBool(g, "use_mask", gizmo_.useMask);
         readBool(g, "all_parts", gizmo_.all);
+        readBool(g, "folder_parts", gizmo_.folder);
         readFloat(g, "falloff", gizmo_.falloff);
         gizmo_.falloff = std::clamp(gizmo_.falloff, 0.0f, 1.0f);
         if (!gizmo_.pivotPlaced) updateGizmoPivot();

@@ -192,6 +192,60 @@ TEST(part_project_v2_round_trip) {
     std::filesystem::remove(path);
 }
 
+TEST(part_project_folders) {
+    // #96: folders and which Parts are in them come back; no format change (older versions ignore the keys).
+    Document doc = makeScene();
+    const uint32_t gear = doc.addPartFolder("Gear");
+    doc.addPartFolder("Empty");
+    doc.partFolders[0].collapsed = true;
+    doc.setPartFolder(2, gear); // Sword
+    doc.setPartFolder(1, gear); // Eye (active): moves below the Sword
+    CHECK(doc.parts[1].name == "Sword" && doc.parts[2].name == "Eye" && doc.activePart == 2);
+    const std::string path = tempPath("sf_part_folders.sfproj");
+    std::string err;
+    CHECK(saveProject(path, doc, err));
+
+    Document back;
+    CHECK(loadProject(path, back, err));
+    CHECK(back.partFolders.size() == 2 && back.partFolders[0].name == "Gear" && back.partFolders[0].collapsed);
+    CHECK(back.partFolders[1].name == "Empty" && !back.partFolders[1].collapsed);
+    CHECK(back.parts[0].folder == 0 && back.parts[1].folder == back.partFolders[0].id &&
+          back.parts[2].folder == back.partFolders[0].id);
+    CHECK(back.activePart == 2 && !back.dirty());
+
+    std::vector<ZipEntry> entries;
+    CHECK(readStoredZip(path, entries, err));
+    Json manifest;
+    CHECK(!entries.empty() && Json::parse(std::string(entries[0].data.begin(), entries[0].data.end()), manifest, err));
+    CHECK(manifest["version"].asNumber() == kProjectBaseWriteVersion); // what a scene without folders writes
+    CHECK(manifest["part_folders"].size() == 2 && manifest["parts"][1]["folder"].asNumber() == 0);
+    CHECK(!manifest["parts"][0].has("folder"));
+
+    // Saved again (by this version or one that kept the key but not the Parts' folder= index): nothing doubles,
+    // and a Part pointing at a folder that isn't there is outside any folder.
+    CHECK(saveProject(path, back, err));
+    CHECK(editManifest(path, [](Json& j) {
+        Json list = Json::array();
+        for (size_t i = 0; i < j["parts"].size(); ++i) {
+            Json st = j["parts"][i];
+            if (i == 1) st.set("folder", 7.0);
+            list.push(std::move(st));
+        }
+        j.set("parts", std::move(list));
+    }));
+    Document again;
+    CHECK(loadProject(path, again, err));
+    CHECK(again.partFolders.size() == 2 && again.parts[1].folder == 0 && again.parts[2].folder == again.partFolders[0].id);
+    CHECK(!again.projectSettings.has("part_folders"));
+
+    // A project without folders (every earlier version's) opens with none.
+    Document plain = makeScene();
+    CHECK(saveProject(path, plain, err));
+    CHECK(loadProject(path, again, err) && again.partFolders.empty());
+    for (const Part& s : again.parts) CHECK(s.folder == 0);
+    std::filesystem::remove(path);
+}
+
 TEST(part_project_version1_still_loads) {
     // Write a single-Part project, then turn its manifest into the version 1 layout.
     Document doc = makeDoc(makeIcosphere(2));
