@@ -5,6 +5,16 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.7
+
+```features
+date: 2026-11-06
+tagline: Dense scans orbit smoothly on entry-level machines, and Preferences > AI speaks Spanish and Chinese.
+highlight: Dense scans orbit smoothly on entry-level machines
+highlight: Preferences > AI in Spanish and Chinese
+highlight: Live mode's confirmations in your language
+```
+
 ## Version 0.11.6
 
 ```features
