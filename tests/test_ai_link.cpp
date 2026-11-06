@@ -203,7 +203,8 @@ TEST(ai_link_socket_permissions_and_disconnect) {
     std::string err;
     const std::string endpoint = aiLinkEndpoint(err);
     CHECK(!endpoint.empty());
-    CHECK(aiLinkFileMode(std::filesystem::path(endpoint).parent_path().string()) == 0700);
+    const std::string folder = std::filesystem::path(endpoint).parent_path().string(); // run/sculptforge, or the
+    CHECK(aiLinkFileMode(folder) == 0700);                                                // short /tmp one (macOS)
 
     AiLinkListener listener;
     CHECK(listener.open(endpoint, err));
@@ -240,14 +241,14 @@ TEST(ai_link_socket_permissions_and_disconnect) {
     CHECK(c2.readLine(line, 2000) == -1);
 
     // A folder opened to others is closed again; one that isn't a folder is refused.
-    std::filesystem::permissions(run + "/sculptforge", std::filesystem::perms::all);
+    std::filesystem::permissions(folder, std::filesystem::perms::all);
     listener.close();
     CHECK(!aiLinkEndpoint(err).empty());
-    CHECK(aiLinkFileMode(run + "/sculptforge") == 0700);
-    std::filesystem::remove_all(run + "/sculptforge");
-    { std::ofstream(run + "/sculptforge") << "x"; }
+    CHECK(aiLinkFileMode(folder) == 0700);
+    std::filesystem::remove_all(folder);
+    { std::ofstream(folder) << "x"; }
     CHECK(aiLinkEndpoint(err).empty());
-    std::filesystem::remove(run + "/sculptforge");
+    std::filesystem::remove(folder);
     // The socket file is gone after close; nobody's listening: the CLI says so.
     CHECK(aiLinkFileMode(endpoint) == -1);
     AiLinkConn c3;
