@@ -3550,6 +3550,42 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     // The back faces left in clusters along the silhouette: the GPU skips them too when they can't show.
     if (cullBackfaces_ || xrayCull_) gl::Enable(GL_CULL_FACE);
     if (xrayCull_) gl::CullFace(xrayCull_);
+    // The first stroke's own GL work, done a frame after the Part first shows instead (the open's first frame stays as
+    // it was): its programs below (GHOST, draft FLAT) compile on first use, and drivers that compile only at the first
+    // draw (NVIDIA on Windows) stalled the first stroke of every session 1-1.8 s. Each draws one cluster here, under
+    // the main draw (same depth: it paints over it), and that cluster's vertices go up once as a stroke upload does.
+    // SF_NO_STROKE_WARM=1 leaves it out (to compare); SF_FRAME_LOG says what it cost.
+    static const bool noWarm = std::getenv("SF_NO_STROKE_WARM") != nullptr;
+    if (active && !noWarm && !thumbnailPass_ && !textured && !normalMapped && drawAlpha_ >= 1.0f && !xrayCull_ && !drawClusters_.empty() &&
+        s.strokeWarmed != features && s.strokeWarmFrames++ >= 1) {
+        s.strokeWarmed = features;
+        const auto warmStart = std::chrono::steady_clock::now();
+        const std::vector<uint32_t> one{drawClusters_.front()};
+        const auto range = s.order.clusters()[one[0]];
+        std::vector<PackedVertex> verts(range.vertexCount);
+        if (!verts.empty()) { // (BufferSubData of what is there: the stroke uploads' path, nothing changes)
+            const GLintptr at = GLintptr(size_t(range.firstVertex) * sizeof(PackedVertex));
+            const GLsizeiptr bytes = GLsizeiptr(verts.size() * sizeof(PackedVertex));
+            gl::BindBuffer(GL_ARRAY_BUFFER, s.vertexBuffer);
+            gl::GetBufferSubData(GL_ARRAY_BUFFER, at, bytes, verts.data());
+            gl::BufferSubData(GL_ARRAY_BUFFER, at, bytes, verts.data());
+            gl::BindBuffer(GL_ARRAY_BUFFER, 0);
+        }
+        const size_t drawn = lastDrawn_;
+        for (int k = 1; k < 4; ++k) {
+            if ((k & 2) && perTriangle) continue; // (draft strokes draw per-triangle data in full)
+            if (const MeshProgram* pg = meshProgram(features | ((k & 1) ? kGhost : 0) | ((k & 2) ? kFlat : 0))) {
+                bind(pg);
+                if (k & 1) gl::Uniform1i(pg->ghostGroups, 0); // (no dabs: the surface as it is)
+                drawClusters(s, one, GL_TRIANGLES, DrawPart::Triangles, -1);
+            }
+        }
+        bind(p);
+        lastDrawn_ = drawn;
+        if (static const bool log = std::getenv("SF_FRAME_LOG") != nullptr; log)
+            SDL_Log("stroke programs warmed in %.1f ms (features 0x%x)",
+                    std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - warmStart).count(), unsigned(features));
+    }
     // The predictive preview (render/Ghost.h): the clusters a ghost dab reaches draw with the GHOST program, the
     // rest as usual (most of the mesh, which then doesn't pay for the preview).
     // A draft stroke (Sculptor::draftStrokes) left the normals of the clusters it moved as they were: those draw

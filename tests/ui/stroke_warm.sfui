@@ -1,0 +1,12 @@
+# The first stroke of a session draws with programs nothing drew before it (the predictive preview's GHOST, draft
+# strokes' FLAT normals); NVIDIA compiles them at their first draw and froze the first stroke 1-1.8 s on Windows.
+# They're compiled and drawn a frame after the model shows, so none is left for the stroke.
+run new_sphere subdivisions=4
+expect_value drawn_triangles > 0               # (the view drawn: the model shows)
+expect_value drawn_triangles > 0               # a frame later: warmed
+expect_value stroke_programs >= 3
+key f
+camera 0 0
+snapshot
+drag_path 0.4 0.5 0.6 0.5
+expect_value moved > 0

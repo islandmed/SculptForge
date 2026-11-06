@@ -256,6 +256,12 @@ public:
     // are still to be updated (drawn in full until then).
     size_t coarseDrawnClusters() const { return lastCoarseClusters_; }
     size_t coarsePendingClusters() const;
+    // The stroke-only programs (predictive preview, draft normals) compiled so far: drawSlot warms them before a stroke.
+    int strokePrograms() const {
+        int n = 0;
+        for (int f = 0; f < 256; ++f) n += programs_[f].id && (f & (kGhost | kFlat)) ? 1 : 0;
+        return n;
+    }
     // At rest (still 150 ms, no stroke) an over-budget mesh draws in full detail when one full frame fits the still-frame
     // budget (100 ms, from the measured GPU time per triangle); else it stays coarse (coarsePreviewOnly: the info line
     // says so). coarseStillWanted: the last frame drew coarse and full detail follows once the view has been still long
@@ -419,6 +425,9 @@ private:
         // A mesh with a micro level (core/Micro.h) draws through this instead of the buffers above.
         std::shared_ptr<MicroRenderer> micro;
         size_t microDrawn = 0;
+        // The stroke-only programs (GHOST, draft FLAT) warmed for these features (drawSlot; -1: not yet), and
+        // the frames drawn while waiting (the open's first frame isn't made slower).
+        mutable int strokeWarmed = -1, strokeWarmFrames = 0;
     };
     MeshSlot& slot(uint32_t id); // created on first use
     static void freeSlot(MeshSlot& s);

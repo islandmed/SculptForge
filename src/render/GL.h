@@ -132,6 +132,7 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
     X(void, BindBuffer, GLenum, GLuint)                                                      \
     X(void, BufferData, GLenum, GLsizeiptr, const void*, GLenum)                             \
     X(void, BufferSubData, GLenum, GLintptr, GLsizeiptr, const void*)                        \
+    X(void, GetBufferSubData, GLenum, GLintptr, GLsizeiptr, void*)                           \
     X(void, GenVertexArrays, GLsizei, GLuint*)                                               \
     X(void, DeleteVertexArrays, GLsizei, const GLuint*)                                      \
     X(void, BindVertexArray, GLuint)                                                         \
