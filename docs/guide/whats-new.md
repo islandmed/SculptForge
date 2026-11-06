@@ -5,6 +5,17 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.5
+
+```features
+date: unreleased
+tagline: Connecting your AI assistant now takes three steps, the interface speaks Simplified Chinese, and the brush size ring follows the pen.
+highlight: Help > Connect an AI tool: three steps, copyable commands for your tool, example prompts
+highlight: The interface in Simplified Chinese
+highlight: The brush size ring previews on the mesh while you resize
+highlight: Discord status clears when you quit and shows the new SF icon
+```
+
 ## Version 0.11.4
 
 ```features
