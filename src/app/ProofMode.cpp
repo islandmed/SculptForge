@@ -24,6 +24,7 @@
 #include "core/Benchmark.h"
 #include "core/MemoryGuard.h"
 #include "core/Primitives.h"
+#include "core/Project.h"
 #include "core/Timeline.h"
 
 #include "render/GL.h"
