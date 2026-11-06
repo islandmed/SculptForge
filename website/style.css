@@ -611,8 +611,7 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
 .wn-home-card p { margin: 0 0 0.7em; color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
 .wn-home-card ul { margin: 0; padding-left: 1.1em; color: #d6d6dd; font-size: 0.92rem; line-height: 1.55; }
 .wn-home-card li::marker { color: var(--accent); }
-.wn-home-card .wn-pic-mark { display: grid; place-items: center; background: radial-gradient(circle at 50% 45%, rgba(242, 140, 60, 0.18), #1b1b21 65%); }
-.wn-home-card .wn-pic-mark img { width: auto; height: 80%; aspect-ratio: 1; object-fit: contain; } /* the bust fills the box */
+.wn-home-card .wn-card-body:first-child { border-top: 3px solid var(--accent); } /* text-only: no picture of its own */
 .wn-home-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
 .wn-home-group { display: flex; flex-direction: column; padding: 18px 20px; color: inherit; border: 1px solid var(--border);
                  border-radius: var(--radius); background: var(--bg); transition: border-color 0.2s; }
@@ -678,4 +677,21 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
 @media (max-width: 620px) {
   .speed-line { order: 3; font-size: 0.9rem; margin: -0.6em 0 1.2em; }
   .hero-sculpt video { aspect-ratio: 720 / 866; }
+}
+
+/* Community band under the hero; the feature set in threes; AI as one compact section lower down. */
+.community { border-top: 1px solid var(--border); background: radial-gradient(900px 400px at 85% 0%, rgba(242, 140, 60, 0.08), transparent 60%); }
+.community .ctas { margin: 28px 0 0; }
+#feature-set .grid { grid-template-columns: repeat(3, 1fr); }
+.ai-compact { padding: 56px 0; border-top: 1px solid var(--border); }
+.ai-compact .section-lede { margin-bottom: 18px; }
+.ai-list { color: #cfcfd6; padding-left: 1.2em; max-width: 52em; }
+.ai-list li { margin-bottom: 0.5em; }
+@media (max-width: 960px) {
+  #feature-set .grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 620px) {
+  .community-grid { display: grid; grid-template-columns: 1fr; overflow: visible; gap: 10px; margin: 0; padding: 0; }
+  .community-grid .card { padding: 16px 18px; }
+  .community .ctas .btn { white-space: nowrap; padding: 12px 14px; }
 }
