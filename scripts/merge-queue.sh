@@ -61,12 +61,17 @@ checks_green() { # the PR's own required checks passed (skipped counts as passed
 }
 
 wait_ci() { # wait_ci <branch>: dispatches the full CI on the branch, waits, returns its conclusion
-    local branch=$1 sha id=""
+    local branch=$1 sha id="" old
     sha=$(git rev-parse "origin/$branch")
+    # The runs this commit already has (a gate run again on the same commit): the new one is the run not among them,
+    # not the newest listed, which right after the dispatch is still an old, finished one (11-06: a failed and a
+    # cancelled run were judged in 18 s while the new run was building).
+    old=$(gh run list -R "$REPO" --workflow ci.yml --branch "$branch" --event workflow_dispatch --json databaseId,headSha \
+        -q ".[] | select(.headSha == \"$sha\") | .databaseId")
     gh workflow run ci.yml -R "$REPO" --ref "$branch" -f full=true >/dev/null
     for _ in $(seq 60); do
         id=$(gh run list -R "$REPO" --workflow ci.yml --branch "$branch" --event workflow_dispatch --json databaseId,headSha \
-            -q "[.[] | select(.headSha == \"$sha\")][0].databaseId")
+            -q ".[] | select(.headSha == \"$sha\") | .databaseId" | grep -vxF -f <(printf '%s\n' $old) | head -1 || true)
         [ -n "$id" ] && break
         sleep 5
     done
