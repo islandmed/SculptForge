@@ -13,7 +13,8 @@ or the picture or text you give Generate 3D) goes to the service you picked.
 Generate 3D are hidden, their commands (`brush_ai`, `image_to_3d`, `text_to_3d`, `comfyui_check`)
 are not registered in the app, `sculptforge-cli`, Python or the MCP tool list, and no AI request is
 made. The setting is `"enabled"` in `ai.json`. `SF_AI=off` in the environment (or `--no-ai`) turns
-it off and locks it, for studios; `SF_AI=on` turns it on whatever was saved.
+it off and locks it, for studios; `SF_AI=on` turns it on whatever was saved. A studio's policy file locks it either
+way (see [IT deployment](guide/studios.md#it-deployment)).
 
 ## What is sent where
 
@@ -24,8 +25,15 @@ it off and locks it, for studios; `SF_AI=on` turns it on whatever was saved.
 | Generate 3D (text) | Hugging Face Spaces (free), fal.ai, Meshy, your own ComfyUI | Your text description | As above |
 | Send to Unreal | Your own Unreal Editor (local network) | The exported FBX | None |
 
-Keys are stored in your local settings file (`ai.json`, owner-only permissions) or read from
-environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `HF_TOKEN`, `FAL_KEY`, `MESHY_API_KEY`).
+Keys are stored in your operating system's keychain (macOS Keychain, Windows Credential Manager, or the Secret
+Service on Linux), never in a settings file, or read from environment variables (`ANTHROPIC_API_KEY`,
+`OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `HF_TOKEN`, `FAL_KEY`, `MESHY_API_KEY`). Keys saved by older versions in
+`ai.json` move into the keychain at the first start.
+
+**Preferences > AI > Provider** has presets for Anthropic, OpenAI, Ollama, LM Studio, vLLM, llama.cpp server,
+a LiteLLM proxy (a studio's own gateway, which can front Amazon Bedrock, Google Vertex AI and Azure OpenAI) and
+OpenRouter. Studios can limit which providers and addresses artists may use, require their single sign-on, and keep
+an audit log of every AI action: see [IT deployment](guide/studios.md#it-deployment).
 
 ## The free Brush Lab model
 

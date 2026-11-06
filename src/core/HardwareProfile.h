@@ -66,6 +66,9 @@ struct HardwareInfo {
 
 // Fills the machine fields (os, cpu, cpuThreads, ramMB, simd, simdBuild, appVersion).
 void probeSystem(HardwareInfo& info);
+// Processor time this process has used so far, every thread's (user + system), in seconds. Not std::clock(): on
+// Windows that is wall time, so an idle app read as 100 % of a core.
+double processCpuSeconds();
 // Classifies the GPU from its OpenGL strings: Software (llvmpipe, softpipe, SwiftShader, Microsoft Basic Render,
 // GDI Generic, Apple Software Renderer), Unified (Apple GPUs, including Asahi Linux), Integrated (Intel UHD / Iris /
 // Xe, AMD APUs whose name has no model number) or Discrete (NVIDIA GeForce / Quadro / RTX, AMD Radeon RX / Pro,

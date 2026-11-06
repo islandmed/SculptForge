@@ -6,6 +6,46 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.5] - 2026-11-06
+
+### Added
+- While the **S** (Size) pop-up is open, the brush ring stays on the model at the point where it was opened and shows
+  the size being set, live while dragging and before Enter while typing a number (#138). **O** (Falloff) draws the
+  inner Falloff ring the same way. The ring lies under the pop-up so its number stays readable.
+- **Simplified Chinese interface** (Preferences > Interface > Language): the Traditional Chinese translation by
+  yoyomaimai (#114) in simplified characters, reviewed for mainland usage (鼠标, 软件, 文件, 视图, 菜单, 设置, 工具栏, 默认 and 预设, 撤销,
+  rows and columns), every label covered. Brush and tool names stay in English. The characters come from a small
+  built-in Noto Sans SC subset (SIL OFL), so nothing needs installing. zh-CN, zh-SG and zh-Hans codes select it;
+  zh-TW, zh-HK and zh-MO keep Traditional.
+
+### Changed
+- **Help > Connect an AI tool** is the in-app guide to live mode: 1. pick your tool (Claude Code, Claude Desktop,
+  Cursor, or any other in the list) with the exact command or settings for this install, now for the live-mode server
+  (`sculptforge-cli --mcp --attach`, listed as `sculptforge-live` beside a headless `sculptforge` entry); 2. the
+  live-mode switch; 3. what happens next; four example prompts with Copy. The plan notes moved to a **Plans and
+  sign-in** tooltip; the headless server and the Claude Desktop bundle are in the user guide.
+- The live-mode dialogs (**Let an AI tool control this window?**, **Allow this AI step?**) look like the app's other
+  dialogs: one text width, two buttons of one width (the answer first), no close box (Deny or Escape), the code in a
+  large font instead of a scaled-up small one. While the approval is open the Connect window steps aside, so two
+  dialogs never stack; after Approve it closes and the badge takes over.
+- **Show SculptForge on Discord** shows the new SF icon.
+
+### Fixed
+- **Show SculptForge on Discord** stays up to date. Changes made in quick succession (opening files, typing the
+  challenge) used to be dropped by Discord after the fifth in 20 seconds. Now the latest always arrives. After Discord
+  restarts, your status is back within seconds instead of a minute.
+- Discord no longer shows SculptForge while it isn't running. Runs by scripts and test tools (benchmarks, offscreen
+  checks) never show it, whatever the preferences say. On Linux, a process SculptForge starts (an AI worker) can no
+  longer keep the connection, and the status, open after SculptForge quits.
+- `--measure-idle` reported about 100 % of one core on Windows while the app sat idle: it timed itself with the C
+  library's clock, which on Windows counts wall time, not processor time. It now reads the process's real CPU time on
+  every OS. Measured from outside on Windows (RTX 3060), idle 0.11.1 and 0.11.2 (a sphere open) use 0.00 % of a core,
+  and Linux uses 0.7 %: there was no busy loop. The idle tests now also fail if the app uses more than 2 % of a core
+  over 30 s.
+- The **Paint** menu jittered on a short screen (reported at 1280x720 fullscreen, thanks ebarranco): taller than the
+  space under the menu bar, it scrolled, its colour picker shrank under the scrollbar, the menu stopped scrolling and
+  grew again, every frame. A menu that scrolls now widens by its scrollbar instead.
+
 ## [0.11.4] - 2026-11-05
 
 ### Added

@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ai/AiCommands.h"
+#include "core/AuditLog.h"
 
 #include "ai/AiPolicy.h"
 #include "ai/BrushGalleryClient.h"
@@ -68,9 +69,29 @@ CommandResult importGenerated(Document& doc, const Args& a, const GeneratorResul
 } // namespace
 
 void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()> settings) {
+    // Every run goes into the audit log (core/AuditLog.h), from the app, a script, the CLI or an AI tool; with the
+    // policy's audit.required, a run whose line can't be written is refused before anything is sent.
+    auto add = [&registry](Command c) {
+        c.run = [name = c.name, run = std::move(c.run)](Document& doc, const Args& a) -> CommandResult {
+            audit::Entry e;
+            e.tool = "ai";
+            e.command = name;
+            e.args = audit::summarizeArgs(a);
+            const auto start = std::chrono::steady_clock::now();
+            CommandResult r;
+            if (std::string why; audit::required() && !audit::writable(&why)) r = {false, why};
+            else r = run(doc, a);
+            e.ok = r.ok;
+            e.message = r.message;
+            e.ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+            audit::record(e);
+            return r;
+        };
+        registry.add(std::move(c));
+    };
     using T = ParamSpec::Type;
     removeAiFeatureCommands(registry); // never twice
-    registry.add({"brush_ai",
+    add({"brush_ai",
                   "Design a brush from a description. Free by default (a hosted open model, no key); or "
                   "provider=anthropic (ANTHROPIC_API_KEY), or provider=openai-compatible endpoint=... model=... "
                   "for OpenAI, Ollama, LM Studio etc.",
@@ -91,7 +112,7 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                       return {true, "'" + r.recipe.name + "': " + r.reply};
                   }});
 
-    registry.add({"image_to_3d",
+    add({"image_to_3d",
                   "Reconstruct a full 3D model from one picture (character, creature, prop) and make it sculptable. "
                   "Free by default via Hugging Face Spaces (Hunyuan3D, TRELLIS.2, Stable Fast 3D; HF_TOKEN raises the "
                   "daily quota), paid via fal.ai (FAL_KEY) / Meshy (MESHY_API_KEY), or any workflow on your own "
@@ -133,7 +154,7 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                       return importGenerated(doc, a, r, mode, "");
                   }});
 
-    registry.add({"text_to_3d",
+    add({"text_to_3d",
                   "Create a 3D model from a description and make it sculptable. Free by default via Hugging Face "
                   "(Hunyuan3D 2 / 2 mini Turbo; HF_TOKEN raises the daily quota), or paid via fal.ai (FAL_KEY) / "
                   "Meshy (MESHY_API_KEY), or a workflow on your own ComfyUI (service=comfyui workflow=FILE). Replaces the scene.",
@@ -182,7 +203,7 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                       return importGenerated(doc, a, r, mode, " from text");
                   }});
 
-    registry.add({"comfyui_check",
+    add({"comfyui_check",
                   "Check that a ComfyUI server answers (for service=comfyui) and show its version and GPU.",
                   {{"url", T::String, "Server address. Default http://127.0.0.1:8188 or your saved one.", false}},
                   [settings](Document&, const Args& a) -> CommandResult {

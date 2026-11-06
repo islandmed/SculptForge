@@ -118,6 +118,7 @@ struct AppOptions {
 };
 
 class Demo;
+struct StudioSignInJob; // PanelAi.cpp: the studio sign-in on a worker (ai/Oidc.h)
 
 // Wakes the main loop from any thread (SDL_PushEvent): the app draws only when something changed (#14), so work
 // that finishes off the main thread (a file dialog's answer, a phone message) calls this to be seen at once.
@@ -238,11 +239,15 @@ private:
     void sendBrushRequest(const std::string& text);
     void pollBrushRequest();
     const BrushRecipe* activeRecipe() const;
+    // The brush ring at the pointer; while the S / O pop-up is open (#138), at the point it opened from, with the
+    // size or falloff being set (dragged or typed).
     void drawBrushCursor();
-    // The brush ring lying on the surface under the pointer (#25, Preferences > Cursor > Cursor follows surface);
-    // false when the pointer is off the model (the flat screen ring is drawn instead). `ring` false: only the
-    // centre and the symmetry copies' dots (Hide ring while stroking).
-    bool drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col, bool ring);
+    // The brush ring lying on the surface under (x, y) (#25, Preferences > Cursor > Cursor follows surface);
+    // false when that point is off the model (the flat screen ring is drawn instead). `ring` false: only the
+    // centre and the symmetry copies' dots (Hide ring while stroking). `focal`: the Falloff the inner ring shows.
+    bool drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, float focal, ImU32 col, bool ring);
+    bool sizeRingPreview_ = false; // the last ring drawn was the S / O pop-up's preview (UI tests: size_ring_preview)
+    float sizeRingPreviewPx_ = 0.0f; // its radius, pixels (UI tests: size_ring_px)
     std::vector<glm::vec3> cursorRing_, cursorInner_; // scratch, kept to avoid allocating per frame
     bool surfaceCursorShown_ = false; // the last cursor drawn lay on the surface (UI tests: surface_cursor)
     bool ringShown_ = true;           // the last cursor drawn had its ring (UI tests: cursor_ring)
@@ -441,7 +446,8 @@ private:
     bool showHelp_ = false;
     bool showAbout_ = false;
     bool showConnectAi_ = false; // Help > Connect an AI tool (PanelConnectAi.cpp; only while AI is on)
-    int connectPlan_ = 0;        // its "I have a ... subscription" choice (connect::Plan)
+    std::string connectClient_ = "claude_code"; // its "Pick your tool" choice (a connect::Client id)
+    float connectScale_ = 0.0f;                 // the UI scale it was last placed for
     void drawConnectAi();
     // Supporting SculptForge (Support.h): the app only ever opens the membership page or its Stripe checkout links in the
     // browser; nothing else changes.
@@ -525,6 +531,7 @@ private:
     char discordChallengeBuf_[64 * 4 + 1] = {};  // the theme field (64 code points of UTF-8)
     bool discordPresenceAvailable() const;       // an application ID is compiled in
     void updateDiscordPresence();                // every frame: sends only when what's shown changes
+    bool discordAgentRun() const;                // agent or offscreen run: never (discord::agentRun)
     void drawIntegrationsPrefs();                // Preferences > Integrations
     bool welcomeAfterCard_ = false;             // the first-run welcome waits until the card closes
     // What's New (WhatsNewPopup.cpp): the newest version's feature cards from docs/guide/whats-new.md, once after an
@@ -553,8 +560,13 @@ private:
     // Preferences > AI (PanelAi.cpp, ai/AiPolicy.h): Enable AI features. Off removes the AI commands, the Brush Lab
     // and Generate 3D entries and closes their windows; saved in ai.json at once (not in tests). SF_AI / --no-ai lock it.
     void setAiFeatures(bool on);
+    void applyAiFeatures(bool on, bool save); // the switch itself, whatever locks it (setAiFeatures, a policy)
+    void registerPolicyTestCommand(); // ui_policy: UI tests only (tests/ui/studio_policy.sfui)
     void registerAiActions(); // ui.brush_lab, ui.generate3d: only while AI is on
     void drawAiPrefs();       // the Preferences > AI section and the first-run question
+    void drawAiStudioPrefs(); // Preferences > AI: what the studio's policy manages, the studio sign-in, the audit log
+    void storeAiKeys();       // the keys aiSettings_ holds, into the OS keychain (a worker; ai/Secrets.h)
+    void applyUpdatePolicy(); // a studio policy's update check and channel (core/ManagedPolicy.h) over the saved ones
     // Live mode (PanelAiLink.cpp, link/AiLink.h): Preferences > AI > Let AI tools control this window. An AI tool
     // (sculptforge-cli --mcp --attach) connects over a local socket / pipe only this user can open, is approved in
     // a dialog (a one-time code), shows an "AI connected" badge with Disconnect while it works, and asks first
@@ -572,6 +584,7 @@ private:
     void aiLinkDisconnect(const std::string& why); // the kill switch: closes the connection now
     void aiLinkPicked(const std::string& path);    // a file the user chose: an AI tool may use it without asking
     int aiLinkStateValue() const;  // UI tests: 0 off, 1 listening, 2 waiting for approval, 3 connected, 4 asking
+    std::string aiLinkClient() const; // the connected (or asking) tool's name, "" without one
     std::vector<std::string> aiLinkPickedPaths_; // files the user chose this run (each connection starts with them)
     void aiLinkExecute(const link::AiLinkCall& call);
     uint32_t activePartInfoId() const;
@@ -580,6 +593,7 @@ private:
     bool aiRenderView(const Camera& cam, int width, int height, Image& img, std::string& error);
     Json aiLiveTool(const std::string& name, const Args& args, bool& ok); // viewport_image, view_set, ...
     // Brush Lab (AI brush designer)
+    std::shared_ptr<StudioSignInJob> signInJob_; // Preferences > AI > Studio sign-in, while it runs
     bool showBrushLab_ = false; // floating; opened from the top shelf's AI Brush or the Brush palette
     bool hideUi_ = false;
     uint64_t seenSplatsVersion_ = 0;
@@ -1544,6 +1558,8 @@ private:
     bool lookDirty_ = false;   // uiPrefs_.look or the layout changed: applied at the start of the next shell
     CanvasRect focusRect_;     // the tile under the pointer (tiled looks highlight its border)
     float menuX_ = 0.0f;       // where the open task menu drops from
+    ImVec4 menuRect_{};        // the open task menu's rect last frame, and how often it changed while open (UI tests)
+    int menuRectChanges_ = 0;
     std::map<std::string, std::string> menuSection_; // each task menu's last section (palette id)
     void drawShelf(int shelf, const CanvasRect& rect);
     void drawShelfItem(int shelf, int index, const std::string& item, bool vertical);

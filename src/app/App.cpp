@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
+#include "app/Pickers.h"
 #include "app/BrandMark.h"
 #include "io/BridgeProtocol.h"
 #include "core/LayerStack.h"
@@ -16,6 +17,12 @@
 #include "core/PerfTrace.h"
 
 #include "ai/AiCommands.h"
+#include "ai/Oidc.h"
+#include "ai/Secrets.h"
+#include "core/AuditLog.h"
+#include "core/Keychain.h"
+#include "core/ManagedPolicy.h"
+#include "ai/Providers.h"
 #include "app/Demo.h"
 #include "app/Shell.h"
 #include "app/Theme.h"
@@ -236,8 +243,24 @@ bool App::init(const AppOptions& options) {
     } else {
         io.IniFilename = nullptr;
     }
+    if (!options.uiTest.empty()) policy::resetPolicyForTests(); // (a UI test's ui_policy never reaches the next one)
     // Preferences > AI: tests, renders and videos start with AI on whatever this computer chose (SF_AI still wins).
     ai::setAiEnabled(ai::aiFeaturesAllowed(headless || !options.demo.empty() || aiSettings_.enabled));
+    // AI keys and the studio sign-in are in the OS keychain (ai/Secrets.h, ai/Oidc.h), read on a worker so no frame
+    // waits on an unlock prompt. Tests, renders and benchmarks never touch the user's keychain.
+    audit::setClient("app");
+    ai::secrets::setLazy(false);
+    if (headless || !options.uiTest.empty() || !options.demo.empty() || options.benchmark) {
+        keychain::useMemoryForTests(true);
+    } else {
+        std::thread([path = aiSettingsPath_] {
+            std::string message;
+            if (!path.empty()) ai::secrets::migrateLegacyKeys(path, message);
+            if (!message.empty()) SDL_Log("%s", message.c_str());
+            ai::secrets::preload();
+            ai::oidc::loadSaved();
+        }).detach();
+    }
     ai::registerAiCommands(commands_, [this] { return aiSettings_; });
     registerPaintUiCommands();
     registerViewUiCommands(); // light, xray, view_resolution, save_render (PanelView.cpp)
@@ -837,7 +860,7 @@ int App::run() {
     constexpr double kMeasureSettle = 3.0;
     const double started = seconds();
     uint64_t framesDrawn = 0, wakeUps = 0, framesAtMeasure = 0, wakesAtMeasure = 0;
-    std::clock_t cpuAtMeasure = 0; // processor time of every thread (the driver's included)
+    double cpuAtMeasure = 0.0; // processor time of every thread (the driver's included)
     bool measuring = false;
     // Input while measuring (a pointer crossing the window on a shared desktop) restarts the count once it has
     // passed: idle means no input. After kMeasureGiveUp seconds it counts whatever comes (the test's timeout).
@@ -890,17 +913,21 @@ int App::run() {
                 measuring = true;
                 framesAtMeasure = framesDrawn;
                 wakesAtMeasure = wakeUps;
-                cpuAtMeasure = std::clock();
+                cpuAtMeasure = processCpuSeconds();
             } else if (measuring && t0 >= measureFrom + options_.measureIdle) {
                 const double fps = double(framesDrawn - framesAtMeasure) / double(options_.measureIdle);
-                const double cpu = 100.0 * double(std::clock() - cpuAtMeasure) / CLOCKS_PER_SEC / double(options_.measureIdle);
+                const double cpu = 100.0 * (processCpuSeconds() - cpuAtMeasure) / double(options_.measureIdle);
                 std::printf("Idle: %llu frames, %llu wake-ups in %.1f s: %.2f fps, CPU %.1f%% of one core (%s redraw)\n",
                             (unsigned long long)(framesDrawn - framesAtMeasure), (unsigned long long)(wakeUps - wakesAtMeasure),
                             double(options_.measureIdle), fps, cpu, continuous ? "continuous" : "on-demand");
                 if (measureRestarts > 0) std::printf("  (restarted %d times after input)\n", measureRestarts);
                 std::fflush(stdout);
                 // Idle is 0 fps; a pointer crossing the window draws about a second's worth. Every frame is 60+.
-                return continuous || fps < 5.0 ? 0 : 1;
+                // And near 0 CPU (a laptop's battery): SF_IDLE_CPU_MAX percent of one core, 2 unless set.
+                const char* cpuMaxEnv = std::getenv("SF_IDLE_CPU_MAX");
+                const double cpuMax = cpuMaxEnv && *cpuMaxEnv ? std::atof(cpuMaxEnv) : 2.0;
+                if (!continuous && cpu > cpuMax) std::printf("Idle: CPU over %.1f%% of one core: something spins while idle\n", cpuMax);
+                return continuous || (fps < 5.0 && cpu <= cpuMax) ? 0 : 1;
             }
         }
         // Nothing to draw: sleep until an event, or the next poller tick.
@@ -2890,8 +2917,16 @@ void App::drawUi() {
     // In Gizmo mode (and with the QRemesh Guides brush) the brush ring shows only while Ctrl masks or Shift smooths.
     const bool ringOff = gizmoActive() || (guidesMode_ && !(inputMods() & SDL_KMOD_SHIFT)) || sculptableHot() || forgesphereActive() ||
                          uvToolActive();
-    if (((!ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y)) || drag_ == Drag::Stroke) &&
+    // (The S / O pop-up holds the mouse, but its ring shows where it opened, #138.)
+    ImVec2 sliderOpened;
+    PickerUi::Slider sliderWhich;
+    float sliderValue;
+    const bool sliderRing = PickerUi::sliderPreview(*this, sliderOpened, sliderWhich, sliderValue) &&
+                            canvasRect().contains(sliderOpened.x, sliderOpened.y);
+    if (!sliderRing) sizeRingPreview_ = false;
+    if (((!ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y)) || drag_ == Drag::Stroke || sliderRing) &&
         !hideBrushCursor_ && radial_.menu < 0 && !strokePopup_.open && drag_ != Drag::Select && drag_ != Drag::Guide && // (no ring under a pie or the stroke popup)
+        aiLinkStateValue() != 2 && aiLinkStateValue() != 4 && // (nor over a live-mode question: it is drawn above windows)
         (!ringOff || drag_ == Drag::Stroke || ctrlDown(inputMods())))
         drawBrushCursor();
     drawSelectionOverlay();
@@ -3223,16 +3258,36 @@ bool App::beginPanel(const char* name, bool* open, float width) {
 
 void App::drawAiSettings() {
     using P = ai::AiSettings::Provider;
-    const char* providers[] = {"Free - no account or key", "Anthropic (Claude) - your key",
-                               "OpenAI-compatible (OpenAI, Ollama, LM Studio...)"};
-    int provider = int(aiSettings_.provider);
+    // Presets (ai/Providers.h): one click fills the endpoint and a model. A studio's policy may allow only some
+    // (core/ManagedPolicy.h ai.providers): the others are greyed with "Managed by your studio".
+    const std::string current = ai::providerId(aiSettings_);
+    const ai::ProviderPreset* chosen = ai::findProviderPreset(current);
     ImGui::SetNextItemWidth(-1);
-    if (ImGui::Combo("##provider", &provider, providers, 3)) {
-        // Only the brush provider changes; the image-to-3D settings stay.
-        const ai::AiSettings d = ai::AiSettings::defaults(P(provider));
-        aiSettings_.provider = d.provider;
-        aiSettings_.endpoint = d.endpoint;
-        aiSettings_.model = d.model;
+    if (ImGui::BeginCombo("##provider", chosen ? tr(chosen->label) : current.c_str())) {
+        for (const ai::ProviderPreset& p : ai::providerPresets()) {
+            const bool allowed = policy::aiProviderAllowed(p.id);
+            ImGui::BeginDisabled(!allowed);
+            if (ImGui::Selectable(tr(p.label), current == p.id)) {
+                // Only the brush provider changes; the image-to-3D settings stay.
+                aiSettings_ = ai::withPreset(aiSettings_, p.id);
+                modelsChecked_ = false;
+            }
+            ImGui::EndDisabled();
+            if (!allowed && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("%s", ui::ManagedByText().c_str());
+        }
+        ImGui::EndCombo();
+    }
+    if (!policy::current().aiProviders.empty()) ui::ManagedBadge();
+    if (std::string why; !policy::aiProviderAllowed(current, &why)) { // (saved before the policy came)
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.6f, 0.4f, 1));
+        ImGui::TextWrapped("%s", tr(policy::current().ai == policy::Lock::Off ? why : std::string("Your studio doesn't allow this provider: pick another")).c_str());
+        ImGui::PopStyleColor();
+    }
+    if (chosen) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+        ImGui::TextWrapped("%s", tr(chosen->note));
+        ImGui::PopStyleColor();
     }
     auto textField = [](const char* label, std::string& value, ImGuiInputTextFlags flags = 0) {
         char buf[512];
@@ -3241,20 +3296,8 @@ void App::drawAiSettings() {
         if (ImGui::InputText(label, buf, sizeof buf, flags)) value = buf;
     };
     if (aiSettings_.provider == P::OpenAICompatible) {
-        // One-click presets for the two common local servers.
-        const float third = (ImGui::GetContentRegionAvail().x - 2 * ImGui::GetStyle().ItemSpacing.x) / 3;
-        if (ImGui::Button("Ollama", ImVec2(third, 0))) {
-            aiSettings_.endpoint = "http://localhost:11434/v1/chat/completions";
-            modelsChecked_ = false;
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("LM Studio", ImVec2(third, 0))) {
-            aiSettings_.endpoint = "http://localhost:1234/v1/chat/completions";
-            modelsChecked_ = false;
-        }
-        ImGui::SameLine();
         ImGui::BeginDisabled(pendingModels_.valid());
-        if (ImGui::Button(pendingModels_.valid() ? "Checking..." : "Find models", ImVec2(third, 0))) {
+        if (ImGui::Button(pendingModels_.valid() ? tr("Checking...") : tr("Find models"), ImVec2(-1, 0))) {
             auto promise = std::make_shared<std::promise<ModelList>>();
             pendingModels_ = promise->get_future();
             std::thread([promise, settings = aiSettings_] {
@@ -3274,18 +3317,37 @@ void App::drawAiSettings() {
         }
     }
     if (aiSettings_.provider != P::Free) {
-        textField("Endpoint", aiSettings_.endpoint);
+        textField(tr("Endpoint"), aiSettings_.endpoint);
+        if (std::string why; !aiSettings_.endpoint.empty() && !policy::aiEndpointAllowed(aiSettings_.endpoint, &why)) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.6f, 0.4f, 1));
+            ImGui::TextWrapped("%s", tr(why).c_str());
+            ImGui::PopStyleColor();
+        }
         if (aiSettings_.provider == P::OpenAICompatible && modelsChecked_ && !localModels_.models.empty()) {
             ImGui::SetNextItemWidth(-ImGui::CalcTextSize("Endpoint").x - ImGui::GetStyle().ItemInnerSpacing.x);
-            if (ImGui::BeginCombo("Model", aiSettings_.model.c_str())) {
+            if (ImGui::BeginCombo(tr("Model"), aiSettings_.model.c_str())) {
                 for (const auto& m : localModels_.models)
                     if (ImGui::Selectable(m.c_str(), m == aiSettings_.model)) aiSettings_.model = m;
                 ImGui::EndCombo();
             }
         } else {
-            textField("Model", aiSettings_.model);
+            textField(tr("Model"), aiSettings_.model);
         }
-        textField("API key", aiSettings_.apiKey, ImGuiInputTextFlags_Password);
+        if (ai::oidc::usesSignIn(aiSettings_.endpoint)) {
+            // The studio gateway takes the studio sign-in instead of a key (ai/Oidc.h).
+            ImGui::TextDisabled("%s", tr("Uses your studio sign-in (Preferences > AI > Studio sign-in)"));
+        } else {
+            textField(tr("API key"), aiSettings_.apiKey, ImGuiInputTextFlags_Password);
+            const ai::ProviderPreset* p = ai::findProviderPreset(current);
+            const char* env = p && *p->keyEnv ? p->keyEnv : nullptr;
+            if (aiSettings_.apiKey.empty()) {
+                const char* where = !ai::secrets::cached(ai::secrets::presetAccount(current)).empty()
+                                        ? tr("Saved in your system keychain.")
+                                    : env && std::getenv(env) ? tr("Using the key from the environment.")
+                                                              : nullptr;
+                if (where) ImGui::TextDisabled("%s", where);
+            }
+        }
     }
     if (aiSettings_.provider == P::OpenAICompatible && modelsChecked_) {
         const bool ok = localModels_.error.empty();
@@ -3297,19 +3359,20 @@ void App::drawAiSettings() {
             ImGui::TextWrapped("%s", localModels_.error.c_str());
         ImGui::PopStyleColor();
     }
-    if (aiSettings_.provider == P::OpenAICompatible && ImGui::TreeNode("Run a model on this computer")) {
+    if ((current == "ollama" || current == "lmstudio" || current == "openai-compatible") &&
+        ImGui::TreeNode("Run a model on this computer")) {
         // Steps for the platform we're on; the guide covers the others.
 #if defined(_WIN32)
         ImGui::TextWrapped("1. Install Ollama from ollama.com/download, or in PowerShell:\n"
                            "      winget install Ollama.Ollama\n"
                            "2. Download the model (in PowerShell):\n"
                            "      ollama pull qwen3:4b-instruct\n"
-                           "3. Ollama runs in the system tray. Click Ollama above, then Find models.");
+                           "3. Ollama runs in the system tray. Pick Ollama above, then Find models.");
 #elif defined(__APPLE__)
         ImGui::TextWrapped("1. Install Ollama from ollama.com/download and drag it to Applications.\n"
                            "2. Download the model (in Terminal):\n"
                            "      ollama pull qwen3:4b-instruct\n"
-                           "3. Ollama runs in the menu bar. Click Ollama above, then Find models.");
+                           "3. Ollama runs in the menu bar. Pick Ollama above, then Find models.");
 #else
         ImGui::TextWrapped("1. Install Ollama (or use your package manager, e.g. sudo pacman -S ollama):\n"
                            "      curl -fsSL https://ollama.com/install.sh | sh\n"
@@ -3317,7 +3380,7 @@ void App::drawAiSettings() {
                            "      sudo systemctl enable --now ollama\n"
                            "3. Download the model:\n"
                            "      ollama pull qwen3:4b-instruct\n"
-                           "4. Click Ollama above, then Find models.");
+                           "4. Pick Ollama above, then Find models.");
 #endif
         ImGui::TextWrapped("The 2.5 GB model needs about 4 GB of free memory and works without a graphics card "
                            "(10-20 s per brush on a laptop CPU, a few seconds with a GPU).");
@@ -3335,16 +3398,16 @@ void App::drawAiSettings() {
         std::string err;
         status_ = aiSettingsPath_.empty() || !aiSettings_.save(aiSettingsPath_, err) ? "Could not save AI settings " + err
                                                                                      : "AI settings saved";
+        storeAiKeys();
     }
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     if (aiSettings_.provider == P::Free)
-        ImGui::TextWrapped("Free: an open model (GPT-OSS 20B) hosted by Pollinations.ai, no sign-up. Only your "
-                           "brush description and settings are sent. Rate limited to a request every few seconds; "
-                           "if it can't be reached, a running Ollama is used instead.");
+        ImGui::TextWrapped("%s", tr("Rate limited to a request every few seconds; if it can't be reached, a running "
+                                    "Ollama is used instead."));
     else
-        ImGui::TextWrapped("Requests go only to the endpoint above. Keys are stored on this computer only "
-                           "(owner-readable ai.json); leave empty to use ANTHROPIC_API_KEY / OPENAI_API_KEY. "
-                           "For private, offline use, run Ollama and pick OpenAI-compatible.");
+        ImGui::TextWrapped("%s", tr("Requests go only to the endpoint above. Keys are kept in your system keychain "
+                                    "(never in a settings file); leave empty to use the environment (ANTHROPIC_API_KEY, "
+                                    "OPENAI_API_KEY). For private, offline use, pick Ollama or LM Studio."));
     ImGui::PopStyleColor();
 }
 
@@ -3575,6 +3638,14 @@ void App::showHunyuanNoticeOnce() {
     saved.save(aiSettingsPath_, err);
 }
 
+void App::storeAiKeys() {
+    // Into the keychain on a worker (an unlock prompt never holds up a frame); ai.json never has them.
+    std::thread([settings = aiSettings_] {
+        if (!ai::secrets::storeKeys(settings))
+            SDL_Log("AI keys: no keychain on this computer, so they last until SculptForge quits (or set them in the environment)");
+    }).detach();
+}
+
 void App::drawAiPrefsSection() {
     ImGui::SetNextItemWidth(-1);
     ImGui::InputTextWithHint("##hftoken", tr("Hugging Face token (hf_...)"), hfToken_, sizeof hfToken_, ImGuiInputTextFlags_Password);
@@ -3590,6 +3661,7 @@ void App::drawAiPrefsSection() {
         std::string err;
         status_ = !aiSettingsPath_.empty() && saved.save(aiSettingsPath_, err) ? "Hugging Face token saved"
                                                                                : "Save failed " + err;
+        storeAiKeys();
     }
 }
 
@@ -3848,6 +3920,7 @@ void App::drawImageTo3D() {
         std::string err;
         status_ = !aiSettingsPath_.empty() && aiSettings_.save(aiSettingsPath_, err) ? "Image to 3D settings saved"
                                                                                         : "Save failed " + err;
+        storeAiKeys();
     }
 
     if (textMode_) {
@@ -3933,14 +4006,14 @@ void App::drawPalette_Splats() {
     drawSculptableSection(); // Make sculptable (PanelSculptable.cpp)
 }
 
-bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col, bool ring) {
+bool App::drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, float focal, ImU32 col, bool ring) {
     // Only what brushes work on: the active, visible Part with an up-to-date BVH (a stale one, after a
     // whole-mesh change, is rebuilt at the next press; until then the flat ring shows), not an LOD preview.
     if (previewLod_ >= 0 || doc_.bvhDirty) return false;
     // Not while the solver thread is moving this mesh (predictive strokes): reading it then races the dabs.
     if (solverBusy() || (asyncStroke_ && drag_ == Drag::Stroke)) return false;
     RayHit hit;
-    if (!pick(mouseX_, mouseY_, hit)) return false; // one ray, as a press would cast
+    if (!pick(x, y, hit)) return false; // one ray, as a press would cast
     // The world radius a dab here gets (App::firstDab / the brushes: Size times world size of a pixel).
     const float radius = radiusPx * camera_.worldPerPixel(hit.position, canvasHeight());
     if (!(radius > 0.0f) || !std::isfinite(radius)) return false;
@@ -3948,7 +4021,7 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col, bool ring
     // that plane (#88): no per-point pressing, so bumps can't bend or break the ring. Never a pass over the mesh.
     const glm::vec3 n = surfaceCursorNormal(doc_.mesh, doc_.bvh, hit, radius);
     surfaceCursorCircle(hit.position, n, radius, 64, cursorRing_);
-    surfaceCursorCircle(hit.position, n, radius * focalRingFraction(focalShift_), 48, cursorInner_);
+    surfaceCursorCircle(hit.position, n, radius * focalRingFraction(focal), 48, cursorInner_);
 
     const glm::vec3 eye = camera_.position(), forward = camera_.forward();
     const bool ortho = camera_.ortho;
@@ -4107,15 +4180,28 @@ void App::drawViewFigure() {
 }
 
 void App::drawBrushCursor() {
-    ImDrawList* dl = ImGui::GetForegroundDrawList();
+    // The S / O pop-up (#138): the ring stays where the pop-up opened, at the size or falloff being set, under the
+    // pop-up (the background list) so its number stays readable.
+    ImVec2 opened;
+    PickerUi::Slider which;
+    float value;
+    sizeRingPreview_ = drag_ != Drag::Stroke && PickerUi::sliderPreview(*this, opened, which, value);
+    ImDrawList* dl = sizeRingPreview_ ? ImGui::GetBackgroundDrawList() : ImGui::GetForegroundDrawList();
     const CanvasRect canvas = canvasRect();
     dl->PushClipRect(ImVec2(canvas.x, canvas.y), ImVec2(canvas.x + canvas.w, canvas.y + canvas.h), true);
     struct PopClip {
         ImDrawList* dl;
         ~PopClip() { dl->PopClipRect(); }
     } popClip{dl};
-    const float r = radiusPx_ * (pressureSizeOn() && lastInputPen_ ? std::max(strokePressure(), 0.05f) : 1.0f);
-    const glm::vec2 at = predictedPointer(); // during a predictive stroke, where the pen will be as this frame shows
+    float r = radiusPx_ * (pressureSizeOn() && lastInputPen_ ? std::max(strokePressure(), 0.05f) : 1.0f);
+    float focal = focalShift_;
+    glm::vec2 at = predictedPointer(); // during a predictive stroke, where the pen will be as this frame shows
+    if (sizeRingPreview_) {
+        at = glm::vec2(opened.x, opened.y);
+        if (which == PickerUi::Slider::DrawSize) r = value;
+        else focal = value;
+        sizeRingPreviewPx_ = r;
+    }
     const ImVec2 c(at.x, at.y);
     const SDL_Keymod mod = inputMods();
     const bool inverted = drag_ == Drag::Stroke ? strokeInvert_
@@ -4139,18 +4225,18 @@ void App::drawBrushCursor() {
     }
     // Preferences > Cursor > Hide ring while stroking (#88): the dot and the symmetry dots stay.
     const bool ring = !(uiPrefs_.hideRingWhileStroking && drag_ == Drag::Stroke);
-    surfaceCursorShown_ = uiPrefs_.cursorFollowsSurface && drawSurfaceCursor(dl, r, col, ring);
+    surfaceCursorShown_ = uiPrefs_.cursorFollowsSurface && drawSurfaceCursor(dl, c.x, c.y, r, focal, col, ring);
     ringShown_ = ring;
     if (!surfaceCursorShown_) {
         if (ring) {
             dl->AddCircle(c, r, col, 64, 1.5f);
             // The inner ring is Falloff: where the falloff drops to half.
-            dl->AddCircle(c, r * focalRingFraction(focalShift_), IM_COL32(255, 255, 255, 90), 48, 1.0f);
+            dl->AddCircle(c, r * focalRingFraction(focal), IM_COL32(255, 255, 255, 90), 48, 1.0f);
         } else {
             dl->AddCircleFilled(c, 2.0f * uiScale_, col);
         }
     }
-    drawPrecisionCursor(dl, c, r, col); // Steady Stroke's string, the precision drag, the size in mm (Precision.cpp)
+    if (!sizeRingPreview_) drawPrecisionCursor(dl, c, r, col); // Steady Stroke's string, the precision drag, the size in mm (Precision.cpp; the pop-up shows the size itself)
 }
 
 } // namespace sf

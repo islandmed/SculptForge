@@ -4,7 +4,8 @@
 // Show SculptForge on Discord (core/DiscordPresence.h): what is sent (the name only, the optional challenge and
 // file name, never a path), sanitising, the frame reader's bounds (malformed frames, oversized lengths, fuzz),
 // the socket ownership check (wrong owner, symlink), off = zero connections, and a whole session against a fake
-// Discord on a Unix socket (handshake, activity, clear; a malformed reply closes the connection).
+// Discord on a Unix socket (handshake, activity, clear; a malformed reply closes the connection; Discord restarting;
+// bursts; a killed process), and agent runs never showing.
 #include "TestHarness.h"
 
 #include "core/DiscordPresence.h"
@@ -14,12 +15,15 @@
 #include <cstring>
 #include <random>
 #include <thread>
+#include <vector>
 
 #if !defined(_WIN32)
 #include <cstdlib>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <csignal>
 #include <sys/un.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #endif
 
@@ -78,11 +82,13 @@ TEST(discord_activity_sends_the_name_only) {
     CHECK(act.isObject());
     CHECK(!act.has("details")); // Discord shows the application's name: SculptForge
     CHECK(!act.has("state"));
-    CHECK(act["assets"]["large_image"].asString() == "logo");
+    // The SF mark by URL (Discord's RPC docs: an external https image in large_image, through its media proxy).
+    CHECK(act["assets"]["large_image"].asString() == "https://sculptforge.app/press/sculptforge-icon-1024.png");
     CHECK(act["assets"]["large_text"].asString() == "SculptForge");
-    CHECK(act["timestamps"]["start"].asNumber() == 1793750400.0);
+    CHECK(act["timestamps"]["start"].asNumber() == 1793750400.0); // seconds, as in the docs' SET_ACTIVITY example
+    CHECK(act["type"].asNumber() == 0.0); // Playing (SET_ACTIVITY takes 0, 2, 3 or 5)
     // Nothing else: no buttons, party, secrets (join / spectate) or small image.
-    for (const auto& m : act.members()) CHECK(m.first == "assets" || m.first == "timestamps");
+    for (const auto& m : act.members()) CHECK(m.first == "assets" || m.first == "timestamps" || m.first == "type");
     for (const auto& m : act["assets"].members()) CHECK(m.first == "large_image" || m.first == "large_text");
 }
 
@@ -233,6 +239,27 @@ TEST(discord_off_never_connects) {
     CHECK(connectAttempts() == before);
 }
 
+TEST(discord_agent_runs_never_show) {
+    const auto env = [](std::initializer_list<std::pair<const char*, const char*>> vars) {
+        std::vector<std::pair<std::string, std::string>> v;
+        for (const auto& p : vars) v.emplace_back(p.first, p.second);
+        return [v](const char* n) -> const char* {
+            for (const auto& p : v)
+                if (p.first == n) return p.second.c_str();
+            return nullptr;
+        };
+    };
+    CHECK(!agentRun(env({}), "x11"));
+    CHECK(!agentRun(env({{"SDL_APP_ID", "sculptforge"}}), "wayland"));
+    CHECK(!agentRun(env({{"SDL_APP_ID", "sculptforge"}}), nullptr));
+    CHECK(agentRun(env({{"SDL_APP_ID", "sculptforge-agent"}}), "x11"));
+    CHECK(agentRun(env({{"SDL_VIDEO_DRIVER", "offscreen"}}), nullptr));
+    CHECK(agentRun(env({}), "offscreen")); // the driver SDL picked
+    CHECK(agentRun(env({{"SF_NO_DISCORD", "1"}}), "windows"));
+    CHECK(!agentRun(env({{"SF_NO_DISCORD", "0"}}), "windows"));
+    CHECK(!agentRun(env({{"SF_NO_DISCORD", ""}}), "windows"));
+}
+
 #if !defined(_WIN32)
 
 namespace {
@@ -304,6 +331,26 @@ struct EnvVar {
         else unsetenv(name.c_str());
     }
 };
+
+// Discord's side of one connection: the handshake, READY, then the first activity. -1 on failure.
+int acceptSession(int listener, std::string& activity) {
+    const int c = acceptWithTimeout(listener);
+    uint32_t op = 0;
+    std::string hs;
+    const std::string ready = encodeFrame(OpFrame, "{\"cmd\":\"DISPATCH\",\"evt\":\"READY\"}");
+    if (c < 0 || !readFrame(c, op, hs) || op != OpHandshake || send(c, ready.data(), ready.size(), 0) != ssize_t(ready.size()) ||
+        !readFrame(c, op, activity) || op != OpFrame) {
+        if (c >= 0) close(c);
+        return -1;
+    }
+    return c;
+}
+
+std::string stateOf(const std::string& frame) {
+    Json j;
+    std::string err;
+    return Json::parseStrict(frame, j, err) ? j["args"]["activity"]["state"].asString() : std::string("?");
+}
 
 } // namespace
 
@@ -412,5 +459,121 @@ TEST(discord_malformed_reply_closes) {
     close(listener);
     CHECK(closedByClient);
     CHECK(accepted == 2);
+}
+// Discord quits and starts again while SculptForge runs: the client finds it again within seconds (2 s, not the
+// 60 s back-off), sends what's shown again, and later changes still go out (Tony 11-05: "it doesn't update anymore").
+TEST(discord_reconnects_after_discord_restarts) {
+    TempSocketDir t;
+    const std::string path = t.dir + "/discord-ipc-0";
+    int listener = listenAt(path);
+    CHECK(listener >= 0);
+    if (listener < 0) return;
+    EnvVar xdg("XDG_RUNTIME_DIR", t.dir);
+
+    Client client("1234567890");
+    client.setTimingForTests(60000, 1000, 0);
+    Activity a;
+    a.show = true;
+    a.fileName = "kraken.sfproj";
+    client.set(a);
+    std::string first;
+    int c = acceptSession(listener, first);
+    CHECK(c >= 0 && stateOf(first) == "kraken.sfproj");
+    // Discord quits: its socket goes away.
+    if (c >= 0) close(c);
+    close(listener);
+    unlink(path.c_str());
+    for (int i = 0; i < 700 && client.connected(); ++i) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    CHECK(!client.connected()); // noticed at the next drain (every 5 s)
+    // It starts again.
+    listener = listenAt(path);
+    CHECK(listener >= 0);
+    const auto t0 = std::chrono::steady_clock::now();
+    std::string again;
+    c = acceptSession(listener, again);
+    const double waited = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    CHECK(c >= 0 && stateOf(again) == "kraken.sfproj"); // shown again without any change
+    CHECK(waited < 4.5);
+    // A change after the reconnect goes out.
+    a.fileName = "dragon.sfproj";
+    client.set(a);
+    uint32_t op = 0;
+    std::string changed;
+    CHECK(c >= 0 && readFrame(c, op, changed) && stateOf(changed) == "dragon.sfproj");
+    if (c >= 0) close(c);
+    close(listener);
+}
+
+// Discord takes 5 activities in 20 s and drops the rest: changes in a burst come out spaced, and the last one
+// (what the window shows now) is always sent.
+TEST(discord_bursts_send_the_latest) {
+    TempSocketDir t;
+    const int listener = listenAt(t.dir + "/discord-ipc-0");
+    CHECK(listener >= 0);
+    if (listener < 0) return;
+    EnvVar xdg("XDG_RUNTIME_DIR", t.dir);
+    Client client("1234567890");
+    client.setTimingForTests(60000, 1000, 400);
+    Activity a;
+    a.show = true;
+    a.fileName = "a0.sfproj";
+    client.set(a);
+    std::string frame;
+    const int c = acceptSession(listener, frame);
+    CHECK(c >= 0 && stateOf(frame) == "a0.sfproj");
+    if (c < 0) return;
+    for (int i = 1; i <= 8; ++i) {
+        a.fileName = "a" + std::to_string(i) + ".sfproj";
+        client.set(a);
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    std::vector<std::string> got;
+    uint32_t op = 0;
+    while (got.empty() || got.back() != "a8.sfproj") {
+        if (!readFrame(c, op, frame)) break;
+        got.push_back(stateOf(frame));
+    }
+    CHECK(!got.empty() && got.back() == "a8.sfproj");
+    CHECK(got.size() <= 2); // not 8
+    close(c);
+    close(listener);
+}
+
+// Quit, a crash or a kill: the connection closes with the process (Discord then clears what it showed), even
+// with a child process still running that was started after the connection (close-on-exec).
+TEST(discord_killed_process_closes_the_connection) {
+    TempSocketDir t;
+    const int listener = listenAt(t.dir + "/discord-ipc-0");
+    CHECK(listener >= 0);
+    if (listener < 0) return;
+    EnvVar xdg("XDG_RUNTIME_DIR", t.dir);
+    const pid_t pid = fork();
+    if (pid == 0) {
+        Client* client = new Client("1234567890"); // never destroyed: the kill ends it
+        Activity a;
+        a.show = true;
+        client->set(a);
+        for (int i = 0; i < 300 && client->activitiesSent() < 1; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        if (fork() == 0) { // a worker started after the connection, outliving this process
+            execl("/bin/sleep", "sleep", "3", static_cast<char*>(nullptr));
+            _exit(127);
+        }
+        kill(getpid(), SIGKILL);
+        _exit(1);
+    }
+    std::string activity;
+    const int c = acceptSession(listener, activity);
+    CHECK(c >= 0);
+    int status = 0;
+    waitpid(pid, &status, 0);
+    CHECK(WIFSIGNALED(status));
+    if (c >= 0) {
+        timeval tv{1, 0}; // well before the worker's 3 s are up
+        setsockopt(c, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
+        char b;
+        CHECK(recv(c, &b, 1, 0) == 0); // EOF: closed
+        close(c);
+    }
+    close(listener);
 }
 #endif

@@ -2,8 +2,6 @@
 # the literal as JSON, tab-separated. A label that isn't here fails the test: wrap it in tr() and translate it
 # (coverage.py --missing), or, if it stays English in every language, add it to the intentional section.
 # --- intentional: names that stay English everywhere ---
-App.cpp	ImGui::Button	"Ollama"
-App.cpp	ImGui::Button	"LM Studio"
 App.cpp	ImGui::SeparatorText	"Unreal Engine"
 # --- backlog (11-06): shown in English in every language. Wrap in tr(), translate, delete the line; never add here.
 App.cpp	ImGui::Begin	"About SculptForge"
@@ -84,19 +82,17 @@ App.cpp	ImGui::TextDisabled	"Sculpt expressions & correctives;\nexported as glTF
 App.cpp	ImGui::TextDisabled	"This stays in the Model tooltip."
 App.cpp	ImGui::TextDisabled	"editable"
 App.cpp	ImGui::TextUnformatted	"Free and open-source digital sculpting."
-App.cpp	ImGui::TextWrapped	"1. Install Ollama (or use your package manager, e.g. sudo pacman -S ollama):\n      curl -fsSL https://ollama.com/install.sh | sh\n2. Start it if needed:\n      sudo systemctl enable --now ollama\n3. Download the model:\n      ollama pull qwen3:4b-instruct\n4. Click Ollama above, then Find models."
-App.cpp	ImGui::TextWrapped	"1. Install Ollama from ollama.com/download and drag it to Applications.\n2. Download the model (in Terminal):\n      ollama pull qwen3:4b-instruct\n3. Ollama runs in the menu bar. Click Ollama above, then Find models."
-App.cpp	ImGui::TextWrapped	"1. Install Ollama from ollama.com/download, or in PowerShell:\n      winget install Ollama.Ollama\n2. Download the model (in PowerShell):\n      ollama pull qwen3:4b-instruct\n3. Ollama runs in the system tray. Click Ollama above, then Find models."
+App.cpp	ImGui::TextWrapped	"1. Install Ollama (or use your package manager, e.g. sudo pacman -S ollama):\n      curl -fsSL https://ollama.com/install.sh | sh\n2. Start it if needed:\n      sudo systemctl enable --now ollama\n3. Download the model:\n      ollama pull qwen3:4b-instruct\n4. Pick Ollama above, then Find models."
+App.cpp	ImGui::TextWrapped	"1. Install Ollama from ollama.com/download and drag it to Applications.\n2. Download the model (in Terminal):\n      ollama pull qwen3:4b-instruct\n3. Ollama runs in the menu bar. Pick Ollama above, then Find models."
+App.cpp	ImGui::TextWrapped	"1. Install Ollama from ollama.com/download, or in PowerShell:\n      winget install Ollama.Ollama\n2. Download the model (in PowerShell):\n      ollama pull qwen3:4b-instruct\n3. Ollama runs in the system tray. Pick Ollama above, then Find models."
 App.cpp	ImGui::TextWrapped	"Built with SDL 3 (zlib), Dear ImGui (MIT), GLM (MIT), stb (MIT/public domain), ufbx (MIT/public domain), xatlas (MIT), MikkTSpace (zlib), the Inter and JetBrains Mono typefaces (SIL OFL 1.1) and the MIT-licensed colours of the Forge Terminal look's schemes. Quad Remesh follows Instant Meshes (BSD-3-Clause). The phone link uses QR Code generator (MIT), libdatachannel and libjuice (MPL-2.0), usrsctp (BSD-3-Clause) and Mbed TLS (Apache-2.0). Uses libcurl (curl license) where available."
 App.cpp	ImGui::TextWrapped	"Connected - %d model%s installed"
 App.cpp	ImGui::TextWrapped	"Copyright (C) 2026 The SculptForge contributors. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 3 or later. It comes with ABSOLUTELY NO WARRANTY."
 App.cpp	ImGui::TextWrapped	"Describe a brush the way you'd describe it to another sculptor."
 App.cpp	ImGui::TextWrapped	"Describe one object: \"a stylised dragon head with curled horns\", \"a cartoon fox sitting\"."
-App.cpp	ImGui::TextWrapped	"Free: an open model (GPT-OSS 20B) hosted by Pollinations.ai, no sign-up. Only your brush description and settings are sent. Rate limited to a request every few seconds; if it can't be reached, a running Ollama is used instead."
 App.cpp	ImGui::TextWrapped	"Offline: no outside connections. Updates come only from your studio's channel."
 App.cpp	ImGui::TextWrapped	"Open or drop a .ply capture (Polycam, Luma, Postshot, Scaniverse...) to sculpt against it."
 App.cpp	ImGui::TextWrapped	"Or drop a sketch, concept, logo, photo or height map onto the window."
-App.cpp	ImGui::TextWrapped	"Requests go only to the endpoint above. Keys are stored on this computer only (owner-readable ai.json); leave empty to use ANTHROPIC_API_KEY / OPENAI_API_KEY. For private, offline use, run Ollama and pick OpenAI-compatible."
 App.cpp	ImGui::TextWrapped	"Skeletal mesh with %zu morph targets."
 App.cpp	ImGui::TextWrapped	"Static mesh with %d LODs."
 App.cpp	ImGui::TextWrapped	"The 2.5 GB model needs about 4 GB of free memory and works without a graphics card (10-20 s per brush on a laptop CPU, a few seconds with a GPU)."

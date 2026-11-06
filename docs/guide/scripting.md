@@ -244,13 +244,77 @@ threads.
 
 ## AI agents (MCP)
 
-`sculptforge-cli --mcp` runs SculptForge as an MCP server. An AI tool (Claude, Codex, Gemini, Grok, Cursor, VS Code
-and others) gets every command as a tool and works on one scene for the session: it can open files, generate
-models, sculpt strokes, remesh, paint and export. The AI tool starts `sculptforge-cli` on your computer and talks to
-it over standard input and output. Nothing listens on the network, and nothing is installed into the AI tool.
+An AI tool (Claude Code, Claude Desktop, Cursor and others) can work in the SculptForge window while you watch. The
+AI blocks out a starting point and shows you options; you do the art. **Help > Connect an AI tool...** is the guide
+in the app, on one screen; it is there while AI features are on (**Edit > Preferences > AI**). It says what this
+section says, in the same words.
 
-The easy way: **Help > Connect an AI tool...** shows, for your install, the exact command or settings for each tool
-below, with Copy buttons. It is there while AI features are on (**Edit > Preferences > AI**).
+### Connect an AI tool
+
+**1. Pick your tool.** The window shows the exact command or settings for your install, with **Copy**. SculptForge
+is listed as `sculptforge-live` and started as `sculptforge-cli --mcp --attach`, so it sits beside a `sculptforge`
+entry you may already have (the headless server, below). Claude Code, in a terminal:
+
+```sh
+claude mcp add --scope user sculptforge-live -- /path/to/sculptforge-cli --mcp --attach
+```
+
+Claude Desktop: add this to its configuration file (**Settings > Developer > Edit Config**), then restart Claude
+Desktop:
+
+```text
+{
+  "mcpServers": {
+    "sculptforge-live": { "command": "/path/to/sculptforge-cli", "args": ["--mcp", "--attach"] }
+  }
+}
+```
+
+Cursor takes the same entry in `~/.cursor/mcp.json`. For every other tool, use its setup from the table in
+[Every other tool](#every-other-tool) with the name `sculptforge-live` and the arguments `--mcp --attach`; the
+window writes it out for you. Where `sculptforge-cli` is on your system: [Where sculptforge-cli is](#where-sculptforge-cli-is).
+
+**2. Let it work in this window.** Turn on **Let AI tools control this window**, right there in the window's step 2
+(the same switch as in **Edit > Preferences > AI**). It is off by default, and gone while AI features are off.
+
+**3. What happens next.**
+
+- Ask your AI tool for something (examples below). SculptForge shows **Let an AI tool control this window?** with a
+  6-digit code: click **Approve**, or tell the AI the code. Approval lasts until it disconnects.
+- While it works, the **AI connected** badge sits at the bottom right. **Disconnect** stops it (also in the command
+  palette: *Disconnect AI tool*; turning the switch or AI features off disconnects it too).
+- Every step lands in Undo as **AI: ...**, so you can step back.
+- It asks you first (**Allow this AI step?**) before files outside the project, scripts and the network: reading or
+  writing files outside the project folder and the files you picked, overwriting a file, saving over the project,
+  deleting library files, running a macro or script, and anything that uses the network (Generate 3D, AI Brush, the
+  brush gallery). Deny and it is told not to retry. Installing or switching packs and the AI switch itself are
+  never offered.
+- It sees the viewport; what it sees goes to that tool's AI service. `viewport_image` returns the viewport as you
+  see it, `view_turntable` the model from 4 to 8 sides in one picture, `view_set` turns and frames your camera, and
+  `stroke_screen` draws a brush stroke in screen space. With `blockout` (a Forge Sphere armature in one call),
+  `measure` and `scene_overview` it can look, think and correct.
+
+**Try asking:**
+
+- "Block out a creature head with horns for me to sculpt."
+- "Look at my model from all sides and tell me what to fix."
+- "Make three rock variations I can refine."
+- "Teach me: walk me through sculpting an ear, step by step."
+
+The recipes your AI tool lists as prompts (creature head, stylised bust, game-ready, rock variations, teach me) work
+here too.
+
+How it is kept safe: the connection is a Unix socket (owner-only, in your runtime folder) or, on Windows, a named
+pipe only your user account can open; there is no network port. Only one AI tool can be connected at a time,
+requests are rate limited, and what the tool sends is data: tool names and values, never code to run.
+
+### Without a window: the headless server
+
+`sculptforge-cli --mcp` runs SculptForge as an MCP server with a scene of its own, no window needed: for batch jobs
+and your own agents. The AI tool gets every command as a tool and works on that scene for the session: it can open
+files, generate models, sculpt strokes, remesh, paint and export. It starts `sculptforge-cli` on your computer and
+talks to it over standard input and output. Nothing listens on the network, and nothing is installed into the AI
+tool. The setups below use the name `sculptforge` and `--mcp`; the Claude Desktop bundle is this server too.
 
 ### I have a subscription
 
@@ -340,7 +404,8 @@ servers: use the Agents SDK or plain function calling below.
 ### Using it
 
 Ask for something like "make a sphere, remesh it at 128 and export it to ~/Desktop/ball.glb". File paths are on your
-machine. The agent works headless on its own scene; to see the result, open the exported file in SculptForge.
+machine. The headless server works on its own scene; to see the result, open the exported file in SculptForge (or
+use live mode, above, to watch it work).
 
 - **viewport_image** gives the agent a picture of the scene (a clay-shaded view of the visible Parts, any angle) to
   check each step by eye. Every tool call is one undo step, so the agent can take back what went wrong.
@@ -423,38 +488,6 @@ for step in interaction.steps:
 ```
 
 Never point a tool at a web app's session or cookies: use each vendor's own app, CLI or API as above.
-
-### Live mode: an AI tool sculpts in the open window
-
-Turn on **Edit > Preferences > AI > Let AI tools control this window** (off by default, and gone while AI features
-are off), then add the attach server to your AI tool:
-
-```sh
-claude mcp add sculptforge-live -- /path/to/sculptforge-cli --mcp --attach
-```
-
-Ask it to connect ("connect to SculptForge and block out a dragon head"). SculptForge shows **Let an AI tool control
-this window?** with a 6-digit code: click **Approve**, or read the code to the AI tool. The approval lasts until it
-disconnects. While it works:
-
-- an **AI connected** badge sits at the bottom right of the canvas, with **Disconnect** (also in the command palette:
-  *Disconnect AI tool*). Turning the switch or AI features off disconnects it too;
-- every step it takes is in the undo history, labelled **AI:**, so you can step back through its work;
-- it asks first (**Allow this AI step?**) before reading or writing files outside the project folder and the files
-  you picked, overwriting a file, saving over the project, deleting library files, running a macro or script, or
-  anything that uses the network (Generate 3D, AI Brush, the brush gallery). Deny and it is told not to retry.
-  Installing or switching packs and the AI switch itself are never offered;
-- it can see: `viewport_image` returns the viewport as you see it, `view_turntable` the model from 4 to 8 sides in one
-  picture, `view_set` turns and frames your camera, and `stroke_screen` draws a brush stroke in screen space. With
-  `blockout` (a Forge Sphere armature in one call), `measure` and `scene_overview` it can look, think and correct.
-  What it sees goes to that tool's AI service, as anything you show it does.
-
-The recipes your AI tool lists as prompts (creature head, stylised bust, game-ready, rock variations, teach me) work
-in live mode too.
-
-How it is kept safe: the connection is a Unix socket (owner-only, in your runtime folder) or, on Windows, a named
-pipe only your user account can open; there is no network port. Only one AI tool can be connected at a time,
-requests are rate limited, and what the tool sends is data: tool names and values, never code to run.
 
 ## See also
 

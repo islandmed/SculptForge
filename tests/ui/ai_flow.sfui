@@ -1,0 +1,66 @@
+# The whole AI flow as a new user walks it, at 100% and 200% UI scale (the review screenshots, docs/guide/scripting.md):
+# Help > Connect an AI tool, live mode on from its step 2, the approval with its code (the guide steps aside: never two
+# dialogs stacked), the badge, "Allow this AI step?", Disconnect.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+run ai_features on=true
+click "Help##palette.help"
+click "Connect an AI tool...##help.connect_ai"
+shot connect-100
+click "Claude Desktop##ai_tool.claude_desktop"
+shot connect-100-desktop
+click "Other tools##ai_tool.other"
+shot connect-100-other
+click "Claude Code##ai_tool.claude_code"
+click "Let AI tools control this window##connect.ai_live"
+expect_value ai_link_state == 1
+shot connect-100-on
+ai_client connect
+ai_client send {"hello":"sculptforge-live","v":1,"client":"Claude Code"}
+wait_value ai_link_state == 2 5
+expect_text "Let an AI tool control this window?"
+expect_not "1. Pick your tool"
+shot approve-100
+click "Approve##ailink"
+wait_value ai_link_state == 3 5
+expect_value connect_ai_open == 0
+shot badge-100
+ai_client send {"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"export_glb","arguments":{"path":"/tmp/elsewhere/out.glb"}}}
+wait_value ai_link_state == 4 5
+shot confirm-100
+click "Deny##ailinkconfirm"
+wait_value ai_link_state == 3 5
+click "Disconnect##ailink"
+wait_value ai_link_state == 1 5
+shot disconnected-100
+ai_client close
+# Denied: the guide comes back.
+click "Help##palette.help"
+click "Connect an AI tool...##help.connect_ai"
+ai_client connect
+ai_client send {"hello":"sculptforge-live","v":1,"client":"Claude Code"}
+wait_value ai_link_state == 2 5
+click "Deny##ailink"
+wait_value ai_link_state == 1 5
+expect_text "1. Pick your tool"
+ai_client close
+
+ui_scale 200
+shot connect-200
+click "Other tools##ai_tool.other"
+shot connect-200-other
+ai_client connect
+ai_client send {"hello":"sculptforge-live","v":1,"client":"Claude Code"}
+wait_value ai_link_state == 2 5
+shot approve-200
+click "Approve##ailink"
+wait_value ai_link_state == 3 5
+shot badge-200
+ai_client send {"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"export_glb","arguments":{"path":"/tmp/elsewhere/out.glb"}}}
+wait_value ai_link_state == 4 5
+shot confirm-200
+click "Deny##ailinkconfirm"
+wait_value ai_link_state == 3 5
+click "Disconnect##ailink"
+wait_value ai_link_state == 1 5
+ai_client close

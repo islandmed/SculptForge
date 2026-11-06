@@ -18,13 +18,17 @@
 #include "app/Ui.h"
 #include "cli/McpServer.h"
 #include "cli/McpTools.h"
+#include "core/AuditLog.h"
+#include "core/ManagedPolicy.h"
 #include "link/AiLink.h"
 #include "link/AiLinkSession.h"
 
 #include <IconsLucide.h>
 #include <imgui.h>
 
+#include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <deque>
@@ -41,6 +45,16 @@ namespace {
 constexpr double kApprovalSeconds = 120.0; // an unanswered Approve dialog says no
 
 double seconds() { return double(SDL_GetTicksNS()) * 1e-9; }
+
+// The dialogs look like the app's others (Save changes?, Delete brush): text wrapped at one width, the answer first
+// and the refusal second, both buttons one width (110 px, wider only if a translation needs it).
+constexpr float kDialogWrap = 400.0f;
+float dialogButtonWidth(const char* const (&labels)[2], float scale) {
+    float w = 110.0f * scale;
+    for (const char* l : labels)
+        w = std::max(w, ImGui::CalcTextSize(l, nullptr, true).x + 2.0f * ImGui::GetStyle().FramePadding.x);
+    return w;
+}
 
 Json schemaProp(const char* type, const char* description) {
     Json p = Json::object();
@@ -102,6 +116,28 @@ Json liveTools() {
 
 bool isLiveTool(const std::string& name) {
     return name == "viewport_image" || name == "view_set" || name == "view_turntable" || name == "stroke_screen";
+}
+
+// A studio's policy (core/ManagedPolicy.h) may allow only some kinds of tool: the rest are neither listed nor run.
+bool policyAllowsTool(const Command* cmd, const std::string& name, std::string* why = nullptr) {
+    std::vector<std::string> params;
+    if (cmd)
+        for (const auto& p : cmd->params) params.push_back(p.name);
+    return policy::mcpToolAllowed(name, params, why);
+}
+
+// One line in the audit log (core/AuditLog.h) per live-mode call, refusals too.
+void auditLive(const std::string& client, const std::string& name, const Args& args, bool ok, const std::string& message,
+               int64_t ms = -1) {
+    audit::Entry entry;
+    entry.client = "mcp-live:" + client;
+    entry.tool = "mcp-live";
+    entry.command = name;
+    entry.args = audit::summarizeArgs(args);
+    entry.ok = ok;
+    entry.message = message;
+    entry.ms = ms;
+    audit::record(entry);
 }
 
 // Commands that start a new scene (Document::setMesh: the edit history is cleared).
@@ -216,6 +252,10 @@ void App::AiLinkStateDeleter::operator()(AiLinkState* s) const {
 // ---------------------------------------------------------------------------
 
 void App::setAiLiveControl(bool on) {
+    if (std::string why; on && !policy::mcpLiveAllowed(&why)) {
+        status_ = why;
+        return;
+    }
     aiSettings_.liveControl = on;
     std::string err;
     if (!uiConfigDeterministic_ && !aiSettingsPath_.empty() && !aiSettings_.save(aiSettingsPath_, err)) status_ = err;
@@ -226,7 +266,7 @@ void App::setAiLiveControl(bool on) {
 }
 
 void App::syncAiLink() {
-    const bool want = ai::aiEnabled() && aiSettings_.liveControl;
+    const bool want = ai::aiEnabled() && aiSettings_.liveControl && policy::mcpLiveAllowed(); // (a policy: never listen)
     if (want == bool(aiLink_)) return;
     if (!want) {
         if (aiLink_ && aiLink_->session) consoleEcho("ai_live", {}, {true, "AI tool disconnected"});
@@ -263,6 +303,10 @@ void App::aiLinkPicked(const std::string& path) {
     aiLinkPickedPaths_.push_back(path);
 }
 
+std::string App::aiLinkClient() const {
+    return aiLink_ && aiLink_->session ? aiLink_->session->client() : std::string();
+}
+
 int App::aiLinkStateValue() const {
     if (!aiLink_) return 0;
     if (!aiLink_->session) return 1;
@@ -272,14 +316,22 @@ int App::aiLinkStateValue() const {
 
 void App::drawAiLinkPrefs() {
     if (!ai::aiEnabled()) return;
+    if (!policy::mcpLiveAllowed()) { // the studio's policy says never: the switch stays off and nothing listens
+        ImGui::BeginDisabled();
+        bool off = false;
+        ImGui::Checkbox(tr("Let AI tools control this window##prefs.ai_live"), &off);
+        ImGui::EndDisabled();
+        ui::ManagedBadge(); // (its own line: the narrow Preferences window would clip it)
+        return;
+    }
     bool on = aiSettings_.liveControl;
     if (ImGui::Checkbox(tr("Let AI tools control this window##prefs.ai_live"), &on)) setAiLiveControl(on);
     ui::HelpAction(*this, "prefs.ai_live");
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("%s", tr("An AI tool on this computer (sculptforge-cli --mcp --attach) can ask to sculpt here while "
-                                "you watch. You approve each connection; it can see the viewport, and what it sees goes "
-                                "to that tool's AI service. Files outside the project, scripts and the network ask "
-                                "you first. Nothing listens on the network."));
+    ImGui::TextWrapped("%s", tr("An AI tool on this computer can ask to work in this window while you watch. You approve "
+                                "it with a 6-digit code. Every step lands in Undo. Files outside the project, scripts and "
+                                "the network ask you first. What it sees goes to that tool's AI service. Nothing listens "
+                                "on the network. To set up your tool: Help > Connect an AI tool."));
     ImGui::PopStyleColor();
     if (aiLink_ && !aiLink_->error.empty()) ImGui::TextColored(theme::danger, "%s", aiLink_->error.c_str());
 }
@@ -353,9 +405,10 @@ void App::pollAiLink() {
         case K::ListTools: {
             Json tools = Json::array();
             const Json commands = mcpToolList(commands_), live = liveTools();
-            for (const Json& t : commands.items())
+            for (const Json& t : commands.items()) // (mcpToolList leaves out what the policy doesn't allow)
                 if (!link::AiLinkPolicy::hidden(t["name"].asString())) tools.push(t);
-            for (const Json& t : live.items()) tools.push(t);
+            for (const Json& t : live.items())
+                if (policyAllowsTool(nullptr, t["name"].asString())) tools.push(t);
             s.send(link::AiLinkSession::listReply(step.call.id, std::move(tools)));
             break;
         }
@@ -367,12 +420,19 @@ void App::pollAiLink() {
                 s.send(link::AiLinkSession::resultReply(step.call.id, false, "Unknown tool: " + name));
                 break;
             }
+            if (std::string why; !policyAllowsTool(isLiveTool(name) ? nullptr : cmd, name, &why) ||
+                                 (audit::required() && !audit::writable(&why))) {
+                auditLive(s.session->client(), name, step.call.args, false, why);
+                s.send(link::AiLinkSession::resultReply(step.call.id, false, why));
+                break;
+            }
             s.session->policy.projectDir = macroProjectDir();
             link::AiDecision d = s.session->policy.classify(isLiveTool(name) ? nullptr : cmd, name, step.call.args);
             // A new scene clears the history: unsaved work couldn't be undone back.
             if (d.verdict == link::AiVerdict::Allow && doc_.dirty() && replacesScene(name))
                 d = link::confirmBecause("Replaces the scene: your unsaved changes would be lost");
             if (d.verdict == link::AiVerdict::Deny) {
+                auditLive(s.session->client(), name, step.call.args, false, d.reason);
                 s.send(link::AiLinkSession::resultReply(step.call.id, false, d.reason));
             } else if (d.verdict == link::AiVerdict::Confirm) {
                 // The dialog and the status line in the interface language; the tool only ever gets English.
@@ -393,9 +453,14 @@ void App::pollAiLink() {
 void App::aiLinkExecute(const link::AiLinkCall& call) {
     AiLinkState& s = *aiLink_;
     ++s.commands;
+    const auto start = std::chrono::steady_clock::now();
+    const auto elapsedMs = [&] {
+        return int64_t(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+    };
     if (isLiveTool(call.name)) {
         bool ok = true;
         Json content = aiLiveTool(call.name, call.args, ok);
+        auditLive(s.session->client(), call.name, call.args, ok, ok ? "" : "failed", elapsedMs()); // (never the image)
         s.send(link::AiLinkSession::contentReply(call.id, std::move(content), !ok));
         return;
     }
@@ -405,6 +470,7 @@ void App::aiLinkExecute(const link::AiLinkCall& call) {
     const uint64_t revision = doc_.undo.revision();
     runCommand(call.name, call.args);
     labelAiUndo(part, before, revision);
+    auditLive(s.session->client(), call.name, call.args, lastCommandOk_, status_, elapsedMs());
     s.send(link::AiLinkSession::resultReply(call.id, lastCommandOk_, status_));
 }
 
@@ -628,39 +694,31 @@ void App::drawAiLink() {
                                     ImGuiWindowFlags_AlwaysAutoResize;
 
     if (s.approving && s.session->state() == link::AiLinkSession::State::Pairing) {
-        ImGui::SetNextWindowPos(centre, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowPos(centre, ImGuiCond_Always, ImVec2(0.5f, 0.5f)); // (Appearing: an auto-sized window has no size yet)
         if (std::exchange(s.focusDialog, false)) ImGui::SetNextWindowFocus();
         bool open = true;
-        if (ImGui::Begin(tr("Let an AI tool control this window?###ailinkapprove"), &open, dialog)) {
-            ImGui::PushTextWrapPos(460 * sc);
+        if (ImGui::Begin(tr("Let an AI tool control this window?###ailinkapprove"), nullptr, dialog)) {
+            ImGui::PushTextWrapPos(kDialogWrap * sc);
             ImGui::TextWrapped(tr("\"%s\" on this computer asks to sculpt in this window."), s.session->client().c_str());
-            ImGui::Spacing();
-            ImGui::TextUnformatted(tr("Code"));
+            ImGui::TextUnformatted(tr("Click Approve, or tell your AI tool this code:"));
             const std::string& code = s.session->code();
-            ImGui::PushFont(nullptr);
-            ImGui::SetWindowFontScale(2.2f);
+            if (fontCardTitle_) ImGui::PushFont(fontCardTitle_); // (digits at display size, not a scaled-up 15 px)
             ImGui::TextColored(theme::accent, "%s %s", code.substr(0, 3).c_str(), code.substr(3).c_str());
-            ImGui::SetWindowFontScale(1.0f);
-            ImGui::PopFont();
-            ImGui::TextWrapped("%s", tr("Click Approve, or tell your AI tool this code. Approval lasts until it disconnects."));
-            ImGui::Spacing();
-            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-            ImGui::TextWrapped("%s", tr("It can run SculptForge's commands and see the viewport; what it sees goes to that "
-                                        "tool's AI service. Every step is in Undo. Files outside the project, scripts "
-                                        "and the network ask you first."));
-            ImGui::PopStyleColor();
+            if (fontCardTitle_) ImGui::PopFont();
+            ImGui::TextDisabled("%s", tr("Approval lasts until it disconnects. Every step lands in Undo. Files outside the "
+                                         "project, scripts and the network ask you first. What it sees goes to that "
+                                         "tool's AI service."));
             ImGui::PopTextWrapPos();
             ImGui::Spacing();
-            ImGui::PushStyleColor(ImGuiCol_Button, theme::accent);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::accentHover);
-            ImGui::PushStyleColor(ImGuiCol_Text, theme::textOnAccent);
-            const bool approve = ImGui::Button(tr("Approve##ailink"), ImVec2(140 * sc, 0));
-            ImGui::PopStyleColor(3);
+            const char* labels[] = {tr("Approve##ailink"), tr("Deny##ailink")};
+            const ImVec2 size(dialogButtonWidth(labels, sc), 0);
+            const bool approve = ImGui::Button(labels[0], size);
             ImGui::SameLine();
-            if (ImGui::Button(tr("Deny##ailink"), ImVec2(120 * sc, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) open = false;
+            if (ImGui::Button(labels[1], size) || ImGui::IsKeyPressed(ImGuiKey_Escape)) open = false;
             if (approve) {
                 s.send(s.session->approve());
                 s.approving = false;
+                showConnectAi_ = false; // its steps are done; the badge takes over
                 status_ = std::string(tr("AI connected: ")) + s.session->client();
                 consoleEcho("ai_live", {}, {true, "AI connected: " + s.session->client()});
             }
@@ -701,23 +759,26 @@ void App::drawAiLink() {
     ImGui::PopStyleVar();
 
     if (!s.confirm) return;
-    ImGui::SetNextWindowPos(centre, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowPos(centre, ImGuiCond_Always, ImVec2(0.5f, 0.5f)); // (Appearing: an auto-sized window has no size yet)
     if (std::exchange(s.focusDialog, false)) ImGui::SetNextWindowFocus();
     bool open = true;
     bool allow = false;
-    if (ImGui::Begin(tr("Allow this AI step?###ailinkconfirm"), &open, dialog)) {
-        ImGui::PushTextWrapPos(480 * sc);
+    if (ImGui::Begin(tr("Allow this AI step?###ailinkconfirm"), nullptr, dialog)) {
+        ImGui::PushTextWrapPos(kDialogWrap * sc);
         ImGui::TextWrapped(tr("%s wants to run:"), s.session->client().c_str());
+        if (fontMono_) ImGui::PushFont(fontMono_);
         ImGui::TextColored(theme::accent, "%s", s.confirm->call.name.c_str());
         const std::string args = link::describeArgs(s.confirm->call.args);
         if (!args.empty()) ImGui::TextWrapped("%s", args.c_str());
-        ImGui::Spacing();
+        if (fontMono_) ImGui::PopFont();
         ImGui::TextColored(theme::danger, "%s", s.confirm->reason.c_str());
         ImGui::PopTextWrapPos();
         ImGui::Spacing();
-        allow = ImGui::Button(tr("Allow once##ailink"), ImVec2(140 * sc, 0));
+        const char* labels[] = {tr("Allow once##ailink"), tr("Deny##ailinkconfirm")};
+        const ImVec2 size(dialogButtonWidth(labels, sc), 0);
+        allow = ImGui::Button(labels[0], size);
         ImGui::SameLine();
-        if (ImGui::Button(tr("Deny##ailinkconfirm"), ImVec2(120 * sc, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) open = false;
+        if (ImGui::Button(labels[1], size) || ImGui::IsKeyPressed(ImGuiKey_Escape)) open = false;
     }
     ImGui::End();
     if (allow) {
@@ -728,6 +789,7 @@ void App::drawAiLink() {
             if (const std::string f = argString(p.call.args, key); !f.empty()) aiLinkPicked(f);
         aiLinkExecute(p.call);
     } else if (!open) {
+        auditLive(s.session->client(), s.confirm->call.name, s.confirm->call.args, false, "Declined by the user");
         s.send(link::AiLinkSession::declinedReply(s.confirm->call.id, s.confirm->call.name));
         s.confirm.reset();
         status_ = tr("AI step declined");
