@@ -80,7 +80,7 @@ jobs:
             # Site lane: every file on tools/ci/site_lane.txt (the list ~/Work/.sf/lane.sh reads too), read from the base,
             # never from the change itself (a pull request can't widen it for its own run).
             lane=$(gh api "repos/$REPO/contents/tools/ci/site_lane.txt?ref=$base" -H 'Accept: application/vnd.github.raw') &&
-              lane=$(grep -v '^#' <<< "$lane") || lane=""
+              lane=$(grep -v -e '^#' -e '^[[:space:]]*$' <<< "$lane") || lane="" # (a blank line would match every file)
             if [ -n "$files" ] && [ -n "$lane" ] && ! grep -qvE -f <(echo "$lane") <<< "$files"; then
               echo "::notice::site lane only (tools/ci/site_lane.txt): no build or tests"
               code=false
