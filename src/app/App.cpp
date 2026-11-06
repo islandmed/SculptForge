@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
+#include "app/Pickers.h"
 #include "app/BrandMark.h"
 #include "io/BridgeProtocol.h"
 #include "core/LayerStack.h"
@@ -2890,7 +2891,14 @@ void App::drawUi() {
     // In Gizmo mode (and with the QRemesh Guides brush) the brush ring shows only while Ctrl masks or Shift smooths.
     const bool ringOff = gizmoActive() || (guidesMode_ && !(inputMods() & SDL_KMOD_SHIFT)) || sculptableHot() || forgesphereActive() ||
                          uvToolActive();
-    if (((!ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y)) || drag_ == Drag::Stroke) &&
+    // (The S / O pop-up holds the mouse, but its ring shows where it opened, #138.)
+    ImVec2 sliderOpened;
+    PickerUi::Slider sliderWhich;
+    float sliderValue;
+    const bool sliderRing = PickerUi::sliderPreview(*this, sliderOpened, sliderWhich, sliderValue) &&
+                            canvasRect().contains(sliderOpened.x, sliderOpened.y);
+    if (!sliderRing) sizeRingPreview_ = false;
+    if (((!ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y)) || drag_ == Drag::Stroke || sliderRing) &&
         !hideBrushCursor_ && radial_.menu < 0 && !strokePopup_.open && drag_ != Drag::Select && drag_ != Drag::Guide && // (no ring under a pie or the stroke popup)
         aiLinkStateValue() != 2 && aiLinkStateValue() != 4 && // (nor over a live-mode question: it is drawn above windows)
         (!ringOff || drag_ == Drag::Stroke || ctrlDown(inputMods())))
@@ -3934,14 +3942,14 @@ void App::drawPalette_Splats() {
     drawSculptableSection(); // Make sculptable (PanelSculptable.cpp)
 }
 
-bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col, bool ring) {
+bool App::drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, float focal, ImU32 col, bool ring) {
     // Only what brushes work on: the active, visible Part with an up-to-date BVH (a stale one, after a
     // whole-mesh change, is rebuilt at the next press; until then the flat ring shows), not an LOD preview.
     if (previewLod_ >= 0 || doc_.bvhDirty) return false;
     // Not while the solver thread is moving this mesh (predictive strokes): reading it then races the dabs.
     if (solverBusy() || (asyncStroke_ && drag_ == Drag::Stroke)) return false;
     RayHit hit;
-    if (!pick(mouseX_, mouseY_, hit)) return false; // one ray, as a press would cast
+    if (!pick(x, y, hit)) return false; // one ray, as a press would cast
     // The world radius a dab here gets (App::firstDab / the brushes: Size times world size of a pixel).
     const float radius = radiusPx * camera_.worldPerPixel(hit.position, canvasHeight());
     if (!(radius > 0.0f) || !std::isfinite(radius)) return false;
@@ -3949,7 +3957,7 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col, bool ring
     // that plane (#88): no per-point pressing, so bumps can't bend or break the ring. Never a pass over the mesh.
     const glm::vec3 n = surfaceCursorNormal(doc_.mesh, doc_.bvh, hit, radius);
     surfaceCursorCircle(hit.position, n, radius, 64, cursorRing_);
-    surfaceCursorCircle(hit.position, n, radius * focalRingFraction(focalShift_), 48, cursorInner_);
+    surfaceCursorCircle(hit.position, n, radius * focalRingFraction(focal), 48, cursorInner_);
 
     const glm::vec3 eye = camera_.position(), forward = camera_.forward();
     const bool ortho = camera_.ortho;
@@ -4108,15 +4116,28 @@ void App::drawViewFigure() {
 }
 
 void App::drawBrushCursor() {
-    ImDrawList* dl = ImGui::GetForegroundDrawList();
+    // The S / O pop-up (#138): the ring stays where the pop-up opened, at the size or falloff being set, under the
+    // pop-up (the background list) so its number stays readable.
+    ImVec2 opened;
+    PickerUi::Slider which;
+    float value;
+    sizeRingPreview_ = drag_ != Drag::Stroke && PickerUi::sliderPreview(*this, opened, which, value);
+    ImDrawList* dl = sizeRingPreview_ ? ImGui::GetBackgroundDrawList() : ImGui::GetForegroundDrawList();
     const CanvasRect canvas = canvasRect();
     dl->PushClipRect(ImVec2(canvas.x, canvas.y), ImVec2(canvas.x + canvas.w, canvas.y + canvas.h), true);
     struct PopClip {
         ImDrawList* dl;
         ~PopClip() { dl->PopClipRect(); }
     } popClip{dl};
-    const float r = radiusPx_ * (pressureSizeOn() && lastInputPen_ ? std::max(strokePressure(), 0.05f) : 1.0f);
-    const glm::vec2 at = predictedPointer(); // during a predictive stroke, where the pen will be as this frame shows
+    float r = radiusPx_ * (pressureSizeOn() && lastInputPen_ ? std::max(strokePressure(), 0.05f) : 1.0f);
+    float focal = focalShift_;
+    glm::vec2 at = predictedPointer(); // during a predictive stroke, where the pen will be as this frame shows
+    if (sizeRingPreview_) {
+        at = glm::vec2(opened.x, opened.y);
+        if (which == PickerUi::Slider::DrawSize) r = value;
+        else focal = value;
+        sizeRingPreviewPx_ = r;
+    }
     const ImVec2 c(at.x, at.y);
     const SDL_Keymod mod = inputMods();
     const bool inverted = drag_ == Drag::Stroke ? strokeInvert_
@@ -4140,18 +4161,18 @@ void App::drawBrushCursor() {
     }
     // Preferences > Cursor > Hide ring while stroking (#88): the dot and the symmetry dots stay.
     const bool ring = !(uiPrefs_.hideRingWhileStroking && drag_ == Drag::Stroke);
-    surfaceCursorShown_ = uiPrefs_.cursorFollowsSurface && drawSurfaceCursor(dl, r, col, ring);
+    surfaceCursorShown_ = uiPrefs_.cursorFollowsSurface && drawSurfaceCursor(dl, c.x, c.y, r, focal, col, ring);
     ringShown_ = ring;
     if (!surfaceCursorShown_) {
         if (ring) {
             dl->AddCircle(c, r, col, 64, 1.5f);
             // The inner ring is Falloff: where the falloff drops to half.
-            dl->AddCircle(c, r * focalRingFraction(focalShift_), IM_COL32(255, 255, 255, 90), 48, 1.0f);
+            dl->AddCircle(c, r * focalRingFraction(focal), IM_COL32(255, 255, 255, 90), 48, 1.0f);
         } else {
             dl->AddCircleFilled(c, 2.0f * uiScale_, col);
         }
     }
-    drawPrecisionCursor(dl, c, r, col); // Steady Stroke's string, the precision drag, the size in mm (Precision.cpp)
+    if (!sizeRingPreview_) drawPrecisionCursor(dl, c, r, col); // Steady Stroke's string, the precision drag, the size in mm (Precision.cpp; the pop-up shows the size itself)
 }
 
 } // namespace sf

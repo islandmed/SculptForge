@@ -1472,6 +1472,19 @@ void drawPickers(App& app) {
     }
 }
 
+bool PickerUi::sliderPreview(const App& app, ImVec2& at, Slider& which, float& value) {
+    const State& s = st();
+    if (s.slider != int(Slider::DrawSize) && s.slider != int(Slider::FocalShift)) return false;
+    which = Slider(s.slider);
+    at = s.sliderAt;
+    value = which == Slider::DrawSize ? app.radiusPx_ : app.focalShift_;
+    if (!s.sliderTyped.empty() && s.sliderTyped != "-" && s.sliderTyped != ".") {
+        const float v = std::strtof(s.sliderTyped.c_str(), nullptr); // as Enter would apply it
+        value = which == Slider::DrawSize ? std::clamp(v, kMinDrawSizePx, kMaxDrawSizePx) : std::clamp(v / 100.0f, -1.0f, 1.0f);
+    }
+    return true;
+}
+
 bool PickerUi::sliderKnob(ImVec2& knob) {
     const State& s = st();
     if (s.slider < 0 || !s.sliderPlaced) return false;

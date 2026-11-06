@@ -238,11 +238,15 @@ private:
     void sendBrushRequest(const std::string& text);
     void pollBrushRequest();
     const BrushRecipe* activeRecipe() const;
+    // The brush ring at the pointer; while the S / O pop-up is open (#138), at the point it opened from, with the
+    // size or falloff being set (dragged or typed).
     void drawBrushCursor();
-    // The brush ring lying on the surface under the pointer (#25, Preferences > Cursor > Cursor follows surface);
-    // false when the pointer is off the model (the flat screen ring is drawn instead). `ring` false: only the
-    // centre and the symmetry copies' dots (Hide ring while stroking).
-    bool drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col, bool ring);
+    // The brush ring lying on the surface under (x, y) (#25, Preferences > Cursor > Cursor follows surface);
+    // false when that point is off the model (the flat screen ring is drawn instead). `ring` false: only the
+    // centre and the symmetry copies' dots (Hide ring while stroking). `focal`: the Falloff the inner ring shows.
+    bool drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, float focal, ImU32 col, bool ring);
+    bool sizeRingPreview_ = false; // the last ring drawn was the S / O pop-up's preview (UI tests: size_ring_preview)
+    float sizeRingPreviewPx_ = 0.0f; // its radius, pixels (UI tests: size_ring_px)
     std::vector<glm::vec3> cursorRing_, cursorInner_; // scratch, kept to avoid allocating per frame
     bool surfaceCursorShown_ = false; // the last cursor drawn lay on the surface (UI tests: surface_cursor)
     bool ringShown_ = true;           // the last cursor drawn had its ring (UI tests: cursor_ring)
