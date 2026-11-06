@@ -43,8 +43,8 @@ p { margin: 0 0 1em; }
 .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 600; font-size: 1.1rem; }
 .brand:hover { text-decoration: none; }
-/* The SF monogram (inline SVG, tools/brand/sf-mark.svg: Archivo Black letters as paths): its tile's edge lines up with the page text. */
-.brand .sf-mark { display: block; flex: none; }
+/* The cube mark (inline SVG, tools/brand/cube-mark.svg; docs/brand.md): its tile's edge lines up with the page text. */
+.brand .brand-mark { display: block; flex: none; }
 .nav nav { display: flex; gap: 22px; align-items: center; flex: none; }
 .nav nav a { color: var(--muted); font-size: 0.95rem; white-space: nowrap; }
 .nav nav a:hover { color: var(--text); text-decoration: none; }

@@ -3,13 +3,14 @@
 
     python -I tools/brand/make_icons.py <bust.jpeg> [--discord DIR]
 
-The app icon is the SF mark (Tony 11-05: the bust doesn't read at task bar size): tools/brand/sf-mark*.svg
-(make_sf_mark.py), rendered with rsvg-convert: assets/branding/sculptforge-16..1024.png (16-32 px from
-sf-mark-small.svg), .ico, .icns (Apple's grid, sf-mark-macos(-small).svg), the site's favicons and apple-touch-icon, the
-press icons and, with --discord, the bot avatar.
+Which mark goes where: docs/brand.md. The app icon is the cube (Tony 11-06): tools/brand/cube-mark*.svg
+(make_cube_mark.py), rendered with rsvg-convert: assets/branding/sculptforge-16..1024.png (16-32 px from
+cube-mark-small.svg), .ico, .icns (Apple's grid, cube-mark-macos(-small).svg), the site's favicons and apple-touch-icon,
+the press icons (also Discord Rich Presence's image) and, with --discord DIR, the files uploaded by hand: the Discord bot
+avatar and server icon and the GitHub avatar (all the cube). The SF letters (make_sf_mark.py) are retired.
 The bust (<bust.jpeg>: the concept art, a rounded-square tile on a dark backdrop, found from its light rim) is the
 illustration: assets/branding/bust/ (About, What's New, the support card), the home page's What's New cards, the
-press kit, the social previews and the Discord server icon.
+press kit and the social previews.
 """
 import argparse
 import io
@@ -175,7 +176,7 @@ def sf(name, n):
 
 def icon(n):
     """The app icon n px wide: the small cut up to 32 px, the mark from 48."""
-    return sf("sf-mark-small" if n <= 32 else "sf-mark", n)
+    return sf("cube-mark-small" if n <= 32 else "cube-mark", n)
 
 
 def write_icns(path):
@@ -185,7 +186,7 @@ def write_icns(path):
     chunks = b""
     for kind, n in slots:
         buf = io.BytesIO()
-        sf("sf-mark-macos-small" if n <= 32 else "sf-mark-macos", n).save(buf, format="PNG", optimize=True)
+        sf("cube-mark-macos-small" if n <= 32 else "cube-mark-macos", n).save(buf, format="PNG", optimize=True)
         chunks += kind.encode() + struct.pack(">I", 8 + len(buf.getvalue())) + buf.getvalue()
     with open(path, "wb") as f:
         f.write(b"icns" + struct.pack(">I", 8 + len(chunks)) + chunks)
@@ -208,6 +209,7 @@ def main():
     ico[0].save(os.path.join(ROOT, br, "sculptforge.ico"), format="ICO", sizes=[(i.width, i.height) for i in ico],
                 append_images=ico[1:])
     write_icns(os.path.join(ROOT, br, "sculptforge.icns"))
+    png(icon(512), "packaging", "flatpak", "flatpark", "org.sculptforge.SculptForge", "org.sculptforge.SculptForge.png")
 
     # The site's favicons (as the app icon) and the press kit's app icon.
     png(icon(16), "website", "img", "favicon-16.png")
@@ -216,9 +218,9 @@ def main():
     fav = [icon(n) for n in (48, 32, 16)]
     fav[0].save(os.path.join(ROOT, "website", "favicon.ico"), format="ICO", sizes=[(i.width, i.height) for i in fav],
                 append_images=fav[1:])
-    png(sf("sf-mark-square", 180).convert("RGB"), "website", "img", "apple-touch-icon.png")  # iOS rounds it
+    png(sf("cube-mark-square", 180).convert("RGB"), "website", "img", "apple-touch-icon.png")  # iOS rounds it
     png(icon(256), "website", "img", "icon-256.png")  # the Discord announcements' avatar
-    png(icon(1024), "website", "press", "sculptforge-icon-1024.png")
+    png(icon(1024), "website", "press", "sculptforge-icon-1024.png")  # also Discord Rich Presence's large image
     png(icon(256), "website", "press", "sculptforge-icon-256.png")
 
     # The bust: the illustration.
@@ -234,11 +236,10 @@ def main():
     png(social(bust, 1280, 640, font, tagline), "docs", "images", "social-preview.png")  # GitHub's (uploaded by hand)
 
     if a.discord:
-        # Discord crops both to circles. The bot's avatar is the app icon, full bleed; the server icon the bust, inset.
-        sf("sf-mark-square", 512).convert("RGB").save(os.path.join(a.discord, "discord-bot-avatar-512.png"))
-        av = Image.new("RGBA", (512, 512), (0x1c, 0x1a, 0x1c, 255))
-        av.alpha_composite(shrink(bust, 440), (36, 36))
-        av.convert("RGB").save(os.path.join(a.discord, "discord-server-icon-512.png"))
+        # Discord and GitHub crop to circles: the bot avatar, the server icon and the GitHub avatar are the cube, full
+        # bleed (Tony 11-06).
+        for name, n in (("discord-bot-avatar", 512), ("discord-server-icon", 512), ("github-avatar", 500)):
+            sf("cube-mark-square", n).convert("RGB").save(os.path.join(a.discord, f"{name}-{n}.png"))
     print("done")
 
 
