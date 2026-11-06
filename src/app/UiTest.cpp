@@ -95,7 +95,7 @@
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once ui.json is written: the preferences save themselves, or Save Layout),
 //                            console_open, command_palette_open, customize, shelves_visible,
-//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, offscreen_items (past the window edge), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
+//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, menu_rect_changes (the open task menu moved or resized since last read), offscreen_items (past the window edge), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
@@ -828,6 +828,11 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "right_tray_open") return app_.layout_.rightTrayOpen ? 1.0 : 0.0;
     if (name == "left_tray_open") return app_.layout_.leftTrayOpen ? 1.0 : 0.0;
     if (name == "right_tray_shown") return app_.shell_.rightTray.w > 0.0f ? 1.0 : 0.0; // drawn, not just set open (#107)
+    if (name == "menu_rect_changes") { // times the open task menu moved or resized since the last read (a jitter is many)
+        const int n = app_.menuRectChanges_;
+        app_.menuRectChanges_ = 0;
+        return double(n);
+    }
     if (name == "shell_narrow") return app_.shell_.narrow ? 1.0 : 0.0;
     if (name == "offscreen_items") { // items drawn past the window's edge last frame (#105); names them in the log
         const std::vector<std::string> off = Demo::offscreenItems();
