@@ -692,7 +692,9 @@ void App::drawPalette_Preferences() {
     }
     if (subpalette("preferences.tablet", "Tablet")) {
         tray::Section section;
+        Demo::pushScope("Tablet"); // (UI tests: past_right:Tablet)
         drawTabletSection();
+        Demo::popScope();
     }
     if (subpalette("preferences.performance", "Performance")) {
         tray::Section section;

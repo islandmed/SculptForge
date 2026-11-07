@@ -963,6 +963,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(menu_stable_720 menu_stable --size 1280x720)
     sculptforge_ui_test(title_version_1440 title_version --size 1440x900)
     sculptforge_ui_test(title_version_1024 title_version --size 1024x768)
+    sculptforge_ui_test(tablet_view_speed_1440 tablet_view_speed --size 1440x900)
+    sculptforge_ui_test(tablet_view_speed_1024 tablet_view_speed --size 1024x768)
     sculptforge_ui_test(timeline_narrow_1024 timeline_narrow --size 1024x768)
     # The membership moments' card and the top bar's heart at 1440 and 1024 px (tests/ui/support/support_shots.sfui).
     sculptforge_ui_test(support_shots_1440 support/support_shots --size 1440x900)

@@ -44,6 +44,9 @@ struct ItemTable {
     std::vector<std::string> scopes; // Demo::pushScope: panels drawn inside the shell's trays and drop-downs
     // Items whose visible part runs past the window's edge this frame (#105): "window/label".
     std::map<ImGuiID, std::string> offscreen;
+    // Items that run past their window's inner right edge, scrollable or not (a button cut off at a panel's edge):
+    // "window/label" by ID, the window without its "##" part.
+    std::map<ImGuiID, std::string> pastRight;
 };
 ItemTable& items() {
     static ItemTable t;
@@ -72,6 +75,12 @@ void ImGuiTestEngineHook_ItemAdd(ImGuiContext* ctx, ImGuiID id, const ImRect& bb
         if (bb.GetWidth() > 1.0f && bb.GetHeight() > 1.0f && ((outX && !scrollX) || (outY && !scrollY) || (offScreen && !scrollX && !scrollY)))
             items().offscreen[id] = std::string(win->RootWindow->Name) + "/(unlabelled at " + std::to_string(int(bb.Min.x)) +
                                     "," + std::to_string(int(bb.Min.y)) + ")";
+        if (!win->ScrollbarX && bb.GetWidth() > 1.0f && bb.Max.x > win->InnerRect.Max.x + 1.0f) {
+            std::string root = win->RootWindow->Name; // (in a pushScope panel: the panel's name)
+            if (const size_t hash = root.find("##"); hash != std::string::npos) root.resize(hash);
+            if (!items().scopes.empty()) root = items().scopes.back();
+            items().pastRight[id] = root + "/(unlabelled at " + std::to_string(int(bb.Min.x)) + "," + std::to_string(int(bb.Min.y)) + ")";
+        }
         clip.ClipWith(ImRect(ImVec2(0, 0), ctx->IO.DisplaySize));
     }
     items().rects[id] = {bb, clip};
@@ -90,6 +99,8 @@ void ImGuiTestEngineHook_ItemInfo(ImGuiContext* ctx, ImGuiID id, const char* lab
     std::string window = ctx && ctx->CurrentWindow ? ctx->CurrentWindow->RootWindow->Name : "";
     if (auto off = items().offscreen.find(id); off != items().offscreen.end()) off->second = window + "/" + text;
     if (const size_t hash = window.find("##"); hash != std::string::npos) window.resize(hash);
+    if (auto past = items().pastRight.find(id); past != items().pastRight.end())
+        past->second = (items().scopes.empty() ? window : items().scopes.back()) + "/" + text;
     auto add = [&](const std::string& key) {
         items().byLabel[key] = it->second;
         if (!window.empty()) items().byLabel[window + "/" + key] = it->second;
@@ -139,6 +150,7 @@ void resetDemoGlobals() { items() = {}; }
 void Demo::beginFrame() {
     items().byLabel.clear();
     items().offscreen.clear();
+    items().pastRight.clear();
     items().frame.clear();
     items().scopes.clear();
 }
@@ -165,6 +177,13 @@ std::vector<std::string> Demo::similarItems(const std::string& label) {
 std::vector<std::string> Demo::offscreenItems() {
     std::vector<std::string> out;
     for (const auto& [id, name] : items().offscreen) out.push_back(name);
+    return out;
+}
+
+std::vector<std::string> Demo::pastRightEdge(const std::string& window) {
+    std::vector<std::string> out;
+    for (const auto& [id, name] : items().pastRight)
+        if (name.compare(0, window.size() + 1, window + "/") == 0) out.push_back(name);
     return out;
 }
 

@@ -1,0 +1,98 @@
+# A Huion tablet on Windows (GonzaloHernandez3D on Reddit, with a Razer Tartarus keypad): menus and buttons took
+# several pen taps before one worked (the mouse's first click always did), and orbiting with the pen turned the
+# view far faster than the mouse. Every pen tap below is a single tap, down and up within one frame, often with the
+# pen only just come into range over the item; each must work the first time. Then the same drag on the
+# background turns the view by the same angle with the pen tip and with the mouse, unless Preferences > Tablet >
+# View speed says otherwise.
+run new_sphere subdivisions=4
+key f
+
+# Huion's stream: the pen's events plus the driver's own mouse events (a press at each touch, never released).
+pen_stream huion
+sdl_pen_mouse on
+pen_tap "Clay##brush.clay" enter
+expect_value brush_type == 1
+pen_tap "Inflate##brush.inflate"
+expect_value brush_type == 4
+pen_tap "Standard##brush.standard" enter
+expect_value brush_type == 0
+expect_value ui_left_down == 0
+
+# A menu and one of its items, tap after tap, the pen leaving range between them.
+pen_tap "View##menu.view" enter
+wait 0.2
+expect "Floor grid##render"
+pen_tap "Floor grid##render"
+expect_value floor_grid == 1
+key escape                                     # (the toggle keeps its menu open)
+pen_out
+pen_tap "View##menu.view" enter
+wait 0.2
+expect "Floor grid##render"
+pen_tap "Floor grid##render" enter
+expect_value floor_grid == 0
+key escape
+pen_tap "Help##menu.help" enter
+wait 0.2
+expect "User Guide##help.guide"
+key escape
+expect_value ui_left_down == 0
+
+# Windows Ink alone (SDL's pen mouse events, which the app ignores): the same taps.
+pen_stream ink
+pen_tap "Clay##brush.clay" enter
+expect_value brush_type == 1
+pen_tap "View##menu.view" enter
+wait 0.2
+expect "Floor grid##render"
+pen_tap "Floor grid##render"
+expect_value floor_grid == 1
+key escape
+pen_tap "View##menu.view"
+wait 0.2
+pen_tap "Floor grid##render"
+expect_value floor_grid == 0
+key escape
+pen_out
+
+# Orbit: the pen tip on the background turns the view by the same angle per pixel as the mouse, with each stream.
+run ui_look look=classic layout=classic        # (its background beside the model, as pen_navigation.sfui)
+snapshot
+camera 0 0
+drag 0.12 0.3 0.12 0.5
+remember camera_pitch mouse
+expect_value camera_pitch < -20
+expect_value moved == 0
+camera 0 0
+pen_drag 0.12 0.3 0.12 0.5
+expect_value camera_pitch >= $mouse-0.5
+expect_value camera_pitch <= $mouse+0.5
+pen_out
+pen_stream huion
+camera 0 0
+pen_drag 0.12 0.3 0.12 0.5
+expect_value camera_pitch >= $mouse-0.5
+expect_value camera_pitch <= $mouse+0.5
+expect_value moved == 0
+pen_out
+pen_stream ink
+expect_value stroking == 0
+
+# Preferences > Tablet > View speed turned down: the pen turns the view that much less, the mouse as before.
+expect_value tablet_view_speed == 1
+click "Preferences##palette.preferences"
+click "Tablet##preferences.tablet"
+drag_item "##tablet_view_speed" -2000 0
+expect_value tablet_view_speed < 0.11
+shot view-speed
+key escape
+camera 0 0
+pen_drag 0.12 0.3 0.12 0.5
+expect_value camera_pitch < 0
+expect_value camera_pitch > $mouse*0.15
+pen_out
+camera 0 0
+drag 0.12 0.3 0.12 0.5
+expect_value camera_pitch >= $mouse-0.5
+expect_value camera_pitch <= $mouse+0.5
+expect_value moved == 0

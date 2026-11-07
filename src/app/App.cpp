@@ -1951,6 +1951,11 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
             return;
         }
     }
+    // Preferences > Tablet > View speed: the pen's view drags (tip or side button) by its own amount per pixel.
+    if (fromPen && (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom)) {
+        dx *= uiPrefs_.tablet.viewSpeed;
+        dy *= uiPrefs_.tablet.viewSpeed;
+    }
     switch (drag_) {
     case Drag::Stroke: strokeTo(x, y); break;
     case Drag::Orbit: orbitBy(x, y, dx, dy); break;

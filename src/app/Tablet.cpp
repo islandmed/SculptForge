@@ -362,8 +362,13 @@ const char* App::pressureStatus() const {
 void App::drawPressureStatus() {
     const bool ok = penSeen_ && penTracker_.hasPressure();
     ImGui::TextColored(col(ok ? ui::color::accent : ui::color::textDim), "%s", tr(pressureStatus()));
+    // Troubleshooting beside it, or on its own line where it would run past the panel (200% UI scale, narrow trays).
+    const char* help = tr(ICON_LC_CIRCLE_HELP "  Troubleshooting##pressure_help");
+    const ImGuiStyle& st = ImGui::GetStyle();
+    const float helpW = ImGui::CalcTextSize(help, nullptr, true).x + st.FramePadding.x * 2.0f;
     ImGui::SameLine();
-    if (ImGui::SmallButton(tr(ICON_LC_CIRCLE_HELP "  Troubleshooting##pressure_help")))
+    if (ImGui::GetContentRegionAvail().x < helpW) ImGui::NewLine();
+    if (ImGui::SmallButton(help))
         guide_.open("troubleshooting.md#pen-tablets");
 #if defined(_WIN32)
     ui::HelpText("Pressure", nullptr,
@@ -530,6 +535,13 @@ void App::drawTabletSection() {
                  "Turn on if the tablet driver is set to Mouse mode: the pen moves the cursor by how far it moves, and "
                  "lifting it and putting it down elsewhere leaves the cursor where it was. Off (Pen mode): the cursor "
                  "is where the pen is.",
+                 path);
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    ui::SliderInside("##tablet_view_speed", &t.viewSpeed, 0.1f, 2.0f, "View speed %.2f");
+    ui::HelpText("View speed", nullptr,
+                 "How far the pen turns, pans and zooms the view, against the mouse's 1.00. A tablet spreads its "
+                 "whole area over the screen, so a short pen movement crosses many pixels: if the view spins too "
+                 "fast with the pen, turn this down.",
                  path);
 
     // --- Live pressure ---
@@ -710,7 +722,7 @@ void App::drawTabletSection() {
         t.mouseMode = mouseMode;
     }
     ui::HelpText("Tablet defaults", nullptr, "Eraser: Invert; lower button: Right-click; upper button: Invert (Alt); third "
-                                             "button: Pan view. The curve and Mouse mode stay.", path);
+                                             "button: Pan view; View speed 1.00. The curve and Mouse mode stay.", path);
     ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextUnformatted(tr("These settings save themselves."));
