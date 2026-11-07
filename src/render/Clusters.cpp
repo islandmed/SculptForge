@@ -597,6 +597,20 @@ bool coarseAttributesMatch(const CoarseLevels& L, const CoarseVertices& V) {
     return !V.colors.empty() == !L.colors.empty() && !V.mask.empty() == !L.mask.empty();
 }
 
+namespace {
+// A micro triangle's corner k (c0, c1, c2: its grid's (0, 0), (n, 0), (0, n)): height in steps and mask. The one place
+// microCorners reads the micro level, so a sparse height store (Focus Detail phase 4) only changes this. (The corner
+// point is the base corner plus its normal times the height: the Phong pull is zero there, MicroTriangle::evalWeights.)
+struct MicroCorner {
+    float height = 0.0f, mask = 0.0f;
+};
+MicroCorner microCorner(const MicroMesh& mm, uint32_t t, int k) {
+    const uint32_t corner[3] = {MicroMesh::index(0, 0, mm.n), MicroMesh::index(mm.n, 0, mm.n), MicroMesh::index(0, mm.n, mm.n)};
+    const size_t at = size_t(t) * mm.samples + corner[k];
+    return {float(mm.disp[at]), mm.hasMask() ? float(mm.mask[at]) / 255.0f : 0.0f};
+}
+} // namespace
+
 void microCorners(const Mesh& mesh, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals, std::vector<float>& mask,
                   std::span<const uint32_t> vertices, std::span<const uint32_t> normalsOf) {
     const size_t nv = mesh.vertexCount();
@@ -609,9 +623,6 @@ void microCorners(const Mesh& mesh, std::vector<glm::vec3>& positions, std::vect
         if (masked) mask.resize(nv);
         else std::vector<float>().swap(mask);
     }
-    // (corner c0, c1, c2 of a triangle's grid: (0, 0), (n, 0), (0, n); its point is the corner plus the corner's
-    // normal times its displacement: the Phong pull is zero there, as MicroTriangle::evalWeights)
-    const uint32_t corner[3] = {MicroMesh::index(0, 0, mm.n), MicroMesh::index(mm.n, 0, mm.n), MicroMesh::index(0, mm.n, mm.n)};
     const size_t count = all ? nv : vertices.size();
     poolFor(count, [&](size_t i0, size_t i1) {
         for (size_t i = i0; i < i1; ++i) {
@@ -621,11 +632,11 @@ void microCorners(const Mesh& mesh, std::vector<glm::vec3>& positions, std::vect
             for (uint32_t t : mesh.vertexTriangles(v)) {
                 const glm::uvec3 tri = mesh.triangles[t];
                 const int k = tri.x == v ? 0 : tri.y == v ? 1 : 2;
-                const size_t at = size_t(t) * mm.samples + corner[k];
+                const MicroCorner c = microCorner(mm, t, k);
                 const glm::vec3 n = mesh.normals[v];
                 const float len = glm::length(n);
-                if (len > 1e-20f) p += n / len * (float(mm.disp[at]) * mm.step);
-                if (masked) m = float(mm.mask[at]) / 255.0f;
+                if (len > 1e-20f) p += n / len * (c.height * mm.step);
+                if (masked) m = c.mask;
                 break; // (stitched: every triangle around it holds the same corner)
             }
             positions[v] = p;
