@@ -289,7 +289,8 @@
 //                            scroll: only the wheel, from the cap's first stir (inside the dead zone) and on for a
 //                            quarter second after it is let go (stragglers; fenix's slow tilt, 11-06)
 //   spacemouse_unplug        unplug it
-//   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view)
+//   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view),
+//                            spacemouse_echo (1 while a mouse wheel would be dropped as the driver's echo)
 //   ui_scale PERCENT | auto  Preferences > Interface > UI scale (applied live, #87); display_scale PERCENT: the display's
 //                            content scale changes, with SDL's event (Windows DPI, another monitor); logical_width W: the display scale that makes the window W logical px wide (#105)
 //   expect_value ui_scale (percent built now), font_height (default font, px), frame_height, panel_width (right
@@ -1188,6 +1189,11 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "touch_fingers") return double(app_.touch_.fingers());
     if (name == "spacemouse_connected") return app_.spaceMouse_ ? 1.0 : 0.0;
     if (name == "spacemouse_moving") return app_.spaceMouseMoving() ? 1.0 : 0.0;
+    if (name == "spacemouse_echo") { // a mouse's wheel turned now would be taken for the driver's echo
+        SDL_Event e{};
+        e.type = SDL_EVENT_MOUSE_WHEEL;
+        return app_.spaceMouseEcho(e) ? 1.0 : 0.0;
+    }
     if (name == "camera_distance") return app_.camera_.distance;
     if (name == "camera_pan") return glm::length(app_.camera_.target);
     if (name == "groups") {

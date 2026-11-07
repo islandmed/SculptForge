@@ -65,6 +65,6 @@ expect_value camera_pan <= $p0+0.0001
 
 # The echo is over: the mouse wheel zooms again.
 spacemouse_echo off
-wait 0.5
+wait_value spacemouse_echo == 0 5
 wheel 0.5 0.5 3
 expect_value camera_distance < $d0-0.01
