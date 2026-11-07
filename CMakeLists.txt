@@ -980,6 +980,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(windows_dpi_2160 windows_dpi --size 2160x1350)
     # Part folders (#96) at 200 % on a 3200x1800 screen (tests/ui/hidpi/: scripts only run at their HiDPI size).
     sculptforge_ui_test(part_folders_hidpi hidpi/part_folders --size 3200x1800)
+    # Trays and columns never scroll sideways at auto scale on a 1920x1200 screen (dm4nd on Discord).
+    sculptforge_ui_test(tray_hscroll_hidpi hidpi/tray_hscroll --size 1920x1200)
     set_tests_properties(ui_right_tray_looks_720 ui_windows_dpi_2560 ui_windows_dpi_2160 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
     sculptforge_ui_test(user_guide_1080 user_guide --size 1920x1080)
     # The Deform panel for the look review (tests/ui/sizes/: scripts only run at their own sizes).

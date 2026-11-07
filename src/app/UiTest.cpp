@@ -25,6 +25,7 @@
 //   drag X0 Y0 X1 Y1 [S] [release]  left-drag in window fractions (rectangle hide, sliders...); release:
 //                            let go of the held modifiers halfway (Alt-drag, release Alt to zoom)
 //   drag_item LABEL DX DY [S] left-drag from the item by DX DY pixels (scrubbing, dragging a tile out)
+//   wheel_item LABEL X Y      the mouse wheel over the item: X sideways (a trackpad swipe), Y up/down
 //   drag_path U0 V0 U1 V1 ... [keep] [S=seconds]   left-drag through the points (fractions of the model's
 //                            on-screen bounds; outside 0..1 is the background) with the held modifiers: a lasso,
 //                            or a rectangle from the first point to the last. keep: leave the button down
@@ -102,7 +103,7 @@
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once ui.json is written: the preferences save themselves, or Save Layout),
 //                            console_open, command_palette_open, customize, shelves_visible,
-//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, title_overlaps (top bar widgets over each other), timeline_overlaps (the timeline header's pieces over each other), menu_rect_changes (the open task menu moved or resized since last read), offscreen_items (past the window edge), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
+//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, title_overlaps (top bar widgets over each other), timeline_overlaps (the timeline header's pieces over each other), menu_rect_changes (the open task menu moved or resized since last read), offscreen_items (past the window edge), hscroll_windows (shown vertical windows wider inside than out), hscrolled_windows (shown windows scrolled sideways), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
@@ -969,6 +970,25 @@ double Demo::query(const std::string& name, bool& known) const {
         const std::vector<std::string> off = Demo::offscreenItems();
         for (const std::string& o : off) std::fprintf(stderr, "offscreen: %s\n", o.c_str());
         return double(off.size());
+    }
+    if (name == "hscrolled_windows") { // shown windows scrolled sideways now (a sideways wheel moved them); names them
+        int n = 0;
+        for (ImGuiWindow* w : ImGui::GetCurrentContext()->Windows)
+            if (w->Active && !w->Hidden && std::abs(w->Scroll.x) > 0.5f) {
+                std::fprintf(stderr, "hscrolled: %s (%.0f px)\n", w->Name, w->Scroll.x);
+                ++n;
+            }
+        return n;
+    }
+    if (name == "hscroll_windows") { // shown vertical windows (trays, side shelves) wider inside than out; names them
+        int n = 0;
+        for (ImGuiWindow* w : ImGui::GetCurrentContext()->Windows)
+            if (w->Active && !w->Hidden && w->Size.y > w->Size.x && w->ScrollMax.x > 0.5f &&
+                !(w->Flags & (ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_Popup))) {
+                std::fprintf(stderr, "hscroll: %s (%.0f px over %.0f)\n", w->Name, w->ScrollMax.x, w->Size.x);
+                ++n;
+            }
+        return n;
     }
     if (name == "library_open") return app_.libraryBrowser_.open() ? 1.0 : 0.0;
     if (name == "guide_open") return app_.guide_.isOpen() ? 1.0 : 0.0;
@@ -2796,6 +2816,30 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.handleEvent(e);
         });
         wait(0.05f);
+    } else if (verb == "wheel_item") { // wheel_item LABEL X Y: the wheel over a UI item; X is sideways (a trackpad swipe)
+        if (!need(3)) return false;
+        const std::string label = w[1];
+        auto at = std::make_shared<ImVec2>();
+        steps_.push_back([this, line, label, at](float t) {
+            if (findItem(label, *at)) {
+                mouseMotion(at->x, at->y);
+                return true;
+            }
+            if (t > 3.0f) fail(line, notFound(label));
+            return t > 3.0f;
+        });
+        wait(0.05f);
+        run([this, at, dx = num(2, 0.0f), dy = num(3, 0.0f)] {
+            SDL_Event e{};
+            e.type = SDL_EVENT_MOUSE_WHEEL;
+            e.wheel.windowID = SDL_GetWindowID(app_.window_);
+            e.wheel.x = dx;
+            e.wheel.y = dy;
+            e.wheel.mouse_x = at->x;
+            e.wheel.mouse_y = at->y;
+            app_.handleEvent(e);
+        });
+        wait(0.1f);
     } else if (verb == "mouse_move") {
         if (!need(2)) return false;
         run([this, u = num(1, 0.5f), v = num(2, 0.5f)] {
