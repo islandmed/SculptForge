@@ -48,5 +48,12 @@ wait_idle 20
 expect_text "SculptForge 99.0.0-beta.1 is available"
 expect_text "Try the beta"
 shot update-banner-beta
+# The banner stays above the Preferences menu, its buttons in sight: the first click outside the menu closes it (as
+# for any menu), the next one is Later's.
 click "Later"
+expect_not "Update channel"
+click "Later"
+expect_not "Skip this version"
+click "Preferences##palette.preferences"
+expect_text "Update channel"
 click "Stable##prefs.update_stable"
