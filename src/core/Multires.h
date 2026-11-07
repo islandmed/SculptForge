@@ -40,6 +40,7 @@
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -194,6 +195,11 @@ bool subdivReconstruct(Mesh& mesh, std::string& error, BVH* bvh = nullptr);
 // Folds edits of the current level into the stack (see the file comment). Cheap when nothing changed.
 // Returns false (and drops the stack) if the mesh no longer has the current level's topology.
 bool subdivCommit(Mesh& mesh);
+// Runs `op` on every level's data and on the mesh (the current level), after folding in pending edits and
+// evaluating stale levels, then fits the sculpt-layer details again: for changes that are exact on every level
+// (reordering, renaming, merging, inverting, baking or clearing sculpt layers). `op` must change arrays only
+// (level data has no topology). Without levels it just runs `op` on the mesh.
+void subdivForEachLevel(Mesh& mesh, const std::function<void(Mesh&)>& op);
 // A full copy of level `level` (pending edits included), e.g. to export the base cage.
 Mesh subdivLevelMesh(const Mesh& mesh, int level);
 

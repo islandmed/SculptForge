@@ -109,6 +109,8 @@ float KeycapsWidth(const std::string& chord);
 float KeycapsAt(ImDrawList* drawList, ImVec2 pos, const std::string& chord); // no layout; returns the width
 // A plain tooltip after the hover delay (icon-only buttons, clipped labels); suppressed while Ctrl is held.
 void DelayedTooltip(const char* text);
+// An eye at `c`: open (almond and pupil) or closed (lower lid and lashes), for show / hide toggles.
+void DrawEye(ImDrawList* dl, ImVec2 c, float size, bool open, ImU32 col);
 bool CtrlHeld();
 bool AltHeld();
 

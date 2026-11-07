@@ -13,7 +13,8 @@ size_t UndoRecord::approxBytes() const {
                    facegroups.bytes() + (paint ? paint->bytes() : 0) +
                    (textureTiles ? textureTiles->bytes() : 0) + (texture ? texture->bytes() : 0) +
                    (subdiv ? subdiv->bytes() : 0) + (topology ? topology->bytes() : 0) +
-                   (micro ? micro->bytes() : 0) + uvs.bytes() + (sets ? sets->bytes() : 0) + (uv ? uv->bytes() : 0);
+                   (micro ? micro->bytes() : 0) + uvs.bytes() + (sets ? sets->bytes() : 0) + (uv ? uv->bytes() : 0) +
+                   (layerSettings ? layerSettings->bytes() : 0);
     for (const auto& l : layerOffsets) bytes += l.bytes();
     if (mesh)
         bytes += mesh->vertexCount() * ((2 + (mesh->base.empty() ? 0 : 1 + mesh->layers.size())) * sizeof(glm::vec3) +
@@ -127,6 +128,28 @@ size_t PaintStackUndo::bytes() const {
     return n;
 }
 
+LayerSettingsUndo LayerSettingsUndo::capture(const Mesh& mesh) {
+    LayerSettingsUndo u;
+    for (const SculptLayer& l : mesh.layers) {
+        u.weights.push_back(l.weight);
+        u.visible.push_back(l.visible ? 1 : 0);
+    }
+    u.strength = mesh.layerStrength;
+    return u;
+}
+
+void LayerSettingsUndo::swapWith(Mesh& mesh) {
+    for (size_t i = 0; i < mesh.layers.size() && i < weights.size(); ++i) {
+        std::swap(weights[i], mesh.layers[i].weight);
+        bool v = visible[i] != 0;
+        std::swap(v, mesh.layers[i].visible);
+        visible[i] = v ? 1 : 0;
+    }
+    std::swap(strength, mesh.layerStrength);
+    mesh.evaluateAll();
+    mesh.recomputeAllNormals();
+}
+
 UndoRecord UndoRecord::captureHidden(const Mesh& mesh, std::string label, std::span<const uint32_t> tris) {
     UndoRecord r;
     r.label = std::move(label);
@@ -158,6 +181,10 @@ void UndoStack::apply(UndoRecord& r, Mesh& mesh, BVH& bvh) {
     }
     if (r.micro) r.micro->swapWith(mesh); // (the base doesn't move: no BVH work)
     if (r.sets) std::swap(mesh.selectionSets, r.sets->list);
+    if (r.layerSettings) {
+        r.layerSettings->swapWith(mesh);
+        bvh.refitAll(mesh);
+    }
     if (r.mesh) {
         std::swap(*r.mesh, mesh);
         mesh.topologyDirty = true;

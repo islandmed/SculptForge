@@ -70,6 +70,7 @@ void assignLevelArrays(Mesh& out, const Mesh& m) {
     out.quadPartners = m.quadPartners;
     out.base = m.base;
     out.layers = m.layers;
+    out.layerStrength = m.layerStrength;
     out.paintBase = m.paintBase;
     out.paintLayers = m.paintLayers;
     out.activePaintLayer = m.activePaintLayer;
@@ -129,7 +130,7 @@ void evaluateLayers(Mesh& m) {
     parallelRange(m.positions.size(), [&](size_t b, size_t e) {
         for (size_t v = b; v < e; ++v) {
             glm::vec3 p = m.base[v];
-            for (const auto& l : m.layers) p += l.weight * l.delta[v];
+            for (size_t i = 0; i < m.layers.size(); ++i) p += m.layerWeight(int(i)) * m.layers[i].delta[v];
             m.positions[v] = p;
         }
     });
@@ -1012,8 +1013,9 @@ bool sameLayerSet(const Mesh& a, const Mesh& b) {
     return true;
 }
 bool sameLayerWeights(const Mesh& a, const Mesh& b) {
+    if (a.layerStrength != b.layerStrength) return false;
     for (size_t i = 0; i < a.layers.size() && i < b.layers.size(); ++i)
-        if (a.layers[i].weight != b.layers[i].weight) return false;
+        if (a.layers[i].weight != b.layers[i].weight || a.layers[i].visible != b.layers[i].visible) return false;
     return true;
 }
 bool samePaintSet(const Mesh& a, const Mesh& b) {
@@ -1038,7 +1040,7 @@ void remapLayers(Mesh& m, std::vector<std::shared_ptr<std::vector<glm::vec3>>>* 
     std::vector<std::shared_ptr<std::vector<glm::vec3>>> details;
     std::vector<bool> used(m.layers.size(), false);
     for (const SculptLayer& wl : w.layers) {
-        SculptLayer l{wl.name, {}, wl.weight};
+        SculptLayer l{wl.name, {}, wl.weight, wl.visible};
         std::shared_ptr<std::vector<glm::vec3>> d;
         for (size_t i = 0; i < m.layers.size(); ++i)
             if (!used[i] && m.layers[i].name == wl.name) {
@@ -1325,7 +1327,8 @@ std::shared_ptr<Mesh> divideData(const SubdivTopology& tp, const Mesh& coarse) {
         fine->positions = subdivideField(tp, tp.smooth, coarse.positions);
     } else {
         fine->base = subdivideField(tp, tp.smooth, coarse.base);
-        for (const SculptLayer& l : coarse.layers) fine->layers.push_back({l.name, subdivideField(tp, tp.smooth, l.delta), l.weight});
+        fine->layerStrength = coarse.layerStrength;
+        for (const SculptLayer& l : coarse.layers) fine->layers.push_back({l.name, subdivideField(tp, tp.smooth, l.delta), l.weight, l.visible});
         fine->positions.resize(fine->base.size());
         evaluateLayers(*fine);
     }
@@ -1483,7 +1486,11 @@ bool subdivCommit(Mesh& w) {
         for (int j = 0; j < n; ++j) {
             if (j == c) continue;
             Mesh& m = mutableData(s.levels[size_t(j)]);
-            for (size_t i = 0; i < m.layers.size() && i < w.layers.size(); ++i) m.layers[i].weight = w.layers[i].weight;
+            m.layerStrength = w.layerStrength;
+            for (size_t i = 0; i < m.layers.size() && i < w.layers.size(); ++i) {
+                m.layers[i].weight = w.layers[i].weight;
+                m.layers[i].visible = w.layers[i].visible;
+            }
             if (!s.levels[size_t(j)].stale) evaluateLayers(m);
         }
     }
@@ -1657,6 +1664,42 @@ bool subdivDeleteHigher(Mesh& mesh, std::string& error) {
     s.levels.resize(size_t(s.current) + 1);
     dropStackIfSingle(mesh);
     return true;
+}
+
+void subdivForEachLevel(Mesh& w, const std::function<void(Mesh&)>& op) {
+    if (!w.multires || !subdivCommit(w)) {
+        op(w);
+        return;
+    }
+    MultiresStack& s = mutableStack(w);
+    const int n = int(s.levels.size());
+    // Every level exact first (positions stand for their details), then the same change on each of them.
+    for (int j = 1; j < n; ++j)
+        if (s.levels[size_t(j)].stale) evaluateLevel(s, j);
+    for (int j = 0; j < n; ++j) op(mutableData(s.levels[size_t(j)]));
+    op(w);
+    // The sculpt-layer details again, from the new offsets in the frames of each level's subdivided base.
+    for (int j = 1; j < n; ++j) {
+        SubdivLevel& L = s.levels[size_t(j)];
+        L.detail.reset();
+        const Mesh& cm = *s.levels[size_t(j) - 1].data;
+        const Mesh& fm = *L.data;
+        std::vector<std::shared_ptr<std::vector<glm::vec3>>> details(fm.layers.size());
+        if (!fm.layers.empty()) {
+            const SubdivTopology& tp = *L.topo;
+            const std::vector<glm::vec3> Q = subdivideField(tp, tp.smooth, baseChannel(cm));
+            std::vector<glm::vec3> nrm;
+            std::vector<uint32_t> refs;
+            levelFrames(L, Q, nrm, refs);
+            for (size_t i = 0; i < fm.layers.size() && i < cm.layers.size(); ++i) {
+                const std::vector<glm::vec3> sub = subdivideField(tp, tp.smooth, cm.layers[i].delta);
+                std::vector<glm::vec3> world(sub.size());
+                for (size_t v = 0; v < sub.size(); ++v) world[v] = fm.layers[i].delta[v] - sub[v];
+                layerDetailToLocal(refs, nrm, Q, world, mutableArray(details[i], Q.size()));
+            }
+        }
+        L.layerDetail = std::move(details);
+    }
 }
 
 Mesh subdivLevelMesh(const Mesh& mesh, int level) {
@@ -2205,10 +2248,11 @@ bool subdivReconstruct(Mesh& mesh, std::string& error, BVH* bvh) {
         // The coarse base is the positions so far (the layers' offsets are added below).
         const std::vector<glm::vec3> Q = subdivideField(*tp, true, coarse.positions);
         coarse.base = coarse.positions;
+        coarse.layerStrength = mesh.layerStrength;
         const std::vector<glm::vec3> n = fineNormals(mesh.triangles, Q);
         const std::vector<uint32_t> refs = frameRefs(tp->fineVertices, mesh.triangles);
         for (const SculptLayer& l : mesh.layers) {
-            SculptLayer cl{l.name, std::vector<glm::vec3>(nc), l.weight};
+            SculptLayer cl{l.name, std::vector<glm::vec3>(nc), l.weight, l.visible};
             for (uint32_t v = 0; v < nc; ++v) cl.delta[v] = l.delta[rec.vertexChild[v]];
             const std::vector<glm::vec3> s = subdivideField(*tp, true, cl.delta);
             std::vector<glm::vec3> world(s.size());

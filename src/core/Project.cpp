@@ -358,6 +358,7 @@ void writeMesh(Writer& w, const std::string& prefix, const Mesh& m, Json& out, s
     // Optional and ignored by older readers, so no format version bump.
     if (m.hasQuads())
         mesh.set("quad_partners", w.uints(prefix + "mesh/quad_partners.bin", m.quadPartners.data(), m.quadPartners.size(), 1));
+    if (!m.layers.empty() && m.layerStrength != 1.0f) mesh.set("layer_strength", double(m.layerStrength)); // (optional too)
     out.set("mesh", std::move(mesh));
 
     Json layers = Json::array();
@@ -365,6 +366,7 @@ void writeMesh(Writer& w, const std::string& prefix, const Mesh& m, Json& out, s
         Json l = Json::object();
         l.set("name", m.layers[i].name);
         l.set("weight", double(m.layers[i].weight));
+        if (!m.layers[i].visible) l.set("visible", false); // (optional: older readers show the layer)
         l.set("delta", w.vec3s(prefix + "layers/" + std::to_string(i) + ".bin", m.layers[i].delta));
         layers.push(std::move(l));
     }
@@ -418,11 +420,16 @@ bool readMesh(Reader& r, const Json& mj, const Json& lj, Mesh& m, std::string& e
         r.uints(mj["quad_partners"], "quad partners", nt, 1, m.quadPartners.data());
     }
     if (lj.size()) {
+        if (mj.has("layer_strength")) {
+            const double k = mj["layer_strength"].asNumber(1.0);
+            m.layerStrength = std::isfinite(k) ? float(std::clamp(k, 0.0, 10.0)) : 1.0f;
+        }
         r.vec3s(mj["base"], "base positions", nv, m.base);
         for (size_t i = 0; i < lj.size() && r.error.empty(); ++i) {
             SculptLayer layer;
             layer.name = lj[i]["name"].asString();
             layer.weight = float(lj[i]["weight"].asNumber(1.0));
+            if (lj[i].has("visible")) layer.visible = lj[i]["visible"].asBool(true);
             r.vec3s(lj[i]["delta"], "layer offsets", nv, layer.delta);
             m.layers.push_back(std::move(layer));
         }

@@ -115,7 +115,7 @@ int strokePath(Document& doc, const BrushRecipe* recipe, BrushType type, const P
 
     const std::string label = recipe ? recipe->name : brushLabel(type);
     if (!doc.sculptor.beginStroke(mesh, label, doc.activeLayer)) {
-        error = "Active layer weight is 0 - raise it to sculpt into the layer";
+        error = "Active layer is hidden or at weight 0 - show it or raise its weight to sculpt into it";
         return -1;
     }
 

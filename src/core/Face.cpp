@@ -1178,7 +1178,7 @@ FaceWeightsStats applyFaceWeights(Document& doc, const std::vector<std::pair<std
         for (uint32_t li : changed) changedSupport.push_back(&layerSupport(m.layers[li], revision));
         std::vector<std::pair<const SculptLayer*, const std::vector<uint32_t>*>> live;
         for (const auto& l : m.layers)
-            if (l.weight != 0.0f) live.push_back({&l, &layerSupport(l, revision)});
+            if (l.visible && l.weight * m.layerStrength != 0.0f) live.push_back({&l, &layerSupport(l, revision)});
         constexpr size_t kBlock = 16384;
         const size_t nv = m.positions.size(), blocks = (nv + kBlock - 1) / kBlock;
         static std::vector<uint8_t> mark; // (guarded by gSupportMutex; all zero between calls)
@@ -1198,7 +1198,7 @@ FaceWeightsStats applyFaceWeights(Document& doc, const std::vector<std::pair<std
                     }
                 if (vs.empty()) continue;
                 for (const auto& [l, support] : live) {
-                    const float w = l->weight;
+                    const float w = l->weight * m.layerStrength; // (only shown layers are live)
                     for (auto it = std::lower_bound(support->begin(), support->end(), lo); it != support->end() && *it < hi; ++it)
                         if (mark[*it]) m.positions[*it] += w * l->delta[*it];
                 }

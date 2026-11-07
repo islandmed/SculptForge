@@ -155,7 +155,7 @@ glm::vec3 transformCenter(const Mesh& mesh, const std::vector<float>& weights) {
 }
 
 bool TransformSession::layerWeightZero(const Mesh& mesh, int layer) {
-    return layer >= 0 && layer < int(mesh.layers.size()) && std::abs(mesh.layers[size_t(layer)].weight) < 1e-6f;
+    return layer >= 0 && layer < int(mesh.layers.size()) && std::abs(mesh.layerWeight(layer)) < 1e-6f;
 }
 
 bool TransformSession::begin(const Mesh& mesh, std::vector<float> weights, Symmetry mirror, const glm::vec3& pivot,
@@ -215,7 +215,7 @@ bool TransformSession::begin(const Mesh& mesh, std::vector<float> weights, Symme
     for (uint16_t l : level_) usedLevels_[l] = 1;
     layered_ = !mesh.layers.empty();
     layer_ = layer >= 0 && layer < int(mesh.layers.size()) ? layer : -1;
-    if (layer_ >= 0) invWeight_ = 1.0f / mesh.layers[size_t(layer_)].weight;
+    if (layer_ >= 0) invWeight_ = 1.0f / mesh.layerWeight(layer_);
     // Recording into a layer starts from the shape as shown; otherwise from the base.
     const auto& src = layer_ >= 0 ? mesh.positions : mesh.basePositions();
     base_.resize(verts_.size());

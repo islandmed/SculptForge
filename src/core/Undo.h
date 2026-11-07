@@ -57,6 +57,17 @@ struct PaintStackUndo {
     size_t bytes() const;
 };
 
+// Sculpt layer settings (Tool > Layers: weights, eyes, Strength): no offsets, so a weight drag costs a few bytes.
+struct LayerSettingsUndo {
+    std::vector<float> weights;
+    std::vector<uint8_t> visible;
+    float strength = 1.0f;
+
+    static LayerSettingsUndo capture(const Mesh& mesh);
+    void swapWith(Mesh& mesh); // re-evaluates the shape and its normals
+    size_t bytes() const { return weights.size() * sizeof(float) + visible.size(); }
+};
+
 // Texels of one RGBA8 texture array (core/Texture.h) as 64x64 tiles: only the listed tiles are stored, each
 // as its texels or, when they are all the same, as one RGBA value (a blank layer's tile costs 4 bytes).
 struct PackedTexels {
@@ -173,11 +184,16 @@ struct UndoRecord {
     std::unique_ptr<MicroUndo> micro;     // micro-displacement tiles of a stroke, or a micro level added / removed (core/Micro.h)
     UndoChannel<glm::vec2> uvs;           // per corner (index = triangle * 3 + corner)
     std::unique_ptr<SelectionSetsUndo> sets;
+    std::unique_ptr<LayerSettingsUndo> layerSettings;
+    // Sculpt layer operations (core/SculptLayers): the active layer before the step and after it, by name ("" = the
+    // base mesh), so undo and redo select the same layer again.
+    bool hasActiveLayer = false;
+    std::string activeLayerBefore, activeLayerAfter;
 
     bool empty() const {
         return positions.empty() && mask.empty() && colors.empty() && paintAlpha.empty() && hidden.empty() &&
                facegroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !part && !micro &&
-               uvs.empty() && !sets && !uv;
+               uvs.empty() && !sets && !uv && !layerSettings;
     }
     size_t approxBytes() const;
 

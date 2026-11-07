@@ -759,6 +759,12 @@ void Mesh::finishNormals(float* curvature, bool computeNormals) {
     }, 4096);
 }
 
+float Mesh::layerWeight(int index) const {
+    if (index < 0 || index >= static_cast<int>(layers.size())) return 0.0f;
+    const SculptLayer& l = layers[size_t(index)];
+    return l.visible ? l.weight * layerStrength : 0.0f;
+}
+
 int Mesh::addLayer(std::string name) {
     if (layers.empty()) base = positions;
     layers.push_back({std::move(name), std::vector<glm::vec3>(positions.size(), glm::vec3(0.0f)), 1.0f});
@@ -784,6 +790,90 @@ void Mesh::setLayerWeight(int index, float weight) {
     recomputeAllNormals();
 }
 
+bool Mesh::moveLayer(int from, int to) {
+    const int n = static_cast<int>(layers.size());
+    if (from < 0 || from >= n || to < 0 || to >= n) return false;
+    if (from == to) return true;
+    SculptLayer l = std::move(layers[size_t(from)]);
+    layers.erase(layers.begin() + from);
+    layers.insert(layers.begin() + to, std::move(l));
+    return true; // (the sum doesn't depend on the order)
+}
+
+bool Mesh::reorderLayers(const std::vector<int>& order) {
+    const size_t n = layers.size();
+    if (order.size() != n) return false;
+    std::vector<uint8_t> seen(n, 0);
+    for (int i : order) {
+        if (i < 0 || size_t(i) >= n || seen[size_t(i)]) return false;
+        seen[size_t(i)] = 1;
+    }
+    std::vector<SculptLayer> out;
+    out.reserve(n);
+    for (int i : order) out.push_back(std::move(layers[size_t(i)]));
+    layers = std::move(out);
+    return true; // (the sum doesn't depend on the order)
+}
+
+bool Mesh::duplicateLayer(int index, std::string name) {
+    if (index < 0 || index >= static_cast<int>(layers.size())) return false;
+    SculptLayer copy = layers[size_t(index)];
+    copy.name = std::move(name);
+    layers.insert(layers.begin() + index, std::move(copy));
+    evaluateAll();
+    return true;
+}
+
+bool Mesh::mergeLayerDown(int index) {
+    if (index < 0 || index + 1 >= static_cast<int>(layers.size())) return false;
+    SculptLayer &top = layers[size_t(index)], &below = layers[size_t(index) + 1];
+    if (top.visible != below.visible) return false;
+    const float wt = top.weight, wb = below.weight;
+    for (size_t v = 0; v < below.delta.size() && v < top.delta.size(); ++v)
+        below.delta[v] = wb * below.delta[v] + wt * top.delta[v];
+    below.weight = 1.0f;
+    layers.erase(layers.begin() + index);
+    evaluateAll();
+    return true;
+}
+
+bool Mesh::invertLayer(int index) {
+    if (index < 0 || index >= static_cast<int>(layers.size())) return false;
+    for (auto& d : layers[size_t(index)].delta) d = -d;
+    evaluateAll();
+    return true;
+}
+
+bool Mesh::bakeLayer(int index) {
+    if (index < 0 || index >= static_cast<int>(layers.size())) return false;
+    const float w = layerWeight(index);
+    const std::vector<glm::vec3>& d = layers[size_t(index)].delta;
+    if (w != 0.0f)
+        for (size_t v = 0; v < base.size() && v < d.size(); ++v) base[v] += w * d[v];
+    layers.erase(layers.begin() + index);
+    if (layers.empty()) {
+        positions = std::move(base); // the base is the positions again
+        base.clear();
+    } else {
+        evaluateAll();
+    }
+    return true;
+}
+
+int Mesh::bakeShownLayers() {
+    int baked = 0;
+    for (int i = static_cast<int>(layers.size()) - 1; i >= 0; --i)
+        if (layers[size_t(i)].visible && bakeLayer(i)) ++baked;
+    return baked;
+}
+
+void Mesh::clearLayers() {
+    if (layers.empty()) return;
+    positions = base;
+    base.clear();
+    layers.clear();
+}
+
 std::vector<glm::vec3>& Mesh::layerTarget(int layer) {
     if (layers.empty()) return positions;
     if (layer < 0 || layer >= static_cast<int>(layers.size())) return base;
@@ -792,23 +882,25 @@ std::vector<glm::vec3>& Mesh::layerTarget(int layer) {
 
 float Mesh::layerTargetWeight(int layer) const {
     if (layers.empty() || layer < 0 || layer >= static_cast<int>(layers.size())) return 1.0f;
-    return layers[layer].weight;
+    return layerWeight(layer);
 }
 
 void Mesh::evaluate(std::span<const uint32_t> verts) {
     if (layers.empty()) return;
     for (uint32_t v : verts) {
         glm::vec3 p = base[v];
-        for (const auto& l : layers) p += l.weight * l.delta[v];
+        for (const auto& l : layers) p += (l.visible ? l.weight * layerStrength : 0.0f) * l.delta[v];
         positions[v] = p;
     }
 }
 
 void Mesh::evaluateAll() {
     if (layers.empty()) return;
+    std::vector<float> w(layers.size());
+    for (size_t i = 0; i < w.size(); ++i) w[i] = layerWeight(int(i));
     for (size_t v = 0; v < positions.size(); ++v) {
         glm::vec3 p = base[v];
-        for (const auto& l : layers) p += l.weight * l.delta[v];
+        for (size_t i = 0; i < w.size(); ++i) p += w[i] * layers[i].delta[v];
         positions[v] = p;
     }
 }
@@ -905,7 +997,7 @@ Mesh weldImported(const Mesh& m, const std::vector<SculptLayer>& layers) {
     if (!layers.empty()) {
         welded.base = welded.positions;
         for (const auto& src : layers) {
-            SculptLayer layer{src.name, {}, src.weight};
+            SculptLayer layer{src.name, {}, src.weight, src.visible};
             layer.delta.reserve(kept.size());
             for (uint32_t v : kept) layer.delta.push_back(v < src.delta.size() ? src.delta[v] : glm::vec3(0.0f));
             welded.layers.push_back(std::move(layer));

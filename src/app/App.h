@@ -227,6 +227,8 @@ private:
     void processPendingFiles();
 
     void setLayerWeight(int index, float weight);
+    void setLayerStrengthLive(float strength); // Tool > Layers > Strength while dragging (undo on release)
+    void syncLodLayers();                      // LODs get the layers' weights, eyes and strength
     void animateLayers(float dt);
     void generateLods();
     void clearLods();
@@ -702,6 +704,11 @@ private:
 
     // Sculpt layers / expression preview
     char newLayerName_[64] = "Smile";
+    int renamingLayer_ = -1; // sculpt layer being renamed inline (Tool > Layers)
+    std::vector<std::string> layerSelection_; // Shift+clicked layers (by name), moved together with the active one
+    bool focusLayerRename_ = false;
+    char layerRenameBuffer_[128] = "";
+    std::unique_ptr<LayerSettingsUndo> layerDragBefore_; // the settings when a weight / Strength drag began
     int playingLayer_ = -1;
     float playTime_ = 0.0f;
 

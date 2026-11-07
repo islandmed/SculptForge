@@ -333,6 +333,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <future>
@@ -795,6 +796,17 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "face_landmarks") return double(app_.faceLandmarks_.count());
     if (name == "face_placing") return app_.facePlacing_ ? 1.0 : 0.0;
     if (name == "face_take_playing") return app_.faceTakePlaying_ ? 1.0 : 0.0;
+    // Sculpt layers (Tool > Layers) by name: layer_index_<name> (-1 = none), layer_weight_<name>, layer_shown_<name>.
+    if (name == "layer_strength") return double(m.layerStrength);
+    if (name == "active_layer") return double(app_.doc_.activeLayer);
+    for (const char* key : {"layer_index_", "layer_weight_", "layer_shown_"})
+        if (name.rfind(key, 0) == 0) {
+            const std::string layer = name.substr(std::strlen(key));
+            for (size_t i = 0; i < m.layers.size(); ++i)
+                if (m.layers[i].name == layer)
+                    return key[6] == 'i' ? double(i) : key[6] == 'w' ? double(m.layers[i].weight) : m.layers[i].visible ? 1.0 : 0.0;
+            return -1.0;
+        }
     if (name.rfind("face_", 0) == 0) {
         for (const auto& l : m.layers)
             if (l.name == name.substr(5)) return double(l.weight);

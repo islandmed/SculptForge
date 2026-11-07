@@ -101,7 +101,7 @@ CommandResult runTransform(Document& doc, const Args& a) {
     }
     if (t.identity()) return {true, "Nothing to do: the transform changes nothing"};
     if (TransformSession::layerWeightZero(doc.mesh, doc.activeLayer))
-        return {false, "Active layer weight is 0 - raise it to transform into the layer"};
+        return {false, "Active layer is hidden or at weight 0 - show it or raise its weight to transform into it"};
 
     size_t moved = 0;
     for (int i : targets) moved += transformPart(doc, i, t, useMask, falloff, sym, "Transform");

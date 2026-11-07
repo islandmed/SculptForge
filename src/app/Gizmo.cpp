@@ -502,7 +502,7 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
         }
         if (gizmo_.sessions.empty()) {
             status_ = TransformSession::layerWeightZero(doc_.mesh, doc_.activeLayer)
-                          ? "Active layer weight is 0 - raise it to transform into the layer"
+                          ? "Active layer is hidden or at weight 0 - show it or raise its weight to transform into it"
                       : gizmo_.useMask && doc_.mesh.hasMask() ? "Nothing to move: everything is masked (Ctrl+click the "
                                                               "background to invert the mask)"
                                                             : "Nothing to move: the Part is hidden or empty";

@@ -23,6 +23,7 @@
 #include "core/CloseHoles.h"
 #include "core/Cut.h"
 #include "core/Multires.h"
+#include "core/SculptLayers.h"
 #include "core/Micro.h"
 #include "core/MeshTransform.h"
 #include "core/PathStroke.h"
@@ -90,6 +91,22 @@ std::string argString(const Args& args, const std::string& key, const std::strin
 namespace {
 
 constexpr size_t kMaxSubdivideTriangles = 50'000'000;
+
+std::string activeLayerName(const Document& doc) {
+    const int i = doc.activeLayer;
+    return i >= 0 && i < int(doc.mesh.layers.size()) ? doc.mesh.layers[size_t(i)].name : std::string();
+}
+
+// After undo / redo: make layer `name` active again ("" = the base mesh), or keep the index while it still fits.
+void selectLayer(Document& doc, const std::string& name) {
+    if (!name.empty())
+        for (size_t i = 0; i < doc.mesh.layers.size(); ++i)
+            if (doc.mesh.layers[i].name == name) {
+                doc.activeLayer = int(i);
+                return;
+            }
+    if (name.empty() || doc.activeLayer >= int(doc.mesh.layers.size())) doc.activeLayer = -1;
+}
 
 std::string lowerExtension(const std::string& path) {
     std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
@@ -399,53 +416,6 @@ CommandRegistry::CommandRegistry() {
              for (int i = 1; i < levels; ++i) m = loopSubdivide(m);
              doc.replaceMeshUndoable(std::move(m), "Subdivide");
              return {true, "Subdivided to " + std::to_string(doc.mesh.triangleCount()) + " triangles"};
-         }});
-
-    add({"layer_add",
-         "Add a sculpt layer (blend shape / morph target). New strokes go into it until another layer is made active.",
-         {{"name", T::String, "Layer name, e.g. 'Smile' or 'BlinkL'.", false}},
-         [](Document& doc, const Args& a) -> CommandResult {
-             Mesh m = doc.mesh;
-             int idx = m.addLayer(argString(a, "name", "Layer " + std::to_string(doc.mesh.layers.size() + 1)));
-             doc.replaceMeshUndoable(std::move(m), "Add Layer");
-             doc.activeLayer = idx;
-             return {true, "Added layer '" + doc.mesh.layers[idx].name + "' (index " + std::to_string(idx) + ")"};
-         }});
-
-    add({"layer_remove",
-         "Delete a sculpt layer and its offsets.",
-         {{"index", T::Number, "Layer index (0-based).", true}},
-         [](Document& doc, const Args& a) -> CommandResult {
-             int idx = int(argNumber(a, "index", -1));
-             if (idx < 0 || idx >= int(doc.mesh.layers.size())) return {false, "No layer " + std::to_string(idx)};
-             Mesh m = doc.mesh;
-             m.removeLayer(idx);
-             doc.replaceMeshUndoable(std::move(m), "Remove Layer");
-             doc.activeLayer = -1;
-             return {true, "Removed layer " + std::to_string(idx)};
-         }});
-
-    add({"layer_set_weight",
-         "Set how strongly a sculpt layer is applied (0 = off, 1 = as sculpted; negative or >1 exaggerates).",
-         {{"index", T::Number, "Layer index (0-based).", true},
-          {"weight", T::Number, "Blend weight, typically 0-1.", true}},
-         [](Document& doc, const Args& a) -> CommandResult {
-             int idx = int(argNumber(a, "index", -1));
-             if (idx < 0 || idx >= int(doc.mesh.layers.size())) return {false, "No layer " + std::to_string(idx)};
-             doc.mesh.setLayerWeight(idx, float(argNumber(a, "weight", 1.0)));
-             doc.bvhDirty = true;
-             doc.modified = true;
-             return {true, "Layer " + std::to_string(idx) + " weight set"};
-         }});
-
-    add({"layer_set_active",
-         "Choose which sculpt layer new strokes go into (-1 = base mesh).",
-         {{"index", T::Number, "Layer index, or -1 for the base mesh.", true}},
-         [](Document& doc, const Args& a) -> CommandResult {
-             int idx = int(argNumber(a, "index", -1));
-             if (idx < -1 || idx >= int(doc.mesh.layers.size())) return {false, "No layer " + std::to_string(idx)};
-             doc.activeLayer = idx;
-             return {true, idx < 0 ? "Sculpting on base mesh" : "Sculpting on layer " + doc.mesh.layers[idx].name};
          }});
 
     add({"decimate",
@@ -841,16 +811,24 @@ CommandRegistry::CommandRegistry() {
 
     add({"undo", "Undo the last action.", {},
          [](Document& doc, const Args&) -> CommandResult {
+             // A layer operation selects the layer that was active before it; anything else keeps the same layer.
+             const std::string active = activeLayerName(doc);
              if (!doc.undo.undo(doc.mesh, doc.bvh)) return {false, "Nothing to undo"};
-             if (UndoRecord* r = doc.undo.lastRedo(); r && r->part) doc.applyPartStep(*r->part);
+             UndoRecord* r = doc.undo.lastRedo();
+             if (r && r->part) doc.applyPartStep(*r->part);
+             if (r && r->hasActiveLayer) r->activeLayerAfter = active;
+             selectLayer(doc, r && r->hasActiveLayer ? r->activeLayerBefore : active);
              doc.modified = true;
              return {true, "Undone"};
          }});
 
     add({"redo", "Redo the last undone action.", {},
          [](Document& doc, const Args&) -> CommandResult {
+             const std::string active = activeLayerName(doc);
              if (!doc.undo.redo(doc.mesh, doc.bvh)) return {false, "Nothing to redo"};
-             if (UndoRecord* r = doc.undo.lastUndo(); r && r->part) doc.applyPartStep(*r->part);
+             UndoRecord* r = doc.undo.lastUndo();
+             if (r && r->part) doc.applyPartStep(*r->part);
+             selectLayer(doc, r && r->hasActiveLayer ? r->activeLayerAfter : active);
              doc.modified = true;
              return {true, "Redone"};
          }});
@@ -872,6 +850,7 @@ CommandRegistry::CommandRegistry() {
     registerFaceGroupCommands(*this);
     registerSelectionSetCommands(*this); // selection_set_* (core/SelectionSets.h)
     registerPartCommands(*this);
+    registerSculptLayerCommands(*this); // layer_* (core/SculptLayers.h)
     registerSubdivCommands(*this); // subdiv_* (core/MultiresCommands.cpp)
     registerMicroCommands(*this);  // micro_* (core/MicroCommands.cpp)
     registerDyntopoCommands(*this); // dyntopo (core/DyntopoCommands.cpp)

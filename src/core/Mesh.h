@@ -72,6 +72,7 @@ struct SculptLayer {
     std::string name;
     std::vector<glm::vec3> delta;
     float weight = 1.0f;
+    bool visible = true; // the eye in Tool > Layers: a hidden layer blends in at 0 and keeps its weight
 };
 
 // Triangle mesh with vertex adjacency, suitable for sculpting.
@@ -169,10 +170,34 @@ public:
     std::vector<glm::vec3> base;
     std::vector<SculptLayer> layers;
 
+    // Scales every layer's weight (Tool > Layers > Strength): 1 = as set, 0 = the base mesh alone.
+    float layerStrength = 1.0f;
+    // What layer `index` is blended in with: its weight times layerStrength, 0 while hidden.
+    float layerWeight(int index) const;
+
     int addLayer(std::string name);
     void removeLayer(int index);
     // Re-evaluates every vertex and recomputes normals (BVH must be rebuilt by the caller).
     void setLayerWeight(int index, float weight);
+    // Layer management (Tool > Layers). These change the arrays only (positions re-evaluated, no normals), so they
+    // also run on the level data of a subdivision stack (subdivForEachLevel); false when `index` is out of range.
+    // Moves layer `from` to place `to` in the list.
+    bool moveLayer(int from, int to);
+    // Puts the layers in a new order: new layer k = old layer order[k] (a permutation of every index).
+    bool reorderLayers(const std::vector<int>& order);
+    // Inserts a copy of layer `index` just above it (the copy is the new `index`), named `name`.
+    bool duplicateLayer(int index, std::string name);
+    // Folds layer `index` into the one below it (index + 1) at both weights: the shape stays the same and the
+    // merged layer has weight 1 (it keeps the lower layer's name). Both must be shown, or both hidden.
+    bool mergeLayerDown(int index);
+    // Negates the layer's offsets (the opposite shape at the same weight).
+    bool invertLayer(int index);
+    // Adds the layer, as it shows now (layerWeight), into the base and removes it: the shape stays the same.
+    bool bakeLayer(int index);
+    // Bakes every shown layer (hidden ones stay layers); returns how many.
+    int bakeShownLayers();
+    // Removes every layer (the base mesh alone).
+    void clearLayers();
     // The array a stroke on `layer` writes to (-1 = base), and the weight its offsets are scaled by.
     std::vector<glm::vec3>& layerTarget(int layer);
     float layerTargetWeight(int layer) const;

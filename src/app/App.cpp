@@ -6,6 +6,7 @@
 #include "io/BridgeProtocol.h"
 #include "core/ThreadPool.h"
 #include "core/LayerStack.h"
+#include "core/SculptLayers.h"
 #include "core/HardwareProfile.h"
 #include "app/ShellQuote.h"
 #include "app/SpaceCamera.h"
@@ -2229,7 +2230,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     if (!doc_.sculptor.beginStroke(doc_.mesh,
                                    !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushLabel(strokeBrush_),
                                    strokeSculpt_ ? doc_.activeLayer : -1)) {
-        status_ = "Active layer weight is 0 - raise it to sculpt into the layer";
+        status_ = "Active layer is hidden or at weight 0 - show it or raise its weight to sculpt into it";
         drag_ = Drag::Orbit;
         return;
     }
@@ -2968,7 +2969,7 @@ void App::setLayerWeight(int index, float weight) {
     doc_.mesh.setLayerWeight(index, weight);
     doc_.bvhDirty = true;
     doc_.modified = true;
-    for (auto& lod : lods_) lod.setLayerWeight(index, weight); // LODs share the blend shapes
+    syncLodLayers();
 }
 
 void App::animateLayers(float dt) {
@@ -3148,26 +3149,224 @@ void App::drawUi() {
     drawSupportCard();   // the support card at launch, over everything (PanelSupportCard.cpp)
 }
 
+void App::syncLodLayers() {
+    for (auto& lod : lods_) { // LODs share the blend shapes and their settings
+        if (lod.layers.size() != doc_.mesh.layers.size()) continue;
+        for (size_t i = 0; i < lod.layers.size(); ++i) {
+            lod.layers[i].weight = doc_.mesh.layers[i].weight;
+            lod.layers[i].visible = doc_.mesh.layers[i].visible;
+        }
+        lod.layerStrength = doc_.mesh.layerStrength;
+        lod.evaluateAll();
+        lod.recomputeAllNormals();
+    }
+}
+
+void App::setLayerStrengthLive(float strength) {
+    if (solverBusy()) solverWait();
+    doc_.mesh.layerStrength = strength;
+    doc_.mesh.evaluateAll();
+    doc_.mesh.recomputeAllNormals();
+    doc_.bvhDirty = true;
+    doc_.modified = true;
+    syncLodLayers();
+}
+
 void App::drawLayersContents() {
     const float scale = uiScale_;
+    const ImGuiStyle& style = ImGui::GetStyle();
+    constexpr const char* kLayersPath = "Tool > Layers";
     ImGui::TextDisabled(tr("Sculpt expressions & correctives;\nexported as glTF morph targets."));
 
+    // A slider drag changes the mesh live and is one undo step when released (only the settings are kept).
+    auto dragUndo = [&](const char* label) {
+        if (ImGui::IsItemActivated()) layerDragBefore_ = std::make_unique<LayerSettingsUndo>(LayerSettingsUndo::capture(doc_.mesh));
+        if (ImGui::IsItemDeactivated() && layerDragBefore_) {
+            if (ImGui::IsItemDeactivatedAfterEdit()) pushLayerSettingsUndo(doc_, std::move(*layerDragBefore_), label);
+            layerDragBefore_.reset();
+        }
+    };
+    // 0 on the slider just drawn (range -range..range, so the middle): notches at the top and bottom edges (clear of
+    // the text) and a light fill from 0 to the value, so a negative weight reads as running the other way.
+    auto zeroMark = [&](float value, float range) {
+        const ImVec2 r0 = ImGui::GetItemRectMin(), r1 = ImGui::GetItemRectMax();
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        const float pad = ImGui::GetStyle().GrabMinSize * 0.5f + 2.0f * scale;
+        const float x = std::floor((r0.x + r1.x) * 0.5f) + 0.5f;
+        const float t = std::clamp(value / range, -1.0f, 1.0f);
+        const float vx = x + t * ((r1.x - r0.x) * 0.5f - pad);
+        if (std::abs(vx - x) >= 1.0f) {
+            ImVec4 c = ImGui::GetStyleColorVec4(ImGuiCol_SliderGrab);
+            c.w = 0.28f;
+            dl->AddRectFilled(ImVec2(std::min(x, vx), r0.y + 1.0f), ImVec2(std::max(x, vx), r1.y - 1.0f),
+                              ImGui::GetColorU32(c));
+        }
+        const float notch = std::max(3.0f, std::round((r1.y - r0.y) * 0.22f));
+        const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+        const float thick = std::max(1.0f, scale);
+        dl->AddLine(ImVec2(x, r0.y), ImVec2(x, r0.y + notch), col, thick);
+        dl->AddLine(ImVec2(x, r1.y - notch), ImVec2(x, r1.y), col, thick);
+    };
+
+    // The layers moved together: the Shift+clicked ones and the active one (indices, top to bottom).
+    auto selectedLayers = [&]() {
+        std::vector<int> out;
+        for (int i = 0; i < int(doc_.mesh.layers.size()); ++i) {
+            const std::string& name = doc_.mesh.layers[size_t(i)].name;
+            if (i == doc_.activeLayer ||
+                std::find(layerSelection_.begin(), layerSelection_.end(), name) != layerSelection_.end())
+                out.push_back(i);
+        }
+        return out;
+    };
+    auto moveSelected = [&](const std::vector<int>& layers, const char* place, int to) {
+        if (layers.empty()) return;
+        playingLayer_ = -1;
+        std::string list;
+        for (int i : layers) list += (list.empty() ? "" : ",") + std::to_string(i);
+        Args a{{"indices", list}};
+        if (place) a["place"] = std::string(place);
+        else a["to"] = double(to);
+        runCommand("layer_move", a);
+    };
+    std::erase_if(layerSelection_, [&](const std::string& name) {
+        return std::none_of(doc_.mesh.layers.begin(), doc_.mesh.layers.end(),
+                            [&](const SculptLayer& l) { return l.name == name; });
+    });
+
+    if (!doc_.mesh.layers.empty()) {
+        float k = doc_.mesh.layerStrength;
+        ImGui::SetNextItemWidth(-1);
+        const bool changed = ImGui::SliderFloat("##strength", &k, 0.0f, 2.0f, tr("all layers %.2f"));
+        dragUndo("Layers Strength");
+        if (changed) setLayerStrengthLive(k);
+        ui::HelpText("Strength", nullptr,
+                     "One strength for every layer of this Part: 1 = each at its own weight, 0 = the base mesh alone, "
+                     "2 = twice as strong. Exports write the weights as shown.",
+                     kLayersPath);
+    }
+
     if (ImGui::RadioButton(tr("Base mesh"), doc_.activeLayer < 0)) runCommand("layer_set_active", {{"index", -1.0}});
-    constexpr const char* kLayersPath = "Tool > Layers";
     ui::HelpText("Base mesh", nullptr, "Strokes go into the base shape, not a layer.", kLayersPath);
 
-    int removeIndex = -1;
+    int removeIndex = -1, toggleIndex = -1, moveFrom = -1, moveTo = -1;
+    const std::vector<int> selection = selectedLayers();
+    std::string menuCommand;
+    int menuIndex = -1;
+    const float lineH = ImGui::GetFrameHeight();
     for (int i = 0; i < int(doc_.mesh.layers.size()); ++i) {
         SculptLayer& layer = doc_.mesh.layers[i];
         ImGui::PushID(i);
+        Demo::pushScope(layer.name.c_str()); // UI tests: "Smile/##eye", "Smile/##weight"
         ImGui::Separator();
-        if (ImGui::RadioButton(layer.name.c_str(), doc_.activeLayer == i))
-            runCommand("layer_set_active", {{"index", double(i)}});
-        ui::HelpText(layer.name.c_str(), nullptr,
-                     "Select to sculpt into this layer. With subdivision levels, record at any level: a "
-                     "layer keeps its own detail on every level and follows Lower Level / Higher Level and Divide.",
+
+        // The eye.
+        const ImVec2 eyePos = ImGui::GetCursorScreenPos();
+        const ImVec2 eyeSize(lineH, lineH);
+        if (ImGui::InvisibleButton("##eye", eyeSize)) toggleIndex = i;
+        const bool eyeHovered = ImGui::IsItemHovered();
+        ui::DrawEye(ImGui::GetWindowDrawList(), ImVec2(eyePos.x + eyeSize.x * 0.5f, eyePos.y + eyeSize.y * 0.5f),
+                    ImGui::GetTextLineHeight() * 0.8f, layer.visible,
+                    ImGui::GetColorU32(eyeHovered      ? style.Colors[ImGuiCol_ButtonHovered]
+                                       : layer.visible ? style.Colors[ImGuiCol_Text]
+                                                       : style.Colors[ImGuiCol_TextDisabled]));
+        ui::HelpText(layer.visible ? "Hide layer" : "Show layer", nullptr,
+                     "Show or hide this layer. A hidden layer keeps its weight; it can't be sculpted into, and exports "
+                     "write it at weight 0.",
                      kLayersPath);
-        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 52 * scale);
+        ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
+
+        // The name: select to sculpt into it, double-click to rename, drag onto another layer to move it there.
+        const float buttonsW = ImGui::CalcTextSize(tr("Stop")).x + ImGui::CalcTextSize("X").x +
+                               style.FramePadding.x * 4 + style.ItemSpacing.x * 2;
+        const float nameW = std::max(40.0f * scale, ImGui::GetContentRegionAvail().x - buttonsW);
+        if (renamingLayer_ == i) {
+            if (focusLayerRename_) {
+                ImGui::SetKeyboardFocusHere();
+                focusLayerRename_ = false;
+            }
+            ImGui::SetNextItemWidth(nameW);
+            if (ImGui::InputText("##rename", layerRenameBuffer_, sizeof layerRenameBuffer_,
+                                 ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll)) {
+                menuCommand = "layer_rename";
+                menuIndex = i;
+            } else if (ImGui::IsItemDeactivated()) {
+                renamingLayer_ = -1; // Escape or clicked away
+            }
+        } else {
+            if (!layer.visible) ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
+            ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.0f, 0.5f));
+            const bool inSelection = std::find(selection.begin(), selection.end(), i) != selection.end();
+            if (ImGui::Selectable(layer.name.c_str(), inSelection, ImGuiSelectableFlags_AllowDoubleClick,
+                                  ImVec2(nameW, lineH))) {
+                // Shift+click: add to (or take from) the layers moved together.
+                if (ImGui::GetIO().KeyShift || (SDL_GetModState() & SDL_KMOD_SHIFT)) {
+                    auto at = std::find(layerSelection_.begin(), layerSelection_.end(), layer.name);
+                    if (at != layerSelection_.end()) layerSelection_.erase(at);
+                    else if (doc_.activeLayer != i) layerSelection_.push_back(layer.name);
+                } else {
+                    layerSelection_.clear();
+                    if (doc_.activeLayer != i) runCommand("layer_set_active", {{"index", double(i)}});
+                }
+            }
+            ImGui::PopStyleVar();
+            if (doc_.activeLayer == i) { // the active layer (strokes go into it): an accent bar
+                const ImVec2 r0 = ImGui::GetItemRectMin(), r1 = ImGui::GetItemRectMax();
+                ImGui::GetWindowDrawList()->AddRectFilled(r0, ImVec2(r0.x + 2.0f * scale, r1.y), theme::u32(theme::accent));
+            }
+            if (!layer.visible) ImGui::PopStyleColor();
+            ui::HelpText(layer.name.c_str(), nullptr,
+                         "Select to sculpt into this layer; double-click to rename it, drag it onto another layer to "
+                         "move it there, Shift+click to move several together, right-click for more. With subdivision "
+                         "levels, record at any level: a layer keeps its own detail on every level and follows Lower "
+                         "Level / Higher Level and Divide.",
+                         kLayersPath);
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                renamingLayer_ = i;
+                focusLayerRename_ = true;
+                std::snprintf(layerRenameBuffer_, sizeof layerRenameBuffer_, "%s", layer.name.c_str());
+            }
+            if (ImGui::BeginDragDropSource()) {
+                ImGui::SetDragDropPayload("SF_SCULPT_LAYER", &i, sizeof i);
+                ImGui::Text(tr("Move %s"), layer.name.c_str());
+                ImGui::EndDragDropSource();
+            }
+            if (ImGui::BeginDragDropTarget()) {
+                if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload("SF_SCULPT_LAYER")) {
+                    moveFrom = *static_cast<const int*>(p->Data);
+                    moveTo = i;
+                }
+                ImGui::EndDragDropTarget();
+            }
+            if (ImGui::BeginPopupContextItem("##menu")) {
+                ImGui::TextDisabled("%s", layer.name.c_str());
+                ImGui::Separator();
+                auto item = [&](const char* label, const char* command, bool enabled = true) {
+                    if (ImGui::MenuItem(tr(label), nullptr, false, enabled)) {
+                        menuCommand = command;
+                        menuIndex = i;
+                    }
+                };
+                if (ImGui::MenuItem(tr("Rename"))) {
+                    renamingLayer_ = i;
+                    focusLayerRename_ = true;
+                    std::snprintf(layerRenameBuffer_, sizeof layerRenameBuffer_, "%s", layer.name.c_str());
+                }
+                item("Move Up", "layer_move_up", i > 0);
+                item("Move Down", "layer_move_down", i + 1 < int(doc_.mesh.layers.size()));
+                item("Move to Top", "layer_move_top", i > 0);
+                item("Move to Bottom", "layer_move_bottom", i + 1 < int(doc_.mesh.layers.size()));
+                item("Duplicate", "layer_duplicate");
+                item("Merge Down", "layer_merge_down", i + 1 < int(doc_.mesh.layers.size()));
+                item("Invert", "layer_invert");
+                item("Bake into Base", "layer_bake", layer.visible);
+                ImGui::Separator();
+                item("Delete", "layer_remove");
+                ImGui::EndPopup();
+            }
+        }
+
+        ImGui::SameLine();
         const bool playing = playingLayer_ == i;
         if (ImGui::SmallButton(tr(playing ? "Stop" : "Play"))) {
             playingLayer_ = playing ? -1 : i;
@@ -3179,21 +3378,123 @@ void App::drawLayersContents() {
         ImGui::SameLine();
         if (ImGui::SmallButton("X")) removeIndex = i;
         ui::HelpText("Delete layer", nullptr, "Delete this layer on every subdivision level (undoable).", kLayersPath);
+
         float w = layer.weight;
         ImGui::SetNextItemWidth(-1);
-        if (ImGui::SliderFloat("##weight", &w, 0.0f, 1.0f, tr("weight %.2f"))) {
+        const bool changed = ImGui::SliderFloat("##weight", &w, -1.0f, 1.0f, tr("weight %.2f"));
+        dragUndo("Layer Weight");
+        zeroMark(layer.weight, 1.0f);
+        if (changed) {
             if (playingLayer_ == i) playingLayer_ = -1;
-            setLayerWeight(i, w);
+            setLayerWeight(i, std::abs(w) < 0.02f ? 0.0f : w); // (snaps to 0 near the middle)
         }
         ui::HelpText("Weight", nullptr,
-                     "How strongly the layer shows: 0 = off, 1 = as sculpted. One weight for every "
-                     "subdivision level.",
+                     "How strongly the layer shows: 0 (the mark in the middle) = off, 1 = as sculpted, -1 = the "
+                     "opposite shape. Ctrl+click to type a value. One weight for every subdivision level.",
                      kLayersPath);
+        Demo::popScope();
         ImGui::PopID();
+    }
+
+    // Changes after the list, so it isn't drawn half old, half new.
+    if (toggleIndex >= 0)
+        runCommand("layer_set_visible", {{"index", double(toggleIndex)},
+                                         {"visible", !doc_.mesh.layers[size_t(toggleIndex)].visible}});
+    if (moveFrom >= 0 && moveTo >= 0 && moveFrom != moveTo) {
+        // A dragged layer of the selection takes the whole selection along.
+        if (std::find(selection.begin(), selection.end(), moveFrom) != selection.end() && selection.size() > 1)
+            moveSelected(selection, nullptr, moveTo);
+        else
+            runCommand("layer_move", {{"index", double(moveFrom)}, {"to", double(moveTo)}});
     }
     if (removeIndex >= 0) {
         if (playingLayer_ == removeIndex) playingLayer_ = -1;
         runCommand("layer_remove", {{"index", double(removeIndex)}});
+    }
+    auto onLayer = [&](const std::string& command, int index) {
+        playingLayer_ = -1;
+        if (command == "layer_rename") {
+            renamingLayer_ = -1;
+            runCommand("layer_rename", {{"index", double(index)}, {"name", std::string(layerRenameBuffer_)}});
+        } else if (command == "layer_move_up" || command == "layer_move_down") {
+            runCommand("layer_move", {{"index", double(index)}, {"direction", command == "layer_move_up" ? -1.0 : 1.0}});
+        } else if (command == "layer_move_top" || command == "layer_move_bottom") {
+            runCommand("layer_move", {{"index", double(index)}, {"place", std::string(command == "layer_move_top" ? "top" : "bottom")}});
+        } else {
+            runCommand(command, {{"index", double(index)}});
+        }
+    };
+    if (!menuCommand.empty() && menuIndex >= 0) onLayer(menuCommand, menuIndex);
+
+    // The active layer's operations, and the ones for all layers.
+    if (!doc_.mesh.layers.empty()) {
+        ImGui::Separator();
+        const int a = doc_.activeLayer;
+        const int n = int(doc_.mesh.layers.size());
+        const std::vector<int> sel = selectedLayers();
+        const bool canUp = !sel.empty() && sel.back() >= int(sel.size()); // (not packed at the top already)
+        const bool canDown = !sel.empty() && sel.front() < n - int(sel.size()); // (nor at the bottom)
+        ImGui::BeginDisabled(!canUp);
+        if (ImGui::SmallButton(tr("Top"))) moveSelected(sel, "top", 0);
+        ImGui::EndDisabled();
+        ui::HelpText("Top", nullptr, "Move the selected layers to the top of the list.", kLayersPath);
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!canUp);
+        if (ImGui::SmallButton(tr("Up"))) moveSelected(sel, "up", 0);
+        ImGui::EndDisabled();
+        ui::HelpText("Up", nullptr,
+                     "Move the selected layers one place up (or drag one by its name). Shift+click names to select "
+                     "several; they move together.",
+                     kLayersPath);
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!canDown);
+        if (ImGui::SmallButton(tr("Down"))) moveSelected(sel, "down", 0);
+        ImGui::EndDisabled();
+        ui::HelpText("Down", nullptr, "Move the selected layers one place down.", kLayersPath);
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!canDown);
+        if (ImGui::SmallButton(tr("Bottom"))) moveSelected(sel, "bottom", 0);
+        ImGui::EndDisabled();
+        ui::HelpText("Bottom", nullptr, "Move the selected layers to the bottom of the list.", kLayersPath);
+
+        ImGui::BeginDisabled(a < 0 || a + 1 >= n);
+        if (ImGui::SmallButton(tr("Merge Down"))) onLayer("layer_merge_down", a);
+        ImGui::EndDisabled();
+        ui::HelpText("Merge Down", nullptr,
+                     "Merge the active layer into the one below it, each at its weight: the shape stays the same and "
+                     "the merged layer has weight 1.",
+                     kLayersPath);
+        ImGui::SameLine();
+        ImGui::BeginDisabled(a < 0);
+        if (ImGui::SmallButton(tr("Invert"))) onLayer("layer_invert", a);
+        ImGui::EndDisabled();
+        ui::HelpText("Invert", nullptr, "Negate the active layer's offsets: it pushes where it pulled.", kLayersPath);
+        ImGui::SameLine();
+        ImGui::BeginDisabled(a < 0);
+        if (ImGui::SmallButton(tr("Duplicate"))) onLayer("layer_duplicate", a);
+        ImGui::EndDisabled();
+        ui::HelpText("Duplicate", nullptr, "Copy the active layer just above it; the copy becomes the active layer.",
+                     kLayersPath);
+
+        ImGui::BeginDisabled(a < 0 || !doc_.mesh.layers[size_t(std::max(a, 0))].visible);
+        if (ImGui::SmallButton(tr("Bake"))) onLayer("layer_bake", a);
+        ImGui::EndDisabled();
+        ui::HelpText("Bake", nullptr,
+                     "Bake the active layer into the base mesh as it shows now (its weight and the strength) and "
+                     "remove it. The shape stays the same; on every subdivision level.",
+                     kLayersPath);
+        ImGui::SameLine();
+        if (ImGui::SmallButton(tr("Bake All"))) {
+            playingLayer_ = -1;
+            runCommand("layer_bake", {{"all", true}});
+        }
+        ui::HelpText("Bake All", nullptr, "Bake every shown layer into the base mesh (hidden layers stay).", kLayersPath);
+        ImGui::SameLine();
+        if (ImGui::SmallButton(tr("Clear All"))) {
+            playingLayer_ = -1;
+            runCommand("layer_clear");
+        }
+        ui::HelpText("Clear All", nullptr, "Delete every layer of this Part, in one undo step.", kLayersPath);
     }
 
     ImGui::Separator();

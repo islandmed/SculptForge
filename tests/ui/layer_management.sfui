@@ -1,0 +1,112 @@
+# Sculpt layer management (Tool > Layers, @foirgairwolf's request): drag to reorder, Up / Down, double-click rename,
+# the eye, the -1..1 weight slider with its 0 mark, Strength, Merge Down, Invert, Bake, Bake All and Clear All,
+# each undone with Ctrl+Z. The screenshots are the panel's review shots.
+run new_sphere subdivisions=4
+orbit 20 -10
+key f
+run layer_add name=Smile
+run stroke points="0,-0.2,1.2" brush=Inflate radius=0.3 strength=1
+run layer_add name=Blink
+run stroke points="0.3,0.3,1.2" brush=Standard radius=0.25 strength=1
+run layer_add name=Brow
+run stroke points="-0.3,0.4,1.2 0.3,0.45,1.2" brush=Crease radius=0.2 strength=1
+click "Layers##tool.layers"
+expect_value layers == 3
+expect_value active_layer == 2
+shot layers-panel
+
+# Drag Brow by its name onto Smile: it moves to the top, the active layer with it.
+drag_item "Layers/Brow" 0 -110 0.6
+expect_value layer_index_Brow == 0
+expect_value active_layer == 0
+key ctrl+z
+expect_value layer_index_Brow == 2
+# Up / Down move the active layer.
+click "Layers/Up"
+expect_value layer_index_Brow == 1
+click "Layers/Down"
+expect_value layer_index_Brow == 2
+
+# Double-click to rename; Enter keeps it.
+double_click "Layers/Smile"
+type "Layers/##rename" jawOpen
+key enter
+expect_value layer_index_jawOpen == 0
+expect_value layer_index_Smile == -1
+shot layers-renamed
+key ctrl+z
+expect_value layer_index_Smile == 0
+
+# The eye hides and shows; the weight stays.
+click "Smile/##eye"
+expect_value layer_shown_Smile == 0
+expect_value layer_weight_Smile == 1
+shot layers-hidden
+key ctrl+z
+expect_value layer_shown_Smile == 1
+
+# The weight slider runs from -1 to 1: all the way left is the opposite shape; one drag is one undo step.
+drag_item "Smile/##weight" -600 0
+expect_value layer_weight_Smile == -1
+shot layers-negative
+key ctrl+z
+expect_value layer_weight_Smile == 1
+
+# Strength for all layers.
+drag_item "Layers/##strength" -600 0
+expect_value layer_strength == 0
+key ctrl+z
+expect_value layer_strength == 1
+
+# Invert, Merge Down, Bake, Bake All, Clear All on the active layer (Brow), each undone.
+click "Layers/Invert"
+expect_status "Inverted"
+key ctrl+z
+click "Layers/Blink"
+expect_value active_layer == 1
+click "Layers/Merge Down"
+expect_value layers == 2
+expect_value layer_index_Brow == 1
+key ctrl+z
+expect_value layers == 3
+click "Layers/Bake"
+expect_value layers == 2
+expect_value layer_index_Blink == -1
+key ctrl+z
+expect_value layers == 3
+click "Layers/Bake All"
+expect_value layers == 0
+key ctrl+z
+expect_value layers == 3
+click "Layers/Clear All"
+expect_value layers == 0
+key ctrl+z
+expect_value layers == 3
+
+# Shift+click selects several; Bottom moves them together, in their order (@foirgairwolf's follow-up).
+click "Layers/Blink"
+hold shift
+click "Layers/Smile"
+hold none
+shot layers-two-selected
+click "Layers/Bottom"
+expect_value layer_index_Brow == 0
+expect_value layer_index_Smile == 1
+expect_value layer_index_Blink == 2
+key ctrl+z
+expect_value layer_index_Smile == 0
+# Duplicate: a copy above the active layer, made active.
+click "Layers/Blink"
+click "Layers/Duplicate"
+expect_value layers == 4
+expect_status "Blink copy"
+key ctrl+z
+expect_value layers == 3
+
+# Ctrl-hover help.
+hold ctrl
+hover "Layers/Merge Down"
+expect_help "each at its weight"
+hover "Layers/##strength"
+expect_help "every layer"
+hold none

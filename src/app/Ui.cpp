@@ -954,4 +954,21 @@ void DrawHelp(App& app) {
 
 const std::string& HelpShown() { return g_shown; }
 
+// An eye: open (almond and pupil) or closed (lower lid and lashes).
+void DrawEye(ImDrawList* dl, ImVec2 c, float size, bool open, ImU32 col) {
+    const float w = size * 0.5f, h = size * 0.42f, t = std::max(1.0f, size * 0.09f);
+    const ImVec2 l(c.x - w, c.y), r(c.x + w, c.y);
+    if (open) {
+        dl->AddBezierQuadratic(l, ImVec2(c.x, c.y - h * 1.6f), r, col, t);
+        dl->AddBezierQuadratic(l, ImVec2(c.x, c.y + h * 1.6f), r, col, t);
+        dl->AddCircleFilled(c, size * 0.2f, col);
+        return;
+    }
+    dl->AddBezierQuadratic(l, ImVec2(c.x, c.y + h * 1.3f), r, col, t);
+    for (float u : {-0.55f, 0.0f, 0.55f}) {
+        const ImVec2 a(c.x + u * w, c.y + h * 0.62f * (1.0f - u * u * 0.5f));
+        dl->AddLine(a, ImVec2(a.x + u * size * 0.12f, a.y + size * 0.22f), col, t);
+    }
+}
+
 } // namespace sf::ui

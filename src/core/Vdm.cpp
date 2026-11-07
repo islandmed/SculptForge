@@ -937,7 +937,7 @@ void registerVdmCommands(CommandRegistry& registry) {
                       std::string symError;
                       if (!symmetryArg(a, doc.mesh, sym, symError)) return {false, symError};
                       if (!doc.sculptor.beginStroke(doc.mesh, "VDM", doc.activeLayer))
-                          return {false, "Active layer weight is 0 - raise it to sculpt into the layer"};
+                          return {false, "Active layer is hidden or at weight 0 - show it or raise its weight to sculpt into it"};
                       doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Vdm, p, sym);
                       UndoRecord r = doc.sculptor.endStroke();
                       if (!r.empty()) doc.undo.push(std::move(r));

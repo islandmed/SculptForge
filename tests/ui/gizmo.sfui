@@ -146,7 +146,7 @@ expect_value moved > 1000
 run layer_set_weight index=0 weight=0
 gizmo_drag move_y 0 -70
 expect_value moved == 0
-expect_status weight is 0
+expect_status at weight 0
 run layer_set_weight index=0 weight=1 ; layer_remove index=0 ; mask_clear
 key r
 

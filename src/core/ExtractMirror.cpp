@@ -326,8 +326,9 @@ Mesh mirrorAndWeld(const Mesh& mesh, int axis, bool keepPositive, std::string& e
     vectorAttribute(mesh.positions, out.positions);
     if (!mesh.layers.empty()) {
         vectorAttribute(mesh.base, out.base);
+        out.layerStrength = mesh.layerStrength;
         for (const SculptLayer& l : mesh.layers) {
-            out.layers.push_back({l.name, {}, l.weight});
+            out.layers.push_back({l.name, {}, l.weight, l.visible});
             vectorAttribute(l.delta, out.layers.back().delta);
         }
     }

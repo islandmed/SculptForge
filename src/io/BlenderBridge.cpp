@@ -246,7 +246,7 @@ bool writeBridgeShapes(const std::string& path, const Mesh& mesh, std::string& e
     for (const SculptLayer& l : mesh.layers) {
         u32(uint32_t(l.name.size()));
         data += l.name;
-        f32(l.weight);
+        f32(mesh.layerWeight(int(&l - mesh.layers.data()))); // (as shown)
         std::vector<uint32_t> idx;
         for (uint32_t v = 0; v < l.delta.size(); ++v)
             if (l.delta[v] != glm::vec3(0.0f)) idx.push_back(v);
