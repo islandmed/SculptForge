@@ -4376,6 +4376,23 @@ constexpr Entry kSimplifiedChinese[] = {
      "旋转模板，以逆时针度数表示；Ctrl+点击以输入。"},
     {"Centre the Stencil again, upright, 80% of the view's height.",
      "将模板重新居中、摆正，高度为视图的 80%。"},
+    // --- Tool > Geometry > Edges (PanelEdges.cpp, #108) ---
+    {"Add every edge that touches a selected one.", "添加与已选边相接的所有边。"},
+    {"Add the open (border) edges: the rims of holes and of open surfaces.", "添加开放（边界）边：孔洞和开放曲面的边缘。"},
+    {"Deselect All", "全部取消选择"},
+    {"Deselect every edge.", "取消选择所有边。"},
+    {"Drop the selected edges at the loose ends of the selection (Shrink takes back what Grow added; closed loops keep every edge).", "去掉选区松散末端的已选边（缩减会撤回扩张添加的边；闭合循环保留所有边）。"},
+    {"Edges", "边"},
+    {"Edges mode", "边模式"},
+    {"Edges mode selects edges of the base level", "边模式选择基础级别的边"},
+    {"Only within selection", "仅在选区内"},
+    {"Open Edges", "开放边"},
+    {"Select by Angle", "按角度选择"},
+    {"Select by Angle keeps only the edges among those selected now (e.g. a loop's sharp stretch).", "按角度选择只保留当前已选边中的边（如循环中锐利的一段）。"},
+    {"Select by Angle takes the edges where the faces on either side meet at more than this many degrees (0 = flat). 30 finds the hard edges of most models; lower finds softer ones too.", "按角度选择会选取两侧面夹角大于此度数的边（0 = 平坦）。30 可找到大多数模型的硬边；更低的值也会找到较柔和的边。"},
+    {"Select edges of the base level on the model, for edge creases: click an edge, Shift+click adds, Ctrl+click removes, double-click takes its edge loop. A Part with subdivision levels steps down to SDiv 1 (its base) first. Click the button again to sculpt.", "在模型上选择基础级别的边，用于边折痕：单击一条边，Shift+单击添加，Ctrl+单击移除，双击选择其边循环。有细分级别的部件会先降到 SDiv 1（其基础）。再次单击该按钮即可雕刻。"},
+    {"Select every edge where the faces on either side meet at more than the Angle (30 degrees by default): the hard edges of a model. With Only within selection it keeps just those among the edges selected now.", "选择两侧面夹角大于“角度”（默认 30 度）的所有边：即模型的硬边。勾选“仅在选区内”时，只保留当前已选边中的这些边。"},
+    {"Select the edges that aren't selected, and drop those that are.", "选择未选中的边，并取消已选中的边。"},
 };
 
 } // namespace

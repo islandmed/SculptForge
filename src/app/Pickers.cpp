@@ -573,6 +573,7 @@ bool PickerUi::isActive(const App& app, const BrushItem& item) {
 
 void PickerUi::select(App& app, const BrushItem& item) {
     if (item.kind != BrushItem::Kind::Guides) app.guidesMode_ = false;
+    app.edgesMode_ = false; // picking any brush leaves Edges mode (PanelEdges.cpp)
     switch (item.kind) {
     case BrushItem::Kind::Type:
         app.brush_ = BrushType(item.index);
