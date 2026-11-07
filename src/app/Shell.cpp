@@ -1032,6 +1032,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::headerHover);
     if (ImGui::Button((name + "##docname").c_str(), ImVec2(0, buttonH))) saveProjectAs(false);
+    const float docEnd = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x;
     ImGui::PopStyleColor(2);
     ui::HelpText("Project", "Ctrl+S", "Click to save the project. * means it has unsaved changes.", "Title");
 
@@ -1050,6 +1051,11 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     const std::string linkLabel = std::string(ICON_LC_RADIO " ") + tr("Live link on") + "##mayalink.chip";
     if (mayaLink) rightW += buttonW(linkLabel.c_str()) + 8.0f * s;
     const float rightX = g.title.w - 8.0f * s - rightW;
+    // The quiet heart (Help > Support SculptForge; a member's badge), left of the controls: only while the readout
+    // keeps its room, so it goes before anything crowds.
+    const float heartW = buttonH;
+    const bool heart = !studioMembership() && rightX - heartW - 8.0f * s - docEnd > 340.0f * s;
+    const float readoutEnd = heart ? rightX - heartW - 8.0f * s : rightX;
 
     // Info readout and the status message, elided to fit: secondary, so in the 12 px font.
     ImGui::SameLine(0.0f, 14.0f * s);
@@ -1082,7 +1088,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     char fps[32];
     std::snprintf(fps, sizeof fps, "%.0f fps", fpsShown_);
     const float fpsSlot = ImGui::CalcTextSize("0000 fps").x;
-    const float avail = rightX - infoX - 16.0f * s;
+    const float avail = readoutEnd - infoX - 16.0f * s;
     const float infoW = ImGui::CalcTextSize(info).x + 18.0f * s + fpsSlot;
     if (infoW < avail) {
         ImGui::TextDisabled("%s", info);
@@ -1111,6 +1117,9 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     }
     if (fontSmall_) ImGui::PopFont();
 
+    if (heart)
+        drawSupportHeart(ImVec2(ImGui::GetWindowPos().x + rightX - heartW - 4.0f * s, ImGui::GetWindowPos().y + (h - buttonH) * 0.5f),
+                         heartW, dl);
     // QuickSave, the layout presets and Menus are small dark chips with readable labels: buttons, but quieter than
     // the shelves (Menus on is an option: raised grey with an underline). 1 2 3 are segments of one control.
     ImGui::SetCursorPos(ImVec2(rightX, (h - buttonH) * 0.5f));
@@ -1515,6 +1524,11 @@ void App::drawStatusBar(const ShellGeometry& g) {
     const float wsW = buttonH + 4.0f * s;
     const float presetsX = right - 3.0f * wsW - 2.0f * s;
     right = presetsX - 14.0f * s;
+    // The quiet heart (Help > Support SculptForge; a member's badge), left of the workspaces: only while the modules
+    // keep their room beside the menus, so it goes first in a narrower window.
+    const float heartW = buttonH, heartX = right - heartW;
+    const bool heart = !studioMembership() && heartX - menusEnd > 420.0f * s;
+    if (heart) right = heartX - 10.0f * s;
     // The Maya bridge is on (#42): Send to Maya, one click, left of the workspaces; never over the menus (a narrow
     // window, #105, keeps File > Maya > Send to Maya).
     const std::string mayaLabel = std::string(ICON_LC_SEND) + " " + (caps ? upper(tr("Send to Maya")) : std::string(tr("Send to Maya")));
@@ -1663,6 +1677,8 @@ void App::drawStatusBar(const ShellGeometry& g) {
         }
         ui::HelpAction(*this, "file.send_maya");
     }
+
+    if (heart) drawSupportHeart(ImVec2(heartX, o.y + (h - buttonH) * 0.5f), heartW, dl);
 
     // Layout presets 1 2 3, drawn as workspaces.
     for (int i = 1; i <= 3; ++i) {

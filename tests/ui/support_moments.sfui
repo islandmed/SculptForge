@@ -1,0 +1,115 @@
+# Membership moments for returning users (Support.h, PanelSupportCard.cpp): milestones (the 10th start, 10 hours of
+# sculpting, the 100th save; counted on this computer only) with the true number, the feed's honest line (latest.json's
+# "support"), the backoff (after the 3rd Not now monthly, after the 6th only with an update) and the top bar's quiet
+# heart (Help > Support SculptForge), a member's badge instead. Every rule of the card stays: never modal, never
+# mid-stroke, never in tests (member_card lets the moments through), never for members.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=3
+wait_idle
+
+# The heart: Help > Support SculptForge (the membership page; UI tests never start a browser).
+expect "Support SculptForge##topbar.heart"
+expect_not "Member##topbar.member"
+click "Support SculptForge##topbar.heart"
+expect_value support_requests == 1
+expect_status https://sculptforge.app/support.html
+
+# A test-mode start counts nothing: no milestone.
+member_card milestone days=0
+wait 0.3
+expect_value member_card_open == 0
+
+# The 10th start (here the 12th): the true number.
+member_card milestone days=0 starts=12
+wait 0.4
+expect_value member_card_open == 1
+expect_text You've opened SculptForge 12 times. Members keep it free and growing.
+expect_text Founding Members
+expect "Not now##member_card.not_now"
+expect_value member_card_milestones == 1
+shot milestone-starts
+click "Not now##member_card.not_now"
+expect_value member_card_not_now == 1
+# Once each: the starts milestone doesn't come back.
+member_card milestone days=8 starts=40
+wait 0.3
+expect_value member_card_open == 0
+
+# 10 hours of sculpting (stroke time, every session; whole hours, rounded down).
+member_card milestone days=12 sculpt_hours=12.6
+wait 0.4
+expect_value member_card_open == 1
+expect_text You've sculpted 12 hours in SculptForge. Members keep it free and growing.
+shot milestone-hours
+click "Not now##member_card.not_now"
+expect_value member_card_not_now == 2
+
+# The feed's "support" block: honest lines in turn instead of the Founding Members line (this is the 3rd card: the
+# third line).
+env SF_UPDATE_FEED $SCRIPT_DIR/data/update_support.json
+click "Help##palette.help"
+click "Check for updates##help.check_updates"
+wait_idle 20
+wait 0.2
+# The 100th save: a real save counts (Ctrl+S; UI tests count once member_card has run). The card waits for its week.
+run save_project path=sf_ui_support_moments.sfproj
+member_card none days=24 saves=99
+key ctrl+s
+wait 0.4
+expect_value member_card_saves == 100
+expect_value member_card_open == 1
+expect_text You've saved your work 100 times in SculptForge. Members keep it free and growing.
+expect_text 3 changes in this release were members' requests.
+expect_no_text The first 100 members are Founding Members
+shot milestone-saves-feed
+click "Not now##member_card.not_now"
+expect_value member_card_not_now == 3
+# The next card: the feed's next line.
+member_card render days=60
+wait 0.4
+expect_value member_card_open == 1
+expect_text Nice render.
+expect_text Members funded this month: Cloth brush, Faster remesh.
+shot feed-funded
+
+# After the 3rd Not now: monthly. (Shown on day 60: day 80 brings nothing, day 90 does.)
+click "Not now##member_card.not_now"
+expect_value member_card_not_now == 4
+member_card render days=80
+wait 0.3
+expect_value member_card_open == 0
+member_card render days=90.1
+wait 0.4
+expect_value member_card_open == 1
+expect_text Founding Members so far: 2 of 100.
+click "Not now##member_card.not_now"
+member_card render days=121
+wait 0.4
+expect_value member_card_open == 1
+click "Not now##member_card.not_now"
+expect_value member_card_not_now == 6
+# After the 6th: only the first start after an update (and still at most monthly).
+member_card render days=200
+member_card sculpted days=200
+member_card challenge days=200
+member_card milestone days=200 starts=500
+wait 0.3
+expect_value member_card_open == 0
+expect_value member_card_pending == 0
+member_card updated days=200
+wait 0.4
+expect_value member_card_open == 1
+expect_text is here. Members get new versions early, as betas.
+
+# A member: the heart becomes a small badge (no count, nothing that moves), and no more cards.
+click "I'm already a member##member_card.already"
+wait 0.3
+member_sign_in ok
+wait 0.4
+expect_value supporter == 1
+expect "Member##topbar.member"
+expect_not "Support SculptForge##topbar.heart"
+member_card updated days=400
+wait 0.3
+expect_value member_card_open == 0
+shot member-badge

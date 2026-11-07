@@ -931,6 +931,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(studio_mode studio/studio_mode --studio ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/studio/studio.json)
     sculptforge_ui_test(shell_layout_1080 shell_layout --size 1920x1080)
     sculptforge_ui_test(menu_stable_720 menu_stable --size 1280x720)
+    # The membership moments' card and the top bar's heart at 1440 and 1024 px (tests/ui/support/support_shots.sfui).
+    sculptforge_ui_test(support_shots_1440 support/support_shots --size 1440x900)
+    sculptforge_ui_test(support_shots_1024 support/support_shots --size 1024x768)
     sculptforge_ui_test(help_console_1080 help_console --size 1920x1080)
     # The S / U / I / O slider on a UI scaled 1.5x (Windows at 150%, #9): it must still open under the cursor.
     sculptforge_ui_test(size_popup_scaled size_popup --size 2400x1350)

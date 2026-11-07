@@ -17,6 +17,17 @@ inline constexpr const char* kUpdateFeedUrl = "https://sculptforge.app/latest.js
 inline constexpr const char* kUpdateFeedMirrorUrl = "https://islandmed.github.io/latest.json";
 inline constexpr int64_t kUpdateCheckInterval = 24 * 60 * 60; // seconds
 
+// The membership card's honest line (the feed's optional "support" block, app/Support.h): {"funded_this_month":
+// ["Cloth brush", ...], "founding": {"taken": 2, "limit": 100}, "member_requests_this_release": 3}. Only real
+// numbers the coordinator writes by hand; anything missing or odd stays unset (-1, empty) and the card keeps its
+// usual words. Names printable text (48 bytes at most, 5 at most).
+struct SupportFeed {
+    bool present = false;              // the feed had a "support" object
+    std::vector<std::string> funded;   // funded this month
+    int foundingTaken = -1, foundingLimit = -1;
+    int memberRequests = -1;           // features in this release that members asked for
+};
+
 struct UpdateInfo {
     std::string version;                 // "0.6.0"
     std::string downloadUrl;             // the download page
@@ -28,6 +39,7 @@ struct UpdateInfo {
     // "Creatures"}): the membership card's moment, once per id. Empty when missing or odd; id letters, digits and
     // '-' (32 at most), title printable text (48 bytes at most).
     std::string challengeId, challengeTitle;
+    SupportFeed support;
 };
 
 // Which releases the update check offers (Preferences > Updates): Stable, or Preview, which adds the betas
