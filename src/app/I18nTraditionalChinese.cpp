@@ -107,6 +107,8 @@ constexpr Entry kTraditionalChinese[] = {
     {"Search", "搜尋"},
     {"Minimize", "最小化"},
     {"Menus", "選單"},
+    {"More menus", "更多選單"},
+    {"The menus that don't fit in the window's width.", "視窗寬度放不下的選單。"},
     {"Snapshots", "快照"},
     {"Save Snapshot", "儲存快照"},
     {"Base", "基底"},

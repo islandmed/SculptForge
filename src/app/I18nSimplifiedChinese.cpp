@@ -109,6 +109,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Search", "搜索"},
     {"Minimize", "最小化"},
     {"Menus", "菜单"},
+    {"More menus", "更多菜单"},
+    {"The menus that don't fit in the window's width.", "窗口宽度放不下的菜单。"},
     {"Snapshots", "快照"},
     {"Save Snapshot", "保存快照"},
     {"Base", "基底"},

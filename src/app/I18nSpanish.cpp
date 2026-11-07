@@ -110,6 +110,8 @@ constexpr Entry kSpanish[] = {
     {"Search", "Buscar"},
     {"Minimize", "Minimizar"},
     {"Menus", "Menús"},
+    {"More menus", "Más menús"},
+    {"The menus that don't fit in the window's width.", "Los menús que no caben en el ancho de la ventana."},
     {"Snapshots", "Instantáneas"},
     {"Save Snapshot", "Guardar instantánea"},
     {"Base", "Base"},
