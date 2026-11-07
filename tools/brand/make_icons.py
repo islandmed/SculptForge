@@ -2,6 +2,7 @@
 """Builds every SculptForge icon and logo file.
 
     python -I tools/brand/make_icons.py <bust.jpeg> [--discord DIR] [--style outline|filled]
+    python -I tools/brand/make_icons.py --icns-only [--style outline|filled]
 
 Which mark goes where: docs/brand.md. The app icon is the outline cube (Tony 11-06 21:1x: "I want that back as the icon
 as it was before"): the files that shipped in 0.1-0.10, frozen in tools/brand/cube-outline/ (Lucide's "box" on a dark
@@ -17,11 +18,13 @@ icon, GitHub avatar).
 import argparse
 import io
 import os
-import struct
 import subprocess
 import sys
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import icns  # noqa: E402  (tools/brand/icns.py)
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SS = 4  # supersampling of masks and drawn shapes
@@ -220,26 +223,28 @@ def flat(im, bg=(0x0e, 0x0e, 0x11)):
 
 
 def write_icns(path):
-    """macOS: every iconset slot as PNG (Pillow's writer leaves out the 16 and 32 px 1x ones), on Apple's grid."""
-    slots = (("icp4", 16), ("icp5", 32), ("ic11", 32), ("ic12", 64), ("ic07", 128), ("ic13", 256), ("ic08", 256),
-             ("ic14", 512), ("ic09", 512), ("ic10", 1024))
-    chunks = b""
-    for kind, n in slots:
+    """macOS: every iconset slot on Apple's grid (tools/brand/icns.py: 16 and 32 px as RGB + mask, the rest PNG)."""
+    def png(n):
         buf = io.BytesIO()
         mac(n).save(buf, format="PNG", optimize=True)
-        chunks += kind.encode() + struct.pack(">I", 8 + len(buf.getvalue())) + buf.getvalue()
-    with open(path, "wb") as f:
-        f.write(b"icns" + struct.pack(">I", 8 + len(chunks)) + chunks)
+        return buf.getvalue()
+    icns.write(path, lambda n: mac(n).convert("RGBA").tobytes(), png)
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("bust")
+    ap.add_argument("bust", nargs="?")
     ap.add_argument("--discord")
     ap.add_argument("--style", choices=("outline", "filled"), default="outline")
+    ap.add_argument("--icns-only", action="store_true", help="only assets/branding/sculptforge.icns (no bust needed)")
     a = ap.parse_args()
     global STYLE
     STYLE = a.style
+    if a.icns_only:
+        write_icns(os.path.join(ROOT, "assets", "branding", "sculptforge.icns"))
+        return print("done")
+    if not a.bust:
+        ap.error("the bust concept art is needed (or --icns-only)")
 
     def png(im, *path):
         im.save(os.path.join(ROOT, *path), optimize=True)

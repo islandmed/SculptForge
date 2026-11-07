@@ -28,7 +28,8 @@ The outline cube: Lucide's "box" icon (ISC, credited in `THIRD_PARTY_NOTICES.md`
 tile, as it shipped in 0.1-0.10 (088f0cd6, site 71cd4f7) and as the Discord developer portal shows it. Tony 11-06 21:1x:
 "I want that back as the icon as it was before". The originals are frozen in `tools/brand/cube-outline/` and copied
 pixel for pixel; only sizes that never shipped (24 px, the macOS `.icns` on Apple's grid, apple-touch-icon) are rendered
-from its SVG. Never redraw or retouch it. Comparison sheets: `~/Work/.sf/brand/shots/cube-outline-*.png`.
+from its SVG. Never redraw or retouch it. The `.icns` keeps 16 and 32 px as RGB + mask (`is32`/`il32`), never PNG:
+Finder draws PNG there as noise (#156); `tools/brand/icns.py` checks it (test `icns`). Comparison sheets: `~/Work/.sf/brand/shots/cube-outline-*.png`.
 
 | Where | File |
 |---|---|
