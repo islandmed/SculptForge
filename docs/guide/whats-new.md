@@ -17,6 +17,28 @@ highlight: Brush sets: swap the whole bottom shelf and its keys in one step (tha
 highlight: Floor grid: View > Floor grid draws a faint grid on the floor the model stands on (thanks @fenixpoints, #115)
 ```
 
+- **Brush sets**: save the bottom shelf and its brushes' keys as a named set (Wood, Metal, Stone...) and swap both in
+  one step from **Sculpt > Brush > Brush set**, the shelf's right-click menu or <kbd>F3</kbd>. Asked for by
+  @NicTanghe.
+- **Creature bones**: **Append > Insert on the model > Creature bones** is a built-in set of original fantasy creature
+  bones (skull, jaw, teeth, horns, spine, ribs, limb and wing bones, claws, tail): pick one and drag it onto your
+  model, no file needed. Thanks @kenttumanda123-netizen (#154).
+- **Floor grid**: **View > Floor grid** draws a faint grid on the floor the model stands on, for grounding,
+  perspective and lining up Parts. Off by default.
+- **Maya Live**: turn on **File > Maya > Live** (and **Live** on the Maya shelf) and each app sends what you change by
+  itself, 300 ms after a stroke or edit, only the Parts that changed. Thanks @tristratos (#42).
+- **Maya Live link**: **File > Maya > Live link...** connects SculptForge and Maya on this computer so Maya follows
+  your stroke while you draw it. It asks every time, is off at every start, and the ember **Live link on** chip in the
+  top bar turns it off.
+- **Package managers**: the install guide lists where SculptForge is today: Homebrew available, winget and Omarchy in
+  review, the AUR package ready to publish, apt and dnf repositories on the way. Thanks @NicTanghe (#149).
+- **Stencil**: lay an image over the view and sculpt or paint through it (**Sculpt > Alpha > Stencil**). Move, scale
+  and turn it on the canvas with **Adjust**, stroke over it, turn the model and repeat. Sculpt brushes take its
+  brightness, Vertex Paint its colours; Tile repeats it across the view.
+- **Dynamic topology** no longer shows a long spike and a patch of broken faces after zooming in and sculpting (only
+  the display was wrong: Undo or the next strokes put it right) (thanks @editordenis4-collab, #153).
+- **Big brushes on big meshes** follow the pen closer on 4-core machines and settle sooner after pen-up.
+
 ## Version 0.11.10
 
 ```features

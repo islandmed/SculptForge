@@ -6,6 +6,66 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.11] - 2026-11-06
+
+### Added
+- **Brush sets** (#143, asked for by @NicTanghe): **Sculpt > Brush > Brush set > Save** keeps the bottom shelf's
+  brushes, in order, and their keys as a named set in your brush library; picking a set (the Brush palette, the bottom
+  shelf's right-click menu **Brush set**, or **Brush Set: Wood** in the command palette) swaps the shelf and the keys
+  in one step, and the set you switched to comes back at the next start. Custom and pack brushes on the bottom shelf
+  can now hold a key too (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click the tile, then press the key). Commands: `brush_set`,
+  `brush_set_save`, `brush_set_delete`.
+- **Creature bones** (Append > Insert on the model, #154): a built-in insert set of 13 original fantasy creature bones
+  (Skull, Jaw, Fang, Blade tooth, Swept horn, Spiral horn, Claw, Vertebra, Tail vertebrae, Rib, Limb bone, Wing bone,
+  Wing finger), clean closed quad meshes for dividing and sculpting, generated in-house by tools/creature-bones.
+  Commands: `insert_set_items set=builtin:creature-bones`, `insert_mesh set=builtin:creature-bones index=<n>`.
+  Translated piece names. Thanks @kenttumanda123-netizen.
+- **Floor grid** (#115, **View > Floor grid**, also **Tool > Display** and the command palette): a faint grid on the
+  floor under the model (its lowest point, Y up; it moves when a stroke or a move ends), the X and Z axes through the
+  origin marked, squares stepping by ten with the zoom and fading into the distance. It never draws over the model.
+  Off by default; remembered in the preferences. Suggested by @fenixpoints.
+- **Maya Live** (#42, thanks @tristratos): **File > Maya > Live** sends the Parts a stroke, undo or edit changed to
+  the exchange folder by itself once the scene is still for 300 ms (never mid-stroke), written in the background; the
+  Maya shelf's new **Live** button does the same for Maya edits (node-dirty callbacks, debounced). Echo guard:
+  manifests carry the writer's session id, a Get is never sent back, and an object that comes back unchanged is
+  skipped (no undo step). Both sides pick up sends every 250 ms (was once a second); OBJs are written to a temporary
+  name and renamed.
+- **Maya Live link** (#42): opt-in, off at every start and never remembered; a warning every time it is turned on; an
+  ember **Live link on** chip in the top bar (and the Forge status bar) turns it off. A per-user Unix socket or named
+  pipe (never a TCP or UDP port), a 128-bit pairing code (**File > Maya > Copy pairing code**, pasted into the shelf's
+  new **Link** button), one client at a time, mesh data only in strictly parsed frames (1 GiB cap, timeouts,
+  fuzz-tested). SculptForge streams the vertices a stroke moves about ten times a second and sends whole meshes when
+  faces change; Maya edits come back as whole meshes. Studios can forbid it with `"maya": {"link": "never"}`. Guide:
+  Working with Maya > Live, Live link.
+- **Stencil** (Sculpt > Alpha > Stencil, #155, thanks @kenttumanda123-netizen): an image over the view (loaded like an
+  alpha, or the brush's alpha) that the brushes work through. It stays put on screen while the model turns under it;
+  every brush that takes an alpha (built-in, custom and Community brushes, the Paint brush, micro levels) takes its
+  brightness (sculpt) or its colours (Vertex Paint, or its brightness masking the paint colour) at the place each
+  vertex shows, and nothing off the image. Adjust: drag to move, a corner to scale, the round handle to turn; arrows,
+  - =, , . on the keyboard. Invert, Tile, Opacity, Hide while navigating. Symmetry mirrors it. Commands
+  `stencil_load`, `stencil_set`, `stencil_clear`. Texture painting doesn't take it yet.
+
+### Changed
+- Install guide: a **Package managers** table with each one's status (Homebrew available; winget and Omarchy in
+  review; AUR ready, not published yet; apt and dnf repositories built, live once their signing key exists). Asked for
+  by @NicTanghe (#149).
+- Big brushes on dense meshes keep a shorter queue of pending dabs when each dab is slow (about 150 ms of work, at
+  least one dab, instead of always four): a big Clay stroke on a dense scan lags less and settles sooner after pen-up,
+  with the same stroke; small brushes are unchanged.
+- Site: the README links to GitHub Releases and the guide on GitHub for networks that block sculptforge.app;
+  sculptforge.app/security.txt (RFC 9116) points to GitHub private vulnerability reporting.
+
+### Fixed
+- Dynamic topology: after strokes in several places (zooming in between them makes many more triangles), the view
+  could draw a long spike out of the mesh and a patch of dark, broken or missing faces until the next Undo or a full
+  redraw. When the renderer's buffers for the remeshed areas grew, the areas drawn before kept their vertices but lost
+  their triangles, which then drew whatever the new buffer held. The mesh itself was never damaged. Thanks
+  @editordenis4-collab (#153).
+
+### Security
+- New local listener, the Maya Live link: per-user socket / pipe only, opt-in with a warning each time, pairing code,
+  mesh data only (SECURITY.md).
+
 ## [0.11.10] - 2026-11-06
 
 ### Added
