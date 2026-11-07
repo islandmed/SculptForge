@@ -33,6 +33,9 @@ can step back down at any time.
 - **Smt** (next to Divide) smooths the new level, rounding off the shape. Turn it off to
   divide flat: the new level keeps the hard edges and flat faces of the one below, for hard-surface pieces.
 - Divide always adds the level on top. If you are at a lower level it steps to the highest first.
+- **Creased edges stay sharp.** Edges creased in **Geometry > Edges** ([Edges](edges.md#creases)) on the base
+  level keep a hard line through the levels: a crease of 1 stays sharp on every level, lower values round off
+  after a few levels.
 - Mask, vertex paint, paint layers and UVs are interpolated onto the new level; face groups and hidden faces carry
   over; sculpt layers are divided with the shape.
 - How far you can divide depends on your computer's memory: about 160 million triangles with 32 GB (each
@@ -70,13 +73,15 @@ What happens to your sculpting when you change level:
 | Face Groups, hidden faces | Copied down to the parent faces, inherited up by the faces they contain |
 | UVs | Copied down and interpolated up |
 | Texture | Shared by every level (it lives on the UVs) |
+| Edge creases | Set on the base level; the levels above are made with them. Creasing or uncreasing at SDiv 1 reshapes the higher levels, their sculpted detail riding along |
 
 Clearing the mask, removing a layer or deleting the paint layers does it on every level.
 
 ## Delete Lower and Delete Higher
 
 **Delete Lower** deletes the levels below the current one: the current level becomes the new base cage (SDiv 1).
-**Delete Higher** deletes the levels above, and the detail sculpted on them. Both are undoable. Deleting down to a
+What is left of the edge creases from the deleted levels becomes the new base's own creases, so the levels
+above keep their shape. **Delete Higher** deletes the levels above, and the detail sculpted on them. Both are undoable. Deleting down to a
 single level leaves an ordinary mesh.
 
 ## Reconstruct Subdiv
