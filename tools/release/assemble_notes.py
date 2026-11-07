@@ -172,8 +172,21 @@ def run(root, version, mode):
     root = Path(root)
     frags = fragments(root)
     if mode == "--check":
+        # whats_new and highlight text goes into the in-app What's New, drawn with the app's Latin UI font: the same
+        # rule as the guide (tools/guide/build_site.py, ctest guide_site), here and not only after the bump assembles
+        # the notes (0.11.10: "繁體中文 and 简体中文" in a whats_new line stopped the stage).
+        bad = []
+        for path, f in frags:
+            for key in ("whats_new", "highlight"):
+                for text in f.get(key, []) if isinstance(f.get(key), list) else [f.get(key) or ""]:
+                    chars = sorted({ch for ch in text if ord(ch) > 0xFF or (ord(ch) < 0x20 and ch not in "\t\n")})
+                    if chars:
+                        bad.append(f"{path.name}: {key}: characters the app's font can't show: "
+                                   + " ".join(f"U+{ord(ch):04X}" for ch in chars))
+        for b in bad:
+            print(b)
         print(f"{len(frags)} note fragment(s) parse")
-        return 0
+        return 1 if bad else 0
     if mode == "--testers":
         sys.stdout.write(testers(version, frags))
         return 0
@@ -219,6 +232,10 @@ def self_test():
             "Free notes for reviewers.\n")
         (t / "changes/fix-pen.md").write_text("---\nfixed: Pen pressure on Windows Ink (#72).\n---\n")
         assert run(t, "0.2.0", "--check") == 0
+        cjk = t / "changes/fix-lang.md"  # (a language named in its own script: the app's font can't draw it)
+        cjk.write_text("---\nwhats_new: **Español, 繁體中文** labels.\n---\n", encoding="utf-8")
+        assert run(t, "0.2.0", "--check") == 1
+        cjk.unlink()
         hl = Path(tmp) / "hl.txt"
         with open(hl, "w") as out:
             saved, sys.stdout = sys.stdout, out
