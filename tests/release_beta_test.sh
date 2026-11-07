@@ -72,6 +72,7 @@ runs() {
 }
 case "\$*" in
   "auth status"*) echo "Logged in to github.com account islandmed" ;;
+  "api users/"*) exit 0 ;; # every credited handle is an account (tools/release/check_credits.py)
   "secret list --env"*) printf 'INSIDERS_REPO_TOKEN\t2026-11-05T00:00:00Z\nUPDATE_SIGNING_KEY\t2026-11-05T00:00:00Z\n' ;;
   "secret list"*) printf 'DISCORD_MEMBERS_WEBHOOK\t2026-11-05T00:00:00Z\n'; [ -z "\${SECRET_AT_REPO:-}" ] || printf 'UPDATE_SIGNING_KEY\t2026-11-05T00:00:00Z\n' ;;
   "api repos/islandmed/SculptForge/actions/workflows/packages.yml/runs"*) runs "\$2" ;;

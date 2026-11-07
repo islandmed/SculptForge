@@ -807,6 +807,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME media_takedown_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/media_takedown.py --self-test)
     # The public gallery repository matches tools/brush-gallery/repo (the live compare is in release.sh: network).
     add_test(NAME gallery_published_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/brush-gallery/check_published.py --self-test)
+    # Credited @handles are GitHub accounts (the live check is in release.sh's preflight: network).
+    add_test(NAME credits_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_credits.py --self-test)
     # The Claude Desktop bundle and its MCP registry entry (tools/release/build_mcpb.py, mcp_server_json.py): packed
     # from the built CLI and its server run from the unpacked bundle, as packages.yml does on every OS.
     add_test(NAME mcpb_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/build_mcpb.py --self-test)

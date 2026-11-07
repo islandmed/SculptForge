@@ -308,6 +308,11 @@ preflight() {
     gallery=$(python3 tools/brush-gallery/check_published.py 2>/dev/null) || rc=$?
     [ $rc -ne 2 ] || die "$(head -1 <<<"$gallery")" "check the network and gh auth status, then run again"
     [ $rc -eq 0 ] || die "the public gallery (islandmed/sculptforge-brushes) differs from tools/brush-gallery/repo: $(head -3 <<<"$gallery")" "copy tools/brush-gallery/repo into a clone of it, commit, push its main"
+    # Credits: every @handle in the notes is a GitHub account; a Discord-only requester is "name on Discord", no @.
+    local credits; rc=0
+    credits=$(python3 tools/release/check_credits.py 2>&1) || rc=$?
+    [ $rc -ne 2 ] || die "$credits" "check the network and gh auth status, then run again"
+    [ $rc -eq 0 ] || die "a credited @handle isn't a GitHub account: $credits" "fix the spelling, or for a Discord-only requester write \"thanks name on Discord\" (no @) in that changes/ file and the highlights, commit, run again"
     grep -q '^set(SCULPTFORGE_PRERELEASE "[a-z0-9.]*")$' CMakeLists.txt ||
         die "CMakeLists.txt lost its set(SCULPTFORGE_PRERELEASE \"\") line that step bump sets" "restore it under project() (git log -p CMakeLists.txt), commit"
     python3 -c 'import json, sys; json.load(open(sys.argv[1]))' website/latest.json 2>/dev/null || die "website/latest.json is not valid JSON" "fix it, commit"
