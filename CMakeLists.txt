@@ -775,6 +775,9 @@ if(SCULPTFORGE_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}) # docs/legal/trademarks.md
     # No raw string literal in src/ over MSVC's ~16K characters (C2026: only the Windows build would fail).
     add_test(NAME raw_literal_size COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/dev/check_literals.py)
+    # assets/branding/sculptforge.icns: every slot decodes at its size, 16/32 px as RGB + mask, never PNG (#156).
+    add_test(NAME icns COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/brand/icns.py)
+    add_test(NAME icns_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/brand/icns.py --self-test)
     add_test(NAME macos_api COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/dev/check_macos_api.py)
     add_test(NAME macos_api_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/dev/check_macos_api.py --self-test)
     # website/brushes.html #packs matches src/core/BrushPacks.cpp: every brush, its preview and the guide links.
