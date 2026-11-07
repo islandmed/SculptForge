@@ -176,6 +176,10 @@ std::unique_ptr<Mesh> sculptBrushPreview(const BrushRecipe* recipe, int type) {
         stroke(d, nullptr, bt, line({-0.15f, 0.0f, 2.0f}, {0.15f, 0.0f, 2.0f}), 0.36f, 0.3f, false);
         break;
     }
+    case BrushType::Cloth: // the front dragged sideways twice: it bunches into folds
+        for (int pass = 0; pass < 2; ++pass)
+            stroke(d, nullptr, bt, line({-0.35f, 0.0f, 2.0f}, {0.25f, 0.0f, 2.0f}), 0.4f, 0.7f, false);
+        break;
     case BrushType::Layer: // a ring raised to one flat height per stroke; two strokes, two steps (a square path's
         // corners were dabbed twice and pinched)
         for (int pass = 0; pass < 2; ++pass)

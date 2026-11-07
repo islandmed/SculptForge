@@ -896,6 +896,14 @@ private:
     float faceTakeTime_ = 0.0f;
     std::mutex faceTakeMutex_;
     std::string pendingFaceTake_; // set by the file dialog thread
+    // Cloth brush and Drape (PanelCloth.cpp, core/Cloth.h): Brush > Cloth, and the other visible Parts as the
+    // surfaces the cloth collides with (built once, rebuilt when one of them changes).
+    void drawClothSection();
+    void prepareClothColliders();
+    bool clothUiValue(const std::string& name, double& out) const; // UI test values (UiTest.cpp)
+    std::unique_ptr<ClothColliders> clothColliders_;
+    std::vector<uint64_t> clothCollidersKey_;
+    bool clothCollide_ = true; // Brush > Cloth > Collide with other Parts
     // Kelvinlet brushes and Alpha / VDM from viewport (PanelKelvinlet.cpp, core/Kelvinlet.h, core/ViewCapture.h).
     bool kelvinStrokeBrush() const; // KelvinGrab / Twist / Scale: the drag drives the brush, not dabs
     void kelvinBegin(const RayHit& hit);
