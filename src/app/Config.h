@@ -96,6 +96,8 @@ struct UiPrefs {
     // Tool > Display > Backface culling (#68): skip the back faces of every Part (faster on dense meshes; see
     // through open meshes). Off by default; a preference, projects keep their own.
     bool backfaceCulling = false;
+    // View > Display > Floor grid (#115): the grid on the ground plane (RenderSettings::floorGrid). Off by default.
+    bool floorGrid = false;
     // UV Editor > Pack > Columns x Rows (#135): the UDIM grid the last pack filled, the default for new projects.
     int uvPackColumns = 1, uvPackRows = 1;
     // Preferences > Interface > Mask darkness (and Tool > Masking): how dark masked areas show, 0-1

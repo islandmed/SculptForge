@@ -706,6 +706,57 @@ void main() {
 }
 )";
 
+// The floor grid (#115, View > Floor grid): one quad on the floor (y = RenderSettings::floorHeight) around the eye,
+// its lines drawn in the fragment shader. Three levels of 10x steps, the finest fading out as the view zooms out
+// (uBlend) so a zoom never pops; cells under a few pixels fade too (no moire at grazing angles), and all of it fades
+// with the distance from the eye. X (red) and Z (blue) mark the axes through the origin.
+const char* kFloorVS = R"(#version 330 core
+uniform mat4 uView;
+uniform mat4 uProj;
+uniform vec2 uCentre;
+uniform float uHalf;
+uniform float uFloor;
+out vec3 vWorld;
+void main() {
+    vec2 c = vec2(gl_VertexID & 1, gl_VertexID >> 1) * 2.0 - 1.0;
+    vWorld = vec3(uCentre.x + c.x * uHalf, uFloor, uCentre.y + c.y * uHalf);
+    gl_Position = uProj * (uView * vec4(vWorld, 1.0));
+}
+)";
+
+const char* kFloorFS = R"(#version 330 core
+in vec3 vWorld;
+out vec4 fragColor;
+uniform vec3 uEye;
+uniform float uStep;  // the finest level's cell
+uniform float uBlend; // 0..1: how far the view has zoomed out of that level
+uniform float uFade;  // the distance from the eye where the grid is gone
+uniform vec3 uLine;
+float lines(vec2 p, float step, float px) {
+    vec2 c = p / step;
+    vec2 w = max(fwidth(c), vec2(1e-6));
+    vec2 g = abs(fract(c - 0.5) - 0.5) / w; // distance to the nearest line, in pixels
+    float l = 1.0 - min(min(g.x, g.y) / px, 1.0);
+    return l * (1.0 - smoothstep(0.08, 0.3, max(w.x, w.y))); // cells under ~12 px fade out
+}
+void main() {
+    vec2 p = vWorld.xz;
+    float a = max(lines(p, uStep, 1.0) * 0.10 * (1.0 - uBlend), lines(p, uStep * 10.0, 1.0) * mix(0.22, 0.10, uBlend));
+    a = max(a, lines(p, uStep * 100.0, 1.2) * 0.22);
+    vec2 w = max(fwidth(p), vec2(1e-6));
+    float onX = 1.0 - min(abs(p.y) / w.y / 1.5, 1.0), onZ = 1.0 - min(abs(p.x) / w.x / 1.5, 1.0);
+    vec3 c = uLine;
+    float axis = max(onX, onZ) * 0.5;
+    if (axis > a) {
+        c = onX >= onZ ? vec3(0.86, 0.36, 0.36) : vec3(0.36, 0.55, 0.92);
+        a = axis;
+    }
+    a *= 1.0 - smoothstep(0.3 * uFade, uFade, distance(vWorld, uEye));
+    if (a < 1.0 / 255.0) discard;
+    fragColor = vec4(c, a);
+}
+)";
+
 // The PBR view's environment behind the model: the view ray of each pixel into the prefiltered environment at
 // the background's blur, exposed and tone mapped like the shading.
 const char* kEnvBgFS = R"(#version 330 core
@@ -1242,6 +1293,8 @@ void Renderer::shutdown() {
     envIndex_ = envFailedIndex_ = -1;
     deleteProgram(envBgProgram_);
     envBgProgram_ = 0;
+    deleteProgram(floorProgram_);
+    floorProgram_ = 0;
     gl::DeleteVertexArrays(1, &emptyVao_);
     for (MeshProgram& p : programs_) {
         deleteProgram(p.id);
@@ -2992,6 +3045,8 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     previewOnly_ = stillWanted_ = false;
     gl::Enable(GL_DEPTH_TEST);
     gl::DepthFunc(GL_LEQUAL);
+    floorGridDrawn_ = false;
+    if (settings.floorGrid) drawFloorGrid(camera, view, proj, settings); // (under everything: the Parts paint over it)
     if (drawList_.empty() || !settings.showMesh) {
         if (settings.showSplats) drawSplats(view, proj, fbWidth, fbHeight, settings.splatOpacity);
         gl::UseProgram(0);
@@ -3212,6 +3267,50 @@ void Renderer::cullCoarse(const MeshSlot& s, const CullView& frame, size_t budge
 // Draws `clusters` of `s` (the VAO for `part` bound): their triangles, the wireframe's edges, or their motion
 // proxies. One multi-draw, or with per-triangle data on a driver whose gl_VertexID lacks the base vertex, one
 // draw per cluster with its first drawn triangle in `primBaseLocation`.
+// The floor grid (#115): drawn right after the background, before any Part, with no depth: every Part (and splat)
+// paints over it, so it never shows on the model, from above or below. Its cell is a power of ten of the zoom: 0.1
+// at the default view of a new model, 1 from ten times further out.
+void Renderer::drawFloorGrid(const Camera& camera, const glm::mat4& view, const glm::mat4& proj,
+                             const RenderSettings& settings) {
+    if (thumbnailPass_) return;
+    if (!floorProgram_) {
+        std::string error;
+        floorProgram_ = link(kFloorVS, kFloorFS, error);
+        if (!floorProgram_) {
+            SDL_Log("Floor grid: %s", error.c_str());
+            return;
+        }
+    }
+    const glm::vec3 eye = glm::vec3(glm::inverse(view)[3]);
+    const float zoom = std::log10(std::max(camera.distance, 1e-4f)) - 0.3f, level = std::floor(zoom);
+    const float fade = std::max(camera.distance * 6.0f, std::abs(eye.y - settings.floorHeight) * 2.0f);
+    // Lines a little lighter than a dark background, darker than a light one.
+    const glm::vec3 bg = settings.gradientBackground ? settings.gradientCentre : settings.backgroundColor;
+    const float luma = glm::dot(bg, glm::vec3(0.2126f, 0.7152f, 0.0722f));
+    const glm::vec3 line = luma > 0.5f ? glm::vec3(0.08f) : glm::vec3(0.86f);
+    gl::UseProgram(floorProgram_);
+    auto at = [&](const char* n) { return gl::GetUniformLocation(floorProgram_, n); };
+    gl::UniformMatrix4fv(at("uView"), 1, GL_FALSE, glm::value_ptr(view));
+    gl::UniformMatrix4fv(at("uProj"), 1, GL_FALSE, glm::value_ptr(proj));
+    gl::Uniform2f(at("uCentre"), eye.x, eye.z);
+    gl::Uniform1f(at("uHalf"), fade);
+    gl::Uniform1f(at("uFloor"), settings.floorHeight);
+    gl::Uniform3fv(at("uEye"), 1, glm::value_ptr(eye));
+    gl::Uniform1f(at("uStep"), std::pow(10.0f, level - 1.0f));
+    gl::Uniform1f(at("uBlend"), zoom - level);
+    gl::Uniform1f(at("uFade"), fade);
+    gl::Uniform3fv(at("uLine"), 1, glm::value_ptr(line));
+    gl::BindVertexArray(emptyVao_);
+    gl::Disable(GL_DEPTH_TEST);
+    gl::Enable(GL_BLEND);
+    gl::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    gl::Disable(GL_CULL_FACE);
+    gl::DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    gl::Disable(GL_BLEND);
+    gl::Enable(GL_DEPTH_TEST);
+    floorGridDrawn_ = true;
+}
+
 void Renderer::drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clusters, GLenum mode, DrawPart part, GLint primBaseLocation) {
     drawCounts_.clear();
     drawOffsets_.clear();

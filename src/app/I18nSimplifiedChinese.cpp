@@ -1499,6 +1499,12 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Tool > Remesh", "工具 > 重新网格化"},
     {"Cut", "切割"},
     {"Selection Sets", "选择集"},
+    {"Floor grid", "地面网格"},
+    {"A faint grid on the floor the model stands on (its lowest point, Y up), fading into the distance: a "
+     "reference for perspective and lining up Parts; the red and blue lines are the X and Z axes. It moves when "
+     "a stroke or a move ends. Off by default; saved automatically.",
+     "模型所站立地面上的淡淡网格（位于模型最低点，Y 轴向上），向远处渐隐：用作透视和对齐部件的参考；红线和蓝线是 X 轴和 "
+     "Z 轴。笔触或移动结束时更新位置。默认关闭；自动保存。"},
     {"Backface culling", "背面剔除"},
     {"Don't draw the back faces of the model: faster on dense meshes, and you see through the openings of open meshes "
      "(a scan, a garment) instead of their inside. Brushes then work only on faces you can see. Off by default; "

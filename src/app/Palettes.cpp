@@ -742,6 +742,9 @@ void App::drawPalette_Render() {
     ui::HelpAction(*this, "view.mask");
     ImGui::Checkbox(tr("Show Face Groups##render"), &renderSettings_.showFaceGroups);
     ui::HelpAction(*this, "view.facegroups");
+    if (ImGui::Checkbox(tr("Floor grid##render"), &renderSettings_.floorGrid))
+        uiPrefs_.floorGrid = renderSettings_.floorGrid; // (a preference: on in every session until turned off)
+    ui::HelpAction(*this, "view.floor_grid");
     bool xray = renderSettings_.xray;
     if (ui::Checkbox("X-Ray##render", &xray)) runCommand("xray", {{"on", xray}});
     ui::HelpAction(*this, "view.xray");
@@ -998,6 +1001,9 @@ void App::drawPalette_Tool() {
                      "of open meshes (a scan, a garment) instead of their inside. Brushes then work only on faces you "
                      "can see. Off by default; saved automatically, projects keep their own.",
                      "Tool > Display");
+        if (ImGui::Checkbox(tr("Floor grid##display"), &renderSettings_.floorGrid))
+            uiPrefs_.floorGrid = renderSettings_.floorGrid;
+        ui::HelpAction(*this, "view.floor_grid");
         ImGui::ColorEdit3(tr("Material colour"), &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
         ui::HelpText("Material colour", nullptr, "Colour of the Studio material (the clay colour).", "Tool > Display");
         drawShadingControls();
