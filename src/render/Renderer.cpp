@@ -2282,17 +2282,19 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
         s.outOfMemory = !s.micro->sync(mesh);
         s.drawnTriangles = s.outOfMemory ? 0 : 1; // (draw() skips empty slots)
         s.fresh = true;                           // (back to a mesh: a full upload)
-        // Coarse levels when even one micro triangle per base triangle is over the budget (a dense base).
-        if (coarseLod_ && !s.coarseTried && !s.outOfMemory && mesh.triangleCount() > (lodBudget_ ? lodBudget_ : triangleBudget(RenderSettings())))
+        // Coarse levels when even one micro triangle per base triangle is over the budget (a dense base), once the
+        // micro level has been on screen (the first frame doesn't wait for their build: seconds on a 28M base).
+        if (coarseLod_ && !s.coarseTried && !s.outOfMemory && s.microShown && mesh.triangleCount() > (lodBudget_ ? lodBudget_ : triangleBudget(RenderSettings())))
             buildMicroCoarse(s, mesh);
         if (s.coarse && !s.coarsePending.empty() && !s.coarseEdited && !stroking_) updateMicroCoarse(s, mesh); // (the stroke is over)
         s.coarseEdited = false;
+        s.microShown = true; // (the next sync builds the coarse levels)
         return;
     }
     if (s.micro) {
         s.micro.reset();
         s.fresh = true; // (a full upload: the mesh's own coarse levels from scratch)
-        s.microCoarseKey = 0, s.microFull = 0, s.microAllMoved = false;
+        s.microCoarseKey = 0, s.microFull = 0, s.microAllMoved = false, s.microShown = false;
         std::vector<glm::vec3>().swap(s.microPositions), std::vector<glm::vec3>().swap(s.microNormals);
         std::vector<float>().swap(s.microMask), std::vector<uint8_t>().swap(s.microMoved), std::vector<uint32_t>().swap(s.microMovedList);
     }
@@ -3767,6 +3769,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     // (the budget is shared by the micro Parts on screen: each gets it whole; one is the usual case)
     const_cast<MeshSlot&>(s).microDrawn = s.micro->draw(p->id, frameCull_, frameProj_, frameViewport_, budget, target);
     lastDrawn_ += s.microDrawn;
+    if (coarseLod_ && !s.coarseTried) stillWanted_ = true; // (another frame: sync builds its coarse levels)
 }
 
 // The coarse levels of a micro level (coarseClusters_: the clusters in view): every one at one level, the finest
