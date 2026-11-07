@@ -87,4 +87,27 @@ click "Brush##palette.brush"
 wait 0.5
 shot wn-brush-settings
 key escape
+# 0.11.11 Stencil (#155): a dense sphere sculpted through a Cobblestone stencil; the overlay, then the stencil hidden.
+run new_sphere subdivisions=7
+wait_idle 20
+key f
+click "X##transform.symmetry_x"
+expect_value symmetry_x == 0
+click "Standard##brush.standard"
+run brush_set_alpha name=cobblestone
+run stencil_load alpha=true reset=true
+run brush_set_alpha name=round
+run stencil_set size=0.6 angle=12 opacity=0.45
+stroke 0.2 0.35 0.8 0.35
+stroke 0.2 0.45 0.8 0.45
+stroke 0.2 0.55 0.8 0.55
+stroke 0.2 0.65 0.8 0.65
+hover_window 0.9 0.6
+wait 0.5
+shot wn-stencil-overlay
+run stencil_set visible=false
+wait 0.5
+shot wn-stencil
+run stencil_clear
+
 # (images/wn-first-sculpt.jpg is cut from images/first-sculpt/12-render.jpg, the lesson's own Save Render.)
