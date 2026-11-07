@@ -87,7 +87,7 @@ click "Brush##palette.brush"
 wait 0.5
 shot wn-brush-settings
 key escape
-# 0.11.11 Stencil (#155): a dense sphere sculpted through a Cobblestone stencil; the overlay, then the stencil hidden.
+# 0.11.12 Stencil (#155): a dense sphere (328K triangles) sculpted through a Cobblestone stencil; the overlay, then the stencil hidden.
 run new_sphere subdivisions=7
 wait_idle 20
 key f
