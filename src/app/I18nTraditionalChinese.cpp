@@ -4526,7 +4526,6 @@ constexpr Entry kTraditionalChinese[] = {
     {"Fixed", "固定"},
     {"Insert Point", "插入點"},
     {"Distance %.2f", "距離 %.2f"},
-    {"Merge", "合併"},
     {"New Part", "新部件"},
     {"(point %d selected)", "(已選取點 %d)"},
     {"%d points", "%d 個點"},

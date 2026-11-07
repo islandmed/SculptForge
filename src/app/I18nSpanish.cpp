@@ -5006,7 +5006,6 @@ constexpr Entry kSpanish[] = {
     {"Fixed", "Fija"},
     {"Insert Point", "Insertar punto"},
     {"Distance %.2f", "Distancia %.2f"},
-    {"Merge", "Fusionar"},
     {"New Part", "Nueva pieza"},
     {"(point %d selected)", "(punto %d seleccionado)"},
     {"%d points", "%d puntos"},

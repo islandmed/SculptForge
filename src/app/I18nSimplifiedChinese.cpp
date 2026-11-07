@@ -4528,7 +4528,6 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Fixed", "固定"},
     {"Insert Point", "插入点"},
     {"Distance %.2f", "距离 %.2f"},
-    {"Merge", "合并"},
     {"New Part", "新部件"},
     {"(point %d selected)", "(已选中点 %d)"},
     {"%d points", "%d 个点"},
