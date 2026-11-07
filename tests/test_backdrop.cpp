@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Image to 3D drops the flat plane a picture's background often becomes (core/Backdrop.h, request from @fenix):
+// Image to 3D drops the flat plane a picture's background often becomes (core/Backdrop.h, request from fenix on Discord):
 // a back wall or a ground, apart from the subject or joined to it, goes; a relief or a coin on its own stays.
 #include "TestHarness.h"
 
