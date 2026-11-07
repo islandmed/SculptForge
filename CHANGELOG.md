@@ -6,6 +6,58 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.14] - 2026-11-07
+
+### Added
+- **Deformation stack** (Tool > Deformation > Stack, requested by foirgairwolf on Discord): thirteen whole-Part shape
+  operations in four groups (Transform: Move, Turn, Scale, Squash; Bend & Twist: Bend, Twist, Taper, Shear; Shape:
+  Round, Box, Flatten, Sag, Depth; plus the Surface ones), each along any of X, Y and Z about the Part's centre (or
+  the gizmo's placed pivot), with Direction for Bend and Shear and Soft for an eased profile. The preview is the stack
+  applied as one undo step and follows each change; Apply, Apply Selected, Reset and Repeat. The mask holds what it
+  covers. Commands `deform_move` ... `deform_depth` and `deform_stack` for scripts and the AI.
+- **Size** (Tool > Deformation, requested by foirgairwolf on Discord): the active Part's X, Y and Z dimensions in
+  scene units, to drag or type exactly; it resizes about its centre (Uniform: in proportion), one undo step. Command
+  `deform_size`.
+- Top bar heart (Help > Support SculptForge); a small badge for verified members. Hidden in studio builds and before
+  it would crowd a narrow top bar.
+- Note fragments take `member_request: true` (and `member_credit: @handle` when the member opted in): What's New tags
+  the change "Requested by a member".
+- Website: **Feature queue** (sculptforge.app/queue.html, footer link on the membership page): every feature idea with
+  its status (building, queued, shipped, already in the app, declined) and a member flag.
+
+### Changed
+- **Blender add-on and Maya script have their own versions** and can be released on their own, as soon as they change
+  (GitHub releases `blender-vX.Y.Z` / `maya-vX.Y.Z`); the website's download links follow the newest one. The add-on
+  is now 1.0.0 (it used to carry the app's version). Each SculptForge release still includes both.
+- Membership card: milestone moments (10th start, 10 hours of stroke time, 100th save; local counts only, nothing
+  sent), an optional honest line from the update feed's `support` block (funded this month, Founding Members taken,
+  member requests this release), and a backoff (monthly after the 3rd "Not now", only after an update after the 6th).
+  Every existing rule stays: never modal, never mid-stroke or during a job, never in tests, renders or CI, never for
+  members, at most once a week.
+- **Compact bars** (factoberplay on YouTube): the Library strip and the Sculpt Timeline take 158 logical px instead of
+  228 (31% less). The Library's thumbnails are 64 px by default (were 96) and its tab row 26 px; drag the strip's edge
+  toward the canvas to size them (48-128 px, kept with the layout; also **Edit > Preferences > Library >
+  Thumbnails**). The timeline is one row (step count, track, icon buttons) with thin branch lanes; the full strip with
+  its header row comes back from the unfold icon or **Edit > Preferences > Interface > Compact timeline**.
+- The membership cards link to the membership terms (**Terms & refunds**, sculptforge.app/terms.html), and open only
+  their fixed links.
+- The built-in **Stone Carve** brush (Sculpt > Brush, and the community gallery) has a name of our own. Shelves, key
+  bindings, pie menus and scripts saved with its old name still find it.
+- Website: **How requests work** on the membership page (sculptforge.app/support.html#requests): bugs are always free;
+  every idea goes in a public queue; members' requests are built first, one guaranteed request a month each (built and
+  credited); Founding Members and Studio go first; a monthly member vote sets the order; popular ideas from everyone
+  still get built. A "Built for members" list shows what member requests became.
+- Website: Studio membership now lists your own private repository and build (a branch with the features and fixes you
+  ask for, rebased onto every release), a private Discord space for your team and a seat on the Studio steering
+  committee (one representative per studio).
+
+### Fixed
+- The one-line Linux installer (`curl -fsSL .../install/install.sh | sh`) downloads the AppImage again: it asked for
+  `SculptForge-X.Y.Z-linux-x86_64.AppImage` (and `linux-arm64`) while releases name it
+  `SculptForge-X.Y.Z-x86_64.AppImage` and `-aarch64.AppImage`, so it stopped with a 404. Checked against
+  SHA256SUMS.txt as before. A test and a release check now fail when an install script asks for an asset the release
+  doesn't have (#159, thanks @justblack1556).
+
 ## [0.11.13] - 2026-11-07
 
 ### Added

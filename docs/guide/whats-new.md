@@ -16,6 +16,22 @@ highlight: Small screens: below 1280 px the side palettes open as drop-downs ins
 highlight: Membership moments: a quiet heart in the top bar and an occasional thank-you at a milestone; nothing in the app is ever paywalled
 ```
 
+- **Deformation stack** (requested by foirgairwolf on Discord): **Tool > Deformation > Stack** bends, twists, tapers,
+  shears, turns, moves, scales, squashes, rounds, boxes, flattens, sags or puts depth on the whole Part, along any of
+  X, Y and Z, with a live preview. Stack steps up, switch them on and off, repeat one, then **Apply** (one undo step),
+  **Apply Selected** or **Reset**. Every step is a command too: `deform_stack ops="bend 45 y soft; twist 90 y"`.
+- **Exact size** (requested by foirgairwolf on Discord): **Tool > Deformation > Size** shows the Part's width, height
+  and depth in scene units; drag one or type an exact value to resize it, with **Uniform** keeping its proportions.
+- **Membership moments**: the small membership card can now also come at a milestone (your 10th start, 10 hours of
+  sculpting, your 100th save; counted on your computer only, never sent) and says the true number. After a third **Not
+  now** it waits a month, after a sixth it only comes with an update. A quiet heart at the right of the top bar opens
+  **Help > Support SculptForge...**; members see a small badge there instead.
+- **Requested by a member**: changes members asked for through Member Requests are marked in What's New.
+- **Slimmer Library and timeline**: the Library strip and the Sculpt Timeline under it take about a third less of the
+  viewport's height. The timeline is one thin row (the full strip is one click away, or **Edit > Preferences >
+  Interface > Compact timeline**), and you can drag the Library's edge to size its thumbnails. Thanks factoberplay on
+  YouTube.
+
 ## Version 0.11.13
 
 ```features
