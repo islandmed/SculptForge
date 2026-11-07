@@ -1,0 +1,120 @@
+# Studios and companies whose OFFICIAL public job feeds feed sculptforge.app/jobs.html (tools/jobs/fetch.py, daily).
+# Only feeds a company publishes for embedding: Greenhouse job board API, Lever postings API, Ashby posting API,
+# Recruitee careers API, Personio XML feed, Teamtailor RSS. Never LinkedIn, Indeed, ArtStation, Glassdoor or any site
+# whose terms forbid it. SmartRecruiters is out: its robots.txt disallows every crawler but one.
+# One line per source: {name, ats, slug, sector}. ats: greenhouse | lever | lever-eu | ashby | recruitee | personio |
+# teamtailor. sector: games | film-vfx | animation | collectibles | 3d-printing | jewelry | medical-dental |
+# product-viz | ar-vr | advertising | archviz | outsourcing. A role's region comes from its own location (a studio's
+# office abroad counts there); the group below is the studio's home, used when the location names no country.
+# Adding one: check the feed answers and lists this company's jobs (not a namesake), then add the line here.
+
+North America:
+  - {name: Epic Games, ats: greenhouse, slug: epicgames, sector: games}
+  - {name: Riot Games, ats: greenhouse, slug: riotgames, sector: games}
+  - {name: Bungie, ats: greenhouse, slug: bungie, sector: games}
+  - {name: Rockstar Games, ats: greenhouse, slug: rockstargames, sector: games}
+  - {name: Sony Interactive Entertainment, ats: greenhouse, slug: sonyinteractiveentertainmentglobal, sector: games}
+  - {name: Naughty Dog, ats: greenhouse, slug: naughtydog, sector: games}
+  - {name: Roblox, ats: greenhouse, slug: roblox, sector: games}
+  - {name: 2K, ats: greenhouse, slug: 2k, sector: games}
+  - {name: Hangar 13, ats: greenhouse, slug: hangar13, sector: games}
+  - {name: Visual Concepts, ats: greenhouse, slug: visualconcepts, sector: games}
+  - {name: Firaxis Games, ats: greenhouse, slug: firaxis, sector: games}
+  - {name: Gearbox, ats: greenhouse, slug: gearbox, sector: games}
+  - {name: Unknown Worlds, ats: greenhouse, slug: unknownworlds, sector: games}
+  - {name: Digital Extremes, ats: greenhouse, slug: digitalextremes, sector: games}
+  - {name: Scopely, ats: greenhouse, slug: scopely, sector: games}
+  - {name: Bandai Namco Entertainment America, ats: greenhouse, slug: bandainamco, sector: games}
+  - {name: Kabam, ats: lever, slug: kabam, sector: games}
+  - {name: Jam City, ats: lever, slug: jamcity, sector: games}
+  - {name: ArenaNet, ats: ashby, slug: arenanet, sector: games}
+  - {name: thatgamecompany, ats: ashby, slug: thatgamecompany, sector: games}
+  - {name: Sony Pictures Imageworks, ats: greenhouse, slug: sonypicturesimageworks, sector: film-vfx}
+  - {name: Sony Pictures Animation, ats: greenhouse, slug: sonypicturesanimation, sector: animation}
+  - {name: Blur Studio, ats: greenhouse, slug: blurstudio, sector: film-vfx}
+  - {name: LAIKA, ats: greenhouse, slug: laika, sector: animation}
+  - {name: Hasbro, ats: greenhouse, slug: hasbro, sector: collectibles}
+  - {name: Formlabs, ats: greenhouse, slug: formlabs, sector: 3d-printing}
+  - {name: Markforged, ats: greenhouse, slug: markforged, sector: 3d-printing}
+  - {name: Xometry, ats: greenhouse, slug: xometry, sector: 3d-printing}
+  - {name: Fictiv, ats: greenhouse, slug: fictiv, sector: 3d-printing}
+  - {name: Protolabs, ats: lever, slug: protolabs, sector: 3d-printing}
+  - {name: Velo3D, ats: lever, slug: velo3d, sector: 3d-printing}
+  - {name: Mejuri, ats: greenhouse, slug: mejuri, sector: jewelry}
+  - {name: Brilliant Earth, ats: greenhouse, slug: brilliantearth, sector: jewelry}
+  - {name: Ring Concierge, ats: greenhouse, slug: ringconcierge, sector: jewelry}
+  - {name: Candid, ats: greenhouse, slug: candid, sector: medical-dental}
+  - {name: Dandy, ats: ashby, slug: dandy, sector: medical-dental}
+  - {name: Overjet, ats: ashby, slug: overjet, sector: medical-dental}
+  - {name: Luma AI, ats: ashby, slug: lumaai, sector: ar-vr}
+  - {name: Meshy, ats: ashby, slug: meshy, sector: ar-vr}
+  - {name: Genies, ats: ashby, slug: genies, sector: ar-vr}
+  - {name: Sandbox VR, ats: lever, slug: sandboxvr, sector: ar-vr}
+
+Latin America:
+  - {name: Wildlife Studios, ats: greenhouse, slug: wildlifestudios, sector: games}
+  - {name: Fanatee, ats: lever, slug: fanatee, sector: games}
+
+UK/Ireland:
+  - {name: Framestore, ats: recruitee, slug: framestore, sector: film-vfx}
+  - {name: Frontier Developments, ats: lever-eu, slug: frontier, sector: games}
+  - {name: Kwalee, ats: lever-eu, slug: kwalee, sector: games}
+  - {name: Firesprite, ats: greenhouse, slug: firesprite, sector: games}
+  - {name: Tripledot Studios, ats: greenhouse, slug: tripledotstudios, sector: games}
+  - {name: ManvsMachine, ats: greenhouse, slug: manvsmachine, sector: advertising}
+  - {name: Missoma, ats: teamtailor, slug: missoma, sector: jewelry}
+  - {name: Axial3D, ats: personio, slug: axial3d, sector: medical-dental}
+
+Europe:
+  - {name: Larian Studios, ats: lever, slug: larian, sector: games}
+  - {name: Embark Studios, ats: teamtailor, slug: embarkstudios, sector: games}
+  - {name: Sharkmob, ats: teamtailor, slug: sharkmob, sector: games}
+  - {name: Fatshark, ats: teamtailor, slug: fatshark, sector: games}
+  - {name: IO Interactive, ats: teamtailor, slug: ioi, sector: games}
+  - {name: CI Games, ats: teamtailor, slug: cigames, sector: games}
+  - {name: Twin Harbour Interactive, ats: teamtailor, slug: twinharbour, sector: games}
+  - {name: Supercell, ats: ashby, slug: supercell, sector: games}
+  - {name: Voodoo, ats: ashby, slug: voodoo, sector: games}
+  - {name: Huuuge Games, ats: recruitee, slug: huuuge, sector: games}
+  - {name: 11 bit studios, ats: recruitee, slug: 11bitstudios, sector: games}
+  - {name: Crytek, ats: lever, slug: crytek, sector: games}
+  - {name: Avalanche Studios, ats: lever, slug: avalanchestudios, sector: games}
+  - {name: Quantic Dream, ats: lever-eu, slug: quanticdream, sector: games}
+  - {name: Housemarque, ats: greenhouse, slug: housemarque, sector: games}
+  - {name: Goodbye Kansas, ats: teamtailor, slug: goodbyekansas, sector: film-vfx}
+  - {name: 3Shape, ats: teamtailor, slug: 3shape, sector: medical-dental}
+
+Middle East/Africa:
+  - {name: Moon Active, ats: ashby, slug: moonactive, sector: games}
+  - {name: Playtika, ats: greenhouse, slug: playtikaltd, sector: games}
+  - {name: Dream Games, ats: lever, slug: dreamgames, sector: games}
+  - {name: Good Job Games, ats: greenhouse, slug: goodjobgames, sector: games}
+  - {name: Loop Games, ats: lever, slug: loopgames, sector: games}
+  - {name: Agave Games, ats: ashby, slug: agavegames, sector: games}
+  - {name: Bigger Games, ats: ashby, slug: biggergames, sector: games}
+
+India:
+  # No India-based studio with an official public feed found yet; Indian roles come from studios' offices there
+  # (Scopely, Kwalee, Rockstar, Krafton). Many use Workday, Keka or Darwinbox, which publish no public feed.
+
+Greater China:
+  - {name: HoYoverse, ats: ashby, slug: hoyoverse, sector: games}
+  - {name: NetEase Games, ats: greenhouse, slug: neteasegames, sector: games}
+  - {name: Animoca Brands, ats: lever, slug: animocabrands, sector: ar-vr}
+
+Japan:
+  # No Japan-based studio with an official public feed found yet (most use HERP or HRMOS, no public API); Japanese
+  # roles come from studios' Tokyo offices (Riot, Epic, Sony Interactive, Supercell).
+
+Korea:
+  - {name: KRAFTON, ats: greenhouse, slug: krafton, sector: games}
+  - {name: NEOWIZ, ats: lever, slug: neowiz, sector: games}
+
+Southeast Asia:
+  # Southeast Asian roles come from studios' offices there (Larian Kuala Lumpur, Tripledot Jakarta, HoYoverse
+  # Singapore, Riot Singapore).
+
+Oceania:
+  - {name: Wētā Workshop, ats: teamtailor, slug: wetaworkshop, sector: collectibles}
+  - {name: RocketWerkz, ats: recruitee, slug: rocketwerkz, sector: games}
+  - {name: ZURU, ats: ashby, slug: zuru, sector: collectibles}

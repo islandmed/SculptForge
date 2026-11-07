@@ -1,0 +1,394 @@
+{
+"generated": "2026-11-07",
+"max_age_days": 90,
+"regions": [
+"North America",
+"Latin America",
+"UK/Ireland",
+"Europe",
+"Middle East/Africa",
+"India",
+"Greater China",
+"Japan",
+"Korea",
+"Southeast Asia",
+"Oceania"
+],
+"sectors": {
+"games": "Games",
+"film-vfx": "Film & VFX",
+"animation": "Animation",
+"collectibles": "Collectibles & toys",
+"3d-printing": "3D printing",
+"jewelry": "Jewelry",
+"medical-dental": "Medical & dental",
+"product-viz": "Product visualization",
+"ar-vr": "AR/VR & 3D tech",
+"advertising": "Advertising & CGI",
+"archviz": "Architectural visualization",
+"outsourcing": "Outsourcing"
+},
+"roles_types": {
+"character": "Character & creature",
+"environment": "Environment",
+"prop": "Props & hard surface",
+"print": "Sculptor, figures & print",
+"cad": "Jewelry & dental CAD",
+"generalist": "3D artist & modeler"
+},
+"studios": 83,
+"roles": [
+{
+"id": "greenhouse:naughtydog:6240876004",
+"title": "Senior Environment Artist Texture",
+"studio": "Naughty Dog",
+"location": "United States, Santa Monica, CA",
+"regions": [
+"North America"
+],
+"remote": false,
+"posted": "2026-11-04",
+"url": "https://job-boards.greenhouse.io/naughtydog/jobs/6240876004",
+"sector": "games",
+"role": "environment",
+"contract": false,
+"new": true
+},
+{
+"id": "lever-eu:frontier:d81e0934-8f97-4f45-b89f-e6d7c3916b35",
+"title": "Graduate Character Artist",
+"studio": "Frontier Developments",
+"location": "Cambridge / Hybrid",
+"regions": [
+"UK/Ireland"
+],
+"remote": false,
+"posted": "2026-11-04",
+"url": "https://jobs.eu.lever.co/frontier/d81e0934-8f97-4f45-b89f-e6d7c3916b35",
+"sector": "games",
+"role": "character",
+"contract": false,
+"new": true
+},
+{
+"id": "lever:larian:dcff9fb6-ed96-4de5-adef-17fefcde584b",
+"title": "Character Artist Internship",
+"studio": "Larian Studios",
+"location": "Gent",
+"regions": [
+"Europe"
+],
+"remote": false,
+"posted": "2026-11-03",
+"url": "https://jobs.lever.co/larian/dcff9fb6-ed96-4de5-adef-17fefcde584b",
+"sector": "games",
+"role": "character",
+"contract": false,
+"new": true
+},
+{
+"id": "lever:neowiz:7f78deae-10c8-44d7-b213-f32b971bb1af",
+"title": "[NOUGH Studio] P의 거짓 차기작 배경 모델러 (인턴)",
+"studio": "NEOWIZ",
+"location": "",
+"regions": [
+"Korea"
+],
+"remote": false,
+"posted": "2026-10-29",
+"url": "https://jobs.lever.co/neowiz/7f78deae-10c8-44d7-b213-f32b971bb1af",
+"sector": "games",
+"role": "environment",
+"contract": false,
+"new": true
+},
+{
+"id": "greenhouse:sonyinteractiveentertainmentglobal:6237080004",
+"title": "Senior 3D Designer",
+"studio": "Sony Interactive Entertainment",
+"location": "Malaysia, Petaling Jaya",
+"regions": [
+"Southeast Asia"
+],
+"remote": false,
+"posted": "2026-10-28",
+"url": "https://job-boards.greenhouse.io/sonyinteractiveentertainmentglobal/jobs/6237080004",
+"sector": "games",
+"role": "generalist",
+"contract": false,
+"new": true
+},
+{
+"id": "greenhouse:epicgames:6224462004",
+"title": "Senior Character Artist",
+"studio": "Epic Games",
+"location": "Cary, North Carolina, United States",
+"regions": [
+"North America"
+],
+"remote": false,
+"posted": "2026-10-22",
+"url": "https://epicgames.com/careers/jobs/6224462004?gh_jid=6224462004",
+"sector": "games",
+"role": "character",
+"contract": false,
+"new": true
+},
+{
+"id": "greenhouse:epicgames:6224464004",
+"title": "Senior Character Artist",
+"studio": "Epic Games",
+"location": "Multiple Locations",
+"regions": [
+"North America"
+],
+"remote": false,
+"posted": "2026-10-22",
+"url": "https://epicgames.com/careers/jobs/6224464004?gh_jid=6224464004",
+"sector": "games",
+"role": "character",
+"contract": false,
+"new": true
+},
+{
+"id": "greenhouse:riotgames:7271195",
+"title": "3D Environment Artist - Unpublished R&D Product (Contract)",
+"studio": "Riot Games",
+"location": "Guangzhou, China",
+"regions": [
+"Greater China"
+],
+"remote": false,
+"posted": "2026-10-15",
+"url": "https://www.riotgames.com/en/work-with-us/job/7271195?gh_jid=7271195",
+"sector": "games",
+"role": "environment",
+"contract": true,
+"new": true
+},
+{
+"id": "greenhouse:riotgames:8282210",
+"title": "3D Character Artist (Contract)",
+"studio": "Riot Games",
+"location": "Guangzhou, China",
+"regions": [
+"Greater China"
+],
+"remote": false,
+"posted": "2026-10-15",
+"url": "https://www.riotgames.com/en/work-with-us/job/8282210?gh_jid=8282210",
+"sector": "games",
+"role": "character",
+"contract": true,
+"new": true
+},
+{
+"id": "lever:larian:55238820-92ef-4b4e-ba18-a9fdd027f737",
+"title": "Environment Artist - Internship",
+"studio": "Larian Studios",
+"location": "Gent",
+"regions": [
+"Europe"
+],
+"remote": false,
+"posted": "2026-10-15",
+"url": "https://jobs.lever.co/larian/55238820-92ef-4b4e-ba18-a9fdd027f737",
+"sector": "games",
+"role": "environment",
+"contract": false,
+"new": true
+},
+{
+"id": "greenhouse:riotgames:8279690",
+"title": "3D Character Artist - Unpublished R&D Product",
+"studio": "Riot Games",
+"location": "Shanghai, China",
+"regions": [
+"Greater China"
+],
+"remote": false,
+"posted": "2026-10-14",
+"url": "https://www.riotgames.com/en/work-with-us/job/8279690?gh_jid=8279690",
+"sector": "games",
+"role": "character",
+"contract": false,
+"new": true
+},
+{
+"id": "lever:neowiz:f98e7602-7c88-4c01-b492-879e565685c7",
+"title": "[ASTRA9 Studio] 내러티브 중심 RPG 신작 3D 배경모델러 (인턴)",
+"studio": "NEOWIZ",
+"location": "",
+"regions": [
+"Korea"
+],
+"remote": false,
+"posted": "2026-10-14",
+"url": "https://jobs.lever.co/neowiz/f98e7602-7c88-4c01-b492-879e565685c7",
+"sector": "games",
+"role": "environment",
+"contract": false,
+"new": true
+},
+{
+"id": "ashby:voodoo:45169264-5113-4ec8-85df-435e845b8edd",
+"title": "3D Artist - Puzzle Games",
+"studio": "Voodoo",
+"location": "Beijing",
+"regions": [
+"Greater China"
+],
+"remote": false,
+"posted": "2026-10-12",
+"url": "https://jobs.ashbyhq.com/voodoo/45169264-5113-4ec8-85df-435e845b8edd",
+"sector": "games",
+"role": "generalist",
+"contract": false,
+"new": true
+},
+{
+"id": "teamtailor:embarkstudios:00381e92-2f07-4dba-af30-f1f31dae1811",
+"title": "3D Artist",
+"studio": "Embark Studios",
+"location": "Stockholm, Sweden",
+"regions": [
+"Europe"
+],
+"remote": false,
+"posted": "2026-10-08",
+"url": "https://careers.embark-studios.com/jobs/8517231-3d-artist",
+"sector": "games",
+"role": "generalist",
+"contract": false,
+"new": true
+},
+{
+"id": "ashby:voodoo:f8231db6-ec7c-47ad-86ae-7ba48b01f94e",
+"title": "3D Game Artist - Sand Loop",
+"studio": "Voodoo",
+"location": "Paris",
+"regions": [
+"Europe"
+],
+"remote": true,
+"posted": "2026-10-06",
+"url": "https://jobs.ashbyhq.com/voodoo/f8231db6-ec7c-47ad-86ae-7ba48b01f94e",
+"sector": "games",
+"role": "generalist",
+"contract": false,
+"new": true
+},
+{
+"id": "teamtailor:embarkstudios:97817fba-505e-487e-8fb5-cccf8de23aa7",
+"title": "Character Artist",
+"studio": "Embark Studios",
+"location": "Stockholm, Sweden",
+"regions": [
+"Europe"
+],
+"remote": false,
+"posted": "2026-09-30",
+"url": "https://careers.embark-studios.com/jobs/8476314-character-artist",
+"sector": "games",
+"role": "character",
+"contract": false,
+"new": true
+},
+{
+"id": "greenhouse:tripledotstudios:4973861101",
+"title": "3D Artist",
+"studio": "Tripledot Studios",
+"location": "Jakarta",
+"regions": [
+"Southeast Asia"
+],
+"remote": false,
+"posted": "2026-09-15",
+"url": "https://job-boards.eu.greenhouse.io/tripledotstudios/jobs/4973861101",
+"sector": "games",
+"role": "generalist",
+"contract": false,
+"new": true
+},
+{
+"id": "greenhouse:riotgames:8163170",
+"title": "Principal 3D Character Artist - Unpublished R&D Product",
+"studio": "Riot Games",
+"location": "Los Angeles, USA",
+"regions": [
+"North America"
+],
+"remote": false,
+"posted": "2026-09-09",
+"url": "https://www.riotgames.com/en/work-with-us/job/8163170?gh_jid=8163170",
+"sector": "games",
+"role": "character",
+"contract": false,
+"new": true
+},
+{
+"id": "ashby:thatgamecompany:36e101a4-c7ba-4884-8999-cd04abb979ee",
+"title": "3D Character Artist (Mid-Senior)",
+"studio": "thatgamecompany",
+"location": "Remote - US",
+"regions": [
+"North America"
+],
+"remote": true,
+"posted": "2026-09-02",
+"url": "https://jobs.ashbyhq.com/thatgamecompany/36e101a4-c7ba-4884-8999-cd04abb979ee",
+"sector": "games",
+"role": "character",
+"contract": false,
+"new": true
+},
+{
+"id": "ashby:supercell:8cb16c25-3e09-4245-96b0-6bab32186181",
+"title": "Senior Level Artist, Project R.I.S.E",
+"studio": "Supercell",
+"location": "Shanghai",
+"regions": [
+"Greater China"
+],
+"remote": false,
+"posted": "2026-09-01",
+"url": "https://jobs.ashbyhq.com/supercell/8cb16c25-3e09-4245-96b0-6bab32186181",
+"sector": "games",
+"role": "environment",
+"contract": false,
+"new": true
+},
+{
+"id": "lever:jamcity:5162e400-e24f-47f1-9a64-51548812b74a",
+"title": "3D Artist",
+"studio": "Jam City",
+"location": "Montevideo",
+"regions": [
+"Latin America"
+],
+"remote": false,
+"posted": "2026-09-01",
+"url": "https://jobs.lever.co/jamcity/5162e400-e24f-47f1-9a64-51548812b74a",
+"sector": "games",
+"role": "generalist",
+"contract": false,
+"new": true
+},
+{
+"id": "greenhouse:2k:7812709003",
+"title": "Lead Level Artist",
+"studio": "2K",
+"location": "Montréal, Quebec, Canada",
+"regions": [
+"North America"
+],
+"remote": false,
+"posted": "2026-08-14",
+"url": "https://job-boards.greenhouse.io/2k/jobs/7812709003",
+"sector": "games",
+"role": "environment",
+"contract": false,
+"new": true
+}
+]
+}

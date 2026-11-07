@@ -12,6 +12,9 @@
 ^tools/guide/build_site\.py$
 ^tools/marks_media_[a-z]+\.(json|txt)$
 ^changes/site-
+# The jobs page's daily fetcher and its workflow (website data only, nothing compiled in).
+^tools/jobs/
+^\.github/workflows/jobs\.yml$
 !^docs/supporters\.txt$
 !^website/founding\.json$
 !^website/link/

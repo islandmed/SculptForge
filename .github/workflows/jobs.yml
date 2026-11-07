@@ -1,0 +1,88 @@
+# Daily (06:23 UTC): sculpting and 3D modeling roles from studios' official job feeds for sculptforge.app/jobs.html,
+# by tools/jobs/fetch.py (sources: tools/jobs/studios.yaml). state.json (last good roles per feed, first-seen dates),
+# jobs.json, new.md (the #jobs digest) and coverage.md live on the jobs-data branch; the Website workflow runs after
+# this one, copies jobs.json in and fills website/jobs.html from it, so the page updates without a commit to main.
+#
+# Two jobs, so no external input is parsed while a write token exists: "fetch" reads 83 outside feeds with a
+# read-only token and hands its four files over as an artifact; "publish" (contents: write) only schema-checks those
+# files (fetch.py --validate: exact keys, types, lengths, https URLs, nothing else in the folder) and pushes them.
+name: Jobs
+
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: jobs
+
+jobs:
+  fetch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            tools/jobs
+            tools/check_marks.py
+            docs/legal/trademarks.md
+            website/jobs.html
+          sparse-checkout-cone-mode: false
+      - name: Self-test
+        run: python3 tools/jobs/fetch.py --self-test
+      # The jobs-data branch is public: read it anonymously.
+      - name: Last run's state
+        run: |
+          mkdir -p "$RUNNER_TEMP/state"
+          curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/jobs-data/state.json" \
+            -o "$RUNNER_TEMP/state/state.json" || rm -f "$RUNNER_TEMP/state/state.json"
+      # One request per feed (robots.txt honoured); a failing feed keeps its last good roles. The coverage report
+      # (roles per region, dead feeds) goes to this run's summary.
+      - name: Fetch
+        run: python3 tools/jobs/fetch.py --state "$RUNNER_TEMP/state" --site website | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: jobs-data
+          path: |
+            ${{ runner.temp }}/state/state.json
+            ${{ runner.temp }}/state/jobs.json
+            ${{ runner.temp }}/state/new.md
+            ${{ runner.temp }}/state/coverage.md
+          retention-days: 3
+          if-no-files-found: error
+
+  publish:
+    needs: fetch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      # Our own validator from main (never code from the artifact).
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: tools/jobs/fetch.py
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: jobs-data
+          path: ${{ runner.temp }}/data
+      - name: Validate
+        run: python3 -I tools/jobs/fetch.py --validate "$RUNNER_TEMP/data"
+      - name: Push jobs-data
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          cd "$RUNNER_TEMP/data"
+          git init -q -b jobs-data
+          git add state.json jobs.json new.md coverage.md
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "Jobs $(date -u +%F)"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${{ github.repository }}" jobs-data
