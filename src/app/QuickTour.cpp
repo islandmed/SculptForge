@@ -51,7 +51,7 @@ constexpr TourSlide kSlides[] = {
      nullptr, "ui.palette.draw"},
     {"Quad Remesh", "images/quick-tour/04-quad.jpg",
      "Automatic quad retopology: Tool > Remesh > Quad Remesh rebuilds a sculpt as clean quads whose edge loops follow "
-     "the forms. Set Target Polygons and leave Keep Original on. Divide the result, then Project Detail (Tool > Parts) "
+     "the forms. Set Target Quads and leave Keep Original on. Add levels to the result, then Project Detail (Tool > Parts) "
      "brings the detail back. Draw Quad Remesh Guides to steer the loops.",
      "tool.remesh", "ui.palette.tool"},
     {"Levels, Parts and Face Groups", "images/quick-tour/05-levels.jpg",
@@ -64,10 +64,10 @@ constexpr TourSlide kSlides[] = {
      "one By cavity, By face group or along the border. Press G for the stroke popup: its Shapes row picks Mask Pen, "
      "Lasso Mask or Rectangle Mask for the next Ctrl stroke.",
      "tool.masking", "ui.palette.tool"},
-    {"Cut, Clip and Close Holes", "images/quick-tour/07-cut.jpg",
+    {"Cut, Clip and Fill Holes", "images/quick-tour/07-cut.jpg",
      "Pick a shape in Tool > Cut and draw it with Ctrl+Shift: a line, lasso, rectangle or polyline goes straight "
      "through the whole Part, and a closed Part stays closed. Cut it away, cut in, add, or Clip: press everything "
-     "outside the shape flat onto its outline. Close Holes (Tool > Geometry) caps every open boundary.",
+     "outside the shape flat onto its outline. Fill Holes (Tool > Geometry) caps every open boundary.",
      "tool.cut", "ui.palette.tool"},
     {"Brushes, alphas and the Library", "images/quick-tour/08-library.jpg",
      "B opens the brush picker; type the first letters of a name to pick one. The Alpha tile picks the stamp shape. "

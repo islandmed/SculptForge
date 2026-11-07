@@ -1,4 +1,4 @@
-# Subdivision levels and the tools that rebuild the mesh (Decimate, Subdivide, Remesh, QRemesh, Delete Hidden,
+# Subdivision levels and the tools that rebuild the mesh (Decimate, Subdivide, Remesh, QRemesh, Remove Hidden,
 # merging and splitting Parts): they work on the current level, the status line says the levels were removed
 # and which one became the base, and Ctrl+Z brings every level back. Selecting another Part and coming back
 # still steps between the levels.
@@ -8,37 +8,37 @@ run part_delete index=0
 orbit 140 -70
 key f
 click "Geometry##tool.geometry"
-click "Geometry/Reconstruct Subdiv"
-click "Geometry/Reconstruct Subdiv"
+click "Geometry/Rebuild Lower Levels"
+click "Geometry/Rebuild Lower Levels"
 expect_value sdiv_levels == 3
-expect_value sdiv == 1
+expect_value subdiv_level == 1
 
-# Up to SDiv 2 and sculpt there (an edit not folded into the levels yet).
+# Up to Level 2 and sculpt there (an edit not folded into the levels yet).
 key d
-expect_value sdiv == 2
+expect_value subdiv_level == 2
 expect_value triangles == 6912
 snapshot
 stroke 0.3 0.4 0.7 0.5
 expect_value moved > 10
 
-# Decimate at SDiv 2: half of SDiv 2's triangles, and the status line says what happened to the levels.
+# Decimate at Level 2: half of Level 2's triangles, and the status line says what happened to the levels.
 click "Geometry/Decimate"
 expect_value sdiv_levels == 0
 expect_value triangles < 6912
 expect_value triangles > 1000
-expect_status "Subdivision levels removed: SDiv 2 of 3 kept as the new base"
+expect_status "Subdivision levels removed: Level 2 of 3 kept as the new base"
 expect_text "No subdivision levels"
 shot decimated
 
-# Undo: all three levels again, at SDiv 2 with the stroke.
+# Undo: all three levels again, at Level 2 with the stroke.
 key ctrl+z
 expect_value sdiv_levels == 3
-expect_value sdiv == 2
+expect_value subdiv_level == 2
 expect_value triangles == 6912
-expect_text "SDiv 2 / 3"
+expect_text "Level 2 / 3"
 shot levels-back
 
-# Subdivide (the flat one, without levels) from SDiv 2: four times its triangles.
+# Subdivide (the flat one, without levels) from Level 2: four times its triangles.
 click "Geometry/Subdivide (removes levels)"
 # It asks first on a Part with levels (Discord 11-02); Cancel keeps the levels.
 expect_text "This removes your 3 subdivision levels"
@@ -49,10 +49,10 @@ click "Geometry/Subdivide (removes levels)"
 click "Subdivide/Subdivide and Remove Levels"
 expect_value triangles == 27648
 expect_value sdiv_levels == 0
-expect_status "Subdivision levels removed: SDiv 2 of 3 kept as the new base"
+expect_status "Subdivision levels removed: Level 2 of 3 kept as the new base"
 key ctrl+z
 expect_value sdiv_levels == 3
-expect_value sdiv == 2
+expect_value subdiv_level == 2
 # Don't ask again: the next Subdivide goes straight through.
 click "Geometry/Subdivide (removes levels)"
 click "Subdivide/Don't ask again"
@@ -64,20 +64,20 @@ expect_value sdiv_levels == 0
 expect_no_text "This removes your"
 key ctrl+z
 expect_value sdiv_levels == 3
-expect_value sdiv == 2
+expect_value subdiv_level == 2
 
 # Another Part and back: the levels step as before (the cached levels of the Part left are freed).
 run part_append type=sphere name=Eye
 expect_value sdiv_levels == 0
 run part_select name=Box
-expect_value sdiv == 2
+expect_value subdiv_level == 2
 key d
-expect_value sdiv == 3
+expect_value subdiv_level == 3
 expect_value triangles == 27648
 key shift+d
 key shift+d
-expect_value sdiv == 1
+expect_value subdiv_level == 1
 expect_value triangles == 1728
 key d
-expect_value sdiv == 2
+expect_value subdiv_level == 2
 shot after-switching

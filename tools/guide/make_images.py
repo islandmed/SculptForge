@@ -172,7 +172,7 @@ def remesh(shots: pathlib.Path):
 
 
 def mirror_weld(shots: pathlib.Path):
-    """A head sculpted on one side, then after Mirror And Weld X."""
+    """A head sculpted on one side, then after Make Symmetric X."""
     box = (420, 150, 900, 850)
     before = Image.open(shots / "mirror-weld-before.png").convert("RGB").crop(box)
     after = Image.open(shots / "mirror-weld-after.png").convert("RGB").crop(box)
@@ -181,13 +181,13 @@ def mirror_weld(shots: pathlib.Path):
     img.paste(after, (before.width + 12, 0))
     d = ImageDraw.Draw(img)
     label(d, (before.width // 2, 24), "Sculpted on one side", 20, "mt")
-    label(d, (before.width + 12 + after.width // 2, 24), "After Mirror And Weld X", 20, "mt")
+    label(d, (before.width + 12 + after.width // 2, 24), "After Make Symmetric X", 20, "mt")
     return save(img, "mirror-weld", 900)
 
 
 def subdivision(shots: pathlib.Path):
     box = (250, 125, 1070, 890)
-    names = [("sdiv-1", "SDiv 1: 108 triangles"), ("sdiv-3", "SDiv 3: 1,728"), ("sdiv-6", "SDiv 6: 110,592")]
+    names = [("level-1", "Level 1: 108 triangles"), ("level-3", "Level 3: 1,728"), ("level-6", "Level 6: 110,592")]
     panels = [Image.open(shots / f"{n}.png").convert("RGB").crop(box) for n, _ in names]
     w, h = panels[0].size
     img = Image.new("RGB", (w * 3 + 24, h), (20, 20, 22))

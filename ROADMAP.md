@@ -60,7 +60,7 @@ rendering/animation (use Blender).
 - ✅ Masking: Ctrl paints / Ctrl+Alt erases the mask, invert, clear, blur, sharpen, grow, shrink,
   mask by cavity and by face group; every brush and vertex paint respect the mask
 - ✅ Face Groups (auto by normals, by connectivity, by UVs, from mask, merge visible) and classic visibility:
-  Ctrl+Shift isolate / hide a group, rectangle hide, show all, invert, delete hidden; Ctrl / Ctrl+Shift switch
+  Ctrl+Shift isolate / hide a group, rectangle hide, show all, invert, remove hidden; Ctrl / Ctrl+Shift switch
   the brush to the mask / selection brushes
 - ✅ Parts: separate meshes in one scene, each with its own undo history; append (primitives or files),
   duplicate, delete, rename, show/hide, solo, reorder, merge down / merge visible, split by face groups or pieces,
@@ -93,7 +93,7 @@ always-latest downloads.
 Ranked by what sculptors cite most on sculpting forums:
 
 - ✅ Multiresolution subdivision levels (step up and down, keep detail, reconstruct)
-- ✅ quad remesh-class quad retopology (Quad Remesh: target count, Adaptive Size, Keep Groups, vertex paint density,
+- ✅ quad remesh-class quad retopology (Quad Remesh: target count, Size Variation, Follow Face Groups, vertex paint density,
   symmetry) plus Project Detail detail transfer (v0.5); ✅ curve guides (Quad Remesh Guides, v0.8)
 - ✅ Automatic UV unwrapping (Auto UV, xatlas) and texture painting on UV maps (v0.4.2)
 - ✅ Normal / displacement / AO / cavity / colour map baking with MikkTSpace tangents and a viewport preview (v0.5)

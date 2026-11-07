@@ -64,7 +64,7 @@
 <strong>Split &gt; Hidden / Masked / Unmasked</strong> (<strong>Tool &gt; Parts</strong>): move the hidden, masked or unmasked triangles of a Part into a new Part just below it, in one undo step. Asked for by foirgairwolf on Discord.
 </li>
 <li>
-<strong>Delete masked</strong> (<strong>Tool &gt; Visibility</strong>) deletes what is masked, as <strong>Delete hidden</strong> does for what is hidden. Undoable.
+<strong>Delete masked</strong> (<strong>Tool &gt; Visibility</strong>) deletes what is masked, as <strong>Remove Hidden</strong> does for what is hidden. Undoable.
 </li>
 <li>
 <strong>Smooth or flat per Part, right in the list</strong>: click the mark left of a Part&#x27;s eye to go from the scene&#x27;s shading to Smooth to Flat.
@@ -116,7 +116,7 @@
 <strong>Version at a glance</strong>: the window title and the top bar show the SculptForge version, so a screenshot says which one you run. A beta&#x27;s tag shows in the accent colour.
 </li>
 <li>
-<strong>Reconstruct Subdiv</strong> keeps UVs on the lower levels of a high-poly that was unwrapped on its own: no more faces stretched across UDIM tiles, even with overlapping islands.
+<strong>Rebuild Lower Levels</strong> keeps UVs on the lower levels of a high-poly that was unwrapped on its own: no more faces stretched across UDIM tiles, even with overlapping islands.
 </li>
 <li>
 <strong>Timelapse</strong> videos of dense sculpts no longer flicker (<strong>Edit &gt; Export timelapse...</strong>).
@@ -228,7 +228,7 @@ Fewer shards when sculpting rough micro-level surfaces (Clay strokes ending wher
 <strong>Easier to read view axes</strong>: the corner axes now show <strong>X</strong>, <strong>Y</strong> and <strong>Z</strong> in filled circles, with smaller rings for the opposite ends; the ends pointing away are smaller and fainter, on a soft disc that reads on dark and light backgrounds. Click an end for that view, click it again for the opposite view, drag on the disc to orbit; an exact view&#x27;s name (&quot;Front view&quot;, &quot;Top view&quot;...) shows under it.
 </li>
 <li>
-<strong>Reconstruct Subdiv</strong> works on open meshes such as UV-tiled panels, and the lower level keeps each face&#x27;s UVs.
+<strong>Rebuild Lower Levels</strong> works on open meshes such as UV-tiled panels, and the lower level keeps each face&#x27;s UVs.
 </li>
 <li>
 <strong>Drag Stamp with a pen</strong>: a stamp (a vector displacement or any brush) dragged to size keeps its strength when you lift the pen, instead of going weak or vanishing.
@@ -286,7 +286,7 @@ The app icon is now the orange SF mark, as on the website; it reads at task bar 
 <strong>Easier to see</strong>: options that are on stand out in every colour scheme, and Quad Remesh guide curves draw smooth with an outline.
 </li>
 <li>
-<strong>Safer levels</strong>: in Tool &gt; Geometry, <strong>Divide (keeps levels)</strong> and <strong>Subdivide (removes levels)</strong> no longer sit together, Micro has its own group, and Subdivide, Delete Lower and Delete Higher ask before removing levels (with <strong>Don&#x27;t ask again</strong> for Subdivide).
+<strong>Safer levels</strong>: in Tool &gt; Geometry, <strong>Add Level</strong> and <strong>Subdivide (removes levels)</strong> no longer sit together, Micro has its own group, and Subdivide, Remove Below and Remove Above ask before removing levels (with <strong>Don&#x27;t ask again</strong> for Subdivide).
 </li>
 </ul><h3 id="version-0112" class="wn-ver">Version 0.11.2<time datetime="2026-11-05">2026-11-05</time></h3><ul>
 <li>
@@ -446,7 +446,7 @@ New icon and logo.
 <strong>Also new since 0.10.9</strong> (missing from its notes): the brush ring is a true circle lying on the surface, symmetry copies show as dots, the crosshair stays while you turn the view, and <strong>Preferences &gt; Cursor &gt; Hide ring while stroking</strong> leaves only the dot while you sculpt (#88); drag empty panel space, or middle-drag anywhere in a panel, to scroll it with a pen (#100); Neutral is the default look for new installs; <strong>Look &gt; Outlines</strong> (#98); the Strokes ring on <kbd>J</kbd>.
 </li>
 <li>
-<strong>Close Holes</strong>: <strong>Tool &gt; Geometry &gt; Close Holes</strong> caps every open boundary of a Part with a patch that follows the curve of the surface around it.
+<strong>Fill Holes</strong>: <strong>Tool &gt; Geometry &gt; Fill Holes</strong> caps every open boundary of a Part with a patch that follows the curve of the surface around it.
 </li>
 <li>
 <strong>Clip</strong>: <strong>Tool &gt; Cut &gt; Clip</strong> presses everything on one side of a line, or outside a lasso or rectangle, flat onto the shape. Nothing is removed. Use it for hard-surface planes and clean silhouettes.
@@ -542,7 +542,7 @@ New icon and logo.
 <strong>Move keeps up on dense meshes</strong>: Move no longer slows to a crawl on 33 million triangles with a fast pen, and the first orbit after a long stroke no longer hitches.
 </li>
 <li>
-<strong>No more running out of memory</strong>: <strong>Help &gt; Benchmark</strong> skips a scene your computer hasn&#x27;t got the free memory for (and says how much to free), and Subdivide, Divide, Micro and Voxel Remesh ask first when the result wouldn&#x27;t fit in the memory free now.
+<strong>No more running out of memory</strong>: <strong>Help &gt; Benchmark</strong> skips a scene your computer hasn&#x27;t got the free memory for (and says how much to free), and Subdivide, Add Level, Micro and Voxel Remesh ask first when the result wouldn&#x27;t fit in the memory free now.
 </li>
 <li>
 <strong>Clay follows Intensity and pressure</strong>: Clay and Clay Block build gently with a light pen or a low Intensity instead of planing flat as at full strength (#83). See <a href="sculpting.html#built-in-brushes">Sculpting</a>.
@@ -827,8 +827,8 @@ Dynamic topology with symmetry now adds detail on the mirrored side too when the
 </li>
 </ul><h3 id="version-096" class="wn-ver">Version 0.9.6<time datetime="2026-10-31">2026-10-31</time></h3><h4 id="extract">Extract<a class="anchor" href="#extract" aria-label="Link to this section">#</a></h4>
 <p>Mask part of a Part and <strong>Tool &gt; Parts &gt; Extract</strong> turns it into a shell that fits the surface exactly: a helmet, a strap, a piece of armour. Set <strong>Thick</strong>, <strong>Edge Smooth</strong> and <strong>Double</strong> while the preview shows, then <strong>Accept</strong> keeps it as a new Part (and <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes it away again). <strong>Corners</strong> and <strong>Border</strong> give the rim triangles instead of quads. See <a href="parts.html#extract-a-shell">Extract a shell</a>.</p>
-<h4 id="mirror-and-weld">Mirror And Weld<a class="anchor" href="#mirror-and-weld" aria-label="Link to this section">#</a></h4>
-<p><strong>Tool &gt; Geometry &gt; Modify Topology &gt; Mirror And Weld</strong> mirrors one side of a model onto the other across X, Y or Z and welds the seam into one watertight mesh, keeping face groups and vertex paint. <strong>Tool &gt; Deformation &gt; Mirror</strong> flips a Part. See <a href="geometry.html#mirror-and-weld">Mirror And Weld</a>.</p>
+<h4 id="make-symmetric">Make Symmetric<a class="anchor" href="#make-symmetric" aria-label="Link to this section">#</a></h4>
+<p><strong>Tool &gt; Geometry &gt; Symmetry &gt; Make Symmetric</strong> mirrors one side of a model onto the other across X, Y or Z and welds the seam into one watertight mesh, keeping face groups and vertex paint. <strong>Tool &gt; Deformation &gt; Mirror</strong> flips a Part. See <a href="geometry.html#make-symmetric">Make Symmetric</a>.</p>
 <h4 id="a-flat-background">A flat background<a class="anchor" href="#a-flat-background" aria-label="Link to this section">#</a></h4>
 <p><strong>Preferences &gt; Display &gt; Background</strong> (also in the Render palette) switches the view from the gradient to a flat colour you pick. Saved automatically; projects keep their own. See <a href="interface.html#the-background">The background</a>.</p>
 <h4 id="flatpak">Flatpak<a class="anchor" href="#flatpak" aria-label="Link to this section">#</a></h4>
@@ -842,7 +842,7 @@ Fast strokes on very dense meshes keep their curve. When one dab cost more than 
 The AppImage has a PNG icon at its root, so AppImage managers (AppManager, Gear Lever) show SculptForge&#x27;s icon when they add it to your menu.
 </li>
 <li>
-Divide (<kbd>Ctrl</kbd>+<kbd>D</kbd>) no longer crashes on models with a point where many polygons meet, such as a Blender cylinder with Triangle Fan caps of 22 or more sides or a UV sphere&#x27;s poles.
+Add Level (<kbd>Ctrl</kbd>+<kbd>D</kbd>) no longer crashes on models with a point where many polygons meet, such as a Blender cylinder with Triangle Fan caps of 22 or more sides or a UV sphere&#x27;s poles.
 </li>
 <li>
 Generating with a <a href="generate-3d.html">ComfyUI</a> workflow and a fixed seed could crash at random; fixed.
@@ -924,7 +924,7 @@ Idle, SculptForge no longer keeps your graphics card busy: it draws a new frame 
 <h4 id="classic-sculpting-keys-in-blenders-sculpt-mode">Classic sculpting keys in Blender&#x27;s Sculpt Mode<a class="anchor" href="#classic-sculpting-keys-in-blenders-sculpt-mode" aria-label="Link to this section">#</a></h4>
 <p>The Blender add-on has a new preference, <strong>The Classic sculpting keys in Sculpt Mode</strong>: S, U and O for Size, Strength and Falloff, B for the brushes by name, Space for the quick menu, Alt to dig in, Ctrl to mask, Ctrl+Shift to hide, D and Shift+D for subdivision levels, and more. See <a href="blender.html#classic-sculpting-keys-in-sculpt-mode">Working with Blender</a>.</p>
 <h4 id="draw-the-edge-loops-you-want">Draw the edge loops you want<a class="anchor" href="#draw-the-edge-loops-you-want" aria-label="Link to this section">#</a></h4>
-<p><strong>Quad Remesh Guides</strong> work: draw curves on the sculpt, around the eyes, the mouth or a joint, and Quad Remesh puts an edge loop on each one and turns the flow around it to follow. A curve that ends where it started becomes a loop that closes cleanly, symmetry mirrors what you draw, and <strong>Curves Strength</strong> sets how far around a curve the flow follows it. Guides are kept with each Part and saved in the project. See <a href="retopology.html#quad-remesh-guides">Quad Remesh Guides</a>.</p>
+<p><strong>Quad Remesh Guides</strong> work: draw curves on the sculpt, around the eyes, the mouth or a joint, and Quad Remesh puts an edge loop on each one and turns the flow around it to follow. A curve that ends where it started becomes a loop that closes cleanly, symmetry mirrors what you draw, and <strong>Guide Strength</strong> sets how far around a curve the flow follows it. Guides are kept with each Part and saved in the project. See <a href="retopology.html#quad-remesh-guides">Quad Remesh Guides</a>.</p>
 <h4 id="sculpt-layers-on-every-subdivision-level">Sculpt layers on every subdivision level<a class="anchor" href="#sculpt-layers-on-every-subdivision-level" aria-label="Link to this section">#</a></h4>
 <p>Sculpt layers now have a guide section on how they work with subdivision levels: record a layer at the top, step down and up, divide, reconstruct or delete levels, save, and it&#x27;s still there, with one weight for every level. See <a href="layers.html#layers-and-subdivision-levels">Layers and subdivision levels</a>.</p><h3 id="version-07" class="wn-ver">Version 0.7<time datetime="2026-10-25">2026-10-25</time></h3><p>The Classic sculpting keys and gestures by default, and a bridge that sends models between Blender and SculptForge.</p>
 <h4 id="your-hands-just-work">Your hands just work<a class="anchor" href="#your-hands-just-work" aria-label="Link to this section">#</a></h4>
@@ -959,7 +959,7 @@ Idle, SculptForge no longer keeps your graphics card busy: it draws a new frame 
 <p>A sculpt with subdivision levels takes about half the memory it did: a 33 million triangle model with its levels needs about 3.4 GB instead of 5.6, so a laptop with 32 GB holds models of 100 million triangles and more.</p>
 <ul>
 <li>
-<strong>Divide goes past 100 million triangles.</strong> The limit now follows your computer&#x27;s memory instead of stopping at 50 million.
+<strong>Add Level goes past 100 million triangles.</strong> The limit now follows your computer&#x27;s memory instead of stopping at 50 million.
 </li>
 <li>
 <strong>Opening a project is twice as fast</strong> and no longer needs twice the model&#x27;s memory while it loads. Project files of divided models are about 30% smaller. Projects from 0.5 open as before; save a copy if you still need to open it in 0.5.
@@ -996,16 +996,16 @@ Opening a big model or dividing it sends it to the graphics card about 40% faste
 <p>Sculpt one model at several resolutions: big forms low, fine detail high, and back down without losing anything.</p>
 <ul>
 <li>
-<strong>Divide</strong> (<kbd>Ctrl</kbd>+<kbd>D</kbd>) adds a level and keeps the ones below. Quads stay quads (Catmull-Clark); <strong>Smt</strong> off divides without smoothing.
+<strong>Add Level</strong> (<kbd>Ctrl</kbd>+<kbd>D</kbd>) adds a level and keeps the ones below. Quads stay quads (Catmull-Clark); <strong>Smooth</strong> off divides without smoothing.
 </li>
 <li>
-<strong>Lower Level</strong> / <strong>Higher Level</strong> (<kbd>Shift</kbd>+<kbd>D</kbd> / <kbd>D</kbd>) and the <strong>SDiv</strong> slider step between levels. Detail sculpted high rides along when you reshape low, and edits high show up softened below. Stepping back and forth is instant, even at millions of polygons.
+<strong>Lower Level</strong> / <strong>Higher Level</strong> (<kbd>Shift</kbd>+<kbd>D</kbd> / <kbd>D</kbd>) and the <strong>Level</strong> slider step between levels. Detail sculpted high rides along when you reshape low, and edits high show up softened below. Stepping back and forth is instant, even at millions of polygons.
 </li>
 <li>
 Mask, vertex paint, paint layers, face groups, hidden faces, UVs and sculpt layers follow the levels.
 </li>
 <li>
-<strong>Delete Lower</strong>, <strong>Delete Higher</strong> and <strong>Reconstruct Subdiv</strong> (find the lower levels of a model subdivided elsewhere). Undo walks back through strokes and level changes; projects save every level; the Parts list shows &quot;SDiv 3/5&quot;.
+<strong>Remove Below</strong>, <strong>Remove Above</strong> and <strong>Rebuild Lower Levels</strong> (find the lower levels of a model subdivided elsewhere). Undo walks back through strokes and level changes; projects save every level; the Parts list shows &quot;Level 3/5&quot;.
 </li>
 <li>
 <kbd>Ctrl</kbd>+<kbd>D</kbd> now divides with levels; the old one-way <strong>Subdivide</strong> is still in <strong>Tool &gt; Geometry</strong>.
@@ -1055,7 +1055,7 @@ Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
 <h4 id="quad-retopology-and-detail-projection">Quad retopology and detail projection<a class="anchor" href="#quad-retopology-and-detail-projection" aria-label="Link to this section">#</a></h4>
 <ul>
 <li>
-<strong>Quad Remesh</strong> (<strong>Tool &gt; Geometry</strong>, like quad remesh) rebuilds a sculpt as clean quads whose edge loops follow the forms, near a <strong>Target Polygons</strong> count, in the background. <strong>Keep Groups</strong>, <strong>Adaptive Size</strong>, <strong>Use Vertex Paint</strong>, <strong>Symmetry</strong> and <strong>Half / Same / Double</strong> work.
+<strong>Quad Remesh</strong> (<strong>Tool &gt; Geometry</strong>, like quad remesh) rebuilds a sculpt as clean quads whose edge loops follow the forms, near a <strong>Target Quads</strong> count, in the background. <strong>Follow Face Groups</strong>, <strong>Size Variation</strong>, <strong>Use Vertex Paint</strong>, <strong>Symmetry</strong> and <strong>50% / 100% / 200%</strong> work.
 </li>
 <li>
 <strong>Project Detail</strong> (<strong>Tool &gt; Parts &gt; Project</strong>) puts the sculpted detail and vertex paint back onto the divided quads, with <strong>Dist</strong>, <strong>Mean</strong> and <strong>Blur</strong>, and respects the mask.
@@ -1097,7 +1097,7 @@ Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
 <strong>Faster, safer Auto UV on dense sculpts:</strong> no more crash or folded UVs on dense smooth meshes, and a million-triangle sculpt unwraps in a quarter of a minute or so. Decimate keeps the texture exact across UV seams.
 </li>
 <li>
-<strong>Subdivision levels, polished.</strong> Tools that rebuild the mesh (remesh, Decimate, Quad Remesh, Subdivide, Delete Hidden, merge and split) tell you they removed the levels and that the level you were on became the new base; <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings them all back. Sculpt layers&#x27; fine detail turns with a low level you pose with the Gizmo, and Parts you aren&#x27;t working on no longer hold cached levels in memory.
+<strong>Subdivision levels, polished.</strong> Tools that rebuild the mesh (remesh, Decimate, Quad Remesh, Subdivide, Remove Hidden, merge and split) tell you they removed the levels and that the level you were on became the new base; <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings them all back. Sculpt layers&#x27; fine detail turns with a low level you pose with the Gizmo, and Parts you aren&#x27;t working on no longer hold cached levels in memory.
 </li>
 <li>
 <strong>Quad Remesh symmetry follows your model.</strong> Symmetry (now on by default) mirrors across the model&#x27;s own middle, so a model away from the centre comes out mirror-symmetric too. If the model isn&#x27;t symmetric, Quad Remesh remeshes it whole and tells you. Eyes, teeth and rivets get their own quads instead of disappearing, and thin hard-edged parts such as blades and fins keep both sides and their edges. See <a href="retopology.html">Quad retopology</a>.

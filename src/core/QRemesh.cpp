@@ -433,7 +433,7 @@ Level buildFinest(const WorkMesh& m, bool keepGroups, float sharpCos, std::vecto
     for (const EdgeInfo& e : edges) {
         const bool open = e.count == 1;
         bool border = keepGroups && e.count == 2 && m.group[e.t0] != m.group[e.t1];
-        if (!border && sharpCos < 1.0f && e.count == 2) { // a hard edge (Detect Edges)
+        if (!border && sharpCos < 1.0f && e.count == 2) { // a hard edge (Keep Hard Edges)
             const glm::uvec3 a = m.T[e.t0], b = m.T[e.t1];
             const vec3 na = safeNormalize(glm::cross(m.P[a.y] - m.P[a.x], m.P[a.z] - m.P[a.x]));
             const vec3 nb = safeNormalize(glm::cross(m.P[b.y] - m.P[b.x], m.P[b.z] - m.P[b.x]));
@@ -1270,7 +1270,7 @@ void removeDoublets(QuadMesh& q) {
 struct Snapper {
     const TriangleBVH* surface = nullptr;
     const SegmentBVH* boundary = nullptr; // open edges of the source (incl. the symmetry cut)
-    const SegmentBVH* borders = nullptr;  // face group borders (Keep Groups) and hard edges
+    const SegmentBVH* borders = nullptr;  // face group borders (Follow Face Groups) and hard edges
     const SegmentBVH* corners = nullptr;  // where several of those meet (as zero-length segments)
     float reach = 1.0f;
     const SegmentBVH* guides = nullptr;   // QRemesh Guides: only the loops' own vertices snap to them
@@ -1552,7 +1552,7 @@ bool remeshPiece(WorkMesh work, int axis, double wantQuads, const QRemeshOptions
     mark("refine");
     levels.push_back(buildFinest(work, opt.keepGroups, sharpCos, boundarySegs, boundaryIsCut, borderSegs, axis));
     if (!guides.empty()) {
-        // The flow follows a curve over 0.5 (Curves Strength 0) to 6 quads (1) to each side; a quad is half the
+        // The flow follows a curve over 0.5 (Guide Strength 0) to 6 quads (1) to each side; a quad is half the
         // lattice spacing (each extracted face splits into four).
         const float strength = std::clamp(opt.guideStrength, 0.0f, 1.0f);
         applyGuides(levels[0], guides, spacing * (0.25f + 2.75f * strength), axis, guideSegs, closedGuides);
@@ -1604,7 +1604,7 @@ bool remeshPiece(WorkMesh work, int axis, double wantQuads, const QRemeshOptions
         if (!report(0.20f + 0.20f * float(levels.size() - li) / float(levels.size() - base))) return false;
     }
 
-    // Scale field on the base level: curvature (Adaptive Size) and vertex paint density, then normalised to the
+    // Scale field on the base level: curvature (Size Variation) and vertex paint density, then normalised to the
     // wanted number of faces and passed up the hierarchy.
     Level& L = levels[base];
     std::vector<float> rel(L.size(), 1.0f); // relative edge length
@@ -1972,7 +1972,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
                 continue;
             }
             small[i] = 1;
-            // Adaptive Size: a small piece is tightly curved, so it gets denser quads than its area alone gives
+            // Size Variation: a small piece is tightly curved, so it gets denser quads than its area alone gives
             // (up to the 1 / 0.45^2 the curvature allows within a piece); sizes as the radius of a sphere of the
             // same area, against the biggest piece's.
             double weight = 1.0;
@@ -2082,7 +2082,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
     }
     parts.clear();
     if (qm.quads.empty() && qm.tris.empty()) {
-        error = "Quad Remesh could not build quads on this surface (try a higher Target or turn Keep Groups off)";
+        error = "Quad Remesh could not build quads on this surface (try a higher Target or turn Follow Face Groups off)";
         return false;
     }
     if (!report(0.94f)) return false;

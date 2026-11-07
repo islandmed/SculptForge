@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Plain words that find a feature in the command search (F3) when its label says it another way: "retopo" finds
-// Quad Remesh, "multires" finds Divide, "kitbash" finds Append. Generic sculpting words only, never another
+// Quad Remesh, "multires" finds Add Level, "kitbash" finds Append. Generic sculpting words only, never another
 // product's feature names (docs/legal/trademarks.md). A hit shows as "Quad Remesh (also: retopo)".
 #pragma once
 
@@ -29,7 +29,7 @@ inline constexpr SearchAlias kSearchAliases[] = {
     {"Cut", "clip, trim, slice, boolean", false},
     {"Clip", "trim, slice, flatten", true},
     {"Part", "folders, objects, meshes", false},
-    {"Divide", "subdivide, subdivision, multires, levels", false},
+    {"Add Level", "subdivide, subdivision, multires, levels", false},
     {"Higher Level", "subdivision, multires, levels", true},
     {"Lower Level", "subdivision, multires, levels", true},
     {"Vertex Paint", "vertex color, vertex colour, color, colour", false},
@@ -38,7 +38,7 @@ inline constexpr SearchAlias kSearchAliases[] = {
     {"Library", "assets, browser", false},
     {"Forge Sphere", "armature, skeleton, base mesh", false},
     {"Lit Sphere", "sphere material, shader, material capture, material image", false},
-    {"Close Holes", "fill holes, cap, watertight", false},
+    {"Fill Holes", "fill holes, cap, watertight", false},
     {"Snapshot", "checkpoint, backup", false},
     {"Steady Stroke", "stabilizer, smoothing", false},
     {"Falloff", "softness, hardness", false},

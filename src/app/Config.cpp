@@ -419,7 +419,7 @@ void App::initActions() {
     add("edit.redo", "Redo", "Edit", "Ctrl+Shift+Z / Ctrl+Y", [this] { runCommand("redo"); }, ICON_LC_REDO_2, "redo", nullptr,
         [this] { return doc_.undo.canRedo(); });
     // Subdivide bakes: it keeps no levels, and on a Part with levels it removes them. Named and placed apart from
-    // Divide, and it asks first on a Part with levels (Discord 11-02: "I keep pressing the wrong one").
+    // Add Level, and it asks first on a Part with levels (Discord 11-02: "I keep pressing the wrong one").
     add("geometry.subdivide", "Subdivide (removes levels)", "Tool > Geometry", nullptr,
         [this] {
             if (doc_.mesh.multires && uiPrefs_.confirmSubdivide) openSubdivideConfirm_ = true;
@@ -428,20 +428,20 @@ void App::initActions() {
         nullptr, "subdivide", nullptr, nullptr,
         "Destructive: four times the polygons as one plain mesh, with no lower levels to step back to. On a Part "
         "with subdivision levels it removes them (it asks first; Ctrl+Z brings them back). To keep levels, use "
-        "Divide (keeps levels) instead.");
-    add("geometry.close_holes", "Close Holes", "Tool > Geometry", nullptr, [this] { runCommand("close_holes"); },
+        "Add Level instead.");
+    add("geometry.close_holes", "Fill Holes", "Tool > Geometry", nullptr, [this] { runCommand("close_holes"); },
         ICON_LC_CIRCLE_DOT, "close_holes", nullptr, nullptr,
         "Cap every open boundary of the active Part (a hole, an open bottom, the rim of an extracted shell) with a "
         "new patch sized like the polygons around it, so remeshing and sculpting see a closed surface. The rest of "
         "the Part stays as it is; the patches get a face group of their own (#103).");
     // Subdivision levels (Tool > Geometry; core/Multires.h).
-    add("geometry.divide", "Divide (keeps levels)", "Tool > Geometry", "Ctrl+D", [this] { runCommand("subdiv_divide", {{"smooth", smt_}}); },
+    add("geometry.divide", "Add Level", "Tool > Geometry", "Ctrl+D", [this] { runCommand("subdiv_divide", {{"smooth", smt_}}); },
         ICON_LC_GRID_2X2, "subdiv_divide", nullptr, nullptr,
         "Non-destructive: add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to "
-        "shape big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smt off divides without smoothing.");
-    add("geometry.smt", "Smt", "Tool > Geometry", nullptr, [this] { smt_ = !smt_; }, nullptr, nullptr,
+        "shape big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smooth off divides without smoothing.");
+    add("geometry.smt", "Smooth", "Tool > Geometry", nullptr, [this] { smt_ = !smt_; }, nullptr, nullptr,
         [this] { return smt_; }, nullptr,
-        "Smooth the next Divide (on by default). Off: the new level keeps the hard edges and flat faces of the one below.");
+        "Smooth the next new level (on by default). Off: the new level keeps the hard edges and flat faces of the one below.");
     add("geometry.lower_res", "Lower Level", "Tool > Geometry", "Shift+D", [this] { runCommand("subdiv_lower"); },
         ICON_LC_CHEVRON_DOWN, "subdiv_lower", nullptr, [this] { return subdivCurrentLevel(doc_.mesh) > 0; },
         "Step one subdivision level down (fewer polygons, for big forms). The detail of the higher levels is kept.");
@@ -449,15 +449,15 @@ void App::initActions() {
         ICON_LC_CHEVRON_UP, "subdiv_higher", nullptr,
         [this] { return subdivCurrentLevel(doc_.mesh) + 1 < subdivLevelCount(doc_.mesh); },
         "Step one subdivision level up (more polygons, for detail). Edits made below carry the detail along.");
-    add("geometry.del_lower", "Delete Lower", "Tool > Geometry", nullptr, [this] { confirmLevelDelete("subdiv_delete_lower"); }, nullptr,
+    add("geometry.del_lower", "Remove Below", "Tool > Geometry", nullptr, [this] { confirmLevelDelete("subdiv_delete_lower"); }, nullptr,
         "subdiv_delete_lower", nullptr, [this] { return subdivCurrentLevel(doc_.mesh) > 0; });
-    add("geometry.del_higher", "Delete Higher", "Tool > Geometry", nullptr, [this] { confirmLevelDelete("subdiv_delete_higher"); }, nullptr,
+    add("geometry.del_higher", "Remove Above", "Tool > Geometry", nullptr, [this] { confirmLevelDelete("subdiv_delete_higher"); }, nullptr,
         "subdiv_delete_higher", nullptr,
         [this] { return subdivCurrentLevel(doc_.mesh) + 1 < subdivLevelCount(doc_.mesh); });
-    add("geometry.reconstruct", "Reconstruct Subdiv", "Tool > Geometry", nullptr, [this] { runCommand("subdiv_reconstruct"); },
+    add("geometry.reconstruct", "Rebuild Lower Levels", "Tool > Geometry", nullptr, [this] { runCommand("subdiv_reconstruct"); },
         nullptr, "subdiv_reconstruct", nullptr, [this] { return subdivCurrentLevel(doc_.mesh) == 0; });
     // Micro-displacement levels (Tool > Geometry > Micro; core/Micro.h).
-    add("geometry.micro_divide", "Divide to Micro", "Tool > Geometry", nullptr,
+    add("geometry.micro_divide", "Add Micro", "Tool > Geometry", nullptr,
         [this] { runCommand("micro_divide", {{"level", double(microSlider_)}}); }, ICON_LC_GRID_3X3, "micro_divide", nullptr,
         [this] { return !hasMicro(doc_.mesh) && subdivCurrentLevel(doc_.mesh) + 1 >= subdivLevelCount(doc_.mesh); },
         "Store the surface above the highest level as micro displacements: hundreds of millions of sculptable "
@@ -506,7 +506,7 @@ void App::initActions() {
         ICON_LC_UNLINK, "part_make_unique", nullptr, [this] { return doc_.linkCount(doc_.activePart) > 1; },
         "Give the active linked Part its own copy of the mesh: it stays where it is and no longer changes with the "
         "others.");
-    // Tool > Part > Extract, Tool > Geometry > Modify Topology, Tool > Deformation (PanelExtract.cpp).
+    // Tool > Part > Extract, Tool > Geometry > Symmetry, Tool > Deformation (PanelExtract.cpp).
     add("part.extract", "Extract", "Tool > Parts", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
         [this] { return doc_.mesh.hasMask(); },
         "Make a shell from the masked part of the Part (a helmet, a strap, clothing), shown as a preview below it. "
@@ -535,7 +535,7 @@ void App::initActions() {
         },
         nullptr, nullptr, [this] { return extractTriBorder_; }, nullptr,
         "Triangle border: the whole rim of the extracted shell is made of triangles instead of quads.");
-    add("geometry.mirror_weld", "Mirror And Weld", "Tool > Geometry", nullptr,
+    add("geometry.mirror_weld", "Make Symmetric", "Tool > Geometry", nullptr,
         [this] { runCommand("mirror_and_weld", {{"axis", axesText(mirrorWeldAxes_)}}); }, nullptr, "mirror_and_weld",
         nullptr, [this] { return !axesText(mirrorWeldAxes_).empty() && doc_.mesh.triangleCount() > 0; },
         "Mirror the + side of the Part onto the - side across the chosen axis and weld the seam into one "
@@ -543,14 +543,14 @@ void App::initActions() {
     add("deformation.mirror", "Mirror", "Tool > Deformation", nullptr,
         [this] { runCommand("mirror", {{"axis", axesText(mirrorAxes_)}}); }, nullptr, "mirror", nullptr,
         [this] { return !axesText(mirrorAxes_).empty() && doc_.mesh.vertexCount() > 0; },
-        "Flip the Part across the chosen axis, through the origin (the plane symmetry and Mirror And Weld use).");
+        "Flip the Part across the chosen axis, through the origin (the plane symmetry and Make Symmetric use).");
     for (int k = 0; k < 3; ++k) {
         static const char* const kWeldIds[3] = {"geometry.mirror_weld_x", "geometry.mirror_weld_y", "geometry.mirror_weld_z"};
         static const char* const kMirrorIds[3] = {"deformation.mirror_x", "deformation.mirror_y", "deformation.mirror_z"};
         static const char* const kNames[3] = {"X", "Y", "Z"};
         add(kWeldIds[k], kNames[k], "Tool > Geometry", nullptr, [this, k] { mirrorWeldAxes_[k] = !mirrorWeldAxes_[k]; },
             nullptr, nullptr, [this, k] { return mirrorWeldAxes_[k]; }, nullptr,
-            "An axis Mirror And Weld mirrors across (several: one after the other).");
+            "An axis Make Symmetric mirrors across (several: one after the other).");
         add(kMirrorIds[k], kNames[k], "Tool > Deformation", nullptr, [this, k] { mirrorAxes_[k] = !mirrorAxes_[k]; }, nullptr,
             nullptr, [this, k] { return mirrorAxes_[k]; }, nullptr, "An axis Mirror flips along (several: one after the other).");
     }

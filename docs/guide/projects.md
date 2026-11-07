@@ -71,7 +71,7 @@ symmetric ones are exactly symmetric, so [X symmetry](sculpting.md) works from t
 Ear, Head, Bust and Torso are cut from a body, so they have open edges where they were cut.
 
 A starter mesh opens with subdivision levels (two, or one for the Full Body): block out the big forms at
-**SDiv 1**, the base cage, and step up for the detail (see [Geometry](geometry.md)). It opens as a new, unsaved
+**Level 1**, the base cage, and step up for the detail (see [Geometry](geometry.md)). It opens as a new, unsaved
 scene: **Save** asks for a name. Double-click a tile to open it; <kbd>Shift</kbd>+double-click appends its base
 cage as a Part, for example an Eye next to a head.
 

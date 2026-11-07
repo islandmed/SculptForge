@@ -102,7 +102,7 @@ void App::drawVisibilitySection() {
     ImGui::SameLine();
     if (ImGui::Button(tr("Invert visible"), ImVec2(half, 0))) runCommand("invert_visibility");
     ImGui::BeginDisabled(!doc_.mesh.hasHidden());
-    if (ImGui::Button(tr("Delete hidden"), ImVec2(half, 0))) runCommand("delete_hidden");
+    if (ImGui::Button(tr("Remove Hidden"), ImVec2(half, 0))) runCommand("delete_hidden");
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip("%s", tr("Ctrl+Shift+click a group to isolate it, +Alt to hide it, on the background to show all.\n"

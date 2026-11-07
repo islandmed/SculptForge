@@ -32,8 +32,8 @@ SKIPPED = 77  # exit code when git can't list the files (ctest SKIP_RETURN_CODE:
 
 
 def load_marks(text=None):
-    """The patterns between <!-- marks:begin --> and <!-- marks:end --> (and labels:begin / labels:end) in
-    docs/legal/trademarks.md."""
+    """The patterns between <!-- marks:begin --> and <!-- marks:end --> (and labels:begin / labels:end, and the
+    whole-labels block: words refused only as an entire UI string or bold guide term) in docs/legal/trademarks.md."""
     if text is None:
         text = (ROOT / TRADEMARKS).read_text(encoding="utf-8")
     marks = []
@@ -43,6 +43,11 @@ def load_marks(text=None):
             lines = [line.strip() for line in block.splitlines() if line.strip()]
             # A mark's space also stands for - _ . or several spaces; a label's stays a space (ids like draw_size).
             marks += [m.replace(" ", SEPARATOR) for m in lines] if name == "marks" else lines
+    if "<!-- whole-labels:begin -->" in text:  # competitor palette words refused only as a whole label, case as written
+        block = text.split("<!-- whole-labels:begin -->", 1)[1].split("<!-- whole-labels:end -->", 1)[0]
+        words = "|".join(line.strip() for line in block.splitlines() if line.strip())
+        if words:
+            marks.append(f'(?-i:"(?:{words})(?:##[^"]*)?"|\\*\\*(?:{words})\\*\\*|<strong>(?:{words})</strong>)')
     if not marks:
         raise SystemExit(f"check_marks: no patterns in {TRADEMARKS}")
     return re.compile("|".join(f"(?:{m})" for m in marks), re.IGNORECASE)
@@ -232,6 +237,16 @@ def self_test():
     assert all(mark_re.search(a + b) for a, b in zip(("press Store", "the Focal", "Lower"), (" Config", " Shift slider", " Res")))
     assert not mark_re.search("drawSize focalShift_ RgbIntensity config.store subdiv_lower projectAll lower resolution")
     assert not mark_re.search("Save Layout, Size, Intensity, Colour intensity, Falloff, Lower Level, Lasso Mask")
+    # competitor palette phrases (fix/ip-labels), split here because this file is scanned too
+    for a, b in (("Modify", " Topology"), ("Mirror And", " Weld"), ("Reconstruct", " Subdiv"), ("Delete", " Lower"),
+                 ("Close", " Holes"), ("SD", "iv 2"), ("S", "mt on"), ("Target", " Polygons 2000"),
+                 ("Detect", " Edges"), ("Curves", " Strength")):
+        assert mark_re.search(a + b), a + b
+    for w in ("Div" + "ide",):
+        assert mark_re.search(f'tr("{w}")') and mark_re.search(f'"{w}##x"') and mark_re.search(f"use **{w}**"), w
+        assert not mark_re.search(f"{w.lower()} the mesh, {w} it, \"{w} more\", {w.lower()}_count"), w
+    assert not mark_re.search("Make Symmetric, Rebuild Lower Levels, Remove Below, Add Level, Fill Holes, smt_, sdiv_levels, "
+                              "close_holes, subdiv_delete_lower, Level 2 / 4, Target Quads, Keep Hard Edges, geometry.smt")
     assert problems_in("a\n" + words[0][0] + " b\nc", mark_re) == [(2, words[0][0] + " b")]
     assert problems_in('x\n  "press Store "\n  "Config keeps it"', mark_re) == [(2, '"press Store "')]
     assert load_marks("x <!-- marks:begin -->\n  ab?c\n<!-- marks:end -->").search("AC")

@@ -12,10 +12,10 @@ animate.
 
 1. Select the sculpt and open **Tool > Remesh** (the same Quad Remesh controls are also under **Tool > Geometry**).
    Under **Quad Remesh**, turn on **Keep Original**.
-2. Set **Target Polygons** (for example 5000) and click **Quad Remesh**. It runs in the background: a progress bar
+2. Set **Target Quads** (for example 5000) and click **Quad Remesh**. It runs in the background: a progress bar
    replaces the button, and **Cancel** stops it. The result replaces the Part, and the sculpt as it was is
    kept as a hidden Part called "*name* Original" right below it.
-3. Divide the new mesh two or three times (**Tool > Geometry > Subdivide**, <kbd>Ctrl</kbd>+<kbd>D</kbd>).
+3. Add two or three levels to the new mesh (**Tool > Geometry > Add Level**, <kbd>Ctrl</kbd>+<kbd>D</kbd>).
 4. Show the original again (the eye in **Tool > Parts**) and click **Project Detail** under **Tool > Parts >
    Project**. The divided quads snap onto the sculpt and take its vertex paint.
 5. Hide or delete the original. You now have the same sculpt on clean quads.
@@ -32,11 +32,11 @@ Both steps are single undo steps (<kbd>Ctrl</kbd>+<kbd>Z</kbd>).
 |---|---|
 | **Quad Remesh** | Starts the retopology. The status line reports the result and its quality, e.g. "Quad Remesh: 5072 quads from 47214 triangles (100% quads) in 6.5 s. Quality: 260 poles (141 x3, 113 x5, 6 other), corners 8.5 deg off square, distance to the sculpt 0.106% mean / 1.27% max of its size" |
 | **Method** | **Quad Remesh 2** (the default): the whole layout is solved at once as an integer grid, so poles appear only where the form needs them and loops run unbroken. **Legacy**: the method of SculptForge 0.9, kept for comparison and for closed guide loops |
-| **Target Polygons** | About how many quads to make (100 to 200,000 on the slider, more from scripts). The result is usually within 5% of it |
-| **Half / Same / Double** | Set the target to half, the same as or twice the Part's current polygon count |
-| **Adaptive Size** | 0 makes quads all about the same size. Higher values make smaller quads where the surface curves and bigger ones on flat areas, for the same total |
-| **Keep Groups** | Edge loops run exactly along the face group borders, and the result keeps the face groups |
-| **Detect Edges** | Hard edges get an edge loop, so boxes and bevels stay crisp (on by default). Quad Remesh 2 takes faces meeting at more than about 60 degrees along a line at least a few quads long (a scan's or a sculpt's deep creases are left to the flow); the legacy method any edge over 50 degrees |
+| **Target Quads** | About how many quads to make (100 to 200,000 on the slider, more from scripts). The result is usually within 5% of it |
+| **50% / 100% / 200%** | Set the target to half, the same as or twice the Part's current polygon count |
+| **Size Variation** | 0 makes quads all about the same size. Higher values make smaller quads where the surface curves and bigger ones on flat areas, for the same total |
+| **Follow Face Groups** | Edge loops run exactly along the face group borders, and the result keeps the face groups |
+| **Keep Hard Edges** | Hard edges get an edge loop, so boxes and bevels stay crisp (on by default). Quad Remesh 2 takes faces meeting at more than about 60 degrees along a line at least a few quads long (a scan's or a sculpt's deep creases are left to the flow); the legacy method any edge over 50 degrees |
 | **Use Vertex Paint** | Paint where you want density: red areas get up to four times the quads, blue areas down to a quarter, white areas are unchanged |
 | **Symmetry** | Remesh one half and mirror it, welded on the seam, for exactly symmetric topology (on by default). It mirrors on the axis chosen in **Sculpt > Symmetry & Gizmo** (X if none), across the model's own middle plane: the world's centre plane when the model is symmetric about it, otherwise the plane through the model's middle, so a model moved away from the centre works too. A model that isn't mirror-symmetric is remeshed whole instead, and the status line says "Symmetry off: the model isn't mirror-symmetric"; one that is nearly symmetric (a bump on one side) gets mirrored topology that follows each side's own surface |
 | **Keep Original** | Keep the Part as it was, hidden, below the new one, ready for Project Detail. Off: the Part is replaced (undo brings it back) |
@@ -44,7 +44,7 @@ Both steps are single undo steps (<kbd>Ctrl</kbd>+<kbd>Z</kbd>).
 | **Keep Texture** | Shown when the Part has a painted texture (on by default): Auto UV the result and project the texture onto it. Off: the texture is dropped |
 | **Quad Remesh Guides** | Picks the guides brush: draw curves on the model for the edge loops to follow. See [Quad Remesh Guides](#quad-remesh-guides) |
 | **Delete Last** / **Clear** | Delete the last guide curve drawn (with its mirror copies), or all of them |
-| **Curves Strength** | How far around each guide the edge flow follows it: 0 = only the loop on the curve, 100 = about six quads to each side (default 50) |
+| **Guide Strength** | How far around each guide the edge flow follows it: 0 = only the loop on the curve, 100 = about six quads to each side (default 50) |
 | **Quality Report** | Shown after a Quad Remesh of the active Part: the poles (vertices with other than four edges, by how many edges), how far quad corners are from square (mean and worst 1%), and how far the new surface is from the sculpt (mean and maximum, in % of its size) |
 
 What happens to your data:
@@ -55,26 +55,26 @@ What happens to your data:
 - Sculpt layers are baked into the surface: the result has no layers.
 - Mask and vertex paint are interpolated from the closest point of the sculpt (vertex paint is blurred to the new
   resolution until you project it back onto a divided copy).
-- Face Groups are kept with **Keep Groups**; otherwise the result is one face group. The old UVs are dropped. A
+- Face Groups are kept with **Follow Face Groups**; otherwise the result is one face group. The old UVs are dropped. A
   painted texture is kept with **Keep Texture** (on by default): the result gets Auto UVs and the texture, every
   layer of it, is projected onto them from the old surface, in the same undo step. See
   [Texture painting](texture-painting.md#uvs-and-geometry).
 - Hidden parts are remeshed too.
 - Separate pieces stay separate and none is dropped: small ones (eyes, teeth, rivets, anything that would get
   fewer than about 100 quads) are remeshed on their own with at least 32 quads, more for small round pieces
-  with Adaptive Size. A piece the grid can't cover at all is kept as it was (as triangles).
-- Thin parts (a blade, a fin, a slab thinner than a quad) keep both their sides, and with **Detect Edges** their
+  with Size Variation. A piece the grid can't cover at all is kept as it was (as triangles).
+- Thin parts (a blade, a fin, a slab thinner than a quad) keep both their sides, and with **Keep Hard Edges** their
   hard edges keep a loop each and their corners stay put. Their corners can still be cut a little when the
   part is much thinner than a quad: raise the target, or use vertex paint density there.
 
 ### Guiding the edge flow
 
 - **Quad Remesh Guides** put an edge loop exactly where you draw: around the eyes, the mouth, a joint. See below.
-- **Face Groups** are as strong a guide. Paint a group around an eye, the mouth or a muscle, turn on **Keep
-  Groups**, and loops will circle it. See [Face Groups](face-groups.md).
+- **Face Groups** are as strong a guide. Paint a group around an eye, the mouth or a muscle, turn on **Follow
+  Face Groups**, and loops will circle it. See [Face Groups](face-groups.md).
 - **Vertex Paint** sets the density with **Use Vertex Paint**: paint the face red and the back of the head blue to
   spend the quads where they matter.
-- **Adaptive Size** around 0.5 gives detailed areas more quads without your help; use 0 for an even mesh, for
+- **Size Variation** around 0.5 gives detailed areas more quads without your help; use 0 for an even mesh, for
   example before more sculpting.
 
 ### How it works
@@ -85,7 +85,7 @@ al. 2013), in its own implementation:
 
 1. **A working surface.** The sculpt is brought to about three triangle edges per quad edge with even
    triangles (dense sculpts are first decimated in parallel blocks), keeping open edges, face group borders
-   (**Keep Groups**) and real hard edges (**Detect Edges**; creases shorter than two quads or softer than about 55
+   (**Follow Face Groups**) and real hard edges (**Keep Hard Edges**; creases shorter than two quads or softer than about 55
    degrees at the quad scale are sculpt detail, not hard edges) on their exact place.
 2. **Curvature and directions.** The principal curvature directions, smoothed over about one quad, and a
    smooth cross field (the directions the edges take) solved over the whole surface at once: it follows the
@@ -124,8 +124,8 @@ distance in % of the model's size; legacy first):
 | Sculpted sphere (1.3M) | 2,000 | 84 to 8 | 4.3° to 3.9° | 0.037% to 0.035% |
 | | 10,000 | 401 to 8 | 4.3° to 5.2° | 0.008% to 0.007% |
 
-On smooth sculpts with Adaptive Size the corners are a few degrees further from square than the legacy method's:
-the grid bends to vary the quad size instead of adding poles. Set Adaptive Size to 0 for the squarest grid.
+On smooth sculpts with Size Variation the corners are a few degrees further from square than the legacy method's:
+the grid bends to vary the quad size instead of adding poles. Set Size Variation to 0 for the squarest grid.
 
 A 1.3-million-triangle sculpt takes about 4 seconds to 5,000 quads on a 10-core M1 Pro; denser sculpts are first
 decimated in parallel blocks to a working resolution: 5.2 million triangles take 7 to 9 seconds (1.3 GB at most)
@@ -172,16 +172,16 @@ Good to know:
   guide left far from the surface, for example after moving the Part with the Gizmo, is ignored and the
   status line says so: draw it again.
 - A loop gets an even number of quads around it, so it closes cleanly. Two guides closer together than about a
-  quad compete for the same loop; draw them further apart or raise **Target Polygons**. A very small loop, about
+  quad compete for the same loop; draw them further apart or raise **Target Quads**. A very small loop, about
   25 quads round or fewer, may not close, and the edges just outside it bend to fit the extra quads the next
-  ring needs: raise **Target Polygons**.
-- **Curves Strength** doesn't change the loop on the curve, only how far around it the other edges turn to
+  ring needs: raise **Target Quads**.
+- **Guide Strength** doesn't change the loop on the curve, only how far around it the other edges turn to
   follow. Lower it when guides are close to each other or to the symmetry plane.
 
 ### How the guides work
 
 Each curve constrains Quad Remesh's cross field (the directions the edges take) to run along it, falling off over a
-few quads (**Curves Strength**), and adds a lattice line on the curve, so one edge loop lies on it. Along a closed
+few quads (**Guide Strength**), and adds a lattice line on the curve, so one edge loop lies on it. Along a closed
 curve the lattice corners are placed at even steps, an even number of them (a ring of quads round a disk always
 has an even number of sides), so the loop meets itself without a kink. With symmetry Quad Remesh remeshes one half,
 so a loop across the middle is cut there: its corners start on the seam, where it meets its mirror image.
@@ -239,6 +239,6 @@ the background.
 
 - [Subdivide, remesh, decimate and LODs](geometry.md): voxel remesh first to fuse pieces, subdivide after Quad Remesh
 - [Parts](parts.md): show, hide and duplicate the original
-- [Face Groups and visibility](face-groups.md): guides for Keep Groups
+- [Face Groups and visibility](face-groups.md): guides for Follow Face Groups
 - [Projects](projects.md): Quad Remesh Guides are saved with each Part
 - [Texture painting](texture-painting.md): Auto UV on the new topology

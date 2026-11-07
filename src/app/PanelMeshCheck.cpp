@@ -118,7 +118,7 @@ void App::drawMeshCheckContents() {
         const char* const rows[kMeshIssueCount][2] = {
             {tr("Non-manifold edges"), tr("Edges shared by three or more triangles. Fix gives each extra triangle its "
                                           "own copy of the edge, so it comes loose; nothing is deleted.")},
-            {tr("Holes"), tr("Open boundaries. Fix caps each one with a patch, as Close Holes does.")},
+            {tr("Holes"), tr("Open boundaries. Fix caps each one with a patch, as Fill Holes does.")},
             {tr("Duplicate triangles"), tr("Triangles on the same three points as another. Fix deletes the copies.")},
             {tr("Degenerate triangles"), tr("Triangles that use one point twice. Fix deletes them.")},
             {tr("Zero-area triangles"), tr("Triangles whose three points are in one line. Fix collapses their shortest edge.")},

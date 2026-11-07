@@ -66,7 +66,7 @@ size_t highValence(const Mesh& m, glm::vec3 c = glm::vec3(0.0f), float angle = 0
     return n;
 }
 
-// Six quads (on the unit sphere with about `quads` of them): as far as Curves Strength 100 turns the flow.
+// Six quads (on the unit sphere with about `quads` of them): as far as Guide Strength 100 turns the flow.
 float sixQuads(int quads) { return 6.0f * std::sqrt(4.0f * kPi / float(quads)); }
 
 struct GuideFit {

@@ -7,7 +7,7 @@
 //    undoable step. Thickness is a fraction of the Part's size (negative = inward), Edge Smooth smooths the jagged edge
 //    the mask's triangles leave, Both Sides grows the shell both ways; Thickness 0 gives a single-sided surface. The rim
 //    is quads, except at sharp corners with Corners and all along it with Border.
-//  - Mirror And Weld (Tool > Geometry > Modify Topology): the half on the + side of a plane through the origin
+//  - Make Symmetric (Tool > Geometry > Symmetry): the half on the + side of a plane through the origin
 //    is kept and mirrored onto the - side, and the seam welded into one watertight mesh. Triangles crossing the
 //    plane are cut on it; face groups, vertex paint, mask, UVs and sculpt layers are carried over.
 //  - Mirror (Tool > Deformation): flips the Part across a plane (normals stay outward).
@@ -35,7 +35,7 @@ struct ExtractOptions {
 // surface (face group 1) when the thickness is 0. Empty (with `error`) when nothing is masked.
 Mesh extractShell(const Mesh& mesh, const ExtractOptions& options, std::string& error);
 
-// Mirror And Weld across the plane `axis` = 0 (X), 1 (Y) or 2 (Z) through the origin, keeping the + side (or
+// Make Symmetric across the plane `axis` = 0 (X), 1 (Y) or 2 (Z) through the origin, keeping the + side (or
 // the - side when !keepPositive). Empty (with `error`) when nothing is on the kept side.
 Mesh mirrorAndWeld(const Mesh& mesh, int axis, bool keepPositive, std::string& error);
 

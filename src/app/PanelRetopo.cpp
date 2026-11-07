@@ -63,7 +63,7 @@ void App::registerRetopoUiActions() {
     add("geometry.qremesh", "Quad Remesh", kQRemeshPath, [this] { startQRemesh(); },
         [this] { return !qremesh_ && doc_.mesh.triangleCount() > 0; },
         "Automatic quad retopology: rebuilds the Part as clean, all-quad topology whose "
-        "edge loops follow the forms, close to Target Polygons. Runs in the background (Cancel stops it); undoable. "
+        "edge loops follow the forms, close to Target Quads. Runs in the background (Cancel stops it); undoable. "
         "Then divide it and use Part > Project > Project Detail to bring the detail back.",
         "qremesh");
     {
@@ -458,39 +458,42 @@ void App::drawQRemeshContents() {
                      kQRemeshPath);
     }
     ImGui::SetNextItemWidth(-1);
-    tray::SliderInt("##qtarget", &retopo_.target, 100, 200000, "Target Polygons %d", ImGuiSliderFlags_Logarithmic);
-    ui::HelpText("Target Polygons", nullptr,
-                 "About how many quads Quad Remesh makes (Ctrl+click to type a number). Half / Same / Double set it from "
+    tray::SliderInt("##qtarget", &retopo_.target, 100, 200000, "Target Quads %d", ImGuiSliderFlags_Logarithmic);
+    ui::HelpText("Target Quads", nullptr,
+                 "About how many quads Quad Remesh makes (Ctrl+click to type a number). 50% / 100% / 200% set it from "
                  "the Part's current polygon count.",
                  kQRemeshPath);
     const size_t faces = faceCount(doc_.mesh);
     auto setTarget = [&](double k) { retopo_.target = int(std::clamp(double(faces) * k, 100.0, 2'000'000.0)); };
-    if (ImGui::Button(tr("Half"), ImVec2(third, 0))) setTarget(0.5);
-    ui::HelpText("Half", nullptr, "Target half the Part's current polygon count.", kQRemeshPath);
+    if (ImGui::Button(tr("50%"), ImVec2(third, 0))) setTarget(0.5);
+    ui::HelpText("50%", nullptr, "Target half the Part's current polygon count.", kQRemeshPath);
     ImGui::SameLine();
-    if (ImGui::Button(tr("Same"), ImVec2(third, 0))) setTarget(1.0);
-    ui::HelpText("Same", nullptr, "Target the Part's current polygon count (to clean up topology without changing its density).",
+    if (ImGui::Button(tr("100%"), ImVec2(third, 0))) setTarget(1.0);
+    ui::HelpText("100%", nullptr, "Target the Part's current polygon count (to clean up topology without changing its density).",
                  kQRemeshPath);
     ImGui::SameLine();
-    if (ImGui::Button(tr("Double"), ImVec2(-1, 0))) setTarget(2.0);
-    ui::HelpText("Double", nullptr, "Target twice the Part's current polygon count.", kQRemeshPath);
+    if (ImGui::Button(tr("200%"), ImVec2(-1, 0))) setTarget(2.0);
+    ui::HelpText("200%", nullptr, "Target twice the Part's current polygon count.", kQRemeshPath);
 
     ImGui::SetNextItemWidth(-1);
-    ui::SliderInside("##qadaptive", &retopo_.adaptive, 0.0f, 1.0f, "Adaptive Size %.2f");
-    ui::HelpText("Adaptive Size", nullptr,
+    ui::SliderInside("##qadaptive", &retopo_.adaptive, 0.0f, 1.0f, "Size Variation %.2f");
+    ui::HelpText("Size Variation", nullptr,
                  "0: quads all about the same size. Higher: smaller quads where the surface curves, bigger ones on "
                  "flat areas (the count stays near the target).",
                  kQRemeshPath);
 
-    ImGui::Checkbox(tr("Keep Groups"), &retopo_.keepGroups);
-    ui::HelpText("Keep Groups", nullptr,
+    ImGui::Checkbox(tr("Follow Face Groups"), &retopo_.keepGroups);
+    ui::HelpText("Follow Face Groups", nullptr,
                  "Edge loops follow the face group borders exactly and the result keeps the face groups. Paint groups "
                  "where you want loops (around the eyes, the mouth) to guide the flow.",
                  kQRemeshPath);
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
-    ImGui::Checkbox(tr("Detect Edges"), &retopo_.detectEdges);
-    ui::HelpText("Detect Edges", nullptr, "Hard edges get an edge loop, so they stay sharp (Quad Remesh 2: faces meeting at more than about 60 degrees along a line at least a few quads long; legacy: more than 50 degrees).",
+    // The right column, inside the section indent, when the left label leaves room (else its own row).
+    if (ImGui::GetItemRectMax().x + style.ItemSpacing.x <= ImGui::GetWindowPos().x + x0 + half + style.ItemSpacing.x) {
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x);
+    }
+    ImGui::Checkbox(tr("Keep Hard Edges"), &retopo_.detectEdges);
+    ui::HelpText("Keep Hard Edges", nullptr, "Hard edges get an edge loop, so they stay sharp (Quad Remesh 2: faces meeting at more than about 60 degrees along a line at least a few quads long; legacy: more than 50 degrees).",
                  kQRemeshPath);
     ImGui::Checkbox(tr("Use Vertex Paint"), &retopo_.useVertexPaint);
     ui::HelpText("Use Vertex Paint", nullptr,
@@ -563,8 +566,8 @@ void App::drawQRemeshGuideControls() {
     ImGui::SameLine();
     ui::ActionButton(*this, "geometry.qremesh_guides_clear", ImVec2(-1, 0));
     ImGui::SetNextItemWidth(-1);
-    ui::SliderInside("##qcurves", &curvesStrength_, 0.0f, 100.0f, "Curves Strength %.0f");
-    ui::HelpText("Curves Strength", nullptr,
+    ui::SliderInside("##qcurves", &curvesStrength_, 0.0f, 100.0f, "Guide Strength %.0f");
+    ui::HelpText("Guide Strength", nullptr,
                  "How far around each guide curve the edge flow follows it: 0 = only the edge loop on the curve, 100 = "
                  "about six quads to each side. The loop on the curve is always made.",
                  kQRemeshPath);

@@ -98,7 +98,6 @@ constexpr Entry kTraditionalChinese[] = {
     {"From an image", "從影像建立"},
     {"From Image", "從影像"},
     {"Voxel Remesh", "體素重新網格化"},
-    {"Modify Topology", "修改拓樸"},
     {"Game Ready", "適用於遊戲"},
     {"Navigation", "導覽"},
     // --- Title bar, status line, search ---
@@ -195,7 +194,6 @@ constexpr Entry kTraditionalChinese[] = {
     {"Invert", "反轉"},
     {"Smooth keeps volume", "平滑時保留體積"},
     {"Smooth face group borders only", "僅平滑面群組邊界"},
-    {"Symmetry", "對稱"},
     {"Symmetry X", "X 軸對稱"},
     {"Local", "區域"},
     {"X axis", "X 軸"},
@@ -369,40 +367,36 @@ constexpr Entry kTraditionalChinese[] = {
     {"Both Sides", "兩側"},
     {"Dist", "距離"},
     // --- Geometry ---
-    {"Divide", "細分"},
     {"Subdivide", "細分"},
-    {"Reconstruct Subdiv", "重建細分"},
-    {"Divide to Micro", "細分至微細分"},
+    {"Rebuild Lower Levels", "重建較低層級"},
+    {"Add Micro", "新增微細分"},
     {"Delete Micro", "刪除微細分"},
     {"Bake Micro", "烘焙微細分"},
     {"Micro Surface Noise", "微細分表面雜訊"},
     {"Micro", "微細分"},
-    {"SDiv", "細分級"},
-    {"No subdivision levels - Divide adds them", "沒有細分級別——使用「細分」新增級別"},
+    {"Level", "層級"},
     {"Decimate", "減面"},
     {"Keep", "保留"},
     {"Keep Masked", "保留遮罩"},
-    {"Keep Groups", "保留群組"},
+    {"Follow Face Groups", "沿面群組"},
     {"Keep Original", "保留原始模型"},
     {"Keep Texture", "保留紋理"},
     {"Reduce the triangle count while keeping the shape. Sculpt layers are kept.", "在保留形狀的同時減少三角形數量，並保留雕刻圖層。"},
     {"Fraction of the triangles Decimate keeps.", "減面後保留的三角形比例。"},
     {"Mirror", "鏡像"},
-    {"Mirror And Weld", "鏡像並焊接"},
+    {"Make Symmetric", "使對稱"},
     {"Close Gaps", "封閉間隙"},
     {"Fill holes", "填補孔洞"},
-    {"Delete hidden", "刪除隱藏部分"},
+    {"Remove Hidden", "移除隱藏部分"},
     // --- Quad Remesh and Remesh ---
     {"Quad Remesh", "四邊形重拓樸"},
     {"Quad Remesh Guides", "四邊形重拓樸引導線"},
-    {"Target Polygons", "目標多邊形數量"},
-    {"Adaptive Size", "自適應尺寸"},
-    {"Curves Strength", "曲線強度"},
+    {"Target Quads", "目標四邊面數"},
+    {"Size Variation", "尺寸變化"},
+    {"Guide Strength", "導引強度"},
     {"Guides", "引導線"},
     {"Use Vertex Paint", "使用頂點繪製"},
-    {"Detect Edges", "偵測邊緣"},
-    {"Half", "一半"},
-    {"Same", "相同"},
+    {"Keep Hard Edges", "保留硬邊"},
     {"Quality Report", "品質報告"},
     {"no curves", "沒有曲線"},
     {"%zu curves (%zu loops)", "%zu 條曲線（%zu 個迴圈）"},
@@ -933,10 +927,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"Dark is high", "暗部高"},
     // --- App.cpp (tools/i18n/coverage.py) ---
     {"Strokes go into the base shape, not a layer.", "筆畫會進入基底形狀，而不是圖層。"},
-    {"Select to sculpt into this layer. With subdivision levels, record at any level: a layer keeps its own detail on "
-     "every level and follows Lower Level / Higher Level and Divide.",
-     "選取後即可雕刻到此圖層。有細分層級時，可在任何層級錄製：圖層在每個層級都保有自己的細節，並跟隨降低層級／提高層"
-     "級與細分。"},
+    {"Select to sculpt into this layer. With subdivision levels, record at any level: a layer keeps its own detail on every level and follows Lower Level / Higher Level and Add Level.", "選取後即可雕刻到此圖層。有細分層級時，可在任何層級錄製：圖層在每個層級都保有自己的細節，並跟隨降低層級／提高層級與新增層級。"},
     {"Animate this blend shape 0 -> 1 -> 0 (Stop sets it back to 1).",
      "播放此混合形狀 0 -> 1 -> 0 的動畫（停止會將它設回 1）。"},
     {"Delete this layer on every subdivision level (undoable).", "在每個細分層級刪除此圖層（可復原）。"},
@@ -954,26 +945,22 @@ constexpr Entry kTraditionalChinese[] = {
      "載入內建的測試擷取（以高斯 Splat 呈現的風格化頭部，帶有少量浮點），不需要自己的掃描即可試用「轉為可雕刻」。"
      "splat_test_capture kind=object 則載入馬克杯。"},
     // --- Config.cpp (tools/i18n/coverage.py) ---
-    {"Close Holes", "封閉孔洞"},
+    {"Fill Holes", "填補孔洞"},
     {"Cap every open boundary of the active Part (a hole, an open bottom, the rim of an extracted shell) with a new "
      "patch sized like the polygons around it, so remeshing and sculpting see a closed surface. The rest of the Part "
      "stays as it is; the patches get a face group of their own (#103).",
      "以新的面片封閉目前部件的每個開放邊界（孔洞、開放的底部、擷取外殼的邊緣），面片大小與周圍多邊形相近，讓重新網格"
      "化與雕刻看到封閉的表面。部件的其餘部分保持不變；面片會有自己的面群組 (#103)。"},
-    {"Add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to shape "
-     "big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smt off divides without smoothing.",
-     "新增一個細分層級：多邊形變為四倍，並保留較低層級，讓你能回到低層級塑造大形，再回到細節。四邊面維持四邊面 "
-     "(Catmull-Clark)。關閉 Smt 時細分不會平滑。"},
-    {"Smooth the next Divide (on by default). Off: the new level keeps the hard edges and flat faces of the one below.",
-     "平滑下一次細分（預設開啟）。關閉：新層級保留下層的硬邊與平面。"},
+    {"Add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to shape big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smooth off divides without smoothing.", "新增一個細分層級：多邊形變為四倍，並保留較低層級，讓你能回到低層級塑造大形，再回到細節。四邊面維持四邊面 (Catmull-Clark)。關閉「平滑」 時細分不會平滑。"},
+    {"Smooth the next new level (on by default). Off: the new level keeps the hard edges and flat faces of the one below.", "平滑下一個新層級（預設開啟）。關閉：新層級保留下層的硬邊與平面。"},
     {"Lower Level", "降低層級"},
     {"Step one subdivision level down (fewer polygons, for big forms). The detail of the higher levels is kept.",
      "降低一個細分層級（較少多邊形，用於大形）。較高層級的細節會保留。"},
     {"Higher Level", "提高層級"},
     {"Step one subdivision level up (more polygons, for detail). Edits made below carry the detail along.",
      "提高一個細分層級（較多多邊形，用於細節）。在下層所做的編輯會帶著細節一起變化。"},
-    {"Delete Lower", "刪除較低層級"},
-    {"Delete Higher", "刪除較高層級"},
+    {"Remove Below", "移除較低層級"},
+    {"Remove Above", "移除較高層級"},
     {"Store the surface above the highest level as micro displacements: hundreds of millions of sculptable triangles "
      "in a fraction of the memory (300M take about 0.4 GB). The Micro slider sets how fine.",
      "將最高層級之上的表面儲存為微細分位移：數億個可雕刻三角面，只佔一小部分記憶體（3 億個約 0.4 GB）。「微細分」滑桿"
@@ -1008,10 +995,8 @@ constexpr Entry kTraditionalChinese[] = {
      "mesh. Face Groups and vertex paint come along. To keep the other side, Deformation > Mirror first.",
      "沿所選軸將部件的 + 側鏡像到 - 側，並將接縫焊接成一個封閉網格。面群組與頂點繪製也會一併處理。若要保留另一側，請"
      "先使用變形 > 鏡像。"},
-    {"Flip the Part across the chosen axis, through the origin (the plane symmetry and Mirror And Weld use).",
-     "沿所選軸經由原點翻轉部件（對稱與鏡像並焊接所用的平面）。"},
-    {"An axis Mirror And Weld mirrors across (several: one after the other).",
-     "鏡像並焊接所沿的軸（多個時：依序處理）。"},
+    {"Flip the Part across the chosen axis, through the origin (the plane symmetry and Make Symmetric use).", "沿所選軸經由原點翻轉部件（對稱與使對稱所用的平面）。"},
+    {"An axis Make Symmetric mirrors across (several: one after the other).", "使對稱所沿的軸（多個時：依序處理）。"},
     {"An axis Mirror flips along (several: one after the other).", "鏡像翻轉所沿的軸（多個時：依序處理）。"},
     {"New from Starter Mesh...", "從起始網格新增..."},
     {"Start from a base mesh: human head, bust, full body, hand, foot, ear, eye, stylised and creature heads, torso, "
@@ -2256,11 +2241,7 @@ constexpr Entry kTraditionalChinese[] = {
      "穩定版只提供正式發行版本。預覽另外也提供更新來源列出的 Beta 版。Beta 版是會員福利：會員可從私人會員儲存庫與 "
      "Discord 的 #members 頻道取得。當穩定版超越某個 Beta 版時，預覽會改為提供穩定版。"},
     // --- PanelRetopo.cpp (tools/i18n/coverage.py) ---
-    {"Automatic quad retopology: rebuilds the Part as clean, all-quad topology whose edge loops follow the forms, "
-     "close to Target Polygons. Runs in the background (Cancel stops it); undoable. Then divide it and use Part > "
-     "Project > Project Detail to bring the detail back.",
-     "自動四邊面重新拓樸：將部件重建為乾淨、全四邊面的拓樸，其邊環順著形體走，面數接近目標多邊形數量。在背景中執行（"
-     "「取消」可停止）；可復原。之後細分它，再用部件 > 投射 > Project Detail 找回細節。"},
+    {"Automatic quad retopology: rebuilds the Part as clean, all-quad topology whose edge loops follow the forms, close to Target Quads. Runs in the background (Cancel stops it); undoable. Then divide it and use Part > Project > Project Detail to bring the detail back.", "自動四邊面重新拓樸：將部件重建為乾淨、全四邊面的拓樸，其邊環順著形體走，面數接近目標四邊面數。在背景中執行（「取消」可停止）；可復原。之後細分它，再用部件 > 投射 > Project Detail 找回細節。"},
     {"The Quad Remesh Guides brush: drag on the model to draw a curve for Quad Remesh's edge loops to follow, around "
      "an eye, the mouth or a joint. A curve that ends where it started becomes a loop. Symmetry mirrors it; "
      "Alt+click a curve to delete it. Pick any brush to sculpt again.",
@@ -2290,10 +2271,7 @@ constexpr Entry kTraditionalChinese[] = {
      "Legacy: the method of SculptForge 0.9 (more poles, a split look).",
      "Quad Remesh 2（預設）：以整個模型為單一整數網格求解的曲率對齊佈線，極點只出現在形體需要之處，邊環不中斷；開放的"
      "導引曲線會成為精確的邊環。舊版：SculptForge 0.9 的方法（極點較多，看起來較零碎）。"},
-    {"About how many quads Quad Remesh makes (Ctrl+click to type a number). Half / Same / Double set it from the "
-     "Part's current polygon count.",
-     "Quad Remesh 大約產生的四邊面數量（按住 Ctrl 並按一下可輸入數字）。一半／相同／雙倍會依部件目前的多邊形數量設定"
-     "。"},
+    {"About how many quads Quad Remesh makes (Ctrl+click to type a number). 50% / 100% / 200% set it from the Part's current polygon count.", "Quad Remesh 大約產生的四邊面數量（按住 Ctrl 並按一下可輸入數字）。50%／100%／200%會依部件目前的多邊形數量設定。"},
     {"Target half the Part's current polygon count.", "目標為部件目前多邊形數量的一半。"},
     {"Target the Part's current polygon count (to clean up topology without changing its density).",
      "目標為部件目前的多邊形數量（在不改變密度的情況下整理拓樸）。"},
@@ -3432,15 +3410,19 @@ constexpr Entry kTraditionalChinese[] = {
     {"Rate limited to a request every few seconds; if it can't be reached, a running Ollama is used instead.", "每隔幾秒才能發出一次請求；若無法連線，會改用正在執行的 Ollama。"},
     {"Your studio doesn't allow this provider: pick another", "你的工作室不允許此提供者：請選擇其他提供者"},
     // Review fixes (fix/review-voidart-2)
-    {"Change the Mesh (no levels)", "變更網格（無層級）"},
     {"Ctrl+Z brings them back.", "Ctrl+Z 可復原。"},
-    {"Delete Higher Levels", "刪除較高層級"},
-    {"Delete Lower Levels", "刪除較低層級"},
-    {"Delete SDiv %d to %d and the detail sculpted on them?", "刪除 SDiv %d 至 %d 及其上雕刻的細節？"},
-    {"Delete SDiv 1 to %d? SDiv %d becomes the base mesh.", "刪除 SDiv 1 至 %d？SDiv %d 成為基礎網格。"},
+    {"Remove Levels Above", "移除較高層級"},
+    {"Remove Levels Below", "移除較低層級"},
     {"Delete view", "刪除視圖"},
-    {"Destructive: four times the polygons as one plain mesh, with no lower levels to step back to. On a Part with subdivision levels it removes them (it asks first; Ctrl+Z brings them back). To keep levels, use Divide (keeps levels) instead.", "不可逆：多邊形變為四倍，成為單一網格，沒有可返回的較低層級。在有細分層級的部件上會移除層級（會先詢問；Ctrl+Z 可復原）。若要保留層級，請改用「細分（保留層級）」。"},
-    {"Divide (keeps levels)", "細分（保留層級）"},
+    {"Destructive: four times the polygons as one plain mesh, with no lower levels to step back to. On a Part with subdivision levels it removes them (it asks first; Ctrl+Z brings them back). To keep levels, use Add Level instead.", "不可逆：多邊形變為四倍，成為單一網格，沒有可返回的較低層級。在有細分層級的部件上會移除層級（會先詢問；Ctrl+Z 可復原）。若要保留層級，請改用「新增層級」。"},
+    {"Symmetry", "對稱"},
+    {"Levels", "層級"},
+    {"Cleanup", "清理"},
+    {"Resolution (no levels)", "解析度（無層級）"},
+    {"No subdivision levels - Add Level adds them", "沒有細分層級——使用「新增層級」新增"},
+    {"Remove levels %d to %d and the detail sculpted on them?", "移除層級 %d 至 %d 及其上雕刻的細節？"},
+    {"Remove levels 1 to %d? Level %d becomes the base mesh.", "移除層級 1 至 %d？層級 %d 成為基礎網格。"},
+    {"Add Level", "新增層級"},
     {"Don't ask again", "不再詢問"},
     {"Dynamic needs one plain mesh: Freeze keeps the level shown and removes the others (Ctrl+Z brings them back).", "動態需要單一網格：固定會保留目前顯示的層級並移除其他層級（Ctrl+Z 可復原）。"},
     {"Extract makes a shell from the masked area: mask it first (Ctrl+drag on the model).", "擷取會從遮罩區域建立外殼：請先遮罩（在模型上 Ctrl+拖曳）。"},
@@ -3458,7 +3440,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"Mask darkness %.2f", "遮罩深度 %.2f"},
     {"Mask first (Ctrl+drag)", "請先遮罩（Ctrl+拖曳）"},
     {"Micro Detail", "微細節"},
-    {"Non-destructive: add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to shape big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smt off divides without smoothing.", "非不可逆：新增一個細分層級：多邊形變為四倍，並保留較低層級，可下移塑造大形再回到細節。四邊形維持四邊形（Catmull-Clark）。關閉 Smt 則細分而不平滑。"},
+    {"Non-destructive: add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to shape big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smooth off divides without smoothing.", "非不可逆：新增一個細分層級：多邊形變為四倍，並保留較低層級，可下移塑造大形再回到細節。四邊形維持四邊形（Catmull-Clark）。關閉「平滑」 則細分而不平滑。"},
     {"Remember this camera as a named view (View > Views; the name field names it). Saved with the project.", "將此相機記為具名視圖（檢視 > 視圖；名稱欄位為其命名）。隨專案儲存。"},
     {"Restore View", "還原視圖"},
     {"Save View", "儲存視圖"},
@@ -4469,7 +4451,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"No problems found", "沒有發現問題"},
     {"Non-manifold edges", "非流形邊"},
     {"Not checked yet", "尚未檢查"},
-    {"Open boundaries. Fix caps each one with a patch, as Close Holes does.", "開放的邊界。修正會像封閉孔洞一樣，用補片封住每一個。"},
+    {"Open boundaries. Fix caps each one with a patch, as Fill Holes does.", "開放的邊界。修正會像封閉孔洞一樣，用補片封住每一個。"},
     {"Points no triangle uses. Fix removes them.", "沒有三角形使用的點。修正會移除它們。"},
     {"Points this close (in scene units) or closer merge. 0 merges only points exactly on top of each other. The points that would merge show on the model in orange.", "距離在此值（場景單位）以內的點會合併。0 只合併完全重疊的點。將合併的點會在模型上以橘色顯示。"},
     {"The mesh changed: check again", "網格已變更：請重新檢查"},

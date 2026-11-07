@@ -6,16 +6,16 @@ expect_value triangles == 1280
 # F1: the Controls sheet is generated from the action registry. Ctrl+hover explains any item,
 # Ctrl+Alt+hover shows a command's scripting parameters.
 key f1
-type Controls/##controls_filter divide
-expect "Controls/Divide (keeps levels)"
+type Controls/##controls_filter "add level"
+expect "Controls/Add Level"
 hold ctrl
-hover "Controls/Divide (keeps levels)"
+hover "Controls/Add Level"
 expect_help "subdivision level"
 expect_help Ctrl+D
 shot help_ctrl_hover
 hold ctrl+alt
-hover "Controls/Divide (keeps levels)"
-expect_help "Smt: smooth the new level"
+hover "Controls/Add Level"
+expect_help "Smooth: smooth the new level"
 shot help_ctrl_alt_hover
 hold none
 wait 0.2
@@ -32,7 +32,7 @@ expect_value wireframe == 1
 key ctrl+k
 expect_value wireframe == 0
 key f1
-expect_not Controls/Divide
+expect_not Controls/Add Level
 
 # Command palette (F3): fuzzy search, Enter runs.
 key f3
@@ -45,6 +45,21 @@ expect_value triangles == 5120
 expect_value command_palette_open == 0
 key ctrl+z
 expect_value triangles == 1280
+
+# Renamed labels (fix/ip-labels) are still found by the old words: the action ids and commands keep them.
+key f3
+type "##Command palette" reconstruct
+expect_text "Rebuild Lower Levels"
+key escape
+key f3
+type "##Command palette" "mirror weld"
+expect_text "Make Symmetric"
+key escape
+key f3
+type "##Command palette" "holes close"
+expect_text "Fill Holes"
+key escape
+expect_value command_palette_open == 0
 
 # Commands that need parameters open in the console with their name typed.
 key f3

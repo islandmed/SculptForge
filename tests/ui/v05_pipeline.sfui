@@ -15,7 +15,7 @@ expect_value quad_percent > 80
 
 # Subdivision levels, then project the high-poly's detail onto the top level.
 run subdiv_divide ; subdiv_divide
-expect_value sdiv == 3
+expect_value subdiv_level == 3
 expect_value sdiv_levels == 3
 run part_visibility name=High visible=true
 run project_all distance=0.1
@@ -25,7 +25,7 @@ shot projected
 
 # Pose at the base level: the detail rides along when stepping back up.
 run subdiv_level level=1
-expect_value sdiv == 1
+expect_value subdiv_level == 1
 remember center_y base_y
 run transform translate=0,0.25,0
 expect_value center_y > $base_y
@@ -33,7 +33,7 @@ run subdiv_level level=3
 expect_value center_y > $base_y
 # Undo steps back through the level change, then the move.
 key ctrl+z
-expect_value sdiv == 1
+expect_value subdiv_level == 1
 key ctrl+z
 expect_value center_y < 0.01
 

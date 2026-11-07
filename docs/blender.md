@@ -141,7 +141,7 @@ found by running real Blender 4.2.23 and 5.2.3 headless:
   checks that operator's poll.
 
 `tests/blender/test_in_blender.py` checks every item's operator and settings, the data paths in Sculpt Mode, the
-brush picks, SDiv/Divide and that turning the preference off or disabling the add-on leaves Blender's keymap as it
+brush picks, level step / Add Level and that turning the preference off or disabling the add-on leaves Blender's keymap as it
 was. It also checks vector displacement maps both ways (see core/Vdm.h): SculptForge's exported EXR read by
 Blender equals its .sfvdm row for row (Blender's pixels start at the bottom), and Blender's 32-bit ZIP / PIZ and
 16-bit EXRs load in SculptForge unchanged.

@@ -65,7 +65,7 @@ bool microDivideUndoable(Document& doc, int level, std::string& message) {
     r.micro->swapWhole = true;
     r.micro->whole = std::move(before);
     doc.undo.push(std::move(r));
-    message = "Divided to micro: " + summary(doc.mesh);
+    message = "Added micro: " + summary(doc.mesh);
     return true;
 }
 

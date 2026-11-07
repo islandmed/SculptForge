@@ -897,34 +897,8 @@ void App::drawPalette_Tool() {
     if (subpalette("tool.geometry", "Geometry")) {
         tray::Section section;
         Demo::pushScope("Geometry");
-        drawGeometrySection();
-        // Apart from Divide and Micro: these change the mesh itself and keep no levels.
-        ImGui::Spacing();
-        tray::GroupLabel(*this, "Change the Mesh (no levels)");
-        actionRow(*this, {"geometry.subdivide"}); // (its own row: the long label needs the width)
-        actionRow(*this, {"geometry.close_holes"});
-        const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-        if (ImGui::Button(tr("Decimate"), ImVec2(half, 0))) {
-            Args args{{"ratio", double(decimateRatio_)}};
-            if (decimateKeepMasked_) args["keep_masked"] = true;
-            runCommand("decimate", args);
-        }
-        ui::HelpText("Decimate", nullptr, "Reduce the triangle count while keeping the shape. Sculpt layers are kept.",
-                     "Tool > Geometry");
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(-1);
-        ui::SliderInside("##decimate", &decimateRatio_, 0.05f, 0.95f, "Keep %.2f");
-        ui::HelpText("Keep", nullptr, "Fraction of the triangles Decimate keeps.", "Tool > Geometry");
-        ImGui::Checkbox(tr("Keep Masked##decimate"), &decimateKeepMasked_);
-        ui::HelpText("Keep Masked", nullptr,
-                     "Decimate leaves masked vertices where they are, so masked areas keep their triangles exactly; "
-                     "the rest is decimated around them.",
-                     "Tool > Geometry");
-        Demo::pushScope("QRemesh");
-        drawQRemeshContents(); // quad retopology (PanelRetopo.cpp)
+        drawGeometrySection(); // PanelGeometry.cpp
         Demo::popScope();
-        drawModifyTopologyContents(); // Mirror And Weld (PanelExtract.cpp)
-        drawMeshCheckContents();      // Merge by Distance, Check Mesh (PanelMeshCheck.cpp)
     }
     if (subpalette("tool.remesh", "Remesh")) {
         tray::Section section;

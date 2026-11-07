@@ -26,7 +26,7 @@ palette (<kbd>F3</kbd>) also finds a feature by what it does: type "remesh", "gr
 | LOD chain | A series of lighter copies of a model (LOD0, LOD1...) for game engines. See [Geometry](geometry.md#lod-chains) |
 | MCP | Model Context Protocol: `sculptforge-cli --mcp` lets AI agents such as Claude run SculptForge commands |
 | Pivot | The point the Gizmo turns and scales about. <kbd>Alt</kbd>+click the model to put it there. See [The pivot](gizmo.md#the-pivot) |
-| Subdivide | One-way subdivision without levels (**Tool > Geometry > Subdivide**, `subdivide`); **Divide** keeps the levels |
+| Subdivide | One-way subdivision without levels (**Tool > Geometry > Subdivide**, `subdivide`); **Add Level** keeps the levels |
 | Send to Unreal | Export and import a model into a running Unreal Editor in one step (<kbd>Ctrl</kbd>+<kbd>U</kbd>) |
 | Shelves, palettes, trays | The interface around the canvas: shelves hold the most-used controls, palettes hold everything, trays hold pinned palettes. See [The interface](interface.md) |
 | Studio brush folder | A shared, read-only brush folder for a team (`SCULPTFORGE_BRUSH_PATH`). See [For studios](studios.md) |

@@ -1,11 +1,11 @@
-# Micro-displacement levels (Tool > Geometry > Micro): Divide to Micro stores the surface above the highest level
+# Micro-displacement levels (Tool > Geometry > Micro): Add Micro stores the surface above the highest level
 # as displacement grids, the viewport draws it, Standard and Move sculpt it, undo steps back, Delete Micro removes it.
 run new_sphere subdivisions=5
 orbit 30 -15
 click "Geometry##tool.geometry"
-expect "Geometry/Divide to Micro"
-click "Geometry/Divide to Micro"
-expect_status "Divided to micro"
+expect "Geometry/Add Micro"
+click "Geometry/Add Micro"
+expect_status "Added micro"
 expect "Geometry/Bake Micro"
 expect_text "Micro 4"
 # The title bar counts the micro triangles beside the triangles (#125).
@@ -37,6 +37,6 @@ expect_status "Undo"
 
 # Delete Micro takes it away; undo brings it back.
 click "Geometry/Delete Micro"
-expect "Geometry/Divide to Micro"
+expect "Geometry/Add Micro"
 key ctrl+z
 expect "Geometry/Bake Micro"

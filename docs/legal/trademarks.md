@@ -113,6 +113,11 @@ their old ids (`config.store`, `rgb_intensity`, `focal`, `subdiv_lower`...); onl
 | Radial Count | Radial Copies |
 | Group Masked | Group from Mask |
 | Thick / E Smt / Double / TCorne / TBorder (Extract) | Thickness / Edge Smooth / Both Sides / Corners / Border (scripts: `triangle_corners`, `triangle_border`; the old names still read) |
+| Modify Topology / Mirror And Weld | Symmetry / Make Symmetric |
+| Reconstruct Subdiv / Delete Lower / Delete Higher | Rebuild Lower Levels / Remove Below / Remove Above |
+| Divide / Smt / SDiv | Add Level / Smooth / Level |
+| Close Holes / Delete Hidden | Fill Holes / Remove Hidden |
+| Target Polygons / Half / Same / Double / Adaptive Size / Keep Groups / Detect Edges / Curves Strength | Target Quads / 50% / 100% / 200% / Size Variation / Follow Face Groups / Keep Hard Edges / Guide Strength |
 
 <!-- labels:begin -->
     store ?config
@@ -137,7 +142,29 @@ their old ids (`config.store`, `rgb_intensity`, `focal`, `subdiv_lower`...); onl
     (?-i:\bE Smt\b)
     (?-i:\bTCorne\b)
     (?-i:\bTBorder\b)
+    modify topology
+    mirror (?:and|&) weld
+    reconstruct subdiv
+    \bdelete (?:lower|higher|hidden)\b
+    close holes
+    \bsdiv\b
+    (?-i:\bSmt\b)
+    target polygons
+    adaptive size
+    curves strength
+    detect edges
+    \bkeep groups\b
+    \bhalf ?/ ?same ?/ ?double\b
 <!-- labels:end -->
+
+One-word labels that are everyday words in prose and code are refused only as a whole interface label: a string
+literal that is just the word (`"Divide"`, `"Divide##x"`) or a bold term in the guide (`**Divide**`), case as shown.
+The abbreviation above (`(?-i:...)`) is matched case as shown too, so the `geometry.smt` action id (kept, like #117's
+ids) doesn't count.
+
+<!-- whole-labels:begin -->
+    Divide
+<!-- whole-labels:end -->
 
 ## Old words read on load (src/core/LegacyNames.h)
 

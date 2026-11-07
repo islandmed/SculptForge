@@ -10,10 +10,10 @@ micro triangles take about 0.4 GB, sculpt in real time and draw at 60+ frames pe
 
 ## Making a micro level
 
-1. Divide the Part to a comfortable highest level (0.3 to 2 million triangles is the sweet spot).
+1. Add levels to the Part up to a comfortable highest one (0.3 to 2 million triangles is the sweet spot).
 2. In **Tool > Geometry**, set the **Micro** slider. Each step is four times the triangles: the label shows the
    total (Micro 4 on a 1.2 million triangle level is 300 million micro triangles).
-3. Click **Divide to Micro**. The surface stays exactly as smooth as before; the micro level starts flat on it.
+3. Click **Add Micro**. The surface stays exactly as smooth as before; the micro level starts flat on it.
 
 The micro level sits on the highest subdivision level, so step up to it first. While a micro level exists you
 can't change subdivision levels (Bake it or delete it first).

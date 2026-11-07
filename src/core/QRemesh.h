@@ -10,7 +10,7 @@
 //  1. A multi-resolution hierarchy of the surface's vertex graph (greedy edge matching, ~halving per level).
 //  2. A smooth 4-RoSy orientation field (where the quad edges point), solved coarse to fine.
 //  3. A position field: per vertex the nearest corner of a local quad lattice with the wanted edge length,
-//     made consistent across neighbours (also coarse to fine). Adaptive Size scales the lattice with the
+//     made consistent across neighbours (also coarse to fine). Size Variation scales the lattice with the
 //     curvature; vertex paint can ask for more (red) or fewer (blue) polygons.
 //  4. Extraction: vertices whose lattice corners coincide merge, lattice-neighbours become edges, the graph's
 //     faces are traced in each vertex's tangent plane, and every face (quad, or the odd triangle / pentagon
@@ -21,7 +21,7 @@
 //
 // QRemesh Guides (curves drawn on the surface) constrain the fields the same way: a lattice line along each
 // curve, and the orientation turned towards it over a falloff (core/QRemeshGuides.h).
-// Keep Groups constrains the fields to the face group borders, so edge loops run along them (and the result
+// Follow Face Groups constrains the fields to the face group borders, so edge loops run along them (and the result
 // keeps the groups). Symmetry remeshes one half (cut at the plane) and mirrors it, welded on the seam; the plane
 // is the model's own (found from it, so a model away from the origin works), and a model that isn't
 // mirror-symmetric is remeshed whole instead. Separate pieces are kept: small ones (eyes, rivets) are remeshed
@@ -47,8 +47,8 @@ enum class QRemeshMethod { V2 = 0, Legacy = 1 };
 
 struct QRemeshOptions {
     QRemeshMethod method = QRemeshMethod::V2;
-    int targetQuads = 5000;  // the classic Target Polygons Count (here in polygons, not thousands)
-    float adaptive = 0.5f;   // Adaptive Size: 0 = even quads, 1 = sizes follow the curvature strongly
+    int targetQuads = 5000;  // the classic Target Quads Count (here in polygons, not thousands)
+    float adaptive = 0.5f;   // Size Variation: 0 = even quads, 1 = sizes follow the curvature strongly
     bool keepGroups = false; // edge loops along face group borders; the result keeps the groups
     bool detectEdges = true; // hard edges (faces meeting at more than 50 degrees) get an edge loop
     bool useVertexPaint = false; // red vertex paint: up to 4x the density, blue: down to 1/4
@@ -61,7 +61,7 @@ struct QRemeshOptions {
     int smoothIterations = 6;
     uint32_t seed = 1;       // the field's random start (the result is deterministic for a seed)
     // QRemesh Guides (core/QRemeshGuides.h), in the source's space: an edge loop runs along each curve and the
-    // edge flow turns to follow it. guideStrength (Curves Strength, 0..1): how far around a curve the
+    // edge flow turns to follow it. guideStrength (Guide Strength, 0..1): how far around a curve the
     // flow follows it (0 = only the loop on the curve itself, 1 = about six quads to each side).
     std::vector<QRemeshGuide> guides;
     float guideStrength = 0.5f;
@@ -110,7 +110,7 @@ using QRemeshProgress = std::function<bool(float fraction)>;
 
 // Retopologises `source` (its evaluated positions: sculpt layers are baked; hidden parts are remeshed too)
 // into `out`: all quads (as triangle pairs, Mesh::quadPartners), mask and vertex paint interpolated from the
-// sculpt, face groups with Keep Groups. False with `error` set on failure or cancel.
+// sculpt, face groups with Follow Face Groups. False with `error` set on failure or cancel.
 bool qremesh(const Mesh& source, const QRemeshOptions& options, Mesh& out, std::string& error,
              const QRemeshProgress& progress = {}, QRemeshStats* stats = nullptr);
 

@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// the classic Extract (Tool > Part), Mirror And Weld (Tool > Geometry > Modify Topology) and Mirror
+// Extract (Tool > Part), Make Symmetric (Tool > Geometry > Symmetry) and Mirror
 // (Tool > Deformation). The work is done by the extract / mirror_and_weld / mirror commands (core/ExtractMirror.h).
 #include "app/App.h"
 #include "app/Demo.h"
@@ -81,9 +81,10 @@ void App::drawExtractContents() {
     Demo::popScope();
 }
 
-void App::drawModifyTopologyContents() {
-    Demo::pushScope("Modify Topology");
-    tray::GroupLabel(*this, "Modify Topology");
+void App::drawSymmetryContents() {
+    Demo::pushScope("Symmetry");
+    ImGui::Spacing();
+    tray::GroupLabel(*this, "Symmetry");
     const ImGuiStyle& style = ImGui::GetStyle();
     const float axisW = ImGui::GetFrameHeight() * 1.3f;
     ui::ActionButton(*this, "geometry.mirror_weld",

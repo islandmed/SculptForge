@@ -7,16 +7,20 @@ chapter explains what each one does to your mesh and its attributes, and when to
 All of them work on the **active Part** and, except the LOD preview, are undoable with
 <kbd>Ctrl</kbd>+<kbd>Z</kbd>.
 
+In **Tool > Geometry** they are grouped by what you do: **Levels** (see [Subdivision levels](subdivision-levels.md)),
+**Micro Detail**, **Resolution** (Decimate, Quad Remesh, Subdivide), **Cleanup** (Fill Holes) and **Symmetry**
+(Make Symmetric).
+
 ## At a glance
 
 | Tool | Where | Triangles | Quads | Keeps sculpt layers | Keeps mask and vertex paint | Keeps face groups, hidden faces, UVs |
 |---|---|---|---|---|---|---|
-| Divide (levels) | **Tool > Geometry > Divide**, <kbd>Ctrl</kbd>+<kbd>D</kbd> | x4 per level, lower levels kept | Each quad becomes four (Catmull-Clark) | Yes | Yes (interpolated) | Yes |
+| Add Level | **Tool > Geometry > Add Level**, <kbd>Ctrl</kbd>+<kbd>D</kbd> | x4 per level, lower levels kept | Each quad becomes four (Catmull-Clark) | Yes | Yes (interpolated) | Yes |
 | Subdivide | **Tool > Geometry > Subdivide** | x4 per level | Each quad becomes four | Yes | Yes (interpolated) | Yes |
 | Voxel Remesh | **Tool > Remesh > Voxel Remesh** | Set by resolution | All quads (new ones) | Baked in | Yes (transferred) | No (reset); a texture is kept on new UVs with Keep Texture |
-| Quad Remesh | **Tool > Geometry > Quad Remesh** | Set by Target Polygons | All quads, with edge loops | Baked in | Yes (transferred) | Face Groups with Keep Groups; no hidden faces; a texture is kept on new UVs with Keep Texture |
+| Quad Remesh | **Tool > Geometry > Quad Remesh** | Set by Target Quads | All quads, with edge loops | Baked in | Yes (transferred) | Face Groups with Follow Face Groups; no hidden faces; a texture is kept on new UVs with Keep Texture |
 | Decimate | **Tool > Geometry > Decimate** | Reduced | No, all triangles | Yes | Yes | Yes |
-| Mirror And Weld | **Tool > Geometry > Modify Topology** | Twice the kept side | Yes | Yes | Yes (mirrored) | Yes (mirrored) |
+| Make Symmetric | **Tool > Geometry > Symmetry** | Twice the kept side | Yes | Yes | Yes (mirrored) | Yes (mirrored) |
 | LOD chain | **Tool > Export** | One level per ratio step | LOD0 keeps them; lower levels are triangles | Yes, on every level | Yes | Yes |
 
 ## Quads and triangles
@@ -38,7 +42,7 @@ glTF (`.glb`) and STL only hold triangles, so those exports always write triangl
 
 ## Subdivide
 
-For sculpting at several resolutions use **Divide** (<kbd>Ctrl</kbd>+<kbd>D</kbd>), which keeps the lower levels to
+For sculpting at several resolutions use **Add Level** (<kbd>Ctrl</kbd>+<kbd>D</kbd>), which keeps the lower levels to
 step back to: see [Subdivision levels](subdivision-levels.md). **Subdivide (removes levels)** is the one-way
 version; on a Part with levels it asks before removing them.
 
@@ -125,17 +129,17 @@ Texture), where a remesh would bake or drop them; use the button or <kbd>Shift</
 ## Quad Remesh
 
 **Tool > Geometry > Quad Remesh** is automatic quad retopology: it rebuilds the Part as
-clean quads whose edge loops follow the forms, close to a target polygon count, with Keep Groups, Adaptive Size,
+clean quads whose edge loops follow the forms, close to a target polygon count, with Follow Face Groups, Size Variation,
 vertex paint density and symmetry. **Project Detail** (**Tool > Parts > Project**) brings the sculpted detail back onto
 the new topology after you divide it. Both have their own chapter: [Quad retopology and detail
 projection](retopology.md).
 
-## Close Holes
+## Fill Holes
 
-**Tool > Geometry > Close Holes** caps every open boundary of the active Part, such as a hole, an open bottom or the
+**Tool > Geometry > Fill Holes** caps every open boundary of the active Part, such as a hole, an open bottom or the
 rim of an extracted shell. The new patch's triangles are sized like the ones around the hole, and the patch follows
 the curve of the surface around it, so a hole in a sphere closes round, not flat. The rest of the Part is not changed.
-The patches get a [face group](face-groups.md) of their own, so you can mask or hide them in one click. Close Holes
+The patches get a [face group](face-groups.md) of their own, so you can mask or hide them in one click. Fill Holes
 makes an open scan or an extracted part watertight without a remesh. <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings the holes
 back.
 
@@ -157,14 +161,14 @@ scan down to something you can work with.
 > **Tip:** Decimate a duplicate Part (**Tool > Parts > Duplicate**) when you want to keep the full-resolution
 > sculpt in the same project.
 
-## Mirror And Weld
+## Make Symmetric
 
-**Mirror And Weld**, in **Tool > Geometry > Modify Topology**, makes a model symmetric: it keeps the half on the
+**Make Symmetric**, in **Tool > Geometry > Symmetry**, makes a model symmetric: it keeps the half on the
 + side of the chosen axis (+X is the model's left, your right when you look at its face), mirrors it onto the
 other side and welds the two halves along the middle into one watertight mesh. Use it after sculpting one side
 without symmetry, to finish a half model, or to repair a model whose sides have drifted apart.
 
-![A head with a scar and a brow ridge on one side, then the same head after Mirror And Weld X](images/mirror-weld.jpg)
+![A head with a scar and a brow ridge on one side, then the same head after Make Symmetric X](images/mirror-weld.jpg)
 
 - Pick the axis with **X**, **Y** and **Z** beside the button (X is on by default). With several on, they apply
   one after the other.
@@ -207,7 +211,7 @@ changes only what that row names, as one undo step.
 | Row | What it is | What Fix does |
 |---|---|---|
 | **Non-manifold edges** | Edges shared by three or more triangles (a fin, a wall inside the mesh) | Each triangle past the first two gets its own copy of the edge, so it comes loose; nothing is deleted |
-| **Holes** | Open boundary loops | Caps each with a patch, as [Close Holes](#close-holes) does |
+| **Holes** | Open boundary loops | Caps each with a patch, as [Fill Holes](#fill-holes) does |
 | **Duplicate triangles** | Triangles on the same three points as another, either way round | Deletes the copies |
 | **Degenerate triangles** | Triangles that use one point twice | Deletes them |
 | **Zero-area triangles** | Three different points in one line (a sliver) | Collapses each one's shortest edge |
@@ -249,8 +253,8 @@ See [Exporting](exporting.md) for these exports and their options.
 
 ## Undo and safety
 
-Subdivide, remesh, Quad Remesh, decimate, Mirror And Weld, Mirror, Merge by Distance, every Check Mesh fix and
-delete hidden are single undo steps on the
+Subdivide, remesh, Quad Remesh, decimate, Make Symmetric, Mirror, Merge by Distance, every Check Mesh fix and
+Remove Hidden are single undo steps on the
 active Part. They can use a lot of memory on dense meshes, and undo keeps a full copy of the previous mesh for
 each of them. Before a big change on a heavy sculpt:
 

@@ -627,7 +627,7 @@ bool readTexture(Reader& r, const Json& tj, Mesh& m, std::string& error) {
 
 // Subdivision levels (core/Multires.h) are the Part key "subdiv" (format 4; sculpt-layer details in local
 // frames from format 5): the current level and every level's mesh (as "mesh" / "layers" / "paint_layers"),
-// details and topology (scheme, Smt, quad pairing and child maps). The Part's own "mesh" is the current level,
+// details and topology (scheme, Smooth, quad pairing and child maps). The Part's own "mesh" is the current level,
 // so readers that don't know levels load what was shown. A current level identical to that mesh is not written
 // twice ("same_as_mesh"). Format 6: a generated level (made by Divide, SubdivTopology::generated) has no
 // triangles and no child maps ("generated"), and a level without "detail" that isn't stale takes the detail that

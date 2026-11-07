@@ -83,7 +83,7 @@
 <p><strong>Make Mesh</strong> builds the skin as a new Part right below the Forge Sphere Part and makes it active:</p>
 <ul>
 <li>
-It is watertight and made of quads, ready for the brushes, <a href="dynamic-topology.html">Dynamic topology</a>, <a href="subdivision-levels.html">Divide</a> or <a href="retopology.html">Quad Remesh</a>.
+It is watertight and made of quads, ready for the brushes, <a href="dynamic-topology.html">Dynamic topology</a>, <a href="subdivision-levels.html">Add Level</a> or <a href="retopology.html">Quad Remesh</a>.
 </li>
 <li>
 Each link gets its own <a href="face-groups.html">face group</a>, so you can isolate or mask a limb straight away.
@@ -93,7 +93,7 @@ Each link gets its own <a href="face-groups.html">face group</a>, so you can iso
 </li>
 </ul>
 <p>The Forge Sphere Part is hidden and kept. To change the proportions later, show and select it, edit the spheres and Make Mesh again. The armature is saved with the project.</p>
-<aside class="callout callout-tip"><p><strong>Tip:</strong> for clean edge flow, run <a href="retopology.html">Quad Remesh</a> on the new mesh, then Divide and sculpt.</p></aside>
+<aside class="callout callout-tip"><p><strong>Tip:</strong> for clean edge flow, run <a href="retopology.html">Quad Remesh</a> on the new mesh, then add levels and sculpt.</p></aside>
 <h2 id="scripting">Scripting<a class="anchor" href="#scripting" aria-label="Link to this section">#</a></h2>
 <p>The same operations are commands (see <a href="scripting.html">Scripting</a>): <code>forgesphere_new</code>, <code>forgesphere_list</code>, <code>forgesphere_add</code>, <code>forgesphere_set</code>, <code>forgesphere_delete</code>, <code>forgesphere_insert</code>, <code>forgesphere_preview</code> and <code>forgesphere_make_mesh</code>. For example, a simple figure:</p>
 <div class="code-block"><pre class="code"><code>forgesphere_new radius=0.5

@@ -1,9 +1,11 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Tool > Geometry: subdivision levels (Lower Level / Higher Level, SDiv, Delete Lower / Delete Higher,
-// Reconstruct Subdiv, Divide with Smt). The levels themselves live in core/Multires.
+// Tool > Geometry, grouped by what you do: Levels (the Level slider, Lower / Higher Level, Add Level with Smooth,
+// Rebuild Lower Levels, Remove Below / Above), Micro Detail, Resolution (Decimate, Quad Remesh, Subdivide), Cleanup
+// (Fill Holes, Merge by Distance, Check Mesh) and Symmetry (Make Symmetric). The levels themselves live in core/Multires.
 #include "app/App.h"
+#include "app/Demo.h"
 #include "app/Palettes.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
@@ -24,50 +26,52 @@ void App::drawGeometrySection() {
     const ImGuiStyle& style = ImGui::GetStyle();
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
 
-    ui::ActionButton(*this, "geometry.lower_res", ImVec2(half, 0));
-    ImGui::SameLine();
-    ui::ActionButton(*this, "geometry.higher_res", ImVec2(half, 0));
-
-    // SDiv: the level slider (1 = the base cage). Applied when released, as one undo step.
+    // Grouped by what you do (fix/ip-labels): Levels, Micro Detail, Resolution, Cleanup, Symmetry.
+    tray::GroupLabel(*this, "Levels");
+    // Level: the slider (1 = the base cage). Applied when released, as one undo step.
     ImGui::BeginDisabled(levels < 2);
     if (!sdivHeld_) sdivSlider_ = float(current + 1);
     ImGui::SetNextItemWidth(-1);
     char format[32];
-    std::snprintf(format, sizeof format, "SDiv %%.0f / %d", std::max(levels, 1));
-    ui::SliderInside("##sdiv", &sdivSlider_, 1.0f, float(std::max(levels, 1)), format, ImGuiSliderFlags_AlwaysClamp);
+    std::snprintf(format, sizeof format, "Level %%.0f / %d", std::max(levels, 1));
+    ui::SliderInside("##level", &sdivSlider_, 1.0f, float(std::max(levels, 1)), format, ImGuiSliderFlags_AlwaysClamp);
     sdivHeld_ = ImGui::IsItemActive();
     sdivSlider_ = std::round(sdivSlider_);
     if (ImGui::IsItemDeactivatedAfterEdit() && int(sdivSlider_) - 1 != current)
         runCommand("subdiv_level", {{"level", double(sdivSlider_)}});
     ImGui::EndDisabled();
-    ui::HelpText("SDiv", nullptr,
+    ui::HelpText("Level", nullptr,
                  "The subdivision level to sculpt at: 1 is the base cage, the highest has the finest detail. "
                  "D / Shift+D step up / down. Detail is kept on every level.",
                  "Tool > Geometry");
 
-    ui::ActionButton(*this, "geometry.del_lower", ImVec2(half, 0));
+    ui::ActionButton(*this, "geometry.lower_res", ImVec2(half, 0));
     ImGui::SameLine();
-    ui::ActionButton(*this, "geometry.del_higher", ImVec2(half, 0));
-    ui::ActionButton(*this, "geometry.reconstruct", ImVec2(-1, 0));
+    ui::ActionButton(*this, "geometry.higher_res", ImVec2(half, 0));
 
-    // Divide with its Smt toggle beside it.
-    const float smtW = ImGui::CalcTextSize("Smt").x + 2.0f * style.FramePadding.x + 6.0f * uiScale_;
-    ui::ActionButton(*this, "geometry.divide", ImVec2(ImGui::GetContentRegionAvail().x - smtW - style.ItemSpacing.x, 0),
+    // Add Level with its Smooth toggle beside it.
+    const float smoothW = ImGui::CalcTextSize(tr("Smooth")).x + 2.0f * style.FramePadding.x + 6.0f * uiScale_;
+    ui::ActionButton(*this, "geometry.divide", ImVec2(ImGui::GetContentRegionAvail().x - smoothW - style.ItemSpacing.x, 0),
                      ui::Look::IconLabel);
     ImGui::SameLine();
     ui::ActionButton(*this, "geometry.smt", ImVec2(-1, 0));
+    ui::ActionButton(*this, "geometry.reconstruct", ImVec2(-1, 0));
+    // The two that throw levels away come last (each asks first).
+    ui::ActionButton(*this, "geometry.del_lower", ImVec2(half, 0));
+    ImGui::SameLine();
+    ui::ActionButton(*this, "geometry.del_higher", ImVec2(half, 0));
 
     if (levels) {
         char info[96];
-        std::snprintf(info, sizeof info, "SDiv %d of %d  -  base %zu, top %zu triangles", current + 1, levels,
+        std::snprintf(info, sizeof info, "Level %d of %d  -  base %zu, top %zu triangles", current + 1, levels,
                       subdivLevelTriangles(m, 0), subdivLevelTriangles(m, levels - 1));
         ImGui::TextDisabled("%s", info);
     } else {
-        ImGui::TextDisabled("%s", tr("No subdivision levels - Divide adds them"));
+        ImGui::TextDisabled("%s", tr("No subdivision levels - Add Level adds them"));
     }
 
-    // Micro: displacement levels above the highest level (core/Micro.h), in a group of its own: Divide and Delete
-    // Lower / Delete Higher change the levels, Micro only adds detail on top (a tester mixed them up side by side).
+    // Micro: displacement levels above the highest level (core/Micro.h), in a group of its own: Add Level and Remove
+    // Below / Remove Above change the levels, Micro only adds detail on top (a tester mixed them up side by side).
     ImGui::Spacing();
     tray::GroupLabel(*this, "Micro Detail");
     const bool micro = hasMicro(m);
@@ -107,7 +111,37 @@ void App::drawGeometrySection() {
                       double(mm.bytes()) / 1e6, mm.disp.mapped() ? ", out of core" : "");
         ImGui::TextDisabled("%s", info);
     }
-    ImGui::Separator();
+
+    // Resolution: these change the mesh itself and keep no levels.
+    ImGui::Spacing();
+    tray::GroupLabel(*this, "Resolution (no levels)");
+    if (ImGui::Button(tr("Decimate"), ImVec2(half, 0))) {
+        Args args{{"ratio", double(decimateRatio_)}};
+        if (decimateKeepMasked_) args["keep_masked"] = true;
+        runCommand("decimate", args);
+    }
+    ui::HelpText("Decimate", nullptr, "Reduce the triangle count while keeping the shape. Sculpt layers are kept.",
+                 "Tool > Geometry");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(-1);
+    ui::SliderInside("##decimate", &decimateRatio_, 0.05f, 0.95f, "Keep %.2f");
+    ui::HelpText("Keep", nullptr, "Fraction of the triangles Decimate keeps.", "Tool > Geometry");
+    ImGui::Checkbox(tr("Keep Masked##decimate"), &decimateKeepMasked_);
+    ui::HelpText("Keep Masked", nullptr,
+                 "Decimate leaves masked vertices where they are, so masked areas keep their triangles exactly; "
+                 "the rest is decimated around them.",
+                 "Tool > Geometry");
+    ui::ActionButton(*this, "geometry.subdivide", ImVec2(-1, 0)); // (its own row: the long label needs the width)
+    Demo::pushScope("QRemesh");
+    drawQRemeshContents(); // quad retopology (PanelRetopo.cpp)
+    Demo::popScope();
+
+    ImGui::Spacing();
+    tray::GroupLabel(*this, "Cleanup");
+    ui::ActionButton(*this, "geometry.close_holes", ImVec2(-1, 0), ui::Look::IconLabel);
+    drawMeshCheckContents(); // Merge by Distance, Check Mesh (PanelMeshCheck.cpp)
+
+    drawSymmetryContents(); // Make Symmetric (PanelExtract.cpp)
 }
 
 } // namespace sf

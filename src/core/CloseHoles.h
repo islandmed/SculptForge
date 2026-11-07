@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Close Holes (#103): caps the open boundaries of a Part with new polygon patches, so an extracted shell, a cut
+// Fill Holes (#103): caps the open boundaries of a Part with new polygon patches, so an extracted shell, a cut
 // scan or an imported open mesh becomes closed without remeshing. Each boundary loop is triangulated (the best
 // ear first, in the loop's best-fit plane; a fan around its centre when the loop folds over itself in that
 // plane), then the patch is refined towards the boundary's edge length (long edges split, edges flipped to

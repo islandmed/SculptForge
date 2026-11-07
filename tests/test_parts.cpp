@@ -287,7 +287,7 @@ TEST(part_split_by_selection) {
     CHECK(reg.execute(doc, "undo").ok);
     CHECK(doc.partCount() == 1 && doc.mesh.triangleCount() == total);
 
-    // Delete Masked: the mirror of Delete Hidden.
+    // Delete Masked: the mirror of Remove Hidden.
     CHECK(reg.execute(doc, "delete_masked").ok);
     CHECK(doc.mesh.triangleCount() == total - masked);
     CHECK(reg.execute(doc, "undo").ok && doc.mesh.triangleCount() == total);

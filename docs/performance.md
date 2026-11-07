@@ -931,7 +931,7 @@ GPU upload). Undo is the same or faster.
   vertices as coarse vertices, then edge points, then face points, and lays its triangles out polygon by polygon
   (`generateFaces`). Such a level stores no triangles or quad pairs (in `SubdivLevel::data`), no child maps and no
   per-triangle parents and corner codes; all of them follow from the coarse polygons. The working mesh gets its
-  triangles generated when the level is entered. Levels from Reconstruct Subdiv, imports and older projects whose
+  triangles generated when the level is entered. Levels from Rebuild Lower Levels, imports and older projects whose
   numbering matches are recognised as generated; other levels keep the old path.
 - **Details or positions, not both**: a level that isn't stale keeps its positions and no detail; the detail is
   fitted to the positions when a lower level is about to change (before the levels above are marked stale), and

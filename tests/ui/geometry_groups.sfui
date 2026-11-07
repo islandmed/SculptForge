@@ -1,0 +1,40 @@
+# Tool > Geometry grouped by what you do (fix/ip-labels): Levels, Micro Detail, Resolution, Cleanup, Symmetry, with
+# the controls named by function. CMake also runs this at 1440x900 and 2880x1800 (where the 200% shot has the
+# tray); narrow/geometry_groups.sfui is the 1024 px one.
+run new_sphere subdivisions=3
+click "Geometry##tool.geometry"
+expect "Geometry/##level"
+expect "Geometry/Lower Level"
+expect "Geometry/Add Level"
+expect "Geometry/Smooth"
+expect "Geometry/Rebuild Lower Levels"
+expect "Geometry/Remove Below"
+expect "Geometry/Remove Above"
+expect "Geometry/Add Micro"
+expect "Geometry/Decimate"
+expect "Geometry/Subdivide (removes levels)"
+expect "Geometry/Fill Holes"
+expect "Symmetry/Make Symmetric"
+expect_text "Levels"
+expect_text "Cleanup"
+shot geometry-100
+
+# Two levels: the Level slider and the level buttons in use.
+key ctrl+d
+key ctrl+d
+expect_value subdiv_level == 3
+expect_text "Level 3 of 3"
+shot geometry-levels-100
+
+# The Quad Remesh controls further down.
+expect "QRemesh/200%"
+expect "QRemesh/Follow Face Groups"
+expect "QRemesh/Keep Hard Edges"
+hover "QRemesh/Keep Hard Edges"
+shot geometry-qremesh-100
+
+# 200%: the tray scrolls, so only shots here.
+ui_scale 200
+wait 0.3
+shot geometry-200
+ui_scale 100

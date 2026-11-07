@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// "Not enough free memory": Subdivide, Divide, a micro level or a voxel remesh that would build a mesh larger than
+// "Not enough free memory": Subdivide, Add Level, a micro level or a voxel remesh that would build a mesh larger than
 // the memory free now (core/MemoryGuard.h) asks before it runs. Running out takes the whole system down (other
 // programs hold memory the hardware profile, which budgets from the total, counts as ours).
 #include "app/App.h"
@@ -18,8 +18,8 @@ namespace {
 
 const char* commandTitle(const std::string& name) {
     if (name == "subdivide") return "Subdivide";
-    if (name == "subdiv_divide") return "Divide";
-    if (name == "micro_divide") return "Divide to a micro level";
+    if (name == "subdiv_divide") return "Add Level";
+    if (name == "micro_divide") return "Add Micro";
     if (name == "remesh") return "Voxel remesh";
     return "This step";
 }

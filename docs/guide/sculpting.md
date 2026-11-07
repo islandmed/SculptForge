@@ -597,7 +597,7 @@ and a custom brush saves them in its brush file, so they travel in brush codes a
 script: `brush_alpha_options follow_stroke=false angle=45 angle_jitter=20`.
 
 > **Tip:** a VDM moves points sideways, so it needs points to move: on a coarse mesh the shape breaks up into
-> spikes. Divide first (the model above has 330 000 triangles), and stamp at the highest
+> spikes. Add levels first (the model above has 330 000 triangles), and stamp at the highest
 > [subdivision level](subdivision-levels.md); stepping down and back up keeps the stamp. Use Front faces only
 > on thin parts so the stamp doesn't reach through to the other side.
 
@@ -606,7 +606,7 @@ script: `brush_alpha_options follow_stroke=false angle=45 angle_jitter=20`.
 1. In **Sculpt > Brush > Vector Displacement**, click **New VDM Plane**. A flat 2 x 2 grid appears as a new Part,
    seen from the top, with its border masked (so the stamp blends into any surface); the other Parts are
    hidden. **Plane Res** sets how many quads it has (256 by default).
-2. Sculpt the shape with any brush: overhangs are welcome (Move, Tendril, Inflate). Divide the plane for finer
+2. Sculpt the shape with any brush: overhangs are welcome (Move, Tendril, Inflate). Add levels to the plane for finer
    detail. Keep the border flat.
 3. Type a name, choose the **Map Size** (256 pixels holds most shapes, 512 fine detail) and click **Create VDM**.
    The new map is saved in your brush library, shows in the list and becomes the VDM brush's map.

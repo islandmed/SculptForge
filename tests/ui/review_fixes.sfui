@@ -1,5 +1,5 @@
 # What a 0.10.6 video review and a Discord tester hit, part 1 (part 2: review_fixes_mask_views.sfui): Dynamic on
-# the divided default sphere was a dead end (now Freeze Levels), and Delete Lower / Delete Higher deleting levels
+# the divided default sphere was a dead end (now Freeze Levels), and Remove Below / Remove Above deleting levels
 # without asking.
 run new_sphere
 run subdiv_divide

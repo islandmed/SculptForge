@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Extract (a shell from the mask, preview + Accept, undo), Mirror And Weld and Mirror (core/ExtractMirror.h).
+// Extract (a shell from the mask, preview + Accept, undo), Make Symmetric and Mirror (core/ExtractMirror.h).
 #include "TestHarness.h"
 
 #include "core/Commands.h"
@@ -174,7 +174,7 @@ TEST(mirror_and_weld_sphere) {
     for (const auto& p : m.positions) missing += !keys.count(key(glm::vec3(-p.x, p.y, p.z)));
     CHECK(missing == 0);
 
-    CHECK(doc.undo.undoLabel() == "Mirror And Weld");
+    CHECK(doc.undo.undoLabel() == "Make Symmetric");
     CHECK(reg.execute(doc, "undo").ok);
     CHECK(doc.mesh.triangleCount() == before);
 

@@ -1,5 +1,5 @@
 # View controls (#80, #91, #102, #103): X-Ray next to Solo, the view's resolution, the light, Save Render's size
-# and shape, Cut's Clip mode and Tool > Geometry > Close Holes.
+# and shape, Cut's Clip mode and Tool > Geometry > Fill Holes.
 run new_sphere subdivisions=4
 run part_append type=cube name=Box
 run part_select index=0
@@ -97,7 +97,7 @@ key ctrl+z
 key x
 click "Away##cut.away"
 
-# Close Holes (#103): a hole through the sphere (hide a square of it, delete the hidden part), closed again from
+# Fill Holes (#103): a hole through the sphere (hide a square of it, delete the hidden part), closed again from
 # Tool > Geometry.
 camera 0 0
 run hide_rect x0=-0.25 y0=-0.25 x1=0.25 y1=0.25 inside=true
@@ -107,8 +107,8 @@ camera -35 -15
 wait 0.2
 shot close-holes-before
 click "Tool/Geometry"
-click "Close Holes##geometry.close_holes"
-expect_status Close Holes: closed 2 holes
+click "Fill Holes##geometry.close_holes"
+expect_status Fill Holes: closed 2 holes
 expect_value triangles > $open
 wait 0.2
 shot close-holes-after

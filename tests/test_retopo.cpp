@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // QRemesh (quad retopology) and ProjectAll (detail projection): the result is a closed 2-manifold made of
-// quads, near the target count and the sculpt's surface (Hausdorff distance); Keep Groups, symmetry, open
+// quads, near the target count and the sculpt's surface (Hausdorff distance); Follow Face Groups, symmetry, open
 // surfaces, vertex paint density, mask / colour transfer, cancel; projecting detail back onto a divided retopo
 // brings the error down and respects the mask; both commands are one undo step.
 // SF_RETOPO_BENCH=1 also times both on a 1M+ triangle sculpt.
@@ -105,21 +105,21 @@ TEST(qremesh_keep_groups_follows_borders) {
     Mesh out;
     std::string err;
     CHECK(qremesh(doc.mesh, o, out, err));
-    checkQuadMesh(out, true, "cube, Keep Groups");
+    checkQuadMesh(out, true, "cube, Follow Face Groups");
     // Six groups, each quad entirely in one (halves agree), and the cube's sharp edges kept.
     CHECK(out.hasFaceGroups());
     std::set<uint32_t> groups(out.facegroups.begin(), out.facegroups.end());
     CHECK(groups.size() == 6);
     for (size_t t = 0; t + 1 < out.triangleCount(); t += 2) CHECK(out.facegroups[t] == out.facegroups[t + 1]);
     const SurfaceDeviation d = measureDeviation(out, doc.mesh);
-    std::printf("  cube with Keep Groups: Hausdorff %.3f%% of the size\n", 100.0f * d.max / diagonal(doc.mesh));
+    std::printf("  cube with Follow Face Groups: Hausdorff %.3f%% of the size\n", 100.0f * d.max / diagonal(doc.mesh));
     CHECK(d.max < 0.005f * diagonal(doc.mesh));
     // Without groups or edge detection the corners round off.
     o.keepGroups = false;
     Mesh soft;
     CHECK(qremesh(doc.mesh, o, soft, err));
     CHECK(measureDeviation(soft, doc.mesh).max > d.max * 2.0f);
-    // Detect Edges alone also keeps them.
+    // Keep Hard Edges alone also keeps them.
     o.detectEdges = true;
     Mesh hard;
     CHECK(qremesh(doc.mesh, o, hard, err));

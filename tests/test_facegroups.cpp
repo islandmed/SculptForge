@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Face groups and visibility: grouping commands, hide/isolate/show/invert,
-// rectangle and lasso hiding, delete hidden, undo, and that picking and brushes skip
+// rectangle and lasso hiding, remove hidden, undo, and that picking and brushes skip
 // hidden geometry.
 #include "TestHarness.h"
 

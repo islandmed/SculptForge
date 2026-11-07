@@ -83,7 +83,7 @@ start from: Skull, Jaw, Fang, Blade tooth, Swept horn, Spiral horn, Claw, Verteb
 Limb bone, Wing bone and Wing finger. Click one in the **Insert set** window and drag on the model, as with any set;
 horns, claws and teeth grow from where you drag. With **Symmetry** X on, a horn or a claw gets its mirrored twin.
 
-Each piece is a clean, closed quad mesh of 500 to 4,200 faces, so it takes **Divide** and sculpting well: insert, then
+Each piece is a clean, closed quad mesh of 500 to 4,200 faces, so it takes **Add Level** and sculpting well: insert, then
 sculpt the joins smooth, or **Voxel Remesh** to fuse the piece into the model. Drag pieces onto an empty **Plane** or **Sphere**
 Part to build a skeleton of their own Part. The pieces were designed for SculptForge (tools/creature-bones in the
 source) and come under the app's licence, GPL-3.0. (Commands: `insert_set_items set=builtin:creature-bones`;
@@ -187,7 +187,7 @@ A triangle counts as **masked when the average mask of its three corners is abov
 splits along its middle and a single masked corner doesn't take its neighbours. UVs, face groups, vertex paint and
 sculpt layers carry over to both sides. [Subdivision levels](subdivision-levels.md) can't be cut: the split is
 made at the level the Part is on, which becomes its base (undo brings the levels back). To delete instead of
-split, use **Delete hidden** or **Delete masked** in **Tool > Visibility**.
+split, use **Remove Hidden** or **Delete masked** in **Tool > Visibility**.
 
 ## Extract a shell
 

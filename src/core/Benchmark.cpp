@@ -483,7 +483,7 @@ std::string runDyntopoBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
         log("Building a " + millions(double(target)) + " triangle sphere...");
         Document doc;
         doc.mesh = makeBenchSphere(target);
-        doc.mesh.multires.reset(); // (as after Delete Lower)
+        doc.mesh.multires.reset(); // (as after Remove Below)
         doc.mesh.rebuildTopology();
         doc.bvh.build(doc.mesh);
         Mesh& m = doc.mesh;

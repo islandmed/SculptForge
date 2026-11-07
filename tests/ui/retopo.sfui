@@ -16,17 +16,17 @@ expect_value quads == 0
 hold ctrl
 hover "QRemesh/Quad Remesh"
 expect_help "all-quad topology"
-hover "QRemesh/Keep Groups"
+hover "QRemesh/Follow Face Groups"
 expect_help "face group borders"
-hover "QRemesh/Double"
+hover "QRemesh/200%"
 expect_help "twice"
 hover "QRemesh/##qtarget"
 expect_help "how many quads"
 hold none
 
-# Target Polygons about 3000 (drag the slider), keep the original.
+# Target Quads about 3000 (drag the slider), keep the original.
 drag_item "QRemesh/##qtarget" -16 0
-expect_text "Target Polygons 3"
+expect_text "Target Quads 3"
 click "QRemesh/Keep Original"
 remember triangles sculpt_tris
 click "QRemesh/Quad Remesh"
@@ -49,13 +49,13 @@ expect_value triangles == $sculpt_tris
 key ctrl+shift+z
 expect_value quads > 2400
 
-# Half / Same / Double set the target from the current polygon count.
+# 50% / 100% / 200% set the target from the current polygon count.
 # (2400-4400 polygons doubled can't start with a 3, unlike the dragged target of about 3000.)
-click "QRemesh/Double"
-expect_text "Target Polygons"
-expect_no_text "Target Polygons 3"
+click "QRemesh/200%"
+expect_text "Target Quads"
+expect_no_text "Target Quads 3"
 
-# Divide twice, show the original and project its detail back.
+# Add two levels, show the original and project its detail back.
 run subdivide levels=2
 run part_visibility index=1 visible=true
 click "Parts##tool.part"
@@ -83,7 +83,7 @@ run part_select index=1
 run part_visibility index=1 visible=true
 click "Geometry##tool.geometry"
 click "QRemesh/Keep Original"
-click "QRemesh/Same"
+click "QRemesh/100%"
 remember triangles before_cancel
 click "QRemesh/Quad Remesh"
 expect_value qremesh_running == 1
@@ -98,7 +98,7 @@ drop ../../assets/demo/lion-head.glb
 wait_idle 30
 click "QRemesh/Keep Original"
 drag_item "QRemesh/##qtarget" 6 0
-expect_text "Target Polygons 5"
+expect_text "Target Quads 5"
 click "QRemesh/Quad Remesh"
 wait_idle 120
 expect_status "100% quads"

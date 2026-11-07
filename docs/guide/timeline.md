@@ -11,7 +11,7 @@ after it, and render the whole history as a turntable timelapse video.
 ## The strip
 
 Each step is a tick on the track: sculpt strokes in light grey, masks in blue, vertex paint in pink, visibility
-and face groups in green, and topology changes (dynamic topology, remeshing, Divide, Part changes) as tall
+and face groups in green, and topology changes (dynamic topology, remeshing, Add Level, Part changes) as tall
 teal ticks. The orange scrubber marks the state the canvas shows; the steps after it are dimmed. A dot above a
 tick marks a re-tuned stroke.
 
@@ -49,7 +49,7 @@ later Inflate keeps the direction it pushed in then. For most detail passes that
 change under a lot of later work, check the area afterwards.
 
 A stroke can't be re-tuned when a step after it replaced the mesh as a whole (dynamic topology, a remesh,
-Divide, a sculpt layer change): the menu says which step is in the way. Strokes made on a sculpt layer can't be
+Add Level, a sculpt layer change): the menu says which step is in the way. Strokes made on a sculpt layer can't be
 re-tuned either.
 
 ## Big meshes
@@ -77,7 +77,7 @@ about the last 100 strokes of the size above, a 33 million one about 70; small d
 Turn on **Save with project** (the save icon on the strip) and saving a project also writes its history beside it, as
 `name.sfhist` next to `name.sfproj`. Opening the project brings the timeline back, branches and re-tuned strengths
 included, as long as the project hasn't been changed elsewhere since. Sculpt strokes, masks, vertex paint, visibility
-and face groups are saved; a topology change (dynamic topology, remesh, Divide, sculpt layers) cuts the saved
+and face groups are saved; a topology change (dynamic topology, remesh, Add Level, sculpt layers) cuts the saved
 history there, keeping what came after it.
 
 ## Timelapse video

@@ -252,15 +252,15 @@ stroke 0.3 0.7 0.7 0.74 1.0
 run subdiv_level level=1
 click "Wire##view.wire"
 wait 0.2
-shot sdiv-1
+shot level-1
 run subdiv_level level=3
 wait 0.2
-shot sdiv-3
+shot level-3
 click "Wire##view.wire"
 run subdiv_level level=6
 click "Tool/Geometry"
 wait 0.2
-shot sdiv-6
+shot level-6
 
 # Dynamic topology: Tendril pulls horns out of a sphere (mirrored), with new triangles all along them.
 run new_sphere subdivisions=3
@@ -397,7 +397,7 @@ wait 0.2
 shot extract
 click "Groups##view.facegroups"
 
-# Mirror And Weld (geometry.md): a head sculpted on one side, then mirrored and welded.
+# Make Symmetric (geometry.md): a head sculpted on one side, then mirrored and welded.
 run new_head
 run stroke points="0.035,0.005,0.2 0.06,-0.03,0.2 0.07,-0.07,0.2" brush=Standard radius=0.012 strength=1
 run stroke points="0.015,0.105,0.2 0.04,0.1,0.2 0.065,0.085,0.2" brush=Standard radius=0.014 strength=1

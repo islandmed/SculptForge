@@ -42,7 +42,7 @@ struct Proxy {
     std::vector<uint32_t> group;   // per triangle
     std::vector<uint32_t> opp;     // per corner 3t+k (the edge T[k] -> T[k+1]): the twin corner, kNone when open
     std::vector<uint8_t> feature;  // per corner: the edge is a feature line (open edges included)
-    std::vector<uint8_t> sharp;    // per corner: ... because it is a hard edge (Detect Edges)
+    std::vector<uint8_t> sharp;    // per corner: ... because it is a hard edge (Keep Hard Edges)
     std::vector<uint8_t> guide;    // per corner: ... because a QRemesh Guide runs along it (empty: none)
     std::vector<float> size;       // per vertex: wanted quad edge length
     std::vector<float> fieldSize;  // per vertex: the (relative) size the cross field turns with; empty = none

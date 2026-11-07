@@ -135,7 +135,7 @@ TEST(search_aliases_are_generic_words) {
     CHECK(has(searchAliasesIn("Append", "Tool > Parts"), "kitbash"));
     CHECK(has(searchAliasesIn("Duplicate", "Tool > Parts"), "folders"));
     CHECK(has(searchAliasesIn("Clip", "Tool > Cut"), "trim"));
-    CHECK(has(searchAliasesIn("Divide"), "multires"));
+    CHECK(has(searchAliasesIn("Add Level"), "multires"));
     CHECK(has(searchAliasesIn("Show face groups"), "groups"));
     CHECK(searchAliasesIn("Partial redo").empty());       // whole words only
     CHECK(searchAliasesIn("Dynamic stroke spacing").empty()); // "Dynamic" only as the whole label

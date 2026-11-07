@@ -2682,7 +2682,7 @@ void App::runCommand(const std::string& name, const Args& args) {
         lastCommandOk_ = packs_.review != nullptr;
         return;
     }
-    // A big mesh (Subdivide, Divide, micro, remesh) asks first when it wouldn't fit the memory free now.
+    // A big mesh (Subdivide, Add Level, micro, remesh) asks first when it wouldn't fit the memory free now.
     if (!memoryAllows(name, args, [this, name, args] { runCommand(name, args); })) {
         lastCommandOk_ = false;
         return;
@@ -2707,7 +2707,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     // synchronous command, as its next steps read the UVs at once.
     CommandResult r = name == "uv_auto" && macros_.runDepth == 0 ? startAutoUvCommand(args)
                                                                  : commands_.execute(doc_, name, withUnit.empty() ? args : withUnit);
-    if (perftrace::on()) { // a command that held up the frames (remesh, Divide, micro, open...)
+    if (perftrace::on()) { // a command that held up the frames (remesh, Add Level, micro, open...)
         const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - commandStart).count();
         if (ms > perf_.traceLongMs) {
             char took[48];
@@ -3195,7 +3195,7 @@ void App::drawLayersContents() {
             runCommand("layer_set_active", {{"index", double(i)}});
         ui::HelpText(layer.name.c_str(), nullptr,
                      "Select to sculpt into this layer. With subdivision levels, record at any level: a "
-                     "layer keeps its own detail on every level and follows Lower Level / Higher Level and Divide.",
+                     "layer keeps its own detail on every level and follows Lower Level / Higher Level and Add Level.",
                      kLayersPath);
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 52 * scale);
         const bool playing = playingLayer_ == i;

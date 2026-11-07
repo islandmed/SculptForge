@@ -1,12 +1,12 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Multiresolution subdivision levels, classic (Tool > Geometry: Divide, Lower Level / Higher Level, SDiv,
-// Delete Lower / Delete Higher, Reconstruct Subdiv, Smt).
+// Multiresolution subdivision levels, classic (Tool > Geometry: Divide, Lower Level / Higher Level, Level,
+// Remove Below / Remove Above, Rebuild Lower Levels, Smooth).
 //
 // A Part's mesh may carry a stack of levels (Mesh::multires). Level 0 is the base cage; each higher level
 // is the one below subdivided (Catmull-Clark when the mesh has quads, so quads stay quads; Loop on pure
-// triangle meshes; or flat when Smt was off) plus a detail displacement per vertex, stored in the local frame
+// triangle meshes; or flat when Smooth was off) plus a detail displacement per vertex, stored in the local frame
 // (tangent, bitangent, normal) of the subdivided surface:
 //
 //     P[k] = S(P[k-1]) + Frame(S(P[k-1])) * D[k]
@@ -31,7 +31,7 @@
 //
 // The stack is shared copy-on-write (std::shared_ptr): copying a Mesh for an undo snapshot or an export is
 // cheap, and changing one level only copies that level. Stepping levels is one undo step (UndoRecord::
-// subdiv), and so are Divide, Delete Lower, Delete Higher and Reconstruct: each keeps the previous stack, which
+// subdiv), and so are Divide, Remove Below, Remove Above and Reconstruct: each keeps the previous stack, which
 // shares every level the operation didn't touch.
 #pragma once
 
@@ -60,7 +60,7 @@ struct Document;
 // coarse polygons, which saves about 30 bytes per triangle at the top level.
 struct SubdivTopology {
     bool catmullClark = false; // quads (and triangles) -> quads; false = Loop, triangles -> 4 triangles
-    bool smooth = true;        // false: flat subdivision (Smt off), the shape is not smoothed
+    bool smooth = true;        // false: flat subdivision (Smooth off), the shape is not smoothed
     bool generated = false;
     uint32_t coarseVertices = 0, fineVertices = 0;
     size_t fineTriangles = 0;
@@ -144,7 +144,7 @@ struct MultiresStack {
 // --- Queries (0 levels = a plain mesh) ---
 int subdivLevelCount(const Mesh& mesh);
 int subdivCurrentLevel(const Mesh& mesh); // 0-based; 0 without levels
-// "SDiv 3/5" (1-based shows it), or "" without levels.
+// "Level 3/5" (1-based shows it), or "" without levels.
 std::string subdivLevelText(const Mesh& mesh);
 // Triangle count of level `level`.
 size_t subdivLevelTriangles(const Mesh& mesh, int level);
@@ -159,10 +159,10 @@ size_t subdivCacheBytes(const Mesh& mesh);
 // meshes kept by undo steps.
 void subdivReleaseCache(Mesh& mesh);
 
-// --- Tools that rebuild the mesh (voxel remesh, decimate, QRemesh, Subdivide, Delete Hidden, merging and
+// --- Tools that rebuild the mesh (voxel remesh, decimate, QRemesh, Subdivide, Remove Hidden, merging and
 // splitting Parts) work on the current level, pending edits included, and leave a plain mesh: the levels
 // are dropped and the current level becomes the new base. ---
-// The status-line note for dropping `mesh`'s levels: "Subdivision levels removed: SDiv 3 of 5 kept as the new
+// The status-line note for dropping `mesh`'s levels: "Subdivision levels removed: Level 3 of 5 kept as the new
 // base". "" when the mesh has no levels. `name` (a Part name, optional) prefixes the level.
 std::string subdivDroppedNote(const Mesh& mesh, const std::string& name = {});
 // Adds the note for Part `index` (named) to doc.notice, for operations that aren't undoable (merging and
@@ -175,7 +175,7 @@ void notePartLevelsDropped(Document& doc, int index);
 // Operations that change the working mesh take an optional BVH: when given it is made valid for the new
 // mesh (rebuilt, or taken from the level cache); otherwise the caller rebuilds it.
 //
-// Adds a level on top (stepping to the highest level first) and makes it current. `smooth` = Smt.
+// Adds a level on top (stepping to the highest level first) and makes it current. `smooth` = Smooth.
 // `maxTriangles` 0 = subdivMaxTriangles().
 bool subdivDivide(Mesh& mesh, bool smooth, std::string& error, BVH* bvh = nullptr, size_t maxTriangles = 0);
 // The most triangles Divide makes on this computer: what fits in about 60% of its memory at kDivideBytesPerTriangle
@@ -199,7 +199,7 @@ Mesh subdivLevelMesh(const Mesh& mesh, int level);
 
 // --- Project files ---
 // Rebuilds the topology of a saved level from what the file keeps: the coarse level's triangles and vertex
-// count, the fine vertex count, the scheme, Smt, the quad pairing and the child maps. `fineTriangles` are the
+// count, the fine vertex count, the scheme, Smooth, the quad pairing and the child maps. `fineTriangles` are the
 // level's own triangles, or null for a generated level (which stores none). A level whose child maps and
 // triangles are the generated ones becomes generated (attachSubdivStack then drops its triangles). Null with
 // `error` set when they don't fit the meshes.
@@ -241,7 +241,7 @@ bool setSubdivLevelUndoable(Document& doc, int level, std::string& message);
 bool deleteLowerUndoable(Document& doc, std::string& message);
 bool deleteHigherUndoable(Document& doc, std::string& message);
 bool reconstructUndoable(Document& doc, std::string& message);
-// Freeze levels: keep the level shown as a plain mesh and delete every other level (Delete Higher and Delete Lower in
+// Freeze levels: keep the level shown as a plain mesh and delete every other level (Remove Above and Remove Below in
 // one undo step), e.g. before Dynamic topology, which needs a mesh without levels.
 bool freezeLevelsUndoable(Document& doc, std::string& message);
 

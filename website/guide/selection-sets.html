@@ -84,7 +84,7 @@ Click <strong>Store</strong>. Storing again under the same name replaces that se
 <p>The menu next to <strong>From Visible</strong> sets how <strong>Restore</strong> meets what you have now, for the mask and visibility:</p>
 <div class="table-wrap"><table><thead><tr><th>Mode</th><th>Mask</th><th>Visibility</th></tr></thead><tbody><tr><td><strong>Replace</strong></td><td>The set&#x27;s mask.</td><td>The set&#x27;s shown faces.</td></tr><tr><td><strong>Union</strong></td><td>Masked in either.</td><td>Shown in either.</td></tr><tr><td><strong>Intersect</strong></td><td>Masked in both.</td><td>Shown in both.</td></tr><tr><td><strong>Subtract</strong></td><td>Masked now but not in the set.</td><td>Shown now but not in the set.</td></tr></tbody></table></div>
 <p>Every store, restore, rename, delete and combine is one undo step.</p>
-<p>A set greyed out in the list no longer fits the Part: its topology changed since (a remesh, Dynamic topology, Delete hidden). Undo the change, or delete the set.</p>
+<p>A set greyed out in the list no longer fits the Part: its topology changed since (a remesh, Dynamic topology, Remove Hidden). Undo the change, or delete the set.</p>
 <h2 id="combine-sets">Combine sets<a class="anchor" href="#combine-sets" aria-label="Link to this section">#</a></h2>
 <p>Pick a second set in the menu under <strong>Restore</strong>, choose <strong>Union</strong>, <strong>Intersect</strong> or <strong>Subtract</strong> above, and click <strong>Combine</strong>: a new set (&quot;Head + Arms&quot;, &quot;Head &amp; Arms&quot; or &quot;Head - Arms&quot;) holds the mask and visibility of the two combined that way. Your current mask and visibility are not touched until you restore it.</p>
 <h2 id="subdivision-levels">Subdivision levels<a class="anchor" href="#subdivision-levels" aria-label="Link to this section">#</a></h2>
@@ -100,7 +100,7 @@ going up, masks and vertex paint are interpolated, face groups and visibility ar
 a shape travels as its difference from that level&#x27;s own surface, so the detail of the levels in between stays where it is.
 </li>
 </ul>
-<p>So you can store a mask at SDiv 1, sculpt at SDiv 5 and restore the mask there, or keep a high-resolution face group set and use it at the base cage. Sets survive <strong>Divide</strong>, <strong>Delete Lower</strong>, <strong>Delete Higher</strong> and <strong>Reconstruct Subdiv</strong> as long as the level they were stored at still exists.</p>
+<p>So you can store a mask at Level 1, sculpt at Level 5 and restore the mask there, or keep a high-resolution face group set and use it at the base cage. Sets survive <strong>Add Level</strong>, <strong>Remove Below</strong>, <strong>Remove Above</strong> and <strong>Rebuild Lower Levels</strong> as long as the level they were stored at still exists.</p>
 <h2 id="morph-targets">Morph targets<a class="anchor" href="#morph-targets" aria-label="Link to this section">#</a></h2>
 <p>Store a set with <strong>Shape</strong> ticked to keep the surface as it is now. Then:</p>
 <ul>

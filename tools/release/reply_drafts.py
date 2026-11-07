@@ -99,7 +99,7 @@ def main(argv):
         assert e[2] == ("Fixed", "Stamp keeps strength (#146, Huion).")
         assert issues_named(sec) == [142, 144, 146]
         assert missing_words("Options: OCIO config file (UI scale already in Edit > Preferences)", e[1][1])
-        assert not missing_words("UVs being corrupted on Reconstruct Subdiv", "**Reconstruct Subdiv** keeps UVs")
+        assert not missing_words("UVs being corrupted on Rebuild Lower Levels", "**Rebuild Lower Levels** keeps UVs")
         d = draft(146, {"title": "Drag stamp weak", "state": "OPEN", "author": {"login": "pen"}, "body": ""},
                   [e[2]], "9.0.0", "o/r", "v9.0.0")
         assert "Fixed in SculptForge 9.0.0" in d and "Thanks @pen " in d and "Huion)." in d

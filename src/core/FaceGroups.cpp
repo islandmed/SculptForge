@@ -526,7 +526,7 @@ void registerFaceGroupCommands(CommandRegistry& reg) {
                  if (m.triangleCount() == 0) return {false, "Everything is hidden"};
                  const size_t removed = doc.mesh.triangleCount() - m.triangleCount();
                  if (removed == 0) return {false, "Nothing is hidden"};
-                 doc.replaceMeshUndoable(std::move(m), "Delete Hidden");
+                 doc.replaceMeshUndoable(std::move(m), "Remove Hidden");
                  return {true, "Deleted " + std::to_string(removed) + " triangles, " +
                                    std::to_string(doc.mesh.triangleCount()) + " left"};
              }});

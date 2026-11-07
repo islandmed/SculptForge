@@ -212,7 +212,7 @@ private:
     void freezeLevelsAndDynamic();
     void drawDynamicOffer(); // the pop-up setDynamic opens instead of a dead-end message
     bool openDynamicOffer_ = false;
-    // Delete Lower / Delete Higher from the interface: a confirmation naming the levels that go (scripts run directly).
+    // Remove Below / Remove Above from the interface: a confirmation naming the levels that go (scripts run directly).
     void confirmLevelDelete(const std::string& command);
     std::string pendingLevelDelete_;
     bool openLevelDelete_ = false;
@@ -1362,7 +1362,7 @@ private:
     } guidesFrom_;
     std::vector<glm::vec3> guidePath_; // the curve being drawn (points on the surface)
     float guidePathLast_[2] = {0.0f, 0.0f};
-    float curvesStrength_ = 50.0f;     // Curves Strength 0-100 (QRemeshOptions::guideStrength x 100)
+    float curvesStrength_ = 50.0f;     // Guide Strength 0-100 (QRemeshOptions::guideStrength x 100)
     // Which guide points face the camera (drawn solid; the others faint), cached per view and guide set.
     std::vector<std::vector<uint8_t>> guideVisible_;
     uint64_t guideVisibleKey_ = 0;
@@ -1861,10 +1861,10 @@ private:
     float morphAmount_ = 1.0f;
     bool renamingSet_ = false;
     char setRenameBuffer_[64] = "";
-    void drawGeometrySection(); // PanelGeometry.cpp: Divide, SDiv, Lower / Higher Level, Delete Lower / Higher, Reconstruct
-    bool smt_ = true;           // Tool > Geometry > Smt: Divide smooths
-    float sdivSlider_ = 1.0f;   // the SDiv slider while dragged (1-based)
-    float microSlider_ = 4.0f;  // Tool > Geometry > Micro: the micro level the next Divide to micro makes
+    void drawGeometrySection(); // PanelGeometry.cpp: Add Level, Level, Lower / Higher Level, Remove Below / Above, Rebuild Lower Levels
+    bool smt_ = true;           // Tool > Geometry > Smooth: Add Level smooths
+    float sdivSlider_ = 1.0f;   // the Level slider while dragged (1-based)
+    float microSlider_ = 4.0f;  // Tool > Geometry > Micro: the micro level the next Add Micro makes
     bool sdivHeld_ = false;
     void drawPartsContents();
     // Parts list folders (#96): what a frame's folder rows asked for, run after the list (by folder name).
@@ -1877,10 +1877,10 @@ private:
     void partDropTarget(const std::string& folder, PartFolderActions& fa);
     std::string partFolderName(uint32_t id) const;
     void startFolderRename(); // the folder just made: its name ready to type
-    // PanelExtract.cpp: Tool > Part > Extract, Tool > Geometry > Modify Topology (Mirror And Weld) and
+    // PanelExtract.cpp: Tool > Part > Extract, Tool > Geometry > Symmetry (Make Symmetric) and
     // Tool > Deformation (Mirror).
     void drawExtractContents();
-    void drawModifyTopologyContents();
+    void drawSymmetryContents();
     void drawDeformationContents();
     // PanelMeshCheck.cpp: Tool > Geometry > Merge by Distance (weld_points) and Check Mesh (mesh_check / mesh_fix),
     // and the points a weld would merge drawn on the model while the section shows.
@@ -1904,7 +1904,7 @@ private:
     bool extractDouble_ = false;           // Both Sides
     bool extractTriCorners_ = false;        // Corners: triangles in the rim's sharp corners
     bool extractTriBorder_ = false;         // Border: the whole rim triangles
-    bool mirrorWeldAxes_[3] = {true, false, false}; // Mirror And Weld's X Y Z
+    bool mirrorWeldAxes_[3] = {true, false, false}; // Make Symmetric's X Y Z
     bool mirrorAxes_[3] = {true, false, false};     // Deformation > Mirror's X Y Z
     // Deformation > Stack (docs/design/deform-panel.md): the steps, the one being edited and the preview, which is
     // the stack really applied as one undo step (redone after each change while it is still the last step).

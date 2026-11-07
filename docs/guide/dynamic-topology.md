@@ -74,7 +74,7 @@ first. If you turn Dynamic on and then pick a Part that has levels, strokes scul
 **Sculpt > Draw & Tablet** palette shows the same **Freeze Levels + Dynamic** button.
 
 A good workflow: block in with Dynamic, then [Quad Remesh](retopology.md) or [Voxel Remesh](geometry.md) for an even
-base, **Divide** for levels, and sculpt the fine detail on them.
+base, **Add Level** for levels, and sculpt the fine detail on them.
 
 ## Undo and speed
 

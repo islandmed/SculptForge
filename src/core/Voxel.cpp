@@ -610,7 +610,7 @@ Mesh voxelRemesh(const Mesh& source, int resolution, std::string* error, const s
         if (cells > 64.0 && double(inside) < 0.5 * cells) {
             if (error)
                 *error = "Remesh: the Part has open borders that couldn't be capped, so it isn't a closed solid and the "
-                         "remesh would be full of holes; the Part is unchanged. Close it first (Tool > Geometry > Close Holes)";
+                         "remesh would be full of holes; the Part is unchanged. Close it first (Tool > Geometry > Fill Holes)";
             return {};
         }
     }
