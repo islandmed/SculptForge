@@ -189,7 +189,26 @@ land_staging() { # land_staging [--with CMD] [REF]
     if [ -n "$pid" ]; then wait "$pid" || local_rc=$?; tail -5 "/tmp/merge-queue-with-${sha:0:8}.log" | sed 's/^/   /'; fi
     echo "   CI on staging: $ci; local: $([ $local_rc = 0 ] && echo ok || echo "failed ($local_rc)"); $(( $(date +%s) - t0 )) s"
     [ "$ci" = success ] && [ $local_rc = 0 ] || die "staging is red: main stays at $(git rev-parse --short origin/main); fix the batch and run again"
+    # A release being promoted on this machine (scripts/release.sh X.Y.Z --yes) holds main until it is done: wait
+    # (up to SF_PROMOTE_WAIT_MIN, default 180), then land this batch on top of it.
+    local lock waited=0 holder
+    lock="$(git rev-parse --git-common-dir)/sf-promoting"
+    while holder=$(cat "$lock" 2>/dev/null) && kill -0 "${holder%% *}" 2>/dev/null; do
+        [ $waited = 0 ] && echo "   main waits for the ${holder#* } promote (pid ${holder%% *}) to finish"
+        [ $waited -lt $(( ${SF_PROMOTE_WAIT_MIN:-180} * 60 )) ] ||
+            die "the ${holder#* } promote still holds main after ${SF_PROMOTE_WAIT_MIN:-180} min: staging ${sha:0:8} is green, run again when it is done"
+        sleep 30; waited=$(( waited + 30 ))
+    done
     git fetch -q origin main
+    # What that promote pushed after the tag (site, feed, What's New) is release paperwork: land the batch on top of it
+    # with a merge (tools/release/paperwork_only.py checks the files and lines; anything else stops as before).
+    if [ $waited -gt 0 ] && ! git merge-base --is-ancestor origin/main "$sha" &&
+        python3 tools/release/paperwork_only.py "$(git merge-base origin/main "$sha")" origin/main >/dev/null; then
+        local tree merged
+        tree=$(git merge-tree --write-tree "$sha" origin/main) &&
+            merged=$(git commit-tree "$tree" -p "$sha" -p origin/main -m "Merge the release paperwork from main into staging ${sha:0:8}") &&
+            { echo "   main got release paperwork while waiting: landing ${merged:0:8} (${sha:0:8} + main)"; sha=$merged; }
+    fi
     git merge-base --is-ancestor origin/main "$sha" ||
         die "main moved while staging ran ($(git rev-parse --short origin/main)): merge it in and run again"
     git push -q origin "$sha:refs/heads/main" # a fast-forward: exactly the tree CI passed

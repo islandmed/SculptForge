@@ -120,8 +120,17 @@ CURRENT=setup
 case ${HIGHLIGHTS:-} in ''|/*) ;; *) HIGHLIGHTS=$PWD/$HIGHLIGHTS ;; esac
 HIGHLIGHTS_GIVEN=${HIGHLIGHTS:-} # preflight may fill HIGHLIGHTS with a file of its own; resume names only this one
 work=$(mktemp -d)
-trap 'rm -rf "$work"' EXIT
 cd "$(git rev-parse --show-toplevel)"
+# Promoting holds main still: the next batch may stage meanwhile (CI, packages, T1), and only its last move, main's
+# fast-forward (scripts/merge-queue.sh staging), waits for this lock, so the steps after the tag see this version's
+# main (docs/design/release-lanes.md §3). Per machine (the git common dir); a dead holder's lock doesn't count.
+PROMOTE_LOCK="$(git rev-parse --git-common-dir)/sf-promoting"
+if [ $MODE != stage ] && [ -z "$STAGED" ]; then
+    echo "$$ $V" > "$PROMOTE_LOCK"
+    trap 'rm -rf "$work"; [ "$(cut -d" " -f1 "$PROMOTE_LOCK" 2>/dev/null)" = $$ ] && rm -f "$PROMOTE_LOCK"' EXIT
+else
+    trap 'rm -rf "$work"' EXIT
+fi
 
 # --- helpers that steps share -------------------------------------------------------------------------------------
 
