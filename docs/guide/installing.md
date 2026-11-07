@@ -30,7 +30,7 @@ Each link below downloads the newest version. Pick the one for your system:
 | Ubuntu, Debian, Mint, Pop!_OS | [.deb for x86_64](https://github.com/islandmed/SculptForge/releases/latest/download/sculptforge_amd64.deb) or [ARM64](https://github.com/islandmed/SculptForge/releases/latest/download/sculptforge_arm64.deb) | `sudo apt install ./sculptforge_amd64.deb` |
 | Fedora, RHEL, Rocky, Alma 8+ | [.rpm for x86_64](https://github.com/islandmed/SculptForge/releases/latest/download/sculptforge.x86_64.rpm) or [ARM64](https://github.com/islandmed/SculptForge/releases/latest/download/sculptforge.aarch64.rpm) | `sudo dnf install ./sculptforge.x86_64.rpm` |
 | Any Linux | [AppImage for x86_64](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-x86_64.AppImage) or [ARM64](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-arm64.AppImage) | `chmod +x` the file, then run it |
-| Any Linux, sandboxed | [Flatpak for x86_64](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-x86_64.flatpak) or [ARM64](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-arm64.flatpak) | `flatpak install --user ./SculptForge-linux-x86_64.flatpak` (see [Flatpak](#flatpak)) |
+| Any Linux, sandboxed | [Flatpak for x86_64](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-x86_64.flatpak) or [ARM64](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-arm64.flatpak) | `flatpak install --user ./SculptForge-linux-x86_64.flatpak`, or install from FlatPark to get updates (see [Flatpak](#flatpak)) |
 | Arch Linux | `packaging/arch/PKGBUILD` in the source | `makepkg -si` in that folder (the AUR package isn't published yet; see [Package managers](#package-managers)) |
 | Studio pipelines | `SculptForge-<version>-...-vfx2026.tar.gz` or `...-vfx2027.tar.gz` | See [SculptForge for studios](studios.md) |
 
@@ -66,7 +66,7 @@ Where SculptForge is in a package manager today, so it updates with the rest of 
 | AUR (Arch Linux) | **Ready, not published yet** | Until then: `makepkg -si` in `packaging/arch` |
 | Omarchy | **Submitted, in review** at omarchy-pkgs | As for Arch meanwhile |
 | apt (Debian, Ubuntu) and dnf (Fedora, RHEL) repositories | **Not yet; being built** ([#149](https://github.com/islandmed/SculptForge/issues/149)) | Install the `.deb` or `.rpm` file; SculptForge tells you when a new version is out |
-| Flathub | **Not published**; the Flatpak is a single file (see [Flatpak](#flatpak)) | `flatpak install --user ./SculptForge-linux-x86_64.flatpak` |
+| FlatPark (Linux) | **Available** (x86_64, ARM64) | `flatpak --user remote-add --if-not-exists flatpark https://dl.flatpark.org/flatpark.flatpakrepo` then `flatpak --user install flatpark org.sculptforge.SculptForge` (see [Flatpak](#flatpak)) |
 
 This table changes as each one goes live.
 
@@ -81,20 +81,27 @@ automation](scripting.md)). On macOS the command-line tool sits inside the app b
 ### Flatpak
 
 The Flatpak runs SculptForge in Flatpak's sandbox and works on any distribution that has Flatpak (most do; see
-[flatpak.org/setup](https://flatpak.org/setup/) if yours doesn't). It is a single file: download it, then
+[flatpak.org/setup](https://flatpak.org/setup/) if yours doesn't). The easiest way is from
+[FlatPark](https://flatpark.org/), a community Flatpak repository that carries SculptForge's official Linux build
+unmodified (x86_64 and ARM64):
 
 ```sh
-flatpak install --user ./SculptForge-linux-x86_64.flatpak     # or ...-linux-arm64.flatpak
+flatpak --user remote-add --if-not-exists flatpark https://dl.flatpark.org/flatpark.flatpakrepo
+flatpak --user install flatpark org.sculptforge.SculptForge
 flatpak run org.sculptforge.SculptForge
 ```
 
-SculptForge then appears in your application menu. The first install also downloads the freedesktop runtime it
-runs on (a few hundred MB, shared with other Flatpak apps) from Flathub; the file adds Flathub for that if it isn't
-set up. Only the runtime comes from Flathub: SculptForge itself is not published there.
+Or install the single file from the release: download it, then
+`flatpak install --user ./SculptForge-linux-x86_64.flatpak` (or `...-linux-arm64.flatpak`).
 
-- **Updating**: SculptForge tells you when there is a new version, as the other packages do. Download the new
-  `.flatpak` and install it the same way; your settings are kept. `flatpak update` updates the runtime but not
-  a SculptForge installed from a file.
+SculptForge then appears in your application menu. The first install also downloads the freedesktop runtime it
+runs on (a few hundred MB, shared with other Flatpak apps) from Flathub; both ways add Flathub for that if it
+isn't set up. SculptForge itself is not on Flathub.
+
+- **Updating**: from FlatPark, new versions arrive with `flatpak update` (or your software center's updates),
+  usually within a day of each release. SculptForge's own new-version notice still says to download the file;
+  with FlatPark you can ignore that. Installed from the file, download the new `.flatpak` and install it the
+  same way. Your settings are kept either way.
 - **Uninstalling**: `flatpak uninstall org.sculptforge.SculptForge` (add `--delete-data` to remove its
   settings too).
 - **Files**: the sandbox can read and write your home folder, so projects, models and the textures beside them
@@ -258,7 +265,7 @@ in SculptForge's settings), and **Sign out** removes it. Without a keychain the 
 Installs that belong to a package manager are never replaced by the app: the Arch PKGBUILD (and the AUR and
 Omarchy packages once they are published) builds without the update check, a Homebrew install shows
 `brew upgrade --cask sculptforge`, and the Flatpak, `.deb` and `.rpm` files say to download the new file and open
-it. The macOS app shows **Download** for now.
+it (a Flatpak from FlatPark updates with `flatpak update`). The macOS app shows **Download** for now.
 
 To update by hand, download the new release and install it over the old one. Either way your settings, brushes
 and library are kept: they live in your user folders, not next to the program (see
