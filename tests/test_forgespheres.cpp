@@ -80,6 +80,20 @@ TEST(forgespheres_symmetric_edits) {
     CHECK(joint == 4 && in.size() == 6 && in[2].parent == 4 && in[4].parent == 0 && in[3].parent == 5);
     CHECK(glm::length(in[4].center - vec3(0.45f, 0.05f, 0)) < 1e-6f);
     CHECK(forgespheresValidate(in).empty());
+
+    // Near the centre line (closer than its radius) a new sphere snaps onto it as one sphere, not two that
+    // overlap; a sphere growing from the arm stays mirrored even when it reaches the centre.
+    auto mid = s;
+    int one = -1;
+    CHECK(forgesphereAdd(mid, 0, vec3(0.08f, -0.6f, 0.1f), 0.2f, {true, false, false}, &one));
+    CHECK(one == 4 && mid.size() == 5 && mid[4].center == vec3(0.0f, -0.6f, 0.1f) && mid[4].parent == 0);
+    CHECK(forgesphereAdd(mid, 0, vec3(0.25f, -0.6f, 0.1f), 0.2f, {true, false, false}));
+    CHECK(mid.size() == 7 && std::abs(mid[6].center.x + 0.25f) < 1e-6f); // a radius off: a mirrored pair
+    CHECK(forgesphereAdd(mid, 0, vec3(0.08f, -0.6f, 0.1f), 0.2f, {false, false, false}));
+    CHECK(mid.size() == 8 && mid[7].center.x == 0.08f); // no symmetry: where it was put
+    CHECK(forgesphereAdd(mid, 2, vec3(0.1f, 0.1f, 0), 0.15f, {true, false, false}));
+    CHECK(mid.size() == 10 && mid[9].parent == 3 && std::abs(mid[9].center.x + 0.1f) < 1e-6f);
+    CHECK(forgespheresValidate(mid).empty());
 }
 
 TEST(forgespheres_validate_and_json) {

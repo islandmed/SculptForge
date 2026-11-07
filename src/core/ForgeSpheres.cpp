@@ -257,8 +257,18 @@ int forgesphereMirror(const std::vector<ForgeSphere>& s, int i, const vec3& m) {
     return best;
 }
 
-bool forgesphereAdd(std::vector<ForgeSphere>& s, int parent, const vec3& center, float radius, Symmetry sym, int* added) {
-    if (!validIndex(s, parent) || !(radius > 0.0f) || !std::isfinite(center.x + center.y + center.z)) return false;
+bool forgesphereAdd(std::vector<ForgeSphere>& s, int parent, const vec3& at, float radius, Symmetry sym, int* added) {
+    if (!validIndex(s, parent) || !(radius > 0.0f) || !std::isfinite(at.x + at.y + at.z)) return false;
+    // Near a mirror plane the copy would overlap the sphere: snap onto the plane as one sphere instead, when the
+    // parent has no separate twin across it (a sphere off the plane keeps its own mirrored child).
+    vec3 center = at;
+    const bool axes[3] = {sym.x, sym.y, sym.z};
+    for (int a = 0; a < 3; ++a) {
+        vec3 m(1.0f);
+        m[a] = -1.0f;
+        const int p = forgesphereMirror(s, parent, m);
+        if (axes[a] && std::abs(center[a]) < radius && (p < 0 || p == parent)) center[a] = 0.0f;
+    }
     // Mirror parents come from the armature as it was, before the new spheres join it.
     std::vector<std::pair<int, vec3>> copies;
     for (const vec3& m : otherMirrors(sym)) {
