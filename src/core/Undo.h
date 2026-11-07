@@ -147,6 +147,7 @@ inline constexpr int kActivePaintLayer = -2;
 //  - micro: the grid tiles a stroke on a micro level changed, or a whole micro level (core/Micro.h)
 //  - uvs: per triangle corner texture coordinates (restoring a selection set's UVs)
 //  - sets: the Selection Sets list (core/SelectionSets.h)
+//  - creases: per triangle corner edge creases (core/EdgeSelect.h)
 // Record old values before changing them (ensureX() the attribute first);
 // undo allocates a missing attribute so values can always be restored.
 struct UndoRecord {
@@ -173,11 +174,12 @@ struct UndoRecord {
     std::unique_ptr<MicroUndo> micro;     // micro-displacement tiles of a stroke, or a micro level added / removed (core/Micro.h)
     UndoChannel<glm::vec2> uvs;           // per corner (index = triangle * 3 + corner)
     std::unique_ptr<SelectionSetsUndo> sets;
+    UndoChannel<float> creases;           // per corner, like `uvs`
 
     bool empty() const {
         return positions.empty() && mask.empty() && colors.empty() && paintAlpha.empty() && hidden.empty() &&
                facegroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !part && !micro &&
-               uvs.empty() && !sets && !uv;
+               uvs.empty() && !sets && !uv && creases.empty();
     }
     size_t approxBytes() const;
 

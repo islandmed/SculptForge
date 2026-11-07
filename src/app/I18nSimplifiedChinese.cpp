@@ -4613,6 +4613,13 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Updated every second",
      "每秒更新"},
     // --- Tool > Geometry > Edges (PanelEdges.cpp, #108) ---
+    {"Crease", "折痕"},
+    {"Crease %.2f", "折痕 %.2f"},
+    {"Crease the selected edges by the Crease value (1 = fully sharp), for subdivision. Creased edges show tinted on the base level.", "按折痕值为所选边设置折痕（1 = 完全锐利），用于细分。有折痕的边在基础级别上以着色显示。"},
+    {"How sharp Crease makes the selected edges: 1 is fully sharp, lower values are softer.", "折痕让所选边有多锐利：1 为完全锐利，较低的值较柔和。"},
+    {"Remove the crease from the selected edges.", "移除所选边的折痕。"},
+    {"Uncrease", "移除折痕"},
+    {"creased", "条有折痕"},
     {"Add every edge that touches a selected one.", "添加与已选边相接的所有边。"},
     {"Add the open (border) edges: the rims of holes and of open surfaces.", "添加开放（边界）边：孔洞和开放曲面的边缘。"},
     {"Deselect All", "全部取消选择"},

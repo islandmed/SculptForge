@@ -21,6 +21,8 @@ namespace sf {
 
 class CommandRegistry;
 class Mesh;
+template <class T>
+struct UndoChannel;
 
 constexpr uint32_t kNoEdge = ~0u;
 
@@ -94,7 +96,18 @@ std::vector<uint32_t> edgeSelectedVertices(const EdgeSelection& sel);
 // The status line for the selection: "12 edges selected of 1,920".
 std::string edgeSelectionText(const EdgeSelection& sel);
 
-// edge_select (core/EdgeSelect.cpp).
+// Creases: 0..1 per edge (1 = fully sharp), kept in Mesh::creases on both corners of the edge; subdivision keeps
+// creased edges sharp. The crease of edge e (the larger of its two sides).
+float edgeCrease(const Mesh& mesh, const EdgeTopology& topo, uint32_t e);
+// Sets the crease of every edge flagged in `edges` (one flag per edge of `topo`) to `value` (0 clears), recording
+// the old value of each corner it changes in `undo` (when given). Frees Mesh::creases once nothing is creased.
+// Returns how many edges changed.
+size_t edgeSetCrease(Mesh& mesh, const EdgeTopology& topo, const std::vector<uint8_t>& edges, float value,
+                     UndoChannel<float>* undo);
+// How many edges have a crease.
+size_t edgeCreasedCount(const Mesh& mesh, const EdgeTopology& topo);
+
+// edge_select and edge_crease (core/EdgeSelect.cpp).
 void registerEdgeCommands(CommandRegistry& registry);
 
 } // namespace sf

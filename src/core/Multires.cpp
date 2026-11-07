@@ -67,6 +67,7 @@ void assignLevelArrays(Mesh& out, const Mesh& m) {
     out.facegroups = m.facegroups;
     out.hidden = m.hidden;
     out.uvs = m.uvs;
+    out.creases = m.creases; // (only a base level has any: the levels above are made with them)
     out.quadPartners = m.quadPartners;
     out.base = m.base;
     out.layers = m.layers;
@@ -1471,7 +1472,7 @@ bool levelsDiffer(const Mesh& w, const Mesh& r) {
     if (!sameArray(w.positions, r.positions) || !sameArray(w.base, r.base) || !sameLayerSet(w, r) ||
         !sameLayerWeights(w, r) || !sameArray(w.mask, r.mask) || !sameArray(w.colors, r.colors) ||
         !sameArray(w.facegroups, r.facegroups) || !sameArray(w.hidden, r.hidden) || !sameArray(w.uvs, r.uvs) ||
-        !samePaintSet(w, r) || !samePaintProperties(w, r) || !sameArray(w.paintBase, r.paintBase))
+        !sameArray(w.creases, r.creases) || !samePaintSet(w, r) || !samePaintProperties(w, r) || !sameArray(w.paintBase, r.paintBase))
         return true;
     for (size_t i = 0; i < w.layers.size(); ++i)
         if (!sameArray(w.layers[i].delta, r.layers[i].delta)) return true;
