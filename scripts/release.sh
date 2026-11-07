@@ -407,6 +407,8 @@ step_bump() {
     # The What's New UI test checks the guide's newest three sections: pinned here to this version's.
     out=$(python3 tools/release/pin_whats_new_test.py "$BASE" 2>&1) || die "$out" "fix docs/guide/whats-new.md (its newest section must be '## Version $BASE'), commit, push main"
     [ -n "$out" ] && echo "   pinned: $out"
+    # The app's copy of the site's quotes (compiled in; the site's own file goes live at once, the app's each release).
+    cp website/testimonials.json docs/testimonials-app.json
     out=$(python3 - "$BASE" "$TODAY" "$PRE" <<'PY'
 import re, sys
 v, today, pre = sys.argv[1:]
@@ -482,7 +484,7 @@ PY
     python3 tools/guide/build_site.py >/dev/null # the guide, and the home page's What's New area for $V (not a beta's)
     [ -n "$PRE" ] || card_ok || die "website/index.html has no 'new in $V' card after build_site.py" "$card_fix"
     git add CMakeLists.txt CITATION.cff packaging/rez/package.py packaging/linux/org.sculptforge.SculptForge.metainfo.xml CHANGELOG.md website/index.html docs/guide/whats-new.md
-    git add -A changes tests/ui/whats_new.sfui
+    git add -A changes tests/ui/whats_new.sfui docs/testimonials-app.json
     git add -A website/guide
     if git diff --cached --quiet; then
         ok "every version file already says $V and the guide is built"

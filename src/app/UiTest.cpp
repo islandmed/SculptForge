@@ -89,6 +89,7 @@
 //                            whats_new_contents / whats_new_expanded (its guide chapter: contents entries, open sections),
 //                            custom_brush_active (a custom brush is the active one),
 //                            member_card_open / member_card_pending / member_card_verifying / member_signed_in /
+//                            member_card_quote (it shows a member's words, docs/testimonials-app.json) /
 //                            supporter (the membership cards, Support.h),
 //                            welcome_open (the first-run welcome shown), new_look_card_open (the one-time
 //                            "SculptForge has a new look" card),
@@ -973,6 +974,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "supporter") return app_.supportCardPrefs_.supporter ? 1.0 : 0.0;
     // The small membership card (Support.h): open (1), the sign-in running from it, member builds signed in.
     if (name == "member_card_open") return app_.memberCard_ != MemberMoment::None ? 1.0 : 0.0;
+    if (name == "member_card_quote") return app_.memberCard_ != MemberMoment::None && !testimonials().empty() ? 1.0 : 0.0;
     if (name == "member_card_pending") return app_.memberMomentPending_ != MemberMoment::None ? 1.0 : 0.0;
     if (name == "member_card_verifying") return app_.memberVerifying_ ? 1.0 : 0.0;
     if (name == "member_signed_in") return app_.memberSignedIn() ? 1.0 : 0.0;

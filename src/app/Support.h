@@ -41,11 +41,11 @@ inline constexpr size_t kSupportersMax = 2000;    // names kept
 
 // One line of docs/supporters.txt as it may be shown: valid UTF-8 only (invalid bytes dropped), no control or
 // invisible formatting characters (C0, DEL, C1, zero-width, bidi overrides and isolates, BOM), spaces trimmed,
-// at most kSupporterNameMax characters.
-inline std::string sanitizeSupporterName(std::string_view line) {
+// at most kSupporterNameMax characters (or maxChars).
+inline std::string sanitizeSupporterName(std::string_view line, size_t maxChars = kSupporterNameMax) {
     std::string out;
     size_t chars = 0;
-    for (size_t i = 0; i < line.size() && chars < kSupporterNameMax;) {
+    for (size_t i = 0; i < line.size() && chars < maxChars;) {
         const auto b = static_cast<unsigned char>(line[i]);
         uint32_t cp = 0;
         size_t len = 0;
@@ -201,6 +201,52 @@ inline FoundingMembers parseFoundingMembers(const std::string& json) {
             if (!name.empty()) f.names.push_back(std::move(name));
         }
     return f;
+}
+
+// --- What artists say (docs/testimonials-app.json, compiled in: release.sh copies it from website/testimonials.json at
+// each release, so a quote is on the site at once and in the app from the next version; consent on record) ---
+
+inline constexpr size_t kTestimonialQuoteMax = 600; // characters
+inline constexpr size_t kTestimonialRoleMax = 60;
+inline constexpr size_t kTestimonialsMax = 50;
+
+struct Testimonial {
+    std::string quote, name, role; // exact wording, plain text
+};
+
+// The compiled-in docs/testimonials-app.json (PanelSupport.cpp).
+const std::vector<Testimonial>& testimonials();
+
+// docs/testimonials-app.json, in website/testimonials.json's format:
+// [{"quote": "...", "name": "...", "role": "...", "date": "YYYY-MM-DD"}, ...]. A quote is the artist's own approved
+// wording, so it is shown exactly or not at all: one that sanitising would change (control or invisible characters,
+// invalid UTF-8, too long) is skipped, never cut or cleaned. Names and roles are sanitised like the supporters list;
+// an entry without a quote or a name is skipped. At most kTestimonialsMax.
+inline std::vector<Testimonial> parseTestimonials(const std::string& json) {
+    std::vector<Testimonial> out;
+    Json j;
+    std::string error;
+    if (!Json::parse(json, j, error) || !j.isArray()) return out;
+    for (const Json& e : j.items()) {
+        if (out.size() >= kTestimonialsMax) break;
+        if (!e.isObject() || !e["quote"].isString() || !e["name"].isString()) continue;
+        const std::string& quote = e["quote"].asString();
+        if (quote.empty() || sanitizeSupporterName(quote, kTestimonialQuoteMax) != quote) continue;
+        Testimonial t{quote, sanitizeSupporterName(e["name"].asString()),
+                      e["role"].isString() ? sanitizeSupporterName(e["role"].asString(), kTestimonialRoleMax) : std::string()};
+        if (!t.name.empty()) out.push_back(std::move(t));
+    }
+    return out;
+}
+
+// Which quote the small membership card shows: picked from the day it shows (its shownAt), mixed so showings a week
+// apart don't keep landing on the same one; steady while it is open.
+inline size_t testimonialForCard(int64_t shownAt, size_t count) {
+    if (count == 0) return 0;
+    uint64_t x = uint64_t(shownAt / 86400) + 0x9E3779B97F4A7C15ull; // splitmix64
+    x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ull;
+    x = (x ^ (x >> 27)) * 0x94D049BB133111EBull;
+    return size_t((x ^ (x >> 31)) % count);
 }
 
 } // namespace sf

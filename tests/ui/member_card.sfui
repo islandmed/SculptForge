@@ -23,6 +23,7 @@ expect_text Twenty minutes of sculpting. Members keep SculptForge free and movin
 expect_text $5 a month or $48 a year
 expect_text Member Requests
 expect_text Founding Members
+expect_value member_card_quote == 1              # one member's words (docs/testimonials-app.json), named by nobody here
 expect "Become a member##member_card.become"
 expect "Not now##member_card.not_now"
 expect "I'm already a member##member_card.already"

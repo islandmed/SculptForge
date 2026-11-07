@@ -25,6 +25,8 @@ extern const unsigned char supporters[]; // docs/supporters.txt (CMakeLists.txt)
 extern const unsigned long long supporters_size;
 extern const unsigned char foundingMembers[]; // website/founding.json (CMakeLists.txt)
 extern const unsigned long long foundingMembers_size;
+extern const unsigned char testimonials[]; // docs/testimonials-app.json (CMakeLists.txt)
+extern const unsigned long long testimonials_size;
 } // namespace assets
 
 namespace {
@@ -41,6 +43,12 @@ const FoundingMembers& foundingMembers() {
     static const FoundingMembers f = parseFoundingMembers(
         std::string(reinterpret_cast<const char*>(assets::foundingMembers), size_t(assets::foundingMembers_size)));
     return f;
+}
+
+const std::vector<Testimonial>& testimonials() {
+    static const std::vector<Testimonial> t = parseTestimonials(
+        std::string(reinterpret_cast<const char*>(assets::testimonials), size_t(assets::testimonials_size)));
+    return t;
 }
 
 void App::openSupportPage() {
@@ -64,6 +72,18 @@ void App::openDiscordPage() {
 }
 
 void App::drawSupportersSection() {
+    // What artists say: each quote exactly as approved (plain text, never a format string), then who said it.
+    if (!testimonials().empty()) {
+        ImGui::SeparatorText(tr("What artists say"));
+        for (const Testimonial& t : testimonials()) {
+            ImGui::TextWrapped("\xe2\x80\x9c%s\xe2\x80\x9d", t.quote.c_str());
+            ImGui::PushStyleColor(ImGuiCol_Text, theme::accentHover);
+            if (t.role.empty()) ImGui::TextWrapped("%s", t.name.c_str());
+            else ImGui::TextWrapped("%s, %s", t.name.c_str(), t.role.c_str());
+            ImGui::PopStyleColor();
+            ImGui::Spacing();
+        }
+    }
     const FoundingMembers& founding = foundingMembers();
     if (!founding.names.empty()) {
         ImGui::SeparatorText(tr("Founding Members"));

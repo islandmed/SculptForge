@@ -41,10 +41,12 @@ expect_value welcome_open == 1
 click "Close##welcome"
 expect_value welcome_open == 0
 
-# Help > About: the Founding Members and the supporters (docs/supporters.txt, website/founding.json: compiled in),
+# Help > About: what artists say, the Founding Members and the supporters (docs/testimonials-app.json,
+# docs/supporters.txt, website/founding.json: compiled in),
 # checked without naming anyone, so a new credit doesn't break the test.
 click "Help##palette.help"
 click "About SculptForge##help.about"
+expect_text "What artists say"
 expect_text "Founding Members"
 expect_text "Supporters"
 expect_text "Thank you to everyone who supports SculptForge"

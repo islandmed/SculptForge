@@ -381,7 +381,8 @@ if(SCULPTFORGE_BUILD_APP)
     appIconSmall ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-32.png # its small cut (up to 32 px)
     bustMark ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/bust/bust-256.png # the illustration: About, What's New, support card
     supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt # Help > About (never empty: it starts with comments)
-    foundingMembers ${CMAKE_CURRENT_SOURCE_DIR}/website/founding.json) # Help > About and the membership card
+    foundingMembers ${CMAKE_CURRENT_SOURCE_DIR}/website/founding.json # Help > About and the membership card
+    testimonials ${CMAKE_CURRENT_SOURCE_DIR}/docs/testimonials-app.json) # What artists say: Help > About, the membership card
   include(cmake/EmbedGuide.cmake)
   embed_guide(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp ${CMAKE_CURRENT_SOURCE_DIR}/docs/guide)
   add_executable(sculptforge

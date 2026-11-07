@@ -638,6 +638,16 @@ void App::drawMemberCard() {
                                    "their price locked for good."), founding.limit);
                 ImGui::PopStyleColor();
             }
+            // One member's words (docs/testimonials-app.json, exact), a different one each time the card shows.
+            if (const std::vector<Testimonial>& said = testimonials(); !said.empty()) {
+                const Testimonial& t = said[testimonialForCard(supportCardPrefs_.shownAt, said.size())];
+                ImGui::Spacing();
+                ImGui::TextWrapped("\xe2\x80\x9c%s\xe2\x80\x9d", t.quote.c_str());
+                ImGui::PushStyleColor(ImGuiCol_Text, theme::textDim);
+                if (t.role.empty()) ImGui::TextWrapped("%s", t.name.c_str());
+                else ImGui::TextWrapped("%s, %s", t.name.c_str(), t.role.c_str());
+                ImGui::PopStyleColor();
+            }
             ImGui::Spacing();
             ImGui::PushStyleColor(ImGuiCol_Button, theme::accent);
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::accentHover);

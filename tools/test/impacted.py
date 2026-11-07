@@ -38,6 +38,7 @@ HAND_MAP = [
     ("docs/guide/*", "guide_site guide_menu_paths ui_user_guide ui_user_guide_1080 ui_whats_new ui_guide_shortcuts ui_quick_tour"),
     ("docs/guide/whats-new.md", "release_notes ui_whats_new"),
     ("docs/supporters.txt", "ui_support ui_support_card"),
+    ("docs/testimonials-app.json", "ui_support ui_member_card"),
     ("website/*", "guide_site"),
     ("changes/*", "release_notes release_notes_fragments"),
     ("CHANGELOG.md", "release_notes"),

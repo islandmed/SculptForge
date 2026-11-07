@@ -7,10 +7,12 @@
 
 #include "app/Support.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <vector>
 
 using namespace sf;
 
@@ -139,6 +141,52 @@ TEST(founding_members_json) {
     Json j;
     std::string error;
     CHECK(Json::parse(text, j, error) && j["limit"].isNumber() && j["taken"].isNumber() && j["names"].isArray());
+}
+
+TEST(testimonials_json) {
+    CHECK(parseTestimonials("").empty() && parseTestimonials("{}").empty());
+    const auto t = parseTestimonials(R"([
+        {"quote": "Fits like a glove.", "name": "Ada (ada3d)", "role": "environment artist", "date": "2026-11-07"},
+        {"quote": "No role here.", "name": "Bo"},
+        {"quote": "Hidden‮characters", "name": "Eve"},
+        {"quote": "Control\nchars", "name": "Eve"},
+        {"quote": " padded", "name": "Eve"},
+        {"quote": "No name", "name": ""},
+        {"quote": "", "name": "Eve"},
+        {"quote": 5, "name": "Eve"},
+        {"quote": "Name cleaned", "name": "‮Mal", "role": 3}
+    ])");
+    CHECK(t.size() == 3); // a quote is shown exactly as approved or not at all: never cut or cleaned
+    CHECK(t[0].quote == "Fits like a glove." && t[0].name == "Ada (ada3d)" && t[0].role == "environment artist");
+    CHECK(t[1].quote == "No role here." && t[1].role.empty());
+    CHECK(t[2].quote == "Name cleaned" && t[2].name == "Mal" && t[2].role.empty());
+    CHECK(parseTestimonials("[{\"quote\": \"" + std::string(kTestimonialQuoteMax + 1, 'a') + "\", \"name\": \"A\"}]").empty());
+    CHECK(parseTestimonials("[{\"quote\": \"" + std::string(kTestimonialQuoteMax, 'a') + "\", \"name\": \"A\"}]").size() == 1);
+    // The card's quote rotates: weekly showings reach every quote (7 of them too), always within range.
+    CHECK(testimonialForCard(0, 0) == 0 && testimonialForCard(123456789, 1) == 0);
+    for (size_t n : {2, 3, 7}) {
+        std::vector<bool> seen(n);
+        for (int64_t week = 0; week < 60; ++week) seen[testimonialForCard(1794000000 + week * 7 * 86400, n)] = true;
+        CHECK(std::count(seen.begin(), seen.end(), true) == int64_t(n));
+    }
+    CHECK(testimonialForCard(-5 * 86400, 3) < 3);
+    // The app's copy (compiled in): every entry is shown, none skipped; and it only ever holds quotes the site has
+    // (release.sh copies website/testimonials.json over it; between releases the site may have more).
+    const auto read = [](const char* rel) {
+        std::ifstream in(std::string(SF_TEST_DATA_DIR) + "/../../" + rel, std::ios::binary);
+        CHECK(in.good());
+        return std::string{std::istreambuf_iterator<char>(in), {}};
+    };
+    const std::string app = read("docs/testimonials-app.json"), site = read("website/testimonials.json");
+    Json j;
+    std::string error;
+    CHECK(Json::parse(app, j, error) && j.isArray());
+    CHECK(!j.items().empty() && parseTestimonials(app).size() == j.items().size());
+    const auto onSite = parseTestimonials(site);
+    for (const Testimonial& a : parseTestimonials(app))
+        CHECK(std::any_of(onSite.begin(), onSite.end(), [&](const Testimonial& s) {
+            return s.quote == a.quote && s.name == a.name && s.role == a.role;
+        }));
 }
 
 TEST(support_card_links_match_the_website) {
