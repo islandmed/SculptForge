@@ -88,8 +88,21 @@ TEST(qremesh_same_result_on_one_thread_or_all) {
     CHECK(sameMesh(a, b));
 }
 
+TEST(qremesh_hard_edges_keep_the_dense_proxy) {
+    // Smooth pieces get a coarser proxy (2 edges per quad edge instead of 2.5); a cube's hard edges stay on the denser
+    // one, which keeps its corners the only poles (at 2 it had 35).
+    const Mesh cube = makeCube(13, 2.0f);
+    QRemeshOptions o;
+    QRemeshStats st;
+    Mesh out;
+    std::string error;
+    CHECK(qremesh(cube, o, out, error, {}, &st));
+    const QuadQuality q = st.quality.measured ? st.quality : quadQuality(out, &cube);
+    CHECK(q.poles == 8);
+}
+
 TEST(nightly_qremesh_small_mesh_at_the_defaults_is_fast) {
-    // A 1k-triangle sculpt at the defaults (5000 quads): 0.76 s on the floor-tier laptop (1.24 s before 0.11.13).
+    // A 1k-triangle sculpt at the defaults (5000 quads): 0.55 s on the floor-tier laptop (1.24 s before 0.11.13).
     const Mesh src = bumpySphere(9);
     QRemeshOptions o;
     Mesh out;

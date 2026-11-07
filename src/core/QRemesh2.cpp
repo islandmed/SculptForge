@@ -1148,11 +1148,17 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
             out.why = "closed guide loop";
             return false;
         }
-    const float densities[2] = {2.5f, 3.2f};
-    for (float d : densities) {
+    // Proxy density (proxy edges per quad edge). Smooth forms come out as well at 2 as at 2.5 (14 organic benchmark
+    // cases, geometric means: Hausdorff, poles, angles and edge spread equal or better, mean distance +1%) in 0.65x
+    // the time; hard edges need 2.5 to keep their corners regular (a cube: 35 poles at 2), so a piece with one that
+    // survives at the proxy's scale, or with guides, uses 2.5. 3.2: the retry when the result isn't manifold.
+    const float densities[3] = {2.0f, 2.5f, 3.2f};
+    for (int i = guides.empty() ? 0 : 1; i < 3; ++i) {
+        const float d = densities[i];
         out = FieldPieceResult{};
         const bool ok = remeshPieceOnce(piece, axis, wantQuads, opt, diag, guides, report, out, cancelled, d);
         if (cancelled) return false;
+        if (!ok && out.why == "hard edges") continue;
         if (ok && quadsManifold(out.mesh.P.size(), out.mesh.quads, out.mesh.tris)) return true;
         if (ok) out.why = "not manifold";
     }
@@ -1204,6 +1210,7 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
     const float sharpCos = opt.detectEdges ? std::cos(glm::radians(60.0f)) : 2.0f;
     std::vector<vec3> segA, segB;
     std::unordered_set<uint64_t> sharp;
+    bool hardChains = false;
     {
         const std::vector<SrcEdge> edges = meshEdges(piece.P, piece.T);
         std::vector<vec3> fn(piece.T.size());
@@ -1235,12 +1242,24 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
             for (uint32_t i : sharpEdges) uf.unite(id[edges[i].a], id[edges[i].b]);
             std::vector<double> len(verts.size(), 0.0);
             for (uint32_t i : sharpEdges) len[uf.find(id[edges[i].a])] += double(glm::length(piece.P[edges[i].a] - piece.P[edges[i].b]));
+            // A chain that will pass the proxy's test below (long, sharp on average): this piece has hard edges.
+            std::vector<double> bend(verts.size(), 0.0);
+            for (uint32_t i : sharpEdges)
+                bend[uf.find(id[edges[i].a])] += double(glm::length(piece.P[edges[i].a] - piece.P[edges[i].b])) *
+                                                 std::acos(std::clamp(double(glm::dot(fn[edges[i].t0], fn[edges[i].t1])), -1.0, 1.0));
+            for (size_t r = 0; r < verts.size(); ++r)
+                if (len[r] >= 3.0 * double(h0) && bend[r] >= glm::radians(55.0) * len[r]) hardChains = true;
             for (uint32_t i : sharpEdges) {
                 if (len[uf.find(id[edges[i].a])] < 1.5 * double(h0)) continue;
                 sharp.insert(edgeKey(edges[i].a, edges[i].b));
                 segA.push_back(piece.P[edges[i].a]), segB.push_back(piece.P[edges[i].b]);
             }
         }
+    }
+    const bool organicTry = density < 2.5f && !std::getenv("SF_QR2_DENSITY");
+    if (organicTry && hardChains) {
+        out.why = "hard edges"; // (remeshPieceV2 starts again at the hard-edge density)
+        return false;
     }
     SegmentBVH features;
     if (!segA.empty()) features.build(segA, segB);
@@ -1318,6 +1337,11 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
     {
         const size_t d = demoteSoftEdges(proxy);
         if (timing && d) std::fprintf(stderr, "  v2 %zu soft hard-edge corners demoted\n", d);
+    }
+    if (organicTry && std::find(proxy.sharp.begin(), proxy.sharp.end(), uint8_t(1)) != proxy.sharp.end()) {
+        out.why = "hard edges"; // (remeshPieceV2 starts again at the hard-edge density)
+        if (timing) std::fprintf(stderr, "  v2 hard edges at density %.2f: again at 2.5\n", double(density));
+        return false;
     }
     Frames frames;
     frames.build(proxy);

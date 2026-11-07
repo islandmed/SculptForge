@@ -32,6 +32,13 @@ inline S conjOf(const S& v) {
     if constexpr (std::is_same_v<S, double>) return v;
     else return std::conj(v);
 }
+// a * b without std::complex's NaN / infinity recovery (a branch and a library call in the hot loops); the same
+// four products and two sums, so the same bits for finite values (fp-contract is off).
+template <class S>
+inline S mulS(const S& a, const S& b) {
+    if constexpr (std::is_same_v<S, double>) return a * b;
+    else return S(a.real() * b.real() - a.imag() * b.imag(), a.real() * b.imag() + a.imag() * b.real());
+}
 template <class S>
 inline double realOf(const S& v) {
     if constexpr (std::is_same_v<S, double>) return v;
@@ -79,7 +86,7 @@ struct SparseMatrix {
     static constexpr size_t kRows = 1024;
     S row(size_t i, const std::vector<S>& x) const {
         S s{};
-        for (uint32_t k = off[i]; k < off[i + 1]; ++k) s += val[k] * x[col[k]];
+        for (uint32_t k = off[i]; k < off[i + 1]; ++k) s += mulS(val[k], x[col[k]]);
         return s;
     }
     void mul(const std::vector<S>& x, std::vector<S>& y) const {
@@ -311,7 +318,7 @@ private:
             const size_t i = forwards ? s : n - 1 - s;
             S r = b[i];
             for (uint32_t k = A.off[i]; k < A.off[i + 1]; ++k)
-                if (A.col[k] != i) r -= A.val[k] * x[A.col[k]];
+                if (A.col[k] != i) r -= mulS(A.val[k], x[A.col[k]]);
             x[i] = r / A.diag[i];
         }
     }
@@ -372,14 +379,14 @@ private:
         poolFor(nc, [&](size_t b0, size_t e0) {
             for (size_t c = b0; c < e0; ++c) {
                 S s{};
-                for (uint32_t m = L.rOff[c]; m < L.rOff[c + 1]; ++m) s += L.rVal[m] * r[L.rRow[m]];
+                for (uint32_t m = L.rOff[c]; m < L.rOff[c + 1]; ++m) s += mulS(L.rVal[m], r[L.rRow[m]]);
                 rc[c] = s;
             }
         }, 1024);
         vcycle(li + 1, rc, xc);
         poolFor(n, [&](size_t b0, size_t e0) {
             for (size_t i = b0; i < e0; ++i)
-                for (uint32_t m = L.pOff[i]; m < L.pOff[i + 1]; ++m) x[i] += L.pVal[m] * xc[L.pCol[m]];
+                for (uint32_t m = L.pOff[i]; m < L.pOff[i + 1]; ++m) x[i] += mulS(L.pVal[m], xc[L.pCol[m]]);
         }, SparseMatrix<S>::kRows);
         sweep(L.A, b, x, false, L.swap);
     }

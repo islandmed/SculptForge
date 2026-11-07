@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // sf_remesh_bench: times every remesh path at the UI defaults on spheres of a given size (tests/perf, docs/testing-flow.md).
-//   sf_remesh_bench [--runs N] [--tris 1000,10000,...] [--paths qr2,legacy,voxel] [--bumpy] [--shape sphere|cube|torus]
+//   sf_remesh_bench [--runs N] [--tris 1000,10000,...] [--paths qr2,legacy,voxel] [--bumpy] [--shape sphere|cube|torus|starter:<id>]
 //                   [--target Q] [--voxel-res R]
 // One CSV row per run on stdout: path, input triangles, run, total ms, the time between progress marks (stages), the
 // output size and the Hausdorff / mean distance to the input (% of the bounding-box diagonal, quadQuality).
 // SF_QREMESH_TIMING=1 adds Quad Remesh's own per-stage lines on stderr.
+#include "core/Document.h"
 #include "core/Primitives.h"
 #include "core/QRemesh.h"
+#include "core/StarterMeshes.h"
 #include "core/Voxel.h"
 
 #include <algorithm>
@@ -29,8 +31,23 @@ using Clock = std::chrono::steady_clock;
 double ms(Clock::time_point a, Clock::time_point b) { return std::chrono::duration<double, std::milli>(b - a).count(); }
 
 // A quad sphere with about `tris` triangles (6 r^2 quads); bumpy: a few octaves of sine ridges, like a rough sculpt.
-// cube: hard edges and corners (feature lines); torus: genus one.
+// cube: hard edges and corners (feature lines); torus: genus one; starter:<id>: a starter mesh's biggest part (real
+// sculpt forms: bust, heads, hand), divided until it has about `tris` triangles.
 Mesh sphere(size_t tris, bool bumpy, const std::string& shape) {
+    if (shape.rfind("starter:", 0) == 0) {
+        const StarterMesh* starter = findStarterMesh(shape.substr(8));
+        Mesh best;
+        for (int levels = 0; starter && levels <= 5; ++levels) {
+            Document d;
+            std::string error;
+            if (!loadStarterMesh(*starter, d, levels, error)) break;
+            best = Mesh{};
+            for (int i = 0; i < d.partCount(); ++i)
+                if (d.partMesh(i).triangleCount() > best.triangleCount()) best = d.partMesh(i);
+            if (double(best.triangleCount()) >= 0.7 * double(tris)) break;
+        }
+        return best;
+    }
     const int r = std::max(2, int(std::lround(std::sqrt(double(tris) / 12.0))));
     if (shape == "cube") return makeCube(r, 2.0f);
     if (shape == "torus") {
@@ -89,7 +106,7 @@ int main(int argc, char** argv) {
         else if (a == "--shape" && more) shape = argv[++i];
         else {
             std::fprintf(stderr, "usage: sf_remesh_bench [--runs N] [--tris a,b,c] [--paths qr2,legacy,voxel] [--bumpy] "
-                                 "[--shape sphere|cube|torus] [--target Q] [--voxel-res R]\n");
+                                 "[--shape sphere|cube|torus|starter:<id>] [--target Q] [--voxel-res R]\n");
             return 2;
         }
     }
