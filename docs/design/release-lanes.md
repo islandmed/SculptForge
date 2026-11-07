@@ -1,6 +1,7 @@
 # Release lanes: design
 
-Status: design. Today two lanes exist: **site** (website/, README, brand: `tools/ci/site_lane.txt`, live from main in
+Status (11-07): §1 built (feat/release-lanes), §2 built (feat/integration-lanes), §3 built (feat/release-overlap),
+§4 live in ~/Work/.sf. Before this, two lanes existed: **site** (website/, README, brand: `tools/ci/site_lane.txt`, live from main in
 minutes) and **app** (everything else: the release train). A credit, a quote or a brush still needs an app release.
 This splits the rest so each kind of change ships at its own pace, and makes the app train itself smaller.
 
@@ -51,8 +52,8 @@ for the update check. No new host, port, listener, IPC or code path that runs an
   parsers (images, meshes) are bigger surface. They would ride the same signed manifest with a SHA-256 per file.
 - **Opt-out:** Preferences > Updates "Fetch credits and community content" (on), `SF_CONTENT=off`, studio mode off.
   Nothing about the user is sent (same GET as the feed; no cookies, no ID).
-- **Needs:** coordinator OK on this note; Tony OK for the new key and the `content` environment secret (key
-  handling). Until the secret exists pages.yml skips signing and the app keeps the compiled-in copy.
+- **OKs:** coordinator (11-07) and Tony (11-07: the fetch, the key and the `content` environment, main only). The
+  key was made by `~/Work/.sf/lanes/make-content-key.sh`; its private half went straight into the secret.
 
 Once shipped, the `!` lines in `tools/ci/site_lane.txt` go: app tests read fixtures, not the live credits, and the
 compiled-in copies are refreshed by `release.sh` bump.
@@ -74,20 +75,21 @@ for (or force) an app release.
 
 ## 3. Smaller app trains
 
-- T0 already runs only impacted tests (`tools/test/impacted.py`); the full suite runs at stage. Add a per-shard time
-  budget in `tools/test/run.py` (a test over its budget is reported like a failure on T1, so slow tests get split
-  instead of silently growing the train).
-- Stage N+1 while N promotes: `release.sh --stage` works in the batch checkout, promote on ~/Work/Zbrush main; the
-  shared state between them is the `staging` branch and the release logs. Promote reads the tag's commit, not
-  `staging`'s tip, so the next stage can push `staging` once N's tag exists. `check` verifies that instead of
-  assuming one train at a time.
+- Already in place: T0 runs only impacted tests (`tools/test/impacted.py`), the full suite at stage, and the test
+  runner (tools/test) fails a test over its time budget (`--budget`, 20 s) after a rerun alone.
+- Stage N+1 while N promotes: a promote (`release.sh X.Y.Z --yes`) holds a lock (`sf-promoting` in the git common
+  dir, with its pid). N+1's `--stage` runs staging, CI, packages and T1 meanwhile; only main's fast-forward
+  (`merge-queue.sh staging`) waits for the lock, then lands on top of the promote's paperwork (paperwork_only.py) or
+  stops as before. Promote already finds staging's packages by commit, not by `staging`'s tip.
 
 ## 4. PC disk hygiene
 
-Weekly (Sunday 04:00, reaper.sh): `pc-reap.sh` (build trees of removed worktrees, daily already), `ccache -M 40G`
-on the PC, `fstrim -av` in WSL so freed blocks return. Requires the WSL disk to be sparse, set once by Tony on Windows:
-`wsl --manage Ubuntu-24.04 --set-sparse true` (documented in reference-windows-pc). A C: free-space line in
-health.md; under 20 GB the PC refuses new build trees (pc.sh) instead of filling the disk.
+`pc-reap.sh`, every 6 h from reaper.sh: removes the WSL build trees of worktrees that are gone (any `git worktree list`
+checkout counts as alive) or idle for 2 days (`build/.ninja_log` age), skips a tree whose pc.sh lock is held, fstrims
+WSL, and writes C:'s free GB to `~/Work/.sf/pc-cfree.txt`. Before 11-07 it skipped whenever any pc.sh job ran, which
+was nearly always, so it rarely did anything. ccache is already capped at 5 GB. Freed blocks go back to Windows only
+when the WSL disk is sparse, which Tony sets once: `wsl --manage Ubuntu-24.04 --set-sparse true` (after
+`wsl --shutdown`). Next, if C: keeps running low: pc.sh reads pc-cfree.txt and sends jobs to the laptop under 15 GB.
 
 ## Order
 
