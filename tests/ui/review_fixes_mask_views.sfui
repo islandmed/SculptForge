@@ -1,0 +1,41 @@
+# What a 0.10.6 video review and a Discord tester hit, part 2 (part 1: review_fixes.sfui): Extract greyed out
+# without saying why, no saved camera views, and a near-black mask under a dense wireframe.
+run new_sphere
+run subdiv_divide
+run subdiv_divide
+key f
+camera 0 0
+
+# The mask: a readable tint with a soft edge, the wireframe still visible over it; Mask darkness is a preference.
+run mask_rect y0=0.2
+expect_value masked > 0
+click "Wire##view.wire"
+expect_value mask_darkness == 70
+shot mask_wire
+click "Wire##view.wire"
+run mask_clear
+
+# Extract without a mask says what it needs.
+expect_text "Mask first (Ctrl+drag)"
+shot extract_hint
+# Tool > Masking has the Mask darkness slider too.
+click "Masking##tool.masking"
+expect_text "Mask Darkness"
+shot mask_darkness
+
+# Saved views: save one, turn away, Numpad 0 comes back to it.
+camera 30 20
+key ctrl+alt+numpad0
+expect_value saved_views == 1
+expect_status "View saved: View 1"
+camera 0 0
+key numpad0
+expect_value camera_yaw > 29.9
+expect_value camera_yaw < 30.1
+key numpad3
+expect_value camera_yaw > 89.9
+# View > Views: the axis buttons and the saved view.
+click "View##menu.view"
+expect_text "View 1"
+shot views
+key escape

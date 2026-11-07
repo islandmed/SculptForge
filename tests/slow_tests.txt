@@ -4,7 +4,6 @@
 # name                                                          seconds  plan
 ui_uv_editor                                                       40  packs < 1 s now (fix/uv-pack-speed); left: the lion's Least Stretch unwrap (10 s, line 30) and UI steps: a smaller model for T1, the lion nightly
 marks                                                              21  the whole tree incl. binaries since fix/marks-normalize (19-20 s on the laptop): cache results by file hash like check_marks_media, or scan only changed files in T0
-ui_review_fixes                                                    25  14 s alone on the PC, 22 s alone and 35 s in a busy run (0.11.11 stage): split its review checks into two scripts
 insider_drops                                                      100  tools/drops selftest: profile it; split the network-free checks from the packaging ones
 ui_retopo                                                           63  one wait_idle of 23 s (line 103: QRemesh of the sculpt): a lower target
 ui_first_sculpt                                                     48  the lesson end to end (225 lines, no single long step): split into two scripts
