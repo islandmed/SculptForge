@@ -101,6 +101,7 @@ Json toJson(const UiPrefs& p) {
     j.set("librarySort", p.librarySort);
     if (!p.brushSet.empty()) j.set("brushSet", p.brushSet);
     j.set("spaceCamera", p.spaceCamera);
+    j.set("stopStickyKeysPrompt", p.stopStickyKeysPrompt);
     j.set("emulate3Button", p.emulate3Button);
     j.set("mayaZoomHorizontal", p.mayaZoomHorizontal);
     j.set("wheelZoomToPointer", p.wheelZoomToPointer);
@@ -193,6 +194,7 @@ void fromJson(const Json& j, UiPrefs& p) {
         if (j[key].isString()) *v = listSortId(listSortFromId(j[key].asString()));
     if (j["brushSet"].isString() && j["brushSet"].asString().size() <= 64) p.brushSet = j["brushSet"].asString();
     p.spaceCamera = j["spaceCamera"].asBool(p.spaceCamera);
+    p.stopStickyKeysPrompt = j["stopStickyKeysPrompt"].asBool(p.stopStickyKeysPrompt);
     p.emulate3Button = j["emulate3Button"].asBool(p.emulate3Button);
     p.mayaZoomHorizontal = j["mayaZoomHorizontal"].asBool(p.mayaZoomHorizontal);
     p.wheelZoomToPointer = j["wheelZoomToPointer"].asBool(p.inputStyle == 3); // (inputStyle is read above)

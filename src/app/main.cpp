@@ -5,6 +5,8 @@
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
 #include "app/OptimisticBench.h"
+#include "app/StickyKeys.h"
+#include "app/UserData.h"
 #include "app/UiServe.h"
 #include "ai/AiPolicy.h"
 #include "core/Benchmark.h"
@@ -168,6 +170,7 @@ int finishIsolated(int code) {
 [[noreturn]] static void crashOnPurpose(const std::string& kind) {
     sf::crashlog::quietSystemCrashDialog();
     sf::crashlog::action("crash_test " + kind);
+    sf::stickykeys::update(true); // the shortcuts off, as with focus: the crash handler must put them back
     if (kind == "abort") std::abort();
     if (kind == "throw") throw std::runtime_error("crash test");
     volatile int* nowhere = nullptr;
@@ -317,6 +320,22 @@ static int runMain(int argc, char** argv) {
         for (const std::string& m : studio.messages) SDL_Log("%s", m.c_str());
         if (studio.active) SDL_Log("Studio mode%s: no outside connections", studio.profile.name.empty() ? "" : (" (" + studio.profile.name + ")").c_str());
     }
+    { // Windows: the Sticky Keys prompt off while focused (StickyKeys.h). Only a run someone sits at changes the
+      // system's flags; tests, renders and agent runs get the in-memory fake (SF_STICKY_KEYS=system: the real ones,
+      // for checks on real hardware, e.g. a --crash-test).
+        const char* keys = std::getenv("SF_STICKY_KEYS");
+        const bool system = keys && *keys ? std::string(keys) == "system"
+                                          : options.renderPath.empty() && options.recordPath.empty() &&
+                                                options.uiTest.empty() && options.timelapsePath.empty() &&
+                                                !options.benchmark && options.demo.empty() && crashTest.empty() &&
+                                                !automatedRun();
+        std::string dir = sf::crashlog::path();
+        dir = dir.empty() ? sf::userDataDir() : dir.substr(0, dir.find_last_of("/\\") + 1);
+        const sf::stickykeys::Spi* spi = system ? sf::stickykeys::systemSpi() : sf::stickykeys::fakeSpi();
+        sf::stickykeys::start(spi, dir.empty() ? std::string() : dir + "sticky-keys.txt");
+        if (sf::stickykeys::recoveredAtStart())
+            sf::crashlog::note("The last session ended without putting the Sticky Keys shortcut back: put back now");
+    }
     if (!crashTest.empty()) crashOnPurpose(crashTest);
     auto app = std::make_unique<sf::App>();
     if (!app->init(options)) {
@@ -344,6 +363,7 @@ static int runMain(int argc, char** argv) {
     if (!g_uiServe) sf::armExitWatchdog(15000, code);
     app->shutdown();
     app.reset();
+    sf::stickykeys::stop();
     if (std::getenv("SF_STARTUP_TIMES"))
         std::fprintf(stderr, "run %.1f ms, shutdown %.1f ms\n", std::chrono::duration<double, std::milli>(runEnd - runStart).count(),
                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - runEnd).count());

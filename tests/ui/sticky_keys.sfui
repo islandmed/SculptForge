@@ -1,0 +1,22 @@
+# Windows: Shift five times popped the Sticky Keys prompt while sculpting (Oslen on Discord). While the window has
+# focus the prompt's shortcut is off; focus lost or the preference off puts it back. Scripts use the in-memory fake
+# (StickyKeys.h), never the system's flags; Windows' defaults: STICKYKEYS dwFlags 0x1FE = 510, quiet 0x1F2 = 498.
+run new_sphere subdivisions=4
+expect_value sticky_keys == 1
+window_focus 1
+wait 0.05
+expect_value sticky_keys_quiet == 1
+expect_value sticky_keys_flags == 498
+window_focus 0
+wait 0.05
+expect_value sticky_keys_quiet == 0
+expect_value sticky_keys_flags == 510
+window_focus 1
+wait 0.05
+expect_value sticky_keys_quiet == 1
+run sticky_keys on=false
+expect_value sticky_keys == 0
+expect_value sticky_keys_quiet == 0
+expect_value sticky_keys_flags == 510
+run sticky_keys on=true
+expect_value sticky_keys_quiet == 1

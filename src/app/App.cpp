@@ -15,6 +15,7 @@
 #include "app/AsyncStroke.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
+#include "app/StickyKeys.h"
 #include "core/PerfTrace.h"
 
 #include "ai/AiCommands.h"
@@ -330,6 +331,7 @@ bool App::init(const AppOptions& options) {
 }
 
 void App::shutdown() {
+    stickykeys::restore(); // first: the user's Sticky Keys shortcut back, whatever the teardown does
     if (!initialised_) { // init stopped early (no window or no OpenGL): nothing but SDL to take down
         if (sharedWindow_) return; // --ui-serve: the server's window, context and SDL stay
         if (glContext_) SDL_GL_DestroyContext(glContext_);
@@ -486,6 +488,7 @@ int App::runUiTest(int w, int h, int fps) {
         }
         trackModOrder(); // (the script's held keys of the last frame: Maya's Alt, then Ctrl, #134)
         demo_->update(dt);
+        updateStickyKeys(); // (the fake's: scripts never touch the system's)
         processPendingFiles();
         animateLayers(dt);
         pollBrushRequest();
@@ -715,6 +718,7 @@ int App::runRecording() {
         } // the demo provides all input
         trackModOrder(); // (the script's held keys of the last frame: Maya's Alt, then Ctrl, #134)
         demo_->update(dt);
+        updateStickyKeys(); // (the fake's: scripts never touch the system's)
         processPendingFiles();
         animateLayers(dt);
         pollBrushRequest();
@@ -817,6 +821,12 @@ void App::redrawIn(double seconds) {
 // then, so nothing kept the frames coming and the app looked as if in the background until the pointer came back
 // (Discord, Windows 11). Whether the app is in use follows the window's focus, never the pointer: while focused,
 // it keeps drawing for a while after any input (keys included) and while a key is held.
+// Windows: the Sticky Keys prompt's shortcut off while the window has focus and isn't minimised (StickyKeys.h).
+void App::updateStickyKeys() {
+    stickykeys::update(uiPrefs_.stopStickyKeysPrompt && windowFocused_ &&
+                       !(SDL_GetWindowFlags(window_) & SDL_WINDOW_MINIMIZED));
+}
+
 bool App::focusKeepsDrawing(double now) const {
     if (!windowFocused_) return false;
     if (now - lastInputAt_ < kFocusedActiveSeconds) return true;
@@ -1157,6 +1167,7 @@ int App::run() {
             pollSculptable();
         }
         tickProject(dt); // the title and autosave, asleep or not
+        updateStickyKeys();
         const double t = seconds();
         if (const uint64_t key = frameKey(); key != lastKey) { // a job finished, the Blender bridge sent a model...
             lastKey = key;
@@ -1546,9 +1557,15 @@ void App::dispatchEvent(const SDL_Event& event) {
         break;
     case SDL_EVENT_WINDOW_FOCUS_GAINED:
         windowFocused_ = true;
+        updateStickyKeys();
+        break;
+    case SDL_EVENT_WINDOW_MINIMIZED:
+    case SDL_EVENT_WINDOW_RESTORED:
+        updateStickyKeys();
         break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         windowFocused_ = false;
+        updateStickyKeys(); // at once: the next key may be another app's
         if (radial_.hold != RadialHold::None) closeRadialMenu(); // its key or button's release won't come here
         if (strokePopup_.held) closeStrokePopup();
         spaceHeld_ = false; // Space let go in another window never reaches us

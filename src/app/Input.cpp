@@ -14,6 +14,7 @@
 #include "app/AirStroke.h"
 #include "app/BlenderKeymap.h"
 #include "app/Pickers.h"
+#include "app/StickyKeys.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
@@ -208,6 +209,13 @@ void App::registerInputActions() {
         "and with Ctrl held too a drag zooms (#43). Off by default: with the Classic sculpting keys, Space opens the Quick Menu (with this "
         "on, a right click still does). Typing a space in a text field is never taken.",
         [this] { uiPrefs_.spaceCamera = !uiPrefs_.spaceCamera; }, [this] { return uiPrefs_.spaceCamera; });
+    add("input.sticky_keys", "Stop the Sticky Keys prompt while SculptForge has focus", nullptr, "Preferences > Input", "",
+        "Windows: pressing Shift five times (smooth, the camera keys) no longer opens the Sticky Keys prompt, nor does "
+        "a long Shift hold open the Filter Keys one, while SculptForge has focus. Only the shortcuts are turned off, "
+        "only while you are here, and never saved: switch to another app, minimise or quit and they are back as they "
+        "were. If you use Sticky, Filter or Toggle Keys they are left alone. On by default.",
+        [this] { uiPrefs_.stopStickyKeysPrompt = !uiPrefs_.stopStickyKeysPrompt; },
+        [this] { return uiPrefs_.stopStickyKeysPrompt; });
     add("input.emulate_3_button", "Emulate 3 Button Mouse", nullptr, "Preferences > Input", "",
         "Blender style: Alt+left-drag always turns the view (Shift pans, Ctrl zooms), as Blender's Emulate 3 Button "
         "Mouse preference does, for pens and trackpads. Off (as Blender's default keymap, 5.1 and later): Alt+left-drag "
@@ -272,6 +280,18 @@ void App::registerInputActions() {
                    [this](Document&, const Args& a) -> CommandResult {
                        const bool ok = importBlenderKeymap(argString(a, "path"));
                        return {ok, status_};
+                   }});
+    commands_.add({"sticky_keys",
+                   "Windows: stop the Sticky Keys prompt (Shift five times) while SculptForge has focus (Preferences > "
+                   "Input). Only the shortcut is turned off, for the session, and only when Sticky, Filter and Toggle "
+                   "Keys are off. Without `on`, says the setting.",
+                   {{"on", ParamSpec::Type::Bool, "On (the default) or off.", false}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       if (a.contains("on")) uiPrefs_.stopStickyKeysPrompt = argBool(a, "on", true);
+                       updateStickyKeys();
+                       return {true, std::string("Stop the Sticky Keys prompt: ") +
+                                         (uiPrefs_.stopStickyKeysPrompt ? "on" : "off") +
+                                         (stickykeys::isQuiet() ? " (its shortcut is off now)" : "")};
                    }});
     registerViewActions();
     registerStrokePopupActions(); // StrokePopup.cpp
@@ -567,6 +587,12 @@ void App::drawInputSection() {
     if (ui::Checkbox("Hold Space and drag to move the camera##input.space_camera", &spaceCamera))
         uiPrefs_.spaceCamera = spaceCamera;
     ui::HelpAction(*this, "input.space_camera");
+#if defined(_WIN32)
+    bool stickyKeys = uiPrefs_.stopStickyKeysPrompt;
+    if (ui::Checkbox("Stop the Sticky Keys prompt while SculptForge has focus##input.sticky_keys", &stickyKeys))
+        uiPrefs_.stopStickyKeysPrompt = stickyKeys;
+    ui::HelpAction(*this, "input.sticky_keys");
+#endif
     if (blenderStyle()) {
         bool emulate = uiPrefs_.emulate3Button;
         if (ui::Checkbox("Emulate 3 Button Mouse##input.emulate_3_button", &emulate)) uiPrefs_.emulate3Button = emulate;

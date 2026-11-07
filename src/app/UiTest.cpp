@@ -172,7 +172,8 @@
 //                            2 DragDot, 3 Spray, 4 LazyMouse), vdms (VDM brush maps), vdm_files (.sfvdm in the library)
 //                            z_intensity, smooth_intensity, rgb_intensity (0-100), focal_shift (-100..100), draw_size,
 //                            size_popup_open (the S / U / I / O slider), size_knob_x / size_knob_y (its knob, pixels),
-//                            quickmenu_open, right_click_menu, space_camera, space_held, air_strokes, radial_open / radial_menu (-1 none) / radial_held /
+//                            quickmenu_open, right_click_menu, space_camera, sticky_keys (the preference), sticky_keys_quiet (its shortcuts off now),
+//                            sticky_keys_flags (STICKYKEYS dwFlags; the fake's in scripts), space_held, air_strokes, radial_open / radial_menu (-1 none) / radial_held /
 //                            radial_hover / radial_ran (radial menus: open, the menu, held by its key or button, the
 //                            slot pointed at, the slot run last), radial_menus, radial_slots_N, stroke_popup_open / stroke_popup_held / stroke_popup_hover / stroke_popup_picked (the stroke popup: items are strokes 0-4, then Add, Sub, Smooth, Mask, Select, then the shapes 10-16), stroke_latch (0 none, 1 Smooth, 2 Mask, 3 Select), invert_toggle, lazy_mouse (the Lazy Stroke type),
 //                            steady_stroke (Steady Stroke on, any type), steady_lag (px from the pointer to the brush on
@@ -307,6 +308,7 @@
 #define SDL_PEN_INPUT_IN_PROXIMITY (1u << 31) // SDL 3.4's flag; older SDL 3 never sets it
 #endif
 #include "app/Demo.h"
+#include "app/StickyKeys.h"
 #include "app/Ui.h"
 #include "app/UserGlyphs.h"
 
@@ -731,6 +733,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "quickmenu_open") return app_.quickMenu_.open ? 1.0 : 0.0;
     if (name == "right_click_menu") return app_.uiPrefs_.rightClickQuickMenu ? 1.0 : 0.0;
     if (name == "space_camera") return app_.uiPrefs_.spaceCamera ? 1.0 : 0.0;
+    if (name == "sticky_keys") return app_.uiPrefs_.stopStickyKeysPrompt ? 1.0 : 0.0;
+    if (name == "sticky_keys_quiet") return stickykeys::isQuiet() ? 1.0 : 0.0;
+    if (name == "sticky_keys_flags") return double(stickykeys::current().sticky); // the fake's STICKYKEYS dwFlags
     if (name == "look_outline_opacity") return double(std::lround(app_.uiPrefs_.look.outlineOpacity * 100.0f)); // percent
     if (name == "look_outlines") return double(app_.uiPrefs_.look.outlines); // 0 off, 1 subtle, 2 on
     if (name == "look_neutral") return app_.uiPrefs_.look.scheme == "neutral" ? 1.0 : 0.0; // Forge Terminal's Neutral colours

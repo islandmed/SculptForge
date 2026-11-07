@@ -87,6 +87,12 @@ they go: drag up to zoom out, down to zoom in.
 Quick Menu. With it on, <kbd>Space</kbd> no longer opens the Quick Menu (a right click still does), and a space typed in
 a text field is never taken.
 
+On Windows, pressing <kbd>Shift</kbd> five times (smoothing, the camera keys) used to open the Sticky Keys prompt.
+**Edit > Preferences > Input > Stop the Sticky Keys prompt while SculptForge has focus** (on by default) turns off only
+that shortcut, and Filter Keys' and Toggle Keys', while SculptForge has focus, full screen or windowed. Nothing is
+saved: switch to another app, minimise or quit and the shortcuts are back. If you use Sticky, Filter or Toggle Keys,
+they are left alone.
+
 **Start strokes off the model** (also **View > Lock camera**) is off by default. With it on (a label at the top of
 the canvas says so, and in the SculptForge layout the status bar shows **CAMERA LOCKED**), a
 left-drag on the background no longer rotates: it waits, and the brush starts where the cursor first reaches the

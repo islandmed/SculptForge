@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/CrashLog.h"
+#include "app/StickyKeys.h"
 #include "app/UserData.h"
 
 #include <SDL3/SDL.h>
@@ -112,12 +113,14 @@ void rawWrite(const char* s) {
 }
 
 void crashHeader(const char* what, const char* detail = nullptr) {
+    const bool keysBack = stickykeys::restoreFromCrash(); // first: a crash never leaves the user's settings changed
     rawWrite("\nCRASH: SculptForge " SCULPTFORGE_VERSION " crashed: ");
     rawWrite(what);
     rawWrite(detail);
     rawWrite("\nCRASH: last thing done: ");
     rawWrite(g_last);
     rawWrite("\n");
+    if (keysBack) rawWrite("CRASH: the Sticky Keys shortcut is back as it was\n");
 }
 
 #if !defined(_WIN32)

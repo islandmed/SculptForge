@@ -347,7 +347,7 @@ target_link_libraries(sculptforge-cli PRIVATE sculptforge_core sculptforge_ai sc
 if(SCULPTFORGE_BUILD_APP OR SCULPTFORGE_BUILD_TESTS)
   add_library(sculptforge_appshared STATIC src/app/AssetLibrary.cpp src/app/BrushPreview.cpp src/app/UiLayout.cpp
     src/app/ShellGeometry.cpp src/app/LookSchemes.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp
-    src/app/I18nTraditionalChinese.cpp src/app/I18nSimplifiedChinese.cpp src/app/ConnectAi.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
+    src/app/I18nTraditionalChinese.cpp src/app/I18nSimplifiedChinese.cpp src/app/ConnectAi.cpp src/app/StickyKeys.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
   target_link_libraries(sculptforge_appshared PUBLIC sculptforge_core)
   if(MSVC)
     target_compile_options(sculptforge_appshared PRIVATE /W4 /utf-8 /permissive-)

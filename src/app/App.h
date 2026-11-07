@@ -2462,6 +2462,7 @@ private:
     // ---- end classic feel ----
     // ---- Redraw on demand (App.cpp run()) ----
     bool wantsFrames(double now) const; // something animates or runs: keep drawing
+    void updateStickyKeys();
     bool focusKeepsDrawing(double now) const; // the window has focus and was just used (not: the pointer is over it)
     static constexpr double kFocusedActiveSeconds = 2.0;
     bool windowFocused_ = false; // keyboard focus (SDL_EVENT_WINDOW_FOCUS_GAINED / _LOST)
