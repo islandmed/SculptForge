@@ -62,3 +62,37 @@ expect_value cloth_fabric == 1
 expect_value cloth_soft == 0
 expect_value cloth_self == 1
 shot cloth_panel
+
+# The other modes, each picked in the panel: Grab carries the spot it started on, Pinch gathers the cloth into
+# folds, Inflate balloons it with wrinkles (Symmetry X is on: both sides).
+click "##clothmode"
+wait 0.2
+click "Grab"
+expect_value cloth_mode == 3
+snapshot
+stroke 0.56 0.5 0.66 0.42
+expect_value moved > 200
+wait_idle 30
+shot cloth_grab
+key ctrl+z
+click "##clothmode"
+wait 0.2
+click "Pinch"
+expect_value cloth_mode == 5
+snapshot
+stroke 0.6 0.5 0.615 0.5
+expect_value moved > 200
+wait_idle 30
+shot cloth_pinch
+key ctrl+z
+click "##clothmode"
+wait 0.2
+click "Inflate"
+expect_value cloth_mode == 6
+snapshot
+stroke 0.6 0.5 0.62 0.5
+expect_value moved > 200
+wait_idle 30
+shot cloth_inflate
+key ctrl+z
+expect_value moved == 0
