@@ -661,8 +661,9 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
 }
 .guide-page .nav .wrap, .guide-page .footer .wrap { max-width: 1360px; }
 
-/* The hero plays a real sculpting session at real speed; live mode is the first section under it, beside the bust. */
-.hero-sculpt video { aspect-ratio: 1280 / 924; object-fit: cover; background: #222; }
+/* The hero clip's frame comes from its figure in index.html (--hero-ar, --hero-ar-phone), so a new source is one block there;
+   live mode is the first section under it, beside the bust. */
+.hero-sculpt video { aspect-ratio: var(--hero-ar, 1280 / 924); object-fit: cover; background: #222; }
 .speed-line { color: var(--muted); font-size: 0.95rem; max-width: 36em; margin: 0.4em 0 0; }
 .speed-line a { white-space: nowrap; }
 .live { border-top: 1px solid var(--border); }
@@ -676,10 +677,10 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
 }
 @media (max-width: 620px) {
   .speed-line { order: 3; font-size: 0.9rem; margin: -0.6em 0 1.2em; }
-  .hero-sculpt video { aspect-ratio: 720 / 866; }
-  .hero-review figcaption { display: block; padding: 0 16px; } /* the review credit stays next to the clip on phones */
+  .hero-sculpt video { aspect-ratio: var(--hero-ar-phone, 720 / 866); }
+  .hero-video .hero-credit { display: block; padding: 0 16px; } /* a credit stays next to the clip on phones */
 }
-.hero-review figcaption a { color: inherit; text-decoration: underline; }
+.hero-credit a { color: inherit; text-decoration: underline; }
 
 /* Community band under the hero; the feature set in threes; AI as one compact section lower down. */
 .community { border-top: 1px solid var(--border); background: radial-gradient(900px 400px at 85% 0%, rgba(242, 140, 60, 0.08), transparent 60%); }

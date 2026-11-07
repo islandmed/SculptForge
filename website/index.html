@@ -23,7 +23,7 @@
   </script>
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://sculptforge.app/img/social-preview.png?v=5">
-  <link rel="stylesheet" href="style.css?v=26">
+  <link rel="stylesheet" href="style.css?v=27">
   <script src="motion.js?v=11" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
@@ -73,14 +73,17 @@
             <li>VFX Reference Platform</li><li>Classic sculpting keys</li><li>No account</li><li>No telemetry</li><li>Windows · macOS · Linux</li>
           </ul>
         </div>
-        <figure class="hero-video hero-sculpt hero-review">
+        <!-- Hero clip: everything about the source lives in this figure (files, poster, frame sizes, description, credit).
+             New source: desktop + webm + 720x866 phone cut + poster in media/, then edit this block only. A caption with
+             class="hero-credit" stays visible on phones; without it the caption hides there. -->
+        <figure class="hero-video hero-sculpt" style="--hero-ar: 1176 / 850; --hero-ar-phone: 720 / 866">
           <video id="hero-video" poster="media/poster-asknk.jpg?v=1" autoplay muted loop playsinline preload="metadata"
                  aria-label="A clip from askNK's video review of SculptForge: Facial Shapes turns a sculpted head through a smile, an open mouth, a blink and other expressions">
             <source src="media/asknk-review-mobile.mp4?v=1" type="video/mp4" media="(max-width: 620px)">
             <source src="media/asknk-review.webm?v=1" type="video/webm">
             <source src="media/asknk-review.mp4?v=1" type="video/mp4">
           </video>
-          <figcaption>From <a href="https://www.youtube.com/watch?v=cunchKGUzcw" rel="noopener">askNK's review</a>
+          <figcaption class="hero-credit">From <a href="https://www.youtube.com/watch?v=cunchKGUzcw" rel="noopener">askNK's review</a>
             of SculptForge: Facial Shapes on a sculpted head. Clip shared with askNK's permission.</figcaption>
         </figure>
       </div>
