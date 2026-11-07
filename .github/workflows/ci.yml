@@ -80,7 +80,9 @@ jobs:
             # Site lane: every file on tools/ci/site_lane.txt (the list ~/Work/.sf/lane.sh reads too), read from the base,
             # never from the change itself (a pull request can't widen it for its own run).
             lane=$(gh api "repos/$REPO/contents/tools/ci/site_lane.txt?ref=$base" -H 'Accept: application/vnd.github.raw') &&
-              lane=$(grep -v -e '^#' -e '^[[:space:]]*$' <<< "$lane") || lane="" # (a blank line would match every file)
+              { appin=$(grep '^!' <<< "$lane" | cut -c2-); lane=$(grep -v -e '^#' -e '^!' -e '^[[:space:]]*$' <<< "$lane"); } || lane="" # (a blank line would match every file)
+            # '!' lines: app inputs inside the site paths (compiled in): touching one means build and test.
+            if [ -n "$appin" ] && grep -qE -f <(echo "$appin") <<< "$files"; then lane=""; fi
             if [ -n "$files" ] && [ -n "$lane" ] && ! grep -qvE -f <(echo "$lane") <<< "$files"; then
               echo "::notice::site lane only (tools/ci/site_lane.txt): no build or tests"
               code=false
@@ -88,7 +90,7 @@ jobs:
               code=false
               while IFS= read -r f; do
                 case "$f" in
-                  website/link/*) code=true ;;
+                  website/link/*|website/founding.json) code=true ;; # (built into the app)
                   website/*|.github/workflows/pages.yml|.github/workflows/download-stats.yml|packaging/arch/*|tools/publish/*|scripts/release.sh|scripts/merge-queue.sh) ;;
                   docs/guide/*|docs/supporters.txt) code=true ;;
                   docs/*.md|docs/design/*|changes/*|.github/ISSUE_TEMPLATE/*|.github/PULL_REQUEST_TEMPLATE.md) ;;

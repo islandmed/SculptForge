@@ -1,14 +1,17 @@
 # Site lane: a change whose every file matches one of these (extended regexes, one per line, '#' lines ignored) is
 # site-only. It deploys from main (pages.yml) and skips the app build and tests in CI (ci.yml, job Changes), on
 # staging too; ~/Work/.sf/lane.sh routes it to sitegate.sh instead of the PC suite.
-# (website/link and docs/supporters.txt are built into the app too: it picks them up at the next release, whose
-# build and PC suite test them.)
+# Lines starting with '!' are app inputs inside those paths (compiled in, read by app tests): a change touching one is
+# in the app lane (built and tested) even when every file also matches above. ui_support broke on main 11-07 when a
+# Founding Member credit (docs/supporters.txt, website/founding.json) took the site lane and skipped the app tests.
 ^website/
 ^README\.md$
 ^THIRD_PARTY_NOTICES\.md$
 ^docs/brand\.md$
-^docs/supporters\.txt$
 ^tools/brand/
 ^tools/guide/build_site\.py$
 ^tools/marks_media_[a-z]+\.(json|txt)$
 ^changes/site-
+!^docs/supporters\.txt$
+!^website/founding\.json$
+!^website/link/
