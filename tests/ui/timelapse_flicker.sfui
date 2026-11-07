@@ -1,0 +1,26 @@
+# Timelapse frames don't flicker (Discord, 0.11.10: a PBR timelapse of a dense mesh flickered a little). A mesh over
+# the triangle budget whose full frame doesn't fit the still-frame budget stays on its coarse levels in the view;
+# after each history seek its edited clusters drew in full until their levels followed a frame later, so the
+# timelapse flipped between full and coarse detail from frame to frame. Timelapse frames are always the full mesh:
+# on a static camera, held frames of the same step must match (timelapse_flicker: the largest mean per-pixel luma
+# change, 0-255, between consecutive held frames).
+run ui_look look=classic layout=classic
+env SF_TRIANGLE_BUDGET 40000
+env SF_STILL_FRAME_MS 0.001
+run new_sphere subdivisions=6
+stroke 0.35 0.40 0.60 0.45
+stroke 0.40 0.55 0.62 0.60
+stroke 0.30 0.30 0.50 0.35
+expect_value timeline_steps == 3
+run viewport_shading mode=pbr
+wait_value environment_pending == 0
+wait 0.6
+# (the view itself is on its coarse levels: the case that flickered)
+expect_value coarse_clusters > 0
+expect_value timelapse_flicker >= 0
+expect_value timelapse_flicker < 0.05
+expect_value timeline_cursor == 3
+# Lit Sphere too.
+run viewport_shading mode=lit_sphere
+wait 0.3
+expect_value timelapse_flicker < 0.05

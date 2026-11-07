@@ -2620,6 +2620,7 @@ private:
     bool timelapseStep(double budgetSeconds); // renders frames for up to the budget; false when finished
     bool timelapseBusy() const; // a timelapse is rendering (a few frames each app frame)
     int runTimelapseCli();                    // sculptforge FILE --timelapse out.mp4
+    bool renderTimelapseFrame(const Camera& cam, int width, int height, std::vector<uint8_t>& rgba, std::string& err);
     void startProofMode();                    // Help > Benchmark, sculptforge --benchmark
     bool proofSkippedScenes() const;          // the benchmark skipped a scene: too little free memory
     bool proofRunning() const;                // a benchmark is measuring (not its intro or results): every frame is wanted

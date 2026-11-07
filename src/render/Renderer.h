@@ -45,6 +45,10 @@ struct RenderSettings {
     bool motionProxy = false;  // the view is moving (Fast Navigation): draw big meshes' lighter proxy (render/Clusters.h)
     double stillSeconds = 0.0; // how long the view has been still (0 while it moves): coarse levels give way to full detail
     bool stroking = false;     // a stroke runs (its dabs still landing): coarse levels stay
+    // Offline frames (the timelapse, --render): always the full mesh, never its coarse levels. In the view a frame
+    // too slow for the still budget stays coarse while edited clusters draw in full until their levels follow, so
+    // a timelapse seeking through the history flipped between the two from frame to frame (Discord, 0.11.10).
+    bool fullDetail = false;
     bool flatShading = false;  // the scene's shading (Material palette): faceted; Parts can override (core/Document.h)
     // Backface culling (#68, Tool > Display): back faces are never drawn, on any mesh (closed or not, from any
     // view). Off: they are skipped only where they can't show (a closed mesh seen from outside, Renderer::cull).
