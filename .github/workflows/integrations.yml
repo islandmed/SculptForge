@@ -2,28 +2,34 @@ name: Integrations
 
 # The integration lanes (docs/design/release-lanes.md §2, docs/releasing.md "Integration releases"): the Blender
 # add-on and the Maya script ship when they change, not with the app. A tag blender-vX.Y.Z or maya-vX.Y.Z (on main,
-# whose file carries exactly that version) runs this: checks, the zip(s) and their SHA256SUMS.txt in a GitHub
-# release of that name, never marked latest (the app's releases/latest stays the app), then the website again so
-# its download links name the new release (pages.yml, step "Integration downloads"). No app version, update feed or
-# package changes. What the two sides can read of each other is the bridge manifest's version, not the app's.
+# whose file carries exactly that version) runs this: checks, the zip(s), SHA256SUMS.txt signed with the release key
+# like the app's (they run inside people's Blender and Maya: the same trust), a GitHub release of that name, never
+# marked latest (the app's releases/latest stays the app), then the website again so its download links name the new
+# release (pages.yml, step "Integration downloads"). No app version, update feed or package changes.
+# Locked down like release.yml (tools/release/check_workflows.py): tag pushes only, pinned actions; the signing key
+# only in job sign (environment `release`, whose deployment rule must list these tag patterns besides v*), which
+# can't write; publish re-checks the signature against the key compiled into the app before releasing.
 
 on:
   push:
     tags: ['blender-v[0-9]*', 'maya-v[0-9]*']
 
 permissions:
-  contents: write
-  actions: write
+  contents: read
 
 concurrency:
   group: integrations-${{ github.ref_name }}
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-24.04
+    outputs:
+      lane: ${{ steps.b.outputs.lane }}
+      title: ${{ steps.b.outputs.title }}
     steps:
-      - uses: actions/checkout@v7
-      - name: Check, build
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: b
+        name: Check, build, checksums
         run: |
           tag=$GITHUB_REF_NAME; lane=${tag%%-v*}; V=${tag#*-v}
           git fetch -q origin main
@@ -32,24 +38,77 @@ jobs:
           case $lane in
             blender)
               have=$(sed -n 's/^version = "\(.*\)"/\1/p' addons/blender/sculptforge_bridge/blender_manifest.toml)
+              [ "$have" = "$V" ] || { echo "::error::$tag but the manifest says $have: bump it on main first"; exit 1; }
               python3 addons/blender/build_addon.py --check --out dist
-              [ "$have" != "$V" ] || cp "dist/sculptforge_bridge-$V.zip" dist/sculptforge_bridge.zip
+              cp "dist/sculptforge_bridge-$V.zip" dist/sculptforge_bridge.zip
               title="SculptForge Bridge for Blender $V" ;;
             maya)
               have=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' integrations/maya/sculptforge_maya.py)
+              [ "$have" = "$V" ] || { echo "::error::$tag but the script says $have: bump it on main first"; exit 1; }
               python3 -I tests/maya/test_sculptforge_maya.py   # mocked maya.cmds
               python3 -m zipfile -c dist/sculptforge_maya.zip integrations/maya/sculptforge_maya.py integrations/maya/README.md
               title="SculptForge for Maya $V" ;;
+            *) echo "::error::unknown lane $lane"; exit 1 ;;
           esac
-          [ "$have" = "$V" ] || { echo "::error::$tag but the file says $have: bump it on main first"; exit 1; }
           (cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
-          { echo "lane=$lane"; echo "title=$title"; } >> "$GITHUB_ENV"
+          { echo "lane=$lane"; echo "title=$title"; } >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist
+
+  sign:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: release # UPDATE_SIGNING_KEY lives only here (and in member-release)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist
+      - name: Sign the checksums (the same key and script as the app's releases)
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          [ -n "$UPDATE_SIGNING_KEY" ] || { echo "::error::no UPDATE_SIGNING_KEY here: nothing is published unsigned"; exit 1; }
+          tools/release/sign_sums.sh dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sig
+          path: dist/SHA256SUMS.txt.sig
+
+  publish:
+    needs: [build, sign]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sig
+          path: dist
+      - name: Re-check the files and the signature against the key compiled into the app
+        run: |
+          (cd dist && sha256sum -c SHA256SUMS.txt)
+          pub=$(sed -n 's/.*kUpdatePublicKeyHex = "\([0-9a-f]\{64\}\)".*/\1/p' src/core/SelfUpdate.h)
+          { printf '302a300506032b6570032100%s' "$pub" | xxd -r -p; } > "$RUNNER_TEMP/pub.der"
+          openssl pkeyutl -verify -pubin -keyform DER -inkey "$RUNNER_TEMP/pub.der" -rawin \
+            -in dist/SHA256SUMS.txt -sigfile dist/SHA256SUMS.txt.sig
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
+          LANE: ${{ needs.build.outputs.lane }}
+          TITLE: ${{ needs.build.outputs.title }}
         run: |
-          notes="$title. Install and use: https://sculptforge.app/guide/$lane.html. Works with SculptForge releases that read bridge manifest version 1 or newer."
-          gh release create "$GITHUB_REF_NAME" dist/* --title "$title" --notes "$notes" --latest=false --verify-tag
+          notes="$TITLE. Install and use: https://sculptforge.app/guide/$LANE.html. SHA256SUMS.txt is signed with the SculptForge release key (SHA256SUMS.txt.sig, Ed25519). Works with SculptForge releases that read bridge manifest version 1."
+          gh release create "$GITHUB_REF_NAME" dist/* --title "$TITLE" --notes "$notes" --latest=false --verify-tag
       - name: Website (download links name this release)
         env:
           GH_TOKEN: ${{ github.token }}
