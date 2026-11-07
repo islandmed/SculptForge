@@ -221,6 +221,11 @@ embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedRecipes.cpp sf::assets
   recipeDirtAndDust ${CMAKE_CURRENT_SOURCE_DIR}/assets/materials/dirt_and_dust.sfmaterial
   recipeRustedIron ${CMAKE_CURRENT_SOURCE_DIR}/assets/materials/rusted_iron.sfmaterial)
 target_sources(sculptforge_core PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedRecipes.cpp)
+# The built-in insert sets (core/Parts.h builtinInsertSets): Creature bones (#154), original pieces made by
+# tools/creature-bones/build.sh, a zlib-compressed multi-object OBJ.
+embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedInsertSets.cpp sf::assets
+  insertSetCreatureBones ${CMAKE_CURRENT_SOURCE_DIR}/assets/insert-sets/creature-bones.obj.z)
+target_sources(sculptforge_core PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedInsertSets.cpp)
 target_include_directories(sculptforge_core PUBLIC src PRIVATE third_party/stb third_party/ufbx third_party/xatlas third_party/mikktspace third_party/tinyexr)
 if(WIN32)
   target_link_libraries(sculptforge_core PRIVATE shell32 advapi32) # core/Trash.cpp: the Recycle Bin; core/DiscordPresence.cpp: the pipe server's user

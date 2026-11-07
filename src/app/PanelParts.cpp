@@ -559,6 +559,14 @@ void App::drawPartsContents() {
                 SDL_ShowOpenFolderDialog(onAppendChosen, &dialogRequests_[int(FileAction::InsertSet)], window_, nullptr, false);
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
                 ImGui::SetTooltip("%s", tr("A folder of .obj, .ply or .glb files: insert them one at a time"));
+            // The built-in sets (core/Parts.h): no file to pick.
+            for (const BuiltinInsertSet& b : builtinInsertSets()) {
+                const std::string path = std::string(kBuiltinInsertSetPrefix) + b.id;
+                if (ImGui::MenuItem(tr(b.name), nullptr, insertSetActive() && insertSet_.path == path)) chooseInsertSet(path);
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+                    ImGui::SetTooltip("%s", tr("Original creature bones to build on: skull, jaw, teeth, horns, spine, "
+                                               "ribs, limb and wing bones, claws and tail"));
+            }
             ImGui::EndMenu();
         }
         if (ImGui::MenuItem(tr("From file...")))
@@ -836,7 +844,11 @@ void App::drawInsertSetPicker() {
     const std::string title = std::string(tr("Insert set")) + "###insertset";
     if (ImGui::Begin(title.c_str(), &open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing)) {
         const auto set = std::filesystem::path(std::u8string(insertSet_.path.begin(), insertSet_.path.end())).lexically_normal();
-        const std::string name = (set.has_filename() ? set.filename() : set.parent_path().filename()).string();
+        std::string name = (set.has_filename() ? set.filename() : set.parent_path().filename()).string();
+        const BuiltinInsertSet* builtin = nullptr;
+        for (const BuiltinInsertSet& b : builtinInsertSets())
+            if (insertSet_.path == std::string(kBuiltinInsertSetPrefix) + b.id) builtin = &b;
+        if (builtin) name = tr(builtin->name);
         ImGui::TextDisabled("%s  (%d)", name.c_str(), int(insertSet_.items.size()));
         const float spacing = ImGui::GetStyle().ItemSpacing.x;
         const int perRow = std::clamp(int(insertSet_.items.size()), 1, 5);
@@ -844,10 +856,11 @@ void App::drawInsertSetPicker() {
             const InsertSetItem& it = insertSet_.items[i];
             if (i % size_t(perRow)) ImGui::SameLine(0, spacing);
             const std::string id = "##insertset" + std::to_string(i);
-            if (AssetTile(id.c_str(), thumbs_.insertSetItem(it.file, it.object), ICON_LC_BOX, it.name, tile,
+            const std::string label = builtin ? tr(it.name) : it.name; // a built-in set's names are ours to translate
+            if (AssetTile(id.c_str(), thumbs_.insertSetItem(it.file, it.object), ICON_LC_BOX, label, tile,
                           int(i) == insertSet_.index))
                 selectInsertSetItem(int(i));
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", it.name.c_str());
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", label.c_str());
         }
         AssetTileHoverGlow();
         ImGui::TextDisabled("%s", tr("[ / ] previous / next   Esc stops"));

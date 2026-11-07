@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <map>
 
@@ -245,4 +246,64 @@ TEST(insert_mesh_from_set) {
     CHECK(!listInsertSet((dir / "missing.glb").string(), items, err));
     std::filesystem::remove_all(dir);
     std::remove(glb.c_str());
+}
+
+// The built-in Creature bones set (#154): no file to pick, every piece inserts as quads, one undo step each.
+TEST(insert_builtin_creature_bones) {
+#if defined(_WIN32)
+    const char* var = "APPDATA";
+#else
+    const char* var = "XDG_DATA_HOME";
+#endif
+    // the per-user data folder in a temp folder (the set is written there once per run)
+    const std::filesystem::path data = std::filesystem::temp_directory_path() / "sf_builtin_sets";
+    std::filesystem::remove_all(data);
+    const char* had = std::getenv(var);
+    const std::string old = had ? had : "";
+    auto setVar = [&](const std::string& v) {
+#if defined(_WIN32)
+        _putenv_s(var, v.c_str());
+#else
+        if (v.empty() && !had) unsetenv(var);
+        else setenv(var, v.c_str(), 1);
+#endif
+    };
+    setVar(data.string());
+    CHECK(builtinInsertSets().size() == 1 && std::string(builtinInsertSets()[0].id) == "creature-bones");
+    const std::string set = std::string(kBuiltinInsertSetPrefix) + "creature-bones";
+    std::vector<InsertSetItem> items;
+    std::string err;
+    CHECK(listInsertSet(set, items, err));
+    const std::vector<std::string> names = {"Skull", "Jaw", "Fang", "Blade tooth", "Swept horn", "Spiral horn", "Claw",
+                                            "Vertebra", "Tail vertebrae", "Rib", "Limb bone", "Wing bone",
+                                            "Wing finger"};
+    CHECK(items.size() == names.size());
+    for (size_t i = 0; i < items.size() && i < names.size(); ++i) CHECK(items[i].name == names[i]);
+    std::string file;
+    CHECK(resolveInsertSetPath(set, file, err) && std::filesystem::exists(std::filesystem::path(std::u8string(file.begin(), file.end()))));
+    CHECK(file.find("insert-sets") != std::string::npos);
+
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 3.0}}).ok);
+    const size_t before = doc.mesh.triangleCount();
+    for (size_t i = 0; i < names.size(); ++i) {
+        Mesh piece;
+        std::string name;
+        CHECK(loadInsertSetItem(set, int(i), piece, name, err) && name == names[i]);
+        // clean starting pieces: closed, low-to-mid poly, nearly all quads
+        size_t quads = 0;
+        for (size_t t = 0; t < piece.triangles.size(); ++t)
+            if (piece.hasQuads() && piece.quadPartners[t] != Mesh::kNoQuad) ++quads;
+        CHECK(piece.triangleCount() >= 400 && piece.triangleCount() <= 12000);
+        CHECK(quads >= piece.triangleCount() * 9 / 10);
+        const CommandResult r = reg.execute(doc, "insert_mesh", {{"set", set}, {"index", double(i)}, {"x", 0.0}, {"y", 1.0}, {"z", 0.0}, {"size", 0.4}});
+        CHECK(r.ok && r.message.find(names[i]) != std::string::npos);
+        CHECK(doc.mesh.triangleCount() == before + piece.triangleCount());
+        CHECK(reg.execute(doc, "undo", {}).ok);
+        CHECK(doc.mesh.triangleCount() == before);
+    }
+    CHECK(reg.execute(doc, "insert_set_items", {{"set", set}}).message.find("12. Wing finger") != std::string::npos);
+    CHECK(!listInsertSet(std::string(kBuiltinInsertSetPrefix) + "nothing", items, err));
+    setVar(old);
 }

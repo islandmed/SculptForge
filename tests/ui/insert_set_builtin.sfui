@@ -1,0 +1,24 @@
+# #154: the built-in Creature bones set: Append > Insert on the model > Creature bones, no file to pick. Its picker
+# shows every piece; a click picks one, the next drag inserts it (X symmetry is on: a mirrored copy too).
+run new_sphere subdivisions=4
+key f
+remember triangles base
+click "Parts/Append"
+hover "Insert on the model"
+click "Creature bones"
+wait 0.1
+expect_status Insert Skull (1 of 13)
+wait_idle
+shot creature_bones_picker
+
+click "##insertset6"
+expect_status Insert Claw (7 of 13)
+stroke 0.8 0.45 0.86 0.45
+expect_status 2 Claws (mirrored)
+expect_value triangles > $base
+wait_idle
+shot creature_bones_claw
+key ctrl+z
+expect_value triangles == $base
+key escape
+expect_status Insert off

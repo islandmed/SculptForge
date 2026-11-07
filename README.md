@@ -28,11 +28,6 @@
   <a href="https://sculptforge.app/support.html">Membership</a>
 </p>
 
-<p align="center"><sub>
-  If sculptforge.app is blocked on your network: <a href="https://github.com/islandmed/SculptForge/releases/latest">download from GitHub Releases</a>
-  and read the <a href="docs/guide/index.md">user guide on GitHub</a>.
-</sub></p>
-
 <p align="center">
   <a href="https://sculptforge.app/#demos"><img src="docs/images/showcase.jpg" width="800" alt="A detailed lion head sculpted in SculptForge"></a>
 </p>
@@ -168,7 +163,7 @@ you modify it in-house without publishing your changes. See **[docs/studios.md](
 **[Download for macOS](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-macos.dmg)** ·
 **[Download for Linux](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-x86_64.AppImage)** (AppImage, x86_64)
 
-Every link gets the newest version, straight from GitHub (works where sculptforge.app is blocked; the [guide is here too](docs/guide/index.md)). **[install/](install/README.md)** has the full list (.deb, .rpm, ARM64,
+Every link gets the newest version. **[install/](install/README.md)** has the full list (.deb, .rpm, ARM64,
 portable .zip, Arch) and what to do after downloading. Or install with one command:
 
 ```sh
