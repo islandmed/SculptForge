@@ -31,6 +31,7 @@
 #include "core/ThreadPool.h"
 
 #include <algorithm>
+#include <functional>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -1151,9 +1152,14 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
     // Proxy density (proxy edges per quad edge). Smooth forms come out as well at 2 as at 2.5 (14 organic benchmark
     // cases, geometric means: Hausdorff, poles, angles and edge spread equal or better, mean distance +1%) in 0.65x
     // the time; hard edges need 2.5 to keep their corners regular (a cube: 35 poles at 2), so a piece with one that
-    // survives at the proxy's scale, or with guides, uses 2.5. 3.2: the retry when the result isn't manifold.
+    // survives at the proxy's scale, with guides or with Follow Face Groups borders (feature lines too), uses 2.5, and so does
+    // a strong Size Variation (above the default 0.5 the coarser proxy evens the sizes out). 3.2: the retry when the
+    // result isn't manifold.
     const float densities[3] = {2.0f, 2.5f, 3.2f};
-    for (int i = guides.empty() ? 0 : 1; i < 3; ++i) {
+    const bool groupBorders =
+        opt.keepGroups && std::adjacent_find(piece.group.begin(), piece.group.end(), std::not_equal_to<>()) != piece.group.end();
+    const bool dense = !guides.empty() || groupBorders || opt.adaptive > 0.5f;
+    for (int i = dense ? 1 : 0; i < 3; ++i) {
         const float d = densities[i];
         out = FieldPieceResult{};
         const bool ok = remeshPieceOnce(piece, axis, wantQuads, opt, diag, guides, report, out, cancelled, d);
