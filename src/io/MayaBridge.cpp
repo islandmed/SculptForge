@@ -10,6 +10,8 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
+#include <random>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -125,8 +127,9 @@ bool parseMayaManifest(const std::string& text, MayaManifest& out, std::string& 
         return true;
     };
     if (!optionalString("sender", m.sender) || !optionalString("sender_version", m.senderVersion) ||
-        !optionalString("unit", m.unit))
+        !optionalString("unit", m.unit) || !optionalString("writer", m.writer))
         return false;
+    m.live = j["live"].isBool() && j["live"].asBool();
     const Json& objects = j["objects"];
     if (!objects.isArray()) {
         error = "The Maya bridge manifest lists no objects";
@@ -171,6 +174,8 @@ std::string writeMayaManifest(const MayaManifest& m) {
     s += "  \"sender\": " + jsonQuote(m.sender) + ",\n";
     s += "  \"sender_version\": " + jsonQuote(m.senderVersion) + ",\n";
     if (!m.unit.empty()) s += "  \"unit\": " + jsonQuote(m.unit) + ",\n";
+    if (!m.writer.empty()) s += "  \"writer\": " + jsonQuote(m.writer) + ",\n";
+    if (m.live) s += "  \"live\": true,\n";
     s += "  \"objects\": [";
     for (size_t i = 0; i < m.objects.size(); ++i) {
         s += i ? ",\n    {" : "\n    {";
@@ -268,7 +273,7 @@ bool mayaReceive(const std::string& folder, std::vector<MeshObject>& out, MayaMa
 }
 
 bool mayaSend(const std::vector<MeshObjectRef>& objects, const std::string& folder, std::string& message,
-              std::vector<std::string>* sentNames, int64_t* revision) {
+              std::vector<std::string>* sentNames, int64_t* revision, const std::string& writer, bool live) {
     if (folder.empty()) {
         message = "Choose the Maya exchange folder first (File > Maya > Exchange folder...)";
         return false;
@@ -299,6 +304,8 @@ bool mayaSend(const std::vector<MeshObjectRef>& objects, const std::string& fold
     MayaManifest m;
     m.revision = std::max<int64_t>(mayaRevision(pathUtf8(outbox)), 0) + 1;
     m.sender = "sculptforge";
+    m.writer = writer;
+    m.live = live;
 #ifdef SCULPTFORGE_VERSION
     m.senderVersion = SCULPTFORGE_VERSION;
 #endif
@@ -324,14 +331,28 @@ bool mayaSend(const std::vector<MeshObjectRef>& objects, const std::string& fold
         MayaObject b{name, prefix + file};
         std::string err;
         const Mesh& mesh = *objects[k].mesh;
+        // Written as <file>.tmp, then renamed (a reader polling the folder never sees half of it; a leftover
+        // .tmp starts with this send's prefix, so the next send removes it).
+        const fs::path final = outbox / utf8Path(b.file);
+        fs::path tmp = final;
+        tmp += ".tmp";
         bool ok;
         if (mesh.hasFaceGroups()) {
             // Face groups would be OBJ groups, which Maya's importer turns into separate objects or sets.
             Mesh plain = mesh;
             plain.facegroups.clear();
-            ok = saveObj(pathUtf8(outbox / utf8Path(b.file)), plain, err);
+            ok = saveObj(pathUtf8(tmp), plain, err);
         } else {
-            ok = saveObj(pathUtf8(outbox / utf8Path(b.file)), mesh, err);
+            ok = saveObj(pathUtf8(tmp), mesh, err);
+        }
+        if (ok) {
+            std::error_code rn;
+            fs::rename(tmp, final, rn);
+            if (rn) {
+                fs::remove(tmp, rn);
+                ok = false;
+                err = "cannot rename " + pathUtf8(tmp);
+            }
         }
         if (!ok) {
             message = "Cannot send \"" + name + "\" to Maya: " + err;
@@ -354,7 +375,8 @@ bool mayaSend(const std::vector<MeshObjectRef>& objects, const std::string& fold
             fs::remove(entry.path(), rm); // may be open on Windows; the next send tries again
         }
     }
-    message = "Sent " + countText(objects.size()) + " to Maya: click Get from SculptForge on Maya's SculptForge shelf";
+    message = live ? "Live: sent " + countText(objects.size()) + " to Maya"
+                   : "Sent " + countText(objects.size()) + " to Maya: click Get from SculptForge on Maya's SculptForge shelf";
     if (sentNames) *sentNames = std::move(names);
     if (revision) *revision = m.revision;
     return true;
@@ -376,6 +398,109 @@ long long mayaManifestStamp(const std::string& box) {
     if (ec) return 0;
     const unsigned long long stamp = static_cast<unsigned long long>(t.time_since_epoch().count()) * 1000003ull + size;
     return static_cast<long long>(stamp | 1); // never 0 for a file that is there
+}
+
+std::string mayaNewWriterId() {
+    std::random_device rd;
+    const unsigned long long v = (static_cast<unsigned long long>(rd()) << 32) ^ rd() ^
+                                 static_cast<unsigned long long>(std::chrono::steady_clock::now().time_since_epoch().count());
+    char text[17];
+    std::snprintf(text, sizeof text, "%016llx", v);
+    return text;
+}
+
+namespace {
+
+// 64-bit words through a multiply-rotate mix: a few GB/s, enough for a 2M-triangle Part in a few ms.
+template <class T>
+void hashArray(uint64_t& h, const std::vector<T>& v) {
+    const size_t bytes = v.size() * sizeof(T);
+    const unsigned char* p = reinterpret_cast<const unsigned char*>(v.data());
+    h = (h ^ bytes) * 0x9E3779B97F4A7C15ull;
+    size_t i = 0;
+    for (; i + 8 <= bytes; i += 8) {
+        uint64_t w;
+        std::memcpy(&w, p + i, 8);
+        h = ((h ^ w) * 0xFF51AFD7ED558CCDull);
+        h ^= h >> 29;
+    }
+    uint64_t tail = 0;
+    if (i < bytes) std::memcpy(&tail, p + i, bytes - i);
+    h = (h ^ tail) * 0xC4CEB9FE1A85EC53ull;
+}
+
+} // namespace
+
+uint64_t mayaMeshHash(const Mesh& mesh) {
+    uint64_t h = 0x5346u; // "SF"
+    hashArray(h, mesh.positions);
+    hashArray(h, mesh.triangles);
+    hashArray(h, mesh.quadPartners);
+    hashArray(h, mesh.uvs);
+    hashArray(h, mesh.colors);
+    return h ^ (h >> 31);
+}
+
+Mesh mayaSendCopy(const Mesh& mesh) {
+    Mesh m;
+    m.positions = mesh.positions;
+    m.triangles = mesh.triangles;
+    m.uvs = mesh.uvs;
+    m.colors = mesh.colors;
+    // Quads as the exporter sees them (quadPartnerAt: a pair split between face groups is two triangles), since
+    // the copy has no face groups.
+    if (mesh.hasQuads()) {
+        m.quadPartners.resize(mesh.triangleCount());
+        for (uint32_t t = 0; t < mesh.triangleCount(); ++t) m.quadPartners[t] = mesh.quadPartnerAt(t);
+    }
+    return m;
+}
+
+namespace {
+
+// The faces an OBJ carries (quads as quads), each starting at its lowest vertex: what survives a round trip
+// through another app, which may split a quad along its other diagonal.
+std::vector<uint32_t> writtenFaces(const Mesh& m) {
+    std::vector<uint32_t> out;
+    out.reserve(size_t(m.triangleCount()) * 3);
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        glm::uvec4 f;
+        const int n = m.exportFace(t, f);
+        if (n == 0) continue;
+        int first = 0;
+        for (int c = 1; c < n; ++c)
+            if (f[c] < f[first]) first = c;
+        out.push_back(uint32_t(n));
+        for (int c = 0; c < n; ++c) out.push_back(f[(first + c) % n]);
+    }
+    return out;
+}
+
+} // namespace
+
+bool mayaMeshesMatch(const Mesh& a, const Mesh& b) {
+    if (a.positions.size() != b.positions.size() || a.triangleCount() != b.triangleCount() || a.uvs.size() != b.uvs.size())
+        return false;
+    const bool sameTriangles = a.triangles == b.triangles;
+    if (!sameTriangles && writtenFaces(a) != writtenFaces(b)) return false;
+    // OBJ text rounds (7 significant digits from SculptForge, Maya's own from Maya): allow a millionth of each
+    // coordinate and a hundred-thousandth of the mesh's size, far below anything a stroke does.
+    glm::vec3 lo(0.0f), hi(0.0f);
+    if (!a.positions.empty()) lo = hi = a.positions[0];
+    for (const glm::vec3& p : a.positions) {
+        lo = glm::min(lo, p);
+        hi = glm::max(hi, p);
+    }
+    const float size = std::max({hi.x - lo.x, hi.y - lo.y, hi.z - lo.z, 1e-6f});
+    for (size_t i = 0; i < a.positions.size(); ++i) {
+        const glm::vec3 d = glm::abs(a.positions[i] - b.positions[i]);
+        const float tol = 1e-5f * size + 1e-6f * std::max({std::abs(a.positions[i].x), std::abs(a.positions[i].y),
+                                                            std::abs(a.positions[i].z)});
+        if (d.x > tol || d.y > tol || d.z > tol) return false;
+    }
+    for (size_t i = 0; sameTriangles && i < a.uvs.size(); ++i) // (other triangles: their corners' UVs differ in order)
+        if (glm::any(glm::greaterThan(glm::abs(a.uvs[i] - b.uvs[i]), glm::vec2(1e-6f)))) return false;
+    return true;
 }
 
 } // namespace sf

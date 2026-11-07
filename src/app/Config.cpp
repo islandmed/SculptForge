@@ -984,6 +984,7 @@ void App::restartPrefsForTest(const std::string& uiJson) {
     UiPrefs defaults;
     defaults.mayaFolder = uiPrefs_.mayaFolder; // (maya.json, not ui.json)
     defaults.mayaAutoReceive = uiPrefs_.mayaAutoReceive;
+    defaults.mayaLive = uiPrefs_.mayaLive;
     uiPrefs_ = defaults;
     actions_.clearOverrides();
     resetRadialMenus();

@@ -2123,10 +2123,10 @@ constexpr Entry kSpanish[] = {
      "Por borde desvanece la máscara desde el borde hacia el anillo más interior."},
     // --- PanelMaya.cpp (tools/i18n/coverage.py) ---
     {"Get automatically", "Recibir automáticamente"},
-    {"Load what Maya sends as soon as it arrives: SculptForge checks the exchange folder's manifest once a second "
-     "(its modification time and size only). On once you choose the folder; off: use Get from Maya.",
-     "Carga lo que envía Maya en cuanto llega: SculptForge comprueba el manifiesto de la carpeta de intercambio una "
-     "vez por segundo (solo su fecha de modificación y su tamaño). Activado al elegir la carpeta; desactivado: usa "
+    {"Load what Maya sends as soon as it arrives: SculptForge checks the exchange folder's manifest every "
+     "250 ms (its modification time and size only). On once you choose the folder; off: use Get from Maya.",
+     "Carga lo que envía Maya en cuanto llega: SculptForge comprueba el manifiesto de la carpeta de intercambio cada "
+     "250 ms (solo su fecha de modificación y su tamaño). Activado al elegir la carpeta; desactivado: usa "
      "Recibir de Maya."},
     {"Turn the Maya bridge off", "Desactivar el puente con Maya"},
     {"Forget the exchange folder; nothing in it is deleted.",
@@ -4764,6 +4764,43 @@ constexpr Entry kSpanish[] = {
      "Gira la plantilla, en grados en sentido antihorario; Ctrl+clic para escribir."},
     {"Centre the Stencil again, upright, 80% of the view's height.",
      "Centra la plantilla de nuevo, derecha, al 80% de la altura de la vista."},
+    // --- Maya Live and the Live link (PanelMaya.cpp, Shell.cpp) ---
+    {"Keep Maya in step as you sculpt: after each stroke (once you pause for 300 ms), the Parts it changed go to the exchange folder by themselves, and what Maya sends loads by itself. Still files only: no network. Turn on Live on Maya's SculptForge shelf too.",
+     "Mantén Maya al día mientras esculpes: tras cada trazo (en cuanto pausas 300 ms), las Piezas que cambió van solas a la carpeta de intercambio, y lo que envía Maya se carga solo. Solo archivos: sin red. Activa también Live en el estante de SculptForge de Maya."},
+    {"Live link",
+     "Enlace en vivo"},
+    {"Maya follows your strokes as you draw them, over a connection on this computer (the shelf's Link button). Asks first, every time; off again at every start.",
+     "Maya sigue tus trazos mientras los dibujas, mediante una conexión en este ordenador (el botón Link del estante). Pregunta antes, cada vez; se desactiva en cada inicio."},
+    {"Live link: connected to %s",
+     "Enlace en vivo: conectado a %s"},
+    {"Live link on: waiting for Maya",
+     "Enlace en vivo activado: esperando a Maya"},
+    {"Pairing code: %s",
+     "Código de emparejamiento: %s"},
+    {"Copy pairing code",
+     "Copiar código de emparejamiento"},
+    {"Turn the Live link off",
+     "Desactivar el enlace en vivo"},
+    {"Turn on the Maya Live link?",
+     "¿Activar el enlace en vivo con Maya?"},
+    {"The Live link lets the SculptForge shelf in Maya follow your strokes as you sculpt.",
+     "El enlace en vivo permite que el estante de SculptForge en Maya siga tus trazos mientras esculpes."},
+    {"It opens a connection on this computer.",
+     "Abre una conexión en este ordenador."},
+    {"Anything running on this computer that knows the pairing code could send meshes into SculptForge. It carries meshes only: never commands, files or scripts. Other computers and web pages can't reach it.",
+     "Cualquier programa de este ordenador que conozca el código de emparejamiento podría enviar mallas a SculptForge. Solo transporta mallas: nunca comandos, archivos ni scripts. Otros ordenadores y las páginas web no pueden alcanzarlo."},
+    {"Turn it off when you're not using it: click \"Live link on\" in the top bar. It is off again every time SculptForge starts.",
+     "Desactívalo cuando no lo uses: haz clic en \"Enlace en vivo activado\" en la barra superior. Se desactiva cada vez que SculptForge se inicia."},
+    {"Turn on",
+     "Activar"},
+    {"Live link on",
+     "Enlace en vivo activado"},
+    {"Click to turn the Maya Live link off.",
+     "Haz clic para desactivar el enlace en vivo con Maya."},
+    {"Top bar",
+     "Barra superior"},
+    {"Status bar",
+     "Barra de estado"},
 };
 
 } // namespace

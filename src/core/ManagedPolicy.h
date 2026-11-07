@@ -71,6 +71,7 @@ struct Policy {
 
     Lock mcp = Lock::Unset;                 // mcp.enabled: Off = no MCP server (sculptforge-cli --mcp refuses)
     bool mcpLiveAllowed = true;             // mcp.live: "never" | "allowed"
+    bool mayaLinkAllowed = true;            // maya.link: "never" | "allowed" (the Maya Live link, link/MayaLink.h)
     std::vector<std::string> mcpCategories; // allowed categories; empty = all
 
     std::string auditPath;                  // with {user}, {host}, {date} filled in; "" = the default
@@ -117,6 +118,7 @@ bool aiProviderAllowed(std::string_view providerId, std::string* why = nullptr);
 bool aiEndpointAllowed(const std::string& url, std::string* why = nullptr);
 bool mcpAllowed(std::string* why = nullptr);
 bool mcpLiveAllowed(std::string* why = nullptr);
+bool mayaLinkAllowed(std::string* why = nullptr);
 // The categories of command NAME (needs the registry's parameter names: a "path", "folder" or "file" parameter is files).
 std::vector<std::string> mcpCategories(std::string_view name, const std::vector<std::string>& paramNames);
 bool mcpToolAllowed(std::string_view name, const std::vector<std::string>& paramNames, std::string* why = nullptr);

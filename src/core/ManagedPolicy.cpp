@@ -118,6 +118,7 @@ Policy failClosed(const std::string& source, const std::string& error) {
     p.network = Lock::Off;
     p.mcp = Lock::Off;
     p.mcpLiveAllowed = false;
+    p.mayaLinkAllowed = false;
     p.updateCheck = Lock::Off;
     return p;
 }
@@ -141,7 +142,7 @@ const std::vector<std::string>& aiProviderIds() {
 bool parsePolicy(const std::string& text, const std::string& source, Policy& out, std::string& error) {
     Json j;
     if (!Json::parseStrict(text, j, error)) return false;
-    if (!checkKeys(j, {"format", "version", "organization", "ai", "network", "mcp", "audit", "signIn", "telemetry", "updates"},
+    if (!checkKeys(j, {"format", "version", "organization", "ai", "network", "mcp", "maya", "audit", "signIn", "telemetry", "updates"},
                    "", error))
         return false;
     if (j["format"].asString() != kPolicyFormat) return (error = "format must be \"sculptforge-policy\"", false);
@@ -184,6 +185,15 @@ bool parsePolicy(const std::string& text, const std::string& source, Policy& out
             p.mcpLiveAllowed = live == "allowed";
         }
         if (p.mcp == Lock::Off) p.mcpLiveAllowed = false;
+    }
+    if (j.has("maya")) {
+        const Json& m = j["maya"];
+        if (!checkKeys(m, {"link"}, "maya", error)) return false;
+        if (m.has("link")) {
+            const std::string link = m["link"].asString();
+            if (link != "never" && link != "allowed") return (error = "maya.link must be \"never\" or \"allowed\"", false);
+            p.mayaLinkAllowed = link == "allowed";
+        }
     }
     if (j.has("audit")) {
         const Json& a = j["audit"];
@@ -337,6 +347,12 @@ bool mcpLiveAllowed(std::string* why) {
     return false;
 }
 
+bool mayaLinkAllowed(std::string* why) {
+    if (gPolicy.mayaLinkAllowed) return true;
+    if (why) *why = "Your studio's policy doesn't allow the Maya Live link";
+    return false;
+}
+
 std::vector<std::string> mcpCategories(std::string_view name, const std::vector<std::string>& paramNames) {
     static const char* kNetwork[] = {"brush_gallery_search", "brush_gallery_install", "unreal_editors", "unreal_send",
                                      "export_unreal"};
@@ -397,6 +413,7 @@ std::string describe(const Policy& p) {
     o << "; network " << (p.network == Lock::Off ? "off (allowed: " + list(p.networkAllow, "nothing") + ")" : "on");
     o << "; MCP " << (p.mcp == Lock::Off ? "off" : "on (tools: " + list(p.mcpCategories, "all") + "; live mode " +
                                                         (p.mcpLiveAllowed ? "allowed" : "never") + ")");
+    o << "; Maya Live link " << (p.mayaLinkAllowed ? "allowed" : "never");
     o << "; audit log " << (p.auditPath.empty() ? "default path" : p.auditPath) << (p.auditRequired ? " (required)" : "");
     if (p.signInConfigured()) o << "; sign-in " << p.issuer;
     o << "; telemetry none (SculptForge has none)";

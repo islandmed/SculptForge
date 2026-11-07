@@ -273,6 +273,7 @@ the system file exists, `SF_POLICY` is ignored, so an artist can't loosen it.
          "endpoints": ["https://llm.acme.internal/", "http://comfy.acme.internal:8188/"], "requireSignIn": true},
   "network": {"enabled": false, "allow": ["https://sw.acme.internal/"], "localNetwork": false},
   "mcp": {"enabled": true, "live": "never", "categories": ["info", "edit", "files"]},
+  "maya": {"link": "never"},
   "audit": {"path": "//fs01/audit/sculptforge/{user}@{host}.jsonl", "maxMB": 20, "keep": 10, "required": true},
   "signIn": {"issuer": "https://acme.okta.com/oauth2/default", "clientId": "0oa1example",
              "useFor": ["https://llm.acme.internal/"]},
@@ -298,6 +299,7 @@ code 2 when it is broken); use it to check a file before you deploy it.
 | `network.localNetwork` | `true`: the Unreal link and phone capture may use the studio network while the network is off |
 | `mcp.enabled` | `false`: no AI tool can connect (`sculptforge-cli --mcp` refuses to start, and **Help > Connect an AI tool** is gone) |
 | `mcp.live` | `"never"`: AI tools work only on their own scene and can never control an open SculptForge window (the window never listens for them; **Let AI tools control this window** is locked off) |
+| `maya.link` | `"never"`: the [Maya Live link](maya.md#live-link) can't be turned on (the window never listens for Maya; the folder bridge still works) |
 | `mcp.categories` | The kinds of command AI tools may use: `info` (read the scene), `edit` (change it in memory), `files` (open, save, export, bridges), `scripts` (macros), `network` (brush gallery, Unreal), `ai` (AI generation). Left out: all |
 | `audit.path`, `audit.maxMB`, `audit.keep` | Where the [audit log](#audit-log) goes, when it rotates (10 MB) and how many old files it keeps (5) |
 | `audit.required` | `true`: an AI action whose audit line can't be written (the share is down) is refused |

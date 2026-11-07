@@ -248,7 +248,9 @@ def test_shelf(sm):
     sm.install_shelf()
     sm.install_shelf()  # again: replaces the shelf
     buttons = cmds.option_vars["_shelves"][sm.SHELF]
-    check(len(buttons) == 4 and all(t == "python" for t, _, _ in buttons), "the shelf has four Python buttons")
+    check(len(buttons) == 6 and all(t == "python" for t, _, _ in buttons), "the shelf has six Python buttons")
+    check(any(n == sm.LIVE_BUTTON for _, _, n in buttons) and any(n == sm.LINK_BUTTON for _, _, n in buttons),
+          "the Live and Link buttons have their names (their labels show on / off)")
     check(any(n == sm.AUTO_BUTTON for _, _, n in buttons), "the Auto button has its name (its label shows on / off)")
     for _, command, _ in buttons:
         func = command.split("sculptforge_maya.")[1].rstrip("()")
@@ -461,6 +463,236 @@ def test_auto(sm, tmp):
     sm._watcher.stop()
 
 
+class Clock(object):
+    def __init__(self):
+        self.t = 100.0
+
+    def __call__(self):
+        return self.t
+
+
+def test_live(sm, tmp):
+    """Live: the wait for stillness, the echo guard, sends of the changed meshes only, and never loading what this
+    Maya session wrote."""
+    clock = Clock()
+    live = sm.LiveState(clock=clock)
+    check(not live.due(), "live: nothing changed, nothing due")
+    live.mark("|a")
+    clock.t += 0.1
+    check(not live.due(), "live: 100 ms after a change: still waiting")
+    live.mark("|b")
+    clock.t += 0.25
+    check(not live.due(), "live: another change restarts the wait")
+    clock.t += 0.1
+    check(live.due() and live.take() == ["|a", "|b"] and not live.due(), "live: 300 ms of stillness: due, once")
+    live.applying += 1
+    live.mark("|a")
+    live.applying -= 1
+    clock.t += 1
+    check(not live.due(), "live: changes while a Get applies don't count (the echo guard)")
+
+    folder = os.path.join(tmp, "live")
+    os.makedirs(folder)
+    cmds = install_fake_maya(folder)
+    sm.POLL_SECONDS = 3600
+    sm._live = sm.LiveState(clock=clock)
+    cmds.add_mesh("|pCube1", CUBE_OBJ)
+    cmds.add_mesh("|pCube2", CUBE_OBJ)
+    cmds.selection = ["|pCube1", "|pCube2"]
+    sm.send_to_sculptforge()  # (watched from now on)
+    box = os.path.join(folder, sm.TO_SCULPTFORGE)
+    m = sm.read_manifest(box)
+    check(m["writer"] == sm.WRITER and not m["live"], "send: the manifest says which Maya session wrote it")
+    check({"|pCube1", "|pCube2"} <= set(sm._watched), "live: what was sent is watched")
+
+    sm.toggle_live()
+    check(sm.live_on() and sm.auto_get_on(), "live on (and Auto with it)")
+    cmds.nodes["|pCube2|pCube2Shape"]["obj"] = CUBE_OBJ.replace("v 1 1 1", "v 1 1.5 1")
+    sm._live.mark("|pCube2")  # (Maya's dirty callback)
+    clock.t += 0.5
+    check(sm._live.due(), "live: due after the edit")
+    sm._live_send()
+    m2 = sm.read_manifest(box)
+    check(m2["revision"] == m["revision"] + 1 and [n for n, _ in m2["objects"]] == ["pCube2"] and m2["live"],
+          "live: only the edited mesh is sent")
+    check(cmds.selection == ["|pCube1", "|pCube2"], "live: the selection is left as it was")
+
+    # A Get of what SculptForge sends doesn't send it back.
+    out = os.path.join(folder, sm.TO_MAYA)
+    write_sculptforge_send(sm, out, 1, ["pCube1"])
+    sm.get_from_sculptforge()
+    clock.t += 1
+    check(not sm._live.due(), "live: a Get is not an edit to send back")
+
+    # A manifest this Maya wrote (the user picked one folder as both): never loaded.
+    sm.write_atomically(os.path.join(out, "manifest.json"),
+                        sm.write_manifest([("pCube1", "r1_000.obj")], 7, writer=sm.WRITER))
+    before = cmds.nodes["|pCube1|pCube1Shape"]["obj"]
+    cmds.nodes["|pCube1|pCube1Shape"]["obj"] = "mine"
+    sm._auto_get_new()
+    check(cmds.nodes["|pCube1|pCube1Shape"]["obj"] == "mine", "auto: what this Maya session wrote isn't loaded")
+    cmds.nodes["|pCube1|pCube1Shape"]["obj"] = before
+    sm.toggle_live()
+    check(not sm.live_on(), "live off")
+    sm._live.mark("|pCube1")
+    clock.t += 1
+    check(sm._live_send() is None, "live off: nothing is sent by itself")
+    if sm._watcher:
+        sm._watcher.stop()
+
+
+def test_link_codec(sm):
+    """The Live link's frames: the same bytes as SculptForge's (tests/maya/data, read by test_maya_live.cpp), strict
+    parsing, and random input refused without anything but LinkError."""
+    data = os.path.join(HERE, "data")
+    mesh = {"name": "pPlane1", "positions": [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 2, 0, 0], "face_sizes": [4, 3],
+            "indices": [0, 1, 2, 3, 1, 4, 2], "uvs": [0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1]}
+    with open(os.path.join(data, "link_mesh.bin"), "rb") as f:
+        check(f.read() == sm.encode_mesh(mesh), "link: the shelf writes SculptForge's Mesh bytes")
+    with open(os.path.join(data, "link_points.bin"), "rb") as f:
+        golden = f.read()
+    check(golden == sm.encode_points("Body", 5, [1, 4], [0.5, 0.25, -1, 2, 3, 4]), "link: and its Points bytes")
+    kind, length = sm.parse_header(golden[:16])
+    name, count, indices, positions = sm.parse_points(golden[16:])
+    check(kind == sm.LINK_POINTS and name == "Body" and count == 5 and list(indices) == [1, 4], "link: points read")
+    back = sm.parse_mesh(sm.encode_mesh(mesh)[16:])
+    check(list(back["indices"]) == mesh["indices"] and list(back["face_sizes"]) == [4, 3] and len(back["uvs"]) == 14,
+          "link: mesh round trip")
+
+    def refused(fn, payload, what):
+        try:
+            fn(payload)
+            check(False, "link refuses " + what)
+        except sm.LinkError:
+            pass
+
+    for bad, what in [(dict(mesh, indices=[0, 1, 2, 3, 1, 5, 2]), "an index out of range"),
+                      (dict(mesh, face_sizes=[2, 5]), "a face of 2"),
+                      (dict(mesh, face_sizes=[4, 4]), "faces that don't add up"),
+                      (dict(mesh, positions=[float("nan")] + mesh["positions"][1:]), "NaN")]:
+        refused(sm.parse_mesh, sm.encode_mesh(bad)[16:], what)
+    for name in ["", "../x", "a b", "1abc"]:
+        raw = name.encode()
+        refused(sm.parse_mesh, struct_name(raw) + sm.encode_mesh(mesh)[16 + 2 + 7:], "the name %r" % name)
+    good = sm.encode_mesh(mesh)[16:]
+    refused(sm.parse_mesh, good + b"x", "a byte too many")
+    for cut in range(len(good)):
+        refused(sm.parse_mesh, good[:cut], "a cut at %d" % cut)
+    for header, what in [(b"GET / HTTP/1.1\r\n\r\n"[:16], "HTTP"), (b"SFML" + bytes([2, 0, 3, 0]) + bytes(8), "version 2"),
+                         (b"SFML" + bytes([1, 0, 9, 0]) + bytes(8), "type 9"),
+                         (b"SFML" + bytes([1, 0, 3, 0]) + bytes([0, 0, 0, 0x40, 1, 0, 0, 0]), "over the cap")]:
+        refused(sm.parse_header, header, what)
+    import random
+    rng = random.Random(42)
+    for i in range(3000):
+        blob = bytearray(good) if i % 2 else bytearray(rng.getrandbits(8) for _ in range(rng.randrange(80)))
+        if i % 2:
+            for _ in range(rng.randrange(1, 5)):
+                blob[rng.randrange(len(blob))] = rng.getrandbits(8)
+        for fn in (sm.parse_mesh, sm.parse_points):
+            try:
+                r = fn(bytes(blob))
+                if fn is sm.parse_mesh:
+                    check(max(r["indices"]) < len(r["positions"]) // 3, "fuzz: what parses is in range")
+            except sm.LinkError:
+                pass
+            except Exception as e:  # anything else would be a parser bug
+                check(False, "fuzz: %r raised %r" % (bytes(blob[:16]), e))
+
+    # Pairing: SculptForge's Copy text or a bare code; only SculptForge's endpoint names.
+    code = "0123456789abcdef0123456789ABCDEF"
+    shown = "-".join(code[k:k + 8].upper() for k in range(0, 32, 8))
+    if os.name != "nt":
+        c, e = sm.parse_pairing("sflink1 %s /run/user/1000/sculptforge/maya-link.sock" % shown)
+        check(c == code.lower() and e.endswith("maya-link.sock"), "pairing: Copy's text")
+        for bad in ["sflink1 %s /etc/passwd" % shown, "sflink1 %s /tmp/../x/maya-link.sock" % shown,
+                    "sflink1 %s relative/maya-link.sock" % shown]:
+            refused(sm.parse_pairing, bad, "the endpoint in %r" % bad)
+    check(sm.parse_pairing(shown)[0] == code.lower(), "pairing: a bare code")
+    for bad in ["", "1234", "zz" * 16, "sflink2 %s x" % shown]:
+        refused(sm.parse_pairing, bad, "the code %r" % bad)
+
+
+def struct_name(raw):
+    import struct
+    return struct.pack("<H", len(raw)) + raw
+
+
+class PairConn(object):
+    """One end of a socket pair, as LinkClient's connection."""
+
+    def __init__(self, sock):
+        self.sock = sock
+
+    def recv(self, n, timeout):
+        import socket
+        self.sock.settimeout(timeout)
+        try:
+            data = self.sock.recv(n)
+        except socket.timeout:
+            return b""
+        if not data:
+            raise ValueError("closed")
+        return data
+
+    def send(self, data):
+        self.sock.sendall(data)
+
+    def close(self):
+        self.sock.close()
+
+
+def test_link_client(sm):
+    """LinkClient against a stand-in SculptForge: the code first, Welcome, then streamed Points fold into one update
+    per object, a Mesh replaces them, and Bye ends it."""
+    import socket
+    import time as _time
+    try:
+        a, b = socket.socketpair()
+    except (AttributeError, OSError):
+        return
+    code = "0123456789abcdef0123456789abcdef"
+    got = []
+    inbox = sm.LinkInbox()
+
+    def app():
+        f = b.recv(16)
+        kind, length = sm.parse_header(f)
+        payload = b""
+        while len(payload) < length:
+            payload += b.recv(length - len(payload))
+        got.append((kind, payload[:32]))
+        b.sendall(sm.frame(sm.LINK_WELCOME, b"\x06\x000.11.11"))
+        b.sendall(sm.encode_points("Body", 10, [1, 2], [1, 1, 1, 2, 2, 2]))
+        b.sendall(sm.encode_points("Body", 10, [2, 3], [5, 5, 5, 3, 3, 3]))
+        _time.sleep(0.2)
+        b.sendall(sm.frame(sm.LINK_BYE))
+
+    import threading
+    t = threading.Thread(target=app)
+    t.start()
+    client = sm.LinkClient(PairConn(a), code, inbox.add)
+    check(got and got[0] == (sm.LINK_HELLO, code.encode()), "link client: the pairing code goes first")
+    check(client.server == "0.11.11" and client.connected, "link client: Welcome, connected")
+    t.join()
+    for _ in range(100):
+        if not client.connected:
+            break
+        _time.sleep(0.01)
+    check(not client.connected and "off" in client.error, "link client: Bye ends the link")
+    taken = inbox.take()
+    check(len(taken) == 1 and taken[0][0] == "Body" and taken[0][1] is None, "link inbox: one update for Body")
+    count, moved = taken[0][2]
+    check(count == 10 and sorted(moved) == [1, 2, 3] and moved[2] == (5, 5, 5), "link inbox: Points fold, later wins")
+    inbox.add(sm.LINK_POINTS, sm.encode_points("Body", 10, [1], [0, 0, 0])[16:])
+    inbox.add(sm.LINK_MESH, sm.encode_mesh({"name": "Body", "positions": [0, 0, 0, 1, 0, 0, 0, 1, 0], "face_sizes": [3],
+                                            "indices": [0, 1, 2], "uvs": []})[16:])
+    taken = inbox.take()
+    check(taken[0][1] is not None and taken[0][2] is None, "link inbox: a whole mesh drops the Points before it")
+    a.close()
+    b.close()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cli", help="sculptforge-cli, for the round trip through SculptForge")
@@ -471,6 +703,9 @@ def main():
         test_format(sm, tmp)
         test_send_and_get(sm, tmp, args.cli)
         test_auto(sm, tmp)
+        test_live(sm, tmp)
+        test_link_codec(sm)
+        test_link_client(sm)
         test_shelf(sm)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

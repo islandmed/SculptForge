@@ -1046,6 +1046,9 @@ void App::drawTitleStrip(const ShellGeometry& g) {
                    10.0f * s + 2.0f * windowButtonW + 2.0f * s;
     if (quickSave) rightW += buttonW(tr("Save Snapshot")) + 8.0f * s;
     if (maya) rightW += buttonW((std::string(ICON_LC_SEND "  ") + tr("Send to Maya")).c_str()) + 8.0f * s;
+    const bool mayaLink = mayaLink_ != nullptr; // the Maya Live link is on: its ember chip turns it off
+    const std::string linkLabel = std::string(ICON_LC_RADIO " ") + tr("Live link on") + "##mayalink.chip";
+    if (mayaLink) rightW += buttonW(linkLabel.c_str()) + 8.0f * s;
     const float rightX = g.title.w - 8.0f * s - rightW;
 
     // Info readout and the status message, elided to fit: secondary, so in the 12 px font.
@@ -1114,6 +1117,15 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     ImGui::PushStyleColor(ImGuiCol_Button, theme::toggleOff);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::toggleOffHover);
     ImGui::PushStyleColor(ImGuiCol_Text, theme::textOff);
+    if (mayaLink) {
+        ImGui::PushStyleColor(ImGuiCol_Button, theme::accent);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::accentHover);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.08f, 0.05f, 0.03f, 1.0f));
+        if (ImGui::Button(linkLabel.c_str(), ImVec2(0, buttonH))) stopMayaLink();
+        ImGui::PopStyleColor(3);
+        ui::HelpText("Live link on", nullptr, "Click to turn the Maya Live link off.", "Top bar");
+        ImGui::SameLine(0.0f, 8.0f * s);
+    }
     if (maya) {
         ui::ActionButton(*this, "file.send_maya", ImVec2(0, buttonH), ui::Look::IconLabel);
         ImGui::SameLine(0.0f, 8.0f * s);
@@ -1510,6 +1522,13 @@ void App::drawStatusBar(const ShellGeometry& g) {
     const float mayaX = right - mayaW;
     const bool maya = !uiPrefs_.mayaFolder.empty() && mayaX > menusEnd;
     if (maya) right = mayaX - 10.0f * s;
+    // The Maya Live link is on: its ember chip, left of Send to Maya; it turns the link off (always shown while on:
+    // the menus give way first).
+    const std::string linkLabel = std::string(ICON_LC_RADIO) + " " + (caps ? upper(tr("Live link on")) : std::string(tr("Live link on")));
+    const float linkW = textW(monoSmall, linkLabel) + 16.0f * s;
+    const float linkX = right - linkW;
+    const bool mayaLink = mayaLink_ != nullptr;
+    if (mayaLink) right = linkX - 10.0f * s;
 
     // Modules: mode, brush, document, triangles, frame rate.
     std::vector<StatusModule> mods;
@@ -1618,6 +1637,16 @@ void App::drawStatusBar(const ShellGeometry& g) {
         }
     }
 
+    if (mayaLink) {
+        ImGui::SetCursorScreenPos(ImVec2(linkX, o.y + (h - buttonH) * 0.5f));
+        const bool clicked = ImGui::InvisibleButton((std::string(tr("Live link on")) + "##mayalink.chip").c_str(), ImVec2(linkW, buttonH));
+        const bool hovered = ImGui::IsItemHovered();
+        const ImVec2 p = ImGui::GetItemRectMin();
+        dl->AddRectFilled(p, ImVec2(p.x + linkW, p.y + buttonH), theme::u32(hovered ? theme::accentHover : theme::accent));
+        textAt(monoSmall, p.x + 8.0f * s, ImVec4(0.08f, 0.05f, 0.03f, 1.0f), linkLabel);
+        if (clicked) stopMayaLink();
+        ui::HelpText("Live link on", nullptr, "Click to turn the Maya Live link off.", "Status bar");
+    }
     if (maya) {
         ImGui::SetCursorScreenPos(ImVec2(mayaX, o.y + (h - buttonH) * 0.5f));
         const bool clicked = ImGui::InvisibleButton((std::string(tr("Send to Maya")) + "##file.send_maya").c_str(), ImVec2(mayaW, buttonH));
