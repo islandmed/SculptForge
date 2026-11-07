@@ -46,8 +46,10 @@ HAND_MAP = [
     ("tests/ui/whats_new.sfui", "release_pin_whats_new release_script_beta"),
     ("tests/release_beta_test.sh", "release_script_beta"),
     ("tools/release/*", "release_notes release_notes_fragments release_script_beta release_pin_whats_new release_workflows"
-                        " release_workflows_self_test release_paperwork release_staged_run release_verify_staged"),
-    (".github/workflows/*", "release_workflows release_script_beta"),
+                        " release_workflows_self_test release_paperwork release_staged_run release_verify_staged"
+                        " release_install_assets release_install_assets_self_test"),
+    (".github/workflows/*", "release_workflows release_script_beta release_install_assets"),
+    ("install/*", "release_install_assets"),
     ("packaging/windows/*", "ui_windows_dpi_2560 ui_windows_dpi_2160 ui_ui_scale_900"),
     ("addons/blender/*", "blender_exchange blender_addon_package blender_addon"),
     ("integrations/maya/*", "maya_shelf_script ui_maya_bridge"),

@@ -24,7 +24,7 @@ quiet() { "$@" >"$S/out.log" 2>&1 || { cat "$S/out.log" >&2; fail "$*"; }; }
 git clone -q --shared --no-checkout "$ROOT" "$S/repo"
 cd "$S/repo"
 git sparse-checkout set --no-cone /.github/workflows/ /CMakeLists.txt /CHANGELOG.md /CITATION.cff /packaging/ /docs/ /tools/ /website/ \
-    /scripts/ /changes/ /tests/ui/whats_new.sfui
+    /scripts/ /changes/ /install/ /tests/ui/whats_new.sfui
 git checkout -q -B main "$(git -C "$ROOT" rev-parse HEAD)"
 # This checkout's uncommitted changes (the tree being tested), then one commit on main.
 paths=(.github/workflows CMakeLists.txt CHANGELOG.md packaging docs tools website scripts changes tests/ui/whats_new.sfui)
@@ -84,7 +84,10 @@ case "\$*" in
   "run view"*"-q .status"*) echo completed ;;
   "run view"*"-q .conclusion"*) echo success ;;
   "repo view islandmed/sculptforge-insiders"*) echo "islandmed/sculptforge-insiders" ;;
-  "release view"*) printf 'SHA256SUMS.txt\nSHA256SUMS.txt.sig\n' ;; # (signed: the app has an update key)
+  "release view"*) printf 'SHA256SUMS.txt\nSHA256SUMS.txt.sig\n' # (signed: the app has an update key)
+    # what install/install.sh and install.ps1 download (tools/release/check_install_assets.py)
+    for f in x86_64.AppImage aarch64.AppImage darwin-universal.dmg windows-x86_64.zip windows-x86_64.exe; do
+      echo "SculptForge-\${3#v}-\$f"; done ;;
   "release download"*) exit 1 ;;
   *homebrew-tap*) printf '  version "0.10.10"\n' | base64 ;;
   "pr view 1800"*) echo "OPEN islandmed sculptforge-bump" ;;
