@@ -2,13 +2,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Focus Detail (core/FocusDetail.h): the detail file, coarse and full tiles, crack-free borders, brushes and undo
-// on streamed tiles, prediction, the LRU budget and incremental saves.
+// on streamed tiles, prediction, the LRU budget and incremental saves; in the app (phase 3): a widened range,
+// create / attach / Save As / compaction, projects naming their detail files, Divide to Micro switching to it,
+// and every micro brush writing exactly what it writes in memory.
 #include "TestHarness.h"
 
 #include "core/Benchmark.h"
 #include "core/BVH.h"
+#include "core/Commands.h"
 #include "core/FocusDetail.h"
 #include "core/Micro.h"
+#include "core/Project.h"
 #include "core/Sculpt.h"
 
 #include <atomic>
@@ -306,6 +310,7 @@ TEST(focus_detail_brush_thread_and_frames_together) {
     CHECK(edgesShared(m));
 }
 
+
 namespace {
 
 // The detail file at `path` fully decompressed (a reference).
@@ -319,8 +324,26 @@ std::vector<int16_t> fullValues(const std::string& path) {
 }
 
 std::vector<int16_t> streamedFull(Mesh& m) {
-    m.micro->focus->ensureFull(*m.micro, allTiles(m), false);
+    m.micro->focus->ensureAllFull(*m.micro, false);
     return m.micro->disp.toVector();
+}
+
+// One dab where a ray from `from` along -Z meets `pickOn` (default: doc's own mesh; a streamed mesh picks on what
+// it holds, so two meshes compared dab at one point picked on the full one).
+void dabAt(Document& doc, BrushType type, const char* name, glm::vec3 from, float radius, float strength,
+           Document* pickOn = nullptr) {
+    RayHit hit;
+    Document& pd = pickOn ? *pickOn : doc;
+    if (!surfaceRaycast(pd.mesh, pd.bvh, from, glm::vec3(0, 0, -1), hit)) return;
+    doc.sculptor.beginStroke(doc.mesh, name);
+    DabParams p;
+    p.center = hit.position;
+    p.radius = radius;
+    p.strength = strength;
+    Symmetry sym;
+    sym.x = false;
+    doc.sculptor.dab(doc.mesh, doc.bvh, type, p, sym);
+    doc.undo.push(doc.sculptor.endStroke());
 }
 
 } // namespace
@@ -356,6 +379,191 @@ TEST(focus_detail_widened_range_rescales_streamed_tiles) {
     CHECK(fd->save(m, err));
     CHECK(!fd->unsaved());
     CHECK(fullValues(path) == expected);
+}
+
+// Divide to Micro beyond the budget: create() writes the live level to a detail file and streams it; Save As writes
+// a compact copy and continues there; saves past half garbage compact; attach() opens a file for a project's Part.
+TEST(focus_detail_create_save_as_compaction_and_attach) {
+    const std::string src = writeSmall("create-src.sfdetail");
+    const std::vector<int16_t> ref = fullValues(src);
+    Mesh m;
+    std::string err;
+    {
+        auto fd = FocusDetail::open(src, m, err);
+        CHECK(fd != nullptr);
+        if (!fd) return;
+        fd->ensureFull(*m.micro, allTiles(m), false);
+        m.micro->focus.reset(); // a level in memory, as Divide to Micro leaves it
+    }
+    CHECK(m.micro->disp.toVector() == ref);
+    const std::string a = focusTempPath("create-a.sfdetail"), b = focusTempPath("create-b.sfdetail");
+    auto fd = FocusDetail::create(a, m, err);
+    CHECK(fd != nullptr);
+    if (!fd) return;
+    CHECK(m.micro->focus == fd && fd->stats().fullTiles == 0);
+    CHECK(edgesShared(m));
+    Document doc = makeDoc(std::move(m));
+    dabAt(doc, BrushType::Clay, "Clay", glm::vec3(0.0f, 0.1f, 5.0f), 0.1f, 0.8f);
+    CHECK(fd->unsaved());
+    const std::vector<int16_t> edited = streamedFull(doc.mesh);
+    CHECK(edited != ref);
+    CHECK(fd->saveAs(doc.mesh, b, err));
+    CHECK(fd->path() == b && !fd->unsaved());
+    CHECK(fullValues(a) == ref);    // the old file stays as it was
+    CHECK(fullValues(b) == edited);
+    // Saves that replace most of the file compact it (written beside it, renamed over it).
+    const size_t compactSize = std::filesystem::file_size(b);
+    for (int k = 0; k < 4; ++k) {
+        doc.mesh.micro->focus->ensureAllFull(*doc.mesh.micro, true);
+        CHECK(fd->save(doc.mesh, err));
+        CHECK(std::filesystem::file_size(b) < compactSize * 2 + 4096);
+    }
+    CHECK(!std::filesystem::exists(b + ".part"));
+    CHECK(fullValues(b) == edited);
+    // attach: a Part with the same base triangles streams the file; another mesh is refused.
+    Mesh part;
+    part.positions = doc.mesh.positions;
+    part.triangles = doc.mesh.triangles;
+    part.rebuildTopology();
+    part.recomputeAllNormals();
+    auto fd2 = FocusDetail::attach(b, part, {}, err);
+    CHECK(fd2 != nullptr);
+    if (fd2) CHECK(streamedFull(part) == edited);
+    Mesh other;
+    other.positions = part.positions;
+    other.triangles.assign(part.triangles.begin(), part.triangles.end() - 1);
+    CHECK(FocusDetail::attach(b, other, {}, err) == nullptr);
+    CHECK(!other.micro);
+}
+
+// A project names its streamed Parts' detail files: Save writes <stem>.sfdetail beside it (a compact copy the first
+// time, in place after that) and loading streams from it; autosave only names the file; a missing file is refused.
+TEST(focus_detail_project_names_its_detail_file) {
+    const std::string src = writeSmall("proj-src.sfdetail");
+    Mesh m;
+    std::string err;
+    auto fd = FocusDetail::open(src, m, err);
+    CHECK(fd != nullptr);
+    if (!fd) return;
+    Document doc = makeDoc(std::move(m));
+    dabAt(doc, BrushType::Standard, "Standard", glm::vec3(0.1f, 0.0f, 5.0f), 0.1f, 0.7f);
+    const std::vector<int16_t> edited = streamedFull(doc.mesh);
+    const auto dir = std::filesystem::path(focusTempPath("proj"));
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    const std::string proj = (dir / "head.sfproj").string(), detail = (dir / "head.sfdetail").string();
+    CHECK(saveProject(proj, doc, err));
+    CHECK(std::filesystem::exists(detail));
+    CHECK(fd->path() == detail);
+    // Edit, save again: in place (incremental).
+    dabAt(doc, BrushType::Inflate, "Inflate", glm::vec3(-0.1f, 0.1f, 5.0f), 0.08f, 0.6f);
+    const std::vector<int16_t> edited2 = streamedFull(doc.mesh);
+    CHECK(saveProject(proj, doc, err));
+    CHECK(fd->path() == detail);
+    Document back;
+    CHECK(loadProject(proj, back, err));
+    CHECK(back.mesh.micro && back.mesh.micro->focus);
+    if (back.mesh.micro && back.mesh.micro->focus) {
+        CHECK(back.mesh.micro->focus->stats().fullTiles == 0); // streamed: opened coarse
+        CHECK(streamedFull(back.mesh) == edited2);
+    }
+    // Autosave names the file without writing it.
+    dabAt(doc, BrushType::Clay, "Clay", glm::vec3(0.0f, -0.1f, 5.0f), 0.08f, 0.6f);
+    const auto stamp = std::filesystem::last_write_time(detail);
+    const std::string autosave = (dir / "autosave.sfproj").string();
+    CHECK(saveProject(autosave, doc, err, true));
+    CHECK(std::filesystem::last_write_time(detail) == stamp);
+    CHECK(!std::filesystem::exists(dir / "autosave.sfdetail"));
+    CHECK(fd->unsaved());
+    Document recovered;
+    CHECK(loadProject(autosave, recovered, err));
+    if (recovered.mesh.micro && recovered.mesh.micro->focus) CHECK(streamedFull(recovered.mesh) == edited2);
+    // Missing detail file: a clear error.
+    back = Document();
+    recovered = Document();
+    std::filesystem::rename(detail, detail + ".moved");
+    Document none;
+    CHECK(!loadProject(proj, none, err));
+    CHECK(err.find("head.sfdetail") != std::string::npos);
+    (void)edited;
+}
+
+// Divide to Micro past the memory budget streams the new level; undo and redo swap it whole.
+TEST(focus_detail_divide_to_micro_switches_when_large) {
+    setenv("SF_FOCUS_DETAIL", "1", 1); // (the budget is hundreds of millions of micro triangles)
+    setenv("SF_MICRO_SWAP_DIR", focusTempPath("swap").c_str(), 1);
+    Mesh base;
+    {
+        Mesh head;
+        std::string err;
+        CHECK(FocusDetail::open(writeSmall("divide.sfdetail"), head, err) != nullptr);
+        base.positions = head.positions;
+        base.triangles = head.triangles;
+        base.rebuildTopology();
+        base.recomputeAllNormals();
+    }
+    Document doc = makeDoc(std::move(base));
+    std::string msg;
+    CHECK(microDivideUndoable(doc, 5, msg));
+    unsetenv("SF_FOCUS_DETAIL");
+    unsetenv("SF_MICRO_SWAP_DIR");
+    CHECK(doc.mesh.micro && doc.mesh.micro->focus);
+    CHECK(msg.find("Focus Detail") != std::string::npos);
+    if (!doc.mesh.micro || !doc.mesh.micro->focus) return;
+    const std::string file = doc.mesh.micro->focus->path();
+    CHECK(file.find("unsaved-") != std::string::npos);
+    dabAt(doc, BrushType::Clay, "Clay", glm::vec3(0.0f, 0.1f, 5.0f), 0.1f, 0.8f);
+    doc.undo.undo(doc.mesh, doc.bvh); // the stroke
+    doc.undo.undo(doc.mesh, doc.bvh); // the divide
+    CHECK(!doc.mesh.micro);
+    doc.undo.redo(doc.mesh, doc.bvh);
+    CHECK(doc.mesh.micro && doc.mesh.micro->focus);
+    CHECK(!microWantsFocus(size_t(100) << 20, 5));
+    CHECK(microWantsFocus(size_t(1) << 30, 7));
+    CHECK(!microWantsFocus(size_t(1) << 30, FocusDetail::kCoarseLevel));
+}
+
+// Every micro brush writes on a streamed level exactly what it writes on the same level in memory (the tiles it
+// touches are made full first), including a Move and a whole-surface step (noise) with its undo.
+TEST(focus_detail_every_micro_brush_matches_in_memory) {
+    const std::string path = writeSmall("brushes.sfdetail");
+    std::string err;
+    Mesh a, b;
+    auto fdA = FocusDetail::open(path, a, err);
+    CHECK(fdA != nullptr);
+    if (!fdA) return;
+    {
+        auto fdB = FocusDetail::open(path, b, err);
+        fdB->ensureFull(*b.micro, allTiles(b), false);
+        b.micro->focus.reset();
+    }
+    Document streamed = makeDoc(std::move(a)), memory = makeDoc(std::move(b));
+    const struct {
+        BrushType type;
+        const char* name;
+    } brushes[] = {{BrushType::Standard, "Standard"}, {BrushType::Clay, "Clay"},       {BrushType::ClayBlock, "ClayBlock"},
+                   {BrushType::Smooth, "Smooth"},     {BrushType::Inflate, "Inflate"}, {BrushType::Flatten, "Flatten"},
+                   {BrushType::Trim, "Trim"},         {BrushType::Layer, "Layer"},     {BrushType::Pinch, "Pinch"},
+                   {BrushType::Crease, "Crease"},     {BrushType::SharpCrease, "SharpCrease"}};
+    int k = 0;
+    for (const auto& br : brushes) {
+        CHECK(microBrushSupport(br.type) > 0);
+        const glm::vec3 from(0.3f * std::sin(float(k)), 0.3f * std::cos(float(k)), 5.0f);
+        dabAt(streamed, br.type, br.name, from, 0.09f, 0.7f, &memory);
+        dabAt(memory, br.type, br.name, from, 0.09f, 0.7f);
+        ++k;
+        const bool same = streamedFull(streamed.mesh) == memory.mesh.micro->disp.toVector();
+        if (!same) std::fprintf(stderr, "  differs after %s\n", br.name);
+        CHECK(same);
+    }
+    CommandRegistry reg;
+    CHECK(reg.execute(streamed, "micro_noise", {{"amplitude", 0.002}}).ok);
+    CHECK(reg.execute(memory, "micro_noise", {{"amplitude", 0.002}}).ok);
+    CHECK(streamedFull(streamed.mesh) == memory.mesh.micro->disp.toVector());
+    streamed.undo.undo(streamed.mesh, streamed.bvh);
+    memory.undo.undo(memory.mesh, memory.bvh);
+    CHECK(streamedFull(streamed.mesh) == memory.mesh.micro->disp.toVector());
+    CHECK(edgesShared(streamed.mesh));
 }
 
 #endif

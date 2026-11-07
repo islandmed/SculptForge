@@ -26,7 +26,7 @@ void App::openFocusDetail(const std::string& path) {
     doc_.setMesh(std::move(m), std::filesystem::path(path).stem().string());
     frameActivePart();
     char buf[160];
-    std::snprintf(buf, sizeof buf, "Focus Detail (experimental): %.2f billion micro triangles; detail streams in where you look and sculpt",
+    std::snprintf(buf, sizeof buf, "Focus Detail: %.2f billion micro triangles; full detail loads where you look and sculpt",
                   double(tris) / 1e9);
     status_ = buf;
 }

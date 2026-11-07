@@ -450,75 +450,70 @@ bool FocusDetail::mapFile(std::string& error) {
 #endif
 }
 
-std::shared_ptr<FocusDetail> FocusDetail::open(const std::string& path, Mesh& out, std::string& error) {
-    std::shared_ptr<FocusDetail> fd(new FocusDetail());
-    fd->path_ = path;
-    if (!fd->mapFile(error)) return nullptr;
-    const uint8_t* b = fd->map_;
+bool FocusDetail::loadIndex(std::string& error) {
+    const uint8_t* b = map_;
     Header h;
-    if (!decodeHeader(b, fd->mapBytes_, h, error)) return nullptr;
+    if (!decodeHeader(b, mapBytes_, h, error)) return false;
     const uint32_t T = h.tris, V = h.verts, chunks = (T + h.chunkTiles - 1) / h.chunkTiles;
     if (h.chunkTiles != kChunk || h.coarseLevel != uint32_t(kCoarseLevel) || h.baseBytes != uint64_t(V) * 24 + uint64_t(T) * 12 ||
-        h.baseOffset < kHeaderBytes || h.baseOffset + h.baseBytes > fd->mapBytes_ || h.dirOffset + h.dirBytes > fd->mapBytes_ ||
+        h.baseOffset < kHeaderBytes || h.baseOffset + h.baseBytes > mapBytes_ || h.dirOffset + h.dirBytes > mapBytes_ ||
         h.dirBytes != uint64_t(T) * sizeof(Entry) + uint64_t(chunks) * sizeof(ChunkEntry) ||
         fnv1a(b + h.dirOffset, h.dirBytes) != h.dirHash) {
         error = "Detail file is damaged";
-        return nullptr;
+        return false;
     }
-    fd->level_ = int(h.level);
-    fd->n_ = 1u << h.level;
-    fd->samples_ = (fd->n_ + 1) * (fd->n_ + 2) / 2;
-    fd->coarseN_ = 1u << h.coarseLevel;
-    fd->coarseSamples_ = (fd->coarseN_ + 1) * (fd->coarseN_ + 2) / 2;
-    fd->codec_ = h.codec;
-    fd->step_ = h.step;
-    fd->generation_ = h.generation;
-    fd->garbage_ = h.garbage;
-    fd->dir_.resize(T);
-    fd->chunks_.resize(chunks);
-    std::memcpy(fd->dir_.data(), b + h.dirOffset, size_t(T) * sizeof(Entry));
-    std::memcpy(fd->chunks_.data(), b + h.dirOffset + size_t(T) * sizeof(Entry), size_t(chunks) * sizeof(ChunkEntry));
-    for (const Entry& e : fd->dir_)
-        if (e.offset < kHeaderBytes || e.offset + e.bytes > fd->mapBytes_) {
+    level_ = int(h.level);
+    n_ = 1u << h.level;
+    samples_ = (n_ + 1) * (n_ + 2) / 2;
+    coarseN_ = 1u << h.coarseLevel;
+    coarseSamples_ = (coarseN_ + 1) * (coarseN_ + 2) / 2;
+    codec_ = h.codec;
+    step_ = h.step;
+    generation_ = h.generation;
+    garbage_ = h.garbage;
+    baseOffset_ = h.baseOffset;
+    dir_.resize(T);
+    chunks_.resize(chunks);
+    std::memcpy(dir_.data(), b + h.dirOffset, size_t(T) * sizeof(Entry));
+    std::memcpy(chunks_.data(), b + h.dirOffset + size_t(T) * sizeof(Entry), size_t(chunks) * sizeof(ChunkEntry));
+    for (const Entry& e : dir_)
+        if (e.offset < kHeaderBytes || e.offset + e.bytes > mapBytes_) {
             error = "Detail file is damaged";
-            return nullptr;
+            return false;
         }
-    for (const ChunkEntry& c : fd->chunks_)
-        if (c.offset < kHeaderBytes || c.offset + c.bytes > fd->mapBytes_) {
+    for (const ChunkEntry& c : chunks_)
+        if (c.offset < kHeaderBytes || c.offset + c.bytes > mapBytes_) {
             error = "Detail file is damaged";
-            return nullptr;
+            return false;
         }
-    // The base mesh
-    Mesh m;
-    m.positions.resize(V);
-    m.normals.resize(V);
-    m.triangles.resize(T);
-    const uint8_t* base = b + h.baseOffset;
-    std::memcpy(m.positions.data(), base, size_t(V) * 12);
-    std::memcpy(m.normals.data(), base + size_t(V) * 12, size_t(V) * 12);
-    std::memcpy(m.triangles.data(), base + size_t(V) * 24, size_t(T) * 12);
-    for (const glm::uvec3& t : m.triangles)
+    tris_.resize(T);
+    std::memcpy(tris_.data(), b + h.baseOffset + size_t(V) * 24, size_t(T) * 12);
+    for (const glm::uvec3& t : tris_)
         if (t.x >= V || t.y >= V || t.z >= V) {
             error = "Detail file is damaged";
-            return nullptr;
+            return false;
         }
-    m.rebuildTopology();
-    // Coarse grids, then every tile upsampled from its coarse grid.
-    const uint32_t CS = fd->coarseSamples_, S = fd->samples_;
-    fd->coarse_.assign(size_t(T) * CS, 0);
+    baseHash_ = fnv1a(b + h.baseOffset, size_t(V) * 24);
+    // Coarse grids (always resident)
+    const uint32_t CS = coarseSamples_;
+    coarse_.assign(size_t(T) * CS, 0);
     std::atomic<bool> bad{false};
     poolFor(chunks, [&](size_t c0, size_t c1) {
         for (size_t c = c0; c < c1; ++c) {
             const uint32_t first = uint32_t(c) * kChunk, count = std::min(kChunk, T - first);
-            if (!decompressValues(fd->codec_, b + fd->chunks_[c].offset, fd->chunks_[c].bytes, count, CS,
-                                  fd->coarse_.data() + size_t(first) * CS))
+            if (!decompressValues(codec_, b + chunks_[c].offset, chunks_[c].bytes, count, CS, coarse_.data() + size_t(first) * CS))
                 bad = true;
         }
     }, 1, 1);
     if (bad) {
         error = "Detail file is damaged";
-        return nullptr;
+        return false;
     }
+    return true;
+}
+
+bool FocusDetail::attachTo(Mesh& m, std::vector<uint8_t> mask, std::string& error) {
+    const uint32_t T = uint32_t(dir_.size()), CS = coarseSamples_, S = samples_;
     MicroStore disp;
     if (microWantsOutOfCore(size_t(T) * S)) {
         std::string why;
@@ -527,25 +522,78 @@ std::shared_ptr<FocusDetail> FocusDetail::open(const std::string& path, Mesh& ou
         disp = std::vector<int16_t>(size_t(T) * S);
     }
     poolFor(T, [&](size_t t0, size_t t1) {
-        for (size_t t = t0; t < t1; ++t) upsample(fd->coarse_.data() + t * CS, fd->coarseN_, fd->n_, disp.data() + t * S);
+        for (size_t t = t0; t < t1; ++t) upsample(coarse_.data() + t * CS, coarseN_, n_, disp.data() + t * S);
     }, 64);
-    if (!microAttach(m, fd->level_, fd->step_, std::move(disp), {}, error)) return nullptr;
+    std::shared_ptr<MicroMesh> before = std::move(m.micro);
+    if (!microAttach(m, level_, step_, std::move(disp), std::move(mask), error)) {
+        m.micro = std::move(before);
+        return false;
+    }
     MicroMesh& mm = *m.micro;
     mm.rangeMax = 0;
     for (uint32_t t = 0; t < T; ++t) {
-        mm.triRange[t] = fd->dir_[t].range; // the full tile's (brushes find triangles with it)
+        mm.triRange[t] = dir_[t].range; // the full tile's (brushes find triangles with it)
         mm.rangeMax = std::max(mm.rangeMax, mm.triRange[t]);
     }
-    fd->state_.assign(T, kCoarse);
-    fd->lastWanted_.assign(T, 0);
-    fd->parked_.resize(T);
-    fd->score_.assign(T, 0.0f);
-    fd->tris_ = m.triangles;
-    fd->baseHash_ = fnv1a(base, size_t(V) * 24);
-    fd->stats_.tiles = T;
-    mm.focus = fd;
+    state_.assign(T, kCoarse);
+    lastWanted_.assign(T, 0);
+    parked_.assign(T, {});
+    score_.assign(T, 0.0f);
+    fullTiles_ = 0;
+    stats_ = {};
+    stats_.tiles = T;
+    return true;
+}
+
+std::shared_ptr<FocusDetail> FocusDetail::open(const std::string& path, Mesh& out, std::string& error) {
+    std::shared_ptr<FocusDetail> fd(new FocusDetail());
+    fd->path_ = path;
+    if (!fd->mapFile(error) || !fd->loadIndex(error)) return nullptr;
+    // The base mesh
+    Mesh m;
+    const uint8_t* base = fd->map_ + fd->baseOffset_;
+    Header h;
+    decodeHeader(fd->map_, fd->mapBytes_, h, error); // (checked by loadIndex)
+    m.positions.resize(h.verts);
+    m.normals.resize(h.verts);
+    std::memcpy(m.positions.data(), base, size_t(h.verts) * 12);
+    std::memcpy(m.normals.data(), base + size_t(h.verts) * 12, size_t(h.verts) * 12);
+    m.triangles = fd->tris_;
+    m.rebuildTopology();
+    if (!fd->attachTo(m, {}, error)) return nullptr;
+    m.micro->focus = fd;
     out = std::move(m);
     return fd;
+}
+
+std::shared_ptr<FocusDetail> FocusDetail::attach(const std::string& path, Mesh& m, std::vector<uint8_t> mask,
+                                                 std::string& error) {
+    std::shared_ptr<FocusDetail> fd(new FocusDetail());
+    fd->path_ = path;
+    if (!fd->mapFile(error) || !fd->loadIndex(error)) return nullptr;
+    if (fd->tris_ != m.triangles) {
+        error = "The detail file " + std::filesystem::path(path).filename().string() + " belongs to another mesh";
+        return nullptr;
+    }
+    if (m.normals.size() != m.vertexCount()) m.recomputeAllNormals();
+    if (!fd->attachTo(m, std::move(mask), error)) return nullptr;
+    m.micro->focus = fd;
+    return fd;
+}
+
+std::shared_ptr<FocusDetail> FocusDetail::create(const std::string& path, Mesh& m, std::string& error) {
+    if (!m.micro || m.micro->focus || !microMatches(m)) {
+        error = "Nothing to stream: no micro level";
+        return nullptr;
+    }
+    const MicroMesh& mm = *m.micro;
+    const uint32_t S = mm.samples;
+    if (!write(path, m, mm.level, mm.step,
+               [&](const MicroTriangle&, uint32_t t, int16_t* out) { std::memcpy(out, mm.disp.data() + size_t(t) * S, S * 2); },
+               error))
+        return nullptr;
+    std::vector<uint8_t> mask = mm.mask;
+    return attach(path, m, std::move(mask), error);
 }
 
 // ---------------------------------------------------------------------------
@@ -613,6 +661,17 @@ void FocusDetail::ensureFull(MicroMesh& mm, std::span<const uint32_t> tris, bool
     std::vector<uint32_t> need;
     for (uint32_t t : tris) {
         if (t >= state_.size()) continue;
+        lastWanted_[t] = frame_;
+        if (state_[t] == kCoarse) need.push_back(t);
+        else if (edit) state_[t] = kDirty;
+    }
+    if (!need.empty()) promoteLocked(mm, need, edit, true);
+}
+
+void FocusDetail::ensureAllFull(MicroMesh& mm, bool edit) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<uint32_t> need;
+    for (uint32_t t = 0; t < uint32_t(state_.size()); ++t) {
         lastWanted_[t] = frame_;
         if (state_[t] == kCoarse) need.push_back(t);
         else if (edit) state_[t] = kDirty;
@@ -773,7 +832,7 @@ FocusStats FocusDetail::stats() const {
 // Saving: changed tiles only
 // ---------------------------------------------------------------------------
 
-bool FocusDetail::save(Mesh& m, std::string& error) {
+bool FocusDetail::save(const Mesh& m, std::string& error) {
 #if defined(SF_FOCUS_POSIX)
     if (!m.micro || m.micro->focus.get() != this) {
         error = "Not this detail file's mesh";
@@ -783,8 +842,14 @@ bool FocusDetail::save(Mesh& m, std::string& error) {
     std::lock_guard<std::mutex> lock(mutex_);
     const uint32_t T = uint32_t(state_.size()), S = samples_, CS = coarseSamples_;
     std::vector<uint32_t> tiles;
+    uint64_t replaced = 0;
     for (uint32_t t = 0; t < T; ++t)
-        if (state_[t] == kDirty || !parked_[t].empty()) tiles.push_back(t);
+        if (state_[t] == kDirty || !parked_[t].empty()) {
+            tiles.push_back(t);
+            replaced += dir_[t].bytes;
+        }
+    // Compaction: a fresh file once the garbage would pass half of it.
+    if ((garbage_ + replaced) * 2 > mapBytes_) return saveAsLocked(m, path_, error);
     // The base cage moved (Move on a micro level): its block goes too.
     std::vector<uint8_t> baseBlock;
     if (m.normals.size() == m.vertexCount()) {
@@ -879,6 +944,7 @@ bool FocusDetail::save(Mesh& m, std::string& error) {
     chunks_ = std::move(chunkDir);
     garbage_ = garbage;
     generation_ = h.generation;
+    baseOffset_ = h.baseOffset;
     rescaled_ = false;
     if (!baseBlock.empty()) baseHash_ = fnv1a(baseBlock.data(), m.vertexCount() * 24);
     for (uint32_t t : tiles) {
@@ -887,6 +953,138 @@ bool FocusDetail::save(Mesh& m, std::string& error) {
     }
     return mapFile(error);
 #else
+    error = "Focus Detail needs Linux or macOS for now";
+    return false;
+#endif
+}
+
+bool FocusDetail::saveAs(const Mesh& m, const std::string& path, std::string& error) {
+    if (!m.micro || m.micro->focus.get() != this) {
+        error = "Not this detail file's mesh";
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(mutex_);
+    return saveAsLocked(m, path, error);
+}
+
+bool FocusDetail::saveAsLocked(const Mesh& m, const std::string& path, std::string& error) {
+#if defined(SF_FOCUS_POSIX)
+    MicroMesh& mm = *m.micro;
+    const uint32_t T = uint32_t(state_.size()), S = samples_, CS = coarseSamples_, V = uint32_t(m.vertexCount());
+    const std::string tmp = path + ".part";
+    std::FILE* f = std::fopen(tmp.c_str(), "wb");
+    if (!f) {
+        error = "Can't write " + tmp;
+        return false;
+    }
+    Header h;
+    h.codec = codec_;
+    h.level = uint32_t(level_);
+    h.coarseLevel = kCoarseLevel;
+    h.tris = T;
+    h.verts = V;
+    h.chunkTiles = kChunk;
+    h.step = step_;
+    h.baseOffset = kHeaderBytes;
+    h.baseBytes = uint64_t(V) * 24 + uint64_t(T) * 12;
+    h.generation = generation_ + 1;
+    std::vector<glm::vec3> normals = m.normals;
+    if (normals.size() != V) {
+        Mesh copy;
+        copy.positions = m.positions;
+        copy.triangles = m.triangles;
+        copy.recomputeAllNormals();
+        normals = std::move(copy.normals);
+    }
+    bool ok = std::fwrite(encodeHeader(h).data(), 1, kHeaderBytes, f) == kHeaderBytes;
+    ok = ok && std::fwrite(m.positions.data(), 12, V, f) == V;
+    ok = ok && std::fwrite(normals.data(), 12, V, f) == V;
+    ok = ok && std::fwrite(tris_.data(), 12, T, f) == T;
+    uint64_t offset = kHeaderBytes + h.baseBytes;
+    std::vector<Entry> dir = dir_;
+    std::vector<ChunkEntry> chunkDir(chunks_.size());
+    // Tiles in batches: edited ones compressed in parallel, parked ones as they are, the rest copied as stored.
+    const uint32_t batch = kChunk * 4;
+    std::vector<std::vector<uint8_t>> blobs(batch);
+    for (uint32_t b0 = 0; ok && b0 < T; b0 += batch) {
+        const uint32_t b1 = std::min(T, b0 + batch);
+        poolFor(b1 - b0, [&](size_t b, size_t e) {
+            for (size_t k = b; k < e; ++k) {
+                const uint32_t t = b0 + uint32_t(k);
+                blobs[k].clear();
+                if (state_[t] == kDirty) {
+                    const int16_t* g = mm.disp.data() + size_t(t) * S;
+                    const TileInfo info = analyse(g, n_, S, coarseN_, step_, coarse_.data() + size_t(t) * CS);
+                    dir[t].coarseErr = info.coarseErr;
+                    dir[t].range = info.range;
+                    dir[t].shift = 0;
+                    compressTile(codec_, g, n_, S, blobs[k]);
+                } else if (!parked_[t].empty()) {
+                    dir[t].shift = 0;
+                }
+            }
+        }, 16);
+        for (uint32_t t = b0; ok && t < b1; ++t) {
+            const uint8_t* p;
+            size_t bytes;
+            if (state_[t] == kDirty) p = blobs[t - b0].data(), bytes = blobs[t - b0].size();
+            else if (!parked_[t].empty()) p = parked_[t].data(), bytes = parked_[t].size();
+            else p = map_ + dir_[t].offset, bytes = dir_[t].bytes;
+            dir[t].offset = offset;
+            dir[t].bytes = uint32_t(bytes);
+            ok = bytes && std::fwrite(p, 1, bytes, f) == bytes;
+            offset += bytes;
+        }
+    }
+    std::vector<std::vector<uint8_t>> chunkBlobs(chunks_.size());
+    poolFor(chunks_.size(), [&](size_t b, size_t e) {
+        for (size_t c = b; c < e; ++c) {
+            const uint32_t first = uint32_t(c) * kChunk, count = std::min(kChunk, T - first);
+            compressValues(codec_, coarse_.data() + size_t(first) * CS, count, CS, chunkBlobs[c]);
+        }
+    }, 1);
+    for (size_t c = 0; ok && c < chunkBlobs.size(); ++c) {
+        chunkDir[c].offset = offset;
+        chunkDir[c].bytes = uint32_t(chunkBlobs[c].size());
+        ok = std::fwrite(chunkBlobs[c].data(), 1, chunkBlobs[c].size(), f) == chunkBlobs[c].size();
+        offset += chunkBlobs[c].size();
+    }
+    std::vector<uint8_t> dirBytes(size_t(T) * sizeof(Entry) + chunkDir.size() * sizeof(ChunkEntry));
+    std::memcpy(dirBytes.data(), dir.data(), size_t(T) * sizeof(Entry));
+    std::memcpy(dirBytes.data() + size_t(T) * sizeof(Entry), chunkDir.data(), chunkDir.size() * sizeof(ChunkEntry));
+    h.dirOffset = offset;
+    h.dirBytes = dirBytes.size();
+    h.dirHash = fnv1a(dirBytes.data(), dirBytes.size());
+    ok = ok && std::fwrite(dirBytes.data(), 1, dirBytes.size(), f) == dirBytes.size();
+    ok = ok && std::fseek(f, 0, SEEK_SET) == 0 && std::fwrite(encodeHeader(h).data(), 1, kHeaderBytes, f) == kHeaderBytes;
+    ok = ok && std::fflush(f) == 0 && ::fsync(fileno(f)) == 0;
+    ok = std::fclose(f) == 0 && ok;
+    std::error_code ec;
+    if (ok) std::filesystem::rename(tmp, path, ec);
+    if (!ok || ec) {
+        std::filesystem::remove(tmp, ec);
+        error = "Writing " + path + " failed (disk full?)";
+        return false;
+    }
+    // Continue in the new file (an old one stays as it was saved).
+    unmap();
+    path_ = path;
+    if (!mapFile(error)) return false;
+    dir_ = std::move(dir);
+    chunks_ = std::move(chunkDir);
+    garbage_ = 0;
+    generation_ = h.generation;
+    baseOffset_ = h.baseOffset;
+    baseHash_ = fnv1a(map_ + h.baseOffset, size_t(V) * 24);
+    rescaled_ = false;
+    for (uint32_t t = 0; t < T; ++t) {
+        if (state_[t] == kDirty) state_[t] = kFull;
+        std::vector<uint8_t>().swap(parked_[t]);
+    }
+    return true;
+#else
+    (void)m;
+    (void)path;
     error = "Focus Detail needs Linux or macOS for now";
     return false;
 #endif
@@ -940,6 +1138,44 @@ bool focusWriteSyntheticHead(const std::string& path, size_t baseTriangles, int 
                 out[idx] = int16_t(std::clamp(std::lround(d / step), -32767L, 32767L));
             }
     }, error);
+}
+
+bool microWantsFocus(size_t microTriangles, int level) {
+#if defined(SF_FOCUS_POSIX)
+    if (level <= FocusDetail::kCoarseLevel) return false;
+    if (const char* e = std::getenv("SF_FOCUS_DETAIL"); e && *e) return e[0] == '1';
+    return microTriangles > kFocusTriangles;
+#else
+    (void)microTriangles;
+    (void)level;
+    return false;
+#endif
+}
+
+std::string focusUnsavedPath() {
+    namespace fs = std::filesystem;
+    const fs::path dir = MicroStore::swapFolder();
+    std::error_code ec;
+    fs::create_directories(dir, ec);
+    focusRemoveStaleUnsaved();
+    static std::atomic<uint32_t> serial{0};
+    const auto now = std::chrono::system_clock::now().time_since_epoch();
+    char name[96];
+    std::snprintf(name, sizeof name, "unsaved-%lld-%u.sfdetail",
+                  (long long)std::chrono::duration_cast<std::chrono::milliseconds>(now).count(), unsigned(serial++));
+    return (dir / name).string();
+}
+
+void focusRemoveStaleUnsaved() {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    const auto old = fs::file_time_type::clock::now() - std::chrono::hours(24 * 7);
+    for (fs::directory_iterator it(MicroStore::swapFolder(), ec), end; !ec && it != end; it.increment(ec)) {
+        const std::string name = it->path().filename().string();
+        if (name.rfind("unsaved-", 0) != 0) continue;
+        std::error_code e2;
+        if (const auto t = it->last_write_time(e2); !e2 && t < old) fs::remove(it->path(), e2);
+    }
 }
 
 std::string focusStandard1bPath(std::string& error, const std::function<void(const std::string&)>& log) {
