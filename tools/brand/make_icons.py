@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Builds every SculptForge icon and logo file.
 
-    python -I tools/brand/make_icons.py <bust.jpeg> [--discord DIR]
+    python -I tools/brand/make_icons.py <bust.jpeg> [--discord DIR] [--style outline|filled]
 
-Which mark goes where: docs/brand.md. The app icon is the cube (Tony 11-06): tools/brand/cube-mark*.svg
-(make_cube_mark.py), rendered with rsvg-convert: assets/branding/sculptforge-16..1024.png (16-32 px from
-cube-mark-small.svg), .ico, .icns (Apple's grid, cube-mark-macos(-small).svg), the site's favicons and apple-touch-icon,
-the press icons (also Discord Rich Presence's image). The SF letters (make_sf_mark.py) are retired.
+Which mark goes where: docs/brand.md. The app icon is the outline cube (Tony 11-06 21:1x: "I want that back as the icon
+as it was before"): the files that shipped in 0.1-0.10, frozen in tools/brand/cube-outline/ (Lucide's "box" on a dark
+tile, ISC, THIRD_PARTY_NOTICES.md). Those sizes are copied byte for byte (512/1024/256 PNGs, the .ico's frames); the
+others (24 px, the .icns on Apple's grid, apple-touch-icon) are its SVG rendered with rsvg-convert. --style filled
+builds the alternative instead: our drawn filled cube, tools/brand/cube-mark*.svg (make_cube_mark.py). The SF letters
+(make_sf_mark.py) are retired.
 The bust (<bust.jpeg>: the concept art, a rounded-square tile on a dark backdrop, found from its light rim) is the
 brand: assets/branding/bust/ (About, What's New, the support card), the site header's lockup and What's New cards,
 the press kit, the social previews and, with --discord DIR, the files uploaded by hand (Discord bot avatar and server
@@ -169,14 +171,52 @@ def social(master, w, h, font_path, tagline):
 
 def sf(name, n):
     """tools/brand/<name>.svg rendered n px wide."""
-    svg = os.path.join(ROOT, "tools", "brand", name + ".svg")
+    return svg_png(os.path.join(ROOT, "tools", "brand", name + ".svg"), n)
+
+
+STYLE = "outline"
+OUTLINE = os.path.join(ROOT, "tools", "brand", "cube-outline")
+
+
+def svg_png(svg, n):
     png = subprocess.run(["rsvg-convert", "-w", str(n), "-h", str(n), svg], check=True, capture_output=True).stdout
     return Image.open(io.BytesIO(png)).convert("RGBA")
 
 
+def outline(n):
+    """The shipped outline icon n px wide: its own PNG or .ico frame where it had one, else its SVG rendered."""
+    path = os.path.join(OUTLINE, f"sculptforge-{n}.png")
+    if os.path.exists(path):
+        return Image.open(path).convert("RGBA")
+    ico = Image.open(os.path.join(OUTLINE, "sculptforge.ico"))
+    if (n, n) in ico.info["sizes"]:
+        ico.size = (n, n)
+        return ico.copy().convert("RGBA")
+    return svg_png(os.path.join(OUTLINE, "sculptforge-icon.svg"), n)
+
+
 def icon(n):
-    """The app icon n px wide: the small cut up to 32 px, the mark from 48."""
+    """The app icon n px wide (filled: the small cut up to 32 px, the mark from 48)."""
+    if STYLE == "outline":
+        return outline(n)
     return sf("cube-mark-small" if n <= 32 else "cube-mark", n)
+
+
+def mac(n):
+    """macOS: the icon on Apple's grid (an 824 px tile centred in 1024)."""
+    if STYLE != "outline":
+        return sf("cube-mark-macos-small" if n <= 32 else "cube-mark-macos", n)
+    k = round(n * 824 / 1024)
+    im = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    im.alpha_composite(svg_png(os.path.join(OUTLINE, "sculptforge-icon.svg"), k), ((n - k) // 2, (n - k) // 2))
+    return im
+
+
+def flat(im, bg=(0x0e, 0x0e, 0x11)):
+    """On the tile's bottom colour, for places that round or circle it themselves."""
+    out = Image.new("RGBA", im.size, bg + (255,))
+    out.alpha_composite(im)
+    return out.convert("RGB")
 
 
 def write_icns(path):
@@ -186,7 +226,7 @@ def write_icns(path):
     chunks = b""
     for kind, n in slots:
         buf = io.BytesIO()
-        sf("cube-mark-macos-small" if n <= 32 else "cube-mark-macos", n).save(buf, format="PNG", optimize=True)
+        mac(n).save(buf, format="PNG", optimize=True)
         chunks += kind.encode() + struct.pack(">I", 8 + len(buf.getvalue())) + buf.getvalue()
     with open(path, "wb") as f:
         f.write(b"icns" + struct.pack(">I", 8 + len(chunks)) + chunks)
@@ -196,7 +236,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("bust")
     ap.add_argument("--discord")
+    ap.add_argument("--style", choices=("outline", "filled"), default="outline")
     a = ap.parse_args()
+    global STYLE
+    STYLE = a.style
 
     def png(im, *path):
         im.save(os.path.join(ROOT, *path), optimize=True)
@@ -215,13 +258,22 @@ def main():
     png(icon(16), "website", "img", "favicon-16.png")
     png(icon(32), "website", "img", "favicon-32.png")
     png(icon(64), "website", "img", "favicon-64.png")
+    if STYLE == "outline":  # the site's own cuts of 0.1-0.10 (71cd4f7)
+        png(Image.open(os.path.join(OUTLINE, "site-favicon-64.png")), "website", "img", "favicon-64.png")
     fav = [icon(n) for n in (48, 32, 16)]
     fav[0].save(os.path.join(ROOT, "website", "favicon.ico"), format="ICO", sizes=[(i.width, i.height) for i in fav],
                 append_images=fav[1:])
-    png(sf("cube-mark-square", 180).convert("RGB"), "website", "img", "apple-touch-icon.png")  # iOS rounds it
+    square = flat(icon(1024)).resize((180, 180), Image.LANCZOS) if STYLE == "outline" else \
+        sf("cube-mark-square", 180).convert("RGB")
+    png(square, "website", "img", "apple-touch-icon.png")  # iOS rounds it
     png(icon(256), "website", "img", "icon-256.png")  # the Discord announcements' avatar
+    if STYLE == "outline":
+        png(Image.open(os.path.join(OUTLINE, "site-icon-256.png")), "website", "img", "icon-256.png")
     png(icon(1024), "website", "press", "sculptforge-icon-1024.png")  # also Discord Rich Presence's large image
     png(icon(256), "website", "press", "sculptforge-icon-256.png")
+    frozen = os.path.join(ROOT, "website", "press", "sculptforge-app-icon-cube-outline-1024.png")
+    if STYLE == "outline" and not os.path.exists(frozen):  # by URL (Discord Rich Presence): never overwritten
+        icon(1024).save(frozen, optimize=True)
 
     # The bust: the illustration.
     bust, _ = master_from_concept(a.bust)
@@ -245,6 +297,9 @@ def main():
             k = round(n * 440 / 512)
             av.alpha_composite(shrink(bust, k), ((n - k) // 2, (n - k) // 2))
             av.convert("RGB").save(os.path.join(a.discord, f"{name}-{n}.png"))
+        # Discord server and developer portal icon: the app icon (Tony 11-06 21:02), on its tile's dark.
+        flat(icon(512)).save(os.path.join(a.discord, f"discord-server-icon-cube-{STYLE}-512.png"))
+        icon(1024).save(os.path.join(a.discord, f"discord-portal-icon-cube-{STYLE}-1024.png"))
     print("done")
 
 

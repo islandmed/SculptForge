@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-"""The cube mark, the app icon and the site's logo (Tony 11-06: "I like the cube as well"): an orange cube seen corner on
-(three faces: light top, forge-orange left, dark right, split by dark seams) on a dark tile. Our own drawing: six
-points of a regular hexagon and its centre, nothing traced or taken from an icon set.
+"""The filled cube: the alternative app icon (the shipped one is the outline cube in tools/brand/cube-outline/, Tony
+11-06 21:1x; docs/brand.md). An orange cube seen corner on (three faces: light top, forge-orange left, dark right, split
+by dark seams) on a dark tile. Our own drawing: six points of a regular hexagon and its centre, nothing traced or taken
+from an icon set.
 
     python -I tools/brand/make_cube_mark.py tools/brand
 
 Writes cube-mark.svg (the mark), cube-mark-small.svg (16-32 px: a bigger cube, no inner rim), cube-mark-square.svg
 (full bleed: apple-touch-icon, Discord avatar) and cube-mark-macos(-small).svg (Apple's icon grid).
-tools/brand/make_icons.py renders the app icon set and the site's favicons from them (rsvg-convert); the site header has
-cube-mark.svg inline (class="brand-mark" in the pages and tools/guide/build_site.py). The SF mark (make_sf_mark.py)
-stays in tools/brand as the alternative.
+`tools/brand/make_icons.py ... --style filled` renders the app icon set and the site's favicons from them (rsvg-convert).
 """
 import math
 import sys

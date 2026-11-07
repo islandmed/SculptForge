@@ -281,6 +281,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 Icon font `assets/fonts/lucide.ttf` (lucide-static 1.52.0, https://lucide.dev), embedded in the app. The
 header `third_party/lucide/IconsLucide.h` is generated from the same version.
 
+The SculptForge app icon (`assets/branding/sculptforge-*.png`, `.ico`, `.icns`, the Flatpak icon, the site's favicons
+and press icons, the Discord icons) is Lucide's "box" icon (lucide-static 1.52.0) in orange on a dark tile; sources in
+`tools/brand/cube-outline/`. Same licence:
+
 ```
 ISC License
 

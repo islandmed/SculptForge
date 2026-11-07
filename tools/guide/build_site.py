@@ -780,9 +780,9 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <meta name="description" content="{desc}">
   <meta name="theme-color" content="#111114">
   <meta name="color-scheme" content="dark">
-  <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=6">
-  <link rel="icon" type="image/png" sizes="64x64" href="../img/favicon-64.png?v=6">
-  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png?v=6">
+  <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=7">
+  <link rel="icon" type="image/png" sizes="64x64" href="../img/favicon-64.png?v=7">
+  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png?v=7">
   <link rel="canonical" href="{url}">
   <meta property="og:type" content="article">
   <meta property="og:title" content="{html.escape(title)}">
@@ -995,7 +995,7 @@ def supporters_html() -> str:
   <title>Members</title>
   <meta name="description" content="The members who keep SculptForge free and open source for everyone.">
   <meta name="color-scheme" content="dark light">
-  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png?v=6">
+  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png?v=7">
   <link rel="canonical" href="{SITE}supporters.html">
   <link rel="stylesheet" href="style.css?v=18">
   <style>
