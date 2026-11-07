@@ -324,11 +324,12 @@
             </ul>
           </div>
           <div class="actions">
-            <a class="btn btn-hot" href="mailto:hello@sculptforge.app?subject=SculptForge%20Studio%20membership">Start a Studio membership</a>
+            <a class="btn btn-hot" data-mail="SculptForge Studio membership" href="https://discord.gg/gWrYkEmQhH" rel="noopener">Start a Studio membership</a>
             <a class="btn btn-ghost" href="https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204" rel="noopener">Founding Studio: $150 / month</a>
             <p><strong>Founding Studio</strong>: the first 10 studios pay $150 a month for up to 10 artists, locked for
-              as long as they stay subscribed. Questions first: write to
-              <a href="mailto:hello@sculptforge.app">hello@sculptforge.app</a>.
+              as long as they stay subscribed. Questions first:
+              <a data-mail="SculptForge Studio question" href="https://discord.gg/gWrYkEmQhH" rel="noopener">email us</a>.
+              <noscript>(Email needs JavaScript: ask us on the <a href="https://discord.gg/gWrYkEmQhH" rel="noopener">SculptForge Discord</a> and we'll reply privately.)</noscript>
               <a href="guide/studios.html#your-studio-build">Your studio build</a> explains what to send. Payments go
               through Stripe; cancel anytime in the customer portal. SculptForge releases stay free for everyone and
               nothing in the app is paywalled. <a href="support.html">All memberships</a>.</p>
@@ -400,6 +401,12 @@
       });
       stage.addEventListener('pointerleave', () => { art.style.setProperty('--px', '0px'); art.style.setProperty('--py', '0px'); });
     })();
+  </script>
+  <script>
+    // Studio email: the address is assembled on click, never present in the page source (spam scrapers).
+    document.querySelectorAll('a[data-mail]').forEach((a) => a.addEventListener('click', () => {
+      a.href = 'mailto:' + 'hello' + '@' + 'sculptforge.app' + '?subject=' + encodeURIComponent(a.dataset.mail);
+    }));
   </script>
 </body>
 </html>
