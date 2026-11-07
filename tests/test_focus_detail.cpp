@@ -104,6 +104,58 @@ TEST(focus_detail_open_is_coarse_then_full_is_exact) {
     CHECK(mm.rangeMax > 0);
 }
 
+// The renderer's per-tile record (render/MicroFocus.h): a coarse tile's record rebuilds exactly what disp holds
+// (its upsampled inside and its edges, real ones next to full tiles), so the GPU draws what brushes and picks see,
+// crack-free on both sides of the focus border; a full tile's gives back its edges and coarse points.
+TEST(focus_detail_gpu_record_rebuilds_coarse_tiles_exactly) {
+    const std::string path = writeSmall("record.sfdetail");
+    Mesh m;
+    std::string err;
+    auto fd = FocusDetail::open(path, m, err);
+    CHECK(fd != nullptr);
+    if (!fd) return;
+    const MicroMesh& mm = *m.micro;
+    const uint32_t n = mm.n, cn = 1u << FocusDetail::kCoarseLevel, s = n / cn;
+    const uint32_t R = (cn + 1) * (cn + 2) / 2 + 3 * (n - 1);
+    auto check = [&](size_t& coarseOff, size_t& fullOff, size_t& coarseTiles) {
+        std::vector<int16_t> rec(R);
+        coarseOff = fullOff = coarseTiles = 0;
+        for (uint32_t t = 0; t < mm.baseTriangles; ++t) {
+            const int16_t* g = mm.disp.data() + size_t(t) * mm.samples;
+            focusFillRecord(g, n, cn, rec.data());
+            const bool coarse = fd->tileLevel(t) == 0;
+            coarseTiles += coarse;
+            for (uint32_t J = 0; J <= n; ++J)
+                for (uint32_t I = 0; I + J <= n; ++I) {
+                    const bool kept = J == 0 || I == 0 || I + J == n || (I % s == 0 && J % s == 0);
+                    if (!coarse && !kept) continue;
+                    if (focusRecordValue(rec.data(), n, cn, I, J) != g[MicroMesh::index(I, J, n)]) ++(coarse ? coarseOff : fullOff);
+                }
+        }
+    };
+    size_t coarseOff, fullOff, coarseTiles;
+    check(coarseOff, fullOff, coarseTiles);
+    CHECK(coarseTiles == mm.baseTriangles);
+    CHECK(coarseOff == 0);
+    // A focus: every third tile full (their real edges go into coarse neighbours), then some demoted again.
+    std::vector<uint32_t> some;
+    for (uint32_t t = 0; t < mm.baseTriangles; t += 3) some.push_back(t);
+    fd->ensureFull(*m.micro, some, false);
+    check(coarseOff, fullOff, coarseTiles);
+    CHECK(coarseTiles < mm.baseTriangles && coarseTiles > 0);
+    CHECK(coarseOff == 0);
+    CHECK(fullOff == 0);
+    const size_t focusCoarse = coarseTiles;
+    fd->budgetBytes = 1; // (demoted again once not wanted for a few frames: their neighbours take back upsampled edges)
+    FocusView view;
+    FocusBrush brush;
+    for (int f = 0; f < 20; ++f) fd->update(m, view, brush, 100.0);
+    check(coarseOff, fullOff, coarseTiles);
+    CHECK(coarseTiles > focusCoarse);
+    CHECK(coarseOff == 0);
+    CHECK(fullOff == 0);
+}
+
 TEST(focus_detail_damaged_file_is_refused) {
     const std::string path = writeSmall("damaged.sfdetail");
     std::filesystem::resize_file(path, std::filesystem::file_size(path) - 100);

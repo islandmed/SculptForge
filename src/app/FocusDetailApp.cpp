@@ -30,11 +30,11 @@ void App::openFocusDetail(const std::string& path) {
     status_ = buf;
 }
 
-void App::updateFocusDetail() {
+void App::updateFocusDetail(float heightPx) {
     Mesh& m = doc_.mesh;
     if (!m.micro || !m.micro->focus || solverBusy()) return;
     FocusDetail& fd = *m.micro->focus;
-    const float h = float(canvasHeight());
+    const float h = heightPx > 0.0f ? heightPx : float(canvasHeight());
     if (!(h > 0.0f)) return;
     FocusView view;
     view.valid = true;

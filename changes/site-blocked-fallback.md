@@ -1,1 +1,4 @@
-- Site: GitHub fallback links in the README for networks that block sculptforge.app; security.txt (RFC 9116) pointing to GitHub private vulnerability reporting.
+---
+changed: Site: GitHub fallback links in the README for networks that block sculptforge.app; security.txt (RFC 9116)
+  pointing to GitHub private vulnerability reporting.
+---
