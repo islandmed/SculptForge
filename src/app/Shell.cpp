@@ -777,8 +777,7 @@ void App::registerShellActions() {
              id == "preferences" ? "Ctrl+," : "", // (Cmd+, on macOS, where apps keep their settings, #111)
              "",
              [this, id] {
-                 if (std::count(layout_.leftTray.begin(), layout_.leftTray.end(), id) +
-                     std::count(layout_.rightTray.begin(), layout_.rightTray.end(), id)) {
+                 if (paletteInShownTray(id)) {
                      flashPalette_ = id;
                      flashStart_ = ImGui::GetTime();
                      return;
@@ -902,6 +901,11 @@ void App::applyPreset(int preset) {
     dropdown_.clear();
     status_ = std::string("Layout: ") + kNames[std::clamp(preset, 0, 2)] + " (Save Layout keeps it)";
     lastCommandOk_ = true;
+}
+
+bool App::paletteInShownTray(const std::string& id) const {
+    return std::count(layout_.leftTray.begin(), layout_.leftTray.end(), id) ||
+           (!shell_.narrow && std::count(layout_.rightTray.begin(), layout_.rightTray.end(), id));
 }
 
 void App::removePaletteFromTrays(const std::string& id) {
@@ -1214,9 +1218,7 @@ void App::drawPaletteBar(const ShellGeometry& g) {
     for (size_t k = 0; k < order.size(); ++k) {
         const int i = int(k);
         const PaletteDef& p = list[order[k]];
-        const bool inTray = std::count(layout_.leftTray.begin(), layout_.leftTray.end(), p.id) +
-                                std::count(layout_.rightTray.begin(), layout_.rightTray.end(), p.id) >
-                            0;
+        const bool inTray = paletteInShownTray(p.id);
         const bool open = dropdown_ == p.id;
         ImGui::PushStyleColor(ImGuiCol_Button, open ? theme::header : ImVec4(0, 0, 0, 0));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::headerHover);
@@ -1478,11 +1480,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
             } else {
                 // The section shown last, else the first one; one that sits in a tray is already on screen, so the
                 // menu opens on the next one (a menu whose sections are all in trays flashes the tray instead).
-                auto inTray = [&](const std::string& id) {
-                    return std::count(layout_.leftTray.begin(), layout_.leftTray.end(), id) +
-                               std::count(layout_.rightTray.begin(), layout_.rightTray.end(), id) >
-                           0;
-                };
+                auto inTray = [&](const std::string& id) { return paletteInShownTray(id); };
                 std::string section = menuSection_[m.id];
                 if (section.empty() || taskMenuOf(section) != i || inTray(section)) {
                     section.clear();

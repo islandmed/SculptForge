@@ -1713,6 +1713,8 @@ private:
     void drawPaletteBody(const std::string& id);
     void movePaletteToTray(const std::string& id, bool right);
     void removePaletteFromTrays(const std::string& id);
+    // In a tray that is drawn: below 1280 px the right tray isn't, and its palettes open as drop-downs instead.
+    bool paletteInShownTray(const std::string& id) const;
     void finishShelfDrag();
     void noteLayoutChanged();
     void applyPreset(int preset);
