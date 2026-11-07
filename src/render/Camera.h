@@ -30,6 +30,9 @@ public:
 
     void orbit(float dxPixels, float dyPixels);     // turntable
     void orbitFree(float dxPixels, float dyPixels); // trackball about the screen axes
+    // Orbit lock X or Z: the view turns about one world axis only. The drag's part across the axis on screen turns
+    // it (as free orbiting would), `rollRadians` (the cursor's sweep around the view's centre) when it points at you.
+    void orbitAbout(const glm::vec3& worldAxis, float dxPixels, float dyPixels, float rollRadians);
     void setOrientation(const glm::quat& q);        // as yaw / pitch / roll
     // The nearest of the 24 views looking along a world axis with another world axis up (the classic
     // Shift while rotating).

@@ -12,6 +12,25 @@ model about the screen's own axes, so it follows the cursor and can roll right o
 in Blender or Maya, set **Edit > Preferences > Interface > Rotation** to **Turntable**: sideways drags then turn the
 model around its vertical axis and up-down drags tilt it, stopping just short of looking straight down or up.
 
+### Orbit lock
+
+**View > Orbit lock** picks how a rotation drag turns the view, one key each:
+
+| Lock | Key | A rotation drag |
+|---|---|---|
+| **Free** | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> | turns about the screen's axes (the default, as above) |
+| **Y (turntable)** | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Y</kbd> | keeps the model upright: the **Turntable** rotation above |
+| **X** | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> | turns about the world X axis only: from the front, an up or down drag tips the model towards you or away, and sideways drags do nothing |
+| **Z** | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> | turns about the world Z axis only: from the front, a drag around the middle of the view turns the model like a wheel; from the side, an up or down drag tips it |
+
+With X or Z locked, only the part of the drag that moves across the axis on screen counts, so the axis itself never
+moves: nothing drifts, however long you drag. <kbd>Shift</kbd> still snaps to the nearest side view. The axis
+gizmo shows the lock: the locked axis runs through its disc in its colour, and a small lock with the axis letter sits
+at the disc's lower right. The lock is the same setting as **Edit > Preferences > Interface > Rotation**, saved
+with your preferences; scripts and the console use `orbit_lock axis=free|y|x|z`.
+
+![View > Orbit lock: the X lock picked in the View menu, the axis gizmo with X through its disc and the lock badge](images/orbit-lock.jpg)
+
 Panning moves the target; zooming moves the camera closer to it or further away. The view is a perspective
 view with a 35 degree field of view, or orthographic (<kbd>Numpad 5</kbd>): no foreshortening, so sizes don't
 shrink with depth. The front, side and top views (<kbd>Numpad 1</kbd>, <kbd>3</kbd>, <kbd>7</kbd>) switch to

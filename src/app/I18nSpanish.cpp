@@ -600,6 +600,30 @@ constexpr Entry kSpanish[] = {
     {"Automatic", "Automática"},
     {"Rotation", "Rotación"},
     {"Free", "Libre"},
+    {"Orbit lock",
+     "Bloqueo de órbita"},
+    {"Y (turntable)",
+     "Y (plataforma giratoria)"},
+    {"Rotation drags turn the view about the screen's axes and can roll it over the top (the default). "
+     "Saved with the preferences.",
+     "Arrastrar para girar mueve la vista sobre los ejes de la pantalla y puede darle la vuelta por "
+     "arriba (lo predeterminado). Se guarda con las preferencias."},
+    {"Rotation drags turn the view like a turntable: the model stays upright and turns about its vertical "
+     "(Y) axis. Saved with the preferences.",
+     "Arrastrar para girar mueve la vista como una plataforma giratoria: el modelo se queda derecho y "
+     "gira sobre su eje vertical (Y). Se guarda con las preferencias."},
+    {"Rotation drags turn the view about the world X axis only (red): from the front, an up or down drag "
+     "tips the model towards you or away. Shift still snaps to a side view; the axis gizmo shows the "
+     "lock. Saved with the preferences.",
+     "Arrastrar para girar mueve la vista solo sobre el eje X del mundo (rojo): desde el frente, "
+     "arrastrar arriba o abajo inclina el modelo hacia ti o hacia atrás. Mayús sigue ajustando a una "
+     "vista lateral; el gizmo de ejes muestra el bloqueo. Se guarda con las preferencias."},
+    {"Rotation drags turn the view about the world Z axis only (blue): from the front, a drag around the "
+     "middle turns the model like a wheel. Shift still snaps to a side view; the axis gizmo shows the "
+     "lock. Saved with the preferences.",
+     "Arrastrar para girar mueve la vista solo sobre el eje Z del mundo (azul): desde el frente, "
+     "arrastrar alrededor del centro gira el modelo como una rueda. Mayús sigue ajustando a una vista "
+     "lateral; el gizmo de ejes muestra el bloqueo. Se guarda con las preferencias."},
     {"Turntable", "Plataforma giratoria"},
     {"Camera notch", "Muesca de la cámara"},
     {"Always reserve", "Reservar siempre"},
@@ -1283,10 +1307,11 @@ constexpr Entry kSpanish[] = {
      "ventana (Windows: Configuración > Pantalla > Escala, por monitor)."},
     {"Free: dragging turns the model about the screen's axes and can roll it over the top; press Shift while rotating "
      "to snap to the nearest front, side, top or bottom view. Turntable: the model stays upright and turns about its "
-     "vertical axis, as in Blender or Maya.",
+     "vertical axis, as in Blender or Maya. X axis, Z axis: it turns about that world axis only (View > Orbit lock).",
      "Libre: arrastrar gira el modelo sobre los ejes de la pantalla y puede darle la vuelta por arriba; pulsa Mayús "
      "mientras giras para ajustar a la vista frontal, lateral, superior o inferior más cercana. Plataforma "
-     "giratoria: el modelo se queda derecho y gira sobre su eje vertical, como en Blender o Maya."},
+     "giratoria: el modelo se queda derecho y gira sobre su eje vertical, como en Blender o Maya."
+     " Eje X, eje Z: gira solo sobre ese eje del mundo (Vista > Bloqueo de órbita)."},
     {"Keeps the interface below the camera notch of MacBooks (and other laptops) when SculptForge fills the screen. "
      "Automatic asks the system (macOS) or recognises a notched MacBook display (Linux).",
      "Mantiene la interfaz por debajo de la muesca de la cámara de los MacBook (y otros portátiles) cuando "
@@ -1609,9 +1634,9 @@ constexpr Entry kSpanish[] = {
      "pinceles; Nunca: la tecla no hace nada en ellos."},
     {"Share size and intensity across brushes", "Compartir tamaño e intensidad entre pinceles"},
     {"Free: the model turns about the screen's axes and can roll over the top. Turntable: it stays upright, as in "
-     "Blender or Maya.",
+     "Blender or Maya. X axis, Z axis: it turns about that world axis only (View > Orbit lock).",
      "Libre: el modelo gira sobre los ejes de la pantalla y puede darse la vuelta por arriba. Plataforma giratoria: "
-     "se queda derecho, como en Blender o Maya."},
+     "se queda derecho, como en Blender o Maya. Eje X, eje Z: gira solo sobre ese eje del mundo (Vista > Bloqueo de órbita)."},
     {"The pointer over the 3D view: a crosshair (the default, as in most sculpting apps; it stays while the view "
      "turns) or the arrow. Panels, menus and popups always show the arrow (or their own resize and text cursors). "
      "Saved automatically.",

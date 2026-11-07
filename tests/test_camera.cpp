@@ -106,3 +106,62 @@ TEST(camera_orthographic_matches_perspective_at_the_target) {
     const glm::vec4 p = c.projection() * c.view() * glm::vec4(0.0f, 0.0f, 1.0f, 1.0f); // in front of the target...
     CHECK(std::abs(p.z / p.w) <= 1.0f); // ...and behind the eye, still drawn
 }
+
+TEST(camera_orbit_lock_turns_about_one_world_axis) {
+    // View > Orbit lock X / Z (foirgairwolf on Discord): whatever the drag, the locked axis stays where it is on screen and
+    // nothing turns about the other two.
+    for (int axisIndex : {0, 2}) {
+        glm::vec3 axis(0.0f);
+        axis[axisIndex] = 1.0f;
+        Camera c;
+        c.setOrientation(glm::angleAxis(glm::radians(25.0f), glm::vec3(0, 1, 0)) *
+                         glm::angleAxis(glm::radians(-15.0f), glm::vec3(1, 0, 0)));
+        const glm::quat start = c.orientation();
+        const glm::vec3 axisOnScreen = glm::conjugate(start) * axis;
+        c.orbitAbout(axis, 37.0f, -81.0f, 0.2f);
+        c.orbitAbout(axis, -12.0f, 140.0f, -0.05f);
+        const glm::quat q = c.orientation();
+        CHECK(near(glm::conjugate(q) * axis, axisOnScreen, 1e-4f));
+        // The turn from the start is a rotation about the axis alone.
+        const glm::quat turn = q * glm::conjugate(start);
+        const glm::vec3 v(turn.x, turn.y, turn.z);
+        CHECK(glm::length(v - axis * glm::dot(v, axis)) < 1e-4f);
+        CHECK(glm::length(v) > 0.05f); // and it did turn
+    }
+}
+
+TEST(camera_orbit_lock_follows_the_drag) {
+    // From the front: X lock tips the model with an up / down drag and ignores a sideways one (the same way free
+    // orbiting tips it); Z lock turns it like a wheel with the cursor's sweep, as rolling the view does.
+    Camera x;
+    x.orbitAbout(glm::vec3(1, 0, 0), 200.0f, 0.0f, 0.0f);
+    CHECK(near(x.forward(), glm::vec3(0, 0, -1)));
+    Camera free;
+    free.orbitFree(0.0f, 50.0f);
+    x.orbitAbout(glm::vec3(1, 0, 0), 0.0f, 50.0f, 0.0f);
+    CHECK(near(x.forward(), free.forward(), 1e-4f));
+    Camera z;
+    z.orbitAbout(glm::vec3(0, 0, 1), 0.0f, 0.0f, 0.3f);
+    Camera roll;
+    roll.setOrientation(roll.orientation() * glm::angleAxis(-0.3f, glm::vec3(0, 0, 1)));
+    CHECK(near(z.forward(), glm::vec3(0, 0, -1)));
+    CHECK(near(up(z), up(roll), 1e-4f));
+}
+
+TEST(camera_orbit_lock_does_not_drift) {
+    // 1000 small drags (through straight up and down for X, where yaw / pitch / roll is degenerate) end where one
+    // turn by their sum does, and the locked axis has not moved on screen.
+    for (int axisIndex : {0, 2}) {
+        glm::vec3 axis(0.0f);
+        axis[axisIndex] = 1.0f;
+        Camera c;
+        c.setOrientation(glm::angleAxis(glm::radians(10.0f), glm::vec3(0, 1, 0)));
+        const glm::quat start = c.orientation();
+        const glm::vec3 axisOnScreen = glm::conjugate(start) * axis;
+        for (int i = 0; i < 1000; ++i) c.orbitAbout(axis, 0.7f, 1.3f, 0.004f);
+        const float total = -(1.3f * axisOnScreen.x + 0.7f * axisOnScreen.y) * 0.008f * 1000.0f - 0.004f * axisOnScreen.z * 1000.0f;
+        const glm::quat expected = glm::angleAxis(total, axis) * start;
+        CHECK(std::abs(std::abs(glm::dot(glm::normalize(c.orientation()), expected)) - 1.0f) < 1e-4f);
+        CHECK(near(glm::conjugate(c.orientation()) * axis, axisOnScreen, 1e-3f));
+    }
+}
