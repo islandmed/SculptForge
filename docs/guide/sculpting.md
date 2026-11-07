@@ -484,6 +484,8 @@ stroke takes its detail (the sculpt brushes its brightness, white = full effect,
 colours). Off the image nothing happens. It stays put on the screen while the model turns under it, so you place it,
 stroke over it, turn the model or move the stencil, and stroke again.
 
+![A Cobblestone stencil over a sphere, turned and placed with Adjust](images/wn-stencil-overlay.jpg)
+
 1. In **Sculpt > Alpha**, under **Stencil**, click **Load image...** (any PNG, JPG, BMP, TGA, PSD or GIF), or
    **Use alpha** to make the brush's alpha (a built-in pattern or one from your Library) the stencil.
 2. Turn on **Adjust**: drag inside the stencil to move it, a corner to scale it, the round handle above it to turn it
@@ -492,6 +494,8 @@ stroke over it, turn the model or move the stencil, and stroke again.
    sculpting.
 3. Stroke over it with any brush that takes an alpha: the built-in sculpt brushes, custom and Community brushes and
    the Paint brush. The brush's own falloff, Intensity, mask and alpha still apply on top.
+
+![The same sphere with the stencil hidden: four Standard strokes left its stones](images/wn-stencil.jpg)
 
 | Option | What it does |
 |---|---|
