@@ -336,9 +336,12 @@ void App::shutdown() {
         SDL_Quit();
         return;
     }
+    // First: clears what Discord shows, then closes. Never made again: endStroke and the rest of the teardown
+    // update the title, which used to start a new client that showed SculptForge again while quitting (@ebarranco).
+    discordClosed_ = true;
+    discordClient_.reset();
     saveWindowState();
     autosavePrefs(true); // a change still waiting for its moment
-    discordClient_.reset(); // clears what Discord shows, then closes
     if (doc_.sculptor.strokeActive()) endStroke();
     solver_.reset(); // (its thread uses the renderer)
     flushBrushEdits();
@@ -1159,13 +1162,20 @@ int App::run() {
             redrawAt_ = 0.0;
             draw = true;
         }
-        if (!draw && !continuous && !wantsFrames(t)) continue;
+        // No frame: the update still ticks (drawUpdateBanner, on frames). After Restart to update this version hides
+        // its window and draws nothing, yet must see the new version start (or its deadline) and quit; it never did,
+        // and kept running hidden, "Playing SculptForge" on Discord (@ebarranco, 0.11.1 -> 0.11.10).
+        if (!draw && !continuous && !wantsFrames(t)) {
+            tickSelfUpdate();
+            continue;
+        }
 
         int fbW = 0, fbH = 0, winW = 0, winH = 0;
         SDL_GetWindowSizeInPixels(window_, &fbW, &fbH);
         SDL_GetWindowSize(window_, &winW, &winH);
         if (fbW <= 0 || fbH <= 0) {
             draw = false; // minimised: the next event (restore) draws again
+            tickSelfUpdate();
             continue;
         }
         if (measuring) cpuFrameStart = processCpuSeconds();

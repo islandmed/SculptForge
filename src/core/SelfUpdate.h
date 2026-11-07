@@ -159,6 +159,11 @@ StartCheck checkPendingAtStart(const std::string& notePath, const std::string& r
 // The new version is up: the backup and the note go.
 void confirmStarted(const std::string& notePath);
 
+// Linux AppImage: the process at procDir (/proc/<pid>) is an earlier SculptForge run from the same AppImage file:
+// ours (same user), its program is named sculptforge, and its APPIMAGE is appImage. Anything else (the file manager,
+// a shell, another user's process, another copy of SculptForge): false. Always false off Linux.
+bool isOldAppImage(const std::string& procDir, const std::string& appImage);
+
 // Windows: the PowerShell helper that waits for this process (`pid`) to end, checks the staged package's hash again,
 // installs it (the installer silently, or the zip unpacked beside the folder and swapped in, the old folder kept
 // as .old), starts the new version when `relaunch`, and rolls a portable folder back if the new one exits at once.

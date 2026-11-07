@@ -25,6 +25,10 @@
 #define NOMINMAX
 #include <windows.h> // GetCurrentProcessId
 #endif
+#if defined(__linux__)
+#include <csignal> // kill (endOldAppImage)
+#include <unistd.h>
+#endif
 
 namespace sf {
 
@@ -162,6 +166,19 @@ void App::initSelfUpdate() {
     }
 }
 
+// Linux AppImage, after Restart to update: SculptForge 0.11.10 and earlier, hidden while waiting, never noticed the
+// new version start and kept running (tickSelfUpdate ran only on drawn frames). The new version ends it: its parent
+// is that version (AppRun is the program itself) when it runs our same AppImage file (update::isOldAppImage).
+void App::endOldAppImage() {
+#if defined(__linux__)
+    const char* appImage = std::getenv("APPIMAGE");
+    const pid_t parent = getppid();
+    if (!appImage || !*appImage || parent <= 1 || !update::isOldAppImage("/proc/" + std::to_string(parent), appImage)) return;
+    SDL_Log("update: the previous version (process %d) is still running; ending it", int(parent));
+    kill(parent, SIGTERM); // SDL: a quit, as if its window were closed (its changes were saved before the restart)
+#endif
+}
+
 void App::tickSelfUpdate() {
     if (memberSignIn_ && memberSignIn_->done) {
         const std::shared_ptr<MemberSignIn> job = std::move(memberSignIn_);
@@ -183,6 +200,7 @@ void App::tickSelfUpdate() {
     if (confirmStartAt_ > 0.0 && nowSeconds() >= confirmStartAt_) {
         confirmStartAt_ = 0.0;
         update::confirmStarted(updateNotePath()); // (the old version, watching, sees the note go and quits)
+        endOldAppImage();
     }
     if (selfUpdateStage_ == SelfUpdateStage::Downloading && selfUpdate_ && selfUpdate_->done) {
         if (selfUpdate_->ok) {
@@ -211,6 +229,8 @@ void App::tickSelfUpdate() {
     SDL_Log("update: %s exited with %d before it was up; %s", selfUpdateVersion_.c_str(), code,
             restored ? "the previous version is back" : error.c_str());
     if (window_) SDL_ShowWindow(window_);
+    discordClosed_ = false; // this version carries on: back on Discord, if it's on
+    updateDiscordPresence();
     selfUpdateStage_ = SelfUpdateStage::Failed;
     selfUpdateError_ = restored ? "SculptForge " + selfUpdateVersion_ + " didn't start, so this version was kept"
                                 : "SculptForge " + selfUpdateVersion_ + " didn't start: " + error;
@@ -318,6 +338,10 @@ void App::restartIntoUpdate() {
         }
         selfUpdateStage_ = SelfUpdateStage::Restarting;
         if (restartChild_ && window_) SDL_HideWindow(window_); // (shown again if the new version doesn't start)
+        if (restartChild_) { // hidden: the new version shows itself on Discord (if it's on), never both
+            discordClosed_ = true;
+            discordClient_.reset();
+        }
     });
 }
 

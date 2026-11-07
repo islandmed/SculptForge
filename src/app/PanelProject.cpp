@@ -858,7 +858,7 @@ void App::pollUpdateCheck() {
 
 void App::drawUpdateBanner() {
     pollUpdateCheck(); // (here, not in tickProject: this runs every frame, UI tests included)
-    tickSelfUpdate();
+    tickSelfUpdate();  // (and in run() on the passes that draw nothing: asleep, hidden for a restart)
     if (!updateAvailable_) return;
     const UpdateInfo& u = *updateAvailable_;
     const CanvasRect c = canvasRect(); // top centre of the 3D view, clear of the shelves

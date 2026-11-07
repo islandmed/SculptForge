@@ -163,6 +163,7 @@ add_library(sculptforge_core STATIC
   src/core/LitSphere.cpp
   src/core/Trash.cpp
   src/core/DiscordPresence.cpp
+  src/core/ExitWatchdog.cpp
   src/core/Project.cpp
   src/core/Guide.cpp
   src/core/WhatsNew.cpp

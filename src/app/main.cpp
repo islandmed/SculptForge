@@ -8,6 +8,7 @@
 #include "app/UiServe.h"
 #include "ai/AiPolicy.h"
 #include "core/Benchmark.h"
+#include "core/ExitWatchdog.h"
 #include "core/Wavelet.h"
 #include "core/FocusDetail.h"
 #include "core/Pack.h"
@@ -169,6 +170,8 @@ int finishIsolated(int code) {
     *nowhere = 1;
     std::abort();
 }
+
+static bool g_uiServe = false; // --ui-serve: runMain runs once per script in one process
 
 // One run of the app: the whole of main, also each script of the warm UI test server (--ui-serve, UiServe.cpp).
 static int runMain(int argc, char** argv) {
@@ -332,6 +335,9 @@ static int runMain(int argc, char** argv) {
     const auto runStart = std::chrono::steady_clock::now();
     int code = app->run();
     const auto runEnd = std::chrono::steady_clock::now();
+    // Quitting always ends the process, even if a driver or thread stalls the teardown or the exit (core/ExitWatchdog.h).
+    // --ui-serve runs the next script in this process: never there.
+    if (!g_uiServe) sf::armExitWatchdog(15000, code);
     app->shutdown();
     app.reset();
     if (std::getenv("SF_STARTUP_TIMES"))
@@ -360,6 +366,9 @@ int main(int argc, char** argv) {
 #ifndef _WIN32
     if (argc >= 2 && std::string(argv[1]) == "--cli") return execCli(argc, argv);
 #endif
-    if (argc >= 2 && std::string(argv[1]) == "--ui-serve") return sf::runUiServer(argc - 1, argv + 1, runMain);
+    if (argc >= 2 && std::string(argv[1]) == "--ui-serve") {
+        g_uiServe = true;
+        return sf::runUiServer(argc - 1, argv + 1, runMain);
+    }
     return runMain(argc, argv);
 }
