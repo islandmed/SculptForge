@@ -62,6 +62,9 @@ struct UiPrefs {
     // The mouse wheel zooms toward the surface point under the pointer (#134) instead of the view's centre. On for
     // the Maya style (set with the style, and the default when ui.json doesn't say); the other styles keep the centre.
     bool wheelZoomToPointer = false;
+    // Rotation drags that start over the model turn the view about the surface point under the pointer (and move the
+    // target to its depth); over the background, about the target as before. Every input style.
+    bool orbitAtPointer = true;
     // Tool > Remesh (#121): Quick Remesh (Shift+R, or hold N and drag on the background, remeshes the active Part at
     // the Voxel Resolution) and Remesh after each stroke (a stroke that stretched the surface remeshes it).
     bool quickRemesh = false, remeshAfterStroke = false;

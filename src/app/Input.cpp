@@ -626,6 +626,12 @@ void App::drawInputSection() {
                  "stays upright, as in Blender or Maya. X axis, Z axis: it turns about that world axis only "
                  "(View > Orbit lock).",
                  "Preferences > Input");
+    ui::Checkbox("Orbit around the pointer##input.orbit_at_pointer", &uiPrefs_.orbitAtPointer);
+    ui::HelpText("Orbit around the pointer", nullptr,
+                 "A rotation that starts over the model turns the view about the point under the pointer, and later "
+                 "zooms work at that depth. Started over the background, it turns about the middle of the view as "
+                 "before. In every key style.",
+                 "Preferences > Input");
     drawRadialMenusSection(); // RadialMenu.cpp
     drawSpaceMouseSection();  // SpaceMouse.cpp
 }

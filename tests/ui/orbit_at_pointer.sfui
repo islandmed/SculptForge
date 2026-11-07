@@ -1,0 +1,45 @@
+# Orbit around the pointer (dm4nd on Discord, #ideas): a rotation that starts over the model turns the view about the
+# point under the pointer (the target moves there, to its depth); over the background it turns about the target, as
+# with the preference off (Preferences > Input).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+input_style maya
+expect_value orbit_at_pointer == 1
+mouse_move 0.5 0.5
+key alt+h
+expect_value camera_pan == 0
+
+# Alt+left drag (Maya's orbit) starting on the side of the model: the target leaves the sphere's centre.
+snapshot
+remember camera_yaw y0
+hold alt
+stroke 0.78 0.5 0.88 0.5
+hold none
+expect_value camera_yaw != $y0
+expect_value camera_pan > 0.01
+expect_value masked == 0
+expect_value moved == 0
+shot over_model
+
+# Started beside the model: about the target, which stays where it is.
+key alt+h
+hold alt
+drag_path -0.4 0.5 -0.3 0.5
+hold none
+expect_value camera_yaw != 0
+expect_value camera_pan < 0.0001
+
+# Off: over the model too, the view turns about the target.
+key alt+h
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+shot orbit_pref
+click "Orbit around the pointer##input.orbit_at_pointer"
+expect_value orbit_at_pointer == 0
+click "Preferences##palette.preferences"
+mouse_move 0.5 0.5
+hold alt
+stroke 0.78 0.5 0.88 0.5
+hold none
+expect_value camera_yaw != 0
+expect_value camera_pan < 0.0001

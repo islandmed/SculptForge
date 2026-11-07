@@ -659,6 +659,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "maya_link_connected") return app_.mayaLink_ && app_.mayaLink_->connected() ? 1.0 : 0.0;
     if (name == "maya_link_streams") return double(app_.mayaLinkStreams_);
     if (name == "wheel_to_pointer") return app_.uiPrefs_.wheelZoomToPointer ? 1.0 : 0.0;
+    if (name == "orbit_at_pointer") return app_.uiPrefs_.orbitAtPointer ? 1.0 : 0.0;
     if (name == "along_normal") return double(app_.uiPrefs_.alongNormal);
     if (name == "stroke_along_normal") return app_.strokeAlongNormal_ ? 1.0 : 0.0;
     if (name.rfind("forgesphere_x", 0) == 0 || name.rfind("forgesphere_r", 0) == 0) { // forgesphere_x2, forgesphere_r2: sphere 2's x / radius

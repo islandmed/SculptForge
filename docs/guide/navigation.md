@@ -65,7 +65,7 @@ camera.
 
 | To | Do this |
 |---|---|
-| Rotate | Left-drag on the background, or right-drag anywhere on the canvas; add <kbd>Shift</kbd> to snap to an axis view |
+| Rotate | Left-drag on the background, or right-drag anywhere on the canvas; add <kbd>Shift</kbd> to snap to an axis view. Started over the model, the view turns about the point under the pointer (**Edit > Preferences > Input > Orbit around the pointer**, on by default) |
 | Roll (turn about the view axis) | <kbd>Shift</kbd>+click the background, let go of <kbd>Shift</kbd>, then drag (Maya style: hold <kbd>Alt</kbd>, add <kbd>Ctrl</kbd>, left-drag sideways) |
 | Pan | <kbd>Alt</kbd>+left-drag on the background, <kbd>Alt</kbd>+right-drag, or middle-drag |
 | Zoom | Mouse wheel (toward the middle of the view, or toward the pointer with **Edit > Preferences > Input > Wheel zooms toward the pointer**, on in the Maya style); <kbd>Alt</kbd>+left-drag on the background, then let go of <kbd>Alt</kbd> and keep dragging; <kbd>Ctrl</kbd>+right-drag; <kbd>Ctrl</kbd>+middle-drag; <kbd>Ctrl</kbd>+left-drag on the background when nothing is masked (not with the Classic sculpting keys) |
@@ -257,12 +257,19 @@ These live on the right shelf and in the **View** menu:
 **Fullscreen** (<kbd>F11</kbd>) and hiding the shelves (<kbd>Tab</kbd>) give the canvas the most room. See
 [The interface](interface.md).
 
+## Orbit around the pointer
+
+**Edit > Preferences > Input > Orbit around the pointer** (on by default, in every key style): a rotation that starts
+over the model turns the view about the surface point under the pointer, so the detail you're working on stays put
+instead of swinging around the middle of the scene. The view doesn't jump when the drag starts, and the camera's
+target moves to that point's depth, so zooming toward the middle afterwards zooms at the depth you were working at.
+A rotation that starts over the background turns about the target as before; so does a drag on the axis gizmo's disc.
+Turntable, the orbit locks and <kbd>Shift</kbd> snapping work as usual. Turn it off to always orbit the target (which
+**Frame** sets to the scene centre).
+
 ## Not yet
 
-> **Not yet:** SculptForge has no rotation around the point under the cursor (the
-> camera always orbits its target, which Frame sets to the scene centre) and no floor grid. Pan the target onto
-> the area you're working on to orbit around it, or zoom there with the wheel and **Wheel zooms toward the pointer**
-> on: that moves the target toward the point under the pointer too.
+> **Not yet:** SculptForge has no floor grid.
 
 ## See also
 

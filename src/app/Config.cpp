@@ -104,6 +104,7 @@ Json toJson(const UiPrefs& p) {
     j.set("emulate3Button", p.emulate3Button);
     j.set("mayaZoomHorizontal", p.mayaZoomHorizontal);
     j.set("wheelZoomToPointer", p.wheelZoomToPointer);
+    j.set("orbitAtPointer", p.orbitAtPointer);
     j.set("invertZoom", p.invertZoom);
     j.set("quickRemesh", p.quickRemesh);
     j.set("remeshAfterStroke", p.remeshAfterStroke);
@@ -196,6 +197,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.emulate3Button = j["emulate3Button"].asBool(p.emulate3Button);
     p.mayaZoomHorizontal = j["mayaZoomHorizontal"].asBool(p.mayaZoomHorizontal);
     p.wheelZoomToPointer = j["wheelZoomToPointer"].asBool(p.inputStyle == 3); // (inputStyle is read above)
+    p.orbitAtPointer = j["orbitAtPointer"].asBool(p.orbitAtPointer);
     p.invertZoom = j["invertZoom"].asBool(p.invertZoom);
     p.quickRemesh = j["quickRemesh"].asBool(p.quickRemesh);
     p.remeshAfterStroke = j["remeshAfterStroke"].asBool(p.remeshAfterStroke);

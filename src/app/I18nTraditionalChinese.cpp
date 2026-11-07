@@ -1435,6 +1435,9 @@ constexpr Entry kTraditionalChinese[] = {
     {"Invert zoom", "反轉縮放"},
     {"Turn zoom drags around (the mouse wheel stays as it is).", "反轉縮放拖曳方向（滑鼠滾輪維持不變）。"},
     {"Wheel zooms toward the pointer", "滾輪朝指標縮放"},
+    {"Orbit around the pointer", "以指標為中心環繞"},
+    {"A rotation that starts over the model turns the view about the point under the pointer, and later zooms work at that depth. Started over the background, it turns about the middle of the view as before. In every key style.",
+     "從模型上開始的旋轉會以指標下的點為中心旋轉視圖，之後的縮放也在該深度進行。從背景開始時，照舊以視圖中心旋轉。適用於所有按鍵風格。"},
     {"The mouse wheel zooms toward the point of the model under the pointer, which stays under it, instead of the "
      "middle of the view. On with Maya keys (choosing a style sets it), off with the others.",
      "滑鼠滾輪會朝指標下的模型位置縮放，該點維持在指標下，而不是朝視圖中央。使用 Maya 按鍵時開啟（選擇風格時會自動設"

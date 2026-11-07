@@ -598,7 +598,7 @@ way. **Hold Space and drag to move the camera** (off by default) turns <kbd>Spac
 left-drag rotates, right- or middle-drag pans and <kbd>Ctrl</kbd>+drag zooms (see
 [Navigation](navigation.md#mouse-and-pen)). **Radial Menus** edits your pie menus and their keys (see [Radial menus](sculpting.md#radial-menus)).
 **Cursor follows surface** (on by default) lays the brush rings on the model under the pointer (see
-[Size and Falloff](sculpting.md#size-intensity-colour-intensity-and-falloff)); off, they are flat circles on the screen. **Rotation** chooses free rotation or a turntable. See
+[Size and Falloff](sculpting.md#size-intensity-colour-intensity-and-falloff)); off, they are flat circles on the screen. **Rotation** chooses free rotation or a turntable. **Orbit around the pointer** (on by default) turns the view about the point of the model under the pointer when a rotation starts over it (see [Navigation](navigation.md#orbit-around-the-pointer)). See
 [Quick tour for experienced sculptors](quick-tour.md).
 
 ### The background
