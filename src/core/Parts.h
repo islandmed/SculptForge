@@ -56,6 +56,17 @@ constexpr int kInsertSetMaxItems = 512;
 bool listInsertSet(const std::string& path, std::vector<InsertSetItem>& items, std::string& error);
 // One item's mesh, and its name.
 bool loadInsertSetItem(const std::string& path, int index, Mesh& out, std::string& name, std::string& error);
+// The built-in insert sets, inside the app (no file to pick): "builtin:<id>" works wherever a set path does.
+// Creature bones (#154): original pieces from tools/creature-bones (assets/insert-sets).
+struct BuiltinInsertSet {
+    const char* id;   // "creature-bones"
+    const char* name; // "Creature bones" (English; the UI translates it)
+};
+const std::vector<BuiltinInsertSet>& builtinInsertSets();
+inline constexpr const char* kBuiltinInsertSetPrefix = "builtin:";
+// The file a set path names: a built-in set is written from the app to <app data>/insert-sets/<id>.obj when that
+// file is missing or differs (else the system temp folder); any other path is itself.
+bool resolveInsertSetPath(const std::string& path, std::string& file, std::string& error);
 
 // part_list, part_select, part_append, part_duplicate, part_delete,
 // part_rename, part_visibility, part_solo, part_show_all, part_move,

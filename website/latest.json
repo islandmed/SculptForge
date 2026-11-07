@@ -1,11 +1,12 @@
 {
-  "version": "0.11.10",
+  "version": "0.11.9",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Exports keep their real size: what you import in mm or cm comes back out the same size, for 3D printing and other apps (thanks @Swar55, @NicTanghe, #148)",
-    "Alt+Q sculpts the Part under the cursor, in every input style (thanks @ziel9627 on Discord)",
-    "Insert sets: pick a piece from a multi-object file or folder by its thumbnail, step through them with [ and ]",
-    "Spanish and Chinese everywhere: the Generate 3D panel and the last untranslated labels now read in your language"
+    "Folders in Tool > Parts: drag Parts in, fold, hide and move them together (thanks @ebarranco, #96)",
+    "Line Gradient: drag a colour ramp across the model (thanks @Devon0209, #99)",
+    "Auto UV runs in the background and can be cancelled",
+    "Paint colour stays visible while you orbit or paint dense models",
+    "Hyper3D Rodin, direct: generate a model from an image or a description with your own Hyper3D key (thanks @ElgoogUdiab, #123)"
   ]
 }

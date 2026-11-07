@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Parts.h"
 
+#include "core/BrushLibrary.h"
 #include "core/Commands.h"
 #include "core/Dyntopo.h"
 #include "core/Masking.h"
@@ -14,13 +15,26 @@
 #include "io/ObjIO.h"
 #include "io/PlyIO.h"
 
+#include <stb_image.h>
+
 #include <cctype>
 #include <algorithm>
+#include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <numeric>
 #include <utility>
 #include <vector>
+
+// assets/insert-sets/*.obj.z (zlib-compressed OBJ; tools/creature-bones/build.sh), embedded by CMakeLists.txt.
+namespace sf::assets {
+extern const unsigned char insertSetCreatureBones[];
+extern const unsigned long long insertSetCreatureBones_size;
+} // namespace sf::assets
 
 namespace sf {
 
@@ -257,8 +271,70 @@ bool loadInsertObjects(const std::string& path, std::vector<MeshObject>& out, st
 
 } // namespace
 
-bool listInsertSet(const std::string& path, std::vector<InsertSetItem>& items, std::string& error) {
+const std::vector<BuiltinInsertSet>& builtinInsertSets() {
+    static const std::vector<BuiltinInsertSet> sets = {{"creature-bones", "Creature bones"}};
+    return sets;
+}
+
+bool resolveInsertSetPath(const std::string& path, std::string& file, std::string& error) {
+    const std::string prefix = kBuiltinInsertSetPrefix;
+    if (path.compare(0, prefix.size(), prefix) != 0) {
+        file = path;
+        return true;
+    }
+    const std::string id = path.substr(prefix.size());
+    const unsigned char* data = nullptr;
+    size_t size = 0;
+    if (id == "creature-bones") data = assets::insertSetCreatureBones, size = size_t(assets::insertSetCreatureBones_size);
+    if (!data) return error = "No built-in insert set '" + id + "'", false;
+    // Written once per run (the thumbnails and each insert read the file): the app's copy, unless the file there
+    // already has exactly these bytes.
+    static std::mutex mutex;
+    static std::map<std::string, std::string> written;
+    std::lock_guard<std::mutex> lock(mutex);
+    if (auto it = written.find(id); it != written.end()) return file = it->second, true;
+    int len = 0;
+    const std::unique_ptr<char, decltype(&std::free)> obj(
+        stbi_zlib_decode_malloc(reinterpret_cast<const char*>(data), int(size), &len), &std::free);
+    if (!obj || len <= 0) return error = "The built-in insert set '" + id + "' is damaged", false;
+    const std::string_view content(obj.get(), size_t(len));
+    std::error_code ec;
+    const std::string appData = appDataDir();
+    std::vector<std::filesystem::path> dirs;
+    if (!appData.empty()) dirs.push_back(std::filesystem::path(std::u8string(appData.begin(), appData.end())) / "insert-sets");
+    if (const auto tmp = std::filesystem::temp_directory_path(ec); !ec) dirs.push_back(tmp / "sculptforge-insert-sets");
+    for (const auto& dir : dirs) {
+        const auto target = dir / (id + ".obj");
+        bool same = false;
+        if (std::ifstream in(target, std::ios::binary); in) {
+            const std::string have((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            same = have == content;
+        }
+        if (!same) {
+            std::filesystem::create_directories(dir, ec);
+            auto part = target;
+            part += ".part";
+            {
+                std::ofstream out(part, std::ios::binary | std::ios::trunc);
+                if (!out || !out.write(content.data(), std::streamsize(content.size())) || !out.flush()) continue;
+            }
+            std::filesystem::rename(part, target, ec);
+            if (ec) {
+                std::filesystem::remove(part, ec);
+                continue;
+            }
+        }
+        const auto u8 = target.u8string();
+        file = written[id] = std::string(u8.begin(), u8.end());
+        return true;
+    }
+    return error = "Couldn't write the built-in insert set '" + id + "' to the app's data folder", false;
+}
+
+bool listInsertSet(const std::string& setPath, std::vector<InsertSetItem>& items, std::string& error) {
     items.clear();
+    std::string path;
+    if (!resolveInsertSetPath(setPath, path, error)) return false;
     const std::filesystem::path dir(std::u8string(path.begin(), path.end()));
     std::error_code ec;
     if (std::filesystem::is_directory(dir, ec)) {
@@ -290,8 +366,10 @@ bool listInsertSet(const std::string& path, std::vector<InsertSetItem>& items, s
     return !items.empty();
 }
 
-bool loadInsertSetItem(const std::string& path, int index, Mesh& out, std::string& name, std::string& error) {
+bool loadInsertSetItem(const std::string& setPath, int index, Mesh& out, std::string& name, std::string& error) {
     std::vector<InsertSetItem> items;
+    std::string path;
+    if (!resolveInsertSetPath(setPath, path, error)) return false;
     const std::filesystem::path dir(std::u8string(path.begin(), path.end()));
     std::error_code ec;
     if (std::filesystem::is_directory(dir, ec)) {
@@ -543,7 +621,7 @@ void registerPartCommands(CommandRegistry& reg) {
     std::vector<ParamSpec> meshParams{
         {"part", T::String, "insert a copy of this Part (by name)", false},
         {"file", T::String, "insert the mesh in this model file (.obj, .ply or .glb)", false},
-        {"set", T::String, "insert one item of this insert set: a folder of model files, or a file with several objects", false},
+        {"set", T::String, "insert one item of this insert set: a folder of model files, a file with several objects, or builtin:creature-bones (the built-in Creature bones)", false},
         {"index", T::Number, "with set=: which item (0 = the first; insert_set_items lists them)", false}};
     meshParams.insert(meshParams.end(), placeParams.begin(), placeParams.end());
     reg.add({"insert_mesh",
@@ -581,8 +659,8 @@ void registerPartCommands(CommandRegistry& reg) {
 
     reg.add({"insert_set_items",
              "List the items of an insert set (a folder of .obj / .ply / .glb files, or one file with several "
-             "objects), in the order insert_mesh set=<path> index=<n> numbers them.",
-             {{"set", T::String, "the folder or file", true}},
+             "objects, or builtin:creature-bones), in the order insert_mesh set=<path> index=<n> numbers them.",
+             {{"set", T::String, "the folder or file, or builtin:creature-bones", true}},
              [](Document&, const Args& a) -> CommandResult {
                  std::vector<InsertSetItem> items;
                  std::string error;

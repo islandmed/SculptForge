@@ -68,10 +68,24 @@ Click **Append** and choose:
   the next item and `[` to the previous one (around the set; brush size keys come back once you stop). Esc or the
   window's close button stops. (Commands: `insert_set_items set=<path>` lists them;
   `insert_mesh set=<path> index=<n>` inserts item `n`, 0 being the first.)
+  **Creature bones**, at the end of the same menu, is a set that comes with SculptForge: no file to pick (see below).
 - **From file...**: a model (`.obj`, `.fbx`, `.glb`, `.gltf`, `.ply`, `.stl`, Bridge files, `.usda`, `.usd`, `.usdz`) or
   a project (`.sfproj`). A file with several objects adds one Part per object.
 
 The new Part becomes the active one.
+
+### Creature bones
+
+**Append > Insert on the model > Creature bones** opens a built-in insert set of original fantasy creature bones to
+start from: Skull, Jaw, Fang, Blade tooth, Swept horn, Spiral horn, Claw, Vertebra, Tail vertebrae, Rib,
+Limb bone, Wing bone and Wing finger. Click one in the **Insert set** window and drag on the model, as with any set;
+horns, claws and teeth grow from where you drag. With **Symmetry** X on, a horn or a claw gets its mirrored twin.
+
+Each piece is a clean, closed quad mesh of 500 to 4,200 faces, so it takes **Divide** and sculpting well: insert, then
+sculpt the joins smooth, or **Voxel Remesh** to fuse the piece into the model. Drag pieces onto an empty **Plane** or **Sphere**
+Part to build a skeleton of their own Part. The pieces were designed for SculptForge (tools/creature-bones in the
+source) and come under the app's licence, GPL-3.0. (Commands: `insert_set_items set=builtin:creature-bones`;
+`insert_mesh set=builtin:creature-bones index=<n>`.)
 
 You can also add files as Parts from elsewhere:
 

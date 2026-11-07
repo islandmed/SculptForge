@@ -7,6 +7,7 @@
 #include "TestHarness.h"
 
 #include "app/I18n.h"
+#include "core/Parts.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -282,4 +283,21 @@ TEST(i18n_simplified_chinese_lookup) {
                 ++taiwanese;
             }
     CHECK(taiwanese == 0);
+}
+
+// The built-in insert sets' names and their pieces' names (from the set's file, so a new piece needs its entry)
+// are shown through tr() (PanelParts.cpp): each language has them.
+TEST(i18n_builtin_insert_sets_translated) {
+    for (const sf::BuiltinInsertSet& b : sf::builtinInsertSets()) {
+        std::vector<sf::InsertSetItem> items;
+        std::string err;
+        CHECK(sf::listInsertSet(std::string(sf::kBuiltinInsertSetPrefix) + b.id, items, err));
+        std::vector<std::string> names{b.name};
+        for (const sf::InsertSetItem& it : items) names.push_back(it.name);
+        for (const sf::Language l : {sf::Language::Spanish, sf::Language::TraditionalChinese, sf::Language::SimplifiedChinese})
+            for (const std::string& n : names) {
+                if (!sf::i18n::lookup(l, n)) std::printf("  no %s translation for \"%s\"\n", sf::languageCode(l), n.c_str());
+                CHECK(sf::i18n::lookup(l, n) != nullptr);
+            }
+    }
 }
