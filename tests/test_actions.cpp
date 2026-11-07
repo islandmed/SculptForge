@@ -84,6 +84,29 @@ TEST(action_registry_style_default_before_add) {
     CHECK(reg.shortcutText("ui.size_popup") == "Ctrl+Alt+S");
 }
 
+TEST(action_brush_size_keys_follow_rebinding) {
+    // Ziel on Discord: holding a rebound Smaller / Larger brush key repeats like [ and ] do (App.cpp asks
+    // brushSizeStep(actionForKey(...)) for key repeats, so this is what decides it).
+    ActionRegistry reg;
+    reg.add({"brush.size_down", "Smaller brush", nullptr, "", "Draw", "[", "", [] {}, nullptr, nullptr});
+    reg.add({"brush.size_up", "Larger brush", nullptr, "", "Draw", "]", "", [] {}, nullptr, nullptr});
+    reg.add({"brush.size_down_fine", "Smaller brush by 1 px", nullptr, "", "Draw", "Shift+[", "", [] {}, nullptr, nullptr});
+    reg.add({"brush.size_up_fine", "Larger brush by 1 px", nullptr, "", "Draw", "Shift+]", "", [] {}, nullptr, nullptr});
+    reg.add({"view.wireframe", "Wireframe", nullptr, "", "Render", "W", "", [] {}, nullptr, nullptr});
+    const auto step = [&](SDL_Keycode k, SDL_Keymod m = SDL_KMOD_NONE) { return brushSizeStep(reg.actionForKey(k, m)); };
+    CHECK(step(SDLK_LEFTBRACKET) == -1 && step(SDLK_RIGHTBRACKET) == 1);
+    CHECK(step(SDLK_LEFTBRACKET, SDL_KMOD_LSHIFT) == -1 && step(SDLK_W) == 0 && step(SDLK_Q) == 0);
+    reg.setShortcut("brush.size_down", "Q");
+    reg.setShortcut("brush.size_up", "E");
+    reg.setShortcut("brush.size_down_fine", "Shift+A");
+    reg.setShortcut("brush.size_up_fine", "Alt+D");
+    CHECK(step(SDLK_Q) == -1 && step(SDLK_E) == 1);
+    CHECK(step(SDLK_A, SDL_KMOD_LSHIFT) == -1 && step(SDLK_D, SDL_KMOD_LALT) == 1);
+    CHECK(step(SDLK_LEFTBRACKET) == 0 && step(SDLK_RIGHTBRACKET) == 0); // the old keys no longer repeat
+    CHECK(step(SDLK_W) == 0 && step(SDLK_LSHIFT, SDL_KMOD_LSHIFT) == 0);
+    CHECK(brushSizeStep(nullptr) == 0);
+}
+
 TEST(action_registry_commands) {
     CommandRegistry commands;
     ActionRegistry reg;

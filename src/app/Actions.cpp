@@ -242,8 +242,8 @@ const Action* ActionRegistry::actionForChord(const Chord& chord) const {
     return nullptr;
 }
 
-bool ActionRegistry::handleKey(SDL_Keycode key, SDL_Keymod mods) {
-    if (isModifierKey(key)) return false;
+const Action* ActionRegistry::actionForKey(SDL_Keycode key, SDL_Keymod mods) const {
+    if (isModifierKey(key)) return nullptr;
     Chord chord = chordFromEvent(key, mods);
     const Action* a = actionForChord(chord);
     if (!a && !chord.ctrl && (chord.shift || chord.alt)) {
@@ -252,6 +252,18 @@ bool ActionRegistry::handleKey(SDL_Keycode key, SDL_Keymod mods) {
         chord.shift = chord.alt = false;
         a = actionForChord(chord);
     }
+    return a;
+}
+
+int brushSizeStep(const Action* a) {
+    if (!a) return 0;
+    if (a->id == "brush.size_down" || a->id == "brush.size_down_fine") return -1;
+    if (a->id == "brush.size_up" || a->id == "brush.size_up_fine") return 1;
+    return 0;
+}
+
+bool ActionRegistry::handleKey(SDL_Keycode key, SDL_Keymod mods) {
+    const Action* a = actionForKey(key, mods);
     if (!a || !a->run) return false;
     if (a->enabled && !a->enabled()) return true; // bound, just not available right now
     // Copy: running an action may register or replace actions.

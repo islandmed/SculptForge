@@ -48,6 +48,10 @@ bool isModifierKey(SDL_Keycode key);
 // The individual keys of a chord, for drawing keycaps: "Ctrl+Shift+Z" -> {"Ctrl", "Shift", "Z"}.
 std::vector<std::string> chordKeys(std::string_view chord);
 
+// -1 for Smaller brush (and by 1 px), +1 for Larger brush (and by 1 px), 0 otherwise: these repeat while their
+// key is held, and step through an insert set, on whatever keys they are bound to.
+int brushSizeStep(const Action* a);
+
 class ActionRegistry {
 public:
     void add(Action a); // replaces by id
@@ -76,6 +80,8 @@ public:
     void clearOverrides();
     // The action that CHORD runs (enabled or not), or nullptr.
     const Action* actionForChord(const Chord& chord) const;
+    // The action a key press runs, as handleKey finds it (an unbound Shift or Alt chord falls back to the plain key).
+    const Action* actionForKey(SDL_Keycode key, SDL_Keymod mods) const;
     // Every command becomes "cmd.<name>". Commands with required parameters are listed too: `prefill`
     // is called for them (the console opens with the name typed), `run` for the others. Commands that
     // another action already runs (Action::command) are skipped by the command palette, not here.
