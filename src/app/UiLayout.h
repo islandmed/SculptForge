@@ -19,6 +19,8 @@ struct CanvasRect {
     bool contains(float px, float py) const { return px >= x && py >= y && px < x + w && py < y + h; }
 };
 
+constexpr float kLibraryTileMin = 48.0f, kLibraryTileMax = 128.0f;
+
 struct UiLayout {
     int version = 4; // 2: the top shelf has Dynamic; 3: the right shelf has Undo / Redo; 4: the left shelf has the stroke
                      // popup (older stored layouts get them on load)
@@ -33,6 +35,9 @@ struct UiLayout {
     float consoleHeight = 160;
     bool libraryOpen = false;
     int libraryRows = 1;
+    // Library thumbnail size, logical px (kLibraryTileMin-Max): drag the strip's edge toward the canvas to change it.
+    // 64 since the strip went compact (was 96, @factoberplay: the strip took too much height).
+    float libraryTile = 64;
     std::string libraryTab = "project";
     bool libraryBottom = false;
     int shelfTiles = 1; // bottom shelf brush tiles: 0 small, 1 medium, 2 large (shell::bottomShelfSize)

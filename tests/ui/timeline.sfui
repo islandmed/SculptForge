@@ -13,9 +13,9 @@ expect_value timeline_cursor == 4
 shot strokes
 
 # Drag the scrubber to the start of the track, then back to the middle.
-view_drag 0.60 0.177 0.075 0.177
+drag_item "##track" -2000 0
 expect_value timeline_cursor == 0
-view_drag 0.09 0.177 0.40 0.177
+drag_item "##track" 10 0
 expect_value timeline_cursor < 4
 expect_value timeline_cursor > 0
 shot scrubbed

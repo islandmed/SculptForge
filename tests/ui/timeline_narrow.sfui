@@ -25,3 +25,16 @@ logical_width 512
 wait_idle 30
 expect_value timeline_overlaps == 0
 shot header_512
+
+# The full strip (header row above the track) elides the same way.
+ui_scale 200
+click "##timeline.full"
+expect_value timeline_height > 26
+expect_value timeline_overlaps == 0
+shot header_200_full
+logical_width 512
+wait_idle 30
+expect_value timeline_overlaps == 0
+shot header_512_full
+click "###timeline.compact"
+expect_value timeline_height == 32                 # the thin row and one branch lane (26 + 6)
