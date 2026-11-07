@@ -30,6 +30,7 @@
 #include "core/Pack.h"
 #include "core/Parts.h"
 #include "core/Document.h"
+#include "core/Deform.h"
 #include "core/DiscordPresence.h"
 #include "core/Face.h"
 #include "core/GeneratedRemesh.h"
@@ -1797,6 +1798,35 @@ private:
     bool extractTBorder_ = false;          // TBorder
     bool mirrorWeldAxes_[3] = {true, false, false}; // Mirror And Weld's X Y Z
     bool mirrorAxes_[3] = {true, false, false};     // Deformation > Mirror's X Y Z
+    // Deformation > Stack (docs/design/deform-panel.md): the steps, the one being edited and the preview, which is
+    // the stack really applied as one undo step (redone after each change while it is still the last step).
+    struct DeformStackUi {
+        std::vector<DeformStep> steps;
+        std::vector<char> on;    // per step: runs in the stack
+        int selected = -1;
+        int addOp = int(DeformOp::Bend);
+        bool preview = true;
+        bool previewed = false;  // the preview step is in the undo history
+        uint64_t revision = 0;   // undo revision right after it
+        uint32_t part = 0;       // the Part it was applied to
+    } deformStack_;
+    void drawDeformStack();
+    // Deformation > Size: the active Part's dimensions (scene units), worked out again when the undo history, the
+    // active Part or its vertex count changes; editing one resizes the Part (deform_size).
+    struct DeformSizeUi {
+        uint64_t revision = ~uint64_t(0);
+        uint32_t part = 0;
+        size_t vertices = 0;
+        glm::vec3 size{0.0f}, edit{0.0f};
+        bool uniform = true;
+    } deformSize_;
+    void drawDeformSize();
+    void deformStackRefresh();           // undo the preview if it is still the last step, then preview again
+    bool deformStackUndoPreview();       // undo it if it is the last step; false when there was none (or it is stale)
+    void deformStackRun(const std::vector<DeformStep>& steps); // as one undo step (the preview, or an apply)
+    void deformStackApply(bool selectedOnly);
+    void deformStackReset();
+    void deformStackAdd(DeformOp op);
     void pollAlphaFile();
     ShellGeometry shell_;      // this frame's regions (drawShell)
     ImFont* fontSmall_ = nullptr, *fontTiny_ = nullptr, *fontIcons_ = nullptr, *fontBold_ = nullptr;

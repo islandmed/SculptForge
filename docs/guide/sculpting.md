@@ -310,6 +310,46 @@ They are commands too: `deform_polish amount=60`, `deform_relax`, `deform_smooth
 `deform_balloon amount=-20` (add `masked=false` to ignore the mask). On a 10-million-vertex Part at amount 50,
 Smooth takes about 0.5 s, Balloon 0.7 s, Relax 0.9 s and Polish 2 s (Apple M1 Pro).
 
+### Size
+
+**Tool > Deformation > Size** shows the active Part's width (**X**), height (**Y**) and depth (**Z**) in scene
+units (requested by foirgairwolf on Discord). Drag one, or double-click it and type an exact value: the Part resizes about its
+centre as one undo step. With **Uniform** on (the default) the other sides follow in proportion; off, only that side
+changes. The mask holds what it covers. Command: `deform_size x=2.5` (any of `x`, `y`, `z`), or `deform_size
+uniform=10` for the largest side.
+
+### Deformation stack
+
+**Tool > Deformation > Stack** shapes the whole Part with a list of steps (requested by foirgairwolf on Discord). **Add step**
+picks one; click a step to set its amount, its axes (**X Y Z**, any mix) and, where it applies, **Direction** and
+**Soft**. With **Preview** on, the Part follows each change (on very heavy Parts, when you let go of the slider).
+
+| Group | Step | What it does along the chosen axis |
+|---|---|---|
+| Transform | **Move** | Moves the Part by a percent of its half-size. |
+| | **Turn** | Turns it by degrees about the axis (several axes: X, then Y, then Z). |
+| | **Scale** | 100 doubles it, -100 halves it, on the chosen axes only. |
+| | **Squash** | Shorter along the axis and wider across it, keeping the volume (negative: taller and thinner). |
+| Bend & Twist | **Bend** | Curves it end to end by degrees toward **Direction** (0 = toward +Y, +X for the Y axis). |
+| | **Twist** | Turns one end against the other by degrees. |
+| | **Taper** | The + end wider and the - end narrower (negative: the other way). |
+| | **Shear** | Leans it toward **Direction**; 100 is 45 degrees. |
+| Shape | **Round** | Toward a sphere; with one axis left out, toward a cylinder about it. |
+| | **Box** | Toward a cube (or a square bar). |
+| | **Flatten** | Cuts the + side flat by a percent of the depth (negative: the - side). |
+| | **Sag** | Parts far from the axis droop down it, like a weight on outstretched arms (negative lifts). |
+| | **Depth** | A perspective: the + end wider, the - end narrower, more toward the ends. |
+| Surface | **Polish**, **Relax**, **Smooth**, **Balloon** | As above. |
+
+**Soft** eases Bend, Twist, Taper and Shear toward the ends (a bend that curves most in the middle) and rounds
+Flatten's cut. Steps work about the Part's centre, or about the gizmo's pivot when you placed it.
+
+The checkbox beside a step switches it off without losing it; **Repeat** adds the selected step again; **Remove**
+takes it out. **Apply** keeps the result (one undo step) and starts a new stack, **Apply Selected** keeps only
+the selected step, and **Reset** takes the preview back off. The mask holds what it covers and hidden faces stay.
+For scripts and the AI: `deform_stack ops="bend 45 y soft; twist 90 y; taper -30 y"`, or one step at a time with
+`deform_bend amount=45 axes=y soft=true direction=90`.
+
 ## Strokes
 
 The stroke type decides how cursor movement becomes brush dabs. Choose it from the **Stroke** tile on the left

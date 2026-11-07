@@ -460,6 +460,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelSupportCard.cpp
     src/app/PanelIntegrations.cpp
     src/app/WhatsNewPopup.cpp
+    src/app/PanelDeform.cpp
     src/app/PanelExtract.cpp
     src/app/PanelTimeline.cpp
     src/app/ProofMode.cpp

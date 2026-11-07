@@ -543,6 +543,69 @@ void App::initActions() {
                 nullptr, kCommands[k], nullptr, [this, k] { return doc_.mesh.vertexCount() > 0 && deformAmount_[k] != 0.0f; },
                 kHelp[k]);
     }
+    // Deformation > Stack (PanelDeform.cpp, docs/design/deform-panel.md).
+    {
+        auto sel = [this]() -> DeformStep* {
+            DeformStackUi& ds = deformStack_;
+            return ds.selected >= 0 && ds.selected < int(ds.steps.size()) ? &ds.steps[size_t(ds.selected)] : nullptr;
+        };
+        auto any = [this] { return !deformStack_.steps.empty(); };
+        add("deformation.stack_apply", "Apply", "Tool > Deformation", nullptr, [this] { deformStackApply(false); }, nullptr,
+            nullptr, nullptr, any,
+            "Keep the stack's result on the Part (one undo step) and start a new stack. With Preview on, what you "
+            "see is what stays.");
+        add("deformation.stack_apply_selected", "Apply Selected", "Tool > Deformation", nullptr,
+            [this] { deformStackApply(true); }, nullptr, nullptr, nullptr, [sel] { return sel() != nullptr; },
+            "Keep only the selected step on the Part (one undo step) and take it off the stack; the rest stay to "
+            "edit.");
+        add("deformation.stack_reset", "Reset", "Tool > Deformation", nullptr, [this] { deformStackReset(); }, nullptr,
+            nullptr, nullptr, any, "Take the preview back off the Part and empty the stack.");
+        add("deformation.stack_repeat", "Repeat", "Tool > Deformation", nullptr,
+            [this, sel] {
+                if (DeformStep* st = sel()) {
+                    const DeformStep copy = *st;
+                    deformStack_.steps.insert(deformStack_.steps.begin() + deformStack_.selected + 1, copy);
+                    deformStack_.on.insert(deformStack_.on.begin() + deformStack_.selected + 1, char(1));
+                    ++deformStack_.selected;
+                    deformStackRefresh();
+                }
+            },
+            nullptr, nullptr, nullptr, [sel] { return sel() != nullptr; },
+            "Add the selected step again right after it (twice the twist, a second bend...).");
+        add("deformation.stack_remove", "Remove", "Tool > Deformation", nullptr,
+            [this, sel] {
+                if (sel()) {
+                    deformStack_.steps.erase(deformStack_.steps.begin() + deformStack_.selected);
+                    deformStack_.on.erase(deformStack_.on.begin() + deformStack_.selected);
+                    deformStack_.selected = std::min(deformStack_.selected, int(deformStack_.steps.size()) - 1);
+                    deformStackRefresh();
+                }
+            },
+            nullptr, nullptr, nullptr, [sel] { return sel() != nullptr; }, "Take the selected step off the stack.");
+        static const char* const kAxisIds[3] = {"deformation.stack_x", "deformation.stack_y", "deformation.stack_z"};
+        static const char* const kAxisNames[3] = {"X", "Y", "Z"};
+        for (int k = 0; k < 3; ++k)
+            add(kAxisIds[k], kAxisNames[k], "Tool > Deformation", nullptr,
+                [this, sel, k] {
+                    DeformStep* st = sel();
+                    if (!st) return;
+                    const uint8_t bit = uint8_t(1 << k);
+                    if ((st->options.axes & ~bit) == 0) return; // keep at least one axis
+                    st->options.axes ^= bit;
+                    deformStackRefresh();
+                },
+                nullptr, nullptr,
+                [sel, k] {
+                    const DeformStep* st = sel();
+                    return st && (st->options.axes & (1 << k));
+                },
+                [sel] {
+                    const DeformStep* st = sel();
+                    return st && deformUsesAxes(st->op);
+                },
+                "An axis the selected step works along (several: one after the other, or together for Move, Scale, "
+                "Round and Box).");
+    }
     add("file.new_sphere", "New Sphere", "File", "Ctrl+N", [this] { confirmDiscard([this] { runCommand("new_sphere"); }); },
         ICON_LC_FILE_PLUS, "new_sphere");
     add("file.new_plane", "New Plane", "File", nullptr, [this] { confirmDiscard([this] { runCommand("new_plane"); }); }, nullptr,
