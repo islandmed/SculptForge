@@ -461,6 +461,7 @@ App::DabSettings App::dabSettings() const {
     // A predictive stroke works from its own copies of the recipe and alpha (made when it began).
     st.recipe = asyncStroke_ ? strokeRecipe_.get() : strokeRecipe();
     st.alpha = asyncStroke_ ? strokeAlpha_.get() : &doc_.brushAlpha; // (null: round)
+    st.stencil = doc_.stencil;
     st.vdmOwner = doc_.brushVdm;
     st.vdm = st.vdmOwner.get();
     return st;

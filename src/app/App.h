@@ -171,7 +171,7 @@ public:
 
 private:
     enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, PartClick, Select, Gizmo, Guide, Sculptable, ForgeSphere, Insert, Capture,
-                      AirStroke, UvTool, SizeScrub, QuickRemesh, Gradient }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
+                      AirStroke, UvTool, SizeScrub, QuickRemesh, Gradient, Stencil }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
 
     void handleEvent(const SDL_Event& e); // the pen's mouse events first (penMouseEvents), then dispatchEvent
     void dispatchEvent(const SDL_Event& e);
@@ -373,6 +373,7 @@ private:
         Symmetry symmetry;
         const BrushRecipe* recipe = nullptr;
         const BrushAlpha* alpha = nullptr;
+        Stencil stencil; // (a copy: its image is shared and never changes, so the solver thread can read it)
         const VectorDisplacement* vdm = nullptr;
         std::shared_ptr<const VectorDisplacement> vdmOwner; // (keeps the VDM alive for the batch)
     };
@@ -943,6 +944,30 @@ private:
     void endGradientEdit();
     void drawGradientOverlay();
     void drawLineGradientControls(); // Color palette
+    // Stencil (#155, StencilOverlay.cpp; core/Stencil.h): the image over the view the brushes work through. Adjust
+    // Stencil puts handles on it (move, scale, turn) and takes the drags and the arrow / - = / , . keys until Enter.
+    void registerStencilActions();
+    void drawStencilSection(); // Alpha palette
+    void drawStencilOverlay(); // under the panels, over the model
+    int stencilHandleAt(float x, float y) const; // 0 inside, 1 a corner, 2 the turn handle, -1 none
+    bool stencilMouseDown(float x, float y, SDL_Keymod mod); // true when Adjust takes the click
+    void stencilMouseMove(float x, float y);
+    void stencilMouseUp();
+    bool stencilKey(SDL_Keycode key, SDL_Keymod mod);
+    bool stencilUiValue(const std::string& name, double& out) const;
+    static void SDLCALL onStencilChosen(void* userdata, const char* const* files, int filter);
+    void pollStencilFile();
+    struct StencilUi {
+        bool adjust = false;
+        bool hideWhileNavigating = true;
+        int handle = -1;             // being dragged (stencilHandleAt's)
+        Stencil start;               // as it was when the drag began
+        glm::vec2 startMouse{0.0f};
+        unsigned tex = 0;            // the overlay's texture, of texImage (inverted when texInvert)
+        const Image* texImage = nullptr;
+        bool texInvert = false;
+        std::string pendingPath;     // set by the file dialog thread (under alphaMutex_)
+    } stencil_;
     bool gradientUiValue(const std::string& name, double& out) const; // UI test values
     struct GradientUi {
         bool armed = false;

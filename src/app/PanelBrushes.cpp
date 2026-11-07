@@ -68,7 +68,9 @@ void App::drawAlphaSection() {
     ImGui::TextUnformatted(alpha.name.c_str());
 
     drawAlphaOptions();
+    drawStencilSection(); // StencilOverlay.cpp (#155), above the long grid so it shows
     // Built-in and library alphas, then Load image... and Invert loaded image (Pickers.cpp), as in the alpha picker.
+    ImGui::Separator();
     drawAlphaGrid(*this, GridMode::Palette);
 }
 

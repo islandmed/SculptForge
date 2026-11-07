@@ -8,6 +8,7 @@
 #include "core/IndexBits.h"
 #include "core/Kelvinlet.h"
 #include "core/Mesh.h"
+#include "core/Stencil.h"
 #include "core/Symmetry.h"
 #include "core/Undo.h"
 
@@ -88,6 +89,8 @@ struct DabParams {
     // find where that ray meets the surface the batch's earlier dabs left.
     glm::vec3 pickDir{0.0f};
     glm::vec3 pickNormal{0.0f}; // the surface's normal there (zero: unknown)
+    // The Stencil (#155, core/Stencil.h): each vertex also takes the image at the place it shows on screen.
+    StencilView stencil;
 };
 
 // Local symmetry's centre for a Part: the middle of its bounding box (in parallel).
@@ -101,6 +104,7 @@ inline DabParams transformed(const DabParams& p, const SymCopy& c) {
     o.alphaUp = c.dir(p.alphaUp);
     o.pickDir = c.dir(p.pickDir);
     o.pickNormal = c.dir(p.pickNormal);
+    o.stencil.copy = c; // (the mirror takes the stencil at its mirror image's place: the pattern mirrors)
     return o;
 }
 

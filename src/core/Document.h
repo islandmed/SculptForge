@@ -10,6 +10,7 @@
 #include "core/QRemeshGuides.h"
 #include "core/Sculpt.h"
 #include "core/Splats.h"
+#include "core/Stencil.h"
 #include "core/TextureChannels.h"
 #include "core/Undo.h"
 #include "core/Uv.h"
@@ -89,6 +90,7 @@ struct Document {
     std::vector<BrushRecipe> brushes = builtinBrushRecipes();
     int activeBrush = -1; // index into `brushes`, -1 = use a built-in brush type
     BrushAlpha brushAlpha; // stamp shaping every brush's falloff (empty = round); brush_set_alpha
+    Stencil stencil;       // the image over the view the brushes work through (#155; stencil_load, core/Stencil.h)
     glm::vec3 paintColor{0.22f, 0.22f, 0.22f}; // current vertex paint colour (linear RGB; see set_color); a mid grey
     // Material texture painting (core/TextureChannels.h): what the Paint brush lays on the material channels
     // (paint_material; its colour is paintColor), and the channel the view shows on its own (channel_view).

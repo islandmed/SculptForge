@@ -129,12 +129,15 @@ size_t paintDab(Sculptor& sculptor, Mesh& mesh, const BVH& bvh, const DabParams&
     // An alpha shapes the dab as it does a sculpt dab and a texture dab (#152): on the view plane, turned by alphaUp,
     // reaching into its square's corners.
     const bool useAlpha = p.alpha && !p.alpha->empty();
+    const bool useStencil = p.stencil.active();
     for (const SymCopy& m : Sculptor::copies(sym)) {
         const glm::vec3 center = m.point(p.center), viewDir = m.dir(p.viewDir);
         glm::vec3 aUp = m.dir(p.alphaUp);
         aUp -= viewDir * glm::dot(aUp, viewDir);
         aUp = glm::length(aUp) > 1e-6f ? glm::normalize(aUp) : glm::vec3(0, 1, 0);
         const glm::vec3 aRight = glm::cross(aUp, -viewDir);
+        StencilView stencil = p.stencil;
+        stencil.copy = m;
         static thread_local ConnectedScratch connected;
         brushRegion(mesh, bvh, center, viewDir, p.radius * (useAlpha ? kAlphaReach : 1.0f), p.connectedOnly, p.viewFalloff,
                     verts, connected);
@@ -143,10 +146,17 @@ size_t paintDab(Sculptor& sculptor, Mesh& mesh, const BVH& bvh, const DabParams&
             const glm::vec3 o = mesh.positions[v] - center;
             const float f = useAlpha ? p.alpha->stamp(glm::dot(o, aRight) / p.radius, glm::dot(o, aUp) / p.radius, p.focal)
                                      : brushFalloff(brushDistance(mesh.positions[v], center, viewDir, p.viewFalloff), p.radius, p.focal);
-            const float w = f * s * vertexInfluence(mesh, v);
+            float w = f * s * vertexInfluence(mesh, v);
             if (w <= 0.0f) continue;
+            glm::vec3 c = color;
+            if (useStencil) { // the Stencil's colour (or its brightness masking the paint colour), #155
+                const glm::vec4 st = stencil.paint(mesh.positions[v], color);
+                w *= st.w;
+                if (w <= 0.0f) continue;
+                c = glm::vec3(st);
+            }
             sculptor.recordColor(mesh, v);
-            paintVertex(mesh, v, color, w, p.invert); // Alt paints Base back to white, erases a layer
+            paintVertex(mesh, v, c, w, p.invert); // Alt paints Base back to white, erases a layer
             ++changed;
         }
         sculptor.timings.vertices += verts.size();

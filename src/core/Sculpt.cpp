@@ -169,6 +169,14 @@ namespace {
 
 glm::vec3 projectOnPlane(const glm::vec3& v, const glm::vec3& n) { return v - n * glm::dot(v, n); }
 
+// A micro level's dab takes the Stencil as its per-point pattern (the points are in copy `m`'s place); empty without one.
+std::function<float(const glm::vec3&)> stencilTexture(const DabParams& p, const SymCopy& m) {
+    if (!p.stencil.active()) return {};
+    StencilView view = p.stencil;
+    view.copy = m;
+    return [view](const glm::vec3& x) { return view.weight(x); };
+}
+
 // Smooth's keep-volume steps (Sculptor::taubinShrink): Taubin's own values, pass band 1/lambda + 1/mu = 0.1.
 constexpr float kTaubinLambda = 0.6307f, kTaubinMu = -0.6732f;
 
@@ -423,7 +431,7 @@ bool Sculptor::microBaseDab(const Mesh& mesh, BrushType type, const DabParams& p
     if (microBase_ < 0) { // (decided once a stroke: its dabs all go one way)
         const MicroMesh& mm = *mesh.micro;
         microBase_ = microBaseDabs && (type == BrushType::Standard || type == BrushType::Clay || type == BrushType::Inflate) &&
-                             !mm.hasMask() && mesh.mask.empty() && !mesh.hasHidden() && !(p.alpha && !p.alpha->empty()) &&
+                             !mm.hasMask() && mesh.mask.empty() && !mesh.hasHidden() && !(p.alpha && !p.alpha->empty()) && !p.stencil.active() &&
                              mesh.layers.empty() && !dyntopo.enabled && mm.baseEdge > 0.0f &&
                              p.radius >= kMicroBaseSpan * mm.baseEdge
                          ? 1
@@ -956,14 +964,14 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
         const uint64_t pts = micro_.points;
         for (const SymCopy& m : copies(sym))
             micro_.dab(mesh, bvh, type, m.point(p.center), m.dir(p.viewDir), p.radius, p.strength * std::clamp(p.pressure, 0.0f, 1.0f),
-                       p.invert, p.focal, m.dir(p.alphaUp), false, 0.0f, p.alpha, {}, m.dir(p.strokeDelta));
+                       p.invert, p.focal, m.dir(p.alphaUp), false, 0.0f, p.alpha, stencilTexture(p, m), m.dir(p.strokeDelta));
         timings.kernelMs += micro_.findMs + micro_.kernelMs - k0;
         timings.normalsMs += micro_.stitchMs - s0;
         timings.vertices += micro_.points - pts;
         ++timings.dabs;
         return;
     }
-    lastFusable_ = adaptiveDabs && isPlaneKernelBrush(type) && type != BrushType::Trim && !(p.alpha && !p.alpha->empty()) &&
+    lastFusable_ = adaptiveDabs && isPlaneKernelBrush(type) && type != BrushType::Trim && !(p.alpha && !p.alpha->empty()) && !p.stencil.active() &&
                    !p.frontFacesOnly && !p.connectedOnly && !p.viewFalloff && !dyntopo.enabled;
     if (batching_ && batchable(mesh, type, p, sym)) { // a fused batch's (SculptBatch.cpp)
         pending_.push_back({type, p, sym});
@@ -996,6 +1004,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     auto clock = std::chrono::steady_clock::now();
     // Alphas and the square Clay Block tip reach into the corners of their square.
     const bool useAlpha = p.alpha && !p.alpha->empty();
+    const bool useStencil = p.stencil.active();
     const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBlock ? 1.3f : 1.0f;
     brushRegion(mesh, bvh, p.center, p.viewDir, p.radius * reach, p.connectedOnly, p.viewFalloff, verts_, connected_);
     if (verts_.empty()) return;
@@ -1014,6 +1023,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                    // (an alpha's fine pattern or Clay Block's square tip, which turn with the area normal, and the brushes that move along each vertex's own normal amplify a
                    // hair's difference in the normals the next dabs read)
                    type != BrushType::Nudge && type != BrushType::Inflate && type != BrushType::ClayBlock && !useAlpha &&
+                   !p.stencil.active() && // (the stencil's detail, as an alpha's)
                    mesh.normals.size() == mesh.vertexCount();
     if (adaptiveDab_ && (mesh.mask.size() == mesh.vertexCount() || mesh.hasHidden())) {
         // A mask's edge is a step the adaptive normals don't see (they follow the brush, not the mask): regions
@@ -1086,8 +1096,9 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     // points next to it, which only the brushes that read nothing but the place, and v's own normal, are asked).
     const auto offset = [&](size_t i, uint32_t v, const glm::vec3& x) -> glm::vec3 {
         const glm::vec3 o = x - p.center;
-        const float f = useAlpha ? p.alpha->stamp(glm::dot(o, right) / r, glm::dot(o, up) / r, p.focal)
-                                 : brushFalloff(brushDistance(p, x), r, p.focal);
+        float f = useAlpha ? p.alpha->stamp(glm::dot(o, right) / r, glm::dot(o, up) / r, p.focal)
+                           : brushFalloff(brushDistance(p, x), r, p.focal);
+        if (useStencil && f > 0.0f) f *= p.stencil.weight(x);
         glm::vec3 d(0.0f);
 
         switch (type) {
@@ -1355,9 +1366,14 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
         const float pressure = std::pow(std::clamp(p.pressure, 0.0f, 1.0f), recipe.pressureCurve);
         const double k0 = micro_.findMs + micro_.kernelMs, s0 = micro_.stitchMs;
         const uint64_t pts = micro_.points;
-        for (const SymCopy& m : copies(sym))
+        for (const SymCopy& m : copies(sym)) {
+            const auto stencil = stencilTexture(p, m);
+            std::function<float(const glm::vec3&)> both = texture;
+            if (stencil && texture) both = [&texture, &stencil](const glm::vec3& x) { return texture(x) * stencil(x); };
+            else if (stencil) both = stencil;
             micro_.dab(mesh, bvh, BrushType::Standard, m.point(p.center), m.dir(p.viewDir), p.radius, strength * pressure,
-                       invert, p.focal, m.dir(p.alphaUp), false, 0.0f, p.alpha, texture);
+                       invert, p.focal, m.dir(p.alphaUp), false, 0.0f, p.alpha, both);
+        }
         timings.kernelMs += micro_.findMs + micro_.kernelMs - k0;
         timings.normalsMs += micro_.stitchMs - s0;
         timings.vertices += micro_.points - pts;
@@ -1445,6 +1461,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         if (r.pattern != BrushRecipe::Pattern::None && r.patternAmount > 0.0f)
             w *= glm::mix(1.0f, samplePattern(r.pattern, pos[v] * patternFreq), r.patternAmount);
         if (useAlpha) w *= alphaWeight(pos[v]);
+        if (p.stencil.active() && w > 0.0f) w *= p.stencil.weight(pos[v]);
         weights_[i] = w;
     });
     glm::vec3 areaNormal = sums.normal, areaCenter = sums.center;
