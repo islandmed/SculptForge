@@ -32,6 +32,7 @@
 #include "core/Document.h"
 #include "core/DiscordPresence.h"
 #include "core/Face.h"
+#include "core/Backdrop.h"
 #include "core/GeneratedRemesh.h"
 #include "core/MeshTransform.h"
 #include "app/Wintab.h"
@@ -686,10 +687,13 @@ private:
         "If the mask's edge is too ragged to join up, the status line says so and nothing changes.";
     bool keepTexture_ = true; // Keep Texture: remeshes carry a painted texture over (core/TextureTransfer.h)
     int remeshResolution_ = 256;
+    bool removeBackground_ = true; // Generate 3D's "Remove flat background" (core/Backdrop.h)
     // A generated model, made sculptable on the worker thread (Quad Remesh takes seconds).
     struct GeneratedModel {
         ai::GeneratorResult result;
         std::shared_ptr<Mesh> remeshed; // null: Remesh off, or it failed (remeshError)
+        std::shared_ptr<Mesh> withoutBackdrop; // the raw mesh minus a flat background plane (null: none found or off)
+        BackdropRemoval backdrop;
         GeneratedRemeshStats stats;
         std::string remeshError;
     };

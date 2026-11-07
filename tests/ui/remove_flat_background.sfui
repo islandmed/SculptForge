@@ -1,0 +1,29 @@
+# Image to 3D's "Remove flat background" (core/Backdrop.h, request from @fenix): a generated head with the picture's
+# background turned into a thin wall behind it. The command Generate 3D runs on its result removes the wall, as one
+# undo step; Undo brings it back. Generate 3D shows the option, on by default.
+run ui_look look=classic layout=classic        # written for the Classic look
+# The wall: a 0.7 m square just behind the head (the lion is 0.32 x 0.44 x 0.21 m, standing on y = 0).
+run new_plane resolution=4 ; transform scale=0.35 rotate=90,0,0 pivot=origin translate=0,0.22,-0.16
+remember triangles wall
+run part_append path=$SCRIPT_DIR/../../assets/demo/lion-head.glb ; part_merge_visible
+expect_value triangles > $wall
+remember triangles both
+camera 30 10
+key f
+shot backdrop-before
+
+run remove_flat_background
+expect_status "Removed a flat background plane"
+expect_value triangles == 47214
+shot backdrop-after
+
+key ctrl+z
+expect_value triangles == $both
+key ctrl+shift+z
+expect_value triangles == 47214
+
+# The option in Generate 3D.
+drop ../../assets/demo/teddy-sketch.png
+wait_for "Generate 3D" 5
+expect_text Remove flat background
+shot generate-remove-background

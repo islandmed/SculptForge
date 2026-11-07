@@ -45,7 +45,11 @@ The window has two tabs, **From image** and **From text**.
      <kbd>Shift</kbd>+<kbd>D</kbd>.
    - **Voxel remesh**: one even, watertight triangle surface. Faster (about a second).
    - **Off (raw mesh)**: the model exactly as the service made it.
-5. Click **Generate 3D model**. A progress bar shows the queue position and progress; **Cancel** stops the
+5. Leave **Remove flat background** on (the default) to drop the flat plane a picture's background often
+   becomes: a thin wall behind or a ground under the subject that covers most of the model's bounds. A relief
+   or a coin on its own is kept. The status line says when a plane was removed; Undo brings it back (with Remesh
+   on, the first Undo steps back to the raw mesh, the second brings the plane back).
+6. Click **Generate 3D model**. A progress bar shows the queue position and progress; **Cancel** stops the
    job.
 
 When it finishes, the status line reports the size before and after remeshing, for example
@@ -245,6 +249,9 @@ sculptforge-cli -c 'image_to_3d path=hero.png; export_glb path=hero.glb'
 
 # TRELLIS.2, best detail, with a free Hugging Face token (without one, Hunyuan3D 2.1 runs and says so)
 HF_TOKEN=hf_... sculptforge-cli -c 'image_to_3d path=hero.png model=trellis-2; export_glb path=hero.glb'
+
+# keep a flat background plane the service made (removed by default; remove_flat_background does it later)
+sculptforge-cli -c 'image_to_3d path=hero.png remove_background=false; export_glb path=hero.glb'
 
 # voxel remesh instead of the default Quad Remesh
 sculptforge-cli -c 'image_to_3d path=hero.png remesh=voxel; export_glb path=hero.glb'

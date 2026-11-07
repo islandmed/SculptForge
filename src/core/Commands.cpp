@@ -20,6 +20,7 @@
 #include "core/HardwareProfile.h"
 #include "core/ImageTo3D.h"
 #include "core/Masking.h"
+#include "core/Backdrop.h"
 #include "core/CloseHoles.h"
 #include "core/Cut.h"
 #include "core/Multires.h"
@@ -878,6 +879,7 @@ CommandRegistry::CommandRegistry() {
     registerMaskingCommands(*this);
     registerCutCommands(*this); // cut (core/Cut.h)
     registerCloseHolesCommands(*this); // close_holes (core/CloseHoles.h)
+    registerBackdropCommands(*this);   // remove_flat_background (core/Backdrop.h)
     registerFaceGroupCommands(*this);
     registerSelectionSetCommands(*this); // selection_set_* (core/SelectionSets.h)
     registerPartCommands(*this);
