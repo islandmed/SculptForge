@@ -163,7 +163,8 @@ void ManagedBadge() {
 
 bool IsModeAction(std::string_view id) {
     auto starts = [&](std::string_view p) { return id.substr(0, p.size()) == p; };
-    if (id == "tool.draw" || id == "tool.move" || id == "tool.scale" || id == "tool.rotate") return true;
+    if (id == "tool.draw" || id == "tool.move" || id == "tool.scale" || id == "tool.rotate" || id == "tool.gizmo_all")
+        return true;
     if (id == "draw.sculpt" || id == "draw.paint") return true;
     if (starts("brush.pen_")) return false; // a brush's pen pressure switches (#122): choices, not brush picks
     return starts("brush.") || starts("mask.") || starts("select.");

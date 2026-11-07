@@ -1182,6 +1182,11 @@ constexpr Entry kSimplifiedChinese[] = {
      "snaps to 10% steps. E again: back to Draw.",
      "操纵器，缩放：拖动方块沿轴拉伸，拖动中心等比例缩放（向右或向上：放大）。Shift 以 10% 为一级贴齐。再按 E：回到绘"
      "制。"},
+    {"Gizmo, All: move, rotate and scale handles at once. Arrows and squares move, the centre moves in the view, "
+     "rings turn, the boxes past the rings stretch along an axis and the four outer tabs scale evenly. Shift snaps. "
+     "Shift+W again: back to Draw.",
+     "操纵器，全部：同时提供移动、旋转和缩放控制点。箭头和方块用于移动，中心在视图中移动，圆环用于旋转，圆环外的方块沿轴"
+     "拉伸，外侧四个标签等比缩放。Shift 贴齐。再按 Shift+W：回到绘制。"},
     {"Gizmo, Rotate: drag a ring to turn about that axis, the outer ring to turn in the view. Mask the body and put "
      "the pivot at a joint to pose a limb. Shift snaps to 15 degrees. R again: back to Draw.",
      "操纵器，旋转：拖动圆环绕该轴旋转，拖动外环在视图中旋转。遮罩身体并将枢轴点放在关节上即可摆出肢体姿势。Shift 以 "
@@ -3992,8 +3997,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "从当前视图把图片投射到模型上作为表面细节（使用当前图层）。"},
     {"Proof mode measures how responsive sculpting is on this computer. For each mesh size it builds a sphere with subdivision levels, then plays a scripted pen stroke through the same code your pen goes through (240 samples a second), with a normal and a large brush, and turns the view.",
      "证明模式会测量这台电脑上雕刻的响应速度。针对每种网格大小，它会创建带细分级别的球体，再通过与你的笔相同的代码路径（每秒 240 个采样）播放预设的笔触，使用普通和大号笔刷，并旋转视图。"},
-    {"Q W E R: Draw, Move, Scale, Rotate",
-     "Q W E R：绘制、移动、缩放、旋转"},
+    {"Q W E R: Draw, Move, Scale, Rotate; Shift+W: All",
+     "Q W E R：绘制、移动、缩放、旋转；Shift+W：全部"},
     {"Quad Remesh (default): clean quads ready for sculpting and subdividing, with one subdivision level holding the detail. Voxel remesh: an even, watertight triangle surface. Off: the model as the service made it.",
      "四边形重拓扑（默认）：干净的四边面，可直接雕刻和细分，并用一个细分级别保留细节。体素重新网格化：均匀、封闭的三角面。关闭：保留服务生成的原始模型。"},
     {"Quad Remesh 2",

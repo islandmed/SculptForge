@@ -257,7 +257,8 @@ float pointsReadoutW(const Document& doc) { return kPointsReadoutW + (visibleMic
 bool segmentPair(const std::string& a, const std::string& b) {
     auto group = [](const std::string& id) {
         if (id == "draw.sculpt" || id == "draw.paint") return 1;
-        if (id == "tool.draw" || id == "tool.move" || id == "tool.scale" || id == "tool.rotate") return 5;
+        if (id == "tool.draw" || id == "tool.move" || id == "tool.scale" || id == "tool.rotate" || id == "tool.gizmo_all")
+            return 5;
         if (id == "draw.raise" || id == "draw.lower") return 2;
         if (id.rfind("transform.symmetry_", 0) == 0) return 3;
         if (id.rfind("draw.pressure_", 0) == 0) return 4;
@@ -1655,7 +1656,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
     std::vector<StatusModule> mods;
     {
         const char* mode = paintMode_ ? "Paint" : "Sculpt";
-        for (const char* t : {"tool.move", "tool.scale", "tool.rotate"})
+        for (const char* t : {"tool.move", "tool.scale", "tool.rotate", "tool.gizmo_all"})
             if (const Action* a = actions_.find(t); a && a->checked && a->checked()) mode = a->label.c_str();
         mods.push_back({ICON_LC_SQUARE_TERMINAL, "mode", upper(tr(mode)), true});
         std::string brush = brushName(brush_);
