@@ -526,7 +526,15 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                     if (texture) f *= texture(p);
                     if (mk && stride == 1) f *= 1.0f - float(mk[idx]) / 255.0f; // (coarse: the fine points' mask, below)
                     if (f <= 0.0f) continue;
-                    const float facing = std::max(glm::dot(nn, areaNormal), 0.3f); // moving along nn reaches a plane this much slower
+                    const float facingRaw = glm::dot(nn, areaNormal);
+                    const float facing = std::max(facingRaw, 0.3f); // moving along nn reaches a plane this much slower
+                    // The plane brushes (Flatten, Clay, Clay Block, Trim) move a point along its normal towards their
+                    // plane. A point turned edge-on or away from it (a fold's far wall, a scan's noisy normal) can't
+                    // get there that way: moving it anyway only takes it further, dab after dab, into a spike where
+                    // the dabs pile up (a stroke's end). Those stay put, and no point moves more than a quarter of
+                    // the brush a dab.
+                    const bool reachesPlane = facingRaw > 0.1f;
+                    const float planeCap = r * 0.25f * f;
                     float delta = 0.0f;
                     auto neighbourAverage = [&](float& lo, float& hi) {
                         float sum = 0.0f;
@@ -562,26 +570,30 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                         break;
                     }
                     case BrushType::Flatten: {
+                        if (!reachesPlane) break;
                         const float h = glm::dot(p - areaCenter, areaNormal);
-                        delta = -h * s * f * (invert ? -0.5f : 1.0f) / facing;
+                        delta = std::clamp(-h * s * f * (invert ? -0.5f : 1.0f) / facing, -planeCap, planeCap);
                         break;
                     }
                     case BrushType::Clay: {
+                        if (!reachesPlane) break;
                         const glm::vec3 pp = areaCenter + areaNormal * (sign * r * 0.05f * s);
                         const float h = glm::dot(p - pp, areaNormal);
-                        if (sign * h < 0.0f) delta = -h * f * clayPull(s) / facing;
+                        if (sign * h < 0.0f) delta = std::clamp(-h * f * clayPull(s) / facing, -planeCap, planeCap);
                         break;
                     }
                     case BrushType::ClayBlock: {
+                        if (!reachesPlane) break;
                         const glm::vec3 pp = areaCenter + areaNormal * (sign * r * 0.08f * s);
                         const float h = glm::dot(p - pp, areaNormal);
-                        if (sign * h < 0.0f) delta = -h * f * clayPull(s) / facing;
+                        if (sign * h < 0.0f) delta = std::clamp(-h * f * clayPull(s) / facing, -planeCap, planeCap);
                         break;
                     }
                     case BrushType::Trim: {
+                        if (!reachesPlane) break;
                         const glm::vec3 pp = areaCenter - areaNormal * (sign * r * 0.02f * s);
                         const float h = glm::dot(p - pp, areaNormal);
-                        if (sign * h > 0.0f) delta = -h * std::min(1.0f, std::sqrt(f) * (0.5f + s)) / facing;
+                        if (sign * h > 0.0f) delta = std::clamp(-h * std::min(1.0f, std::sqrt(f) * (0.5f + s)) / facing, -planeCap, planeCap);
                         break;
                     }
                     case BrushType::Layer: {
