@@ -896,6 +896,7 @@ Mesh weldImported(const Mesh& m, const std::vector<SculptLayer>& layers) {
     }
     const size_t nt = m.triangles.size();
     const bool tGroups = m.facegroups.size() == nt, tHidden = m.hidden.size() == nt, tUvs = m.uvs.size() == nt * 3;
+    const bool tCreases = m.creases.size() == nt * 3;
     std::vector<uint32_t> newTriangle(m.hasQuads() ? nt : 0, Mesh::kNoQuad);
     for (size_t ti = 0; ti < nt; ++ti) {
         const auto& t = m.triangles[ti];
@@ -906,6 +907,9 @@ Mesh weldImported(const Mesh& m, const std::vector<SculptLayer>& layers) {
         if (tGroups) welded.facegroups.push_back(m.facegroups[ti]);
         if (tHidden) welded.hidden.push_back(m.hidden[ti]);
         if (tUvs) welded.uvs.insert(welded.uvs.end(), m.uvs.begin() + std::ptrdiff_t(ti * 3), m.uvs.begin() + std::ptrdiff_t(ti * 3 + 3));
+        if (tCreases)
+            welded.creases.insert(welded.creases.end(), m.creases.begin() + std::ptrdiff_t(ti * 3),
+                                  m.creases.begin() + std::ptrdiff_t(ti * 3 + 3));
     }
     if (!newTriangle.empty()) remapQuads(m, newTriangle, welded);
     if (!layers.empty()) {

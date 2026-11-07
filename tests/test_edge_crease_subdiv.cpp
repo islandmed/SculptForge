@@ -3,7 +3,8 @@
 //
 // Subdivision with edge creases (#108 slice 3, core/Multires.h EdgeSharpness): Catmull-Clark and Loop semi-sharp
 // creases against hand-computed values on a unit cube, the s - 1 rule across levels, bit-identical results without
-// creases (and away from them), levels that follow a crease change at the base, Delete Lower and projects.
+// creases (and away from them), levels that follow a crease change at the base, Delete Lower and projects; USD
+// creases out and in (slice 4).
 #include "TestHarness.h"
 
 #include "core/Commands.h"
@@ -12,9 +13,13 @@
 #include "core/Multires.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
+#include "io/UsdIO.h"
 
 #include <cmath>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 
 using namespace sf;
 
@@ -221,4 +226,190 @@ TEST(edge_crease_subdiv_delete_lower_and_projects_keep_the_shape) {
     bool same = doc.mesh.positions.size() == top.size();
     for (size_t v = 0; same && v < top.size(); ++v) same = glm::length(doc.mesh.positions[v] - top[v]) < 1e-4f;
     CHECK(same);
+}
+
+TEST(edge_crease_usd_export_import) {
+    // A creased cage: USD creaseIndices / creaseLengths / creaseSharpnesses (sharpness 10 c^2), Catmull-Clark
+    // scheme; read back onto both sides of each edge. A plain mesh keeps subdivisionScheme "none" and no creases.
+    Document doc = makeDoc(makeCube(1));
+    CHECK(selectEdge(doc, A, B) && selectEdge(doc, B, C));
+    CHECK(registry().execute(doc, "edge_crease", {{"value", 1.0}}).ok);
+    CHECK(registry().execute(doc, "edge_select", {{"op", std::string("none")}}).ok);
+    CHECK(selectEdge(doc, C, D));
+    CHECK(registry().execute(doc, "edge_crease", {{"value", 0.5}}).ok);
+    std::string err;
+    const std::string path = tempPath("edge_crease.usda");
+    CHECK(saveUsd(path, &doc.mesh, nullptr, "Cage", err));
+    std::string text;
+    {
+        std::ifstream f(path);
+        text.assign(std::istreambuf_iterator<char>(f), {});
+    }
+    CHECK(text.find("int[] creaseLengths = [2, 2, 2]") != std::string::npos);
+    CHECK(text.find("float[] creaseSharpnesses") != std::string::npos);
+    CHECK(text.find("subdivisionScheme = \"catmullClark\"") != std::string::npos);
+    Mesh back;
+    SplatCloud splats;
+    CHECK(loadUsd(path, back, splats, err));
+    const auto topo = buildEdgeTopology(back);
+    const auto own = buildEdgeTopology(doc.mesh);
+    CHECK(edgeCreasedCount(back, *topo) == 3);
+    size_t sharp = 0, half = 0;
+    for (uint32_t e = 0; e < topo->edgeCount(); ++e) {
+        const float c = edgeCrease(back, *topo, e);
+        sharp += std::fabs(c - 1.0f) < 1e-5f;
+        half += std::fabs(c - 0.5f) < 1e-5f;
+    }
+    CHECK(sharp == 2 && half == 1);
+    // Both sides of each creased edge, as Crease sets them.
+    size_t corners = 0;
+    for (float c : back.creases) corners += c > 0.0f;
+    CHECK(corners == 6);
+    CHECK(edgeCreasedCount(doc.mesh, *own) == 3);
+
+    // At SDiv 2 (of 3) the level's edges carry what is left of the creases below: each creased edge's two halves.
+    CHECK(registry().execute(doc, "subdiv_divide", {}).ok);
+    CHECK(registry().execute(doc, "subdiv_divide", {}).ok);
+    CHECK(registry().execute(doc, "subdiv_level", {{"level", 2.0}}).ok);
+    CHECK(saveUsd(path, &doc.mesh, nullptr, "Level", err));
+    Mesh level;
+    CHECK(loadUsd(path, level, splats, err));
+    CHECK(edgeCreasedCount(level, *buildEdgeTopology(level)) == 6);
+
+    // Hand-written chains: one 3-point crease with one sharpness, and per-edge sharpness; "none" without creases.
+    {
+        std::ofstream f(path);
+        f << R"(#usda 1.0
+def Mesh "Quads"
+{
+    int[] faceVertexCounts = [4, 4]
+    int[] faceVertexIndices = [0, 1, 4, 3, 1, 2, 5, 4]
+    point3f[] points = [(0,0,0), (1,0,0), (2,0,0), (0,1,0), (1,1,0), (2,1,0)]
+    int[] creaseIndices = [0, 1, 2, 1, 4]
+    int[] creaseLengths = [3, 2]
+    float[] creaseSharpnesses = [10, 2.5]
+}
+)";
+    }
+    Mesh chain;
+    CHECK(loadUsd(path, chain, splats, err));
+    const auto ct = buildEdgeTopology(chain);
+    CHECK(edgeCreasedCount(chain, *ct) == 3);
+    std::filesystem::remove(path);
+    Mesh plainCube = makeCube(1);
+    CHECK(saveUsd(path, &plainCube, nullptr, "Plain", err));
+    {
+        std::ifstream f(path);
+        text.assign(std::istreambuf_iterator<char>(f), {});
+    }
+    CHECK(text.find("crease") == std::string::npos);
+    CHECK(text.find("subdivisionScheme = \"none\"") != std::string::npos);
+    std::filesystem::remove(path);
+}
+
+TEST(edge_crease_usd_hostile_files) {
+    // Two quads (6 points). Each malformed crease set is skipped whole with a warning naming the prim; the mesh
+    // still opens. Huge finite sharpness clamps to 10 (crease 1); negative sharpness is no crease, no warning.
+    const std::string path = tempPath("edge_crease_hostile.usda");
+    auto load = [&](const std::string& creases, Mesh& out, std::string& warnings) {
+        {
+            std::ofstream f(path);
+            f << "#usda 1.0\ndef Mesh \"Quads\"\n{\n    int[] faceVertexCounts = [4, 4]\n"
+                 "    int[] faceVertexIndices = [0, 1, 4, 3, 1, 2, 5, 4]\n"
+                 "    point3f[] points = [(0,0,0), (1,0,0), (2,0,0), (0,1,0), (1,1,0), (2,1,0)]\n"
+              << creases << "}\n";
+        }
+        SplatCloud splats;
+        std::string err;
+        warnings.clear();
+        const bool ok = loadUsd(path, out, splats, err, &warnings);
+        return ok && out.triangleCount() == 4;
+    };
+    struct Case {
+        const char* what;
+        std::string attrs;
+    };
+    std::string many = "    int[] creaseIndices = [";
+    for (int i = 0; i < 200; ++i) many += i ? (i % 2 ? ", 1" : ", 0") : "0";
+    many += "]\n    int[] creaseLengths = [200]\n    float[] creaseSharpnesses = [1]\n";
+    const Case hostile[] = {
+        {"lengths add up to more", "int[] creaseIndices = [0, 1, 2]\nint[] creaseLengths = [4]\nfloat[] creaseSharpnesses = [1]\n"},
+        {"lengths add up to less", "int[] creaseIndices = [0, 1, 2, 5]\nint[] creaseLengths = [2]\nfloat[] creaseSharpnesses = [1]\n"},
+        {"negative index", "int[] creaseIndices = [-1, 1]\nint[] creaseLengths = [2]\nfloat[] creaseSharpnesses = [1]\n"},
+        {"index past the points", "int[] creaseIndices = [0, 6]\nint[] creaseLengths = [2]\nfloat[] creaseSharpnesses = [1]\n"},
+        {"huge index", "int[] creaseIndices = [0, 1e300]\nint[] creaseLengths = [2]\nfloat[] creaseSharpnesses = [1]\n"},
+        {"fractional index", "int[] creaseIndices = [0, 1.5]\nint[] creaseLengths = [2]\nfloat[] creaseSharpnesses = [1]\n"},
+        {"length 1", "int[] creaseIndices = [0]\nint[] creaseLengths = [1]\nfloat[] creaseSharpnesses = [1]\n"},
+        {"negative length", "int[] creaseIndices = [0, 1]\nint[] creaseLengths = [-2]\nfloat[] creaseSharpnesses = [1]\n"},
+        {"huge length", "int[] creaseIndices = [0, 1]\nint[] creaseLengths = [1e18]\nfloat[] creaseSharpnesses = [1]\n"},
+        {"lengths that overflow", "int[] creaseIndices = [0, 1, 2]\nint[] creaseLengths = [2, 18446744073709551615]\nfloat[] creaseSharpnesses = [1, 1]\n"},
+        {"sharpness count", "int[] creaseIndices = [0, 1, 1, 4]\nint[] creaseLengths = [2, 2]\nfloat[] creaseSharpnesses = [1, 2, 3]\n"},
+        {"infinite sharpness", "int[] creaseIndices = [0, 1]\nint[] creaseLengths = [2]\nfloat[] creaseSharpnesses = [1e999]\n"},
+        {"missing lengths", "int[] creaseIndices = [0, 1]\nfloat[] creaseSharpnesses = [1]\n"},
+        {"too many indices", many},
+    };
+    for (const Case& c : hostile) {
+        Mesh m;
+        std::string warnings;
+        const bool opened = load(c.attrs, m, warnings);
+        CHECK(opened);
+        CHECK(!m.hasCreases());
+        const bool warned = warnings.find("Edge creases of /Quads skipped") != std::string::npos;
+        CHECK(warned);
+        if (!opened || m.hasCreases() || !warned) std::printf("  hostile case: %s (%s)\n", c.what, warnings.c_str());
+    }
+    // Clamped, not refused: 1e30 -> sharpness 10 (crease 1); -5 -> no crease; an edge the faces don't have
+    // (0-2) and a repeated edge (the second, softer one loses) leave no trace.
+    Mesh m;
+    std::string warnings;
+    CHECK(load("int[] creaseIndices = [0, 1, 1, 0, 1, 4, 0, 2]\nint[] creaseLengths = [2, 2, 2, 2]\n"
+               "float[] creaseSharpnesses = [1e30, 2.5, -5, 10]\n", m, warnings));
+    CHECK(warnings.empty());
+    const auto topo = buildEdgeTopology(m);
+    CHECK(edgeCreasedCount(m, *topo) == 1);
+    float most = 0.0f;
+    for (float c : m.creases) most = std::max(most, c);
+    CHECK(most == 1.0f);
+
+    // Two prims merged into one mesh: the second prim's crease indices are its own points (offset past the first's).
+    {
+        std::ofstream f(path);
+        f << R"(#usda 1.0
+def Mesh "A"
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(0,0,0), (1,0,0), (1,1,0), (0,1,0)]
+}
+def Mesh "B"
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(5,0,0), (6,0,0), (6,1,0), (5,1,0)]
+    int[] creaseIndices = [0, 1]
+    int[] creaseLengths = [2]
+    float[] creaseSharpnesses = [10]
+}
+)";
+    }
+    Mesh two;
+    SplatCloud splats;
+    std::string err;
+    warnings.clear();
+    CHECK(loadUsd(path, two, splats, err, &warnings) && warnings.empty());
+    CHECK(two.creases.size() == two.triangleCount() * 3);
+    // (Positions may be scaled to metres: compare against the merged mesh's width. B's bottom edge: both ends at
+    // more than 0.8 of the widest x, the same y, and the lowest y.)
+    const AABB box = two.bounds();
+    size_t onB = 0, elsewhere = 0;
+    for (size_t c = 0; c < two.creases.size(); ++c) {
+        if (two.creases[c] <= 0.0f) continue;
+        const glm::uvec3& t = two.triangles[c / 3];
+        const glm::vec3 a = two.positions[t[int(c % 3)]], b = two.positions[t[int((c + 1) % 3)]];
+        const float wide = box.min.x + (box.max.x - box.min.x) * 0.8f;
+        const bool edge01 = a.x > wide && b.x > wide && a.y == b.y && std::fabs(a.y - box.min.y) < 1e-6f;
+        (edge01 ? onB : elsewhere)++;
+    }
+    CHECK(onB == 1 && elsewhere == 0);
+    std::filesystem::remove(path);
 }
