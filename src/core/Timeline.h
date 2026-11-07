@@ -117,6 +117,10 @@ public:
     inline static const Document* historyDocument = nullptr;
     size_t checkpointEvery = 16;           // a checkpoint every this many path steps (doubles when over budget)
     size_t checkpointBudget = size_t(1) << 30; // bytes of checkpoints
+    // Vertices a sync copies into the checkpoint being made: the copy spreads over the frames after a stroke
+    // (about 12 MB, a millisecond, each) instead of stalling the first one (Lucy 28M: 168 MB at once).
+    size_t checkpointSlice = size_t(1) << 20;
+    size_t checkpointPending() const { return pending_.copy.size(); } // vertices copied so far (0: none under way)
     size_t branchBudget = size_t(3) << 29;     // 1.5 GiB of inactive branches and `other` copies
     size_t checkpointBytes() const;
     size_t extraBytes() const; // `other` copies and inactive branches
@@ -165,6 +169,13 @@ private:
     size_t cursor_ = 0;
     UndoStack* stack_ = nullptr; // the watched stack (re-pointed by attach / every Document call)
     std::map<uint32_t, std::vector<glm::vec3>> checkpoints_; // node id -> positions after it
+    struct PendingCheckpoint { // a checkpoint being copied, kept while the step and the stack's revision stay
+        uint32_t id = kNone;
+        uint64_t revision = 0;
+        size_t vertices = 0;
+        const glm::vec3* source = nullptr;
+        std::vector<glm::vec3> copy;
+    } pending_;
     size_t meshVertices_ = 0; // vertex count fast steps and checkpoints belong to
     std::vector<uint32_t> batch_; // vertices a batched run moved (flushBatch)
     std::vector<uint8_t> batchSeen_;

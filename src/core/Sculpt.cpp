@@ -1277,7 +1277,7 @@ void Sculptor::taubinShrink(const Mesh& mesh) {
 // The BVH after a mirror's dab moved (some of) the vertices its query returned, verts_ (the kernel ran since
 // `clock`). The next mirror's query needs the new boxes; normals wait until every mirror moved its vertices
 // (updateDabNormals), so where mirrors overlap they are updated once.
-void Sculptor::finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_point clock) {
+void Sculptor::finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_point clock, bool listVertices) {
     timings.kernelMs += lapMs(clock);
     bvh.refitQueried(mesh);
     timings.bvhMs += lapMs(clock);
@@ -1296,7 +1296,10 @@ void Sculptor::finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_p
         timings.normalsMs += lapMs(clock);
         return;
     }
-    dabVerts_.insert(dabVerts_.end(), verts_.begin(), verts_.end()); // a vertex twice is fine: updateNormals dedups
+    // The normals come from the leaves' triangles (updateDabNormals); only remeshing reads the vertices (its rings,
+    // repairDab). Listing them anyway copied the region every dab (240 px on Lucy 28M: 10 MB).
+    if (listVertices || dynTopo_.active() || leaves.empty())
+        dabVerts_.insert(dabVerts_.end(), verts_.begin(), verts_.end()); // a vertex twice is fine: updateNormals dedups
     dabLeaves_.insert(dabLeaves_.end(), leaves.begin(), leaves.end());
 }
 

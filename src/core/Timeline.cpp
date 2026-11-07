@@ -71,6 +71,7 @@ bool Timeline::fastShape(const UndoRecord& r) {
 void Timeline::reset() {
     nodes_.clear();
     checkpoints_.clear();
+    pending_ = PendingCheckpoint{};
     nodes_.emplace_back();
     nodes_[0].kind = Kind::Start;
     nodes_[0].label = "Start";
@@ -315,16 +316,30 @@ size_t Timeline::extraBytes() const {
 
 void Timeline::maybeCheckpoint(const Mesh& mesh) {
     const uint32_t id = path_[cursor_];
-    if (checkpoints_.count(id) || cursor_ % std::max<size_t>(checkpointEvery, 1) != 0 || !mesh.layers.empty() ||
-        mesh.vertexCount() == 0)
-        return;
-    if (cursor_ > 0 && !nodes_[id].fast) return; // a checkpoint helps runs of fast steps
-    const size_t bytes = mesh.vertexCount() * sizeof(glm::vec3);
-    if (bytes > checkpointBudget) return;
-    std::vector<glm::vec3> copy(mesh.vertexCount());
-    poolFor(copy.size(), [&](size_t b, size_t e) { std::memcpy(&copy[b], &mesh.positions[b], (e - b) * sizeof(glm::vec3)); },
-            1 << 18);
+    const size_t V = mesh.vertexCount();
+    const uint64_t revision = stack_ ? stack_->revision() : 0;
+    // A copy under way goes on while the mesh shows what it began copying: the same step, nothing undone, redone,
+    // re-tuned or sculpted since (each changes the revision), the same positions array.
+    if (pending_.source && (pending_.id != id || pending_.revision != revision || pending_.source != mesh.positions.data() ||
+                            pending_.vertices != V || !mesh.layers.empty()))
+        pending_ = PendingCheckpoint{};
+    if (!pending_.source) {
+        if (checkpoints_.count(id) || cursor_ % std::max<size_t>(checkpointEvery, 1) != 0 || !mesh.layers.empty() || V == 0)
+            return;
+        if (cursor_ > 0 && !nodes_[id].fast) return; // a checkpoint helps runs of fast steps
+        if (V * sizeof(glm::vec3) > checkpointBudget) return;
+        pending_.id = id;
+        pending_.revision = revision;
+        pending_.source = mesh.positions.data();
+        pending_.vertices = V;
+        pending_.copy.reserve(V); // (pages arrive as the slices fill them)
+    }
+    std::vector<glm::vec3>& copy = pending_.copy;
+    const size_t done = copy.size(), end = std::min(V, done + std::max<size_t>(checkpointSlice, 1));
+    copy.insert(copy.end(), mesh.positions.begin() + std::ptrdiff_t(done), mesh.positions.begin() + std::ptrdiff_t(end));
+    if (end < V) return;
     checkpoints_[id] = std::move(copy);
+    pending_ = PendingCheckpoint{};
     enforceBudgets();
 }
 

@@ -651,7 +651,7 @@ void Sculptor::kelvinletSingle(Mesh& mesh, BVH& bvh, const KelvinletKernel& k, c
     if (verts_.empty()) return;
     displaceAll(mesh, verts_, scratch_);
     if (kept * 4 > total) {
-        finishDab(mesh, bvh, clock); // much of the region moved: refit and renormal the queried leaves
+        finishDab(mesh, bvh, clock, true); // much of the region moved: refit and renormal the queried leaves
         return;
     }
     timings.kernelMs += lapMs(clock);

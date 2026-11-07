@@ -217,6 +217,9 @@ public:
 
     UndoRecord endStroke();
     bool strokeActive() const { return active_; }
+    // The vertices the last dab listed for the normals beside their leaves (0 unless remeshing: tests check the
+    // dab copies no region it doesn't need).
+    size_t dabVerticesListed() const { return dabVerts_.size(); }
     // Whole-mesh operations (core/Deform.h) inside a stroke: moves `verts` (each once, increasing) by `d` as given
     // (the caller weighed in the mask), recorded for undo and written to the stroke's layer; then their normals
     // and the BVH.
@@ -371,7 +374,8 @@ private:
     float kelvinLastCut_ = 0.0f;
     uint64_t snakeStroke_ = 0;
     float snakeTravel_ = 0.0f;
-    void finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_point clock);
+    // listVertices: into dabVerts_ even when the leaves' normals cover them (Kelvinlet: another mirror may take rings).
+    void finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_point clock, bool listVertices = false);
     void updateDabNormals(Mesh& mesh, const BVH& bvh);
     void touch(Mesh& mesh, uint32_t v);
     // The one place brushes move vertices: scales `d` by vertexInfluence().
