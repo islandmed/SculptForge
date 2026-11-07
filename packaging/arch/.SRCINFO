@@ -1,6 +1,6 @@
 pkgbase = sculptforge
 	pkgdesc = Free, open-source digital sculpting app with classic sculpting keys, for artists and game pipelines
-	pkgver = 0.11.12
+	pkgver = 0.11.13
 	pkgrel = 1
 	url = https://sculptforge.app/
 	arch = x86_64
@@ -17,10 +17,10 @@ pkgbase = sculptforge
 	depends = hicolor-icon-theme
 	optdepends = ollama: local AI for the Brush Lab
 	optdepends = ffmpeg: recording demo videos (sculptforge --record)
-	source = sculptforge-0.11.12.tar.gz::https://github.com/islandmed/SculptForge/archive/refs/tags/v0.11.12.tar.gz
+	source = sculptforge-0.11.13.tar.gz::https://github.com/islandmed/SculptForge/archive/refs/tags/v0.11.13.tar.gz
 	source = imgui-1.91.9.tar.gz::https://github.com/ocornut/imgui/archive/refs/tags/v1.91.9.tar.gz
 	source = glm-1.0.1.tar.gz::https://github.com/g-truc/glm/archive/refs/tags/1.0.1.tar.gz
-	sha256sums = a1bed1f74ea5b97824f54f23581987fc908ba854c602b6cd4de66ef3c77fb33d
+	sha256sums = 963c25e4d4f87c7f43a5b51bab63d009d27dbbbd562295b2131838b36e4130f7
 	sha256sums = 3872a5f90df78fced023c1945f4466b654fd74573370b77b17742149763a7a7c
 	sha256sums = 9f3174561fd26904b23f0db5e560971cbf9b3cbda0b280f04d5c379d03bf234c
 
