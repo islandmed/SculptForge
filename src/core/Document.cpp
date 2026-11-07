@@ -83,6 +83,7 @@ void Document::selectPart(int i) {
         return;
     }
     uvSelection.clear();
+    edgeSelection.clear();
     // Check the active Part back in, then check `i` out. Swapping keeps each
     // mesh's GPU dirty state, so the renderer doesn't re-upload anything.
     auto swapIn = [this](PartData& s) {

@@ -442,6 +442,7 @@ void App::registerShellActions() {
             doc_.activeBrush = -1;
             paintMode_ = false;
             guidesMode_ = false; // leaves the QRemesh Guides brush
+            edgesMode_ = false;  // and Edges mode
             maskBrush_.on = false;
         };
         a.checked = [this, type] { return brush_ == type && doc_.activeBrush < 0 && !paintMode_ && !guidesMode_; };

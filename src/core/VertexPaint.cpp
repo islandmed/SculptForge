@@ -5,6 +5,7 @@
 #include "core/LayerStack.h"
 #include "core/MaterialRecipe.h"
 #include "core/MeshMaps.h"
+#include "core/EdgeSelect.h"
 #include "core/Uv.h"
 #include "core/MapExport.h"
 
@@ -530,6 +531,7 @@ void registerPaintCommands(CommandRegistry& registry) {
     registerPaintLayerCommands(registry); // paint_layer_* (core/PaintLayer.cpp)
     registerTextureCommands(registry);    // texture_*, uv_auto, paint_target (core/TextureCommands.cpp)
     registerUvCommands(registry);         // uv_unwrap, uv_pack, uv_seam, uv_select, ... (core/UvCommands.cpp)
+    registerEdgeCommands(registry);       // edge_select (core/EdgeSelect.cpp)
     registerTextureChannelCommands(registry); // texture_channels, paint_material, channel_view (core/TextureChannelCommands.cpp)
     registerMeshMapCommands(registry);        // mesh_maps (core/MeshMaps.cpp)
     registerLayerStackCommands(registry);     // fill_layer (core/LayerStack.cpp)

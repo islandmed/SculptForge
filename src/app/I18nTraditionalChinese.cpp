@@ -4610,6 +4610,23 @@ constexpr Entry kTraditionalChinese[] = {
      "這張顯示卡不會回報記憶體使用量"},
     {"Updated every second",
      "每秒更新"},
+    // --- Tool > Geometry > Edges (PanelEdges.cpp, #108) ---
+    {"Add every edge that touches a selected one.", "加入與已選邊相接的所有邊。"},
+    {"Add the open (border) edges: the rims of holes and of open surfaces.", "加入開放（邊界）邊：孔洞與開放曲面的邊緣。"},
+    {"Deselect All", "全部取消選取"},
+    {"Deselect every edge.", "取消選取所有邊。"},
+    {"Drop the selected edges at the loose ends of the selection (Shrink takes back what Grow added; closed loops keep every edge).", "移除選取範圍末端的已選邊（縮減會撤回擴張加入的邊；封閉循環保留所有邊）。"},
+    {"Edges", "邊"},
+    {"Edges mode", "邊模式"},
+    {"Edges mode selects edges of the base level", "邊模式選取基礎層級的邊"},
+    {"Only within selection", "僅在選取範圍內"},
+    {"Open Edges", "開放邊"},
+    {"Select by Angle", "依角度選取"},
+    {"Select by Angle keeps only the edges among those selected now (e.g. a loop's sharp stretch).", "依角度選取只保留目前已選邊中的邊（例如循環中銳利的一段）。"},
+    {"Select by Angle takes the edges where the faces on either side meet at more than this many degrees (0 = flat). 30 finds the hard edges of most models; lower finds softer ones too.", "依角度選取會選取兩側面夾角大於此度數的邊（0 = 平坦）。30 可找到大多數模型的硬邊；更低的值也會找到較柔和的邊。"},
+    {"Select edges of the base level on the model, for edge creases: click an edge, Shift+click adds, Ctrl+click removes, double-click takes its edge loop. A Part with subdivision levels steps down to Level 1 (its base) first. Click the button again to sculpt.", "在模型上選取基礎層級的邊，用於邊摺痕：按一下一條邊，Shift+按一下加入，Ctrl+按一下移除，按兩下選取其邊循環。有細分層級的部件會先降到層級 1（其基礎）。再按一次該按鈕即可雕刻。"},
+    {"Select every edge where the faces on either side meet at more than the Angle (30 degrees by default): the hard edges of a model. With Only within selection it keeps just those among the edges selected now.", "選取兩側面夾角大於「角度」（預設 30 度）的所有邊：即模型的硬邊。勾選「僅在選取範圍內」時，只保留目前已選邊中的這些邊。"},
+    {"Select the edges that aren't selected, and drop those that are.", "選取未選取的邊，並取消已選取的邊。"},
 };
 
 } // namespace

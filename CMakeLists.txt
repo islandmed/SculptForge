@@ -119,6 +119,7 @@ add_library(sculptforge_core STATIC
   src/core/PaintLayer.cpp
   src/core/Texture.cpp
   src/core/TextureCommands.cpp
+  src/core/EdgeSelect.cpp
   src/core/Uv.cpp
   src/core/UvCommands.cpp
   src/core/UvPack.cpp
@@ -446,6 +447,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelPbr.cpp
     src/app/PanelFill.cpp
     src/app/PanelGeometry.cpp
+    src/app/PanelEdges.cpp
     src/app/Gizmo.cpp
     src/app/PanelBake.cpp
     src/app/FocusDetailApp.cpp

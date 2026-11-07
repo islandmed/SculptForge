@@ -755,6 +755,7 @@ void App::initActions() {
                 doc_.activeBrush = -1;
                 paintMode_ = false;
                 guidesMode_ = false; // leaves the QRemesh Guides brush
+                edgesMode_ = false;  // and Edges mode
                 maskBrush_.on = false;
             },
             ICON_LC_BRUSH, nullptr, [this, type] { return brush_ == type && doc_.activeBrush < 0 && !paintMode_ && !guidesMode_; }, nullptr,
@@ -883,6 +884,7 @@ void App::initActions() {
     registerBakeUiActions();    // Tool > Bake (PanelBake.cpp)
     registerUvEditorActions();  // UV Editor (PanelUvEditor.cpp)
     registerRetopoUiActions(); // Geometry > QRemesh, Part > ProjectAll (PanelRetopo.cpp)
+    registerEdgeUiActions();   // Geometry > Edges (PanelEdges.cpp)
     registerForgeSphereUiActions(); // Tool > Forge Spheres (PanelForge Spheres.cpp)
     registerTubeUiActions();        // Tool > Tube (PanelTube.cpp)
     registerSplatTrainUi();    // Splats > Train from capture (PanelSplatTrain.cpp)

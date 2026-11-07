@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Tool > Geometry, grouped by what you do: Levels (the Level slider, Lower / Higher Level, Add Level with Smooth,
-// Rebuild Lower Levels, Remove Below / Above), Micro Detail, Resolution (Decimate, Quad Remesh, Subdivide), Cleanup
-// (Fill Holes, Merge by Distance, Check Mesh) and Symmetry (Make Symmetric). The levels themselves live in core/Multires.
+// Rebuild Lower Levels, Remove Below / Above), Edges (PanelEdges.cpp), Micro Detail, Resolution (Decimate, Quad
+// Remesh, Subdivide), Cleanup (Fill Holes, Merge by Distance, Check Mesh) and Symmetry (Make Symmetric). The levels
+// themselves live in core/Multires.
 #include "app/App.h"
 #include "app/Demo.h"
 #include "app/Palettes.h"
@@ -26,7 +27,7 @@ void App::drawGeometrySection() {
     const ImGuiStyle& style = ImGui::GetStyle();
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
 
-    // Grouped by what you do (fix/ip-labels): Levels, Micro Detail, Resolution, Cleanup, Symmetry.
+    // Grouped by what you do (fix/ip-labels): Levels, Edges, Micro Detail, Resolution, Cleanup, Symmetry.
     tray::GroupLabel(*this, "Levels");
     // Level: the slider (1 = the base cage). Applied when released, as one undo step.
     ImGui::BeginDisabled(levels < 2);
@@ -69,6 +70,7 @@ void App::drawGeometrySection() {
     } else {
         ImGui::TextDisabled("%s", tr("No subdivision levels - Add Level adds them"));
     }
+    drawEdgesSection(); // Edges: Edges mode, Select by Angle (PanelEdges.cpp)
 
     // Micro: displacement levels above the highest level (core/Micro.h), in a group of its own: Add Level and Remove
     // Below / Remove Above change the levels, Micro only adds detail on top (a tester mixed them up side by side).

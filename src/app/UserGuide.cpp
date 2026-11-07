@@ -452,6 +452,7 @@ std::string UserGuide::chapterFor(const std::string& palette, const std::string&
     if (starts("Tool > Forge Spheres") || starts("Tool > Forge Spheres")) return "forge-spheres.md";
     if (starts("Tool > Layers")) return "layers.md";
     if (starts("Tool > Facial Shapes")) return "facial-shapes.md";
+    if (starts("Tool > Geometry > Edges")) return "edges.md";
     if (starts("Tool > Geometry") || starts("Tool > Remesh")) return "geometry.md";
     if (starts("Tool > Masking")) return "masking.md";
     if (starts("Tool > Face Groups") || starts("Tool > Face groups") || starts("Tool > Visibility")) return "face-groups.md";
