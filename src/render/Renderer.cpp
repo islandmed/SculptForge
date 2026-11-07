@@ -3662,7 +3662,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     // (While a stroke's edits wait for their levels, all of it in full: edited clusters in full beside coarse ones
     // would leave seams, and squeeze the rest to the coarsest level.)
     bool coarse = coarseLod_ && coarseAllowed && s.coarse && s.coarse->clusters.size() == s.drawCount.size() &&
-                  s.coarsePending.empty() && (settings.motionProxy || s.drawnTriangles > budget);
+                  s.coarsePending.empty() && !settings.fullDetail && (settings.motionProxy || s.drawnTriangles > budget);
     // At rest the real detail, if one full frame fits the still-frame budget (a single slow frame is fine).
     if (static const bool log = std::getenv("SF_COARSE_LOG") != nullptr; log && coarse)
         std::fprintf(stderr, "coarse lod: still %.2f s, moving %d, stroking %d, pending %zu, per triangle %.3g ms\n", settings.stillSeconds,
@@ -3698,7 +3698,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     // the main draw (same depth: it paints over it), and that cluster's vertices go up once as a stroke upload does.
     // SF_NO_STROKE_WARM=1 leaves it out (to compare); SF_FRAME_LOG says what it cost.
     static const bool noWarm = std::getenv("SF_NO_STROKE_WARM") != nullptr;
-    if (active && !noWarm && !thumbnailPass_ && !textured && !normalMapped && drawAlpha_ >= 1.0f && !xrayCull_ && !drawClusters_.empty() &&
+    if (active && !noWarm && !thumbnailPass_ && !settings.fullDetail && !textured && !normalMapped && drawAlpha_ >= 1.0f && !xrayCull_ && !drawClusters_.empty() &&
         s.strokeWarmed != features && s.strokeWarmFrames++ >= 1) {
         s.strokeWarmed = features;
         const auto warmStart = std::chrono::steady_clock::now();

@@ -1149,6 +1149,37 @@ double Demo::query(const std::string& name, bool& known) const {
         app_.benchmarkDrawMs(0);
         return double(app_.renderer_.coarseDrawnClusters());
     }
+    if (name == "timelapse_flicker") {
+        // The timelapse's frames on a static camera (320x180, as renderTimelapseFrame draws them): through the
+        // history, then a hold on the last step. Held frames show the same model from the same place, so they must
+        // match: the largest mean per-pixel luma change (0-255) between consecutive held frames.
+        Timeline* t = Timeline::of(app_.doc_.undo);
+        if (!t || t->cursor() == 0) return -1.0;
+        const size_t last = t->cursor();
+        Camera cam = app_.camera_;
+        cam.frame(app_.sceneBounds());
+        cam.pitch = app_.camera_.pitch;
+        cam.distance *= 0.72f;
+        cam.aspect = 320.0f / 180.0f;
+        std::vector<uint8_t> prev, rgba;
+        double worst = 0.0;
+        std::string err;
+        for (size_t step = 0; step <= last + 6; ++step) {
+            const size_t at = std::min(step, last);
+            if (at != t->cursor() && !t->seek(app_.doc_, at, &err)) return -2.0;
+            if (!app_.renderTimelapseFrame(cam, 320, 180, rgba, err)) return -3.0;
+            if (step > last && prev.size() == rgba.size()) {
+                double sum = 0.0;
+                for (size_t i = 0; i + 3 < rgba.size(); i += 4) {
+                    const auto luma = [](const uint8_t* p) { return 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]; };
+                    sum += std::abs(luma(&rgba[i]) - luma(&prev[i]));
+                }
+                worst = std::max(worst, sum / double(rgba.size() / 4));
+            }
+            prev.swap(rgba);
+        }
+        return worst;
+    }
     if (name == "stroke_programs") return double(app_.renderer_.strokePrograms()); // compiled before any stroke (warmed)
     if (name == "render_patch_errors") { // the 3D view drawn once more now: dynamic-topology patch triangles wrong on the GPU
         app_.benchmarkDrawMs(0);

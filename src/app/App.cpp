@@ -398,6 +398,7 @@ int App::renderHeadless() {
     settings.showFaceGroups = settings.showFaceGroups || options_.facegroups;
     settings.showMesh = !options_.hideMesh;
     settings.dimInactive = false; // a beauty shot: every Part at full brightness
+    settings.fullDetail = true;   // (never the view's coarse levels: a turntable's frames all alike)
     syncScene();
     const std::filesystem::path out(std::u8string(options_.renderPath.begin(), options_.renderPath.end()));
     for (int f = 0; f < frames; ++f) {

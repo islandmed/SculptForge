@@ -263,9 +263,6 @@ bool App::timelapseStep(double budgetSeconds) {
         return false;
     };
     if (!t || j.cancelled) return finish(false);
-    RenderSettings settings = renderSettings_;
-    settings.dimInactive = false;
-    settings.motionProxy = false;
     while (j.frame < j.frames) {
         // The history plays between the two holds; the camera turns once around the model over the whole video.
         const int sweep = std::max(1, j.frames - j.hold0 - j.hold1);
@@ -278,8 +275,7 @@ bool App::timelapseStep(double budgetSeconds) {
         }
         Camera cam = j.camera;
         cam.yaw = j.yaw0 + 6.2831853f * float(j.frame) / float(j.frames);
-        syncScene();
-        if (!renderer_.renderToImage(cam, j.width, j.height, settings, j.rgba, err)) {
+        if (!renderTimelapseFrame(cam, j.width, j.height, j.rgba, err)) {
             j.error = err;
             return finish(false);
         }
@@ -293,6 +289,19 @@ bool App::timelapseStep(double budgetSeconds) {
             return true;
     }
     return finish(true);
+}
+
+// One frame as the timelapse renders it: the view's look, every Part at full brightness, the full mesh (never the
+// view's coarse levels or proxy, which switch with how long the view has been still and with edits waiting for their
+// levels: the history's seeks flipped dense meshes between the two from frame to frame).
+bool App::renderTimelapseFrame(const Camera& cam, int width, int height, std::vector<uint8_t>& rgba, std::string& err) {
+    RenderSettings settings = renderSettings_;
+    settings.dimInactive = false;
+    settings.motionProxy = false;
+    settings.stroking = false;
+    settings.fullDetail = true;
+    syncScene();
+    return renderer_.renderToImage(cam, width, height, settings, rgba, err);
 }
 
 int App::runTimelapseCli() {
