@@ -2372,9 +2372,12 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "expect_status") {
         if (!need(1)) return false;
         const std::string text = restOf(lineText_, 1);
-        run([this, line, text] {
-            if (app_.status_.find(text) == std::string::npos)
-                fail(line, "status is \"" + app_.status_ + "\", expected it to contain \"" + text + "\"");
+        // Polls: some statuses come from a worker (Generate 3D's refusals), which a slow runner reports late.
+        steps_.push_back([this, line, text](float t) {
+            if (app_.status_.find(text) != std::string::npos) return true;
+            SDL_Delay(10);
+            if (t > 5.0f) fail(line, "status is \"" + app_.status_ + "\", expected it to contain \"" + text + "\"");
+            return t > 5.0f;
         });
     } else if (verb == "expect_help") {
         if (!need(1)) return false;
