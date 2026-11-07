@@ -142,7 +142,7 @@ jobs:
       - run: |
           python3 tools/media_takedown.py --self-test
           python3 tools/check_marks_media.py || { grep -q . <(python3 tools/check_marks_media.py 2>/dev/null | grep "not in tools/marks_media_cache.json") &&
-            sudo apt-get install -y -qq tesseract-ocr ffmpeg python3-pil >/dev/null && python3 tools/check_marks_media.py; }
+            sudo apt-get update -qq && sudo apt-get install -y -qq tesseract-ocr ffmpeg python3-pil >/dev/null && python3 tools/check_marks_media.py; }
 
   build:
     name: ${{ matrix.name }} (${{ matrix.shard }}/${{ matrix.shards }})
