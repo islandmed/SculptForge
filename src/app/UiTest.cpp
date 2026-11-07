@@ -636,6 +636,14 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "guides_mode") return app_.guidesMode_ ? 1.0 : 0.0;
     if (name == "forgespheres") return double(m.forgespheres.size());
     if (name == "forgesphere_preview") return m.forgespherePreview ? 1.0 : 0.0;
+    if (name == "tube_points") return double(m.tube.points.size()); // the active Tube Part's (Tube, PanelTube.cpp)
+    if (name == "tube_draw") return app_.tubeDraw_ ? 1.0 : 0.0;
+    if (name == "tube_selected") return double(app_.tubeSelection());
+    if (name == "tube_parts") {
+        int n = 0;
+        for (int i = 0; i < app_.doc_.partCount(); ++i) n += !app_.doc_.partMesh(i).tube.empty();
+        return double(n);
+    }
     if (name == "forgesphere_selected") return double(app_.forgesphereSelection());
     if (name == "forgesphere_menu") return app_.zsMenuShown_ ? 1.0 : 0.0;
     if (name == "forgesphere_place_child") return app_.forgespherePlaceChild_ ? 1.0 : 0.0;
@@ -1731,6 +1739,37 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             std::string got = app_.actions_.shortcutText(id);
             if (!app_.actions_.find(id)) fail(line, "no action " + id);
             else if (got != want) fail(line, id + " has \"" + got + "\", expected \"" + want + "\"");
+        });
+    } else if (verb == "drag_tube_point") {
+        // drag_tube_point K DX DY [seconds]: press on control point K of the active Tube Part (else the first visible
+        // one; Tube, PanelTube.cpp) and drag it DX, DY pixels; 0 0 is a click.
+        if (!need(3)) return false;
+        const int index = int(num(1, 0));
+        const float dx = num(2, 0), dy = num(3, 0), seconds = num(4, 0.4f);
+        auto start = std::make_shared<ImVec2>();
+        steps_.push_back([this, line, index, dx, dy, seconds, start](float t) {
+            if (t == 0.0f) {
+                const Document& doc = app_.doc_;
+                int part = doc.mesh.tube.empty() ? -1 : doc.activePart;
+                for (int i = 0; part < 0 && i < doc.partCount(); ++i)
+                    if (doc.parts[size_t(i)].visible && !doc.partMesh(i).tube.empty()) part = i;
+                const TubeShape* tube = part >= 0 ? &doc.partMesh(part).tube : nullptr;
+                if (!tube || index < 0 || size_t(index) >= tube->points.size() ||
+                    !app_.gizmoProject(tube->points[size_t(index)].position, *start)) {
+                    fail(line, "tube point " + std::to_string(index) + " is not on screen");
+                    return true;
+                }
+                mouseMotion(start->x, start->y);
+                return false;
+            }
+            if (!buttonDown_ && t < seconds) mouseButton(true, SDL_BUTTON_LEFT);
+            const float u = std::min(t / seconds, 1.0f);
+            mouseMotion(start->x + dx * u, start->y + dy * u);
+            if (t >= seconds) {
+                mouseButton(false, SDL_BUTTON_LEFT);
+                return true;
+            }
+            return false;
         });
     } else if (verb == "drag_landmark") {
         if (!need(3)) return false;

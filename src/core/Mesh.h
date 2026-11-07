@@ -88,6 +88,20 @@ struct ForgeSphere {
     int parent = -1;
 };
 
+// A Tube's curve (core/Tube.h): control points the tube passes through, each with its own radius. Not empty =
+// a Tube Part, whose triangles are swept along the curve until Bake.
+struct TubePoint {
+    glm::vec3 position{0.0f};
+    float radius = 0.1f;
+};
+struct TubeShape {
+    std::vector<TubePoint> points;
+    bool flatCaps = false; // flat ends instead of round
+    bool mirrorX = false;  // a mirror copy across x = 0 (symmetry X)
+    float edge = 0.0f;     // target edge length; 0 = from the radius (16 sides around the average)
+    bool empty() const { return points.empty(); }
+};
+
 class Mesh {
 public:
     std::vector<glm::vec3> positions;
@@ -208,6 +222,9 @@ public:
     // spheres and their links, or the skin while `Forge SpherePreview`). Copies, undo steps and projects carry it.
     std::vector<ForgeSphere> forgespheres;
     bool forgespherePreview = false;
+
+    // Tube (core/Tube.h): not empty = a Tube Part, whose triangles are swept from this curve; Bake clears it.
+    TubeShape tube;
 
     // Selection Sets (core/SelectionSets.h): named snapshots of the mask, face groups, vertex paint, hidden faces, UVs
     // and shape, immutable and shared by copies of the mesh (undo steps swap the whole list). They belong to the

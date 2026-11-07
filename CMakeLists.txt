@@ -149,6 +149,7 @@ add_library(sculptforge_core STATIC
   src/core/QRemesh2Param.cpp
   src/core/QuadQuality.cpp
   src/core/ForgeSpheres.cpp src/core/AgentTools.cpp
+  src/core/Tube.cpp
   src/core/Projection.cpp
   src/core/RetopoCommands.cpp
   third_party/xatlas/xatlas.cpp
@@ -443,6 +444,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/FocusDetailApp.cpp
     src/app/PanelRetopo.cpp
     src/app/PanelForgeSpheres.cpp
+    src/app/PanelTube.cpp
     src/app/PanelSplatTrain.cpp
     src/app/PanelSculptable.cpp
     src/app/PanelPerformance.cpp

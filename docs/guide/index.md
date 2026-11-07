@@ -45,6 +45,7 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 13. [Parts](parts.md)
     - [Linked Duplicates](linked-duplicates.md)
 14. [Forge Spheres](forge-spheres.md)
+    - [Tube: draw in 3D space](tube.md)
 15. [Vertex Paint and materials](vertex-paint.md)
 16. [Texture painting](texture-painting.md)
 17. [UV Editor](uv-editor.md)

@@ -487,6 +487,7 @@ void registerCloseHolesCommands(CommandRegistry& registry) {
          [](Document& doc, const Args& a) -> CommandResult {
              if (doc.mesh.triangleCount() == 0) return {false, "The Part is empty"};
              if (!doc.mesh.forgespheres.empty()) return {false, "Close Holes: make Forge Spheres into a mesh first"};
+             if (!doc.mesh.tube.empty()) return {false, "Close Holes: bake the Tube first"};
              if (doc.mesh.micro) return {false, "Close Holes: apply or remove the micro level first"};
              CloseHolesOptions o;
              o.maxEdges = size_t(std::max(0.0, argNumber(a, "max_edges", 0.0)));

@@ -13,6 +13,7 @@
 #include "core/Texture.h"
 #include "core/ThreadPool.h"
 #include "core/ForgeSpheres.h"
+#include "core/Tube.h"
 #include "io/Zip.h"
 
 #include <algorithm>
@@ -952,6 +953,7 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
             st.set("forgespheres", forgespheresToJson(m.forgespheres));
             if (m.forgespherePreview) st.set("forgesphere_preview", true);
         }
+        if (const Mesh& m = doc.partMesh(i); !m.tube.empty()) st.set("tube", tubeToJson(m.tube)); // a Tube Part (core/Tube.h); optional
         parts.push(std::move(st));
     }
     manifest.set("parts", std::move(parts));
@@ -1104,6 +1106,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             if (!readMesh(r, sj["mesh"], sj["layers"], s.mesh, error, false, false)) return false;
             s.mesh.forgespheres = forgespheresFromJson(sj["forgespheres"]);
             s.mesh.forgespherePreview = !s.mesh.forgespheres.empty() && sj["forgesphere_preview"].asBool(false);
+            s.mesh.tube = tubeFromJson(sj["tube"]);
             readSelectionSets(r, sj["selection_sets"], s.mesh, skippedSets);
             // The BVH builds (on the pool) while the levels and topology load (off it), then the normals.
             s.startBvh();

@@ -160,6 +160,7 @@ void registerAgentTools(CommandRegistry& reg) {
                      out += "\n" + std::to_string(i) + ". " + p.name + ": " + std::to_string(m.triangleCount()) + " triangles";
                      if (subdivLevelCount(m)) out += ", " + subdivLevelText(m);
                      if (!m.forgespheres.empty()) out += ", Forge Spheres (" + std::to_string(m.forgespheres.size()) + ")";
+                     if (!m.tube.empty()) out += ", Tube (" + std::to_string(m.tube.points.size()) + " points, editable until tube_bake)";
                      if (m.triangleCount()) out += ", " + partLine(doc, i);
                      if (i == doc.activePart) out += ", active";
                      if (!p.visible) out += ", hidden";

@@ -36,6 +36,7 @@
 #include "core/Project.h"
 #include "core/QRemesh.h"
 #include "core/ForgeSpheres.h"
+#include "core/Tube.h"
 #include "core/Garment.h"
 #include "core/Deform.h"
 #include "core/Sculptable.h"
@@ -694,6 +695,7 @@ CommandRegistry::CommandRegistry() {
     registerRetopoCommands(*this); // qremesh, project_all (RetopoCommands.cpp)
     registerQRemeshGuideCommands(*this); // qremesh_guide, ... (QRemeshGuides.cpp)
     registerForgeSphereCommands(*this);      // Forge Sphere_new, ... (Forge Spheres.cpp)
+    registerTubeCommands(*this);             // tube_new, ... (Tube.cpp)
     registerAgentTools(*this);               // blockout, measure, scene_overview (core/AgentTools.cpp)
     registerDeformCommands(*this);       // deform_polish, deform_relax, deform_smooth, deform_balloon (Deform.cpp)
 

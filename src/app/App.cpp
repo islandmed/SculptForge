@@ -1782,6 +1782,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     if (button == SDL_BUTTON_LEFT) {
         if (axisGizmoMouseDown(x, y)) return;   // the axis gizmo's ends snap to a side view (#43)
         if (forgesphereMouseDown(x, y, mod)) return; // a Forge Sphere Part takes clicks on it (PanelForge Spheres.cpp)
+        if (tubeMouseDown(x, y, mod)) return;        // Draw Tube, a Tube Part's points (PanelTube.cpp)
         if (stencilMouseDown(x, y, nav)) return; // Adjust Stencil: move, scale, turn it (StencilOverlay.cpp)
         if (gradientMouseDown(x, y, nav)) return; // Line Gradient: a new line or an end handle (LineGradient.cpp)
         if (facegroupMouseDown(x, y, mod)) return;
@@ -1965,6 +1966,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Gradient: gradientMouseMove(x, y); break;
     case Drag::Stencil: stencilMouseMove(x, y); break;
     case Drag::ForgeSphere: forgesphereDragTo(x, y); break;
+    case Drag::Tube: tubeDragTo(x, y); break;
     case Drag::AirStroke: airStrokeTo(x, y); break;
     case Drag::QuickRemesh: break; // (remeshes when let go)
     case Drag::SizeScrub:
@@ -2112,6 +2114,7 @@ void App::onMouseUp() {
     if (drag_ == Drag::Gradient) gradientMouseUp();
     if (drag_ == Drag::Stencil) stencilMouseUp();
     if (drag_ == Drag::ForgeSphere) forgesphereRelease();
+    if (drag_ == Drag::Tube) tubeRelease();
     if (drag_ == Drag::AirStroke) airStrokeRelease();
     gizmoRelease();
     drag_ = Drag::None;
@@ -3066,6 +3069,7 @@ void App::drawUi() {
     drawUvEditorOverlay(); // UV seams on the model, the Seam tool's cursor (PanelUvEditor.cpp)
     drawForgeSphereOverlay(); // the sphere under the cursor (PanelForge Spheres.cpp)
     drawForgeSphereMenu();    // a right click on a sphere
+    drawTubeOverlay();        // Draw Tube's trail and cursor, a Tube Part's points (PanelTube.cpp)
     drawFaceOverlay();   // facial landmarks (PanelFace.cpp)
     drawSplatTrainOverlay(); // splat training progress (PanelSplatTrain.cpp)
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
@@ -3081,7 +3085,7 @@ void App::drawUi() {
     }
     // In Gizmo mode (and with the QRemesh Guides brush) the brush ring shows only while Ctrl masks or Shift smooths.
     const bool ringOff = gizmoActive() || stencil_.adjust || (guidesMode_ && !(inputMods() & SDL_KMOD_SHIFT)) || sculptableHot() || forgesphereActive() ||
-                         uvToolActive();
+                         uvToolActive() || tubeDraw_ || tubeActive();
     // (The S / O pop-up holds the mouse, but its ring shows where it opened, #138.)
     ImVec2 sliderOpened;
     PickerUi::Slider sliderWhich;

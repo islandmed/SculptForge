@@ -202,6 +202,10 @@ size_t deformActivePart(Document& doc, DeformOp op, const DeformOptions& o, std:
         error = name + ": the active Part is a Forge Sphere Part (Make Mesh first)";
         return 0;
     }
+    if (!mesh.tube.empty()) {
+        error = name + ": the active Part is a Tube Part (Bake it first)";
+        return 0;
+    }
     if (mesh.micro) {
         error = name + ": the active Part has a micro level (Bake Micro or Delete Micro first)";
         return 0;

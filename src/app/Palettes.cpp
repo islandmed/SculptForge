@@ -856,6 +856,12 @@ void App::drawPalette_Tool() {
         drawForgeSpheresContents(); // PanelForge Spheres.cpp
         Demo::popScope();
     }
+    if (subpalette("tool.tube", "Tube")) {
+        tray::Section section;
+        Demo::pushScope("Tube");
+        drawTubeContents(); // PanelTube.cpp
+        Demo::popScope();
+    }
     if (subpalette("tool.layers", "Layers")) {
         tray::Section section;
         Demo::pushScope("Layers");
