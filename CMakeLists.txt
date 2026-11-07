@@ -786,6 +786,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The release's SBOM (tools/release/sbom.py, docs/guide/security.md): every fetched archive is a listed component.
     add_test(NAME sbom COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/sbom.py --check)
     add_test(NAME marks_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py --self-test)
+    # Our email address stays off everything public (website/, docs/, README*): hello@ is a private support inbox.
+    add_test(NAME public_email COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_public_email.py
+             ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME public_email_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_public_email.py --self-test)
     # The same marks read off the pixels of every tracked image and video (OCR, cached by file hash), and the deploy's
     # takedown of flagged ones (tools/media_takedown.py).
     add_test(NAME marks_media COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks_media.py
