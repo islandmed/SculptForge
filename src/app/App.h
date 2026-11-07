@@ -1339,15 +1339,19 @@ private:
     void syncEdgesMode();
     bool edgesMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
     uint32_t edgeUnderCursor(float x, float y);           // kNoEdge off the model
-    void drawEdgeOverlay();                                // the selected edges and the one under the cursor
+    void drawEdgeOverlay();                                // the selected and creased edges, the one under the cursor
     void drawEdgesSection();                               // Geometry > Edges
     bool edgesMode_ = false;
     float edgeAngle_ = 30.0f;
     bool edgeWithin_ = false;
+    float edgeCrease_ = 1.0f; // the value Crease sets
     struct EdgeOverlay {
         const void* topo = nullptr;
-        uint64_t revision = 0, visibleKey = 0;
-        std::vector<uint32_t> edges;  // the selected edges
+        uint64_t revision = 0, creaseKey = 0, visibleKey = 0;
+        std::vector<uint32_t> edges;  // the selected edges (in Edges mode), then the creased ones
+        size_t selectedEdges = 0;     // how many of `edges` are selected ones
+        size_t creased = 0;           // creased edges of the Part
+        std::vector<float> crease;    // per entry of `edges`
         std::vector<uint8_t> visible; // per entry of `edges`
         uint32_t hovered = ~0u;
     } edgeOverlay_;

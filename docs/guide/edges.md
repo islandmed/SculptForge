@@ -1,4 +1,4 @@
-# Edges: selecting edges for creases
+# Edges: selecting and creasing edges
 
 **Tool > Geometry > Edges** selects edges of a Part's base mesh: one by one, as whole edge loops, along open
 borders, or every hard edge at once by the angle between its faces. The selection is what edge creases are set
@@ -40,10 +40,22 @@ Select by Angle to keep only its hard stretch.
 - **Open Edges** adds the open (border) edges: the rims of holes and of open surfaces.
 - **Invert** swaps selected and unselected edges; **Deselect All** clears the selection.
 
-The line under the buttons counts the selection: *12 edges selected of 1920*.
+The line under the buttons counts the selection (and the creased edges): *12 edges selected of 1920*.
 
 The selection belongs to the active Part. Picking another Part, or changing the mesh's polygons (remeshing,
 Dynamic topology, Delete Hidden), drops it. It isn't part of undo, and it stays when you leave Edges mode.
+
+## Creases
+
+**Crease** gives the selected edges a crease of the **Crease** value: 1 is fully sharp, lower values are softer (0.5
+is half as sharp). **Uncrease** removes it. Each is one undo step.
+
+Creased edges are drawn in blue over the base level, brighter and thicker the sharper they are, also when you are
+sculpting (not in Edges mode); selected creased edges are a thicker orange line. The line under the buttons counts
+them: *24 edges selected of 48, 24 creased*.
+
+Creases are saved in the project with the base level and stay there while you step up and down the levels.
+Subdivision that keeps creased edges sharp comes in the next step of #108.
 
 ## Big meshes
 
@@ -64,6 +76,19 @@ edge_select op=info
 
 `op` is `edge`, `loop`, `angle`, `open`, `grow`, `shrink`, `all`, `none`, `invert` or `info`. `edge` and `loop`
 take an edge index (`edge=N`) or the two vertices it joins (`a=` `b=`).
+
+Creases are the `edge_crease` command:
+
+```
+edge_crease value=1
+edge_crease value=0.5
+edge_crease clear=true
+edge_crease clear=true all=true
+edge_crease info=true
+```
+
+`value` (0..1, default 1) is set on the selected edges; `clear` removes their crease; `all` works on every creased
+edge of the Part instead of the selection.
 
 ## See also
 

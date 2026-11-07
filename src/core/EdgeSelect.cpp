@@ -9,6 +9,7 @@
 #include "core/Mesh.h"
 #include "core/Multires.h"
 #include "core/ThreadPool.h"
+#include "core/Undo.h"
 #include "core/Uv.h"
 
 #include <algorithm>
@@ -290,6 +291,41 @@ std::string edgeSelectionText(const EdgeSelection& sel) {
     return count(sel.count, "edge") + " selected of " + std::to_string(total);
 }
 
+float edgeCrease(const Mesh& m, const EdgeTopology& topo, uint32_t e) {
+    if (m.creases.size() != m.triangleCount() * 3 || e >= topo.edgeCount()) return 0.0f;
+    const uint32_t c = topo.edgeCorner[e], d = topo.twin[c];
+    return std::max(m.creases[c], d == kNoCorner ? 0.0f : m.creases[d]);
+}
+
+size_t edgeSetCrease(Mesh& m, const EdgeTopology& topo, const std::vector<uint8_t>& edges, float value,
+                     UndoChannel<float>* undo) {
+    value = std::isfinite(value) ? std::clamp(value, 0.0f, 1.0f) : 0.0f;
+    if (value == 0.0f && !m.hasCreases()) return 0;
+    std::vector<float>& cr = m.ensureCreases();
+    size_t changed = 0;
+    auto set = [&](uint32_t c) {
+        if (c == kNoCorner || cr[c] == value) return false;
+        if (undo) undo->add(c, cr[c]);
+        cr[c] = value;
+        return true;
+    };
+    for (uint32_t e = 0; e < edges.size() && e < topo.edgeCount(); ++e) {
+        if (!edges[e]) continue;
+        const uint32_t c = topo.edgeCorner[e];
+        const bool a = set(c), b = set(topo.twin[c]);
+        changed += a || b;
+    }
+    if (value == 0.0f && std::all_of(cr.begin(), cr.end(), [](float f) { return f == 0.0f; })) m.clearCreases();
+    return changed;
+}
+
+size_t edgeCreasedCount(const Mesh& m, const EdgeTopology& topo) {
+    if (!m.hasCreases()) return 0;
+    size_t n = 0;
+    for (uint32_t e = 0; e < topo.edgeCount(); ++e) n += edgeCrease(m, topo, e) > 0.0f;
+    return n;
+}
+
 void registerEdgeCommands(CommandRegistry& reg) {
     reg.add({"edge_select",
              "Select edges of the active Part's base level (what edge creases are set on). op: edge (edge `edge`, or the "
@@ -356,6 +392,46 @@ void registerEdgeCommands(CommandRegistry& reg) {
                  else if (op == "invert") edgeSelectInvert(sel);
                  else if (op != "info") return {false, "op must be edge, loop, angle, open, grow, shrink, all, none, invert or info"};
                  return {true, edgeSelectionText(sel)};
+             }});
+    reg.add({"edge_crease",
+             "Crease the selected edges of the active Part's base level (edge_select picks them), for subdivision: "
+             "value 1 is fully sharp, 0.5 half as sharp, 0 (or clear) removes the crease. `all`: every "
+             "creased edge of the Part instead of the selection (with clear: removes every crease). One undo step.",
+             {{"value", T::Number, "the crease, 0..1 (default 1)", false},
+              {"clear", T::Bool, "remove the crease (value 0)", false},
+              {"all", T::Bool, "every creased edge of the Part, not just the selected ones", false},
+              {"info", T::Bool, "only report how many edges are creased", false}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 Mesh& m = doc.mesh;
+                 if (m.triangleCount() == 0) return {false, "The active Part has no faces"};
+                 if (subdivCurrentLevel(m) > 0)
+                     return {false, "Creases are set on the base level (SDiv 1): step down with Lower Level first"};
+                 EdgeSelection& sel = doc.edgeSelection;
+                 const EdgeTopology& topo = sel.sync(m);
+                 auto summary = [&] { return count(edgeCreasedCount(m, topo), "creased edge") + " of " +
+                                             std::to_string(topo.edgeCount()); };
+                 if (argBool(a, "info", false)) return {true, summary()};
+                 const float value = argBool(a, "clear", false)
+                                         ? 0.0f
+                                         : float(std::clamp(argNumber(a, "value", 1.0), 0.0, 1.0));
+                 std::vector<uint8_t> creased;
+                 if (argBool(a, "all", false)) {
+                     creased.assign(topo.edgeCount(), 0);
+                     for (uint32_t e = 0; e < topo.edgeCount(); ++e) creased[e] = edgeCrease(m, topo, e) > 0.0f;
+                 }
+                 const std::vector<uint8_t>& edges = argBool(a, "all", false) ? creased : sel.selected;
+                 if (std::find(edges.begin(), edges.end(), uint8_t(1)) == edges.end())
+                     return {false, argBool(a, "all", false) ? "No edge is creased"
+                                                             : "No edges selected (Tool > Geometry > Edges, or edge_select)"};
+                 UndoRecord r;
+                 r.label = value > 0.0f ? "Crease Edges" : "Uncrease Edges";
+                 const size_t changed = edgeSetCrease(m, topo, edges, value, &r.creases);
+                 if (changed == 0) return {true, "Nothing to change: " + summary()};
+                 doc.undo.push(std::move(r));
+                 char head[64];
+                 if (value > 0.0f) std::snprintf(head, sizeof head, "Crease %g on ", double(value));
+                 else std::snprintf(head, sizeof head, "Crease removed from ");
+                 return {true, head + count(changed, "edge") + ": " + summary()};
              }});
 }
 

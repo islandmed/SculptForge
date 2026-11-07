@@ -3,8 +3,9 @@
 //
 // Tool > Geometry > Edges (#108): Edges mode picks edges of the base level on the model (click, Shift adds, Ctrl
 // removes, double-click takes the edge loop) and selects them by angle, along open borders, grows and shrinks the
-// selection. The selection is core/EdgeSelect.h's (Document::edgeSelection), drawn here over the model; every
-// change runs the edge_select command, so the console and scripts show it.
+// selection; Crease sets a crease (0..1) on the selected edges for subdivision. The selection is core/EdgeSelect.h's
+// (Document::edgeSelection), drawn here over the model with the creased edges (shown at the base level in every
+// mode); every change runs the edge_select / edge_crease command, so the console and scripts show it.
 #include "app/App.h"
 #include "app/Palettes.h"
 #include "app/Ui.h"
@@ -78,6 +79,12 @@ void App::registerEdgeUiActions() {
         "Select the edges that aren't selected, and drop those that are.", "edge_select");
     add("geometry.edges_clear", "Deselect All", [this] { runCommand("edge_select", {{"op", std::string("none")}}); },
         "Deselect every edge.", "edge_select");
+    add("geometry.edges_crease", "Crease", [this] { runCommand("edge_crease", {{"value", double(edgeCrease_)}}); },
+        "Crease the selected edges by the Crease value (1 = fully sharp), for subdivision. Creased edges show tinted on "
+        "the base level.",
+        "edge_crease");
+    add("geometry.edges_uncrease", "Uncrease", [this] { runCommand("edge_crease", {{"clear", true}}); },
+        "Remove the crease from the selected edges.", "edge_crease");
 }
 
 void App::setEdgesMode(bool on) {
@@ -132,18 +139,30 @@ bool App::edgesMouseDown(float x, float y, SDL_Keymod mod) {
 
 void App::drawEdgeOverlay() {
     syncEdgesMode();
-    if (!edgesMode_) return;
     const Mesh& m = doc_.mesh;
+    if (!edgesMode_ && !m.hasCreases()) return; // (sculpting pays nothing more)
     if (!doc_.activePartInfo().visible || m.triangleCount() == 0 || subdivCurrentLevel(m) > 0) return;
     EdgeSelection& sel = doc_.edgeSelection;
     const EdgeTopology& topo = sel.sync(m);
     EdgeOverlay& ov = edgeOverlay_;
-    if (ov.topo != sel.topo.get() || ov.revision != sel.revision) {
+    // Creases change only with an undo step (or a new topology), so the undo revision tells when to look again.
+    const uint64_t creaseKey = m.hasCreases() ? doc_.undo.revision() * 2 + 1 + (edgesMode_ ? 0 : 1ull << 63) : 0;
+    if (ov.topo != sel.topo.get() || ov.revision != sel.revision || ov.creaseKey != creaseKey) {
         ov.topo = sel.topo.get();
         ov.revision = sel.revision;
+        ov.creaseKey = creaseKey;
         ov.edges.clear();
-        for (uint32_t e = 0; e < sel.selected.size(); ++e)
-            if (sel.selected[e]) ov.edges.push_back(e);
+        ov.crease.clear();
+        if (edgesMode_)
+            for (uint32_t e = 0; e < sel.selected.size(); ++e)
+                if (sel.selected[e]) ov.edges.push_back(e), ov.crease.push_back(edgeCrease(m, topo, e));
+        ov.selectedEdges = ov.edges.size();
+        ov.creased = size_t(std::count_if(ov.crease.begin(), ov.crease.end(), [](float c) { return c > 0.0f; }));
+        if (m.hasCreases())
+            for (uint32_t e = 0; e < topo.edgeCount(); ++e) {
+                const float c = edgeCrease(m, topo, e);
+                if (c > 0.0f && !(edgesMode_ && sel.selected[e])) ov.edges.push_back(e), ov.crease.push_back(c), ++ov.creased;
+            }
         ov.visibleKey = 0;
     }
 
@@ -206,13 +225,20 @@ void App::drawEdgeOverlay() {
         dl->AddLine(a, b, IM_COL32(12, 12, 16, 170), width + 2.0f * s);
         dl->AddLine(a, b, col, width);
     };
+    // Creased edges: blue, brighter and wider the sharper; selected ones orange (a creased one a thicker line).
+    auto creaseColor = [](float c) {
+        const float t = std::clamp(c, 0.0f, 1.0f);
+        return IM_COL32(int(70 + 40 * t), int(130 + 100 * t), 255, int(150 + 105 * t));
+    };
     const size_t step = std::max<size_t>(1, ov.edges.size() / kDrawnEdges);
-    for (size_t i = 0; i < ov.edges.size(); i += step)
-        if (ov.visible[i]) line(ov.edges[i], IM_COL32(255, 168, 48, 255), 2.0f * s);
+    for (size_t i = ov.selectedEdges; i < ov.edges.size(); i += step)
+        if (ov.visible[i]) line(ov.edges[i], creaseColor(ov.crease[i]), (1.25f + ov.crease[i]) * s);
+    for (size_t i = 0; i < ov.selectedEdges; i += step)
+        if (ov.visible[i]) line(ov.edges[i], IM_COL32(255, 168, 48, 255), (ov.crease[i] > 0.0f ? 3.0f : 2.0f) * s);
 
     // The edge a click would take, under the cursor.
     const ImVec2 mouse(mouseX_, mouseY_);
-    if (drag_ == Drag::None && !ImGui::GetIO().WantCaptureMouse && cr.contains(mouse.x, mouse.y)) {
+    if (edgesMode_ && drag_ == Drag::None && !ImGui::GetIO().WantCaptureMouse && cr.contains(mouse.x, mouse.y)) {
         doc_.syncBvh();
         const uint32_t e = edgeUnderCursor(mouse.x, mouse.y);
         if (e != kNoEdge) {
@@ -253,8 +279,22 @@ void App::drawEdgesSection() {
     ui::ActionButton(*this, "geometry.edges_invert", ImVec2(third, 0));
     ImGui::SameLine();
     ui::ActionButton(*this, "geometry.edges_clear", ImVec2(-1, 0));
+    ImGui::Spacing();
+    ImGui::SetNextItemWidth(-1);
+    ui::SliderInside("##edgecrease", &edgeCrease_, 0.05f, 1.0f, "Crease %.2f", ImGuiSliderFlags_AlwaysClamp);
+    ui::HelpText("Crease", nullptr,
+                 "How sharp Crease makes the selected edges: 1 is fully sharp, lower values are softer.",
+                 kEdgesPath);
+    ui::ActionButton(*this, "geometry.edges_crease", ImVec2(half, 0));
+    ImGui::SameLine();
+    ui::ActionButton(*this, "geometry.edges_uncrease", ImVec2(-1, 0));
     ImGui::EndDisabled();
-    if (edgesMode_) ImGui::TextDisabled("%s", edgeSelectionText(doc_.edgeSelection).c_str());
+    if (edgesMode_) {
+        const EdgeSelection& sel = doc_.edgeSelection;
+        const size_t creased = doc_.mesh.hasCreases() && edgeOverlay_.topo == sel.topo.get() ? edgeOverlay_.creased : 0;
+        if (creased) ImGui::TextDisabled("%s, %zu %s", edgeSelectionText(sel).c_str(), creased, tr("creased"));
+        else ImGui::TextDisabled("%s", edgeSelectionText(sel).c_str());
+    }
     else ImGui::TextDisabled("%s", tr("Edges mode selects edges of the base level"));
 }
 

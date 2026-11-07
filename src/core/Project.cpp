@@ -356,6 +356,7 @@ void writeMesh(Writer& w, const std::string& prefix, const Mesh& m, Json& out, s
     if (m.hasUvs()) mesh.set("uvs", w.floats(prefix + "mesh/uvs.bin", &m.uvs[0].x, m.uvs.size(), 2));
     if (m.hasUvFlags()) mesh.set("uv_flags", w.bytes(prefix + "mesh/uv_flags.bin", m.uvFlags)); // seams, pins (core/Uv.h)
     // Optional and ignored by older readers, so no format version bump.
+    if (m.hasCreases()) mesh.set("creases", w.floats(prefix + "mesh/creases.bin", m.creases.data(), m.creases.size(), 1));
     if (m.hasQuads())
         mesh.set("quad_partners", w.uints(prefix + "mesh/quad_partners.bin", m.quadPartners.data(), m.quadPartners.size(), 1));
     out.set("mesh", std::move(mesh));
@@ -412,6 +413,11 @@ bool readMesh(Reader& r, const Json& mj, const Json& lj, Mesh& m, std::string& e
     }
     if (mj.has("uv_flags")) {
         if (!r.bytes(mj["uv_flags"], "UV seams", nt * 3, m.uvFlags)) m.uvFlags.clear();
+    }
+    if (mj["creases"].isObject()) { // edge creases (core/EdgeSelect.h), 0..1 per corner (another form: ignored)
+        m.creases.resize(nt * 3);
+        if (!r.floats(mj["creases"], "edge creases", nt * 3, 1, nt ? m.creases.data() : nullptr)) m.creases.clear();
+        for (float& c : m.creases) c = std::isfinite(c) ? std::clamp(c, 0.0f, 1.0f) : 0.0f;
     }
     if (mj.has("quad_partners")) { // rebuildTopology() unpairs anything that isn't a valid pair
         m.quadPartners.resize(nt);
