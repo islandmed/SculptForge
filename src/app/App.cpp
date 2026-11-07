@@ -1618,8 +1618,8 @@ void App::dispatchEvent(const SDL_Event& event) {
         }
         if (!io.WantCaptureKeyboard && !e.key.repeat) quickRemeshKey(e.key.key, e.key.mod, true); // held: drag remeshes
         if (!io.WantCaptureKeyboard && !e.key.repeat) onKey(e.key.key, e.key.mod);
-        else if (!io.WantCaptureKeyboard && (e.key.key == SDLK_LEFTBRACKET || e.key.key == SDLK_RIGHTBRACKET))
-            onKey(e.key.key, e.key.mod);
+        else if (!io.WantCaptureKeyboard && brushSizeStep(actions_.actionForKey(e.key.key, e.key.mod)))
+            onKey(e.key.key, e.key.mod); // held brush size keys repeat, whatever they are bound to
         break;
     case SDL_EVENT_KEY_UP:
         if (e.key.key == SDLK_SPACE) spaceHeld_ = false;
@@ -2131,9 +2131,9 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
         closeStrokePopup();
         return;
     }
-    if ((key == SDLK_LEFTBRACKET || key == SDLK_RIGHTBRACKET) && !(mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) &&
-        insertSetActive()) { // an insert set: [ and ] step through it (the drag sets the size, not the brush's)
-        selectInsertSetItem(insertSet_.index + (key == SDLK_RIGHTBRACKET ? 1 : -1));
+    if (const int step = brushSizeStep(actions_.actionForKey(key, mod)); step && insertSetActive()) {
+        // an insert set: the brush size keys ([ and ]) step through it (the drag sets the size, not the brush's)
+        selectInsertSetItem(insertSet_.index + step);
         return;
     }
     if (key == SDLK_ESCAPE && !insertType_.empty()) { // Append > Insert (#34) off
