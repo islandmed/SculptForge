@@ -17,6 +17,7 @@ namespace sf {
 namespace {
 
 constexpr int kMaxSide = 2048; // a stencil spans the view: more detail than an alpha's 512, at most 16 MB
+constexpr int kBuiltinStencilSize = 1024; // a built-in pattern made into a Stencil (BrushAlpha::builtinAt)
 
 // sRGB byte -> linear, once.
 const std::array<float, 256>& linearTable() {
@@ -177,10 +178,18 @@ void registerStencilCommands(CommandRegistry& registry) {
                           if (al.empty()) return {false, "The brush has no alpha (Round): pick one, or load an image"};
                           Image img;
                           std::string err;
-                          // An image alpha at its own resolution (the alpha keeps 512 px); a built-in as made.
-                          if (al.path.empty() || !Image::load(al.path, img, err)) img = alphaImage(al);
-                          else if (al.inverted) for (size_t i = 0; i < img.rgba.size(); i += 4)
-                              for (int k = 0; k < 3; ++k) img.rgba[i + size_t(k)] = uint8_t(255 - img.rgba[i + size_t(k)]);
+                          // An image alpha at its own resolution (the alpha keeps 512 px); a built-in pattern made
+                          // again at 1024 px (at 128 its pixels showed as stair-steps along every edge it sculpted).
+                          BrushAlpha big;
+                          if (!al.path.empty() && Image::load(al.path, img, err)) {
+                              if (al.inverted)
+                                  for (size_t i = 0; i < img.rgba.size(); i += 4)
+                                      for (int k = 0; k < 3; ++k) img.rgba[i + size_t(k)] = uint8_t(255 - img.rgba[i + size_t(k)]);
+                          } else if (al.path.empty() && BrushAlpha::builtinAt(al.name, kBuiltinStencilSize, big) && !big.empty()) {
+                              img = alphaImage(big);
+                          } else {
+                              img = alphaImage(al);
+                          }
                           st.set(std::move(img), al.name, al.path);
                       } else {
                           return {false, "stencil_load needs path=<image> or alpha=true"};

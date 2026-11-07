@@ -15,6 +15,8 @@ namespace sf {
 namespace {
 
 constexpr int kBuiltinSize = 128;
+// The size generate() fills: kBuiltinSize, or larger while BrushAlpha::builtinAt makes one (a Stencil spans the view).
+thread_local int gGenerateSize = kBuiltinSize;
 
 float smooth01(float t) {
     t = std::clamp(t, 0.0f, 1.0f);
@@ -44,13 +46,14 @@ template <class F>
 BrushAlpha generate(std::string name, F&& f) {
     BrushAlpha a;
     a.name = std::move(name);
-    a.width = a.height = kBuiltinSize;
-    a.values.resize(size_t(kBuiltinSize) * kBuiltinSize);
-    for (int y = 0; y < kBuiltinSize; ++y)
-        for (int x = 0; x < kBuiltinSize; ++x) {
-            const float u = (float(x) + 0.5f) / kBuiltinSize * 2.0f - 1.0f;
-            const float v = 1.0f - (float(y) + 0.5f) / kBuiltinSize * 2.0f;
-            a.values[size_t(y) * kBuiltinSize + size_t(x)] = std::clamp(f(u, v), 0.0f, 1.0f);
+    const int n = gGenerateSize;
+    a.width = a.height = n;
+    a.values.resize(size_t(n) * size_t(n));
+    for (int y = 0; y < n; ++y)
+        for (int x = 0; x < n; ++x) {
+            const float u = (float(x) + 0.5f) / float(n) * 2.0f - 1.0f;
+            const float v = 1.0f - (float(y) + 0.5f) / float(n) * 2.0f;
+            a.values[size_t(y) * size_t(n) + size_t(x)] = std::clamp(f(u, v), 0.0f, 1.0f);
         }
     return a;
 }
@@ -448,6 +451,18 @@ bool BrushAlpha::builtin(const std::string& name, BrushAlpha& out) {
             return true;
         }
     return false;
+}
+
+bool BrushAlpha::builtinAt(const std::string& name, int size, BrushAlpha& out) {
+    const std::string key = lookupKey(name);
+    for (const Generated& g : kGenerated)
+        if (lookupKey(g.name) == key) {
+            gGenerateSize = std::clamp(size, 8, 4096);
+            out = g.make();
+            gGenerateSize = kBuiltinSize;
+            return true;
+        }
+    return builtin(name, out); // (Round, Square, Noise: as made)
 }
 
 BrushAlpha BrushAlpha::fromImage(const Image& image, std::string name, bool invert) {
