@@ -153,6 +153,14 @@ private:
     size_t mapBytes_ = 0;
 };
 
+// The renderer's per-tile record (render/MicroFocus.h): a tile's coarse grid (cn segments, a subsample of its full
+// grid of n) followed by the inner points of its three edges at full resolution, (cn + 1)(cn + 2) / 2 + 3 (n - 1)
+// values. focusRecordValue rebuilds grid point (I, J) from it as the micro vertex shader does: the edges as stored,
+// inside as the coarse grid upsampled (FocusDetail's own integer sums), so a coarse tile's record gives back exactly
+// the values it holds in MicroMesh::disp.
+void focusFillRecord(const int16_t* grid, uint32_t n, uint32_t cn, int16_t* record);
+int focusRecordValue(const int16_t* record, uint32_t n, uint32_t cn, uint32_t I, uint32_t J);
+
 // A synthetic asset for benchmarks and tests: the standard scenes' procedural head with about `baseTriangles`
 // base triangles at micro level `level`, plus skin-like detail (wrinkles and pores) generated per tile. Written
 // to `path` (nothing in memory at full resolution).

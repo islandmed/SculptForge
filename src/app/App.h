@@ -2102,7 +2102,7 @@ private:
     void frameActivePart();
     // Focus Detail (prototype, FocusDetailApp.cpp): open a .sfdetail file; once a frame, the camera and brush.
     void openFocusDetail(const std::string& path);
-    void updateFocusDetail();
+    void updateFocusDetail(float heightPx = 0.0f); // (0: the canvas's)
     glm::vec3 focusBrushPos_{0.0f}, focusBrushVel_{0.0f};
     float focusBrushRadius_ = 0.0f;
     double focusBrushTime_ = 0.0;

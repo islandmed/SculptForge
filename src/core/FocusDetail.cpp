@@ -10,6 +10,7 @@
 #include "core/ThreadPool.h"
 
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -273,6 +274,44 @@ void shareEdges(const std::vector<glm::uvec3>& triangles, MicroMesh& mm, uint32_
 }
 
 } // namespace
+
+void focusFillRecord(const int16_t* g, uint32_t n, uint32_t cn, int16_t* out) {
+    const uint32_t s = n / cn;
+    for (uint32_t J = 0; J <= cn; ++J)
+        for (uint32_t I = 0; I + J <= cn; ++I) out[MicroMesh::index(I, J, cn)] = g[MicroMesh::index(I * s, J * s, n)];
+    int16_t* e = out + (cn + 1) * (cn + 2) / 2;
+    for (int ed = 0; ed < 3; ++ed)
+        for (uint32_t k = 1; k < n; ++k) {
+            uint32_t i, j;
+            MicroMesh::edgePoint(ed, k, n, i, j);
+            *e++ = g[MicroMesh::index(i, j, n)];
+        }
+}
+
+int focusRecordValue(const int16_t* rec, uint32_t n, uint32_t cn, uint32_t I, uint32_t J) {
+    const uint32_t CS = (cn + 1) * (cn + 2) / 2;
+    int e = -1;
+    uint32_t k = 0;
+    if (J == 0) e = 0, k = I;
+    else if (I + J == n) e = 1, k = J;
+    else if (I == 0) e = 2, k = n - J;
+    if (e >= 0 && k > 0 && k < n) return rec[CS + uint32_t(e) * (n - 1) + k - 1];
+    const int s = int(n / cn), sh = std::countr_zero(n / cn);
+    const uint32_t ci = I >> sh, cj = J >> sh;
+    const int fi = int(I) & (s - 1), fj = int(J) & (s - 1);
+    auto C = [&](uint32_t i, uint32_t j) { return int(rec[MicroMesh::index(i, j, cn)]); };
+    int sum;
+    if (fi + fj <= s) {
+        sum = (s - fi - fj) * C(ci, cj);
+        if (fi > 0) sum += fi * C(ci + 1, cj);
+        if (fj > 0) sum += fj * C(ci, cj + 1);
+    } else {
+        sum = (fi + fj - s) * C(ci + 1, cj + 1) + (s - fi) * C(ci, cj + 1) + (s - fj) * C(ci + 1, cj);
+    }
+    const int q = sum + s / 2;
+    return q >= 0 ? q >> sh : -((-q + s - 1) >> sh);
+}
+
 
 // ---------------------------------------------------------------------------
 // Writing

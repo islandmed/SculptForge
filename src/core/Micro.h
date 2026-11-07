@@ -258,8 +258,13 @@ public:
     void shade(const Mesh& m, std::span<const uint32_t> dirty, bool all, std::vector<uint32_t>& written,
                const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare = {}, bool grow = true,
                std::vector<uint32_t>* outer = nullptr);
+    // shade() for another level of the same base: `level` instead of base.micro (Focus Detail's coarse grids,
+    // render/MicroFocus.h). It needs the base's edge neighbours (edgeNeighbor).
+    void shadeLevel(const Mesh& base, const MicroMesh& level, std::span<const uint32_t> dirty, bool all,
+                    std::vector<uint32_t>& written, const std::function<uint32_t*(uint32_t tri)>& out, bool grow = true);
 
 private:
+    const MicroMesh* level_ = nullptr; // (shadeLevel)
     // shade() for the triangles `seeds` (grown by the triangles sharing a vertex when `grow`); appends to `written`.
     void shadeSet(const Mesh& m, std::span<const uint32_t> seeds, bool grow, std::vector<uint32_t>& written,
                   const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare, std::vector<uint32_t>* outer = nullptr);

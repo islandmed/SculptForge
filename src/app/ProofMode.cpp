@@ -33,6 +33,7 @@
 #include "render/GL.h"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -97,7 +98,7 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
                                         return makeBenchHead(size_t(1) << 20);
                                     }
                                     return m;
-                                }, 5};
+                                }, 2}; // (heights 1 GB + per-tile GPU levels, render/MicroFocus.h: ~2 bytes a micro triangle)
         return {s1b};
     }
     if (name.rfind("file:", 0) == 0) { // --benchmark-file: a project from disk (a scan, a real sculpt), the scoreboard's strokes
@@ -298,6 +299,53 @@ long long driverFreeVramKb() {
     return -1;
 }
 
+// Linux: the GPU memory this process holds as the kernel's DRM driver counts it (/proc/self/fdinfo, drm-total-* or
+// drm-resident-* summed over its GPU files; on unified memory too), in KB; -1 when the driver doesn't say.
+long long drmUsedKb() {
+#if defined(__linux__)
+    long long total = 0, resident = 0;
+    bool any = false;
+    std::error_code ec;
+    for (const auto& e : std::filesystem::directory_iterator("/proc/self/fdinfo", ec)) {
+        std::ifstream f(e.path());
+        std::string line;
+        while (std::getline(f, line)) {
+            const bool isTotal = line.rfind("drm-total-", 0) == 0, isResident = line.rfind("drm-resident-", 0) == 0;
+            if (!isTotal && !isResident) continue;
+            const size_t colon = line.find(':');
+            if (colon == std::string::npos) continue;
+            std::istringstream in(line.substr(colon + 1));
+            long long v = 0;
+            std::string unit;
+            if (!(in >> v)) continue;
+            in >> unit;
+            const long long kb = unit == "MiB" ? v << 10 : unit == "GiB" ? v << 20 : unit == "KiB" ? v : v >> 10;
+            (isTotal ? total : resident) += kb;
+            any = true;
+        }
+    }
+    if (any) return std::max(total, resident);
+    // Drivers that don't count it there (Asahi): the GPU buffers mapped from the render node (unified memory maps
+    // them all; v0.11.9 on standard-1b: 3,006 MB, the renderer's own count 3,130 MB).
+    std::ifstream smaps("/proc/self/smaps");
+    std::string line;
+    bool dri = false;
+    long long kb = 0;
+    while (std::getline(smaps, line)) {
+        if (!line.empty() && std::isxdigit(static_cast<unsigned char>(line[0])) && line.find('-') != std::string::npos &&
+            line.find(':') > line.find(' ')) {
+            dri = line.find("/dev/dri/") != std::string::npos;
+            any = any || dri;
+        } else if (dri && line.rfind("Size:", 0) == 0) {
+            kb += std::atoll(line.c_str() + 5);
+        }
+    }
+    return any ? kb : -1;
+#else
+    return -1;
+#endif
+}
+
 struct PhaseResult {
     std::string name;
     std::string brush;
@@ -328,6 +376,7 @@ struct SizeResult {
     size_t gpuBufferBytes = 0;   // the most the renderer's vertex and index buffers held (documentMemory().gpu)
     long long vramUsedKb = -1;   // the most the driver's free graphics memory dropped from before the build (-1: unknown)
     long long vramFreeBeforeKb = -1;
+    long long drmKb = -1, drmBeforeKb = -1; // the most drmUsedKb() showed, and before the build
     std::vector<PhaseResult> phases;
     MemoryCheck memory;  // free memory before the build
     std::string skipped; // not built: too little free memory (benchmarkSkippedMessage)
@@ -698,6 +747,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         if (r.vramFreeBeforeKb >= 0)
             if (const long long freeKb = driverFreeVramKb(); freeKb >= 0)
                 r.vramUsedKb = std::max(r.vramUsedKb, std::max(0LL, r.vramFreeBeforeKb - freeKb));
+        r.drmKb = std::max(r.drmKb, drmUsedKb());
         ++p.phaseIndex;
         if (p.phaseIndex < p.phases.size()) {
             beginPhase();
@@ -764,7 +814,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             p.stage = p.sizeIndex < p.sizes.size() ? Stage::Announce : Stage::Finish;
             break;
         }
-        const long long vramBefore = driverFreeVramKb();
+        const long long vramBefore = driverFreeVramKb(), drmBefore = drmUsedKb();
         resetPeakResidentBytes();
         const double t0 = nowSeconds();
         const size_t tris = size_t(s.millions * 1e6);
@@ -777,6 +827,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         r.buildSeconds = nowSeconds() - t0;
         p.buildStart = t0;
         r.vramFreeBeforeKb = vramBefore;
+        r.drmBeforeKb = drmBefore;
         p.results.push_back(r);
         camera_.frame(sceneBounds());
         camera_.yaw = 0.0f;
@@ -981,6 +1032,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             run.set("ram_mb", double(r.ramBytes >> 20));
             run.set("peak_ram_mb", double(r.peakRamBytes >> 20));
             run.set("gpu_buffers_mb", double(r.gpuBufferBytes >> 20));
+            if (r.drmKb > 0) run.set("gpu_driver_mb", double((r.drmKb - std::max(0LL, r.drmBeforeKb)) >> 10)); // (fdinfo, less what the app held before)
             if (r.vramUsedKb > 0) run.set("vram_used_mb", double(r.vramUsedKb >> 10)); // (0: the driver's number never moved, as on unified memory)
             double stall = 0;
             for (const PhaseResult& ph : r.phases) stall = std::max(stall, worstStallMs(ph.frameMs, ph.releaseMs));
@@ -1074,7 +1126,10 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             if (r.shadedSeconds > 0) std::printf(", fully shaded %.2f s (RAM then %zu MB)", r.shadedSeconds, r.loadedRamBytes >> 20);
             std::printf("\n");
             std::printf("  %-5s peak RAM %zu MB, GPU buffers %zu MB%s, worst stall %.0f ms\n", r.label.c_str(), r.peakRamBytes >> 20,
-                        r.gpuBufferBytes >> 20, r.vramUsedKb > 0 ? (", driver VRAM used " + std::to_string(r.vramUsedKb >> 10) + " MB").c_str() : "",
+                        r.gpuBufferBytes >> 20,
+                        (std::string(r.vramUsedKb > 0 ? ", driver VRAM used " + std::to_string(r.vramUsedKb >> 10) + " MB" : "") +
+                         (r.drmKb > 0 ? ", driver GPU memory " + std::to_string((r.drmKb - std::max(0LL, r.drmBeforeKb)) >> 10) + " MB" : ""))
+                            .c_str(),
                         [&] { double w = 0; for (const PhaseResult& ph : r.phases) w = std::max(w, worstStallMs(ph.frameMs, ph.releaseMs)); return w; }());
             for (const PhaseResult& ph : r.phases) {
                 const Percentiles f = percentiles(ph.frameMs), l = percentiles(ph.lagMs), lp = percentiles(ph.lagPx);
