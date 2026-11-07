@@ -8,6 +8,7 @@
 
 #include "ai/Http.h"
 #include "core/Ed25519.h"
+#include "core/Keychain.h"
 #include "core/MemberBuilds.h"
 #include "core/SelfUpdate.h"
 #include "core/Sha256.h"
@@ -623,6 +624,61 @@ TEST(member_builds_device_flow_answers) {
     CHECK(parseLogin(R"({"login":"<script>"})").empty());
 }
 
+// GitHub's newer tokens are ~520 characters and may grow: up to kMaxTokenLength parse, store (split across entries
+// where one entry is too small, as on Windows), load and go into the header; longer is refused.
+TEST(member_builds_long_tokens) {
+    using namespace sf::member;
+    const std::string a520 = "ghs_" + std::string(516, 'A'), r4000 = "ghr_" + std::string(3996, 'b');
+    const std::string a4096 = "ghu_" + std::string(4092, 'c'), tooLong = "ghu_" + std::string(4093, 'd');
+    std::string err;
+    for (const auto& [access, refresh] : {std::pair{a520, r4000}, std::pair{r4000, a520}, std::pair{a4096, a4096}}) {
+        Tokens t;
+        CHECK(parseTokenReply(R"({"access_token":")" + access + R"(","refresh_token":")" + refresh +
+                                  R"(","expires_in":28800,"token_type":"bearer"})",
+                              0, t, err) == TokenReply::Ok);
+        CHECK(t.access == access && t.refresh == refresh);
+        CHECK(headersFor(kUserUrl, t.access)[0] == "Authorization: Bearer " + access);
+        for (size_t cap : {size_t(0), size_t(2560), size_t(1000)}) {
+            keychain::useMemoryForTests(true, cap);
+            CHECK(keychain::store(kKeychainAccount, tokensToSecret(t)));
+            std::string secret;
+            Tokens back;
+            CHECK(keychain::load(kKeychainAccount, secret) && tokensFromSecret(secret, back));
+            CHECK(back.access == access && back.refresh == refresh);
+        }
+    }
+    Tokens t;
+    CHECK(parseTokenReply(R"({"access_token":")" + tooLong + R"(","token_type":"bearer"})", 0, t, err) == TokenReply::Error);
+    CHECK(parseTokenReply(R"({"access_token":"ghu_x","refresh_token":")" + tooLong + R"(","token_type":"bearer"})", 0, t,
+                          err) == TokenReply::Error);
+    DeviceCode c;
+    CHECK(parseDeviceCode(R"({"device_code":")" + a520 + R"(","user_code":"WDJB-MJHT","verification_uri":"https://github.com/login/device"})",
+                          0, c, err));
+    CHECK(!parseDeviceCode(R"({"device_code":")" + tooLong + R"(","user_code":"WDJB-MJHT","verification_uri":"https://github.com/login/device"})",
+                           0, c, err));
+    Tokens back;
+    CHECK(!tokensFromSecret(R"({"access":")" + tooLong + R"("})", back));
+
+    // Split entries: what earlier versions stored (one entry) still loads; a shorter secret replaces a split one and
+    // leaves no parts behind; erase removes every part.
+    keychain::useMemoryForTests(true, 2560);
+    const std::string old = R"({"access":"ghu_short","refresh":"ghr_short"})";
+    CHECK(keychain::store(kKeychainAccount, old));
+    std::string got, part;
+    CHECK(keychain::load(kKeychainAccount, got) && got == old && tokensFromSecret(got, back) && back.access == "ghu_short");
+    const std::string big(9000, 'x');
+    CHECK(keychain::store(kKeychainAccount, big) && keychain::load(kKeychainAccount, got) && got == big);
+    CHECK(keychain::load(std::string(kKeychainAccount) + "#4", part) && !keychain::load(std::string(kKeychainAccount) + "#5", part));
+    CHECK(keychain::store(kKeychainAccount, std::string(3000, 'y')) && keychain::load(kKeychainAccount, got) && got == std::string(3000, 'y'));
+    CHECK(!keychain::load(std::string(kKeychainAccount) + "#3", part));
+    CHECK(keychain::store(kKeychainAccount, old) && keychain::load(kKeychainAccount, got) && got == old);
+    CHECK(!keychain::load(std::string(kKeychainAccount) + "#1", part));
+    CHECK(keychain::store(kKeychainAccount, big) && keychain::erase(kKeychainAccount));
+    CHECK(!keychain::load(kKeychainAccount, got) && !keychain::load(std::string(kKeychainAccount) + "#1", part));
+    CHECK(!keychain::store(kKeychainAccount, std::string(2560 * 17, 'z'))); // (more parts than allowed: refused)
+    keychain::useMemoryForTests(true);
+}
+
 TEST(member_builds_release_list) {
     using namespace sf::member;
     const char* list = R"([
@@ -682,9 +738,11 @@ TEST(self_update_live_github_redirect) {
 }
 
 #if defined(_WIN32)
-#include "core/Keychain.h"
-// Windows Credential Manager: store, read back, replace, erase (a test entry, not the member sign-in's).
+// Windows Credential Manager itself (the tests otherwise use the in-memory keychain): store, read back, replace, erase,
+// and a secret over its 2560-byte entry limit (two long GitHub tokens), split across entries. A test entry, not the
+// member sign-in's.
 TEST(self_update_keychain_windows) {
+    keychain::useMemoryForTests(false);
     const std::string account = "test-self-update";
     keychain::erase(account);
     std::string got;
@@ -693,8 +751,18 @@ TEST(self_update_keychain_windows) {
     CHECK(keychain::load(account, got) && got == "{\"access\":\"ghu_test\"}");
     CHECK(keychain::store(account, "second"));
     CHECK(keychain::load(account, got) && got == "second");
-    CHECK(keychain::erase(account) && !keychain::load(account, got));
+    member::Tokens t;
+    t.access = "ghu_" + std::string(4092, 'a');
+    t.refresh = "ghr_" + std::string(4092, 'b');
+    CHECK(keychain::store(account, member::tokensToSecret(t)));
+    member::Tokens back;
+    CHECK(keychain::load(account, got) && member::tokensFromSecret(got, back) && back.access == t.access && back.refresh == t.refresh);
+    CHECK(keychain::store(account, "short again") && keychain::load(account, got) && got == "short again");
+    CHECK(!keychain::load(account + "#1", got));
+    CHECK(keychain::store(account, member::tokensToSecret(t)));
+    CHECK(keychain::erase(account) && !keychain::load(account, got) && !keychain::load(account + "#1", got));
     CHECK(keychain::erase(account)); // (nothing there: still fine)
+    keychain::useMemoryForTests(true);
 }
 #endif
 
