@@ -404,6 +404,10 @@ constexpr Entry kSpanish[] = {
     {"Delete Micro", "Eliminar micro"},
     {"Bake Micro", "Hacer bake de micro"},
     {"Micro Surface Noise", "Ruido de superficie micro"},
+    {"Streamed: full detail loads where you look and sculpt", "Transmitido: el detalle completo se carga donde miras y esculpes"},
+    {"Focus Detail keeps this micro level in a .sfdetail file beside the project and loads full detail only where you look "
+     "and sculpt. Keep the file with the project.",
+     "Focus Detail guarda este nivel micro en un archivo .sfdetail junto al proyecto y carga el detalle completo solo donde miras y esculpes. Guarda el archivo con el proyecto."},
     {"Micro", "Micro"},
     {"SDiv", "SDiv"},
     {"No subdivision levels - Divide adds them", "Sin niveles de subdivisión: Dividir los añade"},
