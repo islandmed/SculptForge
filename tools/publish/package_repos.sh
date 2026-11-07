@@ -8,7 +8,7 @@
 #   FILES.txt: "<path on the site> <release asset name>" for every package the metadata names
 # website/apt and website/rpm are put together from it by tools/publish/package_repos_fetch.sh (pages.yml), which
 # downloads those assets. The signature covers each package's SHA-256, so apt and dnf refuse any other bytes.
-# Signing key: REPO_SIGNING_KEY (armored OpenPGP private key) and REPO_SIGNING_PASSPHRASE in the environment, as
+# Signing key: REPO_SIGNING_KEY (armored OpenPGP signing subkey; REPO_SIGNING_PASSPHRASE if it has one) in the environment, as
 # the release workflow's `release` environment provides them. Needs apt-ftparchive (apt-utils), createrepo_c, gpg.
 set -euo pipefail
 dist=$(cd "$1" && pwd)

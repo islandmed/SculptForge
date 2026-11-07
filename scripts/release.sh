@@ -337,6 +337,16 @@ preflight() {
     grep -q '^set(SCULPTFORGE_PRERELEASE "[a-z0-9.]*")$' CMakeLists.txt ||
         die "CMakeLists.txt lost its set(SCULPTFORGE_PRERELEASE \"\") line that step bump sets" "restore it under project() (git log -p CMakeLists.txt), commit"
     python3 -c 'import json, sys; json.load(open(sys.argv[1]))' website/latest.json 2>/dev/null || die "website/latest.json is not valid JSON" "fix it, commit"
+    # The apt/dnf signing subkey expires after 2 years (docs/design/package-repos.md): stop 120 days ahead, while
+    # there is time for the renewed key to reach users before the old date.
+    if [ -f website/sculptforge.asc ]; then
+        local kexp
+        command -v gpg >/dev/null || die "gpg is not installed (it checks website/sculptforge.asc's expiry)" "install gnupg"
+        kexp=$(gpg --batch --with-colons --show-keys website/sculptforge.asc 2>/dev/null |
+            awk -F: '$1 == "sub" && $2 !~ /[rei]/ && $12 ~ /s/ {print ($7 == "" ? 9999999999 : $7)}' | sort -n | tail -1)
+        [ -n "$kexp" ] && [ "$kexp" -gt $(($(date +%s) + 120 * 86400)) ] ||
+            die "the apt/dnf signing subkey in website/sculptforge.asc expires ${kexp:+on $(date -d "@$kexp" +%F)}${kexp:-(none valid)}" "Tony: ~/Work/.sf/repo-key.sh --extend (in his terminal); then copy ~/Work/.sf/secrets/repo-key/sculptforge.asc to website/sculptforge.asc, commit, push main"
+    fi
     # The members' publishing path: release.yml's actions pinned to commit SHAs, INSIDERS_REPO_TOKEN only in the
     # member-release environment (docs/releasing.md, "Secrets").
     out=$(python3 tools/release/check_workflows.py 2>&1) || die "the release workflows aren't locked down: $out" "fix .github/workflows (docs/releasing.md, \"Secrets\"), commit, push main"

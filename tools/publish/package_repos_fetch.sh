@@ -43,8 +43,20 @@ get sculptforge-package-repos.tar.gz "$work/repos.tar.gz"
 check sculptforge-package-repos.tar.gz "$work/repos.tar.gz"
 mkdir "$work/x"
 tar -C "$work/x" -xzf "$work/repos.tar.gz" --no-same-owner
+# sculptforge.app/sculptforge.asc is committed (website/sculptforge.asc, made by ~/Work/.sf/repo-key.sh): the release's
+# metadata must be signed by that same primary key; before it is committed, the release's copy goes there.
+fprs() { gpg --batch --with-colons --show-keys "$1" 2>/dev/null | awk -F: '$1 == "pub" {p=1; next} $1 == "fpr" && p {print $10; p=0}'; }
+if [ -f "$site/sculptforge.asc" ]; then
+    [ -n "$(fprs "$site/sculptforge.asc")" ] && [ "$(fprs "$site/sculptforge.asc")" = "$(fprs "$work/x/apt/sculptforge.asc")" ] ||
+        { echo "package_repos_fetch: $tag's repositories are signed by $(fprs "$work/x/apt/sculptforge.asc"), not website/sculptforge.asc's $(fprs "$site/sculptforge.asc")" >&2; exit 1; }
+else
+    cp "$work/x/apt/sculptforge.asc" "$site/sculptforge.asc"
+fi
 rm -rf "$site/apt" "$site/rpm"
 cp -r "$work/x/apt" "$work/x/rpm" "$site/"
+# The committed key (it carries the latest subkey expiry) everywhere apt and dnf fetch it.
+cp "$site/sculptforge.asc" "$site/apt/sculptforge.asc"
+cp "$site/sculptforge.asc" "$site/rpm/sculptforge.asc"
 while read -r path asset; do
     case "$path" in apt/*|rpm/*) ;; *) echo "package_repos_fetch: unexpected path $path" >&2; exit 1 ;; esac
     case "$path$asset" in *..*) echo "package_repos_fetch: unexpected path $path" >&2; exit 1 ;; esac
