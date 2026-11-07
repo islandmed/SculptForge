@@ -1463,6 +1463,7 @@ private:
     };
     std::unordered_map<uint32_t, MayaLinkSent> mayaLinkSent_; // by Part id
     Uint64 mayaLinkStreamNs_ = 0;
+    Uint64 mayaLinkStreamEveryNs_ = link::kMayaLinkStreamNs; // stretched on big meshes: the diff stays ~4% of the time
     int mayaLinkStreams_ = 0; // mid-stroke Points sent (UI tests: maya_link_streams)
 
     // Phone link (PanelPhone.cpp, link/PhoneLink.h): File > Capture from phone. The server runs only while the

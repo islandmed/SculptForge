@@ -50,6 +50,15 @@ bool waitFor(const std::function<bool()>& f, int ms = 3000) {
     return f();
 }
 
+void setTestEnv(const char* name, const std::string& value) {
+#ifdef _WIN32
+    _putenv_s(name, value.c_str());
+#else
+    if (value.empty()) unsetenv(name);
+    else setenv(name, value.c_str(), 1);
+#endif
+}
+
 bool readFrame(link::AiLinkConn& c, link::MayaLinkType& type, std::string& payload) {
     char header[link::kMayaLinkHeaderBytes];
     size_t got = 0;
@@ -305,18 +314,19 @@ TEST(maya_link_refuses_malformed) {
     CHECK(!parseMayaLinkMesh(huge, out, err));
 }
 
-#ifndef _WIN32
 TEST(maya_link_server_pairs_and_streams) {
     using namespace link;
     const fs::path dir = fs::temp_directory_path() / ("sf_maya_link_" + std::to_string(std::random_device{}() % 100000));
     fs::create_directories(dir);
-    setenv("SF_AI_LIVE_DIR", dir.string().c_str(), 1);
+    setTestEnv("SF_AI_LIVE_DIR", dir.string());
     std::string err;
     const std::string endpoint = localEndpoint("maya-link", err);
-    CHECK(!endpoint.empty() && endpoint.find("maya-link.sock") != std::string::npos);
+    CHECK(!endpoint.empty() && endpoint.find("maya-link") != std::string::npos);
     MayaLinkServer server;
     CHECK(server.start(endpoint, err));
+#ifndef _WIN32
     CHECK(aiLinkFileMode(endpoint) == 0600);
+#endif
     // A second server on the same endpoint: refused (another window has it on).
     MayaLinkServer second;
     CHECK(!second.start(endpoint, err));
@@ -410,8 +420,55 @@ TEST(maya_link_server_pairs_and_streams) {
         CHECK(last == "disconnected: timed out");
     }
     server.stop();
+#ifndef _WIN32
     CHECK(aiLinkFileMode(endpoint) < 0); // the socket file is gone when the link is off
-    unsetenv("SF_AI_LIVE_DIR");
+#endif
+    setTestEnv("SF_AI_LIVE_DIR", "");
+    fs::remove_all(dir);
+}
+
+#ifdef SF_PYTHON_EXE
+// The Maya shelf script's own client (tests/maya/link_peer.py: LinkClient over the Unix socket, or on Windows the
+// named pipe through PeekNamedPipe) against the app's server: pairing, a mesh from "Maya", streamed Points back.
+TEST(maya_link_python_client) {
+    using namespace link;
+    const fs::path dir = fs::temp_directory_path() / ("sf_maya_peer_" + std::to_string(std::random_device{}() % 100000));
+    fs::create_directories(dir);
+    setTestEnv("SF_AI_LIVE_DIR", dir.string());
+    std::string err;
+    const std::string endpoint = localEndpoint("maya-link", err);
+    MayaLinkServer server;
+    CHECK(server.start(endpoint, err));
+    const fs::path script = fs::path(SF_TEST_DATA_DIR) / ".." / "maya" / "link_peer.py";
+    const std::string pairing = mayaLinkPairingText(server.code(), endpoint);
+    int exitCode = -1;
+    std::thread peer([&] {
+        std::string cmd = std::string("\"") + SF_PYTHON_EXE + "\" -I \"" + script.string() + "\" \"" + pairing + "\"";
+#ifdef _WIN32
+        cmd = "\"" + cmd + "\""; // (cmd /c drops the outer pair of quotes)
+#endif
+        exitCode = std::system(cmd.c_str());
+    });
+    std::vector<MayaLinkMesh> got;
+    CHECK(waitFor([&] {
+        for (auto& m : server.takeReceived()) got.push_back(std::move(m));
+        return !got.empty();
+    }, 20000));
+    CHECK(got.size() == 1 && got[0].name == "pCube1" && got[0].faceSizes.size() == 6);
+    CHECK(server.clientName() == "link_peer");
+    // Two Points for the same object, then a third: the client folds what it hasn't applied yet.
+    for (uint32_t k = 0; k < 3; ++k) {
+        MayaLinkPoints p;
+        p.name = "pCube1";
+        p.vertexCount = 8;
+        p.indices = {k, 7};
+        p.positions = {float(k), 0, 0, 9, 9, float(k)};
+        server.send(p);
+    }
+    peer.join();
+    CHECK(exitCode == 0);
+    server.stop();
+    setTestEnv("SF_AI_LIVE_DIR", "");
     fs::remove_all(dir);
 }
 #endif
@@ -461,7 +518,7 @@ TEST(maya_live_bench) {
         // Carried through a real link: this test plays Maya, sending to the app's server.
         const fs::path dir = fs::temp_directory_path() / "sf_maya_bench_link";
         fs::create_directories(dir);
-        setenv("SF_AI_LIVE_DIR", dir.string().c_str(), 1);
+        setTestEnv("SF_AI_LIVE_DIR", dir.string());
         const std::string endpoint = localEndpoint("maya-link", err);
         MayaLinkServer server;
         CHECK(server.start(endpoint, err));
@@ -498,7 +555,7 @@ TEST(maya_live_bench) {
         CHECK(parseMayaLinkPoints(payloadOf(pf), pb, err));
         std::printf("  stroke: Points encode+parse %4.1f ms (%.1f MB)\n", ms(t), double(pf.size()) / 1e6);
         server.stop();
-        unsetenv("SF_AI_LIVE_DIR");
+        setTestEnv("SF_AI_LIVE_DIR", "");
         fs::remove_all(dir);
     }
 }
