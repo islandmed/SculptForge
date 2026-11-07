@@ -31,6 +31,7 @@ highlight: Timelapse: rendered timelapses no longer flicker between detail level
 - **Reconstruct Subdiv** keeps UVs on the lower levels of a high-poly that was unwrapped on its own: no more faces
   stretched across UDIM tiles, even with overlapping islands.
 - **Timelapse** videos of dense sculpts no longer flicker (**Edit > Export timelapse...**).
+- The membership card now shows the Studio membership's flat price for any number of artists.
 
 ## Version 0.11.12
 

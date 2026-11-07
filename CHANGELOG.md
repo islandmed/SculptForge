@@ -40,6 +40,7 @@ All notable changes to SculptForge are listed here. The format follows
   the accent colour; builds from a git checkout show "dev" and their commit.
 
 ### Fixed
+- The membership card now shows the Studio membership's flat price for any number of artists.
 - **Reconstruct Subdiv** (Tool > Geometry): the levels it builds keep each face inside one UV island when the imported
   high-poly's seams run through the lower level's faces (UVs made on the high-poly, automatic unwraps with overlapping
   islands). Such faces used to take each corner's UV from a different island and stretch across UDIM tiles.
