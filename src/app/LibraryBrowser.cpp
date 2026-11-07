@@ -484,7 +484,7 @@ void LibraryBrowser::activate(App& app, const AssetEntry& e, bool append) {
                 app.runCommand("new_plane");
             else {
                 app.runCommand("new_cube");
-                if (app.lastCommandOk_) app.camera_.frame(app.sceneBounds());
+                if (app.lastCommandOk_) app.frameView(app.sceneBounds());
             }
         });
         return;

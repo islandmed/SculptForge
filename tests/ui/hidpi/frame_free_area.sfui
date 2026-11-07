@@ -1,0 +1,53 @@
+# Framing fits the model into the canvas the overlays leave free (the open Library along the top, the Sculpt Timeline
+# strip under it), and every left shelf item stays in view: run at 1920x1080 by CMake (ui_frame_free_area_1080), at
+# UI scale 100 / 150 / 200 (ui-compact's shots: at 200 % the sphere's top sat under the bands; at 150 % the colour
+# picker ran under the bottom shelf). The left shelf settles its fit in a frame or two after a scale change (wait_value).
+run new_sphere subdivisions=3
+expect_value model_top_clear >= 0
+expect_value model_bottom_clear >= 0
+key ,
+expect_value library_open == 1
+click "Library/Tool"
+wait_idle 30
+
+ui_scale 100
+wait_idle 10
+key f
+wait_idle 5
+expect_value model_top_clear >= 0
+expect_value model_bottom_clear >= 0
+wait_value left_column_clipped == 0 5
+shot s100
+
+ui_scale 150
+wait_idle 10
+key f
+wait_idle 5
+expect_value model_top_clear >= 0
+expect_value model_bottom_clear >= 0
+wait_value left_column_clipped == 0 5
+shot s150
+
+ui_scale 200
+wait_idle 10
+key f
+wait_idle 5
+expect_value model_top_clear >= 0
+expect_value model_bottom_clear >= 0
+wait_value left_column_clipped == 0 5
+expect_value camera_shift_y < 0
+shot s200
+
+# Closing the Library doesn't move the view (the lens shift stays until the next Frame); framing again centres the
+# model in the larger free area.
+key ,
+expect_value library_open == 0
+wait_idle 5
+expect_value camera_shift_y < 0
+expect_value model_top_clear >= 0
+key f
+wait_idle 5
+expect_value model_top_clear >= 0
+expect_value model_bottom_clear >= 0
+shot s200-closed
+ui_scale 100

@@ -979,6 +979,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(uv_editor_scales_4k uv_editor_scales --size 3840x2160)
     # The Library on a 1280x720 screen (#80): its close button stays on screen.
     sculptforge_ui_test(library_small_screen_720 library_small_screen --size 1280x720)
+    # Framing fits the model into the canvas the Library and the Sculpt Timeline leave free; the left shelf fits its
+    # column (1080p at 100 / 150 / 200 %; tests/ui/hidpi/: only at that size).
+    sculptforge_ui_test(frame_free_area_1080 hidpi/frame_free_area --size 1920x1080)
     # #107: every look's right tray on a 1280x720 screen; #105: a Windows laptop at 150-200 % (2560x1600 at 200 % is
     # 1280x800 logical px), nothing past the window's edges.
     sculptforge_ui_test(right_tray_looks_720 right_tray_looks --size 1280x720)

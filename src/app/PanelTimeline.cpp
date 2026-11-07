@@ -348,6 +348,11 @@ int App::runTimelapseCli() {
 }
 
 void App::drawTimelineUi() {
+    // What the strip covers this frame (set where it is drawn below); framing keeps the model clear of it.
+    timelineTopInset_ = 0.0f;
+    timelineStripY_ = -1.0f;
+    timelineStripH_ = 0.0f;
+    timelineDrawn_ = true;
     if (!timelineUi_) timelineUi_ = std::make_shared<TimelineUiState>();
     TimelineUiState& s = *timelineUi_;
     if (!s.loaded) {
@@ -420,9 +425,6 @@ void App::drawTimelineUi() {
         if (!layout_.libraryBottom) c.y += lib;
         c.h -= lib;
     }
-    timelineTopInset_ = 0.0f;
-    timelineStripY_ = -1.0f;
-    timelineStripH_ = 0.0f;
     if (c.w < 200 || c.h < 150 || hideUi_) return;
     const float margin = 10 * sc;
     if (!s.visible) {

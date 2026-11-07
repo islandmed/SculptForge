@@ -291,7 +291,7 @@ void App::pollSplatTrain() {
                 renderSettings_.showMesh = false;
                 status_ = "Showing the splat as it trains (Splats > Show mesh brings the sculpt back)";
             }
-            camera_.frame(sceneBounds());
+            frameView(sceneBounds());
         }
     }
     if (s.job.busy()) return;

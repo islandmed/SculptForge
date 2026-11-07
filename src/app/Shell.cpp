@@ -245,6 +245,23 @@ std::string elide(ImFont* font, const std::string& text, float width) {
     return s + "...";
 }
 
+// A left shelf caption: at its font's size, else smaller down to 80 % of it (still readable), else none, so a
+// column shrunk to fit (App::shelfFit_) never shows a cut word ("Stan..."); the tile's tooltip names it then.
+// Returns false when it was left out.
+bool fitCaption(ImDrawList* dl, ImFont* font, ImVec2 a, ImVec2 b, ImU32 col, const std::string& text) {
+    if (!font) font = ImGui::GetFont();
+    const float width = b.x - a.x;
+    const float full = font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, text.c_str()).x;
+    float size = font->FontSize;
+    if (full > width) {
+        size = std::floor(font->FontSize * width / std::max(full, 1.0f)); // text width scales with the size
+        if (size < font->FontSize * 0.8f) return false;
+    }
+    const ImVec2 ts = font->CalcTextSizeA(size, FLT_MAX, 0.0f, text.c_str());
+    dl->AddText(font, size, ImVec2(std::floor((a.x + b.x - ts.x) * 0.5f), std::floor((a.y + b.y - ts.y) * 0.5f)), col, text.c_str());
+    return true;
+}
+
 constexpr float kPointsReadoutW = 190.0f; // the ActiveTris / TotalTris readout at the right of the top shelf, unscaled
 constexpr float kMicroReadoutW = 100.0f;  // ... and its "Micro 300.00M" in front while a visible Part has a micro level (#125)
 
@@ -298,6 +315,8 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const float alpha = disabled ? 0.4f : 1.0f;
     ImFont* caption = look == int(ui::Look::IconLabel) ? app.fontTiny_ : app.fontSmall_;
+    // On the left shelf (Stroke popup) a caption that doesn't fit is shrunk or left out, never cut (fitCaption).
+    const bool leftShelf = std::strcmp(ImGui::GetCurrentWindow()->Name, kShelfWindows[kShelfLeft]) == 0;
     const float capH = caption ? caption->FontSize + 2.0f * s : 14.0f * s;
     if (look == int(ui::Look::IconLabel)) {
         // Right-shelf toggles are options (Mask, Paint, Wire): on is a raised grey with an accent bar down the
@@ -315,8 +334,11 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
         // off doesn't look disabled); disabled items are faded by alpha.
         const ImU32 fg = theme::u32(on ? (mode ? theme::textOnAccent : theme::textBright) : hovered || !a.checked ? theme::text : theme::textOff, alpha);
         centredText(dl, app.fontIcons_, p0, ImVec2(p1.x, p1.y - capH + 2.0f * s), fg, a.icon ? a.icon : "?");
-        centredText(dl, caption, ImVec2(p0.x, p1.y - capH), ImVec2(p1.x, p1.y - 1.0f * s), fg,
-                    elide(caption ? caption : ImGui::GetFont(), label, size.x - 2.0f * s).c_str());
+        if (!leftShelf)
+            centredText(dl, caption, ImVec2(p0.x, p1.y - capH), ImVec2(p1.x, p1.y - 1.0f * s), fg,
+                        elide(caption ? caption : ImGui::GetFont(), label, size.x - 2.0f * s).c_str());
+        else if (!fitCaption(dl, caption, ImVec2(p0.x + 1.0f * s, p1.y - capH), ImVec2(p1.x - 1.0f * s, p1.y - 1.0f * s), fg, label) && hovered)
+            ui::DelayedTooltip(label.c_str());
         return clicked;
     }
     // Tile: a square picture (brush thumbnail or icon) with the name under it.
@@ -345,8 +367,14 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     const std::string key = app.actions().shortcutText(a.id);
     if (key.size() == 1 && caption)
         dl->AddText(caption, caption->FontSize, ImVec2(p0.x + 3 * s, p0.y + 1 * s), theme::u32(theme::textDim), key.c_str());
-    centredText(dl, caption, ImVec2(p0.x, p1.y - capH), p1, theme::u32(on ? theme::accent : theme::text, alpha),
-                elide(caption ? caption : ImGui::GetFont(), label, size.x).c_str());
+    if (leftShelf) {
+        if (!fitCaption(dl, caption, ImVec2(p0.x, p1.y - capH), p1, theme::u32(on ? theme::accent : theme::text, alpha), label) &&
+            hovered)
+            ui::DelayedTooltip(label.c_str());
+    } else {
+        centredText(dl, caption, ImVec2(p0.x, p1.y - capH), p1, theme::u32(on ? theme::accent : theme::text, alpha),
+                    elide(caption ? caption : ImGui::GetFont(), label, size.x).c_str());
+    }
     return clicked;
 }
 
@@ -518,7 +546,7 @@ void App::registerShellActions() {
 
     // View (right shelf, Render palette). Frame keeps F; its short label fits the right shelf.
     add({"view.frame", "Frame", ICON_LC_SCAN, "Fit the whole model in the view.", "Transform", "F", "",
-         [this] { camera_.frame(sceneBounds()); }, nullptr, nullptr});
+         [this] { frameView(sceneBounds()); }, nullptr, nullptr});
         flag("view.wire", "Wire", ICON_LC_GRID_3X3, "Render", "", &renderSettings_.wireframe,
          "Wireframe: show the polygons of the active Part (Shift+F).");
     flag("view.facegroups", "Groups", ICON_LC_SHAPES, "Render", "", &renderSettings_.showFaceGroups,
@@ -852,6 +880,30 @@ CanvasRect App::canvasRect() const {
     }
     return c;
 }
+
+glm::vec4 App::freeCanvasArea() const {
+    const CanvasRect c = canvasRect();
+    if (hideUi_ || c.w < 1.0f || c.h < 1.0f) return glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+    float top = c.y, bottom = c.y + c.h;
+    if (libraryBrowser_.open()) { // as drawTimeline places the strip beside it
+        const float lib = std::min(LibraryBrowser::height(layout_, uiScale_), c.h);
+        if (layout_.libraryBottom) bottom -= lib;
+        else top += lib;
+    }
+    if (timelineStripY_ >= 0.0f) { // the strip (or its tab) as last drawn
+        if (uiPrefs_.timelineTop) top = std::max(top, timelineStripY_ + timelineStripH_);
+        else bottom = std::min(bottom, timelineStripY_);
+    } else if (!timelineDrawn_) { // not drawn yet (the model at startup): as the bare compact strip will be (margin, row)
+        const float h = (6.0f + 2.0f * 3.0f + 20.0f) * uiScale_;
+        if (uiPrefs_.timelineTop) top += h;
+        else bottom -= h;
+    }
+    // Nothing sensible left (a tiny window): the whole canvas.
+    if (bottom - top < c.h * 0.25f) return glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+    return glm::vec4(0.0f, (top - c.y) / c.h, 1.0f, (bottom - c.y) / c.h);
+}
+
+void App::frameView(const AABB& box) { camera_.frame(box, freeCanvasArea()); }
 
 void App::canvasRay(float x, float y, glm::vec3& origin, glm::vec3& dir) const {
     const CanvasRect c = canvasRect();
@@ -2287,11 +2339,37 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
         }
     }
 
+    // A side shelf taller than its column (the brush tiles and the colour picker at 150 % on a 1080p screen): its
+    // tiles, the picker and the left shelf's action tiles shrink until everything fits, down to 0.6 of their size; past that the wheel scrolls it.
+    // Their height is about proportional to the size (the captions aren't), so the next frame's fit is solved from
+    // this one's and settles in a frame or two.
+    if (vertical && !rects.empty()) {
+        float scalable = 0.0f;
+        for (size_t k = 0; k < rects.size(); ++k) {
+            const std::string& id = list[size_t(indices[k])];
+            // What shrinks: the tiles, the picker, and on the left shelf its action tiles (Stroke popup).
+            if (id.rfind("widget.tile.", 0) == 0 || id == "widget.color" || (shelf == kShelfLeft && id != "sep" && actions_.find(id)))
+                scalable += rects[k].GetHeight();
+        }
+        const float needed = rects.back().Max.y + ImGui::GetScrollY() - r.y + pad.y;
+        shelfClipped_[shelf] = int(std::count_if(rects.begin(), rects.end(), [&](const ImRect& rc) { return rc.Max.y > r.y + r.h + 0.5f; }));
+        float& fit = shelfFit_[shelf];
+        if (scalable > 0.0f) {
+            const float fixed = needed - scalable;
+            const float want = std::clamp(fit * (r.h - 1.0f * s - fixed) / scalable, 0.6f, 1.0f);
+            if (want < fit - 0.002f || want > fit + 0.02f) fit = want; // (growing back waits for a clear margin)
+        } else {
+            fit = 1.0f;
+        }
+    }
+
     ImGuiWindow* window = ImGui::GetCurrentWindow();
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    // Bottom shelf: the wheel scrolls it sideways when it doesn't fit.
-    if (shelf == kShelfBottom && ImGui::IsWindowHovered() && ImGui::GetIO().MouseWheel != 0.0f)
-        ImGui::SetScrollX(ImGui::GetScrollX() - ImGui::GetIO().MouseWheel * 60.0f * s);
+    // Bottom shelf: the wheel scrolls it sideways when it doesn't fit; a side shelf, up and down.
+    if ((shelf == kShelfBottom || vertical) && ImGui::IsWindowHovered() && ImGui::GetIO().MouseWheel != 0.0f) {
+        if (vertical) ImGui::SetScrollY(ImGui::GetScrollY() - ImGui::GetIO().MouseWheel * 60.0f * s);
+        else ImGui::SetScrollX(ImGui::GetScrollX() - ImGui::GetIO().MouseWheel * 60.0f * s);
+    }
     if (layout_.customize)
         dashedRect(dl, ImVec2(r.x + 2.0f, r.y + 2.0f), ImVec2(r.x + r.w - 2.0f, r.y + r.h - 2.0f), theme::u32(theme::accent, 0.6f),
                    4.0f * s);
@@ -2454,7 +2532,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
                      "Micro: the micro triangles of the visible Parts' micro levels (Geometry > Micro).",
                      "Draw");
     } else if (item.rfind("widget.tile.", 0) == 0) {
-        const float w = fitW((shell_.narrow ? 60.0f : 76.0f) * s);
+        const float w = fitW(std::floor((shell_.narrow ? 60.0f : 76.0f) * s * shelfFit_[shelf]));
         const ImVec2 size(w, w + (fontSmall_ ? fontSmall_->FontSize : 12.0f) + 4.0f * s);
         centre(w);
         if (item == "widget.tile.brush") drawBrushTile("##tile.brush", size);
@@ -2463,7 +2541,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         else if (item == "widget.tile.material") drawMaterialTile("##tile.material", size);
         else ImGui::Dummy(size);
     } else if (item == "widget.color") {
-        const float w = fitW((shell_.narrow ? 60.0f : 76.0f) * s);
+        const float w = fitW(std::floor((shell_.narrow ? 60.0f : 76.0f) * s * shelfFit_[shelf]));
         centre(w);
         drawColorWidget(w);
     } else if (item == "widget.nav.move" || item == "widget.nav.zoom" || item == "widget.nav.rotate") {
@@ -2535,7 +2613,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         const ImVec2 size = shelf == kShelfTop      ? ImVec2(look == ui::Look::Icon ? rowH : 0.0f, rowH)
                             : shelf == kShelfRight  ? ImVec2(fitW(44.0f * s), 40.0f * s)
                             : shelf == kShelfBottom ? ImVec2(bottomTileW_, shell::bottomShelfSize(layout_.shelfTiles).tileH * s)
-                                                    : ImVec2(winW - 2.0f * padX, 60.0f * s);
+                                                    : ImVec2(winW - 2.0f * padX, std::floor(60.0f * s * shelfFit_[shelf]));
         centre(size.x);
         // Top shelf hierarchy, by meaning (docs/ui-design.md §10). Every item is the full row height in the same
         // font, so both rows share one baseline. Mode groups (Draw | Move | Scale | Rotate, Sculpt | Paint) and
@@ -2819,8 +2897,8 @@ bool tileFrame(const char* id, ImVec2 size, ui::TileLift& lift, ImFont* font, co
     pic1 = ImVec2(b.x, b.y - capH);
     dl->AddRectFilled(pic0, pic1, theme::u32(theme::tile), theme::rounding(4.0f * s));
     if (hovered) dl->AddRectFilled(pic0, pic1, theme::u32(theme::buttonHover, 0.45f), theme::rounding(4.0f * s)); // (a faint fill, no border)
-    centredText(dl, font, ImVec2(a.x, b.y - capH), b, theme::u32(hovered ? theme::text : theme::textDim),
-                elide(font ? font : ImGui::GetFont(), caption, size.x).c_str());
+    if (!fitCaption(dl, font, ImVec2(a.x, b.y - capH), b, theme::u32(hovered ? theme::text : theme::textDim), caption) && hovered)
+        ui::DelayedTooltip(caption.c_str()); // too narrow for its name (the column shrunk to fit): the name on hover
     lift = ui::BeginTileLift(pic0, pic1); // the picture lifts, the caption stays
     dl->AddRectFilled(pic0, pic1, theme::u32(theme::tile), theme::rounding(4.0f * s));
     if (hovered) dl->AddRectFilled(pic0, pic1, theme::u32(theme::buttonHover, 0.45f), theme::rounding(4.0f * s)); // (a faint fill)

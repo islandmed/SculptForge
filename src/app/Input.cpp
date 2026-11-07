@@ -459,8 +459,8 @@ void App::viewOrbitStep(float yawDegrees, float pitchDegrees) {
 
 void App::frameActivePart() {
     const AABB b = doc_.partBounds(doc_.activePart); // (where it is: a moved linked copy, #94)
-    if (b.valid()) camera_.frame(b);
-    else camera_.frame(sceneBounds());
+    if (b.valid()) frameView(b);
+    else frameView(sceneBounds());
 }
 
 SDL_Keymod App::blenderMods(SDL_Keymod keyboard) const {

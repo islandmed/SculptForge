@@ -67,7 +67,7 @@ void App::receiveFromBlender() {
         blenderSeenRevision_ = bridgeRevision(blenderInbox(root));
     }
     runCommand("blender_receive");
-    if (status_.rfind("Received", 0) == 0) camera_.frame(sceneBounds());
+    if (status_.rfind("Received", 0) == 0) frameView(sceneBounds());
 }
 
 void App::drawBlenderMenu() {

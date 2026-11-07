@@ -2024,7 +2024,7 @@ void App::resetView() {
     camera_.yaw = camera_.pitch = camera_.roll = 0.0f; // the view a new model opens with: from the front
     camera_.ortho = false;
     autoOrtho_ = false;
-    camera_.frame(sceneBounds());
+    frameView(sceneBounds());
     status_ = "View reset";
 }
 
@@ -2052,9 +2052,10 @@ void App::rollBy(float x, float y, float dx, float dy) {
 }
 
 float App::rollSweep(float x, float y, float dx, float dy) const {
-    // The angle the cursor sweeps around the canvas centre (near the centre, a sideways drag turns by its length).
+    // The angle the cursor sweeps around the view's centre (near the centre, a sideways drag turns by its length):
+    // where the target is on screen, off the canvas centre by the lens shift (Camera::frame).
     const CanvasRect c = canvasRect();
-    const glm::vec2 centre(c.x + c.w * 0.5f, c.y + c.h * 0.5f);
+    const glm::vec2 centre(c.x + c.w * 0.5f * (1.0f + camera_.shift.x), c.y + c.h * 0.5f * (1.0f - camera_.shift.y));
     const glm::vec2 now(x, y), before(x - dx, y - dy);
     float angle = 0.0f;
     if (glm::length(now - centre) > 20.0f && glm::length(before - centre) > 20.0f) {
@@ -2724,11 +2725,11 @@ void App::runCommand(const std::string& name, const Args& args) {
     if (r.ok && (name == "new_sphere" || name == "new_plane" || name == "new_head" || name == "new_starter_mesh" ||
                  name == "open_obj" || name == "open" || name == "image_relief" || name == "image_inflate" || name == "splat_to_mesh" ||
                  (name == "splat_transform" && args.contains("fit"))))
-        camera_.frame(sceneBounds());
+        frameView(sceneBounds());
     // A new Part lands beside the model: bring it into view only if it isn't already.
     if (r.ok && (name == "part_append" || name == "part_duplicate" || name == "part_duplicate_linked") &&
         !onScreen(doc_.partBounds(doc_.activePart)))
-        camera_.frame(sceneBounds());
+        frameView(sceneBounds());
     afterCommand(name, args, r);
     afterVdmCommand(name, r); // the VDM brush after vdm_set / vdm_capture, the top view after vdm_new_plane
     watchActiveBrush();
@@ -2922,7 +2923,7 @@ void App::processPendingFiles() {
         case FileAction::SaveProject: saveProjectTo(f.path); break;
         case FileAction::AppendPart:
             runCommand("part_append", {{"path", f.path}});
-            if (lastCommandOk_) camera_.frame(sceneBounds()); // a model can be any size, anywhere
+            if (lastCommandOk_) frameView(sceneBounds()); // a model can be any size, anywhere
             break;
         case FileAction::ComfyWorkflow: setComfyWorkflow(f.path, comfyPickingText_); break;
         case FileAction::LoadLitSphere: runCommand("load_litsphere", {{"path", f.path}}); break;

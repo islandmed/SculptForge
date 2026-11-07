@@ -383,6 +383,8 @@ void App::storeProjectSettings() {
     cam.set("pitch", double(camera_.pitch));
     cam.set("roll", double(camera_.roll));
     cam.set("fov_y", double(camera_.fovY));
+    cam.set("shift_x", double(camera_.shift.x));
+    cam.set("shift_y", double(camera_.shift.y));
     s.set("camera", std::move(cam));
     Json views = Json::array();
     for (const SavedView& v : savedViews_) {
@@ -395,6 +397,8 @@ void App::storeProjectSettings() {
         o.set("roll", double(v.camera.roll));
         o.set("fov_y", double(v.camera.fovY));
         o.set("ortho", v.camera.ortho);
+        o.set("shift_x", double(v.camera.shift.x));
+        o.set("shift_y", double(v.camera.shift.y));
         views.push(std::move(o));
     }
     s.set("views", std::move(views));
@@ -509,6 +513,10 @@ void App::applyProjectSettings() {
         camera_.roll = 0.0f; // projects from before free rotation have none
         readFloat(cam, "roll", camera_.roll);
         readFloat(cam, "fov_y", camera_.fovY);
+        camera_.shift = glm::vec2(0.0f); // projects from before the lens shift have none
+        readFloat(cam, "shift_x", camera_.shift.x);
+        readFloat(cam, "shift_y", camera_.shift.y);
+        camera_.shift = glm::clamp(camera_.shift, glm::vec2(-1.0f), glm::vec2(1.0f));
         camera_.distance = std::max(camera_.distance, 1e-4f);
         camera_.fovY = std::clamp(camera_.fovY, 0.05f, 3.0f);
     }
@@ -526,6 +534,10 @@ void App::applyProjectSettings() {
             readFloat(o, "roll", v.camera.roll);
             readFloat(o, "fov_y", v.camera.fovY);
             readBool(o, "ortho", v.camera.ortho);
+            v.camera.shift = glm::vec2(0.0f);
+            readFloat(o, "shift_x", v.camera.shift.x);
+            readFloat(o, "shift_y", v.camera.shift.y);
+            v.camera.shift = glm::clamp(v.camera.shift, glm::vec2(-1.0f), glm::vec2(1.0f));
             v.camera.distance = std::max(v.camera.distance, 1e-4f);
             v.camera.fovY = std::clamp(v.camera.fovY, 0.05f, 3.0f);
             savedViews_.push_back(std::move(v));
@@ -688,7 +700,7 @@ void App::afterCommand(const std::string& name, const Args& args, const CommandR
     const std::string path = argString(args, "path", doc_.path);
     const bool project = name == "open_project" || (name == "open" && isProjectPath(path));
     if (project) {
-        if (!doc_.projectSettings["camera"].isObject()) camera_.frame(sceneBounds()); // e.g. saved by the CLI
+        if (!doc_.projectSettings["camera"].isObject()) frameView(sceneBounds()); // e.g. saved by the CLI
         applyProjectSettings(); // after runCommand framed the camera, so the saved view wins
     }
     if (project || name == "open" || name == "open_obj" || name == "save_project" || name == "save_obj")
