@@ -214,6 +214,9 @@ bool subdivReconstruct(Mesh& mesh, std::string& error, BVH* bvh = nullptr);
 bool subdivCommit(Mesh& mesh);
 // The sharpness level `level` (>= 1) is made with, or null (tests, exporters).
 const EdgeSharpness* subdivLevelSharpness(const Mesh& mesh, int level);
+// The creases of the current level's edges as Mesh::creases (per corner, 0..1; empty = none): its own, and what
+// is left of the creases further down (the sharpness the level above is made with). For exporters.
+std::vector<float> subdivCornerCreases(const Mesh& mesh);
 // A full copy of level `level` (pending edits included), e.g. to export the base cage.
 Mesh subdivLevelMesh(const Mesh& mesh, int level);
 

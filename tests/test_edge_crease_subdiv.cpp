@@ -3,7 +3,8 @@
 //
 // Subdivision with edge creases (#108 slice 3, core/Multires.h EdgeSharpness): Catmull-Clark and Loop semi-sharp
 // creases against hand-computed values on a unit cube, the s - 1 rule across levels, bit-identical results without
-// creases (and away from them), levels that follow a crease change at the base, Delete Lower and projects.
+// creases (and away from them), levels that follow a crease change at the base, Delete Lower and projects; USD
+// creases out and in (slice 4).
 #include "TestHarness.h"
 
 #include "core/Commands.h"
@@ -12,9 +13,13 @@
 #include "core/Multires.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
+#include "io/UsdIO.h"
 
 #include <cmath>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 
 using namespace sf;
 
@@ -221,4 +226,83 @@ TEST(edge_crease_subdiv_delete_lower_and_projects_keep_the_shape) {
     bool same = doc.mesh.positions.size() == top.size();
     for (size_t v = 0; same && v < top.size(); ++v) same = glm::length(doc.mesh.positions[v] - top[v]) < 1e-4f;
     CHECK(same);
+}
+
+TEST(edge_crease_usd_export_import) {
+    // A creased cage: USD creaseIndices / creaseLengths / creaseSharpnesses (sharpness 10 c^2), Catmull-Clark
+    // scheme; read back onto both sides of each edge. A plain mesh keeps subdivisionScheme "none" and no creases.
+    Document doc = makeDoc(makeCube(1));
+    CHECK(selectEdge(doc, A, B) && selectEdge(doc, B, C));
+    CHECK(registry().execute(doc, "edge_crease", {{"value", 1.0}}).ok);
+    CHECK(registry().execute(doc, "edge_select", {{"op", std::string("none")}}).ok);
+    CHECK(selectEdge(doc, C, D));
+    CHECK(registry().execute(doc, "edge_crease", {{"value", 0.5}}).ok);
+    std::string err;
+    const std::string path = tempPath("edge_crease.usda");
+    CHECK(saveUsd(path, &doc.mesh, nullptr, "Cage", err));
+    std::string text;
+    {
+        std::ifstream f(path);
+        text.assign(std::istreambuf_iterator<char>(f), {});
+    }
+    CHECK(text.find("int[] creaseLengths = [2, 2, 2]") != std::string::npos);
+    CHECK(text.find("float[] creaseSharpnesses") != std::string::npos);
+    CHECK(text.find("subdivisionScheme = \"catmullClark\"") != std::string::npos);
+    Mesh back;
+    SplatCloud splats;
+    CHECK(loadUsd(path, back, splats, err));
+    const auto topo = buildEdgeTopology(back);
+    const auto own = buildEdgeTopology(doc.mesh);
+    CHECK(edgeCreasedCount(back, *topo) == 3);
+    size_t sharp = 0, half = 0;
+    for (uint32_t e = 0; e < topo->edgeCount(); ++e) {
+        const float c = edgeCrease(back, *topo, e);
+        sharp += std::fabs(c - 1.0f) < 1e-5f;
+        half += std::fabs(c - 0.5f) < 1e-5f;
+    }
+    CHECK(sharp == 2 && half == 1);
+    // Both sides of each creased edge, as Crease sets them.
+    size_t corners = 0;
+    for (float c : back.creases) corners += c > 0.0f;
+    CHECK(corners == 6);
+    CHECK(edgeCreasedCount(doc.mesh, *own) == 3);
+
+    // At SDiv 2 (of 3) the level's edges carry what is left of the creases below: each creased edge's two halves.
+    CHECK(registry().execute(doc, "subdiv_divide", {}).ok);
+    CHECK(registry().execute(doc, "subdiv_divide", {}).ok);
+    CHECK(registry().execute(doc, "subdiv_level", {{"level", 2.0}}).ok);
+    CHECK(saveUsd(path, &doc.mesh, nullptr, "Level", err));
+    Mesh level;
+    CHECK(loadUsd(path, level, splats, err));
+    CHECK(edgeCreasedCount(level, *buildEdgeTopology(level)) == 6);
+
+    // Hand-written chains: one 3-point crease with one sharpness, and per-edge sharpness; "none" without creases.
+    {
+        std::ofstream f(path);
+        f << R"(#usda 1.0
+def Mesh "Quads"
+{
+    int[] faceVertexCounts = [4, 4]
+    int[] faceVertexIndices = [0, 1, 4, 3, 1, 2, 5, 4]
+    point3f[] points = [(0,0,0), (1,0,0), (2,0,0), (0,1,0), (1,1,0), (2,1,0)]
+    int[] creaseIndices = [0, 1, 2, 1, 4]
+    int[] creaseLengths = [3, 2]
+    float[] creaseSharpnesses = [10, 2.5]
+}
+)";
+    }
+    Mesh chain;
+    CHECK(loadUsd(path, chain, splats, err));
+    const auto ct = buildEdgeTopology(chain);
+    CHECK(edgeCreasedCount(chain, *ct) == 3);
+    std::filesystem::remove(path);
+    Mesh plainCube = makeCube(1);
+    CHECK(saveUsd(path, &plainCube, nullptr, "Plain", err));
+    {
+        std::ifstream f(path);
+        text.assign(std::istreambuf_iterator<char>(f), {});
+    }
+    CHECK(text.find("crease") == std::string::npos);
+    CHECK(text.find("subdivisionScheme = \"none\"") != std::string::npos);
+    std::filesystem::remove(path);
 }

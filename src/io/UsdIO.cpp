@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "io/UsdIO.h"
 
+#include "core/Multires.h"
 #include "core/SelectionSets.h"
 #include "core/Units.h"
 #include "io/TextureExport.h"
@@ -292,7 +293,30 @@ void writeMesh(Writer& w, const Mesh& mesh, const std::string& root, const std::
         w.line("    interpolation = \"vertex\"");
         w.line(")");
     }
-    w.line("uniform token subdivisionScheme = \"none\"");
+    // Edge creases (#108): one two-point crease per creased edge, its sharpness as in subdivision (10 = sharp on
+    // every level, USD's "infinitely sharp"). A creased mesh is a cage to subdivide, so it says which scheme.
+    const std::vector<float> creases = subdivCornerCreases(mesh);
+    std::vector<std::pair<glm::uvec2, float>> creased;
+    for (size_t c = 0; c < creases.size() && creases.size() == mesh.triangleCount() * 3; ++c) {
+        if (!(creases[c] > 0.0f)) continue;
+        const glm::uvec3& t = mesh.triangles[c / 3];
+        const uint32_t a = t[int(c % 3)], b = t[int((c + 1) % 3)];
+        creased.push_back({glm::uvec2(std::min(a, b), std::max(a, b)), creaseSharpness(creases[c])});
+    }
+    std::sort(creased.begin(), creased.end(), [](const auto& x, const auto& y) {
+        return x.first.x != y.first.x ? x.first.x < y.first.x : x.first.y != y.first.y ? x.first.y < y.first.y : x.second > y.second;
+    });
+    creased.erase(std::unique(creased.begin(), creased.end(), [](const auto& x, const auto& y) { return x.first == y.first; }),
+                  creased.end());
+    if (!creased.empty()) {
+        w.array("int[] creaseIndices", creased, [&](const auto& e) {
+            w.s += std::to_string(e.first.x) + ", " + std::to_string(e.first.y);
+        });
+        w.array("int[] creaseLengths", creased, [&](const auto&) { w.s += "2"; });
+        w.array("float[] creaseSharpnesses", creased, [&](const auto& e) { w.num(e.second); });
+    }
+    w.line(std::string("uniform token subdivisionScheme = \"") +
+           (creased.empty() ? "none" : mesh.hasQuads() ? "catmullClark" : "loop") + "\"");
     writeSelectionSets(w, mesh, triFace, faces.size());
     if (skinned) {
         w.array("uniform token[] skel:blendShapes", shapeNames, [&](const std::string& n) { w.s += quoted(n); });
@@ -1054,6 +1078,43 @@ const Prim* skelAnimation(const std::vector<Prim>& prims, const std::map<std::st
 // Internal references (SculptForge writes linked copies, #94, as instanceable prims referencing the first one): a
 // referencing prim gets the referenced prim's type, properties (its own win) and children, with paths inside it
 // moved under the referencing prim. One level; a reference to itself, an ancestor or a descendant is ignored.
+// Edge creases (creaseIndices: chains of points, creaseLengths: points per chain, creaseSharpnesses: one per
+// chain or one per edge) onto the corners of the prim's triangles (from `firstTri`) as Mesh::creases.
+void readCreases(const Prim& p, size_t points, uint32_t baseIndex, size_t firstTri, Mesh& m) {
+    const Value* idx = p.get("creaseIndices");
+    const Value* len = p.get("creaseLengths");
+    const Value* sh = p.get("creaseSharpnesses");
+    if (!idx || !len || !sh || len->nums.empty() || sh->nums.empty()) return;
+    size_t edges = 0;
+    for (double l : len->nums) edges += l >= 2.0 && l <= double(idx->nums.size()) ? size_t(l) - 1 : 0;
+    const bool perEdge = sh->nums.size() == edges && sh->nums.size() != len->nums.size();
+    std::map<uint64_t, float> crease; // (a << 32 | b), a < b: the crease value
+    size_t cursor = 0, edge = 0;
+    for (size_t c = 0; c < len->nums.size(); ++c) {
+        const double l = len->nums[c];
+        const size_t n = l >= 0.0 && l <= double(idx->nums.size()) ? size_t(l) : idx->nums.size() + 1;
+        if (cursor + n > idx->nums.size()) break;
+        for (size_t k = 0; k + 1 < n; ++k, ++edge) {
+            const double s = perEdge ? sh->nums[edge] : c < sh->nums.size() ? sh->nums[c] : 0.0;
+            const size_t a = indexValue(idx->nums[cursor + k], points), b = indexValue(idx->nums[cursor + k + 1], points);
+            if (a >= points || b >= points || a == b || !(s > 0.0)) continue;
+            const uint64_t lo = baseIndex + std::min(a, b), hi = baseIndex + std::max(a, b);
+            float& v = crease[lo << 32 | hi];
+            v = std::max(v, sharpnessCrease(float(std::min(s, 10.0))));
+        }
+        cursor += n;
+    }
+    if (crease.empty()) return;
+    for (size_t t = firstTri; t < m.triangles.size(); ++t)
+        for (int k = 0; k < 3; ++k) {
+            const uint64_t a = m.triangles[t][k], b = m.triangles[t][(k + 1) % 3];
+            const auto it = crease.find(std::min(a, b) << 32 | std::max(a, b));
+            if (it == crease.end()) continue;
+            m.creases.resize(m.triangles.size() * 3, 0.0f);
+            m.creases[t * 3 + size_t(k)] = it->second;
+        }
+}
+
 void expandInternalReferences(std::vector<Prim>& prims, std::map<std::string, size_t>& byPath) {
     const size_t original = prims.size();
     for (size_t i = 0; i < original; ++i) {
@@ -1206,6 +1267,7 @@ bool readUsdaText(const std::string& text, bool split, std::vector<MeshObject>& 
                 return e < st->nums.size() / 2 ? glm::vec2(float(st->nums[e * 2]), float(st->nums[e * 2 + 1])) : glm::vec2(0.0f);
             };
             size_t cursor = 0;
+            const size_t firstPrimTri = m.triangles.size();
             std::vector<glm::uvec2> faceTris; // per face: its first triangle and how many (selection sets)
             for (double c : counts->nums) {
                 const size_t n = size_t(std::max(0.0, c));
@@ -1234,6 +1296,8 @@ bool readUsdaText(const std::string& text, bool split, std::vector<MeshObject>& 
                 faceTris.push_back({firstTri, uint32_t(m.triangles.size()) - firstTri});
                 cursor += n;
             }
+            readCreases(p, pts.size(), baseIndex, firstPrimTri, m);
+            if (m.hasCreases()) m.creases.resize(m.triangles.size() * 3, 0.0f); // (prims before or after without)
             ++objects.back().meshPrims;
             readSelectionSets(prims, i, pts.size(), m.triangles.size(), faceTris, objects.back().sets);
             if (m.hasQuads()) m.quadPartners.resize(m.triangles.size(), Mesh::kNoQuad);

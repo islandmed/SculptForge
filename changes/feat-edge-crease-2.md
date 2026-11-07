@@ -9,7 +9,9 @@ added: **Crease** / **Uncrease** in Tool > Geometry > Edges (#108): a crease val
   level in every mode. The `edge_crease` command does the same from scripts. **Divide honours creases**
   (Catmull-Clark and Loop semi-sharp creases: sharpness 10 x crease², s - 1 per level, fractional blending):
   creasing at SDiv 1 under existing levels reshapes them with their detail; Delete Lower keeps what is left of the
-  creases on the new base. Without creases subdivision is bit-for-bit unchanged. Thanks _tfx on Discord for asking; the
+  creases on the new base. Without creases subdivision is bit-for-bit unchanged. **USD** export / import carries
+  them (`creaseIndices` / `creaseLengths` / `creaseSharpnesses`, `subdivisionScheme` catmullClark or loop on a
+  creased cage); glTF, OBJ, FBX, PLY and STL have none (documented). Thanks _tfx on Discord for asking; the
   plan for edge creases is @NicTanghe's (#108).
 testers:
   - Any OS: new Cube, Tool > Geometry > Edges mode, Select by Angle, Crease (1.00): the 12 sides turn a thick orange;
@@ -23,5 +25,7 @@ testers:
     and razor-sharp edges. Crease 0.5 instead: crisp edges with a small round-off.
   - Creature Head with levels: SDiv 1, crease a loop round the eye, step up: a crisp line round the eye, the
     sculpted detail still there. Uncrease, step up: smooth again.
+  - Crease a Cube's sides, File > Export USD at SDiv 1, open it in Blender (or usdview with subdivision on): the
+    same sharp edges. Open the .usda in SculptForge again: the creases are back (blue lines).
 ---
-Slices 2-3 of #108 (creases stored, subdivision honours them). USD export/import is slice 4.
+Slices 2-4 of #108: creases stored, subdivision honours them, USD export/import.
