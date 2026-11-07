@@ -5,8 +5,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
-#include <charconv>
 #include <cstdio>
+#include <cstdlib>
 
 namespace sf {
 
@@ -28,11 +28,15 @@ std::string number(double v) {
     return s == "-0" ? "0" : s;
 }
 
-// Characters in the shortest decimal form that reads back as `v`.
+// Significant digits in the shortest decimal form that reads back as `v` (9 always do for a float). Not
+// std::to_chars: its float overloads need macOS 13.3, above our deployment target. Digits, not characters: %g
+// writes 697130 at 5 digits as 6.9713e+05.
 size_t shortestLength(float v) {
     char buf[32];
-    const auto r = std::to_chars(buf, buf + sizeof buf, v);
-    return size_t(r.ptr - buf);
+    for (int digits = 1; digits < 9; ++digits)
+        if (std::snprintf(buf, sizeof buf, "%.*g", digits, double(v)) > 0 && std::strtof(buf, nullptr) == v)
+            return size_t(digits);
+    return 9;
 }
 
 } // namespace
