@@ -123,7 +123,7 @@ work=$(mktemp -d)
 cd "$(git rev-parse --show-toplevel)"
 # Promoting holds main still: the next batch may stage meanwhile (CI, packages, T1), and only its last move, main's
 # fast-forward (scripts/merge-queue.sh staging), waits for this lock, so the steps after the tag see this version's
-# main (docs/design/release-lanes.md §3). Per machine (the git common dir: releases and batches run in ~/Work/Zbrush
+# main (docs/design/release-lanes.md §3). Per machine (the git common dir: releases and batches run in the main checkout
 # and its worktrees on one machine). "pid start-time version": a crashed promote's lock, or its pid reused by another
 # process (a different start time), doesn't count.
 PROMOTE_LOCK="$(git rev-parse --git-common-dir)/sf-promoting"
