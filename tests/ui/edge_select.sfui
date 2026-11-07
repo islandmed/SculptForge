@@ -98,6 +98,16 @@ expect_value edges_creased < $creased
 key ctrl+z
 expect_value edges_creased == $creased
 
+# Slice 3: Add Level keeps the creased sides sharp (and the softer loop rounder); stepping down shows the creases again.
+run subdiv_divide
+run subdiv_divide
+run subdiv_divide
+expect_value subdiv_level == 4
+shot edge-crease-divided
+run subdiv_level level=1
+expect_value subdiv_level == 1
+expect_value edges_mode == 1
+
 # Picking a brush leaves the mode; the selection stays for the next time, the creases stay drawn.
 click "Geometry/Select by Angle"
 key b
@@ -135,3 +145,12 @@ key d
 expect_value subdiv_level == 2
 click_part Skull 0.5 0.45 1
 expect_status "step down to Level 1"
+
+# Creases on the head's base: the picked edges sharp, the levels above (with their sculpted detail) follow.
+key shift+d
+expect_value subdiv_level == 1
+click "Geometry/Crease"
+expect_value edges_creased > 0
+key d
+expect_value subdiv_level == 2
+shot edge-crease-head

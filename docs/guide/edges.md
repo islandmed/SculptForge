@@ -55,7 +55,20 @@ sculpting (not in Edges mode); selected creased edges are a thicker orange line.
 them: *24 edges selected of 48, 24 creased*.
 
 Creases are saved in the project with the base level and stay there while you step up and down the levels.
-Subdivision that keeps creased edges sharp comes in the next step of #108.
+
+### What a crease does to subdivision
+
+**Add Level** keeps creased edges sharp (semi-sharp creases, the rules film and game tools share):
+
+- A crease of **1** is fully sharp on every level: a creased edge stays a straight hard line, a vertex where two
+  creased edges meet follows the crease, and one where three or more meet stays a hard corner.
+- Lower values are sharp for fewer levels, then round off: the sharpness is 10 x crease², so 0.5 (sharpness 2.5)
+  is sharp for two levels and half-sharp on the third, 0.25 (sharpness 0.6) only tightens the rounding a little.
+- A single creased edge ending in smooth surface fades out there: its ends stay smooth.
+- Open (border) edges were always kept sharp; they still are.
+
+Creasing or uncreasing at Level 1 under existing levels reshapes the levels above when you step up, carrying their
+sculpted detail along. With no creases subdivision is exactly what it was.
 
 ## Big meshes
 
@@ -91,6 +104,7 @@ edge_crease info=true
 edge of the Part instead of the selection.
 
 ## See also
+
 
 - [Subdivision levels](subdivision-levels.md)
 - [Subdivide, remesh, decimate and LODs](geometry.md)
