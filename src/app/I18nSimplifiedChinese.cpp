@@ -917,6 +917,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "设置精细程度。"},
     {"Turn the micro level into a regular mesh in a new Part (for export or tools that need real geometry).",
      "将微细分层级转为新部件中的普通网格（用于导出或需要真实几何的工具）。"},
+    {"What artists say",
+     "艺术家怎么说"},
     {"Write the micro level as a 32-bit EXR displacement map over the base UVs (next to the project).",
      "将微细分层级写成基底 UV 上的 32 位 EXR 位移贴图（放在项目旁）。"},
     {"Sculpting: %s", "正在雕刻：%s"},

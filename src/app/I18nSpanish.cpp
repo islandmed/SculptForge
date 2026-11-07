@@ -836,6 +836,8 @@ constexpr Entry kSpanish[] = {
     {"Don't Save", "No guardar"},
     {"SculptForge did not close normally last time.", "SculptForge no se cerró correctamente la última vez."},
     {"Restore the autosaved work?", "¿Restaurar el trabajo autoguardado?"},
+    {"What artists say",
+     "Lo que dicen los artistas"},
     {"What happened is in sculptforge-previous.log (Help > Open log folder);",
      "Lo ocurrido está en sculptforge-previous.log (Ayuda > Abrir la carpeta de registros);"},
     {"please attach it if you report the problem.", "adjúntalo si informas del problema."},
