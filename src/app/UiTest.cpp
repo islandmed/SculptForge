@@ -961,6 +961,11 @@ double Demo::query(const std::string& name, bool& known) const {
         for (const std::string& o : off) std::fprintf(stderr, "offscreen: %s\n", o.c_str());
         return double(off.size());
     }
+    if (name.compare(0, 11, "past_right:") == 0) { // past_right:WINDOW: its items cut off at its right edge last frame
+        const std::vector<std::string> past = Demo::pastRightEdge(name.substr(11));
+        for (const std::string& p : past) std::fprintf(stderr, "past right edge: %s\n", p.c_str());
+        return double(past.size());
+    }
     if (name == "library_open") return app_.libraryBrowser_.open() ? 1.0 : 0.0;
     if (name == "guide_open") return app_.guide_.isOpen() ? 1.0 : 0.0;
     if (name == "guide_hits") return double(app_.guide_.searchHits());

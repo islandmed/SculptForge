@@ -21,3 +21,6 @@ fixed on main after the report (10-31 to 11-02); tests/ui/pen_quick_taps.sfui re
 (new `pen_tap` verb). Orbit: SDL 3.2.30 gives pen and mouse in the same window pixels (per-monitor DPI aware, no
 relative mode), and the test proves the same drag turns the view by the same angle with either; the difference is the
 tablet's absolute mapping, hence the setting.
+Also: Preferences > Tablet's Troubleshooting button moves below "Pressure: ..." when it doesn't fit beside it (it was
+cut off at 200% UI scale); tests/ui/tablet_view_speed.sfui checks with `past_right:Tablet` (new query: items of a
+pushScope panel past their window's inner right edge) at 100% and 200%, 1440x900 and 1024x768.

@@ -362,8 +362,13 @@ const char* App::pressureStatus() const {
 void App::drawPressureStatus() {
     const bool ok = penSeen_ && penTracker_.hasPressure();
     ImGui::TextColored(col(ok ? ui::color::accent : ui::color::textDim), "%s", tr(pressureStatus()));
+    // Troubleshooting beside it, or on its own line where it would run past the panel (200% UI scale, narrow trays).
+    const char* help = tr(ICON_LC_CIRCLE_HELP "  Troubleshooting##pressure_help");
+    const ImGuiStyle& st = ImGui::GetStyle();
+    const float helpW = ImGui::CalcTextSize(help, nullptr, true).x + st.FramePadding.x * 2.0f;
     ImGui::SameLine();
-    if (ImGui::SmallButton(tr(ICON_LC_CIRCLE_HELP "  Troubleshooting##pressure_help")))
+    if (ImGui::GetContentRegionAvail().x < helpW) ImGui::NewLine();
+    if (ImGui::SmallButton(help))
         guide_.open("troubleshooting.md#pen-tablets");
 #if defined(_WIN32)
     ui::HelpText("Pressure", nullptr,
