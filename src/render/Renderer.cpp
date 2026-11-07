@@ -4,6 +4,7 @@
 #include "render/MicroRenderer.h"
 
 #include "core/LitSphere.h"
+#include "core/MemoryGuard.h"
 #include "core/Tangents.h"
 #include "core/Texture.h"
 #include "core/TextureChannels.h"
@@ -3591,6 +3592,25 @@ CoarseVertices microVertices(const std::vector<glm::vec3>& positions, const std:
 void Renderer::buildMicroCoarse(MeshSlot& s, const Mesh& mesh) {
     s.coarseTried = true;
     const auto start = std::chrono::steady_clock::now();
+    const size_t nv = mesh.vertexCount();
+    // A tight machine: no coarse levels (the micro level draws as before) when their memory (~48 bytes a base vertex:
+    // corners, normals, the levels) isn't free, or an allocation fails.
+    if (const MemoryCheck m = checkMemory(nv * 48); !m.enough) {
+        std::fprintf(stderr, "coarse lod (micro): skipped, needs %s free with its margin, %s available\n",
+                     formatGigabytes(m.needBytes + memoryMargin(m.needBytes)).c_str(), formatGigabytes(m.availableBytes).c_str());
+        return;
+    }
+    try {
+        buildMicroCoarseLevels(s, mesh, start);
+    } catch (const std::bad_alloc&) {
+        std::fprintf(stderr, "coarse lod (micro): skipped, out of memory\n");
+        s.coarse.reset();
+        std::vector<glm::vec3>().swap(s.microPositions), std::vector<glm::vec3>().swap(s.microNormals);
+        std::vector<float>().swap(s.microMask), std::vector<uint8_t>().swap(s.microMoved), std::vector<ClusterBounds>().swap(s.bounds);
+    }
+}
+
+void Renderer::buildMicroCoarseLevels(MeshSlot& s, const Mesh& mesh, std::chrono::steady_clock::time_point start) {
     const size_t nv = mesh.vertexCount();
     s.order.build(mesh);
     microCorners(mesh, s.microPositions, s.microNormals, s.microMask);

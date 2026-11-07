@@ -13,6 +13,7 @@
 #include "render/Ghost.h"
 #include "render/ScreenStroke.h"
 
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <functional>
@@ -482,6 +483,7 @@ private:
     // A micro level's coarse levels: built, edits noted (before MicroRenderer::sync clears them), updated, drawn
     // (false: not drawable this frame, the micro level draws).
     void buildMicroCoarse(MeshSlot& s, const Mesh& mesh);
+    void buildMicroCoarseLevels(MeshSlot& s, const Mesh& mesh, std::chrono::steady_clock::time_point start);
     void noteMicroEdits(MeshSlot& s, const Mesh& mesh);
     void updateMicroCoarse(MeshSlot& s, const Mesh& mesh);
     bool drawMicroCoarse(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings, size_t budget);

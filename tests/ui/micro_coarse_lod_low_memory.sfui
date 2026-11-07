@@ -1,0 +1,18 @@
+# A micro level's coarse levels on a tight machine (Renderer::buildMicroCoarse): when their memory isn't free they're
+# skipped and the micro level draws as before (within its own budget), never a failure.
+run ui_look look=classic layout=classic
+env SF_TRIANGLE_BUDGET 40000
+env SF_STILL_FRAME_MS 0.001
+run new_sphere subdivisions=6
+run micro_divide level=1
+env SF_AVAILABLE_MEMORY_MB 100
+expect_status "Divided to micro"
+camera 0 0
+wait 0.6
+expect_value coarse_clusters == 0
+expect_value drawn_triangles > 0
+expect_no_text "Preview detail"
+camera 35 20
+wait 0.6
+expect_value coarse_clusters == 0
+shot micro-coarse-low-memory
