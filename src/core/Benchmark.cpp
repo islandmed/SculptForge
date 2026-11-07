@@ -115,18 +115,21 @@ size_t peakResidentBytes() {
 MemoryUse documentMemory(const Document& doc) {
     MemoryUse u;
     std::vector<const PaintTexture*> seen; // textures shared between Parts count once
+    std::vector<const PartData*> meshes;   // and meshes shared by linked Parts (#94): one mesh, one GPU slot
     for (int i = 0; i < doc.partCount(); ++i) {
-        const bool active = i == doc.activePart;
+        const bool active = doc.checkedOut(i);
         const Part& st = doc.parts[size_t(i)];
+        if (std::find(meshes.begin(), meshes.end(), st.data.get()) != meshes.end()) continue;
+        meshes.push_back(st.data.get());
         const Mesh& m = doc.partMesh(i);
         u.mesh += m.memoryBytes();
         if (m.texture && std::find(seen.begin(), seen.end(), m.texture.get()) == seen.end()) {
             seen.push_back(m.texture.get());
             u.textures += m.texture->colourBytes();
         }
-        u.bvh += (active ? doc.bvh : st.bvh).memoryBytes();
+        u.bvh += (active ? doc.bvh : st.data->bvh).memoryBytes();
         u.levels += subdivBytes(m);
-        u.undo += (active ? doc.undo : st.undo).undoBytes();
+        u.undo += (active ? doc.undo : st.data->undo).undoBytes();
         u.triangles += m.triangleCount();
         u.vertices += m.vertexCount();
         if (st.visible) // the renderer's cluster layout (core/UploadOrder.h): packed vertices (12 bytes, + colour 4,

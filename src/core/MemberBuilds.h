@@ -27,6 +27,7 @@ inline constexpr const char* kReleasesUrl = "https://api.github.com/repos/island
 inline constexpr const char* kUserUrl = "https://api.github.com/user";
 inline constexpr const char* kAssetUrlPrefix = "https://api.github.com/repos/islandmed/sculptforge-insiders/releases/assets/";
 inline constexpr const char* kKeychainAccount = "member-builds"; // (core/Keychain.h)
+inline constexpr size_t kMaxTokenLength = 4096; // longest access/refresh/device code accepted (GitHub: ~520 today)
 
 // The member API URLs the app may call with the token: the release list, one asset by number, the signed-in user.
 bool isMemberApiUrl(const std::string& url);

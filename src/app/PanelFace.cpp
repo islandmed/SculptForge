@@ -225,7 +225,7 @@ bool App::faceMouseDown(float x, float y, SDL_Keymod mod) {
     const float grab = 10.0f * uiScale_;
     for (int i = 0; i < kFaceLandmarkCount; ++i) {
         ImVec2 sp;
-        if (faceLandmarks_.set[size_t(i)] && i != facePlaceIndex_ && gizmoProject(faceLandmarks_.position[size_t(i)], sp) &&
+        if (faceLandmarks_.set[size_t(i)] && i != facePlaceIndex_ && partProject(faceLandmarks_.position[size_t(i)], sp) &&
             std::hypot(sp.x - x, sp.y - y) < grab) {
             facePlaceIndex_ = i;
             status_ = std::string("Click the new place for the ") + faceLandmarkLabel(i);
@@ -261,7 +261,7 @@ void App::drawFaceOverlay() {
     for (int i = 0; i < kFaceLandmarkCount; ++i) {
         if (!faceLandmarks_.set[size_t(i)]) continue;
         ImVec2 p;
-        if (!gizmoProject(faceLandmarks_.position[size_t(i)], p)) continue;
+        if (!partProject(faceLandmarks_.position[size_t(i)], p)) continue;
         const bool current = facePlacing_ && i == facePlaceIndex_;
         dl->AddCircleFilled(p, 5.0f * s, current ? IM_COL32(255, 196, 64, 255) : IM_COL32(80, 200, 255, 255));
         dl->AddCircle(p, 5.0f * s, IM_COL32(0, 0, 0, 200), 0, 1.5f * s);

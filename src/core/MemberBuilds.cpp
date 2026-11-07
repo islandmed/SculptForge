@@ -29,9 +29,9 @@ std::string formEncode(const std::string& s) {
 
 std::string str(const Json& j, const char* key) { return j[key].isString() ? j[key].asString() : std::string(); }
 
-// Tokens are short printable strings; anything else is not a token.
+// Tokens are printable strings of at most kMaxTokenLength (GitHub's newer tokens are ~520); anything else is not a token.
 bool tokenLike(const std::string& s) {
-    return !s.empty() && s.size() <= 512 &&
+    return !s.empty() && s.size() <= kMaxTokenLength &&
            std::all_of(s.begin(), s.end(), [](char c) { return c > 32 && c < 127 && c != '"' && c != '\\'; });
 }
 

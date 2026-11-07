@@ -284,7 +284,7 @@ ImVec2 Demo::project(const glm::vec3& p) const {
 }
 
 ImVec2 Demo::onModel(float u, float v) const {
-    const AABB b = app_.doc_.mesh.bounds();
+    const AABB b = app_.doc_.partBounds(app_.doc_.activePart); // (where it is: a moved linked copy, #94)
     ImVec2 lo(1e9f, 1e9f), hi(-1e9f, -1e9f);
     for (int i = 0; i < 8; ++i) {
         const glm::vec3 c((i & 1) ? b.max.x : b.min.x, (i & 2) ? b.max.y : b.min.y, (i & 4) ? b.max.z : b.min.z);

@@ -1,0 +1,27 @@
+# The timeline strip's header never overlaps its controls: in a narrow window or at a high UI scale (a 1024 px window
+# at 200 %) the step text, branch count, step name and message are elided before they reach "Save with project".
+# CMake also runs this at 1024x768.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+stroke 0.35 0.40 0.60 0.45
+stroke 0.40 0.55 0.62 0.60
+run timeline_seek index=1
+stroke 0.30 0.60 0.55 0.70
+expect_value timeline_branches == 1
+expect_value timeline_overlaps == 0
+shot header
+
+ui_scale 200
+expect_value timeline_overlaps == 0
+shot header_200
+run ui_look look=forge layout=sculptforge
+expect_value timeline_overlaps == 0
+shot header_200_sculptforge
+
+# 512 logical px at any window size (a 1024 px window at 200 %).
+ui_scale auto
+run ui_look look=classic layout=classic
+logical_width 512
+wait_idle 30
+expect_value timeline_overlaps == 0
+shot header_512

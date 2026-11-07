@@ -28,8 +28,9 @@ them is an export, not a save. See [Exporting](exporting.md).
 - **File > Save As...** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) saves under a new name.
 - In the Classic layout, clicking the document name in the title strip also saves.
 
-The bar along the top shows the file name with `*` after it while there are unsaved changes, and the window title
-starts with `*`. Any edit in any Part counts, as do splat edits and layer weight changes.
+The bar along the top shows the file name with `*` after it while there are unsaved changes, and so does the window
+title, which starts with the file name. Any edit in any Part counts, as do splat edits and layer weight changes.
+The window title and the top bar also show the SculptForge version, so a screenshot says which one you run.
 
 If you opened a model file (an OBJ, say) rather than a project, **Save** asks where to save a new `.sfproj`; the
 original model file is left alone.

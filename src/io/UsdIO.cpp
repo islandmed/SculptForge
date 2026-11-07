@@ -197,8 +197,25 @@ void writeSelectionSets(Writer& w, const Mesh& mesh, std::vector<uint32_t> triFa
 }
 
 // One mesh prim `prim` under the root (a SkelRoot holding the Mesh when it has blend shapes).
+// xformOp:transform and its order for a prim placed by `m` (nothing for the identity).
+void writeTransform(Writer& w, const glm::mat4& m, bool always = false) {
+    if (m == glm::mat4(1.0f) && !always) return;
+    w.indent();
+    w.s += "matrix4d xformOp:transform = (";
+    for (int col = 0; col < 4; ++col) { // USD rows are glm columns (row-vector convention)
+        w.s += col ? ", (" : "(";
+        for (int r = 0; r < 4; ++r) {
+            if (r) w.s += ", ";
+            w.num(m[col][r]);
+        }
+        w.s += ')';
+    }
+    w.s += ")\n";
+    w.line("uniform token[] xformOpOrder = [\"xformOp:transform\"]");
+}
+
 void writeMesh(Writer& w, const Mesh& mesh, const std::string& root, const std::string& prim, const std::string& material,
-               const MorphAnimation* animation) {
+               const MorphAnimation* animation, const glm::mat4& transform = glm::mat4(1.0f)) {
     const bool skinned = !mesh.layers.empty();
     const std::string meshPath = skinned ? "/" + root + "/" + prim + "/Mesh" : "/" + root + "/" + prim;
     // Unique, valid names for the blend shapes.
@@ -217,13 +234,17 @@ void writeMesh(Writer& w, const Mesh& mesh, const std::string& root, const std::
     base.rebuildTopology();
     base.recomputeAllNormals();
 
-    if (skinned) w.open("def SkelRoot \"" + prim + "\"");
+    if (skinned) {
+        w.open("def SkelRoot \"" + prim + "\"");
+        writeTransform(w, transform);
+    }
     w.line("def Mesh \"" + (skinned ? std::string("Mesh") : prim) + "\" (");
     w.line(skinned ? "    prepend apiSchemas = [\"SkelBindingAPI\", \"MaterialBindingAPI\"]"
                    : "    prepend apiSchemas = [\"MaterialBindingAPI\"]");
     w.line(")");
     w.line("{");
     ++w.depth;
+    if (!skinned) writeTransform(w, transform);
     writeExtent(w, base.bounds());
     // Quads where the mesh keeps them (Mesh::quadPartners), else triangles; UVs per face corner in the same
     // order (a quad split by a UV seam along its diagonal is written as two triangles).
@@ -353,20 +374,7 @@ void writeSplats(Writer& w, const SplatCloud& c) {
     w.line("uniform int radiance:sphericalHarmonicsDegree = " + std::to_string(c.shDegree));
     w.array("float3[] scales", c.scales, [&](const glm::vec3& v) { w.vec3(v); });
     w.line("uniform token sortingModeHint = \"zDepth\"");
-    if (c.transform != glm::mat4(1.0f)) {
-        w.indent();
-        w.s += "matrix4d xformOp:transform = (";
-        for (int col = 0; col < 4; ++col) { // USD rows are glm columns (row-vector convention)
-            w.s += col ? ", (" : "(";
-            for (int r = 0; r < 4; ++r) {
-                if (r) w.s += ", ";
-                w.num(c.transform[col][r]);
-            }
-            w.s += ')';
-        }
-        w.s += ")\n";
-        w.line("uniform token[] xformOpOrder = [\"xformOp:transform\"]");
-    }
+    writeTransform(w, c.transform);
     w.close();
 }
 
@@ -514,6 +522,7 @@ std::string buildUsda(const std::vector<MeshObjectRef>& meshes, const std::vecto
         std::set<std::string> used = {"Materials", "Splats"};
         std::vector<std::pair<std::string, std::string>> textured; // material name, texture
         std::vector<size_t> texturedMesh;                         // which mesh each textured material is for
+        std::vector<std::string> prims;                           // by mesh
         for (size_t i = 0; i < meshes.size(); ++i) {
             const MeshObjectRef& m = meshes[i];
             std::string prim = "Sculpt";
@@ -523,13 +532,28 @@ std::string buildUsda(const std::vector<MeshObjectRef>& meshes, const std::vecto
                 for (int k = 2; used.count(prim); ++k) prim = base + "_" + std::to_string(k);
             }
             used.insert(prim);
+            prims.push_back(prim);
+            // A linked copy (#94): an instanceable prim referencing the first one's (its mesh, material and
+            // blend shapes), placed by its own transform. Readers that instance load the mesh once.
+            if (m.instanceOf >= 0 && size_t(m.instanceOf) < i) {
+                w.line("def \"" + prim + "\" (");
+                w.line("    instanceable = true");
+                w.line("    prepend references = </" + root + "/" + prims[size_t(m.instanceOf)] + ">");
+                w.line(")");
+                w.line("{");
+                ++w.depth;
+                writeTransform(w, m.transform, true); // (always: else the referenced prim's own would apply)
+                w.close();
+                w.s += '\n';
+                continue;
+            }
             std::string material = mixed && m.mesh->hasColors() ? paintedClay : clay;
             if (!textures[i].empty()) {
                 textured.push_back({prim + "_Material", textures[i]});
                 texturedMesh.push_back(i);
                 material = "/" + root + "/Materials/" + textured.back().first;
             }
-            writeMesh(w, *m.mesh, root, prim, material, animation);
+            writeMesh(w, *m.mesh, root, prim, material, animation, m.transform);
             w.s += '\n';
         }
         w.open("def Scope \"Materials\"");
@@ -649,6 +673,7 @@ struct Value {
 
 struct Prim {
     std::string type, path;
+    std::string reference; // an internal reference's target path (metadata `references = </path>`)
     bool abstract = false;
     int parent = -1;
     std::map<std::string, Value> attrs;
@@ -701,6 +726,31 @@ private:
             else if (isPunct(")") || isPunct("]") || isPunct("}")) --level;
             advance();
         } while (level > 0);
+    }
+
+    // A prim's metadata: only an internal reference is kept (`[prepend] references = </path>` or `[</path>]`).
+    void parsePrimMetadata(Prim& prim) {
+        advance();
+        while (tok_.kind != Token::End && !isPunct(")")) {
+            if (isIdent("references")) {
+                advance();
+                if (isPunct("=")) advance();
+                if (isPunct("[")) {
+                    advance();
+                    if (tok_.kind == Token::Path) prim.reference = std::string(tok_.text);
+                    while (tok_.kind != Token::End && !isPunct("]")) advance();
+                    advance();
+                } else {
+                    if (tok_.kind == Token::Path) prim.reference = std::string(tok_.text);
+                    advance();
+                }
+            } else if (isPunct("(") || isPunct("[") || isPunct("{")) {
+                skipBalanced();
+            } else {
+                advance();
+            }
+        }
+        advance(); // ')'
     }
 
     void parseLayerMetadata() {
@@ -790,7 +840,7 @@ private:
         prim.parent = parent;
         prim.abstract = abstract;
         advance();
-        if (isPunct("(")) skipBalanced();
+        if (isPunct("(")) parsePrimMetadata(prim);
         if (!expect("{")) return false;
         const int index = int(prims.size());
         prims.push_back(std::move(prim));
@@ -1001,6 +1051,43 @@ const Prim* skelAnimation(const std::vector<Prim>& prims, const std::map<std::st
     return nullptr;
 }
 
+// Internal references (SculptForge writes linked copies, #94, as instanceable prims referencing the first one): a
+// referencing prim gets the referenced prim's type, properties (its own win) and children, with paths inside it
+// moved under the referencing prim. One level; a reference to itself, an ancestor or a descendant is ignored.
+void expandInternalReferences(std::vector<Prim>& prims, std::map<std::string, size_t>& byPath) {
+    const size_t original = prims.size();
+    for (size_t i = 0; i < original; ++i) {
+        if (prims[i].reference.empty()) continue;
+        const auto it = byPath.find(prims[i].reference);
+        if (it == byPath.end() || it->second >= original) continue;
+        const size_t r = it->second;
+        const std::string from = prims[r].path, to = prims[i].path;
+        if (from == to || to.rfind(from + "/", 0) == 0 || from.rfind(to + "/", 0) == 0) continue;
+        auto moved = [&](Value v) {
+            for (auto& s : v.strs)
+                if (s == from || s.rfind(from + "/", 0) == 0) s = to + s.substr(from.size());
+            return v;
+        };
+        if (prims[i].type.empty()) prims[i].type = prims[r].type;
+        for (const auto& [name, value] : prims[r].attrs) prims[i].attrs.try_emplace(name, moved(value));
+        std::map<size_t, size_t> cloneOf{{r, i}}; // referenced prim -> its copy
+        for (size_t q = r + 1; q < original && prims[q].path.rfind(from + "/", 0) == 0; ++q) {
+            const auto parent = cloneOf.find(size_t(prims[q].parent));
+            if (parent == cloneOf.end()) continue;
+            Prim c;
+            c.type = prims[q].type;
+            c.path = to + prims[q].path.substr(from.size());
+            c.abstract = prims[q].abstract || prims[i].abstract;
+            c.parent = int(parent->second);
+            for (const auto& [name, value] : prims[q].attrs) c.attrs.emplace(name, moved(value));
+            if (byPath.count(c.path)) continue; // (the referencing prim has a child of that name already)
+            cloneOf[q] = prims.size();
+            byPath[c.path] = prims.size();
+            prims.push_back(std::move(c));
+        }
+    }
+}
+
 // Merges every Mesh prim into one object, or (split) makes one object per prim.
 bool readUsdaText(const std::string& text, bool split, std::vector<MeshObject>& outMeshes, SplatCloud& outSplats,
                   std::string& error) {
@@ -1012,6 +1099,7 @@ bool readUsdaText(const std::string& text, bool split, std::vector<MeshObject>& 
     auto& prims = parser.prims;
     std::map<std::string, size_t> byPath;
     for (size_t i = 0; i < prims.size(); ++i) byPath[prims[i].path] = i;
+    expandInternalReferences(prims, byPath);
 
     // World transforms (parents come first in `prims`), Y up, in the stage's unit. Mesh points go to metres through
     // double (fromFileUnits), so 12.7 cm is the float nearest 0.127 m; splats take the unit in their transform.
@@ -1249,8 +1337,14 @@ bool saveUsd(const std::string& path, const Mesh* mesh, const SplatCloud* splats
 bool saveUsd(const std::string& path, const std::vector<MeshObjectRef>& meshesIn, const SplatCloud* splats,
              const std::string& name, std::string& error, const MorphAnimation* animation) {
     std::vector<MeshObjectRef> meshes;
-    for (const auto& m : meshesIn)
-        if (m.mesh && m.mesh->triangleCount() > 0) meshes.push_back(m);
+    std::vector<int> kept(meshesIn.size(), -1); // (instanceOf names an index of meshesIn)
+    for (size_t i = 0; i < meshesIn.size(); ++i) {
+        const auto& m = meshesIn[i];
+        if (!m.mesh || m.mesh->triangleCount() == 0) continue;
+        kept[i] = int(meshes.size());
+        meshes.push_back(m);
+        if (m.instanceOf >= 0) meshes.back().instanceOf = size_t(m.instanceOf) < i ? kept[size_t(m.instanceOf)] : -1;
+    }
     const bool hasSplats = splats && !splats->empty();
     if (meshes.empty() && !hasSplats) {
         error = "Nothing to export";
@@ -1268,7 +1362,9 @@ bool saveUsd(const std::string& path, const std::vector<MeshObjectRef>& meshesIn
         return false;
     }
     // Textures: PNGs inside a .usdz package, else beside the layer; asset paths are relative to the layer.
-    const std::vector<std::string> pngs = textureFileNames(path, meshes);
+    std::vector<std::string> pngs = textureFileNames(path, meshes);
+    for (size_t i = 0; i < meshes.size(); ++i)
+        if (meshes[i].instanceOf >= 0) pngs[i].clear(); // (a linked copy uses the first one's material)
     // Material channel maps (PBR slots) per textured mesh, named after its colour PNG.
     std::vector<std::vector<PbrPng>> pbrPngs(meshes.size());
     std::vector<std::vector<std::pair<std::string, std::string>>> pbr(meshes.size());

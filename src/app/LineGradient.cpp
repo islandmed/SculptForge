@@ -122,7 +122,7 @@ void App::applyGradient() {
                                   {"color", colorToHex(doc_.paintColor)},
                                   {"to", gradient_.toClear ? std::string("clear") : colorToHex(gradient_.to)},
                                   {"aspect", double(c.w / c.h)},
-                                  {"view_proj", matrixText(camera_.projection() * camera_.view())}});
+                                  {"view_proj", matrixText(partCamera().projection() * partCamera().view())}}); // (#94)
     if (!lastCommandOk_ || doc_.undo.revision() == before) return;
     gradient_.placed = true;
     gradient_.revision = doc_.undo.revision();

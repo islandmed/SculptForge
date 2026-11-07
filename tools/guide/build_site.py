@@ -1038,6 +1038,7 @@ def supporters_html() -> str:
         <a href="index.html">Home</a>
         <a href="support.html">Membership</a>
         <a href="terms.html">Terms</a>
+        <a href="jobs.html">Jobs</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
       </div>
       <p class="fine">Copyright © 2026 The SculptForge contributors.</p>
@@ -1100,7 +1101,8 @@ def main() -> int:
         if wn:
             write_home(wn, False)
         urls = [SITE, SITE + "brushes.html", SITE + "press.html",
-                SITE + "studios.html", SITE + "ai.html", SITE + "support.html", SITE + "terms.html", SITE + "supporters.html",
+                SITE + "studios.html", SITE + "ai.html", SITE + "support.html", SITE + "terms.html", SITE + "jobs.html", SITE + "queue.html",
+                SITE + "supporters.html",
                 SITE + "performance/"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]
         (ROOT / "website" / "sitemap.xml").write_text(
             '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'

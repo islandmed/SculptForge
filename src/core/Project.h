@@ -26,12 +26,14 @@ namespace sf {
 // frames, not world space (format 4 files are converted when they load). 6: levels made by Divide keep no
 // triangles, child maps or (where their positions say it) details; older files still load. 7: a Part texture
 // may carry material channels (the texture's "pbr" key, core/LayerStackIO.h), and a Part a micro-displacement
-// level ("micro", core/Micro.h); both keys are optional in 7.
+// level ("micro", core/Micro.h); both keys are optional in 7. 8: Linked Duplicates (#94): a Part may share an
+// earlier Part's mesh ("link": that Part's index, no mesh of its own) and have a "transform" (16 numbers,
+// column-major) placing its mesh in the scene.
 //
 // kProjectVersion is the newest format this build reads. Saving writes the lowest version the content needs
 // (ProjectVersionNeed): a project that uses nothing newer than format 6 is still written as 6, so older
 // SculptForge versions keep opening it. A feature that needs a newer format calls need(N) while saving.
-constexpr int kProjectVersion = 7;
+constexpr int kProjectVersion = 8;
 constexpr int kProjectBaseWriteVersion = 6;
 struct ProjectVersionNeed {
     int version = kProjectBaseWriteVersion;

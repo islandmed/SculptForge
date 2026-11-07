@@ -348,10 +348,10 @@ TEST(face_parts_eyes_and_teeth) {
     teeth.recomputeAllNormals();
     doc.addPart(teeth, "Teeth", false);
     doc.addPart(makeIcosphere(2, 0.5f), "Far away ball", false);
-    for (auto& p : doc.parts[3].mesh.positions) p += glm::vec3(3, 0, 0);
+    for (auto& p : doc.parts[3].data->mesh.positions) p += glm::vec3(3, 0, 0);
     CHECK(run(doc, "face_shapes_generate").ok);
 
-    const Mesh& em = doc.parts[1].mesh;
+    const Mesh& em = doc.parts[1].data->mesh;
     const SculptLayer* up = findLayer(em, "eyeLookUpLeft");
     const SculptLayer* out = findLayer(em, "eyeLookOutLeft");
     CHECK(up && out && em.layers.size() == 8);
@@ -368,7 +368,7 @@ TEST(face_parts_eyes_and_teeth) {
         CHECK(out->delta[front].x > 0.003f); // looking out = towards the character's left
         CHECK(up->delta[rightFront] == glm::vec3(0.0f));
     }
-    const Mesh& tm = doc.parts[2].mesh;
+    const Mesh& tm = doc.parts[2].data->mesh;
     const SculptLayer* jaw = findLayer(tm, "jawOpen");
     CHECK(jaw != nullptr);
     if (jaw) {
@@ -382,12 +382,12 @@ TEST(face_parts_eyes_and_teeth) {
         CHECK(upperMove == 0.0f);
     }
     CHECK(findLayer(tm, "eyeBlinkLeft") == nullptr); // teeth only get the jaw shapes
-    CHECK(doc.parts[3].mesh.layers.empty());      // not on the face: left alone
+    CHECK(doc.parts[3].data->mesh.layers.empty());      // not on the face: left alone
 
     // face_weights drives every Part: the eyes turn with eyeLookUpLeft.
-    const auto eyesBefore = doc.parts[1].mesh.positions;
+    const auto eyesBefore = doc.parts[1].data->mesh.positions;
     CHECK(run(doc, "face_weights", {{"json", std::string("{\"eyeLookUpLeft\":1,\"jawOpen\":0.5}")}}).ok);
-    CHECK(doc.parts[1].mesh.positions != eyesBefore);
+    CHECK(doc.parts[1].data->mesh.positions != eyesBefore);
 }
 
 TEST(face_weights_fast_path_is_exact_and_not_undoable) {

@@ -166,7 +166,7 @@ TEST(maya_bridge_round_trip) {
     CHECK(doc.partCount() == 2 && doc.activePart == 0 && doc.parts[0].name == "Body Hi");
     CHECK(doc.mesh.quadCount() == quads && doc.mesh.hasUvs() && doc.undo.canUndo());
     CHECK(std::abs(doc.mesh.positions[0].y - obj.positions[0].y) < 1e-5f);
-    CHECK(doc.parts[1].name == "pSphere1" && doc.parts[1].bridgeName == "pSphere1");
+    CHECK(doc.parts[1].name == "pSphere1" && doc.parts[1].data->bridgeName == "pSphere1");
 
     // A second send: the next revision, the first send's files removed, others in the folder left alone.
     writeText(root / "sculptforge_to_maya" / "notes.txt", "mine");

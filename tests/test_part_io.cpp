@@ -540,7 +540,7 @@ TEST(part_bridge_send_receive_and_export) {
     CommandRegistry reg;
     CommandResult r = reg.execute(doc, "bridge_send", {{"folder", root.string()}, {"launch", false}});
     CHECK(r.ok && r.message.find("1 more Parts") != std::string::npos);
-    CHECK(doc.bridgeName == "Body" && doc.parts[2].bridgeName == "Sword" && doc.parts[1].bridgeName == "Eye_ZB");
+    CHECK(doc.bridgeName == "Body" && doc.parts[2].data->bridgeName == "Sword" && doc.parts[1].data->bridgeName == "Eye_ZB");
     const fs::path project = root / bridgefile::kProjectsFolder / "Default";
     CHECK(fs::exists(project / (std::string("Body") + bridgefile::kExt)) && fs::exists(project / (std::string("Sword") + bridgefile::kExt)) && !fs::exists(project / (std::string("Eye_ZB") + bridgefile::kExt)));
 
@@ -549,7 +549,7 @@ TEST(part_bridge_send_receive_and_export) {
     r = reg.execute(back, "bridge_receive", {{"folder", root.string()}});
     CHECK(r.ok && back.partCount() == 2);
     CHECK(back.parts[0].name == "Body" && back.parts[1].name == "Sword");
-    CHECK(back.bridgeName == "Body" && back.parts[1].bridgeName == "Sword");
+    CHECK(back.bridgeName == "Body" && back.parts[1].data->bridgeName == "Sword");
     CHECK(back.mesh.triangleCount() == doc.partMesh(0).triangleCount() && back.mesh.hasColors() && back.mesh.hasMask());
     CHECK(groupCount(back.partMesh(1)) == 2);
 

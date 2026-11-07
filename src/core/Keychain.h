@@ -9,6 +9,7 @@
 // prompt): prefer worker threads. SF_KEYCHAIN=none turns the keychain off (render farms, CI).
 #pragma once
 
+#include <cstddef>
 #include <string>
 
 namespace sf::keychain {
@@ -19,7 +20,8 @@ bool erase(const std::string& account);                             // true when
 // Whether this computer has a keychain SculptForge can use (Linux: libsecret is installed).
 bool available();
 
-// Tests: an in-memory keychain instead of the real one, so no test reads or writes the user's.
-void useMemoryForTests(bool on);
+// Tests: an in-memory keychain instead of the real one, so no test reads or writes the user's. maxEntry: the most one
+// entry holds (0: no limit; 2560 acts like Windows Credential Manager, where longer secrets are split across entries).
+void useMemoryForTests(bool on, size_t maxEntry = 0);
 
 } // namespace sf::keychain

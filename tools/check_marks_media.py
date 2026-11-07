@@ -13,6 +13,7 @@ Files listed in tools/marks_media_pending.txt (shots waiting to be re-recorded) 
   check_marks_media.py               check every tracked image and video (ctest: marks_media)
   check_marks_media.py FILE...       check these files (any path), print every hit with its frame time
   check_marks_media.py --jobs N      parallel OCR jobs (default 3: the laptop's heavy-job budget)
+  check_marks_media.py --cached-only the cache only, as CI reads it (no OCR there): a new image fails here too
   check_marks_media.py --self-test
 """
 import hashlib
@@ -142,7 +143,8 @@ def main(argv):
     jobs = int(argv[argv.index("--jobs") + 1]) if "--jobs" in argv else 3
     explicit = [a for a in argv if not a.startswith("--") and not a.isdigit()]
     mark_re = check_marks.load_marks()
-    have_ocr = bool(shutil.which("tesseract") and shutil.which("ffmpeg"))
+    # --cached-only: as CI (no tesseract there), so a new image fails until its entry is committed, on every machine.
+    have_ocr = "--cached-only" not in argv and bool(shutil.which("tesseract") and shutil.which("ffmpeg"))
     cache = {} if explicit else load_cache()  # named files are read afresh, so their words can be shown
     if not explicit and check_marks.tracked_files() is None:
         print("check_marks_media: skipped, git can't list the tracked files here")
@@ -152,8 +154,9 @@ def main(argv):
     todo = [p for p in paths if keys[p] not in cache]
     if todo and not have_ocr:
         for p in todo:
-            print(f"{p}: not in tools/marks_media_cache.json and tesseract/ffmpeg aren't here; "
-                  "run tools/check_marks_media.py where they are and commit the cache")
+            why = "this check reads the cache only, as CI does" if "--cached-only" in argv else "tesseract/ffmpeg aren't here"
+            print(f"{p}: not in tools/marks_media_cache.json ({why}); "
+                  "run tools/check_marks_media.py where tesseract is and commit the cache")
         return 1
 
     def work(p):

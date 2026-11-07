@@ -70,10 +70,10 @@ mkdir -p "$BIN"
 if [ $OS = Linux ]; then
   case $(uname -m) in
     x86_64|amd64) ARCH=x86_64 ;;
-    aarch64|arm64) ARCH=arm64 ;;
+    aarch64|arm64) ARCH=aarch64 ;;
     *) die "no Linux build for $(uname -m) yet; see https://github.com/$REPO#building" ;;
   esac
-  APPIMAGE=SculptForge-$V-linux-$ARCH.AppImage
+  APPIMAGE=SculptForge-$V-$ARCH.AppImage # the AppImage way: x86_64 or aarch64, no "linux" (#159)
   fetch "$APPIMAGE"
   chmod +x "$TMP/$APPIMAGE"
   (cd "$TMP" && "./$APPIMAGE" --appimage-extract >/dev/null) || die "could not unpack $APPIMAGE"

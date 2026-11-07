@@ -4,6 +4,8 @@
 
 #include "core/Multires.h"
 
+#include <glm/gtc/matrix_transform.hpp>
+
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
@@ -14,7 +16,14 @@ namespace sf {
 Document::Document() {
     parts.emplace_back();
     parts.back().id = 1;
+    parts.back().data->key = 1;
     parts.back().name = "Sculpt";
+}
+
+uint32_t Document::newPartId(Part& p) {
+    p.id = nextPartId_++;
+    if (!p.data->key) p.data->key = p.id;
+    return p.id;
 }
 
 void Document::setMesh(Mesh m, std::string name, BVH* built) {
@@ -32,7 +41,7 @@ void Document::setMesh(Mesh m, std::string name, BVH* built) {
     partFolders.clear();
     parts.clear();
     parts.emplace_back();
-    parts.back().id = nextPartId_++;
+    newPartId(parts.back());
     parts.back().name = name.empty() ? "Sculpt" : std::move(name);
     activePart = 0;
     extractPreview = {};
@@ -42,7 +51,7 @@ void Document::setMesh(Mesh m, std::string name, BVH* built) {
 bool Document::dirty() const {
     if (modified || undo.revision() != cleanRevision_ || splatsVersion != cleanSplatsVersion_) return true;
     for (int i = 0; i < partCount(); ++i)
-        if (i != activePart && parts[size_t(i)].undo.revision() != parts[size_t(i)].cleanRevision) return true;
+        if (!checkedOut(i) && parts[size_t(i)].data->undo.revision() != parts[size_t(i)].data->cleanRevision) return true;
     return false;
 }
 
@@ -51,15 +60,32 @@ void Document::markClean() {
     cleanRevision_ = undo.revision();
     cleanSplatsVersion_ = splatsVersion;
     for (int i = 0; i < partCount(); ++i)
-        if (i != activePart) parts[size_t(i)].cleanRevision = parts[size_t(i)].undo.revision();
+        if (!checkedOut(i)) parts[size_t(i)].data->cleanRevision = parts[size_t(i)].data->undo.revision();
+}
+
+BVH& Document::partBvh(int i) {
+    if (checkedOut(i)) {
+        syncBvh();
+        return bvh;
+    }
+    PartData& d = *parts[size_t(i)].data;
+    if (d.bvhDirty || (d.bvh.nodeCount() == 0 && d.mesh.triangleCount())) {
+        d.bvh.build(d.mesh);
+        d.bvhDirty = false;
+    }
+    return d.bvh;
 }
 
 void Document::selectPart(int i) {
     if (i < 0 || i >= partCount() || i == activePart) return;
+    if (checkedOut(i)) { // a linked copy of the active Part: its data is checked out already
+        activePart = i;
+        return;
+    }
     uvSelection.clear();
     // Check the active Part back in, then check `i` out. Swapping keeps each
     // mesh's GPU dirty state, so the renderer doesn't re-upload anything.
-    auto swapIn = [this](Part& s) {
+    auto swapIn = [this](PartData& s) {
         std::swap(mesh, s.mesh);
         std::swap(bvh, s.bvh);
         std::swap(undo, s.undo);
@@ -69,22 +95,22 @@ void Document::selectPart(int i) {
         std::swap(bvhDirty, s.bvhDirty);
         std::swap(cleanRevision_, s.cleanRevision);
     };
-    swapIn(parts[size_t(activePart)]);
-    subdivReleaseCache(parts[size_t(activePart)].mesh); // only the active Part keeps cached levels
+    swapIn(*parts[size_t(activePart)].data);
+    subdivReleaseCache(parts[size_t(activePart)].data->mesh); // only the active Part keeps cached levels
     activePart = i;
-    swapIn(parts[size_t(i)]);
+    swapIn(*parts[size_t(i)].data);
     if (bvh.nodeCount() == 0 && mesh.triangleCount()) bvhDirty = true; // built on first use
     syncBvh();
 }
 
 int Document::addPart(Mesh m, std::string name, bool select, int at, BVH* built) {
     Part s;
-    s.id = nextPartId_++;
+    newPartId(s);
     s.name = uniquePartName(name.empty() ? "Part" : name);
-    s.mesh = std::move(m);
-    s.mesh.topologyDirty = true;
-    if (built) s.bvh = std::move(*built);
-    else s.bvh.build(s.mesh);
+    s.data->mesh = std::move(m);
+    s.data->mesh.topologyDirty = true;
+    if (built) s.data->bvh = std::move(*built);
+    else s.data->bvh.build(s.data->mesh);
     const int index = at < 0 || at > partCount() ? partCount() : at;
     parts.insert(parts.begin() + index, std::move(s));
     if (index <= activePart) ++activePart;
@@ -129,17 +155,31 @@ int Document::partIndex(uint32_t id) const {
 }
 
 bool Document::applyPartStep(PartStep& step) {
+    if (step.isTransform) {
+        const int i = partIndex(step.id);
+        if (i < 0) return false;
+        std::swap(parts[size_t(i)].transform, step.transform);
+        modified = true;
+        return true;
+    }
     if (step.stashed) { // redo: put it back where it was
         const int at = std::clamp(step.at, 0, partCount());
         parts.insert(parts.begin() + at, std::move(*step.stashed));
         step.stashed.reset();
         if (at <= activePart) ++activePart;
-        parts[size_t(at)].mesh.topologyDirty = true;
+        partMesh(at).topologyDirty = true;
         modified = true;
         return true;
     }
     const int i = partIndex(step.id);
-    if (i < 0 || i == activePart || partCount() <= 1) return false;
+    if (i < 0 || partCount() <= 1) return false;
+    if (i == activePart) { // a linked copy (its history is its group's): another Part of the group takes over
+        int other = -1;
+        for (int k = 0; k < partCount() && other < 0; ++k)
+            if (k != i && checkedOut(k)) other = k;
+        if (other < 0) return false;
+        selectPart(other);
+    }
     step.at = i;
     step.stashed = std::make_unique<Part>(std::move(parts[size_t(i)]));
     parts.erase(parts.begin() + i);
@@ -231,11 +271,104 @@ std::string Document::uniqueFolderName(const std::string& wanted) const {
     }
 }
 
+AABB Document::partBounds(int i) const {
+    const AABB local = partMesh(i).bounds();
+    const glm::mat4& t = parts[size_t(i)].transform;
+    if (!local.valid() || !parts[size_t(i)].moved()) return local;
+    AABB b;
+    for (int c = 0; c < 8; ++c)
+        b.expand(glm::vec3(t * glm::vec4(c & 1 ? local.max.x : local.min.x, c & 2 ? local.max.y : local.min.y,
+                                         c & 4 ? local.max.z : local.min.z, 1.0f)));
+    return b;
+}
+
 AABB Document::visibleBounds() const {
     AABB b;
     for (int i = 0; i < partCount(); ++i)
-        if (parts[size_t(i)].visible && partMesh(i).vertexCount()) b.expand(partMesh(i).bounds());
+        if (parts[size_t(i)].visible && partMesh(i).vertexCount()) b.expand(partBounds(i));
     return b;
+}
+
+int Document::linkCount(int i) const {
+    int n = 0;
+    for (const Part& p : parts) n += p.data == parts[size_t(i)].data ? 1 : 0;
+    return n;
+}
+
+int Document::addLink(int i, std::string name, const glm::mat4& transform, int at) {
+    Part s;
+    s.data = parts[size_t(i)].data;
+    newPartId(s);
+    s.name = uniquePartName(name.empty() ? parts[size_t(i)].name : name);
+    s.transform = transform;
+    at = at < 0 || at > partCount() ? partCount() : at;
+    parts.insert(parts.begin() + at, std::move(s));
+    if (at <= activePart) ++activePart;
+    modified = true;
+    return at;
+}
+
+int Document::linkedDuplicate(int i, const glm::vec3& offset) {
+    int first = i; // named after the group's first Part: "Body link", "Body link 2", ...
+    for (int k = 0; k < partCount(); ++k)
+        if (parts[size_t(k)].data == parts[size_t(i)].data) {
+            first = k;
+            break;
+        }
+    const int at = addLink(i, parts[size_t(first)].name + " link",
+                           glm::translate(glm::mat4(1.0f), offset) * parts[size_t(i)].transform, i + 1);
+    parts[size_t(at)].visible = parts[size_t(at - 1)].visible;
+    parts[size_t(at)].shading = parts[size_t(at - 1)].shading;
+    selectPart(at);
+    // One step in the shared history: undo takes the copy away again (applyPartStep).
+    UndoRecord r;
+    r.label = "Linked Duplicate";
+    r.part = std::make_shared<PartStep>();
+    r.part->id = parts[size_t(at)].id;
+    r.part->at = at;
+    undo.push(std::move(r));
+    modified = true;
+    return at;
+}
+
+bool Document::makeUnique(int i) {
+    if (i < 0 || i >= partCount() || linkCount(i) < 2) return false;
+    auto own = std::make_shared<PartData>();
+    own->key = nextPartId_++; // (a new GPU mesh: the group keeps its key)
+    const bool active = i == activePart;
+    const PartData& from = *parts[size_t(i)].data;
+    own->mesh = checkedOut(i) ? mesh : from.mesh;
+    own->mesh.topologyDirty = true;
+    own->activeLayer = checkedOut(i) ? activeLayer : from.activeLayer;
+    own->qremeshGuides = checkedOut(i) ? qremeshGuides : from.qremeshGuides;
+    own->bvh.build(own->mesh);
+    own->cleanRevision = ~uint64_t(0); // unsaved until the next save
+    if (active) {
+        // Check the group's data back in through another of its Parts, then this one's own copy out.
+        int other = -1;
+        for (int k = 0; k < partCount() && other < 0; ++k)
+            if (k != i && checkedOut(k)) other = k;
+        activePart = other;
+        parts[size_t(i)].data = std::move(own);
+        selectPart(i);
+    } else {
+        parts[size_t(i)].data = std::move(own);
+    }
+    modified = true;
+    return true;
+}
+
+void Document::setPartTransform(int i, const glm::mat4& transform, const std::string& label) {
+    if (i < 0 || i >= partCount() || parts[size_t(i)].transform == transform) return;
+    UndoRecord r;
+    r.label = label;
+    r.part = std::make_shared<PartStep>();
+    r.part->id = parts[size_t(i)].id;
+    r.part->isTransform = true;
+    r.part->transform = parts[size_t(i)].transform;
+    parts[size_t(i)].transform = transform;
+    partUndo(i).push(std::move(r));
+    modified = true;
 }
 
 int Document::addBrush(BrushRecipe recipe) {

@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sculpting and 3D modeling jobs - SculptForge</title>
+  <meta name="description" content="Open sculpting and 3D modeling jobs worldwide: games, film and VFX, animation, collectibles, 3D printing, jewelry and dental CAD, AR/VR. From studios' own job boards, updated daily.">
+  <meta name="theme-color" content="#111114">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png?v=7">
+  <link rel="icon" type="image/png" sizes="64x64" href="img/favicon-64.png?v=7">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=7">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Sculpting and 3D modeling jobs, worldwide">
+  <meta property="og:description" content="Character, creature, environment, prop, figure and CAD sculpting roles from studios' own job boards, updated daily.">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=5">
+  <meta property="og:url" content="https://sculptforge.app/jobs.html">
+  <link rel="canonical" href="https://sculptforge.app/jobs.html">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="style.css?v=19">
+  <script src="motion.js?v=11" defer></script>
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <style>
+    .jobs-bar { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; margin-bottom: 18px; }
+    .jobs-bar input[type=search], .jobs-bar select { background: var(--panel); color: var(--text); border: 1px solid var(--border);
+      border-radius: 10px; padding: 9px 12px; font: inherit; font-size: 0.95rem; min-width: 0; }
+    .jobs-bar input[type=search] { flex: 1 1 160px; }
+    .jobs-bar select { flex: 0 1 auto; max-width: 11.5em; }
+    .section.jobs-list { padding-top: 40px; }
+    .jobs-bar label.check { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 0.95rem; cursor: pointer; }
+    .jobs-count { color: var(--muted); font-size: 0.95rem; margin: 0 0 12px; }
+    .jobs { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+    .job a { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.2fr) minmax(0, 1.6fr) 6.5em; gap: 4px 18px;
+      padding: 13px 4px; border-bottom: 1px solid var(--border); color: var(--text); align-items: baseline; }
+    .job a:hover { background: var(--panel); text-decoration: none; }
+    .job a:focus-visible { outline: 2px solid var(--accent-2); outline-offset: -2px; }
+    .job-title { font-weight: 600; overflow-wrap: anywhere; }
+    .job-studio { color: var(--accent-2); }
+    .job-where { color: var(--muted); font-size: 0.93rem; overflow-wrap: anywhere; }
+    .job time { color: var(--muted); font-size: 0.88rem; text-align: right; font-variant-numeric: tabular-nums; }
+    .tag { display: inline-block; font-size: 0.75rem; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--text); margin-left: 4px; }
+    .job-empty, .jobs-none { color: var(--muted); padding: 24px 4px; }
+    .jobs-about { color: var(--muted); font-size: 0.93rem; max-width: 52em; margin-top: 36px; }
+    .jobs-about p { margin: 0 0 10px; }
+    @media (max-width: 760px) {
+      .job a { grid-template-columns: minmax(0, 1fr) auto; }
+      .job-title { grid-column: 1 / -1; }
+      .job-where { grid-column: 1 / -1; grid-row: 3; }
+      .jobs-bar input[type=search] { flex-basis: 100%; }
+      .jobs-bar select { flex: 1 1 140px; max-width: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="index.html"><img class="brand-mark" src="img/bust-mark-44.png" srcset="img/bust-mark-88.png 2x, img/bust-mark-132.png 3x" width="44" height="44" alt=""><span>SculptForge</span></a>
+      <nav aria-label="Main">
+        <a href="index.html#features">Features</a>
+        <a href="index.html#demos">Demos</a>
+        <a href="brushes.html">Brushes</a>
+        <a href="guide/index.html">Guide</a>
+        <a href="studios.html">Studios</a>
+        <a class="nav-support" href="support.html">Support</a>
+        <a class="nav-dl" href="index.html#download">Download</a>
+        <a class="gh" href="https://discord.gg/gWrYkEmQhH">Discord</a>
+        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="wrap">
+        <p class="eyebrow">Jobs</p>
+        <h1>Sculpting and 3D modeling jobs</h1>
+        <p class="lede">Open roles worldwide where sculpting and 3D modeling are the craft: games, film and VFX, animation,
+          collectibles and toys, 3D printing, jewelry and dental CAD, AR/VR. Straight from the companies' own job boards,
+          updated every day.</p>
+      </div>
+    </section>
+
+    <section class="section alt jobs-list">
+      <div class="wrap">
+        <form class="jobs-bar" role="search" onsubmit="return false">
+          <input type="search" id="q" placeholder="Search title, studio or place" aria-label="Search jobs">
+          <select id="region" aria-label="Region"><option value="">All regions</option><!-- jobs:regions --><option value="North America">North America (6)</option><option value="Latin America">Latin America (1)</option><option value="UK/Ireland">UK/Ireland (1)</option><option value="Europe">Europe (5)</option><option value="Middle East/Africa" disabled>Middle East/Africa (0)</option><option value="India" disabled>India (0)</option><option value="Greater China">Greater China (5)</option><option value="Japan" disabled>Japan (0)</option><option value="Korea">Korea (2)</option><option value="Southeast Asia">Southeast Asia (2)</option><option value="Oceania" disabled>Oceania (0)</option><!-- /jobs:regions --></select>
+          <select id="sector" aria-label="Sector"><option value="">All sectors</option><!-- jobs:sectors --><option value="games">Games (22)</option><option value="film-vfx" disabled>Film &amp; VFX (0)</option><option value="animation" disabled>Animation (0)</option><option value="collectibles" disabled>Collectibles &amp; toys (0)</option><option value="3d-printing" disabled>3D printing (0)</option><option value="jewelry" disabled>Jewelry (0)</option><option value="medical-dental" disabled>Medical &amp; dental (0)</option><option value="product-viz" disabled>Product visualization (0)</option><option value="ar-vr" disabled>AR/VR &amp; 3D tech (0)</option><option value="advertising" disabled>Advertising &amp; CGI (0)</option><option value="archviz" disabled>Architectural visualization (0)</option><option value="outsourcing" disabled>Outsourcing (0)</option><!-- /jobs:sectors --></select>
+          <select id="role" aria-label="Role"><option value="">All roles</option><!-- jobs:roles --><option value="character">Character &amp; creature (9)</option><option value="environment">Environment (7)</option><option value="prop" disabled>Props &amp; hard surface (0)</option><option value="print" disabled>Sculptor, figures &amp; print (0)</option><option value="cad" disabled>Jewelry &amp; dental CAD (0)</option><option value="generalist">3D artist &amp; modeler (6)</option><!-- /jobs:roles --></select>
+          <label class="check"><input type="checkbox" id="remote"> Remote</label>
+          <label class="check"><input type="checkbox" id="contract"> Contract or freelance</label>
+        </form>
+        <p class="jobs-count" aria-live="polite"><span id="shown"><!-- jobs:count -->22<!-- /jobs:count --></span> roles
+          from <!-- jobs:studios -->83<!-- /jobs:studios --> companies, updated <!-- jobs:updated -->2026-11-07<!-- /jobs:updated -->.</p>
+        <ul class="jobs" id="jobs">
+<!-- jobs:rows -->
+          <li class="job" data-regions="North America" data-sector="games" data-role="environment" data-remote="0" data-contract="0"><a href="https://job-boards.greenhouse.io/naughtydog/jobs/6240876004" rel="noopener nofollow" target="_blank"><span class="job-title">Senior Environment Artist Texture</span><span class="job-studio">Naughty Dog</span><span class="job-where">United States, Santa Monica, CA</span><time datetime="2026-11-04">2026-11-04</time></a></li>
+          <li class="job" data-regions="UK/Ireland" data-sector="games" data-role="character" data-remote="0" data-contract="0"><a href="https://jobs.eu.lever.co/frontier/d81e0934-8f97-4f45-b89f-e6d7c3916b35" rel="noopener nofollow" target="_blank"><span class="job-title">Graduate Character Artist</span><span class="job-studio">Frontier Developments</span><span class="job-where">Cambridge / Hybrid</span><time datetime="2026-11-04">2026-11-04</time></a></li>
+          <li class="job" data-regions="Europe" data-sector="games" data-role="character" data-remote="0" data-contract="0"><a href="https://jobs.lever.co/larian/dcff9fb6-ed96-4de5-adef-17fefcde584b" rel="noopener nofollow" target="_blank"><span class="job-title">Character Artist Internship</span><span class="job-studio">Larian Studios</span><span class="job-where">Gent</span><time datetime="2026-11-03">2026-11-03</time></a></li>
+          <li class="job" data-regions="Korea" data-sector="games" data-role="environment" data-remote="0" data-contract="0"><a href="https://jobs.lever.co/neowiz/7f78deae-10c8-44d7-b213-f32b971bb1af" rel="noopener nofollow" target="_blank"><span class="job-title">[NOUGH Studio] P의 거짓 차기작 배경 모델러 (인턴)</span><span class="job-studio">NEOWIZ</span><span class="job-where">Korea</span><time datetime="2026-10-29">2026-10-29</time></a></li>
+          <li class="job" data-regions="Southeast Asia" data-sector="games" data-role="generalist" data-remote="0" data-contract="0"><a href="https://job-boards.greenhouse.io/sonyinteractiveentertainmentglobal/jobs/6237080004" rel="noopener nofollow" target="_blank"><span class="job-title">Senior 3D Designer</span><span class="job-studio">Sony Interactive Entertainment</span><span class="job-where">Malaysia, Petaling Jaya</span><time datetime="2026-10-28">2026-10-28</time></a></li>
+          <li class="job" data-regions="North America" data-sector="games" data-role="character" data-remote="0" data-contract="0"><a href="https://epicgames.com/careers/jobs/6224462004?gh_jid=6224462004" rel="noopener nofollow" target="_blank"><span class="job-title">Senior Character Artist</span><span class="job-studio">Epic Games</span><span class="job-where">Cary, North Carolina, United States</span><time datetime="2026-10-22">2026-10-22</time></a></li>
+          <li class="job" data-regions="North America" data-sector="games" data-role="character" data-remote="0" data-contract="0"><a href="https://epicgames.com/careers/jobs/6224464004?gh_jid=6224464004" rel="noopener nofollow" target="_blank"><span class="job-title">Senior Character Artist</span><span class="job-studio">Epic Games</span><span class="job-where">Multiple Locations</span><time datetime="2026-10-22">2026-10-22</time></a></li>
+          <li class="job" data-regions="Greater China" data-sector="games" data-role="environment" data-remote="0" data-contract="1"><a href="https://www.riotgames.com/en/work-with-us/job/7271195?gh_jid=7271195" rel="noopener nofollow" target="_blank"><span class="job-title">3D Environment Artist - Unpublished R&amp;D Product (Contract)</span><span class="job-studio">Riot Games</span><span class="job-where">Guangzhou, China</span><time datetime="2026-10-15">2026-10-15</time></a></li>
+          <li class="job" data-regions="Greater China" data-sector="games" data-role="character" data-remote="0" data-contract="1"><a href="https://www.riotgames.com/en/work-with-us/job/8282210?gh_jid=8282210" rel="noopener nofollow" target="_blank"><span class="job-title">3D Character Artist (Contract)</span><span class="job-studio">Riot Games</span><span class="job-where">Guangzhou, China</span><time datetime="2026-10-15">2026-10-15</time></a></li>
+          <li class="job" data-regions="Europe" data-sector="games" data-role="environment" data-remote="0" data-contract="0"><a href="https://jobs.lever.co/larian/55238820-92ef-4b4e-ba18-a9fdd027f737" rel="noopener nofollow" target="_blank"><span class="job-title">Environment Artist - Internship</span><span class="job-studio">Larian Studios</span><span class="job-where">Gent</span><time datetime="2026-10-15">2026-10-15</time></a></li>
+          <li class="job" data-regions="Greater China" data-sector="games" data-role="character" data-remote="0" data-contract="0"><a href="https://www.riotgames.com/en/work-with-us/job/8279690?gh_jid=8279690" rel="noopener nofollow" target="_blank"><span class="job-title">3D Character Artist - Unpublished R&amp;D Product</span><span class="job-studio">Riot Games</span><span class="job-where">Shanghai, China</span><time datetime="2026-10-14">2026-10-14</time></a></li>
+          <li class="job" data-regions="Korea" data-sector="games" data-role="environment" data-remote="0" data-contract="0"><a href="https://jobs.lever.co/neowiz/f98e7602-7c88-4c01-b492-879e565685c7" rel="noopener nofollow" target="_blank"><span class="job-title">[ASTRA9 Studio] 내러티브 중심 RPG 신작 3D 배경모델러 (인턴)</span><span class="job-studio">NEOWIZ</span><span class="job-where">Korea</span><time datetime="2026-10-14">2026-10-14</time></a></li>
+          <li class="job" data-regions="Greater China" data-sector="games" data-role="generalist" data-remote="0" data-contract="0"><a href="https://jobs.ashbyhq.com/voodoo/45169264-5113-4ec8-85df-435e845b8edd" rel="noopener nofollow" target="_blank"><span class="job-title">3D Artist - Puzzle Games</span><span class="job-studio">Voodoo</span><span class="job-where">Beijing</span><time datetime="2026-10-12">2026-10-12</time></a></li>
+          <li class="job" data-regions="Europe" data-sector="games" data-role="generalist" data-remote="0" data-contract="0"><a href="https://careers.embark-studios.com/jobs/8517231-3d-artist" rel="noopener nofollow" target="_blank"><span class="job-title">3D Artist</span><span class="job-studio">Embark Studios</span><span class="job-where">Stockholm, Sweden</span><time datetime="2026-10-08">2026-10-08</time></a></li>
+          <li class="job" data-regions="Europe" data-sector="games" data-role="generalist" data-remote="1" data-contract="0"><a href="https://jobs.ashbyhq.com/voodoo/f8231db6-ec7c-47ad-86ae-7ba48b01f94e" rel="noopener nofollow" target="_blank"><span class="job-title">3D Game Artist - Sand Loop</span><span class="job-studio">Voodoo</span><span class="job-where">Paris <span class="tag">Remote</span></span><time datetime="2026-10-06">2026-10-06</time></a></li>
+          <li class="job" data-regions="Europe" data-sector="games" data-role="character" data-remote="0" data-contract="0"><a href="https://careers.embark-studios.com/jobs/8476314-character-artist" rel="noopener nofollow" target="_blank"><span class="job-title">Character Artist</span><span class="job-studio">Embark Studios</span><span class="job-where">Stockholm, Sweden</span><time datetime="2026-09-30">2026-09-30</time></a></li>
+          <li class="job" data-regions="Southeast Asia" data-sector="games" data-role="generalist" data-remote="0" data-contract="0"><a href="https://job-boards.eu.greenhouse.io/tripledotstudios/jobs/4973861101" rel="noopener nofollow" target="_blank"><span class="job-title">3D Artist</span><span class="job-studio">Tripledot Studios</span><span class="job-where">Jakarta</span><time datetime="2026-09-15">2026-09-15</time></a></li>
+          <li class="job" data-regions="North America" data-sector="games" data-role="character" data-remote="0" data-contract="0"><a href="https://www.riotgames.com/en/work-with-us/job/8163170?gh_jid=8163170" rel="noopener nofollow" target="_blank"><span class="job-title">Principal 3D Character Artist - Unpublished R&amp;D Product</span><span class="job-studio">Riot Games</span><span class="job-where">Los Angeles, USA</span><time datetime="2026-09-09">2026-09-09</time></a></li>
+          <li class="job" data-regions="North America" data-sector="games" data-role="character" data-remote="1" data-contract="0"><a href="https://jobs.ashbyhq.com/thatgamecompany/36e101a4-c7ba-4884-8999-cd04abb979ee" rel="noopener nofollow" target="_blank"><span class="job-title">3D Character Artist (Mid-Senior)</span><span class="job-studio">thatgamecompany</span><span class="job-where">Remote - US <span class="tag">Remote</span></span><time datetime="2026-09-02">2026-09-02</time></a></li>
+          <li class="job" data-regions="Greater China" data-sector="games" data-role="environment" data-remote="0" data-contract="0"><a href="https://jobs.ashbyhq.com/supercell/8cb16c25-3e09-4245-96b0-6bab32186181" rel="noopener nofollow" target="_blank"><span class="job-title">Senior Level Artist, Project R.I.S.E</span><span class="job-studio">Supercell</span><span class="job-where">Shanghai</span><time datetime="2026-09-01">2026-09-01</time></a></li>
+          <li class="job" data-regions="Latin America" data-sector="games" data-role="generalist" data-remote="0" data-contract="0"><a href="https://jobs.lever.co/jamcity/5162e400-e24f-47f1-9a64-51548812b74a" rel="noopener nofollow" target="_blank"><span class="job-title">3D Artist</span><span class="job-studio">Jam City</span><span class="job-where">Montevideo</span><time datetime="2026-09-01">2026-09-01</time></a></li>
+          <li class="job" data-regions="North America" data-sector="games" data-role="environment" data-remote="0" data-contract="0"><a href="https://job-boards.greenhouse.io/2k/jobs/7812709003" rel="noopener nofollow" target="_blank"><span class="job-title">Lead Level Artist</span><span class="job-studio">2K</span><span class="job-where">Montréal, Quebec, Canada</span><time datetime="2026-08-14">2026-08-14</time></a></li>
+<!-- /jobs:rows -->
+        </ul>
+        <p class="jobs-none" id="none" hidden>No roles match these filters right now. New ones arrive daily.</p>
+        <div class="jobs-about">
+          <p>Listings come from the public job feeds companies publish for their own careers pages. We show the title as
+            published, the company, the place and the date, and link to the original posting: apply there. A role leaves
+            this page when its posting closes or after <!-- jobs:maxage -->90<!-- /jobs:maxage --> days. SculptForge
+            isn't affiliated with these companies.</p>
+          <p>Hiring sculptors or 3D modelers, or is a studio missing? Tell us on the
+            <a href="https://discord.gg/gWrYkEmQhH" rel="noopener">SculptForge Discord</a>.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="index.html"><img class="brand-mark" src="img/bust-mark-44.png" srcset="img/bust-mark-88.png 2x, img/bust-mark-132.png 3x" width="32" height="32" alt=""><span>SculptForge</span></a>
+        <p class="fine">Copyright © 2026 The SculptForge contributors. SculptForge is licensed under the
+          <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
+      </div>
+      <div class="links">
+        <a href="performance/">Performance</a>
+        <a href="guide/index.html">User Guide</a>
+        <a href="brushes.html">Community brushes</a>
+        <a href="benchmarks/">Benchmarks: 15M and 33M</a>
+        <a href="press.html">Press kit</a>
+        <a href="support.html">Membership</a>
+        <a href="supporters.html">Members</a>
+        <a href="terms.html">Terms</a>
+        <a href="jobs.html">Jobs</a>
+        <a href="https://github.com/islandmed/SculptForge">Source code</a>
+        <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
+      </div>
+      <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners. The site uses no cookies. Visits are counted anonymously with <a href="https://www.goatcounter.com/">GoatCounter</a>.</p>
+    </div>
+  </footer>
+  <script>
+    // Filters run in the page: no cookies, no storage. The URL hash keeps them, so a filtered list can be shared.
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const rows = [...document.querySelectorAll('#jobs .job')];
+      const ids = ['q', 'region', 'sector', 'role', 'remote', 'contract'];
+      const val = (id) => $(id).type === 'checkbox' ? ($(id).checked ? '1' : '') : $(id).value.trim();
+      function apply() {
+        const f = Object.fromEntries(ids.map((id) => [id, val(id)]));
+        const q = f.q.toLowerCase();
+        let n = 0;
+        for (const li of rows) {
+          const d = li.dataset;
+          const ok = (!f.region || d.regions.split('|').includes(f.region)) && (!f.sector || d.sector === f.sector) &&
+            (!f.role || d.role === f.role) && (!f.remote || d.remote === '1') && (!f.contract || d.contract === '1') &&
+            (!q || li.textContent.toLowerCase().includes(q));
+          li.hidden = !ok;
+          n += ok;
+        }
+        $('shown').textContent = n;
+        $('none').hidden = n > 0 || rows.length === 0;
+        const h = new URLSearchParams(Object.entries(f).filter(([, v]) => v)).toString();
+        history.replaceState(null, '', h ? '#' + h : location.pathname);
+      }
+      const p = new URLSearchParams(location.hash.slice(1));
+      for (const id of ids) {
+        const v = p.get(id);
+        if (v === null) continue;
+        if ($(id).type === 'checkbox') $(id).checked = v === '1';
+        else if ($(id).tagName !== 'SELECT' || [...$(id).options].some((o) => o.value === v)) $(id).value = v;
+      }
+      ids.forEach((id) => $(id).addEventListener('input', apply));
+      apply();
+    })();
+  </script>
+</body>
+</html>

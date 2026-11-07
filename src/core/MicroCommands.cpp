@@ -139,7 +139,8 @@ void registerMicroCommands(CommandRegistry& reg) {
                      return {true, "Baked the micro level into this Part: " + tris + " triangles"};
                  }
                  const std::string name = doc.uniquePartName(doc.activePartInfo().name + " baked");
-                 doc.addPart(std::move(baked), name, false, doc.activePart + 1);
+                 const int at = doc.addPart(std::move(baked), name, false, doc.activePart + 1);
+                 doc.parts[size_t(at)].transform = doc.activePartInfo().transform; // (a linked copy's place)
                  return {true, "Baked the micro level into Part \"" + name + "\": " + tris + " triangles"};
              }});
 

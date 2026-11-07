@@ -7,6 +7,7 @@
 #include "core/Dyntopo.h"
 #include "core/Masking.h"
 #include "core/Multires.h"
+#include "core/PathStroke.h"
 #include "core/FaceGroups.h"
 #include "core/Primitives.h"
 #include "core/Sculpt.h"
@@ -18,6 +19,7 @@
 #include <stb_image.h>
 
 #include <cctype>
+#include <deque>
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
@@ -103,25 +105,62 @@ Mesh mergeMeshes(const std::vector<const Mesh*>& meshes) {
     return out;
 }
 
+Mesh placedMesh(const Mesh& mesh, const glm::mat4& transform) {
+    Mesh out = mesh;
+    if (transform == glm::mat4(1.0f)) return out;
+    const glm::mat3 linear(transform);
+    for (auto& p : out.positions) p = glm::vec3(transform * glm::vec4(p, 1.0f));
+    for (auto& p : out.base) p = glm::vec3(transform * glm::vec4(p, 1.0f));
+    for (auto& l : out.layers)
+        for (auto& d : l.delta) d = linear * d;
+    out.multires.reset();
+    out.topologyDirty = true;
+    out.recomputeAllNormals();
+    return out;
+}
+
+const Mesh& partPlacedMesh(const Document& doc, int i, Mesh& scratch) {
+    if (!doc.parts[size_t(i)].moved()) return doc.partMesh(i);
+    scratch = placedMesh(doc.partMesh(i), doc.parts[size_t(i)].transform);
+    return scratch;
+}
+
 Mesh mergedVisibleMesh(const Document& doc) {
-    if (doc.partCount() == 1) return doc.mesh;
+    if (doc.partCount() == 1) return placedMesh(doc.mesh, doc.parts[0].transform);
+    std::deque<Mesh> placed;
     std::vector<const Mesh*> meshes;
     for (int i = 0; i < doc.partCount(); ++i)
-        if (doc.parts[size_t(i)].visible && doc.partMesh(i).triangleCount()) meshes.push_back(&doc.partMesh(i));
+        if (doc.parts[size_t(i)].visible && doc.partMesh(i).triangleCount())
+            meshes.push_back(&partPlacedMesh(doc, i, placed.emplace_back()));
     if (meshes.empty()) return Mesh();
     if (meshes.size() == 1) return *meshes.front();
     return mergeMeshes(meshes);
 }
 
-std::vector<MeshObjectRef> visiblePartObjects(const Document& doc) {
+std::vector<MeshObjectRef> visiblePartObjects(const Document& doc, bool instances) {
+    std::vector<MeshObjectRef> out;
+    std::vector<const PartData*> data; // by object, for instanceOf
+    auto add = [&](int i, const std::string& name) {
+        const Part& p = doc.parts[size_t(i)];
+        MeshObjectRef o{name, &doc.partMesh(i)};
+        if (instances) {
+            o.transform = p.transform;
+            const auto first = std::find(data.begin(), data.end(), p.data.get());
+            if (first != data.end()) o.instanceOf = int(first - data.begin());
+        } else if (p.moved()) {
+            o.owned = std::make_shared<const Mesh>(placedMesh(doc.partMesh(i), p.transform));
+            o.mesh = o.owned.get();
+        }
+        data.push_back(p.data.get());
+        out.push_back(std::move(o));
+    };
     if (doc.partCount() == 1) {
         if (doc.mesh.triangleCount() == 0) return {};
-        return {{doc.assetName(), &doc.mesh}};
+        add(0, doc.assetName());
+        return out;
     }
-    std::vector<MeshObjectRef> out;
     for (int i = 0; i < doc.partCount(); ++i)
-        if (doc.parts[size_t(i)].visible && doc.partMesh(i).triangleCount())
-            out.push_back({doc.parts[size_t(i)].name, &doc.partMesh(i)});
+        if (doc.parts[size_t(i)].visible && doc.partMesh(i).triangleCount()) add(i, doc.parts[size_t(i)].name);
     return out;
 }
 
@@ -212,10 +251,12 @@ void replaceWithPieces(Document& doc, int index, std::vector<Mesh> pieces) {
     const std::string base = doc.parts[size_t(index)].name;
     const bool visible = doc.parts[size_t(index)].visible;
     const uint32_t folder = doc.parts[size_t(index)].folder;
+    const glm::mat4 place = doc.parts[size_t(index)].transform;
     for (size_t k = 0; k < pieces.size(); ++k) {
         const int at = doc.addPart(std::move(pieces[k]), base + " " + std::to_string(k + 1), false, index + 1 + int(k));
         doc.parts[size_t(at)].visible = visible;
         doc.parts[size_t(at)].folder = folder;
+        doc.parts[size_t(at)].transform = place;
     }
     doc.selectPart(index + 1);
     doc.removePart(index);
@@ -526,6 +567,7 @@ void registerPartCommands(CommandRegistry& reg) {
                      const Part& s = doc.parts[size_t(i)];
                      out += "\n" + std::to_string(i) + ". " + s.name + " (" + countText(doc.partMesh(i).triangleCount());
                      if (subdivLevelCount(doc.partMesh(i))) out += ", " + subdivLevelText(doc.partMesh(i));
+                     if (const int links = doc.linkCount(i); links > 1) out += ", linked x" + std::to_string(links);
                      if (i == doc.activePart) out += ", active";
                      if (!s.visible) out += ", hidden";
                      if (const int f = doc.partFolderIndex(s.folder); f >= 0) out += ", in " + doc.partFolders[size_t(f)].name;
@@ -715,10 +757,42 @@ void registerPartCommands(CommandRegistry& reg) {
                  Mesh copy = doc.partMesh(i);
                  const Shading shading = doc.parts[size_t(i)].shading;
                  const uint32_t folder = doc.parts[size_t(i)].folder;
+                 const glm::mat4 place = doc.parts[size_t(i)].transform;
                  const int added = doc.addPart(std::move(copy), doc.parts[size_t(i)].name + " copy", true, i + 1);
                  doc.parts[size_t(added)].shading = shading;
                  doc.parts[size_t(added)].folder = folder; // (right below it: the folder stays together)
+                 doc.parts[size_t(added)].transform = place;
                  return {true, "Duplicated as " + doc.parts[size_t(added)].name};
+             }});
+
+    reg.add({"part_duplicate_linked",
+             "Linked Duplicate: a new Part sharing the Part's mesh, with its own place in the scene (#94). "
+             "Sculpting, painting or masking any linked Part changes them all; move each with the Gizmo or "
+             "`transform`. One GPU mesh for all of them. Undoable.",
+             {indexParam, nameParam,
+              {"offset", T::String, "Where the copy goes relative to the Part, x,y,z in world units. Default: beside "
+                                    "it on +X.", false}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const int i = targetPart(doc, a);
+                 if (i < 0) return notFound(a);
+                 if (doc.partMesh(i).triangleCount() == 0) return {false, doc.parts[size_t(i)].name + " is empty"};
+                 glm::vec3 offset(doc.partBounds(i).extent().x * 1.15f, 0.0f, 0.0f);
+                 if (a.contains("offset") && !parseVec3(argString(a, "offset"), offset))
+                     return {false, "Bad offset '" + argString(a, "offset") + "' (expected x,y,z)"};
+                 const int added = doc.linkedDuplicate(i, offset);
+                 return {true, "Linked duplicate " + doc.parts[size_t(added)].name + " (" +
+                                   std::to_string(doc.linkCount(added)) + " linked Parts share the mesh)"};
+             }});
+
+    reg.add({"part_make_unique",
+             "Make Unique: give a linked Part its own copy of the mesh, so it no longer changes with the others "
+             "(#94). It stays where it is; its edit history starts fresh.",
+             {indexParam, nameParam},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const int i = targetPart(doc, a);
+                 if (i < 0) return notFound(a);
+                 if (!doc.makeUnique(i)) return {false, doc.parts[size_t(i)].name + " isn't linked"};
+                 return {true, doc.parts[size_t(i)].name + " is unique now"};
              }});
 
     reg.add({"part_delete", "Delete a Part (not undoable). The last Part can't be deleted.",
@@ -892,13 +966,18 @@ void registerPartCommands(CommandRegistry& reg) {
              [](Document& doc, const Args& a) -> CommandResult {
                  const int i = doc.activePart;
                  if (i + 1 >= doc.partCount()) return {false, "There's no Part below " + doc.activePartInfo().name};
-                 Mesh merged = mergeMeshes({&doc.partMesh(i), &doc.partMesh(i + 1)});
-                 const std::string texture = carryMergedTexturesNote({&doc.partMesh(i), &doc.partMesh(i + 1)}, merged,
-                                                                     argBool(a, "keep_texture", true));
+                 doc.makeUnique(i); // (a linked Part: the merge is its own, the others stay as they are)
+                 // Both where they are in the scene (linked copies, #94): the merged Part isn't moved.
+                 Mesh placedA, placedB;
+                 const Mesh& a0 = partPlacedMesh(doc, i, placedA);
+                 const Mesh& b0 = partPlacedMesh(doc, i + 1, placedB);
+                 Mesh merged = mergeMeshes({&a0, &b0});
+                 const std::string texture = carryMergedTexturesNote({&a0, &b0}, merged, argBool(a, "keep_texture", true));
                  for (int k : {i, i + 1}) notePartLevelsDropped(doc, k); // merged at their current levels
                  const std::string name = doc.parts[size_t(i)].name, below = doc.parts[size_t(i + 1)].name;
                  doc.removePart(i + 1);
                  doc.replaceActiveMesh(std::move(merged));
+                 doc.activePartInfo().transform = glm::mat4(1.0f);
                  return {true, "Merged " + below + " into " + name + " (" + countText(doc.mesh.triangleCount()) + ")" + texture};
              }});
 
@@ -913,8 +992,9 @@ void registerPartCommands(CommandRegistry& reg) {
                  if (visible.size() < 2) return {false, "Show at least two Parts to merge"};
                  Mesh merged = mergedVisibleMesh(doc);
                  std::vector<const Mesh*> parts; // as mergedVisibleMesh gathers them
+                 std::deque<Mesh> placed;
                  for (int i : visible)
-                     if (doc.partMesh(i).triangleCount()) parts.push_back(&doc.partMesh(i));
+                     if (doc.partMesh(i).triangleCount()) parts.push_back(&partPlacedMesh(doc, i, placed.emplace_back()));
                  const std::string texture =
                      parts.size() > 1 ? carryMergedTexturesNote(parts, merged, argBool(a, "keep_texture", true)) : std::string();
                  for (int k : visible) notePartLevelsDropped(doc, k); // merged at their current levels

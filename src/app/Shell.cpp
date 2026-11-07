@@ -853,6 +853,11 @@ void App::canvasRay(float x, float y, glm::vec3& origin, glm::vec3& dir) const {
     camera_.screenRay(x - c.x, y - c.y, c.w, c.h, origin, dir);
 }
 
+void App::partRay(float x, float y, glm::vec3& origin, glm::vec3& dir) const {
+    const CanvasRect c = canvasRect();
+    partCamera().screenRay(x - c.x, y - c.y, c.w, c.h, origin, dir);
+}
+
 Renderer::Viewport App::canvasViewport(int fbWidth, int fbHeight) const {
     if (hideUi_) return {};
     int w = 0, h = 0;
@@ -1012,44 +1017,86 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f * s, 0.0f));
 
     // App mark and name.
+    barSpans_.clear(); // (UI tests check that nothing overlaps)
     { // the cube app icon (the same in every look), a little taller than the name
         const float m = std::round(std::min(ImGui::GetFontSize() * 1.3f, h - 4.0f * s));
         ImGui::SetCursorPos(ImVec2(8.0f * s, std::floor((h - m) * 0.5f)));
         brand::appMarkItem(m);
     }
+    const float brandX = ImGui::GetItemRectMin().x;
     ImGui::SameLine(0.0f, 6.0f * s);
     ImGui::SetCursorPosY(textY);
     if (fontBold_) ImGui::PushFont(fontBold_);
     ImGui::TextUnformatted(tr("SculptForge"));
     if (fontBold_) ImGui::PopFont();
+    barSpans_.push_back({brandX, ImGui::GetItemRectMax().x});
+    const float nameEnd = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x; // (the cursor is on the next line)
 
-    // Document name; click saves.
-    ImGui::SameLine(0.0f, 16.0f * s);
+    // Right-aligned controls: QuickSave, layout presets, Menus, search. Measured first. A window too narrow for it
+    // all (1024 px at 200 % UI scale) never overlaps: things give way in this order: the version, the layout presets,
+    // Save Snapshot, the search field (to its icon), Send to Maya, then the document name.
+    const ImGuiStyle& st = ImGui::GetStyle();
+    auto buttonW = [&](const char* label) { return ImGui::CalcTextSize(label, nullptr, true).x + st.FramePadding.x * 2.0f; };
+    bool quickSave = actions_.find("file.quicksave") != nullptr;
+    bool maya = !uiPrefs_.mayaFolder.empty(); // the Maya bridge is on (#42): one click sends back
+    bool presets = true, docName = true;
+    float searchW = 150.0f * s;
+    const float windowButtonW = buttonH + 6.0f * s; // minimise and close, at the far right
+    const bool mayaLink = mayaLink_ != nullptr; // the Maya Live link is on: its ember chip turns it off
+    const std::string linkLabel = std::string(ICON_LC_RADIO " ") + tr("Live link on") + "##mayalink.chip";
     std::string name = doc_.path.empty() ? std::string(tr("Untitled"))
                                          : std::filesystem::path(std::u8string(doc_.path.begin(), doc_.path.end())).filename().string();
     if (doc_.dirty()) name += " *";
-    ImGui::SetCursorPosY((h - buttonH) * 0.5f);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::headerHover);
-    if (ImGui::Button((name + "##docname").c_str(), ImVec2(0, buttonH))) saveProjectAs(false);
-    ImGui::PopStyleColor(2);
-    ui::HelpText("Project", "Ctrl+S", "Click to save the project. * means it has unsaved changes.", "Title");
+    auto rightWidth = [&] {
+        float w = searchW + buttonW(tr(ICON_LC_MENU " Menus")) + 8.0f * s + 10.0f * s + 2.0f * windowButtonW + 2.0f * s;
+        if (presets) w += 3.0f * (buttonH + 2.0f * s) + 10.0f * s;
+        if (quickSave) w += buttonW(tr("Save Snapshot")) + 8.0f * s;
+        if (maya) w += buttonW((std::string(ICON_LC_SEND "  ") + tr("Send to Maya")).c_str()) + 8.0f * s;
+        if (mayaLink) w += buttonW(linkLabel.c_str()) + 8.0f * s;
+        return w;
+    };
+    auto fits = [&] { return nameEnd + (docName ? 16.0f * s + buttonW(name.c_str()) : 0.0f) + 14.0f * s + rightWidth() + 8.0f * s <= g.title.w; };
+    if (!fits()) presets = false;
+    if (!fits()) quickSave = false;
+    if (!fits()) searchW = buttonH + 4.0f * s;
+    if (!fits()) maya = false;
+    if (!fits()) docName = false;
+    const float rightX = g.title.w - 8.0f * s - rightWidth();
 
-    // Right-aligned controls: QuickSave, layout presets, Menus, search. Measured first.
-    const ImGuiStyle& st = ImGui::GetStyle();
-    auto buttonW = [&](const char* label) { return ImGui::CalcTextSize(label, nullptr, true).x + st.FramePadding.x * 2.0f; };
-    const bool quickSave = actions_.find("file.quicksave") != nullptr;
-    const bool maya = !uiPrefs_.mayaFolder.empty(); // the Maya bridge is on (#42): one click sends back
-    const float searchW = 150.0f * s;
-    const float windowButtonW = buttonH + 6.0f * s; // minimise and close, at the far right 
-    float rightW = searchW + buttonW(tr(ICON_LC_MENU " Menus")) + 3.0f * (buttonH + 2.0f * s) + 18.0f * s +
-                   10.0f * s + 2.0f * windowButtonW + 2.0f * s;
-    if (quickSave) rightW += buttonW(tr("Save Snapshot")) + 8.0f * s;
-    if (maya) rightW += buttonW((std::string(ICON_LC_SEND "  ") + tr("Send to Maya")).c_str()) + 8.0f * s;
-    const bool mayaLink = mayaLink_ != nullptr; // the Maya Live link is on: its ember chip turns it off
-    const std::string linkLabel = std::string(ICON_LC_RADIO " ") + tr("Live link on") + "##mayalink.chip";
-    if (mayaLink) rightW += buttonW(linkLabel.c_str()) + 8.0f * s;
-    const float rightX = g.title.w - 8.0f * s - rightW;
+    // The version, small and dim beside the name (support screenshots); a beta's or a dev build's tag in the accent.
+    // The first thing a narrow window drops.
+    if (presets) {
+        const ShownVersion v = appShownVersion();
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        const float numW = ImGui::CalcTextSize(v.number.c_str()).x;
+        const float tagW = v.tag.empty() ? 0.0f : ImGui::CalcTextSize(v.tag.c_str()).x + 4.0f * s;
+        if (nameEnd + 6.0f * s + numW + tagW + 16.0f * s + buttonW(name.c_str()) + 14.0f * s < rightX) {
+            const float y = std::floor((h - ImGui::GetTextLineHeight()) * 0.5f) + 1.0f * s;
+            ImGui::SameLine(0.0f, 6.0f * s);
+            ImGui::SetCursorPosY(y);
+            ImGui::TextDisabled("%s", v.number.c_str());
+            const float vx = ImGui::GetItemRectMin().x;
+            if (!v.tag.empty()) {
+                ImGui::SameLine(0.0f, 4.0f * s);
+                ImGui::SetCursorPosY(y);
+                ImGui::TextColored(theme::accent, "%s", v.tag.c_str());
+            }
+            barSpans_.push_back({vx, ImGui::GetItemRectMax().x});
+        }
+        if (fontSmall_) ImGui::PopFont();
+    }
+
+    // Document name; click saves.
+    if (docName) {
+        ImGui::SameLine(0.0f, 16.0f * s);
+        ImGui::SetCursorPosY((h - buttonH) * 0.5f);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::headerHover);
+        if (ImGui::Button((name + "##docname").c_str(), ImVec2(0, buttonH))) saveProjectAs(false);
+        ImGui::PopStyleColor(2);
+        ui::HelpText("Project", "Ctrl+S", "Click to save the project. * means it has unsaved changes.", "Title");
+        barSpans_.push_back({ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().x});
+    }
 
     // Info readout and the status message, elided to fit: secondary, so in the 12 px font.
     ImGui::SameLine(0.0f, 14.0f * s);
@@ -1106,8 +1153,8 @@ void App::drawTitleStrip(const ShellGeometry& g) {
             if (ImGui::IsItemHovered() && msg.size() > 40) ImGui::SetTooltip("%s", msg.c_str());
             if (fontSmall_) ImGui::PushFont(fontSmall_);
         }
-    } else {
-        ImGui::TextDisabled("%s", elide(ImGui::GetFont(), info, std::max(0.0f, avail)).c_str());
+    } else if (avail > 40.0f * s) {
+        ImGui::TextDisabled("%s", elide(ImGui::GetFont(), info, avail).c_str());
     }
     if (fontSmall_) ImGui::PopFont();
 
@@ -1134,12 +1181,12 @@ void App::drawTitleStrip(const ShellGeometry& g) {
         ui::ActionButton(*this, "file.quicksave", ImVec2(0, buttonH));
         ImGui::SameLine(0.0f, 8.0f * s);
     }
-    for (int i = 1; i <= 3; ++i) {
+    for (int i = 1; i <= 3 && presets; ++i) {
         ui::ActionButton(*this, ("ui.preset." + std::to_string(i)).c_str(), ImVec2(buttonH + 2.0f * s, buttonH));
         ui::HelpAction(*this, ("ui.preset." + std::to_string(i)).c_str());
-        ImGui::SameLine(0.0f, i < 3 ? 1.0f * s : 4.0f * s); // 6 px in all, as rightW counts
+        ImGui::SameLine(0.0f, i < 3 ? 1.0f * s : 8.0f * s); // 10 px in all, as rightWidth counts
     }
-    ImGui::SameLine(0.0f, 8.0f * s);
+    const float controlsX = ImGui::GetCursorScreenPos().x; // (Live link, Send to Maya, Save Snapshot and 1 2 3 start at rightX)
     ui::ActionButton(*this, "ui.menus", ImVec2(0, buttonH), ui::Look::IconLabel);
     ImGui::PopStyleColor(3);
     ImGui::SameLine(0.0f, 8.0f * s);
@@ -1149,10 +1196,14 @@ void App::drawTitleStrip(const ShellGeometry& g) {
         const bool clicked = ImGui::InvisibleButton("##search", ImVec2(searchW, buttonH));
         const bool hovered = ImGui::IsItemHovered();
         dl->AddRectFilled(p, ImVec2(p.x + searchW, p.y + buttonH), theme::u32(hovered ? theme::frameHover : theme::frame), theme::rounding(3.0f * s));
-        const float ty = p.y + (buttonH - ImGui::GetFontSize()) * 0.5f;
-        dl->AddText(ImVec2(p.x + 7.0f * s, ty), theme::u32(theme::textDim), tr(ICON_LC_SEARCH "  Search"));
-        const ImVec2 kw = ImGui::CalcTextSize("F3");
-        dl->AddText(ImVec2(p.x + searchW - kw.x - 7.0f * s, ty), theme::u32(theme::textDim, 0.8f), "F3");
+        if (searchW < 150.0f * s) { // a narrow window: just the icon
+            ui::CentredGlyph(dl, nullptr, p, ImVec2(p.x + searchW, p.y + buttonH), theme::u32(theme::textDim), ICON_LC_SEARCH);
+        } else {
+            const float ty = p.y + (buttonH - ImGui::GetFontSize()) * 0.5f;
+            dl->AddText(ImVec2(p.x + 7.0f * s, ty), theme::u32(theme::textDim), tr(ICON_LC_SEARCH "  Search"));
+            const ImVec2 kw = ImGui::CalcTextSize("F3");
+            dl->AddText(ImVec2(p.x + searchW - kw.x - 7.0f * s, ty), theme::u32(theme::textDim, 0.8f), "F3");
+        }
         if (clicked) {
             if (const Action* a = actions_.find("ui.command_palette"); a && a->run) a->run();
         }
@@ -1180,6 +1231,8 @@ void App::drawTitleStrip(const ShellGeometry& g) {
         }
         if (!close) ImGui::SameLine(0.0f, 2.0f * s);
     }
+    barSpans_.push_back({ImGui::GetWindowPos().x + rightX, controlsX}); // the chips left of Menus
+    barSpans_.push_back({controlsX, ImGui::GetItemRectMax().x});          // Menus, search, window buttons
     ImGui::PopStyleVar(2);
     ImGui::End();
 }
@@ -1442,18 +1495,102 @@ void App::drawStatusBar(const ShellGeometry& g) {
     }
     const bool caps = style == Status::Terminal;
     x = textAt(bold, x, theme::textBright, caps ? "SCULPTFORGE" : "SculptForge");
-    x += (style == Status::TitleBlock ? 14.0f : 18.0f) * s;
-    if (style == Status::TitleBlock || style == Status::Terminal) {
-        dl->AddLine(ImVec2(std::floor(x) + 0.5f, o.y + inset), ImVec2(std::floor(x) + 0.5f, o.y + h - inset), theme::u32(theme::tileBorder));
-        x += 8.0f * s;
-    }
+    // The version, small and dim beside the name (support screenshots); a beta's or a dev build's tag in the accent.
+    const ShownVersion version = appShownVersion();
+    const float versionW = 6.0f * s + textW(monoSmall, version.number) + (version.tag.empty() ? 0.0f : 4.0f * s + textW(monoSmall, version.tag));
+    const float brandEnd = x;
+    const bool divider = style == Status::TitleBlock || style == Status::Terminal;
+    const float menusGap = (style == Status::TitleBlock ? 14.0f : 18.0f) * s + (divider ? 8.0f * s : 0.0f);
 
-    // The task menus.
+    // The task menus, measured.
     int menuCount = 0;
     const TaskMenuDef* menus = taskMenus(menuCount);
     const int openMenu = dropdown_.empty() ? -1 : taskMenuOf(dropdown_);
     ImFont* menuFont = style == Status::Modules ? ImGui::GetFont() : monoSmall;
-    for (int i = 0; i < menuCount; ++i) {
+    std::vector<float> menuWs(static_cast<size_t>(menuCount), 0.0f);
+    for (int i = 0; i < menuCount; ++i)
+        menuWs[size_t(i)] = textW(menuFont, style == Status::Modules ? std::string(tr(menus[i].name)) : upper(tr(menus[i].name))) +
+                            16.0f * s + (style == Status::Modules ? 2.0f : 0.0f) * s;
+
+    // Right side, measured first: window controls, search, the layout presets as workspaces, then the modules.
+    const float buttonH = h - 2.0f * inset - 8.0f * s;
+    const float winW = buttonH + 8.0f * s;
+    float right = o.x + g.title.w - 6.0f * s - inset;
+    const float closeX = right - 2.0f * winW - 2.0f * s;
+    right = closeX - 10.0f * s;
+    const float wsW = buttonH + 4.0f * s;
+    // The Maya Live link is on: its ember chip, left of the workspaces; it turns the link off (always shown while on:
+    // the rest gives way first).
+    const std::string linkLabel = std::string(ICON_LC_RADIO) + " " + (caps ? upper(tr("Live link on")) : std::string(tr("Live link on")));
+    const float linkW = textW(monoSmall, linkLabel) + 16.0f * s;
+    const bool mayaLink = mayaLink_ != nullptr;
+    // A window too narrow for it all (1024 px at 200 % UI scale) never overlaps: things give way in this order: the
+    // version, the workspaces, the search field (to its icon), then the last menus (into a >> button).
+    float searchW = 150.0f * s;
+    const float moreW = buttonH;
+    auto menusRight = [&](bool presets) { // where the menus must end
+        return right - searchW - 10.0f * s - (presets ? 3.0f * wsW + 2.0f * s + 14.0f * s : 0.0f) -
+               (mayaLink ? linkW + 10.0f * s : 0.0f) - 12.0f * s;
+    };
+    auto menusWidth = [&](int n) {
+        float w = n < menuCount ? moreW : 0.0f;
+        for (int i = 0; i < n; ++i) w += menuWs[size_t(i)];
+        return w;
+    };
+    const bool showVersion = brandEnd + versionW + menusGap + menusWidth(menuCount) <= menusRight(true); // (the modules give way)
+    const float menusX = brandEnd + (showVersion ? versionW : 0.0f) + menusGap;
+    const bool showPresets = menusX + menusWidth(menuCount) <= menusRight(true);
+    if (!showPresets && menusX + menusWidth(menuCount) > menusRight(false)) searchW = buttonH + 4.0f * s; // just the icon
+    int shownMenus = menuCount;
+    while (shownMenus > 1 && menusX + menusWidth(shownMenus) > menusRight(false)) --shownMenus;
+    const float searchX = right - searchW;
+    right = searchX - 10.0f * s;
+    const float presetsX = right - 3.0f * wsW - 2.0f * s;
+    if (showPresets) right = presetsX - 14.0f * s;
+    barSpans_.clear(); // (UI tests check that nothing overlaps)
+    barSpans_.push_back({o.x + 12.0f * s, brandEnd});
+    barSpans_.push_back({closeX, closeX + 2.0f * winW + 2.0f * s});
+    barSpans_.push_back({searchX, searchX + searchW});
+    if (showPresets) barSpans_.push_back({presetsX, presetsX + 3.0f * wsW + 2.0f * s});
+
+    if (showVersion) {
+        const float vx = textAt(monoSmall, brandEnd + 6.0f * s, theme::textDim, version.number);
+        const float end = version.tag.empty() ? vx : textAt(monoSmall, vx + 4.0f * s, theme::accent, version.tag);
+        ImGui::LogText("%s", version.text().c_str()); // (UI tests read the bar)
+        barSpans_.push_back({brandEnd + 6.0f * s, end});
+        x += versionW;
+    }
+    x += (style == Status::TitleBlock ? 14.0f : 18.0f) * s;
+    if (divider) {
+        dl->AddLine(ImVec2(std::floor(x) + 0.5f, o.y + inset), ImVec2(std::floor(x) + 0.5f, o.y + h - inset), theme::u32(theme::tileBorder));
+        x += 8.0f * s;
+    }
+
+    // The task menus. Opening one: the section shown last, else the first one; one that sits in a tray is already
+    // on screen, so the menu opens on the next one (a menu whose sections are all in trays flashes the tray instead).
+    auto openTaskMenu = [&](int i, float atX) {
+        const TaskMenuDef& m = menus[i];
+        auto inTray = [&](const std::string& id) {
+            return std::count(layout_.leftTray.begin(), layout_.leftTray.end(), id) +
+                       std::count(layout_.rightTray.begin(), layout_.rightTray.end(), id) >
+                   0;
+        };
+        std::string section = menuSection_[m.id];
+        if (section.empty() || taskMenuOf(section) != i || inTray(section)) {
+            section.clear();
+            for (int k = 0; k < 6 && m.sections[k] && section.empty(); ++k)
+                if (!inTray(m.sections[k])) section = m.sections[k];
+        }
+        if (section.empty()) {
+            flashPalette_ = m.sections[0];
+            flashStart_ = ImGui::GetTime();
+        } else {
+            dropdown_ = section;
+            menuX_ = atX;
+            openDropdown_ = true;
+        }
+    };
+    for (int i = 0; i < shownMenus; ++i) {
         const TaskMenuDef& m = menus[i];
         const std::string shown = style == Status::Modules ? std::string(tr(m.name)) : upper(tr(m.name));
         const float w = textW(menuFont, shown) + 16.0f * s;
@@ -1472,65 +1609,49 @@ void App::drawStatusBar(const ShellGeometry& g) {
         textAt(menuFont, a.x + 8.0f * s, col, shown);
         ImGui::LogText("%s", tr(m.name));
         ui::HelpText(m.name, nullptr, "Open this menu. Its sections are the palettes of the Classic layout.", "Menus");
+        barSpans_.push_back({a.x, b.x});
         // Click to open or close; while one is open, pointing at another menu switches to it, as in a menu bar.
         const bool switchTo = openMenu >= 0 && !open && hovered;
         if (pressed || switchTo) {
-            if (open && pressed) {
-                dropdown_.clear();
-            } else {
-                // The section shown last, else the first one; one that sits in a tray is already on screen, so the
-                // menu opens on the next one (a menu whose sections are all in trays flashes the tray instead).
-                auto inTray = [&](const std::string& id) {
-                    return std::count(layout_.leftTray.begin(), layout_.leftTray.end(), id) +
-                               std::count(layout_.rightTray.begin(), layout_.rightTray.end(), id) >
-                           0;
-                };
-                std::string section = menuSection_[m.id];
-                if (section.empty() || taskMenuOf(section) != i || inTray(section)) {
-                    section.clear();
-                    for (int k = 0; k < 6 && m.sections[k] && section.empty(); ++k)
-                        if (!inTray(m.sections[k])) section = m.sections[k];
-                }
-                if (section.empty()) {
-                    flashPalette_ = m.sections[0];
-                    flashStart_ = ImGui::GetTime();
-                } else {
-                    dropdown_ = section;
-                    menuX_ = a.x;
-                    openDropdown_ = true;
-                }
-            }
+            if (open && pressed) dropdown_.clear();
+            else openTaskMenu(i, a.x);
         }
         x += w + (style == Status::Modules ? 2.0f : 0.0f) * s;
     }
+    if (shownMenus < menuCount) { // the menus that don't fit, behind >>
+        ImGui::SetCursorScreenPos(ImVec2(x, o.y + inset));
+        const bool pressed = ImGui::InvisibleButton("##menu.more", ImVec2(moreW, h - 2.0f * inset));
+        const bool hovered = ImGui::IsItemHovered();
+        const bool open = openMenu >= shownMenus;
+        const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
+        if (open || hovered) dl->AddRectFilled(a, b, theme::u32(open ? theme::selection : theme::headerHover, open ? 1.0f : 0.7f));
+        if (open) dl->AddRectFilled(ImVec2(a.x, b.y - 2.0f * s), b, theme::u32(theme::accent));
+        centredText(dl, nullptr, a, b, theme::u32(open || hovered ? theme::textBright : theme::text), ICON_LC_CHEVRONS_RIGHT);
+        ui::HelpText("More menus", nullptr, "The menus that don't fit in the window's width.", "Menus");
+        barSpans_.push_back({a.x, b.x});
+        if (pressed) ImGui::OpenPopup("##menu.more.list");
+        ImGui::SetNextWindowPos(ImVec2(a.x, b.y));
+        if (ImGui::BeginPopup("##menu.more.list")) {
+            for (int i = shownMenus; i < menuCount; ++i)
+                if (ImGui::Selectable((std::string(tr(menus[i].name)) + "##menu." + menus[i].id).c_str(), openMenu == i))
+                    openTaskMenu(i, a.x);
+            ImGui::EndPopup();
+        }
+        x += moreW;
+    }
     const float menusEnd = x + 12.0f * s;
 
-    // Right side, measured first: window controls, search, the layout presets as workspaces, then the modules.
-    const float buttonH = h - 2.0f * inset - 8.0f * s;
-    const float winW = buttonH + 8.0f * s;
-    const float searchW = 150.0f * s;
-    float right = o.x + g.title.w - 6.0f * s - inset;
-    const float closeX = right - 2.0f * winW - 2.0f * s;
-    right = closeX - 10.0f * s;
-    const float searchX = right - searchW;
-    right = searchX - 10.0f * s;
-    const float wsW = buttonH + 4.0f * s;
-    const float presetsX = right - 3.0f * wsW - 2.0f * s;
-    right = presetsX - 14.0f * s;
     // The Maya bridge is on (#42): Send to Maya, one click, left of the workspaces; never over the menus (a narrow
-    // window, #105, keeps File > Maya > Send to Maya).
+    // window, #105, keeps File > Maya > Send to Maya), nor over the Live link chip that goes left of it.
     const std::string mayaLabel = std::string(ICON_LC_SEND) + " " + (caps ? upper(tr("Send to Maya")) : std::string(tr("Send to Maya")));
     const float mayaW = textW(monoSmall, mayaLabel) + 16.0f * s;
     const float mayaX = right - mayaW;
-    const bool maya = !uiPrefs_.mayaFolder.empty() && mayaX > menusEnd;
+    const bool maya = !uiPrefs_.mayaFolder.empty() && mayaX - (mayaLink ? linkW + 10.0f * s : 0.0f) > menusEnd;
     if (maya) right = mayaX - 10.0f * s;
-    // The Maya Live link is on: its ember chip, left of Send to Maya; it turns the link off (always shown while on:
-    // the menus give way first).
-    const std::string linkLabel = std::string(ICON_LC_RADIO) + " " + (caps ? upper(tr("Live link on")) : std::string(tr("Live link on")));
-    const float linkW = textW(monoSmall, linkLabel) + 16.0f * s;
     const float linkX = right - linkW;
-    const bool mayaLink = mayaLink_ != nullptr;
     if (mayaLink) right = linkX - 10.0f * s;
+    if (maya) barSpans_.push_back({mayaX, mayaX + mayaW});
+    if (mayaLink) barSpans_.push_back({linkX, linkX + linkW});
 
     // Modules: mode, brush, document, triangles, frame rate.
     std::vector<StatusModule> mods;
@@ -1624,6 +1745,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
         }
         mx += w;
     }
+    if (!shown.empty()) barSpans_.push_back({modulesX, mx});
     if (style == Status::TitleBlock)
         dl->AddLine(ImVec2(std::floor(mx + 10.0f * s) + 0.5f, o.y + inset), ImVec2(std::floor(mx + 10.0f * s) + 0.5f, o.y + h - inset),
                     theme::u32(theme::tileBorder));
@@ -1667,7 +1789,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
     }
 
     // Layout presets 1 2 3, drawn as workspaces.
-    for (int i = 1; i <= 3; ++i) {
+    for (int i = 1; i <= 3 && showPresets; ++i) {
         const std::string id = "ui.preset." + std::to_string(i);
         ImGui::SetCursorScreenPos(ImVec2(presetsX + float(i - 1) * (wsW + 1.0f * s), o.y + (h - buttonH) * 0.5f));
         const Action* a = actions_.find(id);
@@ -1689,9 +1811,13 @@ void App::drawStatusBar(const ShellGeometry& g) {
         const ImVec2 p = ImGui::GetItemRectMin();
         dl->AddRectFilled(p, ImVec2(p.x + searchW, p.y + buttonH), theme::u32(hovered ? theme::frameHover : theme::frame));
         if (theme::look.tiled) dl->AddRect(p, ImVec2(p.x + searchW, p.y + buttonH), theme::u32(theme::tileBorder));
-        const char* prompt = style == Status::Terminal ? "> search" : style == Status::TitleBlock ? ICON_LC_SEARCH " SEARCH" : ICON_LC_SEARCH " search";
-        textAt(monoSmall, p.x + 8.0f * s, theme::textDim, prompt);
-        textAt(monoSmall, p.x + searchW - textW(monoSmall, "F3") - 8.0f * s, theme::accent, "F3");
+        if (searchW < 150.0f * s) { // a narrow window: just the icon
+            centredText(dl, nullptr, p, ImVec2(p.x + searchW, p.y + buttonH), theme::u32(theme::textDim), ICON_LC_SEARCH);
+        } else {
+            const char* prompt = style == Status::Terminal ? "> search" : style == Status::TitleBlock ? ICON_LC_SEARCH " SEARCH" : ICON_LC_SEARCH " search";
+            textAt(monoSmall, p.x + 8.0f * s, theme::textDim, prompt);
+            textAt(monoSmall, p.x + searchW - textW(monoSmall, "F3") - 8.0f * s, theme::accent, "F3");
+        }
         if (clicked) {
             if (const Action* a = actions_.find("ui.command_palette"); a && a->run) a->run();
         }

@@ -302,12 +302,12 @@ void App::pumpStroke() {
         s.batch.clear();
         s.finalize = true;
         s.catchUp = false;
-        s.view.camera = camera_;
+        s.view.camera = partCamera();
         s.view.canvas = canvasRect();
         s.view.probe = nullptr;
         s.view.radiusProbe = nullptr;
         s.view.settings = dabSettings();
-        s.uploadId = doc_.activePartInfo().id;
+        s.uploadId = doc_.meshKey(doc_.activePart);
         renderer_.setPersistentUpload(uiPrefs_.fastUpload);
     renderer_.bindStrokeUpload(s.uploadId, s.upload); // (the slot, found here: the thread doesn't walk the renderer's list)
         s.prepare = &displayedMesh() == &doc_.mesh;
@@ -326,12 +326,12 @@ void App::pumpStroke() {
         s.batch.clear();
         s.finalize = false;
         s.catchUp = true;
-        s.view.camera = camera_;
+        s.view.camera = partCamera();
         s.view.canvas = canvasRect();
         s.view.probe = nullptr;
         s.view.radiusProbe = nullptr;
         s.view.settings = dabSettings();
-        s.uploadId = doc_.activePartInfo().id;
+        s.uploadId = doc_.meshKey(doc_.activePart);
         renderer_.bindStrokeUpload(s.uploadId, s.upload);
         s.prepare = &displayedMesh() == &doc_.mesh;
         s.start();
@@ -355,7 +355,7 @@ void App::pumpStroke() {
     s.finalize = strokeFinishing_ && dabQueue_.empty();
     s.catchUp = false; // (dabs are coming: the exact normals wait for a pause or the release)
     lastDabsQueued_ = double(SDL_GetTicksNS()) * 1e-9;
-    s.view.camera = camera_;
+    s.view.camera = partCamera();
     s.view.canvas = canvasRect();
     s.view.probe = strokeProbe_ ? &s.probe : nullptr;
     s.view.radiusProbe = strokeProbe_ ? &s.radiusProbe : nullptr;
@@ -401,7 +401,7 @@ void App::finishStrokeNow() {
     if (solver_) solver_->finalize = false;
     doc_.sculptor.flushDraft(doc_.mesh, doc_.bvh); // (a draft stroke ended here rather than on the solver thread)
     renderer_.setDraftNormals(0);
-    if (asyncStroke_) renderer_.refineStrokeBounds(doc_.activePartInfo().id, displayedMesh()); // (the quick ones)
+    if (asyncStroke_) renderer_.refineStrokeBounds(doc_.meshKey(doc_.activePart), displayedMesh()); // (the quick ones)
     strokeFinishing_ = false;
     asyncStroke_ = false;
     renderer_.setGhost(0, GhostStroke());
@@ -507,7 +507,7 @@ bool App::ghostSurface(const glm::vec3& origin, const glm::vec3& dir, glm::vec3&
 void App::buildGhost() {
     ghostHeadValid_ = false;
     renderer_.setScreenStroke(GhostStroke()); // (set again below when this frame's dabs draw on the screen)
-    const uint32_t id = doc_.activePartInfo().id;
+    const uint32_t id = doc_.meshKey(doc_.activePart); // (the renderer's slot: linked Parts share it)
     if (liveMove_.active) { // Live Move: one "dab" per mirror, the whole move so far
         GhostStroke g;
         g.kind = GhostKind::Move;
@@ -579,13 +579,14 @@ void App::buildGhost() {
     if (mirrors.size() > GhostStroke::kMaxMirrors) mirrors.resize(GhostStroke::kMaxMirrors); // (the shader's groups)
     const size_t perMirror = GhostStroke::kMaxDabs / std::max<size_t>(1, mirrors.size());
     std::vector<GhostDab> base;
+    const Camera cam = partCamera();
     for (const Screen& sd : pending) {
         if (base.size() >= perMirror) break;
         glm::vec3 origin, dir, n;
-        camera_.screenRay(sd.x - c.x, sd.y - c.y, c.w, c.h, origin, dir);
+        cam.screenRay(sd.x - c.x, sd.y - c.y, c.w, c.h, origin, dir);
         GhostDab d;
         if (!ghostSurface(origin, dir, d.center, n)) continue;
-        d.radius = (worldSize_ && worldRadius_ > 0.0f ? worldRadius_ : radiusPx_ * camera_.worldPerPixel(d.center, c.h)) *
+        d.radius = (worldSize_ && worldRadius_ > 0.0f ? worldRadius_ : radiusPx_ * cam.worldPerPixel(d.center, c.h)) *
                    (pressureSizeOn() ? std::max(sd.pressure, 0.05f) : 1.0f);
         d.normal = n;
         d.strength = std::clamp((strokeBrush_ == BrushType::Smooth ? smoothStrength_ : strength_), 0.0f, 1.0f) *

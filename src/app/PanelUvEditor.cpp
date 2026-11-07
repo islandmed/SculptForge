@@ -1239,7 +1239,7 @@ void App::drawUvEditor() {
     v.min = s.center - half;
     v.max = s.center + half;
     v.imageMode = s.image;
-    v.image = s.image == 2 && hasTexture(m) ? renderer_.paintTexture(doc_.activePartInfo().id) : 0;
+    v.image = s.image == 2 && hasTexture(m) ? renderer_.paintTexture(doc_.meshKey(doc_.activePart)) : 0;
     v.imageOpacity = s.image == 2 ? 1.0f : s.imageOpacity;
     v.checkerScale = s.checkerScale;
     v.tiles = s.tiles;
@@ -1677,7 +1677,7 @@ void App::drawUvEditorOverlay() {
                 if ((m.uvFlags[c] & kUvSeam) && (twin[c] == kNoCorner || c < twin[c])) s.seamCorners.push_back(c);
             s.seamKey = key;
         }
-        const glm::vec3 eye = camera_.position();
+        const glm::vec3 eye = partCamera().position();
         ImDrawList* dl = ImGui::GetBackgroundDrawList();
         const CanvasRect cr = canvasRect();
         dl->PushClipRect(ImVec2(cr.x, cr.y), ImVec2(cr.x + cr.w, cr.y + cr.h), true);
@@ -1695,7 +1695,7 @@ void App::drawUvEditorOverlay() {
             const bool front = faces(c / 3, mid) || (twin.size() == nc && twin[c] != kNoCorner && faces(twin[c] / 3, mid));
             if (!front) continue;
             ImVec2 pa, pb;
-            if (!gizmoProject(a, pa) || !gizmoProject(b, pb)) continue;
+            if (!partProject(a, pa) || !partProject(b, pb)) continue;
             dl->AddLine(pa, pb, IM_COL32(245, 78, 64, 225), 1.6f * uiScale_);
         }
         dl->PopClipRect();
@@ -1707,7 +1707,7 @@ void App::drawUvEditorOverlay() {
         if (canvasRect().contains(mouse.x, mouse.y) && pick(mouse.x, mouse.y, hit)) {
             ImVec2 p;
             const glm::vec3 at = s.tool == 1 ? m.positions[UvEditorUi{*this, s}.nearestVertex(hit)] : hit.position;
-            if (gizmoProject(at, p)) {
+            if (partProject(at, p)) {
                 ImDrawList* fg = ImGui::GetForegroundDrawList();
                 const ImU32 col = s.tool == 1 ? ((inputMods() & SDL_KMOD_ALT) ? IM_COL32(150, 200, 255, 255) : IM_COL32(245, 78, 64, 255))
                                               : theme::u32(theme::accent);

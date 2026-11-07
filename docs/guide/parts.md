@@ -35,6 +35,7 @@ and they catch up a moment after you stop changing a Part (not during a stroke).
 | Hide or show it | Click the eye at the end of the row |
 | Shade it smooth or flat | Click the mark left of the eye: it goes from **as the scene** (dim) to **Smooth** (a disc) to **Flat** (a faceted hexagon) and back. Only this Part changes; the scene's own setting is **Render > Materials > Shading** |
 | Duplicate or delete it | Right-click the row > **Duplicate** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>) or **Delete...** |
+| Make a copy that shares the mesh | Right-click the row > **Linked Duplicate**, or the **Linked Duplicate** button; see [Linked Duplicates](linked-duplicates.md) |
 | See its vertex and triangle counts | Point at the row for a moment |
 
 The list shows six rows and scrolls when there are more. Names are kept unique: renaming a Part to a name that
@@ -97,6 +98,8 @@ You can also add files as Parts from elsewhere:
 > **Tip:** **Duplicate** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>, also in the command palette as
 > **Duplicate Part**) copies the active Part with its layers and attributes, names it `<name> copy` and puts it
 > right under the original. Use it to keep a safe copy before a destructive step such as a remesh.
+> **Linked Duplicate** instead makes a copy that shares the mesh and changes with it (rivets, legs, columns); see
+> [Linked Duplicates](linked-duplicates.md).
 
 ## Show, hide and solo
 
@@ -220,7 +223,7 @@ delete can't be undone.
 
 | Format | What happens to Parts |
 |---|---|
-| Project (`.sfproj`) | Every Part is saved with its name, visibility, folder, attributes, layers and active layer |
+| Project (`.sfproj`) | Every Part is saved with its name, visibility, folder, attributes, layers and active layer; [linked copies](linked-duplicates.md) keep their link |
 | OBJ | Each visible Part is an `o` object; on import, `o` objects become Parts and `g` groups become face groups |
 | glTF / GLB | One node and mesh per visible Part, both ways |
 | FBX | One model per visible Part (with LODs, an LOD group each), both ways |
@@ -243,6 +246,7 @@ used.
 | `part_select index=1` | Make a Part active |
 | `part_append type=cube` | Add a primitive (`sphere`, `cube`, `plane`); `path=` adds a file; `size=` (0.05-2, default 0.35) |
 | `part_duplicate` | Copy a Part |
+| `part_duplicate_linked` / `part_make_unique` | A [linked copy](linked-duplicates.md) sharing the mesh / break the link |
 | `part_delete name=Helmet` | Delete a Part |
 | `part_rename to=Body` | Rename a Part |
 | `part_visibility visible=false` | Show or hide (toggles when `visible` is left out) |
@@ -266,6 +270,7 @@ part_append type=sphere name=EyeL size=0.12; part_duplicate; part_rename to=EyeR
 
 ## See also
 
+- [Linked Duplicates](linked-duplicates.md): copies that share one mesh
 - [Face Groups and visibility](face-groups.md): hide parts of one Part
 - [Sculpt layers and blend shapes](layers.md): layers belong to each Part
 - [Exporting](exporting.md): how Parts reach other applications

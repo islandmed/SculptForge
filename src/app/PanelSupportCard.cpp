@@ -330,7 +330,7 @@ void App::drawSupportCard() {
           "Your name in the credits, in the app and on the website"},
          "Become a member", "Become a member##card.member", kSupportUrlMember, yearly ? "or $48 a year" : nullptr},
         {"Studio", "$300", "/ month",
-         {"Up to 10 artists (+$25 / month each after), each with everything in Member",
+         {"A flat rate for the whole studio: any number of artists, each with everything in Member",
           "Your studio's own build: brushes, alphas, Lit Spheres, keymaps, logo",
           "Isolated: a private release channel, no outside connections",
           "First response within 2 business days; up to 3 custom items a month", nullptr},

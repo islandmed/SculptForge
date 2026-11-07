@@ -45,6 +45,10 @@ struct RenderSettings {
     bool motionProxy = false;  // the view is moving (Fast Navigation): draw big meshes' lighter proxy (render/Clusters.h)
     double stillSeconds = 0.0; // how long the view has been still (0 while it moves): coarse levels give way to full detail
     bool stroking = false;     // a stroke runs (its dabs still landing): coarse levels stay
+    // Offline frames (the timelapse, --render): always the full mesh, never its coarse levels. In the view a frame
+    // too slow for the still budget stays coarse while edited clusters draw in full until their levels follow, so
+    // a timelapse seeking through the history flipped between the two from frame to frame (Discord, 0.11.10).
+    bool fullDetail = false;
     bool flatShading = false;  // the scene's shading (Material palette): faceted; Parts can override (core/Document.h)
     // Backface culling (#68, Tool > Display): back faces are never drawn, on any mesh (closed or not, from any
     // view). Off: they are skipped only where they can't show (a closed mesh seen from outside, Renderer::cull).
@@ -116,7 +120,9 @@ struct MeshOverlay {
     float checkerScale = 8.0f;    // checker squares per UV unit
 };
 
-// One mesh of the scene for Renderer::syncScene: a Part, keyed by its stable id.
+// One mesh of the scene for Renderer::syncScene: a Part, keyed by its stable id. Linked Parts (#94) share one
+// mesh: they come with the same id (their PartData key) and their own `model` matrices, and are drawn from one
+// GPU slot, uploaded once.
 struct SceneMesh {
     uint32_t id = 0;
     Mesh* mesh = nullptr;
@@ -128,6 +134,7 @@ struct SceneMesh {
     bool flat = false;      // flat shading: each triangle shows its own face normal (faceted)
     bool pbr = false;       // the view shades PBR: upload the texture's material channels and their tangents
     const MeshOverlay* overlay = nullptr; // the UV Editor's view of the active mesh (must outlive the frame)
+    glm::mat4 model{1.0f}; // where the mesh is in the scene (Part::transform)
 };
 
 // Part of the target the 3D view is drawn into (framebuffer pixels, origin bottom-left); the rest is
@@ -572,7 +579,11 @@ private:
         uint32_t id;
         bool active;
         bool flat;
+        bool moved = false;      // drawn with `model` (a linked copy, #94)
+        glm::mat4 model{1.0f};
     };
+    // drawSlot for `item`: with its model matrix in the frame's view and culling (restored after).
+    void drawItem(const MeshSlot& s, const DrawItem& item, const RenderSettings& settings);
     std::vector<DrawItem> drawList_;      // visible meshes, in scene order
     std::vector<uint32_t> visibleGroups_; // scratch for uploadFaces
     std::vector<glm::vec2> visibleUvs_;   // scratch for uploadFaces

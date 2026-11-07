@@ -93,6 +93,8 @@
 //                            welcome_open (the first-run welcome shown), new_look_card_open (the one-time
 //                            "SculptForge has a new look" card),
 //                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
+//                            linked_parts (Parts sharing the active one's mesh, #94; 1 = none), part_moved, part_x (its
+//                            centre's x in the scene),
 //                            extract_preview (1 while an Extract preview waits for Accept), open_edges (edges of
 //                            the active Part with one triangle: 0 = watertight), solid_volume (the active Part's
 //                            volume with its open borders capped),
@@ -100,7 +102,7 @@
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once ui.json is written: the preferences save themselves, or Save Layout),
 //                            console_open, command_palette_open, customize, shelves_visible,
-//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, menu_rect_changes (the open task menu moved or resized since last read), offscreen_items (past the window edge), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
+//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, title_overlaps (top bar widgets over each other), timeline_overlaps (the timeline header's pieces over each other), menu_rect_changes (the open task menu moved or resized since last read), offscreen_items (past the window edge), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
@@ -180,7 +182,7 @@
 //                            pressure curve: its points, its value at half pressure x100), brush_curves (brushes with
 //                            their own curve), dab_error_px (the last stroke's dab furthest from its cursor
 //                            position, projected back), dab_jitter / dab_jitter_raw (its depth wobble with / without
-//                            the pick filter, x1000 radii), dabs, pixel_density (2 on a HiDPI screen), input_style (0 classic, 1 SculptForge, 2 Blender), turntable,
+//                            the pick filter, x1000 radii), dabs, pixel_density (2 on a HiDPI screen), input_style (0 classic, 1 SculptForge, 2 Blender), turntable, orbit_lock (0 free, 1 Y, 2 X, 3 Z),
 //                            camera_ortho, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
 //                            claim), brush_type (BrushType
 //                            index, -1 for a custom brush or Paint), last_dab_x / last_dab_y (window pixels), paint_r
@@ -435,6 +437,12 @@ std::string restOf(const std::string& line, int skip) {
     std::string rest = line.substr(i);
     if (rest.size() >= 2 && rest.front() == '"' && rest.back() == '"') rest = rest.substr(1, rest.size() - 2);
     return rest;
+}
+
+// "{version}" in an expected text: the version as the window title and the top bar show it ("0.11.13 dev 1a2b3c4").
+std::string withVersion(std::string text, const std::string& version) {
+    if (const size_t at = text.find("{version}"); at != std::string::npos) text.replace(at, 9, version);
+    return text;
 }
 
 SDL_Keymod parseMods(const std::string& text, std::string* key = nullptr) {
@@ -801,7 +809,8 @@ double Demo::query(const std::string& name, bool& known) const {
         return -1.0; // no such layer
     }
     if (name == "input_style") return double(app_.uiPrefs_.inputStyle);
-    if (name == "turntable") return app_.uiPrefs_.turntable ? 1.0 : 0.0;
+    if (name == "turntable") return app_.uiPrefs_.orbitLock == 1 ? 1.0 : 0.0;
+    if (name == "orbit_lock") return double(app_.uiPrefs_.orbitLock);
     if (name == "camera_ortho") return app_.camera_.ortho ? 1.0 : 0.0;
     if (name == "mask_brush") return app_.maskBrushActive() ? 1.0 : 0.0;
     if (name == "brush_sets") return double(app_.brushSets().size()); // brush sets in the library (#143)
@@ -841,6 +850,11 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "saved_views") return double(app_.savedViews_.size());
     if (name == "mask_darkness") return std::round(app_.renderSettings_.maskDarkness * 100.0f);
     if (name == "brush_type") return app_.doc_.activeBrush >= 0 || app_.paintMode_ ? -1.0 : double(int(app_.brush_));
+    if (name == "dab_scene_error_px") { // the last dab's centre, placed in the scene and shown by the view, to the cursor
+        const Part& part = app_.doc_.activePartInfo(); // (a moved linked copy, #94: its own space and the scene's agree)
+        const ImVec2 p = project(glm::vec3(part.transform * glm::vec4(app_.lastDabCentre_, 1.0f)));
+        return double(glm::distance(glm::vec2(p.x, p.y), app_.lastDabScreen_));
+    }
     if (name == "last_dab_x") return app_.lastDabScreen_.x;
     if (name == "last_dab_y") return app_.lastDabScreen_.y;
     if (name == "paint_r") return std::round(255.0f * linearToSrgb(app_.doc_.paintColor).x);
@@ -928,6 +942,19 @@ double Demo::query(const std::string& name, bool& known) const {
         return double(n);
     }
     if (name == "shell_narrow") return app_.shell_.narrow ? 1.0 : 0.0;
+    // Spans (x from-to) drawn over each other last frame; names them in the log.
+    auto overlaps = [](const std::vector<std::pair<float, float>>& b, const char* what) {
+        int n = 0;
+        for (size_t i = 0; i < b.size(); ++i)
+            for (size_t j = i + 1; j < b.size(); ++j)
+                if (b[i].first < b[j].second - 0.5f && b[j].first < b[i].second - 0.5f) {
+                    std::printf("%s: %.0f-%.0f and %.0f-%.0f\n", what, b[i].first, b[i].second, b[j].first, b[j].second);
+                    ++n;
+                }
+        return n;
+    };
+    if (name == "title_overlaps") return overlaps(app_.barSpans_, "title_overlaps"); // top bar widgets over each other
+    if (name == "timeline_overlaps") return overlaps(app_.timelineSpans_, "timeline_overlaps"); // the timeline header's pieces
     if (name == "offscreen_items") { // items drawn past the window's edge last frame (#105); names them in the log
         const std::vector<std::string> off = Demo::offscreenItems();
         for (const std::string& o : off) std::fprintf(stderr, "offscreen: %s\n", o.c_str());
@@ -1005,12 +1032,15 @@ double Demo::query(const std::string& name, bool& known) const {
                           glm::cross(glm::dvec3(capped.positions[t.y]), glm::dvec3(capped.positions[t.z])));
         return v / 6.0;
     }
+    if (name == "linked_parts") return double(app_.doc_.linkCount(app_.doc_.activePart)); // (#94: 1 = not linked)
+    if (name == "part_moved") return app_.doc_.activePartInfo().moved() ? 1.0 : 0.0;
+    if (name == "part_x") return double(app_.doc_.partBounds(app_.doc_.activePart).center().x);
     if (name == "visible_parts")
         return double(std::count_if(doc.parts.begin(), doc.parts.end(), [](const Part& s) { return s.visible; }));
     if (name == "edited_parts") { // Parts with undo history (the active one's lives in doc.undo)
         int n = 0;
         for (int i = 0; i < doc.partCount(); ++i)
-            n += (i == doc.activePart ? doc.undo.canUndo() : doc.parts[size_t(i)].undo.canUndo()) ? 1 : 0;
+            n += doc.partUndo(i).canUndo() ? 1 : 0;
         return double(n);
     }
     if (name == "user_brushes")
@@ -1160,6 +1190,37 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "coarse_clusters") { // the 3D view drawn once more now: the clusters it drew at a coarse level
         app_.benchmarkDrawMs(0);
         return double(app_.renderer_.coarseDrawnClusters());
+    }
+    if (name == "timelapse_flicker") {
+        // The timelapse's frames on a static camera (320x180, as renderTimelapseFrame draws them): through the
+        // history, then a hold on the last step. Held frames show the same model from the same place, so they must
+        // match: the largest mean per-pixel luma change (0-255) between consecutive held frames.
+        Timeline* t = Timeline::of(app_.doc_.undo);
+        if (!t || t->cursor() == 0) return -1.0;
+        const size_t last = t->cursor();
+        Camera cam = app_.camera_;
+        cam.frame(app_.sceneBounds());
+        cam.pitch = app_.camera_.pitch;
+        cam.distance *= 0.72f;
+        cam.aspect = 320.0f / 180.0f;
+        std::vector<uint8_t> prev, rgba;
+        double worst = 0.0;
+        std::string err;
+        for (size_t step = 0; step <= last + 6; ++step) {
+            const size_t at = std::min(step, last);
+            if (at != t->cursor() && !t->seek(app_.doc_, at, &err)) return -2.0;
+            if (!app_.renderTimelapseFrame(cam, 320, 180, rgba, err)) return -3.0;
+            if (step > last && prev.size() == rgba.size()) {
+                double sum = 0.0;
+                for (size_t i = 0; i + 3 < rgba.size(); i += 4) {
+                    const auto luma = [](const uint8_t* p) { return 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]; };
+                    sum += std::abs(luma(&rgba[i]) - luma(&prev[i]));
+                }
+                worst = std::max(worst, sum / double(rgba.size() / 4));
+            }
+            prev.swap(rgba);
+        }
+        return worst;
     }
     if (name == "stroke_programs") return double(app_.renderer_.strokePrograms()); // compiled before any stroke (warmed)
     if (name == "render_patch_errors") { // the 3D view drawn once more now: dynamic-topology patch triangles wrong on the GPU
@@ -1545,7 +1606,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 return true;
             }
             // The point of its on-screen bounds nearest (U, V) where it's the front Part and no panel covers it.
-            const AABB b = app_.doc_.partMesh(index).bounds();
+            const AABB b = app_.doc_.partBounds(index);
             ImVec2 lo(1e9f, 1e9f), hi(-1e9f, -1e9f);
             for (int i = 0; i < 8; ++i) {
                 const ImVec2 p = project(glm::vec3((i & 1) ? b.max.x : b.min.x, (i & 2) ? b.max.y : b.min.y,
@@ -1834,7 +1895,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         auto points = std::make_shared<std::vector<ImVec2>>();
         steps_.push_back([this, uv, points](float t) {
             // The model's on-screen bounds, without onModel's walk onto the surface: points may be on the background.
-            const AABB b = app_.doc_.mesh.bounds();
+            const AABB b = app_.doc_.partBounds(app_.doc_.activePart);
             ImVec2 lo(1e9f, 1e9f), hi(-1e9f, -1e9f);
             for (int i = 0; i < 8; ++i) {
                 const ImVec2 p = project(glm::vec3((i & 1) ? b.max.x : b.min.x, (i & 2) ? b.max.y : b.min.y,
@@ -2378,12 +2439,22 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
     } else if (verb == "expect_text" || verb == "expect_no_text") {
         if (!need(1)) return false;
-        const std::string text = restOf(lineText_, 1);
+        const std::string text = withVersion(restOf(lineText_, 1), App::appShownVersion().text());
         const bool want = verb == "expect_text";
         steps_.push_back([this, line, text, want](float t) {
             if (t == 0.0f) return false;
             if ((frameText_.find(text) != std::string::npos) != want)
                 fail(line, want ? "no text \"" + text + "\" on screen" : "text \"" + text + "\" is on screen");
+            return true;
+        });
+    } else if (verb == "expect_title") { // the OS window title contains the text ({version}: the version as shown)
+        if (!need(1)) return false;
+        const std::string text = withVersion(restOf(lineText_, 1), App::appShownVersion().text());
+        steps_.push_back([this, line, text](float t) {
+            if (t == 0.0f) return false; // the title is set while the frame after the previous step draws
+            const char* title = SDL_GetWindowTitle(app_.window_);
+            const std::string have = title ? title : "";
+            if (have.find(text) == std::string::npos) fail(line, "window title is \"" + have + "\", expected \"" + text + "\"");
             return true;
         });
     } else if (verb == "expect_status") {

@@ -351,7 +351,7 @@ void App::drawTextureMapContents() {
         const float side = ImGui::GetContentRegionAvail().x;
         const ImVec2 p = ImGui::GetCursorScreenPos();
         ImDrawList* dl = ImGui::GetWindowDrawList();
-        const GLuint tex = hasTexture(m) ? renderer_.paintTexture(doc_.activePartInfo().id) : 0;
+        const GLuint tex = hasTexture(m) ? renderer_.paintTexture(doc_.meshKey(doc_.activePart)) : 0;
         if (tex) dl->AddImage(ImTextureID(uintptr_t(tex)), p, ImVec2(p.x + side, p.y + side), ImVec2(0, 1), ImVec2(1, 0));
         else dl->AddRectFilled(p, ImVec2(p.x + side, p.y + side), IM_COL32(40, 40, 46, 255));
         const uint64_t key = (uint64_t(doc_.activePartInfo().id) << 40) ^ uint64_t(uintptr_t(m.uvs.data())) ^ m.uvs.size();

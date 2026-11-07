@@ -24,6 +24,7 @@
 #include "app/Theme.h"
 
 #include "core/Benchmark.h"
+#include "core/BrushAlpha.h"
 #include "core/HardwareProfile.h"
 #include "core/MemoryGuard.h"
 #include "core/Primitives.h"
@@ -681,6 +682,24 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             const glm::vec2 q = strokePoint(p, 0.0);
             p.samples.push_back({now, q, 0.0});
             p.lastSample = now;
+            // SF_BENCH_STENCIL=Cobblestone (a built-in alpha's name) or =photo.png: the strokes go through that Stencil
+            // (#155), tiled so every dab reads it; SF_BENCH_STENCIL_SIZE=0.1 its height as a fraction of the view's (default
+            // 0.8; small: vertices many image pixels apart, every read a disc). bench.sh stencil.
+            if (const char* sb = std::getenv("SF_BENCH_STENCIL"); sb && *sb && !doc_.stencil.active()) {
+                if (std::string(sb).find('.') == std::string::npos) {
+                    const BrushAlpha keep = doc_.brushAlpha; // (the brush itself stays Round)
+                    BrushAlpha::builtin(sb, doc_.brushAlpha);
+                    runCommand("stencil_load", {{"alpha", true}, {"reset", true}});
+                    doc_.brushAlpha = keep;
+                } else {
+                    runCommand("stencil_load", {{"path", std::string(sb)}, {"reset", true}});
+                }
+                const char* size = std::getenv("SF_BENCH_STENCIL_SIZE");
+                runCommand("stencil_set", {{"tile", true}, {"size", size ? std::atof(size) : 0.8}});
+                std::fprintf(stderr, "bench stencil: %s %dx%d size %.2f\n", doc_.stencil.name.c_str(),
+                             doc_.stencil.image ? doc_.stencil.image->width : 0,
+                             doc_.stencil.image ? doc_.stencil.image->height : 0, doc_.stencil.size);
+            }
             strokeProbe_ = &p.dabs;
             onMouseDown(q.x, q.y, SDL_BUTTON_LEFT);
             p.pressed = drag_ == Drag::Stroke;

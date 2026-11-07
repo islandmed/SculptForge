@@ -1,12 +1,12 @@
 {
-  "version": "0.11.12",
+  "version": "0.11.13",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Your languages: names you type in Chinese, Japanese or Korean (Parts, layers, folders, brush sets, files) draw with your system's fonts instead of \"?\"",
-    "Stencil: clean, sharp groove edges when you sculpt through a stencil, and detailed photos stay even on lighter meshes",
-    "Restart to update: on Linux the previous version now quits, and Discord stops showing SculptForge when you close it (thanks @ebarranco)",
-    "SpaceMouse: turning the cap slowly no longer zooms the view away (thanks @fenixpoints)",
-    "App icon: the outline cube is back, and a fix for garbled small icon sizes on macOS (thanks @tristratos, #156)"
+    "Linked duplicates: sculpt one Part and every copy follows, each in its own place (thanks @ebarranco, #94)",
+    "Orbit lock: View > Orbit lock turns the view about X, Y or Z only (thanks foirgairwolf on Discord)",
+    "Image to 3D: remove the flat background plane a generated model stands on, in one click (thanks fenix on Discord)",
+    "Reconstruct Subdiv: lower levels keep their UVs, even where seams cross coarse faces (thanks @RodTDai, #145)",
+    "Timelapse: rendered timelapses no longer flicker between detail levels (thanks @ebarranco)"
   ]
 }

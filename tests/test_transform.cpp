@@ -60,11 +60,24 @@ Mesh makeArm(int subdivisions = 4) {
 TEST(transform_translate_is_exact) {
     Document d = makeDoc(makeIcosphere(3));
     const auto before = d.mesh.positions;
-    CHECK(run(d, "transform", {{"translate", std::string("0.25,-1,3")}}).ok);
+    const CommandResult moved = run(d, "transform", {{"translate", std::string("0.25,-1,3")}});
+    CHECK(moved.ok);
+    CHECK(moved.message == "Moved " + vertexCountText(before.size())); // a plain sentence, no raw pivot floats
     bool exact = true;
     for (size_t v = 0; v < before.size(); ++v) exact = exact && d.mesh.positions[v] == before[v] + glm::vec3(0.25f, -1.0f, 3.0f);
     CHECK(exact);
     CHECK(d.undo.canUndo());
+}
+
+TEST(transform_status_counts_read_as_text) {
+    CHECK(vertexCountText(1) == "1 vertex");
+    CHECK(vertexCountText(642) == "642 vertices");
+    CHECK(vertexCountText(2562) == "2,562 vertices");
+    CHECK(vertexCountText(1234567) == "1,234,567 vertices");
+    Document d = makeDoc(makeIcosphere(3));
+    CHECK(run(d, "transform", {{"rotate", std::string("0,90,0")}}).message.rfind("Turned ", 0) == 0);
+    CHECK(run(d, "transform", {{"scale", 2.0}}).message.rfind("Scaled ", 0) == 0);
+    CHECK(run(d, "transform", {{"scale", 0.5}, {"translate", std::string("1,0,0")}}).message.rfind("Transformed ", 0) == 0);
 }
 
 TEST(transform_matches_the_formula) {
@@ -394,7 +407,7 @@ TEST(transform_all_parts) {
     CHECK(d.partMesh(1).positions[0] == b[0] + glm::vec3(0, 2, 0));
     // One undo step in each Part.
     CHECK(d.undo.canUndo());
-    CHECK(d.parts[1].undo.canUndo());
+    CHECK(d.parts[1].data->undo.canUndo());
     d.selectPart(1);
     CHECK(run(d, "undo").ok);
     CHECK(sameBits(d.mesh.positions, b));

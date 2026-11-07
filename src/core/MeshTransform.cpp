@@ -66,6 +66,33 @@ glm::vec3 MeshTransform::apply(const glm::vec3& p) const {
     return l * p + o;
 }
 
+glm::mat4 MeshTransform::matrix() const {
+    glm::mat3 l;
+    glm::vec3 o;
+    at(1.0f, l, o);
+    glm::mat4 m(l);
+    m[3] = glm::vec4(o, 1.0f);
+    return m;
+}
+
+MeshTransform MeshTransform::inSpaceOf(const glm::mat4& place) const {
+    const float s = glm::length(glm::vec3(place[0]));
+    if (!(s > 0.0f)) return *this;
+    const glm::mat3 r = glm::mat3(place) / s, rt = glm::transpose(r);
+    MeshTransform out = *this;
+    out.pivot = glm::vec3(glm::inverse(place) * glm::vec4(pivot, 1.0f));
+    out.frame = rt * frame;
+    out.translate = rt * translate / s;
+    out.rotate = glm::normalize(glm::quat_cast(rt) * rotate * glm::quat_cast(r));
+    return out;
+}
+
+MeshTransform MeshTransform::evenScale() const {
+    MeshTransform out = *this;
+    out.scale = glm::vec3((scale.x + scale.y + scale.z) / 3.0f);
+    return out;
+}
+
 glm::quat eulerRotation(const glm::vec3& degrees, const glm::mat3& axes) {
     const glm::quat qx = glm::angleAxis(glm::radians(degrees.x), axes[0]);
     const glm::quat qy = glm::angleAxis(glm::radians(degrees.y), axes[1]);
@@ -356,24 +383,37 @@ void TransformSession::cancel(Mesh& mesh, BVH& bvh) {
     *this = TransformSession();
 }
 
+std::string vertexCountText(size_t n) {
+    std::string digits = std::to_string(n);
+    for (int i = int(digits.size()) - 3; i > 0; i -= 3) digits.insert(size_t(i), 1, ',');
+    return digits + (n == 1 ? " vertex" : " vertices");
+}
+
+bool partMovesWhole(const Document& doc, int index, bool useMask) {
+    const bool instance = doc.linkCount(index) > 1 || doc.parts[size_t(index)].moved();
+    return instance && !(useMask && doc.partMesh(index).hasMask());
+}
+
 size_t transformPart(Document& doc, int index, const MeshTransform& t, bool useMask, float falloff, Symmetry mirror,
                         const std::string& label) {
     if (index < 0 || index >= doc.partCount()) return 0;
-    const bool active = index == doc.activePart;
-    Part& info = doc.parts[size_t(index)];
-    Mesh& mesh = active ? doc.mesh : info.mesh;
-    BVH& bvh = active ? doc.bvh : info.bvh;
-    UndoStack& undo = active ? doc.undo : info.undo;
-    if (active) doc.syncBvh();
-    else if (info.bvhDirty) {
-        info.bvh.build(info.mesh);
-        info.bvhDirty = false;
+    Mesh& mesh = doc.partMesh(index);
+    const Part& part = doc.parts[size_t(index)];
+    // A linked copy (or one moved as a whole before) moves as a whole: its transform, one undo step in its
+    // group's history. With a mask, what moves is the shared mesh, in the Part's own space.
+    if (partMovesWhole(doc, index, useMask)) {
+        if (!part.visible || mesh.vertexCount() == 0) return 0;
+        doc.setPartTransform(index, t.evenScale().matrix() * part.transform, label);
+        return mesh.vertexCount();
     }
+    const MeshTransform local = part.moved() ? t.inSpaceOf(part.transform) : t;
+    BVH& bvh = doc.partBvh(index);
+    UndoStack& undo = doc.partUndo(index);
     TransformSession s;
-    const int layer = active ? doc.activeLayer : -1;
-    if (!s.begin(mesh, transformWeights(mesh, useMask, falloff), mirror, t.pivot, layer)) return 0;
+    const int layer = part.data == doc.activePartInfo().data ? doc.activeLayer : -1; // (the checked-out mesh)
+    if (!s.begin(mesh, transformWeights(mesh, useMask, falloff), mirror, local.pivot, layer)) return 0;
     const size_t n = s.movingVertices();
-    s.apply(mesh, t);
+    s.apply(mesh, local);
     UndoRecord r = s.finish(mesh, bvh, label);
     if (r.empty()) return 0;
     undo.push(std::move(r));

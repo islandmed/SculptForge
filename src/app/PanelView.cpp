@@ -130,11 +130,46 @@ void App::registerViewUiCommands() {
                        return {ok, message};
                    }});
 
+    // View > Orbit lock (a request from foirgairwolf on Discord): which way a rotation drag turns the view.
+    commands_.add({"orbit_lock",
+                   "Orbit lock (View > Orbit lock): how a rotation drag turns the view. free: about the screen's axes "
+                   "(it can roll over the top); y: a turntable, upright, about the vertical axis; x or z: about that "
+                   "world axis only. The axis gizmo shows the lock; saved with the preferences.",
+                   {{"axis", T::String, "free, x, y or z.", true}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       const int lock = parseOrbitLock(argString(a, "axis"));
+                       if (lock < 0) return {false, "orbit_lock: axis is free, x, y or z"};
+                       uiPrefs_.orbitLock = lock;
+                       static constexpr const char* said[4] = {"Orbit lock: free", "Orbit lock: Y (turntable)",
+                                                               "Orbit lock: X axis", "Orbit lock: Z axis"};
+                       return {true, said[lock]};
+                   }});
+
     auto add = [this](std::string id, std::string label, const char* icon, std::string description, std::string palette,
-                      std::function<void()> run, std::function<bool()> checked) {
-        actions_.add({std::move(id), std::move(label), icon, std::move(description), std::move(palette), "", "",
-                      std::move(run), std::move(checked), nullptr});
+                      std::function<void()> run, std::function<bool()> checked, std::string shortcut = "") {
+        actions_.add({std::move(id), std::move(label), icon, std::move(description), std::move(palette),
+                      std::move(shortcut), "", std::move(run), std::move(checked), nullptr});
     };
+    auto lockRun = [this](int lock) { return [this, lock] { runCommand("orbit_lock", {{"axis", std::string(orbitLockName(lock))}}); }; };
+    auto lockOn = [this](int lock) { return [this, lock] { return uiPrefs_.orbitLock == lock; }; };
+    add("view.orbit_lock_free", "Free", nullptr,
+        "Rotation drags turn the view about the screen's axes and can roll it over the top (the "
+        "default). Saved with the preferences.",
+        "View > Orbit lock", lockRun(0), lockOn(0), "Alt+Shift+F");
+    add("view.orbit_lock_y", "Y (turntable)", nullptr,
+        "Rotation drags turn the view like a turntable: the model stays upright and turns about its "
+        "vertical (Y) axis. Saved with the preferences.",
+        "View > Orbit lock", lockRun(1), lockOn(1), "Alt+Shift+Y");
+    add("view.orbit_lock_x", "X", nullptr,
+        "Rotation drags turn the view about the world X axis only (red): from the front, an up or down drag tips "
+        "the model towards you or away. Shift still snaps to a side view; the axis gizmo shows the lock. Saved with "
+        "the preferences.",
+        "View > Orbit lock", lockRun(2), lockOn(2), "Alt+Shift+X");
+    add("view.orbit_lock_z", "Z", nullptr,
+        "Rotation drags turn the view about the world Z axis only (blue): from the front, a drag around the middle "
+        "turns the model like a wheel. Shift still snaps to a side view; the axis gizmo shows the lock. Saved with "
+        "the preferences.",
+        "View > Orbit lock", lockRun(3), lockOn(3), "Alt+Shift+Z");
     add("view.xray", "X-Ray", ICON_LC_SCAN, "See through the other Parts to the active one (again: solid). With only the "
         "active Part shown, it is see-through itself (#80, #91).", "Tool > Parts",
         [this] { runCommand("xray"); }, [this] { return renderSettings_.xray; });

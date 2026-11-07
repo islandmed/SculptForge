@@ -195,7 +195,11 @@ generated from SculptForge's action registry, the same source as the Controls wi
 
 | Action | Keys | What it does |
 |---|---|---|
+| Free | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> | Rotation drags turn the view about the screen's axes and can roll it over the top (the default). Saved with the preferences. |
 | Lock camera | <kbd>Shift</kbd>+<kbd>L</kbd> | Lock the camera for left-drags: a drag that starts on the background sculpts once it reaches the model instead of turning the view (Preferences > Input > Start strokes off the model, #62). The status bar shows CAMERA LOCKED while it is on. Right-drag or Alt+drag still move the view. Shift+L turns it on and off. |
+| X | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> | Rotation drags turn the view about the world X axis only (red): from the front, an up or down drag tips the model towards you or away. Shift still snaps to a side view; the axis gizmo shows the lock. Saved with the preferences. |
+| Y (turntable) | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Y</kbd> | Rotation drags turn the view like a turntable: the model stays upright and turns about its vertical (Y) axis. Saved with the preferences. |
+| Z | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> | Rotation drags turn the view about the world Z axis only (blue): from the front, a drag around the middle turns the model like a wheel. Shift still snaps to a side view; the axis gizmo shows the lock. Saved with the preferences. |
 
 <!-- END GENERATED: shortcuts -->
 

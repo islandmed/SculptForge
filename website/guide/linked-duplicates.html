@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Linked Duplicates - SculptForge User Guide</title>
+  <meta name="description" content="A Linked Duplicate is a Part that shares its mesh with another Part but sits in its own place: rivets on a belt, the four legs of a table, the teeth of a gear, a row of columns. Sculpt, paint or mask any one of them and every linked copy changes with it; move, turn or scale each one on its own. A hu">
+  <meta name="theme-color" content="#111114">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=7">
+  <link rel="icon" type="image/png" sizes="64x64" href="../img/favicon-64.png?v=7">
+  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png?v=7">
+  <link rel="canonical" href="https://sculptforge.app/guide/linked-duplicates.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Linked Duplicates - SculptForge User Guide">
+  <meta property="og:description" content="A Linked Duplicate is a Part that shares its mesh with another Part but sits in its own place: rivets on a belt, the four legs of a table, the teeth of a gear, a row of columns. Sculpt, paint or mask any one of them and every linked copy changes with it; move, turn or scale each one on its own. A hu">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=5">
+  <meta property="og:url" content="https://sculptforge.app/guide/linked-duplicates.html">
+  <link rel="stylesheet" href="../style.css?v=19">
+  <script src="../motion.js?v=11" defer></script>
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <script src="search-index.js?v=51" defer></script>
+</head>
+<body class="guide-page" data-prev="parts.html" data-next="forge-spheres.html">
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="../index.html"><img class="brand-mark" src="../img/bust-mark-44.png" srcset="../img/bust-mark-88.png 2x, ../img/bust-mark-132.png 3x" width="44" height="44" alt=""><span>SculptForge</span></a>
+      <nav aria-label="Main">
+        <a href="../index.html#features">Features</a>
+        <a href="../index.html#demos">Demos</a>
+        <a href="../brushes.html">Brushes</a>
+        <a href="index.html" aria-current="page">Guide</a>
+        <a class="nav-dl" href="../index.html#download">Download</a>
+        <a class="gh" href="https://discord.gg/gWrYkEmQhH">Discord</a>
+        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
+      </nav>
+    </div>
+  </header>
+  <div class="wrap guide-layout">
+    <div class="guide-side">
+      <button class="toc-toggle" type="button" aria-expanded="false" aria-controls="guide-toc">
+        <span>Contents</span><span class="toc-current">Linked Duplicates</span></button>
+      <div id="guide-toc" class="toc-panel">
+        <div class="guide-search" role="search">
+          <input type="search" id="guide-q" placeholder="Search the guide" aria-label="Search the guide" autocomplete="off">
+          <div class="search-results" id="guide-results" hidden></div>
+        </div>
+        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="first-sculpt.html">Your first sculpt in 10 minutes</a></li><li><a href="whats-new.html">What&#x27;s new</a></li><li><a href="quick-tour.html">Quick tour for experienced sculptors</a></li><li><a href="installing.html">Install SculptForge on Windows, macOS and Linux</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li></ul><p class="toc-group">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="brush-packs.html">Brush packs</a></li><li><a href="masking.html">Masking</a></li><li><a href="face-groups.html">Face Groups and visibility</a></li><li><a href="selection-sets.html">Selection sets and morph targets</a></li><li><a href="parts.html">Parts</a></li><li><a href="linked-duplicates.html" class="current" aria-current="page">Linked Duplicates</a><ul class="toc-sections"><li><a href="#make-a-linked-copy">Make a linked copy</a></li><li><a href="#sculpt-any-of-them">Sculpt any of them</a></li><li><a href="#move-turn-and-scale-a-copy">Move, turn and scale a copy</a></li><li><a href="#make-unique">Make Unique</a></li><li><a href="#linked-copies-in-files">Linked copies in files</a></li><li><a href="#scripting">Scripting</a></li><li><a href="#see-also">See also</a></li></ul></li><li><a href="forge-spheres.html">Forge Spheres</a></li><li><a href="vertex-paint.html">Vertex Paint and materials</a></li><li><a href="texture-painting.html">Texture painting</a></li><li><a href="uv-editor.html">UV Editor</a></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="fill-layers.html">Fill layers, Mesh Maps and Material Recipes</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo)</a></li><li><a href="geometry.html">Subdivide, remesh, decimate and LODs</a></li><li><a href="cut.html">Cut: line, lasso, rectangle and polyline</a></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and Bridge</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and snapshots</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="packs-and-macros.html">Packs and macros</a></li><li><a href="studios.html">SculptForge for studios</a></li><li><a href="security.html">Security overview for IT reviews</a></li></ul><p class="toc-group">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting: tablets, display, crashes and FAQ</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="discord.html">Show SculptForge on Discord</a></li></ul></nav>
+      </div>
+    </div>
+    <main class="guide-main" id="top">
+      <article class="guide-article">
+<h1 id="linked-duplicates">Linked Duplicates</h1>
+<p>A <strong>Linked Duplicate</strong> is a Part that shares its mesh with another Part but sits in its own place: rivets on a belt, the four legs of a table, the teeth of a gear, a row of columns. Sculpt, paint or mask any one of them and every linked copy changes with it; move, turn or scale each one on its own. A hundred linked copies cost about as much memory as one mesh, on the graphics card too.</p>
+<figure class="shot"><a href="images/linked-duplicates.jpg" class="zoom"><img src="images/linked-duplicates.jpg" alt="Three linked copies of one sphere, the last one scaled up: a stroke on it shows on all three; the Parts list shows a link and the count on each row" width="958" height="310" loading="lazy" decoding="async"></a><figcaption>Three linked copies of one sphere, the last one scaled up: a stroke on it shows on all three; the Parts list shows a link and the count on each row</figcaption></figure>
+<h2 id="make-a-linked-copy">Make a linked copy<a class="anchor" href="#make-a-linked-copy" aria-label="Link to this section">#</a></h2>
+<ol>
+<li>
+Select the Part in <strong>Tool &gt; Parts</strong>.
+</li>
+<li>
+Click <strong>Linked Duplicate</strong> (or right-click its row &gt; <strong>Linked Duplicate</strong>).
+</li>
+</ol>
+<p>The copy is named <code>&lt;name&gt; link</code>, goes right under the original in the list and appears beside it on +X. It becomes the active Part. Each linked Part shows a link and the number of Parts sharing the mesh at the end of its row; point at the row to see the count in the tooltip too.</p>
+<p>Making a linked copy is undoable: <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes it away again.</p>
+<h2 id="sculpt-any-of-them">Sculpt any of them<a class="anchor" href="#sculpt-any-of-them" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>
+Brushes, masking, Vertex Paint, texture painting, face groups and whole-mesh tools (remesh, subdivide, decimate, layers) work on the shared mesh: every linked copy shows the change at once.
+</li>
+<li>
+Strokes land where you see them on whichever copy is active, even when it is turned or scaled. <strong>Symmetry</strong> mirrors across the copy&#x27;s own axes, so a turned copy still sculpts symmetrically.
+</li>
+<li>
+Linked copies share one undo history: undo on any of them steps back the shared mesh.
+</li>
+<li>
+The copies that aren&#x27;t active are drawn slightly darker, like other Parts. The mask shows on the active one.
+</li>
+</ul>
+<h2 id="move-turn-and-scale-a-copy">Move, turn and scale a copy<a class="anchor" href="#move-turn-and-scale-a-copy" aria-label="Link to this section">#</a></h2>
+<p>Use the <a href="gizmo.html">Gizmo</a> on the active linked Part: it moves, turns or scales that copy as a whole and leaves the others where they are. Each move is one undo step. Scaling a linked copy is always even (the same along every axis), so it stays a copy of the same shape; uneven scaling takes the mean.</p>
+<p>With a mask (and the Gizmo&#x27;s <strong>Mask</strong> option on), the Gizmo poses the shared mesh instead: the unmasked part moves, in every copy, along the active copy&#x27;s own axes.</p>
+<p><code>transform</code> does the same from the <a href="scripting.html">console</a>: <code>transform translate=0,1,0 rotate=0,90,0</code>.</p>
+<h2 id="make-unique">Make Unique<a class="anchor" href="#make-unique" aria-label="Link to this section">#</a></h2>
+<p><strong>Make Unique</strong> (in <strong>Tool &gt; Parts</strong>, or right-click the row) gives the active linked Part its own copy of the mesh. It stays where it is and no longer changes with the others. Its undo history starts fresh.</p>
+<p>Deleting a linked Part never touches the others: the mesh stays as long as one Part uses it.</p>
+<h2 id="linked-copies-in-files">Linked copies in files<a class="anchor" href="#linked-copies-in-files" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table><thead><tr><th>Format</th><th>What happens</th></tr></thead><tbody><tr><td>Project (<code>.sfproj</code>)</td><td>The links and each copy&#x27;s place are kept; the mesh is saved once</td></tr><tr><td>glTF / GLB</td><td>One mesh, one node per copy with its own matrix</td></tr><tr><td>USD (<code>.usda</code>, <code>.usdz</code>)</td><td>The first copy holds the mesh; each other copy is an <code>instanceable</code> prim that references it, with its own transform</td></tr><tr><td>OBJ, STL, PLY, FBX, Bridge</td><td>Every copy is written as its own mesh, where it is</td></tr></tbody></table></div>
+<p><strong>Merge down</strong> and <strong>Merge visible</strong> put every Part where it is in the scene, so merged linked copies end up as separate pieces of one mesh. Projects with linked copies need SculptForge 0.12 or later to open.</p>
+<h2 id="scripting">Scripting<a class="anchor" href="#scripting" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody><tr><td><code>part_duplicate_linked</code></td><td>A linked copy of the active Part (or <code>index=</code> / <code>name=</code>); <code>offset=x,y,z</code> places it (default: beside it on +X)</td></tr><tr><td><code>part_make_unique</code></td><td>Give a linked Part its own mesh</td></tr><tr><td><code>part_list</code></td><td>Linked Parts show <code>linked xN</code></td></tr></tbody></table></div>
+<div class="code-block"><pre class="code"><code class="language-text">part_duplicate_linked offset=0,0,2; part_duplicate_linked offset=0,0,2; part_duplicate_linked offset=0,0,2</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+<h2 id="see-also">See also<a class="anchor" href="#see-also" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>
+<a href="parts.html">Parts</a>: the Parts list, merging and splitting
+</li>
+<li>
+<a href="gizmo.html">Moving, rotating and posing (Gizmo)</a>
+</li>
+<li>
+<a href="exporting.html">Exporting</a>
+</li>
+</ul>
+      </article>
+      <nav class="pager" aria-label="Previous and next chapter"><a class="prev" rel="prev" href="parts.html"><span>Previous</span>Parts</a><a class="next" rel="next" href="forge-spheres.html"><span>Next</span>Forge Spheres</a></nav>
+      <p class="guide-meta fine">Also in the app: <strong>Help &gt; User Guide</strong> (<kbd>Shift</kbd>+<kbd>F1</kbd>).
+        Found a mistake? <a href="https://github.com/islandmed/SculptForge/edit/main/docs/guide/linked-duplicates.md">Edit this page on GitHub</a>.</p>
+    </main>
+    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#make-a-linked-copy">Make a linked copy</a></li><li><a href="#sculpt-any-of-them">Sculpt any of them</a></li><li><a href="#move-turn-and-scale-a-copy">Move, turn and scale a copy</a></li><li><a href="#make-unique">Make Unique</a></li><li><a href="#linked-copies-in-files">Linked copies in files</a></li><li><a href="#scripting">Scripting</a></li><li><a href="#see-also">See also</a></li></ul></aside>
+  </div>
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="../index.html"><img class="brand-mark" src="../img/bust-mark-44.png" srcset="../img/bust-mark-88.png 2x, ../img/bust-mark-132.png 3x" width="32" height="32" alt=""><span>SculptForge</span></a>
+        <p class="fine">Copyright © 2026 The SculptForge contributors.<br>The SculptForge User Guide is part of
+          SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
+      </div>
+      <div class="links">
+        <a href="../performance/">Performance</a>
+        <a href="index.html">User guide</a>
+        <a href="../supporters.html">Members</a>
+        <a href="https://github.com/islandmed/SculptForge">Source code</a>
+        <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
+        <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
+        <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
+      </div>
+      <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners.</p>
+    </div>
+  </footer>
+</body>
+</html>

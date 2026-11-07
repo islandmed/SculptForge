@@ -402,6 +402,7 @@ int App::renderHeadless() {
     settings.showFaceGroups = settings.showFaceGroups || options_.facegroups;
     settings.showMesh = !options_.hideMesh;
     settings.dimInactive = false; // a beauty shot: every Part at full brightness
+    settings.fullDetail = true;   // (never the view's coarse levels: a turntable's frames all alike)
     syncScene();
     const std::filesystem::path out(std::u8string(options_.renderPath.begin(), options_.renderPath.end()));
     for (int f = 0; f < frames; ++f) {
@@ -1638,7 +1639,7 @@ void App::dispatchEvent(const SDL_Event& event) {
 bool App::pick(float x, float y, RayHit& hit) const {
     if (!doc_.activePartInfo().visible) return false; // you can't sculpt what you can't see
     glm::vec3 origin, dir;
-    canvasRay(x, y, origin, dir);
+    partRay(x, y, origin, dir);
     return frontRaycast(origin, dir, hit);
 }
 
@@ -1946,7 +1947,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     }
     switch (drag_) {
     case Drag::Stroke: strokeTo(x, y); break;
-    case Drag::Orbit: orbitBy(dx, dy); break;
+    case Drag::Orbit: orbitBy(x, y, dx, dy); break;
     case Drag::Roll:
         if (rollSideways_) camera_.setOrientation(camera_.orientation() * glm::angleAxis(dx * 0.008f, glm::vec3(0, 0, 1)));
         else rollBy(x, y, dx, dy);
@@ -2007,7 +2008,7 @@ void App::wheelZoom(float x, float y, float steps) {
     RayHit hit;
     glm::vec3 p;
     if (canPick && pick(x, y, hit)) {
-        p = hit.position;
+        p = glm::vec3(doc_.activePartInfo().transform * glm::vec4(hit.position, 1.0f)); // (a moved linked copy, #94)
     } else {
         const glm::vec3 fwd = camera_.forward();
         const float along = glm::dot(dir, fwd);
@@ -2025,7 +2026,7 @@ void App::resetView() {
     status_ = "View reset";
 }
 
-void App::orbitBy(float dx, float dy) {
+void App::orbitBy(float x, float y, float dx, float dy) {
     if (autoOrtho_) { // an axis view turned: back to perspective (Blender's Auto Perspective)
         camera_.ortho = false;
         autoOrtho_ = false;
@@ -2034,7 +2035,10 @@ void App::orbitBy(float dx, float dy) {
         orbitRaw_ = camera_;
         orbitStarted_ = true;
     }
-    if (uiPrefs_.turntable || forceTurntable_) orbitRaw_.orbit(dx, dy);
+    const int lock = forceTurntable_ ? 1 : uiPrefs_.orbitLock;
+    if (lock == 1) orbitRaw_.orbit(dx, dy);
+    else if (lock == 2) orbitRaw_.orbitAbout(glm::vec3(1, 0, 0), dx, dy, rollSweep(x, y, dx, dy));
+    else if (lock == 3) orbitRaw_.orbitAbout(glm::vec3(0, 0, 1), dx, dy, rollSweep(x, y, dx, dy));
     else orbitRaw_.orbitFree(dx, dy);
     // Holding Shift snaps to the nearest view along an axis; letting go continues from where the cursor took it.
     if (inputMods(false) & SDL_KMOD_SHIFT) camera_.setOrientation(Camera::snapped(orbitRaw_.orientation()));
@@ -2042,8 +2046,11 @@ void App::orbitBy(float dx, float dy) {
 }
 
 void App::rollBy(float x, float y, float dx, float dy) {
-    // Turn about the view axis by the angle the cursor sweeps around the canvas centre (a sideways drag far
-    // from the centre still turns, by its length).
+    camera_.setOrientation(camera_.orientation() * glm::angleAxis(-rollSweep(x, y, dx, dy), glm::vec3(0, 0, 1)));
+}
+
+float App::rollSweep(float x, float y, float dx, float dy) const {
+    // The angle the cursor sweeps around the canvas centre (near the centre, a sideways drag turns by its length).
     const CanvasRect c = canvasRect();
     const glm::vec2 centre(c.x + c.w * 0.5f, c.y + c.h * 0.5f);
     const glm::vec2 now(x, y), before(x - dx, y - dy);
@@ -2054,7 +2061,7 @@ void App::rollBy(float x, float y, float dx, float dy) {
     } else {
         angle = dx * 0.008f;
     }
-    camera_.setOrientation(camera_.orientation() * glm::angleAxis(-angle, glm::vec3(0, 0, 1)));
+    return angle;
 }
 
 void App::onMouseUp() {
@@ -2069,8 +2076,8 @@ void App::onMouseUp() {
     if (drag_ == Drag::Insert) {
         // The drag's length on screen, as a size at the surface point's depth (at least a small default).
         const float px = std::max(insertPx_, 12.0f * uiScale_);
-        const float dist = glm::length(camera_.position() - insertAt_);
-        const float worldPerPx = 2.0f * dist * std::tan(camera_.fovY * 0.5f) / std::max(canvasRect().h, 1.0f);
+        const float dist = glm::length(partCamera().position() - insertAt_);
+        const float worldPerPx = 2.0f * dist * std::tan(partCamera().fovY * 0.5f) / std::max(canvasRect().h, 1.0f);
         Args args{{"x", double(insertAt_.x)}, {"y", double(insertAt_.y)},
                   {"z", double(insertAt_.z)}, {"nx", double(insertNormal_.x)},
                   {"ny", double(insertNormal_.y)}, {"nz", double(insertNormal_.z)},
@@ -2170,7 +2177,7 @@ void App::beginAlongNormal(const RayHit& hit, float radius) {
     glm::vec3 n = brushAreaNormal(doc_.mesh, doc_.bvh, hit.position, std::max(radius, 1e-6f), focalShift_);
     if (glm::length(n) < 0.5f) n = hit.normal;
     if (glm::length(n) < 0.5f) return;
-    if (glm::dot(n, camera_.forward()) > 0.0f && glm::dot(hit.normal, camera_.forward()) < 0.0f) n = -n; // (outward, to the viewer)
+    if (glm::dot(n, partCamera().forward()) > 0.0f && glm::dot(hit.normal, partCamera().forward()) < 0.0f) n = -n; // (outward, to the viewer)
     strokeAlongNormal_ = true;
     alongNormalDir_ = glm::normalize(n);
     alongNormalAnchor_ = hit.position;
@@ -2183,10 +2190,10 @@ void App::beginAlongNormal(const RayHit& hit, float radius) {
 // viewer (the cursor can't say how far along it), by how far the cursor went up since the press.
 glm::vec3 App::alongNormalTarget(float x, float y) const {
     glm::vec3 origin, dir;
-    canvasRay(x, y, origin, dir);
+    partRay(x, y, origin, dir);
     float s = 0.0f;
     if (!lineRayClosest(alongNormalAnchor_, alongNormalDir_, origin, dir, s))
-        s = (alongNormalStartY_ - y) * camera_.worldPerPixel(alongNormalAnchor_, canvasHeight());
+        s = (alongNormalStartY_ - y) * partCamera().worldPerPixel(alongNormalAnchor_, canvasHeight());
     return alongNormalAnchor_ + alongNormalDir_ * s;
 }
 
@@ -2257,8 +2264,8 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     pointerLatestAt_ = double(SDL_GetTicksNS()) * 1e-9;
     penPredictor_.reset(pointerLatest_, pointerLatestAt_);
     {
-        const glm::vec3 n = glm::dot(hit.normal, camera_.forward()) > 0.0f ? -hit.normal : hit.normal;
-        ghostFrame_ = {hit.position, glm::length(n) > 0.0f ? glm::normalize(n) : -camera_.forward(), hit.position, true};
+        const glm::vec3 n = glm::dot(hit.normal, partCamera().forward()) > 0.0f ? -hit.normal : hit.normal;
+        ghostFrame_ = {hit.position, glm::length(n) > 0.0f ? glm::normalize(n) : -partCamera().forward(), hit.position, true};
         const glm::uvec3 t = hit.triangle < doc_.mesh.triangles.size() ? doc_.mesh.triangles[hit.triangle] : glm::uvec3(0);
         const auto& P = doc_.mesh.positions;
         ghostCurvature_ = 0.0f;
@@ -2270,8 +2277,8 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         // few percent (#122), so Move grabs with the full brush size.
         DabParams p;
         p.center = hit.position;
-        p.viewDir = camera_.forward();
-        p.radius = radiusPx_ * camera_.worldPerPixel(hit.position, canvasHeight());
+        p.viewDir = partCamera().forward();
+        p.radius = radiusPx_ * partCamera().worldPerPixel(hit.position, canvasHeight());
         p.strength = strength_;
         p.focal = focalShift_;
         p.connectedOnly = uiPrefs_.connectedOnly;
@@ -2295,7 +2302,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     lazyMouse_.reset(glm::vec2(x, y));
     if ((strokeBrush_ == BrushType::SnakeHook || strokeBrush_ == BrushType::KelvinSnake) && !recipe && strokeSculpt_) {
         grabLast_ = hit.position; // the pulled tip (see snakeHookTo)
-        beginAlongNormal(hit, radiusPx_ * camera_.worldPerPixel(hit.position, canvasHeight()));
+        beginAlongNormal(hit, radiusPx_ * partCamera().worldPerPixel(hit.position, canvasHeight()));
         return;
     }
     if (strokeType_ == StrokeType::DragRect || strokeType_ == StrokeType::DragDot) {
@@ -2353,8 +2360,8 @@ void App::strokeTo(float x, float y) {
     }
     if (strokeBrush_ == BrushType::Move && !recipe && strokeSculpt_) {
         glm::vec3 origin, dir;
-        canvasRay(x, y, origin, dir);
-        glm::vec3 n = camera_.forward();
+        partRay(x, y, origin, dir);
+        glm::vec3 n = partCamera().forward();
         float denom = glm::dot(dir, n);
         if (std::abs(denom) < 1e-6f) return;
         float t = glm::dot(grabLast_ - origin, n) / denom; // (the plane through the grabbed point, facing the view)
@@ -2495,7 +2502,7 @@ void App::dabAt(float x, float y, float pressure) {
         strokeProbe_->emplace_back(x, y);
         if (strokeRadiusProbe_) strokeRadiusProbe_->push_back(st.radiusPx);
     }
-    const Camera& cam = dabView_ ? dabView_->camera : camera_;
+    const Camera cam = dabView_ ? dabView_->camera : partCamera(); // (a moved linked copy: its own space)
     const glm::vec2 pathPoint(x, y); // (before any scatter: the rake follows the stroke itself)
     const BrushRecipe* recipe = st.recipe;
     if (recipe && recipe->jitter > 0.0f) {
@@ -2567,7 +2574,10 @@ void App::dabAt(float x, float y, float pressure) {
     p.connectedOnly = st.connectedOnly;
     p.viewFalloff = st.viewFalloff;
     p.focal = st.focal;
-    if (!dabView_) lastDabScreen_ = glm::vec2(x, y); // (the solver's: when its batch is committed)
+    if (!dabView_) { // (the solver's: when its batch is committed)
+        lastDabScreen_ = glm::vec2(x, y);
+        lastDabCentre_ = hit.position;
+    }
     if (st.mask) {
         p.strength = st.maskStrength;
         doc_.sculptor.dabMask(doc_.mesh, doc_.bvh, p, st.symmetry);
@@ -2713,7 +2723,8 @@ void App::runCommand(const std::string& name, const Args& args) {
                  (name == "splat_transform" && args.contains("fit"))))
         camera_.frame(sceneBounds());
     // A new Part lands beside the model: bring it into view only if it isn't already.
-    if (r.ok && (name == "part_append" || name == "part_duplicate") && !onScreen(doc_.mesh.bounds()))
+    if (r.ok && (name == "part_append" || name == "part_duplicate" || name == "part_duplicate_linked") &&
+        !onScreen(doc_.partBounds(doc_.activePart)))
         camera_.frame(sceneBounds());
     afterCommand(name, args, r);
     afterVdmCommand(name, r); // the VDM brush after vdm_set / vdm_capture, the top view after vdm_new_plane
@@ -2848,7 +2859,7 @@ void App::updateFloorHeight() {
         const Part& p = doc_.parts[size_t(i)];
         mix(p.id);
         mix(p.visible);
-        mix(p.undo.revision());
+        mix(doc_.partUndo(i).revision());
         mix(doc_.partMesh(i).vertexCount());
     }
     if (key == floorKey_) return;
@@ -2949,11 +2960,13 @@ void App::syncScene() {
     for (int i = 0; i < doc_.partCount(); ++i) {
         Part& s = doc_.parts[size_t(i)];
         const bool active = i == doc_.activePart;
-        Mesh* mesh = active ? &shown : &s.mesh;
+        Mesh* mesh = doc_.checkedOut(i) ? &shown : &s.data->mesh;
         // Solo channel view (channel_view): the texture's shown texels follow before the renderer uploads them.
         if (mesh->texture) syncChannelView(*mesh->texture, doc_.channelView);
         const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading);
-        scene.push_back({s.id, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe, flat});
+        const uint32_t key = doc_.meshKey(i); // (linked Parts, #94: one GPU mesh, drawn where each is)
+        scene.push_back({key, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe, flat});
+        scene.back().model = s.transform;
         scene.back().pbr = renderSettings_.pbr();
         if (active && &shown == &doc_.mesh) scene.back().overlay = uvEditorOverlay(s.id); // the UV Editor's colours
     }
@@ -3001,10 +3014,11 @@ void App::updateTitle() {
                            ? std::string("Untitled")
                            : std::filesystem::path(std::u8string(doc_.path.begin(), doc_.path.end())).filename().string();
     updateDiscordPresence(); // the file name, if it's shown (sends only on a change)
-    std::string title = (doc_.dirty() ? "* " : "") + name + " - SculptForge";
-    if (*appPrerelease()) title += " " + appVersionLabel(); // "- SculptForge 0.11.0 Beta 1": a beta says so
+    // "Head.sfproj* — SculptForge 0.11.13": the document first (taskbars and Alt-Tab cut the end off), the version
+    // last, so support screenshots show it.
+    std::string title = name + (doc_.dirty() ? "*" : "") + " — SculptForge " + appShownVersion().text();
     if (const StudioStart& studio = studioMode(); studio.active && !studio.profile.title.empty())
-        title += " - " + studio.profile.title; // a studio build's own title
+        title += " — " + studio.profile.title; // a studio build's own title
     if (title == windowTitle_) return; // called every frame
     windowTitle_ = title;
     SDL_SetWindowTitle(window_, title.c_str());
@@ -3697,8 +3711,8 @@ void App::projectImageFromView() {
     o.depth = projectDepth_ * glm::length(b.extent());
     o.invert = projectInvert_;
     Mesh m = doc_.mesh;
-    size_t n = projectImage(m, doc_.activeLayer, refImage_, camera_.projection() * camera_.view(),
-                            view.w / std::max(view.h, 1.0f), camera_.position(), o);
+    size_t n = projectImage(m, doc_.activeLayer, refImage_, partCamera().projection() * partCamera().view(),
+                            view.w / std::max(view.h, 1.0f), partCamera().position(), o);
     if (n == 0) {
         status_ = "The image didn't land on the model - aim the view at it first";
         return;
@@ -3736,24 +3750,30 @@ void App::startGenerator() {
     pendingGenerator_ = promise->get_future();
     std::thread([promise, settings, in = refImagePath_, text = textMode_ ? std::string(textPrompt_) : std::string(),
                  out = std::string(stem.begin(), stem.end()), progress = generatorProgress_,
-                 mode = GeneratedRemesh(generatedRemesh_), resolution = remeshResolution_] {
+                 mode = GeneratedRemesh(generatedRemesh_), resolution = remeshResolution_, dropBackdrop = removeBackground_] {
         GeneratedModel g;
         g.result = text.empty() ? ai::generate3D(settings, in, out, progress.get())
                                 : ai::generate3DFromText(settings, text, out, progress.get());
-        if (g.result.ok && mode != GeneratedRemesh::Off) {
+        if (g.result.ok && (mode != GeneratedRemesh::Off || dropBackdrop)) {
             // Made sculptable here, so the window stays responsive; the main thread opens the file and swaps this in.
             Document scratch;
             const CommandResult opened = CommandRegistry().execute(scratch, "open", {{"path", g.result.outputPath}});
-            progress->percent = 0;
-            progress->setStatus(mode == GeneratedRemesh::Quad ? "Making it sculptable: Quad Remesh..." : "Making it sculptable: Voxel Remesh...");
+            // The background plane goes first (one undo step of its own), so the remesh doesn't build it in.
+            if (opened.ok && dropBackdrop && removeFlatBackdrop(scratch.mesh, &g.backdrop))
+                g.withoutBackdrop = std::make_shared<Mesh>(scratch.mesh);
             Mesh m;
-            if (!opened.ok) {
+            if (mode == GeneratedRemesh::Off) {
+                // (opened for the background check only)
+            } else if (!opened.ok) {
                 g.remeshError = opened.message;
-            } else if (remeshGenerated(scratch.mesh, mode, resolution, 1, m, g.remeshError, &g.stats, [progress](float f) {
-                           progress->percent = int(f * 100.0f);
-                           return !progress->cancel.load();
-                       })) {
-                g.remeshed = std::make_shared<Mesh>(std::move(m));
+            } else {
+                progress->percent = 0;
+                progress->setStatus(mode == GeneratedRemesh::Quad ? "Making it sculptable: Quad Remesh..." : "Making it sculptable: Voxel Remesh...");
+                if (remeshGenerated(scratch.mesh, mode, resolution, 1, m, g.remeshError, &g.stats, [progress](float f) {
+                        progress->percent = int(f * 100.0f);
+                        return !progress->cancel.load();
+                    }))
+                    g.remeshed = std::make_shared<Mesh>(std::move(m));
             }
         }
         promise->set_value(std::move(g));
@@ -3782,12 +3802,14 @@ void App::pollGenerator() {
     std::filesystem::remove(std::filesystem::path(std::u8string(r.outputPath.begin(), r.outputPath.end())), ec);
     const size_t raw = doc_.mesh.triangleCount();
     const auto mode = GeneratedRemesh(generatedRemesh_);
+    if (g.withoutBackdrop) doc_.replaceMeshUndoable(std::move(*g.withoutBackdrop), "Remove Flat Background");
     if (g.remeshed) doc_.replaceMeshUndoable(std::move(*g.remeshed), mode == GeneratedRemesh::Quad ? "Quad Remesh" : "Remesh");
     doc_.path.clear();
     const std::string remeshNote = g.remeshed ? ", " + generatedRemeshNote(g.stats, mode) : std::string();
     status_ = !g.remeshError.empty()
                   ? "Generated model imported (" + std::to_string(raw) + " tris, not remeshed: " + g.remeshError + ")" + note
                   : "Generated model imported (" + std::to_string(raw) + " tris" + remeshNote + ") - ready to sculpt" + note;
+    if (g.backdrop.planes) status_ += ". " + backdropRemovedNote(g.backdrop) + ", Undo brings it back";
     updateTitle();
 }
 
@@ -4084,6 +4106,11 @@ void App::drawImageTo3D() {
                           generatedQuadTarget(remeshResolution_));
             hint(quads);
         }
+        ImGui::Checkbox(tr("Remove flat background"), &removeBackground_);
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip(tr("Drops the flat plane a picture's background often becomes (a wall behind or ground under "
+                              "the subject) before the model lands. A relief or coin on its own is kept. Undo brings "
+                              "a removed plane back."));
     }
     ImGui::PopItemWidth();
     if (pendingGenerator_.valid()) {
@@ -4212,7 +4239,7 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, fl
     RayHit hit;
     if (!pick(x, y, hit)) return false; // one ray, as a press would cast
     // The world radius a dab here gets (App::firstDab / the brushes: Size times world size of a pixel).
-    const float radius = radiusPx * camera_.worldPerPixel(hit.position, canvasHeight());
+    const float radius = radiusPx * partCamera().worldPerPixel(hit.position, canvasHeight());
     if (!(radius > 0.0f) || !std::isfinite(radius)) return false;
     // A steady normal over the brush's area (32 rays), then the ring and the Falloff ring as true circles in
     // that plane (#88): no per-point pressing, so bumps can't bend or break the ring. Never a pass over the mesh.
@@ -4220,8 +4247,8 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, fl
     surfaceCursorCircle(hit.position, n, radius, 64, cursorRing_);
     surfaceCursorCircle(hit.position, n, radius * focalRingFraction(focal), 48, cursorInner_);
 
-    const glm::vec3 eye = camera_.position(), forward = camera_.forward();
-    const bool ortho = camera_.ortho;
+    const glm::vec3 eye = partCamera().position(), forward = partCamera().forward();
+    const bool ortho = partCamera().ortho;
     auto facing = [&](const glm::vec3& p, const glm::vec3& pn) {
         return glm::dot(pn, ortho ? -forward : eye - p) > 0.0f;
     };
@@ -4229,7 +4256,7 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, fl
         ImVec2 sp[64];
         const size_t count = std::min<size_t>(points.size(), 64);
         for (size_t i = 0; i < count; ++i)
-            if (!gizmoProject(points[i], sp[i])) return; // (behind the camera: a huge brush close up)
+            if (!partProject(points[i], sp[i])) return; // (behind the camera: a huge brush close up)
         dl->AddPolyline(sp, int(count), colour, ImDrawFlags_Closed, width);
     };
     auto fade = [](ImU32 colour, float k) {
@@ -4247,7 +4274,7 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, fl
         const glm::vec3 q = m.point(hit.position);
         if (glm::length(q - hit.position) < radius * 0.05f || !facing(q, m.dir(n))) continue;
         ImVec2 at;
-        if (!gizmoProject(q, at)) continue;
+        if (!partProject(q, at)) continue;
         ++symmetryCopiesDrawn_;
         dl->AddCircleFilled(at, 3.0f * uiScale_, IM_COL32(0, 0, 0, 110));
         dl->AddCircleFilled(at, 2.25f * uiScale_, fade(col, 0.8f));
@@ -4258,8 +4285,8 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, fl
     }
     // The surface's direction: a short line out of the centre (with a dot where the brush touches).
     ImVec2 c0, c1;
-    if (gizmoProject(hit.position, c0)) {
-        if (ring && gizmoProject(hit.position + n * (radius * 0.4f), c1)) dl->AddLine(c0, c1, fade(col, 0.85f), 1.5f);
+    if (partProject(hit.position, c0)) {
+        if (ring && partProject(hit.position + n * (radius * 0.4f), c1)) dl->AddLine(c0, c1, fade(col, 0.85f), 1.5f);
         dl->AddCircleFilled(c0, 2.0f * uiScale_, col);
     }
     return true;
@@ -4332,7 +4359,8 @@ void App::drawAxisGizmo() {
     // negative ends smaller rings (their letter under the pointer). Drawn back to front: the ends pointing away are
     // smaller and fainter, the near ones on top. A click on an end snaps to that side (axisGizmoMouseDown), a
     // second click to the opposite side; the end under the pointer gets a ring. On an exact side view its name
-    // shows under the disc.
+    // shows under the disc. With an orbit lock (View > Orbit lock), the axis the view turns about runs through the
+    // disc, and a lock with its letter sits at the disc's lower right.
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
     const float unit = axisGizmoUnit();
     auto ends = axisGizmoLayout();
@@ -4355,9 +4383,20 @@ void App::drawAxisGizmo() {
     dl->AddCircleFilled(centre, discR, withAlpha(tint, onDisc ? 0.17f : light ? 0.08f : 0.07f), 48);
     dl->AddCircle(centre, discR, withAlpha(tint, onDisc ? 0.22f : 0.10f), 48, 1.0f * uiScale_);
 
-    std::sort(ends.begin(), ends.end(), [](const AxisGizmoEnd& a, const AxisGizmoEnd& b) { return a.depth < b.depth; });
     static constexpr ImU32 colours[3] = {IM_COL32(236, 84, 92, 255), IM_COL32(124, 196, 64, 255), IM_COL32(64, 140, 236, 255)};
     static constexpr const char* names[3] = {"X", "Y", "Z"};
+    // The locked axis, end to end through the disc (as long as it looks from here: a dot when it points at you).
+    static constexpr int lockAxes[4] = {-1, 1, 0, 2}; // UiPrefs::orbitLock: free, Y, X, Z
+    const int lockAxis = lockAxes[std::clamp(forceTurntable_ ? 1 : uiPrefs_.orbitLock, 0, 3)];
+    if (lockAxis >= 0)
+        for (const AxisGizmoEnd& e : ends)
+            if (e.axis == lockAxis && !e.negative) {
+                const glm::vec2 d = (e.at - c) * ((discR - 3.0f * unit) / (kAxisGizmoLength * unit));
+                dl->AddLine(ImVec2(c.x - d.x, c.y - d.y), ImVec2(c.x + d.x, c.y + d.y), withAlpha(colours[lockAxis], 0.55f),
+                            1.5f * unit);
+            }
+
+    std::sort(ends.begin(), ends.end(), [](const AxisGizmoEnd& a, const AxisGizmoEnd& b) { return a.depth < b.depth; });
     ImFont* font = fontBold_ ? fontBold_ : ImGui::GetFont();
     // The letters shrink with the circles (Small) but never grow past the UI font.
     const float fontSize = ImGui::GetFontSize() * 0.92f * std::min(1.0f, unit / std::max(uiScale_, 0.01f));
@@ -4399,6 +4438,22 @@ void App::drawAxisGizmo() {
         const ImVec2 at(std::round(c.x - ts.x * 0.5f), std::round(c.y + discR + 4.0f * uiScale_));
         dl->AddText(ImGui::GetFont(), size, ImVec2(at.x + 1.0f, at.y + 1.0f), light ? IM_COL32(255, 255, 255, 110) : IM_COL32(0, 0, 0, 150), text);
         dl->AddText(ImGui::GetFont(), size, at, light ? IM_COL32(30, 30, 34, 230) : IM_COL32(232, 232, 236, 220), text);
+    }
+
+    // The orbit lock's badge: a lock and the axis letter in its colour, on a pill at the disc's lower right.
+    if (lockAxis >= 0) {
+        const float size = ImGui::GetFontSize() * 0.8f;
+        ImFont* f = ImGui::GetFont();
+        const ImVec2 iconSize = f->CalcTextSizeA(size, FLT_MAX, 0.0f, ICON_LC_LOCK);
+        const ImVec2 nameSize = font->CalcTextSizeA(size, FLT_MAX, 0.0f, names[lockAxis]);
+        const float gap = 2.0f * uiScale_, padX = 4.0f * uiScale_, padY = 1.0f * uiScale_;
+        const float w = iconSize.x + gap + nameSize.x + 2.0f * padX, h = std::max(iconSize.y, nameSize.y) + 2.0f * padY;
+        const ImVec2 a(std::round(c.x + discR * 0.62f), std::round(c.y + discR * 0.62f));
+        dl->AddRectFilled(a, ImVec2(a.x + w, a.y + h), light ? IM_COL32(255, 255, 255, 200) : IM_COL32(20, 20, 24, 190), h * 0.5f);
+        dl->AddRect(a, ImVec2(a.x + w, a.y + h), withAlpha(colours[lockAxis], 0.8f), h * 0.5f, 0, 1.0f * uiScale_);
+        dl->AddText(f, size, ImVec2(a.x + padX, a.y + padY), light ? IM_COL32(30, 30, 34, 230) : IM_COL32(232, 232, 236, 230),
+                    ICON_LC_LOCK);
+        dl->AddText(font, size, ImVec2(a.x + padX + iconSize.x + gap, a.y + padY), colours[lockAxis], names[lockAxis]);
     }
 }
 

@@ -603,7 +603,7 @@ int App::guideAt(float x, float y) const {
         for (size_t i = 0; i <= n; ++i) {
             if (i == n && !guide.closed) break;
             ImVec2 p;
-            if (!gizmoProject(guide.points[i % n], p)) {
+            if (!partProject(guide.points[i % n], p)) {
                 havePrev = false;
                 continue;
             }
@@ -712,7 +712,7 @@ void App::drawQRemeshGuides() {
     // Which points the model hides: a ray from the eye to each one (refreshed when the view or the guides change;
     // at most ~2000 rays a frame, the points between them follow their neighbours).
     {
-        const glm::mat4 vp = camera_.projection() * camera_.view();
+        const glm::mat4 vp = partCamera().projection() * partCamera().view();
         uint64_t key = 1469598103934665603ull;
         auto mix = [&](const void* data, size_t bytes) {
             const auto* b = static_cast<const unsigned char*>(data);
@@ -741,12 +741,12 @@ void App::drawQRemeshGuides() {
                 vis.assign(pts.size(), 1);
                 for (size_t i = 0; i < pts.size(); i += stride) {
                     ImVec2 sp;
-                    if (!gizmoProject(pts[i], sp)) {
+                    if (!partProject(pts[i], sp)) {
                         vis[i] = 0;
                         continue;
                     }
                     glm::vec3 origin, dir;
-                    canvasRay(sp.x, sp.y, origin, dir);
+                    partRay(sp.x, sp.y, origin, dir);
                     const float t = glm::dot(pts[i] - origin, dir) / std::max(glm::dot(dir, dir), 1e-20f);
                     RayHit hit;
                     vis[i] = !doc_.bvh.raycast(doc_.mesh, origin, dir, hit) || hit.t > t - eps / std::sqrt(glm::dot(dir, dir));
@@ -781,7 +781,7 @@ void App::drawQRemeshGuides() {
         bool whole = guide.closed;
         for (size_t i = 0; i < n; ++i) {
             ImVec2 p;
-            const bool on = gizmoProject(guide.points[i], p);
+            const bool on = partProject(guide.points[i], p);
             const bool vis = on && guideVisible_[g][i] != 0;
             if (!on || (!run.empty() && vis != runVis)) {
                 whole = false;
@@ -799,7 +799,7 @@ void App::drawQRemeshGuides() {
         }
         if (guide.closed && !whole && !run.empty() && n > 0) { // close the loop back to the first point
             ImVec2 p0;
-            if (gizmoProject(guide.points[0], p0)) run.push_back(p0);
+            if (partProject(guide.points[0], p0)) run.push_back(p0);
         }
         flush(whole);
     }
@@ -810,7 +810,7 @@ void App::drawQRemeshGuides() {
             std::vector<ImVec2> pts;
             for (const glm::vec3& q : guidePath_) {
                 ImVec2 a;
-                if (gizmoProject(q * m, a)) pts.push_back(a);
+                if (partProject(q * m, a)) pts.push_back(a);
             }
             if (drag_ == Drag::Guide && own) pts.push_back(ImVec2(mouseX_, mouseY_)); // up to the pointer (the lazy lag)
             guideLine(dl, pts, false, own ? IM_COL32(255, 230, 140, 255) : IM_COL32(255, 230, 140, 140), (own ? 2.5f : 1.5f) * s,

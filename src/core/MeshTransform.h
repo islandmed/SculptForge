@@ -45,6 +45,12 @@ struct MeshTransform {
     // The transform at weight `w` (0 = nothing, 1 = all of it) as p' = linear * p + offset.
     void at(float w, glm::mat3& linear, glm::vec3& offset) const;
     glm::vec3 apply(const glm::vec3& p) const; // full weight
+    glm::mat4 matrix() const;                  // full weight
+    // The same transform as seen in the space of a Part placed by `place` (Part::transform, a similarity): what it
+    // does to that Part's own mesh coordinates.
+    MeshTransform inSpaceOf(const glm::mat4& place) const;
+    // With one scale along every axis (the mean): a linked copy's transform stays a similarity.
+    MeshTransform evenScale() const;
 };
 
 // Rotation by Euler angles in degrees about axes[0], then axes[1], then axes[2] (the splat_rotate order).
@@ -114,8 +120,14 @@ public:
     static constexpr int kLevels = 4096;
 };
 
-// Transforms Part `index` of `doc` (active or not) as one undoable step on that Part; on the active Part it
-// records into the active sculpt layer (doc.activeLayer). Returns the number of vertices that moved.
+// True when a transform moves Part `index` as a whole, by its Part::transform: a linked copy (#94) or a Part
+// moved that way before, unless `useMask` and it has a mask (then the mask's part of its mesh moves).
+bool partMovesWhole(const Document& doc, int index, bool useMask);
+// "2,562 vertices" (the count grouped by thousands) for transform status lines.
+std::string vertexCountText(size_t n);
+// Transforms Part `index` of `doc` (active or not) as one undoable step on that Part (a linked copy as a whole
+// unless masked: partMovesWhole); on the active Part's mesh it records into the active sculpt layer
+// (doc.activeLayer). Returns the number of vertices that moved.
 size_t transformPart(Document& doc, int index, const MeshTransform& t, bool useMask, float falloff, Symmetry mirror,
                         const std::string& label);
 

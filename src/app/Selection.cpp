@@ -87,7 +87,7 @@ bool App::runSelection(const char* rectCommand, const char* lassoCommand, Args a
     if (c.w <= 0.0f || c.h <= 0.0f || selectPath_.empty()) return false;
     // Window pixels -> normalised device coordinates (y up).
     auto ndc = [&](ImVec2 p) { return glm::vec2((p.x - c.x) / c.w * 2.0f - 1.0f, 1.0f - (p.y - c.y) / c.h * 2.0f); };
-    args["view_proj"] = matrixString(camera_.projection() * camera_.view());
+    args["view_proj"] = matrixString(partCamera().projection() * partCamera().view());
     if (selectShape_ == SelectShape::Lasso) {
         std::vector<ImVec2> path = selectPath_;
         path.push_back(ImVec2(mouseX_, mouseY_));

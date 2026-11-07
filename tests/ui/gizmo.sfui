@@ -173,7 +173,7 @@ expect_value guide_open == 0
 click "Reset##gizmo.reset_pivot"
 type "Gizmo/##gizmo_rotate_z" 90
 click "Gizmo/Apply"
-expect_status Transformed
+expect_status Turned
 expect_value size_y > 5.9
 expect_value can_undo == 1
 shot numeric

@@ -20,6 +20,7 @@
 #include "core/HardwareProfile.h"
 #include "core/ImageTo3D.h"
 #include "core/Masking.h"
+#include "core/Backdrop.h"
 #include "core/CloseHoles.h"
 #include "core/Cut.h"
 #include "core/Multires.h"
@@ -465,14 +466,15 @@ CommandRegistry::CommandRegistry() {
          }});
 
     add({"export_glb",
-         "Export a game-ready binary glTF (.glb), one node and mesh per visible Part. Sculpt layers become "
+         "Export a game-ready binary glTF (.glb), one node and mesh per visible Part (linked copies: one mesh, a node "
+         "each). Sculpt layers become "
          "morph targets (blend shapes). UVs are kept and Part textures are embedded. A baked face take "
          "(face_take_bake) becomes an animation of the morph target weights.",
          {{"path", T::String, "Output .glb path (UTF-8).", true}},
          [](Document& doc, const Args& a) -> CommandResult {
              std::string path = argString(a, "path");
              std::string err;
-             const auto objects = visiblePartObjects(doc);
+             const auto objects = visiblePartObjects(doc, true); // (linked copies, #94: one mesh, placed each)
              if (objects.empty()) return {false, "Nothing visible to export"};
              MorphAnimation take;
              const bool animated = bakedFaceAnimation(doc, take);
@@ -482,7 +484,7 @@ CommandRegistry::CommandRegistry() {
 
     add({"export_usd",
          "Export OpenUSD (.usda text, or .usdz package for AR Quick Look / Vision Pro), one Mesh prim per visible "
-         "Part. Sculpt layers become "
+         "Part (linked copies: instanceable prims referencing the first). Sculpt layers become "
          "UsdSkel blend shapes with their current weights; loaded Gaussian splats are included as a "
          "ParticleField3DGaussianSplat prim. UVs are kept; a Part's texture becomes a UsdPreviewSurface texture "
          "(packed into .usdz, else a PNG beside the file). A baked face take (face_take_bake) becomes time samples "
@@ -493,7 +495,7 @@ CommandRegistry::CommandRegistry() {
              std::string path = argString(a, "path");
              std::string err;
              const SplatCloud* splats = argBool(a, "splats", true) && !doc.splats.empty() ? &doc.splats : nullptr;
-             const auto objects = visiblePartObjects(doc);
+             const auto objects = visiblePartObjects(doc, true); // (linked copies, #94: one mesh, placed each)
              MorphAnimation take;
              const bool animated = bakedFaceAnimation(doc, take);
              if (!saveUsd(path, objects, splats, doc.assetName(), err, animated ? &take : nullptr)) return {false, err};
@@ -729,6 +731,14 @@ CommandRegistry::CommandRegistry() {
              st.spacing = float(argNumber(a, "spacing", -1.0));
              st.seed = uint32_t(std::max(argNumber(a, "seed", 1.0), 0.0));
              if (!symmetryArg(a, doc.mesh, st.symmetry, err)) return {false, err};
+             if (const Part& part = doc.activePartInfo(); part.moved()) { // a moved linked copy (#94): into its space
+                 const glm::mat4 inv = glm::inverse(part.transform);
+                 const float scale = glm::length(glm::vec3(part.transform[0]));
+                 for (auto& p : st.points) p = glm::vec3(inv * glm::vec4(p, 1.0f));
+                 const glm::vec3 view = glm::mat3(inv) * st.view;
+                 if (glm::length(view) > 0.0f) st.view = glm::normalize(view);
+                 if (scale > 0.0f) st.radius /= scale;
+             }
 
              // Resolve the brush: a library recipe (exact name, then any case), then a built-in type.
              const std::string name = argString(a, "brush");
@@ -870,6 +880,7 @@ CommandRegistry::CommandRegistry() {
     registerMaskingCommands(*this);
     registerCutCommands(*this); // cut (core/Cut.h)
     registerCloseHolesCommands(*this); // close_holes (core/CloseHoles.h)
+    registerBackdropCommands(*this);   // remove_flat_background (core/Backdrop.h)
     registerFaceGroupCommands(*this);
     registerSelectionSetCommands(*this); // selection_set_* (core/SelectionSets.h)
     registerPartCommands(*this);

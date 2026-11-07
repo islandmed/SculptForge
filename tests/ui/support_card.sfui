@@ -22,7 +22,8 @@ expect_text Member
 expect_text $5
 expect_text $300
 expect_text Betas and early builds of the next version
-expect_text Up to 10 artists (+$25 / month each after), each with everything in Member
+expect_text A flat rate for the whole studio: any number of artists, each with everything in Member
+expect_no_text 10 artists
 expect_text Isolated: a private release channel, no outside connections
 expect_text Founding Studio: $150, first 10 studios
 expect_text or $48 a year
