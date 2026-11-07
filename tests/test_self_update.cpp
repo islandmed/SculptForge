@@ -307,6 +307,12 @@ TEST(self_update_detects_installs) {
     p.flatpakId = "org.sculptforge.SculptForge";
     in = detectInstall(p);
     CHECK(in.kind == InstallKind::PackageManager && in.manager == "Flatpak" && in.command.empty()); // (a file install)
+    p.exePath = "/app/extra/sculptforge/bin/sculptforge"; // FlatPark's package (the release tarball as extra data)
+    in = detectInstall(p);
+    CHECK(in.kind == InstallKind::PackageManager && in.manager == "FlatPark" &&
+          in.command == "flatpak update org.sculptforge.SculptForge");
+    p.exePath = "/app/bin/sculptforge"; // our .flatpak file
+    CHECK(detectInstall(p).command.empty());
     p.flatpakId.clear(), p.appImage.clear(), p.exePath = "/usr/bin/sculptforge";
     present = {"/usr/bin/pacman"};
     in = detectInstall(p);

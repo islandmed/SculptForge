@@ -99,9 +99,8 @@ runs on (a few hundred MB, shared with other Flatpak apps) from Flathub; both wa
 isn't set up. SculptForge itself is not on Flathub.
 
 - **Updating**: from FlatPark, new versions arrive with `flatpak update` (or your software center's updates),
-  usually within a day of each release. SculptForge's own new-version notice still says to download the file;
-  with FlatPark you can ignore that. Installed from the file, download the new `.flatpak` and install it the
-  same way. Your settings are kept either way.
+  usually within a day of each release, and SculptForge's new-version notice shows that command. Installed from
+  the file, download the new `.flatpak` and install it the same way. Your settings are kept either way.
 - **Uninstalling**: `flatpak uninstall org.sculptforge.SculptForge` (add `--delete-data` to remove its
   settings too).
 - **Files**: the sandbox can read and write your home folder, so projects, models and the textures beside them
@@ -265,7 +264,7 @@ in SculptForge's settings), and **Sign out** removes it. Without a keychain the 
 Installs that belong to a package manager are never replaced by the app: the Arch PKGBUILD (and the AUR and
 Omarchy packages once they are published) builds without the update check, a Homebrew install shows
 `brew upgrade --cask sculptforge`, and the Flatpak, `.deb` and `.rpm` files say to download the new file and open
-it (a Flatpak from FlatPark updates with `flatpak update`). The macOS app shows **Download** for now.
+it (a Flatpak from FlatPark shows `flatpak update`). The macOS app shows **Download** for now.
 
 To update by hand, download the new release and install it over the old one. Either way your settings, brushes
 and library are kept: they live in your user folders, not next to the program (see

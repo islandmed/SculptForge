@@ -197,7 +197,14 @@ Install detectInstall(const InstallProbe& probe) {
     if (probe.os == "linux") {
         if (!probe.flatpakId.empty() || exists("/.flatpak-info")) {
             in.kind = InstallKind::PackageManager;
-            in.manager = "Flatpak"; // installed from our .flatpak file: `flatpak update` doesn't reach it, a new file does
+            in.manager = "Flatpak";
+            // FlatPark's package runs the release tarball as extra data (/app/extra), so `flatpak update` brings new
+            // versions; our own .flatpak file builds into /app/bin and isn't reached by it: a new file is.
+            if (probe.exePath.rfind("/app/extra/", 0) == 0) {
+                in.manager = "FlatPark";
+                in.command = "flatpak update " + (probe.flatpakId.empty() ? std::string("org.sculptforge.SculptForge")
+                                                                          : probe.flatpakId);
+            }
             return in;
         }
         if (!probe.appImage.empty() && probe.appImage[0] == '/' && exists(probe.appImage)) {
