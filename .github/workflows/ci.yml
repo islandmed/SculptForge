@@ -342,6 +342,7 @@ jobs:
         run: python -m pip install "bpy==${{ matrix.bpy }}" numpy
       - name: Build sculptforge-cli
         run: |
+          ccache -z # (ccache -s below: this run's hits, not the restored cache's lifetime)
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF -DSCULPTFORGE_BUILD_APP=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build --target sculptforge-cli --parallel 4

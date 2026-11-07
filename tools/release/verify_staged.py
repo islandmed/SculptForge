@@ -3,13 +3,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Checks the packages a release is about to publish (release.yml, jobs verify and publish). Refuses on any mismatch.
 
-  verify_staged.py DIST SUMS --run ID --sha SHA [--staged] [--repo R] [--sums-only]
+  verify_staged.py DIST SUMS --run ID --sha SHA [--staged [--ref REF]] [--repo R] [--sums-only]
 
 1. Checksums: DIST holds exactly the files SUMS lists (SHA256SUMS.staged.txt, written by packages.yml's job sums in
    the run that built them), and each file's SHA-256, computed here, is the one listed.
 2. Provenance (skipped with --sums-only): each file has a GitHub artifact attestation (actions/attest-build-provenance
    in packages.yml), checked with `gh attestation verify`: signed by this repository's packages.yml, for exactly SHA,
-   in run ID; with --staged also from refs/heads/staging and a push (the merge queue's staging run).
+   in run ID; with --staged also from a push to REF (default refs/heads/staging; refs/heads/main when main's run built
+   it). SHA is the commit the run built: the tagged one, or one with the same build-input key (tools/release/staged_run.py).
 """
 import argparse
 import hashlib
@@ -58,17 +59,17 @@ def attested(certs, run, staged):
     return False
 
 
-def check_attestation(path, repo, run, sha, staged):
+def check_attestation(path, repo, run, sha, staged, ref="refs/heads/staging"):
     cmd = ["gh", "attestation", "verify", str(path), "--repo", repo, "--signer-workflow", f"{repo}/.github/workflows/packages.yml",
            "--source-digest", sha, "--format", "json"]
     if staged:
-        cmd += ["--source-ref", "refs/heads/staging"]
+        cmd += ["--source-ref", ref]
     p = subprocess.run(cmd, capture_output=True, text=True)
     if p.returncode != 0:
         return f"{path.name}: no valid attestation ({(p.stderr or p.stdout).strip().splitlines()[-1:] or ['gh failed']})"
     certs = [r["verificationResult"]["signature"]["certificate"] for r in json.loads(p.stdout)]
     if not attested(certs, run, staged):
-        return f"{path.name}: attested, but not by run {run}{' on a push to staging' if staged else ''}"
+        return f"{path.name}: attested, but not by run {run}{' on a push to ' + ref if staged else ''}"
     return None
 
 
@@ -118,12 +119,13 @@ def main():
     ap.add_argument("--sha", required=True)
     ap.add_argument("--repo", default="islandmed/SculptForge")
     ap.add_argument("--staged", action="store_true")
+    ap.add_argument("--ref", default="refs/heads/staging", choices=["refs/heads/staging", "refs/heads/main"])
     ap.add_argument("--sums-only", action="store_true")
     a = ap.parse_args()
     sums = read_sums(Path(a.sums).read_text(encoding="utf-8"))
     errs = ["no recorded checksums"] if not sums else check_sums(a.dist, sums)
     if not errs and not a.sums_only:
-        errs = [e for p in sorted(Path(a.dist).iterdir()) if (e := check_attestation(p, a.repo, a.run, a.sha, a.staged))]
+        errs = [e for p in sorted(Path(a.dist).iterdir()) if (e := check_attestation(p, a.repo, a.run, a.sha, a.staged, a.ref))]
     for e in errs:
         print(f"::error::{e}")
     if errs:

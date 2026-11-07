@@ -42,7 +42,7 @@ the gates, what each step does, and how to recover.
    commit. For the bump commit, step `ci` and release.yml reuse the CI result of the commit before it when the bump
    only added release paperwork (`tools/release/paperwork_only.py`: exact files and lines, fails safe). Step `check` has
    already run the bump's own tests (What's New, the guide, notes) on the bumped tree. Packages still has to pass for the
-   bump commit itself:
+   bump commit itself, or for one with the same build inputs (below):
    - **CI** (ci.yml) runs every test on Linux x86_64 and ARM64, macOS, Windows, the VFX platforms and Blender.
    - **Packages** (packages.yml) builds every release package the way it ships, with its tests.
 4. **Packaged-artifact smoke tests** (release.yml `smoke`): every package is installed or unpacked on a fresh runner.
@@ -68,10 +68,22 @@ packages and T1 go ahead, and only main's fast-forward waits for the lock (`SF_P
 If the promote pushed release paperwork to main meanwhile (site, feed, What's New: `tools/release/paperwork_only.py`),
 the batch lands as a merge on top of it; anything else on main stops as before. A dead holder's lock doesn't count.
 
-What makes a run promotable (tools/release/staged_run.py, used by release.sh steps ci and tag and by release.yml
-`locate`; refused otherwise, nothing is rebuilt silently):
-- packages.yml of this repository, triggered by a **push** to `staging` for exactly the tagged commit: never a
-  pull_request, a workflow_dispatch or a fork's run;
+**Build inputs, built once.** A commit's build-input key (tools/release/build_key.py) is a SHA-256 of `git ls-tree -r`
+over the files that go into the packages: every file except those tools/release/build_inputs.txt lists (the website but
+website/link/ and website/founding.json, release paperwork). Version files are inputs. Same key = every input file byte
+for byte the same, so the packages are the same build. packages.yml runs on every push to main and staging (no
+`paths:` filter: one skipped 0.11.14's staging push and the release rebuilt from the tag for a queue.html edit); its
+job `reuse` looks for an earlier green run with the same key (staged_run.py --before-run: only older runs, so two never
+wait for each other; one in progress is waited for) and then skips every build ("reuses run N" in the summary). The
+binaries carry the commit they were built from (proof mode's `SF_GIT_COMMIT`), which for a reused run is that run's
+commit: same inputs, another SHA.
+
+What makes a run promotable (tools/release/staged_run.py, used by release.sh steps ci and tag, release.yml
+`locate` and packages.yml `reuse`; refused otherwise, nothing is rebuilt silently):
+- packages.yml of this repository, triggered by a **push** to `staging` or `main` for the tagged commit, or for a
+  commit with the same build-input key, computed from git there (never read from the run; release.yml `locate`
+  checks it again and logs both): never a pull_request, a workflow_dispatch or a fork's run. The exact commit wins,
+  then the newest;
 - pushed and (re)run by islandmed (`actor` and `triggering_actor`);
 - concluded `success`, at most 7 days old (`SF_STAGED_MAX_DAYS`; artifacts are kept 14), every package artifact and
   `staged-sums` still there;
@@ -79,8 +91,8 @@ What makes a run promotable (tools/release/staged_run.py, used by release.sh ste
 
 Before anything is published (release.yml `verify`, tools/release/verify_staged.py): the downloaded files are exactly
 those packages.yml's job `sums` recorded, each with the recorded SHA-256, and each has a GitHub artifact attestation
-(actions/attest-build-provenance in every build job) that `gh attestation verify` accepts for packages.yml, this
-commit, that run and, promoted, `refs/heads/staging` and a push. `publish` re-checks the checksums of the files it
+(actions/attest-build-provenance in every build job) that `gh attestation verify` accepts for packages.yml, the
+commit that run built, that run and, promoted, its branch (`refs/heads/staging` or `refs/heads/main`) and a push. `publish` re-checks the checksums of the files it
 uploads. Any mismatch stops the release.
 
 Signing happens only at promotion: `UPDATE_SIGNING_KEY` is a secret of the environments `release` (job `publish`,
@@ -92,7 +104,7 @@ that run's Actions artifacts (14 days). In this public repository signed-in GitH
 artifacts, as they always could for main's Packages runs; the attestations (public, in Sigstore's log) carry only
 checksums and the commit.
 
-**--rebuild** (fallback): bump pushed to main, no staging run for that commit, so release.yml builds the packages from
+**--rebuild** (fallback): bump pushed to main, no main or staging run for that commit's build inputs, so release.yml builds the packages from
 the tag (about 40 minutes), attests and verifies them the same way, then smoke-tests and publishes.
 
 Compiler caches: release builds restore main's caches, and nothing run from a tag or a pull request ever saves one.

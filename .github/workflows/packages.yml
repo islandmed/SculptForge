@@ -1,13 +1,19 @@
 name: Packages
 
 # The release packages (.deb, AppImage, .tar.gz, Flatpak, .rpm and VFX Reference Platform tarballs, .dmg, Windows
-# installer and .zip), each built and tested exactly as a release ships them. It runs on every push to staging and main
-# that changes the app, so a tagged release promotes the staging run's packages of the commit it tags instead of
-# building them again (.github/workflows/release.yml); release.yml also calls it to build from the tag (--rebuild).
+# installer and .zip), each built and tested exactly as a release ships them. It runs on every push to staging and main,
+# so a tagged release promotes those packages instead of building them again (.github/workflows/release.yml);
+# release.yml also calls it to build from the tag (--rebuild).
+#
+# Build once: job reuse computes the push's build-input key (tools/release/build_key.py: a hash of every file that goes
+# into the packages, tools/release/build_inputs.txt) and, when an earlier green run of THIS workflow on a maintainer's
+# push to main or staging built the same key (tools/release/staged_run.py, the same rule the release uses), skips every
+# build and says which run it reuses. A website or release-paperwork change never builds again; there is no `paths:`
+# filter (it skipped staging's push of 0.11.14 and the release rebuilt from the tag).
 #
 # Integrity: the release promotes only artifacts of a successful run of THIS workflow triggered by a maintainer's push
-# to `staging` (scripts/merge-queue.sh staging) for exactly the tagged commit (tools/release/staged_run.py, in
-# release.yml and scripts/release.sh); main's push then reuses the staging run (job reuse). Every package gets a GitHub
+# to `staging` or `main` for the tagged commit or one with the same key (tools/release/staged_run.py, in release.yml and
+# scripts/release.sh; release.yml recomputes both keys from git). Every package gets a GitHub
 # artifact attestation (job permissions id-token/attestations: write, nothing else) and job sums records their SHA-256;
 # release.yml checks both before publishing (tools/release/verify_staged.py). Artifacts are kept 14 days.
 # Compiler caches are restored here but saved only by branch runs (pushes to main or staging, maintainers' own
@@ -19,16 +25,7 @@ name: Packages
 on:
   push:
     branches: [main, staging] # staging: the merge queue's batch, the release's packages (built once, promoted unchanged)
-    paths: # everything but the website (its phone page, website/link, is built into the app) and release paperwork
-      - '**'
-      - '!website/**'
-      - website/link/**
-      - '!.github/workflows/pages.yml'
-      - '!.github/workflows/download-stats.yml'
-      - '!packaging/arch/**'
-      - '!tools/publish/**'
-      - '!scripts/release.sh'
-      - '!docs/releasing.md'
+    # No paths: job reuse skips the builds when nothing that goes into the packages changed (tools/release/build_inputs.txt).
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -46,7 +43,10 @@ permissions:
 
 concurrency:
   group: packages-${{ inputs.ref || github.ref }}
-  cancel-in-progress: true # a newer push to main supersedes; a tag of the older commit then builds its own
+  # main never cancels a build in progress: with no paths: filter every push runs, and a website push (the queue page
+  # merges often) would cancel the build of the app change before it; the newer run waits, then reuses that build.
+  # (Waiting runs still replace each other: the newest push is the one checked.) A newer staging batch supersedes.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   REF: ${{ inputs.ref || github.sha }}
@@ -62,11 +62,12 @@ env:
 
 jobs:
   reuse:
-    # A batch that went through `staging` (scripts/merge-queue.sh staging) ran this workflow there on the push, for the
-    # same commit; main's push then reuses that run instead of building it all again, and the release promotes the
-    # staging run's packages (release.yml, job locate). In progress: wait for it. Failed, cancelled or none: build.
-    name: Reuse the staging run
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # The packages of an earlier green run on a maintainer's push to main or staging whose build inputs are byte for
+    # byte this commit's (tools/release/staged_run.py: the same SHA, or the same tools/release/build_key.py key): reused,
+    # not rebuilt, and the release promotes that run. Only runs older than this one count, so two runs never wait for
+    # each other; one in progress is waited for. Failed, cancelled, expired or none: build. Dispatches and tags build.
+    name: Reuse an earlier build of the same inputs
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     permissions:
@@ -75,23 +76,27 @@ jobs:
     outputs:
       run-id: ${{ steps.find.outputs.run-id }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        # trees only (the key hashes git objects, never file contents): earlier runs' commits are fetched the same way
+        with: { persist-credentials: false, filter: 'blob:none', sparse-checkout: tools/release }
       - id: find
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
+          RUN: ${{ github.run_id }}
         run: |
-          id=$(gh api "repos/$REPO/actions/workflows/packages.yml/runs?head_sha=$SHA&event=push&branch=staging&per_page=5" \
-               --jq '[.workflow_runs[] | select(.head_sha == "'"$SHA"'" and .head_branch == "staging"
-                     and .path == ".github/workflows/packages.yml" and .head_repository.full_name == "'"$REPO"'")][0].id // empty')
-          [ -n "$id" ] || { echo "No Packages run on staging for $SHA: building here"; exit 0; }
-          while [ "$(gh api "repos/$REPO/actions/runs/$id" --jq .status)" != completed ]; do sleep 30; done
-          conclusion=$(gh api "repos/$REPO/actions/runs/$id" --jq .conclusion)
-          if [ "$conclusion" = success ]; then
-            echo "::notice::$SHA's packages were built and tested on staging (run $id, https://github.com/$REPO/actions/runs/$id): reused, not rebuilt"
+          key=$(python3 tools/release/build_key.py "$SHA" | cut -d' ' -f1)
+          echo "Build-input key of $SHA: \`$key\`" >> "$GITHUB_STEP_SUMMARY"
+          rc=0
+          found=$(python3 tools/release/staged_run.py --repo "$REPO" --sha "$SHA" --before-run "$RUN" --wait --wait-minutes 45 --full) || rc=$?
+          if [ $rc = 0 ]; then
+            read -r id built ref <<<"$found"
+            echo "::notice::reuses run $id ($ref, $built): the same build inputs, built and tested there (https://github.com/$REPO/actions/runs/$id)"
+            echo "Reuses run [$id](https://github.com/$REPO/actions/runs/$id) ($ref, $built): nothing rebuilt." >> "$GITHUB_STEP_SUMMARY"
             echo "run-id=$id" >> "$GITHUB_OUTPUT"
           else
-            echo "Packages run $id on staging: $conclusion: building here"
+            echo "No earlier green build of these inputs (exit $rc, above): building here" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
 
   linux:
@@ -133,6 +138,7 @@ jobs:
           restore-keys: ccache-pkg-linux-${{ matrix.arch }}.
       - name: Build
         run: |
+          ccache -z # (ccache -s below: this run's hits, not the restored cache's lifetime)
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DSCULPTFORGE_MOLD=OFF
           cmake --build build --parallel 4
@@ -248,9 +254,9 @@ jobs:
       matrix:
         include:
           # CY2026: EL8 / glibc 2.28 also gives the .rpm for RHEL 8, 9, 10 and Fedora.
-          - { label: 'RPM + VFX CY2026', suffix: vfx2026, cy: CY2026, generators: 'RPM;TGZ', image: 'rockylinux:8', arch: x86_64, ccarch: x86_64, os: "${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}" }
+          - { label: 'RPM + VFX CY2026', suffix: vfx2026, cy: CY2026, generators: 'RPM;TGZ', image: 'rockylinux:8', arch: x86_64, ccarch: x86_64, ci: 'ccache-ci-CY2026.', os: "${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}" }
           - { label: 'RPM + VFX CY2026', suffix: vfx2026, cy: CY2026, generators: 'RPM;TGZ', image: 'rockylinux:8', arch: arm64, ccarch: aarch64, os: "${{ vars.SF_RUNNER_LINUX_ARM || 'ubuntu-24.04-arm' }}" }
-          - { label: 'VFX CY2027', suffix: vfx2027, cy: CY2027, generators: 'TGZ', image: 'rockylinux:9', arch: x86_64, ccarch: x86_64, os: "${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}" }
+          - { label: 'VFX CY2027', suffix: vfx2027, cy: CY2027, generators: 'TGZ', image: 'rockylinux:9', arch: x86_64, ccarch: x86_64, ci: 'ccache-ci-CY2027.', os: "${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}" }
           - { label: 'VFX CY2027', suffix: vfx2027, cy: CY2027, generators: 'TGZ', image: 'rockylinux:9', arch: arm64, ccarch: aarch64, os: "${{ vars.SF_RUNNER_LINUX_ARM || 'ubuntu-24.04-arm' }}" }
     steps:
       - run: dnf -y install git tar gzip zstd
@@ -281,10 +287,10 @@ jobs:
         with:
           path: .ccache
           key: ccache-pkg-${{ matrix.suffix }}-${{ matrix.arch }}.${{ github.sha }}
-          # CI's job for the same image and compiler (x86_64) shares most object files.
+          # CI's job for the same image and compiler (x86_64 only: CI builds no arm64 VFX image) shares most object files.
           restore-keys: |
             ccache-pkg-${{ matrix.suffix }}-${{ matrix.arch }}.
-            ccache-ci-${{ matrix.cy }}.
+            ${{ matrix.ci }}
       - name: Python 3.13 (python-build-standalone, pinned by hash)
         run: |
           case $(uname -m) in
@@ -299,6 +305,7 @@ jobs:
       - name: Build with GCC 14
         run: |
           source /opt/rh/gcc-toolset-14/enable
+          ccache -z
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DSCULPTFORGE_MOLD=OFF \
             -DSCULPTFORGE_BUILD_PYTHON=ON -DPython_EXECUTABLE="$PYTHON313" -DSCULPTFORGE_PYTHON_INSTALL_DIR=lib/sculptforge/python
@@ -361,6 +368,7 @@ jobs:
           restore-keys: ccache-pkg-macos.
       - name: Build
         run: |
+          ccache -z
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
             -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
@@ -443,6 +451,7 @@ jobs:
             ccache-ci-windows.
       - name: Build (Visual Studio generator; ccache as cl.exe, one compiler per file)
         run: |
+          ccache -z
           cmake -S . -B build -DSCULPTFORGE_USE_SYSTEM_SDL=OFF `
             -DCMAKE_VS_GLOBALS="CLToolExe=cl.exe;CLToolPath=${{ env.SF_CCACHE_CL }};TrackFileAccess=false;UseMultiToolTask=true;EnforceProcessCountAcrossBuilds=true"
           cmake --build build --config Release --parallel 4
@@ -479,7 +488,7 @@ jobs:
   sums:
     name: Record checksums
     needs: [linux, flatpak, vfx, macos, windows]
-    # Explicit: job reuse is skipped outside a push to main, and a skipped ancestor would skip this job too.
+    # Explicit: job reuse is skipped outside a push to main or staging, and a skipped ancestor would skip this job too.
     if: ${{ !cancelled() && needs.linux.result == 'success' && needs.flatpak.result == 'success' && needs.vfx.result == 'success' && needs.macos.result == 'success' && needs.windows.result == 'success' }}
     runs-on: ubuntu-24.04
     steps:

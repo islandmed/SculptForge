@@ -1,0 +1,17 @@
+# Build inputs: the files that go into the release packages (tools/release/build_key.py, docs/releasing.md "Build once").
+# Every file of a commit is a build input unless a line below matches its path (extended regexes, one per line, '#' lines
+# ignored); a line starting with '!' makes a matching path an input again (the last matching line decides). Two commits
+# whose inputs are byte for byte the same build the same packages, so packages.yml and tools/release/staged_run.py reuse
+# one green run for both. When in doubt, leave a file an input: a needless build costs minutes, a missed input ships
+# a package that wasn't built from what it claims. Version files (CMakeLists.txt and the rest) are inputs: the version
+# is baked in.
+# The website and the release's own paperwork (built from main, never compiled into the app):
+^website/
+^\.github/workflows/(pages|download-stats)\.yml$
+^packaging/arch/
+^tools/publish/
+^scripts/release\.sh$
+^docs/releasing\.md$
+# ...except what the app compiles in (CMakeLists.txt: the phone page, Help > About's Founding Members; tools/ci/site_lane.txt):
+!^website/link/
+!^website/founding\.json$
