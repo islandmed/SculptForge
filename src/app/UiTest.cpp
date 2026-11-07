@@ -155,7 +155,7 @@
 //                            time_limit_scale (timeLimit()'s factor: 4 on CI or in a parallel ctest, else 1),
 //                            voxel_remesh_running, quick_remesh / remesh_after_stroke (Tool > Remesh, #121), stroke_stretched,
 //                            qremesh_guides (guide curves on the active Part), qremesh_guide_loops (closed ones),
-//                            guides_mode (1 while the QRemesh Guides brush is picked),
+//                            guides_mode (1 while the QRemesh Guides brush is picked), insert_brush (1 while the Insert brush is),
 //                            quads (quad pairs in the active Part), quad_percent (quads among its polygons)
 //                            mask_shape (0 MaskPen, 1 MaskLasso, 2 MaskRect), hide_shape (1 SelectLasso, 2 SelectRect)
 //                            sdiv (the current subdivision level, 1 = base; 0 without levels), sdiv_levels (0 = none)
@@ -626,6 +626,7 @@ double Demo::query(const std::string& name, bool& known) const {
         return double(n);
     }
     if (name == "guides_mode") return app_.guidesMode_ ? 1.0 : 0.0;
+    if (name == "insert_brush") return app_.insertBrush_.on ? 1.0 : 0.0;
     if (name == "forgespheres") return double(m.forgespheres.size());
     if (name == "forgesphere_preview") return m.forgespherePreview ? 1.0 : 0.0;
     if (name == "forgesphere_selected") return double(app_.forgesphereSelection());

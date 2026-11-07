@@ -198,6 +198,7 @@ void App::syncShelfBrushActions() {
                     doc_.activeBrush = i;
                     paintMode_ = false;
                     guidesMode_ = false;
+                    endInsertBrush();
                     maskBrush_.on = false;
                 }
         };

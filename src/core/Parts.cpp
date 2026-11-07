@@ -415,7 +415,8 @@ bool normalizedPiece(const Mesh& source, float size, Mesh& out) {
 
 // Places `prim` (built around the origin, its axis +Y) where insert_primitive / insert_mesh say: on the surface
 // point, +Y along the normal, turned by twist, with mirrored copies for symmetry; merged into the active
-// Part as one new face group, one undo step.
+// Part as one new face group, or (new_part=true, the Insert brush's option) a new Part of its own beside the
+// active one, which stays active. One undo step either way.
 CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::string& label) {
     std::vector<SymCopy> mirrors;
     std::string error;
@@ -466,13 +467,40 @@ CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::st
     for (const SymCopy& m : mirrors)
         for (int i = 0; i < 3; ++i)
             for (int j = 0; j < 3; ++j) radial = radial || (i != j && m.m[i][j] != 0.0f);
+    const size_t tris = prim.triangleCount() * (1 + copies.size());
+    const std::string what =
+        copies.empty() ? "a " + label : std::to_string(copies.size() + 1) + " " + label + (radial ? "s (radial)" : "s (mirrored)");
+    if (argBool(a, "new_part", false)) {
+        // Its own Part, right below the active one (in its folder), the copies with it; the undo step takes it out.
+        std::vector<const Mesh*> pieces{&prim};
+        for (const Mesh& c2 : copies) pieces.push_back(&c2);
+        Mesh piece = mergeMeshes(pieces);
+        piece.facegroups.assign(piece.triangles.size(), 0u);
+        std::string name = label;
+        if (!name.empty()) name[0] = char(std::toupper(static_cast<unsigned char>(name[0])));
+        const uint32_t folder = doc.activePartInfo().folder;
+        const int i = doc.addPart(std::move(piece), name, false, doc.activePart + 1);
+        doc.parts[size_t(i)].folder = folder;
+        UndoRecord r;
+        r.label = "Insert " + label;
+        r.part = std::make_shared<PartStep>();
+        r.part->id = doc.parts[size_t(i)].id;
+        r.part->at = i;
+        doc.undo.push(std::move(r));
+        return {true, "Inserted " + what + " as Part " + doc.parts[size_t(i)].name + " (" + std::to_string(tris) + " triangles)"};
+    }
     std::vector<const Mesh*> parts{&doc.mesh, &prim};
     for (const Mesh& c2 : copies) parts.push_back(&c2);
+    const size_t had = doc.mesh.vertexCount();
     Mesh merged = mergeMeshes(parts);
-    const size_t tris = prim.triangleCount() * (1 + copies.size());
+    const bool maskRest = argBool(a, "mask_rest", false);
+    if (maskRest) { // the Part as it was masked, the new piece free: ready to sculpt it in (@foirgairwolf)
+        merged.mask.assign(merged.vertexCount(), 0.0f);
+        std::fill(merged.mask.begin(), merged.mask.begin() + std::ptrdiff_t(had), 1.0f);
+    }
     doc.replaceMeshUndoable(std::move(merged), "Insert " + label);
-    return {true, "Inserted " + (copies.empty() ? "a " + label : std::to_string(copies.size() + 1) + " " + label + (radial ? "s (radial)" : "s (mirrored)")) +
-                      " (" + std::to_string(tris) + " triangles, face group " + std::to_string(group + 1) + ")"};
+    return {true, "Inserted " + what + " (" + std::to_string(tris) + " triangles, face group " + std::to_string(group + 1) + ")" +
+                      (maskRest ? ", the rest masked" : "")};
 }
 
 } // namespace
@@ -594,7 +622,9 @@ void registerPartCommands(CommandRegistry& reg) {
         {"nx", T::Number, "surface normal x", false}, {"ny", T::Number, "surface normal y", false}, {"nz", T::Number, "surface normal z", false},
         {"size", T::Number, "size in scene units (default 0.2)", false},
         {"twist", T::Number, "turn about the normal in degrees (default 0)", false},
-        {"symmetry", T::String, "mirror axes, e.g. \"x\" or \"xz\": a mirrored copy across each plane (#43; default none)", false}};
+        {"symmetry", T::String, "mirror axes, e.g. \"x\" or \"xz\": a mirrored copy across each plane (#43; default none)", false},
+        {"new_part", T::Bool, "true: a new Part of its own (with its mirrored copies) beside the active one, instead of joining it", false},
+        {"mask_rest", T::Bool, "joining the active Part: mask everything that was there, so only the new piece takes brushes (one undo step)", false}};
     std::vector<ParamSpec> primitiveParams{{"type", T::String, "sphere, cube, cylinder, cone, torus, capsule or quadsphere", false}};
     primitiveParams.insert(primitiveParams.end(), placeParams.begin(), placeParams.end());
     reg.add({"insert_primitive",
@@ -602,7 +632,7 @@ void registerPartCommands(CommandRegistry& reg) {
              "normal, its centre on the surface, as one new face group; one undoable step.",
              primitiveParams,
              [](Document& doc, const Args& a) -> CommandResult {
-                 const std::string blocked = dyntopoBlocker(doc.mesh);
+                 const std::string blocked = argBool(a, "new_part", false) ? std::string() : dyntopoBlocker(doc.mesh);
                  if (!blocked.empty()) return {false, "Can't insert: " + blocked};
                  const std::string type = argString(a, "type", "sphere");
                  const float size = float(std::max(argNumber(a, "size", 0.2), 1e-4));
@@ -630,7 +660,7 @@ void registerPartCommands(CommandRegistry& reg) {
              "along the surface normal, as one new face group; one undoable step.",
              meshParams,
              [](Document& doc, const Args& a) -> CommandResult {
-                 const std::string blocked = dyntopoBlocker(doc.mesh);
+                 const std::string blocked = argBool(a, "new_part", false) ? std::string() : dyntopoBlocker(doc.mesh);
                  if (!blocked.empty()) return {false, "Can't insert: " + blocked};
                  if (int(a.contains("part")) + int(a.contains("file")) + int(a.contains("set")) != 1)
                      return {false, "Give part=, file= or set="};

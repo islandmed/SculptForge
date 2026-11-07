@@ -1,10 +1,10 @@
-# Content pass: the brush lists are A-Z by default with a Sort menu (A-Z, Recent, Pack), the six built-in brush
+# Content pass: the brush lists are A-Z by default with a Sort menu (A-Z, Recent, Pack), the seven built-in brush
 # packs load, and a pack brush picked the first time brings its own alpha (Rivet Row: Rivets, turned along the
 # stroke; Soft Clay: none).
 run ui_look look=classic layout=classic
 run new_sphere subdivisions=6
 key f
-expect_value builtin_pack_brushes == 60
+expect_value builtin_pack_brushes == 70
 expect_value brush_sort == 0
 expect_value alpha_index == 0
 
@@ -43,6 +43,7 @@ expect_text Organic & Skin
 expect_text Cloth & Folds
 expect_text Damage & Wear
 expect_text Ornament
+expect_text Forge Stamps
 wait_idle 180
 shot brush_palette_packs
 

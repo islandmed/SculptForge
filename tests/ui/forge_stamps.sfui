@@ -1,0 +1,50 @@
+# Forge Stamps (@foirgairwolf): the seventh brush pack, ten stamps of our own generated forms (core/BrushAlpha.cpp),
+# each one shaped form per click, pressed in or raised; each brings its own alpha the first time it is picked.
+run new_sphere subdivisions=6
+key f
+expect_value builtin_pack_brushes == 70
+brush_size 34
+
+run brush_use name="Nostril Press"
+wait 0.2
+snapshot
+stroke 0.40 0.36 0.401 0.36
+expect_value moved > 20
+run brush_use name="Ear Whorl Press"
+wait 0.2
+stroke 0.46 0.36 0.461 0.36
+run brush_use name="Scale Plate Stamp"
+wait 0.2
+stroke 0.52 0.36 0.521 0.36
+run brush_use name="Rivet Head Stamp"
+wait 0.2
+stroke 0.58 0.36 0.581 0.36
+run brush_use name="Hatch Seam Cut"
+wait 0.2
+stroke 0.40 0.50 0.401 0.50
+run brush_use name="Louvre Cut"
+wait 0.2
+stroke 0.46 0.50 0.461 0.50
+run brush_use name="Cross Screw Stamp"
+wait 0.2
+stroke 0.52 0.50 0.521 0.50
+run brush_use name="Suction Cup Stamp"
+wait 0.2
+stroke 0.58 0.50 0.581 0.50
+run brush_use name="Gill Slit Cut"
+wait 0.2
+stroke 0.46 0.64 0.461 0.64
+run brush_use name="Socket Press"
+wait 0.2
+stroke 0.54 0.64 0.541 0.64
+expect_value moved > 400
+wait_idle
+shot forge_stamps
+
+# A drag lays a row: Rivet Head Stamp's wide spacing leaves separate rivets along the stroke.
+key ctrl+z
+run brush_use name="Rivet Head Stamp"
+wait 0.2
+stroke 0.36 0.74 0.64 0.74
+wait_idle
+shot forge_stamps_row

@@ -307,3 +307,115 @@ TEST(insert_builtin_creature_bones) {
     CHECK(!listInsertSet(std::string(kBuiltinInsertSetPrefix) + "nothing", items, err));
     setVar(old);
 }
+
+// The Insert brush (@foirgairwolf): new_part=true makes each insert a Part of its own beside the active one, which
+// stays active; placed and oriented as a merged insert, its mirrored copies in the same Part, one undo step.
+TEST(insert_new_part_placement_orientation_undo) {
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 3.0}}).ok);
+    const size_t before = doc.mesh.triangleCount();
+    const uint32_t sculptId = doc.activePartInfo().id;
+    const AABB prim = makeCylinder(24, 0.4f).bounds(); // its axis is +Y
+    // On the side facing -Z: the cylinder's axis turns onto the normal, its centre on the surface point.
+    const Args at = {{"type", std::string("cylinder")}, {"x", 0.0}, {"y", 0.0}, {"z", -1.0},
+                     {"nx", 0.0}, {"ny", 0.0}, {"nz", -1.0}, {"size", 0.4}, {"new_part", true}};
+    const CommandResult r = reg.execute(doc, "insert_primitive", at);
+    CHECK(r.ok && r.message.find("as Part Cylinder") != std::string::npos);
+    CHECK(doc.partCount() == 2);
+    CHECK(doc.activePartInfo().id == sculptId && doc.activePart == 0); // still sculpting the model
+    CHECK(doc.mesh.triangleCount() == before);                         // the model is as it was
+    CHECK(doc.parts[1].name == "Cylinder");
+    const Mesh& piece = doc.partMesh(1);
+    CHECK(piece.triangleCount() == makeCylinder(24, 0.4f).triangleCount());
+    const AABB box = piece.bounds();
+    const glm::vec3 c = box.center(), e = box.extent(), pe = prim.extent();
+    CHECK(glm::length(c - glm::vec3(0.0f, 0.0f, -1.0f)) < 1e-3f);
+    CHECK(std::abs(e.z - pe.y) < 1e-3f);                                       // its length along the normal
+    CHECK(std::abs(e.x - pe.x) < 1e-3f && std::abs(e.y - pe.z) < 1e-3f);       // its round sides across it
+    // One undo step takes the Part out; redo puts it back where it was.
+    CHECK(reg.execute(doc, "undo", {}).ok);
+    CHECK(doc.partCount() == 1 && doc.mesh.triangleCount() == before);
+    CHECK(reg.execute(doc, "redo", {}).ok);
+    CHECK(doc.partCount() == 2 && doc.parts[1].name == "Cylinder" && doc.activePart == 0);
+    CHECK(reg.execute(doc, "undo", {}).ok);
+
+    // Mirrored with X symmetry: both copies in the one new Part, one step; the model untouched.
+    Args mirrored = {{"type", std::string("cone")}, {"x", 1.0}, {"y", 0.0}, {"z", 0.0}, {"nx", 1.0}, {"ny", 0.0},
+                     {"nz", 0.0}, {"size", 0.3}, {"twist", 30.0}, {"symmetry", std::string("x")}, {"new_part", true}};
+    CHECK(reg.execute(doc, "insert_primitive", mirrored).ok);
+    CHECK(doc.partCount() == 2 && doc.mesh.triangleCount() == before);
+    const Mesh& pair = doc.partMesh(1);
+    CHECK(pair.triangleCount() == 2 * makeCone(24, 0.3f).triangleCount());
+    CHECK(pair.bounds().min.x < -1.1f && pair.bounds().max.x > 1.1f);
+    CHECK(std::abs(pair.bounds().min.x + pair.bounds().max.x) < 1e-3f);
+    CHECK(reg.execute(doc, "undo", {}).ok);
+    CHECK(doc.partCount() == 1);
+
+    // Two in a row: two Parts, uniquely named, each its own undo step; the new Part stays in the model's folder.
+    CHECK(reg.execute(doc, "part_folder_new", {{"folder", std::string("Body")}}).ok);
+    const uint32_t folder = doc.activePartInfo().folder;
+    Args sphere = {{"type", std::string("sphere")}, {"x", 0.0}, {"y", 1.0}, {"z", 0.0}, {"size", 0.2}, {"new_part", true}};
+    CHECK(reg.execute(doc, "insert_primitive", sphere).ok);
+    CHECK(reg.execute(doc, "insert_primitive", sphere).ok);
+    CHECK(doc.partCount() == 3 && doc.findPart("Sphere") >= 0 && doc.findPart("Sphere 2") >= 0);
+    CHECK(doc.parts[1].folder == folder && doc.parts[2].folder == folder);
+    CHECK(reg.execute(doc, "undo", {}).ok);
+    CHECK(doc.partCount() == 2);
+    CHECK(reg.execute(doc, "undo", {}).ok);
+    CHECK(doc.partCount() == 1 && doc.mesh.triangleCount() == before);
+
+    // Without new_part it joins the active Part as before (the brush's New Part off).
+    sphere["new_part"] = false;
+    CHECK(reg.execute(doc, "insert_primitive", sphere).ok);
+    CHECK(doc.partCount() == 1 && doc.mesh.triangleCount() > before);
+    CHECK(reg.execute(doc, "undo", {}).ok);
+    CHECK(doc.mesh.triangleCount() == before);
+}
+
+TEST(insert_mesh_new_part) {
+    // insert_mesh takes new_part too: a copy of another Part, named after it, normalised to `size`.
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 3.0}}).ok);
+    CHECK(reg.execute(doc, "part_append", {{"type", std::string("cube")}, {"name", std::string("Stud")}}).ok);
+    CHECK(reg.execute(doc, "part_select", {{"index", 0.0}}).ok);
+    const size_t before = doc.mesh.triangleCount();
+    CHECK(reg.execute(doc, "insert_mesh", {{"part", std::string("Stud")}, {"x", 0.0}, {"y", 1.0}, {"z", 0.0},
+                                           {"size", 0.25}, {"new_part", true}}).ok);
+    CHECK(doc.partCount() == 3 && doc.activePart == 0 && doc.mesh.triangleCount() == before);
+    const int i = doc.findPart("Stud 2");
+    CHECK(i == 1); // right below the active Part
+    const glm::vec3 e = doc.partMesh(i).bounds().extent();
+    CHECK(std::abs(std::max({e.x, e.y, e.z}) - 0.25f) < 1e-3f);
+    CHECK(glm::length(doc.partMesh(i).bounds().center() - glm::vec3(0, 1, 0)) < 1e-3f);
+    CHECK(reg.execute(doc, "undo", {}).ok);
+    CHECK(doc.partCount() == 2 && doc.findPart("Stud 2") < 0);
+}
+
+TEST(insert_mask_rest) {
+    // @foirgairwolf: inserting into the same Part with mask_rest=true masks everything that was there and leaves the
+    // new piece free, ready to sculpt it in; one undo step brings back the mesh and its mask as they were.
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 3.0}}).ok);
+    const size_t verts = doc.mesh.vertexCount();
+    CHECK(!doc.mesh.hasMask());
+    const CommandResult r = reg.execute(doc, "insert_mesh", {{"set", std::string("builtin:creature-bones")}, {"index", 6.0},
+                                                             {"x", 1.0}, {"y", 0.0}, {"z", 0.0}, {"nx", 1.0}, {"ny", 0.0},
+                                                             {"nz", 0.0}, {"size", 0.4}, {"mask_rest", true}});
+    CHECK(r.ok && r.message.find("the rest masked") != std::string::npos);
+    CHECK(doc.partCount() == 1 && doc.mesh.vertexCount() > verts && doc.mesh.hasMask());
+    bool restMasked = true, pieceFree = true;
+    for (size_t v = 0; v < doc.mesh.vertexCount(); ++v) {
+        if (v < verts) restMasked = restMasked && doc.mesh.mask[v] == 1.0f;
+        else pieceFree = pieceFree && doc.mesh.mask[v] == 0.0f;
+    }
+    CHECK(restMasked && pieceFree);
+    CHECK(reg.execute(doc, "undo", {}).ok);
+    CHECK(doc.mesh.vertexCount() == verts && !doc.mesh.hasMask());
+    // Ignored for a new Part (nothing of the model changes).
+    CHECK(reg.execute(doc, "insert_primitive", {{"type", std::string("cube")}, {"x", 0.0}, {"y", 1.0}, {"z", 0.0},
+                                                {"new_part", true}, {"mask_rest", true}}).ok);
+    CHECK(doc.partCount() == 2 && !doc.mesh.hasMask());
+}

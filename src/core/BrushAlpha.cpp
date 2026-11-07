@@ -358,6 +358,115 @@ const Generated kGenerated[] = {
              return std::clamp(facet * 1.6f, 0.0f, 1.0f) * roundEdge(u, v);
          });
      }},
+    // The Forge Stamps pack's shapes (@foirgairwolf): one form each, stamped once (or in a row along a stroke).
+    {"Nostril", "A nostril: a curved, flared pit, deepest at its inner lobe (press it in with Sub).",
+     [] {
+         return generate("Nostril", [](float u, float v) {
+             const float x = u + 0.2f * v * v - 0.04f, y = v + 0.04f; // the outer side curls round
+             const float bowl = 1.0f - smooth01(std::hypot(x / 0.66f, y / 0.44f));
+             const float lobe = 1.0f - smooth01(std::hypot((u - 0.16f) / 0.3f, (v + 0.02f) / 0.22f));
+             return std::clamp(0.6f * bowl + 0.55f * lobe * bowl, 0.0f, 1.0f);
+         });
+     }},
+    {"Ear Whorl", "An ear's whorl: a C-shaped fold round a deep bowl, open at the front (press it in with Sub).",
+     [] {
+         return generate("Ear Whorl", [](float u, float v) {
+             const float r = std::hypot(u, v * 0.85f), a = std::atan2(v, u);
+             const float open = smooth01((kPi - std::abs(a) - 0.45f) / 0.55f); // the gap faces -X
+             const float fold = (1.0f - smooth01(std::abs(r - 0.68f) / 0.13f)) * open;
+             const float bowl = 1.0f - smooth01(std::hypot((u - 0.06f) / 0.44f, (v + 0.08f) / 0.38f));
+             return std::max(0.7f * fold, 0.95f * bowl * (0.75f + 0.25f * bowl));
+         });
+     }},
+    {"Scale Plate", "One pointed scale with a soft keel, for rows of large scales along a stroke.",
+     [] {
+         return generate("Scale Plate", [](float u, float v) {
+             if (v < -0.9f || v > 0.75f) return 0.0f;
+             const float t = (v + 0.9f) / 1.65f; // 0 at the tip, 1 at the root
+             const float half = 0.66f * std::sqrt(std::max(0.0f, t * (1.15f - t)));
+             if (half <= 1e-4f || std::abs(u) >= half) return 0.0f;
+             const float across = std::abs(u) / half;
+             const float dome = std::sqrt(std::max(0.0f, 1.0f - across * across)) * (0.55f + 0.45f * t);
+             return std::clamp(dome + 0.15f * (1.0f - across) * (1.0f - t), 0.0f, 1.0f) * (1.0f - smooth01((t - 0.9f) / 0.1f));
+         });
+     }},
+    {"Rivet Head", "One domed rivet head on a thin flange (stamp it, or space the dabs for a row).",
+     [] {
+         return generate("Rivet Head", [](float u, float v) {
+             const float r = std::hypot(u, v);
+             const float flange = 0.24f * (1.0f - smooth01((r - 0.8f) / 0.08f));
+             const float d = r / 0.56f;
+             const float dome = d < 1.0f ? 0.24f + 0.76f * std::sqrt(1.0f - d * d) : 0.0f;
+             return std::max(flange, dome);
+         });
+     }},
+    {"Hatch Seam", "A rounded panel's seam with a screw hole in each corner, for hatches and access plates.",
+     [] {
+         return generate("Hatch Seam", [](float u, float v) {
+             const float qx = std::abs(u) - 0.72f + 0.18f, qy = std::abs(v) - 0.52f + 0.18f;
+             const float box = std::hypot(std::max(qx, 0.0f), std::max(qy, 0.0f)) + std::min(std::max(qx, qy), 0.0f) - 0.18f;
+             const float seam = 1.0f - smooth01(std::abs(box) / 0.06f);
+             const float hole = 1.0f - smooth01(std::hypot(std::abs(u) - 0.55f, std::abs(v) - 0.35f) / 0.075f);
+             return std::max(seam, hole);
+         });
+     }},
+    {"Louvre", "Four angled vent slats, deep at the top edge and shallow at the bottom (press it in with Sub).",
+     [] {
+         return generate("Louvre", [](float u, float v) {
+             float best = 0.0f;
+             for (int i = 0; i < 4; ++i) {
+                 const float y = -0.6f + 0.4f * float(i);
+                 const float d = segmentDistance(u, v, -0.64f, y, 0.64f, y);
+                 const float slat = 1.0f - smooth01((d - 0.07f) / 0.05f);
+                 best = std::max(best, slat * (0.6f + 0.4f * std::clamp((v - y) / 0.12f, -1.0f, 1.0f)));
+             }
+             return best;
+         });
+     }},
+    {"Cross Screw", "A round screw head with a cross slot, for props and machines (stamp it).",
+     [] {
+         return generate("Cross Screw", [](float u, float v) {
+             const float r = std::hypot(u, v) / 0.8f;
+             if (r >= 1.0f) return 0.0f;
+             const float head = 0.25f + 0.75f * std::sqrt(1.0f - r * r);
+             const float bar = std::min(std::max(std::abs(u) / 0.08f, std::abs(v) / 0.5f), std::max(std::abs(v) / 0.08f, std::abs(u) / 0.5f));
+             const float slot = 1.0f - smooth01((bar - 0.8f) / 0.2f);
+             return std::clamp(head - 0.6f * slot, 0.0f, 1.0f) * (1.0f - smooth01((r - 0.94f) / 0.06f));
+         });
+     }},
+    {"Suction Cup", "A raised cup with a hollow in its middle and a soft rim, for tentacles (space the dabs).",
+     [] {
+         return generate("Suction Cup", [](float u, float v) {
+             const float r = std::hypot(u, v);
+             const float mound = 1.0f - smooth01((r - 0.5f) / 0.4f);
+             const float hollow = 1.0f - smooth01(r / 0.36f);
+             const float rim = 1.0f - smooth01(std::abs(r - 0.48f) / 0.12f);
+             return std::clamp(0.75f * mound - 0.6f * hollow + 0.25f * rim, 0.0f, 1.0f);
+         });
+     }},
+    {"Gill Slits", "Three curved slits that taper at their ends, for fish, sharks and creatures (press them in with Sub).",
+     [] {
+         return generate("Gill Slits", [](float u, float v) {
+             float best = 0.0f;
+             const float along = std::abs(v) / 0.74f;
+             if (along >= 1.0f) return 0.0f;
+             const float w = 0.075f * (1.0f - along * along) + 0.01f;
+             for (int i = -1; i <= 1; ++i) {
+                 const float x = 0.42f * float(i) + 0.16f * (v * v - 0.3f);
+                 best = std::max(best, 1.0f - smooth01(std::abs(u - x) / w));
+             }
+             return best;
+         });
+     }},
+    {"Socket", "A round hole with a countersunk rim, for screw holes, ports and sockets (press it in with Sub).",
+     [] {
+         return generate("Socket", [](float u, float v) {
+             const float r = std::hypot(u, v);
+             if (r < 0.3f) return 1.0f - 0.08f * smooth01(r / 0.3f);
+             if (r < 0.7f) return 0.92f - 0.67f * (r - 0.3f) / 0.4f;
+             return 0.25f * (1.0f - smooth01((r - 0.7f) / 0.15f));
+         });
+     }},
 };
 
 } // namespace

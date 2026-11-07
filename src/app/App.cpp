@@ -2078,6 +2078,8 @@ void App::onMouseUp() {
                   // the drag's direction on screen turns it about the normal
                   {"twist", insertPx_ > 4.0f ? double(glm::degrees(std::atan2(mouseY_ - insertY_, mouseX_ - insertX_))) : 0.0}};
         args = withSymmetryArgs(std::move(args));
+        if (insertBrush_.on && insertBrush_.newPart) args["new_part"] = true; // the Insert brush (InsertBrush.cpp)
+        else if (insertBrush_.on && insertBrush_.maskRest) args["mask_rest"] = true;
         if (insertType_ == "mesh") { // your own mesh: a Part's copy, a file or a set's item (insert_mesh)
             args[insertMeshKey_] = insertMeshValue_;
             if (insertMeshKey_ == "set") args["index"] = double(insertSet_.index);
@@ -2127,6 +2129,11 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
     if ((key == SDLK_LEFTBRACKET || key == SDLK_RIGHTBRACKET) && !(mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) &&
         insertSetActive()) { // an insert set: [ and ] step through it (the drag sets the size, not the brush's)
         selectInsertSetItem(insertSet_.index + (key == SDLK_RIGHTBRACKET ? 1 : -1));
+        return;
+    }
+    if ((key == SDLK_LEFTBRACKET || key == SDLK_RIGHTBRACKET) && !(mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) &&
+        insertBrush_.on && insertType_ != "mesh") { // the Insert brush: [ and ] step through the primitives
+        stepInsertShape(key == SDLK_RIGHTBRACKET ? 1 : -1);
         return;
     }
     if (key == SDLK_ESCAPE && !insertType_.empty()) { // Append > Insert (#34) off

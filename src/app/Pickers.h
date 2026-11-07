@@ -41,7 +41,7 @@ void drawVdmGrid(App& app, GridMode mode);
 
 // One brush of the picker, the Library Brush tab and the shelves.
 struct BrushItem {
-    enum class Kind { Type, Paint, Recipe, File, Guides } kind = Kind::Type; // Guides: QRemesh Guides (PanelRetopo.cpp)
+    enum class Kind { Type, Paint, Recipe, File, Guides, Insert } kind = Kind::Type; // Guides: QRemesh Guides (PanelRetopo.cpp); Insert: InsertBrush.cpp
     int index = -1;   // BrushType (Type) or doc.brushes index (Recipe)
     std::string name; // shown under the tile
     std::string path; // .sfbrush (File)

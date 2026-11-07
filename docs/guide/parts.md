@@ -87,6 +87,33 @@ Part to build a skeleton of their own Part. The pieces were designed for SculptF
 source) and come under the app's licence, GPL-3.0. (Commands: `insert_set_items set=builtin:creature-bones`;
 `insert_mesh set=builtin:creature-bones index=<n>`.)
 
+### The Insert brush
+
+The **Insert** brush on the bottom shelf does the same in one step, with no menu trip: pick it, then drag on the model.
+Each drag places a shape standing on the surface where you pressed, along its normal; the drag's length sets its size
+and its direction turns it. Each shape becomes a **new Part** right below the model (with its mirrored copy when
+**Symmetry** is on), and the model stays the active Part, so you can keep dragging. One <kbd>Ctrl</kbd>+<kbd>Z</kbd>
+takes the last one away.
+
+![The Insert brush's palette, and a mirrored cube joining the model with the rest masked](images/insert-brush.jpg)
+
+Its palette opens at the bottom left of the view while the brush is on:
+
+- **Shapes**: Sphere, Cube, Cylinder, Cone, Torus, Capsule and Quad Sphere. <kbd>[</kbd> and <kbd>]</kbd> step through them.
+- **Creature bones**: every piece of the built-in set, one click each.
+- **Your set from file...** / **Your set from folder...**: your own insert set; its pieces then show in the palette too.
+- **New Part**: on (the default), each shape is a Part of its own; off, it joins the active Part as a new face group,
+  as **Insert on the model** does.
+- **Mask the rest** (with New Part off, on by default): everything that was in the Part is masked as the shape joins it,
+  so brushes shape and blend only the new piece. The same undo step takes the mask back; Ctrl+drag on the background
+  clears it.
+
+Picking any other brush, **Paint** or the Gizmo leaves the Insert brush; so does <kbd>Esc</kbd>. Like every brush it
+can have a key: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click its tile, then press the key. It is also in the brush picker
+(<kbd>B</kbd>) and the command palette. (Commands: `insert_primitive type=cone x= y= z= nx= ny= nz= size= new_part=true`,
+and `new_part=true` on `insert_mesh`; `mask_rest=true` masks the rest when it joins the Part.) To press a shaped form into the surface instead (a nostril, a rivet, a vent),
+use the [Forge Stamps](brush-packs.md#forge-stamps) brushes.
+
 You can also add files as Parts from elsewhere:
 
 - **Import** in the Tool palette header (or **File > Import**) adds a model file as a new Part.
@@ -238,6 +265,7 @@ used.
 | `part_split_groups` / `part_split_parts` | Split |
 | `extract thickness=0.02 smooth=5 double=false` | Preview an Extract shell from the mask; `tcorne` / `tborder` for a triangle rim; `accept=true` keeps it at once |
 | `extract_accept` / `extract_cancel` | Keep or remove the Extract preview |
+| `insert_primitive type=cone x=0 y=1 z=0 nx=0 ny=1 nz=0 size=0.2 new_part=true` | Insert a shape on the surface as a new Part (the Insert brush); without `new_part` it joins the active Part |
 
 ```text
 part_append type=sphere name=EyeL size=0.12; part_duplicate; part_rename to=EyeR

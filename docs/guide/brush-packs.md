@@ -1,6 +1,6 @@
 # Brush packs
 
-SculptForge comes with sixty ready-tuned brushes in six packs, on top of the built-in brushes. Each one is a
+SculptForge comes with seventy ready-tuned brushes in seven packs, on top of the built-in brushes. Each one is a
 brush recipe (see [Brush Lab](brush-lab.md)) with its own alpha where it needs one, so you can use them as they are,
 or open one in Brush Lab and make your own version. Every brush, alpha and preview here is made by SculptForge itself:
 the recipe engine, procedural alphas and the same clay-ball thumbnails as the brush picker.
@@ -137,8 +137,34 @@ Beads, ropes, filigree, studs and carved patterns for jewellery, trims and decor
 | **Gem Setting** | A raised round setting with a crisp rim, for cabochons and gem seats. |  |
 | **Dot Texture** | Fine even dots, for stippling, punched leather and decorative fields. | Dot Grid |
 
+## Forge Stamps
+
+One shaped form per click, pressed in or raised: nostrils, ear whorls, scales, rivets, screws, seams and vents. Each
+stamps one of SculptForge's own generated shapes where you click; the dabs are spaced wide, so a drag lays a row.
+Hold **Alt** to raise a pressed form instead (or press a raised one in). Thanks to @foirgairwolf for the idea.
+
+![The Forge Stamps brushes](images/brush-packs/forge-stamps.jpg)
+
+| Brush | What it does | Alpha |
+|---|---|---|
+| **Nostril Press** | Presses a flared nostril into a nose; click once, then mirror or stamp the other. | Nostril |
+| **Ear Whorl Press** | Presses an ear's C-shaped fold and bowl into a block-in ear in one click. | Ear Whorl |
+| **Scale Plate Stamp** | Raises one large pointed scale per dab; drag for a row that follows the stroke. | Scale Plate |
+| **Rivet Head Stamp** | Raises one domed rivet on a flange per click; drag for an evenly spaced row. | Rivet Head |
+| **Hatch Seam Cut** | Cuts a rounded access panel's seam and its four screw holes in one click. | Hatch Seam |
+| **Louvre Cut** | Presses four angled vent slats into a panel in one click. | Louvre |
+| **Cross Screw Stamp** | Raises a round screw head with a cross slot; click once per screw. | Cross Screw |
+| **Suction Cup Stamp** | Raises hollow suction cups along a tentacle; drag down its underside. | Suction Cup |
+| **Gill Slit Cut** | Cuts three tapering gill slits behind a head; the slits follow the stroke. | Gill Slits |
+| **Socket Press** | Presses a countersunk round hole, for screw holes, ports and sockets. | Socket |
+
+To place a whole shape as its own piece instead (a horn, a bone, a bolt you can move later), use the
+[Insert brush](parts.md#the-insert-brush).
+
 ## New alphas
 
 Six procedural alphas came with the packs and work with any brush (**Sculpt > Alpha**): **Cobblestone**,
-**Leather Grain**, **Hex Plates**, **Knit**, **Bolt** and **Chips**. **Sculpt > Alpha** lists every alpha A-Z (Round, the
+**Leather Grain**, **Hex Plates**, **Knit**, **Bolt** and **Chips**. The Forge Stamps brought ten more: **Nostril**,
+**Ear Whorl**, **Scale Plate**, **Rivet Head**, **Hatch Seam**, **Louvre**, **Cross Screw**, **Suction Cup**, **Gill Slits**
+and **Socket**. **Sculpt > Alpha** lists every alpha A-Z (Round, the
 plain tip, first), has a filter field, and **Sort** for the most recently used first or by pack.

@@ -1,8 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The built-in brush packs: sixty tuned recipes in six named packs (Clay & Form, Hard Surface, Organic & Skin,
-// Cloth & Folds, Damage & Wear, Ornament), made only from SculptForge's own recipe engine and procedural alphas.
+// The built-in brush packs: seventy tuned recipes in seven named packs (Clay & Form, Hard Surface, Organic & Skin,
+// Cloth & Folds, Damage & Wear, Ornament, Forge Stamps), made only from SculptForge's own recipe engine and procedural alphas.
 // They ship with the app as built-in brushes (BrushSource::Builtin) with origin.pack set to the pack's name, so
 // the brush lists can show and sort them by pack. Guide: docs/guide/brush-packs.md.
 #pragma once

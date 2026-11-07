@@ -49,6 +49,7 @@ public:
     ImTextureID vdm(const std::shared_ptr<const VectorDisplacement>& vdm); // one stamp of the map on a plane
     ImTextureID material(int litsphere);     // -1 = Studio
     ImTextureID primitive(int primitive); // Primitive (AssetLibrary.h)
+    ImTextureID insertShape(const std::string& type); // an insert_primitive type (the Insert brush's palette)
     // Projects (their embedded thumbnail.png, else rendered once), meshes and images.
     ImTextureID file(const std::string& path);
     // An insert set's item (core/Parts.h InsertSetItem): object `object` of a model file, or the whole file (-1).

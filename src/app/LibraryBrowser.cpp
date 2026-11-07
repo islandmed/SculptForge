@@ -249,6 +249,7 @@ void LibraryBrowser::rootEntries(App& app, std::vector<AssetEntry>& out) {
                 e.kind = AssetKind::BrushFile;
                 break;
             case BrushItem::Kind::Guides: // a tool, not a brush file: only in the pickers
+            case BrushItem::Kind::Insert:
                 continue;
             }
             out.push_back(std::move(e));

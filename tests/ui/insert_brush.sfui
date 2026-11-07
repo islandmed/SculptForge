@@ -1,0 +1,69 @@
+# The Insert brush (@foirgairwolf): on the bottom shelf, no Parts > Append trip. A drag on the model places the
+# palette's shape standing on the surface as a new Part (X symmetry is on: the mirrored copy is in the same Part),
+# the model stays active, one undo step. [ and ] step through the shapes; New Part off joins the active Part.
+run new_sphere subdivisions=4
+key f
+remember triangles base
+click "Insert##brush.insert"
+expect_value insert_brush == 1
+expect_status Insert Sphere
+wait_idle
+shot insert_brush_palette
+
+click "##insertshape_cone"
+expect_status Insert Cone
+stroke 0.525 0.47 0.525 0.62
+expect_status as Part Cone
+expect_value parts == 2
+expect_value active_part == 0
+expect_value triangles == $base
+wait_idle
+shot insert_brush_cone
+key ctrl+z
+expect_value parts == 1
+
+key ]
+expect_status Insert Torus
+key [
+expect_status Insert Cone
+
+# A Creature bones piece, from the same palette.
+click "##insertbuiltin0_6"
+expect_status Insert Claw (7 of 13)
+stroke 0.8 0.55 0.86 0.55
+expect_status as Part Claw
+expect_value parts == 2
+wait_idle
+shot insert_brush_claw
+key ctrl+z
+expect_value parts == 1
+
+# New Part off: the shape joins the active Part as a face group, the rest masked (Mask the rest, on by default) so
+# only the new piece takes brushes; one Ctrl+Z takes both back.
+click "New Part"
+expect "Mask the rest"
+click "##insertshape_cube"
+stroke 0.8 0.45 0.86 0.45
+expect_status the rest masked
+expect_value parts == 1
+expect_value triangles > $base
+expect_value masked > 0
+wait_idle
+shot insert_brush_mask_rest
+key ctrl+z
+expect_value triangles == $base
+expect_value masked == 0
+click "Mask the rest"
+click "##insertshape_cube"
+stroke 0.8 0.45 0.86 0.45
+expect_value masked == 0
+key ctrl+z
+
+# Any other brush leaves it; so does Esc.
+click "Clay##brush.clay"
+expect_value insert_brush == 0
+click "Insert##brush.insert"
+expect_value insert_brush == 1
+key escape
+expect_value insert_brush == 0
+expect_status Insert off

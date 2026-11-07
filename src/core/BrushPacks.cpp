@@ -24,6 +24,7 @@ const PackInfo kPacks[] = {
     {"Cloth & Folds", "Folds, seams, stitches, weave and knit for clothing and soft goods."},
     {"Damage & Wear", "Cracks, chips, dents, scratches and erosion for weathered stone, wood and metal."},
     {"Ornament", "Beads, ropes, filigree, studs and carved patterns for jewellery, trims and decoration."},
+    {"Forge Stamps", "One shaped form per click, pressed in or raised: nostrils, ear whorls, scales, rivets, screws, seams and vents."},
 };
 
 // Adds brushes to `out` for one pack: b("Name", "One line.", [](BrushRecipe& r) { ... }).
@@ -271,6 +272,43 @@ void ornament(PackBuilder b) {
     });
 }
 
+// The Forge Stamps (@foirgairwolf): each stamps one of our own generated forms (core/BrushAlpha.cpp) where you click,
+// pressed in (negative depth) or raised; wide spacing, so a drag lays a row. Click and hold Alt to flip one.
+void forgeStamps(PackBuilder b) {
+    b("Nostril Press", "Presses a flared nostril into a nose; click once, then mirror or stamp the other.", [](BrushRecipe& r) {
+        r.depth = -0.7f; r.alpha = "Nostril"; r.hardness = 0.35f; r.spacing = 2.0f; r.smooth = 0.05f; r.frontFacesOnly = true;
+    });
+    b("Ear Whorl Press", "Presses an ear's C-shaped fold and bowl into a block-in ear in one click.", [](BrushRecipe& r) {
+        r.depth = -0.65f; r.alpha = "Ear Whorl"; r.hardness = 0.3f; r.spacing = 2.0f; r.smooth = 0.05f; r.frontFacesOnly = true;
+    });
+    b("Scale Plate Stamp", "Raises one large pointed scale per dab; drag for a row that follows the stroke.", [](BrushRecipe& r) {
+        r.depth = 0.5f; r.alpha = "Scale Plate"; r.alphaFollow = true; r.hardness = 0.8f; r.spacing = 0.75f;
+        r.frontFacesOnly = true;
+    });
+    b("Rivet Head Stamp", "Raises one domed rivet on a flange per click; drag for an evenly spaced row.", [](BrushRecipe& r) {
+        r.depth = 0.55f; r.alpha = "Rivet Head"; r.hardness = 0.95f; r.spacing = 1.4f; r.frontFacesOnly = true;
+    });
+    b("Hatch Seam Cut", "Cuts a rounded access panel's seam and its four screw holes in one click.", [](BrushRecipe& r) {
+        r.depth = -0.5f; r.alpha = "Hatch Seam"; r.hardness = 0.95f; r.spacing = 2.0f; r.frontFacesOnly = true;
+    });
+    b("Louvre Cut", "Presses four angled vent slats into a panel in one click.", [](BrushRecipe& r) {
+        r.depth = -0.6f; r.alpha = "Louvre"; r.hardness = 0.9f; r.spacing = 2.0f; r.frontFacesOnly = true;
+    });
+    b("Cross Screw Stamp", "Raises a round screw head with a cross slot; click once per screw.", [](BrushRecipe& r) {
+        r.depth = 0.5f; r.alpha = "Cross Screw"; r.hardness = 0.95f; r.spacing = 2.0f; r.frontFacesOnly = true;
+    });
+    b("Suction Cup Stamp", "Raises hollow suction cups along a tentacle; drag down its underside.", [](BrushRecipe& r) {
+        r.depth = 0.5f; r.alpha = "Suction Cup"; r.hardness = 0.8f; r.spacing = 1.1f; r.frontFacesOnly = true;
+    });
+    b("Gill Slit Cut", "Cuts three tapering gill slits behind a head; the slits follow the stroke.", [](BrushRecipe& r) {
+        r.depth = -0.6f; r.alpha = "Gill Slits"; r.alphaFollow = true; r.hardness = 0.85f; r.pinch = 0.2f;
+        r.spacing = 2.0f; r.frontFacesOnly = true;
+    });
+    b("Socket Press", "Presses a countersunk round hole, for screw holes, ports and sockets.", [](BrushRecipe& r) {
+        r.depth = -0.75f; r.alpha = "Socket"; r.hardness = 0.95f; r.spacing = 2.0f; r.frontFacesOnly = true;
+    });
+}
+
 } // namespace
 
 const std::vector<std::string>& builtinBrushPacks() {
@@ -290,13 +328,14 @@ std::string builtinBrushPackHelp(const std::string& pack) {
 
 std::vector<BrushRecipe> builtinPackRecipes() {
     std::vector<BrushRecipe> out;
-    out.reserve(60);
+    out.reserve(70);
     clayAndForm({out, kPacks[0].name});
     hardSurface({out, kPacks[1].name});
     organicAndSkin({out, kPacks[2].name});
     clothAndFolds({out, kPacks[3].name});
     damageAndWear({out, kPacks[4].name});
     ornament({out, kPacks[5].name});
+    forgeStamps({out, kPacks[6].name});
     return out;
 }
 

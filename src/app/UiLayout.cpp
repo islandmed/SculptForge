@@ -48,7 +48,7 @@ UiLayout standardLayout() {
     l.bottomShelf = {"brush.standard", "brush.clay",    "brush.clayblock", "brush.sharpcrease", "brush.move",
                      "brush.smooth",   "brush.inflate", "brush.pinch",       "brush.flatten",     "brush.crease",
                      "brush.trim",     "brush.tendril", "brush.layer",     "brush.nudge",       "brush.kelvingrab",
-                     "brush.detailclone", "brush.paint",
+                     "brush.detailclone", "brush.paint", "brush.insert",
                      "widget.add_brush"};
     return l;
 }
@@ -142,6 +142,10 @@ bool fromJson(const Json& j, UiLayout& l, std::string& error, int shellLayout) {
         std::find(out.rightShelf.begin(), out.rightShelf.end(), "edit.redo") == out.rightShelf.end())
         out.rightShelf.insert(out.rightShelf.begin(), {"edit.undo", "edit.redo", "sep"});
     readStrings(j["bottomShelf"], out.bottomShelf);
+    // Version 5 added the Insert brush: put it into stored bottom shelves, before the + tile.
+    if (int(j["version"].asNumber(1)) < 5 && j["bottomShelf"].isArray() &&
+        std::find(out.bottomShelf.begin(), out.bottomShelf.end(), "brush.insert") == out.bottomShelf.end())
+        out.bottomShelf.insert(std::find(out.bottomShelf.begin(), out.bottomShelf.end(), "widget.add_brush"), "brush.insert");
     flag("consoleOpen", out.consoleOpen);
     number("consoleHeight", out.consoleHeight);
     flag("libraryOpen", out.libraryOpen);

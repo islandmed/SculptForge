@@ -599,9 +599,10 @@ TEST(spray_and_spacing_are_deterministic) {
 }
 
 TEST(alpha_generated_builtins) {
-    // #43: twelve patterns made in code (no image files), after Round, Square and Noise, and six for the brush packs.
+    // #43: twelve patterns made in code (no image files), after Round, Square and Noise, six for the brush packs and
+    // ten for the Forge Stamps.
     const auto& all = BrushAlpha::builtins();
-    CHECK(all.size() == 21);
+    CHECK(all.size() == 31);
     CHECK(all[0].empty() && all[0].name == "Round" && all[1].name == "Square" && all[2].name == "Noise");
     for (size_t i = 3; i < all.size(); ++i) {
         const BrushAlpha& a = all[i];

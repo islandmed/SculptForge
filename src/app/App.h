@@ -1252,6 +1252,7 @@ private:
     std::shared_ptr<struct SculptableUiState> sculptable_;
     // Geometry > QRemesh (quad retopology on a worker thread) and Part > Project (ProjectAll); PanelRetopo.cpp.
     void registerRetopoUiActions();
+    void registerInsertBrushActions(); // the Insert brush (InsertBrush.cpp)
     void drawQRemeshContents();
     void drawProjectContents();
     void startQRemesh();
@@ -1947,11 +1948,29 @@ private:
         int index = 0;
     } insertSet_;
     void chooseInsertSet(const std::string& path); // the file or folder dialog's answer
+    void openInsertSetDialog(bool folder);         // the file (or folder) dialog that answers with it
     void selectInsertSetItem(int index);           // wraps around
     bool insertSetActive() const { return insertType_ == "mesh" && insertMeshKey_ == "set" && !insertSet_.items.empty(); }
     void drawInsertSetPicker();
     glm::vec3 insertAt_{0.0f}, insertNormal_{0.0f, 1.0f, 0.0f};
     float insertX_ = 0.0f, insertY_ = 0.0f, insertPx_ = 0.0f;
+    // The Insert brush (InsertBrush.cpp; @foirgairwolf): Insert on the model as a brush on the bottom shelf, with a
+    // key like the others. Its palette picks the shape (a primitive, or an item of Creature bones or your own insert
+    // set) and whether each one becomes a new Part (the default) or joins the active Part. A mode beside the brushes
+    // (as the QRemesh Guides brush): picking any brush, Paint, the guides or the Gizmo leaves it, and Esc stops it.
+    struct InsertBrush {
+        bool on = false;
+        bool newPart = true;
+        bool maskRest = true; // New Part off: the rest of the Part masked, the piece free (@foirgairwolf)
+        std::string shape = "sphere"; // the primitive it starts with, or "set" (insertSet_'s item)
+        std::vector<std::vector<InsertSetItem>> builtin; // per builtinInsertSets(): its items (listed on first show)
+    } insertBrush_;
+    void setInsertBrush(bool on);
+    void endInsertBrush() { if (insertBrush_.on) setInsertBrush(false); } // (the brushes' actions call it)
+    void chooseInsertShape(const std::string& type); // a primitive
+    void stepInsertShape(int step);                  // [ and ]: the previous / next primitive
+    void syncInsertBrush();                          // per frame: leaves it when something else took over
+    void drawInsertBrushPalette();
     // own: our ui.json (its layout becomes storedLayout_; it may have none), not a shared file.
     bool readUiConfig(const std::string& path, std::string& err, bool own = false);
     bool writeUiConfig(const std::string& path, std::string& err);

@@ -270,6 +270,26 @@ ImTextureID ThumbnailCache::primitive(int primitive) {
         true);
 }
 
+ImTextureID ThumbnailCache::insertShape(const std::string& type) {
+    const std::string key = "insertshape|" + type + "|" + std::to_string(kThumbnailVersion);
+    return request(
+        hex64(fnv1a64(key)),
+        [type] {
+            Result r;
+            // As insert_primitive makes them, finer (a thumbnail shows the silhouette, not the low count).
+            if (type == "cube") r.mesh = std::make_unique<Mesh>(makeCube(24, 1.4f));
+            else if (type == "cylinder") r.mesh = std::make_unique<Mesh>(makeCylinder(48, 1.4f));
+            else if (type == "cone") r.mesh = std::make_unique<Mesh>(makeCone(48, 1.5f));
+            else if (type == "torus") r.mesh = std::make_unique<Mesh>(makeTorus(64, 1.6f));
+            else if (type == "capsule") r.mesh = std::make_unique<Mesh>(makeCapsule(48, 1.5f));
+            else if (type == "quadsphere") r.mesh = std::make_unique<Mesh>(makeQuadSphere(24, 1.6f));
+            else r.mesh = std::make_unique<Mesh>(makeIcosphere(5, 1.0f));
+            if (type == "torus") r.pitch = -40.0f;
+            return r;
+        },
+        true);
+}
+
 ThumbnailCache::Stat& ThumbnailCache::stat(const std::string& path) {
     Stat& s = stats_[path];
     const double now = ImGui::GetTime();

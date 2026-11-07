@@ -653,9 +653,10 @@ void App::initActions() {
                 doc_.activeBrush = -1;
                 paintMode_ = false;
                 guidesMode_ = false; // leaves the QRemesh Guides brush
+                endInsertBrush();    // and the Insert brush
                 maskBrush_.on = false;
             },
-            ICON_LC_BRUSH, nullptr, [this, type] { return brush_ == type && doc_.activeBrush < 0 && !paintMode_ && !guidesMode_; }, nullptr,
+            ICON_LC_BRUSH, nullptr, [this, type] { return brush_ == type && doc_.activeBrush < 0 && !paintMode_ && !guidesMode_ && !insertBrush_.on; }, nullptr,
             (std::string("Sculpt with the ") + brushLabel(type) + " brush.").c_str());
     }
 
@@ -781,6 +782,7 @@ void App::initActions() {
     registerBakeUiActions();    // Tool > Bake (PanelBake.cpp)
     registerUvEditorActions();  // UV Editor (PanelUvEditor.cpp)
     registerRetopoUiActions(); // Geometry > QRemesh, Part > ProjectAll (PanelRetopo.cpp)
+    registerInsertBrushActions(); // the Insert brush on the bottom shelf (InsertBrush.cpp)
     registerForgeSphereUiActions(); // Tool > Forge Spheres (PanelForge Spheres.cpp)
     registerSplatTrainUi();    // Splats > Train from capture (PanelSplatTrain.cpp)
     registerSculptableUiActions(); // Splats > Make sculptable (PanelSculptable.cpp)

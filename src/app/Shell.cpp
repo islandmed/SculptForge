@@ -408,9 +408,10 @@ void App::registerShellActions() {
             doc_.activeBrush = -1;
             paintMode_ = false;
             guidesMode_ = false; // leaves the QRemesh Guides brush
+            endInsertBrush();    // and the Insert brush
             maskBrush_.on = false;
         };
-        a.checked = [this, type] { return brush_ == type && doc_.activeBrush < 0 && !paintMode_ && !guidesMode_; };
+        a.checked = [this, type] { return brush_ == type && doc_.activeBrush < 0 && !paintMode_ && !guidesMode_ && !insertBrush_.on; };
         add(std::move(a));
     }
     add({"draw.sculpt", "Sculpt", nullptr,
@@ -2364,6 +2365,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         } else if (clicked && found >= 0) {
             doc_.activeBrush = found;
             paintMode_ = false;
+            endInsertBrush();
         }
         ui::HelpText(name.c_str(), chord.empty() ? nullptr : chord.c_str(),
                      found >= 0 && !doc_.brushes[size_t(found)].description.empty() ? doc_.brushes[size_t(found)].description.c_str()
@@ -2691,12 +2693,16 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
         return;
     }
     const BrushRecipe* recipe = activeRecipe();
-    const std::string name = guidesMode_ ? "Quad Remesh Guides" : paintMode_ ? "Paint" : recipe ? recipe->name : brushLabel(brush_);
+    const std::string name = guidesMode_        ? "Quad Remesh Guides"
+                             : insertBrush_.on  ? "Insert"
+                             : paintMode_       ? "Paint"
+                             : recipe           ? recipe->name
+                                                : brushLabel(brush_);
     ImVec2 a, b;
     ui::TileLiftScope lift;
     const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, name, s, a, b);
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    ImTextureID tex = paintMode_ || guidesMode_ ? ImTextureID(0) : recipe ? thumbs_.recipe(*recipe) : thumbs_.brush(int(brush_));
+    ImTextureID tex = paintMode_ || guidesMode_ || insertBrush_.on ? ImTextureID(0) : recipe ? thumbs_.recipe(*recipe) : thumbs_.brush(int(brush_));
     const ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
     const float r = (b.x - a.x) * 0.36f;
     if (tex) {
@@ -2706,6 +2712,9 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
     } else if (guidesMode_) { // QRemesh Guides (PanelRetopo.cpp)
         dl->AddCircleFilled(c, r, theme::u32(theme::tile), 32);
         centredText(dl, fontIcons_, a, b, IM_COL32(255, 196, 64, 255), ICON_LC_SPLINE);
+    } else if (insertBrush_.on) { // the Insert brush (InsertBrush.cpp)
+        dl->AddCircleFilled(c, r, theme::u32(theme::tile), 32);
+        centredText(dl, fontIcons_, a, b, theme::u32(theme::accent), ICON_LC_SHAPES);
     } else if (paintMode_) {
         const glm::vec3 pc = linearToSrgb(doc_.paintColor);
         dl->AddCircleFilled(c, r, theme::u32(ImVec4(pc.x, pc.y, pc.z, 1.0f)), 32);

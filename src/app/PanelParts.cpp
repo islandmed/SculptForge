@@ -550,13 +550,10 @@ void App::drawPartsContents() {
             // Insert sets (kitbash sets): a file with several objects, or a folder of model files; a picker of
             // their thumbnails, [ and ] step through them.
             ImGui::Separator();
-            if (ImGui::MenuItem(tr("Insert set from file...")))
-                SDL_ShowOpenFileDialog(onAppendChosen, &dialogRequests_[int(FileAction::InsertSet)], window_,
-                                       kInsertFilters, 2, nullptr, false);
+            if (ImGui::MenuItem(tr("Insert set from file..."))) openInsertSetDialog(false);
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
                 ImGui::SetTooltip("%s", tr("A model file with several objects: insert them one at a time"));
-            if (ImGui::MenuItem(tr("Insert set from folder...")))
-                SDL_ShowOpenFolderDialog(onAppendChosen, &dialogRequests_[int(FileAction::InsertSet)], window_, nullptr, false);
+            if (ImGui::MenuItem(tr("Insert set from folder..."))) openInsertSetDialog(true);
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
                 ImGui::SetTooltip("%s", tr("A folder of .obj, .ply or .glb files: insert them one at a time"));
             // The built-in sets (core/Parts.h): no file to pick.
@@ -809,6 +806,11 @@ void App::drawPartFolderRow(int fi, float rowH, ImVec2 cellPad, PartFolderAction
     ImGui::PopID();
 }
 
+void App::openInsertSetDialog(bool folder) {
+    if (folder) SDL_ShowOpenFolderDialog(onAppendChosen, &dialogRequests_[int(FileAction::InsertSet)], window_, nullptr, false);
+    else SDL_ShowOpenFileDialog(onAppendChosen, &dialogRequests_[int(FileAction::InsertSet)], window_, kInsertFilters, 2, nullptr, false);
+}
+
 void App::chooseInsertSet(const std::string& path) {
     InsertSetState set;
     std::string error;
@@ -834,7 +836,7 @@ void App::selectInsertSetItem(int index) {
 
 // The insert set's picker: a thumbnail per item, the one a drag inserts outlined; open while inserting from a set.
 void App::drawInsertSetPicker() {
-    if (!insertSetActive()) return;
+    if (!insertSetActive() || insertBrush_.on) return; // (the Insert brush's palette shows the set itself)
     const float s = uiScale_, tile = 72.0f * s;
     const CanvasRect c = canvasRect();
     // Bottom left of the canvas: clear of the timeline strip and the view figure at the top.
@@ -874,6 +876,7 @@ void App::drawInsertSetPicker() {
 
 void App::drawPartPopups() {
     drawInsertSetPicker();
+    drawInsertBrushPalette(); // (InsertBrush.cpp)
     const std::string popup = partConfirm_.title + "###" + partConfirm_.command;
     if (openPartConfirm_) {
         ImGui::OpenPopup(popup.c_str());
