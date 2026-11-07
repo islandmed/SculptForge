@@ -1,0 +1,9 @@
+# Requesters we know only on Discord: credit them "thanks name on Discord", never "@name" (an @ points at GitHub,
+# where the name is free or someone else's). One name per line, as they spell it; tools/release/check_credits.py
+# fails the release on "@name" in changes/*.md, the highlights, the guide or the site. Case doesn't matter.
+foirgairwolf
+fenix
+Cytrick
+Oslen
+_tfx
+Hameron   # _tfx: never @_tfx or @Hameron
