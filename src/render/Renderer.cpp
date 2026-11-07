@@ -322,16 +322,24 @@ flat in int vPrimBase;
 // interpolated on the micro triangle under the pixel (normal, curvature, mask), whatever level the geometry drew.
 flat in int vSlot;
 flat in int vEdges;
+flat in int vPage; // Focus Detail: the page with the full shading grid (-1: uShade holds the coarse one)
 in vec2 vIJ;
 uniform samplerBuffer uShade;
+uniform samplerBuffer uPoolShade;
 uniform int uN;
 uniform int uSamples;
+uniform int uFocus, uCN, uCSamples;
 uniform mat4 uView;
 uniform int uMicroWire; // 1: the wireframe of the base (the level below the micro level) on the micro surface
 vec4 gNC;
 float gMask;
 float gWire = 0.0;
-vec4 shadeAt(int i, int j) { return texelFetch(uShade, vSlot * uSamples + j * (uN + 1) - (j * (j - 1)) / 2 + i); }
+bool gCoarse = false;
+vec4 shadeAt(int i, int j) {
+    if (gCoarse) return texelFetch(uShade, vSlot * uCSamples + j * (uCN + 1) - (j * (j - 1)) / 2 + i);
+    int k = j * (uN + 1) - (j * (j - 1)) / 2 + i;
+    return uFocus == 1 ? texelFetch(uPoolShade, vPage * uSamples + k) : texelFetch(uShade, vSlot * uSamples + k);
+}
 vec3 octNormal(vec2 v) {
     vec2 e = v * 2.0 - 1.0;
     vec3 n = vec3(e, 1.0 - abs(e.x) - abs(e.y));
@@ -341,16 +349,20 @@ vec3 octNormal(vec2 v) {
     return normalize(n);
 }
 void microFetch() {
-    float fi = clamp(vIJ.x, 0.0, float(uN)), fj = clamp(vIJ.y, 0.0, float(uN));
-    int i0 = min(int(fi), uN - 1), j0 = min(int(fj), uN - 1);
-    if (i0 + j0 > uN - 1) {
-        if (fi >= fj) i0 = uN - 1 - j0;
-        else j0 = uN - 1 - i0;
+    // (Focus Detail: a tile without its full shading interpolates the coarse grid's, gn segments)
+    gCoarse = uFocus == 1 && vPage < 0;
+    int gn = gCoarse ? uCN : uN;
+    vec2 gij = gCoarse ? vIJ * (float(uCN) / float(uN)) : vIJ;
+    float fi = clamp(gij.x, 0.0, float(gn)), fj = clamp(gij.y, 0.0, float(gn));
+    int i0 = min(int(fi), gn - 1), j0 = min(int(fj), gn - 1);
+    if (i0 + j0 > gn - 1) {
+        if (fi >= fj) i0 = gn - 1 - j0;
+        else j0 = gn - 1 - i0;
     }
     float a = fi - float(i0), b = fj - float(j0);
     vec4 s0, s1, s2;
     vec3 w;
-    if (a + b <= 1.0 || i0 + j0 + 2 > uN) {
+    if (a + b <= 1.0 || i0 + j0 + 2 > gn) {
         s0 = shadeAt(i0, j0); s1 = shadeAt(i0 + 1, j0); s2 = shadeAt(i0, j0 + 1);
         w = vec3(1.0 - a - b, a, b);
     } else {

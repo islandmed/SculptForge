@@ -1,6 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
+
+#include "core/FocusDetail.h"
 #include "app/Pickers.h"
 #include "app/BrandMark.h"
 #include "io/BridgeProtocol.h"
@@ -418,6 +420,18 @@ int App::renderHeadless() {
         img.width = options_.width;
         img.height = options_.height;
         std::string err;
+        // Focus Detail: frames for the detail to stream in where the camera looks (promotion, then GPU pages).
+        if (doc_.mesh.micro && doc_.mesh.micro->focus)
+            for (int k = 0; k < 16; ++k) {
+                updateFocusDetail(float(img.height));
+                syncScene();
+                std::vector<uint8_t> warm;
+                renderer_.renderToImage(camera_, img.width, img.height, settings, warm, err);
+            }
+        if (doc_.mesh.micro && doc_.mesh.micro->focus) {
+            const FocusStats st = doc_.mesh.micro->focus->stats();
+            SDL_Log("Focus Detail: %zu of %zu tiles full, GPU buffers %zu MB", st.fullTiles, st.tiles, renderer_.gpuBytes() >> 20);
+        }
         if (!renderer_.renderToImage(camera_, img.width, img.height, settings, img.rgba, err)) {
             SDL_Log("Render failed: %s", err.c_str());
             return 1;
