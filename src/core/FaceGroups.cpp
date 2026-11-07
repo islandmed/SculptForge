@@ -296,8 +296,9 @@ std::vector<uint8_t> trianglesIn(const Mesh& mesh, TriangleSet set, size_t* coun
     const size_t nt = mesh.triangleCount();
     std::vector<uint8_t> in(nt, uint8_t(0));
     size_t n = 0;
-    if (set == TriangleSet::Hidden) {
-        for (size_t t = 0; t < nt && t < mesh.hidden.size(); ++t) n += in[t] = mesh.hidden[t] != 0;
+    if (set == TriangleSet::Hidden || set == TriangleSet::Visible) {
+        const bool hidden = set == TriangleSet::Hidden;
+        for (size_t t = 0; t < nt; ++t) n += in[t] = (t < mesh.hidden.size() && mesh.hidden[t] != 0) == hidden;
     } else {
         const bool masked = set == TriangleSet::Masked;
         const size_t nv = mesh.mask.size();

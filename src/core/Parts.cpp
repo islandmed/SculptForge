@@ -4,7 +4,9 @@
 
 #include "core/BrushLibrary.h"
 #include "core/Commands.h"
+#include "core/CopyName.h"
 #include "core/Dyntopo.h"
+#include "core/ExtractMirror.h"
 #include "core/Masking.h"
 #include "core/Multires.h"
 #include "core/PathStroke.h"
@@ -17,6 +19,8 @@
 #include "io/PlyIO.h"
 
 #include <stb_image.h>
+
+#include <glm/matrix.hpp>
 
 #include <cctype>
 #include <deque>
@@ -299,6 +303,54 @@ CommandResult splitOffPart(Document& doc, TriangleSet set, const char* label, co
         r->part->at = at;
     }
     return {true, "Split " + countText(n) + " into " + name + ", " + countText(doc.mesh.triangleCount()) + " stay in " + source};
+}
+
+// part_move_faces (#158): the active Part's triangles in `set` join Part `to`, in one undo step on the active
+// Part that swaps Part `to`'s mesh (and its own history, which goes with that mesh) in and out.
+CommandResult moveFacesToPart(Document& doc, TriangleSet set, int to, const char* what) {
+    if (to < 0 || to >= doc.partCount()) return {false, "No such Part"};
+    const std::string source = doc.activePartInfo().name, target = doc.parts[size_t(to)].name;
+    if (to == doc.activePart) return {false, "Pick another Part than " + source + " to move faces into"};
+    if (doc.checkedOut(to)) return {false, target + " is a linked copy of " + source + ": they share one mesh"};
+    size_t n = 0;
+    std::vector<uint8_t> in = trianglesIn(doc.mesh, set, &n);
+    if (n == 0) return {false, "Nothing in " + source + " is " + what};
+    if (n == doc.mesh.triangleCount())
+        return {false, "Everything in " + source + " is " + what + ": nothing would stay (merge the Parts instead)"};
+    Mesh piece = extractTriangles(doc.mesh, in);
+    for (uint8_t& k : in) k = !k;
+    Mesh rest = extractTriangles(doc.mesh, in);
+    in = {};
+    if (set == TriangleSet::Hidden) piece.hidden.clear(); // shown in their new Part, as Split does
+    if (set == TriangleSet::Masked) piece.mask.clear();
+    notePartLevelsDropped(doc, doc.activePart); // cut from the current levels
+    notePartLevelsDropped(doc, to);
+    Part& dest = doc.parts[size_t(to)];
+    // Where they were seen: from the active Part's place into Part `to`'s (linked copies, #94, move on their own).
+    const glm::mat4 into = glm::inverse(dest.transform) * doc.activePartInfo().transform;
+    if (into != glm::mat4(1.0f)) piece = placedMesh(piece, into);
+    PartData& destData = *dest.data;
+    auto step = std::make_shared<PartStep>();
+    step->id = dest.id;
+    step->mesh = std::make_unique<Mesh>(mergeMeshes({&destData.mesh, &piece}));
+    step->history = std::make_unique<UndoStack>();
+    step->layer = -1; // its sculpt layer, found by name in the merged mesh (mergeMeshes matches them by name)
+    if (destData.activeLayer >= 0 && size_t(destData.activeLayer) < destData.mesh.layers.size())
+        for (size_t k = 0; k < step->mesh->layers.size(); ++k)
+            if (step->mesh->layers[k].name == destData.mesh.layers[size_t(destData.activeLayer)].name) step->layer = int(k);
+    piece = Mesh();
+    doc.applyPartStep(*step); // Part `to` takes the merged mesh; the step keeps its old one for undo
+    doc.replaceMeshUndoable(std::move(rest), "Move Faces");
+    if (UndoRecord* r = doc.undo.lastUndo()) r->part = std::move(step);
+    return {true, "Moved " + countText(n) + " from " + source + " into " + target + " (" +
+                      countText(doc.partMesh(to).triangleCount()) + " now)"};
+}
+
+// The selection (#158) by id, so it survives the list reordering under a loop.
+std::vector<uint32_t> selectedPartIds(const Document& doc) {
+    std::vector<uint32_t> ids;
+    for (int i : doc.selectedPartIndices()) ids.push_back(doc.parts[size_t(i)].id);
+    return ids;
 }
 
 // Reads the mesh in a model file for insert_mesh (#34): OBJ, PLY or GLB / glTF through the importers, every
@@ -584,14 +636,118 @@ void registerPartCommands(CommandRegistry& reg) {
                  return {true, out};
              }});
 
-    reg.add({"part_select", "Make a Part the active one: brushes and commands work on it.", {indexParam, nameParam},
+    reg.add({"part_select",
+             "Make a Part the active one: brushes and commands work on it. With add or range it also picks Parts "
+             "for the list's selection (#158), which hide, show, solo and folder moves take.",
+             {indexParam, nameParam,
+              {"add", T::Bool, "Add it to the selection, or take it out if it's in (Ctrl+click). Default false.", false},
+              {"range", T::Bool, "Select every Part from the active one to it; the active one stays (Shift+click). "
+                                 "Default false.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  if (!a.contains("index") && !a.contains("name")) return {false, "Give index= or name="};
                  const int i = targetPart(doc, a);
                  if (i < 0) return notFound(a);
+                 const std::string name = doc.parts[size_t(i)].name;
+                 const auto count = [&doc] { return std::to_string(doc.selectedPartIndices().size()) + " selected"; };
+                 if (argBool(a, "range", false)) {
+                     doc.clearPartSelection(); // a range replaces the selection, from the active Part (the anchor)
+                     for (int k = std::min(i, doc.activePart); k <= std::max(i, doc.activePart); ++k)
+                         if (!doc.partInSelection(k)) doc.selectedParts.push_back(doc.parts[size_t(k)].id);
+                     return {true, "Selected up to " + name + " (" + count() + ")"};
+                 }
+                 if (argBool(a, "add", false)) {
+                     const uint32_t id = doc.parts[size_t(i)].id;
+                     auto& sel = doc.selectedParts;
+                     const auto it = std::find(sel.begin(), sel.end(), id);
+                     if (i == doc.activePart || it != sel.end()) { // in: take it out
+                         if (it != sel.end()) sel.erase(it);
+                         if (i == doc.activePart) {
+                             const std::vector<int> rest = doc.selectedPartIndices();
+                             if (rest.size() < 2) return {false, name + " is the active Part: it stays selected"};
+                             const int next = rest[0] == i ? rest[1] : rest[0]; // the next selected Part takes over
+                             sel.erase(std::remove(sel.begin(), sel.end(), doc.parts[size_t(next)].id), sel.end());
+                             doc.selectPart(next);
+                             sel.erase(std::remove(sel.begin(), sel.end(), id), sel.end());
+                             if (doc.partInSelection(i)) // still in through a picked folder
+                                 return {true, name + " is in a selected folder; active Part: " + doc.activePartInfo().name};
+                             return {true, "Deselected " + name + "; active Part: " + doc.activePartInfo().name};
+                         }
+                         return {true, "Deselected " + name + " (" + count() + ")"};
+                     }
+                     sel.push_back(doc.activePartInfo().id); // the old active one stays in
+                     doc.selectPart(i);
+                     sel.erase(std::remove(sel.begin(), sel.end(), id), sel.end());
+                     doc.parts[size_t(i)].visible = true;
+                     return {true, "Active Part: " + name + " (" + count() + ")"};
+                 }
+                 doc.clearPartSelection();
                  doc.selectPart(i);
                  doc.parts[size_t(i)].visible = true; // you can't sculpt what you can't see
-                 return {true, "Active Part: " + doc.parts[size_t(i)].name};
+                 return {true, "Active Part: " + name};
+             }});
+
+    reg.add({"part_select_folder",
+             "Select a folder in the Parts list (#158): its Parts join the selection that hide, show, solo and "
+             "folder moves take. The active Part stays.",
+             {{"folder", T::String, "Folder name.", true},
+              {"add", T::Bool, "Add it to the selection, or take it out if it's in (Ctrl or Shift+click). Default "
+                               "false: it becomes the whole selection, with the active Part.", false}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const int f = targetFolder(doc, a);
+                 if (f < 0) return folderNotFound(a);
+                 const PartFolder& folder = doc.partFolders[size_t(f)];
+                 auto& sel = doc.selectedFolders;
+                 if (!argBool(a, "add", false)) doc.clearPartSelection();
+                 const auto it = std::find(sel.begin(), sel.end(), folder.id);
+                 const bool in = it == sel.end();
+                 if (in) sel.push_back(folder.id);
+                 else sel.erase(it);
+                 return {true, (in ? "Selected " : "Deselected ") + folder.name + " (" +
+                                   std::to_string(doc.selectedPartIndices().size()) + " Parts selected)"};
+             }});
+
+    reg.add({"part_select_none", "Clear the Parts list's selection (#158): only the active Part stays selected.", {},
+             [](Document& doc, const Args&) -> CommandResult {
+                 doc.clearPartSelection();
+                 return {true, "Selection: " + doc.activePartInfo().name};
+             }});
+
+    reg.add({"part_selection_visibility", "Show or hide every selected Part (#158; the active one and those picked).",
+             {{"visible", T::Bool, "true to show, false to hide. Default: hide if any is shown, else show.", false}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const std::vector<int> sel = doc.selectedPartIndices();
+                 bool anyShown = false;
+                 for (int i : sel) anyShown |= doc.parts[size_t(i)].visible;
+                 const bool show = argBool(a, "visible", !anyShown);
+                 for (int i : sel) doc.parts[size_t(i)].visible = show;
+                 doc.modified = true;
+                 return {true, std::to_string(sel.size()) + " Part" + (sel.size() == 1 ? "" : "s") + (show ? " shown" : " hidden")};
+             }});
+
+    reg.add({"part_move_faces",
+             "Move faces of the active Part into another Part (#158): its masked (average mask above 0.5), hidden, "
+             "visible or unmasked triangles, in one undo step. Both Parts keep UVs, face groups and vertex paint.",
+             {{"what", T::String, "masked, hidden, visible or unmasked. Default masked.", false},
+              {"to", T::String, "The Part to move them into, by name.", false},
+              {"to_index", T::Number, "Or by index (0 = top of the list).", false}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const std::string what = argString(a, "what", "masked");
+                 TriangleSet set;
+                 if (what == "masked") set = TriangleSet::Masked;
+                 else if (what == "hidden") set = TriangleSet::Hidden;
+                 else if (what == "visible") set = TriangleSet::Visible;
+                 else if (what == "unmasked") set = TriangleSet::Unmasked;
+                 else return {false, "Unknown what='" + what + "' (masked, hidden, visible, unmasked)"};
+                 int to = -1;
+                 if (a.contains("to")) {
+                     to = doc.findPart(argString(a, "to"));
+                     if (to < 0) return {false, "No Part named '" + argString(a, "to") + "'"};
+                 } else if (a.contains("to_index")) {
+                     to = int(argNumber(a, "to_index", -1));
+                 } else {
+                     return {false, "Give to= or to_index="};
+                 }
+                 return moveFacesToPart(doc, set, to, what.c_str());
              }});
 
     reg.add({"part_append",
@@ -760,10 +916,13 @@ void registerPartCommands(CommandRegistry& reg) {
                  const Shading shading = doc.parts[size_t(i)].shading;
                  const uint32_t folder = doc.parts[size_t(i)].folder;
                  const glm::mat4 place = doc.parts[size_t(i)].transform;
-                 const int added = doc.addPart(std::move(copy), doc.parts[size_t(i)].name + " copy", true, i + 1);
+                 const std::string name = copyName(doc.parts[size_t(i)].name, [&](const std::string& n) { return doc.findPart(n) >= 0; });
+                 const int added = doc.addPart(std::move(copy), name, true, i + 1); // Head.01, Head.02 (Oslen on Discord)
                  doc.parts[size_t(added)].shading = shading;
                  doc.parts[size_t(added)].folder = folder; // (right below it: the folder stays together)
                  doc.parts[size_t(added)].transform = place;
+                 doc.parts[size_t(added)].hasOrigin = doc.parts[size_t(i)].hasOrigin; // (i stays above the copy)
+                 doc.parts[size_t(added)].origin = doc.parts[size_t(i)].origin;
                  return {true, "Duplicated as " + doc.parts[size_t(added)].name};
              }});
 
@@ -782,6 +941,8 @@ void registerPartCommands(CommandRegistry& reg) {
                  if (a.contains("offset") && !parseVec3(argString(a, "offset"), offset))
                      return {false, "Bad offset '" + argString(a, "offset") + "' (expected x,y,z)"};
                  const int added = doc.linkedDuplicate(i, offset);
+                 doc.parts[size_t(added)].hasOrigin = doc.parts[size_t(i)].hasOrigin; // (in the mesh's space: it moves
+                 doc.parts[size_t(added)].origin = doc.parts[size_t(i)].origin;       // with the copy's transform)
                  return {true, "Linked duplicate " + doc.parts[size_t(added)].name + " (" +
                                    std::to_string(doc.linkCount(added)) + " linked Parts share the mesh)"};
              }});
@@ -795,6 +956,74 @@ void registerPartCommands(CommandRegistry& reg) {
                  if (i < 0) return notFound(a);
                  if (!doc.makeUnique(i)) return {false, doc.parts[size_t(i)].name + " isn't linked"};
                  return {true, doc.parts[size_t(i)].name + " is unique now"};
+             }});
+
+    // Mirror copy (Oslen on Discord): Duplicate, then Deformation > Mirror on the copy, as one undo step on the
+    // source Part (as Extract: undo takes the copy away, redo puts it back). The copy has no subdivision levels:
+    // the stack isn't flipped (mirrorFlip), so it is the source's current level, mirrored.
+    reg.add({"part_mirror_copy",
+             "Copy a Part mirrored across a plane through the world centre (the one symmetry and Mirror And Weld use), "
+             "or through the Part's origin, just below it. One undo step. The copy is the current subdivision level.",
+             {{"axis", T::String, "x (default), y or z.", false},
+              {"pivot", T::String, "world (default) or origin (the Part's origin; Tool > Parts > Origin).", false},
+              indexParam, nameParam},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const int i = targetPart(doc, a);
+                 if (i < 0) return notFound(a);
+                 const std::string axisName = argString(a, "axis", "x");
+                 const int axis = axisName == "x" ? 0 : axisName == "y" ? 1 : axisName == "z" ? 2 : -1;
+                 if (axis < 0) return {false, "Bad axis '" + axisName + "' (x, y or z)"};
+                 const std::string pivotName = argString(a, "pivot", "world");
+                 const Part& src = doc.parts[size_t(i)];
+                 const glm::mat4 place = src.transform;
+                 float pivot = 0.0f; // where the plane crosses the axis, in the scene
+                 if (pivotName == "origin") {
+                     if (!src.hasOrigin) return {false, src.name + " has no origin (Tool > Parts > Origin > Set...)"};
+                     pivot = glm::vec3(place * glm::vec4(src.origin, 1.0f))[axis];
+                 } else if (pivotName != "world") {
+                     return {false, "Bad pivot '" + pivotName + "' (world or origin)"};
+                 }
+                 const Mesh& from = doc.partMesh(i);
+                 if (from.vertexCount() == 0) return {false, src.name + " is empty"};
+                 const std::string levels = subdivLevelText(from);
+                 // In place (the usual Part, not moved): the mesh flips across the plane. A moved Part (a linked
+                 // copy, #94) flips across its own axis plane and the copy's transform makes up the rest: scene
+                 // mirror * transform * local mirror, a turn and a move (no mirror left in it).
+                 const bool moved = src.moved();
+                 Mesh copy = mirrorFlip(from, axis, moved ? 0.0f : pivot);
+                 glm::mat4 copyPlace(1.0f);
+                 glm::vec3 origin = src.origin;
+                 if (moved) {
+                     glm::mat4 local(1.0f), scene(1.0f);
+                     local[axis][axis] = -1.0f;
+                     scene[axis][axis] = -1.0f;
+                     scene[3][axis] = 2.0f * pivot;
+                     copyPlace = scene * place * local;
+                     origin[axis] = -origin[axis];
+                 } else {
+                     origin[axis] = 2.0f * pivot - origin[axis];
+                 }
+                 const Shading shading = src.shading;
+                 const uint32_t folder = src.folder;
+                 const bool hasOrigin = src.hasOrigin;
+                 const std::string name = src.name;
+                 const int added = doc.addPart(std::move(copy), copyName(name, [&](const std::string& n) { return doc.findPart(n) >= 0; }),
+                                               false, i + 1);
+                 Part& p = doc.parts[size_t(added)];
+                 p.shading = shading;
+                 p.folder = folder;
+                 p.transform = copyPlace;
+                 p.hasOrigin = hasOrigin;
+                 p.origin = origin;
+                 UndoRecord r;
+                 r.label = "Mirror copy";
+                 r.part = std::make_shared<PartStep>();
+                 r.part->id = p.id;
+                 r.part->at = added;
+                 doc.undo.push(std::move(r));
+                 std::string msg = "Mirrored " + name + " across " + axisName + " as " + p.name;
+                 if (!levels.empty()) msg += " (" + levels + " copied; the copy has no other levels)";
+                 return {true, msg};
              }});
 
     reg.add({"part_delete", "Delete a Part (not undoable). The last Part can't be deleted.",
@@ -862,9 +1091,20 @@ void registerPartCommands(CommandRegistry& reg) {
                  return {true, "Made folder " + folder + " with " + doc.parts[size_t(at)].name};
              }});
 
-    reg.add({"part_set_folder", "Put a Part into a folder, or take it out (folder empty).",
-             {{"folder", T::String, "Folder name; empty = out of its folder.", true}, indexParam, nameParam},
+    reg.add({"part_set_folder", "Put a Part (or every selected one) into a folder, or take it out (folder empty).",
+             {{"folder", T::String, "Folder name; empty = out of its folder.", true}, indexParam, nameParam,
+              {"selection", T::Bool, "Every selected Part (#158) instead of one. Default false.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
+                 if (argBool(a, "selection", false)) {
+                     const std::string to = argString(a, "folder");
+                     const int f = to.empty() ? -1 : targetFolder(doc, a);
+                     if (!to.empty() && f < 0) return folderNotFound(a);
+                     const uint32_t id = f < 0 ? 0 : doc.partFolders[size_t(f)].id;
+                     const std::vector<uint32_t> ids = selectedPartIds(doc);
+                     for (uint32_t part : ids) doc.setPartFolder(doc.partIndex(part), id);
+                     const std::string n = std::to_string(ids.size()) + " Part" + (ids.size() == 1 ? "" : "s");
+                     return {true, f < 0 ? n + " out of their folders" : n + " in " + doc.partFolders[size_t(f)].name};
+                 }
                  const int i = targetPart(doc, a);
                  if (i < 0) return notFound(a);
                  const std::string name = doc.parts[size_t(i)].name;
@@ -931,15 +1171,20 @@ void registerPartCommands(CommandRegistry& reg) {
                  return {true, "Removed folder " + name + " (its Parts stay)"};
              }});
 
-    reg.add({"part_solo", "Show only the active Part, or (when it already is the only one shown) show all again.", {},
+    reg.add({"part_solo",
+             "Show only the selected Parts (the active one, and any picked in the list, #158), or (when they already "
+             "are the only ones shown) show all again.",
+             {},
              [](Document& doc, const Args&) -> CommandResult {
                  bool othersShown = false;
                  for (int i = 0; i < doc.partCount(); ++i)
-                     othersShown |= i != doc.activePart && doc.parts[size_t(i)].visible;
+                     othersShown |= !doc.partInSelection(i) && doc.parts[size_t(i)].visible;
+                 const size_t n = doc.selectedPartIndices().size();
                  for (int i = 0; i < doc.partCount(); ++i)
-                     doc.parts[size_t(i)].visible = i == doc.activePart || !othersShown;
+                     doc.parts[size_t(i)].visible = doc.partInSelection(i) || !othersShown;
                  doc.modified = true;
-                 return {true, othersShown ? "Solo: " + doc.activePartInfo().name : std::string("All Parts shown")};
+                 if (!othersShown) return {true, "All Parts shown"};
+                 return {true, n > 1 ? "Solo: " + std::to_string(n) + " Parts" : "Solo: " + doc.activePartInfo().name};
              }});
 
     reg.add({"part_show_all", "Show every Part.", {},

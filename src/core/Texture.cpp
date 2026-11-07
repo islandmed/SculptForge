@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Texture.h"
+#include "core/CopyName.h"
 
 #include "core/ThreadPool.h"
 
@@ -1908,7 +1909,7 @@ int duplicateTextureLayer(PaintTexture& t, int layer) {
         copy.id = newTextureLayerId();
         copy.locked = false;
     }
-    copy.name = uniqueTextureLayerName(t, copy.name + " copy");
+    copy.name = copyName(copy.name, [&](const std::string& n) { return findTextureLayer(t, n) != -2; }); // Rust.01
     t.layers.insert(t.layers.begin() + (layer + 1), std::move(copy));
     syncLayerChannels(t);
     t.activeLayer = layer + 1;

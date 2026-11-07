@@ -1,0 +1,102 @@
+# The Parts list as an outliner (#158, @Ygrekie): Ctrl / Shift+click rows and folders, hide / show / solo the
+# selection, drag it into a folder, and Move faces here.
+run new_sphere subdivisions=4 ; part_rename to=Body
+run part_append type=cube ; part_rename to=Box
+run part_append type=cube ; part_rename to=Crate
+run part_append type=cube ; part_rename to=Drum
+expect_value parts == 4
+
+# A click selects one; Ctrl+click adds; Shift+click a range from the active one.
+click "Parts/Body"
+expect_value active_part == 0
+expect_value selected_parts == 1
+hold ctrl
+click "Parts/Crate"
+hold none
+expect_value active_part == 2
+expect_value selected_parts == 2
+expect_text "2 selected"
+hold shift
+click "Parts/Drum"
+hold none
+expect_value selected_parts == 2
+expect_value active_part == 2
+hold ctrl
+click "Parts/Body"
+hold none
+expect_value selected_parts == 3
+expect_text "3 selected"
+shot outliner-selected
+
+# Hide and show them at once; Solo shows only them, and again brings the rest back.
+click "Parts/Hide##selection"
+expect_value visible_parts == 1
+click "Parts/Show##selection"
+expect_value visible_parts == 4
+click "Parts/Solo"
+expect_value visible_parts == 3
+click "Parts/Solo"
+expect_value visible_parts == 4
+
+# The folder button: a new folder holding the whole selection.
+click "Parts/###part_folder_new"
+key escape
+run part_list
+expect_status Folder (3 Parts)
+# Clear: only the active Part stays selected; a Ctrl+click on the folder's header selects its Parts again.
+click "Parts/Clear##selection"
+expect_value selected_parts == 1
+hold ctrl
+click "Parts/Folder##folder"
+hold none
+expect_value selected_parts == 3
+run part_select_none
+
+# Move faces here: the masked half of Body into Box, one undo step.
+click "Parts/Body"
+remember triangles body
+run mask_rect x0=0 y0=-1 x1=1 y1=1
+run part_move_faces what=masked to=Box
+expect_status into Box
+expect_value triangles < $body
+expect_value parts == 4
+key ctrl+z
+expect_value triangles == $body
+shot outliner-moved
+
+# Part origin (Devon on Discord): Set... > Centre of mass, shown on the gizmo; Move to... > Onto the X symmetry plane.
+run part_select name=Body ; mask_clear ; transform translate=1.5,0,0
+click "Parts/Set...##origin"
+click "Centre of mass"
+expect_status Body origin: 1.5
+key w
+shot origin-on-gizmo
+key w
+click "Parts/Move to...##origin"
+click "Onto the X symmetry plane"
+expect_status Moved Body by -1.5
+key ctrl+z
+run part_origin set=none
+expect_status no origin
+
+# The Snap menu (Devon on Discord): Shift+S with the Blender-style keys, a plain list at the cursor.
+input_style blender
+run part_select name=Body ; part_to_world ; transform translate=0.8,0,0
+key w
+hover_model 0.5 0.5
+key shift+s
+expect "Origin to bounds centre"
+shot snap-menu
+click "Origin to bounds centre"
+expect_status Body origin: 0.8
+key shift+s
+click "Pivot to world centre"
+expect_status Gizmo pivot at 0,0,0
+key shift+s
+click "Part onto the X symmetry plane"
+expect_status Moved Body by -0.8
+run gizmo_pivot to=origin
+expect_status Gizmo pivot at
+run_fails gizmo_pivot to=nowhere
+key w
+input_style sculptforge

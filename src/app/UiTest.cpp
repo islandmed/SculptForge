@@ -92,7 +92,8 @@
 //                            supporter (the membership cards, Support.h),
 //                            welcome_open (the first-run welcome shown), new_look_card_open (the one-time
 //                            "SculptForge has a new look" card),
-//                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
+//                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), selected_parts,
+//                            visible_parts,
 //                            linked_parts (Parts sharing the active one's mesh, #94; 1 = none), part_moved, part_x (its
 //                            centre's x in the scene),
 //                            extract_preview (1 while an Extract preview waits for Accept), open_edges (edges of
@@ -1013,6 +1014,7 @@ double Demo::query(const std::string& name, bool& known) const {
         return n;
     }
     if (name == "active_part") return double(doc.activePart);
+    if (name == "selected_parts") return double(doc.selectedPartIndices().size()); // the Parts list's selection (#158)
     if (name == "extract_preview") return doc.extractPreviewCurrent() ? 1.0 : 0.0;
     if (name == "open_edges") {
         std::map<std::pair<uint32_t, uint32_t>, int> edges;

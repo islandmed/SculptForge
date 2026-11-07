@@ -7,10 +7,15 @@
 #include "TestHarness.h"
 
 #include "core/Commands.h"
+#include "core/CopyName.h"
 #include "core/FaceGroups.h"
+#include "core/Multires.h"
 #include "core/Primitives.h"
+#include "core/PartOrigin.h"
 #include "core/Parts.h"
 #include "io/ObjIO.h"
+
+#include <glm/matrix.hpp>
 
 #include <cmath>
 #include <set>
@@ -167,7 +172,7 @@ TEST(part_merge_split_commands) {
     // Duplicate sits right below the original and is independent.
     CHECK(reg.execute(doc, "part_select", {{"index", 0.0}}).ok);
     CHECK(reg.execute(doc, "part_duplicate").ok);
-    CHECK(doc.activePart == 1 && doc.parts[1].name.find("copy") != std::string::npos);
+    CHECK(doc.activePart == 1 && doc.parts[1].name == doc.parts[0].name + ".01");
     CHECK(reg.execute(doc, "mask_all").ok);
     CHECK(!doc.partMesh(0).hasMask());
 }
@@ -320,4 +325,244 @@ TEST(part_split_mask_threshold) {
     const auto in = trianglesIn(m, TriangleSet::Masked, &n);
     CHECK(n == 1 && in[0] == 0 && in[1] == 1);
     CHECK(trianglesIn(m, TriangleSet::Unmasked)[0] == 1);
+}
+
+TEST(part_list_selection) {
+    // The Parts list's selection (#158): Ctrl+click (add), Shift+click (range), folders; hide / show / solo /
+    // folder moves take all of it, and the active Part is always in it.
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 2.0}}).ok);
+    for (int k = 0; k < 4; ++k) CHECK(reg.execute(doc, "part_append", {{"type", std::string("cube")}}).ok);
+    CHECK(doc.partCount() == 5);
+    CHECK(reg.execute(doc, "part_select", {{"index", 0.0}}).ok);
+    CHECK(doc.selectedPartIndices() == std::vector<int>{0});
+    // Add 2, then a range from the active one (now 2) to 4.
+    CHECK(reg.execute(doc, "part_select", {{"index", 2.0}, {"add", true}}).ok);
+    CHECK(doc.activePart == 2 && doc.selectedPartIndices() == (std::vector<int>{0, 2}));
+    CHECK(reg.execute(doc, "part_select", {{"index", 4.0}, {"range", true}}).ok);
+    CHECK(doc.activePart == 2 && doc.selectedPartIndices() == (std::vector<int>{2, 3, 4}));
+    // Ctrl+click on a selected one takes it out; on the active one, the next selected takes over.
+    CHECK(reg.execute(doc, "part_select", {{"index", 3.0}, {"add", true}}).ok);
+    CHECK(doc.selectedPartIndices() == (std::vector<int>{2, 4}));
+    CHECK(reg.execute(doc, "part_select", {{"index", 2.0}, {"add", true}}).ok);
+    CHECK(doc.activePart == 4 && doc.selectedPartIndices() == std::vector<int>{4});
+    CHECK(!reg.execute(doc, "part_select", {{"index", 4.0}, {"add", true}}).ok); // the last one stays
+    // Hide, show and solo the selection.
+    CHECK(reg.execute(doc, "part_select", {{"index", 1.0}, {"add", true}}).ok);
+    CHECK(reg.execute(doc, "part_selection_visibility").ok);
+    CHECK(!doc.parts[1].visible && !doc.parts[4].visible && doc.parts[0].visible && doc.parts[2].visible);
+    CHECK(reg.execute(doc, "part_selection_visibility").ok);
+    CHECK(doc.parts[1].visible && doc.parts[4].visible);
+    CHECK(reg.execute(doc, "part_solo").ok);
+    for (int i = 0; i < 5; ++i) CHECK(doc.parts[size_t(i)].visible == (i == 1 || i == 4));
+    CHECK(reg.execute(doc, "part_solo").ok); // again: all shown
+    for (int i = 0; i < 5; ++i) CHECK(doc.parts[size_t(i)].visible);
+    // The selection into a folder at once; then the folder itself selected.
+    CHECK(reg.execute(doc, "part_folder_new", {{"folder", std::string("Pair")}, {"empty", true}}).ok);
+    const std::string a = doc.parts[1].name, b = doc.parts[4].name;
+    CHECK(reg.execute(doc, "part_set_folder", {{"folder", std::string("Pair")}, {"selection", true}}).ok);
+    const uint32_t pair = doc.partFolders[size_t(doc.findPartFolder("Pair"))].id;
+    CHECK(doc.parts[size_t(doc.findPart(a))].folder == pair && doc.parts[size_t(doc.findPart(b))].folder == pair);
+    CHECK(reg.execute(doc, "part_select", {{"index", 0.0}}).ok); // a plain click: only Part 0
+    CHECK(doc.selectedPartIndices() == std::vector<int>{0});
+    CHECK(reg.execute(doc, "part_select_folder", {{"folder", std::string("Pair")}}).ok);
+    CHECK(doc.selectedPartIndices().size() == 3 && doc.partInSelection(doc.findPart(a)) && doc.partInSelection(doc.findPart(b)));
+    CHECK(reg.execute(doc, "part_selection_visibility", {{"visible", false}}).ok);
+    CHECK(!doc.parts[0].visible && !doc.parts[size_t(doc.findPart(a))].visible);
+    CHECK(reg.execute(doc, "part_select_folder", {{"folder", std::string("Pair")}, {"add", true}}).ok); // toggled out
+    CHECK(doc.selectedPartIndices() == std::vector<int>{0});
+    CHECK(reg.execute(doc, "part_select_folder", {{"folder", std::string("Pair")}}).ok);
+    CHECK(reg.execute(doc, "part_select_none").ok && doc.selectedPartIndices() == std::vector<int>{0});
+    // Deleted Parts drop out of the selection.
+    CHECK(reg.execute(doc, "part_select", {{"index", 3.0}, {"add", true}}).ok);
+    CHECK(reg.execute(doc, "part_delete", {{"index", 0.0}}).ok);
+    CHECK(doc.selectedPartIndices().size() == 1);
+}
+
+TEST(part_move_faces) {
+    // Masked faces of the active Part into another one (#158): one undo step on the active Part, which also
+    // gives the other Part its old mesh and history back.
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 3.0}}).ok);
+    CHECK(reg.execute(doc, "part_append", {{"type", std::string("cube")}}).ok);
+    const std::string cube = doc.activePartInfo().name;
+    CHECK(reg.execute(doc, "mask_invert").ok); // a step in the cube's own history
+    CHECK(doc.undo.canUndo());
+    CHECK(reg.execute(doc, "mask_clear").ok);
+    const size_t cubeTris = doc.mesh.triangleCount();
+    CHECK(reg.execute(doc, "part_select", {{"index", 0.0}}).ok);
+    const size_t total = doc.mesh.triangleCount();
+    doc.mesh.mask.assign(doc.mesh.vertexCount(), 0.0f);
+    for (size_t v = 0; v < doc.mesh.vertexCount(); ++v) doc.mesh.mask[v] = doc.mesh.positions[v].x > 0.0f ? 1.0f : 0.0f;
+    doc.mesh.colors.assign(doc.mesh.vertexCount(), glm::vec3(0.1f, 0.5f, 0.9f));
+    size_t masked = 0;
+    trianglesIn(doc.mesh, TriangleSet::Masked, &masked);
+    CHECK(!reg.execute(doc, "part_move_faces", {{"to_index", 0.0}}).ok); // not into itself
+    CHECK(!reg.execute(doc, "part_move_faces", {{"to", std::string("nope")}}).ok);
+    CHECK(!reg.execute(doc, "part_move_faces", {{"what", std::string("hidden")}, {"to", cube}}).ok); // none hidden
+    CHECK(reg.execute(doc, "part_move_faces", {{"to", cube}}).ok);
+    CHECK(doc.partCount() == 2 && doc.activePart == 0);
+    CHECK(doc.mesh.triangleCount() == total - masked);
+    CHECK(doc.partMesh(1).triangleCount() == cubeTris + masked);
+    CHECK(doc.partMesh(1).hasColors()); // the moved faces keep their paint
+    CHECK(!doc.partUndo(1).canUndo()); // its history was for the old mesh
+    CHECK(reg.execute(doc, "undo").ok);
+    CHECK(doc.mesh.triangleCount() == total && doc.partMesh(1).triangleCount() == cubeTris);
+    CHECK(doc.partUndo(1).canUndo()); // and back
+    CHECK(reg.execute(doc, "redo").ok);
+    CHECK(doc.mesh.triangleCount() == total - masked && doc.partMesh(1).triangleCount() == cubeTris + masked);
+    // Visible faces: hide some, move what shows; everything visible would leave nothing.
+    CHECK(reg.execute(doc, "undo").ok);
+    doc.mesh.mask.clear();
+    doc.mesh.hidden.assign(total, uint8_t(0));
+    for (size_t t = 0; t < total / 2; ++t) doc.mesh.hidden[t] = 1;
+    CHECK(reg.execute(doc, "part_move_faces", {{"what", std::string("visible")}, {"to_index", 1.0}}).ok);
+    CHECK(doc.mesh.triangleCount() == total / 2 && doc.partMesh(1).triangleCount() == cubeTris + (total - total / 2));
+    CHECK(reg.execute(doc, "undo").ok);
+    doc.mesh.hidden.clear();
+    CHECK(!reg.execute(doc, "part_move_faces", {{"what", std::string("visible")}, {"to_index", 1.0}}).ok);
+}
+
+TEST(part_origin_and_to_world) {
+    // Part origins (Devon on Discord): set, carried by whole-Part transforms, one undo step each; part_to_world
+    // puts the origin (or the bounds centre) at 0,0,0, or only one coordinate (the symmetry plane).
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 3.0}}).ok);
+    CHECK(reg.execute(doc, "transform", {{"translate", std::string("2,1,-3")}}).ok);
+    const glm::vec3 c = boundsCentre(doc.mesh);
+    CHECK(std::abs(c.x - 2.0f) < 1e-4f && std::abs(c.y - 1.0f) < 1e-4f && std::abs(c.z + 3.0f) < 1e-4f);
+    // A sphere's centre of mass is its centre; a plane's is its surface's.
+    CHECK(glm::length(centreOfMass(doc.mesh) - c) < 1e-3f);
+    CHECK(!doc.activePartInfo().hasOrigin);
+    CHECK(glm::length(partPivot(doc, 0) - c) < 1e-6f); // no origin: the bounds centre
+
+    CHECK(!reg.execute(doc, "part_origin", {{"set", std::string("nowhere")}}).ok);
+    CHECK(!reg.execute(doc, "part_origin", {{"set", std::string("point")}}).ok);
+    CHECK(reg.execute(doc, "part_origin", {{"set", std::string("point")}, {"point", std::string("2,0,-3")}}).ok);
+    CHECK(doc.activePartInfo().hasOrigin && doc.activePartInfo().origin == glm::vec3(2, 0, -3));
+    CHECK(reg.execute(doc, "undo").ok && !doc.activePartInfo().hasOrigin);
+    CHECK(reg.execute(doc, "redo").ok && doc.activePartInfo().origin == glm::vec3(2, 0, -3));
+
+    // A whole-Part move carries the origin, in the same undo step.
+    CHECK(reg.execute(doc, "transform", {{"translate", std::string("1,0,0")}}).ok);
+    CHECK(glm::length(doc.activePartInfo().origin - glm::vec3(3, 0, -3)) < 1e-5f);
+    CHECK(reg.execute(doc, "undo").ok);
+    CHECK(glm::length(doc.activePartInfo().origin - glm::vec3(2, 0, -3)) < 1e-5f);
+    CHECK(glm::length(boundsCentre(doc.mesh) - c) < 1e-4f);
+
+    // Onto the X plane only: x of the origin goes to 0, the rest stays.
+    CHECK(reg.execute(doc, "part_to_world", {{"axis", std::string("x")}}).ok);
+    CHECK(std::abs(doc.activePartInfo().origin.x) < 1e-5f && std::abs(doc.activePartInfo().origin.z + 3.0f) < 1e-5f);
+    CHECK(std::abs(boundsCentre(doc.mesh).x) < 1e-4f && std::abs(boundsCentre(doc.mesh).y - 1.0f) < 1e-4f);
+    // Then all of it: the origin at 0,0,0 (so the bounds centre at 0,1,0, the origin being 1 below it).
+    CHECK(reg.execute(doc, "part_to_world").ok);
+    CHECK(glm::length(doc.activePartInfo().origin) < 1e-5f);
+    CHECK(glm::length(boundsCentre(doc.mesh) - glm::vec3(0, 1, 0)) < 1e-4f);
+    CHECK(reg.execute(doc, "part_to_world").ok); // already there: fine, nothing to do
+    // Hidden triangles move too (the mask and visibility don't matter here).
+    CHECK(reg.execute(doc, "undo").ok && reg.execute(doc, "undo").ok);
+    CHECK(glm::length(boundsCentre(doc.mesh) - c) < 1e-4f && glm::length(doc.activePartInfo().origin - glm::vec3(2, 0, -3)) < 1e-5f);
+    doc.mesh.hidden.assign(doc.mesh.triangleCount(), uint8_t(1));
+    CHECK(reg.execute(doc, "part_origin", {{"set", std::string("none")}}).ok);
+    CHECK(reg.execute(doc, "part_to_world").ok);
+    CHECK(glm::length(boundsCentre(doc.mesh)) < 1e-4f);
+
+    // Other Parts by name; bounds, mass and world.
+    CHECK(reg.execute(doc, "part_append", {{"type", std::string("plane")}}).ok);
+    const std::string plane = doc.activePartInfo().name;
+    CHECK(reg.execute(doc, "part_select", {{"index", 0.0}}).ok);
+    CHECK(reg.execute(doc, "part_origin", {{"set", std::string("mass")}, {"name", plane}}).ok);
+    const int pi = doc.findPart(plane);
+    CHECK(doc.parts[size_t(pi)].hasOrigin);
+    CHECK(glm::length(doc.parts[size_t(pi)].origin - boundsCentre(doc.partMesh(pi))) < 1e-3f); // a flat plane: its middle
+    CHECK(reg.execute(doc, "part_origin", {{"set", std::string("world")}}).ok);
+    CHECK(doc.activePartInfo().hasOrigin && doc.activePartInfo().origin == glm::vec3(0.0f));
+}
+
+TEST(part_mirror_copy) {
+    // Mirror copy (Oslen on Discord): a mirrored copy just below the Part, one undo step on the source.
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 2.0}}).ok);
+    CHECK(reg.execute(doc, "subdiv_divide").ok && subdivLevelCount(doc.mesh) == 2);
+    CHECK(reg.execute(doc, "transform", {{"translate", std::string("2,1,0")}}).ok);
+    const size_t tris = doc.mesh.triangleCount();
+    CHECK(!reg.execute(doc, "part_mirror_copy", {{"axis", std::string("w")}}).ok);
+    CHECK(!reg.execute(doc, "part_mirror_copy", {{"pivot", std::string("origin")}}).ok); // no origin yet
+    const CommandResult r = reg.execute(doc, "part_mirror_copy");
+    CHECK(r.ok && r.message.find("SDiv") != std::string::npos);
+    CHECK(doc.partCount() == 2 && doc.activePart == 0 && doc.parts[1].name == doc.parts[0].name + ".01");
+    const Mesh& copy = doc.partMesh(1);
+    CHECK(copy.triangleCount() == tris && subdivLevelCount(copy) == 0);
+    CHECK(glm::length(boundsCentre(copy) - glm::vec3(-2, 1, 0)) < 1e-4f);
+    CHECK(subdivLevelCount(doc.mesh) == 2); // the source keeps its levels
+    CHECK(reg.execute(doc, "undo").ok && doc.partCount() == 1);
+    CHECK(reg.execute(doc, "redo").ok && doc.partCount() == 2 && doc.parts[1].name == doc.parts[0].name + ".01");
+    // Across the Part's origin: the copy lands on the Part itself (a symmetric sphere about its centre).
+    CHECK(reg.execute(doc, "part_origin", {{"set", std::string("bounds")}}).ok);
+    CHECK(reg.execute(doc, "part_mirror_copy", {{"pivot", std::string("origin")}, {"axis", std::string("y")}}).ok);
+    CHECK(glm::length(boundsCentre(doc.partMesh(1)) - glm::vec3(2, 1, 0)) < 1e-4f);
+    CHECK(doc.parts[1].hasOrigin && glm::length(doc.parts[1].origin - doc.parts[0].origin) < 1e-5f);
+}
+
+TEST(copy_names) {
+    // Numbered copies (Oslen on Discord): Head -> Head.01, .02; a copy of Head.01 is the next free number.
+    CHECK(copyNameBase("Head.01") == "Head" && copyNameBase("Head.5") == "Head.5" && copyNameBase("v1.2b") == "v1.2b");
+    CHECK(copyNameBase(".01") == ".01" && copyNameBase("Head") == "Head");
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 1.0}}).ok && reg.execute(doc, "part_rename", {{"to", std::string("Head")}}).ok);
+    CHECK(reg.execute(doc, "part_duplicate").ok && doc.activePartInfo().name == "Head.01");
+    CHECK(reg.execute(doc, "part_duplicate").ok && doc.activePartInfo().name == "Head.02");
+    CHECK(reg.execute(doc, "part_select", {{"name", std::string("Head")}}).ok);
+    CHECK(reg.execute(doc, "part_duplicate").ok && doc.activePartInfo().name == "Head.03");
+    CHECK(reg.execute(doc, "part_mirror_copy").ok && doc.findPart("Head.04") >= 0);
+}
+
+TEST(parts_tools_on_linked_copies) {
+    // Linked copies (#94) sit somewhere else than their mesh: origin, Mirror copy and Move faces work where they're seen.
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 2.0}}).ok);
+    CHECK(reg.execute(doc, "part_rename", {{"to", std::string("Ear")}}).ok);
+    CHECK(reg.execute(doc, "part_duplicate_linked", {{"offset", std::string("3,0,0")}}).ok);
+    const int link = doc.activePart;
+    CHECK(doc.parts[size_t(link)].moved());
+
+    // Origin at the world centre: stored in the mesh's space, shown in the scene's.
+    CHECK(reg.execute(doc, "part_origin", {{"set", std::string("world")}}).ok);
+    CHECK(glm::length(partOriginInScene(doc.parts[size_t(link)])) < 1e-5f);
+    CHECK(glm::length(doc.parts[size_t(link)].origin - glm::vec3(-3, 0, 0)) < 1e-5f);
+    CHECK(reg.execute(doc, "undo").ok && !doc.parts[size_t(link)].hasOrigin);
+    // Bounds centre: the copy's own centre in the scene.
+    CHECK(reg.execute(doc, "part_origin", {{"set", std::string("bounds")}}).ok);
+    CHECK(glm::length(partPivot(doc, link) - doc.partBounds(link).center()) < 1e-4f);
+    // To the world centre: its transform moves (the shared mesh doesn't), the origin with it.
+    CHECK(reg.execute(doc, "part_to_world").ok);
+    CHECK(glm::length(doc.partBounds(link).center()) < 1e-4f);
+    CHECK(glm::length(doc.partBounds(0).center()) < 1e-4f); // (the first Ear, never moved, stays at 0 too)
+    CHECK(reg.execute(doc, "undo").ok && std::abs(doc.partBounds(link).center().x - 3.0f) < 1e-4f);
+
+    // Mirror copy of the moved copy across X: it lands at -3, not inside out, with no mirror in its transform.
+    CHECK(reg.execute(doc, "part_mirror_copy").ok);
+    const int mirrored = link + 1;
+    CHECK(std::abs(doc.partBounds(mirrored).center().x + 3.0f) < 1e-4f);
+    CHECK(glm::determinant(glm::mat3(doc.parts[size_t(mirrored)].transform)) > 0.0f);
+    CHECK(glm::length(partOriginInScene(doc.parts[size_t(mirrored)]) - glm::vec3(-3, 0, 0)) < 1e-4f);
+
+    // Move faces from the plain mirrored copy into Part 0 (not moved): they stay where they were seen.
+    CHECK(reg.execute(doc, "part_select", {{"index", double(mirrored)}}).ok);
+    const AABB seen = doc.partBounds(mirrored);
+    doc.mesh.mask.assign(doc.mesh.vertexCount(), 0.0f);
+    for (size_t v = 0; v < doc.mesh.vertexCount(); ++v) doc.mesh.mask[v] = doc.mesh.positions[v].y > 0.0f ? 1.0f : 0.0f;
+    CHECK(reg.execute(doc, "part_move_faces", {{"what", std::string("masked")}, {"to_index", 0.0}}).ok);
+    CHECK(doc.partBounds(0).min.x < seen.max.x - 1.0f); // Part 0 now reaches over to -3
+    // Not into a linked copy of the active Part itself.
+    CHECK(reg.execute(doc, "part_select", {{"index", double(link)}}).ok);
+    doc.mesh.mask.assign(doc.mesh.vertexCount(), 1.0f);
+    doc.mesh.mask[0] = 0.0f;
+    CHECK(!reg.execute(doc, "part_move_faces", {{"what", std::string("masked")}, {"to_index", 0.0}}).ok);
 }

@@ -155,6 +155,27 @@ int Document::partIndex(uint32_t id) const {
 }
 
 bool Document::applyPartStep(PartStep& step) {
+    if (step.originStep) {
+        const int i = partIndex(step.id);
+        if (i < 0) return false;
+        std::swap(parts[size_t(i)].hasOrigin, step.hasOrigin);
+        std::swap(parts[size_t(i)].origin, step.origin);
+        modified = true;
+        return true;
+    }
+    if (step.mesh) { // another Part's mesh: swap it (and its history) back in, for undo and redo alike
+        const int i = partIndex(step.id);
+        if (i < 0 || checkedOut(i)) return false;
+        PartData& d = *parts[size_t(i)].data; // (its linked copies share it: they change together)
+        std::swap(d.mesh, *step.mesh);
+        std::swap(d.undo, *step.history);
+        std::swap(d.activeLayer, step.layer);
+        d.bvh = BVH();
+        d.bvhDirty = true;
+        d.mesh.topologyDirty = true;
+        modified = true;
+        return true;
+    }
     if (step.isTransform) {
         const int i = partIndex(step.id);
         if (i < 0) return false;
@@ -186,6 +207,21 @@ bool Document::applyPartStep(PartStep& step) {
     if (activePart > i) --activePart;
     modified = true;
     return true;
+}
+
+bool Document::partInSelection(int i) const {
+    if (i < 0 || i >= partCount()) return false;
+    if (i == activePart) return true;
+    const Part& p = parts[size_t(i)];
+    return std::find(selectedParts.begin(), selectedParts.end(), p.id) != selectedParts.end() ||
+           (p.folder && std::find(selectedFolders.begin(), selectedFolders.end(), p.folder) != selectedFolders.end());
+}
+
+std::vector<int> Document::selectedPartIndices() const {
+    std::vector<int> out;
+    for (int i = 0; i < partCount(); ++i)
+        if (partInSelection(i)) out.push_back(i);
+    return out;
 }
 
 bool Document::extractPreviewCurrent() const {

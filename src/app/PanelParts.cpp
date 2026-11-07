@@ -276,9 +276,17 @@ void App::drawPartsContents() {
     const ImGuiStyle& style = ImGui::GetStyle();
 
     // The list: name, levels, triangles, shading, eye. Row actions run after the loop (they change the list).
-    int selectIndex = -1, toggleIndex = -1, shadeIndex = -1, deleteIndex = -1, duplicateIndex = -1, renameIndex = -1;
+    int selectIndex = -1, toggleIndex = -1, shadeIndex = -1, deleteIndex = -1, duplicateIndex = -1, mirrorCopyIndex = -1,
+        renameIndex = -1;
     int linkIndex = -1, uniqueIndex = -1; // Linked Duplicate / Make Unique from the right-click menu
     std::string renameTo;
+    // The selection (#158): Ctrl+click adds or takes out a Part, Shift+click a range from the active one; either on a
+    // folder's header selects the folder. Faces moved into a Part: what (masked, hidden, ...) and where.
+    const std::vector<int> selection = doc_.selectedPartIndices();
+    const bool multi = selection.size() > 1;
+    int selectAdd = -1, selectRange = -1, moveFacesTo = -1;
+    const char* moveFaces = nullptr;
+    bool selectionVisibility = false, selectionShow = false;
     // Folders (#96): pending actions on one, by name; a Part put into a folder ("" = out of its folder).
     PartFolderActions fa;
     int newFolderPart = -1;
@@ -374,15 +382,22 @@ void App::drawPartsContents() {
                 ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.0f, 0.5f));
                 // (Pressed itself, not through the shade mark or eye over it: two quick clicks on those aren't a
                 // double-click on the row, so they don't start a rename.)
+                const bool inSelection = doc_.partInSelection(i);
                 const ImGuiSelectableFlags rowFlags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap |
                                                       ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_NoAutoClosePopups;
-                const bool rowPressed = ImGui::Selectable(s.name.c_str(), isActive, rowFlags, ImVec2(0.0f, innerH));
-                if (rowPressed && !isActive) selectIndex = i;
+                const bool rowPressed = ImGui::Selectable(s.name.c_str(), inSelection, rowFlags, ImVec2(0.0f, innerH));
+                if (rowPressed) {
+                    const SDL_Keymod mod = SDL_GetModState(); // Ctrl or Cmd, as every other click reads them
+                    if (mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) selectAdd = i;
+                    else if (mod & SDL_KMOD_SHIFT) selectRange = i;
+                    else if (!isActive || multi) selectIndex = i;
+                }
                 ImGui::PopStyleVar();
                 if (!s.visible) ImGui::PopStyleColor();
                 if (ImGui::BeginDragDropSource()) { // #96: drag a Part onto a folder (or onto a Part outside folders)
                     ImGui::SetDragDropPayload("SF_PART", &s.id, sizeof s.id);
-                    ImGui::Text(tr("Move %s"), s.name.c_str());
+                    if (multi && inSelection) ImGui::Text(tr("Move %d Parts"), int(selection.size())); // #158: all of them
+                    else ImGui::Text(tr("Move %s"), s.name.c_str());
                     ImGui::EndDragDropSource();
                 }
                 {
@@ -404,7 +419,7 @@ void App::drawPartsContents() {
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
                     char linked[96] = "";
                     if (links > 1) std::snprintf(linked, sizeof linked, tr("\nLinked: %d Parts share this mesh"), links);
-                    ImGui::SetTooltip(tr("%s\n%zu vertices, %zu triangles%s%s%s\nClick to select, double-click to rename"),
+                    ImGui::SetTooltip(tr("%s\n%zu vertices, %zu triangles%s%s%s\nClick to select, Ctrl+click to add, Shift+click for a range, double-click to rename"),
                                       s.name.c_str(), doc_.partMesh(i).vertexCount(), doc_.partMesh(i).triangleCount(),
                                       subdivLevelCount(doc_.partMesh(i)) ? ", " : "",
                                       subdivLevelText(doc_.partMesh(i)).c_str(), linked);
@@ -425,6 +440,26 @@ void App::drawPartsContents() {
                         std::snprintf(renameBuffer_, sizeof renameBuffer_, "%s", s.name.c_str());
                     }
                     if (ImGui::MenuItem(tr("Duplicate"), actions_.shortcutText("part.duplicate").c_str())) duplicateIndex = i;
+                    if (ImGui::MenuItem(tr("Mirror copy"), actions_.shortcutText("part.mirror_copy").c_str())) mirrorCopyIndex = i;
+                    if (multi && inSelection) { // #158: the whole selection
+                        bool anyShown = false;
+                        for (int k : selection) anyShown |= doc_.parts[size_t(k)].visible;
+                        if (ImGui::MenuItem(anyShown ? tr("Hide the selected Parts") : tr("Show the selected Parts"))) {
+                            selectionVisibility = true;
+                            selectionShow = !anyShown;
+                        }
+                    }
+                    if (!isActive && ImGui::BeginMenu(tr("Move faces here"))) { // #158: from the active Part
+                        ImGui::TextDisabled(tr("From %s:"), doc_.activePartInfo().name.c_str());
+                        static const char* const kWhat[][2] = {
+                            {"masked", "Masked"}, {"hidden", "Hidden"}, {"visible", "Visible"}, {"unmasked", "Unmasked"}};
+                        for (const auto& w : kWhat)
+                            if (ImGui::MenuItem(tr(w[1]))) {
+                                moveFaces = w[0];
+                                moveFacesTo = i;
+                            }
+                        ImGui::EndMenu();
+                    }
                     if (ImGui::BeginMenu(tr("Folder"))) {
                         if (ImGui::MenuItem(tr("New folder"))) newFolderPart = i;
                         if (!doc_.partFolders.empty()) ImGui::Separator();
@@ -524,6 +559,10 @@ void App::drawPartsContents() {
         runCommand("part_select", {{"index", double(selectIndex)}});
         partSelected("Parts list");
     }
+    if (selectAdd >= 0) runCommand("part_select", {{"index", double(selectAdd)}, {"add", true}});
+    if (selectRange >= 0) runCommand("part_select", {{"index", double(selectRange)}, {"range", true}});
+    if (selectionVisibility) runCommand("part_selection_visibility", {{"visible", selectionShow}});
+    if (moveFaces) runCommand("part_move_faces", {{"what", std::string(moveFaces)}, {"to_index", double(moveFacesTo)}});
     if (toggleIndex >= 0) runCommand("part_visibility", {{"index", double(toggleIndex)}});
     if (shadeIndex >= 0) {
         const Shading now = doc_.parts[size_t(shadeIndex)].shading;
@@ -531,12 +570,16 @@ void App::drawPartsContents() {
         runCommand("part_shading", {{"index", double(shadeIndex)}, {"mode", std::string(shadingName(next))}});
     }
     if (duplicateIndex >= 0) runCommand("part_duplicate", {{"index", double(duplicateIndex)}});
+    if (mirrorCopyIndex >= 0) runCommand("part_mirror_copy", {{"index", double(mirrorCopyIndex)}});
     if (newFolderPart >= 0) {
         runCommand("part_folder_new", {{"index", double(newFolderPart)}});
         startFolderRename();
     }
-    if (fa.part >= 0 && fa.partTo != partFolderName(doc_.parts[size_t(fa.part)].folder))
+    if (fa.part >= 0 && multi && doc_.partInSelection(fa.part)) // #158: a selected Part takes the selection along
+        runCommand("part_set_folder", {{"folder", fa.partTo}, {"selection", true}});
+    else if (fa.part >= 0 && fa.partTo != partFolderName(doc_.parts[size_t(fa.part)].folder))
         runCommand("part_set_folder", {{"index", double(fa.part)}, {"folder", fa.partTo}});
+    if (!fa.select.empty()) runCommand("part_select_folder", {{"folder", fa.select}, {"add", true}});
     if (!fa.toggle.empty()) runCommand("part_folder_visibility", {{"folder", fa.toggle}});
     if (!fa.collapse.empty()) runCommand("part_folder_collapse", {{"folder", fa.collapse}});
     if (!fa.rename.empty() && !fa.renameTo.empty() && fa.renameTo != fa.rename)
@@ -557,6 +600,23 @@ void App::drawPartsContents() {
     }
     if (linkIndex >= 0) runCommand("part_duplicate_linked", {{"index", double(linkIndex)}});
     if (uniqueIndex >= 0) runCommand("part_make_unique", {{"index", double(uniqueIndex)}});
+
+    // The selection (#158): how many, hide or show them all, or back to the active Part alone.
+    if (const std::vector<int> sel = doc_.selectedPartIndices(); sel.size() > 1) {
+        bool anyShown = false;
+        for (int i : sel) anyShown |= doc_.parts[size_t(i)].visible;
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled(tr("%d selected"), int(sel.size()));
+        ImGui::SameLine();
+        if (ImGui::SmallButton(anyShown ? tr("Hide##selection") : tr("Show##selection")))
+            runCommand("part_selection_visibility", {{"visible", !anyShown}});
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("%s", anyShown ? tr("Hide the selected Parts") : tr("Show the selected Parts"));
+        ImGui::SameLine();
+        if (ImGui::SmallButton(tr("Clear##selection"))) runCommand("part_select_none");
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("%s", tr("Only the active Part stays selected"));
+    }
 
     // Buttons act on the active Part.
     const std::string activeName = doc_.activePartInfo().name;
@@ -674,24 +734,32 @@ void App::drawPartsContents() {
         ImGui::SetTooltip("%s", tr("Move down the list"));
     ImGui::SameLine();
     if (ImGui::Button(ICON_LC_FOLDER_PLUS "###part_folder_new", ImVec2(arrowW, 0))) {
+        const bool several = doc_.selectedPartIndices().size() > 1;
         runCommand("part_folder_new");
+        if (several && lastCommandOk_) // #158: the whole selection goes in
+            runCommand("part_set_folder", {{"folder", doc_.partFolders.back().name}, {"selection", true}});
         startFolderRename();
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-        ImGui::SetTooltip("%s", tr("New folder with the active Part (drag Parts onto a folder to add them)"));
+        ImGui::SetTooltip("%s", doc_.selectedPartIndices().size() > 1
+                                    ? tr("New folder with the selected Parts (drag Parts onto a folder to add them)")
+                                    : tr("New folder with the active Part (drag Parts onto a folder to add them)"));
     ImGui::SameLine();
     // Solo and X-Ray side by side (#80), then Unhide all.
     // Solo and X-Ray as wide as their words (never clipped, at any UI scale); Unhide all takes the rest.
     const float pad = 2.0f * style.FramePadding.x + 4.0f * uiScale_;
     const float soloW = std::ceil(ImGui::CalcTextSize(tr("Solo")).x + pad), xrayW = std::ceil(ImGui::CalcTextSize(tr("X-Ray")).x + pad);
-    const bool solo = count > 1 && visibleCount == 1 && doc_.activePartInfo().visible;
+    // Solo shows the selection (#158): lit while exactly the selected Parts are shown and some others aren't.
+    const std::vector<int> picked = doc_.selectedPartIndices();
+    bool solo = count > int(picked.size());
+    for (int i = 0; i < count && solo; ++i) solo = doc_.parts[size_t(i)].visible == doc_.partInSelection(i);
     ImGui::BeginDisabled(count < 2);
     if (solo) ImGui::PushStyleColor(ImGuiCol_Button, style.Colors[ImGuiCol_ButtonActive]);
     if (ImGui::Button(tr("Solo"), ImVec2(soloW, 0))) runCommand("part_solo");
     if (solo) ImGui::PopStyleColor();
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-        ImGui::SetTooltip(tr(solo ? "Show the other Parts again" : "Show only the active Part"));
+        ImGui::SetTooltip(tr(solo ? "Show the other Parts again" : picked.size() > 1 ? "Show only the selected Parts" : "Show only the active Part"));
     ImGui::SameLine();
     const bool xray = renderSettings_.xray;
     if (xray) ImGui::PushStyleColor(ImGuiCol_Button, style.Colors[ImGuiCol_ButtonActive]);
@@ -766,6 +834,48 @@ void App::drawPartsContents() {
         ImGui::SameLine();
         splitButton("Unmasked##part_split", "part_split_unmasked", masked,
                     "Split unmasked: the unmasked triangles become a new Part; the masked ones stay");
+    }
+    // The Part's origin (Devon on Discord; core/PartOrigin.h): where the gizmo turns it, and moving it to the world
+    // centre or onto a symmetry plane. One undo step each.
+    {
+        const Part& p = doc_.activePartInfo();
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("%s", tr("Origin"));
+        ImGui::SameLine();
+        const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
+        if (ImGui::Button(tr("Set...##origin"), ImVec2(half, 0))) ImGui::OpenPopup("##origin set");
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("%s", p.hasOrigin ? tr("The point the gizmo turns and scales this Part about (shown on the gizmo)")
+                                                : tr("No origin yet: the gizmo uses the Part's bounds centre"));
+        ImGui::SameLine();
+        if (ImGui::Button(tr("Move to...##origin"), ImVec2(-1, 0))) ImGui::OpenPopup("##origin move");
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("%s", tr("Move the whole Part so its origin is at the world centre, or only onto a symmetry plane"));
+        if (ImGui::BeginPopup("##origin set")) {
+            ImGui::TextDisabled(tr("Origin of %s"), p.name.c_str());
+            if (ImGui::MenuItem(tr("Bounds centre"))) runCommand("part_origin", {{"set", std::string("bounds")}});
+            if (ImGui::MenuItem(tr("Centre of mass"))) runCommand("part_origin", {{"set", std::string("mass")}});
+            if (ImGui::MenuItem(tr("World centre"))) runCommand("part_origin", {{"set", std::string("world")}});
+            if (ImGui::MenuItem(tr("Gizmo pivot"), nullptr, false, gizmoActive())) {
+                char at[96];
+                std::snprintf(at, sizeof at, "%.9g,%.9g,%.9g", double(gizmo_.pivot.x), double(gizmo_.pivot.y), double(gizmo_.pivot.z));
+                runCommand("part_origin", {{"set", std::string("point")}, {"point", std::string(at)}});
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("%s", tr("Where the gizmo's pivot is: Alt+click the model with the gizmo on to place it"));
+            ImGui::Separator();
+            if (ImGui::MenuItem(tr("No origin"), nullptr, false, p.hasOrigin)) runCommand("part_origin", {{"set", std::string("none")}});
+            ImGui::EndPopup();
+        }
+        if (ImGui::BeginPopup("##origin move")) {
+            ImGui::TextDisabled(tr("Move %s"), p.name.c_str());
+            if (ImGui::MenuItem(tr("To the world centre"))) runCommand("part_to_world");
+            ImGui::Separator();
+            if (ImGui::MenuItem(tr("Onto the X symmetry plane"))) runCommand("part_to_world", {{"axis", std::string("x")}});
+            if (ImGui::MenuItem(tr("Onto the Y symmetry plane"))) runCommand("part_to_world", {{"axis", std::string("y")}});
+            if (ImGui::MenuItem(tr("Onto the Z symmetry plane"))) runCommand("part_to_world", {{"axis", std::string("z")}});
+            ImGui::EndPopup();
+        }
     }
     if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::TextDisabled("%s", tr("Alt+click a Part to select it"));
@@ -842,10 +952,12 @@ void App::drawPartFolderRow(int fi, float rowH, ImVec2 cellPad, PartFolderAction
     } else {
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + textX);
         if (!visible) ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
-        if (ImGui::Selectable((f.name + "##folder").c_str(), false,
+        const bool picked = std::find(doc_.selectedFolders.begin(), doc_.selectedFolders.end(), f.id) != doc_.selectedFolders.end();
+        if (ImGui::Selectable((f.name + "##folder").c_str(), picked,
                               ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap |
                                   ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_NoAutoClosePopups)) {
-            fa.collapse = f.name; // (a double-click's second click folds it back)
+            if (SDL_GetModState() & (SDL_KMOD_CTRL | SDL_KMOD_GUI | SDL_KMOD_SHIFT)) fa.select = f.name; // #158: selected
+            else fa.collapse = f.name; // (a double-click's second click folds it back)
             if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) { // the header's own (not its eye's)
                 renamingFolder_ = f.id;
                 focusRename_ = true;
@@ -856,8 +968,8 @@ void App::drawPartFolderRow(int fi, float rowH, ImVec2 cellPad, PartFolderAction
         partDropTarget(f.name, fa);
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
             ImGui::SetTooltip("%s (%d)\n%s", f.name.c_str(), members,
-                              f.collapsed ? tr("Click to open, double-click to rename, drag Parts onto it")
-                                          : tr("Click to fold, double-click to rename, drag Parts onto it"));
+                              f.collapsed ? tr("Click to open, double-click to rename, Ctrl+click to select, drag Parts onto it")
+                                          : tr("Click to fold, double-click to rename, Ctrl+click to select, drag Parts onto it"));
         if (ImGui::BeginPopupContextItem("##folder row")) {
             ImGui::TextDisabled("%s", f.name.c_str());
             if (ImGui::MenuItem(tr("Rename"))) {

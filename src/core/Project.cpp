@@ -852,6 +852,8 @@ struct LoadedPart {
     bool visible = true;
     Shading shading = Shading::Default;
     int folder = -1; // index into the manifest's part_folders (#96)
+    bool hasOrigin = false; // core/PartOrigin.h
+    glm::vec3 origin{0.0f};
     int activeLayer = -1;
     int link = -1;              // a linked copy of this earlier Part (#94): no mesh of its own
     glm::mat4 transform{1.0f};  // Part::transform
@@ -904,6 +906,11 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         st.set("visible", s.visible);
         if (s.shading != Shading::Default) st.set("shading", shadingName(s.shading)); // (no format change: optional)
         if (const int f = doc.partFolderIndex(s.folder); f >= 0) st.set("folder", f); // (#96: optional, as shading)
+        if (s.hasOrigin) { // (optional, as shading)
+            Json o = Json::array();
+            for (int k = 0; k < 3; ++k) o.push(double(s.origin[k]));
+            st.set("origin", std::move(o));
+        }
         if (s.moved()) {
             st.set("transform", matrixJson(s.transform));
             version.need(8);
@@ -1089,6 +1096,10 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             s.visible = sj["visible"].asBool(true);
             if (sj["shading"].isString()) parseShading(sj["shading"].asString(), s.shading); // unknown: Default
             s.folder = int(sj["folder"].asNumber(-1));
+            if (const Json& o = sj["origin"]; o.isArray() && o.size() == 3) {
+                for (int k = 0; k < 3; ++k) s.origin[k] = float(o[size_t(k)].asNumber(0));
+                s.hasOrigin = std::isfinite(s.origin.x) && std::isfinite(s.origin.y) && std::isfinite(s.origin.z);
+            }
             s.bridgeName = sj["bridge_name"].asString();
             s.qremeshGuides = qremeshGuidesFromJson(sj["qremesh_guides"]);
             if (sj["transform"].isArray()) s.transform = matrixFromJson(sj["transform"]);
@@ -1196,11 +1207,15 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     doc.parts[0].visible = parts[0].visible;
     doc.parts[0].shading = parts[0].shading;
     doc.parts[0].transform = parts[0].transform;
+    doc.parts[0].hasOrigin = parts[0].hasOrigin;
+    doc.parts[0].origin = parts[0].origin;
     for (size_t i = 1; i < parts.size(); ++i) {
         if (parts[i].link >= 0) { // shares an earlier Part's mesh (Parts load in order: index i is i here too)
             const int at = doc.addLink(parts[i].link, parts[i].name, parts[i].transform);
             doc.parts[size_t(at)].visible = parts[i].visible;
             doc.parts[size_t(at)].shading = parts[i].shading;
+            doc.parts[size_t(at)].hasOrigin = parts[i].hasOrigin;
+            doc.parts[size_t(at)].origin = parts[i].origin;
             continue;
         }
         BVH* builtI = parts[i].finishBvh();
@@ -1209,6 +1224,8 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
         s.visible = parts[i].visible;
         s.shading = parts[i].shading;
         s.transform = parts[i].transform;
+        s.hasOrigin = parts[i].hasOrigin;
+        s.origin = parts[i].origin;
         s.data->activeLayer = validLayer(parts[i].activeLayer, s.data->mesh);
         s.data->bridgeName = parts[i].bridgeName;
         s.data->qremeshGuides = std::move(parts[i].qremeshGuides);

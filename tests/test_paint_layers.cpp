@@ -240,7 +240,7 @@ TEST(paint_layers_commands_and_undo) {
     CHECK(m.paintLayers[2].name == "Dirt" && m.activePaintLayer == 2);
     CHECK(!reg.execute(doc, "paint_layer_move", {{"direction", std::string("up")}}).ok); // already on top
     CHECK(reg.execute(doc, "undo").ok && sameStack(m, three));
-    CHECK(reg.execute(doc, "paint_layer_duplicate").ok && m.paintLayers.size() == 4 && m.paintLayers[2].name == "Dirt copy");
+    CHECK(reg.execute(doc, "paint_layer_duplicate").ok && m.paintLayers.size() == 4 && m.paintLayers[2].name == "Dirt.01");
     CHECK(m.paintLayers[2].alpha == m.paintLayers[1].alpha && m.activePaintLayer == 2);
     CHECK(reg.execute(doc, "undo").ok && sameStack(m, three));
     CHECK(reg.execute(doc, "paint_layer_delete", {{"index", 0.0}}).ok && m.paintLayers.size() == 2);

@@ -3,6 +3,7 @@
 #include "core/MeshTransform.h"
 
 #include "core/Document.h"
+#include "core/PartOrigin.h" // carryPartOrigin
 
 #include <algorithm>
 #include <cmath>
@@ -200,6 +201,7 @@ bool TransformSession::begin(const Mesh& mesh, std::vector<float> weights, Symme
         if (weighted) full[v] = uint16_t(l);
     }
     if (verts_.empty()) return false;
+    whole_ = verts_.size() == nv && std::all_of(level_.begin(), level_.end(), [](uint16_t l) { return l == kLevels; });
 
     // Symmetry only makes sense for a part of the mesh, on a side of the plane.
     Symmetry sym{false, false, false};
@@ -414,9 +416,11 @@ size_t transformPart(Document& doc, int index, const MeshTransform& t, bool useM
     if (!s.begin(mesh, transformWeights(mesh, useMask, falloff), mirror, local.pivot, layer)) return 0;
     const size_t n = s.movingVertices();
     s.apply(mesh, local);
+    const bool whole = s.whole();
     UndoRecord r = s.finish(mesh, bvh, label);
     if (r.empty()) return 0;
     undo.push(std::move(r));
+    if (whole) carryPartOrigin(doc, index, local, undo); // the origin (in the mesh's space) moves with it, same step
     return n;
 }
 

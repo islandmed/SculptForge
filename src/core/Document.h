@@ -58,6 +58,11 @@ struct Part {
     // Where the mesh is in the scene: world = transform * mesh position. Identity unless the Part is a linked copy
     // moved on its own (or was one: Make Unique keeps it). A similarity (rotation, translation, uniform scale).
     glm::mat4 transform{1.0f};
+    // The Part's origin (core/PartOrigin.h), in the mesh's space (world = transform * origin, so a linked copy
+    // carries its own): the point the gizmo turns and scales it about and Move to world centre puts at 0,0,0. Moves
+    // with whole-Part transforms. None: the gizmo uses the bounds centre.
+    bool hasOrigin = false;
+    glm::vec3 origin{0.0f};
     std::shared_ptr<PartData> data = std::make_shared<PartData>();
     Part() = default;
     Part(Part&&) = default;
@@ -77,13 +82,22 @@ struct PartFolder {
 
 // An undo step that added Part `id` at list position `at` (UndoRecord::part): `stashed` holds the Part
 // while it's undone. With `isTransform` it instead moved Part `id` (a linked copy): `transform` holds the
-// other transform (undo and redo swap it with the Part's).
+// other transform (undo and redo swap it with the Part's). With `mesh` set, a step that changed another Part's mesh
+// too (part_move_faces, #158): `mesh`, `history` and `layer` hold Part `id`'s other mesh, its own undo history and
+// active layer, swapped in and out of its PartData on undo and redo.
 struct PartStep {
     uint32_t id = 0;
     int at = 0;
     std::unique_ptr<Part> stashed;
     bool isTransform = false;
     glm::mat4 transform{1.0f};
+    std::unique_ptr<Mesh> mesh;
+    std::unique_ptr<UndoStack> history;
+    int layer = -1;
+    // Or, with `originStep` set, Part `id`'s origin (Part::hasOrigin / origin) as it was before or after: swapped
+    // with the Part's on undo and redo (core/PartOrigin.h). The Part may be the active one.
+    bool originStep = false, hasOrigin = false;
+    glm::vec3 origin{0.0f};
 };
 
 // Extract's preview (core/ExtractMirror.h): Part `id`, made from the mask of Part `source` as it was at
@@ -215,9 +229,22 @@ struct Document {
     int findPart(const std::string& name) const;
     // Index of the Part with this id, or -1.
     int partIndex(uint32_t id) const;
-    // Undoes or redoes a PartStep: takes the Part out of the list into the step, or puts it back. False
-    // when there was nothing to do (the Part was deleted since, or it's the active or the last one).
+    // Undoes or redoes a PartStep: takes the Part out of the list into the step, or puts it back (or swaps
+    // its mesh). False when there was nothing to do (the Part was deleted since, or it's the active or the
+    // last one).
     bool applyPartStep(PartStep& step);
+
+    // The Parts list's selection (#158): Parts and folders picked with Ctrl / Shift+click, by id, on top of the
+    // active Part, which is always in it. Hide, show, solo and folder moves take it. View state: not saved, not
+    // undoable; ids of Parts or folders removed since are ignored.
+    std::vector<uint32_t> selectedParts, selectedFolders;
+    // The selected Parts in list order: the active one, the picked ones and every Part in a picked folder.
+    std::vector<int> selectedPartIndices() const;
+    bool partInSelection(int i) const;
+    void clearPartSelection() {
+        selectedParts.clear();
+        selectedFolders.clear();
+    }
 
     // The Extract preview waiting for Accept, if any (see ExtractPreview).
     ExtractPreview extractPreview;

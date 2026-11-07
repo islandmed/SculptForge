@@ -98,6 +98,7 @@ add_library(sculptforge_core STATIC
   src/core/Cut.cpp
   src/core/CloseHoles.cpp
   src/core/MeshCheck.cpp
+  src/core/PartOrigin.cpp
   src/core/BrushAlpha.cpp
   src/core/Stencil.cpp
   src/core/Stroke.cpp
@@ -476,6 +477,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Input.cpp
     src/app/RadialMenu.cpp
     src/app/StrokePopup.cpp
+    src/app/SnapMenu.cpp
     src/render/GL.cpp
     src/render/ScreenStroke.cpp
     src/render/Renderer.cpp

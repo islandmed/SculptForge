@@ -275,6 +275,7 @@ void App::registerInputActions() {
                    }});
     registerViewActions();
     registerStrokePopupActions(); // StrokePopup.cpp
+    registerSnapMenu();           // SnapMenu.cpp
     applyInputStyle();
 }
 
@@ -404,7 +405,8 @@ void App::applyInputStyle() {
         {"transform.symmetry_x", {"X", "X", ""}},
         {"draw.paint", {"P", "P", ""}},
         {"ui.picker.material", {"M", "M", ""}},
-        {"stroke.lazy", {"L", "L", "L / Shift+S"}},
+        {"stroke.lazy", {"L", "L", "L"}},             // (Blender style: Shift+S is the Snap menu)
+        {"transform.snap_menu", {"", "", "Shift+S"}}, // assignable in the other styles
         {"stroke.popup", {"G", "G", "Z"}}, // (Blender's G is its Move brush; J opens the Strokes radial menu)
         {"mask.clear", {"Ctrl+Shift+A", "Ctrl+Shift+A", "Alt+M / Ctrl+Shift+A"}},
         {"geometry.lower_res", {"Shift+D", "Shift+D", "Alt+1 / Shift+D"}},

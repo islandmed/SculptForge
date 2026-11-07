@@ -480,6 +480,10 @@ void App::initActions() {
         ICON_LC_COPY, "part_duplicate", nullptr, nullptr,
         "Copy the active Part, with its layers and attributes, and make the copy active (also in the Parts list's "
         "right-click menu).");
+    add("part.mirror_copy", "Mirror Copy", "Tool > Parts", nullptr, [this] { runCommand("part_mirror_copy"); }, nullptr,
+        "part_mirror_copy", nullptr, nullptr,
+        "Copy the active Part mirrored across X through the world centre, as a new Part below it: one undo step (also in "
+        "the Parts list's right-click menu). The copy is the current subdivision level.");
     add("part.split_hidden", "Split Hidden", "Tool > Parts", nullptr, [this] { runCommand("part_split_hidden"); }, nullptr,
         "part_split_hidden", nullptr, [this] { return doc_.mesh.hasHidden(); },
         "Move the hidden triangles of the active Part into a new Part just below it, shown. One undo step.");

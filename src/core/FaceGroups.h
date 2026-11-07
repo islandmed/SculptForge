@@ -80,8 +80,9 @@ Mesh rebuildTriangles(const Mesh& mesh, const std::vector<uint8_t>& keep, const 
 
 // The triangles Split / Delete by selection take (part_split_hidden / _masked / _unmasked, delete_masked).
 // A triangle is masked when the average mask of its three corners is above kMaskedThreshold (so a corner-only
-// or soft-edge mask doesn't take its neighbours); unmasked is every other triangle. Hidden and visible alike.
-enum class TriangleSet : uint8_t { Hidden, Masked, Unmasked };
+// or soft-edge mask doesn't take its neighbours); unmasked is every other triangle, hidden and visible alike.
+// Visible is every triangle not hidden (part_move_faces, #158).
+enum class TriangleSet : uint8_t { Hidden, Masked, Unmasked, Visible };
 inline constexpr float kMaskedThreshold = 0.5f;
 // in[t] = 1 for the triangles in `set`; `count` (optional) receives how many.
 std::vector<uint8_t> trianglesIn(const Mesh& mesh, TriangleSet set, size_t* count = nullptr);

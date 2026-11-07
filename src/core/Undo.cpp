@@ -2,11 +2,26 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Undo.h"
 
+#include "core/Document.h" // PartStep
 #include "core/SelectionSets.h"
 
 #include <utility>
 
 namespace sf {
+
+namespace {
+
+size_t meshBytes(const Mesh& m) {
+    size_t bytes = m.vertexCount() * ((2 + (m.base.empty() ? 0 : 1 + m.layers.size())) * sizeof(glm::vec3) + 8 * sizeof(uint32_t)) +
+                   m.triangleCount() * (sizeof(glm::uvec3) + sizeof(glm::vec3) + 4 * sizeof(uint32_t)) +
+                   m.mask.size() * sizeof(float) + m.colors.size() * sizeof(glm::vec3) +
+                   m.facegroups.size() * sizeof(uint32_t) + m.hidden.size() + m.uvs.size() * sizeof(glm::vec2) +
+                   m.quadPartners.size() * sizeof(uint32_t) + m.paintBase.size() * sizeof(glm::vec3);
+    for (const auto& l : m.paintLayers) bytes += l.color.size() * sizeof(glm::vec3) + l.alpha.size() * sizeof(float);
+    return bytes;
+}
+
+} // namespace
 
 size_t UndoRecord::approxBytes() const {
     size_t bytes = positions.bytes() + mask.bytes() + colors.bytes() + paintAlpha.bytes() + hidden.bytes() +
@@ -15,17 +30,8 @@ size_t UndoRecord::approxBytes() const {
                    (subdiv ? subdiv->bytes() : 0) + (topology ? topology->bytes() : 0) +
                    (micro ? micro->bytes() : 0) + uvs.bytes() + (sets ? sets->bytes() : 0) + (uv ? uv->bytes() : 0);
     for (const auto& l : layerOffsets) bytes += l.bytes();
-    if (mesh)
-        bytes += mesh->vertexCount() * ((2 + (mesh->base.empty() ? 0 : 1 + mesh->layers.size())) * sizeof(glm::vec3) +
-                                        8 * sizeof(uint32_t)) +
-                 mesh->triangleCount() * (sizeof(glm::uvec3) + sizeof(glm::vec3) + 4 * sizeof(uint32_t)) +
-                 mesh->mask.size() * sizeof(float) + mesh->colors.size() * sizeof(glm::vec3) +
-                 mesh->facegroups.size() * sizeof(uint32_t) + mesh->hidden.size() + mesh->uvs.size() * sizeof(glm::vec2) +
-                 mesh->quadPartners.size() * sizeof(uint32_t);
-    if (mesh) {
-        bytes += mesh->paintBase.size() * sizeof(glm::vec3);
-        for (const auto& l : mesh->paintLayers) bytes += l.color.size() * sizeof(glm::vec3) + l.alpha.size() * sizeof(float);
-    }
+    if (mesh) bytes += meshBytes(*mesh);
+    if (part && part->mesh) bytes += meshBytes(*part->mesh); // another Part's mesh (part_move_faces)
     return bytes;
 }
 

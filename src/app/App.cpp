@@ -3039,6 +3039,7 @@ void App::drawUi() {
     drawLibraryBrowserUi(); // thumbnails, the Library over the canvas, pickers, size / strength pop-ups
     drawQuickMenu();  // Space (Input.cpp)
     drawRadialMenu(); // radial menus (RadialMenu.cpp)
+    drawSnapMenu();    // the Snap menu at the cursor (SnapMenu.cpp)
     drawStrokePopup(); // the stroke popup and a latched modifier's label at the cursor (StrokePopup.cpp)
     drawPartPopups();
     if (showBrushLab_) drawBrushLab();

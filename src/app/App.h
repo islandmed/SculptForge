@@ -1803,6 +1803,7 @@ private:
     // Parts list folders (#96): what a frame's folder rows asked for, run after the list (by folder name).
     struct PartFolderActions {
         std::string toggle, collapse, remove, gizmo, rename, renameTo;
+        std::string select; // Ctrl / Shift+click on its header: the folder joins or leaves the selection (#158)
         int part = -1;      // a Part put into folder partTo ("" = out of its folder)
         std::string partTo;
     };
@@ -2452,6 +2453,10 @@ private:
     // Smooth, Mask and Select latch: strokes act as if Shift, Ctrl or Ctrl+Shift were held until the same item is
     // picked again or another brush is picked.
     void registerStrokePopupActions();
+    // SnapMenu.cpp: the Snap menu (transform.snap_menu) and the gizmo_pivot command.
+    void registerSnapMenu();
+    void drawSnapMenu();
+    bool snapMenuRequest_ = false; // open it at the cursor next frame
     void openStrokePopup(bool held, int key);
     void closeStrokePopup() { strokePopup_.open = false; }
     void pickStrokePopupItem(int item, bool close);

@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/PaintLayer.h"
+#include "core/CopyName.h"
 
 #include "core/Commands.h"
 #include "core/Mesh.h"
@@ -280,7 +281,7 @@ int duplicatePaintLayer(Mesh& m, int layer) {
         copy = m.paintLayers[size_t(layer)];
         copy.locked = false;
     }
-    copy.name = uniquePaintLayerName(m, copy.name + " copy");
+    copy.name = copyName(copy.name, [&](const std::string& n) { return findPaintLayer(m, n) != -2; }); // Dirt.01
     m.paintLayers.insert(m.paintLayers.begin() + (layer + 1), std::move(copy));
     m.activePaintLayer = layer + 1;
     compositePaintAll(m);

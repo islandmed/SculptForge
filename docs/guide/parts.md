@@ -43,6 +43,24 @@ is already taken adds a number.
 
 Selecting a hidden Part shows it again, because you can't sculpt what you can't see.
 
+### Select several Parts and folders
+
+Like an outliner, the list can select more than one row. You still sculpt one Part, the active one, but
+hide, show, **Solo** and folder moves work on the whole selection.
+
+| To | Do this |
+|---|---|
+| Add a Part or take it out | <kbd>Ctrl</kbd>+click its row (it becomes the active one) |
+| Select a run of Parts | <kbd>Shift</kbd>+click: every Part from the active one to the one you click |
+| Select a folder | <kbd>Ctrl</kbd>+click or <kbd>Shift</kbd>+click its header: all its Parts join the selection |
+| Hide or show the selection | **Hide** / **Show** in the line under the list that says how many are selected, or right-click a selected row |
+| Show only the selection | **Solo** (click it again to bring the rest back) |
+| Put the selection in a folder | Drag any selected row onto a folder's header, or click the folder button to make a new folder with all of them |
+| Go back to one Part | **Clear**, or click a row without <kbd>Ctrl</kbd> or <kbd>Shift</kbd> |
+
+Selected rows are highlighted; the active one also has the accent bar. The selection is part of the view, so it
+isn't saved or undone, and a deleted Part simply drops out of it.
+
 ### Select a Part in the viewport
 
 Hold <kbd>Alt</kbd> and click another Part on the canvas. It becomes the active one and the list scrolls to it.
@@ -96,16 +114,21 @@ You can also add files as Parts from elsewhere:
   and choose **Append as Part**.
 
 > **Tip:** **Duplicate** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>, also in the command palette as
-> **Duplicate Part**) copies the active Part with its layers and attributes, names it `<name> copy` and puts it
-> right under the original. Use it to keep a safe copy before a destructive step such as a remesh.
-> **Linked Duplicate** instead makes a copy that shares the mesh and changes with it (rivets, legs, columns); see
-> [Linked Duplicates](linked-duplicates.md).
+> **Duplicate Part**) copies the active Part with its layers and attributes, names it `<name>.01` (then `.02`,
+> `.03`; a copy of `Head.01` is `Head.02`) and puts it right under the original. Use it to keep a safe copy before
+> a destructive step such as a remesh. **Linked Duplicate** instead makes a copy that shares the mesh and changes
+> with it (rivets, legs, columns); see [Linked Duplicates](linked-duplicates.md).
+>
+> **Mirror copy** (right-click the row, or **Mirror Copy** in the command palette) copies the Part mirrored across
+> X through the world centre (the plane symmetry uses), names it as Duplicate does and puts it under the original:
+> one undo step. Sculpt one ear, Mirror copy it for the other. The copy is the level you're on: it has no other
+> subdivision levels. Script: `part_mirror_copy axis=x|y|z pivot=world|origin`.
 
 ## Show, hide and solo
 
 - The eye on each row shows or hides that Part.
-- **Solo** shows only the active Part. Click it again to bring the others back. The **Solo** button on the right
-  shelf does the same.
+- **Solo** shows only the active Part, or every selected Part when you have [selected several](#select-several-parts-and-folders).
+  Click it again to bring the others back. The **Solo** button on the right shelf does the same.
 - **X-Ray**, next to **Solo**, shows the active Part through the others: the other Parts turn see-through and only
   their nearest surface shows. When only the active Part is shown, it is see-through itself. Click **X-Ray** again
   to make them solid. **View > X-Ray** does the same.
@@ -138,6 +161,39 @@ the folder's Parts active and turns on the gizmo's **Folder** option, so every v
 together; see [All Parts and Folder](gizmo.md#all-parts). Duplicates and the pieces of a split stay in their
 Part's folder. Folders are saved in the project; older versions of SculptForge open the file and simply show no
 folders.
+
+## Part origin
+
+Each Part can have an **origin**: the point the [gizmo](gizmo.md) turns and scales it about, and the point
+**Move to... > To the world centre** puts at 0,0,0. Without one, the gizmo uses the Part's bounds centre, as
+before. Set it in the **Origin** row of **Tool > Parts**:
+
+| **Set...** | The origin goes to |
+|---|---|
+| **Bounds centre** | the middle of the Part's bounding box |
+| **Centre of mass** | the centre of the Part as a solid of even density (for an open shell or a plane, the centre of its surface) |
+| **World centre** | 0,0,0 |
+| **Gizmo pivot** | wherever the gizmo's pivot is now: turn the gizmo on and <kbd>Alt</kbd>+click the model to place it first |
+| **No origin** | none again: the gizmo goes back to the bounds centre |
+
+| **Move to...** | Moves the whole Part so that |
+|---|---|
+| **To the world centre** | its origin (or bounds centre) is at 0,0,0 |
+| **Onto the X / Y / Z symmetry plane** | only that coordinate becomes 0: an off-centre model sits across the symmetry plane, ready for **Mirror And Weld** or symmetric strokes |
+
+The origin shows on the gizmo as a small ring with a cross, and it moves with the Part: when the gizmo or the
+`transform` command moves all of a Part (no mask in use), the origin goes along. Each **Set** and each **Move to**
+is one undo step, and the move takes the whole Part, hidden faces and sculpt layers included. The origin is saved
+in the project.
+
+### The Snap menu
+
+One key opens a short list at the cursor to put things somewhere exact: **Origin to bounds centre**, **Origin to
+world centre**, **Origin to gizmo pivot**; **Part to world centre**, **Part onto the X symmetry plane**; and, with the
+gizmo on, **Pivot to what moves** (the Part, or its unmasked part), **Pivot to origin** and **Pivot to world
+centre**. With the Blender-style keys (**Edit > Preferences > Input**) the key is <kbd>Shift</kbd>+<kbd>S</kbd>;
+in the other styles it has no key until you give it one (**Snap menu** in **Edit > Preferences > Hotkeys**, or
+run it from the command palette). Moving the gizmo's pivot isn't an undo step, as when you <kbd>Alt</kbd>+drag it.
 
 ## Reorder Parts
 
@@ -188,6 +244,24 @@ splits along its middle and a single masked corner doesn't take its neighbours. 
 sculpt layers carry over to both sides. [Subdivision levels](subdivision-levels.md) can't be cut: the split is
 made at the level the Part is on, which becomes its base (undo brings the levels back). To delete instead of
 split, use **Delete hidden** or **Delete masked** in **Tool > Visibility**.
+
+### Move faces into another Part
+
+To give part of the active Part to a Part that already exists, without making a new one, right-click the other Part's
+row > **Move faces here**, then choose which triangles of the active Part go over:
+
+| Choice | Moves |
+|---|---|
+| **Masked** | the masked triangles (average mask above 50%, as for Split); they arrive unmasked |
+| **Hidden** | the hidden triangles; they arrive shown |
+| **Visible** | every triangle that isn't hidden: hide what should stay, then move what you see |
+| **Unmasked** | the triangles that aren't masked |
+
+Both Parts keep UVs, face groups (the moved faces keep their own groups) and vertex paint. It's **one undo step**
+on the active Part: <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes the faces back out of the other Part and gives that Part its
+own earlier undo history again. The other Part's history starts over after the move, because its earlier steps
+were for its old mesh. As with Split, a Part with subdivision levels is cut at the level it's on. If every
+triangle would move, nothing is moved; use **Merge** instead.
 
 ## Extract a shell
 
@@ -243,23 +317,30 @@ used.
 | Command | What it does |
 |---|---|
 | `part_list` | List the Parts |
-| `part_select index=1` | Make a Part active |
+| `part_select index=1` | Make a Part active (and the only one selected); `add=true` adds it to the selection or takes it out, `range=true` selects from the active one to it |
+| `part_select_folder folder=Eyes` | Select a folder's Parts (`add=true`: add it or take it out) |
+| `part_select_none` | Only the active Part stays selected |
+| `part_selection_visibility visible=false` | Hide or show every selected Part (toggles when `visible` is left out) |
 | `part_append type=cube` | Add a primitive (`sphere`, `cube`, `plane`); `path=` adds a file; `size=` (0.05-2, default 0.35) |
 | `part_duplicate` | Copy a Part |
 | `part_duplicate_linked` / `part_make_unique` | A [linked copy](linked-duplicates.md) sharing the mesh / break the link |
 | `part_delete name=Helmet` | Delete a Part |
 | `part_rename to=Body` | Rename a Part |
 | `part_visibility visible=false` | Show or hide (toggles when `visible` is left out) |
-| `part_solo` / `part_show_all` | Solo the active Part / show every Part |
+| `part_solo` / `part_show_all` | Solo the selection (the active Part, or every selected one) / show every Part |
 | `part_move direction=up` | Move a Part up or down the list |
 | `part_folder_new folder=Eyes` | Make a folder holding a Part (`empty=true`: an empty one) |
-| `part_set_folder name=EyeL folder=Eyes` | Put a Part into a folder (`folder=` empty: out of its folder) |
+| `part_set_folder name=EyeL folder=Eyes` | Put a Part into a folder (`folder=` empty: out of its folder; `selection=true`: every selected Part) |
 | `part_folder_visibility folder=Eyes` | Hide or show a folder's Parts (toggles when `visible` is left out) |
 | `part_folder_collapse` / `part_folder_rename` / `part_folder_delete` | Fold or open, rename, remove a folder (`folder=`) |
 | `transform translate=0,0.1,0 folder=true` | Transform the visible Parts in the active Part's folder |
 | `part_merge_down` / `part_merge_visible` | Merge |
 | `part_split_groups` / `part_split_parts` | Split |
 | `part_split_hidden` / `part_split_masked` / `part_split_unmasked` | Split off into a new Part (undoable) |
+| `part_origin set=mass` | Set a Part's origin: `bounds`, `mass`, `world`, `point point=x,y,z` or `none` (undoable) |
+| `gizmo_pivot to=origin` | Put the gizmo's pivot at what moves (`selection`), the Part's `origin`, the `world` centre or `point point=x,y,z` (app only) |
+| `part_to_world axis=x` | Move a Part so its origin is at 0,0,0 (`axis=all`, the default) or on a symmetry plane (`x`, `y`, `z`) (undoable) |
+| `part_move_faces what=masked to=Helmet` | Move the active Part's `masked`, `hidden`, `visible` or `unmasked` triangles into another Part (`to=` name or `to_index=`; undoable) |
 | `part_shading mode=flat` | Shade a Part `default` (as the scene), `smooth` or `flat` |
 | `extract thickness=0.02 smooth=5 double=false` | Preview an Extract shell from the mask; `tcorne` / `tborder` for a triangle rim; `accept=true` keeps it at once |
 | `extract_accept` / `extract_cancel` | Keep or remove the Extract preview |

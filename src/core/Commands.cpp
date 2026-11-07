@@ -27,6 +27,7 @@
 #include "core/Micro.h"
 #include "core/MeshTransform.h"
 #include "core/MeshCheck.h"
+#include "core/PartOrigin.h"
 #include "core/PathStroke.h"
 #include "core/FaceGroups.h"
 #include "core/SelectionSets.h"
@@ -891,6 +892,7 @@ CommandRegistry::CommandRegistry() {
     registerTransformCommands(*this); // transform (core/MeshTransform.h)
     registerExtractMirrorCommands(*this); // extract, mirror_and_weld, mirror (core/ExtractMirror.h)
     registerMeshCheckCommands(*this);     // weld_points, mesh_check, mesh_fix (core/MeshCheck.h)
+    registerPartOriginCommands(*this);    // part_origin, part_to_world (core/PartOrigin.h)
     registerPerformanceCommands(*this); // perf_info, set_multithreading (core/Benchmark.cpp)
     registerHardwareProfileCommands(*this); // performance_profile, calibrate, set_performance_override (core/HardwareProfile.cpp)
     registerTimelineCommands(*this); // timeline_info / seek / select / retune / save / load (core/Timeline.h)

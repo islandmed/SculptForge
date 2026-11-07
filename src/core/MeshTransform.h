@@ -88,6 +88,7 @@ public:
 
     bool active() const { return active_; }
     size_t movingVertices() const { return verts_.size(); }
+    bool whole() const { return whole_; } // every vertex moves fully (no mask, nothing hidden): the Part's origin goes along
     bool mirrored() const { return mirrors_.size() > 1; }
     // True when begin failed because the layer to record into has weight 0 (its offsets would not show).
     static bool layerWeightZero(const Mesh& mesh, int layer);
@@ -115,6 +116,7 @@ private:
     std::vector<uint8_t> usedLevels_;                 // which quantized weights occur
     std::vector<Level> table_;                        // mirrors_.size() * (kLevels + 1)
     bool moved_ = false;
+    bool whole_ = false;
 
 public:
     static constexpr int kLevels = 4096;

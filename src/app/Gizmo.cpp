@@ -8,13 +8,16 @@
 // the release makes one undo step per Part. Shift snaps (15 degrees, the grid, 10%), Alt+drag moves the pivot
 // or turns the axes only, Alt+click on the model puts the pivot there. The Transform gizmo panel adds numeric entry.
 #include "app/App.h"
+#include "app/Theme.h"
 #include "app/Ui.h"
+#include "core/PartOrigin.h"
 
 #include <IconsLucide.h>
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 
 namespace sf {
 
@@ -217,6 +220,13 @@ void App::updateGizmoPivot() {
                    doc_.mesh.vertexCount() * 31u ^ (gizmo_.all ? 2u : 0u) ^ (gizmo_.useMask ? 4u : 0u) ^
                    (gizmo_.folder ? 8u + uint64_t(doc_.activePartInfo().folder) * 16u : 0u) ^
                    uint64_t(doc_.partCount()) << 48;
+    if (const Part& p = doc_.activePartInfo(); p.hasOrigin) // its origin set or moved (core/PartOrigin.h)
+        for (int k = 0; k < 3; ++k) {
+            const glm::vec3 at = partOriginInScene(p); // (a linked copy's moves with its transform)
+            uint32_t bits = 0;
+            std::memcpy(&bits, &at[k], sizeof bits);
+            key = key * 1099511628211ull ^ bits;
+        }
     if (gizmo_.all || gizmo_.folder)
         for (int i = 0; i < doc_.partCount(); ++i)
             key = key * 1099511628211ull ^ doc_.partUndo(i).revision() ^ (doc_.parts[size_t(i)].visible ? 1u : 0u);
@@ -233,6 +243,12 @@ void App::updateGizmoPivot() {
         gizmo_.pivotPlaced = false;
     }
     if (gizmo_.pivotPlaced) return;
+    // A Part with an origin turns about it, when the whole of it moves (no mask in use).
+    if (const Part& p = doc_.activePartInfo();
+        p.hasOrigin && !gizmo_.all && !gizmo_.folder && transformWeights(doc_.mesh, gizmo_.useMask, 0.0f).empty()) {
+        gizmo_.pivot = partOriginInScene(p);
+        return;
+    }
     AABB box;
     for (int i : gizmoTargets()) {
         const Mesh& m = doc_.partMesh(i);
@@ -651,9 +667,14 @@ void App::gizmoRelease() {
     for (size_t i = 0; i < gizmo_.sessions.size(); ++i) {
         const int st = gizmo_.parts[i];
         const size_t n = gizmo_.sessions[i].movingVertices();
+        const bool whole = gizmo_.sessions[i].whole();
         UndoRecord r = gizmo_.sessions[i].finish(doc_.partMesh(st), doc_.partBvh(st), label);
         if (r.empty()) continue;
         doc_.partUndo(st).push(std::move(r));
+        if (whole) { // its origin goes along (in the mesh's space, as the session moved it)
+            const Part& s = doc_.parts[size_t(st)];
+            carryPartOrigin(doc_, st, s.moved() ? gizmo_.current.inSpaceOf(s.transform) : gizmo_.current, doc_.partUndo(st));
+        }
         moved += n;
     }
     for (size_t i = 0; i < gizmo_.wholeParts.size(); ++i) { // linked copies: one transform step each
@@ -794,6 +815,18 @@ void App::drawGizmo() {
         return;
     }
     const bool dragging = drag_ == Drag::Gizmo && gizmo_.handle != H::None;
+    // The active Part's origin (core/PartOrigin.h): a small ring and cross, where the gizmo sits unless it was moved.
+    if (const Part& p = doc_.activePartInfo(); p.hasOrigin) {
+        ImVec2 po;
+        if (gizmoProject(partOriginInScene(p), po)) {
+            const float r = 5.0f * s;
+            const ImU32 col = theme::u32(theme::accent);
+            dl->AddCircle(po, r + 1.0f * s, IM_COL32(0, 0, 0, 110), 0, 3.0f * s);
+            dl->AddCircle(po, r, col, 0, 1.5f * s);
+            dl->AddLine(ImVec2(po.x - r * 1.8f, po.y), ImVec2(po.x + r * 1.8f, po.y), col, 1.2f * s);
+            dl->AddLine(ImVec2(po.x, po.y - r * 1.8f), ImVec2(po.x, po.y + r * 1.8f), col, 1.2f * s);
+        }
+    }
     auto colorFor = [&](H h, int axis) {
         if (gizmo_.hover == h) return kHot;
         return axisColor(axis, dragging ? 0.45f : 1.0f);

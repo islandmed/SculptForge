@@ -68,7 +68,9 @@ mask and a pivot off the plane; a Part moved as a whole just moves.
 ## The pivot
 
 The pivot is the point rotation and scaling turn about, and where the gizmo sits. It starts at the centre of what
-will move (the Part, or its unmasked part) and follows it when you change the mask or pick another Part.
+will move (the Part, or its unmasked part) and follows it when you change the mask or pick another Part. A Part
+with an [origin](parts.md#part-origin) starts at its origin instead (when all of it moves), marked by a small
+ring with a cross, and the origin travels with the Part.
 
 | To | Do this |
 |---|---|

@@ -108,7 +108,7 @@ click "Parts/Helmet"
 click "Parts/Duplicate"
 expect_value parts == 4
 expect_value active_part == 3
-expect "Parts/Helmet copy"
+expect "Parts/Helmet.01"
 click "Parts/Delete..."
 expect_text This can't be undone
 shot confirm-delete
@@ -117,8 +117,8 @@ expect_value parts == 4
 click "Parts/Delete..."
 click "Delete Part?/Delete"
 expect_value parts == 3
-expect_status Deleted Part Helmet copy
-expect_not "Parts/Helmet copy"
+expect_status Deleted Part Helmet.01
+expect_not "Parts/Helmet.01"
 
 # Move the active Part up and down the list.
 click "Parts/Sphere"

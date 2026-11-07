@@ -79,7 +79,8 @@ bool resolveInsertSetPath(const std::string& path, std::string& file, std::strin
 // part_list, part_select, part_append, part_duplicate, part_duplicate_linked, part_make_unique, part_delete,
 // part_rename, part_visibility, part_solo, part_show_all, part_move,
 // part_merge_down, part_merge_visible, part_split_groups, part_split_parts, part_split_hidden,
-// part_split_masked, part_split_unmasked.
+// part_split_masked, part_split_unmasked, part_select_folder, part_select_none, part_selection_visibility,
+// part_move_faces.
 void registerPartCommands(CommandRegistry& registry);
 
 } // namespace sf
