@@ -152,8 +152,8 @@ SculptForge is free software under the GNU General Public License, version 3 or 
 ## Studio membership
 
 SculptForge is free for any number of artists, and nothing in the app is ever paywalled. A Studio membership is
-$300 a month for up to 10 artists, plus $25 a month for each extra artist. The first 10 studios become Founding
-Studios at $150 a month, locked for as long as they stay subscribed. Each artist gets everything in Member, and the
+a flat $300 a month for the whole studio, any number of artists. The first 10 studios become Founding
+Studios at a flat $150 a month, locked for as long as they stay subscribed. Each artist gets everything in Member, and the
 studio gets:
 
 - **Its own build** with its brushes, alphas, Lit Spheres, keymaps, macros, preferences, paths and logo built in.
@@ -166,7 +166,8 @@ studio gets:
   (bigger features are quoted separately), your requests first on the roadmap, and a private Discord channel.
 
 Every release stays free for everyone; bug-fix and security releases go out to everyone the same day. Join at
-[sculptforge.app/studios.html](https://sculptforge.app/studios.html#membership) or write to hello@sculptforge.app.
+[sculptforge.app/studios.html](https://sculptforge.app/studios.html#membership) or ask on the
+[SculptForge Discord](https://discord.gg/gWrYkEmQhH).
 
 **What stays private, and what doesn't.** SculptForge is GPL-3.0, and so is your studio build: its source comes
 with it and is yours to share. There are no exclusive or secret features. What stays private is yours: the

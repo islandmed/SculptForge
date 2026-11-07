@@ -133,8 +133,8 @@ SculptForge is GPL-3.0-or-later. In practice:
 
 ## Studio builds and offline deployment
 
-A Studio membership ($300 a month for up to 10 artists, +$25 per extra artist; Founding Studio $150 for the
-first 10 studios) includes a custom build with your own assets and defaults baked in, a private release channel,
+A Studio membership (a flat $300 a month for the whole studio, any number of artists; Founding Studio a flat
+$150 for the first 10 studios) includes a custom build with your own assets and defaults baked in, a private release channel,
 studio mode (no outside connections), a pinned version with security backports to the current release and one LTS
 line, and an offline signed installer. The build is GPL-3.0 like every SculptForge build; your assets, settings
 and network stay private. See the user guide's
