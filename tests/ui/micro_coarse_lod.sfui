@@ -1,0 +1,50 @@
+# Coarse levels of a micro level (docs/design/micro-coarse-lod.md): a micro level on a base over the triangle budget
+# (even one micro triangle per base triangle doesn't fit) draws the coarse levels of its displaced base corners
+# while the view moves or the frame doesn't fit, as a mesh does (coarse_lod.sfui); at rest the micro level, if a
+# frame of it fits the still-frame budget. A stroke draws the micro level; the levels follow after it.
+run ui_look look=classic layout=classic
+env SF_TRIANGLE_BUDGET 40000
+env SF_STILL_FRAME_MS 0.001
+run new_sphere subdivisions=6
+run micro_divide level=1
+expect_status "Divided to micro"
+run micro_noise amplitude=0.01 scale=12
+camera 0 0
+wait 0.6
+expect_value drawn_triangles <= 40000
+expect_value drawn_triangles > 2000
+expect_value coarse_clusters > 0
+expect_text "Preview detail"
+shot micro-coarse-preview
+camera 35 20
+wait 0.6
+expect_value drawn_triangles <= 40000
+shot micro-coarse-turned
+
+# A stroke: the micro level draws while it runs (its clusters pending); after it the coarse levels follow.
+camera 0 0
+wait 0.6
+remember coarse_clusters before
+expect_value coarse_pending == 0
+key b
+key c
+key l
+stroke 0.42 0.45 0.58 0.55 0.6 hold
+wait 0.3
+expect_value coarse_pending > 0
+expect_value coarse_clusters == 0
+shot micro-coarse-during-stroke
+release
+wait 0.8
+expect_value coarse_pending == 0
+expect_value coarse_clusters == $before
+expect_value drawn_triangles <= 40000
+shot micro-coarse-after-stroke
+
+# A still frame that fits: at rest the micro level itself, and no "Preview detail".
+env SF_STILL_FRAME_MS 100000
+wait 1.2
+expect_value coarse_clusters == 0
+expect_value drawn_triangles > 40000
+expect_no_text "Preview detail"
+shot micro-still-full-detail
