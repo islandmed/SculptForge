@@ -241,7 +241,7 @@
       "added": "2026-10-22"
     },
     {
-      "name": "Stone Chisel",
+      "name": "Stone Carve",
       "description": "Scrapes hard planes and breaks them up with cracks for rocks and ruins.",
       "author": "SculptForge",
       "tags": [
@@ -249,9 +249,9 @@
         "environment",
         "hard-surface"
       ],
-      "file": "brushes/stone-chisel.sfbrush",
-      "preview": "previews/stone-chisel.png",
-      "sha256": "7db8ad4c84793a093fc21bd724bc63c127dde0528df32d677fe5552378c299e4",
+      "file": "brushes/stone-carve.sfbrush",
+      "preview": "previews/stone-carve.png",
+      "sha256": "e17a11064b9385a2c9d0d46c1ab3568585a1505200dddab5aa006feb455a69fd",
       "added": "2026-10-22"
     },
     {

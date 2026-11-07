@@ -35,8 +35,8 @@ public:
     void showFolder(LibraryTab tab, const std::string& folder);
     // Preferences > Library (the shell's Preferences palette calls this).
     void drawPreferences(App& app);
-    // Height the strip takes over the canvas at `rows` rows (logical px x scale).
-    static float height(int rows, float scale);
+    // Height the strip takes over the canvas with the layout's rows and tile size (logical px x scale).
+    static float height(const UiLayout& layout, float scale);
 
     // A file dropped at (x, y) (window coordinates): an image dropped on the Material tab loads as a Lit Sphere (#124).
     // False when the Library doesn't take it (the canvas does what it always does).
@@ -78,6 +78,10 @@ private:
     bool tileDrag_ = false;
     AssetEntry dragEntry_;
     float scrollTo_ = -1.0f; // reset scroll after navigating
+    // Dragging the strip's canvas edge: the tile size it started from and where.
+    bool resizing_ = false;
+    float resizeY_ = 0.0f, resizeTile_ = 0.0f;
+    void drawResizeHandle(App& app, ImVec2 pos, ImVec2 size);
     std::string imageMenu_;  // image tile double-clicked: its action menu
     // Folders added with "Open folder..." (shown at every tab's root).
     std::vector<std::string> extraRoots_;

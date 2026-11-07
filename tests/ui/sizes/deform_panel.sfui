@@ -1,0 +1,21 @@
+# The Deform panel as people see it (docs/design/deform-panel.md), for the look review on a 1440x900 window
+# (CMake: ui_deform_panel_1440; deform_panel_1024.sfui is the same at 1024x768): a tall Part, a stack of three
+# steps previewed on it, one on two axes, and Size showing the Part's real dimensions.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+run deform_scale amount=100 axes=y
+click "Tool##palette.tool"
+click "Deformation##tool.deformation"
+expect "Size/##deform_size_x"
+click "##deform_stack_add"
+click "Stack/Taper##deform_add_Taper"
+click "##deform_stack_add"
+click "Stack/Twist##deform_add_Twist"
+click "##deform_stack_add"
+click "Stack/Bend##deform_add_Bend"
+expect_status "Deform stack (3 steps)"
+click "Stack/Z"
+expect_status "Deform stack (3 steps)"
+click "Frame##view.frame"
+wait_idle 30
+shot deform-panel

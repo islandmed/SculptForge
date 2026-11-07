@@ -777,8 +777,7 @@ void App::registerShellActions() {
              id == "preferences" ? "Ctrl+," : "", // (Cmd+, on macOS, where apps keep their settings, #111)
              "",
              [this, id] {
-                 if (std::count(layout_.leftTray.begin(), layout_.leftTray.end(), id) +
-                     std::count(layout_.rightTray.begin(), layout_.rightTray.end(), id)) {
+                 if (paletteInShownTray(id)) {
                      flashPalette_ = id;
                      flashStart_ = ImGui::GetTime();
                      return;
@@ -891,6 +890,7 @@ void App::applyPreset(int preset) {
     l.consoleHeight = layout_.consoleHeight;
     l.libraryOpen = layout_.libraryOpen;
     l.libraryRows = layout_.libraryRows;
+    l.libraryTile = layout_.libraryTile;
     l.libraryTab = layout_.libraryTab;
     l.libraryBottom = layout_.libraryBottom;
     l.leftHanded = layout_.leftHanded;
@@ -907,6 +907,11 @@ void App::applyPreset(int preset) {
     dropdown_.clear();
     status_ = std::string("Layout: ") + kNames[std::clamp(preset, 0, 2)] + " (Save Layout keeps it)";
     lastCommandOk_ = true;
+}
+
+bool App::paletteInShownTray(const std::string& id) const {
+    return std::count(layout_.leftTray.begin(), layout_.leftTray.end(), id) ||
+           (!shell_.narrow && std::count(layout_.rightTray.begin(), layout_.rightTray.end(), id));
 }
 
 void App::removePaletteFromTrays(const std::string& id) {
@@ -1032,14 +1037,16 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     barSpans_.push_back({brandX, ImGui::GetItemRectMax().x});
     const float nameEnd = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x; // (the cursor is on the next line)
 
-    // Right-aligned controls: QuickSave, layout presets, Menus, search. Measured first. A window too narrow for it
-    // all (1024 px at 200 % UI scale) never overlaps: things give way in this order: the version, the layout presets,
-    // Save Snapshot, the search field (to its icon), Send to Maya, then the document name.
+    // Right-aligned controls: the support heart, QuickSave, layout presets, Menus, search. Measured first. A window
+    // too narrow for it all (1024 px at 200 % UI scale) never overlaps: things give way in this order: the heart, the
+    // version, the layout presets, Save Snapshot, the search field (to its icon), Send to Maya, then the document name.
     const ImGuiStyle& st = ImGui::GetStyle();
     auto buttonW = [&](const char* label) { return ImGui::CalcTextSize(label, nullptr, true).x + st.FramePadding.x * 2.0f; };
     bool quickSave = actions_.find("file.quicksave") != nullptr;
     bool maya = !uiPrefs_.mayaFolder.empty(); // the Maya bridge is on (#42): one click sends back
     bool presets = true, docName = true;
+    bool heart = !studioMembership(); // Help > Support SculptForge (a member's badge); no room needed for it
+    const float heartW = buttonH;
     float searchW = 150.0f * s;
     const float windowButtonW = buttonH + 6.0f * s; // minimise and close, at the far right
     const bool mayaLink = mayaLink_ != nullptr; // the Maya Live link is on: its ember chip turns it off
@@ -1050,12 +1057,21 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     auto rightWidth = [&] {
         float w = searchW + buttonW(tr(ICON_LC_MENU " Menus")) + 8.0f * s + 10.0f * s + 2.0f * windowButtonW + 2.0f * s;
         if (presets) w += 3.0f * (buttonH + 2.0f * s) + 10.0f * s;
+        if (heart) w += heartW + 8.0f * s;
         if (quickSave) w += buttonW(tr("Save Snapshot")) + 8.0f * s;
         if (maya) w += buttonW((std::string(ICON_LC_SEND "  ") + tr("Send to Maya")).c_str()) + 8.0f * s;
         if (mayaLink) w += buttonW(linkLabel.c_str()) + 8.0f * s;
         return w;
     };
     auto fits = [&] { return nameEnd + (docName ? 16.0f * s + buttonW(name.c_str()) : 0.0f) + 14.0f * s + rightWidth() + 8.0f * s <= g.title.w; };
+    { // the heart goes first: before the version beside the name gives way
+        const ShownVersion v = appShownVersion();
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        const float versionW = 6.0f * s + ImGui::CalcTextSize(v.number.c_str()).x +
+                               (v.tag.empty() ? 0.0f : ImGui::CalcTextSize(v.tag.c_str()).x + 4.0f * s);
+        if (fontSmall_) ImGui::PopFont();
+        if (nameEnd + versionW + 16.0f * s + buttonW(name.c_str()) + 14.0f * s + rightWidth() + 8.0f * s > g.title.w) heart = false;
+    }
     if (!fits()) presets = false;
     if (!fits()) quickSave = false;
     if (!fits()) searchW = buttonH + 4.0f * s;
@@ -1164,6 +1180,10 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     ImGui::PushStyleColor(ImGuiCol_Button, theme::toggleOff);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::toggleOffHover);
     ImGui::PushStyleColor(ImGuiCol_Text, theme::textOff);
+    if (heart) {
+        drawSupportHeart(ImVec2(ImGui::GetWindowPos().x + rightX, ImGui::GetWindowPos().y + (h - buttonH) * 0.5f), heartW, dl);
+        ImGui::SameLine(0.0f, 8.0f * s);
+    }
     if (mayaLink) {
         ImGui::PushStyleColor(ImGuiCol_Button, theme::accent);
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::accentHover);
@@ -1267,11 +1287,7 @@ void App::drawPaletteBar(const ShellGeometry& g) {
     for (size_t k = 0; k < order.size(); ++k) {
         const int i = int(k);
         const PaletteDef& p = list[order[k]];
-        // In a tray that shows: a narrow window draws no right tray, so its palettes open as drop-downs from here
-        // (else a click only flashed a tray that isn't there, and Tool could not be opened at 1024 px).
-        const bool inTray =
-            (layout_.leftTrayOpen && std::count(layout_.leftTray.begin(), layout_.leftTray.end(), p.id) > 0) ||
-            (layout_.rightTrayOpen && !shell_.narrow && std::count(layout_.rightTray.begin(), layout_.rightTray.end(), p.id) > 0);
+        const bool inTray = paletteInShownTray(p.id);
         const bool open = dropdown_ == p.id;
         ImGui::PushStyleColor(ImGuiCol_Button, open ? theme::header : ImVec4(0, 0, 0, 0));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::headerHover);
@@ -1331,6 +1347,7 @@ UiLayout relayout(const UiLayout& from, int layoutKind) {
     l.consoleHeight = from.consoleHeight;
     l.libraryOpen = from.libraryOpen;
     l.libraryRows = from.libraryRows;
+    l.libraryTile = from.libraryTile;
     l.libraryTab = from.libraryTab;
     l.libraryBottom = from.libraryBottom;
     l.leftHanded = from.leftHanded;
@@ -1570,11 +1587,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
     // on screen, so the menu opens on the next one (a menu whose sections are all in trays flashes the tray instead).
     auto openTaskMenu = [&](int i, float atX) {
         const TaskMenuDef& m = menus[i];
-        auto inTray = [&](const std::string& id) {
-            return std::count(layout_.leftTray.begin(), layout_.leftTray.end(), id) +
-                       std::count(layout_.rightTray.begin(), layout_.rightTray.end(), id) >
-                   0;
-        };
+        auto inTray = [&](const std::string& id) { return paletteInShownTray(id); };
         std::string section = menuSection_[m.id];
         if (section.empty() || taskMenuOf(section) != i || inTray(section)) {
             section.clear();
@@ -1652,6 +1665,14 @@ void App::drawStatusBar(const ShellGeometry& g) {
     if (mayaLink) right = linkX - 10.0f * s;
     if (maya) barSpans_.push_back({mayaX, mayaX + mayaW});
     if (mayaLink) barSpans_.push_back({linkX, linkX + linkW});
+    // The quiet heart (Help > Support SculptForge; a member's badge), left of the rest: the first thing to give way,
+    // while the modules still have their room beside the menus.
+    const float heartW = buttonH, heartX = right - heartW;
+    const bool heart = !studioMembership() && heartX - menusEnd > 420.0f * s;
+    if (heart) {
+        right = heartX - 10.0f * s;
+        barSpans_.push_back({heartX, heartX + heartW});
+    }
 
     // Modules: mode, brush, document, triangles, frame rate.
     std::vector<StatusModule> mods;
@@ -1788,6 +1809,8 @@ void App::drawStatusBar(const ShellGeometry& g) {
         ui::HelpAction(*this, "file.send_maya");
     }
 
+    if (heart) drawSupportHeart(ImVec2(heartX, o.y + (h - buttonH) * 0.5f), heartW, dl);
+
     // Layout presets 1 2 3, drawn as workspaces.
     for (int i = 1; i <= 3 && showPresets; ++i) {
         const std::string id = "ui.preset." + std::to_string(i);
@@ -1908,9 +1931,7 @@ void App::drawTaskMenu() {
             if (!p) continue;
             const std::string title = tr(taskSectionTitle(menu, k));
             const bool current = dropdown_ == p->id;
-            const bool inTray = std::count(layout_.leftTray.begin(), layout_.leftTray.end(), p->id) +
-                                    std::count(layout_.rightTray.begin(), layout_.rightTray.end(), p->id) >
-                                0;
+            const bool inTray = paletteInShownTray(p->id);
             const float rowH = 28.0f * s;
             const bool clicked = ImGui::InvisibleButton((title + "##section." + p->id).c_str(), ImVec2(listW, rowH));
             const bool hovered = ImGui::IsItemHovered();

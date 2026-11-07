@@ -100,3 +100,29 @@ TEST(legacy_names_read_old_files_and_scripts) {
     const CommandResult missing = reg.execute(doc, "open", {{"path", path}});
     CHECK(!missing.ok && missing.message.find(capitalised(old.at("classic"))) != std::string::npos);
 }
+
+// Whole names (kNames): the old name, in any case, is today's; the word alone, or inside another name (a user's own
+// brush), stays as it is.
+TEST(legacy_whole_names_match_the_trademarks_table) {
+    std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../docs/legal/trademarks.md");
+    std::stringstream s;
+    s << f.rdbuf();
+    const std::string text = s.str();
+    const std::regex row(R"(\| N\d+ \| `([^`]+)` \| `([^`]+)` \| `0x([0-9A-F]+)` \|)");
+    size_t rows = 0;
+    for (std::sregex_iterator it(text.begin(), text.end(), row), end; it != end; ++it, ++rows) {
+        const std::string old = (*it)[1], now = (*it)[2];
+        CHECK(legacy::modernize(old) == now);
+        std::string mixed = old; // as the app wrote it: words capitalised
+        for (size_t i = 0; i < mixed.size(); ++i)
+            if (i == 0 || mixed[i - 1] == ' ' || mixed[i - 1] == '.')
+                mixed[i] = char(std::toupper(static_cast<unsigned char>(mixed[i])));
+        CHECK(legacy::modernize(mixed) == now);
+        CHECK(legacy::isOld(old));
+        const std::string word = old.substr(old.rfind(' ') + 1);
+        CHECK(legacy::modernize(word) == word);
+        CHECK(legacy::modernize("brush.recipe.My " + capitalised(word)) == "brush.recipe.My " + capitalised(word));
+        CHECK(legacy::modernize(old + " 2") == old + " 2");
+    }
+    CHECK(rows == std::size(legacy::kNames));
+}

@@ -189,7 +189,39 @@ land_staging() { # land_staging [--with CMD] [REF]
     if [ -n "$pid" ]; then wait "$pid" || local_rc=$?; tail -5 "/tmp/merge-queue-with-${sha:0:8}.log" | sed 's/^/   /'; fi
     echo "   CI on staging: $ci; local: $([ $local_rc = 0 ] && echo ok || echo "failed ($local_rc)"); $(( $(date +%s) - t0 )) s"
     [ "$ci" = success ] && [ $local_rc = 0 ] || die "staging is red: main stays at $(git rev-parse --short origin/main); fix the batch and run again"
+    # A release being promoted on this machine (scripts/release.sh X.Y.Z --yes) holds main until it is done: wait
+    # (up to SF_PROMOTE_WAIT_MIN, default 180), then land this batch on top of it.
+    local lock waited=0 holder pid start ver
+    lock="$(git rev-parse --git-common-dir)/sf-promoting"
+    # Held = its pid is alive AND started when the lock says (scripts/release.sh writes "pid start-time version"): a
+    # crashed promote's lock, or one whose pid was reused, doesn't hold anything.
+    while [ -f "$lock" ] && read -r pid start ver < "$lock" && [ -n "$pid" ] &&
+        [ "$(cut -d' ' -f22 "/proc/$pid/stat" 2>/dev/null)" = "$start" ]; do
+        [ $waited = 0 ] && echo "   main waits for the $ver promote (pid $pid) to finish"
+        [ $waited -lt $(( ${SF_PROMOTE_WAIT_MIN:-180} * 60 )) ] ||
+            die "the $ver promote still holds main after ${SF_PROMOTE_WAIT_MIN:-180} min: staging ${sha:0:8} is green, run again when it is done"
+        sleep 30; waited=$(( waited + 30 ))
+    done
     git fetch -q origin main
+    # What that promote pushed after its tag (site, feed, What's New, AUR version lines) is release paperwork: land the
+    # batch on top of it with a merge. tools/release/paperwork_only.py --post-tag checks main's new commits AND the
+    # landing tree against the staged one (never src/, tests/, the build, workflows or an app input such as
+    # website/founding.json). A conflict, a revert or a stale tree stops; nothing picks a side.
+    if [ $waited -gt 0 ] && ! git merge-base --is-ancestor origin/main "$sha"; then
+        local tree merged base
+        base=$(git merge-base origin/main "$sha")
+        python3 tools/release/paperwork_only.py --post-tag "$base" origin/main ||
+            die "main got more than release paperwork while the promote ran (above): merge origin/main into the batch and run again"
+        tree=$(git merge-tree --write-tree --no-messages "$sha" origin/main) ||
+            die "the batch conflicts with main's release paperwork: merge origin/main into it by hand and run again"
+        merged=$(git commit-tree "$tree" -p "$sha" -p origin/main -m "Merge the release paperwork from main into staging ${sha:0:8}")
+        python3 tools/release/paperwork_only.py --post-tag "$sha" "$merged" ||
+            die "the merged tree differs from the tested ${sha:0:8} in more than paperwork (above): run again"
+        python3 tools/ci/no_revert.py --merge "$merged" && python3 tools/ci/no_revert.py --stale origin/main "$merged" ||
+            die "the paperwork merge ${merged:0:8} fails the revert or stale-tree check (above)"
+        echo "   main got release paperwork while waiting: landing ${merged:0:8} = tested ${sha:0:8} + paperwork only (checked)"
+        sha=$merged
+    fi
     git merge-base --is-ancestor origin/main "$sha" ||
         die "main moved while staging ran ($(git rev-parse --short origin/main)): merge it in and run again"
     git push -q origin "$sha:refs/heads/main" # a fast-forward: exactly the tree CI passed

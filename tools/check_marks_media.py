@@ -148,7 +148,7 @@ def main(argv):
     cache = {} if explicit else load_cache()  # named files are read afresh, so their words can be shown
     if not explicit and check_marks.tracked_files() is None:
         print("check_marks_media: skipped, git can't list the tracked files here")
-        return 0
+        return check_marks.SKIPPED
     paths = explicit or media_files()
     keys = {p: sha(ROOT / p if not explicit else p) for p in paths}
     todo = [p for p in paths if keys[p] not in cache]

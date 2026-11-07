@@ -28,6 +28,7 @@ SEPARATOR = r"(?:[ \t]+|[-_.])"  # what a space in a pattern stands for
 # Binary files of SculptForge's own formats, read as their printable strings (zip archives are read whatever the name).
 OWN_BINARY = (".sfproj", ".sfbrush", ".sfmaterial", ".sfpack", ".sfmacro", ".bridge", ".z", ".bin", ".json")
 MIN_STRING = 4  # shortest printable run read from a binary file
+SKIPPED = 77  # exit code when git can't list the files (ctest SKIP_RETURN_CODE: reported as skipped, not passed)
 
 
 def load_marks(text=None):
@@ -243,8 +244,10 @@ def main(argv):
         return 0
     mark_re = load_marks()
     if tracked_files() is None:
+        # A tree without .git (pc.sh ships a tarball) is "not checked", never "clean" (11-07: the PC's marks test
+        # passed in 0.04 s on a branch with a mark in a comment).
         print("check_marks: skipped, git can't list the tracked files here")
-        return 0
+        return SKIPPED
     if "--count" in argv:
         count(mark_re)
         return 0

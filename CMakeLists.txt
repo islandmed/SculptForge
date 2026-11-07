@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.11.13 LANGUAGES C CXX)
+project(SculptForge VERSION 0.11.14 LANGUAGES C CXX)
 # "beta.1" while this is a beta of that version (title bar and About: "0.11.0 Beta 1"), "" for a stable release.
 # scripts/release.sh sets it; release.yml checks the tag against both (v0.11.0-beta.1).
 set(SCULPTFORGE_PRERELEASE "")
@@ -462,6 +462,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelSupportCard.cpp
     src/app/PanelIntegrations.cpp
     src/app/WhatsNewPopup.cpp
+    src/app/PanelDeform.cpp
     src/app/PanelExtract.cpp
     src/app/PanelMeshCheck.cpp
     src/app/PanelTimeline.cpp
@@ -674,8 +675,8 @@ find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
   add_custom_target(blender_addon
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/addons/blender/build_addon.py --check
-            --version ${PROJECT_VERSION} --out ${CMAKE_CURRENT_BINARY_DIR}/blender-addon
-    COMMENT "Packaging the Blender add-on (sculptforge_bridge-${PROJECT_VERSION}.zip)")
+            --out ${CMAKE_CURRENT_BINARY_DIR}/blender-addon
+    COMMENT "Packaging the Blender add-on (its own version: addons/blender/sculptforge_bridge/blender_manifest.toml)")
 endif()
 
 # --- Tests ---
@@ -756,7 +757,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     endif()
     # The add-on's zips build and its manifest passes the checks Blender's validator makes.
     add_test(NAME blender_addon_package COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/addons/blender/build_addon.py
-                                              --check --version ${PROJECT_VERSION} --out ${CMAKE_CURRENT_BINARY_DIR}/blender-addon)
+                                              --check --out ${CMAKE_CURRENT_BINARY_DIR}/blender-addon)
     # The Maya shelf script (integrations/maya, #42) with a mocked maya.cmds, round-tripped through sculptforge-cli.
     add_test(NAME maya_shelf_script COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/maya/test_sculptforge_maya.py
                                             --cli ${SCULPTFORGE_CLI_RUNNER})
@@ -812,6 +813,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # without its committed cache entry fails here too, not only in CI (0.11.12 staging).
     add_test(NAME marks_media COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks_media.py --cached-only
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    # Without .git (the PC's shipped tree) both report "skipped", not "passed"; t0.sh runs marks locally first.
+    set_tests_properties(marks marks_media PROPERTIES SKIP_RETURN_CODE 77)
     add_test(NAME marks_media_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks_media.py --self-test)
     add_test(NAME media_takedown_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/media_takedown.py --self-test)
     # The public gallery repository matches tools/brush-gallery/repo (the live compare is in release.sh: network).
@@ -950,6 +953,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(title_version_1440 title_version --size 1440x900)
     sculptforge_ui_test(title_version_1024 title_version --size 1024x768)
     sculptforge_ui_test(timeline_narrow_1024 timeline_narrow --size 1024x768)
+    # The membership moments' card and the top bar's heart at 1440 and 1024 px (tests/ui/support/support_shots.sfui).
+    sculptforge_ui_test(support_shots_1440 support/support_shots --size 1440x900)
+    sculptforge_ui_test(support_shots_1024 support/support_shots --size 1024x768)
     sculptforge_ui_test(help_console_1080 help_console --size 1920x1080)
     # The S / U / I / O slider on a UI scaled 1.5x (Windows at 150%, #9): it must still open under the cursor.
     sculptforge_ui_test(size_popup_scaled size_popup --size 2400x1350)
@@ -980,6 +986,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(part_folders_hidpi hidpi/part_folders --size 3200x1800)
     set_tests_properties(ui_right_tray_looks_720 ui_windows_dpi_2560 ui_windows_dpi_2160 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
     sculptforge_ui_test(user_guide_1080 user_guide --size 1920x1080)
+    # The Deform panel for the look review (tests/ui/sizes/: scripts only run at their own sizes).
+    sculptforge_ui_test(deform_panel_1440 sizes/deform_panel --size 1440x900)
+    sculptforge_ui_test(deform_panel_1024 sizes/deform_panel_1024 --size 1024x768)
+    sculptforge_ui_test(deform_panel_1024_200 sizes/deform_panel_1024 --size 2048x1536)
     # A crash leaves a note in the log file (#16). Needs no window.
     add_test(NAME crash_log COMMAND ${CMAKE_COMMAND} -DAPP=$<TARGET_FILE:sculptforge>
              -DDIR=${CMAKE_CURRENT_BINARY_DIR}/crash-log-test -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/crash_log.cmake)

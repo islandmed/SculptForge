@@ -373,6 +373,7 @@ Working with the strip:
   and forward through tabs and folders, and the breadcrumb shows where you are.
 - Type in **Filter** to show only items whose names contain the text.
 - Choose **1** to **4** rows of thumbnails.
+- Drag the strip's edge toward the canvas to make the thumbnails bigger or smaller (48 to 128 px; 64 by default).
 - **Open folder...** adds a folder of your own to the root of every tab.
 - On the Snapshots tab, **Save now** takes a snapshot.
 - The **x** at the right end of the header, or <kbd>Esc</kbd>, closes the Library (while you type in Filter,
@@ -608,7 +609,7 @@ charcoal radial gradient (the default), or **Flat Colour**, one solid colour wit
 saves itself for the next session, and each project keeps the background it was saved with. From a script:
 `set_background mode=flat`, `set_background color=60,70,80` or `set_background mode=gradient`.
 
-**Edit > Preferences > Library** has **Show at startup** (on by default), the number of **Rows**, **Placement**
+**Edit > Preferences > Library** has **Show at startup** (on by default), the number of **Rows**, the **Thumbnails** size, **Placement**
 (along the top of the canvas, or at the bottom above the bottom shelf) and the **Library folder**.
 **Edit > Preferences > Autosave** sets how often a recovery copy is saved (see [Projects, autosave and snapshots](projects.md)).
 

@@ -132,9 +132,11 @@ def unescape(s):
 def tokens(text):
     """(kind, value, line): kind is 'str' (adjacent literals and ICON_LC_* macros joined), 'id' or 'p'."""
     out = []
+    line, at = 1, 0  # counted on from the last token (from the file's start each time was quadratic: 15 s on the PC)
     for m in TOKEN.finditer(text):
         t = m.group(0)
-        line = text.count("\n", 0, m.start()) + 1
+        line += text.count("\n", at, m.start())
+        at = m.start()
         if t.startswith("//") or t.startswith("/*"):
             continue
         if m.group(2) is not None or m.group(3) is not None:

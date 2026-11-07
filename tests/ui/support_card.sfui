@@ -29,6 +29,12 @@ expect_text Founding Studio: $150, first 10 studios
 expect_text or $48 a year
 expect "Member, $48 a year##card.member_yearly"
 shot first_run
+# HiDPI: the same card at 200 %.
+ui_scale 200
+wait 0.5
+shot first_run-200
+ui_scale 100
+wait 0.5
 # The members' Discord in the footer opens the invite (kDiscordUrl) and leaves the card open.
 expect "Join the members on Discord##card.discord"
 click "Join the members on Discord##card.discord"
@@ -64,6 +70,20 @@ expect_value support_requests == 3
 expect_status https://sculptforge.app/studios.html#membership
 wait 0.4
 
+# Terms & refunds in the footer opens the membership terms (kTermsUrl) and keeps the card open.
+click "Preferences##palette.preferences"   # (Support stays expanded)
+click "Show the memberships"
+wait 0.8
+expect_text Terms & refunds
+click "##card.terms"
+expect_value support_requests == 4
+expect_status https://sculptforge.app/terms.html
+wait 0.4
+expect_value support_card_open == 1
+key Escape
+wait 0.4
+expect_value support_card_open == 0
+
 # Not now and Esc close it.
 click "Preferences##palette.preferences"   # (Support stays expanded)
 click "Show the memberships"
@@ -95,4 +115,4 @@ support_card first_run
 expect_value support_card_open == 0
 click "Preferences##palette.preferences"   # (Support stays expanded)
 expect_text Thank you for being a member! No membership cards show.
-expect_value support_requests == 3
+expect_value support_requests == 4

@@ -62,6 +62,12 @@ the run. `scripts/release.sh X.Y.Z` then only promotes: step `bump` checks main 
 waits for staging's Packages run and checks it, step `tag` tags **exactly that commit** (main must be it). The Release
 workflow takes that run's packages unchanged, verifies them, smoke-tests them, signs and publishes.
 
+**The next batch stages while this one promotes.** A promote holds a lock (`sf-promoting` in the git common dir,
+with its pid) from start to end. `scripts/release.sh X.Y+1 --stage` may run at the same time: staging, its CI, its
+packages and T1 go ahead, and only main's fast-forward waits for the lock (`SF_PROMOTE_WAIT_MIN`, default 180).
+If the promote pushed release paperwork to main meanwhile (site, feed, What's New: `tools/release/paperwork_only.py`),
+the batch lands as a merge on top of it; anything else on main stops as before. A dead holder's lock doesn't count.
+
 What makes a run promotable (tools/release/staged_run.py, used by release.sh steps ci and tag and by release.yml
 `locate`; refused otherwise, nothing is rebuilt silently):
 - packages.yml of this repository, triggered by a **push** to `staging` for exactly the tagged commit: never a
@@ -191,6 +197,30 @@ What keeps the insiders token from leaking; `tools/release/check_workflows.py` (
 - islandmed/sculptforge-insiders: private, members invited with `permission=pull` only, ruleset on `main`: no force
   push, no deletion.
 
+## Integration releases (Blender add-on, Maya script)
+
+They have their own versions and ship when they change, not with the app (docs/design/release-lanes.md §2):
+`version` in `addons/blender/sculptforge_bridge/blender_manifest.toml` (and `bl_info`), `__version__` in
+`integrations/maya/sculptforge_maya.py`. To release one, land the version bump on main like any change (notes in
+`changes/<branch>.md`), then the release coordinator tags that commit:
+
+```sh
+git tag blender-v1.1.0 origin/main && git push origin blender-v1.1.0     # or maya-vX.Y.Z
+```
+
+`.github/workflows/integrations.yml` checks the tag is on main and matches the file, runs the checks, signs
+SHA256SUMS.txt with the release key exactly like an app release (`tools/release/sign_sums.sh`, job `sign` in the
+environment `release`; the add-on runs inside people's Blender and Maya, so it gets the app's trust), re-checks the
+signature against the key compiled into the app, publishes the zip(s), SHA256SUMS.txt and its .sig as a GitHub release
+of that name (never "latest": that stays the app), and redeploys the website, whose download links then name it (pages.yml, "Integration downloads"). Each app release still carries the
+add-on and the script as they are on its commit. Compatibility is the bridge manifest's `version` (`VERSION` in
+`bridge_protocol.py` and the Maya script; the app checks it in src/io/BlenderBridge.cpp): raise it only for a change the other
+side can't read, and both sides already say "update SculptForge" / "update this script" for a newer one.
+
+One-time setting (the maintainer, GitHub > Settings > Environments > release > Deployment branches and tags): besides
+`v*`, allow the tags `blender-v*` and `maya-v*`. Until then job `sign` is refused and nothing is published (never
+unsigned). `tools/release/check_workflows.py` keeps integrations.yml locked down like release.yml.
+
 ## MCP registry (by hand, the maintainer's account)
 
 Each release carries the Claude Desktop bundles (`SculptForge-<version>-<os>.mcpb`, tools/release/build_mcpb.py,
@@ -209,6 +239,14 @@ automatically.
   `"challenge": {"id": "YYYY-MM", "title": "<theme>"}` to `website/latest.json` (push main; the site deploys). The
   app's daily update check reads it once per id: the small membership card's challenge moment ("The <theme>
   challenge results are in, on Discord").
+- **The membership card's honest line (optional):** `website/latest.json` may carry
+  `"support": {"funded_this_month": ["<what members funded>", ...], "founding": {"taken": N, "limit": 100},
+  "member_requests_this_release": N}` (any part may be left out). The app's daily update check keeps it, and the small
+  card shows one true line from it in turn ("Members funded this month: ...", "Founding Members so far: N of 100...",
+  "N changes in this release were members' requests."); without the block the card keeps its usual Founding Members
+  line. Only real numbers: `founding` from `website/founding.json`, the requests count from
+  `tools/release/assemble_notes.py X.Y.Z --member-requests` before the bump (fragments with `member_request: true`).
+  Never anything that reads as urgency.
 - **Member Requests:** each approved request goes into islandmed/sculptforge-insiders as
   `requests/YYYY-MM/<slug>/request.json` + its file (+ `preview.png`), `"approved": true` once the requester has
   OK'd the preview (format: `tools/member-requests/requests.py`). On the 1st, member-requests.yml packs last month's,

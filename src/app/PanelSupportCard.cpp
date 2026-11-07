@@ -6,6 +6,7 @@
 // their perks, in the current look's colours (Theme.h); on the first start only, and from Help > Support. The small
 // card: one line along the bottom of the canvas at a good moment (memberMoment), at most once a week, until someone
 // becomes a member. Never mid-stroke or during a job, never for a member, never in tests, renders, demos or CI.
+// The top bar's quiet heart opens Help > Support SculptForge (a member sees a small badge instead).
 // No countdowns, no guilt, nothing pre-selected; Close is always there. Every button only opens one of the fixed
 // links in Support.h in the browser, except "I'm already a member", which is the member builds' GitHub sign-in.
 #include "app/App.h"
@@ -13,6 +14,7 @@
 #include "app/Theme.h"
 #include "app/Ui.h"
 
+#include <IconsLucide.h>
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <imgui_impl_sdl3.h>
@@ -151,6 +153,7 @@ void App::closeSupportCard() {
 }
 
 void App::openSupportLink(const char* url) {
+    if (!url || !supportLinkAllowed(url)) return;
     ++supportPageRequests_;
     if (!interactive()) { // UI tests, renders and demos never start a browser
         status_ = std::string("Support SculptForge: ") + url;
@@ -341,6 +344,7 @@ void App::drawSupportCard() {
     const float tierTop = b.y - footer - tierH;
     const char* clicked = nullptr;
     bool discord = false; // the Discord pill in the footer (opens the invite, keeps the card)
+    bool terms = false;   // Terms & refunds in the footer (opens the terms page, keeps the card)
     for (int i = 0; i < 2; ++i) {
         const Tier& tier = kTiers[i];
         const bool featured = i == 0;
@@ -477,6 +481,11 @@ void App::drawSupportCard() {
                               ImVec2(g0.x + 3.0f * k, g1.y + 5.0f * k), tc(hot ? ink : accent, fa));
         const float my = (g0.y + g1.y) * 0.5f, r = 1.6f * k;
         for (int i = -1; i <= 1; ++i) dl->AddCircleFilled(ImVec2((g0.x + g1.x) * 0.5f + float(i) * 4.5f * k, my), r, tc(bg, fa));
+        // The fine print: the membership terms (refunds, cancelling), after the pill.
+        const char* label = tr("Terms & refunds");
+        const float tx = std::floor(c0.x + paint.measure(boldUi, 15.0f, "Join the members on Discord").x + 44.0f * k + glyph +
+                                    10.0f * k + 24.0f * k);
+        terms = link(label, "##card.terms", ImVec2(tx, std::floor(fy - paint.measure(bodyFont, 15.0f, label).y * 0.5f)), dim, true);
     }
     bool later = false, supporter = false;
     {
@@ -503,6 +512,8 @@ void App::drawSupportCard() {
             closeSupportCard();
         } else if (discord) {
             openDiscordPage(); // the card stays: a membership may still follow
+        } else if (terms) {
+            openSupportLink(kTermsUrl); // the card stays too
         } else if (supporter) {
             closeSupportCard();
             verifyMember(); // the small card shows the sign-in's steps
@@ -521,7 +532,8 @@ void App::drawSupportPrefs() {
         ImGui::TextWrapped("%s", "Thank you for being a member! No membership cards show.");
     } else {
         ImGui::TextWrapped("%s", "A small membership card shows at most once a week, at a good moment (never mid-stroke), "
-                                 "until you become a member.");
+                                 "until you become a member. After a third Not now it waits a month; after a sixth it "
+                                 "only comes with an update.");
         if (ImGui::Button(tr("I'm already a member##prefs.member_verify"), ImVec2(-1, 0))) verifyMember();
         ui::HelpText("I'm already a member", nullptr,
                      "Signs in with GitHub, as member builds do (Preferences > Updates): no more membership cards, "
@@ -538,17 +550,36 @@ int64_t App::memberClock() const { return int64_t(std::time(nullptr)) + memberCl
 void App::memberMoment(MemberMoment m) {
     const bool testMode = supportCardTestMode() && !memberCardTestMode_;
     if (m == MemberMoment::None || memberCard_ != MemberMoment::None || memberVerifying_) return;
-    if (!memberMomentAllowed(supportCardPrefs_, memberSignedIn(), memberClock(), testMode)) return;
+    if (studioMembership() || !memberMomentAllowed(supportCardPrefs_, memberSignedIn(), memberClock(), testMode, m)) return;
     memberMomentPending_ = m; // (the latest moment's words)
     redrawIn(0.0);
 }
 
+void App::memberMilestoneCheck() {
+    if (memberCard_ != MemberMoment::None || memberMomentPending_ != MemberMoment::None || memberVerifying_) return;
+    if (const MemberMoment m = milestoneDue(supportCardPrefs_); m != MemberMoment::None) memberMoment(m);
+}
+
+void App::countMemberSave() {
+    if (supportCardTestMode() && !memberCardTestMode_) return; // (counted on this computer, never sent)
+    supportCardPrefs_.saves = std::min(supportCardPrefs_.saves + 1, 100000000);
+    memberMilestoneCheck();
+}
+
 void App::tickMemberCard(float dt) {
     const bool stroking = doc_.sculptor.strokeActive();
-    if (stroking) sessionSculptSeconds_ = addSculptTime(sessionSculptSeconds_, double(dt));
+    if (stroking) {
+        sessionSculptSeconds_ = addSculptTime(sessionSculptSeconds_, double(dt));
+        if (!supportCardTestMode() || memberCardTestMode_)
+            supportCardPrefs_.sculptSeconds = addSculptTime(supportCardPrefs_.sculptSeconds, double(dt));
+    }
     if (sculptMomentDue(sessionSculptSeconds_, sculptMomentDone_)) {
         sculptMomentDone_ = true;
         memberMoment(MemberMoment::Sculpted);
+    }
+    if (!stroking && ImGui::GetTime() - milestoneCheckedAt_ >= 60.0) { // the sculpting hours: once a minute is plenty
+        milestoneCheckedAt_ = ImGui::GetTime();
+        memberMilestoneCheck();
     }
     if (memberMomentPending_ == MemberMoment::None) return;
     const bool otherCard = supportCard_ || showWelcome_ || quickTourOpen_ || whatsNew_ || showWhatsNew_ ||
@@ -556,6 +587,11 @@ void App::tickMemberCard(float dt) {
     if (!memberCardMayOpen(stroking, backgroundBusy(), otherCard)) return; // (it waits)
     memberCard_ = std::exchange(memberMomentPending_, MemberMoment::None);
     supportCardPrefs_.shownAt = memberClock();
+    // A milestone shows once, with its true number now; the feed's honest lines take turns, card by card.
+    supportCardPrefs_.milestonesShown |= milestoneBit(memberCard_);
+    memberCardMilestone_ = milestoneLine(memberCard_, supportCardPrefs_);
+    memberCardFeedLine_ = supportFeedLine(supportCardPrefs_.feed, supportCardPrefs_.shownCount);
+    supportCardPrefs_.shownCount = std::min(supportCardPrefs_.shownCount + 1, 1000000);
     saveProjectPrefs(); // (recorded as it shows: a crash can't bring it back at once)
     redrawIn(0.0);
 }
@@ -622,6 +658,9 @@ void App::drawMemberCard() {
                 line = challengeTitle_.empty() ? std::string("The monthly challenge results are in, on Discord.")
                                                : "The " + challengeTitle_ + " challenge results are in, on Discord.";
                 break;
+            case MemberMoment::Starts:
+            case MemberMoment::SculptHours:
+            case MemberMoment::Saves: line = formatCardLine(memberCardMilestone_, tr(memberCardMilestone_.format)); break;
             case MemberMoment::None: break;
             }
             if (bold) ImGui::PushFont(bold);
@@ -631,8 +670,13 @@ void App::drawMemberCard() {
             ImGui::TextWrapped("%s", "$5 a month or $48 a year: betas early, the feature vote, Member Requests and your "
                                      "name in the credits. Nothing in the app is ever paywalled.");
             ImGui::PopStyleColor();
+            // The feed's honest line in turn (latest.json's "support"), else the Founding Members' offer.
             const FoundingMembers& founding = foundingMembers();
-            if (founding.open()) {
+            if (memberCardFeedLine_.format) {
+                ImGui::PushStyleColor(ImGuiCol_Text, theme::accentHover);
+                ImGui::TextWrapped("%s", formatCardLine(memberCardFeedLine_, tr(memberCardFeedLine_.format)).c_str());
+                ImGui::PopStyleColor();
+            } else if (founding.open()) {
                 ImGui::PushStyleColor(ImGuiCol_Text, theme::accentHover);
                 ImGui::TextWrapped(tr("The first %d members are Founding Members: a badge, their name in the credits and "
                                    "their price locked for good."), founding.limit);
@@ -650,6 +694,20 @@ void App::drawMemberCard() {
             ImGui::SameLine();
             const bool already = ImGui::Button(tr("I'm already a member##member_card.already"));
             if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Sign in with GitHub (the member builds' sign-in): no more cards."));
+            { // the fine print: the membership terms (refunds, cancelling), a quiet link after the buttons (or under them)
+                const char* terms = tr("Terms & refunds##member_card.terms");
+                ImGui::SameLine();
+                if (ImGui::GetContentRegionAvail().x < ImGui::CalcTextSize(terms, nullptr, true).x) ImGui::NewLine();
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+                ImGui::PushStyleColor(ImGuiCol_Text, theme::textDim);
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+                if (ImGui::SmallButton(terms)) openSupportLink(kTermsUrl);
+                if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                ImGui::PopStyleVar();
+                ImGui::PopStyleColor(4);
+            }
             if (become) {
                 openSupportPage(); // both choices (monthly, yearly) on the membership page
                 memberCardChoice(MemberCardChoice::Become);
@@ -662,6 +720,34 @@ void App::drawMemberCard() {
         }
     }
     ImGui::End();
+}
+
+// --- The top bar's heart ---
+
+bool App::drawSupportHeart(ImVec2 at, float size, ImDrawList* dl) {
+    if (studioMembership()) return false; // (a Studio member's own build)
+    const bool member = supportCardPrefs_.supporter || memberSignedIn();
+    ImGui::SetCursorScreenPos(at);
+    const bool clicked = ImGui::InvisibleButton(member ? "Member##topbar.member" : "Support SculptForge##topbar.heart",
+                                                ImVec2(size, size));
+    const bool hovered = ImGui::IsItemHovered();
+    const ImVec2 b(at.x + size, at.y + size);
+    if (hovered && !member) dl->AddRectFilled(at, b, theme::u32(theme::frameHover), theme::rounding(3.0f * uiScale_));
+    // Quiet: the dim text colour like the window buttons; the accent only under the pointer (a member's badge: the
+    // accent, small and still). No animation, no count.
+    const ImU32 col = theme::u32(member ? theme::accent : hovered ? theme::accentHover : theme::textDim, member ? 0.85f : 1.0f);
+    ui::CentredGlyph(dl, nullptr, at, b, col, member ? ICON_LC_BADGE_CHECK : ICON_LC_HEART);
+    if (member) {
+        ui::HelpText("Member", nullptr, "Thank you for being a member: you keep SculptForge free and growing.", "Top bar");
+    } else {
+        ui::HelpText("Support SculptForge", nullptr,
+                     "SculptForge is free and open source. Members keep it free and growing (Help > Support SculptForge).",
+                     "Top bar");
+        if (clicked) {
+            if (const Action* a = actions_.find("help.support"); a && a->run) a->run();
+        }
+    }
+    return true;
 }
 
 } // namespace sf

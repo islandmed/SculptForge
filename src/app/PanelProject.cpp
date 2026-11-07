@@ -23,6 +23,7 @@
 #include "core/Project.h"
 
 #include <imgui.h>
+#include <imgui_internal.h> // (BringWindowToDisplayFront: the update banner)
 
 #include <algorithm>
 #include <cmath>
@@ -123,6 +124,25 @@ void App::initProject() {
         supportCardPrefs_.hiddenUntil = int64_t(prefs["member_card_hidden_until"].asNumber(0));
         if (prefs["member_card_challenge"].isString())
             supportCardPrefs_.challengeSeen = prefs["member_card_challenge"].asString().substr(0, 32);
+        { // the backoff and the milestones' counts (this computer only: never sent)
+            auto count = [&](const char* key) { return int(std::clamp(prefs[key].asNumber(0), 0.0, 1e8)); };
+            supportCardPrefs_.notNow = count("member_card_not_now");
+            supportCardPrefs_.shownCount = count("member_card_shown");
+            supportCardPrefs_.starts = count("member_card_starts");
+            supportCardPrefs_.saves = count("member_card_saves");
+            supportCardPrefs_.milestonesShown = unsigned(count("member_card_milestones")) & 7u;
+            supportCardPrefs_.sculptSeconds = std::clamp(prefs["member_card_sculpt_seconds"].asNumber(0), 0.0, 1e9);
+            // The last update check's "support" block (core/UpdateCheck.h), for the card's honest line.
+            if (const Json& f = prefs["member_card_feed"]; f.isObject()) {
+                SupportFeed& feed = supportCardPrefs_.feed;
+                feed.present = true;
+                for (const Json& n : f["funded"].items())
+                    if (n.isString() && feed.funded.size() < 5) feed.funded.push_back(sanitizeSupporterName(n.asString()));
+                feed.foundingTaken = int(std::clamp(f["founding_taken"].asNumber(-1), -1.0, 1e5));
+                feed.foundingLimit = int(std::clamp(f["founding_limit"].asNumber(-1), -1.0, 1e5));
+                feed.memberRequests = int(std::clamp(f["member_requests"].asNumber(-1), -1.0, 1e5));
+            }
+        }
         discordPrefs_.enabled = prefs["discord_presence"].asBool(false); // Preferences > Integrations (PanelIntegrations.cpp)
         discordPrefs_.showChallenge = prefs["discord_challenge_shown"].asBool(false);
         discordPrefs_.showFileName = prefs["discord_file_name_shown"].asBool(false);
@@ -154,13 +174,17 @@ void App::initProject() {
     }
     initSelfUpdate(); // a just-installed version counts its start (PanelUpdate.cpp)
     recentFiles_ = pruneRecentFiles(std::move(recentFiles_), fileExists);
+    // (the starts milestone: counted on this computer only, never sent)
+    if (!supportCardTestMode()) supportCardPrefs_.starts = std::min(supportCardPrefs_.starts + 1, 100000000);
     saveProjectPrefs(); // records this version, so What's New shows once
     updateDiscordPresence(); // on if it was left on (PanelIntegrations.cpp)
-    // The full membership card on the first start (Support.h); after an update, the small card's moment.
+    // The full membership card on the first start (Support.h); after an update, the small card's moment; then a
+    // milestone due (the starts are counted above).
     if (updatedThisStart_) memberMoment(MemberMoment::Updated);
     launchSupportCard(!hadPrefs,
                       std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count(),
                       supportCardTestMode());
+    memberMilestoneCheck();
 
 #if SF_UPDATE_CHECK
     const int64_t now = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
@@ -207,6 +231,24 @@ void App::saveProjectPrefs() {
     prefs.set("support_card_shown_at", double(supportCardPrefs_.shownAt));
     prefs.set("member_card_hidden_until", double(supportCardPrefs_.hiddenUntil));
     if (!supportCardPrefs_.challengeSeen.empty()) prefs.set("member_card_challenge", supportCardPrefs_.challengeSeen);
+    {
+        const SupportCardPrefs& c = supportCardPrefs_;
+        prefs.set("member_card_not_now", c.notNow);
+        prefs.set("member_card_shown", c.shownCount);
+        prefs.set("member_card_starts", c.starts);
+        prefs.set("member_card_saves", c.saves);
+        prefs.set("member_card_milestones", int(c.milestonesShown));
+        prefs.set("member_card_sculpt_seconds", std::floor(c.sculptSeconds));
+        if (c.feed.present) {
+            Json f = Json::object(), funded = Json::array();
+            for (const auto& n : c.feed.funded) funded.push(n);
+            f.set("funded", std::move(funded));
+            f.set("founding_taken", c.feed.foundingTaken);
+            f.set("founding_limit", c.feed.foundingLimit);
+            f.set("member_requests", c.feed.memberRequests);
+            prefs.set("member_card_feed", std::move(f));
+        }
+    }
     prefs.set("discord_presence", discordPrefs_.enabled); // Preferences > Integrations (PanelIntegrations.cpp)
     prefs.set("discord_challenge_shown", discordPrefs_.showChallenge);
     prefs.set("discord_file_name_shown", discordPrefs_.showFileName);
@@ -302,6 +344,7 @@ void App::saveProjectTo(const std::string& path) {
         return;
     }
     runCommand("save_project", {{"path", path}});
+    if (lastCommandOk_) countMemberSave(); // (the 100th save milestone: counted on this computer only)
     if (continueAfterSave_) {
         continueAfterSave_ = false;
         auto action = std::move(discardAction_);
@@ -843,6 +886,11 @@ void App::pollUpdateCheck() {
         return;
     }
     const UpdateInfo& u = job->info;
+    // The feed's "support" block (the card's honest line): kept until the next check, gone when the feed drops it.
+    if (u.support.present || supportCardPrefs_.feed.present) {
+        supportCardPrefs_.feed = u.support;
+        saveProjectPrefs();
+    }
     // The monthly challenge's results (latest.json's `challenge`): once per challenge, the membership card's moment.
     if (!u.challengeId.empty() && u.challengeId != supportCardPrefs_.challengeSeen) {
         supportCardPrefs_.challengeSeen = u.challengeId;
@@ -874,6 +922,9 @@ void App::drawUpdateBanner() {
                                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
                                    ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
     if (ImGui::Begin("##update_banner", nullptr, flags)) {
+        // Above the floating panels (a Preferences window open over the canvas's top would hide its buttons), but
+        // never over a modal dialog.
+        if (!ImGui::GetTopMostPopupModal()) ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
         // Reading size (the guide's 17 px fonts), so the highlights are easy to read over the canvas.
         if (ImFont* title = guide_.bodyBoldFont()) ImGui::PushFont(title);
         ImGui::Text(tr("SculptForge %s is available"), u.version.c_str());

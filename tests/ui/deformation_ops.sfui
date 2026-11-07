@@ -48,3 +48,44 @@ click "Deformation/Balloon"
 expect_status "everything masked"
 expect_value moved == 0
 run mask_clear
+
+# The stack (docs/design/deform-panel.md): add steps, the preview follows, Apply is one undo step, Reset takes it back.
+expect "##deform_stack_add"
+expect_text No steps yet
+click "##deform_stack_add"
+click "Stack/Bend##deform_add_Bend"
+expect_status "Deform stack (1 step)"
+expect_value moved > 0
+expect "##deform_step_amount"
+expect "##deform_step_direction"
+expect "Stack/X"
+shot stack-bend
+click "##deform_stack_add"
+click "Stack/Twist##deform_add_Twist"
+expect_status "Deform stack (2 steps)"
+click "Stack/Repeat"
+expect_status "Deform stack (3 steps)"
+click "Stack/Remove"
+expect_status "Deform stack (2 steps)"
+# Reset: back where it was, the list empty.
+click "Stack/Reset"
+expect_value moved == 0
+expect_text No steps yet
+# Apply keeps the preview; one undo takes the whole stack back.
+click "##deform_stack_add"
+click "Stack/Taper##deform_add_Taper"
+click "##deform_stack_add"
+click "Stack/Round##deform_add_Round"
+click "Stack/Apply"
+expect_value moved > 0
+expect_text No steps yet
+key ctrl+z
+expect_value moved == 0
+
+# Size: the Part's dimensions in scene units; typing one resizes it (Uniform: in proportion), one undo step.
+expect "Size/##deform_size_x"
+expect "Size/Uniform##deform_size_uniform"
+run deform_size uniform=3
+expect_status "Size 3"
+key ctrl+z
+expect_value moved == 0

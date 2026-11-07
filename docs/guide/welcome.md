@@ -22,10 +22,14 @@ early builds (from SculptForge 1.0, each release about two weeks early), a vote 
 (ask for a brush, alpha or material) and your name in the credits (every release stays free for everyone; bug-fix and security releases
 go out to everyone the same day): **Help > Support SculptForge...** opens [sculptforge.app/support.html](https://sculptforge.app/support.html) in your browser, where you can become a
 member. That is all it does: the app has no payment code, no account and no licence check. Members are thanked
-by name in **Help > About**. While SculptForge starts (the first time, after an update, and at most once a week
-otherwise) a card shows the memberships; **I'm already a member** hides it for good and **Edit > Preferences > Support**
-turns it off. After about ten hours of sculpting, SculptForge also shows one small note about this along the bottom
-of the canvas, once, and never again after you close it.
+by name in **Help > About**; the small heart at the right of the top bar opens the membership page too (members
+see a small badge there instead). The first start shows the memberships once (**Edit > Preferences > Support > Show the
+memberships** shows them again). After that, a small card along the bottom of the canvas may come at a good moment:
+about 20 minutes of sculpting, a Save Render, the first start after an update, the monthly challenge results, or a
+milestone (your 10th start, 10 hours of sculpting, your 100th save, counted on your computer only and never sent).
+It comes at most once a week and never mid-stroke. **Not now** waits a week; after the third, a month; after the
+sixth, it only comes with an update. **I'm already a member** signs in with GitHub (as member builds do) and hides it
+for good.
 
 ## What you can do with it
 

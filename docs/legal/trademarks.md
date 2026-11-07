@@ -155,6 +155,13 @@ FNV-1a 64 of the lower-case word. `tests/test_legacy_names.cpp` checks `LegacyNa
 | W12 | `goz` | `bridge` | `0xD4F75918FABCC503` |
 | W13 | `polyf` | `wire` | `0x90F1043555FF3A33` |
 
+Whole names, matched only as the entire string (the word alone is an everyday one a user's own brush may hold):
+
+| Id | Old name | Today | Hash |
+|---|---|---|---|
+| N1 | `brush.recipe.stone chisel` | `brush.recipe.Stone Carve` | `0x71FEDAD706F8BDF4` |
+| N2 | `stone chisel` | `Stone Carve` | `0xA8D1CB6C0FF343FC` |
+
 ## The Bridge format's bytes (src/io/BridgeProtocol.h)
 
 | Constant | Spells |
