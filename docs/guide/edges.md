@@ -70,6 +70,18 @@ Creases are saved in the project with the base level and stay there while you st
 Creasing or uncreasing at Level 1 under existing levels reshapes the levels above when you step up, carrying their
 sculpted detail along. With no creases subdivision is exactly what it was.
 
+### Exporting creases
+
+**File > Export USD / USDZ** writes the creases of the level you export: each creased edge as a two-point crease
+(`creaseIndices`, `creaseLengths`, `creaseSharpnesses`, with the same sharpness, 10 = sharp on every level), and
+sets `subdivisionScheme` to Catmull-Clark (Loop for a mesh of triangles), so other apps subdivide the cage the same
+way. Exporting a higher level writes what is left of the creases on its edges; the top level has none. A plain
+mesh without creases is written as before (`none`). Opening a USD file reads its creases back onto the base, in
+chains or one edge at a time, from any app.
+
+glTF, OBJ, FBX, PLY and STL have no creases: export Level 1 to USD to keep them, or add levels first to bake them into
+the shape.
+
 ## Big meshes
 
 Only the base level is ever searched: the levels above it never pay for edge lists. On a base of a million

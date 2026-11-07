@@ -979,6 +979,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(geometry_groups_1440 geometry_groups --size 1440x900)
     sculptforge_ui_test(geometry_groups_2880 geometry_groups --size 2880x1800) # its 200% shot: 1440 px of UI
     sculptforge_ui_test(geometry_groups_1024 narrow/geometry_groups --size 1024x768)
+    # Edges mode and creases (tests/ui/edge_select.sfui) at 1440 px of UI, 100% and 200% (#108).
+    sculptforge_ui_test(edge_select_1440 edge_select --size 1440x900)
+    sculptforge_ui_test(edge_select_2880 edge_select --size 2880x1800) # its 200% shots: 1440 px of UI
     sculptforge_ui_test(timeline_narrow_1024 timeline_narrow --size 1024x768)
     sculptforge_ui_test(extract_labels_1024 extract_labels --size 1024x768)
     sculptforge_ui_test(extract_labels_1440 extract_labels --size 1440x900)

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "io/UsdIO.h"
 
+#include "core/Multires.h"
 #include "core/SelectionSets.h"
 #include "core/Units.h"
 #include "io/TextureExport.h"
@@ -23,6 +24,7 @@
 #include <map>
 #include <set>
 #include <string_view>
+#include <unordered_map>
 
 namespace sf {
 
@@ -292,7 +294,30 @@ void writeMesh(Writer& w, const Mesh& mesh, const std::string& root, const std::
         w.line("    interpolation = \"vertex\"");
         w.line(")");
     }
-    w.line("uniform token subdivisionScheme = \"none\"");
+    // Edge creases (#108): one two-point crease per creased edge, its sharpness as in subdivision (10 = sharp on
+    // every level, USD's "infinitely sharp"). A creased mesh is a cage to subdivide, so it says which scheme.
+    const std::vector<float> creases = subdivCornerCreases(mesh);
+    std::vector<std::pair<glm::uvec2, float>> creased;
+    for (size_t c = 0; c < creases.size() && creases.size() == mesh.triangleCount() * 3; ++c) {
+        if (!(creases[c] > 0.0f)) continue;
+        const glm::uvec3& t = mesh.triangles[c / 3];
+        const uint32_t a = t[int(c % 3)], b = t[int((c + 1) % 3)];
+        creased.push_back({glm::uvec2(std::min(a, b), std::max(a, b)), creaseSharpness(creases[c])});
+    }
+    std::sort(creased.begin(), creased.end(), [](const auto& x, const auto& y) {
+        return x.first.x != y.first.x ? x.first.x < y.first.x : x.first.y != y.first.y ? x.first.y < y.first.y : x.second > y.second;
+    });
+    creased.erase(std::unique(creased.begin(), creased.end(), [](const auto& x, const auto& y) { return x.first == y.first; }),
+                  creased.end());
+    if (!creased.empty()) {
+        w.array("int[] creaseIndices", creased, [&](const auto& e) {
+            w.s += std::to_string(e.first.x) + ", " + std::to_string(e.first.y);
+        });
+        w.array("int[] creaseLengths", creased, [&](const auto&) { w.s += "2"; });
+        w.array("float[] creaseSharpnesses", creased, [&](const auto& e) { w.num(e.second); });
+    }
+    w.line(std::string("uniform token subdivisionScheme = \"") +
+           (creased.empty() ? "none" : mesh.hasQuads() ? "catmullClark" : "loop") + "\"");
     writeSelectionSets(w, mesh, triFace, faces.size());
     if (skinned) {
         w.array("uniform token[] skel:blendShapes", shapeNames, [&](const std::string& n) { w.s += quoted(n); });
@@ -1054,6 +1079,64 @@ const Prim* skelAnimation(const std::vector<Prim>& prims, const std::map<std::st
 // Internal references (SculptForge writes linked copies, #94, as instanceable prims referencing the first one): a
 // referencing prim gets the referenced prim's type, properties (its own win) and children, with paths inside it
 // moved under the referencing prim. One level; a reference to itself, an ancestor or a descendant is ignored.
+// Edge creases (creaseIndices: chains of points, creaseLengths: points per chain, creaseSharpnesses: one per
+// chain or one per edge) onto the corners of the prim's triangles (from `firstTri`, points from `baseIndex`) as
+// Mesh::creases. Imported files are untrusted: all or nothing per prim. Every length a whole number >= 2, their
+// sum exactly the index count (summed with a bound, so it can't overflow), every index a whole number < `points`,
+// a sharpness per chain or per edge and each finite (clamped to 0..10, USD's "infinitely sharp"), and at most
+// kMaxCreaseIndices indices. Anything else skips the prim's creases and returns why (the import goes on);
+// edges named twice keep the sharper value, edges the faces don't have are ignored.
+constexpr size_t kMaxCreaseIndices = size_t(1) << 26; // 64M points of crease chains: far beyond any real cage
+std::string readCreases(const Prim& p, size_t points, uint32_t baseIndex, size_t firstTri, Mesh& m) {
+    const Value* idx = p.get("creaseIndices");
+    const Value* len = p.get("creaseLengths");
+    const Value* sh = p.get("creaseSharpnesses");
+    if (!idx && !len && !sh) return {};
+    const std::string head = "Edge creases of " + p.path + " skipped: ";
+    if (!idx || !len || !sh) return head + "creaseIndices, creaseLengths and creaseSharpnesses must all be given";
+    if (idx->nums.empty() && len->nums.empty() && sh->nums.empty()) return {};
+    const size_t ni = idx->nums.size(), nl = len->nums.size(), ns = sh->nums.size();
+    if (ni > kMaxCreaseIndices || ni > points * 16 + 16) return head + "too many crease indices";
+    auto whole = [](double v, double limit) { return std::isfinite(v) && v >= 0.0 && v < limit && v == std::floor(v); };
+    size_t sum = 0, edges = 0;
+    for (double l : len->nums) {
+        if (!whole(l, double(ni) + 1.0) || l < 2.0) return head + "a crease length is not a whole number of at least 2";
+        if (size_t(l) > ni - std::min(sum, ni)) return head + "creaseLengths add up to more than creaseIndices";
+        sum += size_t(l);
+        edges += size_t(l) - 1;
+    }
+    if (sum != ni) return head + "creaseLengths don't add up to the number of creaseIndices";
+    if (ns != nl && ns != edges) return head + "creaseSharpnesses needs one value per crease or per crease edge";
+    for (double v : idx->nums)
+        if (!whole(v, double(points))) return head + "a crease index is out of range";
+    for (double s : sh->nums)
+        if (!std::isfinite(s)) return head + "a crease sharpness is not a finite number";
+    const bool perEdge = ns == edges && ns != nl;
+    std::unordered_map<uint64_t, float> crease; // (a << 32 | b), a < b, offset by baseIndex: the crease value
+    size_t cursor = 0, edge = 0;
+    for (size_t c = 0; c < nl; ++c) {
+        const size_t n = size_t(len->nums[c]);
+        for (size_t k = 0; k + 1 < n; ++k, ++edge) {
+            const float s = float(std::clamp(perEdge ? sh->nums[edge] : sh->nums[c], 0.0, 10.0));
+            const uint64_t a = uint64_t(idx->nums[cursor + k]), b = uint64_t(idx->nums[cursor + k + 1]);
+            if (a == b || s <= 0.0f) continue;
+            float& v = crease[(baseIndex + std::min(a, b)) << 32 | (baseIndex + std::max(a, b))];
+            v = std::max(v, sharpnessCrease(s));
+        }
+        cursor += n;
+    }
+    if (crease.empty()) return {};
+    for (size_t t = firstTri; t < m.triangles.size(); ++t)
+        for (int k = 0; k < 3; ++k) {
+            const uint64_t a = m.triangles[t][k], b = m.triangles[t][(k + 1) % 3];
+            const auto it = crease.find(std::min(a, b) << 32 | std::max(a, b));
+            if (it == crease.end()) continue;
+            m.creases.resize(m.triangles.size() * 3, 0.0f);
+            m.creases[t * 3 + size_t(k)] = it->second;
+        }
+    return {};
+}
+
 void expandInternalReferences(std::vector<Prim>& prims, std::map<std::string, size_t>& byPath) {
     const size_t original = prims.size();
     for (size_t i = 0; i < original; ++i) {
@@ -1090,7 +1173,7 @@ void expandInternalReferences(std::vector<Prim>& prims, std::map<std::string, si
 
 // Merges every Mesh prim into one object, or (split) makes one object per prim.
 bool readUsdaText(const std::string& text, bool split, std::vector<MeshObject>& outMeshes, SplatCloud& outSplats,
-                  std::string& error) {
+                  std::string& error, std::string* warnings) {
     Parser parser(text);
     if (!parser.parse()) {
         error = parser.error;
@@ -1206,6 +1289,7 @@ bool readUsdaText(const std::string& text, bool split, std::vector<MeshObject>& 
                 return e < st->nums.size() / 2 ? glm::vec2(float(st->nums[e * 2]), float(st->nums[e * 2 + 1])) : glm::vec2(0.0f);
             };
             size_t cursor = 0;
+            const size_t firstPrimTri = m.triangles.size();
             std::vector<glm::uvec2> faceTris; // per face: its first triangle and how many (selection sets)
             for (double c : counts->nums) {
                 const size_t n = size_t(std::max(0.0, c));
@@ -1234,6 +1318,9 @@ bool readUsdaText(const std::string& text, bool split, std::vector<MeshObject>& 
                 faceTris.push_back({firstTri, uint32_t(m.triangles.size()) - firstTri});
                 cursor += n;
             }
+            if (std::string w = readCreases(p, pts.size(), baseIndex, firstPrimTri, m); !w.empty() && warnings)
+                *warnings += (warnings->empty() ? "" : "; ") + w;
+            if (m.hasCreases()) m.creases.resize(m.triangles.size() * 3, 0.0f); // (prims before or after without)
             ++objects.back().meshPrims;
             readSelectionSets(prims, i, pts.size(), m.triangles.size(), faceTris, objects.back().sets);
             if (m.hasQuads()) m.quadPartners.resize(m.triangles.size(), Mesh::kNoQuad);
@@ -1407,7 +1494,7 @@ bool saveUsd(const std::string& path, const std::vector<MeshObjectRef>& meshesIn
 namespace {
 
 bool readUsdFile(const std::string& path, bool split, std::vector<MeshObject>& meshes, SplatCloud& splats,
-                 std::string& error) {
+                 std::string& error, std::string* warnings) {
     std::string text;
     if (lowerExtension(path) == ".usdz") {
         std::vector<ZipEntry> entries;
@@ -1433,20 +1520,21 @@ bool readUsdFile(const std::string& path, bool split, std::vector<MeshObject>& m
         error = path + " is not a text USD layer";
         return false;
     }
-    return readUsdaText(text, split, meshes, splats, error);
+    return readUsdaText(text, split, meshes, splats, error, warnings);
 }
 
 } // namespace
 
-bool loadUsd(const std::string& path, Mesh& mesh, SplatCloud& splats, std::string& error) {
+bool loadUsd(const std::string& path, Mesh& mesh, SplatCloud& splats, std::string& error, std::string* warnings) {
     std::vector<MeshObject> meshes;
-    if (!readUsdFile(path, false, meshes, splats, error)) return false;
+    if (!readUsdFile(path, false, meshes, splats, error, warnings)) return false;
     mesh = meshes.empty() ? Mesh() : std::move(meshes.front().mesh);
     return true;
 }
 
-bool loadUsd(const std::string& path, std::vector<MeshObject>& meshes, SplatCloud& splats, std::string& error) {
-    return readUsdFile(path, true, meshes, splats, error);
+bool loadUsd(const std::string& path, std::vector<MeshObject>& meshes, SplatCloud& splats, std::string& error,
+             std::string* warnings) {
+    return readUsdFile(path, true, meshes, splats, error, warnings);
 }
 
 } // namespace sf

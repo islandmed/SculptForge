@@ -1941,18 +1941,9 @@ bool subdivDeleteLower(Mesh& mesh, std::string& error) {
         base.quadPartners = mesh.quadPartners;
     }
     // The creases left from the levels below become the new base's own, so the levels above keep their shape.
-    if (size_t(s.current) + 1 < s.levels.size() && s.levels[size_t(s.current) + 1].sharp) {
-        const SubdivLevel& up = s.levels[size_t(s.current) + 1];
-        std::vector<float> creases(mesh.triangleCount() * 3, 0.0f);
-        for (uint32_t t = 0; t < mesh.triangleCount(); ++t)
-            for (int k = 0; k < 3; ++k) {
-                const uint32_t e = topoEdge(*up.topo, mesh.triangles[t][k], mesh.triangles[t][(k + 1) % 3]);
-                if (e != kNone) creases[t * 3 + size_t(k)] = sharpnessCrease(up.sharp->at(e)); // (no diagonal is an edge)
-            }
-        if (std::any_of(creases.begin(), creases.end(), [](float c) { return c > 0.0f; })) {
-            mesh.creases = creases;
-            mutableData(s.levels[size_t(s.current)]).creases = std::move(creases);
-        }
+    if (std::vector<float> creases = subdivCornerCreases(mesh); !creases.empty()) {
+        mesh.creases = creases;
+        mutableData(s.levels[size_t(s.current)]).creases = std::move(creases);
     }
     s.levels.erase(s.levels.begin(), s.levels.begin() + s.current);
     s.current = 0;
@@ -2098,6 +2089,25 @@ void convertWorldLayerDetail(MultiresStack& s) {
 const EdgeSharpness* subdivLevelSharpness(const Mesh& mesh, int level) {
     if (!mesh.multires || level < 1 || size_t(level) >= mesh.multires->levels.size()) return nullptr;
     return mesh.multires->levels[size_t(level)].sharp.get();
+}
+
+std::vector<float> subdivCornerCreases(const Mesh& mesh) {
+    const MultiresStack* s = mesh.multires.get();
+    const size_t up = s ? size_t(s->current) + 1 : 0;
+    if (!s || up >= s->levels.size() || !s->levels[up].topo || !subdivMatches(mesh)) return mesh.creases;
+    // The mesh's own creases (maybe newer than the stack's) and what is left of the ones below.
+    const SubdivLevel& L = s->levels[up];
+    const std::shared_ptr<const EdgeSharpness> sharp =
+        levelSharpness(s->current >= 1 ? &s->levels[size_t(s->current)] : nullptr, mesh.triangles, mesh.creases, *L.topo);
+    if (!sharp) return {};
+    std::vector<float> creases(mesh.triangleCount() * 3, 0.0f);
+    for (uint32_t t = 0; t < mesh.triangleCount(); ++t)
+        for (int k = 0; k < 3; ++k) {
+            const uint32_t e = topoEdge(*L.topo, mesh.triangles[t][k], mesh.triangles[t][(k + 1) % 3]);
+            if (e != kNone) creases[t * 3 + size_t(k)] = sharpnessCrease(sharp->at(e)); // (no diagonal is an edge)
+        }
+    if (std::none_of(creases.begin(), creases.end(), [](float c) { return c > 0.0f; })) return {};
+    return creases;
 }
 
 const Mesh& subdivLevelData(const Mesh& mesh, int level) { return *mesh.multires->levels[size_t(level)].data; }
