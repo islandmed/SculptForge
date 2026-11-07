@@ -383,6 +383,12 @@ void TransformSession::cancel(Mesh& mesh, BVH& bvh) {
     *this = TransformSession();
 }
 
+std::string vertexCountText(size_t n) {
+    std::string digits = std::to_string(n);
+    for (int i = int(digits.size()) - 3; i > 0; i -= 3) digits.insert(size_t(i), 1, ',');
+    return digits + (n == 1 ? " vertex" : " vertices");
+}
+
 bool partMovesWhole(const Document& doc, int index, bool useMask) {
     const bool instance = doc.linkCount(index) > 1 || doc.parts[size_t(index)].moved();
     return instance && !(useMask && doc.partMesh(index).hasMask());

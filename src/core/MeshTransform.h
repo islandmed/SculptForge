@@ -123,6 +123,8 @@ public:
 // True when a transform moves Part `index` as a whole, by its Part::transform: a linked copy (#94) or a Part
 // moved that way before, unless `useMask` and it has a mask (then the mask's part of its mesh moves).
 bool partMovesWhole(const Document& doc, int index, bool useMask);
+// "2,562 vertices" (the count grouped by thousands) for transform status lines.
+std::string vertexCountText(size_t n);
 // Transforms Part `index` of `doc` (active or not) as one undoable step on that Part (a linked copy as a whole
 // unless masked: partMovesWhole); on the active Part's mesh it records into the active sculpt layer
 // (doc.activeLayer). Returns the number of vertices that moved.

@@ -49,12 +49,6 @@ bool vecArg(const Args& a, const std::string& key, glm::vec3& out, bool uniform,
     return false;
 }
 
-std::string fmt(const glm::vec3& v) {
-    char buf[96];
-    std::snprintf(buf, sizeof buf, "%g,%g,%g", double(v.x), double(v.y), double(v.z));
-    return buf;
-}
-
 CommandResult runTransform(Document& doc, const Args& a) {
     std::string err;
     glm::vec3 translate(0.0f), rotate(0.0f), scale(1.0f), orient(0.0f);
@@ -118,9 +112,12 @@ CommandResult runTransform(Document& doc, const Args& a) {
     if (moved == 0)
         return {false, useMask && doc.mesh.hasMask() ? "Nothing moved: everything is masked (masked=0 ignores the mask)"
                                                     : "Nothing moved: the Part is empty or hidden"};
-    std::string msg = "Transformed " + std::to_string(moved) + " vertices";
+    // "Moved 2,562 vertices": the verb says what changed (the pivot is in the command's own arguments).
+    const bool moves = t.translate != glm::vec3(0.0f), turns = t.rotate != glm::quat(1, 0, 0, 0),
+               scales = t.scale != glm::vec3(1.0f);
+    const char* verb = int(moves) + int(turns) + int(scales) > 1 ? "Transformed" : moves ? "Moved" : turns ? "Turned" : "Scaled";
+    std::string msg = std::string(verb) + " " + vertexCountText(moved);
     if (targets.size() > 1) msg += " in " + std::to_string(targets.size()) + " Parts";
-    msg += " about " + fmt(t.pivot);
     return {true, msg};
 }
 

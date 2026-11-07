@@ -695,7 +695,7 @@ void App::gizmoRelease() {
     if (!sym.empty() && doc_.mesh.hasMask() && gizmo_.useMask) args["symmetry"] = sym;
     if (gizmo_.all) args["all"] = true;
     else if (gizmo_.folder && doc_.activePartInfo().folder) args["folder"] = true;
-    status_ = std::string(label) + " " + readout + ": " + std::to_string(moved) + " vertices";
+    status_ = std::string(label) + " " + readout + ": " + vertexCountText(moved);
     consoleEcho("transform", args, {true, status_});
     updateTitle();
 }
