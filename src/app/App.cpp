@@ -3014,10 +3014,11 @@ void App::updateTitle() {
                            ? std::string("Untitled")
                            : std::filesystem::path(std::u8string(doc_.path.begin(), doc_.path.end())).filename().string();
     updateDiscordPresence(); // the file name, if it's shown (sends only on a change)
-    std::string title = (doc_.dirty() ? "* " : "") + name + " - SculptForge";
-    if (*appPrerelease()) title += " " + appVersionLabel(); // "- SculptForge 0.11.0 Beta 1": a beta says so
+    // "Head.sfproj* — SculptForge 0.11.13": the document first (taskbars and Alt-Tab cut the end off), the version
+    // last, so support screenshots show it.
+    std::string title = name + (doc_.dirty() ? "*" : "") + " — SculptForge " + appShownVersion().text();
     if (const StudioStart& studio = studioMode(); studio.active && !studio.profile.title.empty())
-        title += " - " + studio.profile.title; // a studio build's own title
+        title += " — " + studio.profile.title; // a studio build's own title
     if (title == windowTitle_) return; // called every frame
     windowTitle_ = title;
     SDL_SetWindowTitle(window_, title.c_str());

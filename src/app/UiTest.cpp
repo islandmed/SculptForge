@@ -102,7 +102,7 @@
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once ui.json is written: the preferences save themselves, or Save Layout),
 //                            console_open, command_palette_open, customize, shelves_visible,
-//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, menu_rect_changes (the open task menu moved or resized since last read), offscreen_items (past the window edge), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
+//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, title_overlaps (top bar widgets over each other), menu_rect_changes (the open task menu moved or resized since last read), offscreen_items (past the window edge), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
@@ -437,6 +437,12 @@ std::string restOf(const std::string& line, int skip) {
     std::string rest = line.substr(i);
     if (rest.size() >= 2 && rest.front() == '"' && rest.back() == '"') rest = rest.substr(1, rest.size() - 2);
     return rest;
+}
+
+// "{version}" in an expected text: the version as the window title and the top bar show it ("0.11.13 dev 1a2b3c4").
+std::string withVersion(std::string text, const std::string& version) {
+    if (const size_t at = text.find("{version}"); at != std::string::npos) text.replace(at, 9, version);
+    return text;
 }
 
 SDL_Keymod parseMods(const std::string& text, std::string* key = nullptr) {
@@ -936,6 +942,17 @@ double Demo::query(const std::string& name, bool& known) const {
         return double(n);
     }
     if (name == "shell_narrow") return app_.shell_.narrow ? 1.0 : 0.0;
+    if (name == "title_overlaps") { // top bar widgets drawn over each other last frame; names their spans in the log
+        int n = 0;
+        const auto& b = app_.barSpans_;
+        for (size_t i = 0; i < b.size(); ++i)
+            for (size_t j = i + 1; j < b.size(); ++j)
+                if (b[i].first < b[j].second - 0.5f && b[j].first < b[i].second - 0.5f) {
+                    std::printf("title_overlaps: %.0f-%.0f and %.0f-%.0f\n", b[i].first, b[i].second, b[j].first, b[j].second);
+                    ++n;
+                }
+        return n;
+    }
     if (name == "offscreen_items") { // items drawn past the window's edge last frame (#105); names them in the log
         const std::vector<std::string> off = Demo::offscreenItems();
         for (const std::string& o : off) std::fprintf(stderr, "offscreen: %s\n", o.c_str());
@@ -2420,12 +2437,22 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
     } else if (verb == "expect_text" || verb == "expect_no_text") {
         if (!need(1)) return false;
-        const std::string text = restOf(lineText_, 1);
+        const std::string text = withVersion(restOf(lineText_, 1), App::appShownVersion().text());
         const bool want = verb == "expect_text";
         steps_.push_back([this, line, text, want](float t) {
             if (t == 0.0f) return false;
             if ((frameText_.find(text) != std::string::npos) != want)
                 fail(line, want ? "no text \"" + text + "\" on screen" : "text \"" + text + "\" is on screen");
+            return true;
+        });
+    } else if (verb == "expect_title") { // the OS window title contains the text ({version}: the version as shown)
+        if (!need(1)) return false;
+        const std::string text = withVersion(restOf(lineText_, 1), App::appShownVersion().text());
+        steps_.push_back([this, line, text](float t) {
+            if (t == 0.0f) return false; // the title is set while the frame after the previous step draws
+            const char* title = SDL_GetWindowTitle(app_.window_);
+            const std::string have = title ? title : "";
+            if (have.find(text) == std::string::npos) fail(line, "window title is \"" + have + "\", expected \"" + text + "\"");
             return true;
         });
     } else if (verb == "expect_status") {

@@ -48,6 +48,12 @@ TEST(update_versions_order_prereleases) {
     CHECK(versionLabel("9.0.0", "beta.1") == "9.0.0 Beta 1");
     CHECK(versionLabel("9.0.0", "rc.2") == "9.0.0 RC 2");
     CHECK(versionLabel("8.10.11", "") == "8.10.11");
+    CHECK(shownVersion("8.10.11", "", "").text() == "8.10.11");
+    CHECK(shownVersion("8.10.11", "", "").tag.empty());
+    CHECK(shownVersion("9.0.0", "beta.2", "").text() == "9.0.0 beta.2");
+    CHECK(shownVersion("9.0.0", "beta.2", "").tag == "beta.2");
+    CHECK(shownVersion("8.10.11", "", "1a2b3c4d5e").tag == "dev 1a2b3c4");
+    CHECK(shownVersion("9.0.0", "rc.1", "1a2b3c4").text() == "9.0.0 rc.1 dev 1a2b3c4");
 }
 
 // latest.json while 9.0.0 Beta 1 is out: old apps and Stable read the top level, Preview the channel's entry.
