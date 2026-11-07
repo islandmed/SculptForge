@@ -88,7 +88,7 @@ constexpr Entry kSpanish[] = {
     {"A mirrored copy of the selected panel (the other sleeve), placed on the other side.", "Una copia reflejada del panel seleccionado (la otra manga), colocada al otro lado."},
     {"Add a 40 x 30 cm rectangle panel, ready to reshape.", "Añade un panel rectangular de 40 x 30 cm, listo para darle forma."},
     {"Add panels from an SVG: every closed shape, at the file's real size.", "Añade paneles desde un SVG: cada forma cerrada, al tamaño real del archivo."},
-    {"Copy the selected panel beside it.", "Copia el panel seleccionado a su lado."},
+    {"Copy the selected panel beside it (Ctrl+D over the window).", "Copia el panel seleccionado a su lado (Ctrl+D sobre la ventana)."},
     {"Delete Panel", "Eliminar panel"},
     {"Distance between the cloth's particles: smaller makes finer folds and drapes slower.", "Distancia entre las partículas de la tela: menor da pliegues más finos y una caída más lenta."},
     {"Drag points to reshape, Alt+click an edge to add one, Delete removes it", "Arrastra los puntos para dar forma, Alt+clic en un borde añade uno, Supr lo elimina"},

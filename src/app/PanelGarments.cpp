@@ -372,13 +372,13 @@ void App::registerGarmentActions() {
             garments_->frame = true;
         },
         nullptr, nullptr, "Add a 40 x 30 cm rectangle panel, ready to reshape.", "garment_add_panel");
-    add("garment.duplicate", "Duplicate", ICON_LC_COPY, "Ctrl+D",
+    add("garment.duplicate", "Duplicate", ICON_LC_COPY, "",
         [ui] {
             GarmentUi u = ui();
             if (u.run("garment_edit", {{"op", std::string("duplicate")}, {"panel", u.panelRef(u.s.panel)}}))
                 u.s.panel = int(u.s.pat.panels.size()) - 1;
         },
-        nullptr, selected, "Copy the selected panel beside it.", "garment_edit");
+        nullptr, selected, "Copy the selected panel beside it (Ctrl+D over the window).", "garment_edit");
     add("garment.mirror_copy", "Mirror Copy", ICON_LC_FLIP_HORIZONTAL_2, "",
         [ui] {
             GarmentUi u = ui();

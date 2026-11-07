@@ -90,7 +90,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"A mirrored copy of the selected panel (the other sleeve), placed on the other side.", "所选衣片的镜像副本（另一只袖子），放在另一侧。"},
     {"Add a 40 x 30 cm rectangle panel, ready to reshape.", "添加一个 40 x 30 厘米的矩形衣片，可随意改形。"},
     {"Add panels from an SVG: every closed shape, at the file's real size.", "从 SVG 添加衣片：每个闭合形状，按文件的实际尺寸。"},
-    {"Copy the selected panel beside it.", "在旁边复制所选衣片。"},
+    {"Copy the selected panel beside it (Ctrl+D over the window).", "在旁边复制所选衣片（在窗口上按 Ctrl+D）。"},
     {"Delete Panel", "删除衣片"},
     {"Distance between the cloth's particles: smaller makes finer folds and drapes slower.", "布料粒子之间的距离：越小褶皱越细，悬垂越慢。"},
     {"Drag points to reshape, Alt+click an edge to add one, Delete removes it", "拖动点来改形，Alt+单击边添加点，Delete 删除点"},

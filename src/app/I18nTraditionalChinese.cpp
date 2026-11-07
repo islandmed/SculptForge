@@ -88,7 +88,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"A mirrored copy of the selected panel (the other sleeve), placed on the other side.", "所選衣片的鏡像副本（另一隻袖子），放在另一側。"},
     {"Add a 40 x 30 cm rectangle panel, ready to reshape.", "新增一個 40 x 30 公分的矩形衣片，可隨意改形。"},
     {"Add panels from an SVG: every closed shape, at the file's real size.", "從 SVG 新增衣片：每個封閉形狀，依檔案的實際尺寸。"},
-    {"Copy the selected panel beside it.", "在旁邊複製所選衣片。"},
+    {"Copy the selected panel beside it (Ctrl+D over the window).", "在旁邊複製所選衣片（在視窗上按 Ctrl+D）。"},
     {"Delete Panel", "刪除衣片"},
     {"Distance between the cloth's particles: smaller makes finer folds and drapes slower.", "布料粒子之間的距離：越小皺褶越細，懸垂越慢。"},
     {"Drag points to reshape, Alt+click an edge to add one, Delete removes it", "拖曳點來改形，Alt+按一下邊新增點，Delete 刪除點"},
