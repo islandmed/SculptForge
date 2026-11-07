@@ -242,6 +242,23 @@ std::string elide(ImFont* font, const std::string& text, float width) {
     return s + "...";
 }
 
+// A left shelf caption: at its font's size, else smaller down to 80 % of it (still readable), else none, so a
+// column shrunk to fit (App::shelfFit_) never shows a cut word ("Stan..."); the tile's tooltip names it then.
+// Returns false when it was left out.
+bool fitCaption(ImDrawList* dl, ImFont* font, ImVec2 a, ImVec2 b, ImU32 col, const std::string& text) {
+    if (!font) font = ImGui::GetFont();
+    const float width = b.x - a.x;
+    const float full = font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, text.c_str()).x;
+    float size = font->FontSize;
+    if (full > width) {
+        size = std::floor(font->FontSize * width / std::max(full, 1.0f)); // text width scales with the size
+        if (size < font->FontSize * 0.8f) return false;
+    }
+    const ImVec2 ts = font->CalcTextSizeA(size, FLT_MAX, 0.0f, text.c_str());
+    dl->AddText(font, size, ImVec2(std::floor((a.x + b.x - ts.x) * 0.5f), std::floor((a.y + b.y - ts.y) * 0.5f)), col, text.c_str());
+    return true;
+}
+
 constexpr float kPointsReadoutW = 190.0f; // the ActiveTris / TotalTris readout at the right of the top shelf, unscaled
 constexpr float kMicroReadoutW = 100.0f;  // ... and its "Micro 300.00M" in front while a visible Part has a micro level (#125)
 
@@ -295,6 +312,8 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const float alpha = disabled ? 0.4f : 1.0f;
     ImFont* caption = look == int(ui::Look::IconLabel) ? app.fontTiny_ : app.fontSmall_;
+    // On the left shelf (Stroke popup) a caption that doesn't fit is shrunk or left out, never cut (fitCaption).
+    const bool leftShelf = std::strcmp(ImGui::GetCurrentWindow()->Name, kShelfWindows[kShelfLeft]) == 0;
     const float capH = caption ? caption->FontSize + 2.0f * s : 14.0f * s;
     if (look == int(ui::Look::IconLabel)) {
         // Right-shelf toggles are options (Mask, Paint, Wire): on is a raised grey with an accent bar down the
@@ -312,8 +331,11 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
         // off doesn't look disabled); disabled items are faded by alpha.
         const ImU32 fg = theme::u32(on ? (mode ? theme::textOnAccent : theme::textBright) : hovered || !a.checked ? theme::text : theme::textOff, alpha);
         centredText(dl, app.fontIcons_, p0, ImVec2(p1.x, p1.y - capH + 2.0f * s), fg, a.icon ? a.icon : "?");
-        centredText(dl, caption, ImVec2(p0.x, p1.y - capH), ImVec2(p1.x, p1.y - 1.0f * s), fg,
-                    elide(caption ? caption : ImGui::GetFont(), label, size.x - 2.0f * s).c_str());
+        if (!leftShelf)
+            centredText(dl, caption, ImVec2(p0.x, p1.y - capH), ImVec2(p1.x, p1.y - 1.0f * s), fg,
+                        elide(caption ? caption : ImGui::GetFont(), label, size.x - 2.0f * s).c_str());
+        else if (!fitCaption(dl, caption, ImVec2(p0.x + 1.0f * s, p1.y - capH), ImVec2(p1.x - 1.0f * s, p1.y - 1.0f * s), fg, label) && hovered)
+            ui::DelayedTooltip(label.c_str());
         return clicked;
     }
     // Tile: a square picture (brush thumbnail or icon) with the name under it.
@@ -342,8 +364,14 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     const std::string key = app.actions().shortcutText(a.id);
     if (key.size() == 1 && caption)
         dl->AddText(caption, caption->FontSize, ImVec2(p0.x + 3 * s, p0.y + 1 * s), theme::u32(theme::textDim), key.c_str());
-    centredText(dl, caption, ImVec2(p0.x, p1.y - capH), p1, theme::u32(on ? theme::accent : theme::text, alpha),
-                elide(caption ? caption : ImGui::GetFont(), label, size.x).c_str());
+    if (leftShelf) {
+        if (!fitCaption(dl, caption, ImVec2(p0.x, p1.y - capH), p1, theme::u32(on ? theme::accent : theme::text, alpha), label) &&
+            hovered)
+            ui::DelayedTooltip(label.c_str());
+    } else {
+        centredText(dl, caption, ImVec2(p0.x, p1.y - capH), p1, theme::u32(on ? theme::accent : theme::text, alpha),
+                    elide(caption ? caption : ImGui::GetFont(), label, size.x).c_str());
+    }
     return clicked;
 }
 
@@ -2836,8 +2864,8 @@ bool tileFrame(const char* id, ImVec2 size, ui::TileLift& lift, ImFont* font, co
     pic1 = ImVec2(b.x, b.y - capH);
     dl->AddRectFilled(pic0, pic1, theme::u32(theme::tile), theme::rounding(4.0f * s));
     if (hovered) dl->AddRectFilled(pic0, pic1, theme::u32(theme::buttonHover, 0.45f), theme::rounding(4.0f * s)); // (a faint fill, no border)
-    centredText(dl, font, ImVec2(a.x, b.y - capH), b, theme::u32(hovered ? theme::text : theme::textDim),
-                elide(font ? font : ImGui::GetFont(), caption, size.x).c_str());
+    if (!fitCaption(dl, font, ImVec2(a.x, b.y - capH), b, theme::u32(hovered ? theme::text : theme::textDim), caption) && hovered)
+        ui::DelayedTooltip(caption.c_str()); // too narrow for its name (the column shrunk to fit): the name on hover
     lift = ui::BeginTileLift(pic0, pic1); // the picture lifts, the caption stays
     dl->AddRectFilled(pic0, pic1, theme::u32(theme::tile), theme::rounding(4.0f * s));
     if (hovered) dl->AddRectFilled(pic0, pic1, theme::u32(theme::buttonHover, 0.45f), theme::rounding(4.0f * s)); // (a faint fill)
