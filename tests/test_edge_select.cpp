@@ -3,7 +3,8 @@
 //
 // Edge selection on the base level (#108, core/EdgeSelect.h): polygon edges without quad diagonals, picking, loops
 // across quads and along borders, select by angle (and within the selection), grow / shrink, the edge_select
-// command and its base-level rule, and the cost on a 1M-vertex base.
+// command and its base-level rule, and the cost on a 1M-vertex base. Creases (slice 2): set / clear on the selection,
+// both sides of an edge, undo / redo, saved in projects, kept on the base level while stepping levels.
 #include "TestHarness.h"
 
 #include "core/Commands.h"
@@ -11,6 +12,7 @@
 #include "core/EdgeSelect.h"
 #include "core/Multires.h"
 #include "core/Primitives.h"
+#include "core/Project.h"
 
 #include <chrono>
 #include <cstdio>
@@ -224,4 +226,85 @@ TEST(edge_select_million_vertex_base_stays_interactive) {
     CHECK(ms(t0, t1) < timeLimit(1500.0));
     CHECK(ms(t1, t2) < timeLimit(500.0));
     CHECK(ms(t2, t3) < timeLimit(50.0));
+}
+
+TEST(edge_crease_set_clear_undo) {
+    Document doc = makeDoc(makeCube(2));
+    const CommandRegistry& reg = registry();
+    CHECK(!reg.execute(doc, "edge_crease", {}).ok); // nothing selected
+    CHECK(reg.execute(doc, "edge_select", {{"op", std::string("angle")}}).ok); // the cube's 12 hard edges, 2 spans each
+    CHECK(doc.edgeSelection.count == 24);
+    CommandResult r = reg.execute(doc, "edge_crease", {{"value", 0.5}});
+    CHECK(r.ok);
+    CHECK(r.message.find("24 creased edges of 48") != std::string::npos);
+    const EdgeTopology& topo = *doc.edgeSelection.topo;
+    CHECK(doc.mesh.creases.size() == doc.mesh.triangleCount() * 3);
+    size_t corners = 0;
+    for (float c : doc.mesh.creases) corners += c == 0.5f;
+    CHECK(corners == 48); // both sides of every creased edge
+    for (uint32_t e = 0; e < topo.edgeCount(); ++e)
+        CHECK(edgeCrease(doc.mesh, topo, e) == (doc.edgeSelection.selected[e] ? 0.5f : 0.0f));
+    // Sharper on one edge, then undo / redo restore exactly.
+    const std::vector<float> half = doc.mesh.creases;
+    CHECK(reg.execute(doc, "edge_select", {{"op", std::string("edge")}, {"edge", 0.0}}).ok);
+    const uint32_t one = uint32_t(std::find(doc.edgeSelection.selected.begin(), doc.edgeSelection.selected.end(), 1) -
+                                  doc.edgeSelection.selected.begin());
+    CHECK(reg.execute(doc, "edge_crease", {}).ok); // default 1
+    CHECK(edgeCrease(doc.mesh, topo, one) == 1.0f);
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+    CHECK(doc.mesh.creases == half);
+    CHECK(doc.undo.redo(doc.mesh, doc.bvh));
+    CHECK(edgeCrease(doc.mesh, topo, one) == 1.0f);
+    // Clearing every crease frees the array; undo brings them back.
+    r = reg.execute(doc, "edge_crease", {{"clear", true}, {"all", true}});
+    CHECK(r.ok);
+    CHECK(!doc.mesh.hasCreases());
+    CHECK(!reg.execute(doc, "edge_crease", {{"clear", true}, {"all", true}}).ok); // nothing creased
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+    CHECK(edgeCreasedCount(doc.mesh, topo) == 24);
+    // Out-of-range values clamp; the same value again changes nothing (no undo step).
+    const size_t steps = doc.undo.undoCount();
+    CHECK(reg.execute(doc, "edge_select", {{"op", std::string("all")}}).ok);
+    CHECK(reg.execute(doc, "edge_crease", {{"value", 7.0}}).ok);
+    CHECK(edgeCreasedCount(doc.mesh, topo) == 48);
+    CHECK(reg.execute(doc, "edge_crease", {{"value", 1.0}}).ok);
+    CHECK(doc.undo.undoCount() == steps + 1);
+    CHECK(reg.execute(doc, "edge_crease", {{"info", true}}).message.find("48 creased edges") != std::string::npos);
+}
+
+TEST(edge_crease_saved_and_kept_on_the_base_level) {
+    Document doc = makeDoc(makeCube(3));
+    const CommandRegistry& reg = registry();
+    CHECK(reg.execute(doc, "edge_select", {{"op", std::string("angle")}}).ok);
+    CHECK(reg.execute(doc, "edge_crease", {{"value", 0.75}}).ok);
+    const std::vector<float> creases = doc.mesh.creases;
+    // Up two levels (the creases are the base level's; the levels above have none) and back down.
+    CHECK(reg.execute(doc, "subdiv_divide", {}).ok);
+    CHECK(reg.execute(doc, "subdiv_divide", {}).ok);
+    CHECK(!doc.mesh.hasCreases());
+    CHECK(!reg.execute(doc, "edge_crease", {}).ok); // base level only
+    std::string err;
+    CHECK(saveProject(tempPath("edge_crease_levels.sfproj"), doc, err));
+    CHECK(reg.execute(doc, "subdiv_level", {{"level", 1.0}}).ok);
+    CHECK(doc.mesh.creases == creases);
+    // Saved with the levels (stepped up) and as a plain mesh; files without creases load without.
+    Document loaded;
+    CHECK(loadProject(tempPath("edge_crease_levels.sfproj"), loaded, err));
+    CHECK(subdivCurrentLevel(loaded.mesh) == 2);
+    CHECK(subdivLevelData(loaded.mesh, 0).creases == creases);
+    CHECK(reg.execute(loaded, "subdiv_level", {{"level", 1.0}}).ok);
+    CHECK(loaded.mesh.creases == creases);
+    Document plain = makeDoc(makeCube(3));
+    CHECK(reg.execute(plain, "edge_select", {{"op", std::string("angle")}}).ok);
+    CHECK(reg.execute(plain, "edge_crease", {{"value", 0.25}}).ok);
+    CHECK(saveProject(tempPath("edge_crease_plain.sfproj"), plain, err));
+    Document back;
+    CHECK(loadProject(tempPath("edge_crease_plain.sfproj"), back, err));
+    CHECK(back.mesh.creases == plain.mesh.creases);
+    Document none = makeDoc(makeCube(3));
+    CHECK(saveProject(tempPath("edge_crease_none.sfproj"), none, err));
+    CHECK(loadProject(tempPath("edge_crease_none.sfproj"), back, err));
+    CHECK(!back.mesh.hasCreases());
+    for (const char* f : {"edge_crease_levels.sfproj", "edge_crease_plain.sfproj", "edge_crease_none.sfproj"})
+        std::remove(tempPath(f).c_str());
 }

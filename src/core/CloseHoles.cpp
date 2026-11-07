@@ -466,6 +466,7 @@ bool closeHoles(Mesh& mesh, const CloseHolesOptions& options, CloseHolesStats& s
     if (mesh.hasHidden()) mesh.hidden.resize(nt, 0);
     if (mesh.hasUvs()) mesh.uvs.resize(nt * 3, glm::vec2(0.0f));
     if (mesh.hasUvFlags()) mesh.uvFlags.resize(nt * 3, 0);
+    if (mesh.hasCreases()) mesh.creases.resize(nt * 3, 0.0f); // (a creased rim keeps its crease: edgeCrease reads both sides)
     if (mesh.hasQuads()) mesh.quadPartners.resize(nt, Mesh::kNoQuad);
     mesh.rebuildTopology();
     mesh.recomputeAllNormals();

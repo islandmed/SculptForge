@@ -4855,6 +4855,13 @@ constexpr Entry kSpanish[] = {
     {"Status bar",
      "Barra de estado"},
     // --- Tool > Geometry > Edges (PanelEdges.cpp, #108) ---
+    {"Crease", "Pliegue"},
+    {"Crease %.2f", "Pliegue %.2f"},
+    {"Crease the selected edges by the Crease value (1 = fully sharp), for subdivision. Creased edges show tinted on the base level.", "Pliega las aristas seleccionadas con el valor de Pliegue (1 = totalmente afilado), para la subdivisión. Las aristas plegadas se ven teñidas en el nivel base."},
+    {"How sharp Crease makes the selected edges: 1 is fully sharp, lower values are softer.", "Cuánto afila Pliegue las aristas seleccionadas: 1 es totalmente afilado; los valores menores son más suaves."},
+    {"Remove the crease from the selected edges.", "Quita el pliegue de las aristas seleccionadas."},
+    {"Uncrease", "Quitar pliegue"},
+    {"creased", "con pliegue"},
     {"Add every edge that touches a selected one.", "Añade cada arista que toca una seleccionada."},
     {"Add the open (border) edges: the rims of holes and of open surfaces.", "Añade las aristas abiertas (de borde): los bordes de los agujeros y de las superficies abiertas."},
     {"Deselect All", "Deseleccionar todo"},
