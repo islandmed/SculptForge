@@ -452,6 +452,7 @@ private:
         std::shared_ptr<MicroRenderer> micro;
         size_t microDrawn = 0;
         bool microShown = false; // a micro level synced once: its first frame doesn't wait for the coarse build
+        bool microCoarseDue = false; // its coarse levels are to be built (a dense base): the next frame builds them
         size_t microFull = 0; // what its last micro draw drew (0: none yet)
         // Its coarse levels (the ones above, on its displaced base corners: microCorners, docs/design/micro-coarse-lod.md),
         // with `order`, `bounds`, `grid` and `box` of the base. The corners an edit moved wait in microMoved until
