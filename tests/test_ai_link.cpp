@@ -156,6 +156,7 @@ TEST(ai_link_policy) {
     CHECK(verdict("macro_run", {{"name", std::string("x")}}) == AiVerdict::Confirm);
     CHECK(AiLinkPolicy{}.classify(reg.find("mesh_info"), "image_to_3d", {}).verdict == AiVerdict::Confirm);
     CHECK(verdict("brush_delete", {{"name", std::string("x")}}) == AiVerdict::Confirm);
+    CHECK(AiLinkPolicy{}.classify(reg.find("mesh_info"), "brush_set_delete", {}).verdict == AiVerdict::Confirm); // (an app command)
     CHECK(AiLinkPolicy{}.classify(reg.find("mesh_info"), "anything", {{"url", std::string("http://x")}}).verdict == AiVerdict::Confirm);
     // No project: a relative path can't be placed, so it asks.
     AiLinkPolicy none;

@@ -98,6 +98,7 @@ Json toJson(const UiPrefs& p) {
     j.set("alphaSort", p.alphaSort);
     j.set("materialSort", p.materialSort);
     j.set("librarySort", p.librarySort);
+    if (!p.brushSet.empty()) j.set("brushSet", p.brushSet);
     j.set("spaceCamera", p.spaceCamera);
     j.set("emulate3Button", p.emulate3Button);
     j.set("mayaZoomHorizontal", p.mayaZoomHorizontal);
@@ -177,6 +178,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     for (auto [key, v] : {std::pair{"brushSort", &p.brushSort}, std::pair{"alphaSort", &p.alphaSort},
                           std::pair{"materialSort", &p.materialSort}, std::pair{"librarySort", &p.librarySort}})
         if (j[key].isString()) *v = listSortId(listSortFromId(j[key].asString()));
+    if (j["brushSet"].isString() && j["brushSet"].asString().size() <= 64) p.brushSet = j["brushSet"].asString();
     p.spaceCamera = j["spaceCamera"].asBool(p.spaceCamera);
     p.emulate3Button = j["emulate3Button"].asBool(p.emulate3Button);
     p.mayaZoomHorizontal = j["mayaZoomHorizontal"].asBool(p.mayaZoomHorizontal);
@@ -788,6 +790,7 @@ void App::initActions() {
     registerInputActions();     // the Classic sculpting keys: U I O, Space, L, V, Ctrl+A / I / H / W..., the input style (Input.cpp)
     registerTimelineUiActions(); // Sculpt Timeline, timelapse, Help > Benchmark (PanelTimeline.cpp)
 
+    registerBrushSets(); // brush set commands and actions; the active set's shelf back (PanelBrushSets.cpp)
     // Every command, so the command palette finds anything scriptable.
     actions_.registerCommands(
         commands_, [this](const std::string& name) { runCommand(name); },
@@ -991,6 +994,7 @@ void App::restartPrefsForTest(const std::string& uiJson) {
     if (fileExists(uiConfigPath()) && !readUiConfig(uiConfigPath(), err, true)) status_ = err;
     applyInputStyle();
     registerLibraryActions(); // as at a start: registered after the style is applied (#147)
+    restoreBrushSet();
     layoutBaseline_ = layoutKey();
     prefsSavedKey_ = prefsKey();
     prefsSaveAt_ = 0.0;
@@ -1206,6 +1210,7 @@ void App::drawHintsSection() {
 }
 
 void App::watchLayoutChanges() {
+    syncShelfBrushActions();
     autosavePrefs();
     if (layoutHintShown_ || uiConfigDeterministic_ || ++layoutCheckFrame_ % 20 != 0) return;
     if (layoutKey() == layoutBaseline_) return;

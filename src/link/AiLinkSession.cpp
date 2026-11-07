@@ -114,7 +114,8 @@ AiDecision AiLinkPolicy::classify(const Command* cmd, const std::string& name, c
     if (name == "macro_run" || name.rfind("script", 0) == 0 || name.rfind("python", 0) == 0)
         return confirmBecause("Runs a macro or script");
     if (name == "splat_train") return confirmBecause("Runs outside programs (splat training)");
-    if (name == "brush_delete" || name == "vdm_delete") return confirmBecause("Deletes a file from your library");
+    if (name == "brush_delete" || name == "vdm_delete" || name == "brush_set_delete")
+        return confirmBecause("Deletes a file from your library");
 
     const bool writer = writes(name);
     for (const auto& [key, value] : args) {

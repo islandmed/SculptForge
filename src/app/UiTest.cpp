@@ -789,6 +789,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "turntable") return app_.uiPrefs_.turntable ? 1.0 : 0.0;
     if (name == "camera_ortho") return app_.camera_.ortho ? 1.0 : 0.0;
     if (name == "mask_brush") return app_.maskBrushActive() ? 1.0 : 0.0;
+    if (name == "brush_sets") return double(app_.brushSets().size()); // brush sets in the library (#143)
+    if (name == "brush_set_active") return double(app_.matchingBrushSet()); // the set the bottom shelf is, -1 none
+    if (name == "bottom_shelf_items") return double(app_.layout_.bottomShelf.size());
     if (name == "shortcut_conflicts") { // keys that two actions claim (only the first would ever run)
         int conflicts = 0;
         std::vector<Chord> seen;

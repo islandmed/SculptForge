@@ -234,7 +234,11 @@ void centredText(ImDrawList* dl, ImFont* font, ImVec2 a, ImVec2 b, ImU32 col, co
 std::string elide(ImFont* font, const std::string& text, float width) {
     if (font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, text.c_str()).x <= width) return text;
     std::string s = text;
-    while (!s.empty() && font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, (s + "...").c_str()).x > width) s.pop_back();
+    while (!s.empty() && font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, (s + "...").c_str()).x > width) {
+        // One whole UTF-8 character: its continuation bytes, then its lead byte (half a Chinese character drew as "?").
+        while (!s.empty() && (static_cast<unsigned char>(s.back()) & 0xC0) == 0x80) s.pop_back();
+        if (!s.empty()) s.pop_back();
+    }
     return s + "...";
 }
 
@@ -2317,14 +2321,22 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         else drawBrushIcon(dl, c, pic * 0.36f, int(BrushType::Standard));
         dl->AddText(fontSmall_, fontSmall_ ? fontSmall_->FontSize : 12.0f, ImVec2(a.x + 2.0f * s, a.y), theme::u32(theme::accent),
                     ICON_LC_SPARKLE);
+        // Its key (a brush set gives it one, #143) in the other corner, as the built-in tiles show theirs.
+        const std::string chord = actions_.shortcutText(item);
+        if (chord.size() == 1 && fontSmall_) {
+            const float kw = fontSmall_->CalcTextSizeA(fontSmall_->FontSize, FLT_MAX, 0.0f, chord.c_str()).x;
+            dl->AddText(fontSmall_, fontSmall_->FontSize, ImVec2(b.x - kw - 3.0f * s, a.y + 1.0f * s), theme::u32(theme::textDim), chord.c_str());
+        }
         if (on) dl->AddRect(a, b, theme::u32(theme::accent), theme::rounding(4.0f * s), 0, 2.0f * s);
         centredText(dl, fontSmall_, ImVec2(a.x, b.y - capH), b, theme::u32(found < 0 ? theme::textDim : on ? theme::accent : theme::text),
                     elide(fontSmall_ ? fontSmall_ : ImGui::GetFont(), name, size.x).c_str());
-        if (clicked && found >= 0) {
+        if (clicked && ui::CtrlHeld() && ui::AltHeld()) {
+            if (!layout_.customize) beginShortcutCapture(item); // Ctrl+Alt+click: a key for it, as the other tiles
+        } else if (clicked && found >= 0) {
             doc_.activeBrush = found;
             paintMode_ = false;
         }
-        ui::HelpText(name.c_str(), nullptr,
+        ui::HelpText(name.c_str(), chord.empty() ? nullptr : chord.c_str(),
                      found >= 0 && !doc_.brushes[size_t(found)].description.empty() ? doc_.brushes[size_t(found)].description.c_str()
                                                                                    : "One of your custom brushes.",
                      "Bottom shelf");
@@ -2375,6 +2387,10 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
             if (index < int(list.size()) && list[size_t(index)] == item) list.erase(list.begin() + index);
             noteLayoutChanged();
         }
+        if (shelf == kShelfBottom && ImGui::BeginMenu(tr("Brush set"))) { // also the Brush palette's (#143)
+            drawBrushSetMenu();
+            ImGui::EndMenu();
+        }
         if (shelf == kShelfBottom && ImGui::BeginMenu(tr("Tile size"))) { // also in Preferences > Interface
             static const char* kTiles[] = {"Small", "Medium", "Large"};
             for (int i = 0; i < 3; ++i)
@@ -2384,7 +2400,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         ImGui::EndPopup();
     }
     // Customize mode: widgets (sliders, tiles, readouts) are Ctrl+Alt drag sources too.
-    if (item != "sep" && !actions_.find(item)) {
+    if (item != "sep" && (!actions_.find(item) || item.rfind("brush.recipe.", 0) == 0)) { // (custom brushes have actions, #143)
         ui::SetNextItemOrigin(shelf, index);
         ui::UiItemDragSource(*this, item.c_str(), item.c_str());
     }

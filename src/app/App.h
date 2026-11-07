@@ -21,6 +21,7 @@
 #include "app/UserGuide.h"
 #include "ai/ComfyUI.h"
 #include "ai/ImageTo3DService.h"
+#include "core/BrushSets.h"
 #include "core/BrushSettings.h"
 #include "core/Commands.h"
 #include "core/Image.h"
@@ -2219,6 +2220,40 @@ private:
         bool lastOk = false, lastOneStep = false;
     } macros_;
     // ---- end Packs and macros ----
+    // ---- Brush sets (PanelBrushSets.cpp, core/BrushSets.h, #143) ----
+    // Named bottom shelves with their keys: switching swaps the shelf's brushes and the keys of the brushes on it in
+    // one step (the Brush palette's Brush set menu, the bottom shelf's right-click menu, the command palette, the
+    // brush_set command). Save Shelf as Brush Set keeps the current shelf and keys; sets live in the user library.
+public:
+    void drawBrushSetRow();  // the Brush palette's row: the set menu and Save
+    void drawBrushSetMenu(); // the set list, Save, Delete (in a menu)
+    const std::vector<BrushSet>& brushSets() const { return brushSets_.list; }
+    int matchingBrushSet() const; // the set whose shelf is the bottom shelf now, or -1
+
+private:
+    void registerBrushSets();     // commands, actions, the sets, the active set's shelf back (initActions)
+    void refreshBrushSets();      // reads the sets folder; one action per set
+    void restoreBrushSet();       // the set last switched to (uiPrefs_.brushSet): its shelf, at start
+    void syncShelfBrushActions(); // per frame: an action for each custom brush on the bottom shelf, so it can hold a key
+    bool applyBrushSet(const std::string& name, std::string& message);
+    bool saveShelfAsBrushSet(const std::string& name, std::string& message);
+    bool deleteBrushSet(const std::string& name, std::string& message);
+    template <class... A> void say(std::string& message, const char* english, A... args);
+    void sayCounts(std::string& message, const char* english, const std::string& name, int brushes, int keys);
+    void runBrushSetCommand(const std::string& command, const std::string& name); // then the status in the interface language
+    void openBrushSetSave();
+    void drawBrushSetSave(); // the Save Shelf as Brush Set window
+    struct BrushSetsUi {
+        std::vector<BrushSet> list;
+        std::vector<std::string> shelfSeen; // the bottom shelf when its brushes' actions were last made
+        bool saveOpen = false, saveFocus = false, deleteOpen = false;
+        char name[65] = "";
+        std::string error;    // why the last Save didn't work
+        std::string shown;    // the last brush set step's result in the interface language (the status bar)
+        std::string deleting; // the set Delete asks about
+        std::string pending;  // a set's action ran: switched to at the start of the next frame
+    } brushSets_;
+    // ---- end Brush sets ----
     // ---- Radial menus (RadialMenu.cpp, core/RadialMenu.h, #45) ----
     // Up to eight pie menus of up to eight actions each. A menu's key (action radial.menuN, set in the keymap like
     // any other) or its mouse / pen button, held: the pie shows at the cursor, a flick toward a slot and letting go

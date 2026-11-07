@@ -67,9 +67,9 @@ std::string elide(const std::string& text, float width) {
     if (ImGui::CalcTextSize(text.c_str()).x <= width) return text;
     std::string s = text;
     while (!s.empty() && ImGui::CalcTextSize((s + "...").c_str()).x > width) {
-        s.pop_back();
-        while (!s.empty() && (static_cast<unsigned char>(s.back()) & 0xC0) == 0x80)
-            s.pop_back(); // whole UTF-8 chars
+        // One whole UTF-8 character: its continuation bytes, then its lead byte.
+        while (!s.empty() && (static_cast<unsigned char>(s.back()) & 0xC0) == 0x80) s.pop_back();
+        if (!s.empty()) s.pop_back();
     }
     return s + "...";
 }

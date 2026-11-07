@@ -284,6 +284,14 @@ The active brush is outlined in the accent colour.
 - **Bigger or smaller tiles**: right-click any brush on the shelf and choose **Tile size**: Small, Medium (the
   default) or Large. The same setting is in **Edit > Preferences > Interface > Shelf tiles**. Small leaves the most
   room for the model on a laptop screen.
+- **A key for any brush on the shelf**: hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd>, click its tile, then press the key.
+  Custom and pack brushes show their key in the top-right corner.
+- **Brush sets**: keep the shelf as it is now, with the keys of its brushes, as a named set (Wood, Metal,
+  Stone...): **Sculpt > Brush > Brush set > Save**, or right-click the shelf and choose **Brush set > Save Shelf as Brush
+  Set...**. Pick a set from either menu, or type **Brush Set** in the command palette (<kbd>F3</kbd>), to swap the
+  whole shelf and its keys in one step. The set you switched to comes back the next time you start SculptForge.
+  Sets are saved in your brush library (a `sets` folder next to your brushes); deleting a set leaves the brushes
+  and the shelf as they are.
 
 ## Pop-up pickers
 

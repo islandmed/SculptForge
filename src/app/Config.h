@@ -46,6 +46,7 @@ struct UiPrefs {
     bool emulateNumpad = false; // Blender style: the 1-9 and 0 keys above the letters act as the numpad (laptops)
     // The order of the asset lists (core/ListSort.h ids "az", "recent", "pack"): brushes, alphas, materials, Library.
     std::string brushSort = "az", alphaSort = "az", materialSort = "az", librarySort = "az";
+    std::string brushSet; // the brush set last switched to (#143): its shelf comes back at the next start; "" = none
     bool rightClickQuickMenu = true; // a right click on the canvas (no drag) opens the QuickMenu (#22)
     bool spaceCamera = false; // hold Space and drag to move the camera (#43; off: Space opens the QuickMenu)
     // Blender style (#77): off, as Blender 5.1+'s default keymap, Alt+left-drag on the model masks (Ctrl+Alt unmasks)

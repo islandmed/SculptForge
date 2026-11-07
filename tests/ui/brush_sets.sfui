@@ -1,0 +1,127 @@
+# Brush sets (#143): the bottom shelf and its brushes' keys saved as a named set (Wood, Metal...), switched in one
+# step from the Brush palette, the shelf's right-click menu or F3; a pack brush on the shelf holds a key like the
+# built-in ones; the set switched to comes back after a restart; Delete removes only the set.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+expect_value brush_sets == 0
+
+# Wood: Rivet Row on the shelf, with J (Ctrl+Alt+click its tile, then the key), and K on Clay.
+click "##addbrush"
+click "Rivet Row"
+expect "Rivet Row##brush.recipe.Rivet Row"
+hold ctrl+alt
+click "Rivet Row##brush.recipe.Rivet Row"
+hold none
+key j
+expect_shortcut "brush.recipe.Rivet Row" J
+hold ctrl+alt
+click "Clay##brush.clay"
+hold none
+key k
+expect_shortcut brush.clay K
+key j
+expect_value brush_type == -1
+key k
+expect_value brush_type == 1
+click "Brush##palette.brush"
+expect_text Brush set: none yet
+hold ctrl
+hover "##brushset"
+expect_help swap the shelf's brushes
+hold none
+click "Save##brushsetsave"
+type "##brushsetname" Wood
+wait_idle 30
+shot save_dialog
+click "Save##brushsetsave_ok"
+expect_status Brush set saved: Wood
+expect_value brush_sets == 1
+expect_value brush_set_active == 0
+
+# Metal: no Rivet Row, no Clay on the shelf, and J on Flatten (taken from Rivet Row).
+right_click "Rivet Row##brush.recipe.Rivet Row"
+click "Remove from shelf"
+right_click "Clay##brush.clay"
+click "Remove from shelf"
+expect_value brush_set_active == -1
+hold ctrl+alt
+click "Flatten##brush.flatten"
+hold none
+key j
+expect_shortcut brush.flatten J
+run brush_set_save name=Metal
+expect_value brush_sets == 2
+click "Brush##palette.brush"
+expect_text Brush set: Metal
+
+# One step back to Wood (the Brush palette's menu): its shelf and its keys.
+click "##brushset"
+expect "Metal##brushset0"
+wait_idle 30
+shot set_menu
+click "Wood##brushset1"
+expect_status Brush set: Wood
+expect "Rivet Row##brush.recipe.Rivet Row"
+expect "Clay##brush.clay"
+expect_shortcut "brush.recipe.Rivet Row" J
+expect_shortcut brush.clay K
+expect_value shortcut_conflicts == 0
+key j
+expect_value brush_type == -1
+
+# Metal again from the bottom shelf's right-click menu.
+right_click "Flatten##brush.flatten"
+hover "Brush set"
+wait 0.2
+expect "Metal##brushset0"
+wait_idle 30
+shot shelf_menu
+click "Metal##brushset0"
+expect_not "Rivet Row##brush.recipe.Rivet Row"
+expect_not "Clay##brush.clay"
+expect_shortcut brush.flatten J
+expect_value shortcut_conflicts == 0
+key j
+expect_value brush_type == 6
+
+# F3 finds every set.
+key f3
+type "##Command palette" "brush set: wood"
+expect_text "Brush Set: Wood"
+key enter
+wait 0.2
+expect_value brush_set_active == 1
+expect "Rivet Row##brush.recipe.Rivet Row"
+
+# The set switched to comes back at the next start (shelf and keys).
+restart
+expect_value brush_sets == 2
+expect_value brush_set_active == 1
+expect "Rivet Row##brush.recipe.Rivet Row"
+expect_shortcut "brush.recipe.Rivet Row" J
+click "Brush##palette.brush"
+expect_text Brush set: Wood
+wait_idle 60
+shot palette
+
+# Delete asks first and leaves the shelf as it is.
+click "##brushset"
+click "Delete Wood...##brushsetmenu"
+expect_text Delete the brush set Wood?
+click "Delete##brushsetdelete_ok"
+expect_value brush_sets == 1
+expect "Rivet Row##brush.recipe.Rivet Row"
+expect_value brush_set_active == -1
+click "Brush##palette.brush"
+expect_text this shelf (not saved)
+run_fails brush_set name=Wood
+run_fails brush_set_save name=""
+
+# HiDPI: the row and the menu at 200 %.
+ui_scale 200
+wait_idle 60
+click "##brushset"
+expect "Metal##brushset0"
+wait_idle 30
+shot set_menu_hidpi
+key escape
