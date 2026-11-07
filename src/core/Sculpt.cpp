@@ -43,6 +43,7 @@ const char* brushName(BrushType type) {
     case BrushType::KelvinSnake: return "KelvinSnake";
     case BrushType::DetailClone: return "DetailClone";
     case BrushType::Morph: return "Morph";
+    case BrushType::Cloth: return "Cloth";
     default: return "?";
     }
 }
@@ -948,6 +949,10 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
     if (!active_) return;
     // Morph: nothing without a target (Tool > Selection Sets > Morph Target); not on micro levels (no grid shapes).
     if (type == BrushType::Morph && (mesh.micro || !morphTarget(mesh))) return;
+    if (type == BrushType::Cloth) { // ClothBrush.cpp (no remeshing: the simulation keeps its own topology)
+        dabCloth(mesh, bvh, p, sym);
+        return;
+    }
     if (isKelvinletBrush(type)) { // Kelvinlet.cpp (no remeshing: they move the surface, as Move does)
         dabKelvinlet(mesh, bvh, type, p, sym);
         return;

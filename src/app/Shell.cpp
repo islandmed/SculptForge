@@ -171,6 +171,9 @@ void drawBrushIcon(ImDrawList* dl, ImVec2 c, float r, int type) {
         break;
     }
     case BrushType::Inflate: dl->AddCircle(c, r * 0.45f, hi, 24, w); break;
+    case BrushType::Cloth: // folds: three soft waves
+        for (float dy : {-0.28f, 0.0f, 0.28f}) curve(r * dy, hi, w * 0.7f);
+        break;
     case BrushType::KelvinGrab: { // a soft bulge with a drag arrow
         dl->AddCircle(c, r * 0.5f, hi, 32, w * 0.6f);
         const ImVec2 a(c.x - r * 0.1f, c.y + r * 0.1f), b(c.x + r * 0.5f, c.y - r * 0.5f);
@@ -392,6 +395,7 @@ void App::registerShellActions() {
         "Stamps the VDM brush's map along the stroke, each copy turned to follow it. Capture one with Capture from view.",
         "Pulls the surface back toward the morph target, a selection set's shape (Tool > Selection Sets > Morph "
         "Target); Alt pushes away. Works at any subdivision level.",
+        "Moves the surface like fabric: drag it and it folds where it bunches up. Mode and fabric in Brush > Cloth.",
     };
     static_assert(std::size(kBrushHelp) == size_t(BrushType::Count));
     for (int i = 0; i < int(BrushType::Count); ++i) {

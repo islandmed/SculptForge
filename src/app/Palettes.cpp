@@ -369,6 +369,10 @@ void App::drawPalette_Brush() {
             }
         }
     }
+    if (subpalette("brush.cloth_options", "Cloth")) {
+        tray::Section section;
+        drawClothSection(); // PanelCloth.cpp
+    }
     if (subpalette("brush.kelvinlet", "Kelvinlet & Capture")) {
         tray::Section section;
         drawKelvinletSection(); // PanelKelvinlet.cpp

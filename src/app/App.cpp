@@ -2197,6 +2197,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     }();
     doc_.sculptor.analyticNormals = analyticNormals == 1 || (analyticNormals == -1 && radiusPx_ >= 160.0f);
     fusedDabs_ = 64.0;
+    if (strokeSculpt_ && !recipe && strokeBrush_ == BrushType::Cloth) prepareClothColliders(); // (PanelCloth.cpp)
     if (!doc_.sculptor.beginStroke(doc_.mesh,
                                    !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushLabel(strokeBrush_),
                                    strokeSculpt_ ? doc_.activeLayer : -1)) {
