@@ -25,9 +25,10 @@ inline constexpr const char* kContentUrl = "https://sculptforge.app/content/v1.j
 inline constexpr const char* kContentMirrorUrl = "https://islandmed.github.io/content/v1.json";
 inline constexpr size_t kContentMaxBytes = 64 * 1024; // refused while reading past this
 inline constexpr int kContentSchema = 1;              // a newer schema is ignored (the cache stays)
-// The public half of the content key (Ed25519, hex). Empty: no key yet, so the app never fetches and uses the
+// The public half of the content key (Ed25519, hex; made 11-07, private half only in the GitHub environment `content`).
+// Empty would mean no key: the app would never fetch and would use the
 // compiled-in copy. Never the release key (kUpdatePublicKeyHex): the content key signs on every push to main.
-inline constexpr const char* kContentPublicKeyHex = "";
+inline constexpr const char* kContentPublicKeyHex = "dcec4b19745634d261d8b6c69e00d7c087e72b17ecd6c0a11a1ad426cba62302";
 
 struct CommunityContent {
     int64_t serial = 0; // rises with every publish (the commit time); an older one is never taken over a newer one

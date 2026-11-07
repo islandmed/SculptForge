@@ -19,7 +19,7 @@ jobs:
   # The content lane (docs/design/release-lanes.md §1): website/content/v1.json (credits, Founding Members,
   # testimonials) and its Ed25519 signature, which the app checks against the content key compiled into it
   # (src/app/CommunityContent.h). The private half is only in the `content` environment (main only), never the
-  # release key. No CONTENT_SIGNING_KEY yet: no file is published and apps keep their compiled-in lists.
+  # release key (secret made 11-07; without it no file is published and apps keep their compiled-in lists).
   content:
     runs-on: ubuntu-24.04
     environment: content

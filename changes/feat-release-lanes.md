@@ -10,4 +10,3 @@ security: The credits file is checked with an Ed25519 signature under a key of i
 testers:
   - Any OS: Help > About lists the supporters and Founding Members; Preferences > Updates has the new switch.
 ---
-Inert until the content key exists (kContentPublicKeyHex empty): Tony OKs the key + `content` environment secret.
