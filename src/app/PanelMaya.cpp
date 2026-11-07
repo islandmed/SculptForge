@@ -321,14 +321,18 @@ void App::pollMayaLink(Uint64 now) {
             status_ = "Maya Live link: got " + std::to_string(count) + (count == 1 ? " object" : " objects") + " from Maya";
         }
     }
-    // Mid-stroke: the active Part's moved vertices, at most every 100 ms (between the solver's batches).
-    if (doc_.sculptor.strokeActive() && now - mayaLinkStreamNs_ >= link::kMayaLinkStreamNs && doc_.activePart >= 0) {
+    // Mid-stroke: the active Part's moved vertices, at most every 100 ms (between the solver's batches). The diff
+    // scans the whole Part (16 ms at 28M triangles): on big meshes the interval stretches to 25x its cost, so
+    // streaming never takes more than ~4% of the main thread.
+    if (doc_.sculptor.strokeActive() && now - mayaLinkStreamNs_ >= mayaLinkStreamEveryNs_ && doc_.activePart >= 0) {
         mayaLinkStreamNs_ = now;
+        const Uint64 diffFrom = SDL_GetTicksNS();
         const auto sent = mayaLinkSent_.find(doc_.activePartInfo().id);
         if (sent != mayaLinkSent_.end() && sent->second.positions.size() == doc_.mesh.positions.size()) {
             link::MayaLinkPoints points =
                 link::mayaLinkPointsBetween(mayaLinkName(doc_.activePart), sent->second.positions, doc_.mesh.positions);
             for (uint32_t v : points.indices) sent->second.positions[v] = doc_.mesh.positions[v];
+            mayaLinkStreamEveryNs_ = std::max<Uint64>(link::kMayaLinkStreamNs, (SDL_GetTicksNS() - diffFrom) * 25);
             if (!points.indices.empty()) {
                 mayaLink_->send(std::move(points));
                 ++mayaLinkStreams_;
