@@ -12,4 +12,5 @@ testers:
 ---
 Part 1 of 3 (garments agent). Core only: no UI, no simulation yet (Drape comes from the cloth agent's solver,
 docs/design/cloth.md section 7). Tests: tests/test_garment.cpp (a sewn T-shirt welds into one consistently
-oriented surface with exactly four openings; SVG reader fuzzed).
+oriented surface with exactly four openings; SVG reader fuzzed; imports and project loads share a 50,000
+flattened-outline-point budget, and the self-crossing check runs on a grid, so a hostile file stays fast).
