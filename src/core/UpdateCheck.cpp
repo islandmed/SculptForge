@@ -143,4 +143,10 @@ std::string versionLabel(const std::string& version, const std::string& prerelea
     return label;
 }
 
+ShownVersion shownVersion(const std::string& version, const std::string& prerelease, const std::string& devCommit) {
+    ShownVersion v{version, prerelease};
+    if (!devCommit.empty()) v.tag += (v.tag.empty() ? "dev " : " dev ") + devCommit.substr(0, 7);
+    return v;
+}
+
 } // namespace sf

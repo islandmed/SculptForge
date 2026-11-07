@@ -1542,7 +1542,8 @@ private:
     void pollUpdateCheck();
     static const char* appPrerelease();     // "beta.1" in a beta build, else ""
     static std::string appFullVersion();    // "0.11.0-beta.1": what the update check compares
-    static std::string appVersionLabel();   // "0.11.0 Beta 1": title bar (betas only) and About
+    static std::string appVersionLabel();   // "0.11.0 Beta 1": About and the update check
+    static ShownVersion appShownVersion();  // "0.11.0" + "beta.1" / "dev 1a2b3c4": window title and top bar
     void drawUpdateBanner();
     void drawUpdatesSection(); // Preferences > Updates
     bool checkUpdates_ = true;

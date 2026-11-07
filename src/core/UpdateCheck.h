@@ -48,6 +48,14 @@ int compareVersions(const std::string& a, const std::string& b);
 // What people read: "0.11.0" and "beta.1" make "0.11.0 Beta 1" (title bar, About); no prerelease, the version.
 std::string versionLabel(const std::string& version, const std::string& prerelease);
 
+// The version as the window title and the top bar show it, for support screenshots: the number, and a tag the top bar
+// draws in the accent colour: "0.11.13"; "0.12.0" + "beta.2"; a developer's build "0.11.13" + "dev 1a2b3c4".
+struct ShownVersion {
+    std::string number, tag;
+    std::string text() const { return tag.empty() ? number : number + " " + tag; }
+};
+ShownVersion shownVersion(const std::string& version, const std::string& prerelease, const std::string& devCommit);
+
 // The check runs when the last one is a day old (or in the future: the clock was changed).
 inline bool updateCheckDue(int64_t lastCheck, int64_t now) {
     return lastCheck <= 0 || now < lastCheck || now - lastCheck >= kUpdateCheckInterval;

@@ -1011,30 +1011,6 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f * s, (buttonH - ImGui::GetFontSize()) * 0.5f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f * s, 0.0f));
 
-    // App mark and name.
-    { // the cube app icon (the same in every look), a little taller than the name
-        const float m = std::round(std::min(ImGui::GetFontSize() * 1.3f, h - 4.0f * s));
-        ImGui::SetCursorPos(ImVec2(8.0f * s, std::floor((h - m) * 0.5f)));
-        brand::appMarkItem(m);
-    }
-    ImGui::SameLine(0.0f, 6.0f * s);
-    ImGui::SetCursorPosY(textY);
-    if (fontBold_) ImGui::PushFont(fontBold_);
-    ImGui::TextUnformatted(tr("SculptForge"));
-    if (fontBold_) ImGui::PopFont();
-
-    // Document name; click saves.
-    ImGui::SameLine(0.0f, 16.0f * s);
-    std::string name = doc_.path.empty() ? std::string(tr("Untitled"))
-                                         : std::filesystem::path(std::u8string(doc_.path.begin(), doc_.path.end())).filename().string();
-    if (doc_.dirty()) name += " *";
-    ImGui::SetCursorPosY((h - buttonH) * 0.5f);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::headerHover);
-    if (ImGui::Button((name + "##docname").c_str(), ImVec2(0, buttonH))) saveProjectAs(false);
-    ImGui::PopStyleColor(2);
-    ui::HelpText("Project", "Ctrl+S", "Click to save the project. * means it has unsaved changes.", "Title");
-
     // Right-aligned controls: QuickSave, layout presets, Menus, search. Measured first.
     const ImGuiStyle& st = ImGui::GetStyle();
     auto buttonW = [&](const char* label) { return ImGui::CalcTextSize(label, nullptr, true).x + st.FramePadding.x * 2.0f; };
@@ -1050,6 +1026,53 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     const std::string linkLabel = std::string(ICON_LC_RADIO " ") + tr("Live link on") + "##mayalink.chip";
     if (mayaLink) rightW += buttonW(linkLabel.c_str()) + 8.0f * s;
     const float rightX = g.title.w - 8.0f * s - rightW;
+
+    // App mark and name.
+    { // the cube app icon (the same in every look), a little taller than the name
+        const float m = std::round(std::min(ImGui::GetFontSize() * 1.3f, h - 4.0f * s));
+        ImGui::SetCursorPos(ImVec2(8.0f * s, std::floor((h - m) * 0.5f)));
+        brand::appMarkItem(m);
+    }
+    ImGui::SameLine(0.0f, 6.0f * s);
+    ImGui::SetCursorPosY(textY);
+    if (fontBold_) ImGui::PushFont(fontBold_);
+    ImGui::TextUnformatted(tr("SculptForge"));
+    if (fontBold_) ImGui::PopFont();
+
+    std::string name = doc_.path.empty() ? std::string(tr("Untitled"))
+                                         : std::filesystem::path(std::u8string(doc_.path.begin(), doc_.path.end())).filename().string();
+    if (doc_.dirty()) name += " *";
+    // The version, small and dim beside the name (support screenshots); a beta's or a dev build's tag in the accent.
+    // A narrow window drops it first, so it never crowds the document name and the controls on the right.
+    {
+        const ShownVersion v = appShownVersion();
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        const float numW = ImGui::CalcTextSize(v.number.c_str()).x;
+        const float tagW = v.tag.empty() ? 0.0f : ImGui::CalcTextSize(v.tag.c_str()).x + 4.0f * s;
+        const float nameW = ImGui::CalcTextSize(name.c_str()).x + 12.0f * s;
+        const float nameEnd = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x; // (the cursor is on the next line)
+        if (nameEnd + 6.0f * s + numW + tagW + 16.0f * s + nameW + 16.0f * s < rightX) {
+            const float y = std::floor((h - ImGui::GetTextLineHeight()) * 0.5f) + 1.0f * s;
+            ImGui::SameLine(0.0f, 6.0f * s);
+            ImGui::SetCursorPosY(y);
+            ImGui::TextDisabled("%s", v.number.c_str());
+            if (!v.tag.empty()) {
+                ImGui::SameLine(0.0f, 4.0f * s);
+                ImGui::SetCursorPosY(y);
+                ImGui::TextColored(theme::accent, "%s", v.tag.c_str());
+            }
+        }
+        if (fontSmall_) ImGui::PopFont();
+    }
+
+    // Document name; click saves.
+    ImGui::SameLine(0.0f, 16.0f * s);
+    ImGui::SetCursorPosY((h - buttonH) * 0.5f);
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::headerHover);
+    if (ImGui::Button((name + "##docname").c_str(), ImVec2(0, buttonH))) saveProjectAs(false);
+    ImGui::PopStyleColor(2);
+    ui::HelpText("Project", "Ctrl+S", "Click to save the project. * means it has unsaved changes.", "Title");
 
     // Info readout and the status message, elided to fit: secondary, so in the 12 px font.
     ImGui::SameLine(0.0f, 14.0f * s);
@@ -1440,6 +1463,28 @@ void App::drawStatusBar(const ShellGeometry& g) {
     }
     const bool caps = style == Status::Terminal;
     x = textAt(bold, x, theme::textBright, caps ? "SCULPTFORGE" : "SculptForge");
+    // The version, small and dim beside the name (support screenshots); a beta's or a dev build's tag in the accent.
+    // Placed once the menus are measured: a narrow window drops it before it crowds them.
+    const float versionX = x + 6.0f * s;
+    const ShownVersion version = appShownVersion();
+    const float versionW = 6.0f * s + textW(monoSmall, version.number) + (version.tag.empty() ? 0.0f : 4.0f * s + textW(monoSmall, version.tag));
+    float menuW = 0.0f;
+    {
+        int count = 0;
+        const TaskMenuDef* defs = taskMenus(count);
+        ImFont* f = style == Status::Modules ? ImGui::GetFont() : monoSmall;
+        for (int i = 0; i < count; ++i)
+            menuW += textW(f, style == Status::Modules ? std::string(tr(defs[i].name)) : upper(tr(defs[i].name))) + 16.0f * s +
+                     (style == Status::Modules ? 2.0f : 0.0f) * s;
+    }
+    // The fixed controls on the right (window buttons, search, workspaces: see below) and room for the modules.
+    const float fixedRight = 2.0f * (h - 2.0f * inset) + 150.0f * s + 3.0f * (h - 2.0f * inset) + 60.0f * s + 200.0f * s;
+    if (x + versionW + 18.0f * s + menuW + 12.0f * s + fixedRight < o.x + g.title.w) {
+        float vx = textAt(monoSmall, versionX, theme::textDim, version.number);
+        if (!version.tag.empty()) textAt(monoSmall, vx + 4.0f * s, theme::accent, version.tag);
+        ImGui::LogText("%s", version.text().c_str()); // (UI tests read the bar)
+        x += versionW;
+    }
     x += (style == Status::TitleBlock ? 14.0f : 18.0f) * s;
     if (style == Status::TitleBlock || style == Status::Terminal) {
         dl->AddLine(ImVec2(std::floor(x) + 0.5f, o.y + inset), ImVec2(std::floor(x) + 0.5f, o.y + h - inset), theme::u32(theme::tileBorder));

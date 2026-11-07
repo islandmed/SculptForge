@@ -437,6 +437,12 @@ std::string restOf(const std::string& line, int skip) {
     return rest;
 }
 
+// "{version}" in an expected text: the version as the window title and the top bar show it ("0.11.13 dev 1a2b3c4").
+std::string withVersion(std::string text, const std::string& version) {
+    if (const size_t at = text.find("{version}"); at != std::string::npos) text.replace(at, 9, version);
+    return text;
+}
+
 SDL_Keymod parseMods(const std::string& text, std::string* key = nullptr) {
     SDL_Keymod mods = SDL_KMOD_NONE;
     std::stringstream ss(text);
@@ -2378,12 +2384,22 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
     } else if (verb == "expect_text" || verb == "expect_no_text") {
         if (!need(1)) return false;
-        const std::string text = restOf(lineText_, 1);
+        const std::string text = withVersion(restOf(lineText_, 1), App::appShownVersion().text());
         const bool want = verb == "expect_text";
         steps_.push_back([this, line, text, want](float t) {
             if (t == 0.0f) return false;
             if ((frameText_.find(text) != std::string::npos) != want)
                 fail(line, want ? "no text \"" + text + "\" on screen" : "text \"" + text + "\" is on screen");
+            return true;
+        });
+    } else if (verb == "expect_title") { // the OS window title contains the text ({version}: the version as shown)
+        if (!need(1)) return false;
+        const std::string text = withVersion(restOf(lineText_, 1), App::appShownVersion().text());
+        steps_.push_back([this, line, text](float t) {
+            if (t == 0.0f) return false; // the title is set while the frame after the previous step draws
+            const char* title = SDL_GetWindowTitle(app_.window_);
+            const std::string have = title ? title : "";
+            if (have.find(text) == std::string::npos) fail(line, "window title is \"" + have + "\", expected \"" + text + "\"");
             return true;
         });
     } else if (verb == "expect_status") {
