@@ -983,6 +983,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The Deform panel for the look review (tests/ui/sizes/: scripts only run at their own sizes).
     sculptforge_ui_test(deform_panel_1440 sizes/deform_panel --size 1440x900)
     sculptforge_ui_test(deform_panel_1024 sizes/deform_panel_1024 --size 1024x768)
+    sculptforge_ui_test(deform_panel_1024_200 sizes/deform_panel_1024 --size 2048x1536)
     # A crash leaves a note in the log file (#16). Needs no window.
     add_test(NAME crash_log COMMAND ${CMAKE_COMMAND} -DAPP=$<TARGET_FILE:sculptforge>
              -DDIR=${CMAKE_CURRENT_BINARY_DIR}/crash-log-test -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/crash_log.cmake)
