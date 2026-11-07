@@ -155,6 +155,13 @@ void App::initProject() {
         newLookCardDone_ = prefs["new_look_card_done"].asBool(false);
         quickTourDone_ = prefs["quick_tour_done"].asBool(false);
         uiPrefs_.confirmSubdivide = prefs["confirm_subdivide"].asBool(uiPrefs_.confirmSubdivide); // (Don't ask again)
+        recentColors_.clear();
+        for (const auto& c : prefs["recent_colors"].items()) {
+            if (recentColors_.size() >= kRecentColorsMax || !c.isArray()) break;
+            glm::vec3 v(0.0f);
+            readVec3(c, v);
+            recentColors_.push_back(glm::clamp(v, glm::vec3(0.0f), glm::vec3(1.0f)));
+        }
         if (!uiPrefs_.lookSaved && !uiConfigDeterministic_) {
             UiPrefs saved = uiPrefs_;
             if (!lookFromJson(prefs["ui_look"], saved)) {
@@ -261,8 +268,21 @@ void App::saveProjectPrefs() {
     prefs.set("new_look_card_done", newLookCardDone_);
     prefs.set("quick_tour_done", quickTourDone_);
     prefs.set("confirm_subdivide", uiPrefs_.confirmSubdivide);
+    Json colours = Json::array(); // the left shelf's recent colours, newest first
+    for (const glm::vec3& c : recentColors_) colours.push(vec3Json(c));
+    prefs.set("recent_colors", std::move(colours));
     std::string err; // (temp file, then rename: a quit that ends mid-write leaves the last one whole)
     if (!writeJsonAtomic(prefDir_ + "project.json", prefs, err)) SDL_Log("%s", err.c_str());
+}
+
+void App::rememberPaintColor(const glm::vec3& linear) {
+    // Already the newest: nothing to move or save (each stroke with the same colour lands here).
+    auto same = [&](const glm::vec3& c) { return glm::all(glm::lessThan(glm::abs(c - linear), glm::vec3(0.5f / 255.0f))); };
+    if (!recentColors_.empty() && same(recentColors_.front())) return;
+    recentColors_.erase(std::remove_if(recentColors_.begin(), recentColors_.end(), same), recentColors_.end());
+    recentColors_.insert(recentColors_.begin(), linear);
+    if (recentColors_.size() > kRecentColorsMax) recentColors_.resize(kRecentColorsMax);
+    saveProjectPrefs();
 }
 
 void App::rememberRecent(const std::string& path) {

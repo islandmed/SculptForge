@@ -1,0 +1,54 @@
+# The left shelf's recent colours (Oslen on Discord): a paint stroke or Fill puts its colour first in a thin row under
+# the two swatches; clicking one paints with it again. Kept in the preferences (project.json).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+expect_value recent_colors == 0
+expect_not "##recent0"
+
+# Two strokes in red, then one in blue: two recent colours, blue first.
+run set_color color=c81e1e
+key p
+stroke 0.40 0.45 0.60 0.45
+stroke 0.40 0.50 0.60 0.50
+expect_value recent_colors == 1
+run set_color color=1e3cc8
+stroke 0.40 0.55 0.60 0.55
+expect_value recent_colors == 2
+expect_value paint_r == 30
+shot two-recent
+
+# Red is second: clicking it makes it the paint colour (the row keeps its order until it is painted with).
+click "##recent1"
+expect_value paint_r == 200
+expect_value recent_colors == 2
+
+# Fill counts too: green joins the front; red painted again moves back to the front without a duplicate.
+run set_color color=1ec83c
+click "Fill##color.fill"
+expect_value recent_colors == 3
+run set_color color=c81e1e
+stroke 0.40 0.60 0.60 0.60
+expect_value recent_colors == 3
+click "##recent0"
+expect_value paint_r == 200
+
+# Nine colours keep only the newest eight.
+run set_color color=1a1a1a
+stroke 0.40 0.62 0.60 0.62
+run set_color color=2b2b2b
+stroke 0.40 0.64 0.60 0.64
+run set_color color=3c3c3c
+stroke 0.40 0.66 0.60 0.66
+run set_color color=4d4d4d
+stroke 0.40 0.68 0.60 0.68
+run set_color color=5e5e5e
+stroke 0.40 0.70 0.60 0.70
+run set_color color=6f6f6f
+stroke 0.40 0.72 0.60 0.72
+expect_value recent_colors == 8
+expect "##recent7"
+shot eight-recent
+ui_scale 200
+wait_idle 10
+expect "##recent7"
+shot eight-recent-200

@@ -1869,6 +1869,11 @@ private:
     std::vector<std::string> collapsedPalettes_; // tray palettes showing only their header
     void autoCollapseTray(bool right, const std::string& keep);
     glm::vec3 secondaryColor_{1.0f, 1.0f, 1.0f}; // the left shelf's second swatch (click swaps, "Alternate")
+    // The left shelf's recent colours: the last paint colours a stroke or Fill used, newest first (Oslen on Discord).
+    // Saved in project.json (the app's preferences), linear like doc_.paintColor.
+    static constexpr size_t kRecentColorsMax = 8;
+    std::vector<glm::vec3> recentColors_;
+    void rememberPaintColor(const glm::vec3& linear);
     uint64_t activeTrisKey_ = ~uint64_t(0); // the top shelf's ActiveTris, recounted when the scene changes
     size_t activeTris_ = 0;
     float bottomTileW_ = 58.0f; // bottom shelf tiles shrink (down to 44 px) before the shelf scrolls

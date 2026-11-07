@@ -4942,6 +4942,11 @@ constexpr Entry kSpanish[] = {
      "Gracias por ser miembro: mantienes SculptForge gratis y en crecimiento."},
     {"SculptForge is free and open source. Members keep it free and growing (Help > Support SculptForge).",
      "SculptForge es libre y de código abierto. Los miembros lo mantienen gratis y en crecimiento (Ayuda > Apoya a SculptForge)."},
+    // Recent colours (Oslen on Discord)
+    {"Recent colour",
+     "Color reciente"},
+    {"A colour you painted with lately: click to paint with it again.",
+     "Un color con el que pintaste hace poco: haz clic para volver a pintar con él."},
 };
 
 } // namespace

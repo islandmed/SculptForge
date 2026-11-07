@@ -54,6 +54,7 @@ constexpr ImU32 kMarkerDark = IM_COL32(0, 0, 0, 150);         // their outline, 
 constexpr float kFieldGap = 4.0f;   // one gap between every part of the colour field (square, strip, swatches, Fill)
 constexpr float kHueStripW = 10.0f; // wide enough to read as a control next to the square
 constexpr float kSwatchH = 18.0f;
+constexpr float kRecentH = 12.0f; // the recent colours' rows: thin
 
 const SDL_DialogFileFilter kAlphaFilters[] = {{"Images", "png;jpg;jpeg;bmp;tga;psd;gif"}, {"All files", "*"}};
 
@@ -1636,6 +1637,23 @@ void App::drawColorWidget(float width) {
            rounding, s, ImGui::IsItemHovered());
     ui::HelpText("Second colour", nullptr, "Click to swap it with the main colour.", "Left shelf");
     if (swap) std::swap(doc_.paintColor, secondaryColor_);
+    // The recent colours (Oslen on Discord): the last ones painted with, newest first, in rows of four (a second row
+    // once there are more than four) across the column's width. Click one to paint with it.
+    if (!recentColors_.empty()) {
+        constexpr int kCols = 4;
+        const float rw = std::floor((width - gap * float(kCols - 1)) / float(kCols)), rh = kRecentH * s;
+        for (size_t i = 0; i < recentColors_.size(); ++i) {
+            if (i % kCols != 0) ImGui::SameLine();
+            const ImVec2 ra = ImGui::GetCursorScreenPos();
+            const std::string id = "##recent" + std::to_string(i);
+            const bool use = ImGui::InvisibleButton(id.c_str(), ImVec2(rw, rh));
+            const glm::vec3 c = linearToSrgb(recentColors_[i]);
+            swatch(dl, ra, ImVec2(ra.x + rw, ra.y + rh), ImVec4(c.x, c.y, c.z, 1.0f), theme::rounding(2.0f * s), s,
+                   ImGui::IsItemHovered());
+            ui::HelpText("Recent colour", nullptr, "A colour you painted with lately: click to paint with it again.", "Left shelf");
+            if (use) doc_.paintColor = recentColors_[i];
+        }
+    }
     ui::ActionButton(*this, "color.fill", ImVec2(width, 0), ui::Look::IconLabel);
     ImGui::PopStyleVar();
     ui::HelpAction(*this, "color.fill");

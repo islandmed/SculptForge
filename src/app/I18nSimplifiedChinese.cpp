@@ -4464,6 +4464,11 @@ constexpr Entry kSimplifiedChinese[] = {
      "感谢你成为会员：你让 SculptForge 保持免费并持续成长。"},
     {"SculptForge is free and open source. Members keep it free and growing (Help > Support SculptForge).",
      "SculptForge 是免费的开源软件。会员让它保持免费并持续成长（帮助 > 支持 SculptForge）。"},
+    // Recent colours (Oslen on Discord)
+    {"Recent colour",
+     "最近颜色"},
+    {"A colour you painted with lately: click to paint with it again.",
+     "你最近用过的绘制颜色：点击即可再次使用。"},
 };
 
 } // namespace

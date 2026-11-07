@@ -4462,6 +4462,11 @@ constexpr Entry kTraditionalChinese[] = {
      "感謝你成為會員：你讓 SculptForge 保持免費並持續成長。"},
     {"SculptForge is free and open source. Members keep it free and growing (Help > Support SculptForge).",
      "SculptForge 是免費的開源軟體。會員讓它保持免費並持續成長（說明 > 支持 SculptForge）。"},
+    // Recent colours (Oslen on Discord)
+    {"Recent colour",
+     "最近顏色"},
+    {"A colour you painted with lately: click to paint with it again.",
+     "你最近用過的繪製顏色：點擊即可再次使用。"},
 };
 
 } // namespace
