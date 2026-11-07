@@ -49,6 +49,11 @@ uint32_t defaultCodec() {
 #endif
 }
 
+// [offset, offset + bytes) lies past the header and inside a file of `size` bytes (no wrap for crafted offsets).
+bool inFile(uint64_t offset, uint64_t bytes, size_t size) {
+    return offset >= kHeaderBytes && offset <= size && bytes <= size - offset;
+}
+
 uint64_t fnv1a(const uint8_t* p, size_t n) {
     uint64_t h = 1469598103934665603ull;
     for (size_t i = 0; i < n; ++i) h = (h ^ p[i]) * 1099511628211ull;
@@ -456,7 +461,7 @@ bool FocusDetail::loadIndex(std::string& error) {
     if (!decodeHeader(b, mapBytes_, h, error)) return false;
     const uint32_t T = h.tris, V = h.verts, chunks = (T + h.chunkTiles - 1) / h.chunkTiles;
     if (h.chunkTiles != kChunk || h.coarseLevel != uint32_t(kCoarseLevel) || h.baseBytes != uint64_t(V) * 24 + uint64_t(T) * 12 ||
-        h.baseOffset < kHeaderBytes || h.baseOffset + h.baseBytes > mapBytes_ || h.dirOffset + h.dirBytes > mapBytes_ ||
+        !inFile(h.baseOffset, h.baseBytes, mapBytes_) || !inFile(h.dirOffset, h.dirBytes, mapBytes_) ||
         h.dirBytes != uint64_t(T) * sizeof(Entry) + uint64_t(chunks) * sizeof(ChunkEntry) ||
         fnv1a(b + h.dirOffset, h.dirBytes) != h.dirHash) {
         error = "Detail file is damaged";
@@ -477,12 +482,12 @@ bool FocusDetail::loadIndex(std::string& error) {
     std::memcpy(dir_.data(), b + h.dirOffset, size_t(T) * sizeof(Entry));
     std::memcpy(chunks_.data(), b + h.dirOffset + size_t(T) * sizeof(Entry), size_t(chunks) * sizeof(ChunkEntry));
     for (const Entry& e : dir_)
-        if (e.offset < kHeaderBytes || e.offset + e.bytes > mapBytes_) {
+        if (!inFile(e.offset, e.bytes, mapBytes_)) {
             error = "Detail file is damaged";
             return false;
         }
     for (const ChunkEntry& c : chunks_)
-        if (c.offset < kHeaderBytes || c.offset + c.bytes > mapBytes_) {
+        if (!inFile(c.offset, c.bytes, mapBytes_)) {
             error = "Detail file is damaged";
             return false;
         }
