@@ -15,6 +15,7 @@
 
 #include <IconsLucide.h>
 #include <cctype>
+#include <cmath>
 #include <cstring>
 #include <imgui_internal.h>
 
@@ -77,6 +78,25 @@ void drawEye(ImDrawList* dl, ImVec2 c, float size, bool open, ImU32 col) {
         const ImVec2 a(c.x + u * w, c.y + h * 0.62f * (1.0f - u * u * 0.5f));
         dl->AddLine(a, ImVec2(a.x + u * size * 0.12f, a.y + size * 0.22f), col, t);
     }
+}
+
+// Shading mark: a shaded disc (smooth) or a faceted hexagon (flat).
+void drawShadeMark(ImDrawList* dl, ImVec2 c, float size, bool flat, ImU32 col) {
+    const float r = size * 0.5f, t = std::max(1.0f, size * 0.11f);
+    if (!flat) {
+        dl->AddCircle(c, r, col, 0, t);
+        dl->AddCircleFilled(ImVec2(c.x - r * 0.3f, c.y - r * 0.3f), r * 0.32f, col);
+        return;
+    }
+    ImVec2 p[6];
+    for (int k = 0; k < 6; ++k) {
+        const float a = 3.14159265f / 3.0f * float(k) + 3.14159265f / 6.0f;
+        p[k] = ImVec2(c.x + r * std::cos(a), c.y + r * std::sin(a));
+    }
+    dl->AddPolyline(p, 6, col, ImDrawFlags_Closed, t);
+    dl->AddLine(c, p[1], col, t * 0.8f);
+    dl->AddLine(c, p[3], col, t * 0.8f);
+    dl->AddLine(c, p[5], col, t * 0.8f);
 }
 
 } // namespace
@@ -248,8 +268,8 @@ void App::drawPartsContents() {
     const int active = doc_.activePart;
     const ImGuiStyle& style = ImGui::GetStyle();
 
-    // The list: eye, name, triangles. Row actions run after the loop (they change the list).
-    int selectIndex = -1, toggleIndex = -1, deleteIndex = -1, duplicateIndex = -1, renameIndex = -1;
+    // The list: name, levels, triangles, shading, eye. Row actions run after the loop (they change the list).
+    int selectIndex = -1, toggleIndex = -1, shadeIndex = -1, deleteIndex = -1, duplicateIndex = -1, renameIndex = -1;
     std::string renameTo;
     // Folders (#96): pending actions on one, by name; a Part put into a folder ("" = out of its folder).
     PartFolderActions fa;
@@ -298,7 +318,7 @@ void App::drawPartsContents() {
     ImGui::PushStyleColor(ImGuiCol_Header, kRowSelected);
     ImGui::PushStyleColor(ImGuiCol_HeaderHovered, kRowHover);
     ImGui::PushStyleColor(ImGuiCol_HeaderActive, kRowPressed);
-    if (ImGui::BeginTable("##parts", 4, ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_PadOuterX, ImVec2(-1, listH))) {
+    if (ImGui::BeginTable("##parts", 5, ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_PadOuterX, ImVec2(-1, listH))) {
         const float eyeW = ImGui::GetTextLineHeight() * 1.2f;
         ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthStretch);
         // Subdivision levels lists them ("SDiv 3/5"); empty for meshes without levels.
@@ -306,6 +326,7 @@ void App::drawPartsContents() {
         for (int i = 0; i < count && !anyLevels; ++i) anyLevels = subdivLevelCount(doc_.partMesh(i)) > 0;
         ImGui::TableSetupColumn("sdiv", ImGuiTableColumnFlags_WidthFixed, anyLevels ? ImGui::CalcTextSize("SDiv 8/8").x : 0.0f);
         ImGui::TableSetupColumn("tris", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("0.00M").x);
+        ImGui::TableSetupColumn("shade", ImGuiTableColumnFlags_WidthFixed, eyeW);
         ImGui::TableSetupColumn("eye", ImGuiTableColumnFlags_WidthFixed, eyeW);
         // A Part dropped on a row: into that folder, or (on a Part outside folders) out of its folder.
         for (const Row& row : rows) {
@@ -438,6 +459,26 @@ void App::drawPartsContents() {
             ImGui::TextColored(trisCol, "%s", tris.c_str());
             ImGui::TableSetColumnIndex(3);
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + textDy);
+            {
+                // Smooth / flat shading of this Part: click cycles Scene -> Smooth -> Flat (part_shading).
+                const ImVec2 at = ImGui::GetCursorScreenPos();
+                const ImVec2 size(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeight());
+                if (ImGui::InvisibleButton(("##shade " + s.name).c_str(), size)) shadeIndex = i;
+                const bool hovered = ImGui::IsItemHovered();
+                const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading);
+                if (hovered)
+                    ImGui::SetTooltip(tr(s.shading == Shading::Default ? "%s: shading as the scene (%s). Click: Smooth"
+                                         : s.shading == Shading::Smooth ? "%s: smooth shading. Click: Flat"
+                                                                        : "%s: flat shading. Click: as the scene"),
+                                      s.name.c_str(), tr(renderSettings_.flatShading ? "flat" : "smooth"));
+                const ImU32 col = ImGui::GetColorU32(hovered                       ? style.Colors[ImGuiCol_ButtonHovered]
+                                                     : s.shading != Shading::Default ? style.Colors[ImGuiCol_Text]
+                                                                                     : style.Colors[ImGuiCol_TextDisabled]);
+                drawShadeMark(ImGui::GetWindowDrawList(), ImVec2(at.x + size.x * 0.5f, at.y + size.y * 0.5f),
+                              ImGui::GetTextLineHeight() * 0.7f, flat, col);
+            }
+            ImGui::TableSetColumnIndex(4);
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + textDy);
             const ImVec2 eyePos = ImGui::GetCursorScreenPos();
             const ImVec2 eyeSize(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeight());
             if (ImGui::InvisibleButton(("##eye " + s.name).c_str(), eyeSize)) toggleIndex = i;
@@ -462,6 +503,11 @@ void App::drawPartsContents() {
         partSelected("Parts list");
     }
     if (toggleIndex >= 0) runCommand("part_visibility", {{"index", double(toggleIndex)}});
+    if (shadeIndex >= 0) {
+        const Shading now = doc_.parts[size_t(shadeIndex)].shading;
+        const Shading next = now == Shading::Default ? Shading::Smooth : now == Shading::Smooth ? Shading::Flat : Shading::Default;
+        runCommand("part_shading", {{"index", double(shadeIndex)}, {"mode", std::string(shadingName(next))}});
+    }
     if (duplicateIndex >= 0) runCommand("part_duplicate", {{"index", double(duplicateIndex)}});
     if (newFolderPart >= 0) {
         runCommand("part_folder_new", {{"index", double(newFolderPart)}});
@@ -666,6 +712,30 @@ void App::drawPartsContents() {
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip("%s", tr("One Part per disconnected piece"));
+    // Split off what is hidden, masked or not masked into a new Part below (one undo step each): "Split" and three
+    // short buttons, so the row fits the narrowest tray.
+    {
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("%s", tr("Split"));
+        ImGui::SameLine();
+        const float third = (ImGui::GetContentRegionAvail().x - 2.0f * style.ItemSpacing.x) / 3.0f;
+        const bool masked = doc_.mesh.hasMask();
+        auto splitButton = [&](const char* label, const char* command, bool enabled, const char* tip) {
+            ImGui::BeginDisabled(!enabled);
+            if (ImGui::Button(tr(label), ImVec2(third, 0))) runCommand(command);
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
+                ImGui::SetTooltip("%s", tr(tip));
+        };
+        splitButton("Hidden##part_split", "part_split_hidden", doc_.mesh.hasHidden(),
+                    "Split hidden: the hidden triangles become a new Part");
+        ImGui::SameLine();
+        splitButton("Masked##part_split", "part_split_masked", masked,
+                    "Split masked: the masked triangles (average mask above 50%) become a new Part");
+        ImGui::SameLine();
+        splitButton("Unmasked##part_split", "part_split_unmasked", masked,
+                    "Split unmasked: the unmasked triangles become a new Part; the masked ones stay");
+    }
     if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::TextDisabled("%s", tr("Alt+click a Part to select it"));
     if (fontSmall_) ImGui::PopFont();
@@ -791,7 +861,7 @@ void App::drawPartFolderRow(int fi, float rowH, ImVec2 cellPad, PartFolderAction
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(t.c_str()).x);
         ImGui::TextDisabled("%s", t.c_str());
     }
-    ImGui::TableSetColumnIndex(3);
+    ImGui::TableSetColumnIndex(4);
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + textDy);
     const ImVec2 eyePos = ImGui::GetCursorScreenPos();
     const ImVec2 eyeSize(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeight());

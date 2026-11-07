@@ -102,11 +102,17 @@ void App::drawVisibilitySection() {
     ImGui::SameLine();
     if (ImGui::Button(tr("Invert visible"), ImVec2(half, 0))) runCommand("invert_visibility");
     ImGui::BeginDisabled(!doc_.mesh.hasHidden());
-    if (ImGui::Button(tr("Delete hidden"), ImVec2(-1, 0))) runCommand("delete_hidden");
+    if (ImGui::Button(tr("Delete hidden"), ImVec2(half, 0))) runCommand("delete_hidden");
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip("%s", tr("Ctrl+Shift+click a group to isolate it, +Alt to hide it, on the background to show all.\n"
                           "Ctrl+Shift+drag hides outside the rectangle or lasso (Alt: inside)."));
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!doc_.mesh.hasMask());
+    if (ImGui::Button(tr("Delete masked"), ImVec2(half, 0))) runCommand("delete_masked");
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip("%s", tr("Delete the masked triangles (average mask above 50%); undo brings them back"));
 }
 
 } // namespace sf

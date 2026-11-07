@@ -914,6 +914,7 @@ void App::drawPalette_Tool() {
         drawQRemeshContents(); // quad retopology (PanelRetopo.cpp)
         Demo::popScope();
         drawModifyTopologyContents(); // Mirror And Weld (PanelExtract.cpp)
+        drawMeshCheckContents();      // Merge by Distance, Check Mesh (PanelMeshCheck.cpp)
     }
     if (subpalette("tool.remesh", "Remesh")) {
         tray::Section section;

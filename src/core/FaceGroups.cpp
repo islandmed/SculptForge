@@ -292,31 +292,60 @@ Mesh deleteHiddenTriangles(const Mesh& mesh) {
     return extractTriangles(mesh, keep);
 }
 
-Mesh extractTriangles(const Mesh& mesh, const std::vector<uint8_t>& keep) {
-    const size_t nv = mesh.vertexCount(), nt = mesh.triangleCount();
-    std::vector<uint32_t> remap(nv, kUnassigned);
-    std::vector<uint32_t> kept;
+std::vector<uint8_t> trianglesIn(const Mesh& mesh, TriangleSet set, size_t* count) {
+    const size_t nt = mesh.triangleCount();
+    std::vector<uint8_t> in(nt, uint8_t(0));
+    size_t n = 0;
+    if (set == TriangleSet::Hidden) {
+        for (size_t t = 0; t < nt && t < mesh.hidden.size(); ++t) n += in[t] = mesh.hidden[t] != 0;
+    } else {
+        const bool masked = set == TriangleSet::Masked;
+        const size_t nv = mesh.mask.size();
+        for (size_t t = 0; t < nt; ++t) {
+            const glm::uvec3 v = mesh.triangles[t];
+            float sum = 0.0f;
+            if (nv) sum = (v.x < nv ? mesh.mask[v.x] : 0.0f) + (v.y < nv ? mesh.mask[v.y] : 0.0f) + (v.z < nv ? mesh.mask[v.z] : 0.0f);
+            n += in[t] = (sum > 3.0f * kMaskedThreshold) == masked;
+        }
+    }
+    if (count) *count = n;
+    return in;
+}
+
+Mesh extractTriangles(const Mesh& mesh, const std::vector<uint8_t>& keep) { return rebuildTriangles(mesh, keep, {}); }
+
+Mesh rebuildTriangles(const Mesh& mesh, const std::vector<uint8_t>& keep, const TriangleRebuild& how) {
+    const size_t nt = mesh.triangleCount();
+    const size_t ids = how.source ? how.source->size() : mesh.vertexCount();
+    std::vector<uint32_t> remap(ids, kUnassigned);
+    std::vector<uint32_t> kept; // the source vertex of each new vertex
     Mesh out;
     bool anyHidden = false;
     std::vector<uint32_t> newTriangle(mesh.hasQuads() ? nt : 0, Mesh::kNoQuad);
     for (uint32_t t = 0; t < nt; ++t) {
         if (t >= keep.size() || !keep[t]) continue;
         if (!newTriangle.empty()) newTriangle[t] = uint32_t(out.triangles.size());
+        const glm::uvec3 c = how.corners ? (*how.corners)[t] : mesh.triangles[t];
+        const bool flip = how.flip && (*how.flip)[t];
         glm::uvec3 tri;
         for (int k = 0; k < 3; ++k) {
-            uint32_t& r = remap[mesh.triangles[t][k]];
+            uint32_t& r = remap[c[k]];
             if (r == kUnassigned) {
                 r = static_cast<uint32_t>(kept.size());
-                kept.push_back(mesh.triangles[t][k]);
+                kept.push_back(how.source ? (*how.source)[c[k]] : c[k]);
             }
             tri[k] = r;
         }
+        if (flip) std::swap(tri.y, tri.z);
         out.triangles.push_back(tri);
         out.hidden.push_back(mesh.triangleHidden(t) ? 1 : 0);
         anyHidden |= mesh.triangleHidden(t);
         if (mesh.hasFaceGroups()) out.facegroups.push_back(mesh.facegroups[t]);
-        if (mesh.hasUvs()) out.uvs.insert(out.uvs.end(), mesh.uvs.begin() + std::ptrdiff_t(t) * 3,
-                                          mesh.uvs.begin() + std::ptrdiff_t(t) * 3 + 3);
+        if (mesh.hasUvs()) {
+            const auto uv = mesh.uvs.begin() + std::ptrdiff_t(t) * 3;
+            if (flip) out.uvs.insert(out.uvs.end(), {uv[0], uv[2], uv[1]});
+            else out.uvs.insert(out.uvs.end(), uv, uv + 3);
+        }
     }
     out.positions.reserve(kept.size());
     for (uint32_t v : kept) out.positions.push_back(mesh.positions[v]);
@@ -499,6 +528,21 @@ void registerFaceGroupCommands(CommandRegistry& reg) {
                  if (removed == 0) return {false, "Nothing is hidden"};
                  doc.replaceMeshUndoable(std::move(m), "Delete Hidden");
                  return {true, "Deleted " + std::to_string(removed) + " triangles, " +
+                                   std::to_string(doc.mesh.triangleCount()) + " left"};
+             }});
+
+    reg.add({"delete_masked",
+             "Permanently delete the masked part of the mesh (undoable): triangles whose corners' average mask is "
+             "above 0.5.",
+             {},
+             [](Document& doc, const Args&) -> CommandResult {
+                 size_t masked = 0;
+                 std::vector<uint8_t> keep = trianglesIn(doc.mesh, TriangleSet::Unmasked);
+                 for (uint8_t k : keep) masked += !k;
+                 if (masked == 0) return {false, "Nothing is masked"};
+                 if (masked == doc.mesh.triangleCount()) return {false, "Everything is masked"};
+                 doc.replaceMeshUndoable(extractTriangles(doc.mesh, keep), "Delete Masked");
+                 return {true, "Deleted " + std::to_string(masked) + " triangles, " +
                                    std::to_string(doc.mesh.triangleCount()) + " left"};
              }});
 }

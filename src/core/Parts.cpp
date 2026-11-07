@@ -221,6 +221,43 @@ void replaceWithPieces(Document& doc, int index, std::vector<Mesh> pieces) {
     doc.removePart(index);
 }
 
+// Split Hidden / Masked / Unmasked: the triangles in `set` leave the active Part for a new Part just below it
+// (named "<Part> <suffix>", shown as the source is, in its folder, with its shading). One undo step: the
+// source's old mesh and the new Part go back together. Every attribute extractTriangles keeps carries over (UVs,
+// face groups, vertex paint, sculpt layers); subdivision levels can't be cut, so the source's are noted dropped
+// and undo restores them. The new Part shows everything (Split Hidden) and starts unmasked (Split Masked).
+CommandResult splitOffPart(Document& doc, TriangleSet set, const char* label, const char* suffix, const char* what) {
+    size_t n = 0;
+    std::vector<uint8_t> in = trianglesIn(doc.mesh, set, &n);
+    const std::string source = doc.activePartInfo().name;
+    if (n == 0) return {false, "Nothing in " + source + " is " + what};
+    if (n == doc.mesh.triangleCount()) return {false, "Everything in " + source + " is " + what + ": nothing would stay"};
+    Mesh piece = extractTriangles(doc.mesh, in);
+    for (uint8_t& k : in) k = !k;
+    Mesh rest = extractTriangles(doc.mesh, in);
+    in = {};
+    if (set == TriangleSet::Hidden) piece.hidden.clear();
+    if (set == TriangleSet::Masked) piece.mask.clear();
+    const Part& from = doc.activePartInfo();
+    const bool visible = from.visible;
+    const uint32_t folder = from.folder;
+    const Shading shading = from.shading;
+    const int at = doc.addPart(std::move(piece), doc.uniquePartName(source + " " + suffix), false, doc.activePart + 1);
+    Part& added = doc.parts[size_t(at)];
+    added.visible = visible;
+    added.folder = folder;
+    added.shading = shading;
+    const uint32_t id = added.id;
+    const std::string name = added.name;
+    doc.replaceMeshUndoable(std::move(rest), label);
+    if (UndoRecord* r = doc.undo.lastUndo()) {
+        r->part = std::make_shared<PartStep>();
+        r->part->id = id;
+        r->part->at = at;
+    }
+    return {true, "Split " + countText(n) + " into " + name + ", " + countText(doc.mesh.triangleCount()) + " stay in " + source};
+}
+
 // Reads the mesh in a model file for insert_mesh (#34): OBJ, PLY or GLB / glTF through the importers, every
 // object in it as one mesh. Nothing but the file itself is read.
 bool loadInsertMesh(const std::string& path, Mesh& out, std::string& error) {
@@ -905,6 +942,27 @@ void registerPartCommands(CommandRegistry& reg) {
                  const size_t n = pieces.size();
                  replaceWithPieces(doc, doc.activePart, std::move(pieces));
                  return {true, "Split into " + std::to_string(n) + " Parts"};
+             }});
+
+    reg.add({"part_split_hidden", "Move the hidden triangles of the active Part into a new Part below it (one undo step).", {},
+             [](Document& doc, const Args&) -> CommandResult {
+                 return splitOffPart(doc, TriangleSet::Hidden, "Split Hidden", "hidden", "hidden");
+             }});
+
+    reg.add({"part_split_masked",
+             "Move the masked triangles of the active Part (corners' average mask above 0.5) into a new, unmasked "
+             "Part below it (one undo step).",
+             {},
+             [](Document& doc, const Args&) -> CommandResult {
+                 return splitOffPart(doc, TriangleSet::Masked, "Split Masked", "masked", "masked");
+             }});
+
+    reg.add({"part_split_unmasked",
+             "Move the unmasked triangles of the active Part (corners' average mask 0.5 or less) into a new Part "
+             "below it; the masked ones stay (one undo step).",
+             {},
+             [](Document& doc, const Args&) -> CommandResult {
+                 return splitOffPart(doc, TriangleSet::Unmasked, "Split Unmasked", "unmasked", "unmasked");
              }});
 }
 

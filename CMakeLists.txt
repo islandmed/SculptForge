@@ -97,6 +97,7 @@ add_library(sculptforge_core STATIC
   src/core/Masking.cpp
   src/core/Cut.cpp
   src/core/CloseHoles.cpp
+  src/core/MeshCheck.cpp
   src/core/BrushAlpha.cpp
   src/core/Stencil.cpp
   src/core/Stroke.cpp
@@ -461,6 +462,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelIntegrations.cpp
     src/app/WhatsNewPopup.cpp
     src/app/PanelExtract.cpp
+    src/app/PanelMeshCheck.cpp
     src/app/PanelTimeline.cpp
     src/app/ProofMode.cpp
     src/app/BenchVideo.cpp

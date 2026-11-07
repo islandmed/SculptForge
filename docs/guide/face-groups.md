@@ -92,8 +92,9 @@ Open **Tool > Visibility**:
 | **Show all** | Show every hidden part again. Available when something is hidden. | `show_all` |
 | **Invert visible** | Hide what is visible and show what is hidden. | `invert_visibility` |
 | **Delete hidden** | Permanently remove the hidden triangles from the mesh. Undoable. | `delete_hidden` |
+| **Delete masked** | Remove the masked triangles (their corners' average mask above 50%). Undoable. Available when something is masked. | `delete_masked` |
 
-**Delete hidden** keeps every attribute of what remains (mask, vertex paint, face groups, UVs and sculpt layers).
+**Delete hidden** and **Delete masked** keep every attribute of what remains (mask, vertex paint, face groups, UVs and sculpt layers).
 Use it to cut away parts of a scan or a generated model, or to remove the inside of a mesh after you isolated
 the outside.
 

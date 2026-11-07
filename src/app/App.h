@@ -33,6 +33,7 @@
 #include "core/DiscordPresence.h"
 #include "core/Face.h"
 #include "core/GeneratedRemesh.h"
+#include "core/MeshCheck.h"
 #include "core/MeshTransform.h"
 #include "app/Wintab.h"
 #include "core/PenPredictor.h"
@@ -1788,6 +1789,20 @@ private:
     void drawExtractContents();
     void drawModifyTopologyContents();
     void drawDeformationContents();
+    // PanelMeshCheck.cpp: Tool > Geometry > Merge by Distance (weld_points) and Check Mesh (mesh_check / mesh_fix),
+    // and the points a weld would merge drawn on the model while the section shows.
+    void drawMeshCheckContents();
+    void drawWeldPreviewOverlay();
+    uint64_t meshCheckKey() const; // changes with the active Part's mesh
+    float weldDistance_ = -1.0f;   // scene units; < 0 until the section first shows (then a default from the Part's size)
+    bool weldShown_ = false;       // the section was drawn this frame (the preview shows)
+    uint64_t weldKey_ = 0;         // meshCheckKey() and distance the count below is for
+    float weldKeyDistance_ = -1.0f;
+    size_t weldCount_ = 0;
+    std::vector<glm::vec3> weldPoints_; // a sample (<= 20000) of the points that would merge, for the preview
+    MeshReport meshReport_;
+    uint64_t meshReportKey_ = 0; // 0 = not checked yet
+    void runMeshCheck();
     void runExtract(); // Extract with the palette's settings (a preview; Accept keeps it)
     static std::string axesText(const bool axes[3]); // "x", "xz", "" (the axis argument of mirror commands)
     float extractThick_ = 0.015f;          // Thick: fraction of the Part's size
