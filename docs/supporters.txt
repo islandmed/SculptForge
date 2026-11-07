@@ -1,3 +1,4 @@
 # SculptForge supporters, shown in Help > About (one name per line, plain text).
 # Lines starting with # are ignored. Names are cut to 40 characters; control characters are removed.
 Richard Throgmorton (MakIt3D)
+macklorange
