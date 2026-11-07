@@ -511,7 +511,24 @@ step_stage() {
     "${MERGE_QUEUE:-scripts/merge-queue.sh}" staging ${with:+--with "$with"} "$sha" ||
         die "staging ${sha:0:8} is red, or main moved (above)" "fix the batch (main moved: merge origin/main), then $(resume bump)"
     ok "main is the staged ${sha:0:8} ($V); packages.yml is building its packages on the staging push"
-    echo "   next, on main: ${HIGHLIGHTS_GIVEN:+HIGHLIGHTS=$HIGHLIGHTS_GIVEN }scripts/release.sh $V --yes (waits for that run, then promotes it)"
+    # The staging push's Packages run builds what --yes will promote, the macOS .dmg included (deployment target 11:
+    # 0.11.10's std::to_chars(float) passed CI and failed only there, noticed by hand). Wait for it here.
+    local id="" tries=30 failed
+    while [ -z "$id" ] && [ "$tries" -gt 0 ]; do
+        id=$(gh run list -R "$REPO" -w packages.yml -c "$sha" -b staging -e push -L 1 --json databaseId -q '.[0].databaseId')
+        tries=$((tries - 1))
+        [ -n "$id" ] || sleep 10
+    done
+    [ -n "$id" ] || die "no Packages run on the staging push of ${sha:0:8} after 5 minutes" "gh run list -R $REPO -w packages.yml -L 3, then $(resume stage)"
+    echo "   waiting for Packages run $id on staging (every platform's package) ..." >&2
+    gh run watch "$id" -R "$REPO" --interval 60 >/dev/null 2>&1 || true
+    if [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)" != success ]; then
+        failed=$(gh run view "$id" -R "$REPO" --json jobs -q '[.jobs[] | select(.conclusion == "failure") | .name] | join(", ")')
+        die "Packages on staging failed (${failed:-see the run}): https://github.com/$REPO/actions/runs/$id" \
+            "fix it on top of ${sha:0:8} (main is already there), then $(resume stage)"
+    fi
+    ok "Packages run $id built every package for ${sha:0:8}"
+    echo "   next, on main: ${HIGHLIGHTS_GIVEN:+HIGHLIGHTS=$HIGHLIGHTS_GIVEN }scripts/release.sh $V --yes (promotes that run's packages)"
 }
 
 step_check() {
