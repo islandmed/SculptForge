@@ -145,7 +145,7 @@ TEST(founding_members_json) {
 
 TEST(testimonials_json) {
     CHECK(parseTestimonials("").empty() && parseTestimonials("{}").empty());
-    const auto t = parseTestimonials(R"([
+    const auto t = parseTestimonials(R"js([
         {"quote": "Fits like a glove.", "name": "Ada (ada3d)", "role": "environment artist", "date": "2026-11-07"},
         {"quote": "No role here.", "name": "Bo"},
         {"quote": "Hidden‮characters", "name": "Eve"},
@@ -155,7 +155,7 @@ TEST(testimonials_json) {
         {"quote": "", "name": "Eve"},
         {"quote": 5, "name": "Eve"},
         {"quote": "Name cleaned", "name": "‮Mal", "role": 3}
-    ])");
+    ])js");
     CHECK(t.size() == 3); // a quote is shown exactly as approved or not at all: never cut or cleaned
     CHECK(t[0].quote == "Fits like a glove." && t[0].name == "Ada (ada3d)" && t[0].role == "environment artist");
     CHECK(t[1].quote == "No role here." && t[1].role.empty());
