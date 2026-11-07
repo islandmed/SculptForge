@@ -135,9 +135,9 @@ void App::dragDotTo(float x, float y) {
     const float pressure = stampPressure_.hold(strokePressure()); // (not the lift's falling pressure, #146)
     DabParams p;
     p.center = hit.position;
-    p.viewDir = camera_.forward();
+    p.viewDir = partCamera().forward();
     p.radius = radiusPx_ * (pressureSizeOn() ? std::max(pressure, 0.05f) : 1.0f) *
-               camera_.worldPerPixel(hit.position, canvasHeight());
+               partCamera().worldPerPixel(hit.position, canvasHeight());
     p.strength = strokeBrush_ == BrushType::Smooth ? smoothStrength_ : strength_;
     p.pressure = pressureStrengthOn() ? pressure : 1.0f;
     p.invert = strokeInvert_;

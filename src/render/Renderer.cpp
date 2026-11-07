@@ -1542,13 +1542,35 @@ void Renderer::syncScene(const std::vector<SceneMesh>& scene) {
     }
     drawList_.clear();
     proxyPending_ = false;
+    std::vector<uint32_t> synced; // linked Parts (#94): one mesh, uploaded once (as the active one, if it's one of them)
     for (const SceneMesh& m : scene) {
         if (!m.visible || !m.mesh) continue; // hidden: keeps its dirty state until shown
-        MeshSlot& ms = slot(m.id);
-        ms.overlay = m.active ? m.overlay : nullptr;
-        sync(ms, *m.mesh, m.normalMap, m.wireframe && m.active, m.pbr);
-        drawList_.push_back({m.id, m.active, m.flat});
+        if (std::find(synced.begin(), synced.end(), m.id) == synced.end()) {
+            synced.push_back(m.id);
+            const SceneMesh* first = &m;
+            for (const SceneMesh& o : scene)
+                if (o.id == m.id && o.visible && o.active) first = &o;
+            MeshSlot& ms = slot(m.id);
+            ms.overlay = first->active ? first->overlay : nullptr;
+            sync(ms, *first->mesh, first->normalMap, first->wireframe && first->active, first->pbr);
+        }
+        drawList_.push_back({m.id, m.active, m.flat, m.model != glm::mat4(1.0f), m.model});
     }
+}
+
+void Renderer::drawItem(const MeshSlot& s, const DrawItem& item, const RenderSettings& settings) {
+    if (!item.moved) {
+        drawSlot(s, item.active, item.flat, settings);
+        return;
+    }
+    const glm::mat4 view = frameView_;
+    const CullView cull = frameCull_;
+    frameView_ = view * item.model;
+    frameCull_ = CullView::from(frameView_, frameProj_);
+    frameCull_.backfaces = cull.backfaces;
+    drawSlot(s, item.active, item.flat, settings);
+    frameView_ = view;
+    frameCull_ = cull;
 }
 
 // The packed vertices of dirtyRuns_ (all of them when `full`, which also sizes the buffer). A vertex that left
@@ -3078,7 +3100,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     drawAlpha_ = 1.0f;
     for (const DrawItem& item : drawList_)
         if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0 && !seeThrough(item))
-            drawSlot(*s, item.active, item.flat, settings);
+            drawItem(*s, item, settings);
     drawMark(2);
     if (xray) {
         gl::Enable(GL_BLEND);
@@ -3090,13 +3112,13 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
             gl::ColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
             for (const DrawItem& item : drawList_)
                 if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0 && seeThrough(item))
-                    drawSlot(*s, item.active, item.flat, settings);
+                    drawItem(*s, item, settings);
             gl::ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
             gl::DepthMask(GL_FALSE);
             drawAlpha_ = opacity;
             for (const DrawItem& item : drawList_)
                 if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0 && seeThrough(item))
-                    drawSlot(*s, item.active, item.flat, settings);
+                    drawItem(*s, item, settings);
         } else {
             // The lone active Part: its back faces first, then its front faces over them, so its far side and
             // insides show through in order (exact for a convex Part, close for the rest).
@@ -3107,7 +3129,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
                 xrayCull_ = cull;
                 for (const DrawItem& item : drawList_)
                     if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0)
-                        drawSlot(*s, item.active, item.flat, settings);
+                        drawItem(*s, item, settings);
             }
             xrayCull_ = 0;
             keepBackfaces_ = false;
@@ -3130,9 +3152,10 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
 
     if (settings.wireframe) { // the active Part only
         // Two programs: edge lists fade their sub-pixel edges (kWireLineGS); triangle outlines draw as before.
+        glm::mat4 wireView = view; // the item's (view * model for a moved linked copy)
         auto use = [&](GLuint prog, const MeshSlot& slot) {
             gl::UseProgram(prog);
-            gl::UniformMatrix4fv(gl::GetUniformLocation(prog, "uView"), 1, GL_FALSE, glm::value_ptr(view));
+            gl::UniformMatrix4fv(gl::GetUniformLocation(prog, "uView"), 1, GL_FALSE, glm::value_ptr(wireView));
             gl::UniformMatrix4fv(gl::GetUniformLocation(prog, "uProj"), 1, GL_FALSE, glm::value_ptr(proj));
             gl::Uniform3fv(gl::GetUniformLocation(prog, "uGridOrigin"), 1, glm::value_ptr(slot.grid.origin));
             gl::Uniform1f(gl::GetUniformLocation(prog, "uGridStep"), slot.grid.step);
@@ -3146,6 +3169,9 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         for (const DrawItem& item : drawList_) {
             const MeshSlot* s = item.active ? findSlot(item.id) : nullptr;
             if (!s || s->drawnTriangles == 0 || s->micro) continue; // (micro levels: drawMicro draws theirs)
+            wireView = item.moved ? view * item.model : view; // (a linked copy, #94)
+            const CullView frameCull = frameCull_;
+            if (item.moved) frameCull_ = CullView::from(wireView, proj);
             cull(*s, frameCull_);
             if (!s->patches.empty() && s->patchVao) { // dynamic topology's patches
                 const bool lines = s->patchLinesOn;
@@ -3167,6 +3193,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
                 drawClusters(*s, drawClusters_, GL_TRIANGLES, DrawPart::Triangles, -1);
                 gl::PolygonMode(GL_FRONT_AND_BACK, GL_FILL);
             }
+            frameCull_ = frameCull;
         }
         gl::DepthMask(GL_TRUE);
         gl::Disable(GL_BLEND);

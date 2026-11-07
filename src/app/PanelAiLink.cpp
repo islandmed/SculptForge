@@ -671,12 +671,13 @@ Json App::aiLiveTool(const std::string& name, const Args& args, bool& ok) {
             if (std::sscanf(token.c_str(), "%f,%f", &u, &v) != 2 || !std::isfinite(u) || !std::isfinite(v))
                 return fail("points must be \"u,v u,v ...\" in 0..1 (bad: " + token + ")");
             glm::vec3 origin, dir;
-            camera_.screenRay(u * c.w, v * c.h, c.w, c.h, origin, dir);
+            partCamera().screenRay(u * c.w, v * c.h, c.w, c.h, origin, dir); // (the active Part's space, #94)
             RayHit hit;
             if (!doc_.bvh.raycast(doc_.mesh, origin, dir, hit)) {
                 ++misses;
                 continue;
             }
+            hit.position = glm::vec3(doc_.activePartInfo().transform * glm::vec4(hit.position, 1.0f)); // stroke takes scene points
             if (radius == 0.0f) radius = camera_.worldPerPixel(hit.position, c.h) * radiusFrac * c.h;
             char buf[96];
             std::snprintf(buf, sizeof buf, "%s%g,%g,%g", worldPoints.empty() ? "" : " ", double(hit.position.x),

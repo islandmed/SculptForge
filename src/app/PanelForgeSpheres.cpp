@@ -153,10 +153,10 @@ void App::drawForgeSpheresContents() {
 
 float App::worldPerPixel(const glm::vec3& at) const {
     ImVec2 sp;
-    if (!gizmoProject(at, sp)) return 0.0f;
+    if (!partProject(at, sp)) return 0.0f;
     glm::vec3 o0, d0, o1, d1;
-    canvasRay(sp.x, sp.y, o0, d0);
-    canvasRay(sp.x + 1.0f, sp.y, o1, d1);
+    partRay(sp.x, sp.y, o0, d0);
+    partRay(sp.x + 1.0f, sp.y, o1, d1);
     const glm::vec3 n = glm::normalize(d0);
     return glm::length(planeHit(o1, d1, at, n) - planeHit(o0, d0, at, n));
 }
@@ -217,7 +217,7 @@ bool App::forgesphereMouseDown(float x, float y, SDL_Keymod mod) {
     }
     if (d.op == ForgeSphereMode::Move) {
         glm::vec3 o, dir;
-        canvasRay(x, y, o, dir);
+        partRay(x, y, o, dir);
         const glm::vec3 c = d.start[size_t(d.sphere)].center;
         d.grab = c - planeHit(o, dir, c, glm::normalize(dir));
     }
@@ -236,7 +236,7 @@ void App::forgesphereDragTo(float x, float y) {
     case ForgeSphereMode::Draw: {
         // The new sphere sits on the parent's surface where the drag started, sized by the drag.
         glm::vec3 o, dir;
-        canvasRay(d.x, d.y, o, dir);
+        partRay(d.x, d.y, o, dir);
         glm::vec3 n = -glm::normalize(dir);
         const float tc = glm::dot(z.center - o, glm::normalize(dir));
         const glm::vec3 closest = o + glm::normalize(dir) * tc;
@@ -248,7 +248,7 @@ void App::forgesphereDragTo(float x, float y) {
             // Half the parent's size, starting on its surface and following the cursor in the plane through
             // that point facing the camera.
             glm::vec3 o2, dir2;
-            canvasRay(x, y, o2, dir2);
+            partRay(x, y, o2, dir2);
             const glm::vec3 at = planeHit(o2, dir2, c, glm::normalize(dir));
             forgesphereAdd(s, d.sphere, at, 0.5f * z.radius, symmetry_, &d.added);
             status_ = "Forge Spheres: new sphere, " + std::to_string(glm::distance(at, z.center) / z.radius).substr(0, 4) +
@@ -263,7 +263,7 @@ void App::forgesphereDragTo(float x, float y) {
     }
     case ForgeSphereMode::Move: {
         glm::vec3 o, dir;
-        canvasRay(x, y, o, dir);
+        partRay(x, y, o, dir);
         const glm::vec3 c = planeHit(o, dir, z.center, glm::normalize(dir)) + d.grab;
         forgesphereSet(s, d.sphere, c, z.radius, symmetry_);
         break;
@@ -387,7 +387,7 @@ void App::drawForgeSphereOverlay() {
         ImVec2 c;
         const float wpp = worldPerPixel(z.center);
         dl->PushClipRect(ImVec2(cr.x, cr.y), ImVec2(cr.x + cr.w, cr.y + cr.h), true);
-        if (gizmoProject(z.center, c) && wpp > 0.0f) dl->AddCircle(c, z.radius / wpp + 2.0f * s, IM_COL32(255, 170, 60, 220), 64, 2.0f * s);
+        if (partProject(z.center, c) && wpp > 0.0f) dl->AddCircle(c, z.radius / wpp + 2.0f * s, IM_COL32(255, 170, 60, 220), 64, 2.0f * s);
         dl->PopClipRect();
     }
     bool link = false;
@@ -402,13 +402,13 @@ void App::drawForgeSphereOverlay() {
         ImVec2 m;
         const glm::vec3 mid = (c.center + p.center) * 0.5f;
         const float wpp = worldPerPixel(mid);
-        if (forgesphereMode_ == ForgeSphereMode::Draw && gizmoProject(mid, m) && wpp > 0.0f)
+        if (forgesphereMode_ == ForgeSphereMode::Draw && partProject(mid, m) && wpp > 0.0f)
             dl->AddCircle(m, 0.5f * (c.radius + p.radius) / wpp, IM_COL32(120, 200, 255, 160), 48, 1.5f * s);
     } else {
         const ForgeSphere& z = doc_.mesh.forgespheres[size_t(i)];
         ImVec2 c;
         const float wpp = worldPerPixel(z.center);
-        if (gizmoProject(z.center, c) && wpp > 0.0f) dl->AddCircle(c, z.radius / wpp, col, 64, 2.0f * s);
+        if (partProject(z.center, c) && wpp > 0.0f) dl->AddCircle(c, z.radius / wpp, col, 64, 2.0f * s);
     }
     dl->PopClipRect();
 }

@@ -49,7 +49,8 @@ std::string applyQRemesh(Document& doc, Mesh result, bool keepOriginal, const QR
         const int at = doc.activePart + 1;
         doc.addPart(doc.mesh, active.name + " Original", false, at);
         doc.parts[size_t(at)].visible = false;
-        doc.parts[size_t(at)].qremeshGuides = doc.qremeshGuides; // to remesh it again with them
+        doc.parts[size_t(at)].data->qremeshGuides = doc.qremeshGuides; // to remesh it again with them
+        doc.parts[size_t(at)].transform = active.transform;
     }
     doc.replaceMeshUndoable(std::move(result), "Quad Remesh");
     const size_t faces = st.quads + st.triangles;

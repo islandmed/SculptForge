@@ -10,7 +10,7 @@ namespace sf {
 size_t mayaDropUnchanged(const Document& doc, std::vector<MeshObject>& objects) {
     return std::erase_if(objects, [&](const MeshObject& o) {
         for (int i = 0; i < doc.partCount(); ++i) {
-            const std::string& bridge = i == doc.activePart ? doc.bridgeName : doc.parts[size_t(i)].bridgeName;
+            const std::string& bridge = doc.checkedOut(i) ? doc.bridgeName : doc.parts[size_t(i)].data->bridgeName;
             if (bridge == o.name) return mayaMeshesMatch(doc.partMesh(i), o.mesh);
         }
         return false;

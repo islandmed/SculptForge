@@ -76,7 +76,7 @@ void saveMayaPrefs(const std::string& configDir, const UiPrefs& p) {
 }
 
 uint64_t partUndoRevision(const Document& doc, int i) {
-    return i == doc.activePart ? doc.undo.revision() : doc.parts[size_t(i)].undo.revision();
+    return doc.partUndo(i).revision();
 }
 
 // One number for every Part's id and undo revision: it moves with each stroke, undo, new or removed Part.

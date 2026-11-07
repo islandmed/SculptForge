@@ -311,7 +311,7 @@ TEST(paint_layers_project_round_trip) {
     CHECK(sameStack(back.mesh, doc.mesh));
     CHECK(back.mesh.paintLayers[0].blend == BlendMode::Overlay && back.mesh.paintLayers[0].opacity == 0.75f);
     CHECK(!back.mesh.paintLayers[1].visible && back.mesh.paintLayers[1].locked && back.mesh.activePaintLayer == 0);
-    CHECK(back.parts[1].mesh.paintLayers.empty());
+    CHECK(back.parts[1].data->mesh.paintLayers.empty());
     // Undo after loading has no history, but painting works on the loaded stack.
     CHECK(reg.execute(back, "paint_fill", {{"color", std::string("#ffffff")}}).ok);
     CHECK(reg.execute(back, "undo").ok && sameStack(back.mesh, doc.mesh));

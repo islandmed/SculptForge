@@ -146,7 +146,7 @@ TEST(blender_bridge_round_trip) {
     CHECK(r.ok && r.message.find("Received 2 objects") != std::string::npos);
     CHECK(doc.partCount() == 2 && doc.activePart == 0);
     CHECK(doc.parts[0].name == "Cube" && doc.bridgeName == "Cube");
-    CHECK(doc.parts[1].name == "Ball ü" && doc.parts[1].bridgeName == "Ball ü");
+    CHECK(doc.parts[1].name == "Ball ü" && doc.parts[1].data->bridgeName == "Ball ü");
     CHECK(doc.mesh.quadCount() == cube.quadCount() && doc.mesh.quadCount() > 0);
     CHECK(doc.partMesh(1).facegroups.size() == ball.triangleCount() && doc.partMesh(1).hasUvs());
     // Placed as in Blender's scene: p_sf = A * M_blender * A^-1 * p.

@@ -394,7 +394,7 @@ TEST(transform_all_parts) {
     CHECK(d.partMesh(1).positions[0] == b[0] + glm::vec3(0, 2, 0));
     // One undo step in each Part.
     CHECK(d.undo.canUndo());
-    CHECK(d.parts[1].undo.canUndo());
+    CHECK(d.parts[1].data->undo.canUndo());
     d.selectPart(1);
     CHECK(run(d, "undo").ok);
     CHECK(sameBits(d.mesh.positions, b));

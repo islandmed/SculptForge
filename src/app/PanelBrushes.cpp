@@ -25,7 +25,7 @@ void SDLCALL App::onAlphaChosen(void* userdata, const char* const* files, int) {
 }
 
 glm::vec3 App::screenUpVector(float angle) const {
-    const glm::quat q = camera_.orientation();
+    const glm::quat q = partCamera().orientation();
     return q * glm::vec3(-std::sin(angle), std::cos(angle), 0.0f);
 }
 
@@ -131,8 +131,8 @@ void App::drawAlphaOptions(bool vdm) {
 void App::snakeHookTo(float x, float y) {
     const float h = canvasHeight();
     glm::vec3 origin, dir;
-    canvasRay(x, y, origin, dir);
-    const glm::vec3 n = camera_.forward();
+    partRay(x, y, origin, dir);
+    const glm::vec3 n = partCamera().forward();
     const float denom = glm::dot(dir, n);
     if (std::abs(denom) < 1e-6f) return;
     // Along the normal (App::beginAlongNormal): the tip slides out along the normal at the press.
@@ -141,7 +141,7 @@ void App::snakeHookTo(float x, float y) {
     const float pressure = strokePressure();
     DabParams p;
     p.viewDir = n;
-    p.radius = radiusPx_ * (pressureSizeOn() ? std::max(pressure, 0.05f) : 1.0f) * camera_.worldPerPixel(grabLast_, h);
+    p.radius = radiusPx_ * (pressureSizeOn() ? std::max(pressure, 0.05f) : 1.0f) * partCamera().worldPerPixel(grabLast_, h);
     p.strength = strength_;
     p.pressure = pressureStrengthOn() ? pressure : 1.0f;
     p.invert = strokeInvert_;
@@ -168,13 +168,13 @@ void App::dragRectTo(float x, float y) {
     const glm::vec2 drag = glm::vec2(x, y) - dragAnchor_;
     const float len = glm::length(drag);
     if (len < 2.0f) return;
-    const glm::quat q = camera_.orientation();
+    const glm::quat q = partCamera().orientation();
     const float pressure = stampPressure_.hold(strokePressure()); // (not the lift's falling pressure, #146)
 
     DabParams p;
     p.center = dragAnchorHit_;
-    p.viewDir = camera_.forward();
-    p.radius = len * camera_.worldPerPixel(dragAnchorHit_, canvasHeight());
+    p.viewDir = partCamera().forward();
+    p.radius = len * partCamera().worldPerPixel(dragAnchorHit_, canvasHeight());
     p.strength = strength_;
     p.pressure = pressureStrengthOn() ? pressure : 1.0f;
     p.invert = strokeInvert_;

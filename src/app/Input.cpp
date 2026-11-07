@@ -458,7 +458,7 @@ void App::viewOrbitStep(float yawDegrees, float pitchDegrees) {
 }
 
 void App::frameActivePart() {
-    const AABB b = doc_.mesh.bounds();
+    const AABB b = doc_.partBounds(doc_.activePart); // (where it is: a moved linked copy, #94)
     if (b.valid()) camera_.frame(b);
     else camera_.frame(sceneBounds());
 }

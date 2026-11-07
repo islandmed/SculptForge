@@ -51,7 +51,7 @@ void App::syncWorldSize() {
         haveCursorSurface_ = true;
     }
     // Off the model: at the surface point last under the cursor (so zooming there keeps the size), else the pivot.
-    cursorWorldPerPx_ = camera_.worldPerPixel(haveCursorSurface_ ? cursorSurface_ : camera_.target, canvasHeight());
+    cursorWorldPerPx_ = partCamera().worldPerPixel(haveCursorSurface_ ? cursorSurface_ : partCamera().target, canvasHeight());
     const float wpp = cursorWorldPerPx_;
     if (!(wpp > 0.0f)) return;
     if (!worldSize_ || radiusPx_ != worldSyncedPx_ || worldRadius_ <= 0.0f) {

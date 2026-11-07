@@ -54,7 +54,7 @@ bool App::kelvinStrokeBrush() const { return dragBrush(strokeBrush_) && !strokeR
 void App::kelvinBegin(const RayHit& hit) {
     // Full brush size, as Move: the press pressure of a pen is near zero, so Pressure > Size would shrink the grab (#122).
     kelvinCenter_ = hit.position;
-    kelvinRadius_ = radiusPx_ * camera_.worldPerPixel(hit.position, canvasHeight());
+    kelvinRadius_ = radiusPx_ * partCamera().worldPerPixel(hit.position, canvasHeight());
     grabLast_ = kelvinTarget_ = hit.position;
     kelvinPending_ = 0.0f;
     kelvinLastX_ = lastX_;
@@ -69,8 +69,8 @@ void App::kelvinTo(float x, float y) {
         // The grabbed point follows the cursor in the plane through it facing the camera (as Move), or along the
         // normal (App::beginAlongNormal).
         glm::vec3 origin, dir;
-        canvasRay(x, y, origin, dir);
-        const glm::vec3 n = camera_.forward();
+        partRay(x, y, origin, dir);
+        const glm::vec3 n = partCamera().forward();
         const float denom = glm::dot(dir, n);
         if (strokeAlongNormal_) kelvinTarget_ = alongNormalTarget(x, y);
         else if (std::abs(denom) < 1e-6f) return;
@@ -91,8 +91,8 @@ void App::kelvinTo(float x, float y) {
 bool App::kelvinNextStep(KelvinletStep& step) {
     step = KelvinletStep{};
     step.radius = kelvinRadius_;
-    step.viewDir = camera_.forward();
-    step.axis = -camera_.forward();
+    step.viewDir = partCamera().forward();
+    step.axis = -partCamera().forward();
     step.frontFacesOnly = frontFacesOnly_;
     const float share = doc_.sculptor.kelvinletOverBudget() ? 0.5f : 1.0f;
     if (strokeBrush_ == BrushType::KelvinGrab) {
@@ -140,7 +140,7 @@ bool App::kelvinPump() {
     s.view.probe = nullptr;
     s.view.radiusProbe = nullptr;
     s.view.settings = dabSettings();
-    s.uploadId = doc_.activePartInfo().id;
+    s.uploadId = doc_.meshKey(doc_.activePart);
     renderer_.setPersistentUpload(uiPrefs_.fastUpload);
     renderer_.bindStrokeUpload(s.uploadId, s.upload);
     s.prepare = &displayedMesh() == &doc_.mesh;
@@ -157,8 +157,8 @@ void App::kelvinAdvance() {
     }
     KelvinletStep step;
     step.radius = kelvinRadius_;
-    step.viewDir = camera_.forward();
-    step.axis = -camera_.forward();
+    step.viewDir = partCamera().forward();
+    step.axis = -partCamera().forward();
     step.frontFacesOnly = frontFacesOnly_;
     static const bool log = std::getenv("SF_KELVIN_LOG") != nullptr;
     const SculptTimings before = doc_.sculptor.timings;
@@ -350,12 +350,12 @@ void App::captureMouseUp() {
         }
         // Keep the square where it was drawn: the point on the plane through the hit under the centre.
         glm::vec3 origin, dir;
-        canvasRay(centre.x, centre.y, origin, dir);
-        const glm::vec3 n = camera_.forward();
+        partRay(centre.x, centre.y, origin, dir);
+        const glm::vec3 n = partCamera().forward();
         hit.position = origin + dir * (glm::dot(hit.position - origin, n) / glm::dot(dir, n));
     }
-    const float halfWorld = half * camera_.worldPerPixel(hit.position, canvasHeight());
-    capture_.frame = makeCaptureFrame(hit.position, camera_.forward(), screenUpVector(0.0f), halfWorld, capture_.circle);
+    const float halfWorld = half * partCamera().worldPerPixel(hit.position, canvasHeight());
+    capture_.frame = makeCaptureFrame(hit.position, partCamera().forward(), screenUpVector(0.0f), halfWorld, capture_.circle);
     capture_.haveFrame = true;
     capture_.open = true;
     recapture();

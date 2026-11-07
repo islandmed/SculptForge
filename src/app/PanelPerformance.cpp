@@ -219,7 +219,7 @@ void App::notePerformanceFrame(double syncMs) {
     }
     // A Part too big for the GPU's memory isn't drawn: say so once.
     bool oom = false;
-    for (const Part& s : doc_.parts) oom = oom || (s.visible && renderer_.outOfMemory(s.id));
+    for (int i = 0; i < doc_.partCount(); ++i) oom = oom || (doc_.parts[size_t(i)].visible && renderer_.outOfMemory(doc_.meshKey(i)));
     if (oom && !perf_.gpuOutOfMemory)
         status_ = "Not enough GPU memory to show every Part: hide some, or step down a subdivision level "
                   "(Preferences > Performance)";

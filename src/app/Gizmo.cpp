@@ -218,7 +218,8 @@ void App::updateGizmoPivot() {
                    (gizmo_.folder ? 8u + uint64_t(doc_.activePartInfo().folder) * 16u : 0u) ^
                    uint64_t(doc_.partCount()) << 48;
     if (gizmo_.all || gizmo_.folder)
-        for (const Part& s : doc_.parts) key = key * 1099511628211ull ^ s.undo.revision() ^ (s.visible ? 1u : 0u);
+        for (int i = 0; i < doc_.partCount(); ++i)
+            key = key * 1099511628211ull ^ doc_.partUndo(i).revision() ^ (doc_.parts[size_t(i)].visible ? 1u : 0u);
     if (key == gizmo_.centreKey) return;
     gizmo_.centreKey = key;
     // A new mask (or another Part) means a new part to move: follow its centre again.
@@ -236,7 +237,11 @@ void App::updateGizmoPivot() {
     for (int i : gizmoTargets()) {
         const Mesh& m = doc_.partMesh(i);
         if (m.vertexCount() == 0) continue;
-        box.expand(transformBounds(m, transformWeights(m, gizmo_.useMask, 0.0f)));
+        const AABB local = transformBounds(m, transformWeights(m, gizmo_.useMask, 0.0f));
+        const glm::mat4& t = doc_.parts[size_t(i)].transform; // (a linked copy's place in the scene)
+        for (int c = 0; c < 8 && local.valid(); ++c)
+            box.expand(glm::vec3(t * glm::vec4(c & 1 ? local.max.x : local.min.x, c & 2 ? local.max.y : local.min.y,
+                                               c & 4 ? local.max.z : local.min.z, 1.0f)));
     }
     gizmo_.pivot = box.valid() ? box.center() : glm::vec3(0.0f);
 }
@@ -276,6 +281,11 @@ bool App::gizmoProject(const glm::vec3& p, ImVec2& out) const {
     const CanvasRect r = canvasRect();
     out = ImVec2(r.x + (c.x / c.w * 0.5f + 0.5f) * r.w, r.y + (0.5f - c.y / c.w * 0.5f) * r.h);
     return true;
+}
+
+bool App::partProject(const glm::vec3& p, ImVec2& out) const {
+    const Part& s = doc_.activePartInfo();
+    return gizmoProject(s.moved() ? glm::vec3(s.transform * glm::vec4(p, 1.0f)) : p, out);
 }
 
 // ---------------------------------------------------------------------------
@@ -484,23 +494,31 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
 
     gizmo_.parts.clear();
     gizmo_.sessions.clear();
+    gizmo_.wholeParts.clear();
+    gizmo_.wholeStart.clear();
     if (!gizmo_.pivotOnly) {
+        std::vector<const PartData*> meshes; // a mesh linked Parts share is edited once
         for (int i : gizmoTargets()) {
             Mesh& m = doc_.partMesh(i);
-            Part& s = doc_.parts[size_t(i)];
-            if (i != doc_.activePart && s.bvhDirty) {
-                s.bvh.build(s.mesh);
-                s.bvhDirty = false;
-            }
-            // The active Part records into its active sculpt layer, as strokes do.
-            const int layer = i == doc_.activePart ? doc_.activeLayer : -1;
-            TransformSession session;
-            if (!session.begin(m, transformWeights(m, gizmo_.useMask, gizmo_.falloff), symmetry_, gizmo_.pivot, layer))
+            const Part& s = doc_.parts[size_t(i)];
+            if (partMovesWhole(doc_, i, gizmo_.useMask)) { // a linked copy: its transform (#94)
+                if (m.vertexCount() == 0) continue;
+                gizmo_.wholeParts.push_back(i);
+                gizmo_.wholeStart.push_back(s.transform);
                 continue;
+            }
+            if (std::find(meshes.begin(), meshes.end(), s.data.get()) != meshes.end()) continue;
+            meshes.push_back(s.data.get());
+            doc_.partBvh(i);
+            // The active Part's mesh records into its active sculpt layer, as strokes do.
+            const int layer = s.data == doc_.activePartInfo().data ? doc_.activeLayer : -1;
+            TransformSession session;
+            const glm::vec3 pivot = s.moved() ? glm::vec3(glm::inverse(s.transform) * glm::vec4(gizmo_.pivot, 1.0f)) : gizmo_.pivot;
+            if (!session.begin(m, transformWeights(m, gizmo_.useMask, gizmo_.falloff), symmetry_, pivot, layer)) continue;
             gizmo_.parts.push_back(i);
             gizmo_.sessions.push_back(std::move(session));
         }
-        if (gizmo_.sessions.empty()) {
+        if (gizmo_.sessions.empty() && gizmo_.wholeParts.empty()) {
             status_ = TransformSession::layerWeightZero(doc_.mesh, doc_.activeLayer)
                           ? "Active layer weight is 0 - raise it to transform into the layer"
                       : gizmo_.useMask && doc_.mesh.hasMask() ? "Nothing to move: everything is masked (Ctrl+click the "
@@ -525,8 +543,9 @@ void App::gizmoDragTo(float x, float y) {
     const glm::vec3 c = gizmo_.startPivot;
     const int axis = axisOf(h);
     float size = 0.0f;
-    for (int i : gizmo_.parts.empty() ? gizmoTargets() : gizmo_.parts)
-        size = std::max(size, glm::length(doc_.partMesh(i).bounds().extent()));
+    for (int i : gizmo_.parts.empty() && gizmo_.wholeParts.empty() ? gizmoTargets() : gizmo_.parts)
+        size = std::max(size, glm::length(doc_.partBounds(i).extent()));
+    for (int i : gizmo_.wholeParts) size = std::max(size, glm::length(doc_.partBounds(i).extent()));
     const float grid = gridStep(size);
     MeshTransform t;
     t.pivot = c;
@@ -604,7 +623,15 @@ void App::gizmoDragTo(float x, float y) {
         return;
     }
     gizmo_.current = t;
-    for (size_t i = 0; i < gizmo_.sessions.size(); ++i) gizmo_.sessions[i].apply(doc_.partMesh(gizmo_.parts[i]), t);
+    for (size_t i = 0; i < gizmo_.sessions.size(); ++i) {
+        const Part& s = doc_.parts[size_t(gizmo_.parts[i])];
+        gizmo_.sessions[i].apply(doc_.partMesh(gizmo_.parts[i]), s.moved() ? t.inSpaceOf(s.transform) : t);
+    }
+    if (!gizmo_.wholeParts.empty()) {
+        const glm::mat4 m = t.evenScale().matrix(); // (a linked copy scales evenly: it stays a similarity)
+        for (size_t i = 0; i < gizmo_.wholeParts.size(); ++i)
+            doc_.parts[size_t(gizmo_.wholeParts[i])].transform = m * gizmo_.wholeStart[i];
+    }
 }
 
 void App::gizmoRelease() {
@@ -618,21 +645,28 @@ void App::gizmoRelease() {
     const std::string readout = std::move(gizmo_.readout);
     gizmo_.handle = H::None;
     gizmo_.readout.clear();
-    if (gizmo_.pivotOnly || gizmo_.sessions.empty()) return;
+    if (gizmo_.pivotOnly || (gizmo_.sessions.empty() && gizmo_.wholeParts.empty())) return;
     const char* label = isRotate(h) ? "Gizmo Rotate" : isScale(h) ? "Gizmo Scale" : "Gizmo Move";
     size_t moved = 0;
     for (size_t i = 0; i < gizmo_.sessions.size(); ++i) {
         const int st = gizmo_.parts[i];
-        const bool active = st == doc_.activePart;
-        Part& s = doc_.parts[size_t(st)];
         const size_t n = gizmo_.sessions[i].movingVertices();
-        UndoRecord r = gizmo_.sessions[i].finish(active ? doc_.mesh : s.mesh, active ? doc_.bvh : s.bvh, label);
+        UndoRecord r = gizmo_.sessions[i].finish(doc_.partMesh(st), doc_.partBvh(st), label);
         if (r.empty()) continue;
-        (active ? doc_.undo : s.undo).push(std::move(r));
+        doc_.partUndo(st).push(std::move(r));
         moved += n;
+    }
+    for (size_t i = 0; i < gizmo_.wholeParts.size(); ++i) { // linked copies: one transform step each
+        Part& s = doc_.parts[size_t(gizmo_.wholeParts[i])];
+        const glm::mat4 now = s.transform;
+        s.transform = gizmo_.wholeStart[i];
+        doc_.setPartTransform(gizmo_.wholeParts[i], now, label);
+        moved += now != gizmo_.wholeStart[i] ? doc_.partMesh(gizmo_.wholeParts[i]).vertexCount() : 0;
     }
     gizmo_.sessions.clear();
     gizmo_.parts.clear();
+    gizmo_.wholeParts.clear();
+    gizmo_.wholeStart.clear();
     if (moved == 0) return;
     // The gizmo moves and turns with what it moved.
     const MeshTransform& t = gizmo_.current;

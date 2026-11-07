@@ -1720,6 +1720,11 @@ private:
     void updateCameraAspect(); // camera_.aspect from the canvas
     // Ray through window point (x, y) of the canvas, and the canvas height for screen-size conversions.
     void canvasRay(float x, float y, glm::vec3& origin, glm::vec3& dir) const;
+    // The view from inside the active Part (a moved linked copy, #94): camera_ with that Part's transform undone,
+    // so rays, brush sizes and projections line up with its mesh (and symmetry is about its own axes). The same
+    // as camera_ for a Part that isn't moved. partRay / partProject: canvasRay / gizmoProject in that space.
+    Camera partCamera() const { return camera_.inSpaceOf(doc_.activePartInfo().transform); }
+    void partRay(float x, float y, glm::vec3& origin, glm::vec3& dir) const;
     float canvasHeight() const { return canvasRect().h; }
     Renderer::Viewport canvasViewport(int fbWidth, int fbHeight) const; // the canvas in framebuffer pixels
     void drawCanvasFrame();
@@ -2026,6 +2031,7 @@ private:
     glm::mat3 gizmoFrame() const;
     float gizmoWorldSize() const; // world length of an axis arrow (constant on screen)
     bool gizmoProject(const glm::vec3& p, ImVec2& out) const; // false behind the camera
+    bool partProject(const glm::vec3& p, ImVec2& out) const;  // a point of the active Part's mesh
     GizmoHandle gizmoHandleAt(float x, float y) const;
     bool gizmoHandleScreen(GizmoHandle h, ImVec2& out) const; // a point to grab handle h (UI tests)
     std::vector<int> gizmoTargets() const; // Parts a drag transforms (the active one, or All)
@@ -2060,6 +2066,9 @@ private:
         MeshTransform current;
         std::vector<int> parts;
         std::vector<TransformSession> sessions;
+        // Linked copies (#94) the drag moves as a whole (partMovesWhole), and their transforms when it began.
+        std::vector<int> wholeParts;
+        std::vector<glm::mat4> wholeStart;
         std::string readout;        // shown beside the gizmo while dragging ("Rotate 45")
         // Where the gizmo was before and after each of its undo steps (active Part, by undo depth).
         struct Step {
@@ -2440,6 +2449,7 @@ private:
     void resetView();                              // the view.reset action (Maya keys: Alt+H, #134)
     float rollStartX_ = 0.0f, rollStartY_ = 0.0f;
     glm::vec2 lastDabScreen_{0.0f}; // window pixels of the last dab (UI tests: last_dab_x / last_dab_y)
+    glm::vec3 lastDabCentre_{0.0f}; // ... and its centre on the active Part's mesh (UI tests: dab_scene_error_px)
     bool maskClickPending_ = false; // Ctrl+press on the model: a click blurs (Alt: sharpens), a drag paints
     float maskClickX_ = 0.0f, maskClickY_ = 0.0f;
     // ---- end classic feel ----

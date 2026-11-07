@@ -517,7 +517,9 @@ void registerForgeSphereCommands(CommandRegistry& reg) {
                  const size_t faces = skin.triangleCount() - skin.quadCount();
                  const int from = doc.activePart;
                  const std::string name = doc.uniquePartName(doc.parts[size_t(from)].name + " Mesh");
+                 const glm::mat4 place = doc.parts[size_t(from)].transform;
                  doc.addPart(std::move(skin), name, true, from + 1);
+                 doc.activePartInfo().transform = place;
                  if (argBool(a, "keep", true)) doc.parts[size_t(from)].visible = false;
                  else doc.removePart(from);
                  return {true, "Made \"" + name + "\" from the Forge Spheres: " + std::to_string(faces) + " faces"};

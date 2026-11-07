@@ -3,6 +3,7 @@
 //
 // The `transform` command (core/MeshTransform.h): what a Transform gizmo drag does, for scripts, the console and AI.
 #include "core/Commands.h"
+#include "core/Document.h"
 #include "core/MeshTransform.h"
 #include "core/PathStroke.h"
 
@@ -75,9 +76,15 @@ CommandResult runTransform(Document& doc, const Args& a) {
     }
 
     std::vector<int> targets;
-    for (int i = 0; i < doc.partCount(); ++i)
-        if (i == doc.activePart || (doc.parts[size_t(i)].visible && (all || (folder && doc.parts[size_t(i)].folder == folder))))
-            targets.push_back(i);
+    for (int i = 0; i < doc.partCount(); ++i) {
+        const Part& s = doc.parts[size_t(i)];
+        if (!(i == doc.activePart || (s.visible && (all || (folder && s.folder == folder))))) continue;
+        // Linked copies (#94) share one mesh: a masked edit of it happens once.
+        const bool again = std::any_of(targets.begin(), targets.end(),
+                                       [&](int k) { return doc.parts[size_t(k)].data == s.data; });
+        if (again && !partMovesWhole(doc, i, useMask)) continue;
+        targets.push_back(i);
+    }
 
     MeshTransform t;
     t.translate = translate;
@@ -91,7 +98,10 @@ CommandResult runTransform(Document& doc, const Args& a) {
             const Mesh& m = doc.partMesh(i);
             if (m.vertexCount() == 0) continue;
             const AABB b = transformBounds(m, transformWeights(m, useMask, falloff));
-            if (b.valid()) box.expand(b);
+            const glm::mat4& place = doc.parts[size_t(i)].transform; // (where a linked copy is)
+            for (int c = 0; c < 8 && b.valid(); ++c)
+                box.expand(glm::vec3(place * glm::vec4(c & 1 ? b.max.x : b.min.x, c & 2 ? b.max.y : b.min.y,
+                                                       c & 4 ? b.max.z : b.min.z, 1.0f)));
         }
         t.pivot = box.valid() ? box.center() : glm::vec3(0.0f);
     } else if (pivot == "origin") {

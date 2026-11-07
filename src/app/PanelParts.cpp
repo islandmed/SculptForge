@@ -10,6 +10,8 @@
 #include "app/Demo.h"
 #include "app/Theme.h"
 #include "app/I18n.h"
+#include "app/Ui.h"
+#include <IconsLucide.h>
 #include "core/Multires.h"
 #include "render/GL.h"
 
@@ -91,15 +93,13 @@ int App::pickPart(float x, float y, RayHit* out) {
         if (!s.visible) continue;
         RayHit hit;
         bool found = false;
-        if (i == doc_.activePart) {
-            doc_.syncBvh();
-            found = doc_.bvh.raycast(doc_.mesh, origin, dir, hit);
-        } else {
-            if (s.bvhDirty || (s.bvh.nodeCount() == 0 && s.mesh.triangleCount())) {
-                s.bvh.build(s.mesh);
-                s.bvhDirty = false;
-            }
-            found = s.bvh.raycast(s.mesh, origin, dir, hit);
+        // In the Part's own space (a linked copy's transform): the ray goes there, the hit comes back.
+        const glm::mat4 inv = s.moved() ? glm::inverse(s.transform) : glm::mat4(1.0f);
+        const glm::vec3 o = glm::vec3(inv * glm::vec4(origin, 1.0f)), d = glm::mat3(inv) * dir;
+        found = doc_.partBvh(i).raycast(doc_.partMesh(i), o, d, hit);
+        if (found && s.moved()) {
+            hit.position = glm::vec3(s.transform * glm::vec4(hit.position, 1.0f));
+            hit.normal = glm::normalize(glm::mat3(s.transform) * hit.normal);
         }
         if (found && (best < 0 || hit.t < nearest.t)) {
             best = i;
@@ -133,7 +133,7 @@ void App::partClickRelease() {
             runCommand("part_select", {{"index", double(partClickTarget_)}});
             partSelected("Alt+click");
         }
-        if (partClickFrame_) camera_.frame(doc_.mesh.bounds()); // Shift+Alt+click: frame it too
+        if (partClickFrame_) camera_.frame(doc_.partBounds(doc_.activePart)); // Shift+Alt+click: frame it too
     }
     partClickTarget_ = -1;
     partClickFrame_ = false;
@@ -194,15 +194,22 @@ void App::updatePartThumbnails() {
     ids.reserve(doc_.parts.size());
     const double now = double(SDL_GetTicksNS()) * 1e-9; // (the main loop's clock, as redrawAt_)
     for (int i = 0; i < doc_.partCount(); ++i) {
-        const Part& s = doc_.parts[size_t(i)];
+        // By mesh (Document::meshKey): linked copies (#94) show their shared mesh's one thumbnail, kept by its
+        // first visible Part.
+        const uint32_t mk = doc_.meshKey(i);
+        if (std::find(ids.begin(), ids.end(), mk) != ids.end()) continue;
+        int first = i;
+        for (int k = i; k < doc_.partCount() && !doc_.parts[size_t(first)].visible; ++k)
+            if (doc_.meshKey(k) == mk && doc_.parts[size_t(k)].visible) first = k;
+        const Part& s = doc_.parts[size_t(first)];
         const Mesh& m = doc_.partMesh(i);
-        const UndoStack& undo = i == doc_.activePart ? doc_.undo : s.undo;
+        const UndoStack& undo = doc_.partUndo(i);
         uint64_t key = undo.revision();
         for (uint64_t part : {uint64_t(m.triangleCount()), uint64_t(m.vertexCount()), uint64_t(s.visible),
                               uint64_t(s.shading), uint64_t(renderSettings_.litsphere + 1), uint64_t(renderSettings_.showVertexPaint)})
             key = key * 1099511628211ull ^ part;
-        partThumbSchedule_.observe(s.id, key, now);
-        ids.push_back(s.id);
+        partThumbSchedule_.observe(mk, key, now);
+        ids.push_back(mk);
     }
     for (uint32_t gone : partThumbSchedule_.keepOnly(ids))
         if (auto it = partThumbs_.find(gone); it != partThumbs_.end()) {
@@ -250,6 +257,7 @@ void App::drawPartsContents() {
 
     // The list: eye, name, triangles. Row actions run after the loop (they change the list).
     int selectIndex = -1, toggleIndex = -1, deleteIndex = -1, duplicateIndex = -1, renameIndex = -1;
+    int linkIndex = -1, uniqueIndex = -1; // Linked Duplicate / Make Unique from the right-click menu
     std::string renameTo;
     // Folders (#96): pending actions on one, by name; a Part put into a folder ("" = out of its folder).
     PartFolderActions fa;
@@ -371,11 +379,23 @@ void App::drawPartsContents() {
                     focusRename_ = true;
                     std::snprintf(renameBuffer_, sizeof renameBuffer_, "%s", s.name.c_str());
                 }
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-                    ImGui::SetTooltip(tr("%s\n%zu vertices, %zu triangles%s%s\nClick to select, double-click to rename"),
+                const int links = doc_.linkCount(i);
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+                    char linked[96] = "";
+                    if (links > 1) std::snprintf(linked, sizeof linked, tr("\nLinked: %d Parts share this mesh"), links);
+                    ImGui::SetTooltip(tr("%s\n%zu vertices, %zu triangles%s%s%s\nClick to select, double-click to rename"),
                                       s.name.c_str(), doc_.partMesh(i).vertexCount(), doc_.partMesh(i).triangleCount(),
                                       subdivLevelCount(doc_.partMesh(i)) ? ", " : "",
-                                      subdivLevelText(doc_.partMesh(i)).c_str());
+                                      subdivLevelText(doc_.partMesh(i)).c_str(), linked);
+                }
+                if (links > 1) { // a link and the count at the name's end (#94): these Parts share one mesh
+                    const std::string badge = std::string(ICON_LC_LINK) + " " + std::to_string(links);
+                    const ImVec2 r1 = ImGui::GetItemRectMax(), bs = ImGui::CalcTextSize(badge.c_str());
+                    const float x = ImGui::TableGetCellBgRect(ImGui::GetCurrentTable(), 0).Max.x - bs.x - cellPad.x;
+                    ImVec4 col = isActive ? theme::accent : style.Colors[ImGuiCol_TextDisabled];
+                    ImGui::GetWindowDrawList()->AddText(ImVec2(x, r1.y - innerH * 0.5f - bs.y * 0.5f),
+                                                        ImGui::ColorConvertFloat4ToU32(col), badge.c_str());
+                }
                 if (ImGui::BeginPopupContextItem("##row")) {
                     ImGui::TextDisabled("%s", s.name.c_str());
                     if (ImGui::MenuItem(tr("Rename"))) {
@@ -401,6 +421,8 @@ void App::drawPartsContents() {
                         }
                         ImGui::EndMenu();
                     }
+                    if (ImGui::MenuItem(tr("Linked Duplicate"))) linkIndex = i;
+                    if (ImGui::MenuItem(tr("Make Unique"), nullptr, false, links > 1)) uniqueIndex = i;
                     if (ImGui::MenuItem(tr("Delete..."), nullptr, false, count > 1)) deleteIndex = i;
                     ImGui::EndPopup();
                 }
@@ -414,7 +436,7 @@ void App::drawPartsContents() {
                 ImDrawList* dl = ImGui::GetWindowDrawList();
                 const ImVec2 t1(thumbAt.x + thumb, thumbAt.y + thumb);
                 dl->AddRectFilled(thumbAt, t1, ImGui::ColorConvertFloat4ToU32(kThumbWell), theme::rounding(3.0f * scale));
-                const auto tex = partThumbs_.find(s.id);
+                const auto tex = partThumbs_.find(doc_.meshKey(i));
                 if (tex != partThumbs_.end() && tex->second)
                     dl->AddImageRounded(ImTextureID(uintptr_t(tex->second)), thumbAt, t1, ImVec2(0, 0), ImVec2(1, 1),
                                         IM_COL32(255, 255, 255, s.visible ? 255 : 110), theme::rounding(3.0f * scale));
@@ -487,6 +509,8 @@ void App::drawPartsContents() {
         setGizmoMode(GizmoMode::Move);
         status_ = "Move " + fa.gizmo + ": drag the gizmo (its visible Parts move together; W again: back to Draw)";
     }
+    if (linkIndex >= 0) runCommand("part_duplicate_linked", {{"index", double(linkIndex)}});
+    if (uniqueIndex >= 0) runCommand("part_make_unique", {{"index", double(uniqueIndex)}});
 
     // Buttons act on the active Part.
     const std::string activeName = doc_.activePartInfo().name;
@@ -582,6 +606,13 @@ void App::drawPartsContents() {
     if (ImGui::Button(tr("Delete..."), ImVec2(third, 0)))
         confirm("Delete Part?", "Delete \"" + activeName + "\"? This can't be undone.", "Delete", "part_delete");
     ImGui::EndDisabled();
+    // Linked Duplicates (#94): copies sharing one mesh, each placed on its own.
+    {
+        const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) / 2.0f;
+        ui::ActionButton(*this, "part.duplicate_linked", ImVec2(half, 0), ui::Look::IconLabel);
+        ImGui::SameLine();
+        ui::ActionButton(*this, "part.make_unique", ImVec2(half, 0), ui::Look::IconLabel);
+    }
 
     const float arrowW = ImGui::GetFrameHeight();
     ImGui::BeginDisabled(active <= 0);

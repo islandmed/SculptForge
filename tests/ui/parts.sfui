@@ -156,6 +156,8 @@ expect "Parts/Append"
 # Wireframe, face group colours and the LOD preview are for the active Part only.
 key shift+f
 expect_value wireframe == 1
+# (Parts closed first: open, it is tall enough that Face Groups is below the tray's fold)
+click "Parts##tool.part"
 click "Face Groups"
 click "Show face groups"
 shot active-overlays
