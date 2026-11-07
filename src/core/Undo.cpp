@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Undo.h"
 
+#include "core/MeshTransform.h"
 #include "core/SelectionSets.h"
 
 #include <utility>
@@ -13,7 +14,8 @@ size_t UndoRecord::approxBytes() const {
                    facegroups.bytes() + (paint ? paint->bytes() : 0) +
                    (textureTiles ? textureTiles->bytes() : 0) + (texture ? texture->bytes() : 0) +
                    (subdiv ? subdiv->bytes() : 0) + (topology ? topology->bytes() : 0) +
-                   (micro ? micro->bytes() : 0) + uvs.bytes() + (sets ? sets->bytes() : 0) + (uv ? uv->bytes() : 0);
+                   (micro ? micro->bytes() : 0) + uvs.bytes() + (sets ? sets->bytes() : 0) + (uv ? uv->bytes() : 0) +
+                   (transformOp ? transformOp->bytes() : 0);
     for (const auto& l : layerOffsets) bytes += l.bytes();
     if (mesh)
         bytes += mesh->vertexCount() * ((2 + (mesh->base.empty() ? 0 : 1 + mesh->layers.size())) * sizeof(glm::vec3) +

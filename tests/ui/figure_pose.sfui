@@ -1,0 +1,42 @@
+# Pose all Parts (core/FigurePose.h, docs/design/pose-all.md; @ABHITAR): an arm with an eye and a plate on its far
+# end. Pose all Parts shows one grey Pose Mesh (face group colours per Part) and hides the Parts; a masked rotation
+# with a soft joint on it, then Apply Pose: every Part follows, and one Ctrl+Z puts them all back.
+run new_sphere subdivisions=6 ; part_rename to=Arm ; transform scale=3,0.6,0.6 masked=false pivot=origin
+run part_append type=sphere ; part_rename to=Eye ; transform scale=0.2 pivot=origin translate=2.6,0,0.65
+run part_append type=cube ; part_rename to=Plate ; transform scale=0.3 pivot=origin translate=2,0.62,0
+run part_select index=0
+key f
+expect_value parts == 3
+shot figure
+
+# Pose all Parts: a fourth Part, the Pose Mesh, the only one shown.
+click "Parts/Pose all Parts"
+expect_status Figure Pose: 3 Parts
+expect_value parts == 4
+expect_value visible_parts == 1
+expect "Parts/Apply Pose"
+run mask_rect x0=-1 x1=0 y0=-1 y1=1
+run transform rotate=0,0,40 pivot=0,0,0 falloff=0.1
+shot pose-mesh-posed
+
+# Apply Pose: back to three Parts, all posed.
+click "Parts/Apply Pose"
+expect_status Posed 3 Parts
+expect_value parts == 3
+expect_value visible_parts == 3
+expect "Parts/Pose all Parts"
+shot applied
+
+# One undo step for every Part; redo poses them again.
+key ctrl+z
+shot undone
+key ctrl+shift+z
+shot redone
+
+# Cancel leaves the scene as it was.
+click "Parts/Pose all Parts"
+run transform translate=0,1,0 masked=false
+click "Parts/Cancel Pose"
+expect_value parts == 3
+expect_value visible_parts == 3
+shot cancelled

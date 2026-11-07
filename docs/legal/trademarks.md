@@ -91,6 +91,8 @@ elsewhere.
     gizmo ?3d
     \bpoly ?f(?:rame)?\b
     \btranspose ?all\b
+    transpose ?master
+    proxy ?pose
 <!-- marks:end -->
 
 ## Their interface's labels (#117)

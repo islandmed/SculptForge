@@ -71,6 +71,7 @@ add_library(sculptforge_core STATIC
   src/core/GarmentCommands.cpp
   src/core/ExtractMirror.cpp
   src/core/MeshTransform.cpp
+  src/core/FigurePose.cpp
   src/core/Deform.cpp
   src/core/TransformCommands.cpp
   src/core/Decimate.cpp
@@ -722,6 +723,13 @@ if(SCULPTFORGE_BUILD_TESTS)
   set_tests_properties(sculptforge_tests_nightly PROPERTIES LABELS nightly TIMEOUT 3600
                        ENVIRONMENT "TMPDIR=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TEMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly")
   file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly)
+  # Opt-in benches: own entry, labels bench + nightly (T0, CI and the shards never run them), hard timeout.
+  # SF_FIGURE_POSE_MTRIS=2,20,50 selects the sizes (tests/test_figure_pose.cpp); without it the entry does nothing.
+  add_test(NAME figure_pose_bench COMMAND sculptforge_tests --nightly nightly_figure_pose_bench)
+  set_tests_properties(figure_pose_bench PROPERTIES LABELS "bench;nightly" TIMEOUT 1800 RUN_SERIAL TRUE)
+  # SF_DECIMATE_AB=1: decimate() with and without its valence cap (tests/test_decimate_valence.cpp).
+  add_test(NAME decimate_valence_ab COMMAND sculptforge_tests --nightly nightly_decimate_valence_cap)
+  set_tests_properties(decimate_valence_ab PROPERTIES LABELS "bench;nightly" TIMEOUT 1800 RUN_SERIAL TRUE)
   # A stand-in for Brush, COLMAP and ffmpeg (tests/tools/fake_splat_tools.cpp): splat training is tested without a GPU.
   add_executable(sf_fake_splat_tools tests/tools/fake_splat_tools.cpp)
   target_include_directories(sf_fake_splat_tools PRIVATE third_party/stb)

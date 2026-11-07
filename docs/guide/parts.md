@@ -162,6 +162,26 @@ meshes the Auto UV takes a while. Scripts can skip it with `keep_texture=false`,
 > **Tip:** Merge first when you want one [voxel remesh](geometry.md#voxel-remesh) to fuse several pieces into a
 > single watertight surface.
 
+## Pose all Parts
+
+A character made of many Parts (body, eyes, teeth, armour plates, belts) can be posed in one go instead of Part by
+Part:
+
+1. Click **Pose all Parts** under the Parts list. The visible Parts are merged into one light grey **Pose Mesh**
+   (300,000 triangles in all, shared by size, so small Parts such as eyes keep their shape) and hidden while you
+   pose. Each Part is one [face group](masking.md) on it, so Mask by Face group picks whole Parts.
+2. Pose it with the [Gizmo](gizmo.md) (W move, E scale, R rotate) and masks: mask the body, rotate an arm
+   about the shoulder with a falloff for a soft joint. Symmetry poses both sides. The Pose Mesh is small, so every
+   drag is instant, and Ctrl+Z steps back through the pose.
+3. Click **Apply Pose**. Every Part takes the same moves at full resolution, its sculpt layers, subdivision levels
+   and micro level following; the Pose Mesh goes away. The whole pose is **one undo step** across every Part.
+   **Cancel Pose** removes the Pose Mesh and changes nothing.
+
+Only Gizmo moves carry over for now: a brush stroke on the Pose Mesh stops Apply until you undo it. A Part you
+edit while posing (by selecting it in the list) keeps your edit and is left out of the pose; the status line says
+which. Scripts: `figure_pose_begin triangles=300000`, `figure_pose_apply`, `figure_pose_cancel`,
+`figure_pose_info`.
+
 ## Split a Part
 
 - **Split groups** makes one Part per face group. It is available when the active Part has more than one

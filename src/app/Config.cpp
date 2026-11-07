@@ -21,6 +21,7 @@
 #include "core/Bake.h"
 #include "core/ListSort.h"
 #include "core/Micro.h"
+#include "core/FigurePose.h"
 #include "core/Multires.h"
 #include "core/Script.h"
 #include "core/Units.h"
@@ -514,6 +515,17 @@ void App::initActions() {
     add("part.extract_accept", "Accept", "Tool > Parts", nullptr, [this] { runCommand("extract_accept"); }, nullptr,
         "extract_accept", nullptr, [this] { return doc_.extractPreviewCurrent(); },
         "Keep the Extract preview as a new Part below this one. Ctrl+Z takes it away again.");
+    // Figure Pose (core/FigurePose.h, PanelParts.cpp).
+    add("part.figure_pose", "Pose all Parts", "Tool > Parts", nullptr, [this] { runCommand("figure_pose_begin"); }, nullptr,
+        "figure_pose_begin", nullptr, [this] { return !figurePoseActive(doc_); },
+        "Merge the visible Parts into one light Pose Mesh and pose it with the Gizmo and masks; Apply Pose gives "
+        "every Part the pose at full resolution.");
+    add("part.figure_pose_apply", "Apply Pose", "Tool > Parts", nullptr, [this] { runCommand("figure_pose_apply"); },
+        nullptr, "figure_pose_apply", nullptr, [this] { return figurePoseActive(doc_); },
+        "Give every Part the Pose Mesh's moves at full resolution, as one undo step, and remove the Pose Mesh.");
+    add("part.figure_pose_cancel", "Cancel Pose", "Tool > Parts", nullptr, [this] { runCommand("figure_pose_cancel"); },
+        nullptr, "figure_pose_cancel", nullptr, [this] { return figurePoseActive(doc_); },
+        "Remove the Pose Mesh and show the Parts again; nothing changes.");
     add("part.extract_double", "Double", "Tool > Parts", nullptr,
         [this] {
             extractDouble_ = !extractDouble_;
