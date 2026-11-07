@@ -27,7 +27,8 @@ In every mode, <kbd>Alt</kbd>+click a sphere to delete it together with everythi
 sphere (orange) always stays.
 
 **Symmetry** (<kbd>X</kbd>) mirrors every edit: grow an arm on the right and the left one grows with it, move a
-leg and its twin moves too. A sphere on the centre line stays on it.
+leg and its twin moves too. A sphere on the centre line stays on it, and a new sphere placed closer to the centre
+line than its own radius snaps onto it as one sphere instead of two overlapping twins.
 
 Every drag is one step of the Part's undo history, so <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes back the last sphere
 you added, moved or scaled.

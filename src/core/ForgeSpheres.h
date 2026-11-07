@@ -46,7 +46,8 @@ int forgesphereMirror(const std::vector<ForgeSphere>& spheres, int i, const glm:
 
 // Symmetric edits (`sym`: the planes to mirror across, as the sculpt symmetry). Each returns false and leaves
 // `spheres` alone when the arguments are out of range.
-// Adds a sphere growing from `parent`; `added` gets the new sphere's index (its mirror copies follow it).
+// Adds a sphere growing from `parent`; `added` gets the new sphere's index (its mirror copies follow it). With
+// symmetry, a sphere within its radius of a mirror plane snaps onto it as one sphere (unless the parent has a twin).
 bool forgesphereAdd(std::vector<ForgeSphere>& spheres, int parent, const glm::vec3& center, float radius, Symmetry sym,
                 int* added = nullptr);
 // Moves and resizes sphere `i`; a sphere on a mirror plane stays on it.
