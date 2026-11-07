@@ -51,6 +51,11 @@ public:
     size_t pagesShaded() const { return shadedPages_; }
     size_t pendingPages() const { return pendingShade_.size(); }
 
+    // Main-thread ms since the last takeSplit(), by part (the benchmark's focus_split_ms): coarse grids, records,
+    // coarse shading, page heights, page shading, whole rebuilds (syncAll).
+    enum Part { kCoarse, kRecords, kShadeCoarse, kPages, kShadePages, kSyncAll, kParts };
+    void takeSplit(double* out) { for (int k = 0; k < kParts; ++k) out[k] += splitMs_[k], splitMs_[k] = 0; }
+
     size_t poolBudgetBytes = size_t(384) << 20; // the pool's most (full grid + full shading: 6 bytes a point)
 
 private:
@@ -62,6 +67,7 @@ private:
     void shadePages(const Mesh& mesh, MicroRenderer& r, size_t budgetPoints);
     void freePage(uint32_t slot);
 
+    double splitMs_[kParts] = {};
     uint32_t n_ = 1, samples_ = 3, coarseN_ = 1, coarseSamples_ = 3, shift_ = 0, record_ = 0, slots_ = 0;
     MicroMesh coarse_;               // the coarse level: every tile's coarse grid (shading only)
     MicroShader shader_;             // coarse shading

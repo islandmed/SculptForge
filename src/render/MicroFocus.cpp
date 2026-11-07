@@ -15,6 +15,19 @@
 namespace sf {
 
 namespace {
+// Adds the time since the last lap to one part of MicroFocus's split.
+struct Lap {
+    double* ms;
+    std::chrono::steady_clock::time_point t = std::chrono::steady_clock::now();
+    void operator()(int part) {
+        const auto now = std::chrono::steady_clock::now();
+        ms[part] += std::chrono::duration<double, std::milli>(now - t).count();
+        t = now;
+    }
+};
+} // namespace
+
+namespace {
 
 constexpr GLenum kUnitPages = 0x84CD, kUnitPool = 0x84CE, kUnitPoolShade = 0x84CF; // GL_TEXTURE13-15
 constexpr uint32_t kChunkTexels = 1u << 26; // (MicroRenderer's: texture buffer limits)
@@ -291,6 +304,7 @@ void MicroFocus::shadePages(const Mesh& mesh, MicroRenderer& r, size_t budgetPoi
 
 void MicroFocus::syncAll(Mesh& mesh, MicroRenderer& r) {
     const MicroMesh& mm = *mesh.micro;
+    Lap lap{splitMs_};
     for (uint32_t s = 0; s < slots_; ++s) freePage(s);
     pendingShade_.clear();
     buildCoarse(mesh, mm, {});
@@ -307,6 +321,7 @@ void MicroFocus::syncAll(Mesh& mesh, MicroRenderer& r) {
     gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
     bytes_ += size_t(slots_) * 4;
     pageTableDirty_ = false;
+    lap(kSyncAll);
 }
 
 void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>& dirty, const std::vector<uint64_t>& moved,
@@ -314,6 +329,7 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
     const MicroMesh& mm = *mesh.micro;
     const FocusDetail* fd = mm.focus.get();
     ++frame_;
+    Lap lap{splitMs_};
     // Changed heights: records, coarse grids, pages (a tile that went coarse gives its page back).
     std::vector<uint32_t> slots, resend, reshade(dirty);
     slots.reserve(dirty.size());
@@ -328,7 +344,9 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
     slots.erase(std::unique(slots.begin(), slots.end()), slots.end());
     if (!dirty.empty()) {
         buildCoarse(mesh, mm, dirty);
+        lap(kCoarse);
         writeRecords(mm, r, slots, false);
+        lap(kRecords);
     }
     // A moved base: the shading of the tiles around it.
     for (size_t w = 0; w < moved.size(); ++w)
@@ -342,6 +360,7 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
         reshade.erase(std::unique(reshade.begin(), reshade.end()), reshade.end());
         shadeCoarse(mesh, r, reshade, false);
     }
+    lap(kShadeCoarse);
     // Pages for the full tiles the last draw drew finer than the coarse level, finest first.
     std::vector<std::pair<int, uint32_t>> want; // (-level, slot)
     const uint32_t shift = r.clusterShift_, size = 1u << shift;
@@ -391,6 +410,7 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
         resend.insert(resend.end(), added.begin(), added.end());
     }
     sendPages(mm, r, resend);
+    lap(kPages);
     // Full shading for the pages, within the frame's shading budget (as MicroRenderer's).
     if (!pendingShade_.empty()) {
         std::sort(pendingShade_.begin(), pendingShade_.end());
@@ -398,12 +418,14 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
         // (finest-drawn first would be better; slot order keeps runs together)
         shadePages(mesh, r, microShadeBudget(tier, stroking, viewMoving, shadeNsPerPoint_, size_t(samples_) * 3));
     }
+    lap(kShadePages);
     if (pageTableDirty_) {
         gl::BindBuffer(GL_TEXTURE_BUFFER, pageData_);
         gl::BufferSubData(GL_TEXTURE_BUFFER, 0, GLsizeiptr(size_t(slots_) * 4), page_.data());
         gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
         pageTableDirty_ = false;
     }
+    lap(kPages);
 }
 
 void MicroFocus::bind(GLuint program, const std::vector<uint8_t>& visible, const std::vector<int8_t>& levels) {

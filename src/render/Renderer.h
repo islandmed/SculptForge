@@ -262,6 +262,8 @@ public:
     size_t gpuBytes() const;
     // Micro grid points whose shading still waits for a frame's budget (MicroRenderer::pendingShading, all slots).
     size_t microPendingShading() const;
+    // Focus Detail's GPU sync time by part since the last call (MicroFocus::Part; adds into out[MicroFocus::kParts]).
+    void takeFocusSplit(double* out);
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
     size_t lastDrawnTriangles() const { return lastDrawn_; }
     bool floorGridDrawn() const { return floorGridDrawn_; } // the last draw() drew the floor grid (tests)

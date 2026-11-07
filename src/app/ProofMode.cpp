@@ -32,6 +32,7 @@
 #include "core/Timeline.h"
 
 #include "render/GL.h"
+#include "render/MicroFocus.h"
 
 #include <algorithm>
 #include <cctype>
@@ -361,6 +362,7 @@ struct PhaseResult {
     std::vector<double> coarse;   // clusters each frame drew at a coarse level (0: full detail)
     size_t screenStrokeFrames = 0; // frames the view showed pending dabs on the screen (render/ScreenStroke.h)
     std::vector<double> split[6]; // each frame by part (App::frameSplitMs_, the frame before: the swap comes after)
+    std::vector<double> focusSplit[7]; // a streamed level's main-thread work each frame: promote, then MicroFocus::Part
     SculptTimings stroke;         // the stroke's own work (solver thread: kernel, normals, BVH), when it ended
     double strokeSyncMs = 0;      // its uploads to the GPU (main thread, over strokeFrames frames)
     int strokeFrames = 0;
@@ -902,6 +904,12 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         if (ph.frameMs.size() < 1000000 && now - p.stageStart > 0.0) {
             ph.frameMs.push_back(frameMs);
             for (int k = 0; k < 6; ++k) ph.split[k].push_back(frameSplitMs_[k]);
+            if (doc_.mesh.micro && doc_.mesh.micro->focus) {
+                double f[MicroFocus::kParts] = {};
+                renderer_.takeFocusSplit(f);
+                ph.focusSplit[0].push_back(doc_.mesh.micro->focus->stats().lastUpdateMs);
+                for (int k = 0; k < MicroFocus::kParts; ++k) ph.focusSplit[k + 1].push_back(f[k]);
+            }
             ph.drawn.push_back(double(renderer_.lastDrawnTriangles()));
             ph.coarse.push_back(double(renderer_.coarseDrawnClusters()));
             ph.screenStrokeFrames += renderer_.screenStrokeDrawn() ? 1 : 0;
@@ -1072,6 +1080,12 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     const char* names[6] = {"events", "sculpt", "ui", "upload", "draw", "swap_wait"};
                     for (int k = 0; k < 6; ++k) split.set(names[k], percentilesJson(percentiles(ph.split[k])));
                     j.set("frame_split_ms", split);
+                    if (!ph.focusSplit[0].empty()) { // (Focus Detail: where "upload" went)
+                        Json fs = Json::object();
+                        const char* fnames[7] = {"promote", "coarse", "records", "shade_coarse", "pages", "shade_pages", "sync_all"};
+                        for (int k = 0; k < 7; ++k) fs.set(fnames[k], percentilesJson(percentiles(ph.focusSplit[k])));
+                        j.set("focus_split_ms", fs);
+                    }
                     j.set("triangles_drawn", percentilesJson(percentiles(ph.drawn)));
                     if (ph.radiusPx < 0 && !ph.drawn.empty()) { // still: what its last frame drew (after the 150 ms wait)
                         j.set("detail", ph.coarse.empty() || ph.coarse.back() == 0 ? "full" : "coarse");

@@ -1272,6 +1272,11 @@ size_t Renderer::microPendingShading() const {
     return total;
 }
 
+void Renderer::takeFocusSplit(double* out) {
+    for (MeshSlot& s : slots_)
+        if (s.micro && s.micro->focus()) s.micro->focus()->takeSplit(out);
+}
+
 size_t Renderer::gpuBytes() const {
     size_t total = 0;
     for (const MeshSlot& s : slots_) {

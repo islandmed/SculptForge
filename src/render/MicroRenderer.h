@@ -58,6 +58,7 @@ public:
     float lastTargetPx = 0.0f;
     // Focus Detail's per-tile GPU levels (null for a level in memory), for tests and the benchmark.
     const MicroFocus* focus() const { return focus_.get(); }
+    MicroFocus* focus() { return focus_.get(); }
 
 private:
     friend class MicroFocus;
