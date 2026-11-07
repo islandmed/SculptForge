@@ -261,7 +261,7 @@ def results(junit):
     return out
 
 
-def main(argv=None):
+def run_tests(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--build", default="build")
     ap.add_argument("--cache", default=os.environ.get("SF_TEST_CACHE", ""))
@@ -479,6 +479,37 @@ def self_test():
     assert rerun_args(["-j10", "-CRelease", "-R", "x"]) == ["-j10", "-CRelease"] and rerun_args(["-j"]) == ["-j"]
     print("run.py self-test passed")
     return 0
+
+
+def disk_tmp():
+    """A temp folder on disk: /tmp is RAM (tmpfs) on some machines, and UI tests write hundreds of MB each."""
+    for d in ("/var/tmp",):
+        if os.path.isdir(d) and os.access(d, os.W_OK):
+            return d
+    return tempfile.gettempdir()
+
+
+def main(argv=None):
+    # Every test of this run writes its temp files (the app's sculptforge-ui-test-* folders: settings, logs, autosaves of
+    # big meshes) under one private folder, removed when the run passes and kept, with its path printed, when it fails
+    # (11-06: thousands of leftover folders in a RAM /tmp helped run the laptop out of memory).
+    tmp = tempfile.mkdtemp(prefix="sf-tests-", dir=disk_tmp())
+    saved = {k: os.environ.get(k) for k in ("TMPDIR", "TMP", "TEMP")}
+    os.environ.update(TMPDIR=tmp, TMP=tmp, TEMP=tmp)
+    rc = 1
+    try:
+        rc = run_tests(argv)
+        return rc
+    finally:
+        for k, v in saved.items():
+            if v is None: os.environ.pop(k, None)
+            else: os.environ[k] = v
+        if rc == 0:
+            shutil.rmtree(tmp, ignore_errors=True)
+        elif os.path.isdir(tmp) and os.listdir(tmp):
+            print(f"run.py: the tests' temp files are kept for a look: {tmp}")
+        else:
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 if __name__ == "__main__":
