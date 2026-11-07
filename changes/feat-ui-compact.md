@@ -2,9 +2,9 @@
 whats_new: **Slimmer Library and timeline**: the Library strip and the Sculpt Timeline under it take about a third
   less of the viewport's height. The timeline is one thin row (the full strip is one click away, or **Edit >
   Preferences > Interface > Compact timeline**), and you can drag the Library's edge to size its thumbnails.
-  Thanks @factoberplay (YouTube).
+  Thanks factoberplay on YouTube.
 highlight: Slimmer Library and timeline: more room for the model
-changed: **Compact bars** (@factoberplay, YouTube): the Library strip and the Sculpt Timeline take 158 logical px
+changed: **Compact bars** (factoberplay on YouTube): the Library strip and the Sculpt Timeline take 158 logical px
   instead of 228 (31% less). The Library's thumbnails are 64 px by default (were 96) and its tab row 26 px; drag
   the strip's edge toward the canvas to size them (48-128 px, kept with the layout; also **Edit > Preferences >
   Library > Thumbnails**). The timeline is one row (step count, track, icon buttons) with thin branch lanes; the
