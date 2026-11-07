@@ -39,10 +39,17 @@ jobs:
           REPO_SIGNING_KEY=$(gpg --batch --pinentry-mode loopback --passphrase test --armor --export-secret-keys) \
             REPO_SIGNING_PASSPHRASE=test tools/publish/package_repos.sh dist dist/sculptforge-package-repos.tar.gz
           (cd dist && sha256sum sculptforge-package-repos.tar.gz >> SHA256SUMS.txt)
+          # The sums signed as release.yml signs them (tools/release/sign_sums.sh), with a throwaway Ed25519 key.
+          openssl genpkey -algorithm ed25519 -out "$RUNNER_TEMP/release.pem"
+          openssl pkeyutl -sign -inkey "$RUNNER_TEMP/release.pem" -rawin -in dist/SHA256SUMS.txt -out dist/SHA256SUMS.txt.sig
+          echo "PACKAGE_REPOS_PUBKEY_HEX=$(openssl pkey -in "$RUNNER_TEMP/release.pem" -pubout -outform DER | tail -c 32 | od -An -tx1 -v | tr -d ' \n')" >> "$GITHUB_ENV"
           tar -tzf dist/sculptforge-package-repos.tar.gz
       - name: Site put together (as pages.yml does)
         run: |
           mkdir site
+          # Sums not signed by the release key: refused before anything is downloaded
+          if PACKAGE_REPOS_PUBKEY_HEX=$(printf '%064d' 0 | tr 0 a) PACKAGE_REPOS_LOCAL=dist \
+              tools/publish/package_repos_fetch.sh vTEST site; then echo "unsigned sums accepted"; exit 1; fi
           PACKAGE_REPOS_LOCAL=dist tools/publish/package_repos_fetch.sh vTEST site
           find site -type f | sort
           (cd site && python3 -m http.server 8000 --bind 127.0.0.1 >/dev/null 2>&1 &)

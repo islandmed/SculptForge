@@ -23,7 +23,9 @@ mkdir -m 700 "$GNUPGHOME"
 printf '%s\n' "$REPO_SIGNING_KEY" | gpg --batch --quiet --import
 fpr=$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1 == "fpr" {print $10; exit}')
 [ -n "$fpr" ] || { echo "package_repos: REPO_SIGNING_KEY holds no secret key" >&2; exit 2; }
-sign() { gpg --batch --yes --quiet --pinentry-mode loopback --passphrase "${REPO_SIGNING_PASSPHRASE:-}" \
+# The passphrase from a 0600 file in the 0700 work folder, never on a command line (the runner's process list).
+(umask 077; printf '%s' "${REPO_SIGNING_PASSPHRASE:-}" > "$work/passphrase")
+sign() { gpg --batch --yes --quiet --pinentry-mode loopback --passphrase-file "$work/passphrase" \
     --digest-algo SHA512 --local-user "$fpr" "$@"; }
 
 shopt -s nullglob

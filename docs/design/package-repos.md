@@ -30,7 +30,8 @@ files, byte for byte (the ones the release workflow verified and smoke-tested).
    `REPO_SIGNING_KEY` secret the step says so and does nothing.
 2. **Website** (`pages.yml`): `tools/publish/package_repos_fetch.sh` takes the latest published release's metadata
    and downloads the packages it names into `website/apt/pool/...` and `website/rpm/packages/`, each checked against
-   that release's `SHA256SUMS.txt`, then deploys with the rest of the site. Nothing is committed to git (about
+   that release's `SHA256SUMS.txt`, whose release signature (`SHA256SUMS.txt.sig`, the app's one-click update key) is
+   verified first, then deploys with the rest of the site. Nothing is committed to git (about
    120 MB per release); only the newest version is in the repositories (older ones stay on the releases page).
 3. **Trust chain**: the key signs the metadata; the metadata lists each package's SHA-256; apt and dnf refuse a
    package whose bytes differ (`.github/workflows/repos.yml` tests exactly that, plus installs on Debian, Ubuntu,
@@ -39,7 +40,7 @@ files, byte for byte (the ones the release workflow verified and smoke-tested).
    checksum) and `gpgcheck=0`. A later step can sign the `.rpm` in `packages.yml` if a distribution policy needs it.
 
 The key lives only in the `release` environment (tags `v*` only), reaches one step, and is never written to disk
-outside that step's temporary keyring. The tools are installed in an earlier step that never sees it. pages.yml
+outside that step's temporary keyring (the passphrase goes to gpg through a 0600 file, never a command line). The tools are installed in an earlier step that never sees it. pages.yml
 and everything else never see it.
 
 ## The signing key (maintainer: once, about 5 minutes)
