@@ -7,6 +7,16 @@
 
 namespace sf {
 
+size_t mayaDropUnchanged(const Document& doc, std::vector<MeshObject>& objects) {
+    return std::erase_if(objects, [&](const MeshObject& o) {
+        for (int i = 0; i < doc.partCount(); ++i) {
+            const std::string& bridge = i == doc.activePart ? doc.bridgeName : doc.parts[size_t(i)].bridgeName;
+            if (bridge == o.name) return mayaMeshesMatch(doc.partMesh(i), o.mesh);
+        }
+        return false;
+    });
+}
+
 void registerMayaCommands(CommandRegistry& reg) {
     using T = ParamSpec::Type;
 
@@ -29,12 +39,17 @@ void registerMayaCommands(CommandRegistry& reg) {
     reg.add({"maya_receive",
              "Load what Maya last sent with the SculptForge shelf script. Each object replaces the Part with its "
              "name (an undoable step on that Part) or becomes a new Part; the first object replaces a fresh "
-             "scene.",
+             "scene. Objects that match their Part already (sent back unchanged) are skipped.",
              {{"folder", T::String, "The exchange folder (the same one chosen in Maya's shelf script).", true}},
              [](Document& doc, const Args& a) -> CommandResult {
                  std::vector<MeshObject> objects;
                  std::string msg;
                  if (!mayaReceive(argString(a, "folder"), objects, nullptr, msg)) return {false, msg};
+                 // What comes back as it went out (Live's echo, or a send of untouched objects) is no new step.
+                 const size_t received = objects.size();
+                 mayaDropUnchanged(doc, objects);
+                 if (objects.empty()) return {true, "Maya sent " + std::string(received == 1 ? "it" : "them") +
+                                                        " back unchanged: nothing to update"};
                  receiveObjects(doc, objects, "Get from Maya", true);
                  return {true, msg};
              }});

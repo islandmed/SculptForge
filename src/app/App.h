@@ -53,6 +53,8 @@
 #include "core/WhatsNew.h"
 #include "core/Texture.h"
 #include "io/ArExport.h"
+#include "io/MayaBridge.h"
+#include "link/MayaLink.h"
 #include "link/PhoneLink.h"
 #include "link/Qr.h"
 #include "render/Camera.h"
@@ -1375,17 +1377,61 @@ private:
     int64_t blenderSeenRevision_ = -1; // revision last loaded (or present at start, which is not loaded)
     Uint64 blenderLastPollNs_ = 0, blenderLastBeatNs_ = 0;
     // Maya bridge (PanelMaya.cpp, io/MayaBridge.h, #42): off until the user picks an exchange folder
-    // (uiPrefs_.mayaFolder); with Get automatically on, that one folder's manifest is checked once a second.
+    // (uiPrefs_.mayaFolder); with Get automatically on, that one folder's manifest is checked every 250 ms.
+    // Live (uiPrefs_.mayaLive): the Parts a stroke or edit changed go to Maya by themselves once the scene has
+    // been still for 300 ms, written on a worker from a copy (PanelMaya.cpp).
     void drawMayaMenu();
     void pollMaya();
+    void pollMayaLive(Uint64 now);
     void sendToMaya();
     void receiveFromMaya();
     void chooseMayaFolder();
     void setMayaFolder(const std::string& folder);
+    void setMayaLive(bool on);
+    void mayaLiveMarkAll(); // every Part as it is now counts as exchanged (Live just turned on, a manual send)
+    void finishMayaLiveSend();
     int64_t mayaSeenRevision_ = -1;  // revision last loaded (or present when the folder was chosen / at start)
     long long mayaManifestStamp_ = 0; // its modification time and size then (the cheap check before reading it)
     bool mayaInitialised_ = false;
     Uint64 mayaLastPollNs_ = 0;
+    std::string mayaWriter_; // this session's writer id in the manifests it writes (mayaNewWriterId)
+    struct MayaLiveSeen {
+        uint64_t revision = 0; // the Part's undo revision when last exchanged
+        uint64_t hash = 0;     // mayaMeshHash then (0 = not yet hashed)
+    };
+    std::unordered_map<uint32_t, MayaLiveSeen> mayaLiveSeen_; // by Part id
+    MayaLiveDebounce mayaLiveWait_;
+    uint64_t mayaLiveKey_ = 0; // every Part's id and undo revision at the last look (a change restarts the wait)
+    struct MayaLiveResult {
+        bool ok = false;
+        std::string message;
+        std::vector<uint32_t> ids;     // Parts sent
+        std::vector<std::string> names; // their names in Maya
+        std::vector<uint64_t> hashes;  // their hashes as sent (all the Parts looked at)
+        std::vector<uint32_t> hashedIds;
+        std::vector<uint64_t> revisions; // the hashed Parts' undo revisions then
+    };
+    std::future<MayaLiveResult> mayaLiveJob_;
+    int mayaLiveSends_ = 0; // Live sends that wrote something (UI tests: maya_live_sends)
+    // The Maya Live link (link/MayaLink.h, PanelMaya.cpp): off at every start, never remembered as on; turned on
+    // only through its warning dialog, off from the top bar's "Live link on" chip. While Maya is connected, a
+    // stroke streams the vertices it moves (at most every 100 ms) and each change goes over the link instead of
+    // the folder.
+    void drawMayaLinkDialog();
+    void startMayaLink();
+    void stopMayaLink();
+    void pollMayaLink(Uint64 now);
+    void sendMayaLinkPart(int part);
+    std::string mayaLinkName(int part); // the Part's name in Maya (its Bridge name, made unique and set)
+    std::unique_ptr<link::MayaLinkServer> mayaLink_;
+    bool mayaLinkAsk_ = false; // the warning dialog is open
+    struct MayaLinkSent {
+        std::vector<glm::vec3> positions; // what Maya has of the Part
+        uint64_t topology = 0;            // a hash of its triangles then (another: a whole mesh goes)
+    };
+    std::unordered_map<uint32_t, MayaLinkSent> mayaLinkSent_; // by Part id
+    Uint64 mayaLinkStreamNs_ = 0;
+    int mayaLinkStreams_ = 0; // mid-stroke Points sent (UI tests: maya_link_streams)
 
     // Phone link (PanelPhone.cpp, link/PhoneLink.h): File > Capture from phone. The server runs only while the
     // window is open; captures land in <library>/Captures and run the command for their kind; AR models are

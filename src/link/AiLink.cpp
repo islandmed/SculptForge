@@ -174,10 +174,12 @@ HANDLE createInstance(const std::string& endpoint, bool first) {
 
 } // namespace
 
-std::string aiLinkEndpoint(std::string& error) {
+std::string aiLinkEndpoint(std::string& error) { return localEndpoint("ai-live", error); }
+
+std::string localEndpoint(const std::string& endpointName, std::string& error) {
 #if defined(_WIN32)
     (void)error;
-    std::string name = "\\\\.\\pipe\\sculptforge-ai-live-" + userName();
+    std::string name = "\\\\.\\pipe\\sculptforge-" + endpointName + "-" + userName();
     if (const char* own = std::getenv("SF_AI_LIVE_DIR"); own && *own) // tests and isolated runs (app/main.cpp)
         name += "-" + std::to_string(std::hash<std::string>{}(own) % 1000000007u);
     return name;
@@ -195,11 +197,11 @@ std::string aiLinkEndpoint(std::string& error) {
     }
     // A Unix socket path must fit sun_path (104 bytes on macOS, whose $TMPDIR and test folders are long): then a
     // short owner-only folder in /tmp, one per original folder so isolated runs never share the user's socket.
-    if (dir.size() + sizeof("/ai-live.sock") > sizeof(sockaddr_un{}.sun_path))
+    if (dir.size() + endpointName.size() + sizeof("/.sock") > sizeof(sockaddr_un{}.sun_path))
         dir = "/tmp/sf-live-" + std::to_string(::getuid()) + "-" +
               std::to_string(std::hash<std::string>{}(dir) % 1000000007u);
     if (!safeDir(dir, error)) return {};
-    return dir + "/ai-live.sock";
+    return dir + "/" + endpointName + ".sock";
 #endif
 }
 
@@ -274,6 +276,20 @@ int AiLinkConn::readLine(std::string& line, int timeoutMs, size_t maxLine) {
         }
         if (handle_ == kInvalid) return -1;
         char chunk[16384];
+        const long long got = readChunk(chunk, sizeof chunk, remainingMs(deadline));
+        if (got == 0) {
+            if (remainingMs(deadline) == 0) return 0;
+            continue;
+        }
+        if (got < 0) return -1;
+        buffer_.append(chunk, size_t(got));
+    }
+}
+
+long long AiLinkConn::readChunk(char* chunk, size_t size, int timeoutMs) {
+    const auto deadline = Clock::now() + std::chrono::milliseconds(timeoutMs);
+    for (;;) {
+        if (handle_ == kInvalid) return -1;
         long long got = 0;
 #if defined(_WIN32)
         DWORD avail = 0;
@@ -283,13 +299,13 @@ int AiLinkConn::readLine(std::string& line, int timeoutMs, size_t maxLine) {
         }
         if (avail == 0) {
             if (remainingMs(deadline) == 0) return 0;
-            Sleep(5);
+            Sleep(2);
             continue;
         }
         OVERLAPPED ov{};
         ov.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
         DWORD n = 0;
-        BOOL ok = ReadFile(asHandle(handle_), chunk, DWORD(std::min<size_t>(sizeof chunk, avail)), &n, &ov);
+        BOOL ok = ReadFile(asHandle(handle_), chunk, DWORD(std::min<size_t>(size, avail)), &n, &ov);
         if (!ok && GetLastError() == ERROR_IO_PENDING) ok = GetOverlappedResult(asHandle(handle_), &ov, &n, TRUE);
         CloseHandle(ov.hEvent);
         if (!ok || n == 0) {
@@ -306,35 +322,50 @@ int AiLinkConn::readLine(std::string& line, int timeoutMs, size_t maxLine) {
             close();
             return -1;
         }
-        got = ::recv(int(handle_), chunk, sizeof chunk, 0);
+        got = ::recv(int(handle_), chunk, size, 0);
         if (got <= 0) {
             if (got < 0 && (errno == EINTR || errno == EAGAIN)) continue;
             close();
             return -1;
         }
 #endif
-        buffer_.append(chunk, size_t(got));
+        return got;
     }
+}
+
+long long AiLinkConn::readBytes(char* buffer, size_t size, int timeoutMs) {
+    if (!buffer_.empty()) { // (what a readLine read past its line)
+        const size_t n = std::min(size, buffer_.size());
+        std::memcpy(buffer, buffer_.data(), n);
+        buffer_.erase(0, n);
+        return (long long)n;
+    }
+    return readChunk(buffer, size, timeoutMs);
 }
 
 bool AiLinkConn::writeLine(const std::string& line) {
     if (handle_ == kInvalid || line.find('\n') != std::string::npos) return false;
     const std::string data = line + "\n";
+    return writeAll(data.data(), data.size());
+}
+
+bool AiLinkConn::writeAll(const char* data, size_t size) {
+    if (handle_ == kInvalid) return false;
     size_t sent = 0;
-    while (sent < data.size()) {
+    while (sent < size) {
 #if defined(_WIN32)
         OVERLAPPED ov{};
         ov.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
         DWORD n = 0;
-        BOOL ok = WriteFile(asHandle(handle_), data.data() + sent, DWORD(std::min<size_t>(data.size() - sent, 1 << 20)), &n, &ov);
+        BOOL ok = WriteFile(asHandle(handle_), data + sent, DWORD(std::min<size_t>(size - sent, 1 << 20)), &n, &ov);
         if (!ok && GetLastError() == ERROR_IO_PENDING) ok = GetOverlappedResult(asHandle(handle_), &ov, &n, TRUE);
         CloseHandle(ov.hEvent);
         if (!ok) return false;
 #else
 #if defined(MSG_NOSIGNAL)
-        const ssize_t n = ::send(int(handle_), data.data() + sent, data.size() - sent, MSG_NOSIGNAL);
+        const ssize_t n = ::send(int(handle_), data + sent, size - sent, MSG_NOSIGNAL);
 #else
-        const ssize_t n = ::send(int(handle_), data.data() + sent, data.size() - sent, 0);
+        const ssize_t n = ::send(int(handle_), data + sent, size - sent, 0);
 #endif
         if (n < 0 && errno == EINTR) continue;
         if (n <= 0) return false;

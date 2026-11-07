@@ -1,13 +1,17 @@
 # SculptForge bridge for Maya
 
 Send the selected meshes from Maya to SculptForge and get them back, the way the Bridge works between SculptForge and
-other apps. One Python file (`sculptforge_maya.py`), plain `maya.cmds`, no other modules. Tested against a
+other apps. One Python file (`sculptforge_maya.py`): plain `maya.cmds`, `maya.api.OpenMaya` for Live, and Python's
+standard library (`socket`, `ctypes`), nothing else and nothing of Maya's shipped with it. Tested against a
 mocked `maya.cmds` (`tests/maya/test_sculptforge_maya.py`); it uses only commands Maya has had for many
 versions (Maya 2022 or newer, Python 3), but it has not been run inside a real Maya yet: please report what
 you find on the [issue tracker](https://github.com/islandmed/SculptForge/issues/42).
 
-The two apps share **one exchange folder that you pick in both** and nothing else: no ports, sockets or
-servers, and neither app runs anything it finds in the folder. Meshes travel as OBJ files (quads and UVs).
+The two apps share **one exchange folder that you pick in both**: neither app runs anything it finds in the
+folder, and meshes travel as OBJ files (quads and UVs). **Live** sends what you edit by itself, still through the
+folder. The opt-in **Live link** (SculptForge asks every time it is turned on, and it is off at every start) is a
+connection on this computer only, never a network port: a Unix socket or a named pipe only your account can
+open, opened with SculptForge's pairing code, carrying mesh data only.
 
 ## Install
 
@@ -25,7 +29,8 @@ servers, and neither app runs anything it finds in the folder. Meshes travel as 
    sculptforge_maya.install_shelf()
    ```
 
-   A **SculptForge** shelf appears with four buttons: **Send**, **Get**, **Auto** and **Folder**. You only do
+   A **SculptForge** shelf appears with six buttons: **Send**, **Get**, **Auto**, **Live**, **Link** and
+   **Folder**. You only do
    this once; Maya keeps the shelf. (Updating: copy the new file and run `install_shelf()` again.)
 
 ## Use
@@ -42,8 +47,18 @@ servers, and neither app runs anything it finds in the folder. Meshes travel as 
    object. The whole Get is one undo step.
 
 **Auto** is on by default and starts with the first Send, Get or Folder click in a Maya session: a background
-thread looks at the modification time and size of SculptForge's manifest once a second and nothing else, and
+thread looks at the modification time and size of SculptForge's manifest every 250 ms and nothing else, and
 the Get itself runs in Maya's main thread. Something sent before it started waits for **Get**.
+
+**Live** (click it; off by default) also sends by itself: the meshes you sent or got, and the ones selected when
+you turned it on, are watched with Maya's node-dirty callbacks, and 300 ms after you stop editing one, it goes to
+SculptForge. A Get is never sent back, and a manifest this Maya session wrote is never loaded.
+
+**Link**: in SculptForge turn on **File > Maya > Live link...** and choose **Copy pairing code**; click **Link**
+here and paste. SculptForge then streams the vertices each stroke moves (about ten times a second) and Maya
+updates the mesh in place; your Maya edits go back as whole meshes. Updates over the link aren't Maya undo steps
+(undo in SculptForge). Click **Linked** to disconnect. Everything that arrives is checked strictly (sizes,
+ranges, finite numbers, Maya names) before it touches the scene.
 
 ## What comes across
 

@@ -633,6 +633,12 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "smooth_remesh") return std::round(app_.doc_.sculptor.dyntopo.smoothRemesh * 100.0f);
     if (name == "invert_zoom") return app_.uiPrefs_.invertZoom ? 1.0 : 0.0;
     if (name == "maya_zoom_horizontal") return app_.uiPrefs_.mayaZoomHorizontal ? 1.0 : 0.0;
+    if (name == "maya_live") return app_.uiPrefs_.mayaLive ? 1.0 : 0.0;
+    if (name == "maya_live_sends") return double(app_.mayaLiveSends_);
+    if (name == "maya_get_auto") return app_.uiPrefs_.mayaAutoReceive ? 1.0 : 0.0;
+    if (name == "maya_link") return app_.mayaLink_ ? 1.0 : 0.0;
+    if (name == "maya_link_connected") return app_.mayaLink_ && app_.mayaLink_->connected() ? 1.0 : 0.0;
+    if (name == "maya_link_streams") return double(app_.mayaLinkStreams_);
     if (name == "wheel_to_pointer") return app_.uiPrefs_.wheelZoomToPointer ? 1.0 : 0.0;
     if (name == "along_normal") return double(app_.uiPrefs_.alongNormal);
     if (name == "stroke_along_normal") return app_.strokeAlongNormal_ ? 1.0 : 0.0;

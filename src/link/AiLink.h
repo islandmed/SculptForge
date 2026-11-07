@@ -24,6 +24,9 @@ inline constexpr size_t kAiLinkMaxReplyLine = 64u << 20;  // app -> client (view
 
 // The endpoint this user's app listens on ("" with `error` set when the folder can't be made safe).
 std::string aiLinkEndpoint(std::string& error);
+// The same kind of endpoint under another name: "<folder>/<name>.sock", or \\.\pipe\sculptforge-<name>-<user>
+// (the Maya link, link/MayaLink.h: "maya-link").
+std::string localEndpoint(const std::string& name, std::string& error);
 
 // One connection: a socket (POSIX) or pipe handle (Windows).
 class AiLinkConn {
@@ -39,6 +42,10 @@ public:
     // than `maxLine` (the connection is then closed).
     int readLine(std::string& line, int timeoutMs, size_t maxLine = kAiLinkMaxLine);
     bool writeLine(const std::string& line);
+    // Binary use (the Maya link): up to `size` bytes, waiting at most `timeoutMs` for the first: the count, 0 on
+    // timeout, -1 when closed. writeAll sends every byte (false: the peer is gone).
+    long long readBytes(char* buffer, size_t size, int timeoutMs);
+    bool writeAll(const char* data, size_t size);
     bool valid() const { return handle_ != kInvalid; }
     void close();
     // Unblocks a readLine waiting on another thread (the connection is closed afterwards by its owner).
@@ -49,6 +56,7 @@ public:
     bool server_ = false; // Windows: the app's end of the pipe (disconnect before closing)
 
 private:
+    long long readChunk(char* chunk, size_t size, int timeoutMs); // one read from the handle (no buffer_)
     std::string buffer_;
 };
 

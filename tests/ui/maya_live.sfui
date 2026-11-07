@@ -1,0 +1,94 @@
+# Maya Live (File > Maya > Live, #42): off until turned on; then a stroke's Part goes to the exchange folder by
+# itself once the scene is still (300 ms), and only the changed Part. The Live link (File > Maya > Live link...):
+# a warning every time it is turned on (Cancel leaves it off), then the ember "Live link on" chip in the top bar,
+# the pairing code in the menu, and one click on the chip turns it off.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+copy data/maya/send1 sf_ui_maya_live/maya_to_sculptforge
+choose_file maya_folder sf_ui_maya_live
+wait 0.3
+expect_value maya_live == 0
+
+click "File##palette.file"
+hover "Maya"
+wait 0.2
+expect "Live##maya"
+expect "Live link...##maya"
+hold ctrl
+hover "Live##maya"
+expect_help "after each stroke"
+hold none
+shot menu_live_off
+click "Live##maya"
+expect_value maya_live == 1
+expect_value maya_get_auto == 1
+expect_status "Maya Live on"
+
+# A stroke: once it ends and the scene is still, the Part goes to Maya by itself.
+stroke 0.3 0.5 0.7 0.5
+wait_value maya_live_sends >= 1 10
+expect_status "Live: sent 1 object to Maya"
+click "File##palette.file"
+hover "Maya"
+wait 0.2
+shot menu_live_on
+key escape
+key escape
+
+# The Live link: asks first, every time.
+click "File##palette.file"
+hover "Maya"
+wait 0.2
+click "Live link...##maya"
+wait 0.3
+expect "Turn on##mayalink"
+expect_text It opens a connection on this computer.
+shot link_warning
+click "Cancel##mayalink"
+wait 0.2
+expect_value maya_link == 0
+expect_not "Live link on##mayalink.chip"
+click "File##palette.file"
+hover "Maya"
+wait 0.2
+click "Live link...##maya"
+wait 0.3
+click "Turn on##mayalink"
+wait 0.3
+expect_value maya_link == 1
+expect_value maya_link_connected == 0
+expect "Live link on##mayalink.chip"
+shot link_chip
+click "File##palette.file"
+hover "Maya"
+wait 0.2
+expect_text Live link on: waiting for Maya
+expect_text Pairing code:
+expect "Copy pairing code##maya"
+shot link_menu
+key escape
+key escape
+
+# The chip turns it off.
+click "Live link on##mayalink.chip"
+wait 0.2
+expect_value maya_link == 0
+expect_status "Maya Live link off"
+expect_not "Live link on##mayalink.chip"
+
+# The Forge look's status bar shows the chip too (turned on in the Classic look's menu, then the look switched).
+click "File##palette.file"
+hover "Maya"
+wait 0.2
+click "Live link...##maya"
+wait 0.3
+click "Turn on##mayalink"
+wait 0.3
+run ui_look look=forge layout=sculptforge
+wait 0.3
+expect "Live link on##mayalink.chip"
+shot forge_link_chip
+click "Live link on##mayalink.chip"
+wait 0.2
+expect_value maya_link == 0
+expect_not "Live link on##mayalink.chip"

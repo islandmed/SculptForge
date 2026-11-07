@@ -172,3 +172,13 @@ FNV-1a 64 of the lower-case word. `tests/test_legacy_names.cpp` checks `LegacyNa
 
 ZBrush is a trademark of Maxon. SculptForge is not affiliated with or endorsed by Maxon. Where a page needs a notice
 at all, it says: "Product names are trademarks of their respective owners."
+
+Other apps SculptForge works with are named only to say what it works with ("Send to Maya", "Working with Maya",
+"Working with Blender"): no logos, icons or look-alike art of theirs, and none of their code or SDK ships with
+SculptForge (the Maya shelf script uses the `maya.cmds` and `maya.api` of the user's own Maya; the Blender add-on
+uses Blender's own `bpy`).
+
+- Autodesk and Maya are registered trademarks of Autodesk, Inc. SculptForge is not affiliated with or endorsed by
+  Autodesk.
+- Blender is a registered trademark of the Blender Foundation. SculptForge is not affiliated with or endorsed by the
+  Blender Foundation.

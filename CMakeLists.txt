@@ -318,7 +318,8 @@ set_source_files_properties(third_party/qrcodegen/qrcodegen.cpp ${CMAKE_CURRENT_
 
 # --- Headless command-line tool (pipelines, build farms, AI agents) ---
 # The MCP server (src/cli/McpServer.cpp) is a library of its own: the tool and the tests link it, nobody compiles it twice.
-add_library(sculptforge_mcp STATIC src/cli/McpServer.cpp src/cli/McpTools.cpp src/cli/McpAttach.cpp src/link/AiLink.cpp src/link/AiLinkSession.cpp)
+add_library(sculptforge_mcp STATIC src/cli/McpServer.cpp src/cli/McpTools.cpp src/cli/McpAttach.cpp src/link/AiLink.cpp src/link/AiLinkSession.cpp
+  src/link/MayaLink.cpp)
 target_compile_definitions(sculptforge_mcp PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
 target_link_libraries(sculptforge_mcp PUBLIC sculptforge_core sculptforge_ai)
 if(WIN32)

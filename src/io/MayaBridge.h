@@ -15,6 +15,11 @@
 // manifest's size, version and every field's type; at most kMayaMaxObjects objects; names are reduced to Maya's
 // characters; files must be plain *.obj names in the manifest's own folder (no folders, no "..", no absolute
 // paths, no links) and regular files no bigger than kMayaMaxObjBytes.
+//
+// Live (opt-in on both sides): each side sends its changed objects by itself once it has been still for
+// kMayaLiveIdleNs, still through files only. The manifest's "writer" (a random id per app session) and each
+// side's own state keep an app from loading back what it just wrote; mayaMeshesMatch() drops an object that
+// comes back unchanged, so an echo never becomes an undo step, let alone a loop.
 #pragma once
 
 #include "io/MeshObject.h"
@@ -30,6 +35,8 @@ inline constexpr size_t kMayaMaxObjects = 256;
 inline constexpr size_t kMayaMaxNameBytes = 128;
 inline constexpr size_t kMayaMaxFileNameBytes = 64;
 inline constexpr unsigned long long kMayaMaxObjBytes = 8ull << 30; // 8 GiB: a 30M-triangle OBJ with UVs fits
+inline constexpr unsigned long long kMayaLiveIdleNs = 300'000'000ull;  // Live sends once the scene is this still
+inline constexpr unsigned long long kMayaPollNs = 250'000'000ull;      // the manifest's cheap check, this often
 
 struct MayaObject {
     std::string name; // the Maya transform's short name (Maya characters only): the Part's bridgeName
@@ -41,6 +48,8 @@ struct MayaManifest {
     std::string sender;   // "maya" or "sculptforge"
     std::string senderVersion;
     std::string unit;     // Maya's linear unit when Maya sent ("cm" by default); informational, OBJ is taken 1:1
+    std::string writer;   // the sending app session's id (optional: "" from older versions)
+    bool live = false;    // sent by Live (informational)
     std::vector<MayaObject> objects;
 };
 
@@ -65,8 +74,32 @@ bool mayaReceive(const std::string& folder, std::vector<MeshObject>& out, MayaMa
                  std::string& message);
 // Writes the objects to <folder>/sculptforge_to_maya with the next revision (names made Maya-safe and unique;
 // `sentNames` receives them) and removes the files of earlier sends.
+// `writer` and `live` go into the manifest. Each OBJ is written to a temporary name and renamed, then the
+// manifest likewise: a reader never sees half a file.
 bool mayaSend(const std::vector<MeshObjectRef>& objects, const std::string& folder, std::string& message,
-              std::vector<std::string>* sentNames = nullptr, int64_t* revision = nullptr);
+              std::vector<std::string>* sentNames = nullptr, int64_t* revision = nullptr,
+              const std::string& writer = "", bool live = false);
+
+// A new random writer id (16 hex digits) for this app session.
+std::string mayaNewWriterId();
+// A hash of what an OBJ send carries (positions, triangles, quads, UVs): Live skips Parts whose hash is unchanged.
+uint64_t mayaMeshHash(const Mesh& mesh);
+// Only what an OBJ send writes (positions, triangles, quads, UVs, vertex paint), so Live can write it off the
+// main thread while sculpting goes on.
+Mesh mayaSendCopy(const Mesh& mesh);
+// The same faces and UVs, and every position within OBJ's 7 significant digits: what came back is what went out.
+bool mayaMeshesMatch(const Mesh& a, const Mesh& b);
+
+// Live's wait: changed() at every edit, due() once nothing changed for kMayaLiveIdleNs and no stroke is on.
+struct MayaLiveDebounce {
+    unsigned long long since = 0; // the last change (ns); 0 = nothing waits
+    void changed(unsigned long long now) { since = now ? now : 1; }
+    bool pending() const { return since != 0; }
+    bool due(unsigned long long now, bool stroking) const {
+        return since != 0 && !stroking && now >= since && now - since >= kMayaLiveIdleNs;
+    }
+    void clear() { since = 0; }
+};
 
 // The revision of the manifest in `box`, or -1 when there is none (or it is not valid).
 int64_t mayaRevision(const std::string& box);
