@@ -296,6 +296,20 @@ TEST(part_split_by_selection) {
     CHECK(!reg.execute(doc, "part_split_masked").ok);
 }
 
+TEST(part_split_linked_copy) {
+    // Splitting a moved linked copy (#94): the new Part stays where the copy is, not at the shared mesh's place.
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 3.0}}).ok);
+    CHECK(reg.execute(doc, "part_duplicate_linked", {{"offset", std::string("3,0,0")}}).ok);
+    const int copy = doc.activePart;
+    CHECK(doc.parts[size_t(copy)].moved());
+    doc.mesh.mask.assign(doc.mesh.vertexCount(), 0.0f);
+    for (size_t v = 0; v < doc.mesh.vertexCount(); ++v) doc.mesh.mask[v] = doc.mesh.positions[v].x > 0.0f ? 1.0f : 0.0f;
+    CHECK(reg.execute(doc, "part_split_masked").ok);
+    CHECK(doc.parts[size_t(copy + 1)].transform == doc.parts[size_t(copy)].transform);
+}
+
 TEST(part_split_mask_threshold) {
     // A triangle is masked when its corners' average mask is above 0.5 (kMaskedThreshold), not at it.
     Mesh m;

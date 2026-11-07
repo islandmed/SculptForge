@@ -283,11 +283,13 @@ CommandResult splitOffPart(Document& doc, TriangleSet set, const char* label, co
     const bool visible = from.visible;
     const uint32_t folder = from.folder;
     const Shading shading = from.shading;
+    const glm::mat4 place = from.transform; // (a moved linked copy, #94: the piece stays where it was seen)
     const int at = doc.addPart(std::move(piece), doc.uniquePartName(source + " " + suffix), false, doc.activePart + 1);
     Part& added = doc.parts[size_t(at)];
     added.visible = visible;
     added.folder = folder;
     added.shading = shading;
+    added.transform = place;
     const uint32_t id = added.id;
     const std::string name = added.name;
     doc.replaceMeshUndoable(std::move(rest), label);
