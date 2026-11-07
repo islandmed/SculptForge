@@ -39,6 +39,7 @@
 
 #include <glm/glm.hpp>
 
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -112,6 +113,20 @@ bool subdivImplicitAdjacency(const SubdivTopology& tp, const std::vector<glm::uv
 // polygon becomes one quad: triangles 2i and 2i + 1).
 void generateFaces(const SubdivTopology& tp, std::vector<glm::uvec3>& triangles, std::vector<uint32_t>* quadPartners);
 
+// Edge creases (Mesh::creases, #108) as subdivision sharpness: crease value c (0..1) is sharpness 10 c^2 (1 = 10,
+// sharp on every level; 0.5 = 2.5). Semi-sharp creases (the uniform rule): an edge of sharpness s >= 1 subdivides
+// as a crease (its new point is its midpoint; a vertex on two such edges follows the crease, on more stays put),
+// 0 < s < 1 blends that with the smooth rule by s, and the two halves of the edge get s - 1 on the next level.
+// Open (border) edges are always sharp, as before.
+inline float creaseSharpness(float crease) { return 10.0f * crease * crease; }
+inline float sharpnessCrease(float sharpness) { return sharpness >= 10.0f ? 1.0f : sharpness > 0.0f ? std::sqrt(sharpness * 0.1f) : 0.0f; }
+// The sharp edges of a level's coarse edges (SubdivTopology::edges), sorted by edge; sharpness > 0.
+struct EdgeSharpness {
+    std::vector<uint32_t> edges;
+    std::vector<float> sharpness;
+    float at(uint32_t e) const;
+};
+
 // One level of the stack. `data` is the level as a mesh without topology (positions, every attribute, sculpt
 // and paint layers; no texture; the triangles and quad pairs only when the level isn't generated, see
 // SubdivTopology). For levels above the one last edited `stale` is set and data->positions / base / layer
@@ -127,6 +142,9 @@ struct SubdivLevel {
     // subdivided shape (as `detail`), so they turn with the surface.
     std::vector<std::shared_ptr<std::vector<glm::vec3>>> layerDetail;
     bool stale = false;
+    // Sharpness of the edges this level is made from (null = none): the level below's creases and what is left
+    // of the creases further down (s - 1 per level). Follows from the levels; not saved.
+    std::shared_ptr<const EdgeSharpness> sharp;
     size_t triangleCount() const { return topo && topo->generated ? topo->fineTriangles : data->triangleCount(); }
 };
 
@@ -194,6 +212,8 @@ bool subdivReconstruct(Mesh& mesh, std::string& error, BVH* bvh = nullptr);
 // Folds edits of the current level into the stack (see the file comment). Cheap when nothing changed.
 // Returns false (and drops the stack) if the mesh no longer has the current level's topology.
 bool subdivCommit(Mesh& mesh);
+// The sharpness level `level` (>= 1) is made with, or null (tests, exporters).
+const EdgeSharpness* subdivLevelSharpness(const Mesh& mesh, int level);
 // A full copy of level `level` (pending edits included), e.g. to export the base cage.
 Mesh subdivLevelMesh(const Mesh& mesh, int level);
 
