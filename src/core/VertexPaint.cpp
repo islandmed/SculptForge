@@ -141,6 +141,7 @@ size_t paintDab(Sculptor& sculptor, Mesh& mesh, const BVH& bvh, const DabParams&
         static thread_local ConnectedScratch connected;
         brushRegion(mesh, bvh, center, viewDir, p.radius * (useAlpha ? kAlphaReach : 1.0f), p.connectedOnly, p.viewFalloff,
                     verts, connected);
+        if (useStencil) stencil.setSpacing(center, viewDir, p.radius * (useAlpha ? kAlphaReach : 1.0f), verts.size());
         for (uint32_t v : verts) {
             if (p.frontFacesOnly && v < mesh.normals.size() && glm::dot(mesh.normals[v], viewDir) > 0.0f) continue;
             const glm::vec3 o = mesh.positions[v] - center;

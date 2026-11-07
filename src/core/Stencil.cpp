@@ -17,6 +17,7 @@ namespace sf {
 namespace {
 
 constexpr int kMaxSide = 2048; // a stencil spans the view: more detail than an alpha's 512, at most 16 MB
+constexpr int kMinLevel = 512;           // the smallest mip level (Stencil::mips)
 constexpr int kBuiltinStencilSize = 1024; // a built-in pattern made into a Stencil (BrushAlpha::builtinAt)
 
 // sRGB byte -> linear, once.
@@ -89,10 +90,37 @@ glm::vec2 Stencil::canvasPoint(glm::vec2 uv, float canvasAspect) const {
     return glm::vec2(center.x + d.x / std::max(canvasAspect, 1e-6f), center.y + d.y);
 }
 
-float Stencil::value(glm::vec2 uv) const {
+const Image& Stencil::level(int l) const {
+    if (l <= 0 || !mips || mips->empty()) return *image;
+    return (*mips)[size_t(std::min(l, int(mips->size()))) - 1];
+}
+
+// A disc of 17 taps `spacing` image pixels across (a centre, 8 at half the radius, 8 at the radius turned half a step),
+// weighted 4 / 2 / 1, from the level where the taps are still 4 of its pixels apart or more.
+template <class T, class Read>
+T Stencil::disc(glm::vec2 uv, float spacing, Read&& read) const {
+    const int l = std::clamp(int(std::floor(std::log2(spacing / 4.0f))), 0, mips ? int(mips->size()) : 0);
+    const Image& img = level(l);
+    const glm::vec2 px(0.5f * spacing / float(image->width), 0.5f * spacing / float(image->height)); // the radius, in uv
+    T sum = read(img, uv) * 4.0f;
+    for (int i = 0; i < 8; ++i) {
+        const float a = float(i) * 0.785398163f, b = a + 0.392699082f;
+        sum += read(img, uv + 0.5f * px * glm::vec2(std::cos(a), std::sin(a))) * 2.0f;
+        sum += read(img, uv + px * glm::vec2(std::cos(b), std::sin(b)));
+    }
+    return sum * (1.0f / 28.0f);
+}
+
+float Stencil::value(glm::vec2 uv, float spacing) const {
     if (!image || image->empty()) return 0.0f;
-    const Taps t = taps(*image, uv, tile);
-    const uint8_t* px = image->rgba.data();
+    if (spacing > 1.5f)
+        return disc<float>(uv, spacing, [this](const Image& img, glm::vec2 at) { return valueAt(img, at); });
+    return valueAt(*image, uv);
+}
+
+float Stencil::valueAt(const Image& img, glm::vec2 uv) const {
+    const Taps t = taps(img, uv, tile);
+    const uint8_t* px = img.rgba.data();
     float out = 0.0f;
     for (int k = 0; k < 4; ++k) {
         const uint8_t* p = px + t.at[k];
@@ -103,10 +131,16 @@ float Stencil::value(glm::vec2 uv) const {
     return std::clamp(out, 0.0f, 1.0f);
 }
 
-glm::vec4 Stencil::color(glm::vec2 uv) const {
+glm::vec4 Stencil::color(glm::vec2 uv, float spacing) const {
     if (!image || image->empty()) return glm::vec4(0.0f);
-    const Taps t = taps(*image, uv, tile);
-    const uint8_t* px = image->rgba.data();
+    if (spacing > 1.5f)
+        return disc<glm::vec4>(uv, spacing, [this](const Image& img, glm::vec2 at) { return colorAt(img, at); });
+    return colorAt(*image, uv);
+}
+
+glm::vec4 Stencil::colorAt(const Image& img, glm::vec2 uv) const {
+    const Taps t = taps(img, uv, tile);
+    const uint8_t* px = img.rgba.data();
     const auto& lin = linearTable();
     glm::vec4 out(0.0f);
     for (int k = 0; k < 4; ++k) {
@@ -120,11 +154,16 @@ glm::vec4 Stencil::color(glm::vec2 uv) const {
 void Stencil::set(Image img, std::string n, std::string p) {
     if (img.empty()) {
         image.reset();
+        mips.reset();
         name.clear();
         path.clear();
         return;
     }
     image = std::make_shared<const Image>(img.downscaled(kMaxSide));
+    auto levels = std::make_shared<std::vector<Image>>();
+    for (const Image* at = image.get(); std::max(at->width, at->height) / 2 >= kMinLevel; at = &levels->back())
+        levels->push_back(at->downscaled(std::max(at->width, at->height) / 2));
+    mips = std::move(levels);
     name = std::move(n);
     path = std::move(p);
 }
@@ -142,17 +181,29 @@ bool StencilView::canvasAt(const glm::vec3& world, glm::vec2& canvas) const {
     return true;
 }
 
+void StencilView::setSpacing(const glm::vec3& center, const glm::vec3& viewDir, float radius, size_t vertices) {
+    spacing = 0.0f;
+    if (!active() || vertices == 0 || radius <= 0.0f || stencil->size <= 0.0f) return;
+    // A direction across the view: the radius as it shows, in canvas heights (canvasAt maps a symmetry copy back).
+    const glm::vec3 d = glm::length(viewDir) > 1e-12f ? glm::normalize(viewDir) : glm::vec3(0, 0, -1);
+    const glm::vec3 across = glm::normalize(glm::cross(d, std::abs(d.y) < 0.9f ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0)));
+    glm::vec2 a, b;
+    if (!canvasAt(center, a) || !canvasAt(center + across * radius, b)) return;
+    const float r = glm::length(glm::vec2((b.x - a.x) * canvasAspect, b.y - a.y));
+    spacing = r * std::sqrt(3.14159265f / float(vertices)) / stencil->size * float(stencil->image->height);
+}
+
 float StencilView::weight(const glm::vec3& world) const {
     glm::vec2 c, uv;
     if (!canvasAt(world, c) || !stencil->imageCoord(c, canvasAspect, uv)) return 0.0f;
-    return stencil->value(uv);
+    return stencil->value(uv, spacing);
 }
 
 glm::vec4 StencilView::paint(const glm::vec3& world, const glm::vec3& paintColor) const {
     glm::vec2 c, uv;
     if (!canvasAt(world, c) || !stencil->imageCoord(c, canvasAspect, uv)) return glm::vec4(paintColor, 0.0f);
-    if (!stencil->colors) return glm::vec4(paintColor, stencil->value(uv));
-    const glm::vec4 col = stencil->color(uv);
+    if (!stencil->colors) return glm::vec4(paintColor, stencil->value(uv, spacing));
+    const glm::vec4 col = stencil->color(uv, spacing);
     return col.w > 1e-6f ? glm::vec4(glm::vec3(col) / col.w, col.w) : glm::vec4(paintColor, 0.0f); // (un-premultiplied)
 }
 

@@ -1008,6 +1008,8 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBlock ? 1.3f : 1.0f;
     brushRegion(mesh, bvh, p.center, p.viewDir, p.radius * reach, p.connectedOnly, p.viewFalloff, verts_, connected_);
     if (verts_.empty()) return;
+    StencilView stencil = p.stencil; // (averaged over the vertices' spacing where they are many pixels apart)
+    if (useStencil) stencil.setSpacing(p.center, p.viewDir, p.radius * reach, verts_.size());
 
     auto& pos = mesh.positions;
     const auto& nrm = mesh.normals;
@@ -1098,7 +1100,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         const glm::vec3 o = x - p.center;
         float f = useAlpha ? p.alpha->stamp(glm::dot(o, right) / r, glm::dot(o, up) / r, p.focal)
                            : brushFalloff(brushDistance(p, x), r, p.focal);
-        if (useStencil && f > 0.0f) f *= p.stencil.weight(x);
+        if (useStencil && f > 0.0f) f *= stencil.weight(x);
         glm::vec3 d(0.0f);
 
         switch (type) {
@@ -1409,6 +1411,8 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     brushRegion(mesh, bvh, p.center, p.viewDir, p.radius * (useAlpha ? kAlphaReach : 1.0f), p.connectedOnly,
                 p.viewFalloff, verts_, connected_);
     if (verts_.empty()) return;
+    StencilView stencil = p.stencil;
+    if (stencil.active()) stencil.setSpacing(p.center, p.viewDir, p.radius * (useAlpha ? kAlphaReach : 1.0f), verts_.size());
     const auto& pos = mesh.positions;
     const auto& nrm = mesh.normals;
     glm::vec3 aUp = projectOnPlane(p.alphaUp, p.viewDir);
@@ -1461,7 +1465,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         if (r.pattern != BrushRecipe::Pattern::None && r.patternAmount > 0.0f)
             w *= glm::mix(1.0f, samplePattern(r.pattern, pos[v] * patternFreq), r.patternAmount);
         if (useAlpha) w *= alphaWeight(pos[v]);
-        if (p.stencil.active() && w > 0.0f) w *= p.stencil.weight(pos[v]);
+        if (stencil.active() && w > 0.0f) w *= stencil.weight(pos[v]);
         weights_[i] = w;
     });
     glm::vec3 areaNormal = sums.normal, areaCenter = sums.center;

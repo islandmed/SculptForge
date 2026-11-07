@@ -282,3 +282,46 @@ TEST(stencil_groove_walls_are_smooth_along_the_groove) {
     coarse.size = 1.0f;
     CHECK(grooveRoughness(coarse, angle, 160) > 2.0f * r);
 }
+
+TEST(stencil_fine_image_on_a_light_mesh_sculpts_evenly) {
+    // A 2048 px one-pixel checker over the view: each vertex of a light mesh is many pixels from the next, so read
+    // point by point it got whatever pixel it landed on (noise that shimmers as the stencil moves); averaged over the
+    // vertices' spacing it is an even grey, so the stroke raises an even plateau.
+    Image checker = blackImage(2048, 2048);
+    for (int y = 0; y < 2048; ++y)
+        for (int x = 0; x < 2048; ++x)
+            if ((x + y) % 2 == 0)
+                for (int k = 0; k < 3; ++k) checker.rgba[(size_t(y) * 2048 + size_t(x)) * 4 + size_t(k)] = 255;
+    Stencil st;
+    st.set(checker, "checker", "");
+    CHECK(st.mips && st.mips->size() == 2); // 1024, 512 (no coarser: their square pixels would stair-step edges)
+    st.size = 1.0f;
+    // The plateau's unevenness (sd / mean of the heights along the stroke's middle), with and without the stencil:
+    // the stencil may add next to nothing to what the stroke itself leaves on the grid.
+    auto unevenness = [&](int res, const Stencil* with) {
+        Document doc = makeDoc(makePlane(res));
+        Mesh& m = doc.mesh;
+        CHECK(doc.sculptor.beginStroke(m, "Standard"));
+        for (float s = -0.5f; s <= 0.5f; s += 0.02f) {
+            DabParams p = topDab(glm::vec3(s, 0, 0), 0.3f);
+            p.strength = 0.3f;
+            if (with) p.stencil = {with, topView(), 1.0f};
+            doc.sculptor.dab(m, doc.bvh, BrushType::Standard, p, Symmetry{false, false, false});
+        }
+        doc.sculptor.endStroke();
+        double sum = 0, sq = 0, n = 0;
+        for (const glm::vec3& v : m.positions)
+            if (std::abs(v.x) < 0.3f && std::abs(v.z) < 0.05f) {
+                sum += v.y;
+                sq += double(v.y) * v.y;
+                n += 1;
+            }
+        const double mean = sum / n;
+        return mean > 0.0 ? std::sqrt(std::max(0.0, sq / n - mean * mean)) / mean : 1.0;
+    };
+    for (int res : {40, 160}) {
+        const double plain = unevenness(res, nullptr), stencilled = unevenness(res, &st);
+        std::printf("  %d cells: plateau sd / mean %.4f (no stencil %.4f)\n", res, stencilled, plain);
+        CHECK(stencilled < plain + 0.01); // (point by point: 0.065 at 40 cells, 0.17 at 160)
+    }
+}
