@@ -4,7 +4,7 @@ added: **Garments, part 2: the Pattern window** (Tool > Garments > Pattern): the
   points (snapping to the 5 mm grid and other panels' points; Ctrl drags freely), curve handles or whole panels;
   Alt+click an edge to add a point, Delete removes it, C curves an edge. Sew by clicking two edges: every seam is
   listed with both lengths, green when they match, red when one side is eased in. Duplicate, Mirror Copy (the
-  other sleeve), Mirror, rename, place around the body, particle distance, fabric and thickness; export SVG or
+  other sleeve), Mirror, rename, particle distance, fabric and thickness; export SVG or
   DXF. Ctrl+Z / Ctrl+Shift+Z over the window undo and redo pattern edits. In English, Spanish and Chinese.
 testers:
   - Any OS: Tool > Garments > T-Shirt; drag a corner of the front: the side seam turns red with both lengths.

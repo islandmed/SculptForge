@@ -367,7 +367,7 @@ void App::registerGarmentActions() {
         [this, ui] {
             showGarments_ = true;
             GarmentUi u = ui();
-            u.run("garment_add_panel", {{"width_mm", 400.0}, {"height_mm", 300.0}, {"slot", std::string("free")}});
+            u.run("garment_add_panel", {{"width_mm", 400.0}, {"height_mm", 300.0}});
             garments_->panel = int(garments_->pat.panels.size()) - 1;
             garments_->frame = true;
         },
@@ -384,7 +384,7 @@ void App::registerGarmentActions() {
             GarmentUi u = ui();
             if (u.run("garment_mirror_copy", {{"panel", u.panelRef(u.s.panel)}})) u.s.panel = int(u.s.pat.panels.size()) - 1;
         },
-        nullptr, selected, "A mirrored copy of the selected panel (the other sleeve), placed on the other side.",
+        nullptr, selected, "A mirrored copy of the selected panel (the other sleeve) beside it, with no seams.",
         "garment_mirror_copy");
     add("garment.mirror", "Mirror", nullptr, "",
         [ui] {
@@ -745,19 +745,12 @@ void App::drawGarments() {
         ImGui::InputText("##garmentname", s.name, sizeof s.name);
         if (ImGui::IsItemDeactivatedAfterEdit() && p.name != s.name && s.name[0])
             u.run("garment_edit", {{"op", std::string("rename")}, {"panel", u.panelRef(s.panel)}, {"name", std::string(s.name)}});
-        ui::HelpText("Name", nullptr, "The panel's name (front, back, sleeve... also says where it goes around the body).", kPath);
+        ui::HelpText("Name", nullptr, "The panel's name.", kPath);
         const glm::vec2 lo = garment::panelMin(p), hi = garment::panelMax(p);
         ImGui::TextDisabled(tr("%.1f x %.1f cm, %.0f cm2"), double(hi.x - lo.x) * 0.1, double(hi.y - lo.y) * 0.1,
                             double(garment::panelArea(p)) * 0.01);
         if (s.edge >= 0 && s.edge < int(p.points.size()))
             ImGui::TextDisabled(tr("Edge %d: %.1f cm"), s.edge + 1, double(garment::edgeLength(p, uint32_t(s.edge))) * 0.1);
-        int slot = int(p.place.slot);
-        const char* slots[int(garment::Slot::Count)];
-        for (int k = 0; k < int(garment::Slot::Count); ++k) slots[k] = tr(garment::slotLabel(garment::Slot(k)));
-        ImGui::SetNextItemWidth(-1);
-        if (ImGui::Combo("##garmentslot", &slot, slots, int(garment::Slot::Count)))
-            u.run("garment_place", {{"panel", u.panelRef(s.panel)}, {"slot", std::string(garment::slotId(garment::Slot(slot)))}});
-        ui::HelpText("Place", nullptr, "Where the panel goes around the body when it is draped.", kPath);
         ui::ActionButton(*this, "garment.duplicate", ImVec2(half, 0));
         ImGui::SameLine();
         ui::ActionButton(*this, "garment.mirror_copy", ImVec2(-1, 0));
