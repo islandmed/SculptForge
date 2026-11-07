@@ -1,8 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// garment_* commands (core/Garment.h): make and edit the scene's garment pattern, sew it, place it around the
-// body, write and read pattern files. The pattern lives in the project (Document::projectSettings["garment"]).
+// garment_* commands (core/Garment.h): make and edit the scene's garment pattern, sew it, write and read
+// pattern files. The pattern lives in the project (Document::projectSettings["garment"]).
 #include "core/Commands.h"
 #include "core/Garment.h"
 
@@ -129,8 +129,8 @@ void registerGarmentCommands(CommandRegistry& reg) {
                      const Panel& p = pat.panels[i];
                      const glm::vec2 size = panelMax(p) - panelMin(p);
                      char buf[200];
-                     std::snprintf(buf, sizeof buf, "\n%zu. %s: %.0f x %.0f mm, %zu edges, %s", i + 1, p.name.c_str(),
-                                   double(size.x), double(size.y), p.points.size(), slotLabel(p.place.slot));
+                     std::snprintf(buf, sizeof buf, "\n%zu. %s: %.0f x %.0f mm, %zu edges", i + 1, p.name.c_str(),
+                                   double(size.x), double(size.y), p.points.size());
                      s << buf;
                  }
                  for (const Seam& sm : pat.seams) s << "\nSeam " << checkSeam(pat, sm).text;
@@ -140,11 +140,10 @@ void registerGarmentCommands(CommandRegistry& reg) {
     reg.add({"garment_add_panel",
              "Garments: add a pattern panel from its outline: points as JSON [x0, y0, x1, y1, ...] in mm (y up), "
              "or a rectangle from width_mm and height_mm.",
-             {{"name", T::String, "Panel name (front, back, sleeve... also picks its place around the body)", false},
+             {{"name", T::String, "Panel name", false},
               {"points", T::String, "Outline as JSON [x0, y0, x1, y1, ...] in mm, 3 points or more", false},
               {"width_mm", T::Number, "Rectangle width (when no points)", false},
-              {"height_mm", T::Number, "Rectangle height (when no points)", false},
-              {"slot", T::String, "front, back, left, right, left_arm, right_arm or free (default: from the name)", false}},
+              {"height_mm", T::Number, "Rectangle height (when no points)", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  Pattern pat;
                  documentPattern(doc, pat);
@@ -170,20 +169,9 @@ void registerGarmentCommands(CommandRegistry& reg) {
                  normalizePanel(p);
                  std::string error;
                  if (!validPanel(p, error)) return {false, error};
-                 Slot slot;
-                 if (const std::string s = argString(a, "slot"); !s.empty()) {
-                     if (!slotFromId(lower(s), slot)) return {false, "Unknown slot \"" + s + "\""};
-                     p.place.slot = slot;
-                     pat.panels.push_back(std::move(p));
-                 } else {
-                     pat.panels.push_back(std::move(p));
-                     Pattern one;
-                     one.panels.push_back(pat.panels.back());
-                     autoSlots(one);
-                     pat.panels.back().place.slot = one.panels[0].place.slot;
-                 }
+                 pat.panels.push_back(std::move(p));
                  setDocumentPattern(doc, pat);
-                 return {true, "Added " + pat.panels.back().name + " (" + slotLabel(pat.panels.back().place.slot) + "): " + summary(pat)};
+                 return {true, "Added " + pat.panels.back().name + ": " + summary(pat)};
              }});
     reg.add({"garment_remove_panel", "Garments: remove a panel (and its seams).",
              {{"panel", T::String, "Panel name or number", true}},
@@ -211,7 +199,7 @@ void registerGarmentCommands(CommandRegistry& reg) {
                  if (!findPanel(pat, argString(a, "panel"), i, error)) return {false, error};
                  const uint32_t j = mirroredCopy(pat, i, argString(a, "name"));
                  setDocumentPattern(doc, pat);
-                 return {true, "Added " + pat.panels[j].name + " (" + slotLabel(pat.panels[j].place.slot) + ")"};
+                 return {true, "Added " + pat.panels[j].name};
              }});
     reg.add({"garment_sew",
              "Garments: sew an edge range of one panel to an edge range of another (or the same) panel. Edges are "
@@ -255,30 +243,6 @@ void registerGarmentCommands(CommandRegistry& reg) {
                  }
                  setDocumentPattern(doc, pat);
                  return {true, "Garment: " + summary(pat) + ", " + pat.fabric};
-             }});
-    reg.add({"garment_place", "Garments: where a panel goes around the body.",
-             {{"panel", T::String, "Panel name or number", true},
-              {"slot", T::String, "front, back, left, right, left_arm, right_arm or free", false},
-              {"x", T::Number, "Offset across (around) the body, metres", false},
-              {"y", T::Number, "Offset up, metres", false},
-              {"z", T::Number, "Offset away from the body, metres", false},
-              {"wrap", T::Bool, "Bend around the torso or arm (default true)", false}},
-             [](Document& doc, const Args& a) -> CommandResult {
-                 CommandResult r;
-                 Pattern pat;
-                 if (!loadOrFail(doc, pat, r)) return r;
-                 uint32_t i;
-                 std::string error;
-                 if (!findPanel(pat, argString(a, "panel"), i, error)) return {false, error};
-                 Placement& pl = pat.panels[i].place;
-                 if (const std::string s = argString(a, "slot"); !s.empty() && !slotFromId(lower(s), pl.slot))
-                     return {false, "Unknown slot \"" + s + "\""};
-                 pl.offset.x = float(std::clamp(argNumber(a, "x", pl.offset.x), -10.0, 10.0));
-                 pl.offset.y = float(std::clamp(argNumber(a, "y", pl.offset.y), -10.0, 10.0));
-                 pl.offset.z = float(std::clamp(argNumber(a, "z", pl.offset.z), -10.0, 10.0));
-                 pl.wrap = argBool(a, "wrap", pl.wrap);
-                 setDocumentPattern(doc, pat);
-                 return {true, pat.panels[i].name + ": " + slotLabel(pl.slot)};
              }});
     reg.add({"garment_export",
              "Garments: write the pattern at real size for sewing: svg (sewing and cutting lines, notches, grain "
@@ -330,12 +294,7 @@ void registerGarmentCommands(CommandRegistry& reg) {
                          c.c2 += shift;
                      }
                  }
-                 const size_t first = pat.panels.size();
                  pat.panels.insert(pat.panels.end(), panels.begin(), panels.end());
-                 Pattern added;
-                 added.panels.assign(pat.panels.begin() + long(first), pat.panels.end());
-                 autoSlots(added);
-                 std::copy(added.panels.begin(), added.panels.end(), pat.panels.begin() + long(first));
                  setDocumentPattern(doc, pat);
                  return {true, "Imported " + std::to_string(n) + " panels" + (error.empty() ? "" : " (" + error + ")")};
              }});

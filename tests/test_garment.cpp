@@ -3,7 +3,7 @@
 //
 // Garments (core/Garment.h): pattern panels, even triangulation, seams that weld into one consistently oriented
 // garment (a T-shirt sewn from its template is a single surface with exactly four openings: hem, neck, two
-// sleeves), the arrangement around a body, project and file round trips (SVG, DXF), the SVG reader against
+// sleeves), the flat rest shape, project and file round trips (SVG, DXF), the SVG reader against
 // hostile input, and the garment_* commands.
 #include "TestHarness.h"
 
@@ -74,16 +74,6 @@ Topology topology(const Mesh& m) {
     return r;
 }
 
-// A w x h x d box centred on the origin (finely divided, so the body analysis has vertices to read).
-Mesh makeBox(float w, float h, float d) {
-    Mesh m = makeCube(12, 2.0f);
-    AABB b;
-    for (const glm::vec3& p : m.positions) b.expand(p);
-    for (glm::vec3& p : m.positions) p = (p - b.center()) / b.extent() * glm::vec3(w, h, d);
-    m.rebuildTopology();
-    return m;
-}
-
 std::string readAll(const std::string& path) {
     std::ifstream f(path, std::ios::binary);
     std::stringstream s;
@@ -147,9 +137,10 @@ TEST(garment_sewn_tshirt_welds_into_one_oriented_surface) {
     CHECK(triangulatePattern(pat, m, error));
     // One link per point along each seam, both sides the same count.
     CHECK(!m.links.empty());
-    std::vector<glm::vec3> placed, rest;
-    placePattern(pat, m, defaultBody(), placed, rest);
-    const Mesh flat = garmentToMesh(m, placed, 0.0f);
+    std::vector<glm::vec3> rest;
+    flatRest(m, rest);
+    CHECK(rest.size() == m.vertexCount() && std::abs(rest[0].x - m.flat[0].x * 0.001f) < 1e-6f && rest[0].z == 0.0f);
+    const Mesh flat = garmentToMesh(m, rest, 0.0f);
     CHECK(flat.triangleCount() == m.triangles.size());
     const Topology t = topology(flat);
     CHECK(t.manifold);
@@ -162,7 +153,7 @@ TEST(garment_sewn_tshirt_welds_into_one_oriented_surface) {
     std::set<uint32_t> groups(flat.facegroups.begin(), flat.facegroups.end());
     CHECK(groups == std::set<uint32_t>({1, 2, 3, 4}));
     // Thickened: closed (no border at all) and still consistently oriented.
-    const Mesh thick = garmentToMesh(m, placed, 2.0f);
+    const Mesh thick = garmentToMesh(m, rest, 2.0f);
     const Topology tt = topology(thick);
     CHECK(tt.manifold && tt.consistent && tt.borderLoops == 0);
     CHECK(thick.vertexCount() == 2 * flat.vertexCount());
@@ -176,79 +167,15 @@ TEST(garment_flipped_seam_is_reported_and_twists) {
     GarmentMesh m;
     std::string error;
     CHECK(triangulatePattern(pat, m, error));
-    std::vector<glm::vec3> placed, rest;
-    placePattern(pat, m, defaultBody(), placed, rest);
-    CHECK(!topology(garmentToMesh(m, placed, 0.0f)).consistent);
-}
-
-TEST(garment_panels_are_placed_around_the_body_facing_out) {
-    const Pattern pat = tshirtPattern();
-    GarmentMesh m;
-    std::string error;
-    CHECK(triangulatePattern(pat, m, error));
-    // A capsule-ish body: a tall box torso with arms out (T pose), 1.75 m.
-    Mesh body = makeBox(0.34f, 0.6f, 0.22f);
-    for (glm::vec3& p : body.positions) p += glm::vec3(0, 1.1f, 0);
-    Mesh arms = makeBox(1.4f, 0.1f, 0.1f);
-    const size_t base = body.positions.size();
-    for (glm::vec3 p : arms.positions) body.positions.push_back(p + glm::vec3(0, 1.36f, 0));
-    for (glm::uvec3 t : arms.triangles) body.triangles.push_back(t + glm::uvec3(uint32_t(base)));
-    Mesh legs = makeBox(0.3f, 0.8f, 0.2f);
-    const size_t base2 = body.positions.size();
-    for (glm::vec3 p : legs.positions) body.positions.push_back(p + glm::vec3(0, 0.4f, 0));
-    for (glm::uvec3 t : legs.triangles) body.triangles.push_back(t + glm::uvec3(uint32_t(base2)));
-    body.rebuildTopology();
-    const BodyFrame f = analyzeBody(body);
-    CHECK(f.arms);
-    CHECK(std::abs(f.torsoHalfWidth - 0.17f) < 0.03f);
-    CHECK(f.torsoFrontZ > 0.09f && f.torsoBackZ < -0.09f);
-    CHECK(f.leftArmDir.x > 0.9f && f.rightArmDir.x < -0.9f);
-    std::vector<glm::vec3> placed, rest;
-    placePattern(pat, m, f, placed, rest);
-    CHECK(placed.size() == m.vertexCount() && rest.size() == m.vertexCount());
-    // Front in front of the chest, back behind it, sleeves out along the arms.
-    auto mean = [&](uint32_t panel) {
-        glm::dvec3 s(0.0);
-        for (uint32_t v = m.panelFirstVertex[panel]; v < m.panelFirstVertex[panel + 1]; ++v) s += glm::dvec3(placed[v]);
-        return glm::vec3(s / double(m.panelFirstVertex[panel + 1] - m.panelFirstVertex[panel]));
-    };
-    // (wrapped half-way round, so their middles are off the chest and back, their sides beside the torso)
-    auto extremeZ = [&](uint32_t panel, bool front) {
-        float z = front ? -1e9f : 1e9f;
-        for (uint32_t v = m.panelFirstVertex[panel]; v < m.panelFirstVertex[panel + 1]; ++v)
-            z = front ? std::max(z, placed[v].z) : std::min(z, placed[v].z);
-        return z;
-    };
-    CHECK(mean(0).z > f.centerZ && extremeZ(0, true) > f.torsoFrontZ + 0.02f);
-    CHECK(mean(1).z < f.centerZ && extremeZ(1, false) < f.torsoBackZ - 0.02f);
-    CHECK(mean(2).x > f.torsoHalfWidth && mean(3).x < -f.torsoHalfWidth);
-    // Triangles face away from the body: outward from the torso axis or the arm's axis.
-    int out = 0, total = 0;
-    for (uint32_t t = 0; t < m.triangles.size(); ++t) {
-        const glm::uvec3 tri = m.triangles[t];
-        const glm::vec3 a = placed[tri.x], b = placed[tri.y], c = placed[tri.z];
-        const glm::vec3 n = glm::cross(b - a, c - a), ctr = (a + b + c) / 3.0f;
-        const uint32_t panel = m.panelOf[tri.x];
-        glm::vec3 radial;
-        if (panel < 2) radial = glm::vec3(ctr.x - f.centerX, 0, ctr.z - f.centerZ);
-        else {
-            const glm::vec3 s = panel == 2 ? f.leftShoulder : f.rightShoulder;
-            const glm::vec3 d = panel == 2 ? f.leftArmDir : f.rightArmDir;
-            radial = (ctr - s) - glm::dot(ctr - s, d) * d;
-        }
-        out += glm::dot(n, radial) > 0.0f;
-        ++total;
-    }
-    CHECK(out > total * 95 / 100);
-    // The rest shape is the flat pattern, metres.
-    CHECK(std::abs(rest[0].x - m.flat[0].x * 0.001f) < 1e-6f && rest[0].z == 0.0f);
+    std::vector<glm::vec3> rest;
+    flatRest(m, rest);
+    CHECK(!topology(garmentToMesh(m, rest, 0.0f)).consistent);
 }
 
 TEST(garment_pattern_round_trips_json_and_project) {
     Pattern pat = tshirtPattern(1000.0f, 650.0f);
     pat.particleDistance = 12.0f;
     pat.fabric = "denim";
-    pat.panels[2].place.offset = {0.01f, -0.02f, 0.005f};
     pat.seams[3].flipped = true;
     Pattern back;
     std::string error;
@@ -455,7 +382,7 @@ TEST(garment_edits_keep_seams_and_shapes) {
     // Mirrored copy: the other arm.
     Pattern t = tshirtPattern();
     const uint32_t c = mirroredCopy(t, 2, "Extra");
-    CHECK(t.panels[c].place.slot == Slot::RightArm && t.panels[c].name == "Extra");
+    CHECK(t.panels[c].name == "Extra" && t.seams.size() == tshirtPattern().seams.size()); // (no seams added)
 }
 
 TEST(garment_triangulates_quickly) {
@@ -486,7 +413,6 @@ TEST(garment_commands_make_sew_and_export) {
     CHECK(r.ok); // the front hem is free
     CHECK(reg.execute(doc, "garment_set", {{"particle_mm", 20.0}, {"fabric", std::string("silk")}}).ok);
     CHECK(!reg.execute(doc, "garment_set", {{"fabric", std::string("tweed")}}).ok);
-    CHECK(reg.execute(doc, "garment_place", {{"panel", std::string("Pocket")}, {"slot", std::string("front")}, {"z", 0.01}}).ok);
     const std::string svg = tempPath("garment_cmd.svg"), dxf = tempPath("garment_cmd.dxf");
     CHECK(reg.execute(doc, "garment_export", {{"path", svg}}).ok);
     CHECK(reg.execute(doc, "garment_export", {{"path", dxf}}).ok);
@@ -497,8 +423,6 @@ TEST(garment_commands_make_sew_and_export) {
     CHECK(r.ok && r.message.find("Imported 5 panels") != std::string::npos);
     Pattern got;
     CHECK(documentPattern(doc, got) && got.panels.size() == 5);
-    CHECK(got.panels[1].place.slot == Slot::Back && got.panels[2].place.slot == Slot::LeftArm &&
-          got.panels[3].place.slot == Slot::RightArm);
     CHECK(reg.execute(doc, "garment_clear").ok && !documentPattern(doc, got));
     std::remove(svg.c_str());
     std::remove(dxf.c_str());

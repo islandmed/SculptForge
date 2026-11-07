@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Garments: pattern panels, their edits, seams, the body arrangement, the Part made after the simulation, the
+// Garments: pattern panels, their edits, seams, the flat rest shape, the Part made after the simulation, the
 // T-shirt template and the project JSON (core/Garment.h). Triangulation is in GarmentMesh.cpp, files in
 // GarmentFiles.cpp.
 #include "core/Garment.h"
@@ -121,42 +121,11 @@ void fixPanels(std::vector<Seam>& seams, uint32_t removed) {
     }
 }
 
-Slot mirroredSlot(Slot s) {
-    switch (s) {
-    case Slot::Left: return Slot::Right;
-    case Slot::Right: return Slot::Left;
-    case Slot::LeftArm: return Slot::RightArm;
-    case Slot::RightArm: return Slot::LeftArm;
-    default: return s;
-    }
-}
-
 bool overlaps(const SeamSide& x, const SeamSide& y) {
     return x.panel == y.panel && x.edge == y.edge && x.t0 < y.t1 - 1e-4f && y.t0 < x.t1 - 1e-4f;
 }
 
 } // namespace
-
-// ---------------------------------------------------------------------------
-// Slots
-// ---------------------------------------------------------------------------
-
-const char* slotId(Slot s) {
-    static const char* ids[] = {"front", "back", "left", "right", "left_arm", "right_arm", "free"};
-    return s < Slot::Count ? ids[int(s)] : "free";
-}
-const char* slotLabel(Slot s) {
-    static const char* labels[] = {"Front", "Back", "Left side", "Right side", "Left arm", "Right arm", "Free"};
-    return s < Slot::Count ? labels[int(s)] : "Free";
-}
-bool slotFromId(const std::string& id, Slot& out) {
-    for (int i = 0; i < int(Slot::Count); ++i)
-        if (id == slotId(Slot(i))) {
-            out = Slot(i);
-            return true;
-        }
-    return false;
-}
 
 // ---------------------------------------------------------------------------
 // Panel geometry
@@ -403,8 +372,6 @@ uint32_t mirroredCopy(Pattern& pat, uint32_t i, const std::string& name) {
     one.panels.push_back(pat.panels[j]);
     mirrorPanel(one, 0);
     pat.panels[j] = std::move(one.panels[0]);
-    pat.panels[j].place.slot = mirroredSlot(pat.panels[j].place.slot);
-    pat.panels[j].place.offset.x = -pat.panels[j].place.offset.x;
     return j;
 }
 
@@ -632,262 +599,12 @@ std::vector<std::string> patternProblems(const Pattern& pat) {
 }
 
 // ---------------------------------------------------------------------------
-// Arrangement
+// Rest shape
 // ---------------------------------------------------------------------------
 
-BodyFrame defaultBody() {
-    BodyFrame b;
-    b.bounds.min = {-0.85f, 0.0f, -0.13f};
-    b.bounds.max = {0.85f, 1.75f, 0.13f};
-    b.shoulderY = 1.45f;
-    b.torsoHalfWidth = 0.17f;
-    b.torsoFrontZ = 0.11f;
-    b.torsoBackZ = -0.11f;
-    b.arms = true;
-    b.leftShoulder = {0.17f, 1.40f, 0.0f};
-    b.rightShoulder = {-0.17f, 1.40f, 0.0f};
-    b.armRadius = 0.05f;
-    return b;
-}
-
-BodyFrame analyzeBody(const Mesh& body) {
-    BodyFrame f;
-    if (body.positions.empty()) return defaultBody();
-    for (const glm::vec3& p : body.positions) f.bounds.expand(p);
-    const float h = f.bounds.extent().y;
-    const float y0 = f.bounds.min.y;
-    f.centerX = f.bounds.center().x;
-    f.centerZ = f.bounds.center().z;
-    if (!(h > 1e-6f)) return defaultBody();
-    // Torso width: x coverage of the chest band by triangles (not vertices: a coarse mesh has gaps between
-    // them), from the middle out to the first empty gap (arms held away).
-    const float binW = h / 175.0f; // 1 cm on a 1.75 m figure
-    const int bins = 400;
-    std::vector<int> occ(bins, 0);
-    const float bandLo = y0 + 0.58f * h, bandHi = y0 + 0.70f * h;
-    auto cover = [&](float xa, float xb) {
-        // Both sides of the middle fold onto |x - centre|.
-        const float lo = xa - f.centerX, hi = xb - f.centerX;
-        const float a = (lo <= 0.0f && hi >= 0.0f) ? 0.0f : std::min(std::abs(lo), std::abs(hi));
-        const float b = std::max(std::abs(lo), std::abs(hi));
-        for (int k = int(a / binW); k <= int(b / binW) && k < bins; ++k) ++occ[size_t(k)];
-    };
-    for (const glm::uvec3& t : body.triangles) {
-        if (t.x >= body.positions.size() || t.y >= body.positions.size() || t.z >= body.positions.size()) continue;
-        const glm::vec3 a = body.positions[t.x], b = body.positions[t.y], c = body.positions[t.z];
-        const float ylo = std::min({a.y, b.y, c.y}), yhi = std::max({a.y, b.y, c.y});
-        if (yhi < bandLo || ylo > bandHi) continue;
-        const float xlo = std::min({a.x, b.x, c.x}), xhi = std::max({a.x, b.x, c.x});
-        if (xlo < f.centerX && xhi > f.centerX) {
-            cover(xlo, f.centerX);
-            cover(f.centerX, xhi);
-        } else {
-            cover(xlo, xhi);
-        }
-    }
-    if (body.triangles.empty())
-        for (const glm::vec3& p : body.positions)
-            if (p.y >= bandLo && p.y <= bandHi) cover(p.x, p.x);
-    int edge = 0;
-    for (int k = 0; k < bins; ++k) {
-        if (occ[size_t(k)]) edge = k;
-        else if (edge > 0 || k > 2) break;
-    }
-    f.torsoHalfWidth = std::max(binW, (float(edge) + 1.0f) * binW);
-    // Depth: the front and back of the chest band near the middle.
-    float front = f.centerZ, back = f.centerZ;
-    bool any = false;
-    for (const glm::vec3& p : body.positions)
-        if (p.y >= bandLo && p.y <= bandHi && std::abs(p.x - f.centerX) < 0.5f * f.torsoHalfWidth) {
-            front = any ? std::max(front, p.z) : p.z;
-            back = any ? std::min(back, p.z) : p.z;
-            any = true;
-        }
-    f.torsoFrontZ = front;
-    f.torsoBackZ = back;
-    if (any) f.centerZ = 0.5f * (front + back);
-    // Shoulders: the highest point over the outer half of the torso's width (the neck and head are narrower,
-    // arms held out are further out), below the top of the head.
-    f.shoulderY = y0 + 0.83f * h;
-    float top = -std::numeric_limits<float>::max();
-    for (const glm::vec3& p : body.positions) {
-        const float dx = std::abs(p.x - f.centerX);
-        if (dx >= 0.5f * f.torsoHalfWidth && dx <= f.torsoHalfWidth && p.y > bandLo && p.y < y0 + 0.95f * h) top = std::max(top, p.y);
-    }
-    if (top > bandLo) f.shoulderY = top;
-    // Arms: vertices well outside the torso above the waist, one slab near the shoulder and one further out.
-    f.armRadius = 0.03f * h;
-    for (int side = 0; side < 2; ++side) {
-        const float s = side == 0 ? 1.0f : -1.0f;
-        const float x1 = 1.4f * f.torsoHalfWidth, x2 = x1 + 0.15f * h, slab = 0.08f * h;
-        glm::dvec3 m1(0.0), m2(0.0);
-        size_t n1 = 0, n2 = 0;
-        for (const glm::vec3& p : body.positions) {
-            if (p.y < y0 + 0.5f * h) continue;
-            const float dx = s * (p.x - f.centerX);
-            if (dx >= x1 && dx < x1 + slab) {
-                m1 += glm::dvec3(p);
-                ++n1;
-            } else if (dx >= x2 && dx < x2 + slab) {
-                m2 += glm::dvec3(p);
-                ++n2;
-            }
-        }
-        if (n1 < 8) continue;
-        const glm::vec3 p1 = glm::vec3(m1 / double(n1));
-        glm::vec3 dir(s, 0.0f, 0.0f);
-        if (n2 >= 8) dir = glm::normalize(glm::vec3(m2 / double(n2)) - p1);
-        if (dir.x * s < 0.3f) continue; // not an arm held out
-        // Radius: the mean distance of the near slab's vertices from the arm's line.
-        double r = 0.0;
-        for (const glm::vec3& p : body.positions) {
-            if (p.y < y0 + 0.5f * h) continue;
-            const float dx = s * (p.x - f.centerX);
-            if (dx >= x1 && dx < x1 + slab) {
-                const glm::vec3 d = p - p1;
-                r += double(glm::length(d - glm::dot(d, dir) * dir));
-            }
-        }
-        const float radius = float(r / double(n1));
-        // The shoulder: back along the arm to the torso's side.
-        const float back = (s * (p1.x - f.centerX) - f.torsoHalfWidth) / std::max(0.3f, std::abs(dir.x));
-        const glm::vec3 shoulder = p1 - dir * back;
-        f.arms = true;
-        f.armRadius = side == 0 ? radius : 0.5f * (f.armRadius + radius);
-        (side == 0 ? f.leftShoulder : f.rightShoulder) = shoulder;
-        (side == 0 ? f.leftArmDir : f.rightArmDir) = dir;
-    }
-    if (!f.arms) { // arms down or none: sleeves start at the shoulders, pointing out and down
-        f.leftShoulder = {f.centerX + f.torsoHalfWidth, f.shoulderY - 0.03f * h, f.centerZ};
-        f.rightShoulder = {f.centerX - f.torsoHalfWidth, f.shoulderY - 0.03f * h, f.centerZ};
-        f.leftArmDir = glm::normalize(glm::vec3(0.3f, -1.0f, 0.0f));
-        f.rightArmDir = glm::normalize(glm::vec3(-0.3f, -1.0f, 0.0f));
-    }
-    return f;
-}
-
-void autoSlots(Pattern& pat) {
-    auto has = [](std::string s, const char* w) {
-        std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return char(std::tolower(c)); });
-        return s.find(w) != std::string::npos;
-    };
-    int sleeves = 0;
-    for (Panel& p : pat.panels) {
-        if (p.place.slot != Slot::Front) continue; // chosen already
-        if (has(p.name, "back")) p.place.slot = Slot::Back;
-        else if (has(p.name, "sleeve") || has(p.name, "arm")) {
-            const bool right = has(p.name, "right") || (!has(p.name, "left") && sleeves % 2 == 1);
-            p.place.slot = right ? Slot::RightArm : Slot::LeftArm;
-            ++sleeves;
-        } else if (has(p.name, "side")) {
-            p.place.slot = has(p.name, "right") ? Slot::Right : Slot::Left;
-        }
-    }
-}
-
-namespace {
-
-// Arc length of an ellipse quarter from angle 0, tabulated, so a panel's x (arc length) maps to an angle.
-struct EllipseArc {
-    float a, b; // semi-axes along S and R0
-    std::vector<float> len; // at angles i / N * pi
-    static constexpr int N = 128;
-    EllipseArc(float aa, float bb) : a(aa), b(bb), len(N + 1) {
-        float l = 0.0f;
-        glm::vec2 prev(0.0f, b);
-        for (int i = 0; i <= N; ++i) {
-            const float th = float(i) / float(N) * kPi;
-            const glm::vec2 q(a * std::sin(th), b * std::cos(th));
-            if (i) l += glm::length(q - prev);
-            prev = q;
-            len[size_t(i)] = l;
-        }
-    }
-    // (along S, along R0) at arc length x from the front point (x < 0 goes the other way; past half: straight on).
-    glm::vec2 at(float x) const {
-        const float s = x < 0 ? -1.0f : 1.0f;
-        const float want = std::abs(x);
-        if (want >= len.back()) return {s * 0.0f, -b - (want - len.back())}; // (never this far in practice)
-        const auto it = std::lower_bound(len.begin(), len.end(), want);
-        const size_t i = size_t(std::max<ptrdiff_t>(1, it - len.begin()));
-        const float f = len[i] > len[i - 1] ? (want - len[i - 1]) / (len[i] - len[i - 1]) : 0.0f;
-        const float th = (float(i - 1) + f) / float(N) * kPi;
-        return {s * a * std::sin(th), b * std::cos(th)};
-    }
-};
-
-struct SlotFrame {
-    glm::vec3 c, axis, out, side; // panel top centre on the axis; +y of the panel; facing; +x of the panel
-    float across = 0.1f, depth = 0.1f; // ellipse semi-axes (side, out)
-};
-
-SlotFrame slotFrame(const Panel& p, const BodyFrame& b, float gap) {
-    SlotFrame f;
-    const glm::vec3 up(0.0f, 1.0f, 0.0f);
-    const float frontD = std::max(0.02f, b.torsoFrontZ - b.centerZ), backD = std::max(0.02f, b.centerZ - b.torsoBackZ);
-    const glm::vec3 torso(b.centerX, b.shoulderY, b.centerZ);
-    switch (p.place.slot) {
-    case Slot::Front: f = {torso, up, {0, 0, 1}, {}, b.torsoHalfWidth, frontD}; break;
-    case Slot::Back: f = {torso, up, {0, 0, -1}, {}, b.torsoHalfWidth, backD}; break;
-    case Slot::Left: f = {torso, up, {1, 0, 0}, {}, std::max(frontD, backD), b.torsoHalfWidth}; break;
-    case Slot::Right: f = {torso, up, {-1, 0, 0}, {}, std::max(frontD, backD), b.torsoHalfWidth}; break;
-    case Slot::LeftArm:
-    case Slot::RightArm: {
-        const bool left = p.place.slot == Slot::LeftArm;
-        const glm::vec3 dir = glm::normalize(left ? b.leftArmDir : b.rightArmDir);
-        f.c = left ? b.leftShoulder : b.rightShoulder;
-        f.axis = -dir; // the sleeve's top (cap) points back to the shoulder
-        glm::vec3 o = up - glm::dot(up, f.axis) * f.axis;
-        if (glm::length(o) < 1e-3f) o = glm::vec3(0, 0, 1) - glm::dot(glm::vec3(0, 0, 1), f.axis) * f.axis;
-        f.out = glm::normalize(o);
-        f.across = f.depth = b.armRadius;
-        break;
-    }
-    default: f = {torso + glm::vec3(0, 0, b.torsoFrontZ - b.centerZ + 0.25f), up, {0, 0, 1}, {}, 0, 0}; break;
-    }
-    f.side = glm::cross(f.axis, f.out); // so that (side x axis) faces out: counter-clockwise panels face away
-    f.across += gap + p.place.offset.z;
-    f.depth += gap + p.place.offset.z;
-    return f;
-}
-
-} // namespace
-
-glm::vec3 placePoint(const Panel& p, glm::vec2 flat, const BodyFrame& body, float gap) {
-    const glm::vec2 lo = panelMin(p), hi = panelMax(p);
-    const float x = (flat.x - 0.5f * (lo.x + hi.x)) * 0.001f + p.place.offset.x;
-    const float y = (flat.y - hi.y) * 0.001f + p.place.offset.y;
-    const SlotFrame f = slotFrame(p, body, gap);
-    if (!p.place.wrap || p.place.slot == Slot::Free) return f.c + f.axis * y + f.out * f.depth + f.side * x;
-    const EllipseArc arc(f.across, f.depth);
-    const glm::vec2 q = arc.at(x);
-    return f.c + f.axis * y + f.side * q.x + f.out * q.y;
-}
-
-void placePattern(const Pattern& pat, const GarmentMesh& m, const BodyFrame& body, std::vector<glm::vec3>& placed,
-                  std::vector<glm::vec3>& rest, float gap) {
-    placed.resize(m.flat.size());
+void flatRest(const GarmentMesh& m, std::vector<glm::vec3>& rest) {
     rest.resize(m.flat.size());
-    // One frame and arc table per panel (placePoint would rebuild them per vertex).
-    for (size_t pi = 0; pi + 1 < m.panelFirstVertex.size() && pi < pat.panels.size(); ++pi) {
-        const Panel& p = pat.panels[pi];
-        const glm::vec2 lo = panelMin(p), hi = panelMax(p);
-        const SlotFrame f = slotFrame(p, body, gap);
-        const EllipseArc arc(f.across, f.depth);
-        const bool wrap = p.place.wrap && p.place.slot != Slot::Free;
-        for (uint32_t v = m.panelFirstVertex[pi]; v < m.panelFirstVertex[pi + 1]; ++v) {
-            const glm::vec2 q = m.flat[v];
-            const float x = (q.x - 0.5f * (lo.x + hi.x)) * 0.001f + p.place.offset.x;
-            const float y = (q.y - hi.y) * 0.001f + p.place.offset.y;
-            if (wrap) {
-                const glm::vec2 e = arc.at(x);
-                placed[v] = f.c + f.axis * y + f.side * e.x + f.out * e.y;
-            } else {
-                placed[v] = f.c + f.axis * y + f.out * f.depth + f.side * x;
-            }
-            rest[v] = glm::vec3(q * 0.001f, 0.0f);
-        }
-    }
+    for (size_t v = 0; v < m.flat.size(); ++v) rest[v] = glm::vec3(m.flat[v] * 0.001f, 0.0f);
 }
 
 // ---------------------------------------------------------------------------
@@ -1058,14 +775,11 @@ Pattern tshirtPattern(float chestMm, float lengthMm) {
     const float length = std::clamp(lengthMm, 300.0f, 1500.0f);
     pat.panels.push_back(bodyPanel("Front", 0.0f, half, length, 90.0f));
     pat.panels.push_back(bodyPanel("Back", 2.0f * half + 60.0f, half, length, 20.0f));
-    pat.panels[1].place.slot = Slot::Back;
     // Each armhole (front + back) is the cap's length, plus 2% ease.
     const float armhole = edgeLength(pat.panels[0], 2) + edgeLength(pat.panels[1], 6);
     const float sx = 3.0f * half + 120.0f + 190.0f; // 60 mm right of the back
     pat.panels.push_back(sleevePanel("Left sleeve", sx, armhole * 1.02f));
     pat.panels.push_back(sleevePanel("Right sleeve", sx + 440.0f, armhole * 1.02f));
-    pat.panels[2].place.slot = Slot::LeftArm;
-    pat.panels[3].place.slot = Slot::RightArm;
     std::string error;
     auto sew = [&](uint32_t pa, uint32_t ea, float a0, float a1, uint32_t pb, uint32_t eb, float b0, float b1) {
         addSeam(pat, {{pa, ea, a0, a1}, {pb, eb, b0, b1}, false}, error);
@@ -1151,11 +865,6 @@ Json patternToJson(const Pattern& pat) {
         pj.set("notches", std::move(notches));
         pj.set("grain", num(p.grainDegrees));
         pj.set("allowance_mm", num(p.seamAllowance));
-        pj.set("slot", slotId(p.place.slot));
-        Json off = Json::array();
-        for (int k = 0; k < 3; ++k) off.push(num(p.place.offset[k]));
-        pj.set("offset", std::move(off));
-        pj.set("wrap", p.place.wrap);
         panels.push(std::move(pj));
     }
     j.set("panels", std::move(panels));
@@ -1210,11 +919,6 @@ bool patternFromJson(const Json& j, Pattern& out, std::string& error) {
                 p.notches.push_back({uint32_t(nj[0].asNumber(0)), fnum(nj[1], 0.5f)});
         p.grainDegrees = fnum(pj["grain"], 90.0f);
         p.seamAllowance = std::clamp(fnum(pj["allowance_mm"], 10.0f), 0.0f, 200.0f);
-        Slot s;
-        if (pj["slot"].isString() && slotFromId(pj["slot"].asString(), s)) p.place.slot = s;
-        if (pj["offset"].isArray() && pj["offset"].size() == 3)
-            for (int k = 0; k < 3; ++k) p.place.offset[k] = std::clamp(fnum(pj["offset"][size_t(k)], 0.0f), -10.0f, 10.0f);
-        p.place.wrap = pj["wrap"].asBool(true);
         normalizePanel(p);
         std::string why;
         if (!validPanel(p, why, &outlineBudget)) {

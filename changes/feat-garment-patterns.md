@@ -2,10 +2,9 @@
 added: **Garments, part 1** (scripting and the AI assistant for now; the Pattern window follows): pattern panels at
   real size (millimetres, curves, notches, grain line, seam allowance) saved in the project, a T-shirt template
   (front, back, two sleeves, sewn), seams with length and direction checks, even triangulation at a chosen particle
-  distance with seams matched point for point, placement around the body (front, back, sides, arms found from its
-  shape), export as a real-size SVG for printing and sewing (with a 50 mm scale square) or DXF for cutters, and
-  SVG panels read back in. Commands: garment_new, garment_info, garment_add_panel, garment_sew, garment_place,
-  garment_export, garment_import and more.
+  distance with seams matched point for point, export as a real-size SVG for printing and sewing (with a 50 mm
+  scale square) or DXF for cutters, and SVG panels read back in. Commands: garment_new, garment_info,
+  garment_add_panel, garment_sew, garment_export, garment_import and more.
 testers:
   - Any OS: `sculptforge-cli -c "garment_new; garment_export path=shirt.svg"`; open the SVG in a
     browser or print it at 100%: the square is 50 mm, the front is 52 cm wide.
