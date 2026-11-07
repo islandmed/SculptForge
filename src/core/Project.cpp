@@ -1052,6 +1052,35 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
     return true;
 }
 
+namespace {
+
+std::string& autosaveFolder() {
+    static std::string folder;
+    return folder;
+}
+
+// A project's micro "detail" name -> the file (see setProjectAutosaveFolder).
+bool detailFileOf(const std::string& project, const std::string& name, std::filesystem::path& file) {
+    const std::filesystem::path p = fsPath(project), n = fsPath(name);
+    if (n.extension() != ".sfdetail" || n.stem().empty()) return false;
+    if (n.is_absolute()) { // only our own autosave
+        std::error_code ec;
+        const std::string& folder = autosaveFolder();
+        if (folder.empty() || p.filename() != "autosave.sfproj" ||
+            !std::filesystem::equivalent(p.parent_path(), fsPath(folder), ec))
+            return false;
+        file = n;
+        return true;
+    }
+    if (name.find_first_of("/\\:") != std::string::npos || name == "." || name == ".." || n.has_root_path()) return false;
+    file = p.parent_path() / n;
+    return true;
+}
+
+} // namespace
+
+void setProjectAutosaveFolder(const std::string& folder) { autosaveFolder() = folder; }
+
 bool loadProject(const std::string& path, Document& doc, std::string& error) {
     Reader r;
     if (!r.open(path, error)) return false;
@@ -1133,8 +1162,11 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
                         error = r.error;
                         return false;
                     }
-                    std::filesystem::path file = fsPath(dj.asString());
-                    if (file.is_relative()) file = fsPath(path).parent_path() / file;
+                    std::filesystem::path file;
+                    if (!detailFileOf(path, dj.asString(), file)) {
+                        error = "Detail file name is invalid";
+                        return false;
+                    }
                     std::error_code ec;
                     if (!std::filesystem::exists(file, ec)) {
                         error = "The detail file " + utf8(file.filename()) + " is missing: keep it beside " +

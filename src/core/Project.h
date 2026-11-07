@@ -49,6 +49,10 @@ bool isProjectPath(const std::string& path);
 // and so on for more Parts), written in place when it's already there, else as a compact copy that the Part then
 // streams from. `autosave`: the detail files are only named, as last saved (edits since then aren't in them).
 bool saveProject(const std::string& path, const Document& doc, std::string& error, bool autosave = false);
+// A streamed level's detail file is a plain file name resolved beside the project (`<name>.sfdetail`: no folders,
+// so a shared project can't point at other files); only the app's own autosave (`autosave.sfproj` in this folder,
+// set at startup) may name one by its full path (an unsaved level's file in the swap folder, or a saved one).
+void setProjectAutosaveFolder(const std::string& folder);
 // Replaces the scene with the project at `path`. On failure `doc` is untouched.
 // Restores the active Part, sets doc.path, gives every Part an empty
 // edit history and marks the document clean.
