@@ -112,9 +112,11 @@ pen_lift
 pen_rest off
 key ctrl+z
 
-# Without the cap pushed the mouse and its wheel work as ever.
+# Without the cap pushed the mouse and its wheel work as ever (the wheel once the echo is over, kSpaceMouseEchoHold
+# after the cap last moved: spacemouse_tilt.sfui).
 pen_out
 spacemouse_echo off
+wait_value spacemouse_echo == 0 5
 key f
 remember camera_distance d3
 wheel 0.5 0.5 2

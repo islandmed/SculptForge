@@ -206,9 +206,13 @@ private:
     void penRestNoise();
     // spacemouse_echo on: while the virtual cap is pushed, a SpaceMouse driver that doesn't know the app (3DxWare's
     // defaults) moves the system pointer and scrolls the wheel every frame (fenix, Discord 11-06).
-    bool spaceMouseEcho_ = false;
+    // spacemouse_echo scroll: as macOS 3DxWare scrolls for an app it doesn't know: the wheel from the cap's first stir
+    // (inside the app's dead zone), by the cap's push, and on for a quarter second after it is let
+    // go; no pointer motion (a slow tilt zoomed the view away, fenix 11-06).
+    bool spaceMouseEcho_ = false, spaceMouseScrollEcho_ = false;
+    float scrollMomentum_ = 0.0f, scrollMomentumLeft_ = 0.0f;
     std::array<float, 6> virtualAxes_{};
-    void spaceMouseEchoFrame();
+    void spaceMouseEchoFrame(float dt);
     static constexpr SDL_MouseID kDriverMouse = 7; // the driver's own mouse device
     // `snapshot` saves the active mesh; moved* values compare against it. `remember` keeps values for $NAME.
     std::vector<glm::vec3> basePositions_, baseNormals_;

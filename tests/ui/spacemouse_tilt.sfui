@@ -1,0 +1,70 @@
+# A slow turn of the SpaceMouse cap about a horizontal axis, forward / back or sideways (fenix, Discord 11-06, a real
+# SpaceMouse Compact on macOS with 3DxWare): it first
+# turned the view, then turned into a zoom that flew the camera into the model or away to infinity. 3DxWare scrolls
+# the wheel for an app it doesn't know from the cap's first stir, inside our dead zone, and macOS carries the scroll
+# on after the cap is let go; the 0.11.10 echo filter dropped it only while the cap was past the dead zone. Replayed
+# here: the view only turns, keeps its distance and its pivot, and the mouse wheel works again once the echo ends.
+run new_sphere subdivisions=4
+key f
+camera 0 0
+spacemouse 0 0 0 0 0 0 0.1                     # plugged in, cap at rest
+spacemouse_echo scroll
+remember camera_distance d0
+remember camera_pan p0
+
+# A slow tilt: first inside the dead zone (the driver scrolls already, the view holds still)...
+spacemouse 0 0 0 0.06 0 0 1.0
+expect_value camera_pitch == 0
+expect_value camera_distance >= $d0-0.0001
+expect_value camera_distance <= $d0+0.0001
+# ... then past it, held, and let go; the driver's scroll straggles on a moment after.
+spacemouse 0 0 0 0.3 0 0 2.0
+wait 1.2
+expect_value camera_pitch < -10
+expect_value camera_distance >= $d0-0.0001
+expect_value camera_distance <= $d0+0.0001
+expect_value camera_pan >= $p0-0.0001
+expect_value camera_pan <= $p0+0.0001
+shot spacemouse_tilt
+
+# Tilted the other way, the same.
+camera 0 0
+spacemouse 0 0 0 -0.3 0 0 2.0
+wait 1.2
+expect_value camera_pitch > 10
+expect_value camera_distance >= $d0-0.0001
+expect_value camera_distance <= $d0+0.0001
+
+# Rolled sideways (the cap turned about the other horizontal axis), both ways: the view rolls, the same.
+camera 0 0
+spacemouse 0 0 0 0 0.3 0 2.0
+wait 1.2
+expect_value camera_roll > 10
+expect_value camera_distance >= $d0-0.0001
+expect_value camera_distance <= $d0+0.0001
+expect_value camera_pan >= $p0-0.0001
+expect_value camera_pan <= $p0+0.0001
+camera 0 0
+spacemouse 0 0 0 0 -0.3 0 2.0
+wait 1.2
+expect_value camera_roll < -10
+expect_value camera_distance >= $d0-0.0001
+expect_value camera_distance <= $d0+0.0001
+
+# Twisted slowly in the horizontal plane (fenix's screenshot: the Spin bar full, the Zoom bar a little): the view
+# turns, the same.
+camera 0 0
+spacemouse 0 0 0 0 0 0.05 1.0
+spacemouse 0 0 0 0 0 0.3 2.0
+wait 1.2
+expect_value camera_yaw > 10
+expect_value camera_distance >= $d0-0.0001
+expect_value camera_distance <= $d0+0.0001
+expect_value camera_pan >= $p0-0.0001
+expect_value camera_pan <= $p0+0.0001
+
+# The echo is over: the mouse wheel zooms again.
+spacemouse_echo off
+wait_value spacemouse_echo == 0 5
+wheel 0.5 0.5 3
+expect_value camera_distance < $d0-0.01

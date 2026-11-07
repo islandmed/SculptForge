@@ -185,3 +185,38 @@ TEST(spacemouse_settings_json) {
     fromJson(Json(), d); // not an object: untouched
     CHECK(near(d.speed, 4.0f));
 }
+
+// fenix (Discord 11-06): slowly turning the cap about a horizontal axis first turned the view, then zoomed it away.
+// A turn alone only turns (no zoom or pan from Rx or Ry, free or turntable), and the driver's echo counts from the cap's first stir, inside the
+// dead zone, so its scrolling is dropped from the start.
+TEST(spacemouse_tilt_only_turns_and_stirs_early) {
+    SpaceMouseSettings s;
+    for (bool turntable : {false, true}) {
+        s.turntable = turntable;
+        for (float r : {0.1f, 0.3f, -0.6f, 1.0f}) {
+            std::array<float, kSmAxes> a{};
+            a[kSmRx] = r; // forward / back
+            SpaceMouseMotion m = spaceMouseMotion(a, 1.0f / 60.0f, s);
+            CHECK(m.tip != 0.0f && m.zoom == 0.0f && m.panX == 0.0f && m.panY == 0.0f && m.spin == 0.0f && m.roll == 0.0f);
+            a = {};
+            a[kSmRy] = r; // sideways: a roll, none in turntable
+            m = spaceMouseMotion(a, 1.0f / 60.0f, s);
+            CHECK((m.roll != 0.0f) != turntable && m.zoom == 0.0f && m.panX == 0.0f && m.panY == 0.0f && m.spin == 0.0f &&
+                  m.tip == 0.0f);
+        }
+    }
+    s = SpaceMouseSettings(); // dead zone 8%: stirred past 4%
+    std::array<float, kSmAxes> a{};
+    CHECK(!spaceMouseStirred(a, s));
+    a[kSmRx] = 0.03f;
+    CHECK(!spaceMouseStirred(a, s)); // a cap resting a little off centre
+    a[kSmRx] = -0.05f;
+    CHECK(spaceMouseStirred(a, s) && !spaceMouseMotion(a, 1.0f / 60.0f, s).any()); // stirred, not yet moving the view
+    s.deadZone = 0.0f;
+    a[kSmRx] = 0.005f;
+    CHECK(!spaceMouseStirred(a, s));
+    a[kSmRx] = 0.02f;
+    CHECK(spaceMouseStirred(a, s));
+    s.enabled = false; // SpaceMouse off: its driver's scrolling is the user's to keep
+    CHECK(!spaceMouseStirred(a, s));
+}

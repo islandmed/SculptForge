@@ -83,6 +83,7 @@ def changed_files(root, base):
 def words(path):
     stem = os.path.splitext(os.path.basename(path))[0]
     parts = re.findall(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])|[0-9]+", stem)
+    parts.append(stem)  # the whole name too: SpaceMouse.cpp -> ui_spacemouse_pen (a test names it as one word)
     return {p.lower() for p in parts if len(p) >= 4 and p.lower() not in STOP_WORDS}
 
 
@@ -427,7 +428,8 @@ def self_test():
         assert rc("@@ -3 +3 @@\n-  c.cpp)\n+  b.cpp)\n") == "."  # a source list: everything
         assert rc("@@ -1 +1 @@\n-project(y)\n+project(x)\n") == "."
         assert r() == ""
-        assert words("src/app/PanelMicroLevels.cpp") == {"micro", "levels"}
+        assert words("src/app/PanelMicroLevels.cpp") == {"micro", "levels", "panelmicrolevels"}
+        assert "spacemouse" in words("src/app/SpaceMouse.cpp")
     print("impacted.py self-test passed")
     return 0
 

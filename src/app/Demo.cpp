@@ -216,7 +216,7 @@ void Demo::update(float dt) {
                 mouse_.y, int(buttonDown_));
     stride_ = 1;
     if (penResting_) penRestNoise(); // (UiTest.cpp)
-    if (spaceMouseEcho_) spaceMouseEchoFrame();
+    if (spaceMouseEcho_ || spaceMouseScrollEcho_) spaceMouseEchoFrame(dt);
     {
         const auto now = std::chrono::steady_clock::now();
         if (lastFrame_.time_since_epoch().count() != 0)
