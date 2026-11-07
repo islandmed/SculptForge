@@ -1114,6 +1114,11 @@ double Demo::query(const std::string& name, bool& known) const {
         return double(app_.renderer_.coarseDrawnClusters());
     }
     if (name == "stroke_programs") return double(app_.renderer_.strokePrograms()); // compiled before any stroke (warmed)
+    if (name == "render_patch_errors") { // the 3D view drawn once more now: dynamic-topology patch triangles wrong on the GPU
+        app_.benchmarkDrawMs(0);
+        return double(app_.renderer_.patchErrors(app_.doc_.parts[size_t(app_.doc_.activePart)].id, app_.displayedMesh()));
+    }
+    if (name == "render_patches") return double(app_.renderer_.patchCount(app_.doc_.parts[size_t(app_.doc_.activePart)].id));
     if (name == "coarse_pending") return double(app_.renderer_.coarsePendingClusters()); // edited, levels not updated yet
     if (name == "panel_drag_scrolls") return double(ui::DragScrolls()); // #100: drags that scrolled a panel
     if (name == "panel_drag_scroll_y") return double(ui::DragScrollY());  // that panel's scroll after the last one

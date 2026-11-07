@@ -256,6 +256,14 @@ public:
     // are still to be updated (drawn in full until then).
     size_t coarseDrawnClusters() const { return lastCoarseClusters_; }
     size_t coarsePendingClusters() const;
+    // Dynamic topology patches (tests): the triangles of mesh slot `id`'s uploaded patches whose indices on the GPU
+    // (read back) aren't the mesh's triangles now.
+    size_t patchErrors(uint32_t id, const Mesh& mesh);
+    size_t patchCount(uint32_t id) const {
+        for (const MeshSlot& s : slots_)
+            if (s.id == id) return s.patches.size();
+        return 0;
+    }
     // The stroke-only programs (predictive preview, draft normals) compiled so far: drawSlot warms them before a stroke.
     int strokePrograms() const {
         int n = 0;
