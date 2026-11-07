@@ -154,8 +154,9 @@ def main(argv):
     todo = [p for p in paths if keys[p] not in cache]
     if todo and not have_ocr:
         for p in todo:
-            print(f"{p}: not in tools/marks_media_cache.json and tesseract/ffmpeg aren't here; "
-                  "run tools/check_marks_media.py where they are and commit the cache")
+            why = "this check reads the cache only, as CI does" if "--cached-only" in argv else "tesseract/ffmpeg aren't here"
+            print(f"{p}: not in tools/marks_media_cache.json ({why}); "
+                  "run tools/check_marks_media.py where tesseract is and commit the cache")
         return 1
 
     def work(p):
