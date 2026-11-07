@@ -1,4 +1,5 @@
 ---
+highlight: Restart to update: on Linux the previous version now quits, and Discord stops showing SculptForge when you close it (thanks @ebarranco)
 whats_new: After **Restart to update** on Linux, the previous version quits instead of staying hidden in the background (it kept showing SculptForge on Discord). Discord shows the outline cube icon.
 fixed: Linux AppImage: after Restart to update, the previous version hid its window and never quit, so it kept running
   in the background (and, with Show SculptForge on Discord on, kept "Playing SculptForge" on your profile after you

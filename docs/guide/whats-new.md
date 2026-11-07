@@ -5,6 +5,18 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.12
+
+```features
+date: 2026-11-07
+tagline: Your names in your language, a cleaner Restart to update, and the cube is back.
+highlight: Your languages: names you type in Chinese, Japanese or Korean (Parts, layers, folders, brush sets, files) draw with your system's fonts instead of "?"
+highlight: Stencil: clean, sharp groove edges when you sculpt through a stencil, and detailed photos stay even on lighter meshes
+highlight: Restart to update: on Linux the previous version now quits, and Discord stops showing SculptForge when you close it (thanks @ebarranco)
+highlight: SpaceMouse: turning the cap slowly no longer zooms the view away (thanks @fenixpoints)
+highlight: App icon: the outline cube is back, and a fix for garbled small icon sizes on macOS (thanks @tristratos, #156)
+```
+
 ## Version 0.11.11
 
 ```features

@@ -1,4 +1,5 @@
 ---
+highlight: SpaceMouse: turning the cap slowly no longer zooms the view away (thanks @fenixpoints)
 fixed: **SpaceMouse**: turning the cap slowly no longer ends in a zoom that flies the view away (3DxWare's scrolling got
   through while the cap was inside the dead zone, and just after the cap was let go). Thanks @fenixpoints.
 testers:

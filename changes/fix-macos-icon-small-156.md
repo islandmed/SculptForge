@@ -1,4 +1,5 @@
 ---
+highlight: App icon: the outline cube is back, and a fix for garbled small icon sizes on macOS (thanks @tristratos, #156)
 fixed: macOS: the app's small icon (Finder's Get Info thumbnail, list view, 16 and 32 px) was noise; the .icns now
   stores those sizes in the classic RGB + mask form Finder draws everywhere (#156, thanks @tristratos).
 testers:

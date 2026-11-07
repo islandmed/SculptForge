@@ -1,4 +1,5 @@
 ---
+highlight: Stencil: clean, sharp groove edges when you sculpt through a stencil, and detailed photos stay even on lighter meshes
 fixed: **Stencil** edges sculpt as clean grooves instead of a beaded zipper: a built-in pattern made into a Stencil
   (**Use alpha**) is generated again at 1024 px instead of the alpha's 128, whose pixels showed as stair-steps
   along every edge it sculpted.

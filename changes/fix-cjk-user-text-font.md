@@ -1,4 +1,5 @@
 ---
+highlight: Your languages: names you type in Chinese, Japanese or Korean (Parts, layers, folders, brush sets, files) draw with your system's fonts instead of "?"
 whats_new: Names you type in Chinese, Japanese or Korean (Parts, folders, layers, brush sets, files, Library items) draw with your system's fonts instead of **?**, in any interface language.
 fixed: Text people type (Part, folder, layer and brush-set names, file names, Library items, pasted text) with a
   character outside the bundled fonts drew as "?": the Chinese fonts carry only the interface's own characters.

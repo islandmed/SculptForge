@@ -70,6 +70,9 @@
 <li>
 <strong>Linux:</strong> on a machine without a working GPU driver, Mesa&#x27;s software renderer works (slowly): <code>LIBGL_ALWAYS_SOFTWARE=1 sculptforge</code>.
 </li>
+<li>
+<strong>Linux on Apple Silicon (Asahi) and other ARM machines:</strong> use the ARM64 download. The x86_64 one runs there only through the FEX emulator, which stops at once with <code>&lt;jemalloc&gt;: Unsupported system page size</code> on 16 KiB pages; start it in a 4 KiB-page VM with <code>muvm -- ./SculptForge-linux-x86_64.AppImage</code> if you need it.
+</li>
 </ol>
 <p>To see why it stopped, start it from a terminal and read the messages. It prints the OpenGL version and GPU it found at start-up (for example <code>OpenGL 4.6 (Core Profile) Mesa 26.1.8 on ...</code>), or the error, such as <code>OpenGL 3.3 context creation failed</code> or <code>Missing OpenGL function: ...</code>.</p>
 <ul>
