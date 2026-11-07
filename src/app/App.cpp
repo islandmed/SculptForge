@@ -779,6 +779,7 @@ constexpr double kStrokeBudgetSeconds = 0.010; // a frame's share of placing a s
 constexpr float kRightClickSlop = 4.0f;        // pixels a right press may move and still be a click (#22)
 constexpr double kStrokeBacklogSeconds = 0.05; // queued dabs beyond this much work are thinned (strokeTo)
 constexpr size_t kStrokeBacklogMinDabs = 4;    // ... but never fewer dabs than this waiting
+constexpr double kStrokeBacklogFloorSeconds = 0.15; // ... unless that is more than this much work (at least one)
 
 } // namespace
 
@@ -2398,7 +2399,12 @@ void App::strokeTo(float x, float y) {
             const char* env = std::getenv("SF_STROKE_BACKLOG");
             return env && *env ? std::max(0L, std::strtol(env, nullptr, 10)) : -1L;
         }();
-        dabQueue_.thin(strokeBacklogLimit(dabSeconds_, fixedLimit, kStrokeBacklogSeconds, kStrokeBacklogMinDabs));
+        // Slow dabs keep a shorter floor: about kStrokeBacklogFloorSeconds of them (SF_BACKLOG_FLOOR_MS; 0 = always 4).
+        static const double floorSeconds = [] {
+            const char* env = std::getenv("SF_BACKLOG_FLOOR_MS");
+            return env && *env ? std::max(0.0, std::strtod(env, nullptr)) / 1000.0 : kStrokeBacklogFloorSeconds;
+        }();
+        dabQueue_.thin(strokeBacklogLimit(dabSeconds_, fixedLimit, kStrokeBacklogSeconds, kStrokeBacklogMinDabs, floorSeconds));
     } else {
         drainStrokeDabs(0.0); // scripts, UI tests and recordings place every dab at once, as before
     }
