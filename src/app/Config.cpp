@@ -340,6 +340,7 @@ constexpr Gesture kBlenderGestures[] = {
               "frame everything; Emulate Numpad (Preferences > Input) for the number row"},
     {"Paint mask", "M for the Mask brush, then drag (Ctrl+drag unmasks); M again goes back"},
     {"Invert / clear mask", "Ctrl+I / Alt+M"},
+    {"Select a Part", "Alt+Q over it (Alt+click masks in this style), or triple-click it"},
     {"Hide face group", "H over it (Shift+H: show only it, again: everything; Alt+H shows all)"},
     {"Hide outside a rectangle or lasso", "Ctrl+Shift + drag (add Alt: inside; shape in Tool > Visibility); click: "
                                           "isolate the face group, the background shows all"},
