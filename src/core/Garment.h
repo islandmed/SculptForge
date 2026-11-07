@@ -115,7 +115,10 @@ float perimeter(const Panel& p);
 glm::vec2 panelMin(const Panel& p);
 glm::vec2 panelMax(const Panel& p);
 // False (with a reason) for fewer than 3 points, a zero-area or self-crossing outline, or edges shorter than 1 mm.
-bool validPanel(const Panel& p, std::string& error);
+// With `outlineBudget`, the panel's flattened outline points are taken from it (a whole import or load shares one
+// budget of kOutlineBudget); a panel past it is refused.
+constexpr size_t kOutlineBudget = 50000;
+bool validPanel(const Panel& p, std::string& error, size_t* outlineBudget = nullptr);
 // The outline grown outward by `distance` mm (the cutting line), as a closed polyline.
 std::vector<glm::vec2> offsetOutline(const Panel& p, float distance);
 

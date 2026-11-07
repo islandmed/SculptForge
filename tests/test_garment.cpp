@@ -361,6 +361,68 @@ TEST(garment_svg_reader_survives_hostile_input) {
     CHECK(std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() < timeLimit(20.0));
 }
 
+TEST(garment_svg_import_bounds_flattened_curves) {
+    // 512 panels of 39 wild cubic edges each: under the 20,000 input-point cap, but every curve flattens to up to
+    // 512 segments. The import stops at 50,000 outline points in all and says so, quickly.
+    std::string svg = "<svg width=\"100cm\" viewBox=\"0 0 1000 1000\">";
+    std::mt19937 rng(3);
+    for (int k = 0; k < 512; ++k) {
+        svg += "<path d=\"M 0 0";
+        for (int e = 0; e < 39; ++e)
+            svg += " C " + std::to_string(rng() % 1000) + " " + std::to_string(rng() % 1000) + " " + std::to_string(rng() % 1000) + " " +
+                   std::to_string(rng() % 1000) + " " + std::to_string(rng() % 1000) + " " + std::to_string(rng() % 1000);
+        svg += " Z\"/>";
+    }
+    svg += "</svg>";
+    std::vector<Panel> panels;
+    std::string error;
+    const auto start = std::chrono::steady_clock::now();
+    panelsFromSvg(svg, panels, error);
+    CHECK(std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() < timeLimit(2.0));
+    CHECK(error.find("not read") != std::string::npos);
+    // Groups nested past the 64-deep stack: their closing tags don't pop the real groups' transforms.
+    std::string deep = "<svg width=\"100mm\" viewBox=\"0 0 100 100\"><g transform=\"translate(10 0)\">";
+    for (int k = 0; k < 100; ++k) deep += "<g>";
+    for (int k = 0; k < 100; ++k) deep += "</g>";
+    deep += "<rect x=\"0\" y=\"0\" width=\"10\" height=\"10\"/></g></svg>";
+    panels.clear();
+    CHECK(panelsFromSvg(deep, panels, error) == 1);
+    CHECK(!panels.empty() && std::abs(panelMin(panels[0]).x - 10.0f) < 0.01f);
+}
+
+TEST(garment_crossing_check_matches_brute_force) {
+    // The grid crossing check against an all-pairs test on random polygons (many cross, some don't).
+    std::mt19937 rng(11);
+    int crossing = 0, clean = 0;
+    for (int t = 0; t < 400; ++t) {
+        Panel p;
+        const int n = 3 + int(rng() % 40);
+        const bool star = t % 2; // star-shaped: never crosses; else random points: usually crosses
+        for (int k = 0; k < n; ++k) {
+            const float a = 6.2831853f * float(k) / float(n);
+            const float r = 50.0f + float(rng() % 1000);
+            p.points.push_back(star ? glm::vec2(std::cos(a), std::sin(a)) * r : glm::vec2(float(rng() % 2000), float(rng() % 2000)));
+            p.curves.push_back({});
+        }
+        const std::vector<glm::vec2> o = outline(p, 0.5f);
+        const size_t m = o.size();
+        auto cross = [](glm::vec2 a, glm::vec2 b, glm::vec2 c, glm::vec2 d) {
+            auto x = [](glm::vec2 u, glm::vec2 v) { return u.x * v.y - u.y * v.x; };
+            const float d1 = x(b - a, c - a), d2 = x(b - a, d - a), d3 = x(d - c, a - c), d4 = x(d - c, b - c);
+            return ((d1 > 0) != (d2 > 0)) && ((d3 > 0) != (d4 > 0)) && d1 != 0 && d2 != 0 && d3 != 0 && d4 != 0;
+        };
+        bool brute = false;
+        for (size_t i = 0; i < m && !brute; ++i)
+            for (size_t j = i + 2; j < m && !brute; ++j)
+                if (!(i == 0 && j == m - 1)) brute = cross(o[i], o[(i + 1) % m], o[j], o[(j + 1) % m]);
+        std::string why;
+        const bool ok = validPanel(p, why);
+        if (why.find("crosses") != std::string::npos || ok) CHECK(ok == !brute);
+        (brute ? crossing : clean)++;
+    }
+    CHECK(crossing > 50 && clean > 50);
+}
+
 TEST(garment_edits_keep_seams_and_shapes) {
     // Mirror twice: the same panel; area unchanged.
     Pattern pat = tshirtPattern();

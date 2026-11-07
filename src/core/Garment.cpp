@@ -60,7 +60,7 @@ int fineCount(const Panel& p, uint32_t e) {
     const EdgeCurve& c = curveOf(p, e);
     if (!c.curved) return 1;
     const float hull = glm::length(c.c1 - startOf(p, e)) + glm::length(c.c2 - c.c1) + glm::length(endOf(p, e) - c.c2);
-    return std::clamp(int(std::ceil(hull / 1.0f)), 16, 2048);
+    return std::isfinite(hull) ? int(std::clamp(std::ceil(hull), 16.0f, 2048.0f)) : 16;
 }
 // The Bezier parameter at arc-length fraction t.
 float paramAt(const Samples& s, float t) {
@@ -177,7 +177,8 @@ std::vector<glm::vec2> edgePolyline(const Panel& p, uint32_t e, float tolerance)
     // Segments for a flattening error under `tolerance`: a cubic's chord error falls with the square of the count.
     const glm::vec2 a = startOf(p, e), b = endOf(p, e);
     const float bend = std::max(glm::length(a - 2.0f * c.c1 + c.c2), glm::length(c.c1 - 2.0f * c.c2 + b));
-    const int n = std::clamp(int(std::ceil(std::sqrt(0.75f * bend / std::max(tolerance, 0.01f)))), 4, 512);
+    const float want = std::ceil(std::sqrt(0.75f * bend / std::max(tolerance, 0.01f)));
+    const int n = std::isfinite(want) ? int(std::clamp(want, 4.0f, 512.0f)) : 4; // non-finite: validPanel refuses it
     std::vector<glm::vec2> out;
     out.reserve(size_t(n) + 1);
     for (int i = 0; i <= n; ++i) out.push_back(bezier(a, c.c1, c.c2, b, float(i) / float(n)));
@@ -239,16 +240,27 @@ glm::vec2 panelMax(const Panel& p) {
     return p.points.empty() ? glm::vec2(0.0f) : m;
 }
 
-bool validPanel(const Panel& p, std::string& error) {
+bool validPanel(const Panel& p, std::string& error, size_t* outlineBudget) {
     if (p.points.size() < 3) {
         error = p.name + " needs at least 3 points";
         return false;
     }
-    for (glm::vec2 q : p.points)
-        if (!std::isfinite(q.x) || !std::isfinite(q.y) || std::abs(q.x) > 1e6f || std::abs(q.y) > 1e6f) {
+    auto out = [](glm::vec2 q) { return !std::isfinite(q.x) || !std::isfinite(q.y) || std::abs(q.x) > 1e6f || std::abs(q.y) > 1e6f; };
+    for (size_t k = 0; k < p.points.size(); ++k)
+        if (out(p.points[k]) || (k < p.curves.size() && p.curves[k].curved && (out(p.curves[k].c1) || out(p.curves[k].c2)))) {
             error = p.name + " has a point out of range";
             return false;
         }
+    if (outlineBudget) { // curves flatten to up to 512 points each: bound the work across a whole import or load
+        size_t n = 0;
+        for (uint32_t e = 0; e < count(p); ++e) n += edgePolyline(p, e, 0.5f).size() - 1;
+        if (n > *outlineBudget) {
+            *outlineBudget = 0;
+            error = p.name + ": over " + std::to_string(kOutlineBudget) + " outline points in all";
+            return false;
+        }
+        *outlineBudget -= n;
+    }
     for (uint32_t e = 0; e < count(p); ++e)
         if (edgeLength(p, e) < 1.0f) {
             error = p.name + ": edge " + std::to_string(e + 1) + " is shorter than 1 mm";
@@ -264,14 +276,57 @@ bool validPanel(const Panel& p, std::string& error) {
         error = p.name + " has too many points";
         return false;
     }
-    for (size_t i = 0; i < n; ++i)
-        for (size_t j = i + 2; j < n; ++j) {
-            if (i == 0 && j == n - 1) continue;
-            if (segmentsCross(o[i], o[(i + 1) % n], o[j], o[(j + 1) % n])) {
-                error = p.name + "'s outline crosses itself";
+    // Self-crossing check on a uniform grid (about one segment per cell): only segments sharing a cell are tested,
+    // so a valid outline costs about O(n). Hostile outlines that pile segments into few cells hit the budget.
+    glm::vec2 lo(std::numeric_limits<float>::max()), hi(std::numeric_limits<float>::lowest());
+    for (glm::vec2 q : o) lo = glm::min(lo, q), hi = glm::max(hi, q);
+    const int g = std::clamp(int(std::ceil(std::sqrt(double(n)))), 1, 256);
+    const glm::vec2 cell = glm::max((hi - lo) / float(g), glm::vec2(1e-6f));
+    std::vector<std::vector<uint32_t>> grid(size_t(g) * size_t(g));
+    size_t work = 0;
+    const size_t budget = 4000000;
+    for (size_t i = 0; i < n; ++i) {
+        const glm::vec2 a = o[i], b = o[(i + 1) % n];
+        // Walk the cells the segment passes through (grid traversal), testing what is already there.
+        const glm::vec2 pa = (a - lo) / cell, pb = (b - lo) / cell, d = pb - pa;
+        int x = std::clamp(int(pa.x), 0, g - 1), y = std::clamp(int(pa.y), 0, g - 1);
+        const int xe = std::clamp(int(pb.x), 0, g - 1), ye = std::clamp(int(pb.y), 0, g - 1);
+        const int sx = d.x > 0 ? 1 : -1, sy = d.y > 0 ? 1 : -1;
+        const float dtx = d.x != 0 ? std::abs(1.0f / d.x) : std::numeric_limits<float>::infinity();
+        const float dty = d.y != 0 ? std::abs(1.0f / d.y) : std::numeric_limits<float>::infinity();
+        float tx = d.x != 0 ? (sx > 0 ? float(x + 1) - pa.x : pa.x - float(x)) * dtx : dtx;
+        float ty = d.y != 0 ? (sy > 0 ? float(y + 1) - pa.y : pa.y - float(y)) * dty : dty;
+        for (int steps = 0; steps <= 2 * g + 2; ++steps) {
+            std::vector<uint32_t>& c = grid[size_t(y) * size_t(g) + size_t(x)];
+            work += c.size() + 1;
+            if (work > budget) {
+                error = p.name + "'s outline is too complex to check";
                 return false;
             }
+            for (uint32_t j : c) {
+                if (j + 1 == i || (i + 1) % n == j) continue; // neighbours share a point
+                if (segmentsCross(a, b, o[j], o[(j + 1) % n])) {
+                    error = p.name + "'s outline crosses itself";
+                    return false;
+                }
+            }
+            if (c.empty() || c.back() != uint32_t(i)) c.push_back(uint32_t(i));
+            if (x == xe && y == ye) break;
+            // Step to the next cell; on an exact corner take both axes' neighbours so a crossing there is seen.
+            if (std::abs(tx - ty) < 1e-6f) {
+                if (x + sx >= 0 && x + sx < g) grid[size_t(y) * size_t(g) + size_t(x + sx)].push_back(uint32_t(i));
+                if (y + sy >= 0 && y + sy < g) grid[size_t(y + sy) * size_t(g) + size_t(x)].push_back(uint32_t(i));
+                x = std::clamp(x + sx, 0, g - 1), y = std::clamp(y + sy, 0, g - 1);
+                tx += dtx, ty += dty;
+            } else if (tx < ty) {
+                x = std::clamp(x + sx, 0, g - 1);
+                tx += dtx;
+            } else {
+                y = std::clamp(y + sy, 0, g - 1);
+                ty += dty;
+            }
         }
+    }
     return true;
 }
 
@@ -1130,7 +1185,7 @@ bool patternFromJson(const Json& j, Pattern& out, std::string& error) {
     if (j["fabric"].isString()) pat.fabric = j["fabric"].asString().substr(0, 32);
     pat.thickness = std::clamp(fnum(j["thickness_mm"], 2.0f), 0.0f, 100.0f);
     std::vector<int> index; // old panel index -> new (-1: left out)
-    size_t totalPoints = 0;
+    size_t totalPoints = 0, outlineBudget = kOutlineBudget;
     for (const Json& pj : j["panels"].items()) {
         index.push_back(-1);
         if (pat.panels.size() >= 512) break;
@@ -1162,7 +1217,7 @@ bool patternFromJson(const Json& j, Pattern& out, std::string& error) {
         p.place.wrap = pj["wrap"].asBool(true);
         normalizePanel(p);
         std::string why;
-        if (!validPanel(p, why)) {
+        if (!validPanel(p, why, &outlineBudget)) {
             error += (error.empty() ? "" : "; ") + why + " (left out)";
             continue;
         }
