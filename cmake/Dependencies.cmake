@@ -37,6 +37,9 @@ else()
   set(SDL_STATIC ON CACHE BOOL "" FORCE)
   set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
   set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
+  # SDL 3.4 needs the XTest headers for X11 unless told not to; nothing here uses XTest, and the build machines
+  # (CI, the PC's Linux builds) don't all have libxtst-dev.
+  set(SDL_X11_XTEST OFF CACHE BOOL "" FORCE)
   FetchContent_MakeAvailable(SDL3)
 endif()
 
