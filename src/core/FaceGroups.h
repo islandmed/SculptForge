@@ -67,9 +67,27 @@ bool facegroupIsolated(const Mesh& mesh, uint32_t group);
 Mesh deleteHiddenTriangles(const Mesh& mesh);
 // Copy of the triangles with keep[t] != 0, compacted the same way (hidden flags are kept).
 Mesh extractTriangles(const Mesh& mesh, const std::vector<uint8_t>& keep);
+// The general form, for welds and repairs (core/MeshCheck.h): kept triangle t gets the corner ids corners[t]
+// (null: mesh.triangles[t]), each id i standing for vertex source[i] of `mesh` (null: vertex i), whose position and
+// attributes it copies; ids are compacted in order of first use, so one vertex can become several (source repeats)
+// and several one (corners share an id). flip[t] != 0 (null: none) reverses t's winding, its UVs with it.
+struct TriangleRebuild {
+    const std::vector<glm::uvec3>* corners = nullptr;
+    const std::vector<uint32_t>* source = nullptr;
+    const std::vector<uint8_t>* flip = nullptr;
+};
+Mesh rebuildTriangles(const Mesh& mesh, const std::vector<uint8_t>& keep, const TriangleRebuild& how);
+
+// The triangles Split / Delete by selection take (part_split_hidden / _masked / _unmasked, delete_masked).
+// A triangle is masked when the average mask of its three corners is above kMaskedThreshold (so a corner-only
+// or soft-edge mask doesn't take its neighbours); unmasked is every other triangle. Hidden and visible alike.
+enum class TriangleSet : uint8_t { Hidden, Masked, Unmasked };
+inline constexpr float kMaskedThreshold = 0.5f;
+// in[t] = 1 for the triangles in `set`; `count` (optional) receives how many.
+std::vector<uint8_t> trianglesIn(const Mesh& mesh, TriangleSet set, size_t* count = nullptr);
 
 // Adds the face group and visibility commands (face group_*, hide_face group,
-// isolate_face group, show_all, invert_visibility, hide_rect, hide_lasso, delete_hidden).
+// isolate_face group, show_all, invert_visibility, hide_rect, hide_lasso, delete_hidden, delete_masked).
 void registerFaceGroupCommands(CommandRegistry& registry);
 
 } // namespace sf

@@ -1,0 +1,58 @@
+# Split hidden / masked / unmasked and Delete masked (foirgairwolf on Discord), and the per-Part shading mark in
+# the list.
+run new_sphere subdivisions=4 ; part_rename to=Body
+remember triangles all
+# Nothing masked yet: the command refuses.
+run_fails part_split_masked
+expect_value parts == 1
+
+# Mask the right half, split it off: a new Part below, unmasked; one Ctrl+Z puts it back.
+run mask_rect x0=0 y0=-1 x1=1 y1=1
+click "Parts/Masked##part_split"
+expect_value parts == 2
+expect_value active_part == 0
+expect_status into Body masked
+expect "Parts/Body masked"
+expect_value triangles < $all
+shot split-masked
+key ctrl+z
+expect_value parts == 1
+expect_value triangles == $all
+
+# Unmasked: the masked side stays in Body.
+click "Parts/Unmasked##part_split"
+expect_value parts == 2
+expect "Parts/Body unmasked"
+key ctrl+z
+expect_value parts == 1
+
+# Hidden: hide the left half, split it off.
+run mask_clear ; hide_rect x0=0 y0=-1 x1=1 y1=1
+expect_value hidden > 0
+click "Parts/Hidden##part_split"
+expect_value parts == 2
+expect_value hidden == 0
+expect "Parts/Body hidden"
+key ctrl+z
+expect_value parts == 1
+expect_value hidden > 0
+run show_all
+
+# The shading mark in the Parts list: Scene -> Smooth -> Flat -> Scene.
+expect_value part_shading == 0
+click "Parts/##shade Body"
+expect_value part_shading == 1
+click "Parts/##shade Body"
+expect_value part_shading == 2
+shot shading-flat
+click "Parts/##shade Body"
+expect_value part_shading == 0
+
+# Delete masked in Tool > Visibility, undoable.
+run mask_rect x0=0 y0=-1 x1=1 y1=1
+click "Visibility"
+shot delete-masked-button
+click "Delete masked"
+expect_value triangles < $all
+key ctrl+z
+expect_value triangles == $all

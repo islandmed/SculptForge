@@ -1,0 +1,30 @@
+# Merge by Distance and Check Mesh in Tool > Geometry (foirgairwolf on Discord), on a cube whose faces don't share their
+# points (each face nudged 1e-5 apart, so the importer keeps them), with one flipped and one repeated triangle.
+run open path=$SCRIPT_DIR/../data/check_mesh_cube.obj
+expect_value vertices == 24
+click "Geometry##tool.geometry"
+# Six loose faces: six holes. Checking changes nothing.
+click "Check##mesh_check"
+expect_text Duplicate triangles
+expect_value vertices == 24
+# The default distance (a ten-thousandth of the size) catches every nudged copy: 16 of the 24 points merge.
+expect_text 16 points will merge
+shot weld-preview
+click "Merge##weld_points"
+expect_value vertices == 8
+expect_status Merged 16 points
+expect_text The mesh changed: check again
+click "Check##mesh_check"
+expect_text Flipped triangles
+expect_text Non-manifold edges
+shot check-rows
+click "Fix all##mesh_fix"
+expect_status Fixed
+expect_text No problems found
+expect_value triangles == 12
+shot fixed
+# One undo brings every problem back; one more brings back the loose faces.
+key ctrl+z
+expect_value triangles == 13
+key ctrl+z
+expect_value vertices == 24

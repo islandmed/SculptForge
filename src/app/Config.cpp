@@ -480,6 +480,20 @@ void App::initActions() {
         ICON_LC_COPY, "part_duplicate", nullptr, nullptr,
         "Copy the active Part, with its layers and attributes, and make the copy active (also in the Parts list's "
         "right-click menu).");
+    add("part.split_hidden", "Split Hidden", "Tool > Parts", nullptr, [this] { runCommand("part_split_hidden"); }, nullptr,
+        "part_split_hidden", nullptr, [this] { return doc_.mesh.hasHidden(); },
+        "Move the hidden triangles of the active Part into a new Part just below it, shown. One undo step.");
+    add("part.split_masked", "Split Masked", "Tool > Parts", nullptr, [this] { runCommand("part_split_masked"); }, nullptr,
+        "part_split_masked", nullptr, [this] { return doc_.mesh.hasMask(); },
+        "Move the masked triangles (the average mask of their corners above 50%) into a new, unmasked Part just "
+        "below. One undo step.");
+    add("part.split_unmasked", "Split Unmasked", "Tool > Parts", nullptr, [this] { runCommand("part_split_unmasked"); },
+        nullptr, "part_split_unmasked", nullptr, [this] { return doc_.mesh.hasMask(); },
+        "Move the triangles that are not masked into a new Part just below; the masked ones stay. One undo step.");
+    add("geometry.delete_masked", "Delete Masked", "Tool > Visibility", nullptr, [this] { runCommand("delete_masked"); },
+        nullptr, "delete_masked", nullptr, [this] { return doc_.mesh.hasMask(); },
+        "Delete the masked triangles (the average mask of their corners above 50%) of the active Part. Ctrl+Z "
+        "brings them back.");
     add("part.sculpt_under_cursor", "Sculpt the Part under the cursor", "Tool > Parts", "Alt+Q",
         [this] { sculptPartUnderCursor(); }, ICON_LC_MOUSE_POINTER_CLICK, nullptr, nullptr, nullptr,
         "Make the Part under the pointer the one you sculpt, without moving the view (each Part keeps its mask). "

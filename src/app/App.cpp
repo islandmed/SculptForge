@@ -3067,6 +3067,7 @@ void App::drawUi() {
     drawGizmo(); // Transform gizmo handles and panel (Gizmo.cpp)
     drawQRemeshGuides(); // QRemesh Guides curves (PanelRetopo.cpp)
     drawUvEditorOverlay(); // UV seams on the model, the Seam tool's cursor (PanelUvEditor.cpp)
+    drawWeldPreviewOverlay(); // the points Merge by Distance would merge (PanelMeshCheck.cpp)
     drawForgeSphereOverlay(); // the sphere under the cursor (PanelForge Spheres.cpp)
     drawForgeSphereMenu();    // a right click on a sphere
     drawTubeOverlay();        // Draw Tube's trail and cursor, a Tube Part's points (PanelTube.cpp)

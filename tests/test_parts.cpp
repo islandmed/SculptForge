@@ -243,3 +243,81 @@ TEST(part_folders) {
     // A new scene has no folders.
     CHECK(reg.execute(doc, "new_sphere").ok && doc.partFolders.empty());
 }
+
+TEST(part_split_by_selection) {
+    // Split Hidden / Masked / Unmasked (foirgairwolf on Discord): the triangles leave for a new Part below, one undo
+    // step.
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 3.0}}).ok);
+    const size_t total = doc.mesh.triangleCount();
+    CHECK(!reg.execute(doc, "part_split_masked").ok);   // nothing masked
+    CHECK(!reg.execute(doc, "part_split_unmasked").ok); // everything unmasked: nothing would stay
+    CHECK(!reg.execute(doc, "part_split_hidden").ok);
+    doc.mesh.mask.assign(doc.mesh.vertexCount(), 0.0f);
+    for (size_t v = 0; v < doc.mesh.vertexCount(); ++v) doc.mesh.mask[v] = doc.mesh.positions[v].x > 0.0f ? 1.0f : 0.0f;
+    doc.mesh.colors.assign(doc.mesh.vertexCount(), glm::vec3(0.2f, 0.4f, 0.6f));
+    size_t masked = 0;
+    trianglesIn(doc.mesh, TriangleSet::Masked, &masked);
+    CHECK(masked > 0 && masked < total);
+    CHECK(reg.execute(doc, "part_split_masked").ok);
+    CHECK(doc.partCount() == 2 && doc.activePart == 0);
+    CHECK(doc.mesh.triangleCount() == total - masked);
+    CHECK(doc.partMesh(1).triangleCount() == masked && !doc.partMesh(1).hasMask()); // the new Part starts unmasked
+    CHECK(doc.partMesh(1).hasColors() && doc.partMesh(1).colors[0] == glm::vec3(0.2f, 0.4f, 0.6f));
+    CHECK(doc.parts[1].name == doc.parts[0].name + " masked");
+    // One undo brings the source back whole and takes the new Part away; redo does both again.
+    CHECK(reg.execute(doc, "undo").ok);
+    CHECK(doc.partCount() == 1 && doc.mesh.triangleCount() == total);
+    CHECK(reg.execute(doc, "redo").ok);
+    CHECK(doc.partCount() == 2 && doc.mesh.triangleCount() == total - masked && doc.partMesh(1).triangleCount() == masked);
+    CHECK(reg.execute(doc, "undo").ok);
+
+    // Unmasked: the masked side stays.
+    CHECK(reg.execute(doc, "part_split_unmasked").ok);
+    CHECK(doc.mesh.triangleCount() == masked && doc.partMesh(1).triangleCount() == total - masked);
+    CHECK(reg.execute(doc, "undo").ok);
+
+    // Hidden: the new Part shows them.
+    doc.mesh.hidden.assign(total, uint8_t(0));
+    for (size_t t = 0; t < total / 4; ++t) doc.mesh.hidden[t] = 1;
+    CHECK(reg.execute(doc, "part_split_hidden").ok);
+    CHECK(doc.partMesh(1).triangleCount() == total / 4 && !doc.partMesh(1).hasHidden());
+    CHECK(doc.mesh.triangleCount() == total - total / 4 && !doc.mesh.hasHidden());
+    CHECK(reg.execute(doc, "undo").ok);
+    CHECK(doc.partCount() == 1 && doc.mesh.triangleCount() == total);
+
+    // Delete Masked: the mirror of Delete Hidden.
+    CHECK(reg.execute(doc, "delete_masked").ok);
+    CHECK(doc.mesh.triangleCount() == total - masked);
+    CHECK(reg.execute(doc, "undo").ok && doc.mesh.triangleCount() == total);
+    doc.mesh.mask.assign(doc.mesh.vertexCount(), 1.0f);
+    CHECK(!reg.execute(doc, "delete_masked").ok); // everything masked
+    CHECK(!reg.execute(doc, "part_split_masked").ok);
+}
+
+TEST(part_split_linked_copy) {
+    // Splitting a moved linked copy (#94): the new Part stays where the copy is, not at the shared mesh's place.
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 3.0}}).ok);
+    CHECK(reg.execute(doc, "part_duplicate_linked", {{"offset", std::string("3,0,0")}}).ok);
+    const int copy = doc.activePart;
+    CHECK(doc.parts[size_t(copy)].moved());
+    doc.mesh.mask.assign(doc.mesh.vertexCount(), 0.0f);
+    for (size_t v = 0; v < doc.mesh.vertexCount(); ++v) doc.mesh.mask[v] = doc.mesh.positions[v].x > 0.0f ? 1.0f : 0.0f;
+    CHECK(reg.execute(doc, "part_split_masked").ok);
+    CHECK(doc.parts[size_t(copy + 1)].transform == doc.parts[size_t(copy)].transform);
+}
+
+TEST(part_split_mask_threshold) {
+    // A triangle is masked when its corners' average mask is above 0.5 (kMaskedThreshold), not at it.
+    Mesh m;
+    m.positions = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
+    m.triangles = {{0, 1, 2}, {1, 3, 2}};
+    m.mask = {0.5f, 0.5f, 0.5f, 1.0f};
+    size_t n = 0;
+    const auto in = trianglesIn(m, TriangleSet::Masked, &n);
+    CHECK(n == 1 && in[0] == 0 && in[1] == 1);
+    CHECK(trianglesIn(m, TriangleSet::Unmasked)[0] == 1);
+}

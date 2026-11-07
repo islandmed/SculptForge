@@ -1,0 +1,40 @@
+# The Parts / Geometry tools (foirgairwolf on Discord) on a 1024x768 window (CMake: ui_parts_tools_1024), where the
+# window is narrow: no right tray, so Tool opens as a drop-down from the palette bar (the classic layout).
+run ui_look look=classic layout=classic
+expect_value shell_narrow == 1
+expect_value right_tray_shown == 0
+
+# Tool > Parts: the Split row and the shading mark.
+run new_sphere subdivisions=4 ; part_rename to=Body
+run mask_rect x0=0 y0=-1 x1=1 y1=1
+click "Tool##palette.tool"
+# (Parts is open by default: a click would close it)
+click "Parts/Masked##part_split"
+expect_value parts == 2
+click "Parts/##shade Body"
+click "Parts/##shade Body"
+expect_value part_shading == 2
+shot parts-split-shading
+key ctrl+z
+
+# Tool > Visibility: Delete masked beside Delete hidden.
+click "Visibility"
+shot delete-masked-button
+click "Delete masked"
+expect_status Deleted
+key ctrl+z
+
+# Tool > Geometry: Merge by Distance with its live count, then Check Mesh's rows and Fix buttons.
+run open path=$SCRIPT_DIR/../../data/check_mesh_cube.obj
+expect_value vertices == 24
+click "Geometry##tool.geometry"
+expect_text 16 points will merge
+shot weld-preview
+click "Merge##weld_points"
+expect_value vertices == 8
+click "Check##mesh_check"
+expect_text Flipped triangles
+shot check-rows
+click "Fix all##mesh_fix"
+expect_text No problems found
+shot fixed

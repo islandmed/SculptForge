@@ -12,8 +12,8 @@ hiding, reordering, merging and splitting Parts, and how they travel through fil
   [sculpt layers](layers.md).
 - Each Part has its own undo history. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the last change in the active
   Part, and switching Parts doesn't lose the history of the others.
-- Adding, deleting, reordering, merging and splitting Parts are **not undoable**. Merges and
-  deletes ask for confirmation first.
+- Adding, deleting, reordering, merging and splitting Parts are **not undoable**, except **Split hidden**,
+  **Split masked** and **Split unmasked** (one undo step each). Merges and deletes ask for confirmation first.
 - The Parts list highlights the active Part. In the Classic layout the title strip also shows it and its place
   in the list, for example `Part Helmet (2/5)`.
 
@@ -23,7 +23,7 @@ The list is in **Tool > Parts**, which is open in the right tray by default.
 
 ![The Parts sub-palette with several Parts, the active one highlighted](images/parts.jpg)
 
-Each row shows a small picture of the Part, its name, its triangle count and an eye. The pictures are drawn from
+Each row shows a small picture of the Part, its name, its triangle count, its shading and an eye. The pictures are drawn from
 the model the viewport already has on the graphics card, so they cost almost nothing even on very dense Parts,
 and they catch up a moment after you stop changing a Part (not during a stroke).
 
@@ -33,6 +33,7 @@ and they catch up a moment after you stop changing a Part (not during a stroke).
 | Sculpt the Part under the cursor | Point at it and press <kbd>Alt</kbd>+<kbd>Q</kbd> (every input style, as in Blender): it becomes the active Part, the view stays put and each Part keeps its mask |
 | Rename it | Double-click the row (or right-click > **Rename**), type, press <kbd>Enter</kbd> |
 | Hide or show it | Click the eye at the end of the row |
+| Shade it smooth or flat | Click the mark left of the eye: it goes from **as the scene** (dim) to **Smooth** (a disc) to **Flat** (a faceted hexagon) and back. Only this Part changes; the scene's own setting is **Render > Materials > Shading** |
 | Duplicate or delete it | Right-click the row > **Duplicate** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>) or **Delete...** |
 | Make a copy that shares the mesh | Right-click the row > **Linked Duplicate**, or the **Linked Duplicate** button; see [Linked Duplicates](linked-duplicates.md) |
 | See its vertex and triangle counts | Point at the row for a moment |
@@ -170,6 +171,24 @@ meshes the Auto UV takes a while. Scripts can skip it with `keep_texture=false`,
 Both replace the active Part with the pieces. Because a merge keeps each original mesh in its own face group,
 **Split groups** undoes a merge.
 
+### Split hidden, masked or unmasked
+
+The **Split** row (**Hidden**, **Masked**, **Unmasked**) takes part of the active Part out into a **new Part just below it**, in the same folder, shown
+as the source is and shaded the same way. Each is **one undo step**: <kbd>Ctrl</kbd>+<kbd>Z</kbd> puts the
+triangles back and removes the new Part.
+
+| Button | Moves into the new Part | Command |
+|---|---|---|
+| **Split > Hidden** | the hidden triangles; they are shown in the new Part | `part_split_hidden` |
+| **Split > Masked** | the masked triangles; the new Part starts unmasked | `part_split_masked` |
+| **Split > Unmasked** | the triangles that are not masked; the masked ones stay | `part_split_unmasked` |
+
+A triangle counts as **masked when the average mask of its three corners is above 50%**, so a soft mask edge
+splits along its middle and a single masked corner doesn't take its neighbours. UVs, face groups, vertex paint and
+sculpt layers carry over to both sides. [Subdivision levels](subdivision-levels.md) can't be cut: the split is
+made at the level the Part is on, which becomes its base (undo brings the levels back). To delete instead of
+split, use **Delete hidden** or **Delete masked** in **Tool > Visibility**.
+
 ## Extract a shell
 
 **Extract**, in **Tool > Parts**, makes a new Part from the masked part of the active one: a helmet from the
@@ -240,6 +259,8 @@ used.
 | `transform translate=0,0.1,0 folder=true` | Transform the visible Parts in the active Part's folder |
 | `part_merge_down` / `part_merge_visible` | Merge |
 | `part_split_groups` / `part_split_parts` | Split |
+| `part_split_hidden` / `part_split_masked` / `part_split_unmasked` | Split off into a new Part (undoable) |
+| `part_shading mode=flat` | Shade a Part `default` (as the scene), `smooth` or `flat` |
 | `extract thickness=0.02 smooth=5 double=false` | Preview an Extract shell from the mask; `tcorne` / `tborder` for a triangle rim; `accept=true` keeps it at once |
 | `extract_accept` / `extract_cancel` | Keep or remove the Extract preview |
 

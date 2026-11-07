@@ -97,6 +97,7 @@ add_library(sculptforge_core STATIC
   src/core/Masking.cpp
   src/core/Cut.cpp
   src/core/CloseHoles.cpp
+  src/core/MeshCheck.cpp
   src/core/BrushAlpha.cpp
   src/core/Stencil.cpp
   src/core/Stroke.cpp
@@ -465,6 +466,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/WhatsNewPopup.cpp
     src/app/PanelDeform.cpp
     src/app/PanelExtract.cpp
+    src/app/PanelMeshCheck.cpp
     src/app/PanelTimeline.cpp
     src/app/ProofMode.cpp
     src/app/BenchVideo.cpp
@@ -959,6 +961,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(help_console_1080 help_console --size 1920x1080)
     # The S / U / I / O slider on a UI scaled 1.5x (Windows at 150%, #9): it must still open under the cursor.
     sculptforge_ui_test(size_popup_scaled size_popup --size 2400x1350)
+    # The Parts / Geometry tools (foirgairwolf on Discord) at a laptop's and a small window's width: rows fit.
+    sculptforge_ui_test(parts_split_selection_1440 parts_split_selection --size 1440x900)
+    sculptforge_ui_test(mesh_check_1440 mesh_check --size 1440x900)
+    sculptforge_ui_test(parts_tools_1024 sizes/parts_tools_1024 --size 1024x768) # (palettes are drop-downs there)
     # The stroke popup on a UI scaled 1.5x: it opens under the cursor and its items are where they're drawn.
     sculptforge_ui_test(stroke_popup_scaled stroke_popup --size 2400x1350)
     # Library single click (#142) on a UI scaled 1.5x: tiles still take one click.

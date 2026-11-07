@@ -182,6 +182,41 @@ without symmetry, to finish a half model, or to repair a model whose sides have 
 surface still facing outward. Face Groups, vertex paint, UVs and layers come along; subdivision levels are removed
 (undo restores them). `mirror pivot=center` flips it in place about its own centre instead.
 
+## Merge by Distance
+
+**Tool > Geometry > Merge by Distance** merges the points of the active Part that are closer together than the
+**Distance** slider into one. Use it on an import whose triangles don't share their points (an STL, or a model
+another program split at its seams): until they are merged, every triangle is loose and a brush tears the surface
+apart.
+
+- The line under the slider counts the points that will merge, and those points show on the model in orange while
+  the section is open. On meshes with more than 1.5 million points the count updates when you let go of the slider.
+- **0** merges only points exactly on top of each other. The slider goes up to 2% of the Part's size; scripts can use
+  any distance.
+- Points are taken in order: each one within the distance of a point kept before it merges into the nearest of them
+  and takes its position, mask, vertex paint and sculpt layer offsets. Triangles that collapse (two corners on one
+  point) are removed, and so are points no triangle uses.
+- One undo step. Subdivision levels are removed (undo restores them).
+
+## Check Mesh
+
+**Tool > Geometry > Check Mesh** looks for what makes a mesh hard to sculpt, remesh, 3D print or export. **Check**
+counts the problems; it changes nothing. Each problem found gets a row with its count and a **Fix** button that
+changes only what that row names, as one undo step.
+
+| Row | What it is | What Fix does |
+|---|---|---|
+| **Non-manifold edges** | Edges shared by three or more triangles (a fin, a wall inside the mesh) | Each triangle past the first two gets its own copy of the edge, so it comes loose; nothing is deleted |
+| **Holes** | Open boundary loops | Caps each with a patch, as [Close Holes](#close-holes) does |
+| **Duplicate triangles** | Triangles on the same three points as another, either way round | Deletes the copies |
+| **Degenerate triangles** | Triangles that use one point twice | Deletes them |
+| **Zero-area triangles** | Three different points in one line (a sliver) | Collapses each one's shortest edge |
+| **Flipped triangles** | Triangles wound against their neighbours, or a closed piece that is inside out | Turns them to match the rest of their piece, and closed pieces right way out |
+| **Isolated points** | Points no triangle uses | Removes them |
+
+**Fix all** fixes every row except **Holes**, in one undo step: a mesh can be open on purpose (a cloth panel, a
+mask, a relief), so holes are only capped when you click their own **Fix**. After a fix the list checks again.
+
 ## LOD chains
 
 A level-of-detail chain is a series of lighter copies of the model for game engines: LOD0 is the full sculpt, and
@@ -214,7 +249,8 @@ See [Exporting](exporting.md) for these exports and their options.
 
 ## Undo and safety
 
-Subdivide, remesh, Quad Remesh, decimate, Mirror And Weld, Mirror and delete hidden are single undo steps on the
+Subdivide, remesh, Quad Remesh, decimate, Mirror And Weld, Mirror, Merge by Distance, every Check Mesh fix and
+delete hidden are single undo steps on the
 active Part. They can use a lot of memory on dense meshes, and undo keeps a full copy of the previous mesh for
 each of them. Before a big change on a heavy sculpt:
 
@@ -233,6 +269,9 @@ each of them. Before a big change on a heavy sculpt:
 | `close_holes` | `max_edges` closes only holes with at most that many boundary edges (default 0: all); `refine` (default true; false: as few triangles as possible); `new_group` (default true) |
 | `mirror_and_weld` | `axis` x, y, z or several, e.g. `xz` (default x); `side` positive (default) or negative |
 | `mirror` | `axis` (default x); `pivot` origin (default) or center |
+| `weld_points` | `distance` in scene units (0: only exactly coincident points); `preview=true` only counts them |
+| `mesh_check` | Lists the problems, e.g. `holes=2 flipped=14` |
+| `mesh_fix` | `issue` non_manifold, holes, duplicate, degenerate, zero_area, flipped, isolated or all (all but holes) |
 | `export_lods` | `path` (base name), `levels` 1-8 including LOD0 (default 4), `ratio` 0.1-0.9 (default 0.5) |
 
 ```sh
