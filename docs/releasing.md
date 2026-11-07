@@ -62,6 +62,12 @@ the run. `scripts/release.sh X.Y.Z` then only promotes: step `bump` checks main 
 waits for staging's Packages run and checks it, step `tag` tags **exactly that commit** (main must be it). The Release
 workflow takes that run's packages unchanged, verifies them, smoke-tests them, signs and publishes.
 
+**The next batch stages while this one promotes.** A promote holds a lock (`sf-promoting` in the git common dir,
+with its pid) from start to end. `scripts/release.sh X.Y+1 --stage` may run at the same time: staging, its CI, its
+packages and T1 go ahead, and only main's fast-forward waits for the lock (`SF_PROMOTE_WAIT_MIN`, default 180).
+If the promote pushed release paperwork to main meanwhile (site, feed, What's New: `tools/release/paperwork_only.py`),
+the batch lands as a merge on top of it; anything else on main stops as before. A dead holder's lock doesn't count.
+
 What makes a run promotable (tools/release/staged_run.py, used by release.sh steps ci and tag and by release.yml
 `locate`; refused otherwise, nothing is rebuilt silently):
 - packages.yml of this repository, triggered by a **push** to `staging` for exactly the tagged commit: never a
