@@ -14,7 +14,7 @@ added: **Panels in their own windows** (multi-monitor): any palette, the User Gu
   by Richard Throgmorton (MakIt3D), Founding Member #1's Member Request.
 testers:
   - Windows, two monitors: Tool palette header > Open in its own window; drag it to the second monitor; sculpt a few
-    strokes, change Draw Size in the panel; quit and start again: the panel is back on the second monitor.
+    strokes, change the brush Size in the panel; quit and start again: the panel is back on the second monitor.
   - Windows at 150% on one monitor: the panel window's text is sharp and the same size as the main window's.
   - F1 (Controls) > Open in its own window; close it; press F1 again: it opens on the monitor it was on. Press B with
     the panel focused: the brush picker opens (shortcuts work from a panel).
