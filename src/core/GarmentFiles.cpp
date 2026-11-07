@@ -471,6 +471,7 @@ int panelsFromSvg(const std::string& svg, std::vector<Panel>& out, std::string& 
     std::vector<bool> ours; // shapes marked class="sew" (a SculptForge pattern: only those are panels)
     size_t budget = 200000;  // path commands
     size_t points = 0;
+    size_t deepGroups = 0; // <g> past the 64-deep stack: counted, so their </g> don't pop real groups
     bool sawSvg = false;
     for (size_t i = 0; i < svg.size();) {
         const size_t lt = svg.find('<', i);
@@ -498,7 +499,8 @@ int panelsFromSvg(const std::string& svg, std::vector<Panel>& out, std::string& 
         if (tag.empty() || tag[0] == '?' || tag[0] == '!') continue; // declarations, DOCTYPE (never expanded)
         if (tag[0] == '/') {
             if (tag.compare(1, 1, "g") == 0 && (tag.size() == 2 || std::isspace(static_cast<unsigned char>(tag[2])))) {
-                if (stack.size() > 1) stack.pop_back();
+                if (deepGroups) --deepGroups;
+                else if (stack.size() > 1) stack.pop_back();
             }
             continue;
         }
@@ -521,8 +523,10 @@ int panelsFromSvg(const std::string& svg, std::vector<Panel>& out, std::string& 
             continue;
         }
         if (el == "g") {
-            if (!selfClosing) stack.push_back(m);
-            if (stack.size() > 64) stack.pop_back();
+            if (!selfClosing) {
+                if (stack.size() < 64) stack.push_back(m);
+                else ++deepGroups;
+            }
             continue;
         }
         std::vector<Shape> found;
@@ -578,7 +582,8 @@ int panelsFromSvg(const std::string& svg, std::vector<Panel>& out, std::string& 
         return 0;
     }
     const bool onlyOurs = std::find(ours.begin(), ours.end(), true) != ours.end();
-    int added = 0, rejected = 0;
+    int added = 0, rejected = 0, skipped = 0;
+    size_t outlineBudget = kOutlineBudget;
     for (size_t k = 0; k < shapes.size(); ++k) {
         if (onlyOurs && !ours[k]) continue;
         const Shape& s = shapes[k];
@@ -589,13 +594,26 @@ int panelsFromSvg(const std::string& svg, std::vector<Panel>& out, std::string& 
             p.points.push_back(conv(s.pts[e]));
             p.curves.push_back({bool(s.curved[e]), conv(s.ctrl[e][0]), conv(s.ctrl[e][1])});
         }
-        // Drop points closer than 1 mm to the one before (exporters repeat points).
-        for (size_t e = p.points.size(); e-- > 1 && p.points.size() > 3;)
-            if (glm::length(p.points[e] - p.points[e - 1]) < 1.0f && !p.curves[e - 1].curved) {
-                p.points.erase(p.points.begin() + long(e));
-                p.curves[e - 1] = p.curves[e];
-                p.curves.erase(p.curves.begin() + long(e));
+        // Drop points closer than 1 mm to the one kept before (exporters repeat points); the dropped point's
+        // outgoing curve becomes the kept point's.
+        {
+            std::vector<glm::vec2> pts;
+            std::vector<EdgeCurve> cur;
+            pts.reserve(p.points.size());
+            cur.reserve(p.curves.size());
+            size_t left = p.points.size();
+            for (size_t e = 0; e < p.points.size(); ++e) {
+                if (!pts.empty() && left > 3 && !cur.back().curved && glm::length(p.points[e] - pts.back()) < 1.0f) {
+                    cur.back() = p.curves[e];
+                    --left;
+                    continue;
+                }
+                pts.push_back(p.points[e]);
+                cur.push_back(p.curves[e]);
             }
+            p.points = std::move(pts);
+            p.curves = std::move(cur);
+        }
         if (p.points.size() == 2) { // two points joined by a curve and a line (or two curves): split each curve
             Pattern one;
             one.panels.push_back(std::move(p));
@@ -603,10 +621,14 @@ int panelsFromSvg(const std::string& svg, std::vector<Panel>& out, std::string& 
                 if (one.panels[0].curves[e].curved) splitEdge(one, 0, e, 0.5f);
             p = std::move(one.panels[0]);
         }
+        if (!outlineBudget) {
+            ++skipped;
+            continue;
+        }
         normalizePanel(p);
         std::string why;
-        if (!validPanel(p, why)) {
-            ++rejected;
+        if (!validPanel(p, why, &outlineBudget)) {
+            ++(outlineBudget ? rejected : skipped);
             continue;
         }
         out.push_back(std::move(p));
@@ -614,6 +636,10 @@ int panelsFromSvg(const std::string& svg, std::vector<Panel>& out, std::string& 
     }
     if (!added) error = shapes.empty() ? "No closed shapes in the SVG" : "No usable panels in the SVG (" + std::to_string(rejected) + " shapes skipped)";
     else if (rejected) error = std::to_string(rejected) + " shapes skipped (open, crossing or too small)";
+    if (skipped) {
+        const std::string more = std::to_string(skipped) + " shapes not read (over " + std::to_string(kOutlineBudget) + " outline points in all)";
+        error = error.empty() ? more : error + "; " + more;
+    }
     return added;
 }
 
