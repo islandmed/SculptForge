@@ -44,6 +44,8 @@ struct BrushAlpha {
     static const std::vector<BrushAlpha>& builtins();
     // A built-in by name, ignoring case, spaces, '_' and '-' ("none" = Round); false for unknown names.
     static bool builtin(const std::string& name, BrushAlpha& out);
+    // A built-in pattern made at `size` x `size` (the Stencil's, which spans the view: 128 shows its pixels there).
+    static bool builtinAt(const std::string& name, int size, BrushAlpha& out);
     // One line on what a built-in is for (empty for unknown names), and all their names for messages.
     static std::string builtinHelp(const std::string& name);
     static std::string builtinNames();

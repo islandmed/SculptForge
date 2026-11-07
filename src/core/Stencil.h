@@ -16,6 +16,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace sf {
 
@@ -23,6 +24,10 @@ class CommandRegistry;
 
 struct Stencil {
     std::shared_ptr<const Image> image; // null = no stencil (straight from the file; inverted on sampling)
+    // The image halved (box filtered) while it stays 512 px or more: where a dab's vertices are many pixels apart it
+    // reads a disc of taps from the level that resolves them (finer levels' square pixels never stair-step an edge
+    // at the mesh's scale, as levels down to 128 px did).
+    std::shared_ptr<const std::vector<Image>> mips;
     std::string name, path;             // shown in the Stencil section; path empty for one made from an alpha
     // Placement. `center` in canvas fractions (0..1 across, 0..1 down); `size` the image's height as a fraction of the
     // canvas height (its width follows the image's aspect); `angle` radians, counter-clockwise as seen.
@@ -44,14 +49,22 @@ struct Stencil {
     // The reverse: where image coordinates (u, v) land on the canvas (corners, handles).
     glm::vec2 canvasPoint(glm::vec2 uv, float canvasAspect) const;
     // At image coordinates: the brightness the sculpt brushes take (luminance x the pixel's alpha, inverted), and
-    // the colour (linear) with how much of it Vertex Paint lays (.a: the pixel's alpha).
-    float value(glm::vec2 uv) const;
-    glm::vec4 color(glm::vec2 uv) const;
+    // the colour (linear) with how much of it Vertex Paint lays (.a: the pixel's alpha). `spacing`: how many image
+    // pixels apart the vertices reading it are; past 1.5 the read averages a disc that wide (a fine photo on a
+    // light mesh then gives each vertex its neighbourhood's brightness, not one pixel's: no noise, no shimmer).
+    float value(glm::vec2 uv, float spacing = 0.0f) const;
+    glm::vec4 color(glm::vec2 uv, float spacing = 0.0f) const;
 
     // Makes a stencil from an image (`image` empty: clears it); placement kept.
     void set(Image image, std::string name, std::string path);
     // Centred, the image's height 80% of the canvas's, upright.
     void resetPlacement();
+
+private:
+    const Image& level(int l) const; // 0 the image, l > 0 mips[l - 1] (the smallest past the end)
+    float valueAt(const Image& img, glm::vec2 uv) const;
+    glm::vec4 colorAt(const Image& img, glm::vec2 uv) const;
+    template <class T, class Read> T disc(glm::vec2 uv, float spacing, Read&& read) const;
 };
 
 // A stencil as one dab sees it: the view it was made in, and the symmetry copy the dab is for (the mirror's
@@ -61,6 +74,11 @@ struct StencilView {
     glm::mat4 viewProj{1.0f};
     float canvasAspect = 1.0f;
     SymCopy copy; // identity: the stroke itself
+    float spacing = 0.0f; // how many image pixels apart the dab's vertices show (0: read point by point)
+
+    // Sets `spacing` for a dab of `radius` at `center` holding `vertices` vertices: its circle on screen shared out
+    // evenly among them, in image pixels.
+    void setSpacing(const glm::vec3& center, const glm::vec3& viewDir, float radius, size_t vertices);
 
     bool active() const { return stencil && stencil->active(); }
     // The canvas point (fractions) a world point shows at; false behind the camera.

@@ -14,6 +14,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <cmath>
+#include <tuple>
 
 using namespace sf;
 
@@ -188,10 +189,139 @@ TEST(stencil_commands) {
     CHECK(reg.execute(doc, "brush_set_alpha", {{"name", "cracks"}}).ok);
     CHECK(reg.execute(doc, "stencil_load", {{"alpha", true}, {"reset", true}}).ok);
     CHECK(doc.stencil.active() && doc.stencil.name == "Cracks");
+    CHECK(doc.stencil.image->width == 1024); // a built-in pattern made again at the Stencil's size (the alpha's is 128)
+    CHECK(doc.brushAlpha.width == 128);
     CHECK(reg.execute(doc, "stencil_set", {{"x", 0.25}, {"angle", 450.0}, {"size", 100.0}, {"opacity", 2.0}, {"tile", true}}).ok);
     CHECK(near(doc.stencil.center.x, 0.25f) && near(glm::degrees(doc.stencil.angle), 90.0f, 1e-3f));
     CHECK(doc.stencil.size == 20.0f && doc.stencil.opacity == 1.0f && doc.stencil.tile);
     CHECK(reg.execute(doc, "stencil_set", {{"visible", false}}).ok && !doc.stencil.active());
     CHECK(reg.execute(doc, "stencil_clear", {}).ok && !doc.stencil.image);
     CHECK(!reg.execute(doc, "stencil_load", {{"path", "/nonexistent/stencil.png"}}).ok);
+}
+
+namespace {
+// A straight groove across the view at `angleDeg`, its profile as the Cobblestone pattern's (sqrt of a smoothstep:
+// steep at the floor), `halfWidth` canvas heights; w x w pixels.
+Image grooveImage(int w, float angleDeg, float halfWidth) {
+    Image img = blackImage(w, w);
+    const glm::vec2 dir(std::cos(glm::radians(angleDeg)), std::sin(glm::radians(angleDeg)));
+    for (int y = 0; y < w; ++y)
+        for (int x = 0; x < w; ++x) {
+            const glm::vec2 p((x + 0.5f) / w - 0.5f, (y + 0.5f) / w - 0.5f);
+            const float d = std::abs(p.x * dir.y - p.y * dir.x); // distance from the line through the centre
+            float t = std::clamp(d / halfWidth, 0.0f, 1.0f);
+            t = t * t * (3.0f - 2.0f * t);
+            const uint8_t g = uint8_t(std::lround(std::sqrt(t) * 255.0f));
+            for (int k = 0; k < 3; ++k) img.rgba[(size_t(y) * size_t(w) + size_t(x)) * 4 + size_t(k)] = g;
+        }
+    return img;
+}
+// Sculpts Standard dabs along the groove of `st` (laid over topView, the plane 2 x 2 world = the canvas), and returns
+// the roughness along it: vertices binned by their distance from the groove line, the p99 of how far each is from its
+// bin's mean height, over the groove's depth. A clean groove's height depends on the distance alone (0); beads along
+// it don't.
+float grooveRoughness(const Stencil& st, float angleDeg, int resolution) {
+    Document doc = makeDoc(makePlane(resolution));
+    Mesh& m = doc.mesh;
+    // The groove on the plane: canvas y runs along +z (topView), so the image's (x, y) is the world's (x, z).
+    const glm::vec3 along(std::cos(glm::radians(angleDeg)), 0.0f, std::sin(glm::radians(angleDeg)));
+    CHECK(doc.sculptor.beginStroke(m, "Standard"));
+    for (float s = -0.6f; s <= 0.6f; s += 0.01f) {
+        DabParams p = topDab(along * s, 0.25f);
+        p.strength = 0.3f;
+        p.stencil = {&st, topView(), 1.0f};
+        doc.sculptor.dab(m, doc.bvh, BrushType::Standard, p, Symmetry{false, false, false});
+    }
+    doc.sculptor.endStroke();
+    const glm::vec3 across = glm::cross(along, glm::vec3(0, 1, 0));
+    // Each bin's heights against a straight line through them (height by distance), so a steep wall inside one bin
+    // isn't counted as roughness; what is left is how the height wanders along the groove.
+    constexpr int kBins = 60;
+    constexpr float kReach = 0.15f; // world units each side of the groove line
+    struct Fit { double n = 0, x = 0, y = 0, xx = 0, xy = 0; };
+    std::vector<Fit> fit(kBins);
+    std::vector<std::tuple<int, float, float>> samples; // bin, distance, height
+    float lo = 1e9f, hi = -1e9f;
+    for (const glm::vec3& v : m.positions) {
+        if (std::abs(glm::dot(v, along)) > 0.3f) continue; // the stroke's even middle
+        const float d = std::abs(glm::dot(v, across));
+        if (d >= kReach) continue;
+        const int b = std::min(int(d / kReach * kBins), kBins - 1);
+        Fit& f = fit[size_t(b)];
+        f.n += 1; f.x += d; f.y += v.y; f.xx += double(d) * d; f.xy += double(d) * v.y;
+        samples.emplace_back(b, d, v.y);
+        lo = std::min(lo, v.y);
+        hi = std::max(hi, v.y);
+    }
+    std::vector<float> dev;
+    for (auto [b, d, y] : samples) {
+        const Fit& f = fit[size_t(b)];
+        const double den = f.n * f.xx - f.x * f.x;
+        const double k = std::abs(den) > 1e-18 ? (f.n * f.xy - f.x * f.y) / den : 0.0;
+        const double c = (f.y - k * f.x) / f.n;
+        dev.push_back(float(std::abs(y - (c + k * d))));
+    }
+    std::sort(dev.begin(), dev.end());
+    const float depth = std::max(hi - lo, 1e-9f);
+    return dev.empty() ? 1.0f : dev[size_t(double(dev.size() - 1) * 0.99)] / depth;
+}
+} // namespace
+
+TEST(stencil_groove_walls_are_smooth_along_the_groove) {
+    // A Cobblestone-like groove, 30 degrees across the plane's grid, about three vertices wide each side: its walls
+    // and floor must follow the groove, not bead along the triangles (#155, the 0.11.11 What's New shots).
+    const float angle = 30.0f;
+    Stencil st;
+    st.set(grooveImage(1024, angle, 0.02f), "groove", "");
+    st.size = 1.0f;
+    const float r = grooveRoughness(st, angle, 160);
+    CHECK(r < 0.01f);
+    // The cause in 0.11.11: the pattern at the alpha's 128 px, its pixels stair-stepping along the groove.
+    Stencil coarse;
+    coarse.set(grooveImage(128, angle, 0.02f), "groove", "");
+    coarse.size = 1.0f;
+    CHECK(grooveRoughness(coarse, angle, 160) > 2.0f * r);
+}
+
+TEST(stencil_fine_image_on_a_light_mesh_sculpts_evenly) {
+    // A 2048 px one-pixel checker over the view: each vertex of a light mesh is many pixels from the next, so read
+    // point by point it got whatever pixel it landed on (noise that shimmers as the stencil moves); averaged over the
+    // vertices' spacing it is an even grey, so the stroke raises an even plateau.
+    Image checker = blackImage(2048, 2048);
+    for (int y = 0; y < 2048; ++y)
+        for (int x = 0; x < 2048; ++x)
+            if ((x + y) % 2 == 0)
+                for (int k = 0; k < 3; ++k) checker.rgba[(size_t(y) * 2048 + size_t(x)) * 4 + size_t(k)] = 255;
+    Stencil st;
+    st.set(checker, "checker", "");
+    CHECK(st.mips && st.mips->size() == 2); // 1024, 512 (no coarser: their square pixels would stair-step edges)
+    st.size = 1.0f;
+    // The plateau's unevenness (sd / mean of the heights along the stroke's middle), with and without the stencil:
+    // the stencil may add next to nothing to what the stroke itself leaves on the grid.
+    auto unevenness = [&](int res, const Stencil* with) {
+        Document doc = makeDoc(makePlane(res));
+        Mesh& m = doc.mesh;
+        CHECK(doc.sculptor.beginStroke(m, "Standard"));
+        for (float s = -0.5f; s <= 0.5f; s += 0.02f) {
+            DabParams p = topDab(glm::vec3(s, 0, 0), 0.3f);
+            p.strength = 0.3f;
+            if (with) p.stencil = {with, topView(), 1.0f};
+            doc.sculptor.dab(m, doc.bvh, BrushType::Standard, p, Symmetry{false, false, false});
+        }
+        doc.sculptor.endStroke();
+        double sum = 0, sq = 0, n = 0;
+        for (const glm::vec3& v : m.positions)
+            if (std::abs(v.x) < 0.3f && std::abs(v.z) < 0.05f) {
+                sum += v.y;
+                sq += double(v.y) * v.y;
+                n += 1;
+            }
+        const double mean = sum / n;
+        return mean > 0.0 ? std::sqrt(std::max(0.0, sq / n - mean * mean)) / mean : 1.0;
+    };
+    for (int res : {40, 160}) {
+        const double plain = unevenness(res, nullptr), stencilled = unevenness(res, &st);
+        std::printf("  %d cells: plateau sd / mean %.4f (no stencil %.4f)\n", res, stencilled, plain);
+        CHECK(stencilled < plain + 0.01); // (point by point: 0.065 at 40 cells, 0.17 at 160)
+    }
 }
