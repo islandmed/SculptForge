@@ -50,10 +50,24 @@ inline constexpr Word kWords[] = {
     {0xD4F75918FABCC503ull, 3, "bridge", "Bridge"},            // W12
 };
 
-// Today's spelling of `s`: every old word in it replaced, keeping its case (lower, Capitalised or UPPER).
-// Returns `s` unchanged when it holds none. Only for names SculptForge itself wrote (ids, keys, command and value
-// names, archive paths), never for user text or file-system paths.
+// Whole names renamed where the word alone is an everyday one (a user's own brush may hold it): matched only as the
+// entire string, ASCII case ignored. N1..N2 in docs/legal/trademarks.md.
+struct Name {
+    uint64_t hash;        // of the old name, lower case
+    uint8_t length;       // its length
+    std::string_view now; // today's name
+};
+inline constexpr Name kNames[] = {
+    {0x71FEDAD706F8BDF4ull, 25, "brush.recipe.Stone Carve"}, // N1: the built-in recipe's action id
+    {0xA8D1CB6C0FF343FCull, 12, "Stone Carve"},              // N2: its name
+};
+
+// Today's spelling of `s`: a whole old name (kNames) replaced, or every old word in it, keeping its case (lower,
+// Capitalised or UPPER). Returns `s` unchanged when it holds none. Only for names SculptForge itself wrote (ids,
+// keys, command and value names, archive paths), never for user text or file-system paths.
 inline std::string modernize(std::string_view s) {
+    for (const Name& n : kNames)
+        if (s.size() == n.length && hash(s) == n.hash) return std::string(n.now);
     std::string out;
     out.reserve(s.size() + 8);
     for (size_t i = 0; i < s.size();) {

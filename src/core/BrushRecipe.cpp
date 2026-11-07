@@ -319,7 +319,7 @@ std::vector<BrushRecipe> builtinBrushRecipes() {
     }
     {
         BrushRecipe r;
-        r.name = "Stone Chisel";
+        r.name = "Stone Carve";
         r.description = "Scrapes hard planes and breaks them up with cracks for rocks and ruins.";
         r.depth = -0.25f;
         r.plane = BrushRecipe::Plane::Scrape;
