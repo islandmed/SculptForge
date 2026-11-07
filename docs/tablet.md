@@ -14,6 +14,9 @@ Open **Preferences > Tablet** to check the pen and tune it:
   in its own mouse mode (Wacom: Mapping > Mode > Mouse; XP-Pen and Huion: Relative / Mouse mode). While the pen is
   in range SculptForge draws the arrow at the brush and hides the system's, which sits where the pen is on the
   tablet; clicks land at the arrow. Off (pen mode, the default): the cursor is where the pen is.
+- **View speed**: how far the pen turns, pans and zooms the view per pixel, 0.10 to 2.00; 1.00 (the default) moves
+  it as the mouse does. A tablet spreads its whole area over the screen, so a short pen movement crosses many
+  pixels: if orbiting with the pen spins the model too fast, turn it down. The mouse keeps its own speed.
 - **Pressure meter**: the pressure the tablet reports, and what brushes get after the curve below.
 - **Draw-test area**: draw in it with the pen; the stroke is as thick as the brush pressure and the line along
   the bottom plots the pressure along the stroke. Good for checking a light touch and a full press.
@@ -106,7 +109,7 @@ The settings and the curve are in `src/core/Tablet.h` (unit tests: `tests/test_t
 handling and the preferences panel in `src/app/Tablet.cpp`. UI tests drive a simulated pen with real SDL pen
 events plus the mouse events SDL 3.2 synthesizes from them (which the app ignores: it makes the pen's mouse events
 itself, `App::penMouseEvents`): `pen_stroke`, `pen_drag_item`, `pen_button`, `pen_hover`, `pen_enter`, `pen_drag`,
-`pen_pressure`, `pen_out`, `pen_new`, `pen_lost`, `pen_stream`, `sdl_pen_mouse`, `tablet_plug` and `tablet_unplug`
+`pen_pressure`, `pen_tap`, `pen_out`, `pen_new`, `pen_lost`, `pen_stream`, `sdl_pen_mouse`, `tablet_plug` and `tablet_unplug`
 (documented in `src/app/UiTest.cpp`); `tests/ui/pen_ui_windows.sfui` replays #95 (pen taps on brushes, out of
 range and back, a second brush, back to the canvas) for Windows Ink, a Huion-style pen + mouse stream, SDL's stuck
 pen state and Wintab-style mouse input; `tests/ui/tablet.sfui`

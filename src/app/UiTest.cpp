@@ -1169,6 +1169,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "brush_pressure") return app_.strokePressure();
     if (name == "stroking") return app_.drag_ == App::Drag::Stroke ? 1.0 : 0.0;
     if (name == "tablet_mouse_mode") return app_.uiPrefs_.tablet.mouseMode ? 1.0 : 0.0;
+    if (name == "tablet_view_speed") return double(app_.uiPrefs_.tablet.viewSpeed);
     if (name == "perf_trace") return perftrace::on() ? 1.0 : 0.0; // Help > Record a performance trace
     if (name == "perf_trace_long_frames" || name == "perf_trace_strokes" || name == "perf_trace_commands") {
         std::ifstream in(std::filesystem::path(std::u8string(reinterpret_cast<const char8_t*>(perftrace::path().data()),
@@ -2649,6 +2650,28 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             ++testPen_;
         });
         wait(0.1f);
+    } else if (verb == "pen_tap") {
+        // pen_tap LABEL [enter]: a quick tap on the item, down and up within one frame (a pen's tap is often shorter
+        // than a frame at 240 samples a second); enter: the pen only now comes into range there, no hover before it.
+        if (!need(1)) return false;
+        const std::string label = w[1];
+        const bool enter = std::find(w.begin() + 2, w.end(), "enter") != w.end();
+        auto centre = std::make_shared<ImVec2>();
+        steps_.push_back([this, line, label, centre](float t) {
+            if (findItem(label, *centre)) return true;
+            if (t > 3.0f) fail(line, notFound(label));
+            return t > 3.0f;
+        });
+        run([this, centre, enter] {
+            if (enter && penIn_) penProximity(false);
+            if (!penIn_) penProximity(true);
+            penMove(centre->x, centre->y);
+            penTouch(true, false);
+            penPressure(0.3f);
+            penTouch(false, false);
+            penPressure(0.0f);
+        });
+        wait(0.1f);
     } else if (verb == "pen_button") {
         if (!need(2)) return false;
         const int button = int(num(1, 1));
@@ -3286,7 +3309,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
                 "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
                 "drag_item", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "look",
                 "run", "wait", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
-                "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "wheel", "mouse_move",
+                "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move",
                 "touch_stroke", "touch_pinch", "classic_keys", "input_style"};
             if (!allowed.count(verb)) {
                 error = scriptName_ + ":" + std::to_string(n) + ": '" + verb +

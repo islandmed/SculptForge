@@ -531,6 +531,13 @@ void App::drawTabletSection() {
                  "lifting it and putting it down elsewhere leaves the cursor where it was. Off (Pen mode): the cursor "
                  "is where the pen is.",
                  path);
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    ui::SliderInside("##tablet_view_speed", &t.viewSpeed, 0.1f, 2.0f, "View speed %.2f");
+    ui::HelpText("View speed", nullptr,
+                 "How far the pen turns, pans and zooms the view, against the mouse's 1.00. A tablet spreads its "
+                 "whole area over the screen, so a short pen movement crosses many pixels: if the view spins too "
+                 "fast with the pen, turn this down.",
+                 path);
 
     // --- Live pressure ---
     const float raw = penTracker_.raw(), curved = t.curve.apply(raw);
@@ -710,7 +717,7 @@ void App::drawTabletSection() {
         t.mouseMode = mouseMode;
     }
     ui::HelpText("Tablet defaults", nullptr, "Eraser: Invert; lower button: Right-click; upper button: Invert (Alt); third "
-                                             "button: Pan view. The curve and Mouse mode stay.", path);
+                                             "button: Pan view; View speed 1.00. The curve and Mouse mode stay.", path);
     ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextUnformatted(tr("These settings save themselves."));

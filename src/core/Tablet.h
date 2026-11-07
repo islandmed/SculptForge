@@ -62,6 +62,10 @@ struct TabletSettings {
     // Mouse mode (#54): the tablet driver is set to move the cursor relatively, like a mouse, so the pen's
     // reported position isn't where the cursor is (PenCursor).
     bool mouseMode = false;
+    // How far the pen turns, pans and zooms the view per pixel, against the mouse's 1 (0.1 - 2). A tablet maps
+    // its whole area onto the screen, so a short pen movement crosses many pixels and the view seemed to spin
+    // (GonzaloHernandez3D, Huion on Windows): turn it down to taste.
+    float viewSpeed = 1.0f;
 };
 
 Json toJson(const TabletSettings& t);

@@ -74,6 +74,7 @@ Json toJson(const TabletSettings& t) {
     for (PenAction a : t.buttons) buttons.push(std::string(penActionId(a)));
     j.set("buttons", buttons);
     j.set("mouseMode", t.mouseMode);
+    j.set("viewSpeed", double(t.viewSpeed));
     return j;
 }
 
@@ -98,6 +99,7 @@ void fromJson(const Json& j, TabletSettings& t) {
                 if (a != PenAction::EraseMask) t.buttons[i] = a;
             }
     t.mouseMode = j["mouseMode"].asBool(t.mouseMode);
+    t.viewSpeed = std::clamp(float(j["viewSpeed"].asNumber(t.viewSpeed)), 0.1f, 2.0f);
 }
 
 void PenPressureTracker::sample(float pressure) {

@@ -572,6 +572,11 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Mouse & pen", "鼠标与笔"},
     {"Mouse mode (relative)", "鼠标模式（相对）"},
     {"Mouse mode", "鼠标模式"},
+    {"View speed", "视图速度"},
+    {"View speed %.2f", "视图速度 %.2f"},
+    {"How far the pen turns, pans and zooms the view, against the mouse's 1.00. A tablet spreads its whole area over "
+     "the screen, so a short pen movement crosses many pixels: if the view spins too fast with the pen, turn this down.",
+     "笔旋转、平移和缩放视图的幅度，相对于鼠标的 1.00。数位板把整个区域映射到屏幕上，笔移动一小段就会跨过很多像素：如果用笔时视图转得过快，请调低此值。"},
     {"Pressure curve", "压力曲线"},
     {"Pressure test", "压力测试"},
     {"Pressure meter", "压力计"},
@@ -3069,9 +3074,9 @@ constexpr Entry kSimplifiedChinese[] = {
     {"What the pen's eraser end does. Invert: brushes subtract, like holding Alt (with Ctrl it erases mask). Erase "
      "mask: removes mask wherever it draws.",
      "笔尾橡皮擦的功能。反转：笔刷改为减去，如同按住 Alt（搭配 Ctrl 则擦除遮罩）。擦除遮罩：在绘制处移除遮罩。"},
-    {"Eraser: Invert; lower button: Right-click; upper button: Invert (Alt); third button: Pan view. The curve and "
-     "Mouse mode stay.",
-     "橡皮擦：反转；下方按钮：右键单击；上方按钮：反转 (Alt)；第三个按钮：平移视图。曲线与鼠标模式保持不变。"},
+    {"Eraser: Invert; lower button: Right-click; upper button: Invert (Alt); third button: Pan view; View speed 1.00. "
+     "The curve and Mouse mode stay.",
+     "橡皮擦：反转；下方按钮：右键单击；上方按钮：反转 (Alt)；第三个按钮：平移视图；视图速度 1.00。曲线与鼠标模式保持不变。"},
     {"These settings save themselves.", "这些设置会自动保存。"},
     // --- UserGuide.cpp (tools/i18n/coverage.py) ---
     {"Go back to the page you were reading.", "回到你正在阅读的页面。"},

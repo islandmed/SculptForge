@@ -701,6 +701,13 @@ constexpr Entry kSpanish[] = {
     {"Mouse & pen", "Ratón y lápiz"},
     {"Mouse mode (relative)", "Modo ratón (relativo)"},
     {"Mouse mode", "Modo ratón"},
+    {"View speed", "Velocidad de vista"},
+    {"View speed %.2f", "Velocidad de vista %.2f"},
+    {"How far the pen turns, pans and zooms the view, against the mouse's 1.00. A tablet spreads its whole area over "
+     "the screen, so a short pen movement crosses many pixels: if the view spins too fast with the pen, turn this down.",
+     "Cuánto gira, desplaza y acerca la vista el lápiz, frente al 1.00 del ratón. Una tableta reparte toda su área "
+     "sobre la pantalla, así que un movimiento corto del lápiz recorre muchos píxeles: si la vista gira demasiado rápido "
+     "con el lápiz, bájalo."},
     {"Pressure curve", "Curva de presión"},
     {"Pressure test", "Prueba de presión"},
     {"Pressure meter", "Medidor de presión"},
@@ -3497,10 +3504,10 @@ constexpr Entry kSpanish[] = {
      "mask: removes mask wherever it draws.",
      "Lo que hace la goma del lápiz. Invertir: los pinceles restan, como mantener Alt (con Ctrl borra máscara). "
      "Borrar máscara: quita máscara por donde dibuja."},
-    {"Eraser: Invert; lower button: Right-click; upper button: Invert (Alt); third button: Pan view. The curve and "
-     "Mouse mode stay.",
+    {"Eraser: Invert; lower button: Right-click; upper button: Invert (Alt); third button: Pan view; View speed 1.00. "
+     "The curve and Mouse mode stay.",
      "Borrador: Invertir; botón inferior: Clic derecho; botón superior: Invertir (Alt); tercer botón: Desplazar "
-     "vista. La curva y el modo Ratón se quedan."},
+     "vista; Velocidad de vista 1.00. La curva y el modo Ratón se quedan."},
     // --- UserGuide.cpp (tools/i18n/coverage.py) ---
     {"Go back to the page you were reading.", "Vuelve a la página que estabas leyendo."},
     {"Back (Alt+Left)", "Atrás (Alt+Izquierda)"},
