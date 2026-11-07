@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
 
 namespace sf {
 
@@ -56,8 +57,12 @@ void App::drawClothSection() {
     const char* help = "Brush > Cloth";
     ImGui::SetNextItemWidth(-1);
     int mode = int(c.mode);
-    const char* modes[] = {tr("Drag"), tr("Push"), tr("Settle"), tr("Grab"), tr("Expand"), tr("Pinch"), tr("Inflate")};
-    static_assert(std::size(modes) == size_t(ClothBrushMode::Count));
+    // (Each item's id names the combo: Pinch and Inflate are also brushes on the shelf.)
+    const char* names[] = {tr("Drag"), tr("Push"), tr("Settle"), tr("Grab"), tr("Expand"), tr("Pinch"), tr("Inflate")};
+    static_assert(std::size(names) == size_t(ClothBrushMode::Count));
+    std::string labels[std::size(names)];
+    const char* modes[std::size(names)];
+    for (size_t i = 0; i < std::size(names); ++i) labels[i] = std::string(names[i]) + "##clothmode", modes[i] = labels[i].c_str();
     if (ImGui::Combo("##clothmode", &mode, modes, int(ClothBrushMode::Count))) c.mode = ClothBrushMode(mode);
     ui::HelpText("Cloth mode", nullptr,
                  "Drag: the surface under the brush follows the stroke as fabric, folding where it bunches up. Push: "

@@ -67,7 +67,7 @@ shot cloth_panel
 # folds, Inflate balloons it with wrinkles (Symmetry X is on: both sides).
 click "##clothmode"
 wait 0.2
-click "Grab"
+click "Grab##clothmode"
 expect_value cloth_mode == 3
 snapshot
 stroke 0.56 0.5 0.66 0.42
@@ -77,7 +77,7 @@ shot cloth_grab
 key ctrl+z
 click "##clothmode"
 wait 0.2
-click "Pinch"
+click "Pinch##clothmode"
 expect_value cloth_mode == 5
 snapshot
 stroke 0.6 0.5 0.615 0.5
@@ -87,7 +87,7 @@ shot cloth_pinch
 key ctrl+z
 click "##clothmode"
 wait 0.2
-click "Inflate"
+click "Inflate##clothmode"
 expect_value cloth_mode == 6
 snapshot
 stroke 0.6 0.5 0.62 0.5
