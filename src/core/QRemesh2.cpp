@@ -28,6 +28,7 @@
 #include "core/QRemesh2.h"
 
 #include "core/Parallel.h"
+#include "core/ThreadPool.h"
 
 #include <algorithm>
 #include <chrono>
@@ -1370,15 +1371,22 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
         VertexFaces vf;
         vf.build(proxy.P.size(), proxy.T);
         auto smoothLog = [&](std::vector<float>& x, int rounds) {
+            std::vector<double> lx(x.size());
             for (int it = 0; it < rounds; ++it) {
+                // Each vertex's log once per round (not once per corner that sees it), then the averages in parallel.
+                poolFor(x.size(), [&](size_t b, size_t e) {
+                    for (size_t v = b; v < e; ++v) lx[v] = std::log(double(x[v]));
+                });
                 std::vector<float> lr(x.size());
-                for (size_t v = 0; v < x.size(); ++v) {
-                    double s = 0.0;
-                    int c = 0;
-                    for (uint32_t k = vf.off[v]; k < vf.off[v + 1]; ++k)
-                        for (int j = 0; j < 3; ++j) s += std::log(double(x[proxy.T[vf.tri[k]][j]])), ++c;
-                    lr[v] = c ? float(std::exp(s / double(c))) : x[v];
-                }
+                poolFor(x.size(), [&](size_t b, size_t e) {
+                    for (size_t v = b; v < e; ++v) {
+                        double s = 0.0;
+                        int c = 0;
+                        for (uint32_t k = vf.off[v]; k < vf.off[v + 1]; ++k)
+                            for (int j = 0; j < 3; ++j) s += lx[proxy.T[vf.tri[k]][j]], ++c;
+                        lr[v] = c ? float(std::exp(s / double(c))) : x[v];
+                    }
+                });
                 x.swap(lr);
             }
         };
