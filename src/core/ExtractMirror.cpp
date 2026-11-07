@@ -72,6 +72,10 @@ Mesh extractShell(const Mesh& mesh, const ExtractOptions& o, std::string& error)
         error = "Extract works on meshes; make the Forge Spheres a mesh first";
         return {};
     }
+    if (!mesh.tube.empty()) {
+        error = "Extract works on meshes; bake the Tube first";
+        return {};
+    }
     // The patch: the visible triangles whose corners are masked (on average), with their own vertices.
     std::vector<uint32_t> remap(nv, kNone), kept, patchOf(mesh.hasQuads() ? nt : 0, kNone);
     std::vector<glm::uvec3> tris;
@@ -385,6 +389,7 @@ Mesh mirrorFlip(const Mesh& mesh, int axis, float pivot) {
     for (auto& l : out.layers)
         for (auto& v : l.delta) v[axis] = -v[axis];
     for (auto& z : out.forgespheres) z.center[axis] = 2.0f * pivot - z.center[axis];
+    for (auto& p : out.tube.points) p.position[axis] = 2.0f * pivot - p.position[axis];
     for (auto& t : out.triangles) std::swap(t.y, t.z);
     for (size_t t = 0; t * 3 + 2 < out.uvs.size(); ++t) std::swap(out.uvs[3 * t + 1], out.uvs[3 * t + 2]);
     out.rebuildTopology();
@@ -485,6 +490,7 @@ void registerExtractMirrorCommands(CommandRegistry& reg) {
                  if (!positive && side != "negative" && side != "-" && side != "neg")
                      return {false, "Bad side '" + side + "' (positive or negative)"};
                  if (!doc.mesh.forgespheres.empty()) return {false, "Mirror And Weld works on meshes; make the Forge Spheres a mesh first"};
+                 if (!doc.mesh.tube.empty()) return {false, "Mirror And Weld works on meshes; bake the Tube first"};
                  if (doc.mesh.triangleCount() == 0) return {false, "The Part is empty"};
                  const size_t before = doc.mesh.triangleCount();
                  Mesh m = doc.mesh;

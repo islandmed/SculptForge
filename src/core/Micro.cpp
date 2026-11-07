@@ -348,6 +348,10 @@ bool microDivide(Mesh& m, int level, std::string& error, int outOfCore) {
         error = "Forge Sphere Parts can't have a micro level (make an adaptive skin first)";
         return false;
     }
+    if (!m.tube.empty()) {
+        error = "Tube Parts can't have a micro level (Bake the tube first)";
+        return false;
+    }
     if (!m.layers.empty()) {
         error = "Sculpt layers can't carry a micro level yet: bake or delete the layers first";
         return false;

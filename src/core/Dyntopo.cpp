@@ -111,6 +111,7 @@ std::string dyntopoBlocker(const Mesh& mesh) {
     if (mesh.multires)
         return "Dynamic topology needs a mesh without subdivision levels: Freeze Levels keeps the level shown and removes the others";
     if (mesh.triangleCount() == 0) return "The mesh has no triangles";
+    if (!mesh.tube.empty()) return "This is a Tube Part: Bake it first (Tool > Tube > Bake)";
     return {};
 }
 

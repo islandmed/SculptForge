@@ -175,7 +175,7 @@ public:
 
 private:
     enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, PartClick, Select, Gizmo, Guide, Sculptable, ForgeSphere, Insert, Capture,
-                      AirStroke, UvTool, SizeScrub, QuickRemesh, Gradient, Stencil }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
+                      AirStroke, UvTool, SizeScrub, QuickRemesh, Gradient, Stencil, Tube }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
 
     void handleEvent(const SDL_Event& e); // the pen's mouse events first (penMouseEvents), then dispatchEvent
     void dispatchEvent(const SDL_Event& e);
@@ -1398,6 +1398,49 @@ private:
         int added = -1;                // Draw: the new sphere's index
         const char* label = "";
     } zsDrag_;
+    // Tube (PanelTube.cpp, core/Tube.h): with Draw Tube on, a left-drag anywhere draws a clay tube in the air (on a
+    // plane facing the view, or snapped onto surfaces); a Tube Part's points are dragged to move them (Ctrl: resize,
+    // Alt+click: delete) until Bake. Each stroke or point drag is one undo step.
+    enum class TubeDepth { Surface, Pivot, Fixed };
+    void registerTubeUiActions();
+    void drawTubeContents();                                // Tool > Tube
+    bool tubeMouseDown(float x, float y, SDL_Keymod mod);   // true if it took the click
+    void tubeDragTo(float x, float y);
+    void tubeRelease();
+    void drawTubeOverlay();                                 // the stroke being drawn, the points, the cursor
+    bool tubeActive() const { return !doc_.mesh.tube.empty(); }
+    int tubePointAt(float x, float y, int* part = nullptr) const; // control point under the cursor (of `part`), or -1
+    int tubeSelection() const;                              // tubeSelected_ when it is still a point, else -1
+    glm::vec3 tubeViewDir() const;                          // into the screen
+    bool tubeDraw_ = false;
+    TubeDepth tubeDepth_ = TubeDepth::Surface;
+    float tubeFixedDepth_ = 0.0f;  // Fixed: distance from the camera (0 = take the pivot's on first use)
+    float tubeSizePx_ = 14.0f;     // tube radius on screen at the drawing depth
+    float tubePressure_ = 0.7f;    // how much pen pressure thins the tube (0 = none)
+    float tubeSmoothing_ = 0.5f;
+    bool tubeSnap_ = false;        // points over a surface sit on it
+    bool tubeFlatCaps_ = false;
+    bool tubeMerge_ = false;       // into the active Part (even edges) instead of a new Tube Part
+    bool tubeBakeUniform_ = false; // Bake re-sweeps with even edges (dynamic topology)
+    int tubeSelected_ = -1;
+    float tubeRadiusEdit_ = -1.0f; // the selected point's Radius slider while it is held
+    int tubeRadiusEditPoint_ = -1;
+    bool tubeHaveAnchor_ = false;  // the last stroke's end, the next stroke's depth when it starts off the model
+    glm::vec3 tubeAnchor_{0.0f};
+    struct TubeDrag {
+        bool drawing = false;
+        glm::vec3 planePoint{0.0f}, planeNormal{0.0f, 0.0f, -1.0f};
+        float radius = 0.0f; // world radius at full pressure
+        std::vector<TubePoint> samples;
+        std::vector<ImVec4> screen; // x, y, radius in pixels (the trail drawn while the pen moves)
+        int point = -1;             // editing: the point dragged
+        bool resize = false;
+        TubeShape start, preview; // the curve when the drag began, and now
+        Mesh before;
+        glm::vec3 grab{0.0f};
+        float x = 0.0f, y = 0.0f;
+        bool changed = false;
+    } tubeDrag_;
     const BrushRecipe* strokeRecipe() const; // recipe the current stroke sculpts with (none for Smooth / paint only)
     // Bridge bridge and Bridge/STL files (PanelBridge.cpp).
     void drawBridgeMenu();

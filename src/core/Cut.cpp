@@ -1311,6 +1311,7 @@ void registerCutCommands(CommandRegistry& registry) {
          [](Document& doc, const Args& a) -> CommandResult {
              if (doc.mesh.triangleCount() == 0) return {false, "The Part is empty"};
              if (!doc.mesh.forgespheres.empty()) return {false, "Cut: make Forge Spheres into a mesh first"};
+             if (!doc.mesh.tube.empty()) return {false, "Cut: bake the Tube first"};
              if (doc.mesh.micro) return {false, "Cut: apply or remove the micro level first"};
              CutShape shape = CutShape::Lasso;
              CutMode mode = CutMode::Away;

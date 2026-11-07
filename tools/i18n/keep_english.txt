@@ -41,3 +41,4 @@ http://%s
 Gen-2.5 Low
 Gen-2.5 Medium
 Gen-2.5 High
+Tube

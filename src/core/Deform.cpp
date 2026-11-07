@@ -576,6 +576,7 @@ bool canDeform(Document& doc, const std::string& name, std::string& error) {
     if (doc.sculptor.strokeActive()) error = name + ": finish the stroke first";
     else if (mesh.vertexCount() == 0 || mesh.triangleCount() == 0) error = name + ": the active Part is empty";
     else if (!mesh.forgespheres.empty()) error = name + ": the active Part is a Forge Sphere Part (Make Mesh first)";
+    else if (!mesh.tube.empty()) error = name + ": the active Part is a Tube Part (Bake it first)";
     else if (mesh.micro) error = name + ": the active Part has a micro level (Bake Micro or Delete Micro first)";
     else return true;
     return false;
