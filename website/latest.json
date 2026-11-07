@@ -1,12 +1,12 @@
 {
-  "version": "0.11.11",
+  "version": "0.11.12",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Stencil: place a reference image over the model, then sculpt or paint through it, and move it and repeat (thanks @kenttumanda123-netizen, #155)",
-    "Maya Live: each stroke goes to Maya on its own, and Maya's edits come back the same way. An optional Live link makes it near-instant; it's off by default and warns when you turn it on (thanks @tristratos, #42)",
-    "Creature bones: 13 original starting pieces for building creatures, in Insert sets (thanks @kenttumanda123-netizen, #154)",
-    "Brush sets: swap the whole bottom shelf and its keys in one step (thanks @NicTanghe, #143)",
-    "Floor grid: View > Floor grid draws a faint grid on the floor the model stands on (thanks @fenixpoints, #115)"
+    "Your languages: names you type in Chinese, Japanese or Korean (Parts, layers, folders, brush sets, files) draw with your system's fonts instead of \"?\"",
+    "Stencil: clean, sharp groove edges when you sculpt through a stencil, and detailed photos stay even on lighter meshes",
+    "Restart to update: on Linux the previous version now quits, and Discord stops showing SculptForge when you close it (thanks @ebarranco)",
+    "SpaceMouse: turning the cap slowly no longer zooms the view away (thanks @fenixpoints)",
+    "App icon: the outline cube is back, and a fix for garbled small icon sizes on macOS (thanks @tristratos, #156)"
   ]
 }
