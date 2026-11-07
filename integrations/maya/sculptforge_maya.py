@@ -24,6 +24,10 @@ Plain maya.cmds (maya.mel for the shelf, maya.utils for Auto, maya.api.OpenMaya'
 standard library. Install: see README.md beside this file, or run install_shelf() once.
 """
 
+# This script's own version (its integration lane: a tag maya-vX.Y.Z releases it, docs/releasing.md). What it can
+# read from SculptForge is the manifest VERSION below, not the app's version.
+__version__ = "1.0.0"
+
 import json
 import os
 import re

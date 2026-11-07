@@ -342,11 +342,12 @@ jobs:
           cp "SculptForge-$V-linux-arm64.mcpb" SculptForge-linux-arm64.mcpb
       - name: MCP registry entry (server.json for the .mcpb bundles; publishing it is the maintainer's, docs/releasing.md)
         run: python3 tools/release/mcp_server_json.py --version "${TAG#v}" --dist dist
+      # The add-on has its own version and lane (tags blender-vX.Y.Z, integrations.yml); each app release carries the
+      # add-on as it is on the tagged commit, under its own version.
       - name: Blender add-on (extension and legacy zips, plus a version-less copy for the website's link)
         run: |
-          V=${TAG#v}
-          python3 addons/blender/build_addon.py --check --version "$V" --out dist
-          cp "dist/sculptforge_bridge-$V.zip" dist/sculptforge_bridge.zip
+          python3 addons/blender/build_addon.py --check --out dist
+          cp dist/sculptforge_bridge-*[0-9].zip dist/sculptforge_bridge.zip
       - name: Maya shelf script (Python source and its README; nothing to build)
         run: python3 -m zipfile -c dist/sculptforge_maya.zip integrations/maya/sculptforge_maya.py integrations/maya/README.md
       - name: Software bill of materials (CycloneDX; covered by the checksums and their signature)
