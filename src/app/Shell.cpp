@@ -1817,7 +1817,14 @@ void App::drawTaskMenu() {
         Demo::pushScope(def->name);
         if (def->scope) Demo::pushScope(def->scope);
         const std::string id = dropdown_;
-        if (paletteHeader(id.c_str(), false, true)) drawPaletteBody(id);
+        if (PanelWindow* panel = findPanel("palette." + id)) { // in a window of its own (PanelWindows.cpp)
+            ImGui::TextDisabled("%s", tr("In a window of its own"));
+            if (panel->window && ImGui::Button(tr(ICON_LC_SQUARE_ARROW_OUT_UP_RIGHT "  Show it"))) SDL_RaiseWindow(panel->window);
+            ImGui::SameLine();
+            if (ImGui::Button(tr(ICON_LC_PANEL_TOP "  Back in the main window"))) dockPanel("palette." + id);
+        } else if (paletteHeader(id.c_str(), false, true)) {
+            drawPaletteBody(id);
+        }
         if (def->scope) Demo::popScope();
         Demo::popScope();
     }
@@ -1865,7 +1872,7 @@ bool App::paletteHeader(const char* id, bool inTray, bool right) {
     centredText(dl, nullptr, p, ImVec2(p.x + h, p.y + h), theme::u32(iconHovered ? theme::accentHover : theme::textDim),
                 inTray ? (right ? ICON_LC_PANEL_RIGHT : ICON_LC_PANEL_LEFT) : ICON_LC_PANEL_RIGHT);
     ImGui::SameLine();
-    const bool titleClicked = ImGui::InvisibleButton("##title", ImVec2(std::max(1.0f, w - 2.0f * h), h));
+    const bool titleClicked = ImGui::InvisibleButton("##title", ImVec2(std::max(1.0f, w - 3.0f * h), h));
     const bool titleHovered = ImGui::IsItemHovered();
     if (fontBold_) ImGui::PushFont(fontBold_);
     {
@@ -1888,6 +1895,17 @@ bool App::paletteHeader(const char* id, bool inTray, bool right) {
     ImGui::LogText("%s", tr(paletteTitle(*def)));
     if (fontBold_) ImGui::PopFont();
     ImGui::SameLine();
+    // Its own window, to keep on another monitor (PanelWindows.cpp, docs/design/detach-panels.md).
+    const bool detachClicked = ImGui::InvisibleButton("##detach", ImVec2(h, h));
+    const bool detachHovered = ImGui::IsItemHovered();
+    ui::HelpText("Open in its own window", nullptr,
+                 "Move this palette to a window of its own, to keep on another monitor or a pen display. Close that window "
+                 "to bring it back. It opens there next time too.",
+                 tr(paletteTitle(*def)));
+    ui::DelayedTooltip("Open in its own window");
+    centredText(dl, nullptr, ImVec2(p.x + w - 2.0f * h, p.y), ImVec2(p.x + w - h, p.y + h),
+                theme::u32(detachHovered ? theme::textHover : theme::textDim), ICON_LC_SQUARE_ARROW_OUT_UP_RIGHT);
+    ImGui::SameLine();
     const bool endClicked = ImGui::InvisibleButton(inTray ? "##collapse" : "##close", ImVec2(h, h));
     const bool endHovered = ImGui::IsItemHovered();
     centredText(dl, nullptr, ImVec2(p.x + w - h, p.y), ImVec2(p.x + w, p.y + h),
@@ -1896,6 +1914,11 @@ bool App::paletteHeader(const char* id, bool inTray, bool right) {
     ImGui::PopStyleVar();
     ImGui::Dummy(ImVec2(0, 2.0f * s));
 
+    if (detachClicked) {
+        if (!inTray) ImGui::CloseCurrentPopup();
+        detachPanel(std::string("palette.") + id);
+        return false;
+    }
     if (iconClicked) {
         if (inTray) {
             removePaletteFromTrays(id);
@@ -1931,6 +1954,13 @@ void App::drawPaletteBody(const std::string& id) {
 }
 
 void App::drawPaletteDropdown() {
+    if (PanelWindow* panel = dropdown_.empty() ? nullptr : findPanel("palette." + dropdown_)) {
+        // In a window of its own: that window comes up instead of a drop-down (PanelWindows.cpp).
+        if (panel->window) SDL_RaiseWindow(panel->window);
+        dropdown_.clear();
+        openDropdown_ = false;
+        return;
+    }
     if (openDropdown_) {
         ImGui::OpenPopup("##palettedropdown");
         openDropdown_ = false;
@@ -1978,7 +2008,7 @@ void App::drawTray(bool right, const CanvasRect& r) {
     const std::vector<std::string> ids = list; // headers may move palettes out
     for (const std::string& id : ids) {
         const PaletteDef* def = findPalette(id);
-        if (!def) continue;
+        if (!def || panelDetached("palette." + id)) continue; // in a window of its own (PanelWindows.cpp)
         ImGui::PushID(id.c_str());
         Demo::pushScope(def->name);
         if (def->scope) Demo::pushScope(def->scope);

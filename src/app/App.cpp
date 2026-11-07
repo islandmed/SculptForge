@@ -342,6 +342,7 @@ void App::shutdown() {
     discordClosed_ = true;
     discordClient_.reset();
     saveWindowState();
+    closePanelWindows(); // (panels.json keeps them for the next start)
     autosavePrefs(true); // a change still waiting for its moment
     if (doc_.sculptor.strokeActive()) endStroke();
     solver_.reset(); // (its thread uses the renderer)
@@ -856,6 +857,7 @@ int App::run() {
         if (!startTake()) return 1;
     } else if (options_.benchmark) startProofMode(); // runs in this loop (ProofMode.cpp)
     if (g_wakeEvent == 0) g_wakeEvent = SDL_RegisterEvents(1);
+    restorePanelWindows(); // the panels last session kept in windows of their own (PanelWindows.cpp)
     // Dabs are queued and placed within a time budget each frame (strokeTo). SF_STROKE_IMMEDIATE=1 places them all
     // as each pointer sample arrives, as before 0.9.6 (for comparison).
     const char* immediateEnv = std::getenv("SF_STROKE_IMMEDIATE");
@@ -961,6 +963,14 @@ int App::run() {
             if ((strokeProbe_ || takeRunning()) && ((ev.type >= SDL_EVENT_MOUSE_MOTION && ev.type <= SDL_EVENT_MOUSE_WHEEL) ||
                                                     (ev.type >= SDL_EVENT_PEN_PROXIMITY_IN && ev.type <= SDL_EVENT_PEN_AXIS)))
                 return; // --measure-stroke, a take: the real pointer stays out of the scripted stroke
+            // A panel in a window of its own (PanelWindows.cpp): hovering it redraws only that panel, not the view.
+            if (const PanelEvent pe = panelWindowEvent(ev); pe != PanelEvent::None) {
+                if (pe == PanelEvent::Main) {
+                    draw = true;
+                    activeUntil_ = std::max(activeUntil_, seconds() + 0.75);
+                }
+                return;
+            }
             handleEvent(ev);
             if (ev.type == SDL_EVENT_KEYMAP_CHANGED || ev.type == SDL_EVENT_KEYBOARD_ADDED ||
                 ev.type == SDL_EVENT_KEYBOARD_REMOVED || ev.type == SDL_EVENT_MOUSE_ADDED ||
@@ -994,6 +1004,7 @@ int App::run() {
         if (!continuous && !draw) {
             int timeout = io.WantTextInput ? kCaretTickMs : kIdleTickMs;
             if (redrawAt_ > 0.0) timeout = std::clamp(int((redrawAt_ - t0) * 1000.0) + 1, 0, timeout);
+            if (panelsActiveUntil_ > t0) timeout = std::min(timeout, 16); // a hovered panel window's tooltips
             if (SDL_WaitEventTimeout(&e, timeout)) {
                 onEvent(e);
             } else if (io.WantTextInput) {
@@ -1171,6 +1182,10 @@ int App::run() {
         // its window and draws nothing, yet must see the new version start (or its deadline) and quit; it never did,
         // and kept running hidden, "Playing SculptForge" on Discord (@ebarranco, 0.11.1 -> 0.11.10).
         if (!draw && !continuous && !wantsFrames(t)) {
+            if (panelsDirty_ || t < panelsActiveUntil_) { // only a panel window changed (hover): just it
+                drawPanelWindows(true);
+                updateMouseCursor();
+            }
             tickSelfUpdate();
             continue;
         }
@@ -1260,6 +1275,7 @@ int App::run() {
         SDL_GL_SwapWindow(window_);
         lastFrameFence_ = gl::FenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
         gl::Flush(); // (to the GPU now: an offscreen swap sends nothing)
+        drawPanelWindows(false); // panels in windows of their own (PanelWindows.cpp), after the main window's swap
         mark();
         if (phases == 7) // (Help > Benchmark splits each phase's frames by these)
             for (int k = 0; k < 6; ++k) frameSplitMs_[k] = phase[k + 1] - phase[k];
@@ -1679,8 +1695,14 @@ void App::updateMouseCursor() {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
     const ImGuiMouseCursor ui = ImGui::GetMouseCursor();
+    // Over a panel in a window of its own: that panel's (PanelWindows.cpp; there is one system cursor).
+    int panel = -2;
+    if (SDL_Window* over = drag_ == Drag::None && !panelWindows_.empty() ? SDL_GetMouseFocus() : nullptr; over && over != window_)
+        for (const PanelWindow& p : panelWindows_)
+            if (p.window == over) panel = p.cursor == ImGuiMouseCursor_None ? kCursorHidden : p.cursor;
     // (Mouse mode with the pen: the system's would sit where the pen is on the tablet, not at the cursor.)
-    cursorKind_ = penSoftCursor()           ? kCursorHidden
+    cursorKind_ = panel != -2               ? panel
+                  : penSoftCursor()         ? kCursorHidden
                   : viewportCursorWanted()  ? kCursorCrosshair
                   : ui == ImGuiMouseCursor_None || io.MouseDrawCursor ? kCursorHidden
                                                                       : int(ui);
@@ -3136,7 +3158,8 @@ void App::drawUi() {
         ImGui::End();
     }
     drawSupportUi(); // the first-run welcome, the one support reminder (PanelSupport.cpp)
-    guide_.draw(*this);  // Help > User Guide
+    if (!panelDetached("guide")) guide_.draw(*this); // Help > User Guide (or in its own window: PanelWindows.cpp)
+    drawFloatingPanels(); // palettes detached where there are no windows of their own (PanelWindows.cpp)
     drawBrushSetSave();  // Save Shelf as Brush Set, Delete Brush Set (PanelBrushSets.cpp)
     drawPacksUi();       // pack review, New Pack, macro confirmation and editor (PanelPacks.cpp)
     drawMemoryConfirm(); // "Not enough free memory" before a big mesh (MemoryConfirm.cpp)

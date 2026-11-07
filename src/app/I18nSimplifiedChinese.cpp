@@ -4342,6 +4342,21 @@ constexpr Entry kSimplifiedChinese[] = {
      "旋转模板，以逆时针度数表示；Ctrl+点击以输入。"},
     {"Centre the Stencil again, upright, 80% of the view's height.",
      "将模板重新居中、摆正，高度为视图的 80%。"},
+    // Panels in windows of their own (PanelWindows.cpp)
+    {"Back in the main window", "移回主窗口"},
+    {"Controls in its own window", "在独立窗口中显示操作方式"},
+    {"In a window of its own", "在独立窗口中"},
+    {"Show it", "显示"},
+    {"Move Controls to a window of its own, to keep on another monitor. It opens there next time too.", "将操作方式移到独立窗口，以便放在另一台显示器上。下次也会在那里打开。"},
+    {"Move the guide to a window of its own, to keep on another monitor. It opens there next time too.", "将指南移到独立窗口，以便放在另一台显示器上。下次也会在那里打开。"},
+    {"Move this palette to a window of its own, to keep on another monitor or a pen display. Close that window to bring it back. It opens there next time too.", "将此面板移到独立窗口，以便放在另一台显示器或数位屏上。关闭该窗口即可移回。下次也会在那里打开。"},
+    {"Open Controls (every shortcut and gesture) in a window of its own, to keep on another monitor.", "在独立窗口中打开操作方式（所有快捷键和手势），以便放在另一台显示器上。"},
+    {"Open in its own window", "在独立窗口中打开"},
+    {"Open the User Guide in a window of its own, to keep on another monitor. It opens there next time too.", "在独立窗口中打开使用指南，以便放在另一台显示器上。下次也会在那里打开。"},
+    {"Put every panel that is in a window of its own back in the main window, and forget where those windows were.", "将所有在独立窗口中的面板移回主窗口，并忘记那些窗口的位置。"},
+    {"Put this panel back in the main window. Preferences > Config > Reset panel windows puts all of them back.", "将此面板移回主窗口。偏好设置 > 设置 > 重置面板窗口会将全部移回。"},
+    {"Reset panel windows", "重置面板窗口"},
+    {"User Guide in its own window", "在独立窗口中显示使用指南"},
 };
 
 } // namespace

@@ -402,6 +402,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Ui.cpp
     src/app/UserGlyphs.cpp
     src/app/Shell.cpp
+    src/app/PanelWindows.cpp
     src/app/Palettes.cpp
     src/app/Theme.cpp
     src/app/CommandPalette.cpp

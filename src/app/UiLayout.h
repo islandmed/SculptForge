@@ -50,4 +50,22 @@ Json toJson(const UiLayout& layout);
 // stored) comes from standardLayout(shellLayout): the SculptForge layout's shelves for a SculptForge-layout file.
 bool fromJson(const Json& j, UiLayout& layout, std::string& error, int shellLayout = 0);
 
+// A panel in a window of its own (docs/design/detach-panels.md): "palette.<id>", "guide" or "controls", and where
+// its window was (desktop coordinates, logical px; placed false: the window system chose, e.g. Wayland). Kept in
+// <user data>/panels.json, never in ui.json: one desk's monitor coordinates don't travel with a shared interface.
+struct PanelPlacement {
+    std::string id;
+    int x = 0, y = 0, w = 320, h = 480;
+    bool placed = false;
+};
+Json panelPlacementsToJson(const std::vector<PanelPlacement>& panels);
+// Ids too long or repeated are dropped, at most 32 panels, sizes clamped to 160..16384.
+std::vector<PanelPlacement> panelPlacementsFromJson(const Json& j);
+// Whether a display (usable bounds, desktop coordinates) still shows the top of a window placed at x, y: the same
+// rule as the main window's (#105), so a panel on a monitor that has gone opens beside the main window instead.
+struct DisplayRect {
+    int x = 0, y = 0, w = 0, h = 0;
+};
+bool panelOnDisplays(const PanelPlacement& p, const std::vector<DisplayRect>& displays);
+
 } // namespace sf
