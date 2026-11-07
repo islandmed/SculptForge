@@ -340,6 +340,16 @@ TEST(maya_link_server_pairs_and_streams) {
         CHECK(c.writeAll(http.data(), http.size()));
         CHECK(waitFor([&] { return server.refused() == 2; }) && !server.connected());
     }
+    // Before pairing, a header claiming 1 GiB is refused on the claim: nothing near that size is allocated.
+    {
+        AiLinkConn c;
+        CHECK(aiLinkConnect(c, endpoint, err));
+        std::string big = mayaLinkFrame(MayaLinkType::Hello, {});
+        for (int i = 0; i < 8; ++i) big[8 + size_t(i)] = char(((1ull << 30) >> (8 * i)) & 0xff);
+        CHECK(c.writeAll(big.data(), big.size()));
+        CHECK(waitFor([&] { return server.refused() == 3; }) && !server.connected());
+        CHECK(server.largestBuffer() <= kMayaLinkMaxHello);
+    }
     // The right code: Welcome, then meshes both ways.
     AiLinkConn c;
     CHECK(aiLinkConnect(c, endpoint, err));
@@ -379,6 +389,26 @@ TEST(maya_link_server_pairs_and_streams) {
     const std::string bye = mayaLinkFrame(MayaLinkType::Bye, {});
     CHECK(c.writeAll(bye.data(), bye.size()));
     CHECK(waitFor([&] { return !server.connected(); }));
+
+    // After pairing, a frame claiming 1 GiB that sends 10 bytes and stalls: it times out, and the buffer never grew
+    // past one read chunk (the claim isn't allocated up front).
+    server.setFrameTimeoutMs(300);
+    {
+        AiLinkConn s;
+        CHECK(aiLinkConnect(s, endpoint, err));
+        const std::string h = encodeMayaLinkHello(server.code(), "staller");
+        CHECK(s.writeAll(h.data(), h.size()));
+        CHECK(readFrame(s, t, p) && t == MayaLinkType::Welcome);
+        CHECK(waitFor([&] { return server.connected(); }));
+        std::string big = mayaLinkFrame(MayaLinkType::Mesh, std::string(10, 'x'));
+        for (int i = 0; i < 8; ++i) big[8 + size_t(i)] = char(((1ull << 30) >> (8 * i)) & 0xff);
+        CHECK(s.writeAll(big.data(), big.size()));
+        CHECK(waitFor([&] { return !server.connected(); }, 5000));
+        CHECK(server.largestBuffer() <= 10 + kMayaLinkReadChunk); // (at most one chunk ahead of what arrived)
+        std::string last, ev;
+        while (!(ev = server.takeEvent()).empty()) last = ev;
+        CHECK(last == "disconnected: timed out");
+    }
     server.stop();
     CHECK(aiLinkFileMode(endpoint) < 0); // the socket file is gone when the link is off
     unsetenv("SF_AI_LIVE_DIR");

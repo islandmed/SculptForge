@@ -445,7 +445,7 @@ std::vector<MayaLinkMesh> MayaLinkServer::takeReceived() {
 }
 
 bool MayaLinkServer::readFrame(AiLinkConn& conn, MayaLinkType& type, std::string& payload, int firstByteMs,
-                               std::string& error) {
+                               uint64_t maxLength, std::string& error) {
     char header[kMayaLinkHeaderBytes];
     size_t got = 0;
     int wait = firstByteMs;
@@ -464,19 +464,29 @@ bool MayaLinkServer::readFrame(AiLinkConn& conn, MayaLinkType& type, std::string
             return false;
         }
         got += size_t(n);
-        wait = kMayaLinkFrameMs;
+        wait = frameMs_;
         if (stopping_) return false;
     }
     uint64_t length = 0;
     if (!parseMayaLinkHeader(header, type, length, error)) return false;
-    payload.assign(size_t(length), '\0');
-    for (size_t at = 0; at < payload.size();) {
-        const long long n = conn.readBytes(payload.data() + at, payload.size() - at, kMayaLinkFrameMs);
+    if (length > maxLength) { // (before pairing: only a Hello's size)
+        error = "a message over the size cap";
+        return false;
+    }
+    // The payload grows as its bytes arrive, a MiB at a time: a header's claim alone never allocates.
+    payload.clear();
+    while (payload.size() < length) {
+        const size_t at = payload.size();
+        payload.resize(at + size_t(std::min<uint64_t>(length - at, kMayaLinkReadChunk)));
+        largestBuffer_ = std::max<size_t>(largestBuffer_, payload.size());
+        const long long n = conn.readBytes(payload.data() + at, payload.size() - at, frameMs_);
         if (n <= 0) {
+            payload.clear();
+            payload.shrink_to_fit();
             error = n < 0 ? "closed" : "timed out";
             return false;
         }
-        at += size_t(n);
+        payload.resize(at + size_t(n));
         if (stopping_) return false;
     }
     return true;
@@ -500,7 +510,7 @@ bool MayaLinkServer::serve(AiLinkConn& conn) {
     std::string error, payload;
     MayaLinkType type{};
     // Pairing first: a Hello with the code within kMayaLinkHelloMs, or the connection closes.
-    if (!readFrame(conn, type, payload, kMayaLinkHelloMs, error) || type != MayaLinkType::Hello) {
+    if (!readFrame(conn, type, payload, kMayaLinkHelloMs, kMayaLinkMaxHello, error) || type != MayaLinkType::Hello) {
         if (error == "closed") return false; // (a probe: another window checking whether the link is on)
         ++refused_;
         event("refused: " + std::string(error.empty() ? "no pairing code" : error));
@@ -531,7 +541,7 @@ bool MayaLinkServer::serve(AiLinkConn& conn) {
             error = "closed";
             break;
         }
-        if (!readFrame(conn, type, payload, 10, error)) {
+        if (!readFrame(conn, type, payload, 10, kMayaLinkMaxPayload, error)) {
             if (error.empty()) continue; // nothing this time
             break;
         }

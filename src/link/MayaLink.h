@@ -43,6 +43,8 @@ inline constexpr uint32_t kMayaLinkMaxVertices = 64u << 20;
 inline constexpr size_t kMayaLinkCodeChars = 32;
 inline constexpr int kMayaLinkHelloMs = 5000;                    // to send Hello after connecting
 inline constexpr int kMayaLinkFrameMs = 30000;                   // no byte of a started frame for this long: closed
+inline constexpr uint64_t kMayaLinkMaxHello = 256;               // before pairing, no frame may claim more
+inline constexpr size_t kMayaLinkReadChunk = 1u << 20;           // payloads grow as bytes arrive, a MiB at a time
 inline constexpr unsigned long long kMayaLinkStreamNs = 100'000'000ull; // mid-stroke Points, at most this often
 
 enum class MayaLinkType : uint16_t { Hello = 1, Welcome = 2, Mesh = 3, Points = 4, Bye = 5 };
@@ -111,6 +113,10 @@ public:
     std::string clientName() const;
     // Counts for the UI and tests: refused connections (wrong code, a second client, bad frames).
     int refused() const { return refused_; }
+    // Tests: the biggest payload buffer a read ever held (claims never allocate ahead of the bytes), and a shorter
+    // stall limit than kMayaLinkFrameMs.
+    size_t largestBuffer() const { return largestBuffer_; }
+    void setFrameTimeoutMs(int ms) { frameMs_ = ms; }
     void send(MayaLinkMesh mesh);
     void send(MayaLinkPoints points);
     std::vector<MayaLinkMesh> takeReceived();
@@ -119,7 +125,8 @@ public:
 private:
     void run();
     bool serve(AiLinkConn& conn);
-    bool readFrame(AiLinkConn& conn, MayaLinkType& type, std::string& payload, int firstByteMs, std::string& error);
+    bool readFrame(AiLinkConn& conn, MayaLinkType& type, std::string& payload, int firstByteMs, uint64_t maxLength,
+                   std::string& error);
     bool flush(AiLinkConn& conn);
     void event(std::string text);
 
@@ -127,6 +134,8 @@ private:
     std::thread thread_;
     std::atomic<bool> running_{false}, stopping_{false}, connected_{false};
     std::atomic<int> refused_{0};
+    std::atomic<size_t> largestBuffer_{0};
+    std::atomic<int> frameMs_{kMayaLinkFrameMs};
     std::string code_, endpoint_;
     mutable std::mutex mutex_;
     std::string client_;
