@@ -2,7 +2,7 @@
 whats_new: **Stencil**: lay an image over the view and sculpt or paint through it (**Sculpt > Alpha > Stencil**). Move,
   scale and turn it on the canvas with **Adjust**, stroke over it, turn the model and repeat. Sculpt brushes take its
   brightness, Vertex Paint its colours; Tile repeats it across the view.
-highlight: Stencil: sculpt and paint through an image (thanks @kenttumanda123-netizen, #155)
+highlight: Stencil: place a reference image over the model, then sculpt or paint through it, and move it and repeat (thanks @kenttumanda123-netizen, #155)
 added: **Stencil** (Sculpt > Alpha > Stencil, #155, thanks @kenttumanda123-netizen): an image over the view (loaded
   like an alpha, or the brush's alpha) that the brushes work through. It stays put on screen while the model turns
   under it; every brush that takes an alpha (built-in, custom and Community brushes, the Paint brush, micro levels)

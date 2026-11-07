@@ -1,6 +1,7 @@
 ---
 whats_new: **Floor grid**: **View > Floor grid** draws a faint grid on the floor the model stands on, for grounding,
   perspective and lining up Parts. Off by default.
+highlight: Floor grid: View > Floor grid draws a faint grid on the floor the model stands on (thanks @fenixpoints, #115)
 added: **Floor grid** (#115, **View > Floor grid**, also **Tool > Display** and the command palette): a faint grid on the
   floor under the model (its lowest point, Y up; it moves when a stroke or a move ends), the X and Z axes through the
   origin marked, squares stepping by ten with the zoom and fading into the distance. It never draws over the model.

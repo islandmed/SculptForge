@@ -1,7 +1,7 @@
 ---
 whats_new: **Brush sets**: save the bottom shelf and its brushes' keys as a named set (Wood, Metal, Stone...) and swap
   both in one step from **Sculpt > Brush > Brush set**, the shelf's right-click menu or <kbd>F3</kbd>. Asked for by @NicTanghe.
-highlight: Brush sets: swap the whole bottom shelf and its keys in one step
+highlight: Brush sets: swap the whole bottom shelf and its keys in one step (thanks @NicTanghe, #143)
 added: **Brush sets** (#143, asked for by @NicTanghe): **Sculpt > Brush > Brush set > Save** keeps the bottom shelf's brushes, in
   order, and their keys as a named set in your brush library; picking a set (the Brush palette, the bottom shelf's
   right-click menu **Brush set**, or **Brush Set: Wood** in the command palette) swaps the shelf and the keys in one

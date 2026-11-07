@@ -5,6 +5,18 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.11
+
+```features
+date: 2026-11-06
+tagline: Sculpt through a reference image, a live link to Maya, and creature bones to build from.
+highlight: Stencil: place a reference image over the model, then sculpt or paint through it, and move it and repeat (thanks @kenttumanda123-netizen, #155)
+highlight: Maya Live: each stroke goes to Maya on its own, and Maya's edits come back the same way. An optional Live link makes it near-instant; it's off by default and warns when you turn it on (thanks @tristratos, #42)
+highlight: Creature bones: 13 original starting pieces for building creatures, in Insert sets (thanks @kenttumanda123-netizen, #154)
+highlight: Brush sets: swap the whole bottom shelf and its keys in one step (thanks @NicTanghe, #143)
+highlight: Floor grid: View > Floor grid draws a faint grid on the floor the model stands on (thanks @fenixpoints, #115)
+```
+
 ## Version 0.11.10
 
 ```features

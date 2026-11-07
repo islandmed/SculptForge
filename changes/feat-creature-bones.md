@@ -2,7 +2,7 @@
 whats_new: **Creature bones**: **Append > Insert on the model > Creature bones** is a built-in set of original
   fantasy creature bones (skull, jaw, teeth, horns, spine, ribs, limb and wing bones, claws, tail): pick one
   and drag it onto your model, no file needed. Thanks @kenttumanda123-netizen (#154).
-highlight: Creature bones: a built-in insert set of 13 original bones
+highlight: Creature bones: 13 original starting pieces for building creatures, in Insert sets (thanks @kenttumanda123-netizen, #154)
 added: **Creature bones** (Append > Insert on the model, #154): a built-in insert set of 13 original fantasy creature
   bones (Skull, Jaw, Fang, Blade tooth, Swept horn, Spiral horn, Claw, Vertebra, Tail vertebrae, Rib, Limb
   bone, Wing bone, Wing finger), clean closed quad meshes for dividing and sculpting, generated in-house by

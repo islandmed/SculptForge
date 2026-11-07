@@ -1,7 +1,7 @@
 ---
 whats_new: **Maya Live**: turn on **File > Maya > Live** (and **Live** on the Maya shelf) and each app sends what you change by itself, 300 ms after a stroke or edit, only the Parts that changed. Thanks @tristratos (#42).
 whats_new: **Maya Live link**: **File > Maya > Live link...** connects SculptForge and Maya on this computer so Maya follows your stroke while you draw it. It asks every time, is off at every start, and the ember **Live link on** chip in the top bar turns it off.
-highlight: Maya follows your strokes live (thanks @tristratos, #42)
+highlight: Maya Live: each stroke goes to Maya on its own, and Maya's edits come back the same way. An optional Live link makes it near-instant; it's off by default and warns when you turn it on (thanks @tristratos, #42)
 added: **Maya Live** (#42, thanks @tristratos): **File > Maya > Live** sends the Parts a stroke, undo or edit changed
   to the exchange folder by itself once the scene is still for 300 ms (never mid-stroke), written in the background;
   the Maya shelf's new **Live** button does the same for Maya edits (node-dirty callbacks, debounced). Echo guard:
