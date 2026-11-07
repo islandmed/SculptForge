@@ -1247,6 +1247,18 @@ private:
     void applyHardwareProfile(const struct HardwareProfile& profile, bool announce);
     void finishCalibration();
     std::shared_ptr<struct HwProfileUi> hwProfile_;
+    // Hardware tiers (PanelHardwareTier.cpp, core/HardwareTier.h): the tier, GPU and Compute part of Preferences >
+    // Performance, the first-run tier card, the tier chip and Turbo in the top bar, the memory guard.
+    void drawHardwareTierSection();
+    void drawTierCard();               // once per machine, after calibration (or a hardware change); never blocks
+    void updateTierMemoryGuard();      // every frame (cheap: looks once a second)
+    void registerHardwareTierUiActions();
+    void saveProfileOverrides(const struct ProfileOverrides& o); // map, save, apply
+    std::string tierChipLabel() const; // "HIGH" / "" (no profile in this run)
+    void setTurbo(bool on);
+    bool turboOn() const;
+    bool turbo_ = false;               // (mirrors the profile's overrides.turbo; SF_TURBO=1 for benches)
+    double turboToggledAt_ = -10.0;    // the bolt's little animation
     // Splats > Make sculptable (PanelSculptable.cpp, core/Sculptable.h): splat capture -> sculptable Part on a
     // worker thread; the crop box and the face landmark review in the viewport.
     void registerSculptableUiActions();
@@ -1687,6 +1699,13 @@ private:
     bool hideBrushCursor_ = false; // demos: camera moves while the cursor is off screen
     float fpsShown_ = -1.0f; // title-strip frame rate, refreshed twice a second
     double fpsShownAt_ = 0.0;
+    // Title-strip memory (sfmonitor's request): sampled once a second, cheap (statm, meminfo, one GL query).
+    struct MemoryShown {
+        size_t appBytes = 0, freeBytes = 0, totalBytes = 0; // this process's resident RAM; the system's free and total
+        uint64_t gpuTotalMB = 0, gpuFreeMB = 0;             // the graphics card, all programs; 0 = it doesn't say
+        double at = -1.0;
+    } memShown_;
+    void sampleMemoryShown();
 public:
     // The part of the window the 3D view uses (logical px); the whole window while the UI is hidden.
     CanvasRect canvasRect() const;

@@ -13,6 +13,7 @@
 // machine), and keep the fixed 10 million triangle Fast Navigation threshold.
 #include "app/App.h"
 #include "app/Calibration.h"
+#include "app/HwProfileUi.h"
 #include "app/CrashLog.h"
 #include "app/Ui.h"
 #include "app/UserData.h"
@@ -36,32 +37,6 @@
 
 namespace sf {
 
-struct HwProfileUi {
-    HardwareProfile profile;
-    bool active = false;           // a profile is applied: its threshold governs Fast Navigation
-    bool saved = false;            // the profile came from (or went to) the cache
-    std::unique_ptr<Calibrator> calibrator;
-    std::string calibrationReason; // "first launch", "GPU changed", ...
-    bool announce = false;         // say what calibration found in the status bar
-    int calibrationFrames = 0;     // frames shown since calibration started (the first shows the overlay)
-    FrameGovernor governor;
-    GpuFrameTimer timer;
-    uint64_t frame = 0;
-    double frameStartMs = 0.0, drawStartMs = -1.0; // (drawStartMs: the 3D view's draw began; -1: not this frame)
-    struct Pending {
-        uint64_t frame;
-        FrameSample sample;
-        double cpuBeforeDrawMs; // the GPU waited through it inside the frame's timer query
-    };
-    std::deque<Pending> pending;   // frames waiting for their GPU time
-    uint64_t revision = 0;         // performanceSettingsRevision() when last applied
-    int displayHz = 0;
-    PowerSource power = PowerSource::Unknown;
-    double nextPowerCheck = 0.0;   // seconds (SDL ticks)
-    TierConfig tier;               // what currentTierConfig() holds
-    double lastCpuMs = 0.0, lastGpuMs = -1.0;
-    bool overridesOpen = false;
-};
 
 namespace {
 
@@ -165,6 +140,10 @@ void App::initHardwareProfile() {
     }
     applyHardwareProfile(start, false);
     if (!hw.calibrator) SDL_Log("Hardware profile: %s", start.reason.c_str());
+    SDL_Log("Hardware tier: %s (%s%s%s)", hwTierName(start.hwTier), start.detected.machine.c_str(),
+            start.detected.limit.empty() ? "" : "; ", start.detected.limit.c_str());
+    // The tier card: after calibration (finishCalibration), or now for a machine it wasn't shown on (SF_NO_CALIBRATION).
+    if (!hw.calibrator) hw.tierCard = start.overrides.tierCardFor != tierCardKey(start.hardware);
 }
 
 // Makes `p` the profile in effect: the process-wide settings and the governor's starting point; `announce` (after a
@@ -173,8 +152,15 @@ void App::applyHardwareProfile(const HardwareProfile& p, bool announce) {
     HwProfileUi& hw = *hwProfile_;
     hw.profile = p;
     hw.active = true;
-    // The tier's knobs for this power source and display; its target Hz is the governor's (60 / 120 / 144).
-    hw.tier = tierConfigFor(p, hw.power, hw.displayHz);
+    turbo_ = p.overrides.turbo || turbo_;
+    // The tier's knobs for this power source and display; its target Hz is the governor's (60 / 120 / 144). Turbo
+    // takes the detected tier's budgets when a lower one was set by hand (never past what the machine carries, and
+    // the memory guard's steps still apply).
+    HardwareProfile forTier = p;
+    HwTier simulated;
+    if (turbo_ && !simulatedHwTier(simulated) && p.detected.tier > p.hwTier) forTier.hwTier = p.detected.tier;
+    forTier.overrides.turbo = turbo_;
+    hw.tier = tierConfigFor(forTier, hw.power, hw.displayHz, hw.memoryGuard.stepDown);
     setCurrentTierConfig(hw.tier);
     PerformanceSettings s = p.settings;
     s.targetFps = hw.tier.targetHz;
@@ -189,6 +175,7 @@ void App::applyHardwareProfile(const HardwareProfile& p, bool announce) {
         hw.tier.uploadBudgetMBPerFrame = s.uploadBudgetMBPerFrame;
         hw.tier.residentCacheCapMB = std::min<uint64_t>(hw.tier.residentCacheCapMB, 1024);
         hw.tier.zeroCopyUMA = false;
+        hw.tier.budgets.threads = 4;
         setCurrentTierConfig(hw.tier);
         SDL_Log("Hardware profile: simulating the floor tier (SF_HW_SIMULATE=floor): budget 2M triangles, 4 threads");
     }
@@ -224,6 +211,8 @@ void App::finishCalibration() {
     SDL_Log("Hardware profile: %s (%.0f ms)", p.reason.c_str(), p.calibration.durationMs);
     applyHardwareProfile(p, hw.announce);
     hw.announce = false;
+    // First launch, or another machine: the tier card says what it found (once per machine).
+    hw.tierCard = p.overrides.tierCardFor != tierCardKey(p.hardware);
 }
 
 void App::shutdownHardwareProfile() {
@@ -311,6 +300,7 @@ void App::hardwareProfileFrameEnd() {
                                         std::to_string(hw.tier.targetHz) + " Hz";
         }
     }
+    updateTierMemoryGuard();
     // The set_performance_override or calibrate command changed the profile: take it up.
     if (performanceSettingsRevision() != hw.revision) {
         HardwareProfile cached;
@@ -322,6 +312,9 @@ void App::hardwareProfileFrameEnd() {
 bool App::hardwareCalibrating() const { return hwProfile_ && hwProfile_->calibrator; }
 
 void App::drawHardwareProfileOverlay() {
+    // The first-run card is for people: benchmarks, takes and demos run without it (a take's stroke would land on it).
+    const bool scripted = options_.benchmark || !options_.benchmarkScript.empty() || !options_.demo.empty();
+    if (hwProfile_ && !hwProfile_->calibrator && hwProfile_->tierCard && !scripted) drawTierCard();
     if (!hwProfile_ || !hwProfile_->calibrator) return;
     HwProfileUi& hw = *hwProfile_;
     const ImGuiViewport* vp = ImGui::GetMainViewport();
@@ -350,6 +343,7 @@ void App::drawHardwareProfileOverlay() {
 }
 
 void App::registerPerformanceProfileUiActions() {
+    registerHardwareTierUiActions(); // the tier, Compute, the graphics card, Turbo (PanelHardwareTier.cpp)
     {
         Action a;
         a.id = "perf.recalibrate";
@@ -393,7 +387,8 @@ void App::registerPerformanceProfileUiActions() {
 }
 
 void App::drawPerformanceProfileSection() {
-    ImGui::TextUnformatted(tr("Hardware profile"));
+    drawHardwareTierSection(); // the tier, why, what it turns on; graphics card; Compute (PanelHardwareTier.cpp)
+    ImGui::TextUnformatted(tr("Render profile"));
     ui::HelpText("Hardware profile", nullptr,
                  "SculptForge measures this computer on first launch (and when the graphics card, its driver or the "
                  "version changes) and picks settings to match: how many triangles the view draws per frame, when big "
@@ -422,7 +417,7 @@ void App::drawPerformanceProfileSection() {
                              : h.vramMB ? formatMegabytes(h.vramMB)
                                         : std::string("memory unknown");
     if (fontBold_) ImGui::PushFont(fontBold_);
-    ImGui::TextWrapped(tr("Detected %s, %s -> %s"), h.glRenderer.empty() ? "an unknown GPU" : h.glRenderer.c_str(), vram.c_str(),
+    ImGui::TextWrapped(tr("%s, %s: %s render profile"), h.glRenderer.empty() ? "An unknown GPU" : h.glRenderer.c_str(), vram.c_str(),
                        tierName(p.tier));
     if (fontBold_) ImGui::PopFont();
     // Why (the reason without the "Detected ... -> tier" the line above already says).
@@ -486,7 +481,7 @@ void App::drawPerformanceProfileSection() {
     if (ImGui::TreeNode(tr("Manual overrides"))) {
         ProfileOverrides o = p.overrides;
         bool edited = false;
-        const char* tiers[] = {tr("Tier: automatic"), tr("Software (safe mode)"), tr("Laptop / Budget"), tr("Workstation")};
+        const char* tiers[] = {tr("Render profile: automatic"), tr("Software (safe mode)"), tr("Laptop / Budget"), tr("Workstation")};
         int tierIndex = 0;
         ProfileTier forced;
         if (!o.tier.empty() && tierFromName(o.tier, forced)) tierIndex = int(forced) + 1;
@@ -533,9 +528,13 @@ void App::drawPerformanceProfileSection() {
             edited = true;
         }
         if (o.any() && ImGui::Button(tr("Back to automatic"))) {
-            const bool governorWas = o.governor;
+            const ProfileOverrides was = o;
             o = ProfileOverrides{};
-            o.governor = governorWas;
+            o.governor = was.governor;
+            o.compute = was.compute; // (choices, not tuning: kept)
+            o.gpu = was.gpu;
+            o.turbo = was.turbo;
+            o.tierCardFor = was.tierCardFor;
             edited = true;
         }
         if (edited) {

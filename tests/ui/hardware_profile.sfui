@@ -10,8 +10,14 @@ expect_no_text Getting to know this computer
 click "Preferences##palette.preferences"
 click "Performance##preferences.performance"
 wait_for "Frame Governor" 10
-expect_text Hardware profile
-expect_text Detected
+expect_text Render profile
+expect_text render profile
+# The hardware tier (PanelHardwareTier.cpp): the machine and its tier, what it turns on, Compute and its tasks.
+expect_text What this turns on
+expect_text Focus Detail keeps
+expect_text Compute
+expect_text Brush solver: CPU
+expect_text CPU only for now
 expect_text Triangles
 expect_text View budget
 expect_text Motion proxy from

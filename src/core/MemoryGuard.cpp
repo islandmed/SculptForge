@@ -82,6 +82,21 @@ MemoryCheck checkMemory(size_t need, size_t available) {
     return c;
 }
 
+std::string compactBytes(size_t b) {
+    char buf[16];
+    const double gb = double(b) / double(1ull << 30);
+    if (gb < 0.995) std::snprintf(buf, sizeof buf, "%.0fM", double(b) / double(1u << 20));
+    else std::snprintf(buf, sizeof buf, gb < 9.95 ? "%.1fG" : "%.0fG", gb);
+    return buf;
+}
+
+std::string memoryText(size_t b) {
+    std::string s = compactBytes(b);
+    const char unit = s.back();
+    s.pop_back();
+    return s + (unit == 'G' ? " GB" : " MB");
+}
+
 std::string formatGigabytes(size_t b) {
     const double gb = double(b) / 1e9;
     char buf[32];

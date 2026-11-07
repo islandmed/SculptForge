@@ -46,6 +46,14 @@ struct TierConfig {
     // per point, so a slower CPU shades fewer and the dabs and the orbit keep up; 0 = the points budget only).
     double strokeShadeMs = 10.0;
     uint64_t outOfCorePoints = 0;
+    // The hardware tier (core/HardwareTier.h): the one in effect (the detected or chosen one, minus the memory guard's
+    // steps) and its budgets, which the advanced levels read (Focus Detail, coarse LOD, micro levels, dense strokes).
+    HwTier hwTier = HwTier::Floor;
+    HwTier chosenHwTier = HwTier::Floor; // before the memory guard
+    int memoryStepDown = 0;
+    TierBudgets budgets;
+    ComputeChoice compute = ComputeChoice::Auto; // (SF_COMPUTE applied)
+    bool turbo = false;                  // Turbo is on (App: eye candy off while working, top budgets)
     bool onBattery() const { return power == PowerSource::Battery; }
 };
 
@@ -59,8 +67,9 @@ size_t microShadeBudget(const TierConfig& tier, bool stroking, bool viewMoving, 
 
 // 144 for displays of 143 Hz and up, 120 from 119 Hz, else 60 (also when unknown: 0).
 int targetHzForDisplay(int displayHz);
-// The knobs for `profile` on this power source and display (displayHz 0 = unknown). Deterministic.
-TierConfig tierConfigFor(const HardwareProfile& profile, PowerSource power, int displayHz);
+// The knobs for `profile` on this power source and display (displayHz 0 = unknown), the hardware tier stepped down
+// `memoryStepDown` levels by the memory guard (never below Floor). Deterministic but for SF_TIER_* / SF_COMPUTE.
+TierConfig tierConfigFor(const HardwareProfile& profile, PowerSource power, int displayHz, int memoryStepDown = 0);
 Json tierConfigJson(const TierConfig& config);
 
 // The configuration in effect (the app sets it from the profile, the power source and the display).

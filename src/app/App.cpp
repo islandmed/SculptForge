@@ -144,6 +144,9 @@ bool App::init(const AppOptions& options) {
     // Full screen on one monitor stays up when the pointer clicks on another (Windows multi-monitor, Discord).
     SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
     if (!headless && options.demo.empty()) applyCachedThreadCount(); // the hardware profile's threads, before any brush work
+    // The graphics card chosen in Preferences > Performance, before the GL context (a failed start falls back).
+    std::string gpuNotice;
+    if (!headless && options.demo.empty() && !sharedWindow_) gpuNotice = applyCachedGpuChoice();
     if (sharedWindow_) syncSdlEnvironment(); // (what SDL_Init would have read)
     else if (!SDL_Init(SDL_INIT_VIDEO)) {
         startError_ = std::string("The window system did not start: ") + SDL_GetError();
@@ -230,6 +233,8 @@ bool App::init(const AppOptions& options) {
         SDL_Log("%s", err.c_str());
         return false;
     }
+    if (!headless && options.demo.empty() && !sharedWindow_) gpuChoiceStarted(); // (the chosen card works)
+    if (!gpuNotice.empty()) status_ = gpuNotice;
     timer.step("renderer");
     renderer_.setEnvironmentWake([] { wakeMainLoop(); }); // (PBR view: a new environment's lighting is ready)
     // Fill layers ask for Mesh Maps: the app bakes them on a worker thread (PanelFill.cpp, updateMeshMaps).
@@ -1225,7 +1230,7 @@ int App::run() {
         renderSettings_.materialTint = materialTintFor(doc_.paintColor); // (Color > Colour tints the material)
         renderSettings_.resolutionScale = float(uiPrefs_.viewResolution) / 100.0f; // (#80; only the window's view)
         if (perf_.movingNow) // while the view moves, the floor tier draws fewer pixels; full resolution when it stops
-            renderSettings_.resolutionScale = std::min(renderSettings_.resolutionScale, motionResolution());
+            renderSettings_.resolutionScale = std::min(renderSettings_.resolutionScale, turbo_ ? std::min(motionResolution(), 0.75f) : motionResolution());
         hardwareProfileDrawStart();
         perf_.samplesUsed = renderer_.drawView(camera_, fbW, fbH, renderSettings_, canvasViewport(fbW, fbH), samples);
         if (snapshotEnv && *snapshotEnv && (sm.moving || sm.releasing)) {

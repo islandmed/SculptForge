@@ -16,6 +16,7 @@
 #include "app/Ui.h"
 #include "app/I18n.h"
 #include "core/LitSphere.h"
+#include "core/MemoryGuard.h"
 #include "core/Micro.h"
 #include "core/Multires.h"
 #include "core/VertexPaint.h"
@@ -33,6 +34,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <tuple>
 
 namespace sf {
 
@@ -1545,8 +1547,16 @@ void App::drawStatusBar(const ShellGeometry& g) {
     // version, the workspaces, the search field (to its icon), then the last menus (into a >> button).
     float searchW = 150.0f * s;
     const float moreW = buttonH;
-    auto menusRight = [&](bool presets) { // where the menus must end
+    // Turbo's bolt (View > Turbo, our own drawing, orange when on) and the hardware tier chip (opens Preferences >
+    // Performance), left of the layout presets. A narrow window drops the chip after the version, then the bolt, then
+    // the presets (View > Turbo and the Performance panel stay).
+    const float boltW = buttonH;
+    const std::string tierText = tierChipLabel();
+    const std::string tierLabel = tierText.empty() ? std::string() : std::string(ICON_LC_GAUGE) + " " + (caps ? upper(tr(tierText.c_str())) : std::string(tr(tierText.c_str())));
+    const float tierW = tierLabel.empty() ? 0.0f : textW(monoSmall, tierLabel) + 16.0f * s;
+    auto menusRight = [&](bool presets, bool chip = false, bool bolt = false) { // where the menus must end
         return right - searchW - 10.0f * s - (presets ? 3.0f * wsW + 2.0f * s + 14.0f * s : 0.0f) -
+               (chip && tierW > 0.0f ? tierW + 8.0f * s : 0.0f) - (bolt ? boltW + 6.0f * s : 0.0f) -
                (mayaLink ? linkW + 10.0f * s : 0.0f) - 12.0f * s;
     };
     auto menusWidth = [&](int n) {
@@ -1554,9 +1564,11 @@ void App::drawStatusBar(const ShellGeometry& g) {
         for (int i = 0; i < n; ++i) w += menuWs[size_t(i)];
         return w;
     };
-    const bool showVersion = brandEnd + versionW + menusGap + menusWidth(menuCount) <= menusRight(true); // (the modules give way)
+    const bool showVersion = brandEnd + versionW + menusGap + menusWidth(menuCount) <= menusRight(true, true, true); // (the modules give way)
     const float menusX = brandEnd + (showVersion ? versionW : 0.0f) + menusGap;
-    const bool showPresets = menusX + menusWidth(menuCount) <= menusRight(true);
+    const bool tierChip = tierW > 0.0f && menusX + menusWidth(menuCount) <= menusRight(true, true, true);
+    const bool boltShown = menusX + menusWidth(menuCount) <= menusRight(true, tierChip, true);
+    const bool showPresets = menusX + menusWidth(menuCount) <= menusRight(true, tierChip, boltShown);
     if (!showPresets && menusX + menusWidth(menuCount) > menusRight(false)) searchW = buttonH + 4.0f * s; // just the icon
     int shownMenus = menuCount;
     while (shownMenus > 1 && menusX + menusWidth(shownMenus) > menusRight(false)) --shownMenus;
@@ -1569,6 +1581,16 @@ void App::drawStatusBar(const ShellGeometry& g) {
     barSpans_.push_back({closeX, closeX + 2.0f * winW + 2.0f * s});
     barSpans_.push_back({searchX, searchX + searchW});
     if (showPresets) barSpans_.push_back({presetsX, presetsX + 3.0f * wsW + 2.0f * s});
+    const float boltX = right - boltW;
+    if (boltShown) {
+        right = boltX - 6.0f * s;
+        barSpans_.push_back({boltX, boltX + boltW});
+    }
+    const float tierX = right - tierW;
+    if (tierChip) {
+        right = tierX - 8.0f * s;
+        barSpans_.push_back({tierX, tierX + tierW});
+    }
 
     if (showVersion) {
         const float vx = textAt(monoSmall, brandEnd + 6.0f * s, theme::textDim, version.number);
@@ -1703,6 +1725,20 @@ void App::drawStatusBar(const ShellGeometry& g) {
         // View > Lock camera (#62, Shift+L): left-drags on the background start strokes instead of turning the view.
         if (uiPrefs_.airStrokes) mods.push_back({ICON_LC_LOCK, "camera", upper(tr("Camera locked")), true});
     }
+    // Memory beside them (sfmonitor, Oslen on Discord): this app's RAM and the system's free RAM, then the graphics
+    // card's memory in use where its driver says. Once a second; the tooltip has the detail.
+    sampleMemoryShown();
+    const MemoryShown& mem = memShown_;
+    int ramMod = -1, gpuMod = -1;
+    if (mem.appBytes) {
+        ramMod = int(mods.size());
+        mods.push_back({ICON_LC_MEMORY_STICK, "ram", compactBytes(mem.appBytes) + (mem.freeBytes ? " / " + compactBytes(mem.freeBytes) + " " + tr("free") : std::string())});
+    }
+    if (mem.gpuTotalMB > mem.gpuFreeMB || mem.gpuFreeMB) {
+        gpuMod = int(mods.size());
+        mods.push_back({ICON_LC_GPU, "gpu", mem.gpuTotalMB > mem.gpuFreeMB ? compactBytes(size_t(mem.gpuTotalMB - mem.gpuFreeMB) << 20)
+                                                                          : compactBytes(size_t(mem.gpuFreeMB) << 20) + " " + tr("free")});
+    }
     ImFont* labelFont = theme::look.id != 0 && fontMonoTiny_ ? fontMonoTiny_ : fontTiny_ ? fontTiny_ : monoSmall;
     auto moduleW = [&](const StatusModule& m) {
         switch (style) {
@@ -1717,19 +1753,25 @@ void App::drawStatusBar(const ShellGeometry& g) {
     const float sepW = style == Status::Terminal ? textW(monoSmall, " | ") : style == Status::TitleBlock ? 0.0f : 16.0f * s;
     // Drop the least important modules (from the file name inwards) until they fit beside the menus.
     std::vector<int> shown = {0, 1, 2, 3, 4};
-    if (mods.size() > 5) shown.insert(shown.begin() + 1, 5); // Camera locked, beside the mode (never dropped)
+    if (uiPrefs_.airStrokes) shown.insert(shown.begin() + 1, 5); // Camera locked, beside the mode (never dropped)
+    for (int m : {ramMod, gpuMod}) // after the triangles, before the frame rate
+        if (m >= 0) shown.insert(std::find(shown.begin(), shown.end(), 4), m);
     auto total = [&] {
         float w = 0.0f;
         for (size_t k = 0; k < shown.size(); ++k) w += moduleW(mods[size_t(shown[k])]) + (k ? sepW : 0.0f);
         return w;
     };
-    for (int drop : {2, 4, 1})
+    for (int drop : {gpuMod, 2, ramMod, 4, 1}) { // (RAM outlasts the file name, and shrinks to the app's own before it goes)
+        if (drop >= 0 && drop == ramMod && total() > right - menusEnd - 120.0f * s) mods[size_t(ramMod)].value = compactBytes(mem.appBytes);
         if (total() > right - menusEnd - 120.0f * s) shown.erase(std::remove(shown.begin(), shown.end(), drop), shown.end());
+    }
     // A narrow window (#105: 800 logical px at Windows' 200 %): never over the menus; the triangles go, then the mode.
-    for (int drop : {3, 5, 0})
+    for (int drop : {gpuMod, ramMod, 3, 5, 0})
         if (total() > right - menusEnd) shown.erase(std::remove(shown.begin(), shown.end(), drop), shown.end());
     float mx = right - total();
     const float modulesX = mx;
+    std::vector<std::tuple<int, float, float>> memSpans; // (module, x0, x1): the memory modules' tooltip
+
     for (size_t k = 0; k < shown.size(); ++k) {
         const StatusModule& m = mods[size_t(shown[k])];
         const float w = moduleW(m);
@@ -1764,9 +1806,29 @@ void App::drawStatusBar(const ShellGeometry& g) {
                 textAt(monoSmall, ix + textW(monoSmall, " "), theme::text, m.value);
             }
         }
+        if (shown[k] == ramMod || shown[k] == gpuMod) memSpans.push_back({shown[k], mx, mx + w});
         mx += w;
     }
     if (!shown.empty()) barSpans_.push_back({modulesX, mx});
+    for (const auto& [m, x0, x1] : memSpans) {
+        ImGui::SetCursorScreenPos(ImVec2(x0, o.y + (h - buttonH) * 0.5f));
+        ImGui::InvisibleButton(m == ramMod ? "##status.ram" : "##status.gpu", ImVec2(std::max(x1 - x0, 1.0f), buttonH));
+        if (ImGui::IsItemHovered()) {
+            std::string tip = std::string(tr("RAM used by SculptForge")) + ": " + memoryText(mem.appBytes);
+            if (mem.freeBytes)
+                tip += "\n" + std::string(tr("RAM free")) + ": " + memoryText(mem.freeBytes) +
+                       (mem.totalBytes ? " / " + memoryText(mem.totalBytes) : std::string());
+            if (mem.gpuTotalMB > mem.gpuFreeMB)
+                tip += "\n" + std::string(tr("Graphics card memory in use (all programs)")) + ": " +
+                       memoryText(size_t(mem.gpuTotalMB - mem.gpuFreeMB) << 20) + " / " + memoryText(size_t(mem.gpuTotalMB) << 20);
+            else if (mem.gpuFreeMB)
+                tip += "\n" + std::string(tr("Graphics card memory free")) + ": " + memoryText(size_t(mem.gpuFreeMB) << 20);
+            else
+                tip += "\n" + std::string(tr("This graphics card doesn't report its memory use"));
+            tip += "\n" + std::string(tr("Updated every second"));
+            ImGui::SetTooltip("%s", tip.c_str());
+        }
+    }
     if (style == Status::TitleBlock)
         dl->AddLine(ImVec2(std::floor(mx + 10.0f * s) + 0.5f, o.y + inset), ImVec2(std::floor(mx + 10.0f * s) + 0.5f, o.y + h - inset),
                     theme::u32(theme::tileBorder));
@@ -1782,6 +1844,48 @@ void App::drawStatusBar(const ShellGeometry& g) {
         }
     }
 
+    if (tierChip) {
+        ImGui::SetCursorScreenPos(ImVec2(tierX, o.y + (h - buttonH) * 0.5f));
+        const bool clicked = ImGui::InvisibleButton((std::string(tr("Performance tier")) + "##perf.tier_chip").c_str(), ImVec2(tierW, buttonH));
+        const bool hovered = ImGui::IsItemHovered();
+        const ImVec2 p = ImGui::GetItemRectMin();
+        dl->AddRect(p, ImVec2(p.x + tierW, p.y + buttonH), theme::u32(hovered ? theme::accent : theme::tileBorder), 3.0f * s);
+        if (hovered) dl->AddRectFilled(p, ImVec2(p.x + tierW, p.y + buttonH), theme::u32(theme::frameHover, 0.6f), 3.0f * s);
+        textAt(monoSmall, p.x + 8.0f * s, hovered ? theme::textBright : theme::textDim, tierLabel);
+        ImGui::LogText("%s", tierLabel.c_str());
+        if (clicked) openPerformancePrefs();
+        ui::HelpText("Performance tier", nullptr,
+                     "The hardware tier SculptForge runs at on this computer. Click for what it turns on and to change it "
+                     "(Preferences > Performance).",
+                     "Status bar");
+    }
+    if (boltShown) {
+        // The bolt: two triangles of our own; orange when on; a short pop when it is switched.
+        ImGui::SetCursorScreenPos(ImVec2(boltX, o.y + (h - buttonH) * 0.5f));
+        const bool clicked = ImGui::InvisibleButton((std::string(tr("Turbo")) + "##view.turbo").c_str(), ImVec2(boltW, buttonH));
+        const bool hovered = ImGui::IsItemHovered();
+        const ImVec2 p = ImGui::GetItemRectMin();
+        const bool on = turboOn();
+        if (hovered) dl->AddRectFilled(p, ImVec2(p.x + boltW, p.y + buttonH), theme::u32(theme::frameHover, 0.7f), 3.0f * s);
+        const float since = float(ImGui::GetTime() - turboToggledAt_);
+        const float pop = since >= 0.0f && since < 0.3f ? 1.0f + 0.12f * std::sin(since / 0.3f * 3.14159f) : 1.0f;
+        const float u = buttonH * 0.30f * pop; // half height of the bolt
+        const ImVec2 c(p.x + boltW * 0.5f, p.y + buttonH * 0.5f);
+        const ImU32 col = theme::u32(on ? theme::accent : hovered ? theme::textBright : theme::textDim);
+        const float bx[6] = {0.30f, -0.50f, -0.04f, -0.30f, 0.50f, 0.04f}, by[6] = {-1.0f, 0.14f, 0.14f, 1.0f, -0.14f, -0.14f};
+        ImVec2 bolt[6];
+        for (int k = 0; k < 6; ++k) bolt[k] = ImVec2(c.x + bx[k] * u, c.y + by[k] * u);
+        if (on) dl->AddConcavePolyFilled(bolt, 6, col);
+        else dl->AddPolyline(bolt, 6, col, ImDrawFlags_Closed, std::max(1.0f, 1.25f * s));
+        ImGui::LogText("%s", on ? "Turbo on" : "Turbo off");
+        if (clicked) {
+            if (const Action* a = actions_.find("view.turbo"); a && a->run) {
+                actions_.touch(a->id);
+                a->run();
+            }
+        }
+        ui::HelpAction(*this, "view.turbo");
+    }
     if (mayaLink) {
         ImGui::SetCursorScreenPos(ImVec2(linkX, o.y + (h - buttonH) * 0.5f));
         const bool clicked = ImGui::InvisibleButton((std::string(tr("Live link on")) + "##mayalink.chip").c_str(), ImVec2(linkW, buttonH));
