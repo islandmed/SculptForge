@@ -1090,10 +1090,10 @@ constexpr Entry kTraditionalChinese[] = {
      "向 SculptForge 網站確認是否有新版本。SculptForge 每天也會自動檢查一次（偏好設定 > 更新）。"},
     {"Version, licence and the open-source components SculptForge is built with.",
      "版本、授權，以及 SculptForge 所使用的開放原始碼元件。"},
-    {"SculptForge is free and stays free. A membership adds betas and early builds, Member Requests (ask for a brush "
-     "or an alpha), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in "
+    {"SculptForge is free and stays free. A membership adds betas and early builds, Member Requests (one request a "
+     "month, built first and credited to you), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in "
      "your browser. Nothing in the app changes either way.",
-     "SculptForge 免費且將一直免費。成為會員可獲得 Beta 版與搶先版本、Member Requests（請求筆刷或 Alpha）、投票決定下"
+     "SculptForge 免費且將一直免費。成為會員可獲得 Beta 版與搶先版本、Member Requests（每月一個請求，先為你開發並列出你的名字）、投票決定下"
      "一步開發內容，以及名列致謝名單：會在瀏覽器中開啟 sculptforge.app/support.html。無論如何，應用程式本身都不會有任"
      "何改變。"},
     {"The official SculptForge community on Discord: questions, tips and work in progress. Opens the invite in your "
@@ -4106,8 +4106,8 @@ constexpr Entry kTraditionalChinese[] = {
      "雕刻到 Splat"},
     {"SculptForge has a new look",
      "SculptForge 換了新外觀"},
-    {"SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (ask for a brush or an alpha) and your name in the credits. %s",
-     "SculptForge 是免費的。會員可搶先取得測試版與早期版本、投票決定接下來開發什麼、提出會員請求（索取筆刷或 Alpha），並列名於致謝名單。%s"},
+    {"SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (one request a month, built first and credited to you) and your name in the credits. %s",
+     "SculptForge 是免費的。會員可搶先取得測試版與早期版本、投票決定接下來開發什麼、提出會員請求（每月一個，先為你開發並列出你的名字），並列名於致謝名單。%s"},
     {"Search brushes (scales, skin, stone...)",
      "搜尋筆刷（鱗片、皮膚、石頭...）"},
     {"Selection brushes (Ctrl+Shift)",

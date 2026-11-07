@@ -273,7 +273,7 @@ void App::drawSupportUi() {
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
-            ImGui::TextWrapped(tr("SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (ask for a brush or an alpha) and your name in the credits. %s"), kFreeReleaseNote);
+            ImGui::TextWrapped(tr("SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (one request a month, built first and credited to you) and your name in the credits. %s"), kFreeReleaseNote);
             if (ImGui::Button(tr("Support SculptForge##welcome"))) showSupportCard(SupportCardReason::Manual); // the memberships
             ImGui::SameLine();
             if (ImGui::Button(tr("Close##welcome"))) showWelcome_ = false;

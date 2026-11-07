@@ -22,6 +22,7 @@ expect_text Member
 expect_text $5
 expect_text $300
 expect_text Betas and early builds of the next version
+expect_text Member Requests: one a month, built first, credited to you
 expect_text A flat rate for the whole studio: any number of artists, each with everything in Member
 expect_no_text 10 artists
 expect_text Isolated: a private release channel, no outside connections
