@@ -4376,6 +4376,11 @@ constexpr Entry kSimplifiedChinese[] = {
      "旋转模板，以逆时针度数表示；Ctrl+点击以输入。"},
     {"Centre the Stencil again, upright, 80% of the view's height.",
      "将模板重新居中、摆正，高度为视图的 80%。"},
+    // Recent colours (Oslen on Discord)
+    {"Recent colour",
+     "最近颜色"},
+    {"A colour you painted with lately: click to paint with it again.",
+     "你最近用过的绘制颜色：点击即可再次使用。"},
 };
 
 } // namespace

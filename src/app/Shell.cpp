@@ -660,7 +660,10 @@ void App::registerShellActions() {
     add({"geometry.to_splats", "Sculpt to Splats", nullptr, "Turn the sculpt into Gaussian splats.", "Splats", "",
          "mesh_to_splats", [this] { runCommand("mesh_to_splats"); }, nullptr, nullptr});
     add({"color.fill", "Fill", ICON_LC_PAINT_BUCKET, "Fill the unmasked area with the colour.", "Color", "",
-         "paint_fill", [this] { runCommand("paint_fill", {{"color", colorToHex(doc_.paintColor)}}); }, nullptr, nullptr});
+         "paint_fill", [this] {
+             rememberPaintColor(doc_.paintColor);
+             runCommand("paint_fill", {{"color", colorToHex(doc_.paintColor)}});
+         }, nullptr, nullptr});
 
     // The shell itself.
     add({"ui.toggle_shelves", "Shelves", ICON_LC_MAXIMIZE, "Hide or show the shelves and trays around the canvas.", "Preferences",

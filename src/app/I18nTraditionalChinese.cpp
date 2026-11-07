@@ -4374,6 +4374,11 @@ constexpr Entry kTraditionalChinese[] = {
      "旋轉模板，以逆時針度數表示；Ctrl+點擊以輸入。"},
     {"Centre the Stencil again, upright, 80% of the view's height.",
      "將模板重新置中、擺正，高度為視圖的 80%。"},
+    // Recent colours (Oslen on Discord)
+    {"Recent colour",
+     "最近顏色"},
+    {"A colour you painted with lately: click to paint with it again.",
+     "你最近用過的繪製顏色：點擊即可再次使用。"},
 };
 
 } // namespace

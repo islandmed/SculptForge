@@ -421,6 +421,7 @@ void App::paintAt(const DabParams& dab) {
 
 void App::beginPaintStroke() {
     paintSnapshot_.reset();
+    if (strokePaint_) rememberPaintColor(doc_.paintColor); // (the left shelf's recent colours)
     const Mesh& m = doc_.mesh;
     if (strokePaint_ && paintsTexture(m)) { // texture painting: tiles go into the stroke's undo step
         if (!texturePainter_.begin(doc_.mesh, doc_.paintMaterial.channels)) {

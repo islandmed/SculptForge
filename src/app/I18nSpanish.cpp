@@ -4854,6 +4854,11 @@ constexpr Entry kSpanish[] = {
      "Barra superior"},
     {"Status bar",
      "Barra de estado"},
+    // Recent colours (Oslen on Discord)
+    {"Recent colour",
+     "Color reciente"},
+    {"A colour you painted with lately: click to paint with it again.",
+     "Un color con el que pintaste hace poco: haz clic para volver a pintar con él."},
 };
 
 } // namespace

@@ -185,7 +185,7 @@
 //                            the pick filter, x1000 radii), dabs, pixel_density (2 on a HiDPI screen), input_style (0 classic, 1 SculptForge, 2 Blender), turntable, orbit_lock (0 free, 1 Y, 2 X, 3 Z),
 //                            camera_ortho, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
 //                            claim), brush_type (BrushType
-//                            index, -1 for a custom brush or Paint), last_dab_x / last_dab_y (window pixels), paint_r
+//                            index, -1 for a custom brush or Paint), last_dab_x / last_dab_y (window pixels), paint_r, recent_colors (the left shelf's recent paint colours)
 //                            gizmo_mode (0 Draw, 1 Move, 2 Scale, 3 Rotate), gizmo_hover (handle under the cursor,
 //                            0 = none, in gizmo_drag's order from 1), gizmo_falloff, pivot_x / pivot_y / pivot_z,
 //                            center_x / center_y / center_z and size_x / size_y / size_z (active mesh bounds)
@@ -857,6 +857,7 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "last_dab_x") return app_.lastDabScreen_.x;
     if (name == "last_dab_y") return app_.lastDabScreen_.y;
+    if (name == "recent_colors") return double(app_.recentColors_.size()); // the left shelf's recent colours
     if (name == "paint_r") return std::round(255.0f * linearToSrgb(app_.doc_.paintColor).x);
     if (name == "gizmo_mode") return double(int(app_.gizmo_.mode));
     if (name == "gizmo_hover") return double(int(app_.gizmo_.hover));

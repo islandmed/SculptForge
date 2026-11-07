@@ -45,6 +45,8 @@ paints the current colour along its stroke. The Smooth brush and <kbd>Shift</kbd
 
 - The **left shelf** has a colour picker (a square plus a hue strip), two swatches and a **Fill** button. Clicking
   the second swatch swaps it with the main colour.
+- Under the two swatches, the **recent colours** are the last eight you painted with or filled with, newest first.
+  Click one to paint with it again. They are kept when you restart.
 - The **Paint** menu has a larger hue wheel with a hex value, ten preset swatches (white, near black, red,
   orange, yellow, green, blue, purple, skin and brown) and the fill buttons.
 - Press <kbd>C</kbd> with the cursor over the model to pick the colour under it (the mesh needs vertex paint for this,
