@@ -52,6 +52,16 @@ void Camera::orbitFree(float dx, float dy) {
                    glm::angleAxis(-dy * 0.008f, glm::vec3(1, 0, 0)));
 }
 
+void Camera::orbitAbout(const glm::vec3& worldAxis, float dx, float dy, float rollRadians) {
+    // Free orbiting turns the camera by (-dy, -dx, 0) * 0.008 about its own axes: only its part along the locked
+    // axis (in camera space) is kept, and the roll for the part pointing out of the screen.
+    const glm::vec3 axis = glm::normalize(worldAxis);
+    const glm::quat q = glm::normalize(orientation());
+    const glm::vec3 a = glm::conjugate(q) * axis;
+    const float angle = -(dy * a.x + dx * a.y) * 0.008f - rollRadians * a.z;
+    setOrientation(glm::angleAxis(angle, axis) * q);
+}
+
 void Camera::setOrientation(const glm::quat& q) {
     glm::extractEulerAngleYXZ(glm::mat4_cast(glm::normalize(q)), yaw, pitch, roll);
     if (std::abs(roll) < 1e-6f) roll = 0.0f;

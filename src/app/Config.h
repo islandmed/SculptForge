@@ -15,6 +15,7 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace sf {
@@ -37,7 +38,9 @@ struct UiPrefs {
     std::string lengthUnit = "mm", fileUnit = "m";
     std::string language = "en"; // Preferences > Interface: the interface language, "en", "es" or "zh-TW" (app/I18n.h)
     int cameraNotch = 0;        // keep the UI out of a laptop's camera notch: 0 automatic, 1 always, 2 never
-    bool turntable = false;     // rotation: false = free, about the screen axes; true = turntable (Y up)
+    // View > Orbit lock (rotation): 0 free, about the screen axes; 1 turntable (Y up); 2 about world X only; 3 about
+    // world Z only (Camera::orbitAbout). Saved as "orbitLock", and "turntable" for older versions.
+    int orbitLock = 0;
     int inputStyle = 1;         // Preferences > Input: 0 classic, 1 SculptForge (the default for new installs:
                                 // 1-0 brushes, I = Falloff...), 2 Blender (middle-drag orbit, numpad views,
                                 // Blender's sculpt keys), 3 Maya (Input.cpp). The first-run welcome asks.
@@ -152,6 +155,9 @@ Json toJson(const UiPrefs& prefs);
 void lookToJson(const UiPrefs& prefs, Json& j);
 bool lookFromJson(const Json& j, UiPrefs& prefs);
 void fromJson(const Json& j, UiPrefs& prefs);
+// UiPrefs::orbitLock as the orbit_lock command and ui.json name it: "free", "y", "x", "z" (-1: not one of them).
+const char* orbitLockName(int lock);
+int parseOrbitLock(std::string_view name);
 
 namespace config {
 // Preferences palette sub-palettes (the shell's Preferences palette calls these).

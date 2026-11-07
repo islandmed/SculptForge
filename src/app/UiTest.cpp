@@ -180,7 +180,7 @@
 //                            pressure curve: its points, its value at half pressure x100), brush_curves (brushes with
 //                            their own curve), dab_error_px (the last stroke's dab furthest from its cursor
 //                            position, projected back), dab_jitter / dab_jitter_raw (its depth wobble with / without
-//                            the pick filter, x1000 radii), dabs, pixel_density (2 on a HiDPI screen), input_style (0 classic, 1 SculptForge, 2 Blender), turntable,
+//                            the pick filter, x1000 radii), dabs, pixel_density (2 on a HiDPI screen), input_style (0 classic, 1 SculptForge, 2 Blender), turntable, orbit_lock (0 free, 1 Y, 2 X, 3 Z),
 //                            camera_ortho, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
 //                            claim), brush_type (BrushType
 //                            index, -1 for a custom brush or Paint), last_dab_x / last_dab_y (window pixels), paint_r
@@ -801,7 +801,8 @@ double Demo::query(const std::string& name, bool& known) const {
         return -1.0; // no such layer
     }
     if (name == "input_style") return double(app_.uiPrefs_.inputStyle);
-    if (name == "turntable") return app_.uiPrefs_.turntable ? 1.0 : 0.0;
+    if (name == "turntable") return app_.uiPrefs_.orbitLock == 1 ? 1.0 : 0.0;
+    if (name == "orbit_lock") return double(app_.uiPrefs_.orbitLock);
     if (name == "camera_ortho") return app_.camera_.ortho ? 1.0 : 0.0;
     if (name == "mask_brush") return app_.maskBrushActive() ? 1.0 : 0.0;
     if (name == "brush_sets") return double(app_.brushSets().size()); // brush sets in the library (#143)

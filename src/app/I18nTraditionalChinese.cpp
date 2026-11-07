@@ -1111,9 +1111,9 @@ constexpr Entry kTraditionalChinese[] = {
      "文字與控制項的大小，立即套用。「自動」會依視窗所在的顯示器而定（Windows：設定 > 顯示器 > 縮放，依各顯示器）。"},
     {"Free: dragging turns the model about the screen's axes and can roll it over the top; press Shift while rotating "
      "to snap to the nearest front, side, top or bottom view. Turntable: the model stays upright and turns about its "
-     "vertical axis, as in Blender or Maya.",
+     "vertical axis, as in Blender or Maya. X axis, Z axis: it turns about that world axis only (View > Orbit lock).",
      "自由：拖曳會以螢幕的軸旋轉模型，並可從上方翻轉；旋轉時按住 Shift 可貼齊最近的正面、側面、頂部或底部視圖。轉盤："
-     "模型保持直立並繞垂直軸旋轉，如同 Blender 或 Maya。"},
+     "模型保持直立並繞垂直軸旋轉，如同 Blender 或 Maya。X 軸、Z 軸：模型只繞該世界軸旋轉（檢視 > 軌道鎖定）。"},
     {"Keeps the interface below the camera notch of MacBooks (and other laptops) when SculptForge fills the screen. "
      "Automatic asks the system (macOS) or recognises a notched MacBook display (Linux).",
      "SculptForge 全螢幕時，讓界面保持在 MacBook（及其他筆電）相機瀏海下方。「自動」會詢問系統 (macOS) 或辨識有瀏海的"
@@ -1397,9 +1397,27 @@ constexpr Entry kTraditionalChinese[] = {
      "按鍵對它們沒有作用。"},
     {"Share size and intensity across brushes", "筆刷之間共用大小與強度"},
     {"Free", "自由"},
+    {"Orbit lock",
+     "軌道鎖定"},
+    {"Y (turntable)",
+     "Y（轉盤）"},
+    {"Rotation drags turn the view about the screen's axes and can roll it over the top (the default). "
+     "Saved with the preferences.",
+     "旋轉拖曳以螢幕的軸轉動檢視，並可從上方翻轉（預設）。隨偏好設定儲存。"},
+    {"Rotation drags turn the view like a turntable: the model stays upright and turns about its vertical "
+     "(Y) axis. Saved with the preferences.",
+     "旋轉拖曳像轉盤一樣轉動檢視：模型保持直立並繞其垂直（Y）軸旋轉。隨偏好設定儲存。"},
+    {"Rotation drags turn the view about the world X axis only (red): from the front, an up or down drag "
+     "tips the model towards you or away. Shift still snaps to a side view; the axis gizmo shows the "
+     "lock. Saved with the preferences.",
+     "旋轉拖曳只繞世界 X 軸（紅色）轉動檢視：從正面看，上下拖曳會讓模型朝你或遠離你傾斜。Shift 仍可貼齊側視圖；軸向小工具會顯示鎖定。隨偏好設定儲存。"},
+    {"Rotation drags turn the view about the world Z axis only (blue): from the front, a drag around the "
+     "middle turns the model like a wheel. Shift still snaps to a side view; the axis gizmo shows the "
+     "lock. Saved with the preferences.",
+     "旋轉拖曳只繞世界 Z 軸（藍色）轉動檢視：從正面看，繞中心拖曳會讓模型在螢幕上原地轉動。Shift 仍可貼齊側視圖；軸向小工具會顯示鎖定。隨偏好設定儲存。"},
     {"Free: the model turns about the screen's axes and can roll over the top. Turntable: it stays upright, as in "
-     "Blender or Maya.",
-     "自由：模型以螢幕的軸旋轉，並可從上方翻轉。轉盤：模型保持直立，如同 Blender 或 Maya。"},
+     "Blender or Maya. X axis, Z axis: it turns about that world axis only (View > Orbit lock).",
+     "自由：模型以螢幕的軸旋轉，並可從上方翻轉。轉盤：模型保持直立，如同 Blender 或 Maya。X 軸、Z 軸：模型只繞該世界軸旋轉（檢視 > 軌道鎖定）。"},
     {"The pointer over the 3D view: a crosshair (the default, as in most sculpting apps; it stays while the view "
      "turns) or the arrow. Panels, menus and popups always show the arrow (or their own resize and text cursors). "
      "Saved automatically.",

@@ -90,7 +90,8 @@ Json toJson(const UiPrefs& p) {
     j.set("libraryAtStartup", p.libraryAtStartup);
     j.set("libraryFolder", p.libraryFolder);
     j.set("cameraNotch", double(p.cameraNotch));
-    j.set("turntable", p.turntable);
+    j.set("orbitLock", std::string(orbitLockName(p.orbitLock)));
+    j.set("turntable", p.orbitLock == 1);
     j.set("inputStyle", std::string(p.inputStyle == 3 ? "maya" : p.inputStyle == 2 ? "blender" : p.inputStyle == 1 ? "sculptforge" : "classic"));
     j.set("emulateNumpad", p.emulateNumpad);
     j.set("rightClickQuickMenu", p.rightClickQuickMenu);
@@ -154,6 +155,17 @@ Json toJson(const UiPrefs& p) {
     return j;
 }
 
+const char* orbitLockName(int lock) {
+    static constexpr const char* names[4] = {"free", "y", "x", "z"};
+    return names[std::clamp(lock, 0, 3)];
+}
+
+int parseOrbitLock(std::string_view name) {
+    for (int i = 0; i < 4; ++i)
+        if (name == orbitLockName(i)) return i;
+    return name == "turntable" ? 1 : -1;
+}
+
 void fromJson(const Json& j, UiPrefs& p) {
     if (!j.isObject()) return;
     p.popupInfo = j["popupInfo"].asBool(p.popupInfo);
@@ -167,7 +179,8 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.libraryAtStartup = j["libraryAtStartup"].asBool(p.libraryAtStartup);
     if (j["libraryFolder"].isString()) p.libraryFolder = j["libraryFolder"].asString();
     p.cameraNotch = std::clamp(int(j["cameraNotch"].asNumber(p.cameraNotch)), 0, 2);
-    p.turntable = j["turntable"].asBool(p.turntable);
+    if (j["turntable"].asBool(false)) p.orbitLock = 1;
+    if (j["orbitLock"].isString()) p.orbitLock = std::max(parseOrbitLock(j["orbitLock"].asString()), 0);
     if (j["inputStyle"].isString()) {
         p.inputStyleSaved = true;
         const std::string style = j["inputStyle"].asString();
@@ -1608,17 +1621,19 @@ void drawInterfaceSection(App& app) {
                  "Size of text and controls, applied at once. Automatic follows the display the window is on (Windows: "
                  "Settings > Display > Scale, per monitor).",
                  "Preferences > Interface");
-    static const char* kRotation[] = {"Free", "Turntable"};
+    static const char* kRotation[] = {"Free", "Turntable", "X axis", "Z axis"}; // UiPrefs::orbitLock
+    p.orbitLock = std::clamp(p.orbitLock, 0, 3);
     ImGui::SetNextItemWidth(-FLT_MIN);
-    if (ImGui::BeginCombo("##rotation", (std::string(tr("Rotation:")) + " " + tr(kRotation[p.turntable ? 1 : 0])).c_str())) {
-        for (int i = 0; i < 2; ++i)
-            if (ImGui::Selectable(tr(kRotation[i]), (i == 1) == p.turntable)) p.turntable = i == 1;
+    if (ImGui::BeginCombo("##rotation", (std::string(tr("Rotation:")) + " " + tr(kRotation[p.orbitLock])).c_str())) {
+        for (int i = 0; i < 4; ++i)
+            if (ImGui::Selectable(tr(kRotation[i]), i == p.orbitLock)) p.orbitLock = i;
         ImGui::EndCombo();
     }
     ui::HelpText("Rotation", nullptr,
                  "Free: dragging turns the model about the screen's axes and can roll it over the top; press "
                  "Shift while rotating to snap to the nearest front, side, top or bottom view. Turntable: the model stays "
-                 "upright and turns about its vertical axis, as in Blender or Maya.",
+                 "upright and turns about its vertical axis, as in Blender or Maya. X axis, Z axis: it turns about that "
+                 "world axis only (View > Orbit lock).",
                  "Preferences > Interface");
     static const char* kNotch[] = {"Automatic", "Always reserve", "Off"};
     ImGui::SetNextItemWidth(-FLT_MIN);

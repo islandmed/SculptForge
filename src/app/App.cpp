@@ -1946,7 +1946,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     }
     switch (drag_) {
     case Drag::Stroke: strokeTo(x, y); break;
-    case Drag::Orbit: orbitBy(dx, dy); break;
+    case Drag::Orbit: orbitBy(x, y, dx, dy); break;
     case Drag::Roll:
         if (rollSideways_) camera_.setOrientation(camera_.orientation() * glm::angleAxis(dx * 0.008f, glm::vec3(0, 0, 1)));
         else rollBy(x, y, dx, dy);
@@ -2025,7 +2025,7 @@ void App::resetView() {
     status_ = "View reset";
 }
 
-void App::orbitBy(float dx, float dy) {
+void App::orbitBy(float x, float y, float dx, float dy) {
     if (autoOrtho_) { // an axis view turned: back to perspective (Blender's Auto Perspective)
         camera_.ortho = false;
         autoOrtho_ = false;
@@ -2034,7 +2034,10 @@ void App::orbitBy(float dx, float dy) {
         orbitRaw_ = camera_;
         orbitStarted_ = true;
     }
-    if (uiPrefs_.turntable || forceTurntable_) orbitRaw_.orbit(dx, dy);
+    const int lock = forceTurntable_ ? 1 : uiPrefs_.orbitLock;
+    if (lock == 1) orbitRaw_.orbit(dx, dy);
+    else if (lock == 2) orbitRaw_.orbitAbout(glm::vec3(1, 0, 0), dx, dy, rollSweep(x, y, dx, dy));
+    else if (lock == 3) orbitRaw_.orbitAbout(glm::vec3(0, 0, 1), dx, dy, rollSweep(x, y, dx, dy));
     else orbitRaw_.orbitFree(dx, dy);
     // Holding Shift snaps to the nearest view along an axis; letting go continues from where the cursor took it.
     if (inputMods(false) & SDL_KMOD_SHIFT) camera_.setOrientation(Camera::snapped(orbitRaw_.orientation()));
@@ -2042,8 +2045,11 @@ void App::orbitBy(float dx, float dy) {
 }
 
 void App::rollBy(float x, float y, float dx, float dy) {
-    // Turn about the view axis by the angle the cursor sweeps around the canvas centre (a sideways drag far
-    // from the centre still turns, by its length).
+    camera_.setOrientation(camera_.orientation() * glm::angleAxis(-rollSweep(x, y, dx, dy), glm::vec3(0, 0, 1)));
+}
+
+float App::rollSweep(float x, float y, float dx, float dy) const {
+    // The angle the cursor sweeps around the canvas centre (near the centre, a sideways drag turns by its length).
     const CanvasRect c = canvasRect();
     const glm::vec2 centre(c.x + c.w * 0.5f, c.y + c.h * 0.5f);
     const glm::vec2 now(x, y), before(x - dx, y - dy);
@@ -2054,7 +2060,7 @@ void App::rollBy(float x, float y, float dx, float dy) {
     } else {
         angle = dx * 0.008f;
     }
-    camera_.setOrientation(camera_.orientation() * glm::angleAxis(-angle, glm::vec3(0, 0, 1)));
+    return angle;
 }
 
 void App::onMouseUp() {
@@ -4331,7 +4337,8 @@ void App::drawAxisGizmo() {
     // negative ends smaller rings (their letter under the pointer). Drawn back to front: the ends pointing away are
     // smaller and fainter, the near ones on top. A click on an end snaps to that side (axisGizmoMouseDown), a
     // second click to the opposite side; the end under the pointer gets a ring. On an exact side view its name
-    // shows under the disc.
+    // shows under the disc. With an orbit lock (View > Orbit lock), the axis the view turns about runs through the
+    // disc, and a lock with its letter sits at the disc's lower right.
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
     const float unit = axisGizmoUnit();
     auto ends = axisGizmoLayout();
@@ -4354,9 +4361,20 @@ void App::drawAxisGizmo() {
     dl->AddCircleFilled(centre, discR, withAlpha(tint, onDisc ? 0.17f : light ? 0.08f : 0.07f), 48);
     dl->AddCircle(centre, discR, withAlpha(tint, onDisc ? 0.22f : 0.10f), 48, 1.0f * uiScale_);
 
-    std::sort(ends.begin(), ends.end(), [](const AxisGizmoEnd& a, const AxisGizmoEnd& b) { return a.depth < b.depth; });
     static constexpr ImU32 colours[3] = {IM_COL32(236, 84, 92, 255), IM_COL32(124, 196, 64, 255), IM_COL32(64, 140, 236, 255)};
     static constexpr const char* names[3] = {"X", "Y", "Z"};
+    // The locked axis, end to end through the disc (as long as it looks from here: a dot when it points at you).
+    static constexpr int lockAxes[4] = {-1, 1, 0, 2}; // UiPrefs::orbitLock: free, Y, X, Z
+    const int lockAxis = lockAxes[std::clamp(forceTurntable_ ? 1 : uiPrefs_.orbitLock, 0, 3)];
+    if (lockAxis >= 0)
+        for (const AxisGizmoEnd& e : ends)
+            if (e.axis == lockAxis && !e.negative) {
+                const glm::vec2 d = (e.at - c) * ((discR - 3.0f * unit) / (kAxisGizmoLength * unit));
+                dl->AddLine(ImVec2(c.x - d.x, c.y - d.y), ImVec2(c.x + d.x, c.y + d.y), withAlpha(colours[lockAxis], 0.55f),
+                            1.5f * unit);
+            }
+
+    std::sort(ends.begin(), ends.end(), [](const AxisGizmoEnd& a, const AxisGizmoEnd& b) { return a.depth < b.depth; });
     ImFont* font = fontBold_ ? fontBold_ : ImGui::GetFont();
     // The letters shrink with the circles (Small) but never grow past the UI font.
     const float fontSize = ImGui::GetFontSize() * 0.92f * std::min(1.0f, unit / std::max(uiScale_, 0.01f));
@@ -4398,6 +4416,22 @@ void App::drawAxisGizmo() {
         const ImVec2 at(std::round(c.x - ts.x * 0.5f), std::round(c.y + discR + 4.0f * uiScale_));
         dl->AddText(ImGui::GetFont(), size, ImVec2(at.x + 1.0f, at.y + 1.0f), light ? IM_COL32(255, 255, 255, 110) : IM_COL32(0, 0, 0, 150), text);
         dl->AddText(ImGui::GetFont(), size, at, light ? IM_COL32(30, 30, 34, 230) : IM_COL32(232, 232, 236, 220), text);
+    }
+
+    // The orbit lock's badge: a lock and the axis letter in its colour, on a pill at the disc's lower right.
+    if (lockAxis >= 0) {
+        const float size = ImGui::GetFontSize() * 0.8f;
+        ImFont* f = ImGui::GetFont();
+        const ImVec2 iconSize = f->CalcTextSizeA(size, FLT_MAX, 0.0f, ICON_LC_LOCK);
+        const ImVec2 nameSize = font->CalcTextSizeA(size, FLT_MAX, 0.0f, names[lockAxis]);
+        const float gap = 2.0f * uiScale_, padX = 4.0f * uiScale_, padY = 1.0f * uiScale_;
+        const float w = iconSize.x + gap + nameSize.x + 2.0f * padX, h = std::max(iconSize.y, nameSize.y) + 2.0f * padY;
+        const ImVec2 a(std::round(c.x + discR * 0.62f), std::round(c.y + discR * 0.62f));
+        dl->AddRectFilled(a, ImVec2(a.x + w, a.y + h), light ? IM_COL32(255, 255, 255, 200) : IM_COL32(20, 20, 24, 190), h * 0.5f);
+        dl->AddRect(a, ImVec2(a.x + w, a.y + h), withAlpha(colours[lockAxis], 0.8f), h * 0.5f, 0, 1.0f * uiScale_);
+        dl->AddText(f, size, ImVec2(a.x + padX, a.y + padY), light ? IM_COL32(30, 30, 34, 230) : IM_COL32(232, 232, 236, 230),
+                    ICON_LC_LOCK);
+        dl->AddText(font, size, ImVec2(a.x + padX + iconSize.x + gap, a.y + padY), colours[lockAxis], names[lockAxis]);
     }
 }
 
