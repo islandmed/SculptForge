@@ -3,7 +3,7 @@ whats_new: **Tube**: draw clay tubes in the air like a 3D pen. **Tool > Tube > D
   model, off it, or out of it. Pen pressure thins the tube; drag its points afterwards to reshape it, then **Bake** to
   sculpt it, or draw straight into the active Part with **Merge** (even edges, ready for dynamic topology). Thanks to
   GABO on Discord for the idea.
-highlight: Tube: draw clay tubes in 3D space
+highlight: Tube: draw clay tubes in the air like a 3D pen, then edit their points (thanks GABO on Discord)
 added: **Tube** (Tool > Tube): draw tubes freely in 3D space, like a 3D pen. Strokes lie on a plane facing the view
   (at the surface where the stroke starts, the pivot, or a fixed distance), optionally snapped onto surfaces; pen
   pressure sets the radius and the stroke is smoothed into a curve. The tube is swept along it with rings placed

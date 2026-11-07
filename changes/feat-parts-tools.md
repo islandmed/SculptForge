@@ -5,7 +5,7 @@ whats_new: **Delete masked** (**Tool > Visibility**) deletes what is masked, as 
   hidden. Undoable.
 whats_new: **Smooth or flat per Part, right in the list**: click the mark left of a Part's eye to go from the scene's
   shading to Smooth to Flat.
-highlight: Split masked, hidden or unmasked into a new Part
+highlight: Parts tools: split hidden, masked or unmasked areas into a new Part, merge points by distance, and Check Mesh with a Fix for each problem (thanks foirgairwolf on Discord)
 added: **Split > Hidden / Masked / Unmasked** (Tool > Parts; `part_split_hidden`, `part_split_masked`,
   `part_split_unmasked`): the triangles leave the active Part for a new Part below it (same folder, visibility and
   shading), one undo step that also removes the new Part. A triangle is masked when its corners' average mask is

@@ -1,4 +1,5 @@
 ---
+highlight: Side shelves no longer scroll sideways (thanks dm4nd on Discord), and Frame fits the model into the free area of the canvas
 fixed: The side columns (the shelf with Undo and Redo, the brush and colour shelf) and the trays no longer scroll
   sideways. At some UI scales their tiles were a few pixels wider than the column, so a sideways swipe or scroll
   moved them; the tiles now fit the column and the trays only scroll up and down (dm4nd on Discord).

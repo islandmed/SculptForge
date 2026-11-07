@@ -1,6 +1,6 @@
 ---
 whats_new: **Hardware tiers and Turbo**: SculptForge sorts your computer into a tier (Essential, Standard, High, Extreme) and switches on what it can carry: more Focus Detail memory, 16K textures. A card on first launch says what it found; the tier sits in the top bar. The new bolt (**View > Turbo**, Ctrl+Alt+T) trades antialiasing and detail while you sculpt and orbit for speed, and puts everything back the moment you stop.
-highlight: Hardware tiers and a Turbo button
+highlight: Hardware tiers and Turbo: SculptForge tunes itself to your computer, with a memory readout in the top bar (thanks Oslen on Discord)
 added: **Hardware tiers** (Edit > Preferences > Performance): the detected tier and why ("RTX 3060, 12 GB VRAM, 32 GB
   RAM: High"), what it turns on, Auto or any tier by hand. The Essential tier works exactly as before; Standard and up
   keep more Focus Detail in memory, and High and up allow 16K paint and bake textures. A small card on first launch
