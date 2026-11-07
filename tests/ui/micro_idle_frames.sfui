@@ -5,7 +5,12 @@ run micro_divide level=1
 expect_status "Divided to micro"
 window_focus 0
 mouse_leave
-wait 2
+# (in real time, with room for slow CI: its first-launch calibration and micro shading draw for a while too)
+shot micro-idle-first
+wait_value wants_frames == 0 60
+# (a drawn frame of the micro level: the bug asked for more frames from it, and UI tests draw the 3D view only for
+# shots; the first one can come before the micro shading is ready, and then draws without it)
+shot micro-idle
+wait_value wants_frames == 0 60
 expect_value coarse_clusters == 0
-expect_value wants_frames == 0
 window_focus 1
