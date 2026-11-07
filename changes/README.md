@@ -25,6 +25,8 @@ Anything after the front matter is for reviewers and is not copied anywhere.
 | `highlight` | the version's feature block and the update feed | optional; 3-5 per release in all, one short line |
 | `added` `changed` `fixed` `removed` `security` (`deprecated`) | `CHANGELOG.md` `[Unreleased]`, that section | the full entry, issue numbers and credits |
 | `testers` | the #testers checklist (`assemble_notes.py X.Y.Z --testers`) | what to try, where, what "good" looks like |
+| `member_request` | `true`: the What's New bullets end *Requested by a member*, the highlights "(requested by a member)" | a change a member asked for (Member Requests); `assemble_notes.py X.Y.Z --member-requests` counts them for latest.json's `support.member_requests_this_release` |
+| `member_credit` | the member's @handle (or short name) beside that tag | **only if the member opted in to being credited**; never otherwise |
 
 Every key may repeat. A value continues on the next lines indented by two spaces; each `testers` item starts with
 `  - `. The version's tagline and feature cards (title, line, image, Try it) stay hand-written in the ```features block of

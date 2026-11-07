@@ -4880,6 +4880,26 @@ constexpr Entry kSpanish[] = {
      "Tamaño de miniatura"},
     {"Thumbnails %.0f px",
      "Miniaturas %.0f px"},
+    // Membership moments (PanelSupportCard.cpp)
+    {"Member", "Miembro"},
+    {"You've opened SculptForge %d times. Members keep it free and growing.",
+     "Has abierto SculptForge %d veces. Los miembros lo mantienen gratis y en crecimiento."},
+    {"You've sculpted %d hours in SculptForge. Members keep it free and growing.",
+     "Has esculpido %d horas en SculptForge. Los miembros lo mantienen gratis y en crecimiento."},
+    {"You've saved your work %d times in SculptForge. Members keep it free and growing.",
+     "Has guardado tu trabajo %d veces en SculptForge. Los miembros lo mantienen gratis y en crecimiento."},
+    {"Members funded this month: %s.",
+     "Financiado por los miembros este mes: %s."},
+    {"Founding Members so far: %d of %d. A badge, your name in the credits and your price locked for good.",
+     "Miembros fundadores hasta ahora: %d de %d. Una insignia, tu nombre en los créditos y tu precio fijo para siempre."},
+    {"%d change in this release was a member's request.",
+     "%d cambio de esta versión fue una petición de un miembro."},
+    {"%d changes in this release were members' requests.",
+     "%d cambios de esta versión fueron peticiones de miembros."},
+    {"Thank you for being a member: you keep SculptForge free and growing.",
+     "Gracias por ser miembro: mantienes SculptForge gratis y en crecimiento."},
+    {"SculptForge is free and open source. Members keep it free and growing (Help > Support SculptForge).",
+     "SculptForge es libre y de código abierto. Los miembros lo mantienen gratis y en crecimiento (Ayuda > Apoya a SculptForge)."},
 };
 
 } // namespace

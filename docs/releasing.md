@@ -239,6 +239,14 @@ automatically.
   `"challenge": {"id": "YYYY-MM", "title": "<theme>"}` to `website/latest.json` (push main; the site deploys). The
   app's daily update check reads it once per id: the small membership card's challenge moment ("The <theme>
   challenge results are in, on Discord").
+- **The membership card's honest line (optional):** `website/latest.json` may carry
+  `"support": {"funded_this_month": ["<what members funded>", ...], "founding": {"taken": N, "limit": 100},
+  "member_requests_this_release": N}` (any part may be left out). The app's daily update check keeps it, and the small
+  card shows one true line from it in turn ("Members funded this month: ...", "Founding Members so far: N of 100...",
+  "N changes in this release were members' requests."); without the block the card keeps its usual Founding Members
+  line. Only real numbers: `founding` from `website/founding.json`, the requests count from
+  `tools/release/assemble_notes.py X.Y.Z --member-requests` before the bump (fragments with `member_request: true`).
+  Never anything that reads as urgency.
 - **Member Requests:** each approved request goes into islandmed/sculptforge-insiders as
   `requests/YYYY-MM/<slug>/request.json` + its file (+ `preview.png`), `"approved": true` once the requester has
   OK'd the preview (format: `tools/member-requests/requests.py`). On the 1st, member-requests.yml packs last month's,

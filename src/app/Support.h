@@ -10,8 +10,10 @@
 #pragma once
 
 #include "core/Json.h"
+#include "core/UpdateCheck.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -120,16 +122,25 @@ struct FoundingMembers {
 // --- The membership card at good moments (PanelSupportCard.cpp) ---
 // A small card along the bottom of the canvas, never a modal, at most once a week, until someone becomes a member.
 // It waits for the moment: ~20 minutes of active sculpting in this session (stroke time, not idle time), a Save
-// Render, the first start after an update, or the monthly challenge's results (website/latest.json's `challenge`).
+// Render, the first start after an update, the monthly challenge's results (website/latest.json's `challenge`), or a
+// milestone (the 10th start, 10 hours of sculpting, the 100th save: counted on this computer only, never sent).
 // Never mid-stroke or while a background job runs, never in tests, renders, demos or CI, never for a member signed in
-// for member builds (or verified once). Its buttons: Become a member, Not now (a week) and I'm already a member,
-// which signs in with GitHub (Preferences > Updates > Member builds' sign-in): access to the member repository hides
-// it for good and turns member builds on; no sign-in (cancelled, declined, no access) hides it for three months.
+// for member builds (or verified once). Its buttons: Become a member, Not now (a week; after the 3rd a month; after
+// the 6th only the first start after an update) and I'm already a member, which signs in with GitHub (Preferences >
+// Updates > Member builds' sign-in): access to the member repository hides it for good and turns member builds on;
+// no sign-in (cancelled, declined, no access) hides it for three months.
 // The full card at launch (the memberships side by side) shows on the first start only and from Help > Support.
 inline constexpr double kMemberCardSculptSeconds = 20.0 * 60.0; // active stroke time in this session
 inline constexpr double kSculptTimeMaxStep = 0.25; // one frame's share at most (a stall or a clock jump adds little)
 inline constexpr int64_t kMemberCardIntervalSeconds = 7 * 24 * 3600; // at most once a week (and "Not now")
 inline constexpr int64_t kMemberCardNoSignInSeconds = 90 * 24 * 3600; // "I'm already a member" without a sign-in
+inline constexpr int64_t kMemberCardMonthlySeconds = 30 * 24 * 3600; // after the 3rd "Not now"
+inline constexpr int kMemberCardMonthlyAfter = 3;  // "Not now"s before the card is monthly
+inline constexpr int kMemberCardUpdatesOnlyAfter = 6; // "Not now"s before it only comes with an update
+// The milestones (once each): the 10th start, 10 hours of sculpting (stroke time, every session), the 100th save.
+inline constexpr int kMilestoneStarts = 10;
+inline constexpr double kMilestoneSculptSeconds = 10.0 * 3600.0;
+inline constexpr int kMilestoneSaves = 100;
 
 // Adds one frame's `dt` seconds spent in a stroke to the sculpting time.
 inline double addSculptTime(double total, double dt) {
@@ -143,6 +154,14 @@ struct SupportCardPrefs {
     int64_t shownAt = 0;         // seconds since 1970 when a membership card last showed (0: never)
     int64_t hiddenUntil = 0;     // "Not now" or a sign-in that didn't happen: nothing before this (0: none)
     std::string challengeSeen;   // the last monthly challenge result the card knew of (latest.json's challenge.id)
+    int notNow = 0;              // "Not now"s so far (the backoff)
+    int shownCount = 0;          // small cards shown (which honest line comes next)
+    // The milestones' counts, on this computer only (project.json; nothing is ever sent).
+    int starts = 0;              // interactive starts
+    double sculptSeconds = 0.0;  // stroke time, every session
+    int saves = 0;               // project saves
+    unsigned milestonesShown = 0; // bits: 1 starts, 2 sculpting hours, 4 saves
+    SupportFeed feed;            // the last update check's "support" block (the card's honest line)
 };
 
 enum class SupportCardReason { None, FirstRun, Manual };
@@ -153,16 +172,114 @@ inline SupportCardReason supportCardDue(const SupportCardPrefs& p, bool firstRun
     return SupportCardReason::FirstRun;
 }
 
-enum class MemberMoment { None, Sculpted, SavedRender, Updated, Challenge };
+enum class MemberMoment { None, Sculpted, SavedRender, Updated, Challenge, Starts, SculptHours, Saves };
 
-// Whether a moment may bring the card at all (the weekly limit, the snooze, members): checked when the moment
-// happens; a moment that may not is dropped, not saved for later.
-inline bool memberMomentAllowed(const SupportCardPrefs& p, bool signedInMember, int64_t now, bool testMode) {
+// How long between cards: a week; a month after the 3rd "Not now" (and from then on).
+inline int64_t memberCardInterval(int notNow) {
+    return notNow >= kMemberCardMonthlyAfter ? kMemberCardMonthlySeconds : kMemberCardIntervalSeconds;
+}
+
+// Whether a moment may bring the card at all (the weekly or monthly limit, the snooze, members; after the 6th "Not
+// now", only an update's): checked when the moment happens; a moment that may not is dropped, not saved for later
+// (a milestone stays due: it is checked again at the next start, save or sculpting minute).
+inline bool memberMomentAllowed(const SupportCardPrefs& p, bool signedInMember, int64_t now, bool testMode,
+                                MemberMoment m = MemberMoment::None) {
     if (testMode || p.supporter || signedInMember) return false;
+    if (p.notNow >= kMemberCardUpdatesOnlyAfter && m != MemberMoment::Updated) return false;
     // (a clock set back past a snooze, or a snooze longer than it can be, ends it: a damaged value can't hide it for good)
     if (p.hiddenUntil > now && p.hiddenUntil - now <= kMemberCardNoSignInSeconds) return false;
-    const int64_t since = now - p.shownAt;
-    return p.shownAt <= 0 || since >= kMemberCardIntervalSeconds || since <= -kMemberCardIntervalSeconds;
+    const int64_t since = now - p.shownAt, interval = memberCardInterval(p.notNow);
+    return p.shownAt <= 0 || since >= interval || since <= -interval;
+}
+
+inline unsigned milestoneBit(MemberMoment m) {
+    return m == MemberMoment::Starts ? 1u : m == MemberMoment::SculptHours ? 2u : m == MemberMoment::Saves ? 4u : 0u;
+}
+
+// The milestone reached and not yet shown (starts first, then sculpting hours, then saves); None for none.
+inline MemberMoment milestoneDue(const SupportCardPrefs& p) {
+    const auto due = [&](MemberMoment m, bool reached) { return reached && !(p.milestonesShown & milestoneBit(m)); };
+    if (due(MemberMoment::Starts, p.starts >= kMilestoneStarts)) return MemberMoment::Starts;
+    if (due(MemberMoment::SculptHours, p.sculptSeconds >= kMilestoneSculptSeconds)) return MemberMoment::SculptHours;
+    if (due(MemberMoment::Saves, p.saves >= kMilestoneSaves)) return MemberMoment::Saves;
+    return MemberMoment::None;
+}
+
+// One line of the card, translatable: `format` (an English tr() key with at most one %d / %s pair) and its values.
+struct CardLine {
+    const char* format = nullptr; // nullptr: no line
+    int a = 0, b = 0;
+    std::string text;             // the %s value (a list of names)
+    bool textFirst = false;       // the format takes %s before the numbers
+};
+
+// `format` is line.format or its translation (same placeholders, same order).
+inline std::string formatCardLine(const CardLine& line, const char* format) {
+    if (!line.format || !format) return {};
+    char buf[512];
+    if (line.textFirst) std::snprintf(buf, sizeof buf, format, line.text.c_str());
+    else std::snprintf(buf, sizeof buf, format, line.a, line.b);
+    return buf;
+}
+
+// The milestone's words, with the true number at the time it shows (the hours whole, rounded down).
+inline CardLine milestoneLine(MemberMoment m, const SupportCardPrefs& p) {
+    CardLine l;
+    switch (m) {
+    case MemberMoment::Starts:
+        l.format = "You've opened SculptForge %d times. Members keep it free and growing.";
+        l.a = p.starts;
+        break;
+    case MemberMoment::SculptHours:
+        l.format = "You've sculpted %d hours in SculptForge. Members keep it free and growing.";
+        l.a = int(std::min(p.sculptSeconds / 3600.0, 1e6));
+        break;
+    case MemberMoment::Saves:
+        l.format = "You've saved your work %d times in SculptForge. Members keep it free and growing.";
+        l.a = p.saves;
+        break;
+    default: break;
+    }
+    return l;
+}
+
+// The honest lines the feed's "support" block allows (none: the card keeps its usual Founding Members line). Only
+// what the numbers say: no countdowns, no "only N left", nothing that isn't in the feed.
+inline std::vector<CardLine> supportFeedLines(const SupportFeed& f) {
+    std::vector<CardLine> out;
+    if (!f.funded.empty()) {
+        CardLine l;
+        l.format = "Members funded this month: %s.";
+        l.textFirst = true;
+        for (size_t i = 0; i < f.funded.size(); ++i) {
+            const std::string name = sanitizeSupporterName(f.funded[i]);
+            if (name.empty()) continue;
+            if (!l.text.empty()) l.text += ", ";
+            l.text += name;
+        }
+        if (!l.text.empty()) out.push_back(std::move(l));
+    }
+    if (f.foundingLimit >= 1 && f.foundingTaken >= 0 && f.foundingTaken < f.foundingLimit) {
+        CardLine l;
+        l.format = "Founding Members so far: %d of %d. A badge, your name in the credits and your price locked for good.";
+        l.a = f.foundingTaken, l.b = f.foundingLimit;
+        out.push_back(std::move(l));
+    }
+    if (f.memberRequests > 0) {
+        CardLine l;
+        l.format = f.memberRequests == 1 ? "%d change in this release was a member's request."
+                                         : "%d changes in this release were members' requests.";
+        l.a = f.memberRequests;
+        out.push_back(std::move(l));
+    }
+    return out;
+}
+
+// The line for the `shown`th card: the feed's lines in turn; no line (format nullptr) without them.
+inline CardLine supportFeedLine(const SupportFeed& f, int shown) {
+    const std::vector<CardLine> lines = supportFeedLines(f);
+    if (lines.empty()) return {};
+    return lines[size_t(std::max(0, shown)) % lines.size()];
 }
 
 // A moment allowed, the card waits for a calm frame: no stroke, no background job, no other card or dialog.
@@ -177,12 +294,15 @@ inline bool sculptMomentDue(double sessionSculptSeconds, bool alreadyThisSession
 
 enum class MemberCardChoice { Become, NotNow, SignedIn, NoSignIn };
 
-// What a choice on the card leaves in the preferences. Become a member opens the checkout and counts as "Not now"
-// (the card comes back in a week unless they sign in or say they're a member).
+// What a choice on the card leaves in the preferences. Become a member opens the checkout and snoozes like "Not now"
+// without counting as one (the card comes back in a week unless they sign in or say they're a member).
 inline void applyMemberCardChoice(SupportCardPrefs& p, MemberCardChoice c, int64_t now) {
     switch (c) {
-    case MemberCardChoice::Become:
-    case MemberCardChoice::NotNow: p.hiddenUntil = now + kMemberCardIntervalSeconds; break;
+    case MemberCardChoice::Become: p.hiddenUntil = now + memberCardInterval(p.notNow); break;
+    case MemberCardChoice::NotNow:
+        p.notNow = std::min(p.notNow + 1, 1000);
+        p.hiddenUntil = now + memberCardInterval(p.notNow);
+        break;
     case MemberCardChoice::SignedIn: p.supporter = true; break;
     case MemberCardChoice::NoSignIn: p.hiddenUntil = now + kMemberCardNoSignInSeconds; break;
     }
