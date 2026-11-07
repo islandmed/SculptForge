@@ -26,6 +26,7 @@
 //   stroke U0 V0 U1 V1 [S]   brush stroke across the model (fractions of its on-screen bounds)
 //   view_drag X0 Y0 X1 Y1 [S]  left-drag in the viewport at window fractions, gliding there first like stroke (same
 //                            point twice = a click)
+//   drag_frames X0 Y0 X1 Y1 N NAME  left-drag at window fractions in N steps, a shot NAME-0..NAME-N along the way
 //   drag X0 Y0 X1 Y1 [S] [release]  left-drag in window fractions (rectangle hide, sliders...); release:
 //                            let go of the held modifiers halfway (Alt-drag, release Alt to zoom)
 //   drag_item LABEL DX DY [S] [keep] left-drag from the item by DX DY pixels (scrubbing, dragging a tile out);
@@ -760,6 +761,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "maya_link_connected") return app_.mayaLink_ && app_.mayaLink_->connected() ? 1.0 : 0.0;
     if (name == "maya_link_streams") return double(app_.mayaLinkStreams_);
     if (name == "wheel_to_pointer") return app_.uiPrefs_.wheelZoomToPointer ? 1.0 : 0.0;
+    if (name == "orbit_at_pointer") return app_.uiPrefs_.orbitAtPointer ? 1.0 : 0.0;
     if (name == "along_normal") return double(app_.uiPrefs_.alongNormal);
     if (name == "stroke_along_normal") return app_.strokeAlongNormal_ ? 1.0 : 0.0;
     if (name.rfind("forgesphere_x", 0) == 0 || name.rfind("forgesphere_r", 0) == 0) { // forgesphere_x2, forgesphere_r2: sphere 2's x / radius
@@ -1801,6 +1803,37 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return ImVec2((x0 + (x1 - x0) * u) * float(ww), (y0 + (y1 - y0) * u) * float(wh));
         }, seconds);
         run([this] { SDL_SetModState(held_); });
+        wait(0.1f);
+    } else if (verb == "drag_frames") {
+        // drag_frames x0 y0 x1 y1 N NAME: a left drag at window fractions in N even steps, a screenshot NAME-0 (pressed,
+        // not moved yet) to NAME-N after each step; the button goes up after the last. For a drag's frames as reviewers see them.
+        if (!need(6)) return false;
+        const float x0 = num(1, 0), y0 = num(2, 0), x1 = num(3, 0), y1 = num(4, 0);
+        const int n = std::clamp(int(num(5, 6)), 1, 30);
+        const std::string name = w[6];
+        auto at = [this](float x, float y) {
+            int ww = 0, wh = 0;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            return ImVec2(x * float(ww), y * float(wh));
+        };
+        auto shoot = [this](const std::string& file) {
+            steps_.push_back([this, file](float t) {
+                if (t == 0.0f) return false; // a settled frame
+                if (!shotDir_.empty()) shotRequest_ = shotDir_ + "/" + file + ".png";
+                return true;
+            });
+            wait(0.05f);
+        };
+        run([this, at, x0, y0] { const ImVec2 p = at(x0, y0); mouseMotion(p.x, p.y); });
+        wait(0.1f);
+        run([this] { SDL_SetModState(held_); mouseButton(true, SDL_BUTTON_LEFT); });
+        shoot(name + "-0");
+        for (int k = 1; k <= n; ++k) {
+            const float u = float(k) / float(n);
+            run([this, at, x = x0 + (x1 - x0) * u, y = y0 + (y1 - y0) * u] { const ImVec2 p = at(x, y); mouseMotion(p.x, p.y); });
+            shoot(name + "-" + std::to_string(k));
+        }
+        run([this] { mouseButton(false, SDL_BUTTON_LEFT); SDL_SetModState(held_); });
         wait(0.1f);
     } else if (verb == "axis_click") {
         // axis_click +x|-x|+y|-y|+z|-z: click that end of the axis gizmo (Draw > Camera > Axes, #43)
@@ -3920,7 +3953,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
             }
             static const std::set<std::string> allowed = {
                 "click", "double_click", "right_click", "hover", "hover_model", "hover_window", "type", "key", "key_down",
-                "key_up", "hold", "stroke", "view_drag", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
+                "key_up", "hold", "stroke", "view_drag", "drag_frames", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
                 "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
                 "drag_item", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "look",
                 "run", "key_nav_speed", "wait", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
