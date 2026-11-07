@@ -2453,6 +2453,14 @@ constexpr Entry kSpanish[] = {
      "show a banner when there is a newer one. Nothing about you or your computer is sent.",
      "Una vez al día al iniciar, descarga del sitio web de SculptForge un archivo pequeño que nombra la versión más "
      "nueva, y muestra un aviso cuando hay una más nueva. No se envía nada sobre ti ni sobre tu equipo."},
+    {"Fetch credits and community content", "Descargar créditos y contenido de la comunidad"},
+    {"With the update check, download the supporters, Founding Members and artist quotes shown in Help > About from "
+     "the SculptForge website, so they are current between releases. Text only, signed by SculptForge and checked "
+     "before use; nothing about you is sent. Off: the list this version shipped with.",
+     "Con la búsqueda de actualizaciones, descarga del sitio web de SculptForge los colaboradores, los Miembros "
+     "fundadores y las citas de artistas que aparecen en Ayuda > Acerca de, para que estén al día entre versiones. "
+     "Solo texto, firmado por SculptForge y comprobado antes de usarlo; no se envía nada sobre ti. Desactivado: la "
+     "lista con la que se publicó esta versión."},
     {"Update channel", "Canal de actualización"},
     {"Stable", "Estable"},
     {"Preview (betas)", "Vista previa (betas)"},

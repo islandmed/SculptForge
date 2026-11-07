@@ -2168,6 +2168,13 @@ constexpr Entry kTraditionalChinese[] = {
      "show a banner when there is a newer one. Nothing about you or your computer is sent.",
      "每天啟動時一次，從 SculptForge 網站下載一個標示最新版本的小檔案，有較新版本時顯示橫幅。不會傳送任何關於你或你電"
      "腦的資訊。"},
+    {"Fetch credits and community content", "下載致謝名單與社群內容"},
+    {"With the update check, download the supporters, Founding Members and artist quotes shown in Help > About from "
+     "the SculptForge website, so they are current between releases. Text only, signed by SculptForge and checked "
+     "before use; nothing about you is sent. Off: the list this version shipped with.",
+     "隨更新檢查一併從 SculptForge 網站下載「說明 > 關於」中顯示的支持者、創始會員與藝術家推薦語，讓它們在兩"
+     "次發行之間保持最新。僅限文字，由 SculptForge 簽署並在使用前驗證；不會傳送任何關於你的資訊。關閉：使用"
+     "此版本內建的名單。"},
     {"Update channel", "更新頻道"},
     {"Stable", "穩定版"},
     {"Preview (betas)", "預覽（Beta 版）"},

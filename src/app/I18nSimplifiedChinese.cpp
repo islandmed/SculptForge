@@ -2168,6 +2168,13 @@ constexpr Entry kSimplifiedChinese[] = {
      "show a banner when there is a newer one. Nothing about you or your computer is sent.",
      "每天启动时一次，从 SculptForge 网站下载一个标记最新版本的小文件，有较新版本时显示横幅。不会发送任何关于你或你电"
      "脑的信息。"},
+    {"Fetch credits and community content", "下载致谢名单与社区内容"},
+    {"With the update check, download the supporters, Founding Members and artist quotes shown in Help > About from "
+     "the SculptForge website, so they are current between releases. Text only, signed by SculptForge and checked "
+     "before use; nothing about you is sent. Off: the list this version shipped with.",
+     "随更新检查一并从 SculptForge 网站下载“帮助 > 关于”中显示的支持者、创始会员与艺术家推荐语，让它们在两"
+     "次发布之间保持最新。仅限文字，由 SculptForge 签名并在使用前验证；不会发送任何关于你的信息。关闭：使用"
+     "此版本内置的名单。"},
     {"Update channel", "更新通道"},
     {"Stable", "稳定版"},
     {"Preview (betas)", "预览（Beta 版）"},
