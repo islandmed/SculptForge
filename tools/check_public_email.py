@@ -30,7 +30,8 @@ def scan(root):
         with open(p, encoding='utf-8', errors='replace') as fh:
             for n, line in enumerate(fh, 1):
                 for m in BAD.finditer(line):
-                    hits.append(f'{os.path.relpath(p, root)}:{n}: {line[max(0, m.start() - 30):m.end() + 10].strip()}')
+                    rel = os.path.relpath(p, root).replace(os.sep, '/')  # (Windows: the same names as elsewhere)
+                    hits.append(f'{rel}:{n}: {line[max(0, m.start() - 30):m.end() + 10].strip()}')
     return hits
 
 
