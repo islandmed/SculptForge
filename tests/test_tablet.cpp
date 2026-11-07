@@ -254,6 +254,21 @@ TEST(tablet_settings_mouse_mode_round_trip) {
     CHECK(!d.mouseMode);
 }
 
+TEST(tablet_settings_view_speed_round_trip) {
+    TabletSettings t;
+    CHECK(near(t.viewSpeed, 1.0f)); // the pen navigates as the mouse until turned down
+    t.viewSpeed = 0.4f;
+    TabletSettings back;
+    fromJson(toJson(t), back);
+    CHECK(near(back.viewSpeed, 0.4f));
+    Json j;
+    std::string err;
+    CHECK(Json::parse(R"({"viewSpeed":0})", j, err)); // out of range: clamped, the view still moves
+    TabletSettings d;
+    fromJson(j, d);
+    CHECK(near(d.viewSpeed, 0.1f));
+}
+
 // A pen without a pressure axis (Windows Ink off) sends 0 while touching: after a few motions it draws at full
 // pressure instead of never starting the stroke; a pen with pressure never does.
 TEST(pen_pressure_tracker_no_pressure_axis) {
