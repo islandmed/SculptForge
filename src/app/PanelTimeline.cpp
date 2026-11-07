@@ -104,6 +104,17 @@ struct TimelineUiState {
 
 namespace {
 
+// Shortens `text` with "..." to fit `width` (whole UTF-8 characters).
+std::string fitText(const std::string& text, float width) {
+    if (ImGui::CalcTextSize(text.c_str()).x <= width) return text;
+    std::string t = text;
+    while (!t.empty() && ImGui::CalcTextSize((t + "...").c_str()).x > width) {
+        while (!t.empty() && (static_cast<unsigned char>(t.back()) & 0xC0) == 0x80) t.pop_back();
+        if (!t.empty()) t.pop_back();
+    }
+    return t.empty() ? std::string() : t + "...";
+}
+
 std::string prefsFile(const std::string& configDir) { return configDir.empty() ? std::string() : configDir + "timeline.json"; }
 
 void loadPrefs(TimelineUiState& s, const std::string& configDir, bool deterministic) {
@@ -443,25 +454,48 @@ void App::drawTimelineUi() {
     }
     const auto& path = t->path();
     const size_t n = path.size();
-    // Header row: what it is, where the cursor is, the controls.
+    // Header row: what it is, where the cursor is, the controls. The controls are measured and right-aligned; the
+    // text left of them is elided before it reaches them (a 1024 px window at 200 %), the step count last.
+    const ImGuiStyle& st = ImGui::GetStyle();
+    const float smallW = ImGui::CalcTextSize(ICON_LC_FILM).x + st.FramePadding.x * 2.0f; // SmallButton: same x padding
+    const float checkW = ImGui::GetFrameHeight() + st.ItemInnerSpacing.x + ImGui::CalcTextSize(tr("Save with project")).x;
+    const float controlsW = checkW + 2.0f * (smallW + st.ItemSpacing.x);
+    const float controlsX = std::max(ImGui::GetCursorPosX(), ImGui::GetWindowWidth() - st.WindowPadding.x - controlsW);
+    timelineSpans_.clear(); // (UI tests check that nothing overlaps)
+    auto room = [&] { return controlsX - st.ItemSpacing.x - 8 * sc - (ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x); };
+    auto tail = [&](const std::string& text, const ImVec4* col) { // one more piece of the header, elided to the room left
+        if (text.empty()) return;
+        const float avail = room() - st.ItemSpacing.x;
+        if (avail < ImGui::CalcTextSize("M...").x) return;
+        const std::string shown = fitText(text, avail);
+        ImGui::SameLine();
+        if (col) ImGui::TextColored(*col, "%s", shown.c_str());
+        else ImGui::TextDisabled("%s", shown.c_str());
+        timelineSpans_.push_back({ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().x});
+    };
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(ICON_LC_HISTORY);
-    ImGui::SameLine();
-    ImGui::Text(tr("Step %zu of %zu"), t->cursor(), n - 1);
+    timelineSpans_.push_back({ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().x});
+    {
+        char stepText[64];
+        std::snprintf(stepText, sizeof stepText, tr("Step %zu of %zu"), t->cursor(), n - 1);
+        const std::string shown = fitText(stepText, std::max(0.0f, room() - st.ItemSpacing.x));
+        if (!shown.empty()) {
+            ImGui::SameLine();
+            ImGui::TextUnformatted(shown.c_str());
+            timelineSpans_.push_back({ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().x});
+        }
+    }
     if (!branches.empty()) {
-        ImGui::SameLine();
-        ImGui::TextDisabled(tr(branches.size() == 1 ? "%s %zu branch" : "%s %zu branches"), ICON_LC_GIT_BRANCH, branches.size());
+        char branchText[64];
+        std::snprintf(branchText, sizeof branchText, tr(branches.size() == 1 ? "%s %zu branch" : "%s %zu branches"), ICON_LC_GIT_BRANCH,
+                      branches.size());
+        tail(branchText, nullptr);
     }
-    if (const Timeline::Node& cur = t->node(t->cursorNode()); t->cursor() > 0) {
-        ImGui::SameLine();
-        ImGui::TextDisabled("  %s", cur.label.c_str());
-    }
-    if (!s.message.empty()) {
-        ImGui::SameLine();
-        ImGui::TextColored(theme::textDim, "  %s", s.message.c_str());
-    }
-    const float buttons = 250 * sc;
-    ImGui::SameLine(ImGui::GetWindowWidth() - buttons);
+    if (const Timeline::Node& cur = t->node(t->cursorNode()); t->cursor() > 0) tail("  " + cur.label, nullptr);
+    if (!s.message.empty()) tail("  " + s.message, &theme::textDim);
+    ImGui::SameLine(controlsX);
+    const float controlsStart = ImGui::GetCursorScreenPos().x;
     if (ImGui::Checkbox(tr("Save with project"), &s.saveHistory)) {
         Timeline::saveWithProject = s.saveHistory;
         savePrefs(s, configDir_, uiConfigDeterministic_);
@@ -479,6 +513,7 @@ void App::drawTimelineUi() {
         savePrefs(s, configDir_, uiConfigDeterministic_);
     }
     ui::HelpText("Hide", nullptr, "Fold the timeline into a tab.", "Edit > Sculpt Timeline");
+    timelineSpans_.push_back({controlsStart, ImGui::GetItemRectMax().x});
 
     // Branch lanes, then the track.
     ImDrawList* dl = ImGui::GetWindowDrawList();

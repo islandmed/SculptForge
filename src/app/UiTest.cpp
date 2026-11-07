@@ -102,7 +102,7 @@
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once ui.json is written: the preferences save themselves, or Save Layout),
 //                            console_open, command_palette_open, customize, shelves_visible,
-//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, title_overlaps (top bar widgets over each other), menu_rect_changes (the open task menu moved or resized since last read), offscreen_items (past the window edge), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
+//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, title_overlaps (top bar widgets over each other), timeline_overlaps (the timeline header's pieces over each other), menu_rect_changes (the open task menu moved or resized since last read), offscreen_items (past the window edge), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
@@ -942,17 +942,19 @@ double Demo::query(const std::string& name, bool& known) const {
         return double(n);
     }
     if (name == "shell_narrow") return app_.shell_.narrow ? 1.0 : 0.0;
-    if (name == "title_overlaps") { // top bar widgets drawn over each other last frame; names their spans in the log
+    // Spans (x from-to) drawn over each other last frame; names them in the log.
+    auto overlaps = [](const std::vector<std::pair<float, float>>& b, const char* what) {
         int n = 0;
-        const auto& b = app_.barSpans_;
         for (size_t i = 0; i < b.size(); ++i)
             for (size_t j = i + 1; j < b.size(); ++j)
                 if (b[i].first < b[j].second - 0.5f && b[j].first < b[i].second - 0.5f) {
-                    std::printf("title_overlaps: %.0f-%.0f and %.0f-%.0f\n", b[i].first, b[i].second, b[j].first, b[j].second);
+                    std::printf("%s: %.0f-%.0f and %.0f-%.0f\n", what, b[i].first, b[i].second, b[j].first, b[j].second);
                     ++n;
                 }
         return n;
-    }
+    };
+    if (name == "title_overlaps") return overlaps(app_.barSpans_, "title_overlaps"); // top bar widgets over each other
+    if (name == "timeline_overlaps") return overlaps(app_.timelineSpans_, "timeline_overlaps"); // the timeline header's pieces
     if (name == "offscreen_items") { // items drawn past the window's edge last frame (#105); names them in the log
         const std::vector<std::string> off = Demo::offscreenItems();
         for (const std::string& o : off) std::fprintf(stderr, "offscreen: %s\n", o.c_str());
