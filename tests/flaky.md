@@ -12,6 +12,7 @@ deletes it; remove its lines once fixed.
 | 2026-11-06 | ui_stroke_background | laptop (heavy.sh, -j3) | ed1b0099 |
 | 2026-11-06 | ui_stroke_background_preview | laptop (heavy.sh, -j3) | ed1b0099 |
 | 2026-11-06 | ui_stroke_persistent_upload | laptop (heavy.sh, -j3) | ed1b0099 |
+| 2026-11-06 | ui_idle_redraw | Linux aarch64, -j3 | bf383ffe |
 
 ## Owned
 
