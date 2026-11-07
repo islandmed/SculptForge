@@ -31,7 +31,7 @@ bool App::discordAgentRun() const {
 void App::updateDiscordPresence() {
     // Scripted and agent runs (benchmarks, offscreen checks, the Windows PC's runs) use the user's preferences too:
     // they never show up on the user's Discord.
-    if (!discordPresenceAvailable() || supportCardTestMode() || discordAgentRun()) return;
+    if (!discordPresenceAvailable() || supportCardTestMode() || discordAgentRun() || discordClosed_) return;
     if (!discordPrefs_.enabled && !discordClient_) return; // never switched on: no thread, no connection
     if (!discordClient_) discordClient_.reset(new discord::Client(discord::kDiscordAppId));
     if (discordStart_ == 0)

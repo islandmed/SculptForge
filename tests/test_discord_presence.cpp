@@ -9,10 +9,15 @@
 #include "TestHarness.h"
 
 #include "core/DiscordPresence.h"
+#include "core/ExitWatchdog.h"
+#include "core/Sha256.h"
 #include "core/Json.h"
 
+#include <atomic>
 #include <chrono>
 #include <cstring>
+#include <fstream>
+#include <sstream>
 #include <random>
 #include <thread>
 #include <vector>
@@ -83,7 +88,7 @@ TEST(discord_activity_sends_the_name_only) {
     CHECK(!act.has("details")); // Discord shows the application's name: SculptForge
     CHECK(!act.has("state"));
     // The app icon by URL (Discord's RPC docs: an external https image in large_image, through its media proxy).
-    CHECK(act["assets"]["large_image"].asString() == "https://sculptforge.app/press/sculptforge-icon-1024.png");
+    CHECK(act["assets"]["large_image"].asString() == "https://sculptforge.app/press/sculptforge-app-icon-cube-outline-1024.png");
     CHECK(act["assets"]["large_text"].asString() == "SculptForge");
     CHECK(act["timestamps"]["start"].asNumber() == 1793750400.0); // seconds, as in the docs' SET_ACTIVITY example
     CHECK(act["type"].asNumber() == 0.0); // Playing (SET_ACTIVITY takes 0, 2, 3 or 5)
@@ -126,6 +131,28 @@ TEST(discord_clear_has_no_activity) {
     const Json h = parsed(handshakeJson("1234"));
     CHECK(h["v"].asNumber() == 1.0 && h["client_id"].asString() == "1234");
     CHECK(h.members().size() == 2);
+}
+
+// Discord's media proxy caches the image by its URL: the file it names never changes (a new icon, a new name). The
+// press icon changed, yet profiles kept the SF mark (@ebarranco).
+TEST(discord_icon_url_is_frozen) {
+    const std::string url = kLargeImageUrl, site = "https://sculptforge.app/";
+    CHECK(url.rfind(site, 0) == 0);
+    std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../website/" + url.substr(site.size()), std::ios::binary);
+    CHECK(f.good());
+    std::ostringstream bytes;
+    bytes << f.rdbuf();
+    // Changed on purpose? Add the new image under a new file name, point kLargeImageUrl at it and pin it here.
+    CHECK(sha256Hex(bytes.str()) == "95ce025be2983fb0a6d824fda577e3a0b705dd618102c227420093312261adef");
+}
+
+TEST(exit_watchdog_fires_after_its_timeout) {
+    std::atomic<bool> fired{false};
+    const auto start = std::chrono::steady_clock::now();
+    armExitWatchdog(50, 0, [&] { fired = true; });
+    for (int i = 0; i < 500 && !fired; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    CHECK(fired.load());
+    CHECK(std::chrono::steady_clock::now() - start >= std::chrono::milliseconds(50));
 }
 
 TEST(discord_frame_reader_bounds) {
@@ -569,6 +596,49 @@ TEST(discord_killed_process_closes_the_connection) {
     CHECK(WIFSIGNALED(status));
     if (c >= 0) {
         timeval tv{1, 0}; // well before the worker's 3 s are up
+        setsockopt(c, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
+        char b;
+        CHECK(recv(c, &b, 1, 0) == 0); // EOF: closed
+        close(c);
+    }
+    close(listener);
+}
+// Quitting with a stuck teardown (a driver or a thread that never ends): the watchdog ends the process with its exit
+// code, and the Discord connection closes with it, so the status goes (@ebarranco: "Playing SculptForge" stayed).
+TEST(exit_watchdog_ends_a_stuck_process) {
+    TempSocketDir t;
+    const int listener = listenAt(t.dir + "/discord-ipc-0");
+    CHECK(listener >= 0);
+    if (listener < 0) return;
+    EnvVar xdg("XDG_RUNTIME_DIR", t.dir);
+    const pid_t pid = fork();
+    if (pid == 0) {
+        Client* client = new Client("1234567890"); // never destroyed: the teardown is stuck
+        Activity a;
+        a.show = true;
+        client->set(a);
+        for (int i = 0; i < 300 && client->activitiesSent() < 1; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        armExitWatchdog(200, 7);
+        std::thread([] { for (;;) std::this_thread::sleep_for(std::chrono::seconds(1)); }).join(); // never returns
+        _exit(1);
+    }
+    std::string activity;
+    const int c = acceptSession(listener, activity);
+    CHECK(c >= 0);
+    int status = 0;
+    bool exited = false;
+    for (int i = 0; i < 500 && !exited; ++i) { // 5 s at most
+        exited = waitpid(pid, &status, WNOHANG) == pid;
+        if (!exited) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    if (!exited) {
+        kill(pid, SIGKILL);
+        waitpid(pid, &status, 0);
+    }
+    CHECK(exited);
+    CHECK(WIFEXITED(status) && WEXITSTATUS(status) == 7);
+    if (c >= 0) {
+        timeval tv{1, 0};
         setsockopt(c, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
         char b;
         CHECK(recv(c, &b, 1, 0) == 0); // EOF: closed

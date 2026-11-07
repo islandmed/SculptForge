@@ -30,9 +30,10 @@ namespace sf::discord {
 // The SculptForge application on Discord's developer portal (a public ID, not a secret). "0" hides the feature and
 // never connects.
 inline constexpr const char* kDiscordAppId = "1567737303210926130";
-// The icon: the cube app icon on the site (Discord fetches an external image through its media proxy; the portal's
-// "logo" asset was a placeholder cube).
-inline constexpr const char* kLargeImageUrl = "https://sculptforge.app/press/sculptforge-icon-1024.png";
+// The icon: the outline cube app icon on the site. Discord's media proxy caches an external image by its URL, so
+// this file never changes: a new icon gets a new file name (sculptforge-icon-1024.png changed, yet Discord kept
+// showing the SF mark; @ebarranco). tests/test_discord_presence.cpp pins its content.
+inline constexpr const char* kLargeImageUrl = "https://sculptforge.app/press/sculptforge-app-icon-cube-outline-1024.png";
 
 // A run made by a script or an agent, never the user at the window: SDL_APP_ID=sculptforge-agent,
 // SDL_VIDEO_DRIVER=offscreen (or videoDriver "offscreen") or SF_NO_DISCORD set. It never shows anything on the

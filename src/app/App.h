@@ -549,6 +549,7 @@ private:
     struct DiscordClientDelete { void operator()(discord::Client* c) const; };
     DiscordPresencePrefs discordPrefs_;
     std::unique_ptr<discord::Client, DiscordClientDelete> discordClient_; // made on the first switch-on
+    bool discordClosed_ = false;                 // quitting: cleared and closed, never made again (shutdown)
     int64_t discordStart_ = 0;                   // seconds since 1970 when this session started (the elapsed time)
     char discordChallengeBuf_[64 * 4 + 1] = {};  // the theme field (64 code points of UTF-8)
     bool discordPresenceAvailable() const;       // an application ID is compiled in
@@ -1555,6 +1556,7 @@ private:
     // when it doesn't) or when the app quits (Later). Package-managed installs get their command instead.
     enum class SelfUpdateStage { Idle, Downloading, Ready, Restarting, Failed };
     void initSelfUpdate();  // initProject: a just-installed version counts its start (and rolls back a broken one)
+    void endOldAppImage();  // Linux AppImage: the version that restarted into this one quits (0.11.10 and earlier stayed)
     void tickSelfUpdate();  // each frame: confirms this version is up, watches a restart
     bool drawSelfUpdate(const UpdateInfo& u, bool& close); // the banner's Update row; true: it replaces the usual buttons
     bool selfUpdateOffered(const UpdateInfo& u);

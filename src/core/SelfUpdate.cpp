@@ -21,6 +21,10 @@
 #elif defined(__APPLE__)
 #include <mach-o/dyld.h>
 #endif
+#if defined(__linux__)
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 namespace sf::update {
 
@@ -502,6 +506,30 @@ StartCheck checkPendingAtStart(const std::string& notePath, const std::string& r
     }
     writePending(notePath, p);
     return StartCheck::Counting;
+}
+
+bool isOldAppImage(const std::string& procDir, const std::string& appImage) {
+#if defined(__linux__)
+    if (appImage.empty()) return false;
+    struct stat st{};
+    if (::stat(procDir.c_str(), &st) != 0 || st.st_uid != ::geteuid()) return false;
+    std::error_code ec;
+    const fs::path exe = fs::read_symlink(fs::path(procDir) / "exe", ec);
+    if (ec || exe.filename() != "sculptforge") return false;
+    std::ifstream f(fs::path(procDir) / "environ", std::ios::binary);
+    std::string env((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    const std::string want = "APPIMAGE=" + appImage;
+    for (size_t at = 0; at < env.size();) {
+        const size_t end = std::min(env.find('\0', at), env.size());
+        if (env.compare(at, end - at, want) == 0) return true;
+        at = end + 1;
+    }
+    return false;
+#else
+    (void)procDir;
+    (void)appImage;
+    return false;
+#endif
 }
 
 void confirmStarted(const std::string& notePath) {

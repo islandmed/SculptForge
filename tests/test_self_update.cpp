@@ -18,6 +18,11 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <string>
+#include <vector>
+#if defined(__linux__)
+#include <unistd.h>
+#endif
 
 using namespace sf;
 using namespace sf::update;
@@ -361,6 +366,53 @@ TEST(self_update_downloads_and_installs) {
     CHECK(checkPendingAtStart(s.note, "99.0.0", p, error) == StartCheck::Nothing);
 }
 
+// The update replaces the AppImage in place: the file keeps the name it had (a copy downloaded as 0.11.1 and updated
+// since stays SculptForge-0.11.1-x86_64.AppImage; Help > About shows the version), nothing else appears beside it,
+// and versions are whole strings (0.11.10 is never 0.11.1). @ebarranco's 0.11.1 file ran 0.11.10.
+TEST(self_update_appimage_names_and_versions) {
+    const std::string x86 = "SculptForge-linux-x86_64.AppImage";
+    CHECK(versionedAsset(x86, "0.11.10") == "SculptForge-0.11.10-x86_64.AppImage");
+    CHECK(versionedAsset(x86, "0.11.11") == "SculptForge-0.11.11-x86_64.AppImage");
+    CHECK(versionedAsset(x86, "0.10.0") == "SculptForge-0.10.0-x86_64.AppImage");
+    CHECK(versionedAsset(x86, "0.11.11-beta.1") == "SculptForge-0.11.11-x86_64.AppImage");
+    struct Step {
+        const char *file, *from, *to;
+    };
+    for (const Step& st : {Step{"SculptForge-0.11.10-x86_64.AppImage", "0.11.10", "0.11.11"},
+                           Step{"SculptForge-0.9.12-x86_64.AppImage", "0.9.12", "0.10.0"},
+                           Step{"SculptForge-0.11.1-x86_64.AppImage", "0.11.1", "0.11.10"}}) {
+        Sandbox s("sf_self_update_names");
+        const fs::path target = s.dir / "Apps" / st.file;
+        fs::remove(s.install.target);
+        writeAll(target, std::string("old ") + st.from);
+        s.install.target = target.string();
+        const std::string staged = stagingPath(s.install, st.to), content = std::string("new ") + st.to;
+        CHECK(fs::path(staged).filename() == std::string(".download-") + st.to + "-" + x86);
+        writeAll(staged, content);
+        Download d;
+        d.staged = staged;
+        d.sha256 = sha256Hex(content);
+        std::string error;
+        CHECK(installAppImage(s.install, d, st.to, st.from, s.note, error));
+        CHECK(readAll(target) == content && readAll(s.install.target + ".old") == std::string("old ") + st.from);
+        std::vector<std::string> names;
+        for (const auto& e : fs::directory_iterator(s.dir / "Apps")) names.push_back(e.path().filename().string());
+        std::sort(names.begin(), names.end());
+        CHECK((names == std::vector<std::string>{st.file, std::string(st.file) + ".old"}));
+        Pending p;
+        CHECK(readPending(s.note, p) && p.version == st.to && p.from == st.from && p.target == s.install.target);
+        CHECK(checkPendingAtStart(s.note, st.to, p, error) == StartCheck::Counting && p.starts == 1);
+        confirmStarted(s.note);
+        CHECK(!fs::exists(s.install.target + ".old") && readAll(target) == content);
+    }
+    // A note for 0.11.10 doesn't count a start of 0.11.1 (or the other way round): only the exact version.
+    Sandbox s("sf_self_update_names_exact");
+    CHECK(writePending(s.note, {"0.11.10", "0.11.1", s.install.target, s.install.target + ".old", 0}));
+    Pending p;
+    std::string error;
+    CHECK(checkPendingAtStart(s.note, "0.11.1", p, error) == StartCheck::Abandoned);
+}
+
 TEST(self_update_refuses_bad_releases) {
     struct Case {
         const char* what;
@@ -637,5 +689,36 @@ TEST(self_update_keychain_windows) {
     CHECK(keychain::load(account, got) && got == "second");
     CHECK(keychain::erase(account) && !keychain::load(account, got));
     CHECK(keychain::erase(account)); // (nothing there: still fine)
+}
+#endif
+
+#if defined(__linux__)
+// After Restart to update, the new version ends the old one only when it's that old SculptForge from the same AppImage
+// file (0.11.10 and earlier stayed hidden and kept running: @ebarranco). A fake /proc/<pid> entry.
+TEST(self_update_old_appimage_check) {
+    const fs::path dir = fs::temp_directory_path() / ("sf-oldappimage-" + std::to_string(::getpid()));
+    fs::remove_all(dir);
+    fs::create_directories(dir / "mount" / "usr" / "bin");
+    std::ofstream(dir / "mount" / "usr" / "bin" / "sculptforge") << "x";
+    std::ofstream(dir / "mount" / "usr" / "bin" / "dolphin") << "x";
+    const std::string appImage = "/home/someone/SculptForge/SculptForge-0.11.1-x86_64.AppImage";
+    const auto proc = [&](const std::string& name, const std::string& program, const std::string& environ) {
+        const fs::path p = dir / name;
+        fs::create_directories(p);
+        fs::create_symlink(dir / "mount" / "usr" / "bin" / program, p / "exe");
+        std::ofstream(p / "environ", std::ios::binary) << environ;
+        return p.string();
+    };
+    const std::string env = std::string("HOME=/home/someone") + '\0' + "APPIMAGE=" + appImage + '\0' + "OWD=/home/someone" + '\0';
+    CHECK(isOldAppImage(proc("old", "sculptforge", env), appImage));
+    CHECK(!isOldAppImage(proc("other-file", "sculptforge", env), appImage + ".old"));           // another copy
+    CHECK(!isOldAppImage(proc("prefix", "sculptforge", env), "/home/someone/SculptForge/SculptForge")); // whole value only
+    CHECK(!isOldAppImage(proc("filemanager", "dolphin", env), appImage));                        // the file manager
+    CHECK(!isOldAppImage(proc("no-appimage", "sculptforge", std::string("HOME=/x") + '\0'), appImage));
+    CHECK(!isOldAppImage(proc("old2", "sculptforge", env), ""));
+    CHECK(!isOldAppImage((dir / "missing").string(), appImage));
+    CHECK(!isOldAppImage("/proc/1", appImage)); // init: not ours
+    CHECK(!isOldAppImage("/proc/self", appImage)); // the tests: not sculptforge
+    fs::remove_all(dir);
 }
 #endif
