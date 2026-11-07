@@ -1,0 +1,11 @@
+# A micro level on a base under the triangle budget has no coarse levels to build: the app rests when idle (a frame
+# asked for a coarse build that never comes kept it drawing; background_frames.sfui is the same check for jobs).
+run new_sphere subdivisions=6
+run micro_divide level=1
+expect_status "Divided to micro"
+window_focus 0
+mouse_leave
+wait 2
+expect_value coarse_clusters == 0
+expect_value wants_frames == 0
+window_focus 1
