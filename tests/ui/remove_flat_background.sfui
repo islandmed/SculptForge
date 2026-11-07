@@ -1,4 +1,4 @@
-# Image to 3D's "Remove flat background" (core/Backdrop.h, request from @fenix): a generated head with the picture's
+# Image to 3D's "Remove flat background" (core/Backdrop.h, request from fenix on Discord): a generated head with the picture's
 # background turned into a thin wall behind it. The command Generate 3D runs on its result removes the wall, as one
 # undo step; Undo brings it back. Generate 3D shows the option, on by default.
 run ui_look look=classic layout=classic        # written for the Classic look
