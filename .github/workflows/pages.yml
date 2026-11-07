@@ -3,7 +3,7 @@ name: Website
 on:
   push:
     branches: [main]
-    paths: ['website/**', 'docs/supporters.txt', '.github/workflows/pages.yml', 'tools/marks_media_flagged.txt']
+    paths: ['website/**', 'docs/supporters.txt', 'tools/content/**', '.github/workflows/pages.yml', 'tools/marks_media_flagged.txt']
   workflow_dispatch:
 
 permissions:
@@ -16,7 +16,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The content lane (docs/design/release-lanes.md §1): website/content/v1.json (credits, Founding Members,
+  # testimonials) and its Ed25519 signature, which the app checks against the content key compiled into it
+  # (src/app/CommunityContent.h). The private half is only in the `content` environment (main only), never the
+  # release key. No CONTENT_SIGNING_KEY yet: no file is published and apps keep their compiled-in lists.
+  content:
+    runs-on: ubuntu-24.04
+    environment: content
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the serial is the sources' last commit time
+      - name: Build and sign content/v1.json
+        env:
+          CONTENT_SIGNING_KEY: ${{ secrets.CONTENT_SIGNING_KEY }}
+        run: |
+          mkdir -p out
+          if [ -z "$CONTENT_SIGNING_KEY" ]; then echo "No CONTENT_SIGNING_KEY secret: no content file"; exit 0; fi
+          python3 tools/content/build_content.py --out out/v1.json
+          printf '%s\n' "$CONTENT_SIGNING_KEY" > "$RUNNER_TEMP/content.pem"
+          openssl pkeyutl -sign -inkey "$RUNNER_TEMP/content.pem" -rawin -in out/v1.json -out out/v1.json.sig
+          rm -f "$RUNNER_TEMP/content.pem"
+          [ "$(stat -c %s out/v1.json.sig)" = 64 ]
+      - uses: actions/upload-artifact@v7
+        with:
+          name: content
+          path: out
+          if-no-files-found: ignore
+
   deploy:
+    needs: content
     runs-on: ubuntu-24.04
     environment:
       name: github-pages
@@ -53,6 +84,11 @@ jobs:
       # The credits page always matches docs/supporters.txt on main.
       - name: Supporters page
         run: python3 tools/guide/build_site.py --supporters
+      - uses: actions/download-artifact@v8
+        continue-on-error: true # (no file until the content key exists)
+        with:
+          name: content
+          path: website/content
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
@@ -75,6 +111,7 @@ jobs:
   # It points search engines at sculptforge.app (canonical links, robots.txt) and is skipped until the
   # MIRROR_DEPLOY_KEY secret exists (tools/publish/setup-channels.sh sets it up).
   mirror:
+    needs: content
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -97,6 +134,11 @@ jobs:
           fi
       - name: Supporters page
         run: python3 tools/guide/build_site.py --supporters
+      - uses: actions/download-artifact@v8
+        continue-on-error: true # (no file until the content key exists)
+        with:
+          name: content
+          path: website/content
       # The mirror is public too: the same takedown as the deploy (tools/marks_media_flagged.txt).
       - name: Media takedown
         run: python3 tools/media_takedown.py website

@@ -5,17 +5,28 @@
 // Members in Help > About. Each only opens kSupportUrl in the browser (Support.h); the app is the same for everyone,
 // so nothing here checks, sends or stores anything else.
 #include "app/App.h"
+#include "app/CommunityContent.h"
 #include "app/Config.h"
 #include "app/LookSchemes.h"
 #include "app/Theme.h"
+#include "ai/Http.h"
+#include "core/NetworkPolicy.h"
+#include "core/StudioProfile.h"
 
 #include <IconsLucide.h>
 #include <imgui.h>
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <memory>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 namespace sf {
@@ -31,24 +42,127 @@ extern const unsigned long long testimonials_size;
 
 namespace {
 
+// The content lane's last good copy (CommunityContent.h): set and read on the main thread only; null until one is
+// accepted, and each section falls back to the compiled-in file when the copy doesn't carry it.
+std::shared_ptr<const CommunityContent> g_content;
+
 const std::vector<std::string>& supporterNames() {
+    if (g_content && g_content->hasSupporters) return g_content->supporters;
     static const std::vector<std::string> names =
         parseSupporters(std::string_view(reinterpret_cast<const char*>(assets::supporters), size_t(assets::supporters_size)));
     return names;
 }
 
+std::filesystem::path utf8Path(const std::string& p) { return std::filesystem::path(std::u8string(p.begin(), p.end())); }
+
+std::string readFile(const std::string& path) {
+    std::ifstream f(utf8Path(path), std::ios::binary);
+    std::string s;
+    if (f) s.assign(std::istreambuf_iterator<char>(f), {});
+    return s;
+}
+
+// Written beside, then renamed over: a crash mid-write never leaves half a file.
+bool writeFileAtomic(const std::string& path, const std::string& data) {
+    const std::string tmp = path + ".tmp";
+    {
+        std::ofstream f(utf8Path(tmp), std::ios::binary | std::ios::trunc);
+        if (!f || !f.write(data.data(), std::streamsize(data.size()))) return false;
+    }
+    std::error_code ec;
+    std::filesystem::rename(utf8Path(tmp), utf8Path(path), ec);
+    return !ec;
+}
+
+// One file from the two fixed places, at most kContentMaxBytes, no redirect off them.
+bool fetchContentFile(const std::string& name, std::string& body, std::string& error) {
+    static const std::string prefixes[] = {"https://sculptforge.app/content/", "https://islandmed.github.io/content/"};
+    auto allowed = [](const std::string& url) {
+        for (const std::string& p : prefixes)
+            if (net::urlUnderPrefix(url, p)) return net::urlAllowed(url);
+        return false;
+    };
+    for (const std::string& p : prefixes) {
+        body.clear();
+        bool tooBig = false;
+        const ai::HttpResponse r = ai::httpGetRestricted(p + name, allowed, 10, [&](const char* d, size_t n) {
+            if (body.size() + n > kContentMaxBytes) return !(tooBig = true);
+            body.append(d, n);
+            return true;
+        });
+        if (r.status == 200 && !tooBig) return true;
+        error = tooBig ? "over " + std::to_string(kContentMaxBytes) + " bytes"
+                       : r.status ? "the server answered " + std::to_string(r.status) : (r.error.empty() ? "no connection" : r.error);
+    }
+    return false;
+}
+
 } // namespace
 
 const FoundingMembers& foundingMembers() {
+    if (g_content && g_content->hasFounding) return g_content->founding;
     static const FoundingMembers f = parseFoundingMembers(
         std::string(reinterpret_cast<const char*>(assets::foundingMembers), size_t(assets::foundingMembers_size)));
     return f;
 }
 
 const std::vector<Testimonial>& testimonials() {
+    if (g_content && g_content->hasTestimonials) return g_content->testimonials;
     static const std::vector<Testimonial> t = parseTestimonials(
         std::string(reinterpret_cast<const char*>(assets::testimonials), size_t(assets::testimonials_size)));
     return t;
+}
+
+void App::loadCommunityContent() {
+    if (!contentFetch_ || !*kContentPublicKeyHex) return; // off: the compiled-in lists only
+    const std::string json = readFile(prefDir_ + "content.json");
+    if (json.empty()) return;
+    auto c = std::make_shared<CommunityContent>();
+    std::string error;
+    if (acceptCommunityContent(json, readFile(prefDir_ + "content.json.sig"), kContentPublicKeyHex, 0, *c, error))
+        g_content = std::move(c);
+    else if (!contentErrorLogged_) {
+        contentErrorLogged_ = true;
+        std::fprintf(stderr, "SculptForge: community content cache refused (%s); using the built-in list\n", error.c_str());
+    }
+}
+
+void App::startContentFetch() {
+    // No key yet, switched off, studio mode or SF_CONTENT=off: nothing is fetched (the compiled-in lists stay).
+    const char* env = std::getenv("SF_CONTENT");
+    if (contentJob_ || !contentFetch_ || !*kContentPublicKeyHex || studioMode().active || !options_.uiTest.empty() ||
+        (env && std::string(env) == "off"))
+        return;
+    auto job = std::make_shared<ContentJob>();
+    contentJob_ = job;
+    const int64_t minSerial = g_content ? g_content->serial : 0;
+    // Detached like the update check: a slow network never holds up quitting.
+    std::thread([job, minSerial] {
+        CommunityContent parsed;
+        job->ok = fetchContentFile("v1.json", job->json, job->error) &&
+                  fetchContentFile("v1.json.sig", job->signature, job->error) &&
+                  acceptCommunityContent(job->json, job->signature, kContentPublicKeyHex, minSerial, parsed, job->error);
+        job->done = true;
+    }).detach();
+}
+
+void App::pollContentFetch() {
+    if (!contentJob_ || !contentJob_->done) return;
+    const std::shared_ptr<ContentJob> job = std::move(contentJob_);
+    contentJob_.reset();
+    auto c = std::make_shared<CommunityContent>();
+    std::string error = job->error;
+    // Checked again here (the thread's minimum may be stale); a refusal keeps the last good copy and is logged once.
+    if (job->ok && acceptCommunityContent(job->json, job->signature, kContentPublicKeyHex, g_content ? g_content->serial : 0,
+                                          *c, error)) {
+        if (writeFileAtomic(prefDir_ + "content.json.sig", job->signature) && writeFileAtomic(prefDir_ + "content.json", job->json))
+            g_content = std::move(c);
+        return;
+    }
+    if (!contentErrorLogged_) {
+        contentErrorLogged_ = true;
+        std::fprintf(stderr, "SculptForge: community content not updated (%s); keeping the current list\n", error.c_str());
+    }
 }
 
 void App::openSupportPage() {

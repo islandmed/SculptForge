@@ -108,6 +108,7 @@ void App::initProject() {
         // (the membership card's update moment: a newer version than the last start's)
         updatedThisStart_ = !lastSeen.empty() && compareVersions(SCULPTFORGE_VERSION, lastSeen) > 0;
         checkUpdates_ = prefs["check_updates"].asBool(checkUpdates_);
+        contentFetch_ = prefs["community_content"].asBool(contentFetch_);
         updateCheckedAt_ = int64_t(prefs["update_checked_at"].asNumber(0));
         if (prefs["update_skipped"].isString()) updateSkipped_ = prefs["update_skipped"].asString();
         memberBuilds_ = prefs["member_builds"].asBool(false); // (the token itself is in the keychain only)
@@ -166,9 +167,12 @@ void App::initProject() {
     const int64_t now = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     applyUpdatePolicy();
     if (checkUpdates_ && options_.uiTest.empty() && options_.benchmarkScript.empty() && // (a take: local only)
-        !std::getenv("SF_NO_UPDATE_CHECK") && updateCheckDue(updateCheckedAt_, now))
+        !std::getenv("SF_NO_UPDATE_CHECK") && updateCheckDue(updateCheckedAt_, now)) {
         startUpdateCheck(false);
+        startContentFetch(); // (PanelSupport.cpp: the content lane, same day, same hosts)
+    }
 #endif
+    loadCommunityContent();
 
     // An autosave newer than the last clean exit means the previous session ended unexpectedly.
     std::error_code ec;
@@ -197,6 +201,7 @@ void App::saveProjectPrefs() {
     if (startInputStyle_ >= 0) prefs.set("input_style", startInputStyle_);
     prefs.set("last_seen_version", std::string(SCULPTFORGE_VERSION));
     prefs.set("check_updates", checkUpdates_);
+    prefs.set("community_content", contentFetch_);
     prefs.set("update_checked_at", double(updateCheckedAt_));
     if (!updateSkipped_.empty()) prefs.set("update_skipped", updateSkipped_);
     prefs.set("update_channel", std::string(updateChannel_ == UpdateChannel::Preview ? "preview" : "stable"));
@@ -859,6 +864,7 @@ void App::pollUpdateCheck() {
 
 void App::drawUpdateBanner() {
     pollUpdateCheck(); // (here, not in tickProject: this runs every frame, UI tests included)
+    pollContentFetch();
     tickSelfUpdate();  // (and in run() on the passes that draw nothing: asleep, hidden for a restart)
     if (!updateAvailable_) return;
     const UpdateInfo& u = *updateAvailable_;
@@ -923,6 +929,13 @@ void App::drawUpdatesSection() {
     ui::HelpText("Check for updates", nullptr,
                  "Once a day at startup, download a small file from the SculptForge website that names the newest "
                  "version, and show a banner when there is a newer one. Nothing about you or your computer is sent.",
+                 "Preferences > Updates");
+    if (ImGui::Checkbox(tr("Fetch credits and community content"), &contentFetch_)) saveProjectPrefs();
+    ui::HelpText("Fetch credits and community content", nullptr,
+                 "With the update check, download the supporters, Founding Members and artist quotes shown in Help > "
+                 "About from the SculptForge website, so they are current between releases. Text only, signed by "
+                 "SculptForge and checked before use; nothing about you is sent. Off: the list this version shipped "
+                 "with.",
                  "Preferences > Updates");
     ImGui::TextUnformatted(tr("Update channel"));
     int channel = updateChannel_ == UpdateChannel::Preview ? 1 : 0;

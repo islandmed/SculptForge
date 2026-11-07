@@ -1550,6 +1550,18 @@ private:
     std::string updateSkipped_;     // "Skip this version"
     UpdateChannel updateChannel_ = appPrerelease()[0] ? UpdateChannel::Preview : UpdateChannel::Stable; // a beta stays on betas
     std::shared_ptr<UpdateJob> updateJob_;
+    // The content lane (CommunityContent.h, PanelSupport.cpp): signed credits and testimonials from the website.
+    struct ContentJob {
+        std::atomic<bool> done{false};
+        bool ok = false;
+        std::string json, signature, error;
+    };
+    void loadCommunityContent();  // the last good copy in the preferences folder, at startup
+    void startContentFetch();     // with the daily update check
+    void pollContentFetch();
+    bool contentFetch_ = true;    // Preferences > Updates "Fetch credits and community content"
+    bool contentErrorLogged_ = false; // a refused file is logged once, never shown
+    std::shared_ptr<ContentJob> contentJob_;
     std::optional<UpdateInfo> updateAvailable_; // shown as the banner until dismissed
     std::string updateStatus_;                  // the last check's result, for Preferences > Updates
     // One-click update (PanelUpdate.cpp, core/SelfUpdate.h): the banner's Update button downloads and verifies the
