@@ -110,6 +110,14 @@ float spaceMouseDeadZone(float value, float deadZone) {
     return std::copysign((a - deadZone) / (1.0f - deadZone), value);
 }
 
+bool spaceMouseStirred(const std::array<float, kSmAxes>& axes, const SpaceMouseSettings& s) {
+    if (!s.enabled) return false;
+    const float threshold = std::max(s.deadZone * 0.5f, 0.01f);
+    for (float a : axes)
+        if (std::abs(a) > threshold) return true;
+    return false;
+}
+
 SpaceMouseMotion spaceMouseMotion(const std::array<float, kSmAxes>& axes, float dt, const SpaceMouseSettings& s) {
     SpaceMouseMotion m;
     if (!s.enabled || !(dt > 0.0f)) return m;

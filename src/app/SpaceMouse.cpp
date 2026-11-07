@@ -107,12 +107,18 @@ void App::spaceMouseClose() {
     spaceMouseMoving_ = spaceMousePushed_ = false;
 }
 
-bool App::spaceMouseDeflected() const {
-    if (!spaceMouse_) return false;
+namespace {
+std::array<float, kSmAxes> readAxes(SDL_Joystick* j) {
     std::array<float, kSmAxes> axes{};
     for (int i = 0; i < kSmAxes; ++i)
-        axes[size_t(i)] = std::clamp(float(SDL_GetJoystickAxis(spaceMouse_, i)) / 32767.0f, -1.0f, 1.0f);
-    return spaceMouseMotion(axes, 1.0f / 60.0f, uiPrefs_.spaceMouse).any();
+        axes[size_t(i)] = std::clamp(float(SDL_GetJoystickAxis(j, i)) / 32767.0f, -1.0f, 1.0f);
+    return axes;
+}
+} // namespace
+
+bool App::spaceMouseDeflected() const {
+    if (!spaceMouse_) return false;
+    return spaceMouseMotion(readAxes(spaceMouse_), 1.0f / 60.0f, uiPrefs_.spaceMouse).any();
 }
 
 void App::spaceMouseEvent(const SDL_Event& e) {
@@ -146,11 +152,13 @@ void App::spaceMouseEvent(const SDL_Event& e) {
 void App::updateSpaceMouse(float dt) {
     // The first frame of a move counts as one frame, not the time since the last frame drawn (a loop that sleeps
     // while idle wakes on the axis event: the cap has only just left the centre).
+    spaceMouseQuiet_ = std::min(spaceMouseQuiet_ + std::max(dt, 0.0f), 1e9f);
+    spaceMouseReadNs_ = SDL_GetTicksNS();
     if (!spaceMouseMoving_) dt = std::min(dt, 1.0f / 60.0f);
     spaceMouseMoving_ = spaceMousePushed_ = false;
     if (!spaceMouse_) return;
-    for (int i = 0; i < kSmAxes; ++i)
-        spaceMouseAxes_[size_t(i)] = std::clamp(float(SDL_GetJoystickAxis(spaceMouse_, i)) / 32767.0f, -1.0f, 1.0f);
+    spaceMouseAxes_ = readAxes(spaceMouse_);
+    if (spaceMouseStirred(spaceMouseAxes_, uiPrefs_.spaceMouse)) spaceMouseQuiet_ = 0.0f;
     for (float v : spaceMouseAxes_) spaceMouseReported_ = spaceMouseReported_ || v != 0.0f;
     const SpaceMouseSettings& s = uiPrefs_.spaceMouse;
     const SpaceMouseMotion m = spaceMouseMotion(spaceMouseAxes_, dt, s);
@@ -219,7 +227,9 @@ void App::regrabAfterViewMove() {
 // A SpaceMouse driver that doesn't know SculptForge (3DxWare's defaults) also moves the system pointer or scrolls the
 // wheel while the cap is pushed: the cursor jumped from the pen to wherever the driver put it, and the wheel zoomed
 // toward it (fenix, Discord 11-06). While the cap moves the view, only the pen and touch move the cursor; a mouse's
-// buttons still click.
+// buttons still click. It starts inside the dead zone and its scrolling's momentum outlasts the cap: a slow tilt
+// zoomed the view away (fenix, 11-06), so the echo counts from the cap's first stir, its wheel until kSpaceMouseEchoHold
+// after.
 bool App::spaceMouseEcho(const SDL_Event& e) const {
     SDL_MouseID which = 0;
     if (e.type == SDL_EVENT_MOUSE_MOTION) which = e.motion.which;
@@ -228,7 +238,13 @@ bool App::spaceMouseEcho(const SDL_Event& e) const {
     if (which == SDL_PEN_MOUSEID || which == SDL_TOUCH_MOUSEID) return false;
     // (The cap as it is now, too: the echo of its first push comes in the same batch of events as the push, before
     // the frame reads the axes.)
-    return spaceMousePushed_ || spaceMouseDeflected();
+    if (!spaceMouse_) return false;
+    if (spaceMousePushed_ || spaceMouseStirred(readAxes(spaceMouse_), uiPrefs_.spaceMouse)) return true;
+    // Only the scrolling outlasts the cap (momentum): a mouse picked up as the cap is let go moves the cursor at once.
+    if (e.type != SDL_EVENT_MOUSE_WHEEL) return false;
+    // (Plus the time since that read: a loop that slept while idle reads the cap again only after this event.)
+    const float sinceRead = spaceMouseReadNs_ ? float(double(SDL_GetTicksNS() - spaceMouseReadNs_) * 1e-9) : 0.0f;
+    return spaceMouseQuiet_ + sinceRead < kSpaceMouseEchoHold;
 }
 
 bool App::sixDofPointerEvent(const SDL_Event& e) {

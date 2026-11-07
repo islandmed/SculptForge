@@ -285,7 +285,9 @@
 //                            e.g. a pen stroke while the view turns); spacemouse_hold 0 0 0 0 0 0 lets go
 //   spacemouse_button N      press and release button N (1 = left side button, 2 = right)
 //   spacemouse_echo on|off   while the cap is pushed, the system pointer drifts and the wheel scrolls every frame, as
-//                            a SpaceMouse driver does for an app it doesn't know (3DxWare's defaults; fenix 11-06)
+//                            a SpaceMouse driver does for an app it doesn't know (3DxWare's defaults; fenix 11-06);
+//                            scroll: only the wheel, from the cap's first stir (inside the dead zone) and on for a
+//                            second after it is let go (macOS momentum; fenix's slow tilt, 11-06)
 //   spacemouse_unplug        unplug it
 //   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view)
 //   ui_scale PERCENT | auto  Preferences > Interface > UI scale (applied live, #87); display_scale PERCENT: the display's
@@ -2840,7 +2842,11 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         wait(0.1f);
     } else if (verb == "spacemouse_echo") {
         if (!need(1)) return false;
-        run([this, on = w[1] != "off"] { spaceMouseEcho_ = on; });
+        run([this, mode = w[1]] {
+            spaceMouseEcho_ = mode == "on";
+            spaceMouseScrollEcho_ = mode == "scroll";
+            scrollMomentumLeft_ = 0.0f;
+        });
     } else if (verb == "pen_rest") {
         if (!need(1)) return false;
         run([this, on = w[1] != "off"] {
@@ -2957,10 +2963,33 @@ void Demo::penRestNoise() {
     app_.handleEvent(e);
 }
 
-void Demo::spaceMouseEchoFrame() {
+void Demo::spaceMouseEchoFrame(float dt) {
+    if (!virtualSpaceMouseHandle_) return;
+    if (spaceMouseScrollEcho_) {
+        float push = 0.0f; // the cap's largest push, signed
+        for (float a : virtualAxes_)
+            if (std::abs(a) > std::abs(push)) push = a;
+        if (std::abs(push) > 0.01f) {
+            scrollMomentum_ = push * 3.0f; // wheel steps per frame, as the driver's scrolling accelerates
+            scrollMomentumLeft_ = 1.0f;
+        } else {
+            scrollMomentumLeft_ -= dt;
+            if (scrollMomentumLeft_ <= 0.0f) return;
+            scrollMomentum_ *= 0.95f;
+        }
+        SDL_Event e{};
+        e.type = SDL_EVENT_MOUSE_WHEEL;
+        e.wheel.windowID = SDL_GetWindowID(app_.window_);
+        e.wheel.which = kDriverMouse;
+        e.wheel.y = scrollMomentum_;
+        e.wheel.mouse_x = mouse_.x;
+        e.wheel.mouse_y = mouse_.y;
+        app_.handleEvent(e);
+        return;
+    }
     bool pushed = false;
     for (float a : virtualAxes_) pushed = pushed || std::abs(a) > 0.1f;
-    if (!pushed || !virtualSpaceMouseHandle_) return;
+    if (!pushed) return;
     // The system pointer (no device: injected input) drifts away from the pen, and the wheel zooms.
     mouseMotion(mouse_.x + 7.0f, mouse_.y + 3.0f);
     SDL_Event e{};
