@@ -1,0 +1,17 @@
+# Preferences > Tablet > View speed (the pen's own orbit, pan and zoom speed): the row fits and reads at 100% and
+# 200% UI scale, and in narrow windows (CMake also runs it at 1440x900 and 1024x768).
+run ui_look look=classic layout=classic        # (Preferences on the palette bar, as tablet.sfui)
+run new_sphere subdivisions=3
+click "Preferences##palette.preferences"
+click "Tablet##preferences.tablet"
+expect "##tablet_view_speed"
+expect_value tablet_view_speed == 1
+expect_text View speed 1.00
+shot tablet-100
+key escape
+ui_scale 200
+wait 0.3
+click "Preferences##palette.preferences"   # (Tablet stays open: clicking it again would fold it)
+hover "##tablet_view_speed"                 # (scrolls the panel to it in short windows)
+expect_text View speed 1.00
+shot tablet-200

@@ -13,6 +13,8 @@ testers:
     picks the first time, also right after bringing the pen in from out of range.
   - Same tablet: drag on the background with the pen tip, then Preferences > Tablet > View speed 0.40 and drag again:
     the view turns less than half as far; the mouse turns it as before.
+  - Windows with a real Huion or Wacom tablet: orbiting with the pen feels right at View speed 1.00, and lower values
+    slow it (0.50 about half as far per stroke).
 ---
 Root causes: the missed taps were SDL 3.2's stuck pen-mouse state and the driver's unreleased presses (#95, #13),
 fixed on main after the report (10-31 to 11-02); tests/ui/pen_quick_taps.sfui replays the report with one-frame taps
