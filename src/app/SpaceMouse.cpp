@@ -227,7 +227,7 @@ void App::regrabAfterViewMove() {
 // A SpaceMouse driver that doesn't know SculptForge (3DxWare's defaults) also moves the system pointer or scrolls the
 // wheel while the cap is pushed: the cursor jumped from the pen to wherever the driver put it, and the wheel zoomed
 // toward it (fenix, Discord 11-06). While the cap moves the view, only the pen and touch move the cursor; a mouse's
-// buttons still click. It starts inside the dead zone and its scrolling's momentum outlasts the cap: a slow tilt
+// buttons still click. It starts inside the dead zone and its last scroll events may trail the cap: a slow tilt
 // zoomed the view away (fenix, 11-06), so the echo counts from the cap's first stir, its wheel until kSpaceMouseEchoHold
 // after.
 bool App::spaceMouseEcho(const SDL_Event& e) const {
@@ -240,7 +240,7 @@ bool App::spaceMouseEcho(const SDL_Event& e) const {
     // the frame reads the axes.)
     if (!spaceMouse_) return false;
     if (spaceMousePushed_ || spaceMouseStirred(readAxes(spaceMouse_), uiPrefs_.spaceMouse)) return true;
-    // Only the scrolling outlasts the cap (momentum): a mouse picked up as the cap is let go moves the cursor at once.
+    // Only the scrolling may trail the cap: a mouse picked up as the cap is let go moves the cursor at once.
     if (e.type != SDL_EVENT_MOUSE_WHEEL) return false;
     // (Plus the time since that read: a loop that slept while idle reads the cap again only after this event.)
     const float sinceRead = spaceMouseReadNs_ ? float(double(SDL_GetTicksNS() - spaceMouseReadNs_) * 1e-9) : 0.0f;

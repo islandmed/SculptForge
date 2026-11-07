@@ -207,7 +207,7 @@ private:
     // spacemouse_echo on: while the virtual cap is pushed, a SpaceMouse driver that doesn't know the app (3DxWare's
     // defaults) moves the system pointer and scrolls the wheel every frame (fenix, Discord 11-06).
     // spacemouse_echo scroll: as macOS 3DxWare scrolls for an app it doesn't know: the wheel from the cap's first stir
-    // (inside the app's dead zone), by the cap's push, and on with the scroll's momentum for a second after it is let
+    // (inside the app's dead zone), by the cap's push, and on for a quarter second after it is let
     // go; no pointer motion (a slow tilt zoomed the view away, fenix 11-06).
     bool spaceMouseEcho_ = false, spaceMouseScrollEcho_ = false;
     float scrollMomentum_ = 0.0f, scrollMomentumLeft_ = 0.0f;

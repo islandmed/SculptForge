@@ -17,7 +17,7 @@ spacemouse 0 0 0 0.06 0 0 1.0
 expect_value camera_pitch == 0
 expect_value camera_distance >= $d0-0.0001
 expect_value camera_distance <= $d0+0.0001
-# ... then past it, held, and let go; the driver's scroll carries on for a second after.
+# ... then past it, held, and let go; the driver's scroll straggles on a moment after.
 spacemouse 0 0 0 0.3 0 0 2.0
 wait 1.2
 expect_value camera_pitch < -10

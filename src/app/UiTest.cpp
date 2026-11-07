@@ -287,7 +287,7 @@
 //   spacemouse_echo on|off   while the cap is pushed, the system pointer drifts and the wheel scrolls every frame, as
 //                            a SpaceMouse driver does for an app it doesn't know (3DxWare's defaults; fenix 11-06);
 //                            scroll: only the wheel, from the cap's first stir (inside the dead zone) and on for a
-//                            second after it is let go (macOS momentum; fenix's slow tilt, 11-06)
+//                            quarter second after it is let go (stragglers; fenix's slow tilt, 11-06)
 //   spacemouse_unplug        unplug it
 //   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view)
 //   ui_scale PERCENT | auto  Preferences > Interface > UI scale (applied live, #87); display_scale PERCENT: the display's
@@ -2971,7 +2971,7 @@ void Demo::spaceMouseEchoFrame(float dt) {
             if (std::abs(a) > std::abs(push)) push = a;
         if (std::abs(push) > 0.01f) {
             scrollMomentum_ = push * 3.0f; // wheel steps per frame, as the driver's scrolling accelerates
-            scrollMomentumLeft_ = 1.0f;
+            scrollMomentumLeft_ = 0.25f;
         } else {
             scrollMomentumLeft_ -= dt;
             if (scrollMomentumLeft_ <= 0.0f) return;

@@ -2558,7 +2558,7 @@ private:
     // and wheel meanwhile are the driver's echo of it (3DxWare's mouse emulation), not the user (spaceMouseEcho).
     bool spaceMousePushed_ = false;
     // Seconds since the cap was last stirred (spaceMouseStirred: inside the dead zone too) at the last read, and when
-    // that read was: the driver's scrolling (momentum) lasts kSpaceMouseEchoHold past it.
+    // that read was: the driver's scroll may trail it by kSpaceMouseEchoHold past it.
     float spaceMouseQuiet_ = 1e9f;
     Uint64 spaceMouseReadNs_ = 0;
     bool spaceMouseEcho(const SDL_Event& e) const;

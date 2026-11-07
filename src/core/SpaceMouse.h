@@ -70,11 +70,13 @@ constexpr float kSpaceMouseZoomRate = 6.0f;  // Camera::zoom steps (x0.46 of the
 constexpr float kSpaceMouseMaxStep = 0.1f;   // seconds: a stalled frame doesn't throw the view
 
 // A SpaceMouse driver that doesn't know the app (3DxWare's defaults) scrolls the wheel and moves the system pointer
-// from the cap's first stir, well inside our dead zone, and macOS carries its scrolling on (momentum) after the cap
-// is let go: a slow tilt zoomed the view away (fenix, Discord 11-06). The cap counts as stirred past half the dead
+// from the cap's first stir, well inside our dead zone, and its last scroll events may come just after the cap is
+// let go: a slow tilt zoomed the view away (fenix, Discord 11-06). The cap counts as stirred past half the dead
 // zone (a cap that rests a little off centre has its dead zone raised, so its own noise never counts): pointer and
 // wheel events from anything but the pen are the driver's echo meanwhile, the wheel also for this long after.
-constexpr float kSpaceMouseEchoHold = 1.5f; // seconds
+// Short: a real wheel turned this soon after the cap is dropped too (SDL gives the driver's scroll and the mouse's the
+// same id). Longer only if a real driver's scroll is seen to go on after the cap rests.
+constexpr float kSpaceMouseEchoHold = 0.3f; // seconds
 bool spaceMouseStirred(const std::array<float, kSmAxes>& axes, const SpaceMouseSettings& s);
 
 // An axis value (-1 .. 1) after the dead zone: 0 inside it, rescaled so the rest of the travel still reaches 1.
