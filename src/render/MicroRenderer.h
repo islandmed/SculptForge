@@ -17,14 +17,18 @@
 //   shading grid, so lighting keeps every micro detail even where the geometry is coarser.
 // - Brushes mark base triangles dirty; their displacement tiles are re-sent at once, their shading (and that of
 //   their neighbours) within a per-frame budget of grid points (the rest follows on the next frames).
+// - A level that streams from a detail file (Focus Detail) keeps a small record per tile and full grids only for
+//   the tiles drawn finer than its coarse level (render/MicroFocus.h).
 // GL 3.3 core: texture buffers, instancing, no tessellation or compute shaders (macOS stops at GL 4.1).
 #pragma once
 
 #include "core/Micro.h"
 #include "render/Clusters.h"
+#include "render/MicroFocus.h"
 #include "render/GL.h"
 
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <vector>
 
@@ -52,8 +56,11 @@ public:
     bool viewMoving = false;
     // The last draw: the level used by each visible cluster (-1 = culled), and the target it settled on.
     float lastTargetPx = 0.0f;
+    // Focus Detail's per-tile GPU levels (null for a level in memory), for tests and the benchmark.
+    const MicroFocus* focus() const { return focus_.get(); }
 
 private:
+    friend class MicroFocus;
     void buildLayout(const Mesh& mesh);
     void uploadBase(const Mesh& mesh);
     void updateClusterBounds(const Mesh& mesh, const std::vector<uint32_t>& clusters);
@@ -113,8 +120,9 @@ private:
     struct Uniforms {
         GLuint program = 0;
         GLint slotBase = -1, chunkSlot = -1, level = -1, n = -1, samples = -1, clusterShift = -1, step = -1, unrolled = -1,
-              corners = -1;
+              corners = -1, focus = -1;
     } u_;
+    std::unique_ptr<MicroFocus> focus_;
 };
 
 // The micro mesh shader's vertex stage (with the mesh fragment shader under MICRO).

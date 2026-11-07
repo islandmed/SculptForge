@@ -182,11 +182,16 @@ without them, so it overstates what prediction misses. The quiet run will remeas
 **Missing / not true yet:**
 - **CPU memory isn't sparse.** `disp` stays a dense 2 bytes per point (1.04 GB at 1B) because every consumer indexes it
   directly. Promotion saves decompression and I/O, not RAM. At 1B this is fine (RSS ~1.2-1.5 GB). At 4B+ it isn't.
-- **GPU memory doesn't scale with the focus.** The renderer uploads every tile's full grid (6 B a point: ~3.1 GB at
-  1B; on unified-memory machines that's system RAM). Per-tile GPU levels are perf-moonshots #8 (estimate: 3.1 GB →
-  ~0.6 GB with this focus).
-- **First shading** of all tiles in the renderer (~5 s at 1B Micro 5, docs/performance.md) still runs at open,
-  coarse or not. Shading coarse tiles at their 45 points would cut it ~180×.
+- ~~GPU memory doesn't scale with the focus~~ **Done (11-06, `perf/focus-gpu-levels`, render/MicroFocus.h):** per
+  tile a record (coarse grid + its three edges at full resolution, 426 values at level 7) that the vertex shader
+  rebuilds exactly as `disp` holds it (test `focus_detail_gpu_record_rebuilds_coarse_tiles_exactly`); full grids
+  only in a page pool (384 MB cap) for full tiles the last frame drew finer than level 3. Measured on standard-1b
+  (laptop, floor profile, a busy machine, functional runs): GPU buffers mapped from the render node 87 MB against
+  3,006 MB for v0.11.9 on the same file (/proc/self/smaps; Asahi has no fdinfo memory counters); the renderer's own
+  count 64 MB framed, at most 186 MB in a 1080p close-up sweep (2,432 full tiles).
+- ~~First shading of all tiles~~ **Done with it:** coarse tiles are shaded on the coarse level
+  (`MicroShader::shadeLevel`); pages get their full shading within the frame's shading budget. standard-1b opened in
+  0.49 s with the first frame fully shaded at 0.65 s (same run). The official bench.sh focus rows replace these.
 - **Not wired into projects:** a `.sfproj` doesn't reference a `.sfdetail`; the app has no Save for it yet (the core
   `save()` is tested). Compaction of garbage, Windows mapping, masks on streamed tiles (`mask` stays dense), layers,
   and multiple streamed Parts aren't done.

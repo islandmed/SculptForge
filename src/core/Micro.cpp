@@ -790,14 +790,14 @@ void MicroShader::shade(const Mesh& m, std::span<const uint32_t> dirty, bool all
                         std::vector<uint32_t>* outer) {
     written.clear();
     if (outer) outer->clear();
-    if (!m.micro) return;
+    if (!m.micro && !level_) return;
     if (!all) {
         shadeSet(m, dirty, grow, written, out, prepare, grow ? nullptr : outer);
         return;
     }
     // Everything: in runs of triangles (neighbours by index on levels made by Divide), each with the ring its
     // shared points need, so the edge sums stay a few MB instead of 20 bytes per edge point of the whole mesh.
-    const uint32_t nt = m.micro->baseTriangles;
+    const uint32_t nt = (level_ ? level_ : m.micro.get())->baseTriangles;
     constexpr uint32_t kRun = 1u << 16;
     std::vector<uint32_t> run;
     for (uint32_t b = 0; b < nt; b += kRun) {
@@ -807,9 +807,16 @@ void MicroShader::shade(const Mesh& m, std::span<const uint32_t> dirty, bool all
     }
 }
 
+void MicroShader::shadeLevel(const Mesh& base, const MicroMesh& level, std::span<const uint32_t> dirty, bool all,
+                             std::vector<uint32_t>& written, const std::function<uint32_t*(uint32_t tri)>& out, bool grow) {
+    level_ = &level;
+    shade(base, dirty, all, written, out, {}, grow);
+    level_ = nullptr;
+}
+
 void MicroShader::shadeSet(const Mesh& m, std::span<const uint32_t> dirty, bool grow, std::vector<uint32_t>& written,
                            const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare, std::vector<uint32_t>* outer) {
-    const MicroMesh& mm = *m.micro;
+    const MicroMesh& mm = level_ ? *level_ : *m.micro;
     const uint32_t n = mm.n, S = mm.samples, nt = mm.baseTriangles;
     if (mm.edgeNeighbor.size() != size_t(nt) * 3) return; // (ensureTopology first)
     if (stamp_.size() != nt) {
