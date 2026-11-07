@@ -90,6 +90,7 @@ bool App::interactive() const { return options_.renderPath.empty() && options_.r
 void App::initProject() {
     if (!interactive()) return;
     prefDir_ = userDataDir();
+    setProjectAutosaveFolder(prefDir_); // (its autosave may name a streamed level's file by path: core/Project.h)
     if (prefDir_.empty()) return;
     std::ifstream f(fsPath(prefDir_ + "project.json"), std::ios::binary);
     Json prefs;

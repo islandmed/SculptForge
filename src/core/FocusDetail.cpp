@@ -435,9 +435,11 @@ bool FocusDetail::mapFile(std::string& error) {
 #if defined(SF_FOCUS_POSIX)
     if (map_) ::munmap(const_cast<uint8_t*>(map_), mapBytes_);
     map_ = nullptr;
-    if (fd_ < 0) fd_ = ::open(path_.c_str(), O_RDWR);
+    // Read only (save() opens it for writing itself); a regular file, not through a symlink, a FIFO (nonblocking:
+    // opening one waits for a writer) or a device.
+    if (fd_ < 0) fd_ = ::open(path_.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
     struct stat st {};
-    if (fd_ < 0 || ::fstat(fd_, &st) != 0 || st.st_size < off_t(kHeaderBytes)) {
+    if (fd_ < 0 || ::fstat(fd_, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size < off_t(kHeaderBytes)) {
         error = "Can't open " + path_;
         return false;
     }
@@ -931,17 +933,27 @@ bool FocusDetail::save(const Mesh& m, std::string& error) {
     h.generation = generation_ + 1;
     h.garbage = garbage;
     h.step = step_;
+    // Written through its own descriptor, only when it is still the file we read (same inode, not a symlink).
+    struct stat was {}, now {};
+    const int wfd = ::open(path_.c_str(), O_WRONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (wfd < 0 || ::fstat(fd_, &was) != 0 || ::fstat(wfd, &now) != 0 || was.st_dev != now.st_dev || was.st_ino != now.st_ino) {
+        if (wfd >= 0) ::close(wfd);
+        error = "Can't write " + path_;
+        return false;
+    }
     auto pwriteAll = [&](const uint8_t* p, size_t size, uint64_t at) {
         while (size) {
-            const ssize_t w = ::pwrite(fd_, p, size, off_t(at));
+            const ssize_t w = ::pwrite(wfd, p, size, off_t(at));
             if (w <= 0) return false;
             p += w, size -= size_t(w), at += uint64_t(w);
         }
         return true;
     };
     const std::vector<uint8_t> head = encodeHeader(h);
-    if (!pwriteAll(tail.data(), tail.size(), offset) || ::fsync(fd_) != 0 || !pwriteAll(head.data(), head.size(), 0) ||
-        ::fsync(fd_) != 0) {
+    const bool written = pwriteAll(tail.data(), tail.size(), offset) && ::fsync(wfd) == 0 &&
+                         pwriteAll(head.data(), head.size(), 0) && ::fsync(wfd) == 0;
+    ::close(wfd);
+    if (!written) {
         error = "Saving " + path_ + " failed (disk full?)";
         return false;
     }

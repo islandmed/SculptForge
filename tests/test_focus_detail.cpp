@@ -11,11 +11,14 @@
 #include "core/BVH.h"
 #include "core/Commands.h"
 #include "core/FocusDetail.h"
+#include "core/Json.h"
 #include "core/Micro.h"
 #include "core/Project.h"
 #include "core/Sculpt.h"
+#include "io/Zip.h"
 
 #include <atomic>
+#include <sys/stat.h>
 #include <cstdio>
 #include <cstring>
 #include <thread>
@@ -537,6 +540,7 @@ TEST(focus_detail_project_names_its_detail_file) {
     dabAt(doc, BrushType::Clay, "Clay", glm::vec3(0.0f, -0.1f, 5.0f), 0.08f, 0.6f);
     const auto stamp = std::filesystem::last_write_time(detail);
     const std::string autosave = (dir / "autosave.sfproj").string();
+    setProjectAutosaveFolder(dir.string()); // (the app's own autosave may name its detail file by path)
     CHECK(saveProject(autosave, doc, err, true));
     CHECK(std::filesystem::last_write_time(detail) == stamp);
     CHECK(!std::filesystem::exists(dir / "autosave.sfdetail"));
@@ -544,6 +548,12 @@ TEST(focus_detail_project_names_its_detail_file) {
     Document recovered;
     CHECK(loadProject(autosave, recovered, err));
     if (recovered.mesh.micro && recovered.mesh.micro->focus) CHECK(streamedFull(recovered.mesh) == edited2);
+    // The same autosave anywhere else (a shared project naming a file by path) is refused.
+    setProjectAutosaveFolder(focusTempPath("elsewhere"));
+    Document refused;
+    CHECK(!loadProject(autosave, refused, err));
+    CHECK(err == "Detail file name is invalid");
+    setProjectAutosaveFolder("");
     // Missing detail file: a clear error.
     back = Document();
     recovered = Document();
@@ -552,6 +562,63 @@ TEST(focus_detail_project_names_its_detail_file) {
     CHECK(!loadProject(proj, none, err));
     CHECK(err.find("head.sfdetail") != std::string::npos);
     (void)edited;
+}
+
+// A shared project can't make us open other files: its detail file is a plain name beside it ending in .sfdetail,
+// and the file must be a regular file reached without a symlink (a FIFO or a device is refused without blocking).
+TEST(focus_detail_project_detail_names_are_confined) {
+    const std::string src = writeSmall("confined-src.sfdetail");
+    Mesh m;
+    std::string err;
+    auto fd = FocusDetail::open(src, m, err);
+    CHECK(fd != nullptr);
+    if (!fd) return;
+    Document doc = makeDoc(std::move(m));
+    const auto dir = std::filesystem::path(focusTempPath("confined"));
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir / "a");
+    const std::string proj = (dir / "head.sfproj").string();
+    CHECK(saveProject(proj, doc, err));
+    std::filesystem::copy_file(dir / "head.sfdetail", dir / "a" / "b.sfdetail");
+    std::filesystem::copy_file(dir / "head.sfdetail", dir.parent_path() / "x.sfdetail",
+                               std::filesystem::copy_options::overwrite_existing);
+    auto withDetail = [&](const std::string& name) { // the project naming `name`; true when it loads
+        std::vector<ZipEntry> entries;
+        std::string e;
+        CHECK(readStoredZip(proj, entries, e));
+        for (auto& z : entries)
+            if (z.name == "manifest.json") {
+                std::string text(z.data.begin(), z.data.end());
+                const size_t at = text.find("\"head.sfdetail\"");
+                CHECK(at != std::string::npos);
+                if (at != std::string::npos) text.replace(at, 15, jsonQuote(name));
+                z.data.assign(text.begin(), text.end());
+            }
+        const std::string copy = (dir / "named.sfproj").string();
+        CHECK(writeStoredZip(copy, entries, 1, e));
+        Document d;
+        const bool ok = loadProject(copy, d, err);
+        if (ok) CHECK(d.mesh.micro && d.mesh.micro->focus);
+        return ok;
+    };
+    CHECK(withDetail("head.sfdetail"));
+    for (const std::string bad : {(dir / "head.sfdetail").string(), std::string("../x.sfdetail"), std::string("a/b.sfdetail"),
+                                  std::string("a\\b.sfdetail"), std::string("head.sfproj"), std::string(".sfdetail"),
+                                  std::string("/dev/zero")}) {
+        CHECK(!withDetail(bad));
+        CHECK(err == "Detail file name is invalid");
+    }
+    // A symlink beside the project, a FIFO, a directory: refused when opened (no hang on the FIFO).
+    std::filesystem::create_symlink(dir / "head.sfdetail", dir / "link.sfdetail");
+    CHECK(!withDetail("link.sfdetail"));
+    CHECK(::mkfifo((dir / "pipe.sfdetail").c_str(), 0600) == 0);
+    CHECK(!withDetail("pipe.sfdetail"));
+    std::filesystem::create_directories(dir / "dir.sfdetail");
+    CHECK(!withDetail("dir.sfdetail"));
+    // Devices: FocusDetail itself only maps regular files.
+    Mesh none;
+    CHECK(FocusDetail::open("/dev/zero", none, err) == nullptr);
+    CHECK(FocusDetail::open((dir / "pipe.sfdetail").string(), none, err) == nullptr);
 }
 
 // Divide to Micro past the memory budget streams the new level; undo and redo swap it whole.
@@ -587,6 +654,46 @@ TEST(focus_detail_divide_to_micro_switches_when_large) {
     CHECK(!microWantsFocus(size_t(100) << 20, 5));
     CHECK(microWantsFocus(size_t(1) << 30, 7));
     CHECK(!microWantsFocus(size_t(1) << 30, FocusDetail::kCoarseLevel));
+}
+
+// A micro level in memory still saves as format 7 (no detail file) and loads back exactly: format 8 is written
+// only when a level streams, so builds before 0.11.12 keep opening these projects.
+TEST(focus_detail_in_memory_micro_project_stays_format_7) {
+    setenv("SF_FOCUS_DETAIL", "0", 1);
+    Mesh base;
+    {
+        Mesh head;
+        std::string err;
+        CHECK(FocusDetail::open(writeSmall("format7.sfdetail"), head, err) != nullptr);
+        base.positions = head.positions;
+        base.triangles = head.triangles;
+        base.rebuildTopology();
+        base.recomputeAllNormals();
+    }
+    Document doc = makeDoc(std::move(base));
+    std::string msg, err;
+    CHECK(microDivideUndoable(doc, 5, msg));
+    unsetenv("SF_FOCUS_DETAIL");
+    CHECK(doc.mesh.micro && !doc.mesh.micro->focus);
+    if (!doc.mesh.micro) return;
+    dabAt(doc, BrushType::Clay, "Clay", glm::vec3(0.0f, 0.1f, 5.0f), 0.1f, 0.8f);
+    const auto dir = std::filesystem::path(focusTempPath("format7"));
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    const std::string proj = (dir / "head.sfproj").string();
+    CHECK(saveProject(proj, doc, err));
+    std::vector<ZipEntry> entries;
+    CHECK(readStoredZip(proj, entries, err));
+    Json manifest;
+    for (const auto& e : entries)
+        if (e.name == "manifest.json") CHECK(Json::parse(std::string(e.data.begin(), e.data.end()), manifest, err));
+    CHECK(manifest["version"].asNumber() == 7);
+    CHECK(manifest.dump().find(".sfdetail") == std::string::npos);
+    CHECK(!std::filesystem::exists(dir / "head.sfdetail"));
+    Document back;
+    CHECK(loadProject(proj, back, err));
+    CHECK(back.mesh.micro && !back.mesh.micro->focus);
+    if (back.mesh.micro) CHECK(back.mesh.micro->disp == doc.mesh.micro->disp);
 }
 
 // Every micro brush writes on a streamed level exactly what it writes on the same level in memory (the tiles it
