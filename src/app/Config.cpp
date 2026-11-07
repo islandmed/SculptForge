@@ -341,6 +341,9 @@ constexpr Gesture kBlenderGestures[] = {
     {"Paint mask", "M for the Mask brush, then drag (Ctrl+drag unmasks); M again goes back"},
     {"Invert / clear mask", "Ctrl+I / Alt+M"},
     {"Hide face group", "H over it (Shift+H: show only it, again: everything; Alt+H shows all)"},
+    {"Hide outside a rectangle or lasso", "Ctrl+Shift + drag (add Alt: inside; shape in Tool > Visibility); click: "
+                                          "isolate the face group, the background shows all"},
+    {"Cut", "Pick a Cut shape (Ctrl+Shift + click the brush tile, or Ctrl+Shift+B), then Ctrl+Shift + drag"},
     {"Brush radius / strength", "F / Shift+F, then drag or type a number"},
     {"Help on any control", "Hold Ctrl and point at it (Ctrl+Alt: scripting parameters)"},
     {"Assign a shortcut", "Ctrl+Alt + click any button, then press the key"},

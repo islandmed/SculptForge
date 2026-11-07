@@ -19,6 +19,9 @@ shape next to **Select Rectangle** and **Select Lasso**, or use the shape button
 While a Cut shape is picked, <kbd>Ctrl</kbd>+<kbd>Shift</kbd> cuts instead of hiding; pick **Select Rectangle**
 or **Select Lasso** again to hide parts of the model.
 
+The keys are the same in every input style, the [Blender style](shortcuts.md#blender-keys) too: there
+<kbd>Ctrl</kbd> alone inverts the brush, but <kbd>Ctrl</kbd>+<kbd>Shift</kbd> still picks, hides and cuts.
+
 ## Pick a mode
 
 **Tool > Cut** has four modes:
