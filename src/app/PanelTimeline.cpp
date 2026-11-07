@@ -89,6 +89,7 @@ struct TimelineUiState {
     bool visible = true;      // the strip is open (else only its tab shows)
     bool record = true;       // keep a timeline for the history
     bool saveHistory = false; // write <name>.sfhist with the project
+    bool compact = true;      // one row: the count, the track and icon buttons (Preferences > Interface > Compact timeline)
     bool dragging = false;
     size_t pendingSeek = SIZE_MAX; // the scrubber's target, applied once a frame
     uint32_t retuneNode = Timeline::kNone;
@@ -130,6 +131,7 @@ void loadPrefs(TimelineUiState& s, const std::string& configDir, bool determinis
     s.visible = j["visible"].asBool(s.visible);
     s.record = j["record"].asBool(s.record);
     s.saveHistory = j["save_history"].asBool(s.saveHistory);
+    s.compact = j["compact"].asBool(s.compact);
 }
 
 void savePrefs(const TimelineUiState& s, const std::string& configDir, bool deterministic) {
@@ -138,6 +140,7 @@ void savePrefs(const TimelineUiState& s, const std::string& configDir, bool dete
     j.set("visible", s.visible);
     j.set("record", s.record);
     j.set("save_history", s.saveHistory);
+    j.set("compact", s.compact);
     std::ofstream f(fsPathOf(prefsFile(configDir)));
     f << j.dump(true);
 }
@@ -185,6 +188,14 @@ void App::registerTimelineUiActions() {
         "Timeline position: the Sculpt Timeline strip runs along the bottom of the viewport, above the brush shelf. "
         "Saved automatically.",
         [this] { uiPrefs_.timelineTop = false; }, [this] { return !uiPrefs_.timelineTop; });
+    add("view.timeline_compact", "Compact timeline", ICON_LC_FOLD_VERTICAL, "Preferences > Interface",
+        "The Sculpt Timeline as one thin row: the step count, the track and icon buttons (the default). Off: the "
+        "full strip, with a header row above the track. Saved automatically.",
+        [this, ui] {
+            ui().compact = !ui().compact;
+            savePrefs(ui(), configDir_, uiConfigDeterministic_);
+        },
+        [ui] { return ui().compact; });
     add("timeline.timelapse", "Export timelapse...", ICON_LC_FILM, "Edit",
         "Render the history of the active Part as a turntable timelapse video (1080p or 4K MP4, no captions).",
         [ui] { ui().timelapseDialog = true; });
@@ -340,6 +351,7 @@ void App::drawTimelineUi() {
     // What the strip covers this frame (set where it is drawn below); framing keeps the model clear of it.
     timelineTopInset_ = 0.0f;
     timelineStripY_ = -1.0f;
+    timelineStripH_ = 0.0f;
     timelineDrawn_ = true;
     if (!timelineUi_) timelineUi_ = std::make_shared<TimelineUiState>();
     TimelineUiState& s = *timelineUi_;
@@ -409,7 +421,7 @@ void App::drawTimelineUi() {
     // The open Library takes the canvas's top (or bottom) edge: the strip moves off it, so it never covers the
     // Library's tabs and close button (#80, a 720p screen at 150%).
     if (libraryBrowser_.open()) {
-        const float lib = std::min(LibraryBrowser::height(layout_.libraryRows, sc), c.h);
+        const float lib = std::min(LibraryBrowser::height(layout_, sc), c.h);
         if (!layout_.libraryBottom) c.y += lib;
         c.h -= lib;
     }
@@ -438,16 +450,22 @@ void App::drawTimelineUi() {
     }
     const auto branches = t->branches();
     const int lanes = std::min<int>(3, int(branches.size()));
-    const float laneH = 7 * sc, trackH = 26 * sc;
-    const float height = 30 * sc + trackH + float(lanes) * (laneH + 3 * sc);
-    const float stripY = top ? c.y + margin : c.y + c.h - margin - height;
+    // Compact (the default, @factoberplay): one row, the step count, the track and icon buttons, with
+    // thin branch lanes over the track; the full strip has a header row above the track (Preferences > Interface).
+    const bool compact = s.compact;
+    const float laneH = (compact ? 4 : 7) * sc, laneGap = (compact ? 2 : 3) * sc, trackH = (compact ? 20 : 26) * sc;
+    const float padY = (compact ? 3 : 5) * sc;
+    const float height = compact ? 2 * padY + trackH + float(lanes) * (laneH + laneGap)
+                                 : 30 * sc + trackH + float(lanes) * (laneH + laneGap);
+    const float stripMargin = (compact ? 6 : 10) * sc;
+    const float stripY = top ? c.y + stripMargin : c.y + c.h - stripMargin - height;
     ImGui::SetNextWindowPos(ImVec2(c.x + margin, stripY), ImGuiCond_Always);
     timelineStripY_ = stripY;
     timelineStripH_ = height;
     if (top) timelineTopInset_ = stripY + height - canvasRect().y;
     ImGui::SetNextWindowSize(ImVec2(c.w - 2 * margin, height), ImGuiCond_Always);
     ImGui::SetNextWindowBgAlpha(0.88f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8 * sc, 5 * sc));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2((compact ? 6 : 8) * sc, padY));
     const bool open = ImGui::Begin("##timeline", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings |
                                                               ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav |
                                                               ImGuiWindowFlags_NoScrollWithMouse);
@@ -458,77 +476,160 @@ void App::drawTimelineUi() {
     }
     const auto& path = t->path();
     const size_t n = path.size();
-    // Header row: what it is, where the cursor is, the controls. The controls are measured and right-aligned; the
-    // text left of them is elided before it reaches them (a 1024 px window at 200 %), the step count last.
-    const ImGuiStyle& st = ImGui::GetStyle();
-    const float smallW = ImGui::CalcTextSize(ICON_LC_FILM).x + st.FramePadding.x * 2.0f; // SmallButton: same x padding
-    const float checkW = ImGui::GetFrameHeight() + st.ItemInnerSpacing.x + ImGui::CalcTextSize(tr("Save with project")).x;
-    const float controlsW = checkW + 2.0f * (smallW + st.ItemSpacing.x);
-    const float controlsX = std::max(ImGui::GetCursorPosX(), ImGui::GetWindowWidth() - st.WindowPadding.x - controlsW);
-    timelineSpans_.clear(); // (UI tests check that nothing overlaps)
-    auto room = [&] { return controlsX - st.ItemSpacing.x - 8 * sc - (ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x); };
-    auto tail = [&](const std::string& text, const ImVec4* col) { // one more piece of the header, elided to the room left
-        if (text.empty()) return;
-        const float avail = room() - st.ItemSpacing.x;
-        if (avail < ImGui::CalcTextSize("M...").x) return;
-        const std::string shown = fitText(text, avail);
-        ImGui::SameLine();
-        if (col) ImGui::TextColored(*col, "%s", shown.c_str());
-        else ImGui::TextDisabled("%s", shown.c_str());
-        timelineSpans_.push_back({ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().x});
-    };
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted(ICON_LC_HISTORY);
-    timelineSpans_.push_back({ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().x});
-    {
-        char stepText[64];
-        std::snprintf(stepText, sizeof stepText, tr("Step %zu of %zu"), t->cursor(), n - 1);
-        const std::string shown = fitText(stepText, std::max(0.0f, room() - st.ItemSpacing.x));
-        if (!shown.empty()) {
-            ImGui::SameLine();
-            ImGui::TextUnformatted(shown.c_str());
-            timelineSpans_.push_back({ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().x});
-        }
-    }
-    if (!branches.empty()) {
-        char branchText[64];
-        std::snprintf(branchText, sizeof branchText, tr(branches.size() == 1 ? "%s %zu branch" : "%s %zu branches"), ICON_LC_GIT_BRANCH,
-                      branches.size());
-        tail(branchText, nullptr);
-    }
-    if (const Timeline::Node& cur = t->node(t->cursorNode()); t->cursor() > 0) tail("  " + cur.label, nullptr);
-    if (!s.message.empty()) tail("  " + s.message, &theme::textDim);
-    ImGui::SameLine(controlsX);
-    const float controlsStart = ImGui::GetCursorScreenPos().x;
-    if (ImGui::Checkbox(tr("Save with project"), &s.saveHistory)) {
-        Timeline::saveWithProject = s.saveHistory;
-        savePrefs(s, configDir_, uiConfigDeterministic_);
-    }
-    ui::HelpText("Save with project", nullptr,
-                 "Also save the history beside the project as <name>.sfhist (strokes, masks, vertex paint, visibility; "
-                 "a topology change cuts it). Opening the project brings it back.",
-                 "Edit > Sculpt Timeline");
-    ImGui::SameLine();
-    if (ImGui::SmallButton(ICON_LC_FILM)) s.timelapseDialog = true;
-    ui::HelpText("Export timelapse", nullptr, "Render this history as a turntable timelapse video.", "Edit > Sculpt Timeline");
-    ImGui::SameLine();
-    if (ImGui::SmallButton(top ? ICON_LC_CHEVRON_UP : ICON_LC_CHEVRON_DOWN)) {
-        s.visible = false;
-        savePrefs(s, configDir_, uiConfigDeterministic_);
-    }
-    ui::HelpText("Hide", nullptr, "Fold the timeline into a tab.", "Edit > Sculpt Timeline");
-    timelineSpans_.push_back({controlsStart, ImGui::GetItemRectMax().x});
-
-    // Branch lanes, then the track.
+    timelineSpans_.clear(); // (UI tests check that nothing in the strip's row overlaps)
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    const ImVec2 origin = ImGui::GetCursorScreenPos();
-    const float x0 = origin.x + 6 * sc, x1 = origin.x + ImGui::GetContentRegionAvail().x - 6 * sc;
+    float x0 = 0.0f, x1 = 0.0f, y = 0.0f;
+    if (compact) {
+        // The track row sits below the lanes; the count on its left, the buttons on its right, all centred on it.
+        const ImVec2 wp = ImGui::GetWindowPos();
+        const float padX = 6 * sc, rowY = wp.y + padY + float(lanes) * (laneH + laneGap), mid = rowY + trackH * 0.5f;
+        const float right = wp.x + ImGui::GetWindowWidth() - padX;
+        ImGui::SetCursorScreenPos(ImVec2(wp.x + padX, std::floor(mid - ImGui::GetTextLineHeight() * 0.5f)));
+        ImGui::Text("%s %zu/%zu", ICON_LC_HISTORY, t->cursor(), n - 1);
+        timelineSpans_.push_back({ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().x});
+        if (ImGui::IsItemHovered()) {
+            std::string tip = std::string(tr("Sculpt Timeline")) + "\n";
+            char buf[96];
+            std::snprintf(buf, sizeof buf, tr("Step %zu of %zu"), t->cursor(), n - 1);
+            tip += buf;
+            if (t->cursor() > 0) tip += ": " + t->node(t->cursorNode()).label;
+            if (!branches.empty()) {
+                std::snprintf(buf, sizeof buf, tr(branches.size() == 1 ? "%zu branch" : "%zu branches"), branches.size());
+                tip += std::string("\n") + buf;
+            }
+            ImGui::SetTooltip("%s", tip.c_str());
+        }
+        float left = ImGui::GetItemRectMax().x + 10 * sc;
+        if (!s.message.empty()) { // what went wrong (or a branch switch): kept short so the track keeps its room
+            const float w = std::min(ImGui::CalcTextSize(s.message.c_str()).x, (right - left) * 0.3f);
+            ImGui::SetCursorScreenPos(ImVec2(left, std::floor(mid - ImGui::GetTextLineHeight() * 0.5f)));
+            ImGui::PushClipRect(ImVec2(left, rowY), ImVec2(left + w, rowY + trackH), true);
+            ImGui::TextColored(theme::textDim, "%s", s.message.c_str());
+            ImGui::PopClipRect();
+            if (ImGui::IsMouseHoveringRect(ImVec2(left, rowY), ImVec2(left + w, rowY + trackH)))
+                ImGui::SetTooltip("%s", s.message.c_str());
+            timelineSpans_.push_back({left, left + w});
+            left += w + 10 * sc;
+        }
+        // Icon buttons, right to left: hide, full strip, timelapse, save with project (lit when on).
+        const float b = trackH, gap = 2 * sc;
+        float bx = right - 4 * b - 3 * gap;
+        auto iconButton = [&](const char* id, const char* glyph, bool on) {
+            ImGui::SetCursorScreenPos(ImVec2(bx, rowY));
+            const bool clicked = ImGui::InvisibleButton(id, ImVec2(b, b));
+            const ImVec2 a = ImGui::GetItemRectMin(), e = ImGui::GetItemRectMax();
+            if (on || ImGui::IsItemHovered())
+                dl->AddRectFilled(a, e, theme::u32(on ? theme::selection : theme::frameHover), theme::rounding(3 * sc));
+            ui::CentredGlyph(dl, nullptr, a, e, theme::u32(on ? theme::accent : theme::text), glyph);
+            bx += b + gap;
+            return clicked;
+        };
+        if (iconButton("Save with project", ICON_LC_SAVE, s.saveHistory)) {
+            s.saveHistory = !s.saveHistory;
+            Timeline::saveWithProject = s.saveHistory;
+            savePrefs(s, configDir_, uiConfigDeterministic_);
+        }
+        ui::HelpText(s.saveHistory ? "Save with project: on" : "Save with project: off", nullptr,
+                     "Also save the history beside the project as <name>.sfhist (strokes, masks, vertex paint, visibility; "
+                     "a topology change cuts it). Opening the project brings it back.",
+                     "Edit > Sculpt Timeline");
+        if (iconButton("##timelapse", ICON_LC_FILM, false)) s.timelapseDialog = true;
+        ui::HelpText("Export timelapse", nullptr, "Render this history as a turntable timelapse video.", "Edit > Sculpt Timeline");
+        if (iconButton("##timeline.full", ICON_LC_UNFOLD_VERTICAL, false)) {
+            s.compact = false;
+            savePrefs(s, configDir_, uiConfigDeterministic_);
+        }
+        ui::HelpText("Full timeline", nullptr,
+                     "Show the timeline with its header row (Preferences > Interface > Compact timeline).",
+                     "Edit > Sculpt Timeline");
+        if (iconButton("##timeline.hide", top ? ICON_LC_CHEVRON_UP : ICON_LC_CHEVRON_DOWN, false)) {
+            s.visible = false;
+            savePrefs(s, configDir_, uiConfigDeterministic_);
+        }
+        ui::HelpText("Hide", nullptr, "Fold the timeline into a tab.", "Edit > Sculpt Timeline");
+        timelineSpans_.push_back({right - 4 * b - 3 * gap, right});
+        x0 = left + 6 * sc;
+        x1 = right - 4 * b - 3 * gap - 12 * sc;
+        y = wp.y + padY;
+    } else {
+        // Header row: what it is, where the cursor is, the controls. The controls are measured and right-aligned;
+        // the text left of them is elided before it reaches them (a 1024 px window at 200 %), the step count last.
+        const ImGuiStyle& st = ImGui::GetStyle();
+        const float smallW = ImGui::CalcTextSize(ICON_LC_FILM).x + st.FramePadding.x * 2.0f; // SmallButton: same x padding
+        const float checkW = ImGui::GetFrameHeight() + st.ItemInnerSpacing.x + ImGui::CalcTextSize(tr("Save with project")).x;
+        const float controlsW = checkW + 3.0f * (smallW + st.ItemSpacing.x);
+        const float controlsX = std::max(ImGui::GetCursorPosX(), ImGui::GetWindowWidth() - st.WindowPadding.x - controlsW);
+        auto room = [&] { return controlsX - st.ItemSpacing.x - 8 * sc - (ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x); };
+        auto tail = [&](const std::string& text, const ImVec4* col) { // one more piece of the header, elided to the room left
+            if (text.empty()) return;
+            const float avail = room() - st.ItemSpacing.x;
+            if (avail < ImGui::CalcTextSize("M...").x) return;
+            const std::string shown = fitText(text, avail);
+            ImGui::SameLine();
+            if (col) ImGui::TextColored(*col, "%s", shown.c_str());
+            else ImGui::TextDisabled("%s", shown.c_str());
+            timelineSpans_.push_back({ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().x});
+        };
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(ICON_LC_HISTORY);
+        timelineSpans_.push_back({ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().x});
+        {
+            char stepText[64];
+            std::snprintf(stepText, sizeof stepText, tr("Step %zu of %zu"), t->cursor(), n - 1);
+            const std::string shown = fitText(stepText, std::max(0.0f, room() - st.ItemSpacing.x));
+            if (!shown.empty()) {
+                ImGui::SameLine();
+                ImGui::TextUnformatted(shown.c_str());
+                timelineSpans_.push_back({ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().x});
+            }
+        }
+        if (!branches.empty()) {
+            char branchText[64];
+            std::snprintf(branchText, sizeof branchText, tr(branches.size() == 1 ? "%s %zu branch" : "%s %zu branches"),
+                          ICON_LC_GIT_BRANCH, branches.size());
+            tail(branchText, nullptr);
+        }
+        if (const Timeline::Node& cur = t->node(t->cursorNode()); t->cursor() > 0) tail("  " + cur.label, nullptr);
+        if (!s.message.empty()) tail("  " + s.message, &theme::textDim);
+        ImGui::SameLine(controlsX);
+        const float controlsStart = ImGui::GetCursorScreenPos().x;
+        if (ImGui::Checkbox(tr("Save with project"), &s.saveHistory)) {
+            Timeline::saveWithProject = s.saveHistory;
+            savePrefs(s, configDir_, uiConfigDeterministic_);
+        }
+        ui::HelpText("Save with project", nullptr,
+                     "Also save the history beside the project as <name>.sfhist (strokes, masks, vertex paint, visibility; "
+                     "a topology change cuts it). Opening the project brings it back.",
+                     "Edit > Sculpt Timeline");
+        ImGui::SameLine();
+        if (ImGui::SmallButton(ICON_LC_FILM)) s.timelapseDialog = true;
+        ui::HelpText("Export timelapse", nullptr, "Render this history as a turntable timelapse video.", "Edit > Sculpt Timeline");
+        ImGui::SameLine();
+        if (ImGui::SmallButton(ICON_LC_FOLD_VERTICAL "###timeline.compact")) {
+            s.compact = true;
+            savePrefs(s, configDir_, uiConfigDeterministic_);
+        }
+        ui::HelpText("Compact timeline", nullptr, "Fold the header row into the track's row: a thinner strip.",
+                     "Edit > Sculpt Timeline");
+        ImGui::SameLine();
+        if (ImGui::SmallButton(top ? ICON_LC_CHEVRON_UP : ICON_LC_CHEVRON_DOWN)) {
+            s.visible = false;
+            savePrefs(s, configDir_, uiConfigDeterministic_);
+        }
+        ui::HelpText("Hide", nullptr, "Fold the timeline into a tab.", "Edit > Sculpt Timeline");
+        timelineSpans_.push_back({controlsStart, ImGui::GetItemRectMax().x});
+        // Branch lanes, then the track.
+        const ImVec2 origin = ImGui::GetCursorScreenPos();
+        x0 = origin.x + 6 * sc;
+        x1 = origin.x + ImGui::GetContentRegionAvail().x - 6 * sc;
+        y = origin.y;
+    }
+    const float laneTop = y;
     size_t span = n > 1 ? n - 1 : 1; // steps the track shows: the active branch, or a longer other branch
     for (const Timeline::Branch& b : branches) span = std::max(span, b.from + b.length);
     const float step = (x1 - x0) / float(span);
     auto xOf = [&](double i) { return x0 + float(i) * step; };
     const ImVec2 mouse = ImGui::GetIO().MousePos;
-    float y = origin.y;
     uint32_t hovered = Timeline::kNone;
     for (int l = 0; l < lanes; ++l) {
         const Timeline::Branch& b = branches[branches.size() - 1 - size_t(l)]; // the newest on top
@@ -539,7 +640,7 @@ void App::drawTimelineUi() {
         dl->AddCircleFilled(ImVec2(bx1, ly), 3.0f * sc, theme::u32(theme::textBright, 0.9f));
         ImGui::SetCursorScreenPos(ImVec2(bx0, y));
         ImGui::PushID(int(b.first));
-        if (ImGui::InvisibleButton("##lane", ImVec2(std::max(8 * sc, bx1 - bx0 + 4 * sc), laneH))) {
+        if (ImGui::InvisibleButton("##lane", ImVec2(std::max(8 * sc, bx1 - bx0 + 4 * sc), laneH + (compact ? laneGap : 0.0f)))) {
             std::string e;
             if (!t->select(doc_, b.tip, &e)) s.message = e;
             else s.message = "Switched to the other branch (the one you left is a lane now)";
@@ -549,10 +650,10 @@ void App::drawTimelineUi() {
                                                : "Branch from step %zu: %zu steps, ending with \"%s\"\nClick to make it the active branch"),
                               b.from, b.length, t->node(b.tip).label.c_str());
         ImGui::PopID();
-        y += laneH + 3 * sc;
+        y += laneH + laneGap;
     }
     if (branches.size() > size_t(lanes)) {
-        dl->AddText(ImVec2(x1 - 30 * sc, origin.y), theme::u32(theme::textDim), ("+" + std::to_string(branches.size() - size_t(lanes))).c_str());
+        dl->AddText(ImVec2(x1 - 30 * sc, laneTop), theme::u32(theme::textDim), ("+" + std::to_string(branches.size() - size_t(lanes))).c_str());
     }
     const float ty0 = y, ty1 = y + trackH;
     dl->AddRectFilled(ImVec2(x0 - 4 * sc, ty0), ImVec2(x1 + 4 * sc, ty1), theme::u32(theme::frame, 0.5f), 3 * sc);

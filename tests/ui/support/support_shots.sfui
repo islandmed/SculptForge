@@ -1,0 +1,36 @@
+# Screenshots of the membership moments at 1440 and 1024 px wide (CMakeLists.txt: ui_support_shots_1440 / _1024):
+# the top bar's heart in the Classic and the SculptForge looks (it gives way before crowding a narrow bar), the
+# milestone card, the card with the feed's honest line, and a member's badge. Nothing size-dependent is asserted here;
+# support_moments.sfui checks the behaviour.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+wait_idle
+shot heart-classic
+member_card milestone days=0 starts=12
+wait 0.4
+shot card-milestone-classic
+click "Not now##member_card.not_now"
+env SF_UPDATE_FEED $SCRIPT_DIR/../data/update_support.json
+click "Help##palette.help"
+click "Check for updates##help.check_updates"
+wait_idle 20
+wait 0.2
+member_card milestone days=8 sculpt_hours=12.6
+wait 0.4
+shot card-feed-classic
+click "Not now##member_card.not_now"
+
+run ui_look look=forge layout=sculptforge
+wait 0.2
+shot heart-forge
+member_card render days=16
+wait 0.4
+shot card-feed-forge
+click "I'm already a member##member_card.already"
+wait 0.3
+member_sign_in ok
+wait 0.4
+shot badge-forge
+run ui_look look=classic layout=classic
+wait 0.2
+shot badge-classic

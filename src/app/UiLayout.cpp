@@ -93,6 +93,7 @@ Json toJson(const UiLayout& l) {
     j.set("consoleHeight", double(l.consoleHeight));
     j.set("libraryOpen", l.libraryOpen);
     j.set("libraryRows", double(l.libraryRows));
+    j.set("libraryTile", double(l.libraryTile));
     j.set("libraryTab", l.libraryTab);
     j.set("libraryBottom", l.libraryBottom);
     j.set("shelfTiles", double(l.shelfTiles));
@@ -146,6 +147,7 @@ bool fromJson(const Json& j, UiLayout& l, std::string& error, int shellLayout) {
     number("consoleHeight", out.consoleHeight);
     flag("libraryOpen", out.libraryOpen);
     out.libraryRows = int(j["libraryRows"].asNumber(out.libraryRows));
+    out.libraryTile = std::clamp(float(j["libraryTile"].asNumber(out.libraryTile)), kLibraryTileMin, kLibraryTileMax);
     if (j["libraryTab"].isString()) out.libraryTab = j["libraryTab"].asString();
     flag("libraryBottom", out.libraryBottom);
     out.shelfTiles = std::clamp(int(j["shelfTiles"].asNumber(out.shelfTiles)), 0, 2);

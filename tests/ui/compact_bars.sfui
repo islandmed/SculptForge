@@ -1,0 +1,54 @@
+# Compact bars (@factoberplay, YouTube): the Library strip and the Sculpt Timeline under it took too much of the
+# viewport's height. Compact by default: 64 px thumbnails and a 26 px tab row (was 96 and 28), and a one-row
+# timeline (count, track, icon buttons; was a header row over the track). Together they reclaim over 30% of the
+# 228 logical px they took before (162 + 10 gap + 56); dragging the Library's edge sizes its thumbnails.
+run new_sphere subdivisions=4
+stroke 0.35 0.40 0.60 0.45
+stroke 0.35 0.50 0.60 0.55
+key ,
+expect_value library_open == 1
+click "Library/Tool"
+wait_idle 30
+expect_value library_tile == 64
+expect_value library_height == 126
+expect_value timeline_height == 26
+expect_value timeline_steps == 2
+shot compact-100
+
+# Hit targets stay usable: scrubbing the one-row track and its buttons work.
+drag_item "##track" -2000 0
+expect_value timeline_cursor == 0
+drag_item "##track" 2000 0
+expect_value timeline_cursor == 2
+double_click "Library/Sphere"
+expect_status Created sphere
+
+# The full strip is a click away (and back).
+click "##timeline.full"
+expect_value timeline_height == 56
+shot full-100
+click "###timeline.compact"
+expect_value timeline_height == 26
+
+# Drag the Library's edge: bigger thumbnails, then smaller, held within 48-128 (the timeline follows the edge).
+drag_item "Library size##lbresize" 0 40
+expect_value library_tile > 90
+drag_item "Library size##lbresize" 0 400
+expect_value library_tile == 128
+expect_value library_height == 190
+drag_item "Library size##lbresize" 0 -400
+expect_value library_tile == 48
+expect_value library_height == 110
+expect_value timeline_height == 26
+shot library-small
+
+# Larger UI scales keep the same logical sizes (the layout scales, nothing clips).
+ui_scale 150
+wait_idle 10
+expect_value library_height == 110
+expect_value timeline_height == 26
+shot compact-150
+ui_scale 200
+wait_idle 10
+expect_value timeline_height == 26
+shot compact-200

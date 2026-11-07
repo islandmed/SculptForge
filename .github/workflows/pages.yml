@@ -47,6 +47,19 @@ jobs:
       # No image or video that shows a mark goes out, whichever commit it came from (tools/marks_media_flagged.txt).
       - name: Media takedown
         run: python3 tools/media_takedown.py website
+      # The integration lanes (integrations.yml): the download links name the newest blender-v*/maya-v* release
+      # once it exists, else the app's latest release, which carries the add-on too.
+      - name: Integration downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for lane in blender maya; do
+            t=$(git tag -l "$lane-v[0-9]*" --sort=-v:refname | head -1)
+            [ -n "$t" ] && gh release view "$t" >/dev/null 2>&1 || continue
+            f=sculptforge_maya.zip; [ $lane = maya ] || f=sculptforge_bridge.zip
+            grep -rl --include='*.html' "releases/latest/download/$f" website | xargs -r sed -i "s#releases/latest/download/$f#releases/download/$t/$f#g"
+            echo "$f -> $t"
+          done
       # The apt and dnf repositories (sculptforge.app/apt and /rpm): the latest published release's signed metadata
       # and its .deb and .rpm files, each checked against that release's SHA256SUMS.txt (docs/design/package-repos.md).
       # Nothing until a release carries the metadata (it needs the REPO_SIGNING_KEY secret).
@@ -124,6 +137,19 @@ jobs:
       # The mirror is public too: the same takedown as the deploy (tools/marks_media_flagged.txt).
       - name: Media takedown
         run: python3 tools/media_takedown.py website
+      # The integration lanes (integrations.yml): the download links name the newest blender-v*/maya-v* release
+      # once it exists, else the app's latest release, which carries the add-on too.
+      - name: Integration downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for lane in blender maya; do
+            t=$(git tag -l "$lane-v[0-9]*" --sort=-v:refname | head -1)
+            [ -n "$t" ] && gh release view "$t" >/dev/null 2>&1 || continue
+            f=sculptforge_maya.zip; [ $lane = maya ] || f=sculptforge_bridge.zip
+            grep -rl --include='*.html' "releases/latest/download/$f" website | xargs -r sed -i "s#releases/latest/download/$f#releases/download/$t/$f#g"
+            echo "$f -> $t"
+          done
       - name: Push website/ to islandmed/islandmed.github.io
         env:
           KEY: ${{ secrets.MIRROR_DEPLOY_KEY }}

@@ -30,6 +30,7 @@
 #include "core/Pack.h"
 #include "core/Parts.h"
 #include "core/Document.h"
+#include "core/Deform.h"
 #include "core/DiscordPresence.h"
 #include "core/Face.h"
 #include "core/Backdrop.h"
@@ -541,6 +542,15 @@ private:
     bool sculptMomentDone_ = false;             // the sculpting moment came this session
     MemberMoment memberMomentPending_ = MemberMoment::None; // allowed, waiting for a calm frame
     MemberMoment memberCard_ = MemberMoment::None;          // the small card showing
+    CardLine memberCardMilestone_;              // a milestone card's words, numbers as it showed
+    CardLine memberCardFeedLine_;               // the feed's honest line on this card (none: the usual one)
+    void memberMilestoneCheck();                // a milestone due may bring the card (a start, a save, a minute)
+    void countMemberSave();                     // a project save (the 100th save milestone)
+    double milestoneCheckedAt_ = 0.0;           // seconds (ImGui clock): the sculpting hours, checked each minute
+    // The top bar's heart (Help > Support SculptForge); a member's badge instead. False: no room or a studio build.
+    bool drawSupportHeart(ImVec2 at, float size, ImDrawList* dl);
+    // A Studio member's build or studio mode (core/StudioProfile.h): no heart, no small cards.
+    bool studioMembership() const { return isStudioBuild() || studioMode().active; }
     bool memberVerifying_ = false;              // the card's sign-in runs (shown in the card)
     bool updatedThisStart_ = false;             // this start runs a newer version than the last (the update moment)
     std::string challengeTitle_;                // the monthly challenge whose results came (latest.json)
@@ -1725,6 +1735,8 @@ private:
     void drawPaletteBody(const std::string& id);
     void movePaletteToTray(const std::string& id, bool right);
     void removePaletteFromTrays(const std::string& id);
+    // In a tray that is drawn: below 1280 px the right tray isn't, and its palettes open as drop-downs instead.
+    bool paletteInShownTray(const std::string& id) const;
     void finishShelfDrag();
     void noteLayoutChanged();
     void applyPreset(int preset);
@@ -1815,6 +1827,35 @@ private:
     bool extractTBorder_ = false;          // TBorder
     bool mirrorWeldAxes_[3] = {true, false, false}; // Mirror And Weld's X Y Z
     bool mirrorAxes_[3] = {true, false, false};     // Deformation > Mirror's X Y Z
+    // Deformation > Stack (docs/design/deform-panel.md): the steps, the one being edited and the preview, which is
+    // the stack really applied as one undo step (redone after each change while it is still the last step).
+    struct DeformStackUi {
+        std::vector<DeformStep> steps;
+        std::vector<char> on;    // per step: runs in the stack
+        int selected = -1;
+        int addOp = int(DeformOp::Bend);
+        bool preview = true;
+        bool previewed = false;  // the preview step is in the undo history
+        uint64_t revision = 0;   // undo revision right after it
+        uint32_t part = 0;       // the Part it was applied to
+    } deformStack_;
+    void drawDeformStack();
+    // Deformation > Size: the active Part's dimensions (scene units), worked out again when the undo history, the
+    // active Part or its vertex count changes; editing one resizes the Part (deform_size).
+    struct DeformSizeUi {
+        uint64_t revision = ~uint64_t(0);
+        uint32_t part = 0;
+        size_t vertices = 0;
+        glm::vec3 size{0.0f}, edit{0.0f};
+        bool uniform = true;
+    } deformSize_;
+    void drawDeformSize();
+    void deformStackRefresh();           // undo the preview if it is still the last step, then preview again
+    bool deformStackUndoPreview();       // undo it if it is the last step; false when there was none (or it is stale)
+    void deformStackRun(const std::vector<DeformStep>& steps); // as one undo step (the preview, or an apply)
+    void deformStackApply(bool selectedOnly);
+    void deformStackReset();
+    void deformStackAdd(DeformOp op);
     void pollAlphaFile();
     ShellGeometry shell_;      // this frame's regions (drawShell)
     ImFont* fontSmall_ = nullptr, *fontTiny_ = nullptr, *fontIcons_ = nullptr, *fontBold_ = nullptr;
@@ -2640,7 +2681,7 @@ private:
     void drawTimelineUi();            // once a frame from drawUi: keeps the timeline attached and draws the strip
     float timelineTopInset_ = 0.0f;   // how far down the canvas the strip (or its tab) reaches at the top; 0 at the bottom
     float timelineStripY_ = -1.0f;    // the strip's (or tab's) top edge in window pixels this frame (-1: not shown)
-    float timelineStripH_ = 0.0f;     // and its height
+    float timelineStripH_ = 0.0f;     // and its height (UI tests: timeline_height)
     bool timelineDrawn_ = false;      // drawTimelineUi has run (before it, framing assumes the strip at its default)
     void registerTimelineUiActions(); // view.timeline, timeline.timelapse, help.benchmark
     void startTimelapse(const std::string& path, int width, int height, float seconds, int fps);

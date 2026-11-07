@@ -28,9 +28,20 @@ expect "Not now##member_card.not_now"
 expect "I'm already a member##member_card.already"
 expect_no_text Don't show again
 shot sculpted
+# HiDPI: the same card at 200 %.
+ui_scale 200
+wait 0.3
+shot sculpted-200
+ui_scale 100
+wait 0.3
+# Terms & refunds (the fine print) opens the membership terms; the card stays.
+click "Terms & refunds##member_card.terms"
+expect_value support_requests == 1
+expect_status https://sculptforge.app/terms.html
+expect_value member_card_open == 1
 # Become a member opens the membership page (both choices); the card goes, back in a week.
 click "Become a member##member_card.become"
-expect_value support_requests == 1
+expect_value support_requests == 2
 expect_status https://sculptforge.app/support.html
 expect_value member_card_open == 0
 # Once per session: more sculpting brings nothing more.

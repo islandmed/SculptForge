@@ -15,7 +15,7 @@
 bl_info = {  # legacy add-on install (Blender 4.2+ reads blender_manifest.toml instead)
     "name": "SculptForge Bridge",
     "author": "SculptForge contributors",
-    "version": (0, 7, 0),
+    "version": (1, 0, 0),
     "blender": (4, 2, 0),
     "location": "3D View > Sidebar > SculptForge, Object menu, File > Import / Export",
     "description": "Send meshes to SculptForge and back, updating the objects in place",
