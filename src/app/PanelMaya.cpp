@@ -164,8 +164,9 @@ void App::pollMayaLive(Uint64 now) {
             const uint64_t revision = partUndoRevision(doc_, i);
             const auto seen = mayaLiveSeen_.find(part.id);
             if (seen != mayaLiveSeen_.end() && seen->second.revision == revision) continue;
+            if (!part.visible || doc_.partMesh(i).triangleCount() == 0) continue; // (goes once shown and changed)
             mayaLiveSeen_[part.id] = {revision, 0};
-            if (part.visible && doc_.partMesh(i).triangleCount()) sendMayaLinkPart(i);
+            sendMayaLinkPart(i);
         }
         return;
     }
@@ -184,9 +185,9 @@ void App::pollMayaLive(Uint64 now) {
         const auto seen = mayaLiveSeen_.find(part.id);
         if (seen != mayaLiveSeen_.end() && seen->second.revision == revision) continue;
         if (!part.visible || doc_.partMesh(i).triangleCount() == 0) continue;
-        const std::string& bridge = partBridgeName(doc_, i);
-        items.push_back({part.id, revision, seen == mayaLiveSeen_.end() ? 0 : seen->second.hash,
-                         bridge.empty() ? part.name : bridge, mayaSendCopy(doc_.partMesh(i))});
+        // (Its Maya name, unique among the Parts: a send of one Part never lands on another's object.)
+        items.push_back({part.id, revision, seen == mayaLiveSeen_.end() ? 0 : seen->second.hash, mayaLinkName(i),
+                         mayaSendCopy(doc_.partMesh(i))});
     }
     if (items.empty()) return;
     mayaLiveJob_ = std::async(std::launch::async, [folder = uiPrefs_.mayaFolder, writer = mayaWriter_,
