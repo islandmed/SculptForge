@@ -1,6 +1,8 @@
 # Text people type (a Part's name here) in characters the bundled fonts lack: 鬱龘 (rare Han) and 𠀋 (U+2000B, past
 # the BMP) come from another font instead of drawing as "?" (src/app/UserGlyphs.h). The app takes them from the
 # system's fonts; the test gives it a three-character cut of Noto Sans CJK JP so every machine draws the same.
+# cold: the counts and the merged glyphs are per process (an earlier script in a warm server left glyphs_merged at 7 on
+# the Linux Packages runner, 0.11.12 staging), so this script always starts a fresh app.
 env SF_FALLBACK_FONTS $SCRIPT_DIR/../data/fonts/cjk-fallback-test.otf
 run ui_look look=classic layout=classic
 run new_sphere subdivisions=2 ; part_rename to=Body
