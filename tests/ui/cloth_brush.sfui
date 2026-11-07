@@ -80,7 +80,7 @@ wait 0.2
 click "Pinch##clothmode"
 expect_value cloth_mode == 5
 snapshot
-stroke 0.6 0.5 0.615 0.5
+stroke 0.6 0.5 0.64 0.5
 expect_value moved > 200
 wait_idle 30
 shot cloth_pinch

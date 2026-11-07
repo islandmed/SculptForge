@@ -300,18 +300,18 @@ void Sculptor::dabCloth(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym) 
                     const float l = glm::length(out);
                     if (l < 1e-9f * r) break;
                     const float dir = (set.mode == ClothBrushMode::Expand ? 1.0f : -1.0f) * sign;
-                    const float amount = 0.08f * s * r;
+                    const float amount = 0.15f * s * r;
                     if (dir > 0.0f) move = out / l * amount;
-                    else move = out / l * -std::min(amount, 0.5f * l), move += nrm * (0.3f * glm::length(move));
+                    else move = out / l * -std::min(amount, 0.5f * l), move += nrm * (0.5f * glm::length(move));
                     break;
                 }
                 case ClothBrushMode::Inflate: {
                     // More fabric (its rest lengths grow) pushed out along the normals: it balloons, and folds
                     // where it can't; Alt takes fabric away and pulls in.
                     float& g = cs.grow.try_emplace(cs.verts[i], 1.0f).first->second;
-                    g = std::clamp(g + sign * 0.03f * s * f, 0.5f, 2.0f);
+                    g = std::clamp(g + sign * 0.02f * s * f, 0.5f, 2.0f);
                     sim.setRestScale(uint32_t(i), g);
-                    move = nrm * (sign * 0.04f * s * r);
+                    move = nrm * (sign * 0.15f * s * r);
                     break;
                 }
                 default:
