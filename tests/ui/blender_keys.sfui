@@ -268,6 +268,7 @@ wait 0.1
 click "Select Rectangle##held.select.rect"
 hold none
 expect_value hide_shape == 2
+mouse_move 0.5 0.5                            # (back over the view: the keys below are the view's)
 
 # --- Alt+1 / Alt+2 step the subdivision levels; X swaps the colours; Shift+Z wireframe ---
 run subdiv_divide
