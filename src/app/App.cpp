@@ -3735,24 +3735,30 @@ void App::startGenerator() {
     pendingGenerator_ = promise->get_future();
     std::thread([promise, settings, in = refImagePath_, text = textMode_ ? std::string(textPrompt_) : std::string(),
                  out = std::string(stem.begin(), stem.end()), progress = generatorProgress_,
-                 mode = GeneratedRemesh(generatedRemesh_), resolution = remeshResolution_] {
+                 mode = GeneratedRemesh(generatedRemesh_), resolution = remeshResolution_, dropBackdrop = removeBackground_] {
         GeneratedModel g;
         g.result = text.empty() ? ai::generate3D(settings, in, out, progress.get())
                                 : ai::generate3DFromText(settings, text, out, progress.get());
-        if (g.result.ok && mode != GeneratedRemesh::Off) {
+        if (g.result.ok && (mode != GeneratedRemesh::Off || dropBackdrop)) {
             // Made sculptable here, so the window stays responsive; the main thread opens the file and swaps this in.
             Document scratch;
             const CommandResult opened = CommandRegistry().execute(scratch, "open", {{"path", g.result.outputPath}});
-            progress->percent = 0;
-            progress->setStatus(mode == GeneratedRemesh::Quad ? "Making it sculptable: Quad Remesh..." : "Making it sculptable: Voxel Remesh...");
+            // The background plane goes first (one undo step of its own), so the remesh doesn't build it in.
+            if (opened.ok && dropBackdrop && removeFlatBackdrop(scratch.mesh, &g.backdrop))
+                g.withoutBackdrop = std::make_shared<Mesh>(scratch.mesh);
             Mesh m;
-            if (!opened.ok) {
+            if (mode == GeneratedRemesh::Off) {
+                // (opened for the background check only)
+            } else if (!opened.ok) {
                 g.remeshError = opened.message;
-            } else if (remeshGenerated(scratch.mesh, mode, resolution, 1, m, g.remeshError, &g.stats, [progress](float f) {
-                           progress->percent = int(f * 100.0f);
-                           return !progress->cancel.load();
-                       })) {
-                g.remeshed = std::make_shared<Mesh>(std::move(m));
+            } else {
+                progress->percent = 0;
+                progress->setStatus(mode == GeneratedRemesh::Quad ? "Making it sculptable: Quad Remesh..." : "Making it sculptable: Voxel Remesh...");
+                if (remeshGenerated(scratch.mesh, mode, resolution, 1, m, g.remeshError, &g.stats, [progress](float f) {
+                        progress->percent = int(f * 100.0f);
+                        return !progress->cancel.load();
+                    }))
+                    g.remeshed = std::make_shared<Mesh>(std::move(m));
             }
         }
         promise->set_value(std::move(g));
@@ -3781,12 +3787,14 @@ void App::pollGenerator() {
     std::filesystem::remove(std::filesystem::path(std::u8string(r.outputPath.begin(), r.outputPath.end())), ec);
     const size_t raw = doc_.mesh.triangleCount();
     const auto mode = GeneratedRemesh(generatedRemesh_);
+    if (g.withoutBackdrop) doc_.replaceMeshUndoable(std::move(*g.withoutBackdrop), "Remove Flat Background");
     if (g.remeshed) doc_.replaceMeshUndoable(std::move(*g.remeshed), mode == GeneratedRemesh::Quad ? "Quad Remesh" : "Remesh");
     doc_.path.clear();
     const std::string remeshNote = g.remeshed ? ", " + generatedRemeshNote(g.stats, mode) : std::string();
     status_ = !g.remeshError.empty()
                   ? "Generated model imported (" + std::to_string(raw) + " tris, not remeshed: " + g.remeshError + ")" + note
                   : "Generated model imported (" + std::to_string(raw) + " tris" + remeshNote + ") - ready to sculpt" + note;
+    if (g.backdrop.planes) status_ += ". " + backdropRemovedNote(g.backdrop) + ", Undo brings it back";
     updateTitle();
 }
 
@@ -4083,6 +4091,11 @@ void App::drawImageTo3D() {
                           generatedQuadTarget(remeshResolution_));
             hint(quads);
         }
+        ImGui::Checkbox(tr("Remove flat background"), &removeBackground_);
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip(tr("Drops the flat plane a picture's background often becomes (a wall behind or ground under "
+                              "the subject) before the model lands. A relief or coin on its own is kept. Undo brings "
+                              "a removed plane back."));
     }
     ImGui::PopItemWidth();
     if (pendingGenerator_.valid()) {

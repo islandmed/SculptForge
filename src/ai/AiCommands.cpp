@@ -8,6 +8,7 @@
 #include "ai/ComfyUI.h"
 #include "ai/ImageTo3DService.h"
 #include "core/EnginePresets.h"
+#include "core/Backdrop.h"
 #include "core/GeneratedRemesh.h"
 #include "core/Texture.h"
 #include "core/Voxel.h"
@@ -50,6 +51,8 @@ CommandResult importGenerated(Document& doc, const Args& a, const GeneratorResul
     if (!r.privateDir.empty()) std::filesystem::remove_all(std::filesystem::path(std::u8string(r.privateDir.begin(), r.privateDir.end())), ec);
     if (!opened.ok) return opened;
     doc.path.clear();
+    BackdropRemoval backdrop;
+    if (argBool(a, "remove_background", true)) removeFlatBackdrop(doc.mesh, &backdrop);
     GeneratedRemeshStats st;
     if (mode != GeneratedRemesh::Off) {
         std::string err;
@@ -64,6 +67,7 @@ CommandResult importGenerated(Document& doc, const Args& a, const GeneratorResul
     const std::string note = generatedRemeshNote(st, mode);
     return {true, "Generated a 3D model" + what + " (" + std::to_string(st.rawTriangles) + " triangles" +
                       (note.empty() ? std::string() : ", " + note) + ") - ready to sculpt" +
+                      (backdrop.planes ? ". " + backdropRemovedNote(backdrop) : std::string()) +
                       (r.note.empty() ? std::string() : " " + r.note)};
 }
 
@@ -130,7 +134,9 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                    {"resolution", T::Number, "Remesh detail (64-512): voxels across the model; quad picks about "
                                              "resolution^2/2 quads (256: 32768). Default 256.", false},
                    {"levels", T::Number, "quad: subdivision levels above the quad cage (0-2), projected onto the "
-                                         "model. Default 1.", false}},
+                                         "model. Default 1.", false},
+                   {"remove_background", T::Bool, "Drop a flat plane the background became (a wall behind or ground "
+                                                  "under the subject; a relief or coin alone is kept). Default true.", false}},
                   [settings](Document& doc, const Args& a) -> CommandResult {
                       AiSettings s = settings();
                       if (a.contains("service")) s.generatorService = argString(a, "service");
@@ -173,7 +179,9 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                    {"resolution", T::Number, "Remesh detail (64-512): voxels across the model; quad picks about "
                                              "resolution^2/2 quads (256: 32768). Default 256.", false},
                    {"levels", T::Number, "quad: subdivision levels above the quad cage (0-2), projected onto the "
-                                         "model. Default 1.", false}},
+                                         "model. Default 1.", false},
+                   {"remove_background", T::Bool, "Drop a flat plane the background became (a wall behind or ground "
+                                                  "under the subject; a relief or coin alone is kept). Default true.", false}},
                   [settings](Document& doc, const Args& a) -> CommandResult {
                       AiSettings s = settings();
                       if (a.contains("service")) s.generatorService = argString(a, "service");
