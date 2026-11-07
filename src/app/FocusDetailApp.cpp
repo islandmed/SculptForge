@@ -4,6 +4,7 @@
 // Focus Detail in the app (prototype; core/FocusDetail.h): opening a .sfdetail file (or `--focus-detail FILE`,
 // or the `standard-1b` benchmark scene) and, once a frame, telling the focus where the camera and brush are.
 #include "app/App.h"
+#include "core/TierConfig.h"
 
 #include "core/FocusDetail.h"
 #include "core/Micro.h"
@@ -64,7 +65,10 @@ void App::updateFocusDetail() {
         brush.radius = focusBrushRadius_;
         brush.mirrorX = symmetry_.x;
     }
-    fd.update(m, view, brush, 3.0);
+    // The hardware tier's budgets (core/HardwareTier.h; Floor: 512 MB, 3 ms, as before tiers).
+    const TierBudgets& tb = currentTierConfig().budgets;
+    fd.budgetBytes = size_t(tb.focusResidentMB) << 20;
+    fd.update(m, view, brush, tb.focusUpdateMs);
 }
 
 } // namespace sf

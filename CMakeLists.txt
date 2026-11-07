@@ -49,6 +49,7 @@ add_library(sculptforge_core STATIC
   src/core/FrameGovernor.cpp
   src/core/PerfTrace.cpp
   src/core/TierConfig.cpp
+  src/core/HardwareTier.cpp
   src/core/MemoryGuard.cpp
   src/core/Sculpt.cpp
   src/core/SculptBatch.cpp
@@ -239,6 +240,7 @@ target_sources(sculptforge_core PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedInse
 target_include_directories(sculptforge_core PUBLIC src PRIVATE third_party/stb third_party/ufbx third_party/xatlas third_party/mikktspace third_party/tinyexr)
 if(WIN32)
   target_link_libraries(sculptforge_core PRIVATE shell32 advapi32) # core/Trash.cpp: the Recycle Bin; core/DiscordPresence.cpp: the pipe server's user
+  target_link_libraries(sculptforge_core PRIVATE dxgi) # core/HardwareTier.cpp: the graphics cards (GPU picker)
 endif()
 # Third-party C code: compile quietly.
 if(MSVC)
@@ -395,6 +397,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Calibration.cpp
     src/app/OptimisticBench.cpp
     src/app/PanelPerformanceProfile.cpp
+    src/app/PanelHardwareTier.cpp
     src/app/CrashLog.cpp
     src/app/App.cpp
     src/app/Precision.cpp
@@ -946,6 +949,12 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The hardware profile panel with a real calibration (tests/ui/hardware_profile.sfui).
     if(TEST ui_hardware_profile)
       set_tests_properties(ui_hardware_profile PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1")
+    endif()
+    # Hardware tiers: the first-run card, the tier chip, Turbo, the panel (tests/ui/hardware_tier.sfui).
+    # Also at 2880 px wide, so the 200 % top bar has room for the chip and the bolt (the shots show them).
+    sculptforge_ui_test(hardware_tier_2880 hardware_tier --size 2880x1620)
+    if(TEST ui_hardware_tier)
+      set_tests_properties(ui_hardware_tier ui_hardware_tier_2880 PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1;SF_NO_CALIBRATION=1;SF_HW_SIMULATE=high")
     endif()
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     # Studio mode: About shows the studio (tests/data/studio; core/StudioProfile.h).

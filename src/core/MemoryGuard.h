@@ -32,6 +32,10 @@ struct MemoryCheck {
 MemoryCheck checkMemory(size_t needBytes, size_t availableBytes);
 inline MemoryCheck checkMemory(size_t needBytes) { return checkMemory(needBytes, availableMemoryBytes()); }
 
+// "1.2G", "14G", "640M": the top bar's compact memory figures, in binary units like the system monitors (a 12 GB
+// card is 12G, not 13G). memoryText: the same spelled out for tooltips, "1.2 GB", "640 MB".
+std::string compactBytes(size_t bytes);
+std::string memoryText(size_t bytes);
 // "5 GB", "2.3 GB", "0.4 GB" (decimal gigabytes, as the system's own tools show them).
 std::string formatGigabytes(size_t bytes);
 // "33M skipped: needs ~5 GB free, 1.3 GB available. Close other apps and run again"

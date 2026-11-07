@@ -22,6 +22,7 @@
 // (core/FrameGovernor.h) adjusts the render budgets at run time.
 #pragma once
 
+#include "core/HardwareTier.h"
 #include "core/Json.h"
 
 #include <cstdint>
@@ -120,6 +121,12 @@ struct ProfileOverrides {
     int targetFps = 0;
     bool governor = true;                 // the adaptive frame governor (off: the budgets stay as set)
     int draftBrush = 0;                   // TierConfig::draftBrushMode: 0 automatic, 1 always, 2 never
+    std::string level;                    // hardware tier (core/HardwareTier.h): "" = automatic, else a hwTierName()
+    // Kept by "Back to automatic" (choices, not tuning): not counted by any().
+    std::string compute;                  // "" / "auto", "cpu", "gpu" (Preferences > Performance > Compute)
+    std::string gpu;                      // the graphics card: "" = Auto, else a GpuAdapter::id (next start)
+    bool turbo = false;                   // Turbo (View > Turbo): remembered per machine
+    std::string tierCardFor;              // the machine the first-run tier card was shown for (tierCardKey)
     bool any() const;
 };
 
@@ -132,7 +139,12 @@ struct HardwareProfile {
     PerformanceSettings settings; // the tier's settings with the overrides applied
     PerformanceSettings automatic; // before the overrides
     ProfileOverrides overrides;
+    HwTierDetection detected;    // the hardware tier the machine carries, and why
+    HwTier hwTier = HwTier::Floor; // the tier in effect (detected, or set by hand / SF_HW_SIMULATE)
 };
+
+// The machine, for the first-run tier card: the GPU, its memory and the RAM (a driver update doesn't count).
+std::string tierCardKey(const HardwareInfo& hw);
 
 // Maps what was detected and measured to a tier and its settings. Deterministic: the same inputs give the same
 // profile. With nothing measured (skipped, or no GPU numbers) it falls back to the memory sizes and the probe's

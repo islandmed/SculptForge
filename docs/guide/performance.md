@@ -50,6 +50,48 @@ Open **Preferences** and click **Performance**.
 | **Last stroke** | What your last stroke cost per dab: **Brush** (finding and moving the vertices), **Normals** (shading), **BVH** (the structure that finds the surface under the cursor), and the **GPU upload** per frame |
 | **Memory** | What the scene holds: the meshes, the BVHs, the subdivision levels kept for stepping between them, the undo history (up to 1 GB; the oldest steps are dropped beyond that) and, roughly, the graphics card's buffers |
 
+## Your hardware tier
+
+On top of the profile below, SculptForge sorts your computer into a **tier**, so the bigger features switch on by
+themselves where your machine can carry them, and never where it can't. Every tier sculpts smoothly: the higher
+ones give more room for detail.
+
+| Tier | For | What it adds |
+|---|---|---|
+| **Essential** | every computer SculptForge runs on | settings tuned for the machine; Focus Detail keeps 512 MB of full-resolution detail close by |
+| **Standard** | 16 GB of memory, 6 or more threads and a 4 GB graphics card (or graphics that share the memory) | twice the Focus Detail memory, streamed in faster |
+| **High** | 32 GB, 8 or more threads and an 8 GB graphics card (or 32 GB shared, such as an Apple Pro or Max) | 2 GB of Focus Detail, 16K paint and bake textures |
+| **Extreme** | 64 GB, 16 or more threads and a 16 GB graphics card (or 64 GB shared) | 4 GB of Focus Detail, the most of everything |
+
+A graphics card or processor that measures slow keeps a lower tier, whatever its memory says.
+
+The first time SculptForge starts (and when you change the graphics card or the memory), a small card in the
+corner of the 3D view says what it found, for example *Your machine: RTX 3060, 12 GB VRAM, 32 GB RAM. Tier:
+High*, and what that turns on. Click **Got it**; it doesn't show again on this computer. The tier is also in the
+top bar, next to the bolt: click it to open **Edit > Preferences > Performance**.
+
+There, at the top:
+
+| Control | What it does |
+|---|---|
+| **Tier** | your machine, its tier, what the next tier would need, and **What this turns on** |
+| Auto / each tier | choose the tier yourself. A tier above the detected one is allowed; the memory guard still watches it |
+| **Turbo** | the same switch as the bolt (below) |
+| **Graphics card** | on a computer with two (a laptop's built-in and gaming graphics, or two cards): which one draws SculptForge. **Auto** takes the fastest one. It applies the next time SculptForge starts; if that card can't start, SculptForge goes back to the system's choice and says so |
+| **Compute** | **Auto**, **CPU** or **GPU** for the heavy work. Each task shows where it runs; the ones that have no graphics card version yet say *CPU only for now*. Auto uses the graphics card only where it measured faster, and never on the Essential tier |
+
+**Free memory is watched.** If your computer runs low on memory while you work (another program, a huge scene),
+SculptForge steps the tier down one level and says so in the status bar; detail streams in a little later and
+nothing is lost. When there is room again for a minute, it steps back up.
+
+### Turbo
+
+The small bolt in the top bar (also **View > Turbo**, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd>) gives everything
+your computer can safely spare to sculpting speed: while you sculpt or orbit, the view draws without
+antialiasing and with a lighter version of big scenes, and the tier's top budgets apply. The moment you stop, the
+view is back at full quality. It turns orange while on, and a line in the status bar says what it changed. Turn
+it off and every setting is exactly as you left it. SculptForge remembers it on this computer.
+
 ## The hardware profile
 
 The first time you start SculptForge, a small window says **Getting to know this computer** for a second or two:
