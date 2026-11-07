@@ -52,6 +52,7 @@ void App::drawMeshCheckContents() {
     if (ImGui::Button(tr("Merge##weld_points"), ImVec2(button, 0))) {
         runCommand("weld_points", {{"distance", double(weldDistance_)}});
         weldKey_ = 0;
+        meshReportScroll_ = 2; // Check Mesh is next: its row comes into view (below the fold in a 1024 px drop-down)
     }
     ImGui::EndDisabled();
     ui::HelpText("Merge", nullptr,
@@ -143,7 +144,7 @@ void App::drawMeshCheckContents() {
             ImGui::PopID();
         }
     }
-    if (meshReportScroll_ > 0) { // the report's last line just above the tray's bottom edge
+    if (meshReportScroll_ > 0) { // Check Mesh's last line (the report's, or "check again") above the bottom edge
         --meshReportScroll_;
         if (ImGui::GetCursorScreenPos().y > ImGui::GetWindowPos().y + ImGui::GetWindowHeight()) ImGui::SetScrollHereY(1.0f);
     }

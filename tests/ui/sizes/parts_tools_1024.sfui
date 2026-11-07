@@ -28,6 +28,9 @@ key ctrl+z
 run open path=$SCRIPT_DIR/../../data/check_mesh_cube.obj
 expect_value vertices == 24
 click "Geometry##tool.geometry"
+# The drop-down is taller than the window: a middle-drag on it scrolls down to Merge by Distance and Check Mesh.
+button_drag middle 0.7 0.8 0.7 0.2 0.3
+expect_value panel_drag_scrolls >= 1
 expect_text 16 points will merge
 shot weld-preview
 click "Merge##weld_points"
