@@ -886,8 +886,8 @@ void App::saveWindowState() const {
     }
     j.set("maximized", maximized);
     j.set("fullscreen", fullscreen);
-    std::ofstream out(path);
-    out << j.dump(true);
+    std::string err; // (temp file, then rename: a quit that ends mid-write leaves the last one whole)
+    if (!writeJsonAtomic(path, j, err)) SDL_Log("%s", err.c_str());
 }
 
 std::string App::uiConfigPath() const { return configDir_.empty() ? std::string() : configDir_ + "ui.json"; }
