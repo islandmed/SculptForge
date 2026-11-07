@@ -219,7 +219,8 @@ void App::saveProjectPrefs() {
     prefs.set("new_look_card_done", newLookCardDone_);
     prefs.set("quick_tour_done", quickTourDone_);
     prefs.set("confirm_subdivide", uiPrefs_.confirmSubdivide);
-    std::ofstream(fsPath(prefDir_ + "project.json"), std::ios::binary | std::ios::trunc) << prefs.dump(true);
+    std::string err; // (temp file, then rename: a quit that ends mid-write leaves the last one whole)
+    if (!writeJsonAtomic(prefDir_ + "project.json", prefs, err)) SDL_Log("%s", err.c_str());
 }
 
 void App::rememberRecent(const std::string& path) {
