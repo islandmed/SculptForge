@@ -21,6 +21,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <sstream>
 
 using namespace sf;
@@ -537,6 +538,192 @@ TEST(multires_reconstruct_keeps_udim_uvs) {
     checkReconstructKeepsUvs(makeTorus(12));       // closed, every vertex regular: four readings of the corners fit,
     checkReconstructKeepsUvs(makeTorus(12), true); // and with these diagonals the first one tried is a shifted one
     checkReconstructKeepsUvs(makeCube(3), true);
+}
+
+// #145 reopened: the reconstructed LOWER levels broke. `coarse` gets UDIM islands (by face direction; the x < 0 half
+// mirrored onto the x > 0 half's tile), is divided `levels` times, and the top goes out and back in as an OBJ; then
+// Reconstruct runs `levels` times. Every reconstructed level must be the divided one: each triangle inside one
+// original face, with that face's corner UVs (so seams kept, islands intact, values in their UDIM tile).
+static void checkReconstructLevelsKeepUvs(const char* name, Mesh coarse, int levels) {
+    std::printf("  %s\n", name);
+    coarse.recomputeAllNormals();
+    coarse.uvs.resize(coarse.triangleCount() * 3);
+    for (uint32_t t = 0; t < coarse.triangleCount(); ++t) {
+        uint32_t f = t; // a quad's two triangles share an island: pick by the pair's first triangle
+        if (coarse.quadPartnerAt(t) != Mesh::kNoQuad) f = std::min(t, coarse.quadPartnerAt(t));
+        const glm::uvec3 tf = coarse.triangles[f];
+        const glm::vec3 p0 = coarse.positions[tf.x], p1 = coarse.positions[tf.y], p2 = coarse.positions[tf.z];
+        const glm::vec3 n = glm::cross(p1 - p0, p2 - p0), c = (p0 + p1 + p2) / 3.0f;
+        int axis = 0;
+        for (int a = 1; a < 3; ++a)
+            if (std::abs(n[a]) > std::abs(n[axis])) axis = a;
+        const uint32_t island = uint32_t(axis * 2 + (n[axis] < 0 ? 1 : 0)) * 2 + (c.y > 0.0f ? 1 : 0);
+        for (int k = 0; k < 3; ++k) {
+            const glm::vec3 p = coarse.positions[coarse.triangles[t][k]];
+            glm::vec2 uv(p[(axis + 1) % 3], p[(axis + 2) % 3]);
+            if (axis != 0) uv.x = std::abs(uv.x); // mirrored: both halves on one tile
+            uv = glm::clamp(uv * 0.2f + 0.5f, glm::vec2(0.01f), glm::vec2(0.99f));
+            coarse.uvs[size_t(t) * 3 + size_t(k)] = uv + glm::vec2(float(island % 10), float(island / 10));
+        }
+    }
+    Document src = makeDoc(std::move(coarse));
+    for (int i = 0; i < levels; ++i) CHECK(run(src, "subdiv_divide").ok);
+    const Mesh top = subdivLevelMesh(src.mesh, levels);
+    const std::string path = tempPath("sf_reconstruct_uvs.obj");
+    std::string err;
+    CHECK(saveObj(path, top, err));
+    Mesh plain;
+    CHECK(loadObj(path, plain, err));
+    std::filesystem::remove(path);
+    // Divided levels number their vertices coarse corners first, so source level k's vertex b is the top's b (the OBJ
+    // keeps the order; its positions and UVs are rounded to 7 digits).
+    CHECK(plain.vertexCount() == top.vertexCount());
+    std::map<std::tuple<float, float, float>, uint32_t> topIndex;
+    for (uint32_t v = 0; v < plain.vertexCount(); ++v) topIndex[{plain.positions[v].x, plain.positions[v].y, plain.positions[v].z}] = v;
+    Document d = makeDoc(std::move(plain));
+    for (int i = 0; i < levels; ++i) CHECK(run(d, "subdiv_reconstruct").ok);
+    CHECK(subdivLevelCount(d.mesh) == levels + 1);
+    if (subdivLevelCount(d.mesh) != levels + 1) return;
+    for (int k = 0; k < levels; ++k) {
+        const Mesh want = subdivLevelMesh(src.mesh, k), got = subdivLevelMesh(d.mesh, k);
+        CHECK(got.triangleCount() == want.triangleCount() && got.vertexCount() == want.vertexCount());
+        CHECK(got.uvs.size() == got.triangleCount() * 3);
+        if (got.uvs.size() != got.triangleCount() * 3 || got.vertexCount() != want.vertexCount()) continue;
+        // The reconstructed level's corners sit on the top's vertices (the top is the imported mesh).
+        std::vector<uint32_t> srcIndex(got.vertexCount(), UINT32_MAX);
+        for (uint32_t v = 0; v < got.vertexCount(); ++v) {
+            auto it = topIndex.find({got.positions[v].x, got.positions[v].y, got.positions[v].z});
+            if (it != topIndex.end()) srcIndex[v] = it->second;
+        }
+        // Source triangles by vertex, then: each triangle lies in one source face and has its corner UVs.
+        std::vector<std::vector<uint32_t>> facesOf(want.vertexCount());
+        for (uint32_t t = 0; t < want.triangleCount(); ++t)
+            for (int c = 0; c < 3; ++c) facesOf[want.triangles[t][c]].push_back(t);
+        size_t wrong = 0;
+        for (uint32_t t = 0; t < got.triangleCount(); ++t) {
+            bool found = false;
+            const uint32_t v0 = srcIndex[got.triangles[t].x];
+            for (uint32_t b : v0 < want.vertexCount() ? facesOf[v0] : std::vector<uint32_t>{}) {
+                auto uvAt = [&](uint32_t v, glm::vec2& uv) {
+                    for (uint32_t bt : {b, want.quadPartnerAt(b)}) {
+                        if (bt == Mesh::kNoQuad) continue;
+                        for (int c = 0; c < 3; ++c)
+                            if (want.triangles[bt][c] == v) {
+                                uv = want.uvs[size_t(bt) * 3 + size_t(c)];
+                                return true;
+                            }
+                    }
+                    return false;
+                };
+                bool all = true;
+                for (int c = 0; c < 3 && all; ++c) {
+                    glm::vec2 uv;
+                    all = uvAt(srcIndex[got.triangles[t][c]], uv) &&
+                          glm::all(glm::lessThan(glm::abs(uv - got.uvs[size_t(t) * 3 + size_t(c)]), glm::vec2(1e-5f)));
+                }
+                if ((found = all)) break;
+            }
+            if (!found && wrong++ == 0)
+                std::printf("    SDiv %d triangle %u: UVs (%g,%g) (%g,%g) (%g,%g) aren't one original face's\n", k + 1, t,
+                            got.uvs[t * 3].x, got.uvs[t * 3].y, got.uvs[t * 3 + 1].x, got.uvs[t * 3 + 1].y, got.uvs[t * 3 + 2].x,
+                            got.uvs[t * 3 + 2].y);
+        }
+        if (wrong) std::printf("    SDiv %d: %zu of %zu triangles wrong\n", k + 1, wrong, got.triangleCount());
+        CHECK(wrong == 0);
+    }
+    // Stepping through every level and back to the top gives back the imported UVs.
+    CHECK(run(d, "subdiv_level", {{"level", double(levels + 1)}}).ok);
+    const std::vector<glm::vec2> topUvs = d.mesh.uvs;
+    for (int k = levels; k >= 1; --k) CHECK(run(d, "subdiv_level", {{"level", double(k)}}).ok);
+    CHECK(run(d, "subdiv_level", {{"level", double(levels + 1)}}).ok);
+    CHECK(d.mesh.uvs == topUvs);
+}
+
+TEST(multires_reconstruct_lower_levels_keep_uvs) {
+    checkReconstructLevelsKeepUvs("cube (valence-3 poles)", makeCube(2), 3);
+    checkReconstructLevelsKeepUvs("plane (open border)", makePlane(3), 3);
+    checkReconstructLevelsKeepUvs("torus (regular, closed)", makeTorus(8), 2);
+    checkReconstructLevelsKeepUvs("quad sphere", makeQuadSphere(2), 2);
+    checkReconstructLevelsKeepUvs("cylinder (n-gon caps)", makeCylinder(8), 2);
+    checkReconstructLevelsKeepUvs("cone (triangles + quads)", makeCone(6), 2);
+    checkReconstructLevelsKeepUvs("capsule", makeCapsule(8), 2);
+}
+
+// #145 (RodTDai's answers, screenshots and hint): a high-poly unwrapped on its own, so UV seams run THROUGH the
+// faces of the levels Reconstruct finds, and islands overlap (automatic unwraps stack them). Before, such a face took
+// each corner's UV from whichever island that corner was in and stretched across UDIM tiles. Fine UVs here: a planar
+// projection per island, islands cut by planes off the coarse edges, two tiles of four overlapping islands each
+// (as is, mirrored, rotated, shifted); out and back in as an OBJ. Every reconstructed triangle must lie in one
+// island: all three corners near that island's projection of their positions.
+static glm::vec2 islandUv(uint32_t island, glm::vec3 p) {
+    glm::vec2 uv = glm::vec2(p.x, p.y + 0.5f * p.z) * 0.25f + 0.5f;
+    switch (island >> 1) {
+    case 1: uv.x = 1.0f - uv.x; break;
+    case 2: uv = glm::vec2(1.0f) - uv; break;
+    case 3: uv += glm::vec2(0.07f, 0.05f); break;
+    }
+    return uv + glm::vec2(float(island & 1), 0.0f);
+}
+
+static void checkReconstructSeamsThroughFaces(const char* name, Mesh coarse, int levels) {
+    std::printf("  %s\n", name);
+    Document src = makeDoc(std::move(coarse));
+    for (int i = 0; i < levels; ++i) CHECK(run(src, "subdiv_divide").ok);
+    Mesh top = subdivLevelMesh(src.mesh, levels);
+    top.uvs.resize(top.triangleCount() * 3);
+    for (uint32_t t = 0; t < top.triangleCount(); ++t) {
+        uint32_t f = t; // both halves of a fine quad in one island
+        if (top.quadPartnerAt(t) != Mesh::kNoQuad) f = std::min(t, top.quadPartnerAt(t));
+        const uint32_t g = top.quadPartnerAt(f);
+        glm::vec3 c(0.0f);
+        int k = 0;
+        for (uint32_t x : {f, g})
+            if (x != Mesh::kNoQuad)
+                for (int j = 0; j < 3; ++j) c += top.positions[top.triangles[x][j]], ++k;
+        c /= float(k);
+        const uint32_t island = uint32_t(c.x > 0.13f) + 2u * uint32_t(c.y > -0.21f) + 4u * uint32_t(c.z > 0.37f);
+        for (int j = 0; j < 3; ++j) top.uvs[size_t(t) * 3 + size_t(j)] = islandUv(island, top.positions[top.triangles[t][j]]);
+    }
+    const std::string path = tempPath("sf_reconstruct_seams.obj");
+    std::string err;
+    CHECK(saveObj(path, top, err));
+    Mesh plain;
+    CHECK(loadObj(path, plain, err));
+    std::filesystem::remove(path);
+    const std::vector<glm::vec2> fineUvs = plain.uvs;
+    Document d = makeDoc(std::move(plain));
+    for (int i = 0; i < levels; ++i) CHECK(run(d, "subdiv_reconstruct").ok);
+    CHECK(subdivLevelCount(d.mesh) == levels + 1);
+    for (int k = 0; k < levels && subdivLevelCount(d.mesh) == levels + 1; ++k) {
+        const Mesh got = subdivLevelMesh(d.mesh, k);
+        CHECK(got.uvs.size() == got.triangleCount() * 3);
+        if (got.uvs.size() != got.triangleCount() * 3) continue;
+        size_t wrong = 0;
+        for (uint32_t t = 0; t < got.triangleCount(); ++t) {
+            bool ok = false;
+            for (uint32_t island = 0; island < 8 && !ok; ++island) {
+                ok = true;
+                for (int j = 0; j < 3 && ok; ++j)
+                    ok = glm::length(got.uvs[size_t(t) * 3 + size_t(j)] - islandUv(island, got.positions[got.triangles[t][j]])) < 0.05f;
+            }
+            if (!ok && wrong++ == 0)
+                std::printf("    SDiv %d triangle %u: UVs (%g,%g) (%g,%g) (%g,%g) aren't one island's\n", k + 1, t, got.uvs[t * 3].x,
+                            got.uvs[t * 3].y, got.uvs[t * 3 + 1].x, got.uvs[t * 3 + 1].y, got.uvs[t * 3 + 2].x, got.uvs[t * 3 + 2].y);
+        }
+        if (wrong) std::printf("    SDiv %d: %zu of %zu triangles wrong\n", k + 1, wrong, got.triangleCount());
+        CHECK(wrong == 0);
+    }
+    CHECK(run(d, "subdiv_level", {{"level", double(levels + 1)}}).ok);
+    CHECK(d.mesh.uvs == fineUvs); // the imported level keeps its own UVs exactly
+}
+
+TEST(multires_reconstruct_keeps_overlapping_uvs_with_seams_through_faces) {
+    checkReconstructSeamsThroughFaces("cube", makeCube(3), 1);
+    checkReconstructSeamsThroughFaces("cube, 2 levels", makeCube(3), 2);
+    checkReconstructSeamsThroughFaces("quad sphere", makeQuadSphere(3), 2);
+    checkReconstructSeamsThroughFaces("cone (triangles + quads)", makeCone(8), 2);
+    checkReconstructSeamsThroughFaces("plane (open border)", makePlane(5), 2);
+    checkReconstructSeamsThroughFaces("torus (regular, closed)", makeTorus(12), 1);
 }
 
 TEST(multires_project_round_trip_keeps_every_level) {

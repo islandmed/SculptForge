@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.11.12 LANGUAGES C CXX)
+project(SculptForge VERSION 0.11.13 LANGUAGES C CXX)
 # "beta.1" while this is a beta of that version (title bar and About: "0.11.0 Beta 1"), "" for a stable release.
 # scripts/release.sh sets it; release.yml checks the tag against both (v0.11.0-beta.1).
 set(SCULPTFORGE_PRERELEASE "")
@@ -141,6 +141,7 @@ add_library(sculptforge_core STATIC
   src/core/SurfaceQuery.cpp
   src/core/QRemesh.cpp
   src/core/GeneratedRemesh.cpp
+  src/core/Backdrop.cpp
   src/core/QRemeshGuides.cpp
   src/core/QRemesh2.cpp
   src/core/QRemesh2Proxy.cpp
@@ -494,6 +495,12 @@ if(SCULPTFORGE_BUILD_APP)
   if(SF_GIT_COMMIT)
     set_source_files_properties(src/app/ProofMode.cpp src/app/BenchTake.cpp PROPERTIES COMPILE_DEFINITIONS "SF_GIT_COMMIT=\"${SF_GIT_COMMIT}\"")
   endif()
+  # A developer's build says so beside the version (window title, top bar): "0.11.13 dev 1a2b3c4". AUTO = a git
+  # checkout built outside CI; release packages build in CI or from a tarball (AUR, brew, Flatpak skip .git).
+  set(SCULPTFORGE_DEV_BUILD AUTO CACHE STRING "Show 'dev <commit>' beside the version: AUTO, ON or OFF")
+  if(SF_GIT_COMMIT AND (SCULPTFORGE_DEV_BUILD STREQUAL "ON" OR (SCULPTFORGE_DEV_BUILD STREQUAL "AUTO" AND NOT DEFINED ENV{CI})))
+    set_property(SOURCE src/app/PanelProject.cpp APPEND PROPERTY COMPILE_DEFINITIONS "SF_DEV_COMMIT=\"${SF_GIT_COMMIT}\"")
+  endif()
   if(MSVC)
     target_compile_options(sculptforge PRIVATE /W4 /utf-8 /permissive-)
   else()
@@ -800,13 +807,16 @@ if(SCULPTFORGE_BUILD_TESTS)
              ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME public_email_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_public_email.py --self-test)
     # The same marks read off the pixels of every tracked image and video (OCR, cached by file hash), and the deploy's
-    # takedown of flagged ones (tools/media_takedown.py).
-    add_test(NAME marks_media COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks_media.py
+    # takedown of flagged ones (tools/media_takedown.py). --cached-only reads it as CI does (no OCR there), so a new image
+    # without its committed cache entry fails here too, not only in CI (0.11.12 staging).
+    add_test(NAME marks_media COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks_media.py --cached-only
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME marks_media_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks_media.py --self-test)
     add_test(NAME media_takedown_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/media_takedown.py --self-test)
     # The public gallery repository matches tools/brush-gallery/repo (the live compare is in release.sh: network).
     add_test(NAME gallery_published_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/brush-gallery/check_published.py --self-test)
+    # Credited @handles are GitHub accounts (the live check is in release.sh's preflight: network).
+    add_test(NAME credits_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_credits.py --self-test)
     # The Claude Desktop bundle and its MCP registry entry (tools/release/build_mcpb.py, mcp_server_json.py): packed
     # from the built CLI and its server run from the unpacked bundle, as packages.yml does on every OS.
     add_test(NAME mcpb_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/build_mcpb.py --self-test)
@@ -932,6 +942,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(studio_mode studio/studio_mode --studio ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/studio/studio.json)
     sculptforge_ui_test(shell_layout_1080 shell_layout --size 1920x1080)
     sculptforge_ui_test(menu_stable_720 menu_stable --size 1280x720)
+    sculptforge_ui_test(title_version_1440 title_version --size 1440x900)
+    sculptforge_ui_test(title_version_1024 title_version --size 1024x768)
+    sculptforge_ui_test(timeline_narrow_1024 timeline_narrow --size 1024x768)
     sculptforge_ui_test(help_console_1080 help_console --size 1920x1080)
     # The S / U / I / O slider on a UI scaled 1.5x (Windows at 150%, #9): it must still open under the cursor.
     sculptforge_ui_test(size_popup_scaled size_popup --size 2400x1350)

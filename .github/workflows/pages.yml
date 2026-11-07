@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths: ['website/**', 'docs/supporters.txt', '.github/workflows/pages.yml', 'tools/marks_media_flagged.txt']
   workflow_dispatch:
+  # The daily jobs list (.github/workflows/jobs.yml) goes live as soon as it is fetched.
+  workflow_run:
+    workflows: [Jobs]
+    types: [completed]
 
 permissions:
   contents: read
@@ -53,6 +57,16 @@ jobs:
       # The credits page always matches docs/supporters.txt on main.
       - name: Supporters page
         run: python3 tools/guide/build_site.py --supporters
+      # sculptforge.app/jobs.html: the roles fetched today (jobs.yml) from the jobs-data branch. A missing branch or
+      # a bad file leaves main's committed snapshot in place; --render refuses data with a mark in it.
+      - name: Jobs
+        run: |
+          if git fetch -q --depth=1 origin jobs-data && git show FETCH_HEAD:jobs.json > "$RUNNER_TEMP/jobs.json"; then
+            cp "$RUNNER_TEMP/jobs.json" website/jobs.json
+            python3 tools/jobs/fetch.py --render --site website || git checkout -- website/jobs.json website/jobs.html
+          else
+            echo "No jobs-data branch yet: main's snapshot"
+          fi
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
@@ -97,6 +111,16 @@ jobs:
           fi
       - name: Supporters page
         run: python3 tools/guide/build_site.py --supporters
+      # sculptforge.app/jobs.html: the roles fetched today (jobs.yml) from the jobs-data branch. A missing branch or
+      # a bad file leaves main's committed snapshot in place; --render refuses data with a mark in it.
+      - name: Jobs
+        run: |
+          if git fetch -q --depth=1 origin jobs-data && git show FETCH_HEAD:jobs.json > "$RUNNER_TEMP/jobs.json"; then
+            cp "$RUNNER_TEMP/jobs.json" website/jobs.json
+            python3 tools/jobs/fetch.py --render --site website || git checkout -- website/jobs.json website/jobs.html
+          else
+            echo "No jobs-data branch yet: main's snapshot"
+          fi
       # The mirror is public too: the same takedown as the deploy (tools/marks_media_flagged.txt).
       - name: Media takedown
         run: python3 tools/media_takedown.py website

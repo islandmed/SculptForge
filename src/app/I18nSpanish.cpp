@@ -110,6 +110,8 @@ constexpr Entry kSpanish[] = {
     {"Search", "Buscar"},
     {"Minimize", "Minimizar"},
     {"Menus", "Menús"},
+    {"More menus", "Más menús"},
+    {"The menus that don't fit in the window's width.", "Los menús que no caben en el ancho de la ventana."},
     {"Snapshots", "Instantáneas"},
     {"Save Snapshot", "Guardar instantánea"},
     {"Base", "Base"},
@@ -393,8 +395,15 @@ constexpr Entry kSpanish[] = {
     {"Not enough GPU memory to show every Part: hide some or step down a subdivision level.",
      "No hay memoria de GPU suficiente para mostrar todas las piezas: oculta alguna o baja un nivel de "
      "subdivisión."},
-    {"%s\n%zu vertices, %zu triangles%s%s\nClick to select, double-click to rename",
-     "%s\n%zu vértices, %zu triángulos%s%s\nClic para seleccionar, doble clic para renombrar"},
+    {"%s\n%zu vertices, %zu triangles%s%s%s\nClick to select, double-click to rename",
+     "%s\n%zu vértices, %zu triángulos%s%s%s\nClic para seleccionar, doble clic para renombrar"},
+    {"\nLinked: %d Parts share this mesh", "\nEnlazada: %d piezas comparten esta malla"},
+    {"Linked Duplicate", "Duplicado enlazado"},
+    {"Make Unique", "Hacer única"},
+    {"A copy that shares the active Part's mesh, beside it: sculpt, paint or mask any of them and all change. Move each with the Gizmo; Make Unique gives one its own mesh again. Hundreds of copies cost about one mesh.",
+     "Una copia que comparte la malla de la pieza activa, a su lado: esculpe, pinta o enmascara cualquiera y cambian todas. Mueve cada una con el gizmo; Hacer única le devuelve a una su propia malla. Cientos de copias cuestan más o menos una malla."},
+    {"Give the active linked Part its own copy of the mesh: it stays where it is and no longer changes with the others.",
+     "Da a la pieza enlazada activa su propia copia de la malla: se queda donde está y ya no cambia con las demás."},
     {"Extract", "Extraer"},
     {"Accept", "Aceptar"},
     {"Double", "Doble"},
@@ -600,6 +609,30 @@ constexpr Entry kSpanish[] = {
     {"Automatic", "Automática"},
     {"Rotation", "Rotación"},
     {"Free", "Libre"},
+    {"Orbit lock",
+     "Bloqueo de órbita"},
+    {"Y (turntable)",
+     "Y (plataforma giratoria)"},
+    {"Rotation drags turn the view about the screen's axes and can roll it over the top (the default). "
+     "Saved with the preferences.",
+     "Arrastrar para girar mueve la vista sobre los ejes de la pantalla y puede darle la vuelta por "
+     "arriba (lo predeterminado). Se guarda con las preferencias."},
+    {"Rotation drags turn the view like a turntable: the model stays upright and turns about its vertical "
+     "(Y) axis. Saved with the preferences.",
+     "Arrastrar para girar mueve la vista como una plataforma giratoria: el modelo se queda derecho y "
+     "gira sobre su eje vertical (Y). Se guarda con las preferencias."},
+    {"Rotation drags turn the view about the world X axis only (red): from the front, an up or down drag "
+     "tips the model towards you or away. Shift still snaps to a side view; the axis gizmo shows the "
+     "lock. Saved with the preferences.",
+     "Arrastrar para girar mueve la vista solo sobre el eje X del mundo (rojo): desde el frente, "
+     "arrastrar arriba o abajo inclina el modelo hacia ti o hacia atrás. Mayús sigue ajustando a una "
+     "vista lateral; el gizmo de ejes muestra el bloqueo. Se guarda con las preferencias."},
+    {"Rotation drags turn the view about the world Z axis only (blue): from the front, a drag around the "
+     "middle turns the model like a wheel. Shift still snaps to a side view; the axis gizmo shows the "
+     "lock. Saved with the preferences.",
+     "Arrastrar para girar mueve la vista solo sobre el eje Z del mundo (azul): desde el frente, "
+     "arrastrar alrededor del centro gira el modelo como una rueda. Mayús sigue ajustando a una vista "
+     "lateral; el gizmo de ejes muestra el bloqueo. Se guarda con las preferencias."},
     {"Turntable", "Plataforma giratoria"},
     {"Camera notch", "Muesca de la cámara"},
     {"Always reserve", "Reservar siempre"},
@@ -1325,10 +1358,11 @@ constexpr Entry kSpanish[] = {
      "ventana (Windows: Configuración > Pantalla > Escala, por monitor)."},
     {"Free: dragging turns the model about the screen's axes and can roll it over the top; press Shift while rotating "
      "to snap to the nearest front, side, top or bottom view. Turntable: the model stays upright and turns about its "
-     "vertical axis, as in Blender or Maya.",
+     "vertical axis, as in Blender or Maya. X axis, Z axis: it turns about that world axis only (View > Orbit lock).",
      "Libre: arrastrar gira el modelo sobre los ejes de la pantalla y puede darle la vuelta por arriba; pulsa Mayús "
      "mientras giras para ajustar a la vista frontal, lateral, superior o inferior más cercana. Plataforma "
-     "giratoria: el modelo se queda derecho y gira sobre su eje vertical, como en Blender o Maya."},
+     "giratoria: el modelo se queda derecho y gira sobre su eje vertical, como en Blender o Maya."
+     " Eje X, eje Z: gira solo sobre ese eje del mundo (Vista > Bloqueo de órbita)."},
     {"Keeps the interface below the camera notch of MacBooks (and other laptops) when SculptForge fills the screen. "
      "Automatic asks the system (macOS) or recognises a notched MacBook display (Linux).",
      "Mantiene la interfaz por debajo de la muesca de la cámara de los MacBook (y otros portátiles) cuando "
@@ -1651,9 +1685,9 @@ constexpr Entry kSpanish[] = {
      "pinceles; Nunca: la tecla no hace nada en ellos."},
     {"Share size and intensity across brushes", "Compartir tamaño e intensidad entre pinceles"},
     {"Free: the model turns about the screen's axes and can roll over the top. Turntable: it stays upright, as in "
-     "Blender or Maya.",
+     "Blender or Maya. X axis, Z axis: it turns about that world axis only (View > Orbit lock).",
      "Libre: el modelo gira sobre los ejes de la pantalla y puede darse la vuelta por arriba. Plataforma giratoria: "
-     "se queda derecho, como en Blender o Maya."},
+     "se queda derecho, como en Blender o Maya. Eje X, eje Z: gira solo sobre ese eje del mundo (Vista > Bloqueo de órbita)."},
     {"The pointer over the 3D view: a crosshair (the default, as in most sculpting apps; it stays while the view "
      "turns) or the arrow. Panels, menus and popups always show the arrow (or their own resize and text cursors). "
      "Saved automatically.",
@@ -4687,6 +4721,10 @@ constexpr Entry kSpanish[] = {
      "Ver en RA"},
     {"View resolution 75%%: draws about half the pixels, for integrated graphics and big screens.",
      "Resolución de vista 75%%: dibuja más o menos la mitad de los píxeles, para gráficos integrados y pantallas grandes."},
+    {"Remove flat background",
+     "Quitar el fondo plano"},
+    {"Drops the flat plane a picture's background often becomes (a wall behind or ground under the subject) before the model lands. A relief or coin on its own is kept. Undo brings a removed plane back.",
+     "Quita el plano en que suele convertirse el fondo de una imagen (una pared detrás o un suelo bajo el sujeto) antes de que llegue el modelo. Un relieve o una moneda solos se conservan. Deshacer recupera un plano quitado."},
     {"Voxel remesh",
      "Remallado vóxel"},
     {"Welcome to SculptForge",

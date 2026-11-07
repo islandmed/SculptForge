@@ -6,6 +6,56 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.13] - 2026-11-07
+
+### Added
+- **Generate 3D > Remove flat background** (on by default): a thin wall behind or ground under the subject, covering
+  most of the model's bounds, is removed from the generated mesh before remeshing, as its own undo step; a relief or a
+  coin on its own is kept. `image_to_3d` / `text_to_3d` take `remove_background=false`, and the new
+  `remove_flat_background` command does it on the active Part. Requested by fenix on Discord.
+- **Linked Duplicates** (#94, asked for by ebarranco; the idea of placing copies on their own by NicTanghe): **Tool >
+  Parts > Linked Duplicate** adds a Part sharing the active one's mesh, undo history and GPU buffers, with its own
+  transform. Strokes, masking and painting on any copy edit the shared mesh (symmetry about the copy's own axes); the
+  Gizmo and `transform` move a linked copy as a whole (a mask poses the shared mesh instead); **Make Unique** breaks
+  the link; deleting one keeps the others. The Parts list shows a link and the count. Projects keep the links (project
+  format 8); glTF reuses one mesh with a node per copy, USD writes instanceable prims referencing the first copy (and
+  reads them back), OBJ / STL / FBX / PLY write each copy where it is. Commands `part_duplicate_linked` and
+  `part_make_unique`. 500 linked copies use about the memory of one mesh.
+- **Orbit lock** (View > Orbit lock, a request from foirgairwolf on Discord): besides Free and Y (the turntable),
+  rotation drags can turn the view about the world X or Z axis only, with no drift over long drags. A key for each
+  (Alt+Shift+F / Y / X / Z) and the `orbit_lock axis=free|y|x|z` command; the axis gizmo draws the locked axis through
+  its disc with a lock badge. Shift still snaps to side views. Saved with the preferences (also Preferences >
+  Interface / Input > Rotation; older versions read Y as Turntable).
+- Website: **Jobs** (sculptforge.app/jobs.html, footer link): open sculpting and 3D modeling roles worldwide (games,
+  film and VFX, animation, collectibles, 3D printing, jewelry and dental CAD, AR/VR) from the companies' own public
+  job feeds, filtered by region, sector, role, Remote and contract. A daily GitHub Action (tools/jobs/fetch.py,
+  sources in tools/jobs/studios.yaml) refreshes it; titles, companies and places only, never job descriptions.
+
+### Changed
+- The window title starts with the project name and a "*" for unsaved changes (taskbars stay readable), then
+  SculptForge and its version, and the top bar shows the version, small and dim, beside the name in both layouts (a
+  narrow window drops it). A narrow window or a high UI scale (a 1024 px window at 200 %) never draws top bar items
+  over each other any more: the version goes first, then the layout presets and Save Snapshot, the search field
+  shrinks to its icon, and the menus that don't fit open from a >> button. Betas show their tag ("0.12.0 beta.2") in
+  the accent colour; builds from a git checkout show "dev" and their commit.
+
+### Fixed
+- The membership card now shows the Studio membership's flat price for any number of artists.
+- **Reconstruct Subdiv** (Tool > Geometry): the levels it builds keep each face inside one UV island when the imported
+  high-poly's seams run through the lower level's faces (UVs made on the high-poly, automatic unwraps with overlapping
+  islands). Such faces used to take each corner's UV from a different island and stretch across UDIM tiles.
+  Reconstructing again on such a mesh also finds the right lower level now. Thanks @RodTDai for the report, the
+  screenshots and the diagnosis that pointed to the fix (#145).
+- Timelapse: a PBR timelapse of a high-detail sculpt flickered a little in the video (not in the view): after each
+  step of the history the frames switched between the full mesh and its lighter preview levels. Timelapse frames and
+  `--render` turntables now always draw the full mesh. Thanks @ebarranco.
+- The Sculpt Timeline strip's header no longer runs under **Save with project** in a narrow window or at a high UI
+  scale (a 1024 px window at 200 %): the step count, branches, step name and message are shortened with "..." to fit.
+- **Member builds sign-in** accepts GitHub's longer tokens (its new ~520-character format, and up to 4096 characters):
+  before, a long token was refused and the sign-in failed without a word. On Windows, where one Credential Manager
+  entry holds at most 2560 bytes, a longer sign-in is kept across several entries (studio sign-ins too); sign-ins
+  stored by earlier versions still load.
+
 ## [0.11.12] - 2026-11-07
 
 ### Added

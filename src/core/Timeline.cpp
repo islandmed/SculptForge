@@ -951,7 +951,10 @@ bool saveHistorySidecar(Document& doc, const std::string& projectPath, std::stri
     std::vector<uint8_t> body;
     Writer wb{body};
     for (int i = 0; i < doc.partCount(); ++i) {
-        UndoStack& stack = i == doc.activePart ? doc.undo : doc.parts[size_t(i)].undo;
+        bool shared = false; // a linked copy: its history (the group's) is saved with the group's first Part
+        for (int k = 0; k < i; ++k) shared |= doc.parts[size_t(k)].data == doc.parts[size_t(i)].data;
+        if (shared) continue;
+        UndoStack& stack = doc.partUndo(i);
         Timeline* t = Timeline::of(stack);
         if (!t) continue;
         t->bindStack(stack);

@@ -1,0 +1,69 @@
+# View > Orbit lock (foirgairwolf on Discord, #ideas): Free / Y (turntable) / X / Z, a key and the orbit_lock command
+# each. A rotation drag turns the view about the locked world axis only; the axis gizmo draws that axis through its
+# disc with a lock badge; Shift still snaps; the lock is saved with the preferences.
+run ui_look look=forge layout=sculptforge
+run new_sphere subdivisions=4
+input_style classic
+camera 0 0
+wait 0.2
+expect_value orbit_lock == 0
+expect_shortcut view.orbit_lock_x Alt+Shift+X
+expect_shortcut view.orbit_lock_y Alt+Shift+Y
+expect_shortcut view.orbit_lock_z Alt+Shift+Z
+expect_shortcut view.orbit_lock_free Alt+Shift+F
+expect_value shortcut_conflicts == 0
+run_fails orbit_lock axis=w
+
+# The View menu's row; X picked there.
+click "View##menu.view"
+expect "X##view.orbit_lock_x"
+click "X##view.orbit_lock_x"
+expect_value orbit_lock == 2
+shot view-menu
+key escape
+wait 0.2
+
+# X from the front: a drag tips the model (pitch only), the sideways part does nothing.
+orbit 300 60
+expect_value camera_yaw < 0.01
+expect_value camera_yaw > -0.01
+expect_value camera_roll < 0.01
+expect_value camera_roll > -0.01
+expect_value camera_pitch < -10
+shot x-locked
+
+# Z by key, from the front: the view only rolls (it keeps looking along -Z).
+key shift+alt+z
+expect_value orbit_lock == 3
+camera 0 0
+orbit 200 120
+expect_value camera_yaw < 0.01
+expect_value camera_yaw > -0.01
+expect_value camera_pitch < 0.01
+expect_value camera_pitch > -0.01
+expect_value camera_roll != 0
+shot z-locked
+
+# Shift still snaps to the nearest side view.
+hold shift
+orbit 61 -37
+hold none
+expect_value camera_aligned == 1
+
+# Y is the turntable as before; Free as before.
+run orbit_lock axis=y
+expect_value orbit_lock == 1
+expect_value turntable == 1
+camera 0 0
+orbit 120 -60
+expect_value camera_roll == 0
+key shift+alt+f
+expect_value orbit_lock == 0
+expect_value turntable == 0
+
+# Saved with the preferences.
+run orbit_lock axis=z
+restart
+wait 0.2
+expect_value orbit_lock == 3
+run orbit_lock axis=free

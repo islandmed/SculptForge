@@ -454,7 +454,7 @@ TEST(qremesh_guide_command_parts_and_projects) {
     std::printf("  %s\n", r.message.c_str());
     CHECK(r.message.find("followed 1 guide") != std::string::npos);
     CHECK(doc.qremeshGuides.size() == 1);
-    CHECK(doc.parts[size_t(doc.activePart + 1)].qremeshGuides.size() == 1);
+    CHECK(doc.parts[size_t(doc.activePart + 1)].data->qremeshGuides.size() == 1);
     r = reg.execute(doc, "qremesh", {{"target", 1500.0}, {"guides", false}});
     CHECK(r.ok && r.message.find("guide") == std::string::npos);
     // Guides left behind by a move are ignored, with a note.

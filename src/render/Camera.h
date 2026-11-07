@@ -30,6 +30,9 @@ public:
 
     void orbit(float dxPixels, float dyPixels);     // turntable
     void orbitFree(float dxPixels, float dyPixels); // trackball about the screen axes
+    // Orbit lock X or Z: the view turns about one world axis only. The drag's part across the axis on screen turns
+    // it (as free orbiting would), `rollRadians` (the cursor's sweep around the view's centre) when it points at you.
+    void orbitAbout(const glm::vec3& worldAxis, float dxPixels, float dyPixels, float rollRadians);
     void setOrientation(const glm::quat& q);        // as yaw / pitch / roll
     // The nearest of the 24 views looking along a world axis with another world axis up (the classic
     // Shift while rotating).
@@ -40,6 +43,10 @@ public:
 
     // Ray through a window coordinate (origin top-left).
     void screenRay(float x, float y, float width, float height, glm::vec3& origin, glm::vec3& dir) const;
+    // The same view as seen from a space placed by `place` (a similarity: rotation, translation, uniform scale;
+    // e.g. a linked Part's transform): view() becomes view() * place up to a uniform scale, which the projection
+    // ignores, so rays, projections and pixel sizes in that space match the view's.
+    Camera inSpaceOf(const glm::mat4& place) const;
     // World units covered by one window pixel at the depth of `point`.
     float worldPerPixel(const glm::vec3& point, float viewportHeight) const;
 

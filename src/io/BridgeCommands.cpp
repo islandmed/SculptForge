@@ -41,7 +41,7 @@ std::string sendName(const Document& doc, const Args& a) {
 } // namespace
 
 std::string& partBridgeName(Document& doc, int i) {
-    return i == doc.activePart ? doc.bridgeName : doc.parts[size_t(i)].bridgeName;
+    return doc.checkedOut(i) ? doc.bridgeName : doc.parts[size_t(i)].data->bridgeName;
 }
 
 std::vector<MeshObjectRef> bridgeObjects(Document& doc, std::vector<int>& indices) {

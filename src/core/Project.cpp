@@ -853,6 +853,8 @@ struct LoadedPart {
     Shading shading = Shading::Default;
     int folder = -1; // index into the manifest's part_folders (#96)
     int activeLayer = -1;
+    int link = -1;              // a linked copy of this earlier Part (#94): no mesh of its own
+    glm::mat4 transform{1.0f};  // Part::transform
     Mesh mesh;
     // A big mesh's BVH is built on its own thread once the positions and triangles are read (they don't change
     // after that), while the subdivision levels, topology and normals load.
@@ -896,14 +898,27 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
     Json parts = Json::array();
     for (int i = 0; i < doc.partCount(); ++i) {
         const Part& s = doc.parts[size_t(i)];
-        const bool active = i == doc.activePart;
+        const bool active = doc.checkedOut(i);
         Json st = Json::object();
         st.set("name", s.name);
         st.set("visible", s.visible);
         if (s.shading != Shading::Default) st.set("shading", shadingName(s.shading)); // (no format change: optional)
         if (const int f = doc.partFolderIndex(s.folder); f >= 0) st.set("folder", f); // (#96: optional, as shading)
+        if (s.moved()) {
+            st.set("transform", matrixJson(s.transform));
+            version.need(8);
+        }
+        int link = -1; // a linked copy (#94): the first Part with its mesh holds it
+        for (int k = 0; k < i && link < 0; ++k)
+            if (doc.parts[size_t(k)].data == s.data) link = k;
+        if (link >= 0) {
+            st.set("link", link);
+            version.need(8);
+            parts.push(std::move(st));
+            continue;
+        }
         writeMesh(w, "parts/" + std::to_string(i) + "/", doc.partMesh(i), st);
-        st.set("active_layer", active ? doc.activeLayer : s.activeLayer);
+        st.set("active_layer", active ? doc.activeLayer : s.data->activeLayer);
         if (hasPaintLayers(doc.partMesh(i)))
             st.set("paint_layers", writePaintLayers(w, "parts/" + std::to_string(i) + "/", doc.partMesh(i)));
         if (doc.partMesh(i).texture && doc.partMesh(i).texture->width > 0) {
@@ -927,9 +942,9 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
             st.set("micro", std::move(mj));
             version.need(7);
         }
-        const std::string& bridgeName = active ? doc.bridgeName : s.bridgeName;
+        const std::string& bridgeName = active ? doc.bridgeName : s.data->bridgeName;
         if (!bridgeName.empty()) st.set("bridge_name", bridgeName);
-        const std::vector<QRemeshGuide>& guides = active ? doc.qremeshGuides : s.qremeshGuides;
+        const std::vector<QRemeshGuide>& guides = active ? doc.qremeshGuides : s.data->qremeshGuides;
         if (!guides.empty()) st.set("qremesh_guides", qremeshGuidesToJson(guides)); // (no format change: optional)
         if (const Mesh& m = doc.partMesh(i); m.selectionSets && !m.selectionSets->sets.empty())
             st.set("selection_sets", writeSelectionSets(w, "parts/" + std::to_string(i) + "/", *m.selectionSets));
@@ -1076,6 +1091,16 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             s.folder = int(sj["folder"].asNumber(-1));
             s.bridgeName = sj["bridge_name"].asString();
             s.qremeshGuides = qremeshGuidesFromJson(sj["qremesh_guides"]);
+            if (sj["transform"].isArray()) s.transform = matrixFromJson(sj["transform"]);
+            if (const Json& lj = sj["link"]; lj.isNumber()) {
+                const double l = lj.asNumber(-1);
+                if (!(l >= 0 && l < double(parts.size() - 1)) || parts[size_t(l)].link >= 0) {
+                    error = "Project Part link is invalid";
+                    return false;
+                }
+                s.link = int(l);
+                continue;
+            }
             if (!readMesh(r, sj["mesh"], sj["layers"], s.mesh, error, false, false)) return false;
             s.mesh.forgespheres = forgespheresFromJson(sj["forgespheres"]);
             s.mesh.forgespherePreview = !s.mesh.forgespheres.empty() && sj["forgesphere_preview"].asBool(false);
@@ -1170,15 +1195,23 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     doc.qremeshGuides = std::move(parts[0].qremeshGuides);
     doc.parts[0].visible = parts[0].visible;
     doc.parts[0].shading = parts[0].shading;
+    doc.parts[0].transform = parts[0].transform;
     for (size_t i = 1; i < parts.size(); ++i) {
+        if (parts[i].link >= 0) { // shares an earlier Part's mesh (Parts load in order: index i is i here too)
+            const int at = doc.addLink(parts[i].link, parts[i].name, parts[i].transform);
+            doc.parts[size_t(at)].visible = parts[i].visible;
+            doc.parts[size_t(at)].shading = parts[i].shading;
+            continue;
+        }
         BVH* builtI = parts[i].finishBvh();
         const int at = doc.addPart(std::move(parts[i].mesh), parts[i].name, false, -1, builtI);
         Part& s = doc.parts[size_t(at)];
         s.visible = parts[i].visible;
         s.shading = parts[i].shading;
-        s.activeLayer = validLayer(parts[i].activeLayer, s.mesh);
-        s.bridgeName = parts[i].bridgeName;
-        s.qremeshGuides = std::move(parts[i].qremeshGuides);
+        s.transform = parts[i].transform;
+        s.data->activeLayer = validLayer(parts[i].activeLayer, s.data->mesh);
+        s.data->bridgeName = parts[i].bridgeName;
+        s.data->qremeshGuides = std::move(parts[i].qremeshGuides);
     }
     // Folders (#96): a Part pointing at a folder that isn't there is simply outside any folder.
     if (const Json& folders = manifest["part_folders"]; folders.isArray() && folders.size() <= kMaxProjectParts) {

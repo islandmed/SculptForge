@@ -18,7 +18,7 @@
   <meta property="og:url" content="https://sculptforge.app/support.html">
   <link rel="canonical" href="https://sculptforge.app/support.html">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="style.css?v=19">
+  <link rel="stylesheet" href="style.css?v=28">
   <style>
     /* The first screen: a calm stage (words, a warm glow, a faint grid) with the memberships rising onto it.
        It follows the system's light or dark setting like the rest of the page. */
@@ -166,6 +166,7 @@
     }
   </style>
   <script src="motion.js?v=11" defer></script>
+  <script src="testimonials.js?v=1" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </head>
 <body class="support-page">
@@ -246,15 +247,26 @@
             <p class="per-year">Founding Studio: <a href="https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204" rel="noopener">$150 / month</a> flat, locked, for the first 10 studios</p>
           </article>
         </div>
+        <!-- What artists say: testimonials.json (consent on record, exact wording); testimonials.js redraws from it. -->
+        <aside class="tiers-voices" aria-labelledby="voices-title">
+          <p class="voices-title" id="voices-title">What artists say</p>
+          <div class="voices-list" data-testimonials="2">
+          <figure class="voice">
+            <blockquote><p>I am an environment artist creating high and low poly assets for several projects including the game Wayward Realms. After fighting several other apps and spending too much money SculptForge fits like a hand-made glove. While there is much to love about this software I am glad I found something that actually makes sense.</p></blockquote>
+            <figcaption><span class="voice-name">Richard Throgmorton (MakIt3D)</span><span class="voice-role">environment artist</span></figcaption>
+          </figure>
+          </div>
+        </aside>
         <p class="fine support-fine">Betas and early builds come from a private GitHub repository: send us your GitHub username (at checkout, by
           email reply or in #members) and you'll get an invite. Join the <a href="https://discord.gg/gWrYkEmQhH" rel="noopener">SculptForge Discord</a>
           and tell us your membership for #members. <a href="studios.html">For studios</a>.</p>
         <p class="fine support-fine">Studio builds are GPL-3.0 like every SculptForge build: the source is yours to share,
           and there are no exclusive or secret features. What stays private is your studio's assets, settings and
           network. <a href="studios.html#faq">Studio questions</a>.</p>
-        <p class="fine support-fine">Payments are handled by Stripe (cards, Apple Pay, Google Pay); SculptForge never sees your
+        <p class="fine support-fine" id="refunds">Payments are handled by Stripe (cards, Apple Pay, Google Pay); SculptForge never sees your
           card details. Memberships are subscriptions to SculptForge benefits; cancel anytime in the
-          <a href="https://billing.stripe.com/p/login/4gM7sL8uXc5s4iv5eh4F200" rel="noopener">customer portal</a>.</p>
+          <a href="https://billing.stripe.com/p/login/4gM7sL8uXc5s4iv5eh4F200" rel="noopener">customer portal</a>.
+          <a href="terms.html#refunds">Membership terms and refunds</a>.</p>
       </div>
     </section>
 
@@ -309,6 +321,8 @@
         <a href="press.html">Press kit</a>
         <a href="support.html">Membership</a>
         <a href="supporters.html">Members</a>
+        <a href="terms.html">Terms</a>
+        <a href="jobs.html">Jobs</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
         <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
       </div>

@@ -19,12 +19,13 @@
   <meta property="og:url" content="https://sculptforge.app/">
   <link rel="canonical" href="https://sculptforge.app/">
   <script type="application/ld+json">
-  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.11.12", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=5", "sameAs": ["https://github.com/islandmed/SculptForge"]}
+  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.11.13", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=5", "sameAs": ["https://github.com/islandmed/SculptForge"]}
   </script>
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://sculptforge.app/img/social-preview.png?v=5">
-  <link rel="stylesheet" href="style.css?v=27">
+  <link rel="stylesheet" href="style.css?v=28">
   <script src="motion.js?v=11" defer></script>
+  <script src="testimonials.js?v=1" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
 <body>
@@ -86,6 +87,21 @@
           <figcaption class="hero-credit">From <a href="https://www.youtube.com/watch?v=cunchKGUzcw" rel="noopener">askNK's review</a>
             of SculptForge: Facial Shapes on a sculpted head. Clip shared with askNK's permission.</figcaption>
         </figure>
+      </div>
+    </section>
+
+    <!-- What artists say: testimonials.json (consent on record, exact wording). Keep this markup in step with the JSON;
+         testimonials.js redraws it from the JSON if they differ. -->
+    <section id="what-artists-say" class="voices" aria-labelledby="voices-title">
+      <div class="wrap">
+        <p class="eyebrow">From our members</p>
+        <h2 id="voices-title">What artists say</h2>
+        <div class="voices-list" data-testimonials>
+          <figure class="voice">
+            <blockquote><p>I am an environment artist creating high and low poly assets for several projects including the game Wayward Realms. After fighting several other apps and spending too much money SculptForge fits like a hand-made glove. While there is much to love about this software I am glad I found something that actually makes sense.</p></blockquote>
+            <figcaption><span class="voice-name">Richard Throgmorton (MakIt3D)</span><span class="voice-role">environment artist</span></figcaption>
+          </figure>
+        </div>
       </div>
     </section>
 
@@ -385,14 +401,14 @@ rez-env sculptforge -- sculptforge troll.usda \
       <div class="wrap">
         <h2>What's new in 0.11</h2>
         <!-- whats-new:start (tools/guide/build_site.py writes this from docs/guide/whats-new.md: edit that) -->
-        <p class="section-lede">New in 0.11.12: Your names in your language, a cleaner Restart to update, and the cube is back. <a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
+        <p class="section-lede">New in 0.11.13: Linked duplicates, an orbit lock, and cleaner Image to 3D. <a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
         <div class="wn-home">
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-01113"><div class="wn-card-body"><h3>Linked duplicates, Orbit lock, Image to 3D <small>new in 0.11.13</small></h3><p>Linked duplicates, an orbit lock, and cleaner Image to 3D.</p><ul><li>Sculpt one Part and every copy follows, each in its own place (thanks @ebarranco, #94)</li><li>View &gt; Orbit lock turns the view about X, Y or Z only (thanks foirgairwolf on Discord)</li><li>Remove the flat background plane a generated model stands on, in one click (thanks fenix on Discord)</li><li>Lower levels keep their UVs, even where seams cross coarse faces (thanks @RodTDai, #145)</li><li>Rendered timelapses no longer flicker between detail levels (thanks @ebarranco)</li></ul></div></a></article>
           <article class="wn-home-card"><a href="guide/whats-new.html#version-01112"><div class="wn-card-body"><h3>Your languages, Stencil, Restart to update <small>new in 0.11.12</small></h3><p>Your names in your language, a cleaner Restart to update, and the cube is back.</p><ul><li>Names you type in Chinese, Japanese or Korean (Parts, layers, folders, brush sets, files) draw with your system&#x27;s fonts instead of &quot;?&quot;</li><li>Clean, sharp groove edges when you sculpt through a stencil, and detailed photos stay even on lighter meshes</li><li>On Linux the previous version now quits, and Discord stops showing SculptForge when you close it (thanks @ebarranco)</li><li>Turning the cap slowly no longer zooms the view away (thanks @fenixpoints)</li><li>The outline cube is back, and a fix for garbled small icon sizes on macOS (thanks @tristratos, #156)</li></ul></div></a></article>
           <article class="wn-home-card"><a href="guide/whats-new.html#version-01111"><div class="wn-card-body"><h3>Stencil, Maya Live, Creature bones <small>new in 0.11.11</small></h3><p>Sculpt through a reference image, a live link to Maya, and creature bones to build from.</p><ul><li>Place a reference image over the model, then sculpt or paint through it, and move it and repeat (thanks @kenttumanda123-netizen, #155)</li><li>Each stroke goes to Maya on its own, and Maya&#x27;s edits come back the same way. An optional Live link makes it near-instant; it&#x27;s off by default and warns when you turn it on (thanks @tristratos, #42)</li><li>13 original starting pieces for building creatures, in Insert sets (thanks @kenttumanda123-netizen, #154)</li><li>Swap the whole bottom shelf and its keys in one step (thanks @NicTanghe, #143)</li><li>View &gt; Floor grid draws a faint grid on the floor the model stands on (thanks @fenixpoints, #115)</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-01110"><div class="wn-card-body"><h3>Exports keep their real size, Insert sets, Spanish and Chinese everywhere <small>new in 0.11.10</small></h3><p>Exports keep their real size, Alt+Q switches Parts, and insert sets for kitbashing.</p><ul><li>What you import in mm or cm comes back out the same size, for 3D printing and other apps (thanks @Swar55, @NicTanghe, #148)</li><li>Alt+Q sculpts the Part under the cursor, in every input style (thanks @ziel9627 on Discord)</li><li>Pick a piece from a multi-object file or folder by its thumbnail, step through them with [ and ]</li><li>The Generate 3D panel and the last untranslated labels now read in your language</li><li>Kitbash sets for Insert</li></ul></div></a></article>
         </div>
         <div class="wn-home-groups">
-          <a class="wn-home-group" href="guide/whats-new.html#versions-0110-to-0119"><h3>0.11.0 to 0.11.9</h3><ul><li>Folders in Tool &gt; Parts</li><li>Clearer corner axes</li><li>Studio controls</li><li>Help &gt; Connect an AI tool</li></ul><span>All changes &rarr;</span></a>
+          <a class="wn-home-group" href="guide/whats-new.html#versions-0110-to-01110"><h3>0.11.0 to 0.11.10</h3><ul><li>Exports keep their real size</li><li>Folders in Tool &gt; Parts</li><li>Clearer corner axes</li><li>Studio controls</li><li>Help &gt; Connect an AI tool</li></ul><span>All changes &rarr;</span></a>
           <a class="wn-home-group" href="guide/whats-new.html#versions-010x"><h3>0.10.x</h3><ul><li>Your first sculpt in 10 minutes</li><li>A new look</li><li>PBR viewport</li><li>UV Editor</li><li>Keep Masked remeshing</li><li>Micro levels</li></ul><span>All changes &rarr;</span></a>
           <a class="wn-home-group" href="guide/whats-new.html#versions-09-and-earlier"><h3>0.9 and earlier</h3><ul><li>Faster big brushes</li><li>Extract</li><li>Forge Spheres</li><li>Scan to sculptable</li><li>Dynamic topology</li><li>Subdivision levels</li></ul><span>All changes &rarr;</span></a>
         </div>
@@ -418,7 +434,7 @@ rez-env sculptforge -- sculptforge troll.usda \
     <section id="download" class="section alt">
       <div class="wrap">
         <h2>Download</h2>
-        <p class="section-lede">Version 0.11.12. All builds come from the
+        <p class="section-lede">Version 0.11.13. All builds come from the
           <a href="https://github.com/islandmed/SculptForge/releases/latest">latest GitHub release</a>, with
           SHA-256 checksums. Free forever; <a href="support.html">membership</a> adds betas and early builds, Member Requests, a roadmap vote and credits.</p>
         <div class="downloads">
@@ -503,6 +519,8 @@ rez-env sculptforge -- sculptforge troll.usda \
         <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
         <a href="support.html">Membership</a>
         <a href="supporters.html">Members</a>
+        <a href="terms.html">Terms</a>
+        <a href="jobs.html">Jobs</a>
         <a href="ai.html">AI tools</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/THIRD_PARTY_NOTICES.md">Third-party notices</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>

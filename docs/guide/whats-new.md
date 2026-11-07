@@ -5,6 +5,34 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.13
+
+```features
+date: 2026-11-07
+tagline: Linked duplicates, an orbit lock, and cleaner Image to 3D.
+highlight: Linked duplicates: sculpt one Part and every copy follows, each in its own place (thanks @ebarranco, #94)
+highlight: Orbit lock: View > Orbit lock turns the view about X, Y or Z only (thanks foirgairwolf on Discord)
+highlight: Image to 3D: remove the flat background plane a generated model stands on, in one click (thanks fenix on Discord)
+highlight: Reconstruct Subdiv: lower levels keep their UVs, even where seams cross coarse faces (thanks @RodTDai, #145)
+highlight: Timelapse: rendered timelapses no longer flicker between detail levels (thanks @ebarranco)
+```
+
+- **Remove flat background**: Image to 3D drops the flat plane a picture's background often turns into (a wall behind
+  or a ground under the subject) before the model lands. On by default in **Generate 3D**; Undo brings a removed plane
+  back. Thanks fenix on Discord.
+- **Linked Duplicates**: **Tool > Parts > Linked Duplicate** makes a copy that shares the Part's mesh but sits in its
+  own place. Sculpt, paint or mask any of them and all change; move, turn or scale each with the Gizmo. **Make
+  Unique** gives one its own mesh again. Hundreds of copies cost about one mesh.
+- **Orbit lock**: **View > Orbit lock** turns the view about one axis only: **Free**, **Y (turntable)**, **X** or
+  **Z** (<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> / <kbd>Y</kbd> / <kbd>X</kbd> / <kbd>Z</kbd>). The axis gizmo
+  shows which axis is locked. Thanks foirgairwolf on Discord for the idea.
+- **Version at a glance**: the window title and the top bar show the SculptForge version, so a screenshot says which
+  one you run. A beta's tag shows in the accent colour.
+- **Reconstruct Subdiv** keeps UVs on the lower levels of a high-poly that was unwrapped on its own: no more faces
+  stretched across UDIM tiles, even with overlapping islands.
+- **Timelapse** videos of dense sculpts no longer flicker (**Edit > Export timelapse...**).
+- The membership card now shows the Studio membership's flat price for any number of artists.
+
 ## Version 0.11.12
 
 ```features

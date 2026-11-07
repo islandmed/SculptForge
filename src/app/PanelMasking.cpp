@@ -469,7 +469,7 @@ void App::drawMaskingSection() {
                    int(MaskArt::Facing), cell)) {
         const glm::vec3 dir = maskFacingDir_ == 1 ? glm::vec3(0, 1, 0)
                               : maskFacingDir_ == 2 ? glm::vec3(0, -1, 0)
-                                                    : -camera_.forward();
+                                                    : -partCamera().forward();
         runCommand("mask_by_facing", {{"x", double(dir.x)},
                                       {"y", double(dir.y)},
                                       {"z", double(dir.z)},

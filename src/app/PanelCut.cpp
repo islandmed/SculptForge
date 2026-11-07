@@ -40,7 +40,7 @@ void App::runCut(const char* shape, const std::vector<ImVec2>& path, bool closed
                       double(1.0f - (p.y - c.y) / c.h * 2.0f));
         points += buf;
     }
-    const glm::mat4 vp = camera_.projection() * camera_.view();
+    const glm::mat4 vp = partCamera().projection() * partCamera().view();
     std::string matrix;
     for (int i = 0; i < 16; ++i) {
         std::snprintf(buf, sizeof buf, "%s%.9g", i ? " " : "", double(vp[i / 4][i % 4]));

@@ -23,15 +23,23 @@ class CommandRegistry;
 // layers are matched by name.
 Mesh mergeMeshes(const std::vector<const Mesh*>& meshes);
 
+// A copy of `mesh` placed by `transform` (Part::transform): positions, the layers' base and offsets, normals.
+// Subdivision levels are left out (they'd be in the old place).
+Mesh placedMesh(const Mesh& mesh, const glm::mat4& transform);
+// Part `i`'s mesh where it is in the scene: the mesh itself when it isn't moved, else a placed copy in `scratch`.
+const Mesh& partPlacedMesh(const Document& doc, int i, Mesh& scratch);
+
 // The visible Parts merged into one mesh (for exporters that write a single
-// mesh). With one Part this is a copy of it, whether shown or not.
+// mesh), where they are in the scene. With one Part this is a copy of it, whether shown or not.
 Mesh mergedVisibleMesh(const Document& doc);
 
 // The visible Parts that have triangles, in list order and named after
 // them, for exporters that write one object per Part. With a single Part
 // it is that one (shown or not) named doc.assetName(), so one-object exports
-// stay as they were.
-std::vector<MeshObjectRef> visiblePartObjects(const Document& doc);
+// stay as they were. Moved Parts (linked copies, #94) come as placed copies, unless `instances`: then each
+// object refers to its Part's mesh as is, with the Part's transform, and linked copies name the first object
+// with their mesh (MeshObjectRef::instanceOf).
+std::vector<MeshObjectRef> visiblePartObjects(const Document& doc, bool instances = false);
 
 // Replaces the scene with one Part per object (the first one active), named
 // after the objects. A single object, or an unnamed one, is named
@@ -68,7 +76,7 @@ inline constexpr const char* kBuiltinInsertSetPrefix = "builtin:";
 // file is missing or differs (else the system temp folder); any other path is itself.
 bool resolveInsertSetPath(const std::string& path, std::string& file, std::string& error);
 
-// part_list, part_select, part_append, part_duplicate, part_delete,
+// part_list, part_select, part_append, part_duplicate, part_duplicate_linked, part_make_unique, part_delete,
 // part_rename, part_visibility, part_solo, part_show_all, part_move,
 // part_merge_down, part_merge_visible, part_split_groups, part_split_parts.
 void registerPartCommands(CommandRegistry& registry);

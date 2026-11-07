@@ -880,11 +880,11 @@ glm::vec3 moveRigid(const Similarity& align, const glm::mat3& R, const glm::vec3
 
 // Undoable mesh replacement for Part `i` (the active one through Document::replaceMeshUndoable).
 void replacePartMesh(Document& doc, int i, Mesh m, const std::string& label) {
-    if (i == doc.activePart) {
+    if (doc.checkedOut(i)) {
         doc.replaceMeshUndoable(std::move(m), label);
         return;
     }
-    Part& s = doc.parts[size_t(i)];
+    PartData& s = *doc.parts[size_t(i)].data;
     UndoRecord r;
     r.label = label;
     r.mesh = std::make_unique<Mesh>(std::move(s.mesh));
@@ -1157,7 +1157,7 @@ FaceWeightsStats applyFaceWeights(Document& doc, const std::vector<std::pair<std
     for (int si = 0; si < doc.partCount(); ++si) {
         Mesh& m = doc.partMesh(si);
         if (m.layers.empty() || m.base.size() != m.positions.size()) continue;
-        const uint64_t revision = si == doc.activePart ? doc.undo.revision() : doc.parts[size_t(si)].undo.revision();
+        const uint64_t revision = doc.partUndo(si).revision();
         std::vector<uint32_t> changed;
         for (size_t w = 0; w < weights.size(); ++w)
             for (size_t li = 0; li < m.layers.size(); ++li)
@@ -1210,8 +1210,8 @@ FaceWeightsStats applyFaceWeights(Document& doc, const std::vector<std::pair<std
         if (verts.empty()) continue;
         m.updateNormals(verts); // (also marks them, and their neighbours, for the GPU)
         stats.vertices += verts.size();
-        if (si == doc.activePart) doc.bvhDirty = true;
-        else doc.parts[size_t(si)].bvhDirty = true;
+        if (doc.checkedOut(si)) doc.bvhDirty = true;
+        else doc.parts[size_t(si)].data->bvhDirty = true;
     }
     for (size_t w = 0; w < weights.size(); ++w) {
         if (matched[w]) ++stats.matched;

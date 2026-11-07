@@ -377,7 +377,7 @@ void App::restoreView(int index) {
 void App::setInputStyle(int style) {
     uiPrefs_.inputStyle = std::clamp(style, 0, 3);
     uiPrefs_.wheelZoomToPointer = mayaStyle(); // Maya's wheel zooms toward the pointer; the others to the centre (#134)
-    if (blenderStyle()) uiPrefs_.turntable = true; // Blender orbits as a turntable; Preferences > Input changes it
+    if (blenderStyle()) uiPrefs_.orbitLock = 1; // Blender orbits as a turntable; Preferences > Input changes it
     maskBrush_.on = false;
     applyInputStyle();
     if (uiPrefs_.inputStyle == 0) offerQuickTour(); // the Classic sculpting keys: the quick tour, once (QuickTour.cpp)
@@ -458,7 +458,7 @@ void App::viewOrbitStep(float yawDegrees, float pitchDegrees) {
 }
 
 void App::frameActivePart() {
-    const AABB b = doc_.mesh.bounds();
+    const AABB b = doc_.partBounds(doc_.activePart); // (where it is: a moved linked copy, #94)
     if (b.valid()) camera_.frame(b);
     else camera_.frame(sceneBounds());
 }
@@ -616,13 +616,15 @@ void App::drawInputSection() {
     drawPackKeymapRows(); // keymaps from installed packs (PanelPacks.cpp)
     ImGui::TextDisabled("%s", tr("Rotation"));
     ImGui::SameLine();
-    int rotation = uiPrefs_.turntable ? 1 : 0;
+    int rotation = std::clamp(uiPrefs_.orbitLock, 0, 3);
     ImGui::SetNextItemWidth(-1);
-    const std::string rotations = std::string(tr("Free")) + '\0' + tr("Turntable") + '\0';
-    if (ImGui::Combo("##rotation_input", &rotation, rotations.c_str())) uiPrefs_.turntable = rotation == 1;
+    const std::string rotations = std::string(tr("Free")) + '\0' + tr("Turntable") + '\0' + tr("X axis") + '\0' +
+                                  tr("Z axis") + '\0';
+    if (ImGui::Combo("##rotation_input", &rotation, rotations.c_str())) uiPrefs_.orbitLock = rotation;
     ui::HelpText("Rotation", nullptr,
                  "Free: the model turns about the screen's axes and can roll over the top. Turntable: it "
-                 "stays upright, as in Blender or Maya.",
+                 "stays upright, as in Blender or Maya. X axis, Z axis: it turns about that world axis only "
+                 "(View > Orbit lock).",
                  "Preferences > Input");
     drawRadialMenusSection(); // RadialMenu.cpp
     drawSpaceMouseSection();  // SpaceMouse.cpp
