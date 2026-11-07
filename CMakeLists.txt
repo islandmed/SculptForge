@@ -810,6 +810,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # without its committed cache entry fails here too, not only in CI (0.11.12 staging).
     add_test(NAME marks_media COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks_media.py --cached-only
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    # Without .git (the PC's shipped tree) both report "skipped", not "passed"; t0.sh runs marks locally first.
+    set_tests_properties(marks marks_media PROPERTIES SKIP_RETURN_CODE 77)
     add_test(NAME marks_media_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks_media.py --self-test)
     add_test(NAME media_takedown_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/media_takedown.py --self-test)
     # The public gallery repository matches tools/brush-gallery/repo (the live compare is in release.sh: network).
