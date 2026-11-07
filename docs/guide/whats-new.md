@@ -17,6 +17,11 @@ highlight: SpaceMouse: turning the cap slowly no longer zooms the view away (tha
 highlight: App icon: the outline cube is back, and a fix for garbled small icon sizes on macOS (thanks @tristratos, #156)
 ```
 
+- Names you type in Chinese, Japanese or Korean (Parts, folders, layers, brush sets, files, Library items) draw with
+  your system's fonts instead of **?**, in any interface language.
+- After **Restart to update** on Linux, the previous version quits instead of staying hidden in the background (it
+  kept showing SculptForge on Discord). Discord shows the outline cube icon.
+
 ## Version 0.11.11
 
 ```features

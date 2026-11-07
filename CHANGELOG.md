@@ -6,6 +6,70 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.12] - 2026-11-07
+
+### Added
+- **Garments, part 1** (scripting and the AI assistant for now; the Pattern window follows): pattern panels at real
+  size (millimetres, curves, notches, grain line, seam allowance) saved in the project, a T-shirt template (front,
+  back, two sleeves, sewn), seams with length and direction checks, even triangulation at a chosen particle distance
+  with seams matched point for point, export as a real-size SVG for printing and sewing (with a 50 mm scale square) or
+  DXF for cutters, and SVG panels read back in. Commands: garment_new, garment_info, garment_add_panel, garment_sew,
+  garment_export, garment_import and more.
+
+### Changed
+- The app icon is the orange outline cube again, as it was before 0.11 (window, taskbar, dock, Start menu, Linux
+  packages).
+- Linux packaging: every AppImage build checks that it starts on 4, 16 and 64 KiB memory pages (no bundled jemalloc,
+  64 KiB ELF alignment on ARM64). On Apple Silicon Linux (Asahi) the guide points to the ARM64 build: the x86_64 one
+  runs there only through the FEX emulator, whose own jemalloc stops with "Unsupported system page size".
+- **Maya Live link** (#42): on very large meshes the mid-stroke updates to Maya come less often (at most about 4% of
+  the app's time), so sculpting stays smooth; the link is now tested on Windows' named pipe as well.
+- A check (tools/check_public_email.py, in CI and the test suite) keeps our email address off the website, docs and
+  README.
+- Site: Richard Throgmorton (MakIt3D) is credited as our first Founding Member (members page, membership page; Help >
+  About in the next app build).
+- Site: favicons and the press kit's app icon are the orange outline cube again, as it was before 0.11.
+- Guide: SculptForge installs from FlatPark (x86_64 and ARM64) and then updates with `flatpak update`; the package
+  table, the Flatpak section and the press kit's platform list say so.
+- Site: our email address is no longer in any public page; the Studios page's "Start a Studio membership" and "email
+  us" links build it when clicked (Discord without JavaScript), and the guide points to the SculptForge Discord.
+- Studio membership is now a flat $300 a month for the whole studio, any number of artists (no per-artist charge);
+  Founding Studio is a flat $150 a month for the first 10 studios. The Studios and Membership pages get a direct
+  "Studio: $300 / month" checkout button.
+
+### Fixed
+- Text people type (Part, folder, layer and brush-set names, file names, Library items, pasted text) with a character
+  outside the bundled fonts drew as "?": the Chinese fonts carry only the interface's own characters. Such a character
+  is now taken from the system's fonts the first time it is drawn (Windows: Microsoft YaHei, JhengHei, Yu Gothic,
+  Malgun Gothic; macOS: PingFang, Hiragino, Apple SD Gothic Neo; Linux: fontconfig, e.g. Noto Sans CJK), including
+  characters past U+FFFF such as 𠀋. Nothing is loaded while no such text is shown, and the interface uses about 15 MB
+  less memory (the fonts are no longer copied per size). Shortened names (the title bar) no longer end in a broken
+  character when cut in Chinese.
+- The new-version notice in a Flatpak from FlatPark shows `flatpak update` (with a Copy button) instead of telling you
+  to download a new file.
+- Focus Detail (experimental, `--focus-detail`): the app loop now loads full detail where the camera looks (it only
+  did in UI tests); a stroke that widened the displacement range left the tiles not yet loaded at the old scale (they
+  now follow, and Save writes them at the new scale).
+- macOS: the app's small icon (Finder's Get Info thumbnail, list view, 16 and 32 px) was noise; the .icns now stores
+  those sizes in the classic RGB + mask form Finder draws everywhere (#156, thanks @tristratos).
+- The window's size and place and project.json (recent files, Discord and autosave settings) are written to a
+  temporary file and then renamed, so a quit that ends mid-write (a stalled disk) keeps the last whole copy.
+- Linux AppImage: after Restart to update, the previous version hid its window and never quit, so it kept running in
+  the background (and, with Show SculptForge on Discord on, kept "Playing SculptForge" on your profile after you
+  closed SculptForge). It now quits as soon as the new version is up. Updating from 0.11.10 or earlier, the new
+  version ends the previous one itself (thanks @ebarranco).
+- Show SculptForge on Discord: quitting clears it first and it never comes back during the teardown; a quit that
+  stalls ends the process after 15 s; the status shows the outline cube icon instead of the old SF letters.
+- **SpaceMouse**: turning the cap slowly no longer ends in a zoom that flies the view away (3DxWare's scrolling got
+  through while the cap was inside the dead zone, and just after the cap was let go). Thanks @fenixpoints.
+- **Stencil** edges sculpt as clean grooves instead of a beaded zipper: a built-in pattern made into a Stencil (**Use
+  alpha**) is generated again at 1024 px instead of the alpha's 128, whose pixels showed as stair-steps along every
+  edge it sculpted.
+- **Stencil** photos on lighter meshes sculpt and paint evenly instead of as noise: where a dab's vertices are many
+  image pixels apart, each reads the average of a disc as wide as their spacing (from the image or a half / quarter
+  size copy, never below 512 px), not the one pixel it lands on, so a fine photo doesn't speckle or shimmer as you
+  move the stencil.
+
 ## [0.11.11] - 2026-11-06
 
 ### Added

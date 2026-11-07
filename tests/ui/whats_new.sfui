@@ -2,9 +2,9 @@
 # block); Esc closes it, Try it opens the feature, Full release notes opens the guide chapter, which shows the last
 # three versions in full and folds the older ones into groups.
 # The window is pinned to 0.10.7's five cards (SF_WHATS_NEW_VERSION), so this stays valid after each release; the guide
-# chapter below is pinned to 0.11.11 (SF_GUIDE_VERSION), so it checks 0.11.11's section before and after the release.
+# chapter below is pinned to 0.11.12 (SF_GUIDE_VERSION), so it checks 0.11.12's section before and after the release.
 env SF_WHATS_NEW_VERSION 0.10.7
-env SF_GUIDE_VERSION 0.11.11
+env SF_GUIDE_VERSION 0.11.12
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 click "Help##palette.help"
@@ -62,12 +62,12 @@ wait 0.3
 expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
+expect_text "Version 0.11.12"
+expect_text "Your names in your language, a cleaner Restart to update, and the cube is back."
 expect_text "Version 0.11.11"
 expect_text "Sculpt through a reference image, a live link to Maya, and creature bones to build from."
 expect_text "Version 0.11.10"
 expect_text "Exports keep their real size, Alt+Q switches Parts, and insert sets for kitbashing."
-expect_text "Version 0.11.9"
-expect_text "Folders for your Parts, a Line Gradient for paint, and Auto UV that never freezes the app."
 expect_value whats_new_contents == 6
 expect_value whats_new_expanded == 1
 shot whats-new-guide
