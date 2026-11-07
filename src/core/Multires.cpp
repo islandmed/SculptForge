@@ -812,27 +812,206 @@ void prolongFaces(const SubdivTopology& tp, const std::vector<T>& coarse, std::v
 }
 
 // UVs per triangle corner; `flags` are per triangle. `coarseTris`: the coarse level's triangles.
+// Each coarse corner takes the UV of its fine vertex, which needs every UV seam on the coarse edges. A fine level
+// unwrapped on its own (#145, @RodTDai's diagnosis: a high-poly imported with its UDIM layout) also has seams through
+// coarse polygons, whose fine faces then lie in several islands; one UV per corner can't hold that, and copying each
+// corner from its own fine face stretched faces across the layout. Such a polygon keeps one island: the one most
+// of its fine faces are in (ties: the larger island, then the lower id, so a seam along a row of polygons moves to
+// one side of it), and a corner of another island takes that island's UV at the same vertex where a fine face of
+// the island touches it, else a least-squares affine fit of the island's UVs over the polygon, averaged over every
+// polygon that needs the same vertex in the same island (so neighbours meet without cracks). Islands are fine faces
+// joined across edges whose two ends have the same UVs on both sides: overlapping islands stay apart.
 void restrictUvs(const SubdivTopology& tp, const std::vector<glm::uvec3>& coarseTris, const std::vector<glm::vec2>& fine,
                  std::vector<glm::vec2>& coarse, const std::vector<uint8_t>* flags, std::vector<uint8_t>& outFlags) {
     const size_t nt = coarseTris.size();
     if (coarse.size() != nt * 3) coarse.assign(nt * 3, glm::vec2(0.0f));
     outFlags.assign(nt, 0);
+    auto put = [&](uint32_t p, uint32_t i, glm::vec2 uv) {
+        const uint32_t cv = tp.polyVerts[tp.polyOffsets[p] + i];
+        for (uint32_t t : {tp.polyTris[p].x, tp.polyTris[p].y}) {
+            if (t == kNone) continue;
+            for (uint32_t s = 0; s < 3; ++s)
+                if (coarseTris[t][s] == cv) {
+                    coarse[t * 3 + s] = uv;
+                    outFlags[t] = 1;
+                }
+        }
+    };
+    const size_t np = tp.polygonCount(), nf = tp.fineTriangles;
+    // Fine faces by polygon (CSR) with their corner codes.
+    std::vector<uint32_t> parent(nf, kNone), offsets(np + 1, 0), faces(nf);
+    std::vector<uint8_t> codes(nf * 3), touched(np, 0);
     forEachFineFace(tp, [&](size_t f, uint32_t p, uint32_t, const uint8_t* code) {
-        if (flags && !(*flags)[f]) return;
-        const uint32_t o = tp.polyOffsets[p];
-        for (int c = 0; c < 3; ++c) {
-            if (code[c] >= 4) continue;
-            const uint32_t cv = tp.polyVerts[o + code[c]];
-            for (uint32_t t : {tp.polyTris[p].x, tp.polyTris[p].y}) {
-                if (t == kNone) continue;
-                for (uint32_t s = 0; s < 3; ++s)
-                    if (coarseTris[t][s] == cv) {
-                        coarse[t * 3 + s] = fine[f * 3 + size_t(c)];
-                        outFlags[t] = 1;
-                    }
+        parent[f] = p;
+        for (int c = 0; c < 3; ++c) codes[f * 3 + size_t(c)] = code[c];
+        if (!flags || (*flags)[f]) touched[p] = 1;
+        ++offsets[p + 1];
+    });
+    for (size_t p = 0; p < np; ++p) offsets[p + 1] += offsets[p];
+    {
+        std::vector<uint32_t> cursor(offsets.begin(), offsets.end() - 1);
+        for (uint32_t f = 0; f < nf; ++f)
+            if (parent[f] != kNone) faces[cursor[parent[f]]++] = f;
+    }
+    auto same = [](glm::vec2 a, glm::vec2 b) { return glm::all(glm::lessThanEqual(glm::abs(a - b), glm::vec2(1e-6f))); };
+    auto uvAt = [&](uint32_t f, int c) { return fine[size_t(f) * 3 + size_t(c)]; };
+    // A polygon whose fine vertices each have one UV (no seam inside): its corners as before.
+    std::vector<uint32_t> split;
+    for (uint32_t p = 0; p < np; ++p) {
+        if (!touched[p]) continue;
+        glm::vec2 first[9];
+        bool seen[9] = {}, clean = true;
+        for (uint32_t k = offsets[p]; k < offsets[p + 1] && clean; ++k)
+            for (int c = 0; c < 3 && clean; ++c) {
+                const uint8_t code = codes[size_t(faces[k]) * 3 + size_t(c)];
+                if (!seen[code]) seen[code] = true, first[code] = uvAt(faces[k], c);
+                else clean = same(first[code], uvAt(faces[k], c));
+            }
+        if (!clean) {
+            split.push_back(p);
+            continue;
+        }
+        for (uint32_t i = 0; i < 4; ++i)
+            if (seen[i]) put(p, i, first[i]);
+    }
+    if (split.empty()) return;
+
+    // UV islands of the fine faces (union-find; a root is its island's lowest face).
+    std::vector<uint32_t> root(nf);
+    for (uint32_t f = 0; f < nf; ++f) root[f] = f;
+    auto find = [&](uint32_t f) {
+        while (root[f] != f) f = root[f] = root[root[f]];
+        return f;
+    };
+    auto join = [&](uint32_t a, uint32_t b) {
+        a = find(a), b = find(b);
+        if (a != b) root[std::max(a, b)] = std::min(a, b);
+    };
+    // Joined when the shared edge's two ends have the same UVs in both faces. Inside a polygon: the codes they share;
+    // across polygons: the halves of coarse edges (corner to edge point), each kept by the first face that has it.
+    const size_t ne = tp.edges.size();
+    std::vector<uint32_t> halfFace(ne * 2, kNone);
+    std::vector<glm::vec2> halfUv(ne * 4);
+    for (uint32_t p = 0; p < np; ++p) {
+        const uint32_t o = tp.polyOffsets[p], n = polySize(tp, p);
+        for (uint32_t k = offsets[p]; k < offsets[p + 1]; ++k) {
+            const uint32_t f = faces[k];
+            const uint8_t* cf = &codes[size_t(f) * 3];
+            for (uint32_t l = k + 1; l < offsets[p + 1]; ++l) {
+                const uint32_t g = faces[l];
+                const uint8_t* cg = &codes[size_t(g) * 3];
+                int shared = 0, match = 0;
+                for (int a = 0; a < 3; ++a)
+                    for (int b = 0; b < 3; ++b)
+                        if (cf[a] == cg[b]) ++shared, match += same(uvAt(f, a), uvAt(g, b));
+                if (shared == 2 && match == 2) join(f, g);
+            }
+            for (int a = 0; a < 3; ++a) {
+                const int b = (a + 1) % 3;
+                int corner = cf[a] < 4 ? a : cf[b] < 4 ? b : -1, mid = corner == a ? b : a;
+                if (corner < 0 || cf[mid] < 4 || cf[mid] > 7) continue;
+                const uint32_t i = cf[corner], side = cf[mid] - 4u;
+                if (side != i && side != (i + n - 1) % n) continue;
+                const uint32_t e = tp.polyEdges[o + side], h = e * 2 + (tp.edges[e].x == tp.polyVerts[o + i] ? 0u : 1u);
+                if (halfFace[h] == kNone) {
+                    halfFace[h] = f;
+                    halfUv[h * 2] = uvAt(f, corner), halfUv[h * 2 + 1] = uvAt(f, mid);
+                } else if (same(halfUv[h * 2], uvAt(f, corner)) && same(halfUv[h * 2 + 1], uvAt(f, mid))) {
+                    join(halfFace[h], f);
+                }
             }
         }
-    });
+    }
+    std::vector<uint32_t> islandSize(nf, 0);
+    for (uint32_t f = 0; f < nf; ++f) ++islandSize[find(f)];
+
+    // Where each fine corner sits in a polygon's parameter layout (for the affine fits).
+    auto layout = [&](uint32_t n, uint8_t code) -> glm::vec2 {
+        auto corner = [&](uint32_t i) {
+            if (!tp.catmullClark) return i == 0 ? glm::vec2(0.0f) : i == 1 ? glm::vec2(1.0f, 0.0f) : glm::vec2(0.0f, 1.0f);
+            const float a = 6.2831853f * float(i) / float(n);
+            return glm::vec2(std::cos(a), std::sin(a));
+        };
+        if (code < 4) return corner(code);
+        if (code < 8) return (corner(code - 4u) + corner((code - 3u) % n)) * 0.5f;
+        return glm::vec2(0.0f);
+    };
+    // Per (coarse vertex, island): a UV of the island at that vertex (exact), or the sum and count of the fits.
+    struct Shared {
+        glm::vec2 uv{0.0f};
+        int fits = 0;
+        bool exact = false;
+    };
+    std::unordered_map<uint64_t, Shared> shared;
+    struct Pending {
+        uint32_t p, i;
+        uint64_t key;
+    };
+    std::vector<Pending> pending;
+    for (uint32_t p : split) {
+        const uint32_t o = tp.polyOffsets[p], n = polySize(tp, p);
+        // The island: most fine faces here, then the larger island, then the lower id.
+        uint32_t island = kNone, most = 0;
+        for (uint32_t k = offsets[p]; k < offsets[p + 1]; ++k) {
+            const uint32_t r = find(faces[k]);
+            uint32_t count = 0;
+            for (uint32_t l = offsets[p]; l < offsets[p + 1]; ++l) count += find(faces[l]) == r;
+            if (island == kNone || count > most || (count == most && (islandSize[r] > islandSize[island] ||
+                                                                     (islandSize[r] == islandSize[island] && r < island))))
+                island = r, most = count;
+        }
+        for (uint32_t i = 0; i < n; ++i) {
+            bool done = false;
+            for (uint32_t k = offsets[p]; k < offsets[p + 1] && !done; ++k)
+                for (int c = 0; c < 3 && !done; ++c)
+                    if (codes[size_t(faces[k]) * 3 + size_t(c)] == i && find(faces[k]) == island)
+                        put(p, i, uvAt(faces[k], c)), done = true;
+            if (done) continue;
+            const uint32_t cv = tp.polyVerts[o + i];
+            const uint64_t key = uint64_t(cv) << 32 | island;
+            auto [it, fresh] = shared.try_emplace(key);
+            Shared& sv = it->second;
+            if (fresh) { // a fine face of the island at this vertex, in any polygon around it
+                for (uint32_t x = tp.vertEdgeOffsets[cv]; x < tp.vertEdgeOffsets[cv + 1] && !sv.exact; ++x)
+                    for (uint32_t q : {tp.edgeFaces[tp.vertEdges[x]].x, tp.edgeFaces[tp.vertEdges[x]].y}) {
+                        if (q == kNone || sv.exact) continue;
+                        for (uint32_t k = offsets[q]; k < offsets[q + 1] && !sv.exact; ++k)
+                            for (int c = 0; c < 3 && !sv.exact; ++c) {
+                                const uint8_t code = codes[size_t(faces[k]) * 3 + size_t(c)];
+                                if (code < 4 && tp.polyVerts[tp.polyOffsets[q] + code] == cv && find(faces[k]) == island)
+                                    sv.uv = uvAt(faces[k], c), sv.exact = true;
+                            }
+                    }
+            }
+            if (!sv.exact) { // uv = A (s, t, 1) by least squares over the island's fine corners in this polygon
+                glm::mat3 m(0.0f);
+                glm::mat3x2 r(0.0f); // columns: s, t, 1 -> the uv sums
+                for (uint32_t k = offsets[p]; k < offsets[p + 1]; ++k) {
+                    if (find(faces[k]) != island) continue;
+                    for (int c = 0; c < 3; ++c) {
+                        const glm::vec2 st = layout(n, codes[size_t(faces[k]) * 3 + size_t(c)]);
+                        const glm::vec3 x(st, 1.0f);
+                        m += glm::outerProduct(x, x);
+                        r += glm::outerProduct(uvAt(faces[k], c), x);
+                    }
+                }
+                if (std::abs(glm::determinant(m)) > 1e-6f) {
+                    sv.uv += r * glm::inverse(m) * glm::vec3(layout(n, uint8_t(i)), 1.0f);
+                    ++sv.fits;
+                }
+            }
+            pending.push_back({p, i, key});
+        }
+    }
+    for (const Pending& x : pending) {
+        const Shared& sv = shared[x.key];
+        if (sv.exact) put(x.p, x.i, sv.uv);
+        else if (sv.fits) put(x.p, x.i, sv.uv / float(sv.fits));
+        else // no fit: the corner's own UV
+            for (uint32_t k = offsets[x.p]; k < offsets[x.p + 1]; ++k)
+                for (int c = 0; c < 3; ++c)
+                    if (codes[size_t(faces[k]) * 3 + size_t(c)] == x.i) put(x.p, x.i, uvAt(faces[k], c));
+    }
 }
 
 void prolongUvs(const SubdivTopology& tp, const std::vector<glm::vec2>& coarse, std::vector<glm::vec2>& fine,
@@ -1864,7 +2043,7 @@ bool reconstructCatmullClark(const Mesh& m, Reconstruction& out, std::string& er
         if (polyDone[seed]) continue;
         // Four ways to label the seed quad; keep the consistent one whose face points look most like quads.
         int best = -1;
-        long bestScore = -1, bestSeams = 0;
+        long bestScore = -1, bestSeams = 0, bestOdd = 0;
         std::vector<uint8_t> bestLabels;
         std::vector<uint32_t> bestPolys;
         for (int option = 0; option < 4; ++option) {
@@ -1897,21 +2076,34 @@ bool reconstructCatmullClark(const Mesh& m, Reconstruction& out, std::string& er
                 }
             }
             if (!ok) continue;
-            long score = 0, seams = 0; // face points off UV seams, then of valence 4 (coarse quads) first
+            // Face points of valence 4 (coarse quads) first, then off UV seams, then more quads. Seams only break
+            // ties: a high-poly unwrapped on its own has seams through coarse faces too, and the reading with the
+            // corners as face points (all of valence 3 or 5) put fewer face points on them (#145).
+            long score = 0, seams = 0, odd = 0;
             for (uint32_t v : touched) {
-                if (lab[v] != kF) continue;
+                if (lab[v] == kO) continue;
+                bool border = false;
+                for (uint32_t i = w->vertEdgeOffsets[v]; i < w->vertEdgeOffsets[v + 1]; ++i)
+                    border = border || w->edgeFaces[w->vertEdges[i]].y == kNone;
+                const uint32_t valence = w->vertEdgeOffsets[v + 1] - w->vertEdgeOffsets[v];
+                if (lab[v] == kE) { // an edge point joins its two corners and two face points (one on a border)
+                    ok = ok && valence == (border ? 3u : 4u);
+                    continue;
+                }
                 seams += seam[v];
                 // A face point is never on a border (on an open mesh, e.g. a UDIM plane, the swapped
-                // reading has more face points: #145).
-                for (uint32_t i = w->vertEdgeOffsets[v]; i < w->vertEdgeOffsets[v + 1] && ok; ++i)
-                    ok = w->edgeFaces[w->vertEdges[i]].y != kNone;
-                score += (w->vertEdgeOffsets[v + 1] - w->vertEdgeOffsets[v]) == 4 ? 2 : 1;
+                // reading has more face points: #145) and is in a triangle or a quad.
+                ok = ok && !border && (valence == 3 || valence == 4);
+                const bool quad = valence == 4;
+                score += quad ? 2 : 1;
+                odd += !quad;
             }
             if (!ok) continue;
-            if (best < 0 || seams < bestSeams || (seams == bestSeams && score > bestScore)) {
+            if (best < 0 || odd < bestOdd || (odd == bestOdd && (seams < bestSeams || (seams == bestSeams && score > bestScore)))) {
                 best = option;
                 bestScore = score;
                 bestSeams = seams;
+                bestOdd = odd;
                 bestLabels = std::move(lab);
                 bestPolys = std::move(polys);
             }
