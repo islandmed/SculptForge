@@ -672,8 +672,8 @@ find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
   add_custom_target(blender_addon
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/addons/blender/build_addon.py --check
-            --version ${PROJECT_VERSION} --out ${CMAKE_CURRENT_BINARY_DIR}/blender-addon
-    COMMENT "Packaging the Blender add-on (sculptforge_bridge-${PROJECT_VERSION}.zip)")
+            --out ${CMAKE_CURRENT_BINARY_DIR}/blender-addon
+    COMMENT "Packaging the Blender add-on (its own version: addons/blender/sculptforge_bridge/blender_manifest.toml)")
 endif()
 
 # --- Tests ---
@@ -754,7 +754,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     endif()
     # The add-on's zips build and its manifest passes the checks Blender's validator makes.
     add_test(NAME blender_addon_package COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/addons/blender/build_addon.py
-                                              --check --version ${PROJECT_VERSION} --out ${CMAKE_CURRENT_BINARY_DIR}/blender-addon)
+                                              --check --out ${CMAKE_CURRENT_BINARY_DIR}/blender-addon)
     # The Maya shelf script (integrations/maya, #42) with a mocked maya.cmds, round-tripped through sculptforge-cli.
     add_test(NAME maya_shelf_script COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/maya/test_sculptforge_maya.py
                                             --cli ${SCULPTFORGE_CLI_RUNNER})

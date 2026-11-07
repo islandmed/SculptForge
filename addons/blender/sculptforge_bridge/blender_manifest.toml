@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "sculptforge_bridge"
-version = "0.7.0"
+version = "1.0.0"
 name = "SculptForge Bridge"
 tagline = "Send meshes to SculptForge and back, updated in place"
 maintainer = "SculptForge contributors"

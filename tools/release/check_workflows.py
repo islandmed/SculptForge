@@ -15,6 +15,9 @@
     tools/release/staged_run.py; a publisher doesn't need job verify or re-check the checksums
     (tools/release/verify_staged.py); packages.yml reads any secret, or a job of it uploads packages without a
     pinned actions/attest-build-provenance step.
+  - integrations.yml (the Blender/Maya lanes) runs on anything but tag pushes, has an unpinned `uses:` or shell
+    tracing, reads a secret other than UPDATE_SIGNING_KEY (in `environment: release`, by a job that can't write), or
+    publishes without re-checking SHA256SUMS.txt.sig against the app's key (openssl pkeyutl -verify).
 
 Plain text parsing (no PyYAML): workflows here keep jobs at two spaces and their keys at four.
 """
@@ -98,6 +101,29 @@ def check(files):
             elif job != "sums" and "upload-artifact" in body and paths(body, "path") != paths(body, "subject-path"):
                 errs.append(f"packages.yml: job {job} attests {sorted(paths(body, 'subject-path'))} but uploads {sorted(paths(body, 'path'))}"
                             " (verify refuses an unattested file)")
+    it = files.get("integrations.yml")
+    if it is not None:
+        on = it.split("\njobs:")[0]
+        if re.findall(r"secrets\.(\w+)", it) and set(re.findall(r"secrets\.(\w+)", it)) != {"UPDATE_SIGNING_KEY"}:
+            errs.append("integrations.yml: reads a secret other than UPDATE_SIGNING_KEY")
+        ij = jobs(it)
+        for job, lines in ij.items():
+            body = "\n".join(lines)
+            if SIGNING in body and re.search(r"contents:\s*write", body):
+                errs.append(f"integrations.yml: job {job} holds UPDATE_SIGNING_KEY and a GitHub token that can write")
+            if "gh release create" in body and "pkeyutl -verify" not in body:
+                errs.append(f"integrations.yml: job {job} publishes without re-checking the signature (openssl pkeyutl -verify)")
+        if not any(SIGNING in "\n".join(l) for l in ij.values()):
+            errs.append("integrations.yml: no job signs SHA256SUMS.txt (UPDATE_SIGNING_KEY in environment release)")
+        if not re.search(r"^on:\s*\n\s+push:\s*\n\s+tags:", on, re.M) or re.search(
+                r"\b(branches|pull_request|workflow_dispatch|schedule|workflow_run|issue_comment)\b", on):
+            errs.append("integrations.yml: must run on tag pushes only")
+        for n, line in enumerate(it.splitlines(), 1):
+            m = re.match(r"^\s*(?:-\s+)?uses:\s*(\S.*?)\s*$", line)
+            if m and not m.group(1).startswith("./") and not PINNED.match(m.group(1)):
+                errs.append(f"integrations.yml:{n}: `uses: {m.group(1)}` is not pinned to a full commit SHA")
+            if re.search(r"(^|[\s;])set\s+-[a-wyz]*x", line):
+                errs.append(f"integrations.yml:{n}: shell tracing (set -x)")
     rel = files.get("release.yml")
     if rel is None:
         return errs + ["release.yml: missing"]
@@ -196,6 +222,33 @@ jobs:
 """
 
 
+INTEGRATIONS = """on:
+  push:
+    tags: ['blender-v[0-9]*']
+permissions:
+  contents: read
+jobs:
+  sign:
+    runs-on: ubuntu-24.04
+    environment: release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: tools/release/sign_sums.sh dist
+  publish:
+    needs: sign
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - run: openssl pkeyutl -verify -pubin -rawin -in dist/SHA256SUMS.txt -sigfile dist/SHA256SUMS.txt.sig
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create x --latest=false
+"""
+
+
 def self_test():
     cases = {
         "good": ({"release.yml": GOOD}, 0),
@@ -220,6 +273,24 @@ def self_test():
         "no publisher": ({"release.yml": GOOD.replace(TOKEN, "github.token")}, 1),
         "prt": ({"release.yml": GOOD, "x.yml": "on:\n  pull_request_target:\njobs:\n  a:\n    steps: []\n"}, 1),
         "repo-level reader": ({"release.yml": GOOD, "x.yml": f"jobs:\n  a:\n    env:\n      T: ${{{{ {TOKEN} }}}}\n"}, 1),
+        "integrations good": ({"release.yml": GOOD, "integrations.yml": INTEGRATIONS}, 0),
+        "integrations unpinned": ({"release.yml": GOOD, "integrations.yml": INTEGRATIONS.replace(
+            "@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1", "@v7")}, 1),
+        "integrations other secret": ({"release.yml": GOOD, "integrations.yml": INTEGRATIONS.replace(
+            "github.token", "secrets.REPO_SIGNING_KEY")}, 1),
+        "integrations key outside env": ({"release.yml": GOOD, "integrations.yml": INTEGRATIONS.replace(
+            "    environment: release\n", "")}, 1),
+        "integrations signer can write": ({"release.yml": GOOD, "integrations.yml": INTEGRATIONS.replace(
+            "    environment: release\n", "    environment: release\n    permissions:\n      contents: write\n")}, 1),
+        "integrations unverified publish": ({"release.yml": GOOD, "integrations.yml": INTEGRATIONS.replace(
+            "openssl pkeyutl -verify", "true")}, 1),
+        "integrations unsigned": ({"release.yml": GOOD, "integrations.yml": INTEGRATIONS.replace(
+            "secrets.UPDATE_SIGNING_KEY", "github.token")}, 1),
+        "integrations on a branch": ({"release.yml": GOOD, "integrations.yml": INTEGRATIONS.replace(
+            "    tags: ['blender-v[0-9]*']", "    branches: [main]")}, 1),
+        "integrations dispatch": ({"release.yml": GOOD, "integrations.yml": INTEGRATIONS.replace(
+            "jobs:", "  workflow_dispatch:\njobs:", 1)}, 1),
+        "integrations set -x": ({"release.yml": GOOD, "integrations.yml": INTEGRATIONS.replace("run: gh release", "run: set -x; gh release")}, 1),
         "env reader ok": ({"release.yml": GOOD, "x.yml": f"jobs:\n  a:\n    environment: other-env\n    env:\n      T: ${{{{ {TOKEN} }}}}\n"}, 0),
     }
     bad = [f"{k}: {check(f)}" for k, (f, n) in cases.items() if bool(check(f)) != bool(n)]
