@@ -1211,6 +1211,7 @@ int App::run() {
         perf_.proxyPrebuild = uiPrefs_.fastNavigation && !perf_.movingNow && !doc_.sculptor.strokeActive() &&
                               dabQueue_.empty() && !strokeFinishing_ && !solverBusy();
         renderer_.setProxyPrebuild(perf_.proxyPrebuild);
+        updateFocusDetail(); // a streamed micro level: promote what the camera and brush need, before the upload
         syncScene();
         mark();
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());

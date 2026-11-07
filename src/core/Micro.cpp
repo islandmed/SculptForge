@@ -76,6 +76,7 @@ int MicroMesh::widen(float need) {
     step *= float(div);
     rescaled = true;
     reach.all = true;
+    if (focus) focus->rescale(*this, doublings); // (the tiles not in disp: core/FocusDetail.h)
     ++revision;
     return div;
 }
@@ -195,7 +196,12 @@ bool microMatches(const Mesh& m) {
 }
 
 MicroMesh& mutableMicro(Mesh& m) {
-    if (m.micro.use_count() > 1) m.micro = std::make_shared<MicroMesh>(*m.micro);
+    if (m.micro.use_count() > 1) {
+        std::shared_ptr<MicroMesh> kept = m.micro;
+        if (kept->focus) kept->focus->ensureAllFull(*kept, false); // the copy left behind stands alone: every tile full,
+        m.micro = std::make_shared<MicroMesh>(*kept);
+        kept->focus.reset(); // and the stream goes on with this Mesh
+    }
     return *m.micro;
 }
 
@@ -1091,6 +1097,7 @@ bool microBakeMesh(const Mesh& m, int level, Mesh& out, std::string& error, size
         error = "This Part has no micro level";
         return false;
     }
+    if (m.micro->focus) m.micro->focus->ensureAllFull(*m.micro, false); // (streamed: every tile at full detail)
     const MicroMesh& mm = *m.micro;
     if (level < 0 || level > mm.level) level = mm.level;
     if (mm.edgeNeighbor.size() != size_t(mm.baseTriangles) * 3) {
@@ -1228,6 +1235,7 @@ bool microExportDisplacement(const Mesh& m, const std::string& path, int size, b
         error = "Displacement maps need UVs on the base (Tool > UV Map, at the lowest level)";
         return false;
     }
+    if (m.micro->focus) m.micro->focus->ensureAllFull(*m.micro, false); // (streamed: every tile at full detail)
     if (size < 16 || size > 16384) {
         error = "Map size must be 16 to 16384";
         return false;
@@ -1355,6 +1363,7 @@ void microNoise(Mesh& m, float amplitude, float frequency, uint32_t seed) {
     if (!m.micro) return;
     MicroMesh& mm = mutableMicro(m);
     mm.ensureTopology(m);
+    if (mm.focus) mm.focus->ensureAllFull(mm, true);
     mm.widen(float(mm.rangeMax) * mm.step + std::abs(amplitude) * 1.5f);
     const uint32_t n = mm.n, S = mm.samples;
     poolFor(mm.baseTriangles, [&](size_t b0, size_t e0) {
