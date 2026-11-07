@@ -57,6 +57,7 @@ jobs:
       - uses: actions/upload-pages-artifact@v5
         with:
           path: website
+          include-hidden-files: true # website/.well-known/ (security.txt); nothing else under website/ is hidden
       - id: deployment
         uses: actions/deploy-pages@v5
       # Tell Bing and the other IndexNow search engines about the pages straight away (key file in website/).
