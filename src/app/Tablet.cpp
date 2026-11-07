@@ -276,6 +276,10 @@ void App::handlePenEvent(const SDL_Event& e) {
         if (e.paxis.axis == SDL_PEN_AXIS_PRESSURE) {
             ++penDiag_.pressure;
             if (penMotionHeld_) penDiag_.axesAfterMotion = true;
+#if defined(__linux__)
+            // SDL's X11 and Wayland pens lose a sample's pressure (core/Tablet.h); not with Classic pen timing.
+            penTracker_.holdLostZero = !uiPrefs_.tablet.classicTiming;
+#endif
             if (!penTracker_.sample(e.paxis.value)) ++penDiag_.lostSamples;
             penDiag_.sampled(penTracker_.raw(), penTouching_);
             if (drag_ == Drag::Stroke && firstDabPending_ && penTracker_.readyForFirstDab()) firstDab(lastX_, lastY_);
@@ -799,11 +803,18 @@ std::string App::tabletReport() const {
     }
     facts.push_back({"Tablet devices", tablets.empty() ? "-" : tablets});
     facts.push_back({"Mouse mode", uiPrefs_.tablet.mouseMode ? "on" : "off"});
+    facts.push_back({"Classic pen timing", uiPrefs_.tablet.classicTiming ? "on" : "off"});
     return penReport(facts, penDiag_);
 }
 
 void App::drawTabletDiagnostics() {
     if (!ImGui::TreeNodeEx(tr("Troubleshooting details##tablet_diag"), ImGuiTreeNodeFlags_SpanAvailWidth)) return;
+    ImGui::Checkbox(tr("Classic pen timing##tablet_classic_timing"), &uiPrefs_.tablet.classicTiming);
+    ui::HelpText("Classic pen timing", nullptr,
+                 "The pen as in SculptForge 0.11.15 and before: strokes move without waiting for each pen sample's "
+                 "pressure, and a pressure sample the system lost is not held. Turn on only if pressure got worse "
+                 "with your tablet since 0.11.16, and tell us (Copy details below).",
+                 "Preferences > Tablet");
     const std::string report = tabletReport();
     ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
     ImGui::PushTextWrapPos(0.0f);

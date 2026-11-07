@@ -43,3 +43,29 @@ shot tablet-troubleshooting
 click "Copy details##tablet_diag"
 wait 0.1
 shot tablet-troubleshooting-copy
+
+# Classic pen timing (the escape hatch, in Troubleshooting details): the stroke moves at a sample's motion without
+# waiting for its pressure, as in 0.11.15 and before, so the sample's dabs get the pressure of the sample before.
+click "Classic pen timing##tablet_classic_timing"
+click "Preferences##palette.preferences"
+wait 0.1
+pen_press 0.4 0.45 0.2
+pen_sample 0.45 0.45 0.2
+pen_sample 0.5 0.45 1
+expect_value stroke_sample_pressure <= 0.21
+pen_sample 0.55 0.45 0.3
+expect_value stroke_sample_pressure >= 0.99
+pen_lift
+expect_value stroking == 0
+key ctrl+z
+pen_out
+# And off again: on time.
+click "Preferences##palette.preferences"
+click "Classic pen timing##tablet_classic_timing"
+click "Preferences##palette.preferences"
+wait 0.1
+pen_press 0.4 0.45 0.2
+pen_sample 0.5 0.45 1
+expect_value stroke_sample_pressure >= 0.99
+pen_lift
+key ctrl+z

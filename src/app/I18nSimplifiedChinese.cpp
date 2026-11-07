@@ -3180,6 +3180,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Tilt: not reported by this pen", "倾斜：此数位笔不报告"},
     {"Troubleshooting details", "故障排除详情"},
     {"Copy details", "复制详情"},
+    {"Classic pen timing", "经典数位笔时序"},
+    {"The pen as in SculptForge 0.11.15 and before: strokes move without waiting for each pen sample's pressure, and a pressure sample the system lost is not held. Turn on only if pressure got worse with your tablet since 0.11.16, and tell us (Copy details below).", "数位笔按 SculptForge 0.11.15 及更早版本的方式工作：笔画移动时不等待每个采样的压力，系统丢失的压力采样也不保留。仅当你的数位板自 0.11.16 起压感变差时才开启，并告诉我们（下方的复制详情）。"},
     {"Copies the lines above for a bug report about the pen: the SDL version, the display system, how SculptForge was installed and the pen's events.", "复制以上内容用于数位笔错误报告：SDL 版本、显示系统、SculptForge 的安装方式以及数位笔输入。"},
     {"Running through XWayland. If the pen's pressure is poor, start SculptForge with SDL_VIDEO_DRIVER=wayland to use Wayland directly.", "正在通过 XWayland 运行。如果数位笔压感不佳，请用 SDL_VIDEO_DRIVER=wayland 启动 SculptForge，直接使用 Wayland。"},
     {"Pressure curve (all brushes)", "压力曲线（所有笔刷）"},

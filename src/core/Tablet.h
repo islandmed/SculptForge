@@ -67,6 +67,10 @@ struct TabletSettings {
     // its whole area onto the screen, so a short pen movement crosses many pixels and the view seemed to spin
     // (GonzaloHernandez3D, Huion on Windows): turn it down to taste.
     float viewSpeed = 1.0f;
+    // Classic pen timing (Preferences > Tablet > Troubleshooting details): the pen as in 0.11.15 and before, should
+    // the new timing misbehave with someone's tablet: the stroke moves at a sample's motion without waiting for its
+    // pressure (App::flushPenMotion), and no lost sample is held (PenPressureTracker::holdLostZero).
+    bool classicTiming = false;
 };
 
 Json toJson(const TabletSettings& t);

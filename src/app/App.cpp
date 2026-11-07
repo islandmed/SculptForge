@@ -145,9 +145,6 @@ bool App::init(const AppOptions& options) {
     // the stroke (pen displays with touch).
     SDL_SetHint(SDL_HINT_PEN_MOUSE_EVENTS, "0");
     SDL_SetHint(SDL_HINT_PEN_TOUCH_EVENTS, "0");
-#if defined(__linux__)
-    penTracker_.holdLostZero = true; // SDL's X11 and Wayland pens lose a sample's pressure (core/Tablet.h)
-#endif
     // Full screen on one monitor stays up when the pointer clicks on another (Windows multi-monitor, Discord).
     SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
     if (!headless && options.demo.empty()) applyCachedThreadCount(); // the hardware profile's threads, before any brush work
@@ -1530,7 +1527,7 @@ void App::handleEvent(const SDL_Event& event) {
     penNoise_ = penRestNoise(event);      // a resting pen's tilt and jitter (Tablet.cpp)
     penMouseEvents(event, true);          // a pen leaving lets go of the tip's button first
     dispatchEvent(event);
-    if (event.type == SDL_EVENT_PEN_MOTION) {
+    if (event.type == SDL_EVENT_PEN_MOTION && !uiPrefs_.tablet.classicTiming) { // (Classic pen timing: at once)
         heldPenMotion_ = event;
         heldPenNoise_ = penNoise_;
         penMotionHeld_ = true;

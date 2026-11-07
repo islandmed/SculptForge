@@ -76,6 +76,7 @@ Json toJson(const TabletSettings& t) {
     j.set("buttons", buttons);
     j.set("mouseMode", t.mouseMode);
     j.set("viewSpeed", double(t.viewSpeed));
+    j.set("classicPenTiming", t.classicTiming);
     return j;
 }
 
@@ -101,6 +102,7 @@ void fromJson(const Json& j, TabletSettings& t) {
             }
     t.mouseMode = j["mouseMode"].asBool(t.mouseMode);
     t.viewSpeed = std::clamp(float(j["viewSpeed"].asNumber(t.viewSpeed)), 0.1f, 2.0f);
+    t.classicTiming = j["classicPenTiming"].asBool(t.classicTiming);
 }
 
 bool PenPressureTracker::sample(float pressure) {

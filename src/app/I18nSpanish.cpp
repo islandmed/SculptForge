@@ -3634,6 +3634,8 @@ constexpr Entry kSpanish[] = {
     {"Tilt: not reported by this pen", "Inclinación: este lápiz no la informa"},
     {"Troubleshooting details", "Detalles para solucionar problemas"},
     {"Copy details", "Copiar detalles"},
+    {"Classic pen timing", "Sincronización clásica del lápiz"},
+    {"The pen as in SculptForge 0.11.15 and before: strokes move without waiting for each pen sample's pressure, and a pressure sample the system lost is not held. Turn on only if pressure got worse with your tablet since 0.11.16, and tell us (Copy details below).", "El lápiz como en SculptForge 0.11.15 y anteriores: los trazos avanzan sin esperar la presión de cada muestra del lápiz, y no se conserva una muestra de presión que el sistema perdió. Actívalo solo si la presión empeoró con tu tableta desde 0.11.16, y avísanos (Copiar detalles, abajo)."},
     {"Copies the lines above for a bug report about the pen: the SDL version, the display system, how SculptForge was installed and the pen's events.", "Copia las líneas de arriba para un informe de error sobre el lápiz: la versión de SDL, el sistema de pantalla, cómo se instaló SculptForge y los eventos del lápiz."},
     {"Running through XWayland. If the pen's pressure is poor, start SculptForge with SDL_VIDEO_DRIVER=wayland to use Wayland directly.", "Se ejecuta a través de XWayland. Si la presión del lápiz va mal, inicia SculptForge con SDL_VIDEO_DRIVER=wayland para usar Wayland directamente."},
     {"Pressure curve (all brushes)", "Curva de presión (todos los pinceles)"},

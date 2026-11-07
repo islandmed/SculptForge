@@ -91,7 +91,9 @@ is added. The logic is `TabletHotplug` in `core/Tablet.h`.
 **Preferences > Tablet > Troubleshooting details** lists the SDL version, the video driver (wayland, x11, windows,
 cocoa), how SculptForge was installed, the pen's events since launch, lost pressure samples, the system's own mouse
 events while the pen was in range, and the last stroke's pressure range. **Copy details** puts it on the clipboard
-for a bug report.
+for a bug report. **Classic pen timing** there (off by default) brings back the pen timing of 0.11.15 and before:
+strokes don't wait for a sample's pressure and no lost sample is held. Turn it on only if pressure feels worse
+with your tablet since 0.11.16, and send the details.
 
 - **No pressure** (the meter stays at 1.00 or never moves): the system doesn't pass pressure on. On Windows
   turn Windows Ink on (above); on Linux check `libinput debug-events`. A pen that never reports pressure
