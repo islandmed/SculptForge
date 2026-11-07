@@ -45,3 +45,4 @@ sculptforge_tests: adaptive_dabs_leave_small_brushes_alone          21  new on m
 # batches of 2 and 6; T0 runs 8-dab strokes, each brush in one size, as two tests). adaptive_dabs_match_exact_strokes
 # is split in two (8 s each, full length). ui_texture_transfer (Voxel Remesh at resolution 32), ui_fill_layers (a 20k
 # sphere), ui_make_sculptable (a 30k capture): 9-16 s now.
+# 11-07 (0.11.12 batch): ui_review_fixes split in two (review_fixes + review_fixes_mask_views, each < 20 s); its line is gone.
