@@ -23,7 +23,7 @@ expect_text Gen-2.5 Medium
 
 click "Generate 3D/Generate 3D model"
 wait 0.5
-expect_text Add your Hyper3D API key
+expect_status Add your Hyper3D API key
 
 click "Generate 3D/From text"
 wait 0.2
