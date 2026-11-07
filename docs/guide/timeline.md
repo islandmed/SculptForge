@@ -19,10 +19,12 @@ tick marks a re-tuned stroke.
 - **Click** a tick to go to the state after that step.
 - **Point** at a tick for what the step was, how many vertices it changed and when.
 - **Right-click** a stroke to re-tune it (see below).
-- The header shows the step you are at, the number of branches and the step's name. **Save with project**
-  keeps the history with the project, the film icon exports a timelapse, and the arrow folds the strip into a
-  small **Timeline** tab (click the tab to open it again; **Sculpt Timeline** in the command palette, F3, does
-  the same).
+- The strip is one thin row: the step you are at on the left (point at it for the step's name and the
+  number of branches), the track, then the buttons. The save icon (**Save with project**, lit when on) keeps the
+  history with the project, the film icon exports a timelapse, the unfold icon shows the full strip with a
+  header row (**Edit > Preferences > Interface > Compact timeline** switches it too), and the arrow folds the
+  strip into a small **Timeline** tab (click the tab to open it again; **Sculpt Timeline** in the command
+  palette, F3, does the same).
 
 Undo and Redo (<kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>) move the scrubber one
 step, as before. Each Part keeps its own timeline, like its own undo history.
@@ -72,7 +74,7 @@ about the last 100 strokes of the size above, a 33 million one about 70; small d
 
 ## Saving the history
 
-Tick **Save with project** in the strip's header and saving a project also writes its history beside it, as
+Turn on **Save with project** (the save icon on the strip) and saving a project also writes its history beside it, as
 `name.sfhist` next to `name.sfproj`. Opening the project brings the timeline back, branches and re-tuned strengths
 included, as long as the project hasn't been changed elsewhere since. Sculpt strokes, masks, vertex paint, visibility
 and face groups are saved; a topology change (dynamic topology, remesh, Divide, sculpt layers) cuts the saved

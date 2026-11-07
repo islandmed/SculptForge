@@ -1611,6 +1611,11 @@ void drawInterfaceSection(App& app) {
     // Timeline position (#63): the Sculpt Timeline strip at the top of the viewport (the default) or the bottom.
     ImGui::TextDisabled("%s", tr("Timeline position"));
     ui::Segmented(app, {"view.timeline_top", "view.timeline_bottom"});
+    if (const Action* a = app.actions().find("view.timeline_compact"); a && a->checked) { // one thin row (@factoberplay)
+        bool compact = a->checked();
+        if (ui::Checkbox("Compact timeline##view.timeline_compact", &compact)) a->run();
+        ui::HelpAction(app, "view.timeline_compact");
+    }
     static const char* kScales[] = {"Automatic", "100%", "125%", "150%", "175%", "200%"};
     static const float kScaleValues[] = {0.0f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f};
     int current = 0;

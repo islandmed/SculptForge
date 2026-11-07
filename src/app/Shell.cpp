@@ -891,6 +891,7 @@ void App::applyPreset(int preset) {
     l.consoleHeight = layout_.consoleHeight;
     l.libraryOpen = layout_.libraryOpen;
     l.libraryRows = layout_.libraryRows;
+    l.libraryTile = layout_.libraryTile;
     l.libraryTab = layout_.libraryTab;
     l.libraryBottom = layout_.libraryBottom;
     l.leftHanded = layout_.leftHanded;
@@ -1329,6 +1330,7 @@ UiLayout relayout(const UiLayout& from, int layoutKind) {
     l.consoleHeight = from.consoleHeight;
     l.libraryOpen = from.libraryOpen;
     l.libraryRows = from.libraryRows;
+    l.libraryTile = from.libraryTile;
     l.libraryTab = from.libraryTab;
     l.libraryBottom = from.libraryBottom;
     l.leftHanded = from.leftHanded;

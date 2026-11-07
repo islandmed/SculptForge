@@ -112,6 +112,7 @@
 //                            symmetry_copies (copies every stroke makes), cursor_copies (brush cursors drawn),
 //                            symmetry_pivot_x (local symmetry's centre), timeline_top (1: the strip at the top),
 //                            timeline_y / axis_gizmo_y (their tops / centre, fractions of the canvas from its top),
+//                            timeline_height / library_height (the strips, logical px; 0 not shown), library_tile,
 //                            axis_view (the side view named under the axis gizmo: 0-5 = +x +y +z -x -y -z, -1 none),
 //                            style_window_min (ImGui's minimum window height, unscaled px: 32 in every look),
 //                            tablet_mouse_mode (Preferences > Tablet > Mouse mode),
@@ -1079,6 +1080,12 @@ double Demo::query(const std::string& name, bool& known) const {
     // Timeline position (#63): 1 at the top of the viewport; the strip's top edge and the axis gizmo's centre as
     // fractions of the canvas height from its top (-1: the strip isn't shown).
     if (name == "timeline_top") return app_.uiPrefs_.timelineTop ? 1.0 : 0.0;
+    // The Library strip's and the timeline strip's (or its tab's) heights in logical px (0: not shown), and the
+    // Library's thumbnail size: compact by default (@factoberplay).
+    if (name == "library_height")
+        return app_.libraryBrowser_.open() ? double(LibraryBrowser::height(app_.layout_, 1.0f)) : 0.0;
+    if (name == "library_tile") return double(app_.layout_.libraryTile);
+    if (name == "timeline_height") return std::round(double(app_.timelineStripH_ / std::max(app_.uiScale_, 0.01f)));
     // The style's minimum window height in unscaled px (32): switching looks must not scale it again each time.
     if (name == "ui_scale") return std::round(double(app_.uiScale_) * 100.0); // percent, as built now (#87)
     if (name == "glyphs_missing") return double(glyphs::missingLastFrame()); // drawn as "?" in the last frame

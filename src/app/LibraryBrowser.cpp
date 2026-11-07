@@ -39,10 +39,10 @@ std::string materialGroup(const AssetEntry& e) {
 namespace fs = std::filesystem;
 
 constexpr const char* kStarterFolder = "Starter meshes"; // the Tool tab's folder of core/StarterMeshes.h
-constexpr float kTile = 96.0f;   // thumbnail size (logical px)
 constexpr float kLabel = 22.0f;  // label under it
 constexpr float kGap = 8.0f;     // between tiles
-constexpr float kHeader = 28.0f; // tab row
+constexpr float kHeader = 26.0f; // tab row
+constexpr float kBottom = 10.0f; // below the tiles: the scrollbar's room
 constexpr ImU32 kAccent = IM_COL32(240, 136, 46, 255);
 constexpr ImU32 kStripBg = IM_COL32(20, 20, 22, 250); // #141416 at 98%
 constexpr ImU32 kHeaderLine = IM_COL32(46, 46, 50, 255);
@@ -124,8 +124,9 @@ void SDLCALL onFolderChosen(void* userdata, const char* const* files, int) {
 
 } // namespace
 
-float LibraryBrowser::height(int rows, float scale) {
-    return (kHeader + float(std::clamp(rows, 1, 4)) * (kTile + kLabel + 4.0f) + 12.0f) * scale;
+float LibraryBrowser::height(const UiLayout& layout, float scale) {
+    const float tile = std::clamp(layout.libraryTile, kLibraryTileMin, kLibraryTileMax);
+    return (kHeader + float(std::clamp(layout.libraryRows, 1, 4)) * (tile + kLabel + 4.0f) + kBottom) * scale;
 }
 
 void LibraryBrowser::show(LibraryTab tab) {
@@ -840,6 +841,7 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
     layout.libraryOpen = open_;
     layout.libraryTab = libraryTabId(place_.tab);
     layout.libraryRows = std::clamp(layout.libraryRows, 1, 4);
+    layout.libraryTile = std::round(std::clamp(layout.libraryTile, kLibraryTileMin, kLibraryTileMax));
     app.libraryScanner_.poll(ImGui::GetTime());
     // Esc closes the Library (#80), unless a picker, a pop-up or a text field has the keys (they take Esc first).
     if (open_ && ImGui::IsKeyPressed(ImGuiKey_Escape, false) && !ImGui::GetIO().WantCaptureKeyboard &&
@@ -853,7 +855,8 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
 
     const float scale = app.uiScale_;
     const int rows = layout.libraryRows;
-    const float h = std::min(height(rows, scale), canvas.h);
+    const float tileLogical = layout.libraryTile;
+    const float h = std::min(height(layout, scale), canvas.h);
     const float y = layout.libraryBottom ? canvas.y + canvas.h - h : canvas.y;
     ImGui::SetNextWindowPos(ImVec2(canvas.x, y));
     ImGui::SetNextWindowSize(ImVec2(canvas.w, h));
@@ -882,13 +885,14 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
     ImGui::SetCursorPosY(std::round((kHeader * scale - ImGui::GetFrameHeight()) * 0.5f));
     drawHeader(app, ws.x - 16.0f * scale);
     if (place_.tab == LibraryTab::Packs) { // a list, not tiles (PanelPacks.cpp)
-        app.drawPacksTab(float(rows) * (kTile + kLabel + 4.0f) * scale + 8.0f * scale);
+        app.drawPacksTab(float(rows) * (tileLogical + kLabel + 4.0f) * scale + 8.0f * scale);
         ImGui::End();
+        drawResizeHandle(app, wp, ws);
         return;
     }
 
     const std::vector<AssetEntry> items = entries(app);
-    const float tile = kTile * scale, rowH = (kTile + kLabel + 4.0f) * scale, gap = kGap * scale;
+    const float tile = tileLogical * scale, rowH = (tileLogical + kLabel + 4.0f) * scale, gap = kGap * scale;
     // Column-major tiles; a Lit Sphere group (#124) starts a new column after a heading column with its name.
     std::vector<ImVec2> at(items.size()); // each tile's place in the strip (x, row)
     struct Heading {
@@ -1070,6 +1074,7 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
         }
     }
     ImGui::End();
+    drawResizeHandle(app, wp, ws);
 
     // A tile dragged out of the strip follows the cursor; releasing it over the canvas loads it.
     if (tileDrag_) {
@@ -1088,6 +1093,49 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
     }
 }
 
+// The strip's edge toward the canvas: drag it to make the thumbnails (and so the strip) bigger or smaller
+// (@factoberplay). A thin window of its own across the edge, so the canvas never takes the press as a stroke.
+void LibraryBrowser::drawResizeHandle(App& app, ImVec2 pos, ImVec2 size) {
+    UiLayout& layout = app.layout_;
+    const float scale = app.uiScale_, band = 8.0f * scale;
+    const float edge = layout.libraryBottom ? pos.y : pos.y + size.y;
+    ImGui::SetNextWindowPos(ImVec2(pos.x, edge - band * 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(size.x, band));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(1, 1));
+    const bool visible = ImGui::Begin("##lbresize", nullptr,
+                                      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+                                          ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBackground |
+                                          ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoNav);
+    ImGui::PopStyleVar(2);
+    if (visible) {
+        ImGui::SetCursorScreenPos(ImVec2(pos.x, edge - band * 0.5f));
+        ImGui::InvisibleButton("Library size##lbresize", ImVec2(size.x, band));
+        const bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
+        const ImGuiIO& io = ImGui::GetIO();
+        if (ImGui::IsItemActivated()) {
+            resizing_ = true;
+            resizeY_ = io.MouseClickedPos[ImGuiMouseButton_Left].y; // where the press was, not where the pointer is now
+            resizeTile_ = layout.libraryTile;
+        }
+        if (resizing_ && (active || ImGui::IsItemDeactivated())) { // (the release frame too: its motion counts)
+            // The strip's edge follows the pointer: the extra height goes to every row's thumbnails.
+            const float dy = (io.MousePos.y - resizeY_) * (layout.libraryBottom ? -1.0f : 1.0f);
+            layout.libraryTile = std::round(std::clamp(resizeTile_ + dy / scale / float(std::max(layout.libraryRows, 1)),
+                                                       kLibraryTileMin, kLibraryTileMax));
+        }
+        if (!active) resizing_ = false;
+        if (hovered || active) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+            const float w = 36.0f * scale, cx = pos.x + size.x * 0.5f;
+            ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(cx - w * 0.5f, edge - 1.5f * scale), ImVec2(cx + w * 0.5f, edge + 1.5f * scale),
+                                                      active ? kAccent : IM_COL32(120, 120, 128, 255), 2.0f * scale);
+        }
+        ui::HelpText("Library size", nullptr, "Drag to make the Library's thumbnails bigger or smaller.", "Library");
+    }
+    ImGui::End();
+}
+
 bool LibraryBrowser::takeDrop(App& app, float x, float y, const std::string& path) {
     if (!open_ || place_.tab != LibraryTab::Material || !isLitSphereFile(path)) return false;
     if (x < shownMin_.x || y < shownMin_.y || x >= shownMax_.x || y >= shownMax_.y) return false;
@@ -1104,6 +1152,11 @@ void LibraryBrowser::drawPreferences(App& app) {
     ImGui::SetNextItemWidth(-1);
     ImGui::SliderInt("##lbrowspref", &layout.libraryRows, 1, 4, tr("Rows %d"));
     ui::HelpText("Rows", nullptr, "Rows of thumbnails in the Library strip.", "Preferences > Library");
+    ImGui::SetNextItemWidth(-1);
+    ImGui::SliderFloat("##lbtilepref", &layout.libraryTile, kLibraryTileMin, kLibraryTileMax, tr("Thumbnails %.0f px"));
+    ui::HelpText("Thumbnail size", nullptr,
+                 "Size of the Library's thumbnails (64 by default); dragging the strip's edge toward the canvas does the same.",
+                 "Preferences > Library");
     int placement = layout.libraryBottom ? 1 : 0;
     ImGui::TextUnformatted(tr("Placement"));
     ImGui::SameLine();

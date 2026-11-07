@@ -2634,6 +2634,7 @@ private:
     void drawTimelineUi();            // once a frame from drawUi: keeps the timeline attached and draws the strip
     float timelineTopInset_ = 0.0f;   // how far down the canvas the strip (or its tab) reaches at the top; 0 at the bottom
     float timelineStripY_ = -1.0f;    // the strip's (or tab's) top edge in window pixels this frame (-1: not shown)
+    float timelineStripH_ = 0.0f;     // and its height (UI tests: timeline_height)
     void registerTimelineUiActions(); // view.timeline, timeline.timelapse, help.benchmark
     void startTimelapse(const std::string& path, int width, int height, float seconds, int fps);
     bool timelapseStep(double budgetSeconds); // renders frames for up to the budget; false when finished
