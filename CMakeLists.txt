@@ -387,6 +387,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/UiTest.cpp
     src/app/UiServe.cpp
     src/app/Ui.cpp
+    src/app/UserGlyphs.cpp
     src/app/Shell.cpp
     src/app/Palettes.cpp
     src/app/Theme.cpp
