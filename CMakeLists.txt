@@ -431,6 +431,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/MemoryConfirm.cpp
     src/app/PanelPaintLayers.cpp
     src/app/PanelTexture.cpp
+    src/app/PanelGarments.cpp
     src/app/PanelUvEditor.cpp
     src/app/PanelPbr.cpp
     src/app/PanelFill.cpp

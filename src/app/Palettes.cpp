@@ -878,6 +878,12 @@ void App::drawPalette_Tool() {
         drawTextureMapContents();
         Demo::popScope();
     }
+    if (subpalette("tool.garments", "Garments")) {
+        tray::Section section;
+        Demo::pushScope("Garments");
+        drawGarmentsContents(); // PanelGarments.cpp
+        Demo::popScope();
+    }
     if (subpalette("tool.bake", "Bake")) {
         tray::Section section;
         Demo::pushScope("Bake");

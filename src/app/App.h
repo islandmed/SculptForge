@@ -1087,6 +1087,21 @@ private:
     // After uv_pack / uv_unwrap from anywhere (the panel, a script, the console): the fields show the grid it used.
     void uvPackGridUsed(const Args& args);
     bool showUvEditor_ = false;
+    // Garments (PanelGarments.cpp): Tool > Garments and the Pattern window (the pattern panels flat at real size,
+    // edited through the garment_* commands, with the window's own undo of the pattern). GarmentUi does the work.
+    friend struct GarmentUi;
+    void registerGarmentActions();
+    void drawGarmentsContents();
+    void drawGarments();
+    void garmentsChanged(bool garmentCommand); // a command ran: re-read the pattern (garment_*: one undo step)
+    bool garmentKey(SDL_Keycode key, SDL_Keymod mod); // keys over the Pattern window (true: taken)
+    // UI test values: garment_window_open, garment_panels, garment_seams, garment_selected, garment_undo_steps,
+    // garment_edits, garment_problems, garment_points and the selected panel's first point (garment_point_x / _y in
+    // mm, garment_point_u / _v on the window); NaN for other names.
+    double garmentTestValue(const std::string& name);
+    static void SDLCALL onGarmentFileChosen(void* userdata, const char* const* files, int filter);
+    std::shared_ptr<struct GarmentEditorState> garments_;
+    bool showGarments_ = false;
     // Auto UV on a worker (xatlas takes seconds on big meshes): the button, New Texture, and the uv_auto command from
     // the console, an AI tool or a UI test (resolution 0: the texture's size, or the size chosen under Texture Map).
     void startAutoUv(int resolution = 0, bool keepTexture = true, bool command = false);
