@@ -245,7 +245,8 @@ TEST(part_folders) {
 }
 
 TEST(part_split_by_selection) {
-    // Split Hidden / Masked / Unmasked (@foirgairwolf): the triangles leave for a new Part below, one undo step.
+    // Split Hidden / Masked / Unmasked (foirgairwolf on Discord): the triangles leave for a new Part below, one undo
+    // step.
     Document doc;
     CommandRegistry reg;
     CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 3.0}}).ok);

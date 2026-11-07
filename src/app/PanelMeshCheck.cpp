@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Tool > Geometry > Merge by Distance and Check Mesh (@foirgairwolf). The work is done by the weld_points,
+// Tool > Geometry > Merge by Distance and Check Mesh (foirgairwolf on Discord). The work is done by the weld_points,
 // mesh_check and mesh_fix commands (core/MeshCheck.h); this is their panel and the weld's preview on the model.
 #include "app/App.h"
 #include "app/Demo.h"
@@ -33,6 +33,7 @@ uint64_t App::meshCheckKey() const {
 void App::runMeshCheck() {
     meshReport_ = checkMesh(doc_.mesh);
     meshReportKey_ = meshCheckKey() | 1; // (never 0: checked)
+    meshReportScroll_ = 2; // (two frames: the first one's scroll is clamped to the size before the rows)
 }
 
 void App::drawMeshCheckContents() {
@@ -141,6 +142,10 @@ void App::drawMeshCheckContents() {
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", rows[i][1]);
             ImGui::PopID();
         }
+    }
+    if (meshReportScroll_ > 0) { // the report's last line just above the tray's bottom edge
+        --meshReportScroll_;
+        if (ImGui::GetCursorScreenPos().y > ImGui::GetWindowPos().y + ImGui::GetWindowHeight()) ImGui::SetScrollHereY(1.0f);
     }
     Demo::popScope();
 }

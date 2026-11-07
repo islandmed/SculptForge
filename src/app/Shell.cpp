@@ -1214,9 +1214,11 @@ void App::drawPaletteBar(const ShellGeometry& g) {
     for (size_t k = 0; k < order.size(); ++k) {
         const int i = int(k);
         const PaletteDef& p = list[order[k]];
-        const bool inTray = std::count(layout_.leftTray.begin(), layout_.leftTray.end(), p.id) +
-                                std::count(layout_.rightTray.begin(), layout_.rightTray.end(), p.id) >
-                            0;
+        // In a tray that shows: a narrow window draws no right tray, so its palettes open as drop-downs from here
+        // (else a click only flashed a tray that isn't there, and Tool could not be opened at 1024 px).
+        const bool inTray =
+            (layout_.leftTrayOpen && std::count(layout_.leftTray.begin(), layout_.leftTray.end(), p.id) > 0) ||
+            (layout_.rightTrayOpen && !shell_.narrow && std::count(layout_.rightTray.begin(), layout_.rightTray.end(), p.id) > 0);
         const bool open = dropdown_ == p.id;
         ImGui::PushStyleColor(ImGuiCol_Button, open ? theme::header : ImVec4(0, 0, 0, 0));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::headerHover);

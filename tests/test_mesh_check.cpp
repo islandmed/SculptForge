@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Merge by distance and Check Mesh / Fix (core/MeshCheck.h; @foirgairwolf).
+// Merge by distance and Check Mesh / Fix (core/MeshCheck.h; foirgairwolf on Discord).
 #include "TestHarness.h"
 
 #include "core/Commands.h"

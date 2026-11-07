@@ -364,12 +364,12 @@ void App::drawPartsContents() {
             } else {
                 if (!s.visible) ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
                 ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.0f, 0.5f));
-                if (ImGui::Selectable(s.name.c_str(), isActive,
-                                      ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap |
-                                          ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_NoAutoClosePopups,
-                                      ImVec2(0.0f, innerH)) &&
-                    !isActive)
-                    selectIndex = i;
+                // (Pressed itself, not through the shade mark or eye over it: two quick clicks on those aren't a
+                // double-click on the row, so they don't start a rename.)
+                const ImGuiSelectableFlags rowFlags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap |
+                                                      ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_NoAutoClosePopups;
+                const bool rowPressed = ImGui::Selectable(s.name.c_str(), isActive, rowFlags, ImVec2(0.0f, innerH));
+                if (rowPressed && !isActive) selectIndex = i;
                 ImGui::PopStyleVar();
                 if (!s.visible) ImGui::PopStyleColor();
                 if (ImGui::BeginDragDropSource()) { // #96: drag a Part onto a folder (or onto a Part outside folders)
@@ -387,7 +387,7 @@ void App::drawPartsContents() {
                     ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(x, r0.y), ImVec2(x + 2.0f * scale, r1.y),
                                                               theme::u32(theme::accent));
                 }
-                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                if (rowPressed && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
                     renamingPart_ = s.id;
                     focusRename_ = true;
                     std::snprintf(renameBuffer_, sizeof renameBuffer_, "%s", s.name.c_str());

@@ -1802,6 +1802,7 @@ private:
     std::vector<glm::vec3> weldPoints_; // a sample (<= 20000) of the points that would merge, for the preview
     MeshReport meshReport_;
     uint64_t meshReportKey_ = 0; // 0 = not checked yet
+    int meshReportScroll_ = 0; // frames left to scroll the tray down to a new report's rows (below the fold)
     void runMeshCheck();
     void runExtract(); // Extract with the palette's settings (a preview; Accept keeps it)
     static std::string axesText(const bool axes[3]); // "x", "xz", "" (the axis argument of mirror commands)

@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Merge by distance and Check Mesh (Tool > Geometry, @foirgairwolf). Weld merges the points closer than a
+// Merge by distance and Check Mesh (Tool > Geometry, foirgairwolf on Discord). Weld merges the points closer than a
 // distance; Check Mesh counts what makes a mesh hard to sculpt, remesh, print or export, and each Fix changes
 // only what its issue names (nothing is fixed while checking). Everything here works on a copy: the commands
 // (weld_points, mesh_check, mesh_fix) replace the active Part's mesh as one undo step.
