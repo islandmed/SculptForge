@@ -1,13 +1,12 @@
 {
-  "version": "0.11.13",
+  "version": "0.11.14",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Linked duplicates: sculpt one Part and every copy follows, each in its own place (thanks @ebarranco, #94)",
-    "Orbit lock: View > Orbit lock turns the view about X, Y or Z only (thanks foirgairwolf on Discord)",
-    "Image to 3D: remove the flat background plane a generated model stands on, in one click (thanks fenix on Discord)",
-    "Reconstruct Subdiv: lower levels keep their UVs, even where seams cross coarse faces (thanks @RodTDai, #145)",
-    "Timelapse: rendered timelapses no longer flicker between detail levels (thanks @ebarranco)"
+    "Deformation stack: bend, twist, taper and more on a whole Part, with a live preview you can reorder and apply (thanks foirgairwolf on Discord)",
+    "Slimmer Library and timeline: about a third less height, with the timeline as one thin row by default (thanks factoberplay on YouTube)",
+    "Small screens: below 1280 px the side palettes open as drop-downs instead of not opening at all",
+    "Membership moments: a quiet heart in the top bar and an occasional thank-you at a milestone; nothing in the app is ever paywalled"
   ],
   "support": {
     "founding": {
