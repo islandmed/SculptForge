@@ -43,7 +43,7 @@ void App::runBridgeCommand(const std::string& name, const Args& args) {
     // A new mesh arrived: frame it (runCommand does this for "open").
     if ((name == "bridge_receive" || name == "bridge_import") &&
         (status_.rfind("Received", 0) == 0 || status_.rfind("Opened", 0) == 0))
-        camera_.frame(sceneBounds());
+        frameView(sceneBounds());
     if (name == "bridge_send") bridgeListTime_ = fileTime(bridgeObjectListPath(bridgeFolder_[0] ? bridgeFolder_ : bridgeDefaultRoot()));
 }
 

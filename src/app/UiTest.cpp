@@ -299,6 +299,10 @@
 //                            shelf, px), title_height, glyphs_missing (glyphs drawn as "?" in the last frame),
 //                            glyphs_merged (typed characters taken from other fonts: SF_FALLBACK_FONTS, the system's),
 //                            font_atlas_kpx (the font atlas texture, thousands of pixels)
+//   expect_value model_top_clear / model_bottom_clear (px between the model's projected bounding box and the bands
+//                            framing keeps it clear of: the open Library, the Sculpt Timeline strip; < 0: under one),
+//                            camera_shift_y (the lens shift framing set, x1000; + up), left_column_clipped (left shelf
+//                            items past its visible bottom)
 //   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 classic, 1 SculptForge)
 #include "app/App.h"
 #include "ai/Http.h"
@@ -307,6 +311,7 @@
 #define SDL_PEN_INPUT_IN_PROXIMITY (1u << 31) // SDL 3.4's flag; older SDL 3 never sets it
 #endif
 #include "app/Demo.h"
+#include "app/Shell.h"
 #include "app/Ui.h"
 #include "app/UserGlyphs.h"
 
@@ -1101,6 +1106,27 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "view_figure") return app_.uiPrefs_.showViewFigure ? 1.0 : 0.0;
     // The side view the axis gizmo names under it (0-5: +X +Y +Z -X -Y -Z, as axis_click), -1 between views.
     if (name == "axis_view") return double(axisGizmoAligned(app_.axisGizmoLayout()));
+    // The model's projected bounding box against the free area framing fits it into (App::freeCanvasArea: the canvas
+    // less the open Library and the Sculpt Timeline strip), px: >= 0 when it clears the band above (below) it.
+    if (name == "model_top_clear" || name == "model_bottom_clear") {
+        const auto c = app_.canvasRect();
+        const glm::vec4 area = app_.freeCanvasArea();
+        const AABB b = app_.sceneBounds();
+        if (!b.valid()) return -1e9;
+        const glm::mat4 vp = app_.camera_.projection() * app_.camera_.view();
+        float top = 1e9f, bottom = -1e9f;
+        for (int k = 0; k < 8; ++k) {
+            const glm::vec3 p((k & 1) ? b.max.x : b.min.x, (k & 2) ? b.max.y : b.min.y, (k & 4) ? b.max.z : b.min.z);
+            const glm::vec4 h = vp * glm::vec4(p, 1.0f);
+            if (h.w <= 0.0f) return -1e9;
+            const float y = c.y + (1.0f - h.y / h.w) * 0.5f * c.h;
+            top = std::min(top, y);
+            bottom = std::max(bottom, y);
+        }
+        return name == "model_top_clear" ? double(top - (c.y + area.y * c.h)) : double(c.y + area.w * c.h - bottom);
+    }
+    // Items of the left shelf (the brush tiles, the colour picker) past its visible bottom in the last frame.
+    if (name == "left_column_clipped") return double(app_.shelfClipped_[kShelfLeft]);
     if (name == "timeline_y" || name == "axis_gizmo_y") {
         const auto c = app_.canvasRect();
         if (name == "timeline_y")
@@ -1265,6 +1291,7 @@ double Demo::query(const std::string& name, bool& known) const {
         return app_.spaceMouseEcho(e) ? 1.0 : 0.0;
     }
     if (name == "camera_distance") return app_.camera_.distance;
+    if (name == "camera_shift_y") return std::round(double(app_.camera_.shift.y) * 1000.0);
     if (name == "camera_pan") return glm::length(app_.camera_.target);
     if (name == "groups") {
         std::set<uint32_t> ids(m.facegroups.begin(), m.facegroups.end());

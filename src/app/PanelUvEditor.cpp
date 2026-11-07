@@ -881,7 +881,7 @@ void App::registerUvEditorActions() {
             showUvEditor_ = !showUvEditor_;
             if (showUvEditor_) { // the model to the left of the window, which opens over the right of the canvas
                 const CanvasRect cr = canvasRect();
-                camera_.frame(sceneBounds());
+                frameView(sceneBounds());
                 camera_.zoom(-1.5f);
                 camera_.pan(-cr.w * 0.33f, 0.0f, cr.h);
             }

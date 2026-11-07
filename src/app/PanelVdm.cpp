@@ -122,7 +122,7 @@ void App::afterVdmCommand(const std::string& name, const CommandResult& r) {
         paintMode_ = false;
     } else if (name == "vdm_new_plane") { // sculpt it from the top, like the map sees it
         camera_.setOrientation(glm::angleAxis(-1.5707963f, glm::vec3(1.0f, 0.0f, 0.0f)));
-        camera_.frame(doc_.mesh.bounds());
+        frameView(doc_.mesh.bounds());
     }
 }
 

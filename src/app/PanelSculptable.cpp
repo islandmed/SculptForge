@@ -298,7 +298,7 @@ void App::pollSculptable() {
     lastCommandOk_ = true;
     clearLods();
     playingLayer_ = -1;
-    if (!onScreen(doc_.partBounds(doc_.activePart))) camera_.frame(sceneBounds());
+    if (!onScreen(doc_.partBounds(doc_.activePart))) frameView(sceneBounds());
     updateTitle();
     consoleEcho("splat_to_mesh", job->args, r);
 }

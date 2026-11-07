@@ -515,7 +515,7 @@ void App::registerShellActions() {
 
     // View (right shelf, Render palette). Frame keeps F; its short label fits the right shelf.
     add({"view.frame", "Frame", ICON_LC_SCAN, "Fit the whole model in the view.", "Transform", "F", "",
-         [this] { camera_.frame(sceneBounds()); }, nullptr, nullptr});
+         [this] { frameView(sceneBounds()); }, nullptr, nullptr});
         flag("view.wire", "Wire", ICON_LC_GRID_3X3, "Render", "", &renderSettings_.wireframe,
          "Wireframe: show the polygons of the active Part (Shift+F).");
     flag("view.facegroups", "Groups", ICON_LC_SHAPES, "Render", "", &renderSettings_.showFaceGroups,
@@ -847,6 +847,30 @@ CanvasRect App::canvasRect() const {
     }
     return c;
 }
+
+glm::vec4 App::freeCanvasArea() const {
+    const CanvasRect c = canvasRect();
+    if (hideUi_ || c.w < 1.0f || c.h < 1.0f) return glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+    float top = c.y, bottom = c.y + c.h;
+    if (libraryBrowser_.open()) { // as drawTimeline places the strip beside it
+        const float lib = std::min(LibraryBrowser::height(layout_.libraryRows, uiScale_), c.h);
+        if (layout_.libraryBottom) bottom -= lib;
+        else top += lib;
+    }
+    if (timelineStripY_ >= 0.0f) { // the strip (or its tab) as last drawn
+        if (uiPrefs_.timelineTop) top = std::max(top, timelineStripY_ + timelineStripH_);
+        else bottom = std::min(bottom, timelineStripY_);
+    } else if (!timelineDrawn_) { // not drawn yet (the model at startup): as the bare strip will be
+        const float h = (10.0f + 30.0f + 26.0f) * uiScale_;
+        if (uiPrefs_.timelineTop) top += h;
+        else bottom -= h;
+    }
+    // Nothing sensible left (a tiny window): the whole canvas.
+    if (bottom - top < c.h * 0.25f) return glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+    return glm::vec4(0.0f, (top - c.y) / c.h, 1.0f, (bottom - c.y) / c.h);
+}
+
+void App::frameView(const AABB& box) { camera_.frame(box, freeCanvasArea()); }
 
 void App::canvasRay(float x, float y, glm::vec3& origin, glm::vec3& dir) const {
     const CanvasRect c = canvasRect();
@@ -2258,11 +2282,37 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
         }
     }
 
+    // A side shelf taller than its column (the brush tiles and the colour picker at 150 % on a 1080p screen): its
+    // tiles, the picker and the left shelf's action tiles shrink until everything fits, down to 0.6 of their size; past that the wheel scrolls it.
+    // Their height is about proportional to the size (the captions aren't), so the next frame's fit is solved from
+    // this one's and settles in a frame or two.
+    if (vertical && !rects.empty()) {
+        float scalable = 0.0f;
+        for (size_t k = 0; k < rects.size(); ++k) {
+            const std::string& id = list[size_t(indices[k])];
+            // What shrinks: the tiles, the picker, and on the left shelf its action tiles (Stroke popup).
+            if (id.rfind("widget.tile.", 0) == 0 || id == "widget.color" || (shelf == kShelfLeft && id != "sep" && actions_.find(id)))
+                scalable += rects[k].GetHeight();
+        }
+        const float needed = rects.back().Max.y + ImGui::GetScrollY() - r.y + pad.y;
+        shelfClipped_[shelf] = int(std::count_if(rects.begin(), rects.end(), [&](const ImRect& rc) { return rc.Max.y > r.y + r.h + 0.5f; }));
+        float& fit = shelfFit_[shelf];
+        if (scalable > 0.0f) {
+            const float fixed = needed - scalable;
+            const float want = std::clamp(fit * (r.h - 1.0f * s - fixed) / scalable, 0.6f, 1.0f);
+            if (want < fit - 0.002f || want > fit + 0.02f) fit = want; // (growing back waits for a clear margin)
+        } else {
+            fit = 1.0f;
+        }
+    }
+
     ImGuiWindow* window = ImGui::GetCurrentWindow();
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    // Bottom shelf: the wheel scrolls it sideways when it doesn't fit.
-    if (shelf == kShelfBottom && ImGui::IsWindowHovered() && ImGui::GetIO().MouseWheel != 0.0f)
-        ImGui::SetScrollX(ImGui::GetScrollX() - ImGui::GetIO().MouseWheel * 60.0f * s);
+    // Bottom shelf: the wheel scrolls it sideways when it doesn't fit; a side shelf, up and down.
+    if ((shelf == kShelfBottom || vertical) && ImGui::IsWindowHovered() && ImGui::GetIO().MouseWheel != 0.0f) {
+        if (vertical) ImGui::SetScrollY(ImGui::GetScrollY() - ImGui::GetIO().MouseWheel * 60.0f * s);
+        else ImGui::SetScrollX(ImGui::GetScrollX() - ImGui::GetIO().MouseWheel * 60.0f * s);
+    }
     if (layout_.customize)
         dashedRect(dl, ImVec2(r.x + 2.0f, r.y + 2.0f), ImVec2(r.x + r.w - 2.0f, r.y + r.h - 2.0f), theme::u32(theme::accent, 0.6f),
                    4.0f * s);
@@ -2422,7 +2472,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
                      "Micro: the micro triangles of the visible Parts' micro levels (Geometry > Micro).",
                      "Draw");
     } else if (item.rfind("widget.tile.", 0) == 0) {
-        const float w = (shell_.narrow ? 60.0f : 76.0f) * s;
+        const float w = std::floor((shell_.narrow ? 60.0f : 76.0f) * s * shelfFit_[shelf]);
         const ImVec2 size(w, w + (fontSmall_ ? fontSmall_->FontSize : 12.0f) + 4.0f * s);
         centre(w);
         if (item == "widget.tile.brush") drawBrushTile("##tile.brush", size);
@@ -2431,7 +2481,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         else if (item == "widget.tile.material") drawMaterialTile("##tile.material", size);
         else ImGui::Dummy(size);
     } else if (item == "widget.color") {
-        const float w = (shell_.narrow ? 60.0f : 76.0f) * s;
+        const float w = std::floor((shell_.narrow ? 60.0f : 76.0f) * s * shelfFit_[shelf]);
         centre(w);
         drawColorWidget(w);
     } else if (item == "widget.nav.move" || item == "widget.nav.zoom" || item == "widget.nav.rotate") {
@@ -2502,7 +2552,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         const ImVec2 size = shelf == kShelfTop      ? ImVec2(look == ui::Look::Icon ? rowH : 0.0f, rowH)
                             : shelf == kShelfRight  ? ImVec2(44.0f * s, 40.0f * s)
                             : shelf == kShelfBottom ? ImVec2(bottomTileW_, shell::bottomShelfSize(layout_.shelfTiles).tileH * s)
-                                                    : ImVec2(winW - 2.0f * padX, 60.0f * s);
+                                                    : ImVec2(winW - 2.0f * padX, std::floor(60.0f * s * shelfFit_[shelf]));
         centre(size.x);
         // Top shelf hierarchy, by meaning (docs/ui-design.md §10). Every item is the full row height in the same
         // font, so both rows share one baseline. Mode groups (Draw | Move | Scale | Rotate, Sculpt | Paint) and

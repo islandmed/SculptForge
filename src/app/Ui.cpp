@@ -567,6 +567,10 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
     const float s = uiScale();
     if (look == Look::Icon && !icon) look = Look::Label;
     if (look == Look::IconLabel && !icon) look = Look::Label;
+    // Too narrow for its words (the left shelf's Fill when the column shrinks to fit, Shell.cpp): the icon alone.
+    if (look == Look::IconLabel && size.x > 0.0f &&
+        ImGui::CalcTextSize((std::string(icon) + "  " + label).c_str()).x + 2.0f * ImGui::GetStyle().FramePadding.x > size.x)
+        look = Look::Icon;
     if (look == Look::Icon && size.x <= 0.0f) size = ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight());
     if (look == Look::Tile && size.x <= 0.0f) size = ImVec2(44.0f * s, 40.0f * s);
 

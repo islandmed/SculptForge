@@ -427,7 +427,7 @@ void App::receiveFromMaya() {
         if (was == before.end() || was->second != revision) mayaLiveSeen_[id] = {revision, 0};
     }
     // (Live keeps the view: Maya's edits arrive while you look at them.)
-    if (status_.rfind("Received", 0) == 0 && !uiPrefs_.mayaLive) camera_.frame(sceneBounds());
+    if (status_.rfind("Received", 0) == 0 && !uiPrefs_.mayaLive) frameView(sceneBounds());
 }
 
 void App::drawMayaMenu() {

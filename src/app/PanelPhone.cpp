@@ -198,7 +198,7 @@ void App::handlePhoneCapture(const link::PhoneEvent& e) {
         // Splats load next to the sculpt; a mesh .ply becomes a new Part (never replacing the work).
         if (ext == ".splat" || plyHasSplats(file)) runCommand("open", {{"path", file}});
         else runCommand("part_append", {{"path", file}});
-        if (lastCommandOk_) camera_.frame(sceneBounds());
+        if (lastCommandOk_) frameView(sceneBounds());
         return;
     }
     case link::CaptureKind::Face: return;

@@ -21,6 +21,10 @@ public:
     float fovY = glm::radians(35.0f);
     float aspect = 1.0f;
     bool ortho = false; // orthographic: shows what a perspective view would at the target's depth (Numpad 5)
+    // Lens shift in normalised device units: where the target lands off the view's centre. frame() sets it to the
+    // centre of the free area it fits into (the canvas less the bands that cover it), so orbiting still turns about
+    // the model and opening or closing a band doesn't move the view.
+    glm::vec2 shift{0.0f};
 
     glm::quat orientation() const;
     glm::vec3 position() const;
@@ -39,7 +43,9 @@ public:
     static glm::quat snapped(const glm::quat& q);
     void pan(float dxPixels, float dyPixels, float viewportHeight);
     void zoom(float steps);
-    void frame(const AABB& box);
+    // The whole box in view, centred. `area` is the part of the view to fit it into, as fractions of the view's
+    // width and height from its top left (x0, y0, x1, y1): the box is fitted to that and centred on it.
+    void frame(const AABB& box, const glm::vec4& area = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
 
     // Ray through a window coordinate (origin top-left).
     void screenRay(float x, float y, float width, float height, glm::vec3& origin, glm::vec3& dir) const;

@@ -165,3 +165,38 @@ TEST(camera_orbit_lock_does_not_drift) {
         CHECK(near(glm::conjugate(c.orientation()) * axis, axisOnScreen, 1e-3f));
     }
 }
+
+TEST(camera_frame_fits_the_free_area_and_rays_follow_the_shift) {
+    // The lower 60 % of the view (bands across its top): the box's projection lies inside that area, centred on it,
+    // and a ray cast through a pixel projects back onto it (the lens shift in both), perspective and orthographic.
+    for (bool ortho : {false, true}) {
+        Camera c;
+        c.aspect = 16.0f / 9.0f;
+        c.ortho = ortho;
+        c.yaw = 0.4f;
+        c.pitch = 0.3f;
+        AABB box;
+        box.expand(glm::vec3(-1.0f, -0.5f, -2.0f));
+        box.expand(glm::vec3(1.5f, 2.0f, 0.5f));
+        const glm::vec4 area(0.0f, 0.4f, 1.0f, 1.0f);
+        c.frame(box, area);
+        const glm::mat4 vp = c.projection() * c.view();
+        for (int k = 0; k < 8; ++k) {
+            const glm::vec3 p((k & 1) ? box.max.x : box.min.x, (k & 2) ? box.max.y : box.min.y, (k & 4) ? box.max.z : box.min.z);
+            const glm::vec4 h = vp * glm::vec4(p, 1.0f);
+            const float y = (1.0f - h.y / h.w) * 0.5f; // from the top
+            CHECK(y > area.y && y < area.w);
+            CHECK(std::abs(h.x / h.w) < 1.0f);
+        }
+        const glm::vec4 t = vp * glm::vec4(box.center(), 1.0f);
+        CHECK(std::abs((1.0f - t.y / t.w) * 0.5f - 0.7f) < 1e-4f);
+        glm::vec3 o, d;
+        c.screenRay(300.0f, 700.0f, 1600.0f, 900.0f, o, d);
+        const glm::vec4 q = vp * glm::vec4(o + d * (glm::length(c.position() - c.target)), 1.0f);
+        CHECK(std::abs((q.x / q.w + 1.0f) * 0.5f * 1600.0f - 300.0f) < 0.05f);
+        CHECK(std::abs((1.0f - q.y / q.w) * 0.5f * 900.0f - 700.0f) < 0.05f);
+        // The whole view: centred, no shift, as before.
+        c.frame(box);
+        CHECK(c.shift == glm::vec2(0.0f));
+    }
+}

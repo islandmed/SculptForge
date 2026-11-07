@@ -540,15 +540,15 @@ bool App::aiApplyView(const Args& args, std::string& error) {
         camera_.pitch = -glm::radians(std::clamp(float(argNumber(args, "elevation", 0.0)), -89.0f, 89.0f)), camera_.roll = 0.0f;
     if (args.contains("ortho")) camera_.ortho = argBool(args, "ortho", false), autoOrtho_ = false;
     const std::string frame = argString(args, "frame");
-    if (frame == "all") camera_.frame(sceneBounds());
-    else if (frame == "active") camera_.frame(doc_.mesh.bounds());
+    if (frame == "all") frameView(sceneBounds());
+    else if (frame == "active") frameView(doc_.mesh.bounds());
     else if (!frame.empty()) {
         const int i = doc_.findPart(frame);
         if (i < 0) {
             error = "No Part \"" + frame + "\" (see scene_overview)";
             return false;
         }
-        camera_.frame(doc_.partMesh(i).bounds());
+        frameView(doc_.partMesh(i).bounds());
     }
     if (args.contains("zoom")) {
         const float z = float(argNumber(args, "zoom", 1.0));

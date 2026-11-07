@@ -133,7 +133,7 @@ void App::partClickRelease() {
             runCommand("part_select", {{"index", double(partClickTarget_)}});
             partSelected("Alt+click");
         }
-        if (partClickFrame_) camera_.frame(doc_.partBounds(doc_.activePart)); // Shift+Alt+click: frame it too
+        if (partClickFrame_) frameView(doc_.partBounds(doc_.activePart)); // Shift+Alt+click: frame it too
     }
     partClickTarget_ = -1;
     partClickFrame_ = false;

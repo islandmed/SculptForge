@@ -28,11 +28,14 @@ glm::mat4 Camera::view() const {
 }
 
 glm::mat4 Camera::projection() const {
-    if (!ortho) return glm::perspective(fovY, aspect, nearPlane(), farPlane());
+    // The lens shift moves the image in clip space (scaled by w, so by `shift` after the divide).
+    glm::mat4 lens(1.0f);
+    lens[3] = glm::vec4(shift, 0.0f, 1.0f);
+    if (!ortho) return lens * glm::perspective(fovY, aspect, nearPlane(), farPlane());
     // As tall as the perspective view at the target; the depth range reaches behind the eye, as in Blender, so
     // zooming in never clips the model.
     const float h = distance * std::tan(fovY * 0.5f);
-    return glm::ortho(-h * aspect, h * aspect, -h, h, -farPlane(), farPlane());
+    return lens * glm::ortho(-h * aspect, h * aspect, -h, h, -farPlane(), farPlane());
 }
 
 void Camera::orbit(float dx, float dy) {
@@ -93,18 +96,27 @@ void Camera::pan(float dx, float dy, float viewportHeight) {
 
 void Camera::zoom(float steps) { distance = std::clamp(distance * std::pow(0.88f, steps), 1e-4f, 1e6f); }
 
-void Camera::frame(const AABB& box) {
+void Camera::frame(const AABB& box, const glm::vec4& area) {
     if (!box.valid()) return;
     target = box.center();
     float radius = std::max(glm::length(box.extent()) * 0.5f, 1e-4f);
-    distance = radius / std::sin(fovY * 0.5f) * 1.1f;
+    // The area's share of the view's height, or of its width if that is the tighter (in heights); the whole view
+    // in a landscape window is 1, as before.
+    const float x0 = std::clamp(area.x, 0.0f, 1.0f), y0 = std::clamp(area.y, 0.0f, 1.0f);
+    const float x1 = std::clamp(area.z, x0, 1.0f), y1 = std::clamp(area.w, y0, 1.0f);
+    float fit = std::min(y1 - y0, (x1 - x0) * std::max(aspect, 1e-3f));
+    if (area == glm::vec4(0.0f, 0.0f, 1.0f, 1.0f)) fit = 1.0f; // the whole view: exactly as before
+    fit = std::max(fit, 0.05f);
+    const float half = std::atan(fit * std::tan(fovY * 0.5f));
+    distance = radius / std::sin(half) * 1.1f;
+    shift = glm::vec2(x0 + x1 - 1.0f, 1.0f - (y0 + y1));
 }
 
 void Camera::screenRay(float x, float y, float width, float height, glm::vec3& origin, glm::vec3& dir) const {
     // From the camera's own axes rather than by inverting projection * view: the same ray, without the matrix
     // inverse's rounding, so the brush lands under the cursor to a fraction of a pixel at any zoom.
-    const float nx = 2.0f * x / std::max(width, 1e-6f) - 1.0f;
-    const float ny = 1.0f - 2.0f * y / std::max(height, 1e-6f);
+    const float nx = 2.0f * x / std::max(width, 1e-6f) - 1.0f - shift.x;
+    const float ny = 1.0f - 2.0f * y / std::max(height, 1e-6f) - shift.y;
     const float t = std::tan(fovY * 0.5f);
     const glm::quat q = orientation();
     if (!ortho) {

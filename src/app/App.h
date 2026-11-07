@@ -1680,6 +1680,10 @@ private:
 public:
     // The part of the window the 3D view uses (logical px); the whole window while the UI is hidden.
     CanvasRect canvasRect() const;
+    // The part of the canvas no band covers (the open Library, the Sculpt Timeline strip), as fractions of the
+    // canvas from its top left (x0, y0, x1, y1): what framing fits the model into.
+    glm::vec4 freeCanvasArea() const;
+    void frameView(const AABB& box); // camera_.frame into freeCanvasArea()
     ShellGeometry shellGeometry() const; // every shell region for the current window (console rect, trays...)
     // Preferences > Interface > Look: applies uiPrefs_.look (colours, style, fonts, the viewport background).
     void applyLook();
@@ -1831,6 +1835,8 @@ private:
     uint64_t activeTrisKey_ = ~uint64_t(0); // the top shelf's ActiveTris, recounted when the scene changes
     size_t activeTris_ = 0;
     float bottomTileW_ = 58.0f; // bottom shelf tiles shrink (down to 44 px) before the shelf scrolls
+    float shelfFit_[4] = {1.0f, 1.0f, 1.0f, 1.0f}; // a side shelf's tiles and colour picker shrink (to 0.6) before it scrolls
+    int shelfClipped_[4] = {0, 0, 0, 0};           // items past a side shelf's visible bottom last frame (UI tests)
     // The top shelf when its row doesn't fit (#105: 1280 logical px at Windows' 200 %): the sliders leave room for the
     // items after them (topShelfTailW_, measured last frame), then the icon buttons drop their labels.
     bool topShelfCompact_ = false;
@@ -2634,6 +2640,8 @@ private:
     void drawTimelineUi();            // once a frame from drawUi: keeps the timeline attached and draws the strip
     float timelineTopInset_ = 0.0f;   // how far down the canvas the strip (or its tab) reaches at the top; 0 at the bottom
     float timelineStripY_ = -1.0f;    // the strip's (or tab's) top edge in window pixels this frame (-1: not shown)
+    float timelineStripH_ = 0.0f;     // and its height
+    bool timelineDrawn_ = false;      // drawTimelineUi has run (before it, framing assumes the strip at its default)
     void registerTimelineUiActions(); // view.timeline, timeline.timelapse, help.benchmark
     void startTimelapse(const std::string& path, int width, int height, float seconds, int fps);
     bool timelapseStep(double budgetSeconds); // renders frames for up to the budget; false when finished
