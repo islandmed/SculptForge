@@ -3681,16 +3681,18 @@ void Renderer::noteMicroEdits(MeshSlot& s, const Mesh& mesh) {
     if (!s.coarse) return;
     const size_t nv = mesh.vertexCount();
     const bool baseMoved = mesh.dirtyBegin < mesh.dirtyEnd;
-    if (!s.microAllMoved && (mm.allDirty || mm.maskDirty || (baseMoved && size_t(mesh.dirtyEnd - mesh.dirtyBegin) > nv / 8))) {
+    const auto allMoved = [&] {
         s.microAllMoved = true;
         for (uint32_t c = 0; c < uint32_t(s.coarseDirty.size()); ++c) markCoarseDirty(s, c);
-    }
+    };
+    if (!s.microAllMoved && (mm.allDirty || mm.maskDirty)) allMoved();
     const auto mark = [&](uint32_t v) {
         s.coarseEdited = true;
         if (s.microAllMoved || v >= nv || s.microMoved[v]) return;
         s.microMoved[v] = 1;
         s.microMovedList.push_back(v);
         if (const uint32_t slot = s.order.toGpu(v); slot != UploadOrder::kNone) markCoarseDirty(s, s.order.clusterOfSlot(slot));
+        if (s.microMovedList.size() > nv / 2) allMoved(); // (over half the corners: all of them, in one pass)
     };
     if (mm.dirtyBits.size() == (size_t(mm.baseTriangles) + 63) / 64)
         for (size_t w = 0; w < mm.dirtyBits.size(); ++w)
@@ -3698,15 +3700,23 @@ void Renderer::noteMicroEdits(MeshSlot& s, const Mesh& mesh) {
                 const glm::uvec3 tri = mesh.triangles[w * 64 + size_t(std::countr_zero(bits))];
                 mark(tri.x), mark(tri.y), mark(tri.z);
             }
-    if (baseMoved)
-        for (uint32_t v = mesh.dirtyBegin; v < std::min<uint32_t>(mesh.dirtyEnd, uint32_t(nv)); ++v) {
-            mark(v);
-            if (s.microAllMoved) break;
-            for (uint32_t t : mesh.vertexTriangles(v)) {
-                const glm::uvec3 tri = mesh.triangles[t];
-                mark(tri.x), mark(tri.y), mark(tri.z);
+    // The moved base vertices (their dirty bits, by block: a scan's vertex order isn't spatial, so a dab's vertices
+    // can lie anywhere between the first and the last) and their neighbours, whose normals move with them.
+    if (baseMoved) {
+        const uint32_t b1 = std::min<uint32_t>(mesh.dirtyEnd, uint32_t(nv));
+        for (uint32_t blk = mesh.dirtyBegin >> Mesh::kDirtyBlockShift; !s.microAllMoved && (blk << Mesh::kDirtyBlockShift) < b1; ++blk) {
+            if (blk >= mesh.dirtyBlocks.size() || !mesh.dirtyBlocks[blk]) continue;
+            const uint32_t e = std::min(b1, (blk + 1) << Mesh::kDirtyBlockShift);
+            for (uint32_t v = std::max(mesh.dirtyBegin, blk << Mesh::kDirtyBlockShift); v < e && !s.microAllMoved; ++v) {
+                if (!mesh.vertexDirty(v)) continue;
+                mark(v);
+                for (uint32_t t : mesh.vertexTriangles(v)) {
+                    const glm::uvec3 tri = mesh.triangles[t];
+                    mark(tri.x), mark(tri.y), mark(tri.z);
+                }
             }
         }
+    }
 }
 
 // After a stroke: the moved corners and the normals around them, then the cells as a mesh's (updateCoarseLevels).
