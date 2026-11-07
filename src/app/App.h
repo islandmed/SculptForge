@@ -1605,6 +1605,7 @@ private:
     uint64_t autosaveRevision_ = ~uint64_t(0);
     bool autosaveWritten_ = false;
     std::string windowTitle_;
+    std::vector<std::pair<float, float>> barSpans_; // the top bar's widgets, x from-to, last frame (UI tests: no overlaps)
     // Parts (PanelParts.cpp): the panel, and Alt+click in the viewport to select one.
     void drawPartPopups();
     // Index of the nearest visible Part under the cursor (-1: none); builds stale BVHs on the way.

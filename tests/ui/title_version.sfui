@@ -6,6 +6,7 @@ expect_title Untitled — SculptForge {version}
 
 run ui_look look=classic layout=classic
 expect_text {version}
+expect_value title_overlaps == 0
 shot classic
 
 run new_sphere subdivisions=3
@@ -23,13 +24,36 @@ shot terminal
 
 run ui_look look=blueprint
 expect_text {version}
+expect_value title_overlaps == 0
 shot title_block
 
-# UI scale 200%: still beside the name, the menus not pushed off.
+expect_value title_overlaps == 0
+
+# UI scale 200% (a 1024 px window is 512 px wide then): nothing in the top bar overlaps; the version goes first, then
+# the workspaces / layout presets, the search field shrinks to its icon, and the last menus move behind >>.
 ui_scale 200
 run ui_look look=classic layout=classic
+expect_value title_overlaps == 0
 shot classic_200
+run ui_look look=classic layout=sculptforge
+expect_value title_overlaps == 0
+shot modules_200
 run ui_look look=forge layout=sculptforge
-expect "Help##menu.help"     # the last menu still fits
+expect_value title_overlaps == 0
 shot terminal_200
-ui_scale 100
+run ui_look look=blueprint
+expect_value title_overlaps == 0
+shot title_block_200
+
+# 512 logical px at any window size (a 1024 px window at 200 %): the menus that don't fit open from >>.
+ui_scale auto
+run ui_look look=forge layout=sculptforge
+logical_width 512
+wait_idle 30
+expect_value title_overlaps == 0
+expect_not "Help##menu.help"
+click "##menu.more"
+click "Help##menu.help"
+expect_value dropdown_open == 1
+shot more_menus_512
+key escape
