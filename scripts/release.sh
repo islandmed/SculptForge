@@ -127,9 +127,15 @@ cd "$(git rev-parse --show-toplevel)"
 # and its worktrees on one machine). "pid start-time version": a crashed promote's lock, or its pid reused by another
 # process (a different start time), doesn't count.
 PROMOTE_LOCK="$(git rev-parse --git-common-dir)/sf-promoting"
+# Staging holds main the same way while it runs (sf-staging, same format): the queue's auto-merges and site-lane pushes
+# wait for it, so a green stage doesn't end in "main moved" (0.11.14: a queue.html edit restarted the stage).
+STAGING_LOCK="$(git rev-parse --git-common-dir)/sf-staging"
 if [ $MODE != stage ] && [ -z "$STAGED" ]; then
     echo "$$ $(cut -d' ' -f22 /proc/$$/stat 2>/dev/null || echo 0) $V" > "$PROMOTE_LOCK"
     trap 'rm -rf "$work"; [ "$(cut -d" " -f1 "$PROMOTE_LOCK" 2>/dev/null)" = $$ ] && rm -f "$PROMOTE_LOCK"' EXIT
+elif [ $MODE = stage ]; then
+    echo "$$ $(cut -d' ' -f22 /proc/$$/stat 2>/dev/null || echo 0) $V" > "$STAGING_LOCK"
+    trap 'rm -rf "$work"; [ "$(cut -d" " -f1 "$STAGING_LOCK" 2>/dev/null)" = $$ ] && rm -f "$STAGING_LOCK"' EXIT
 else
     trap 'rm -rf "$work"' EXIT
 fi
@@ -528,7 +534,8 @@ step_stage() {
     sha=$(git rev-parse HEAD)
     bumped || die "HEAD ${sha:0:8} is not at $V" "run the bump first: $(resume bump)"
     [ -n "${STAGE_WITH+x}" ] || { [ -x "$HOME/Work/.sf/t1.sh" ] && with="$HOME/Work/.sf/t1.sh ."; }
-    "${MERGE_QUEUE:-scripts/merge-queue.sh}" staging ${with:+--with "$with"} "$sha" ||
+    # The release's own suite goes first on the PC (pc.sh priority lane), not behind benches (0.11.14 waited for one).
+    SF_PC_PRIO=1 "${MERGE_QUEUE:-scripts/merge-queue.sh}" staging ${with:+--with "$with"} "$sha" ||
         die "staging ${sha:0:8} is red, or main moved (above)" "fix the batch (main moved: merge origin/main), then $(resume bump)"
     ok "main is the staged ${sha:0:8} ($V); packages.yml is building its packages on the staging push"
     # The staging push's Packages run builds what --yes will promote, the macOS .dmg included (deployment target 11:
@@ -539,7 +546,11 @@ step_stage() {
         tries=$((tries - 1))
         [ -n "$id" ] || sleep 10
     done
-    [ -n "$id" ] || die "no Packages run on the staging push of ${sha:0:8} after 5 minutes" "gh run list -R $REPO -w packages.yml -L 3, then $(resume stage)"
+    if [ -z "$id" ]; then # main is already the staged commit: --yes still works, release.yml builds from the tag (0.11.14)
+        printf '   warning: %s\n' "no Packages run on the staging push of ${sha:0:8} after 5 minutes: --yes will build the packages from the tag (slower); gh run list -R $REPO -w packages.yml -L 3 shows why"
+        echo "   next, on main: ${HIGHLIGHTS_GIVEN:+HIGHLIGHTS=$HIGHLIGHTS_GIVEN }scripts/release.sh $V --yes"
+        return 0
+    fi
     echo "   waiting for Packages run $id on staging (every platform's package) ..." >&2
     gh run watch "$id" -R "$REPO" --interval 60 >/dev/null 2>&1 || true
     if [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)" != success ]; then
