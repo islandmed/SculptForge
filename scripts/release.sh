@@ -505,9 +505,13 @@ for p, t in new.items():  # written only after every check passed, so a failure 
 PY
 ) || die "$out" "fix that file by hand (CHANGELOG entries and What's New are written by people), commit, push main"
     [ -n "$out" ] && echo "$out" | sed 's/^/   set: /'
+    # The app's compiled credits (Help > About, the card's fallback count) from the site's live copy, which the
+    # onboarding script keeps current between releases (website/members-live.json; no file: left as they are).
+    python3 tools/guide/build_site.py --app-credits >/dev/null || die "build_site.py --app-credits failed" "fix website/members-live.json, $(resume bump)"
     python3 tools/guide/build_site.py >/dev/null # the guide, and the home page's What's New area for $V (not a beta's)
     [ -n "$PRE" ] || card_ok || die "website/index.html has no 'new in $V' card after build_site.py" "$card_fix"
     git add CMakeLists.txt CITATION.cff packaging/rez/package.py packaging/linux/org.sculptforge.SculptForge.metainfo.xml CHANGELOG.md website/index.html docs/guide/whats-new.md
+    git add website/founding.json docs/supporters.txt
     git add -A changes tests/ui/whats_new.sfui
     git add -A website/guide
     if git diff --cached --quiet; then
