@@ -23,6 +23,7 @@
 #include "core/Project.h"
 
 #include <imgui.h>
+#include <imgui_internal.h> // (BringWindowToDisplayFront: the update banner)
 
 #include <algorithm>
 #include <cmath>
@@ -921,6 +922,9 @@ void App::drawUpdateBanner() {
                                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
                                    ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
     if (ImGui::Begin("##update_banner", nullptr, flags)) {
+        // Above the floating panels (a Preferences window open over the canvas's top would hide its buttons), but
+        // never over a modal dialog.
+        if (!ImGui::GetTopMostPopupModal()) ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
         // Reading size (the guide's 17 px fonts), so the highlights are easy to read over the canvas.
         if (ImFont* title = guide_.bodyBoldFont()) ImGui::PushFont(title);
         ImGui::Text(tr("SculptForge %s is available"), u.version.c_str());
