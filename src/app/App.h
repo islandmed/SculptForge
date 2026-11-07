@@ -1747,7 +1747,8 @@ private:
     float canvasHeight() const { return canvasRect().h; }
     Renderer::Viewport canvasViewport(int fbWidth, int fbHeight) const; // the canvas in framebuffer pixels
     void drawCanvasFrame();
-    bool canvasNavButton(const char* id, const char* icon, const char* label, int mode); // right-shelf Move/Zoom/Rotate
+    // Right-shelf Move/Zoom/Rotate; width 0: the standard 44 px (times the UI scale).
+    bool canvasNavButton(const char* id, const char* icon, const char* label, int mode, float width = 0.0f);
     void drawBrushTile(const char* id, ImVec2 size);
     void drawStrokeTile(const char* id, ImVec2 size);
     void drawStrokeIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, StrokeType type); // the shelf tile's picture

@@ -85,6 +85,9 @@ bool beginShellWindow(const char* name, const CanvasRect& r, const ImVec4& bg, I
                       bool frame = true) {
     ImGui::SetNextWindowPos(ImVec2(r.x, r.y));
     ImGui::SetNextWindowSize(ImVec2(r.w, r.h));
+    // Trays and side shelves scroll up and down only: a sideways wheel or swipe, or a widget a few pixels too wide,
+    // never moves them sideways (dm4nd on Discord).
+    if (r.h > r.w) ImGui::SetNextWindowScroll(ImVec2(0.0f, -1.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, padding);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
@@ -2357,6 +2360,9 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
     auto centre = [&](float w) {
         if (vertical) ImGui::SetCursorPosX(std::max(padX, (winW - w) * 0.5f));
     };
+    // A side column's items never run past its padding: wider than that, the column would scroll sideways (dm4nd on
+    // Discord: at some UI scales the 76 / 44 px tiles were a few pixels wider than the column's inside).
+    auto fitW = [&](float w) { return vertical ? std::min(w, std::floor(winW - 2.0f * padX)) : w; };
     const float rowH = 26.0f * s;
     if (item == "sep") {
         if (vertical) {
@@ -2445,7 +2451,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
                      "Micro: the micro triangles of the visible Parts' micro levels (Geometry > Micro).",
                      "Draw");
     } else if (item.rfind("widget.tile.", 0) == 0) {
-        const float w = (shell_.narrow ? 60.0f : 76.0f) * s;
+        const float w = fitW((shell_.narrow ? 60.0f : 76.0f) * s);
         const ImVec2 size(w, w + (fontSmall_ ? fontSmall_->FontSize : 12.0f) + 4.0f * s);
         centre(w);
         if (item == "widget.tile.brush") drawBrushTile("##tile.brush", size);
@@ -2454,15 +2460,16 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         else if (item == "widget.tile.material") drawMaterialTile("##tile.material", size);
         else ImGui::Dummy(size);
     } else if (item == "widget.color") {
-        const float w = (shell_.narrow ? 60.0f : 76.0f) * s;
+        const float w = fitW((shell_.narrow ? 60.0f : 76.0f) * s);
         centre(w);
         drawColorWidget(w);
     } else if (item == "widget.nav.move" || item == "widget.nav.zoom" || item == "widget.nav.rotate") {
-        centre(44.0f * s);
+        const float navW = fitW(44.0f * s);
+        centre(navW);
         const int mode = item == "widget.nav.move" ? 0 : item == "widget.nav.zoom" ? 1 : 2;
         canvasNavButton(mode == 0 ? "nav.move" : mode == 1 ? "nav.zoom" : "nav.rotate",
                         mode == 0 ? ICON_LC_HAND : mode == 1 ? ICON_LC_ZOOM_IN : ICON_LC_ROTATE_3D,
-                        mode == 0 ? "Move" : mode == 1 ? "Zoom" : "Rotate", mode);
+                        mode == 0 ? "Move" : mode == 1 ? "Zoom" : "Rotate", mode, navW);
     } else if (item == "widget.add_brush") {
         const ImVec2 size(48.0f * s, shell::bottomShelfSize(layout_.shelfTiles).tileH * s);
         if (ImGui::InvisibleButton("##addbrush", size)) // the brush picker in "add to shelf" mode (Pickers.cpp)
@@ -2523,7 +2530,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
                               : a->icon          ? (topShelfCompact_ ? ui::Look::Icon : ui::Look::IconLabel)
                                                  : ui::Look::Label;
         const ImVec2 size = shelf == kShelfTop      ? ImVec2(look == ui::Look::Icon ? rowH : 0.0f, rowH)
-                            : shelf == kShelfRight  ? ImVec2(44.0f * s, 40.0f * s)
+                            : shelf == kShelfRight  ? ImVec2(fitW(44.0f * s), 40.0f * s)
                             : shelf == kShelfBottom ? ImVec2(bottomTileW_, shell::bottomShelfSize(layout_.shelfTiles).tileH * s)
                                                     : ImVec2(winW - 2.0f * padX, 60.0f * s);
         centre(size.x);
@@ -2748,10 +2755,10 @@ void App::finishShelfDrag() {
 }
 
 // Right-shelf Move / Zoom / Rotate: drag on the button to navigate.
-bool App::canvasNavButton(const char* id, const char* icon, const char* englishLabel, int mode) {
+bool App::canvasNavButton(const char* id, const char* icon, const char* englishLabel, int mode, float width) {
     const char* label = tr(englishLabel);
     const float s = uiScale_;
-    const ImVec2 size(44.0f * s, 40.0f * s);
+    const ImVec2 size(width > 0.0f ? width : 44.0f * s, 40.0f * s);
     ImGui::InvisibleButton((std::string(label) + "##" + id).c_str(), size);
     const bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
     if (active) {
