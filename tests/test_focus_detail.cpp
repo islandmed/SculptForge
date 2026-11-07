@@ -17,6 +17,7 @@
 
 #include <atomic>
 #include <cstdio>
+#include <cstring>
 #include <thread>
 #include <filesystem>
 #include <vector>
@@ -168,6 +169,71 @@ TEST(focus_detail_damaged_file_is_refused) {
     CHECK(FocusDetail::open(path, m, err) == nullptr);
     CHECK(!err.empty());
     CHECK(FocusDetail::open(focusTempPath("missing.sfdetail"), m, err) == nullptr);
+}
+
+// Crafted fields (security read of the reader): offsets past the end or wrapping 64 bits, bad counts, a directory
+// entry past the end (directory hash fixed up so the check behind it runs), a triangle index past the vertices.
+TEST(focus_detail_crafted_fields_are_refused) {
+    const std::string good = writeSmall("crafted-src.sfdetail");
+    std::vector<uint8_t> file(std::filesystem::file_size(good));
+    {
+        FILE* f = std::fopen(good.c_str(), "rb");
+        CHECK(f && std::fread(file.data(), 1, file.size(), f) == file.size());
+        if (f) std::fclose(f);
+    }
+    auto get64 = [&](const std::vector<uint8_t>& b, size_t at) { uint64_t v; std::memcpy(&v, b.data() + at, 8); return v; };
+    auto get32 = [&](const std::vector<uint8_t>& b, size_t at) { uint32_t v; std::memcpy(&v, b.data() + at, 4); return v; };
+    auto rehash = [&](std::vector<uint8_t>& b) { // the directory hash (fnv1a), as the writer stores it
+        uint64_t h = 1469598103934665603ull;
+        for (uint64_t i = 0; i < get64(b, 64); ++i) h = (h ^ b[get64(b, 56) + i]) * 1099511628211ull;
+        std::memcpy(b.data() + 88, &h, 8);
+    };
+    auto refused = [&](const char* what, auto&& patch) {
+        std::vector<uint8_t> b = file;
+        patch(b);
+        const std::string path = focusTempPath("crafted.sfdetail");
+        FILE* f = std::fopen(path.c_str(), "wb");
+        CHECK(f && std::fwrite(b.data(), 1, b.size(), f) == b.size());
+        if (f) std::fclose(f);
+        Mesh m;
+        std::string err;
+        const bool ok = FocusDetail::open(path, m, err) == nullptr && !err.empty();
+        if (!ok) std::printf("  not refused: %s\n", what);
+        CHECK(ok);
+    };
+    auto put64 = [](std::vector<uint8_t>& b, size_t at, uint64_t v) { std::memcpy(b.data() + at, &v, 8); };
+    auto put32 = [](std::vector<uint8_t>& b, size_t at, uint32_t v) { std::memcpy(b.data() + at, &v, 4); };
+    refused("truncated header", [](std::vector<uint8_t>& b) { b.resize(64); });
+    refused("bad magic", [](std::vector<uint8_t>& b) { b[0] = 'X'; });
+    refused("newer version", [&](std::vector<uint8_t>& b) { put32(b, 8, 99); });
+    refused("unknown codec", [&](std::vector<uint8_t>& b) { put32(b, 12, 77); });
+    refused("level too high", [&](std::vector<uint8_t>& b) { put32(b, 16, 40); });
+    refused("no triangles", [&](std::vector<uint8_t>& b) { put32(b, 24, 0); });
+    refused("more triangles", [&](std::vector<uint8_t>& b) { put32(b, 24, get32(b, 24) + 1); });
+    refused("huge vertex count", [&](std::vector<uint8_t>& b) { put32(b, 28, 0xFFFFFFFFu); });
+    refused("base past the end", [&](std::vector<uint8_t>& b) { put64(b, 40, b.size()); });
+    refused("base offset wraps", [&](std::vector<uint8_t>& b) { put64(b, 40, ~uint64_t(0) - 7); });
+    refused("directory offset wraps", [&](std::vector<uint8_t>& b) { put64(b, 56, ~uint64_t(0) - 7); });
+    refused("directory size wrong", [&](std::vector<uint8_t>& b) { put64(b, 64, get64(b, 64) - 24); });
+    refused("directory hash wrong", [&](std::vector<uint8_t>& b) { b[get64(b, 56)] ^= 1; });
+    refused("tile offset wraps", [&](std::vector<uint8_t>& b) { put64(b, get64(b, 56), ~uint64_t(0) - 3); rehash(b); });
+    refused("tile past the end", [&](std::vector<uint8_t>& b) { put64(b, get64(b, 56), b.size() - 2); rehash(b); });
+    refused("tile size past the end", [&](std::vector<uint8_t>& b) { put32(b, get64(b, 56) + 8, 0xFFFFFFFFu); rehash(b); });
+    refused("chunk offset wraps", [&](std::vector<uint8_t>& b) {
+        put64(b, get64(b, 56) + size_t(get32(b, 24)) * 24, ~uint64_t(0) - 3);
+        rehash(b);
+    });
+    refused("chunk size wrong", [&](std::vector<uint8_t>& b) {
+        put32(b, get64(b, 56) + size_t(get32(b, 24)) * 24 + 8, 5);
+        rehash(b);
+    });
+    refused("triangle index past the vertices", [&](std::vector<uint8_t>& b) {
+        put32(b, get64(b, 40) + size_t(get32(b, 28)) * 24, get32(b, 28));
+    });
+    // The untouched file still opens.
+    Mesh m;
+    std::string err;
+    CHECK(FocusDetail::open(good, m, err) != nullptr);
 }
 
 TEST(focus_detail_brush_promotes_undo_and_incremental_save) {
