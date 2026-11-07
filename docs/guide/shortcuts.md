@@ -196,6 +196,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Action | Keys | What it does |
 |---|---|---|
 | Lock camera | <kbd>Shift</kbd>+<kbd>L</kbd> | Lock the camera for left-drags: a drag that starts on the background sculpts once it reaches the model instead of turning the view (Preferences > Input > Start strokes off the model, #62). The status bar shows CAMERA LOCKED while it is on. Right-drag or Alt+drag still move the view. Shift+L turns it on and off. |
+| Turbo | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd> | Everything this computer can safely give to sculpting speed, in one click: antialiasing off and a lighter view while you sculpt and orbit (full quality the moment you stop), and the top budgets of the tier this machine carries. It never goes past what the memory holds. Off puts everything back as you set it. Remembered on this computer. |
 
 <!-- END GENERATED: shortcuts -->
 

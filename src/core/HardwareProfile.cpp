@@ -122,7 +122,8 @@ const char* tierName(ProfileTier tier) {
 bool simulatedFloorTier() {
     static const bool on = [] {
         const char* v = std::getenv("SF_HW_SIMULATE");
-        return v && std::string(v) == "floor";
+        HwTier t;
+        return v && hwTierFromName(v, t) && t == HwTier::Floor;
     }();
     return on;
 }
@@ -512,7 +513,7 @@ PerformanceSettings applyOverrides(const PerformanceSettings& a, const ProfileOv
 bool ProfileOverrides::any() const {
     return !tier.empty() || renderTriangleBudget || motionProxyThreshold || vramBudgetMB || uploadBudgetMBPerFrame ||
            maxTextureSize || maxSubdivisionTriangles || microTriangleLimit || threads || targetFps || !governor ||
-           draftBrush;
+           draftBrush || !level.empty();
 }
 
 HardwareProfile mapProfile(const HardwareInfo& hardware, const Calibration& calibration, const ProfileOverrides& overrides,
@@ -530,6 +531,15 @@ HardwareProfile mapProfile(const HardwareInfo& hardware, const Calibration& cali
         p.tier = forced;
     }
     p.automatic = settingsForTier(p.tier, hardware, calibration);
+    // The hardware tier: what the machine carries (core/HardwareTier.h), set by hand, or forced by SF_HW_SIMULATE.
+    p.detected = detectHwTier(hardware, calibration, p.tier);
+    p.hwTier = p.detected.tier;
+    HwTier level;
+    if (simulatedHwTier(level)) p.hwTier = level;
+    else if (!overrides.level.empty() && hwTierFromName(overrides.level, level)) p.hwTier = level;
+    // High and up: 16K textures where the GPU allows them and has the memory.
+    if (const int cap = budgetsForTier(p.hwTier).maxTextureSize; cap > p.automatic.maxTextureSize && p.automatic.vramBudgetMB >= 6144)
+        p.automatic.maxTextureSize = hardware.maxTextureSize > 0 ? std::min(cap, hardware.maxTextureSize) : p.automatic.maxTextureSize;
     p.settings = applyOverrides(p.automatic, overrides);
     const uint64_t gpu = usableGpuMemoryMB(hardware);
     std::string gpuName = hardware.glRenderer.empty() ? std::string("no GPU probed") : hardware.glRenderer;
@@ -537,6 +547,11 @@ HardwareProfile mapProfile(const HardwareInfo& hardware, const Calibration& cali
     p.reason = "Detected " + gpuName + (gpu ? ", " + formatMegabytes(gpu) + " " + gpuKindName(hardware.gpuKind) : std::string()) +
                " -> " + tierName(p.tier) + " (" + why + ")";
     return p;
+}
+
+std::string tierCardKey(const HardwareInfo& hw) {
+    // Rounded to GB: what the driver reports moves a little between runs.
+    return hw.glRenderer + "|" + std::to_string((hw.vramMB + 512) / 1024) + "|" + std::to_string((hw.ramMB + 512) / 1024);
 }
 
 // ---------------------------------------------------------------------------
@@ -650,6 +665,11 @@ Json overridesJson(const ProfileOverrides& o) {
     if (o.targetFps) j.set("target_fps", o.targetFps);
     if (!o.governor) j.set("governor", false);
     if (o.draftBrush) j.set("draft_brush", o.draftBrush == 1 ? "on" : "off");
+    if (!o.level.empty()) j.set("level", o.level);
+    if (!o.compute.empty()) j.set("compute", o.compute);
+    if (!o.gpu.empty()) j.set("gpu", o.gpu);
+    if (o.turbo) j.set("turbo", true);
+    if (!o.tierCardFor.empty()) j.set("tier_card_for", o.tierCardFor);
     return j;
 }
 
@@ -667,6 +687,11 @@ void overridesFromJson(const Json& j, ProfileOverrides& o) {
     o.targetFps = int(j["target_fps"].asNumber());
     o.governor = j["governor"].asBool(true);
     o.draftBrush = j["draft_brush"].asString() == "on" ? 1 : j["draft_brush"].asString() == "off" ? 2 : 0;
+    o.level = j["level"].asString();
+    o.compute = j["compute"].asString();
+    o.gpu = j["gpu"].asString();
+    o.turbo = j["turbo"].asBool(false);
+    o.tierCardFor = j["tier_card_for"].asString();
 }
 
 } // namespace
@@ -690,6 +715,7 @@ Json hardwareProfileToJson(const HardwareProfile& p) {
     j.set("measured_tier", tierName(p.measuredTier));
     j.set("settings", settingsJson(p.settings));
     j.set("overrides", overridesJson(p.overrides));
+    j.set("hw_tier", hwTierName(p.hwTier)); // (informational: mapped again on load)
     return j;
 }
 
@@ -773,6 +799,16 @@ Json calibrationJson(const HardwareProfile& p, const TierConfig* tier) {
     j.set("settings", settingsJson(p.settings));
     j.set("automatic", settingsJson(p.automatic));
     j.set("overrides", overridesJson(p.overrides));
+    {
+        Json t = Json::object();
+        t.set("tier", hwTierName(p.hwTier));
+        t.set("shown_as", hwTierDisplayName(p.hwTier));
+        t.set("detected", hwTierName(p.detected.tier));
+        t.set("machine", p.detected.machine);
+        t.set("limit", p.detected.limit);
+        t.set("budgets", tierBudgetsJson(budgetsForTier(p.hwTier)));
+        j.set("hardware_tier", t);
+    }
     j.set("tier_config", tierConfigJson(tier ? *tier : tierConfigFor(p, PowerSource::Unknown, 0)));
     j.set("network", false); // calibration never uses the network (no telemetry)
     return j;
@@ -806,6 +842,7 @@ bool validateCalibrationJson(const Json& j, std::string& error) {
     need(j, "$", "overrides", T::Object);
     need(j, "$", "network", T::Bool);
     need(j, "$", "tier_config", T::Object);
+    need(j, "$", "hardware_tier", T::Object);
     if (!error.empty()) return false;
     ProfileTier tier;
     if (!tierFromName(j["profile"].asString(), tier)) {
@@ -995,7 +1032,24 @@ bool setOverride(ProfileOverrides& o, const std::string& name, const std::string
             error = "tier must be Software, Laptop (or Budget), Workstation or auto";
             return false;
         }
-    } else if (name == "render_triangle_budget") o.renderTriangleBudget = u;
+    } else if (name == "level" || name == "hardware_tier") {
+        HwTier t;
+        if (clear) o.level.clear();
+        else if (hwTierFromName(text, t)) o.level = hwTierName(t);
+        else {
+            error = "level must be Floor (Essential), Standard, High, Extreme or auto";
+            return false;
+        }
+    } else if (name == "compute") {
+        ComputeChoice c;
+        if (!computeChoiceFromName(clear ? "auto" : text, c)) {
+            error = "compute must be auto, cpu or gpu";
+            return false;
+        }
+        o.compute = c == ComputeChoice::Auto ? std::string() : computeChoiceName(c);
+    } else if (name == "gpu") o.gpu = clear ? std::string() : text;
+    else if (name == "turbo") o.turbo = !clear && (value != 0.0 || text == "on" || text == "true");
+    else if (name == "render_triangle_budget") o.renderTriangleBudget = u;
     else if (name == "motion_proxy_threshold") o.motionProxyThreshold = u;
     else if (name == "vram_budget_mb") o.vramBudgetMB = u;
     else if (name == "upload_budget_mb_per_frame") o.uploadBudgetMBPerFrame = u;
@@ -1082,7 +1136,9 @@ void registerHardwareProfileCommands(CommandRegistry& registry) {
                   }});
     registry.add({"set_performance_override",
                   "Override one setting of the performance profile by hand (kept across re-calibrations), or give it "
-                  "back to the profile with value=auto. Settings: tier (Software, Laptop, Workstation), "
+                  "back to the profile with value=auto. Settings: level (the hardware tier: Floor / Essential, Standard, High, "
+                  "Extreme), compute (auto, cpu, gpu), gpu (a graphics card id, next start), turbo (on / off), tier (the "
+                  "render profile: Software, Laptop, Workstation), "
                   "render_triangle_budget, motion_proxy_threshold, vram_budget_mb, upload_budget_mb_per_frame, "
                   "max_texture_size, max_subdivision_triangles, micro_triangle_limit, threads (next start), target_fps, "
                   "draft_brush (on / off: normals and cavity at pen release), governor (on / off).",

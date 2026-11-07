@@ -1,0 +1,52 @@
+# cold
+# Hardware tiers (PanelHardwareTier.cpp, core/HardwareTier.h). CMake sets SF_HW_PROFILE_IN_TESTS=1,
+# SF_NO_CALIBRATION=1 and SF_HW_SIMULATE=high for this test, so the tier is High on any GPU and the first-run card
+# shows at once (a fresh settings folder is a first launch).
+# The first-run card: the machine, the tier, what it turns on; Got it puts it away for good on this machine.
+run new_sphere
+wait 0.5
+expect_text Tuned for your machine
+expect_text Your machine:
+expect_text Tier: High
+expect_text Turned on:
+shot card
+ui_scale 200
+wait 0.3
+shot card-2x
+ui_scale 100
+wait 0.3
+click "Got it"
+wait 0.3
+expect_no_text Tuned for your machine
+# The tier chip in the top bar; Turbo's bolt beside it.
+expect_text High
+click "Turbo##view.turbo"
+expect_status Turbo on
+wait 0.3
+shot turbo-on
+click "Turbo##view.turbo"
+expect_status Turbo off
+wait 0.4
+shot turbo-off
+# The key and View > Turbo do the same.
+key ctrl+alt+t
+expect_status Turbo on
+key ctrl+alt+t
+expect_status Turbo off
+# The chip opens Preferences > Performance at the tier.
+click "Performance tier##perf.tier_chip"
+wait 0.5
+expect_text "What this turns on:"
+expect_text Forced by SF_HW_SIMULATE=high
+expect_text Compute
+expect_text Brush solver: CPU
+expect_text CPU only for now
+shot panel
+ui_scale 200
+wait 0.3
+shot panel-2x
+ui_scale 100
+# Kept: after a restart the card stays away and Turbo is as left (off).
+restart
+wait 0.5
+expect_no_text Tuned for your machine

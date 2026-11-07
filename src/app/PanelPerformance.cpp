@@ -197,8 +197,12 @@ int App::viewSamples() {
         if (doc_.parts[size_t(i)].visible) triangles += doc_.partMesh(i).triangleCount();
     perf_.movingNow = moving;
     perf_.sceneTriangles = triangles;
-    perf_.proxyNow = uiPrefs_.fastNavigation && moving && triangles >= fastNavigationTriangles(hardwareProfileGoverns());
-    perf_.fastNow = aa > 1 && perf_.proxyNow;
+    // Turbo (View > Turbo): the lighter proxy from half the threshold, and no antialiasing while the view moves or a
+    // stroke runs, whatever the scene's size; still frames are drawn as set.
+    const size_t proxyFrom = fastNavigationTriangles(hardwareProfileGoverns());
+    perf_.proxyNow = (uiPrefs_.fastNavigation || turbo_) && moving && triangles >= (turbo_ ? proxyFrom / 2 : proxyFrom);
+    const bool working = moving || doc_.sculptor.strokeActive() || !dabQueue_.empty();
+    perf_.fastNow = aa > 1 && (perf_.proxyNow || (turbo_ && working));
     perf_.samplesWanted = perf_.fastNow ? 1 : aa;
     return perf_.samplesWanted;
 }

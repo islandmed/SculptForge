@@ -34,7 +34,7 @@ int targetHzForDisplay(int hz) {
     return 60;
 }
 
-TierConfig tierConfigFor(const HardwareProfile& p, PowerSource power, int displayHz) {
+TierConfig tierConfigFor(const HardwareProfile& p, PowerSource power, int displayHz, int memoryStepDown) {
     TierConfig c;
     c.tier = p.tier;
     c.power = power;
@@ -73,6 +73,20 @@ TierConfig tierConfigFor(const HardwareProfile& p, PowerSource power, int displa
     c.outOfCorePoints = (c.residentCacheCapMB << 20) / 2;
     if (p.overrides.draftBrush == 1) c.draftBrushMode = true;
     else if (p.overrides.draftBrush == 2) c.draftBrushMode = false;
+    // The hardware tier's budgets, stepped down by the memory guard.
+    c.chosenHwTier = p.hwTier;
+    c.memoryStepDown = std::clamp(memoryStepDown, 0, int(p.hwTier));
+    c.hwTier = HwTier(int(p.hwTier) - c.memoryStepDown);
+    c.budgets = budgetsForTier(c.hwTier);
+    // Focus Detail's GPU pool on a small graphics card: 256 MB under a 1.5 GB video memory budget.
+    if (c.hwTier == HwTier::Floor && s.vramBudgetMB && s.vramBudgetMB < 1536) c.budgets.focusGpuPoolMB = 256;
+    c.budgets.maxTextureSize = s.maxTextureSize;
+    c.budgets.threads = s.threads; // (SF_HW_SIMULATE=floor: the app sets 4)
+    applyTierBudgetEnv(c.budgets);
+    ComputeChoice saved = ComputeChoice::Auto;
+    computeChoiceFromName(p.overrides.compute, saved);
+    c.compute = computeChoiceWithEnv(saved);
+    c.turbo = p.overrides.turbo;
     return c;
 }
 
@@ -90,6 +104,12 @@ Json tierConfigJson(const TierConfig& c) {
     j.set("target_hz", c.targetHz);
     j.set("power", powerSourceName(c.power));
     j.set("on_battery", c.onBattery());
+    j.set("hw_tier", hwTierName(c.hwTier));
+    j.set("chosen_hw_tier", hwTierName(c.chosenHwTier));
+    j.set("memory_step_down", c.memoryStepDown);
+    j.set("budgets", tierBudgetsJson(c.budgets));
+    j.set("compute", computeChoiceName(c.compute));
+    j.set("turbo", c.turbo);
     return j;
 }
 

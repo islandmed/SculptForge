@@ -1231,6 +1231,18 @@ private:
     void applyHardwareProfile(const struct HardwareProfile& profile, bool announce);
     void finishCalibration();
     std::shared_ptr<struct HwProfileUi> hwProfile_;
+    // Hardware tiers (PanelHardwareTier.cpp, core/HardwareTier.h): the tier, GPU and Compute part of Preferences >
+    // Performance, the first-run tier card, the tier chip and Turbo in the top bar, the memory guard.
+    void drawHardwareTierSection();
+    void drawTierCard();               // once per machine, after calibration (or a hardware change); never blocks
+    void updateTierMemoryGuard();      // every frame (cheap: looks once a second)
+    void registerHardwareTierUiActions();
+    void saveProfileOverrides(const struct ProfileOverrides& o); // map, save, apply
+    std::string tierChipLabel() const; // "HIGH" / "" (no profile in this run)
+    void setTurbo(bool on);
+    bool turboOn() const;
+    bool turbo_ = false;               // (mirrors the profile's overrides.turbo; SF_TURBO=1 for benches)
+    double turboToggledAt_ = -10.0;    // the bolt's little animation
     // Splats > Make sculptable (PanelSculptable.cpp, core/Sculptable.h): splat capture -> sculptable Part on a
     // worker thread; the crop box and the face landmark review in the viewport.
     void registerSculptableUiActions();

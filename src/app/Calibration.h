@@ -21,6 +21,9 @@ namespace sf {
 
 // Fills the GPU fields of `info` from the current OpenGL context (and the machine's, through probeSystem).
 void probeHardware(HardwareInfo& info);
+// Free video memory now (MB), with the extension probeHardware found (`vramSource`: GL_NVX_gpu_memory_info or
+// GL_ATI_meminfo); 0 = unknown. One glGetIntegerv: cheap enough for the memory guard's once-a-second look.
+uint64_t queryFreeVideoMemoryMB(const std::string& vramSource);
 
 class Calibrator {
 public:
@@ -70,6 +73,12 @@ private:
 
 // Sets the shared thread pool's size from the cached profile (call before any brush work; core/ThreadPool.h).
 void applyCachedThreadCount();
+// Before SDL_Init: the graphics card chosen in Preferences > Performance (Auto = the fastest discrete one), through the
+// platform's mechanism (core/HardwareTier.h applyGpuChoice). If the last start with a choice never got its GL context
+// (a marker file is left), this start uses the system's choice and returns a message saying so; else "".
+std::string applyCachedGpuChoice();
+// The GL context and renderer started: the choice worked (the marker goes).
+void gpuChoiceStarted();
 
 // Calibrates now, blocking (about 2-3 s; quick: about 1 s). Needs a current OpenGL context.
 HardwareProfile calibrateNow(bool quick, const ProfileOverrides& overrides, const ProfileTier* previous = nullptr);

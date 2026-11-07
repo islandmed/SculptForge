@@ -1529,6 +1529,18 @@ void App::drawStatusBar(const ShellGeometry& g) {
     const float linkX = right - linkW;
     const bool mayaLink = mayaLink_ != nullptr;
     if (mayaLink) right = linkX - 10.0f * s;
+    // Turbo's bolt (View > Turbo, our own drawing, orange when on) and the hardware tier chip (opens Preferences >
+    // Performance), left of the bridges; the chip gives way first in a narrow window, then the bolt (View > Turbo stays).
+    const float boltW = buttonH;
+    const float boltX = right - boltW;
+    const bool boltShown = boltX > menusEnd;
+    if (boltShown) right = boltX - 6.0f * s;
+    const std::string tierText = tierChipLabel();
+    const std::string tierLabel = tierText.empty() ? std::string() : std::string(ICON_LC_GAUGE) + " " + (caps ? upper(tr(tierText.c_str())) : std::string(tr(tierText.c_str())));
+    const float tierW = tierLabel.empty() ? 0.0f : textW(monoSmall, tierLabel) + 16.0f * s;
+    const float tierX = right - tierW;
+    const bool tierChip = !tierLabel.empty() && tierX > menusEnd + 320.0f * s;
+    if (tierChip) right = tierX - 8.0f * s;
 
     // Modules: mode, brush, document, triangles, frame rate.
     std::vector<StatusModule> mods;
@@ -1637,6 +1649,48 @@ void App::drawStatusBar(const ShellGeometry& g) {
         }
     }
 
+    if (tierChip) {
+        ImGui::SetCursorScreenPos(ImVec2(tierX, o.y + (h - buttonH) * 0.5f));
+        const bool clicked = ImGui::InvisibleButton((std::string(tr("Performance tier")) + "##perf.tier_chip").c_str(), ImVec2(tierW, buttonH));
+        const bool hovered = ImGui::IsItemHovered();
+        const ImVec2 p = ImGui::GetItemRectMin();
+        dl->AddRect(p, ImVec2(p.x + tierW, p.y + buttonH), theme::u32(hovered ? theme::accent : theme::tileBorder), 3.0f * s);
+        if (hovered) dl->AddRectFilled(p, ImVec2(p.x + tierW, p.y + buttonH), theme::u32(theme::frameHover, 0.6f), 3.0f * s);
+        textAt(monoSmall, p.x + 8.0f * s, hovered ? theme::textBright : theme::textDim, tierLabel);
+        ImGui::LogText("%s", tierLabel.c_str());
+        if (clicked) openPerformancePrefs();
+        ui::HelpText("Performance tier", nullptr,
+                     "The hardware tier SculptForge runs at on this computer. Click for what it turns on and to change it "
+                     "(Preferences > Performance).",
+                     "Status bar");
+    }
+    if (boltShown) {
+        // The bolt: two triangles of our own; orange when on; a short pop when it is switched.
+        ImGui::SetCursorScreenPos(ImVec2(boltX, o.y + (h - buttonH) * 0.5f));
+        const bool clicked = ImGui::InvisibleButton((std::string(tr("Turbo")) + "##view.turbo").c_str(), ImVec2(boltW, buttonH));
+        const bool hovered = ImGui::IsItemHovered();
+        const ImVec2 p = ImGui::GetItemRectMin();
+        const bool on = turboOn();
+        if (hovered) dl->AddRectFilled(p, ImVec2(p.x + boltW, p.y + buttonH), theme::u32(theme::frameHover, 0.7f), 3.0f * s);
+        const float since = float(ImGui::GetTime() - turboToggledAt_);
+        const float pop = since >= 0.0f && since < 0.3f ? 1.0f + 0.12f * std::sin(since / 0.3f * 3.14159f) : 1.0f;
+        const float u = buttonH * 0.30f * pop; // half height of the bolt
+        const ImVec2 c(p.x + boltW * 0.5f, p.y + buttonH * 0.5f);
+        const ImU32 col = theme::u32(on ? theme::accent : hovered ? theme::textBright : theme::textDim);
+        const float bx[6] = {0.30f, -0.50f, -0.04f, -0.30f, 0.50f, 0.04f}, by[6] = {-1.0f, 0.14f, 0.14f, 1.0f, -0.14f, -0.14f};
+        ImVec2 bolt[6];
+        for (int k = 0; k < 6; ++k) bolt[k] = ImVec2(c.x + bx[k] * u, c.y + by[k] * u);
+        if (on) dl->AddConcavePolyFilled(bolt, 6, col);
+        else dl->AddPolyline(bolt, 6, col, ImDrawFlags_Closed, std::max(1.0f, 1.25f * s));
+        ImGui::LogText("%s", on ? "Turbo on" : "Turbo off");
+        if (clicked) {
+            if (const Action* a = actions_.find("view.turbo"); a && a->run) {
+                actions_.touch(a->id);
+                a->run();
+            }
+        }
+        ui::HelpAction(*this, "view.turbo");
+    }
     if (mayaLink) {
         ImGui::SetCursorScreenPos(ImVec2(linkX, o.y + (h - buttonH) * 0.5f));
         const bool clicked = ImGui::InvisibleButton((std::string(tr("Live link on")) + "##mayalink.chip").c_str(), ImVec2(linkW, buttonH));

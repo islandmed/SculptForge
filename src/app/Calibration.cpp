@@ -9,6 +9,8 @@
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <fstream>
+#include <filesystem>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -381,6 +383,15 @@ double measureUpload(bool quick) {
 
 } // namespace
 
+uint64_t queryFreeVideoMemoryMB(const std::string& source) {
+    const bool nvx = source.rfind("GL_NVX", 0) == 0, ati = source.rfind("GL_ATI", 0) == 0;
+    if (!nvx && !ati) return 0;
+    while (gl::GetError() != GL_NO_ERROR) {}
+    GLint v[4] = {};
+    gl::GetIntegerv(nvx ? kGL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX : kGL_TEXTURE_FREE_MEMORY_ATI, v);
+    return gl::GetError() == GL_NO_ERROR && v[0] > 0 ? uint64_t(v[0]) >> 10 : 0;
+}
+
 void probeHardware(HardwareInfo& info) {
     probeSystem(info);
     const GlExtra e = loadExtra();
@@ -593,6 +604,42 @@ void applyCachedThreadCount() {
     HardwareProfile cached;
     if (loadHardwareProfile(hardwareProfilePath(), cached) && cached.settings.threads > 0)
         ThreadPool::setSharedThreadCount(cached.settings.threads);
+}
+
+namespace {
+std::string gpuMarkerPath() {
+    const std::string profile = hardwareProfilePath();
+    return profile.empty() ? std::string() : profile + ".gpu-starting";
+}
+} // namespace
+
+std::string applyCachedGpuChoice() {
+    const std::string marker = gpuMarkerPath();
+    if (marker.empty()) return {};
+    std::error_code ec;
+    const std::filesystem::path m(std::u8string(marker.begin(), marker.end()));
+    if (std::filesystem::exists(m, ec)) {
+        // The last start with a chosen card never reached its GL context: the system's choice this time.
+        std::filesystem::remove(m, ec);
+        clearGpuChoice();
+        SDL_Log("Graphics card: the last start on the chosen card failed; using the system's choice");
+        return "The chosen graphics card didn't start last time, so SculptForge uses the system's choice "
+               "(Preferences > Performance > Graphics card)";
+    }
+    HardwareProfile cached;
+    const std::string choice = loadHardwareProfile(hardwareProfilePath(), cached) ? cached.overrides.gpu : std::string();
+    const std::string did = applyGpuChoice(choice, listGpus());
+    if (did.empty()) return {};
+    SDL_Log("Graphics card: %s", did.c_str());
+    std::ofstream(m) << did << "\n";
+    return {};
+}
+
+void gpuChoiceStarted() {
+    const std::string marker = gpuMarkerPath();
+    if (marker.empty()) return;
+    std::error_code ec;
+    std::filesystem::remove(std::filesystem::path(std::u8string(marker.begin(), marker.end())), ec);
 }
 
 HardwareProfile calibrateNow(bool quick, const ProfileOverrides& overrides, const ProfileTier* previous) {

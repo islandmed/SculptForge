@@ -333,6 +333,27 @@ The app reads the power source with `SDL_GetPowerInfo` at start and every 5 seco
 half the upload budget and 60 Hz (unless set by hand), and the status bar says so. The `draft_brush` override
 (on / off) wins over both. `draftBrushMode` is a flag for the brush engine; the brushes don't read it yet.
 
+### Hardware tiers (core/HardwareTier.h, feat/hw-tiers)
+
+A second axis beside the render profile: **Floor** (shown as Essential) / **Standard** / **High** / **Extreme**, from
+the probed memory sizes, GPU type and threads, capped by the calibration (Standard needs 120M triangles/s, High 300M,
+Extreme 1000M; a dab over 2 ms stops at Standard). The render profile still sets the view's budgets from measured
+speed, unchanged. The tier sets `TierConfig::budgets` (TierBudgets), which the advanced levels read: Focus Detail
+(resident MB, GPU pool, ms per frame, streaming threshold), coarse LOD, micro and 1B-scene ceilings, the dense
+stroke knobs, 16K textures. **Floor's budgets are the constants every machine used before tiers**
+(tests/test_hardware_tier.cpp pins them), so the floor tier can't regress; the readers set higher tiers' values as
+they measure them.
+
+- `SF_HW_SIMULATE=floor|standard|high|extreme` forces a tier (floor keeps the integrated-GPU render budgets and 4
+  threads as before); `SF_TIER_<NAME>=<value>` pins one budget (`SF_TIER_FOCUS_RESIDENT_MB=1024`); `SF_COMPUTE=cpu|gpu`;
+  `SF_TURBO=1`.
+- Memory guard: once a second, free RAM (MemAvailable etc.) and free VRAM (NVX / ATI meminfo); under max(1 GB, RAM/10)
+  (or 256 MB VRAM) for 2 s steps the tier in effect down one level; over max(3 GB, RAM/4) for 60 s steps back up; at
+  most one change per 10 s.
+- Turbo: AA off while the view moves or a stroke runs, the motion proxy from half the threshold (even with Fast
+  Navigation off), 75 % resolution while moving, the detected tier's budgets if a lower one was set by hand. It
+  changes no saved setting.
+
 ### Render triangle budget and the frame governor
 
 `renderTriangleBudget()` (core/HardwareProfile.h) is the number of triangles the 3D view may draw per frame to
