@@ -76,6 +76,7 @@ int MicroMesh::widen(float need) {
     step *= float(div);
     rescaled = true;
     reach.all = true;
+    if (focus) focus->rescale(*this, doublings); // (the tiles not in disp: core/FocusDetail.h)
     ++revision;
     return div;
 }
