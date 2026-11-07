@@ -799,8 +799,9 @@ if(SCULPTFORGE_BUILD_TESTS)
              ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME public_email_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_public_email.py --self-test)
     # The same marks read off the pixels of every tracked image and video (OCR, cached by file hash), and the deploy's
-    # takedown of flagged ones (tools/media_takedown.py).
-    add_test(NAME marks_media COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks_media.py
+    # takedown of flagged ones (tools/media_takedown.py). --cached-only reads it as CI does (no OCR there), so a new image
+    # without its committed cache entry fails here too, not only in CI (0.11.12 staging).
+    add_test(NAME marks_media COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks_media.py --cached-only
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME marks_media_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks_media.py --self-test)
     add_test(NAME media_takedown_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/media_takedown.py --self-test)
