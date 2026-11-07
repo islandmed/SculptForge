@@ -64,6 +64,10 @@ add_library(sculptforge_core STATIC
   src/core/ScreenSelect.cpp
   src/core/Parts.cpp
   src/core/Units.cpp
+  src/core/Garment.cpp
+  src/core/GarmentMesh.cpp
+  src/core/GarmentFiles.cpp
+  src/core/GarmentCommands.cpp
   src/core/ExtractMirror.cpp
   src/core/MeshTransform.cpp
   src/core/Deform.cpp
