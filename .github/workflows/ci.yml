@@ -136,6 +136,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: python3 tools/check_marks.py --self-test && python3 tools/check_marks.py
+      - run: python3 tools/check_public_email.py --self-test && python3 tools/check_public_email.py
       # On screen too: images and video frames, read from tools/marks_media_cache.json; a file the cache doesn't have
       # yet is OCR'd here (commit its entry: run tools/check_marks_media.py locally).
       - run: |

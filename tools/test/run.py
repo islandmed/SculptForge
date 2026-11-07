@@ -43,7 +43,7 @@ ENV_PREFIXES = ("SF_", "SCULPTFORGE_", "SDL_", "GALLIUM_", "LIBGL_", "MESA_", "_
 ENV_IGNORE = {"SDL_APP_ID"}
 # Tests that read files their command doesn't name: hashed as globs (repo-relative). "*" = every tracked file.
 READS = {
-    "marks": ["*"], "marks_self_test": ["tools/check_marks.py"],
+    "marks": ["*"], "marks_self_test": ["tools/check_marks.py"], "public_email": ["*"], "public_email_self_test": ["tools/check_public_email.py"],
     "guide_site": ["*"], "guide_menu_paths": ["*"], "ui_guide_shortcuts": ["docs/guide"],
     "release_notes": ["tools/release"], "release_notes_fragments": ["changes", "tools/release"],
     "release_script_beta": ["*"], "upstream_watch": ["tools/upstream-watch"],
