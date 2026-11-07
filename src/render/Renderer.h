@@ -450,6 +450,16 @@ private:
         // A mesh with a micro level (core/Micro.h) draws through this instead of the buffers above.
         std::shared_ptr<MicroRenderer> micro;
         size_t microDrawn = 0;
+        size_t microFull = 0; // what its last micro draw drew (0: none yet)
+        // Its coarse levels (the ones above, on its displaced base corners: microCorners, docs/design/micro-coarse-lod.md),
+        // with `order`, `bounds`, `grid` and `box` of the base. The corners an edit moved wait in microMoved until
+        // the coarse levels update (the stroke is over).
+        std::vector<glm::vec3> microPositions, microNormals;
+        std::vector<float> microMask;
+        std::vector<uint8_t> microMoved;
+        std::vector<uint32_t> microMovedList;
+        bool microAllMoved = false;
+        uint64_t microCoarseKey = 0; // the level and base they were built for
         // The stroke-only programs (GHOST, draft FLAT) warmed for these features (drawSlot; -1: not yet), and
         // the frames drawn while waiting (the open's first frame isn't made slower).
         mutable int strokeWarmed = -1, strokeWarmFrames = 0;
@@ -474,6 +484,13 @@ private:
     void updateCoarse(MeshSlot& s, const Mesh& mesh);
     size_t lodBudget_ = 0; // the last still draw's triangle budget: sync builds the coarse levels of meshes over it
     void buildCoarse(MeshSlot& s, const Mesh& mesh);
+    void installCoarse(MeshSlot& s, std::unique_ptr<CoarseLevels> levels, double buildMs);
+    // A micro level's coarse levels: built, edits noted (before MicroRenderer::sync clears them), updated, drawn
+    // (false: not drawable this frame, the micro level draws).
+    void buildMicroCoarse(MeshSlot& s, const Mesh& mesh);
+    void noteMicroEdits(MeshSlot& s, const Mesh& mesh);
+    void updateMicroCoarse(MeshSlot& s, const Mesh& mesh);
+    bool drawMicroCoarse(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings, size_t budget);
     void uploadCoarsePoints(MeshSlot& s);
     void uploadCoarseAttributes(MeshSlot& s); // the cells' colours and mask (with the coarse VAO bound)
     size_t triangleBudget(const RenderSettings& settings) const;
@@ -529,6 +546,9 @@ private:
     // The coarse-level cull: every visible cluster in full (drawClusters_) if that fits `budget`, else at one level
     // (coarseClusters_, coarseLevel_), the finest that fits.
     void cullCoarse(const MeshSlot& s, const CullView& view, size_t budget);
+    // At rest with coarse levels on: true when a frame of `triangles` in full fits the still-frame budget and the view
+    // has been still long enough; else sets previewOnly_ (it doesn't fit: the Preview detail hint) or stillWanted_.
+    bool stillDetail(size_t triangles, const RenderSettings& settings, size_t budget);
     std::vector<uint32_t> coarseClusters_;
     size_t lastCoarseClusters_ = 0;
     bool previewOnly_ = false, stillWanted_ = false, stroking_ = false;

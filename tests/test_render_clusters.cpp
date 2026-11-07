@@ -7,6 +7,7 @@
 #include "TestHarness.h"
 
 #include "core/Benchmark.h"
+#include "core/Micro.h"
 #include "core/Primitives.h"
 #include "core/ThreadPool.h"
 #include "core/UploadOrder.h"
@@ -357,16 +358,17 @@ namespace {
 
 // Every cell point the mean of its vertices where they are now (the build's membership: a vertex's level-0 cell,
 // then its parents up the levels), brute force over the whole mesh.
-bool cellPointsAreMeans(const CoarseLevels& L, const Mesh& m, float& worst) {
+bool cellPointsAreMeans(const CoarseLevels& L, std::span<const glm::vec3> points, float& worst) {
     std::vector<glm::dvec3> sum(L.positions.size(), glm::dvec3(0.0));
     std::vector<uint32_t> n(L.positions.size(), 0);
-    for (size_t v = 0; v < m.vertexCount(); ++v)
-        for (uint32_t k = L.vertexCell[v]; k != ~0u; k = L.parent[k]) sum[k] += glm::dvec3(m.positions[v]), ++n[k];
+    for (size_t v = 0; v < points.size(); ++v)
+        for (uint32_t k = L.vertexCell[v]; k != ~0u; k = L.parent[k]) sum[k] += glm::dvec3(points[v]), ++n[k];
     worst = 0.0f;
     for (size_t k = 0; k < sum.size(); ++k)
         if (n[k]) worst = std::max(worst, glm::distance(L.positions[k], glm::vec3(sum[k] / double(n[k]))));
     return worst < L.cell * 1e-4f;
 }
+bool cellPointsAreMeans(const CoarseLevels& L, const Mesh& m, float& worst) { return cellPointsAreMeans(L, m.positions, worst); }
 
 Mesh detailedSphere(size_t triangles) {
     Mesh m = makeBenchSphere(triangles);
@@ -540,4 +542,87 @@ TEST(coarse_still_frame_estimate_survives_a_slow_frame) {
     CHECK(nextGpuMsPerTriangle(settled, 50.0, 0.5, 100000) == settled);
     CHECK(nextGpuMsPerTriangle(settled, 50.0, 60.0, top) == settled);
     CHECK(nextGpuMsPerTriangle(0.0, 6.0, 0.5, top) > 0.0);
+}
+
+TEST(micro_coarse_levels_on_displaced_corners) {
+    // A micro level's coarse levels (docs/design/micro-coarse-lod.md) are a mesh's built on its displaced base corners:
+    // microCorners gives each corner where the micro surface has it (microPoint), the cells are the means of those,
+    // and after an edit to some corners' displacement the moved corners (and their neighbours' normals) update them.
+    Mesh m = detailedSphere(200000);
+    std::string err;
+    CHECK(microDivide(m, 1, err));
+    MicroMesh& mm = mutableMicro(m);
+    const uint32_t corner[3] = {MicroMesh::index(0, 0, mm.n), MicroMesh::index(mm.n, 0, mm.n), MicroMesh::index(0, mm.n, mm.n)};
+    // (per vertex, so every triangle around a corner holds the same value: stitched)
+    const auto height = [&](uint32_t v, float scale) { return int16_t(std::lround(scale * std::sin(m.positions[v].x * 40.0f) * 2000.0f)); };
+    for (uint32_t t = 0; t < m.triangleCount(); ++t)
+        for (int k = 0; k < 3; ++k) mm.disp[size_t(t) * mm.samples + corner[k]] = height(m.triangles[t][k], 1.0f);
+    std::vector<glm::vec3> pos, nrm;
+    std::vector<float> mask;
+    microCorners(m, pos, nrm, mask);
+    CHECK(pos.size() == m.vertexCount() && nrm.size() == m.vertexCount() && mask.empty());
+    float off = 0.0f;
+    for (uint32_t t = 0; t < m.triangleCount(); t += 97) {
+        const glm::uvec3 tri = m.triangles[t];
+        off = std::max(off, glm::distance(pos[tri.x], microPoint(m, t, 0, 0)));
+        off = std::max(off, glm::distance(pos[tri.y], microPoint(m, t, mm.n, 0)));
+        off = std::max(off, glm::distance(pos[tri.z], microPoint(m, t, 0, mm.n)));
+    }
+    float moved = 0.0f;
+    for (size_t v = 0; v < m.vertexCount(); ++v) moved = std::max(moved, glm::distance(pos[v], m.positions[v]));
+    std::printf("  micro corners: off the micro surface by %g (moved up to %g)\n", double(off), double(moved));
+    CHECK(off < 1e-5f);
+    CHECK(moved > 1000.0f * mm.step);
+    UploadOrder order;
+    order.build(m);
+    CoarseVertices V;
+    V.positions = pos, V.normals = nrm;
+    CoarseLevels L = buildCoarseLevels(m, V, order);
+    CHECK(L.clusters.size() == order.clusters().size());
+    float worst = 0.0f;
+    CHECK(cellPointsAreMeans(L, pos, worst));
+    // An edit: some corners' displacement changes; microCorners for those (and the normals around them), then the
+    // levels of their clusters: the cells are the means again, as a full recompute has them.
+    std::vector<uint8_t> flag(m.vertexCount(), 0);
+    std::vector<uint32_t> movedVerts, ring;
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        const glm::uvec3 tri = m.triangles[t];
+        if (m.positions[tri.x].y < 0.6f * glm::length(m.positions[tri.x])) continue;
+        for (int k = 0; k < 3; ++k) {
+            mm.disp[size_t(t) * mm.samples + corner[k]] = height(tri[k], 3.0f);
+            if (!flag[tri[k]]) flag[tri[k]] = 1, movedVerts.push_back(tri[k]);
+        }
+    }
+    ring = movedVerts;
+    for (uint32_t v : movedVerts)
+        for (uint32_t t : m.vertexTriangles(v))
+            for (int k = 0; k < 3; ++k)
+                if (!flag[m.triangles[t][k]]) flag[m.triangles[t][k]] = 2, ring.push_back(m.triangles[t][k]);
+    microCorners(m, pos, nrm, mask, movedVerts, ring);
+    std::vector<uint32_t> dirty;
+    for (uint32_t c = 0; c < order.clusters().size(); ++c) {
+        const auto& cl = order.clusters()[c];
+        for (uint32_t l = 0; l < cl.vertexCount; ++l)
+            if (flag[order.fromGpu()[cl.firstVertex + l]]) {
+                dirty.push_back(c);
+                break;
+            }
+    }
+    const std::vector<uint32_t> changed = updateCoarseLevels(L, V, order, dirty);
+    std::vector<glm::vec3> pos2, nrm2;
+    microCorners(m, pos2, nrm2, mask);
+    float partial = 0.0f;
+    for (size_t v = 0; v < pos.size(); ++v) partial = std::max(partial, glm::distance(pos[v], pos2[v]) + glm::distance(nrm[v], nrm2[v]));
+    std::printf("  micro edit: %zu corners moved, %zu dirty clusters, %zu cells changed; partial vs full recompute off by %g\n",
+                movedVerts.size(), dirty.size(), changed.size(), double(partial));
+    CHECK(!movedVerts.empty() && !changed.empty());
+    CHECK(partial < 1e-6f);
+    CHECK(cellPointsAreMeans(L, pos, worst));
+    // A mask on the level: the corners carry it, the cells its mean.
+    mm.mask.assign(size_t(m.triangleCount()) * mm.samples, 255);
+    microCorners(m, pos, nrm, mask);
+    CHECK(mask.size() == m.vertexCount() && mask[0] == 1.0f);
+    V.mask = mask;
+    coarseAttributes(L, V);
+    CHECK(L.mask.size() == L.positions.size() && L.mask[0] == 1.0f);
 }

@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <span>
 #include <vector>
 
 namespace sf {
@@ -111,16 +112,35 @@ struct CoarseLevels {
     // The cell of point p at a level by its grid position (cell id into positions), or ~0u: none there at the build.
     uint32_t cellOf(const glm::vec3& p, int level) const;
 };
+// What the coarse levels are made of, per mesh vertex: its point, normal, colour and mask (normals, colours, mask
+// empty: none). A mesh's own; a micro level's are its displaced base corners (microCorners), on the base's triangles.
+struct CoarseVertices {
+    std::span<const glm::vec3> positions, normals, colors;
+    std::span<const float> mask;
+    static CoarseVertices of(const Mesh& mesh);
+};
 CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order);
+CoarseLevels buildCoarseLevels(const Mesh& mesh, const CoarseVertices& vertices, const UploadOrder& order);
 // After an edit: the points (and normals) of the level-0 cells holding the `dirty` clusters' vertices, from those
 // vertices where they are now, and of their cells up the levels. Returns the cells changed.
 std::vector<uint32_t> updateCoarseLevels(CoarseLevels& levels, const Mesh& mesh, const UploadOrder& order,
                                          const std::vector<uint32_t>& dirty);
+std::vector<uint32_t> updateCoarseLevels(CoarseLevels& levels, const CoarseVertices& vertices, const UploadOrder& order,
+                                         const std::vector<uint32_t>& dirty);
 // The cells' colours and mask from the mesh's: of the level-0 cells `cells0` (cell ids into positions; empty: all)
 // and their cells up the levels. Where the mesh gained or lost colours or a mask since, every cell's.
 void coarseAttributes(CoarseLevels& levels, const Mesh& mesh, std::vector<uint32_t> cells0 = {});
+void coarseAttributes(CoarseLevels& levels, const CoarseVertices& vertices, std::vector<uint32_t> cells0 = {});
 // Whether the cells' colours and mask are there exactly where the mesh has them.
 bool coarseAttributesMatch(const CoarseLevels& levels, const Mesh& mesh);
+bool coarseAttributesMatch(const CoarseLevels& levels, const CoarseVertices& vertices);
+
+// A micro level's base corners as the micro surface has them (core/Micro.h: the corner plus its normal times its
+// displacement), with normals of that displaced base (area-weighted) and the micro mask at the corners (empty when
+// the level has none): what the coarse levels of a micro level are built from. `vertices` empty: every vertex;
+// else those (and the arrays already sized), positions first, then the normals of `normalsOf` (empty: the same).
+void microCorners(const Mesh& mesh, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals, std::vector<float>& mask,
+                  std::span<const uint32_t> vertices = {}, std::span<const uint32_t> normalsOf = {});
 
 // The measured GPU time per drawn triangle (ms; 0 = none yet), a moving average of whole-frame timer queries, after
 // one more frame: `gpuMs` for `triangles`, of which `cpuBeforeDrawMs` the CPU spent before the 3D view's first draw

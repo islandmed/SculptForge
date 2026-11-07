@@ -2277,15 +2277,24 @@ void Renderer::drawPatches(const MeshSlot& s, GLenum mode, DrawPart part, GLint 
 void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, bool wireframe, bool pbr) {
     if (mesh.micro && microMatches(mesh)) { // a micro level draws its own way (render/MicroRenderer.h)
         if (!s.micro) s.micro = std::make_shared<MicroRenderer>();
+        noteMicroEdits(s, mesh); // (before the micro sync clears them)
         s.micro->viewMoving = proxyUsed_; // (the last draw's: the view moving)
         s.outOfMemory = !s.micro->sync(mesh);
         s.drawnTriangles = s.outOfMemory ? 0 : 1; // (draw() skips empty slots)
         s.fresh = true;                           // (back to a mesh: a full upload)
+        // Coarse levels when even one micro triangle per base triangle is over the budget (a dense base).
+        if (coarseLod_ && !s.coarseTried && !s.outOfMemory && mesh.triangleCount() > (lodBudget_ ? lodBudget_ : triangleBudget(RenderSettings())))
+            buildMicroCoarse(s, mesh);
+        if (s.coarse && !s.coarsePending.empty() && !s.coarseEdited && !stroking_) updateMicroCoarse(s, mesh); // (the stroke is over)
+        s.coarseEdited = false;
         return;
     }
     if (s.micro) {
         s.micro.reset();
-        s.fresh = true;
+        s.fresh = true; // (a full upload: the mesh's own coarse levels from scratch)
+        s.microCoarseKey = 0, s.microFull = 0, s.microAllMoved = false;
+        std::vector<glm::vec3>().swap(s.microPositions), std::vector<glm::vec3>().swap(s.microNormals);
+        std::vector<float>().swap(s.microMask), std::vector<uint8_t>().swap(s.microMoved), std::vector<uint32_t>().swap(s.microMovedList);
     }
     const size_t nv = mesh.vertexCount();
     if (normalMap && (!normalMap->rgb || !normalMap->tangents || normalMap->tangents->size() != mesh.uvs.size() ||
@@ -3265,6 +3274,20 @@ void Renderer::cull(const MeshSlot& s, const CullView& frame, bool proxy) {
 // Clark 1976: the detail from what the screen can hold. Everything in full detail if it fits the budget; else every
 // visible cluster at one level, the finest that fits (the coarsest if none does): one level for all keeps the surface
 // closed (render/Clusters.h). Clusters an edit moved draw in full until updated (their seams may gap until then).
+bool Renderer::stillDetail(size_t triangles, const RenderSettings& settings, size_t budget) {
+    constexpr double kStillDelay = 0.15;
+    double stillMs = 100.0;
+    if (const char* e = std::getenv("SF_STILL_FRAME_MS"); e && std::atof(e) > 0.0) stillMs = std::atof(e); // (tests)
+    // (no frame measured yet: the calibrated rate, else the budget as half a 60 Hz frame's worth of triangles)
+    const double perTriangle = gpuMsPerTriangle_ > 0.0 ? gpuMsPerTriangle_
+                               : triangleRateM_ > 0.0 ? 1e-3 / triangleRateM_
+                                                      : (1000.0 / 60.0 * 0.5) / double(std::max<size_t>(budget, 1));
+    if (double(triangles) * perTriangle > stillMs) previewOnly_ = true;
+    else if (settings.stillSeconds >= kStillDelay) return true;
+    else stillWanted_ = true;
+    return false;
+}
+
 void Renderer::cullCoarse(const MeshSlot& s, const CullView& frame, size_t budget) {
     cull(s, frame, false); // (the visible clusters, in full)
     coarseClusters_.clear();
@@ -3407,7 +3430,11 @@ void Renderer::buildCoarse(MeshSlot& s, const Mesh& mesh) {
     s.coarseTried = true;
     const auto start = std::chrono::steady_clock::now();
     auto levels = std::make_unique<CoarseLevels>(buildCoarseLevels(mesh, s.order));
-    const double buildMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    installCoarse(s, std::move(levels), std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+}
+
+// Coarse levels to the GPU (a mesh's or a micro level's: on s.grid, for s.order's clusters).
+void Renderer::installCoarse(MeshSlot& s, std::unique_ptr<CoarseLevels> levels, double buildMs) {
     if (levels->clusters.size() != s.order.clusters().size() || levels->indices.empty()) return;
     if (!s.coarseVao) {
         gl::GenVertexArrays(1, &s.coarseVao);
@@ -3557,7 +3584,160 @@ void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
     s.coarsePending.clear();
 }
 
+namespace {
+// A sphere round cluster c's points (no normal cone: the GPU's culling does the back faces).
+ClusterBounds pointBounds(std::span<const glm::vec3> points, const UploadOrder& order, uint32_t c) {
+    const UploadOrder::Cluster& cl = order.clusters()[c];
+    const auto from = order.fromGpu();
+    AABB box;
+    for (uint32_t i = 0; i < cl.vertexCount; ++i)
+        if (const uint32_t v = from[cl.firstVertex + i]; v < points.size()) box.expand(points[v]);
+    ClusterBounds b;
+    if (!box.valid()) return b;
+    b.center = (box.min + box.max) * 0.5f;
+    float r2 = 0.0f;
+    for (uint32_t i = 0; i < cl.vertexCount; ++i)
+        if (const uint32_t v = from[cl.firstVertex + i]; v < points.size()) r2 = std::max(r2, glm::dot(points[v] - b.center, points[v] - b.center));
+    b.radius = std::sqrt(r2);
+    return b;
+}
+
+CoarseVertices microVertices(const std::vector<glm::vec3>& positions, const std::vector<glm::vec3>& normals, const std::vector<float>& mask) {
+    CoarseVertices v;
+    v.positions = positions;
+    v.normals = normals;
+    if (!mask.empty()) v.mask = mask;
+    return v;
+}
+} // namespace
+
+// A micro level's coarse levels: the base's cluster layout (its own, the micro level has none of these), the
+// displaced corners, then as a mesh's (built at once, timed).
+void Renderer::buildMicroCoarse(MeshSlot& s, const Mesh& mesh) {
+    s.coarseTried = true;
+    const auto start = std::chrono::steady_clock::now();
+    const size_t nv = mesh.vertexCount();
+    s.order.build(mesh);
+    microCorners(mesh, s.microPositions, s.microNormals, s.microMask);
+    if (s.microPositions.size() != nv) return;
+    auto levels = std::make_unique<CoarseLevels>(buildCoarseLevels(mesh, microVertices(s.microPositions, s.microNormals, s.microMask), s.order));
+    AABB box;
+    for (const glm::vec3& p : s.microPositions) box.expand(p);
+    s.box = box;
+    s.grid = PositionGrid::around(box);
+    const uint32_t nc = uint32_t(s.order.clusters().size());
+    s.bounds.assign(nc, ClusterBounds());
+    poolFor(nc, [&](size_t c0, size_t c1) {
+        for (size_t c = c0; c < c1; ++c) s.bounds[c] = pointBounds(s.microPositions, s.order, uint32_t(c));
+    }, 16);
+    s.microMoved.assign(nv, 0);
+    s.microMovedList.clear();
+    s.microAllMoved = false;
+    installCoarse(s, std::move(levels), std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+    if (!s.coarse) {
+        std::vector<glm::vec3>().swap(s.microPositions), std::vector<glm::vec3>().swap(s.microNormals);
+        std::vector<float>().swap(s.microMask), std::vector<uint8_t>().swap(s.microMoved);
+    }
+}
+
+// What an edit changed since the last sync, from the micro level's dirty bits (base triangles whose displacement
+// changed) and the base's moved vertices (whose neighbours' corners move with their normals): the corners to
+// recompute and their clusters (drawn by the micro level until the coarse levels update). A new level or base
+// starts over.
+void Renderer::noteMicroEdits(MeshSlot& s, const Mesh& mesh) {
+    const MicroMesh& mm = *mesh.micro;
+    const uint64_t key = (mm.serial * 0x9E3779B97F4A7C15ull) ^ (uint64_t(mesh.triangleCount()) << 32) ^ uint64_t(mesh.vertexCount()) ^
+                         (uint64_t(mm.level) << 58);
+    if (key != s.microCoarseKey) {
+        s.microCoarseKey = key;
+        s.coarse.reset(), s.coarseTried = false, s.coarseDirty.clear(), s.coarsePending.clear();
+        s.bounds.clear(), s.microFull = 0, s.microAllMoved = false;
+        std::vector<glm::vec3>().swap(s.microPositions), std::vector<glm::vec3>().swap(s.microNormals);
+        std::vector<float>().swap(s.microMask), std::vector<uint8_t>().swap(s.microMoved), std::vector<uint32_t>().swap(s.microMovedList);
+        return;
+    }
+    if (!s.coarse) return;
+    const size_t nv = mesh.vertexCount();
+    const bool baseMoved = mesh.dirtyBegin < mesh.dirtyEnd;
+    if (!s.microAllMoved && (mm.allDirty || mm.maskDirty || (baseMoved && size_t(mesh.dirtyEnd - mesh.dirtyBegin) > nv / 8))) {
+        s.microAllMoved = true;
+        for (uint32_t c = 0; c < uint32_t(s.coarseDirty.size()); ++c) markCoarseDirty(s, c);
+    }
+    const auto mark = [&](uint32_t v) {
+        s.coarseEdited = true;
+        if (s.microAllMoved || v >= nv || s.microMoved[v]) return;
+        s.microMoved[v] = 1;
+        s.microMovedList.push_back(v);
+        if (const uint32_t slot = s.order.toGpu(v); slot != UploadOrder::kNone) markCoarseDirty(s, s.order.clusterOfSlot(slot));
+    };
+    if (mm.dirtyBits.size() == (size_t(mm.baseTriangles) + 63) / 64)
+        for (size_t w = 0; w < mm.dirtyBits.size(); ++w)
+            for (uint64_t bits = mm.dirtyBits[w]; bits; bits &= bits - 1) {
+                const glm::uvec3 tri = mesh.triangles[w * 64 + size_t(std::countr_zero(bits))];
+                mark(tri.x), mark(tri.y), mark(tri.z);
+            }
+    if (baseMoved)
+        for (uint32_t v = mesh.dirtyBegin; v < std::min<uint32_t>(mesh.dirtyEnd, uint32_t(nv)); ++v) {
+            mark(v);
+            if (s.microAllMoved) break;
+            for (uint32_t t : mesh.vertexTriangles(v)) {
+                const glm::uvec3 tri = mesh.triangles[t];
+                mark(tri.x), mark(tri.y), mark(tri.z);
+            }
+        }
+}
+
+// After a stroke: the moved corners and the normals around them, then the cells as a mesh's (updateCoarseLevels).
+void Renderer::updateMicroCoarse(MeshSlot& s, const Mesh& mesh) {
+    const auto start = std::chrono::steady_clock::now();
+    const size_t moved = s.microAllMoved ? mesh.vertexCount() : s.microMovedList.size();
+    if (s.microAllMoved) {
+        microCorners(mesh, s.microPositions, s.microNormals, s.microMask);
+    } else {
+        std::vector<uint32_t> ring = s.microMovedList; // (their normals: theirs and their neighbours')
+        for (uint32_t v : s.microMovedList)
+            for (uint32_t t : mesh.vertexTriangles(v))
+                for (int k = 0; k < 3; ++k)
+                    if (const uint32_t u = mesh.triangles[t][k]; !s.microMoved[u]) {
+                        s.microMoved[u] = 2;
+                        ring.push_back(u);
+                        if (const uint32_t slot = s.order.toGpu(u); slot != UploadOrder::kNone) {
+                            const uint32_t c = s.order.clusterOfSlot(slot);
+                            if (!s.coarseDirty[c]) s.coarseDirty[c] = 1, s.coarsePending.push_back(c);
+                        }
+                    }
+        microCorners(mesh, s.microPositions, s.microNormals, s.microMask, s.microMovedList, ring);
+        for (uint32_t u : ring) s.microMoved[u] = 0;
+    }
+    const std::vector<uint32_t> changed = updateCoarseLevels(*s.coarse, microVertices(s.microPositions, s.microNormals, s.microMask), s.order, s.coarsePending);
+    for (uint32_t c : s.coarsePending) s.bounds[c] = pointBounds(s.microPositions, s.order, c);
+    gl::BindVertexArray(s.coarseVao);
+    if (!changed.empty()) uploadCoarsePoints(s), uploadCoarseAttributes(s);
+    gl::BindVertexArray(0);
+    gl::BindBuffer(GL_ARRAY_BUFFER, 0);
+    for (uint32_t c : s.coarsePending) s.coarseDirty[c] = 0;
+    if (std::getenv("SF_COARSE_LOG"))
+        std::fprintf(stderr, "coarse lod (micro): %zu corners, %zu clusters, %zu points updated in %.1f ms\n", moved, s.coarsePending.size(),
+                     changed.size(), std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+    s.coarsePending.clear();
+    s.microMovedList.clear();
+    s.microAllMoved = false;
+}
+
 void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
+    // A dense base: its coarse levels while even one micro triangle per base triangle in view is over the budget, and
+    // while the view moves; at rest the micro level, if a frame of it fits the still-frame budget (as a mesh's).
+    if (coarseLod_ && s.coarse && s.coarsePending.empty() && s.bounds.size() == s.coarse->clusters.size() && !(active && settings.wireframe)) {
+        const size_t budget = triangleBudget(settings);
+        coarseClusters_.clear();
+        size_t base = 0; // (the fewest the micro level draws)
+        for (uint32_t c = 0; c < uint32_t(s.bounds.size()); ++c)
+            if (s.bounds[c].radius >= 0.0f && insideFrustum(frameCull_, s.bounds[c]))
+                coarseClusters_.push_back(c), base += s.order.clusterTriangles(c);
+        bool coarse = settings.motionProxy || base > budget;
+        if (coarse && !settings.motionProxy && !settings.stroking) coarse = !stillDetail(base, settings, budget);
+        if (coarse && drawMicroCoarse(s, active, flat, settings, budget)) return;
+    }
     const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0));
     if (!p) return;
     gl::UseProgram(p->id);
@@ -3587,6 +3767,76 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     // (the budget is shared by the micro Parts on screen: each gets it whole; one is the usual case)
     const_cast<MeshSlot&>(s).microDrawn = s.micro->draw(p->id, frameCull_, frameProj_, frameViewport_, budget, target);
     lastDrawn_ += s.microDrawn;
+}
+
+// The coarse levels of a micro level (coarseClusters_: the clusters in view): every one at one level, the finest
+// that fits the budget, drawn by the mesh program as a mesh's coarse levels (normals and mask of the cells).
+bool Renderer::drawMicroCoarse(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings, size_t budget) {
+    const CoarseLevels& L = *s.coarse;
+    for (uint32_t c : coarseClusters_)
+        if (L.clusters[c].levels == 0) return false; // (one in full would leave seams: the micro level draws)
+    const int levels = int(L.levels.size());
+    int pick = levels - 1;
+    for (int level = 0; level < levels; ++level) {
+        size_t total = 0;
+        for (uint32_t c : coarseClusters_) total += L.clusters[c].count[std::min(level, L.clusters[c].levels - 1)] / 3;
+        if (total <= budget) {
+            pick = level;
+            break;
+        }
+    }
+    const bool pbr = settings.pbr() && envTexture_, masked = !L.mask.empty();
+    const MeshProgram* p = meshProgram((masked ? kPaint : 0) | (flat ? kFlat : 0) | (pbr ? kPbr : 0));
+    if (!p) return false;
+    gl::UseProgram(p->id);
+    gl::UniformMatrix4fv(p->view, 1, GL_FALSE, glm::value_ptr(frameView_));
+    gl::UniformMatrix4fv(p->proj, 1, GL_FALSE, glm::value_ptr(frameProj_));
+    gl::Uniform3fv(p->gridOrigin, 1, glm::value_ptr(s.grid.origin));
+    gl::Uniform1f(p->gridStep, s.grid.step);
+    gl::Uniform4fv(p->viewport, 1, glm::value_ptr(frameViewport_));
+    const bool orthographic = frameProj_[3][3] == 1.0f;
+    gl::Uniform2f(p->projScale, orthographic ? 1e20f : frameProj_[0][0], orthographic ? 1e20f : frameProj_[1][1]);
+    gl::Uniform3fv(p->baseColor, 1, glm::value_ptr(settings.baseColor));
+    gl::Uniform3fv(p->tintShift, 1, glm::value_ptr(materialTintShift(settings, false)));
+    gl::Uniform1i(p->litsphere, litsphereTexture(settings.litsphere) ? 1 : 0);
+    const LitSphereCavity cavity = litsphereCavity(settings.litsphere);
+    gl::Uniform2f(p->litsphereCavity, cavity.crease, cavity.ridge);
+    if (pbr) setPbrUniforms(*p, settings, false, s);
+    gl::Uniform1i(p->paint, 0);
+    gl::Uniform1i(p->showMask, active && settings.showMask && masked ? 1 : 0);
+    gl::Uniform1f(p->maskDarkness, std::clamp(settings.maskDarkness, 0.0f, 1.0f));
+    gl::Uniform1i(p->groups, 0);
+    gl::Uniform1i(p->dim, !active && settings.dimInactive ? 1 : 0);
+    setLightUniforms(*p, settings);
+    // (one-sided, as a mesh's coarse levels: the few folded slivers a cell merge leaves shade as their neighbours, and
+    // a closed base drops the back faces)
+    gl::Uniform1i(p->twoSided, 0);
+    gl::Uniform1i(p->checker, 0);
+    const bool cullBack = s.micro && s.micro->closed() && !xrayCull_;
+    if (cullBack) gl::Enable(GL_CULL_FACE);
+    gl::BindVertexArray(s.coarseVao);
+    if (L.colors.empty()) gl::VertexAttrib4f(2, 1.0f, 1.0f, 1.0f, 1.0f);
+    if (!masked) gl::VertexAttrib1f(3, 0.0f);
+    drawCounts_.clear();
+    drawOffsets_.clear();
+    size_t indices = 0;
+    for (uint32_t c : coarseClusters_) {
+        const CoarseLevels::Lod& l = L.clusters[c];
+        const int level = std::min(pick, l.levels - 1);
+        drawCounts_.push_back(GLsizei(l.count[level]));
+        drawOffsets_.push_back(reinterpret_cast<const void*>(size_t(l.first[level]) * sizeof(uint32_t)));
+        indices += l.count[level];
+    }
+    drawBases_.assign(drawCounts_.size(), 0);
+    if (!drawCounts_.empty())
+        gl::MultiDrawElementsBaseVertex(GL_TRIANGLES, drawCounts_.data(), GL_UNSIGNED_INT, drawOffsets_.data(), GLsizei(drawCounts_.size()),
+                                        drawBases_.data());
+    if (cullBack) gl::Disable(GL_CULL_FACE);
+    gl::BindVertexArray(0);
+    const_cast<MeshSlot&>(s).microDrawn = indices / 3;
+    lastDrawn_ += indices / 3;
+    lastCoarseClusters_ += coarseClusters_.size();
+    return true;
 }
 
 glm::mat3 lightRotation(float yawDegrees, float pitchDegrees) {
@@ -3694,18 +3944,8 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     if (static const bool log = std::getenv("SF_COARSE_LOG") != nullptr; log && coarse)
         std::fprintf(stderr, "coarse lod: still %.2f s, moving %d, stroking %d, pending %zu, per triangle %.3g ms\n", settings.stillSeconds,
                      int(settings.motionProxy), int(settings.stroking), s.coarsePending.size(), gpuMsPerTriangle_);
-    if (coarse && !settings.motionProxy && !settings.stroking && s.coarsePending.empty()) {
-        constexpr double kStillDelay = 0.15;
-        double stillMs = 100.0;
-        if (const char* e = std::getenv("SF_STILL_FRAME_MS"); e && std::atof(e) > 0.0) stillMs = std::atof(e); // (tests)
-        // (no frame measured yet: the calibrated rate, else the budget as half a 60 Hz frame's worth of triangles)
-        const double perTriangle = gpuMsPerTriangle_ > 0.0 ? gpuMsPerTriangle_
-                                   : triangleRateM_ > 0.0 ? 1e-3 / triangleRateM_
-                                                          : (1000.0 / 60.0 * 0.5) / double(std::max<size_t>(budget, 1));
-        if (double(s.drawnTriangles) * perTriangle > stillMs) previewOnly_ = true;
-        else if (settings.stillSeconds >= kStillDelay) coarse = false;
-        else stillWanted_ = true;
-    }
+    if (coarse && !settings.motionProxy && !settings.stroking && s.coarsePending.empty())
+        coarse = !stillDetail(s.drawnTriangles, settings, budget);
     if (static const bool log = std::getenv("SF_COARSE_LOG") != nullptr; log && s.coarse && !coarse)
         std::fprintf(stderr, "coarse lod: not drawn (per-triangle %d, wireframe %d, drawn %zu, budget %zu)\n", int(perTriangle),
                      int(active && settings.wireframe), s.drawnTriangles, budget);
