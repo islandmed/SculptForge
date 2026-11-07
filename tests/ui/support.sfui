@@ -41,12 +41,14 @@ expect_value welcome_open == 1
 click "Close##welcome"
 expect_value welcome_open == 0
 
-# Help > About: the supporters list is empty for now, so it invites the first one.
+# Help > About: the Founding Members and the supporters (docs/supporters.txt, website/founding.json: compiled in),
+# checked without naming anyone, so a new credit doesn't break the test.
 click "Help##palette.help"
 click "About SculptForge##help.about"
+expect_text "Founding Members"
 expect_text "Supporters"
+expect_text "Thank you to everyone who supports SculptForge"
 expect_text "bug-fix and security releases go out to everyone the same day"
-expect_text "Be the first: sculptforge.app/support.html"
 shot about_supporters
 click "Support SculptForge##about"
 expect_value support_requests == 2
