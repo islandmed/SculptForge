@@ -5,6 +5,17 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.14
+
+```features
+date: 2026-11-07
+tagline: A deformation stack, a slimmer layout, and palettes that open on small screens.
+highlight: Deformation stack: bend, twist, taper and more on a whole Part, with a live preview you can reorder and apply (thanks foirgairwolf on Discord)
+highlight: Slimmer Library and timeline: about a third less height, with the timeline as one thin row by default (thanks factoberplay on YouTube)
+highlight: Small screens: below 1280 px the side palettes open as drop-downs instead of not opening at all
+highlight: Membership moments: a quiet heart in the top bar and an occasional thank-you at a milestone; nothing in the app is ever paywalled
+```
+
 ## Version 0.11.13
 
 ```features

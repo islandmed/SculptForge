@@ -1,4 +1,5 @@
 ---
+highlight: Membership moments: a quiet heart in the top bar and an occasional thank-you at a milestone; nothing in the app is ever paywalled
 whats_new: **Membership moments**: the small membership card can now also come at a milestone (your 10th start,
   10 hours of sculpting, your 100th save; counted on your computer only, never sent) and says the true number. After
   a third **Not now** it waits a month, after a sixth it only comes with an update. A quiet heart at the right of the

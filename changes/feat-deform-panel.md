@@ -5,7 +5,7 @@ whats_new: **Deformation stack** (requested by foirgairwolf on Discord): **Tool 
   **Apply Selected** or **Reset**. Every step is a command too: `deform_stack ops="bend 45 y soft; twist 90 y"`.
 whats_new: **Exact size** (requested by foirgairwolf on Discord): **Tool > Deformation > Size** shows the Part's width, height
   and depth in scene units; drag one or type an exact value to resize it, with **Uniform** keeping its proportions.
-highlight: Deformation stack: bend, twist, taper and more on the whole Part, live
+highlight: Deformation stack: bend, twist, taper and more on a whole Part, with a live preview you can reorder and apply (thanks foirgairwolf on Discord)
 added: **Deformation stack** (Tool > Deformation > Stack, requested by foirgairwolf on Discord): thirteen whole-Part shape
   operations in four groups (Transform: Move, Turn, Scale, Squash; Bend & Twist: Bend, Twist, Taper, Shear; Shape:
   Round, Box, Flatten, Sag, Depth; plus the Surface ones), each along any of X, Y and Z about the Part's centre (or

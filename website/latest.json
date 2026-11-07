@@ -8,5 +8,11 @@
     "Image to 3D: remove the flat background plane a generated model stands on, in one click (thanks fenix on Discord)",
     "Reconstruct Subdiv: lower levels keep their UVs, even where seams cross coarse faces (thanks @RodTDai, #145)",
     "Timelapse: rendered timelapses no longer flicker between detail levels (thanks @ebarranco)"
-  ]
+  ],
+  "support": {
+    "founding": {
+      "taken": 2,
+      "limit": 100
+    }
+  }
 }
