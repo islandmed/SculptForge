@@ -70,6 +70,8 @@ WHATS_NEW = {
     "wn-whats-new": ("wn-whats-new", (170, 120, 1430, 834)),
     "wn-starter-meshes": ("wn-starter-meshes", (108, 145, 1212, 770)),
     "wn-brush-settings": ("wn-brush-settings", (160, 145, 880, 553)),
+    "wn-stencil": ("wn-stencil", (220, 244, 1138, 764)),
+    "wn-stencil-overlay": ("wn-stencil-overlay", (220, 244, 1138, 764)),
 }
 WN_SIZE = (600, 340)
 
