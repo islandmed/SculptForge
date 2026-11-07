@@ -7,7 +7,7 @@ name: Prune caches
 
 on:
   workflow_run:
-    workflows: [CI, Packages]
+    workflows: [CI, Packages, T0]
     types: [completed]
   workflow_dispatch:
 
@@ -29,4 +29,4 @@ jobs:
           sparse-checkout: tools/ci
       - env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 tools/ci/prune_caches.py ccache-ci- cmake-ci- ccache-pkg-
+        run: python3 tools/ci/prune_caches.py ccache-ci- cmake-ci- ccache-pkg- ccache-t0-
