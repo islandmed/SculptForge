@@ -49,6 +49,11 @@ struct RenderSettings {
     // Backface culling (#68, Tool > Display): back faces are never drawn, on any mesh (closed or not, from any
     // view). Off: they are skipped only where they can't show (a closed mesh seen from outside, Renderer::cull).
     bool backfaceCulling = false;
+    // Floor grid (#115, View > Floor grid): a faint grid on the floor under the model (y = floorHeight, Y up; the
+    // app keeps it at the lowest point of the visible Parts), its X and Z axes through the origin, fading with
+    // distance. Drawn under every Part. Off by default.
+    bool floorGrid = false;
+    float floorHeight = 0.0f;
     // The view's background: the charcoal radial gradient (default) or one flat display (sRGB) colour (#21).
     bool gradientBackground = true;
     glm::vec3 backgroundColor{0.168f, 0.168f, 0.168f};
@@ -252,6 +257,7 @@ public:
     size_t microPendingShading() const;
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
     size_t lastDrawnTriangles() const { return lastDrawn_; }
+    bool floorGridDrawn() const { return floorGridDrawn_; } // the last draw() drew the floor grid (tests)
     // Coarse levels (tests): the clusters the last frame drew at a coarse level, and the edited clusters whose levels
     // are still to be updated (drawn in full until then).
     size_t coarseDrawnClusters() const { return lastCoarseClusters_; }
@@ -305,6 +311,8 @@ public:
                                 std::vector<uint8_t>& rgba, std::string& error);
 
 private:
+    void drawFloorGrid(const Camera& camera, const glm::mat4& view, const glm::mat4& proj,
+                       const RenderSettings& settings);
     void drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWidth, int fbHeight, float opacity);
 
     GLuint wireProgram_ = 0, wireLineProgram_ = 0, bgProgram_ = 0, splatProgram_ = 0;
@@ -500,6 +508,8 @@ private:
     bool keepBackfaces_ = false;
     GLenum xrayCull_ = 0;        // X-Ray's lone Part: the faces this pass culls (GL_FRONT, then GL_BACK) // X-Ray's lone see-through Part: draw its back faces too (cull)
     GLuint envTexture_ = 0, brdfTexture_ = 0, envBgProgram_ = 0;
+    GLuint floorProgram_ = 0;   // drawFloorGrid's, linked when the grid first shows
+    bool floorGridDrawn_ = false;
     struct EnvJob;
     std::shared_ptr<EnvJob> envJob_;
     std::function<void()> envWake_;

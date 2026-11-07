@@ -1,0 +1,108 @@
+# Floor grid (#115): View > Floor grid (also Tool > Display and the command palette) draws a faint grid on the floor
+# the model stands on (the lowest point of the visible Parts, Y up), the X and Z axes through the origin marked,
+# fading into the distance. It is drawn before the Parts, so it never shows on the model. Off by default; a preference.
+run ui_look look=forge layout=sculptforge
+run new_sphere subdivisions=4
+camera 30 -20
+wait 0.3
+expect_value floor_grid == 0
+remember drawn_triangles sphere_tris
+shot off
+expect_value floor_grid_drawn == 0
+
+click "View##menu.view"
+expect "Floor grid##render"
+click "Floor grid##render"
+expect_value floor_grid == 1
+shot view-menu
+key escape
+wait 0.3
+shot on
+expect_value floor_grid_drawn == 1
+# The starter sphere (centred on the origin) stands on the grid: the floor is at its bottom, not through its middle.
+expect_value floor_height < -0.9
+remember floor_height sphere_floor
+# The grid adds none of the model's triangles (it draws one quad of its own).
+expect_value drawn_triangles == $sphere_tris
+
+# Seen from above and from far away: the grid steps up by ten, and fades out at the edges.
+camera 30 -60
+wait 0.3
+shot above
+camera_distance 40
+wait 0.3
+shot far
+key f
+wait 0.3
+# From below the floor the whole model still shows: the grid only around it, never over it.
+camera 30 25
+wait 0.3
+shot below
+
+# A model moved below the origin: the floor follows once the move ends.
+camera 30 -20
+run transform translate=0,-3,0 masked=false
+key f
+camera 30 -20
+wait 0.3
+expect_value floor_height < -3.9
+shot below-origin
+key ctrl+z
+key f
+wait 0.3
+expect_value floor_height == $sphere_floor
+
+# A gizmo drag: the floor stays put during the drag and moves when it ends.
+key w
+gizmo_drag move_y 0 70 keep
+wait 0.2
+expect_value floor_height == $sphere_floor
+release
+wait 0.3
+expect_value floor_height < -1.1
+key ctrl+z
+key w
+expect_value gizmo_mode == 0
+wait 0.3
+
+# A plane: the floor is the plane itself, which covers the grid.
+run new_plane resolution=32
+camera 20 -25
+wait 0.3
+shot plane
+
+# A real model at an angle.
+run open path=$SCRIPT_DIR/../data/marble-bust.glb
+key f
+camera 35 -15
+wait 0.5
+shot bust
+
+# HiDPI: the lines stay one pixel wide (they're drawn per pixel, not scaled).
+run new_sphere subdivisions=4
+camera 30 -20
+ui_scale 200
+wait 0.3
+shot on-2x
+ui_scale 100
+
+# Kept after a restart; the command palette turns it off.
+restart
+expect_value floor_grid == 1
+key f3
+type "##Command palette" "floor grid"
+key enter
+expect_value floor_grid == 0
+wait 0.3
+shot palette-off
+expect_value floor_grid_drawn == 0
+restart
+expect_value floor_grid == 0
+
+# Tool > Display has the same switch.
+run ui_look look=classic layout=classic
+click "Tool##palette.tool"
+click "Display##tool.display"
+click "Floor grid##display"
+expect_value floor_grid == 1
+shot tool-display

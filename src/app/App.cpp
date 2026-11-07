@@ -4,6 +4,7 @@
 #include "app/Pickers.h"
 #include "app/BrandMark.h"
 #include "io/BridgeProtocol.h"
+#include "core/ThreadPool.h"
 #include "core/LayerStack.h"
 #include "core/HardwareProfile.h"
 #include "app/ShellQuote.h"
@@ -2792,6 +2793,43 @@ AABB App::sceneBounds() const {
     return b;
 }
 
+void App::updateFloorHeight() {
+    if (!renderSettings_.floorGrid) {
+        floorKey_ = 0; // (measured again when it is turned on)
+        return;
+    }
+    if (renderSettings_.stroking || drag_ != Drag::None) return; // after the stroke or the drag, not during it
+    // What the lowest point depends on: every Part's history, size and visibility (each history's revision moves
+    // with every step, undo and redo; the size and the list catch a new or opened scene).
+    uint64_t key = 1469598103934665603ull;
+    auto mix = [&key](uint64_t v) { key = (key ^ v) * 1099511628211ull; };
+    mix(uint64_t(doc_.activePart));
+    mix(doc_.undo.revision());
+    for (int i = 0; i < doc_.partCount(); ++i) {
+        const Part& p = doc_.parts[size_t(i)];
+        mix(p.id);
+        mix(p.visible);
+        mix(p.undo.revision());
+        mix(doc_.partMesh(i).vertexCount());
+    }
+    if (key == floorKey_) return;
+    floorKey_ = key;
+    float lowest = std::numeric_limits<float>::max();
+    for (int i = 0; i < doc_.partCount(); ++i) {
+        if (!doc_.parts[size_t(i)].visible) continue;
+        const auto& positions = doc_.partMesh(i).positions;
+        const size_t block = 1 << 16;
+        std::vector<float> low((positions.size() + block - 1) / block, std::numeric_limits<float>::max());
+        poolFor(positions.size(), [&](size_t b, size_t e) {
+            float m = std::numeric_limits<float>::max();
+            for (size_t v = b; v < e; ++v) m = std::min(m, positions[v].y);
+            low[b / block] = m;
+        }, block);
+        for (float m : low) lowest = std::min(lowest, m);
+    }
+    renderSettings_.floorHeight = lowest == std::numeric_limits<float>::max() ? 0.0f : lowest; // (no Part: the origin)
+}
+
 void App::processPendingFiles() {
     pollPackDialogs(); // Install Pack, New Pack's save and a macro's "?" files (PanelPacks.cpp)
     std::vector<PendingFile> files;
@@ -2858,6 +2896,7 @@ Mesh& App::displayedMesh() {
 
 void App::syncScene() {
     if (solverBusy()) return; // the solver thread is changing the mesh: the GPU keeps what it has (AsyncStroke.cpp)
+    updateFloorHeight();
     // Fill layers: Mesh Maps bakes started and landed (live after sculpting), and a painted mask's tiles evaluated.
     updateMeshMaps();
     if (paintsTexture(doc_.mesh) && doc_.mesh.texture->fillRevision != doc_.mesh.texture->revision)
