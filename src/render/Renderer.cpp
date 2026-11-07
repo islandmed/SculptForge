@@ -1957,6 +1957,11 @@ bool Renderer::preparePatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
     }
     if (wireframe && !s.patchLinesOn)
         for (MeshSlot::Patch& p : s.patches) p.stale = true; // (their edges weren't built)
+    // More patches than the buffers have room for: uploadPatches makes new, empty ones, so every patch's triangles,
+    // edges and face groups go up again, and those already uploaded kept only their vertices (#153: they drew
+    // whatever the new index buffer held, spikes and broken faces until the next full upload).
+    if (s.patches.size() > s.patchParts)
+        for (MeshSlot::Patch& p : s.patches) p.stale = true;
     const bool hidden = mesh.hidden.size() == nt && nt > 0;
     const bool groups = mesh.facegroups.size() == nt && nt > 0;
     for (MeshSlot::Patch& p : s.patches) {
@@ -3359,6 +3364,49 @@ size_t Renderer::coarsePendingClusters() const {
     size_t n = 0;
     for (const MeshSlot& s : slots_) n += s.coarsePending.size();
     return n;
+}
+
+size_t Renderer::patchErrors(uint32_t id, const Mesh& mesh) {
+    size_t errors = 0;
+    const uint32_t nt = uint32_t(mesh.triangleCount());
+    const bool hidden = mesh.hidden.size() == nt && nt > 0;
+    std::vector<uint16_t> got;
+    std::vector<uint32_t> want;
+    for (MeshSlot& s : slots_) {
+        if (s.id != id) continue;
+        for (const MeshSlot::Patch& p : s.patches) {
+            if (p.stale || !p.uploaded) continue;
+            // The mesh vertices of the patch's triangles now, as preparePatches lists them.
+            want.clear();
+            auto add = [&](uint32_t t) {
+                if (t >= nt || (hidden && mesh.hidden[t])) return;
+                for (int c = 0; c < 3; ++c) want.push_back(mesh.triangles[t][c]);
+            };
+            if (p.key < kTailPatch) {
+                for (uint32_t i = 0; i < s.order.clusterTriangles(p.key); ++i) add(s.order.triangle(p.key, i));
+            } else {
+                const uint32_t first = s.layoutTriangles + (p.key - kTailPatch) * kPatchTriangles;
+                for (uint32_t t = first; t < first + kPatchTriangles && t < nt; ++t) add(t);
+            }
+            got.assign(p.indices, 0);
+            if (!got.empty()) {
+                gl::BindVertexArray(s.patchVao);
+                gl::GetBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GLintptr(size_t(p.part) * kPatchTriangles * 3 * sizeof(uint16_t)),
+                                     GLsizeiptr(got.size() * sizeof(uint16_t)), got.data());
+                gl::BindVertexArray(0);
+            }
+            if (got.size() != want.size()) {
+                errors += std::max(got.size(), want.size()) / 3;
+                continue;
+            }
+            for (size_t i = 0; i < got.size(); i += 3) {
+                bool same = true;
+                for (size_t c = i; c < i + 3; ++c) same = same && got[c] < p.verts.size() && p.verts[got[c]] == want[c];
+                errors += same ? 0 : 1;
+            }
+        }
+    }
+    return errors;
 }
 
 void Renderer::markCoarseDirty(MeshSlot& s, uint32_t c) {

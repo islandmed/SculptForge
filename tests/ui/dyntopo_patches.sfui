@@ -1,0 +1,37 @@
+# Dynamic topology on a finer sphere (#153): short strokes in different places, with X symmetry, change more and more
+# of its clusters, which the renderer draws from patches. When the patches outgrow their GPU buffers (8, then 16) the
+# buffers are made again and every patch drawn before must be sent again: none may draw stale triangles (seen as a
+# long spike and broken faces until the next stroke or Undo). render_patch_errors reads the patches back from the GPU.
+run new_sphere subdivisions=5
+run dyntopo enabled=true detail=100
+click "Standard##brush.standard"
+expect_value symmetry_x == 1
+stroke 0.42 0.30 0.47 0.33
+expect_value render_patch_errors == 0
+stroke 0.42 0.62 0.47 0.66
+expect_value render_patch_errors == 0
+stroke 0.36 0.45 0.40 0.50
+expect_value render_patch_errors == 0
+stroke 0.45 0.20 0.48 0.24
+expect_value render_patch_errors == 0
+stroke 0.44 0.75 0.47 0.79
+expect_value render_patch_errors == 0
+stroke 0.33 0.36 0.36 0.40
+expect_value render_patch_errors == 0
+stroke 0.34 0.58 0.37 0.62
+expect_value render_patch_errors == 0
+stroke 0.30 0.48 0.33 0.52
+expect_value render_patch_errors == 0
+stroke 0.38 0.25 0.41 0.29
+expect_value render_patch_errors == 0
+stroke 0.38 0.70 0.41 0.74
+expect_value render_patch_errors == 0
+stroke 0.47 0.45 0.49 0.55
+expect_value render_patch_errors == 0
+stroke 0.32 0.28 0.35 0.31
+expect_value render_patch_errors == 0
+stroke 0.32 0.68 0.35 0.71
+expect_value render_patch_errors == 0
+expect_value render_patches > 8
+click "Wire##view.wire"
+shot wireframe
