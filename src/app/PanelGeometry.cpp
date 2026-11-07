@@ -107,6 +107,7 @@ void App::drawGeometrySection() {
                       double(mm.bytes()) / 1e6, mm.disp.mapped() ? ", out of core" : "");
         ImGui::TextDisabled("%s", info);
     }
+    drawEdgesSection(); // Edges mode, Select by Angle (PanelEdges.cpp)
     ImGui::Separator();
 }
 

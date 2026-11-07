@@ -5,6 +5,7 @@
 #include "core/BVH.h"
 #include "core/BrushAlpha.h"
 #include "core/BrushRecipe.h"
+#include "core/EdgeSelect.h"
 #include "core/Json.h"
 #include "core/Mesh.h"
 #include "core/QRemeshGuides.h"
@@ -145,6 +146,8 @@ struct Document {
     // The UV Editor's selection on the active Part (core/Uv.h); dropped when another Part is picked or the
     // triangles change (UvSelection::valid). Not part of undo.
     UvSelection uvSelection;
+    // Edges selected on the active Part's base level (core/EdgeSelect.h, Geometry > Edges); dropped like uvSelection.
+    EdgeSelection edgeSelection;
 
     void syncBvh() {
         if (bvhDirty) bvh.build(mesh);
