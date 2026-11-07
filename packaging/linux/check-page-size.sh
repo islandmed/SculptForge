@@ -16,7 +16,9 @@ ARCH=$2
 bad=0
 for f in $(find "$APPDIR" -type f \( -path '*/bin/*' -o -name '*.so' -o -name '*.so.*' \)); do
   head -c 4 "$f" | grep -q 'ELF' || continue
-  if grep -q -a '<jemalloc>' "$f"; then
+  # Linked (NEEDED libjemalloc) or built in (its messages AND its MALLOC_CONF setting: the guide compiled into the app
+  # quotes the message alone, docs/guide/troubleshooting.md).
+  if readelf -d "$f" 2>/dev/null | grep -q 'libjemalloc' || { grep -q -a '<jemalloc>' "$f" && grep -q -a 'MALLOC_CONF' "$f"; }; then
     echo "$f: bundles jemalloc (aborts on other page sizes); use glibc malloc" >&2
     bad=1
   fi
