@@ -485,12 +485,18 @@ def visible(s):
 
 def load_table(path):
     toks = tokens(path.read_text(encoding="utf-8"))
-    table = {}
+    table, dups = {}, DUPLICATES.setdefault(path.name, [])
     for i in range(len(toks) - 4):
         if toks[i][1] == "{" and toks[i + 1][0] == "str" and toks[i + 2][1] == "," and toks[i + 3][0] == "str" \
                 and toks[i + 4][1] == "}":
-            table[toks[i + 1][1].replace(ICON, "")] = toks[i + 3][1]
+            key = toks[i + 1][1].replace(ICON, "")
+            if key in table:  # two branches added the same key; with different words, only one could ever show
+                dups.append((key, toks[i + 1][2]))
+            table[key] = toks[i + 3][1]
     return table
+
+
+DUPLICATES = {}  # table file -> [(key, line)] (load_table)
 
 
 def translates(table, text):
@@ -593,7 +599,11 @@ def main():
                 print(f"    {s.replace(ICON, '<icon>')!r}  {min(strings[s])}")
     if stale:
         print(f"keep_english.txt lines no string uses any more: {stale}")
-    if args.check and (any(missing.values()) or stale):
+    dups = [f"{f}:{line} {k!r}" for f, d in DUPLICATES.items() for k, line in d]
+    if dups:
+        print("keys defined twice in a table (keep one; a different meaning needs a different English label):")
+        print(*("  " + d for d in dups), sep="\n")
+    if args.check and (any(missing.values()) or stale or dups):
         print("i18n_coverage: add the missing strings to the tables (or keep_english.txt for names and units)")
         return 1
     return 0
