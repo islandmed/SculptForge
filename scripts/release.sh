@@ -153,6 +153,10 @@ release_ready() {
     if grep -q 'kUpdatePublicKeyHex = "[0-9a-f]\{64\}"' src/core/SelfUpdate.h 2>/dev/null; then
         grep -qx SHA256SUMS.txt.sig "$work/assets" || die "release $T has no SHA256SUMS.txt.sig: apps can't update to it in one click" "check the UPDATE_SIGNING_KEY secret, then re-run the Release workflow: gh workflow run release.yml -R $REPO --ref $T -f tag=$T"
     fi
+    # install/install.sh and install.ps1 (served from raw main) fetch from releases/latest: every name must be here (#159).
+    local out
+    out=$(python3 tools/release/check_install_assets.py --version "$V" --assets "$work/assets" 2>&1) ||
+        die "$out" "fix the asset names in install/ (site lane, merges at once) or re-run the Release workflow if an upload is missing"
 }
 # Downloads one release asset and checks it against SHA256SUMS.txt with a checksum computed here. Prints the sum.
 asset_sha() {

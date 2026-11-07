@@ -839,6 +839,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     # in GitHub Environments, no pull_request_target (tools/release/check_workflows.py; release.sh check runs it too).
     add_test(NAME release_workflows COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py)
     add_test(NAME release_workflows_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py --self-test)
+    # Every asset install/install.sh and install.ps1 download is one release.yml publishes (#159; release.sh checks
+    # the real release's asset list too).
+    add_test(NAME release_install_assets COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_install_assets.py)
+    add_test(NAME release_install_assets_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_install_assets.py --self-test)
     add_test(NAME release_paperwork COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/paperwork_only.py --self-test)
     # Build once, promote: only a maintainer's push run on staging is promotable (staged_run.py), and every package must
     # match its recorded SHA-256 and attestation before publishing (verify_staged.py).
