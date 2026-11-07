@@ -557,19 +557,19 @@ TEST(self_update_windows_helper) {
 
 TEST(member_builds_urls_and_headers) {
     using namespace sf::member;
-    CHECK(isMemberApiUrl("https://api.github.com/repos/islandmed/sculptforge-insiders/releases?per_page=20"));
+    CHECK(isMemberApiUrl("https://api.github.com/repos/sculptforge/sculptforge-insiders/releases?per_page=20"));
     CHECK(isMemberApiUrl("https://api.github.com/user"));
-    CHECK(isMemberAssetUrl("https://api.github.com/repos/islandmed/sculptforge-insiders/releases/assets/123456"));
-    for (const char* u : {"https://api.github.com/repos/islandmed/sculptforge-insiders/releases/assets/12a",
-                          "https://api.github.com/repos/islandmed/sculptforge-insiders/releases/assets/",
-                          "https://api.github.com/repos/islandmed/sculptforge-insiders/releases/assets/1/../../x",
+    CHECK(isMemberAssetUrl("https://api.github.com/repos/sculptforge/sculptforge-insiders/releases/assets/123456"));
+    for (const char* u : {"https://api.github.com/repos/sculptforge/sculptforge-insiders/releases/assets/12a",
+                          "https://api.github.com/repos/sculptforge/sculptforge-insiders/releases/assets/",
+                          "https://api.github.com/repos/sculptforge/sculptforge-insiders/releases/assets/1/../../x",
                           "https://api.github.com/repos/islandmed/SculptForge/releases?per_page=20",
-                          "https://api.github.com/repos/islandmed/sculptforge-insiders/contents/secrets",
+                          "https://api.github.com/repos/sculptforge/sculptforge-insiders/contents/secrets",
                           "https://api.github.com/user/repos", "https://api.github.com.evil.example/user",
                           "http://api.github.com/user"})
         CHECK(!isMemberApiUrl(u) && !allowedUpdateUrl(u));
     // The token goes to the member API only: never to the asset host, the public release URLs or anywhere else.
-    const auto h = headersFor("https://api.github.com/repos/islandmed/sculptforge-insiders/releases/assets/5", "ghu_x");
+    const auto h = headersFor("https://api.github.com/repos/sculptforge/sculptforge-insiders/releases/assets/5", "ghu_x");
     CHECK(h.size() == 3 && h[0] == "Authorization: Bearer ghu_x" && h[1] == "Accept: application/octet-stream");
     CHECK(headersFor(kReleasesUrl, "ghu_x")[1] == "Accept: application/vnd.github+json");
     for (const char* u : {"https://release-assets.githubusercontent.com/a?sig=1", "https://objects.githubusercontent.com/a",
@@ -693,7 +693,7 @@ TEST(member_builds_release_list) {
     CHECK(parseMemberReleases(list, u, err));
     CHECK(u.version == "99.0.0-preview.1" && u.member && u.files.size() == 3); // the draft and odd entries skipped
     CHECK(u.files["SculptForge-99.0.0-x86_64.AppImage"] == std::string(kAssetUrlPrefix) + "13");
-    CHECK(u.downloadUrl == "https://github.com/islandmed/sculptforge-insiders/releases/tag/v99.0.0-preview.1");
+    CHECK(u.downloadUrl == "https://github.com/sculptforge/sculptforge-insiders/releases/tag/v99.0.0-preview.1");
     CHECK(!parseMemberReleases("[]", u, err) && !parseMemberReleases("{}", u, err));
 
     // A member build downloads and verifies exactly like a public one: same signature, same key, versioned name.

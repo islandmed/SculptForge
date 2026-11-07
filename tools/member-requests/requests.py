@@ -6,7 +6,7 @@ make the ones we can, the requester approves a preview, and at the end of the mo
 as one pack ("Member Requests YYYY-MM"), public for everyone a month later. .github/workflows/member-requests.yml
 runs this at month end.
 
-The month's items live in the private repository islandmed/sculptforge-insiders, one folder each:
+The month's items live in the private repository sculptforge/sculptforge-insiders, one folder each:
 
     requests/2026-11/bark-ridges/request.json   {"name": "Bark Ridges", "type": "alpha", "file": "bark-ridges.png",
                                                  "requested_by": "someone", "approved": true}

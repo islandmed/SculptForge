@@ -153,7 +153,7 @@ bool parseMemberReleases(const std::string& json, UpdateInfo& out, std::string& 
         UpdateInfo info;
         info.version = version;
         info.member = true;
-        info.downloadUrl = "https://github.com/islandmed/sculptforge-insiders/releases/tag/" + tag; // (built here, not read)
+        info.downloadUrl = "https://github.com/sculptforge/sculptforge-insiders/releases/tag/" + tag; // (built here, not read)
         info.notesUrl = info.downloadUrl;
         info.highlights.push_back("Member build (the next release, early)");
         for (const Json& a : r["assets"].items()) {

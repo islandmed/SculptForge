@@ -83,7 +83,7 @@ case "\$*" in
   "run list"*) echo 7 ;;
   "run view"*"-q .status"*) echo completed ;;
   "run view"*"-q .conclusion"*) echo success ;;
-  "repo view islandmed/sculptforge-insiders"*) echo "islandmed/sculptforge-insiders" ;;
+  "repo view sculptforge/sculptforge-insiders"*) echo "sculptforge/sculptforge-insiders" ;;
   "release view"*) printf 'SHA256SUMS.txt\nSHA256SUMS.txt.sig\n' # (signed: the app has an update key)
     # what install/install.sh and install.ps1 download (tools/release/check_install_assets.py)
     for f in x86_64.AppImage aarch64.AppImage darwin-universal.dmg windows-x86_64.zip windows-x86_64.exe; do
@@ -161,7 +161,7 @@ git diff --quiet "$start" HEAD -- website/latest.json website/index.html || fail
 scripts/release.sh 9.0.0-beta.1 --only preview >/dev/null 2>&1 && fail "a beta still has a preview (public feed) step"
 quiet scripts/release.sh 9.0.0-beta.1 --only status
 grep -q 'release-testers-9.0.0-beta.1.md' "$S/out.log" || fail "beta status names no testers checklist"
-grep -q 'islandmed/sculptforge-insiders/releases/tag/v9.0.0-beta.1' "$S/out.log" || fail "beta status doesn't name the members' repository"
+grep -q 'sculptforge/sculptforge-insiders/releases/tag/v9.0.0-beta.1' "$S/out.log" || fail "beta status doesn't name the members' repository"
 grep -q 'scripts/release.sh 9.0.0 --yes' "$S/out.log" || fail "beta status doesn't say how to promote"
 git tag v9.0.0-beta.1 "$(git rev-parse HEAD)" # what step tag would have pushed
 

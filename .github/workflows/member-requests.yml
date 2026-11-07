@@ -1,5 +1,5 @@
 # Member Requests (tools/member-requests/requests.py): on the 1st, last month's approved requests (committed by hand
-# under requests/YYYY-MM/ in the private repository islandmed/sculptforge-insiders) go out to members as one pack,
+# under requests/YYYY-MM/ in the private repository sculptforge/sculptforge-insiders) go out to members as one pack,
 # "Member Requests YYYY-MM": a release in that repository and a post in #members. A month later the pack is free for
 # everyone: this repository's public pack listing (the `packs` branch, listing.json) schedules it now and releases
 # it when its date comes (each run releases the packs that are due).
@@ -51,7 +51,7 @@ jobs:
       - name: Requests (members' repository)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: islandmed/sculptforge-insiders
+          repository: sculptforge/sculptforge-insiders
           token: ${{ secrets.INSIDERS_REPO_TOKEN }}
           path: insiders
           sparse-checkout: requests
@@ -73,11 +73,11 @@ jobs:
       - name: Bundle the month
         if: env.HAS_REQUESTS == '1'
         run: python3 tools/member-requests/requests.py bundle --month "$MONTH" --root insiders/requests --out out --cli build/sculptforge-cli
-      - name: Release in islandmed/sculptforge-insiders
+      - name: Release in sculptforge/sculptforge-insiders
         if: env.HAS_REQUESTS == '1'
         env:
           GH_TOKEN: ${{ secrets.INSIDERS_REPO_TOKEN }}
-          GH_REPO: islandmed/sculptforge-insiders
+          GH_REPO: sculptforge/sculptforge-insiders
         run: |
           [ -f out/bundle.json ] || { echo "No approved requests for $MONTH"; exit 0; }
           tag="requests-$MONTH"
@@ -97,7 +97,7 @@ jobs:
       - name: What the public listing needs
         env:
           GH_TOKEN: ${{ secrets.INSIDERS_REPO_TOKEN }}
-          GH_REPO: islandmed/sculptforge-insiders
+          GH_REPO: sculptforge/sculptforge-insiders
           REPO: ${{ github.repository }}
         run: |
           mkdir -p public/requests
