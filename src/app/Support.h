@@ -31,6 +31,14 @@ inline constexpr const char* kSupportUrlMember = "https://buy.stripe.com/aFacN5h
 inline constexpr const char* kSupportUrlMemberYearly = "https://buy.stripe.com/aFa5kD4eHfhE2an6il4F206"; // $48 / year
 inline constexpr const char* kSupportUrlStudio = "https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204";   // Founding Studio, $150 / month
 inline constexpr const char* kStudioPageUrl = "https://sculptforge.app/studios.html#membership";
+// The membership terms (refunds, cancelling): the page website/support.html and studios.html link to.
+inline constexpr const char* kTermsUrl = "https://sculptforge.app/terms.html";
+// The fixed links the membership cards may open (App::openSupportLink refuses anything else).
+inline bool supportLinkAllowed(std::string_view url) {
+    for (const char* u : {kSupportUrlMember, kSupportUrlMemberYearly, kSupportUrlStudio, kStudioPageUrl, kTermsUrl})
+        if (u[0] != '\0' && url == u) return true;
+    return false;
+}
 // The promise next to members' early builds. Worded the same in the app, on the membership page and in the guide
 // (tests/test_support.cpp checks the membership page).
 inline constexpr const char* kFreeReleaseNote =

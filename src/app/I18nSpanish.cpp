@@ -4321,6 +4321,7 @@ constexpr Entry kSpanish[] = {
      "No hay memoria libre suficiente para %s: se omitirá. Cierra antes otras aplicaciones."},
     {"Not now",
      "Ahora no"},
+    {"Terms & refunds", "Términos y reembolsos"},
     {"Nothing about memberships for a week.",
      "Nada sobre membresías durante una semana."},
     {"Nothing else is sent: no folders, no user name, no model details. Needs the Discord app running.",

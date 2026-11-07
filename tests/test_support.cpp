@@ -175,10 +175,24 @@ TEST(support_card_links_match_the_website) {
         }
     CHECK(studios.find("GPL-3.0") != std::string::npos && studios.find("no exclusive or secret features") != std::string::npos);
     CHECK(std::string(kStudioPageUrl) == "https://sculptforge.app/studios.html#membership");
+    // Terms & refunds: the terms page exists, carries the refund wording and is linked from both pages.
+    CHECK(std::string(kTermsUrl) == "https://sculptforge.app/terms.html");
+    const std::string terms = read("terms.html");
+    CHECK(terms.find("id=\"refunds\"") != std::string::npos && terms.find("Memberships aren't refundable.") != std::string::npos);
+    CHECK(page.find("href=\"terms.html#refunds\"") != std::string::npos);
+    CHECK(studios.find("href=\"terms.html") != std::string::npos);
     // Founding Members and Member Requests on the membership page; its counter reads founding.json.
     CHECK(page.find("Founding Member") != std::string::npos);
     CHECK(page.find("Member Requests") != std::string::npos);
     CHECK(page.find("founding.json") != std::string::npos);
+}
+
+TEST(support_card_opens_only_its_fixed_links) {
+    for (const char* url : {kSupportUrlMember, kSupportUrlMemberYearly, kSupportUrlStudio, kStudioPageUrl, kTermsUrl})
+        CHECK(url[0] == '\0' || supportLinkAllowed(url));
+    for (const char* url : {"", "https://sculptforge.app/terms.html.evil.example", "https://sculptforge.app/terms.htm",
+                            "file:///etc/passwd", "https://buy.stripe.com/", "javascript:alert(1)"})
+        CHECK(!supportLinkAllowed(url));
 }
 
 TEST(support_card_timing) {
