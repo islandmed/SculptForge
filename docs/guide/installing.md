@@ -31,7 +31,7 @@ Each link below downloads the newest version. Pick the one for your system:
 | Fedora, RHEL, Rocky, Alma 8+ | [.rpm for x86_64](https://github.com/islandmed/SculptForge/releases/latest/download/sculptforge.x86_64.rpm) or [ARM64](https://github.com/islandmed/SculptForge/releases/latest/download/sculptforge.aarch64.rpm) | `sudo dnf install ./sculptforge.x86_64.rpm` |
 | Any Linux | [AppImage for x86_64](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-x86_64.AppImage) or [ARM64](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-arm64.AppImage) | `chmod +x` the file, then run it |
 | Any Linux, sandboxed | [Flatpak for x86_64](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-x86_64.flatpak) or [ARM64](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-arm64.flatpak) | `flatpak install --user ./SculptForge-linux-x86_64.flatpak` (see [Flatpak](#flatpak)) |
-| Arch Linux | `packaging/arch/PKGBUILD` in the source | `makepkg -si` in that folder (an AUR package is planned) |
+| Arch Linux | `packaging/arch/PKGBUILD` in the source | `makepkg -si` in that folder (the AUR package isn't published yet; see [Package managers](#package-managers)) |
 | Studio pipelines | `SculptForge-<version>-...-vfx2026.tar.gz` or `...-vfx2027.tar.gz` | See [SculptForge for studios](studios.md) |
 
 Most PCs are x86_64; ARM64 is for ARM laptops, Raspberry Pi and Apple Silicon Macs running Linux. Older
@@ -54,6 +54,21 @@ irm https://raw.githubusercontent.com/islandmed/SculptForge/main/install/install
 
 Both check the download against the release's checksums before installing. To uninstall on macOS or Linux,
 run the first command with `sh -s -- --uninstall` at the end instead of `sh`.
+
+### Package managers
+
+Where SculptForge is in a package manager today, so it updates with the rest of your system:
+
+| Package manager | Status | Command |
+|---|---|---|
+| Homebrew (macOS) | **Available** | `brew install --cask islandmed/tap/sculptforge`, then `brew upgrade` |
+| winget (Windows) | **Submitted, in review** at winget-pkgs; not installable yet | Use the installer or the one-command install meanwhile |
+| AUR (Arch Linux) | **Ready, not published yet** | Until then: `makepkg -si` in `packaging/arch` |
+| Omarchy | **Submitted, in review** at omarchy-pkgs | As for Arch meanwhile |
+| apt (Debian, Ubuntu) and dnf (Fedora, RHEL) repositories | **Not yet; being built** ([#149](https://github.com/islandmed/SculptForge/issues/149)) | Install the `.deb` or `.rpm` file; SculptForge tells you when a new version is out |
+| Flathub | **Not published**; the Flatpak is a single file (see [Flatpak](#flatpak)) | `flatpak install --user ./SculptForge-linux-x86_64.flatpak` |
+
+This table changes as each one goes live.
 
 Every release also has a `SHA256SUMS.txt` file with the checksum of each download, so you can confirm a file
 arrived intact.
@@ -240,9 +255,10 @@ The sign-in can only read the member repository's releases (nothing else on your
 system's keychain (Windows Credential Manager, or the Secret Service on Linux such as GNOME Keyring or KWallet; never
 in SculptForge's settings), and **Sign out** removes it. Without a keychain the sign-in lasts until you quit.
 
-Installs that belong to a package manager are never replaced by the app: the AUR package (Omarchy's too) builds
-without the update check, a Homebrew install shows `brew upgrade --cask sculptforge`, and the Flatpak, `.deb`
-and `.rpm` files say to download the new file and open it. The macOS app shows **Download** for now.
+Installs that belong to a package manager are never replaced by the app: the Arch PKGBUILD (and the AUR and
+Omarchy packages once they are published) builds without the update check, a Homebrew install shows
+`brew upgrade --cask sculptforge`, and the Flatpak, `.deb` and `.rpm` files say to download the new file and open
+it. The macOS app shows **Download** for now.
 
 To update by hand, download the new release and install it over the old one. Either way your settings, brushes
 and library are kept: they live in your user folders, not next to the program (see

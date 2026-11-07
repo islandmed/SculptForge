@@ -1,0 +1,53 @@
+name: Arch package
+
+# packaging/arch/PKGBUILD (the AUR package) built from scratch in a clean Arch container, as an AUR user's makepkg
+# would: the release tag it names, Arch's own SDL3 and curl; the package installed, sculptforge-cli answering. namcap
+# must find no errors in the PKGBUILD or the package, and .SRCINFO must be what `makepkg --printsrcinfo` prints. Runs when packaging/arch
+# changes (scripts/release.sh step aur bumps it on main each release) and by hand.
+# The image is pinned by digest (update: the docker-content-digest of archlinux:base-devel).
+
+on:
+  push:
+    paths:
+      - packaging/arch/**
+      - .github/workflows/arch.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  makepkg:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    container:
+      image: archlinux:base-devel@sha256:2de80105abb49f813a85393c6758a4334deb6bcec4a2411bd2f059c0bee6ee4c
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Builder user
+        run: |
+          pacman -Syu --noconfirm --needed namcap
+          useradd -m builder
+          echo 'builder ALL=(ALL) NOPASSWD: /usr/bin/pacman' > /etc/sudoers.d/builder
+          cp -r packaging/arch /home/builder/pkg
+          chown -R builder: /home/builder/pkg
+      - name: .SRCINFO matches the PKGBUILD
+        working-directory: /home/builder/pkg
+        run: su builder -c 'makepkg --printsrcinfo' | diff -u .SRCINFO -
+      - name: makepkg (dependencies from the Arch repositories)
+        working-directory: /home/builder/pkg
+        run: su builder -c 'MAKEFLAGS=-j4 makepkg --syncdeps --noconfirm --cleanbuild'
+      - name: namcap
+        working-directory: /home/builder/pkg
+        run: |
+          namcap -i PKGBUILD | tee namcap.txt
+          namcap -i ./sculptforge-[0-9]*.pkg.tar.zst | tee -a namcap.txt   # not -debug: its build-id links point into the main package
+          ! grep -E '^[^ ]+ E: ' namcap.txt
+      - name: Installed, the command-line tool answers
+        working-directory: /home/builder/pkg
+        run: |
+          pacman -U --noconfirm ./sculptforge-[0-9]*.pkg.tar.zst
+          test -x /usr/bin/sculptforge
+          sculptforge-cli --schema > schema.json && grep -q '"open"' schema.json

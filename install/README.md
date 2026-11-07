@@ -10,7 +10,7 @@ Pick your system and click the link. It always downloads the newest version.
 | **Fedora / RHEL / Rocky / Alma** | [.rpm for PCs (x86_64)](https://github.com/islandmed/SculptForge/releases/latest/download/sculptforge.x86_64.rpm) · [.rpm for ARM64](https://github.com/islandmed/SculptForge/releases/latest/download/sculptforge.aarch64.rpm) |
 | **macOS (Homebrew)** | `brew install --cask islandmed/tap/sculptforge` |
 | **Any Linux** | [AppImage for PCs (x86_64)](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-x86_64.AppImage) · [AppImage for ARM64](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-arm64.AppImage) |
-| **Arch Linux** | `yay -S sculptforge` |
+| **Arch Linux** | [`packaging/arch/PKGBUILD`](../packaging/arch) with `makepkg -si` (AUR package not published yet) |
 
 Not sure which Linux file? Most PCs are x86_64; ARM64 is for Raspberry Pi, Apple Silicon Macs running Linux
 and ARM laptops.

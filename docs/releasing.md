@@ -116,7 +116,7 @@ The home page's What's New area (between the `whats-new` markers in website/inde
 | tag | checks main is the staged commit with a promotable run, asks, then tags it and pushes the tag (this publishes) | the tag is on GitHub |
 | release | waits for the Release run, then checks the assets and SHA256SUMS.txt | the release has SHA256SUMS.txt |
 | site | update feed (version + your highlights), home page version text, pushes; then waits for the live feed (10 min) and guide (5 min) | latest.json says X.Y.Z |
-| aur | packaging/arch/PKGBUILD: pkgver and the source checksum, computed by downloading the tag's tarball | already at X.Y.Z with that checksum |
+| aur | packaging/arch/PKGBUILD: pkgver and the source checksum, computed by downloading the tag's tarball, and `.SRCINFO`; then, once `~/Work/.sf/aur-publish` exists (packaging/arch/SUBMIT.md), pushes both to the AUR | already at X.Y.Z with that checksum (and the AUR at X.Y.Z) |
 | brew | Homebrew cask through tools/publish/setup-channels.sh, after checking the .dmg's checksum here | the cask is at X.Y.Z |
 | omarchy | bumps the PKGBUILD on our branch of omacom/omarchy-pkgs#1800 (author islandmed noreply) | the PR is at X.Y.Z |
 | replies | writes `release-replies-X.Y.Z.md`: a draft per issue named in the CHANGELOG section; posts nothing | never |

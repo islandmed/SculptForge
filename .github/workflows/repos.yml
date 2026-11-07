@@ -1,0 +1,90 @@
+name: Package repositories
+
+# tools/publish/package_repos.sh (release workflow) and package_repos_fetch.sh (pages.yml) end to end, with the
+# latest release's packages and a throwaway test key made in this job (never the real REPO_SIGNING_KEY): build the
+# signed metadata, put the site together, serve it locally, then install SculptForge with apt in Debian and Ubuntu
+# and with dnf in Fedora and Rocky 9 containers, and check that a package whose bytes differ is refused.
+
+on:
+  push:
+    paths:
+      - tools/publish/package_repos*.sh
+      - .github/workflows/repos.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Tools
+        run: sudo apt-get update -q && sudo apt-get install -y -q createrepo-c
+      - name: The latest release's packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir dist && cd dist
+          gh release download -R "$GITHUB_REPOSITORY" -p 'sculptforge_[0-9]*.deb' -p 'sculptforge-[0-9]*.rpm' -p SHA256SUMS.txt
+          ls -l
+      - name: Metadata, signed with a throwaway key
+        run: |
+          export GNUPGHOME=$(mktemp -d)
+          gpg --batch --pinentry-mode loopback --passphrase test --quick-gen-key "Test only <test@invalid>" rsa4096 sign 1d
+          REPO_SIGNING_KEY=$(gpg --batch --pinentry-mode loopback --passphrase test --armor --export-secret-keys) \
+            REPO_SIGNING_PASSPHRASE=test tools/publish/package_repos.sh dist dist/sculptforge-package-repos.tar.gz
+          (cd dist && sha256sum sculptforge-package-repos.tar.gz >> SHA256SUMS.txt)
+          # The sums signed as release.yml signs them (tools/release/sign_sums.sh), with a throwaway Ed25519 key.
+          openssl genpkey -algorithm ed25519 -out "$RUNNER_TEMP/release.pem"
+          openssl pkeyutl -sign -inkey "$RUNNER_TEMP/release.pem" -rawin -in dist/SHA256SUMS.txt -out dist/SHA256SUMS.txt.sig
+          echo "PACKAGE_REPOS_PUBKEY_HEX=$(openssl pkey -in "$RUNNER_TEMP/release.pem" -pubout -outform DER | tail -c 32 | od -An -tx1 -v | tr -d ' \n')" >> "$GITHUB_ENV"
+          tar -tzf dist/sculptforge-package-repos.tar.gz
+      - name: Site put together (as pages.yml does)
+        run: |
+          mkdir site
+          # Sums not signed by the release key: refused before anything is downloaded
+          if PACKAGE_REPOS_PUBKEY_HEX=$(printf '%064d' 0 | tr 0 a) PACKAGE_REPOS_LOCAL=dist \
+              tools/publish/package_repos_fetch.sh vTEST site; then echo "unsigned sums accepted"; exit 1; fi
+          PACKAGE_REPOS_LOCAL=dist tools/publish/package_repos_fetch.sh vTEST site
+          find site -type f | sort
+          (cd site && python3 -m http.server 8000 --bind 127.0.0.1 >/dev/null 2>&1 &)
+          sleep 1
+      - name: apt (Debian stable, Ubuntu 24.04)
+        run: |
+          for img in debian:stable ubuntu:24.04; do
+            docker run --rm --network host "$img" sh -euc '
+              apt-get update -q >/dev/null && apt-get install -y -q curl ca-certificates >/dev/null
+              install -d -m 0755 /etc/apt/keyrings
+              curl -fsSL http://127.0.0.1:8000/apt/sculptforge.asc -o /etc/apt/keyrings/sculptforge.asc
+              echo "deb [signed-by=/etc/apt/keyrings/sculptforge.asc] http://127.0.0.1:8000/apt stable main" > /etc/apt/sources.list.d/sculptforge.list
+              apt-get update -q
+              apt-get install -y -q sculptforge >/dev/null
+              dpkg -s sculptforge | grep -E "^(Version|Architecture)"
+              test -x /usr/bin/sculptforge && test -x /usr/bin/sculptforge-cli'
+          done
+      - name: dnf (Fedora, Rocky 9)
+        run: |
+          sed 's|https://sculptforge.app/rpm|http://127.0.0.1:8000/rpm|' site/rpm/sculptforge.repo > test.repo
+          for img in fedora:latest rockylinux:9; do
+            docker run --rm --network host -v "$PWD/test.repo:/etc/yum.repos.d/sculptforge.repo:ro" "$img" sh -euc '
+              dnf install -y -q sculptforge
+              rpm -q sculptforge
+              test -x /usr/bin/sculptforge && test -x /usr/bin/sculptforge-cli'
+          done
+      - name: A package with other bytes is refused
+        run: |
+          deb=$(ls site/apt/pool/main/s/sculptforge/*_amd64.deb)
+          printf 'x' >> "$deb"
+          docker run --rm --network host debian:stable sh -euc '
+            apt-get update -q >/dev/null && apt-get install -y -q curl ca-certificates >/dev/null
+            install -d -m 0755 /etc/apt/keyrings
+            curl -fsSL http://127.0.0.1:8000/apt/sculptforge.asc -o /etc/apt/keyrings/sculptforge.asc
+            echo "deb [signed-by=/etc/apt/keyrings/sculptforge.asc] http://127.0.0.1:8000/apt stable main" > /etc/apt/sources.list.d/sculptforge.list
+            apt-get update -q
+            if apt-get install -y -q sculptforge; then echo "apt installed a tampered package"; exit 1; fi
+            echo "apt refused the tampered package"'

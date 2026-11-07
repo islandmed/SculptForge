@@ -298,6 +298,8 @@ jobs:
     permissions:
       contents: write
       actions: read
+    env:
+      HAS_REPO_KEY: ${{ secrets.REPO_SIGNING_KEY != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.TAG }}', persist-credentials: false }
@@ -349,6 +351,19 @@ jobs:
         run: python3 -m zipfile -c dist/sculptforge_maya.zip integrations/maya/sculptforge_maya.py integrations/maya/README.md
       - name: Software bill of materials (CycloneDX; covered by the checksums and their signature)
         run: python3 tools/release/sbom.py --version "${TAG#v}" --out "dist/SculptForge-${TAG#v}-sbom.cdx.json"
+      # The apt and dnf repositories (sculptforge.app/apt and /rpm, docs/design/package-repos.md): signed metadata for
+      # this release's .deb and .rpm, put on the site by pages.yml. Skipped until the REPO_SIGNING_KEY secret exists
+      # in this environment. The tools are installed in their own step, which never sees the key.
+      - name: Repository tools
+        if: ${{ env.HAS_REPO_KEY == 'true' }}
+        run: sudo apt-get update -q && sudo apt-get install -y -q createrepo-c apt-utils
+      - name: Signed apt and dnf repository metadata
+        env:
+          REPO_SIGNING_KEY: ${{ secrets.REPO_SIGNING_KEY }}
+          REPO_SIGNING_PASSPHRASE: ${{ secrets.REPO_SIGNING_PASSPHRASE }}
+        run: |
+          if [ -z "$REPO_SIGNING_KEY" ]; then echo "No REPO_SIGNING_KEY secret: no package repositories for this release"; exit 0; fi
+          tools/publish/package_repos.sh dist dist/sculptforge-package-repos.tar.gz
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
       - name: Sign the checksums (one-click update checks SHA256SUMS.txt.sig, src/core/SelfUpdate.h)
