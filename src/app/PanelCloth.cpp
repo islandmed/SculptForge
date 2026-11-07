@@ -1,9 +1,9 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Cloth brush in the app (core/Cloth.h, core/ClothBrush.cpp): Brush > Cloth (mode, fabric, gravity, reach, steps)
-// and the other visible Parts as the surfaces a Cloth stroke collides with, copied once and kept until one of them
-// changes.
+// Cloth brush in the app (core/Cloth.h, core/ClothBrush.cpp): Brush > Cloth (mode, fabric, gravity, reach, steps,
+// soft body, self-collision) and the other visible Parts as the surfaces a Cloth stroke collides with, copied once
+// and kept until one of them changes.
 #include "app/App.h"
 #include "app/Palettes.h"
 #include "app/Ui.h"
@@ -56,12 +56,16 @@ void App::drawClothSection() {
     const char* help = "Brush > Cloth";
     ImGui::SetNextItemWidth(-1);
     int mode = int(c.mode);
-    const char* modes[] = {tr("Drag"), tr("Push"), tr("Settle")};
+    const char* modes[] = {tr("Drag"), tr("Push"), tr("Settle"), tr("Grab"), tr("Expand"), tr("Pinch"), tr("Inflate")};
+    static_assert(std::size(modes) == size_t(ClothBrushMode::Count));
     if (ImGui::Combo("##clothmode", &mode, modes, int(ClothBrushMode::Count))) c.mode = ClothBrushMode(mode);
     ui::HelpText("Cloth mode", nullptr,
                  "Drag: the surface under the brush follows the stroke as fabric, folding where it bunches up. Push: "
                  "presses it in along the surface (Alt pulls it out) and the cloth around follows. Settle: only gravity, "
-                 "the surface under the brush sags and drapes over what is below it.",
+                 "the surface under the brush sags and drapes over what is below it. Grab: the cloth where the stroke "
+                 "starts is held and follows the brush, the rest trails and folds. Expand and Pinch: spread the cloth "
+                 "out from the brush centre or gather it in (Alt swaps). Inflate: adds fabric under the brush so it "
+                 "balloons out and wrinkles (Alt takes fabric away).",
                  help);
     ImGui::SetNextItemWidth(-1);
     int fabric = int(c.fabric);
@@ -87,6 +91,16 @@ void App::drawClothSection() {
     ImGui::SetNextItemWidth(-1);
     tray::SliderInt("##clothsteps", &c.steps, 1, 8, "Steps %d");
     ui::HelpText("Steps", nullptr, "Simulation steps per dab: more is softer and settles further, but slower.", help);
+    ImGui::SetNextItemWidth(-1);
+    float soft = c.softBody * 100.0f;
+    if (ui::SliderInside("##clothsoft", &soft, 0.0f, 100.0f, "Soft body %.0f")) c.softBody = soft / 100.0f;
+    ui::HelpText("Soft body", nullptr,
+                 "0: the cloth stays where the brush leaves it. Higher: it springs back toward its shape at the "
+                 "start of the stroke, like a stuffed or elastic surface.",
+                 help);
+    ImGui::Checkbox(tr("Self-collision"), &c.selfCollide);
+    ui::HelpText("Self-collision", nullptr,
+                 "Folds push against each other instead of passing through. A little slower on big regions.", help);
     ImGui::Checkbox(tr("Collide with other Parts"), &clothCollide_);
     ui::HelpText("Collide with other Parts", nullptr,
                  "The cloth rests on the other visible Parts instead of passing through them (a shirt on a body).", help);
@@ -96,6 +110,8 @@ void App::drawClothSection() {
 bool App::clothUiValue(const std::string& name, double& out) const {
     if (name == "cloth_mode") return out = double(int(doc_.sculptor.cloth.mode)), true;
     if (name == "cloth_fabric") return out = double(int(doc_.sculptor.cloth.fabric)), true;
+    if (name == "cloth_soft") return out = double(doc_.sculptor.cloth.softBody), true;
+    if (name == "cloth_self") return out = doc_.sculptor.cloth.selfCollide ? 1.0 : 0.0, true;
     if (name == "cloth_region") return out = double(doc_.sculptor.clothRegion()), true;
     if (name == "cloth_colliders") return out = clothColliders_ ? double(clothColliders_->triangles()) : 0.0, true;
     return false;

@@ -9,8 +9,11 @@
 // simulation keeps its velocities. The region's
 // outer ring is pinned (its triangles reach outside it), masked vertices are pinned by their mask, so nothing
 // outside moves and the mask holds. Each dab drives the vertices under the brush (Drag: along the stroke; Push:
-// along the normal) as soft pins weighted by the falloff, runs `steps` frames, and writes the region back through
-// moveVertices (undo, sculpt layers, normals, BVH).
+// along the normal; Grab: from where they were at the stroke's start by the brush's whole travel; Expand / Pinch:
+// along the surface from / to the centre; Inflate: grows their rest lengths and lifts them along their normals) as
+// soft pins weighted by the falloff, runs `steps` frames, and writes the region back through moveVertices (undo,
+// sculpt layers, normals, BVH). Soft body adds a weak pin toward the stroke-start shape everywhere, so moved cloth
+// springs back; self-collision keeps the region's particles half an edge apart, so folds don't pass through.
 //
 // The brush is scale-free: whatever the mesh's size and density, the fabric is set from the region's mean edge
 // length so a particle weighs about 1 and each preset's stretch, compression and bending keep the same balance
@@ -30,8 +33,9 @@ namespace sf {
 
 namespace {
 
-const char* const kModeNames[] = {"drag", "push", "settle"};
-const char* const kModeLabels[] = {"Drag", "Push", "Settle"};
+const char* const kModeNames[] = {"drag", "push", "settle", "grab", "expand", "pinch", "inflate"};
+const char* const kModeLabels[] = {"Drag", "Push", "Settle", "Grab", "Expand", "Pinch", "Inflate"};
+static_assert(std::size(kModeNames) == size_t(ClothBrushMode::Count) && std::size(kModeLabels) == size_t(ClothBrushMode::Count));
 
 // Per preset, the brush's compliance balance: stretch, compression and bending against a unit particle mass at
 // one substep (alpha / h^2 / w). Compression far softer than stretch so a pushed region buckles.
@@ -87,6 +91,8 @@ struct ClothStroke {
     std::vector<glm::vec3> driveMove;          // per region vertex, this dab's summed move (every symmetry copy)
     std::vector<float> driveWeight;
     std::vector<uint32_t> ringOffset, ring; // per region vertex, its neighbours in the region (CSR, from the edges)
+    std::vector<glm::vec3> anchor;          // Grab: the first dab's centre per symmetry copy
+    std::unordered_map<uint32_t, float> grow; // Inflate: per mesh vertex, its rest-length scale (1 = as at the start)
 };
 
 size_t Sculptor::clothRegion() const { return cloth_ ? cloth_->verts.size() : 0; }
@@ -101,6 +107,10 @@ void Sculptor::dabCloth(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym) 
         cs.stroke = strokeId_;
     }
     const std::vector<SymCopy> mirrors = copies(sym);
+    if (cs.anchor.size() != mirrors.size()) {
+        cs.anchor.clear();
+        for (const SymCopy& m : mirrors) cs.anchor.push_back(m.point(p.center));
+    }
     const float r = std::max(p.radius, 1e-6f);
     const ClothBrushSettings& set = cloth;
 
@@ -117,6 +127,11 @@ void Sculptor::dabCloth(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym) 
                 brushVertices(mesh, bvh, m.point(p.center), reach, found);
                 region.insert(region.end(), found.begin(), found.end());
             }
+            if (set.mode == ClothBrushMode::Grab) // (what was grabbed stays in, wherever the brush has gone)
+                for (const glm::vec3& a : cs.anchor) {
+                    brushVertices(mesh, bvh, a, r * 1.05f, found);
+                    region.insert(region.end(), found.begin(), found.end());
+                }
             // The stroke's earlier region stays in (up to the budget): cloth the brush already moved keeps
             // simulating instead of freezing beside cloth that is still being dragged (that tore it).
             if (region.size() + cs.verts.size() <= std::max<size_t>(set.vertexBudget, 1000))
@@ -209,6 +224,12 @@ void Sculptor::dabCloth(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym) 
                 cs.basePin[i] = std::max(cs.basePin[i], t * t);
                 cs.sim.pinTo(uint32_t(i), cs.basePin[i], cs.restLocal[i]);
             }
+            // Soft body: a weak pull back to the stroke-start shape everywhere (0: the cloth stays where it's put).
+            if (const float soft = 0.45f * std::clamp(set.softBody, 0.0f, 1.0f); soft > 0.0f)
+                for (size_t i = 0; i < nv; ++i)
+                    if (cs.basePin[i] < soft) cs.basePin[i] = soft, cs.sim.pinTo(uint32_t(i), soft, cs.restLocal[i]);
+            for (size_t i = 0; i < nv; ++i)
+                if (const auto g = cs.grow.find(cs.verts[i]); g != cs.grow.end()) cs.sim.setRestScale(uint32_t(i), g->second);
         }
         cs.builtAt.clear();
         for (const SymCopy& m : mirrors) cs.builtAt.push_back(m.point(p.center));
@@ -227,6 +248,7 @@ void Sculptor::dabCloth(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym) 
     settings.iterations = n > 20000 ? 1 : n > 8000 ? 2 : kIterations;
     settings.restFrames = 1 << 30;
     settings.gravity = glm::vec3(0.0f, -g * 400.0f * r, 0.0f);
+    settings.selfDistance = set.selfCollide ? 0.5f * cs.meanEdge : 0.0f;
     sim.setSettings(settings);
 
     // Drive the vertices under the brush (soft pins toward where the stroke puts them).
@@ -241,33 +263,69 @@ void Sculptor::dabCloth(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym) 
         const size_t nv = cs.verts.size();
         cs.driveMove.assign(nv, glm::vec3(0.0f));
         cs.driveWeight.assign(nv, 0.0f);
-        for (const SymCopy& m : mirrors) {
+        const bool grab = set.mode == ClothBrushMode::Grab;
+        for (size_t mi = 0; mi < mirrors.size(); ++mi) {
+            const SymCopy& m = mirrors[mi];
             const glm::vec3 c = m.point(p.center), d = m.dir(p.strokeDelta);
             const glm::vec3 view = m.dir(p.viewDir);
+            const glm::vec3 c0 = cs.anchor[mi], travel = c - c0;
             for (size_t i = 0; i < nv; ++i) {
                 if (cs.basePin[i] >= 1.0f) continue;
-                const float dist = brushDistance(x[i], c, view, p.viewFalloff);
+                // Grab weighs each vertex by where it was against where the stroke began; the others by now.
+                const float dist = grab ? brushDistance(cs.restLocal[i], c0, view, p.viewFalloff)
+                                        : brushDistance(x[i], c, view, p.viewFalloff);
                 if (dist >= r) continue;
                 const float f = brushFalloff(dist, r, p.focal);
                 if (f <= 0.0f) continue;
                 const glm::vec3 nrm = mesh.normals.size() == mesh.vertexCount() ? mesh.normals[cs.verts[i]] : -view;
-                glm::vec3 move;
-                if (set.mode == ClothBrushMode::Drag) {
+                glm::vec3 move(0.0f);
+                switch (set.mode) {
+                case ClothBrushMode::Drag: {
                     // Along the stroke, lifted a little off the surface: bunched fabric rises (it can't go into
                     // what is under it), which starts the folds even on a flat sheet.
                     const glm::vec3 along = d * std::min(1.0f, 2.0f * s);
                     move = along + nrm * (0.3f * glm::length(along) * sign);
-                } else {
+                    break;
+                }
+                case ClothBrushMode::Grab: // (held where the brush puts it: f is already in the target)
+                    move = (cs.restLocal[i] + travel - x[i]) / f;
+                    break;
+                case ClothBrushMode::Expand:
+                case ClothBrushMode::Pinch: {
+                    // Along the surface, from or to the centre (no closer than half the way there per dab). Gathered
+                    // cloth also lifts a little, as Drag's does, so it buckles into folds instead of only squeezing
+                    // flat; spread cloth pulls its folds out (on flat cloth Expand barely moves: fabric hardly stretches).
+                    glm::vec3 out = x[i] - c;
+                    out -= nrm * glm::dot(out, nrm);
+                    const float l = glm::length(out);
+                    if (l < 1e-9f * r) break;
+                    const float dir = (set.mode == ClothBrushMode::Expand ? 1.0f : -1.0f) * sign;
+                    const float amount = 0.08f * s * r;
+                    if (dir > 0.0f) move = out / l * amount;
+                    else move = out / l * -std::min(amount, 0.5f * l), move += nrm * (0.3f * glm::length(move));
+                    break;
+                }
+                case ClothBrushMode::Inflate: {
+                    // More fabric (its rest lengths grow) pushed out along the normals: it balloons, and folds
+                    // where it can't; Alt takes fabric away and pulls in.
+                    float& g = cs.grow.try_emplace(cs.verts[i], 1.0f).first->second;
+                    g = std::clamp(g + sign * 0.03f * s * f, 0.5f, 2.0f);
+                    sim.setRestScale(uint32_t(i), g);
+                    move = nrm * (sign * 0.04f * s * r);
+                    break;
+                }
+                default:
                     move = -nrm * (sign * 0.08f * s * r); // Push: into the surface; Alt pulls out
                 }
                 cs.driveMove[i] += move * f;
                 cs.driveWeight[i] = std::max(cs.driveWeight[i], f);
             }
         }
+        const float hold = grab ? 0.8f : 0.6f;
         for (size_t i = 0; i < nv; ++i) {
             if (cs.driveWeight[i] <= 0.0f || glm::dot(cs.driveMove[i], cs.driveMove[i]) <= 0.0f) continue;
             // (never fully held: the fabric's constraints have the last word, so the brush can't tear it)
-            sim.pinTo(uint32_t(i), std::min(0.6f, cs.driveWeight[i] * 0.8f), x[i] + cs.driveMove[i]);
+            sim.pinTo(uint32_t(i), std::min(hold, cs.driveWeight[i] * (grab ? 1.0f : 0.8f)), x[i] + cs.driveMove[i]);
             driven.push_back(uint32_t(i));
         }
     }

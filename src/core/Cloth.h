@@ -15,7 +15,8 @@
 // into folds instead of resisting like rubber), bend (the distance across each pair of triangles sharing an edge,
 // the far corners, Provot-style: cheap, and soft), seams (two particles pulled to rest length 0), pins (a weight
 // toward a fixed point). Contact: particles are pushed out of collider surfaces (other Parts) to a thickness, with
-// friction, through a triangle BVH; self-collision is later (docs/design/cloth.md, phase 2b).
+// friction, through a triangle BVH. Self-collision (optional): particles keep a distance apart, pairs found once a
+// frame in a spatial hash, pushed apart after each substep's constraints (gathered per particle, deterministic).
 #pragma once
 
 #include <glm/glm.hpp>
@@ -97,6 +98,8 @@ struct ClothSettings {
     // At rest: the largest particle speed (m/s) stays under this for `restFrames` frames in a row.
     float restSpeed = 0.01f;
     int restFrames = 10;
+    // > 0: self-collision, particles keep at least this far apart (m; pairs closer than it at rest are skipped).
+    float selfDistance = 0.0f;
 };
 
 // One simulation: particles, constraints, contact. Deterministic: the same setup gives the same positions on
@@ -111,6 +114,11 @@ public:
     // Changes a particle's pin (0..1) and its pinned target (default: where it is now).
     void pin(uint32_t i, float weight);
     void pinTo(uint32_t i, float weight, const glm::vec3& target);
+    // Grows (> 1) or shrinks a particle's share of its edges' rest lengths: an edge rests at its start length times
+    // the mean of its two ends' scales (the Cloth brush's Inflate adds fabric so the surface balloons and folds).
+    void setRestScale(uint32_t i, float scale);
+    float restScale(uint32_t i) const { return i < restScale_.size() ? restScale_[i] : 1.0f; }
+    size_t selfPairs() const { return selfPairs_; } // last frame's self-collision pairs (tests, stats)
 
     // One frame (settings.substeps substeps). Returns true while moving, false once at rest.
     bool step();
@@ -136,6 +144,8 @@ private:
     void buildConstraints(const ClothSetup& setup);
     void project(uint32_t id, float h2inv);
     void findContacts(float frame);
+    void findSelfPairs(float frame);
+    void separateSelf();
     void substep(float h);
 
     Fabric fabric_;
@@ -144,6 +154,12 @@ private:
     std::vector<glm::uvec3> tris_;
     std::vector<glm::vec3> x_, prev_, v_, target_, dx_;
     std::vector<float> invMass_, w_, pinW_; // w_: inverse mass, 0 while held (pin 1)
+    std::vector<glm::vec3> rest_;            // rest positions (self-collision skips pairs close at rest)
+    std::vector<float> restScale_;           // empty = all 1
+    // Self-collision: per particle up to kSelfSlots neighbours within reach this frame (~0u = none).
+    static constexpr uint32_t kSelfSlots = 8;
+    std::vector<uint32_t> selfNbr_;
+    size_t selfPairs_ = 0;
     std::vector<Edge> stretch_, bend_, seam_;
     // Every constraint (kind << 30 | index), grouped by colour: no two of a colour share a particle.
     std::vector<uint32_t> order_, colourOffset_;
@@ -158,17 +174,22 @@ private:
 };
 
 // The Cloth brush's settings (Brush > Cloth; saved with the brush settings).
-enum class ClothBrushMode { Drag, Push, Settle, Count };
+// Drag: the cloth follows the stroke and folds; Push: along the normal (Alt pulls); Settle: only gravity, the region
+// sags and drapes; Grab: the cloth under the stroke's start follows the brush, held (Move-like); Expand / Pinch: along
+// the surface away from / toward the brush centre (Alt swaps); Inflate: the fabric under the brush grows and
+// balloons out along its normals (Alt shrinks and pulls in).
+enum class ClothBrushMode { Drag, Push, Settle, Grab, Expand, Pinch, Inflate, Count };
 struct ClothBrushSettings {
-    ClothBrushMode mode = ClothBrushMode::Drag; // Drag: the cloth follows the stroke and folds; Push: along the normal
-                                               // (Alt pulls); Settle: only gravity, the region sags and drapes
+    ClothBrushMode mode = ClothBrushMode::Drag;
     FabricPreset fabric = FabricPreset::Cotton;
     float gravity = 0.0f;  // 0..1 (Settle uses at least 0.5)
     float reach = 2.5f;    // the simulated region, in brush radii around the stroke (1.5..4)
     int steps = 2;         // simulation frames per dab (1..8): more = softer, slower
     size_t vertexBudget = 30000; // the region's most vertices (a bigger one shrinks its reach)
+    float softBody = 0.0f; // 0..1: 0 = the cloth stays where it is moved; higher springs back toward the stroke-start shape
+    bool selfCollide = true; // folds don't pass through each other
 };
-const char* clothModeName(ClothBrushMode mode); // "drag", "push", "settle"
+const char* clothModeName(ClothBrushMode mode); // "drag", "push", "settle", "grab", "expand", "pinch", "inflate"
 const char* clothModeLabel(ClothBrushMode mode); // "Drag", ...
 bool clothModeFromName(std::string_view name, ClothBrushMode& out);
 

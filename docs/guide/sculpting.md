@@ -653,12 +653,18 @@ Set it up in **Sculpt > Brush > Cloth**:
 
 - **Mode**: **Drag** (the cloth follows the stroke), **Push** (presses it in along the surface; <kbd>Alt</kbd>
   pulls it out, and the cloth around follows), **Settle** (only gravity: the cloth under the brush sags and drapes
-  over what's below).
+  over what's below), **Grab** (the cloth where the stroke starts is held and follows the brush; the cloth around it
+  trails and folds), **Expand** and **Pinch** (spread the cloth out from the brush centre or gather it in;
+  <kbd>Alt</kbd> swaps them), **Inflate** (adds fabric under the brush, so it balloons out and wrinkles where it
+  can't; <kbd>Alt</kbd> takes fabric away).
 - **Fabric**: **Silk** makes many fine folds, **Cotton** medium ones, **Denim** broad ones, **Leather** a few wide,
   stiff ones.
 - **Gravity**: pulls the cloth down while you drag, so folds hang (0 keeps it in place).
 - **Reach**: how far around the brush the cloth is simulated, in brush radii. More lets folds travel further.
 - **Steps**: simulation steps per dab. More is softer and settles further, but slower.
+- **Soft body**: 0 leaves the cloth where the brush puts it. Higher values make it spring back toward its shape
+  at the start of the stroke, like a stuffed or elastic surface.
+- **Self-collision** (on by default): folds push against each other instead of passing through.
 - **Collide with other Parts**: the cloth rests on the other visible Parts instead of passing through them, so a
   shirt Part settles onto the body Part under it.
 

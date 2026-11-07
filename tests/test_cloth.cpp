@@ -374,3 +374,188 @@ TEST(cloth_brush_settle_drapes_down_and_collides) {
     CHECK(lowest < 0.30f);    // sagged
     CHECK(closest > 0.297f);  // never inside the ball
 }
+
+TEST(cloth_self_collision_keeps_layers_apart) {
+    // Two sheets in one cloth: the lower one held, the upper one falls onto it. With self-collision it rests on top
+    // (half a cell's width keeps a particle from slipping between the lower one's); without, it falls through.
+    auto run = [](float selfDistance, size_t* pairs) {
+        ClothSetup a = sheet(20, 1.0f, 0.0f), b = sheet(20, 1.0f, 0.3f);
+        const uint32_t n = uint32_t(a.positions.size());
+        a.pin.assign(n, 1.0f);
+        a.positions.insert(a.positions.end(), b.positions.begin(), b.positions.end());
+        for (glm::uvec3 t : b.triangles) a.triangles.push_back(t + glm::uvec3(n));
+        a.pin.resize(a.positions.size(), 0.0f);
+        ClothSettings set;
+        set.selfDistance = selfDistance;
+        ClothSim sim;
+        CHECK(sim.init(a, fabricPreset(FabricPreset::Cotton), set));
+        size_t most = 0;
+        for (int f = 0; f < 60; ++f) sim.step(), most = std::max(most, sim.selfPairs());
+        if (pairs) *pairs = most;
+        float lowest = 1.0f;
+        for (size_t i = n; i < sim.positions().size(); ++i) lowest = std::min(lowest, sim.positions()[i].y);
+        return lowest;
+    };
+    size_t pairs = 0;
+    const float with = run(0.04f, &pairs), without = run(0.0f, nullptr);
+    std::printf("  self-collision: upper sheet's lowest %.4f with (%zu pairs), %.4f without\n", with, pairs, without);
+    CHECK(pairs > 0);
+    CHECK(with > 0.02f);
+    CHECK(without < -0.05f);
+}
+
+TEST(cloth_self_collision_same_on_any_thread_count) {
+    ClothSetup s = sheet(40, 1.0f, 0.0f);
+    s.pin.assign(s.positions.size(), 0.0f);
+    for (size_t i = 0; i < 41; ++i) s.pin[i] = 1.0f; // (one edge held: the sheet swings down and folds onto itself)
+    ClothSettings set;
+    set.selfDistance = 0.012f;
+    auto run = [&]() {
+        ClothSim sim;
+        sim.init(s, fabricPreset(FabricPreset::Silk), set);
+        for (int f = 0; f < 40; ++f) sim.step();
+        return sim.positions();
+    };
+    const auto parallel = run();
+    ThreadPool::shared().setSerial(true);
+    const auto serial = run();
+    ThreadPool::shared().setSerial(false);
+    CHECK(std::memcmp(parallel.data(), serial.data(), serial.size() * sizeof(glm::vec3)) == 0);
+}
+
+TEST(cloth_rest_scale_grows_edges) {
+    ClothSetup s = sheet(10, 1.0f, 0.0f);
+    ClothSettings set;
+    set.gravity = glm::vec3(0.0f);
+    ClothSim sim;
+    CHECK(sim.init(s, fabricPreset(FabricPreset::Cotton), set));
+    for (uint32_t i = 0; i < sim.particles(); ++i) sim.setRestScale(i, 1.3f);
+    CHECK(sim.restScale(0) == 1.3f);
+    for (int f = 0; f < 60; ++f) sim.step();
+    double before = 0.0, after = 0.0;
+    for (const ClothSim::Edge& e : sim.stretchEdges())
+        before += e.rest, after += glm::distance(sim.positions()[e.a], sim.positions()[e.b]);
+    std::printf("  rest scale 1.3: edges %.3f of their start length\n", after / before);
+    CHECK(after > 1.15 * before);
+}
+
+namespace {
+
+// A stroke of `dabs` dabs on the flat sheet in `mode`, the brush moving `step` along +x from `x0`; returns the doc.
+Document clothStroke(ClothBrushMode mode, float x0, int dabs, float step, float softBody = 0.0f, bool invert = false) {
+    Document d = makeDoc(makePlane(100, 2.0f));
+    d.sculptor.cloth.mode = mode;
+    d.sculptor.cloth.softBody = softBody;
+    d.sculptor.beginStroke(d.mesh, "Cloth");
+    for (int i = 0; i < dabs; ++i) {
+        DabParams p;
+        p.center = glm::vec3(x0 + step * float(i), 0.0f, 0.0f);
+        p.viewDir = glm::vec3(0, -1, 0);
+        p.radius = 0.2f;
+        p.strength = 0.6f;
+        p.invert = invert;
+        p.strokeDelta = i == 0 ? glm::vec3(0.0f) : glm::vec3(step, 0.0f, 0.0f);
+        d.sculptor.dab(d.mesh, d.bvh, BrushType::Cloth, p, Symmetry{false, false, false});
+    }
+    d.undo.push(d.sculptor.endStroke());
+    return d;
+}
+
+} // namespace
+
+TEST(cloth_brush_modes_by_name) {
+    ClothBrushMode m;
+    for (int i = 0; i < int(ClothBrushMode::Count); ++i) {
+        CHECK(clothModeFromName(clothModeName(ClothBrushMode(i)), m) && m == ClothBrushMode(i));
+        CHECK(clothModeFromName(clothModeLabel(ClothBrushMode(i)), m) && m == ClothBrushMode(i));
+    }
+    CHECK(clothModeFromName("Inflate", m) && m == ClothBrushMode::Inflate);
+    CHECK(!clothModeFromName("twist", m));
+}
+
+TEST(cloth_brush_grab_holds_what_it_took) {
+    // Grab at the origin and move 0.2 along +x: the cloth that was under the brush's centre goes most of the way.
+    const Mesh plane = makePlane(100, 2.0f);
+    uint32_t centre = 0;
+    for (uint32_t v = 0; v < plane.vertexCount(); ++v)
+        if (glm::length(plane.positions[v]) < glm::length(plane.positions[centre])) centre = v;
+    Document d = clothStroke(ClothBrushMode::Grab, 0.0f, 11, 0.02f);
+    const glm::vec3 moved = d.mesh.positions[centre] - plane.positions[centre];
+    std::printf("  grab: the centre moved (%.4f, %.4f, %.4f) for a travel of 0.2\n", moved.x, moved.y, moved.z);
+    CHECK(moved.x > 0.12f);
+    CHECK(moved.x < 0.22f);
+}
+
+TEST(cloth_brush_expand_pinch_inflate_soft) {
+    // Dabs in place at the origin. Pinch gathers the cloth under the brush toward the centre and it folds; Expand
+    // over those folds spreads them out again (Alt swaps the two); Inflate lifts it and leaves it longer (more
+    // fabric); Soft body springs a drag back toward the start.
+    const Mesh plane = makePlane(100, 2.0f);
+    auto radial = [&](const Mesh& m) {
+        double sum = 0.0;
+        int count = 0;
+        for (uint32_t v = 0; v < plane.vertexCount(); ++v) {
+            const glm::vec3 a = plane.positions[v];
+            const float r = glm::length(a);
+            if (r < 0.05f || r > 0.15f) continue;
+            glm::vec3 d = m.positions[v] - a;
+            sum += glm::dot(glm::vec3(d.x, 0.0f, d.z), a / r);
+            ++count;
+        }
+        return sum / std::max(1, count);
+    };
+    auto lift = [](const Mesh& m) {
+        float l = 0.0f;
+        for (const glm::vec3& q : m.positions) l = std::max(l, std::abs(q.y));
+        return l;
+    };
+    auto dabs = [](Document& d, ClothBrushMode mode, int count, bool invert) {
+        d.sculptor.cloth.mode = mode;
+        d.sculptor.beginStroke(d.mesh, "Cloth");
+        for (int i = 0; i < count; ++i) {
+            DabParams p;
+            p.viewDir = glm::vec3(0, -1, 0);
+            p.radius = 0.2f;
+            p.strength = 0.6f;
+            p.invert = invert;
+            d.sculptor.dab(d.mesh, d.bvh, BrushType::Cloth, p, Symmetry{false, false, false});
+        }
+        d.undo.push(d.sculptor.endStroke());
+    };
+    Document pinch = makeDoc(plane), swapped = makeDoc(plane);
+    dabs(pinch, ClothBrushMode::Pinch, 10, false);
+    dabs(swapped, ClothBrushMode::Expand, 10, true);
+    const float gathered = lift(pinch.mesh), pinchRadial = float(radial(pinch.mesh));
+    dabs(pinch, ClothBrushMode::Expand, 10, false);
+    std::printf("  pinch: radial %.5f, folds %.4f; expand + Alt: radial %.5f; then Expand: radial %.5f, folds %.4f\n",
+                pinchRadial, gathered, radial(swapped.mesh), radial(pinch.mesh), lift(pinch.mesh));
+    CHECK(pinchRadial < -0.001f);
+    CHECK(gathered > 0.005f);
+    CHECK(radial(swapped.mesh) < -0.001);
+    CHECK(radial(pinch.mesh) > pinchRadial + 0.001f);
+    CHECK(lift(pinch.mesh) < 0.85f * gathered);
+
+    Document inflate = makeDoc(plane);
+    dabs(inflate, ClothBrushMode::Inflate, 15, false);
+    double before = 0.0, after = 0.0;
+    for (const glm::uvec3& t : plane.triangles)
+        for (int k = 0; k < 3; ++k) {
+            const uint32_t a = t[k], b = t[(k + 1) % 3];
+            if (glm::length(plane.positions[a]) > 0.1f) continue;
+            before += glm::distance(plane.positions[a], plane.positions[b]);
+            after += glm::distance(inflate.mesh.positions[a], inflate.mesh.positions[b]);
+        }
+    std::printf("  inflate: lift %.4f, fabric under the brush %.3f of its length\n", lift(inflate.mesh), after / before);
+    CHECK(lift(inflate.mesh) > 0.01f);
+    CHECK(after > 1.03 * before);
+
+    auto mean = [&](const Document& d) {
+        double m = 0.0;
+        for (uint32_t v = 0; v < plane.vertexCount(); ++v) m += glm::distance(d.mesh.positions[v], plane.positions[v]);
+        return m / double(plane.vertexCount());
+    };
+    const double plastic = mean(clothStroke(ClothBrushMode::Drag, -0.4f, 20, 0.02f));
+    const double soft = mean(clothStroke(ClothBrushMode::Drag, -0.4f, 20, 0.02f, 1.0f));
+    std::printf("  drag: mean move %.6f plastic, %.6f soft body\n", plastic, soft);
+    CHECK(soft < 0.7 * plastic);
+}

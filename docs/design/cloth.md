@@ -44,8 +44,10 @@ wasted for a brush); implicit Euler with Newton (Baraff-Witkin) is the reference
 Colliders are the other visible Parts, copied once into a triangle BVH (`ClothColliders`, built in parallel at
 the start of a Drape; the brush uses the Part's own BVH and its other Parts). Contact is particle-vs-surface
 closest point within `thickness + travel`, outward from the surface normal (inside-ness from the normal side, so
-open meshes work). Self-collision (particle-particle on a hash grid, the IPC-style barrier only if needed) is
-phase 2b: off by default, it costs about 2x.
+open meshes work). Self-collision: particle-particle on a hash grid (cells twice the reach, so each particle looks in
+its 2x2x2 nearest cells), pairs found once a frame (each particle keeps its 8 nearest, ties by index; pairs close at
+rest are skipped), pushed apart after each substep's constraints, Jacobi (same on any thread count). The Cloth brush
+has it on (half an edge apart); an IPC-style barrier only if particle-particle proves leaky on coarse meshes.
 
 ## 3. Fabric presets
 
@@ -72,7 +74,12 @@ radius of any dab), each with its stroke-start position as rest. Vertices under 
 the stroke like Move, weighted by the falloff); the region's outer ring is pinned, so nothing outside moves.
 Each dab runs a few substeps on the region (stretch, compress, bend, gravity, contact with other Parts), so
 dragging pulls the cloth along, the compressed side buckles into folds and the folds keep their length. Modes:
-**Drag** (default), **Push** (along the normal, Alt pulls), **Settle** (gravity only: the region sags and drapes).
+**Drag** (default), **Push** (along the normal, Alt pulls), **Settle** (gravity only: the region sags and drapes),
+**Grab** (targets = each vertex's stroke-start position plus the brush's whole travel, weighted by its falloff around
+the stroke's first dab: Move-like, held harder), **Expand** / **Pinch** (along the surface away from / toward the
+centre; Alt swaps), **Inflate** (grows the rest lengths of the edges under the brush, `ClothSim::setRestScale`, and
+lifts along the normals: the fabric balloons and wrinkles where it can't; Alt shrinks). **Soft body** (0..1): a weak
+pin toward the stroke-start shape on every free vertex (0 = plastic, the default).
 Undo = one stroke (the normal stroke record). Bars: stroke lag within the normal brush bars (region capped by the
 tier's active-vertex budget, substeps reduced on big regions).
 
@@ -112,7 +119,7 @@ snap). Garments' own `ClothInput { Mesh, seams, ... }` converts to `ClothSetup` 
 ## 8. Threading, GPU, later
 
 Gathered Jacobi is a flat loop per particle: `poolFor` now; the same kernel is a GPU compute shader later (one
-thread per particle, no atomics). Collision queries are per particle and parallel. Self-collision, wind
+thread per particle, no atomics). Collision queries are per particle and parallel. Wind
 turbulence, sewing-line stiffening, animated bodies: later phases.
 
 ## 9. Questions for Tony (patents, no conclusions)

@@ -49,12 +49,16 @@ click "Cloth##brush.cloth_options"
 expect "##clothmode"
 expect "##clothfabric"
 expect "##clothreach"
+expect "##clothsoft"
 hold ctrl
 hover "##clothmode"
 expect_help bunches
+expect_help balloons
 hover "##clothfabric"
 expect_help Denim
 hold none
 expect_value cloth_mode == 0
 expect_value cloth_fabric == 1
+expect_value cloth_soft == 0
+expect_value cloth_self == 1
 shot cloth_panel
