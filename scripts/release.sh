@@ -546,9 +546,9 @@ step_stage() {
         tries=$((tries - 1))
         [ -n "$id" ] || sleep 10
     done
-    if [ -z "$id" ]; then # main is already the staged commit: --yes still works, release.yml builds from the tag (0.11.14)
-        printf '   warning: %s\n' "no Packages run on the staging push of ${sha:0:8} after 5 minutes: --yes will build the packages from the tag (slower); gh run list -R $REPO -w packages.yml -L 3 shows why"
-        echo "   next, on main: ${HIGHLIGHTS_GIVEN:+HIGHLIGHTS=$HIGHLIGHTS_GIVEN }scripts/release.sh $V --yes"
+    if [ -z "$id" ]; then # main is already the staged commit, so stopping helps nobody: promote with --rebuild (0.11.14)
+        printf '   warning: %s\n' "no Packages run on the staging push of ${sha:0:8} after 5 minutes (gh run list -R $REPO -w packages.yml -L 3 shows why): promote by building from the tag instead"
+        echo "   next, on main: ${HIGHLIGHTS_GIVEN:+HIGHLIGHTS=$HIGHLIGHTS_GIVEN }$(MODE_FLAG=" --rebuild" resume bump)"
         return 0
     fi
     echo "   waiting for Packages run $id on staging (every platform's package) ..." >&2
