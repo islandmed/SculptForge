@@ -525,6 +525,11 @@ if(SCULPTFORGE_BUILD_APP)
     endif()
   endif()
   if(APPLE)
+    # SculptForge > Preferences... in the app menu (#111): SDL's item, given its action (src/app/MacAppMenu.h).
+    enable_language(OBJCXX)
+    target_sources(sculptforge PRIVATE src/app/MacAppMenu.mm)
+    set_source_files_properties(src/app/MacAppMenu.mm PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+    target_link_libraries(sculptforge PRIVATE "-framework Cocoa")
     # App icon: assets/branding/sculptforge.icns (tools/brand/make_icons.py: the SF mark on Apple's icon grid).
     set(ICNS ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge.icns)
     target_sources(sculptforge PRIVATE ${ICNS})
