@@ -1,4 +1,5 @@
 ---
+highlight: Timelapse: rendered timelapses no longer flicker between detail levels (thanks @ebarranco)
 whats_new: **Timelapse** videos of dense sculpts no longer flicker (**Edit > Export timelapse...**).
 fixed: Timelapse: a PBR timelapse of a high-detail sculpt flickered a little in the video (not in the view): after each
   step of the history the frames switched between the full mesh and its lighter preview levels. Timelapse frames and

@@ -2,7 +2,7 @@
 whats_new: **Orbit lock**: **View > Orbit lock** turns the view about one axis only: **Free**, **Y (turntable)**,
   **X** or **Z** (<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> / <kbd>Y</kbd> / <kbd>X</kbd> / <kbd>Z</kbd>). The axis
   gizmo shows which axis is locked. Thanks foirgairwolf on Discord for the idea.
-highlight: Orbit lock: turn the view about X, Y or Z only
+highlight: Orbit lock: View > Orbit lock turns the view about X, Y or Z only (thanks foirgairwolf on Discord)
 added: **Orbit lock** (View > Orbit lock, a request from foirgairwolf on Discord): besides Free and Y (the turntable), rotation
   drags can turn the view about the world X or Z axis only, with no drift over long drags. A key for each
   (Alt+Shift+F / Y / X / Z) and the `orbit_lock axis=free|y|x|z` command; the axis gizmo draws the locked axis

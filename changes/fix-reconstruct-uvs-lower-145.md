@@ -1,4 +1,5 @@
 ---
+highlight: Reconstruct Subdiv: lower levels keep their UVs, even where seams cross coarse faces (thanks @RodTDai, #145)
 whats_new: **Reconstruct Subdiv** keeps UVs on the lower levels of a high-poly that was unwrapped on its own: no more faces stretched across UDIM tiles, even with overlapping islands.
 fixed: **Reconstruct Subdiv** (Tool > Geometry): the levels it builds keep each face inside one UV island when the
   imported high-poly's seams run through the lower level's faces (UVs made on the high-poly, automatic unwraps with

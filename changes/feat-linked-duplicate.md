@@ -2,7 +2,7 @@
 whats_new: **Linked Duplicates**: **Tool > Parts > Linked Duplicate** makes a copy that shares the Part's mesh but
   sits in its own place. Sculpt, paint or mask any of them and all change; move, turn or scale each with the Gizmo.
   **Make Unique** gives one its own mesh again. Hundreds of copies cost about one mesh.
-highlight: Linked Duplicates: sculpt one, every copy follows
+highlight: Linked duplicates: sculpt one Part and every copy follows, each in its own place (thanks @ebarranco, #94)
 added: **Linked Duplicates** (#94, asked for by ebarranco; the idea of placing copies on their own by NicTanghe):
   **Tool > Parts > Linked Duplicate** adds a Part sharing the active one's mesh, undo history and GPU buffers, with
   its own transform. Strokes, masking and painting on any copy edit the shared mesh (symmetry about the copy's own

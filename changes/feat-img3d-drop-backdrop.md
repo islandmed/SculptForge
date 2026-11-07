@@ -1,4 +1,5 @@
 ---
+highlight: Image to 3D: remove the flat background plane a generated model stands on, in one click (thanks fenix on Discord)
 whats_new: **Remove flat background**: Image to 3D drops the flat plane a picture's background often turns into
   (a wall behind or a ground under the subject) before the model lands. On by default in **Generate 3D**; Undo
   brings a removed plane back. Thanks fenix on Discord.

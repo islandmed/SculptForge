@@ -5,6 +5,18 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.13
+
+```features
+date: 2026-11-07
+tagline: Linked duplicates, an orbit lock, and cleaner Image to 3D.
+highlight: Linked duplicates: sculpt one Part and every copy follows, each in its own place (thanks @ebarranco, #94)
+highlight: Orbit lock: View > Orbit lock turns the view about X, Y or Z only (thanks foirgairwolf on Discord)
+highlight: Image to 3D: remove the flat background plane a generated model stands on, in one click (thanks fenix on Discord)
+highlight: Reconstruct Subdiv: lower levels keep their UVs, even where seams cross coarse faces (thanks @RodTDai, #145)
+highlight: Timelapse: rendered timelapses no longer flicker between detail levels (thanks @ebarranco)
+```
+
 ## Version 0.11.12
 
 ```features
