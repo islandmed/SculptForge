@@ -17,6 +17,21 @@ highlight: Reconstruct Subdiv: lower levels keep their UVs, even where seams cro
 highlight: Timelapse: rendered timelapses no longer flicker between detail levels (thanks @ebarranco)
 ```
 
+- **Remove flat background**: Image to 3D drops the flat plane a picture's background often turns into (a wall behind
+  or a ground under the subject) before the model lands. On by default in **Generate 3D**; Undo brings a removed plane
+  back. Thanks fenix on Discord.
+- **Linked Duplicates**: **Tool > Parts > Linked Duplicate** makes a copy that shares the Part's mesh but sits in its
+  own place. Sculpt, paint or mask any of them and all change; move, turn or scale each with the Gizmo. **Make
+  Unique** gives one its own mesh again. Hundreds of copies cost about one mesh.
+- **Orbit lock**: **View > Orbit lock** turns the view about one axis only: **Free**, **Y (turntable)**, **X** or
+  **Z** (<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> / <kbd>Y</kbd> / <kbd>X</kbd> / <kbd>Z</kbd>). The axis gizmo
+  shows which axis is locked. Thanks foirgairwolf on Discord for the idea.
+- **Version at a glance**: the window title and the top bar show the SculptForge version, so a screenshot says which
+  one you run. A beta's tag shows in the accent colour.
+- **Reconstruct Subdiv** keeps UVs on the lower levels of a high-poly that was unwrapped on its own: no more faces
+  stretched across UDIM tiles, even with overlapping islands.
+- **Timelapse** videos of dense sculpts no longer flicker (**Edit > Export timelapse...**).
+
 ## Version 0.11.12
 
 ```features
