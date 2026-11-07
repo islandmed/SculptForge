@@ -35,6 +35,7 @@
 #include "core/Project.h"
 #include "core/QRemesh.h"
 #include "core/ForgeSpheres.h"
+#include "core/Garment.h"
 #include "core/Deform.h"
 #include "core/Sculptable.h"
 #include "core/Splats.h"
@@ -884,6 +885,7 @@ CommandRegistry::CommandRegistry() {
     registerBlenderCommands(*this); // blender_send/receive (io/BlenderCommands.cpp)
     registerMayaCommands(*this); // maya_send/receive (io/MayaCommands.cpp)
     registerBakeCommands(*this); // bake (core/Bake.cpp)
+    registerGarmentCommands(*this); // garment_* (core/GarmentCommands.cpp)
     registerFaceCommands(*this); // face_shapes_generate, face_weights, ... (core/FaceCommands.cpp)
     registerStarterMeshCommands(*this); // new_starter_mesh (core/StarterMeshes.h)
     registerPackCommands(*this);    // pack_install, pack_list, pack_remove, ... (core/Pack.h)
