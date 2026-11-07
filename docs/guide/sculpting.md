@@ -71,7 +71,7 @@ in **Sculpt > Brush > Custom brushes**.
 | **Wrinkle** | Fine, sharp creases for skin folds and fabric wrinkles. |
 | **Palette Knife** | Flattens and drags clay sideways like a sculptor's knife. |
 | **Dragon Scales** | Stamps rounded overlapping scales along the stroke. |
-| **Stone Chisel** | Scrapes hard planes and breaks them up with cracks for rocks and ruins. |
+| **Stone Carve** | Scrapes hard planes and breaks them up with cracks for rocks and ruins. |
 | **Skin Pores** | Sprinkles tiny pores for close-up skin detail. |
 | **Clay Slab** | Builds up flat-topped strokes of clay for blocking in forms. |
 | **Edge Wear** | Chips and softens only the sharp edges and ridges, for weathered props. |

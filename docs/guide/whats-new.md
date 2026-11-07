@@ -422,7 +422,7 @@ highlight: Show SculptForge on Discord (opt-in)
   finished sculpt is the same either way.
 - **Fast Upload (experimental)**: **Preferences > Performance > Fast Upload**. Sculpted changes reach the graphics
   card through shared memory and a copy on the card, instead of a copy by the driver during the frame.
-- **Pattern brushes on micro levels**: Dragon Scales, Skin Pores, Stone Chisel and the other pattern brushes keep
+- **Pattern brushes on micro levels**: Dragon Scales, Skin Pores, Stone Carve and the other pattern brushes keep
   their pattern on a micro level, and carving ones (Wrinkle) carve.
 - **Cmd+, opens Preferences** (Ctrl+, on Windows and Linux).
 - **Show SculptForge on Discord**: **Edit > Preferences > Integrations** lets your Discord friends see you're

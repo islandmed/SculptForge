@@ -272,14 +272,14 @@ TEST(brush_install_update_and_delete) {
 
 TEST(brush_library_overrides_and_restores) {
     LibraryFixture lib("override");
-    writeBrush(lib.studioA / "chisel.sfbrush", "Stone Chisel", 0.05f);
+    writeBrush(lib.studioA / "carve.sfbrush", "Stone Carve", 0.05f);
     Document doc;
     loadBrushLibrary(doc, lib.paths());
     const size_t n = doc.brushes.size();
 
     // Refining a studio brush saves the artist's version; the studio file is untouched.
     const auto before = snapshot(lib.studioA);
-    const int i = int(find(doc, "Stone Chisel") - doc.brushes.data());
+    const int i = int(find(doc, "Stone Carve") - doc.brushes.data());
     doc.brushes[size_t(i)].depth = -0.9f;
     std::string err;
     CHECK(saveBrushToLibrary(doc, i, err, false, lib.paths()));
