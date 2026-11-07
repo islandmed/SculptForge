@@ -10,6 +10,10 @@ set(SF_PIN_glm https://github.com/g-truc/glm/archive/refs/tags/1.0.1.tar.gz
     9f3174561fd26904b23f0db5e560971cbf9b3cbda0b280f04d5c379d03bf234c)
 set(SF_PIN_SDL3 https://github.com/libsdl-org/SDL/releases/download/release-3.2.30/SDL3-3.2.30.tar.gz
     4c3b09330d866dc52eb65b66259a6684ad387252ca8c57901b3a2b534eb42e3d)
+# Linux: SDL 3.4 (cmake/Dependencies.cmake), for Wayland pens: one pen across proximity changes, the eraser end,
+# the tablet's own cursor. (Windows and macOS stay on 3.2.30 until they are checked on real tablets.)
+set(SF_PIN_SDL3_linux https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz
+    9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3)
 set(SF_PIN_imgui https://github.com/ocornut/imgui/archive/refs/tags/v1.91.9.tar.gz
     3872a5f90df78fced023c1945f4466b654fd74573370b77b17742149763a7a7c)
 set(SF_PIN_mbedtls https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.7/mbedtls-3.6.7.tar.bz2

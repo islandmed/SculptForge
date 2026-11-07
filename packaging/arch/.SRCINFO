@@ -7,7 +7,7 @@ pkgbase = sculptforge
 	arch = aarch64
 	license = GPL-3.0-or-later
 	makedepends = cmake
-	depends = sdl3
+	depends = sdl3>=3.4.18
 	depends = curl
 	depends = zstd
 	depends = libgcc

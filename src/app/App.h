@@ -2613,6 +2613,11 @@ private:
     bool dropPenMouseEvent(const SDL_Event& e) const; // SDL's own mouse events for the pen (Tablet.cpp)
     void penMouseEvents(const SDL_Event& pen, bool before); // the pen tip's mouse events, made from the pen's
     void sendPenMouse(SDL_EventType type, float x, float y, SDL_WindowID window);
+    // SDL sends a pen sample's motion before its pressure (every platform; Wayland per tablet frame): the tip's
+    // mouse motion, which moves the stroke, waits for the axes that follow it (Tablet.cpp).
+    void flushPenMotion();
+    SDL_Event heldPenMotion_{};
+    bool penMotionHeld_ = false, heldPenNoise_ = false;
     bool strayMouseMotion(const SDL_Event& e) const;  // a driver's mouse events beside the pen's (Tablet.cpp)
     void keepImGuiOnPen();                            // after ImGui_ImplSDL3_NewFrame (Tablet.cpp)
     bool penSoftCursor() const; // mouse mode with the pen: the arrow is drawn at the brush (Tablet.cpp)
@@ -2644,7 +2649,10 @@ private:
     void tabletNote(TabletHotplug::Note note, const std::string& name);
     const char* pressureStatus() const; // "Pressure: on" / "not detected" (Preferences > Input and > Tablet)
     void drawPressureStatus();          // ... with the troubleshooting link
+    void drawTabletDiagnostics();       // Preferences > Tablet > Troubleshooting details, Copy details
+    std::string tabletReport() const;   // ... the text it copies (core penReport)
     PenPressureTracker penTracker_;
+    PenDiagnostics penDiag_;
     TabletHotplug tabletHotplug_;
     void wintabEvent(const SDL_Event& e); // a mouse event while the tablet driver reports pressure through Wintab
     WintabPressure wintab_;

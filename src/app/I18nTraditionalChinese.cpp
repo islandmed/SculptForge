@@ -3178,6 +3178,10 @@ constexpr Entry kTraditionalChinese[] = {
     {"Troubleshooting", "疑難排解"},
     {"No pen seen yet", "尚未偵測到繪圖筆"},
     {"Tilt: not reported by this pen", "傾斜：此繪圖筆不回報"},
+    {"Troubleshooting details", "疑難排解詳細資訊"},
+    {"Copy details", "複製詳細資訊"},
+    {"Copies the lines above for a bug report about the pen: the SDL version, the display system, how SculptForge was installed and the pen's events.", "複製以上內容用於繪圖筆錯誤回報：SDL 版本、顯示系統、SculptForge 的安裝方式以及繪圖筆輸入。"},
+    {"Running through XWayland. If the pen's pressure is poor, start SculptForge with SDL_VIDEO_DRIVER=wayland to use Wayland directly.", "正在透過 XWayland 執行。如果繪圖筆壓力感應不佳，請用 SDL_VIDEO_DRIVER=wayland 啟動 SculptForge，直接使用 Wayland。"},
     {"Pressure curve (all brushes)", "壓力曲線（所有筆刷）"},
     // --- UserGuide.cpp (tools/i18n/coverage.py) ---
     {"SculptForge is free and open source, and stays that way. If it helps your work, you can support its development.",

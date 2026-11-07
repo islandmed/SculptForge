@@ -22,7 +22,7 @@ NOTICES = ROOT / "THIRD_PARTY_NOTICES.md"
 FETCH = ROOT / "cmake" / "Fetch.cmake"
 
 # Fetch.cmake pin name -> the component's name in THIRD_PARTY_NOTICES.md
-PIN_NAMES = {"glm": "GLM", "SDL3": "SDL 3", "imgui": "Dear ImGui", "mbedtls": "Mbed TLS", "libdatachannel": "libdatachannel",
+PIN_NAMES = {"glm": "GLM", "SDL3": "SDL 3", "SDL3_linux": "SDL 3", "imgui": "Dear ImGui", "mbedtls": "Mbed TLS", "libdatachannel": "libdatachannel",
              "ldc_usrsctp": "usrsctp", "ldc_libjuice": "libjuice", "ldc_plog": "plog", "pybind11": "pybind11"}
 LICENSES = {"MIT License": "MIT", "zlib License": "Zlib", "BSD 3-Clause License": "BSD-3-Clause",
             "Apache License 2.0": "Apache-2.0", "Mozilla Public License 2.0": "MPL-2.0",
@@ -57,7 +57,9 @@ def license_entry(text):
 
 def build(version):
     p = pins()
-    by_name = {v: k for k, v in PIN_NAMES.items()}
+    by_name = {}  # component -> its pins (SDL 3: one for Windows and macOS, one for Linux)
+    for k, v in PIN_NAMES.items():
+        by_name.setdefault(v, []).append(k)
     components = []
     for r in notice_rows():
         if "not shipped" in r["use"] or "nothing vendored" in r["version"] or r["version"] in ("—", "colour values only") or "formulas only" in r["version"]:
@@ -66,10 +68,11 @@ def build(version):
              "licenses": [license_entry(r["license"])]}
         if r["url"]:
             c["externalReferences"] = [{"type": "website", "url": r["url"]}]
-        pin = by_name.get(r["name"])
-        if pin and pin in p:
+        for pin in by_name.get(r["name"], []):
+            if pin not in p:
+                continue
             url, sha = p[pin]
-            c["hashes"] = [{"alg": "SHA-256", "content": sha}]
+            c.setdefault("hashes", []).append({"alg": "SHA-256", "content": sha})
             c.setdefault("externalReferences", []).append({"type": "distribution", "url": url})
         components.append(c)
     return {

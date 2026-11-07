@@ -7,7 +7,7 @@ licenses require.
 
 | Component | Version | License | Used for |
 |---|---|---|---|
-| [SDL 3](https://libsdl.org) | 3.2.30 (or the system's SDL3) | zlib License | Desktop app: windows, input, OpenGL context. Linked dynamically. |
+| [SDL 3](https://libsdl.org) | 3.2.30 (Windows, macOS), 3.4.18 (Linux), or the system's SDL3 | zlib License | Desktop app: windows, input, OpenGL context. Linked dynamically. |
 | [Dear ImGui](https://github.com/ocornut/imgui) | 1.91.9 | MIT License | Desktop app user interface. |
 | [GLM](https://github.com/g-truc/glm) | 1.0.1 | MIT License (or The Happy Bunny License) | Vector and matrix math. |
 | [stb_image / stb_image_write](https://github.com/nothings/stb) | commit 013ac3be | MIT License or Public Domain (Unlicense), at your choice | Image loading and PNG writing. Vendored in third_party/stb. |

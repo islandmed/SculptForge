@@ -3178,6 +3178,10 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Troubleshooting", "故障排除"},
     {"No pen seen yet", "尚未检测到数位笔"},
     {"Tilt: not reported by this pen", "倾斜：此数位笔不报告"},
+    {"Troubleshooting details", "故障排除详情"},
+    {"Copy details", "复制详情"},
+    {"Copies the lines above for a bug report about the pen: the SDL version, the display system, how SculptForge was installed and the pen's events.", "复制以上内容用于数位笔错误报告：SDL 版本、显示系统、SculptForge 的安装方式以及数位笔输入。"},
+    {"Running through XWayland. If the pen's pressure is poor, start SculptForge with SDL_VIDEO_DRIVER=wayland to use Wayland directly.", "正在通过 XWayland 运行。如果数位笔压感不佳，请用 SDL_VIDEO_DRIVER=wayland 启动 SculptForge，直接使用 Wayland。"},
     {"Pressure curve (all brushes)", "压力曲线（所有笔刷）"},
     // --- UserGuide.cpp (tools/i18n/coverage.py) ---
     {"SculptForge is free and open source, and stays that way. If it helps your work, you can support its development.",

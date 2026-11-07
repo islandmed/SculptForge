@@ -69,6 +69,15 @@ a screen and set the pen buttons; on X11 the xf86-input-wacom driver and `xsetwa
 that pressure arrives at all, run `libinput debug-events` and look for `TABLET_TOOL_AXIS` lines with a
 `pressure` value.
 
+The Linux packages (AppImage, tarball, Flatpak) carry SDL 3.4.18, and the AUR package needs that version of the
+system's SDL or later: before SDL 3.4 a Wayland pen counted as a new pen each time it came into range, and its
+eraser end drew as the tip. SDL draws through XWayland when the compositor lacks the fifo-v1 protocol;
+**Preferences > Tablet > Troubleshooting details** says which (Video driver: wayland or x11), and starting
+SculptForge with `SDL_VIDEO_DRIVER=wayland` uses Wayland anyway. SDL sends each pen sample's motion before its
+pressure (on every platform); the stroke waits for that pressure, so a dab never gets the sample before's. On Linux
+a sample that lost its pressure (SDL's X11 pens report 0 when a motion's valuators leave pressure out, its Wayland
+pens 0 for a frame that also carries a hover distance) keeps the last value while the tip touches.
+
 ## Hot-plugging
 
 A tablet plugged in while SculptForge runs works at once: SDL finds a new pen at its first proximity, and the
@@ -78,6 +87,11 @@ releases the buttons it held, so no Alt stays down. On Windows the Wintab contex
 is added. The logic is `TabletHotplug` in `core/Tablet.h`.
 
 ## Troubleshooting
+
+**Preferences > Tablet > Troubleshooting details** lists the SDL version, the video driver (wayland, x11, windows,
+cocoa), how SculptForge was installed, the pen's events since launch, lost pressure samples, the system's own mouse
+events while the pen was in range, and the last stroke's pressure range. **Copy details** puts it on the clipboard
+for a bug report.
 
 - **No pressure** (the meter stays at 1.00 or never moves): the system doesn't pass pressure on. On Windows
   turn Windows Ink on (above); on Linux check `libinput debug-events`. A pen that never reports pressure

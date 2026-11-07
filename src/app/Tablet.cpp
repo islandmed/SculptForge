@@ -19,6 +19,8 @@
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <fstream>
 
 namespace sf {
@@ -75,6 +77,20 @@ void App::sendPenMouse(SDL_EventType type, float x, float y, SDL_WindowID window
     penMouseSending_ = true;
     dispatchEvent(m);
     penMouseSending_ = false;
+}
+
+// Every platform's SDL sends a pen sample as its motion, then its axes (Wayland: a tablet frame's motion, touch, then
+// pressure and tilt). The stroke moves with the tip's mouse motion, so it took the pressure of the sample before:
+// one sample late all along the stroke, and at a press or a lift the dab where the pressure changed got the old one.
+// The tip's mouse motion now waits until the same pen's axes that follow it are in (handleEvent), and goes out at
+// the next other event or when the batch of events ends (the main loop, keepImGuiOnPen).
+void App::flushPenMotion() {
+    if (!penMotionHeld_) return;
+    penMotionHeld_ = false;
+    const bool noise = penNoise_;
+    penNoise_ = heldPenNoise_; // (whether that motion was a resting pen's noise)
+    penMouseEvents(heldPenMotion_, false);
+    penNoise_ = noise;
 }
 
 // before: called ahead of the pen event (a pen leaving, or coming back without having left: let go first);
@@ -138,6 +154,7 @@ bool App::strayMouseMotion(const SDL_Event& e) const {
 // position, on Windows, macOS and X11). With a pen that cursor can be stale or elsewhere (and in Mouse mode it is
 // somewhere else by design), so ImGui's mouse would jump between it and the pen each frame: put it back on the pen.
 void App::keepImGuiOnPen() {
+    flushPenMotion(); // (the scripted and recording loops: the frame's last pen motion)
     ImGuiIO& io = ImGui::GetIO();
     const bool soft = penSoftCursor();
     io.MouseDrawCursor = soft && !viewportCursorWanted(); // over the view the brush ring is the cursor
@@ -215,6 +232,7 @@ void App::handlePenEvent(const SDL_Event& e) {
     }
     switch (e.type) {
     case SDL_EVENT_PEN_PROXIMITY_IN:
+        ++penDiag_.proximity;
         // A pen coming into range while a pen drag is still open: it left without saying so (some drivers never
         // do). End that first, with the buttons it held, instead of carrying the drag on from somewhere else.
         if (penInProximity_ || (dragFromPen_ && drag_ != Drag::None)) penLeft();
@@ -226,9 +244,12 @@ void App::handlePenEvent(const SDL_Event& e) {
         if (penName_.empty()) detectPenName();
         break;
     case SDL_EVENT_PEN_PROXIMITY_OUT:
+        ++penDiag_.proximity;
         penLeft();
         break;
     case SDL_EVENT_PEN_DOWN:
+        ++penDiag_.down;
+        penDiag_.touchDown();
         penSeen_ = penInProximity_ = penTouching_ = true;
         penId_ = e.ptouch.which;
         penEraser_ = e.ptouch.eraser;
@@ -240,26 +261,35 @@ void App::handlePenEvent(const SDL_Event& e) {
         // proximity right after, and some drivers then never send it.
         // The same for a tip drag on the background (rotate / pan / zoom); a side button's view drag goes on.
         if (drag_ != Drag::None && dragFromPen_ && !penNavButton_) onMouseUp();
+        ++penDiag_.up;
         penTouching_ = penEraser_ = false;
         penTracker_.touchUp();
         lastPenTouchNs_ = clickClockNs();
         break;
     case SDL_EVENT_PEN_MOTION:
+        ++penDiag_.motion;
         if (!penNoise_) penSeen_ = penInProximity_ = true; // (a resting pen doesn't take the cursor back)
         penId_ = e.pmotion.which;
         penTracker_.motion();
         break;
     case SDL_EVENT_PEN_AXIS:
         if (e.paxis.axis == SDL_PEN_AXIS_PRESSURE) {
-            penTracker_.sample(e.paxis.value);
+            ++penDiag_.pressure;
+            if (penMotionHeld_) penDiag_.axesAfterMotion = true;
+            if (!penTracker_.sample(e.paxis.value)) ++penDiag_.lostSamples;
+            penDiag_.sampled(penTracker_.raw(), penTouching_);
             if (drag_ == Drag::Stroke && firstDabPending_ && penTracker_.readyForFirstDab()) firstDab(lastX_, lastY_);
-        } else if (e.paxis.axis == SDL_PEN_AXIS_XTILT || e.paxis.axis == SDL_PEN_AXIS_YTILT) {
-            (e.paxis.axis == SDL_PEN_AXIS_XTILT ? penTiltX_ : penTiltY_) = e.paxis.value;
-            penTiltSeen_ = penTiltSeen_ || e.paxis.value != 0.0f;
+        } else {
+            ++penDiag_.otherAxes;
+            if (e.paxis.axis == SDL_PEN_AXIS_XTILT || e.paxis.axis == SDL_PEN_AXIS_YTILT) {
+                (e.paxis.axis == SDL_PEN_AXIS_XTILT ? penTiltX_ : penTiltY_) = e.paxis.value;
+                penTiltSeen_ = penTiltSeen_ || e.paxis.value != 0.0f;
+            }
         }
         break;
     case SDL_EVENT_PEN_BUTTON_DOWN:
     case SDL_EVENT_PEN_BUTTON_UP:
+        ++penDiag_.buttons;
         penButton(e.pbutton.button, e.pbutton.down, e.pbutton.x, e.pbutton.y);
         break;
     default:
@@ -728,6 +758,78 @@ void App::drawTabletSection() {
     ImGui::TextUnformatted(tr("These settings save themselves."));
     ImGui::PopTextWrapPos();
     ImGui::PopStyleColor();
+
+    ImGui::Spacing();
+    drawTabletDiagnostics();
+}
+
+// What a bug report about the pen needs (Preferences > Tablet > Troubleshooting details, Copy details): which SDL
+// and display system the app runs on, how it was installed, and the pen's events as the app saw them.
+std::string App::tabletReport() const {
+    std::vector<std::pair<std::string, std::string>> facts;
+    auto env = [](const char* name) {
+        const char* v = std::getenv(name);
+        return std::string(v && *v ? v : "-");
+    };
+    facts.push_back({"SculptForge", SCULPTFORGE_VERSION});
+    const int linked = SDL_GetVersion();
+    char sdl[96];
+    std::snprintf(sdl, sizeof sdl, "%d.%d.%d (built with %d.%d.%d)", SDL_VERSIONNUM_MAJOR(linked),
+                  SDL_VERSIONNUM_MINOR(linked), SDL_VERSIONNUM_MICRO(linked), SDL_MAJOR_VERSION, SDL_MINOR_VERSION,
+                  SDL_MICRO_VERSION);
+    facts.push_back({"SDL", sdl});
+    const char* driver = SDL_GetCurrentVideoDriver();
+    facts.push_back({"Video driver", driver ? driver : "-"});
+#if defined(__linux__)
+    facts.push_back({"Session", env("XDG_SESSION_TYPE") + " / " + env("XDG_CURRENT_DESKTOP")});
+    facts.push_back({"Package", std::getenv("FLATPAK_ID") ? "Flatpak" : std::getenv("APPIMAGE") ? "AppImage"
+                                                                                            : "tarball or system package"});
+#endif
+    facts.push_back({"Pen", penName_.empty() ? std::string(penSeen_ ? "unnamed" : "none seen") : penName_});
+    std::string status = pressureStatus();
+    if (status.rfind("Pressure: ", 0) == 0) status.erase(0, 10);
+    facts.push_back({"Pressure", status}); // "on", "not detected" ...
+    std::string tablets;
+    int n = 0;
+    if (SDL_MouseID* mice = SDL_GetMice(&n)) {
+        for (int i = 0; i < n; ++i)
+            if (const char* name = SDL_GetMouseNameForID(mice[i]); name && looksLikeTablet(name))
+                tablets += (tablets.empty() ? "" : ", ") + std::string(name);
+        SDL_free(mice);
+    }
+    facts.push_back({"Tablet devices", tablets.empty() ? "-" : tablets});
+    facts.push_back({"Mouse mode", uiPrefs_.tablet.mouseMode ? "on" : "off"});
+    return penReport(facts, penDiag_);
+}
+
+void App::drawTabletDiagnostics() {
+    if (!ImGui::TreeNodeEx(tr("Troubleshooting details##tablet_diag"), ImGuiTreeNodeFlags_SpanAvailWidth)) return;
+    const std::string report = tabletReport();
+    ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextUnformatted(report.c_str());
+    ImGui::PopTextWrapPos();
+    ImGui::PopStyleColor();
+    if (ImGui::SmallButton(tr(ICON_LC_COPY "  Copy details##tablet_diag"))) {
+        SDL_SetClipboardText(report.c_str());
+        status_ = "Tablet details copied: paste them into your bug report";
+    }
+    ui::HelpText("Copy details", nullptr,
+                 "Copies the lines above for a bug report about the pen: the SDL version, the display system, how "
+                 "SculptForge was installed and the pen's events.",
+                 "Preferences > Tablet");
+#if defined(__linux__)
+    // SDL runs on XWayland when the compositor lacks the fifo-v1 protocol (Hyprland, KDE and GNOME have it now).
+    const char* driver = SDL_GetCurrentVideoDriver();
+    if (driver && std::strcmp(driver, "x11") == 0 && std::getenv("WAYLAND_DISPLAY")) {
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextColored(col(ui::color::textDim), "%s",
+                           tr("Running through XWayland. If the pen's pressure is poor, start SculptForge with "
+                              "SDL_VIDEO_DRIVER=wayland to use Wayland directly."));
+        ImGui::PopTextWrapPos();
+    }
+#endif
+    ImGui::TreePop();
 }
 
 } // namespace sf

@@ -3632,6 +3632,10 @@ constexpr Entry kSpanish[] = {
     {"Troubleshooting", "Problemas"},
     {"No pen seen yet", "Ningún lápiz aún"},
     {"Tilt: not reported by this pen", "Inclinación: este lápiz no la informa"},
+    {"Troubleshooting details", "Detalles para solucionar problemas"},
+    {"Copy details", "Copiar detalles"},
+    {"Copies the lines above for a bug report about the pen: the SDL version, the display system, how SculptForge was installed and the pen's events.", "Copia las líneas de arriba para un informe de error sobre el lápiz: la versión de SDL, el sistema de pantalla, cómo se instaló SculptForge y los eventos del lápiz."},
+    {"Running through XWayland. If the pen's pressure is poor, start SculptForge with SDL_VIDEO_DRIVER=wayland to use Wayland directly.", "Se ejecuta a través de XWayland. Si la presión del lápiz va mal, inicia SculptForge con SDL_VIDEO_DRIVER=wayland para usar Wayland directamente."},
     {"Pressure curve (all brushes)", "Curva de presión (todos los pinceles)"},
     // --- UserGuide.cpp (tools/i18n/coverage.py) ---
     {"SculptForge is free and open source, and stays that way. If it helps your work, you can support its development.",
