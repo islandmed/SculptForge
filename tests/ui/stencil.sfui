@@ -1,0 +1,54 @@
+# #155: the Stencil (Sculpt > Alpha > Stencil). Load it, move it with Adjust's handles, and a stroke across its edge
+# changes the mesh only where the stencil covers it; with it hidden the same stroke reaches past it.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=5
+key f
+click "Standard##brush.standard"
+# A stencil from a built-in pattern (Use alpha), then the brush goes back to round.
+run brush_set_alpha name=cobblestone
+run stencil_load alpha=true reset=true
+run brush_set_alpha name=round
+wait 0.1
+expect_value stencil_active == 1
+expect_value stencil_x == 500
+click "Alpha##palette.alpha"
+expect "Adjust##stencil.adjust"
+shot panel
+hold ctrl
+hover "Adjust##stencil.adjust"
+expect_help "corner to scale"
+hold none
+click "Adjust##stencil.adjust"
+expect_value stencil_adjust == 1
+click "Alpha##palette.alpha"
+
+# Smaller, then dragged left from inside: it moves (the view doesn't turn), Enter goes back to sculpting.
+run stencil_set size=0.35 angle=20
+remember camera_yaw yaw
+drag_path 0.5 0.5 0.3 0.5
+expect_value stencil_x < 480
+expect_value camera_yaw == $yaw
+key right
+key comma
+expect_value stencil_angle == 35
+shot adjust
+key enter
+expect_value stencil_adjust == 0
+shot overlay
+
+# One stroke across its edge, symmetry off: only vertices under the stencil move.
+click "X##transform.symmetry_x"
+expect_value symmetry_x == 0
+snapshot
+stroke 0.15 0.5 0.85 0.5
+expect_value moved > 0
+expect_value moved_off_stencil == 0
+expect_value can_undo == 1
+shot result
+
+# Hidden: the same stroke reaches past it.
+run stencil_set visible=false
+snapshot
+stroke 0.15 0.55 0.85 0.55
+expect_value moved_off_stencil > 0
+shot hidden

@@ -121,6 +121,8 @@
 //                            dabs keep the volume now: the option, flipped by letting go of Shift mid-stroke),
 //                            smooth_group_borders (Brush > Smooth face group borders only, #81),
 //                            moved_out (summed movement along the snapshot's normals: > 0 out, < 0 in),
+//                            moved_off_stencil (moved vertices that showed off the Stencil's image), stencil_active,
+//                            stencil_adjust, stencil_x / stencil_y / stencil_size (x1000), stencil_angle (degrees),
 //                            pen_pressure (raw), brush_pressure (after the curve; 1 for the mouse),
 //                            pressure_status (0 no pen yet, 1 on, 2 not detected, 3 not known yet),
 //                            stroke_continuous (Stroke > Continuous, 1 on),
@@ -773,6 +775,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "stroke_continuous") return app_.strokeContinuous_ ? 1.0 : 0.0; // Continuous (#31)
     if (name == "vdms") return double(app_.doc_.vdms.size());
     if (double gv = 0.0; app_.gradientUiValue(name, gv)) return gv; // gradient_armed, gradient_placed (LineGradient.cpp)
+    if (double sv = 0.0; app_.stencilUiValue(name, sv)) return sv; // stencil_active, stencil_x / y / size x1000 (StencilOverlay.cpp)
     if (double kv = 0.0; app_.kelvinUiValue(name, kv)) return kv; // capture_*, kelvin_* (PanelKelvinlet.cpp)
     // Facial shapes (PanelFace.cpp): landmarks placed, placing them, a take playing, and face_<shape>: that layer's weight.
     if (name == "face_landmarks") return double(app_.faceLandmarks_.count());
@@ -1078,6 +1081,22 @@ double Demo::query(const std::string& name, bool& known) const {
             if (v < baseNormals_.size()) out += glm::dot(d, baseNormals_[v]);
         }
         return name == "moved" ? count : name == "moved_max" ? maxD : name == "moved_sum" ? sum : out;
+    }
+    if (name == "moved_off_stencil") { // vertices moved since `snapshot` that showed off the Stencil's image (#155)
+        const Stencil& st = app_.doc_.stencil;
+        if (basePositions_.size() != m.vertexCount() || !st.image) return -1.0;
+        const CanvasRect c = app_.canvasRect();
+        Stencil once = st;
+        once.tile = false;
+        once.visible = true;
+        const StencilView view{&once, app_.camera_.projection() * app_.camera_.view(), c.h > 0.0f ? c.w / c.h : 1.0f};
+        double count = 0.0;
+        for (size_t v = 0; v < basePositions_.size(); ++v) {
+            if (glm::length(m.positions[v] - basePositions_[v]) <= 1e-6f) continue;
+            glm::vec2 at, uv;
+            count += !view.canvasAt(basePositions_[v], at) || !once.imageCoord(at, view.canvasAspect, uv) ? 1.0 : 0.0;
+        }
+        return count;
     }
     if (name == "pen_pressure") return app_.penTracker_.raw();
     if (name == "pressure_status") { // 0 no pen yet, 1 on, 2 not detected, 3 not known yet

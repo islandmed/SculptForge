@@ -1750,6 +1750,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     if (button == SDL_BUTTON_LEFT) {
         if (axisGizmoMouseDown(x, y)) return;   // the axis gizmo's ends snap to a side view (#43)
         if (forgesphereMouseDown(x, y, mod)) return; // a Forge Sphere Part takes clicks on it (PanelForge Spheres.cpp)
+        if (stencilMouseDown(x, y, nav)) return; // Adjust Stencil: move, scale, turn it (StencilOverlay.cpp)
         if (gradientMouseDown(x, y, nav)) return; // Line Gradient: a new line or an end handle (LineGradient.cpp)
         if (facegroupMouseDown(x, y, mod)) return;
         if (maskSelectMouseDown(x, y, mod)) return;
@@ -1930,6 +1931,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Sculptable: sculptableMouseMove(x, y); break;
     case Drag::Capture: captureMouseMove(x, y); break;
     case Drag::Gradient: gradientMouseMove(x, y); break;
+    case Drag::Stencil: stencilMouseMove(x, y); break;
     case Drag::ForgeSphere: forgesphereDragTo(x, y); break;
     case Drag::AirStroke: airStrokeTo(x, y); break;
     case Drag::QuickRemesh: break; // (remeshes when let go)
@@ -2070,6 +2072,7 @@ void App::onMouseUp() {
     if (drag_ == Drag::Sculptable) sculptableMouseUp();
     if (drag_ == Drag::Capture) captureMouseUp();
     if (drag_ == Drag::Gradient) gradientMouseUp();
+    if (drag_ == Drag::Stencil) stencilMouseUp();
     if (drag_ == Drag::ForgeSphere) forgesphereRelease();
     if (drag_ == Drag::AirStroke) airStrokeRelease();
     gizmoRelease();
@@ -2081,6 +2084,7 @@ void App::onMouseUp() {
 void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
     if (cutPolylineKey(key)) return; // Enter ends a Cut Polyline, Esc drops it (PanelCut.cpp)
     if (gradientKey(key)) return;    // Enter keeps a Line Gradient, Esc takes it back (LineGradient.cpp)
+    if (stencilKey(key, mod)) return; // Adjust Stencil's keys, Enter / Esc ends it (StencilOverlay.cpp)
     if (key == SDLK_ESCAPE && radial_.menu >= 0) {
         closeRadialMenu();
         return;
@@ -2545,6 +2549,12 @@ void App::dabAt(float x, float y, float pressure) {
     lastDabAngle_ = dabAngle_;
     p.alphaUp = cam.orientation() * glm::vec3(-std::sin(dabAngle_), std::cos(dabAngle_), 0.0f); // screenUpVector
     p.vdm = st.vdm;
+    if (st.stencil.active()) { // the Stencil (#155): each vertex takes the image where it shows in this view
+        const CanvasRect cr = dabView_ ? dabView_->canvas : canvasRect();
+        p.stencil.stencil = &st.stencil;
+        p.stencil.viewProj = cam.projection() * cam.view();
+        p.stencil.canvasAspect = cr.h > 0.0f ? cr.w / cr.h : 1.0f;
+    }
     p.strokeDelta = haveLastDab_ ? hit.position - lastDabHit_ : glm::vec3(0.0f);
     lastDabHit_ = hit.position;
     haveLastDab_ = true;
@@ -2950,6 +2960,7 @@ void App::drawUi() {
     drawUvEditor();    // Tool > Texture Map > UV Editor (PanelUvEditor.cpp)
     drawTimelineUi();  // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)
     pollAlphaFile();
+    pollStencilFile();
     syncBrushSettings(); // a brush switch brings back that brush's own settings (#78); before pollVdm's stroke
     syncWorldSize(); // World Size: the brush keeps its size on the surface as you zoom (Precision.cpp)
     pollVdm();
@@ -2961,6 +2972,7 @@ void App::drawUi() {
                          c.y + c.h - ImGui::GetFrameHeight() - 20.0f * uiScale_);
     }
     const ImVec2 mouse(mouseX_, mouseY_);
+    drawStencilOverlay(); // the Stencil and, in Adjust, its handles (StencilOverlay.cpp)
     drawGizmo(); // Transform gizmo handles and panel (Gizmo.cpp)
     drawQRemeshGuides(); // QRemesh Guides curves (PanelRetopo.cpp)
     drawUvEditorOverlay(); // UV seams on the model, the Seam tool's cursor (PanelUvEditor.cpp)
@@ -2980,7 +2992,7 @@ void App::drawUi() {
                                                   theme::u32(theme::accent), 48, 2.0f * uiScale_);
     }
     // In Gizmo mode (and with the QRemesh Guides brush) the brush ring shows only while Ctrl masks or Shift smooths.
-    const bool ringOff = gizmoActive() || (guidesMode_ && !(inputMods() & SDL_KMOD_SHIFT)) || sculptableHot() || forgesphereActive() ||
+    const bool ringOff = gizmoActive() || stencil_.adjust || (guidesMode_ && !(inputMods() & SDL_KMOD_SHIFT)) || sculptableHot() || forgesphereActive() ||
                          uvToolActive();
     // (The S / O pop-up holds the mouse, but its ring shows where it opened, #138.)
     ImVec2 sliderOpened;

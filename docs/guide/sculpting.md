@@ -477,6 +477,37 @@ a .sfpack) turns its alpha the same way for everyone. Vector displacement stamps
 [Stamp rotation](#stamp-rotation). From a script:
 `brush_alpha_options follow_stroke=true angle=30 angle_jitter=10 tile_x=2 tile_y=2`.
 
+### Stencil
+
+A **Stencil** is an image laid over the view that you sculpt and paint *through*: wherever it covers the model, a
+stroke takes its detail (the sculpt brushes its brightness, white = full effect, as an alpha; Vertex Paint its
+colours). Off the image nothing happens. It stays put on the screen while the model turns under it, so you place it,
+stroke over it, turn the model or move the stencil, and stroke again.
+
+1. In **Sculpt > Alpha**, under **Stencil**, click **Load image...** (any PNG, JPG, BMP, TGA, PSD or GIF), or
+   **Use alpha** to make the brush's alpha (a built-in pattern or one from your Library) the stencil.
+2. Turn on **Adjust**: drag inside the stencil to move it, a corner to scale it, the round handle above it to turn it
+   (<kbd>Shift</kbd>: 15 degree steps). The arrow keys move it, <kbd>-</kbd> and <kbd>=</kbd> scale it,
+   <kbd>,</kbd> and <kbd>.</kbd> turn it (<kbd>Shift</kbd>: finely). <kbd>Enter</kbd> or <kbd>Esc</kbd> goes back to
+   sculpting.
+3. Stroke over it with any brush that takes an alpha: the built-in sculpt brushes, custom and Community brushes and
+   the Paint brush. The brush's own falloff, Intensity, mask and alpha still apply on top.
+
+| Option | What it does |
+|---|---|
+| **Show** | Hidden, the stencil is off and brushes work as if it weren't there. |
+| **Invert** | Uses the image's negative: black works, white leaves the surface alone. |
+| **Tile** | Repeats the image across the whole view, for skin, fabric and other patterns. |
+| **Paint its colours** | Vertex Paint lays the image's own colours; off, its brightness masks the paint colour. |
+| **Hide while navigating** | Fades the stencil while the view turns, moves or zooms, so you see the model under it. |
+| **Opacity** | How strongly the overlay shows. The brushes always take the whole image (use Intensity to go lighter). |
+| **Size** / **Angle** | Its height in percent of the view's, and its turn; **Reset placement** centres it again. |
+
+With symmetry on, the mirrored side gets the stencil mirrored, as the stroke is. Stencils work on
+[micro levels](micro-levels.md) too. Move, the Kelvinlet brushes, vector displacement stamps and the mask brush don't
+use it. Texture painting doesn't take it yet (Vertex Paint does). The stencil isn't saved with the project. From a
+script: `stencil_load path=skin.png`, `stencil_set x=0.5 y=0.5 size=0.8 angle=30 tile=true`, `stencil_clear`.
+
 ## Vector displacement brushes
 
 A vector displacement brush stamps a whole 3D shape in one

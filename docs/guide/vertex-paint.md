@@ -80,6 +80,14 @@ edit), <kbd>Esc</kbd> takes it back. Each gradient is one undo step. It respects
 hidden faces, and goes into the texture when the Part paints into one. With it on, <kbd>Ctrl</kbd> still masks and
 <kbd>Shift</kbd> still smooths; turn it off with its button or <kbd>Esc</kbd>.
 
+## Paint through a Stencil
+
+A [Stencil](sculpting.md#stencil) (**Sculpt > Alpha > Stencil**) paints too: load a photo or a pattern, place it over
+the model, and paint over it with the Paint brush. Where it covers the model the brush lays the image's colours (with
+your Colour intensity, falloff and mask); everywhere else it paints nothing. Turn off **Paint its colours** to paint
+the paint colour through the image's brightness instead (a grayscale pattern as a mask). Turn the model or move the
+stencil and paint again to cover a whole model.
+
 ## Paint layers
 
 Paint layers stack vertex paint the way Photoshop stacks image layers. Each layer has its own name, visibility,
