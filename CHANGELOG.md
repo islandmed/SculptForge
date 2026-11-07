@@ -6,6 +6,75 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.15] - 2026-11-07
+
+### Added
+- **Tube** (Tool > Tube): draw tubes freely in 3D space, like a 3D pen. Strokes lie on a plane facing the view (at the
+  surface where the stroke starts, the pivot, or a fixed distance), optionally snapped onto surfaces; pen pressure
+  sets the radius and the stroke is smoothed into a curve. The tube is swept along it with rings placed closer in
+  bends and frames that never twist, round or flat ends, and Symmetry X. Each stroke is a Tube Part whose points are
+  dragged (Ctrl: thickness, Alt+click: delete), inserted and deleted until **Bake**, or goes straight into the active
+  Part with even edge lengths for dynamic topology; one undo step each. Script and AI commands `tube_new`,
+  `tube_list`, `tube_set_point`, `tube_insert_point`, `tube_delete_point`, `tube_set`, `tube_bake`. Guide chapter
+  "Tube: draw in 3D space". Requested by GABO on Discord.
+- **Hardware tiers** (Edit > Preferences > Performance): the detected tier and why ("RTX 3060, 12 GB VRAM, 32 GB RAM:
+  High"), what it turns on, Auto or any tier by hand. The Essential tier works exactly as before; Standard and up keep
+  more Focus Detail in memory, and High and up allow 16K paint and bake textures. A small card on first launch (and
+  after a hardware change) shows the tier once; the chip in the top bar opens the panel. A memory guard steps the tier
+  down a level when free memory runs low, and back up when there is room. **Turbo** (the bolt in the top bar, View >
+  Turbo, Ctrl+Alt+T): antialiasing off and a lighter view while you sculpt and orbit, the detected tier's top budgets;
+  full quality when the view stops, and Off changes nothing you set. Remembered per computer. **Graphics card** picker
+  on computers with two (applies on the next start, through the system's own setting; a card that fails to start falls
+  back to the system's choice). **Compute: Auto / CPU / GPU**, with each task's path shown (all CPU for now).
+  SF_HW_SIMULATE=floor|standard|high|extreme, SF_TIER_<NAME>, SF_COMPUTE=cpu|gpu, SF_TURBO=1 for benches. **Memory in
+  the top bar**, beside the triangles and frame rate: SculptForge's RAM and the system's free RAM, and the graphics
+  card's memory in use where its driver reports it (NVIDIA; AMD shows what's free), updated once a second; hover for
+  the detail. Thanks, Oslen on Discord.
+- **Split > Hidden / Masked / Unmasked** (Tool > Parts; `part_split_hidden`, `part_split_masked`,
+  `part_split_unmasked`): the triangles leave the active Part for a new Part below it (same folder, visibility and
+  shading), one undo step that also removes the new Part. A triangle is masked when its corners' average mask is above
+  50%. UVs, face groups, vertex paint and sculpt layers carry over; subdivision levels are cut at the current level
+  (undo restores them). Thanks foirgairwolf on Discord.
+- **Delete masked** (Tool > Visibility; `delete_masked`), the mirror of Delete hidden. Thanks foirgairwolf on Discord.
+- A per-Part shading mark in the Parts list (Scene / Smooth / Flat; `part_shading`). Thanks foirgairwolf on Discord.
+- **Merge by Distance** (Tool > Geometry; `weld_points distance=... preview=true`): the points of the active Part
+  within the distance merge into the nearest kept one; collapsed triangles go; one undo step. The count follows the
+  slider and the points that would merge show in orange. Thanks foirgairwolf on Discord.
+- **Check Mesh** (Tool > Geometry; `mesh_check`, `mesh_fix issue=...`): non-manifold edges (Fix loosens the extra
+  triangles), holes (capped as Close Holes), duplicate and degenerate triangles (deleted), zero-area triangles
+  (shortest edge collapsed), flipped triangles and inside-out closed pieces (rewound), isolated points (removed). Fix
+  all fixes everything except holes, as one undo step. Thanks foirgairwolf on Discord.
+- **Recent colours** (Oslen on Discord): under the left shelf's two swatches, the last eight paint colours a stroke or
+  Fill used, newest first, in rows of four; click one to paint with it. Kept in the preferences, so they survive a
+  restart.
+- **View speed** (Preferences > Tablet): how far the pen turns, pans and zooms the view per pixel, 0.10 to 2.00 (1.00,
+  the default, moves it as the mouse does). A tablet spreads its whole area over the screen, so a short pen movement
+  crosses many pixels and orbiting seemed far faster than with the mouse (Huion on Windows; thanks to
+  GonzaloHernandez3D on Reddit). Saved in the preferences; Tablet defaults sets it back to 1.00.
+
+### Fixed
+- Holding a rebound Smaller brush / Larger brush key (and the 1 px Shift steps) repeats again, like [ and ] always
+  did; after a rebind it changed the size once and stopped. Those keys also step through an insert set. Not while
+  typing in a field (thanks Ziel on Discord).
+- Forge Spheres with Symmetry on: a new sphere placed near the centre line (closer than its own radius) now snaps onto
+  it as one sphere instead of two overlapping twins that skinned as separate branches. Spheres growing from a mirrored
+  arm or leg still get their twin (thanks dm4nd on Discord).
+- **Frame** (F, the Frame button), a new model and **Reset View** fit the model into the canvas the open Library and
+  the Sculpt Timeline strip leave free: at 200 % on a 1080p screen the sphere's top sat under them. Opening or closing
+  the Library doesn't move the view; the next Frame uses the new free area.
+- The left shelf's brush tiles and colour picker shrink to fit its column (and the wheel scrolls it past that): at 150
+  % on a 1080p screen the colour swatches ran under the bottom shelf.
+- Pen taps on menus and buttons work the first time, also a tap within one frame or right after the pen comes into
+  range, with Windows Ink and with Huion's extra mouse events (reported by GonzaloHernandez3D on Reddit; fixed by the
+  pen click rework in 0.10.9, now covered by a test).
+- **Micro levels**: big Clay, Clay Block, Flatten and Trim strokes on a Part with a Micro level could break the
+  surface into shards across the whole brush (since 0.11.10), and sculpting there had become much slower on very dense
+  meshes. Both are back to how 0.11.9 worked, and so is its one known issue: where several Clay strokes end on the
+  same spot of a rough surface, a few short spikes can show. A proper fix for that comes in 0.11.16.
+- The side columns (the shelf with Undo and Redo, the brush and colour shelf) and the trays no longer scroll sideways.
+  At some UI scales their tiles were a few pixels wider than the column, so a sideways swipe or scroll moved them; the
+  tiles now fit the column and the trays only scroll up and down (dm4nd on Discord).
+
 ## [0.11.14] - 2026-11-07
 
 ### Added

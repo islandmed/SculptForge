@@ -17,6 +17,31 @@ highlight: Hardware tiers and Turbo: SculptForge tunes itself to your computer, 
 highlight: Side shelves no longer scroll sideways (thanks dm4nd on Discord), and Frame fits the model into the free area of the canvas
 ```
 
+- **Tube**: draw clay tubes in the air like a 3D pen. **Tool > Tube > Draw Tube**, then drag anywhere: on the model,
+  off it, or out of it. Pen pressure thins the tube; drag its points afterwards to reshape it, then **Bake** to sculpt
+  it, or draw straight into the active Part with **Merge** (even edges, ready for dynamic topology). Thanks to GABO on
+  Discord for the idea.
+- **Hardware tiers and Turbo**: SculptForge sorts your computer into a tier (Essential, Standard, High, Extreme) and
+  switches on what it can carry: more Focus Detail memory, 16K textures. A card on first launch says what it found;
+  the tier sits in the top bar. The new bolt (**View > Turbo**, Ctrl+Alt+T) trades antialiasing and detail while you
+  sculpt and orbit for speed, and puts everything back the moment you stop.
+- **Split > Hidden / Masked / Unmasked** (**Tool > Parts**): move the hidden, masked or unmasked triangles of a Part
+  into a new Part just below it, in one undo step. Asked for by foirgairwolf on Discord.
+- **Delete masked** (**Tool > Visibility**) deletes what is masked, as **Delete hidden** does for what is hidden.
+  Undoable.
+- **Smooth or flat per Part, right in the list**: click the mark left of a Part's eye to go from the scene's shading
+  to Smooth to Flat.
+- **Merge by Distance** (**Tool > Geometry**): merge points closer than a distance, with a live count and the points
+  shown on the model before you click. For unwelded imports. Asked for by foirgairwolf on Discord.
+- **Check Mesh** (**Tool > Geometry**): counts non-manifold edges, holes, duplicate, degenerate, zero-area and flipped
+  triangles and isolated points, with a **Fix** per row and **Fix all**. Checking never changes the mesh.
+- **Recent colours**: the last eight colours you painted with sit under the colour picker on the left shelf; click one
+  to paint with it again. Thanks Oslen on Discord.
+- **Frame** (F) fits the model into the part of the canvas the open Library and the Sculpt Timeline leave free, and
+  the left shelf's brush tiles and colour picker shrink to fit short screens.
+- **Pen view speed**: **Preferences > Tablet > View speed** sets how fast the pen turns, pans and zooms the view,
+  apart from the mouse. Turn it down if the view spins too fast with a tablet. Thanks to GonzaloHernandez3D on Reddit.
+
 ## Version 0.11.14
 
 ```features
