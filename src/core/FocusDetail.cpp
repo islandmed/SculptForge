@@ -516,7 +516,12 @@ std::shared_ptr<FocusDetail> FocusDetail::open(const std::string& path, Mesh& ou
 bool FocusDetail::readTile(uint32_t t, int16_t* out) const {
     if (!parked_[t].empty()) return decompressTile(codec_, parked_[t].data(), parked_[t].size(), n_, samples_, out);
     const Entry& e = dir_[t];
-    return map_ && decompressTile(codec_, map_ + e.offset, e.bytes, n_, samples_, out);
+    if (!map_ || !decompressTile(codec_, map_ + e.offset, e.bytes, n_, samples_, out)) return false;
+    if (e.shift) { // in an older step: as MicroMesh::widen divides (truncating; successive divisions compose)
+        const int div = e.shift >= 15 ? 32768 : 1 << e.shift;
+        for (uint32_t k = 0; k < samples_; ++k) out[k] = int16_t(int(out[k]) / div);
+    }
+    return true;
 }
 
 void FocusDetail::fillCoarse(MicroMesh& mm, uint32_t t) const {
@@ -574,6 +579,46 @@ void FocusDetail::ensureFull(MicroMesh& mm, std::span<const uint32_t> tris, bool
         else if (edit) state_[t] = kDirty;
     }
     if (!need.empty()) promoteLocked(mm, need, edit, true);
+}
+
+void FocusDetail::rescale(MicroMesh& mm, int doublings) {
+    if (doublings <= 0) return;
+    std::lock_guard<std::mutex> lock(mutex_);
+    const int div = 1 << doublings;
+    const uint32_t T = uint32_t(state_.size());
+    poolFor(coarse_.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) coarse_[i] = int16_t(int(coarse_[i]) / div);
+    }, 1 << 16);
+    poolFor(T, [&](size_t b, size_t e) {
+        std::vector<int16_t> g(samples_);
+        for (size_t t = b; t < e; ++t) {
+            Entry& d = dir_[t];
+            d.shift = uint16_t(std::min(int(d.shift) + doublings, 15));
+            d.range = uint16_t(std::min(int(d.range) / div + 1, 32767));
+            if (parked_[t].empty() || !decompressTile(codec_, parked_[t].data(), parked_[t].size(), n_, samples_, g.data())) continue;
+            for (int16_t& v : g) v = int16_t(int(v) / div);
+            compressTile(codec_, g.data(), n_, samples_, parked_[t]);
+        }
+    }, 64);
+    step_ *= float(div);
+    rescaled_ = true;
+    // widen divided the coarse tiles' upsampled values, which rounds unlike upsampling the divided coarse grid:
+    // upsampled again, then the real edges of their full neighbours.
+    poolFor(T, [&](size_t b, size_t e) {
+        for (size_t t = b; t < e; ++t)
+            if (state_[t] == kCoarse) fillCoarse(mm, uint32_t(t));
+    }, 64);
+    for (uint32_t t = 0; t < T; ++t)
+        if (state_[t] != kCoarse) shareEdges(tris_, mm, t, [&](uint32_t u) { return state_[u] == kCoarse ? 1 : 0; });
+    mm.markAllDirty();
+}
+
+bool FocusDetail::unsaved() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (rescaled_) return true;
+    for (size_t t = 0; t < state_.size(); ++t)
+        if (state_[t] == kDirty || !parked_[t].empty()) return true;
+    return false;
 }
 
 void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush, double budgetMs) {
@@ -710,7 +755,7 @@ bool FocusDetail::save(Mesh& m, std::string& error) {
         std::memcpy(baseBlock.data() + m.vertexCount() * 24, tris_.data(), tris_.size() * 12);
         if (fnv1a(baseBlock.data(), m.vertexCount() * 24) == baseHash_) baseBlock.clear();
     }
-    if (tiles.empty() && baseBlock.empty()) return true;
+    if (tiles.empty() && baseBlock.empty() && !rescaled_) return true;
     std::vector<std::vector<uint8_t>> blobs(tiles.size());
     poolFor(tiles.size(), [&](size_t b, size_t e) {
         for (size_t k = b; k < e; ++k) {
@@ -727,8 +772,12 @@ bool FocusDetail::save(Mesh& m, std::string& error) {
         }
     }, 8);
     std::vector<uint32_t> chunkList;
-    for (uint32_t t : tiles)
-        if (chunkList.empty() || chunkList.back() != t / kChunk) chunkList.push_back(t / kChunk);
+    if (rescaled_) { // every coarse grid changed
+        for (uint32_t c = 0; c < uint32_t(chunks_.size()); ++c) chunkList.push_back(c);
+    } else {
+        for (uint32_t t : tiles)
+            if (chunkList.empty() || chunkList.back() != t / kChunk) chunkList.push_back(t / kChunk);
+    }
     std::vector<std::vector<uint8_t>> chunkBlobs(chunkList.size());
     poolFor(chunkList.size(), [&](size_t b, size_t e) {
         for (size_t k = b; k < e; ++k) {
@@ -746,6 +795,7 @@ bool FocusDetail::save(Mesh& m, std::string& error) {
         garbage += dir[tiles[k]].bytes;
         dir[tiles[k]].offset = offset + tail.size();
         dir[tiles[k]].bytes = uint32_t(blobs[k].size());
+        dir[tiles[k]].shift = 0;
         tail.insert(tail.end(), blobs[k].begin(), blobs[k].end());
     }
     for (size_t k = 0; k < chunkList.size(); ++k) {
@@ -771,6 +821,7 @@ bool FocusDetail::save(Mesh& m, std::string& error) {
     h.dirHash = fnv1a(tail.data() + dirAt, h.dirBytes);
     h.generation = generation_ + 1;
     h.garbage = garbage;
+    h.step = step_;
     auto pwriteAll = [&](const uint8_t* p, size_t size, uint64_t at) {
         while (size) {
             const ssize_t w = ::pwrite(fd_, p, size, off_t(at));
@@ -789,6 +840,7 @@ bool FocusDetail::save(Mesh& m, std::string& error) {
     chunks_ = std::move(chunkDir);
     garbage_ = garbage;
     generation_ = h.generation;
+    rescaled_ = false;
     if (!baseBlock.empty()) baseHash_ = fnv1a(baseBlock.data(), m.vertexCount() * 24);
     for (uint32_t t : tiles) {
         if (state_[t] == kDirty) state_[t] = kFull;

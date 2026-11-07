@@ -19,6 +19,8 @@
 // - Edited tiles are dirty until saved; a dirty tile that gets demoted is compressed into memory ("parked").
 //   save() appends only the dirty and parked tiles, the coarse chunks holding them and a new directory, then
 //   rewrites the header (the old directory stays valid until then: a crash keeps the last save).
+// - When a brush widens the displacement range (MicroMesh::widen), rescale() divides the coarse grids and parked
+//   tiles at once and the tiles still in the file as they are read (a per-tile shift in the directory).
 // Undo needs nothing new: a stroke's MicroUndo already keeps copy-on-write deltas of the tiles it touched.
 #pragma once
 
@@ -88,6 +90,8 @@ public:
     void update(Mesh& m, const FocusView& view, const FocusBrush& brush, double budgetMs = 4.0);
     // Makes tiles `tris` full now (brushes, undo); `edit` marks them dirty. Thread-safe.
     void ensureFull(MicroMesh& mm, std::span<const uint32_t> tris, bool edit);
+    // MicroMesh::widen divided every value by 2^doublings and multiplied the step: the same for what isn't in disp.
+    void rescale(MicroMesh& mm, int doublings);
     // Writes the changed tiles to the file (appended), a new directory and header. Returns false with `error`.
     bool save(Mesh& m, std::string& error);
 
@@ -95,6 +99,7 @@ public:
     int tileLevel(uint32_t tri) const { return tri < state_.size() && state_[tri] != kCoarse ? 1 : 0; }
     FocusStats stats() const;
     const std::string& path() const { return path_; }
+    bool unsaved() const; // edits since the last save
 
     size_t budgetBytes = size_t(512) << 20; // full tiles kept (2 bytes a point) before the LRU demotes
     float lookaheadSeconds = 0.25f;         // how far ahead of the brush promotion looks
@@ -107,7 +112,7 @@ private:
         uint64_t offset = 0;
         uint32_t bytes = 0;
         uint16_t range = 0;   // the largest |value| of the full tile
-        uint16_t pad = 0;
+        uint16_t shift = 0;   // the stored tile is in step / 2^shift units (the range widened since it was written)
         float coarseErr = 0;  // world units: the most the upsampled coarse grid is off
         uint32_t pad2 = 0;
     };
@@ -127,6 +132,7 @@ private:
     uint32_t n_ = 0, samples_ = 0, coarseN_ = 0, coarseSamples_ = 0, codec_ = 0;
     float step_ = 0;
     uint64_t generation_ = 0, garbage_ = 0;
+    bool rescaled_ = false;                      // the coarse chunks in the file are in an older step
     std::vector<Entry> dir_;
     std::vector<ChunkEntry> chunks_;
     std::vector<int16_t> coarse_;                // tiles * coarseSamples, always resident

@@ -254,4 +254,56 @@ TEST(focus_detail_brush_thread_and_frames_together) {
     CHECK(edgesShared(m));
 }
 
+namespace {
+
+// The detail file at `path` fully decompressed (a reference).
+std::vector<int16_t> fullValues(const std::string& path) {
+    Mesh m;
+    std::string err;
+    auto fd = FocusDetail::open(path, m, err);
+    if (!fd) return {};
+    fd->ensureFull(*m.micro, allTiles(m), false);
+    return m.micro->disp.toVector();
+}
+
+std::vector<int16_t> streamedFull(Mesh& m) {
+    m.micro->focus->ensureFull(*m.micro, allTiles(m), false);
+    return m.micro->disp.toVector();
+}
+
+} // namespace
+
+// A brush that widens the displacement range (MicroMesh::widen) divides every value: coarse grids, parked tiles
+// and the tiles still in the file (read with a shift) follow, so later promotions match, watertight, saved and
+// reopened alike.
+TEST(focus_detail_widened_range_rescales_streamed_tiles) {
+    const std::string path = writeSmall("widen.sfdetail");
+    const std::vector<int16_t> ref = fullValues(path);
+    Mesh m;
+    std::string err;
+    auto fd = FocusDetail::open(path, m, err);
+    CHECK(fd != nullptr && !ref.empty());
+    if (!fd || ref.empty()) return;
+    MicroMesh& mm = *m.micro;
+    std::vector<uint32_t> parked, full;
+    for (uint32_t t = 0; t < mm.baseTriangles; t += 5) parked.push_back(t);
+    for (uint32_t t = 2; t < mm.baseTriangles; t += 5) full.push_back(t);
+    fd->ensureFull(mm, parked, true);
+    fd->budgetBytes = 0; // demoted while dirty: parked (compressed in memory)
+    for (int f = 0; f < 12; ++f) fd->update(m, FocusView{}, FocusBrush{}, 1000.0);
+    CHECK(fd->stats().parkedTiles > 0);
+    fd->budgetBytes = size_t(1) << 30;
+    fd->ensureFull(mm, full, true); // full and dirty; the rest coarse, read from the file
+    const int div = mm.widen(mm.rangeWorld() * 3.0f);
+    CHECK(div >= 4);
+    CHECK(edgesShared(m));
+    CHECK(fd->unsaved());
+    auto expected = ref;
+    for (int16_t& v : expected) v = int16_t(int(v) / div);
+    CHECK(streamedFull(m) == expected);
+    CHECK(fd->save(m, err));
+    CHECK(!fd->unsaved());
+    CHECK(fullValues(path) == expected);
+}
+
 #endif
