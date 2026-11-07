@@ -71,7 +71,10 @@ for f in "$APPDIR/$ID.png" "$APPDIR/.DirIcon"; do
   fi
 done
 
-# 3. The AppImage. appimagetool checks the AppDir first (.DirIcon, the .desktop file) and stops on a problem.
+# 3. It starts on 4, 16 and 64 KiB pages (no bundled jemalloc; 64 KiB ELF alignment on aarch64).
+sh "$SRC/packaging/linux/check-page-size.sh" "$APPDIR" "$ARCH"
+
+# 4. The AppImage. appimagetool checks the AppDir first (.DirIcon, the .desktop file) and stops on a problem.
 cd "$OUTDIR"
 OUT="SculptForge-$VERSION-$ARCH.AppImage"
 ARCH=$ARCH VERSION=$VERSION "$APPIMAGETOOL" --appimage-extract-and-run --runtime-file "$RUNTIME" \
