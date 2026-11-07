@@ -18,8 +18,9 @@ added: **Maya Live link** (#42): opt-in, off at every start and never remembered
 security: New local listener, the Maya Live link: per-user socket / pipe only, opt-in with a warning each time,
   pairing code, mesh data only (SECURITY.md).
 testers:
-  - NOT YET VERIFIED in a real Maya (tests use a mocked maya.cmds) or on Windows (the named-pipe client): these
-    are the first runs; report anything odd on #42.
+  - NOT YET VERIFIED in a real Maya (tests use a mocked maya.cmds; Windows is verified: the named-pipe link with
+    the shelf's own client in CI, Live's auto-send and the link's listener on a desktop RTX 3060): report anything
+    odd on #42.
   - Any OS with Maya 2022+: install the shelf again (six buttons). File > Maya > Live on in SculptForge, Live on the
     shelf; sculpt a stroke: Maya updates within about half a second; edit the mesh in Maya: SculptForge updates.
     No ping-pong (each change arrives once; no extra undo steps).
@@ -28,5 +29,6 @@ testers:
   - Windows: the same through the named pipe; a wrong code is refused.
 ---
 Security read by input: OK after the pre-pairing allocation fix (readFrame caps a Hello at 256 bytes and grows
-payloads a MiB at a time as bytes arrive). Tony approved the link 11-06 in the mayalive session. Not verified in real
-Maya or on Windows yet.
+payloads a MiB at a time as bytes arrive). Tony approved the link 11-06 in the mayalive session. Windows verified 11-06 (CI
+42344073618: the pipe server and the shelf script's pipe client pair and carry meshes; the 3060 desktop: ui maya_live
+passes on the release build, Live wrote its manifest). Not verified in real Maya yet.
