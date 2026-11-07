@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Garments (docs/design/cloth.md): clothing made the way it is sewn. Pattern panels are flat pieces of fabric drawn
-// at real size (millimetres); seams say which edges are sewn together; each panel is placed around the body; the
+// at real size (millimetres); seams say which edges are sewn together; the user places each panel at the body; the
 // cloth solver (core/Cloth.h, Drape) pulls the seams closed and lets the garment settle; the result becomes a Part
 // whose UVs are the flat panel layout.
 //
@@ -18,8 +18,7 @@
 //    distance (a lattice along the grain, a constrained Delaunay triangulation of it with the outline as
 //    constraints, then smoothing); both sides of a seam get the same number of points, so the seam's particles pair
 //    one to one and weld cleanly after the simulation.
-//  - Arrangement (analyzeBody, placePattern): slots around the body (front, back, sides, arms) found from its
-//    shape, each panel wrapped around the torso or an arm so the seams start close.
+//  - No automatic placement, sewing or seam suggestions: see docs/design/garments.md, "Do not build (patents)".
 //
 // The pattern is saved in the project (Document::projectSettings["garment"]); SVG export writes the panels at real
 // size (with seam allowance, notches, grain lines) for printing and sewing, DXF the outlines for cutters.
@@ -56,19 +55,6 @@ struct Notch {
     float t = 0.5f;
 };
 
-// Where a panel goes around the body (placePattern).
-enum class Slot : uint8_t { Front, Back, Left, Right, LeftArm, RightArm, Free, Count };
-const char* slotId(Slot s);    // "front", "back", "left", "right", "left_arm", "right_arm", "free"
-const char* slotLabel(Slot s); // "Front", ...
-bool slotFromId(const std::string& id, Slot& out);
-
-struct Placement {
-    Slot slot = Slot::Front;
-    // Metres in the slot's frame: x across the panel (around the body), y along it (+ up), z away from the body.
-    glm::vec3 offset{0.0f};
-    bool wrap = true; // bent around the torso or the arm (false: flat, facing out of the slot)
-};
-
 struct Panel {
     std::string name = "Panel";
     std::vector<glm::vec2> points; // mm, the sewing line, counter-clockwise from the right side
@@ -76,7 +62,6 @@ struct Panel {
     std::vector<Notch> notches;
     float grainDegrees = 90.0f;    // warp direction, degrees from +x (90 = up the panel)
     float seamAllowance = 10.0f;   // mm
-    Placement place;
 };
 
 struct SeamSide {
@@ -128,8 +113,8 @@ std::vector<glm::vec2> offsetOutline(const Panel& p, float distance);
 void mirrorPanel(Pattern& pat, uint32_t panel);
 // A copy of the panel `offsetMm` to the right, named "<name> 2" (or `name`); returns its index.
 uint32_t duplicatePanel(Pattern& pat, uint32_t panel, glm::vec2 offsetMm, const std::string& name = {});
-// A mirrored copy (the other sleeve, the other half): mirrored about its centre and moved beside it; its slot is
-// the mirrored one (left arm <-> right arm, left <-> right). Returns its index.
+// A mirrored copy (the other sleeve, the other half): mirrored about its centre and moved beside it, in 2D
+// only (no seams are added). Returns its index.
 uint32_t mirroredCopy(Pattern& pat, uint32_t panel, const std::string& name = {});
 // Unfolds a panel drawn as a half about straight edge `edge` (the fold line): the panel becomes the whole shape,
 // the fold edge disappears. False when the edge is curved.
@@ -183,32 +168,10 @@ struct MeshQuality {
 };
 MeshQuality meshQuality(const GarmentMesh& m, float particleDistance);
 
-// --- Arrangement ---
+// --- Rest shape ---
 
-// What placePattern needs to know about the body, found from its vertices (Y up, facing +Z, metres).
-struct BodyFrame {
-    AABB bounds;
-    float centerX = 0.0f, centerZ = 0.0f;
-    float shoulderY = 0.0f;           // the top of the torso panels
-    float torsoHalfWidth = 0.15f;     // x
-    float torsoFrontZ = 0.1f, torsoBackZ = -0.1f;
-    bool arms = false;                // arms held out (T or A pose) were found
-    glm::vec3 leftShoulder{0.0f}, rightShoulder{0.0f}; // where each arm starts (character's left = +X)
-    glm::vec3 leftArmDir{1.0f, 0.0f, 0.0f}, rightArmDir{-1.0f, 0.0f, 0.0f};
-    float armRadius = 0.05f;
-};
-BodyFrame analyzeBody(const Mesh& body);
-// A body frame for no body: a 1.75 m figure standing at the origin.
-BodyFrame defaultBody();
-
-// Gives panels without a chosen slot one from their names (front, back, sleeve/arm with left/right, side).
-void autoSlots(Pattern& pat);
-// The 3D position (metres) of pattern point `flat` (mm) of panel `p` placed on `body`; `gap` metres off it.
-glm::vec3 placePoint(const Panel& p, glm::vec2 flat, const BodyFrame& body, float gap = 0.03f);
-// Every vertex of `m` placed around the body (placed) and the flat rest shape in 3D (rest: sheet x, y, z = 0, in
-// metres): what the cloth solver starts from.
-void placePattern(const Pattern& pat, const GarmentMesh& m, const BodyFrame& body, std::vector<glm::vec3>& placed,
-                  std::vector<glm::vec3>& rest, float gap = 0.03f);
+// The flat pattern in 3D (sheet x, y, z = 0, metres): the cloth solver's rest shape.
+void flatRest(const GarmentMesh& m, std::vector<glm::vec3>& rest);
 
 // --- After the simulation ---
 
@@ -219,7 +182,7 @@ Mesh garmentToMesh(const GarmentMesh& m, const std::vector<glm::vec3>& positions
 
 // --- Templates ---
 
-// A T-shirt pattern (front, back, two sleeves, all seams sewn, slots set): `chestMm` the body's chest girth,
+// A T-shirt pattern (front, back, two sleeves, all seams sewn): `chestMm` the body's chest girth,
 // `lengthMm` the body length from the shoulder.
 Pattern tshirtPattern(float chestMm = 960.0f, float lengthMm = 700.0f);
 // A simple rectangle panel (`w` x `h` mm, lower-left corner at `at`).
