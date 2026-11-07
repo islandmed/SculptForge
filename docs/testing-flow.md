@@ -5,7 +5,7 @@ four times: by the agent, by the merger's full local ctest, by CI on main, and b
 
 | tier | when | where | what | target |
 |---|---|---|---|---|
-| **T0 impact** | every agent commit | the PC (laptop if the PC sleeps) | build + the tests the change can break | < 1 min |
+| **T0 impact** | every agent commit | the PC (laptop if the PC sleeps), or GitHub Actions while the PC queue is long | build + the tests the change can break | < 1 min |
 | **T1 batch** | once per merge batch | the PC, while T2 runs | the whole suite, -j10 on the GPU, test cache on | < 5 min |
 | **T2 platforms** | once per merge batch | CI on the branch `staging` | every platform, VFX Reference Platform, Blender | the gate for main |
 | **T3 nightly** | once a day | CI (scheduled) + the PC | label `nightly`: benchmarks, stress, heavy meshes, floor-tier perf | |
@@ -28,6 +28,29 @@ four times: by the agent, by the merger's full local ctest, by CI on main, and b
 `marks` (the IP check) always runs. CMake files mean everything runs (`.`). `-v` explains each pick.
 Run it with `~/Work/.sf/t0.sh`: `pc.sh` builds on the PC, runs impacted.py there against the PC's build graph, then
 runs the tests through `tools/test/run.py`.
+
+### T0 on GitHub Actions
+
+`SF_T0_CI=1 ~/Work/.sf/t0.sh` (automatic while more than 3 jobs wait for the PC, never with `SF_PC_PRIO=1`;
+`SF_T0_CI=0` turns it off) runs the same T0 on GitHub's free runners, so branches test in parallel instead of
+queueing for the PC. `~/Work/.sf/t0-ci.sh <worktree>` pushes the worktree's state to `t0/<branch>` (uncommitted work
+as a temporary commit; the worktree is not touched), waits for `.github/workflows/t0.yml`, prints the same lines as
+`t0.sh` and exits 0 green, 1 red, 3 unavailable (t0.sh then uses the PC); it deletes the `t0/` ref after. Results
+stay in `~/Work/.sf/t0-ci/<worktree>/`.
+
+- The run (`tools/ci/t0.sh`): `check_marks`, a Ninja build, impacted.py against the merge base with `origin/main`,
+  the picked tests through `run.py` on the CPU (Mesa llvmpipe, `SDL_VIDEO_DRIVER=offscreen`, `SF_TEST_BUDGET=150`;
+  `GITHUB_ACTIONS` gives the in-test time limits their CI slack).
+- **Always green**: the job is `continue-on-error` and the script never fails, so a red T0 emails nobody. The verdict
+  is the run summary and the artifact `t0-result` (`result.json`: green/red, stage, failed tests; `failed.txt`:
+  LastTestsFailed + FAILED lines; `output.txt`: `ctest --output-on-failure` on the failed tests).
+- **Cache**: every push to main builds once and saves `ccache-t0-linux.<commit>` (main's own CI mostly reuses
+  staging's run and builds nothing, and a `t0/` ref can only read its own and main's caches). `t0/` runs only restore.
+- **Locked down** (`tools/release/check_workflows.py`): pushes to main and `t0/**` only, `contents: read`, no
+  secrets, pinned actions; other branch-push workflows ignore `t0/**`.
+- A branch older than t0.yml gets it (and `tools/ci/t0.sh`) from origin/main in one extra commit, "t0-ci overlay";
+  the tests are still picked from the branch's own files.
+- The PC stays for GPU-specific checks (it runs the D3D12 GPU path), T1 and release staging.
 
 ## T1 and T2: one batch, two machines at once
 

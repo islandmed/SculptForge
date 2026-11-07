@@ -18,6 +18,10 @@
   - integrations.yml (the Blender/Maya lanes) runs on anything but tag pushes, has an unpinned `uses:` or shell
     tracing, reads a secret other than UPDATE_SIGNING_KEY (in `environment: release`, by a job that can't write), or
     publishes without re-checking SHA256SUMS.txt.sig against the app's key (openssl pkeyutl -verify).
+  - t0.yml (T0 on GitHub's runners, ~/Work/.sf/t0-ci.sh) runs on anything but pushes to main and t0/**, can write,
+    reads a secret, has an unpinned `uses:` or shell tracing, saves a cache in a step not limited to main (t0/ runs
+    only restore), or can end red (its job must be continue-on-error: the verdict is the summary, a red T0 emails nobody).
+  - another workflow that runs on branch pushes would also run for t0/** refs (branches-ignore them).
 
 Plain text parsing (no PyYAML): workflows here keep jobs at two spaces and their keys at four.
 """
@@ -124,6 +128,33 @@ def check(files):
                 errs.append(f"integrations.yml:{n}: `uses: {m.group(1)}` is not pinned to a full commit SHA")
             if re.search(r"(^|[\s;])set\s+-[a-wyz]*x", line):
                 errs.append(f"integrations.yml:{n}: shell tracing (set -x)")
+    t0 = files.get("t0.yml")
+    if t0 is not None:
+        on = t0.split("\njobs:")[0]
+        if not re.search(r"^on:\s*\n\s+push:\s*\n\s+branches:\s*\[\s*main,\s*'t0/\*\*'\s*\]\s*$", on, re.M) or re.search(
+                r"\b(tags|pull_request|workflow_dispatch|schedule|workflow_run|issue_comment)\b", on):
+            errs.append("t0.yml: must run on pushes to main and t0/** only")
+        if "secrets." in t0:
+            errs.append("t0.yml: reads a secret")
+        if re.search(r":\s*write\b", t0) or not re.search(r"^permissions:\s*\n\s+contents:\s*read\s*$", t0, re.M):
+            errs.append("t0.yml: permissions must be contents: read only")
+        for step in re.split(r"\n(?=      - )", t0):
+            if re.search(r"actions/cache(/save)?@", step) and "if: github.ref == 'refs/heads/main'" not in step:
+                errs.append("t0.yml: saves a cache in a step not limited to main (if: github.ref == 'refs/heads/main')")
+        for job, lines in jobs(t0).items():
+            if not any(re.match(r"^    continue-on-error:\s*true\b", l) for l in lines):
+                errs.append(f"t0.yml: job {job} isn't continue-on-error: true (a red T0 must not fail the run)")
+        for n, line in enumerate(t0.splitlines(), 1):
+            m = re.match(r"^\s*(?:-\s+)?uses:\s*(\S.*?)\s*$", line)
+            if m and not PINNED.match(m.group(1)):
+                errs.append(f"t0.yml:{n}: `uses: {m.group(1)}` is not pinned to a full commit SHA")
+            if re.search(r"(^|[\s;])set\s+-[a-wyz]*x", line):
+                errs.append(f"t0.yml:{n}: shell tracing (set -x)")
+        for name, text in files.items():
+            on = text.split("\njobs:")[0]
+            if name != "t0.yml" and re.search(r"^  push:\s*$", on, re.M) and not re.search(r"^    (branches|tags):", on, re.M) \
+                    and "t0/**" not in on:
+                errs.append(f"{name}: runs on every branch push, t0/** too (add branches-ignore: ['t0/**'])")
     rel = files.get("release.yml")
     if rel is None:
         return errs + ["release.yml: missing"]
@@ -249,6 +280,24 @@ jobs:
 """
 
 
+T0 = """on:
+  push:
+    branches: [main, 't0/**']
+permissions:
+  contents: read
+jobs:
+  t0:
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      - if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      - run: bash tools/ci/t0.sh
+"""
+
+
 def self_test():
     cases = {
         "good": ({"release.yml": GOOD}, 0),
@@ -291,6 +340,19 @@ def self_test():
         "integrations dispatch": ({"release.yml": GOOD, "integrations.yml": INTEGRATIONS.replace(
             "jobs:", "  workflow_dispatch:\njobs:", 1)}, 1),
         "integrations set -x": ({"release.yml": GOOD, "integrations.yml": INTEGRATIONS.replace("run: gh release", "run: set -x; gh release")}, 1),
+        "t0 good": ({"release.yml": GOOD, "t0.yml": T0}, 0),
+        "t0 on all branches": ({"release.yml": GOOD, "t0.yml": T0.replace("[main, 't0/**']", "['**']")}, 1),
+        "t0 dispatch": ({"release.yml": GOOD, "t0.yml": T0.replace("permissions:", "  workflow_dispatch:\npermissions:")}, 1),
+        "t0 write": ({"release.yml": GOOD, "t0.yml": T0.replace("contents: read", "contents: write")}, 1),
+        "t0 secret": ({"release.yml": GOOD, "t0.yml": T0 + "        env: { K: '${{ secrets.X }}' }\n"}, 1),
+        "t0 unpinned": ({"release.yml": GOOD, "t0.yml": T0.replace("@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1", "@v7")}, 1),
+        "t0 cache save": ({"release.yml": GOOD, "t0.yml": T0.replace("cache/restore@", "cache/save@")}, 1),
+        "t0 cache save any ref": ({"release.yml": GOOD, "t0.yml": T0.replace("      - if: github.ref == 'refs/heads/main'\n        uses", "      - uses")}, 1),
+        "t0 can go red": ({"release.yml": GOOD, "t0.yml": T0.replace("    continue-on-error: true\n", "")}, 1),
+        "t0 set -x": ({"release.yml": GOOD, "t0.yml": T0.replace("run: bash", "run: set -x; bash")}, 1),
+        "t0 other on all branches": ({"release.yml": GOOD, "t0.yml": T0, "a.yml": "on:\n  push:\n    paths: [x]\njobs:\n  a:\n"}, 1),
+        "t0 other ignores t0": ({"release.yml": GOOD, "t0.yml": T0,
+                                 "a.yml": "on:\n  push:\n    branches-ignore: ['t0/**']\n    paths: [x]\njobs:\n  a:\n"}, 0),
         "env reader ok": ({"release.yml": GOOD, "x.yml": f"jobs:\n  a:\n    environment: other-env\n    env:\n      T: ${{{{ {TOKEN} }}}}\n"}, 0),
     }
     bad = [f"{k}: {check(f)}" for k, (f, n) in cases.items() if bool(check(f)) != bool(n)]
