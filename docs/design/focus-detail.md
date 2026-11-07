@@ -204,6 +204,10 @@ without them, so it overstates what prediction misses. The quiet run will remeas
   the level (`mutableMicro`) make every tile full first. Still missing: a sparse CPU array (`disp` stays dense; phase 4),
   Windows mapping, masks on streamed tiles (`mask` stays dense, saved in the project), layers, and several streamed
   Parts are untested beyond naming (`<stem>-2.sfdetail`).
+- **A detail file truncated while mapped can crash the app (SIGBUS).** The level is read through `mmap`; if another
+  program shortens the `.sfdetail` while it's open, touching a page past the new end raises SIGBUS. That's local only
+  (it needs write access to the user's file); a crafted file is refused at open (`focus_detail_crafted_fields_are_refused`).
+  A fix would map a private copy or handle the signal; not planned before phase 4's Windows mapping.
 - **Today's micro level already meets the brief's 1B targets** (docs/performance.md: 1.02B at Micro 5, RSS 1.7 GB,
   open 0.5 s). Focus Detail at 1B wins on disk size, save time and the scaling path, not on RAM.
 
