@@ -984,9 +984,13 @@ TEST(micro_stroke_end_no_spikes_on_a_rough_surface) {
             worst = std::max(worst, d);
             moved += d;
         }
-        std::printf("  %s, 15 Clay dabs (r %.2f): %zu base triangles turned over, largest move %.4f\n", base ? "base" : "grid", r, turned,
-                    worst);
+        size_t baseMoved = 0; // the base path keeps moving the base on a rough surface (a fraction of each dab),
+        for (size_t v = 0; v < positions.size(); ++v) // not the 200M grid every dab (8x slower on the floor tier, 11-07)
+            baseMoved += positions[v] != doc.mesh.positions[v];
+        std::printf("  %s, 15 Clay dabs (r %.2f): %zu base triangles turned over, largest move %.4f, %zu base points moved\n",
+                    base ? "base" : "grid", r, turned, worst, baseMoved);
         CHECK(moved > 0.0f);
+        if (base) CHECK(baseMoved > 0);
         CHECK(turned == 0);
         CHECK(worst <= 2.0f * r);
         CHECK(watertight(doc.mesh));

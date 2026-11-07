@@ -392,6 +392,7 @@ bool Sculptor::beginStroke(const Mesh& mesh, std::string label, int layer) {
     if (layer >= static_cast<int>(mesh.layers.size())) layer = -1;
     if (std::abs(mesh.layerTargetWeight(layer)) < 1e-3f) return false;
     clearRecorded(); // a stroke that never ended
+    ++baseStroke_;   // (baseWouldFold measures turns from the base as this stroke found it)
     layer_ = layer;
     record_ = UndoRecord{};
     record_.label = std::move(label);
@@ -519,21 +520,38 @@ void Sculptor::microBaseKernel(Mesh& mesh, BVH& bvh, BrushType type, const DabPa
         baseMoves_.resize(k);
         // A base rough at its own edges' scale (mane strands meeting the brow): the plane pulls its grooves up past
         // the ridges beside them and folds base triangles over; the detail riding on them swings out into shards
-        // (the lion, 11-06). There the dab goes to the grid instead (its points move along their own normals, the
-        // base stays).
+        // (the lion, 11-06). The dab moves the base by as much of its moves as turns no triangle past 60 degrees;
+        // only when that's under a quarter does it go to the grid (its points move along their own normals, the base
+        // stays). Sending every such dab to the grid cost a 240 px brush on 200M micro triangles 8x its frame rate on
+        // the floor tier (0.11.10-0.11.12: any detailed surface has one such triangle under a big brush).
         if (baseWouldFold(mesh, baseVerts_, baseMoves_)) {
-            micro_.dab(mesh, bvh, type, c, view, r, s, p.invert, p.focal, m.dir(p.alphaUp), false, 0.0f, p.alpha, {}, m.dir(p.strokeDelta));
-            continue;
+            float lo = 0.0f, hi = 1.0f;
+            baseScaled_.resize(k);
+            for (int it = 0; it < 6; ++it) {
+                const float t = 0.5f * (lo + hi);
+                for (size_t i = 0; i < k; ++i) baseScaled_[i] = baseMoves_[i] * t;
+                (baseWouldFold(mesh, baseVerts_, baseScaled_) ? hi : lo) = t;
+            }
+            if (lo < 0.25f) {
+                micro_.dab(mesh, bvh, type, c, view, r, s, p.invert, p.focal, m.dir(p.alphaUp), false, 0.0f, p.alpha, {}, m.dir(p.strokeDelta));
+                timings.kernelMs += lapMs(clock);
+                continue;
+            }
+            for (glm::vec3& mv : baseMoves_) mv *= lo;
         }
         timings.kernelMs += lapMs(clock);
         timings.vertices += k;
+        if (baseStamp_.size() != mesh.vertexCount()) baseStamp_.assign(mesh.vertexCount(), 0), baseStart_.resize(mesh.vertexCount());
+        for (uint32_t v : baseVerts_)
+            if (baseStamp_[v] != baseStroke_) baseStamp_[v] = baseStroke_, baseStart_[v] = mesh.positions[v];
         moveVertices(mesh, bvh, baseVerts_, baseMoves_); // (the undo record, normals, BVH)
         timings.normalsMs += lapMs(clock);
     }
     ++timings.dabs;
 }
 
-// Whether moving `verts` by `moves` would turn a base triangle around them by more than 60 degrees (or flip it).
+// Whether moving `verts` by `moves` would turn a base triangle around them by more than 60 degrees (or flip it) from
+// where this stroke found it: dab by dab, a stroke's piled end would otherwise turn it 60 degrees at a time.
 bool Sculptor::baseWouldFold(const Mesh& mesh, const std::vector<uint32_t>& verts, const std::vector<glm::vec3>& moves) {
     if (verts.empty()) return false;
     const size_t nv = mesh.vertexCount();
@@ -543,11 +561,13 @@ bool Sculptor::baseWouldFold(const Mesh& mesh, const std::vector<uint32_t>& vert
         const uint32_t i = baseSlot_[v];
         return i != ~0u ? mesh.positions[v] + moves[i] : mesh.positions[v];
     };
+    const bool started = baseStamp_.size() == nv;
+    auto start = [&](uint32_t v) { return started && baseStamp_[v] == baseStroke_ ? baseStart_[v] : mesh.positions[v]; };
     bool fold = false;
     for (size_t i = 0; i < verts.size() && !fold; ++i)
         for (uint32_t t : mesh.vertexTriangles(verts[i])) {
             const glm::uvec3 tr = mesh.triangles[t];
-            const glm::vec3 a = mesh.positions[tr.x], b = mesh.positions[tr.y], c = mesh.positions[tr.z];
+            const glm::vec3 a = start(tr.x), b = start(tr.y), c = start(tr.z);
             const glm::vec3 before = glm::cross(b - a, c - a);
             const glm::vec3 a2 = moved(tr.x), b2 = moved(tr.y), c2 = moved(tr.z);
             const glm::vec3 after = glm::cross(b2 - a2, c2 - a2);

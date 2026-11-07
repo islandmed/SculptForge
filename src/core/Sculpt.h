@@ -400,6 +400,10 @@ private:
     std::vector<float> baseFall_;
     std::vector<glm::vec3> baseCorner_, baseNormal_;
     std::vector<uint32_t> baseSlot_; // baseWouldFold's: per vertex, its index in the dab's list
+    std::vector<glm::vec3> baseScaled_; // microBaseKernel's: a fraction of the dab's base moves, tried for folds
+    std::vector<glm::vec3> baseStart_;  // per base point the stroke moved: where the stroke found it (baseStamp_ ==
+    std::vector<uint32_t> baseStamp_;   // baseStroke_), so baseWouldFold bounds the stroke's turn, not each dab's
+    uint32_t baseStroke_ = 1; // (never 0: a fresh baseStamp_ is all 0)
     bool baseWouldFold(const Mesh& mesh, const std::vector<uint32_t>& verts, const std::vector<glm::vec3>& moves);
     bool microReady(Mesh& mesh); // the mesh has a micro level: starts the micro stroke on first use
     float strokeDiagonal_ = 0.0f;
