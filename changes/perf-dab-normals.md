@@ -1,8 +1,8 @@
 ---
-whats_new: **Big brushes on big meshes** follow the pen closer on 4-core machines: a 240 px brush on a 28M-triangle scan lags about a sixth less and settles sooner after pen-up.
+whats_new: **Big brushes on big meshes** follow the pen closer on 4-core machines and settle sooner after pen-up.
 changed: Big brushes on dense meshes keep a shorter queue of pending dabs when each dab is slow (about 150 ms of work,
-  at least one dab, instead of always four): a 240 px Clay stroke on a 28M scan with 4 threads lags 297 ms instead of
-  357 (median) and settles 0.16 s sooner after pen-up, with the same stroke; small brushes are unchanged.
+  at least one dab, instead of always four): a big Clay stroke on a dense scan lags less and settles sooner after
+  pen-up, with the same stroke; small brushes are unchanged.
 testers:
   - 4-core laptop, a 20M+ mesh: a long fast stroke with a 240 px Clay brush; the stroke stays close behind the pen,
     no gaps, same depth as before.
