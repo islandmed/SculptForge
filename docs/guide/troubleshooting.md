@@ -28,6 +28,9 @@ old driver, a remote desktop session or a virtual machine without 3D acceleratio
    remote tool that forwards the GPU.
 4. **Linux:** on a machine without a working GPU driver, Mesa's software renderer works (slowly):
    `LIBGL_ALWAYS_SOFTWARE=1 sculptforge`.
+5. **Linux on Apple Silicon (Asahi) and other ARM machines:** use the ARM64 download. The x86_64 one runs
+   there only through the FEX emulator, which stops at once with `<jemalloc>: Unsupported system page size` on
+   16 KiB pages; start it in a 4 KiB-page VM with `muvm -- ./SculptForge-linux-x86_64.AppImage` if you need it.
 
 To see why it stopped, start it from a terminal and read the messages. It prints the OpenGL version and GPU it
 found at start-up (for example `OpenGL 4.6 (Core Profile) Mesa 26.1.8 on ...`), or the error, such as

@@ -34,8 +34,8 @@ Each link below downloads the newest version. Pick the one for your system:
 | Arch Linux | `packaging/arch/PKGBUILD` in the source | `makepkg -si` in that folder (an AUR package is planned) |
 | Studio pipelines | `SculptForge-<version>-...-vfx2026.tar.gz` or `...-vfx2027.tar.gz` | See [SculptForge for studios](studios.md) |
 
-Most PCs are x86_64; ARM64 is for ARM laptops, Raspberry Pi and Apple Silicon Macs running Linux. Older
-versions are on the [releases page](https://github.com/islandmed/SculptForge/releases).
+Most PCs are x86_64; ARM64 is for ARM laptops, Raspberry Pi and Apple Silicon Macs running Linux (it runs on 4,
+16 and 64 KiB memory pages). Older versions are on the [releases page](https://github.com/islandmed/SculptForge/releases).
 
 ### Install with one command
 
