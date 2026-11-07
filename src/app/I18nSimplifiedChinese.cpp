@@ -2172,7 +2172,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"With the update check, download the supporters, Founding Members and artist quotes shown in Help > About from "
      "the SculptForge website, so they are current between releases. Text only, signed by SculptForge and checked "
      "before use; nothing about you is sent. Off: the list this version shipped with.",
-     "随更新检查一并从 SculptForge 网站下载“帮助 > 关于”中显示的支持者、创始会员与艺术家推荐语，让它们在两"
+     "随更新检查一并从 SculptForge 网站下载“帮助 > 关于”中显示的支持者、创始会员与创作者的话，让它们在两"
      "次发布之间保持最新。仅限文字，由 SculptForge 签名并在使用前验证；不会发送任何关于你的信息。关闭：使用"
      "此版本内置的名单。"},
     {"Update channel", "更新通道"},
