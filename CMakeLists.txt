@@ -822,6 +822,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME release_pin_whats_new COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/pin_whats_new_test.py --self-test)
     # scripts/merge-queue.sh refuses a merge or squash that throws away the other side's change (tools/ci/no_revert.py).
     add_test(NAME ci_no_revert COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/no_revert.py --self-test)
+    # A branch made from an old tree (a squash with reset --soft onto a moved origin/main) put older main files back (0.11.11).
+    add_test(NAME stale_tree COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/no_revert.py --stale origin/main HEAD WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     # scripts/release.sh's beta (X.Y.Z-beta.N), its promotion to stable, and build once (--stage, then promote), in a
     # sandbox with stand-ins for gh and curl.
     if(UNIX AND NOT APPLE AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)

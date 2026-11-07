@@ -6,6 +6,7 @@
     tools/ci/no_revert.py BASE..TIP            every merge commit in the range
     tools/ci/no_revert.py --merge COMMIT       one merge commit
     tools/ci/no_revert.py --squash RESULT BRANCH   RESULT (one commit on main) squashes BRANCH
+    tools/ci/no_revert.py --stale BASE [TIP]   TIP's files against BASE's history (ctest stale_tree: BASE origin/main)
     tools/ci/no_revert.py --self-test
 
 A merge X of A and B (merge base M) must keep both sides' changes: no file A changed since M may come out of X as it
@@ -13,6 +14,11 @@ was at M or as B has it (the same for B). Conflict resolutions that take one sid
 squash made from a branch that started before main moved, undo the other side instead (0.11.1: the quick-remesh
 merge nearly reverted main's newer micro-renderer fix). Five or more changed lines thrown away that way (branch notes
 and the generated guide don't count) fail the check, listed per file. A deliberate revert passes with SF_ALLOW_REVERT=<its commit>.
+--stale catches what a merge check can't: a branch commit made from an old tree (0.11.11: a squash with
+`git reset --soft origin/main` after origin/main had moved put the feed, the home page and security.txt back to an
+older main inside the branch's own commit). A file TIP has as an older version from BASE's recent history (its last
+STALE_DEPTH changes), or a file BASE added in that history that TIP no longer has, is refused, unless a commit in
+BASE..TIP named `Reapply "..."` or `Revert "..."` touched it (a deliberate re-apply after a revert).
 Exit 0 ok, 1 refused, 2 usage or git error.
 """
 import os
@@ -116,6 +122,45 @@ def check_squash(result, branch, cwd=None):
     return report(f"squash {subject[:70]} of {branch}: main", undone(bases, parent, branch, sha, cwd)) and sha
 
 
+STALE_DEPTH = 40
+
+
+def stale(base, tip, cwd=None):
+    """Files TIP has at an older version of BASE's history (or lost although BASE added them recently)."""
+    deliberate = set()
+    for c in git("rev-list", f"{base}..{tip}", cwd=cwd).split():
+        subject = git("log", "-1", "--format=%s", c, cwd=cwd)
+        if subject.startswith(('Reapply "', 'Revert "')):
+            deliberate |= set(git("diff-tree", "-r", "-m", "--no-commit-id", "--name-only", c, cwd=cwd).split())
+    out = []
+    for f in git("diff", "--name-only", base, tip, cwd=cwd).split():
+        if SKIP.match(f) or f in deliberate:
+            continue
+        try:
+            now = git("rev-parse", "-q", "--verify", f"{tip}:{f}", cwd=cwd).strip()
+        except subprocess.CalledProcessError:
+            now = None
+        history = git("rev-list", f"-n{STALE_DEPTH}", base, "--", f, cwd=cwd).split()
+        if now is None:
+            try:
+                git("rev-parse", "-q", "--verify", f"{base}:{f}", cwd=cwd)
+            except subprocess.CalledProcessError:
+                continue
+            added = history and git("log", "--diff-filter=A", "--format=%h", "-n1", base, "--", f, cwd=cwd).strip()
+            if added and git("rev-parse", "-q", "--verify", "--short", added, cwd=cwd):
+                out.append(f"{f}: deleted, though {base} added it recently ({added})")
+            continue
+        for c in history[1:]:
+            try:
+                old = git("rev-parse", "-q", "--verify", f"{c}:{f}", cwd=cwd).strip()
+            except subprocess.CalledProcessError:
+                continue
+            if old == now:
+                out.append(f"{f}: is {base}'s version from {c[:8]}, older than {base}'s own")
+                break
+    return out
+
+
 def allowed(sha):
     ok = os.environ.get("SF_ALLOW_REVERT", "")
     return bool(ok) and sha.startswith(ok) and len(ok) >= 7
@@ -134,6 +179,20 @@ def run(argv, cwd=None):
     elif len(argv) == 3 and argv[0] == "--squash":
         sha = check_squash(argv[1], argv[2], cwd)
         refused = [sha] if sha and not allowed(sha) else []
+    elif len(argv) in (2, 3) and argv[0] == "--stale":
+        try:
+            git("rev-parse", "-q", "--verify", f"{argv[1]}^{{commit}}", cwd=cwd)
+        except subprocess.CalledProcessError:  # (a shallow CI checkout has no origin/main: nothing to compare with)
+            print(f"no_revert --stale: no {argv[1]} here, skipped")
+            return 0
+        found = stale(argv[1], argv[2] if len(argv) == 3 else "HEAD", cwd)
+        for f in found:
+            print(f"stale: {f}")
+        if found:
+            print("A commit was made from an old tree (e.g. git reset --soft onto a moved branch): take these files from "
+                  f"{argv[1]} again (git checkout {argv[1]} -- FILE). Squash with git reset --soft $(git merge-base HEAD "
+                  f"{argv[1]}).")
+        return 1 if found else 0
     else:
         print(__doc__)
         return 2
@@ -201,6 +260,20 @@ def self_test():
         g("merge", "-q", "--no-ff", "--no-commit", "feat2")
         write("a.cpp", fix); g("add", "-A"); g("commit", "-qm", "Merge feat2 (brings deleted lines back)")
         assert run(["--merge", "HEAD"], d) == 1, "a merge that restored main's deleted lines passed"
+        # 5. --stale: a branch commit carrying main's older e.cpp and dropping a file main just added is refused;
+        #    a clean branch and a deliberate `Reapply "..."` pass
+        write("e.cpp", ["int e = 1;"]); g("add", "-A"); g("commit", "-qm", "main: e v1")
+        write("e.cpp", ["int e = 2;"]); write("feed.json", ["0.2"]); g("add", "-A"); g("commit", "-qm", "main: e v2, the feed")
+        g("checkout", "-q", "-b", "stale")
+        write("e.cpp", ["int e = 1;"]); os.remove(os.path.join(d, "feed.json")); write("d.cpp", ["int d = 4;"])
+        g("add", "-A"); g("commit", "-qm", "feature made from an old tree")
+        assert run(["--stale", "main", "stale"], d) == 1, "a stale-tree commit passed"
+        g("checkout", "-q", "-b", "clean", "main")
+        write("d.cpp", ["int d = 4;"]); g("add", "-A"); g("commit", "-qm", "clean feature")
+        assert run(["--stale", "main", "clean"], d) == 0, "a clean branch was refused"
+        g("checkout", "-q", "-b", "again", "main")
+        write("e.cpp", ["int e = 1;"]); g("add", "-A"); g("commit", "-qm", 'Reapply "e v1"')
+        assert run(["--stale", "main", "again"], d) == 0, "a deliberate Reapply was refused"
     print("no_revert self-test: ok")
 
 
