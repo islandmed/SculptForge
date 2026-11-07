@@ -25,7 +25,7 @@ highlight: Kitbash sets for Insert
 - **Real-world size**: parts for 3D printing keep their size through every export. Pick the unit sizes show in (mm,
   cm, m, in) in **Edit > Preferences > Interface > Units**; **Tool** shows the Part's size and **File** the size
   exports write. OBJ and PLY files can be read in mm, cm, m or in (**OBJ/PLY in**). Asked for by @Swar55.
-- **Español, 繁體中文 and 简体中文** now cover the whole interface: **Generate 3D** (tabs, services, hints, Quad Remesh,
+- **Spanish, Traditional Chinese and Simplified Chinese** now cover the whole interface: **Generate 3D** (tabs, services, hints, Quad Remesh,
   Generate 3D model, Quick shapes), the About box, Proof mode, the phone link, the brush gallery, Brush Lab, splat
   training and about 400 other labels that stayed in English.
 - Fewer shards when sculpting rough micro-level surfaces (Clay strokes ending where hair or strands meet skin). Clay
