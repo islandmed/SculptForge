@@ -3914,6 +3914,7 @@ constexpr Entry kSimplifiedChinese[] = {
      "可用内存不足以运行 %s：将会跳过。请先关闭其他应用。"},
     {"Not now",
      "暂时不要"},
+    {"Terms & refunds", "条款与退款"},
     {"Nothing about memberships for a week.",
      "一周内不再显示会员方案。"},
     {"Nothing else is sent: no folders, no user name, no model details. Needs the Discord app running.",

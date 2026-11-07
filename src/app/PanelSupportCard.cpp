@@ -151,6 +151,7 @@ void App::closeSupportCard() {
 }
 
 void App::openSupportLink(const char* url) {
+    if (!url || !supportLinkAllowed(url)) return;
     ++supportPageRequests_;
     if (!interactive()) { // UI tests, renders and demos never start a browser
         status_ = std::string("Support SculptForge: ") + url;
@@ -341,6 +342,7 @@ void App::drawSupportCard() {
     const float tierTop = b.y - footer - tierH;
     const char* clicked = nullptr;
     bool discord = false; // the Discord pill in the footer (opens the invite, keeps the card)
+    bool terms = false;   // Terms & refunds in the footer (opens the terms page, keeps the card)
     for (int i = 0; i < 2; ++i) {
         const Tier& tier = kTiers[i];
         const bool featured = i == 0;
@@ -477,6 +479,11 @@ void App::drawSupportCard() {
                               ImVec2(g0.x + 3.0f * k, g1.y + 5.0f * k), tc(hot ? ink : accent, fa));
         const float my = (g0.y + g1.y) * 0.5f, r = 1.6f * k;
         for (int i = -1; i <= 1; ++i) dl->AddCircleFilled(ImVec2((g0.x + g1.x) * 0.5f + float(i) * 4.5f * k, my), r, tc(bg, fa));
+        // The fine print: the membership terms (refunds, cancelling), after the pill.
+        const char* label = tr("Terms & refunds");
+        const float tx = std::floor(c0.x + paint.measure(boldUi, 15.0f, "Join the members on Discord").x + 44.0f * k + glyph +
+                                    10.0f * k + 24.0f * k);
+        terms = link(label, "##card.terms", ImVec2(tx, std::floor(fy - paint.measure(bodyFont, 15.0f, label).y * 0.5f)), dim, true);
     }
     bool later = false, supporter = false;
     {
@@ -503,6 +510,8 @@ void App::drawSupportCard() {
             closeSupportCard();
         } else if (discord) {
             openDiscordPage(); // the card stays: a membership may still follow
+        } else if (terms) {
+            openSupportLink(kTermsUrl); // the card stays too
         } else if (supporter) {
             closeSupportCard();
             verifyMember(); // the small card shows the sign-in's steps
@@ -650,6 +659,20 @@ void App::drawMemberCard() {
             ImGui::SameLine();
             const bool already = ImGui::Button(tr("I'm already a member##member_card.already"));
             if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Sign in with GitHub (the member builds' sign-in): no more cards."));
+            { // the fine print: the membership terms (refunds, cancelling), a quiet link after the buttons (or under them)
+                const char* terms = tr("Terms & refunds##member_card.terms");
+                ImGui::SameLine();
+                if (ImGui::GetContentRegionAvail().x < ImGui::CalcTextSize(terms, nullptr, true).x) ImGui::NewLine();
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+                ImGui::PushStyleColor(ImGuiCol_Text, theme::textDim);
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+                if (ImGui::SmallButton(terms)) openSupportLink(kTermsUrl);
+                if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                ImGui::PopStyleVar();
+                ImGui::PopStyleColor(4);
+            }
             if (become) {
                 openSupportPage(); // both choices (monthly, yearly) on the membership page
                 memberCardChoice(MemberCardChoice::Become);

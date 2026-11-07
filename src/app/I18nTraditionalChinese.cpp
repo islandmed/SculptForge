@@ -3912,6 +3912,7 @@ constexpr Entry kTraditionalChinese[] = {
      "可用記憶體不足以執行 %s：將會略過。請先關閉其他應用程式。"},
     {"Not now",
      "現在不要"},
+    {"Terms & refunds", "條款與退款"},
     {"Nothing about memberships for a week.",
      "一週內不再顯示會員方案。"},
     {"Nothing else is sent: no folders, no user name, no model details. Needs the Discord app running.",
