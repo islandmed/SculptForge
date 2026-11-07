@@ -250,6 +250,19 @@ void App::commitSolverBatch() {
     if (!s.batch.empty()) {
         lastDabScreen_ = glm::vec2(s.batch.back().x, s.batch.back().y);
         if (s.dabSeconds > 0.0) dabSeconds_ = dabSeconds_ > 0.0 ? dabSeconds_ * 0.8 + s.dabSeconds * 0.2 : s.dabSeconds;
+        { // What a dab takes on this machine: from the last batch's result (when dabs were waiting then: the solver
+          // went straight on) or from being handed over (pumpStroke) to this result: the solver, the upload, the
+          // frames between. The pacer keeps the stroke within it (paceDabs).
+            const double now = double(SDL_GetTicksNS()) * 1e-9;
+            const double from = backlogAtCommit_ && lastCommitAt_ > 0.0 ? lastCommitAt_ : lastDabsQueued_;
+            // (time over dabs, each averaged: a big batch's dabs count as many, not as one cheap one)
+            const double seconds = now - from, dabs = double(s.batch.size());
+            serviceSeconds_ = serviceDabs_ > 0.0 ? serviceSeconds_ * 0.8 + seconds * 0.2 : seconds;
+            serviceDabs_ = serviceDabs_ > 0.0 ? serviceDabs_ * 0.8 + dabs * 0.2 : dabs;
+            dabServiceSeconds_ = serviceSeconds_ / serviceDabs_;
+            lastCommitAt_ = now;
+            backlogAtCommit_ = !dabQueue_.empty();
+        }
         // The fused batch size, toward kFusedBatchSeconds of work: scaled by how far this batch was from it (down at once, up
         // at most 2x a batch, kept fractional so it climbs back from 1 where fusing pays). It settles where a batch costs
         // the budget; on cores where one dab alone costs more, at one dab a batch.

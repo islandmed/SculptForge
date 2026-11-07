@@ -866,7 +866,9 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             // The pointer samples since the last frame (240 a second), in the order a tablet sends them.
             while (p.lastSample + 1.0 / kPointerHz <= now) {
                 p.lastSample += 1.0 / kPointerHz;
-                const double su = std::min(1.0, (p.lastSample - p.stageStart) / spec.seconds);
+                // (from the first sample's time, not the phase's start: the same samples every run, however late
+                // the phase began within its frame; only how they fall into frames differs)
+                const double su = std::min(1.0, (p.lastSample - p.samples.front().t) / spec.seconds);
                 const glm::vec2 q = strokePoint(p, su);
                 p.samples.push_back({p.lastSample, q, p.samples.back().s + double(glm::length(q - p.samples.back().p))});
                 ++ph.samples;
@@ -895,8 +897,11 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 ph.previewLagPx.push_back(p.samples.back().s - p.samples[nearest].s);
             }
             // ... then the new samples go to the input handler, as the next frame's events would.
-            for (; p.sent < p.samples.size(); ++p.sent)
+            for (; p.sent < p.samples.size(); ++p.sent) {
+                inputSeconds_ = p.samples[p.sent].t; // (its timestamp, as a tablet's event carries)
                 onMouseMove(p.samples[p.sent].p.x, p.samples[p.sent].p.y, 0.0f, 0.0f, false);
+            }
+            inputSeconds_ = -1.0;
             if (u >= 1.0) {
                 const double up = nowSeconds();
                 onMouseUp(); // places the dabs still waiting, ends the stroke (undo step, timeline)

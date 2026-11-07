@@ -12,9 +12,13 @@
 //   StrokePath  turns each input sample into the dabs between the previous sample and this one, at an even
 //               spacing. With `smooth`, a long gap between samples is drawn as a curve through the last three
 //               samples (a Hermite segment), not a chord, so a fast arc stays an arc.
-//   DabQueue    holds those dabs; the main loop works through it for a limited time per frame and reads input and
-//               draws in between. If the queue grows past a limit, every second waiting dab is dropped (a wider
-//               spacing under load) so the brush stays near the pointer instead of minutes behind it.
+//   DabPacer    decides which of those dabs a stroke places when the mesh can't keep up, on the input's own clock:
+//               it plays a worker placing each kept dab in turn (what a dab costs), from the samples' timestamps,
+//               and skips a dab that would wait behind too many. So the same input gives the same dabs whatever
+//               the frame rate and however the samples were grouped into frames.
+//   DabQueue    holds the kept dabs; the main loop works through it for a limited time per frame and reads input
+//               and draws in between. Should it still grow far past the limit (the cost was misjudged), every
+//               second waiting dab is dropped so the brush stays near the pointer instead of minutes behind it.
 //
 // Plain floats, no UI or maths library, so it is tested without a window (tests/test_stroke_path.cpp).
 #pragma once
@@ -30,6 +34,7 @@ namespace sf {
 struct PathDab {
     float x = 0.0f, y = 0.0f; // screen pixels
     float pressure = 1.0f;
+    float at = 1.0f; // where along its input segment, 0-1 (the dab's time: between the two samples' timestamps)
 };
 
 class StrokePath {
@@ -105,6 +110,7 @@ public:
                     d.y = ay + sy * u;
                     const float tt = at + (t - at) * u;
                     d.pressure = p0 + (p1 - p0) * tt;
+                    d.at = tt;
                     out.push_back(d);
                     travelled += spacing;
                 }
@@ -156,6 +162,71 @@ inline size_t strokeBacklogLimit(double dabSeconds, long fixed = -1, double back
     if (dabSeconds > 0.0) limit = std::max(limit, size_t(std::min(backlogSeconds / dabSeconds, 1e6)));
     return limit;
 }
+
+// Which dabs a stroke places under load, decided on the input's clock rather than the frame's (see the top).
+// Each dab comes with its input time (seconds, from the samples' timestamps). A virtual worker places the kept
+// dabs one after another, `cost` seconds each, starting no sooner than each dab is due; a dab is kept while fewer
+// than `limit` kept dabs would be waiting to start (the backlog limit, strokeBacklogLimit), otherwise skipped, and a
+// kept dab goes on to the real queue at once. Under load that keeps an even share of the dabs (every second, third,
+// ... as the brush falls behind) and the stroke never more than `limit` dabs behind the pointer, as the frame-time
+// thinning did, but for a given cost the choice only depends on the input: not on how the samples were grouped into
+// frames, nor on a frame that stalled.
+// The cost is what a dab takes on this machine now (App: measured, so the brush keeps up with the pen); setCost
+// updates it. Without one (0), or with limit 0, every dab is kept. The stroke's last dab is always kept (finish).
+class DabPacer {
+public:
+    void reset() {
+        pending_.clear();
+        starts_.clear();
+        free_ = -1e300;
+        cost_ = 0.0;
+        skipped_ = false;
+    }
+    void add(const PathDab& d, double t) { pending_.push_back({d, t}); }
+    size_t pending() const { return pending_.size(); }
+    double cost() const { return cost_; } // 0 until set
+    void setCost(double seconds) { cost_ = std::max(seconds, 0.0); }
+
+    // Decides the dabs added so far; the kept ones are appended to `out`.
+    void decide(size_t limit, std::vector<PathDab>& out) {
+        for (; !pending_.empty(); pending_.pop_front()) {
+            const Timed& d = pending_.front();
+            bool keep = true;
+            if (limit > 0 && cost_ > 0.0) {
+                while (!starts_.empty() && starts_.front() <= d.t) starts_.pop_front();
+                keep = starts_.size() < limit;
+                if (keep) {
+                    const double at = std::max(d.t, free_);
+                    starts_.push_back(at);
+                    free_ = at + cost_;
+                }
+            }
+            skipped_ = !keep;
+            if (keep) out.push_back(d.d);
+            else last_ = d.d;
+        }
+    }
+
+    // The stroke's end: every dab still undecided is decided, and the last one is kept even if it was skipped, so
+    // the stroke ends where the pointer did.
+    void finish(size_t limit, std::vector<PathDab>& out) {
+        decide(limit, out);
+        if (skipped_) out.push_back(last_);
+        skipped_ = false;
+    }
+
+private:
+    struct Timed {
+        PathDab d;
+        double t;
+    };
+    std::deque<Timed> pending_;
+    std::deque<double> starts_; // when the kept dabs not yet started (on the virtual worker) start
+    double free_ = -1e300;      // when the virtual worker is free
+    double cost_ = 0.0;
+    bool skipped_ = false;
+    PathDab last_;
+};
 
 // Dabs waiting to be placed.
 class DabQueue {
