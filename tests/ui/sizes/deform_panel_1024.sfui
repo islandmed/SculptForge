@@ -1,0 +1,21 @@
+# tests/ui/sizes/deform_panel.sfui on a 1024x768 window (CMake: ui_deform_panel_1024): narrower than 1280 px the
+# right tray is not drawn and Tool opens as a drop-down from the bar (it only flashed the hidden tray before).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+run deform_scale amount=100 axes=y
+click "Frame##view.frame"
+click "Tool##palette.tool"
+wait_idle 10
+click "Deformation##tool.deformation"
+expect "Size/##deform_size_x"
+click "##deform_stack_add"
+click "Stack/Taper##deform_add_Taper"
+click "##deform_stack_add"
+click "Stack/Twist##deform_add_Twist"
+click "##deform_stack_add"
+click "Stack/Bend##deform_add_Bend"
+expect_status "Deform stack (3 steps)"
+click "Stack/Z"
+expect_status "Deform stack (3 steps)"
+wait_idle 30
+shot deform-panel

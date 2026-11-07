@@ -461,6 +461,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelSupportCard.cpp
     src/app/PanelIntegrations.cpp
     src/app/WhatsNewPopup.cpp
+    src/app/PanelDeform.cpp
     src/app/PanelExtract.cpp
     src/app/PanelTimeline.cpp
     src/app/ProofMode.cpp
@@ -977,6 +978,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(part_folders_hidpi hidpi/part_folders --size 3200x1800)
     set_tests_properties(ui_right_tray_looks_720 ui_windows_dpi_2560 ui_windows_dpi_2160 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
     sculptforge_ui_test(user_guide_1080 user_guide --size 1920x1080)
+    # The Deform panel for the look review (tests/ui/sizes/: scripts only run at their own sizes).
+    sculptforge_ui_test(deform_panel_1440 sizes/deform_panel --size 1440x900)
+    sculptforge_ui_test(deform_panel_1024 sizes/deform_panel_1024 --size 1024x768)
     # A crash leaves a note in the log file (#16). Needs no window.
     add_test(NAME crash_log COMMAND ${CMAKE_COMMAND} -DAPP=$<TARGET_FILE:sculptforge>
              -DDIR=${CMAKE_CURRENT_BINARY_DIR}/crash-log-test -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/crash_log.cmake)

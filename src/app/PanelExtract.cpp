@@ -114,6 +114,8 @@ void App::drawDeformationContents() {
                  "Deformation > Smooth smooths without shrinking the form (Taubin smoothing) instead of the plain "
                  "smooth, which also shrinks it.",
                  "Tool > Deformation");
+    drawDeformSize();  // PanelDeform.cpp
+    drawDeformStack();
 }
 
 } // namespace sf
