@@ -517,48 +517,12 @@ void Sculptor::microBaseKernel(Mesh& mesh, BVH& bvh, BrushType type, const DabPa
             if (baseMoves_[i] != glm::vec3(0.0f)) baseVerts_[k] = baseVerts_[i], baseMoves_[k++] = baseMoves_[i];
         baseVerts_.resize(k);
         baseMoves_.resize(k);
-        // A base rough at its own edges' scale (mane strands meeting the brow): the plane pulls its grooves up past
-        // the ridges beside them and folds base triangles over; the detail riding on them swings out into shards
-        // (the lion, 11-06). There the dab goes to the grid instead (its points move along their own normals, the
-        // base stays).
-        if (baseWouldFold(mesh, baseVerts_, baseMoves_)) {
-            micro_.dab(mesh, bvh, type, c, view, r, s, p.invert, p.focal, m.dir(p.alphaUp), false, 0.0f, p.alpha, {}, m.dir(p.strokeDelta));
-            continue;
-        }
         timings.kernelMs += lapMs(clock);
         timings.vertices += k;
         moveVertices(mesh, bvh, baseVerts_, baseMoves_); // (the undo record, normals, BVH)
         timings.normalsMs += lapMs(clock);
     }
     ++timings.dabs;
-}
-
-// Whether moving `verts` by `moves` would turn a base triangle around them by more than 60 degrees (or flip it).
-bool Sculptor::baseWouldFold(const Mesh& mesh, const std::vector<uint32_t>& verts, const std::vector<glm::vec3>& moves) {
-    if (verts.empty()) return false;
-    const size_t nv = mesh.vertexCount();
-    if (baseSlot_.size() != nv) baseSlot_.assign(nv, ~0u);
-    for (size_t i = 0; i < verts.size(); ++i) baseSlot_[verts[i]] = uint32_t(i);
-    auto moved = [&](uint32_t v) {
-        const uint32_t i = baseSlot_[v];
-        return i != ~0u ? mesh.positions[v] + moves[i] : mesh.positions[v];
-    };
-    bool fold = false;
-    for (size_t i = 0; i < verts.size() && !fold; ++i)
-        for (uint32_t t : mesh.vertexTriangles(verts[i])) {
-            const glm::uvec3 tr = mesh.triangles[t];
-            const glm::vec3 a = mesh.positions[tr.x], b = mesh.positions[tr.y], c = mesh.positions[tr.z];
-            const glm::vec3 before = glm::cross(b - a, c - a);
-            const glm::vec3 a2 = moved(tr.x), b2 = moved(tr.y), c2 = moved(tr.z);
-            const glm::vec3 after = glm::cross(b2 - a2, c2 - a2);
-            const float l = glm::length(before) * glm::length(after);
-            if (l > 0.0f && glm::dot(before, after) < 0.5f * l) {
-                fold = true;
-                break;
-            }
-        }
-    for (uint32_t v : verts) baseSlot_[v] = ~0u;
-    return fold;
 }
 
 bool Sculptor::microReady(Mesh& mesh) {
