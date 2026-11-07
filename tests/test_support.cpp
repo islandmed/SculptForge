@@ -191,3 +191,117 @@ TEST(support_card_timing) {
     member.supporter = true;
     CHECK(supportCardDue(member, true, false) == SupportCardReason::None);
 }
+
+TEST(member_card_backoff) {
+    const int64_t day = 24 * 3600, now = 1'800'000'000;
+    SupportCardPrefs p;
+    // Weekly for the first two "Not now"s.
+    for (int i = 1; i <= 2; ++i) {
+        p.shownAt = now;
+        applyMemberCardChoice(p, MemberCardChoice::NotNow, now);
+        CHECK(p.notNow == i);
+        CHECK(!memberMomentAllowed(p, false, now + 6 * day, false));
+        CHECK(memberMomentAllowed(p, false, now + 7 * day, false));
+    }
+    // After the 3rd: monthly (the snooze and the gap between cards).
+    applyMemberCardChoice(p, MemberCardChoice::NotNow, now);
+    CHECK(p.notNow == 3);
+    CHECK(!memberMomentAllowed(p, false, now + 29 * day, false));
+    CHECK(memberMomentAllowed(p, false, now + 30 * day, false));
+    p.hiddenUntil = 0;
+    CHECK(!memberMomentAllowed(p, false, now + 8 * day, false)); // shown a week ago: not yet
+    // Become a member snoozes as long without counting as a "Not now".
+    SupportCardPrefs b = p;
+    applyMemberCardChoice(b, MemberCardChoice::Become, now);
+    CHECK(b.notNow == 3 && b.hiddenUntil == now + 30 * day);
+    // After the 6th: only the first start after an update (still at most monthly).
+    for (int i = 0; i < 3; ++i) applyMemberCardChoice(p, MemberCardChoice::NotNow, now);
+    CHECK(p.notNow == 6);
+    for (MemberMoment m : {MemberMoment::Sculpted, MemberMoment::SavedRender, MemberMoment::Challenge, MemberMoment::Starts,
+                           MemberMoment::SculptHours, MemberMoment::Saves, MemberMoment::None})
+        CHECK(!memberMomentAllowed(p, false, now + 60 * day, false, m));
+    CHECK(!memberMomentAllowed(p, false, now + 29 * day, false, MemberMoment::Updated));
+    CHECK(memberMomentAllowed(p, false, now + 60 * day, false, MemberMoment::Updated));
+    // Members and tests: never, whatever the moment.
+    CHECK(!memberMomentAllowed(p, true, now + 60 * day, false, MemberMoment::Updated));
+    CHECK(!memberMomentAllowed(p, false, now + 60 * day, true, MemberMoment::Updated));
+}
+
+TEST(member_card_milestones) {
+    SupportCardPrefs p;
+    CHECK(milestoneDue(p) == MemberMoment::None);
+    p.starts = kMilestoneStarts - 1;
+    p.sculptSeconds = kMilestoneSculptSeconds - 1.0;
+    p.saves = kMilestoneSaves - 1;
+    CHECK(milestoneDue(p) == MemberMoment::None);
+    // The 10th start, 10 hours of sculpting, the 100th save; each once, in that order when several are due.
+    p.starts = 14;
+    p.sculptSeconds = 12.7 * 3600.0;
+    p.saves = 100;
+    CHECK(milestoneDue(p) == MemberMoment::Starts);
+    p.milestonesShown |= milestoneBit(MemberMoment::Starts);
+    CHECK(milestoneDue(p) == MemberMoment::SculptHours);
+    p.milestonesShown |= milestoneBit(MemberMoment::SculptHours);
+    CHECK(milestoneDue(p) == MemberMoment::Saves);
+    p.milestonesShown |= milestoneBit(MemberMoment::Saves);
+    CHECK(milestoneDue(p) == MemberMoment::None);
+    CHECK(milestoneBit(MemberMoment::Sculpted) == 0);
+    // The words state the true number as it shows (hours whole, rounded down).
+    auto words = [&](MemberMoment m) {
+        const CardLine l = milestoneLine(m, p);
+        return formatCardLine(l, l.format);
+    };
+    CHECK(words(MemberMoment::Starts) == "You've opened SculptForge 14 times. Members keep it free and growing.");
+    CHECK(words(MemberMoment::SculptHours) == "You've sculpted 12 hours in SculptForge. Members keep it free and growing.");
+    CHECK(words(MemberMoment::Saves) == "You've saved your work 100 times in SculptForge. Members keep it free and growing.");
+    CHECK(words(MemberMoment::Updated).empty());
+    // A milestone still counts against the weekly limit like any moment.
+    const int64_t day = 24 * 3600, now = 1'800'000'000;
+    SupportCardPrefs q;
+    q.shownAt = now;
+    CHECK(!memberMomentAllowed(q, false, now + 3 * day, false, MemberMoment::Starts));
+    CHECK(memberMomentAllowed(q, false, now + 7 * day, false, MemberMoment::Starts));
+}
+
+TEST(member_card_feed_lines) {
+    // No "support" block: no line (the card keeps its Founding Members words).
+    SupportFeed none;
+    CHECK(supportFeedLines(none).empty());
+    CHECK(supportFeedLine(none, 3).format == nullptr);
+    // The feed's block, parsed and checked (core/UpdateCheck.h).
+    UpdateInfo u;
+    std::string err;
+    CHECK(parseUpdateFeed(R"({"version": "9.0.0", "download": "https://sculptforge.app/#download",
+        "support": {"funded_this_month": ["Cloth brush", "Faster \u0007remesh", 7, "", "c", "d", "e", "f"],
+                    "founding": {"taken": 2, "limit": 100}, "member_requests_this_release": 3}})",
+                          u, err));
+    CHECK(u.support.present);
+    CHECK(u.support.funded.size() == 5 && u.support.funded[1] == "Faster remesh");
+    CHECK(u.support.foundingTaken == 2 && u.support.foundingLimit == 100 && u.support.memberRequests == 3);
+    const std::vector<CardLine> lines = supportFeedLines(u.support);
+    CHECK(lines.size() == 3);
+    auto words = [](const CardLine& l) { return formatCardLine(l, l.format); };
+    CHECK(words(lines[0]) == "Members funded this month: Cloth brush, Faster remesh, c, d, e.");
+    CHECK(words(lines[1]) ==
+          "Founding Members so far: 2 of 100. A badge, your name in the credits and your price locked for good.");
+    CHECK(words(lines[2]) == "3 changes in this release were members' requests.");
+    // They take turns, card by card.
+    CHECK(words(supportFeedLine(u.support, 0)) == words(lines[0]));
+    CHECK(words(supportFeedLine(u.support, 4)) == words(lines[1]));
+    // Odd values are left out, never guessed: a full founding list, taken over the limit, fractions, negatives.
+    UpdateInfo odd;
+    CHECK(parseUpdateFeed(R"({"version": "9.0.0", "download": "https://sculptforge.app/#download",
+        "support": {"founding": {"taken": 120, "limit": 100}, "member_requests_this_release": 2.5}})",
+                          odd, err));
+    CHECK(odd.support.present && odd.support.foundingTaken == -1 && odd.support.memberRequests == -1);
+    CHECK(supportFeedLines(odd.support).empty());
+    SupportFeed full;
+    full.foundingTaken = full.foundingLimit = 100;
+    full.memberRequests = 1;
+    const std::vector<CardLine> one = supportFeedLines(full); // (no founding line once they're all taken)
+    CHECK(one.size() == 1 && words(one[0]) == "1 change in this release was a member's request.");
+    // No block at all: not present.
+    UpdateInfo plain;
+    CHECK(parseUpdateFeed(R"({"version": "9.0.0", "download": "https://sculptforge.app/#download"})", plain, err));
+    CHECK(!plain.support.present);
+}

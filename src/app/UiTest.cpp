@@ -1002,6 +1002,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "member_card_open") return app_.memberCard_ != MemberMoment::None ? 1.0 : 0.0;
     if (name == "member_card_pending") return app_.memberMomentPending_ != MemberMoment::None ? 1.0 : 0.0;
     if (name == "member_card_verifying") return app_.memberVerifying_ ? 1.0 : 0.0;
+    if (name == "member_card_not_now") return double(app_.supportCardPrefs_.notNow);
+    if (name == "member_card_saves") return double(app_.supportCardPrefs_.saves);
+    if (name == "member_card_milestones") return double(app_.supportCardPrefs_.milestonesShown);
     if (name == "member_signed_in") return app_.memberSignedIn() ? 1.0 : 0.0;
     if (name == "part_thumbnails") { // Part panel thumbnails rendered (#43)
         double n = 0.0;
@@ -2348,13 +2351,15 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         }
         run([this, firstRun, testMode] { app_.launchSupportCard(firstRun, app_.memberClock(), testMode); });
     } else if (verb == "member_card") {
-        // A good moment for the small membership card (Support.h): sculpted | render | updated | challenge | none,
-        // with `days=N` (the clock N days on from the test's start) and `sculpt_seconds=S` (this session's stroke time
-        // so far: the next frame decides the sculpting moment). UI tests otherwise never show it (test mode).
+        // A good moment for the small membership card (Support.h): sculpted | render | updated | challenge |
+        // milestone | none, with `days=N` (the clock N days on from the test's start), `sculpt_seconds=S` (this
+        // session's stroke time so far: the next frame decides the sculpting moment), and the milestones' counts
+        // `starts=N`, `sculpt_hours=H`, `saves=N` (`milestone` checks them now). UI tests otherwise never show it.
         if (!need(1)) return false;
         static const std::pair<const char*, MemberMoment> kMoments[] = {
             {"sculpted", MemberMoment::Sculpted}, {"render", MemberMoment::SavedRender},
-            {"updated", MemberMoment::Updated}, {"challenge", MemberMoment::Challenge}, {"none", MemberMoment::None}};
+            {"updated", MemberMoment::Updated}, {"challenge", MemberMoment::Challenge}, {"none", MemberMoment::None},
+            {"milestone", MemberMoment::None}};
         MemberMoment moment = MemberMoment::None;
         bool known = false;
         for (const auto& [n, m] : kMoments)
@@ -2363,21 +2368,30 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             error = "member_card: unknown moment '" + w[1] + "'";
             return false;
         }
-        double days = -1.0, sculpt = -1.0;
+        const bool milestone = w[1] == "milestone";
+        double days = -1.0, sculpt = -1.0, hours = -1.0;
+        int starts = -1, saves = -1;
         for (size_t i = 2; i < w.size(); ++i) {
             if (w[i].rfind("days=", 0) == 0) days = std::atof(w[i].c_str() + 5);
             else if (w[i].rfind("sculpt_seconds=", 0) == 0) sculpt = std::atof(w[i].c_str() + 15);
+            else if (w[i].rfind("sculpt_hours=", 0) == 0) hours = std::atof(w[i].c_str() + 13);
+            else if (w[i].rfind("starts=", 0) == 0) starts = std::atoi(w[i].c_str() + 7);
+            else if (w[i].rfind("saves=", 0) == 0) saves = std::atoi(w[i].c_str() + 6);
             else {
                 error = "member_card: unknown option '" + w[i] + "'";
                 return false;
             }
         }
-        run([this, moment, days, sculpt] {
+        run([this, moment, days, sculpt, milestone, hours, starts, saves] {
             app_.memberCardTestMode_ = true;
             if (days >= 0.0) app_.memberClockOffset_ = int64_t(days * 86400.0);
             if (sculpt >= 0.0) app_.sessionSculptSeconds_ = sculpt;
+            if (hours >= 0.0) app_.supportCardPrefs_.sculptSeconds = hours * 3600.0;
+            if (starts >= 0) app_.supportCardPrefs_.starts = starts;
+            if (saves >= 0) app_.supportCardPrefs_.saves = saves;
             if (moment == MemberMoment::Challenge) app_.challengeTitle_ = "Creatures";
-            app_.memberMoment(moment);
+            if (milestone) app_.memberMilestoneCheck();
+            else app_.memberMoment(moment);
         });
     } else if (verb == "member_sign_in") {
         // Ends the GitHub sign-in that is running (UI tests never reach GitHub): `ok` (the account can read the

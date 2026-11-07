@@ -74,6 +74,18 @@ bool readRelease(const Json& j, UpdateInfo& info) {
     return true;
 }
 
+// Feed text as it may be shown: no control characters, cut to `max` bytes on a UTF-8 boundary.
+std::string feedText(const std::string& in, size_t max) {
+    std::string out;
+    for (char c : in) // (UTF-8 kept whole below)
+        if (static_cast<unsigned char>(c) >= 0x20 && c != 0x7f) out += c;
+    if (out.size() > max) {
+        size_t cut = max;
+        while (cut > 0 && (static_cast<unsigned char>(out[cut]) & 0xC0) == 0x80) --cut;
+        out.resize(cut);
+    }
+    return out;
+}
 } // namespace
 
 bool parseUpdateFeed(const std::string& json, UpdateInfo& out, std::string& error, UpdateChannel channel) {
@@ -102,18 +114,29 @@ bool parseUpdateFeed(const std::string& json, UpdateInfo& out, std::string& erro
         });
         if (idOk) {
             info.challengeId = id;
-            if (challenge["title"].isString()) {
-                std::string title;
-                for (char c : challenge["title"].asString()) // (no control characters; UTF-8 kept whole below)
-                    if (static_cast<unsigned char>(c) >= 0x20 && c != 0x7f) title += c;
-                if (title.size() > 48) {
-                    size_t cut = 48;
-                    while (cut > 0 && (static_cast<unsigned char>(title[cut]) & 0xC0) == 0x80) --cut;
-                    title.resize(cut);
-                }
-                info.challengeTitle = title;
-            }
+            if (challenge["title"].isString()) info.challengeTitle = feedText(challenge["title"].asString(), 48);
         }
+    }
+    const Json& support = j["support"];
+    if (support.isObject()) {
+        SupportFeed& f = info.support;
+        f.present = true;
+        if (support["funded_this_month"].isArray())
+            for (const Json& n : support["funded_this_month"].items()) {
+                if (f.funded.size() >= 5) break;
+                if (!n.isString()) continue;
+                std::string name = feedText(n.asString(), 48);
+                if (name.find_first_not_of(' ') != std::string::npos) f.funded.push_back(std::move(name));
+            }
+        auto count = [](const Json& v) { // a whole number 0..100000, else -1
+            const double d = v.isNumber() ? v.asNumber(-1.0) : -1.0;
+            return d >= 0.0 && d <= 100000.0 && d == double(int(d)) ? int(d) : -1;
+        };
+        if (support["founding"].isObject()) {
+            const int taken = count(support["founding"]["taken"]), limit = count(support["founding"]["limit"]);
+            if (taken >= 0 && limit >= 1 && taken <= limit) f.foundingTaken = taken, f.foundingLimit = limit;
+        }
+        f.memberRequests = count(support["member_requests_this_release"]);
     }
     out = std::move(info);
     return true;

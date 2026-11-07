@@ -4374,6 +4374,26 @@ constexpr Entry kTraditionalChinese[] = {
      "旋轉模板，以逆時針度數表示；Ctrl+點擊以輸入。"},
     {"Centre the Stencil again, upright, 80% of the view's height.",
      "將模板重新置中、擺正，高度為視圖的 80%。"},
+    // Membership moments (PanelSupportCard.cpp)
+    {"Member", "會員"},
+    {"You've opened SculptForge %d times. Members keep it free and growing.",
+     "你已開啟 SculptForge %d 次。會員讓它保持免費並持續成長。"},
+    {"You've sculpted %d hours in SculptForge. Members keep it free and growing.",
+     "你已在 SculptForge 中雕刻了 %d 小時。會員讓它保持免費並持續成長。"},
+    {"You've saved your work %d times in SculptForge. Members keep it free and growing.",
+     "你已在 SculptForge 中儲存作品 %d 次。會員讓它保持免費並持續成長。"},
+    {"Members funded this month: %s.",
+     "本月由會員資助：%s。"},
+    {"Founding Members so far: %d of %d. A badge, your name in the credits and your price locked for good.",
+     "目前的創始會員：%d / %d。獲得徽章、列名於致謝名單，價格永久鎖定。"},
+    {"%d change in this release was a member's request.",
+     "此版本有 %d 項變更來自會員的請求。"},
+    {"%d changes in this release were members' requests.",
+     "此版本有 %d 項變更來自會員的請求。"},
+    {"Thank you for being a member: you keep SculptForge free and growing.",
+     "感謝你成為會員：你讓 SculptForge 保持免費並持續成長。"},
+    {"SculptForge is free and open source. Members keep it free and growing (Help > Support SculptForge).",
+     "SculptForge 是免費的開源軟體。會員讓它保持免費並持續成長（說明 > 支持 SculptForge）。"},
 };
 
 } // namespace

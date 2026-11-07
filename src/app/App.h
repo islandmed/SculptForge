@@ -541,6 +541,15 @@ private:
     bool sculptMomentDone_ = false;             // the sculpting moment came this session
     MemberMoment memberMomentPending_ = MemberMoment::None; // allowed, waiting for a calm frame
     MemberMoment memberCard_ = MemberMoment::None;          // the small card showing
+    CardLine memberCardMilestone_;              // a milestone card's words, numbers as it showed
+    CardLine memberCardFeedLine_;               // the feed's honest line on this card (none: the usual one)
+    void memberMilestoneCheck();                // a milestone due may bring the card (a start, a save, a minute)
+    void countMemberSave();                     // a project save (the 100th save milestone)
+    double milestoneCheckedAt_ = 0.0;           // seconds (ImGui clock): the sculpting hours, checked each minute
+    // The top bar's heart (Help > Support SculptForge); a member's badge instead. False: no room or a studio build.
+    bool drawSupportHeart(ImVec2 at, float size, ImDrawList* dl);
+    // A Studio member's build or studio mode (core/StudioProfile.h): no heart, no small cards.
+    bool studioMembership() const { return isStudioBuild() || studioMode().active; }
     bool memberVerifying_ = false;              // the card's sign-in runs (shown in the card)
     bool updatedThisStart_ = false;             // this start runs a newer version than the last (the update moment)
     std::string challengeTitle_;                // the monthly challenge whose results came (latest.json)
