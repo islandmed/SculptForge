@@ -14,6 +14,7 @@
 //   the project settings, which the document's undo (per Part, for meshes) does not cover.
 #include "app/App.h"
 #include "app/I18n.h"
+#include "app/NativeDialog.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
 
@@ -566,14 +567,14 @@ void App::registerGarmentActions() {
     add("garment.export_svg", "Export SVG", ICON_LC_FILE_DOWN, "",
         [this] {
             garments_->exportFormat.clear();
-            SDL_ShowSaveFileDialog(onGarmentFileChosen, &exportRequest, window_, kSvgFilter, 1, nullptr);
+            sf::dialogs::saveFile(onGarmentFileChosen, &exportRequest, window_, kSvgFilter, 1, nullptr);
         },
         nullptr, have, "Save the panels at real size for printing and sewing: sewing and cutting lines, notches, grain lines.",
         "garment_export");
     add("garment.export_dxf", "Export DXF", ICON_LC_FILE_DOWN, "",
         [this] {
             garments_->exportFormat.clear();
-            SDL_ShowSaveFileDialog(onGarmentFileChosen, &exportRequest, window_, kDxfFilter, 1, nullptr);
+            sf::dialogs::saveFile(onGarmentFileChosen, &exportRequest, window_, kDxfFilter, 1, nullptr);
         },
         nullptr, have, "Save the outlines in millimetres for cutting machines.", "garment_export");
     add("garment.templates", "Templates", ICON_LC_LAYOUT_TEMPLATE, "", [this] { garments_->openTemplates = true; }, nullptr,
@@ -586,18 +587,18 @@ void App::registerGarmentActions() {
     add("garment.print_pdf", "Save PDF...", ICON_LC_FILE_DOWN, "",
         [this] {
             garments_->exportFormat = "pdf";
-            SDL_ShowSaveFileDialog(onGarmentFileChosen, &exportRequest, window_, kPdfFilter, 1, nullptr);
+            sf::dialogs::saveFile(onGarmentFileChosen, &exportRequest, window_, kPdfFilter, 1, nullptr);
         },
         nullptr, have, "Every page in one PDF: trim lines, matching triangles, page names, the 50 mm square.",
         "garment_export");
     add("garment.print_svg", "Save SVG pages...", ICON_LC_FILE_DOWN, "",
         [this] {
             garments_->exportFormat = "svg_pages";
-            SDL_ShowSaveFileDialog(onGarmentFileChosen, &exportRequest, window_, kSvgFilter, 1, nullptr);
+            sf::dialogs::saveFile(onGarmentFileChosen, &exportRequest, window_, kSvgFilter, 1, nullptr);
         },
         nullptr, have, "The same pages, one SVG file each (name-A1.svg, name-A2.svg, ...).", "garment_export");
     add("garment.import_svg", "Import SVG", ICON_LC_FILE_UP, "",
-        [this] { SDL_ShowOpenFileDialog(onGarmentFileChosen, &importRequest, window_, kSvgFilter, 1, nullptr, false); },
+        [this] { sf::dialogs::openFile(onGarmentFileChosen, &importRequest, window_, kSvgFilter, 1, nullptr, false); },
         nullptr, nullptr, "Add panels from an SVG: every closed shape, at the file's real size.", "garment_import");
     add("garment.frame", "Frame", ICON_LC_FOCUS, "", [this] { garments_->frame = true; }, nullptr, nullptr,
         "Fit every panel in the view (F over it).");
