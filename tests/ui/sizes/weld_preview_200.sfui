@@ -3,7 +3,7 @@
 run open path=$SCRIPT_DIR/../../data/check_mesh_cube.obj
 ui_scale 200
 click "Geometry##tool.geometry"
-# (Check scrolls Check Mesh, just below Merge by Distance, into view)
+# (Check scrolls Find Problems, just below Merge by Distance, into view)
 click "Check##mesh_check"
 wait 0.5
 expect_value weld_preview_points == 0
