@@ -64,19 +64,21 @@ TEST(mesh_preview_tells_shapes_apart) {
 
 TEST(generator_stub_waits_behind_the_ai_switch) {
     int calls = 0;
-    ai::setGeneratorStubForTests([&](int call, const std::string& stem) {
+    ai::setGeneratorStubForTests([&](int candidate, const std::string& stem) {
         ++calls;
         ai::GeneratorResult r;
         r.ok = true;
-        r.outputPath = stem + "_" + std::to_string(call) + ".obj";
+        r.outputPath = stem + "_" + std::to_string(candidate) + ".obj";
         return r;
     });
     ai::AiSettings s;
     s.generatorService = "fal"; // a paid service: the stub answers, nothing is sent
     ai::GeneratorResult r = ai::generate3DFromText(s, "a fox", "stem");
     CHECK(r.ok && r.outputPath == "stem_0.obj" && calls == 1);
-    r = ai::generate3D(s, "missing.png", "stem");
-    CHECK(r.ok && r.outputPath == "stem_1.obj" && calls == 2);
+    ai::GenerationProgress third; // the stub answers by candidate, not by arrival (they run on parallel threads)
+    third.candidate = 2;
+    r = ai::generate3D(s, "missing.png", "stem", &third);
+    CHECK(r.ok && r.outputPath == "stem_2.obj" && calls == 2);
     ai::setAiEnabled(false); // AI off: refused before the stub, as before any service
     r = ai::generate3D(s, "missing.png", "stem");
     CHECK(!r.ok && calls == 2);

@@ -60,8 +60,8 @@
 //                            is saved (what waits), the defaults come back, then ui.json is read as at the start;
 //                            FILE (beside the script) replaces ui.json first (an older version's settings)
 //   env NAME VALUE           set an environment variable; $SCRIPT_DIR is the script's folder
-//   generator_stub SHAPE...  Generate 3D answers from a stub instead of any service (never the network): generation
-//                            N gets the Nth shape (cycling): sphere cube torus capsule cone, or fail; off = the services
+//   generator_stub SHAPE...  Generate 3D answers from a stub instead of any service (never the network): candidate
+//                            N (A first) gets the Nth shape (cycling): sphere cube torus capsule cone, or fail; off = the services
 //   input_style STYLE        classic, sculptforge (the default), blender or maya, as Preferences > Input sets it
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
 //                            directory), e.g. to stage what another program would write (the Blender bridge);
@@ -2411,8 +2411,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             }
         run([shapes] {
             if (shapes.front() == "off") return ai::setGeneratorStubForTests({});
-            ai::setGeneratorStubForTests([shapes](int call, const std::string& stem) {
-                const std::string& shape = shapes[size_t(call) % shapes.size()];
+            ai::setGeneratorStubForTests([shapes](int candidate, const std::string& stem) {
+                const std::string& shape = shapes[size_t(candidate) % shapes.size()];
                 ai::GeneratorResult r;
                 if (shape == "fail") {
                     r.error = "The stub service said no";

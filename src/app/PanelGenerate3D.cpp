@@ -97,6 +97,7 @@ void App::startGenerator() {
     for (int i = 0; i < count; ++i) {
         candidateProgress_.push_back(count == 1 ? generatorProgress_ : std::make_shared<ai::GenerationProgress>());
         candidateProgress_.back()->setStatus("Starting...");
+        candidateProgress_.back()->candidate = i;
     }
     candidatesDone_ = std::make_shared<std::atomic<int>>(0);
     auto promise = std::make_shared<std::promise<std::vector<GeneratedCandidate>>>();
