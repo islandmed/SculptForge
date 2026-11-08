@@ -26,6 +26,7 @@
 #include "core/Cut.h"
 #include "core/Multires.h"
 #include "core/Micro.h"
+#include "core/FigurePose.h"
 #include "core/MeshTransform.h"
 #include "core/MeshCheck.h"
 #include "core/PathStroke.h"
@@ -861,6 +862,7 @@ CommandRegistry::CommandRegistry() {
          [](Document& doc, const Args&) -> CommandResult {
              if (!doc.undo.undo(doc.mesh, doc.bvh)) return {false, "Nothing to undo"};
              if (UndoRecord* r = doc.undo.lastRedo(); r && r->part) doc.applyPartStep(*r->part);
+             if (UndoRecord* r = doc.undo.lastRedo(); r && r->group) undoGroupOnOtherParts(doc, r->group, true);
              doc.modified = true;
              return {true, "Undone"};
          }});
@@ -869,6 +871,7 @@ CommandRegistry::CommandRegistry() {
          [](Document& doc, const Args&) -> CommandResult {
              if (!doc.undo.redo(doc.mesh, doc.bvh)) return {false, "Nothing to redo"};
              if (UndoRecord* r = doc.undo.lastUndo(); r && r->part) doc.applyPartStep(*r->part);
+             if (UndoRecord* r = doc.undo.lastUndo(); r && r->group) undoGroupOnOtherParts(doc, r->group, false);
              doc.modified = true;
              return {true, "Redone"};
          }});
@@ -896,6 +899,7 @@ CommandRegistry::CommandRegistry() {
     registerDyntopoCommands(*this); // dyntopo (core/DyntopoCommands.cpp)
     registerSculptableCommands(*this); // splat_to_mesh, face_guides (core/Sculptable.h)
     registerTransformCommands(*this); // transform (core/MeshTransform.h)
+    registerFigurePoseCommands(*this); // figure_pose_* (core/FigurePose.h)
     registerExtractMirrorCommands(*this); // extract, mirror_and_weld, mirror (core/ExtractMirror.h)
     registerMeshCheckCommands(*this);     // weld_points, mesh_check, mesh_fix (core/MeshCheck.h)
     registerPerformanceCommands(*this); // perf_info, set_multithreading (core/Benchmark.cpp)

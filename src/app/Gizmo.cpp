@@ -10,6 +10,7 @@
 // or turns the axes only, Alt+click on the model puts the pivot there. The Transform gizmo panel adds numeric entry.
 #include "app/App.h"
 #include "app/Ui.h"
+#include "core/FigurePose.h"
 
 #include <IconsLucide.h>
 
@@ -610,6 +611,7 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
             TransformSession session;
             const glm::vec3 pivot = s.moved() ? glm::vec3(glm::inverse(s.transform) * glm::vec4(gizmo_.pivot, 1.0f)) : gizmo_.pivot;
             if (!session.begin(m, transformWeights(m, gizmo_.useMask, gizmo_.falloff), symmetry_, pivot, layer)) continue;
+            if (i == doc_.activePart && figurePoseEditing(doc_)) session.keepOp(); // a Pose Mesh move (core/FigurePose.h)
             gizmo_.parts.push_back(i);
             gizmo_.sessions.push_back(std::move(session));
         }

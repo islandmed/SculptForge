@@ -13,6 +13,7 @@
 #include "app/I18n.h"
 #include "app/Ui.h"
 #include <IconsLucide.h>
+#include "core/FigurePose.h"
 #include "core/Multires.h"
 #include "render/GL.h"
 
@@ -723,6 +724,22 @@ void App::drawPartsContents() {
                 "but Split groups separates them again.",
                 "Merge", "part_merge_visible");
     ImGui::EndDisabled();
+
+    // Figure Pose (core/FigurePose.h): pose every visible Part through one light Pose Mesh.
+    if (figurePoseActive(doc_)) {
+        if (ImGui::Button(tr("Apply Pose"), ImVec2(half, 0))) runCommand("figure_pose_apply");
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("%s", tr("Give every Part the Pose Mesh's moves at full resolution, as one undo step"));
+        ImGui::SameLine();
+        if (ImGui::Button(tr("Cancel Pose"), ImVec2(half, 0))) runCommand("figure_pose_cancel");
+    } else {
+        ImGui::BeginDisabled(visibleCount < 1);
+        if (ImGui::Button(tr("Pose all Parts"), ImVec2(-1, 0))) runCommand("figure_pose_begin");
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("%s", tr("Pose the visible Parts together on one light Pose Mesh with the Gizmo and masks, "
+                                       "then Apply Pose"));
+    }
 
     // More than one face group? Counted only when the active mesh changes.
     const uint64_t key = (uint64_t(doc_.activePartInfo().id) << 40) ^ (doc_.undo.revision() * 0x9E3779B97F4A7C15ull) ^

@@ -12,6 +12,7 @@
 #include "core/SelectionSets.h"
 #include "core/Texture.h"
 #include "core/ThreadPool.h"
+#include "core/FigurePose.h"
 #include "core/ForgeSpheres.h"
 #include "core/Tube.h"
 #include "io/Zip.h"
@@ -925,7 +926,14 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         const bool active = doc.checkedOut(i);
         Json st = Json::object();
         st.set("name", s.name);
-        st.set("visible", s.visible);
+        // During a Figure Pose the Parts are saved shown as before it, and the Pose Mesh hidden (core/FigurePose.h).
+        bool visible = s.visible;
+        if (doc.figurePose && doc.partIndex(doc.figurePose->poseMesh) >= 0) {
+            visible = false;
+            for (const auto& [id, was] : doc.figurePose->visibility)
+                if (id == s.id) visible = was;
+        }
+        st.set("visible", visible);
         if (s.shading != Shading::Default) st.set("shading", shadingName(s.shading)); // (no format change: optional)
         if (const int f = doc.partFolderIndex(s.folder); f >= 0) st.set("folder", f); // (#96: optional, as shading)
         if (s.moved()) {
