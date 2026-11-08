@@ -1,0 +1,166 @@
+# #164: in Paint mode the Intensity slider sets how strongly paint colours, for every stroke type, with an alpha
+# and without. Intensity 1 must paint far less than Intensity 100 (red over white: the mean green drops).
+# Sculpting keeps its own Intensity; RGB while sculpting paints at the Colour intensity.
+run ui_look look=classic layout=classic        # the top bar from the report: Paint, Drag Stamp, Intensity
+run new_sphere subdivisions=5
+run set_color color=ff0000
+action draw.paint
+expect_value paint_mode == 1
+remember paint_mean_g white_g
+
+# Drag Stamp with the Cobblestone alpha (the report's screenshots).
+run brush_set_alpha name=Cobblestone
+action stroke.type.drag_stamp
+drag_item "##strength" -2000 0
+expect_text Intensity 1
+expect_value rgb_intensity == 1
+stroke 0.35 0.5 0.65 0.5
+remember paint_mean_g low_g
+expect_value paint_mean_g < $white_g
+shot drag-stamp-1
+key ctrl+z
+drag_item "##strength" 2000 0
+expect_text Intensity 100
+expect_value rgb_intensity == 100
+stroke 0.35 0.5 0.65 0.5
+expect_value paint_mean_g < $low_g-0.5
+shot drag-stamp-100
+key ctrl+z
+
+# Every stroke type, with the alpha and without: Intensity 1 vs 100.
+action stroke.type.dots
+drag_item "##strength" -2000 0
+stroke 0.2 0.5 0.8 0.5
+remember paint_mean_g low_g
+key ctrl+z
+drag_item "##strength" 2000 0
+stroke 0.2 0.5 0.8 0.5
+expect_value paint_mean_g < $low_g-0.5
+key ctrl+z
+
+action stroke.type.slide_stamp
+drag_item "##strength" -2000 0
+stroke 0.3 0.5 0.6 0.5
+remember paint_mean_g low_g
+key ctrl+z
+drag_item "##strength" 2000 0
+stroke 0.3 0.5 0.6 0.5
+expect_value paint_mean_g < $low_g-0.5
+key ctrl+z
+
+action stroke.type.spray
+drag_item "##strength" -2000 0
+stroke 0.2 0.5 0.8 0.5
+remember paint_mean_g low_g
+key ctrl+z
+drag_item "##strength" 2000 0
+stroke 0.2 0.5 0.8 0.5
+expect_value paint_mean_g < $low_g-0.5
+key ctrl+z
+
+action stroke.type.lazy
+drag_item "##strength" -2000 0
+stroke 0.1 0.5 0.9 0.5
+remember paint_mean_g low_g
+key ctrl+z
+drag_item "##strength" 2000 0
+stroke 0.1 0.5 0.9 0.5
+expect_value paint_mean_g < $low_g-0.5
+key ctrl+z
+
+# No alpha.
+run brush_set_alpha name=none
+action stroke.type.dots
+drag_item "##strength" -2000 0
+stroke 0.2 0.5 0.8 0.5
+remember paint_mean_g low_g
+key ctrl+z
+drag_item "##strength" 2000 0
+stroke 0.2 0.5 0.8 0.5
+expect_value paint_mean_g < $low_g-0.5
+key ctrl+z
+
+action stroke.type.drag_stamp
+drag_item "##strength" -2000 0
+stroke 0.35 0.5 0.65 0.5
+remember paint_mean_g low_g
+key ctrl+z
+drag_item "##strength" 2000 0
+stroke 0.35 0.5 0.65 0.5
+expect_value paint_mean_g < $low_g-0.5
+key ctrl+z
+expect_value paint_mean_g >= $white_g
+
+# The U slider at the cursor sets the same paint Intensity in Paint mode.
+mouse_move 0.5 0.5
+key u
+expect_text Intensity 100
+key 3
+key 0
+key enter
+expect_value rgb_intensity == 30
+
+# The Draw palette and the Quick Menu show one Intensity in Paint mode (it is the Colour intensity).
+click "Draw##palette.draw"
+expect_text Intensity 30
+expect_no_text Colour intensity
+shot draw-palette-paint
+click "Draw##palette.draw"
+mouse_move 0.5 0.5
+key space
+expect_value quickmenu_open == 1
+expect "##qm_z"
+expect_not "##qm_rgb"
+shot quickmenu-paint
+key escape
+expect_value quickmenu_open == 0
+
+# Sculpting: the top bar's Intensity is the sculpt Intensity again, and Paint's value stays.
+action draw.paint
+expect_value paint_mode == 0
+drag_item "##strength" -2000 0
+expect_value z_intensity == 1
+expect_value rgb_intensity == 30
+drag_item "##strength" 2000 0
+expect_value z_intensity == 100
+
+# RGB while sculpting (Add and Sub): the colour follows the Colour intensity (I in the classic keys), the surface the Intensity.
+action stroke.type.dots
+action draw.rgb
+mouse_move 0.5 0.5
+action ui.rgb_popup
+key 2
+key enter
+expect_value rgb_intensity == 2
+stroke 0.2 0.5 0.8 0.5
+remember paint_mean_g low_g
+key ctrl+z
+action ui.rgb_popup
+key 1
+key 0
+key 0
+key enter
+stroke 0.2 0.5 0.8 0.5
+expect_value paint_mean_g < $low_g-0.5
+key ctrl+z
+# Sub (Alt): Rgb paints back towards white, also at the Colour intensity (over a red fill).
+run paint_fill color=ff0000
+action ui.rgb_popup
+key 2
+key enter
+hold alt
+stroke 0.2 0.5 0.8 0.5
+hold none
+remember paint_mean_g low_g
+key ctrl+z
+action ui.rgb_popup
+key 1
+key 0
+key 0
+key enter
+hold alt
+stroke 0.2 0.5 0.8 0.5
+hold none
+expect_value paint_mean_g > $low_g+0.5
+shot sculpt-rgb-sub
+key ctrl+z

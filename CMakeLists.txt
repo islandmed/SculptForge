@@ -971,6 +971,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(title_version_1440 title_version --size 1440x900)
     sculptforge_ui_test(title_version_1024 title_version --size 1024x768)
     sculptforge_ui_test(tablet_view_speed_1440 tablet_view_speed --size 1440x900)
+    sculptforge_ui_test(paint_intensity_1440 paint_intensity --size 1440x900) # #164: the top bar's Intensity at 1440
     sculptforge_ui_test(tablet_view_speed_1024 tablet_view_speed --size 1024x768)
     # Tool > Geometry's groups at 1440 and 1024 px (tests/ui/geometry_groups.sfui, 100% and 200% inside;
     # tests/ui/narrow/geometry_groups.sfui at 1024: the drop-down palettes).

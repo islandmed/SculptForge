@@ -149,7 +149,8 @@
 //                            paint_layers (paint layers above Base), active_paint_layer (-1 = Base),
 //                            paint_mean_r / paint_mean_g / paint_mean_b (mean displayed vertex paint, sRGB 0-255)
 //                            uvs (1 when the Part has UVs), texture_size (0 = no texture), paint_texture (1 when
-//                            painting goes into the texture), texture_layers, active_texture_layer,
+//                            painting goes into the texture), paint_mode (1: the Paint brush, colour only),
+//                            texture_layers, active_texture_layer,
 //                            texture_painted (texels of the texture composite that aren't white),
 //                            texture_mean_r / texture_mean_g / texture_mean_b (mean composite, sRGB 0-255),
 //                            material_channels (material channels on the texture, base colour not counted),
@@ -614,6 +615,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "last_stroke_dabs") return double(app_.perf_.lastStroke.dabs);
     if (name == "texture_size") return hasTexture(m) ? double(m.texture->width) : 0.0;
     if (name == "paint_texture") return paintsTexture(m) ? 1.0 : 0.0;
+    if (name == "paint_mode") return app_.paintMode_ ? 1.0 : 0.0;
     if (name == "texture_layers") return hasTexture(m) ? double(m.texture->layers.size()) : 0.0;
     if (name == "active_texture_layer") return hasTexture(m) && !m.texture->layers.empty() ? double(m.texture->activeLayer) : -1.0;
     if (name == "auto_uv_running") return app_.autoUv_ ? 1.0 : 0.0;
