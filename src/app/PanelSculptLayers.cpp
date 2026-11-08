@@ -96,8 +96,9 @@ void App::drawLayersContents() {
         ImGui::TableSetupColumn("weight", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("-0.00").x);
         ImGui::TableSetupColumn("play", ImGuiTableColumnFlags_WidthFixed, iconW);
         ImGui::TableSetupColumn("eye", ImGuiTableColumnFlags_WidthFixed, iconW);
-        const ImVec4 selectedTint = ImVec4(style.Colors[ImGuiCol_Header].x, style.Colors[ImGuiCol_Header].y,
-                                           style.Colors[ImGuiCol_Header].z, style.Colors[ImGuiCol_Header].w * 0.45f);
+        // Selected rows besides the active one: a light accent tint, so the selection reads apart from the active row.
+        const ImVec4 accent = style.Colors[ImGuiCol_CheckMark];
+        const ImVec4 selectedTint = ImVec4(accent.x, accent.y, accent.z, 0.22f);
         for (int i = -1; i < count; ++i) {
             const SculptLayer* l = i >= 0 ? &mesh.layers[size_t(i)] : nullptr;
             const std::string name = l ? l->name : tr("Base mesh");
@@ -260,7 +261,7 @@ void App::drawLayersContents() {
 
     // Up / Down, then the layer tools.
     const float arrow = ImGui::GetFrameHeight();
-    const float third = (ImGui::GetContentRegionAvail().x - 2 * arrow - 4 * style.ItemSpacing.x) / 3.0f;
+    const float half2 = (ImGui::GetContentRegionAvail().x - 2 * arrow - 3 * style.ItemSpacing.x) * 0.5f;
     ImGui::BeginDisabled(!cur || act <= 0);
     if (ImGui::ArrowButton("##layerup", ImGuiDir_Up)) runCommand("layer_move", {{"index", double(act)}, {"direction", std::string("up")}});
     ImGui::EndDisabled();
@@ -272,18 +273,15 @@ void App::drawLayersContents() {
     ImGui::EndDisabled();
     ui::HelpText("Move down", nullptr, "Move the active layer down the list (More has Move to bottom).", kLayersPath);
     ImGui::SameLine();
+    if (ImGui::Button(tr("Duplicate##layer"), ImVec2(half2, 0))) runCommand("layer_duplicate", indexArg(act));
+    ui::HelpText("Duplicate", nullptr, "Copy the active layer, offsets and settings, to a new layer below it.", kLayersPath);
+    ImGui::SameLine();
     ImGui::BeginDisabled(!cur || act >= n - 1);
-    if (ImGui::Button(tr("Merge down"), ImVec2(third, 0))) runCommand("layer_merge_down", indexArg(act));
+    if (ImGui::Button(tr("Merge down"), ImVec2(-1, 0))) runCommand("layer_merge_down", indexArg(act));
     ImGui::EndDisabled();
     ui::HelpText("Merge down", nullptr,
                  "Merge the active layer into the one below it, keeping how both look (the result has weight 1).",
                  kLayersPath);
-    ImGui::SameLine();
-    if (ImGui::Button(tr("Duplicate##layer"), ImVec2(third, 0))) runCommand("layer_duplicate", indexArg(act));
-    ui::HelpText("Duplicate", nullptr, "Copy the active layer, offsets and settings, to a new layer below it.", kLayersPath);
-    ImGui::SameLine();
-    if (ImGui::Button(tr("Invert##layer"), ImVec2(-1, 0))) runCommand("layer_invert", indexArg(act));
-    ui::HelpText("Invert", nullptr, "Turn the active layer the opposite way: bumps become dents.", kLayersPath);
     ImGui::EndDisabled();
 
     // Bake / Delete the selection (or the active layer), More.
@@ -300,15 +298,20 @@ void App::drawLayersContents() {
         std::snprintf(deleteLabel, sizeof deleteLabel, "%s###layerdelete", tr("Delete"));
     }
     const float moreW = ImGui::CalcTextSize(ICON_LC_ELLIPSIS).x + 2 * style.FramePadding.x + 8.0f * scale;
-    const float half = (ImGui::GetContentRegionAvail().x - moreW - 2 * style.ItemSpacing.x) * 0.5f;
+    const float third = (ImGui::GetContentRegionAvail().x - moreW - 3 * style.ItemSpacing.x) / 3.0f;
+    ImGui::BeginDisabled(!cur);
+    if (ImGui::Button(tr("Invert##layer"), ImVec2(third, 0))) runCommand("layer_invert", indexArg(act));
+    ui::HelpText("Invert", nullptr, "Turn the active layer the opposite way: bumps become dents.", kLayersPath);
+    ImGui::EndDisabled();
+    ImGui::SameLine();
     ImGui::BeginDisabled(sel.empty());
-    if (ImGui::Button(bakeLabel, ImVec2(half, 0))) runCommand("layer_bake", selArgs);
+    if (ImGui::Button(bakeLabel, ImVec2(third, 0))) runCommand("layer_bake", selArgs);
     ui::HelpText("Bake", nullptr,
                  "Bake the selected layers (or the active one) into the base mesh as they show now, then remove them. "
                  "The shape doesn't change; undo brings the layers back.",
                  kLayersPath);
     ImGui::SameLine();
-    if (ImGui::Button(deleteLabel, ImVec2(half, 0))) runCommand("layer_remove_many", selArgs);
+    if (ImGui::Button(deleteLabel, ImVec2(third, 0))) runCommand("layer_remove_many", selArgs);
     ui::HelpText("Delete", nullptr, "Delete the selected layers (or the active one) on every subdivision level (undoable).",
                  kLayersPath);
     ImGui::EndDisabled();

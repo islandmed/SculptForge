@@ -26,7 +26,7 @@ weighting, playing and exporting layers.
 
 Open **Tool > Layers** in the right tray.
 
-![The Layers sub-palette with a base mesh and two blend shapes](images/layers.jpg)
+![The Layers sub-palette: All layers, three layers with their weight, Play and eye, and the layer tools](images/layers.jpg)
 
 From top to bottom:
 
