@@ -1,0 +1,52 @@
+# A 1024x768 window (100 % and 200 %; CMake): both layouts' right shelves fit with the view toggles as buttons. At a
+# higher display scale (the window 860 logical px wide, 645 tall) the classic column folds them into one View button
+# whose list turns them on and off; shorter still, its buttons shrink to their icons. Nothing on the shelf is ever cut
+# off (Flat and Solo fell off before).
+run ui_look look=forge layout=sculptforge
+run new_sphere subdivisions=4
+key f
+wait 0.3
+expect_value offscreen_items == 0
+expect_value right_column_clipped == 0
+expect "Turntable##view.turntable"
+shot forge
+run ui_look look=classic layout=classic
+wait 0.3
+expect_value offscreen_items == 0
+expect_value right_column_clipped == 0
+expect "Turntable##view.turntable"
+shot classic
+# (At this scale the palette bar and bottom shelf run past the window's width, as before: only the right shelf counts.)
+logical_width 860
+wait 0.5
+expect_value right_column_clipped == 0
+expect "View##widget.view_fold"
+expect_not "Turntable##view.turntable"
+shot classic-folded
+click "View##widget.view_fold"
+expect "Orthographic##fold.view.ortho"
+shot fold-list
+click "Orthographic##fold.view.ortho"
+expect_value camera_ortho == 1
+click "View##widget.view_fold"
+click "Flat shading##fold.view.flat_shading"
+expect_value flat_shading == 1
+wait 0.2
+shot fold-on
+click "View##widget.view_fold"
+click "Flat shading##fold.view.flat_shading"
+expect_value flat_shading == 0
+key numpad5
+expect_value camera_ortho == 0
+expect_value right_column_clipped == 0
+# Shorter still (525 logical px): the buttons shrink to their icons, and nothing is cut off.
+logical_width 700
+wait 0.5
+expect_value right_column_clipped == 0
+expect "View##widget.view_fold"
+shot icons-only
+# Room again (a smaller scale: 1200 logical px wide, 900 tall): the buttons return.
+logical_width 1200
+wait 0.5
+expect "Turntable##view.turntable"
+expect_value offscreen_items == 0

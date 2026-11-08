@@ -264,6 +264,8 @@ unmasked area with the main colour.
   lock** sets it.
 - **Ortho** (<kbd>Numpad 5</kbd>): an orthographic view (on) or perspective (off).
 - **Floor**: the floor grid under the model, as **View > Floor grid**.
+- In a window too short for all of them, Turn, Ortho, Floor and Flat fold into one **View** button: click it for
+  their list.
 - **Wire** (<kbd>Shift</kbd>+<kbd>F</kbd>): shows the mesh's polygons: quads as quads, triangles as triangles.
 - **Groups**: colours each face group.
 - **Mask** (<kbd>Ctrl</kbd>+<kbd>H</kbd>): shows or hides the mask's darkening (on by default). Hiding it keeps
