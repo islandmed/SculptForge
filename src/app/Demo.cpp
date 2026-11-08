@@ -644,15 +644,19 @@ void Demo::drawOverlay() {
         dl->AddText(f, fs * iz, P(p.x, p.y), IM_COL32(255, 200, 150, 255), text);
     }
 
-    // Cursor arrow (it zooms with the picture, but less, so it never looms).
-    const float s = size.y / 1080.0f * 1.15f / std::sqrt(vz);
-    const ImVec2 m = mouse_;
-    const ImVec2 pts[] = {ImVec2(m.x, m.y), ImVec2(m.x, m.y + 22 * s), ImVec2(m.x + 5.5f * s, m.y + 16.5f * s),
-                          ImVec2(m.x + 9.5f * s, m.y + 25 * s), ImVec2(m.x + 13 * s, m.y + 23.5f * s),
-                          ImVec2(m.x + 9 * s, m.y + 15 * s), ImVec2(m.x + 16 * s, m.y + 15 * s)};
-    dl->AddConcavePolyFilled(pts, 7, IM_COL32(255, 255, 255, 255));
-    dl->AddPolyline(pts, 7, IM_COL32(0, 0, 0, 255), ImDrawFlags_Closed, 1.5f * s);
-    if (buttonDown_) dl->AddCircle(m, 14.0f * s, IM_COL32(255, 160, 80, 220), 32, 2.5f * s);
+    // Cursor arrow (it zooms with the picture, but less, so it never looms). SF_DEMO_NO_POINTER=1 leaves it out (launch
+    // reels and stills show only the app).
+    static const bool noPointer = std::getenv("SF_DEMO_NO_POINTER") != nullptr;
+    if (!noPointer) {
+        const float s = size.y / 1080.0f * 1.15f / std::sqrt(vz);
+        const ImVec2 m = mouse_;
+        const ImVec2 pts[] = {ImVec2(m.x, m.y), ImVec2(m.x, m.y + 22 * s), ImVec2(m.x + 5.5f * s, m.y + 16.5f * s),
+                              ImVec2(m.x + 9.5f * s, m.y + 25 * s), ImVec2(m.x + 13 * s, m.y + 23.5f * s),
+                              ImVec2(m.x + 9 * s, m.y + 15 * s), ImVec2(m.x + 16 * s, m.y + 15 * s)};
+        dl->AddConcavePolyFilled(pts, 7, IM_COL32(255, 255, 255, 255));
+        dl->AddPolyline(pts, 7, IM_COL32(0, 0, 0, 255), ImDrawFlags_Closed, 1.5f * s);
+        if (buttonDown_) dl->AddCircle(m, 14.0f * s, IM_COL32(255, 160, 80, 220), 32, 2.5f * s);
+    }
 
     // Fade to and from black (seamless loops on the website).
     if (const float f = fade(); f > 0.001f)
