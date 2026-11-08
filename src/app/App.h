@@ -2416,6 +2416,10 @@ private:
     void drawHintsSection();
     // Intensity (0-100 on screen): Smooth's own while Shift is held or Smooth is the brush.
     void drawZIntensitySlider(const char* id);
+    // The value every Intensity slider sets (top bar, Draw palette, Quick Menu, U): Smooth's own, the Paint brush's
+    // Colour intensity (#164: painting reads it, so in Paint mode Intensity is how strongly paint colours), or the
+    // sculpt Intensity.
+    float& intensityValue(bool smooth) { return smooth ? smoothStrength_ : paintMode_ ? rgbIntensity_ : strength_; }
     void openQuickMenu();
     void quickMenuKeyUp();   // Space released: a hold closes the menu, a tap leaves it open
     // A right click on the canvas (pressed and let go without moving past kRightClickSlop) opens the QuickMenu

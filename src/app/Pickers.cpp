@@ -1367,7 +1367,8 @@ void drawPickers(App& app) {
             float* value;
             float lo, hi, shownScale;
         };
-        float* z = s.sliderSmooth ? &app.smoothStrength_ : &app.strength_;
+        float* z = &app.intensityValue(s.sliderSmooth); // (in Paint mode the Colour intensity, #164)
+        const bool paintZ = app.paintMode_ && !s.sliderSmooth;
         const Def d = which == PickerUi::Slider::DrawSize
                           ? Def{"Size", "S",
                                 "Brush radius in screen pixels. Drag, or type a number and press Enter. [ and ] also "
@@ -1377,8 +1378,10 @@ void drawPickers(App& app) {
                           ? Def{s.sliderSmooth ? "Smooth Intensity" : "Intensity", "U",
                                 s.sliderSmooth ? "How strongly Smooth works (it keeps its own value: hold "
                                                  "Shift and press U to set it). Type a number and press Enter."
-                                               : "How strongly the brush changes the surface (1-100). Drag, or type a "
-                                                 "number and press Enter.",
+                                : paintZ ? "How strongly painting colours the surface (1-100). Drag, or type a number "
+                                           "and press Enter."
+                                         : "How strongly the brush changes the surface (1-100). Drag, or type a "
+                                           "number and press Enter.",
                                 z, 0.01f, 1.0f, 100.0f}
                       : which == PickerUi::Slider::RgbIntensity
                           ? Def{"Colour intensity", "I",

@@ -394,10 +394,12 @@ void App::drawPalette_Draw() {
     ui::ActionButton(*this, "brush.world_size", ImVec2(-1, 0));
     ImGui::SetNextItemWidth(-1);
     drawZIntensitySlider("##strength");
-    ImGui::SetNextItemWidth(-1);
-    float rgb = rgbIntensity_ * 100.0f;
-    if (ui::SliderInside("##rgbintensity", &rgb, 1.0f, 100.0f, "Colour intensity %.0f")) rgbIntensity_ = rgb / 100.0f;
-    ui::HelpText("Colour intensity", "I", "How strongly painting colours the surface (1-100); Ctrl+click to type.", "Draw");
+    if (!paintMode_) { // (in Paint mode the Intensity above is the Colour intensity, #164)
+        ImGui::SetNextItemWidth(-1);
+        float rgb = rgbIntensity_ * 100.0f;
+        if (ui::SliderInside("##rgbintensity", &rgb, 1.0f, 100.0f, "Colour intensity %.0f")) rgbIntensity_ = rgb / 100.0f;
+        ui::HelpText("Colour intensity", "I", "How strongly painting colours the surface (1-100); Ctrl+click to type.", "Draw");
+    }
     ImGui::SetNextItemWidth(-1);
     float focal = focalShift_ * 100.0f;
     if (ui::SliderInside("##focalshift", &focal, -100.0f, 100.0f, "Falloff %.0f")) focalShift_ = focal / 100.0f;
