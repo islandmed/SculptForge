@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // sf_remesh_bench: times every remesh path at the UI defaults on spheres of a given size (tests/perf, docs/testing-flow.md).
-//   sf_remesh_bench [--runs N] [--tris 1000,10000,...] [--paths qr2,legacy,voxel] [--bumpy] [--shape sphere|cube|torus|starter:<id>]
+//   sf_remesh_bench [--runs N] [--tris 1000,10000,...] [--paths qr2,legacy,voxel] [--bumpy] [--shape sphere|cube|torus|horn|starter:<id>]
 //                   [--target Q] [--voxel-res R]
 // One CSV row per run on stdout: path, input triangles, run, total ms, the time between progress marks (stages), the
 // output size and the Hausdorff / mean distance to the input (% of the bounding-box diagonal, quadQuality).
@@ -31,7 +31,7 @@ using Clock = std::chrono::steady_clock;
 double ms(Clock::time_point a, Clock::time_point b) { return std::chrono::duration<double, std::milli>(b - a).count(); }
 
 // A quad sphere with about `tris` triangles (6 r^2 quads); bumpy: a few octaves of sine ridges, like a rough sculpt.
-// cube: hard edges and corners (feature lines); torus: genus one; starter:<id>: a starter mesh's biggest part (real
+// cube: hard edges and corners (feature lines); torus: genus one; horn: long, flat and thin-tipped; starter:<id>: a starter mesh's biggest part (real
 // sculpt forms: bust, heads, hand), divided until it has about `tris` triangles.
 Mesh sphere(size_t tris, bool bumpy, const std::string& shape) {
     if (shape.rfind("starter:", 0) == 0) {
@@ -56,6 +56,15 @@ Mesh sphere(size_t tris, bool bumpy, const std::string& shape) {
         return m;
     }
     Mesh m = makeQuadSphere(r, 2.0f);
+    if (shape == "horn") { // a thin curved horn, 2455 x 691 x 149 like Oslen's Part (Discord): tapering to a ~4 mm tip
+        for (glm::vec3& p : m.positions) {
+            const glm::vec3 n = glm::normalize(p);
+            const float t = 0.5f * (n.y + 1.0f), taper = 1.0f - 0.95f * t;
+            p = {600.0f * t * t + 345.0f * n.x * taper, 2455.0f * t, 75.0f * n.z * taper};
+        }
+        m.recomputeAllNormals();
+        return m;
+    }
     if (bumpy) {
         for (glm::vec3& p : m.positions) {
             const glm::vec3 n = glm::normalize(p);
@@ -106,7 +115,7 @@ int main(int argc, char** argv) {
         else if (a == "--shape" && more) shape = argv[++i];
         else {
             std::fprintf(stderr, "usage: sf_remesh_bench [--runs N] [--tris a,b,c] [--paths qr2,legacy,voxel] [--bumpy] "
-                                 "[--shape sphere|cube|torus|starter:<id>] [--target Q] [--voxel-res R]\n");
+                                 "[--shape sphere|cube|torus|horn|starter:<id>] [--target Q] [--voxel-res R]\n");
             return 2;
         }
     }
@@ -149,6 +158,13 @@ int main(int argc, char** argv) {
                     o.targetQuads = target;
                     QRemeshStats st;
                     ok = qremesh(src, o, out, error, mark, &st);
+                    if (const char* dump = std::getenv("SF_BENCH_DUMP")) { // SF_BENCH_DUMP=<file>: the (last) result as OBJ
+                        if (std::FILE* fo = std::fopen(dump, "w")) {
+                            for (const glm::vec3& q : out.positions) std::fprintf(fo, "v %g %g %g\n", q.x, q.y, q.z);
+                            for (const glm::uvec3& q : out.triangles) std::fprintf(fo, "f %u %u %u\n", q.x + 1, q.y + 1, q.z + 1);
+                            std::fclose(fo);
+                        }
+                    }
                     q = st.quality;
                 }
                 const double total = ms(t0, Clock::now());
