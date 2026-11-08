@@ -321,10 +321,152 @@ def keep_faces(m, pred):
                         stack.append(o)
         if len(piece) > len(best):
             best = piece
-    faces = [faces[i] for i in sorted(best)]
+    faces = snap_to_edge_loops(m, [faces[i] for i in sorted(best)])
     used = sorted({i for f in faces for i in f})
     remap = {old: new for new, old in enumerate(used)}
     return Mesh([m.verts[i] for i in used], [tuple(remap[i] for i in f) for f in faces])
+
+
+def edge_key(a, b): return (min(a, b), max(a, b))
+
+
+def snap_to_edge_loops(m, faces):
+    """A cut by face centroids steps between two rings of the mesh where the rings tilt across it, and every
+    step is a corner on the open rim that subdivision pulls into a spike. Each open rim moves to the closed edge
+    loop of `m` (through regular four-face vertices) that shares the most edges with it, and the piece is
+    re-grown up to the new rims; a rim with no such loop (the ear's patch) stays as cut."""
+    by_edge = defaultdict(list)
+    for fi, f in enumerate(m.faces):
+        for a, b in zip(f, f[1:] + f[:1]):
+            by_edge[edge_key(a, b)].append(fi)
+    nbrs = defaultdict(set)
+    for a, b in by_edge:
+        nbrs[a].add(b)
+        nbrs[b].add(a)
+    valence = Counter(v for f in m.faces for v in f)
+
+    def walk(a, b):
+        loop = [a, b]
+        while True:
+            p, c = loop[-2], loop[-1]
+            if len(nbrs[c]) != 4 or valence[c] != 4:
+                return None
+            sides = set(by_edge[edge_key(p, c)])
+            ahead = [n for n in nbrs[c] if n != p and not sides & set(by_edge[edge_key(c, n)])]
+            if len(ahead) != 1:
+                return None
+            if ahead[0] == loop[0]:
+                return loop
+            if ahead[0] in loop:
+                return None
+            loop.append(ahead[0])
+
+    edges = Counter()
+    for f in faces:
+        for a, b in zip(f, f[1:] + f[:1]):
+            edges[edge_key(a, b)] += 1
+    rim = {e for e, c in edges.items() if c == 1}
+    next_of = defaultdict(list)
+    for a, b in rim:
+        next_of[a].append(b)
+        next_of[b].append(a)
+    inside = {tuple(f) for f in faces}
+    index = {tuple(f): fi for fi, f in enumerate(m.faces)}
+
+    def grow(walls):
+        """From the cut piece's faces across every edge that is not a wall; the side that holds most of it."""
+        seen = [False] * len(m.faces)
+        best, best_overlap = [], -1
+        for start in sorted(index[f] for f in inside):
+            if seen[start]:
+                continue
+            stack, piece = [start], []
+            seen[start] = True
+            while stack:
+                fi = stack.pop()
+                piece.append(fi)
+                f = m.faces[fi]
+                for a, b in zip(f, f[1:] + f[:1]):
+                    k = edge_key(a, b)
+                    if k in walls:
+                        continue
+                    for o in by_edge[k]:
+                        if not seen[o]:
+                            seen[o] = True
+                            stack.append(o)
+            overlap = sum(1 for fi in piece if tuple(m.faces[fi]) in inside)
+            if overlap > best_overlap:
+                best, best_overlap = piece, overlap
+        return [m.faces[fi] for fi in sorted(best)]
+
+    def bounds_of(fs):
+        vs = [m.verts[v] for f in fs for v in f]
+        return length(sub(tuple(max(p[k] for p in vs) for k in range(3)), tuple(min(p[k] for p in vs) for k in range(3))))
+
+    size = bounds_of(faces)
+    walls, tried = set(rim), set()
+    for e in sorted(rim):
+        if e in tried:
+            continue
+        # This rim's edges (walking the open boundary from e).
+        part, stack = {e}, [e[0], e[1]]
+        seen_v = set(stack)
+        while stack:
+            v = stack.pop()
+            for n in next_of[v]:
+                part.add(edge_key(v, n))
+                if n not in seen_v:
+                    seen_v.add(n)
+                    stack.append(n)
+        tried |= part
+        # Candidate loops of about the rim's length, closest to it on average first, within two of its edges.
+        rim_verts = [m.verts[v] for v in seen_v]
+        lens = sorted(length(sub(m.verts[a], m.verts[b])) for a, b in part)
+        reach = 2.0 * lens[len(lens) // 2]
+        candidates = {}
+        for a, b in sorted(part):
+            loop = walk(a, b)
+            if loop is None or len(loop) * 4 < len(part) * 3 or frozenset(loop) in candidates:
+                continue
+            dist = sum(min(length(sub(m.verts[v], r)) for r in rim_verts) for v in loop) / len(loop)
+            if dist < reach:
+                candidates[frozenset(loop)] = (dist, {edge_key(x, y) for x, y in zip(loop, loop[1:] + loop[:1])})
+        # The first that, in place of the rim, still closes the piece off at about its size.
+        for dist, loop_edges in sorted(candidates.values(), key=lambda c: (c[0], sorted(c[1]))):
+            trial = (walls - part) | loop_edges
+            piece = grow(trial)
+            if abs(len(piece) - len(faces)) * 5 < len(faces) and abs(bounds_of(piece) - size) * 10 < size:
+                walls = trial
+                break
+    return grow(walls)
+
+
+def relax_rim(m, iterations=6, rings=2):
+    """Smooths a patch's open rim where no edge loop runs round it (the ear's skin): each pass moves every rim
+    vertex halfway to the mean of its two rim neighbours, and every vertex up to `rings` in from it halfway to
+    the mean of its neighbours. What lies further in keeps its shape."""
+    edges = Counter(edge_key(a, b) for f in m.faces for a, b in zip(f, f[1:] + f[:1]))
+    nbrs, rim_nbrs = defaultdict(list), defaultdict(list)
+    for (a, b), c in sorted(edges.items()):
+        nbrs[a].append(b)
+        nbrs[b].append(a)
+        if c == 1:
+            rim_nbrs[a].append(b)
+            rim_nbrs[b].append(a)
+    depth = {v: 0 for v in rim_nbrs}
+    front = sorted(rim_nbrs)
+    for r in range(1, rings + 1):
+        front = sorted({n for v in front for n in nbrs[v] if n not in depth})
+        depth.update((n, r) for n in front)
+    verts = list(m.verts)
+    for _ in range(iterations):
+        moved = list(verts)
+        for v, d in depth.items():
+            ns = rim_nbrs[v] if d == 0 else nbrs[v]
+            mean = mul(tuple(sum(verts[n][k] for n in ns) for k in range(3)), 1.0 / len(ns))
+            moved[v] = tuple(lerp(verts[v][k], mean[k], 0.5) for k in range(3))
+        verts = moved
+    return Mesh(verts, m.faces)
 
 
 def plane_side(point, normal):
@@ -366,10 +508,10 @@ def human_parts(body, j):
     chest_y = j["spine-1"][1] - 4.0
     out["bust"] = [keep_faces(body, lambda p: p[1] > chest_y and not arm(p, 0.33, 9.0))]
 
-    # Torso: neck to upper thighs, arms off at the shoulder.
+    # Torso: neck to upper thighs (one clean ring round each), arms cut near the top of the upper arm.
     top_y = j["neck"][1] - 1.0
-    hip_y = j["l-upper-leg"][1] - 9.0
-    out["torso"] = [keep_faces(body, lambda p: hip_y < p[1] < top_y and not arm(p, 0.1, 8.0))]
+    hip_y = j["l-upper-leg"][1] - 12.0
+    out["torso"] = [keep_faces(body, lambda p: hip_y < p[1] < top_y and not arm(p, 0.3, 8.0))]
 
     out["full-body"] = [body]
 
@@ -402,7 +544,8 @@ def human_parts(body, j):
         d = sub(p, ear_c)
         return p[0] > ear_c[0] - 1.2 and (d[1] / 4.0) ** 2 + (d[2] / 2.9) ** 2 < 1.0
 
-    ear = keep_faces(body, ear_pred)
+    # The skin round it is an ellipse across the head's grid, so its rim steps: relaxed into an even curve.
+    ear = relax_rim(keep_faces(body, ear_pred))
     # Ear lying open to the viewer: rotate the outward (+X) side to face +Z.
     out["ear"] = [ear.transformed(lambda v: (-(v[2] - ear_c[2]), v[1], v[0] - ear_c[0]))]
     return out

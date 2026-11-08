@@ -8,3 +8,6 @@ tests/data/** -text
 # coordinator checks the order of the merged result before tagging).
 CHANGELOG.md merge=union
 docs/guide/whats-new.md merge=union
+# Compressed starter meshes: always binary, even when a file's first 8000 bytes hold no NUL (capsule.sfproj.z), so
+# diffs and the push checks never read them as text.
+*.sfproj.z binary
