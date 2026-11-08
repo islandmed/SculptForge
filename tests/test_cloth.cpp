@@ -119,6 +119,167 @@ TEST(cloth_drapes_over_a_sphere_and_rests) {
     CHECK(r.positions[0].y < 0.0f); // a corner hangs below the equator
 }
 
+namespace {
+
+// A collider made of boxes (12 triangles each, outward faces): lo..hi corners.
+void addBox(std::vector<glm::vec3>& pos, std::vector<glm::uvec3>& tris, glm::vec3 lo, glm::vec3 hi) {
+    const uint32_t b = uint32_t(pos.size());
+    for (int i = 0; i < 8; ++i) pos.push_back({i & 1 ? hi.x : lo.x, i & 2 ? hi.y : lo.y, i & 4 ? hi.z : lo.z});
+    const uint32_t f[12][3] = {{0, 2, 1}, {1, 2, 3}, {4, 5, 6}, {5, 7, 6}, {0, 1, 4}, {1, 5, 4},
+                               {2, 6, 3}, {3, 6, 7}, {0, 4, 2}, {2, 4, 6}, {1, 3, 5}, {3, 7, 5}};
+    for (const auto& t : f) tris.push_back(glm::uvec3(b + t[0], b + t[1], b + t[2]));
+}
+
+// The cloth's height above (x, z): the triangle under that point, interpolated (false: none).
+bool clothHeightAt(const std::vector<glm::vec3>& x, const std::vector<glm::uvec3>& tris, float px, float pz, float& y) {
+    for (const glm::uvec3& t : tris) {
+        const glm::vec2 a(x[t.x].x, x[t.x].z), b(x[t.y].x, x[t.y].z), c(x[t.z].x, x[t.z].z), p(px, pz);
+        const float den = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
+        if (std::abs(den) < 1e-12f) continue;
+        const float u = ((b.y - c.y) * (p.x - c.x) + (c.x - b.x) * (p.y - c.y)) / den;
+        const float v = ((c.y - a.y) * (p.x - c.x) + (a.x - c.x) * (p.y - c.y)) / den;
+        if (u < 0.0f || v < 0.0f || u + v > 1.0f) continue;
+        y = u * x[t.x].y + v * x[t.y].y + (1.0f - u - v) * x[t.z].y;
+        return true;
+    }
+    return false;
+}
+
+} // namespace
+
+TEST(cloth_thin_features_stay_under_the_cloth) {
+    // Needles 2 mm square and 3 cm tall on a floor, thinner than the 1 cm particle spacing, placed between particles:
+    // the sheet dropped on them tents over every needle it covers; none pokes through between particles.
+    std::vector<glm::vec3> pos;
+    std::vector<glm::uvec3> tris;
+    addBox(pos, tris, {-0.5f, -0.02f, -0.5f}, {0.5f, 0.0f, 0.5f});
+    std::vector<glm::vec3> tips;
+    for (int i = -3; i <= 3; ++i)
+        for (int k = -3; k <= 3; ++k) {
+            const glm::vec3 c(0.04f * float(i) + 0.0037f, 0.0f, 0.04f * float(k) + 0.0041f);
+            addBox(pos, tris, c - glm::vec3(0.001f, 0.0f, 0.001f), c + glm::vec3(0.001f, 0.03f, 0.001f));
+            tips.push_back(c + glm::vec3(0.0f, 0.03f, 0.0f));
+        }
+    ClothColliders colliders;
+    colliders.add(pos, tris);
+    colliders.build();
+    ClothSetup s = sheet(40, 0.4f, 0.06f); // 1 cm spacing
+    DrapeOptions opt;
+    opt.maxFrames = 400;
+    const DrapeResult r = drapeToRest(s, colliders, fabricPreset(FabricPreset::Silk), opt);
+    int covered = 0, through = 0;
+    for (const glm::vec3& tip : tips) {
+        float y;
+        if (!clothHeightAt(r.positions, s.triangles, tip.x, tip.z, y)) continue;
+        ++covered;
+        if (y < tip.y) ++through;
+    }
+    std::printf("  needles: %d frames, %d covered, %d through the cloth\n", r.frames, covered, through);
+    CHECK(covered >= 25);
+    CHECK(through == 0);
+}
+
+// A closed tube (8 sides, `r` round) along a path: rings at each point, capped at both ends.
+void addTube(std::vector<glm::vec3>& pos, std::vector<glm::uvec3>& tris, const std::vector<glm::vec3>& path, float r) {
+    constexpr int kSides = 8;
+    const uint32_t b = uint32_t(pos.size());
+    for (size_t i = 0; i < path.size(); ++i) {
+        const glm::vec3 t = glm::normalize(path[std::min(i + 1, path.size() - 1)] - path[i > 0 ? i - 1 : 0]);
+        const glm::vec3 u = glm::normalize(glm::cross(t, std::abs(t.y) < 0.9f ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0)));
+        const glm::vec3 v = glm::cross(t, u);
+        for (int k = 0; k < kSides; ++k) {
+            const float a = 6.2831853f * float(k) / float(kSides);
+            pos.push_back(path[i] + (u * std::cos(a) + v * std::sin(a)) * r);
+        }
+    }
+    const uint32_t n = uint32_t(path.size());
+    for (uint32_t i = 0; i + 1 < n; ++i)
+        for (uint32_t k = 0; k < kSides; ++k) {
+            const uint32_t a = b + i * kSides + k, c = b + i * kSides + (k + 1) % kSides;
+            tris.push_back({a, c, a + kSides});
+            tris.push_back({c, c + kSides, a + kSides});
+        }
+    const uint32_t c0 = uint32_t(pos.size()), c1 = c0 + 1;
+    pos.push_back(path.front());
+    pos.push_back(path.back());
+    for (uint32_t k = 0; k < kSides; ++k) {
+        tris.push_back({c0, b + (k + 1) % kSides, b + k});
+        tris.push_back({c1, b + (n - 1) * kSides + k, b + (n - 1) * kSides + (k + 1) % kSides});
+    }
+}
+
+TEST(cloth_curls_stay_under_a_fast_sheet) {
+    // Hooked curls 8 mm thick (a beard's locks), 2.5 cm apart, under a sheet with 1 cm spacing dropped from 30 cm
+    // (over 2 m/s when it lands: several edge lengths a frame). The sheet tents over every curl; none ends above it.
+    std::vector<glm::vec3> pos;
+    std::vector<glm::uvec3> tris;
+    addBox(pos, tris, {-0.5f, -0.02f, -0.5f}, {0.5f, 0.0f, 0.5f});
+    std::vector<glm::vec3> tops;
+    for (int i = -3; i <= 3; ++i)
+        for (int k = -3; k <= 3; ++k) {
+            const glm::vec3 c(0.025f * float(i) + 0.003f, 0.0f, 0.025f * float(k) + 0.004f);
+            std::vector<glm::vec3> path;
+            for (int j = 0; j <= 4; ++j) path.push_back(c + glm::vec3(0.0f, 0.01f * float(j), 0.0f));
+            for (int j = 1; j <= 6; ++j) {
+                const float a = 1.5707963f * float(j) / 6.0f; // (the hook: a quarter turn, 1.2 cm round, toward +x)
+                path.push_back(c + glm::vec3(0.012f * (1.0f - std::cos(a)), 0.04f + 0.012f * std::sin(a), 0.0f));
+            }
+            const size_t first = pos.size();
+            addTube(pos, tris, path, 0.004f);
+            glm::vec3 top = pos[first]; // (its highest vertex)
+            for (size_t q = first; q < pos.size(); ++q)
+                if (pos[q].y > top.y) top = pos[q];
+            tops.push_back(top);
+        }
+    ClothColliders colliders;
+    colliders.add(pos, tris);
+    colliders.build();
+    ClothSetup s = sheet(40, 0.4f, 0.36f);
+    DrapeOptions opt;
+    opt.maxFrames = 400;
+    const DrapeResult r = drapeToRest(s, colliders, fabricPreset(FabricPreset::Cotton), opt);
+    int covered = 0, through = 0;
+    for (const glm::vec3& top : tops) {
+        float y;
+        if (!clothHeightAt(r.positions, s.triangles, top.x, top.z, y)) continue;
+        ++covered;
+        if (y < top.y) ++through;
+    }
+    std::printf("  curls: %d frames, %d covered, %d through the cloth\n", r.frames, covered, through);
+    CHECK(covered >= 25);
+    CHECK(through == 0);
+}
+
+TEST(cloth_fast_particle_does_not_pass_a_thin_shelf) {
+    // A sheet falling beside a wall (its nearest contact all frame) past a 1 mm shelf sticking out of it: falling
+    // fast, it crosses the shelf within one frame; it must land on the shelf, not pass it.
+    std::vector<glm::vec3> pos;
+    std::vector<glm::uvec3> tris;
+    addBox(pos, tris, {-0.01f, -0.3f, -0.2f}, {0.0f, 0.3f, 0.2f});    // the wall, its face at x = 0
+    addBox(pos, tris, {0.0f, -0.001f, -0.2f}, {0.1f, 0.0f, 0.2f});    // the shelf, its top at y = 0
+    ClothColliders colliders;
+    colliders.add(pos, tris);
+    colliders.build();
+    ClothSetup s = sheet(4, 0.04f, 0.0f);
+    for (glm::vec3& p : s.positions) p += glm::vec3(0.025f, 0.2f, 0.0f);
+    ClothSettings settings;
+    settings.substeps = 2;
+    settings.gravity = glm::vec3(0.0f, -200.0f, 0.0f);
+    ClothSim sim;
+    CHECK(sim.init(s, fabricPreset(FabricPreset::Cotton), settings));
+    sim.setColliders(&colliders);
+    float fastest = 0.0f;
+    for (int f = 0; f < 60; ++f) {
+        sim.step();
+        fastest = std::max(fastest, sim.maxSpeed());
+    }
+    float lowest = 1e9f;
+    for (const glm::vec3& p : sim.positions()) lowest = std::min(lowest, p.y);
+    std::printf("  shelf: fastest %.1f m/s (%.1f mm a frame), lowest particle y %.4f\n", fastest, fastest / 60.0f * 1000.0f, lowest);
+    CHECK(fastest / 60.0f > 0.005f); // (more than the shelf and the thickness in one frame)
+    CHECK(lowest > -0.0005f);
+}
+
 TEST(cloth_same_result_on_any_thread_count) {
     const Mesh ball = makeIcosphere(3, 0.3f);
     ClothColliders colliders;

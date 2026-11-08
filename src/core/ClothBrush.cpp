@@ -184,6 +184,7 @@ void Sculptor::dabCloth(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym) 
         fabric.thickness = 0.25f * L;
         ClothSettings settings;
         settings.frameSeconds = kFrame;
+        settings.thinFeatures = false; // (per-dab cost: the brush keeps the plain contacts)
         settings.substeps = kSubsteps;
         settings.restFrames = 1 << 30; // (the brush never stops on rest)
         settings.gravity = glm::vec3(0.0f);
@@ -244,6 +245,7 @@ void Sculptor::dabCloth(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym) 
     const float g = set.mode == ClothBrushMode::Settle ? std::max(0.5f, set.gravity) : std::clamp(set.gravity, 0.0f, 1.0f);
     ClothSettings settings;
     settings.frameSeconds = kFrame;
+    settings.thinFeatures = false; // (per-dab cost: the brush keeps the plain contacts)
     settings.substeps = kSubsteps;
     // Big regions take fewer passes and steps so a dab stays within the brush lag bars (3k vertices, 4 passes: ~5 ms).
     const size_t n = cs.verts.size();
