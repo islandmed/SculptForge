@@ -10,6 +10,8 @@
 #include "core/Document.h"
 #include "core/GarmentTemplates.h"
 
+#include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <map>
 #include <random>
@@ -117,6 +119,38 @@ TEST(garment_mirrored_panel_sews_back_to_its_original) {
             CHECK(std::abs(a.x + b.x) < 0.01f && std::abs(a.y - b.y) < 0.01f);
         }
     }
+}
+
+TEST(garment_template_edges_are_named) {
+    // Every edge of every template has a name (seams read "Left sleeve cuff <-> ...", never "edge 3"), and a mirrored
+    // panel's edge keeps the name of the edge it mirrors.
+    for (const TemplateSpec& t : templateSpecs()) {
+        Pattern pat;
+        std::string error;
+        CHECK(makeTemplate(t.id, SizeChart{}, 0.0f, pat, error));
+        for (uint32_t i = 0; i < pat.panels.size(); ++i) {
+            const Panel& p = pat.panels[i];
+            const bool all = p.edgeNames.size() == p.points.size() &&
+                             std::all_of(p.edgeNames.begin(), p.edgeNames.end(), [](const std::string& n) { return !n.empty(); });
+            if (!all) std::printf("  %s: %s has unnamed edges\n", t.id, p.name.c_str());
+            CHECK(all);
+        }
+        for (const Seam& sm : pat.seams) {
+            // (an unnamed edge reads "<panel> edge <number>")
+            const std::string names = checkSeam(pat, sm).names;
+            bool numbered = false;
+            for (size_t at = names.find(" edge "); at != std::string::npos; at = names.find(" edge ", at + 1))
+                numbered = numbered || (at + 6 < names.size() && std::isdigit((unsigned char)names[at + 6]));
+            if (numbered) std::printf("  %s: %s\n", t.id, names.c_str());
+            CHECK(!numbered);
+        }
+    }
+    Pattern pat;
+    std::string error;
+    CHECK(makeTemplate("trousers", SizeChart{}, 0.0f, pat, error));
+    const Panel m = mirroredPanel(pat.panels[0]);
+    const uint32_t n = uint32_t(m.points.size());
+    for (uint32_t e = 0; e < n; ++e) CHECK(m.edgeNames[mirrorEdge(n, e)] == pat.panels[0].edgeNames[e]);
 }
 
 TEST(garment_templates_are_sound_at_any_size) {
