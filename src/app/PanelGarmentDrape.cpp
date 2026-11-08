@@ -288,8 +288,8 @@ void App::drawGarmentDrapeSection() {
     ui::HelpText("Place panels", nullptr,
                  "Click the body once for each panel: it sits a little in front of the click, facing you, its top "
                  "up the screen. Place each panel slightly in front of the body at its widest point, from the view "
-                 "that faces it (the back from behind, a sleeve from the side). Cloth dropped from above settles behind "
-                 "overhangs like a chin or a beard.",
+                 "that faces it: a front panel on the front of the chest, the back from behind, a sleeve on the upper "
+                 "arm from its side. Cloth dropped from above settles behind overhangs like a chin or a beard.",
                  kPath);
     if (garmentPlacing_ >= 0 && garmentPlacing_ < int(pat.panels.size())) {
         ImGui::PushTextWrapPos(0.0f);
