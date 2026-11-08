@@ -781,8 +781,8 @@ void App::initActions() {
         "Version, licence and the open-source components SculptForge is built with.");
     add("help.support", "Support SculptForge...", "Help", nullptr, [this] { openSupportPage(); }, ICON_LC_HEART, nullptr,
         nullptr, nullptr,
-        "SculptForge is free and stays free. A membership adds betas and early builds, Member Requests (ask "
-        "for a brush or an alpha), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in your browser. Nothing in the app changes either way.");
+        "SculptForge is free and stays free. A membership adds betas and early builds, Member Requests (one request "
+        "a month, built first and credited to you), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in your browser. Nothing in the app changes either way.");
     add("help.discord", "Join the Discord...", "Help", nullptr, [this] { openDiscordPage(); }, ICON_LC_MESSAGE_CIRCLE,
         nullptr, nullptr, nullptr,
         "The official SculptForge community on Discord: questions, tips and work in progress. Opens the invite in "

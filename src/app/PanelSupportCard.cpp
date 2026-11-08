@@ -329,7 +329,7 @@ void App::drawSupportCard() {
     const Tier kTiers[2] = {
         {"Member", "$5", "/ month",
          {"Betas and early builds of the next version", "The monthly feature vote: pick what we build next",
-          "Member Requests: ask for a brush, alpha or material", "The members' channel on Discord",
+          "Member Requests: one a month, built first, credited to you", "The members' channel on Discord",
           "Your name in the credits, in the app and on the website"},
          "Become a member", "Become a member##card.member", kSupportUrlMember, yearly ? "or $48 a year" : nullptr},
         {"Studio", "$300", "/ month",

@@ -1286,11 +1286,11 @@ constexpr Entry kSpanish[] = {
      "al día (Preferencias > Actualizaciones)."},
     {"Version, licence and the open-source components SculptForge is built with.",
      "Versión, licencia y los componentes de código abierto con los que está hecho SculptForge."},
-    {"SculptForge is free and stays free. A membership adds betas and early builds, Member Requests (ask for a brush "
-     "or an alpha), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in "
+    {"SculptForge is free and stays free. A membership adds betas and early builds, Member Requests (one request a "
+     "month, built first and credited to you), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in "
      "your browser. Nothing in the app changes either way.",
      "SculptForge es gratis y seguirá siéndolo. Ser miembro suma betas y versiones anticipadas, Member Requests "
-     "(pide un pincel o un alpha), voto sobre lo próximo que hacemos y tu nombre en los créditos: abre "
+     "(una petición al mes, la hacemos primero y con tu nombre), voto sobre lo próximo que hacemos y tu nombre en los créditos: abre "
      "sculptforge.app/support.html en tu navegador. En la app no cambia nada en ningún caso."},
     {"The official SculptForge community on Discord: questions, tips and work in progress. Opens the invite in your "
      "browser. Bugs still go to Report a problem (GitHub issues).",
@@ -4557,8 +4557,8 @@ constexpr Entry kSpanish[] = {
      "Esculpir sobre splats"},
     {"SculptForge has a new look",
      "SculptForge tiene un aspecto nuevo"},
-    {"SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (ask for a brush or an alpha) and your name in the credits. %s",
-     "SculptForge es gratis. Una membresía añade betas y versiones anticipadas, voto sobre lo próximo que hacemos, Peticiones de miembros (pide un pincel o un alpha) y tu nombre en los créditos. %s"},
+    {"SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (one request a month, built first and credited to you) and your name in the credits. %s",
+     "SculptForge es gratis. Una membresía añade betas y versiones anticipadas, voto sobre lo próximo que hacemos, Peticiones de miembros (una petición al mes, la hacemos primero y con tu nombre) y tu nombre en los créditos. %s"},
     {"Search brushes (scales, skin, stone...)",
      "Buscar pinceles (escamas, piel, piedra...)"},
     {"Selection brushes (Ctrl+Shift)",

@@ -19,7 +19,8 @@ the GPL covers the program, not your models.
 
 SculptForge stays free and works the same for everyone; nothing is ever paywalled. A membership adds betas and
 early builds (from SculptForge 1.0, each release about two weeks early), a vote on what gets built, Member Requests
-(ask for a brush, alpha or material) and your name in the credits (every release stays free for everyone; bug-fix and security releases
+(one request a month, built first and credited to you; bugs are always free, and every idea goes in the public
+[feature queue](https://sculptforge.app/queue.html)) and your name in the credits (every release stays free for everyone; bug-fix and security releases
 go out to everyone the same day): **Help > Support SculptForge...** opens [sculptforge.app/support.html](https://sculptforge.app/support.html) in your browser, where you can become a
 member. That is all it does: the app has no payment code, no account and no licence check. Members are thanked
 by name in **Help > About**; the small heart at the right of the top bar opens the membership page too (members

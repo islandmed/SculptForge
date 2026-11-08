@@ -1090,10 +1090,10 @@ constexpr Entry kSimplifiedChinese[] = {
      "向 SculptForge 网站确认是否有新版本。SculptForge 每天也会自动检查一次（偏好设置 > 更新）。"},
     {"Version, licence and the open-source components SculptForge is built with.",
      "版本、许可，以及 SculptForge 所使用的开源组件。"},
-    {"SculptForge is free and stays free. A membership adds betas and early builds, Member Requests (ask for a brush "
-     "or an alpha), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in "
+    {"SculptForge is free and stays free. A membership adds betas and early builds, Member Requests (one request a "
+     "month, built first and credited to you), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in "
      "your browser. Nothing in the app changes either way.",
-     "SculptForge 免费且将一直免费。成为会员可获得 Beta 版与抢先版本、Member Requests（请求笔刷或 Alpha）、投票决定下"
+     "SculptForge 免费且将一直免费。成为会员可获得 Beta 版与抢先版本、Member Requests（每月一个请求，先为你开发并列出你的名字）、投票决定下"
      "一步开发内容，以及名列致谢名单：会在浏览器中打开 sculptforge.app/support.html。无论如何，应用程序本身都不会有任"
      "何改变。"},
     {"The official SculptForge community on Discord: questions, tips and work in progress. Opens the invite in your "
@@ -4113,8 +4113,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "雕刻到 Splat"},
     {"SculptForge has a new look",
      "SculptForge 换了新外观"},
-    {"SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (ask for a brush or an alpha) and your name in the credits. %s",
-     "SculptForge 是免费的。会员可抢先获得测试版和早期版本、投票决定接下来开发什么、提出会员请求（索取笔刷或 Alpha），并列名于致谢名单。%s"},
+    {"SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (one request a month, built first and credited to you) and your name in the credits. %s",
+     "SculptForge 是免费的。会员可抢先获得测试版和早期版本、投票决定接下来开发什么、提出会员请求（每月一个，先为你开发并列出你的名字），并列名于致谢名单。%s"},
     {"Search brushes (scales, skin, stone...)",
      "搜索笔刷（鳞片、皮肤、石头...）"},
     {"Selection brushes (Ctrl+Shift)",
