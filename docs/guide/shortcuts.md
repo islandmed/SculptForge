@@ -14,8 +14,15 @@ your saved style is kept.
 Every key below can be reassigned: hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and click a button, then press the new
 key, or use **Edit > Preferences > Hotkeys**. Your changes save themselves. See [Customizing the interface](interface.md#customizing-the-interface).
 
-On macOS, <kbd>Cmd</kbd> works wherever a shortcut says <kbd>Ctrl</kbd>. Single-letter shortcuts don't fire
-while you type in a text field.
+On macOS, <kbd>Cmd</kbd> works wherever a shortcut says <kbd>Ctrl</kbd>, and <kbd>Option</kbd> wherever it says
+<kbd>Alt</kbd>. Single-letter shortcuts don't fire while you type in a text field.
+
+Running the Windows version on a Mac through CrossOver or Wine? Their Mac driver sends <kbd>Cmd</kbd> as
+<kbd>Alt</kbd> and leaves <kbd>Option</kbd> unused. The macOS version needs none of this. To keep the Windows one,
+open the bottle's Registry Editor and, under `HKEY_CURRENT_USER\Software\Wine\Mac Driver`, add the strings
+`LeftOptionIsAlt` and `RightOptionIsAlt` set to `y` (Option becomes Alt), and `LeftCommandIsCtrl` and
+`RightCommandIsCtrl` set to `y` (Cmd becomes Ctrl). Restart SculptForge. The setting belongs to the bottle, so a
+new bottle needs it again.
 
 ## Keyboard shortcuts
 
