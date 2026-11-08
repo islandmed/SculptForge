@@ -2203,6 +2203,11 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
         selectInsertSetItem(insertSet_.index + step);
         return;
     }
+    if (key == SDLK_ESCAPE && guidesMode_ && drag_ != Drag::Guide) { // the QRemesh Guides brush off
+        leaveGuides();
+        status_ = "Quad Remesh Guides off";
+        return;
+    }
     if (key == SDLK_ESCAPE && (!insertType_.empty() || tubeDraw_ || edgesMode_)) { // Append > Insert (#34), Draw Tube,
         const bool tube = tubeDraw_, insert = !insertType_.empty();                // Edges mode off
         leaveDrawModes();

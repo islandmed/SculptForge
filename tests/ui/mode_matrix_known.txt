@@ -7,11 +7,6 @@ brush.capture_view | Scale | task modes-capture-exit: a brush or a tool leaves C
 brush.capture_view | a brush on the shelf | task modes-capture-exit: a brush or a tool leaves Capture from view
 brush.capture_view | a palette action | task modes-capture-exit: a brush or a tool leaves Capture from view
 brush.capture_view | undo | task modes-capture-exit: a brush or a tool leaves Capture from view
-brush.qremesh_guides | Draw | task modes-guides-exit: Esc and Draw leave QRemesh Guides
-brush.qremesh_guides | Esc | task modes-guides-exit: Esc and Draw leave QRemesh Guides
-brush.qremesh_guides | a brush on the shelf | task modes-guides-exit: picking a brush leaves it but the status bar still names it
-brush.qremesh_guides | a palette action | task modes-guides-exit: picking a brush leaves it but the status bar still names it
-brush.qremesh_guides | undo | task modes-guides-exit: picking a brush leaves it but the status bar still names it
 face.landmarks | Draw | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
 face.landmarks | Esc | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
 face.landmarks | Move | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too

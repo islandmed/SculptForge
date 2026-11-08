@@ -172,7 +172,12 @@ void App::registerGizmoActions() {
         actions_.add(std::move(a));
     };
     auto mode = [this](GizmoMode m) {
-        return [this, m] { setGizmoMode(gizmo_.mode == m && m != GizmoMode::Off ? GizmoMode::Off : m); };
+        return [this, m] {
+            if (drag_ == Drag::Guide) return;
+            const std::string guides = leaveGuides(); // (the buttons and keys, not setGizmoMode: Guides calls that itself)
+            setGizmoMode(gizmo_.mode == m && m != GizmoMode::Off ? GizmoMode::Off : m);
+            if (!guides.empty()) status_ = "Left " + guides + ". " + status_;
+        };
     };
     auto is = [this](GizmoMode m) { return [this, m] { return gizmo_.mode == m; }; };
     add("tool.draw", "Draw", ICON_LC_PENCIL, "Transform", "Q", mode(GizmoMode::Off), is(GizmoMode::Off),

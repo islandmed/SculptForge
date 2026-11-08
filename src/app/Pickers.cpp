@@ -577,8 +577,9 @@ bool PickerUi::isActive(const App& app, const BrushItem& item) {
 }
 
 void PickerUi::select(App& app, const BrushItem& item) {
-    if (item.kind != BrushItem::Kind::Guides) app.guidesMode_ = false;
-    const std::string left = app.leaveDrawModes(); // Draw Tube and Append > Insert end, the same brush again too
+    const std::string guides = item.kind != BrushItem::Kind::Guides ? app.leaveGuides() : std::string();
+    std::string left = app.leaveDrawModes(); // Draw Tube and Append > Insert end, the same brush again too
+    if (!guides.empty()) left += left.empty() ? guides : " and " + guides;
     app.edgesMode_ = false; // picking any brush leaves Edges mode (PanelEdges.cpp)
     switch (item.kind) {
     case BrushItem::Kind::Type:

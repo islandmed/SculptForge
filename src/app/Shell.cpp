@@ -446,10 +446,11 @@ void App::registerShellActions() {
             brush_ = type;
             doc_.activeBrush = -1;
             paintMode_ = false;
-            guidesMode_ = false; // leaves the QRemesh Guides brush
+            const std::string guides = leaveGuides(); // leaves the QRemesh Guides brush
             edgesMode_ = false;  // and Edges mode
             maskBrush_.on = false;
-            leaveDrawModesStatus(); // and Draw Tube / Append > Insert, the same brush picked again too
+            // and Draw Tube / Append > Insert, the same brush picked again too; the status says what was left
+            if (leaveDrawModesStatus().empty() && !guides.empty()) status_ = "Left " + guides + ": brushes sculpt again";
             if (gizmoActive()) setGizmoMode(GizmoMode::Off); // and the gizmo: the brush sculpts again
         };
         a.checked = [this, type] { return brush_ == type && doc_.activeBrush < 0 && !paintMode_ && !guidesMode_; };

@@ -577,6 +577,14 @@ void App::drawQRemeshGuideControls() {
                  kQRemeshPath);
 }
 
+// Esc, Draw / Move / Scale / Rotate and any other brush leave the QRemesh Guides brush, with the status saying so (mode matrix).
+std::string App::leaveGuides() {
+    if (!guidesMode_) return "";
+    guidesMode_ = false;
+    guidePath_.clear();
+    return "Quad Remesh Guides";
+}
+
 void App::setGuidesMode(bool on) {
     if (drag_ == Drag::Guide) return;
     guidesMode_ = on;

@@ -1451,6 +1451,7 @@ private:
     // QRemesh Guides (PanelRetopo.cpp, core/QRemeshGuides.h): the "QRemesh Guides" brush draws curves on the
     // surface for QRemesh to follow. It is a mode beside the brushes: picking any brush (or the Gizmo) leaves it.
     void setGuidesMode(bool on);
+    std::string leaveGuides(); // the Guides brush off, its curve dropped: "Quad Remesh Guides" if it was on, else ""
     void syncGuidesMode();                                    // leaves the mode when another brush was picked
     bool guideMouseDown(float x, float y, SDL_Keymod mod);    // true if it took the click
     void guideDragTo(float x, float y);
