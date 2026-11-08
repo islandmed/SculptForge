@@ -295,19 +295,22 @@ Your menus save themselves.
 
 ## Whole-Part deformations
 
-**Tool > Reshape** has four operations that work on the whole active Part at once, each with its amount
-beside it (from the discussions). The mask holds what it covers (partly masked areas move partly), hidden faces and
-open borders stay where they are, and each is one undo step:
+**Tool > Reshape** reads top to bottom: **Size**, then the **Stack**, the one place for every whole-Part operation
+(**Mirror** is in **Tool > Geometry > Symmetry**). Four of its steps (the **Surface** group) work on the surface
+itself (from the discussions). The mask holds what it covers (partly masked areas move partly), hidden faces and
+open borders stay where they are:
 
 | Operation | What it does |
 |---|---|
-| **Smooth** | Smooths everything; with **Smooth keeps volume** it doesn't shrink the form. |
+| **Smooth** | Smooths everything; with the step's **Keep volume** it doesn't shrink the form. |
 | **Relax** | Evens out the spacing of the vertices along the surface without changing its shape, for areas a big Move or Tendril stretched. |
 | **Polish** | Flattens fine noise and small bumps while flat areas and sharp edges stay sharp: a scan's grain, or the ripples a voxel remesh leaves on a hard-surface piece. |
 | **Balloon** | Fills the form out toward a rounder volume, like blowing into it. A negative amount lets the air out. |
 
-They are commands too: `deform_smooth amount=30 keep_volume=true`, `deform_relax`, `deform_polish amount=60`,
-`deform_balloon amount=-20` (add `masked=false` to ignore the mask). On a 10-million-vertex Part at amount 50,
+Add one with **Add step > Surface** and set its amount on the step. They are commands too: `deform_smooth amount=30
+keep_volume=true`, `deform_relax`, `deform_polish amount=60`, `deform_balloon amount=-20` (add `masked=false` to
+ignore the mask); from a menu, a key or the command palette, **Smooth**, **Relax**, **Polish** and **Balloon** run
+once at amount 50. On a 10-million-vertex Part at amount 50,
 Smooth takes about 0.5 s, Balloon 0.7 s, Relax 0.9 s and Polish 2 s (Apple M1 Pro).
 
 ### Size
@@ -339,7 +342,7 @@ picks one; click a step to set its amount, its axes (**X Y Z**, any mix) and, wh
 | | **Flatten** | Cuts the + side flat by a percent of the depth (negative: the - side). |
 | | **Sag** | Parts far from the axis droop down it, like a weight on outstretched arms (negative lifts). |
 | | **Depth** | A perspective: the + end wider, the - end narrower, more toward the ends. |
-| Surface | **Polish**, **Relax**, **Smooth**, **Balloon** | As above. |
+| Surface | **Polish**, **Relax**, **Smooth** (**Keep volume**), **Balloon** | See [Whole-Part deformations](#whole-part-deformations). |
 
 **Soft** eases Bend, Twist, Taper and Shear toward the ends (a bend that curves most in the middle) and rounds
 Flatten's cut. Steps work about the Part's centre, or about the gizmo's pivot when you placed it.

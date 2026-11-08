@@ -984,6 +984,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(timeline_narrow_1024 timeline_narrow --size 1024x768)
     sculptforge_ui_test(extract_labels_1024 extract_labels --size 1024x768)
     sculptforge_ui_test(extract_labels_1440 extract_labels --size 1440x900)
+    # Tool > Reshape: Size, then the Stack, no duplicate sliders (tests/ui/deformation_ops.sfui, foirgairwolf on Discord).
+    sculptforge_ui_test(deformation_ops_1024 deformation_ops --size 1024x768)
+    sculptforge_ui_test(deformation_ops_1440 deformation_ops --size 1440x900)
     # The membership moments' card and the top bar's heart at 1440 and 1024 px (tests/ui/support/support_shots.sfui).
     sculptforge_ui_test(support_shots_1440 support/support_shots --size 1440x900)
     # Help > Support (the welcome screen) and the full membership card at 1440 px: the perk lines fit (100 % and 200 %).

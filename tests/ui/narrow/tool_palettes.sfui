@@ -10,8 +10,8 @@ expect "Viewport Look##tool.display"
 shot tool-list-narrow-100
 click "Reshape##tool.deformation"
 wait 0.3
-expect "Reshape/Smooth"
-expect "Reshape/Balloon"
+expect "Size/##deform_size_x"
+expect "##deform_stack_add"
 shot reshape-narrow-100
 ui_scale 200
 wait 0.3

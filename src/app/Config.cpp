@@ -568,28 +568,28 @@ void App::initActions() {
         add(kMirrorIds[k], kNames[k], "Tool > Geometry", nullptr, [this, k] { mirrorAxes_[k] = !mirrorAxes_[k]; }, nullptr,
             nullptr, [this, k] { return mirrorAxes_[k]; }, nullptr, "An axis Mirror flips along (several: one after the other).");
     }
-    // Whole-mesh deformations (core/Deform.h, PanelExtract.cpp), each by its amount slider.
+    // Whole-mesh deformations (core/Deform.h) at amount 50, for menus, keys and search; the panel has them as Stack
+    // steps with their own amount (PanelDeform.cpp).
     {
         static const char* const kIds[4] = {"deformation.polish", "deformation.relax", "deformation.smooth", "deformation.balloon"};
         static const char* const kLabels[4] = {"Polish", "Relax", "Smooth", "Balloon"};
         static const char* const kCommands[4] = {"deform_polish", "deform_relax", "deform_smooth", "deform_balloon"};
         static const char* const kHelp[4] = {
-            "Polish the whole Part by the amount beside it: fine noise and small bumps flatten out while flat areas and "
-            "sharp edges stay. The mask holds what it covers; one undo step.",
+            "Polish the whole Part (amount 50): fine noise and small bumps flatten out while flat areas and sharp "
+            "edges stay. For another amount, add a Polish step to Tool > Reshape > Stack. The mask holds what it "
+            "covers; one undo step.",
             "Relax the whole Part: the vertices even out their spacing along the surface without changing its shape "
-            "(stretched areas after big moves). The mask holds what it covers; one undo step.",
-            "Smooth the whole Part by the amount beside it (Smooth keeps volume: without shrinking it). The mask "
-            "holds what it covers; one undo step.",
-            "Fill the whole Part out toward a rounder volume, like a balloon; a negative "
-            "amount lets the air out. The mask holds what it covers; one undo step."};
+            "(stretched areas after big moves). For another amount, add a Relax step to the Stack. The mask holds "
+            "what it covers; one undo step.",
+            "Smooth the whole Part (amount 50). For another amount, or to keep the volume, add a Smooth step to the "
+            "Stack. The mask holds what it covers; one undo step.",
+            "Fill the whole Part out toward a rounder volume, like a balloon (amount 50). For another amount, or a "
+            "negative one that lets the air out, add a Balloon step to the Stack. The mask holds what it covers; "
+            "one undo step."};
         for (int k = 0; k < 4; ++k)
             add(kIds[k], kLabels[k], "Tool > Reshape", nullptr,
-                [this, k] {
-                    Args a{{"amount", double(deformAmount_[k])}};
-                    if (k == 2) a["keep_volume"] = deformKeepVolume_;
-                    runCommand(kCommands[k], a);
-                },
-                nullptr, kCommands[k], nullptr, [this, k] { return doc_.mesh.vertexCount() > 0 && deformAmount_[k] != 0.0f; },
+                [this, k] { runCommand(kCommands[k], {{"amount", 50.0}}); }, nullptr, kCommands[k], nullptr,
+                [this] { return doc_.mesh.vertexCount() > 0; },
                 kHelp[k]);
     }
     // Reshape > Stack (PanelDeform.cpp, docs/design/deform-panel.md).
