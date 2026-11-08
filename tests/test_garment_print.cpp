@@ -109,10 +109,10 @@ TEST(garment_print_pages_match_at_every_join) {
     CHECK(int(triangles) == 2 * joins);
     CHECK(pages[0].svg.find("width=\"215.9mm\" height=\"279.4mm\"") != std::string::npos);
     for (const SvgPageFile& p : pages) CHECK(p.svg.find("page " + p.name + " ") != std::string::npos);
-    // Every panel's name is on some page.
+    // Every panel's name is on some page (a mirrored copy's in its original's "cut 2" note).
     for (const Panel& p : pat.panels) {
         bool found = false;
-        for (const SvgPageFile& pg : pages) found = found || pg.svg.find(">" + p.name + "</text>") != std::string::npos;
+        for (const SvgPageFile& pg : pages) found = found || pg.svg.find(p.name) != std::string::npos;
         CHECK(found);
     }
 }
