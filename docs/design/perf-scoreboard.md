@@ -112,3 +112,20 @@ Each candidate is measured against the row above on the same tier, interleaved, 
 | perf/n2-wavelet (n2stroke) | N2 wavelet strokes on micro levels, default on; GPU shading (fragment shader) | in progress |
 | perf/beta-boost-2 (betaboost) | Fast Big Brushes with fused batches capped by time; NVIDIA first-dab stall | in progress |
 | research/core-200m (core200m) | N1 screen-space strokes under 1 ms a dab | 6d410e1f: 0.58-0.73 ms GPU per 240 px dab on the laptop (was 4.2-4.8), live on the floor 9.6 vs the ghost's 8.3 ms GPU; research, off (SF_SCREEN_STROKE=1) |
+
+## Release over release: one stroke on a 112M-triangle scan (11-08)
+
+| Release | One 2-second Clay stroke: on screen / pen-up to idle / in all |
+|---|---|
+| 0.11.0 | 72.8 s / 25.2 s / about 98 s |
+| 0.11.8 | 1.1 s / 0.3 s / 1.4 s |
+
+Public wording: "0.11.0: one 2-second stroke on a 112M-triangle scan took about 98 s to finish; 0.11.8: 1.4 s
+(floor tier, method linked)". Never "over 20 min": that was a benchmark-harness run (the harness backported to
+0.11.0, many strokes back to back) timing out, not one stroke.
+
+Method: floor tier (`SF_HW_SIMULATE=floor SF_GOVERNOR=0`, laptop, offscreen), each release's own tag built as
+Release, no benchmark harness. A UI test script opens the scan (28M base triangles, 112M at its micro level), frames
+it, picks Clay at its default size (0.11.0 has no brush-size step), takes a shot, draws one 2 s stroke across the
+middle, takes a shot, waits until idle (cap 40 min) and takes a third; the times are the shots' file times
+(before to stroked, stroked to after). Both runs: undo shows Step 1 of 1. One run per release.
