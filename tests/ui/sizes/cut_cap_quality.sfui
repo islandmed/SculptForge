@@ -1,0 +1,60 @@
+# Cut caps for the look review at 1440 logical px (CMake: ui_cut_cap_quality_1440 at 100 %, ui_cut_cap_quality_1440_200
+# at 200 %), Wire on, close up (Discord, dm4nd: "the cap triangulation looks messy, only a remesh fixes it"): a line
+# cut through low-poly spheres (subdivisions 2 and 3) and the 20k sphere, a rectangle tunnel and a lasso pocket. The
+# cuts replay exact views (as in tests/test_cut.cpp). Every shot comes before the checks, so the script also shows an
+# older build as it was.
+logical_width 1440
+run ui_look look=classic layout=classic
+mouse_move 0.5 0.5
+key shift+f
+
+# --- (1) A line through a low-poly sphere (subdivisions 2): the cap ---
+run new_sphere subdivisions=2
+run cut shape=line points="0.013 -2 0.013 2" mode=away view_proj="0.666666667 0 0 0 0 0.666666667 0 0 0 0 -0.02002002 0 0 0 -0.921921922 1"
+camera -70 -10
+click "Frame##view.frame"
+wait_idle 10
+shot line-sphere2-cap
+expect_value open_edges == 0
+
+# --- (2) The same, subdivisions 3 ---
+run new_sphere subdivisions=3
+run cut shape=line points="0.013 -2 0.013 2" mode=away view_proj="0.666666667 0 0 0 0 0.666666667 0 0 0 0 -0.02002002 0 0 0 -0.921921922 1"
+camera -70 -10
+click "Frame##view.frame"
+wait_idle 10
+shot line-sphere3-cap
+expect_value open_edges == 0
+
+# --- (3) The 20k sphere (subdivisions 5): the cap, then close up on its rim ---
+run new_sphere subdivisions=5
+run cut shape=line points="0.013 -2 0.013 2" mode=away view_proj="0.666666667 0 0 0 0 0.666666667 0 0 0 0 -0.02002002 0 0 0 -0.921921922 1"
+camera -70 -10
+click "Frame##view.frame"
+wait_idle 10
+shot line-sphere5-cap
+zoom 2.5
+wait_idle 10
+shot line-sphere5-rim-closeup
+expect_value open_edges == 0
+
+# --- (4) A rectangle tunnel through the 20k sphere, seen at an angle (its walls) ---
+run new_sphere subdivisions=5
+run cut shape=rect points="-0.31 -0.29 0.33 0.27" mode=away view_proj="0.666666667 0 0 0 0 0.666666667 0 0 0 0 -0.02002002 0 0 0 -0.921921922 1"
+camera -30 -20
+click "Frame##view.frame"
+zoom 1.6
+wait_idle 10
+shot rect-tunnel-walls
+expect_value open_edges == 0
+
+# --- (5) A lasso pocket (Cut In) in a subdivisions 3 sphere: its floor and walls ---
+run new_sphere subdivisions=3
+run cut shape=lasso points="-0.5 -0.47 0.52 -0.45 0.03 0.61" mode=in depth=0.2 view_proj="0.666666667 0 0 0 0 0.666666667 0 0 0 0 -0.02002002 0 0 0 -0.921921922 1"
+camera 15 -15
+click "Frame##view.frame"
+zoom 1.4
+wait_idle 10
+shot lasso-pocket-sphere3
+expect_value open_edges == 0
+key shift+f

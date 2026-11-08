@@ -46,8 +46,12 @@ bool cutRegion(CutShape shape, const std::vector<glm::vec2>& points, bool flip, 
 // fraction of the mesh's largest side. False with `error` when nothing could be cut (the shape misses the mesh,
 // the result would be empty, part of the mesh is behind the camera); `out` is the result otherwise. `depthFrom`: the
 // mesh In and Add measure their depth on (default `mesh`; a symmetric cut passes the Part before its first copy).
+// The new caps and walls get even triangles about the mesh's edge length; `plainWalls[k]` set: wall k (along region
+// edge k) only has its outline's triangles rearranged (a wall another symmetric copy's wall lies on: points inside
+// it would be cut into slivers).
 bool cutMesh(const Mesh& mesh, const glm::mat4& viewProj, const std::vector<glm::dvec2>& region, CutMode mode,
-             float depth, Mesh& out, std::string& error, const Mesh* depthFrom = nullptr);
+             float depth, Mesh& out, std::string& error, const Mesh* depthFrom = nullptr,
+             const std::vector<uint8_t>* plainWalls = nullptr);
 
 // Clip: moves the vertices of `mesh` that `region` (from cutRegion) covers (`open`: a Line or open Polyline) or
 // leaves out (a closed shape) onto `outline` (NDC; open: a polyline, closed: a polygon), along the screen at their
