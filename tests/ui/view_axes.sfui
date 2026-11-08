@@ -1,4 +1,4 @@
-# The corner view axes (Tony 11-06, "the view figure needs more distinguishing features"): filled X / Y / Z circles,
+# The corner view axes (owner 11-06, "the view figure needs more distinguishing features"): filled X / Y / Z circles,
 # smaller rings for the negative ends, far ends smaller and fainter, a soft disc behind them. A click on an end snaps
 # to that view, a second click to the opposite one, a drag on the disc orbits; the exact view's name shows under it.
 # Shots: dark and light backgrounds, UI scale 100 / 150 / 200 %, Small / Medium / Large, several views.

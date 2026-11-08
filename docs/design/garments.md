@@ -21,7 +21,7 @@ make the lengths equal.
 ## Do not build (patents)
 
 Active patents read on these (search: ~/Work/.sf/reports/garment-patents.md, 2026-11-06; not legal advice).
-None of them may be added, in any form, without Tony's explicit OK:
+None of them may be added, in any form, without the owner's explicit OK:
 
 - Automatic placement from the body: feature points, per-body-part bounding volumes, arrangement points, initial
   pattern positions computed from the avatar.

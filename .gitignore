@@ -23,3 +23,9 @@ build-flatpak/
 # Per-worktree agent status (REPORT.md at the top of a worktree): never committed, or merges stop on the
 # coordinator's own copy (feat/test-flow-2 missed 0.11.0-beta.2 that way)
 /REPORT.md
+
+# Agent session files stay on the laptop: never committed, never pushed
+/BRIEF*.md
+/REPORT*.md
+/HANDOFF*.md
+/.design/
