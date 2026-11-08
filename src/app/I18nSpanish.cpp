@@ -2242,26 +2242,30 @@ constexpr Entry kSpanish[] = {
      "convexos), Dirt (grietas), Gradient, Thickness (partes finas), Light Direction (superficies hacia arriba). "
      "Noise es 3D, así que no tiene costuras UV. Paint te deja pintar la máscara con el pincel Paint."},
     // --- PanelForgeSpheres.cpp (tools/i18n/coverage.py) ---
-    {"Add a Forge Sphere Part: one root sphere to block out a body, creature or plant from. Drag on a sphere to grow "
-     "limbs from it, Move and Scale them into proportion, check the skin with Preview (A), then Make Mesh.",
+    {"Add a Forge Sphere Part: one root sphere to block out a body, creature or plant from. Click a sphere to grow "
+     "limbs from it, drag them into place and proportion, check the skin with Preview (A), then Make Mesh.",
      "Añade una Pieza de Forge Spheres: una esfera raíz desde la que bloquear un cuerpo, una criatura o una planta. "
-     "Arrastra sobre una esfera para hacer crecer extremidades, Mueve y Escala para dar proporción, revisa la piel "
+     "Haz clic en una esfera para hacer crecer extremidades, arrástralas a su sitio y proporción, revisa la piel "
      "con Vista previa (A) y luego Crear malla."},
-    {"Drag on a sphere to grow a new sphere from it (how far you drag sets its size). Click a link between two "
-     "spheres to add a joint there, and drag to place it. Alt+click a sphere to delete it.",
-     "Arrastra sobre una esfera para que crezca una esfera nueva de ella (lo que arrastras fija su tamaño). Haz clic "
-     "en un enlace entre dos esferas para añadir ahí una articulación, y arrastra para colocarla. Alt+clic en una "
-     "esfera la borra."},
+    {"Build without switching modes: click a sphere to grow a new one from it, drag a sphere to move it, drag "
+     "near its edge to resize it (the cursor shows which). Click a link between two spheres to add a joint "
+     "there, and drag to place it. Alt+click a sphere to delete it.",
+     "Construye sin cambiar de modo: haz clic en una esfera para que crezca una nueva de ella, arrastra una esfera "
+     "para moverla, arrastra cerca de su borde para cambiar su tamaño (el cursor indica cuál). Haz clic en un enlace "
+     "entre dos esferas para añadir ahí una articulación, y arrastra para colocarla. Alt+clic en una esfera la borra."},
     {"Drag a sphere to move it; the links stretch to follow. Symmetry moves its mirror twin too.",
      "Arrastra una esfera para moverla; los enlaces se estiran para seguirla. La simetría mueve también su gemela "
      "reflejada."},
     {"Drag a sphere up or right to make it bigger, down or left to make it smaller.",
      "Arrastra una esfera hacia arriba o la derecha para agrandarla, hacia abajo o la izquierda para achicarla."},
     {"Drag places child", "Arrastrar coloca hija"},
-    {"Draw: dragging on a sphere moves the new sphere away from it (one drag places a limb joint) instead of sizing "
-     "it. Off, hold Ctrl while you drag for the same.",
-     "Dibujar: arrastrar sobre una esfera aleja de ella la esfera nueva (un arrastre coloca una articulación de "
-     "extremidad) en vez de cambiar su tamaño. Desactivado, mantén Ctrl mientras arrastras para lo mismo."},
+    {"Draw: dragging on a sphere grows a new sphere and moves it away from it (one drag places a limb joint) "
+     "instead of moving the sphere. Off, hold Ctrl while you drag for the same.",
+     "Dibujar: arrastrar sobre una esfera hace crecer una esfera nueva y la aleja de ella (un arrastre coloca una "
+     "articulación de extremidad) en vez de mover la esfera. Desactivado, mantén Ctrl mientras arrastras para lo mismo."},
+    {"click: add  drag: move", "clic: añadir  arrastrar: mover"},
+    {"drag: add", "arrastrar: añadir"},
+    {"drag: resize", "arrastrar: tamaño"},
     {"Delete Selected", "Borrar selección"},
     {"Delete the selected sphere (the one you last clicked or added, outlined in orange) and everything growing from "
      "it. The root stays.",

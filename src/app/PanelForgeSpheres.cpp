@@ -3,14 +3,15 @@
 //
 // Tool > Forge Spheres and the Forge Sphere tool in the viewport (Forge Spheres, core/Forge Spheres.h). While a Forge Sphere
 // Part is active a left-drag on it edits the armature instead of sculpting:
-//   Draw  - drag on a sphere to grow a new one from it (the drag sets its size); click a link to add a joint there
-//           and drag to place it
+//   Draw  - one mode for building (#167): click a sphere to grow a new one from it, drag its body to move it, drag
+//           its outer band (the rim) to resize it; click a link to add a joint there and drag to place it. The
+//           cursor and a tag beside it say which a drag will do.
 //   Move  - drag a sphere to move it across the screen
 //   Scale - drag a sphere up/right to grow it, down/left to shrink it
 //   Alt+click a sphere deletes it with everything growing from it. Symmetry mirrors every edit.
-// Pointer only (#8): Drag places child makes a Draw drag move the new sphere away from its parent (Ctrl+drag does
-// it once), the last sphere clicked or added is selected (Delete Selected, Insert Between, Set as Root), and a
-// right click on a sphere opens a menu with the same three.
+// Pointer only (#8): Drag places child makes a Draw drag grow a new sphere and move it away from its parent
+// (Ctrl+drag does it once), the last sphere clicked or added is selected (Delete Selected, Insert Between, Set as
+// Root), and a right click on a sphere opens a menu with the same three.
 // Dragging the background navigates as usual. Every drag is one undo step (the Part's mesh, which carries
 // the armature, is replaced once at release); the panel's buttons run the Forge Sphere_* commands.
 #include "app/App.h"
@@ -30,6 +31,8 @@ namespace {
 constexpr const char* kForgeSpheresPath = "Tool > Forge Spheres";
 
 bool ctrlDown(SDL_Keymod mod) { return (mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0; } // as App.cpp
+
+constexpr float kClickSlop = 4.0f; // Draw: a press that moves less than this (UI pixels) is a click: it adds a sphere
 
 const char* modeName(int m) { return m == 0 ? "Draw" : m == 1 ? "Move" : "Scale"; } // App::Forge SphereMode order
 
@@ -69,29 +72,30 @@ void App::registerForgeSphereUiActions() {
             }
         },
         nullptr, nullptr,
-        "Add a Forge Sphere Part: one root sphere to block out a body, creature or plant from. Drag on a sphere to grow "
-        "limbs from it, Move and Scale them into proportion, check the skin with Preview (A), then Make Mesh.",
+        "Add a Forge Sphere Part: one root sphere to block out a body, creature or plant from. Click a sphere to grow "
+        "limbs from it, drag them into place and proportion, check the skin with Preview (A), then Make Mesh.",
         "forgesphere_new");
     const auto mode = [this](ForgeSphereMode m) {
         return [this, m] {
             forgesphereMode_ = m;
             status_ = std::string("Forge Spheres: ") + modeName(int(m)) +
-                      (m == ForgeSphereMode::Draw    ? " - drag on a sphere to grow a new one; click a link to add a joint"
+                      (m == ForgeSphereMode::Draw    ? " - click a sphere to grow a new one, drag it to move, drag its rim to resize"
                        : m == ForgeSphereMode::Move ? " - drag a sphere to move it"
                                                 : " - drag a sphere up or right to grow it, down or left to shrink it");
         };
     };
     add("forgesphere.draw", "Draw", mode(ForgeSphereMode::Draw), active, [this] { return forgesphereMode_ == ForgeSphereMode::Draw; },
-        "Drag on a sphere to grow a new sphere from it (how far you drag sets its size). Click a link between two "
-        "spheres to add a joint there, and drag to place it. Alt+click a sphere to delete it.");
+        "Build without switching modes: click a sphere to grow a new one from it, drag a sphere to move it, drag "
+        "near its edge to resize it (the cursor shows which). Click a link between two spheres to add a joint "
+        "there, and drag to place it. Alt+click a sphere to delete it.");
     add("forgesphere.move", "Move", mode(ForgeSphereMode::Move), active, [this] { return forgesphereMode_ == ForgeSphereMode::Move; },
         "Drag a sphere to move it; the links stretch to follow. Symmetry moves its mirror twin too.");
     add("forgesphere.scale", "Scale", mode(ForgeSphereMode::Scale), active, [this] { return forgesphereMode_ == ForgeSphereMode::Scale; },
         "Drag a sphere up or right to make it bigger, down or left to make it smaller.");
     add("forgesphere.place_child", "Drag places child", [this] { forgespherePlaceChild_ = !forgespherePlaceChild_; }, active,
         [this] { return forgespherePlaceChild_; },
-        "Draw: dragging on a sphere moves the new sphere away from it (one drag places a limb joint) instead of "
-        "sizing it. Off, hold Ctrl while you drag for the same.");
+        "Draw: dragging on a sphere grows a new sphere and moves it away from it (one drag places a limb joint) "
+        "instead of moving the sphere. Off, hold Ctrl while you drag for the same.");
     const auto selected = [this] { return forgesphereActive() && forgesphereSelection() > 0; };
     add("forgesphere.delete_selected", "Delete Selected", [this] { forgesphereEdit(ForgeSphereEdit::Delete, forgesphereSelection()); },
         selected, nullptr,
@@ -177,6 +181,17 @@ int App::forgesphereAt(float x, float y, bool* link) const {
     return i >= 0 && size_t(i) < doc_.mesh.forgespheres.size() ? i : -1;
 }
 
+bool App::forgesphereNearRim(int i, float x, float y) const {
+    if (i < 0 || size_t(i) >= doc_.mesh.forgespheres.size()) return false;
+    const ForgeSphere& z = doc_.mesh.forgespheres[size_t(i)];
+    ImVec2 c;
+    const float wpp = worldPerPixel(z.center);
+    if (!partProject(z.center, c) || wpp <= 0.0f) return false;
+    const float r = z.radius / wpp; // the outline the overlay draws
+    const float band = std::min(0.3f * r, 14.0f * uiScale_); // a small sphere keeps most of its body for moving
+    return std::hypot(x - c.x, y - c.y) >= r - band;
+}
+
 bool App::forgesphereMouseDown(float x, float y, SDL_Keymod mod) {
     if (!forgesphereActive()) return false;
     RayHit hit;
@@ -220,7 +235,13 @@ bool App::forgesphereMouseDown(float x, float y, SDL_Keymod mod) {
         doc_.bvh.build(doc_.mesh);
     } else if (d.op == ForgeSphereMode::Draw) {
         d.label = "Forge Sphere add";
-        d.place = forgespherePlaceChild_ || ctrlDown(mod); // the drag moves the new sphere out instead of sizing it
+        d.place = forgespherePlaceChild_ || ctrlDown(mod); // the drag grows a new sphere and moves it out
+        if (!d.place) { // a click adds, a drag moves or resizes: decided at release or once it moves (#167)
+            d.pending = true;
+            d.rim = forgesphereNearRim(i, x, y);
+            ImVec2 c;
+            if (partProject(d.start[size_t(i)].center, c)) d.rimFrom = std::max(std::hypot(x - c.x, y - c.y), 1.0f);
+        }
     } else {
         d.label = d.op == ForgeSphereMode::Move ? "Forge Sphere move" : "Forge Sphere scale";
     }
@@ -230,7 +251,7 @@ bool App::forgesphereMouseDown(float x, float y, SDL_Keymod mod) {
         const glm::vec3 c = d.start[size_t(d.sphere)].center;
         d.grab = c - planeHit(o, dir, c, glm::normalize(dir));
     }
-    if (d.op == ForgeSphereMode::Draw) forgesphereDragTo(x, y); // the new sphere appears at once, at half its parent's size
+    if (d.op == ForgeSphereMode::Draw && !d.pending) forgesphereDragTo(x, y); // the new sphere appears at once
     drag_ = Drag::ForgeSphere;
     return true;
 }
@@ -238,9 +259,21 @@ bool App::forgesphereMouseDown(float x, float y, SDL_Keymod mod) {
 void App::forgesphereDragTo(float x, float y) {
     ForgeSphereDrag& d = zsDrag_;
     if (d.sphere < 0) return;
+    const float moved = std::hypot(x - d.x, y - d.y);
+    if (d.pending) { // Draw: past the slop, a drag on the body moves the sphere and one on its rim resizes it
+        if (moved < kClickSlop * uiScale_) return;
+        d.pending = false;
+        d.op = d.rim ? ForgeSphereMode::Scale : ForgeSphereMode::Move;
+        d.label = d.rim ? "Forge Sphere scale" : "Forge Sphere move";
+        if (!d.rim) {
+            glm::vec3 o, dir;
+            partRay(d.x, d.y, o, dir);
+            const glm::vec3 c = d.start[size_t(d.sphere)].center;
+            d.grab = c - planeHit(o, dir, c, glm::normalize(dir));
+        }
+    }
     std::vector<ForgeSphere> s = d.start;
     const ForgeSphere& z = s[size_t(d.sphere)];
-    const float moved = std::hypot(x - d.x, y - d.y);
     switch (d.op) {
     case ForgeSphereMode::Draw: {
         // The new sphere sits on the parent's surface where the drag started, sized by the drag.
@@ -278,8 +311,14 @@ void App::forgesphereDragTo(float x, float y) {
         break;
     }
     case ForgeSphereMode::Scale: {
-        const float amount = ((x - d.x) - (y - d.y)) / (120.0f * uiScale_);
-        forgesphereSet(s, d.sphere, z.center, std::max(z.radius * std::exp(amount), 1e-4f), symmetry_);
+        float r = z.radius;
+        ImVec2 c;
+        if (d.rim && partProject(z.center, c)) { // Draw's rim drag: the edge follows the cursor
+            r *= std::hypot(x - c.x, y - c.y) / d.rimFrom;
+        } else { // the Scale button: up/right grows, down/left shrinks
+            r *= std::exp(((x - d.x) - (y - d.y)) / (120.0f * uiScale_));
+        }
+        forgesphereSet(s, d.sphere, z.center, std::max(r, 1e-4f), symmetry_);
         break;
     }
     }
@@ -291,13 +330,17 @@ void App::forgesphereDragTo(float x, float y) {
 
 void App::forgesphereRelease() {
     ForgeSphereDrag& d = zsDrag_;
+    if (d.pending) { // Draw: a click on a sphere grows a new one there, half its size
+        d.pending = false;
+        forgesphereDragTo(d.x, d.y);
+    }
     if (d.changed) {
         Mesh after = std::move(doc_.mesh);
         doc_.mesh = std::move(d.before);
         doc_.replaceMeshUndoable(std::move(after), d.label);
         status_ = std::string("Forge Spheres: ") + d.label + "; " + std::to_string(doc_.mesh.forgespheres.size()) + " spheres";
         if (d.added >= 0) forgesphereSelected_ = d.added; // the new sphere
-        else if (d.op == ForgeSphereMode::Move) forgesphereSelected_ = d.sphere; // (an inserted joint, too)
+        else if (d.op != ForgeSphereMode::Draw) forgesphereSelected_ = d.sphere; // moved or resized (an inserted joint, too)
     }
     d = {};
 }
@@ -383,6 +426,7 @@ void App::drawForgeSphereMenu() {
 }
 
 void App::drawForgeSphereOverlay() {
+    forgesphereHint_ = 0;
     if (!forgesphereActive() || doc_.mesh.forgespherePreview || !doc_.activePartInfo().visible) return;
     if (ImGui::GetIO().WantCaptureMouse) return;
     const CanvasRect cr = canvasRect();
@@ -417,7 +461,34 @@ void App::drawForgeSphereOverlay() {
         const ForgeSphere& z = doc_.mesh.forgespheres[size_t(i)];
         ImVec2 c;
         const float wpp = worldPerPixel(z.center);
-        if (partProject(z.center, c) && wpp > 0.0f) dl->AddCircle(c, z.radius / wpp, col, 64, 2.0f * s);
+        // Draw (#167): what a drag here does - the cursor and a tag beside it say it, and the rim thickens for resize.
+        enum class Hint { None, Move, Resize, Add } hint = Hint::None;
+        if (dragging) {
+            hint = zsDrag_.pending ? Hint::None
+                   : zsDrag_.op == ForgeSphereMode::Move ? Hint::Move
+                   : zsDrag_.op == ForgeSphereMode::Scale && zsDrag_.rim ? Hint::Resize
+                                                                         : Hint::None;
+        } else if (forgesphereMode_ == ForgeSphereMode::Draw && !alt) {
+            hint = forgespherePlaceChild_ || ctrlDown(inputMods()) ? Hint::Add
+                   : forgesphereNearRim(i, mouseX_, mouseY_)       ? Hint::Resize
+                                                                   : Hint::Move;
+        }
+        if (partProject(z.center, c) && wpp > 0.0f) {
+            dl->AddCircle(c, z.radius / wpp, col, 64, (hint == Hint::Resize ? 4.0f : 2.0f) * s);
+        }
+        forgesphereHint_ = int(hint);
+        if (hint == Hint::Move) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+        if (hint == Hint::Resize) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNWSE);
+        if (hint != Hint::None && !dragging) {
+            const char* tag = hint == Hint::Move     ? tr("click: add  drag: move")
+                              : hint == Hint::Resize ? tr("drag: resize")
+                                                     : tr("drag: add");
+            const ImVec2 at(mouseX_ + 16.0f * s, mouseY_ + 14.0f * s);
+            const ImVec2 size = ImGui::CalcTextSize(tag);
+            dl->AddRectFilled(ImVec2(at.x - 4.0f * s, at.y - 2.0f * s), ImVec2(at.x + size.x + 4.0f * s, at.y + size.y + 2.0f * s),
+                              IM_COL32(20, 22, 26, 200), 3.0f * s);
+            dl->AddText(at, IM_COL32(220, 235, 255, 255), tag);
+        }
     }
     dl->PopClipRect();
 }

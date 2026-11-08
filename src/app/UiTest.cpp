@@ -721,6 +721,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "forgesphere_selected") return double(app_.forgesphereSelection());
     if (name == "forgesphere_menu") return app_.zsMenuShown_ ? 1.0 : 0.0;
     if (name == "forgesphere_place_child") return app_.forgespherePlaceChild_ ? 1.0 : 0.0;
+    if (name == "forgesphere_hint") return double(app_.forgesphereHint_); // what a Draw drag would do: 0 -, 1 move, 2 resize, 3 add
     if (name.rfind("forgesphere_out", 0) == 0) { // forgesphere_out2: how far sphere 2 is from its parent, in the parent's radii
         const size_t i = size_t(std::atoi(name.c_str() + 15));
         if (i == 0 || i >= m.forgespheres.size()) return -1.0;
@@ -2008,6 +2009,52 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             }
             return false;
         });
+    } else if (verb == "drag_forgesphere") {
+        // drag_forgesphere K body|rim|link DX DY [seconds] [right]: press on Forge Sphere K's body (its centre), just
+        // inside its outline (the rim band Draw resizes with, #167) or on its link to its parent (halfway across the
+        // gap between the surfaces), and drag DX, DY pixels; 0 0 is a click; "right" uses the right button. "hover"
+        // in place of DX DY rests the pointer there (the hint, for shots).
+        if (!need(3)) return false;
+        const int index = int(num(1, 0));
+        const bool rim = w[2] == "rim", onLink = w[2] == "link", hoverOnly = w[3] == "hover";
+        const float dx = hoverOnly ? 0.0f : num(3, 0), dy = hoverOnly ? 0.0f : num(4, 0), seconds = num(5, 0.4f);
+        const Uint8 button = w.size() > 6 && w[6] == "right" ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
+        auto start = std::make_shared<ImVec2>();
+        auto pressed = std::make_shared<bool>(false);
+        steps_.push_back([this, line, index, rim, onLink, hoverOnly, dx, dy, seconds, button, start, pressed](float t) {
+            if (t == 0.0f) {
+                const std::vector<ForgeSphere>& zs = app_.doc_.mesh.forgespheres;
+                ImVec2 c;
+                const bool valid = index >= 0 && size_t(index) < zs.size() && (!onLink || index > 0);
+                glm::vec3 at = valid ? zs[size_t(index)].center : glm::vec3(0.0f);
+                if (valid && onLink) { // halfway across the gap between the two spheres' surfaces
+                    const ForgeSphere &z = zs[size_t(index)], &p = zs[size_t(z.parent)];
+                    const float d = glm::distance(z.center, p.center);
+                    if (d > 1e-6f) at = p.center + (z.center - p.center) / d * (p.radius + 0.5f * (d - p.radius - z.radius));
+                }
+                const float wpp = valid ? app_.worldPerPixel(at) : 0.0f;
+                if (wpp <= 0.0f || !app_.partProject(at, c)) {
+                    fail(line, "forge sphere " + std::to_string(index) + " is not on screen");
+                    return true;
+                }
+                const float r = zs[size_t(index)].radius / wpp;
+                *start = ImVec2(c.x + (rim ? r - std::min(0.12f * r, 5.0f * app_.uiScale_) : 0.0f), c.y);
+                mouseMotion(start->x, start->y);
+                return hoverOnly;
+            }
+            if (!*pressed) { // (the first frame after the hover, however late; buttonDown_ follows the left only)
+                mouseButton(true, button);
+                *pressed = true;
+            }
+            const float u = std::min(t / seconds, 1.0f);
+            mouseMotion(start->x + dx * u, start->y + dy * u);
+            if (t >= seconds) {
+                mouseButton(false, button);
+                return true;
+            }
+            return false;
+        });
+        wait(0.1f);
     } else if (verb == "drag_landmark") {
         if (!need(3)) return false;
         const int index = int(num(1, 0));

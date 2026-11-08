@@ -15,11 +15,18 @@ still navigates. The brush ring is hidden; the sphere under the cursor gets an o
 
 ## Edit the spheres
 
-Pick the mode in **Tool > Forge Spheres**:
+**Draw** (the default) does all three without switching modes (#167):
+
+- **Click** a sphere to grow a new one from it, half its size, on the surface where you clicked.
+- **Drag** a sphere's middle to move it.
+- **Drag near its edge** (the outer band of the outline) to resize it: the edge follows the cursor.
+
+The cursor and a small tag beside it (*drag: move*, *drag: resize*) show what a drag will do before you press.
+The **Move** and **Scale** modes are still there in **Tool > Forge Spheres** for when you want one action only:
 
 | Mode | On a sphere | On a link |
 |---|---|---|
-| **Draw** | Drag to grow a new sphere from it. It starts on the surface where you pressed; how far you drag sets its size (a click makes one half the size of its parent) | Click to add a joint halfway along the link, and drag to place it |
+| **Draw** | Click to grow a new sphere; drag the middle to move it, the edge to resize it | Click to add a joint halfway along the link, and drag to place it |
 | **Move** | Drag to move it across the screen. The links stretch to follow | Moves the sphere at the end of the link |
 | **Scale** | Drag up or right to make it bigger, down or left to make it smaller | Scales the sphere at the end of the link |
 
@@ -33,7 +40,7 @@ line than its own radius snaps onto it as one sphere instead of two overlapping 
 Every drag is one step of the Part's undo history, so <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes back the last sphere
 you added, moved or scaled.
 
-> **Tip:** build the structure first with few spheres (one per joint), set the proportions with Move and Scale,
+> **Tip:** build the structure first with few spheres (one per joint), drag them into place and size in Draw,
 > and add joints on links only where a limb needs to bend or swell.
 
 ## Pointer only
@@ -41,8 +48,8 @@ you added, moved or scaled.
 Everything also works with the pointer alone, without a key held (#8):
 
 - **Drag places child**: with it on, a Draw drag on a sphere makes a new sphere half its size and moves it away
-  from its parent as you drag, so one drag places the next joint of a limb. With it off, hold <kbd>Ctrl</kbd> while
-  you drag for the same.
+  from its parent as you drag (instead of moving the sphere), so one drag places the next joint of a limb. With it
+  off, hold <kbd>Ctrl</kbd> while you drag for the same.
 - **The selected sphere**: the sphere you last clicked or added is outlined in orange. **Delete Selected** deletes
   it and everything growing from it, **Insert Between** adds a joint halfway to the sphere it grows from, and **Set
   as Root** makes it the root: the armature keeps its shape and links and grows from there, so the skin doesn't
