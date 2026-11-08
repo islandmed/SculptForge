@@ -15,6 +15,7 @@ expect_text The AI gives the form; SculptForge gives the topology.
 shot generate-flow-start
 
 click "Generate 3D/Generate 3D model"
+click "Allow##send"                              # the first-use notice for the Hugging Face Space (ai_consent.sfui)
 click OK                                         # the one-time Hunyuan3D licence notice (the default model)
 wait_value generate_candidates == 3 30
 expect_status 3 candidates ready: pick the strongest form

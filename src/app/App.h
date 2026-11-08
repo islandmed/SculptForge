@@ -4,6 +4,7 @@
 
 #include "ai/AiPolicy.h"
 #include "ai/BrushAssistant.h"
+#include "ai/Consent.h"
 #include "app/Actions.h"
 #include "app/AssetLibrary.h"
 #include "app/AxisGizmo.h"
@@ -623,6 +624,24 @@ private:
     void registerAiActions(); // ui.brush_lab, ui.generate3d: only while AI is on
     void drawAiPrefs();       // the Preferences > AI section and the first-run question
     void drawAiStudioPrefs(); // Preferences > AI: what the studio's policy manages, the studio sign-in, the audit log
+    // The first-use notice (PanelAiConsent.cpp, ai/Consent.h): before the first request to a third-party AI host the
+    // panel says what is sent, to whom and who pays; nothing goes until Allow (remembered per service in ai.json).
+    enum class SendPanel { BrushLab, Generate3D };
+    // True when TARGET may be sent to now. Otherwise the notice opens in PANEL (or the studio's "no" goes to the
+    // status line) and RETRY runs after Allow or Use local instead.
+    bool askToSend(const ai::SendTarget& target, SendPanel panel, std::function<void()> retry);
+    void drawSendNotice(SendPanel panel);
+    void drawAiSendPrefs(); // Preferences > AI: each online service, allowed or asks first, with Revoke
+    void rememberSend(const std::string& id, bool allow); // aiSettings_ and ai.json (only that list)
+    struct SendNotice {
+        ai::SendTarget target;
+        SendPanel panel = SendPanel::BrushLab;
+        std::function<void()> retry;
+    };
+    std::optional<SendNotice> sendNotice_;
+    std::future<std::string> localProbe_; // the local server found for "Use local instead" ("ollama:<model>", ...)
+    std::string localFound_;
+    bool localProbed_ = false;
     void storeAiKeys();       // the keys aiSettings_ holds, into the OS keychain (a worker; ai/Secrets.h)
     void applyUpdatePolicy(); // a studio policy's update check and channel (core/ManagedPolicy.h) over the saved ones
     // Live mode (PanelAiLink.cpp, link/AiLink.h): Preferences > AI > Let AI tools control this window. An AI tool

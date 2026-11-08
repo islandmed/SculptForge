@@ -301,7 +301,7 @@ set_source_files_properties(third_party/xatlas/xatlas.cpp third_party/tinyexr/ti
                             PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 
 # --- Bring-your-own-AI (brush assistant). HTTPS via WinHTTP or libcurl. ---
-add_library(sculptforge_ai STATIC src/ai/Http.cpp src/ai/AiPolicy.cpp src/ai/Providers.cpp src/ai/Secrets.cpp src/ai/Oidc.cpp src/ai/BrushAssistant.cpp src/ai/Generator3D.cpp
+add_library(sculptforge_ai STATIC src/ai/Http.cpp src/ai/AiPolicy.cpp src/ai/Providers.cpp src/ai/Consent.cpp src/ai/Secrets.cpp src/ai/Oidc.cpp src/ai/BrushAssistant.cpp src/ai/Generator3D.cpp
   src/ai/ImageTo3DService.cpp src/ai/Hyper3D.cpp src/ai/GradioClient.cpp src/ai/ComfyUI.cpp src/ai/AiCommands.cpp src/ai/BrushGalleryClient.cpp src/link/Socket.cpp
   src/link/UnrealLink.cpp src/ai/Process.cpp src/ai/SplatTrainer.cpp)
 # Lets a build run from its tree find the bundled ComfyUI workflows (integrations/comfyui/workflows).
@@ -490,6 +490,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelSupport.cpp
     src/app/QuickTour.cpp
     src/app/PanelAi.cpp
+    src/app/PanelAiConsent.cpp
     src/app/PanelAiLink.cpp
     src/app/PanelConnectAi.cpp
     src/app/PanelSupportCard.cpp
@@ -1013,6 +1014,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(tablet_troubleshooting_1024 tablet_troubleshooting --size 1024x768)
     # Tool > Geometry's groups at 1440 and 1024 px (tests/ui/geometry_groups.sfui, 100% and 200% inside;
     # tests/ui/narrow/geometry_groups.sfui at 1024: the drop-down palettes).
+    # The first-use notice for online AI services (tests/ui/ai_consent.sfui, 100% and 200% inside).
+    sculptforge_ui_test(ai_consent_1440 ai_consent --size 1440x900)
+    sculptforge_ui_test(ai_consent_2880 ai_consent --size 2880x1800) # its 200% shots: 1440 px of UI
     sculptforge_ui_test(geometry_groups_1440 geometry_groups --size 1440x900)
     sculptforge_ui_test(geometry_groups_2880 geometry_groups --size 2880x1800) # its 200% shot: 1440 px of UI
     sculptforge_ui_test(geometry_groups_1024 narrow/geometry_groups --size 1024x768)

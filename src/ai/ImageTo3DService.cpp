@@ -5,6 +5,7 @@
 #include "ai/AiPolicy.h"
 
 #include "ai/ComfyUI.h"
+#include "ai/Consent.h"
 #include "ai/GradioClient.h"
 #include "ai/Hyper3D.h"
 #include "ai/Http.h"
@@ -589,6 +590,8 @@ GeneratorResult generate3D(const AiSettings& s, const std::string& imagePath, co
                            GenerationProgress* progress) {
     if (!aiEnabled()) return {false, {}, aiOffError()};
     if (std::string why; !serviceAllowed(s, why)) return {false, {}, why};
+    if (std::string why; !generateKeyMissing(s) && !checkSendAllowed(s, generateTarget(s, false), why))
+        return {false, {}, why}; // nothing sent before Allow (ai/Consent.h)
     if (GeneratorResult r; stubbed(outputStem, progress, r)) return r;
     if (s.generatorService == "meshy") return runMeshy(s, imagePath, outputStem, progress);
     if (s.generatorService == "hyper3d") return hyper3d::run(s, imagePath, {}, progress);
@@ -626,6 +629,8 @@ GeneratorResult generate3DFromText(const AiSettings& s, const std::string& promp
                                    GenerationProgress* progress) {
     if (!aiEnabled()) return {false, {}, aiOffError()};
     if (std::string why; !serviceAllowed(s, why)) return {false, {}, why};
+    if (std::string why; !generateKeyMissing(s) && !checkSendAllowed(s, generateTarget(s, true), why))
+        return {false, {}, why};
     GeneratorResult result;
     if (prompt.find_first_not_of(" \t\r\n") == std::string::npos) {
         result.error = "Describe the model you want";
