@@ -12,7 +12,8 @@ its icon and how long you've been at it. It's off until you switch it on.
 Two extras, both off until you check them:
 
 - **Show the monthly challenge** adds a line "Monthly challenge: *theme*", with the theme you type in the box under
-  it (64 characters at most). Handy while you work on the community's monthly challenge.
+  it (64 characters at most). Handy while you work on the community's monthly challenge (a new theme on the 1st;
+  submissions close on the 27th, vote until the end of the month).
 - **Show the file name** adds the name of the file you have open, for example `kraken.sfproj`. Only the name, never
   the folder it's in.
 
