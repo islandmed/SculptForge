@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Code signing policy - SculptForge</title>
+  <meta name="description" content="How SculptForge Windows builds are code-signed through SignPath Foundation, who can sign, and what the app sends over the network.">
+  <meta name="theme-color" content="#111114">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png?v=7">
+  <link rel="icon" type="image/png" sizes="64x64" href="img/favicon-64.png?v=7">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=7">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="SculptForge code signing policy">
+  <meta property="og:description" content="Who signs SculptForge Windows builds, how a release is approved, and the app's privacy statement.">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=5">
+  <meta property="og:url" content="https://sculptforge.app/code-signing.html">
+  <link rel="canonical" href="https://sculptforge.app/code-signing.html">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="style.css?v=19">
+  <script src="motion.js?v=12" defer></script>
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <style>
+    .terms > * { max-width: 720px; }
+    .terms h2 { font-size: 1.25rem; margin: 40px 0 10px; }
+    .terms h2:first-child { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="index.html"><img class="brand-mark" src="img/bust-mark-44.png" srcset="img/bust-mark-88.png 2x, img/bust-mark-132.png 3x" width="44" height="44" alt=""><span>SculptForge</span></a>
+      <nav aria-label="Main">
+        <a href="index.html#features">Features</a>
+        <a href="index.html#demos">Demos</a>
+        <a href="brushes.html">Brushes</a>
+        <a href="guide/index.html">Guide</a>
+        <a href="studios.html">Studios</a>
+        <a class="nav-support" href="support.html">Support</a>
+        <a class="nav-dl" href="index.html#download">Download</a>
+        <a class="gh" href="https://discord.gg/gWrYkEmQhH">Discord</a>
+        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="wrap">
+        <p class="eyebrow">Security</p>
+        <h1>Code signing policy</h1>
+        <p class="lede">Free code signing provided by <a href="https://signpath.io" rel="noopener">SignPath.io</a>,
+          certificate by <a href="https://signpath.org" rel="noopener">SignPath Foundation</a>.</p>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="wrap terms">
+        <h2 id="status">Status</h2>
+        <p>Windows code signing via SignPath Foundation is being set up. Until it is live, Windows builds are unsigned;
+          if SmartScreen appears, choose <em>More info &rarr; Run anyway</em>, and check the SHA-256 checksum on the
+          <a href="https://github.com/islandmed/SculptForge/releases/latest">release page</a>.</p>
+
+        <h2 id="what">What is signed</h2>
+        <p>The Windows installer and the Windows portable build of each SculptForge release, built by the project's
+          public GitHub Actions workflow from the tagged source in the
+          <a href="https://github.com/islandmed/SculptForge">SculptForge repository</a>. Only builds made that way are
+          signed; nothing built elsewhere is sent for signing.</p>
+
+        <h2 id="roles">Team roles</h2>
+        <ul>
+          <li><strong>Committers and reviewers:</strong> the members of the
+            <a href="https://github.com/islandmed/SculptForge">SculptForge repository</a> with write access. Every change
+            is reviewed before it is merged.</li>
+          <li><strong>Approvers:</strong> the maintainer, who approves each signing request for a release.</li>
+        </ul>
+
+        <h2 id="privacy">Privacy</h2>
+        <p>SculptForge does not transfer information to networked systems unless specifically requested by the user or
+          the person installing or operating it, with one exception that can be turned off: once a day at start-up it
+          downloads a small file from sculptforge.app that names the newest version. Nothing about you or your computer
+          is sent; <strong>Edit &gt; Preferences &gt; Updates</strong> turns the check off. There is no telemetry, no
+          analytics and no crash upload; crash logs stay on your computer.</p>
+        <p>Everything else connects only when you use it:</p>
+        <ul>
+          <li><strong>Community brush gallery</strong>: lists and downloads brushes when you open it.</li>
+          <li><strong>AI features</strong>: the brush description or image goes to the service you chose, only when you
+            press Send or Generate. They can be switched off in <strong>Edit &gt; Preferences &gt; AI</strong>. See
+            <a href="ai.html">AI tools</a> and
+            <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>.</li>
+          <li><strong>Phone capture and the local tools</strong> (such as the splat trainer): downloaded or connected
+            only when you start them.</li>
+        </ul>
+        <p>Studios can turn every outside connection off with a policy file; see
+          <a href="guide/security.html">Security and privacy</a> in the user guide.</p>
+
+        <h2 id="contact">Reporting a problem</h2>
+        <p>A signed file that looks wrong, or a security issue: see the
+          <a href="https://github.com/islandmed/SculptForge/blob/main/SECURITY.md">security policy</a>.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="index.html"><img class="brand-mark" src="img/bust-mark-44.png" srcset="img/bust-mark-88.png 2x, img/bust-mark-132.png 3x" width="32" height="32" alt=""><span>SculptForge</span></a>
+        <p class="fine">Copyright © 2026 The SculptForge contributors. SculptForge is licensed under the
+          <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
+      </div>
+      <div class="links">
+        <a href="performance/">Performance</a>
+        <a href="guide/index.html">User Guide</a>
+        <a href="brushes.html">Community brushes</a>
+        <a href="benchmarks/">Benchmarks: 15M and 33M</a>
+        <a href="press.html">Press kit</a>
+        <a href="support.html">Membership</a>
+        <a href="supporters.html">Members</a>
+        <a href="terms.html">Terms</a>
+        <a href="code-signing.html">Code signing</a>
+        <a href="jobs.html">Jobs</a>
+        <a href="https://github.com/islandmed/SculptForge">Source code</a>
+        <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
+      </div>
+      <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners. The site uses no cookies. Visits are counted anonymously with <a href="https://www.goatcounter.com/">GoatCounter</a>.</p>
+    </div>
+  </footer>
+</body>
+</html>
