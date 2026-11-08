@@ -133,13 +133,17 @@
   }
 
   // --- Download counts: GoatCounter (loaded beside this script) records which file was downloaded, so the
-  // stats show downloads per platform next to the visits and the sites that sent them. ---
+  // stats show downloads per platform next to the visits and the sites that sent them. GoatCounter keeps no campaign on
+  // events, so a visit that arrived from a tagged link (an ad's utm_campaign) adds it to the event name: downloads per
+  // ad, from this page view only (no cookie, no storage). ---
+  const campaign = (new URLSearchParams(location.search).get("utm_campaign") || "")
+    .toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 40);
   document.addEventListener("click", (e) => {
     const a = e.target.closest('a[href*="github.com/islandmed/SculptForge/releases"]');
     if (!a || !window.goatcounter?.count) return;
     const file = a.href.split("/download/")[1] || "releases page";
     const title = a.innerText.replace(/\s+/g, " ").trim().slice(0, 60);
-    window.goatcounter.count({ path: "download: " + file, title, event: true });
+    window.goatcounter.count({ path: "download: " + file + (campaign ? " [" + campaign + "]" : ""), title, event: true });
   });
 
   if (!guide) return;
