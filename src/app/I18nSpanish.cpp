@@ -1960,6 +1960,10 @@ constexpr Entry kSpanish[] = {
     {"Brushes subtract instead of add. Holding Alt flips it for one stroke.",
      "Los pinceles restan en vez de sumar. Mantener Alt lo invierte durante un trazo."},
     {"Connected only", "Solo conectado"},
+    {"Lock plane", "Fijar plano"},
+    {"Crisp edge", "Borde nítido"},
+    {"Keep the plane the stroke starts on for the whole stroke.", "Mantiene el plano donde empieza el trazo durante todo el trazo."},
+    {"A hard, clean tip edge and a full plane pull, for hard-surface planes.", "Un borde de punta duro y limpio y un aplanado completo, para planos de superficie dura."},
     {"View falloff", "Ver atenuación"},
     {"The Smooth brush (and Shift) removes bumps without shrinking the form, instead of the plain smooth that also "
      "flattens it. Either way, let go of Shift while still pressing a Shift-smooth stroke to switch to the other "

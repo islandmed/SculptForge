@@ -1727,6 +1727,10 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Brushes subtract instead of add. Holding Alt flips it for one stroke.",
      "笔刷改为减去而非增加。按住 Alt 可在单一笔触中反转。"},
     {"Connected only", "仅限相连"},
+    {"Lock plane", "锁定平面"},
+    {"Crisp edge", "锐利边缘"},
+    {"Keep the plane the stroke starts on for the whole stroke.", "整个笔触都保持笔触起点的平面。"},
+    {"A hard, clean tip edge and a full plane pull, for hard-surface planes.", "硬而干净的笔尖边缘并完全压平，用于硬表面平面。"},
     {"View falloff", "视图衰减"},
     {"The Smooth brush (and Shift) removes bumps without shrinking the form, instead of the plain smooth that also "
      "flattens it. Either way, let go of Shift while still pressing a Shift-smooth stroke to switch to the other "

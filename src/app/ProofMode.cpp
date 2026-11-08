@@ -725,6 +725,24 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         if (spec.radiusPx > 0) {
             brush_ = spec.brush;
             doc_.activeBrush = -1;
+            // SF_BENCH_BRUSH=Flatten (a built-in brush) or =CrispFlatten (a custom or pack brush, spaces and case
+            // ignored): the Clay phases sculpt with it instead, to measure one brush against another (BASE_ENV and
+            // SHA_ENV in bench.sh).
+            if (const char* bb = std::getenv("SF_BENCH_BRUSH"); bb && *bb && spec.brush == BrushType::Clay) {
+                auto key = [](std::string t) {
+                    std::erase_if(t, [](char ch) { return ch == ' '; });
+                    for (char& ch : t) ch = char(std::tolower(static_cast<unsigned char>(ch)));
+                    return t;
+                };
+                BrushType t;
+                if (brushFromName(bb, t)) brush_ = t;
+                else
+                    for (size_t i = 0; i < doc_.brushes.size(); ++i)
+                        if (key(doc_.brushes[i].name) == key(bb)) doc_.activeBrush = int(i);
+                if (p.phaseIndex == 0)
+                    std::fprintf(stderr, "bench brush: %s\n", doc_.activeBrush >= 0 ? doc_.brushes[doc_.activeBrush].name.c_str()
+                                                                                   : brushName(brush_));
+            }
             paintMode_ = false;
             radiusPx_ = spec.radiusPx;
             strength_ = spec.strength;

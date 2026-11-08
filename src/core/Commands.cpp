@@ -628,6 +628,14 @@ CommandRegistry::CommandRegistry() {
         params.push_back({"viewFalloff", T::Bool,
                           "Measure the falloff on screen: a cylinder through the model along the view. Default false.",
                           false});
+        params.push_back({"planeLock", T::Bool,
+                          "Take the plane at the stroke's start and keep it for the whole stroke (false: the plane "
+                          "follows the surface). Default false.",
+                          false});
+        params.push_back({"crispEdge", T::Bool,
+                          "A hard tip edge with a thin anti-aliased band, and the plane pulled all the way: clean, "
+                          "sharp boundaries for hard-surface planes and bevels. Default false.",
+                          false});
         add({"brush_create",
              "Create (or update, by name) a custom sculpting brush from a recipe and make it the active brush. "
              "Omitted parameters use neutral defaults.",

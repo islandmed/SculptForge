@@ -89,6 +89,10 @@ void hardSurface(PackBuilder b) {
         r.depth = 0.0f; r.plane = Plane::Flatten; r.planeAmount = 1.0f; r.hardness = 0.95f; r.alpha = "Square";
         r.spacing = 0.06f;
     });
+    b("Crisp Flatten", "Flattens to the plane the stroke starts on with a clean, sharp edge, for hard planes and bevels.",
+      [](BrushRecipe& r) {
+          r.depth = 0.0f; r.plane = Plane::Flatten; r.planeAmount = 1.0f; r.planeLock = true; r.crispEdge = true;
+      });
     b("Bevel Scrape", "Scrapes high points into a bevel along an edge, for chamfers.", [](BrushRecipe& r) {
         r.depth = -0.05f; r.plane = Plane::Scrape; r.planeAmount = 1.0f; r.hardness = 0.7f; r.pinch = 0.0f;
         r.spacing = 0.06f;
