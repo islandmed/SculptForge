@@ -250,9 +250,10 @@ bumped() {
     grep -q "^project(SculptForge VERSION ${BASE//./\\.}[ )]" CMakeLists.txt && prerelease_is "$PRE" &&
         { [ -n "$PRE" ] || grep -q "^## \[${V//./\\.}\]" CHANGELOG.md; }
 }
-# staged_run SHA [--wait]: the id of staging's Packages run that this release may promote (tools/release/staged_run.py:
-# a push to staging by islandmed for exactly SHA, successful, at most SF_STAGED_MAX_DAYS (7) days old, artifacts
-# present). Its exit status: 0 found, 3 there is no staging run for SHA, 1 none may be promoted (why in $work/staged.err).
+# staged_run SHA [--wait]: the id of the Packages run that this release may promote (tools/release/staged_run.py:
+# a push to staging or main by islandmed for SHA or a commit with the same build-input key (tools/release/build_key.py),
+# successful, at most SF_STAGED_MAX_DAYS (7) days old, artifacts present). Its exit status: 0 found, 3 there is no
+# such run, 1 none may be promoted (why in $work/staged.err).
 staged_run() {
     python3 tools/release/staged_run.py --repo "$REPO" --sha "$1" --actors "$AUTHOR_NAME" --max-days "${SF_STAGED_MAX_DAYS:-7}" \
         ${2:+"$2"} 2>"$work/staged.err"
@@ -611,12 +612,13 @@ step_ci() {
         return
     fi
     local run rc=0
-    echo "   staging's Packages run for ${sha:0:8} (waits while it runs) ..."
+    echo "   the Packages run that built ${sha:0:8}'s build inputs (waits while it runs) ..."
     run=$(staged_run "$sha" --wait) || rc=$?
     case $rc in
-        0) ok "staging's Packages run $run built and tested $V for ${sha:0:8}: the release promotes exactly its packages" ;;
-        3) die "no Packages run on staging for ${sha:0:8}" "$(stage_fix)" ;;
-        *) die "staging's Packages runs for ${sha:0:8} can't be promoted: $(tail -1 "$work/staged.err")" \
+        0) ok "Packages run $run built and tested $V for ${sha:0:8}: the release promotes exactly its packages"
+           sed 's/^ *//' "$work/staged.err" | grep '^run .* built ' | sed 's/^/   /' || true ;;
+        3) die "no Packages run on staging or main for ${sha:0:8} or its build inputs" "$(stage_fix)" ;;
+        *) die "the Packages runs for ${sha:0:8} can't be promoted: $(tail -1 "$work/staged.err")" \
                "a failed run that was a runner hiccup: gh run rerun <id> --failed -R $REPO, then $(resume ci); otherwise $(stage_fix)" ;;
     esac
 }
@@ -628,7 +630,7 @@ step_tag() {
     if [ $MODE = promote ]; then # the tag goes on exactly the staged commit, which main is
         git fetch -q origin main
         [ "$sha" = "$(git rev-parse origin/main)" ] || die "HEAD ${sha:0:8} is not origin/main $(git rev-parse --short origin/main)" "git switch main && git merge --ff-only origin/main; if main moved past the staged commit, stage again: $(stage_fix)"
-        staged_run "$sha" >/dev/null || die "${sha:0:8} has no promotable staging Packages run: $(tail -1 "$work/staged.err")" "$(stage_fix)"
+        staged_run "$sha" >/dev/null || die "${sha:0:8} has no promotable Packages run: $(tail -1 "$work/staged.err")" "$(stage_fix)"
     fi
     confirm "Tag $T at $(git log -1 --format='%h %s' "$sha") and push it? This publishes SculptForge $V${PRE:+ for members, in $INSIDERS_REPO}." ||
         die "not confirmed" "run again and answer y (or YES=1) once the owner has said ship it for $V"

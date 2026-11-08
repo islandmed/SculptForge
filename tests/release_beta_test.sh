@@ -62,8 +62,10 @@ touch "$S/build/CTestTestfile.cmake"
 cat > "$S/bin/gh" <<EOF
 #!/usr/bin/env bash
 # staging's Packages run for the asked commit (tools/release/staged_run.py): STAGED_EVENT, STAGED_ACTOR vary it.
+# Listings by branch (runs of other commits with the same build-input key) are empty here.
 runs() {
   sha=\$(sed -n 's/.*head_sha=\([0-9a-f]*\).*/\1/p' <<<"\$1")
+  [ -n "\$sha" ] || { echo '{"workflow_runs": []}'; return; } # (the branch listings: no other commit's run)
   printf '{"workflow_runs": [{"id": 77, "path": ".github/workflows/packages.yml", "head_sha": "%s", "head_branch": "staging",
     "event": "%s", "status": "completed", "conclusion": "success", "created_at": "%s",
     "head_repository": {"full_name": "islandmed/SculptForge"}, "repository": {"full_name": "islandmed/SculptForge"},

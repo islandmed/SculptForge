@@ -4,14 +4,15 @@ name: Release
 #
 #   locate   the tagged commit must carry the version the tag names (CMakeLists.txt's version, plus its
 #            SCULPTFORGE_PRERELEASE for a beta: v0.11.0-beta.1 tags 0.11.0 with "beta.1"). When the Packages workflow
-#            (packages.yml) ran on a maintainer's push to `staging` for exactly this commit (scripts/release.sh --stage),
-#            the release promotes that run's packages unchanged: built and tested once. tools/release/staged_run.py
-#            picks it (push event, branch, actor, success, at most 7 days old, artifacts present) and refuses the
-#            release if no such run qualifies; CI must have passed on main for the commit. With no staging run at all:
+#            (packages.yml) ran on a maintainer's push to `staging` or `main` for this commit, or for one with the same
+#            build-input key (tools/release/build_key.py: every file that goes into the packages identical), the release
+#            promotes that run's packages unchanged: built and tested once. tools/release/staged_run.py picks it (push
+#            event, branch, actor, success, at most 7 days old, artifacts present, the key recomputed from git) and
+#            refuses the release if no such run qualifies; CI must have passed on main for the commit. With none at all:
 #   build    the Packages workflow runs here, from the tag (compiler cache restored from main, never saved): the
 #            --rebuild path.
 #   verify   every package's SHA-256 is the one its run recorded (packages.yml job sums) and its GitHub artifact
-#            attestation names packages.yml, this commit and that run (and, promoted, a push to staging):
+#            attestation names packages.yml, the commit that run built and that run (and, promoted, its push):
 #            tools/release/verify_staged.py. Any mismatch refuses the release.
 #   smoke    every package installed or unpacked on a fresh runner: the app opens a model and sculpts
 #            (tests/ui/release_smoke.sfui), sculptforge-cli opens, sculpts, saves and reopens and its MCP server answers
@@ -64,6 +65,8 @@ jobs:
     outputs:
       run-id: ${{ steps.find.outputs.run-id }}
       sha: ${{ steps.find.outputs.sha }}
+      built-sha: ${{ steps.find.outputs.built-sha }}
+      built-ref: ${{ steps.find.outputs.built-ref }}
       tag: ${{ steps.find.outputs.tag }}
       staged: ${{ steps.find.outputs.staged }}
     steps:
@@ -106,16 +109,23 @@ jobs:
               --jq '.workflow_runs[] | select(.head_sha == "'"$sha"'" and .head_branch == "main" and .event == "push"
                     and .path == ".github/workflows/'"$1"'" and .head_repository.full_name == "'"$REPO"'") | .id' | head -1
           }
-          # The packages: only the Packages run of a maintainer's push to `staging` for exactly this commit (exit 3:
-          # there is none, build here; exit 1: there are runs, none may be promoted: refuse).
+          # The packages: only the Packages run of a maintainer's push to `staging` or `main` for this commit or one with
+          # the same build-input key (exit 3: there is none, build here; exit 1: there are runs, none may be promoted: refuse).
           rc=0
-          pkg=$(python3 tools/release/staged_run.py --repo "$REPO" --sha "$sha") || rc=$?
+          found=$(python3 tools/release/staged_run.py --repo "$REPO" --sha "$sha" --full) || rc=$?
           if [ $rc = 3 ]; then
-            echo "No Packages run on staging for $sha: building the packages here (the --rebuild path)"
+            echo "No Packages run on staging or main for $sha or its build inputs: building the packages here (the --rebuild path)"
             exit 0
           elif [ $rc != 0 ]; then
-            echo "::error::$sha has Packages runs on staging but none may be promoted (above). Fix: stage the release again (scripts/release.sh X.Y.Z --stage), or delete the tag and use scripts/release.sh X.Y.Z --rebuild."
+            echo "::error::$sha has Packages runs but none may be promoted (above). Fix: stage the release again (scripts/release.sh X.Y.Z --stage), or delete the tag and use scripts/release.sh X.Y.Z --rebuild."
             exit 1
+          fi
+          read -r pkg built ref <<<"$found"
+          case "$ref" in main|staging) ;; *) echo "::error::run $pkg is from '$ref', not main or staging"; exit 1 ;; esac
+          if [ "$built" != "$sha" ]; then # (staged_run.py checked it; checked again here, from git, where it is logged)
+            keys=$(python3 tools/release/build_key.py "$sha" "$built" | cut -d' ' -f1 | sort -u | wc -l)
+            [ "$keys" = 1 ] || { echo "::error::run $pkg built $built, whose build inputs differ from $sha's"; exit 1; }
+            echo "Run $pkg built $built ($ref), whose build inputs are byte for byte $sha's: $(python3 tools/release/build_key.py "$sha")"
           fi
           ci=$(runs ci.yml || true)
           if [ -z "$ci" ]; then
@@ -128,8 +138,10 @@ jobs:
             done
           fi
           [ -n "$ci" ] || { echo "::error::no successful CI run on main for $sha: a staged commit lands on main only after CI passed"; exit 1; }
-          echo "Promoting the packages of staging's Packages run $pkg (CI run $ci passed for $sha)"
+          echo "Promoting the packages of $ref's Packages run $pkg (CI run $ci passed for $sha)"
           echo "run-id=$pkg" >> "$GITHUB_OUTPUT"
+          echo "built-sha=$built" >> "$GITHUB_OUTPUT"
+          echo "built-ref=refs/heads/$ref" >> "$GITHUB_OUTPUT"
           echo "staged=true" >> "$GITHUB_OUTPUT"
 
   build:
@@ -176,9 +188,10 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
           RUN: ${{ needs.locate.outputs.run-id || github.run_id }}
-          SHA: ${{ needs.locate.outputs.sha }}
+          SHA: ${{ needs.locate.outputs.built-sha || needs.locate.outputs.sha }}
           STAGED: ${{ needs.locate.outputs.staged }}
-        run: python3 tools/release/verify_staged.py dist sums/SHA256SUMS.staged.txt --repo "$GITHUB_REPOSITORY" --run "$RUN" --sha "$SHA" ${STAGED:+--staged}
+          REF: ${{ needs.locate.outputs.built-ref }}
+        run: python3 tools/release/verify_staged.py dist sums/SHA256SUMS.staged.txt --repo "$GITHUB_REPOSITORY" --run "$RUN" --sha "$SHA" ${STAGED:+--staged --ref "$REF"}
 
   smoke:
     name: Smoke test ${{ matrix.name }}

@@ -15,6 +15,9 @@
     tools/release/staged_run.py; a publisher doesn't need job verify or re-check the checksums
     (tools/release/verify_staged.py); packages.yml reads any secret, or a job of it uploads packages without a
     pinned actions/attest-build-provenance step.
+  - build once by key: packages.yml filters its pushes by `paths:` (tools/release/build_inputs.txt is the one list of
+    build inputs; a filter skipped 0.11.14's staging push), or has no job reuse picking the earlier run with
+    tools/release/staged_run.py --before-run (only older runs, so two runs never wait for each other).
   - integrations.yml (the Blender/Maya lanes) runs on anything but tag pushes, has an unpinned `uses:` or shell
     tracing, reads a secret other than UPDATE_SIGNING_KEY (in `environment: release`, by a job that can't write), or
     publishes without re-checking SHA256SUMS.txt.sig against the app's key (openssl pkeyutl -verify).
@@ -98,6 +101,10 @@ def check(files):
     if pk is not None:
         if "secrets." in pk:
             errs.append("packages.yml: reads a secret (staging builds must never see one; signing happens at promotion)")
+        if re.search(r"^\s+paths(-ignore)?:", pk.split("\njobs:")[0], re.M):
+            errs.append("packages.yml: a paths: filter (job reuse skips unchanged build inputs: tools/release/build_inputs.txt)")
+        if not re.search(r"staged_run\.py\b.*--before-run", "\n".join(jobs(pk).get("reuse", []))):
+            errs.append("packages.yml: no job reuse running tools/release/staged_run.py --before-run")
         for job, lines in jobs(pk).items():
             body = "\n".join(lines)
             if job != "sums" and "upload-artifact" in body and not ATTEST.search(body):
@@ -233,6 +240,9 @@ PACKAGES = """on:
   push:
     branches: [main, staging]
 jobs:
+  reuse:
+    steps:
+      - run: python3 tools/release/staged_run.py --sha "$SHA" --before-run "$RUN" --wait --full
   linux:
     permissions:
       id-token: write
@@ -309,6 +319,10 @@ def self_test():
         "packages attest unpinned": ({"release.yml": GOOD, "packages.yml": PACKAGES.replace("@4d101475d8b20a2381f78447822ac1eab6504dd8", "@v4")}, 1),
         "packages attests less": ({"release.yml": GOOD, "packages.yml": PACKAGES.replace("            build/*.mcpb\n  sums:", "  sums:")}, 1),
         "packages secret": ({"release.yml": GOOD, "packages.yml": PACKAGES + "        env: { K: '${{ secrets.X }}' }\n"}, 1),
+        "packages paths filter": ({"release.yml": GOOD, "packages.yml": PACKAGES.replace("[main, staging]\n", "[main, staging]\n    paths: ['**', '!website/**']\n")}, 1),
+        "packages paths-ignore": ({"release.yml": GOOD, "packages.yml": PACKAGES.replace("[main, staging]\n", "[main, staging]\n    paths-ignore: [website/**]\n")}, 1),
+        "packages no reuse": ({"release.yml": GOOD, "packages.yml": PACKAGES.replace("staged_run.py", "x.py")}, 1),
+        "packages reuse waits on newer": ({"release.yml": GOOD, "packages.yml": PACKAGES.replace(' --before-run "$RUN"', "")}, 1),
         "signing key outside env": ({"release.yml": GOOD.replace("    environment: release\n", "")}, 1),
         "signing key at repo level elsewhere": ({"release.yml": GOOD, "x.yml": f"jobs:\n  a:\n    env:\n      K: ${{{{ {SIGNING} }}}}\n"}, 1),
         "no staged_run": ({"release.yml": GOOD.replace("staged_run.py", "x.py")}, 1),
