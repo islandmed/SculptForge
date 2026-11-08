@@ -859,6 +859,12 @@ void App::drawPalette_Tool() {
         drawProjectContents(); // ProjectAll (PanelRetopo.cpp)
         Demo::popScope();
     }
+    if (subpalette("tool.garments", "Garments")) {
+        tray::Section section;
+        Demo::pushScope("Garments");
+        drawGarmentsContents(); // PanelGarments.cpp
+        Demo::popScope();
+    }
     if (subpalette("tool.forgespheres", "Forge Spheres")) {
         tray::Section section;
         Demo::pushScope("Forge Spheres");
@@ -967,12 +973,6 @@ void App::drawPalette_Tool() {
         tray::Section section;
         Demo::pushScope("Texture Image");
         drawTextureMapContents();
-        Demo::popScope();
-    }
-    if (subpalette("tool.garments", "Garments")) {
-        tray::Section section;
-        Demo::pushScope("Garments");
-        drawGarmentsContents(); // PanelGarments.cpp
         Demo::popScope();
     }
     if (subpalette("tool.bake", "Bake")) {

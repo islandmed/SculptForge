@@ -82,7 +82,6 @@ constexpr Entry kTraditionalChinese[] = {
     {"Parts", "部件"},
     {"Tablet", "繪圖板"},
     {"Texture Image", "紋理影像"},
-    {"Texture Map", "貼圖"},
     // --- Garments: Tool > Garments and the Pattern window (PanelGarments.cpp) ---
     {"%.1f x %.1f cm, %.0f cm2", "%.1f x %.1f 公分，%.0f 平方公分"},
     {"%.1f, %.1f cm", "%.1f, %.1f 公分"},

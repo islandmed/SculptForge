@@ -64,7 +64,7 @@ expect_value cloth_self == 1
 shot cloth_panel
 
 # The other modes, each picked in the panel: Grab carries the spot it started on, Pinch gathers the cloth into
-# folds, Inflate balloons it with wrinkles (Symmetry X is on: both sides).
+# folds, Inflate puffs it out with wrinkles (Symmetry X is on: both sides).
 click "##clothmode"
 wait 0.2
 click "Grab##clothmode"

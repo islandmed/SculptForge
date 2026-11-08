@@ -84,7 +84,6 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Parts", "部件"},
     {"Tablet", "数位板"},
     {"Texture Image", "纹理图像"},
-    {"Texture Map", "贴图"},
     // --- Garments: Tool > Garments and the Pattern window (PanelGarments.cpp) ---
     {"%.1f x %.1f cm, %.0f cm2", "%.1f x %.1f 厘米，%.0f 平方厘米"},
     {"%.1f, %.1f cm", "%.1f, %.1f 厘米"},

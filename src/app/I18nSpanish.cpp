@@ -82,7 +82,6 @@ constexpr Entry kSpanish[] = {
     {"Parts", "Piezas"},
     {"Tablet", "Tableta"},
     {"Texture Image", "Imagen de textura"},
-    {"Texture Map", "Mapa de textura"},
     // --- Garments: Tool > Garments and the Pattern window (PanelGarments.cpp) ---
     {"%.1f x %.1f cm, %.0f cm2", "%.1f x %.1f cm, %.0f cm2"},
     {"%.1f, %.1f cm", "%.1f, %.1f cm"},
