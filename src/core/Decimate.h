@@ -16,8 +16,12 @@ namespace sf {
 // surviving triangles keep their face group and hidden flag, and corner UVs
 // follow the kept vertex. A decimated result is all triangles (quad pairs are
 // dropped). keepMasked: masked vertices (mask >= kKeepMaskedThreshold) are never collapsed, so they and the
-// triangles between them come through unchanged (#43).
-Mesh decimate(const Mesh& src, size_t targetTriangles, bool keepMasked = false);
+// triangles between them come through unchanged (#43). maxValence: a collapse that leaves the kept vertex more
+// neighbours than this (and than it had) is skipped, so flat areas can't fan out into slivers; 0 = no cap (the
+// A/B in nightly_decimate_valence_cap).
+constexpr size_t kDecimateMaxValence = 16;
+Mesh decimate(const Mesh& src, size_t targetTriangles, bool keepMasked = false,
+              size_t maxValence = kDecimateMaxValence);
 
 // LOD chain: lods[0] is a copy of `src`, each following level has
 // `ratio` times the triangles of the previous one.

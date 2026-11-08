@@ -52,7 +52,7 @@ uint64_t edgeKey(uint32_t a, uint32_t b) {
 
 } // namespace
 
-Mesh decimate(const Mesh& src, size_t targetTriangles, bool keepMasked) {
+Mesh decimate(const Mesh& src, size_t targetTriangles, bool keepMasked, size_t maxValence) {
     const size_t nv = src.vertexCount();
     const size_t nt = src.triangleCount();
     targetTriangles = std::max<size_t>(targetTriangles, 4);
@@ -175,6 +175,11 @@ Mesh decimate(const Mesh& src, size_t targetTriangles, bool keepMasked) {
             else ++common, ++i, ++j;
         }
         if (common != shared.size()) continue;
+        // Valence cap: on flat or evenly curved areas every collapse costs the same, so one vertex can swallow its
+        // whole neighbourhood; each collapse then rescans and re-pushes a fan of thousands (minutes and gigabytes
+        // on a 1M-triangle Part, figure_pose_bench) and the result is slivers. v gets both neighbourhoods; a vertex
+        // already past the cap may still shrink.
+        if (maxValence && nbrU.size() + nbrV.size() - common - 2 > std::max(maxValence, nbrV.size())) continue;
 
         // Reject collapses that flip or degenerate surrounding triangles.
         bool ok = true;

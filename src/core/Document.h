@@ -93,6 +93,8 @@ struct ExtractPreview {
     uint64_t revision = 0;
 };
 
+struct FigurePoseState; // core/FigurePose.h
+
 // Everything that makes up the open scene: the mesh, its acceleration
 // structure and edit history. UI-independent so it can be driven by tests,
 // scripts or an AI assistant through the command registry.
@@ -218,6 +220,9 @@ struct Document {
     // Undoes or redoes a PartStep: takes the Part out of the list into the step, or puts it back. False
     // when there was nothing to do (the Part was deleted since, or it's the active or the last one).
     bool applyPartStep(PartStep& step);
+
+    // The Figure Pose in progress (core/FigurePose.h), null when none. Not saved in projects.
+    std::shared_ptr<FigurePoseState> figurePose;
 
     // The Extract preview waiting for Accept, if any (see ExtractPreview).
     ExtractPreview extractPreview;

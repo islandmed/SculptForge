@@ -126,6 +126,9 @@ struct SelectionSetsUndo {
 // Adding or removing a whole Part (Extract's Accept; core/Document.h). Applied by the undo / redo commands,
 // which see the whole scene: the record itself leaves the mesh alone.
 struct PartStep;
+// The transform and per-vertex weights of a transform step (core/MeshTransform.h), kept on Pose Mesh steps so
+// Figure Pose can replay them at full resolution (core/FigurePose.h).
+struct TransformOp;
 
 // "The active paint layer" for UndoRecord::captureColors.
 inline constexpr int kActivePaintLayer = -2;
@@ -147,6 +150,7 @@ inline constexpr int kActivePaintLayer = -2;
 //  - micro: the grid tiles a stroke on a micro level changed, or a whole micro level (core/Micro.h)
 //  - uvs: per triangle corner texture coordinates (restoring a selection set's UVs)
 //  - sets: the Selection Sets list (core/SelectionSets.h)
+//  - transformOp / group: see below (bookkeeping only; nothing to apply)
 // Record old values before changing them (ensureX() the attribute first);
 // undo allocates a missing attribute so values can always be restored.
 struct UndoRecord {
@@ -173,6 +177,10 @@ struct UndoRecord {
     std::unique_ptr<MicroUndo> micro;     // micro-displacement tiles of a stroke, or a micro level added / removed (core/Micro.h)
     UndoChannel<glm::vec2> uvs;           // per corner (index = triangle * 3 + corner)
     std::unique_ptr<SelectionSetsUndo> sets;
+    std::shared_ptr<const TransformOp> transformOp; // a Pose Mesh transform (core/FigurePose.h); not applied by undo
+    // Steps pushed together on several Parts' histories (Figure Pose's Apply) share a non-zero id: the undo and
+    // redo commands take every Part's top step with that id as one step.
+    uint64_t group = 0;
 
     bool empty() const {
         return positions.empty() && mask.empty() && colors.empty() && paintAlpha.empty() && hidden.empty() &&
