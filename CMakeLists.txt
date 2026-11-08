@@ -515,6 +515,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/render/ScreenStroke.cpp
     src/render/Renderer.cpp
     src/render/UvView.cpp
+    src/render/MicroFocus.cpp
     src/render/MicroRenderer.cpp
   )
   target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone sculptforge_appshared

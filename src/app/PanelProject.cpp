@@ -91,6 +91,7 @@ bool App::interactive() const { return options_.renderPath.empty() && options_.r
 void App::initProject() {
     if (!interactive()) return;
     prefDir_ = userDataDir();
+    setProjectAutosaveFolder(prefDir_); // (its autosave may name a streamed level's file by path: core/Project.h)
     if (prefDir_.empty()) return;
     std::ifstream f(fsPath(prefDir_ + "project.json"), std::ios::binary);
     Json prefs;
@@ -338,7 +339,7 @@ void App::tickProject(float dt) {
     autosaveTimer_ = 0.0f;
     storeProjectSettings();
     std::string err;
-    if (saveProject(autosavePath(prefDir_), doc_, err)) {
+    if (saveProject(autosavePath(prefDir_), doc_, err, /*autosave*/ true)) {
         autosaveRevision_ = revision;
         autosaveWritten_ = true;
         SDL_Log("Autosaved to %s", autosavePath(prefDir_).c_str());

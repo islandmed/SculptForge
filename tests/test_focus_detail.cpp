@@ -2,17 +2,25 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Focus Detail (core/FocusDetail.h): the detail file, coarse and full tiles, crack-free borders, brushes and undo
-// on streamed tiles, prediction, the LRU budget and incremental saves.
+// on streamed tiles, prediction, the LRU budget and incremental saves; in the app (phase 3): a widened range,
+// create / attach / Save As / compaction, projects naming their detail files, Divide to Micro switching to it,
+// and every micro brush writing exactly what it writes in memory.
 #include "TestHarness.h"
 
 #include "core/Benchmark.h"
 #include "core/BVH.h"
+#include "core/Commands.h"
 #include "core/FocusDetail.h"
+#include "core/Json.h"
 #include "core/Micro.h"
+#include "core/Project.h"
 #include "core/Sculpt.h"
+#include "io/Zip.h"
 
 #include <atomic>
+#include <sys/stat.h>
 #include <cstdio>
+#include <cstring>
 #include <thread>
 #include <filesystem>
 #include <vector>
@@ -104,6 +112,58 @@ TEST(focus_detail_open_is_coarse_then_full_is_exact) {
     CHECK(mm.rangeMax > 0);
 }
 
+// The renderer's per-tile record (render/MicroFocus.h): a coarse tile's record rebuilds exactly what disp holds
+// (its upsampled inside and its edges, real ones next to full tiles), so the GPU draws what brushes and picks see,
+// crack-free on both sides of the focus border; a full tile's gives back its edges and coarse points.
+TEST(focus_detail_gpu_record_rebuilds_coarse_tiles_exactly) {
+    const std::string path = writeSmall("record.sfdetail");
+    Mesh m;
+    std::string err;
+    auto fd = FocusDetail::open(path, m, err);
+    CHECK(fd != nullptr);
+    if (!fd) return;
+    const MicroMesh& mm = *m.micro;
+    const uint32_t n = mm.n, cn = 1u << FocusDetail::kCoarseLevel, s = n / cn;
+    const uint32_t R = (cn + 1) * (cn + 2) / 2 + 3 * (n - 1);
+    auto check = [&](size_t& coarseOff, size_t& fullOff, size_t& coarseTiles) {
+        std::vector<int16_t> rec(R);
+        coarseOff = fullOff = coarseTiles = 0;
+        for (uint32_t t = 0; t < mm.baseTriangles; ++t) {
+            const int16_t* g = mm.disp.data() + size_t(t) * mm.samples;
+            focusFillRecord(g, n, cn, rec.data());
+            const bool coarse = fd->tileLevel(t) == 0;
+            coarseTiles += coarse;
+            for (uint32_t J = 0; J <= n; ++J)
+                for (uint32_t I = 0; I + J <= n; ++I) {
+                    const bool kept = J == 0 || I == 0 || I + J == n || (I % s == 0 && J % s == 0);
+                    if (!coarse && !kept) continue;
+                    if (focusRecordValue(rec.data(), n, cn, I, J) != g[MicroMesh::index(I, J, n)]) ++(coarse ? coarseOff : fullOff);
+                }
+        }
+    };
+    size_t coarseOff, fullOff, coarseTiles;
+    check(coarseOff, fullOff, coarseTiles);
+    CHECK(coarseTiles == mm.baseTriangles);
+    CHECK(coarseOff == 0);
+    // A focus: every third tile full (their real edges go into coarse neighbours), then some demoted again.
+    std::vector<uint32_t> some;
+    for (uint32_t t = 0; t < mm.baseTriangles; t += 3) some.push_back(t);
+    fd->ensureFull(*m.micro, some, false);
+    check(coarseOff, fullOff, coarseTiles);
+    CHECK(coarseTiles < mm.baseTriangles && coarseTiles > 0);
+    CHECK(coarseOff == 0);
+    CHECK(fullOff == 0);
+    const size_t focusCoarse = coarseTiles;
+    fd->budgetBytes = 1; // (demoted again once not wanted for a few frames: their neighbours take back upsampled edges)
+    FocusView view;
+    FocusBrush brush;
+    for (int f = 0; f < 20; ++f) fd->update(m, view, brush, 100.0);
+    check(coarseOff, fullOff, coarseTiles);
+    CHECK(coarseTiles > focusCoarse);
+    CHECK(coarseOff == 0);
+    CHECK(fullOff == 0);
+}
+
 TEST(focus_detail_damaged_file_is_refused) {
     const std::string path = writeSmall("damaged.sfdetail");
     std::filesystem::resize_file(path, std::filesystem::file_size(path) - 100);
@@ -112,6 +172,71 @@ TEST(focus_detail_damaged_file_is_refused) {
     CHECK(FocusDetail::open(path, m, err) == nullptr);
     CHECK(!err.empty());
     CHECK(FocusDetail::open(focusTempPath("missing.sfdetail"), m, err) == nullptr);
+}
+
+// Crafted fields (security read of the reader): offsets past the end or wrapping 64 bits, bad counts, a directory
+// entry past the end (directory hash fixed up so the check behind it runs), a triangle index past the vertices.
+TEST(focus_detail_crafted_fields_are_refused) {
+    const std::string good = writeSmall("crafted-src.sfdetail");
+    std::vector<uint8_t> file(std::filesystem::file_size(good));
+    {
+        FILE* f = std::fopen(good.c_str(), "rb");
+        CHECK(f && std::fread(file.data(), 1, file.size(), f) == file.size());
+        if (f) std::fclose(f);
+    }
+    auto get64 = [&](const std::vector<uint8_t>& b, size_t at) { uint64_t v; std::memcpy(&v, b.data() + at, 8); return v; };
+    auto get32 = [&](const std::vector<uint8_t>& b, size_t at) { uint32_t v; std::memcpy(&v, b.data() + at, 4); return v; };
+    auto rehash = [&](std::vector<uint8_t>& b) { // the directory hash (fnv1a), as the writer stores it
+        uint64_t h = 1469598103934665603ull;
+        for (uint64_t i = 0; i < get64(b, 64); ++i) h = (h ^ b[get64(b, 56) + i]) * 1099511628211ull;
+        std::memcpy(b.data() + 88, &h, 8);
+    };
+    auto refused = [&](const char* what, auto&& patch) {
+        std::vector<uint8_t> b = file;
+        patch(b);
+        const std::string path = focusTempPath("crafted.sfdetail");
+        FILE* f = std::fopen(path.c_str(), "wb");
+        CHECK(f && std::fwrite(b.data(), 1, b.size(), f) == b.size());
+        if (f) std::fclose(f);
+        Mesh m;
+        std::string err;
+        const bool ok = FocusDetail::open(path, m, err) == nullptr && !err.empty();
+        if (!ok) std::printf("  not refused: %s\n", what);
+        CHECK(ok);
+    };
+    auto put64 = [](std::vector<uint8_t>& b, size_t at, uint64_t v) { std::memcpy(b.data() + at, &v, 8); };
+    auto put32 = [](std::vector<uint8_t>& b, size_t at, uint32_t v) { std::memcpy(b.data() + at, &v, 4); };
+    refused("truncated header", [](std::vector<uint8_t>& b) { b.resize(64); });
+    refused("bad magic", [](std::vector<uint8_t>& b) { b[0] = 'X'; });
+    refused("newer version", [&](std::vector<uint8_t>& b) { put32(b, 8, 99); });
+    refused("unknown codec", [&](std::vector<uint8_t>& b) { put32(b, 12, 77); });
+    refused("level too high", [&](std::vector<uint8_t>& b) { put32(b, 16, 40); });
+    refused("no triangles", [&](std::vector<uint8_t>& b) { put32(b, 24, 0); });
+    refused("more triangles", [&](std::vector<uint8_t>& b) { put32(b, 24, get32(b, 24) + 1); });
+    refused("huge vertex count", [&](std::vector<uint8_t>& b) { put32(b, 28, 0xFFFFFFFFu); });
+    refused("base past the end", [&](std::vector<uint8_t>& b) { put64(b, 40, b.size()); });
+    refused("base offset wraps", [&](std::vector<uint8_t>& b) { put64(b, 40, ~uint64_t(0) - 7); });
+    refused("directory offset wraps", [&](std::vector<uint8_t>& b) { put64(b, 56, ~uint64_t(0) - 7); });
+    refused("directory size wrong", [&](std::vector<uint8_t>& b) { put64(b, 64, get64(b, 64) - 24); });
+    refused("directory hash wrong", [&](std::vector<uint8_t>& b) { b[get64(b, 56)] ^= 1; });
+    refused("tile offset wraps", [&](std::vector<uint8_t>& b) { put64(b, get64(b, 56), ~uint64_t(0) - 3); rehash(b); });
+    refused("tile past the end", [&](std::vector<uint8_t>& b) { put64(b, get64(b, 56), b.size() - 2); rehash(b); });
+    refused("tile size past the end", [&](std::vector<uint8_t>& b) { put32(b, get64(b, 56) + 8, 0xFFFFFFFFu); rehash(b); });
+    refused("chunk offset wraps", [&](std::vector<uint8_t>& b) {
+        put64(b, get64(b, 56) + size_t(get32(b, 24)) * 24, ~uint64_t(0) - 3);
+        rehash(b);
+    });
+    refused("chunk size wrong", [&](std::vector<uint8_t>& b) {
+        put32(b, get64(b, 56) + size_t(get32(b, 24)) * 24 + 8, 5);
+        rehash(b);
+    });
+    refused("triangle index past the vertices", [&](std::vector<uint8_t>& b) {
+        put32(b, get64(b, 40) + size_t(get32(b, 28)) * 24, get32(b, 28));
+    });
+    // The untouched file still opens.
+    Mesh m;
+    std::string err;
+    CHECK(FocusDetail::open(good, m, err) != nullptr);
 }
 
 TEST(focus_detail_brush_promotes_undo_and_incremental_save) {
@@ -254,6 +379,7 @@ TEST(focus_detail_brush_thread_and_frames_together) {
     CHECK(edgesShared(m));
 }
 
+
 namespace {
 
 // The detail file at `path` fully decompressed (a reference).
@@ -267,8 +393,26 @@ std::vector<int16_t> fullValues(const std::string& path) {
 }
 
 std::vector<int16_t> streamedFull(Mesh& m) {
-    m.micro->focus->ensureFull(*m.micro, allTiles(m), false);
+    m.micro->focus->ensureAllFull(*m.micro, false);
     return m.micro->disp.toVector();
+}
+
+// One dab where a ray from `from` along -Z meets `pickOn` (default: doc's own mesh; a streamed mesh picks on what
+// it holds, so two meshes compared dab at one point picked on the full one).
+void dabAt(Document& doc, BrushType type, const char* name, glm::vec3 from, float radius, float strength,
+           Document* pickOn = nullptr) {
+    RayHit hit;
+    Document& pd = pickOn ? *pickOn : doc;
+    if (!surfaceRaycast(pd.mesh, pd.bvh, from, glm::vec3(0, 0, -1), hit)) return;
+    doc.sculptor.beginStroke(doc.mesh, name);
+    DabParams p;
+    p.center = hit.position;
+    p.radius = radius;
+    p.strength = strength;
+    Symmetry sym;
+    sym.x = false;
+    doc.sculptor.dab(doc.mesh, doc.bvh, type, p, sym);
+    doc.undo.push(doc.sculptor.endStroke());
 }
 
 } // namespace
@@ -304,6 +448,295 @@ TEST(focus_detail_widened_range_rescales_streamed_tiles) {
     CHECK(fd->save(m, err));
     CHECK(!fd->unsaved());
     CHECK(fullValues(path) == expected);
+}
+
+// Divide to Micro beyond the budget: create() writes the live level to a detail file and streams it; Save As writes
+// a compact copy and continues there; saves past half garbage compact; attach() opens a file for a project's Part.
+TEST(focus_detail_create_save_as_compaction_and_attach) {
+    const std::string src = writeSmall("create-src.sfdetail");
+    const std::vector<int16_t> ref = fullValues(src);
+    Mesh m;
+    std::string err;
+    {
+        auto fd = FocusDetail::open(src, m, err);
+        CHECK(fd != nullptr);
+        if (!fd) return;
+        fd->ensureFull(*m.micro, allTiles(m), false);
+        m.micro->focus.reset(); // a level in memory, as Divide to Micro leaves it
+    }
+    CHECK(m.micro->disp.toVector() == ref);
+    const std::string a = focusTempPath("create-a.sfdetail"), b = focusTempPath("create-b.sfdetail");
+    auto fd = FocusDetail::create(a, m, err);
+    CHECK(fd != nullptr);
+    if (!fd) return;
+    CHECK(m.micro->focus == fd && fd->stats().fullTiles == 0);
+    CHECK(edgesShared(m));
+    Document doc = makeDoc(std::move(m));
+    dabAt(doc, BrushType::Clay, "Clay", glm::vec3(0.0f, 0.1f, 5.0f), 0.1f, 0.8f);
+    CHECK(fd->unsaved());
+    const std::vector<int16_t> edited = streamedFull(doc.mesh);
+    CHECK(edited != ref);
+    CHECK(fd->saveAs(doc.mesh, b, err));
+    CHECK(fd->path() == b && !fd->unsaved());
+    CHECK(fullValues(a) == ref);    // the old file stays as it was
+    CHECK(fullValues(b) == edited);
+    // Saves that replace most of the file compact it (written beside it, renamed over it).
+    const size_t compactSize = std::filesystem::file_size(b);
+    for (int k = 0; k < 4; ++k) {
+        doc.mesh.micro->focus->ensureAllFull(*doc.mesh.micro, true);
+        CHECK(fd->save(doc.mesh, err));
+        CHECK(std::filesystem::file_size(b) < compactSize * 2 + 4096);
+    }
+    CHECK(!std::filesystem::exists(b + ".part"));
+    CHECK(fullValues(b) == edited);
+    // attach: a Part with the same base triangles streams the file; another mesh is refused.
+    Mesh part;
+    part.positions = doc.mesh.positions;
+    part.triangles = doc.mesh.triangles;
+    part.rebuildTopology();
+    part.recomputeAllNormals();
+    auto fd2 = FocusDetail::attach(b, part, {}, err);
+    CHECK(fd2 != nullptr);
+    if (fd2) CHECK(streamedFull(part) == edited);
+    Mesh other;
+    other.positions = part.positions;
+    other.triangles.assign(part.triangles.begin(), part.triangles.end() - 1);
+    CHECK(FocusDetail::attach(b, other, {}, err) == nullptr);
+    CHECK(!other.micro);
+}
+
+// A project names its streamed Parts' detail files: Save writes <stem>.sfdetail beside it (a compact copy the first
+// time, in place after that) and loading streams from it; autosave only names the file; a missing file is refused.
+TEST(focus_detail_project_names_its_detail_file) {
+    const std::string src = writeSmall("proj-src.sfdetail");
+    Mesh m;
+    std::string err;
+    auto fd = FocusDetail::open(src, m, err);
+    CHECK(fd != nullptr);
+    if (!fd) return;
+    Document doc = makeDoc(std::move(m));
+    dabAt(doc, BrushType::Standard, "Standard", glm::vec3(0.1f, 0.0f, 5.0f), 0.1f, 0.7f);
+    const std::vector<int16_t> edited = streamedFull(doc.mesh);
+    const auto dir = std::filesystem::path(focusTempPath("proj"));
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    const std::string proj = (dir / "head.sfproj").string(), detail = (dir / "head.sfdetail").string();
+    CHECK(saveProject(proj, doc, err));
+    CHECK(std::filesystem::exists(detail));
+    CHECK(fd->path() == detail);
+    // Edit, save again: in place (incremental).
+    dabAt(doc, BrushType::Inflate, "Inflate", glm::vec3(-0.1f, 0.1f, 5.0f), 0.08f, 0.6f);
+    const std::vector<int16_t> edited2 = streamedFull(doc.mesh);
+    CHECK(saveProject(proj, doc, err));
+    CHECK(fd->path() == detail);
+    Document back;
+    CHECK(loadProject(proj, back, err));
+    CHECK(back.mesh.micro && back.mesh.micro->focus);
+    if (back.mesh.micro && back.mesh.micro->focus) {
+        CHECK(back.mesh.micro->focus->stats().fullTiles == 0); // streamed: opened coarse
+        CHECK(streamedFull(back.mesh) == edited2);
+    }
+    // Autosave names the file without writing it.
+    dabAt(doc, BrushType::Clay, "Clay", glm::vec3(0.0f, -0.1f, 5.0f), 0.08f, 0.6f);
+    const auto stamp = std::filesystem::last_write_time(detail);
+    const std::string autosave = (dir / "autosave.sfproj").string();
+    setProjectAutosaveFolder(dir.string()); // (the app's own autosave may name its detail file by path)
+    CHECK(saveProject(autosave, doc, err, true));
+    CHECK(std::filesystem::last_write_time(detail) == stamp);
+    CHECK(!std::filesystem::exists(dir / "autosave.sfdetail"));
+    CHECK(fd->unsaved());
+    Document recovered;
+    CHECK(loadProject(autosave, recovered, err));
+    if (recovered.mesh.micro && recovered.mesh.micro->focus) CHECK(streamedFull(recovered.mesh) == edited2);
+    // The same autosave anywhere else (a shared project naming a file by path) is refused.
+    setProjectAutosaveFolder(focusTempPath("elsewhere"));
+    Document refused;
+    CHECK(!loadProject(autosave, refused, err));
+    CHECK(err == "Detail file name is invalid");
+    setProjectAutosaveFolder("");
+    // Missing detail file: a clear error.
+    back = Document();
+    recovered = Document();
+    std::filesystem::rename(detail, detail + ".moved");
+    Document none;
+    CHECK(!loadProject(proj, none, err));
+    CHECK(err.find("head.sfdetail") != std::string::npos);
+    (void)edited;
+}
+
+// A shared project can't make us open other files: its detail file is a plain name beside it ending in .sfdetail,
+// and the file must be a regular file reached without a symlink (a FIFO or a device is refused without blocking).
+TEST(focus_detail_project_detail_names_are_confined) {
+    const std::string src = writeSmall("confined-src.sfdetail");
+    Mesh m;
+    std::string err;
+    auto fd = FocusDetail::open(src, m, err);
+    CHECK(fd != nullptr);
+    if (!fd) return;
+    Document doc = makeDoc(std::move(m));
+    const auto dir = std::filesystem::path(focusTempPath("confined"));
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir / "a");
+    const std::string proj = (dir / "head.sfproj").string();
+    CHECK(saveProject(proj, doc, err));
+    std::filesystem::copy_file(dir / "head.sfdetail", dir / "a" / "b.sfdetail");
+    std::filesystem::copy_file(dir / "head.sfdetail", dir.parent_path() / "x.sfdetail",
+                               std::filesystem::copy_options::overwrite_existing);
+    auto withDetail = [&](const std::string& name) { // the project naming `name`; true when it loads
+        std::vector<ZipEntry> entries;
+        std::string e;
+        CHECK(readStoredZip(proj, entries, e));
+        for (auto& z : entries)
+            if (z.name == "manifest.json") {
+                std::string text(z.data.begin(), z.data.end());
+                const size_t at = text.find("\"head.sfdetail\"");
+                CHECK(at != std::string::npos);
+                if (at != std::string::npos) text.replace(at, 15, jsonQuote(name));
+                z.data.assign(text.begin(), text.end());
+            }
+        const std::string copy = (dir / "named.sfproj").string();
+        CHECK(writeStoredZip(copy, entries, 1, e));
+        Document d;
+        const bool ok = loadProject(copy, d, err);
+        if (ok) CHECK(d.mesh.micro && d.mesh.micro->focus);
+        return ok;
+    };
+    CHECK(withDetail("head.sfdetail"));
+    for (const std::string bad : {(dir / "head.sfdetail").string(), std::string("../x.sfdetail"), std::string("a/b.sfdetail"),
+                                  std::string("a\\b.sfdetail"), std::string("head.sfproj"), std::string(".sfdetail"),
+                                  std::string("/dev/zero")}) {
+        CHECK(!withDetail(bad));
+        CHECK(err == "Detail file name is invalid");
+    }
+    // A symlink beside the project, a FIFO, a directory: refused when opened (no hang on the FIFO).
+    std::filesystem::create_symlink(dir / "head.sfdetail", dir / "link.sfdetail");
+    CHECK(!withDetail("link.sfdetail"));
+    CHECK(::mkfifo((dir / "pipe.sfdetail").c_str(), 0600) == 0);
+    CHECK(!withDetail("pipe.sfdetail"));
+    std::filesystem::create_directories(dir / "dir.sfdetail");
+    CHECK(!withDetail("dir.sfdetail"));
+    // Devices: FocusDetail itself only maps regular files.
+    Mesh none;
+    CHECK(FocusDetail::open("/dev/zero", none, err) == nullptr);
+    CHECK(FocusDetail::open((dir / "pipe.sfdetail").string(), none, err) == nullptr);
+}
+
+// Divide to Micro past the memory budget streams the new level; undo and redo swap it whole.
+TEST(focus_detail_divide_to_micro_switches_when_large) {
+    setenv("SF_FOCUS_DETAIL", "1", 1); // (the budget is hundreds of millions of micro triangles)
+    setenv("SF_MICRO_SWAP_DIR", focusTempPath("swap").c_str(), 1);
+    Mesh base;
+    {
+        Mesh head;
+        std::string err;
+        CHECK(FocusDetail::open(writeSmall("divide.sfdetail"), head, err) != nullptr);
+        base.positions = head.positions;
+        base.triangles = head.triangles;
+        base.rebuildTopology();
+        base.recomputeAllNormals();
+    }
+    Document doc = makeDoc(std::move(base));
+    std::string msg;
+    CHECK(microDivideUndoable(doc, 5, msg));
+    unsetenv("SF_FOCUS_DETAIL");
+    unsetenv("SF_MICRO_SWAP_DIR");
+    CHECK(doc.mesh.micro && doc.mesh.micro->focus);
+    CHECK(msg.find("Focus Detail") != std::string::npos);
+    if (!doc.mesh.micro || !doc.mesh.micro->focus) return;
+    const std::string file = doc.mesh.micro->focus->path();
+    CHECK(file.find("unsaved-") != std::string::npos);
+    dabAt(doc, BrushType::Clay, "Clay", glm::vec3(0.0f, 0.1f, 5.0f), 0.1f, 0.8f);
+    doc.undo.undo(doc.mesh, doc.bvh); // the stroke
+    doc.undo.undo(doc.mesh, doc.bvh); // the divide
+    CHECK(!doc.mesh.micro);
+    doc.undo.redo(doc.mesh, doc.bvh);
+    CHECK(doc.mesh.micro && doc.mesh.micro->focus);
+    CHECK(!microWantsFocus(size_t(100) << 20, 5));
+    CHECK(microWantsFocus(size_t(1) << 30, 7));
+    CHECK(!microWantsFocus(size_t(1) << 30, FocusDetail::kCoarseLevel));
+}
+
+// A micro level in memory still saves as format 7 (no detail file) and loads back exactly: format 9 is written
+// only when a level streams, so builds before 0.11.12 keep opening these projects.
+TEST(focus_detail_in_memory_micro_project_stays_format_7) {
+    setenv("SF_FOCUS_DETAIL", "0", 1);
+    Mesh base;
+    {
+        Mesh head;
+        std::string err;
+        CHECK(FocusDetail::open(writeSmall("format7.sfdetail"), head, err) != nullptr);
+        base.positions = head.positions;
+        base.triangles = head.triangles;
+        base.rebuildTopology();
+        base.recomputeAllNormals();
+    }
+    Document doc = makeDoc(std::move(base));
+    std::string msg, err;
+    CHECK(microDivideUndoable(doc, 5, msg));
+    unsetenv("SF_FOCUS_DETAIL");
+    CHECK(doc.mesh.micro && !doc.mesh.micro->focus);
+    if (!doc.mesh.micro) return;
+    dabAt(doc, BrushType::Clay, "Clay", glm::vec3(0.0f, 0.1f, 5.0f), 0.1f, 0.8f);
+    const auto dir = std::filesystem::path(focusTempPath("format7"));
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    const std::string proj = (dir / "head.sfproj").string();
+    CHECK(saveProject(proj, doc, err));
+    std::vector<ZipEntry> entries;
+    CHECK(readStoredZip(proj, entries, err));
+    Json manifest;
+    for (const auto& e : entries)
+        if (e.name == "manifest.json") CHECK(Json::parse(std::string(e.data.begin(), e.data.end()), manifest, err));
+    CHECK(manifest["version"].asNumber() == 7);
+    CHECK(manifest.dump().find(".sfdetail") == std::string::npos);
+    CHECK(!std::filesystem::exists(dir / "head.sfdetail"));
+    Document back;
+    CHECK(loadProject(proj, back, err));
+    CHECK(back.mesh.micro && !back.mesh.micro->focus);
+    if (back.mesh.micro) CHECK(back.mesh.micro->disp == doc.mesh.micro->disp);
+}
+
+// Every micro brush writes on a streamed level exactly what it writes on the same level in memory (the tiles it
+// touches are made full first), including a Move and a whole-surface step (noise) with its undo.
+TEST(focus_detail_every_micro_brush_matches_in_memory) {
+    const std::string path = writeSmall("brushes.sfdetail");
+    std::string err;
+    Mesh a, b;
+    auto fdA = FocusDetail::open(path, a, err);
+    CHECK(fdA != nullptr);
+    if (!fdA) return;
+    {
+        auto fdB = FocusDetail::open(path, b, err);
+        fdB->ensureFull(*b.micro, allTiles(b), false);
+        b.micro->focus.reset();
+    }
+    Document streamed = makeDoc(std::move(a)), memory = makeDoc(std::move(b));
+    const struct {
+        BrushType type;
+        const char* name;
+    } brushes[] = {{BrushType::Standard, "Standard"}, {BrushType::Clay, "Clay"},       {BrushType::ClayBlock, "ClayBlock"},
+                   {BrushType::Smooth, "Smooth"},     {BrushType::Inflate, "Inflate"}, {BrushType::Flatten, "Flatten"},
+                   {BrushType::Trim, "Trim"},         {BrushType::Layer, "Layer"},     {BrushType::Pinch, "Pinch"},
+                   {BrushType::Crease, "Crease"},     {BrushType::SharpCrease, "SharpCrease"}};
+    int k = 0;
+    for (const auto& br : brushes) {
+        CHECK(microBrushSupport(br.type) > 0);
+        const glm::vec3 from(0.3f * std::sin(float(k)), 0.3f * std::cos(float(k)), 5.0f);
+        dabAt(streamed, br.type, br.name, from, 0.09f, 0.7f, &memory);
+        dabAt(memory, br.type, br.name, from, 0.09f, 0.7f);
+        ++k;
+        const bool same = streamedFull(streamed.mesh) == memory.mesh.micro->disp.toVector();
+        if (!same) std::fprintf(stderr, "  differs after %s\n", br.name);
+        CHECK(same);
+    }
+    CommandRegistry reg;
+    CHECK(reg.execute(streamed, "micro_noise", {{"amplitude", 0.002}}).ok);
+    CHECK(reg.execute(memory, "micro_noise", {{"amplitude", 0.002}}).ok);
+    CHECK(streamedFull(streamed.mesh) == memory.mesh.micro->disp.toVector());
+    streamed.undo.undo(streamed.mesh, streamed.bvh);
+    memory.undo.undo(memory.mesh, memory.bvh);
+    CHECK(streamedFull(streamed.mesh) == memory.mesh.micro->disp.toVector());
+    CHECK(edgesShared(streamed.mesh));
 }
 
 #endif

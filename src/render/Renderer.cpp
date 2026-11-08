@@ -331,7 +331,19 @@ uniform int uMicroWire; // 1: the wireframe of the base (the level below the mic
 vec4 gNC;
 float gMask;
 float gWire = 0.0;
+#ifdef FOCUS
+// A streamed level (Focus Detail, render/MicroFocus.h; its own program, so levels in memory run the plain shader)
+flat in int vPage; // the page with the full shading grid (-1: uShade holds the coarse one)
+uniform samplerBuffer uPoolShade;
+uniform int uCN, uCSamples;
+bool gCoarse = false;
+vec4 shadeAt(int i, int j) {
+    if (gCoarse) return texelFetch(uShade, vSlot * uCSamples + j * (uCN + 1) - (j * (j - 1)) / 2 + i);
+    return texelFetch(uPoolShade, vPage * uSamples + j * (uN + 1) - (j * (j - 1)) / 2 + i);
+}
+#else
 vec4 shadeAt(int i, int j) { return texelFetch(uShade, vSlot * uSamples + j * (uN + 1) - (j * (j - 1)) / 2 + i); }
+#endif
 vec3 octNormal(vec2 v) {
     vec2 e = v * 2.0 - 1.0;
     vec3 n = vec3(e, 1.0 - abs(e.x) - abs(e.y));
@@ -341,16 +353,25 @@ vec3 octNormal(vec2 v) {
     return normalize(n);
 }
 void microFetch() {
-    float fi = clamp(vIJ.x, 0.0, float(uN)), fj = clamp(vIJ.y, 0.0, float(uN));
-    int i0 = min(int(fi), uN - 1), j0 = min(int(fj), uN - 1);
-    if (i0 + j0 > uN - 1) {
-        if (fi >= fj) i0 = uN - 1 - j0;
-        else j0 = uN - 1 - i0;
+#ifdef FOCUS
+    // (a tile without its full shading interpolates the coarse grid's, gn segments)
+    gCoarse = vPage < 0;
+    int gn = gCoarse ? uCN : uN;
+    vec2 gij = gCoarse ? vIJ * (float(uCN) / float(uN)) : vIJ;
+#else
+    int gn = uN;
+    vec2 gij = vIJ;
+#endif
+    float fi = clamp(gij.x, 0.0, float(gn)), fj = clamp(gij.y, 0.0, float(gn));
+    int i0 = min(int(fi), gn - 1), j0 = min(int(fj), gn - 1);
+    if (i0 + j0 > gn - 1) {
+        if (fi >= fj) i0 = gn - 1 - j0;
+        else j0 = gn - 1 - i0;
     }
     float a = fi - float(i0), b = fj - float(j0);
     vec4 s0, s1, s2;
     vec3 w;
-    if (a + b <= 1.0 || i0 + j0 + 2 > uN) {
+    if (a + b <= 1.0 || i0 + j0 + 2 > gn) {
         s0 = shadeAt(i0, j0); s1 = shadeAt(i0 + 1, j0); s2 = shadeAt(i0, j0 + 1);
         w = vec3(1.0 - a - b, a, b);
     } else {
@@ -1024,12 +1045,12 @@ bool Renderer::init(std::string& error) {
 const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (features & (kTextured | kNormalMap)) features |= kTextured | kPrim;
     // (micro levels: no per-vertex paint, per-triangle data or predictive preview)
-    if (features & kMicro) features &= kMicro | kFlat | kPbr;
+    if (features & kMicro) features &= kMicro | kFlat | kPbr | kFocus;
     MeshProgram& p = programs_[features & 255];
     if (p.id) return &p;
     std::string prefix = "#version 330 core\n";
-    if (features & kMicro) prefix += "#define MICRO\n";
-    if (features & kPaint) prefix += "#define PAINT\n";
+    if (features & kMicro) prefix += (features & kFocus) ? "#define MICRO\n#define FOCUS\n" : "#define MICRO\n";
+    else if (features & kPaint) prefix += "#define PAINT\n";
     if (features & kPrim) prefix += "#define PRIM\n";
     if (features & kTextured) prefix += "#define TEXTURED\n";
     if (features & kNormalMap) prefix += "#define NORMALMAP\n";
@@ -1258,6 +1279,11 @@ size_t Renderer::microPendingShading() const {
     for (const MeshSlot& s : slots_)
         if (s.micro) total += s.micro->pendingShading();
     return total;
+}
+
+void Renderer::takeFocusSplit(double* out) {
+    for (MeshSlot& s : slots_)
+        if (s.micro && s.micro->focus()) s.micro->focus()->takeSplit(out);
 }
 
 size_t Renderer::gpuBytes() const {
@@ -3558,7 +3584,8 @@ void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
 }
 
 void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
-    const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0));
+    const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0) |
+                                       (s.micro && s.micro->focus() ? kFocus : 0));
     if (!p) return;
     gl::UseProgram(p->id);
     setPbrUniforms(*p, settings, false, s);

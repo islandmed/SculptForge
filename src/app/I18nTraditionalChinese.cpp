@@ -488,6 +488,10 @@ constexpr Entry kTraditionalChinese[] = {
     {"Delete Micro", "刪除微細分"},
     {"Bake Micro", "烘焙微細分"},
     {"Micro Surface Noise", "微細分表面雜訊"},
+    {"Streamed: full detail loads where you look and sculpt", "串流：完整細節只在你觀看和雕刻的地方載入"},
+    {"Focus Detail keeps this micro level in a .sfdetail file beside the project and loads full detail only where you look "
+     "and sculpt. Keep the file with the project.",
+     "Focus Detail 將這個微細分層級存放在專案旁的 .sfdetail 檔案中，只在你觀看和雕刻的地方載入完整細節。請將該檔案與專案放在一起。"},
     {"Micro", "微細分"},
     {"Level", "層級"},
     {"Decimate", "減面"},

@@ -4,6 +4,7 @@
 // micro_* commands (core/Micro.h): Tool > Geometry > Micro for scripts, the console, the CLI, MCP and the AI
 // assistant.
 #include "core/Commands.h"
+#include "core/FocusDetail.h"
 #include "core/Micro.h"
 #include "core/Multires.h"
 
@@ -44,6 +45,7 @@ std::string summary(const Mesh& m) {
 
 // An undo step holding every grid tile (whole-surface edits such as micro_noise).
 std::unique_ptr<MicroUndo> captureAll(const Mesh& m) {
+    if (m.micro->focus) m.micro->focus->ensureAllFull(*m.micro, true); // (streamed: the full tiles are what's kept)
     const MicroMesh& mm = *m.micro;
     auto u = std::make_unique<MicroUndo>();
     u->step = mm.step;
@@ -59,13 +61,22 @@ std::unique_ptr<MicroUndo> captureAll(const Mesh& m) {
 bool microDivideUndoable(Document& doc, int level, std::string& message) {
     std::shared_ptr<MicroMesh> before = doc.mesh.micro;
     if (!microDivide(doc.mesh, level, message)) return false;
+    // Beyond the budget the level streams from a detail file (Focus Detail); saved projects keep it beside them.
+    std::string streamed;
+    if (microWantsFocus(microTriangleCount(doc.mesh), level)) {
+        std::string why;
+        if (FocusDetail::create(focusUnsavedPath(), doc.mesh, why))
+            streamed = "; streamed (Focus Detail): full detail loads where you look and sculpt";
+        else
+            streamed = "; kept in memory (" + why + ")";
+    }
     UndoRecord r;
     r.label = "Micro divide";
     r.micro = std::make_unique<MicroUndo>();
     r.micro->swapWhole = true;
     r.micro->whole = std::move(before);
     doc.undo.push(std::move(r));
-    message = "Added micro: " + summary(doc.mesh);
+    message = "Added micro: " + summary(doc.mesh) + streamed;
     return true;
 }
 

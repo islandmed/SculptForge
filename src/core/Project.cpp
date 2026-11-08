@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Project.h"
 #include "core/LegacyNames.h"
+#include "core/FocusDetail.h"
 #include "core/Micro.h"
 #include "core/Timeline.h"
 
@@ -62,6 +63,10 @@ const char* const kCoreKeys[] = {"format", "version", "app_version", "mesh", "la
                                  "unitless_scale", "unitless_format"};
 
 std::filesystem::path fsPath(const std::string& p) { return std::filesystem::path(std::u8string(p.begin(), p.end())); }
+std::string utf8(const std::filesystem::path& p) {
+    const std::u8string u = p.u8string();
+    return std::string(u.begin(), u.end());
+}
 
 constexpr size_t kMaxAttachmentSize = size_t(64) << 20;
 
@@ -911,7 +916,7 @@ bool isProjectPath(const std::string& path) {
     return ext == kProjectExtension;
 }
 
-bool saveProject(const std::string& path, const Document& doc, std::string& error) {
+bool saveProject(const std::string& path, const Document& doc, std::string& error, bool autosave) {
     Writer w;
     Json manifest = Json::object();
     manifest.set("format", kFormatName);
@@ -921,6 +926,7 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
 
     // Every Part with its mesh, layers and state; blobs live under parts/<i>/.
     Json parts = Json::array();
+    int streamed = 0; // Parts with a streamed micro level so far (their detail files' names)
     for (int i = 0; i < doc.partCount(); ++i) {
         const Part& s = doc.parts[size_t(i)];
         const bool active = doc.checkedOut(i);
@@ -965,11 +971,32 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
             Json mj = Json::object();
             mj.set("level", mm.level);
             mj.set("step", double(mm.step));
-            // Tiles packed (delta + per-tile range, core/MicroStore.h): untouched tiles are 3 bytes.
-            std::vector<uint8_t> packed;
-            microPackTiles(mm.disp.data(), mm.baseTriangles, mm.samples, packed);
-            const size_t packedBytes = packed.size();
-            mj.set("displacement_packed", w.add(p + "displacement.pack", Scalar::U8, 1, packedBytes, std::move(packed)));
+            if (mm.focus) { // format 9: streamed from a detail file (core/FocusDetail.h); the file holds the level
+                FocusDetail& fd = *mm.focus;
+                std::string ref = fd.path();
+                if (!autosave) {
+                    std::filesystem::path target = fsPath(path);
+                    const std::string stem = utf8(target.stem());
+                    target.replace_filename(fsPath(stem + (streamed ? "-" + std::to_string(streamed + 1) : std::string()) + ".sfdetail"));
+                    ++streamed;
+                    std::error_code ec;
+                    const bool same = std::filesystem::equivalent(fsPath(fd.path()), target, ec);
+                    std::string why;
+                    if (!(same ? fd.save(m, why) : fd.saveAs(m, utf8(target), why))) {
+                        error = "Saving the detail of " + s.name + " failed: " + why;
+                        return false;
+                    }
+                    ref = utf8(target.filename());
+                }
+                mj.set("detail", ref);
+                version.need(9);
+            } else {
+                // Tiles packed (delta + per-tile range, core/MicroStore.h): untouched tiles are 3 bytes.
+                std::vector<uint8_t> packed;
+                microPackTiles(mm.disp.data(), mm.baseTriangles, mm.samples, packed);
+                const size_t packedBytes = packed.size();
+                mj.set("displacement_packed", w.add(p + "displacement.pack", Scalar::U8, 1, packedBytes, std::move(packed)));
+            }
             if (mm.hasMask()) mj.set("mask", w.externalBytes(p + "mask.bin", mm.mask));
             st.set("micro", std::move(mj));
             version.need(7);
@@ -1073,6 +1100,35 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
     return true;
 }
 
+namespace {
+
+std::string& autosaveFolder() {
+    static std::string folder;
+    return folder;
+}
+
+// A project's micro "detail" name -> the file (see setProjectAutosaveFolder).
+bool detailFileOf(const std::string& project, const std::string& name, std::filesystem::path& file) {
+    const std::filesystem::path p = fsPath(project), n = fsPath(name);
+    if (n.extension() != ".sfdetail" || n.stem().empty()) return false;
+    if (n.is_absolute()) { // only our own autosave
+        std::error_code ec;
+        const std::string& folder = autosaveFolder();
+        if (folder.empty() || p.filename() != "autosave.sfproj" ||
+            !std::filesystem::equivalent(p.parent_path(), fsPath(folder), ec))
+            return false;
+        file = n;
+        return true;
+    }
+    if (name.find_first_of("/\\:") != std::string::npos || name == "." || name == ".." || n.has_root_path()) return false;
+    file = p.parent_path() / n;
+    return true;
+}
+
+} // namespace
+
+void setProjectAutosaveFolder(const std::string& folder) { autosaveFolder() = folder; }
+
 bool loadProject(const std::string& path, Document& doc, std::string& error) {
     Reader r;
     if (!r.open(path, error)) return false;
@@ -1160,7 +1216,24 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
                 const uint32_t samples = (n + 1) * (n + 2) / 2;
                 MicroStore disp;
                 std::vector<uint8_t> mask;
-                if (const Json& pj = mj["displacement_packed"]; pj.isObject()) { // tiles packed (MicroStore.h)
+                if (const Json& dj = mj["detail"]; dj.isString() && version >= 9) { // streamed (core/FocusDetail.h)
+                    if (mj["mask"].isObject() && !r.bytes(mj["mask"], "micro mask", count, mask)) {
+                        error = r.error;
+                        return false;
+                    }
+                    std::filesystem::path file;
+                    if (!detailFileOf(path, dj.asString(), file)) {
+                        error = "Detail file name is invalid";
+                        return false;
+                    }
+                    std::error_code ec;
+                    if (!std::filesystem::exists(file, ec)) {
+                        error = "The detail file " + utf8(file.filename()) + " is missing: keep it beside " +
+                                utf8(fsPath(path).filename()) + " (Focus Detail streams the micro level from it)";
+                        return false;
+                    }
+                    if (!FocusDetail::attach(utf8(file), s.mesh, std::move(mask), error)) return false;
+                } else if (const Json& pj = mj["displacement_packed"]; pj.isObject()) { // tiles packed (MicroStore.h)
                     std::vector<uint8_t> packed;
                     const size_t bytes = countOf(pj["count"]);
                     if (bytes == size_t(-1) || !r.bytes(pj, "micro displacement", bytes, packed)) {
@@ -1182,11 +1255,14 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
                     }
                     disp = std::move(plain);
                 }
-                if (mj["mask"].isObject() && !r.bytes(mj["mask"], "micro mask", count, mask)) {
-                    error = r.error;
-                    return false;
+                if (!mj["detail"].isString() || version < 9) {
+                    if (mj["mask"].isObject() && !r.bytes(mj["mask"], "micro mask", count, mask)) {
+                        error = r.error;
+                        return false;
+                    }
+                    if (!microAttach(s.mesh, level, float(mj["step"].asNumber(0)), std::move(disp), std::move(mask), error))
+                        return false;
                 }
-                if (!microAttach(s.mesh, level, float(mj["step"].asNumber(0)), std::move(disp), std::move(mask), error)) return false;
             }
             s.activeLayer = int(sj["active_layer"].asNumber(-1));
         }

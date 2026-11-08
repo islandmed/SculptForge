@@ -26,16 +26,16 @@ void App::openFocusDetail(const std::string& path) {
     doc_.setMesh(std::move(m), std::filesystem::path(path).stem().string());
     frameActivePart();
     char buf[160];
-    std::snprintf(buf, sizeof buf, "Focus Detail (experimental): %.2f billion micro triangles; detail streams in where you look and sculpt",
+    std::snprintf(buf, sizeof buf, "Focus Detail: %.2f billion micro triangles; full detail loads where you look and sculpt",
                   double(tris) / 1e9);
     status_ = buf;
 }
 
-void App::updateFocusDetail() {
+void App::updateFocusDetail(float heightPx) {
     Mesh& m = doc_.mesh;
     if (!m.micro || !m.micro->focus || solverBusy()) return;
     FocusDetail& fd = *m.micro->focus;
-    const float h = float(canvasHeight());
+    const float h = heightPx > 0.0f ? heightPx : float(canvasHeight());
     if (!(h > 0.0f)) return;
     FocusView view;
     view.valid = true;

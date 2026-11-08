@@ -120,10 +120,16 @@ void App::drawGeometrySection() {
     }
     if (micro && m.micro) { // (a button above may have just removed it)
         const MicroMesh& mm = *m.micro;
-        char info[128];
+        char info[160];
         std::snprintf(info, sizeof info, "Micro %d: %.1fM triangles, %.0f MB%s", mm.level, double(mm.microTriangles()) / 1e6,
                       double(mm.bytes()) / 1e6, mm.disp.mapped() ? ", out of core" : "");
         ImGui::TextDisabled("%s", info);
+        if (mm.focus) { // streamed from its detail file (core/FocusDetail.h)
+            ImGui::TextDisabled("%s", tr("Streamed: full detail loads where you look and sculpt"));
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", tr("Focus Detail keeps this micro level in a .sfdetail file beside the project and "
+                                           "loads full detail only where you look and sculpt. Keep the file with the project."));
+        }
     }
 
     // Resolution: these change the mesh itself and keep no levels.

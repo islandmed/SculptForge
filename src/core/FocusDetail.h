@@ -18,9 +18,12 @@
 //   MicroUndo::swapWith promote the tiles they are about to change first (ensureFull).
 // - Edited tiles are dirty until saved; a dirty tile that gets demoted is compressed into memory ("parked").
 //   save() appends only the dirty and parked tiles, the coarse chunks holding them and a new directory, then
-//   rewrites the header (the old directory stays valid until then: a crash keeps the last save).
-// - When a brush widens the displacement range (MicroMesh::widen), rescale() divides the coarse grids and parked
-//   tiles at once and the tiles still in the file as they are read (a per-tile shift in the directory).
+//   rewrites the header (the old directory stays valid until then: a crash keeps the last save). Once garbage
+//   passes half the file, save() writes a compact copy instead and renames it over the file (saveAs).
+// - In projects (core/Project.cpp): a .sfproj names its Parts' detail files; Divide to Micro beyond
+//   microWantsFocus() writes one (create) and attaches it. When a brush widens the displacement range
+//   (MicroMesh::widen), rescale() divides the coarse grids and parked tiles at once and the tiles still in the file
+//   as they are read (a per-tile shift in the directory).
 // Undo needs nothing new: a stroke's MicroUndo already keeps copy-on-write deltas of the tiles it touched.
 #pragma once
 
@@ -83,6 +86,13 @@ public:
     // Opens a detail file: `out` becomes its base mesh with a micro level whose tiles all hold their coarse grids,
     // and the returned manager is attached to it (MicroMesh::focus).
     static std::shared_ptr<FocusDetail> open(const std::string& path, Mesh& out, std::string& error);
+    // Opens a detail file for `m`, which must have the file's base triangles (a project's Part): m's micro level
+    // becomes the file's (coarse tiles; `mask` empty or one byte per grid point) and the manager is attached.
+    static std::shared_ptr<FocusDetail> attach(const std::string& path, Mesh& m, std::vector<uint8_t> mask,
+                                               std::string& error);
+    // Writes m's micro level (m must have one without a focus, level > kCoarseLevel) to a new detail file `path` and
+    // attaches it (attach): Divide to Micro beyond the memory budget. The mask stays.
+    static std::shared_ptr<FocusDetail> create(const std::string& path, Mesh& m, std::string& error);
     ~FocusDetail();
 
     // Once a frame (main thread): scores every tile, promotes the wanted ones (most wanted first) for at most
@@ -90,10 +100,16 @@ public:
     void update(Mesh& m, const FocusView& view, const FocusBrush& brush, double budgetMs = 4.0);
     // Makes tiles `tris` full now (brushes, undo); `edit` marks them dirty. Thread-safe.
     void ensureFull(MicroMesh& mm, std::span<const uint32_t> tris, bool edit);
+    // Writes the changed tiles to the file (appended), a new directory and header (a compact copy instead when the
+    // garbage would pass half the file). Returns false with `error`.
+    bool save(const Mesh& m, std::string& error);
+    // Writes everything to `path` as a compact file (unchanged tiles copied as stored; written next to it, then
+    // renamed over it) and continues there: Save As to another project, and compaction when path == path().
+    bool saveAs(const Mesh& m, const std::string& path, std::string& error);
+    // Makes every tile full (whole-surface operations: bake, export, noise, a whole-surface undo step).
+    void ensureAllFull(MicroMesh& mm, bool edit);
     // MicroMesh::widen divided every value by 2^doublings and multiplied the step: the same for what isn't in disp.
     void rescale(MicroMesh& mm, int doublings);
-    // Writes the changed tiles to the file (appended), a new directory and header. Returns false with `error`.
-    bool save(Mesh& m, std::string& error);
 
     // 0 = coarse (upsampled), 1 = full.
     int tileLevel(uint32_t tri) const { return tri < state_.size() && state_[tri] != kCoarse ? 1 : 0; }
@@ -121,6 +137,9 @@ private:
         uint32_t bytes = 0, pad = 0;
     };
     bool mapFile(std::string& error);
+    bool loadIndex(std::string& error);                // header, directory and coarse grids of the mapped file
+    bool attachTo(Mesh& m, std::vector<uint8_t> mask, std::string& error); // m's micro level: every tile coarse
+    bool saveAsLocked(const Mesh& m, const std::string& path, std::string& error);
     void unmap();
     bool readTile(uint32_t t, int16_t* out) const;    // the full grid (parked first, else the file)
     void fillCoarse(MicroMesh& mm, uint32_t t) const; // upsamples the coarse grid into disp
@@ -132,6 +151,7 @@ private:
     uint32_t n_ = 0, samples_ = 0, coarseN_ = 0, coarseSamples_ = 0, codec_ = 0;
     float step_ = 0;
     uint64_t generation_ = 0, garbage_ = 0;
+    uint64_t baseOffset_ = 0;                    // the base block in the mapped file
     bool rescaled_ = false;                      // the coarse chunks in the file are in an older step
     std::vector<Entry> dir_;
     std::vector<ChunkEntry> chunks_;
@@ -152,6 +172,23 @@ private:
     const uint8_t* map_ = nullptr;
     size_t mapBytes_ = 0;
 };
+
+// Divide to Micro streams the new level (Focus Detail) when it has more than kFocusTriangles micro triangles, its
+// level is above kCoarseLevel and this platform maps files (SF_FOCUS_DETAIL=1: always when possible, 0: never).
+constexpr size_t kFocusTriangles = size_t(300) << 20;
+bool microWantsFocus(size_t microTriangles, int level);
+// Where a streamed level lives until its project is saved (the swap folder; core/MicroStore.h). Each call first
+// removes such files older than a week (a crash's autosave names its file, so not at once).
+std::string focusUnsavedPath();
+void focusRemoveStaleUnsaved();
+
+// The renderer's per-tile record (render/MicroFocus.h): a tile's coarse grid (cn segments, a subsample of its full
+// grid of n) followed by the inner points of its three edges at full resolution, (cn + 1)(cn + 2) / 2 + 3 (n - 1)
+// values. focusRecordValue rebuilds grid point (I, J) from it as the micro vertex shader does: the edges as stored,
+// inside as the coarse grid upsampled (FocusDetail's own integer sums), so a coarse tile's record gives back exactly
+// the values it holds in MicroMesh::disp.
+void focusFillRecord(const int16_t* grid, uint32_t n, uint32_t cn, int16_t* record);
+int focusRecordValue(const int16_t* record, uint32_t n, uint32_t cn, uint32_t I, uint32_t J);
 
 // A synthetic asset for benchmarks and tests: the standard scenes' procedural head with about `baseTriangles`
 // base triangles at micro level `level`, plus skin-like detail (wrinkles and pores) generated per tile. Written

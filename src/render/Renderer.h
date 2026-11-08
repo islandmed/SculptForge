@@ -262,6 +262,8 @@ public:
     size_t gpuBytes() const;
     // Micro grid points whose shading still waits for a frame's budget (MicroRenderer::pendingShading, all slots).
     size_t microPendingShading() const;
+    // Focus Detail's GPU sync time by part since the last call (MicroFocus::Part; adds into out[MicroFocus::kParts]).
+    void takeFocusSplit(double* out);
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
     size_t lastDrawnTriangles() const { return lastDrawn_; }
     bool floorGridDrawn() const { return floorGridDrawn_; } // the last draw() drew the floor grid (tests)
@@ -567,6 +569,7 @@ private:
     };
     static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16, kMicro = 32, kGhost = 64,
                          kPbr = 128;
+    static constexpr int kFocus = kPaint; // with kMicro: a streamed level (render/MicroFocus.h; micro programs never paint)
     MeshProgram programs_[256];
     void drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);
     std::string programError_;
