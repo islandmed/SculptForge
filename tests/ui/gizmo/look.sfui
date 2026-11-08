@@ -1,0 +1,121 @@
+# The Transform gizmo's look (fenix on Discord's design, @fenixpoints): each mode (Move, Scale, Rotate, All) from the
+# front and at three-quarters, at 100% and 200% UI scale, on the dark and a light background, with a handle lit.
+# CMake runs it at 1440x900 and 2880x1800 (the 200% shots there are 1440 px of UI). Looks only: the behaviour is
+# gizmo.sfui's and gizmo_all.sfui's.
+run new_sphere subdivisions=4
+key f
+
+key w
+camera 0 0
+gizmo_hover move_x
+expect_value gizmo_hover == 1
+shot move-front-100
+camera 35 -25
+gizmo_hover move_y
+expect_value gizmo_hover == 2
+shot move-34-100
+
+key e
+camera 0 0
+gizmo_hover scale_x
+expect_value gizmo_hover == 12
+shot scale-front-100
+camera 35 -25
+gizmo_hover scale_uniform
+expect_value gizmo_hover == 15
+shot scale-34-100
+
+key r
+camera 0 0
+gizmo_hover rotate_view
+expect_value gizmo_hover == 11
+shot rotate-front-100
+camera 35 -25
+gizmo_hover rotate_y
+expect_value gizmo_hover == 9
+shot rotate-34-100
+
+key shift+w
+expect_value gizmo_mode == 4
+camera 0 0
+gizmo_hover scale_x
+expect_value gizmo_hover == 12
+shot all-front-100
+camera 35 -25
+gizmo_hover move_x
+expect_value gizmo_hover == 1
+shot all-34-100
+gizmo_hover rotate_z
+expect_value gizmo_hover == 10
+shot all-34-hover-ring-100
+gizmo_hover scale_uniform
+expect_value gizmo_hover == 15
+shot all-34-hover-even-100
+
+# Every All handle still has a spot of its own from this angle.
+gizmo_hover move_y
+expect_value gizmo_hover == 2
+gizmo_hover move_z
+expect_value gizmo_hover == 3
+gizmo_hover plane_yz
+expect_value gizmo_hover == 4
+gizmo_hover plane_xz
+expect_value gizmo_hover == 5
+gizmo_hover plane_xy
+expect_value gizmo_hover == 6
+gizmo_hover move_view
+expect_value gizmo_hover == 7
+gizmo_hover rotate_x
+expect_value gizmo_hover == 8
+gizmo_hover rotate_view
+expect_value gizmo_hover == 11
+gizmo_hover scale_y
+expect_value gizmo_hover == 13
+gizmo_hover scale_z
+expect_value gizmo_hover == 14
+
+# A light background, the model small so the gizmo sits over it: every handle still reads.
+run set_background color=214,214,210
+camera 35 -25
+zoom 0.35
+gizmo_hover move_x
+shot all-34-light-100
+key w
+shot move-34-light-100
+key r
+shot rotate-34-light-100
+run set_background mode=gradient
+key f
+
+# 200% UI scale.
+ui_scale 200
+wait 0.2
+key w
+camera 0 0
+shot move-front-200
+camera 35 -25
+shot move-34-200
+key e
+camera 0 0
+shot scale-front-200
+camera 35 -25
+shot scale-34-200
+key r
+camera 0 0
+shot rotate-front-200
+camera 35 -25
+shot rotate-34-200
+key shift+w
+camera 0 0
+gizmo_hover scale_x
+expect_value gizmo_hover == 12
+shot all-front-200
+camera 35 -25
+gizmo_hover move_x
+expect_value gizmo_hover == 1
+shot all-34-200
+gizmo_hover scale_uniform
+expect_value gizmo_hover == 15
+gizmo_hover move_view
+expect_value gizmo_hover == 7
+ui_scale 100

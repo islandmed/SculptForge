@@ -1,8 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Extract (Tool > Part), Make Symmetric (Tool > Geometry > Symmetry) and Mirror
-// (Tool > Deformation). The work is done by the extract / mirror_and_weld / mirror commands (core/ExtractMirror.h).
+// Extract (Tool > Part), Make Symmetric and Mirror (Tool > Geometry > Symmetry) and the whole-Part operations
+// (Tool > Reshape). The work is done by the extract / mirror_and_weld / mirror commands (core/ExtractMirror.h).
 #include "app/App.h"
 #include "app/Demo.h"
 #include "app/I18n.h"
@@ -92,41 +92,21 @@ void App::drawSymmetryContents() {
     ui::HelpAction(*this, "geometry.mirror_weld");
     ImGui::SameLine();
     ui::Segmented(*this, {"geometry.mirror_weld_x", "geometry.mirror_weld_y", "geometry.mirror_weld_z"}, -1.0f);
-    Demo::popScope();
-}
-
-void App::drawDeformationContents() {
-    const ImGuiStyle& style = ImGui::GetStyle();
-    const float axisW = ImGui::GetFrameHeight() * 1.3f;
+    // Mirror flips the whole Part (no weld): beside Make Symmetric, the other way to use the symmetry plane.
     ui::ActionButton(*this, "deformation.mirror",
                      ImVec2(ImGui::GetContentRegionAvail().x - 3.0f * axisW - 2.0f - style.ItemSpacing.x, 0));
     ui::HelpAction(*this, "deformation.mirror");
     ImGui::SameLine();
     ui::Segmented(*this, {"deformation.mirror_x", "deformation.mirror_y", "deformation.mirror_z"}, -1.0f);
-    // Whole-mesh deformations (core/Deform.h, from the discussions): a button and its amount on one row.
-    const float button = ImGui::CalcTextSize("Balloon").x + 2.0f * style.FramePadding.x + ImGui::GetFrameHeight();
-    const struct {
-        const char* action;
-        float* amount;
-        float lo;
-        const char* slider;
-    } rows[] = {{"deformation.polish", &deformAmount_[0], 0.0f, "##deform_polish_amount"},
-                {"deformation.relax", &deformAmount_[1], 0.0f, "##deform_relax_amount"},
-                {"deformation.smooth", &deformAmount_[2], 0.0f, "##deform_smooth_amount"},
-                {"deformation.balloon", &deformAmount_[3], -100.0f, "##deform_balloon_amount"}};
-    for (const auto& r : rows) {
-        ui::ActionButton(*this, r.action, ImVec2(button, 0));
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(-1);
-        ui::SliderInside(r.slider, r.amount, r.lo, 100.0f, "%.0f");
-    }
-    ui::Checkbox("Smooth keeps volume##deformation.smooth_volume", &deformKeepVolume_);
-    ui::HelpText("Smooth keeps volume", nullptr,
-                 "Deformation > Smooth smooths without shrinking the form (Taubin smoothing) instead of the plain "
-                 "smooth, which also shrinks it.",
-                 "Tool > Deformation");
+    Demo::popScope();
+}
+
+void App::drawDeformationContents() {
+    // Tool > Reshape (foirgairwolf on Discord): Size, then the Stack, the one home of every whole-Part operation
+    // (Smooth, Relax, Polish and Balloon are its Surface steps; Mirror is in Geometry > Symmetry).
     drawDeformSize();  // PanelDeform.cpp
     drawDeformStack();
+    drawDeformPlugins(); // PanelPlugins.cpp
 }
 
 } // namespace sf

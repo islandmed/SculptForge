@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Merge by distance and Check Mesh / Fix (core/MeshCheck.h; foirgairwolf on Discord).
+// Merge by distance and Find Problems / Fix (core/MeshCheck.h; foirgairwolf on Discord).
 #include "TestHarness.h"
 
 #include "core/Commands.h"
@@ -72,6 +72,25 @@ TEST(weld_points_by_distance) {
     // A distance as big as the mesh collapses it to nothing that stays a triangle.
     welded = weldByDistance(sphere, 10.0f, &merged);
     CHECK(merged == sphere.vertexCount() - 1 && welded.triangleCount() == 0);
+
+    // Masked only (foirgairwolf on Discord): only masked points merge, and only with each other.
+    Mesh masked = loose;
+    std::vector<float>& mask = masked.ensureMask();
+    for (uint32_t v = 0; v < masked.vertexCount(); ++v) mask[v] = masked.positions[v].y > 0.3f ? 1.0f : 0.0f;
+    size_t all = 0;
+    weldTargets(loose, 0.0f, &all);
+    const std::vector<uint32_t> target = weldTargets(masked, 0.0f, &n, true);
+    CHECK(n > 0 && n < all);
+    for (uint32_t v = 0; v < masked.vertexCount(); ++v)
+        if (target[v] != v) CHECK(mask[v] >= 0.5f && mask[target[v]] >= 0.5f);
+    welded = weldByDistance(masked, 0.0f, &merged, true);
+    CHECK(merged == n && welded.vertexCount() == masked.vertexCount() - n);
+    // No mask at all: nothing merges; everything masked: the same as without the option.
+    weldTargets(loose, 0.0f, &n, true);
+    CHECK(n == 0);
+    std::fill(mask.begin(), mask.end(), 1.0f);
+    weldTargets(masked, 0.0f, &n, true);
+    CHECK(n == all);
 }
 
 TEST(mesh_check_holes_and_isolated) {

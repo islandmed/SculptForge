@@ -17,7 +17,7 @@ interface and keep your changes. The pictures show the default look and layout.
 | Top shelf | Under the menu bar | Sculpt/Paint, Draw/Move/Scale/Rotate, Add/Sub, Rgb, Size, Intensity, Dynamic, symmetry |
 | Left shelf | Left of the canvas | Brush, Stroke, Alpha and Material tiles, the colour picker, Fill |
 | Canvas | Centre | The 3D view, with the Sculpt Timeline along its top; strokes and navigation start only here |
-| Right shelf | Right of the canvas | Undo and Redo, Frame, Move, Zoom and Rotate, display toggles, Solo |
+| Right shelf | Right of the canvas | Undo and Redo, Frame, Move, Zoom and Rotate, view and display toggles, Solo |
 | Right tray | Far right | The **Tool** panel: the active Part, Parts, Layers, Geometry, Masking and more |
 | Bottom shelf | Below the canvas | Your quick brushes |
 
@@ -103,6 +103,30 @@ the same question. The choice is saved at once; turn it back on the same way, or
 Studios can turn it off for everyone with the environment variable `SF_AI=off` (or start with `--no-ai`); the
 setting is then locked. See [Studios](studios.md#environment-variables).
 
+## What leaves your computer
+
+Your sculpt never does. An AI feature sends only the request below, only when you press its button. The first time
+a service on someone else's computer would receive anything, the panel says what is sent, to which address and who
+pays, and nothing goes until you press **Allow** (asked once per service). **Use local instead** switches to a model
+on this computer when one is running (Ollama or LM Studio for brushes, ComfyUI for 3D); otherwise **Set up local**
+shows how. **Edit > Preferences > AI > Online AI services** lists each service as **Allowed** or **Asks first**, with
+**Revoke**. Models on this computer (`localhost`, `127.0.0.1`) never ask.
+
+| You use | Sent | To | Who pays |
+|---|---|---|---|
+| AI Brush, **Free** (the default) | Your brush description and the current brush settings | Pollinations.ai (`text.pollinations.ai`); a running Ollama on this computer if it can't be reached | Pollinations (free, rate limited), no account |
+| AI Brush, Anthropic, OpenAI or OpenRouter | The same text | `api.anthropic.com`, `api.openai.com` or `openrouter.ai` | You, on your own key |
+| AI Brush, Ollama, LM Studio, llama.cpp, vLLM | The same text | This computer (or the server address you typed) | Nobody / your server |
+| Generate 3D, **Hugging Face** (the default) | The picture (framed, at most 1024 px) or your text | The model author's Space, for example `tencent-hunyuan3d-2-1.hf.space` | Hugging Face's free shared GPUs (a daily allowance) |
+| Generate 3D, fal.ai, Meshy, Hyper3D | The picture or your text | `queue.fal.run`, `api.meshy.ai` or `api.hyper3d.com` | You, per generation, on your own key |
+| Generate 3D, ComfyUI | The picture or your text | Your ComfyUI (this computer by default) | Your own GPU |
+| Generate 3D, your command, Offline blockout | Nothing | Stays on this computer | - |
+| Connect an AI tool (MCP) | Nothing from SculptForge | Your AI tool talks to SculptForge on this computer | Your tool |
+
+SculptForge has no servers of its own and no telemetry: no request goes through us, and no key of ours is used.
+Studios can pre-allow the services their policy lists, or forbid the rest (see
+[IT deployment](studios.md#ai-providers)).
+
 ## The menu bar
 
 From left to right:
@@ -174,7 +198,7 @@ turn on **Edit > Preferences > Interface > Palettes strictly A-Z (strict order)*
 | **Script** | File > Script | Console, Run script file, Copy session as script, Clear console |
 | **Splats** | Render > Gaussian Splats | Gaussian splat tools: show, flip, turn, fit, clean floaters, Make sculptable, sculpt to splats, save, clear |
 | **Stroke** | Sculpt > Stroke | The stroke types (Dots, Drag Stamp, Spray, Lazy Stroke) and their settings |
-| **Tool** | Mesh > Parts & Geometry, and the right tray | The active Part with Open, Save and Import, and the Part, Layers, Paint Layers, Geometry, Remesh, Deformation, Masking, Face Groups, Visibility, Export and Display sub-palettes |
+| **Tool** | Mesh > Parts & Geometry, and the right tray | The active Part with Open, Save and Import, and its sub-palettes in the order you work: Parts, Forge Spheres, Tube, Geometry, Remesh, Reshape, Cut, Layers, Facial Shapes, Masking, Face Groups, Visibility, Selection Sets, Paint Layers, Texture Image, Bake, Export and Viewport Look |
 | **Transform** | Sculpt > Symmetry & Gizmo | Draw, Move, Scale and Rotate (the [Gizmo](gizmo.md) with its pivot, axes, options and numeric entry), Symmetry X, Y and Z, Frame, Solo, Wire |
 | **Help** | Help | Controls, User Guide, What's New, Command palette, Website & documentation, Report a problem, Support SculptForge..., About SculptForge |
 
@@ -226,7 +250,8 @@ interface](#customizing-the-interface) to add items.
 - **Add** / **Sub**: brushes add to or subtract from the surface. Holding <kbd>Alt</kbd> flips it for one
   stroke.
 - **Rgb**: sculpt brushes paint the colour at the same time.
-- **Size**: the brush radius in screen pixels (2 to 800).
+- **Size**: the brush radius in screen pixels (2 to 800). While you drag it, the brush ring shows on the model at the
+  new size, where the cursor last was (or in the middle of the view), and fades out when you let go.
 - **Intensity**: how strongly each dab changes the surface (1 to 100). While <kbd>Shift</kbd> is held it shows
   Smooth's own value.
 - **Dynamic**: [dynamic topology](dynamic-topology.md), with its **Detail** slider while it is on.
@@ -255,14 +280,22 @@ unmasked area with the main colour.
 ### Right shelf
 
 - **Undo** and **Redo** (<kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>): greyed out when
-  there is nothing to undo or redo. A layout you customised before they were added gets them at the top.
+  there is nothing to undo or redo. A layout you customised before they were added gets them at the top (and the
+  view toggles below Rotate and Paint).
 - **Frame** (<kbd>F</kbd>): fits the model in the view.
 - **Move**, **Zoom**, **Rotate**: drag on these buttons to pan, zoom and orbit the view.
+- **Turn**: rotation drags turn the model upright like a turntable (on) or freely (off), as **View > Orbit
+  lock** sets it.
+- **Ortho** (<kbd>Numpad 5</kbd>): an orthographic view (on) or perspective (off).
+- **Floor**: the floor grid under the model, as **View > Floor grid**.
+- In a window too short for all of them, Turn, Ortho, Floor and Flat fold into one **View** button: click it for
+  their list.
 - **Wire** (<kbd>Shift</kbd>+<kbd>F</kbd>): shows the mesh's polygons: quads as quads, triangles as triangles.
 - **Groups**: colours each face group.
 - **Mask** (<kbd>Ctrl</kbd>+<kbd>H</kbd>): shows or hides the mask's darkening (on by default). Hiding it keeps
   the mask, which still protects the surface.
 - **Paint**: shows vertex paint colours (on by default).
+- **Flat**: flat shading, every polygon its own face (on), or smooth shading (off), as **Render > Materials > Smooth | Flat**.
 - **Solo**: shows only the active Part (available with two or more Parts).
 - **Splats**: shows or hides a Gaussian splat capture (only shown while one is loaded).
 
@@ -474,7 +507,7 @@ you keep them with **Save Layout**.
 
 ### Move, add and remove shelf items
 
-1. Open **Edit > Preferences > Config** and turn on **Customize Shelves**. The shelves get a dashed orange outline and
+1. Open **Edit > Preferences > Saving & Layouts** and turn on **Customize Shelves**. The shelves get a dashed orange outline and
    the status line reads "Customize: Ctrl+Alt+drag to move or remove items".
 2. Hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and drag any button, slider or tile:
    - onto a shelf to put it there (an orange line shows where it will go), which is how you **add** buttons
@@ -503,7 +536,7 @@ which action lost it.
 
 Every preference (key style, shortcuts, tablet, interface, performance, radial menus...) **saves itself** a moment
 after you change it; there is nothing to press. The layout is the one thing kept on purpose, with **Save Layout**.
-All in **Edit > Preferences > Config**:
+All in **Edit > Preferences > Saving & Layouts**:
 
 | Item | What it does |
 |---|---|
@@ -516,12 +549,12 @@ All in **Edit > Preferences > Config**:
 The command palette (<kbd>F3</kbd>) also has **Save Preferences Now**, which writes them at once; you never need it.
 
 The first time you change the layout in a session, the status line reminds you once: "Layout changed -
-Edit > Preferences > Config > Save Layout keeps it". What a session changes by itself (the console and Library being open, the Library
+Edit > Preferences > Saving & Layouts > Save Layout keeps it". What a session changes by itself (the console and Library being open, the Library
 tab) doesn't count as a layout change.
 
 ### Layout presets
 
-The **1**, **2** and **3** buttons at the top right (also in **Edit > Preferences > Config**) switch between three
+The **1**, **2** and **3** buttons at the top right (also in **Edit > Preferences > Saving & Layouts**) switch between three
 arrangements of the current layout:
 
 1. **Standard**: the Tool panel in the right tray and shelves around the canvas.

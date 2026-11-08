@@ -353,9 +353,169 @@ void earClip(const std::vector<dvec2>& p, const std::vector<uint32_t>& cyc, std:
     out.push_back({cyc[prev[i]], cyc[i], cyc[next[i]]});
 }
 
+// Smallest corner angle of triangle abc (radians).
+double minAngle(const dvec3& a, const dvec3& b, const dvec3& c) {
+    auto at = [](const dvec3& o, const dvec3& x, const dvec3& y) {
+        return std::atan2(glm::length(glm::cross(x - o, y - o)), glm::dot(x - o, y - o));
+    };
+    return std::min({at(a, b, c), at(b, c, a), at(c, a, b)});
+}
+
+// The ear-clipped triangles of one region, made better without touching the region's outline, so every edge it
+// shares with the rest of the mesh stays exactly as it was (watertight for free): Lawson flips of the inside edges
+// towards the largest smallest angle, measured in world space, and optionally points inserted inside (a big cap
+// gets triangles about the mesh's size instead of a fan of long needles between its outline points). A flip or
+// an insertion happens only where every triangle involved stays strictly counter-clockwise in `p`.
+struct RegionTris {
+    std::vector<dvec2>& p; // the region's plane (local ids), as ear-clipped
+    std::vector<dvec3>& w; // world positions (local ids), where angles are measured
+    std::vector<std::array<uint32_t, 3>>& T;
+    std::vector<std::array<int32_t, 3>> nb; // across side i (corner i -> i + 1); -1 = the outline
+    // A flat frame of the region in world space (a prism face's), when given: flips then follow the Delaunay
+    // test there (the same largest smallest angle, far cheaper).
+    const std::vector<dvec2>* flat = nullptr;
+    std::vector<std::pair<int32_t, int>> todo;
+    // Undirected sides, kept only when the ear clipping left a triangle that isn't counter-clockwise (a flip could
+    // then meet a side that exists elsewhere already).
+    bool watch = false;
+    std::unordered_map<uint64_t, uint8_t> edges;
+    size_t flips = 0;
+
+    static uint64_t key(uint32_t a, uint32_t b) { return (uint64_t(std::min(a, b)) << 32) | std::max(a, b); }
+
+    RegionTris(std::vector<dvec2>& p_, std::vector<dvec3>& w_, std::vector<std::array<uint32_t, 3>>& T_,
+               const std::vector<uint32_t>& cycle, const std::vector<dvec2>* flat_ = nullptr)
+        : p(p_), w(w_), T(T_), flat(flat_) {
+        std::unordered_map<uint64_t, uint8_t> outline; // (a bridge is outline on both sides)
+        outline.reserve(cycle.size());
+        for (size_t k = 0; k < cycle.size(); ++k) outline[key(cycle[k], cycle[(k + 1) % cycle.size()])] = 1;
+        std::unordered_map<uint64_t, int32_t> half;
+        half.reserve(T.size() * 3);
+        nb.assign(T.size(), {-1, -1, -1});
+        for (int32_t t = 0; t < int32_t(T.size()); ++t) {
+            watch = watch || orient(T[t][0], T[t][1], T[t][2]) <= 0;
+            for (int i = 0; i < 3; ++i) half[(uint64_t(T[t][i]) << 32) | T[t][(i + 1) % 3]] = t;
+        }
+        for (int32_t t = 0; t < int32_t(T.size()); ++t)
+            for (int i = 0; i < 3; ++i) {
+                const uint32_t a = T[t][i], b = T[t][(i + 1) % 3];
+                if (watch) edges.emplace(key(a, b), 0);
+                if (outline.count(key(a, b))) continue;
+                const auto it = half.find((uint64_t(b) << 32) | a);
+                if (it != half.end()) nb[t][i] = it->second;
+            }
+    }
+    // Whether side a-b of (a, b, c), with d across it, should become c-d.
+    bool better(uint32_t a, uint32_t b, uint32_t c, uint32_t d) const {
+        if (flat) {
+            const std::vector<dvec2>& q = *flat;
+            const dvec2 A = q[a] - q[d], B = q[b] - q[d], C = q[c] - q[d];
+            const double det = (glm::dot(A, A) * cross2(B, C) - glm::dot(B, B) * cross2(A, C) + glm::dot(C, C) * cross2(A, B));
+            const double s = orient2(q[a], q[b], q[c]) > 0 ? 1.0 : -1.0, L = glm::dot(A - B, A - B) + glm::dot(C, C);
+            return det * s > 1e-9 * L * L;
+        }
+        const double before = std::min(minAngle(w[a], w[b], w[c]), minAngle(w[b], w[a], w[d]));
+        const double after = std::min(minAngle(w[c], w[a], w[d]), minAngle(w[d], w[b], w[c]));
+        return after > before + 1e-9;
+    }
+    double orient(uint32_t a, uint32_t b, uint32_t c) const { return orient2(p[a], p[b], p[c]); }
+    void relink(int32_t x, uint32_t u, uint32_t v, int32_t to) {
+        if (x < 0) return;
+        for (int k = 0; k < 3; ++k)
+            if (T[x][k] == u && T[x][(k + 1) % 3] == v) nb[x][k] = to;
+    }
+    void pushSides(int32_t t) {
+        for (int i = 0; i < 3; ++i)
+            if (nb[t][i] >= 0) todo.push_back({t, i});
+    }
+    // Side i of t, between t = (a, b, c) and o = (b, a, d), becomes c-d when that raises the smallest angle.
+    bool tryFlip(int32_t t, int i) {
+        const int32_t o = nb[t][i];
+        if (o < 0) return false;
+        const uint32_t a = T[t][i], b = T[t][(i + 1) % 3], c = T[t][(i + 2) % 3];
+        int j = -1;
+        for (int k = 0; k < 3; ++k)
+            if (T[o][k] == b && T[o][(k + 1) % 3] == a) j = k;
+        if (j < 0) return false;
+        const uint32_t d = T[o][(j + 2) % 3];
+        if (c == d || (watch && edges.count(key(c, d)))) return false;
+        if (orient(a, b, c) <= 0 || orient(b, a, d) <= 0 || orient(c, a, d) <= 0 || orient(d, b, c) <= 0) return false;
+        if (!better(a, b, c, d)) return false;
+        const int32_t nbc = nb[t][(i + 1) % 3], nca = nb[t][(i + 2) % 3], nad = nb[o][(j + 1) % 3], ndb = nb[o][(j + 2) % 3];
+        T[t] = {c, a, d};
+        T[o] = {d, b, c};
+        nb[t] = {nca, nad, o};
+        nb[o] = {ndb, nbc, t};
+        relink(nad, d, a, t);
+        relink(nbc, c, b, o);
+        if (watch) {
+            edges.erase(key(a, b));
+            edges[key(c, d)] = 0;
+        }
+        ++flips;
+        for (int k = 0; k < 2; ++k) {
+            todo.push_back({t, k});
+            todo.push_back({o, k});
+        }
+        return true;
+    }
+    void legalize() {
+        const size_t cap = 64 * T.size() + 64;
+        while (!todo.empty() && flips < cap) {
+            const auto [t, i] = todo.back();
+            todo.pop_back();
+            tryFlip(t, i);
+        }
+        todo.clear();
+    }
+    void improve() {
+        for (int32_t t = 0; t < int32_t(T.size()); ++t) pushSides(t);
+        legalize();
+    }
+    // The triangle holding x, walking from `t`; -1 when the walk is blocked (then a scan when `scan`).
+    int32_t locate(const dvec2& x, int32_t t, bool scan) const {
+        for (size_t step = 0; t >= 0 && step < 4096; ++step) {
+            int k = -1;
+            for (int s = 0; s < 3 && k < 0; ++s) {
+                const int i = int((s + step) % 3);
+                if (orient2(p[T[t][i]], p[T[t][(i + 1) % 3]], x) < 0) k = i;
+            }
+            if (k < 0) return t;
+            t = nb[t][k];
+        }
+        if (!scan) return -1;
+        for (int32_t u = 0; u < int32_t(T.size()); ++u)
+            if (orient2(p[T[u][0]], p[T[u][1]], x) >= 0 && orient2(p[T[u][1]], p[T[u][2]], x) >= 0 &&
+                orient2(p[T[u][2]], p[T[u][0]], x) >= 0)
+                return u;
+        return -1;
+    }
+    // Splits triangle t at the new local point x (already in p and w); false when x isn't well inside it.
+    bool insert(int32_t t, uint32_t x) {
+        const uint32_t a = T[t][0], b = T[t][1], c = T[t][2];
+        const double area = orient(a, b, c);
+        if (area <= 0 || orient(a, b, x) <= 1e-6 * area || orient(b, c, x) <= 1e-6 * area || orient(c, a, x) <= 1e-6 * area)
+            return false;
+        const int32_t t1 = int32_t(T.size()), t2 = t1 + 1, n1 = nb[t][1], n2 = nb[t][2];
+        T[t] = {a, b, x};
+        T.push_back({b, c, x});
+        T.push_back({c, a, x});
+        nb[t] = {nb[t][0], t1, t2};
+        nb.push_back({n1, t2, t});
+        nb.push_back({n2, t, t1});
+        relink(n1, c, b, t1);
+        relink(n2, a, c, t2);
+        if (watch)
+            for (uint32_t v : {a, b, c}) edges[key(v, x)] = 0;
+        for (int32_t u : {t, t1, t2}) pushSides(u);
+        legalize();
+        return true;
+    }
+};
+
 // --- The boolean -------------------------------------------------------------------------------------------
 
-enum : uint8_t { kVertex, kA, kB, kCorner };
+enum : uint8_t { kVertex, kA, kB, kCorner, kInside }; // kInside: a point added inside a prism face
 
 struct Pt {
     dvec3 ndc{0.0};
@@ -396,6 +556,9 @@ struct Cutter {
     std::vector<std::vector<Seg>> faceSegs;
     bool degenerate = false;
     double eps = 1e-12, baryEps = 1e-11;
+    double spacing = 0.0; // world: the points added inside prism faces (the cut mesh edges' median length)
+    double maxInside = 4096.0; // per region: the mesh's triangles / 400, 2048 at least
+    const std::vector<uint8_t>* plainWalls = nullptr; // walls that get no points inside (cutMesh)
     // Wall grid.
     int G = 1;
     dvec2 glo{0.0}, ghi{0.0};
@@ -449,6 +612,162 @@ struct Cutter {
     uint32_t addPoint(const Pt& p) {
         pts.push_back(p);
         return nv + uint32_t(pts.size() - 1);
+    }
+    dvec3 worldOf(uint32_t g) const { return g < nv ? dvec3(mesh.positions[g]) : unproject(pts[g - nv].ndc); }
+
+    // A region's ear-clipped triangles made better (RegionTris). Prism face f >= 0 also gets points inside: a
+    // lattice `spacing` apart (the mesh's edge length; maxInside points at most), then, where a short outline side still
+    // leaves a needle, a point off that side's centre (Ungor's off-centres), so the triangles grow from the outline's
+    // size to the lattice's instead of fanning out from it.
+    void refine(int64_t f, std::vector<uint32_t>& ids, std::vector<dvec2>& p2, const std::vector<uint32_t>& cycle,
+                std::vector<std::array<uint32_t, 3>>& tris) {
+        if (tris.size() < 2 && (f < 0 || spacing <= 0)) return;
+        std::vector<dvec3> w(ids.size());
+        for (uint32_t k : cycle) w[k] = worldOf(ids[k]);
+        if (f < 0 || spacing <= 0 || (f < n && plainWalls && size_t(f) < plainWalls->size() && (*plainWalls)[size_t(f)])) {
+            RegionTris rt(p2, w, tris, cycle);
+            rt.improve();
+            return;
+        }
+        dvec3 nw(0.0);
+        for (const auto& t : tris) nw += glm::cross(w[t[1]] - w[t[0]], w[t[2]] - w[t[0]]);
+        const double area = 0.5 * glm::length(nw);
+        if (!(area > 0)) return;
+        // A frame of the face's plane in world space (angles there are the world's).
+        const dvec3 o = w[cycle[0]], nrm = nw / (2.0 * area);
+        const dvec3 u = glm::normalize(std::abs(nrm.x) < 0.6 ? glm::cross(nrm, dvec3(1, 0, 0)) : glm::cross(nrm, dvec3(0, 1, 0)));
+        const dvec3 v = glm::cross(nrm, u);
+        auto toQ = [&](const dvec3& x) { return dvec2(glm::dot(x - o, u), glm::dot(x - o, v)); };
+        dvec2 lo(1e300), hi(-1e300);
+        std::vector<dvec2> q(ids.size());
+        for (uint32_t k : cycle) {
+            q[k] = toQ(w[k]);
+            lo = glm::min(lo, q[k]);
+            hi = glm::max(hi, q[k]);
+        }
+        RegionTris rt(p2, w, tris, cycle, &q);
+        rt.improve();
+        double h = spacing;
+        constexpr double kRow = 0.8660254037844386; // an equilateral lattice: rows sqrt(3)/2 apart
+        if (area / (kRow * h * h) > maxInside) h = std::sqrt(area / (kRow * maxInside));
+        // The outline in buckets h wide, for the distance from it.
+        double cell = h;
+        while ((hi.x - lo.x) / cell * (hi.y - lo.y) / cell > double(1 << 22)) cell *= 2.0;
+        const int gx = int((hi.x - lo.x) / cell) + 1, gy = int((hi.y - lo.y) / cell) + 1;
+        std::vector<std::vector<uint32_t>> bucket(size_t(gx) * gy);
+        auto cx = [&](double x) { return std::clamp(int((x - lo.x) / cell), 0, gx - 1); };
+        auto cy = [&](double y) { return std::clamp(int((y - lo.y) / cell), 0, gy - 1); };
+        for (uint32_t k = 0; k < cycle.size(); ++k) {
+            const dvec2 a = q[cycle[k]], b = q[cycle[(k + 1) % cycle.size()]];
+            for (int y = cy(std::min(a.y, b.y) - cell); y <= cy(std::max(a.y, b.y) + cell); ++y)
+                for (int x = cx(std::min(a.x, b.x) - cell); x <= cx(std::max(a.x, b.x) + cell); ++x)
+                    bucket[size_t(y) * gx + x].push_back(k);
+        }
+        auto nearOutline = [&](const dvec2& x, double gap) { // (gap < cell)
+            for (uint32_t k : bucket[size_t(cy(x.y)) * gx + cx(x.x)]) {
+                const dvec2 a = q[cycle[k]], ab = q[cycle[(k + 1) % cycle.size()]] - a;
+                const double t = std::clamp(glm::dot(x - a, ab) / std::max(glm::dot(ab, ab), 1e-300), 0.0, 1.0);
+                if (glm::length(x - (a + ab * t)) < gap) return true;
+            }
+            return false;
+        };
+        int scans = 0;
+        // Adds the point at x (plane frame), found by walking from triangle `from`: its triangle, or -1.
+        auto place = [&](const dvec2& x, int32_t from, double clear) -> int32_t {
+            const dvec3 X = o + u * x.x + v * x.y;
+            const dvec4 c = vp * dvec4(X, 1.0);
+            if (c.w <= 1e-12) return -1;
+            Pt pt;
+            pt.kind = kInside;
+            pt.ndc = dvec3(c) / c.w;
+            const dvec2 xp = face2d(uint32_t(f), pt.ndc);
+            const int32_t at = rt.locate(xp, from, scans < 32);
+            if (at < 0) {
+                ++scans;
+                return -1;
+            }
+            for (uint32_t k : tris[at])
+                if (glm::length(q[k] - x) < clear) return -1;
+            const uint32_t local = uint32_t(ids.size());
+            p2.push_back(xp);
+            w.push_back(X);
+            q.push_back(x);
+            if (!rt.insert(at, local)) {
+                p2.pop_back();
+                w.pop_back();
+                q.pop_back();
+                return -1;
+            }
+            ids.push_back(addPoint(pt));
+            return at;
+        };
+        // The lattice: its points inside each ear-clipped triangle (inside the region, then), from that triangle.
+        constexpr double kGap = 0.55; // no lattice point closer to the outline than this many h
+        const size_t first = tris.size();
+        if (area >= 4.0 * h * h) {
+            const double dy = kRow * h;
+            std::unordered_map<uint64_t, uint8_t> taken;
+            std::vector<std::array<dvec2, 3>> seeds(first);
+            for (size_t t0 = 0; t0 < first; ++t0)
+                for (int i = 0; i < 3; ++i) seeds[t0][i] = q[tris[t0][i]];
+            int32_t last = 0;
+            for (size_t t0 = 0; t0 < first; ++t0) {
+                const auto& tq = seeds[t0];
+                const double side = orient2(tq[0], tq[1], tq[2]);
+                if (side == 0.0) continue;
+                const double ylo = std::min({tq[0].y, tq[1].y, tq[2].y}), yhi = std::max({tq[0].y, tq[1].y, tq[2].y});
+                const double xlo = std::min({tq[0].x, tq[1].x, tq[2].x}), xhi = std::max({tq[0].x, tq[1].x, tq[2].x});
+                bool fresh = true;
+                for (int64_t row = int64_t(std::ceil(ylo / dy)); double(row) * dy <= yhi; ++row) {
+                    const double off = (row & 1) ? 0.5 * h : 0.0;
+                    for (int64_t col = int64_t(std::ceil((xlo - off) / h)); double(col) * h + off <= xhi; ++col) {
+                        const dvec2 x(double(col) * h + off, double(row) * dy);
+                        if (orient2(tq[0], tq[1], x) * side < 0 || orient2(tq[1], tq[2], x) * side < 0 ||
+                            orient2(tq[2], tq[0], x) * side < 0)
+                            continue;
+                        if (!taken.emplace((uint64_t(uint32_t(int32_t(row))) << 32) | uint32_t(int32_t(col)), 1).second) continue;
+                        if (nearOutline(x, kGap * h)) continue;
+                        const int32_t at = place(x, fresh ? int32_t(t0) : last, 0.0);
+                        if (at < 0) continue;
+                        last = at;
+                        fresh = false;
+                    }
+                }
+            }
+        }
+        // Off-centres: a needle's shortest side gets the apex of a near-equilateral triangle on it (or the needle's
+        // circumcentre, if nearer), when that lands clear of the outline and of the needle's corners.
+        constexpr double kNeedle = 20.0 * 3.14159265358979323846 / 180.0;
+        const size_t budget = tris.size() + 2 * cycle.size() + 64;
+        std::unordered_map<uint64_t, uint8_t> tried; // shortest sides already given a try
+        for (int round = 0; round < 8 && tris.size() < 3 * budget; ++round) {
+            bool added = false;
+            for (int32_t t = 0; t < int32_t(tris.size()); ++t) {
+                const auto tr = tris[t];
+                if (minAngle(w[tr[0]], w[tr[1]], w[tr[2]]) >= kNeedle) continue;
+                int s = 0;
+                double len[3];
+                for (int i = 0; i < 3; ++i) len[i] = glm::length(q[tr[(i + 1) % 3]] - q[tr[i]]);
+                for (int i = 1; i < 3; ++i)
+                    if (len[i] < len[s]) s = i;
+                const uint32_t a = tr[s], b = tr[(s + 1) % 3], c = tr[(s + 2) % 3];
+                if (!tried.emplace(RegionTris::key(a, b) ^ (uint64_t(c) * 0x9E3779B97F4A7C15ull), 1).second) continue;
+                const double L = len[s];
+                if (!(L > 0.3 * h) || L > 0.9 * h) continue; // (not the thin sides: a rosette of points for one needle)
+                const dvec2 m = 0.5 * (q[a] + q[b]), e = (q[b] - q[a]) / L;
+                dvec2 into(-e.y, e.x);
+                if (glm::dot(q[c] - m, into) < 0) into = -into;
+                // The circumcentre on the bisector, at distance dc from m.
+                const dvec2 ac = q[c] - q[a];
+                const double dc = (glm::dot(ac, ac) - glm::dot(ac, e) * L) / (2.0 * glm::dot(ac, into));
+                double d = 0.8660254037844386 * L;
+                if (dc > 0 && dc < d) d = dc;
+                const dvec2 x = m + into * d;
+                if (nearOutline(x, std::min(0.5 * d, kGap * h))) continue;
+                if (place(x, t, 0.5 * L) >= 0) added = true;
+            }
+            if (!added) break;
+        }
     }
 
     int cell(double x, double lo, double hi) const {
@@ -653,6 +972,7 @@ struct Cutter {
             if (inside) continue;
             tris.clear();
             earClip(p2, reg.cycle, tris);
+            refine(-1, ids, p2, reg.cycle, tris);
             for (const auto& tr : tris) {
                 outTris.push_back({ids[tr[0]], ids[tr[1]], ids[tr[2]]});
                 outParent.push_back(t);
@@ -744,6 +1064,7 @@ struct Cutter {
             if (insideMesh == unionMode) continue;
             tris.clear();
             earClip(p2, reg.cycle, tris);
+            refine(f, ids, p2, reg.cycle, tris);
             emitPrism(ids, tris);
         }
     }
@@ -814,6 +1135,17 @@ struct Cutter {
         const uint32_t nt = uint32_t(mesh.triangleCount());
         for (uint32_t t = 0; t < nt && !degenerate; ++t) processTriangle(t);
         if (degenerate) return false;
+        {
+            std::vector<double> len;
+            for (const Pt& p : pts)
+                if (p.kind == kA) len.push_back(glm::length(dvec3(mesh.positions[p.u]) - dvec3(mesh.positions[p.v])));
+            spacing = 0.0;
+            maxInside = std::max(2048.0, double(nt) / 400.0);
+            if (!len.empty()) {
+                std::nth_element(len.begin(), len.begin() + len.size() / 2, len.end());
+                spacing = len[len.size() / 2];
+            }
+        }
 
         splitParent.assign(nt, 0);
         for (auto& [t, segs] : triSegs) {
@@ -876,6 +1208,7 @@ struct Cutter {
             }
             std::vector<std::array<uint32_t, 3>> tris;
             earClip(p2, cyc, tris);
+            refine(f, ids, p2, cyc, tris);
             emitPrism(ids, tris);
         }
         return true;
@@ -886,87 +1219,159 @@ struct Cutter {
 // cut whose mirror image overlaps it, a second cut through an earlier cap): a needle (two corners at one point)
 // collapses its short edge, a cap (a corner on the opposite side) flips that side with the triangle across it. The
 // next cut skipped such triangles and cracked (Discord, dm4nd: "the cap sometimes fails to close"). `pos` gives an
-// id's position. Keeps the triangles as they were unless the result is still closed and manifold.
+// id's position. Each change is checked against the surface as it is then (a collapse only where the two ends share
+// no neighbour but the two triangles on the edge), and later passes look at the flat triangles only. Keeps the
+// triangles as they were unless the result is still closed and manifold.
 template <class Pos>
 void cleanSlivers(std::vector<std::array<uint32_t, 3>>& tris, std::vector<int64_t>& parents, std::vector<uint8_t>& touched,
                   const Pos& pos) {
     constexpr double kFlat = 1e-6;    // twice the area / the longest side squared
     constexpr double kShort = 1e-5;   // the shortest side / the longest
     auto key = [](uint32_t a, uint32_t b) { return (uint64_t(a) << 32) | b; };
+    auto isFlat = [&](const std::array<uint32_t, 3>& t) {
+        const dvec3 p0 = pos(t[0]), p1 = pos(t[1]), p2 = pos(t[2]);
+        const double l = std::max({glm::length(p1 - p0), glm::length(p2 - p1), glm::length(p0 - p2)});
+        return l > 0.0 && glm::length(glm::cross(p1 - p0, p2 - p0)) <= kFlat * l * l;
+    };
+    std::vector<uint32_t> work;
+    for (uint32_t t = 0; t < tris.size(); ++t)
+        if (isFlat(tris[t])) work.push_back(t);
+    if (work.empty()) return;
     std::vector<std::array<uint32_t, 3>> T = tris;
     std::vector<int64_t> P = parents;
     std::vector<int64_t> changedParents;
+    std::vector<uint8_t> dead(T.size(), 0);
+    std::unordered_map<uint64_t, uint32_t> edge; // directed side -> its triangle
+    edge.reserve(T.size() * 3);
+    for (uint32_t t = 0; t < T.size(); ++t)
+        for (int i = 0; i < 3; ++i) edge[key(T[t][i], T[t][(i + 1) % 3])] = t;
+    auto unlink = [&](uint32_t t) {
+        for (int i = 0; i < 3; ++i)
+            if (const auto it = edge.find(key(T[t][i], T[t][(i + 1) % 3])); it != edge.end() && it->second == t) edge.erase(it);
+    };
+    auto link = [&](uint32_t t) {
+        for (int i = 0; i < 3; ++i) edge[key(T[t][i], T[t][(i + 1) % 3])] = t;
+    };
+    // The triangles around g, turning from t, and the ids next to g (false where the surface isn't closed).
+    auto ringOf = [&](uint32_t g, uint32_t t, std::vector<uint32_t>& ids, std::vector<uint32_t>& faces) {
+        ids.clear();
+        faces.clear();
+        for (uint32_t u = t, guard = 0; guard < 4096; ++guard) {
+            int i = -1;
+            for (int k = 0; k < 3; ++k)
+                if (T[u][k] == g) i = k;
+            if (i < 0) return false;
+            const uint32_t next = T[u][(i + 1) % 3];
+            ids.push_back(next);
+            faces.push_back(u);
+            const auto it = edge.find(key(next, g));
+            if (it == edge.end()) return false;
+            u = it->second;
+            if (u == t) return true;
+        }
+        return false;
+    };
+    std::vector<uint32_t> ringA, ringB, facesA, facesB, later;
     bool any = false;
-    for (int pass = 0; pass < 8; ++pass) {
-        std::unordered_map<uint64_t, uint32_t> edge;
-        edge.reserve(T.size() * 3);
-        for (uint32_t t = 0; t < T.size(); ++t)
-            for (int i = 0; i < 3; ++i) edge[key(T[t][i], T[t][(i + 1) % 3])] = t;
-        std::unordered_map<uint32_t, uint32_t> collapse; // id -> the id it merges into
-        std::vector<uint8_t> dead(T.size(), 0), busy(T.size(), 0);
+    for (int pass = 0; pass < 64 && !work.empty(); ++pass) {
         bool changed = false;
-        for (uint32_t t = 0; t < T.size(); ++t) {
-            if (busy[t]) continue;
+        later.clear();
+        for (uint32_t t : work) {
+            if (dead[t] || !isFlat(T[t])) continue;
             const dvec3 p[3] = {pos(T[t][0]), pos(T[t][1]), pos(T[t][2])};
             double len[3];
             for (int i = 0; i < 3; ++i) len[i] = glm::length(p[(i + 1) % 3] - p[i]); // side i: corner i -> i + 1
             const int lo = int(std::min_element(len, len + 3) - len), hi = int(std::max_element(len, len + 3) - len);
-            if (len[hi] <= 0.0) continue;
-            if (glm::length(glm::cross(p[1] - p[0], p[2] - p[0])) > kFlat * len[hi] * len[hi]) continue;
             if (len[lo] < kShort * len[hi]) { // needle: side lo's end merges into its start
-                const uint32_t a = T[t][lo], b = T[t][(lo + 1) % 3];
-                if (a == b || collapse.count(a) || collapse.count(b)) continue;
-                collapse[b] = a;
-                busy[t] = 1;
+                const uint32_t a = T[t][lo], b = T[t][(lo + 1) % 3], c = T[t][(lo + 2) % 3];
+                const auto across = edge.find(key(b, a));
+                if (a == b || across == edge.end() || !ringOf(a, t, ringA, facesA) || !ringOf(b, t, ringB, facesB)) {
+                    later.push_back(t);
+                    continue;
+                }
+                const uint32_t o = across->second;
+                uint32_t d = ~0u;
+                for (int i = 0; i < 3; ++i)
+                    if (T[o][i] == b && T[o][(i + 1) % 3] == a) d = T[o][(i + 2) % 3];
+                // Only the two triangles on a -> b may share a neighbour of both (else the merge pinches the surface).
+                size_t shared = 0;
+                for (uint32_t x : ringA)
+                    if (std::find(ringB.begin(), ringB.end(), x) != ringB.end()) shared += (x == c || x == d) ? 1 : 100;
+                if (shared != 2 || c == d || ringA.size() < 4 || ringB.size() < 4) {
+                    later.push_back(t);
+                    continue;
+                }
+                for (uint32_t u : facesB) {
+                    unlink(u);
+                    changedParents.push_back(P[u]);
+                    if (u == t || u == o) {
+                        dead[u] = 1;
+                        continue;
+                    }
+                    for (uint32_t& g : T[u])
+                        if (g == b) g = a;
+                }
+                for (uint32_t u : facesB)
+                    if (!dead[u]) {
+                        link(u);
+                        if (isFlat(T[u])) later.push_back(u);
+                    }
                 changed = true;
                 continue;
             }
             // cap: side hi (a -> b) has c on it; the triangle across it is (b, a, d)
             const uint32_t a = T[t][hi], b = T[t][(hi + 1) % 3], c = T[t][(hi + 2) % 3];
             const auto it = edge.find(key(b, a));
-            if (it == edge.end() || busy[it->second]) continue;
+            if (it == edge.end()) {
+                later.push_back(t);
+                continue;
+            }
             const uint32_t o = it->second;
             uint32_t d = ~0u;
             for (int i = 0; i < 3; ++i)
                 if (T[o][i] == b && T[o][(i + 1) % 3] == a) d = T[o][(i + 2) % 3];
-            if (d == ~0u || d == c || edge.count(key(c, d)) || edge.count(key(d, c))) continue;
+            if (d == ~0u || d == c || edge.count(key(c, d)) || edge.count(key(d, c))) {
+                later.push_back(t);
+                continue;
+            }
             const int64_t parent = P[o];
             changedParents.push_back(P[t]);
             changedParents.push_back(P[o]);
+            unlink(t);
+            unlink(o);
             T[t] = {a, d, c};
             T[o] = {d, b, c};
             P[t] = P[o] = parent;
-            busy[t] = busy[o] = 1;
+            link(t);
+            link(o);
+            for (uint32_t u : {t, o})
+                if (isFlat(T[u])) later.push_back(u);
             changed = true;
-        }
-        if (!collapse.empty()) {
-            auto root = [&](uint32_t g) {
-                for (auto it = collapse.find(g); it != collapse.end() && it->second != g; it = collapse.find(g)) g = it->second;
-                return g;
-            };
-            std::vector<std::array<uint32_t, 3>> keptT;
-            std::vector<int64_t> keptP;
-            for (uint32_t t = 0; t < T.size(); ++t) {
-                std::array<uint32_t, 3> r = {root(T[t][0]), root(T[t][1]), root(T[t][2])};
-                if (r != T[t]) changedParents.push_back(P[t]);
-                if (r[0] == r[1] || r[1] == r[2] || r[2] == r[0]) continue; // the needle and its twin across the short side
-                keptT.push_back(r);
-                keptP.push_back(P[t]);
-            }
-            T.swap(keptT);
-            P.swap(keptP);
         }
         any = any || changed;
         if (!changed) break;
+        std::sort(later.begin(), later.end());
+        later.erase(std::unique(later.begin(), later.end()), later.end());
+        work.swap(later);
     }
-    if (!any || T.empty()) return;
+    if (!any) return;
+    size_t k = 0;
+    for (size_t t = 0; t < T.size(); ++t)
+        if (!dead[t]) {
+            T[k] = T[t];
+            P[k] = P[t];
+            ++k;
+        }
+    T.resize(k);
+    P.resize(k);
+    if (T.empty()) return;
     // Closed and manifold still: every directed side once, with its twin.
     std::unordered_map<uint64_t, int> count;
     count.reserve(T.size() * 3);
     for (const auto& t : T)
         for (int i = 0; i < 3; ++i) count[key(t[i], t[(i + 1) % 3])] += 1;
-    for (const auto& [k, n] : count) {
-        const auto twin = count.find((k << 32) | (k >> 32));
+    for (const auto& [k2, n] : count) {
+        const auto twin = count.find((k2 << 32) | (k2 >> 32));
         if (n != 1 || twin == count.end() || twin->second != 1) return;
     }
     tris.swap(T);
@@ -1086,7 +1491,7 @@ size_t clipMesh(Mesh& mesh, const glm::mat4& viewProj, const std::vector<glm::dv
 }
 
 bool cutMesh(const Mesh& mesh, const glm::mat4& viewProj, const std::vector<glm::dvec2>& region, CutMode mode,
-             float depth, Mesh& out, std::string& error, const Mesh* depthFrom) {
+             float depth, Mesh& out, std::string& error, const Mesh* depthFrom, const std::vector<uint8_t>* plainWalls) {
     if (mesh.triangleCount() == 0) {
         error = "Cut: the Part is empty";
         return false;
@@ -1120,6 +1525,7 @@ bool cutMesh(const Mesh& mesh, const glm::mat4& viewProj, const std::vector<glm:
     const double extent = std::max({hi.x - lo.x, hi.y - lo.y, 1e-9});
     c.eps = 1e-12 * std::max(1.0, extent);
     const bool closed = closedMesh(mesh);
+    c.plainWalls = plainWalls;
     c.unionMode = mode == CutMode::Add;
     c.caps = closed;
     if (c.unionMode && !closed) {
@@ -1493,12 +1899,43 @@ void registerCutCommands(CommandRegistry& registry) {
                      }
                  return true;
              };
+             // Walls two copies share (a rectangle across the mirror plane: its top and bottom): plain on both.
+             std::vector<std::vector<uint8_t>> plain(copies.size(), std::vector<uint8_t>(region.size(), 0));
+             if (copies.size() > 1) {
+                 std::vector<std::vector<glm::dvec4>> planes(copies.size());
+                 for (size_t i = 0; i < copies.size(); ++i) {
+                     glm::mat4 inv(glm::transpose(copies[i].m));
+                     inv[3] = glm::vec4(copies[i].pivot - glm::transpose(copies[i].m) * copies[i].pivot, 1.0f);
+                     const glm::dmat4 back = glm::inverse(glm::dmat4(vp * inv));
+                     auto world = [&](glm::dvec2 r, double z) {
+                         const glm::dvec4 w = back * glm::dvec4(r, z, 1.0);
+                         return glm::dvec3(w) / w.w;
+                     };
+                     for (size_t k = 0; k < region.size(); ++k) {
+                         const glm::dvec3 a = world(region[k], -0.5), b = world(region[(k + 1) % region.size()], -0.5),
+                                          c = world(region[k], 0.5);
+                         const glm::dvec3 nrm = glm::normalize(glm::cross(b - a, c - a));
+                         planes[i].push_back(glm::dvec4(nrm, glm::dot(nrm, a)));
+                     }
+                 }
+                 const double size = double(glm::length(doc.mesh.bounds().extent())) + 1e-9;
+                 for (size_t i = 0; i < copies.size(); ++i)
+                     for (size_t j = i + 1; j < copies.size(); ++j)
+                         for (size_t k = 0; k < region.size(); ++k)
+                             for (size_t l = 0; l < region.size(); ++l) {
+                                 const glm::dvec4 P = planes[i][k], Q = planes[j][l];
+                                 const double dot = glm::dot(glm::dvec3(P), glm::dvec3(Q));
+                                 if (std::abs(std::abs(dot) - 1.0) < 1e-7 && std::abs(P.w - (dot > 0 ? Q.w : -Q.w)) < 1e-6 * size)
+                                     plain[i][k] = plain[j][l] = 1;
+                             }
+             }
              Mesh current;
              const Mesh* src = &doc.mesh;
              size_t applied = 0;
              std::string lastError;
              std::vector<glm::mat4> done;
-             for (const SymCopy& copy : copies) {
+             for (size_t ci = 0; ci < copies.size(); ++ci) {
+                 const SymCopy& copy = copies[ci];
                  // The copy of the shape: points p with copy^-1(p) inside the original.
                  glm::mat4 inv(glm::transpose(copy.m));
                  inv[3] = glm::vec4(copy.pivot - glm::transpose(copy.m) * copy.pivot, 1.0f);
@@ -1506,7 +1943,7 @@ void registerCutCommands(CommandRegistry& registry) {
                  if (std::any_of(done.begin(), done.end(), [&](const glm::mat4& d) { return sameCutter(d, view); })) continue;
                  done.push_back(view);
                  Mesh next;
-                 if (!cutMesh(*src, view, region, mode, depth, next, lastError, &doc.mesh)) {
+                 if (!cutMesh(*src, view, region, mode, depth, next, lastError, &doc.mesh, &plain[ci])) {
                      // A mirror image beside the Part cuts nothing; any other failure cuts nothing at all, never one
                      // side only (Discord, dm4nd: with symmetry on, a cut sometimes took one side).
                      if (lastError.find("misses") != std::string::npos) continue;

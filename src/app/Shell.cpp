@@ -6,6 +6,7 @@
 // canvas, the left and right trays with their dividers, customize-mode drag
 // and drop, layout presets, and the actions behind all of it.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "io/BridgeProtocol.h"
 
 #include "app/BrandMark.h"
@@ -176,6 +177,9 @@ void drawBrushIcon(ImDrawList* dl, ImVec2 c, float r, int type) {
         break;
     }
     case BrushType::Inflate: dl->AddCircle(c, r * 0.45f, hi, 24, w); break;
+    case BrushType::Cloth: // folds: three soft waves
+        for (float dy : {-0.28f, 0.0f, 0.28f}) curve(r * dy, hi, w * 0.7f);
+        break;
     case BrushType::KelvinGrab: { // a soft bulge with a drag arrow
         dl->AddCircle(c, r * 0.5f, hi, 32, w * 0.6f);
         const ImVec2 a(c.x - r * 0.1f, c.y + r * 0.1f), b(c.x + r * 0.5f, c.y - r * 0.5f);
@@ -297,6 +301,14 @@ int brushTypeOfAction(std::string_view id) {
     return -1;
 }
 
+// The right shelf's view toggles: the ones that fold into its View button when the shelf doesn't fit.
+// Right shelf tiles shorter than this (logical px; the shelf shrunk to fit a short window) show their icon alone.
+constexpr float kCaptionTileH = 34.0f;
+
+static bool foldsIntoView(const std::string& item) {
+    return item == "view.turntable" || item == "view.ortho" || item == "view.floor_grid" || item == "view.flat_shading";
+}
+
 // ---------------------------------------------------------------------------
 // Button looks (ui::ActionButton)
 // ---------------------------------------------------------------------------
@@ -336,10 +348,19 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
         // Two text levels only: actions and hovered items in text, options that are off in textOff (readable, so
         // off doesn't look disabled); disabled items are faded by alpha.
         const ImU32 fg = theme::u32(on ? (mode ? theme::textOnAccent : theme::textBright) : hovered || !a.checked ? theme::text : theme::textOff, alpha);
+        if (!leftShelf && size.y < kCaptionTileH * s) { // shrunk to fit a short window: the icon alone
+            centredText(dl, app.fontIcons_, p0, p1, fg, a.icon ? a.icon : "?");
+            if (hovered && !ImGui::GetIO().KeyCtrl) ui::DelayedTooltip(label.c_str());
+            return clicked;
+        }
         centredText(dl, app.fontIcons_, p0, ImVec2(p1.x, p1.y - capH + 2.0f * s), fg, a.icon ? a.icon : "?");
+        // Captions that fit the column for actions named in full elsewhere (menus, the command palette).
+        const char* shortName = a.id == "view.turntable" ? "Turn" : a.id == "view.ortho" ? "Ortho" : a.id == "view.floor_grid" ? "Floor"
+                                : a.id == "view.flat_shading" ? "Flat" : nullptr;
+        const std::string shown = shortName ? std::string(tr(shortName)) : label;
         if (!leftShelf)
             centredText(dl, caption, ImVec2(p0.x, p1.y - capH), ImVec2(p1.x, p1.y - 1.0f * s), fg,
-                        elide(caption ? caption : ImGui::GetFont(), label, size.x - 2.0f * s).c_str());
+                        elide(caption ? caption : ImGui::GetFont(), shown, size.x - 2.0f * s).c_str());
         else if (!fitCaption(dl, caption, ImVec2(p0.x + 1.0f * s, p1.y - capH), ImVec2(p1.x - 1.0f * s, p1.y - 1.0f * s), fg, label) && hovered)
             ui::DelayedTooltip(label.c_str());
         return clicked;
@@ -426,6 +447,7 @@ void App::registerShellActions() {
         "Stamps the VDM brush's map along the stroke, each copy turned to follow it. Capture one with Capture from view.",
         "Pulls the surface back toward the morph target, a selection set's shape (Tool > Selection Sets > Morph "
         "Target); Alt pushes away. Works at any subdivision level.",
+        "Moves the surface like fabric: drag it and it folds where it bunches up. Mode and fabric in Brush > Cloth.",
     };
     static_assert(std::size(kBrushHelp) == size_t(BrushType::Count));
     for (int i = 0; i < int(BrushType::Count); ++i) {
@@ -441,8 +463,12 @@ void App::registerShellActions() {
             brush_ = type;
             doc_.activeBrush = -1;
             paintMode_ = false;
-            guidesMode_ = false; // leaves the QRemesh Guides brush
+            const std::string guides = leaveGuides(); // leaves the QRemesh Guides brush
+            edgesMode_ = false;  // and Edges mode
             maskBrush_.on = false;
+            // and Draw Tube / Append > Insert, the same brush picked again too; the status says what was left
+            if (leaveDrawModesStatus().empty() && !guides.empty()) status_ = "Left " + guides + ": brushes sculpt again";
+            if (gizmoActive()) setGizmoMode(GizmoMode::Off); // and the gizmo: the brush sculpts again
         };
         a.checked = [this, type] { return brush_ == type && doc_.activeBrush < 0 && !paintMode_ && !guidesMode_; };
         add(std::move(a));
@@ -571,9 +597,22 @@ void App::registerShellActions() {
          "a stroke or a move ends. Off by default; saved automatically.",
          "Render", "", "", [this] { uiPrefs_.floorGrid = renderSettings_.floorGrid = !renderSettings_.floorGrid; },
          [this] { return renderSettings_.floorGrid; }, nullptr});
+    // The right shelf's view toggles (foirgairwolf on Discord): each flips a setting that lives elsewhere.
+    add({"view.turntable", "Turntable", ICON_LC_ORBIT,
+         "Rotation drags turn the view like a turntable, the model upright (on), or freely about the screen's axes "
+         "(off). The same as View > Orbit lock: Y (turntable) or Free. Saved with the preferences.",
+         "Render", "", "orbit_lock",
+         [this] { runCommand("orbit_lock", {{"axis", std::string(uiPrefs_.orbitLock == 1 ? "free" : "y")}}); },
+         [this] { return uiPrefs_.orbitLock == 1; }, nullptr});
+    add({"view.flat_shading", "Flat shading", ICON_LC_GEM,
+         "Flat shading (on): every polygon shows its own face. Off: smooth shading, the default. The same as "
+         "Material > Smooth | Flat; Parts set to Smooth or Flat keep their own. A preference, saved automatically.",
+         "Render", "", "set_shading",
+         [this] { runCommand("set_shading", {{"mode", std::string(renderSettings_.flatShading ? "smooth" : "flat")}}); },
+         [this] { return renderSettings_.flatShading; }, nullptr});
     flag("view.vertexpaint", "Paint", ICON_LC_PALETTE, "Render", "", &renderSettings_.showVertexPaint,
          "Show vertex paint colours (off: plain material).");
-    // Shading (Material palette, Tool > Display): the scene's, and the active Part's own.
+    // Shading (Material palette, Tool > Viewport Look): the scene's, and the active Part's own.
     // Viewport shading (Material > Viewport Shading): Lit Sphere or PBR.
     add({"view.shading_lit_sphere", "Lit Sphere", nullptr,
          "Lit Sphere shading (the default): the chosen material sphere or the studio lights, made for reading forms "
@@ -647,7 +686,7 @@ void App::registerShellActions() {
          [this] {
              static const SDL_DialogFileFilter filters[] = {
                  {"Models", "obj;fbx;glb;gltf;ply;stl;" SF_BRIDGE_MESH_EXTS ";usda;usd;usdz"}, {"All files", "*"}};
-             SDL_ShowOpenFileDialog(
+             sf::dialogs::openFile(
                  [](void* user, const char* const* files, int) {
                      if (files && files[0]) static_cast<App*>(user)->queueFile(FileAction::AppendPart, files[0]);
                  },
@@ -2242,6 +2281,39 @@ void App::drawPaletteBody(const std::string& id) {
     ImGui::PopID();
 }
 
+void App::closePopupsOnPressOutside(const SDL_Event& e) {
+    if (e.type != SDL_EVENT_MOUSE_BUTTON_DOWN) return;
+    ImGuiContext* g = ImGui::GetCurrentContext();
+    if (!g || g->OpenPopupStack.Size == 0) return;
+    const float x = e.button.x, y = e.button.y;
+    auto inside = [&](float rx, float ry, float rw, float rh) { return x >= rx && x < rx + rw && y >= ry && y < ry + rh; };
+    const ImGuiWindow* hovered = g->HoveredWindow ? g->HoveredWindow->RootWindow : nullptr;
+    for (const ImGuiPopupData& p : g->OpenPopupStack) {
+        if (!p.Window) continue;
+        if (p.Window->Flags & ImGuiWindowFlags_Modal) return; // (a modal dialog keeps its clicks: Esc or its buttons)
+        // Its own press: over it as ImGui sees it (an auto-sized popup grows a frame after its content), or in its rect.
+        if (hovered == p.Window->RootWindow || inside(p.Window->Pos.x, p.Window->Pos.y, p.Window->Size.x, p.Window->Size.y))
+            return;
+        // A press in the window that opened it (a combo's own button, which closes it): ImGui's, as before.
+        if (hovered && p.Window->ParentWindow && hovered == p.Window->ParentWindow->RootWindow) return;
+    }
+    if (!dropdown_.empty()) {
+        const ImVec4 r = sculptForgeLayout() ? menuRect_ : dropdownRect_;
+        if (r.z > 0.0f && inside(r.x, r.y, r.z, r.w)) return;
+        for (const CanvasRect& bar : {shell_.paletteBar, shell_.title})
+            if (inside(bar.x, bar.y, bar.w, bar.h)) return; // (the menu names switch to another menu or close this one)
+    }
+    ImGui::ClosePopupToLevel(0, false);
+    ImGui::FocusWindow(nullptr); // (a focused popup, even closed, blocks hovering the rest for a frame: the press)
+    // On the bare canvas the press starts a stroke: ImGui still wants the mouse from the frame the popup was open.
+    if (!g->HoveredWindow || (g->HoveredWindow->RootWindow && (g->HoveredWindow->RootWindow->Flags & ImGuiWindowFlags_Popup)))
+        ImGui::GetIO().WantCaptureMouse = false;
+    dropdown_.clear();
+    dropdownRect_ = ImVec4();
+    menuX_ = 0.0f;
+    menuRect_ = ImVec4();
+}
+
 void App::drawPaletteDropdown() {
     if (openDropdown_) {
         ImGui::OpenPopup("##palettedropdown");
@@ -2268,7 +2340,12 @@ void App::drawPaletteDropdown() {
     ImGui::PopStyleVar();
     if (!open) {
         dropdown_.clear();
+        dropdownRect_ = ImVec4();
         return;
+    }
+    {
+        const ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
+        dropdownRect_ = ImVec4(wp.x, wp.y, ws.x, ws.y);
     }
     Demo::pushScope(def->name);
     if (def->scope) Demo::pushScope(def->scope);
@@ -2401,10 +2478,21 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f * s, 4.0f * s));
     bool lineStart = true;
     int prevShown = -1; // the last item drawn on this line (contextual items may be skipped)
+    const bool folded = shelf == kShelfRight && rightShelfFolded_ && !layout_.customize;
+    bool foldShown = false;
     for (int i = 0; i < int(list.size()); ++i) {
         const std::string& item = list[size_t(i)];
         if (item == "row") {
             lineStart = true;
+            continue;
+        }
+        if (folded && foldsIntoView(item)) { // one View button where the first of them was
+            if (foldShown) continue;
+            foldShown = true;
+            prevShown = i;
+            drawShelfItem(shelf, i, "widget.view_fold", vertical);
+            rects.push_back(ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()));
+            indices.push_back(i);
             continue;
         }
         if (!shelfItemShown(item)) continue;
@@ -2453,15 +2541,27 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
         for (size_t k = 0; k < rects.size(); ++k) {
             const std::string& id = list[size_t(indices[k])];
             // What shrinks: the tiles, the picker, and on the left shelf its action tiles (Stroke popup).
-            if (id.rfind("widget.tile.", 0) == 0 || id == "widget.color" || (shelf == kShelfLeft && id != "sep" && actions_.find(id)))
+            // On the right shelf, every button (its tiles drop their captions when short; the view toggles fold first).
+            if (id.rfind("widget.tile.", 0) == 0 || id == "widget.color" || (shelf == kShelfLeft && id != "sep" && actions_.find(id)) ||
+                (shelf == kShelfRight && id != "sep"))
                 scalable += rects[k].GetHeight();
         }
         const float needed = rects.back().Max.y + ImGui::GetScrollY() - r.y + pad.y;
         shelfClipped_[shelf] = int(std::count_if(rects.begin(), rects.end(), [&](const ImRect& rc) { return rc.Max.y > r.y + r.h + 0.5f; }));
+        if (shelf == kShelfRight && !layout_.customize) { // fold the view toggles when the shelf is too tall
+            const int folds = int(std::count_if(list.begin(), list.end(), [](const std::string& id) { return foldsIntoView(id); }));
+            if (!rightShelfFolded_ && folds > 0 && needed > r.h + 0.5f) {
+                rightShelfFolded_ = true;
+            } else if (rightShelfFolded_) {
+                // Unfolded at full size: the buttons at fit 1, and the View button's place taken by all of them.
+                const float full = needed - scalable + scalable / std::max(shelfFit_[shelf], 0.1f) + float(folds - 1) * 44.0f * s;
+                if (full <= r.h - 4.0f * s) rightShelfFolded_ = false; // (a small margin: no flicker at the edge)
+            }
+        }
         float& fit = shelfFit_[shelf];
         if (scalable > 0.0f) {
             const float fixed = needed - scalable;
-            const float want = std::clamp(fit * (r.h - 1.0f * s - fixed) / scalable, 0.6f, 1.0f);
+            const float want = std::clamp(fit * (r.h - 1.0f * s - fixed) / scalable, shelf == kShelfRight ? 0.5f : 0.6f, 1.0f); // (the right shelf: icons alone)
             if (want < fit - 0.002f || want > fit + 0.02f) fit = want; // (growing back waits for a clear margin)
         } else {
             fit = 1.0f;
@@ -2655,7 +2755,41 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         const int mode = item == "widget.nav.move" ? 0 : item == "widget.nav.zoom" ? 1 : 2;
         canvasNavButton(mode == 0 ? "nav.move" : mode == 1 ? "nav.zoom" : "nav.rotate",
                         mode == 0 ? ICON_LC_HAND : mode == 1 ? ICON_LC_ZOOM_IN : ICON_LC_ROTATE_3D,
-                        mode == 0 ? "Move" : mode == 1 ? "Zoom" : "Rotate", mode, navW);
+                        mode == 0 ? "Move" : mode == 1 ? "Zoom" : "Rotate", mode, navW,
+                        shelf == kShelfRight ? std::floor(40.0f * s * shelfFit_[shelf]) : 0.0f);
+    } else if (item == "widget.view_fold") {
+        // The folded view toggles (rightShelfFolded_): one button, lit while any of them is on, opening their list.
+        const char* ids[] = {"view.turntable", "view.ortho", "view.floor_grid", "view.flat_shading"};
+        bool anyOn = false;
+        for (const char* id : ids)
+            if (const Action* a = actions_.find(id); a && a->checked && a->checked()) anyOn = true;
+        Action fold;
+        fold.id = "widget.view_fold";
+        fold.label = "View";
+        fold.icon = ICON_LC_EYE;
+        fold.checked = [anyOn] { return anyOn; };
+        const ImVec2 size(fitW(44.0f * s), std::floor(40.0f * s * shelfFit_[shelf]));
+        centre(size.x);
+        if (drawShelfTile(*this, fold, size)) ImGui::OpenPopup("##viewfold");
+        ui::HelpText("View", nullptr, "Turntable, Orthographic, Floor grid and Flat shading: the window is too short "
+                     "to show them as buttons here, so they wait in this list.", "Right shelf");
+        const ImVec2 at = ImGui::GetItemRectMin();
+        ImGui::SetNextWindowPos(ImVec2(at.x - 4.0f * s, at.y), ImGuiCond_Appearing, ImVec2(1.0f, 0.0f));
+        if (ImGui::BeginPopup("##viewfold")) {
+            for (const char* id : ids) {
+                const Action* a = actions_.find(id);
+                if (!a) continue;
+                const std::string key = actions_.shortcutText(id);
+                const bool on = a->checked && a->checked();
+                const std::string label = std::string(trAction(a->id, a->label)) + "##fold." + id;
+                if (ImGui::MenuItem(label.c_str(), key.empty() ? nullptr : key.c_str(), on) && a->run) {
+                    actions_.touch(a->id);
+                    a->run();
+                }
+                ui::HelpAction(*this, id);
+            }
+            ImGui::EndPopup();
+        }
     } else if (item == "widget.add_brush") {
         const ImVec2 size(48.0f * s, shell::bottomShelfSize(layout_.shelfTiles).tileH * s);
         if (ImGui::InvisibleButton("##addbrush", size)) // the brush picker in "add to shelf" mode (Pickers.cpp)
@@ -2716,7 +2850,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
                               : a->icon          ? (topShelfCompact_ ? ui::Look::Icon : ui::Look::IconLabel)
                                                  : ui::Look::Label;
         const ImVec2 size = shelf == kShelfTop      ? ImVec2(look == ui::Look::Icon ? rowH : 0.0f, rowH)
-                            : shelf == kShelfRight  ? ImVec2(fitW(44.0f * s), 40.0f * s)
+                            : shelf == kShelfRight  ? ImVec2(fitW(44.0f * s), std::floor(40.0f * s * shelfFit_[shelf]))
                             : shelf == kShelfBottom ? ImVec2(bottomTileW_, shell::bottomShelfSize(layout_.shelfTiles).tileH * s)
                                                     : ImVec2(winW - 2.0f * padX, std::floor(60.0f * s * shelfFit_[shelf]));
         centre(size.x);
@@ -2875,6 +3009,33 @@ void App::drawDynamicOffer() {
         ImGui::EndPopup();
     }
 
+    // #163 (@TheLycanFenrir): an operation on the whole Part while some of it is hidden: unhide first, or cancel.
+    static constexpr const char* kUnhide = "##unhide_confirm";
+    if (openUnhideConfirm_) {
+        openUnhideConfirm_ = false;
+        ImGui::OpenPopup(kUnhide);
+    }
+    // In the middle of the window, not at the button (a tray button near the edge pushed it into a corner).
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopup(kUnhide)) {
+        Demo::pushScope("Hidden");
+        ImGui::Text(tr("Some of this Part is hidden. %s works on all of it."), tr(unhideOperation_.c_str()));
+        ImGui::TextDisabled("%s", tr("Unhide everything first, so you see what changes. Undo brings it back."));
+        ImGui::Spacing();
+        if (ImGui::Button(tr("Unhide and continue"))) {
+            ImGui::CloseCurrentPopup();
+            runCommand("show_all");
+            if (std::function<void()> proceed = std::exchange(unhideProceed_, nullptr)) proceed();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(tr("Cancel##unhide")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            unhideProceed_ = nullptr;
+            ImGui::CloseCurrentPopup();
+        }
+        Demo::popScope();
+        ImGui::EndPopup();
+    }
+
     static constexpr const char* kPopup = "##dynamic_offer";
     if (openDynamicOffer_) {
         openDynamicOffer_ = false;
@@ -2941,10 +3102,10 @@ void App::finishShelfDrag() {
 }
 
 // Right-shelf Move / Zoom / Rotate: drag on the button to navigate.
-bool App::canvasNavButton(const char* id, const char* icon, const char* englishLabel, int mode, float width) {
+bool App::canvasNavButton(const char* id, const char* icon, const char* englishLabel, int mode, float width, float height) {
     const char* label = tr(englishLabel);
     const float s = uiScale_;
-    const ImVec2 size(width > 0.0f ? width : 44.0f * s, 40.0f * s);
+    const ImVec2 size(width > 0.0f ? width : 44.0f * s, height > 0.0f ? height : 40.0f * s);
     ImGui::InvisibleButton((std::string(label) + "##" + id).c_str(), size);
     const bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
     if (active) {
@@ -2969,8 +3130,13 @@ bool App::canvasNavButton(const char* id, const char* icon, const char* englishL
     dl->AddRectFilled(a, b, theme::u32(active ? theme::accent : hovered ? theme::buttonHover : theme::frame), theme::rounding(4.0f * s));
     const float capH = (fontTiny_ ? fontTiny_->FontSize : 10.0f) + 2.0f * s;
     const ImU32 fg = theme::u32(active ? theme::textOnAccent : theme::text);
-    centredText(dl, fontIcons_, a, ImVec2(b.x, b.y - capH + 2.0f * s), fg, icon);
-    centredText(dl, fontTiny_, ImVec2(a.x, b.y - capH), ImVec2(b.x, b.y - 1.0f * s), fg, label);
+    if (size.y < kCaptionTileH * s) { // a right shelf shrunk to fit: the icon alone, the name in the tooltip
+        centredText(dl, fontIcons_, a, b, fg, icon);
+        if (hovered && !ImGui::GetIO().KeyCtrl) ui::DelayedTooltip(label);
+    } else {
+        centredText(dl, fontIcons_, a, ImVec2(b.x, b.y - capH + 2.0f * s), fg, icon);
+        centredText(dl, fontTiny_, ImVec2(a.x, b.y - capH), ImVec2(b.x, b.y - 1.0f * s), fg, label);
+    }
     ui::HelpAction(*this, id);
     return active;
 }
@@ -3208,5 +3374,17 @@ void App::drawMaterialTile(const char* id, ImVec2 size) {
 }
 
 // drawColorWidget (the left tray's colour field) is in Pickers.cpp.
+
+bool App::unhideAllows(const char* operation, std::function<void()> proceed, bool skip) {
+    const Mesh& m = doc_.mesh;
+    if (skip || !m.hasHidden()) return true;
+    size_t hidden = 0;
+    for (uint8_t h : m.hidden) hidden += h != 0;
+    if (hidden == 0 || hidden == m.hidden.size()) return true; // nothing hidden, or all of it (nothing to see either way)
+    unhideOperation_ = operation;
+    unhideProceed_ = std::move(proceed);
+    openUnhideConfirm_ = true;
+    return false;
+}
 
 } // namespace sf

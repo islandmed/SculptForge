@@ -5,6 +5,128 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.12.0
+
+```features
+date: 2026-11-08
+tagline: Garments and cloth, sandboxed plugins, a Tool palette in the order you work, and cleaner cuts and creases.
+highlight: Garments and cloth: real-size sewing patterns (millimetres, curves, notches, grain line, seam allowance) from 8 templates at your sizes, sewn with matched seam lengths; print at home at real size (PDF/SVG pages) or export DXF for cutters; plus a Cloth brush and Drape for folds on any mesh. For cosplay, costume and textile work
+highlight: Plugins: install sandboxed add-ons from packs (deformers and generators; no file or network access) (thanks @bribblej-web, #20)
+highlight: The Tool palette in the order you work: Reshape gathers Size and the Stack, Mirror moves to Geometry > Symmetry, and Texture Image and Viewport Look say what they do (thanks foirgairwolf on Discord)
+highlight: Cleaner cuts and creases: crease edges (select them by angle too) and they stay sharp when you add levels (thanks @NicTanghe on GitHub, #108, and _tfx on Discord); cut caps are even triangles instead of thin slivers (thanks dm4nd on Discord)
+highlight: Tube shapes: round, square, triangle or ribbon profiles with taper that follow the surface, and any brush, tool or Esc leaves Draw Tube (thanks GABO on Discord); pose every Part at once (thanks @ABHITAR)
+highlight: Each online AI service asks once before anything is sent
+highlight: Cloth brush: folds that behave like fabric
+highlight: Creased edges stay sharp as you add levels
+highlight: Select edges by angle, loop or click
+highlight: Sewing patterns from your measurements, printed at home
+highlight: Generate 3D: pick the best of three, then one click to a clean sculpting base
+highlight: Pose a whole character at once
+highlight: Tube: square, triangle and ribbon shapes, tapers, fewer points (thanks GABO on Discord)
+highlight: One-click Turntable, Ortho, Floor and Flat
+highlight: Cut caps are clean, even triangles instead of thin slivers (thanks dm4nd on Discord)
+highlight: Quad Remesh up to 2.3x faster
+title: Garments and cloth
+line: Real-size sewing patterns from 8 templates at your sizes, printed at home or exported as DXF; Cloth brush and Drape.
+image: images/wn-0120-garments.jpg
+action: guide:garments.md
+title: Plugins
+line: Packs can bring sandboxed plugins: deformers and generators with no file, network or system access.
+image: images/wn-0120-plugins.jpg
+action: guide:packs-and-macros.md#plugins
+title: Pose all Parts
+line: Pose every visible Part at once on one light Pose Mesh; Apply gives each Part the pose at full resolution.
+image: images/wn-0120-pose.jpg
+action: guide:parts.md#pose-all-parts
+title: Tube shapes
+line: Round, square or ribbon cross-sections, with a taper at either end of the tube.
+image: images/wn-0120-tube.jpg
+action: guide:tube.md#shape-cross-section-and-taper
+title: Edge creases
+line: Crease edges (select them by angle too) and they stay sharp when you add levels.
+image: images/wn-0120-crease.jpg
+action: guide:edges.md#creases
+```
+
+- **Nothing leaves without your OK**: the first time AI Brush or Generate 3D would send anything to a service on
+  someone else's computer, the panel says what is sent, to which address and who pays, and waits for **Allow** (once
+  per service). **Use local instead** switches to a model running on this computer. Revoke any service in **Edit >
+  Preferences > AI > Online AI services**.
+- **Cloth brush**: drag the surface like fabric and it folds where it bunches up; **Sculpt > Brush > Cloth** sets
+  Drag, Push, Settle, Grab, Expand, Pinch or Inflate, the fabric (Silk, Cotton, Denim, Leather), gravity reach, Soft
+  body and Self-collision. It rests on other Parts and the mask pins it.
+- **Drape**: **Tool > Drape** drops the active Part as cloth onto the other Parts (a sheet over a chair, a shirt over
+  a body), live, with Silk, Cotton, Denim or Leather; the mask pins it; at rest it is one undo step.
+- **Edge creases** (**Tool > Geometry > Edges**): give the selected edges a crease from 0 to 1 with **Crease**, or
+  remove it with **Uncrease**, and Add Level keeps them sharp: hard rims, panel lines and corners on a smooth
+  subdivided model (#108).
+- **Edges mode** (**Tool > Geometry > Edges**): select edges of the base level on the model (click, Shift adds, Ctrl
+  removes, double-click takes the edge loop), every hard edge at once with **Select by Angle**, open borders, Grow and
+  Shrink. The first step towards edge creases for subdivision (#108).
+- **Templates and Print in the Pattern window** (Tool > Garments): pick a garment at your sizes, edit the size chart,
+  add garments side by side for an outfit, and print the pattern on A4 or Letter with a live page count.
+- **Garment templates and home printing**: trousers, straight and A-line skirts, a hoodie with hood and kangaroo
+  pocket, a dress, a hooded cloak and gloves, drawn at real size from a size chart you type in once (`garment_size`,
+  `garment_new template=...`, `add=true` for an outfit). `garment_export path=x.pdf` prints any pattern on A4 or
+  Letter pages with trim lines, matching triangles, page names and a 50 mm check square; mirrored pieces print once,
+  marked "cut 2". Guide: [Garments](garments.md).
+- **Generate for form, remesh for topology**: **Generate 3D** gives you 1-3 candidates to compare by silhouette; pick
+  one, then **Use as sculpting base** remeshes it into clean, even topology and keeps the detailed original as a
+  hidden reference. Bring your own key to use your own provider and model at no markup.
+- **A cleaner gizmo**: in **All** (Shift+W) each axis is a thin line with its scale ball and its move arrow, well
+  inside the rings, and rings seen edge-on fade away from the centre. Move and Scale use the same arrows and balls.
+  Design by fenix on Discord (@fenixpoints).
+- **Esc** (or picking a brush) now leaves Move, Scale, Rotate and All, so the next stroke sculpts again.
+- **Pose all Parts**: **Tool > Parts > Pose all Parts** merges every visible Part into one light Pose Mesh; pose it
+  with the Gizmo and masks, then **Apply Pose** gives every Part the pose at full resolution, as one undo step.
+  Requested by @ABHITAR.
+- **Tube shapes**: **Tool > Tube > Shape** draws square, triangular and flat ribbon tubes as well as round ones,
+  turned and tapered to a point at either end, and changes them after drawing. **Point spacing** draws with fewer
+  points, and **Simplify** takes points out of a tube you already drew.
+- **View toggles on the right shelf**: **Turn** (turntable), **Ortho**, **Floor** and **Flat** buttons under Rotate
+  and Paint switch the rotation style, the projection, the floor grid and the shading in one click, lit while on.
+- **Live brush ring on the Size slider**: dragging **Size** shows the brush ring on the model at the new size, fading
+  out when you let go.
+- **Plugins**: packs can now bring sandboxed plugins: deformers that reshape the active Part and generators that add a
+  new Part. Open one from **Tool > Reshape > Plugins**: its settings, **Apply**, and **Stop** while it runs. A plugin
+  sees only a copy of the mesh: no files, network or system access, with time and memory limits.
+- **Cut** caps and walls come out as clean, even triangles about the size of the mesh's own, ready to sculpt without a
+  remesh.
+- **Tidier Reshape panel** (thanks foirgairwolf on Discord): **Tool > Reshape** reads top to bottom as Size, then the
+  Stack. Polish, Relax, Smooth and Balloon are now steps in Tool > Reshape > Stack (Add step > Surface); their menu
+  items and keys still run them at 50.
+- **Sharper text on Retina and 5K screens**: text and icons are drawn at the display's full resolution, and
+  **Preferences > Interface > UI scale** has finer steps (**110%**, **115%**, **135%**) and goes to **250%** and
+  **300%** for large high-resolution monitors.
+- **The Tool palette in the order you work**: Parts, then shaping (Geometry, Remesh, **Reshape**, Cut, Layers),
+  masking and groups, painting (Paint Layers, **Texture Image**), then Bake and Export, with **Viewport Look** last.
+  **Reshape** lists Smooth, Relax, Polish and Balloon from gentlest to strongest, and **Mirror** now sits beside
+  **Make Symmetric** in **Tool > Geometry > Symmetry**. Extract's button is **Make Shell**, the mesh check is **Find
+  Problems**, and **Edit > Preferences > Saving & Layouts** holds Save Layout, Reset and Export / Import Interface.
+  Shortcuts, shelves, scripts, saved layouts and files are unchanged, and the command search (F3) still finds each one
+  by its old name.
+- **Masked only** in **Tool > Geometry > Merge by Distance**: weld just the masked points, for example one seam, and
+  leave the rest of the Part alone.
+- **Hidden faces**: Quad Remesh, Voxel Remesh, Decimate and Merge by Distance ask first when part of the Part is
+  hidden, with **Unhide and continue** or **Cancel**.
+- **Paint Intensity**: in Paint mode the **Intensity** slider (top bar, Draw palette, Quick Menu, U) sets how strongly
+  the paint colours, for every stroke type, with or without an alpha.
+- **Quad Remesh on pointed parts**: **Tool > Geometry > Quad Remesh** on a thin part with a sharp tip (a horn, a claw,
+  a blade) no longer tangles along its length, and the quads now end on the point. Thanks Oslen on Discord for the
+  report.
+- **Starter meshes**: the Human Head's neck ends in a clean, even rim (no more two spikes under the jaw), and the
+  Stylised Head, Bust, Torso, Hand and Ear have clean open edges too.
+- **The tier card puts itself away**: **Got it**, its new close button, Esc or Enter dismiss the "Tuned for your
+  machine" card on the first press, and it stays away, also on laptops with two graphics cards.
+- **Tube and Insert let go**: picking any brush or tool (**Draw**, **Move**, **Scale**, **Rotate**), or pressing
+  **Esc**, now ends **Draw Tube** and **Parts > Append > Insert on the model**; the status bar says how.
+- **Pen pressure on Linux**: Wayland pens keep their pressure through the whole stroke, the eraser end works on
+  Wayland, and **Edit > Preferences > Tablet > Troubleshooting details** shows what the pen sends, with **Copy
+  details** for a bug report (and **Classic pen timing**, should pressure feel worse with your tablet).
+- **Faster remeshing**: **Tool > Geometry > Quad Remesh** at the defaults is up to 2.3 times faster (a 1,000-triangle
+  sculpt: 1.24 s before, 0.54 s now on our floor-tier laptop), and **Voxel Remesh** on a 10 million triangle sculpt
+  takes 1.6 s instead of 4.0 s. The quality is the same. Thanks factoberplay on YouTube for the report.
+
 ## Version 0.11.16
 
 ```features
@@ -29,7 +151,7 @@ highlight: macOS: SculptForge > Preferences... in the app menu opens Preferences
   rows instead of cutting words off.
 - **Tool > Geometry, grouped by what you do**: **Levels** (the **Level** slider, **Lower / Higher Level**, **Add
   Level** with **Smooth**, **Rebuild Lower Levels**, then **Remove Below / Remove Above**), **Micro Detail**,
-  **Resolution** (Decimate, Quad Remesh, Subdivide), **Cleanup** (**Fill Holes**, Merge by Distance, Check Mesh) and
+  **Resolution** (Decimate, Quad Remesh, Subdivide), **Cleanup** (**Fill Holes**, Merge by Distance, Find Problems) and
   **Symmetry** (**Make Symmetric**). Quad Remesh controls say what they do too (**Target Quads**, **50% / 100% /
   200%**, **Size Variation**, **Follow Face Groups**, **Keep Hard Edges**, **Guide Strength**), and **Remove Hidden**
   in Tool > Visibility. Shortcuts, shelves, scripts and saved files are unchanged, and the command search (F3) still
@@ -45,7 +167,7 @@ date: 2026-11-07
 tagline: Micro sculpting fixed, a 3D tube pen, and tools for tidy Parts.
 highlight: Fixed: big Clay strokes on Micro levels could break the surface into shards (since 0.11.10); Micro sculpting is back to 0.11.9's speed
 highlight: Tube: draw clay tubes in the air like a 3D pen, then edit their points (thanks GABO on Discord)
-highlight: Parts tools: split hidden, masked or unmasked areas into a new Part, merge points by distance, and Check Mesh with a Fix for each problem (thanks foirgairwolf on Discord)
+highlight: Parts tools: split hidden, masked or unmasked areas into a new Part, merge points by distance, and Find Problems with a Fix for each problem (thanks foirgairwolf on Discord)
 highlight: Hardware tiers and Turbo: SculptForge tunes itself to your computer, with a memory readout in the top bar (thanks Oslen on Discord)
 highlight: Side shelves no longer scroll sideways (thanks dm4nd on Discord), and Frame fits the model into the free area of the canvas
 ```
@@ -66,7 +188,7 @@ highlight: Side shelves no longer scroll sideways (thanks dm4nd on Discord), and
   to Smooth to Flat.
 - **Merge by Distance** (**Tool > Geometry**): merge points closer than a distance, with a live count and the points
   shown on the model before you click. For unwelded imports. Asked for by foirgairwolf on Discord.
-- **Check Mesh** (**Tool > Geometry**): counts non-manifold edges, holes, duplicate, degenerate, zero-area and flipped
+- **Find Problems** (**Tool > Geometry**): counts non-manifold edges, holes, duplicate, degenerate, zero-area and flipped
   triangles and isolated points, with a **Fix** per row and **Fix all**. Checking never changes the mesh.
 - **Recent colours**: the last eight colours you painted with sit under the colour picker on the left shelf; click one
   to paint with it again. Thanks Oslen on Discord.
@@ -86,11 +208,11 @@ highlight: Small screens: below 1280 px the side palettes open as drop-downs ins
 highlight: Membership moments: a quiet heart in the top bar and an occasional thank-you at a milestone; nothing in the app is ever paywalled
 ```
 
-- **Deformation stack** (requested by foirgairwolf on Discord): **Tool > Deformation > Stack** bends, twists, tapers,
+- **Deformation stack** (requested by foirgairwolf on Discord): **Tool > Reshape > Stack** bends, twists, tapers,
   shears, turns, moves, scales, squashes, rounds, boxes, flattens, sags or puts depth on the whole Part, along any of
   X, Y and Z, with a live preview. Stack steps up, switch them on and off, repeat one, then **Apply** (one undo step),
   **Apply Selected** or **Reset**. Every step is a command too: `deform_stack ops="bend 45 y soft; twist 90 y"`.
-- **Exact size** (requested by foirgairwolf on Discord): **Tool > Deformation > Size** shows the Part's width, height
+- **Exact size** (requested by foirgairwolf on Discord): **Tool > Reshape > Size** shows the Part's width, height
   and depth in scene units; drag one or type an exact value to resize it, with **Uniform** keeping its proportions.
 - **Membership moments**: the small membership card can now also come at a milestone (your 10th start, 10 hours of
   sculpting, your 100th save; counted on your computer only, never sent) and says the true number. After a third **Not
@@ -240,7 +362,7 @@ highlight: Hyper3D Rodin, direct: generate a model from an image or a descriptio
 - **Input style keys after a restart**: the Blender, Classic and Maya styles keep every key when SculptForge starts
   again (F for the Size slider in the Blender style, 9 for a Snapshot with the Classic keys).
 - **Auto UV never freezes the app**: the `uv_auto` command from the console, a script or an AI tool now unwraps in the
-  background like the **Tool > Texture Map > Auto UV** button, which gains a **Cancel** button beside its progress.
+  background like the **Tool > Texture Image > Auto UV** button, which gains a **Cancel** button beside its progress.
 - **Faster Pack**: **UV Editor > Pack** across a UDIM grid takes well under a second on most models (it could freeze
   the app for half a minute), runs in the background with a progress bar and **Cancel**, and lays islands out tighter.
   Unwrap runs in the background too.
@@ -484,7 +606,7 @@ action: guide:performance.md#working-with-big-meshes
   while you sculpt.
 - **Preferences save themselves**: key style, shortcuts, tablet, interface, performance and radial menus are kept a
   moment after every change, with nothing to press. The layout (shelves, trays) is kept with **Edit > Preferences >
-  Config > Save Layout**. Thanks fenixpoints (#117).
+  Saving & Layouts > Save Layout**. Thanks fenixpoints (#117).
 - **I is Falloff** with SculptForge keys (U stays Intensity); the Classic sculpting keys are unchanged.
 
 ## Version 0.11.0
@@ -841,7 +963,7 @@ action: guide:baking.md
 - **Move along the normal** (from the discussions): Move, Tendril, Elastic Tendril and KelvinGrab started with
   <kbd>Alt</kbd> held pull the surface straight out of itself (or push it straight in) instead of across the screen.
   See [Sculpting](sculpting.md#along-the-normal).
-- **Polish, Relax, Smooth and Balloon** (from the discussions): **Tool > Deformation** works on the whole Part by an
+- **Polish, Relax, Smooth and Balloon** (from the discussions): **Tool > Reshape** works on the whole Part by an
   amount: Polish flattens fine noise and keeps edges, Relax evens out the spacing, Smooth can keep the volume, and
   Balloon fills the form out. The mask holds what it covers; one undo step each. See
   [Sculpting](sculpting.md#whole-part-deformations).
@@ -854,7 +976,7 @@ action: guide:baking.md
 - **The SculptForge Discord** (**Help > Join the Discord...**): the official community, for questions, tips and
   work in progress. It is also on the support card, in the welcome note and on the website. Bugs still go to
   **Help > Report a problem** (GitHub issues).
-- **Backface culling** (#68, **Tool > Display**): don't draw the back faces of the model, for speed on open meshes
+- **Backface culling** (#68, **Tool > Viewport Look**): don't draw the back faces of the model, for speed on open meshes
   and to see through their openings. Brushes then work only on what you see. Off by default.
 - **A crosshair over the view** (#73): the pointer is a crosshair where brushes act and the arrow over the panels.
   **Preferences > Interface > Viewport cursor** brings the arrow back.
@@ -893,7 +1015,7 @@ link: uv-editor.md
 - **Sets for pipelines**: `selection_set_*` commands for scripts, `sculptforge-cli` and the AI assistant,
   `doc.selection_set()` / `doc.set_selection_set()` in Python, `.sfsets` files to move sets between Parts and
   scenes, and USD exports that carry them as GeomSubsets and primvars (read back on import).
-- **UV Editor** (**Tool > Texture Map > UV Editor**, <kbd>Alt</kbd>+<kbd>U</kbd>): the Part's UVs flat over the UDIM
+- **UV Editor** (**Tool > Texture Image > UV Editor**, <kbd>Alt</kbd>+<kbd>U</kbd>): the Part's UVs flat over the UDIM
   tiles, drawn by the graphics card so a million triangles stay smooth. Draw seams on the model with the **Seam
   Tool** (or take them from face groups, island borders or sharp edges), then **Unwrap**: **Least Stretch**,
   **Conformal**, **By Face Groups**, **Planar**, **Unfold Islands** or **Auto Seams**, with closed and tangled pieces
@@ -1126,7 +1248,7 @@ helmet, a strap, a piece of armour. Set **Thick**, **Edge Smooth** and **Double*
 ### Make Symmetric
 
 **Tool > Geometry > Symmetry > Make Symmetric** mirrors one side of a model onto the other across X, Y
-or Z and welds the seam into one watertight mesh, keeping face groups and vertex paint. **Tool > Deformation >
+or Z and welds the seam into one watertight mesh, keeping face groups and vertex paint. **Tool > Reshape >
 Mirror** flips a Part. See [Make Symmetric](geometry.md#make-symmetric).
 
 ### A flat background
@@ -1645,7 +1767,7 @@ date: 2026-10-23
 Paint into a texture instead of the vertices, so the colour detail comes from the texture (1K to 8K), not from
 the mesh: sharp decals, pores and freckles on a light game mesh.
 
-- **Auto UV.** **Tool > Texture Map > Auto UV** unwraps any sculpt in the background. Models that come in with
+- **Auto UV.** **Tool > Texture Image > Auto UV** unwraps any sculpt in the background. Models that come in with
   UVs keep them, and now OBJ, FBX, USD and glTF carry UVs in and out too.
 - **New Texture.** Pick a size and click **New Texture**: the Paint brush, **Rgb** sculpting, fills, cavity paint
   and colour picking (<kbd>C</kbd>) now work on the texture, with the mask, symmetry, pen pressure and alphas.

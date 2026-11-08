@@ -8,6 +8,7 @@
 #include "TestHarness.h"
 
 #include "ai/AiPolicy.h"
+#include "ai/Consent.h"
 #include "ai/Http.h"
 #include "ai/Hyper3D.h"
 #include "ai/ImageTo3DService.h"
@@ -325,6 +326,7 @@ TEST(hyper3d_full_flow_with_fake_service) {
     AiSettings s = hyper3dSettings();
     s.hyper3dKey = kKey;
     s.hyper3dTier = "Gen-2.5-Medium";
+    allowSend(s, generateTarget(s, true).id); // the artist's Allow in the first-use notice (ai/Consent.h)
     GenerationProgress progress;
     const uint64_t before = httpRequestCount();
     GeneratorResult r = generate3DFromText(s, "a stylised dragon head", tempPath("sf_h3d_flow"), &progress);
@@ -368,6 +370,7 @@ TEST(hyper3d_image_is_sent_as_png_and_never_logged) {
     CHECK(img.savePng(path, err));
     AiSettings s = hyper3dSettings();
     s.hyper3dKey = kKey;
+    allowSend(s, generateTarget(s, false).id);
     GeneratorResult r = generate3D(s, path, tempPath("sf_h3d_img"));
     CHECK(r.ok && !fake.calls.empty());
     CHECK(fake.calls[0].body.find("name=\"images\"; filename=\"input.png\"") != std::string::npos);

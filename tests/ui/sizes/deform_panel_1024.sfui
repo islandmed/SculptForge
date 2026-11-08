@@ -8,7 +8,7 @@ run deform_scale amount=100 axes=y
 click "Frame##view.frame"
 click "Tool##palette.tool"
 wait_idle 10
-click "Deformation##tool.deformation"
+click "Reshape##tool.deformation"
 expect "Size/##deform_size_x"
 click "##deform_stack_add"
 click "Stack/Taper##deform_add_Taper"

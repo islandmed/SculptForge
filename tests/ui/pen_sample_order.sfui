@@ -1,0 +1,71 @@
+# Pen samples in SDL's order: on every platform SDL sends a sample's motion first and its pressure after it
+# (Wayland: a tablet frame's motion, touch, then pressure). The stroke moves with the motion, so it must wait for
+# that sample's pressure: each stroke sample's dabs get their own pressure, not the sample before's (Wayland pen
+# pressure report, YouTube 11-07).
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+wait 0.2
+run new_sphere subdivisions=5
+snapshot
+
+pen_press 0.4 0.45 0.2
+pen_sample 0.45 0.45 0.2
+expect_value stroking == 1
+pen_sample 0.5 0.45 1
+expect_value stroke_sample_pressure >= 0.99
+pen_sample 0.55 0.45 0.3
+expect_value stroke_sample_pressure >= 0.29
+expect_value stroke_sample_pressure <= 0.31
+expect_value pen_axes_after_motion == 1
+pen_lift
+expect_value stroking == 0
+expect_value moved_out > 0
+expect_value can_undo == 1
+key ctrl+z
+
+# A full stroke in SDL's order: light, then heavy, pushes out like the same stroke always did.
+pen_stroke 0.3 0.45 0.7 0.55 0.2 0.2
+remember moved_out light
+key ctrl+z
+pen_stroke 0.3 0.45 0.7 0.55 0.9 0.9
+expect_value moved_out > $light*3
+key ctrl+z
+expect_value pen_lost_samples == 0
+
+# Preferences > Tablet > Troubleshooting details: the counts a bug report needs, and Copy details.
+pen_out
+click "Preferences##palette.preferences"
+click "Tablet##preferences.tablet"
+click "Troubleshooting details##tablet_diag"
+wait 0.2
+expect "Copy details##tablet_diag"
+expect_text Pressure after motion: yes
+shot tablet-troubleshooting
+click "Copy details##tablet_diag"
+wait 0.1
+shot tablet-troubleshooting-copy
+
+# Classic pen timing (the escape hatch, in Troubleshooting details): the stroke moves at a sample's motion without
+# waiting for its pressure, as in 0.11.15 and before, so the sample's dabs get the pressure of the sample before.
+click "Classic pen timing##tablet_classic_timing"
+click "Preferences##palette.preferences"
+wait 0.1
+pen_press 0.4 0.45 0.2
+pen_sample 0.45 0.45 0.2
+pen_sample 0.5 0.45 1
+expect_value stroke_sample_pressure <= 0.21
+pen_sample 0.55 0.45 0.3
+expect_value stroke_sample_pressure >= 0.99
+pen_lift
+expect_value stroking == 0
+key ctrl+z
+pen_out
+# And off again: on time.
+click "Preferences##palette.preferences"
+click "Classic pen timing##tablet_classic_timing"
+click "Preferences##palette.preferences"
+wait 0.1
+pen_press 0.4 0.45 0.2
+pen_sample 0.5 0.45 1
+expect_value stroke_sample_pressure >= 0.99
+pen_lift
+key ctrl+z

@@ -353,6 +353,11 @@ instead of typing URLs:
 | LiteLLM proxy (studio gateway) | `http://localhost:4000/v1/chat/completions` (change it to your gateway) | A virtual key, or the studio sign-in |
 | OpenRouter | `https://openrouter.ai/api/v1/chat/completions` | API key |
 
+The first request to a service on another computer shows the artist a one-time notice (what is sent, where, who
+pays) and waits for **Allow**. A policy decides for its artists instead: every provider listed in `ai.providers`, and
+every address under `ai.endpoints`, is pre-allowed (no notice); anything else stays refused, even if an artist allowed
+it before. See [What leaves your computer](interface.md#what-leaves-your-computer).
+
 **Amazon Bedrock, Google Vertex AI and Azure OpenAI** go through a [LiteLLM proxy](https://docs.litellm.ai/docs/simple_proxy)
 your studio runs: the proxy holds the cloud credentials, applies your budgets and model list, and SculptForge talks
 only to it. A minimal proxy configuration:

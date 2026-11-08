@@ -115,6 +115,38 @@ Every tier runs ctest through `tools/test/run.py --build build [-- ctest args]`:
   run carry the label `no_d3d12`, which pc.sh leaves out. ui_micro_levels makes D3D12 remove the device, yet passes on
   CI and on the same PC's native driver.
 
+## Modes and the monkey
+
+A mode that won't let go (Draw Tube or Append > Insert taking every drag after another brush was picked) breaks the
+app for the person using it, and a hand-written test only covers the modes someone thought of. Two generated UI tests
+cover the class (src/app/UiTestModes.cpp); both run in T0 whenever the app changes (tools/test/impacted.py SMOKE).
+
+- **`ui_mode_matrix`** (tests/ui/mode_matrix.sfui, about 30 s): every action in the registry is run on a small sphere.
+  One that then latches something (`App::latchedForTest()`: a mode a drag goes to, input still captured, an overlay or
+  modal) or stops a plain stroke from sculpting is a **mode**, and each way out is tried from it: Esc, a brush on the
+  shelf, Draw, Move, Scale, Rotate, a palette action, undo. Afterwards the tool is the one picked, a plain stroke
+  sculpts, nothing is latched and the status bar doesn't still name the mode. A palette action or undo needn't leave
+  the mode, but a brush after it must. A new mode is covered without a line anywhere; a way in that isn't an action
+  (Append > Insert's menu) is a `mode_entry NAME | LINE | ...` line in the script. A window an earlier case left open
+  over the model fails the run (close it in `App::unlatchForTest()`), so a leak can't hide later modes.
+  Not modes: an action that asks for a file (no dialog ever opens in a test: src/app/NativeDialog.h), a floating
+  window over the model (the model sculpts beside it), an undoable edit (Mask All), a brush that moves no vertices
+  (Paint). A modal dialog is only expected to close on Esc. Menus and overlays may take a first click to close.
+  Actions that leave the app or reach the network are never run (`kNeverRun`).
+- **`ui_monkey`** (tests/ui/monkey.sfui, a few seconds): 10 seeded sequences of 40 user actions (brushes, strokes,
+  undo / redo, panels, mode toggles, view changes), then Esc and a brush, and the same invariants plus: the mesh is
+  valid (finite, indices in range, watertight if it was), and undo back to the start restores it bit for bit.
+  `ui_monkey_many` (tests/ui/nightly/, T3) runs 200 more seeds.
+- **A failure** names the case (`[mode tube.draw (Draw Tube), exit Esc]`, `[monkey 53]`) and writes its script beside
+  the shots (`ui-shots/<test>/replay-*.sfui`), which replays on its own. `tools/test/shrink_sfui.py APP REPLAY` cuts a
+  monkey replay down to the fewest actions that still fail the same way (50 actions to 2 in 15 s). Failures inside a
+  generated case don't stop the script: every failing mode is listed in one run.
+- **Known failures** (tests/ui/mode_matrix_known.txt, `ID | EXIT | fix task`) are logged as KNOWN, not failed. When a
+  fix lands, its cases pass and the matrix fails until their lines are deleted, so the list only shrinks.
+- **Values for any script:** `latched`, `latched_modes`, `input_captured`, `overlay_open`; steps `expect_latched none`,
+  `expect_sculpts`, `expect_status_not TEXT`, `snapshot_start` / `undo_all` / `expect_restored`, `expect_mesh_valid`,
+  `action ID`. A new mode's state belongs in `App::latchedForTest()` (one line) so failures can name it.
+
 ## T3 nightly
 
 - `TEST(nightly_*)` cases (tests/test_main.cpp) are left out of every shard. They run in

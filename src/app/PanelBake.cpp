@@ -9,6 +9,7 @@
 // (the Renderer's normal map shader), so people can check it next to the high-poly. A bake run from the
 // console or a script (the bake command) shows its normal map too.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/Demo.h"
 #include "app/Ui.h"
 
@@ -228,11 +229,11 @@ void App::registerBakeUiActions() {
         "tangents a game engine uses), to check it against the high-poly. Turn it off to see the bare low-poly.");
     add("bake.open_folder", "Open Folder", [this] {
             const std::string& dir = bake_->writtenFolder;
-            if (!dir.empty() && !SDL_OpenURL(fileUrl(dir).c_str())) status_ = "Couldn't open " + dir + ": " + SDL_GetError();
+            if (!dir.empty() && !sf::dialogs::openUrl(fileUrl(dir).c_str())) status_ = "Couldn't open " + dir + ": " + SDL_GetError();
         },
         nullptr, [this] { return !bake_->writtenFolder.empty(); }, "Open the folder the last bake wrote its maps to.");
     add("bake.choose_folder", "Output Folder...",
-        [this] { SDL_ShowOpenFolderDialog(onBakeFolder, nullptr, window_, nullptr, false); }, nullptr, nullptr,
+        [this] { sf::dialogs::openFolder(onBakeFolder, nullptr, window_, nullptr, false); }, nullptr, nullptr,
         "Choose the folder baked maps are written to. Empty: beside your last export, else the project's folder, "
         "else Bakes in your library folder.",
         "", ICON_LC_FOLDER_OPEN);
@@ -260,7 +261,7 @@ void App::startBake() {
         sources->push_back(std::move(high));
     } else {
         if (!doc_.mesh.hasUvs()) {
-            status_ = "Bake needs UVs on this Part (the low-poly): Tool > Texture Map > Auto UV";
+            status_ = "Bake needs UVs on this Part (the low-poly): Tool > Texture Image > Auto UV";
             return;
         }
         std::string source = "all";
@@ -374,13 +375,13 @@ void App::drawBakeContents() {
 
     // What the maps go onto.
     if (!m.hasUvs()) {
-        ImGui::TextDisabled(tr("No UVs: Tool > Texture Map > Auto UV"));
+        ImGui::TextDisabled("%s", tr("No UVs: Tool > Texture Image > Auto UV"));
     } else {
         ImGui::TextDisabled(tr("Onto %s (%zu tris, UVs)"), doc_.activePartInfo().name.c_str(), m.triangleCount());
     }
     ui::HelpText("Low-poly", nullptr,
                  "Maps are baked onto the active Part's UVs: make the low-poly active (it needs UVs from import or "
-                 "from Auto UV in Tool > Texture Map), and keep the high-poly Part(s) visible.",
+                 "from Auto UV in Tool > Texture Image), and keep the high-poly Part(s) visible.",
                  kPath);
 
     // Source.

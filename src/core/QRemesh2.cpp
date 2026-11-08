@@ -28,8 +28,10 @@
 #include "core/QRemesh2.h"
 
 #include "core/Parallel.h"
+#include "core/ThreadPool.h"
 
 #include <algorithm>
+#include <functional>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -1147,11 +1149,22 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
             out.why = "closed guide loop";
             return false;
         }
-    const float densities[2] = {2.5f, 3.2f};
-    for (float d : densities) {
+    // Proxy density (proxy edges per quad edge). Smooth forms come out as well at 2 as at 2.5 (14 organic benchmark
+    // cases, geometric means: Hausdorff, poles, angles and edge spread equal or better, mean distance +1%) in 0.65x
+    // the time; hard edges need 2.5 to keep their corners regular (a cube: 35 poles at 2), so a piece with one that
+    // survives at the proxy's scale, with guides or with Follow Face Groups borders (feature lines too), uses 2.5, and so does
+    // a strong Size Variation (above the default 0.5 the coarser proxy evens the sizes out). 3.2: the retry when the
+    // result isn't manifold.
+    const float densities[3] = {2.0f, 2.5f, 3.2f};
+    const bool groupBorders =
+        opt.keepGroups && std::adjacent_find(piece.group.begin(), piece.group.end(), std::not_equal_to<>()) != piece.group.end();
+    const bool dense = !guides.empty() || groupBorders || opt.adaptive > 0.5f;
+    for (int i = dense ? 1 : 0; i < 3; ++i) {
+        const float d = densities[i];
         out = FieldPieceResult{};
         const bool ok = remeshPieceOnce(piece, axis, wantQuads, opt, diag, guides, report, out, cancelled, d);
         if (cancelled) return false;
+        if (!ok && out.why == "hard edges") continue;
         if (ok && quadsManifold(out.mesh.P.size(), out.mesh.quads, out.mesh.tris)) return true;
         if (ok) out.why = "not manifold";
     }
@@ -1203,6 +1216,7 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
     const float sharpCos = opt.detectEdges ? std::cos(glm::radians(60.0f)) : 2.0f;
     std::vector<vec3> segA, segB;
     std::unordered_set<uint64_t> sharp;
+    bool hardChains = false;
     {
         const std::vector<SrcEdge> edges = meshEdges(piece.P, piece.T);
         std::vector<vec3> fn(piece.T.size());
@@ -1234,12 +1248,24 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
             for (uint32_t i : sharpEdges) uf.unite(id[edges[i].a], id[edges[i].b]);
             std::vector<double> len(verts.size(), 0.0);
             for (uint32_t i : sharpEdges) len[uf.find(id[edges[i].a])] += double(glm::length(piece.P[edges[i].a] - piece.P[edges[i].b]));
+            // A chain that will pass the proxy's test below (long, sharp on average): this piece has hard edges.
+            std::vector<double> bend(verts.size(), 0.0);
+            for (uint32_t i : sharpEdges)
+                bend[uf.find(id[edges[i].a])] += double(glm::length(piece.P[edges[i].a] - piece.P[edges[i].b])) *
+                                                 std::acos(std::clamp(double(glm::dot(fn[edges[i].t0], fn[edges[i].t1])), -1.0, 1.0));
+            for (size_t r = 0; r < verts.size(); ++r)
+                if (len[r] >= 3.0 * double(h0) && bend[r] >= glm::radians(55.0) * len[r]) hardChains = true;
             for (uint32_t i : sharpEdges) {
                 if (len[uf.find(id[edges[i].a])] < 1.5 * double(h0)) continue;
                 sharp.insert(edgeKey(edges[i].a, edges[i].b));
                 segA.push_back(piece.P[edges[i].a]), segB.push_back(piece.P[edges[i].b]);
             }
         }
+    }
+    const bool organicTry = density < 2.5f && !std::getenv("SF_QR2_DENSITY");
+    if (organicTry && hardChains) {
+        out.why = "hard edges"; // (remeshPieceV2 starts again at the hard-edge density)
+        return false;
     }
     SegmentBVH features;
     if (!segA.empty()) features.build(segA, segB);
@@ -1275,6 +1301,78 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
     mark("remesh");
     std::vector<uint32_t> vmap;
     Proxy proxy = pb.result(&vmap);
+    // Sharp tips (Oslen's horn): a point finer than the proxy carries a whole cap's angle defect on a few vertices, and
+    // the field would put one singularity of index 2/4 or more there, which no quad vertex can be: the grid map then
+    // folds across the whole part. A tip is a cluster of vertices with more than 60 degrees of defect each and 270 in
+    // all within 3 edges (a cube's corner has 90); its proxy gets finer edges (and the cross field a second look). Found
+    // on the first proxy only; later proxies look for them near the same places (the centre drifts as the tip refines).
+    std::vector<vec3> tips, tipCenters, tipAnchors, tipApex;
+    const double tipLimit = glm::radians(double(tune("SF_QR2_TIP", 60.0f))), tipDefect = glm::radians(double(tune("SF_QR2_TIPSUM", 270.0f)));
+    const float tipRel = std::max(tune("SF_QR2_TIPREL", 0.25f), minEdge / L0);
+    auto findTips = [&](const Proxy& px) {
+        tips.clear(), tipCenters.clear();
+        std::vector<double> defect(px.P.size(), 6.283185307179586);
+        std::vector<uint8_t> open(px.P.size(), 0);
+        for (uint32_t t = 0; t < px.T.size(); ++t)
+            for (int k = 0; k < 3; ++k) {
+                const vec3 a = px.P[px.T[t][k]], b = px.P[px.T[t][(k + 1) % 3]], c = px.P[px.T[t][(k + 2) % 3]];
+                defect[px.T[t][k]] -= std::acos(std::clamp(double(glm::dot(safeNormalize(b - a), safeNormalize(c - a))), -1.0, 1.0));
+                if (px.opp[3 * t + k] == kNone) open[px.T[t][k]] = open[px.T[t][(k + 1) % 3]] = 1;
+            }
+        auto nearAnchor = [&](const vec3& x) {
+            if (tipAnchors.empty()) return true;
+            for (const vec3& a : tipAnchors)
+                if (glm::length(x - a) < 3.0f * L0 + 2.0f * h0) return true;
+            return false;
+        };
+        std::vector<uint32_t> sharp;
+        for (uint32_t v = 0; v < px.P.size(); ++v)
+            if (!open[v] && defect[v] > tipLimit && nearAnchor(px.P[v])) sharp.push_back(v);
+        // Sharp vertices closer than 2 edges are one tip; its centre is the defect-weighted mean of the vertices around it.
+        std::vector<int> cl(sharp.size(), -1);
+        for (size_t i = 0; i < sharp.size(); ++i) {
+            if (cl[i] >= 0) continue;
+            cl[i] = int(i);
+            vec3 seed(0.0f);
+            int n = 0;
+            for (size_t j = i; j < sharp.size(); ++j) {
+                if (j > i && (cl[j] >= 0 || glm::length(px.P[sharp[j]] - px.P[sharp[i]]) >= 2.0f * L0)) continue;
+                cl[j] = int(i), seed += px.P[sharp[j]], ++n;
+            }
+            seed /= float(n);
+            glm::dvec3 s(0.0);
+            double sum = 0.0;
+            for (size_t v = 0; v < px.P.size(); ++v)
+                if (!open[v] && defect[v] > 0.0 && glm::length(px.P[v] - seed) <= 3.0f * L0) s += defect[v] * glm::dvec3(px.P[v]), sum += defect[v];
+            if (sum < tipDefect) continue;
+            uint32_t apex = sharp[i];
+            for (size_t j = i; j < sharp.size(); ++j)
+                if (cl[j] == int(i)) {
+                    tips.push_back(px.P[sharp[j]]);
+                    if (defect[sharp[j]] > defect[apex]) apex = sharp[j];
+                }
+            if (tipAnchors.empty()) tipApex.push_back(px.P[apex]);
+            tipCenters.push_back(vec3(s / sum));
+            if (timing) std::fprintf(stderr, "  v2 sharp tip: %d vertices, %.0f degrees of defect\n", n, glm::degrees(sum));
+        }
+        if (tipAnchors.empty()) tipAnchors = tipCenters;
+        return !tips.empty();
+    };
+    auto tipRelB = [&](const Proxy& px, const std::vector<uint32_t>& vm, std::vector<float>& relB) {
+        const float R = 2.0f * L0;
+        for (size_t v = 0; v < vm.size(); ++v)
+            for (const vec3& tp : tips)
+                if (glm::length(px.P[v] - tp) < R) relB[vm[v]] = std::min(relB[vm[v]], tipRel);
+    };
+    if (findTips(proxy))
+        for (int it = 0; it < 2 && !tips.empty(); ++it) {
+            std::vector<float> relB(pb.vertexCount(), 1.0f);
+            tipRelB(proxy, vmap, relB);
+            pb.remesh(L0, relB, 2);
+            vmap.clear();
+            proxy = pb.result(&vmap);
+            findTips(proxy);
+        }
     // Hard edges checked at the proxy's scale: a chain whose faces meet at less than ~40 degrees there (on average),
     // or shorter than two quads, is sculpt detail (a scan's crease), not a hard edge, and stops being a feature.
     auto demoteSoftEdges = [&](Proxy& px) {
@@ -1317,6 +1415,11 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
     {
         const size_t d = demoteSoftEdges(proxy);
         if (timing && d) std::fprintf(stderr, "  v2 %zu soft hard-edge corners demoted\n", d);
+    }
+    if (organicTry && std::find(proxy.sharp.begin(), proxy.sharp.end(), uint8_t(1)) != proxy.sharp.end()) {
+        out.why = "hard edges"; // (remeshPieceV2 starts again at the hard-edge density)
+        if (timing) std::fprintf(stderr, "  v2 hard edges at density %.2f: again at 2.5\n", double(density));
+        return false;
     }
     Frames frames;
     frames.build(proxy);
@@ -1370,15 +1473,22 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
         VertexFaces vf;
         vf.build(proxy.P.size(), proxy.T);
         auto smoothLog = [&](std::vector<float>& x, int rounds) {
+            std::vector<double> lx(x.size());
             for (int it = 0; it < rounds; ++it) {
+                // Each vertex's log once per round (not once per corner that sees it), then the averages in parallel.
+                poolFor(x.size(), [&](size_t b, size_t e) {
+                    for (size_t v = b; v < e; ++v) lx[v] = std::log(double(x[v]));
+                });
                 std::vector<float> lr(x.size());
-                for (size_t v = 0; v < x.size(); ++v) {
-                    double s = 0.0;
-                    int c = 0;
-                    for (uint32_t k = vf.off[v]; k < vf.off[v + 1]; ++k)
-                        for (int j = 0; j < 3; ++j) s += std::log(double(x[proxy.T[vf.tri[k]][j]])), ++c;
-                    lr[v] = c ? float(std::exp(s / double(c))) : x[v];
-                }
+                poolFor(x.size(), [&](size_t b, size_t e) {
+                    for (size_t v = b; v < e; ++v) {
+                        double s = 0.0;
+                        int c = 0;
+                        for (uint32_t k = vf.off[v]; k < vf.off[v + 1]; ++k)
+                            for (int j = 0; j < 3; ++j) s += lx[proxy.T[vf.tri[k]][j]], ++c;
+                        lr[v] = c ? float(std::exp(s / double(c))) : x[v];
+                    }
+                });
                 x.swap(lr);
             }
         };
@@ -1390,6 +1500,7 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
         // Refine the proxy where quads will be small.
         std::vector<float> relB(pb.vertexCount(), 1.0f);
         for (size_t v = 0; v < vmap.size(); ++v) relB[vmap[v]] = std::max(rel[v], minEdge / L0);
+        if (!tips.empty()) tipRelB(proxy, vmap, relB);
         pb.remesh(L0, relB, 2);
         vmap.clear();
         proxy = pb.result(&vmap);
@@ -1457,6 +1568,44 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
         sframes.build(smooth);
         const Curvature scurv = computeCurvature(smooth, sframes, tune("SF_QR2_SCURV", 0.5f) * curvRadius);
         if (!solveCrossField(smooth, sframes, scurv, fs, field, isCancelled)) return false;
+        // Sharp tips where the field put a singularity of index 2/4 or more (one no quad vertex can be): the field points
+        // at the tip from about five quads around instead (quads converge on it like a pencil's), solved again. Tips the
+        // field handles (a full body's fingertips) stay as they are.
+        if (!tipAnchors.empty() && findTips(proxy)) {
+            std::vector<vec3> bad;
+            for (size_t i = 0; i < tipCenters.size(); ++i)
+                for (uint32_t v = 0; v < field.vertexIndex.size(); ++v)
+                    if (field.vertexIndex[v] >= 2 && glm::length(proxy.P[v] - tipCenters[i]) < 3.0f * L0 + 2.0f * h0) {
+                        bad.push_back(tipCenters[i]);
+                        break;
+                    }
+            for (size_t i = 0; i < tipApex.size(); ++i) {
+                bool keep = false;
+                for (const vec3& c : bad) keep |= glm::length(c - tipApex[i]) < 3.0f * L0 + 4.0f * h0;
+                if (!keep) tipApex.erase(tipApex.begin() + long(i--));
+            }
+            if (!bad.empty()) {
+                const float tipR = tune("SF_QR2_TIPR", 5.0f) * h0;
+                const uint32_t nt = uint32_t(proxy.T.size());
+                if (fs.guideAngle.size() != nt) {
+                    fs.guideAngle.assign(nt, std::numeric_limits<float>::quiet_NaN());
+                    fs.guideWeight.assign(nt, 0.0f);
+                }
+                for (uint32_t t = 0; t < nt; ++t) {
+                    const glm::uvec3 tri = proxy.T[t];
+                    const vec3 c = (proxy.P[tri.x] + proxy.P[tri.y] + proxy.P[tri.z]) / 3.0f;
+                    for (const vec3& tp : bad) {
+                        const float d = glm::length(tp - c), x = d / tipR, w = std::exp(-2.0f * x * x);
+                        if (d > 2.0f * tipR || w <= fs.guideWeight[t]) continue;
+                        fs.guideAngle[t] = std::atan2(glm::dot(tp - c, frames.e2[t]), glm::dot(tp - c, frames.e1[t]));
+                        fs.guideWeight[t] = w;
+                    }
+                }
+                if (timing) std::fprintf(stderr, "  v2 %zu sharp tips with a singularity of index 2/4 or more: field points at them\n", bad.size());
+                if (!solveCrossField(smooth, sframes, scurv, fs, field, isCancelled)) return false;
+            }
+        } else
+            tipApex.clear();
     }
     out.singularities = field.singularities;
     mark("cross field");
@@ -1664,6 +1813,28 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
             }
         }
         if (timing && untangled) std::fprintf(stderr, "  v2 untangled %zu vertex moves\n", untangled);
+    }
+    // Sharp tips: quads converge before the point (a quad's corner can't sit on a needle's end), so the needle's last
+    // vertex goes onto the apex and the quads behind it stretch after it, back on the sculpt.
+    for (const vec3& apex : tipApex) {
+        uint32_t end = 0;
+        for (uint32_t v = 1; v < qp.size(); ++v)
+            if (glm::length(qp[v] - apex) < glm::length(qp[end] - apex)) end = v;
+        const vec3 gap = qp.empty() ? vec3(0.0f) : apex - qp[end];
+        const float g = glm::length(gap);
+        if (g < 0.05f * h0 || g > 8.0f * h0) continue;
+        const vec3 from = qp[end];
+        const float R = 3.0f * g + h0;
+        for (uint32_t v = 0; v < qp.size(); ++v) {
+            const float d = glm::length(qp[v] - from);
+            if (d >= R || (!planeVerts.empty() && std::abs(qp[v][axis]) < 0.05f * h0)) continue;
+            const float w = (1.0f - d / R) * (1.0f - d / R);
+            SurfaceHit hit;
+            qp[v] += w * gap;
+            if (v != end && surface.closestPoint(qp[v], 2.0f * h0 + g, hit)) qp[v] = hit.position;
+        }
+        qp[end] = apex;
+        if (timing) std::fprintf(stderr, "  v2 sharp tip: needle end moved %.2f h0 onto the apex\n", double(g / h0));
     }
     for (uint32_t v : planeVerts) { // onto the sculpt, then exactly onto the plane (a symmetric sculpt meets it there)
         for (int it = 0; it < 3; ++it) {

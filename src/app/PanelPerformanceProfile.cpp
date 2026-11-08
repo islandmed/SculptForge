@@ -143,7 +143,7 @@ void App::initHardwareProfile() {
     SDL_Log("Hardware tier: %s (%s%s%s)", hwTierName(start.hwTier), start.detected.machine.c_str(),
             start.detected.limit.empty() ? "" : "; ", start.detected.limit.c_str());
     // The tier card: after calibration (finishCalibration), or now for a machine it wasn't shown on (SF_NO_CALIBRATION).
-    if (!hw.calibrator) hw.tierCard = start.overrides.tierCardFor != tierCardKey(start.hardware);
+    if (!hw.calibrator) hw.tierCard = !tierCardSeen(start.overrides.tierCardFor, start.hardware);
 }
 
 // Makes `p` the profile in effect: the process-wide settings and the governor's starting point; `announce` (after a
@@ -212,7 +212,7 @@ void App::finishCalibration() {
     applyHardwareProfile(p, hw.announce);
     hw.announce = false;
     // First launch, or another machine: the tier card says what it found (once per machine).
-    hw.tierCard = p.overrides.tierCardFor != tierCardKey(p.hardware);
+    hw.tierCard = !tierCardSeen(p.overrides.tierCardFor, p.hardware);
 }
 
 void App::shutdownHardwareProfile() {
@@ -337,7 +337,7 @@ void App::drawHardwareProfileOverlay() {
             finishCalibration();
         }
         ImGui::SameLine();
-        ImGui::TextDisabled(tr("Esc"));
+        ImGui::TextDisabled("%s", tr("Esc"));
     }
     ImGui::End();
 }
@@ -634,7 +634,7 @@ std::string App::perfTraceJobs() const {
     add(sculptableBusy(), "make sculptable");
     add(phoneBusy(), "phone");
     add(bool(updateJob_), "update check");
-    add(running(pendingBrush_) || running(pendingGenerator_) || running(pendingModels_) || running(pendingUnreal_) ||
+    add(running(pendingBrush_) || running(pendingGenerator_) || running(pendingBase_) || running(pendingModels_) || running(pendingUnreal_) ||
             running(pendingComfyCheck_),
         "AI / bridge request");
     add(solverBusy(), "stroke solver");

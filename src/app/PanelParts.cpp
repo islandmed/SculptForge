@@ -6,12 +6,14 @@
 // the classic viewport gesture Alt+click to select a Part. Every action goes
 // through the part_* commands (core/Parts.cpp).
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "io/BridgeProtocol.h"
 #include "app/Demo.h"
 #include "app/Theme.h"
 #include "app/I18n.h"
 #include "app/Ui.h"
 #include <IconsLucide.h>
+#include "core/FigurePose.h"
 #include "core/Multires.h"
 #include "render/GL.h"
 
@@ -592,7 +594,7 @@ void App::drawPartsContents() {
                 if (label == "Quadsphere") label = "Quad Sphere";
                 if (ImGui::MenuItem((label + "##insert").c_str(), nullptr, insertType_ == t)) { // (Append's own Cone is beside it)
                     insertType_ = t;
-                    status_ = "Insert " + label + ": drag on the model (the drag sets its size). Esc stops.";
+                    status_ = "Insert " + label + ": drag on the model to place it. Esc or a brush stops.";
                 }
             }
             ImGui::Separator();
@@ -606,27 +608,27 @@ void App::drawPartsContents() {
                         insertType_ = "mesh";
                         insertMeshKey_ = "part";
                         insertMeshValue_ = name;
-                        status_ = "Insert a copy of " + name + ": drag on the model (the drag sets its size). Esc stops.";
+                        status_ = "Insert a copy of " + name + ": drag on the model to place it. Esc or a brush stops.";
                     }
                 }
                 ImGui::EndMenu();
             }
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
-                ImGui::SetTooltip(tr(count > 1 ? "Insert a copy of another Part into the active one"
+                ImGui::SetTooltip("%s", tr(count > 1 ? "Insert a copy of another Part into the active one"
                                             : "Append another Part first"));
             if (ImGui::MenuItem(tr("From file...##insert")))
-                SDL_ShowOpenFileDialog(onAppendChosen, &dialogRequests_[int(FileAction::InsertMesh)], window_,
+                sf::dialogs::openFile(onAppendChosen, &dialogRequests_[int(FileAction::InsertMesh)], window_,
                                        kInsertFilters, 2, nullptr, false);
             // Insert sets (kitbash sets): a file with several objects, or a folder of model files; a picker of
             // their thumbnails, [ and ] step through them.
             ImGui::Separator();
             if (ImGui::MenuItem(tr("Insert set from file...")))
-                SDL_ShowOpenFileDialog(onAppendChosen, &dialogRequests_[int(FileAction::InsertSet)], window_,
+                sf::dialogs::openFile(onAppendChosen, &dialogRequests_[int(FileAction::InsertSet)], window_,
                                        kInsertFilters, 2, nullptr, false);
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
                 ImGui::SetTooltip("%s", tr("A model file with several objects: insert them one at a time"));
             if (ImGui::MenuItem(tr("Insert set from folder...")))
-                SDL_ShowOpenFolderDialog(onAppendChosen, &dialogRequests_[int(FileAction::InsertSet)], window_, nullptr, false);
+                sf::dialogs::openFolder(onAppendChosen, &dialogRequests_[int(FileAction::InsertSet)], window_, nullptr, false);
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
                 ImGui::SetTooltip("%s", tr("A folder of .obj, .ply or .glb files: insert them one at a time"));
             // The built-in sets (core/Parts.h): no file to pick.
@@ -640,7 +642,7 @@ void App::drawPartsContents() {
             ImGui::EndMenu();
         }
         if (ImGui::MenuItem(tr("From file...")))
-            SDL_ShowOpenFileDialog(onAppendChosen, &dialogRequests_[int(FileAction::AppendPart)], window_,
+            sf::dialogs::openFile(onAppendChosen, &dialogRequests_[int(FileAction::AppendPart)], window_,
                                    kAppendFilters, 2, nullptr, false);
         ImGui::EndPopup();
     }
@@ -691,7 +693,7 @@ void App::drawPartsContents() {
     if (solo) ImGui::PopStyleColor();
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-        ImGui::SetTooltip(tr(solo ? "Show the other Parts again" : "Show only the active Part"));
+        ImGui::SetTooltip("%s", tr(solo ? "Show the other Parts again" : "Show only the active Part"));
     ImGui::SameLine();
     const bool xray = renderSettings_.xray;
     if (xray) ImGui::PushStyleColor(ImGuiCol_Button, style.Colors[ImGuiCol_ButtonActive]);
@@ -722,6 +724,22 @@ void App::drawPartsContents() {
                 "but Split groups separates them again.",
                 "Merge", "part_merge_visible");
     ImGui::EndDisabled();
+
+    // Figure Pose (core/FigurePose.h): pose every visible Part through one light Pose Mesh.
+    if (figurePoseActive(doc_)) {
+        if (ImGui::Button(tr("Apply Pose"), ImVec2(half, 0))) runCommand("figure_pose_apply");
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("%s", tr("Give every Part the Pose Mesh's moves at full resolution, as one undo step"));
+        ImGui::SameLine();
+        if (ImGui::Button(tr("Cancel Pose"), ImVec2(half, 0))) runCommand("figure_pose_cancel");
+    } else {
+        ImGui::BeginDisabled(visibleCount < 1);
+        if (ImGui::Button(tr("Pose all Parts"), ImVec2(-1, 0))) runCommand("figure_pose_begin");
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("%s", tr("Pose the visible Parts together on one light Pose Mesh with the Gizmo and masks, "
+                                       "then Apply Pose"));
+    }
 
     // More than one face group? Counted only when the active mesh changes.
     const uint64_t key = (uint64_t(doc_.activePartInfo().id) << 40) ^ (doc_.undo.revision() * 0x9E3779B97F4A7C15ull) ^
@@ -934,7 +952,7 @@ void App::selectInsertSetItem(int index) {
     if (!n) return;
     insertSet_.index = ((index % n) + n) % n;
     status_ = "Insert " + insertSet_.items[size_t(insertSet_.index)].name + " (" + std::to_string(insertSet_.index + 1) +
-              " of " + std::to_string(n) + "): drag on the model; [ and ] step through the set. Esc stops.";
+              " of " + std::to_string(n) + "): drag on the model; [ and ] step through the set. Esc or a brush stops.";
 }
 
 // The insert set's picker: a thumbnail per item, the one a drag inserts outlined; open while inserting from a set.

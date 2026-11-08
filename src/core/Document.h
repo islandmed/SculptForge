@@ -5,6 +5,7 @@
 #include "core/BVH.h"
 #include "core/BrushAlpha.h"
 #include "core/BrushRecipe.h"
+#include "core/EdgeSelect.h"
 #include "core/Json.h"
 #include "core/Mesh.h"
 #include "core/QRemeshGuides.h"
@@ -93,6 +94,8 @@ struct ExtractPreview {
     uint64_t revision = 0;
 };
 
+struct FigurePoseState; // core/FigurePose.h
+
 // Everything that makes up the open scene: the mesh, its acceleration
 // structure and edit history. UI-independent so it can be driven by tests,
 // scripts or an AI assistant through the command registry.
@@ -145,6 +148,8 @@ struct Document {
     // The UV Editor's selection on the active Part (core/Uv.h); dropped when another Part is picked or the
     // triangles change (UvSelection::valid). Not part of undo.
     UvSelection uvSelection;
+    // Edges selected on the active Part's base level (core/EdgeSelect.h, Geometry > Edges); dropped like uvSelection.
+    EdgeSelection edgeSelection;
 
     void syncBvh() {
         if (bvhDirty) bvh.build(mesh);
@@ -218,6 +223,9 @@ struct Document {
     // Undoes or redoes a PartStep: takes the Part out of the list into the step, or puts it back. False
     // when there was nothing to do (the Part was deleted since, or it's the active or the last one).
     bool applyPartStep(PartStep& step);
+
+    // The Figure Pose in progress (core/FigurePose.h), null when none. Not saved in projects.
+    std::shared_ptr<FigurePoseState> figurePose;
 
     // The Extract preview waiting for Accept, if any (see ExtractPreview).
     ExtractPreview extractPreview;

@@ -59,7 +59,16 @@ void App::registerForgeSphereUiActions() {
         actions_.add(std::move(a));
     };
     const auto active = [this] { return forgesphereActive(); };
-    add("forgesphere.new", "New Forge Sphere", [this] { runCommand("forgesphere_new"); }, nullptr, nullptr,
+    add("forgesphere.new", "New Forge Sphere",
+        [this] {
+            const int before = doc_.activePart;
+            runCommand("forgesphere_new");
+            if (forgesphereActive() && doc_.activePart != before) {
+                forgesphereReturnPart_ = before; // a brush, Draw or Esc goes back to it (PanelTube.cpp leaveDrawModes)
+                status_ += ". A brush or Esc goes back to sculpting";
+            }
+        },
+        nullptr, nullptr,
         "Add a Forge Sphere Part: one root sphere to block out a body, creature or plant from. Drag on a sphere to grow "
         "limbs from it, Move and Scale them into proportion, check the skin with Preview (A), then Make Mesh.",
         "forgesphere_new");
@@ -115,7 +124,7 @@ void App::drawForgeSpheresContents() {
     if (!forgesphereActive()) {
         ui::ActionButton(*this, "forgesphere.new", ImVec2(full, 0));
         ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextDisabled(tr("Block out a base mesh from connected spheres, then Make Mesh to sculpt it."));
+        ImGui::TextDisabled("%s", tr("Block out a base mesh from connected spheres, then Make Mesh to sculpt it."));
         ImGui::PopTextWrapPos();
         return;
     }

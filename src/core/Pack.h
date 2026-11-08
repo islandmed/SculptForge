@@ -39,7 +39,7 @@ struct PackLimits {
     size_t nameBytes = 160;               // one file name, with its folder
 };
 
-enum class PackItemType { Brush, Alpha, LitSphere, Material, Vdm, Keymap, PieMenu, Macro, Count };
+enum class PackItemType { Brush, Alpha, LitSphere, Material, Vdm, Keymap, PieMenu, Macro, Plugin, Count };
 constexpr int kPackItemTypes = int(PackItemType::Count);
 const char* packItemTypeId(PackItemType t);              // "brush" (pack.json)
 const char* packItemFolder(PackItemType t);              // "brushes" (the folder inside the pack)
@@ -60,6 +60,10 @@ struct PackManifest {
     std::string channel;       // "insider" marks a members' pack (Member Requests) (display only; no DRM), or ""
     std::vector<PackItem> contents;
 };
+
+// The text and id rules pack.json uses (also for plugin manifests, core/Plugin.h).
+bool packTextOk(const std::string& s, size_t maxBytes, bool multiline);
+bool packIdValid(const std::string& id);
 
 bool parsePackManifest(const std::string& text, PackManifest& out, std::string& error);
 std::string packManifestText(const PackManifest& m);
@@ -89,6 +93,8 @@ struct PackReview {
     std::string installedVersion;  // "" = not installed
     bool needsNewerApp = false;    // minAppVersion is newer than this build (refused)
     std::vector<std::string> itemNames; // "brush: Dragon Scales", for the review list
+    struct Plugin { std::string file, name, version, kind, params; uint64_t bytes = 0; };
+    std::vector<Plugin> plugins;        // what the review shows for each plugin (core/Plugin.h)
     std::vector<PackFile> files;
     std::string source; // the .sfpack it was read from
 };

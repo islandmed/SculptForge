@@ -13,6 +13,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace sf {
@@ -66,6 +67,10 @@ struct TabletSettings {
     // its whole area onto the screen, so a short pen movement crosses many pixels and the view seemed to spin
     // (GonzaloHernandez3D, Huion on Windows): turn it down to taste.
     float viewSpeed = 1.0f;
+    // Classic pen timing (Preferences > Tablet > Troubleshooting details): the pen as in 0.11.15 and before, should
+    // the new timing misbehave with someone's tablet: the stroke moves at a sample's motion without waiting for its
+    // pressure (App::flushPenMotion), and no lost sample is held (PenPressureTracker::holdLostZero).
+    bool classicTiming = false;
 };
 
 Json toJson(const TabletSettings& t);
@@ -80,10 +85,17 @@ void fromJson(const Json& j, TabletSettings& t);
 // A pen without a pressure axis (Windows Ink switched off in the Wacom driver, some old tablets) may still send
 // pressure 0 while touching: after kSilentMotions touching motions without any real pressure the pen counts as
 // pressure-less and draws at full pressure (noPressure) instead of never starting the stroke.
+//
+// A sample that lost its value keeps the last pressure (sample() returns false): never a NaN or infinity, and with
+// holdLostZero (Linux) not a 0 or below while the tip touches after it already pressed. SDL's X11 pens report 0 for a
+// motion whose valuators leave pressure out (an unchanged value, some drivers), and its Wayland pens 0 for a frame
+// that also carries a hover distance; either made a stroke's pressure drop to nothing and back between samples.
 class PenPressureTracker {
 public:
     static constexpr float kContact = 0.002f; // below this the tip is not really pressing
     static constexpr int kSilentMotions = 8;  // touching motions without pressure before the pen counts as without
+
+    bool holdLostZero = false;
 
     void touchDown() {
         sinceDown_ = false;
@@ -93,9 +105,13 @@ public:
         sinceDown_ = false;
         down_ = false;
     }
-    void sample(float pressure);
+    bool sample(float pressure); // false: a lost sample, the last pressure stays
     void motion(); // the pen moved (counts touching motions that brought no pressure)
-    void reset() { *this = PenPressureTracker(); } // another pen or tablet: forget what this one did
+    void reset() { // another pen or tablet: forget what this one did
+        const bool hold = holdLostZero;
+        *this = PenPressureTracker();
+        holdLostZero = hold;
+    }
     float raw() const { return raw_; }
     float pressure() const { return noPressure() ? 1.0f : raw_; } // what brushes get, before the curve
     bool everSampled() const { return everSampled_; } // false: maybe a pen without pressure
@@ -111,6 +127,24 @@ private:
     bool pressed_ = false;
     int silentMotions_ = 0;
 };
+
+// What Preferences > Tablet > Troubleshooting shows and "Copy details" puts in a bug report: the pen's events as
+// the app saw them (counts since launch), the last pressure and the last stroke's range.
+struct PenDiagnostics {
+    uint64_t proximity = 0, down = 0, up = 0, motion = 0, pressure = 0, otherAxes = 0, buttons = 0;
+    uint64_t lostSamples = 0;     // pressure samples that lost their value (PenPressureTracker::sample)
+    uint64_t strayMouse = 0;      // the system's own mouse events while the pen was in range (ignored)
+    uint64_t penTouchEvents = 0;  // touch events SDL made from the pen (ignored)
+    float lastPressure = -1.0f;   // -1: no pressure sample yet
+    float strokeMin = -1.0f, strokeMax = -1.0f; // the last stroke's raw pressure range (-1: none yet)
+    bool axesAfterMotion = false; // seen: a pen's pressure arrives after its motion (SDL's order on every platform)
+
+    void touchDown() { strokeMin = strokeMax = -1.0f; }
+    void sampled(float p, bool touching);
+};
+
+// The bug-report text: one "name: value" line per fact (SDL version, video driver, package ...), then the counts.
+std::string penReport(const std::vector<std::pair<std::string, std::string>>& facts, const PenDiagnostics& d);
 
 // The pressure a re-pressed stamp uses (Drag Stamp, Slide Stamp: each move undoes the stamp and presses it again):
 // the firmest of the drag so far. A pen's last samples before it lifts fall towards 0 (every tablet does, whether

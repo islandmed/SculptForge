@@ -1,6 +1,6 @@
 # Brand: which mark goes where
 
-Tony 11-06: "brand I like the bust but icon in the app I like the cube". Two marks, one job each. Files are built by
+Owner 11-06: "brand I like the bust but icon in the app I like the cube". Two marks, one job each. Files are built by
 `tools/brand/make_cube_mark.py` (cube SVGs) and `tools/brand/make_icons.py` (every PNG, .ico, .icns and upload file);
 don't edit the outputs by hand.
 
@@ -25,7 +25,7 @@ The clay bust melting into an anvil, on its dark rounded tile. It is who we are:
 ## Cube: the app icon
 
 The outline cube: Lucide's "box" icon (ISC, credited in `THIRD_PARTY_NOTICES.md`) in brand orange on a dark rounded
-tile, as it shipped in 0.1-0.10 (088f0cd6, site 71cd4f7) and as the Discord developer portal shows it. Tony 11-06 21:1x:
+tile, as it shipped in 0.1-0.10 (088f0cd6, site 71cd4f7) and as the Discord developer portal shows it. Owner 11-06 21:1x:
 "I want that back as the icon as it was before". The originals are frozen in `tools/brand/cube-outline/` and copied
 pixel for pixel; only sizes that never shipped (24 px, the macOS `.icns` on Apple's grid, apple-touch-icon) are rendered
 from its SVG. Never redraw or retouch it. The `.icns` keeps 16 and 32 px as RGB + mask (`is32`/`il32`), never PNG:

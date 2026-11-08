@@ -13,6 +13,7 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -420,4 +421,94 @@ TEST(cut_symmetry_all_or_nothing) {
     CHECK(!r.ok);
     CHECK(r.message.find("symmetry") != std::string::npos);
     CHECK(d.mesh.triangleCount() == before);
+}
+
+namespace {
+// The cut's new triangles (its face group, the highest): the smallest corner angle (degrees), the mean of each
+// triangle's smallest angle, the share under 20 degrees and the worst aspect (longest side / its height).
+struct CapQuality {
+    size_t count = 0;
+    double minAngle = 180.0, meanMin = 0.0, under20 = 0.0, maxAspect = 0.0;
+};
+CapQuality capQuality(const Mesh& m) {
+    uint32_t cap = 0;
+    for (uint32_t g : m.facegroups) cap = std::max(cap, g);
+    CapQuality q;
+    for (size_t t = 0; t < m.triangleCount(); ++t) {
+        if (m.facegroupAt(uint32_t(t)) != cap) continue;
+        const glm::dvec3 p[3] = {glm::dvec3(m.positions[m.triangles[t].x]), glm::dvec3(m.positions[m.triangles[t].y]),
+                                 glm::dvec3(m.positions[m.triangles[t].z])};
+        double lo = 180.0, longest = 0.0;
+        for (int i = 0; i < 3; ++i) {
+            const glm::dvec3 a = p[(i + 1) % 3] - p[i], b = p[(i + 2) % 3] - p[i];
+            lo = std::min(lo, std::atan2(glm::length(glm::cross(a, b)), glm::dot(a, b)) * 180.0 / 3.14159265358979);
+            longest = std::max(longest, glm::length(a));
+        }
+        const double area2 = glm::length(glm::cross(p[1] - p[0], p[2] - p[0]));
+        ++q.count;
+        q.minAngle = std::min(q.minAngle, lo);
+        q.meanMin += lo;
+        q.under20 += lo < 20.0;
+        q.maxAspect = std::max(q.maxAspect, area2 > 0 ? longest * longest / area2 : 1e30);
+    }
+    if (q.count) {
+        q.meanMin /= double(q.count);
+        q.under20 /= double(q.count);
+    }
+    return q;
+}
+} // namespace
+
+// Discord (dm4nd): after a cut "the cap triangulation looks messy, only a remesh fixes it". The caps and walls were
+// fans of long needles between their outline points; now they are filled with points about the mesh's edge length
+// apart and flipped towards the largest smallest angle, the outline (shared with the mesh) unchanged. (The needles
+// left on low-poly spheres sit on hair-thin outline sides, where the line passes 0.013 from a column of vertices.)
+TEST(cut_cap_triangle_quality) {
+    struct Case {
+        int level;
+        const char* shape;
+        const char* points;
+        const char* mode;
+    } cases[] = {
+        {2, "line", "0.013 -2 0.013 2", "away"},       {3, "line", "0.013 -2 0.013 2", "away"},
+        {5, "line", "0.013 -2 0.013 2", "away"},       {3, "rect", "-0.31 -0.29 0.33 0.27", "away"},
+        {5, "rect", "-0.31 -0.29 0.33 0.27", "away"},  {5, "lasso", "-0.5 -0.47 0.52 -0.45 0.03 0.61", "in"},
+        {3, "lasso", "-0.5 -0.47 0.52 -0.45 0.03 0.61", "add"},
+    };
+    for (const Case& c : cases) {
+        Document d = makeDoc(makeIcosphere(c.level));
+        CHECK(cut(d, c.shape, c.points, c.mode, {{"depth", 0.2}}).ok);
+        CHECK(isWatertight(d.mesh));
+        const CapQuality q = capQuality(d.mesh);
+        std::printf("cut quality: level %d %s %s: %zu cap triangles, min angle %.2f, mean min %.2f, under 20 %.1f%%, "
+                    "max aspect %.1f\n",
+                    c.level, c.shape, c.mode, q.count, q.minAngle, q.meanMin, 100.0 * q.under20, q.maxAspect);
+        CHECK(q.count > 0 && q.count < d.mesh.triangleCount() / 2);
+        CHECK(q.meanMin > 30.0); // (before: 0.5 to 5.7 degrees, 94 to 100 % under 20)
+        CHECK(q.under20 < 0.4);
+        if (c.level == 5 && std::string(c.shape) == "line") CHECK(q.minAngle > 5.0); // (before: 0.27)
+    }
+}
+
+// SF_CUT_BENCH=1: the time of a cut through a 2M-triangle sphere (the perf gate for the cap quality work).
+TEST(cut_bench_2m) {
+    if (!std::getenv("SF_CUT_BENCH")) return;
+    Mesh m = makeCube(408, 2.0f);
+    for (glm::vec3& p : m.positions) p = glm::normalize(p);
+    m.recomputeAllNormals();
+    for (const char* mode : {"away", "in"}) {
+        double best = 1e30;
+        std::string runs;
+        for (int run = 0; run < 5; ++run) {
+            Document d = makeDoc(m);
+            const auto t0 = std::chrono::steady_clock::now();
+            CHECK(cut(d, "lasso", "-0.5 -0.47 0.52 -0.45 0.03 0.61", mode, {{"depth", 0.2}}).ok);
+            const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+            best = std::min(best, s);
+            char buf[32];
+            std::snprintf(buf, sizeof buf, " %.4f", s);
+            runs += buf;
+        }
+        std::printf("cut bench: %zu triangles, %s: best of 5 %.3f s, runs%s\n", m.triangleCount(), mode, best, runs.c_str());
+    }
 }

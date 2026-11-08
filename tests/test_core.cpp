@@ -1166,11 +1166,13 @@ TEST(mcp_server_protocol) {
     for (const auto& t : list["result"]["tools"].items()) {
         hasRemesh = hasRemesh || t["name"].asString() == "remesh";
         schemasOk = schemasOk && t["inputSchema"]["type"].asString() == "object";
-        packTools = packTools || t["name"].asString() == "pack_install" || t["name"].asString() == "pack_remove";
+        packTools = packTools || t["name"].asString() == "pack_install" || t["name"].asString() == "pack_remove" ||
+                    t["name"].asString().rfind("plugin_", 0) == 0;
     }
-    // Every command but installing, removing and switching packs (the user's decision, never an agent's), plus
-    // viewport_image (cli/McpTools.h).
-    CHECK(hasRemesh && schemasOk && !packTools && list["result"]["tools"].size() == reg.all().size() - 4 + 1);
+    // Every command but installing, removing and switching packs (the user's decision, never an agent's) and the three
+    // plugin commands (plugins run only when the user runs them), plus viewport_image (cli/McpTools.h).
+    CHECK(hasRemesh && schemasOk && !packTools && list["result"]["tools"].size() == reg.all().size() - 4 - 3 + 1);
+    CHECK(call(R"({"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"plugin_run","arguments":{"id":"x"}}})").has("error"));
     Json refused = call(R"({"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"pack_install","arguments":{"path":"x.sfpack"}}})");
     CHECK(refused.has("error"));
     Json ok = call(R"({"jsonrpc":"2.0","id":"a","method":"tools/call","params":{"name":"new_sphere","arguments":{"subdivisions":2}}})");

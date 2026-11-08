@@ -5,6 +5,7 @@
 #include "ai/AiPolicy.h"
 
 #include "ai/ComfyUI.h"
+#include "ai/Consent.h"
 #include "ai/GradioClient.h"
 #include "ai/Hyper3D.h"
 #include "ai/Http.h"
@@ -563,12 +564,35 @@ bool serviceAllowed(const AiSettings& s, std::string& error) {
     if (url.empty()) return policy::aiProviderAllowed(svc, &error);
     return aiRequestAllowed(svc == "fal" || svc == "meshy" || svc == "comfyui" ? svc : "huggingface", url, error);
 }
+
+std::mutex stubMutex;
+GeneratorStub stub;
+
+// The test stub's answer, when one is set.
+bool stubbed(const std::string& outputStem, const GenerationProgress* progress, GeneratorResult& result) {
+    GeneratorStub s;
+    {
+        std::lock_guard lock(stubMutex);
+        s = stub;
+    }
+    if (!s) return false;
+    result = s(progress ? progress->candidate : 0, outputStem);
+    return true;
+}
 } // namespace
+
+void setGeneratorStubForTests(GeneratorStub s) {
+    std::lock_guard lock(stubMutex);
+    stub = std::move(s);
+}
 
 GeneratorResult generate3D(const AiSettings& s, const std::string& imagePath, const std::string& outputStem,
                            GenerationProgress* progress) {
     if (!aiEnabled()) return {false, {}, aiOffError()};
     if (std::string why; !serviceAllowed(s, why)) return {false, {}, why};
+    if (std::string why; !generateKeyMissing(s) && !checkSendAllowed(s, generateTarget(s, false), why))
+        return {false, {}, why}; // nothing sent before Allow (ai/Consent.h)
+    if (GeneratorResult r; stubbed(outputStem, progress, r)) return r;
     if (s.generatorService == "meshy") return runMeshy(s, imagePath, outputStem, progress);
     if (s.generatorService == "hyper3d") return hyper3d::run(s, imagePath, {}, progress);
     if (s.generatorService == "command") {
@@ -605,11 +629,14 @@ GeneratorResult generate3DFromText(const AiSettings& s, const std::string& promp
                                    GenerationProgress* progress) {
     if (!aiEnabled()) return {false, {}, aiOffError()};
     if (std::string why; !serviceAllowed(s, why)) return {false, {}, why};
+    if (std::string why; !generateKeyMissing(s) && !checkSendAllowed(s, generateTarget(s, true), why))
+        return {false, {}, why};
     GeneratorResult result;
     if (prompt.find_first_not_of(" \t\r\n") == std::string::npos) {
         result.error = "Describe the model you want";
         return result;
     }
+    if (stubbed(outputStem, progress, result)) return result;
     if (s.generatorService == "hyper3d") return hyper3d::run(s, {}, prompt, progress);
     if (s.generatorService == "meshy") return runMeshyRequest(s, "/openapi/v2/text-to-3d", meshyTextBody(s.meshyModel, prompt), outputStem, progress);
     if (s.generatorService == "fal")

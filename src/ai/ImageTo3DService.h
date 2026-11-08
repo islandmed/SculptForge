@@ -21,6 +21,7 @@
 #include "core/Json.h"
 
 #include <atomic>
+#include <functional>
 #include <mutex>
 #include <string>
 #include <string_view>
@@ -31,6 +32,7 @@ namespace sf::ai {
 struct GenerationProgress {
     std::atomic<bool> cancel{false};
     std::atomic<int> percent{-1}; // -1 = unknown
+    int candidate = 0;            // which of one generation's candidates this is (0 = A); set before it starts
 
     void setStatus(std::string text) {
         std::lock_guard lock(mutex_);
@@ -84,6 +86,12 @@ GeneratorResult generate3D(const AiSettings& settings, const std::string& imageP
 // Text to 3D: same services (Hugging Face, fal.ai, Meshy); untextured shapes for sculpting.
 GeneratorResult generate3DFromText(const AiSettings& settings, const std::string& prompt, const std::string& outputStem,
                                    GenerationProgress* progress = nullptr);
+
+// Tests: answers generate3D / generate3DFromText in place of every service, after the same checks (the AI switch, the
+// studio policy), so a UI test never reaches the network. `candidate` is the progress's (0 = A; 0 without one): the
+// candidates run on parallel threads, so their order of arrival is not theirs. {} = the services again.
+using GeneratorStub = std::function<GeneratorResult(int candidate, const std::string& outputStem)>;
+void setGeneratorStubForTests(GeneratorStub stub);
 
 // Hyper3D Rodin on fal.ai: image or text to 3D on one endpoint.
 bool rodinModel(std::string_view id);

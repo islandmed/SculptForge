@@ -354,15 +354,17 @@ struct ProxyBuilder::Impl {
         }
     }
 
-    // Splits the edge (a, b) at its middle; the new vertex, or kNone.
-    uint32_t split(uint32_t a, uint32_t b) {
+    // Splits the edge (a, b) at its middle; the new vertex, or kNone. With `unprojected`, the new vertex stays at the
+    // middle and is listed there (with whether it is on a feature line) for the caller to project.
+    uint32_t split(uint32_t a, uint32_t b, std::vector<std::pair<uint32_t, bool>>* unprojected = nullptr) {
         uint32_t et[4];
         const int ne = edgeTris(a, b, et, 4);
         if (ne < 1 || ne > 2) return kNone;
         const bool feature = featureEdge(a, b);
         const uint32_t m = uint32_t(P.size());
         const vec3 mid = 0.5f * (P[a] + P[b]);
-        P.push_back(feature ? projectFeature(mid) : projectSurface(mid));
+        if (unprojected) P.push_back(mid), unprojected->push_back({m, feature});
+        else P.push_back(feature ? projectFeature(mid) : projectSurface(mid));
         deadV.push_back(0);
         VT.emplace_back();
         Lt.push_back(0.5f * (Lt[a] + Lt[b]));
@@ -395,11 +397,21 @@ struct ProxyBuilder::Impl {
         std::sort(c.begin(), c.end(), [](const Cand& x, const Cand& y) {
             return x.len2 > y.len2 || (x.len2 == y.len2 && (x.a < y.a || (x.a == y.a && x.b < y.b)));
         });
+        // The new vertices are projected onto the sculpt after the pass, in parallel: no split in it reads one (every
+        // candidate joins two old vertices, and splits never move old vertices), so the result is the same.
+        std::vector<std::pair<uint32_t, bool>> added;
+        added.reserve(c.size());
         for (const Cand& e : c) {
             uint32_t et[4];
             if (edgeTris(e.a, e.b, et, 4) == 0) continue; // gone (split already from the other side)
-            split(e.a, e.b);
+            split(e.a, e.b, &added);
         }
+        parallelFor(added.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                const auto [v, feature] = added[i];
+                P[v] = feature ? projectFeature(P[v]) : projectSurface(P[v]);
+            }
+        }, 2000);
     }
 
     void collapseShort() {
@@ -550,11 +562,16 @@ struct ProxyBuilder::Impl {
     void remesh(float edge, const std::vector<float>& rel, int iterations) {
         reach = 3.0f * edge;
         for (size_t v = 0; v < P.size(); ++v) Lt[v] = edge * (v < rel.size() ? rel[v] : 1.0f);
+        StageClock clock("proxy");
         for (int it = 0; it < iterations; ++it) {
             splitLong();
+            clock.lap("split");
             collapseShort();
+            clock.lap("collapse");
             flipEdges();
+            clock.lap("flip");
             smooth(2);
+            clock.lap("smooth");
         }
     }
 };

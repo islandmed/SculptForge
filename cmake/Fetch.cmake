@@ -10,6 +10,10 @@ set(SF_PIN_glm https://github.com/g-truc/glm/archive/refs/tags/1.0.1.tar.gz
     9f3174561fd26904b23f0db5e560971cbf9b3cbda0b280f04d5c379d03bf234c)
 set(SF_PIN_SDL3 https://github.com/libsdl-org/SDL/releases/download/release-3.2.30/SDL3-3.2.30.tar.gz
     4c3b09330d866dc52eb65b66259a6684ad387252ca8c57901b3a2b534eb42e3d)
+# Linux: SDL 3.4 (cmake/Dependencies.cmake), for Wayland pens: one pen across proximity changes, the eraser end,
+# the tablet's own cursor. (Windows and macOS stay on 3.2.30 until they are checked on real tablets.)
+set(SF_PIN_SDL3_linux https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz
+    9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3)
 set(SF_PIN_imgui https://github.com/ocornut/imgui/archive/refs/tags/v1.91.9.tar.gz
     3872a5f90df78fced023c1945f4466b654fd74573370b77b17742149763a7a7c)
 set(SF_PIN_mbedtls https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.7/mbedtls-3.6.7.tar.bz2
@@ -24,6 +28,19 @@ set(SF_PIN_ldc_plog https://github.com/SergiusTheBest/plog/archive/94899e0b926ac
     92a08bce559b5f28aa88d3fd9071567414b9f43a83fe2a05a6dd14f1da536072)
 set(SF_PIN_pybind11 https://github.com/pybind/pybind11/archive/refs/tags/v3.0.4.tar.gz
     74b6a2c2b4573a400cafb6ecbf60c98df300cd3d0041296b913d02b2cbbb2676)
+
+# wasmtime's C API, prebuilt (cmake/Wasmtime.cmake): sandboxed plugins. Update every release (docs/releasing.md).
+set(SF_WASMTIME_VERSION 50.0.1) # also in each URL below
+set(SF_PIN_wasmtime_linux_x86_64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-x86_64-linux-c-api.tar.xz
+    e2c0c26e1aef52f82f0b9918ad6f34cc30f4b557aee3e261cb127a9462be8f4d)
+set(SF_PIN_wasmtime_linux_aarch64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-aarch64-linux-c-api.tar.xz
+    1a36140a016a9cc098f02a37bb0cc7be6451032861ba70049127928d2f31ef84)
+set(SF_PIN_wasmtime_macos_x86_64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-x86_64-macos-c-api.tar.xz
+    b6d436cba5c0964785c6ff7c9b5a743131555a0227b4f742185c4fb520c502c5)
+set(SF_PIN_wasmtime_macos_aarch64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-aarch64-macos-c-api.tar.xz
+    a49327ca596fae51cd92e230265132112bb7896c5a24e4d58cd05b56612e26bb)
+set(SF_PIN_wasmtime_windows_x86_64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-x86_64-windows-c-api.zip
+    8b461d9dc12b076d0414b1023433bbb2dc08d3b1c0f0a156853ede35f0147802)
 
 function(sf_fetch_declare name)
   if(NOT DEFINED SF_PIN_${name})

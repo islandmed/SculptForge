@@ -13,6 +13,7 @@
 #include "core/KeepMasked.h"
 #include "core/Macro.h"
 #include "core/Pack.h"
+#include "core/Plugin.h"
 #include "core/Dyntopo.h"
 #include "core/EnginePresets.h"
 #include "core/ExtractMirror.h"
@@ -25,6 +26,7 @@
 #include "core/Cut.h"
 #include "core/Multires.h"
 #include "core/Micro.h"
+#include "core/FigurePose.h"
 #include "core/MeshTransform.h"
 #include "core/MeshCheck.h"
 #include "core/PathStroke.h"
@@ -40,6 +42,7 @@
 #include "core/Tube.h"
 #include "core/Garment.h"
 #include "core/Deform.h"
+#include "core/Drape.h"
 #include "core/Sculptable.h"
 #include "core/Splats.h"
 #include "core/StarterMeshes.h"
@@ -222,8 +225,9 @@ CommandRegistry::CommandRegistry() {
              if (!unit) return {false, err};
              const bool unitless = ext == ".stl" || ext == ".ply" || ext == ".obj";
              bool ok;
+             std::string warnings; // malformed parts the importer skipped (USD creases)
              if (ext == ".glb" || ext == ".gltf") ok = loadGltf(path, objects, err, &splats);
-             else if (ext == ".usda" || ext == ".usd" || ext == ".usdz") ok = loadUsd(path, objects, splats, err);
+             else if (ext == ".usda" || ext == ".usd" || ext == ".usdz") ok = loadUsd(path, objects, splats, err, &warnings);
              else if (ext == ".splat") ok = loadDotSplat(path, splats, err);
              else if (ext == ".fbx") ok = loadFbx(path, objects, err);
              else if (ext == bridgefile::kExtLower) ok = loadBridge(path, m, err, &bridge);
@@ -267,6 +271,7 @@ CommandRegistry::CommandRegistry() {
                         std::to_string(doc.splats.shDegree) + ")";
                  if (hasMesh) doc.markClean(); // a model with its own splats is one freshly opened scene
              }
+             if (!warnings.empty()) msg += ". " + warnings;
              return {true, msg};
          }});
 
@@ -698,6 +703,7 @@ CommandRegistry::CommandRegistry() {
     registerForgeSphereCommands(*this);      // Forge Sphere_new, ... (Forge Spheres.cpp)
     registerTubeCommands(*this);             // tube_new, ... (Tube.cpp)
     registerAgentTools(*this);               // blockout, measure, scene_overview (core/AgentTools.cpp)
+    registerDrapeCommands(*this);        // cloth_drape (Drape.cpp)
     registerDeformCommands(*this);       // deform_polish, deform_relax, deform_smooth, deform_balloon (Deform.cpp)
 
     add({"stroke",
@@ -856,6 +862,7 @@ CommandRegistry::CommandRegistry() {
          [](Document& doc, const Args&) -> CommandResult {
              if (!doc.undo.undo(doc.mesh, doc.bvh)) return {false, "Nothing to undo"};
              if (UndoRecord* r = doc.undo.lastRedo(); r && r->part) doc.applyPartStep(*r->part);
+             if (UndoRecord* r = doc.undo.lastRedo(); r && r->group) undoGroupOnOtherParts(doc, r->group, true);
              doc.modified = true;
              return {true, "Undone"};
          }});
@@ -864,6 +871,7 @@ CommandRegistry::CommandRegistry() {
          [](Document& doc, const Args&) -> CommandResult {
              if (!doc.undo.redo(doc.mesh, doc.bvh)) return {false, "Nothing to redo"};
              if (UndoRecord* r = doc.undo.lastUndo(); r && r->part) doc.applyPartStep(*r->part);
+             if (UndoRecord* r = doc.undo.lastUndo(); r && r->group) undoGroupOnOtherParts(doc, r->group, false);
              doc.modified = true;
              return {true, "Redone"};
          }});
@@ -891,6 +899,7 @@ CommandRegistry::CommandRegistry() {
     registerDyntopoCommands(*this); // dyntopo (core/DyntopoCommands.cpp)
     registerSculptableCommands(*this); // splat_to_mesh, face_guides (core/Sculptable.h)
     registerTransformCommands(*this); // transform (core/MeshTransform.h)
+    registerFigurePoseCommands(*this); // figure_pose_* (core/FigurePose.h)
     registerExtractMirrorCommands(*this); // extract, mirror_and_weld, mirror (core/ExtractMirror.h)
     registerMeshCheckCommands(*this);     // weld_points, mesh_check, mesh_fix (core/MeshCheck.h)
     registerPerformanceCommands(*this); // perf_info, set_multithreading (core/Benchmark.cpp)
@@ -905,6 +914,7 @@ CommandRegistry::CommandRegistry() {
     registerFaceCommands(*this); // face_shapes_generate, face_weights, ... (core/FaceCommands.cpp)
     registerStarterMeshCommands(*this); // new_starter_mesh (core/StarterMeshes.h)
     registerPackCommands(*this);    // pack_install, pack_list, pack_remove, ... (core/Pack.h)
+    registerPluginCommands(*this);  // plugin_list, plugin_run, plugin_enable (core/Plugin.h)
     registerMacroCommands(*this);   // macro_run, macro_list, macro_check (core/Macro.h)
     registerProjectCommands(*this); // keep last (core/Project.cpp)
 }

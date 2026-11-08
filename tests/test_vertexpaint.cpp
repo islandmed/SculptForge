@@ -595,3 +595,24 @@ TEST(vertexpaint_dab_follows_the_alpha) {
     CHECK(inside > 100 && painted > inside / 20 && painted < inside * 9 / 10);
     d2.undo.push(d2.sculptor.endStroke());
 }
+
+TEST(vertexpaint_dab_strength_scales_with_and_without_alpha) {
+    // #164: the dab's strength (the Paint brush's Intensity) scales the colour, with an alpha (Cobblestone) and without.
+    for (const bool withAlpha : {true, false}) {
+        BrushAlpha cobble;
+        CHECK(BrushAlpha::builtin("Cobblestone", cobble));
+        double drop[2] = {0.0, 0.0}; // how much green the red takes away, at strength 0.01 and 1
+        for (int i = 0; i < 2; ++i) {
+            Document doc = makeDoc(makeIcosphere(5));
+            DabParams p = paintParams({0, 0, 1}, 0.4f);
+            p.strength = i == 0 ? 0.01f : 1.0f;
+            if (withAlpha) p.alpha = &cobble;
+            CHECK(doc.sculptor.beginStroke(doc.mesh, "Paint"));
+            CHECK(paintDab(doc.sculptor, doc.mesh, doc.bvh, p, kRed, Symmetry{false, false, false}) > 0);
+            for (const glm::vec3& c : doc.mesh.colors) drop[i] += 1.0 - double(c.y);
+            doc.undo.push(doc.sculptor.endStroke());
+        }
+        CHECK(drop[0] > 0.0);
+        CHECK(drop[1] > drop[0] * 20.0);
+    }
+}

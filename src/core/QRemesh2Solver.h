@@ -32,6 +32,13 @@ inline S conjOf(const S& v) {
     if constexpr (std::is_same_v<S, double>) return v;
     else return std::conj(v);
 }
+// a * b without std::complex's NaN / infinity recovery (a branch and a library call in the hot loops); the same
+// four products and two sums, so the same bits for finite values (fp-contract is off).
+template <class S>
+inline S mulS(const S& a, const S& b) {
+    if constexpr (std::is_same_v<S, double>) return a * b;
+    else return S(a.real() * b.real() - a.imag() * b.imag(), a.real() * b.imag() + a.imag() * b.real());
+}
 template <class S>
 inline double realOf(const S& v) {
     if constexpr (std::is_same_v<S, double>) return v;
@@ -63,6 +70,10 @@ struct SparseMatrix {
             i = j;
         }
         for (size_t i = 0; i < n; ++i) off[i + 1] += off[i];
+        setDiagonal();
+    }
+    // diag from the CSR arrays (n, off, col, val set).
+    void setDiagonal() {
         diag.assign(n, 0.0);
         for (size_t i = 0; i < n; ++i)
             for (uint32_t k = off[i]; k < off[i + 1]; ++k)
@@ -70,14 +81,27 @@ struct SparseMatrix {
         for (double& d : diag)
             if (!(d > 0.0)) d = 1.0;
     }
+    // Rows run in blocks of kRows: small enough to balance the threads (a 60k-row proxy is 60 blocks), large
+    // enough that a block outweighs handing it out.
+    static constexpr size_t kRows = 1024;
+    S row(size_t i, const std::vector<S>& x) const {
+        S s{};
+        for (uint32_t k = off[i]; k < off[i + 1]; ++k) s += mulS(val[k], x[col[k]]);
+        return s;
+    }
     void mul(const std::vector<S>& x, std::vector<S>& y) const {
         poolFor(n, [&](size_t b, size_t e) {
-            for (size_t i = b; i < e; ++i) {
-                S s{};
-                for (uint32_t k = off[i]; k < off[i + 1]; ++k) s += val[k] * x[col[k]];
-                y[i] = s;
+            for (size_t i = b; i < e; ++i) y[i] = row(i, x);
+        }, kRows);
+    }
+    // r = b - A x, in one pass.
+    void residual(const std::vector<S>& b, const std::vector<S>& x, std::vector<S>& r) const {
+        poolFor(n, [&](size_t b0, size_t e0) {
+            for (size_t i = b0; i < e0; ++i) {
+                const S s = row(i, x);
+                r[i] = b[i] - s;
             }
-        });
+        }, kRows);
     }
 };
 
@@ -115,6 +139,13 @@ private:
         // Smoothed prolongation P = (I - w D^-1 A) P0, rows per fine unknown.
         std::vector<uint32_t> pOff, pCol;
         std::vector<S> pVal;
+        // Its transpose (rows per coarse unknown, fine unknowns ascending), so the restriction P^H r gathers in
+        // parallel and adds in the same order as a scatter over the fine unknowns would.
+        std::vector<uint32_t> rOff, rRow;
+        std::vector<S> rVal;
+        // Scratch reused by every V-cycle (one apply() at a time): the residual, the restricted residual and the
+        // coarse correction, and the Jacobi sweeps' other buffer.
+        mutable std::vector<S> r, rc, xc, swap;
     };
     std::vector<Level> levels_;
 
@@ -192,40 +223,94 @@ private:
                 }
             }
             for (size_t i = 0; i < n; ++i) f.pOff[i + 1] += f.pOff[i];
-        }
-        // Galerkin: Ac = P^H A P, via AP (rows fine, columns coarse).
-        std::vector<std::pair<uint64_t, S>> trips;
-        {
-            std::vector<std::pair<uint32_t, S>> ap;
-            std::unordered_map<uint32_t, S> acc;
-            for (size_t i = 0; i < n; ++i) {
-                acc.clear();
-                for (uint32_t k = A.off[i]; k < A.off[i + 1]; ++k) {
-                    const uint32_t j = A.col[k];
-                    for (uint32_t m = f.pOff[j]; m < f.pOff[j + 1]; ++m) acc[f.pCol[m]] += A.val[k] * f.pVal[m];
-                }
+            f.rOff.assign(size_t(nc) + 1, 0);
+            for (uint32_t c : f.pCol) ++f.rOff[c + 1];
+            for (size_t c = 0; c < nc; ++c) f.rOff[c + 1] += f.rOff[c];
+            f.rRow.resize(f.pCol.size());
+            f.rVal.resize(f.pCol.size());
+            std::vector<uint32_t> fill(f.rOff.begin(), f.rOff.end() - 1);
+            for (size_t i = 0; i < n; ++i)
                 for (uint32_t m = f.pOff[i]; m < f.pOff[i + 1]; ++m) {
-                    const uint32_t I = f.pCol[m];
-                    const S pc = conjOf(f.pVal[m]);
-                    for (const auto& [J, v] : acc) trips.push_back({(uint64_t(I) << 32) | J, pc * v});
+                    const uint32_t k = fill[f.pCol[m]]++;
+                    f.rRow[k] = uint32_t(i), f.rVal[k] = conjOf(f.pVal[m]);
                 }
-            }
         }
-        c.A.build(nc, trips);
+        // Galerkin: Ac = P^H A P, row by row in parallel: AP (rows fine, columns coarse), then each coarse row I
+        // from the fine rows of P's column I (the transpose), ascending, so the sums don't depend on the threads.
+        std::vector<uint32_t> apOff, apCol;
+        std::vector<S> apVal;
+        rowProduct(n, nc, apOff, apCol, apVal, [&](size_t i, auto&& add) {
+            for (uint32_t k = A.off[i]; k < A.off[i + 1]; ++k) {
+                const uint32_t j = A.col[k];
+                for (uint32_t m = f.pOff[j]; m < f.pOff[j + 1]; ++m) add(f.pCol[m], A.val[k] * f.pVal[m]);
+            }
+        });
+        rowProduct(nc, nc, c.A.off, c.A.col, c.A.val, [&](size_t I, auto&& add) {
+            for (uint32_t m = f.rOff[I]; m < f.rOff[I + 1]; ++m) {
+                const uint32_t i = f.rRow[m];
+                for (uint32_t k = apOff[i]; k < apOff[i + 1]; ++k) add(apCol[k], f.rVal[m] * apVal[k]);
+            }
+        });
+        c.A.n = nc;
+        c.A.setDiagonal();
         return true;
+    }
+
+    // A sparse product, row by row in parallel: rows(r, add) calls add(column, value) for each term of row r (a
+    // column may come many times: summed in call order). The result is CSR with columns sorted.
+    template <class Rows>
+    static void rowProduct(size_t rows, size_t cols, std::vector<uint32_t>& off, std::vector<uint32_t>& col,
+                           std::vector<S>& val, Rows&& rowTerms) {
+        constexpr size_t block = 512;
+        const size_t blocks = (rows + block - 1) / block;
+        std::vector<std::vector<uint32_t>> bCol(blocks);
+        std::vector<std::vector<S>> bVal(blocks);
+        std::vector<uint32_t> count(rows, 0);
+        poolFor(rows, [&](size_t b0, size_t e0) {
+            std::vector<uint32_t> slot(cols, ~0u), touched;
+            std::vector<S> acc;
+            auto& oc = bCol[b0 / block];
+            auto& ov = bVal[b0 / block];
+            for (size_t r = b0; r < e0; ++r) {
+                touched.clear(), acc.clear();
+                rowTerms(r, [&](uint32_t c, const S& v) {
+                    if (slot[c] == ~0u) slot[c] = uint32_t(touched.size()), touched.push_back(c), acc.push_back(v);
+                    else acc[slot[c]] += v;
+                });
+                const size_t start = oc.size();
+                for (uint32_t c : touched) oc.push_back(c);
+                std::sort(oc.begin() + long(start), oc.end());
+                for (size_t k = start; k < oc.size(); ++k) ov.push_back(acc[slot[oc[k]]]);
+                for (uint32_t c : touched) slot[c] = ~0u;
+                count[r] = uint32_t(touched.size());
+            }
+        }, block, 2);
+        off.assign(rows + 1, 0);
+        for (size_t r = 0; r < rows; ++r) off[r + 1] = off[r] + count[r];
+        col.clear(), val.clear();
+        col.reserve(off[rows]), val.reserve(off[rows]);
+        for (size_t b = 0; b < blocks; ++b) {
+            col.insert(col.end(), bCol[b].begin(), bCol[b].end());
+            val.insert(val.end(), bVal[b].begin(), bVal[b].end());
+        }
     }
 
     // Smoothing on A x = b: damped Jacobi in parallel on big levels (two sweeps), Gauss-Seidel (forwards or
     // backwards, so the V-cycle stays symmetric) on small ones.
-    static void sweep(const SparseMatrix<S>& A, const std::vector<S>& b, std::vector<S>& x, bool forwards) {
+    static void sweep(const SparseMatrix<S>& A, const std::vector<S>& b, std::vector<S>& x, bool forwards,
+                      std::vector<S>& other) {
         const size_t n = A.n;
         if (n > 20000) {
-            std::vector<S> r(n);
+            // Jacobi reads only the old x: each sweep writes the new one into `other` in one pass, then they trade.
+            other.resize(n);
             for (int k = 0; k < 2; ++k) {
-                A.mul(x, r);
                 poolFor(n, [&](size_t b0, size_t e0) {
-                    for (size_t i = b0; i < e0; ++i) x[i] += (0.7 / A.diag[i]) * (b[i] - r[i]);
-                });
+                    for (size_t i = b0; i < e0; ++i) {
+                        const S r = A.row(i, x);
+                        other[i] = x[i] + (0.7 / A.diag[i]) * (b[i] - r);
+                    }
+                }, SparseMatrix<S>::kRows);
+                x.swap(other);
             }
             return;
         }
@@ -233,7 +318,7 @@ private:
             const size_t i = forwards ? s : n - 1 - s;
             S r = b[i];
             for (uint32_t k = A.off[i]; k < A.off[i + 1]; ++k)
-                if (A.col[k] != i) r -= A.val[k] * x[A.col[k]];
+                if (A.col[k] != i) r -= mulS(A.val[k], x[A.col[k]]);
             x[i] = r / A.diag[i];
         }
     }
@@ -280,28 +365,39 @@ private:
         if (li + 1 == levels_.size()) {
             if (!dense_.empty()) solveCoarsest(b, x);
             else
-                for (int s = 0; s < 20; ++s) sweep(L.A, b, x, true), sweep(L.A, b, x, false);
+                for (int s = 0; s < 20; ++s) sweep(L.A, b, x, true, L.swap), sweep(L.A, b, x, false, L.swap);
             return;
         }
-        sweep(L.A, b, x, true);
-        std::vector<S> r(n);
-        L.A.mul(x, r);
-        for (size_t i = 0; i < n; ++i) r[i] = b[i] - r[i];
+        sweep(L.A, b, x, true, L.swap);
+        std::vector<S>& r = L.r;
+        r.resize(n);
+        L.A.residual(b, x, r);
         const size_t nc = levels_[li + 1].A.n;
-        std::vector<S> rc(nc, S{}), xc;
-        for (size_t i = 0; i < n; ++i)
-            for (uint32_t m = L.pOff[i]; m < L.pOff[i + 1]; ++m) rc[L.pCol[m]] += conjOf(L.pVal[m]) * r[i];
+        std::vector<S>& rc = L.rc;
+        std::vector<S>& xc = L.xc;
+        rc.resize(nc);
+        poolFor(nc, [&](size_t b0, size_t e0) {
+            for (size_t c = b0; c < e0; ++c) {
+                S s{};
+                for (uint32_t m = L.rOff[c]; m < L.rOff[c + 1]; ++m) s += mulS(L.rVal[m], r[L.rRow[m]]);
+                rc[c] = s;
+            }
+        }, 1024);
         vcycle(li + 1, rc, xc);
-        for (size_t i = 0; i < n; ++i)
-            for (uint32_t m = L.pOff[i]; m < L.pOff[i + 1]; ++m) x[i] += L.pVal[m] * xc[L.pCol[m]];
-        sweep(L.A, b, x, false);
+        poolFor(n, [&](size_t b0, size_t e0) {
+            for (size_t i = b0; i < e0; ++i)
+                for (uint32_t m = L.pOff[i]; m < L.pOff[i + 1]; ++m) x[i] += mulS(L.pVal[m], xc[L.pCol[m]]);
+        }, SparseMatrix<S>::kRows);
+        sweep(L.A, b, x, false, L.swap);
     }
     std::vector<S> dense_;
 };
 
+constexpr size_t kSumBlock = 8192; // blockSumT's blocks (its partial sums, and so its rounding, depend on them)
+
 template <class S, class F>
 double blockSumT(size_t n, F&& term) {
-    const size_t block = 8192, blocks = (n + block - 1) / block;
+    const size_t block = kSumBlock, blocks = (n + block - 1) / block;
     std::vector<double> part(blocks, 0.0);
     poolFor(n, [&](size_t b, size_t e) {
         double s = 0.0;
@@ -322,7 +418,9 @@ int pcg(const std::function<void(const std::vector<S>&, std::vector<S>&)>& mul, 
     const size_t n = b.size();
     std::vector<S> r(n), z(n), d(n), q(n);
     mul(x, q);
-    for (size_t i = 0; i < n; ++i) r[i] = b[i] - q[i];
+    poolFor(n, [&](size_t b0, size_t e0) {
+        for (size_t i = b0; i < e0; ++i) r[i] = b[i] - q[i];
+    });
     auto precond = [&](const std::vector<S>& in, std::vector<S>& out) {
         if (mg) mg->apply(in, out);
         else
@@ -332,9 +430,12 @@ int pcg(const std::function<void(const std::vector<S>&, std::vector<S>&)>& mul, 
     d = z;
     double rz = blockSumT<S>(n, [&](size_t i) { return realOf(conjOf(r[i]) * z[i]); });
     const double bn = std::sqrt(blockSumT<S>(n, [&](size_t i) { return absq(b[i]); })) + 1e-300;
+    // |r|^2, from blockSumT at the start and then from the update pass itself (the same blocks, the same order).
+    double rr = blockSumT<S>(n, [&](size_t i) { return absq(r[i]); });
+    std::vector<double> part((n + kSumBlock - 1) / kSumBlock, 0.0);
     int it = 0;
     for (; it < maxIt; ++it) {
-        const double rn = std::sqrt(blockSumT<S>(n, [&](size_t i) { return absq(r[i]); }));
+        const double rn = std::sqrt(rr);
         if (rn < tol * bn) break;
         if ((it & 7) == 0 && cancelled && cancelled()) {
             stop = true;
@@ -344,12 +445,23 @@ int pcg(const std::function<void(const std::vector<S>&, std::vector<S>&)>& mul, 
         const double dq = blockSumT<S>(n, [&](size_t i) { return realOf(conjOf(d[i]) * q[i]); });
         if (!(dq > 1e-300)) break;
         const double alpha = rz / dq;
-        for (size_t i = 0; i < n; ++i) x[i] += alpha * d[i], r[i] -= alpha * q[i];
+        poolFor(n, [&](size_t b0, size_t e0) {
+            double s = 0.0;
+            for (size_t i = b0; i < e0; ++i) {
+                x[i] += alpha * d[i], r[i] -= alpha * q[i];
+                s += absq(r[i]);
+            }
+            part[b0 / kSumBlock] = s;
+        }, kSumBlock);
+        rr = 0.0;
+        for (double p : part) rr += p;
         precond(r, z);
         const double rzNew = blockSumT<S>(n, [&](size_t i) { return realOf(conjOf(r[i]) * z[i]); });
         const double beta = rzNew / rz;
         rz = rzNew;
-        for (size_t i = 0; i < n; ++i) d[i] = z[i] + beta * d[i];
+        poolFor(n, [&](size_t b0, size_t e0) {
+            for (size_t i = b0; i < e0; ++i) d[i] = z[i] + beta * d[i];
+        });
     }
     return it;
 }

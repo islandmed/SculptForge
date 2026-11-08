@@ -36,8 +36,8 @@ run part_shading index=0 mode=flat
 expect_value flat_shading == 0
 shot smooth-scene-flat-part
 
-# Tool > Display has the same controls.
-click "Display##tool.display"
+# Tool > Viewport Look has the same controls.
+click "Viewport Look##tool.display"
 expect "Flat##part.shading_flat"
 
 # Projects keep both, and a fresh scene keeps the scene's shading.

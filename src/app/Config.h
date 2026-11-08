@@ -97,7 +97,7 @@ struct UiPrefs {
     // Preferences > Cursor > Viewport cursor (#73): the system cursor over the 3D view, 0 = crosshair (the
     // default, as most sculpting apps), 1 = the arrow. Panels, menus and popups always show their own.
     int viewportCursor = 0;
-    // Tool > Display > Backface culling (#68): skip the back faces of every Part (faster on dense meshes; see
+    // Tool > Viewport Look > Backface culling (#68): skip the back faces of every Part (faster on dense meshes; see
     // through open meshes). Off by default; a preference, projects keep their own.
     bool backfaceCulling = false;
     // View > Display > Floor grid (#115): the grid on the ground plane (RenderSettings::floorGrid). Off by default.

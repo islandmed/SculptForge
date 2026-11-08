@@ -140,6 +140,7 @@ Curvature computeCurvature(const Proxy& p, const Frames& f, float radius) {
 bool solveCrossField(const Proxy& p, const Frames& f, const Curvature& curv, const FieldSettings& s, CrossField& out,
                      const std::function<bool()>& cancelled) {
     const size_t nt = p.T.size();
+    StageClock clock("field");
     // Fixed triangles: those with a feature edge, along the longest one.
     std::vector<uint8_t> fixed(nt, 0);
     std::vector<cd> z(nt, cd(0.0, 0.0)), target(nt, cd(0.0, 0.0));
@@ -251,8 +252,10 @@ bool solveCrossField(const Proxy& p, const Frames& f, const Curvature& curv, con
         meanDiag /= double(nfree);
         for (uint32_t i = 0; i < nfree; ++i) trips.push_back({(uint64_t(i) << 32) | i, cd(1e-4 * meanDiag, 0.0)});
         A.build(nfree, trips);
+        clock.lap("setup");
         Multigrid<cd> mg;
         mg.build(A);
+        clock.lap("multigrid build");
         bool stop = false;
         // Inverse power iteration (the smoothest field, Knoppel et al. 2013) with the alignment and the fixed
         // triangles as a steady pull: x <- A^-1 (sigma x / |x| + b). Where nothing pulls, the field is the smoothest
@@ -329,6 +332,7 @@ bool solveCrossField(const Proxy& p, const Frames& f, const Curvature& curv, con
                 x.swap(nx);
             }
         }
+        clock.lap("solve rounds");
         if (std::getenv("SF_QREMESH_TIMING"))
             std::fprintf(stderr, "  cross field: %zu free triangles, %zu levels, %d iterations\n", nfree, mg.levels(), its);
     }
@@ -358,6 +362,7 @@ bool solveCrossField(const Proxy& p, const Frames& f, const Curvature& curv, con
         out.theta.swap(nextTheta);
     }
     computeMatching(p, f, out);
+    clock.lap("smooth + matching");
     return true;
 }
 

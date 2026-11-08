@@ -70,7 +70,7 @@ click "Reset##gizmo.reset_pivot"
 expect_value pivot_x < 0.01
 expect_value pivot_x > -0.01
 
-# E: Scale. The centre scales evenly, a box along one axis.
+# E: Scale. The centre scales evenly, a ball along one axis.
 key e
 expect_value gizmo_mode == 2
 gizmo_hover scale_uniform
@@ -198,3 +198,14 @@ key q
 expect_value gizmo_mode == 0
 expect_not "Gizmo/Apply"
 shot draw-mode
+
+# Esc, or picking a brush, also leaves the gizmo (any mode): strokes sculpt again (mode-tests' matrix).
+key w
+expect_value gizmo_mode == 1
+key escape
+expect_value gizmo_mode == 0
+key shift+w
+expect_value gizmo_mode == 4
+action brush.clay
+expect_value gizmo_mode == 0
+expect_not "Gizmo/Apply"

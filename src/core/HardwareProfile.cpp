@@ -14,6 +14,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -552,6 +553,55 @@ HardwareProfile mapProfile(const HardwareInfo& hardware, const Calibration& cali
 std::string tierCardKey(const HardwareInfo& hw) {
     // Rounded to GB: what the driver reports moves a little between runs.
     return hw.glRenderer + "|" + std::to_string((hw.vramMB + 512) / 1024) + "|" + std::to_string((hw.ramMB + 512) / 1024);
+}
+
+namespace {
+
+std::vector<std::string> splitOn(const std::string& s, char sep) {
+    std::vector<std::string> out;
+    size_t from = 0;
+    for (size_t at = s.find(sep); ; at = s.find(sep, from)) {
+        out.push_back(s.substr(from, at == std::string::npos ? std::string::npos : at - from));
+        if (at == std::string::npos) break;
+        from = at + 1;
+    }
+    return out;
+}
+
+bool sameTierCardMachine(const std::string& a, const std::string& b) {
+    if (a == b) return true;
+    // "renderer|vram GB|ram GB": the renderer split from the right (a name may hold '|').
+    const size_t a2 = a.rfind('|'), b2 = b.rfind('|');
+    if (a2 == std::string::npos || b2 == std::string::npos || a2 == 0 || b2 == 0) return false;
+    const size_t a1 = a.rfind('|', a2 - 1), b1 = b.rfind('|', b2 - 1);
+    if (a1 == std::string::npos || b1 == std::string::npos || a.compare(0, a1, b, 0, b1) != 0 || a1 != b1) return false;
+    const long av = std::atol(a.c_str() + a1 + 1), bv = std::atol(b.c_str() + b1 + 1);
+    const long ar = std::atol(a.c_str() + a2 + 1), br = std::atol(b.c_str() + b2 + 1);
+    // (Video memory 0: not reported, e.g. Mesa under Wayland where X11 gives it: the same card.)
+    return (av == 0 || bv == 0 || std::labs(av - bv) <= 1) && std::labs(ar - br) <= 1;
+}
+
+} // namespace
+
+bool tierCardSeen(const std::string& seen, const HardwareInfo& hw) {
+    if (seen.empty()) return false;
+    const std::string key = tierCardKey(hw);
+    for (const std::string& k : splitOn(seen, ';'))
+        if (sameTierCardMachine(k, key)) return true;
+    return false;
+}
+
+std::string rememberTierCard(const std::string& seen, const HardwareInfo& hw) {
+    const std::string key = tierCardKey(hw);
+    std::string out = key;
+    int kept = 1;
+    if (!seen.empty())
+        for (const std::string& k : splitOn(seen, ';'))
+            if (!k.empty() && !sameTierCardMachine(k, key) && kept < 4) {
+                out += ";" + k;
+                ++kept;
+            }
+    return out;
 }
 
 // ---------------------------------------------------------------------------

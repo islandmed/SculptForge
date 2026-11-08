@@ -4,6 +4,7 @@
 
 #include "core/BVH.h"
 #include "core/BrushRecipe.h"
+#include "core/Cloth.h"
 #include "core/Dyntopo.h"
 #include "core/IndexBits.h"
 #include "core/Kelvinlet.h"
@@ -43,6 +44,7 @@ enum class BrushType {
     KelvinSnake, // multi-scale elastic SnakeHook: pulls tapering horns out along the stroke
     DetailClone, // stamps the VDM brush's map along the stroke, each stamp turned to follow it (Kelvinlet.cpp)
     Morph,       // pulls the surface toward the Part's morph target, a selection set's shape (core/SelectionSets.h)
+    Cloth,       // simulates the surface under the stroke as fabric: drags fold, gravity drapes (core/Cloth.h)
     Count
 };
 
@@ -180,6 +182,7 @@ inline constexpr float kKeepCurvature = std::numeric_limits<float>::quiet_NaN();
 struct SculptTimings {
     double kernelMs = 0.0, normalsMs = 0.0, bvhMs = 0.0;
     double remeshMs = 0.0; // dynamic topology (core/Dyntopo.h)
+    double clothBuildMs = 0.0, clothSolveMs = 0.0; // Cloth brush: region (re)builds, the simulation (part of kernelMs)
     uint64_t dabs = 0, vertices = 0;
 };
 // Milliseconds since `t`, which moves on to now (for SculptTimings).
@@ -253,6 +256,13 @@ public:
     void flushKelvinletFar(Mesh& mesh, BVH& bvh, bool all);
     // The last kelvinletStep found more vertices than kelvinlet.vertexBudget (the app then moves less per frame).
     bool kelvinletOverBudget() const { return kelvinOverBudget_; }
+
+    // Cloth brush (core/Cloth.h, ClothBrush.cpp): the settings (Brush > Cloth) and the surfaces it collides with,
+    // which the app sets for the stroke (the other visible Parts; null = none).
+    ClothBrushSettings cloth;
+    const ClothColliders* clothColliders = nullptr;
+    // The last Cloth dab's simulated region (vertices) and its widest edge stretch (the brush's stats).
+    size_t clothRegion() const;
 
     // The cavity term (Mesh::curvatureAt) of every vertex whose normal this stroke's dabs updated, by vertex,
     // worked out with the normals (the renderer packs it instead of walking the rings again); null outside a
@@ -353,6 +363,9 @@ private:
     void dabKelvinlet(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Symmetry sym);
     void kelvinletSingle(Mesh& mesh, BVH& bvh, const KelvinletKernel& k, const KelvinletStep& s);
     void dabDetailClone(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym);
+    // ClothBrush.cpp
+    void dabCloth(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym);
+    std::shared_ptr<struct ClothStroke> cloth_;
     void cloneStamp(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym);
     struct CloneState {
         uint64_t stroke = 0;

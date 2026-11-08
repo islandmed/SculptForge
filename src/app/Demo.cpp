@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/Demo.h"
 
+#include <utility>
+
 #include "app/App.h"
 #include "app/UiServe.h"
 #include "app/Ui.h"
@@ -262,7 +264,12 @@ void Demo::update(float dt) {
         lastUpdate_ = now;
     }
     while (step_ < steps_.size()) {
-        if (!steps_[step_](stepTime_)) {
+        const bool done = steps_[step_](stepTime_);
+        if (std::exchange(jumped_, false)) { // a generated case skipped or failed: on from its end (UiTestModes.cpp)
+            stepTime_ = 0.0f;
+            continue;
+        }
+        if (!done) {
             stepTime_ += dt;
             return;
         }
@@ -644,15 +651,19 @@ void Demo::drawOverlay() {
         dl->AddText(f, fs * iz, P(p.x, p.y), IM_COL32(255, 200, 150, 255), text);
     }
 
-    // Cursor arrow (it zooms with the picture, but less, so it never looms).
-    const float s = size.y / 1080.0f * 1.15f / std::sqrt(vz);
-    const ImVec2 m = mouse_;
-    const ImVec2 pts[] = {ImVec2(m.x, m.y), ImVec2(m.x, m.y + 22 * s), ImVec2(m.x + 5.5f * s, m.y + 16.5f * s),
-                          ImVec2(m.x + 9.5f * s, m.y + 25 * s), ImVec2(m.x + 13 * s, m.y + 23.5f * s),
-                          ImVec2(m.x + 9 * s, m.y + 15 * s), ImVec2(m.x + 16 * s, m.y + 15 * s)};
-    dl->AddConcavePolyFilled(pts, 7, IM_COL32(255, 255, 255, 255));
-    dl->AddPolyline(pts, 7, IM_COL32(0, 0, 0, 255), ImDrawFlags_Closed, 1.5f * s);
-    if (buttonDown_) dl->AddCircle(m, 14.0f * s, IM_COL32(255, 160, 80, 220), 32, 2.5f * s);
+    // Cursor arrow (it zooms with the picture, but less, so it never looms). SF_DEMO_NO_POINTER=1 leaves it out (launch
+    // reels and stills show only the app).
+    static const bool noPointer = std::getenv("SF_DEMO_NO_POINTER") != nullptr;
+    if (!noPointer) {
+        const float s = size.y / 1080.0f * 1.15f / std::sqrt(vz);
+        const ImVec2 m = mouse_;
+        const ImVec2 pts[] = {ImVec2(m.x, m.y), ImVec2(m.x, m.y + 22 * s), ImVec2(m.x + 5.5f * s, m.y + 16.5f * s),
+                              ImVec2(m.x + 9.5f * s, m.y + 25 * s), ImVec2(m.x + 13 * s, m.y + 23.5f * s),
+                              ImVec2(m.x + 9 * s, m.y + 15 * s), ImVec2(m.x + 16 * s, m.y + 15 * s)};
+        dl->AddConcavePolyFilled(pts, 7, IM_COL32(255, 255, 255, 255));
+        dl->AddPolyline(pts, 7, IM_COL32(0, 0, 0, 255), ImDrawFlags_Closed, 1.5f * s);
+        if (buttonDown_) dl->AddCircle(m, 14.0f * s, IM_COL32(255, 160, 80, 220), 32, 2.5f * s);
+    }
 
     // Fade to and from black (seamless loops on the website).
     if (const float f = fade(); f > 0.001f)
@@ -810,6 +821,7 @@ void Demo::buildImageTo3D() {
         app_.aiSettings_.hfModel = "hunyuan3d-2.1";
         app_.generatedRemesh_ = int(GeneratedRemesh::Quad);
         app_.remeshResolution_ = 256;
+        app_.candidateCount_ = 1; // one take: it lands at once
         app_.openPath(app_.options_.demoAsset); // opens the Generate 3D panel with the drawing
         fadeFrom_ = fadeTo_ = 1.0f;
         mouse_ = ImVec2(1000.0f * float(app_.options_.height) / 1080.0f, 760.0f * float(app_.options_.height) / 1080.0f);
@@ -832,7 +844,12 @@ void Demo::buildImageTo3D() {
         click("Generate 3D/Generate 3D model");
         waitUntil([this] { return ready(app_.pendingGenerator_); }, 600.0f, 10);
         run([this] {
-            app_.pollGenerator();
+            app_.pollGenerator(); // (one candidate: picked at once)
+            app_.useAsSculptingBase();
+        });
+        waitUntil([this] { return ready(app_.pendingBase_); }, 600.0f, 10);
+        run([this] {
+            app_.pollSculptingBase();
             if (!app_.options_.demoOutput.empty()) { // keep a copy for rehearsals; the status bar keeps its message
                 const std::string status = app_.status_;
                 app_.runCommand("export_glb", {{"path", app_.options_.demoOutput}});

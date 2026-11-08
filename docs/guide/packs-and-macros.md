@@ -1,8 +1,10 @@
 # Packs and macros
 
 A **pack** is one file (`.sfpack`) that brings brushes, alphas, Lit Spheres, Material Recipes, VDM brushes,
-keymaps, pie menus and macros at once. A **macro** is a list of SculptForge commands you can run with one click,
-one key or one pie-menu slot. Both are plain data: SculptForge never runs code from a pack or a macro.
+keymaps, pie menus, macros and **plugins** at once. A **macro** is a list of SculptForge commands you can run with
+one click, one key or one pie-menu slot. A **plugin** is a small sandboxed tool that turns a mesh into a mesh. Nothing
+in a pack runs when you install it or open a project: macros run when you run them, and plugins only when you click
+**Apply** (see [Plugins](#plugins)).
 
 ## Install a pack
 
@@ -13,7 +15,8 @@ Use **File > Install Pack...**, drop a `.sfpack` file on the window, or click **
 |---|---|
 | **Name, version and author** | As the pack's maker wrote them. **Member pack** marks a members' pack (Member Requests). |
 | **License** | The license name, and the license text from the pack on the right. |
-| **Contains** | How many brushes, alphas, Lit Spheres, Material Recipes, VDMs, keymaps, pie menus and macros, with every item listed by name. |
+| **Contains** | How many brushes, alphas, Lit Spheres, Material Recipes, VDMs, keymaps, pie menus, macros and plugins, with every item listed by name. |
+| **Plugins** | Each plugin's name, version, kind (deformer or generator), size, settings and **Permissions: none**. |
 | **Replaces the installed version** | When an older version of the same pack is installed. |
 
 Click **Install** to add it, or **Cancel** to leave everything as it was. When a pack fails a check, the review
@@ -34,6 +37,7 @@ example **Clay (Member pack)**.
 | Keymaps | **Library > Packs > Details > Apply keymap**, and **Edit > Preferences > Input > Pack keymaps**. |
 | Pie menus | **Library > Packs > Details > Add pie menu** (it becomes one of your radial menus). |
 | Macros | <kbd>F3</kbd>, the key editor and the pie menus, as **Name (Pack)**. |
+| Plugins | **Tool > Reshape > Plugins**, and **Library > Packs > Details**. |
 
 Keymaps and pie menus change how SculptForge responds, so they are only applied when you click **Apply keymap**
 or **Add pie menu**. The result saves itself.
@@ -43,7 +47,7 @@ or **Add pie menu**. The result saves itself.
 Open the Library (<kbd>,</kbd>) and click **Packs**. Each installed pack has a row:
 
 - The **check box** turns the pack off or on. Off, its items leave every list; nothing is deleted.
-- **Details** shows its description, folder, keymaps, pie menus and macros.
+- **Details** shows its description, folder, keymaps, pie menus, macros and plugins.
 - **Remove** deletes the pack and everything it brought. Your own files are never touched.
 
 Start SculptForge with `--no-packs` to leave every pack out for one session (safe mode), for example to check
@@ -61,13 +65,40 @@ Tick **Member pack (insider channel)** for a members' pack (Member Requests). It
 review and the pack list; anyone can install the file.
 
 To build a pack from a folder in a script, lay the folder out like a pack (`brushes/`, `alphas/`, `litspheres/`,
-`materials/`, `vdms/`, `keymaps/`, `piemenus/`, `macros/`, plus `LICENSE.txt` and `preview.png`) and run:
+`materials/`, `vdms/`, `keymaps/`, `piemenus/`, `macros/`, `plugins/`, plus `LICENSE.txt` and `preview.png`) and run:
 
 ```
 sculptforge-cli -c 'pack_create folder=MyPack path=MyPack.sfpack id=my-pack name="My Pack" author=Me license=CC-BY-4.0'
 ```
 
 The file format is described in [the pack format](https://github.com/islandmed/SculptForge/blob/main/docs/pack-format.md).
+
+## Plugins
+
+A plugin is a small tool from a pack that works on a mesh, made by anyone and safe to try:
+
+- A **deformer** moves the active Part's vertices (for example **Noise Displace**: smooth noise along the normals).
+  The result is one undo step; the mask and hidden faces hold their vertices, as with the other deformations.
+- A **generator** makes a new mesh, added as a new Part.
+
+Click a plugin's name in **Tool > Reshape > Plugins** (or in its pack's details) to open it: its settings,
+drawn by SculptForge from what the plugin declares, and **Apply** (**Add Part** for a generator). It runs on a copy
+of the Part; the window shows how long it has been running, and **Stop** ends it at once.
+
+**What a plugin can do: only the mesh.** Plugins run in a WebAssembly sandbox. A plugin gets a copy of the Part's
+mesh and its settings, and returns a mesh. It can't open, read or write files, reach the network, read the clock,
+see other Parts, your settings or your keys, or start anything; a pack whose plugin asks for any of that is refused
+when you review it. A plugin never draws its own windows, and it never runs on its own: not on install, not when a
+project opens, not from a macro, and not from an AI agent.
+
+**Limits.** Each run gets a time limit (20 seconds), a work limit and a memory limit. A plugin that crashes or runs
+past a limit is stopped, your mesh is left exactly as it was, and the plugin is **turned off** with the reason shown
+in its window. Click **Turn on again** there (or run `plugin_enable id=...`) to give it another try. Turning the pack
+off or removing it removes its plugins.
+
+Making plugins: the plugin format, a sample and a C header are in
+[docs/design/plugins.md](https://github.com/islandmed/SculptForge/blob/main/docs/design/plugins.md) and
+[sdk/plugin](https://github.com/islandmed/SculptForge/tree/main/sdk/plugin).
 
 ## Record a macro
 
@@ -114,7 +145,7 @@ not asked again for that macro unless its text changes. A macro's edits on one P
 A macro only runs SculptForge's own commands, in order. It can't run programs or scripts, and it can't:
 
 - reach the network (AI services, the brush gallery, Unreal, the phone link) or send to Blender, Maya or the Bridge;
-- install, remove or switch packs, or run another macro;
+- install, remove or switch packs, run another macro, or run a plugin;
 - name a file outside the project folder. File values are either a path inside the folder of the saved project
   (`exports/clean.glb`) or `?`, which opens a file dialog when the macro runs. Absolute paths, `..`, `~` and drive
   letters are refused.
@@ -134,8 +165,11 @@ The same rules apply outside the app:
 | `pack_create folder=... path=...` | Makes a pack from a folder laid out like one. |
 | `macro_run name=... ` or `path=...` | Runs a macro (`project=` sets the folder its relative paths use). |
 | `macro_list` / `macro_check` | Lists the macros, or checks one without running it. |
+| `plugin_list` | Lists the installed plugins with their settings, and which are turned off. |
+| `plugin_run id=noise-displace amount=0.1` | Runs a plugin on the active Part with these settings (the rest keep their defaults). |
+| `plugin_enable id=...` | Turns a plugin that was turned off after a failure on again. |
 
 In Python, `sculptforge.run(doc, "pack_install", path="Pack.sfpack")` and the other commands work the same way.
 A command you type into `sculptforge-cli` or Python is your own explicit request, so it runs without the
 confirmation the app shows. AI agents connected through `sculptforge-cli --mcp` can't install, remove or switch
-packs.
+packs, or run plugins.

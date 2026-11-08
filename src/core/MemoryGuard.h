@@ -13,7 +13,7 @@
 
 namespace sf {
 
-struct Mesh;
+class Mesh;
 
 // Memory the system can still hand out now: Linux MemAvailable, macOS free + inactive + purgeable pages, Windows
 // available physical memory. 0 = unknown. The override (or SF_AVAILABLE_MEMORY_MB) replaces it, for tests.

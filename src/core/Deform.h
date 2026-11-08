@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Whole-mesh deformations (Tool > Deformation, from the discussions): Polish, Relax, Smooth and Balloon, each over
+// Whole-mesh deformations (Tool > Reshape, from the discussions): Smooth, Relax, Polish and Balloon, each over
 // the whole active Part with an amount, the mask holding masked parts in place (partly masked ones move partly),
 // hidden faces and open borders kept, and one undo step. They write through the Sculptor, so a sculpt layer that
 // is being recorded takes the change as a stroke would.
@@ -83,6 +83,11 @@ size_t deformActivePart(Document& doc, DeformOp op, const DeformOptions& options
 // The steps as one undo step labelled `label`.
 size_t deformActivePart(Document& doc, const std::vector<DeformStep>& steps, std::string& error,
                         const std::string& label = "Deform stack");
+// For other whole-Part deformers (core/Plugin.h): whether the active Part can be deformed now (false with `error`), and
+// moving its vertices to `P` through the Sculptor as one undo step labelled `label`.
+bool canDeformActivePart(Document& doc, const std::string& label, std::string& error);
+size_t commitDeformedPositions(Document& doc, const std::vector<glm::vec3>& P, const std::string& label, bool masked,
+                               std::string& error);
 
 // Resizes the active Part to `size` (scene units per axis; <= 0 keeps that axis) about its bounds centre, weighted
 // by 1 - mask when `useMask`, as one undo step ("Size").

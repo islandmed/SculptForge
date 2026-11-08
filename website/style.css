@@ -735,3 +735,29 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
   .voice figcaption { flex-direction: column; gap: 2px; }
   .voice-role::before { content: none; }
 }
+
+/* 0.12 launch band (index.html #new-in-012): the five headliners beside the reel recorded in the app. */
+.release-band { background: radial-gradient(ellipse at 70% 40%, #1d1d23 0%, var(--bg) 70%); border-top: 1px solid var(--border); }
+.release-grid { display: grid; grid-template-columns: 0.9fr 1.3fr; gap: 48px; align-items: center; }
+.release-grid > * { min-width: 0; }
+.release-copy h2 { margin-top: 0.3em; }
+.release-copy .section-lede { margin-bottom: 22px; }
+.release-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.release-list li { border-bottom: 1px solid var(--border); }
+.release-list a { display: block; padding: 11px 0 11px 16px; color: var(--muted); position: relative; line-height: 1.45; }
+.release-list a::before { content: ""; position: absolute; left: 0; top: 17px; width: 4px; height: 14px; border-radius: 2px; background: var(--accent); }
+.release-list a:hover { text-decoration: none; color: var(--text); }
+.release-list strong { color: var(--text); font-weight: 600; margin-right: 6px; }
+.release-video { margin: 0; }
+.release-video video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #111; border: 1px solid var(--border);
+                       border-radius: var(--radius); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45); }
+.release-video figcaption { color: var(--muted); font-size: 0.8rem; margin-top: 10px; text-align: center; }
+@media (max-width: 960px) { .release-grid { grid-template-columns: 1fr; gap: 28px; } }
+@media (max-width: 620px) {
+  .release-video { margin: 0 -16px; }
+  .release-video video { aspect-ratio: 9 / 16; max-height: 80vh; object-fit: cover; border-radius: 0; border-left: 0; border-right: 0; }
+}
+
+/* Home: "Why we build this" band */
+.why-band h2 { max-width: 22em; }
+.why-band .section-lede { margin-bottom: 24px; }

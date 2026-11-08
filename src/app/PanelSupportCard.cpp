@@ -10,6 +10,7 @@
 // No countdowns, no guilt, nothing pre-selected; Close is always there. Every button only opens one of the fixed
 // links in Support.h in the browser, except "I'm already a member", which is the member builds' GitHub sign-in.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/CardPaint.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
@@ -159,7 +160,7 @@ void App::openSupportLink(const char* url) {
         status_ = std::string("Support SculptForge: ") + url;
         return;
     }
-    status_ = SDL_OpenURL(url) ? std::string("Opened ") + url + " in your browser"
+    status_ = sf::dialogs::openUrl(url) ? std::string("Opened ") + url + " in your browser"
                                : std::string("Couldn't open ") + url + ": " + SDL_GetError();
 }
 
@@ -494,12 +495,12 @@ void App::drawSupportCard() {
         const ImVec2 c0(b.x - pad - ls.x - 44.0f * k, fy - 19.0f * k);
         const auto [hot, hit] = pill(label, "Not now##card.later", c0, 0.0f);
         later = hit;
-        if (hot) ImGui::SetTooltip(tr("Nothing about memberships for a week."));
+        if (hot) ImGui::SetTooltip("%s", tr("Nothing about memberships for a week."));
         const char* already = "I'm already a member";
         const ImVec2 as = paint.measure(bodyFont, 15.0f, already);
         supporter = link(already, "I'm already a member##card.supporter_already",
                          ImVec2(c0.x - 24.0f * k - as.x, std::floor(fy - as.y * 0.5f)), dim, false);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Sign in with GitHub (the member builds' sign-in): no more cards."));
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Sign in with GitHub (the member builds' sign-in): no more cards."));
     }
 
     // Esc, or a click outside the card: closed (the small card may follow in a week).
@@ -690,10 +691,10 @@ void App::drawMemberCard() {
             ImGui::PopStyleColor(3);
             ImGui::SameLine();
             const bool notNow = ImGui::Button(tr("Not now##member_card.not_now"));
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Nothing about memberships for a week."));
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Nothing about memberships for a week."));
             ImGui::SameLine();
             const bool already = ImGui::Button(tr("I'm already a member##member_card.already"));
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Sign in with GitHub (the member builds' sign-in): no more cards."));
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Sign in with GitHub (the member builds' sign-in): no more cards."));
             { // the fine print: the membership terms (refunds, cancelling), a quiet link after the buttons (or under them)
                 const char* terms = tr("Terms & refunds##member_card.terms");
                 ImGui::SameLine();

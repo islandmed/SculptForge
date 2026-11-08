@@ -7,6 +7,7 @@
 // Layers, Geometry, Remesh, Masking, Face groups, Visibility, Export and
 // Display sub-palettes.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 
 #include "app/Config.h"
 #include "app/Demo.h"
@@ -369,6 +370,10 @@ void App::drawPalette_Brush() {
             }
         }
     }
+    if (subpalette("brush.cloth_options", "Cloth")) {
+        tray::Section section;
+        drawClothSection(); // PanelCloth.cpp
+    }
     if (subpalette("brush.kelvinlet", "Kelvinlet & Capture")) {
         tray::Section section;
         drawKelvinletSection(); // PanelKelvinlet.cpp
@@ -389,10 +394,12 @@ void App::drawPalette_Draw() {
     ui::ActionButton(*this, "brush.world_size", ImVec2(-1, 0));
     ImGui::SetNextItemWidth(-1);
     drawZIntensitySlider("##strength");
-    ImGui::SetNextItemWidth(-1);
-    float rgb = rgbIntensity_ * 100.0f;
-    if (ui::SliderInside("##rgbintensity", &rgb, 1.0f, 100.0f, "Colour intensity %.0f")) rgbIntensity_ = rgb / 100.0f;
-    ui::HelpText("Colour intensity", "I", "How strongly painting colours the surface (1-100); Ctrl+click to type.", "Draw");
+    if (!paintMode_) { // (in Paint mode the Intensity above is the Colour intensity, #164)
+        ImGui::SetNextItemWidth(-1);
+        float rgb = rgbIntensity_ * 100.0f;
+        if (ui::SliderInside("##rgbintensity", &rgb, 1.0f, 100.0f, "Colour intensity %.0f")) rgbIntensity_ = rgb / 100.0f;
+        ui::HelpText("Colour intensity", "I", "How strongly painting colours the surface (1-100); Ctrl+click to type.", "Draw");
+    }
     ImGui::SetNextItemWidth(-1);
     float focal = focalShift_ * 100.0f;
     if (ui::SliderInside("##focalshift", &focal, -100.0f, 100.0f, "Falloff %.0f")) focalShift_ = focal / 100.0f;
@@ -597,7 +604,7 @@ void App::drawPalette_Generate() {
     tray::GroupLabel(*this, "From an image");
     if (ImGui::Button(tr(refImage_.empty() ? "Choose image...##generate" : "Change image...##generate"), ImVec2(-1, 0))) {
         static const SDL_DialogFileFilter filters[] = {{"Images", "png;jpg;jpeg;bmp;tga;psd;gif"}, {"All files", "*"}};
-        SDL_ShowOpenFileDialog(
+        sf::dialogs::openFile(
             [](void* user, const char* const* files, int) {
                 if (files && files[0]) static_cast<App*>(user)->queueFile(FileAction::OpenImage, files[0]);
             },
@@ -653,7 +660,7 @@ void App::drawPalette_Help() {
 void App::drawPalette_Preferences() {
     const tray::Style style; // quiet check marks
     // The sub-palettes come from Config.cpp (Store / Restore UI, interface preferences, hotkeys, Library).
-    if (subpalette("preferences.config", "Config")) {
+    if (subpalette("preferences.config", "Saving & Layouts")) {
         tray::Section section;
         config::drawConfigSection(*this);
         ImGui::TextDisabled("%s", tr("Layout"));
@@ -842,6 +849,8 @@ void App::drawPalette_Tool() {
         actionRow(*this, {"file.open", "file.save", "file.import"});
         ImGui::Dummy(ImVec2(0, 2.0f * s));
     }
+    // By what you do (fix/ip-palettes): make the Parts, shape them (levels, remesh, reshape, cut, layers), mask and
+    // group, paint and texture, then bake and export; how the viewport looks last. The ids stay (saved layouts).
     if (subpalette("tool.part", "Parts")) {
         tray::Section section;
         Demo::pushScope("Parts");
@@ -850,6 +859,12 @@ void App::drawPalette_Tool() {
         drawExtractContents(); // PanelExtract.cpp
         Demo::pushScope("Project");
         drawProjectContents(); // ProjectAll (PanelRetopo.cpp)
+        Demo::popScope();
+    }
+    if (subpalette("tool.garments", "Garments")) {
+        tray::Section section;
+        Demo::pushScope("Garments");
+        drawGarmentsContents(); // PanelGarments.cpp
         Demo::popScope();
     }
     if (subpalette("tool.forgespheres", "Forge Spheres")) {
@@ -862,36 +877,6 @@ void App::drawPalette_Tool() {
         tray::Section section;
         Demo::pushScope("Tube");
         drawTubeContents(); // PanelTube.cpp
-        Demo::popScope();
-    }
-    if (subpalette("tool.layers", "Layers")) {
-        tray::Section section;
-        Demo::pushScope("Layers");
-        drawLayersContents();
-        Demo::popScope();
-    }
-    if (subpalette("tool.face", "Facial Shapes")) {
-        tray::Section section;
-        Demo::pushScope("Facial Shapes");
-        drawFaceContents(); // PanelFace.cpp
-        Demo::popScope();
-    }
-    if (subpalette("tool.paint_layers", "Paint Layers")) {
-        tray::Section section;
-        Demo::pushScope("Paint Layers");
-        drawPaintLayersContents();
-        Demo::popScope();
-    }
-    if (subpalette("tool.texture", "Texture Map")) {
-        tray::Section section;
-        Demo::pushScope("Texture Map");
-        drawTextureMapContents();
-        Demo::popScope();
-    }
-    if (subpalette("tool.bake", "Bake")) {
-        tray::Section section;
-        Demo::pushScope("Bake");
-        drawBakeContents();
         Demo::popScope();
     }
     if (subpalette("tool.geometry", "Geometry")) {
@@ -938,15 +923,31 @@ void App::drawPalette_Tool() {
         }
         drawQuickRemeshContents(); // Quick Remesh, Remesh after each stroke (#121, PanelRetopo.cpp)
     }
-    if (subpalette("tool.deformation", "Deformation")) {
+    if (subpalette("tool.deformation", "Reshape")) {
         tray::Section section;
-        Demo::pushScope("Deformation");
-        drawDeformationContents(); // Mirror (PanelExtract.cpp)
+        Demo::pushScope("Reshape");
+        drawDeformationContents(); // Smooth, Relax, Polish, Balloon, Size, Stack (PanelExtract.cpp)
         Demo::popScope();
+    }
+    if (subpalette("tool.drape", "Drape")) {
+        tray::Section section;
+        drawDrapeSection(); // PanelDrape.cpp
     }
     if (subpalette("tool.cut", "Cut")) {
         tray::Section section;
         drawCutSection(); // PanelCut.cpp
+    }
+    if (subpalette("tool.layers", "Layers")) {
+        tray::Section section;
+        Demo::pushScope("Layers");
+        drawLayersContents();
+        Demo::popScope();
+    }
+    if (subpalette("tool.face", "Facial Shapes")) {
+        tray::Section section;
+        Demo::pushScope("Facial Shapes");
+        drawFaceContents(); // PanelFace.cpp
+        Demo::popScope();
     }
     if (subpalette("tool.masking", "Masking")) {
         tray::Section section;
@@ -964,13 +965,31 @@ void App::drawPalette_Tool() {
         tray::Section section;
         drawSelectionSetsSection();
     }
+    if (subpalette("tool.paint_layers", "Paint Layers")) {
+        tray::Section section;
+        Demo::pushScope("Paint Layers");
+        drawPaintLayersContents();
+        Demo::popScope();
+    }
+    if (subpalette("tool.texture", "Texture Image")) {
+        tray::Section section;
+        Demo::pushScope("Texture Image");
+        drawTextureMapContents();
+        Demo::popScope();
+    }
+    if (subpalette("tool.bake", "Bake")) {
+        tray::Section section;
+        Demo::pushScope("Bake");
+        drawBakeContents();
+        Demo::popScope();
+    }
     if (subpalette("tool.export", "Export")) {
         tray::Section section;
         Demo::pushScope("Game Ready");
         drawGameExportContents();
         Demo::popScope();
     }
-    if (subpalette("tool.display", "Display")) {
+    if (subpalette("tool.display", "Viewport Look")) {
         tray::Section section;
         ImGui::Checkbox(tr("Wireframe##display"), &renderSettings_.wireframe);
         ui::HelpAction(*this, "view.wireframe");
@@ -986,12 +1005,12 @@ void App::drawPalette_Tool() {
                      "Don't draw the back faces of the model: faster on dense meshes, and you see through the openings "
                      "of open meshes (a scan, a garment) instead of their inside. Brushes then work only on faces you "
                      "can see. Off by default; saved automatically, projects keep their own.",
-                     "Tool > Display");
+                     "Tool > Viewport Look");
         if (ImGui::Checkbox(tr("Floor grid##display"), &renderSettings_.floorGrid))
             uiPrefs_.floorGrid = renderSettings_.floorGrid;
         ui::HelpAction(*this, "view.floor_grid");
         ImGui::ColorEdit3(tr("Material colour"), &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
-        ui::HelpText("Material colour", nullptr, "Colour of the Studio material (the clay colour).", "Tool > Display");
+        ui::HelpText("Material colour", nullptr, "Colour of the Studio material (the clay colour).", "Tool > Viewport Look");
         drawShadingControls();
     }
 }

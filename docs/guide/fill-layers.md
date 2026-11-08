@@ -14,7 +14,7 @@ roughness and the bumps as they will look in a game engine ([Material painting](
 
 ## Lay a Material Recipe
 
-1. Give the Part UVs and a texture (**Tool > Texture Map > Auto UV**, then **New Texture**).
+1. Give the Part UVs and a texture (**Tool > Texture Image > Auto UV**, then **New Texture**).
 2. In **Tool > Paint Layers**, open **Material Recipe** and pick one:
    - **Worn Metal**: dull steel, polished bright on the edges, grime in the creases.
    - **Painted Edges**: painted metal with the paint chipped off its edges.

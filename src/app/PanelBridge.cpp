@@ -3,6 +3,7 @@
 //
 // File > Send to send/receive through the Bridge bridge, Bridge and STL files.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 
 #include "io/BridgeProtocol.h"
 #include "io/BridgeIO.h"
@@ -62,14 +63,14 @@ void App::drawBridgeMenu() {
     if (ImGui::MenuItem(tr("Receive automatically"), nullptr, &bridgeAutoReceive_, bridge) && bridgeAutoReceive_)
         bridgeListTime_ = fileTime(bridgeObjectListPath(root));
     if (bridge) ImGui::TextDisabled(tr("Bridge folder: %s"), root.c_str());
-    else ImGui::TextDisabled(tr("No default bridge folder on this system;\nBridge files still import and export."));
+    else ImGui::TextDisabled("%s", tr("No default bridge folder on this system;\nBridge files still import and export."));
     ImGui::SetNextItemWidth(260.0f * uiScale_);
     ImGui::InputTextWithHint("##bridgefolder", tr("Custom bridge folder (optional)"), bridgeFolder_, sizeof(bridgeFolder_));
     ImGui::Separator();
     if (ImGui::MenuItem(tr("Import Bridge file...")))
-        SDL_ShowOpenFileDialog(onBridgeFileChosen, &bridgeDialogs_[int(BridgeFile::Import)], window_, kBridgeFilters, 2, nullptr, false);
+        sf::dialogs::openFile(onBridgeFileChosen, &bridgeDialogs_[int(BridgeFile::Import)], window_, kBridgeFilters, 2, nullptr, false);
     if (ImGui::MenuItem(tr("Export Bridge file...")))
-        SDL_ShowSaveFileDialog(onBridgeFileChosen, &bridgeDialogs_[int(BridgeFile::Export)], window_, kBridgeFilters, 2, nullptr);
+        sf::dialogs::saveFile(onBridgeFileChosen, &bridgeDialogs_[int(BridgeFile::Export)], window_, kBridgeFilters, 2, nullptr);
     ImGui::EndMenu();
 }
 

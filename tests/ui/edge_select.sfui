@@ -1,0 +1,162 @@
+# Geometry > Edges (#108, slice 1): Edges mode picks edges of the base level on the model. A click selects the edge
+# under the cursor, Shift+click adds, Ctrl+click removes, a double-click takes its edge loop; Select by Angle finds
+# the hard edges (a cube's sides), Grow / Shrink / Open Edges / Invert / Clear change the selection. A Part with
+# subdivision levels steps down to its base first, and picking a brush leaves the mode. Slice 2: Crease / Uncrease set a
+# crease on the selected edges (one undo step each), drawn in blue on the base level in every mode.
+run new_sphere subdivisions=1
+run part_append type=cube name=Box
+run part_delete index=0
+orbit 120 -60
+key f
+# Zoomed out after every frame (F), so the model sits below the timeline band in the shots.
+zoom 0.7
+click "Geometry##tool.geometry"
+click "Geometry/Edges mode"
+expect_value edges_mode == 1
+expect_value edges_selected == 0
+expect_status "Edges: click an edge"
+remember edges_total total
+
+# Select by Angle: the cube's 12 hard sides, every edge along them, and nothing else.
+click "Geometry/Select by Angle"
+expect_value edges_selected >= 12
+expect_status "Edges sharper than 30 degrees"
+remember edges_selected hard
+expect_value edges_shown > 0
+shot edge-select-angle
+ui_scale 200
+key f
+zoom 0.6
+shot edge-select-angle-200
+ui_scale 100
+key f
+zoom 0.7
+click "Geometry/Invert"
+expect_value edges_selected > $hard
+expect_value edges_selected < $total
+click "Geometry/Invert"
+expect_value edges_selected == $hard
+click "Geometry/Deselect All"
+expect_value edges_selected == 0
+
+# Clicks on the model: one edge, Shift adds one, Ctrl takes it away again.
+click_part Box 0.5 0.5 1
+expect_value edges_selected == 1
+hold shift
+click_part Box 0.3 0.62 1
+hold none
+expect_value edges_selected == 2
+hold ctrl
+click_part Box 0.3 0.62 1
+hold none
+expect_value edges_selected == 1
+# The clicks select, they never sculpt.
+expect_value edited_parts == 0
+
+# A double-click: the edge loop through it (across the quads, round the cube or corner to corner).
+click_part Box 0.5 0.5 2
+expect_value edges_selected > 1
+remember edges_selected loop
+click "Geometry/Grow"
+expect_value edges_selected > $loop
+click "Geometry/Shrink"
+expect_value edges_selected == $loop
+shot edge-select-loop
+
+# Only within selection: the loop's hard stretch, if it has one, else nothing.
+click "Geometry/Only within selection"
+click "Geometry/Select by Angle"
+expect_value edges_selected < $loop
+click "Geometry/Only within selection"
+
+# Creases: the hard sides fully sharp, one loop softer; Deselect All leaves them drawn in blue.
+click "Geometry/Select by Angle"
+click "Geometry/Crease"
+expect_status "Crease 1 on"
+expect_value edges_creased == $hard
+click_part Box 0.5 0.5 2
+run edge_crease value=0.25
+expect_value edges_creased > $hard
+remember edges_creased creased
+click "Geometry/Deselect All"
+expect_value edges_shown > 0
+shot edge-crease-cube
+ui_scale 200
+key f
+zoom 0.6
+shot edge-crease-cube-200
+ui_scale 100
+key f
+zoom 0.7
+key ctrl+z
+expect_value edges_creased == $hard
+key ctrl+shift+z
+expect_value edges_creased == $creased
+click_part Box 0.5 0.5 2
+click "Geometry/Uncrease"
+expect_value edges_creased < $creased
+key ctrl+z
+expect_value edges_creased == $creased
+
+# Slice 3: Add Level keeps the creased sides sharp (and the softer loop rounder); stepping down shows the creases again.
+run subdiv_divide
+run subdiv_divide
+run subdiv_divide
+expect_value subdiv_level == 4
+# The Levels line in short counts (full counts clipped at 1440 px): 27.6K base, 1.77M on top.
+expect_text "Level 4 of 4 - base 27.6K, top 1.77M tris"
+shot edge-crease-divided
+ui_scale 200
+wait 0.3
+shot edge-crease-divided-200
+ui_scale 100
+run subdiv_level level=1
+expect_value subdiv_level == 1
+expect_value edges_mode == 1
+
+# Picking a brush leaves the mode; the selection stays for the next time, the creases stay drawn.
+click "Geometry/Select by Angle"
+key b
+key s
+key t
+expect_value edges_mode == 0
+expect_value edges_selected == $hard
+expect_value edges_shown > 0
+shot edge-crease-sculpting
+
+# A creature head with subdivision levels: Edges mode steps down to Level 1 and picks on the base cage there.
+run new_starter_mesh name=creature-head
+key f
+zoom 0.7
+run part_select name=Skull
+expect_value subdiv_level > 1
+click "Geometry/Edges mode"
+expect_value edges_mode == 1
+expect_value subdiv_level == 1
+expect_status "Edges: click an edge"
+click "Geometry/Select by Angle"
+click_part Skull 0.5 0.45 2
+hold shift
+click_part Skull 0.35 0.4 2
+hold none
+expect_value edges_selected > 0
+shot edge-select-head
+ui_scale 200
+key f
+zoom 0.7
+shot edge-select-head-200
+ui_scale 100
+# Stepping up (D) while in the mode: clicks wait for the base again and say so.
+key d
+expect_value subdiv_level == 2
+click_part Skull 0.5 0.45 1
+expect_status "step down to Level 1"
+
+# Creases on the head's base: the picked edges sharp, the levels above (with their sculpted detail) follow.
+key shift+d
+expect_value subdiv_level == 1
+click "Geometry/Crease"
+expect_value edges_creased > 0
+key d
+expect_value subdiv_level == 2
+shot edge-crease-head

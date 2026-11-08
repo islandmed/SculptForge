@@ -5,6 +5,7 @@
 // Members in Help > About. Each only opens kSupportUrl in the browser (Support.h); the app is the same for everyone,
 // so nothing here checks, sends or stores anything else.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/Config.h"
 #include "app/LookSchemes.h"
 #include "app/Theme.h"
@@ -49,7 +50,7 @@ void App::openSupportPage() {
         status_ = std::string("Support SculptForge: ") + kSupportUrl;
         return;
     }
-    status_ = SDL_OpenURL(kSupportUrl) ? std::string("Opened sculptforge.app/support.html in your browser")
+    status_ = sf::dialogs::openUrl(kSupportUrl) ? std::string("Opened sculptforge.app/support.html in your browser")
                                        : std::string("Couldn't open ") + kSupportUrl + ": " + SDL_GetError();
 }
 
@@ -59,7 +60,7 @@ void App::openDiscordPage() {
         status_ = std::string("Join the community on Discord: ") + kDiscordUrl;
         return;
     }
-    status_ = SDL_OpenURL(kDiscordUrl) ? std::string("Opened the SculptForge Discord invite in your browser")
+    status_ = sf::dialogs::openUrl(kDiscordUrl) ? std::string("Opened the SculptForge Discord invite in your browser")
                                        : std::string("Couldn't open ") + kDiscordUrl + ": " + SDL_GetError();
 }
 
@@ -73,9 +74,9 @@ void App::drawSupportersSection() {
     ImGui::SeparatorText(tr("Supporters"));
     const std::vector<std::string>& names = supporterNames();
     if (names.empty()) {
-        ImGui::TextDisabled(tr("Be the first: sculptforge.app/support.html"));
+        ImGui::TextDisabled("%s", tr("Be the first: sculptforge.app/support.html"));
     } else {
-        ImGui::TextWrapped(tr("Thank you to everyone who supports SculptForge:"));
+        ImGui::TextWrapped("%s", tr("Thank you to everyone who supports SculptForge:"));
         // Plain text only (TextUnformatted: no format strings, markup or links), sanitised by parseSupporters.
         const float rows = float(std::min<size_t>(names.size(), 8));
         if (ImGui::BeginChild("##supporters", ImVec2(0, rows * ImGui::GetTextLineHeightWithSpacing() + 4.0f * uiScale_),
@@ -179,15 +180,15 @@ void App::drawSupportUi() {
             }
             ImGui::PopStyleColor();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(tr("Your first sculpt: a cute owl head from this sphere, step by step, in about ten minutes."));
+                ImGui::SetTooltip("%s", tr("Your first sculpt: a cute owl head from this sphere, step by step, in about ten minutes."));
             // Sculpted before: the quick tour (QuickTour.cpp), where everything is in ten slides.
             if (ImGui::Button(tr(ICON_LC_COMPASS "  Sculpted before? Take the quick tour##welcome.tour"), ImVec2(-1, 0)))
                 showQuickTour(0);
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(tr("Ten short slides: remeshing, dynamic topology, retopology, levels, masking, cut, "
+                ImGui::SetTooltip("%s", tr("Ten short slides: remeshing, dynamic topology, retopology, levels, masking, cut, "
                                   "brushes and baking, each with a Show me button."));
             ImGui::Spacing();
-            ImGui::TextWrapped(tr("Hold Ctrl over any control to see what it does. The User Guide (Shift+F1) explains every "
+            ImGui::TextWrapped("%s", tr("Hold Ctrl over any control to see what it does. The User Guide (Shift+F1) explains every "
                                "tool, and the quick tour shows what is where."));
             // The look (0.10.9, #U6): three cards, the first the default. Existing installs never see this window
             // unless they open Help > Welcome, so nobody's look changes by itself.
@@ -233,14 +234,14 @@ void App::drawSupportUi() {
                 showWelcome_ = false;
             }
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(tr("A neutral human head with clean quads and eye and mouth loops, ready for a portrait."));
+                ImGui::SetTooltip("%s", tr("A neutral human head with clean quads and eye and mouth loops, ready for a portrait."));
             ImGui::SameLine();
             if (ImGui::Button(tr("More starter meshes##welcome"))) {
                 showStarterMeshes();
                 showWelcome_ = false;
             }
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(tr("Bust, full body, hand, foot, ear, eye, stylised and creature heads, torso and "
+                ImGui::SetTooltip("%s", tr("Bust, full body, hand, foot, ear, eye, stylised and creature heads, torso and "
                                   "bevelled primitives: Library > Tool > Starter meshes."));
             // AI (Preferences > AI changes it later; saved at once).
             ImGui::Spacing();
@@ -269,7 +270,7 @@ void App::drawSupportUi() {
             ImGui::SameLine();
             if (ImGui::Button(tr("Join the community on Discord##welcome"))) openDiscordPage();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(tr("Questions, tips and work in progress: opens the invite in your browser."));
+                ImGui::SetTooltip("%s", tr("Questions, tips and work in progress: opens the invite in your browser."));
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
@@ -289,13 +290,13 @@ void App::drawSupportUi() {
                                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing;
         bool open = true;
         if (ImGui::Begin(tr("SculptForge has a new look##newlook"), &open, flags)) {
-            ImGui::TextWrapped(tr("Neutral grey panels with one orange accent, and the SculptForge layout: menus by task, a "
+            ImGui::TextWrapped("%s", tr("Neutral grey panels with one orange accent, and the SculptForge layout: menus by task, a "
                                "status bar and a one-row tool shelf. Your layout stays as it is unless you try it."));
             ImGui::Spacing();
             if (ImGui::Button(tr("Try it##newlook"))) chooseNewLook(true);
             ImGui::SameLine();
             if (ImGui::Button(tr("Keep my layout##newlook"))) chooseNewLook(false);
-            ImGui::TextDisabled(tr("Either way: Preferences > Interface > Look changes it later."));
+            ImGui::TextDisabled("%s", tr("Either way: Preferences > Interface > Look changes it later."));
         }
         ImGui::End();
         if (!open) chooseNewLook(false);
@@ -309,14 +310,14 @@ void App::drawSupportUi() {
                                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
         bool open = true;
         if (ImGui::Begin(tr("Big meshes are faster now##bigmesh"), &open, flags)) {
-            ImGui::TextWrapped(tr("On a dense scan with micro levels, big brushes now keep up with the pen and the view turns "
+            ImGui::TextWrapped("%s", tr("On a dense scan with micro levels, big brushes now keep up with the pen and the view turns "
                                "smoothly right after a stroke."));
             ImGui::Spacing();
-            ImGui::TextWrapped(tr("Two settings in Preferences > Performance help most on big meshes:"));
+            ImGui::TextWrapped("%s", tr("Two settings in Preferences > Performance help most on big meshes:"));
             ImGui::Bullet();
-            ImGui::TextWrapped(tr("Background Preview (experimental): a big brush shows under the pen while it's still being worked out."));
+            ImGui::TextWrapped("%s", tr("Background Preview (experimental): a big brush shows under the pen while it's still being worked out."));
             ImGui::Bullet();
-            ImGui::TextWrapped(tr("View resolution 75%%: draws about half the pixels, for integrated graphics and big screens."));
+            ImGui::TextWrapped("%s", tr("View resolution 75%: draws about half the pixels, for integrated graphics and big screens."));
             ImGui::Spacing();
             if (ImGui::Button(tr("Performance settings##bigmesh"))) {
                 openPerformancePrefs();

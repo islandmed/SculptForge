@@ -92,7 +92,7 @@ int runAppBenchmark(BenchCommandLine cl) {
             camera.frame(m.bounds());
             RenderSettings settings;
             settings.motionProxy = moving;
-            // SF_BENCH_CULL=1: Tool > Display > Backface culling on (#68).
+            // SF_BENCH_CULL=1: Tool > Viewport Look > Backface culling on (#68).
             settings.backfaceCulling = std::getenv("SF_BENCH_CULL") && std::string(std::getenv("SF_BENCH_CULL")) == "1";
             // SF_BENCH_FLOOR_GRID=1: View > Display > Floor grid on (#115).
             const char* grid = std::getenv("SF_BENCH_FLOOR_GRID");

@@ -346,7 +346,7 @@ preflight() {
         kexp=$(gpg --batch --with-colons --show-keys website/sculptforge.asc 2>/dev/null |
             awk -F: '$1 == "sub" && $2 !~ /[rei]/ && $12 ~ /s/ {print ($7 == "" ? 9999999999 : $7)}' | sort -n | tail -1)
         [ -n "$kexp" ] && [ "$kexp" -gt $(($(date +%s) + 120 * 86400)) ] ||
-            die "the apt/dnf signing subkey in website/sculptforge.asc expires ${kexp:+on $(date -d "@$kexp" +%F)}${kexp:-(none valid)}" "Tony: ~/Work/.sf/repo-key.sh --extend (in his terminal); then copy ~/Work/.sf/secrets/repo-key/sculptforge.asc to website/sculptforge.asc, commit, push main"
+            die "the apt/dnf signing subkey in website/sculptforge.asc expires ${kexp:+on $(date -d "@$kexp" +%F)}${kexp:-(none valid)}" "the owner: ~/Work/.sf/repo-key.sh --extend (in their terminal); then copy ~/Work/.sf/secrets/repo-key/sculptforge.asc to website/sculptforge.asc, commit, push main"
     fi
     # The members' publishing path: release.yml's actions pinned to commit SHAs, INSIDERS_REPO_TOKEN only in the
     # member-release environment (docs/releasing.md, "Secrets").
@@ -383,6 +383,9 @@ preflight() {
             highlights_ok || HIGHLIGHTS=
         fi
         highlights_ok || die "HIGHLIGHTS must name a file with 3-5 highlight lines for the update feed (now: '${HIGHLIGHTS:-unset}')" "$highlights_fix"
+        # Every credit in them is copied from a note of the batch (a credit typed from memory names the wrong person).
+        out=$(python3 tools/release/check_credits.py --highlights "$HIGHLIGHTS" --version "$BASE" 2>&1) ||
+            die "$out" "write each credit exactly as that branch's changes/ note does (or fix the note), run again"
     fi
     python3 -c 'import json, sys; json.load(open(sys.argv[1]))' website/latest.json 2>/dev/null || die "website/latest.json is not valid JSON" "fix it, commit"
     grep -q '"softwareVersion": "[0-9.]*"' website/index.html && grep -Eq 'Version [0-9]+\.[0-9]+\.[0-9]+\. All builds' website/index.html ||
@@ -526,7 +529,7 @@ PY
     git add CMakeLists.txt CITATION.cff packaging/rez/package.py packaging/linux/org.sculptforge.SculptForge.metainfo.xml CHANGELOG.md website/index.html docs/guide/whats-new.md
     git add website/founding.json docs/supporters.txt
     git add -A changes tests/ui/whats_new.sfui
-    git add -A website/guide
+    git add -A website/guide website/sitemap.xml # build_site.py writes both (a new guide page is a new sitemap line)
     if git diff --cached --quiet; then
         ok "every version file already says $V and the guide is built"
         return

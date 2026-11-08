@@ -333,7 +333,7 @@ bool bakeMeshMaps(const Mesh& mesh, int width, int height, uint32_t kinds, const
                   std::string& error, const BakeProgress& progress) {
     const auto start = Clock::now();
     if (mesh.triangleCount() == 0 || mesh.uvs.size() != mesh.triangleCount() * 3) {
-        error = "The Part has no UVs: run Auto UV (Tool > Texture Map) first";
+        error = "The Part has no UVs: run Auto UV (Tool > Texture Image) first";
         return false;
     }
     if (width < 64 || height < 64 || width > 16384 || height > 16384) {
@@ -617,7 +617,7 @@ void registerMeshMapCommands(CommandRegistry& reg) {
               {"live", T::Bool, "Re-bake changed tiles after sculpting (default true).", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  Mesh& m = doc.mesh;
-                 if (!hasTexture(m)) return {false, "The Part has no texture: Tool > Texture Map > New Texture"};
+                 if (!hasTexture(m)) return {false, "The Part has no texture: Tool > Texture Image > New Texture"};
                  const std::string action = argString(a, "action", "bake");
                  PaintTexture& tex = *m.texture;
                  if (action == "info") return {true, tex.meshMaps ? describeMeshMaps(*tex.meshMaps) : std::string("No Mesh Maps")};

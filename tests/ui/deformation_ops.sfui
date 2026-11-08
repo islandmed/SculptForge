@@ -1,53 +1,60 @@
-# Tool > Deformation's whole-Part operations (from the discussions): Polish, Relax, Smooth and Balloon, each with
-# its amount beside it, one undo step each, the mask holding what it covers.
+# Tool > Reshape (tidied for foirgairwolf on Discord): Size, then the Stack, the one home of the whole-Part operations;
+# Smooth, Relax, Polish and Balloon are its Surface steps, no longer duplicate sliders. Mirror is in Geometry > Symmetry.
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=4
 run deform_balloon amount=-40
-click "Tool##palette.tool"
-click "Deformation##tool.deformation"
-expect "Deformation/Polish"
-expect "##deform_balloon_amount"
-hold ctrl
-hover "Deformation/Polish"
-expect_help "sharp edges stay"
-hover "Deformation/Balloon"
-expect_help "rounder volume"
-hold none
-
-# Balloon fills the Part out; undo takes it back in one step.
+# The old actions still run (menus, keys, search: here the command palette), at amount 50, one undo step each. Before
+# the Tool palette opens: below 1280 px it is a drop-down the command palette closes.
 snapshot
-click "Deformation/Balloon"
+key f3
+type "##Command palette" balloon
+key enter
 expect_status "Balloon 50"
 expect_value moved_out > 0
-shot balloon
 key ctrl+z
 expect_value moved == 0
-
-# Smooth, Polish and Relax each move it, and each is one undo step.
-click "Deformation/Smooth"
-expect_status "Smooth 50"
-expect_value moved > 0
-key ctrl+z
-expect_value moved == 0
-click "Smooth keeps volume##deformation.smooth_volume"
-click "Deformation/Smooth"
-expect_value moved > 0
-key ctrl+z
-click "Deformation/Polish"
-expect_status "Polish 50"
-key ctrl+z
-expect_value moved == 0
-click "Deformation/Relax"
-expect_status "Relax 50"
-expect_value moved > 0
-key ctrl+z
 
 # Masked all over: nothing moves, and the status says why.
 run mask_all
-click "Deformation/Balloon"
+key f3
+type "##Command palette" balloon
+key enter
 expect_status "everything masked"
 expect_value moved == 0
 run mask_clear
+
+click "Tool##palette.tool"
+click "Reshape##tool.deformation"
+expect_not "Reshape/Mirror"
+expect "Size/##deform_size_x"
+shot reshape
+expect_not "##deform_balloon_amount"
+expect_not "Smooth keeps volume##deformation.smooth_volume"
+
+# Surface steps on the Stack: each moves the Part; Smooth has Keep volume; Reset takes it back.
+click "##deform_stack_add"
+click "Stack/Balloon##deform_add_Balloon"
+expect_status "Deform stack (1 step)"
+expect_value moved_out > 0
+shot balloon
+click "Stack/Reset"
+expect_value moved == 0
+click "##deform_stack_add"
+click "Stack/Smooth##deform_add_Smooth"
+expect_value moved > 0
+expect "Stack/Keep volume##deform_step_volume"
+click "Stack/Keep volume##deform_step_volume"
+expect_value moved > 0
+click "Stack/Reset"
+click "##deform_stack_add"
+click "Stack/Polish##deform_add_Polish"
+expect_status "Deform stack (1 step)"
+click "Stack/Reset"
+click "##deform_stack_add"
+click "Stack/Relax##deform_add_Relax"
+expect_value moved > 0
+click "Stack/Reset"
+expect_value moved == 0
 
 # The stack (docs/design/deform-panel.md): add steps, the preview follows, Apply is one undo step, Reset takes it back.
 expect "##deform_stack_add"

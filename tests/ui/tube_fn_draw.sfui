@@ -1,0 +1,68 @@
+# Tube functional pass (the owner: "Tube is also broken"): drawing with the mouse and the pen, off and on the model,
+# very short (a click: a ball) and very long strokes; every tube Part closed (no open edges).
+run ui_look look=classic layout=classic
+wait 0.3
+click "Tube##tool.tube"
+click "Tube/Draw Tube"
+expect_value tube_draw == 1
+# Mouse: from the model into the air.
+drag_path 0.3 0.4 0.55 0.2 0.8 0.45 1.05 0.25 1.3 0.5 S=1.2
+wait 0.2
+expect_value tube_parts == 1
+expect_status "Added Tube Part"
+run part_select index=1
+expect_value open_edges == 0
+expect_value tube_points >= 3
+shot mouse
+run part_select index=0
+# Started off the model (Surface depth falls back to the last stroke's end).
+drag_path 0.05 0.85 0.2 0.9 0.35 0.85 S=0.6
+wait 0.2
+expect_value tube_parts == 2
+shot offmodel
+# Pen: pressure light to firm.
+pen_stroke 0.2 0.7 0.8 0.75 0.1 1.0
+wait 0.2
+expect_value tube_parts == 3
+expect_status "Added Tube Part"
+shot pen
+run part_select index=1                        # (a new Part goes in after the active one)
+print tube_first_radius_x1000
+print tube_last_radius_x1000
+remember tube_last_radius_x1000 last
+expect_value tube_first_radius_x1000 < $last    # pen pressure 0.1 -> 1: thin to thick
+run part_select index=0
+# A plain press on an old tube's dot draws a new tube (Shift, Ctrl or Alt edit the dot instead).
+run part_select index=0
+expect_value tube_parts == 3
+drag_tube_point 0 120 40
+wait 0.2
+expect_value tube_parts == 4
+expect_status "Added Tube Part"
+key ctrl+z
+expect_value tube_parts == 3
+# Very short: a click is a ball.
+drag_path 0.5 0.5 0.5005 0.5 S=0.05
+wait 0.2
+expect_value tube_parts == 4
+expect_status "1 points"
+shot click
+# Very long: back and forth across the view, slowly (many samples), capped at 500 points.
+drag_path 0.05 0.1 0.95 0.15 0.05 0.2 0.95 0.25 0.05 0.3 0.95 0.35 0.05 0.4 0.95 0.45 0.05 0.5 0.95 0.55 0.05 0.6 0.95 0.65 0.05 0.7 0.95 0.75 S=6
+wait 0.3
+expect_value tube_parts == 5
+run part_select index=5
+expect_value tube_points <= 500
+expect_value open_edges == 0
+shot long
+# Undo takes the strokes out one at a time, redo puts them back.
+run part_select index=0
+key ctrl+z
+expect_value tube_parts == 4
+key ctrl+z
+key ctrl+z
+expect_value tube_parts == 2
+run redo
+run redo
+run redo
+expect_value tube_parts == 5

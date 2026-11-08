@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/Pickers.h"
 #include "app/BrandMark.h"
 #include "io/BridgeProtocol.h"
@@ -9,6 +10,7 @@
 #include "core/HardwareProfile.h"
 #include "app/ShellQuote.h"
 #include "app/SpaceCamera.h"
+#include "app/IconsUsed.h"
 #include "app/UiScale.h"
 #include "app/AirStroke.h"
 #include "app/I18n.h"
@@ -140,8 +142,11 @@ bool App::init(const AppOptions& options) {
     // UI tests run in a hidden window that never has focus; SDL drops joystick input without focus otherwise, and
     // the scripted SpaceMouse is a virtual joystick (UiTest.cpp).
     if (!options.uiTest.empty()) SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
-    // The pen tip's mouse events come from the app, not SDL (App::penMouseEvents, #95).
+    // The pen tip's mouse events come from the app, not SDL (App::penMouseEvents, #95), and no touch events either:
+    // SDL's touch made from the pen counted as a finger, and a finger beside it as a two-finger gesture that ended
+    // the stroke (pen displays with touch).
     SDL_SetHint(SDL_HINT_PEN_MOUSE_EVENTS, "0");
+    SDL_SetHint(SDL_HINT_PEN_TOUCH_EVENTS, "0");
     // Full screen on one monitor stays up when the pointer clicks on another (Windows multi-monitor, Discord).
     SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
     if (!headless && options.demo.empty()) applyCachedThreadCount(); // the hardware profile's threads, before any brush work
@@ -254,6 +259,7 @@ bool App::init(const AppOptions& options) {
         io.IniFilename = nullptr;
     }
     if (!options.uiTest.empty()) policy::resetPolicyForTests(); // (a UI test's ui_policy never reaches the next one)
+    if (!options.uiTest.empty()) aiSettings_.sendAllowed.clear(); // UI tests: every online AI service asks first
     // Preferences > AI: tests, renders and videos start with AI on whatever this computer chose (SF_AI still wins).
     ai::setAiEnabled(ai::aiFeaturesAllowed(headless || !options.demo.empty() || aiSettings_.enabled));
     // AI keys and the studio sign-in are in the OS keychain (ai/Secrets.h, ai/Oidc.h), read on a worker so no frame
@@ -498,11 +504,13 @@ int App::runUiTest(int w, int h, int fps) {
         pollBrushRequest();
         pollUnreal();
         pollGenerator();
+        pollSculptingBase();
         pollBlender(); // (demo recordings leave the user's Blender bridge alone)
         pollMaya(); // (tests and recordings never read the user's Maya folder: maya.json isn't loaded)
         pollPhone();
         pollAiLink(); // live mode (PanelAiLink.cpp)
         pollAutoUv();
+        pollDrape(); // (PanelDrape.cpp)
         pollUvEditor();
         pollBake();
         pollQRemesh();
@@ -727,6 +735,7 @@ int App::runRecording() {
         pollBrushRequest();
         pollUnreal();
         pollAutoUv();
+        pollDrape(); // (PanelDrape.cpp)
         pollUvEditor();
         pollBake();
         pollQRemesh();
@@ -809,7 +818,7 @@ void wakeMainLoop() {
 
 bool App::backgroundBusy() const {
     auto running = [](const auto& f) { return f.valid() && f.wait_for(std::chrono::seconds(0)) != std::future_status::ready; };
-    return running(pendingBrush_) || running(pendingGenerator_) || running(pendingModels_) || running(pendingUnreal_) ||
+    return running(pendingBrush_) || running(localProbe_) || running(pendingGenerator_) || running(pendingBase_) || running(pendingModels_) || running(pendingUnreal_) ||
            running(pendingComfyCheck_) || galleryBusy() || thumbs_.busy() || libraryScanner_.busy() || autoUv_ ||
            bakeBusy() || qremesh_ || voxelRemesh_ || updateJob_ || splatTrainBusy() || sculptableBusy() || phoneBusy() || uvEditorBusy() ||
            renderer_.environmentPending() || meshMapsBusy();
@@ -1012,6 +1021,7 @@ int App::run() {
         phases = 0;
         mark();
         while (SDL_PollEvent(&e)) onEvent(e);
+        flushPenMotion(); // the batch's last pen motion, which waited for its pressure (Tablet.cpp)
         if (take_) takeBeforeFrame(); // a take's input since the last frame, at the wall clock's pace
         mark();
         // (The window must have settled too: a window manager that maximises it late, on a busy machine, changes
@@ -1150,6 +1160,7 @@ int App::run() {
             animateLayers(dt);
             pollBrushRequest();
             pollGenerator();
+            pollSculptingBase();
             pollUnreal();
             pollBridge();
             pollBlender();
@@ -1157,6 +1168,8 @@ int App::run() {
             pollPhone();
             pollAiLink(); // live mode (PanelAiLink.cpp): an AI tool's next step
             pollAutoUv();
+            pollDrape();
+        pollDrape(); // (PanelDrape.cpp)
             pollUvEditor();
             pollBake();
             pollQRemesh();
@@ -1365,13 +1378,21 @@ void App::applyUiScale() {
     if (fontsLanguage_ != language()) glyphs::discardPending(); // (its own glyphs come with the new atlas)
     const bool newGlyphs = glyphs::resolve(language() == Language::TraditionalChinese);
     const bool rescale = uiScaleChanged(uiScale_, scale);
-    if (!rescale && !newGlyphs && fontsLanguage_ == language()) return;
+    const bool redensity = uiScaleChanged(fontDensity_, targetFontDensity(scale)); // (a Retina display, or off it)
+    if (!rescale && !redensity && !newGlyphs && fontsLanguage_ == language()) return;
     if (rescale) SDL_Log("UI scale %.0f%%", double(scale * 100.0f));
     uiScale_ = scale;
     ImGui::GetIO().Fonts->Clear();
     buildUiFonts(scale);
     if (ImGui::GetIO().BackendRendererUserData) ImGui_ImplOpenGL3_DestroyFontsTexture(); // the next NewFrame uploads it
     applyLook();
+}
+
+float App::targetFontDensity(float scale) const {
+    float density = 1.0f;
+    if (pixelDensityOverride_ > 0.0f) density = pixelDensityOverride_; // UI tests: pixel_density
+    else if (window_) density = SDL_GetWindowPixelDensity(window_);
+    return fontRasterDensity(scale, density);
 }
 
 void App::requestUiScale() {
@@ -1424,29 +1445,27 @@ void App::buildUiFonts(float scale) {
                                                   15.0f * scale, &fontConfig);
     // Lucide icons (ISC/MIT) merged into the UI font, so ICON_LC_* strings work in any label.
     {
-        static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
-        ImFontConfig icons;
+                ImFontConfig icons;
         icons.MergeMode = true;
         icons.PixelSnapH = true;
         icons.FontDataOwnedByAtlas = false;
         icons.GlyphMinAdvanceX = 15.0f * scale;
         icons.GlyphOffset = ImVec2(0, 2.0f * scale);
         io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
-                                       15.0f * scale, &icons, kIconRanges);
+                                       15.0f * scale, &icons, kUsedIconRanges);
         mergeCjkFont(15.0f * scale);
     }
     // Shell fonts: 12 px captions and 10 px right-shelf labels (with icons), large shelf icons, SemiBold titles.
     {
         auto addIcons = [&](float size) {
-            static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
-            ImFontConfig icons;
+                        ImFontConfig icons;
             icons.MergeMode = true;
             icons.PixelSnapH = true;
             icons.FontDataOwnedByAtlas = false;
             icons.GlyphMinAdvanceX = size * scale;
             icons.GlyphOffset = ImVec2(0, size * 0.13f * scale);
             io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
-                                           size * scale, &icons, kIconRanges);
+                                           size * scale, &icons, kUsedIconRanges);
             mergeCjkFont(size * scale);
         };
         fontSmall_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular),
@@ -1458,17 +1477,15 @@ void App::buildUiFonts(float scale) {
         fontBold_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontSemiBold),
                                                    int(assets::fontSemiBold_size), 15.0f * scale, &fontConfig);
         addIcons(15.0f);
-        static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
-        ImFontConfig big;
+                ImFontConfig big;
         big.PixelSnapH = true;
         big.FontDataOwnedByAtlas = false;
         fontIcons_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
-                                                    20.0f * scale, &big, kIconRanges);
+                                                    20.0f * scale, &big, kUsedIconRanges);
     }
     { // JetBrains Mono (SIL OFL) for the looks (Preferences > Interface > Look), with the icons and box drawing.
         static const ImWchar kMonoRanges[] = {0x0020, 0x00FF, 0x2010, 0x2027, 0x2190, 0x21FF, 0x2500, 0x259F, 0x25A0, 0x25FF, 0};
-        static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
-        auto addMono = [&](const unsigned char* data, unsigned long long size, float px) {
+                auto addMono = [&](const unsigned char* data, unsigned long long size, float px) {
             ImFont* f = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(data), int(size), px * scale, &fontConfig, kMonoRanges);
             ImFontConfig icons;
             icons.MergeMode = true;
@@ -1477,7 +1494,7 @@ void App::buildUiFonts(float scale) {
             icons.GlyphMinAdvanceX = px * scale;
             icons.GlyphOffset = ImVec2(0, px * 0.13f * scale);
             io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size), px * scale,
-                                           &icons, kIconRanges);
+                                           &icons, kUsedIconRanges);
             mergeCjkFont(px * scale);
             return f;
         };
@@ -1509,6 +1526,14 @@ void App::buildUiFonts(float scale) {
                                                          int(assets::fontRegular_size), float(options_.height) * 0.024f,
                                                          &fontConfig);
     }
+    // At the window's pixel density (Retina, a scaled Wayland output): the same sizes in logical px, the glyphs drawn
+    // with as many texels as the screen has pixels. Every font above, the help, guide and typed-glyph ones included.
+    fontDensity_ = targetFontDensity(scale);
+    io.Fonts->Flags |= ImFontAtlasFlags_NoPowerOfTwoHeight; // (GL 3 takes any height; rounding up wasted up to half)
+    for (ImFontConfig& src : io.Fonts->Sources) {
+        src.RasterizerDensity = fontDensity_;
+        if (fontDensity_ >= 2.0f) src.OversampleH = 1; // the density already places glyphs finely; 2x more only grows the atlas
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1517,14 +1542,26 @@ void App::buildUiFonts(float scale) {
 
 void App::handleEvent(const SDL_Event& event) {
     if (dropPenMouseEvent(event)) return; // the pen's mouse events are made here, not by SDL (#95, Tablet.cpp)
+    // A pen motion's mouse motion waits for the pressure that follows it (flushPenMotion, Tablet.cpp).
+    if (penMotionHeld_ && !(event.type == SDL_EVENT_PEN_AXIS && event.paxis.which == heldPenMotion_.pmotion.which))
+        flushPenMotion();
     penNoise_ = penRestNoise(event);      // a resting pen's tilt and jitter (Tablet.cpp)
     penMouseEvents(event, true);          // a pen leaving lets go of the tip's button first
     dispatchEvent(event);
+    if (event.type == SDL_EVENT_PEN_MOTION && !uiPrefs_.tablet.classicTiming) { // (Classic pen timing: at once)
+        heldPenMotion_ = event;
+        heldPenNoise_ = penNoise_;
+        penMotionHeld_ = true;
+        return;
+    }
     penMouseEvents(event, false);         // the tip's mouse events, after the pen's own
 }
 
 void App::dispatchEvent(const SDL_Event& event) {
-    if (strayMouseMotion(event)) return; // neither the canvas nor the UI follows a driver's stray mouse events
+    if (strayMouseMotion(event)) { // neither the canvas nor the UI follows a driver's stray mouse events
+        ++penDiag_.strayMouse;
+        return;
+    }
     if (event.type == SDL_EVENT_MOUSE_MOTION && event.motion.which != SDL_PEN_MOUSEID) mouseSincePen_ = true;
     if (sixDofPointerEvent(event)) return; // nor a SpaceMouse that also says it is a mouse (SpaceMouse.cpp)
     if (spaceMouseEcho(event)) return;     // nor the pointer a SpaceMouse driver moves while the cap is pushed
@@ -1542,6 +1579,8 @@ void App::dispatchEvent(const SDL_Event& event) {
     if (whatsNewEvent(e)) return;     // so does What's New (WhatsNewPopup.cpp)
     if (radialMouseEvent(e)) return;  // clicks on an open radial menu, and the buttons that open one (RadialMenu.cpp)
     if (strokePopupMouseEvent(e)) return; // clicks on the open stroke popup (StrokePopup.cpp)
+    if (tierCardEvent(e)) return;     // the first-run tier card's buttons and keys (PanelHardwareTier.cpp)
+    closePopupsOnPressOutside(e);         // a press outside open menus and popups acts, not only closes them (Shell.cpp)
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
     if (touchMouseEvent(e)) return; // a finger's press waits for a second finger; a gesture's stay off (Touch.cpp)
@@ -1602,7 +1641,9 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
         lastInputPen_ = e.button.which == SDL_PEN_MOUSEID;
         // Strokes and navigation start only on the canvas, never on the shell around it.
-        if (!io.WantCaptureMouse && canvasRect().contains(e.button.x, e.button.y)) {
+        // (Nor under a floating window the pointer only now reached: ImGui's hover is a frame behind, #161.)
+        if (!io.WantCaptureMouse && canvasRect().contains(e.button.x, e.button.y) &&
+            !ui::FloatingWindowAt(ImVec2(e.button.x, e.button.y))) {
             mouseClicks_ = e.button.clicks;
             onMouseDown(e.button.x, e.button.y, e.button.button);
             mouseClicks_ = 1;
@@ -1619,7 +1660,8 @@ void App::dispatchEvent(const SDL_Event& event) {
         break;
     case SDL_EVENT_MOUSE_WHEEL:
         // (Not the scroll a trackpad sends during a pinch or twist: Touch.cpp zooms for that.)
-        if (!io.WantCaptureMouse && !touchPinching_ && canvasRect().contains(e.wheel.mouse_x, e.wheel.mouse_y))
+        if (!io.WantCaptureMouse && !touchPinching_ && canvasRect().contains(e.wheel.mouse_x, e.wheel.mouse_y) &&
+            !ui::FloatingWindowAt(ImVec2(e.wheel.mouse_x, e.wheel.mouse_y)))
             wheelZoom(e.wheel.mouse_x, e.wheel.mouse_y, e.wheel.y);
         break;
     case SDL_EVENT_KEY_DOWN:
@@ -1797,6 +1839,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (tubeMouseDown(x, y, mod)) return;        // Draw Tube, a Tube Part's points (PanelTube.cpp)
         if (stencilMouseDown(x, y, nav)) return; // Adjust Stencil: move, scale, turn it (StencilOverlay.cpp)
         if (gradientMouseDown(x, y, nav)) return; // Line Gradient: a new line or an end handle (LineGradient.cpp)
+        if (edgesMouseDown(x, y, mod)) return; // Edges mode: clicks select edges (PanelEdges.cpp)
         if (facegroupMouseDown(x, y, mod)) return;
         if (maskSelectMouseDown(x, y, mod)) return;
         if (gizmoMouseDown(x, y, mod)) return; // Transform gizmo handles, pivot clicks (Gizmo.cpp)
@@ -2143,6 +2186,7 @@ void App::onMouseUp() {
 }
 
 void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
+    if (tubeKey(key, mod)) return;   // Esc / Undo / Redo during a tube stroke or point drag drop it (PanelTube.cpp)
     if (cutPolylineKey(key)) return; // Enter ends a Cut Polyline, Esc drops it (PanelCut.cpp)
     if (gradientKey(key)) return;    // Enter keeps a Line Gradient, Esc takes it back (LineGradient.cpp)
     if (stencilKey(key, mod)) return; // Adjust Stencil's keys, Enter / Esc ends it (StencilOverlay.cpp)
@@ -2159,19 +2203,34 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
         selectInsertSetItem(insertSet_.index + step);
         return;
     }
-    if (key == SDLK_ESCAPE && !insertType_.empty()) { // Append > Insert (#34) off
-        insertType_.clear();
-        status_ = "Insert off";
+    if (key == SDLK_ESCAPE && guidesMode_ && drag_ != Drag::Guide) { // the QRemesh Guides brush off
+        leaveGuides();
+        status_ = "Quad Remesh Guides off";
+        return;
+    }
+    if (key == SDLK_ESCAPE && (!insertType_.empty() || tubeDraw_ || edgesMode_ || facePlacing_)) { // Append > Insert
+        const bool tube = tubeDraw_, insert = !insertType_.empty(), edges = edgesMode_; // (#34), Draw Tube, Edges mode,
+        leaveDrawModes();                                                            // Place Landmarks off
+        status_ = tube ? "Tube: Draw Tube off" : insert ? "Insert off" : edges ? "Edges mode off" : "Place Landmarks off";
+        return;
+    }
+    if (key == SDLK_ESCAPE && forgesphereActive() && forgesphereReturnPart_ >= 0 && drag_ == Drag::None && !zsMenu_.open) {
+        leaveDrawModesStatus(); // a new Forge Sphere Part: back to the Part before it
         return;
     }
     if (captureShortcutKey(key, mod)) return; // Ctrl+Alt+click a button, then press its new key
     if (uvEditorKey(key, mod)) return;        // keys over the UV Editor's view (PanelUvEditor.cpp)
+    if (garmentKey(key, mod)) return;         // keys over the Pattern window (PanelGarments.cpp)
     if (key == SDLK_ESCAPE && capture_.armed) { // Capture from view waiting for its square (PanelKelvinlet.cpp)
         capture_.armed = false;
         status_ = "Capture cancelled";
         return;
     }
     if (libraryKey(key, mod)) return;        // , Library, B / M pickers, S / I pop-ups (Library.cpp)
+    if (key == SDLK_ESCAPE && gizmoActive() && drag_ != Drag::Gizmo) { // Esc leaves Move / Scale / Rotate / All
+        setGizmoMode(GizmoMode::Off);
+        return;
+    }
     // Blender's Emulate Numpad: the number row works as the numpad, unless the key itself has an action.
     if (blenderStyle() && uiPrefs_.emulateNumpad && key >= SDLK_0 && key <= SDLK_9 &&
         !actions_.actionForChord(chordFromEvent(key, mod)))
@@ -2256,6 +2315,8 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     }();
     doc_.sculptor.analyticNormals = analyticNormals == 1 || (analyticNormals == -1 && radiusPx_ >= 160.0f);
     fusedDabs_ = 64.0;
+    if (drape_) finishDrape(true); // (PanelDrape.cpp: the stroke sculpts the kept result)
+    if (strokeSculpt_ && !recipe && strokeBrush_ == BrushType::Cloth) prepareClothColliders(); // (PanelCloth.cpp)
     if (!doc_.sculptor.beginStroke(doc_.mesh,
                                    !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushLabel(strokeBrush_),
                                    strokeSculpt_ ? doc_.activeLayer : -1)) {
@@ -2697,6 +2758,7 @@ void App::runCommand(const std::string& name, const Args& args) {
         return;
     }
     if (doc_.sculptor.strokeActive()) endStroke();
+    if (drape_) finishDrape(true); // (a running Drape keeps where it got to first: undo, save... see a real step)
     if (name == "save_project") storeProjectSettings();
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
     crashlog::action(name); // (failures reach the log through SDL_Log below)
@@ -2726,6 +2788,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     }
     status_ = r.message;
     if (name.rfind("uv_", 0) == 0 || name == "texture_create" || name == "texture_delete") uvEditorChanged();
+    garmentsChanged(name.rfind("garment_", 0) == 0); // (the Pattern window re-reads the pattern)
     lastCommandOk_ = r.ok;
     if (r.ok && name != "export_glb" && name != "export_lods" && name != "export_usd" && name != "export_fbx" &&
         name != "export_unreal" && name.rfind("unreal_", 0) != 0 && name != "save_obj" && name != "save_project" &&
@@ -2733,7 +2796,8 @@ void App::runCommand(const std::string& name, const Args& args) {
         name != "set_color" && name != "set_material" && name != "load_litsphere" && name != "set_shading" && name != "part_shading" &&
         name != "viewport_shading" &&
         name != "export_ply" && name != "face_weights" &&
-        name != "face_preset" && name.rfind("face_take", 0) != 0 && name != "face_landmarks_detect") {
+        name != "face_preset" && name.rfind("face_take", 0) != 0 && name != "face_landmarks_detect" &&
+        name.rfind("garment_", 0) != 0) {
         clearLods();
         playingLayer_ = -1;
     }
@@ -2756,6 +2820,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     // The console shows every command as a script line (but not a live face feed, 30 times a second).
     if (name != "face_weights" || !r.ok) consoleEcho(name, args, r);
     if (r.ok && (name == "pack_remove" || name == "pack_enable" || name == "pack_disable")) refreshPacks();
+    if (name == "plugin_run" || name == "plugin_enable") refreshPlugins(); // a run may turn one off
     // Macro > Record keeps what the user runs (not what a running macro runs).
     if (r.ok && macros_.recorder.active() && macros_.runDepth == 0 && name != "face_weights")
         macros_.recorder.record(name, args, macroProjectDir());
@@ -2795,12 +2860,12 @@ void App::queueFile(FileAction action, std::string path) {
 void App::loadLitSphereDialog() {
     static const SDL_DialogFileFilter kLitSphereFilters[] = {{"Lit Sphere images", "png;jpg;jpeg;exr"}, {"All files", "*"}};
     const std::string folder = litsphereFolder();
-    SDL_ShowOpenFileDialog(onFileChosen, &dialogRequests_[int(FileAction::LoadLitSphere)], window_, kLitSphereFilters, 2,
+    sf::dialogs::openFile(onFileChosen, &dialogRequests_[int(FileAction::LoadLitSphere)], window_, kLitSphereFilters, 2,
                            folder.empty() ? nullptr : folder.c_str(), false);
 }
 
 void App::openFileDialog() {
-    SDL_ShowOpenFileDialog(onFileChosen, &dialogRequests_[int(FileAction::OpenObj)], window_, kModelFilters, 2,
+    sf::dialogs::openFile(onFileChosen, &dialogRequests_[int(FileAction::OpenObj)], window_, kModelFilters, 2,
                            nullptr, false);
 }
 
@@ -2844,7 +2909,7 @@ void App::saveFileDialog(FileAction action) {
                                     .u8string();
         suggestion.assign(s.begin(), s.end());
     }
-    SDL_ShowSaveFileDialog(onFileChosen, &dialogRequests_[int(action)], window_, filters, count,
+    sf::dialogs::saveFile(onFileChosen, &dialogRequests_[int(action)], window_, filters, count,
                            suggestion.empty() ? nullptr : suggestion.c_str());
 }
 
@@ -2951,7 +3016,7 @@ void App::processPendingFiles() {
             insertMeshKey_ = "file";
             insertMeshValue_ = f.path;
             status_ = "Insert " + std::filesystem::path(std::u8string(f.path.begin(), f.path.end())).filename().string() +
-                      ": drag on the model (the drag sets its size). Esc stops.";
+                      ": drag on the model to place it. Esc or a brush stops.";
             break;
         case FileAction::InsertSet: chooseInsertSet(f.path); break; // Insert on the model > Set (PanelParts.cpp)
         case FileAction::Count: break;
@@ -3066,9 +3131,10 @@ void App::drawUi() {
     drawPartPopups();
     if (showBrushLab_) drawBrushLab();
     drawBrushGallery();
-    if (showImageTo3D_) drawImageTo3D();
+    if (showImageTo3D_ && ai::aiEnabled()) drawImageTo3D(); // (closed when AI goes off; never drawn while it is)
     drawPhoneWindow(); // File > Capture from phone (PanelPhone.cpp)
-    drawUvEditor();    // Tool > Texture Map > UV Editor (PanelUvEditor.cpp)
+    drawUvEditor();    // Tool > Texture Image > UV Editor (PanelUvEditor.cpp)
+    drawGarments();    // Tool > Garments > Pattern (PanelGarments.cpp)
     drawTimelineUi();  // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)
     pollAlphaFile();
     pollStencilFile();
@@ -3086,10 +3152,17 @@ void App::drawUi() {
     drawStencilOverlay(); // the Stencil and, in Adjust, its handles (StencilOverlay.cpp)
     drawGizmo(); // Transform gizmo handles and panel (Gizmo.cpp)
     drawQRemeshGuides(); // QRemesh Guides curves (PanelRetopo.cpp)
+    drawEdgeOverlay();   // Edges mode: the selected edges (PanelEdges.cpp)
     drawUvEditorOverlay(); // UV seams on the model, the Seam tool's cursor (PanelUvEditor.cpp)
     drawWeldPreviewOverlay(); // the points Merge by Distance would merge (PanelMeshCheck.cpp)
     drawForgeSphereOverlay(); // the sphere under the cursor (PanelForge Spheres.cpp)
     drawForgeSphereMenu();    // a right click on a sphere
+    // A brush picked any way (shelf, picker, Library, a key): Draw Tube and Insert end (PanelTube.cpp).
+    const std::array<int, 4> brushNow{int(brush_), doc_.activeBrush, paintMode_ ? 1 : 0, guidesMode_ ? 1 : 0};
+    if (brushNow != drawModesBrush_) {
+        if (drawModesBrush_[0] >= 0 && drag_ != Drag::Tube && drag_ != Drag::Insert) leaveDrawModesStatus();
+        drawModesBrush_ = brushNow;
+    }
     drawTubeOverlay();        // Draw Tube's trail and cursor, a Tube Part's points (PanelTube.cpp)
     drawFaceOverlay();   // facial landmarks (PanelFace.cpp)
     drawSplatTrainOverlay(); // splat training progress (PanelSplatTrain.cpp)
@@ -3106,7 +3179,7 @@ void App::drawUi() {
     }
     // In Gizmo mode (and with the QRemesh Guides brush) the brush ring shows only while Ctrl masks or Shift smooths.
     const bool ringOff = gizmoActive() || stencil_.adjust || (guidesMode_ && !(inputMods() & SDL_KMOD_SHIFT)) || sculptableHot() || forgesphereActive() ||
-                         uvToolActive() || tubeDraw_ || tubeActive();
+                         uvToolActive() || tubeDraw_ || tubeActive() || edgesMode_;
     // (The S / O pop-up holds the mouse, but its ring shows where it opened, #138.)
     ImVec2 sliderOpened;
     PickerUi::Slider sliderWhich;
@@ -3121,6 +3194,7 @@ void App::drawUi() {
         (!ringOff || drag_ == Drag::Stroke || ctrlDown(inputMods())) &&
         (drag_ == Drag::Stroke || !overViewNavigator(mouse.x, mouse.y))) // (nor over the corner axes: a click there navigates)
         drawBrushCursor();
+    drawSizeSliderRing(); // a Size slider dragging (Precision.cpp)
     drawSelectionOverlay();
     drawBrushLibraryPopups();
     autosaveBrush();
@@ -3144,17 +3218,17 @@ void App::drawUi() {
                 if (p.name.empty()) ImGui::TextWrapped("%s", tr("Studio mode"));
                 else ImGui::TextWrapped(tr("Studio build for %s"), p.name.c_str());
                 ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-                ImGui::TextWrapped(tr("Offline: no outside connections. Updates come only from your studio's channel."));
+                ImGui::TextWrapped("%s", tr("Offline: no outside connections. Updates come only from your studio's channel."));
                 ImGui::PopStyleColor();
                 ImGui::Spacing();
             }
             ImGui::TextWrapped("%s", tr(ai::kPrivacyLine)); // also on the site (website/index.html) and in docs/ai-services.md
             ImGui::Spacing();
-            ImGui::TextWrapped(tr("Copyright (C) 2026 The SculptForge contributors. This program is free software: you can "
+            ImGui::TextWrapped("%s", tr("Copyright (C) 2026 The SculptForge contributors. This program is free software: you can "
                                "redistribute it and/or modify it under the terms of the GNU General Public License, "
                                "version 3 or later. It comes with ABSOLUTELY NO WARRANTY."));
             ImGui::Spacing();
-            ImGui::TextWrapped(tr("Built with SDL 3 (zlib), Dear ImGui (MIT), GLM (MIT), stb (MIT/public domain), ufbx "
+            ImGui::TextWrapped("%s", tr("Built with SDL 3 (zlib), Dear ImGui (MIT), GLM (MIT), stb (MIT/public domain), ufbx "
                                "(MIT/public domain), xatlas (MIT), MikkTSpace (zlib), the Inter and JetBrains Mono typefaces "
                                "(SIL OFL 1.1) and the MIT-licensed colours of the Forge Terminal look's schemes. Quad Remesh "
                                "follows Instant Meshes "
@@ -3162,13 +3236,13 @@ void App::drawUi() {
                                "(BSD-3-Clause) and Mbed TLS (Apache-2.0). Uses libcurl (curl license) "
                                "where available."));
             ImGui::Spacing();
-            if (ImGui::Button(tr("License"))) SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/LICENSE");
+            if (ImGui::Button(tr("License"))) sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/blob/main/LICENSE");
             ImGui::SameLine();
             if (ImGui::Button(tr("Third-party notices")))
-                SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/THIRD_PARTY_NOTICES.md");
+                sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/blob/main/THIRD_PARTY_NOTICES.md");
             ImGui::SameLine();
             if (ImGui::Button(tr("AI services & privacy")))
-                SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md");
+                sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md");
             ImGui::Spacing();
             drawSupportersSection(); // PanelSupport.cpp
         }
@@ -3178,6 +3252,7 @@ void App::drawUi() {
     guide_.draw(*this);  // Help > User Guide
     drawBrushSetSave();  // Save Shelf as Brush Set, Delete Brush Set (PanelBrushSets.cpp)
     drawPacksUi();       // pack review, New Pack, macro confirmation and editor (PanelPacks.cpp)
+    drawPluginWindow();  // a plugin's parameters, Apply / Add Part, Stop (PanelPlugins.cpp)
     drawMemoryConfirm(); // "Not enough free memory" before a big mesh (MemoryConfirm.cpp)
     drawAiLink();        // live mode: Approve / Allow dialogs, the "AI connected" badge (PanelAiLink.cpp)
     drawMayaLinkDialog(); // the Maya Live link's warning (PanelMaya.cpp)
@@ -3189,7 +3264,7 @@ void App::drawUi() {
 
 void App::drawLayersContents() {
     const float scale = uiScale_;
-    ImGui::TextDisabled(tr("Sculpt expressions & correctives;\nexported as glTF morph targets."));
+    ImGui::TextDisabled("%s", tr("Sculpt expressions & correctives;\nexported as glTF morph targets."));
 
     if (ImGui::RadioButton(tr("Base mesh"), doc_.activeLayer < 0)) runCommand("layer_set_active", {{"index", -1.0}});
     constexpr const char* kLayersPath = "Tool > Layers";
@@ -3306,7 +3381,7 @@ void App::drawGameExportContents() {
             ImGui::TableNextColumn();
             ImGui::Text("%zu", doc_.mesh.triangleCount());
             ImGui::TableNextColumn();
-            ImGui::TextDisabled(tr("editable"));
+            ImGui::TextDisabled("%s", tr("editable"));
             for (int i = 0; i < int(lods_.size()); ++i) {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
@@ -3322,7 +3397,7 @@ void App::drawGameExportContents() {
             }
             ImGui::EndTable();
         }
-        ImGui::TextDisabled(tr("Click a level to inspect it in the viewport."));
+        ImGui::TextDisabled("%s", tr("Click a level to inspect it in the viewport."));
     }
 
     ImGui::SeparatorText(tr("Unreal Engine"));
@@ -3333,7 +3408,7 @@ void App::drawGameExportContents() {
     ImGui::PopItemWidth();
     ImGui::Checkbox(tr("Unreal is on another computer"), &unrealNetwork_);
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip(tr("In Unreal: Project Settings > Plugins > Python > Advanced:\nMulticast Time-To-Live = 1, "
+        ImGui::SetTooltip("%s", tr("In Unreal: Project Settings > Plugins > Python > Advanced:\nMulticast Time-To-Live = 1, "
                           "Multicast Bind Address = 0.0.0.0"));
     if (pendingUnreal_.valid()) {
         ImGui::ProgressBar(-1.0f * float(ImGui::GetTime()), ImVec2(-1, 0), tr("Sending to Unreal..."));
@@ -3341,7 +3416,7 @@ void App::drawGameExportContents() {
         sendToUnreal();
     }
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip(tr("Imports (or updates) the asset in the open Unreal Editor.\nNeeds the Python Editor Script "
+        ImGui::SetTooltip("%s", tr("Imports (or updates) the asset in the open Unreal Editor.\nNeeds the Python Editor Script "
                           "Plugin and Project Settings > Python > Enable Remote Execution."));
     if (ImGui::Button(tr("Export FBX for Unreal..."), ImVec2(-1, 0))) saveFileDialog(FileAction::ExportUnreal);
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
@@ -3353,7 +3428,7 @@ void App::drawGameExportContents() {
     if (ImGui::Button(tr("GLB + blend shapes"), ImVec2(-1, 0))) saveFileDialog(FileAction::ExportGlb);
     if (ImGui::Button(tr("LOD chain (GLB per level)"), ImVec2(-1, 0))) saveFileDialog(FileAction::ExportLods);
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped(tr("Unreal, Unity, Godot, Blender, three.js"));
+    ImGui::TextWrapped("%s", tr("Unreal, Unity, Godot, Blender, three.js"));
     ImGui::PopStyleColor();
 }
 
@@ -3368,6 +3443,9 @@ const BrushRecipe* App::activeRecipe() const {
 
 void App::sendBrushRequest(const std::string& text) {
     if (text.empty() || pendingBrush_.valid()) return;
+    const bool noKey = aiSettings_.provider == ai::AiSettings::Provider::Anthropic && aiSettings_.resolvedKey().empty();
+    if (ai::aiEnabled() && !noKey && !askToSend(ai::brushTarget(aiSettings_), SendPanel::BrushLab, [this, text] { sendBrushRequest(text); }))
+        return; // the first-use notice: nothing sent before Allow
     chat_.push_back(ai::composeUserMessage(text, refineCurrent_ ? activeRecipe() : nullptr));
     chatLog_.push_back({ChatLine::Kind::User, text});
     scrollChat_ = true;
@@ -3434,7 +3512,7 @@ void App::drawRecipeEditor(BrushRecipe& recipe) {
     if (ImGui::Button(tr("Save .sfbrush..."), ImVec2(half, 0))) saveFileDialog(FileAction::SaveBrush);
     ImGui::SameLine();
     if (ImGui::Button(tr("Install .sfbrush..."), ImVec2(half, 0)))
-        SDL_ShowOpenFileDialog(onFileChosen, &dialogRequests_[int(FileAction::LoadBrush)], window_, kBrushFilters, 2,
+        sf::dialogs::openFile(onFileChosen, &dialogRequests_[int(FileAction::LoadBrush)], window_, kBrushFilters, 2,
                                nullptr, false);
 }
 
@@ -3492,7 +3570,8 @@ void App::drawAiSettings() {
     };
     if (aiSettings_.provider == P::OpenAICompatible) {
         ImGui::BeginDisabled(pendingModels_.valid());
-        if (ImGui::Button(pendingModels_.valid() ? tr("Checking...") : tr("Find models"), ImVec2(-1, 0))) {
+        if (ImGui::Button(pendingModels_.valid() ? tr("Checking...") : tr("Find models"), ImVec2(-1, 0)) &&
+            askToSend(ai::brushTarget(aiSettings_), SendPanel::BrushLab, [] {})) {
             auto promise = std::make_shared<std::promise<ModelList>>();
             pendingModels_ = promise->get_future();
             std::thread([promise, settings = aiSettings_] {
@@ -3558,18 +3637,18 @@ void App::drawAiSettings() {
         ImGui::TreeNode(tr("Run a model on this computer"))) {
         // Steps for the platform we're on; the guide covers the others.
 #if defined(_WIN32)
-        ImGui::TextWrapped(tr("1. Install Ollama from ollama.com/download, or in PowerShell:\n"
+        ImGui::TextWrapped("%s", tr("1. Install Ollama from ollama.com/download, or in PowerShell:\n"
                            "      winget install Ollama.Ollama\n"
                            "2. Download the model (in PowerShell):\n"
                            "      ollama pull qwen3:4b-instruct\n"
                            "3. Ollama runs in the system tray. Pick Ollama above, then Find models."));
 #elif defined(__APPLE__)
-        ImGui::TextWrapped(tr("1. Install Ollama from ollama.com/download and drag it to Applications.\n"
+        ImGui::TextWrapped("%s", tr("1. Install Ollama from ollama.com/download and drag it to Applications.\n"
                            "2. Download the model (in Terminal):\n"
                            "      ollama pull qwen3:4b-instruct\n"
                            "3. Ollama runs in the menu bar. Pick Ollama above, then Find models."));
 #else
-        ImGui::TextWrapped(tr("1. Install Ollama (or use your package manager, e.g. sudo pacman -S ollama):\n"
+        ImGui::TextWrapped("%s", tr("1. Install Ollama (or use your package manager, e.g. sudo pacman -S ollama):\n"
                            "      curl -fsSL https://ollama.com/install.sh | sh\n"
                            "2. Start it if needed:\n"
                            "      sudo systemctl enable --now ollama\n"
@@ -3577,10 +3656,10 @@ void App::drawAiSettings() {
                            "      ollama pull qwen3:4b-instruct\n"
                            "4. Pick Ollama above, then Find models."));
 #endif
-        ImGui::TextWrapped(tr("The 2.5 GB model needs about 4 GB of free memory and works without a graphics card "
+        ImGui::TextWrapped("%s", tr("The 2.5 GB model needs about 4 GB of free memory and works without a graphics card "
                            "(10-20 s per brush on a laptop CPU, a few seconds with a GPU)."));
         if (ImGui::SmallButton(tr("Full guide: Windows, macOS, Linux, LM Studio")))
-            SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/docs/local-ai.md");
+            sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/blob/main/docs/local-ai.md");
         ImGui::TreePop();
     }
     if (aiSettings_.provider == P::Anthropic) {
@@ -3616,12 +3695,12 @@ void App::drawBrushLab() {
         ImGui::End();
         return;
     }
-    ImGui::TextWrapped(tr("Describe a brush the way you'd describe it to another sculptor."));
+    ImGui::TextWrapped("%s", tr("Describe a brush the way you'd describe it to another sculptor."));
 
     // Conversation: just a hint until there is one, then a box that grows with it and scrolls past ~8 lines.
     if (chatLog_.empty() && !pendingBrush_.valid()) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-        ImGui::TextWrapped(tr("Try an idea below, or ask for changes to the selected brush, like \"sharper\" or "
+        ImGui::TextWrapped("%s", tr("Try an idea below, or ask for changes to the selected brush, like \"sharper\" or "
                            "\"less buildup\"."));
         ImGui::PopStyleColor();
     } else {
@@ -3675,6 +3754,7 @@ void App::drawBrushLab() {
         chatInput_[0] = '\0';
         ImGui::SetKeyboardFocusHere(-1);
     }
+    drawSendNotice(SendPanel::BrushLab);
     ImGui::BeginDisabled(!activeRecipe());
     ImGui::Checkbox(tr("Refine the selected brush"), &refineCurrent_);
     ImGui::EndDisabled();
@@ -3686,7 +3766,7 @@ void App::drawBrushLab() {
     ImGui::SameLine();
     if (ImGui::SmallButton(tr("Paste brush"))) pasteBrush();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-        ImGui::SetTooltip(tr("Install a brush someone shared: a brush code (sfbrush1:...) or .sfbrush text on the "
+        ImGui::SetTooltip("%s", tr("Install a brush someone shared: a brush code (sfbrush1:...) or .sfbrush text on the "
                           "clipboard (Ctrl+V in the viewport)"));
 
     if (BrushRecipe* recipe = doc_.activeBrush >= 0 ? &doc_.brushes[doc_.activeBrush] : nullptr) {
@@ -3744,96 +3824,6 @@ void App::projectImageFromView() {
     doc_.replaceMeshUndoable(std::move(m), "Project Image");
     clearLods();
     status_ = "Stamped image onto " + std::to_string(n) + " vertices (Ctrl+Z to undo)";
-    updateTitle();
-}
-
-void App::startGenerator() {
-    if (pendingGenerator_.valid()) return;
-    if (textMode_ ? textPrompt_[0] == '\0' : refImagePath_.empty()) return;
-    aiSettings_.generatorCommand = generatorCommand_;
-    aiSettings_.falKey = falKey_;
-    aiSettings_.falModel = falModel_;
-    aiSettings_.meshyKey = meshyKey_;
-    aiSettings_.hyper3dKey = hyper3dKey_;
-    aiSettings_.hfToken = hfToken_;
-    aiSettings_.comfyUrl = comfyUrl_;
-    // With no workflow chosen, ComfyUI runs the bundled one the panel shows (not saved, so updates reach it).
-    ai::AiSettings settings = aiSettings_;
-    const bool hunyuan = settings.generatorService == "huggingface"
-                             ? ai::hunyuanModel(ai::resolveHfPreset(settings, textMode_).id)
-                             : settings.generatorService == "fal" &&
-                                   ai::hunyuanModel(textMode_ ? ai::falTextModel(settings.falModel) : settings.falModel);
-    if (hunyuan) showHunyuanNoticeOnce();
-    if (settings.comfyImageWorkflow.empty()) settings.comfyImageWorkflow = comfyDefaultWorkflow(false);
-    if (settings.comfyTextWorkflow.empty()) settings.comfyTextWorkflow = comfyDefaultWorkflow(true);
-    auto stem = (std::filesystem::temp_directory_path() / ("sculptforge_generated_" + std::to_string(SDL_GetTicksNS()))).u8string();
-    generatorTime_ = 0.0f;
-    generatorProgress_ = std::make_shared<ai::GenerationProgress>();
-    generatorProgress_->setStatus("Starting...");
-    auto promise = std::make_shared<std::promise<GeneratedModel>>();
-    pendingGenerator_ = promise->get_future();
-    std::thread([promise, settings, in = refImagePath_, text = textMode_ ? std::string(textPrompt_) : std::string(),
-                 out = std::string(stem.begin(), stem.end()), progress = generatorProgress_,
-                 mode = GeneratedRemesh(generatedRemesh_), resolution = remeshResolution_, dropBackdrop = removeBackground_] {
-        GeneratedModel g;
-        g.result = text.empty() ? ai::generate3D(settings, in, out, progress.get())
-                                : ai::generate3DFromText(settings, text, out, progress.get());
-        if (g.result.ok && (mode != GeneratedRemesh::Off || dropBackdrop)) {
-            // Made sculptable here, so the window stays responsive; the main thread opens the file and swaps this in.
-            Document scratch;
-            const CommandResult opened = CommandRegistry().execute(scratch, "open", {{"path", g.result.outputPath}});
-            // The background plane goes first (one undo step of its own), so the remesh doesn't build it in.
-            if (opened.ok && dropBackdrop && removeFlatBackdrop(scratch.mesh, &g.backdrop))
-                g.withoutBackdrop = std::make_shared<Mesh>(scratch.mesh);
-            Mesh m;
-            if (mode == GeneratedRemesh::Off) {
-                // (opened for the background check only)
-            } else if (!opened.ok) {
-                g.remeshError = opened.message;
-            } else {
-                progress->percent = 0;
-                progress->setStatus(mode == GeneratedRemesh::Quad ? "Making it sculptable: Quad Remesh..." : "Making it sculptable: Voxel Remesh...");
-                if (remeshGenerated(scratch.mesh, mode, resolution, 1, m, g.remeshError, &g.stats, [progress](float f) {
-                        progress->percent = int(f * 100.0f);
-                        return !progress->cancel.load();
-                    }))
-                    g.remeshed = std::make_shared<Mesh>(std::move(m));
-            }
-        }
-        promise->set_value(std::move(g));
-    }).detach();
-}
-
-void App::pollGenerator() {
-    if (!pendingGenerator_.valid() || pendingGenerator_.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
-        return;
-    GeneratedModel g = pendingGenerator_.get();
-    const ai::GeneratorResult& r = g.result;
-    const std::string note = r.note.empty() ? std::string() : " - " + r.note;
-    struct PrivateDir { // (Hyper3D: the downloaded file's own folder, gone once the model is in)
-        std::string path;
-        ~PrivateDir() {
-            std::error_code ec;
-            if (!path.empty()) std::filesystem::remove_all(std::filesystem::path(std::u8string(path.begin(), path.end())), ec);
-        }
-    } privateDir{r.privateDir};
-    if (!r.ok) {
-        status_ = "Image to 3D failed: " + r.error + note;
-        return;
-    }
-    runCommand("open", {{"path", r.outputPath}});
-    std::error_code ec;
-    std::filesystem::remove(std::filesystem::path(std::u8string(r.outputPath.begin(), r.outputPath.end())), ec);
-    const size_t raw = doc_.mesh.triangleCount();
-    const auto mode = GeneratedRemesh(generatedRemesh_);
-    if (g.withoutBackdrop) doc_.replaceMeshUndoable(std::move(*g.withoutBackdrop), "Remove Flat Background");
-    if (g.remeshed) doc_.replaceMeshUndoable(std::move(*g.remeshed), mode == GeneratedRemesh::Quad ? "Quad Remesh" : "Remesh");
-    doc_.path.clear();
-    const std::string remeshNote = g.remeshed ? ", " + generatedRemeshNote(g.stats, mode) : std::string();
-    status_ = !g.remeshError.empty()
-                  ? "Generated model imported (" + std::to_string(raw) + " tris, not remeshed: " + g.remeshError + ")" + note
-                  : "Generated model imported (" + std::to_string(raw) + " tris" + remeshNote + ") - ready to sculpt" + note;
-    if (g.backdrop.planes) status_ += ". " + backdropRemovedNote(g.backdrop) + ", Undo brings it back";
     updateTitle();
 }
 
@@ -3908,7 +3898,8 @@ void App::drawComfyUi() {
          "(Hunyuan3D, TRELLIS and more). Nothing goes anywhere else."));
     ImGui::InputText(tr("Server"), comfyUrl_, sizeof comfyUrl_);
     ImGui::BeginDisabled(pendingComfyCheck_.valid());
-    if (ImGui::Button(tr(pendingComfyCheck_.valid() ? "Connecting..." : "Test connection"), ImVec2(-1, 0))) {
+    if (ImGui::Button(tr(pendingComfyCheck_.valid() ? "Connecting..." : "Test connection"), ImVec2(-1, 0)) &&
+        askToSend(ai::comfyTarget(comfyUrl_), SendPanel::Generate3D, [] {})) {
         auto promise = std::make_shared<std::promise<ComfyCheck>>();
         pendingComfyCheck_ = promise->get_future();
         std::thread([promise, url = std::string(comfyUrl_)] {
@@ -3940,7 +3931,7 @@ void App::drawComfyUi() {
     }
     auto browse = [this] {
         comfyPickingText_ = textMode_;
-        SDL_ShowOpenFileDialog(onFileChosen, &dialogRequests_[int(FileAction::ComfyWorkflow)], window_, kWorkflowFilters, 2,
+        sf::dialogs::openFile(onFileChosen, &dialogRequests_[int(FileAction::ComfyWorkflow)], window_, kWorkflowFilters, 2,
                                nullptr, false);
     };
     if (ImGui::BeginCombo(tr("Workflow"), preview.c_str())) {
@@ -3989,15 +3980,15 @@ void App::drawImageTo3D() {
         ImGui::SetNextItemWidth(-1);
         ImGui::InputTextMultiline("##textprompt", textPrompt_, sizeof textPrompt_, ImVec2(-1, ImGui::GetTextLineHeight() * 3.5f));
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-        ImGui::TextWrapped(tr("Describe one object: \"a stylised dragon head with curled horns\", \"a cartoon fox sitting\"."));
+        ImGui::TextWrapped("%s", tr("Describe one object: \"a stylised dragon head with curled horns\", \"a cartoon fox sitting\"."));
         ImGui::PopStyleColor();
     } else {
         if (ImGui::Button(tr(refImage_.empty() ? "Choose image..." : "Change image..."), ImVec2(-1, 0)))
-            SDL_ShowOpenFileDialog(onFileChosen, &dialogRequests_[int(FileAction::OpenImage)], window_, kImageFilters, 2,
+            sf::dialogs::openFile(onFileChosen, &dialogRequests_[int(FileAction::OpenImage)], window_, kImageFilters, 2,
                                    nullptr, false);
         if (refImage_.empty()) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-            ImGui::TextWrapped(tr("Or drop a sketch, concept, logo, photo or height map onto the window."));
+            ImGui::TextWrapped("%s", tr("Or drop a sketch, concept, logo, photo or height map onto the window."));
             ImGui::PopStyleColor();
             ImGui::End();
             return;
@@ -4019,7 +4010,7 @@ void App::drawImageTo3D() {
     };
     // The label column fits this language's longest label ("ID del modelo", "Token de HF"), at most 40% of the panel.
     float labelW = 0;
-    for (const char* l : {"Resolution", "Remesh", "Model", "Model id", "HF token", "API key", "Thickness", "Detail", "Depth"})
+    for (const char* l : {"Resolution", "Candidates", "Model", "Model id", "HF token", "API key", "Thickness", "Detail", "Depth"})
         labelW = std::max(labelW, ImGui::CalcTextSize(tr(l)).x);
     labelW = std::min(labelW, ImGui::GetContentRegionAvail().x * 0.4f) + ImGui::GetStyle().ItemInnerSpacing.x;
 
@@ -4117,35 +4108,50 @@ void App::drawImageTo3D() {
         hint(tr("Offline and instant, but only a puffy blockout of the outline - not a real reconstruction."));
     }
     if (serviceId != "inflate") {
-        const char* remeshModes[] = {tr("Quad Remesh"), tr("Voxel remesh"), tr("Off (raw mesh)")};
-        ImGui::Combo(tr("Remesh"), &generatedRemesh_, remeshModes, 3);
+        // Candidates: several shapes side by side to pick from. Billed services start at one (each is a generation
+        // on the user's key); the free and local ones at three.
+        int& count = serviceId == "fal" || serviceId == "meshy" || serviceId == "hyper3d" ? paidCandidateCount_ : candidateCount_;
+        ImGui::SliderInt(tr("Candidates"), &count, 1, 3);
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-            ImGui::SetTooltip(tr("Quad Remesh (default): clean quads ready for sculpting and subdividing, with one subdivision "
-                              "level holding the detail. Voxel remesh: an even, watertight triangle surface. Off: the "
-                              "model as the service made it."));
-        if (generatedRemesh_ != int(GeneratedRemesh::Off)) ImGui::SliderInt(tr("Resolution"), &remeshResolution_, 96, 400);
-        if (generatedRemesh_ == int(GeneratedRemesh::Quad)) {
-            char quads[160];
-            std::snprintf(quads, sizeof quads, tr("About %d quads, then 1 subdivision level"),
-                          generatedQuadTarget(remeshResolution_));
-            hint(quads);
+            ImGui::SetTooltip("%s", tr("How many shapes to make at once, shown side by side so you can pick the strongest "
+                                       "form before you spend time sculpting it."));
+        if (count > 1 && (serviceId == "fal" || serviceId == "meshy" || serviceId == "hyper3d")) {
+            char billed[160];
+            std::snprintf(billed, sizeof billed, tr("Each candidate is one generation on your key: %d are billed."), count);
+            hint(billed);
         }
         ImGui::Checkbox(tr("Remove flat background"), &removeBackground_);
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-            ImGui::SetTooltip(tr("Drops the flat plane a picture's background often becomes (a wall behind or ground under "
+            ImGui::SetTooltip("%s", tr("Drops the flat plane a picture's background often becomes (a wall behind or ground under "
                               "the subject) before the model lands. A relief or coin on its own is kept. Undo brings "
                               "a removed plane back."));
     }
     ImGui::PopItemWidth();
-    if (pendingGenerator_.valid()) {
+    if (pendingGenerator_.valid() || pendingBase_.valid()) {
         generatorTime_ += ImGui::GetIO().DeltaTime;
-        const int pct = generatorProgress_ ? generatorProgress_->percent.load() : -1;
+        int pct = generatorProgress_ ? generatorProgress_->percent.load() : -1;
+        std::string text = generatorProgress_ ? generatorProgress_->status() : "Working...";
+        if (pendingGenerator_.valid() && candidateProgress_.size() > 1) { // the first one still running speaks for all
+            const int n = int(candidateProgress_.size()), done = candidatesDone_ ? candidatesDone_->load() : 0;
+            for (int i = 0; i < n; ++i)
+                if (const std::string st = candidateProgress_[size_t(i)]->status(); st != "Ready" && st != "Failed") {
+                    char line[256];
+                    std::snprintf(line, sizeof line, tr("%d of %d ready - %s"), done, n, tr(st.c_str()));
+                    text = line;
+                    break;
+                }
+            pct = -1;
+        }
         ImGui::ProgressBar(pct >= 0 ? float(pct) / 100.0f : -1.0f * float(ImGui::GetTime()), ImVec2(-1, 0),
-                           tr(generatorProgress_ ? generatorProgress_->status().c_str() : "Working..."));
-        if (ImGui::Button(tr("Cancel"), ImVec2(-1, 0)) && generatorProgress_) generatorProgress_->cancel = true;
+                           pendingGenerator_.valid() && candidateProgress_.size() > 1 ? text.c_str() : tr(text.c_str()));
+        if (ImGui::Button(tr("Cancel"), ImVec2(-1, 0))) {
+            if (generatorProgress_) generatorProgress_->cancel = true;
+            for (const auto& p : candidateProgress_) p->cancel = true;
+        }
     } else if (ImGui::Button(tr("Generate 3D model"), ImVec2(-1, 0))) {
         startGenerator();
     }
+    drawSendNotice(SendPanel::Generate3D);
     if (openHunyuanNotice_) {
         ImGui::OpenPopup("###hunyuan.licence");
         openHunyuanNotice_ = false;
@@ -4153,7 +4159,7 @@ void App::drawImageTo3D() {
     ImGui::SetNextWindowSize(ImVec2(320 * scale, 0));
     if (ImGui::BeginPopupModal(tr("Hunyuan3D licence###hunyuan.licence"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped("%s", tr(ai::kHunyuanLicenceNote));
-        ImGui::TextDisabled(tr("This stays in the Model tooltip."));
+        ImGui::TextDisabled("%s", tr("This stays in the Model tooltip."));
         if (ImGui::Button(tr("OK"), ImVec2(-1, 0))) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
@@ -4170,6 +4176,8 @@ void App::drawImageTo3D() {
                                                                                         : "Save failed " + err;
         storeAiKeys();
     }
+    drawGeneratedCandidates(); // PanelGenerate3D.cpp
+    if (serviceId != "inflate") drawSculptingBase();
 
     if (textMode_) {
         ImGui::End();
@@ -4221,7 +4229,7 @@ void App::drawPalette_Splats() {
         drawSplatTrainSection(); // train one from a phone capture (PanelSplatTrain.cpp)
         ImGui::Spacing();
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-        ImGui::TextWrapped(tr("Open or drop a .ply capture (Polycam, Luma, Postshot, Scaniverse...) to sculpt against it."));
+        ImGui::TextWrapped("%s", tr("Open or drop a .ply capture (Polycam, Luma, Postshot, Scaniverse...) to sculpt against it."));
         ImGui::PopStyleColor();
         if (ImGui::Button(tr("Sculpt to splats"), ImVec2(-1, 0))) runCommand("mesh_to_splats");
         if (ImGui::Button(tr("Try a test head##splats"), ImVec2(-1, 0))) runCommand("splat_test_capture", {{"kind", std::string("head")}});
@@ -4239,12 +4247,12 @@ void App::drawPalette_Splats() {
     ImGui::SliderFloat("##splatopacity", &renderSettings_.splatOpacity, 0.05f, 1.0f, tr("opacity %.2f"));
     const float third = (ImGui::GetContentRegionAvail().x - 2 * ImGui::GetStyle().ItemSpacing.x) / 3.0f;
     if (ImGui::Button(tr("Flip"), ImVec2(third, 0))) runCommand("splat_transform", {{"rotate_x", 180.0}});
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Turn upside down (most captures are)"));
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Turn upside down (most captures are)"));
     ImGui::SameLine();
     if (ImGui::Button(tr("Turn 90"), ImVec2(third, 0))) runCommand("splat_transform", {{"rotate_y", 90.0}});
     ImGui::SameLine();
     if (ImGui::Button(tr("Fit"), ImVec2(third, 0))) runCommand("splat_transform", {{"fit", true}});
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Centre and scale to the sculpt"));
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Centre and scale to the sculpt"));
     if (ImGui::Button(tr("Clean floaters"), ImVec2(-1, 0))) runCommand("splat_clean", {{"min_opacity", 0.1}, {"keep", 0.97}});
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     if (ImGui::Button(tr("Save splats..."), ImVec2(half, 0))) saveFileDialog(FileAction::SaveSplats);

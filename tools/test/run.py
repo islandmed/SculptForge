@@ -6,7 +6,8 @@
   tools/test/run.py --build build [--cache DIR] [--budget 20] [--flaky-log tests/flaky.md] [-- ctest args...]
   tools/test/run.py --self-test
 
-* Nightly tests (label `nightly`) never run here unless the ctest args select them (-L nightly): T3 runs them.
+* Nightly tests (label `nightly`) never run here unless the ctest args pick labels (-L nightly, -L bench: any -L
+  takes every test with that label, nightly ones too): T3 runs them.
 * Test cache (--cache, or $SF_TEST_CACHE): every test gets a fingerprint, the hash of everything it can read: its
   program (the built file), every file or folder its command names, the app's assets and test data for app tests,
   the test's ENVIRONMENT and the SF_/SCULPTFORGE_/SDL_/GL driver variables of this run. Tests that read the whole tree
@@ -198,6 +199,20 @@ def rerun_args(args):
     return keep
 
 
+def without_nightly(args):
+    """The ctest args with nightly tests left out, unless the args pick labels themselves (-L / --label-regex, any
+    label: -L bench means every bench test, nightly ones too). ctest keeps only the last -LE: nightly folds into it."""
+    if any(x in ("-L", "--label-regex") or x.startswith(("-L=", "--label-regex=")) for x in args):
+        return list(args)
+    args = list(args)
+    le = [i for i, x in enumerate(args) if x in ("-LE", "--label-exclude") and i + 1 < len(args)]
+    if le:
+        args[le[-1] + 1] = f"({args[le[-1] + 1]})|nightly"
+    else:
+        args += ["-LE", "nightly"]
+    return args
+
+
 def run_env():
     return {k: v for k, v in os.environ.items() if k.startswith(ENV_PREFIXES) and k not in ENV_IGNORE}
 
@@ -308,14 +323,7 @@ def run_tests(argv=None):
     root = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip() or os.getcwd()
     if os.environ.get("CI"):
         a.cache = ""
-    selects_nightly = any(x in ("-L", "--label-regex") and i + 1 < len(args) and "nightly" in args[i + 1]
-                          for i, x in enumerate(args))
-    if not selects_nightly:  # one -LE (ctest keeps only the last): fold nightly into the caller's
-        le = [i for i, x in enumerate(args) if x in ("-LE", "--label-exclude") and i + 1 < len(args)]
-        if le:
-            args[le[-1] + 1] = f"({args[le[-1] + 1]})|nightly"
-        else:
-            args += ["-LE", "nightly"]
+    args = without_nightly(args)
     # A parallel run loads the machine like CI: timing checks (timeLimit, tests/TestHarness.h) get CI's slack.
     if parallel_jobs(args) > 1:
         os.environ.setdefault("SF_TIME_LIMIT_SCALE", "4")
@@ -495,6 +503,12 @@ def self_test():
         open(junit, "w").write('<testsuite><testcase name="a" time="1.5" status="run"/>'
                                '<testcase name="b" time="2" status="fail"><failure message="x"/></testcase></testsuite>')
         assert results(junit) == {"a": ("pass", 1.5), "b": ("fail", 2.0)}
+        # Nightly tests stay out unless the args pick labels: any -L (bench tests labelled nightly too, pose-all).
+        assert without_nightly(["-j3"]) == ["-j3", "-LE", "nightly"]
+        assert without_nightly(["-LE", "ui", "-R", "x"]) == ["-LE", "(ui)|nightly", "-R", "x"]
+        assert without_nightly(["-L", "bench", "-j2"]) == ["-L", "bench", "-j2"]
+        assert without_nightly(["--label-regex", "nightly"]) == ["--label-regex", "nightly"]
+        assert without_nightly(["--label-regex=bench", "-LE", "ui"]) == ["--label-regex=bench", "-LE", "ui"]
         open(junit, "w").write('<testsuite><testcase name="sculptforge_tests_0of2" time="9" status="run">'
                                '<system-out>[ RUN] x\n[ OK ] mesh_io (1200 ms)\n[FAIL] y (3 ms)\n</system-out></testcase></testsuite>')
         assert inner_times(junit) == {"mesh_io": 1.2}

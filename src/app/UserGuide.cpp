@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/UserGuide.h"
+#include "app/NativeDialog.h"
 
 #include "app/App.h"
 #include "app/I18n.h"
@@ -409,7 +410,7 @@ void UserGuide::navigate(const std::string& target, bool record) {
     if (!ensureLoaded()) return;
     const guide::Target t = guide::splitTarget(target);
     if (t.external) {
-        SDL_OpenURL(t.file.c_str());
+        sf::dialogs::openUrl(t.file.c_str());
         return;
     }
     if (t.file.empty()) { // an anchor on this page
@@ -452,12 +453,14 @@ std::string UserGuide::chapterFor(const std::string& palette, const std::string&
     if (starts("Tool > Forge Spheres") || starts("Tool > Forge Spheres")) return "forge-spheres.md";
     if (starts("Tool > Layers")) return "layers.md";
     if (starts("Tool > Facial Shapes")) return "facial-shapes.md";
+    if (starts("Tool > Geometry > Edges")) return "edges.md";
     if (starts("Tool > Geometry") || starts("Tool > Remesh")) return "geometry.md";
     if (starts("Tool > Masking")) return "masking.md";
     if (starts("Tool > Face Groups") || starts("Tool > Face groups") || starts("Tool > Visibility")) return "face-groups.md";
     if (starts("Tool > Selection Sets")) return "selection-sets.md";
     if (starts("Tool > Export")) return "exporting.md";
-    if (starts("Tool > Display")) return "interface.md";
+    if (starts("Tool > Reshape")) return "sculpting.md";
+    if (starts("Tool > Viewport Look")) return "interface.md";
     if (starts("Tool")) return "parts.md";
     if (starts("Brush"))
         return actionId == "ui.brush_lab" || actionId == "ui.brush_gallery" || actionId == "brush.paste" ? "brush-lab.md"
@@ -648,7 +651,7 @@ void UserGuide::drawToolbar(App& app) {
         hits_ = book_.search(query_);
     }
     ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - webW);
-    if (ImGui::Button(tr(ICON_LC_GLOBE "  Open in browser##guide_web"))) SDL_OpenURL(websiteUrl().c_str());
+    if (ImGui::Button(tr(ICON_LC_GLOBE "  Open in browser##guide_web"))) sf::dialogs::openUrl(websiteUrl().c_str());
     ui::HelpText("Open in browser", nullptr, "Read this page on the SculptForge website.", "Help > User Guide");
     ImGui::Dummy(ImVec2(0, 2.0f * s));
 }

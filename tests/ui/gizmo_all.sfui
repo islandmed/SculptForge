@@ -34,7 +34,7 @@ gizmo_hover rotate_view
 expect_value gizmo_hover == 11
 gizmo_hover scale_x
 expect_value gizmo_hover == 12
-shot all-hover-scale-box
+shot all-hover-scale-ball
 gizmo_hover scale_uniform
 expect_value gizmo_hover == 15
 shot all-hover-scale-tab
@@ -58,7 +58,7 @@ hold none
 expect_value center_y > 0.19
 key ctrl+z
 
-# A box stretches along its axis, the outer tabs scale evenly; the status repeats the readout.
+# A ball stretches along its axis, the outer tabs scale evenly; the status repeats the readout.
 gizmo_drag scale_y 0 -60
 expect_value size_y > $sy0*1.2
 remember size_x sx0

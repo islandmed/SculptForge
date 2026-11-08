@@ -1,4 +1,4 @@
-# Backface culling (#68): Tool > Display > Backface culling skips the back faces of every Part, also on open meshes
+# Backface culling (#68): Tool > Viewport Look > Backface culling skips the back faces of every Part, also on open meshes
 # (which otherwise draw both sides). Off by default. Brushes then work only on faces that are drawn.
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_plane resolution=64
@@ -13,7 +13,7 @@ expect_value drawn_triangles == $top_off
 shot back-off
 
 click "Tool##palette.tool"
-click "Display##tool.display"
+click "Viewport Look##tool.display"
 expect "Backface culling##display"
 click "Backface culling##display"
 expect_value backface_culling == 1

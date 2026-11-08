@@ -297,7 +297,7 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
         return false;
     }
     if (low.uvs.size() != nt * 3) {
-        error = "The low-poly Part has no UVs: import it with UVs or run Auto UV (Tool > Texture Map)";
+        error = "The low-poly Part has no UVs: import it with UVs or run Auto UV (Tool > Texture Image)";
         return false;
     }
     if (low.normals.size() != low.vertexCount()) {
@@ -890,7 +890,7 @@ bool bakeLevelSources(const Mesh& part, const std::string& source, Mesh& low, Me
     low.texture.reset();
     high.texture = part.texture; // (colour comes from the Part's own texture)
     if (low.uvs.size() != low.triangleCount() * 3) {
-        error = "The Part's lowest level has no UVs: run Auto UV on it first (Tool > Texture Map)";
+        error = "The Part's lowest level has no UVs: run Auto UV on it first (Tool > Texture Image)";
         return false;
     }
     if (low.normals.size() != low.vertexCount()) low.recomputeAllNormals();

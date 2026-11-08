@@ -478,7 +478,7 @@ void Console::draw(App& app, const CanvasRect& rect) {
         }
     }
     if (lines_.empty())
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::color::textDim), tr("Type help and press Enter to list the commands."));
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::color::textDim), "%s", tr("Type help and press Enter to list the commands."));
     if (scrollToBottom_ && (atBottom || focusInput_)) ImGui::SetScrollHereY(1.0f);
     scrollToBottom_ = false;
     ImGui::EndChild();

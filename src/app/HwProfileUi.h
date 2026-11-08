@@ -48,6 +48,12 @@ struct HwProfileUi {
     TierMemoryGuard memoryGuard;   // steps the tier in effect down when free memory runs low
     double nextMemoryCheck = 0.0;  // seconds (SDL ticks)
     bool tierCard = false;         // the first-run tier card is showing
+    struct Box {
+        float x0 = 0.0f, y0 = 0.0f, x1 = 0.0f, y1 = 0.0f;
+        bool contains(float x, float y) const { return x >= x0 && x < x1 && y >= y0 && y < y1; }
+    };
+    Box tierCardGotIt, tierCardClose; // where the card's buttons were last drawn (screen pixels)
+    int tierCardPressed = 0;       // the press began on Got it (1) or the close (2): put away when let go there
     std::vector<GpuAdapter> gpus;  // the graphics cards (listed when the panel first opens)
     bool gpusListed = false;
 };

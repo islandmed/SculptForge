@@ -27,7 +27,7 @@ ends): the effect concentrates in the middle and eases out.
 | | **Flatten** | -100..100 (% of the depth) | cut the + side (- side for negative) at a plane moved in by `t`; Soft blends over a band |
 | | **Sag** | -100..100 | along -axis by `t R/2 (r/R)^2`, `r` = distance from the axis line (outer parts droop) |
 | | **Depth** | -90..90 | cross-section times `1 / (1 - t u / 2)` (a perspective) |
-| Surface | Polish, Relax, Smooth, Balloon | as before | unchanged (they keep borders) |
+| Surface | Polish, Relax, Smooth, Balloon | as before | unchanged (they keep borders); since 0.12.0 the Stack is their only place in the panel (the quick sliders above it are gone; the actions run at amount 50) |
 
 Bend and Shear bend / shift toward a **Direction** (0..360 deg) in the plane across the axis; 0 is +Y for X and Z,
 +X for Y. Axis-type operations (Turn, Squash, Bend, Twist, Taper, Shear, Flatten, Sag, Depth) run once per chosen
@@ -62,7 +62,7 @@ Clean-room: the Python sketch posted with the request is not opened or used. Cla
    Bernstein sum `p = sum B_i^l(s) B_j^m(t) B_k^n(u) P_ijk` (trilinear for resolution 1), weighted by 1 - mask,
    recomputed in parallel per change (positions only, through the same undo-replace preview as the stack).
 3. **Apply**: bake into the vertices as one undo step and drop the cage; **Cancel** drops it unchanged.
-   Toolbar buttons (Generate Lattice, Apply Lattice) plus Tool > Deformation > Lattice; commands
+   Toolbar buttons (Generate Lattice, Apply Lattice) plus Tool > Reshape > Lattice; commands
    `lattice_generate res=3,3,3`, `lattice_move_points`, `lattice_apply`, `lattice_cancel`.
 
 The What's New fragment for this slice credits fenix on Discord.

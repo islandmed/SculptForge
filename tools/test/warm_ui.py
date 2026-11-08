@@ -34,7 +34,9 @@ import threading
 import time
 import uuid
 
-TIMEOUT = 290  # seconds a script may take (ctest gives a ui test 300)
+# Seconds a script may take: ctest gives a ui test 300; a test with its own ctest TIMEOUT sets SF_UI_TIMEOUT a little
+# under it (ui_mode_matrix: 1200, 3-10 min on a loaded CI runner).
+TIMEOUT = int(os.environ.get("SF_UI_TIMEOUT", "290"))
 IDLE_EXIT = 900  # a pool nobody used for this long stops (a ctest run that never reached the cleanup)
 
 

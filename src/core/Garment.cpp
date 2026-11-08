@@ -96,6 +96,10 @@ void reverseInPlace(Panel& p, std::vector<Seam>* seams, uint32_t self) {
     }
     p.points = std::move(pts);
     p.curves = std::move(cur);
+    if (!p.edgeNames.empty()) {
+        p.edgeNames.resize(n);
+        std::reverse(p.edgeNames.begin(), p.edgeNames.end());
+    }
     for (Notch& nt : p.notches) {
         nt.edge = n - 1 - nt.edge;
         nt.t = 1.0f - nt.t;
@@ -133,6 +137,7 @@ bool overlaps(const SeamSide& x, const SeamSide& y) {
 
 void normalizePanel(Panel& p) {
     p.curves.resize(p.points.size());
+    if (!p.edgeNames.empty()) p.edgeNames.resize(p.points.size());
     const uint32_t n = count(p);
     p.notches.erase(std::remove_if(p.notches.begin(), p.notches.end(),
                                    [&](const Notch& nt) { return nt.edge >= n || !(nt.t >= 0.0f && nt.t <= 1.0f); }),
@@ -397,16 +402,20 @@ bool unfoldPanel(Pattern& pat, uint32_t i, uint32_t e, std::string& error) {
     out.points.clear();
     out.curves.clear();
     out.notches.clear();
+    out.edgeNames.clear();
+    const bool named = !p.edgeNames.empty();
     std::vector<uint32_t> order;
     for (uint32_t k = 1; k < n; ++k) order.push_back((e + k) % n);
     for (uint32_t j : order) {
         out.points.push_back(startOf(p, j));
         out.curves.push_back(curveOf(p, j));
+        if (named) out.edgeNames.push_back(j < p.edgeNames.size() ? p.edgeNames[j] : std::string());
     }
     for (auto it = order.rbegin(); it != order.rend(); ++it) {
         const EdgeCurve& c = curveOf(p, *it);
         out.points.push_back(reflect(endOf(p, *it)));
         out.curves.push_back({c.curved, reflect(c.c2), reflect(c.c1)});
+        if (named) out.edgeNames.push_back(*it < p.edgeNames.size() ? p.edgeNames[*it] : std::string());
     }
     const uint32_t m = n - 1; // edges in each half
     for (const Notch& nt : p.notches) {
@@ -457,6 +466,10 @@ void splitEdge(Pattern& pat, uint32_t i, uint32_t e, float t) {
     p.points.insert(p.points.begin() + e + 1, mid);
     p.curves[e] = first;
     p.curves.insert(p.curves.begin() + e + 1, second);
+    if (!p.edgeNames.empty()) { // both halves keep the edge's name
+        p.edgeNames.resize(p.curves.size() - 1);
+        p.edgeNames.insert(p.edgeNames.begin() + e + 1, p.edgeNames[e]);
+    }
     for (Notch& nt : p.notches) {
         if (nt.edge > e) ++nt.edge;
         else if (nt.edge == e) {
@@ -508,6 +521,10 @@ bool removePoint(Pattern& pat, uint32_t i, uint32_t k) {
     p.curves[before] = {};
     p.points.erase(p.points.begin() + k);
     p.curves.erase(p.curves.begin() + k);
+    if (!p.edgeNames.empty()) { // the merged edge keeps the name of the one ending at k
+        p.edgeNames.resize(n);
+        p.edgeNames.erase(p.edgeNames.begin() + k);
+    }
     auto shift = [&](uint32_t& edge) {
         if (k == 0) {
             if (edge > 0) --edge; // edge n-1 (now n-2) is the merged one
@@ -533,7 +550,9 @@ float seamSideLength(const Pattern& pat, const SeamSide& s) {
 
 std::string edgeName(const Pattern& pat, uint32_t panel, uint32_t edge) {
     if (panel >= pat.panels.size()) return "?";
-    return pat.panels[panel].name + " " + std::to_string(edge + 1);
+    const Panel& p = pat.panels[panel];
+    if (edge < p.edgeNames.size() && !p.edgeNames[edge].empty()) return p.name + " " + p.edgeNames[edge];
+    return p.name + " edge " + std::to_string(edge + 1);
 }
 
 bool addSeam(Pattern& pat, const Seam& seam, std::string& error) {
@@ -567,12 +586,13 @@ SeamCheck checkSeam(const Pattern& pat, const Seam& seam) {
     const float diff = std::abs(c.lengthA - c.lengthB);
     c.lengthsMatch = diff <= std::max(3.0f, 0.02f * std::max(c.lengthA, c.lengthB));
     c.twisted = seam.flipped;
-    char buf[160];
-    std::snprintf(buf, sizeof buf, "%s <-> %s: %.0f / %.0f mm", edgeName(pat, seam.a.panel, seam.a.edge).c_str(),
-                  edgeName(pat, seam.b.panel, seam.b.edge).c_str(), double(c.lengthA), double(c.lengthB));
-    c.text = buf;
-    if (!c.lengthsMatch) c.text += " (eased in)";
-    if (c.twisted) c.text += " (twisted)";
+    c.names = edgeName(pat, seam.a.panel, seam.a.edge) + " <-> " + edgeName(pat, seam.b.panel, seam.b.edge);
+    char buf[64];
+    std::snprintf(buf, sizeof buf, "%.0f / %.0f mm", double(c.lengthA), double(c.lengthB));
+    c.lengths = buf;
+    if (!c.lengthsMatch) c.lengths += " (eased in)";
+    if (c.twisted) c.lengths += " (twisted)";
+    c.text = c.names + ": " + c.lengths;
     return c;
 }
 
@@ -732,7 +752,7 @@ namespace {
 
 // A body panel (front or back) centred on x = cx, hem at y = 0: hem, side, armhole, shoulder, neckline, shoulder,
 // armhole, side (edges 0-7).
-Panel bodyPanel(const std::string& name, float cx, float half, float length, float neckDepth) {
+Panel bodyPanel(const std::string& name, float cx, float half, float length, float neckDepth, bool front) {
     const float shoulderHalf = half - 30.0f, neckHalf = 85.0f, drop = 45.0f, armholeY = length - 270.0f;
     Panel p;
     p.name = name;
@@ -746,6 +766,11 @@ Panel bodyPanel(const std::string& name, float cx, float half, float length, flo
     const float cy = length - 8.0f * neckDepth / 6.0f;
     p.curves[4] = {true, P(neckHalf - 5.0f, cy), P(-neckHalf + 5.0f, cy)};
     p.notches = {{1, 0.5f}, {7, 0.5f}};
+    // Edges named as the wearer has them: the front's +x side is their left, the back's their right.
+    const char* a = front ? "left" : "right";
+    const char* b = front ? "right" : "left";
+    p.edgeNames = {"hem", std::string(a) + " side", std::string(a) + " armhole", std::string(a) + " shoulder", "neckline",
+                   std::string(b) + " shoulder", std::string(b) + " armhole", std::string(b) + " side"};
     return p;
 }
 
@@ -764,7 +789,16 @@ Panel sleevePanel(const std::string& name, float cx, float capLength) {
         (edgeLength(p, 2) < capLength ? lo : hi) = m;
     }
     p.notches = {{2, 0.5f}};
+    p.edgeNames = {"hem", "underarm", "cap", "underarm"};
     return p;
+}
+
+void movePanel(Panel& p, glm::vec2 d) {
+    for (glm::vec2& q : p.points) q += d;
+    for (EdgeCurve& c : p.curves) {
+        c.c1 += d;
+        c.c2 += d;
+    }
 }
 
 } // namespace
@@ -773,13 +807,19 @@ Pattern tshirtPattern(float chestMm, float lengthMm) {
     Pattern pat;
     const float half = std::clamp((chestMm + 80.0f) * 0.25f, 120.0f, 1000.0f); // 8 cm ease
     const float length = std::clamp(lengthMm, 300.0f, 1500.0f);
-    pat.panels.push_back(bodyPanel("Front", 0.0f, half, length, 90.0f));
-    pat.panels.push_back(bodyPanel("Back", 2.0f * half + 60.0f, half, length, 20.0f));
+    const float backX = 2.0f * half + 60.0f;
+    pat.panels.push_back(bodyPanel("Front", 0.0f, half, length, 90.0f, true));
+    pat.panels.push_back(bodyPanel("Back", backX, half, length, 20.0f, false));
     // Each armhole (front + back) is the cap's length, plus 2% ease.
     const float armhole = edgeLength(pat.panels[0], 2) + edgeLength(pat.panels[1], 6);
-    const float sx = 3.0f * half + 120.0f + 190.0f; // 60 mm right of the back
-    pat.panels.push_back(sleevePanel("Left sleeve", sx, armhole * 1.02f));
-    pat.panels.push_back(sleevePanel("Right sleeve", sx + 440.0f, armhole * 1.02f));
+    // Two rows (a sheet about as tall as wide): the sleeves under the front and the back, the body panels 60 mm
+    // above the taller sleeve.
+    pat.panels.push_back(sleevePanel("Left sleeve", 0.0f, armhole * 1.02f));
+    // (A small chest puts the back closer than a sleeve is wide: the right sleeve keeps clear of the left.)
+    pat.panels.push_back(sleevePanel("Right sleeve", std::max(backX, 440.0f), armhole * 1.02f));
+    const float rise = std::max(panelMax(pat.panels[2]).y, panelMax(pat.panels[3]).y) + 60.0f;
+    movePanel(pat.panels[0], {0.0f, rise});
+    movePanel(pat.panels[1], {0.0f, rise});
     std::string error;
     auto sew = [&](uint32_t pa, uint32_t ea, float a0, float a1, uint32_t pb, uint32_t eb, float b0, float b1) {
         addSeam(pat, {{pa, ea, a0, a1}, {pb, eb, b0, b1}, false}, error);
@@ -863,6 +903,11 @@ Json patternToJson(const Pattern& pat) {
             notches.push(std::move(nj));
         }
         pj.set("notches", std::move(notches));
+        if (std::any_of(p.edgeNames.begin(), p.edgeNames.end(), [](const std::string& n) { return !n.empty(); })) {
+            Json names = Json::array();
+            for (size_t e = 0; e < p.points.size(); ++e) names.push(e < p.edgeNames.size() ? p.edgeNames[e] : std::string());
+            pj.set("edge_names", std::move(names));
+        }
         pj.set("grain", num(p.grainDegrees));
         pj.set("allowance_mm", num(p.seamAllowance));
         panels.push(std::move(pj));
@@ -917,6 +962,8 @@ bool patternFromJson(const Json& j, Pattern& out, std::string& error) {
         for (const Json& nj : pj["notches"].items())
             if (nj.isArray() && nj.size() == 2 && nj[0].asNumber(-1) >= 0 && nj[0].asNumber(-1) < 1e6)
                 p.notches.push_back({uint32_t(nj[0].asNumber(0)), fnum(nj[1], 0.5f)});
+        if (const Json& names = pj["edge_names"]; names.isArray() && names.size() == p.points.size())
+            for (const Json& nj : names.items()) p.edgeNames.push_back(nj.isString() ? nj.asString().substr(0, 64) : std::string());
         p.grainDegrees = fnum(pj["grain"], 90.0f);
         p.seamAllowance = std::clamp(fnum(pj["allowance_mm"], 10.0f), 0.0f, 200.0f);
         normalizePanel(p);

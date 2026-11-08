@@ -1,0 +1,76 @@
+# The Tool palette's sub-palettes named and ordered by task (fix/ip-palettes): Parts, Geometry, Remesh, Reshape, ...,
+# Masking, Face Groups, ..., Paint Layers, Texture Image, Bake, Export, Viewport Look; Reshape = Size + Stack (Smooth,
+# Relax, Polish, Balloon are Stack steps), Mirror beside Make Symmetric, Make Shell, Find Problems; Preferences >
+# Saving & Layouts.
+# CMake also runs this at 1440x900 and 2880x1800 (where the 200% shots have the tray); narrow/tool_palettes.sfui is
+# the 1024 px one.
+run new_sphere subdivisions=3
+expect "Reshape##tool.deformation"
+expect "Texture Image##tool.texture"
+expect "Viewport Look##tool.display"
+shot tool-list-100
+
+click "Reshape##tool.deformation"
+expect "Size/##deform_size_x"
+expect "##deform_stack_add"
+expect_not "##deform_smooth_amount"
+expect_not "Reshape/Mirror"
+shot reshape-100
+ui_scale 200
+wait 0.3
+shot reshape-200
+ui_scale 100
+click "Reshape##tool.deformation"
+
+click "Geometry##tool.geometry"
+expect "Symmetry/Make Symmetric"
+expect "Symmetry/Mirror"
+expect "Symmetry/Y##deformation.mirror_y"
+expect_text "Find Problems"
+# The tray is taller than the window: a middle-drag on it scrolls down to Cleanup and Symmetry.
+button_drag middle 0.89 0.85 0.89 0.15 0.3
+button_drag middle 0.89 0.85 0.89 0.15 0.3
+shot geometry-symmetry-100
+ui_scale 200
+wait 0.3
+button_drag middle 0.89 0.85 0.89 0.15 0.3
+button_drag middle 0.89 0.85 0.89 0.15 0.3
+button_drag middle 0.89 0.85 0.89 0.15 0.3
+shot geometry-symmetry-200
+ui_scale 100
+click "Geometry##tool.geometry"
+
+click "Parts##tool.part"
+expect "Extract/Make Shell"
+shot parts-make-shell-100
+ui_scale 200
+wait 0.3
+shot parts-make-shell-200
+ui_scale 100
+click "Parts##tool.part"
+
+click "Texture Image##tool.texture"
+expect "Texture Image/Auto UV"
+shot texture-image-100
+click "Texture Image##tool.texture"
+
+click "Viewport Look##tool.display"
+expect "Viewport Look##tool.display"
+expect "Backface culling##display"
+shot viewport-look-100
+ui_scale 200
+wait 0.3
+shot viewport-look-200
+ui_scale 100
+click "Viewport Look##tool.display"
+
+run ui_look look=classic layout=classic        # the classic palette bar: Preferences is a palette
+click "Preferences##palette.preferences"
+click "Saving & Layouts##preferences.config"
+expect "Save Layout##config.save_layout"
+shot saving-layouts-100
+ui_scale 200
+wait 0.3
+shot saving-layouts-200
+ui_scale 100
+key escape

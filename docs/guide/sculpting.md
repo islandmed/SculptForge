@@ -50,6 +50,7 @@ are on the bottom shelf by default and in the brush picker.
 | **Elastic Tendril** | | An elastic Tendril: smooth horns and tendrils that taper as they stretch. | No change |
 | **DetailClone** | | Paints copies of a captured detail (the VDM brush's map) along the stroke, each turned to follow it. | Digs them in |
 | **Morph** | | Pulls the surface back toward the morph target, a selection set with its shape ([Selection sets](selection-sets.md#morph-targets)). Does nothing until you pick one. | Pushes away from it |
+| **Cloth** | | Moves the surface like fabric: drag it and it folds where it bunches up (see [Cloth brush](#cloth-brush)). | Push mode: pulls out |
 | **Paint** | <kbd>P</kbd> | Paints colour without sculpting. See [Vertex Paint and materials](vertex-paint.md). | Paints back to white |
 
 Notes on particular brushes:
@@ -295,24 +296,27 @@ Your menus save themselves.
 
 ## Whole-Part deformations
 
-**Tool > Deformation** has four operations that work on the whole active Part at once, each with its amount
-beside it (from the discussions). The mask holds what it covers (partly masked areas move partly), hidden faces and
-open borders stay where they are, and each is one undo step:
+**Tool > Reshape** reads top to bottom: **Size**, then the **Stack**, the one place for every whole-Part operation
+(**Mirror** is in **Tool > Geometry > Symmetry**). Four of its steps (the **Surface** group) work on the surface
+itself (from the discussions). The mask holds what it covers (partly masked areas move partly), hidden faces and
+open borders stay where they are:
 
 | Operation | What it does |
 |---|---|
-| **Polish** | Flattens fine noise and small bumps while flat areas and sharp edges stay sharp: a scan's grain, or the ripples a voxel remesh leaves on a hard-surface piece. |
+| **Smooth** | Smooths everything; with the step's **Keep volume** it doesn't shrink the form. |
 | **Relax** | Evens out the spacing of the vertices along the surface without changing its shape, for areas a big Move or Tendril stretched. |
-| **Smooth** | Smooths everything; with **Smooth keeps volume** it doesn't shrink the form. |
-| **Balloon** | Fills the form out toward a rounder volume, like blowing into it (experienced sculptors: Inflate Balloon). A negative amount lets the air out. |
+| **Polish** | Flattens fine noise and small bumps while flat areas and sharp edges stay sharp: a scan's grain, or the ripples a voxel remesh leaves on a hard-surface piece. |
+| **Balloon** | Fills the form out toward a rounder volume, like blowing into it. A negative amount lets the air out. |
 
-They are commands too: `deform_polish amount=60`, `deform_relax`, `deform_smooth amount=30 keep_volume=true`,
-`deform_balloon amount=-20` (add `masked=false` to ignore the mask). On a 10-million-vertex Part at amount 50,
+Add one with **Add step > Surface** and set its amount on the step. They are commands too: `deform_smooth amount=30
+keep_volume=true`, `deform_relax`, `deform_polish amount=60`, `deform_balloon amount=-20` (add `masked=false` to
+ignore the mask); from a menu, a key or the command palette, **Smooth**, **Relax**, **Polish** and **Balloon** run
+once at amount 50. On a 10-million-vertex Part at amount 50,
 Smooth takes about 0.5 s, Balloon 0.7 s, Relax 0.9 s and Polish 2 s (Apple M1 Pro).
 
 ### Size
 
-**Tool > Deformation > Size** shows the active Part's width (**X**), height (**Y**) and depth (**Z**) in scene
+**Tool > Reshape > Size** shows the active Part's width (**X**), height (**Y**) and depth (**Z**) in scene
 units (requested by foirgairwolf on Discord). Drag one, or double-click it and type an exact value: the Part resizes about its
 centre as one undo step. With **Uniform** on (the default) the other sides follow in proportion; off, only that side
 changes. The mask holds what it covers. Command: `deform_size x=2.5` (any of `x`, `y`, `z`), or `deform_size
@@ -320,7 +324,7 @@ uniform=10` for the largest side.
 
 ### Deformation stack
 
-**Tool > Deformation > Stack** shapes the whole Part with a list of steps (requested by foirgairwolf on Discord). **Add step**
+**Tool > Reshape > Stack** shapes the whole Part with a list of steps (requested by foirgairwolf on Discord). **Add step**
 picks one; click a step to set its amount, its axes (**X Y Z**, any mix) and, where it applies, **Direction** and
 **Soft**. With **Preview** on, the Part follows each change (on very heavy Parts, when you let go of the slider).
 
@@ -339,7 +343,7 @@ picks one; click a step to set its amount, its axes (**X Y Z**, any mix) and, wh
 | | **Flatten** | Cuts the + side flat by a percent of the depth (negative: the - side). |
 | | **Sag** | Parts far from the axis droop down it, like a weight on outstretched arms (negative lifts). |
 | | **Depth** | A perspective: the + end wider, the - end narrower, more toward the ends. |
-| Surface | **Polish**, **Relax**, **Smooth**, **Balloon** | As above. |
+| Surface | **Polish**, **Relax**, **Smooth** (**Keep volume**), **Balloon** | See [Whole-Part deformations](#whole-part-deformations). |
 
 **Soft** eases Bend, Twist, Taper and Shear toward the ends (a bend that curves most in the middle) and rounds
 Flatten's cut. Steps work about the Part's centre, or about the gizmo's pivot when you placed it.
@@ -685,6 +689,54 @@ layers, and each stroke is one undo step. They don't remesh with dynamic topolog
 > up, keep the brush small or step down a subdivision level for big elastic moves (see
 > [Performance](performance.md)).
 
+## Cloth brush
+
+The **Cloth** brush treats the surface near the stroke as fabric. Drag across a sleeve or a sheet and the
+cloth follows the brush, bunching into folds on the side you push toward; the folds keep the fabric's length
+instead of stretching it like rubber. Only the surface within a few brush radii of the stroke moves, and masked
+areas hold still like pins, so mask a seam or a cuff to keep it in place.
+
+Set it up in **Sculpt > Brush > Cloth**:
+
+- **Mode**: **Drag** (the cloth follows the stroke), **Push** (presses it in along the surface; <kbd>Alt</kbd>
+  pulls it out, and the cloth around follows), **Settle** (only gravity: the cloth under the brush sags and drapes
+  over what's below), **Grab** (the cloth where the stroke starts is held and follows the brush; the cloth around it
+  trails and folds), **Expand** and **Pinch** (spread the cloth out from the brush centre or gather it in;
+  <kbd>Alt</kbd> swaps them), **Inflate** (adds fabric under the brush, so it balloons out and wrinkles where it
+  can't; <kbd>Alt</kbd> takes fabric away).
+- **Fabric**: **Silk** makes many fine folds, **Cotton** medium ones, **Denim** broad ones, **Leather** a few wide,
+  stiff ones.
+- **Gravity**: pulls the cloth down while you drag, so folds hang (0 keeps it in place).
+- **Reach**: how far around the brush the cloth is simulated, in brush radii. More lets folds travel further.
+- **Steps**: simulation steps per dab. More is softer and settles further, but slower.
+- **Soft body**: 0 leaves the cloth where the brush puts it. Higher values make it spring back toward its shape
+  at the start of the stroke, like a stuffed or elastic surface.
+- **Self-collision** (on by default): folds push against each other instead of passing through.
+- **Collide with other Parts**: the cloth rests on the other visible Parts instead of passing through them, so a
+  shirt Part settles onto the body Part under it.
+
+The Cloth brush works with symmetry and sculpt layers, and one stroke is one undo step. It doesn't apply to micro
+levels.
+
+## Drape
+
+**Drape** drops a whole Part as cloth: it falls under gravity onto the other visible Parts and settles there, the
+way a sheet settles over a chair or a shirt over a body. Make the cloth Part (a plane, an extracted shell, a
+garment you sculpted roughly), place it above the body, and with it active open **Tool > Drape**:
+
+- **Fabric**: **Silk** flows into many fine folds, **Cotton** medium ones, **Denim** holds broad folds,
+  **Leather** barely folds.
+- **Units per metre**: how big the sculpt is in real life. Cloth falls by real size, so a sculpt modelled at real
+  size (a SculptForge unit is a metre) uses 1; a body 2 units tall that should be a 1.8 m person uses 1.11.
+- **Pins from mask**: masked areas hold still, like pins: mask a waistband or a collar to hang the cloth from it.
+- **Collide with other Parts**: the cloth rests on the other visible Parts (hide a Part to let the cloth fall
+  through it).
+
+**Simulate** shows the cloth moving live. When it comes to rest the result is kept as one undo step;
+**Pause** / **Resume** stop and continue, **Keep** stops and keeps where it got to, **Reset** puts the Part back.
+Sculpting or running a command while it moves keeps where it got to first. The result is a normal Part: sculpt it,
+or give it thickness with Extract. From a script: `cloth_drape fabric=denim`.
+
 ## Capture an alpha or a VDM from the model
 
 Any detail you have sculpted can become a brush in two seconds: **Capture from view**
@@ -816,11 +868,11 @@ Move, Smooth, Inflate, Pinch, Flatten, Crease, Trim, Tendril, Layer, Nudge and P
 - **Add a brush**: click the **+** tile at the end of the shelf and pick a brush, built-in or custom. Or
   right-click any tile in the brush picker and choose **Add to bottom shelf**.
 - **Remove a brush**: right-click its tile and choose **Remove from shelf**.
-- **Reorder**: turn on **Edit > Preferences > Config > Customize Shelves**, then <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+drag a
+- **Reorder**: turn on **Edit > Preferences > Saving & Layouts > Customize Shelves**, then <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+drag a
   tile to a new place.
 - **Change a brush's key**: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click its tile, then press the new key.
 
-Shelf changes last until you quit. **Edit > Preferences > Config > Save Layout** keeps
+Shelf changes last until you quit. **Edit > Preferences > Saving & Layouts > Save Layout** keeps
 them. See [The interface](interface.md) for more on customizing.
 
 ## Sculpt from a script

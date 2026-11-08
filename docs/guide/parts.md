@@ -62,8 +62,8 @@ Click **Append** and choose:
   side too, in the same undo step; a shape inserted right on a mirror plane isn't doubled.
   To insert your own mesh, choose **Active Part's copy...** and pick another Part (it stays as it is), or
   **From file...** and pick an `.obj`, `.ply` or `.glb` file; then drag as with the shapes. The mesh is centred,
-  scaled so its largest side matches the drag, and stood on the surface along its own up (+Y) axis. Esc stops
-  inserting. (Command: `insert_mesh part=<name>` or `insert_mesh file=<path>`.)
+  scaled so its largest side matches the drag, and stood on the surface along its own up (+Y) axis. Esc, any
+  brush, or Draw / Move stops inserting. (Command: `insert_mesh part=<name>` or `insert_mesh file=<path>`.)
   To insert from a **kitbash set**, choose **Insert set from file...** (one `.obj` or `.glb` with several objects)
   or **Insert set from folder...** (its `.obj`, `.ply` and `.glb` files, by name; not its subfolders). The **Insert set**
   window shows a thumbnail of each item: click one, then drag on the model as above. While inserting, `]` steps to
@@ -162,6 +162,29 @@ meshes the Auto UV takes a while. Scripts can skip it with `keep_texture=false`,
 > **Tip:** Merge first when you want one [voxel remesh](geometry.md#voxel-remesh) to fuse several pieces into a
 > single watertight surface.
 
+## Pose all Parts
+
+A character made of many Parts (body, eyes, teeth, armour plates, belts) can be posed in one go instead of Part by
+Part:
+
+1. Click **Pose all Parts** under the Parts list. The visible Parts are merged into one light grey **Pose Mesh**
+   (300,000 triangles in all, shared by size, so small Parts such as eyes keep their shape) and hidden while you
+   pose. Each Part is one [face group](masking.md) on it, so Mask by Face group picks whole Parts. A Part with
+   [subdivision levels](subdivision-levels.md) joins from a lower level, so even a heavy figure is ready in
+   seconds.
+2. Pose it with the [Gizmo](gizmo.md) (W move, E scale, R rotate) and masks: mask the body, rotate an arm
+   about the shoulder with a falloff for a soft joint. Symmetry poses both sides. The Pose Mesh is small, so every
+   drag is instant, and Ctrl+Z steps back through the pose.
+3. Click **Apply Pose**. Every Part takes the same moves at full resolution, its sculpt layers, subdivision levels
+   and micro level following; the Pose Mesh goes away. The whole pose is **one undo step** across every Part.
+   **Cancel Pose** removes the Pose Mesh and changes nothing.
+
+Only Gizmo moves carry over for now: a brush stroke on the Pose Mesh stops Apply until you undo it. A Part you
+edit while posing (by selecting it in the list) keeps your edit and is left out of the pose; the status line says
+which. A [linked copy](linked-duplicates.md) is left out too (shown, not posed): posing it would pose every copy; Make Unique
+first. Scripts: `figure_pose_begin triangles=300000`, `figure_pose_apply`, `figure_pose_cancel`,
+`figure_pose_info`.
+
 ## Split a Part
 
 - **Split groups** makes one Part per face group. It is available when the active Part has more than one
@@ -192,11 +215,11 @@ split, use **Remove Hidden** or **Delete masked** in **Tool > Visibility**.
 
 ## Extract a shell
 
-**Extract**, in **Tool > Parts**, makes a new Part from the masked part of the active one: a helmet from the
+**Make Shell**, in **Tool > Parts > Extract**, makes a new Part from the masked part of the active one: a helmet from the
 top of a head, a strap, a sleeve, a piece of armour that fits the surface exactly. It works:
 
 1. Mask the part (hold <kbd>Ctrl</kbd> and paint, or use **Rectangle Mask** / **Lasso Mask**; see [Masking](masking.md)).
-2. Click **Extract**. The shell appears as a preview, a Part just below the active one.
+2. Click **Make Shell**. The shell appears as a preview, a Part just below the active one.
 3. Change **Thickness**, **Edge Smooth**, **Both Sides**, **Corners** or **Border** and the preview follows. Click **Accept** to keep it.
 
 | Setting | What it does |

@@ -42,40 +42,48 @@ glm::vec2 lerp(glm::vec2 a, glm::vec2 b, float t) { return a + (b - a) * t; }
 
 } // namespace
 
-TEST(gizmo_all_centre_box_tab_and_ring_priorities) {
+TEST(gizmo_all_centre_ball_tab_and_ring_priorities) {
     const View v = view(30.0f, -25.0f);
     const Screen s = v.screen();
     // The centre is free move, though rings seen nearly edge-on cross it.
     CHECK(pick(s, s.centre) == MoveView);
     CHECK(pick(s, s.centre + glm::vec2(8.0f, -6.0f)) == MoveView);
-    // The scale boxes sit past the rings; anywhere on a box (and a little round it) is that box.
+    // The scale balls sit on the shafts, clear of the centre and short of the heads; anywhere on a ball (and a
+    // little round it) is that ball, and the shaft on both sides of it moves.
     for (int i = 0; i < 3; ++i) {
-        if (!s.axis[i].box) continue;
-        CHECK(pick(s, s.axis[i].boxAt) == Handle(ScaleX + i));
-        CHECK(pick(s, s.axis[i].boxAt + glm::vec2(6.5f, -6.5f)) == Handle(ScaleX + i));
-        CHECK(glm::length(s.axis[i].boxAt - s.centre) > s.unit * kBoxMin * kBox);
+        const Screen::Axis& a = s.axis[i];
+        if (!a.ball) continue;
+        CHECK(pick(s, a.ballAt) == Handle(ScaleX + i));
+        CHECK(pick(s, a.ballAt + glm::vec2(5.5f, -5.5f)) == Handle(ScaleX + i));
+        CHECK(glm::length(a.ballAt - s.centre) > (kCentrePx + kBallPx + 6.0f) * s.scale);
+        CHECK(glm::length(a.tip - a.ballAt) > (kHeadPx + kBallPx + 4.0f) * s.scale);
+        CHECK(pick(s, lerp(a.from, a.ballAt, 0.4f)) == Handle(MoveX + i));
+        CHECK(pick(s, lerp(a.ballAt, a.tip, 0.6f)) == Handle(MoveX + i));
     }
     // The even-scale tabs on the diagonals; the same radius between them picks nothing.
     for (int k = 0; k < 4; ++k) CHECK(pick(s, tabPoint(s, k)) == ScaleUniform);
     CHECK(pick(s, s.centre + glm::vec2(0.0f, -kTabs * s.unit)) == None);
-    // The view ring between the boxes and the tabs.
+    // The view ring between the rings and the tabs.
     CHECK(pick(s, s.centre + glm::vec2(-kViewRing * s.unit, 0.0f)) == RotateView);
     // An arrow wins over a ring crossing it; off the arrow the ring is picked.
     for (int i = 0; i < 3; ++i)
-        if (s.axis[i].arrow) CHECK(pick(s, lerp(s.axis[i].from, s.axis[i].tip, 0.5f)) == Handle(MoveX + i));
+        if (s.axis[i].arrow) CHECK(pick(s, lerp(s.axis[i].from, s.axis[i].tip, 0.85f)) == Handle(MoveX + i));
 }
 
-TEST(gizmo_all_box_hides_when_its_axis_points_at_the_viewer) {
+TEST(gizmo_all_ball_hides_when_its_axis_points_at_the_viewer) {
     const Screen front = view(0.0f, 0.0f).screen(); // Z points at the viewer
-    CHECK(!front.axis[2].box);
+    CHECK(!front.axis[2].ball);
     CHECK(!front.axis[2].arrow);
-    CHECK(front.axis[0].box && front.axis[1].box);
-    // Along the hidden axis, a point near the centre is the centre, not a scale box sitting on top of it.
+    CHECK(front.axis[0].ball && front.axis[1].ball);
+    // Along the hidden axis, a point near the centre is the centre, not a scale ball sitting on top of it.
     CHECK(pick(front, front.centre + glm::vec2(2.0f, 2.0f)) == MoveView);
     // A point on the X ring (seen edge-on, a vertical line) below the centre: that ring.
     CHECK(pick(front, front.centre + glm::vec2(0.0f, 0.85f * front.unit)) == RotateX);
-    // Above the centre the Y arrow lies over the same line and wins.
-    CHECK(pick(front, front.centre + glm::vec2(0.0f, -0.4f * front.unit)) == MoveY);
+    // Above the centre the Y arrow lies over the same line and wins (its ball too).
+    CHECK(pick(front, front.centre + glm::vec2(0.0f, -0.3f * front.unit)) == MoveY);
+    CHECK(pick(front, front.centre + glm::vec2(0.0f, -kBall * front.unit)) == ScaleY);
+    // Between the arrow heads and the rings: clear air, then the ring.
+    CHECK(glm::length(front.axis[0].tip - front.centre) < 0.84f * front.unit);
 }
 
 TEST(gizmo_all_every_handle_reachable_from_any_view_and_ui_scale) {
@@ -99,13 +107,17 @@ TEST(gizmo_all_every_handle_reachable_from_any_view_and_ui_scale) {
                 CHECK(viewRing);
                 for (int i = 0; i < 3; ++i) {
                     const Screen::Axis& a = s.axis[i];
-                    if (a.box) CHECK(pick(s, a.boxAt) == Handle(ScaleX + i));
+                    if (a.ball) { // on top where it is, unless a ball in front lies over it
+                        const Handle h = pick(s, a.ballAt);
+                        CHECK(h == Handle(ScaleX + i) || (h >= ScaleX && h <= ScaleZ && s.axis[h - ScaleX].depth > a.depth));
+                    }
                     if (a.arrow) { // picked on its line, unless an arrow in front lies over it (drawn on top)
                         bool arrow = false, covered = true;
                         for (float t : {0.5f, 0.3f, 0.7f, 0.9f}) {
                             const Handle h = pick(s, lerp(a.from, a.tip, t));
                             arrow = arrow || h == Handle(MoveX + i);
-                            covered = covered && h >= MoveX && h <= MoveZ && s.axis[h - MoveX].depth > a.depth;
+                            covered = covered && ((h >= MoveX && h <= MoveZ && s.axis[h - MoveX].depth > a.depth) ||
+                                                  (h >= ScaleX && h <= ScaleZ));
                         }
                         CHECK(arrow || covered);
                     }
@@ -116,7 +128,7 @@ TEST(gizmo_all_every_handle_reachable_from_any_view_and_ui_scale) {
                                 const glm::vec2 q = lerp(lerp(a.quad[0], a.quad[1], u), lerp(a.quad[3], a.quad[2], u), w);
                                 const Handle h = pick(s, q);
                                 plane = plane || h == Handle(PlaneYZ + i);
-                                covered = covered && ((h >= MoveX && h <= MoveZ) ||
+                                covered = covered && ((h >= MoveX && h <= MoveZ) || (h >= ScaleX && h <= ScaleZ) ||
                                                       (h >= PlaneYZ && h <= PlaneXY && s.axis[h - PlaneYZ].planeDepth > a.planeDepth));
                             }
                         CHECK(plane || covered);
@@ -124,8 +136,9 @@ TEST(gizmo_all_every_handle_reachable_from_any_view_and_ui_scale) {
                     bool ring = false;
                     for (size_t k = 0; k < a.ring.size() && !ring; ++k) ring = pick(s, a.ring[k]) == Handle(RotateX + i);
                     CHECK(ring);
-                    // The arrow head stays inside the rings, the box outside them, with a gap.
-                    if (a.arrow) CHECK(glm::length(a.tip - s.centre) < s.unit * 0.8f);
+                    // The arrow head and the ball stay well inside the rings, with a gap.
+                    if (a.arrow) CHECK(glm::length(a.tip - s.centre) < s.unit * 0.84f);
+                    if (a.ball) CHECK(glm::length(a.ballAt - s.centre) < s.unit * 0.5f);
                 }
             }
     CHECK(views > 300);
@@ -137,5 +150,5 @@ TEST(gizmo_all_turned_axes) {
     const Screen s = view(15.0f, -35.0f, 2.0f).screen(f);
     CHECK(pick(s, s.centre) == MoveView);
     for (int i = 0; i < 3; ++i)
-        if (s.axis[i].box) CHECK(pick(s, s.axis[i].boxAt) == Handle(ScaleX + i));
+        if (s.axis[i].ball) CHECK(pick(s, s.axis[i].ballAt) == Handle(ScaleX + i));
 }

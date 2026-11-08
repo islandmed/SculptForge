@@ -99,6 +99,12 @@ struct TubeShape {
     bool flatCaps = false; // flat ends instead of round
     bool mirrorX = false;  // a mirror copy across x = 0 (symmetry X)
     float edge = 0.0f;     // target edge length; 0 = from the radius (16 sides around the average)
+    enum class Profile : uint8_t { Round, Square, Triangle, Ribbon };
+    Profile profile = Profile::Round; // the cross-section (its "radius" is half its width)
+    float thickness = 0.25f;          // Ribbon: its thickness as a fraction of its width
+    float roll = 0.0f;                // degrees the cross-section is turned about the curve
+    glm::vec3 up{0.0f};               // the first ring's orientation (0: automatic)
+    float taperStart = 0.0f, taperEnd = 0.0f; // fraction of the length narrowing to a point at each end
     bool empty() const { return points.empty(); }
 };
 
@@ -119,6 +125,10 @@ public:
     // Per triangle corner (empty = none): UV editing flags (core/Uv.h), kUvSeam on the edge from this corner to
     // the next (a marked seam, kept on both sides of the edge) and kUvPin (the corner's UV stays put on Unwrap).
     std::vector<uint8_t> uvFlags;
+    // Per triangle corner (empty = none): the crease of the edge from this corner to the next, 0..1 (#108, core/
+    // EdgeSelect.h; 1 = fully sharp), kept on both sides of the edge. Set on a base level: subdivision keeps creased
+    // edges sharp. A quad's diagonal is no edge and has none.
+    std::vector<float> creases;
     // Per triangle: the triangle it forms a quad with (kNoQuad = a plain triangle; empty = no quads). Imported
     // quads are split into two triangles that keep each other here, so the wireframe and the exporters can
     // show and write them as quads again. Pairs are symmetric and share one edge, wound oppositely;
@@ -132,6 +142,7 @@ public:
     bool hasHidden() const { return !hidden.empty(); }
     bool hasUvs() const { return !uvs.empty(); }
     bool hasUvFlags() const { return !uvFlags.empty(); }
+    bool hasCreases() const { return !creases.empty(); }
     bool hasQuads() const { return !quadPartners.empty(); }
 
     float maskAt(uint32_t v) const { return mask.empty() ? 0.0f : mask[v]; }
@@ -165,6 +176,7 @@ public:
     std::vector<uint32_t>& ensureFaceGroups(uint32_t fill = 0);
     std::vector<uint8_t>& ensureHidden();
     std::vector<uint32_t>& ensureQuadPartners();
+    std::vector<float>& ensureCreases();
     // Records triangles `t` and `u` as one quad (growing quadPartners to the triangle count, so it can be called
     // while triangles are being added).
     void pairQuad(uint32_t t, uint32_t u);
@@ -174,6 +186,7 @@ public:
     void clearFaceGroups() { std::vector<uint32_t>().swap(facegroups); }
     void clearHidden() { std::vector<uint8_t>().swap(hidden); }
     void clearQuads() { std::vector<uint32_t>().swap(quadPartners); }
+    void clearCreases() { std::vector<float>().swap(creases); }
     // Drops attributes whose size no longer matches the mesh and unpairs invalid quad pairs (called by
     // rebuildTopology).
     void sanitizeAttributes();

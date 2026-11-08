@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Tool > Geometry, grouped by what you do: Levels (the Level slider, Lower / Higher Level, Add Level with Smooth,
-// Rebuild Lower Levels, Remove Below / Above), Micro Detail, Resolution (Decimate, Quad Remesh, Subdivide), Cleanup
-// (Fill Holes, Merge by Distance, Check Mesh) and Symmetry (Make Symmetric). The levels themselves live in core/Multires.
+// Rebuild Lower Levels, Remove Below / Above), Edges (PanelEdges.cpp), Micro Detail, Resolution (Decimate, Quad
+// Remesh, Subdivide), Cleanup (Fill Holes, Merge by Distance, Find Problems) and Symmetry (Make Symmetric). The levels
+// themselves live in core/Multires.
 #include "app/App.h"
 #include "app/Demo.h"
 #include "app/Palettes.h"
@@ -20,13 +21,24 @@
 
 namespace sf {
 
+namespace {
+// 27648 -> "27.6K", 1769472 -> "1.77M": the Levels line fits the tray at 1440 px and 200% (it clipped with full counts).
+std::string triangleCount(size_t n) {
+    char text[32];
+    if (n < 10000) std::snprintf(text, sizeof text, "%zu", n);
+    else if (n < 1000000) std::snprintf(text, sizeof text, "%.1fK", double(n) / 1e3);
+    else std::snprintf(text, sizeof text, "%.2fM", double(n) / 1e6);
+    return text;
+}
+} // namespace
+
 void App::drawGeometrySection() {
     const Mesh& m = doc_.mesh;
     const int levels = subdivLevelCount(m), current = subdivCurrentLevel(m);
     const ImGuiStyle& style = ImGui::GetStyle();
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
 
-    // Grouped by what you do (fix/ip-labels): Levels, Micro Detail, Resolution, Cleanup, Symmetry.
+    // Grouped by what you do (fix/ip-labels): Levels, Edges, Micro Detail, Resolution, Cleanup, Symmetry.
     tray::GroupLabel(*this, "Levels");
     // Level: the slider (1 = the base cage). Applied when released, as one undo step.
     ImGui::BeginDisabled(levels < 2);
@@ -63,12 +75,14 @@ void App::drawGeometrySection() {
 
     if (levels) {
         char info[96];
-        std::snprintf(info, sizeof info, "Level %d of %d  -  base %zu, top %zu triangles", current + 1, levels,
-                      subdivLevelTriangles(m, 0), subdivLevelTriangles(m, levels - 1));
+        std::snprintf(info, sizeof info, "Level %d of %d - base %s, top %s tris", current + 1, levels,
+                      triangleCount(subdivLevelTriangles(m, 0)).c_str(),
+                      triangleCount(subdivLevelTriangles(m, levels - 1)).c_str());
         ImGui::TextDisabled("%s", info);
     } else {
         ImGui::TextDisabled("%s", tr("No subdivision levels - Add Level adds them"));
     }
+    drawEdgesSection(); // Edges: Edges mode, Select by Angle (PanelEdges.cpp)
 
     // Micro: displacement levels above the highest level (core/Micro.h), in a group of its own: Add Level and Remove
     // Below / Remove Above change the levels, Micro only adds detail on top (a tester mixed them up side by side).
@@ -116,9 +130,12 @@ void App::drawGeometrySection() {
     ImGui::Spacing();
     tray::GroupLabel(*this, "Resolution (no levels)");
     if (ImGui::Button(tr("Decimate"), ImVec2(half, 0))) {
-        Args args{{"ratio", double(decimateRatio_)}};
-        if (decimateKeepMasked_) args["keep_masked"] = true;
-        runCommand("decimate", args);
+        auto decimate = [this] {
+            Args args{{"ratio", double(decimateRatio_)}};
+            if (decimateKeepMasked_) args["keep_masked"] = true;
+            runCommand("decimate", args);
+        };
+        if (unhideAllows("Decimate", decimate)) decimate(); // #163
     }
     ui::HelpText("Decimate", nullptr, "Reduce the triangle count while keeping the shape. Sculpt layers are kept.",
                  "Tool > Geometry");
@@ -139,7 +156,7 @@ void App::drawGeometrySection() {
     ImGui::Spacing();
     tray::GroupLabel(*this, "Cleanup");
     ui::ActionButton(*this, "geometry.close_holes", ImVec2(-1, 0), ui::Look::IconLabel);
-    drawMeshCheckContents(); // Merge by Distance, Check Mesh (PanelMeshCheck.cpp)
+    drawMeshCheckContents(); // Merge by Distance, Find Problems (PanelMeshCheck.cpp)
 
     drawSymmetryContents(); // Make Symmetric (PanelExtract.cpp)
 }
