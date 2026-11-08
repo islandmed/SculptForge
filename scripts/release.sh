@@ -370,6 +370,9 @@ preflight() {
             highlights_ok || HIGHLIGHTS=
         fi
         highlights_ok || die "HIGHLIGHTS must name a file with 3-5 highlight lines for the update feed (now: '${HIGHLIGHTS:-unset}')" "$highlights_fix"
+        # Every credit in them is copied from a note of the batch (a credit typed from memory names the wrong person).
+        out=$(python3 tools/release/check_credits.py --highlights "$HIGHLIGHTS" --version "$BASE" 2>&1) ||
+            die "$out" "write each credit exactly as that branch's changes/ note does (or fix the note), run again"
     fi
     python3 -c 'import json, sys; json.load(open(sys.argv[1]))' website/latest.json 2>/dev/null || die "website/latest.json is not valid JSON" "fix it, commit"
     grep -q '"softwareVersion": "[0-9.]*"' website/index.html && grep -Eq 'Version [0-9]+\.[0-9]+\.[0-9]+\. All builds' website/index.html ||
