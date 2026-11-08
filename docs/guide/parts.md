@@ -196,15 +196,15 @@ top of a head, a strap, a sleeve, a piece of armour that fits the surface exactl
 
 1. Mask the part (hold <kbd>Ctrl</kbd> and paint, or use **Rectangle Mask** / **Lasso Mask**; see [Masking](masking.md)).
 2. Click **Extract**. The shell appears as a preview, a Part just below the active one.
-3. Change **Thick**, **E Smt**, **Double**, **TCorne** or **TBorder** and the preview follows. Click **Accept** to keep it.
+3. Change **Thickness**, **Edge smooth**, **Both Sides**, **Corners** or **Border** and the preview follows. Click **Accept** to keep it.
 
 | Setting | What it does |
 |---|---|
-| **Thick** | The shell's thickness as a share of the Part's size: 0.015 (the default) is 1.5%. Negative grows it inward; 0 makes a single-sided surface |
-| **E Smt** | Smooths the extracted edge, which otherwise follows the mask's triangles in steps. 0 keeps it as masked |
-| **Double** | Grows the shell both inward and outward from the surface |
-| **TCorne** | Triangles instead of quads in the rim where the edge turns sharply (over 50 degrees), so tight corners don't get twisted quads |
-| **TBorder** | The whole rim is triangles instead of quads |
+| **Thickness** | The shell's thickness as a share of the Part's size: 0.015 (the default) is 1.5%. Negative grows it inward; 0 makes a single-sided surface |
+| **Edge smooth** | Smooths the extracted edge, which otherwise follows the mask's triangles in steps. 0 keeps it as masked |
+| **Both Sides** | Grows the shell both inward and outward from the surface |
+| **Corners** | Triangles instead of quads in the rim where the edge turns sharply (over 50 degrees), so tight corners don't get twisted quads |
+| **Border** | The whole rim is triangles instead of quads |
 
 ![A cap extracted from the masked top of a sphere, shown with its face groups: outer, inner and rim](images/extract.jpg)
 
@@ -261,7 +261,7 @@ used.
 | `part_split_groups` / `part_split_parts` | Split |
 | `part_split_hidden` / `part_split_masked` / `part_split_unmasked` | Split off into a new Part (undoable) |
 | `part_shading mode=flat` | Shade a Part `default` (as the scene), `smooth` or `flat` |
-| `extract thickness=0.02 smooth=5 double=false` | Preview an Extract shell from the mask; `tcorne` / `tborder` for a triangle rim; `accept=true` keeps it at once |
+| `extract thickness=0.02 smooth=5 double=false` | Preview an Extract shell from the mask; `triangle_corners` / `triangle_border` for a triangle rim; `accept=true` keeps it at once |
 | `extract_accept` / `extract_cancel` | Keep or remove the Extract preview |
 
 ```text

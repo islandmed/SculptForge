@@ -51,7 +51,7 @@ inline constexpr Word kWords[] = {
 };
 
 // Whole names renamed where the word alone is an everyday one (a user's own brush may hold it): matched only as the
-// entire string, ASCII case ignored. N1..N2 in docs/legal/trademarks.md.
+// entire string, ASCII case ignored. N1..N6 in docs/legal/trademarks.md.
 struct Name {
     uint64_t hash;        // of the old name, lower case
     uint8_t length;       // its length
@@ -60,6 +60,10 @@ struct Name {
 inline constexpr Name kNames[] = {
     {0x71FEDAD706F8BDF4ull, 25, "brush.recipe.Stone Carve"}, // N1: the built-in recipe's action id
     {0xA8D1CB6C0FF343FCull, 12, "Stone Carve"},              // N2: its name
+    {0x02E5D1FCA5703EA4ull, 6, "triangle_corners"},          // N3: extract's argument
+    {0x374EB70D26D039F5ull, 7, "triangle_border"},           // N4: extract's argument
+    {0x3160EB71CE86F92Dull, 19, "part.extract_triangle_corners"}, // N5: the Corners action id
+    {0xB780FCA1FA84E3DEull, 20, "part.extract_triangle_border"},  // N6: the Border action id
 };
 
 // Today's spelling of `s`: a whole old name (kNames) replaced, or every old word in it, keeping its case (lower,

@@ -60,6 +60,10 @@ public:
     static std::vector<std::string> offscreenItems(); // items drawn past the window's edge last frame ("window/label")
     // Items in WINDOW (its name before "##") that ran past its inner right edge last frame, scrollable or not.
     static std::vector<std::string> pastRightEdge(const std::string& window);
+    // A control whose label is wider than the control (cut off): widgets report it while drawing, under the scopes
+    // open then ("Extract/Corners"). clippedLabels(scope) lists last frame's, all of them for an empty scope.
+    static void noteClippedLabel(const std::string& label);
+    static std::vector<std::string> clippedLabels(const std::string& scope);
 
     // UI tests (UiTest.cpp). Steps that fail stop the run; failures() lists why.
     bool loadScript(const std::string& path, std::string& error);

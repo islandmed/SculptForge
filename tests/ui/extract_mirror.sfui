@@ -16,8 +16,8 @@ expect_value active_part == 0
 expect_value extract_preview == 1
 shot extract-preview
 
-# The settings follow the preview: Double grows it both ways (still one preview).
-click "Extract/Double"
+# The settings follow the preview: Both Sides grows it both ways (still one preview).
+click "Extract/Both Sides"
 expect_value parts == 2
 expect_value extract_preview == 1
 shot extract-palette

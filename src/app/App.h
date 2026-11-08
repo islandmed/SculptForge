@@ -1899,11 +1899,11 @@ private:
     void runMeshCheck();
     void runExtract(); // Extract with the palette's settings (a preview; Accept keeps it)
     static std::string axesText(const bool axes[3]); // "x", "xz", "" (the axis argument of mirror commands)
-    float extractThick_ = 0.015f;          // Thick: fraction of the Part's size
-    int extractSmooth_ = 5;                // E Smt
-    bool extractDouble_ = false;           // Double
-    bool extractTCorne_ = false;           // TCorne
-    bool extractTBorder_ = false;          // TBorder
+    float extractThick_ = 0.015f;          // Thickness: fraction of the Part's size
+    int extractSmooth_ = 5;                // Edge smooth
+    bool extractDouble_ = false;           // Both Sides
+    bool extractTriCorners_ = false;        // Corners: triangles in the rim's sharp corners
+    bool extractTriBorder_ = false;         // Border: the whole rim triangles
     bool mirrorWeldAxes_[3] = {true, false, false}; // Mirror And Weld's X Y Z
     bool mirrorAxes_[3] = {true, false, false};     // Deformation > Mirror's X Y Z
     // Deformation > Stack (docs/design/deform-panel.md): the steps, the one being edited and the preview, which is

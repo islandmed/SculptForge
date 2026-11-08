@@ -47,6 +47,8 @@ struct ItemTable {
     // Items that run past their window's inner right edge, scrollable or not (a button cut off at a panel's edge):
     // "window/label" by ID, the window without its "##" part.
     std::map<ImGuiID, std::string> pastRight;
+    // Controls whose label didn't fit them this frame, with the scopes open then.
+    std::vector<std::pair<std::string, std::vector<std::string>>> clipped;
 };
 ItemTable& items() {
     static ItemTable t;
@@ -151,6 +153,7 @@ void Demo::beginFrame() {
     items().byLabel.clear();
     items().offscreen.clear();
     items().pastRight.clear();
+    items().clipped.clear();
     items().frame.clear();
     items().scopes.clear();
 }
@@ -184,6 +187,16 @@ std::vector<std::string> Demo::pastRightEdge(const std::string& window) {
     std::vector<std::string> out;
     for (const auto& [id, name] : items().pastRight)
         if (name.compare(0, window.size() + 1, window + "/") == 0) out.push_back(name);
+    return out;
+}
+
+void Demo::noteClippedLabel(const std::string& label) { items().clipped.push_back({label.substr(0, label.find("##")), items().scopes}); }
+
+std::vector<std::string> Demo::clippedLabels(const std::string& scope) {
+    std::vector<std::string> out;
+    for (const auto& [label, scopes] : items().clipped)
+        if (scope.empty() || std::find(scopes.begin(), scopes.end(), scope) != scopes.end())
+            out.push_back((scopes.empty() ? std::string() : scopes.back() + "/") + label);
     return out;
 }
 

@@ -24,22 +24,33 @@ void App::runExtract() {
     runCommand("extract", {{"thickness", double(extractThick_)},
                            {"smooth", double(extractSmooth_)},
                            {"double", extractDouble_},
-                           {"tcorne", extractTCorne_},
-                           {"tborder", extractTBorder_}});
+                           {"triangle_corners", extractTriCorners_},
+                           {"triangle_border", extractTriBorder_}});
 }
 
 void App::drawExtractContents() {
     Demo::pushScope("Extract");
     tray::GroupLabel(*this, "Extract");
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-    ui::ActionButton(*this, "part.extract", ImVec2(half, 0));
+    // Pairs share a row when both labels fit half of it; a narrow column (a small window, a big interface scale, a
+    // longer translation) gives each its own row instead of cutting the words off.
+    auto actionW = [this](const char* id) { // its label as the button shows it
+        const Action* a = actions_.find(id);
+        return a ? ui::ButtonWidth(trAction(a->id, a->label)) : 0.0f;
+    };
+    const bool masked = doc_.mesh.hasMask() || doc_.extractPreviewCurrent();
+    const bool buttonsPair = actionW("part.extract") <= half &&
+                             (masked ? actionW("part.extract_accept") : ImGui::CalcTextSize(tr("Mask first (Ctrl+drag)")).x) <= half;
+    ui::ActionButton(*this, "part.extract", ImVec2(buttonsPair ? half : -1.0f, 0));
     ui::HelpAction(*this, "part.extract");
-    ImGui::SameLine();
+    if (buttonsPair) ImGui::SameLine();
     // Extract works on the mask: without one, say so where Accept would be (a review read the greyed-out buttons
     // as unclickable); the row keeps its height.
-    if (!doc_.mesh.hasMask() && !doc_.extractPreviewCurrent()) {
+    if (!masked) {
         ImGui::AlignTextToFramePadding();
+        ImGui::PushTextWrapPos(0.0f);
         ImGui::TextDisabled("%s", tr("Mask first (Ctrl+drag)"));
+        ImGui::PopTextWrapPos();
         ui::HelpText("Extract", nullptr, "Extract makes a shell from the masked area: mask it first (Ctrl+drag on the model).",
                      "Tool > Parts > Extract");
     } else {
@@ -49,24 +60,23 @@ void App::drawExtractContents() {
 
     // The settings: changing one while the preview shows extracts again, so the preview follows.
     bool changed = false;
-    ImGui::SetNextItemWidth(half);
-    tray::SliderInt("##extract_smooth", &extractSmooth_, 0, 20, "E Smt %d");
+    const bool slidersPair = ui::SliderWidth("Edge smooth %d", 20) <= half && ui::SliderWidth("Thickness %.3f", -0.1) <= half;
+    ImGui::SetNextItemWidth(slidersPair ? half : -1.0f);
+    tray::SliderInt("##extract_smooth", &extractSmooth_, 0, 20, "Edge smooth %d");
     changed |= ImGui::IsItemDeactivatedAfterEdit();
-    ui::HelpText("E Smt", nullptr,
+    ui::HelpText("Edge smooth", nullptr,
                  "Smooths the extracted edge, which otherwise follows the mask's triangles in steps (0 = as masked).",
                  "Tool > Parts > Extract");
-    ImGui::SameLine();
+    if (slidersPair) ImGui::SameLine();
     ImGui::SetNextItemWidth(-1);
-    ui::SliderInside("##extract_thick", &extractThick_, -0.1f, 0.1f, "Thick %.3f");
+    ui::SliderInside("##extract_thick", &extractThick_, -0.1f, 0.1f, "Thickness %.3f");
     changed |= ImGui::IsItemDeactivatedAfterEdit();
-    ui::HelpText("Thick", nullptr,
+    ui::HelpText("Thickness", nullptr,
                  "Thickness of the shell, as a fraction of the Part's size (0.015 is 1.5%). Negative grows it "
                  "inward; 0 makes a single-sided surface.",
                  "Tool > Parts > Extract");
-    ui::ActionButton(*this, "part.extract_double", ImVec2(half, 0));
-    ui::HelpAction(*this, "part.extract_double");
-    ImGui::SameLine();
-    ui::Segmented(*this, {"part.extract_tcorne", "part.extract_tborder"}, -1.0f);
+    // Both Sides, Corners, Border: one row, or as many as the column needs (Segmented wraps them).
+    ui::Segmented(*this, {"part.extract_double", "part.extract_triangle_corners", "part.extract_triangle_border"}, -1.0f);
     if (changed && doc_.extractPreviewCurrent()) runExtract();
     Demo::popScope();
 }

@@ -52,6 +52,12 @@ void HelpAction(App& app, const char* actionId);
 // classic slider with its label drawn inside the frame ("Size 60"), a quiet fill and a thin neutral bar
 // along the bottom (the accent only while dragging).
 bool SliderInside(const char* id, float* v, float lo, float hi, const char* format, ImGuiSliderFlags flags = 0);
+// Widths a control needs to show its whole label (in the interface language), for rows that put a pair side by side
+// only when both fit: a button, a SliderInside showing `value` with `format` (%d reads as a whole number, as
+// tray::SliderInt shows it), a Checkbox.
+float ButtonWidth(const char* label);
+float SliderWidth(const char* format, double value);
+float CheckboxWidth(const char* label);
 
 // Hover and keyboard focus (docs/ui-design.md §10): every labelled item gets the look's ring (an accent border,
 // Phosphor's glow, Blueprint's cyan line, Classic's warm edge) that eases in over ~100 ms; tiles lift instead.

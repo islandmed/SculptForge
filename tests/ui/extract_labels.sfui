@@ -1,0 +1,53 @@
+# Tool > Parts > Extract and Project in a narrow tray: no control's label is wider than the control (0.11.11-0.11.14
+# cut the Extract settings' short labels off). Pairs share a row only when both fit, else each takes its
+# own; Both Sides / Corners / Border wrap. At 100, 150 and 200 %, with and without a mask (Accept or the "Mask first"
+# hint); CMake also runs it at 1024x768 and 1440x900. Below 1280 logical px the Tool palette is a drop-down, not the
+# tray: ui.palette.tool shows it either way.
+run new_sphere subdivisions=3
+action ui.palette.tool
+expect "Extract/Corners"
+expect "Extract/Border"
+expect "Project/Project Detail"
+expect_value clipped_labels@Extract == 0
+expect_value clipped_labels@Project == 0
+shot unmasked_100
+
+run mask_rect y0=0.3
+wait 0.1
+expect "Extract/Accept"
+expect_value clipped_labels@Extract == 0
+expect_value clipped_labels@Project == 0
+shot masked_100
+
+ui_scale 150
+action ui.palette.tool
+expect "Extract/Corners"
+expect_value clipped_labels@Extract == 0
+expect_value clipped_labels@Project == 0
+shot masked_150
+run mask_clear
+wait 0.1
+expect_value clipped_labels@Extract == 0
+shot unmasked_150
+
+ui_scale 200
+action ui.palette.tool
+expect "Extract/Corners"
+expect_value clipped_labels@Extract == 0
+expect_value clipped_labels@Project == 0
+shot unmasked_200
+run mask_rect y0=0.3
+wait 0.1
+expect_value clipped_labels@Extract == 0
+expect_value clipped_labels@Project == 0
+shot masked_200
+
+# The controls still work: Corners and Border take their clicks and the preview follows.
+run extract
+expect_value extract_preview == 1
+click "Extract/Corners"
+click "Extract/Border"
+expect_value extract_preview == 1
+expect_value clipped_labels@Extract == 0
+shot preview_200
+ui_scale 100

@@ -1086,9 +1086,9 @@ highlight: Flatpak: one sandboxed file for x86_64 and ARM64 Linux
 ### Extract
 
 Mask part of a Part and **Tool > Parts > Extract** turns it into a shell that fits the surface exactly: a
-helmet, a strap, a piece of armour. Set **Thick**, **E Smt** and **Double** while the preview shows, then
-**Accept** keeps it as a new Part (and <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes it away again). **TCorne** and
-**TBorder** give the rim triangles instead of quads. See [Extract a shell](parts.md#extract-a-shell).
+helmet, a strap, a piece of armour. Set **Thick**, **Edge smooth** and **Double** while the preview shows, then
+**Accept** keeps it as a new Part (and <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes it away again). **Corners** and
+**Border** give the rim triangles instead of quads. See [Extract a shell](parts.md#extract-a-shell).
 
 ### Mirror And Weld
 
