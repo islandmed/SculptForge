@@ -1,14 +1,17 @@
 # Garments: sewing patterns at real size
 
 A garment in SculptForge is made the way clothes are made: flat pattern panels at their real size in millimetres,
-sewn edge to edge. The same pattern prints on your home printer to cut real fabric, and (with the cloth solver)
-drapes on your model. For now you make and print patterns with the `garment_*` commands, from **Scripting** or by
-asking the AI assistant ("make me trousers for a 1000 mm hip").
+sewn edge to edge. The same pattern prints on your home printer to cut real fabric, and drapes on your model.
+Open **Tool > Garments** (the **Pattern** window shows the panels flat): **Templates** starts a garment at your
+sizes, **Print** writes the pages. Everything here is also a `garment_*` command for **Scripting** and the AI
+assistant ("make me trousers for a 1000 mm hip").
 
 ## Your size chart
 
 Templates are drawn from a size chart saved in the project: type your measurements (or your model's) once and every
-template uses them. `garment_size` lists the chart; give any measurement in millimetres to change it:
+template uses them. In **Templates > Size chart (mm)**, type a value and press Enter (hover a name to see how to
+measure it); **Default sizes** puts them all back. From a script, `garment_size` lists the chart and takes any
+measurement in millimetres:
 
 ```
 garment_size chest_mm=1020 waist_mm=860 hip_mm=1040 inseam_mm=800
@@ -37,8 +40,9 @@ garment_size chest_mm=1020 waist_mm=860 hip_mm=1040 inseam_mm=800
 
 ## Templates
 
-`garment_new template=<name>` replaces the scene's pattern with a template at your sizes; `add=true` puts it beside
-what is there, so one pattern can hold a whole outfit. Measurements given here go into the chart too, and
+Pick one in **Templates** (or `garment_new template=<name>`): it replaces the scene's pattern with that garment at
+your sizes. Tick **Add beside the pattern** (`add=true`) to put it next to what is there, so one pattern can hold a
+whole outfit. Measurements given here go into the chart too, and
 `length_mm` sets the template's main length for this garment only.
 
 | Template | Panels | `length_mm` is |
@@ -67,8 +71,9 @@ garment_info
 
 ## Print it at home
 
-`garment_export path=trousers.pdf` writes the pattern as A4 pages (`paper=letter` for Letter, `landscape=true` to
-turn them):
+**Print** shows how many pages the pattern takes on **A4** or **Letter** (portrait or **Landscape**); **Save PDF...**
+writes them all in one PDF, **Save SVG pages...** one SVG per page. From a script: `garment_export
+path=trousers.pdf paper=letter landscape=true`.
 
 - **Print at 100%** ("actual size", never "fit to page"), then measure the **50 mm square** on page A1.
 - Each page has a name: rows A, B, C down, columns 1, 2, 3 across. Pages with nothing on them are left out.
@@ -79,6 +84,5 @@ turn them):
 - Solid lines are the sewing lines, dashed lines the cutting lines (seam allowance: 10 mm, 5 mm on gloves).
   Ticks across the allowance are notches; the arrow is the grain line, kept parallel to the fabric's selvedge.
 
-`format=svg_pages` writes the same pages as SVG files (`trousers-A1.svg`, ...). For a print shop or a plotter,
-`path=trousers.svg` writes the whole pattern as one real-size sheet; `path=trousers.dxf` writes the outlines for a
-cutting machine.
+For a print shop or a plotter, **Export SVG** writes the whole pattern as one real-size sheet; **Export DXF** writes
+the outlines for a cutting machine.
