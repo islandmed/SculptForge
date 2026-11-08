@@ -101,7 +101,34 @@ std::string App::drawSizeStatus() const {
 
 void App::drawSizeSlider(const char* id, const char* helpPath, const char* help) {
     ui::SliderInside(id, &radiusPx_, kMinDrawSizePx, kMaxDrawSizePx, drawSizeLabel().c_str(), ImGuiSliderFlags_Logarithmic);
+    if (ImGui::IsItemActivated()) { // where the ring shows: the surface point last under the cursor, if still in view
+        const CanvasRect c = canvasRect();
+        ImVec2 at;
+        if (!(haveCursorSurface_ && partProject(cursorSurface_, at) && c.contains(at.x, at.y)))
+            at = ImVec2(c.x + c.w * 0.5f, c.y + c.h * 0.5f);
+        sizeSliderRingAt_ = at;
+    }
+    if (ImGui::IsItemActive()) {
+        sizeSliderHeld_ = true;
+        sizeSliderRingUntil_ = ImGui::GetTime() + 0.5;
+    }
     ui::HelpText("Size", "S", help, helpPath);
+}
+
+void App::drawSizeSliderRing() {
+    const bool held = sizeSliderHeld_;
+    sizeSliderHeld_ = false; // (set again by the slider while it drags, each frame)
+    const double now = ImGui::GetTime();
+    sizeSliderRingAlpha_ = held ? 1.0f : float(std::clamp((sizeSliderRingUntil_ - now) / 0.5, 0.0, 1.0));
+    if (sizeSliderRingAlpha_ <= 0.0f) return;
+    if (!held) redrawIn(0.0); // the fade draws itself
+    const CanvasRect c = canvasRect();
+    ImDrawList* dl = ImGui::GetBackgroundDrawList(); // under the windows: a quick menu over the canvas stays readable
+    dl->PushClipRect(ImVec2(c.x, c.y), ImVec2(c.x + c.w, c.y + c.h), true);
+    const float a = sizeSliderRingAlpha_;
+    dl->AddCircle(sizeSliderRingAt_, radiusPx_, IM_COL32(255, 190, 120, int(220 * a)), 64, 1.5f * uiScale_);
+    dl->AddCircle(sizeSliderRingAt_, radiusPx_ * focalRingFraction(focalShift_), IM_COL32(255, 255, 255, int(90 * a)), 48, 1.0f);
+    dl->PopClipRect();
 }
 
 void App::drawPrecisionCursor(ImDrawList* dl, ImVec2 c, float r, ImU32 col) {

@@ -25,7 +25,8 @@
 //                            point twice = a click)
 //   drag X0 Y0 X1 Y1 [S] [release]  left-drag in window fractions (rectangle hide, sliders...); release:
 //                            let go of the held modifiers halfway (Alt-drag, release Alt to zoom)
-//   drag_item LABEL DX DY [S] left-drag from the item by DX DY pixels (scrubbing, dragging a tile out)
+//   drag_item LABEL DX DY [S] [keep] left-drag from the item by DX DY pixels (scrubbing, dragging a tile out); keep:
+//                            the button stays down until 'release'
 //   wheel_item LABEL X Y      the mouse wheel over the item: X sideways (a trackpad swipe), Y up/down
 //   drag_path U0 V0 U1 V1 ... [keep] [S=seconds]   left-drag through the points (fractions of the model's
 //                            on-screen bounds; outside 0..1 is the background) with the held modifiers: a lasso,
@@ -188,7 +189,8 @@
 //                            their own curve), dab_error_px (the last stroke's dab furthest from its cursor
 //                            position, projected back), dab_jitter / dab_jitter_raw (its depth wobble with / without
 //                            the pick filter, x1000 radii), dabs, pixel_density (2 on a HiDPI screen), input_style (0 classic, 1 SculptForge, 2 Blender), turntable, orbit_lock (0 free, 1 Y, 2 X, 3 Z),
-//                            camera_ortho, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
+//                            camera_ortho, checked@ACTION (1 when the toggle shows on), size_slider_ring (a Size slider's ring: 1 while it drags, then fading),
+//                            right_column_clipped (right shelf items past its bottom), mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
 //                            claim), brush_type (BrushType
 //                            index, -1 for a custom brush or Paint), last_dab_x / last_dab_y (window pixels), paint_r, recent_colors (the left shelf's recent paint colours)
 //                            gizmo_mode (0 Draw, 1 Move, 2 Scale, 3 Rotate, 4 All), gizmo_hover (handle under the cursor,
@@ -543,6 +545,10 @@ void Demo::detachVirtualSpaceMouse() {
 double Demo::query(const std::string& name, bool& known) const {
     const Mesh& m = app_.doc_.mesh;
     known = true;
+    if (name.rfind("checked@", 0) == 0) { // checked@ACTION: 1 when that toggle shows on (lit), 0 off, -1 no such action
+        const Action* a = app_.actions_.find(name.substr(8));
+        return !a ? -1.0 : a->checked && a->checked() ? 1.0 : 0.0;
+    }
     if (name.rfind("luma@", 0) == 0) { // luma@X,Y: brightness 0-255 of the last shot at window fractions X, Y
         float fx = 0.0f, fy = 0.0f;
         if (std::sscanf(name.c_str() + 5, "%f,%f", &fx, &fy) != 2) {
@@ -1183,6 +1189,8 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     // Items of the left shelf (the brush tiles, the colour picker) past its visible bottom in the last frame.
     if (name == "left_column_clipped") return double(app_.shelfClipped_[kShelfLeft]);
+    if (name == "right_column_clipped") return double(app_.shelfClipped_[kShelfRight]); // (the wheel scrolls to them)
+    if (name == "size_slider_ring") return double(app_.sizeSliderRingAlpha_); // a Size slider's ring: 1 dragging, fading after
     if (name == "timeline_y" || name == "axis_gizmo_y") {
         const auto c = app_.canvasRect();
         if (name == "timeline_y")
@@ -1979,6 +1987,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(3)) return false;
         const std::string label = w[1];
         const float dx = num(2, 0), dy = num(3, 0), seconds = num(4, 0.4f);
+        const bool keep = w.size() > 5 && w[5] == "keep"; // "keep": the button stays down until 'release'
         auto from = std::make_shared<ImVec2>();
         steps_.push_back([this, line, label, from](float t) {
             if (findItem(label, *from)) {
@@ -1988,13 +1997,13 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (t > 3.0f) fail(line, notFound(label));
             return t > 3.0f;
         });
-        steps_.push_back([this, from, dx, dy, seconds](float t) {
+        steps_.push_back([this, from, dx, dy, seconds, keep](float t) {
             if (t == 0.0f) return false; // a frame of hover first
             if (!buttonDown_ && t < seconds) mouseButton(true, SDL_BUTTON_LEFT);
             const float u = std::min(t / seconds, 1.0f);
             mouseMotion(from->x + dx * u, from->y + dy * u);
             if (t >= seconds) {
-                mouseButton(false, SDL_BUTTON_LEFT);
+                if (!keep) mouseButton(false, SDL_BUTTON_LEFT);
                 return true;
             }
             return false;

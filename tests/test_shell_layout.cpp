@@ -203,6 +203,36 @@ TEST(shell_left_shelf_stroke_popup) {
     CHECK(back.leftShelf.size() == 1);
 }
 
+TEST(shell_right_shelf_view_toggles) {
+    // The view toggles (foirgairwolf on Discord) sit under Rotate (Turntable, Ortho, Floor) and Paint (Flat); a layout
+    // stored before them (version < 5) gets them there, without doubling any it already has.
+    for (int shell = 0; shell < 2; ++shell) {
+        const UiLayout l = standardLayout(shell);
+        const auto rotate = std::find(l.rightShelf.begin(), l.rightShelf.end(), "widget.nav.rotate");
+        CHECK(rotate != l.rightShelf.end() && rotate + 3 < l.rightShelf.end() && *(rotate + 1) == "view.turntable" &&
+              *(rotate + 2) == "view.ortho" && *(rotate + 3) == "view.floor_grid");
+        const auto paint = std::find(l.rightShelf.begin(), l.rightShelf.end(), "view.vertexpaint");
+        CHECK(paint != l.rightShelf.end() && paint + 1 != l.rightShelf.end() && *(paint + 1) == "view.flat_shading");
+    }
+    Json old = toJson(standardLayout());
+    old.set("version", 4.0);
+    old.set("rightShelf", shelfJson({"edit.undo", "widget.nav.rotate", "view.floor_grid", "sep", "view.vertexpaint"}));
+    UiLayout back;
+    std::string err;
+    CHECK(fromJson(old, back, err));
+    const std::vector<std::string> want = {"edit.undo", "widget.nav.rotate", "view.turntable", "view.ortho", "view.floor_grid",
+                                           "sep", "view.vertexpaint", "view.flat_shading"};
+    CHECK(back.rightShelf == want);
+    // Without the neighbours (moved or taken out), nothing is added; a current layout stays as it is.
+    old.set("rightShelf", shelfJson({"view.frame"}));
+    CHECK(fromJson(old, back, err));
+    CHECK(back.rightShelf.size() == 1);
+    Json now = toJson(standardLayout());
+    now.set("rightShelf", shelfJson({"widget.nav.rotate", "view.vertexpaint"}));
+    CHECK(fromJson(now, back, err));
+    CHECK(back.rightShelf.size() == 2);
+}
+
 // #85 (regression of #41): on macOS a window saved full screen comes back maximised, never straight into full screen
 // (its traffic lights couldn't be reached); elsewhere it comes back full screen.
 TEST(window_restore_fullscreen) {

@@ -337,9 +337,13 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
         // off doesn't look disabled); disabled items are faded by alpha.
         const ImU32 fg = theme::u32(on ? (mode ? theme::textOnAccent : theme::textBright) : hovered || !a.checked ? theme::text : theme::textOff, alpha);
         centredText(dl, app.fontIcons_, p0, ImVec2(p1.x, p1.y - capH + 2.0f * s), fg, a.icon ? a.icon : "?");
+        // Captions that fit the column for actions named in full elsewhere (menus, the command palette).
+        const char* shortName = a.id == "view.turntable" ? "Turn" : a.id == "view.ortho" ? "Ortho" : a.id == "view.floor_grid" ? "Floor"
+                                : a.id == "view.flat_shading" ? "Flat" : nullptr;
+        const std::string shown = shortName ? std::string(tr(shortName)) : label;
         if (!leftShelf)
             centredText(dl, caption, ImVec2(p0.x, p1.y - capH), ImVec2(p1.x, p1.y - 1.0f * s), fg,
-                        elide(caption ? caption : ImGui::GetFont(), label, size.x - 2.0f * s).c_str());
+                        elide(caption ? caption : ImGui::GetFont(), shown, size.x - 2.0f * s).c_str());
         else if (!fitCaption(dl, caption, ImVec2(p0.x + 1.0f * s, p1.y - capH), ImVec2(p1.x - 1.0f * s, p1.y - 1.0f * s), fg, label) && hovered)
             ui::DelayedTooltip(label.c_str());
         return clicked;
@@ -571,6 +575,19 @@ void App::registerShellActions() {
          "a stroke or a move ends. Off by default; saved automatically.",
          "Render", "", "", [this] { uiPrefs_.floorGrid = renderSettings_.floorGrid = !renderSettings_.floorGrid; },
          [this] { return renderSettings_.floorGrid; }, nullptr});
+    // The right shelf's view toggles (foirgairwolf on Discord): each flips a setting that lives elsewhere.
+    add({"view.turntable", "Turntable", ICON_LC_ORBIT,
+         "Rotation drags turn the view like a turntable, the model upright (on), or freely about the screen's axes "
+         "(off). The same as View > Orbit lock: Y (turntable) or Free. Saved with the preferences.",
+         "Render", "", "orbit_lock",
+         [this] { runCommand("orbit_lock", {{"axis", std::string(uiPrefs_.orbitLock == 1 ? "free" : "y")}}); },
+         [this] { return uiPrefs_.orbitLock == 1; }, nullptr});
+    add({"view.flat_shading", "Flat shading", ICON_LC_GEM,
+         "Flat shading (on): every polygon shows its own face. Off: smooth shading, the default. The same as "
+         "Material > Smooth | Flat; Parts set to Smooth or Flat keep their own. A preference, saved automatically.",
+         "Render", "", "set_shading",
+         [this] { runCommand("set_shading", {{"mode", std::string(renderSettings_.flatShading ? "smooth" : "flat")}}); },
+         [this] { return renderSettings_.flatShading; }, nullptr});
     flag("view.vertexpaint", "Paint", ICON_LC_PALETTE, "Render", "", &renderSettings_.showVertexPaint,
          "Show vertex paint colours (off: plain material).");
     // Shading (Material palette, Tool > Display): the scene's, and the active Part's own.

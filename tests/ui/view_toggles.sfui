@@ -1,0 +1,58 @@
+# The right shelf's view toggles (foirgairwolf on Discord): Turntable, Ortho, Floor and Flat each flip a setting that
+# lives elsewhere (View > Orbit lock, Numpad 5, View > Floor grid, Material > Smooth | Flat) and show it lit when on.
+# Each round trip: the button, then the setting's own control, both ways.
+run ui_look look=forge layout=sculptforge
+run new_sphere subdivisions=3
+key f
+wait 0.2
+
+# Turntable <-> Free (View > Orbit lock).
+run orbit_lock axis=free
+expect_value orbit_lock == 0
+click "Turntable##view.turntable"
+expect_value orbit_lock == 1
+expect_value checked@view.turntable == 1
+click "Turntable##view.turntable"
+expect_value orbit_lock == 0
+run orbit_lock axis=y
+expect_value checked@view.turntable == 1
+# Another lock (X) is not Turntable: the button turns it to Turntable, again to Free.
+run orbit_lock axis=x
+expect_value checked@view.turntable == 0
+click "Turntable##view.turntable"
+expect_value orbit_lock == 1
+click "Turntable##view.turntable"
+expect_value orbit_lock == 0
+
+# Perspective <-> Ortho, and Numpad 5 the same.
+expect_value camera_ortho == 0
+click "Orthographic##view.ortho"
+expect_value camera_ortho == 1
+expect_value checked@view.ortho == 1
+key numpad5
+expect_value camera_ortho == 0
+expect_value checked@view.ortho == 0
+
+# Floor grid on and off (a preference, as View > Floor grid).
+expect_value floor_grid == 0
+click "Floor grid##view.floor_grid"
+expect_value floor_grid == 1
+expect_value checked@view.floor_grid == 1
+wait 0.2
+expect_value floor_grid_drawn == 1
+click "Floor grid##view.floor_grid"
+expect_value floor_grid == 0
+
+# Smooth <-> Flat (Material > Smooth | Flat).
+expect_value flat_shading == 0
+click "Flat shading##view.flat_shading"
+expect_value flat_shading == 1
+expect_value checked@view.flat_shading == 1
+run set_shading mode=smooth
+expect_value checked@view.flat_shading == 0
+click "Flat shading##view.flat_shading"
+click "Flat shading##view.flat_shading"
+expect_value flat_shading == 0
+
+# Ortho's tooltip names its key.
+expect_shortcut view.ortho Numpad 5
