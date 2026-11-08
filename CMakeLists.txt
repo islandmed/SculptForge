@@ -1066,6 +1066,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(parts_split_selection_1440 parts_split_selection --size 1440x900)
     sculptforge_ui_test(mesh_check_1440 mesh_check --size 1440x900)
     sculptforge_ui_test(weld_preview_200 sizes/weld_preview_200 --size 2880x1800) # Merge by Distance's dots at 200%
+    sculptforge_ui_test(mesh_check_messy_1440 mesh_check_messy --size 1440x900)
+    sculptforge_ui_test(mesh_check_messy_2880 mesh_check_messy --size 2880x1800) # (200%: the "Not fixed:" line wraps)
     sculptforge_ui_test(parts_tools_1024 sizes/parts_tools_1024 --size 1024x768) # (palettes are drop-downs there)
     # The stroke popup on a UI scaled 1.5x: it opens under the cursor and its items are where they're drawn.
     sculptforge_ui_test(stroke_popup_scaled stroke_popup --size 2400x1350)

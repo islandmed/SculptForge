@@ -210,16 +210,18 @@ changes only what that row names, as one undo step.
 
 | Row | What it is | What Fix does |
 |---|---|---|
-| **Non-manifold edges** | Edges shared by three or more triangles (a fin, a wall inside the mesh) | Each triangle past the first two gets its own copy of the edge, so it comes loose; nothing is deleted |
-| **Holes** | Open boundary loops | Caps each with a patch, as [Fill Holes](#fill-holes) does |
+| **Non-manifold edges** | Edges shared by three or more triangles (a fin, a wall inside the mesh, two solids touching along an edge) | Pulls the edge apart; nothing is deleted. Solids that only touch come apart closed; a fin or wall comes loose, which leaves its edge open (a hole) |
+| **Holes** | Open boundary loops | Caps each with a patch, as [Fill Holes](#fill-holes) does. The edge of a loose fin or sheet isn't capped (the cap would lie on it) |
 | **Duplicate triangles** | Triangles on the same three points as another, either way round | Deletes the copies |
 | **Degenerate triangles** | Triangles that use one point twice | Deletes them |
 | **Zero-area triangles** | Three different points in one line (a sliver) | Collapses each one's shortest edge |
-| **Flipped triangles** | Triangles wound against their neighbours, or a closed piece that is inside out | Turns them to match the rest of their piece, and closed pieces right way out |
+| **Flipped triangles** | Triangles wound against their neighbours, or a closed piece that is inside out | Turns them to match the rest of their piece, and closed pieces right way out (a piece inside another, such as a hollow's inner wall or an eye, keeps its way) |
 | **Isolated points** | Points no triangle uses | Removes them |
 
 **Fix all** fixes every row except **Holes**, in one undo step: a mesh can be open on purpose (a cloth panel, a
-mask, a relief), so holes are only capped when you click their own **Fix**. After a fix the list checks again.
+mask, a relief), so holes are only capped when you click their own **Fix**. One fix can cause another (collapsing a
+sliver can leave a duplicate), so Fix all checks again and repeats until nothing but holes is left. After any fix
+the list checks again, and whatever is still there is explained under the rows (**Not fixed:**), with why.
 
 ## LOD chains
 

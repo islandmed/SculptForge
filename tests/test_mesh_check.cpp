@@ -9,6 +9,8 @@
 #include "core/MeshCheck.h"
 #include "core/Primitives.h"
 
+#include <random>
+
 using namespace sf;
 
 namespace {
@@ -27,6 +29,48 @@ Mesh unwelded(const Mesh& src) {
     m.recomputeAllNormals();
     return m;
 }
+
+// The surface of the filled cells of an n x n x n grid (x major), faces between filled and empty cells, points
+// shared: cells touching only along an edge or at a corner make the non-manifold edges a messy remesh has.
+Mesh voxels(const std::vector<uint8_t>& on, int n, float jitter = 0.0f, uint32_t seed = 1) {
+    auto at = [&](int x, int y, int z) {
+        return x >= 0 && y >= 0 && z >= 0 && x < n && y < n && z < n && on[size_t((x * n + y) * n + z)];
+    };
+    auto P = [&](int x, int y, int z) { return uint32_t((x * (n + 1) + y) * (n + 1) + z); };
+    std::mt19937 rng(seed);
+    Mesh m;
+    for (int x = 0; x <= n; ++x)
+        for (int y = 0; y <= n; ++y)
+            for (int z = 0; z <= n; ++z) m.positions.push_back(glm::vec3(x, y, z) + glm::vec3(jitter * float(rng() % 100) / 100.0f));
+    for (int x = 0; x < n; ++x)
+        for (int y = 0; y < n; ++y)
+            for (int z = 0; z < n; ++z) {
+                if (!at(x, y, z)) continue;
+                for (int ax = 0; ax < 3; ++ax)
+                    for (int side = 0; side < 2; ++side) {
+                        int d[3] = {0, 0, 0}, b[3] = {x, y, z};
+                        d[ax] = side ? 1 : -1;
+                        if (at(x + d[0], y + d[1], z + d[2])) continue;
+                        b[ax] += side;
+                        const int u = (ax + 1) % 3, v = (ax + 2) % 3;
+                        auto corner = [&](int du, int dv) {
+                            int c[3] = {b[0], b[1], b[2]};
+                            c[u] += du, c[v] += dv;
+                            return P(c[0], c[1], c[2]);
+                        };
+                        const uint32_t q0 = corner(0, 0), q1 = corner(1, 0), q2 = corner(1, 1), q3 = corner(0, 1);
+                        if (side) m.triangles.insert(m.triangles.end(), {{q0, q1, q2}, {q0, q2, q3}});
+                        else m.triangles.insert(m.triangles.end(), {{q0, q2, q1}, {q0, q3, q2}});
+                    }
+            }
+    m.rebuildTopology();
+    Mesh out;
+    size_t n0 = 0;
+    return fixMesh(m, MeshIssue::Isolated, out, n0) ? out : m;
+}
+
+// What's left besides holes.
+size_t notHoles(const MeshReport& r) { return r.total() - r.count[int(MeshIssue::Holes)]; }
 
 Mesh fixed(const Mesh& m, MeshIssue i, size_t* n = nullptr) {
     Mesh out;
@@ -203,4 +247,124 @@ TEST(mesh_check_commands_undo) {
     CHECK(checkMesh(doc.mesh).total() == 0);
     CHECK(reg.execute(doc, "undo").ok);
     CHECK(checkMesh(doc.mesh).total() > 0);
+}
+
+TEST(mesh_check_touching_solids_come_apart_closed) {
+    // Two cells touching along one edge (4 triangles on it): each stays a closed box, no hole opened.
+    Mesh two = voxels({1, 0, 0, 1, 0, 0, 0, 0}, 2);
+    CHECK(issue(two, MeshIssue::NonManifold) == 1 && issue(two, MeshIssue::Holes) == 0);
+    Mesh out;
+    MeshReport did, left;
+    CHECK(fixMeshAll(two, out, did, &left));
+    CHECK(did.count[int(MeshIssue::NonManifold)] == 1 && left.total() == 0 && checkMesh(out).total() == 0);
+    // An L of three cells and one touching it diagonally: three such edges meeting at points.
+    CHECK(fixMeshAll(voxels({1, 1, 1, 0, 1, 0, 0, 1}, 2), out, did, &left) && left.total() == 0);
+    // A solid pinched to an edge it is joined round at both ends (a messy remesh, foirgairwolf's report): the old
+    // split left non-manifold edges and opened holes; now no non-manifold edge is left.
+    std::vector<uint8_t> grid(6 * 6 * 6);
+    std::mt19937 rng(19);
+    for (auto& c : grid) c = rng() % 1000 < 750;
+    const Mesh messy = voxels(grid, 6, 0.1f);
+    CHECK(issue(messy, MeshIssue::NonManifold) > 0);
+    CHECK(fixMeshAll(messy, out, did, &left));
+    CHECK(notHoles(left) == 0 && notHoles(checkMesh(out)) == 0);
+}
+
+TEST(mesh_check_fix_all_reaches_a_fixed_point) {
+    // Messy meshes (random grids, welds that fold a sphere, broken spheres): after Fix all only holes are left, and
+    // the Holes Fix never makes another problem or leaves more holes than it found.
+    for (uint32_t seed = 0; seed < 90; ++seed) {
+        std::mt19937 rng(seed);
+        Mesh m;
+        if (seed % 3 == 0) {
+            const int n = 3 + int(seed % 4);
+            std::vector<uint8_t> grid(size_t(n * n * n));
+            for (auto& c : grid) c = rng() % 100 < 35 + (seed % 5) * 10;
+            m = voxels(grid, n, 0.1f, seed);
+        } else if (seed % 3 == 1) {
+            m = weldByDistance(makeIcosphere(3), 0.05f + float(seed % 7) * 0.03f);
+        } else {
+            m = makeIcosphere(2);
+            for (int k = 0; k < 12; ++k) {
+                const uint32_t t = uint32_t(rng() % m.triangles.size());
+                const glm::uvec3 tri = m.triangles[t];
+                switch (rng() % 6) {
+                case 0: m.triangles.push_back(tri); break;
+                case 1: std::swap(m.triangles[t].y, m.triangles[t].z); break;
+                case 2:
+                    m.positions.push_back(m.positions[tri.x] * 1.4f);
+                    m.triangles.push_back({tri.x, tri.y, uint32_t(m.positions.size() - 1)});
+                    break;
+                case 3: m.positions[tri.x] = 0.5f * (m.positions[tri.y] + m.positions[tri.z]); break;
+                case 4: m.triangles[t].x = tri.y; break;
+                default:
+                    for (auto& q : m.triangles)
+                        for (int c = 0; c < 3; ++c)
+                            if (q[c] == tri.x) q[c] = tri.y;
+                }
+            }
+            m.rebuildTopology();
+        }
+        if (m.triangles.empty()) continue;
+        Mesh out;
+        MeshReport did, left;
+        const Mesh& all = fixMeshAll(m, out, did, &left) ? out : m;
+        const MeshReport after = checkMesh(all);
+        CHECK(notHoles(after) == 0);
+        CHECK(after.total() == left.total());
+        Mesh capped;
+        size_t n = 0;
+        if (fixMesh(all, MeshIssue::Holes, capped, n)) {
+            const MeshReport r = checkMesh(capped);
+            CHECK(notHoles(r) == 0 && r.count[int(MeshIssue::Holes)] < after.count[int(MeshIssue::Holes)]);
+        }
+    }
+}
+
+TEST(mesh_check_hollow_and_nested_pieces) {
+    // A hollow: an outer sphere and an inner one wound inward (its wall faces into the hollow). Not flipped.
+    Mesh outer = makeIcosphere(2, 1.0f), inner = makeIcosphere(2, 0.5f);
+    Mesh hollow = outer;
+    const uint32_t base = uint32_t(hollow.positions.size());
+    hollow.positions.insert(hollow.positions.end(), inner.positions.begin(), inner.positions.end());
+    for (const auto& t : inner.triangles) hollow.triangles.push_back({t.x + base, t.z + base, t.y + base});
+    hollow.rebuildTopology();
+    CHECK(checkMesh(hollow).total() == 0);
+    // An eye in a head (wound outward) is fine too.
+    Mesh eye = outer;
+    eye.positions.insert(eye.positions.end(), inner.positions.begin(), inner.positions.end());
+    for (const auto& t : inner.triangles) eye.triangles.push_back(t + glm::uvec3(base));
+    eye.rebuildTopology();
+    CHECK(checkMesh(eye).total() == 0);
+    // The outer one inside out is still turned the right way out.
+    for (size_t t = 0; t < outer.triangleCount(); ++t) std::swap(eye.triangles[t].y, eye.triangles[t].z);
+    eye.rebuildTopology();
+    CHECK(issue(eye, MeshIssue::Flipped) == outer.triangleCount());
+    size_t n = 0;
+    CHECK(checkMesh(fixed(eye, MeshIssue::Flipped, &n)).total() == 0 && n == outer.triangleCount());
+}
+
+TEST(mesh_check_fix_says_what_is_left) {
+    Document doc;
+    CommandRegistry reg;
+    // A fin on a sphere: Fix all loosens it, which opens it; the hole is left open and the status says so.
+    Mesh m = makeIcosphere(2);
+    const glm::uvec3 t = m.triangles[0];
+    m.positions.push_back(m.positions[t.x] * 1.5f);
+    m.triangles.push_back({t.x, t.y, uint32_t(m.positions.size() - 1)});
+    m.rebuildTopology();
+    doc.replaceMeshUndoable(std::move(m), "Fin");
+    CommandResult r = reg.execute(doc, "mesh_fix", {{"issue", std::string("all")}});
+    CHECK(r.ok && r.message.find("Fixed 1 non-manifold edge") == 0);
+    CHECK(r.message.find("Left: 1 hole left open (Fix all doesn't cap holes") != std::string::npos);
+    // The loose fin's edge can't be capped (a cap would lie on the fin): nothing changes, and it says why.
+    r = reg.execute(doc, "mesh_fix", {{"issue", std::string("holes")}});
+    CHECK(!r.ok && r.message.find("Nothing fixed: 1 hole couldn't be capped (the edge of a loose sheet or fin") == 0);
+    CHECK(issue(doc.mesh, MeshIssue::Holes) == 1);
+    // unfixedSummary names each kind with its reason.
+    MeshReport left;
+    left.count[int(MeshIssue::Flipped)] = 2;
+    CHECK(unfixedSummary(left, true) ==
+          "2 flipped triangles couldn't be turned (a one-sided, twisted piece can't be wound one way everywhere)");
+    CHECK(unfixedSummary(MeshReport{}, true).empty());
 }

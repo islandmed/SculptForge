@@ -11,6 +11,7 @@
 #include "app/Ui.h"
 
 #include <algorithm>
+#include <cstring>
 #include <string>
 
 namespace sf {
@@ -34,9 +35,19 @@ uint64_t App::meshCheckKey() const {
 }
 
 void App::runMeshCheck() {
+    meshFixLeft_.clear();
     meshReport_ = checkMesh(doc_.mesh);
     meshReportKey_ = meshCheckKey() | 1; // (never 0: checked)
     meshReportScroll_ = 2; // (two frames: the first one's scroll is clamped to the size before the rows)
+}
+
+void App::runMeshFix(const std::string& issue) {
+    runCommand("mesh_fix", {{"issue", issue}});
+    const std::string said = status_;
+    runMeshCheck();
+    // What the fix couldn't do, and why, stays under the rows (the status line moves on).
+    for (const char* lead : {". Left: ", "Nothing fixed: "})
+        if (const size_t at = said.find(lead); at != std::string::npos) meshFixLeft_ = said.substr(at + std::strlen(lead));
 }
 
 void App::drawMeshCheckContents() {
@@ -118,13 +129,13 @@ void App::drawMeshCheckContents() {
         if (MeshIssue(i) != MeshIssue::Holes) fixable += meshReport_.count[i];
     ImGui::BeginDisabled(!current || fixable == 0);
     if (ImGui::Button(tr("Fix all##mesh_fix"), ImVec2(-1, 0))) {
-        runCommand("mesh_fix", {{"issue", std::string("all")}});
-        runMeshCheck();
+        runMeshFix("all");
     }
     ImGui::EndDisabled();
     ui::HelpText("Fix all", nullptr,
-                 "Fix every problem listed except holes, as one undo step. Holes stay open: a mesh can be open on "
-                 "purpose (use their own Fix to cap them).",
+                 "Fix every problem listed except holes, as one undo step, checking again until none is left. Holes "
+                 "stay open: a mesh can be open on purpose (use their own Fix to cap them). Whatever can't be fixed "
+                 "is listed below the rows, with why.",
                  "Tool > Geometry > Find Problems");
     if (meshReportKey_ == 0) {
         ImGui::TextDisabled("%s", tr("Not checked yet"));
@@ -155,12 +166,17 @@ void App::drawMeshCheckContents() {
             ImGui::SameLine(ImGui::GetContentRegionMax().x - fixW - style.ItemSpacing.x - ImGui::CalcTextSize(n.c_str()).x);
             ImGui::TextColored(theme::accent, "%s", n.c_str());
             ImGui::SameLine(ImGui::GetContentRegionMax().x - fixW);
-            if (ImGui::Button(tr("Fix"), ImVec2(fixW, 0))) {
-                runCommand("mesh_fix", {{"issue", std::string(meshIssueName(MeshIssue(i)))}});
-                runMeshCheck();
+            const std::string fix = std::string(tr("Fix")) + "##mesh_fix_" + meshIssueName(MeshIssue(i));
+            if (ImGui::Button(fix.c_str(), ImVec2(fixW, 0))) {
+                runMeshFix(meshIssueName(MeshIssue(i)));
             }
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", rows[i][1]);
             ImGui::PopID();
+        }
+        if (!meshFixLeft_.empty()) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            ImGui::TextWrapped("%s %s", tr("Not fixed:"), meshFixLeft_.c_str());
+            ImGui::PopStyleColor();
         }
     }
     if (meshReportScroll_ > 0) { // Find Problems's last line (the report's, or "check again") above the bottom edge
