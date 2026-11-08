@@ -1885,12 +1885,13 @@ private:
     void drawSymmetryContents();
     void drawDeformationContents();
     // PanelMeshCheck.cpp: Tool > Geometry > Merge by Distance (weld_points) and Check Mesh (mesh_check / mesh_fix),
-    // and the points a weld would merge drawn on the model while the section shows.
+    // and the points a weld would merge drawn on the model while the distance is dragged or hovered.
     void drawMeshCheckContents();
     void drawWeldPreviewOverlay();
     uint64_t meshCheckKey() const; // changes with the active Part's mesh
     float weldDistance_ = -1.0f;   // scene units; < 0 until the section first shows (then a default from the Part's size)
-    bool weldShown_ = false;       // the section was drawn this frame (the preview shows)
+    double weldUsedAt_ = -1e9;     // ImGui time the distance was last dragged or hovered (the preview shows, then fades)
+    size_t weldPreviewDrawn_ = 0;  // points the preview drew this frame (UI tests: weld_preview_points)
     uint64_t weldKey_ = 0;         // meshCheckKey() and distance the count below is for
     float weldKeyDistance_ = -1.0f;
     size_t weldCount_ = 0;

@@ -3,13 +3,27 @@
 run open path=$SCRIPT_DIR/../data/check_mesh_cube.obj
 expect_value vertices == 24
 click "Geometry##tool.geometry"
+# The panel open but its distance untouched: no orange dots on the model (on a dense model they read as a fault).
+wait 0.5
+expect_value weld_preview_points == 0
 # Six loose faces: six holes. Checking changes nothing.
 click "Check##mesh_check"
 expect_text Duplicate triangles
 expect_value vertices == 24
 # The default distance (a ten-thousandth of the size) catches every nudged copy: 16 of the 24 points merge.
 expect_text 16 points will merge
+expect_value weld_preview_points == 0
+shot panel-open
+# Dragging the distance shows the points that would merge; let go and move away and they fade out.
+drag_item "##weld_distance" 4 0 0.3 keep
+expect_value weld_preview_points == 16
 shot weld-preview
+release
+hover "Check##mesh_check"
+wait 0.6
+expect_value weld_preview_points == 0
+expect_text 16 points will merge
+shot weld-released
 click "Merge##weld_points"
 expect_value vertices == 8
 expect_status Merged 16 points
