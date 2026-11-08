@@ -33,6 +33,9 @@ paths=(.github/workflows CMakeLists.txt CHANGELOG.md packaging docs tools websit
         if [ -e "$ROOT/$f" ]; then mkdir -p "$(dirname "$f")" && cp "$ROOT/$f" "$f"; else rm -f "$f"; fi
     done
 git config user.name test && git config user.email test@example.org
+# The app's compiled credits as step bump leaves them: onboarding updates website/members-live.json on main at once,
+# while founding.json and supporters.txt wait for the next release's bump, so main's copies can trail it.
+python3 tools/guide/build_site.py --app-credits >/dev/null
 rm -f changes/[!R]*.md # this branch's own fragments: the test writes its own
 mkdir -p changes
 cat > changes/beta-test.md <<'EOF'
