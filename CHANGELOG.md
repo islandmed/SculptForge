@@ -6,6 +6,57 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.16] - 2026-11-07
+
+### Added
+- **Gizmo All mode** (Shift+W, top shelf, Sculpt > Symmetry & Gizmo; the `gizmo_mode` command): move, rotate and scale
+  handles at once, with clear priorities where they cross and no overlaps at any zoom or UI scale. Snapping, the
+  readout, posing with a mask, Alt+drag for the pivot and one undo step per drag work as in the single modes. Idea by
+  fenix on Discord (thanks @fenixpoints, #118).
+- **Keep original** checkbox under **Tool > Parts > Split** (Hidden / Masked / Unmasked; `keep=true` on
+  `part_split_hidden`, `part_split_masked`, `part_split_unmasked`): the triangles are copied into the new Part (UVs,
+  face groups, vertex paint, sculpt layers; the copy is cut at the current subdivision level) and the source Part
+  stays untouched, levels and mask included. One undo step removes the copy. Requested by _tfx on Discord.
+- Website: **Most-wanted brushes** on the brushes page (sculptforge.app/brushes.html#requests): brush requests from
+  the #ideas forum on our Discord, ranked by 👍 votes and refreshed every 30 minutes, with shipped ones marked. The
+  data is also published as sculptforge.app/brush-requests.json.
+
+### Changed
+- Release packages are built once per set of build inputs: a commit whose packaged files are byte for byte an earlier
+  green build's (a website or release-paperwork change) reuses that build's packages, verified and attested as before,
+  instead of building them again (docs/releasing.md, "Build once, promote").
+- **Monthly challenge** on Discord: submissions close on the 27th at 23:59, then everyone votes in a Discord poll
+  until the end of the month; the winner (Featured Artist and a spot on sculptforge.app) is announced on the 1st. The
+  website and the guide's Discord page say so.
+- **Member builds** in the app now come from the SculptForge organization; update to keep signing in.
+- Tool > Geometry is reorganised by task (Levels, Micro Detail, Resolution, Cleanup, Symmetry) with clearer names;
+  your hotkeys, scripts and search keep working.
+- Membership wording in the app, the guide and the README now matches the membership page: **Member Requests** are one
+  request a month, built first and credited to you (Help > Support, the welcome screen and the membership card;
+  Spanish and Chinese too). Bugs are always free, and every idea goes in the public feature queue.
+
+### Fixed
+- Blender input style: Ctrl+Shift did nothing on the model (Ctrl is Blender's invert, so Ctrl+Shift became an inverted
+  smooth), so the Cut shapes and the Ctrl+Shift hide/isolate gestures were out of reach. Ctrl+Shift now keeps its
+  meaning in every style (drag: hide or cut; add Alt: inside / the other side; Ctrl+Shift+click the brush tile or
+  Ctrl+Shift+B: the selection and Cut shapes). Ctrl alone still inverts, Shift alone still smooths. Alt+Q (pick the
+  Part under the cursor, Blender's own key) is now listed with the Blender keys, since Alt+click masks there (thanks
+  dm4nd on Discord).
+- Cut with symmetry on: a shape whose mirror image overlaps it (a rectangle across the middle, a centred one seen at
+  an angle) sometimes cut one side only, In and Add went deeper on one side, and a later cut across those caps could
+  leave a crack. The mirror image now measures its depth on the Part as it was, cuts stop at once instead of leaving
+  one side done, and the zero-area slivers the overlap left in the cap are cleaned up so the next cut closes (thanks
+  dm4nd on Discord).
+- **Tool > Parts > Extract** and **Project** labels were cut off in a narrow tray (since 0.11.11). The settings now
+  read **Thickness**, **Edge Smooth**, **Both Sides**, **Corners** and **Border**; a pair shares a row only when both
+  labels fit, else each takes its own, and Both Sides / Corners / Border wrap. Scripts use `triangle_corners` /
+  `triangle_border`; the old argument and action names still work.
+- macOS: **SculptForge > Preferences...** in the app menu was greyed out; it now opens Preferences, as Cmd+, and Edit
+  > Preferences do (#111, thanks @fenixpoints).
+- Popups, menus, tooltips, the Command Palette, the Quick Menu and floating windows are fully opaque in every look
+  (Classic, Forge Terminal and its schemes, Phosphor, Blueprint); at 200% the Preferences popup showed the Sculpt
+  Timeline's "Save with project" and the shelf text through it. Overlays on the 3D view keep their translucency.
+
 ## [0.11.15] - 2026-11-07
 
 ### Added

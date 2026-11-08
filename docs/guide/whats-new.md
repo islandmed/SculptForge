@@ -17,6 +17,27 @@ highlight: Tool > Geometry is reorganised by task (Levels, Micro Detail, Resolut
 highlight: macOS: SculptForge > Preferences... in the app menu opens Preferences (thanks @fenixpoints)
 ```
 
+- **Gizmo, All**: **Shift+W** (or **All** beside Rotate) puts move, rotate and scale handles on one gizmo: arrows and
+  squares inside the rings, boxes past them to stretch, four outer tabs to scale evenly.
+- **Keep original** for **Tool > Parts > Split**: tick it and Hidden, Masked or Unmasked copy those triangles into a
+  new Part, leaving the source Part as it is.
+- **Cut** with symmetry cuts both sides alike, also across the middle, and its caps stay closed for the next cut.
+- **Blender keys**: Ctrl+Shift hides and cuts again, and Ctrl+Shift+click on the brush tile (or Ctrl+Shift+B) offers
+  the Cut shapes.
+- **Extract labels in full**: **Tool > Parts > Extract** reads **Thickness**, **Edge Smooth**, **Both Sides**,
+  **Corners** and **Border**, and in a narrow tray (a small window, 150% or 200%) the controls move onto their own
+  rows instead of cutting words off.
+- **Tool > Geometry, grouped by what you do**: **Levels** (the **Level** slider, **Lower / Higher Level**, **Add
+  Level** with **Smooth**, **Rebuild Lower Levels**, then **Remove Below / Remove Above**), **Micro Detail**,
+  **Resolution** (Decimate, Quad Remesh, Subdivide), **Cleanup** (**Fill Holes**, Merge by Distance, Check Mesh) and
+  **Symmetry** (**Make Symmetric**). Quad Remesh controls say what they do too (**Target Quads**, **50% / 100% /
+  200%**, **Size Variation**, **Follow Face Groups**, **Keep Hard Edges**, **Guide Strength**), and **Remove Hidden**
+  in Tool > Visibility. Shortcuts, shelves, scripts and saved files are unchanged, and the command search (F3) still
+  finds each control by the words it had before.
+- **macOS**: **SculptForge > Preferences...** in the app menu opens Preferences (it was greyed out).
+- **Opaque popups**: menus, popups, tooltips and windows no longer let the interface behind them show through (it was
+  easy to see at 200% scale), in every look and colour scheme.
+
 ## Version 0.11.15
 
 ```features
