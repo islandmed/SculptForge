@@ -6,6 +6,7 @@
 // Recent and autosave with crash recovery. Prompts only appear in interactive
 // sessions; --render, --record and demos run straight through.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/Support.h"
 #include "app/BigMeshTip.h"
 #include "app/LookSchemes.h"
@@ -353,7 +354,7 @@ void App::saveProjectAs(bool forceDialog) {
     }
     std::string suggestion;
     if (!doc_.path.empty()) suggestion = utf8(fsPath(doc_.path).replace_extension(kProjectExtension));
-    SDL_ShowSaveFileDialog(onProjectChosen, &dialogRequests_[int(FileAction::SaveProject)], window_, kProjectFilters, 2,
+    sf::dialogs::saveFile(onProjectChosen, &dialogRequests_[int(FileAction::SaveProject)], window_, kProjectFilters, 2,
                            suggestion.empty() ? nullptr : suggestion.c_str());
 }
 
@@ -970,10 +971,10 @@ void App::drawUpdateBanner() {
         ImGui::Spacing();
         bool close = false;
         if (!drawSelfUpdate(u, close)) { // (PanelUpdate.cpp: Update, or the package manager's command)
-            if (ImGui::Button(tr("What's new"))) SDL_OpenURL(u.notesUrl.c_str());
+            if (ImGui::Button(tr("What's new"))) sf::dialogs::openUrl(u.notesUrl.c_str());
             ImGui::SameLine();
             if (ImGui::Button(tr("Download"))) {
-                SDL_OpenURL(u.downloadUrl.c_str());
+                sf::dialogs::openUrl(u.downloadUrl.c_str());
                 close = true;
             }
             ImGui::SameLine();

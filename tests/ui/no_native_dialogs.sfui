@@ -1,0 +1,20 @@
+# No system dialog or browser ever opens from a test (src/app/NativeDialog.h): File > Import asks for a file, the
+# request is counted, nothing opens, and the dialog answers what the script queued (or cancels).
+run new_sphere subdivisions=3
+expect_value dialogs_requested == 0
+expect_value parts == 1
+# Nothing queued: a cancel, nothing imported.
+action file.import
+wait 0.2
+expect_value dialogs_requested == 1
+expect_value dialog_kind == 1
+expect_value parts == 1
+# A queued answer: imported as a new Part.
+dialog_answer data/stud.obj
+action file.import
+wait_value parts == 2 10
+expect_value dialogs_requested == 2
+# A URL (Help > Website) opens no browser either.
+action help.website
+expect_value dialogs_requested == 3
+expect_value dialog_kind == 5

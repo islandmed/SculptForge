@@ -5,6 +5,7 @@
 // the VDM plane and Create VDM, Export EXR), their F3 actions, the DragDot stroke, and the DragRect stroke the
 // VDM brush brings along while it is the brush (VDM brushes come set to DragRect).
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/Ui.h"
 
 #include <IconsLucide.h>
@@ -63,7 +64,7 @@ void App::registerVdmActions() {
         actions_.add(std::move(a));
     };
     add("vdm.load", "Load VDM...", ICON_LC_FOLDER_OPEN,
-        [this] { SDL_ShowOpenFileDialog(onVdmChosen, this, window_, kVdmFilters, 2, nullptr, false); }, nullptr,
+        [this] { sf::dialogs::openFile(onVdmChosen, this, window_, kVdmFilters, 2, nullptr, false); }, nullptr,
         "Load a vector displacement map for the VDM brush: a 32- or 16-bit OpenEXR from Blender's VDM Brush Baker (or "
         "any EXR whose RGB are X right, Y up, Z out of the surface, in brush radii) or a .sfvdm. It is kept in your "
         "brush library. You can also drop an .exr on the window.",
@@ -82,7 +83,7 @@ void App::registerVdmActions() {
         "becomes the map, saved in your brush library and picked as the VDM brush's map Needs the VDM plane (its UVs record where each point started).",
         "vdm_capture");
     add("vdm.export", "Export EXR...", ICON_LC_DOWNLOAD,
-        [this] { SDL_ShowSaveFileDialog(onVdmExportChosen, this, window_, kExrFilters, 1, nullptr); },
+        [this] { sf::dialogs::saveFile(onVdmExportChosen, this, window_, kExrFilters, 1, nullptr); },
         [this] { return doc_.brushVdm != nullptr; },
         "Save the VDM brush's map as a 32-bit float OpenEXR, for Blender: add it as the texture of a Draw brush with "
         "Area Plane mapping and Vector Displacement on (Help > User Guide > Sculpting > Vector displacement brushes).",

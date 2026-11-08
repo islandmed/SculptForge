@@ -5,6 +5,7 @@
 // Members in Help > About. Each only opens kSupportUrl in the browser (Support.h); the app is the same for everyone,
 // so nothing here checks, sends or stores anything else.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/Config.h"
 #include "app/LookSchemes.h"
 #include "app/Theme.h"
@@ -49,7 +50,7 @@ void App::openSupportPage() {
         status_ = std::string("Support SculptForge: ") + kSupportUrl;
         return;
     }
-    status_ = SDL_OpenURL(kSupportUrl) ? std::string("Opened sculptforge.app/support.html in your browser")
+    status_ = sf::dialogs::openUrl(kSupportUrl) ? std::string("Opened sculptforge.app/support.html in your browser")
                                        : std::string("Couldn't open ") + kSupportUrl + ": " + SDL_GetError();
 }
 
@@ -59,7 +60,7 @@ void App::openDiscordPage() {
         status_ = std::string("Join the community on Discord: ") + kDiscordUrl;
         return;
     }
-    status_ = SDL_OpenURL(kDiscordUrl) ? std::string("Opened the SculptForge Discord invite in your browser")
+    status_ = sf::dialogs::openUrl(kDiscordUrl) ? std::string("Opened the SculptForge Discord invite in your browser")
                                        : std::string("Couldn't open ") + kDiscordUrl + ": " + SDL_GetError();
 }
 

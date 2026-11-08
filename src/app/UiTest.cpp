@@ -214,6 +214,11 @@
 //   shot NAME                save a screenshot NAME.png (to --ui-out)
 //   expect_guide FILE        the User Guide shows FILE ("masking.md", "index.md")
 //   dump_shortcuts NAME      write every default shortcut as a Markdown table to --ui-out/NAME
+//   action ID                run a registry action as its key, shelf tile or the command palette would
+//   dialog_answer PATH|cancel   what the next file or folder dialog answers (none ever opens from a script:
+//                            NativeDialog.h; PATH relative to the script); values dialogs_requested (dialogs and URLs
+//                            asked for so far), dialog_kind (the last: 0 none, 1 open file, 2 save file, 3 open
+//                            folder, 4 message box, 5 URL)
 //   answer_dialog PATH|cancel   what the open pack or macro file dialog answers (Install Pack, Save Pack, a
 //                            macro's "?"); values: packs_installed, pack_review_open, pack_review_brush, macros,
 //                            macro_recording, macro_recorded, macro_confirm_open, macro_ran, macro_one_step ...
@@ -316,6 +321,7 @@
 #define SDL_PEN_INPUT_IN_PROXIMITY (1u << 31) // SDL 3.4's flag; older SDL 3 never sets it
 #endif
 #include "app/Demo.h"
+#include "app/NativeDialog.h"
 #include "app/Shell.h"
 #include "app/Ui.h"
 #include "app/UserGlyphs.h"
@@ -1354,6 +1360,8 @@ double Demo::query(const std::string& name, bool& known) const {
         std::set<uint32_t> ids(m.facegroups.begin(), m.facegroups.end());
         return double(std::max<size_t>(ids.size(), m.triangleCount() ? 1 : 0));
     }
+    if (name == "dialogs_requested") return double(dialogs::requested());
+    if (name == "dialog_kind") return double(int(dialogs::lastKind()));
     known = false;
     return 0.0;
 }
@@ -2130,6 +2138,27 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
         const auto u8 = file.lexically_normal().u8string();
         run([this, action, path = std::string(u8.begin(), u8.end())] { app_.queueFile(action, path); });
+    } else if (verb == "action") {
+        if (!need(1)) return false;
+        run([this, line, id = w[1]] {
+            const Action* a = app_.actions_.find(id);
+            if (!a || !a->run) return fail(line, "no action " + id);
+            if (a->enabled && !a->enabled()) return fail(line, "action " + id + " is disabled now");
+            app_.actions_.touch(id);
+            a->run();
+        });
+        wait(0.1f);
+    } else if (verb == "dialog_answer") {
+        if (!need(1)) return false;
+        std::string path;
+        if (w[1] != "cancel") {
+            const std::string name = restOf(lineText_, 1);
+            auto file = std::filesystem::path(std::u8string(name.begin(), name.end()));
+            if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
+            const auto u8 = file.lexically_normal().u8string();
+            path.assign(u8.begin(), u8.end());
+        }
+        run([path] { dialogs::answerNext(path); });
     } else if (verb == "answer_dialog") {
         // answer_dialog PATH | cancel: what the open pack or macro file dialog (Install Pack, New Pack's Save Pack,
         // a macro's "?") answers. PATH is relative to the script; a file that doesn't exist beside it (a save) lands
@@ -3409,6 +3438,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
         return false;
     }
     testing_ = true;
+    dialogs::setScripted(true); // no native dialog or browser from a script, ever (NativeDialog.h)
     scriptName_ = std::filesystem::path(std::u8string(path.begin(), path.end())).filename().string();
     {
         std::error_code ec;

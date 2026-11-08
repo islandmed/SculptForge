@@ -6,6 +6,7 @@
 // (copy code, save, rename, delete, reveal), pasting brushes from the
 // clipboard, and saving Brush Lab edits to the user library automatically.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/I18n.h"
 
 #include "app/Pickers.h"
@@ -207,7 +208,7 @@ void App::installBrushFile(const std::string& path) {
 void App::revealBrushFile(int index) {
     if (index < 0 || index >= int(doc_.brushes.size()) || doc_.brushes[size_t(index)].origin.path.empty()) return;
     const std::string dir = utf8(fsPath(doc_.brushes[size_t(index)].origin.path).parent_path());
-    if (!SDL_OpenURL(fileUrl(dir).c_str())) status_ = "Couldn't open " + dir + ": " + SDL_GetError();
+    if (!sf::dialogs::openUrl(fileUrl(dir).c_str())) status_ = "Couldn't open " + dir + ": " + SDL_GetError();
 }
 
 void App::drawCustomBrushes() {

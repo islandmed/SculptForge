@@ -6,6 +6,7 @@
 // Controls sheet (generated from the action registry) and classic
 // shortcut assignment.
 #include "app/UiScale.h"
+#include "app/NativeDialog.h"
 #include "app/Config.h"
 
 #include "app/App.h"
@@ -664,7 +665,7 @@ void App::initActions() {
         "Export the model as glTF binary, with sculpt layers as blend shapes (morph targets).");
     add("file.export_stl", "Export STL...", "File > Export", nullptr, [this] {
             static const SDL_DialogFileFilter filters[] = {{"STL", "stl"}, {"All files", "*"}};
-            SDL_ShowSaveFileDialog(onBridgeFileChosen, &bridgeDialogs_[int(BridgeFile::ExportStl)], window_, filters, 2, nullptr);
+            sf::dialogs::saveFile(onBridgeFileChosen, &bridgeDialogs_[int(BridgeFile::ExportStl)], window_, filters, 2, nullptr);
         },
         nullptr, nullptr, nullptr, nullptr, "Save the visible Parts as one binary STL, for 3D printing.");
     add("file.send_unreal", "Send to Unreal", "File > Export", "Ctrl+U", [this] { sendToUnreal(); }, ICON_LC_SEND, nullptr,
@@ -793,15 +794,15 @@ void App::initActions() {
         "your browser. Bugs still go to Report a problem (GitHub issues).");
     add("help.welcome", "Welcome", "Help", nullptr, [this] { showWelcome_ = true; }, ICON_LC_SPARKLES, nullptr, nullptr,
         nullptr, "The welcome note shown the first time SculptForge starts.");
-    add("help.website", "Website & documentation", "Help", nullptr, [] { SDL_OpenURL("https://sculptforge.app/"); },
+    add("help.website", "Website & documentation", "Help", nullptr, [] { sf::dialogs::openUrl("https://sculptforge.app/"); },
         ICON_LC_BOOK_OPEN, nullptr, nullptr, nullptr, "Open the SculptForge website and user guide in your browser.");
-    add("help.report", "Report a problem", "Help", nullptr, [] { SDL_OpenURL("https://github.com/islandmed/SculptForge/issues"); },
+    add("help.report", "Report a problem", "Help", nullptr, [] { sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/issues"); },
         ICON_LC_CIRCLE_ALERT, nullptr, nullptr, nullptr, "Open the issue tracker in your browser.");
     add("help.log", "Open log folder", "Help", nullptr,
         [this] {
             const std::string url = crashlog::folderUrl();
             if (url.empty()) status_ = "There is no log file (the user data folder couldn't be written).";
-            else if (!SDL_OpenURL(url.c_str()))
+            else if (!sf::dialogs::openUrl(url.c_str()))
                 status_ = "The log is " + crashlog::path() + " (couldn't open its folder: " + SDL_GetError() + ")";
         },
         ICON_LC_FILE_TEXT, nullptr, nullptr, nullptr,
@@ -814,7 +815,7 @@ void App::initActions() {
         "levels, and the GPU and driver. Turn it on, do what is slow, turn it off and attach the file to your report. "
         "A small file on this computer only; off by default and costs nothing when off.");
     add("help.feedback", "Fixes & suggestions", "Help", nullptr,
-        [] { SDL_OpenURL("https://github.com/islandmed/SculptForge/issues/new/choose"); }, ICON_LC_MESSAGE_SQUARE_PLUS,
+        [] { sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/issues/new/choose"); }, ICON_LC_MESSAGE_SQUARE_PLUS,
         nullptr, nullptr, nullptr,
         "Submit a request for a fix or a suggestion: opens the bug report and feature request forms in your browser.");
 
@@ -827,7 +828,7 @@ void App::initActions() {
         "The script console: every command you run appears as a script line, and you can type commands yourself.");
     add("script.run_file", "Run script file...", "Script", nullptr,
         [this] {
-            SDL_ShowOpenFileDialog(onUiFileChosen, &g_requests[kRunScript], window_, kScriptFilters, 2, nullptr, false);
+            sf::dialogs::openFile(onUiFileChosen, &g_requests[kRunScript], window_, kScriptFilters, 2, nullptr, false);
         },
         ICON_LC_FILE_CODE, nullptr, nullptr, nullptr, "Run a text file of script statements, one per line (# starts a comment).");
     add("script.copy_session", "Copy session as script", "Script", nullptr,
@@ -1203,30 +1204,30 @@ void App::restoreCustomUi() {
 }
 
 void App::saveUiDialog() {
-    SDL_ShowSaveFileDialog(onUiFileChosen, &g_requests[kSaveUi], window_, kUiFilters, 1, nullptr);
+    sf::dialogs::saveFile(onUiFileChosen, &g_requests[kSaveUi], window_, kUiFilters, 1, nullptr);
 }
 
 void App::importBlenderKeymapDialog() {
-    SDL_ShowOpenFileDialog(onUiFileChosen, &g_requests[kBlenderKeymap], window_, kBlenderKeymapFilters, 2, nullptr, false);
+    sf::dialogs::openFile(onUiFileChosen, &g_requests[kBlenderKeymap], window_, kBlenderKeymapFilters, 2, nullptr, false);
 }
 
 void App::importRadialMenuDialog() {
-    SDL_ShowOpenFileDialog(onUiFileChosen, &g_requests[kRadialImport], window_, kRadialFilters, 1, nullptr, false);
+    sf::dialogs::openFile(onUiFileChosen, &g_requests[kRadialImport], window_, kRadialFilters, 1, nullptr, false);
 }
 
 void App::exportRadialMenuDialog(int menu) {
     radialEdit_.exportMenu = menu;
-    SDL_ShowSaveFileDialog(onUiFileChosen, &g_requests[kRadialExport], window_, kRadialFilters, 1, nullptr);
+    sf::dialogs::saveFile(onUiFileChosen, &g_requests[kRadialExport], window_, kRadialFilters, 1, nullptr);
 }
 
 void App::chooseMayaFolder() { // the only way the Maya bridge gets a folder: the user picks it (PanelMaya.cpp)
     const std::string start = uiPrefs_.mayaFolder;
-    SDL_ShowOpenFolderDialog(onUiFileChosen, &g_requests[kMayaFolder], window_, start.empty() ? nullptr : start.c_str(),
+    sf::dialogs::openFolder(onUiFileChosen, &g_requests[kMayaFolder], window_, start.empty() ? nullptr : start.c_str(),
                              false);
 }
 
 void App::loadUiDialog() {
-    SDL_ShowOpenFileDialog(onUiFileChosen, &g_requests[kLoadUi], window_, kUiFilters, 1, nullptr, false);
+    sf::dialogs::openFile(onUiFileChosen, &g_requests[kLoadUi], window_, kUiFilters, 1, nullptr, false);
 }
 
 void App::queueUiFile(int kind, std::string path) {
@@ -1819,7 +1820,7 @@ void drawLibraryBrowserSection(App& app) {
     ImGui::TextColored(col(ui::color::textDim), "%s", tr("Library folder"));
     const std::string shown = p.libraryFolder.empty() ? std::string("Documents/SculptForge (default)") : p.libraryFolder;
     if (ImGui::Button((std::string(ICON_LC_FOLDER_OPEN "  ") + shown + "##libfolder").c_str(), ImVec2(-FLT_MIN, 0)))
-        SDL_ShowOpenFolderDialog(onUiFileChosen, &g_requests[kLibraryFolder], app.window_, nullptr, false);
+        sf::dialogs::openFolder(onUiFileChosen, &g_requests[kLibraryFolder], app.window_, nullptr, false);
     ui::HelpText("Library folder", nullptr,
                  "Where your projects, tools, brushes, alphas, images, splats and Snapshots live. Library shows it as User.",
                  "Preferences > Library");

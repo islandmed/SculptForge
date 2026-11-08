@@ -6,6 +6,7 @@
 // canvas, the left and right trays with their dividers, customize-mode drag
 // and drop, layout presets, and the actions behind all of it.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "io/BridgeProtocol.h"
 
 #include "app/BrandMark.h"
@@ -647,7 +648,7 @@ void App::registerShellActions() {
          [this] {
              static const SDL_DialogFileFilter filters[] = {
                  {"Models", "obj;fbx;glb;gltf;ply;stl;" SF_BRIDGE_MESH_EXTS ";usda;usd;usdz"}, {"All files", "*"}};
-             SDL_ShowOpenFileDialog(
+             sf::dialogs::openFile(
                  [](void* user, const char* const* files, int) {
                      if (files && files[0]) static_cast<App*>(user)->queueFile(FileAction::AppendPart, files[0]);
                  },

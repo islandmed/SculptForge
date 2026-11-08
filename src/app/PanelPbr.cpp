@@ -11,6 +11,7 @@
 // Every change goes through a command (texture_channels, channel_view, texture_layer_channel, export_maps), so it
 // is undoable where it edits the texture and scriptable; the brush material is a setting (paint_material).
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/Ui.h"
 
 #include "core/MapExport.h"
@@ -100,7 +101,7 @@ void App::registerPbrUiActions() {
     a.id = "texture.export_maps";
     a.label = "Export Maps...";
     a.palette = kMapPath;
-    a.run = [this] { SDL_ShowOpenFolderDialog(onExportFolder, nullptr, window_, nullptr, false); };
+    a.run = [this] { sf::dialogs::openFolder(onExportFolder, nullptr, window_, nullptr, false); };
     a.enabled = [this] { return hasTexture(doc_.mesh); };
     a.description = "Write the texture's channels as image files for an engine or DCC, with the export preset chosen "
                     "beside the button (Unreal, Unity URP / HDRP, glTF, Godot, Blender, USD).";

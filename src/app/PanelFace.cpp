@@ -5,6 +5,7 @@
 // canvas to guide the fit, the Face test (expression presets and a slider per shape), and recorded takes (play,
 // bake for export).
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/Demo.h"
 #include "app/Palettes.h"
 #include "app/Ui.h"
@@ -136,7 +137,7 @@ void App::registerFaceUiActions() {
         },
         [this] { return faceLandmarks_.count() > 0; }, "Remove the landmarks: Generate then finds the face by itself.", "");
     add("face.take_load", "Load Take...", ICON_LC_FOLDER_OPEN,
-        [this] { SDL_ShowOpenFileDialog(onFaceTakeChosen, this, window_, kTakeFilters, 2, nullptr, false); }, nullptr,
+        [this] { sf::dialogs::openFile(onFaceTakeChosen, this, window_, kTakeFilters, 2, nullptr, false); }, nullptr,
         "Play a recorded face take on the facial shapes: the JSON frames the phone link records ({\"type\":\"face\", "
         "\"t\":ms, \"weights\":{...}} as an array, {\"frames\":[...]} or JSON Lines).",
         "face_take_play");

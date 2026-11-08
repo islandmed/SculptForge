@@ -7,6 +7,7 @@
 // first); then example prompts. docs/guide/scripting.md "Live mode" says the same in the same words. Only while AI
 // features are on (Preferences > AI): the action is registered in registerAiActions() and removed with the others.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/ConnectAi.h"
 #include "app/I18n.h"
 #include "app/Theme.h"
@@ -161,7 +162,7 @@ void App::drawConnectAi() {
         copyButton(status_, sn.text, id);
         codeBox(sn.text, id, fontMono_);
     }
-    if (ImGui::SmallButton((std::string(ICON_LC_BOOK_OPEN " ") + tr("Their documentation")).c_str())) SDL_OpenURL(c.docs);
+    if (ImGui::SmallButton((std::string(ICON_LC_BOOK_OPEN " ") + tr("Their documentation")).c_str())) sf::dialogs::openUrl(c.docs);
     if (const std::vector<const char*> notes = connect::planNotes(c.plan); !notes.empty()) {
         ImGui::SameLine();
         ImGui::TextDisabled(ICON_LC_INFO " %s", tr("Plans and sign-in"));
