@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 namespace sf {
 
@@ -147,11 +148,17 @@ void App::drawForgeSpheresContents() {
     ui::ActionButton(*this, "forgesphere.preview", ImVec2(half, 0));
     ImGui::SameLine();
     ImGui::AlignTextToFramePadding();
-    ImGui::TextDisabled("%zu %s", doc_.mesh.forgespheres.size(), doc_.mesh.forgespheres.size() == 1 ? "sphere" : "spheres");
-    if (const int sel = forgesphereSelection(); sel >= 0) {
-        ImGui::SameLine();
-        ImGui::TextDisabled(tr(sel == 0 ? "(root selected)" : "(sphere %d selected)"), sel);
+    // The count and the selection wrap beside Preview rather than run off a narrow panel.
+    char count[160];
+    int n = std::snprintf(count, sizeof(count), "%zu %s", doc_.mesh.forgespheres.size(),
+                          doc_.mesh.forgespheres.size() == 1 ? "sphere" : "spheres");
+    if (const int sel = forgesphereSelection(); sel >= 0 && n > 0 && size_t(n) < sizeof(count)) {
+        count[n++] = ' ';
+        std::snprintf(count + n, sizeof(count) - size_t(n), tr(sel == 0 ? "(root selected)" : "(sphere %d selected)"), sel);
     }
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("%s", count);
+    ImGui::PopTextWrapPos();
     tray::GroupLabel(*this, "Make Mesh");
     ui::ActionButton(*this, "forgesphere.make_mesh", ImVec2(half, 0));
     ImGui::SameLine();
