@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/Pickers.h"
 #include "app/BrandMark.h"
 #include "io/BridgeProtocol.h"
@@ -2795,12 +2796,12 @@ void App::queueFile(FileAction action, std::string path) {
 void App::loadLitSphereDialog() {
     static const SDL_DialogFileFilter kLitSphereFilters[] = {{"Lit Sphere images", "png;jpg;jpeg;exr"}, {"All files", "*"}};
     const std::string folder = litsphereFolder();
-    SDL_ShowOpenFileDialog(onFileChosen, &dialogRequests_[int(FileAction::LoadLitSphere)], window_, kLitSphereFilters, 2,
+    sf::dialogs::openFile(onFileChosen, &dialogRequests_[int(FileAction::LoadLitSphere)], window_, kLitSphereFilters, 2,
                            folder.empty() ? nullptr : folder.c_str(), false);
 }
 
 void App::openFileDialog() {
-    SDL_ShowOpenFileDialog(onFileChosen, &dialogRequests_[int(FileAction::OpenObj)], window_, kModelFilters, 2,
+    sf::dialogs::openFile(onFileChosen, &dialogRequests_[int(FileAction::OpenObj)], window_, kModelFilters, 2,
                            nullptr, false);
 }
 
@@ -2844,7 +2845,7 @@ void App::saveFileDialog(FileAction action) {
                                     .u8string();
         suggestion.assign(s.begin(), s.end());
     }
-    SDL_ShowSaveFileDialog(onFileChosen, &dialogRequests_[int(action)], window_, filters, count,
+    sf::dialogs::saveFile(onFileChosen, &dialogRequests_[int(action)], window_, filters, count,
                            suggestion.empty() ? nullptr : suggestion.c_str());
 }
 
@@ -3162,13 +3163,13 @@ void App::drawUi() {
                                "(BSD-3-Clause) and Mbed TLS (Apache-2.0). Uses libcurl (curl license) "
                                "where available."));
             ImGui::Spacing();
-            if (ImGui::Button(tr("License"))) SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/LICENSE");
+            if (ImGui::Button(tr("License"))) sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/blob/main/LICENSE");
             ImGui::SameLine();
             if (ImGui::Button(tr("Third-party notices")))
-                SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/THIRD_PARTY_NOTICES.md");
+                sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/blob/main/THIRD_PARTY_NOTICES.md");
             ImGui::SameLine();
             if (ImGui::Button(tr("AI services & privacy")))
-                SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md");
+                sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md");
             ImGui::Spacing();
             drawSupportersSection(); // PanelSupport.cpp
         }
@@ -3434,7 +3435,7 @@ void App::drawRecipeEditor(BrushRecipe& recipe) {
     if (ImGui::Button(tr("Save .sfbrush..."), ImVec2(half, 0))) saveFileDialog(FileAction::SaveBrush);
     ImGui::SameLine();
     if (ImGui::Button(tr("Install .sfbrush..."), ImVec2(half, 0)))
-        SDL_ShowOpenFileDialog(onFileChosen, &dialogRequests_[int(FileAction::LoadBrush)], window_, kBrushFilters, 2,
+        sf::dialogs::openFile(onFileChosen, &dialogRequests_[int(FileAction::LoadBrush)], window_, kBrushFilters, 2,
                                nullptr, false);
 }
 
@@ -3580,7 +3581,7 @@ void App::drawAiSettings() {
         ImGui::TextWrapped(tr("The 2.5 GB model needs about 4 GB of free memory and works without a graphics card "
                            "(10-20 s per brush on a laptop CPU, a few seconds with a GPU)."));
         if (ImGui::SmallButton(tr("Full guide: Windows, macOS, Linux, LM Studio")))
-            SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/docs/local-ai.md");
+            sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/blob/main/docs/local-ai.md");
         ImGui::TreePop();
     }
     if (aiSettings_.provider == P::Anthropic) {
@@ -3940,7 +3941,7 @@ void App::drawComfyUi() {
     }
     auto browse = [this] {
         comfyPickingText_ = textMode_;
-        SDL_ShowOpenFileDialog(onFileChosen, &dialogRequests_[int(FileAction::ComfyWorkflow)], window_, kWorkflowFilters, 2,
+        sf::dialogs::openFile(onFileChosen, &dialogRequests_[int(FileAction::ComfyWorkflow)], window_, kWorkflowFilters, 2,
                                nullptr, false);
     };
     if (ImGui::BeginCombo(tr("Workflow"), preview.c_str())) {
@@ -3993,7 +3994,7 @@ void App::drawImageTo3D() {
         ImGui::PopStyleColor();
     } else {
         if (ImGui::Button(tr(refImage_.empty() ? "Choose image..." : "Change image..."), ImVec2(-1, 0)))
-            SDL_ShowOpenFileDialog(onFileChosen, &dialogRequests_[int(FileAction::OpenImage)], window_, kImageFilters, 2,
+            sf::dialogs::openFile(onFileChosen, &dialogRequests_[int(FileAction::OpenImage)], window_, kImageFilters, 2,
                                    nullptr, false);
         if (refImage_.empty()) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));

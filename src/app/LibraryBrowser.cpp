@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/Theme.h"
+#include "app/NativeDialog.h"
 #include "app/LibraryBrowser.h"
 
 #include "app/App.h"
@@ -566,7 +567,7 @@ void LibraryBrowser::contextMenu(App& app, const AssetEntry& e) {
         ImGui::Separator();
         if (ImGui::MenuItem(tr("Show in file manager"))) {
             const std::string dir = e.kind == AssetKind::Folder ? e.path : utf8(fsPath(e.path).parent_path());
-            if (!SDL_OpenURL(("file://" + dir).c_str())) app.status_ = "Couldn't open " + dir + ": " + SDL_GetError();
+            if (!sf::dialogs::openUrl(("file://" + dir).c_str())) app.status_ = "Couldn't open " + dir + ": " + SDL_GetError();
         }
         if (e.kind != AssetKind::Folder && ImGui::MenuItem(tr("Refresh thumbnail"))) app.thumbs_.refresh(e.path);
     }
@@ -796,7 +797,7 @@ void LibraryBrowser::drawHeader(App& app, float width) {
     ImGui::SameLine(0, 8 * scale);
     if (ImGui::Button(tr(compact ? ICON_LC_FOLDER_PLUS "###Open folder"
                               : ICON_LC_FOLDER_PLUS "  Open folder...###Open folder")))
-        SDL_ShowOpenFolderDialog(onFolderChosen, this, app.window_, nullptr, false);
+        sf::dialogs::openFolder(onFolderChosen, this, app.window_, nullptr, false);
     ui::HelpText("Open folder", nullptr, "Add a folder of your own to the Library (shown at the root of every tab).",
                  "Library");
     ImGui::SameLine(0, 8 * scale);
@@ -1168,7 +1169,7 @@ void LibraryBrowser::drawPreferences(App& app) {
     ImGui::TextDisabled("%s", tr("Library folder"));
     ImGui::TextWrapped("%s", app.library_.user.empty() ? "(none)" : app.library_.user.c_str());
     if (!app.library_.user.empty() && ImGui::Button(tr(ICON_LC_FOLDER_OPEN "  Show library folder")))
-        SDL_OpenURL(("file://" + app.library_.user).c_str());
+        sf::dialogs::openUrl(("file://" + app.library_.user).c_str());
 }
 
 // ---------------------------------------------------------------------------

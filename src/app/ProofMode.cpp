@@ -13,6 +13,7 @@
 // numbers live; the frames go, HUD included, to an MP4 (read back through pixel buffers, encoded by ffmpeg on
 // its own thread: BenchVideo.h), and a JSON result with the hardware and version is written at the end.
 #include "app/ProofMode.h"
+#include "app/NativeDialog.h"
 
 #include "core/Precision.h"
 
@@ -582,10 +583,10 @@ void App::drawProofUi() {
             if (p.video) ImGui::TextDisabled(tr("Video: %s"), p.videoPath.c_str());
             if (ImGui::Button(tr("Open folder"))) {
                 const std::string dir = std::filesystem::path(p.jsonPath).parent_path().string();
-                SDL_OpenURL(("file://" + dir).c_str());
+                sf::dialogs::openUrl(("file://" + dir).c_str());
             }
             ImGui::SameLine();
-            if (ImGui::Button(tr("How to share results"))) SDL_OpenURL("https://sculptforge.app/benchmarks/");
+            if (ImGui::Button(tr("How to share results"))) sf::dialogs::openUrl("https://sculptforge.app/benchmarks/");
             ImGui::SameLine();
             if (ImGui::Button(tr("Close"))) open = false;
         }

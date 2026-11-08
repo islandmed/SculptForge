@@ -4,6 +4,7 @@
 // Pop-up pickers (brush, stroke, alpha and material pop-ups), the
 // Size / Strength sliders at the cursor, and the thumbnail tile.
 #include "app/Theme.h"
+#include "app/NativeDialog.h"
 #include "app/Pickers.h"
 
 #include "app/App.h"
@@ -1030,7 +1031,7 @@ void drawAlphaGrid(App& app, GridMode mode) {
     if (order.empty()) ImGui::TextDisabled(tr("No alpha matches \"%s\""), filter);
     ImGui::Dummy(ImVec2(0, 2));
     if (ImGui::Button(tr(ICON_LC_FOLDER_OPEN "  Load image..."), ImVec2(mode == GridMode::Popup ? 0.0f : -1.0f, 0)))
-        SDL_ShowOpenFileDialog(App::onAlphaChosen, &app, app.window_, kAlphaFilters, 2, nullptr, false);
+        sf::dialogs::openFile(App::onAlphaChosen, &app, app.window_, kAlphaFilters, 2, nullptr, false);
     ui::HelpText("Load image", nullptr, "Use any grayscale image as the alpha: white = full effect, black = none.",
                  "Alpha");
     if (mode == GridMode::Popup) ImGui::SameLine();

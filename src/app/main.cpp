@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/Bench.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
@@ -330,7 +331,7 @@ static int runMain(int argc, char** argv) {
                                (app->startError().empty() ? std::string("See the log for details.") : app->startError()) +
                                "\n\nUpdating the graphics driver (from the PC or GPU maker) usually fixes this.";
             if (!sf::crashlog::path().empty()) text += "\n\nLog: " + sf::crashlog::path();
-            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "SculptForge", text.c_str(), nullptr);
+            sf::dialogs::message(SDL_MESSAGEBOX_ERROR, "SculptForge", text.c_str(), nullptr);
         }
         app->shutdown();
         sf::crashlog::stop();
