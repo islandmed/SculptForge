@@ -18,10 +18,13 @@
 #include "app/Ui.h"
 
 #include "core/Garment.h"
+#include "core/GarmentPrint.h"
+#include "core/GarmentTemplates.h"
 
 #include <IconsLucide.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -35,6 +38,7 @@ constexpr const char* kPath = "Tool > Garments";
 constexpr size_t kUndoSteps = 100;
 const SDL_DialogFileFilter kSvgFilter[] = {{"SVG", "svg"}};
 const SDL_DialogFileFilter kDxfFilter[] = {{"DXF", "dxf"}};
+const SDL_DialogFileFilter kPdfFilter[] = {{"PDF", "pdf"}};
 
 using garment::Panel;
 using garment::Pattern;
@@ -120,6 +124,12 @@ struct GarmentEditorState {
     int edits = 0; // commits from the window (UI tests)
     std::mutex fileMutex;
     std::string importPath, exportPath; // a file dialog's answer, taken on the next frame
+    std::string exportFormat;           // what the export dialog was opened for ("" = from the file's extension)
+    bool openTemplates = false, openPrint = false; // open the Templates / Print popup on the next draw
+    bool addTemplate = false;                      // Templates: beside the pattern instead of replacing it
+    bool printLetter = false, printLandscape = false;
+    std::string printKey; // the pattern and paper the page count is for
+    int printPages = 0;
 };
 
 // The window's work: reading the pattern, the view transform, edits as commands, undo.
@@ -176,6 +186,117 @@ struct GarmentUi {
         return app.lastCommandOk_;
     }
     std::string panelRef(int i) const { return std::to_string(i + 1); }
+
+    // Templates and Print, opened from the Garments panel or the window's toolbar (whichever draws first).
+    static const char* measureLabel(const std::string& key) {
+        if (key == "chest") return tr("Chest");
+        if (key == "waist") return tr("Waist");
+        if (key == "hip") return tr("Hip");
+        if (key == "neck") return tr("Neck");
+        if (key == "shoulder") return tr("Shoulder width");
+        if (key == "arm") return tr("Arm length");
+        if (key == "upper_arm") return tr("Upper arm");
+        if (key == "wrist") return tr("Wrist");
+        if (key == "back_length") return tr("Back length");
+        if (key == "inseam") return tr("Inseam");
+        if (key == "rise") return tr("Rise");
+        if (key == "waist_to_knee") return tr("Waist to knee");
+        if (key == "height") return tr("Height");
+        if (key == "head") return tr("Head");
+        if (key == "hand") return tr("Hand girth");
+        if (key == "hand_length") return tr("Hand length");
+        return "";
+    }
+    static const char* measureHelp(const std::string& key) {
+        if (key == "chest") return tr("Round the fullest part of the chest");
+        if (key == "waist") return tr("Round the natural waist");
+        if (key == "hip") return tr("Round the fullest part of the hips");
+        if (key == "neck") return tr("Round the base of the neck");
+        if (key == "shoulder") return tr("Shoulder point to shoulder point, across the back");
+        if (key == "arm") return tr("Shoulder point to wrist, arm hanging");
+        if (key == "upper_arm") return tr("Round the fullest part of the upper arm");
+        if (key == "wrist") return tr("Round the wrist");
+        if (key == "back_length") return tr("The bone at the base of the neck down to the waist");
+        if (key == "inseam") return tr("Crotch to the floor, or to where the trousers should end");
+        if (key == "rise") return tr("Sitting on a hard chair: waist down to the seat, at the side");
+        if (key == "waist_to_knee") return tr("Waist to knee, down the side");
+        if (key == "height") return tr("Height");
+        if (key == "head") return tr("Round the forehead and the back of the head");
+        if (key == "hand") return tr("Round the knuckles, thumb out");
+        if (key == "hand_length") return tr("Wrist crease to the tip of the middle finger");
+        return "";
+    }
+    void popups() {
+        const float scale = app.uiScale_;
+        if (s.openTemplates) ImGui::OpenPopup("##garment.templates");
+        if (s.openPrint) ImGui::OpenPopup("##garment.print");
+        s.openTemplates = s.openPrint = false;
+        if (ImGui::BeginPopup("##garment.templates")) {
+            ImGui::TextDisabled("%s", tr("New garment at your sizes"));
+            struct Item {
+                const char *id, *label;
+            };
+            const Item items[] = {{"tshirt", tr("T-Shirt")},       {"trousers", tr("Trousers")},
+                                  {"skirt", tr("Straight skirt")}, {"skirt_aline", tr("A-line skirt")},
+                                  {"hoodie", tr("Hoodie")},        {"dress", tr("Dress")},
+                                  {"cloak", tr("Cloak")},          {"glove", tr("Gloves")}};
+            for (const Item& it : items)
+                if (ImGui::Selectable((std::string(it.label) + "##garment.tpl." + it.id).c_str())) {
+                    Args a{{"template", std::string(it.id)}};
+                    if (s.addTemplate) a["add"] = true;
+                    if (run("garment_new", a)) {
+                        app.showGarments_ = true;
+                        s.frame = true;
+                        s.panel = -1;
+                    }
+                }
+            ImGui::Separator();
+            ImGui::Checkbox(tr("Add beside the pattern"), &s.addTemplate);
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+                ImGui::SetTooltip("%s", tr("Keep the pattern and add the new garment next to it (an outfit)"));
+            if (ImGui::TreeNode(tr("Size chart (mm)"))) {
+                const garment::SizeChart chart = garment::documentSizeChart(app.doc_);
+                const auto& specs = garment::measureSpecs();
+                for (size_t i = 0; i < specs.size(); ++i) {
+                    float v = chart.mm[i];
+                    ImGui::SetNextItemWidth(70 * scale);
+                    ImGui::InputFloat((std::string("##garment.size.") + specs[i].key).c_str(), &v, 0.0f, 0.0f, "%.0f");
+                    if (ImGui::IsItemDeactivatedAfterEdit())
+                        app.runCommand("garment_size", {{std::string(specs[i].key) + "_mm", double(v)}});
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted(measureLabel(specs[i].key));
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("%s", measureHelp(specs[i].key));
+                }
+                if (ImGui::Button(tr("Default sizes"))) app.runCommand("garment_size", {{"reset", true}});
+                ImGui::TreePop();
+            }
+            ImGui::EndPopup();
+        }
+        if (ImGui::BeginPopup("##garment.print")) {
+            ImGui::TextDisabled("%s", tr("Print at home, at real size"));
+            int paper = s.printLetter ? 1 : 0;
+            ImGui::RadioButton(tr("A4"), &paper, 0);
+            ImGui::SameLine();
+            ImGui::RadioButton(tr("Letter"), &paper, 1);
+            s.printLetter = paper == 1;
+            ImGui::SameLine();
+            ImGui::Checkbox(tr("Landscape"), &s.printLandscape);
+            garment::PrintOptions o;
+            o.paper = s.printLetter ? garment::Paper::Letter : garment::Paper::A4;
+            o.landscape = s.printLandscape;
+            const std::string key = s.json + (s.printLetter ? "L" : "4") + (s.printLandscape ? "l" : "p");
+            if (key != s.printKey) { // the count draws the pattern once: only when it or the paper changed
+                s.printKey = key;
+                const garment::TileLayout t = garment::tileLayout(s.pat, o);
+                s.printPages = s.pat.panels.empty() || t.rows * t.cols > garment::kMaxPrintPages ? 0 : t.pages();
+            }
+            ImGui::Text(tr("%d pages"), s.printPages);
+            ImGui::TextDisabled("%s", tr("Print at 100% (no fit to page), then measure the 50 mm square on page A1."));
+            ui::ActionButton(app, "garment.print_pdf", ImVec2(-1, 0));
+            ui::ActionButton(app, "garment.print_svg", ImVec2(-1, 0));
+            ImGui::EndPopup();
+        }
+    }
     void setPanel(int i, const Panel& p) {
         run("garment_edit", {{"op", std::string("set_panel")}, {"panel", panelRef(i)}, {"points", pointsJson(p)},
                              {"curves", curvesJson(p)}});
@@ -412,12 +533,38 @@ void App::registerGarmentActions() {
         "Sew two edges: click one, then the other. Their lengths show while you pick; Flip sews start to start.",
         "garment_sew");
     add("garment.export_svg", "Export SVG", ICON_LC_FILE_DOWN, "",
-        [this] { SDL_ShowSaveFileDialog(onGarmentFileChosen, &exportRequest, window_, kSvgFilter, 1, nullptr); }, nullptr,
-        have, "Save the panels at real size for printing and sewing: sewing and cutting lines, notches, grain lines.",
+        [this] {
+            garments_->exportFormat.clear();
+            SDL_ShowSaveFileDialog(onGarmentFileChosen, &exportRequest, window_, kSvgFilter, 1, nullptr);
+        },
+        nullptr, have, "Save the panels at real size for printing and sewing: sewing and cutting lines, notches, grain lines.",
         "garment_export");
     add("garment.export_dxf", "Export DXF", ICON_LC_FILE_DOWN, "",
-        [this] { SDL_ShowSaveFileDialog(onGarmentFileChosen, &exportRequest, window_, kDxfFilter, 1, nullptr); }, nullptr,
-        have, "Save the outlines in millimetres for cutting machines.", "garment_export");
+        [this] {
+            garments_->exportFormat.clear();
+            SDL_ShowSaveFileDialog(onGarmentFileChosen, &exportRequest, window_, kDxfFilter, 1, nullptr);
+        },
+        nullptr, have, "Save the outlines in millimetres for cutting machines.", "garment_export");
+    add("garment.templates", "Templates", ICON_LC_LAYOUT_TEMPLATE, "", [this] { garments_->openTemplates = true; }, nullptr,
+        nullptr,
+        "Start a garment from a template at your sizes: T-shirt, trousers, skirts, hoodie, dress, cloak, gloves. The "
+        "size chart is saved in the project.",
+        "garment_new");
+    add("garment.print", "Print", ICON_LC_PRINTER, "", [this] { garments_->openPrint = true; }, nullptr, have,
+        "Print the pattern at home on A4 or Letter pages that tape together, at real size.", "garment_export");
+    add("garment.print_pdf", "Save PDF...", ICON_LC_FILE_DOWN, "",
+        [this] {
+            garments_->exportFormat = "pdf";
+            SDL_ShowSaveFileDialog(onGarmentFileChosen, &exportRequest, window_, kPdfFilter, 1, nullptr);
+        },
+        nullptr, have, "Every page in one PDF: trim lines, matching triangles, page names, the 50 mm square.",
+        "garment_export");
+    add("garment.print_svg", "Save SVG pages...", ICON_LC_FILE_DOWN, "",
+        [this] {
+            garments_->exportFormat = "svg_pages";
+            SDL_ShowSaveFileDialog(onGarmentFileChosen, &exportRequest, window_, kSvgFilter, 1, nullptr);
+        },
+        nullptr, have, "The same pages, one SVG file each (name-A1.svg, name-A2.svg, ...).", "garment_export");
     add("garment.import_svg", "Import SVG", ICON_LC_FILE_UP, "",
         [this] { SDL_ShowOpenFileDialog(onGarmentFileChosen, &importRequest, window_, kSvgFilter, 1, nullptr, false); },
         nullptr, nullptr, "Add panels from an SVG: every closed shape, at the file's real size.", "garment_import");
@@ -437,6 +584,10 @@ void App::drawGarmentsContents() {
     ui::ActionButton(*this, "garment.new_tshirt", ImVec2(half, 0));
     ImGui::SameLine();
     ui::ActionButton(*this, "garment.import_svg", ImVec2(-1, 0));
+    ui::ActionButton(*this, "garment.templates", ImVec2(half, 0));
+    ImGui::SameLine();
+    ui::ActionButton(*this, "garment.print", ImVec2(-1, 0));
+    u.popups();
     const Pattern& pat = garments_->pat;
     if (pat.panels.empty()) ImGui::TextDisabled("%s", tr("No pattern yet"));
     else ImGui::TextDisabled(tr("%d panels, %d seams"), int(pat.panels.size()), int(pat.seams.size()));
@@ -456,7 +607,21 @@ void App::drawGarments() {
             out.swap(s.exportPath);
         }
         if (!in.empty() && u.run("garment_import", {{"path", in}})) s.frame = true;
-        if (!out.empty()) runCommand("garment_export", {{"path", out}});
+        if (!out.empty()) {
+            Args a{{"path", out}};
+            if (!s.exportFormat.empty()) { // Print: the pages, on the paper picked
+                const bool pdf = s.exportFormat == "pdf";
+                const std::string ext = pdf ? ".pdf" : ".svg";
+                if (out.size() < 4 || !std::equal(ext.begin(), ext.end(), out.end() - 4, [](char x, char y) {
+                        return std::tolower(static_cast<unsigned char>(x)) == std::tolower(static_cast<unsigned char>(y));
+                    }))
+                    a["path"] = out + ext;
+                a["format"] = s.exportFormat;
+                a["paper"] = std::string(s.printLetter ? "letter" : "a4");
+                a["landscape"] = s.printLandscape;
+            }
+            runCommand("garment_export", a);
+        }
     }
     const CanvasRect cr = canvasRect();
     ImGui::SetNextWindowPos(ImVec2(cr.x + cr.w * 0.34f, cr.y + 6 * scale), ImGuiCond_FirstUseEver);
@@ -472,10 +637,12 @@ void App::drawGarments() {
     if (s.panel >= int(pat.panels.size())) s.panel = -1;
 
     // Toolbar.
-    for (const char* id : {"garment.new_tshirt", "garment.add_rect", "garment.import_svg", "garment.export_svg", "garment.export_dxf"}) {
+    for (const char* id : {"garment.templates", "garment.new_tshirt", "garment.add_rect", "garment.import_svg",
+                           "garment.print", "garment.export_svg", "garment.export_dxf"}) {
         ui::ActionButton(*this, id, ImVec2(0, 0), ui::Look::Icon);
         ImGui::SameLine();
     }
+    u.popups();
     ImGui::SameLine(0, 12 * scale);
     ui::ActionButton(*this, "garment.undo", ImVec2(0, 0), ui::Look::Icon);
     ImGui::SameLine();
@@ -866,6 +1033,7 @@ double App::garmentTestValue(const std::string& name) {
     u.refresh();
     if (name == "garment_window_open") return showGarments_ ? 1.0 : 0.0;
     if (name == "garment_panels") return double(s.pat.panels.size());
+    if (name == "garment_print_pages") return double(s.printPages); // the Print popup's count (0 until it opened)
     if (name == "garment_seams") return double(s.pat.seams.size());
     if (name == "garment_selected") return double(s.panel + 1);
     if (name == "garment_hover_seam") return double(s.hoverSeam + 1); // the seam row under the pointer (0: none)
