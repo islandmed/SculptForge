@@ -1,8 +1,8 @@
 ---
 fixed: **Drape** settles where it used to keep twitching: cloth pressed into a narrow fold of the body (an armpit, the
   inside of an elbow) stays put instead of bouncing between the two sides, and sewn seams no longer pull the cloth
-  through the body while they close. A drape now stops as soon as nothing is going anywhere, so it often finishes
-  sooner.
+  through the body while they close. It now runs until the cloth has really stopped, which can take a moment longer
+  (still under 10 s for a 2M-triangle body).
 testers:
   - Any OS: Drape a plane onto a body so it hangs into an armpit or between the arm and the chest: it comes to rest
     (the status says "at rest"), with no flicker in the fold.
