@@ -14,7 +14,9 @@ expect_value parts == 1
 run open path=sf_ui_tube_fn.sfproj
 expect_value parts == 3
 expect_value tube_parts == 2
+hold shift                                     # (Draw Tube is on: Shift grabs a dot)
 drag_tube_point 1 0 -50
+hold none
 expect_status "point moved"
 shot reopened-edit
 # Exports: the tubes go out as meshes.

@@ -48,7 +48,9 @@ drag_path 0.3 0.4 0.55 0.2 0.8 0.45 1.05 0.25 1.3 0.5 S=1.2
 wait 0.2
 expect_value tube_parts == 1
 expect_value active_part == 0
+hold shift                                     # (Draw Tube is on: Shift grabs a dot)
 drag_tube_point 2 0 -60
+hold none
 expect_value active_part == 1
 click "Standard##brush.standard"
 expect_value tube_draw == 0

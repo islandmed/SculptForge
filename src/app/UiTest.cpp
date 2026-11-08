@@ -649,6 +649,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "tube_selected") return double(app_.tubeSelection());
     if (name == "tube_first_radius_x1000" || name == "tube_last_radius_x1000") // the active Tube Part's ends
         return m.tube.empty() ? -1.0 : 1000.0 * (name[5] == 'f' ? m.tube.points.front() : m.tube.points.back()).radius;
+    if (name == "tube_profile") return double(int(m.tube.profile)); // 0 round, 1 square, 2 triangle, 3 ribbon
+    if (name == "tube_taper_end") return double(m.tube.taperEnd);
     if (name == "tube_parts") {
         int n = 0;
         for (int i = 0; i < app_.doc_.partCount(); ++i) n += !app_.doc_.partMesh(i).tube.empty();
