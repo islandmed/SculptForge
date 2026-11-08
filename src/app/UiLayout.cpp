@@ -42,9 +42,8 @@ UiLayout standardLayout() {
     l.leftShelf = {"widget.tile.brush", "widget.tile.stroke", "stroke.popup", "widget.tile.alpha", "widget.tile.material",
                    "widget.color"};
     l.rightShelf = {"edit.undo",  "edit.redo",       "sep",
-                    "view.frame", "widget.nav.move", "widget.nav.zoom", "widget.nav.rotate", "view.turntable",
-                    "view.ortho", "view.floor_grid", "sep",
-                    "view.wire", "view.facegroups", "view.mask",       "view.vertexpaint",    "view.flat_shading", "sep",
+                    "view.frame", "widget.nav.move", "widget.nav.zoom", "widget.nav.rotate", "sep",
+                    "view.wire", "view.facegroups", "view.mask",       "view.vertexpaint",    "sep",
                     "part.solo", "view.splats"};
     l.bottomShelf = {"brush.standard", "brush.clay",    "brush.clayblock", "brush.sharpcrease", "brush.move",
                      "brush.smooth",   "brush.inflate", "brush.pinch",       "brush.flatten",     "brush.crease",
@@ -67,9 +66,8 @@ UiLayout standardLayout(int shellLayout) {
                   "draw.dynamic",         "widget.dyntopo_detail", "sep",
                   "transform.symmetry_x", "transform.symmetry_y", "transform.symmetry_z", "transform.symmetry_radial"};
     l.rightShelf = {"edit.undo",  "edit.redo",       "sep",
-                    "view.frame", "widget.nav.move", "widget.nav.zoom", "widget.nav.rotate", "view.turntable",
-                    "view.ortho", "view.floor_grid", "sep",
-                    "view.wire", "view.facegroups", "view.mask",       "view.vertexpaint",    "view.flat_shading", "sep",
+                    "view.frame", "widget.nav.move", "widget.nav.zoom", "widget.nav.rotate", "sep",
+                    "view.wire", "view.facegroups", "view.mask",       "view.vertexpaint",    "sep",
                     "part.solo", "view.splats"};
     return l;
 }
@@ -144,21 +142,6 @@ bool fromJson(const Json& j, UiLayout& l, std::string& error, int shellLayout) {
         std::find(out.rightShelf.begin(), out.rightShelf.end(), "edit.undo") == out.rightShelf.end() &&
         std::find(out.rightShelf.begin(), out.rightShelf.end(), "edit.redo") == out.rightShelf.end())
         out.rightShelf.insert(out.rightShelf.begin(), {"edit.undo", "edit.redo", "sep"});
-    // Version 5 added the view toggles (foirgairwolf on Discord): Turntable, Ortho and Floor under Rotate, Flat under
-    // Paint, in stored right shelves that still have those neighbours.
-    if (int(j["version"].asNumber(1)) < 5 && j["rightShelf"].isArray()) {
-        auto has = [&](const char* id) { return std::find(out.rightShelf.begin(), out.rightShelf.end(), id) != out.rightShelf.end(); };
-        auto after = [&](const char* anchor, std::initializer_list<const char*> ids) {
-            const auto at = std::find(out.rightShelf.begin(), out.rightShelf.end(), anchor);
-            if (at == out.rightShelf.end()) return;
-            std::vector<std::string> add;
-            for (const char* id : ids)
-                if (!has(id)) add.push_back(id);
-            out.rightShelf.insert(at + 1, add.begin(), add.end());
-        };
-        after("widget.nav.rotate", {"view.turntable", "view.ortho", "view.floor_grid"});
-        after("view.vertexpaint", {"view.flat_shading"});
-    }
     readStrings(j["bottomShelf"], out.bottomShelf);
     flag("consoleOpen", out.consoleOpen);
     number("consoleHeight", out.consoleHeight);
