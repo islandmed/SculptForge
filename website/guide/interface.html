@@ -55,7 +55,7 @@
 <p>SculptForge&#x27;s window has the 3D view (the canvas) in the middle, shelves of the most-used controls around it, menus along the top that hold every function, and trays at the sides where panels can stay open. It comes in two layouts: the <strong>SculptForge layout</strong> (the default), with menus by task, and the <strong>Classic layout</strong>, with a bar of alphabetical palettes. Both hold the same controls; see <a href="#looks-and-layouts">Looks and layouts</a> to switch. This chapter walks through each region, the pop-up pickers, the Library, the built-in help, and how to rearrange the interface and keep your changes. The pictures show the default look and layout.</p>
 <figure class="shot"><a href="images/interface-overview.jpg" class="zoom"><img src="images/interface-overview.jpg" alt="The SculptForge window with its main regions labelled" width="1280" height="768" loading="lazy" decoding="async"></a><figcaption>The SculptForge window with its main regions labelled</figcaption></figure>
 <h2 id="the-regions-at-a-glance">The regions at a glance<a class="anchor" href="#the-regions-at-a-glance" aria-label="Link to this section">#</a></h2>
-<div class="table-wrap"><table><thead><tr><th>Region</th><th>Where</th><th>What it holds</th></tr></thead><tbody><tr><td>Menu bar</td><td>Top edge</td><td>The menus <strong>File, Edit, Sculpt, Paint, Mesh, View, Render, Help</strong>; the status message; mode, brush, file name, triangles and frame rate; layout presets <strong>1 2 3</strong>; <strong>Search</strong></td></tr><tr><td>Top shelf</td><td>Under the menu bar</td><td>Sculpt/Paint, Draw/Move/Scale/Rotate, Add/Sub, Rgb, Size, Intensity, Dynamic, symmetry</td></tr><tr><td>Left shelf</td><td>Left of the canvas</td><td>Brush, Stroke, Alpha and Material tiles, the colour picker, Fill</td></tr><tr><td>Canvas</td><td>Centre</td><td>The 3D view, with the Sculpt Timeline along its top; strokes and navigation start only here</td></tr><tr><td>Right shelf</td><td>Right of the canvas</td><td>Undo and Redo, Frame, Move, Zoom and Rotate, view and display toggles, Solo</td></tr><tr><td>Right tray</td><td>Far right</td><td>The <strong>Tool</strong> panel: the active Part, Parts, Layers, Geometry, Masking and more</td></tr><tr><td>Bottom shelf</td><td>Below the canvas</td><td>Your quick brushes</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>Region</th><th>Where</th><th>What it holds</th></tr></thead><tbody><tr><td>Menu bar</td><td>Top edge</td><td>The menus <strong>File, Edit, Sculpt, Paint, Mesh, View, Render, Help</strong>; the status message; mode, brush, file name, triangles and frame rate; layout presets <strong>1 2 3</strong>; <strong>Search</strong></td></tr><tr><td>Top shelf</td><td>Under the menu bar</td><td>Sculpt/Paint, Draw/Move/Scale/Rotate, Add/Sub, Rgb, Size, Intensity, Dynamic, symmetry</td></tr><tr><td>Left shelf</td><td>Left of the canvas</td><td>Brush, Stroke, Alpha and Material tiles, the colour picker, Fill</td></tr><tr><td>Canvas</td><td>Centre</td><td>The 3D view, with the Sculpt Timeline along its top; strokes and navigation start only here</td></tr><tr><td>Right shelf</td><td>Right of the canvas</td><td>Undo and Redo, Frame, Move, Zoom and Rotate, display toggles, Solo</td></tr><tr><td>Right tray</td><td>Far right</td><td>The <strong>Tool</strong> panel: the active Part, Parts, Layers, Geometry, Masking and more</td></tr><tr><td>Bottom shelf</td><td>Below the canvas</td><td>Your quick brushes</td></tr></tbody></table></div>
 <p>Press <kbd>Tab</kbd> to hide the shelves and trays for a bigger canvas, and again to bring them back. The menu bar stays, so every function is still one click away.</p>
 <p>The <strong>Classic layout</strong> has a title strip and a bar of 16 alphabetical palettes instead of the menu bar, and a two-row top shelf; the rest is the same. See <a href="#the-title-strip-classic-layout">The title strip</a> and <a href="#menus-and-palettes">Palettes</a>.</p>
 <h2 id="looks-and-layouts">Looks and layouts<a class="anchor" href="#looks-and-layouts" aria-label="Link to this section">#</a></h2>
@@ -193,7 +193,7 @@
 <strong>Rgb</strong>: sculpt brushes paint the colour at the same time.
 </li>
 <li>
-<strong>Size</strong>: the brush radius in screen pixels (2 to 800). While you drag it, the brush ring shows on the model at the new size, where the cursor last was (or in the middle of the view), and fades out when you let go.
+<strong>Size</strong>: the brush radius in screen pixels (2 to 800).
 </li>
 <li>
 <strong>Intensity</strong>: how strongly each dab changes the surface (1 to 100). While <kbd>Shift</kbd> is held it shows Smooth&#x27;s own value.
@@ -227,22 +227,13 @@
 <h3 id="right-shelf">Right shelf<a class="anchor" href="#right-shelf" aria-label="Link to this section">#</a></h3>
 <ul>
 <li>
-<strong>Undo</strong> and <strong>Redo</strong> (<kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>): greyed out when there is nothing to undo or redo. A layout you customised before they were added gets them at the top (and the view toggles below Rotate and Paint).
+<strong>Undo</strong> and <strong>Redo</strong> (<kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>): greyed out when there is nothing to undo or redo. A layout you customised before they were added gets them at the top.
 </li>
 <li>
 <strong>Frame</strong> (<kbd>F</kbd>): fits the model in the view.
 </li>
 <li>
 <strong>Move</strong>, <strong>Zoom</strong>, <strong>Rotate</strong>: drag on these buttons to pan, zoom and orbit the view.
-</li>
-<li>
-<strong>Turn</strong>: rotation drags turn the model upright like a turntable (on) or freely (off), as <strong>View &gt; Orbit lock</strong> sets it.
-</li>
-<li>
-<strong>Ortho</strong> (<kbd>Numpad 5</kbd>): an orthographic view (on) or perspective (off).
-</li>
-<li>
-<strong>Floor</strong>: the floor grid under the model, as <strong>View &gt; Floor grid</strong>.
 </li>
 <li>
 <strong>Wire</strong> (<kbd>Shift</kbd>+<kbd>F</kbd>): shows the mesh&#x27;s polygons: quads as quads, triangles as triangles.
@@ -255,9 +246,6 @@
 </li>
 <li>
 <strong>Paint</strong>: shows vertex paint colours (on by default).
-</li>
-<li>
-<strong>Flat</strong>: flat shading, every polygon its own face (on), or smooth shading (off), as <strong>Render &gt; Materials &gt; Smooth | Flat</strong>.
 </li>
 <li>
 <strong>Solo</strong>: shows only the active Part (available with two or more Parts).
