@@ -116,6 +116,8 @@
 //                            timeline_height / library_height (the strips, logical px; 0 not shown), library_tile,
 //                            axis_view (the side view named under the axis gizmo: 0-5 = +x +y +z -x -y -z, -1 none),
 //                            style_window_min (ImGui's minimum window height, unscaled px: 32 in every look),
+//                            style_popup_alpha / style_menu_alpha / style_window_alpha (the look's PopupBg, MenuBarBg and
+//                            WindowBg alpha: 1, opaque, in every look),
 //                            tablet_mouse_mode (Preferences > Tablet > Mouse mode),
 //                            ui_mouse_x / ui_mouse_y (where ImGui sees the pointer), backface_culling, drawn_triangles,
 //                            floor_grid (View > Display > Floor grid), floor_grid_drawn (the 3D view drawn once more
@@ -1144,6 +1146,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "frame_height") return double(ImGui::GetFrameHeight()); // a button's height: font + style padding
     if (name == "panel_width") return double(app_.shell_.rightShelf.w); // the right shelf, 52 logical px
     if (name == "title_height") return double(app_.shell_.title.h);
+    if (name == "style_popup_alpha") return double(ImGui::GetStyle().Colors[ImGuiCol_PopupBg].w);
+    if (name == "style_menu_alpha") return double(ImGui::GetStyle().Colors[ImGuiCol_MenuBarBg].w);
+    if (name == "style_window_alpha") return double(ImGui::GetStyle().Colors[ImGuiCol_WindowBg].w);
     if (name == "style_window_min") return double(ImGui::GetStyle().WindowMinSize.y / std::max(app_.uiScale_, 0.01f));
     // Draw > Camera > Gizmo size and View Figure: the axes' length in unscaled px (34 at Medium), the figure shown.
     if (name == "axis_gizmo_length") return double(34.0f * app_.axisGizmoUnit() / std::max(app_.uiScale_, 0.01f));

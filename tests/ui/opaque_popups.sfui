@@ -1,0 +1,71 @@
+# Opaque popups (fix/opaque-popups): at 200% the Preferences popup showed the Sculpt Timeline's "Save with project" and
+# the shelf text through it (PopupBg alpha 0.98/0.99). Popups, menus, tooltips and windows are opaque in every look and
+# colour scheme; overlays on the 3D view (timeline, hints, badges) keep their own translucency.
+run new_sphere subdivisions=3
+stroke 0.35 0.40 0.60 0.45
+stroke 0.35 0.50 0.60 0.55
+ui_scale 200
+wait_idle 10
+expect_value style_popup_alpha == 1
+expect_value style_menu_alpha == 1
+expect_value style_window_alpha == 1
+click "Edit##menu.edit"
+click "Preferences##section.preferences"
+expect "Preferences/##totray"
+shot preferences-forge-200
+key escape
+
+run ui_look look=classic layout=classic
+wait 0.2
+expect_value style_popup_alpha == 1
+expect_value style_menu_alpha == 1
+expect_value style_window_alpha == 1
+click "Preferences##palette.preferences"
+shot preferences-classic-200
+key escape
+
+run ui_look look=phosphor phosphor=amber effects=true layout=sculptforge
+wait 0.2
+expect_value style_popup_alpha == 1
+expect_value style_menu_alpha == 1
+expect_value style_window_alpha == 1
+run ui_look look=blueprint
+wait 0.2
+expect_value style_popup_alpha == 1
+expect_value style_menu_alpha == 1
+expect_value style_window_alpha == 1
+
+# Every Forge Terminal colour scheme.
+run ui_look look=forge scheme=neutral
+wait 0.2
+expect_value style_popup_alpha == 1
+expect_value style_menu_alpha == 1
+run ui_look scheme=tokyo_night
+wait 0.2
+expect_value style_popup_alpha == 1
+expect_value style_menu_alpha == 1
+run ui_look scheme=catppuccin_mocha
+wait 0.2
+expect_value style_popup_alpha == 1
+expect_value style_menu_alpha == 1
+run ui_look scheme=gruvbox_dark
+wait 0.2
+expect_value style_popup_alpha == 1
+expect_value style_menu_alpha == 1
+run ui_look scheme=nord
+wait 0.2
+expect_value style_popup_alpha == 1
+expect_value style_menu_alpha == 1
+run ui_look scheme=rose_pine
+wait 0.2
+expect_value style_popup_alpha == 1
+expect_value style_menu_alpha == 1
+run ui_look scheme=kanagawa
+wait 0.2
+expect_value style_popup_alpha == 1
+expect_value style_menu_alpha == 1
+run ui_look scheme=everforest outlines=off
+wait 0.2
+expect_value style_popup_alpha == 1
+expect_value style_menu_alpha == 1
+expect_value style_window_alpha == 1

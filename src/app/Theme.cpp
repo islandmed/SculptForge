@@ -38,9 +38,10 @@ void applyStyle() {
     ImVec4* c = s.Colors;
     c[ImGuiCol_Text] = text;
     c[ImGuiCol_TextDisabled] = textDim;
-    c[ImGuiCol_WindowBg] = ImVec4(panelBg.x, panelBg.y, panelBg.z, 0.98f);
+    // Opaque: text behind a window, menu or tooltip showed through at 200% (overlays on the 3D view set their own alpha).
+    c[ImGuiCol_WindowBg] = ImVec4(panelBg.x, panelBg.y, panelBg.z, 1.0f);
     c[ImGuiCol_ChildBg] = ImVec4(0, 0, 0, 0);
-    c[ImGuiCol_PopupBg] = ImVec4(panelBg.x, panelBg.y, panelBg.z, 0.98f);
+    c[ImGuiCol_PopupBg] = ImVec4(panelBg.x, panelBg.y, panelBg.z, 1.0f);
     c[ImGuiCol_Border] = rgb(0x3c3c3c, 0.9f);
     c[ImGuiCol_BorderShadow] = ImVec4(0, 0, 0, 0);
     c[ImGuiCol_FrameBg] = frame;
@@ -247,8 +248,8 @@ void applyLook(const LookSettings& settings, std::string* status) {
     s.WindowBorderSize = s.PopupBorderSize = 1.0f;
     ImVec4* c = s.Colors;
     const ImVec4 s1 = rgb(palette.surface1), s2 = rgb(palette.surface2);
-    c[ImGuiCol_WindowBg] = ImVec4(panelBg.x, panelBg.y, panelBg.z, 0.99f);
-    c[ImGuiCol_PopupBg] = ImVec4(panelBg.x, panelBg.y, panelBg.z, 0.99f);
+    c[ImGuiCol_WindowBg] = ImVec4(panelBg.x, panelBg.y, panelBg.z, 1.0f); // opaque, as in Classic
+    c[ImGuiCol_PopupBg] = ImVec4(panelBg.x, panelBg.y, panelBg.z, 1.0f);
     c[ImGuiCol_Border] = look.outlines == 0 ? mixc(panelBg, strong, 0.3f) : tileBorder; // (popups keep an edge)
     c[ImGuiCol_FrameBgActive] = s1;
     c[ImGuiCol_TitleBgActive] = s1;

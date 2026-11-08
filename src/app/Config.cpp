@@ -1439,7 +1439,7 @@ void App::drawHelpConsoleUi() {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f * s, 12.0f * s));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f * s);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, col(IM_COL32(0x18, 0x18, 0x1a, 0xf8)));
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, col(IM_COL32(0x18, 0x18, 0x1a, 0xff)));
         ImGui::PushStyleColor(ImGuiCol_Border, col(IM_COL32(0xf0, 0x88, 0x2e, 0xa0)));
         if (ImGui::Begin("##shortcut_capture", nullptr,
                          ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
