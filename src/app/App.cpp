@@ -2134,6 +2134,7 @@ void App::onMouseUp() {
 }
 
 void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
+    if (tubeKey(key, mod)) return;   // Esc / Undo / Redo during a tube stroke or point drag drop it (PanelTube.cpp)
     if (cutPolylineKey(key)) return; // Enter ends a Cut Polyline, Esc drops it (PanelCut.cpp)
     if (gradientKey(key)) return;    // Enter keeps a Line Gradient, Esc takes it back (LineGradient.cpp)
     if (stencilKey(key, mod)) return; // Adjust Stencil's keys, Enter / Esc ends it (StencilOverlay.cpp)
