@@ -68,6 +68,10 @@ struct ClothSetup {
     std::vector<float> pin;
     std::vector<ClothSeam> seams;
     float seamCompliance = 0.0f;       // 0 = rigid once closed
+    // Empty, or one per particle: the side it was put on from (Garments: the panel's facing, out of the body). A
+    // particle that starts inside a collider leaves it that way on the first frame, not toward the nearest surface
+    // (which, for a sleeve's hem inside a bent elbow, is half the time the far side of the arm).
+    std::vector<glm::vec3> outward;
 };
 
 // Surfaces the cloth collides with (other Parts). Holds its own copy of the triangles (built once per Drape).
@@ -103,7 +107,8 @@ struct ClothSettings {
     float frameSeconds = 1.0f / 60.0f;
     int substeps = 12;
     int iterations = 1; // constraint passes per substep (the brush uses more: its soft pins pull every substep)
-    // At rest: the largest particle speed (m/s) stays under this for `restFrames` frames in a row.
+    // At rest: over `restFrames` frames no particle got half as far as this speed (m/s) would take it, and none went
+    // faster than ten times it.
     float restSpeed = 0.01f;
     int restFrames = 10;
     // > 0: self-collision, particles keep at least this far apart (m; pairs closer than it at rest are skipped).
@@ -138,7 +143,7 @@ public:
 
     // One frame (settings.substeps substeps). Returns true while moving, false once at rest.
     bool step();
-    bool atRest() const { return restCount_ >= settings_.restFrames; }
+    bool atRest() const { return rested_; }
     float maxSpeed() const { return maxSpeed_; }    // last frame's, m/s
     double kineticEnergy() const;                   // J
     // The worst relative edge stretch, |l - rest| / rest, over all edges (tests, the stats readout).
@@ -165,6 +170,7 @@ private:
     void findThinPairs(float span); // (span: seconds until the next look)
     void separateThin();
     void sweepParticles();
+    void leaveColliders(); // (the first frame: particles that start inside go out along outward_)
     void substep(float h);
 
     Fabric fabric_;
@@ -186,6 +192,10 @@ private:
     // Per particle, this frame's nearest collider point and normal (contact_ = 0: none in reach).
     std::vector<uint8_t> contact_;
     std::vector<glm::vec3> contactPoint_, contactNormal_;
+    std::vector<uint8_t> contact2_;                   // a second surface in a concave corner (an armpit, a crotch)
+    std::vector<glm::vec3> contactPoint2_, contactNormal2_;
+    std::vector<uint8_t> hadContact2_;                // last frame's contact2_ (looked for again every frame)
+    std::vector<float> contactReach_; // (how far findContacts looked: a move shorter than that crossed nothing)
     // Thin features: a collider vertex near a cloth triangle and the side of it the vertex keeps (+1 / -1).
     struct ThinPair {
         uint32_t tri, vertex;
@@ -201,13 +211,17 @@ private:
     std::vector<std::pair<uint64_t, uint32_t>> thinGrid_;
     glm::vec3 thinLo_{0.0f}, thinHi_{-1.0f};
     std::vector<glm::vec3> start_; // positions at the frame's start (the swept-path check)
+    std::vector<glm::vec3> outward_; // ClothSetup::outward (unit), for the first frame
     std::vector<glm::vec3> thinDx_;
     std::vector<float> thinCount_;
     float meanEdge_ = 0.01f;       // rest edge length, mean
     float seamCompliance_ = 0.0f, seamAlpha_ = 0.0f;
     int frame_ = 0;
     float maxSpeed_ = 0.0f;
-    int restCount_ = 0;
+    std::vector<glm::vec3> restFrom_; // positions at the rest window's start
+    int restFromFrame_ = 0;
+    float restPeak_ = 0.0f;           // the fastest frame in the window, m/s
+    bool rested_ = false;
 };
 
 // The Cloth brush's settings (Brush > Cloth; saved with the brush settings).

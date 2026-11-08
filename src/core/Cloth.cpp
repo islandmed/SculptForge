@@ -206,6 +206,7 @@ bool ClothSim::init(const ClothSetup& setup, const Fabric& fabric, const ClothSe
     if (n == 0 || setup.triangles.empty()) return false;
     if (!setup.rest.empty() && setup.rest.size() != n) return false;
     if (!setup.pin.empty() && setup.pin.size() != n) return false;
+    if (!setup.outward.empty() && setup.outward.size() != n) return false;
     for (const glm::uvec3& t : setup.triangles)
         if (t.x >= n || t.y >= n || t.z >= n) return false;
     for (const ClothSeam& s : setup.seams)
@@ -219,6 +220,11 @@ bool ClothSim::init(const ClothSetup& setup, const Fabric& fabric, const ClothSe
     v_.assign(n, glm::vec3(0.0f));
     dx_.assign(n, glm::vec3(0.0f));
     seamCompliance_ = setup.seamCompliance;
+    outward_.clear();
+    for (const glm::vec3& d : setup.outward) {
+        const float l = glm::length(d);
+        outward_.push_back(l > 1e-12f ? d / l : glm::vec3(0.0f));
+    }
 
     // Masses: density x a third of each rest triangle's area.
     const std::vector<glm::vec3>& rest = setup.rest.empty() ? setup.positions : setup.rest;
@@ -391,15 +397,19 @@ void ClothSim::substep(float h) {
                 continue;
             }
             if (contact_[i]) {
-                const glm::vec3 nrm = contactNormal_[i];
-                const float sd = glm::dot(x_[i] - contactPoint_[i], nrm);
-                if (sd < thickness) {
-                    x_[i] += nrm * (thickness - sd);
-                    // Friction: take back part of this substep's sliding along the surface.
-                    glm::vec3 move = x_[i] - prev_[i];
-                    move -= nrm * glm::dot(move, nrm);
-                    x_[i] -= move * friction;
-                }
+                // (two planes in a corner: a few rounds settle the particle into the wedge)
+                for (int round = 0; round < (contact2_[i] ? 3 : 1); ++round)
+                    for (int k = 0; k < (contact2_[i] ? 2 : 1); ++k) {
+                        const glm::vec3 nrm = k ? contactNormal2_[i] : contactNormal_[i];
+                        const float sd = glm::dot(x_[i] - (k ? contactPoint2_[i] : contactPoint_[i]), nrm);
+                        if (sd < thickness) {
+                            x_[i] += nrm * (thickness - sd);
+                            // Friction: take back part of this substep's sliding along the surface.
+                            glm::vec3 move = x_[i] - prev_[i];
+                            move -= nrm * glm::dot(move, nrm);
+                            x_[i] -= move * friction;
+                        }
+                    }
             }
             v_[i] = (x_[i] - prev_[i]) * invH;
         }
@@ -408,9 +418,16 @@ void ClothSim::substep(float h) {
 
 void ClothSim::findContacts(float frame) {
     const size_t n = x_.size();
+    const bool corners = settings_.thinFeatures; // (the Cloth brush keeps plain contacts: per-dab cost)
     contact_.assign(n, 0);
     contactPoint_.resize(n);
     contactNormal_.resize(n);
+    contactReach_.assign(n, 0.0f);
+    hadContact2_.swap(contact2_);
+    hadContact2_.resize(n, 0);
+    contact2_.assign(n, 0);
+    contactPoint2_.resize(n);
+    contactNormal2_.resize(n);
     if (!colliders_ || colliders_->empty()) return;
     const float thickness = fabric_.thickness;
     poolFor(n, [&](size_t b, size_t e) {
@@ -418,11 +435,27 @@ void ClothSim::findContacts(float frame) {
             if (w_[i] <= 0.0f) continue;
             // As far as the particle can travel this frame (gravity included), plus a margin.
             const float reach = thickness * 2.0f + (glm::length(v_[i]) + glm::length(settings_.gravity) * frame) * frame * 1.5f;
+            contactReach_[i] = reach;
             glm::vec3 q, nrm;
             if (colliders_->closest(x_[i], reach, q, nrm)) {
                 contact_[i] = 1;
                 contactPoint_[i] = q;
                 contactNormal_[i] = nrm;
+                // In a concave corner, the push off this surface leads into another one: the particle keeps both, or
+                // it is pushed from one to the other frame after frame. A surface nearer than this one out along its
+                // normal (as far as the particle reaches this frame) closes the corner. Looked for every 8th frame
+                // (staggered: a corner is there for many frames), and every frame while the particle has one.
+                if (!corners || (!hadContact2_[i] && (uint32_t(frame_) + uint32_t(i)) % 8u != 0)) continue;
+                const float probe = reach;
+                glm::vec3 q2, n2;
+                // (and only one the particle, pushed off this surface, could reach this frame: a wrinkle nearby on a
+                // dense scan is no corner)
+                if (colliders_->closest(q + nrm * probe, probe * 0.999f, q2, n2) && glm::dot(n2, nrm) < 0.9f &&
+                    glm::dot(q + nrm * thickness - q2, n2) < reach) {
+                    contact2_[i] = 1;
+                    contactPoint2_[i] = q2;
+                    contactNormal2_[i] = n2;
+                }
             }
         }
     }, 1024);
@@ -487,21 +520,23 @@ void ClothSim::findThinPairs(float span) {
             const float d00 = glm::dot(ab, ab), d01 = glm::dot(ab, ac), d11 = glm::dot(ac, ac);
             const float den = d00 * d11 - d01 * d01;
             if (std::abs(den) < 1e-20f) continue;
-            // Where vertex v is against this triangle: off the plane (signed) and whether it is over the outline.
-            const auto place = [&](uint32_t v, float& sd) {
+            // Where vertex v is against this triangle: off the plane (signed) and whether it is over the outline
+            // (`margin` past it: a held pair gets twice a new one's, or a tip by an edge, pushed a little past it,
+            // goes to the neighbour, is pushed back and returns, two frames over and over).
+            const auto place = [&](uint32_t v, float& sd, float margin) {
                 const glm::vec3 c = colliders_->vertex(v) - a;
                 sd = glm::dot(c, n);
                 const glm::vec3 q = c - n * sd;
                 const float d20 = glm::dot(q, ab), d21 = glm::dot(q, ac);
                 const float bv = (d11 * d20 - d01 * d21) / den, bw = (d00 * d21 - d01 * d20) / den;
-                return bv >= -0.15f && bw >= -0.15f && bv + bw <= 1.15f;
+                return bv >= -margin && bw >= -margin && bv + bw <= 1.0f + margin;
             };
             found.clear();
             // Held pairs: out to an edge length.
             for (uint32_t k = thinLastAt_[t]; k < thinLastAt_[t + 1]; ++k) {
                 float sd;
                 const ThinPair& p = thinLast_[k];
-                if (place(p.vertex, sd) && std::abs(sd) <= meanEdge_) found.push_back({p.side * sd, p});
+                if (place(p.vertex, sd, 0.3f) && std::abs(sd) <= meanEdge_) found.push_back({p.side * sd, p});
             }
             const size_t held = found.size();
             const glm::vec3 tlo = glm::min(a, glm::min(x_[tri.y], x_[tri.z])) - glm::vec3(reach);
@@ -518,7 +553,7 @@ void ClothSim::findThinPairs(float span) {
                             bool known = false;
                             for (size_t h = 0; h < held && !known; ++h) known = found[h].second.vertex == v;
                             float sd;
-                            if (known || !place(v, sd) || std::abs(sd) > reach || std::abs(sd) < 1e-7f) continue;
+                            if (known || !place(v, sd, 0.15f) || std::abs(sd) > reach || std::abs(sd) < 1e-7f) continue;
                             float side = sd > 0.0f ? 1.0f : -1.0f;
                             if (const auto nt0 = thinNearest_.find(v);
                                 nt0 != thinNearest_.end() && sharesParticle(nt0->second.tri, uint32_t(t))) {
@@ -579,7 +614,7 @@ void ClothSim::separateThin() {
         if (std::abs(den) < 1e-20f) continue;
         const float d20 = glm::dot(q, ab), d21 = glm::dot(q, ac);
         const float bv = (d11 * d20 - d01 * d21) / den, bw = (d00 * d21 - d01 * d20) / den;
-        if (bv < -0.25f || bw < -0.25f || bv + bw > 1.25f) continue; // (slid off: a neighbouring triangle has it)
+        if (bv < -0.3f || bw < -0.3f || bv + bw > 1.3f) continue; // (slid off: a neighbouring triangle has it)
         const float bary[3] = {std::clamp(1.0f - bv - bw, 0.0f, 1.0f), std::clamp(bv, 0.0f, 1.0f), std::clamp(bw, 0.0f, 1.0f)};
         const uint32_t ids[3] = {tri.x, tri.y, tri.z};
         float wsum = 0.0f;
@@ -606,6 +641,25 @@ void ClothSim::separateThin() {
         }
 }
 
+// A particle that starts inside a collider (on the back of the nearest surface) goes out the way it was put on: the
+// first surface along `outward` that it leaves through, `thickness` off. Its neighbours outside stay on that side;
+// pushed to the nearest surface instead, a sleeve's hem in the crook of an elbow splits across the forearm.
+void ClothSim::leaveColliders() {
+    if (!colliders_ || colliders_->empty()) return;
+    const float thickness = fabric_.thickness;
+    poolFor(x_.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            const glm::vec3 d = outward_[i];
+            if (w_[i] <= 0.0f || glm::dot(d, d) < 0.5f) continue;
+            glm::vec3 q, n;
+            if (!colliders_->closest(x_[i], 0.25f, q, n) || glm::dot(x_[i] - q, n) >= 0.0f) continue;
+            glm::vec3 p, fn;
+            if (!colliders_->raycast(x_[i], d, 1.0f, p, fn) || glm::dot(fn, d) <= 0.0f) continue; // (no way out)
+            x_[i] = prev_[i] = p + fn * thickness;
+        }
+    }, 1024);
+}
+
 // Each particle's path through the frame against the colliders: one that crossed a face from its front ends up
 // back in front of it (thickness off), its velocity into the surface removed. Catches what the frame's nearest
 // contact missed: a second, thin feature on the way (a nose or a beard lock past the cheek it was resting on).
@@ -613,11 +667,12 @@ void ClothSim::sweepParticles() {
     const float thickness = fabric_.thickness;
     poolFor(x_.size(), [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
-            if (w_[i] <= 0.0f || !contact_[i]) continue;
+            if (w_[i] <= 0.0f) continue;
             glm::vec3 d = x_[i] - start_[i];
             const float len = glm::length(d);
-            // (shorter than the way to the nearest surface at the start: it crossed nothing)
-            if (len < 1e-6f || len < glm::distance(start_[i], contactPoint_[i])) continue;
+            // (shorter than the way to the nearest surface at the start, or than the contact search found clear: it
+            // crossed nothing)
+            if (len < 1e-6f || len < (contact_[i] ? glm::distance(start_[i], contactPoint_[i]) : contactReach_[i])) continue;
             d /= len;
             glm::vec3 p, fn;
             if (!colliders_->raycast(start_[i], d, len, p, fn) || glm::dot(fn, d) >= 0.0f) continue;
@@ -730,14 +785,15 @@ bool ClothSim::step() {
     const float ramp = std::min(1.0f, float(frame_) / float(kSeamRampFrames));
     seamAlpha_ = std::exp(std::log(1e-2f) * (1.0f - ramp) + std::log(std::max(seamCompliance_, 1e-9f)) * ramp);
     if (ramp >= 1.0f && seamCompliance_ <= 0.0f) seamAlpha_ = 0.0f;
+    if (frame_ == 0 && !outward_.empty()) leaveColliders();
     findContacts(frame);
     findSelfPairs(frame);
     // Thin pairs are looked for out to an edge length: a cloth moving farther than that in a frame looks again
     // within it, every `every` substeps.
     const bool thin = settings_.thinFeatures && colliders_ && !colliders_->empty();
     int every = substeps;
+    start_ = x_;
     if (thin) {
-        start_ = x_;
         const float travel = (maxSpeed_ + glm::length(settings_.gravity) * frame) * frame * 1.5f;
         const int looks = std::clamp(int(std::ceil(travel / meanEdge_)), 1, substeps);
         every = (substeps + looks - 1) / looks;
@@ -750,16 +806,29 @@ bool ClothSim::step() {
         substep(h);
     }
     if (thin) sweepParticles();
-    // Damping once per frame, then the rest test.
+    // Damping once per frame, then the rest test: how far each particle got this frame. (Not its last substep's
+    // velocity: a particle held between a seam and a contact goes back and forth within the frame and stays put.)
     const float keep = 1.0f - std::clamp(fabric_.damping, 0.0f, 1.0f);
     float fastest = 0.0f;
     for (size_t i = 0; i < x_.size(); ++i) {
         v_[i] *= keep;
-        fastest = std::max(fastest, glm::dot(v_[i], v_[i]));
+        if (w_[i] > 0.0f) fastest = std::max(fastest, glm::dot(x_[i] - start_[i], x_[i] - start_[i]));
     }
-    maxSpeed_ = std::sqrt(fastest);
+    maxSpeed_ = std::sqrt(fastest) / frame;
     ++frame_;
-    restCount_ = maxSpeed_ < settings_.restSpeed ? restCount_ + 1 : 0;
+    // At rest: over `restFrames` frames no particle got half as far as restSpeed would take it, and none went fast.
+    // (A window, not every frame: a particle held between a seam and a contact can step back and forth a millimetre
+    // forever and go nowhere.)
+    restPeak_ = std::max(restPeak_, maxSpeed_);
+    const int window = std::max(1, settings_.restFrames);
+    if (restFrom_.size() != x_.size()) restFrom_ = start_, restFromFrame_ = frame_ - 1, restPeak_ = maxSpeed_;
+    if (frame_ - restFromFrame_ >= window) {
+        float drift = 0.0f;
+        for (size_t i = 0; i < x_.size(); ++i)
+            if (w_[i] > 0.0f) drift = std::max(drift, glm::dot(x_[i] - restFrom_[i], x_[i] - restFrom_[i]));
+        rested_ = std::sqrt(drift) < settings_.restSpeed * frame * float(window) * 0.5f && restPeak_ < settings_.restSpeed * 10.0f;
+        restFrom_ = x_, restFromFrame_ = frame_, restPeak_ = 0.0f;
+    }
     return !atRest();
 }
 
