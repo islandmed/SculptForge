@@ -616,6 +616,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"UI scale", "界面缩放比例"},
     {"Automatic", "自动"},
     {"Rotation", "旋转"},
+    {"Turntable, Orthographic, Floor grid and Flat shading: the window is too short to show them as buttons here, so they wait in this list.",
+     "转盘、正交、地面网格和平面着色：窗口不够高，这里放不下它们的按钮，所以它们收在这个列表里。"},
     {"Turntable", "转盘"},
     {"Camera notch", "相机刘海区"},
     {"Always reserve", "始终保留空间"},

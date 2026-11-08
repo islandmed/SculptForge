@@ -741,6 +741,8 @@ constexpr Entry kSpanish[] = {
      "Arrastrar para girar mueve la vista solo sobre el eje Z del mundo (azul): desde el frente, "
      "arrastrar alrededor del centro gira el modelo como una rueda. Mayús sigue ajustando a una vista "
      "lateral; el gizmo de ejes muestra el bloqueo. Se guarda con las preferencias."},
+    {"Turntable, Orthographic, Floor grid and Flat shading: the window is too short to show them as buttons here, so they wait in this list.",
+     "Plataforma giratoria, Ortográfica, Rejilla del suelo y Sombreado plano: la ventana es demasiado baja para mostrarlos aquí como botones, así que esperan en esta lista."},
     {"Turntable", "Plataforma giratoria"},
     {"Camera notch", "Muesca de la cámara"},
     {"Always reserve", "Reservar siempre"},

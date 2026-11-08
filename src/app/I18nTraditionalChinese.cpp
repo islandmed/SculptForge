@@ -616,6 +616,8 @@ constexpr Entry kTraditionalChinese[] = {
     {"UI scale", "界面縮放比例"},
     {"Automatic", "自動"},
     {"Rotation", "旋轉"},
+    {"Turntable, Orthographic, Floor grid and Flat shading: the window is too short to show them as buttons here, so they wait in this list.",
+     "轉盤、正交、地面網格和平面著色：視窗不夠高，這裡放不下它們的按鈕，所以它們收在這個列表裡。"},
     {"Turntable", "轉盤"},
     {"Camera notch", "相機瀏海區"},
     {"Always reserve", "一律保留空間"},
