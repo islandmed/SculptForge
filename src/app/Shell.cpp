@@ -444,6 +444,7 @@ void App::registerShellActions() {
             paintMode_ = false;
             guidesMode_ = false; // leaves the QRemesh Guides brush
             maskBrush_.on = false;
+            leaveDrawModesStatus(); // and Draw Tube / Append > Insert, the same brush picked again too
         };
         a.checked = [this, type] { return brush_ == type && doc_.activeBrush < 0 && !paintMode_ && !guidesMode_; };
         add(std::move(a));

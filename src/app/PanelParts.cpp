@@ -593,7 +593,7 @@ void App::drawPartsContents() {
                 if (label == "Quadsphere") label = "Quad Sphere";
                 if (ImGui::MenuItem((label + "##insert").c_str(), nullptr, insertType_ == t)) { // (Append's own Cone is beside it)
                     insertType_ = t;
-                    status_ = "Insert " + label + ": drag on the model (the drag sets its size). Esc stops.";
+                    status_ = "Insert " + label + ": drag on the model to place it. Esc or a brush stops.";
                 }
             }
             ImGui::Separator();
@@ -607,7 +607,7 @@ void App::drawPartsContents() {
                         insertType_ = "mesh";
                         insertMeshKey_ = "part";
                         insertMeshValue_ = name;
-                        status_ = "Insert a copy of " + name + ": drag on the model (the drag sets its size). Esc stops.";
+                        status_ = "Insert a copy of " + name + ": drag on the model to place it. Esc or a brush stops.";
                     }
                 }
                 ImGui::EndMenu();
@@ -935,7 +935,7 @@ void App::selectInsertSetItem(int index) {
     if (!n) return;
     insertSet_.index = ((index % n) + n) % n;
     status_ = "Insert " + insertSet_.items[size_t(insertSet_.index)].name + " (" + std::to_string(insertSet_.index + 1) +
-              " of " + std::to_string(n) + "): drag on the model; [ and ] step through the set. Esc stops.";
+              " of " + std::to_string(n) + "): drag on the model; [ and ] step through the set. Esc or a brush stops.";
 }
 
 // The insert set's picker: a thumbnail per item, the one a drag inserts outlined; open while inserting from a set.

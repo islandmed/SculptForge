@@ -205,6 +205,7 @@ void App::registerGizmoActions() {
 
 void App::setGizmoMode(GizmoMode mode) {
     if (drag_ == Drag::Gizmo) return;
+    const std::string left = leaveDrawModes(); // Draw / Move / Scale / Rotate leave Draw Tube and Append > Insert
     gizmo_.mode = mode;
     gizmo_.snapNext = false;
     gizmo_.hover = GizmoHandle::None;
@@ -213,6 +214,7 @@ void App::setGizmoMode(GizmoMode mode) {
               : mode == GizmoMode::Rotate ? "Rotate: drag a ring (Shift: 15 degrees); mask first to pose a part"
               : mode == GizmoMode::All    ? "All: arrows and squares move, rings turn, boxes and the outer tabs scale"
                                           : "Draw";
+    if (!left.empty()) status_ = "Left " + left + ". " + status_;
     if (mode != GizmoMode::Off) {
         doc_.syncBvh();
         updateGizmoPivot();
