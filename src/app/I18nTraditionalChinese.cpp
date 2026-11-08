@@ -525,7 +525,6 @@ constexpr Entry kTraditionalChinese[] = {
     {"Remeshing", "正在重拓樸"},
     {"Cancel", "取消"},
     {"Stop the remesh; the Part stays as it is.", "停止重拓樸；部件將維持目前狀態。"},
-    {"Voxels across the model: higher keeps more detail and makes more triangles.", "模型寬度方向的體素數量：數值越高，保留的細節越多，產生的三角形也越多。"},
     {"Remesh for sculpting", "重拓樸以利雕刻"},
     // --- Masking ---
     {"Clear", "清除"},
@@ -4983,6 +4982,25 @@ constexpr Entry kTraditionalChinese[] = {
     {"Allowed", "已允許"},
     {"Asks first", "先詢問"},
     {"Revoke", "取消允許"},
+    // Voxel Remesh up to 4096 (PanelRetopo.cpp)
+    {"Voxels across the model, 32 to 4096: higher keeps more detail and makes more triangles (about 4x for each doubling). The line under it estimates the result. Above 512 a remesh can make tens of millions of triangles and take minutes; it asks once first, and won't start if it can't fit in the free memory. Ctrl+click to type a value.",
+     "模型寬度方向的體素數量，32 到 4096：數值越高，保留的細節越多，產生的三角形也越多（每加倍約 4 倍）。下方一行會預測結果。高於 512 時重新網格化可能產生上億等級的大量三角形並花上數分鐘；會先詢問一次，若可用記憶體不足則不會開始。按住 Ctrl 點擊可輸入數值。"},
+    {"Estimate",
+     "預測"},
+    {"About how many triangles Voxel Remesh makes at this Resolution, from the Part's surface area (fine detail smaller than a voxel counts, so a dense scan comes out lower). Above 512 also the memory the remesh needs; in red when that is more than is free now.",
+     "以此解析度進行體素重新網格化約會產生多少三角形，依部件的表面積計算（比體素更細的細節也會計入，因此密集掃描的實際結果會較少）。高於 512 時也會顯示所需記憶體；超過目前可用記憶體時以紅色顯示。"},
+    {"About %s triangles",
+     "約 %s 個三角形"},
+    {"About %s triangles, ~%s of memory",
+     "約 %s 個三角形，記憶體 ~%s"},
+    {"About %s triangles, needs ~%s, %s free",
+     "約 %s 個三角形，需要 ~%s，可用 %s"},
+    {"High resolution remesh",
+     "高解析度重新網格化"},
+    {"Voxel Remesh at resolution %d makes about %s triangles and needs about %s of memory (%s free).",
+     "以解析度 %d 進行體素重新網格化約會產生 %s 個三角形，需要約 %s 記憶體（可用 %s）。"},
+    {"It can take a few minutes; Cancel in Tool > Remesh stops it and the Part stays as it is. Sculpting that many triangles needs a fast computer: Decimate or a lower Resolution makes it lighter. This won't ask again until the Resolution goes back to 512 or less.",
+     "可能需要幾分鐘；在 工具 > 重新網格化 中按取消即可停止，部件保持原樣。雕刻這麼多三角形需要較快的電腦：減面或降低解析度可讓它更輕。直到解析度回到 512 或以下之前不會再詢問。"},
 };
 
 } // namespace

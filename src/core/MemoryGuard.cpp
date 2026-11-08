@@ -5,6 +5,7 @@
 #include "core/Mesh.h"
 #include "core/Micro.h"
 #include "core/Multires.h"
+#include "core/Voxel.h"
 
 #include <algorithm>
 #include <atomic>
@@ -35,9 +36,6 @@ std::atomic<size_t> g_override{0};
 constexpr double kMeshBytesPerTriangle = 150.0;
 // A micro level, per micro triangle: about 0.6 grid points x (2 bytes + 1 of mask + 6 on the GPU) + undo.
 constexpr double kMicroBytesPerTriangle = 6.0;
-// Voxel remesh, per grid cell: the distance field (float), the shell, wall, outside and solid masks, the smoothed
-// field (float).
-constexpr double kVoxelBytesPerCell = 11.0;
 
 size_t systemAvailable() {
 #if defined(_WIN32)
@@ -136,10 +134,10 @@ size_t commandMemoryNeed(const Mesh& mesh, const std::string& name, const Args& 
         if (level <= 0) level = microLevelFor(mesh, size_t(100e6));
         return bytes(nt * std::pow(4.0, level) * kMicroBytesPerTriangle);
     }
-    if (name == "remesh") { // the grid across the longest side, and about 6 R^2 triangles out
-        const double r = std::clamp(argNumber(args, "resolution", 200), 32.0, 512.0);
-        return bytes(r * r * r * kVoxelBytesPerCell + 6.0 * r * r * kMeshBytesPerTriangle);
-    }
+    if (name == "remesh") // the grid and the surface it makes (core/Voxel.h)
+        return estimateVoxelRemesh(mesh, int(std::clamp(argNumber(args, "resolution", 200), double(kVoxelResolutionMin),
+                                                        double(kVoxelResolutionMax))))
+            .bytes;
     return 0;
 }
 

@@ -906,10 +906,7 @@ void App::drawPalette_Tool() {
             ui::HelpAction(*this, "geometry.remesh");
         }
         ImGui::SameLine();
-        ImGui::SetNextItemWidth(-1);
-        tray::SliderInt("##voxres", &voxelResolution_, 32, 512, "Resolution %d"); // as the remesh command (fxrtst 11-05)
-        ui::HelpText("Resolution", nullptr, "Voxels across the model: higher keeps more detail and makes more triangles.",
-                     "Tool > Remesh");
+        drawVoxelResolution(); // the slider (32-4096) and the estimate under it (PanelRetopo.cpp)
         if (voxelRemesh_) {
             if (ImGui::Button(tr("Cancel##voxelremesh"), ImVec2(half, 0))) voxelRemesh_->cancel->store(true);
             ui::HelpText("Cancel", nullptr, "Stop the remesh; the Part stays as it is.", "Tool > Remesh");

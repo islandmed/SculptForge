@@ -6,10 +6,14 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <new>
 #include <numeric>
 
 #include "core/CloseHoles.h"
+#include "core/HardwareProfile.h"
+#include "core/MemoryGuard.h"
 #include "core/ThreadPool.h"
+#include "core/VoxelSparse.h"
 
 namespace sf {
 
@@ -113,7 +117,6 @@ void blurAxis(std::vector<float>& f, const glm::ivec3& dims, int axis) {
         }
 }
 
-// Closest point to `p` on triangle abc (Ericson, Real-Time Collision Detection 5.1.5).
 // An edge with one triangle (undirected, so flipped triangles don't hide it). Edges bucketed by their lower vertex (a
 // counting sort), then each vertex's few edges sorted on their own, in parallel: no sort of every edge at once.
 bool hasOpenEdges(const Mesh& mesh) {
@@ -191,6 +194,10 @@ void dropSpecks(Mesh& m, size_t maxTriangles) {
     m = std::move(out);
 }
 
+
+} // namespace
+
+// Closest point to `p` on triangle abc (Ericson, Real-Time Collision Detection 5.1.5).
 glm::vec3 closestOnTriangle(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c) {
     const glm::vec3 ab = b - a, ac = c - a, ap = p - a;
     const float d1 = glm::dot(ab, ap), d2 = glm::dot(ac, ap);
@@ -210,8 +217,6 @@ glm::vec3 closestOnTriangle(const glm::vec3& p, const glm::vec3& a, const glm::v
     const float denom = 1.0f / (va + vb + vc);
     return a + ab * (vb * denom) + ac * (vc * denom);
 }
-
-} // namespace
 
 bool makeVoxelGrid(const AABB& box, int resolution, int padding, VoxelGrid& grid, size_t maxCells) {
     if (!box.valid()) return false;
@@ -590,6 +595,71 @@ std::vector<float> insideDistanceField(const Mesh& mesh, const VoxelGrid& grid, 
     return f;
 }
 
+namespace {
+int g_sparseAbove = kVoxelDenseMax;
+} // namespace
+
+void setVoxelSparseAbove(int resolution) { g_sparseAbove = resolution; }
+
+int voxelResolutionFromSlider(float t) {
+    t = std::clamp(t, 0.0f, 1.0f);
+    const float a = 2.0f / 3.0f, b = 5.0f / 6.0f;
+    if (t <= a) return int(std::lround(32.0f + (t / a) * float(kVoxelDenseMax - 32)));
+    if (t <= b) return std::clamp(int(std::lround((512.0f + (t - a) / (b - a) * 1536.0f) / 16.0f)) * 16, 528, 2048);
+    return std::clamp(int(std::lround((2048.0f + (t - b) / (1.0f - b) * 2048.0f) / 64.0f)) * 64, 2112, kVoxelResolutionMax);
+}
+
+float voxelSliderFromResolution(int r) {
+    r = std::clamp(r, kVoxelResolutionMin, kVoxelResolutionMax);
+    const float a = 2.0f / 3.0f, b = 5.0f / 6.0f;
+    if (r <= kVoxelDenseMax) return float(r - 32) / float(kVoxelDenseMax - 32) * a;
+    if (r <= 2048) return a + float(r - 512) / 1536.0f * (b - a);
+    return b + float(r - 2048) / 2048.0f * (1.0f - b);
+}
+
+double surfaceArea(const Mesh& mesh) {
+    std::vector<double> part((mesh.triangleCount() + 65535) / 65536, 0.0);
+    poolFor(mesh.triangleCount(), [&](size_t b, size_t e) {
+        double sum = 0.0;
+        for (size_t t = b; t < e; ++t) {
+            const glm::uvec3 tri = mesh.triangles[t];
+            const glm::vec3& a = mesh.positions[tri.x];
+            const float area = glm::length(glm::cross(mesh.positions[tri.y] - a, mesh.positions[tri.z] - a));
+            if (std::isfinite(area)) sum += 0.5 * double(area);
+        }
+        part[b / 65536] = sum;
+    }, 65536);
+    double total = 0.0;
+    for (double v : part) total += v;
+    return total;
+}
+
+VoxelRemeshEstimate estimateVoxelRemesh(const Mesh& mesh, int resolution, double area) {
+    VoxelRemeshEstimate e;
+    const AABB box = mesh.bounds();
+    if (!box.valid() || mesh.triangleCount() == 0) return e;
+    resolution = std::clamp(resolution, kVoxelResolutionMin, kVoxelResolutionMax);
+    if (area < 0.0) area = surfaceArea(mesh);
+    const glm::vec3 ext = glm::max(box.extent(), glm::vec3(1e-6f));
+    const double cell = double(std::max({ext.x, ext.y, ext.z})) / resolution;
+    // Surface nets: a quad (2 triangles) per grid edge the surface crosses, about 1.5 edges per cell of area. Detail
+    // finer than a cell counts in the area but not in the result, so a dense scan comes out somewhat lower.
+    const double cellsOfArea = area / (cell * cell);
+    e.triangles = size_t(3.0 * cellsOfArea);
+    // The grid: dense up to 512 (about 18 bytes a sample at its peak); above it the bricks near the surface (about 26
+    // samples deep per cell of area, 11 bytes each). Then the result in the app (as the other big commands count it).
+    double grid;
+    if (resolution <= g_sparseAbove) {
+        const glm::dvec3 dims = glm::ceil(glm::dvec3(ext) / cell) + 9.0;
+        grid = dims.x * dims.y * dims.z * 18.0;
+    } else {
+        const glm::dvec3 bricks = glm::ceil((glm::ceil(glm::dvec3(ext) / cell) + 9.0) / 8.0);
+        grid = cellsOfArea * 26.0 * 11.0 + bricks.x * bricks.y * bricks.z * 6.0;
+    }
+    e.bytes = size_t(grid + double(e.triangles) * kVoxelResultBytesPerTriangle);
+    return e;
+}
+
 Mesh voxelRemesh(const Mesh& source, int resolution, std::string* error, const std::function<bool(float)>& progress) {
     VoxelGrid grid;
     // An open Part (a starter head's neck, an extracted shell): the flood fill would pour in through the opening and
@@ -607,15 +677,46 @@ Mesh voxelRemesh(const Mesh& source, int resolution, std::string* error, const s
         closeHoles(capped, o, stats, ignored);
     }
     const Mesh& mesh = open ? capped : source;
-    if (mesh.triangleCount() == 0 || !makeVoxelGrid(mesh.bounds(), resolution, 4, grid)) {
-        if (error) *error = mesh.triangleCount() == 0 ? "The mesh is empty" : "Resolution too high for this mesh";
-        return {};
-    }
     auto step = [&](float f) {
         if (!progress || progress(f)) return true;
         if (error) *error = "Voxel Remesh cancelled";
         return false;
     };
+    if (resolution > g_sparseAbove && mesh.triangleCount() > 0) {
+        // The brick grid (VoxelSparse.cpp): the same steps, memory going with the surface instead of the volume.
+        resolution = std::min(resolution, kVoxelResolutionMax);
+        // Up front, from the surface area: the grid and the surface it makes. Past the free memory the remesh doesn't
+        // start (the brick count is checked again once known).
+        const VoxelRemeshEstimate e = estimateVoxelRemesh(mesh, resolution);
+        if (const MemoryCheck c = checkMemory(e.bytes); !c.enough) {
+            if (error)
+                *error = "Voxel Remesh at " + std::to_string(resolution) + " (about " + formatTriangles(e.triangles) +
+                         " triangles) needs ~" + formatGigabytes(e.bytes + memoryMargin(e.bytes)) + " free, " +
+                         formatGigabytes(c.availableBytes) + " available. Lower the Resolution or close other apps";
+            return {};
+        }
+        std::string why;
+        Mesh out;
+        try {
+            out = sparseVoxelSurface(mesh, resolution, 4, 3.0f, open, &why, step);
+        } catch (const std::bad_alloc&) {
+            why = "Voxel Remesh at " + std::to_string(resolution) + " ran out of memory; the Part is unchanged. Lower the Resolution";
+        }
+        if (out.triangleCount() == 0) {
+            if (error && !why.empty()) *error = why;
+            else if (error && error->empty()) *error = "Remesh produced no surface";
+            return {};
+        }
+        if (open) dropSpecks(out, 64);
+        if (!step(0.9f)) return {};
+        transferVertexAttributes(source, out);
+        step(1.0f);
+        return out;
+    }
+    if (mesh.triangleCount() == 0 || !makeVoxelGrid(mesh.bounds(), resolution, 4, grid)) {
+        if (error) *error = mesh.triangleCount() == 0 ? "The mesh is empty" : "Resolution too high for this mesh";
+        return {};
+    }
     rasterizeMeshShell(mesh, grid);
     if (!step(0.1f)) return {};
     std::vector<uint8_t> solid = solidifyShell(grid, 0.5f, 1, true);
