@@ -1,6 +1,5 @@
 ---
-changed: **Member builds** come from the private repository's new home, sculptforge/sculptforge-insiders (moved to
-  the sculptforge GitHub organization); paying members get read access automatically, through a read-only team.
+changed: **Member builds** in the app now come from the SculptForge organization; update to keep signing in.
 testers:
   - Member (signed in to Member builds): Preferences > Updates > Member builds lists the current beta; signing out and
     in again still works.
