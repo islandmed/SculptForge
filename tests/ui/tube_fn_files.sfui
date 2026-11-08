@@ -1,0 +1,47 @@
+# Tube functional pass: bake, delete, save and reopen (still editable), export and reimport.
+run ui_look look=classic layout=classic
+wait 0.3
+click "Tube##tool.tube"
+click "Tube/Draw Tube"
+drag_path 0.3 0.4 0.55 0.2 0.8 0.45 1.05 0.25 1.3 0.5 S=1.2
+wait 0.2
+drag_path 0.3 0.7 0.5 0.8 0.7 0.7 S=0.6
+wait 0.2
+expect_value tube_parts == 2
+run save_project path=sf_ui_tube_fn.sfproj
+run new_sphere subdivisions=2
+expect_value parts == 1
+run open path=sf_ui_tube_fn.sfproj
+expect_value parts == 3
+expect_value tube_parts == 2
+drag_tube_point 1 0 -50
+expect_status "point moved"
+shot reopened-edit
+# Exports: the tubes go out as meshes.
+run export_glb path=sf_ui_tube_fn.glb
+run save_obj path=sf_ui_tube_fn.obj
+run export_stl path=sf_ui_tube_fn.stl
+run open path=sf_ui_tube_fn.obj
+expect_value parts == 3
+expect_value tube_parts == 0
+run open path=sf_ui_tube_fn.glb
+expect_value parts == 3
+run open path=sf_ui_tube_fn.sfproj
+expect_value tube_parts == 2
+# Bake: a plain closed mesh that sculpts; undo brings the points back.
+run part_select index=1
+click "Tube/Bake"
+expect_value tube_parts == 1
+expect_value open_edges == 0
+click "Clay##brush.clay"
+stroke 0.4 0.76 0.6 0.76
+expect_value last_stroke_dabs > 0
+shot baked-sculpted
+run undo
+run undo
+expect_value tube_parts == 2
+# Delete a Tube Part.
+run part_select index=2
+run part_delete index=2
+expect_value tube_parts == 1
+expect_value parts == 2

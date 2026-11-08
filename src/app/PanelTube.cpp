@@ -315,6 +315,9 @@ void App::tubeDragTo(float x, float y) {
     glm::vec3 o, dir;
     canvasRay(x, y, o, dir);
     if (d.drawing) {
+        // A pen touches down before its first pressure sample: the value left from before is stale (full), so the
+        // tube starts at the first fresh one, as a sculpt stroke's first dab does.
+        if (d.samples.empty() && (lastInputPen_ || wintabPen_) && !penTracker_.readyForFirstDab()) return;
         const float pressure = std::clamp(strokePressure(), 0.0f, 1.0f);
         const float r = d.radius * (1.0f - tubePressure_ + tubePressure_ * std::max(pressure, 0.05f));
         glm::vec3 p = planeHit(o, dir, d.planePoint, d.planeNormal);
@@ -366,6 +369,28 @@ void App::tubeRelease() {
                   std::to_string(doc_.mesh.tube.points.size()) + " points";
     }
     d = {};
+}
+
+// Undo in the middle of a stroke or a point drag would change the scene under it (the drag puts its own copy back
+// when let go: the mesh and its points no longer agree), so Esc, Undo and Redo drop the drag instead.
+bool App::tubeKey(SDL_Keycode key, SDL_Keymod mod) {
+    if (drag_ != Drag::Tube) return false;
+    const Action* a = actions_.actionForKey(key, mod);
+    if (key != SDLK_ESCAPE && !(a && (a->id == "edit.undo" || a->id == "edit.redo"))) return false;
+    tubeCancel();
+    return true;
+}
+
+void App::tubeCancel() {
+    TubeDrag& d = tubeDrag_;
+    if (!d.drawing && d.changed) {
+        doc_.mesh = std::move(d.before);
+        doc_.mesh.topologyDirty = true;
+        doc_.bvhDirty = true;
+    }
+    status_ = d.drawing ? "Tube: stroke dropped" : "Tube: point put back";
+    d = {};
+    drag_ = Drag::None;
 }
 
 void App::drawTubeOverlay() {

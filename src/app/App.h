@@ -1421,6 +1421,8 @@ private:
     bool tubeMouseDown(float x, float y, SDL_Keymod mod);   // true if it took the click
     void tubeDragTo(float x, float y);
     void tubeRelease();
+    bool tubeKey(SDL_Keycode key, SDL_Keymod mod); // during a stroke or point drag: Esc, Undo, Redo drop it
+    void tubeCancel();
     void drawTubeOverlay();                                 // the stroke being drawn, the points, the cursor
     bool tubeActive() const { return !doc_.mesh.tube.empty(); }
     int tubePointAt(float x, float y, int* part = nullptr) const; // control point under the cursor (of `part`), or -1

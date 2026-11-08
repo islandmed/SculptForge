@@ -656,6 +656,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "tube_draw") return app_.tubeDraw_ ? 1.0 : 0.0;
     if (name == "insert_mode") return app_.insertType_.empty() ? 0.0 : 1.0; // Append > Insert on the model waits for a drag
     if (name == "tube_selected") return double(app_.tubeSelection());
+    if (name == "tube_first_radius_x1000" || name == "tube_last_radius_x1000") // the active Tube Part's ends
+        return m.tube.empty() ? -1.0 : 1000.0 * (name[5] == 'f' ? m.tube.points.front() : m.tube.points.back()).radius;
     if (name == "tube_parts") {
         int n = 0;
         for (int i = 0; i < app_.doc_.partCount(); ++i) n += !app_.doc_.partMesh(i).tube.empty();
@@ -1835,13 +1837,15 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             else if (got != want) fail(line, id + " has \"" + got + "\", expected \"" + want + "\"");
         });
     } else if (verb == "drag_tube_point") {
-        // drag_tube_point K DX DY [seconds]: press on control point K of the active Tube Part (else the first visible
-        // one; Tube, PanelTube.cpp) and drag it DX, DY pixels; 0 0 is a click.
+        // drag_tube_point K DX DY [seconds] [keep]: press on control point K of the active Tube Part (else the first
+        // visible one; Tube, PanelTube.cpp) and drag it DX, DY pixels; 0 0 is a click. keep: the button stays down
+        // (release lets go).
         if (!need(3)) return false;
         const int index = int(num(1, 0));
-        const float dx = num(2, 0), dy = num(3, 0), seconds = num(4, 0.4f);
+        const bool keep = w.back() == "keep";
+        const float dx = num(2, 0), dy = num(3, 0), seconds = w.size() > 4 && w[4] != "keep" ? num(4, 0.4f) : 0.4f;
         auto start = std::make_shared<ImVec2>();
-        steps_.push_back([this, line, index, dx, dy, seconds, start](float t) {
+        steps_.push_back([this, line, index, dx, dy, seconds, start, keep](float t) {
             if (t == 0.0f) {
                 const Document& doc = app_.doc_;
                 int part = doc.mesh.tube.empty() ? -1 : doc.activePart;
@@ -1860,7 +1864,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             const float u = std::min(t / seconds, 1.0f);
             mouseMotion(start->x + dx * u, start->y + dy * u);
             if (t >= seconds) {
-                mouseButton(false, SDL_BUTTON_LEFT);
+                if (!keep) mouseButton(false, SDL_BUTTON_LEFT);
                 return true;
             }
             return false;
