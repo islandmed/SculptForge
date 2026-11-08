@@ -106,6 +106,7 @@ void App::drawDeformationContents() {
     // (Smooth, Relax, Polish and Balloon are its Surface steps; Mirror is in Geometry > Symmetry).
     drawDeformSize();  // PanelDeform.cpp
     drawDeformStack();
+    drawDeformPlugins(); // PanelPlugins.cpp
 }
 
 } // namespace sf

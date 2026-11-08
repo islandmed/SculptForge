@@ -9,6 +9,9 @@ set(GLM_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLM_BUILD_INSTALL OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(glm)
 
+# wasmtime (sandboxed plugins; the core library uses it, so also without the app)
+include(${CMAKE_CURRENT_LIST_DIR}/Wasmtime.cmake)
+
 if(NOT SCULPTFORGE_BUILD_APP)
   return()
 endif()

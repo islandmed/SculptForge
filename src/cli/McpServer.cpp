@@ -22,9 +22,11 @@ namespace {
 constexpr const char* kLatestProtocol = "2025-06-18";
 
 // Installing, removing or switching packs changes what every later session loads: that stays the user's own
-// decision (the app's review screen, or sculptforge-cli run by hand), never an AI agent's.
+// decision (the app's review screen, or sculptforge-cli run by hand), never an AI agent's. Plugins run only when the
+// user runs them (core/Plugin.h).
 bool hiddenFromAgents(const std::string& name) {
-    return name == "pack_install" || name == "pack_remove" || name == "pack_enable" || name == "pack_disable";
+    return name == "pack_install" || name == "pack_remove" || name == "pack_enable" || name == "pack_disable" ||
+           name.rfind("plugin_", 0) == 0;
 }
 
 std::vector<std::string> paramNames(const Command& c) {

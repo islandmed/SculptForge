@@ -129,6 +129,7 @@ void App::registerPackActions() {
     packs_.pieMenus = enabledPackItems(PackItemType::PieMenu);
     loadPackLitSpheres();
     refreshMacroActions();
+    refreshPlugins();
 }
 
 void App::refreshMacroActions() {
@@ -179,6 +180,7 @@ void App::refreshPacks() {
     packs_.pieMenus = enabledPackItems(PackItemType::PieMenu);
     loadPackLitSpheres();
     refreshMacroActions();
+    refreshPlugins();
 }
 
 std::string App::macroProjectDir() const {
@@ -326,7 +328,7 @@ void App::drawPackReview() {
             ImGui::TextColored(ImColor(kAccent), "%s %s", tr("Replaces the installed version"), r->installedVersion.c_str());
         ImGui::Separator();
         ImGui::TextWrapped("%s %s", tr("Contains:"), packCountsText(r->counts).c_str());
-        const float listH = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 4.2f;
+        const float listH = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * (4.2f + 2.4f * float(r->plugins.size()));
         ImGui::BeginChild("##packitems", ImVec2(ImGui::GetContentRegionAvail().x * 0.48f, std::max(60.0f, listH)),
                           ImGuiChildFlags_Borders);
         for (const std::string& n : r->itemNames) ImGui::TextUnformatted(n.c_str());
@@ -336,8 +338,23 @@ void App::drawPackReview() {
         if (r->licenseText.empty()) ImGui::TextDisabled("%s", tr("No license text in the pack (see License above)."));
         else ImGui::TextWrapped("%s", r->licenseText.c_str());
         ImGui::EndChild();
-        ImGui::TextWrapped("%s", tr("Packs hold data only: nothing in this one runs on install or when a project "
-                                    "opens. Its macros list their commands and ask before they first run."));
+        for (const PackReview::Plugin& pl : r->plugins) {
+            ImGui::TextColored(ImColor(kAccent), "%s %s %s", ICON_LC_WAND_SPARKLES, pl.name.c_str(), pl.version.c_str());
+            ImGui::SameLine();
+            ImGui::TextDisabled(tr("%s plugin, %s KB"), tr(pl.kind.c_str()), std::to_string(std::max<uint64_t>(1, pl.bytes / 1024)).c_str());
+            ImGui::Indent(20 * s);
+            ImGui::TextWrapped("%s", tr("Permissions: none. It sees only the mesh it's given and returns a mesh: no "
+                                        "files, network, clock or system access."));
+            if (!pl.params.empty()) ImGui::TextDisabled("%s %s", tr("Settings:"), pl.params.c_str());
+            ImGui::Unindent(20 * s);
+        }
+        if (r->plugins.empty())
+            ImGui::TextWrapped("%s", tr("Packs hold data only: nothing in this one runs on install or when a project "
+                                        "opens. Its macros list their commands and ask before they first run."));
+        else
+            ImGui::TextWrapped("%s", tr("Nothing in this pack runs on install or when a project opens. Its plugins run "
+                                        "sandboxed, only when you run them, with time and memory limits; macros list "
+                                        "their commands and ask before they first run."));
         if (r->counts[size_t(PackItemType::Keymap)] || r->counts[size_t(PackItemType::PieMenu)])
             ImGui::TextDisabled("%s", tr("Keymaps and pie menus are only applied when you choose to (Library > Packs)."));
         if (ImGui::Button(tr("Install##packreview"), ImVec2(120 * s, 0))) {
@@ -444,6 +461,7 @@ void App::drawPacksTab(float height) {
                         requestMacroRun(mac);
                     ImGui::SameLine();
                 }
+            drawPluginButtons(m.id, false); // on the same row
             ImGui::NewLine();
             ImGui::TextDisabled("%s", p.dir.c_str());
             ImGui::Unindent(24 * s);
@@ -926,6 +944,11 @@ double App::packsTestValue(const std::string& name) const {
         return double(std::count_if(actions_.all().begin(), actions_.all().end(),
                                     [](const Action& a) { return a.id.rfind("macro.run.", 0) == 0; }));
     if (name == "undo_steps") return double(doc_.undo.undoCount());
+    if (name == "plugins_installed") return double(plugins_.list.size());
+    if (name == "plugins_off")
+        return double(std::count_if(plugins_.list.begin(), plugins_.list.end(), [](const InstalledPlugin& p) { return p.off; }));
+    if (name == "plugin_window_open") return plugins_.open.empty() ? 0.0 : 1.0;
+    if (name == "plugin_running") return plugins_.running ? 1.0 : 0.0;
     return std::nan("");
 }
 

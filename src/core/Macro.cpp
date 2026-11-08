@@ -46,7 +46,7 @@ const std::set<std::string>& deniedCommands() {
         "maya_send",      "maya_receive",          "bridge_send",             "bridge_receive",    "unreal_send",
         "unreal_editors", "blender_keymap_import", "macro_run",            "macro_list",     "macro_check",
         "pack_install",   "pack_remove",           "pack_enable",          "pack_disable",   "pack_list",
-        "pack_create",    "calibrate"};
+        "pack_create",    "calibrate",             "plugin_run",           "plugin_enable",  "plugin_list"};
     return kDenied;
 }
 // Parameters a macro may never set (network addresses, programs to start).
@@ -79,6 +79,7 @@ bool macroCommandAllowed(const std::string& command, std::string* why) {
     if (deniedCommands().count(command)) {
         if (command.rfind("macro_", 0) == 0) return no("a macro can't run macros");
         if (command.rfind("pack_", 0) == 0) return no("a macro can't install, list or remove packs");
+        if (command.rfind("plugin_", 0) == 0) return no("plugins run only when you run them, never from a macro");
         return no("it reaches the network or another program, which macros never do");
     }
     static const char* kPrefixes[] = {"ai_", "phone_", "link_", "unreal_", "comfyui", "gallery_", "mcp_"};

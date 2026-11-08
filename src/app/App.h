@@ -29,6 +29,7 @@
 #include "link/AiLinkSession.h"
 #include "core/Macro.h"
 #include "core/Pack.h"
+#include "core/Plugin.h"
 #include "core/Parts.h"
 #include "core/Document.h"
 #include "core/Deform.h"
@@ -69,6 +70,7 @@
 #include <imgui.h>
 
 #include <array>
+#include <chrono>
 #include <atomic>
 #include <cstdint>
 #include <functional>
@@ -78,6 +80,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <thread>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -2432,6 +2435,33 @@ private:
         bool answered = false, answerCancelled = false;
         int dialog = kPackDialogNone; // what the open dialog is for
     } packs_;
+    // Sandboxed plugins (PanelPlugins.cpp, core/Plugin.h).
+    void refreshPlugins();
+    const InstalledPlugin* findPluginUi(const std::string& key) const;
+    void openPlugin(const std::string& key);
+    void startPluginRun(const InstalledPlugin& p);
+    void pollPluginRun();
+    void drawPluginButtons(const std::string& packId, bool endLine = true); // "" = every plugin
+    void drawDeformPlugins();                          // Tool > Deformation > Plugins
+    void drawPluginWindow();
+    struct PluginsUi {
+        std::vector<InstalledPlugin> list;
+        std::string open;                                   // the plugin window's plugin (key), "" = closed
+        std::map<std::string, std::vector<double>> values;  // parameter values by plugin key
+        // The run on a worker: input copied on the UI thread, output committed there once `done`.
+        std::thread worker;
+        std::atomic<bool> cancel{false}, done{false};
+        bool running = false;
+        std::string runKey, error;
+        PluginInput input;
+        PluginOutput output;
+        PluginFailure failure = PluginFailure::None;
+        std::chrono::steady_clock::time_point started;
+        ~PluginsUi() {
+            cancel = true;
+            if (worker.joinable()) worker.join();
+        }
+    } plugins_;
     struct MacrosUi {
         MacroRecorder recorder;
         int runDepth = 0;          // > 0 while a macro runs: its commands aren't recorded or intercepted

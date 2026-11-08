@@ -83,6 +83,11 @@ size_t deformActivePart(Document& doc, DeformOp op, const DeformOptions& options
 // The steps as one undo step labelled `label`.
 size_t deformActivePart(Document& doc, const std::vector<DeformStep>& steps, std::string& error,
                         const std::string& label = "Deform stack");
+// For other whole-Part deformers (core/Plugin.h): whether the active Part can be deformed now (false with `error`), and
+// moving its vertices to `P` through the Sculptor as one undo step labelled `label`.
+bool canDeformActivePart(Document& doc, const std::string& label, std::string& error);
+size_t commitDeformedPositions(Document& doc, const std::vector<glm::vec3>& P, const std::string& label, bool masked,
+                               std::string& error);
 
 // Resizes the active Part to `size` (scene units per axis; <= 0 keeps that axis) about its bounds centre, weighted
 // by 1 - mask when `useMask`, as one undo step ("Size").
