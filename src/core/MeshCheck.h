@@ -22,11 +22,12 @@ class CommandRegistry;
 // For each vertex, the vertex it merges into (itself when it stays): vertices are taken in order and each one
 // within `distance` of a vertex kept before it merges into the nearest such vertex, so the kept points end up at
 // least `distance` apart and keep their positions. distance 0 merges exactly coincident points. `merged`
-// (optional) receives how many vertices go.
-std::vector<uint32_t> weldTargets(const Mesh& mesh, float distance, size_t* merged = nullptr);
+// (optional) receives how many vertices go. maskedOnly (foirgairwolf on Discord): only masked points (mask 0.5 or
+// more) take part, merging only with each other; the rest stay as they are.
+std::vector<uint32_t> weldTargets(const Mesh& mesh, float distance, size_t* merged = nullptr, bool maskedOnly = false);
 // The mesh with those points merged: triangles that collapse (two corners on one point) are dropped and the
 // rest keep their attributes (a merged point takes its target's mask, paint and layers).
-Mesh weldByDistance(const Mesh& mesh, float distance, size_t* merged = nullptr);
+Mesh weldByDistance(const Mesh& mesh, float distance, size_t* merged = nullptr, bool maskedOnly = false);
 
 // --- Find Problems ---
 enum class MeshIssue : uint8_t {

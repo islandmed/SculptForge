@@ -52,7 +52,9 @@ void App::drawMeshCheckContents() {
     const float button = ImGui::CalcTextSize(tr("Merge")).x + 2.0f * style.FramePadding.x + ImGui::GetFrameHeight();
     ImGui::BeginDisabled(weldCount_ == 0 || weldKey_ != key || weldKeyDistance_ != weldDistance_);
     if (ImGui::Button(tr("Merge##weld_points"), ImVec2(button, 0))) {
-        runCommand("weld_points", {{"distance", double(weldDistance_)}});
+        Args args{{"distance", double(weldDistance_)}};
+        if (weldMaskedOnly_) args["masked_only"] = true;
+        runCommand("weld_points", args);
         weldKey_ = 0;
         meshReportScroll_ = 2; // Find Problems is next: its row comes into view (below the fold in a 1024 px drop-down)
     }
@@ -70,9 +72,18 @@ void App::drawMeshCheckContents() {
                  "Points this close (in scene units) or closer merge. 0 merges only points exactly on top of each "
                  "other. The points that would merge show on the model in orange.",
                  "Tool > Geometry > Merge by Distance");
+    if (ui::Checkbox("Masked only##weld_masked_only", &weldMaskedOnly_)) {
+        weldKey_ = 0; // count (and preview) again
+        weldUsedAt_ = ImGui::GetTime();
+    }
+    if (ui::HoveredOrFocused(ImGui::GetItemID())) weldUsedAt_ = ImGui::GetTime(); // the preview shows what it changes
+    ui::HelpText("Masked only", nullptr,
+                 "Merge only masked points, with each other; the rest of the Part stays as it is. Mask a seam or an "
+                 "area first. The points that would merge show on the model while you point at this or the distance.",
+                 "Tool > Geometry > Merge by Distance");
     // The count (and the preview's points) for this mesh and distance: live while dragging on smaller meshes.
     if ((weldKey_ != key || weldKeyDistance_ != weldDistance_) && (!dragging || m.vertexCount() <= kLiveWeldPoints)) {
-        std::vector<uint32_t> target = weldTargets(m, weldDistance_, &weldCount_);
+        std::vector<uint32_t> target = weldTargets(m, weldDistance_, &weldCount_, weldMaskedOnly_);
         weldPoints_.clear();
         const size_t step = std::max<size_t>(1, weldCount_ / kWeldPreviewPoints);
         size_t seen = 0;

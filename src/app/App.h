@@ -1937,6 +1937,7 @@ private:
     size_t weldPreviewDrawn_ = 0;  // points the preview drew this frame (UI tests: weld_preview_points)
     uint64_t weldKey_ = 0;         // meshCheckKey() and distance the count below is for
     float weldKeyDistance_ = -1.0f;
+    bool weldMaskedOnly_ = false;  // Masked only: only masked points merge (foirgairwolf on Discord)
     size_t weldCount_ = 0;
     std::vector<glm::vec3> weldPoints_; // a sample (<= 20000) of the points that would merge, for the preview
     MeshReport meshReport_;
