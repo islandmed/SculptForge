@@ -27,6 +27,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <limits>
 #include <mutex>
 
@@ -115,6 +116,7 @@ struct GarmentEditorState {
     Panel before;          // the dragged panel at the press
     bool moved = false;
     int hoverSeam = -1; // the seam row under the pointer (last frame)
+    ImVec2 seamRow0{0, 0}; // the first seam row's centre on the screen (UI tests)
     bool sewing = false, sewFlip = false;
     int sewPanel = -1, sewEdge = -1;
     bool snap = true;
@@ -126,6 +128,10 @@ struct GarmentEditorState {
     std::string importPath, exportPath; // a file dialog's answer, taken on the next frame
     std::string exportFormat;           // what the export dialog was opened for ("" = from the file's extension)
     bool openTemplates = false, openPrint = false; // open the Templates / Print popup on the next draw
+    // The Templates or Print button last under the pointer (the popup opens below it) and each popup's last size.
+    ImVec2 anchorMin{0, 0}, anchorMax{0, 0};
+    int anchorFrame = -10;
+    ImVec2 templatesSize{0, 0}, printSize{0, 0};
     bool addTemplate = false;                      // Templates: beside the pattern instead of replacing it
     bool printLetter = false, printLandscape = false;
     std::string printKey; // the pattern and paper the page count is for
@@ -226,12 +232,34 @@ struct GarmentUi {
         if (key == "hand_length") return tr("Wrist crease to the tip of the middle finger");
         return "";
     }
+    // After the Templates or Print button: remembers where it is while the pointer is on it.
+    void anchorButton() {
+        if (!ImGui::IsItemHovered()) return;
+        s.anchorMin = ImGui::GetItemRectMin();
+        s.anchorMax = ImGui::GetItemRectMax();
+        s.anchorFrame = ImGui::GetFrameCount();
+    }
+    // A popup opening from its button: below it (its label stays readable), above it only when there's no room
+    // under it; at the pointer when it opened some other way (a shortcut, the command search).
+    void placePopup(ImVec2 size) {
+        if (ImGui::GetFrameCount() - s.anchorFrame > 1) return;
+        const ImVec2 screen = ImGui::GetIO().DisplaySize;
+        const float gap = 2.0f * app.uiScale_;
+        const float x = std::max(0.0f, std::min(s.anchorMin.x, screen.x - size.x));
+        if (s.anchorMax.y + gap + size.y > screen.y && s.anchorMin.y - gap - size.y >= 0.0f)
+            ImGui::SetNextWindowPos(ImVec2(x, s.anchorMin.y - gap), ImGuiCond_Always, ImVec2(0.0f, 1.0f));
+        else
+            ImGui::SetNextWindowPos(ImVec2(x, s.anchorMax.y + gap), ImGuiCond_Always);
+    }
     void popups() {
         const float scale = app.uiScale_;
+        const bool openTemplates = s.openTemplates, openPrint = s.openPrint;
         if (s.openTemplates) ImGui::OpenPopup("##garment.templates");
         if (s.openPrint) ImGui::OpenPopup("##garment.print");
         s.openTemplates = s.openPrint = false;
+        if (openTemplates) placePopup(s.templatesSize);
         if (ImGui::BeginPopup("##garment.templates")) {
+            s.templatesSize = ImGui::GetWindowSize();
             ImGui::TextDisabled("%s", tr("New garment at your sizes"));
             struct Item {
                 const char *id, *label;
@@ -272,7 +300,9 @@ struct GarmentUi {
             }
             ImGui::EndPopup();
         }
+        if (openPrint) placePopup(s.printSize);
         if (ImGui::BeginPopup("##garment.print")) {
+            s.printSize = ImGui::GetWindowSize();
             ImGui::TextDisabled("%s", tr("Print at home, at real size"));
             int paper = s.printLetter ? 1 : 0;
             ImGui::RadioButton(tr("A4"), &paper, 0);
@@ -585,8 +615,10 @@ void App::drawGarmentsContents() {
     ImGui::SameLine();
     ui::ActionButton(*this, "garment.import_svg", ImVec2(-1, 0));
     ui::ActionButton(*this, "garment.templates", ImVec2(half, 0));
+    u.anchorButton();
     ImGui::SameLine();
     ui::ActionButton(*this, "garment.print", ImVec2(-1, 0));
+    u.anchorButton();
     u.popups();
     const Pattern& pat = garments_->pat;
     if (pat.panels.empty()) ImGui::TextDisabled("%s", tr("No pattern yet"));
@@ -640,6 +672,7 @@ void App::drawGarments() {
     for (const char* id : {"garment.templates", "garment.new_tshirt", "garment.add_rect", "garment.import_svg",
                            "garment.print", "garment.export_svg", "garment.export_dxf"}) {
         ui::ActionButton(*this, id, ImVec2(0, 0), ui::Look::Icon);
+        if (!std::strcmp(id, "garment.templates") || !std::strcmp(id, "garment.print")) u.anchorButton();
         ImGui::SameLine();
     }
     u.popups();
@@ -950,6 +983,8 @@ void App::drawGarments() {
         ImGui::PopStyleColor();
         ImGui::EndGroup();
         rowHovered = rowHovered || ImGui::IsItemHovered();
+        if (k == 0) s.seamRow0 = ImVec2((ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
+                                        (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f);
         if (rowHovered) s.hoverSeam = int(k);
         ImGui::PopID();
     }
@@ -1040,6 +1075,20 @@ double App::garmentTestValue(const std::string& name) {
     if (name == "garment_undo_steps") return double(s.undo.size());
     if (name == "garment_edits") return double(s.edits);
     if (name == "garment_problems") return double(garment::patternProblems(s.pat).size());
+    // Where things are on the window (0..1, for drag and hover_window in UI tests, at any window size and UI
+    // scale): the first seam row; the middle of edge E of panel P (garment_edge_u:P:E, both 1-based).
+    int ww = 1, wh = 1;
+    SDL_GetWindowSize(window_, &ww, &wh);
+    if (name == "garment_seam_row_u") return double(s.seamRow0.x) / ww;
+    if (name == "garment_seam_row_v") return double(s.seamRow0.y) / wh;
+    if (name.rfind("garment_edge_u:", 0) == 0 || name.rfind("garment_edge_v:", 0) == 0) {
+        unsigned pi = 0, ei = 0;
+        if (std::sscanf(name.c_str() + 15, "%u:%u", &pi, &ei) != 2 || pi < 1 || pi > s.pat.panels.size() ||
+            ei < 1 || ei > s.pat.panels[pi - 1].points.size())
+            return 0.0;
+        const ImVec2 q = u.toScreen(garment::edgePoint(s.pat.panels[pi - 1], ei - 1, 0.5f));
+        return name[13] == 'u' ? double(q.x) / ww : double(q.y) / wh;
+    }
     // The selected panel's first point: in mm, and where it is on the window (0..1, for drag in UI tests).
     const bool point = name == "garment_point_x" || name == "garment_point_y" || name == "garment_points" ||
                        name == "garment_point_u" || name == "garment_point_v";
@@ -1049,10 +1098,7 @@ double App::garmentTestValue(const std::string& name) {
     if (name == "garment_point_x") return double(p.x);
     if (name == "garment_point_y") return double(p.y);
     if (name == "garment_points") return double(s.pat.panels[s.panel].points.size());
-    int ww = 1, wh = 1;
-    SDL_GetWindowSize(window_, &ww, &wh);
     const ImVec2 q = u.toScreen(p);
-    if (name == "garment_point_u") return double(q.x) / ww;
     return name == "garment_point_u" ? double(q.x) / ww : double(q.y) / wh;
 }
 

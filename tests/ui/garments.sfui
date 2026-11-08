@@ -12,7 +12,9 @@ wait 0.3
 shot tshirt
 
 # Hover the first seam row (Front left side <-> Back left side): its connector shows.
-drag 0.66 0.30 0.66 0.30 0.05
+remember garment_seam_row_u su
+remember garment_seam_row_v sv
+hover_window $su $sv 0.05
 expect_value garment_hover_seam == 1
 shot seam-hovered
 
@@ -21,10 +23,11 @@ click "Front"
 expect_value garment_selected == 1
 remember garment_point_x x0
 remember garment_edits edits
-# (the front's lower left corner sits at 0.3244, 0.5660 of the window in this layout)
-expect_value garment_point_u > 0.32
-expect_value garment_point_u < 0.33
-drag 0.3244 0.5660 0.3144 0.5560 0.3
+# (where the front's lower left corner is on the window, at any window size and UI scale)
+remember garment_point_u pu
+remember garment_point_v pv
+expect_value garment_point_u > 0.1
+drag $pu $pv $pu-0.01 $pv-0.01 0.3
 expect_value garment_point_x < $x0-40
 expect_value garment_edits == $edits+1
 expect_value garment_undo_steps == 2
@@ -37,8 +40,10 @@ key ctrl+z
 
 # Alt+click the hem adds a point there (selected); Delete removes it again.
 remember garment_points pts
+remember garment_edge_u:1:1 hu
+remember garment_edge_v:1:1 hv
 hold alt
-drag 0.355 0.5660 0.355 0.5660 0.05
+drag $hu $hv $hu $hv 0.05
 hold none
 expect_value garment_points == $pts+1
 shot point-added
@@ -47,9 +52,13 @@ expect_value garment_points == $pts
 
 # Sew: click one sleeve's hem, then the other's (a seam that makes no garment sense, but a seam).
 remember garment_seams seams
+remember garment_edge_u:3:1 au
+remember garment_edge_v:3:1 av
+remember garment_edge_u:4:1 bu
+remember garment_edge_v:4:1 bv
 click "Sew"
-drag 0.38 0.7107 0.38 0.7107 0.05
-drag 0.51 0.7107 0.51 0.7107 0.05
+drag $au $av $au $av 0.05
+drag $bu $bv $bu $bv 0.05
 expect_value garment_seams == $seams+1
 shot sewn
 key ctrl+z
