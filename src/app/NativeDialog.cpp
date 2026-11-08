@@ -61,7 +61,18 @@ bool suppressed() {
     return driver && (std::strcmp(driver, "offscreen") == 0 || std::strcmp(driver, "dummy") == 0);
 }
 
-void setScripted(bool on) { g_scripted = on; }
+// A script starts counting from zero: the warm UI pool runs many scripts in one process (tools/test/warm_ui.py), so a
+// request left over from the previous script must not show up in the next one's dialogs_requested.
+void setScripted(bool on) {
+    g_scripted = on;
+    if (on) {
+        g_requested = 0;
+        g_lastKind = int(Kind::None);
+        std::lock_guard<std::mutex> lock(g_mutex);
+        g_answer.clear();
+        g_haveAnswer = false;
+    }
+}
 
 void answerNext(std::string path) {
     std::lock_guard lock(g_mutex);
