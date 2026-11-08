@@ -514,13 +514,13 @@ void App::drawPalette_Color() {
         ImGui::PopID();
         if (i % 5 != 4) ImGui::SameLine();
     }
-    ImGui::TextDisabled(tr(paintsTexture(doc_.mesh) && hasMaterialChannels(*doc_.mesh.texture) ? "C over the model picks its material" : "C over the model picks its colour"));
+    ImGui::TextDisabled("%s", tr(paintsTexture(doc_.mesh) && hasMaterialChannels(*doc_.mesh.texture) ? "C over the model picks its material" : "C over the model picks its colour"));
     drawBrushMaterialContents(); // per-channel brush values when the texture has material channels (PanelPbr.cpp)
     {
         const Mesh& m = doc_.mesh;
         const bool layered = !m.paintLayers.empty() && m.activePaintLayer >= 0 && m.activePaintLayer < int(m.paintLayers.size());
         if (hasTexture(m)) {
-            // Where paint goes, when the Part has a texture (Tool > Texture Map).
+            // Where paint goes, when the Part has a texture (Tool > Texture Image).
             ImGui::AlignTextToFramePadding();
             ImGui::TextDisabled("%s", tr("Paint into"));
             ImGui::SameLine();

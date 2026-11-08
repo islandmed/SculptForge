@@ -7,7 +7,7 @@
   fetch.py --validate DIR                 strict schema check of a run's files (the publish job, before pushing)
   fetch.py --self-test
 
-Rules (Tony 11-07, docs: BRIEF in changes/site-jobs.md):
+Rules (owner 11-07, docs: BRIEF in changes/site-jobs.md):
 - Only the feeds companies publish for embedding (studios.yaml lists them). robots.txt is read per host (RFC 9309:
   a 4xx robots.txt allows, a 5xx or unreachable one disallows for that run); one request per source per UTC day,
   User-Agent names us and a contact page.

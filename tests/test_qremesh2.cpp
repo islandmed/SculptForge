@@ -91,6 +91,18 @@ Mesh hardSurface() {
                     box({0.5f, 0.3f, 0.5f}, {0.6f, 0.0f, 0.75f}, 12)});
 }
 
+// A thin curved horn, 2455 x 691 x 149 like Oslen's Part (Discord): a flat section tapering to a ~4 mm tip.
+Mesh horn(int resolution) {
+    Mesh m = makeQuadSphere(resolution, 2.0f);
+    for (glm::vec3& p : m.positions) {
+        const glm::vec3 n = glm::normalize(p);
+        const float t = 0.5f * (n.y + 1.0f), taper = 1.0f - 0.95f * t;
+        p = {600.0f * t * t + 345.0f * n.x * taper, 2455.0f * t, 75.0f * n.z * taper};
+    }
+    m.recomputeAllNormals();
+    return m;
+}
+
 struct Run {
     Mesh out;
     QRemeshStats st;
@@ -153,6 +165,25 @@ TEST(qremesh2_sphere_has_eight_poles) {
     CHECK(l.ok);
     std::printf("  legacy: %zu poles, corners %.1f deg\n", l.st.quality.poles, l.st.quality.angleDeviation);
     CHECK(l.st.quality.poles > 4 * r.st.quality.poles);
+}
+
+// Oslen's horn (Discord): the sharp tip used to get one singularity of index +4/4 that a quad mesh can't have, the
+// grid map folded across the whole part (Hausdorff 7 %, thousands of poles, tens of seconds at high targets), and the
+// quads stopped short of the point. Here (30k triangles, 3000 quads): 7.5 % and 1037 poles before, 0.5 % and 264
+// after, about 2 s on the laptop. The thresholds leave room: the exact result moves with the compiler's rounding.
+TEST(qremesh2_thin_horn_stays_clean) {
+    const Mesh m = horn(50);
+    const auto t0 = std::chrono::steady_clock::now();
+    const Run r = run(m, 3000, QRemeshMethod::V2);
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    CHECK(r.ok);
+    std::printf("  horn: %zu tris in, %zu quads, %zu poles, Hausdorff %.3f%%, %.0f ms\n", m.triangleCount(), r.st.quads,
+                r.st.quality.poles, r.st.quality.hausdorff, ms);
+    const TopologyReport t = topologyReport(r.out);
+    CHECK(t.manifold() && t.boundaryEdges == 0);
+    CHECK(r.st.quality.measured && r.st.quality.hausdorff < 2.0f);
+    CHECK(r.st.quality.poles < 600);
+    CHECK(ms < 30000.0); // "takes an eternity" guard only: CI machines differ
 }
 
 TEST(qremesh2_is_deterministic) {

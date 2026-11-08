@@ -69,6 +69,19 @@ glm::vec3 transformCenter(const Mesh& mesh, const std::vector<float>& weights);
 // Bounds of the same vertices.
 AABB transformBounds(const Mesh& mesh, const std::vector<float>& weights);
 
+// What a transform step did, enough to do it again on another mesh (Figure Pose, core/FigurePose.h): the final
+// transform, the symmetry asked for, and the weight of every vertex that moved (verts[i] at levels[i] /
+// TransformSession::kLevels; every other vertex 0).
+struct TransformOp {
+    MeshTransform transform;
+    Symmetry mirror{false, false, false};
+    std::vector<uint32_t> verts;
+    std::vector<uint16_t> levels;
+    // Per-vertex weights of a mesh with `vertexCount` vertices.
+    std::vector<float> weights(size_t vertexCount) const;
+    size_t bytes() const { return verts.size() * (sizeof(uint32_t) + sizeof(uint16_t)); }
+};
+
 // One interactive transform (a gizmo drag) or one command: remembers the vertices that move, then applies
 // any transform to those originals (so a drag never accumulates error), and finishes with one undo step.
 // Only moved vertices are touched: their normals, the GPU dirty range (Mesh::markDirty) and the BVH.
@@ -85,6 +98,8 @@ public:
     // Refits the BVH and returns the undo step (empty when nothing moved). Ends the session.
     UndoRecord finish(Mesh& mesh, BVH& bvh, std::string label);
     void cancel(Mesh& mesh, BVH& bvh); // restore + end without an undo step
+    // After begin: finish() also keeps the step's TransformOp in the undo record (UndoRecord::transformOp).
+    void keepOp() { keepOp_ = true; }
 
     bool active() const { return active_; }
     size_t movingVertices() const { return verts_.size(); }
@@ -115,6 +130,9 @@ private:
     std::vector<uint8_t> usedLevels_;                 // which quantized weights occur
     std::vector<Level> table_;                        // mirrors_.size() * (kLevels + 1)
     bool moved_ = false;
+    bool keepOp_ = false;
+    Symmetry mirror_{false, false, false}; // as asked for in begin
+    MeshTransform last_;                   // the last transform applied
 
 public:
     static constexpr int kLevels = 4096;

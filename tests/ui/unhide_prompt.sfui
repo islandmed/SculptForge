@@ -1,0 +1,60 @@
+# #163 (@TheLycanFenrir): Quad Remesh, Voxel Remesh, Decimate and Merge by Distance on a partly hidden Part ask first,
+# in the app (not a system dialog): Unhide and continue shows everything and goes on, Cancel changes nothing. Merge by
+# Distance with Masked only (and the mask shown) just merges the masked points.
+run new_sphere subdivisions=4
+run hide_rect x0=0 y0=-1 x1=1 y1=1 inside=true
+expect_value hidden > 0
+expect_value triangles == 5120
+click "Geometry##tool.geometry"
+
+# Decimate: the prompt; Cancel leaves the Part alone.
+click "Geometry/Decimate"
+expect "Hidden/Unhide and continue"
+expect_text "Some of this Part is hidden"
+shot prompt-decimate
+click "Hidden/Cancel##unhide"
+expect_not "Hidden/Unhide and continue"
+expect_value hidden > 0
+expect_value triangles == 5120
+# Unhide and continue: everything shows, then it decimates; undo takes back each.
+click "Geometry/Decimate"
+click "Hidden/Unhide and continue"
+expect_value hidden == 0
+expect_value triangles < 5120
+key ctrl+z
+expect_value triangles == 5120
+key ctrl+z
+expect_value hidden > 0
+
+# Quad Remesh and Voxel Remesh ask too.
+click "QRemesh/Quad Remesh"
+expect "Hidden/Unhide and continue"
+expect_text "Quad Remesh works on all of it"
+click "Hidden/Cancel##unhide"
+action geometry.remesh
+expect "Hidden/Unhide and continue"
+expect_text "Voxel Remesh works on all of it"
+shot prompt-voxel
+key escape
+expect_not "Hidden/Unhide and continue"
+expect_value hidden > 0
+expect_value triangles == 5120
+
+# Merge by Distance: asks on the unwelded cube with half of it hidden; with Masked only and the mask shown it doesn't.
+run open path=$SCRIPT_DIR/../data/check_mesh_cube.obj
+run hide_rect x0=0 y0=-1 x1=1 y1=1 inside=true
+expect_value hidden > 0
+expect_text 16 points will merge
+click "Merge##weld_points"
+expect "Hidden/Unhide and continue"
+expect_text "Merge by Distance works on all of it"
+shot prompt-merge
+click "Hidden/Cancel##unhide"
+expect_value vertices == 24
+run mask_all
+click "Masked only##weld_masked_only"
+click "Merge##weld_points"
+expect_not "Hidden/Unhide and continue"
+expect_status Merged 9 points
+expect_value hidden > 0
+# (Mask All leaves hidden faces unmasked, so only the shown points merged.)

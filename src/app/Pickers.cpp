@@ -4,6 +4,7 @@
 // Pop-up pickers (brush, stroke, alpha and material pop-ups), the
 // Size / Strength sliders at the cursor, and the thumbnail tile.
 #include "app/Theme.h"
+#include "app/NativeDialog.h"
 #include "app/Pickers.h"
 
 #include "app/App.h"
@@ -476,6 +477,9 @@ const char* brushTypeDescription(int type) {
     case BrushType::Morph:
         return "Pulls the surface back toward a stored shape: pick a selection set with Shape as the Morph Target in "
                "Tool > Selection Sets. Alt pushes away. Works at any subdivision level.";
+    case BrushType::Cloth:
+        return "Moves the surface like fabric: drag to pull it along and it folds where it bunches up; Push presses it "
+               "in, Settle lets it sag and drape over other Parts. Mode and fabric in Brush > Cloth; the mask pins it.";
     default:
         return "";
     }
@@ -573,7 +577,10 @@ bool PickerUi::isActive(const App& app, const BrushItem& item) {
 }
 
 void PickerUi::select(App& app, const BrushItem& item) {
-    if (item.kind != BrushItem::Kind::Guides) app.guidesMode_ = false;
+    const std::string guides = item.kind != BrushItem::Kind::Guides ? app.leaveGuides() : std::string();
+    std::string left = app.leaveDrawModes(); // Draw Tube and Append > Insert end, the same brush again too
+    if (!guides.empty()) left += left.empty() ? guides : " and " + guides;
+    app.edgesMode_ = false; // picking any brush leaves Edges mode (PanelEdges.cpp)
     switch (item.kind) {
     case BrushItem::Kind::Type:
         app.brush_ = BrushType(item.index);
@@ -597,8 +604,9 @@ void PickerUi::select(App& app, const BrushItem& item) {
         break;
     case BrushItem::Kind::Guides:
         app.setGuidesMode(true);
-        return;
+        break;
     }
+    if (!left.empty()) app.status_ = "Left " + left + ". " + app.status_;
 }
 
 ImTextureID PickerUi::thumbnail(App& app, const BrushItem& item) {
@@ -676,7 +684,7 @@ void drawBrushGrid(App& app, GridMode mode) {
     if (popup) {
         // What was typed, or how to type.
         if (typed.empty()) {
-            ImGui::TextDisabled(tr("Type a letter to narrow the brushes, then press its orange key"));
+            ImGui::TextDisabled("%s", tr("Type a letter to narrow the brushes, then press its orange key"));
             ImGui::SameLine();
             SortMenu("brushsortpop", app.uiPrefs_.brushSort);
         } else {
@@ -685,7 +693,7 @@ void drawBrushGrid(App& app, GridMode mode) {
                 c = char(std::toupper(static_cast<unsigned char>(c)));
             ImGui::TextColored(ImVec4(0.94f, 0.53f, 0.18f, 1.0f), "%s", shownTyped.c_str());
             ImGui::SameLine();
-            ImGui::TextDisabled(tr(substring ? "(contains)  Backspace: undo a letter  Enter: first match"
+            ImGui::TextDisabled("%s", tr(substring ? "(contains)  Backspace: undo a letter  Enter: first match"
                                           : "Backspace: undo a letter  Enter: first match"));
         }
     }
@@ -760,7 +768,7 @@ void drawBrushGrid(App& app, GridMode mode) {
             if (b.kind == BrushItem::Kind::Recipe) {
                 // The same menu as the Brush palette's custom-brush list (PanelBrushLibrary.cpp).
                 if (ImGui::MenuItem(tr("Copy brush code"))) app.copyBrushCode(b.index);
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("One line of text to share in chat, email or a forum"));
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("One line of text to share in chat, email or a forum"));
                 if (ImGui::MenuItem(tr("Rename...##brush"))) {
                     app.brushPopup_ = App::BrushPopup::Rename;
                     app.brushPopupName_ = app.doc_.brushes[size_t(b.index)].name;
@@ -1030,7 +1038,7 @@ void drawAlphaGrid(App& app, GridMode mode) {
     if (order.empty()) ImGui::TextDisabled(tr("No alpha matches \"%s\""), filter);
     ImGui::Dummy(ImVec2(0, 2));
     if (ImGui::Button(tr(ICON_LC_FOLDER_OPEN "  Load image..."), ImVec2(mode == GridMode::Popup ? 0.0f : -1.0f, 0)))
-        SDL_ShowOpenFileDialog(App::onAlphaChosen, &app, app.window_, kAlphaFilters, 2, nullptr, false);
+        sf::dialogs::openFile(App::onAlphaChosen, &app, app.window_, kAlphaFilters, 2, nullptr, false);
     ui::HelpText("Load image", nullptr, "Use any grayscale image as the alpha: white = full effect, black = none.",
                  "Alpha");
     if (mode == GridMode::Popup) ImGui::SameLine();
@@ -1360,7 +1368,8 @@ void drawPickers(App& app) {
             float* value;
             float lo, hi, shownScale;
         };
-        float* z = s.sliderSmooth ? &app.smoothStrength_ : &app.strength_;
+        float* z = &app.intensityValue(s.sliderSmooth); // (in Paint mode the Colour intensity, #164)
+        const bool paintZ = app.paintMode_ && !s.sliderSmooth;
         const Def d = which == PickerUi::Slider::DrawSize
                           ? Def{"Size", "S",
                                 "Brush radius in screen pixels. Drag, or type a number and press Enter. [ and ] also "
@@ -1370,8 +1379,10 @@ void drawPickers(App& app) {
                           ? Def{s.sliderSmooth ? "Smooth Intensity" : "Intensity", "U",
                                 s.sliderSmooth ? "How strongly Smooth works (it keeps its own value: hold "
                                                  "Shift and press U to set it). Type a number and press Enter."
-                                               : "How strongly the brush changes the surface (1-100). Drag, or type a "
-                                                 "number and press Enter.",
+                                : paintZ ? "How strongly painting colours the surface (1-100). Drag, or type a number "
+                                           "and press Enter."
+                                         : "How strongly the brush changes the surface (1-100). Drag, or type a "
+                                           "number and press Enter.",
                                 z, 0.01f, 1.0f, 100.0f}
                       : which == PickerUi::Slider::RgbIntensity
                           ? Def{"Colour intensity", "I",

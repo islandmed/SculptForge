@@ -255,7 +255,7 @@ exactly what a stroke, crease or pinch did to the geometry, without smooth blend
 most when blocking out forms on a low-poly base mesh.
 
 - **Render > Materials > Shading**: **Smooth** | **Flat** for the whole scene. The same buttons are in
-  **Tool > Display**.
+  **Tool > Viewport Look**.
 - **This Part**: **Scene** (the default) follows the scene's shading; **Smooth** or **Flat** keeps the active
   Part that way whatever the scene says, for example a flat body with smooth eyes.
 

@@ -10,6 +10,7 @@
 // "Good enough - stop". Missing tools open a prompt that says what would be
 // downloaded, from where, and how big it is (nothing downloads without a click).
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/Ui.h"
 
 #include "ai/SplatTrainer.h"
@@ -208,14 +209,14 @@ void App::registerSplatTrainUi() {
     add("splats.train_video", "Video...", ICON_LC_VIDEO,
         [this] {
             static const SDL_DialogFileFilter filters[] = {{"Videos", "mp4;mov;m4v;webm;mkv;avi"}};
-            SDL_ShowOpenFileDialog(onPicked, pickTag(Pick::Video), window_, filters, 1, nullptr, false);
+            sf::dialogs::openFile(onPicked, pickTag(Pick::Video), window_, filters, 1, nullptr, false);
         },
         idle,
         "Train a Gaussian splat from a video of an object (walk slowly all the way around it). The sharpest frame "
         "of each moment is used. The splat shows in the viewport after a few hundred steps and sharpens live.",
         "splat_train");
     add("splats.train_folder", "Photos Folder...", ICON_LC_FOLDER_OPEN,
-        [this] { SDL_ShowOpenFolderDialog(onPicked, pickTag(Pick::Folder), window_, nullptr, false); }, idle,
+        [this] { sf::dialogs::openFolder(onPicked, pickTag(Pick::Folder), window_, nullptr, false); }, idle,
         "Train a Gaussian splat from a folder: photos taken all around an object, a phone-link capture, or a COLMAP "
         "/ nerfstudio dataset (which already has camera positions).",
         "splat_train");
@@ -227,12 +228,12 @@ void App::registerSplatTrainUi() {
     add("splats.train_cancel", "Cancel", ICON_LC_X, [this] { runCommand("splat_train_cancel"); },
         [this] { return splatTrain_->job.busy(); }, "Stop training. Nothing is saved; the last preview stays in the viewport until you Clear the splats.", "splat_train_cancel");
     add("splats.train_choose_brush", "Choose Brush...", nullptr,
-        [this] { SDL_ShowOpenFileDialog(onPicked, pickTag(Pick::Brush), window_, nullptr, 0, nullptr, false); }, nullptr,
+        [this] { sf::dialogs::openFile(onPicked, pickTag(Pick::Brush), window_, nullptr, 0, nullptr, false); }, nullptr,
         "Use a Brush trainer you already have (brush_app): for example one you built yourself with cargo on Linux "
         "ARM, where there is no ready-made download.",
         "");
     add("splats.train_choose_colmap", "Choose COLMAP...", nullptr,
-        [this] { SDL_ShowOpenFileDialog(onPicked, pickTag(Pick::Colmap), window_, nullptr, 0, nullptr, false); },
+        [this] { sf::dialogs::openFile(onPicked, pickTag(Pick::Colmap), window_, nullptr, 0, nullptr, false); },
         nullptr, "Use a COLMAP program you already have (it finds where each photo was taken).", "");
 }
 
@@ -345,10 +346,10 @@ void App::drawSplatTrainSection() {
     ImGui::SameLine();
     ui::ActionButton(*this, "splats.train_folder", ImVec2((avail - gap) * 0.5f, 0), ui::Look::IconLabel);
     if (s.job.busy()) {
-        ImGui::TextDisabled(tr("Training - progress is over the viewport"));
+        ImGui::TextDisabled("%s", tr("Training - progress is over the viewport"));
     } else if (s.brush.empty()) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-        ImGui::TextWrapped(tr("Trainer: Brush is not installed yet (it is offered when you start)."));
+        ImGui::TextWrapped("%s", tr("Trainer: Brush is not installed yet (it is offered when you start)."));
         ImGui::PopStyleColor();
     }
     if (ImGui::TreeNode(tr("Tools##splattrain"))) {
@@ -387,11 +388,11 @@ void App::drawSplatTrainOverlay() {
             ImGui::TextUnformatted(tr(s.promptFor == Pick::Brush ? "Splat training needs Brush" : "Splat training needs COLMAP"));
             ImGui::Spacing();
             if (s.promptFor == Pick::Brush)
-                ImGui::TextWrapped(tr("Brush is a free, open-source Gaussian splat trainer (Apache-2.0) that runs on your "
+                ImGui::TextWrapped("%s", tr("Brush is a free, open-source Gaussian splat trainer (Apache-2.0) that runs on your "
                                    "graphics card - NVIDIA, AMD, Intel or Apple, no CUDA needed. SculptForge runs it "
                                    "as a separate program."));
             else
-                ImGui::TextWrapped(tr("COLMAP (BSD licence) works out where each photo was taken, which training needs. "
+                ImGui::TextWrapped("%s", tr("COLMAP (BSD licence) works out where each photo was taken, which training needs. "
                                    "SculptForge runs it as a separate program."));
             ImGui::Spacing();
             if (d) {
@@ -432,7 +433,7 @@ void App::drawSplatTrainOverlay() {
                 }
                 ui::ActionButton(*this, s.promptFor == Pick::Brush ? "splats.train_choose_brush" : "splats.train_choose_colmap");
                 ImGui::SameLine();
-                if (ImGui::Button(tr("Project page"))) SDL_OpenURL(d ? d->home
+                if (ImGui::Button(tr("Project page"))) sf::dialogs::openUrl(d ? d->home
                                                                 : s.promptFor == Pick::Brush ? "https://github.com/ArthurBrussee/brush"
                                                                                              : "https://colmap.github.io/install.html");
                 ImGui::SameLine();

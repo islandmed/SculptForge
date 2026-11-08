@@ -1,0 +1,83 @@
+# cold
+# The first-run tier card (#161: Got it did nothing on a Linux laptop, and the card came back on every start).
+# CMake sets SF_HW_PROFILE_IN_TESTS=1, SF_NO_CALIBRATION=1 and SF_HW_SIMULATE=high: the card shows at once.
+# Every way of putting it away works on the first press, at 100, 150 and 200 %, with the model filling the view
+# under the card: a click with a frame of hover, a click whose pointer jumps there in the same frame (ImGui's hover
+# a frame behind), a pen tap with the pen only just in range, the close, Esc and Enter. None of them sculpts the
+# model under it, and the dismissal is saved: after a restart the card stays away.
+run new_sphere subdivisions=4
+key f
+zoom 4
+wait 0.5
+expect_text Tuned for your machine
+expect_value can_undo == 0
+
+# 100 %: the pointer jumps onto Got it and presses in the same frame.
+jump_click "Got it"
+wait 0.3
+expect_value tier_card == 0
+expect_no_text Tuned for your machine
+expect_value tier_card_saved == 1
+expect_value can_undo == 0
+
+# 150 %: an ordinary click.
+ui_scale 150
+tier_card new
+wait 0.3
+expect_value tier_card == 1
+expect_value tier_card_saved == 0
+shot card-150
+click "Got it"
+wait 0.3
+expect_value tier_card == 0
+expect_value tier_card_saved == 1
+expect_value can_undo == 0
+
+# 200 %: the pen, only just in range over Got it, taps once.
+ui_scale 200
+tier_card new
+wait 0.3
+shot card-200
+pen_tap "Got it" enter
+wait 0.3
+expect_value tier_card == 0
+expect_value tier_card_saved == 1
+expect_value can_undo == 0
+pen_out
+
+# The close, top right (a jump there too).
+ui_scale 100
+tier_card new
+wait 0.3
+jump_click "##tiercard.close"
+wait 0.3
+expect_value tier_card == 0
+expect_value tier_card_saved == 1
+expect_value can_undo == 0
+
+# Esc and Enter.
+tier_card new
+wait 0.3
+key escape
+wait 0.2
+expect_value tier_card == 0
+expect_value tier_card_saved == 1
+tier_card new
+wait 0.3
+key enter
+wait 0.2
+expect_value tier_card == 0
+expect_value tier_card_saved == 1
+expect_value can_undo == 0
+
+# Saved: after a restart it stays away.
+restart
+wait 0.5
+expect_value tier_card == 0
+expect_no_text Tuned for your machine
+# (and one never put away comes back)
+tier_card new
+restart
+wait 0.5
+expect_value tier_card == 1
+expect_text Tuned for your machine

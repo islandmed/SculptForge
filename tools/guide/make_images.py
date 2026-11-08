@@ -83,7 +83,7 @@ FEATURE_CROPS = {
     "capture-from-view": ("kelvinlet_capture/capture_window", (440, 140, 1200, 640), 760),
     "fill-layer-panel": ("fill_layers/fill-layer-panel", (1280, 60, 1600, 960), 320),
     "gizmo-pose": ("gizmo/posing-mid-drag", (110, 200, 1000, 860), 890),
-    "gizmo-all": ("gizmo_all/all-hover-scale-box", (415, 305, 905, 650), 490),
+    "gizmo-all": ("gizmo_all/all-hover-scale-ball", (415, 305, 905, 650), 490),
     "pbr-viewport": ("pbr_viewport/pbr-photo-studio", (0, 0, 1600, 960), MAX_WIDTH),
     "pbr-environment": ("pbr_viewport/pbr-outdoor-background", (100, 85, 1215, 870), 960),
     "pbr-brush-material": ("pbr_channels/brush-material", (280, 20, 640, 960), 360),

@@ -12,6 +12,7 @@
 #include "core/SelectionSets.h"
 #include "core/Texture.h"
 #include "core/ThreadPool.h"
+#include "core/FigurePose.h"
 #include "core/ForgeSpheres.h"
 #include "core/Tube.h"
 #include "io/Zip.h"
@@ -192,6 +193,7 @@ class Reader {
 public:
     std::map<std::string, ZipFileEntry> files;
     std::string error;
+    std::string skipped; // optional data left out as unreadable (Document::notice after loading)
     // Big blobs are read on the shared thread pool, except while a BVH builds on another thread (it gets the pool).
     bool parallelReads = true;
 
@@ -220,6 +222,15 @@ public:
         if (it == files.end() || it->second.size > (uint64_t(1) << 32)) return false;
         out.resize(size_t(it->second.size));
         return readAt(it->second.offset, out.size(), out.data());
+    }
+    // True when `desc` describes a blob of this layout that is in the archive whole (no error either way): for
+    // optional data a damaged file may leave out without failing the load.
+    bool fits(const Json& desc, Scalar type, int components, size_t count) const {
+        if (!desc.isObject() || desc["type"].asString() != scalarName(type) || desc["components"].asNumber() != double(components) ||
+            desc["count"].asNumber(-1) != double(count))
+            return false;
+        auto it = files.find(desc["file"].asString());
+        return it != files.end() && it->second.size == uint64_t(count) * uint64_t(components) * scalarSize(type);
     }
     // Validates `desc` against the expected layout and reads its bytes into `out` (false + error on mismatch).
     bool read(const Json& desc, const char* what, Scalar type, int components, size_t count, void* out) {
@@ -357,6 +368,7 @@ void writeMesh(Writer& w, const std::string& prefix, const Mesh& m, Json& out, s
     if (m.hasUvs()) mesh.set("uvs", w.floats(prefix + "mesh/uvs.bin", &m.uvs[0].x, m.uvs.size(), 2));
     if (m.hasUvFlags()) mesh.set("uv_flags", w.bytes(prefix + "mesh/uv_flags.bin", m.uvFlags)); // seams, pins (core/Uv.h)
     // Optional and ignored by older readers, so no format version bump.
+    if (m.hasCreases()) mesh.set("creases", w.floats(prefix + "mesh/creases.bin", m.creases.data(), m.creases.size(), 1));
     if (m.hasQuads())
         mesh.set("quad_partners", w.uints(prefix + "mesh/quad_partners.bin", m.quadPartners.data(), m.quadPartners.size(), 1));
     out.set("mesh", std::move(mesh));
@@ -413,6 +425,18 @@ bool readMesh(Reader& r, const Json& mj, const Json& lj, Mesh& m, std::string& e
     }
     if (mj.has("uv_flags")) {
         if (!r.bytes(mj["uv_flags"], "UV seams", nt * 3, m.uvFlags)) m.uvFlags.clear();
+    }
+    if (mj.has("creases")) { // edge creases (core/EdgeSelect.h), 0..1 per corner, optional: a damaged blob is left out
+        const Json& cj = mj["creases"];
+        if (cj.isObject() && r.fits(cj, Scalar::F32, 1, nt * 3)) {
+            m.creases.resize(nt * 3);
+            if (!r.floats(cj, "edge creases", nt * 3, 1, nt ? m.creases.data() : nullptr)) m.creases.clear();
+            // NaN, infinities and anything outside 0..1 can't come from SculptForge: clamped (NaN -> no crease).
+            for (float& c : m.creases) c = std::isfinite(c) ? std::clamp(c, 0.0f, 1.0f) : c > 0.0f ? 1.0f : 0.0f;
+            if (std::none_of(m.creases.begin(), m.creases.end(), [](float c) { return c > 0.0f; })) m.creases.clear();
+        } else if (cj.isObject()) {
+            r.skipped += (r.skipped.empty() ? "" : ", ") + std::string("edge creases");
+        }
     }
     if (mj.has("quad_partners")) { // rebuildTopology() unpairs anything that isn't a valid pair
         m.quadPartners.resize(nt);
@@ -902,7 +926,14 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         const bool active = doc.checkedOut(i);
         Json st = Json::object();
         st.set("name", s.name);
-        st.set("visible", s.visible);
+        // During a Figure Pose the Parts are saved shown as before it, and the Pose Mesh hidden (core/FigurePose.h).
+        bool visible = s.visible;
+        if (doc.figurePose && doc.partIndex(doc.figurePose->poseMesh) >= 0) {
+            visible = false;
+            for (const auto& [id, was] : doc.figurePose->visibility)
+                if (id == s.id) visible = was;
+        }
+        st.set("visible", visible);
         if (s.shading != Shading::Default) st.set("shading", shadingName(s.shading)); // (no format change: optional)
         if (const int f = doc.partFolderIndex(s.folder); f >= 0) st.set("folder", f); // (#96: optional, as shading)
         if (s.moved()) {
@@ -1236,6 +1267,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     doc.splatsChanged();
     if (!skippedSets.empty())
         doc.notice += (doc.notice.empty() ? "" : "; ") + std::string("Selection sets left out (unreadable): ") + skippedSets;
+    if (!r.skipped.empty()) doc.notice += (doc.notice.empty() ? "" : "; ") + std::string("Left out (unreadable): ") + r.skipped;
     for (const auto& b : manifest["brushes"].items()) {
         if (!b.isObject()) continue;
         // Brushes the library already has, unchanged, stay library brushes; the rest are the project's own.

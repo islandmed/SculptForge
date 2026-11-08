@@ -30,7 +30,7 @@ TEST(ui_scale_automatic_follows_the_display) {
 
 TEST(ui_scale_choice_wins_and_is_clamped) {
     CHECK(near(resolveUiScale(0.0f, 1.5f), 1.5f)); // Automatic
-    for (float s : {1.0f, 1.25f, 1.5f, 1.75f, 2.0f}) {
+    for (float s : {1.0f, 1.1f, 1.15f, 1.25f, 1.35f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f}) {
         CHECK(near(resolveUiScale(s, 1.0f), s));
         CHECK(near(resolveUiScale(s, 2.0f), s)); // a chosen scale ignores the display (#87: Automatic overrode it)
     }
@@ -38,6 +38,24 @@ TEST(ui_scale_choice_wins_and_is_clamped) {
     CHECK(near(resolveUiScale(0.0f, 0.1f), 0.5f));
     CHECK(uiScaleChanged(1.0f, 1.25f));
     CHECK(!uiScaleChanged(1.25f, 1.2499f)); // jitter from the system rebuilds nothing
+}
+
+TEST(ui_scale_fonts_at_the_pixel_density) {
+    // A 5K Retina display (density 2) drew a 1x font atlas stretched 2x: soft text and icons (fenix 11-08).
+    CHECK(near(fontRasterDensity(1.0f, 1.0f), 1.0f)); // Windows / X11: the UI scale already sizes the atlas
+    CHECK(near(fontRasterDensity(2.5f, 1.0f), 1.0f));
+    CHECK(near(fontRasterDensity(1.0f, 2.0f), 2.0f)); // macOS Retina at 100 %
+    CHECK(near(fontRasterDensity(1.0f, 1.5f), 1.5f)); // a Wayland output at 150 %
+    for (float s : {1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f}) {
+        const float d = fontRasterDensity(s, 2.0f);
+        CHECK(d >= 1.0f && d <= 2.0f && s * d <= 3.0f + 1e-4f); // no bigger an atlas than 300 % at 1x (4096x16384)
+    }
+    CHECK(near(fontRasterDensity(1.5f, 2.0f), 2.0f));
+    CHECK(near(fontRasterDensity(2.0f, 2.0f), 1.5f));
+    CHECK(near(fontRasterDensity(3.0f, 2.0f), 1.0f));
+    CHECK(near(fontRasterDensity(1.0f, 0.0f), 1.0f)); // SDL couldn't tell
+    CHECK(near(fontRasterDensity(1.0f, NAN), 1.0f));
+    CHECK(near(fontRasterDensity(1.0f, 9.0f), 3.0f));
 }
 
 TEST(ui_scale_matrix_shell_sizes) {

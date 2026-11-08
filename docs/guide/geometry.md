@@ -177,12 +177,12 @@ without symmetry, to finish a half model, or to repair a model whose sides have 
   from the plane are welded onto it, which closes a half model whose seam isn't exactly at 0.
 - Face Groups, vertex paint, the mask, UVs, quads and sculpt layers are kept; the mirrored side takes the kept side's.
   Subdivision levels are removed (undo restores them), as with the other tools on this page.
-- To keep the **other** side, flip the model first with **Tool > Deformation > Mirror**, or run
+- To keep the **other** side, flip the model first with **Tool > Geometry > Symmetry > Mirror**, or run
   `mirror_and_weld side=negative`.
 
 ## Mirror
 
-**Tool > Deformation > Mirror** flips the Part across the plane through the origin on the chosen axes, with its
+**Tool > Geometry > Symmetry > Mirror** flips the Part across the plane through the origin on the chosen axes, with its
 surface still facing outward. Face Groups, vertex paint, UVs and layers come along; subdivision levels are removed
 (undo restores them). `mirror pivot=center` flips it in place about its own centre instead.
 
@@ -202,9 +202,9 @@ apart.
   point) are removed, and so are points no triangle uses.
 - One undo step. Subdivision levels are removed (undo restores them).
 
-## Check Mesh
+## Find Problems
 
-**Tool > Geometry > Check Mesh** looks for what makes a mesh hard to sculpt, remesh, 3D print or export. **Check**
+**Tool > Geometry > Find Problems** looks for what makes a mesh hard to sculpt, remesh, 3D print or export. **Check**
 counts the problems; it changes nothing. Each problem found gets a row with its count and a **Fix** button that
 changes only what that row names, as one undo step.
 
@@ -253,7 +253,7 @@ See [Exporting](exporting.md) for these exports and their options.
 
 ## Undo and safety
 
-Subdivide, remesh, Quad Remesh, decimate, Make Symmetric, Mirror, Merge by Distance, every Check Mesh fix and
+Subdivide, remesh, Quad Remesh, decimate, Make Symmetric, Mirror, Merge by Distance, every Find Problems fix and
 Remove Hidden are single undo steps on the
 active Part. They can use a lot of memory on dense meshes, and undo keeps a full copy of the previous mesh for
 each of them. Before a big change on a heavy sculpt:

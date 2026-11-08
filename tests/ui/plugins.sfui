@@ -1,0 +1,61 @@
+# Sandboxed plugins (#20): a pack holding two plugins (tests/ui/data/packs/plugins, kept current by
+# plugin_ui_samples_are_current), the review screen showing each plugin with "Permissions: none", the plugins in
+# Library > Packs and Tool > Reshape > Plugins, the plugin window with the settings its manifest declares (drawn
+# by us), Apply as one undo step, and Stop on a plugin that never finishes (the mesh unchanged).
+run new_sphere subdivisions=3
+expect_value plugins_installed == 0
+run pack_create folder="$SCRIPT_DIR/data/packs/plugins" path="$LIBRARY/Plugins.sfpack" id=plugin-pack name="Plugin Pack" author="Test Author" license=CC0-1.0
+
+run pack_install path="$LIBRARY/Plugins.sfpack"
+expect_value pack_review_open == 1
+expect_value pack_review_ok == 1
+expect_value pack_review_plugin == 2
+wait_idle 30
+expect_text Noise Displace 1.0
+expect_text Permissions: none
+expect_text Its plugins run sandboxed
+shot plugin_review
+click "Install##packreview"
+expect_value packs_installed == 1
+expect_value plugins_installed == 2
+
+# Library > Packs: the pack's details list its plugins; one opens its window.
+click "Library/Details##plugin-pack"
+wait_idle 30
+shot plugin_pack_details
+click "Library/###plugin.plugin-pack.noise-displace"
+expect_value plugin_window_open == 1
+wait_idle 30
+expect_text Amount
+expect_text Scale
+expect_text Seed
+shot plugin_window
+expect_value undo_steps == 0
+click "Apply##plugin"
+wait_value plugin_running == 0 10
+expect_status Noise Displace: moved
+expect_value undo_steps == 1
+run undo
+expect_value undo_steps == 0
+
+# A plugin that never finishes: Stop, and the mesh is unchanged.
+click "Library/###plugin.plugin-pack.endless-loop"
+wait_idle 30
+click "Apply##plugin"
+wait_value plugin_running == 1 5
+wait 0.5
+expect_text Running...
+shot plugin_running
+click "Stop##plugin"
+wait_value plugin_running == 0 10
+expect_status Endless Loop: stopped. The mesh is unchanged.
+expect_value undo_steps == 0
+expect_value plugins_off == 0
+
+# Tool > Reshape lists the installed plugins too.
+key esc
+click "Reshape##tool.deformation"
+wait_idle 30
+expect_text Plugins
+expect "###plugin.plugin-pack.noise-displace"
+shot plugin_deformation

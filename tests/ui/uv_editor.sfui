@@ -1,4 +1,4 @@
-# UV Editor (Tool > Texture Map > UV Editor, Alt+U): the 2D layout drawn on the GPU, seams drawn on the model,
+# UV Editor (Tool > Texture Image > UV Editor, Alt+U): the 2D layout drawn on the GPU, seams drawn on the model,
 # unwrapping, the colours and checker on the model, packing across UDIM tiles, texel density, trim strips,
 # selecting and moving islands with undo.
 drop ../../assets/demo/lion-head.glb

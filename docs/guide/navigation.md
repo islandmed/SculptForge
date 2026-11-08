@@ -98,7 +98,7 @@ style, <kbd>Alt</kbd>+left-drag rotates as before. With a pen that has no button
 press <kbd>Shift</kbd>+<kbd>L</kbd> to turn it off while you rotate, or turn on Hold Space. Lasso Mask, Rectangle Mask and the
 <kbd>Ctrl</kbd>+<kbd>Shift</kbd> hide and show shapes work as before.
 
-**Floor grid** (**View > Floor grid**, also **Tool > Display**; off by default, remembered) draws a faint grid on
+**Floor grid** (**View > Floor grid**, also **Tool > Viewport Look**; off by default, remembered) draws a faint grid on
 the floor the model stands on: its lowest point, with the up axis (Y) standing on it. It helps judge perspective and
 tilt and line up Parts; the red line is the X axis, the blue one Z. The floor moves when a stroke or a move ends (not
 during it). The squares step up by ten as you zoom out, and the grid fades into the distance; it never draws over

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <numeric>
 
@@ -113,23 +114,40 @@ void blurAxis(std::vector<float>& f, const glm::ivec3& dims, int axis) {
 }
 
 // Closest point to `p` on triangle abc (Ericson, Real-Time Collision Detection 5.1.5).
-// An edge with one triangle (undirected, so flipped triangles don't hide it).
+// An edge with one triangle (undirected, so flipped triangles don't hide it). Edges bucketed by their lower vertex (a
+// counting sort), then each vertex's few edges sorted on their own, in parallel: no sort of every edge at once.
 bool hasOpenEdges(const Mesh& mesh) {
-    std::vector<uint64_t> edges;
-    edges.reserve(mesh.triangleCount() * 3);
+    const size_t nv = mesh.positions.size();
+    std::vector<uint32_t> off(nv + 1, 0);
     for (const glm::uvec3& t : mesh.triangles)
-        for (int k = 0; k < 3; ++k) {
-            const uint32_t a = t[k], b = t[(k + 1) % 3];
-            edges.push_back(uint64_t(std::min(a, b)) << 32 | std::max(a, b));
-        }
-    std::sort(edges.begin(), edges.end());
-    for (size_t i = 0; i < edges.size();) {
-        size_t j = i + 1;
-        while (j < edges.size() && edges[j] == edges[i]) ++j;
-        if (j - i == 1) return true;
-        i = j;
+        for (int k = 0; k < 3; ++k) ++off[size_t(std::min(t[k], t[(k + 1) % 3])) + 1];
+    for (size_t v = 0; v < nv; ++v) off[v + 1] += off[v];
+    std::vector<uint32_t> other(off[nv]);
+    {
+        std::vector<uint32_t> fill(off.begin(), off.end() - 1);
+        for (const glm::uvec3& t : mesh.triangles)
+            for (int k = 0; k < 3; ++k) {
+                const uint32_t a = t[k], b = t[(k + 1) % 3];
+                other[fill[std::min(a, b)]++] = std::max(a, b);
+            }
     }
-    return false;
+    std::atomic<bool> open{false};
+    poolFor(nv, [&](size_t b0, size_t e0) {
+        for (size_t v = b0; v < e0 && !open.load(std::memory_order_relaxed); ++v) {
+            const auto first = other.begin() + long(off[v]), last = other.begin() + long(off[v + 1]);
+            std::sort(first, last);
+            for (auto i = first; i != last;) {
+                auto j = i + 1;
+                while (j != last && *j == *i) ++j;
+                if (j - i == 1) {
+                    open.store(true, std::memory_order_relaxed);
+                    break;
+                }
+                i = j;
+            }
+        }
+    }, 16384);
+    return open.load();
 }
 
 // Drops the pieces of a surface-nets mesh (quads as triangle pairs t, t + 1) with fewer than `maxTriangles`
@@ -402,20 +420,25 @@ Mesh meshFromField(const VoxelGrid& grid, const std::vector<float>& f, float iso
 
 void rasterizeMeshShell(const Mesh& mesh, VoxelGrid& grid) {
     const auto& P = mesh.positions;
-    for (const auto& t : mesh.triangles) {
-        const glm::vec3 a = (P[t.x] - grid.origin) / grid.cell;
-        const glm::vec3 b = (P[t.y] - grid.origin) / grid.cell;
-        const glm::vec3 c = (P[t.z] - grid.origin) / grid.cell;
-        const float longest = std::max({glm::distance(a, b), glm::distance(b, c), glm::distance(c, a)});
-        const int steps = std::max(1, int(std::ceil(longest * 2.0f)));
-        for (int i = 0; i <= steps; ++i)
-            for (int j = 0; i + j <= steps; ++j) {
-                const float u = float(i) / float(steps), v = float(j) / float(steps);
-                const glm::ivec3 s(glm::round(a + (b - a) * u + (c - a) * v));
-                if (glm::any(glm::lessThan(s, glm::ivec3(0))) || glm::any(glm::greaterThanEqual(s, grid.dims))) continue;
-                grid.values[grid.index(s.x, s.y, s.z)] = 1.0f;
-            }
-    }
+    // Triangles in parallel: every write stores the same 1, so the grid doesn't depend on the order (relaxed atomic
+    // stores, as two triangles may mark the same cell).
+    poolFor(mesh.triangles.size(), [&](size_t tb, size_t te) {
+        for (size_t ti = tb; ti < te; ++ti) {
+            const glm::uvec3 t = mesh.triangles[ti];
+            const glm::vec3 a = (P[t.x] - grid.origin) / grid.cell;
+            const glm::vec3 b = (P[t.y] - grid.origin) / grid.cell;
+            const glm::vec3 c = (P[t.z] - grid.origin) / grid.cell;
+            const float longest = std::max({glm::distance(a, b), glm::distance(b, c), glm::distance(c, a)});
+            const int steps = std::max(1, int(std::ceil(longest * 2.0f)));
+            for (int i = 0; i <= steps; ++i)
+                for (int j = 0; i + j <= steps; ++j) {
+                    const float u = float(i) / float(steps), v = float(j) / float(steps);
+                    const glm::ivec3 s(glm::round(a + (b - a) * u + (c - a) * v));
+                    if (glm::any(glm::lessThan(s, glm::ivec3(0))) || glm::any(glm::greaterThanEqual(s, grid.dims))) continue;
+                    std::atomic_ref<float>(grid.values[grid.index(s.x, s.y, s.z)]).store(1.0f, std::memory_order_relaxed);
+                }
+        }
+    }, 8192);
 }
 
 std::vector<float> insideDistanceField(const Mesh& mesh, const VoxelGrid& grid, const std::vector<uint8_t>& solid, float band) {

@@ -10,6 +10,7 @@
 #include "core/MemoryGuard.h"
 #include "core/TierConfig.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -382,4 +383,35 @@ TEST(hw_tier_compact_memory) {
     CHECK(compactBytes(0) == "0M");
     CHECK(memoryText(12 * GB) == "12 GB");
     CHECK(memoryText(343 * MB) == "343 MB");
+}
+
+TEST(hw_tier_card_seen) {
+    // The first-run card, once per machine (#161: it came back on every start of a laptop with two GPUs).
+    const HardwareInfo intel = box("Intel", "Mesa Intel(R) UHD Graphics 620 (KBL GT2)", 0, 16000, 8);
+    const HardwareInfo nvidia = box("NVIDIA Corporation", "NVIDIA GeForce MX150/PCIe/SSE2", 2048, 16000, 8);
+    CHECK(!tierCardSeen("", intel));
+    std::string seen = rememberTierCard("", intel);
+    CHECK(tierCardSeen(seen, intel));
+    CHECK(!tierCardSeen(seen, nvidia)); // another GPU: the card again, once
+    seen = rememberTierCard(seen, nvidia);
+    CHECK(tierCardSeen(seen, intel) && tierCardSeen(seen, nvidia)); // either GPU at the next start: no card
+    CHECK(rememberTierCard(seen, nvidia) == seen); // (already there: nothing added)
+    // Memory the driver reports either side of a half GB is the same machine; more RAM is a new one.
+    HardwareInfo drift = nvidia;
+    drift.vramMB = 2560;
+    drift.ramMB = 16600;
+    CHECK(tierCardSeen(seen, drift));
+    HardwareInfo upgraded = nvidia;
+    upgraded.ramMB = 32000;
+    CHECK(!tierCardSeen(seen, upgraded));
+    HardwareInfo unreported = nvidia; // (the same card where the driver doesn't say its memory)
+    unreported.vramMB = 0;
+    CHECK(tierCardSeen(seen, unreported));
+    // A key saved by an older version (one machine, no ';') still counts.
+    CHECK(tierCardSeen(tierCardKey(intel), intel));
+    // The last four machines.
+    std::string many;
+    for (int i = 0; i < 6; ++i) many = rememberTierCard(many, box("X", "GPU " + std::to_string(i), 4096, 16000, 8));
+    CHECK(std::count(many.begin(), many.end(), ';') == 3);
+    CHECK(tierCardSeen(many, box("X", "GPU 5", 4096, 16000, 8)) && !tierCardSeen(many, box("X", "GPU 0", 4096, 16000, 8)));
 }

@@ -721,7 +721,7 @@ void notifyMeshMapsChanged(Document&, Mesh& mesh, const std::vector<uint32_t>* t
 
 namespace {
 
-constexpr const char* kNoTextureFill = "The Part has no texture: Tool > Texture Map > New Texture";
+constexpr const char* kNoTextureFill = "The Part has no texture: Tool > Texture Image > New Texture";
 
 // The layer a command names (layer=<name> / index=<i>), else the active one; -2 with `error` when none fits.
 int fillLayerArg(const PaintTexture& t, const Args& a, std::string& error) {

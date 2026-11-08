@@ -4,7 +4,7 @@
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 expect_value panel_drag_scrolls == 0
-click "Deformation##tool.deformation"                # long sub-palettes (Shift+click keeps more open): the tray overflows
+click "Reshape##tool.deformation"                # long sub-palettes (Shift+click keeps more open): the tray overflows
 hold shift
 click "Parts##tool.part"
 click "Geometry##tool.geometry"

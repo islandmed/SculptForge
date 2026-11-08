@@ -1,0 +1,28 @@
+# Drape (docs/design/cloth.md, phase 2): a plane Part above a ball Part, Tool > Drape > Simulate: the plane falls
+# live, wraps the ball and rests, kept as one undo step (Ctrl+Z puts the plane back); the panel's options and help.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_plane resolution=80
+run transform translate=0,0.62,0
+run part_append type=sphere size=0.5 name=Ball   # 1 m across, appended beside the plane at x = 1.6, y = 0.62
+run transform translate=-1.6,-0.62,0                 # under the plane's middle (12 cm below it)
+run part_select name=Plane
+camera 20 -25
+zoom 1.6
+click "Tool##palette.tool"
+click "Drape##tool.drape"
+expect "##drapefabric"
+expect "##drapescale"
+hold ctrl
+hover "##drapescale"
+expect_help 1.8 m
+hold none
+snapshot
+click "Simulate##drape"
+wait_value drape_running == 1 10
+wait_value drape_running == 0 60
+expect_value moved > 3000
+expect_value can_undo == 1
+wait_idle 30
+shot cloth_drape
+key ctrl+z
+expect_value moved == 0

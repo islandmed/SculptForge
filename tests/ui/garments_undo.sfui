@@ -1,0 +1,36 @@
+# Undo keys with the Pattern window (Tool > Garments) open: the pattern's own undo while the window has focus and
+# has a step; otherwise the scene's. Never swallowed (ui_monkey seed 4: Ctrl+Z did nothing with the window open).
+run new_sphere subdivisions=3
+stroke 0.30 0.20 0.78 0.72
+expect_value can_undo == 1
+
+# The window open, no pattern step yet: Ctrl+Z / Ctrl+Shift+Z are the scene's.
+action ui.garments
+expect_value garment_window_open == 1
+expect_value garment_undo_steps == 0
+key ctrl+z
+expect_value can_undo == 0
+key ctrl+shift+z
+expect_value can_undo == 1
+
+# A pattern step (the T-shirt from the Tool palette, which keeps the focus): Ctrl+Z is still the scene's.
+click "Garments##tool.garments"
+click "Garments/T-Shirt"
+expect_value garment_panels == 4
+expect_value garment_undo_steps > 0
+key ctrl+z
+expect_value can_undo == 0
+expect_value garment_panels == 4
+key ctrl+y
+expect_value can_undo == 1
+
+# Focus in the window (its panel list): Ctrl+Z undoes the pattern, the scene keeps its step; redo brings it back.
+remember garment_undo_steps steps
+click "Front"
+key ctrl+z
+expect_value garment_undo_steps == $steps-1
+expect_value can_undo == 1
+key ctrl+shift+z
+expect_value garment_undo_steps == $steps
+expect_value garment_panels == 4
+expect_value can_undo == 1

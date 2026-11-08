@@ -985,18 +985,53 @@ def supporter_names(text: str) -> list:
     return names
 
 
-def supporters_html() -> str:
+def credited_names():
+    """(every credited name, the Founding Members' credit names): only names members chose to be credited with."""
     live = live_members()
     if live:
-        names, fnames = name_list(live["members"]), name_list(live["names"])
-    else:
-        raw = SUPPORTERS.read_bytes().decode("utf-8", errors="ignore") if SUPPORTERS.exists() else ""
-        names = supporter_names(raw)
-        try:
-            f = json.loads(FOUNDING.read_text(encoding="utf-8"))
-            fnames = name_list(f.get("names")) if isinstance(f, dict) and isinstance(f.get("names"), list) else []
-        except (OSError, ValueError):
-            fnames = []
+        return name_list(live["members"]), name_list(live["names"])
+    raw = SUPPORTERS.read_bytes().decode("utf-8", errors="ignore") if SUPPORTERS.exists() else ""
+    try:
+        f = json.loads(FOUNDING.read_text(encoding="utf-8"))
+        fnames = name_list(f.get("names")) if isinstance(f, dict) and isinstance(f.get("names"), list) else []
+    except (OSError, ValueError):
+        fnames = []
+    return supporter_names(raw), fnames
+
+
+# support.html's thanks line under the Member tier: the same Founding Members as supporters.html#founding, rewritten
+# with it (--supporters, which onboarding runs), so it never goes stale. Hidden while there are none.
+SUPPORT_PAGE = ROOT / "website" / "support.html"
+THANKS_RE = re.compile(r'<p class="founding-thanks"[^>]*>.*?</p>', re.S)
+THANKS_SHOWN = 10  # past this, "and N more" (the full list is one click away)
+
+
+def founding_thanks_html(fnames: list) -> str:
+    if not fnames:
+        return '<p class="founding-thanks" hidden></p>'
+    link = lambda t: f'<a href="supporters.html#founding">{t}</a>'
+    if len(fnames) == 1:
+        return f'<p class="founding-thanks">Thank you, {link(html.escape(fnames[0]))}, our first Founding Member.</p>'
+    shown = [html.escape(n) for n in fnames[:THANKS_SHOWN]]
+    more = len(fnames) - len(shown)
+    text = (", ".join(shown) + f" and {more} more") if more else (", ".join(shown[:-1]) + " and " + shown[-1])
+    return f'<p class="founding-thanks">Thank you to our first Founding Members: {link(text)}.</p>'
+
+
+def support_page_html(text: str) -> str:
+    return THANKS_RE.sub(lambda _: founding_thanks_html(credited_names()[1]), text, count=1)
+
+
+def write_support_page() -> None:
+    if SUPPORT_PAGE.exists():
+        text = SUPPORT_PAGE.read_text(encoding="utf-8")
+        new = support_page_html(text)
+        if new != text:
+            SUPPORT_PAGE.write_text(new, encoding="utf-8")
+
+
+def supporters_html() -> str:
+    names, fnames = credited_names()
     if names:
         body = ('<ul class="supporters">\n' + "".join(f"          <li>{html.escape(n)}</li>\n" for n in names)
                 + "        </ul>")
@@ -1093,11 +1128,18 @@ def main() -> int:
         return app_credits()
     if args.supporters:
         SUPPORTERS_PAGE.write_text(supporters_html(), encoding="utf-8")
+        write_support_page()
         return 0
     if args.check and SUPPORTERS_PAGE.exists() and SUPPORTERS_PAGE.read_text(encoding="utf-8") != supporters_html():
         print("website/supporters.html is out of date with website/members-live.json / docs/supporters.txt: run tools/guide/build_site.py",
               file=sys.stderr)
         return 1
+    if args.check and SUPPORT_PAGE.exists():
+        text = SUPPORT_PAGE.read_text(encoding="utf-8")
+        if not THANKS_RE.search(text) or support_page_html(text) != text:
+            print("website/support.html: the Founding Members thanks line is missing or out of date: run tools/guide/build_site.py",
+                  file=sys.stderr)
+            return 1
     index, chapters = load_book()
     wn = next((c for _, c in chapters if isinstance(c, WhatsNewPage)), None)
     if args.check:
@@ -1134,6 +1176,7 @@ def main() -> int:
     # every guide page. Only for the real site, not --out folders.
     if out.resolve() == (ROOT / "website" / "guide").resolve():
         SUPPORTERS_PAGE.write_text(supporters_html(), encoding="utf-8")
+        write_support_page()
         if wn:
             write_home(wn, False)
         urls = [SITE, SITE + "brushes.html", SITE + "press.html",

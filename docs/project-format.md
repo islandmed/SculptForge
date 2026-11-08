@@ -35,6 +35,7 @@ read by `loadProject` (src/core/Project.cpp). Commands: `save_project path=...`,
 | `mesh.facegroups` / `hidden` | parts/i/mesh/face groups.bin, hidden.bin | u32 / u8 per triangle |
 | `mesh.uvs` | parts/i/mesh/uvs.bin | f32 x2 per triangle corner |
 | `mesh.quad_partners` | parts/i/mesh/quad_partners.bin | u32 per triangle: the triangle it forms a quad with, 0xFFFFFFFF = none. Readers drop pairs that aren't mutual or don't share an edge. Added without a version bump: older readers ignore it and load triangles |
+| `mesh.creases` | parts/i/mesh/creases.bin | f32 per triangle corner: the crease (0..1, 1 = sharp) of the edge from that corner to the next, the same on both sides of an edge; only on a base level (level 0 of `subdiv`). Readers clamp to 0..1. Added without a version bump: older readers ignore it and subdivide smooth |
 | `layers[k].delta` | parts/i/layers/<k>.bin | f32 x3 per vertex, plus `name`, `weight` |
 | `paint_layers.base` | parts/i/paint/base.bin | f32 x3 per vertex: the Base paint layer (linear RGB) |
 | `paint_layers.layers[k].color` / `alpha` | parts/i/paint/<k>_color.bin, <k>_alpha.bin | f32 x3 / x1 per vertex, plus `name`, `opacity` (0-1), `blend`, `visible`, `locked` |

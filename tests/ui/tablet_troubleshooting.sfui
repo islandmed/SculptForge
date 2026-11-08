@@ -1,0 +1,28 @@
+# Preferences > Tablet > Troubleshooting details (SDL version, video driver, the pen's events, last pressure, Copy
+# details, Classic pen timing): it fits and reads at 100% and 200% UI scale, nothing runs past the panel's right edge,
+# and the same in narrow windows (CMake runs it at 1440x900 and 1024x768).
+run ui_look look=classic layout=classic        # (Preferences on the palette bar, as tablet.sfui)
+run new_sphere subdivisions=3
+pen_stroke 0.3 0.45 0.7 0.55 0.2 0.8          # (some pen events and a last stroke for the details to show)
+key ctrl+z
+pen_out
+click "Preferences##palette.preferences"
+click "Tablet##preferences.tablet"
+click "Troubleshooting details##tablet_diag"
+hover "Copy details##tablet_diag"              # (scrolls the panel to the details)
+expect "Classic pen timing##tablet_classic_timing"
+expect_text Pressure after motion: yes
+shot tablet-troubleshooting-100
+expect_value past_right:Tablet == 0
+key escape
+ui_scale 200
+wait 0.3
+click "Preferences##palette.preferences"   # (Tablet and the details stay open)
+hover "Copy details##tablet_diag"
+expect "Classic pen timing##tablet_classic_timing"
+shot tablet-troubleshooting-200
+expect_value past_right:Tablet == 0
+hover "Classic pen timing##tablet_classic_timing"   # (the details' top: the toggle, SDL version, video driver)
+expect_text SDL: 
+shot tablet-troubleshooting-200-top
+expect_value past_right:Tablet == 0

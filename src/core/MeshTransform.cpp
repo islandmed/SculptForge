@@ -3,6 +3,7 @@
 #include "core/MeshTransform.h"
 
 #include "core/Document.h"
+#include "core/FigurePose.h"
 
 #include <algorithm>
 #include <cmath>
@@ -181,6 +182,13 @@ glm::vec3 transformCenter(const Mesh& mesh, const std::vector<float>& weights) {
     return box.valid() ? box.center() : glm::vec3(0.0f);
 }
 
+std::vector<float> TransformOp::weights(size_t vertexCount) const {
+    std::vector<float> w(vertexCount, 0.0f);
+    for (size_t i = 0; i < verts.size(); ++i)
+        if (verts[i] < vertexCount) w[verts[i]] = float(levels[i]) / float(TransformSession::kLevels);
+    return w;
+}
+
 bool TransformSession::layerWeightZero(const Mesh& mesh, int layer) {
     return layer >= 0 && layer < int(mesh.layers.size()) && std::abs(mesh.layers[size_t(layer)].weight) < 1e-6f;
 }
@@ -200,6 +208,7 @@ bool TransformSession::begin(const Mesh& mesh, std::vector<float> weights, Symme
         if (weighted) full[v] = uint16_t(l);
     }
     if (verts_.empty()) return false;
+    mirror_ = mirror;
 
     // Symmetry only makes sense for a part of the mesh, on a side of the plane.
     Symmetry sym{false, false, false};
@@ -313,6 +322,7 @@ void TransformSession::apply(Mesh& mesh, const MeshTransform& t) {
             mesh.normals[v] = len > 1e-20f ? n / len : normals_[i];
         }
     });
+    last_ = t;
     if (layered_) mesh.evaluate(verts_);
     // Rigidly moved normals just turn (above); recompute them only where neighbours move differently.
     if (!boundary_.empty()) mesh.updateNormals(boundary_);
@@ -357,6 +367,14 @@ UndoRecord TransformSession::finish(Mesh& mesh, BVH& bvh, std::string label) {
     else bvh.refit(mesh, verts_);
     r.label = std::move(label);
     r.positions.indices = verts_;
+    if (keepOp_) {
+        auto op = std::make_shared<TransformOp>();
+        op->transform = last_;
+        op->mirror = mirror_;
+        op->verts = verts_;
+        op->levels = level_;
+        r.transformOp = std::move(op);
+    }
     if (layer_ >= 0) { // like a stroke into the layer: its old offsets
         r.layer = layer_;
         r.positions.values = std::move(deltas_[0]);
@@ -412,6 +430,7 @@ size_t transformPart(Document& doc, int index, const MeshTransform& t, bool useM
     TransformSession s;
     const int layer = part.data == doc.activePartInfo().data ? doc.activeLayer : -1; // (the checked-out mesh)
     if (!s.begin(mesh, transformWeights(mesh, useMask, falloff), mirror, local.pivot, layer)) return 0;
+    if (index == doc.activePart && figurePoseEditing(doc)) s.keepOp(); // a Pose Mesh move (core/FigurePose.h)
     const size_t n = s.movingVertices();
     s.apply(mesh, local);
     UndoRecord r = s.finish(mesh, bvh, label);

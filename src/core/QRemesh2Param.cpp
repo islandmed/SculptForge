@@ -259,6 +259,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
     const size_t nt = p.T.size(), nv = p.P.size();
     const size_t nc = 3 * nt;
     if (nt == 0) return false;
+    StageClock clock("grid map");
 
     // 1. Comb along a breadth-first spanning tree of the triangles.
     std::vector<uint8_t> tree(nc, 0), seen(nt, 0);
@@ -294,6 +295,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
         }
     }
     // Sanity: tree edges have match 0.
+    clock.lap("comb");
     // 2. Cut graph: interior edges off the tree, pruned.
     std::vector<uint8_t> cut(nc, 0), open(nv, 0);
     for (uint32_t c = 0; c < nc; ++c) {
@@ -333,6 +335,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
     size_t cutEdges = 0;
     for (uint32_t c = 0; c < nc; ++c) cutEdges += cut[c] && p.opp[c] > c;
 
+    clock.lap("cut graph");
     // 3. Wedges: corners of a vertex joined across edges that are neither open nor cut.
     std::vector<uint32_t> parent(nc);
     std::iota(parent.begin(), parent.end(), 0u);
@@ -432,6 +435,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
             if (el.eliminated(v)) maxLen = std::max(maxLen, el.expr(v).size()), total += el.expr(v).size();
         std::fprintf(stderr, "  grid map: expressions max %zu terms, %zu in all\n", maxLen, total);
     }
+    clock.lap("wedges + elimination");
     // 4. Free unknowns. The reduced system C^T K C y = C^T (b - K d) (x = C y + d) is applied without forming it:
     // the cut tree makes C fill in (a transition is the composition of everything below it), C^T K C would not fit.
     const size_t nvar = el.size(), ncopy = 2 * size_t(copies);
@@ -496,18 +500,41 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
                 }
             }
         }
-        std::sort(trips.begin(), trips.end(), [](const Trip& x, const Trip& y) { return x.r < y.r || (x.r == y.r && x.c < y.c); });
-        K.off.assign(ncopy + 1, 0);
-        for (size_t i = 0; i < trips.size();) {
-            size_t j = i;
-            double v = 0.0;
-            while (j < trips.size() && trips[j].r == trips[i].r && trips[j].c == trips[i].c) v += trips[j++].v;
-            K.col.push_back(trips[i].c);
-            K.val.push_back(v);
-            ++K.off[trips[i].r + 1];
-            i = j;
+        // CSR by a counting sort on the row (stable), then each row sorted by column and its duplicates summed in
+        // the order they were made (in parallel: rows are independent; no global sort of ~18 triplets a triangle).
+        std::vector<uint32_t> rowOff(ncopy + 1, 0);
+        for (const Trip& t : trips) ++rowOff[t.r + 1];
+        for (size_t i = 0; i < ncopy; ++i) rowOff[i + 1] += rowOff[i];
+        std::vector<std::pair<uint32_t, double>> byRow(trips.size());
+        {
+            std::vector<uint32_t> fill(rowOff.begin(), rowOff.end() - 1);
+            for (const Trip& t : trips) byRow[fill[t.r]++] = {t.c, t.v};
         }
-        for (size_t i = 0; i < ncopy; ++i) K.off[i + 1] += K.off[i];
+        std::vector<uint32_t> rowCount(ncopy, 0);
+        poolFor(ncopy, [&](size_t b0, size_t e0) {
+            for (size_t r = b0; r < e0; ++r) {
+                const auto first = byRow.begin() + long(rowOff[r]), last = byRow.begin() + long(rowOff[r + 1]);
+                std::stable_sort(first, last, [](const auto& x, const auto& y) { return x.first < y.first; });
+                auto out = first;
+                for (auto it = first; it != last;) {
+                    auto run = it;
+                    double v = 0.0;
+                    while (run != last && run->first == it->first) v += (run++)->second;
+                    *out++ = {it->first, v};
+                    it = run;
+                }
+                rowCount[r] = uint32_t(out - first);
+            }
+        });
+        K.off.assign(ncopy + 1, 0);
+        for (size_t i = 0; i < ncopy; ++i) K.off[i + 1] = K.off[i] + rowCount[i];
+        K.col.resize(K.off[ncopy]);
+        K.val.resize(K.off[ncopy]);
+        poolFor(ncopy, [&](size_t b0, size_t e0) {
+            for (size_t r = b0; r < e0; ++r)
+                for (uint32_t k = 0; k < rowCount[r]; ++k)
+                    K.col[K.off[r] + k] = byRow[rowOff[r] + k].first, K.val[K.off[r] + k] = byRow[rowOff[r] + k].second;
+        });
         K.diag.assign(ncopy, 0.0);
         for (size_t i = 0; i < ncopy; ++i)
             for (uint32_t k = K.off[i]; k < K.off[i + 1]; ++k)
@@ -588,6 +615,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
     }, &diag, nf};
     // Multigrid preconditioner on a sparse stand-in for C^T K C: each wedge unknown mapped to its main free real
     // unknown only (the integer fill-in dropped), integer unknowns on their own diagonal.
+    clock.lap("free unknowns + K, C");
     Multigrid<double> mg;
     {
         std::vector<int64_t> mainOf(ncopy, -1);
@@ -612,6 +640,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
         As.build(nf, trips);
         mg.build(As);
     }
+    clock.lap("multigrid build");
     // The integer unknowns (singularity positions, seam shifts, feature lines) couple across the whole cut tree, which
     // the stand-in leaves out: they get an exact dense block A_ii = S^T K S (S: their columns of C), and the
     // preconditioner is a symmetric block Gauss-Seidel over (integers, reals, integers).
@@ -712,8 +741,10 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
     std::vector<uint8_t> fixed(nf, 0);
     bool stop = false;
     if (useIntBlock) factorInts(fixed);
+    clock.lap("integer block");
     int iters = conjugateGradients(op, rhs, fixed, y, 1e-4, 2000, cancelled, stop, precond);
     if (stop) return false;
+    clock.lap("first solve");
     // Before rounding: scale the map so its area (the number of unit squares, i.e. quads) is the wanted count. The
     // constraints are homogeneous, so a scaled solution is still a solution; distortion near singularities and
     // features otherwise leaves the count 10-20% off.
@@ -768,6 +799,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
             ++rounds;
         }
     }
+    clock.lap("rounding + re-solves");
     if (timing)
         std::fprintf(stderr, "  grid map: %zu free unknowns (%zu integer), %zu rounding rounds, %d CG iterations\n", nf,
                      intFree.size(), rounds, iters);

@@ -6,6 +6,242 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-08
+
+### Added
+- A first-use notice before the first request to each third-party AI host (Pollinations.ai, each Hugging Face Space
+  family, fal.ai, Meshy, Hyper3D, a remote OpenAI-compatible server or ComfyUI), drawn inside the AI Brush or Generate
+  3D panel (no dialog): what is sent, the host, who pays, and **Allow** / **Use local instead** (a running Ollama, LM
+  Studio or ComfyUI) or **Set up local** / **Cancel**. Nothing is sent before Allow: the request functions refuse on
+  their own, so scripts, `sculptforge-cli` and AI tools get the same refusal until the service is allowed in the app.
+  Allow is kept per service in `ai.json` (`sendAllowed`); **Preferences > AI > Online AI services** lists each one as
+  Allowed, Asks first, or set by the studio, with **Revoke**. Servers on this computer (localhost, 127.0.0.1, ::1)
+  never ask. A studio policy pre-allows what its `ai.providers` / `ai.endpoints` list and its "no" wins over an
+  artist's Allow. The guide's interface chapter has a plain "What leaves your computer" table. No new network host,
+  key or server.
+- **Cloth brush**: simulates the surface near the stroke as fabric (our own XPBD cloth solver, docs/design/cloth.md):
+  Drag pulls it along and it buckles into folds that keep their length, Push presses it in (Alt pulls), Settle drapes
+  it under gravity, Grab holds what it took and drags it (Move-like), Expand / Pinch spread or gather it, Inflate adds
+  fabric so it balloons and wrinkles. Soft body springs it back toward its shape; self-collision keeps folds from
+  passing through each other. Fabric presets Silk, Cotton, Denim and Leather; collides with the other visible Parts;
+  masked areas hold like pins; symmetry, sculpt layers, one undo step per stroke. Asked for on YouTube.
+- **Drape** (Tool > Drape, `cloth_drape`): the active Part simulated as cloth (our XPBD solver) until it rests on the
+  other visible Parts; fabric presets, real-size scale (units per metre), pins from the mask, Simulate / Pause / Keep
+  / Reset with a live view, one undo step. The cloth doesn't pass through thin, sharp shapes (needle tips, fingers,
+  curls) or through the body when it falls fast. Tip: drop the cloth from in front of overhanging shapes (beards,
+  chins), or it settles behind them.
+- **Crease** / **Uncrease** in Tool > Geometry > Edges (#108): a crease value (0..1, 1 = fully sharp) on the selected
+  edges of the base level, one undo step each, saved in the project (an optional blob: older versions open the file
+  without creases) and kept on the base while stepping levels. Creased edges are drawn in blue on the base level in
+  every mode. The `edge_crease` command does the same from scripts. **Add Level honours creases** (Catmull-Clark and
+  Loop semi-sharp creases: sharpness 10 x crease², s - 1 per level, fractional blending): creasing at Level 1 under
+  existing levels reshapes them with their detail; Remove Below keeps what is left of the creases on the new base.
+  Without creases subdivision is bit-for-bit unchanged. **USD** export / import carries them (`creaseIndices` /
+  `creaseLengths` / `creaseSharpnesses`, `subdivisionScheme` catmullClark or loop on a creased cage); glTF, OBJ, FBX,
+  PLY and STL have none (documented). Thanks _tfx on Discord for asking; the plan for edge creases is @NicTanghe's
+  (#108).
+- **Edges mode** (Tool > Geometry > Edges, #108): picks edges of a Part's base level (Level 1; a Part with levels
+  steps down to it) on the model: click selects the edge under the cursor, Shift+click adds, Ctrl+click removes, a
+  double-click takes the edge loop (across quads, or along an open border). **Select by Angle** selects the edges
+  whose faces meet at more than the Angle (30 degrees by default), optionally **only within the selection**; **Grow**,
+  **Shrink**, **Open Edges**, **Invert** and **Deselect All**. Quad diagonals are never edges. The `edge_select`
+  command does the same from scripts. Thanks _tfx on Discord for asking for select by angle; the plan for edge creases
+  is @NicTanghe's (#108). Creases themselves come next.
+- **Pattern window: Templates and Print** (Tool > Garments): **Templates** lists the T-shirt, trousers, straight and
+  A-line skirts, hoodie, dress, cloak and gloves, with **Add beside the pattern** for an outfit and an editable **Size
+  chart (mm)** (hover a measurement to see how to take it); **Print** picks A4 or Letter, portrait or landscape, shows
+  how many pages it takes, and saves one PDF or one SVG per page. Both open under their buttons. Spanish and Chinese
+  included.
+- **Garments, part 2: the Pattern window** (Tool > Garments > Pattern): the garment's panels flat at real size over a
+  10 / 100 mm grid with a scale bar. Start from a T-shirt or a rectangle, or import an SVG; drag points (snapping to
+  the 5 mm grid and other panels' points; Ctrl drags freely), curve handles or whole panels; Alt+click an edge to add
+  a point, Delete removes it, C curves an edge. Sew by clicking two edges: every seam is listed by its edges' names
+  ("Front left side <-> Back left side") with both lengths, green when they match, red when one side is eased in;
+  hover a seam or an edge to see what it is sewn to. Duplicate, Mirror Copy (the other sleeve), Mirror, rename,
+  particle distance, fabric and thickness; export SVG or DXF. Ctrl+Z / Ctrl+Shift+Z over the window undo and redo
+  pattern edits. In English, Spanish and Chinese.
+- **Garment templates** (#garments): trousers, straight and A-line skirts (with waistband), hoodie (long sleeves,
+  two-piece hood, kangaroo pocket), dress (bodice and A-line skirt), cloak (half-circle cape with hood) and gloves (a
+  pair), next to the T-shirt. Flat panels at real size from a size chart saved in the project (chest, waist, hip,
+  neck, shoulder, arm, inseam, rise, head, hand and more: `garment_size`), sewn the way each garment is made with the
+  seam lengths matched; `garment_new template=... add=true` builds an outfit in one pattern. Our own proportions,
+  documented in docs/design/garment-templates.md. Their seams read by name in the Pattern window ("Left front inseam
+  <-> Left back inseam", "Left sleeve cuff <-> ..."), as the T-shirt's do; mirrored panels keep the names. **Printing
+  patterns at home**: `garment_export` writes tiled PDF (or one SVG per page) for A4 or Letter, portrait or landscape:
+  trim lines, half triangles that complete across each join, page names (A1, A2, ... B1), the 50 mm check square on
+  A1; blank pages are left out and a mirrored or repeated piece prints once, marked "cut 2, 1 reversed". The
+  whole-sheet SVG and the DXF for cutters stay. Guide chapter [Garments](docs/guide/garments.md).
+- **Generate 3D candidates**: **Candidates** (1-3) makes several shapes in one go, side by side as a shaded thumbnail
+  over a flat black silhouette, so the strongest form is picked before any sculpting. Free and local services start at
+  3; fal.ai, Meshy and Hyper3D start at 1 (each candidate is one generation on your own key, and the window says how
+  many are billed). The pick becomes a Part (only an untouched untitled scene is replaced); the others are discarded
+  or, with **Keep the others as hidden Parts**, kept hidden. "Same shape as A" when a service returns one shape twice.
+- **Use as sculpting base** (Generate 3D): one click after picking runs Voxel Remesh, then Quad Remesh (**Then Quad
+  Remesh**, on by default), for a clean, even mesh with one subdivision level. **Keep a high-detail copy (hidden)**
+  keeps the model as generated as a hidden Part below it; **Project Detail from the high-detail copy** brings its
+  detail back after Add Level.
+- **Pose all Parts** (Tool > Parts, `figure_pose_begin` / `figure_pose_apply` / `figure_pose_cancel`): the visible
+  Parts become one light Pose Mesh (each Part reduced to its share of 300k triangles, one face group per Part, so Mask
+  by Face group picks Parts; a Part with subdivision levels joins from a lower level, so it is ready in seconds). Pose
+  it with the Gizmo, masks, soft joints and symmetry; Undo steps back through the pose. Apply Pose moves every Part at
+  full resolution the same way (sculpt layers, subdivision and micro levels follow), as one undo step across all
+  Parts; Cancel Pose leaves everything as it was. Requested by @ABHITAR.
+- **Tube shapes** (Tool > Tube > Shape): Circle, Square (sharp corners), Triangle and Ribbon cross-sections, Thickness
+  for ribbons, Turn, and Taper start / Taper end; they set new tubes and the selected Tube Part (live while a slider
+  is held, one undo step), and the Symmetry X copy is the exact mirror image. `tube_new` / `tube_set` take `profile`,
+  `thickness`, `turn`, `up`, `taper_start`, `taper_end`. Requested by GABO on Discord.
+- **Point spacing** (Tool > Tube > Stroke) sets how far apart a drawn tube's points are, and **Simplify** (Tool > Tube
+  > Edit, `tube_simplify`) takes about a third of a tube's points out per press, the ones the curve needs least.
+  Requested by GABO on Discord.
+- **View toggles on the right shelf**: Turntable (View > Orbit lock: Y or Free), Ortho (Numpad 5), Floor (View > Floor
+  grid) and Flat (Render > Materials > Smooth | Flat), lit while on. Customised layouts get them below Rotate and
+  Paint. In a window too short for the column they fold into one View button (a list), and shorter still the column's
+  buttons shrink to their icons: nothing is cut off. Thanks foirgairwolf on Discord.
+- **Live brush ring on the Size slider**: while the top shelf's, the Draw palette's or the quick menu's Size slider
+  drags, the brush ring shows on the canvas at the new size (where the cursor last lay on the model, else the middle
+  of the view) and fades out about half a second after release. Thanks ABHITAR on Discord.
+- **Sandboxed plugins** (#20): a pack's `plugins/` folder may hold `.sfplugin` files, WebAssembly modules that turn a
+  mesh into a mesh (deformers: one undo step, mask-aware; generators: a new Part). They run in the wasmtime sandbox
+  with no imports at all (no files, network, clock or system access), a fresh instance per run, a time limit (20 s,
+  plus Stop), a work limit and a memory cap; one that crashes or runs too long is turned off with the reason, and the
+  mesh is never touched. Their settings come from the plugin's manifest and are drawn by SculptForge; the pack review
+  shows each plugin with "Permissions: none". They run only when you run them (never on install, when a project opens,
+  from a macro or from an AI agent). `plugin_list`, `plugin_run`, `plugin_enable`; a sample Noise Displace plugin, a C
+  header (sdk/plugin) and tools/plugin/sfplugin.py for authors. Thanks to @bribblej-web for the request.
+- **Finer UI scale steps** (Preferences > Interface): 110%, 115% and 135% between 100% and 150%, and 250% and 300% for
+  5K and 5K2K monitors run at their native resolution. Thanks @fenixpoints for the suggestion.
+- **Masked only** (Tool > Geometry > Merge by Distance): only masked points merge, with each other; the count and the
+  orange preview dots follow it. `weld_points masked_only=true` for scripts. Thanks foirgairwolf on Discord.
+- Quad Remesh, Voxel Remesh, Decimate and Merge by Distance ask before working on a partly hidden Part, in the app:
+  **Unhide and continue** shows everything and goes on (Undo hides it again), **Cancel** changes nothing. Merge by
+  Distance with Masked only and the mask shown doesn't ask. Thanks @TheLycanFenrir (#163).
+- **Preferences > Tablet > Troubleshooting details**: the SDL version, the video driver (wayland or x11 on Linux), the
+  session and package, the pen's events since launch, lost pressure samples, the system's own mouse events while the
+  pen was in range, the last pressure and the last stroke's range; **Copy details** copies them. Running through
+  XWayland, it says how to start SculptForge on Wayland (`SDL_VIDEO_DRIVER=wayland`). **Classic pen timing** there
+  (off by default) brings back the pen timing of 0.11.15 and before on every platform, a one-click workaround should
+  the new timing misbehave with a tablet.
+
+### Changed
+- Generate 3D no longer remeshes as part of generating: generate for form, then Use as sculpting base for topology.
+  The Remesh drop-down is replaced by the Sculpting base section; the CLI's image_to_3d / text_to_3d
+  (remesh=quad|voxel|false) are unchanged.
+- **Gizmo look** (fenix on Discord's design, @fenixpoints): All (Shift+W) is cleaner and easier to read. Each axis is
+  a thin line with its scale ball part way out and its move arrow at the end, with clear space before the rings (the
+  scale boxes past the rings are gone); rings seen edge-on and their back halves fade so they don't pile up over the
+  centre; the plane squares are lighter; the centre, view ring and even-scale tabs are light grey (charcoal on a light
+  flat background) so the yellow highlight stands out on every handle. Move and Scale use the same arrows and balls,
+  and every handle has a dark edge so it reads on light backgrounds too. Keys, handles and behaviour are unchanged.
+- **Tube**: **Snap to surfaces** is on by default, so a stroke drawn across a model follows its surface instead of
+  sinking into it, and pulled off the model it carries on into the air from the edge. With **Draw Tube** on, a plain
+  drag always draws, even over an old tube's dot; Shift+drag (or Ctrl, Alt) edits the dot. Reported by GABO on
+  Discord.
+- **Tool > Reshape** tidied (foirgairwolf on Discord): **Size**, then the **Stack**, each under its heading. The
+  Polish / Relax / Smooth / Balloon sliders and "Smooth keeps volume" above the Stack are removed. Polish, Relax,
+  Smooth and Balloon are now steps in Tool > Reshape > Stack (Add step > Surface); their menu items and keys still run
+  them at 50. Smooth's step has **Keep volume**; the `deform_polish`, `deform_relax`, `deform_smooth` and
+  `deform_balloon` commands are unchanged.
+- The interface's font texture is about 5x smaller (6 MB instead of 32 MB at 100%, 40 MB instead of 256 MB at 300%):
+  only the icons the app uses are loaded.
+- Tool sub-palettes renamed and reordered by task: Reshape, Texture Image and Viewport Look (were the generic deform,
+  texture and display names); Reshape ordered Smooth, Relax, Polish, Balloon; Mirror moved to Tool > Geometry >
+  Symmetry; Make Shell (Extract's button), Find Problems (Tool > Geometry > Cleanup, also in F3), Preferences > Saving
+  & Layouts. Sub-palette and action ids are unchanged (tool.deformation, tool.texture, tool.display,
+  preferences.config, deformation.mirror, part.extract), so saved layouts, hotkeys, shelves and scripts keep working;
+  translations updated (Spanish, Traditional and Simplified Chinese).
+- Headless runs (the offscreen or dummy video driver, UI test scripts, or `SF_NO_DIALOGS=1`) never open a system file
+  dialog, a message box or the browser: every one goes through one wrapper, which logs the request and answers cancel
+  (or a test's scripted path). A source check (`native_dialogs`) fails on any direct call.
+- No press on a floating card or panel over the 3D view starts a stroke underneath, even before the UI has seen the
+  pointer arrive (the first-run cards, the Quick Tour, banners).
+- **Quad Remesh is faster**, most of all on small models (reported by factoberplay on YouTube): most of it used to run
+  on one core. Its solvers (the multigrid setup, the conjugate-gradient passes, the grid map's matrix assembly), the
+  proxy surface's new vertices and the BVH build of the sculpt now run on all threads. Measured on the floor-tier
+  laptop at the defaults (5000 quads, median of 5): 1k triangles 1242 to 740 ms, 10k 1544 to 1001 ms, 100k 1524 to
+  1087 ms, 1M 2562 to 1793 ms, 10M 11.9 to 7.3 s. Smooth forms (no hard edges) also get a coarser helper surface,
+  which they remesh as well on (14 test sculpts: distance to the sculpt, poles, angles and edge spread the same or
+  better): 1k 1242 to 541 ms, 10k 1544 to 709 ms, 100k 1524 to 794 ms. Models with hard edges keep the denser one and
+  the same mesh as before.
+- **Voxel Remesh and the legacy Quad Remesh are faster on big sculpts**: the open-border check, the shell
+  rasterisation and the BVH build run on all threads (Voxel Remesh at 10M triangles 4.0 to 1.6 s, 1M 546 to 352 ms;
+  legacy Quad Remesh at 10M 11.0 to 7.1 s). Same results.
+
+### Fixed
+- **Leaving the gizmo**: Esc, or picking a brush, now leaves Move, Scale, Rotate and All; before, strokes kept driving
+  the gizmo until Draw (Q) was picked.
+- Cut: the flat cap and the walls a cut leaves were fans of long thin triangles between the outline's points (the cut
+  looked messy in Wire and only a remesh fixed it). They are now filled with even triangles about the mesh's own edge
+  length, and the triangles inside each cut mesh triangle are rearranged the same way. The outline stays exactly where
+  it was, so the result is as watertight as before (thanks dm4nd on Discord).
+- The Arch package builds with strict compiler flags (`-Werror=format-security`, as CachyOS's makepkg sets them): text
+  and tooltips are drawn as plain text, never read as printf formats, so a translation or name holding `%` can't
+  garble a label or crash (thanks @itotochi1107, #162). Every Linux and macOS build now fails on a non-literal format,
+  so it stays fixed.
+- Text and icons were soft on Retina and other 2x displays (5K monitors, scaled Wayland outputs): the font atlas was
+  rasterised at 1x and stretched. It now follows the window's pixel density, and moving the window between a 1x and a
+  2x monitor rebuilds it.
+- Picking a brush, Draw, Move, Scale or Rotate leaves **Brush > Capture from view** while it waits for its square;
+  before, the next drag on the model captured instead of sculpting.
+- After **Tool > Forge Spheres > New Forge Sphere**, picking a brush, Draw, Move, Scale or Rotate, or pressing Esc
+  goes back to the Part you were sculpting (a Forge Sphere Part isn't sculpted until Make Mesh); before, brushes did
+  nothing until you picked that Part again.
+- Picking a brush, Draw, Move, Scale or Rotate leaves **Color > Line Gradient** (a gradient just painted stays as it
+  is); before, drags on the model kept drawing gradient lines after another brush was picked.
+- The **Quad Remesh Guides** brush is left by Esc and by Draw, Move, Scale and Rotate too (before, only another brush
+  left it), and the status bar then says so instead of still describing the Guides brush.
+- **Tool > Facial Shapes > Place Landmarks** is left by Esc, any brush and Draw, Move, Scale or Rotate (before, clicks
+  kept placing landmarks after another brush was picked).
+- With a menu or pop-up open (a palette from the top menu or a task menu, the command palette, a right-click menu), a
+  click on a shelf brush, a tool button or a stroke on the model now does what it says and closes the menu; before,
+  the first click (and with the top menus every click on the brush shelf) only closed it, or did nothing.
+- Esc closes the **Export timelapse** dialog (Sculpt Timeline), like the other dialogs.
+- Paint mode ignored the Intensity slider: Intensity 1 and 100 painted the same, with every stroke type, with or
+  without an alpha. The slider set the sculpt strength, which Paint doesn't use. In Paint mode Intensity is now the
+  Colour intensity (the same value as I); sculpting keeps its own Intensity, and RGB while sculpting still paints at
+  the Colour intensity (#164). Thanks @fxrtst
+- **Quad Remesh on thin, pointed parts** (reported by Oslen on Discord): a long part that tapers to a sharp tip, like
+  a horn, a claw or a blade, could take a very long time at high **Target Quads** and come out with folded, tangled
+  quads along its whole length, and the quads stopped short of the point. The tip now gets its own handling: the quads
+  converge on it like a pencil's and end on the point. Measured on a 2.5 m horn (41k triangles) on our floor-tier
+  laptop: at 5,000 quads 3.5 s to 2.4 s, the distance to the sculpt 7.9 % to 0.5 % of its size, poles 1,533 to 846; at
+  20,000 quads 16.1 s to 7.1 s, 6.7 % to 0.4 %, 6,036 to 4,580 poles; at 50,000 quads 45.6 s to 13.3 s, 0.5 % to 0.3
+  %, 18,714 to 13,430 poles. Models without sharp tips give the same mesh as before; the full-body starter's
+  fingertips fit closer (1.5 % to 1.1 %).
+- **Starter meshes**: the Human Head and Stylised Head had two thin spikes hanging below the neck at every subdivision
+  level; the cut now follows one of the base mesh's edge loops, so the open rim is an even ring. The Bust's chest and
+  arm cuts, the Hand's wrist and the Ear's skin edge are clean too, and the Torso now ends in a ring round each upper
+  thigh and at the top of each upper arm. The faces themselves are unchanged.
+- The first-run tier card ("Tuned for your machine"): **Got it** could do nothing on Linux, and the card came back on
+  every start (#161, thanks @chipset-tech). A press that lands on the card the same frame the pointer gets there (a
+  trackpad tap, a pen touching down, a click in one batch of events with the move) now always reaches its buttons, and
+  never the model underneath; the card also has a close button and goes away with Esc or Enter. It is remembered for
+  each graphics card a laptop starts on, and for memory sizes the driver reports a little differently between starts.
+- **Tube**: Ctrl+Z (or Redo) in the middle of a tube stroke or a point drag left the tube's mesh and its points out of
+  step (two tubes on screen, one set of points, and later edits refused). Esc, Undo and Redo now drop the stroke or
+  put the point back. Esc during a stroke also drops it now instead of making the tube.
+- **Tube**: with a pen, a tube always started at full thickness however lightly it touched down (the pressure from
+  before the touch was used); it starts at the pen's first real pressure now. Reported by GABO on Discord.
+- Draw Tube (Tool > Tube) and Parts > Append > Insert on the model stayed on after picking another brush or tool, so
+  the next drag still drew a tube or inserted a mesh and the other tools seemed dead. Any brush (shelf, picker,
+  Library, its key, the same brush again), Draw / Move / Scale / Rotate, or Esc now leaves both; with a Tube Part
+  selected by its points, a brush goes back to the Part before it. Reported by GABO on Discord.
+- **Pen pressure on Wayland and X11** (Huguillon on YouTube): the Linux packages now carry SDL 3.4.18 (was 3.2.30) and
+  the AUR package needs it: a Wayland pen no longer counts as a new pen each time it comes into range, and its eraser
+  end inverts as set in Preferences > Tablet instead of drawing as the tip. A stroke sample's dabs now get that
+  sample's own pressure: SDL sends the motion before the pressure (every platform), and the stroke took the sample
+  before's. On Linux a sample whose pressure SDL lost (X11 valuators left out, a Wayland frame with a hover distance)
+  keeps the last pressure instead of dropping to 0 mid-stroke; a NaN or infinite pressure is ignored everywhere. Touch
+  events SDL made from the pen are off, so a finger on a pen display beside the pen no longer ends the stroke as a
+  two-finger gesture.
+- **Merge by Distance** (Tool > Geometry): the orange dots for the points that would merge show only while the
+  distance is dragged, hovered or focused with the keyboard, and fade out after. Before, they showed whenever the
+  panel was open, which on a dense model looked like a rendering fault.
+
+### Security
+- Plugins: the design and threat model (sandbox escape, denial of service, spoofing, supply chain) are in
+  docs/design/plugins.md. The runtime is wasmtime 50.0.1, pinned by SHA-256 and updated every release.
+- Interface text, translations and tooltips are never interpreted as printf formats (#162).
+
 ## [0.11.16] - 2026-11-07
 
 ### Added
@@ -91,7 +327,7 @@ All notable changes to SculptForge are listed here. The format follows
 - **Merge by Distance** (Tool > Geometry; `weld_points distance=... preview=true`): the points of the active Part
   within the distance merge into the nearest kept one; collapsed triangles go; one undo step. The count follows the
   slider and the points that would merge show in orange. Thanks foirgairwolf on Discord.
-- **Check Mesh** (Tool > Geometry; `mesh_check`, `mesh_fix issue=...`): non-manifold edges (Fix loosens the extra
+- **Find Problems** (Tool > Geometry; `mesh_check`, `mesh_fix issue=...`): non-manifold edges (Fix loosens the extra
   triangles), holes (capped as Fill Holes), duplicate and degenerate triangles (deleted), zero-area triangles
   (shortest edge collapsed), flipped triangles and inside-out closed pieces (rewound), isolated points (removed). Fix
   all fixes everything except holes, as one undo step. Thanks foirgairwolf on Discord.
@@ -129,13 +365,13 @@ All notable changes to SculptForge are listed here. The format follows
 ## [0.11.14] - 2026-11-07
 
 ### Added
-- **Deformation stack** (Tool > Deformation > Stack, requested by foirgairwolf on Discord): thirteen whole-Part shape
+- **Deformation stack** (Tool > Reshape > Stack, requested by foirgairwolf on Discord): thirteen whole-Part shape
   operations in four groups (Transform: Move, Turn, Scale, Squash; Bend & Twist: Bend, Twist, Taper, Shear; Shape:
   Round, Box, Flatten, Sag, Depth; plus the Surface ones), each along any of X, Y and Z about the Part's centre (or
   the gizmo's placed pivot), with Direction for Bend and Shear and Soft for an eased profile. The preview is the stack
   applied as one undo step and follows each change; Apply, Apply Selected, Reset and Repeat. The mask holds what it
   covers. Commands `deform_move` ... `deform_depth` and `deform_stack` for scripts and the AI.
-- **Size** (Tool > Deformation, requested by foirgairwolf on Discord): the active Part's X, Y and Z dimensions in
+- **Size** (Tool > Reshape, requested by foirgairwolf on Discord): the active Part's X, Y and Z dimensions in
   scene units, to drag or type exactly; it resizes about its centre (Uniform: in proportion), one undo step. Command
   `deform_size`.
 - Top bar heart (Help > Support SculptForge); a small badge for verified members. Hidden in studio builds and before
@@ -306,7 +542,7 @@ All notable changes to SculptForge are listed here. The format follows
   Wing finger), clean closed quad meshes for dividing and sculpting, generated in-house by tools/creature-bones.
   Commands: `insert_set_items set=builtin:creature-bones`, `insert_mesh set=builtin:creature-bones index=<n>`.
   Translated piece names. Thanks @kenttumanda123-netizen.
-- **Floor grid** (#115, **View > Floor grid**, also **Tool > Display** and the command palette): a faint grid on the
+- **Floor grid** (#115, **View > Floor grid**, also **Tool > Viewport Look** and the command palette): a faint grid on the
   floor under the model (its lowest point, Y up; it moves when a stroke or a move ends), the X and Z axes through the
   origin marked, squares stepping by ten with the zoom and fading into the distance. It never draws over the model.
   Off by default; remembered in the preferences. Suggested by @fenixpoints.
@@ -425,7 +661,7 @@ All notable changes to SculptForge are listed here. The format follows
   200 MB and checked before import, kept in a private temporary folder deleted after import; polling backs off to 30
   s. Studios: provider id `hyper3d` in the policy, one audit log line per generation. Thanks to ElgoogUdiab for
   suggesting it (#123); re-implemented in house from Hyper3D's public API documentation.
-- **Cancel** for Auto UV (Tool > Texture Map), beside its progress bar.
+- **Cancel** for Auto UV (Tool > Texture Image), beside its progress bar.
 
 ### Changed
 - The console keeps one line for a job's progress ("Auto UV: 42%") instead of one line per percent.
@@ -801,7 +1037,7 @@ All notable changes to SculptForge are listed here. The format follows
   budget per test. A release bump that only adds paperwork reuses CI instead of waiting for it again.
 - **Preferences save themselves** (#117, thanks fenixpoints): the key style, shortcuts, tablet, interface, performance
   and other preferences, and the radial menus, are written to ui.json half a second after they change (and at quit),
-  through a temporary file. The layout is kept only by the new **Save Layout** (Edit > Preferences > Config). The old
+  through a temporary file. The layout is kept only by the new **Save Layout** (Edit > Preferences > Saving & Layouts). The old
   save command and its Ctrl+Shift+I key are gone; keymaps and macros that name its id (`config.store`) still load, as
   **Save Preferences Now** in the command palette.
 - **SculptForge keys: I is Falloff** (as O); U stays Intensity. The Classic sculpting keys keep S size, U intensity, I
@@ -1316,7 +1552,7 @@ All notable changes to SculptForge are listed here. The format follows
   key held (<kbd>Alt</kbd>; <kbd>Ctrl</kbd> in the Blender and Maya styles) move the surface along the average
   normal under the brush instead of the view plane. These brushes had no use for the key; **Preferences > Input >
   Along the normal** makes it Always or Never.
-- Whole-Part deformations (from the discussions): **Tool > Deformation > Polish** (bilateral normal filtering:
+- Whole-Part deformations (from the discussions): **Tool > Reshape > Polish** (bilateral normal filtering:
   noise goes, planes and edges stay), **Relax** (even spacing along the surface), **Smooth** (Laplacian, or Taubin
   with Smooth keeps volume) and **Balloon** (fills the form out; negative lets the air out), each with an amount,
   mask-aware, open borders and hidden faces kept, one undo step, and as commands (`deform_polish`, `deform_relax`,
@@ -1339,7 +1575,7 @@ All notable changes to SculptForge are listed here. The format follows
 - The website's membership page is now `support.html` (titled Membership; the old address redirects there) and lists
   what each membership includes. Help > Support SculptForge, the welcome, the reminder and the launch card open it
   and describe the membership benefits; the one-time option is now the One-time Supporter (pay what you want).
-- Backface culling (#68): **Tool > Display > Backface culling** skips the back faces of every Part, closed or open,
+- Backface culling (#68): **Tool > Viewport Look > Backface culling** skips the back faces of every Part, closed or open,
   from any view: you see through the openings of open meshes, and brushes and picking work only on the faces drawn.
   Off by default; saved automatically, projects keep their own. An 8M-triangle open mesh seen from behind: 3.1 ms
   -> 0.7 ms a frame; a closed 20M sculpt is unchanged (its hidden back faces were already skipped).
@@ -1355,7 +1591,7 @@ All notable changes to SculptForge are listed here. The format follows
   the <kbd>Ctrl</kbd>+<kbd>Shift</kbd> visibility selection.
 - Smooth on Quad Remesh results (#69): smoothing averaged every neighbour along a triangle edge, quad diagonals
   included, so a vertex at one end of a diagonal was pulled along it and the quads sheared into zigzags. Smooth (the
-  brush, Shift, recipes' smoothing and Tool > Deformation > Smooth) now averages the polygon's own edges. 30 smooth
+  brush, Shift, recipes' smoothing and Tool > Reshape > Smooth) now averages the polygon's own edges. 30 smooth
   strokes on a remeshed sphere: corner angle error 3.9 -> 3.3 degrees (it was 8.8); on the lion head 8.7 -> 9.7
   (was 19.5). Triangle meshes are unchanged.
 - Keep Masked remeshing (#67): Voxel Remesh with Keep Masked failed on real models ("Couldn't cut the remeshed
@@ -1385,7 +1621,7 @@ All notable changes to SculptForge are listed here. The format follows
   `stroke`, `vdm_stamp`, `mask_rect`, `mask_lasso`, `hide_rect`, `hide_lasso`, `insert_primitive` and `insert_mesh`.
 - **Preferences > Interface > Timeline position** (#63): the Sculpt Timeline strip at the top of the viewport (the
   new default, away from the brush shelf) or at the bottom; saved automatically.
-- **UV Editor** (Tool > Texture Map > UV Editor, Alt+U): a window with the active Part's UV layout over the UDIM
+- **UV Editor** (Tool > Texture Image > UV Editor, Alt+U): a window with the active Part's UV layout over the UDIM
   tile grid, drawn on the GPU (pan, zoom, a checker or the painted texture behind). Select vertices, edges, faces or
   islands (1-4) by click or box, or on the model with **Select in 3D**; move, rotate and scale with the selection's
   handles or G / R / S (X / Y lock an axis, Ctrl snaps). **Seam Tool**: drag on the model to mark seams along the
@@ -1706,7 +1942,7 @@ All notable changes to SculptForge are listed here. The format follows
   (docs/performance.md, "Hardware profile").
 - Material painting (PBR): a painted texture can carry Roughness, Metallic, Normal, Height (16-bit), Ambient
   Occlusion, Emissive and Opacity besides its colour, all painted in the same strokes. Turn channels on in
-  **Tool > Texture Map > Material Channels** (`texture_channels`); a channel costs no memory until it is painted
+  **Tool > Texture Image > Material Channels** (`texture_channels`); a channel costs no memory until it is painted
   (64x64 copy-on-write tiles; untouched tiles aren't stored). **Color > Material** sets what the brush lays on
   each channel (material swatches, per-channel value swatches and sliders; `paint_material`), and **C** picks the
   whole material under the cursor. Paint layers hold every channel: channel chips on each layer row turn a
@@ -1714,7 +1950,7 @@ All notable changes to SculptForge are listed here. The format follows
   normals (`texture_layer_channel`). Height also yields a normal combined onto the Normal channel. One undo step
   per stroke, kept per layer and channel. Auto UV, Voxel Remesh, QRemesh and merging Parts carry every channel.
   See the guide's Material painting page.
-- Solo channel view: **Tool > Texture Map** shows one channel on the model (roughness and the other scalars in
+- Solo channel view: **Tool > Texture Image** shows one channel on the model (roughness and the other scalars in
   grey, the normal as colours, emission in colour), live while painting (`channel_view`).
 - Export Maps with presets (`export_maps`): Unreal (`T_*_BC`, `T_*_N` in DirectX, `T_*_ORM`), Unity URP and HDRP
   (mask map), glTF, Godot, Blender (one file per channel) and USD, plus your own JSON presets (the guide's Export
@@ -1861,7 +2097,7 @@ and a fix for Add Level crashing on models from Blender, with a log file so a cr
 - Extract (Tool > Part > Extract): the masked, visible part of a Part becomes a shell with Thick (a share of the Part's size; negative grows inward, 0 makes a single-sided surface), Edge Smooth (smooths the stepped edge) and Double (both ways). Extract shows a preview below the source that follows the settings; Accept keeps it as a new Part with outer, inner and rim face groups and the source's vertex paint, as one undo step (undo removes the Part, redo puts it back). Corners and Border make the rim triangles instead of quads at sharp corners or all along it. An unaccepted preview goes when the source changes and is never saved. Commands: extract, extract_accept, extract_cancel.
 - Make Symmetric (Tool > Geometry > Symmetry, X / Y / Z): keeps the + side of the plane through the origin, cuts polygons crossing it, mirrors the half and welds the seam into one watertight mesh, keeping face groups, vertex paint, mask, UVs, quads and sculpt layers (`mirror_and_weld`, with `side=negative` for the other half). Undoable.
 - A flat viewport background (#21): Preferences > Display > Background (also in the Render palette) switches between the gradient (the default) and Flat Colour with a colour picker. Saved automatically; projects keep their own, and `set_background` (mode, color) scripts it.
-- Mirror (Tool > Deformation, X / Y / Z): flips the Part across the plane through the origin, or in place with `pivot=center` (`mirror`). Undoable.
+- Mirror (Tool > Reshape, X / Y / Z): flips the Part across the plane through the origin, or in place with `pivot=center` (`mirror`). Undoable.
 - A log file, `sculptforge.log` in the user data folder (`%APPDATA%\SculptForge\SculptForge` on Windows,
   `~/Library/Application Support/SculptForge/SculptForge` on macOS, `~/.local/share/SculptForge/SculptForge` on
   Linux), so a crash is never silent: it holds the version, system and GPU, everything SDL_Log reports (the
@@ -1940,7 +2176,7 @@ Thank you for the reports.
   is hidden for the session and the message says where the file is). A project
   using one embeds it as a PNG (an `attachments` entry; no format change), so it opens with the same look anywhere.
   Scripts: `load_litsphere path=...`, `remove_litsphere name=...`, `set_material name=<your LitSphere>`.
-- Smooth / Flat shading (#11): **Material** palette (and **Tool > Display**) > **Shading** switches the whole
+- Smooth / Flat shading (#11): **Material** palette (and **Tool > Viewport Look**) > **Shading** switches the whole
   scene to flat, faceted shading, where every polygon shows its own face; **This Part** keeps one Part smooth
   or flat whatever the scene says. Both are saved in projects (no format change; older files open with your
   preferred shading) and the scene's choice is a preference (saved automatically). Smooth stays the default. Scripts:
@@ -2546,11 +2782,11 @@ adjacency that saves the memory).
 
 ### Texture painting on UV maps
 - Paint into a texture on the model's UVs instead of its vertices, so the colour detail comes from the texture
-  (1K, 2K, 4K or 8K), not from the mesh density (Tool > Texture Map > New Texture, `texture_create`). The Paint
+  (1K, 2K, 4K or 8K), not from the mesh density (Tool > Texture Image > New Texture, `texture_create`). The Paint
   brush, Rgb sculpting, fills, cavity paint, colour picking (C), mask, hidden faces, symmetry and pen pressure
   work as for vertex paint; texture strokes never paint through to the far side. A few texels of padding around
   every UV island keep seams invisible.
-- Vertex / Texture toggle on the top shelf (and in the Color, Paint Layers and Texture Map palettes) chooses
+- Vertex / Texture toggle on the top shelf (and in the Color, Paint Layers and Texture Image palettes) chooses
   where paint goes per Part (`paint_target`). The viewport multiplies the texture with the vertex paint over
   the material; Show texture hides it.
 - The Paint Layers palette works on the texture's own layer stack: blend modes, opacity, visibility, lock,
@@ -2560,7 +2796,7 @@ adjacency that saves the memory).
   tile of one colour costs 4 bytes: a stroke on a new 4K layer takes under a kilobyte of undo, not 64 MB.
 - Interactive at 4K on a 1.3M-triangle mesh: a dab visits only the triangles under the brush and uploads only
   the changed rectangle of the texture.
-- Auto UV (Tool > Texture Map, `uv_auto`): automatic UV unwrapping with xatlas (MIT, vendored in
+- Auto UV (Tool > Texture Image, `uv_auto`): automatic UV unwrapping with xatlas (MIT, vendored in
   third_party/xatlas), running in the background with progress. Show UVs draws the texture with the UV layout.
 - Vertex Paint > Texture and Texture > Vertex Paint (`texture_from_vertexpaint`, `vertexpaint_from_texture`), Import and
   Export Texture (PNG; `texture_import`, `texture_export`), Delete Texture (`texture_delete`).
@@ -2652,7 +2888,7 @@ Shaped by feedback from a working professional modeler and a survey of sculpting
 - Hold Ctrl over any button for what it does, its shortcut and its command (Ctrl+Alt for scripting parameters).
 - Command palette (F3 / Ctrl+Shift+P) finds and runs anything; the console (`` ` ``) shows every command as a
   script line, with completion and history, and copies the session as a macro.
-- Customize: Preferences > Config > Customize Shelves, then Ctrl+Alt+drag to add, move or remove shelf items;
+- Customize: Preferences > Saving & Layouts > Customize Shelves, then Ctrl+Alt+drag to add, move or remove shelf items;
   saving the interface (Ctrl+Shift+I), Reset Layout and Shortcuts, Export / Import Interface, three layout presets, and reassignable
   shortcuts (Ctrl+Alt+click a button, then press a key). Tab hides the shelves.
 - Lucide icons (ISC/MIT). Brush Lab now opens from the "AI Brush" button instead of covering the model at start.

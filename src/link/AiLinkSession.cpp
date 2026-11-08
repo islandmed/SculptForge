@@ -83,7 +83,7 @@ void AiLinkPolicy::addPicked(const std::string& path) {
 
 bool AiLinkPolicy::hidden(const std::string& name) {
     return name == "pack_install" || name == "pack_remove" || name == "pack_enable" || name == "pack_disable" ||
-           name == "ai_features";
+           name == "ai_features" || name.rfind("plugin_", 0) == 0; // plugins run only when the user runs them
 }
 
 bool AiLinkPolicy::allowedPath(const std::string& path) const {

@@ -1,0 +1,2 @@
+# Known mode matrix failures (tests/ui/mode_matrix.sfui, src/app/UiTestModes.cpp): ID | EXIT | the fix task.
+# Logged as KNOWN, not failed. When a fix lands its case passes and the matrix fails until the line goes.

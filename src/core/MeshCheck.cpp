@@ -159,13 +159,14 @@ uint64_t mix(uint64_t x) { // splitmix64's finaliser
 
 } // namespace
 
-std::vector<uint32_t> weldTargets(const Mesh& mesh, float distance, size_t* merged) {
+std::vector<uint32_t> weldTargets(const Mesh& mesh, float distance, size_t* merged, bool maskedOnly) {
     const size_t nv = mesh.vertexCount();
     std::vector<uint32_t> target(nv);
     std::iota(target.begin(), target.end(), 0u);
     size_t n = 0;
     const AABB box = mesh.bounds();
-    if (nv > 1 && box.valid()) {
+    const bool masked = maskedOnly && mesh.hasMask();
+    if (nv > 1 && box.valid() && (masked || !maskedOnly)) {
         // A grid of cells at least twice `distance` wide holding the kept points: a point's matches are in its cell
         // and, along each axis, at most the one neighbour on the side it is near (8 cells at most). Kept points are
         // over `distance` apart, so a cell holds only a few of them, whatever the distance.
@@ -187,6 +188,7 @@ std::vector<uint32_t> weldTargets(const Mesh& mesh, float distance, size_t* merg
         for (uint32_t v = 0; v < nv; ++v) {
             const glm::vec3 p = mesh.positions[v];
             if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) continue; // stays, never matched
+            if (masked && mesh.maskAt(v) < 0.5f) continue; // Masked only: an unmasked point stays, never matched
             const int cx = coord(p.x, box.min.x), cy = coord(p.y, box.min.y), cz = coord(p.z, box.min.z);
             // The neighbour cell each axis needs: -1 / +1 when p is within d of that face, else none (0).
             auto side = [&](float v, float lo, int c) {
@@ -227,9 +229,9 @@ std::vector<uint32_t> weldTargets(const Mesh& mesh, float distance, size_t* merg
     return target;
 }
 
-Mesh weldByDistance(const Mesh& mesh, float distance, size_t* merged) {
+Mesh weldByDistance(const Mesh& mesh, float distance, size_t* merged, bool maskedOnly) {
     size_t n = 0;
-    const std::vector<uint32_t> target = weldTargets(mesh, distance, &n);
+    const std::vector<uint32_t> target = weldTargets(mesh, distance, &n, maskedOnly);
     if (merged) *merged = n;
     return n ? remapped(mesh, target) : mesh;
 }
@@ -462,18 +464,22 @@ void registerMeshCheckCommands(CommandRegistry& reg) {
              "Triangles that collapse are removed; each merged point takes the kept one's position and attributes.",
              {{"distance", T::Number, "Largest distance between points that merge, in scene units (0 = only "
                                       "points exactly on top of each other).", true},
-              {"preview", T::Bool, "Only count the points that would merge; change nothing.", false}},
+              {"preview", T::Bool, "Only count the points that would merge; change nothing.", false},
+              {"masked_only", T::Bool, "Only masked points merge (with each other); default false.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  const double d = argNumber(a, "distance", 0.0);
                  if (!(d >= 0.0) || !std::isfinite(d)) return {false, "distance must be 0 or more"};
                  if (doc.mesh.vertexCount() == 0) return {false, "The mesh is empty"};
                  size_t n = 0;
+                 const bool maskedOnly = argBool(a, "masked_only", false);
                  if (argBool(a, "preview", false)) {
-                     weldTargets(doc.mesh, float(d), &n);
+                     weldTargets(doc.mesh, float(d), &n, maskedOnly);
                      return {true, std::to_string(n) + " points would merge"};
                  }
-                 Mesh m = weldByDistance(doc.mesh, float(d), &n);
-                 if (n == 0) return {false, "No points are that close"};
+                 Mesh m = weldByDistance(doc.mesh, float(d), &n, maskedOnly);
+                 if (n == 0)
+                     return {false, maskedOnly && !doc.mesh.hasMask() ? "Masked only: nothing is masked"
+                                                                      : "No points are that close"};
                  doc.replaceMeshUndoable(std::move(m), "Merge by Distance");
                  return {true, "Merged " + std::to_string(n) + " points, " + std::to_string(doc.mesh.vertexCount()) + " left"};
              }});

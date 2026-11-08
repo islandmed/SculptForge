@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Default actions and shortcuts, the preferences' autosave, Save Layout / Revert / Export / Import Interface,
-// the Preferences > Config / Interface / Hotkeys / Library sections, the F1
+// the Preferences > Saving & Layouts / Interface / Hotkeys / Library sections, the F1
 // Controls sheet (generated from the action registry) and classic
 // shortcut assignment.
+#include "app/IconsUsed.h"
 #include "app/UiScale.h"
+#include "app/NativeDialog.h"
 #include "app/Config.h"
 
 #include "app/App.h"
@@ -21,6 +23,7 @@
 #include "core/Bake.h"
 #include "core/ListSort.h"
 #include "core/Micro.h"
+#include "core/FigurePose.h"
 #include "core/Multires.h"
 #include "core/Script.h"
 #include "core/Units.h"
@@ -381,15 +384,14 @@ void App::addHelpFonts(float scale) {
     cfg.OversampleH = 2;
     fontHelpTitle_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontSemiBold),
                                                     int(assets::fontSemiBold_size), 15.0f * scale, &cfg);
-    static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
-    ImFontConfig icons;
+        ImFontConfig icons;
     icons.MergeMode = true;
     icons.PixelSnapH = true;
     icons.FontDataOwnedByAtlas = false;
     icons.GlyphMinAdvanceX = 15.0f * scale;
     icons.GlyphOffset = ImVec2(0, 2.0f * scale);
     io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size), 15.0f * scale,
-                                   &icons, kIconRanges);
+                                   &icons, kUsedIconRanges);
     mergeCjkFont(15.0f * scale);
     // ProggyClean (ships inside Dear ImGui) is a pixel font: keep it at whole multiples of 13 px.
     ImFontConfig mono;
@@ -433,6 +435,16 @@ void App::initActions() {
         "Destructive: four times the polygons as one plain mesh, with no lower levels to step back to. On a Part "
         "with subdivision levels it removes them (it asks first; Ctrl+Z brings them back). To keep levels, use "
         "Add Level instead.");
+    // Tool > Geometry > Cleanup > Find Problems (PanelMeshCheck.cpp, its Check button): here so F3 finds it.
+    add("geometry.mesh_check", "Find Problems", "Tool > Geometry", nullptr,
+        [this] {
+            runMeshCheck();
+            status_ = meshReport_.summary();
+        },
+        nullptr, "mesh_check", nullptr, [this] { return doc_.mesh.triangleCount() > 0; },
+        "Count what makes the active Part hard to sculpt, remesh, print or export: non-manifold edges, holes, "
+        "duplicate, degenerate and flipped triangles. Changes nothing; Tool > Geometry > Find Problems lists each "
+        "with its Fix.");
     add("geometry.close_holes", "Fill Holes", "Tool > Geometry", nullptr, [this] { runCommand("close_holes"); },
         ICON_LC_CIRCLE_DOT, "close_holes", nullptr, nullptr,
         "Cap every open boundary of the active Part (a hole, an open bottom, the rim of an extracted shell) with a "
@@ -510,14 +522,25 @@ void App::initActions() {
         ICON_LC_UNLINK, "part_make_unique", nullptr, [this] { return doc_.linkCount(doc_.activePart) > 1; },
         "Give the active linked Part its own copy of the mesh: it stays where it is and no longer changes with the "
         "others.");
-    // Tool > Part > Extract, Tool > Geometry > Symmetry, Tool > Deformation (PanelExtract.cpp).
-    add("part.extract", "Extract", "Tool > Parts", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
+    // Tool > Part > Extract, Tool > Geometry > Symmetry (Make Symmetric, Mirror), Tool > Reshape (PanelExtract.cpp).
+    add("part.extract", "Make Shell", "Tool > Parts", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
         [this] { return doc_.mesh.hasMask(); },
         "Make a shell from the masked part of the Part (a helmet, a strap, clothing), shown as a preview below it. "
         "Change Thickness, Edge Smooth, Both Sides, Corners or Border and it updates; Accept keeps it as a new Part.");
     add("part.extract_accept", "Accept", "Tool > Parts", nullptr, [this] { runCommand("extract_accept"); }, nullptr,
         "extract_accept", nullptr, [this] { return doc_.extractPreviewCurrent(); },
         "Keep the Extract preview as a new Part below this one. Ctrl+Z takes it away again.");
+    // Figure Pose (core/FigurePose.h, PanelParts.cpp).
+    add("part.figure_pose", "Pose all Parts", "Tool > Parts", nullptr, [this] { runCommand("figure_pose_begin"); }, nullptr,
+        "figure_pose_begin", nullptr, [this] { return !figurePoseActive(doc_); },
+        "Merge the visible Parts into one light Pose Mesh and pose it with the Gizmo and masks; Apply Pose gives "
+        "every Part the pose at full resolution.");
+    add("part.figure_pose_apply", "Apply Pose", "Tool > Parts", nullptr, [this] { runCommand("figure_pose_apply"); },
+        nullptr, "figure_pose_apply", nullptr, [this] { return figurePoseActive(doc_); },
+        "Give every Part the Pose Mesh's moves at full resolution, as one undo step, and remove the Pose Mesh.");
+    add("part.figure_pose_cancel", "Cancel Pose", "Tool > Parts", nullptr, [this] { runCommand("figure_pose_cancel"); },
+        nullptr, "figure_pose_cancel", nullptr, [this] { return figurePoseActive(doc_); },
+        "Remove the Pose Mesh and show the Parts again; nothing changes.");
     add("part.extract_double", "Both Sides", "Tool > Parts", nullptr,
         [this] {
             extractDouble_ = !extractDouble_;
@@ -543,8 +566,8 @@ void App::initActions() {
         [this] { runCommand("mirror_and_weld", {{"axis", axesText(mirrorWeldAxes_)}}); }, nullptr, "mirror_and_weld",
         nullptr, [this] { return !axesText(mirrorWeldAxes_).empty() && doc_.mesh.triangleCount() > 0; },
         "Mirror the + side of the Part onto the - side across the chosen axis and weld the seam into one "
-        "watertight mesh. Face Groups and vertex paint come along. To keep the other side, Deformation > Mirror first.");
-    add("deformation.mirror", "Mirror", "Tool > Deformation", nullptr,
+        "watertight mesh. Face Groups and vertex paint come along. To keep the other side, Symmetry > Mirror first.");
+    add("deformation.mirror", "Mirror", "Tool > Geometry", nullptr,
         [this] { runCommand("mirror", {{"axis", axesText(mirrorAxes_)}}); }, nullptr, "mirror", nullptr,
         [this] { return !axesText(mirrorAxes_).empty() && doc_.mesh.vertexCount() > 0; },
         "Flip the Part across the chosen axis, through the origin (the plane symmetry and Make Symmetric use).");
@@ -555,51 +578,51 @@ void App::initActions() {
         add(kWeldIds[k], kNames[k], "Tool > Geometry", nullptr, [this, k] { mirrorWeldAxes_[k] = !mirrorWeldAxes_[k]; },
             nullptr, nullptr, [this, k] { return mirrorWeldAxes_[k]; }, nullptr,
             "An axis Make Symmetric mirrors across (several: one after the other).");
-        add(kMirrorIds[k], kNames[k], "Tool > Deformation", nullptr, [this, k] { mirrorAxes_[k] = !mirrorAxes_[k]; }, nullptr,
+        add(kMirrorIds[k], kNames[k], "Tool > Geometry", nullptr, [this, k] { mirrorAxes_[k] = !mirrorAxes_[k]; }, nullptr,
             nullptr, [this, k] { return mirrorAxes_[k]; }, nullptr, "An axis Mirror flips along (several: one after the other).");
     }
-    // Whole-mesh deformations (core/Deform.h, PanelExtract.cpp), each by its amount slider.
+    // Whole-mesh deformations (core/Deform.h) at amount 50, for menus, keys and search; the panel has them as Stack
+    // steps with their own amount (PanelDeform.cpp).
     {
         static const char* const kIds[4] = {"deformation.polish", "deformation.relax", "deformation.smooth", "deformation.balloon"};
         static const char* const kLabels[4] = {"Polish", "Relax", "Smooth", "Balloon"};
         static const char* const kCommands[4] = {"deform_polish", "deform_relax", "deform_smooth", "deform_balloon"};
         static const char* const kHelp[4] = {
-            "Polish the whole Part by the amount beside it: fine noise and small bumps flatten out while flat areas and "
-            "sharp edges stay. The mask holds what it covers; one undo step.",
+            "Polish the whole Part (amount 50): fine noise and small bumps flatten out while flat areas and sharp "
+            "edges stay. For another amount, add a Polish step to Tool > Reshape > Stack. The mask holds what it "
+            "covers; one undo step.",
             "Relax the whole Part: the vertices even out their spacing along the surface without changing its shape "
-            "(stretched areas after big moves). The mask holds what it covers; one undo step.",
-            "Smooth the whole Part by the amount beside it (Smooth keeps volume: without shrinking it). The mask "
-            "holds what it covers; one undo step.",
-            "Fill the whole Part out toward a rounder volume, like a balloon; a negative "
-            "amount lets the air out. The mask holds what it covers; one undo step."};
+            "(stretched areas after big moves). For another amount, add a Relax step to the Stack. The mask holds "
+            "what it covers; one undo step.",
+            "Smooth the whole Part (amount 50). For another amount, or to keep the volume, add a Smooth step to the "
+            "Stack. The mask holds what it covers; one undo step.",
+            "Fill the whole Part out toward a rounder volume, like a balloon (amount 50). For another amount, or a "
+            "negative one that lets the air out, add a Balloon step to the Stack. The mask holds what it covers; "
+            "one undo step."};
         for (int k = 0; k < 4; ++k)
-            add(kIds[k], kLabels[k], "Tool > Deformation", nullptr,
-                [this, k] {
-                    Args a{{"amount", double(deformAmount_[k])}};
-                    if (k == 2) a["keep_volume"] = deformKeepVolume_;
-                    runCommand(kCommands[k], a);
-                },
-                nullptr, kCommands[k], nullptr, [this, k] { return doc_.mesh.vertexCount() > 0 && deformAmount_[k] != 0.0f; },
+            add(kIds[k], kLabels[k], "Tool > Reshape", nullptr,
+                [this, k] { runCommand(kCommands[k], {{"amount", 50.0}}); }, nullptr, kCommands[k], nullptr,
+                [this] { return doc_.mesh.vertexCount() > 0; },
                 kHelp[k]);
     }
-    // Deformation > Stack (PanelDeform.cpp, docs/design/deform-panel.md).
+    // Reshape > Stack (PanelDeform.cpp, docs/design/deform-panel.md).
     {
         auto sel = [this]() -> DeformStep* {
             DeformStackUi& ds = deformStack_;
             return ds.selected >= 0 && ds.selected < int(ds.steps.size()) ? &ds.steps[size_t(ds.selected)] : nullptr;
         };
         auto any = [this] { return !deformStack_.steps.empty(); };
-        add("deformation.stack_apply", "Apply", "Tool > Deformation", nullptr, [this] { deformStackApply(false); }, nullptr,
+        add("deformation.stack_apply", "Apply", "Tool > Reshape", nullptr, [this] { deformStackApply(false); }, nullptr,
             nullptr, nullptr, any,
             "Keep the stack's result on the Part (one undo step) and start a new stack. With Preview on, what you "
             "see is what stays.");
-        add("deformation.stack_apply_selected", "Apply Selected", "Tool > Deformation", nullptr,
+        add("deformation.stack_apply_selected", "Apply Selected", "Tool > Reshape", nullptr,
             [this] { deformStackApply(true); }, nullptr, nullptr, nullptr, [sel] { return sel() != nullptr; },
             "Keep only the selected step on the Part (one undo step) and take it off the stack; the rest stay to "
             "edit.");
-        add("deformation.stack_reset", "Reset", "Tool > Deformation", nullptr, [this] { deformStackReset(); }, nullptr,
+        add("deformation.stack_reset", "Reset", "Tool > Reshape", nullptr, [this] { deformStackReset(); }, nullptr,
             nullptr, nullptr, any, "Take the preview back off the Part and empty the stack.");
-        add("deformation.stack_repeat", "Repeat", "Tool > Deformation", nullptr,
+        add("deformation.stack_repeat", "Repeat", "Tool > Reshape", nullptr,
             [this, sel] {
                 if (DeformStep* st = sel()) {
                     const DeformStep copy = *st;
@@ -611,7 +634,7 @@ void App::initActions() {
             },
             nullptr, nullptr, nullptr, [sel] { return sel() != nullptr; },
             "Add the selected step again right after it (twice the twist, a second bend...).");
-        add("deformation.stack_remove", "Remove", "Tool > Deformation", nullptr,
+        add("deformation.stack_remove", "Remove", "Tool > Reshape", nullptr,
             [this, sel] {
                 if (sel()) {
                     deformStack_.steps.erase(deformStack_.steps.begin() + deformStack_.selected);
@@ -624,7 +647,7 @@ void App::initActions() {
         static const char* const kAxisIds[3] = {"deformation.stack_x", "deformation.stack_y", "deformation.stack_z"};
         static const char* const kAxisNames[3] = {"X", "Y", "Z"};
         for (int k = 0; k < 3; ++k)
-            add(kAxisIds[k], kAxisNames[k], "Tool > Deformation", nullptr,
+            add(kAxisIds[k], kAxisNames[k], "Tool > Reshape", nullptr,
                 [this, sel, k] {
                     DeformStep* st = sel();
                     if (!st) return;
@@ -664,7 +687,7 @@ void App::initActions() {
         "Export the model as glTF binary, with sculpt layers as blend shapes (morph targets).");
     add("file.export_stl", "Export STL...", "File > Export", nullptr, [this] {
             static const SDL_DialogFileFilter filters[] = {{"STL", "stl"}, {"All files", "*"}};
-            SDL_ShowSaveFileDialog(onBridgeFileChosen, &bridgeDialogs_[int(BridgeFile::ExportStl)], window_, filters, 2, nullptr);
+            sf::dialogs::saveFile(onBridgeFileChosen, &bridgeDialogs_[int(BridgeFile::ExportStl)], window_, filters, 2, nullptr);
         },
         nullptr, nullptr, nullptr, nullptr, "Save the visible Parts as one binary STL, for 3D printing.");
     add("file.send_unreal", "Send to Unreal", "File > Export", "Ctrl+U", [this] { sendToUnreal(); }, ICON_LC_SEND, nullptr,
@@ -755,7 +778,9 @@ void App::initActions() {
                 doc_.activeBrush = -1;
                 paintMode_ = false;
                 guidesMode_ = false; // leaves the QRemesh Guides brush
+                edgesMode_ = false;  // and Edges mode
                 maskBrush_.on = false;
+                leaveDrawModesStatus(); // and Draw Tube / Append > Insert
             },
             ICON_LC_BRUSH, nullptr, [this, type] { return brush_ == type && doc_.activeBrush < 0 && !paintMode_ && !guidesMode_; }, nullptr,
             (std::string("Sculpt with the ") + brushLabel(type) + " brush.").c_str());
@@ -793,15 +818,15 @@ void App::initActions() {
         "your browser. Bugs still go to Report a problem (GitHub issues).");
     add("help.welcome", "Welcome", "Help", nullptr, [this] { showWelcome_ = true; }, ICON_LC_SPARKLES, nullptr, nullptr,
         nullptr, "The welcome note shown the first time SculptForge starts.");
-    add("help.website", "Website & documentation", "Help", nullptr, [] { SDL_OpenURL("https://sculptforge.app/"); },
+    add("help.website", "Website & documentation", "Help", nullptr, [] { sf::dialogs::openUrl("https://sculptforge.app/"); },
         ICON_LC_BOOK_OPEN, nullptr, nullptr, nullptr, "Open the SculptForge website and user guide in your browser.");
-    add("help.report", "Report a problem", "Help", nullptr, [] { SDL_OpenURL("https://github.com/islandmed/SculptForge/issues"); },
+    add("help.report", "Report a problem", "Help", nullptr, [] { sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/issues"); },
         ICON_LC_CIRCLE_ALERT, nullptr, nullptr, nullptr, "Open the issue tracker in your browser.");
     add("help.log", "Open log folder", "Help", nullptr,
         [this] {
             const std::string url = crashlog::folderUrl();
             if (url.empty()) status_ = "There is no log file (the user data folder couldn't be written).";
-            else if (!SDL_OpenURL(url.c_str()))
+            else if (!sf::dialogs::openUrl(url.c_str()))
                 status_ = "The log is " + crashlog::path() + " (couldn't open its folder: " + SDL_GetError() + ")";
         },
         ICON_LC_FILE_TEXT, nullptr, nullptr, nullptr,
@@ -814,7 +839,7 @@ void App::initActions() {
         "levels, and the GPU and driver. Turn it on, do what is slow, turn it off and attach the file to your report. "
         "A small file on this computer only; off by default and costs nothing when off.");
     add("help.feedback", "Fixes & suggestions", "Help", nullptr,
-        [] { SDL_OpenURL("https://github.com/islandmed/SculptForge/issues/new/choose"); }, ICON_LC_MESSAGE_SQUARE_PLUS,
+        [] { sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/issues/new/choose"); }, ICON_LC_MESSAGE_SQUARE_PLUS,
         nullptr, nullptr, nullptr,
         "Submit a request for a fix or a suggestion: opens the bug report and feature request forms in your browser.");
 
@@ -827,7 +852,7 @@ void App::initActions() {
         "The script console: every command you run appears as a script line, and you can type commands yourself.");
     add("script.run_file", "Run script file...", "Script", nullptr,
         [this] {
-            SDL_ShowOpenFileDialog(onUiFileChosen, &g_requests[kRunScript], window_, kScriptFilters, 2, nullptr, false);
+            sf::dialogs::openFile(onUiFileChosen, &g_requests[kRunScript], window_, kScriptFilters, 2, nullptr, false);
         },
         ICON_LC_FILE_CODE, nullptr, nullptr, nullptr, "Run a text file of script statements, one per line (# starts a comment).");
     add("script.copy_session", "Copy session as script", "Script", nullptr,
@@ -841,30 +866,30 @@ void App::initActions() {
     add("script.clear_console", "Clear console", "Script", nullptr, [this] { console_.clear(); }, ICON_LC_TRASH_2, nullptr, nullptr,
         nullptr, "Empty the console log (the session script is kept).");
 
-    // --- Config (Preferences > Config) ---
+    // --- Config (Preferences > Saving & Layouts) ---
     // Preferences save themselves (#117); the layout is kept by Save Layout. config.store (Ctrl+Shift+I before
     // 0.11.1) stays as an id, so keymaps and macros that name it still load: it saves the preferences at once.
-    add("config.save_layout", "Save Layout", "Preferences > Config", nullptr, [this] { saveLayout(); }, ICON_LC_SAVE, nullptr,
+    add("config.save_layout", "Save Layout", "Preferences > Saving & Layouts", nullptr, [this] { saveLayout(); }, ICON_LC_SAVE, nullptr,
         nullptr, nullptr,
         "Keep the current layout (shelves, trays, open palettes) for future sessions. Preferences and shortcuts save "
         "themselves.");
-    add("config.store", "Save Preferences Now", "Preferences > Config", nullptr, [this] { savePrefsNow(); }, ICON_LC_SAVE,
+    add("config.store", "Save Preferences Now", "Preferences > Saving & Layouts", nullptr, [this] { savePrefsNow(); }, ICON_LC_SAVE,
         nullptr, nullptr, nullptr,
         "Write the preferences and shortcuts to disk now. Not needed: they save themselves a moment after every change.");
-    add("config.restore_standard", "Reset Layout and Shortcuts", "Preferences > Config", nullptr, [this] { restoreStandardUi(); },
+    add("config.restore_standard", "Reset Layout and Shortcuts", "Preferences > Saving & Layouts", nullptr, [this] { restoreStandardUi(); },
         ICON_LC_ROTATE_CCW, nullptr, nullptr, nullptr,
         "Go back to the built-in layout, shortcuts and radial menus. The shortcuts save themselves; Save Layout keeps "
         "the layout.");
-    add("config.restore_custom", "Revert to Saved Layout", "Preferences > Config", nullptr, [this] { restoreCustomUi(); },
+    add("config.restore_custom", "Revert to Saved Layout", "Preferences > Saving & Layouts", nullptr, [this] { restoreCustomUi(); },
         ICON_LC_ARCHIVE_RESTORE, nullptr, nullptr, [this] { return fileExists(uiConfigPath()); },
         "Go back to the layout the last Save Layout kept.");
-    add("config.load", "Import Interface...", "Preferences > Config", "Ctrl+L", [this] { loadUiDialog(); },
+    add("config.load", "Import Interface...", "Preferences > Saving & Layouts", "Ctrl+L", [this] { loadUiDialog(); },
         ICON_LC_FOLDER_INPUT, nullptr, nullptr, nullptr,
         "Load a layout and shortcuts file someone shared (or you saved with Export Interface).");
-    add("config.save", "Export Interface...", "Preferences > Config", nullptr, [this] { saveUiDialog(); },
+    add("config.save", "Export Interface...", "Preferences > Saving & Layouts", nullptr, [this] { saveUiDialog(); },
         ICON_LC_FOLDER_OUTPUT, nullptr, nullptr, nullptr,
         "Save the layout, shortcuts and interface preferences to a file you can share.");
-    add("config.customize", "Customize Shelves", "Preferences > Config", nullptr,
+    add("config.customize", "Customize Shelves", "Preferences > Saving & Layouts", nullptr,
         [this] {
             layout_.customize = !layout_.customize;
             status_ = layout_.customize ? "Customize: Ctrl+Alt+drag to move or remove items" : "Customize off";
@@ -875,14 +900,16 @@ void App::initActions() {
     // The shell's actions (Shell.cpp: brushes, shelves, palettes, trays): they replace any of the above with
     // the same id and own P (Paint), the symmetry toggles and Tab.
     registerShellActions();
-    registerTextureUiActions(); // Tool > Texture Map, the Vertex / Texture paint target (PanelTexture.cpp)
+    registerTextureUiActions(); // Tool > Texture Image, the Vertex / Texture paint target (PanelTexture.cpp)
     registerLineGradientActions(); // Color > Line Gradient (LineGradient.cpp)
     registerStencilActions();   // Alpha > Stencil (StencilOverlay.cpp)
     registerPbrUiActions();     // material channels, solo view, map export (PanelPbr.cpp)
     registerGizmoActions();     // Q W E R: Draw, and the Transform gizmo's Move, Scale, Rotate; Shift+W All (Gizmo.cpp)
     registerBakeUiActions();    // Tool > Bake (PanelBake.cpp)
     registerUvEditorActions();  // UV Editor (PanelUvEditor.cpp)
+    registerGarmentActions();   // Tool > Garments, the Pattern window (PanelGarments.cpp)
     registerRetopoUiActions(); // Geometry > QRemesh, Part > ProjectAll (PanelRetopo.cpp)
+    registerEdgeUiActions();   // Geometry > Edges (PanelEdges.cpp)
     registerForgeSphereUiActions(); // Tool > Forge Spheres (PanelForge Spheres.cpp)
     registerTubeUiActions();        // Tool > Tube (PanelTube.cpp)
     registerSplatTrainUi();    // Splats > Train from capture (PanelSplatTrain.cpp)
@@ -1203,30 +1230,30 @@ void App::restoreCustomUi() {
 }
 
 void App::saveUiDialog() {
-    SDL_ShowSaveFileDialog(onUiFileChosen, &g_requests[kSaveUi], window_, kUiFilters, 1, nullptr);
+    sf::dialogs::saveFile(onUiFileChosen, &g_requests[kSaveUi], window_, kUiFilters, 1, nullptr);
 }
 
 void App::importBlenderKeymapDialog() {
-    SDL_ShowOpenFileDialog(onUiFileChosen, &g_requests[kBlenderKeymap], window_, kBlenderKeymapFilters, 2, nullptr, false);
+    sf::dialogs::openFile(onUiFileChosen, &g_requests[kBlenderKeymap], window_, kBlenderKeymapFilters, 2, nullptr, false);
 }
 
 void App::importRadialMenuDialog() {
-    SDL_ShowOpenFileDialog(onUiFileChosen, &g_requests[kRadialImport], window_, kRadialFilters, 1, nullptr, false);
+    sf::dialogs::openFile(onUiFileChosen, &g_requests[kRadialImport], window_, kRadialFilters, 1, nullptr, false);
 }
 
 void App::exportRadialMenuDialog(int menu) {
     radialEdit_.exportMenu = menu;
-    SDL_ShowSaveFileDialog(onUiFileChosen, &g_requests[kRadialExport], window_, kRadialFilters, 1, nullptr);
+    sf::dialogs::saveFile(onUiFileChosen, &g_requests[kRadialExport], window_, kRadialFilters, 1, nullptr);
 }
 
 void App::chooseMayaFolder() { // the only way the Maya bridge gets a folder: the user picks it (PanelMaya.cpp)
     const std::string start = uiPrefs_.mayaFolder;
-    SDL_ShowOpenFolderDialog(onUiFileChosen, &g_requests[kMayaFolder], window_, start.empty() ? nullptr : start.c_str(),
+    sf::dialogs::openFolder(onUiFileChosen, &g_requests[kMayaFolder], window_, start.empty() ? nullptr : start.c_str(),
                              false);
 }
 
 void App::loadUiDialog() {
-    SDL_ShowOpenFileDialog(onUiFileChosen, &g_requests[kLoadUi], window_, kUiFilters, 1, nullptr, false);
+    sf::dialogs::openFile(onUiFileChosen, &g_requests[kLoadUi], window_, kUiFilters, 1, nullptr, false);
 }
 
 void App::queueUiFile(int kind, std::string path) {
@@ -1320,7 +1347,7 @@ void App::watchLayoutChanges() {
     if (layoutHintShown_ || uiConfigDeterministic_ || ++layoutCheckFrame_ % 20 != 0) return;
     if (layoutKey() == layoutBaseline_) return;
     layoutHintShown_ = true; // once per session (never saves the layout by itself)
-    status_ = "Layout changed - Preferences > Config > Save Layout keeps it";
+    status_ = "Layout changed - Preferences > Saving & Layouts > Save Layout keeps it";
 }
 
 // ---------------------------------------------------------------------------
@@ -1698,14 +1725,18 @@ void drawInterfaceSection(App& app) {
         if (ui::Checkbox("Compact timeline##view.timeline_compact", &compact)) a->run();
         ui::HelpAction(app, "view.timeline_compact");
     }
-    static const char* kScales[] = {"Automatic", "100%", "125%", "150%", "175%", "200%"};
-    static const float kScaleValues[] = {0.0f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f};
+    // Finer steps near 100 % (125 % was too big a first step) and up to 300 % for a 5K or 5K2K monitor at its native
+    // resolution, no system scaling (fenix 11-08).
+    static const char* kScales[] = {"Automatic", "100%", "110%", "115%", "125%", "135%", "150%",
+                                    "175%",      "200%", "250%", "300%"};
+    static const float kScaleValues[] = {0.0f, 1.0f, 1.1f, 1.15f, 1.25f, 1.35f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f};
+    constexpr int kScaleCount = int(sizeof kScaleValues / sizeof kScaleValues[0]);
     int current = 0;
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < kScaleCount; ++i)
         if (std::abs(kScaleValues[i] - p.uiScale) < 0.01f) current = i;
     ImGui::SetNextItemWidth(-FLT_MIN);
     if (ImGui::BeginCombo("##ui_scale", (std::string(tr("UI scale:")) + " " + tr(kScales[current])).c_str())) {
-        for (int i = 0; i < 6; ++i)
+        for (int i = 0; i < kScaleCount; ++i)
             if (ImGui::Selectable(tr(kScales[i]), i == current)) {
                 p.uiScale = kScaleValues[i];
                 app.requestUiScale(); // live, from the next frame (#87)
@@ -1819,7 +1850,7 @@ void drawLibraryBrowserSection(App& app) {
     ImGui::TextColored(col(ui::color::textDim), "%s", tr("Library folder"));
     const std::string shown = p.libraryFolder.empty() ? std::string("Documents/SculptForge (default)") : p.libraryFolder;
     if (ImGui::Button((std::string(ICON_LC_FOLDER_OPEN "  ") + shown + "##libfolder").c_str(), ImVec2(-FLT_MIN, 0)))
-        SDL_ShowOpenFolderDialog(onUiFileChosen, &g_requests[kLibraryFolder], app.window_, nullptr, false);
+        sf::dialogs::openFolder(onUiFileChosen, &g_requests[kLibraryFolder], app.window_, nullptr, false);
     ui::HelpText("Library folder", nullptr,
                  "Where your projects, tools, brushes, alphas, images, splats and Snapshots live. Library shows it as User.",
                  "Preferences > Library");

@@ -334,8 +334,8 @@ void App::drawSculptableSection() {
         ui::HelpText("Back", nullptr, "Leave the review without remeshing (the scan Part stays as it is).", kPath);
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
         if (s.placing >= 0) ImGui::TextWrapped(tr("Click %s."), kLandmarkPrompts[s.placing]);
-        else if (s.landmarks.valid) ImGui::TextWrapped(tr("Drag the dots to move the landmarks (the other side follows). The lines are the loops Quad Remesh will follow."));
-        else ImGui::TextWrapped(tr("No face found: Place by hand, or Finish without face loops."));
+        else if (s.landmarks.valid) ImGui::TextWrapped("%s", tr("Drag the dots to move the landmarks (the other side follows). The lines are the loops Quad Remesh will follow."));
+        else ImGui::TextWrapped("%s", tr("No face found: Place by hand, or Finish without face loops."));
         ImGui::PopStyleColor();
         ui::ActionButton(*this, "splats.sculptable_place", ImVec2(half, 0));
         ImGui::SameLine();

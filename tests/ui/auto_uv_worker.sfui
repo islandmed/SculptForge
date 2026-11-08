@@ -1,19 +1,19 @@
 # Auto UV never holds up a frame: xatlas takes seconds on a big sculpt (10 s at 327k triangles on the PC when the
 # uv_auto command ran on the main thread: the stall slowtests saw "after texture_create"). The command from a
-# script, the console or an AI tool works on the same worker as the Auto UV button: the Texture Map panel shows its
+# script, the console or an AI tool works on the same worker as the Auto UV button: the Texture Image panel shows its
 # progress with Cancel, frames keep drawing, and the next statement waits for the UVs.
 run new_sphere subdivisions=6
 expect_value triangles > 80000
-click "Texture Map##tool.texture"
+click "Texture Image##tool.texture"
 expect_value uvs == 0
 
 # The button: progress and Cancel while it works. Cancel takes effect at once (xatlas itself only stops between its
 # stages: the job is dropped) and leaves the Part without UVs.
-click "Texture Map/Auto UV"
+click "Texture Image/Auto UV"
 expect_value auto_uv_running == 1
-expect "Texture Map/Cancel##autouv"
+expect "Texture Image/Cancel##autouv"
 shot auto-uv-progress
-click "Texture Map/Cancel##autouv"
+click "Texture Image/Cancel##autouv"
 wait_value auto_uv_running == 0 1
 expect_value uvs == 0
 expect_status "cancelled"

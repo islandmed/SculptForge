@@ -5,6 +5,8 @@
 // pattern files. The pattern lives in the project (Document::projectSettings["garment"]).
 #include "core/Commands.h"
 #include "core/Garment.h"
+#include "core/GarmentPrint.h"
+#include "core/GarmentTemplates.h"
 
 #include <algorithm>
 #include <cmath>
@@ -95,28 +97,86 @@ CommandResult seamCommand(Document& doc, const Args& a) {
 } // namespace
 
 void registerGarmentCommands(CommandRegistry& reg) {
+    // garment_new and garment_size take every size chart measurement as <key>_mm.
+    std::vector<ParamSpec> sizeParams;
+    for (const MeasureSpec& m : measureSpecs())
+        sizeParams.push_back({std::string(m.key) + "_mm", T::Number, m.description, false});
+    // Measurements given are stored in the project's size chart (and used by the next template too).
+    auto applySizes = [](Document& doc, const Args& a, std::string& changed) {
+        SizeChart chart = documentSizeChart(doc);
+        bool any = false;
+        for (const MeasureSpec& m : measureSpecs()) {
+            const std::string key = std::string(m.key) + "_mm";
+            if (!a.count(key)) continue;
+            chart.set(m.key, float(argNumber(a, key, m.fallback)));
+            changed += (changed.empty() ? "" : ", ") + std::string(m.key);
+            any = true;
+        }
+        if (any) setDocumentSizeChart(doc, chart);
+        return chart;
+    };
+    std::string templateList = "empty";
+    for (const TemplateSpec& t : templateSpecs()) templateList += "; " + std::string(t.description);
+    std::vector<ParamSpec> newParams = {
+        {"template", T::String, "tshirt (default), trousers, skirt, skirt_aline, hoodie, dress, cloak, glove or empty",
+         false},
+        {"length_mm", T::Number, "The template's main length in mm (see the template list; default from the size chart)",
+         false},
+        {"add", T::Bool, "Add the template beside the pattern already in the scene (an outfit) instead of replacing it",
+         false},
+        {"particle_mm", T::Number, "Distance between the cloth's particles in mm (default 15; gloves 3-6, from the hand)", false}};
+    newParams.insert(newParams.end(), sizeParams.begin(), sizeParams.end());
     reg.add({"garment_new",
-             "Garments: start a garment pattern in the scene (saved with the project). template: tshirt (front, back "
-             "and two sleeves, sewn and placed: ready to drape) or empty.",
-             {{"template", T::String, "tshirt (default) or empty", false},
-              {"chest_mm", T::Number, "T-shirt: the body's chest girth in mm (default 960)", false},
-              {"length_mm", T::Number, "T-shirt: length from the shoulder in mm (default 700)", false},
-              {"particle_mm", T::Number, "Distance between the cloth's particles in mm (default 15)", false}},
-             [](Document& doc, const Args& a) -> CommandResult {
+             "Garments: start a garment pattern in the scene (saved with the project) from a template, flat panels at "
+             "real size made from the project's size chart (give any measurement as <name>_mm to change it), sewn "
+             "the way the garment is made. Templates: " + templateList + ".",
+             newParams,
+             [applySizes](Document& doc, const Args& a) -> CommandResult {
                  const std::string t = lower(argString(a, "template", "tshirt"));
+                 std::string changed;
+                 const SizeChart chart = applySizes(doc, a, changed);
                  Pattern pat;
-                 if (t == "tshirt" || t == "t-shirt")
-                     pat = tshirtPattern(float(argNumber(a, "chest_mm", 960.0)), float(argNumber(a, "length_mm", 700.0)));
-                 else if (t != "empty")
-                     return {false, "Unknown template \"" + t + "\" (tshirt or empty)"};
-                 pat.particleDistance = float(std::clamp(argNumber(a, "particle_mm", pat.particleDistance), 2.0, 200.0));
+                 std::string error;
+                 if (t != "empty" && !makeTemplate(t == "t-shirt" ? "tshirt" : t, chart,
+                                                   float(argNumber(a, "length_mm", 0.0)), pat, error))
+                     return {false, error};
+                 const bool add = argBool(a, "add", false);
+                 Pattern old;
+                 if (add && t != "empty" && documentPattern(doc, old) && !old.empty()) {
+                     appendPattern(old, pat);
+                     pat = std::move(old);
+                 }
+                 if (a.count("particle_mm"))
+                     pat.particleDistance = float(std::clamp(argNumber(a, "particle_mm", 15.0), 2.0, 200.0));
+                 const std::string sizes = changed.empty() ? "" : " (size chart: " + changed + " set)";
                  if (pat.empty()) {
                      doc.projectSettings.set("garment", patternToJson(pat)); // an empty pattern to draw in
                      doc.modified = true;
-                     return {true, "New empty garment pattern"};
+                     return {true, "New empty garment pattern" + sizes};
                  }
                  setDocumentPattern(doc, pat);
-                 return {true, "New garment pattern: " + summary(pat)};
+                 return {true, std::string(add ? "Added " : "New ") + t + ": " + summary(pat) + sizes};
+             }});
+    std::vector<ParamSpec> chartParams = {{"reset", T::Bool, "Every measurement back to its default first", false}};
+    chartParams.insert(chartParams.end(), sizeParams.begin(), sizeParams.end());
+    reg.add({"garment_size",
+             "Garments: the project's size chart (body measurements in mm that garment_new's templates are made from). "
+             "Give any measurement as <name>_mm to set it; with none, lists the chart.",
+             chartParams,
+             [applySizes](Document& doc, const Args& a) -> CommandResult {
+                 if (argBool(a, "reset", false)) setDocumentSizeChart(doc, SizeChart{});
+                 std::string changed;
+                 const SizeChart chart = applySizes(doc, a, changed);
+                 std::ostringstream s;
+                 s << (changed.empty() ? "Size chart" : "Size chart (" + changed + " set)");
+                 const auto& specs = measureSpecs();
+                 for (size_t i = 0; i < specs.size(); ++i) {
+                     char buf[160];
+                     std::snprintf(buf, sizeof buf, "\n%s_mm = %.0f  (%s)", specs[i].key, double(chart.mm[i]),
+                                   specs[i].description);
+                     s << buf;
+                 }
+                 return {true, s.str()};
              }});
     reg.add({"garment_info", "Garments: the pattern's panels, seams (with their lengths) and any problems.", {},
              [](Document& doc, const Args&) -> CommandResult {
@@ -188,7 +248,7 @@ void registerGarmentCommands(CommandRegistry& reg) {
                  return {true, "Removed " + name};
              }});
     reg.add({"garment_mirror_copy",
-             "Garments: add a mirrored copy of a panel (the other sleeve or side), placed on the other side of the body.",
+             "Garments: add a mirrored copy of a panel (the other sleeve or side), placed beside it in the pattern.",
              {{"panel", T::String, "Panel name or number", true}, {"name", T::String, "The copy's name", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  CommandResult r;
@@ -245,18 +305,50 @@ void registerGarmentCommands(CommandRegistry& reg) {
                  return {true, "Garment: " + summary(pat) + ", " + pat.fabric};
              }});
     reg.add({"garment_export",
-             "Garments: write the pattern at real size for sewing: svg (sewing and cutting lines, notches, grain "
-             "lines, names, a 50 mm scale square; print at 100%) or dxf (outlines in mm).",
-             {{"path", T::String, "File to write (.svg or .dxf)", true}, {"format", T::String, "svg or dxf (default: from the path)", false}},
+             "Garments: write the pattern at real size for sewing: pdf (tiled A4 or Letter pages to print at home: trim "
+             "lines, matching triangles, page names, a 50 mm scale square on A1), svg_pages (the same pages, one SVG "
+             "each: <name>-A1.svg, ...), svg (the whole sheet: sewing and cutting lines, notches, grain lines, names, "
+             "the 50 mm square; for a plotter or print shop) or dxf (outlines in mm, for cutters).",
+             {{"path", T::String, "File to write (.pdf, .svg or .dxf)", true},
+              {"format", T::String, "pdf, svg_pages, svg or dxf (default: from the path)", false},
+              {"paper", T::String, "pdf / svg_pages: a4 (default) or letter", false},
+              {"landscape", T::Bool, "pdf / svg_pages: pages on their side", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  CommandResult r;
                  Pattern pat;
                  if (!loadOrFail(doc, pat, r)) return r;
                  if (pat.empty()) return {false, "The pattern has no panels"};
                  const std::string path = argString(a, "path");
+                 const std::string lp = lower(path);
+                 auto ends = [&](const char* ext) {
+                     const std::string e(ext);
+                     return lp.size() > e.size() && lp.compare(lp.size() - e.size(), e.size(), e) == 0;
+                 };
                  std::string fmt = lower(argString(a, "format"));
-                 if (fmt.empty()) fmt = lower(path).size() > 4 && lower(path).substr(lower(path).size() - 4) == ".dxf" ? "dxf" : "svg";
+                 if (fmt.empty()) fmt = ends(".dxf") ? "dxf" : ends(".pdf") ? "pdf" : "svg";
+                 PrintOptions opt;
+                 const std::string paper = lower(argString(a, "paper", "a4"));
+                 if (paper != "a4" && paper != "letter") return {false, "Unknown paper \"" + paper + "\" (a4 or letter)"};
+                 opt.paper = paper == "letter" ? Paper::Letter : Paper::A4;
+                 opt.landscape = argBool(a, "landscape", false);
                  std::string error;
+                 if (fmt == "pdf" || fmt == "svg_pages") {
+                     const TileLayout t = tileLayout(pat, opt);
+                     const std::string pages = std::to_string(t.pages()) + " " + (paper == "letter" ? "Letter" : "A4") +
+                                               " pages (a grid of " + std::to_string(t.rows) + " rows x " + std::to_string(t.cols) + ", blank ones left out)";
+                     if (fmt == "pdf") {
+                         std::string pdf;
+                         if (!patternToTiledPdf(pat, opt, pdf, error) || !writeText(path, pdf, error)) return {false, error};
+                         return {true, "Wrote " + pages + " to " + path + ": print at 100%, check the 50 mm square on A1"};
+                     }
+                     std::vector<SvgPageFile> svgs;
+                     if (!patternToTiledSvgs(pat, opt, svgs, error)) return {false, error};
+                     const std::string stem = ends(".svg") ? path.substr(0, path.size() - 4) : path;
+                     for (const SvgPageFile& page : svgs)
+                         if (!writeText(stem + "-" + page.name + ".svg", page.svg, error)) return {false, error};
+                     return {true, "Wrote " + pages + " as " + stem + "-A1.svg ..."};
+                 }
+                 if (fmt != "svg" && fmt != "dxf") return {false, "Unknown format \"" + fmt + "\" (pdf, svg_pages, svg or dxf)"};
                  if (!writeText(path, fmt == "dxf" ? patternToDxf(pat) : patternToSvg(pat), error)) return {false, error};
                  return {true, "Wrote " + std::to_string(pat.panels.size()) + " panels to " + path};
              }});
@@ -297,6 +389,110 @@ void registerGarmentCommands(CommandRegistry& reg) {
                  pat.panels.insert(pat.panels.end(), panels.begin(), panels.end());
                  setDocumentPattern(doc, pat);
                  return {true, "Imported " + std::to_string(n) + " panels" + (error.empty() ? "" : " (" + error + ")")};
+             }});
+    reg.add({"garment_edit",
+             "Garments: edit a panel (the Pattern window's edits, one undo step each there). op: set_panel (its outline "
+             "from points [x0, y0, ...] in mm and curves [[edge, c1x, c1y, c2x, c2y], ...] with 0-based edges; seams "
+             "stay when the edge count does), split (a new point at t along an edge), remove_point, move (dx, dy mm), "
+             "duplicate, mirror (in place), unfold (about a straight fold edge) or rename.",
+             {{"op", T::String, "set_panel, split, remove_point, move, duplicate, mirror, unfold or rename", true},
+              {"panel", T::String, "Panel name or number", true},
+              {"points", T::String, "set_panel: outline as JSON [x0, y0, x1, y1, ...] in mm", false},
+              {"curves", T::String, "set_panel: curved edges as JSON [[edge, c1x, c1y, c2x, c2y], ...]", false},
+              {"edge", T::Number, "split, unfold: edge (1-based)", false},
+              {"t", T::Number, "split: where along the edge (0-1, default 0.5)", false},
+              {"point", T::Number, "remove_point: point (1-based)", false},
+              {"dx", T::Number, "move: mm right", false},
+              {"dy", T::Number, "move: mm up", false},
+              {"name", T::String, "duplicate, rename: the name", false}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 CommandResult r;
+                 Pattern pat;
+                 if (!loadOrFail(doc, pat, r)) return r;
+                 uint32_t i;
+                 std::string error;
+                 if (!findPanel(pat, argString(a, "panel"), i, error)) return {false, error};
+                 const std::string op = lower(argString(a, "op"));
+                 Panel& p = pat.panels[i];
+                 const uint32_t edges = uint32_t(p.points.size());
+                 auto edgeArg = [&](uint32_t& e) {
+                     const double v = argNumber(a, "edge", 0);
+                     if (!(v >= 1 && v <= double(edges))) return false;
+                     e = uint32_t(v) - 1;
+                     return true;
+                 };
+                 std::string done;
+                 if (op == "set_panel") {
+                     Json pj, cj;
+                     if (!Json::parse(argString(a, "points"), pj, error) || !pj.isArray() || pj.size() % 2 || pj.size() < 6 ||
+                         pj.size() > 40000)
+                         return {false, "points must be a JSON array [x0, y0, x1, y1, ...] of 3 to 20,000 points"};
+                     Panel q = p;
+                     q.points.clear();
+                     for (size_t k = 0; k + 1 < pj.size(); k += 2)
+                         q.points.push_back({float(pj[k].asNumber()), float(pj[k + 1].asNumber())});
+                     q.curves.assign(q.points.size(), EdgeCurve{});
+                     if (const std::string cs = argString(a, "curves"); !cs.empty()) {
+                         if (!Json::parse(cs, cj, error) || !cj.isArray()) return {false, "curves must be a JSON array"};
+                         for (const Json& c : cj.items()) {
+                             if (!c.isArray() || c.size() != 5) return {false, "Each curve is [edge, c1x, c1y, c2x, c2y]"};
+                             const double e = c[0].asNumber(-1);
+                             if (!(e >= 0 && e < double(q.points.size()))) return {false, "A curve's edge is out of range"};
+                             q.curves[size_t(e)] = {true, {float(c[1].asNumber()), float(c[2].asNumber())},
+                                                    {float(c[3].asNumber()), float(c[4].asNumber())}};
+                         }
+                     }
+                     size_t budget = kOutlineBudget;
+                     if (!validPanel(q, error, &budget)) return {false, error};
+                     if (panelArea(q) < 0.0f) return {false, q.name + "'s outline must run counter-clockwise"};
+                     const bool sameEdges = q.points.size() == edges;
+                     if (!sameEdges) {
+                         q.edgeNames.clear();
+                         pat.seams.erase(std::remove_if(pat.seams.begin(), pat.seams.end(),
+                                                        [&](const Seam& sm) { return sm.a.panel == i || sm.b.panel == i; }),
+                                         pat.seams.end());
+                     }
+                     normalizePanel(q);
+                     p = std::move(q);
+                     done = p.name + (sameEdges ? " reshaped" : " reshaped (its seams were removed: the edges changed)");
+                 } else if (op == "split") {
+                     uint32_t e;
+                     if (!edgeArg(e)) return {false, "No such edge on " + p.name};
+                     splitEdge(pat, i, e, float(std::clamp(argNumber(a, "t", 0.5), 0.01, 0.99)));
+                     done = "Split " + edgeName(pat, i, e);
+                 } else if (op == "remove_point") {
+                     const double v = argNumber(a, "point", 0);
+                     if (!(v >= 1 && v <= double(edges))) return {false, "No such point on " + p.name};
+                     if (!removePoint(pat, i, uint32_t(v) - 1)) return {false, p.name + " needs at least 3 points"};
+                     if (!validPanel(pat.panels[i], error)) return {false, error};
+                     done = "Removed point " + std::to_string(int(v)) + " of " + pat.panels[i].name;
+                 } else if (op == "move") {
+                     const glm::vec2 d(float(std::clamp(argNumber(a, "dx", 0), -1e5, 1e5)), float(std::clamp(argNumber(a, "dy", 0), -1e5, 1e5)));
+                     for (glm::vec2& q : p.points) q += d;
+                     for (EdgeCurve& c : p.curves) c.c1 += d, c.c2 += d;
+                     if (!validPanel(p, error)) return {false, error};
+                     done = "Moved " + p.name;
+                 } else if (op == "duplicate") {
+                     const uint32_t j = duplicatePanel(pat, i, {panelMax(p).x - panelMin(p).x + 60.0f, 0.0f}, argString(a, "name"));
+                     done = "Added " + pat.panels[j].name;
+                 } else if (op == "mirror") {
+                     mirrorPanel(pat, i);
+                     done = "Mirrored " + p.name;
+                 } else if (op == "unfold") {
+                     uint32_t e;
+                     if (!edgeArg(e)) return {false, "No such edge on " + p.name};
+                     if (!unfoldPanel(pat, i, e, error)) return {false, error};
+                     done = "Unfolded " + pat.panels[i].name;
+                 } else if (op == "rename") {
+                     const std::string name = argString(a, "name").substr(0, 128);
+                     if (name.empty()) return {false, "Give a name"};
+                     p.name = name;
+                     done = "Renamed to " + name;
+                 } else {
+                     return {false, "Unknown op \"" + op + "\""};
+                 }
+                 setDocumentPattern(doc, pat);
+                 return {true, done};
              }});
     reg.add({"garment_clear", "Garments: remove the garment pattern from the scene.", {},
              [](Document& doc, const Args&) -> CommandResult {

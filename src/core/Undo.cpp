@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Undo.h"
 
+#include "core/MeshTransform.h"
 #include "core/SelectionSets.h"
 
+#include <algorithm>
 #include <utility>
 
 namespace sf {
@@ -13,7 +15,8 @@ size_t UndoRecord::approxBytes() const {
                    facegroups.bytes() + (paint ? paint->bytes() : 0) +
                    (textureTiles ? textureTiles->bytes() : 0) + (texture ? texture->bytes() : 0) +
                    (subdiv ? subdiv->bytes() : 0) + (topology ? topology->bytes() : 0) +
-                   (micro ? micro->bytes() : 0) + uvs.bytes() + (sets ? sets->bytes() : 0) + (uv ? uv->bytes() : 0);
+                   (micro ? micro->bytes() : 0) + uvs.bytes() + (sets ? sets->bytes() : 0) + (uv ? uv->bytes() : 0) +
+                   creases.bytes() + (transformOp ? transformOp->bytes() : 0);
     for (const auto& l : layerOffsets) bytes += l.bytes();
     if (mesh)
         bytes += mesh->vertexCount() * ((2 + (mesh->base.empty() ? 0 : 1 + mesh->layers.size())) * sizeof(glm::vec3) +
@@ -21,7 +24,7 @@ size_t UndoRecord::approxBytes() const {
                  mesh->triangleCount() * (sizeof(glm::uvec3) + sizeof(glm::vec3) + 4 * sizeof(uint32_t)) +
                  mesh->mask.size() * sizeof(float) + mesh->colors.size() * sizeof(glm::vec3) +
                  mesh->facegroups.size() * sizeof(uint32_t) + mesh->hidden.size() + mesh->uvs.size() * sizeof(glm::vec2) +
-                 mesh->quadPartners.size() * sizeof(uint32_t);
+                 mesh->quadPartners.size() * sizeof(uint32_t) + mesh->creases.size() * sizeof(float);
     if (mesh) {
         bytes += mesh->paintBase.size() * sizeof(glm::vec3);
         for (const auto& l : mesh->paintLayers) bytes += l.color.size() * sizeof(glm::vec3) + l.alpha.size() * sizeof(float);
@@ -193,6 +196,10 @@ void UndoStack::apply(UndoRecord& r, Mesh& mesh, BVH& bvh) {
     }
     if (r.paint) r.paint->swapWith(mesh);
     if (r.uv) r.uv->swapWith(mesh);
+    if (!r.creases.empty()) {
+        r.creases.swapWith(mesh.ensureCreases());
+        if (std::all_of(mesh.creases.begin(), mesh.creases.end(), [](float c) { return c == 0.0f; })) mesh.clearCreases();
+    }
     if (r.texture) r.texture->swapWith(mesh);
     if (r.textureTiles) r.textureTiles->swapWith(mesh);
     if (!r.colors.empty()) {

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 
 namespace sf {
 
@@ -75,6 +76,7 @@ Json toJson(const TabletSettings& t) {
     j.set("buttons", buttons);
     j.set("mouseMode", t.mouseMode);
     j.set("viewSpeed", double(t.viewSpeed));
+    j.set("classicPenTiming", t.classicTiming);
     return j;
 }
 
@@ -100,13 +102,50 @@ void fromJson(const Json& j, TabletSettings& t) {
             }
     t.mouseMode = j["mouseMode"].asBool(t.mouseMode);
     t.viewSpeed = std::clamp(float(j["viewSpeed"].asNumber(t.viewSpeed)), 0.1f, 2.0f);
+    t.classicTiming = j["classicPenTiming"].asBool(t.classicTiming);
 }
 
-void PenPressureTracker::sample(float pressure) {
+bool PenPressureTracker::sample(float pressure) {
+    if (!std::isfinite(pressure) || (holdLostZero && down_ && sinceDown_ && raw_ > kContact && pressure <= 0.0f))
+        return false;
     raw_ = clamp01(pressure);
     sinceDown_ = true;
     everSampled_ = true;
     if (raw_ > kContact) pressed_ = true;
+    return true;
+}
+
+void PenDiagnostics::sampled(float p, bool touching) {
+    lastPressure = p;
+    if (!touching) return;
+    strokeMin = strokeMin < 0.0f ? p : std::min(strokeMin, p);
+    strokeMax = std::max(strokeMax, p);
+}
+
+std::string penReport(const std::vector<std::pair<std::string, std::string>>& facts, const PenDiagnostics& d) {
+    std::string s;
+    for (const auto& [name, value] : facts) s += name + ": " + value + "\n";
+    char buf[512];
+    std::snprintf(buf, sizeof buf,
+                  "Pen events: proximity %llu, down %llu, up %llu, motion %llu, pressure %llu, other axes %llu, "
+                  "buttons %llu\n"
+                  "Lost pressure samples: %llu\nSystem mouse events while the pen was in range: %llu\n"
+                  "Touch events from the pen: %llu\nPressure after motion: %s\n",
+                  (unsigned long long)d.proximity, (unsigned long long)d.down, (unsigned long long)d.up,
+                  (unsigned long long)d.motion, (unsigned long long)d.pressure, (unsigned long long)d.otherAxes,
+                  (unsigned long long)d.buttons, (unsigned long long)d.lostSamples, (unsigned long long)d.strayMouse,
+                  (unsigned long long)d.penTouchEvents, d.axesAfterMotion ? "yes" : "not seen");
+    s += buf;
+    if (d.lastPressure < 0.0f) s += "Last pressure: none yet\n";
+    else {
+        std::snprintf(buf, sizeof buf, "Last pressure: %.3f\n", double(d.lastPressure));
+        s += buf;
+    }
+    if (d.strokeMax >= 0.0f) {
+        std::snprintf(buf, sizeof buf, "Last stroke's pressure: %.3f to %.3f\n", double(d.strokeMin), double(d.strokeMax));
+        s += buf;
+    }
+    return s;
 }
 
 void PenPressureTracker::motion() {

@@ -166,7 +166,7 @@ void App::registerInputActions() {
         [this] { groupMasked(); });
     add("facegroup.uv_groups", "Group by UVs", ICON_LC_GRID_2X2, "Tool > Face Groups", "",
         "One face group per UV island: triangles that touch without a UV seam share a group. "
-        "Only the visible part is regrouped. Needs UVs (Tool > Texture Map > Auto UV makes some).",
+        "Only the visible part is regrouped. Needs UVs (Tool > Texture Image > Auto UV makes some).",
         [this] {
             runCommand("facegroup_uv");
             if (lastCommandOk_) renderSettings_.showFaceGroups = true;
@@ -320,6 +320,11 @@ void App::registerViewActions() {
             autoOrtho_ = false;
         },
         [this] { return camera_.ortho; });
+    if (const Action* ortho = actions_.find("view.ortho")) { // (an icon for the right shelf's view toggles)
+        Action a = *ortho;
+        a.icon = ICON_LC_BOX;
+        actions_.add(std::move(a));
+    }
     add("view.orbit_left", "Orbit left", "Numpad 4", "Turn the view 15 degrees to the left around the model.",
         [this] { viewOrbitStep(-15.0f, 0.0f); });
     add("view.orbit_right", "Orbit right", "Numpad 6", "Turn the view 15 degrees to the right around the model.",
@@ -662,15 +667,16 @@ void App::drawCursorSection() {
 
 void App::drawZIntensitySlider(const char* id) {
     const bool smooth = activeBrush() == BrushType::Smooth && drag_ != Drag::Stroke;
-    float& value = smooth ? smoothStrength_ : strength_;
+    float& value = intensityValue(smooth);
     float shown = value * 100.0f;
     if (ui::SliderInside(id, &shown, 1.0f, 100.0f, smooth ? "Smooth Intensity %.0f" : "Intensity %.0f"))
         value = std::clamp(shown / 100.0f, 0.01f, 1.0f);
     ui::HelpText(smooth ? "Smooth Intensity" : "Intensity", "U",
-                 smooth ? "How strongly Smooth works. Smooth keeps its own value: hold Shift to see and "
-                          "set it. Ctrl+click to type."
-                        : "How strongly each dab changes the surface (1-100). Holding Shift shows Smooth's own value. "
-                          "Ctrl+click to type.",
+                 smooth       ? "How strongly Smooth works. Smooth keeps its own value: hold Shift to see and "
+                                "set it. Ctrl+click to type."
+                 : paintMode_ ? "How strongly painting colours the surface (1-100); Ctrl+click to type."
+                              : "How strongly each dab changes the surface (1-100). Holding Shift shows Smooth's own value. "
+                                "Ctrl+click to type.",
                  "Draw");
 }
 
@@ -800,16 +806,22 @@ void App::drawQuickMenu() {
         if (ui::SliderInside("##qm_focal", &focal, -100.0f, 100.0f, "Falloff %.0f")) focalShift_ = focal / 100.0f;
         ui::HelpText("Falloff", "O", "Below 0: a broad, hard tip. Above 0: a soft point.", "Quick Menu");
         const bool smooth = activeBrush() == BrushType::Smooth;
-        float& zValue = smooth ? smoothStrength_ : strength_;
+        float& zValue = intensityValue(smooth);
         float z = zValue * 100.0f;
         ImGui::SetNextItemWidth(sw);
         if (ui::SliderInside("##qm_z", &z, 1.0f, 100.0f, smooth ? "Smooth Intensity %.0f" : "Intensity %.0f"))
             zValue = z / 100.0f;
-        ui::HelpText("Intensity", "U", "How strongly the brush changes the surface.", "Quick Menu");
-        float rgb = rgbIntensity_ * 100.0f;
-        ImGui::SetNextItemWidth(sw);
-        if (ui::SliderInside("##qm_rgb", &rgb, 1.0f, 100.0f, "Colour intensity %.0f")) rgbIntensity_ = rgb / 100.0f;
-        ui::HelpText("Colour intensity", "I", "How strongly painting colours the surface.", "Quick Menu");
+        ui::HelpText("Intensity", "U",
+                     paintMode_ && !smooth ? "How strongly painting colours the surface." : "How strongly the brush changes the surface.",
+                     "Quick Menu");
+        if (paintMode_) { // Intensity above is the Colour intensity (#164): the same slider twice would only confuse
+            ImGui::Dummy(ImVec2(sw, ImGui::GetFrameHeight()));
+        } else {
+            float rgb = rgbIntensity_ * 100.0f;
+            ImGui::SetNextItemWidth(sw);
+            if (ui::SliderInside("##qm_rgb", &rgb, 1.0f, 100.0f, "Colour intensity %.0f")) rgbIntensity_ = rgb / 100.0f;
+            ui::HelpText("Colour intensity", "I", "How strongly painting colours the surface.", "Quick Menu");
+        }
         ImGui::EndGroup();
         ui::Segmented(*this, {"draw.raise", "draw.lower"}, 2 * tile + ImGui::GetStyle().ItemSpacing.x);
         ImGui::SameLine();

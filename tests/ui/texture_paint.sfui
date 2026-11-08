@@ -1,25 +1,25 @@
-# Texture painting on UV maps (Tool > Texture Map): Auto UV unwraps the sculpt, New Texture gives it a 2K
+# Texture painting on UV maps (Tool > Texture Image): Auto UV unwraps the sculpt, New Texture gives it a 2K
 # texture, and the Paint brush then paints texels instead of vertices, with the same paint layers.
 run new_sphere subdivisions=4
-click "Texture Map##tool.texture"
-expect "Texture Map/Auto UV"
+click "Texture Image##tool.texture"
+expect "Texture Image/Auto UV"
 expect_value uvs == 0
 expect_value texture_size == 0
 
 # Auto UV runs in the background; the status shows its progress.
-click "Texture Map/Auto UV"
+click "Texture Image/Auto UV"
 wait_idle 120
 expect_value uvs == 1
 expect_status "UV islands"
-click "Texture Map/Show UVs"
+click "Texture Image/Show UVs"
 shot uv-layout
 
 # A 2K texture (the default size): painting now goes into it.
-click "Texture Map/New Texture"
+click "Texture Image/New Texture"
 expect_value texture_size == 2048
 expect_value paint_texture == 1
 expect_value texture_painted == 0
-expect "Texture Map/Texture"
+expect "Texture Image/Texture"
 run set_color color=c81e1e
 key p
 stroke 0.15 0.5 0.85 0.5
@@ -74,13 +74,13 @@ expect_value paint_texture == 1
 shot both-targets
 
 # Ctrl-hover help on the new controls.
-click "Texture Map##tool.texture"
+click "Texture Image##tool.texture"
 hold ctrl
-hover "Texture Map/Auto UV"
+hover "Texture Image/Auto UV"
 expect_help "UV islands"
-hover "Texture Map/New Texture"
+hover "Texture Image/New Texture"
 expect_help "texture"
-hover "Texture Map/##texsize"
+hover "Texture Image/##texsize"
 expect_help "8K"
 hold none
 

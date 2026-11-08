@@ -20,7 +20,7 @@ namespace {
 
 using T = ParamSpec::Type;
 
-const char* kNoTexture = "The Part has no texture: create one first (Tool > Texture Map > New, or texture_create)";
+const char* kNoTexture = "The Part has no texture: create one first (Tool > Texture Image > New, or texture_create)";
 
 std::string channelList() {
     std::string s;

@@ -36,8 +36,12 @@ UVs are kept through OBJ, FBX, USD, glTF and Bridge files, in and out. A Part wi
 `<name>_color.png` (`<name>_<Part>_color.png` with several Parts) and referenced by the model, or embedded
 in GLB and USDZ files. Spaces in the file name become `_` in the names of the files written beside it
 (`my scene.obj` gets `my_scene.mtl` and `my_scene_color.png`), because OBJ and MTL separate file names with
-spaces. **Tool > Texture Map > Auto UV** gives any sculpt UVs before export. Normal, displacement and other maps
+spaces. **Tool > Texture Image > Auto UV** gives any sculpt UVs before export. Normal, displacement and other maps
 come from [Tool > Bake](baking.md) as separate image files.
+
+[Edge creases](edges.md#creases) go out and come back in through USD only (`creaseIndices`, `creaseLengths`,
+`creaseSharpnesses`, with `subdivisionScheme` set so other apps subdivide the cage with them). glTF, OBJ, FBX, PLY
+and STL have no creases: export Level 1 to USD to keep them, or add levels first to bake them into the shape.
 
 Textured exports are checked against other tools, not only read back by SculptForge: GLB files pass the Khronos
 glTF validator with no errors or warnings; USD and USDZ files pass OpenUSD's validators (the USDZ files are

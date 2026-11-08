@@ -488,7 +488,7 @@ TEST(discord_malformed_reply_closes) {
     CHECK(accepted == 2);
 }
 // Discord quits and starts again while SculptForge runs: the client finds it again within seconds (2 s, not the
-// 60 s back-off), sends what's shown again, and later changes still go out (Tony 11-05: "it doesn't update anymore").
+// 60 s back-off), sends what's shown again, and later changes still go out (owner 11-05: "it doesn't update anymore").
 TEST(discord_reconnects_after_discord_restarts) {
     TempSocketDir t;
     const std::string path = t.dir + "/discord-ipc-0";

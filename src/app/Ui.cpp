@@ -112,7 +112,7 @@ bool dragSource(App& app, const char* itemId, const char* label, int shelf, int 
     p.fromIndex = index;
     ImGui::SetDragDropPayload(kUiItemPayload, &p, sizeof p);
     ImGui::TextUnformatted(label);
-    ImGui::TextColored(rgba(color::textDim), tr(shelf >= 0 ? "Drop on a shelf to move, elsewhere to remove" : "Drop on a shelf to add"));
+    ImGui::TextColored(rgba(color::textDim), "%s", tr(shelf >= 0 ? "Drop on a shelf to move, elsewhere to remove" : "Drop on a shelf to add"));
     ImGui::EndDragDropSource();
     return true;
 }
@@ -125,6 +125,18 @@ bool CtrlHeld() {
 }
 
 bool AltHeld() { return ImGui::GetIO().KeyAlt || (SDL_GetModState() & SDL_KMOD_ALT) != 0; }
+
+const char* FloatingWindowAt(ImVec2 p) {
+    const ImGuiContext* g = ImGui::GetCurrentContext();
+    if (!g) return nullptr;
+    for (int i = g->Windows.Size - 1; i >= 0; --i) { // front to back
+        const ImGuiWindow* w = g->Windows[i];
+        if (!w->Active || w->Hidden || (w->Flags & (ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_ChildWindow))) continue;
+        if (w->Flags & ImGuiWindowFlags_NoBringToFrontOnFocus) continue; // the shell (Shell.cpp): the view's frame
+        if (w->Rect().Contains(p)) return w->Name;
+    }
+    return nullptr;
+}
 
 void SetNextItemOrigin(int shelf, int index) {
     g_nextShelf = shelf;
@@ -936,7 +948,7 @@ void DrawHelp(App& app) {
                 usage += p.required ? " " + p.name + "=<" + typeName(p.type) + ">" : " [" + p.name + "=...]";
             ImGui::TextColored(rgba(color::accent), "%s", usage.c_str());
             ImGui::PopFont();
-            if (r.params.empty()) ImGui::TextColored(rgba(color::textDim), tr("No parameters."));
+            if (r.params.empty()) ImGui::TextColored(rgba(color::textDim), "%s", tr("No parameters."));
             for (const auto& p : r.params) {
                 ImGui::PushFont(app.consoleFont());
                 ImGui::TextColored(rgba(color::text), "%s", p.name.c_str());

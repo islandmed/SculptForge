@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Tool > Geometry > Merge by Distance and Check Mesh (foirgairwolf on Discord). The work is done by the weld_points,
+// Tool > Geometry > Merge by Distance and Find Problems (foirgairwolf on Discord). The work is done by the weld_points,
 // mesh_check and mesh_fix commands (core/MeshCheck.h); this is their panel and the weld's preview on the model.
 #include "app/App.h"
 #include "app/Demo.h"
@@ -12,7 +12,6 @@
 
 #include <algorithm>
 #include <string>
-#include <utility>
 
 namespace sf {
 
@@ -21,6 +20,10 @@ namespace {
 // The count follows the slider live up to this many points; above it, when the slider is let go.
 constexpr size_t kLiveWeldPoints = 1500000;
 constexpr size_t kWeldPreviewPoints = 20000;
+// The preview shows only while the distance is dragged or hovered (an open panel alone draws nothing: on a dense
+// model the dots read as a rendering fault), stays a moment after (the overlay may draw before the panel in a
+// frame), then fades out.
+constexpr double kWeldPreviewHold = 0.1, kWeldPreviewFade = 0.3;
 
 } // namespace
 
@@ -41,7 +44,6 @@ void App::drawMeshCheckContents() {
     const ImGuiStyle& style = ImGui::GetStyle();
     const float diag = m.vertexCount() ? glm::length(m.bounds().extent()) : 1.0f;
     const uint64_t key = meshCheckKey() | 1;
-    weldShown_ = true;
 
     Demo::pushScope("Merge by Distance");
     tray::GroupLabel(*this, "Merge by Distance");
@@ -50,9 +52,16 @@ void App::drawMeshCheckContents() {
     const float button = ImGui::CalcTextSize(tr("Merge")).x + 2.0f * style.FramePadding.x + ImGui::GetFrameHeight();
     ImGui::BeginDisabled(weldCount_ == 0 || weldKey_ != key || weldKeyDistance_ != weldDistance_);
     if (ImGui::Button(tr("Merge##weld_points"), ImVec2(button, 0))) {
-        runCommand("weld_points", {{"distance", double(weldDistance_)}});
-        weldKey_ = 0;
-        meshReportScroll_ = 2; // Check Mesh is next: its row comes into view (below the fold in a 1024 px drop-down)
+        auto weld = [this] {
+            Args args{{"distance", double(weldDistance_)}};
+            if (weldMaskedOnly_) args["masked_only"] = true;
+            runCommand("weld_points", args);
+            weldKey_ = 0;
+        };
+        // #163: ask on a partly hidden Part, unless only the masked points (shown) merge.
+        const bool maskShown = weldMaskedOnly_ && doc_.mesh.hasMask() && renderSettings_.showMask;
+        if (unhideAllows("Merge by Distance", weld, maskShown)) weld();
+        meshReportScroll_ = 2; // Find Problems is next: its row comes into view (below the fold in a 1024 px drop-down)
     }
     ImGui::EndDisabled();
     ui::HelpText("Merge", nullptr,
@@ -63,13 +72,23 @@ void App::drawMeshCheckContents() {
     ImGui::SetNextItemWidth(-1);
     ui::SliderInside("##weld_distance", &weldDistance_, 0.0f, hi, "Distance %.5f", ImGuiSliderFlags_Logarithmic);
     const bool dragging = ImGui::IsItemActive();
+    if (dragging || ui::HoveredOrFocused(ImGui::GetItemID())) weldUsedAt_ = ImGui::GetTime(); // (focused: by the keyboard)
     ui::HelpText("Distance", nullptr,
                  "Points this close (in scene units) or closer merge. 0 merges only points exactly on top of each "
                  "other. The points that would merge show on the model in orange.",
                  "Tool > Geometry > Merge by Distance");
+    if (ui::Checkbox("Masked only##weld_masked_only", &weldMaskedOnly_)) {
+        weldKey_ = 0; // count (and preview) again
+        weldUsedAt_ = ImGui::GetTime();
+    }
+    if (ui::HoveredOrFocused(ImGui::GetItemID())) weldUsedAt_ = ImGui::GetTime(); // the preview shows what it changes
+    ui::HelpText("Masked only", nullptr,
+                 "Merge only masked points, with each other; the rest of the Part stays as it is. Mask a seam or an "
+                 "area first. The points that would merge show on the model while you point at this or the distance.",
+                 "Tool > Geometry > Merge by Distance");
     // The count (and the preview's points) for this mesh and distance: live while dragging on smaller meshes.
     if ((weldKey_ != key || weldKeyDistance_ != weldDistance_) && (!dragging || m.vertexCount() <= kLiveWeldPoints)) {
-        std::vector<uint32_t> target = weldTargets(m, weldDistance_, &weldCount_);
+        std::vector<uint32_t> target = weldTargets(m, weldDistance_, &weldCount_, weldMaskedOnly_);
         weldPoints_.clear();
         const size_t step = std::max<size_t>(1, weldCount_ / kWeldPreviewPoints);
         size_t seen = 0;
@@ -84,15 +103,15 @@ void App::drawMeshCheckContents() {
         ImGui::TextDisabled("%s", tr("Let go of the slider to count"));
     Demo::popScope();
 
-    Demo::pushScope("Check Mesh");
-    tray::GroupLabel(*this, "Check Mesh");
+    Demo::pushScope("Find Problems");
+    tray::GroupLabel(*this, "Find Problems");
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
     const bool current = meshReportKey_ == key;
     if (ImGui::Button(tr("Check##mesh_check"), ImVec2(half, 0))) runMeshCheck();
     ui::HelpText("Check", nullptr,
                  "Look for what makes a mesh hard to sculpt, remesh, print or export. Checking changes nothing; each "
                  "Fix changes only what its row names, as one undo step.",
-                 "Tool > Geometry > Check Mesh");
+                 "Tool > Geometry > Find Problems");
     ImGui::SameLine();
     size_t fixable = 0;
     for (int i = 0; i < kMeshIssueCount; ++i)
@@ -106,7 +125,7 @@ void App::drawMeshCheckContents() {
     ui::HelpText("Fix all", nullptr,
                  "Fix every problem listed except holes, as one undo step. Holes stay open: a mesh can be open on "
                  "purpose (use their own Fix to cap them).",
-                 "Tool > Geometry > Check Mesh");
+                 "Tool > Geometry > Find Problems");
     if (meshReportKey_ == 0) {
         ImGui::TextDisabled("%s", tr("Not checked yet"));
     } else if (!current) {
@@ -144,7 +163,7 @@ void App::drawMeshCheckContents() {
             ImGui::PopID();
         }
     }
-    if (meshReportScroll_ > 0) { // Check Mesh's last line (the report's, or "check again") above the bottom edge
+    if (meshReportScroll_ > 0) { // Find Problems's last line (the report's, or "check again") above the bottom edge
         --meshReportScroll_;
         if (ImGui::GetCursorScreenPos().y > ImGui::GetWindowPos().y + ImGui::GetWindowHeight()) ImGui::SetScrollHereY(1.0f);
     }
@@ -152,12 +171,17 @@ void App::drawMeshCheckContents() {
 }
 
 void App::drawWeldPreviewOverlay() {
-    const bool shown = std::exchange(weldShown_, false);
-    if (!shown || weldPoints_.empty() || weldKey_ != (meshCheckKey() | 1) || !doc_.activePartInfo().visible) return;
+    weldPreviewDrawn_ = 0;
+    const double since = ImGui::GetTime() - weldUsedAt_;
+    if (since >= kWeldPreviewHold + kWeldPreviewFade || weldPoints_.empty() || weldKey_ != (meshCheckKey() | 1) || !doc_.activePartInfo().visible)
+        return;
+    redrawIn(0.0); // (fading out: the next frame comes even if the pointer rests)
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
     const CanvasRect cr = canvasRect();
     dl->PushClipRect(ImVec2(cr.x, cr.y), ImVec2(cr.x + cr.w, cr.y + cr.h), true);
-    const ImU32 col = theme::u32(theme::accent);
+    const float alpha = float(std::clamp(1.0 - (since - kWeldPreviewHold) / kWeldPreviewFade, 0.0, 1.0));
+    const ImU32 col = theme::u32(theme::accent, alpha);
+    weldPreviewDrawn_ = weldPoints_.size();
     const float r = 2.0f * uiScale_;
     for (const glm::vec3& p : weldPoints_) {
         ImVec2 s;

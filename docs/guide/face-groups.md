@@ -32,7 +32,7 @@ groups. So you can isolate one part and regroup just that part.
 | **By normals** | A new group wherever the surface turns more than the angle next to it (1 to 90 degrees, default 30). Each flat side of a box becomes its own group. | `facegroup_auto_by_normals` |
 | **By pieces** | One group per disconnected piece, such as separate eyes or buttons in one mesh. | `facegroup_by_connectivity` |
 | **From mask** | Masked triangles move into a new group. | `facegroup_from_mask` |
-| **Group by UVs** | One group per UV island: triangles that touch without a UV seam between them share a group. Needs UVs (**Tool > Texture Map > Auto UV** or an imported model's). | `facegroup_uv` |
+| **Group by UVs** | One group per UV island: triangles that touch without a UV seam between them share a group. Needs UVs (**Tool > Texture Image > Auto UV** or an imported model's). | `facegroup_uv` |
 | **Merge visible** | Everything visible becomes one group. | `facegroup_merge_visible` |
 | **Clear groups** | Remove all face groups; the whole Part becomes one group again. | `facegroup_clear` |
 

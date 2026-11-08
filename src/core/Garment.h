@@ -60,6 +60,7 @@ struct Panel {
     std::vector<glm::vec2> points; // mm, the sewing line, counter-clockwise from the right side
     std::vector<EdgeCurve> curves; // one per edge (same count as points)
     std::vector<Notch> notches;
+    std::vector<std::string> edgeNames; // empty, or one per edge ("left side"; "" = unnamed)
     float grainDegrees = 90.0f;    // warp direction, degrees from +x (90 = up the panel)
     float seamAllowance = 10.0f;   // mm
 };
@@ -133,11 +134,13 @@ struct SeamCheck {
     float lengthA = 0.0f, lengthB = 0.0f; // mm
     bool lengthsMatch = true;             // within 2% (and 3 mm): more is eased or gathered in
     bool twisted = false;                 // flipped: the fabric turns over along the seam
-    std::string text;                     // "Front.right <-> Back.left: 412 / 412 mm"
+    std::string names;                    // "Front left side <-> Back left side"
+    std::string lengths;                  // "412 / 412 mm" (with "eased in", "twisted")
+    std::string text;                     // names + ": " + lengths
 };
 SeamCheck checkSeam(const Pattern& pat, const Seam& seam);
 float seamSideLength(const Pattern& pat, const SeamSide& s);
-// "Front", or "Front edge 3" when the panel has no name for it.
+// "Front left side" (the panel's name for the edge), or "Front edge 3" when it has none.
 std::string edgeName(const Pattern& pat, uint32_t panel, uint32_t edge);
 // Problems the pattern has (invalid panels, overlapping or twisted seams, mismatched lengths), one line each.
 std::vector<std::string> patternProblems(const Pattern& pat);

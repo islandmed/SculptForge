@@ -9,7 +9,7 @@
 // Delete, Up / Down / Merge down / Flatten and Clear. Every change goes through
 // the paint_layer_* commands (core/PaintLayer.cpp), so it is undoable and
 // scriptable; the opacity slider previews live and commits on release. When
-// the Part paints into its texture (Tool > Texture Map) the same palette
+// the Part paints into its texture (Tool > Texture Image) the same palette
 // shows and edits the texture's layers (the commands hand over to it).
 #include "app/App.h"
 #include "app/Ui.h"

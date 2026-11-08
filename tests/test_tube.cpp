@@ -324,3 +324,154 @@ TEST(tube_sweep_speed_500_points) {
     CHECK(preview.triangleCount() < kTubePreviewTriangles * 5 / 4 && preview.triangleCount() > kTubePreviewTriangles / 3);
     CHECK(preview.tube.points.size() == 500 && watertight(preview));
 }
+
+TEST(tube_profiles_watertight) {
+    // Every cross-section, swept in quads and in even edges, with round and flat ends, tapered or not, on a bending
+    // curve and as a one-point ball: closed, consistently wound, facing out.
+    using P = TubeShape::Profile;
+    for (P p : {P::Round, P::Square, P::Triangle, P::Ribbon})
+        for (int variant = 0; variant < 8; ++variant) {
+            TubeShape s = curvy();
+            s.profile = p;
+            s.flatCaps = variant & 1;
+            s.roll = (variant & 2) ? 30.0f : 0.0f;
+            if (variant & 4) s.taperStart = 0.3f, s.taperEnd = 0.9f; // (over 1 together: shared out)
+            for (bool uniform : {false, true}) {
+                const Mesh m = tubeSweep(s, uniform);
+                const bool w = watertight(m), o = oriented(m);
+                const double v = signedVolume(m);
+                if (!(w && o && v > 0.0))
+                    std::printf("profile %d variant %d uniform %d: watertight %d oriented %d volume %g\n", int(p), variant,
+                                int(uniform), int(w), int(o), v);
+                CHECK(w && o && v > 0.0);
+            }
+            s.points.resize(1);
+            const Mesh ball = tubeSweep(s);
+            CHECK(watertight(ball) && oriented(ball) && signedVolume(ball) > 0.0);
+        }
+}
+
+TEST(tube_profile_outlines) {
+    // A straight tube along X, radius 0.1, so each ring's outline is in the YZ plane.
+    TubeShape s = line(2.0f, 0.1f);
+    s.up = vec3(0, 1, 0);
+    s.profile = TubeShape::Profile::Square;
+    Mesh m = tubeSweep(s);
+    float ymax = 0.0f, zmax = 0.0f, corner = 0.0f;
+    for (const vec3& v : m.positions)
+        if (v.x > 0.5f && v.x < 1.5f) {
+            ymax = std::max(ymax, std::abs(v.y));
+            zmax = std::max(zmax, std::abs(v.z));
+            corner = std::max(corner, std::min(std::abs(v.y), std::abs(v.z)));
+        }
+    CHECK(std::abs(ymax - 0.1f) < 1e-4f && std::abs(zmax - 0.1f) < 1e-4f);
+    CHECK(std::abs(corner - 0.1f) < 1e-4f); // the corners are vertices: sharp
+    // A ribbon is thin along `up` and full width across it.
+    s.profile = TubeShape::Profile::Ribbon;
+    s.thickness = 0.2f;
+    m = tubeSweep(s);
+    ymax = zmax = 0.0f;
+    for (const vec3& v : m.positions)
+        if (v.x > 0.5f && v.x < 1.5f) ymax = std::max(ymax, std::abs(v.y)), zmax = std::max(zmax, std::abs(v.z));
+    CHECK(std::abs(ymax - 0.02f) < 1e-4f && zmax > 0.097f && zmax < 0.1001f); // (no vertex need sit on the round tip)
+    // Turned 90 degrees, it is thin across instead.
+    s.roll = 90.0f;
+    m = tubeSweep(s);
+    ymax = zmax = 0.0f;
+    for (const vec3& v : m.positions)
+        if (v.x > 0.5f && v.x < 1.5f) ymax = std::max(ymax, std::abs(v.y)), zmax = std::max(zmax, std::abs(v.z));
+    CHECK(ymax > 0.097f && ymax < 0.1001f && std::abs(zmax - 0.02f) < 1e-4f);
+    // Tapered at the end: the last tenth is much thinner than the middle.
+    s = line(2.0f, 0.1f);
+    s.taperEnd = 0.5f;
+    m = tubeSweep(s);
+    float tip = 0.0f, mid = 0.0f;
+    for (const vec3& v : m.positions) {
+        const float r = std::hypot(v.y, v.z);
+        if (v.x > 1.8f && v.x < 2.0f) tip = std::max(tip, r);
+        if (v.x > 0.4f && v.x < 0.6f) mid = std::max(mid, r);
+    }
+    CHECK(mid > 0.099f && tip < 0.025f);
+}
+
+TEST(tube_profile_mirror_exact) {
+    // The X mirror copy of a turned square tube is the exact mirror image of the tube.
+    TubeShape s = curvy();
+    for (TubePoint& p : s.points) p.position.x += 1.0f;
+    s.profile = TubeShape::Profile::Triangle;
+    s.roll = 25.0f;
+    s.up = vec3(0.3f, 1.0f, 0.2f);
+    s.taperEnd = 0.4f;
+    TubeShape one = s;
+    s.mirrorX = true;
+    const Mesh a = tubeSweep(one), both = tubeSweep(s);
+    CHECK(both.vertexCount() == 2 * a.vertexCount() && watertight(both) && signedVolume(both) > 0.0);
+    float worst = 0.0f;
+    for (size_t i = 0; i < a.vertexCount(); i += 7) {
+        const vec3 m(-a.positions[i].x, a.positions[i].y, a.positions[i].z);
+        float best = 1e9f;
+        for (size_t j = a.vertexCount(); j < both.vertexCount(); ++j) best = std::min(best, glm::distance(m, both.positions[j]));
+        worst = std::max(worst, best);
+    }
+    CHECK(worst < 1e-4f);
+}
+
+TEST(tube_point_spacing_and_simplify) {
+    std::vector<TubePoint> raw;
+    for (int i = 0; i < 2000; ++i) {
+        const float u = float(i) / 1999.0f * 10.0f;
+        raw.push_back({vec3(u, std::sin(u), 0.0f), 0.1f});
+    }
+    const size_t normal = tubeFromStroke(raw, 0.5f).size();
+    const size_t sparse = tubeFromStroke(raw, 0.5f, kTubeStrokePoints, 5.0f).size();
+    const size_t dense = tubeFromStroke(raw, 0.5f, kTubeStrokePoints, 0.5f).size();
+    CHECK(sparse * 3 < normal && normal * 2 < dense);
+    // Simplify: a third out per pass, ends kept, never below 2, and a straight run goes first.
+    std::vector<TubePoint> pts = tubeFromStroke(raw, 0.5f);
+    const std::vector<TubePoint> fewer = tubeSimplify(pts, 0.66f);
+    CHECK(fewer.size() == size_t(std::lround(double(pts.size()) * 0.66)));
+    CHECK(fewer.front().position == pts.front().position && fewer.back().position == pts.back().position);
+    std::vector<TubePoint> straight;
+    for (int i = 0; i < 50; ++i) straight.push_back({vec3(float(i), 0, 0), 0.5f});
+    straight.push_back({vec3(49, 5, 0), 0.5f});
+    const auto s2 = tubeSimplify(straight, 0.0f, 0.01f); // only the free ones go: the corner stays
+    CHECK(s2.size() == 3 && s2[1].position == vec3(49, 0, 0));
+    CHECK(tubeSimplify(straight, 0.0f).size() == 2);
+    // The command: one undo step, and refused when there is nothing to take out.
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "tube_new", {{"points", std::string("0,0,0 1,0,0 2,0,0 3,0,0 4,0,1 5,0,1")}, {"radius", 0.2}}).ok);
+    doc.selectPart(1);
+    CHECK(reg.execute(doc, "tube_simplify").ok && doc.mesh.tube.points.size() == 4 && watertight(doc.mesh));
+    CHECK(reg.execute(doc, "undo").ok && doc.mesh.tube.points.size() == 6);
+    CHECK(reg.execute(doc, "tube_simplify", {{"keep", 0.0}}).ok && doc.mesh.tube.points.size() == 2);
+    CHECK(!reg.execute(doc, "tube_simplify").ok);
+}
+
+TEST(tube_profile_commands_and_project) {
+    Document doc;
+    CommandRegistry reg;
+    CHECK(!reg.execute(doc, "tube_new", {{"points", std::string("0,0,0 1,0,0")}, {"profile", std::string("hexagon")}}).ok);
+    CHECK(reg.execute(doc, "tube_new", {{"points", std::string("0,0,0 1,0.3,0 2,0,0.4")}, {"radius", 0.1},
+                                        {"profile", std::string("ribbon")}, {"thickness", 0.3}, {"turn", 15.0},
+                                        {"taper_start", 0.2}, {"up", std::string("0,0,1")}}).ok);
+    doc.selectPart(1);
+    CHECK(doc.mesh.tube.profile == TubeShape::Profile::Ribbon && doc.mesh.tube.roll == 15.0f);
+    CHECK(reg.execute(doc, "tube_set", {{"profile", std::string("square")}, {"taper_end", 0.5}}).ok);
+    CHECK(doc.mesh.tube.profile == TubeShape::Profile::Square && doc.mesh.tube.taperEnd == 0.5f && watertight(doc.mesh));
+    CHECK(!reg.execute(doc, "tube_set", {{"thickness", 2.0}}).ok);
+    CHECK(!reg.execute(doc, "tube_set", {{"taper_start", -1.0}}).ok);
+    CHECK(reg.execute(doc, "undo").ok && doc.mesh.tube.profile == TubeShape::Profile::Ribbon);
+    CHECK(reg.execute(doc, "tube_list").message.find("ribbon profile") != std::string::npos);
+    const std::string path = tempPath("sf_tube_profile.sfproj");
+    std::string err;
+    CHECK(saveProject(path, doc, err));
+    Document back;
+    CHECK(loadProject(path, back, err));
+    const TubeShape& t = back.partMesh(1).tube;
+    CHECK(t.profile == TubeShape::Profile::Ribbon && std::abs(t.thickness - 0.3f) < 1e-6f && t.roll == 15.0f &&
+          std::abs(t.taperStart - 0.2f) < 1e-6f && t.up == vec3(0, 0, 1));
+    back.selectPart(1);
+    CHECK(tubeMatchesMesh(back.mesh));
+    std::filesystem::remove(path);
+}

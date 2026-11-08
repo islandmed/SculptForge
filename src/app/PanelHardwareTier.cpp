@@ -23,12 +23,15 @@
 #include "core/MemoryGuard.h"
 #include "core/ThreadPool.h"
 
+#include <IconsLucide.h>
 #include <SDL3/SDL.h>
 #include <imgui.h>
+#include <imgui_impl_sdl3.h>
 
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <string>
 
 namespace sf {
 
@@ -342,6 +345,14 @@ void App::drawTierCard() {
         ImGui::AlignTextToFramePadding();
         ImGui::TextUnformatted(tr("Tuned for your machine"));
         if (fontBold_) ImGui::PopFont();
+        // The close, top right: puts it away like Got it.
+        const float cb = ImGui::GetFrameHeight();
+        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - cb);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        const bool closed = ui::GlyphButton("##tiercard.close", ICON_LC_X, ImVec2(cb, cb));
+        ImGui::PopStyleColor();
+        hw.tierCardClose = {ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y, ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y};
+        ui::HelpText("Close", "Esc", "Put this card away. It doesn't come back on this computer; the tier is in Preferences > Performance.");
         ImGui::TextWrapped("%s", ("Your machine: " + p.detected.machine + ".").c_str());
         if (fontBold_) ImGui::PushFont(fontBold_);
         ImGui::TextColored(theme::accent, "%s", (std::string("Tier: ") + hwTierDisplayName(hw.tier.hwTier)).c_str());
@@ -365,14 +376,82 @@ void App::drawTierCard() {
         ImGui::PushStyleColor(ImGuiCol_Text, theme::textOnAccent);
         const bool gotIt = ImGui::Button(tr("Got it"), ImVec2(bw, 0.0f));
         ImGui::PopStyleColor(3);
-        if (gotIt) {
-            hw.tierCard = false;
-            ProfileOverrides o = p.overrides;
-            o.tierCardFor = tierCardKey(p.hardware); // not again on this machine
-            saveProfileOverrides(o);
+        hw.tierCardGotIt = {ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y, ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y};
+        if (gotIt || closed) {
+            ImGui::End();
+            dismissTierCard();
+            return;
         }
     }
     ImGui::End();
+}
+
+void App::dismissTierCard() {
+    if (!hwProfile_ || !hwProfile_->tierCard) return;
+    HwProfileUi& hw = *hwProfile_;
+    hw.tierCard = false;
+    hw.tierCardPressed = 0;
+    hw.tierCardGotIt = hw.tierCardClose = {};
+    ProfileOverrides o = hw.profile.overrides;
+    o.tierCardFor = rememberTierCard(o.tierCardFor, hw.profile.hardware); // not again on this machine
+    saveProfileOverrides(o);
+}
+
+void App::tierCardFromDisk() {
+    if (!hwProfile_ || hwProfile_->calibrator) return;
+    HardwareProfile saved;
+    hwProfile_->tierCard = !loadHardwareProfile(hardwareProfilePath(), saved) ||
+                           !tierCardSeen(saved.overrides.tierCardFor, hwProfile_->profile.hardware);
+}
+
+// The card's buttons work on the first press, whatever ImGui's hover says: a pointer that jumps onto Got it and
+// presses in the same frame (a pen landing, a trackpad tap, a press in the same batch of events as the move, the
+// first frame the card is up) found ImGui's hover a frame behind, and the press went to the canvas instead (#161,
+// on Linux). The press here is ImGui's only (no stroke under the card); the release on the same button puts the
+// card away. Esc and Enter do too, while no text field or pop-up has the keys.
+bool App::tierCardEvent(const SDL_Event& e) {
+    if (!hwProfile_ || !hwProfile_->tierCard || hwProfile_->calibrator) return false;
+    if (options_.benchmark || !options_.benchmarkScript.empty() || !options_.demo.empty()) return false; // (not shown)
+    HwProfileUi& hw = *hwProfile_;
+    const ImGuiIO& io = ImGui::GetIO();
+    auto onCard = [](float x, float y) {
+        const char* top = ui::FloatingWindowAt(ImVec2(x, y));
+        return top && std::string(top).rfind("##tiercard", 0) == 0;
+    };
+    switch (e.type) {
+    case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+        if (!onCard(e.button.x, e.button.y)) return false;
+        hw.tierCardPressed = e.button.button != SDL_BUTTON_LEFT       ? 0
+                             : hw.tierCardGotIt.contains(e.button.x, e.button.y) ? 1
+                             : hw.tierCardClose.contains(e.button.x, e.button.y) ? 2
+                                                                                 : 0;
+        SDL_Event m = e;
+        ImGui_ImplSDL3_ProcessEvent(&m); // the card's own items (Preferences > Performance); nothing underneath
+        return true;
+    }
+    case SDL_EVENT_MOUSE_BUTTON_UP: {
+        const int pressed = hw.tierCardPressed;
+        hw.tierCardPressed = 0;
+        if (e.button.button != SDL_BUTTON_LEFT || !pressed) return false;
+        const HwProfileUi::Box& b = pressed == 1 ? hw.tierCardGotIt : hw.tierCardClose;
+        if (!b.contains(e.button.x, e.button.y)) return false;
+        SDL_Event m = e;
+        ImGui_ImplSDL3_ProcessEvent(&m); // (ImGui lets go of its button too)
+        dismissTierCard();
+        return true;
+    }
+    case SDL_EVENT_KEY_DOWN: {
+        const SDL_Keycode k = e.key.key;
+        if (e.key.repeat || (k != SDLK_ESCAPE && k != SDLK_RETURN && k != SDLK_KP_ENTER)) return false;
+        if (e.key.mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_SHIFT | SDL_KMOD_GUI)) return false;
+        if (io.WantTextInput || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel)) return false;
+        if (drag_ != Drag::None) return false; // (Esc cancels a stroke or a drag first)
+        dismissTierCard();
+        return true;
+    }
+    default:
+        return false;
+    }
 }
 
 } // namespace sf

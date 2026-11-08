@@ -4,6 +4,7 @@
 
 #include "ai/AiPolicy.h"
 #include "ai/BrushAssistant.h"
+#include "ai/Consent.h"
 #include "app/Actions.h"
 #include "app/AssetLibrary.h"
 #include "app/AxisGizmo.h"
@@ -29,9 +30,11 @@
 #include "link/AiLinkSession.h"
 #include "core/Macro.h"
 #include "core/Pack.h"
+#include "core/Plugin.h"
 #include "core/Parts.h"
 #include "core/Document.h"
 #include "core/Deform.h"
+#include "core/Drape.h"
 #include "core/DiscordPresence.h"
 #include "core/Face.h"
 #include "core/Backdrop.h"
@@ -69,6 +72,7 @@
 #include <imgui.h>
 
 #include <array>
+#include <chrono>
 #include <atomic>
 #include <cstdint>
 #include <functional>
@@ -78,6 +82,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <thread>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -218,6 +223,13 @@ private:
     std::string pendingLevelDelete_;
     bool openLevelDelete_ = false;
     bool openSubdivideConfirm_ = false; // Subdivide on a Part with levels: confirm first (Shell.cpp)
+    // #163: Quad Remesh, Voxel Remesh, Decimate and Merge by Distance on a partly hidden Part ask first (Shell.cpp):
+    // true when the operation may go ahead now; otherwise the prompt opens and "Unhide and continue" shows
+    // everything, then runs `proceed`.
+    bool unhideAllows(const char* operation, std::function<void()> proceed, bool skip = false);
+    std::string unhideOperation_;
+    std::function<void()> unhideProceed_;
+    bool openUnhideConfirm_ = false;
     void drawDetailSlider(const char* id);
 
     void runCommand(const std::string& name, const Args& args = {});
@@ -279,6 +291,9 @@ private:
     float uiScale_ = 1.0f; // UI layout scale (fonts are rasterised at this scale)
     bool uiScaleDirty_ = false;          // the UI scale may have changed: applyUiScale before the next frame
     float displayScaleOverride_ = 0.0f;  // UI tests (display_scale): the display's content scale, 0 = the real one
+    float pixelDensityOverride_ = 0.0f;  // UI tests (pixel_density): the window's pixel density, 0 = the real one
+    float fontDensity_ = 1.0f;           // framebuffer px per logical px the font atlas was rasterised at
+    float targetFontDensity(float scale) const; // what fontDensity_ should be at UI scale `scale` (the window's display)
     float targetUiScale() const;         // what uiScale_ should be now (Preferences, the display; Config.cpp)
     void applyUiScale();                 // rebuild fonts and style live when it changed (between frames)
     void buildUiFonts(float scale);
@@ -326,6 +341,12 @@ private:
     void setPenPressure(bool size, PenPressure p); // this brush's (and a custom brush's recipe)
     void drawPenPressureSwitches(const char* id); // Pen pressure: Size / Strength [Use global | On | Off]
 
+    // UI tests only (UiTestModes.cpp; nothing else calls them): what holds the viewport now, one "kind: name" each: a
+    // mode a left drag goes to (mode: Draw Tube, mode: Insert, mode: Move ...), input still captured (input: drag 3),
+    // an open overlay or modal (overlay: stroke popup). Empty when a plain stroke sculpts with the picked brush.
+    std::vector<std::string> latchedForTest() const;
+    void unlatchForTest(); // clears all of it, whatever the app's own exits do (between the mode matrix's cases)
+
     // Input / stroke state
     Drag drag_ = Drag::None;
     // Rotation drags: the unsnapped view, so Shift (snap to an axis) can be pressed and released mid-drag.
@@ -362,7 +383,7 @@ private:
     // half-written value (they take effect from the next batch, as they did from the next dab before). The
     // alpha and the recipe are the stroke's own copies (strokeAlpha_, strokeRecipe_), which nothing changes.
     // Never on the solver thread: the painted texture and PBR channels (Mesh::texture: its tiles, shown() and dirty
-    // tiles are edited on the main thread only, and the Texture Map panel runs texture commands). Painting strokes
+    // tiles are edited on the main thread only, and the Texture Image panel runs texture commands). Painting strokes
     // stay in the frame loop (asyncStrokeAllowed), and nothing a batch does (dabAt without paint, the sculptor,
     // prepareStrokeUpload, which refuses slots with UVs) reads mesh->texture.
     struct DabSettings {
@@ -603,6 +624,24 @@ private:
     void registerAiActions(); // ui.brush_lab, ui.generate3d: only while AI is on
     void drawAiPrefs();       // the Preferences > AI section and the first-run question
     void drawAiStudioPrefs(); // Preferences > AI: what the studio's policy manages, the studio sign-in, the audit log
+    // The first-use notice (PanelAiConsent.cpp, ai/Consent.h): before the first request to a third-party AI host the
+    // panel says what is sent, to whom and who pays; nothing goes until Allow (remembered per service in ai.json).
+    enum class SendPanel { BrushLab, Generate3D };
+    // True when TARGET may be sent to now. Otherwise the notice opens in PANEL (or the studio's "no" goes to the
+    // status line) and RETRY runs after Allow or Use local instead.
+    bool askToSend(const ai::SendTarget& target, SendPanel panel, std::function<void()> retry);
+    void drawSendNotice(SendPanel panel);
+    void drawAiSendPrefs(); // Preferences > AI: each online service, allowed or asks first, with Revoke
+    void rememberSend(const std::string& id, bool allow); // aiSettings_ and ai.json (only that list)
+    struct SendNotice {
+        ai::SendTarget target;
+        SendPanel panel = SendPanel::BrushLab;
+        std::function<void()> retry;
+    };
+    std::optional<SendNotice> sendNotice_;
+    std::future<std::string> localProbe_; // the local server found for "Use local instead" ("ollama:<model>", ...)
+    std::string localFound_;
+    bool localProbed_ = false;
     void storeAiKeys();       // the keys aiSettings_ holds, into the OS keychain (a worker; ai/Secrets.h)
     void applyUpdatePolicy(); // a studio policy's update check and channel (core/ManagedPolicy.h) over the saved ones
     // Live mode (PanelAiLink.cpp, link/AiLink.h): Preferences > AI > Let AI tools control this window. An AI tool
@@ -690,7 +729,7 @@ private:
     bool comfyWorkflowsScanned_ = false;
     bool comfyPickingText_ = false;
     std::string comfyWorkflowError_;
-    int generatedRemesh_ = int(GeneratedRemesh::Quad); // Generate 3D's Remesh: Quad (default), Voxel, Off
+    int generatedRemesh_ = int(GeneratedRemesh::Quad); // Generate 3D's sculpting base: Quad (Voxel, then Quad Remesh) or Voxel
     int voxelResolution_ = 200;
     bool voxelKeepMasked_ = false; // Voxel Remesh's Keep Masked (#43)
     static constexpr const char* kKeepMaskedHelp =
@@ -698,21 +737,49 @@ private:
         "it's joined to them along the mask's edge so the model stays closed. Mask what to keep first (Ctrl). "
         "If the mask's edge is too ragged to join up, the status line says so and nothing changes.";
     bool keepTexture_ = true; // Keep Texture: remeshes carry a painted texture over (core/TextureTransfer.h)
-    int remeshResolution_ = 256;
+    int remeshResolution_ = 256; // Generate 3D's sculpting base (its Voxel Remesh resolution)
     bool removeBackground_ = true; // Generate 3D's "Remove flat background" (core/Backdrop.h)
-    // A generated model, made sculptable on the worker thread (Quad Remesh takes seconds).
-    struct GeneratedModel {
+    // Generate 3D (PanelGenerate3D.cpp): generate for form, remesh for topology. One press makes 1-3 candidates side by
+    // side (a thumbnail and a silhouette each); the one picked becomes a Part; "Use as sculpting base" then remeshes it.
+    struct GeneratedCandidate {
         ai::GeneratorResult result;
-        std::shared_ptr<Mesh> remeshed; // null: Remesh off, or it failed (remeshError)
-        std::shared_ptr<Mesh> withoutBackdrop; // the raw mesh minus a flat background plane (null: none found or off)
+        std::shared_ptr<Mesh> mesh; // as generated, in one piece, its flat background dropped; null: it failed (error)
         BackdropRemoval backdrop;
-        GeneratedRemeshStats stats;
-        std::string remeshError;
+        std::string error;
+        Image shaded, silhouette; // (worker) previews; uploaded into the textures on the main thread
+        GLuint shadedTexture = 0, silhouetteTexture = 0;
+        int sameAs = -1; // its outline matches this earlier candidate's (the service gave the same shape twice)
     };
-    std::future<GeneratedModel> pendingGenerator_;
+    std::future<std::vector<GeneratedCandidate>> pendingGenerator_;
+    std::vector<std::shared_ptr<ai::GenerationProgress>> candidateProgress_; // one per candidate being generated
+    std::shared_ptr<std::atomic<int>> candidatesDone_;
+    std::vector<GeneratedCandidate> candidates_; // waiting for a pick
+    int candidateCount_ = 3;     // free and local services
+    int paidCandidateCount_ = 1; // services billed per generation (fal.ai, Meshy, Hyper3D): one unless asked
+    bool keepOtherCandidates_ = false; // the ones not picked stay as hidden Parts
+    bool keepHighDetail_ = true;       // the sculpting base keeps the generated model as a hidden Part to Project Detail from
+    uint32_t generatedPart_ = 0;       // the picked candidate's Part (0: none)
+    uint32_t highDetailPart_ = 0;      // its hidden high-detail copy, once the sculpting base is made
+    int scrollGenerateTo_ = 0;         // 1: the candidates arrived, 2: one was picked; the panel scrolls to what's next
+    struct SculptingBase {
+        bool ok = false;
+        std::shared_ptr<Mesh> result;
+        GeneratedRemeshStats stats;
+        std::string error;
+    };
+    std::future<SculptingBase> pendingBase_;
+    std::shared_ptr<Mesh> baseSource_; // the Part's mesh as it went into the remesh
+    size_t baseTriangles_ = 0;         // the Part must still have these when the remesh lands
     bool openHunyuanNotice_ = false;
     std::shared_ptr<ai::GenerationProgress> generatorProgress_;
     float generatorTime_ = 0.0f;
+    int candidateCountForService() const;
+    void clearCandidates();
+    void pickCandidate(int index);
+    void useAsSculptingBase();
+    void pollSculptingBase();
+    void drawGeneratedCandidates();
+    void drawSculptingBase();
 
     glm::vec3 lastDabHit_{0.0f};
     bool haveLastDab_ = false;
@@ -838,6 +905,13 @@ private:
     float sizeReadoutPx_ = 0.0f;   // the size readout by the brush shows for a moment after a change
     double sizeReadoutUntil_ = 0.0;
     void drawSizeSlider(const char* id, const char* helpPath, const char* help);
+    // While a Size slider drags (top shelf, Draw palette, quick menu; ABHITAR on Discord): the brush ring at the new
+    // size, live, on the canvas where the cursor last lay on the model (else its centre), fading out after release.
+    void drawSizeSliderRing();
+    bool sizeSliderHeld_ = false;
+    double sizeSliderRingUntil_ = 0.0; // the fade's end
+    ImVec2 sizeSliderRingAt_{0.0f, 0.0f};
+    float sizeSliderRingAlpha_ = 0.0f; // as last drawn (UI tests: size_slider_ring)
     // Shift+Alt held mid-stroke: the brush moves at a quarter of the pen's speed and dabs at Precision Intensity.
     PrecisionDrag precision_;
     bool precisionActive_ = false;
@@ -924,6 +998,23 @@ private:
     float faceTakeTime_ = 0.0f;
     std::mutex faceTakeMutex_;
     std::string pendingFaceTake_; // set by the file dialog thread
+    // Cloth brush and Drape (PanelCloth.cpp, core/Cloth.h): Brush > Cloth, and the other visible Parts as the
+    // surfaces the cloth collides with (built once, rebuilt when one of them changes).
+    void drawClothSection();
+    void prepareClothColliders();
+    bool clothUiValue(const std::string& name, double& out) const; // UI test values (UiTest.cpp)
+    std::unique_ptr<ClothColliders> clothColliders_;
+    std::vector<uint64_t> clothCollidersKey_;
+    bool clothCollide_ = true; // Brush > Cloth > Collide with other Parts
+    // Tool > Drape (PanelDrape.cpp, core/Drape.h): the active Part simulated on a worker, shown live; at rest or
+    // Keep it is one undo step, Reset puts it back.
+    struct DrapeJob;
+    std::shared_ptr<DrapeJob> drape_;
+    DrapeRequest drapeRequest_;
+    void drawDrapeSection();
+    void startDrape();
+    void pollDrape();
+    void finishDrape(bool keep);
     // Kelvinlet brushes and Alpha / VDM from viewport (PanelKelvinlet.cpp, core/Kelvinlet.h, core/ViewCapture.h).
     bool kelvinStrokeBrush() const; // KelvinGrab / Twist / Scale: the drag drives the brush, not dabs
     void kelvinBegin(const RayHit& hit);
@@ -1067,7 +1158,7 @@ private:
     // The view's background (#21): gradient or a flat display colour; also the preference for the next session.
     void setBackground(bool gradient, const glm::vec3& color);
     void drawBackgroundControls(const char* idSuffix); // Preferences > Display and the Render palette
-    void drawShadingControls();     // Material palette and Tool > Display: Smooth | Flat, and the Part's own
+    void drawShadingControls();     // Material palette and Tool > Viewport Look: Smooth | Flat, and the Part's own
     void drawViewportShadingControls(); // Material palette: Lit Sphere | PBR and the environment
     void paintAt(const DabParams& p);
     void pickColorUnderCursor();
@@ -1077,7 +1168,7 @@ private:
     void beginPaintStroke();
     void finishPaintStroke(UndoRecord& record);
     TexturePainter texturePainter_; // strokes into the Part's texture (core/Texture.h)
-    // Texture Map sub-palette (PanelTexture.cpp): texture painting on UVs, Auto UV, the UV view.
+    // Texture Image sub-palette (PanelTexture.cpp): texture painting on UVs, Auto UV, the UV view.
     void drawTextureMapContents();
     void registerTextureUiActions();
     // UV Editor (PanelUvEditor.cpp): the window with the 2D UV layout and its tools, the 3D Seam / Select tool, the
@@ -1106,8 +1197,23 @@ private:
     // After uv_pack / uv_unwrap from anywhere (the panel, a script, the console): the fields show the grid it used.
     void uvPackGridUsed(const Args& args);
     bool showUvEditor_ = false;
+    // Garments (PanelGarments.cpp): Tool > Garments and the Pattern window (the pattern panels flat at real size,
+    // edited through the garment_* commands, with the window's own undo of the pattern). GarmentUi does the work.
+    friend struct GarmentUi;
+    void registerGarmentActions();
+    void drawGarmentsContents();
+    void drawGarments();
+    void garmentsChanged(bool garmentCommand); // a command ran: re-read the pattern (garment_*: one undo step)
+    bool garmentKey(SDL_Keycode key, SDL_Keymod mod); // keys over the Pattern window (true: taken)
+    // UI test values: garment_window_open, garment_panels, garment_seams, garment_selected, garment_undo_steps,
+    // garment_edits, garment_problems, garment_points and the selected panel's first point (garment_point_x / _y in
+    // mm, garment_point_u / _v on the window); NaN for other names.
+    double garmentTestValue(const std::string& name);
+    static void SDLCALL onGarmentFileChosen(void* userdata, const char* const* files, int filter);
+    std::shared_ptr<struct GarmentEditorState> garments_;
+    bool showGarments_ = false;
     // Auto UV on a worker (xatlas takes seconds on big meshes): the button, New Texture, and the uv_auto command from
-    // the console, an AI tool or a UI test (resolution 0: the texture's size, or the size chosen under Texture Map).
+    // the console, an AI tool or a UI test (resolution 0: the texture's size, or the size chosen under Texture Image).
     void startAutoUv(int resolution = 0, bool keepTexture = true, bool command = false);
     CommandResult startAutoUvCommand(const Args& args); // runCommand's uv_auto (macros keep the synchronous one)
     void startNewTexture(); // New Texture on the top shelf / Color palette: Auto UV first when there are no UVs
@@ -1135,8 +1241,8 @@ private:
     std::unique_ptr<AutoUvJob> autoUv_;
     bool textureAfterAutoUv_ = false;    // the running Auto UV came from New Texture: make the texture after it
     int textureSizeChoice_ = 1;          // 1K, 2K, 4K, 8K
-    bool showUvView_ = false;            // Texture Map > Show UVs
-    // Material channels (PanelPbr.cpp): channel toggles, the solo channel view and map export under Texture Map,
+    bool showUvView_ = false;            // Texture Image > Show UVs
+    // Material channels (PanelPbr.cpp): channel toggles, the solo channel view and map export under Texture Image,
     // the brush material (per-channel values and swatches) in the Color palette, and per-channel chips on the
     // Paint Layers rows (enable, blend, opacity).
     void drawTextureChannelsContents();
@@ -1253,6 +1359,9 @@ private:
     // Performance, the first-run tier card, the tier chip and Turbo in the top bar, the memory guard.
     void drawHardwareTierSection();
     void drawTierCard();               // once per machine, after calibration (or a hardware change); never blocks
+    bool tierCardEvent(const SDL_Event& e); // its buttons take the press (never the canvas); Esc and Enter put it away
+    void dismissTierCard();            // Got it, the close, Esc, Enter: not again on this machine (saved)
+    void tierCardFromDisk();           // UI tests' restart: shown again unless the saved profile puts it away
     void updateTierMemoryGuard();      // every frame (cheap: looks once a second)
     void registerHardwareTierUiActions();
     void saveProfileOverrides(const struct ProfileOverrides& o); // map, save, apply
@@ -1282,6 +1391,7 @@ private:
     std::shared_ptr<struct SculptableUiState> sculptable_;
     // Geometry > QRemesh (quad retopology on a worker thread) and Part > Project (ProjectAll); PanelRetopo.cpp.
     void registerRetopoUiActions();
+    void registerEdgeUiActions(); // Geometry > Edges (PanelEdges.cpp)
     void drawQRemeshContents();
     void drawProjectContents();
     void startQRemesh();
@@ -1348,6 +1458,7 @@ private:
     // QRemesh Guides (PanelRetopo.cpp, core/QRemeshGuides.h): the "QRemesh Guides" brush draws curves on the
     // surface for QRemesh to follow. It is a mode beside the brushes: picking any brush (or the Gizmo) leaves it.
     void setGuidesMode(bool on);
+    std::string leaveGuides(); // the Guides brush off, its curve dropped: "Quad Remesh Guides" if it was on, else ""
     void syncGuidesMode();                                    // leaves the mode when another brush was picked
     bool guideMouseDown(float x, float y, SDL_Keymod mod);    // true if it took the click
     void guideDragTo(float x, float y);
@@ -1356,11 +1467,33 @@ private:
     void drawQRemeshGuideControls();                          // Geometry > QRemesh > Guides
     int guideAt(float x, float y) const;                      // the guide drawn under the cursor, or -1
     bool guidesMode_ = false;
+    // Edges mode (PanelEdges.cpp, core/EdgeSelect.h): clicks on the model select edges of the base level. Picking a
+    // brush or the Gizmo leaves it.
+    void setEdgesMode(bool on);
+    void syncEdgesMode();
+    bool edgesMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
+    uint32_t edgeUnderCursor(float x, float y);           // kNoEdge off the model
+    void drawEdgeOverlay();                                // the selected and creased edges, the one under the cursor
+    void drawEdgesSection();                               // Geometry > Edges
+    bool edgesMode_ = false;
+    float edgeAngle_ = 30.0f;
+    bool edgeWithin_ = false;
+    float edgeCrease_ = 1.0f; // the value Crease sets
+    struct EdgeOverlay {
+        const void* topo = nullptr;
+        uint64_t revision = 0, creaseKey = 0, visibleKey = 0;
+        std::vector<uint32_t> edges;  // the selected edges (in Edges mode), then the creased ones
+        size_t selectedEdges = 0;     // how many of `edges` are selected ones
+        size_t creased = 0;           // creased edges of the Part
+        std::vector<float> crease;    // per entry of `edges`
+        std::vector<uint8_t> visible; // per entry of `edges`
+        uint32_t hovered = ~0u;
+    } edgeOverlay_;
     struct GuidesFrom { // the brush picked when the mode started
         BrushType brush = BrushType::Standard;
         int recipe = -1;
         bool paint = false;
-    } guidesFrom_;
+    } guidesFrom_, edgesFrom_;
     std::vector<glm::vec3> guidePath_; // the curve being drawn (points on the surface)
     float guidePathLast_[2] = {0.0f, 0.0f};
     float curvesStrength_ = 50.0f;     // Guide Strength 0-100 (QRemeshOptions::guideStrength x 100)
@@ -1390,8 +1523,6 @@ private:
         float x = 0.0f, y = 0.0f;
     } zsMenu_;
     bool forgesphereRightDown(float x, float y); // a right press on a sphere arms the menu
-    float deformAmount_[4] = {50.0f, 50.0f, 50.0f, 50.0f}; // Tool > Deformation: Polish, Relax, Smooth, Balloon
-    bool deformKeepVolume_ = false;
     float zoomDragAmount(float dx, float dy) const; // Drag::Zoom's step (App.cpp)
     void drawForgeSphereMenu();
     bool zsMenuShown_ = false; // the menu was drawn this frame (UI tests)
@@ -1418,22 +1549,37 @@ private:
     enum class TubeDepth { Surface, Pivot, Fixed };
     void registerTubeUiActions();
     void drawTubeContents();                                // Tool > Tube
+    void drawTubeShapeControls(float width);                // its Shape group
     bool tubeMouseDown(float x, float y, SDL_Keymod mod);   // true if it took the click
     void tubeDragTo(float x, float y);
     void tubeRelease();
+    bool tubeKey(SDL_Keycode key, SDL_Keymod mod); // during a stroke or point drag: Esc, Undo, Redo drop it
+    void tubeCancel();
     void drawTubeOverlay();                                 // the stroke being drawn, the points, the cursor
     bool tubeActive() const { return !doc_.mesh.tube.empty(); }
     int tubePointAt(float x, float y, int* part = nullptr) const; // control point under the cursor (of `part`), or -1
     int tubeSelection() const;                              // tubeSelected_ when it is still a point, else -1
     glm::vec3 tubeViewDir() const;                          // into the screen
+    bool tubeGrabsPoints(SDL_Keymod keys) const;            // a press on a dot edits it (Draw Tube on: Shift/Ctrl/Alt)
     bool tubeDraw_ = false;
+    int tubeReturnPart_ = -1;      // the Part that was active before a press on a tube's point selected its Tube Part
+    int forgesphereReturnPart_ = -1; // the Part that was active before New Forge Sphere (a brush or Esc goes back to it)
+    // Picking a brush or a tool (Draw / Move / Scale / Rotate), or Esc, leaves Draw Tube and Append > Insert; with a
+    // Tube Part active (it can't be sculpted) it goes back to the Part before it. Returns what it left ("" if none).
+    std::string leaveDrawModes();
+    std::string leaveDrawModesStatus(); // leaveDrawModes() and a status line saying so (unchanged if nothing was on)
+    std::array<int, 4> drawModesBrush_{-1, -1, -1, -1}; // brush_, activeBrush, paint, guides as last seen (drawUi)
     TubeDepth tubeDepth_ = TubeDepth::Surface;
     float tubeFixedDepth_ = 0.0f;  // Fixed: distance from the camera (0 = take the pivot's on first use)
     float tubeSizePx_ = 14.0f;     // tube radius on screen at the drawing depth
     float tubePressure_ = 0.7f;    // how much pen pressure thins the tube (0 = none)
     float tubeSmoothing_ = 0.5f;
-    bool tubeSnap_ = false;        // points over a surface sit on it
+    bool tubeSnap_ = true;         // points over a surface sit on it (and the plane follows them)
     bool tubeFlatCaps_ = false;
+    float tubeSpacing_ = 1.25f;    // drawn strokes' control points, this many radii apart
+    TubeShape tubeLook_;           // new tubes' profile, thickness, turn and taper (its points unused)
+    bool tubeLookEditing_ = false; // a Shape slider is held: the active Tube Part previews it
+    Mesh tubeLookBefore_;          // (its mesh before, put back before the one undo step)
     bool tubeMerge_ = false;       // into the active Part (even edges) instead of a new Tube Part
     bool tubeBakeUniform_ = false; // Bake re-sweeps with even edges (dynamic topology)
     int tubeSelected_ = -1;
@@ -1817,7 +1963,8 @@ private:
     Renderer::Viewport canvasViewport(int fbWidth, int fbHeight) const; // the canvas in framebuffer pixels
     void drawCanvasFrame();
     // Right-shelf Move/Zoom/Rotate; width 0: the standard 44 px (times the UI scale).
-    bool canvasNavButton(const char* id, const char* icon, const char* label, int mode, float width = 0.0f);
+    bool canvasNavButton(const char* id, const char* icon, const char* label, int mode, float width = 0.0f,
+                         float height = 0.0f); // (a short height: the icon alone, no caption)
     void drawBrushTile(const char* id, ImVec2 size);
     void drawStrokeTile(const char* id, ImVec2 size);
     void drawStrokeIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, StrokeType type); // the shelf tile's picture
@@ -1879,25 +2026,27 @@ private:
     void partDropTarget(const std::string& folder, PartFolderActions& fa);
     std::string partFolderName(uint32_t id) const;
     void startFolderRename(); // the folder just made: its name ready to type
-    // PanelExtract.cpp: Tool > Part > Extract, Tool > Geometry > Symmetry (Make Symmetric) and
-    // Tool > Deformation (Mirror).
+    // PanelExtract.cpp: Tool > Part > Extract, Tool > Geometry > Symmetry (Make Symmetric, Mirror) and
+    // Tool > Reshape (Smooth, Relax, Polish, Balloon).
     void drawExtractContents();
     void drawSymmetryContents();
     void drawDeformationContents();
-    // PanelMeshCheck.cpp: Tool > Geometry > Merge by Distance (weld_points) and Check Mesh (mesh_check / mesh_fix),
-    // and the points a weld would merge drawn on the model while the section shows.
+    // PanelMeshCheck.cpp: Tool > Geometry > Merge by Distance (weld_points) and Find Problems (mesh_check / mesh_fix),
+    // and the points a weld would merge drawn on the model while the distance is dragged or hovered.
     void drawMeshCheckContents();
     void drawWeldPreviewOverlay();
     uint64_t meshCheckKey() const; // changes with the active Part's mesh
     float weldDistance_ = -1.0f;   // scene units; < 0 until the section first shows (then a default from the Part's size)
-    bool weldShown_ = false;       // the section was drawn this frame (the preview shows)
+    double weldUsedAt_ = -1e9;     // ImGui time the distance was last dragged or hovered (the preview shows, then fades)
+    size_t weldPreviewDrawn_ = 0;  // points the preview drew this frame (UI tests: weld_preview_points)
     uint64_t weldKey_ = 0;         // meshCheckKey() and distance the count below is for
     float weldKeyDistance_ = -1.0f;
+    bool weldMaskedOnly_ = false;  // Masked only: only masked points merge (foirgairwolf on Discord)
     size_t weldCount_ = 0;
     std::vector<glm::vec3> weldPoints_; // a sample (<= 20000) of the points that would merge, for the preview
     MeshReport meshReport_;
     uint64_t meshReportKey_ = 0; // 0 = not checked yet
-    int meshReportScroll_ = 0; // frames left to scroll the tray down to Check Mesh (after Merge) or a new report's rows (below the fold)
+    int meshReportScroll_ = 0; // frames left to scroll down to Find Problems (after Merge) or a new report's rows (below the fold)
     void runMeshCheck();
     void runExtract(); // Extract with the palette's settings (a preview; Accept keeps it)
     static std::string axesText(const bool axes[3]); // "x", "xz", "" (the axis argument of mirror commands)
@@ -1907,8 +2056,8 @@ private:
     bool extractTriCorners_ = false;        // Corners: triangles in the rim's sharp corners
     bool extractTriBorder_ = false;         // Border: the whole rim triangles
     bool mirrorWeldAxes_[3] = {true, false, false}; // Make Symmetric's X Y Z
-    bool mirrorAxes_[3] = {true, false, false};     // Deformation > Mirror's X Y Z
-    // Deformation > Stack (docs/design/deform-panel.md): the steps, the one being edited and the preview, which is
+    bool mirrorAxes_[3] = {true, false, false};     // Symmetry > Mirror's X Y Z
+    // Reshape > Stack (docs/design/deform-panel.md): the steps, the one being edited and the preview, which is
     // the stack really applied as one undo step (redone after each change while it is still the last step).
     struct DeformStackUi {
         std::vector<DeformStep> steps;
@@ -1921,7 +2070,7 @@ private:
         uint32_t part = 0;       // the Part it was applied to
     } deformStack_;
     void drawDeformStack();
-    // Deformation > Size: the active Part's dimensions (scene units), worked out again when the undo history, the
+    // Reshape > Size: the active Part's dimensions (scene units), worked out again when the undo history, the
     // active Part or its vertex count changes; editing one resizes the Part (deform_size).
     struct DeformSizeUi {
         uint64_t revision = ~uint64_t(0);
@@ -1946,6 +2095,11 @@ private:
     ImFont* fontCardTitle_ = nullptr, *fontCardHead_ = nullptr, *fontCardBody_ = nullptr; // the support card (Latin only)
     std::string dropdown_;     // palette open as a drop-down ("" = none)
     float dropdownX_ = 0.0f;
+    ImVec4 dropdownRect_{};    // the open drop-down's rect last frame (x, y, w, h)
+    // A press outside every open popup (a palette drop-down or task menu, the command palette, a context menu; not on the
+    // menu names, which switch or close menus, nor with a modal dialog open) closes them before the UI sees the press, so
+    // the press acts: a shelf brush is picked, a stroke on the model starts (mode matrix).
+    void closePopupsOnPressOutside(const SDL_Event& e);
     bool openDropdown_ = false;
     float decimateRatio_ = 0.5f;
     bool decimateKeepMasked_ = false; // Decimate's Keep Masked (#43)
@@ -1967,6 +2121,9 @@ private:
     // The top shelf when its row doesn't fit (#105: 1280 logical px at Windows' 200 %): the sliders leave room for the
     // items after them (topShelfTailW_, measured last frame), then the icon buttons drop their labels.
     bool topShelfCompact_ = false;
+    // The right shelf too tall for the window (1024x768, 1600x960 at 150 %): its view toggles (Turntable, Ortho,
+    // Floor, Flat) fold into one View button with a pop-over, until the window is tall enough again.
+    bool rightShelfFolded_ = false;
     float topShelfFullW_ = 0.0f, topShelfTailW_ = 0.0f;
     int navDrag_ = -1;          // right-shelf drag button being dragged (0 move, 1 zoom, 2 rotate)
     ImVec2 navLast_{0, 0};      // the cursor at its last frame (the drag moves by the cursor's own steps)
@@ -2300,6 +2457,10 @@ private:
     void drawHintsSection();
     // Intensity (0-100 on screen): Smooth's own while Shift is held or Smooth is the brush.
     void drawZIntensitySlider(const char* id);
+    // The value every Intensity slider sets (top bar, Draw palette, Quick Menu, U): Smooth's own, the Paint brush's
+    // Colour intensity (#164: painting reads it, so in Paint mode Intensity is how strongly paint colours), or the
+    // sculpt Intensity.
+    float& intensityValue(bool smooth) { return smooth ? smoothStrength_ : paintMode_ ? rgbIntensity_ : strength_; }
     void openQuickMenu();
     void quickMenuKeyUp();   // Space released: a hold closes the menu, a tap leaves it open
     // A right click on the canvas (pressed and let go without moving past kRightClickSlop) opens the QuickMenu
@@ -2425,6 +2586,33 @@ private:
         bool answered = false, answerCancelled = false;
         int dialog = kPackDialogNone; // what the open dialog is for
     } packs_;
+    // Sandboxed plugins (PanelPlugins.cpp, core/Plugin.h).
+    void refreshPlugins();
+    const InstalledPlugin* findPluginUi(const std::string& key) const;
+    void openPlugin(const std::string& key);
+    void startPluginRun(const InstalledPlugin& p);
+    void pollPluginRun();
+    void drawPluginButtons(const std::string& packId, bool endLine = true); // "" = every plugin
+    void drawDeformPlugins();                          // Tool > Reshape > Plugins
+    void drawPluginWindow();
+    struct PluginsUi {
+        std::vector<InstalledPlugin> list;
+        std::string open;                                   // the plugin window's plugin (key), "" = closed
+        std::map<std::string, std::vector<double>> values;  // parameter values by plugin key
+        // The run on a worker: input copied on the UI thread, output committed there once `done`.
+        std::thread worker;
+        std::atomic<bool> cancel{false}, done{false};
+        bool running = false;
+        std::string runKey, error;
+        PluginInput input;
+        PluginOutput output;
+        PluginFailure failure = PluginFailure::None;
+        std::chrono::steady_clock::time_point started;
+        ~PluginsUi() {
+            cancel = true;
+            if (worker.joinable()) worker.join();
+        }
+    } plugins_;
     struct MacrosUi {
         MacroRecorder recorder;
         int runDepth = 0;          // > 0 while a macro runs: its commands aren't recorded or intercepted
@@ -2613,6 +2801,11 @@ private:
     bool dropPenMouseEvent(const SDL_Event& e) const; // SDL's own mouse events for the pen (Tablet.cpp)
     void penMouseEvents(const SDL_Event& pen, bool before); // the pen tip's mouse events, made from the pen's
     void sendPenMouse(SDL_EventType type, float x, float y, SDL_WindowID window);
+    // SDL sends a pen sample's motion before its pressure (every platform; Wayland per tablet frame): the tip's
+    // mouse motion, which moves the stroke, waits for the axes that follow it (Tablet.cpp).
+    void flushPenMotion();
+    SDL_Event heldPenMotion_{};
+    bool penMotionHeld_ = false, heldPenNoise_ = false;
     bool strayMouseMotion(const SDL_Event& e) const;  // a driver's mouse events beside the pen's (Tablet.cpp)
     void keepImGuiOnPen();                            // after ImGui_ImplSDL3_NewFrame (Tablet.cpp)
     bool penSoftCursor() const; // mouse mode with the pen: the arrow is drawn at the brush (Tablet.cpp)
@@ -2644,7 +2837,10 @@ private:
     void tabletNote(TabletHotplug::Note note, const std::string& name);
     const char* pressureStatus() const; // "Pressure: on" / "not detected" (Preferences > Input and > Tablet)
     void drawPressureStatus();          // ... with the troubleshooting link
+    void drawTabletDiagnostics();       // Preferences > Tablet > Troubleshooting details, Copy details
+    std::string tabletReport() const;   // ... the text it copies (core penReport)
     PenPressureTracker penTracker_;
+    PenDiagnostics penDiag_;
     TabletHotplug tabletHotplug_;
     void wintabEvent(const SDL_Event& e); // a mouse event while the tablet driver reports pressure through Wintab
     WintabPressure wintab_;

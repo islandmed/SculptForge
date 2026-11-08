@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Material channels in the interface (core/TextureChannels.h, core/MapExport.h):
-//   - Tool > Texture Map > Material Channels: which channels the texture has, the solo channel view and Export
+//   - Tool > Texture Image > Material Channels: which channels the texture has, the solo channel view and Export
 //     Maps with a preset;
 //   - Color > Material: what the Paint brush lays on each channel (a checkbox, value swatches and a slider per
 //     channel) and material swatches that set every channel at once; C over the model picks every channel;
@@ -11,6 +11,7 @@
 // Every change goes through a command (texture_channels, channel_view, texture_layer_channel, export_maps), so it
 // is undoable where it edits the texture and scriptable; the brush material is a setting (paint_material).
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/Ui.h"
 
 #include "core/MapExport.h"
@@ -36,7 +37,7 @@ namespace sf {
 
 namespace {
 
-constexpr const char* kMapPath = "Tool > Texture Map";
+constexpr const char* kMapPath = "Tool > Texture Image";
 constexpr const char* kColorPath = "Color > Material";
 constexpr const char* kLayersPath = "Tool > Paint Layers";
 
@@ -100,7 +101,7 @@ void App::registerPbrUiActions() {
     a.id = "texture.export_maps";
     a.label = "Export Maps...";
     a.palette = kMapPath;
-    a.run = [this] { SDL_ShowOpenFolderDialog(onExportFolder, nullptr, window_, nullptr, false); };
+    a.run = [this] { sf::dialogs::openFolder(onExportFolder, nullptr, window_, nullptr, false); };
     a.enabled = [this] { return hasTexture(doc_.mesh); };
     a.description = "Write the texture's channels as image files for an engine or DCC, with the export preset chosen "
                     "beside the button (Unreal, Unity URP / HDRP, glTF, Godot, Blender, USD).";

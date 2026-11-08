@@ -1,0 +1,35 @@
+# Garment templates and home printing (Tool > Garments, the Pattern window): Templates opens the list, Trousers makes
+# them at the project's size chart, a size changed in the chart and "Add beside the pattern" make an outfit, and
+# Print shows how many pages the pattern takes on A4 and on Letter.
+click "Garments##tool.garments"
+expect "Garments/Templates"
+click "Garments/Templates"
+expect "Trousers##garment.tpl.trousers"
+wait 0.2
+shot templates-popup
+click "Trousers##garment.tpl.trousers"
+expect_value garment_window_open == 1
+expect_value garment_panels == 4
+expect_value garment_problems == 0
+wait 0.3
+shot trousers
+
+# A bigger chest in the size chart, then a hoodie beside the trousers.
+run garment_size chest_mm=1100
+click "Garments/Templates"
+click "Add beside the pattern"
+click "Hoodie##garment.tpl.hoodie"
+expect_value garment_panels == 11
+expect_value garment_problems == 0
+wait 0.3
+shot outfit
+
+# Print: the page count for A4, then Letter.
+click "Garments/Print"
+expect "Save PDF..."
+expect_value garment_print_pages > 10
+click "Letter"
+expect_value garment_print_pages > 10
+wait 0.2
+shot print-popup
+key escape

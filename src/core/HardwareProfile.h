@@ -126,7 +126,7 @@ struct ProfileOverrides {
     std::string compute;                  // "" / "auto", "cpu", "gpu" (Preferences > Performance > Compute)
     std::string gpu;                      // the graphics card: "" = Auto, else a GpuAdapter::id (next start)
     bool turbo = false;                   // Turbo (View > Turbo): remembered per machine
-    std::string tierCardFor;              // the machine the first-run tier card was shown for (tierCardKey)
+    std::string tierCardFor;              // the machines the first-run tier card was put away on (tierCardKey, ';' between)
     bool any() const;
 };
 
@@ -145,6 +145,12 @@ struct HardwareProfile {
 
 // The machine, for the first-run tier card: the GPU, its memory and the RAM (a driver update doesn't count).
 std::string tierCardKey(const HardwareInfo& hw);
+// The card was put away on this machine: `seen` (ProfileOverrides::tierCardFor) names it, the same GPU with memory
+// sizes within a GB (a size the driver reports either side of a half GB; video memory not reported matches). A laptop with two GPUs that starts on
+// either one keeps both (#161: the card came back on every start).
+bool tierCardSeen(const std::string& seen, const HardwareInfo& hw);
+// `seen` with this machine added (the newest first; the last four machines).
+std::string rememberTierCard(const std::string& seen, const HardwareInfo& hw);
 
 // Maps what was detected and measured to a tier and its settings. Deterministic: the same inputs give the same
 // profile. With nothing measured (skipped, or no GPU numbers) it falls back to the memory sizes and the probe's

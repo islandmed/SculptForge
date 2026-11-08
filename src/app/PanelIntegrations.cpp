@@ -72,7 +72,7 @@ void App::drawIntegrationsPrefs() {
                  path);
     ImGui::EndDisabled();
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped(tr("Nothing else is sent: no folders, no user name, no model details. Needs the Discord app running."));
+    ImGui::TextWrapped("%s", tr("Nothing else is sent: no folders, no user name, no model details. Needs the Discord app running."));
     ImGui::PopStyleColor();
     if (changed) {
         saveProjectPrefs();

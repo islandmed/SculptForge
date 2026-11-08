@@ -3,6 +3,7 @@
 #include "core/SurfaceQuery.h"
 
 #include "core/Parallel.h"
+#include "core/ThreadPool.h"
 
 #include <algorithm>
 #include <atomic>
@@ -39,47 +40,112 @@ glm::vec3 closestPointOnSegment(const glm::vec3& p, const glm::vec3& a, const gl
 
 } // namespace
 
+namespace {
+
+// One node of a median-split build over order[begin, end): its box, and either a leaf or the split (the two halves
+// as the next tasks). Shared by the serial top of the tree and the subtrees built in parallel, so both make the
+// same tree. `boundsInParallel`: the box pass over a big range on the thread pool (min/max: the same box).
+struct BuildTask {
+    uint32_t node, begin, end;
+};
+template <class Push>
+void buildNode(std::vector<FlatBVH::Node>& nodes, std::vector<uint32_t>& order, const std::vector<AABB>& boxes,
+               const std::vector<glm::vec3>& centers, const BuildTask& t, bool boundsInParallel, Push&& push) {
+    AABB box, cbox;
+    if (boundsInParallel) {
+        constexpr size_t block = 65536;
+        const size_t count = t.end - t.begin, blocks = (count + block - 1) / block;
+        std::vector<AABB> pb(blocks), pc(blocks);
+        poolFor(count, [&](size_t b0, size_t e0) {
+            AABB bb, cc;
+            for (size_t i = t.begin + b0; i < t.begin + e0; ++i) bb.expand(boxes[order[i]]), cc.expand(centers[order[i]]);
+            pb[b0 / block] = bb, pc[b0 / block] = cc;
+        }, block, 2);
+        for (size_t k = 0; k < blocks; ++k) box.expand(pb[k]), cbox.expand(pc[k]);
+    } else {
+        for (uint32_t i = t.begin; i < t.end; ++i) {
+            box.expand(boxes[order[i]]);
+            cbox.expand(centers[order[i]]);
+        }
+    }
+    nodes[t.node].box = box;
+    const uint32_t count = t.end - t.begin;
+    const glm::vec3 ext = cbox.extent();
+    if (count <= kLeafSize || std::max({ext.x, ext.y, ext.z}) <= 0.0f) {
+        nodes[t.node].first = t.begin;
+        nodes[t.node].count = count;
+        return;
+    }
+    const int axis = ext.x >= ext.y && ext.x >= ext.z ? 0 : ext.y >= ext.z ? 1 : 2;
+    const uint32_t mid = t.begin + count / 2;
+    std::nth_element(order.begin() + t.begin, order.begin() + mid, order.begin() + t.end,
+                     [&](uint32_t a, uint32_t b) { return centers[a][axis] < centers[b][axis]; });
+    const uint32_t left = uint32_t(nodes.size());
+    nodes.push_back({});
+    nodes.push_back({});
+    nodes[t.node].first = left;
+    nodes[t.node].count = 0;
+    push(BuildTask{left, t.begin, mid});
+    push(BuildTask{left + 1, mid, t.end});
+}
+
+} // namespace
+
 void FlatBVH::build(const std::vector<AABB>& boxes) {
     nodes_.clear();
     order_.resize(boxes.size());
     for (uint32_t i = 0; i < order_.size(); ++i) order_[i] = i;
     if (boxes.empty()) return;
     std::vector<glm::vec3> centers(boxes.size());
-    for (size_t i = 0; i < boxes.size(); ++i) centers[i] = boxes[i].center();
+    poolFor(boxes.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) centers[i] = boxes[i].center();
+    }, 16384);
 
     nodes_.reserve(2 * boxes.size() / kLeafSize + 2);
     nodes_.push_back({});
-    struct Task {
-        uint32_t node, begin, end;
-    };
-    std::vector<Task> stack{{0, 0, uint32_t(boxes.size())}};
-    while (!stack.empty()) {
-        const Task t = stack.back();
-        stack.pop_back();
-        AABB box, cbox;
-        for (uint32_t i = t.begin; i < t.end; ++i) {
-            box.expand(boxes[order_[i]]);
-            cbox.expand(centers[order_[i]]);
+    // Big meshes: the top of the tree breadth first (one range after another, each box pass on all threads) until
+    // there are a few ranges per thread, then each range's subtree on its own thread, into its own nodes, appended
+    // in order. Every split is the same nth_element of the same range either way, so the tree (and so every query)
+    // is the same as one built on one thread; only the node numbering differs.
+    constexpr uint32_t kSubtree = 1u << 15; // smaller ranges: built whole on one thread
+    std::vector<BuildTask> top{{0, 0, uint32_t(boxes.size())}}, subtrees;
+    const size_t wantTasks = size_t(std::max(1, ThreadPool::shared().threads())) * 4;
+    while (!top.empty()) {
+        std::vector<BuildTask> next;
+        for (const BuildTask& t : top) {
+            if (t.end - t.begin <= kSubtree || subtrees.size() + next.size() + top.size() >= wantTasks * 2) {
+                subtrees.push_back(t);
+                continue;
+            }
+            buildNode(nodes_, order_, boxes, centers, t, true, [&](const BuildTask& c) { next.push_back(c); });
         }
-        nodes_[t.node].box = box;
-        const uint32_t count = t.end - t.begin;
-        const glm::vec3 ext = cbox.extent();
-        if (count <= kLeafSize || std::max({ext.x, ext.y, ext.z}) <= 0.0f) {
-            nodes_[t.node].first = t.begin;
-            nodes_[t.node].count = count;
-            continue;
+        top.swap(next);
+    }
+    std::vector<std::vector<Node>> local(subtrees.size());
+    poolFor(subtrees.size(), [&](size_t b, size_t e) {
+        for (size_t k = b; k < e; ++k) {
+            std::vector<Node>& nodes = local[k];
+            nodes.reserve(2 * size_t(subtrees[k].end - subtrees[k].begin) / kLeafSize + 2);
+            nodes.push_back({});
+            std::vector<BuildTask> stack{{0, subtrees[k].begin, subtrees[k].end}};
+            while (!stack.empty()) {
+                const BuildTask t = stack.back();
+                stack.pop_back();
+                buildNode(nodes, order_, boxes, centers, t, false, [&](const BuildTask& c) { stack.push_back(c); });
+            }
         }
-        const int axis = ext.x >= ext.y && ext.x >= ext.z ? 0 : ext.y >= ext.z ? 1 : 2;
-        const uint32_t mid = t.begin + count / 2;
-        std::nth_element(order_.begin() + t.begin, order_.begin() + mid, order_.begin() + t.end,
-                         [&](uint32_t a, uint32_t b) { return centers[a][axis] < centers[b][axis]; });
-        const uint32_t left = uint32_t(nodes_.size());
-        nodes_.push_back({});
-        nodes_.push_back({});
-        nodes_[t.node].first = left;
-        nodes_[t.node].count = 0;
-        stack.push_back({left, t.begin, mid});
-        stack.push_back({left + 1, mid, t.end});
+    }, 1, 2);
+    // Stitch: a subtree's root goes in its placeholder, the rest after the nodes so far (inner nodes' children
+    // shifted to match; leaves index order_, which every subtree filled in place).
+    for (size_t k = 0; k < subtrees.size(); ++k) {
+        const std::vector<Node>& nodes = local[k];
+        const uint32_t shift = uint32_t(nodes_.size()) - 1;
+        auto moved = [&](Node n) {
+            if (n.count == 0) n.first += shift;
+            return n;
+        };
+        nodes_[subtrees[k].node] = moved(nodes[0]);
+        for (size_t i = 1; i < nodes.size(); ++i) nodes_.push_back(moved(nodes[i]));
     }
 }
 

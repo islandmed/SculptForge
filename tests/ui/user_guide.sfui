@@ -31,6 +31,8 @@ expect_value guide_hits == 0
 # Links between chapters jump; Alt+Left / Alt+Right (back / forward) retrace them.
 click "User Guide/Contents##guide.toc.index"
 expect_guide index.md
+# Keyboard and mouse is near the end of the contents: below the page's bottom edge at 1080 (more chapters each release)
+wheel_item "User Guide/Welcome to SculptForge" 0 -20
 click "User Guide/Keyboard and mouse"
 expect_guide shortcuts.md
 key alt+left

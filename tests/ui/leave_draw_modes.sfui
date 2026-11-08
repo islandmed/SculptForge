@@ -1,0 +1,103 @@
+# Draw Tube and Append > Insert take every left drag in the view; picking any brush (the shelf, its key, the same
+# brush again) or a tool (Draw / Move), or Esc, leaves them, and the status bar says so (GABO on Discord: "after
+# entering the append mode or tube I cant use the other tools anymore", PanelTube.cpp leaveDrawModes).
+run ui_look look=classic layout=classic
+wait 0.3
+click "Tube##tool.tube"
+
+# Draw Tube on: the status says how to leave it.
+click "Tube/Draw Tube"
+expect_value tube_draw == 1
+expect_status "Esc or a brush leaves it"
+shot tube_on
+# A brush from the shelf leaves it.
+click "Clay##brush.clay"
+expect_value tube_draw == 0
+expect_status "Left Draw Tube"
+shot tube_left_by_brush
+# The brush already in use, picked again.
+click "Tube/Draw Tube"
+expect_value tube_draw == 1
+click "Clay##brush.clay"
+expect_value tube_draw == 0
+# A brush key.
+click "Tube/Draw Tube"
+key 1
+expect_value tube_draw == 0
+expect_status "Left Draw Tube"
+# Esc.
+click "Tube/Draw Tube"
+key escape
+expect_value tube_draw == 0
+expect_status "Draw Tube off"
+# Move (W), then Draw (Q).
+click "Tube/Draw Tube"
+key w
+expect_value tube_draw == 0
+expect_value gizmo_mode == 1
+expect_status "Left Draw Tube. Move"
+key q
+expect_value gizmo_mode == 0
+click "Tube/Draw Tube"
+key q
+expect_value tube_draw == 0
+
+# After a tube's point is dragged its Tube Part is active (it can't be sculpted): a brush goes back to the sculpt.
+click "Tube/Draw Tube"
+drag_path 0.3 0.4 0.55 0.2 0.8 0.45 1.05 0.25 1.3 0.5 S=1.2
+wait 0.2
+expect_value tube_parts == 1
+expect_value active_part == 0
+hold shift                                     # (Draw Tube is on: Shift grabs a dot)
+drag_tube_point 2 0 -60
+hold none
+expect_value active_part == 1
+click "Standard##brush.standard"
+expect_value tube_draw == 0
+expect_value active_part == 0
+expect_status "Left Draw Tube"
+stroke 0.45 0.45 0.55 0.5
+expect_value last_stroke_dabs > 0
+shot sculpt_after_tube
+
+# Append > Insert on the model: a brush, Move, Esc each leave it.
+click "Parts##tool.part"
+click "Parts/Append"
+hover "Insert on the model"
+click "Cube##insert"
+expect_value insert_mode == 1
+expect_status "Esc or a brush stops"
+shot insert_on
+click "Clay##brush.clay"
+expect_value insert_mode == 0
+expect_status "Left Insert"
+remember triangles base
+stroke 0.45 0.45 0.55 0.5
+expect_value triangles == $base                # a Clay stroke, no Cube inserted
+click "Parts/Append"
+hover "Insert on the model"
+click "Cube##insert"
+key w
+expect_value insert_mode == 0
+expect_status "Left Insert. Move"
+key q
+click "Parts/Append"
+hover "Insert on the model"
+click "Cube##insert"
+key escape
+expect_value insert_mode == 0
+expect_status "Insert off"
+
+# Both on: one brush leaves both.
+click "Parts/Append"
+hover "Insert on the model"
+click "Cube##insert"
+click "Tube##tool.tube"
+click "Tube/Draw Tube"
+expect_value tube_draw == 1
+expect_value insert_mode == 1
+key 2
+expect_value tube_draw == 0
+expect_value insert_mode == 0
+expect_status "Left Draw Tube and Insert"
+shot both_left

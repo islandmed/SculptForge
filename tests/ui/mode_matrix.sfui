@@ -1,0 +1,13 @@
+# Every mode can be left (GABO on Discord: after Tube or Append > Insert, picking another brush didn't leave the
+# mode). Generated from the action registry (UiTestModes.cpp): each action is run on a small sphere; one that then
+# latches something (App::latchedForTest) or stops a plain stroke from sculpting is a mode, and each way out (Esc, a
+# brush on the shelf, Draw, Move, Scale, Rotate, a palette action, undo) is tried from it: afterwards the tool is the
+# one picked, a plain stroke sculpts, nothing is latched and the status bar doesn't still name the mode. A new mode
+# is covered without a line here; a failing case's script is in ui-shots/mode_matrix/replay-*.sfui.
+run ui_look look=classic layout=classic
+wait 0.3
+# Ways into modes that aren't registry actions (menu items), probed and tried the same way.
+mode_entry Append > Insert (Cube) | click "Parts/Append" | hover "Insert on the model" | click "Cube##insert"
+mode_entry Append > Insert (a file) | choose_file insert data/stud.obj | wait 0.1
+mode_matrix known=mode_matrix_known.txt
+expect_value modes_found >= 4

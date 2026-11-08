@@ -27,4 +27,13 @@ inline float resolveUiScale(float preference, float automatic) {
 // reporting 1.2499 after 1.25, or a repeated event, rebuilds nothing.
 inline bool uiScaleChanged(float current, float target) { return std::abs(current - target) >= 0.005f; }
 
+// How many framebuffer pixels per logical pixel the fonts are rasterised at: the window's pixel density, so text and
+// icons are crisp on Retina and scaled Wayland outputs (a 5K display drew a 1x atlas stretched 2x: soft text, icons off,
+// fenix 11-08). With the UI scale kept to 3x the 100 % size: 300 % alone already makes a 4096x16384 atlas (in Chinese
+// too), a GPU's usual texture limit, so a 2x display gets 2x up to 150 %, 1.5x at 200 % and 1x at 300 %.
+inline float fontRasterDensity(float uiScale, float pixelDensity, float maxTotal = 3.0f) {
+    if (!(pixelDensity > 1.0f) || !std::isfinite(pixelDensity) || !(uiScale > 0.0f)) return 1.0f;
+    return std::clamp(std::min(pixelDensity, 4.0f), 1.0f, std::max(1.0f, maxTotal / uiScale));
+}
+
 } // namespace sf

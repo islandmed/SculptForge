@@ -7,6 +7,9 @@
 // "Brush Lab/Save settings" for the one in that window).
 //
 //   click LABEL / double_click LABEL / right_click LABEL / hover LABEL
+//   jump_click LABEL         the pointer jumps onto the item and clicks in the same frame, no hover frame first (a
+//                            press in the same batch of events as the move, a tap: ImGui's hover is a frame behind)
+//   tier_card new            the first-run tier card again, as on a machine it was never put away on
 //   hover_model U V [S]      glide the mouse (no button) to a point on the model (fractions of its on-screen bounds,
 //                            snapped onto the sculpt like stroke), e.g. to show the brush cursor
 //   hover_window X Y [S]     the same to window fractions (anywhere, e.g. the background)
@@ -25,7 +28,8 @@
 //                            point twice = a click)
 //   drag X0 Y0 X1 Y1 [S] [release]  left-drag in window fractions (rectangle hide, sliders...); release:
 //                            let go of the held modifiers halfway (Alt-drag, release Alt to zoom)
-//   drag_item LABEL DX DY [S] left-drag from the item by DX DY pixels (scrubbing, dragging a tile out)
+//   drag_item LABEL DX DY [S] [keep] left-drag from the item by DX DY pixels (scrubbing, dragging a tile out);
+//                            keep: leave the button down (a check mid-drag), then `release`
 //   wheel_item LABEL X Y      the mouse wheel over the item: X sideways (a trackpad swipe), Y up/down
 //   drag_path U0 V0 U1 V1 ... [keep] [S=seconds]   left-drag through the points (fractions of the model's
 //                            on-screen bounds; outside 0..1 is the background) with the held modifiers: a lasso,
@@ -58,8 +62,11 @@
 //   drop_library FILE        as if FILE were dropped onto the middle of the Library strip (an SDL drop event there)
 //   restart [FILE]           as quitting and starting again, for the preferences, shortcuts and layout: ui.json
 //                            is saved (what waits), the defaults come back, then ui.json is read as at the start;
-//                            FILE (beside the script) replaces ui.json first (an older version's settings)
+//                            FILE (beside the script) replaces ui.json first (an older version's settings); the
+//                            tier card is shown again unless the saved hardware profile put it away
 //   env NAME VALUE           set an environment variable; $SCRIPT_DIR is the script's folder
+//   generator_stub SHAPE...  Generate 3D answers from a stub instead of any service (never the network): candidate
+//                            N (A first) gets the Nth shape (cycling): sphere cube torus capsule cone, or fail; off = the services
 //   input_style STYLE        classic, sculptforge (the default), blender or maya, as Preferences > Input sets it
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
 //                            directory), e.g. to stage what another program would write (the Blender bridge);
@@ -94,6 +101,9 @@
 //                            supporter (the membership cards, Support.h),
 //                            welcome_open (the first-run welcome shown), new_look_card_open (the one-time
 //                            "SculptForge has a new look" card),
+//                            generate_candidates (Generate 3D's, waiting for a pick), generated_part (the pick's Part
+//                            index, -1 none), high_detail_part (its hidden copy's index, -1 none, -2 shown),
+//                            subdiv_levels (the active Part's, 0 none),
 //                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
 //                            linked_parts (Parts sharing the active one's mesh, #94; 1 = none), part_moved, part_x (its
 //                            centre's x in the scene),
@@ -133,6 +143,8 @@
 //                            moved_off_stencil (moved vertices that showed off the Stencil's image), stencil_active,
 //                            stencil_adjust, stencil_x / stencil_y / stencil_size (x1000), stencil_angle (degrees),
 //                            pen_pressure (raw), brush_pressure (after the curve; 1 for the mouse),
+//                            stroke_sample_pressure (the last stroke sample's, as its dabs got it),
+//                            pen_lost_samples (pressure samples that lost their value), pen_axes_after_motion,
 //                            pressure_status (0 no pen yet, 1 on, 2 not detected, 3 not known yet),
 //                            stroke_continuous (Stroke > Continuous, 1 on),
 //                            stroking (1 while a stroke is open), cursor_x / cursor_y (the brush cursor, pixels),
@@ -149,7 +161,8 @@
 //                            paint_layers (paint layers above Base), active_paint_layer (-1 = Base),
 //                            paint_mean_r / paint_mean_g / paint_mean_b (mean displayed vertex paint, sRGB 0-255)
 //                            uvs (1 when the Part has UVs), texture_size (0 = no texture), paint_texture (1 when
-//                            painting goes into the texture), texture_layers, active_texture_layer,
+//                            painting goes into the texture), paint_mode (1: the Paint brush, colour only),
+//                            texture_layers, active_texture_layer,
 //                            texture_painted (texels of the texture composite that aren't white),
 //                            texture_mean_r / texture_mean_g / texture_mean_b (mean composite, sRGB 0-255),
 //                            material_channels (material channels on the texture, base colour not counted),
@@ -188,7 +201,8 @@
 //                            their own curve), dab_error_px (the last stroke's dab furthest from its cursor
 //                            position, projected back), dab_jitter / dab_jitter_raw (its depth wobble with / without
 //                            the pick filter, x1000 radii), dabs, pixel_density (2 on a HiDPI screen), input_style (0 classic, 1 SculptForge, 2 Blender), turntable, orbit_lock (0 free, 1 Y, 2 X, 3 Z),
-//                            camera_ortho, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
+//                            camera_ortho, checked@ACTION (1 when the toggle shows on), size_slider_ring (a Size slider's ring: 1 while it drags, then fading),
+//                            right_column_clipped (right shelf items past its bottom), mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
 //                            claim), brush_type (BrushType
 //                            index, -1 for a custom brush or Paint), last_dab_x / last_dab_y (window pixels), paint_r, recent_colors (the left shelf's recent paint colours)
 //                            gizmo_mode (0 Draw, 1 Move, 2 Scale, 3 Rotate, 4 All), gizmo_hover (handle under the cursor,
@@ -213,7 +227,15 @@
 //   print VALUE              write VALUE's current value to the log (benchmarks: frame_ms)
 //   shot NAME                save a screenshot NAME.png (to --ui-out)
 //   expect_guide FILE        the User Guide shows FILE ("masking.md", "index.md")
+//   Modes and the monkey (UiTestModes.cpp): expect_latched, expect_sculpts, expect_status_not, unlatch, try_action,
+//                            maybe_action, click_exit, snapshot_start, undo_all, expect_restored, expect_mesh_valid,
+//                            mode_matrix [known=FILE] [ID...], monkey SEED STEPS [COUNT]
 //   dump_shortcuts NAME      write every default shortcut as a Markdown table to --ui-out/NAME
+//   action ID                run a registry action as its key, shelf tile or the command palette would
+//   dialog_answer PATH|cancel   what the next file or folder dialog answers (none ever opens from a script:
+//                            NativeDialog.h; PATH relative to the script); values dialogs_requested (dialogs and URLs
+//                            asked for so far), dialog_kind (the last: 0 none, 1 open file, 2 save file, 3 open
+//                            folder, 4 message box, 5 URL)
 //   answer_dialog PATH|cancel   what the open pack or macro file dialog answers (Install Pack, Save Pack, a
 //                            macro's "?"); values: packs_installed, pack_review_open, pack_review_brush, macros,
 //                            macro_recording, macro_recorded, macro_confirm_open, macro_ran, macro_one_step ...
@@ -256,6 +278,8 @@
 //                            motion and pressure, as a pen resting its tip on the tablet
 //   pen_press U V [P]        the pen moves to a point on the model and touches down (pressure P, default 0.5), and
 //                            stays down until pen_lift
+//   pen_sample U V P         one sample of the touching pen: its motion to a point on the model, then pressure P
+//                            (SDL's order on every platform)
 //   pen_lift                 the touching pen lifts
 //   tablet_plug [NAME]       a tablet plugged in while running (default name: a generic HID mouse); its pen gets
 //                            a new id
@@ -299,7 +323,7 @@
 //   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view),
 //                            spacemouse_echo (1 while a mouse wheel would be dropped as the driver's echo)
 //   ui_scale PERCENT | auto  Preferences > Interface > UI scale (applied live, #87); display_scale PERCENT: the display's
-//                            content scale changes, with SDL's event (Windows DPI, another monitor); logical_width W: the display scale that makes the window W logical px wide (#105)
+//                            content scale changes, with SDL's event (Windows DPI, another monitor); pixel_density PERCENT: the window's pixel density (Retina; expect_value font_density, glyph_texels: x100); logical_width W: the display scale that makes the window W logical px wide (#105)
 //   expect_value ui_scale (percent built now), font_height (default font, px), frame_height, panel_width (right
 //                            shelf, px), title_height, glyphs_missing (glyphs drawn as "?" in the last frame),
 //                            glyphs_merged (typed characters taken from other fonts: SF_FALLBACK_FONTS, the system's),
@@ -308,14 +332,19 @@
 //                            framing keeps it clear of: the open Library, the Sculpt Timeline strip; < 0: under one),
 //                            camera_shift_y (the lens shift framing set, x1000; + up), left_column_clipped (left shelf
 //                            items past its visible bottom)
+//   expect_value weld_preview_points (Merge by Distance's orange dots drawn this frame: only while its distance is
+//                            dragged or hovered, fading out after)
 //   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 classic, 1 SculptForge)
 #include "app/App.h"
 #include "ai/Http.h"
+#include "ai/ImageTo3DService.h"
 
 #ifndef SDL_PEN_INPUT_IN_PROXIMITY
 #define SDL_PEN_INPUT_IN_PROXIMITY (1u << 31) // SDL 3.4's flag; older SDL 3 never sets it
 #endif
 #include "app/Demo.h"
+#include "app/NativeDialog.h"
+#include "app/HwProfileUi.h"
 #include "app/Shell.h"
 #include "app/Ui.h"
 #include "app/UserGlyphs.h"
@@ -326,11 +355,13 @@
 #include "core/LitSphere.h"
 #include "core/Multires.h"
 #include "core/PerfTrace.h"
+#include "core/Primitives.h"
 #include "core/Script.h"
 #include "core/SelectionSets.h"
 #include "core/ThreadPool.h"
 #include "core/Timeline.h"
 #include "io/BridgeProtocol.h"
+#include "io/ObjIO.h"
 #include "link/AiLink.h"
 #include "link/HttpServer.h"
 
@@ -502,8 +533,20 @@ std::string number(double v) {
 
 } // namespace
 
+// (UiTestModes.cpp's generated lines are parsed like the script's own)
+std::vector<std::string> splitScriptWords(const std::string& line) { return splitWords(line); }
+std::string restOfLine(const std::string& line, int skip) { return restOf(line, skip); }
+
 void Demo::fail(int line, const std::string& message) {
-    failures_.push_back(scriptName_ + ":" + std::to_string(line) + ": " + message);
+    if (softEnd_ != kNoCase && knownFailure(softEnd_, message)) return; // (a known mode matrix failure: its fix task)
+    failures_.push_back(scriptName_ + ":" + std::to_string(line) + ": " + message + (context_.empty() ? "" : " [" + context_ + "]"));
+    if (softEnd_ != kNoCase) { // inside a generated case: list it, write its script, go on with the next case
+        if (const std::string replay = writeReplay(softEnd_); !replay.empty()) failures_.back() += " (replay: " + replay + ")";
+        SDL_Log("FAIL %s", failures_.back().c_str());
+        if (!shotDir_.empty()) shotRequest_ = shotDir_ + "/FAIL-" + std::to_string(failures_.size()) + ".png";
+        jumpTo(softEnd_);
+        return;
+    }
     SDL_Log("FAIL %s", failures_.back().c_str());
     if (!shotDir_.empty()) shotRequest_ = shotDir_ + "/FAIL-line-" + std::to_string(line) + ".png";
     step_ = steps_.size(); // stop: later steps depend on this one
@@ -543,6 +586,10 @@ void Demo::detachVirtualSpaceMouse() {
 double Demo::query(const std::string& name, bool& known) const {
     const Mesh& m = app_.doc_.mesh;
     known = true;
+    if (name.rfind("checked@", 0) == 0) { // checked@ACTION: 1 when that toggle shows on (lit), 0 off, -1 no such action
+        const Action* a = app_.actions_.find(name.substr(8));
+        return !a ? -1.0 : a->checked && a->checked() ? 1.0 : 0.0;
+    }
     if (name.rfind("luma@", 0) == 0) { // luma@X,Y: brightness 0-255 of the last shot at window fractions X, Y
         float fx = 0.0f, fy = 0.0f;
         if (std::sscanf(name.c_str() + 5, "%f,%f", &fx, &fy) != 2) {
@@ -614,6 +661,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "last_stroke_dabs") return double(app_.perf_.lastStroke.dabs);
     if (name == "texture_size") return hasTexture(m) ? double(m.texture->width) : 0.0;
     if (name == "paint_texture") return paintsTexture(m) ? 1.0 : 0.0;
+    if (name == "paint_mode") return app_.paintMode_ ? 1.0 : 0.0;
     if (name == "texture_layers") return hasTexture(m) ? double(m.texture->layers.size()) : 0.0;
     if (name == "active_texture_layer") return hasTexture(m) && !m.texture->layers.empty() ? double(m.texture->activeLayer) : -1.0;
     if (name == "auto_uv_running") return app_.autoUv_ ? 1.0 : 0.0;
@@ -626,6 +674,7 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (const double v = app_.bakeTestValue(name); !std::isnan(v)) return v;
     if (const double v = app_.uvEditorTestValue(name); !std::isnan(v)) return v;
+    if (const double v = app_.garmentTestValue(name); !std::isnan(v)) return v;
     if (const double v = app_.pbrTestValue(name); !std::isnan(v)) return v; // material_channels, channel_view, ...
     if (const double v = app_.splatTrainTestValue(name); !std::isnan(v)) return v; // splat_training, ...
     if (const double v = app_.sculptableTestValue(name); !std::isnan(v)) return v;
@@ -644,11 +693,26 @@ double Demo::query(const std::string& name, bool& known) const {
         return double(n);
     }
     if (name == "guides_mode") return app_.guidesMode_ ? 1.0 : 0.0;
+    if (name == "edges_mode") return app_.edgesMode_ ? 1.0 : 0.0; // Geometry > Edges (PanelEdges.cpp)
+    if (name == "edges_selected") return double(app_.doc_.edgeSelection.count);
+    if (name == "edges_total") return app_.doc_.edgeSelection.topo ? double(app_.doc_.edgeSelection.topo->edgeCount()) : 0.0;
+    if (name == "edges_creased")
+        return app_.doc_.edgeSelection.topo ? double(edgeCreasedCount(app_.doc_.mesh, *app_.doc_.edgeSelection.topo)) : 0.0;
+    if (name == "edges_shown") {
+        size_t n = 0;
+        for (uint8_t v : app_.edgeOverlay_.visible) n += v;
+        return double(n);
+    }
     if (name == "forgespheres") return double(m.forgespheres.size());
     if (name == "forgesphere_preview") return m.forgespherePreview ? 1.0 : 0.0;
     if (name == "tube_points") return double(m.tube.points.size()); // the active Tube Part's (Tube, PanelTube.cpp)
     if (name == "tube_draw") return app_.tubeDraw_ ? 1.0 : 0.0;
+    if (name == "insert_mode") return app_.insertType_.empty() ? 0.0 : 1.0; // Append > Insert on the model waits for a drag
     if (name == "tube_selected") return double(app_.tubeSelection());
+    if (name == "tube_first_radius_x1000" || name == "tube_last_radius_x1000") // the active Tube Part's ends
+        return m.tube.empty() ? -1.0 : 1000.0 * (name[5] == 'f' ? m.tube.points.front() : m.tube.points.back()).radius;
+    if (name == "tube_profile") return double(int(m.tube.profile)); // 0 round, 1 square, 2 triangle, 3 ribbon
+    if (name == "tube_taper_end") return double(m.tube.taperEnd);
     if (name == "tube_parts") {
         int n = 0;
         for (int i = 0; i < app_.doc_.partCount(); ++i) n += !app_.doc_.partMesh(i).tube.empty();
@@ -810,12 +874,20 @@ double Demo::query(const std::string& name, bool& known) const {
         return 1000.0 * (name == "dab_jitter" ? a.jitterFiltered : a.jitterRaw) / n;
     }
     if (name == "pixel_density") return double(SDL_GetWindowPixelDensity(app_.window_));
+    if (name == "font_density") return double(app_.fontDensity_ * 100.0f); // the font atlas's px per logical px, x100
+    if (name == "glyph_texels") { // measured in the atlas: the default font's "M", texels per logical px, x100
+        const ImFontAtlas* a = ImGui::GetIO().Fonts;
+        const ImFontGlyph* g = ImGui::GetFont() ? ImGui::GetFont()->FindGlyphNoFallback('M') : nullptr;
+        if (!g || a->TexHeight <= 0 || g->Y1 <= g->Y0) return 0.0;
+        return 100.0 * double(g->V1 - g->V0) * double(a->TexHeight) / double(g->Y1 - g->Y0);
+    }
     if (name == "dabs") return double(app_.dabAccuracy_.count);
     if (name == "stroke_type") return double(int(app_.strokeType_)); // 0 Dots, 1 DragRect, 2 DragDot, 3 Spray, 4 LazyMouse
     if (name == "stroke_continuous") return app_.strokeContinuous_ ? 1.0 : 0.0; // Continuous (#31)
     if (name == "vdms") return double(app_.doc_.vdms.size());
     if (double gv = 0.0; app_.gradientUiValue(name, gv)) return gv; // gradient_armed, gradient_placed (LineGradient.cpp)
     if (double sv = 0.0; app_.stencilUiValue(name, sv)) return sv; // stencil_active, stencil_x / y / size x1000 (StencilOverlay.cpp)
+    if (double cv = 0.0; app_.clothUiValue(name, cv)) return cv; // cloth_* (PanelCloth.cpp)
     if (double kv = 0.0; app_.kelvinUiValue(name, kv)) return kv; // capture_*, kelvin_* (PanelKelvinlet.cpp)
     // Facial shapes (PanelFace.cpp): landmarks placed, placing them, a take playing, and face_<shape>: that layer's weight.
     if (name == "face_landmarks") return double(app_.faceLandmarks_.count());
@@ -1021,6 +1093,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "discord_connects") return double(discord::connectAttempts()); // Show SculptForge on Discord: never in tests
     if (name == "discord_presence") return app_.discordPrefs_.enabled ? 1.0 : 0.0;
     if (name == "http_requests") return double(ai::httpRequestCount()); // every request this process started
+    if (name == "generate_candidates") return double(app_.candidates_.size()); // Generate 3D's, waiting for a pick
+    if (name == "generated_part") return double(app_.doc_.partIndex(app_.generatedPart_)); // the pick's Part (-1 none)
+    if (name == "high_detail_part") { // its hidden high-detail copy: the index, -1 none (-2: shown)
+        const int i = app_.doc_.partIndex(app_.highDetailPart_);
+        return i < 0 ? -1.0 : app_.doc_.parts[size_t(i)].visible ? -2.0 : double(i);
+    }
+    if (name == "subdiv_levels") return double(subdivLevelCount(app_.doc_.mesh)); // the active Part's (0: none)
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
     // Help > Quick tour (QuickTour.cpp): open, the slide (1-based), waiting aside after Show me, the one offer.
     if (name == "quick_tour_open") return app_.quickTourOpen_ ? 1.0 : 0.0;
@@ -1183,6 +1262,8 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     // Items of the left shelf (the brush tiles, the colour picker) past its visible bottom in the last frame.
     if (name == "left_column_clipped") return double(app_.shelfClipped_[kShelfLeft]);
+    if (name == "right_column_clipped") return double(app_.shelfClipped_[kShelfRight]); // (the wheel scrolls to them)
+    if (name == "size_slider_ring") return double(app_.sizeSliderRingAlpha_); // a Size slider's ring: 1 dragging, fading after
     if (name == "timeline_y" || name == "axis_gizmo_y") {
         const auto c = app_.canvasRect();
         if (name == "timeline_y")
@@ -1239,6 +1320,9 @@ double Demo::query(const std::string& name, bool& known) const {
         return st == "Pressure: on" ? 1.0 : st == "Pressure: not detected" ? 2.0 : app_.penSeen_ ? 3.0 : 0.0;
     }
     if (name == "brush_pressure") return app_.strokePressure();
+    if (name == "stroke_sample_pressure") return app_.lastStrokePressure_; // the last stroke sample's (dabs end there)
+    if (name == "pen_lost_samples") return double(app_.penDiag_.lostSamples);
+    if (name == "pen_axes_after_motion") return app_.penDiag_.axesAfterMotion ? 1.0 : 0.0;
     if (name == "stroking") return app_.drag_ == App::Drag::Stroke ? 1.0 : 0.0;
     if (name == "tablet_mouse_mode") return app_.uiPrefs_.tablet.mouseMode ? 1.0 : 0.0;
     if (name == "tablet_view_speed") return double(app_.uiPrefs_.tablet.viewSpeed);
@@ -1319,6 +1403,14 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "wants_frames") return app_.wantsFrames(double(SDL_GetTicksNS()) * 1e-9) ? 1.0 : 0.0;
     if (name == "focus_frames") return app_.focusKeepsDrawing(double(SDL_GetTicksNS()) * 1e-9) ? 1.0 : 0.0;
     if (name == "pen_mouse_down") return app_.penMouseDown_ ? 1.0 : 0.0;
+    if (name == "tier_card") return app_.hwProfile_ && app_.hwProfile_->tierCard ? 1.0 : 0.0; // the first-run card is up
+    if (name == "tier_card_saved") { // the saved profile puts it away on this machine (what the next start reads)
+        HardwareProfile saved;
+        return app_.hwProfile_ && loadHardwareProfile(hardwareProfilePath(), saved) &&
+                       tierCardSeen(saved.overrides.tierCardFor, app_.hwProfile_->profile.hardware)
+                   ? 1.0
+                   : 0.0;
+    }
     if (name == "ui_left_down") return ImGui::IsMouseDown(ImGuiMouseButton_Left) ? 1.0 : 0.0;
     if (name == "soft_cursor") return app_.penSoftCursor() ? 1.0 : 0.0; // Mouse mode: the app draws the arrow
     if (name == "ui_mouse_x") return ImGui::GetIO().MousePos.x; // where the panels see the pointer
@@ -1350,12 +1442,33 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "camera_distance") return app_.camera_.distance;
     if (name == "camera_shift_y") return std::round(double(app_.camera_.shift.y) * 1000.0);
     if (name == "camera_pan") return glm::length(app_.camera_.target);
+    if (name == "weld_preview_points") return double(app_.weldPreviewDrawn_); // Merge by Distance's dots on the model now
     if (name == "groups") {
         std::set<uint32_t> ids(m.facegroups.begin(), m.facegroups.end());
         return double(std::max<size_t>(ids.size(), m.triangleCount() ? 1 : 0));
     }
-    known = false;
-    return 0.0;
+    if (name == "dialogs_requested") return double(dialogs::requested());
+    if (name == "dialog_kind") return double(int(dialogs::lastKind()));
+    return queryModes(name, known); // latched, sculpted ... (UiTestModes.cpp); sets known
+}
+
+double Demo::rememberedNumber(int line, const std::string& text, bool* found) {
+    if (found) *found = true;
+    if (text.empty() || text[0] != '$') return std::strtod(text.c_str(), nullptr);
+    // $NAME, $NAME*K, $NAME+K or $NAME-K
+    const size_t op = text.find_first_of("*+-", 1);
+    const std::string key = text.substr(1, op == std::string::npos ? std::string::npos : op - 1);
+    const auto it = remembered_.find(key);
+    if (it == remembered_.end()) {
+        fail(line, "nothing remembered as $" + key);
+        if (found) *found = false;
+        return 0.0;
+    }
+    const double k = op == std::string::npos ? 0.0 : std::strtod(text.c_str() + op + 1, nullptr);
+    return op == std::string::npos ? it->second
+           : text[op] == '*'       ? it->second * k
+           : text[op] == '+'       ? it->second + k
+                                   : it->second - k;
 }
 
 void Demo::testClick(int line, const std::string& label, int button, bool doubleClick) {
@@ -1501,6 +1614,36 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     if (verb == "click" || verb == "double_click" || verb == "right_click") {
         if (!need(1)) return false;
         testClick(line, w[1], verb == "right_click" ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT, verb == "double_click");
+    } else if (verb == "jump_click") {
+        if (!need(1)) return false;
+        const std::string label = w[1];
+        steps_.push_back([this, line, label](float t) {
+            ImVec2 to;
+            bool visible = false;
+            if (findItem(label, to, &visible) && visible) {
+                mouseMotion(to.x, to.y);
+                mouseButton(true, SDL_BUTTON_LEFT);
+                mouseButton(false, SDL_BUTTON_LEFT);
+                return true;
+            }
+            if (t > 3.0f) fail(line, notFound(label));
+            return t > 3.0f;
+        });
+        wait(0.1f);
+    } else if (verb == "tier_card") {
+        if (!need(1)) return false;
+        if (w[1] != "new") {
+            error = "tier_card takes new";
+            return false;
+        }
+        run([this, line] {
+            if (!app_.hwProfile_) return fail(line, "tier_card: no hardware profile (SF_HW_PROFILE_IN_TESTS=1)");
+            ProfileOverrides o = app_.hwProfile_->profile.overrides;
+            o.tierCardFor.clear();
+            app_.saveProfileOverrides(o);
+            app_.hwProfile_->tierCard = true;
+        });
+        wait(0.1f);
     } else if (verb == "hover") {
         if (!need(1)) return false;
         const std::string label = w[1];
@@ -1530,12 +1673,14 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         wait(0.6f); // tooltips appear after a short delay
     } else if (verb == "hover_model" || verb == "hover_window") {
         if (!need(2)) return false;
-        const float u = num(1, 0.5f), v = num(2, 0.5f), seconds = num(3, 0.3f);
+        const std::string us = w[1], vs = w[2]; // fractions, or remembered values ($u) as drag takes them
+        const float seconds = num(3, 0.3f);
         const bool window = verb == "hover_window";
         auto from = std::make_shared<ImVec2>();
         auto to = std::make_shared<ImVec2>();
-        steps_.push_back([this, from, to, u, v, seconds, window](float t) {
+        steps_.push_back([this, line, from, to, us, vs, seconds, window](float t) {
             if (t == 0.0f) {
+                const float u = float(rememberedNumber(line, us)), v = float(rememberedNumber(line, vs));
                 *from = mouse_;
                 int ww = 0, wh = 0;
                 SDL_GetWindowSize(app_.window_, &ww, &wh);
@@ -1754,12 +1899,17 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         wait(0.1f);
     } else if (verb == "drag") {
         if (!need(4)) return false;
-        const float x0 = num(1, 0), y0 = num(2, 0), x1 = num(3, 0), y1 = num(4, 0), seconds = num(5, 0.4f);
+        // X0 Y0 X1 Y1: window fractions, or remembered values ($u, $u-0.01: at any window size and UI scale).
+        const std::vector<std::string> at(w.begin() + 1, w.begin() + 5);
+        const float seconds = num(5, 0.4f);
         const bool release = w.size() > 6 && w[6] == "release";
-        steps_.push_back([this, x0, y0, x1, y1, seconds, release](float t) {
+        auto ends = std::make_shared<glm::vec4>();
+        steps_.push_back([this, line, at, ends, seconds, release](float t) {
+            if (t == 0.0f)
+                for (int i = 0; i < 4; ++i) (*ends)[i] = float(rememberedNumber(line, at[size_t(i)]));
             int ww = 0, wh = 0;
             SDL_GetWindowSize(app_.window_, &ww, &wh);
-            const ImVec2 a(x0 * float(ww), y0 * float(wh)), b(x1 * float(ww), y1 * float(wh));
+            const ImVec2 a(ends->x * float(ww), ends->y * float(wh)), b(ends->z * float(ww), ends->w * float(wh));
             if (t == 0.0f) {
                 mouseMotion(a.x, a.y);
                 return false;
@@ -1826,13 +1976,15 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             else if (got != want) fail(line, id + " has \"" + got + "\", expected \"" + want + "\"");
         });
     } else if (verb == "drag_tube_point") {
-        // drag_tube_point K DX DY [seconds]: press on control point K of the active Tube Part (else the first visible
-        // one; Tube, PanelTube.cpp) and drag it DX, DY pixels; 0 0 is a click.
+        // drag_tube_point K DX DY [seconds] [keep]: press on control point K of the active Tube Part (else the first
+        // visible one; Tube, PanelTube.cpp) and drag it DX, DY pixels; 0 0 is a click. keep: the button stays down
+        // (release lets go).
         if (!need(3)) return false;
         const int index = int(num(1, 0));
-        const float dx = num(2, 0), dy = num(3, 0), seconds = num(4, 0.4f);
+        const bool keep = w.back() == "keep";
+        const float dx = num(2, 0), dy = num(3, 0), seconds = w.size() > 4 && w[4] != "keep" ? num(4, 0.4f) : 0.4f;
         auto start = std::make_shared<ImVec2>();
-        steps_.push_back([this, line, index, dx, dy, seconds, start](float t) {
+        steps_.push_back([this, line, index, dx, dy, seconds, start, keep](float t) {
             if (t == 0.0f) {
                 const Document& doc = app_.doc_;
                 int part = doc.mesh.tube.empty() ? -1 : doc.activePart;
@@ -1851,7 +2003,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             const float u = std::min(t / seconds, 1.0f);
             mouseMotion(start->x + dx * u, start->y + dy * u);
             if (t >= seconds) {
-                mouseButton(false, SDL_BUTTON_LEFT);
+                if (!keep) mouseButton(false, SDL_BUTTON_LEFT);
                 return true;
             }
             return false;
@@ -1978,7 +2130,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "drag_item") {
         if (!need(3)) return false;
         const std::string label = w[1];
-        const float dx = num(2, 0), dy = num(3, 0), seconds = num(4, 0.4f);
+        const bool keep = w.back() == "keep"; // leave the button down (a check mid-drag), then `release`
+        const float dx = num(2, 0), dy = num(3, 0), seconds = w.size() > 4 && w[4] != "keep" ? num(4, 0.4f) : 0.4f;
         auto from = std::make_shared<ImVec2>();
         steps_.push_back([this, line, label, from](float t) {
             if (findItem(label, *from)) {
@@ -1988,13 +2141,13 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (t > 3.0f) fail(line, notFound(label));
             return t > 3.0f;
         });
-        steps_.push_back([this, from, dx, dy, seconds](float t) {
+        steps_.push_back([this, from, dx, dy, seconds, keep](float t) {
             if (t == 0.0f) return false; // a frame of hover first
             if (!buttonDown_ && t < seconds) mouseButton(true, SDL_BUTTON_LEFT);
             const float u = std::min(t / seconds, 1.0f);
             mouseMotion(from->x + dx * u, from->y + dy * u);
             if (t >= seconds) {
-                mouseButton(false, SDL_BUTTON_LEFT);
+                if (!keep) mouseButton(false, SDL_BUTTON_LEFT);
                 return true;
             }
             return false;
@@ -2130,6 +2283,27 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
         const auto u8 = file.lexically_normal().u8string();
         run([this, action, path = std::string(u8.begin(), u8.end())] { app_.queueFile(action, path); });
+    } else if (verb == "action") {
+        if (!need(1)) return false;
+        run([this, line, id = w[1]] {
+            const Action* a = app_.actions_.find(id);
+            if (!a || !a->run) return fail(line, "no action " + id);
+            if (a->enabled && !a->enabled()) return fail(line, "action " + id + " is disabled now");
+            app_.actions_.touch(id);
+            a->run();
+        });
+        wait(0.1f);
+    } else if (verb == "dialog_answer") {
+        if (!need(1)) return false;
+        std::string path;
+        if (w[1] != "cancel") {
+            const std::string name = restOf(lineText_, 1);
+            auto file = std::filesystem::path(std::u8string(name.begin(), name.end()));
+            if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
+            const auto u8 = file.lexically_normal().u8string();
+            path.assign(u8.begin(), u8.end());
+        }
+        run([path] { dialogs::answerNext(path); });
     } else if (verb == "answer_dialog") {
         // answer_dialog PATH | cancel: what the open pack or macro file dialog (Install Pack, New Pack's Save Pack,
         // a macro's "?") answers. PATH is relative to the script; a file that doesn't exist beside it (a save) lands
@@ -2344,6 +2518,18 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.handleEvent(e);
         });
         wait(0.2f);
+    } else if (verb == "pixel_density") {
+        // pixel_density 200: the window's pixel density (macOS Retina, a scaled Wayland output), as SDL reports it with
+        // its display-scale event; the framebuffer here stays 1x, so only the font atlas shows it (font_density)
+        if (!need(1)) return false;
+        run([this, v = num(1, 100) / 100.0f] {
+            app_.pixelDensityOverride_ = v;
+            SDL_Event e{};
+            e.type = SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED;
+            e.window.windowID = SDL_GetWindowID(app_.window_);
+            app_.handleEvent(e);
+        });
+        wait(0.2f);
     } else if (verb == "logical_width") {
         // logical_width 1280: the display reports the scale that makes the window this many logical px wide, as a
         // Windows laptop at 150-200 % does (#105: 2560x1600 at 200 % is 1280x800)
@@ -2384,7 +2570,38 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             const auto u8 = file.lexically_normal().u8string();
             from.assign(u8.begin(), u8.end());
         }
-        run([this, from] { app_.restartPrefsForTest(from); });
+        run([this, from] {
+            app_.restartPrefsForTest(from);
+            app_.tierCardFromDisk();
+        });
+    } else if (verb == "generator_stub") {
+        if (!need(1)) return false;
+        std::vector<std::string> shapes(w.begin() + 1, w.end());
+        for (const std::string& shape : shapes)
+            if (shape != "off" && shape != "sphere" && shape != "cube" && shape != "torus" && shape != "capsule" &&
+                shape != "cone" && shape != "fail") {
+                error = "unknown generator_stub shape '" + shape + "'";
+                return false;
+            }
+        run([shapes] {
+            if (shapes.front() == "off") return ai::setGeneratorStubForTests({});
+            ai::setGeneratorStubForTests([shapes](int candidate, const std::string& stem) {
+                const std::string& shape = shapes[size_t(candidate) % shapes.size()];
+                ai::GeneratorResult r;
+                if (shape == "fail") {
+                    r.error = "The stub service said no";
+                    return r;
+                }
+                const Mesh m = shape == "cube"    ? makeCube(24, 1.6f)
+                               : shape == "torus"   ? makeTorus(48, 2.0f)
+                               : shape == "capsule" ? makeCapsule(32, 2.0f)
+                               : shape == "cone"    ? makeCone(48, 2.0f)
+                                                    : makeIcosphere(4, 1.0f);
+                r.outputPath = stem + ".obj";
+                r.ok = saveObj(r.outputPath, m, r.error);
+                return r;
+            });
+        });
     } else if (verb == "env") {
         if (!need(2)) return false;
         std::string value = restOf(lineText_, 2);
@@ -2639,21 +2856,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         }
         const std::string name = w[1], op = w[2], wantText = w[3];
         run([this, line, name, op, wantText] {
-            double want = std::strtod(wantText.c_str(), nullptr);
-            if (!wantText.empty() && wantText[0] == '$') { // $NAME, $NAME*K, $NAME+K or $NAME-K
-                const size_t op = wantText.find_first_of("*+-", 1);
-                const std::string key = wantText.substr(1, op == std::string::npos ? std::string::npos : op - 1);
-                const auto it = remembered_.find(key);
-                if (it == remembered_.end()) {
-                    fail(line, "nothing remembered as $" + key);
-                    return;
-                }
-                const double k = op == std::string::npos ? 0.0 : std::strtod(wantText.c_str() + op + 1, nullptr);
-                want = op == std::string::npos  ? it->second
-                       : wantText[op] == '*'    ? it->second * k
-                       : wantText[op] == '+'    ? it->second + k
-                                                : it->second - k;
-            }
+            bool found = true;
+            const double want = rememberedNumber(line, wantText, &found);
+            if (!found) return;
             bool k = false;
             const double v = query(name, k);
             if (!compare(v, op, want)) fail(line, name + " is " + number(v) + ", expected " + op + " " + number(want) + " (" + wantText + ")");
@@ -3099,6 +3304,16 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             penPressed_ = true;
         });
         wait(0.1f);
+    } else if (verb == "pen_sample") {
+        // One pen sample while touching, as SDL sends it (Wayland's tablet frame, X11, Windows Ink): the motion
+        // to u, v, then its pressure.
+        if (!need(3)) return false;
+        run([this, u = num(1, 0.5f), v = num(2, 0.5f), pressure = num(3, 0.5f)] {
+            const ImVec2 p = onModel(u, v);
+            penMove(p.x, p.y);
+            penPressure(pressure);
+        });
+        wait(0.05f);
     } else if (verb == "pen_lift") {
         run([this] {
             penPressed_ = false;
@@ -3132,8 +3347,12 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
         wait(0.05f);
     } else {
-        error = "unknown step '" + verb + "'";
-        return false;
+        bool handled = false;
+        if (!parseModeStep(line, w, error, handled)) return false;
+        if (!handled) {
+            error = "unknown step '" + verb + "'";
+            return false;
+        }
     }
     return true;
 }
@@ -3348,11 +3567,11 @@ void Demo::penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bo
         constexpr int kSamples = 4;
         if (*last < 1.0f) {
             const float u = std::min(t / seconds, 1.0f);
-            for (int k = 1; k <= kSamples; ++k) {
+            for (int k = 1; k <= kSamples; ++k) { // (each sample as SDL sends it: the motion, then its pressure)
                 const float uu = *last + (u - *last) * float(k) / float(kSamples);
-                penPressure(p0 + (p1 - p0) * uu);
                 const ImVec2 p = path(uu);
                 penMove(p.x, p.y);
+                penPressure(p0 + (p1 - p0) * uu);
                 if (afterSample) afterSample();
             }
             *last = u;
@@ -3364,8 +3583,8 @@ void Demo::penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bo
             const float dx = b.x - a.x, dy = b.y - a.y, len = std::max(std::hypot(dx, dy), 1e-3f);
             for (int k = 1; k <= kSamples; ++k) {
                 const int i = *tailFrame * kSamples + k;
-                penPressure(p1 * (1.0f - float(i) / float(2 * kSamples)));
                 penMove(b.x + dx / len * 0.5f * float(i), b.y + dy / len * 0.5f * float(i));
+                penPressure(p1 * (1.0f - float(i) / float(2 * kSamples)));
                 if (afterSample) afterSample();
             }
             if (++*tailFrame < 2) return false;
@@ -3409,6 +3628,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
         return false;
     }
     testing_ = true;
+    dialogs::setScripted(true); // no native dialog or browser from a script, ever (NativeDialog.h)
     scriptName_ = std::filesystem::path(std::u8string(path.begin(), path.end())).filename().string();
     {
         std::error_code ec;
@@ -3459,6 +3679,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
             error = scriptName_ + ":" + std::to_string(n) + ": " + err;
             return false;
         }
+        setupLines_.push_back(line); // (a generated case's replay file starts with the lines before it)
         if (profile) stepLines_.resize(steps_.size(), n); // (steps the line added; the first wait counts as line 0)
     }
     wait(0.1f);

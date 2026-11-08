@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Transform gizmo (Move W / Scale E / Rotate R / All Shift+W, Q back to Draw): a gizmo at the pivot with axis arrows,
-// plane squares and a free-move centre (Move), rings and a view ring (Rotate), axis boxes and a uniform centre (Scale);
-// All has every handle at once (short arrows inside the rings, scale boxes just outside, even-scale tabs outermost).
+// plane squares and a free-move centre (Move), rings and a view ring (Rotate), axis balls and a uniform centre (Scale);
+// All has every handle at once (shafts with a scale ball and a move cone inside the rings, even-scale tabs outermost).
 // Dragging a handle transforms the active Part, or only its unmasked part (posing), through a
 // TransformSession (core/MeshTransform.h): every frame recomputes from the drag's start, so nothing drifts, and
 // the release makes one undo step per Part. Shift snaps (15 degrees, the grid, 10%), Alt+drag moves the pivot
 // or turns the axes only, Alt+click on the model puts the pivot there. The Transform gizmo panel adds numeric entry.
 #include "app/App.h"
 #include "app/Ui.h"
+#include "core/FigurePose.h"
 
 #include <IconsLucide.h>
 
@@ -58,6 +59,39 @@ ImU32 axisColor(int axis, float alpha = 1.0f) {
     }
 }
 constexpr ImU32 kHot = IM_COL32(255, 214, 92, 255);
+constexpr ImU32 kOutline = IM_COL32(0, 0, 0, 150); // round every handle: they read on light backgrounds too
+
+ImU32 withAlpha(ImU32 c, float alpha) { return (c & 0x00ffffffu) | (ImU32(std::clamp(alpha, 0.0f, 1.0f) * float(c >> 24)) << 24); }
+
+ImU32 lighter(ImU32 c, float t) { // toward white, alpha kept
+    auto ch = [&](int sh) { const float v = float((c >> sh) & 0xff); return ImU32(v + (255.0f - v) * t) << sh; };
+    return ch(0) | ch(8) | ch(16) | (c & 0xff000000u);
+}
+
+// The handles' shapes (fenix's design: thin shafts, solid cones and balls, room between them). A cone from base to
+// tip, half as wide as w, its lit half lighter so it reads as solid.
+void drawCone(ImDrawList* dl, ImVec2 base, ImVec2 tip, float w, ImU32 col, float s) {
+    const float dx = tip.x - base.x, dy = tip.y - base.y, len = std::sqrt(dx * dx + dy * dy);
+    if (len < 1e-3f) return;
+    const ImVec2 n(-dy / len * w, dx / len * w), d(dx / len, dy / len), m(base.x - d.x * 1.5f * s, base.y - d.y * 1.5f * s);
+    const ImVec2 l(base.x + n.x, base.y + n.y), r(base.x - n.x, base.y - n.y);
+    const float o = 1.4f * s; // the outline: the same cone a little bigger, under it
+    dl->AddTriangleFilled(ImVec2(tip.x + d.x * o, tip.y + d.y * o), ImVec2(l.x + n.x / w * o - d.x * o, l.y + n.y / w * o - d.y * o),
+                          ImVec2(r.x - n.x / w * o - d.x * o, r.y - n.y / w * o - d.y * o), kOutline);
+    dl->AddTriangleFilled(tip, l, m, col);
+    dl->AddTriangleFilled(tip, m, r, lighter(col, 0.28f));
+}
+
+void drawBall(ImDrawList* dl, ImVec2 at, float radius, ImU32 col, float s) {
+    dl->AddCircleFilled(at, radius + 1.4f * s, kOutline, 24);
+    dl->AddCircleFilled(at, radius, col, 24);
+    dl->AddCircleFilled(ImVec2(at.x - radius * 0.32f, at.y - radius * 0.32f), radius * 0.38f, withAlpha(lighter(col, 0.6f), 0.8f), 12);
+}
+
+void drawShaft(ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 col, float s) {
+    dl->AddLine(a, b, kOutline, 4.0f * s);
+    dl->AddLine(a, b, col, 2.0f * s);
+}
 
 float dist2(ImVec2 a, ImVec2 b) { return (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y); }
 
@@ -139,7 +173,12 @@ void App::registerGizmoActions() {
         actions_.add(std::move(a));
     };
     auto mode = [this](GizmoMode m) {
-        return [this, m] { setGizmoMode(gizmo_.mode == m && m != GizmoMode::Off ? GizmoMode::Off : m); };
+        return [this, m] {
+            if (drag_ == Drag::Guide) return;
+            const std::string guides = leaveGuides(); // (the buttons and keys, not setGizmoMode: Guides calls that itself)
+            setGizmoMode(gizmo_.mode == m && m != GizmoMode::Off ? GizmoMode::Off : m);
+            if (!guides.empty()) status_ = "Left " + guides + ". " + status_;
+        };
     };
     auto is = [this](GizmoMode m) { return [this, m] { return gizmo_.mode == m; }; };
     add("tool.draw", "Draw", ICON_LC_PENCIL, "Transform", "Q", mode(GizmoMode::Off), is(GizmoMode::Off),
@@ -148,14 +187,14 @@ void App::registerGizmoActions() {
         "Gizmo, Move: drag an arrow to move along an axis, a square to move in a plane, the centre to move in "
         "the view. Masked parts stay; Shift snaps to the grid; Alt+drag moves only the gizmo. W again: back to Draw.");
     add("tool.scale", "Scale", ICON_LC_SCALING, "Transform", "E", mode(GizmoMode::Scale), is(GizmoMode::Scale),
-        "Gizmo, Scale: drag a box to stretch along an axis or the centre to scale evenly (right or up: bigger). "
+        "Gizmo, Scale: drag a ball to stretch along an axis or the centre to scale evenly (right or up: bigger). "
         "Shift snaps to 10% steps. E again: back to Draw.");
     add("tool.rotate", "Rotate", ICON_LC_ROTATE_CW, "Transform", "R", mode(GizmoMode::Rotate), is(GizmoMode::Rotate),
         "Gizmo, Rotate: drag a ring to turn about that axis, the outer ring to turn in the view. Mask the body "
         "and put the pivot at a joint to pose a limb. Shift snaps to 15 degrees. R again: back to Draw.");
     add("tool.gizmo_all", "All", ICON_LC_AXIS_3D, "Transform", "Shift+W", mode(GizmoMode::All), is(GizmoMode::All),
         "Gizmo, All: move, rotate and scale handles at once. Arrows and squares move, the centre moves in the view, "
-        "rings turn, the boxes past the rings stretch along an axis and the four outer tabs scale evenly. Shift "
+        "rings turn, the ball on each axis stretches along it and the four outer tabs scale evenly. Shift "
         "snaps. Shift+W again: back to Draw.");
     add("gizmo.reset_pivot", "Reset", ICON_LC_LOCATE_FIXED, kPath, "", [this] { resetGizmoPivot(); }, nullptr,
         "Put the gizmo back at the centre of what moves (the Part, or its unmasked part) with world axes.");
@@ -205,14 +244,16 @@ void App::registerGizmoActions() {
 
 void App::setGizmoMode(GizmoMode mode) {
     if (drag_ == Drag::Gizmo) return;
+    const std::string left = leaveDrawModes(); // Draw / Move / Scale / Rotate leave Draw Tube and Append > Insert
     gizmo_.mode = mode;
     gizmo_.snapNext = false;
     gizmo_.hover = GizmoHandle::None;
     status_ = mode == GizmoMode::Move     ? "Move: drag the arrows, squares or centre (Alt+drag: the gizmo only)"
-              : mode == GizmoMode::Scale  ? "Scale: drag a box or the centre (Shift: 10% steps)"
+              : mode == GizmoMode::Scale  ? "Scale: drag a ball or the centre (Shift: 10% steps)"
               : mode == GizmoMode::Rotate ? "Rotate: drag a ring (Shift: 15 degrees); mask first to pose a part"
-              : mode == GizmoMode::All    ? "All: arrows and squares move, rings turn, boxes and the outer tabs scale"
+              : mode == GizmoMode::All    ? "All: arrows and squares move, rings turn, balls and the outer tabs scale"
                                           : "Draw";
+    if (!left.empty()) status_ = "Left " + left + ". " + status_;
     if (mode != GizmoMode::Off) {
         doc_.syncBvh();
         updateGizmoPivot();
@@ -418,8 +459,8 @@ bool App::gizmoHandleScreen(GizmoHandle h, ImVec2& out) const {
     }
     if (all && isScale(h)) {
         const ga::Screen::Axis& a = gizmoAllScreen().axis[axis];
-        out = ImVec2(a.boxAt.x, a.boxAt.y);
-        return a.box && gizmoHandleAt(out.x, out.y) == h;
+        out = ImVec2(a.ballAt.x, a.ballAt.y);
+        return a.ball && gizmoHandleAt(out.x, out.y) == h;
     }
     if (h == H::MoveView || h == H::ScaleUniform) {
         out = pc;
@@ -570,6 +611,7 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
             TransformSession session;
             const glm::vec3 pivot = s.moved() ? glm::vec3(glm::inverse(s.transform) * glm::vec4(gizmo_.pivot, 1.0f)) : gizmo_.pivot;
             if (!session.begin(m, transformWeights(m, gizmo_.useMask, gizmo_.falloff), symmetry_, pivot, layer)) continue;
+            if (i == doc_.activePart && figurePoseEditing(doc_)) session.keepOp(); // a Pose Mesh move (core/FigurePose.h)
             gizmo_.parts.push_back(i);
             gizmo_.sessions.push_back(std::move(session));
         }
@@ -854,9 +896,29 @@ void App::drawGizmo() {
         return axisColor(axis, dragging ? 0.45f : 1.0f);
     };
     const float thick = 2.6f * s;
-    const ImU32 shadow = IM_COL32(0, 0, 0, 110);
+    const ImU32 shadow = kOutline;
     const bool all = gizmo_.mode == GizmoMode::All;
     const float viewRing = all ? ga::kViewRing : kViewRing;
+    // The handles that aren't one axis (centre, view ring, even-scale tabs) are light grey, so the hover's yellow
+    // stands out on them too; charcoal on a light flat background.
+    const glm::vec3 bg = renderSettings_.backgroundColor;
+    const bool lightBg = !renderSettings_.gradientBackground && glm::dot(bg, glm::vec3(0.2126f, 0.7152f, 0.0722f)) > 0.45f;
+    const ImU32 plain = lightBg ? IM_COL32(48, 48, 52, dragging ? 130 : 240) : IM_COL32(236, 236, 236, dragging ? 130 : 240);
+    auto neutral = [&](H h) { return gizmo_.hover == h ? kHot : plain; };
+    auto planeSquare = [&](const ImVec2 q[4], int i) {
+        const H h = H(int(H::PlaneYZ) + i);
+        const bool hot = gizmo_.hover == h;
+        const ImU32 col = colorFor(h, i);
+        dl->AddConvexPolyFilled(q, 4, withAlpha(col, hot ? 0.6f : 0.3f));
+        dl->AddPolyline(q, 4, withAlpha(shadow, 0.5f), ImDrawFlags_Closed, 2.5f * s);
+        dl->AddPolyline(q, 4, withAlpha(col, hot ? 1.0f : 0.8f), ImDrawFlags_Closed, 1.2f * s);
+    };
+    auto axisLabel = [&](ImVec2 at, ImVec2 dir, float px, ImU32 col, int i) {
+        const ImVec2 p(at.x + dir.x * px * s - 3.5f * s, at.y + dir.y * px * s - 7.0f * s);
+        const char* name = i == 0 ? "X" : i == 1 ? "Y" : "Z";
+        dl->AddText(smallFont(), 12.0f * s, ImVec2(p.x + 1.0f * s, p.y + 1.0f * s), shadow, name);
+        dl->AddText(smallFont(), 12.0f * s, p, col, name);
+    };
 
     if (gizmo_.mode == GizmoMode::Move || gizmo_.mode == GizmoMode::Scale) {
         const bool move = gizmo_.mode == GizmoMode::Move;
@@ -869,12 +931,9 @@ void App::drawGizmo() {
                 if (!gizmoProject(c + u * lo + v * lo, q[0]) || !gizmoProject(c + u * hi + v * lo, q[1]) ||
                     !gizmoProject(c + u * hi + v * hi, q[2]) || !gizmoProject(c + u * lo + v * hi, q[3]))
                     continue;
-                const H h = H(int(H::PlaneYZ) + i);
-                const ImU32 col = colorFor(h, i);
-                dl->AddConvexPolyFilled(q, 4, (col & 0x00ffffff) | (gizmo_.hover == h ? 0x90000000u : 0x50000000u));
-                dl->AddPolyline(q, 4, col, ImDrawFlags_Closed, 1.5f * s);
+                planeSquare(q, i);
             }
-        // Arrows / boxes, far ones first.
+        // Shafts with a cone (Move) or a ball (Scale) at the end, far ones first.
         int order[3] = {0, 1, 2};
         std::sort(order, order + 3, [&](int a, int b) { return glm::dot(f[a], toEye) < glm::dot(f[b], toEye); });
         for (int i : order) {
@@ -883,38 +942,38 @@ void App::drawGizmo() {
             const float len = std::sqrt(dist2(a, b));
             if (len < 10.0f * s) continue;
             const H h = H(int(move ? H::MoveX : H::ScaleX) + i);
+            const bool hot = gizmo_.hover == h;
             const ImU32 col = colorFor(h, i);
-            const ImVec2 dir((b.x - a.x) / len, (b.y - a.y) / len), nrm(-dir.y, dir.x);
-            dl->AddLine(a, b, shadow, thick + 2.0f * s);
-            dl->AddLine(a, b, col, thick);
+            const ImVec2 dir((b.x - a.x) / len, (b.y - a.y) / len);
+            drawShaft(dl, a, b, col, s);
             if (move) {
-                const float head = 15.0f * s, w = 6.0f * s;
-                const ImVec2 tip(b.x + dir.x * head, b.y + dir.y * head);
-                dl->AddTriangleFilled(tip, ImVec2(b.x + nrm.x * w, b.y + nrm.y * w), ImVec2(b.x - nrm.x * w, b.y - nrm.y * w), col);
+                const float head = 16.0f * s;
+                drawCone(dl, b, ImVec2(b.x + dir.x * head, b.y + dir.y * head), (hot ? 6.5f : 5.5f) * s, col, s);
             } else {
-                const float h2 = 6.0f * s;
-                dl->AddRectFilled(ImVec2(b.x - h2, b.y - h2), ImVec2(b.x + h2, b.y + h2), col);
-                dl->AddRect(ImVec2(b.x - h2, b.y - h2), ImVec2(b.x + h2, b.y + h2), shadow, 0.0f, 0, 1.0f);
+                drawBall(dl, b, (hot ? 7.5f : 6.5f) * s, col, s);
             }
-            dl->AddText(smallFont(), 12.0f * s, ImVec2(b.x + dir.x * (move ? 20.0f : 11.0f) * s - 3.0f * s,
-                                                       b.y + dir.y * (move ? 20.0f : 11.0f) * s - 7.0f * s),
-                        col, i == 0 ? "X" : i == 1 ? "Y" : "Z");
+            axisLabel(b, dir, move ? 24.0f : 15.0f, col, i);
         }
         const H centre = move ? H::MoveView : H::ScaleUniform;
-        const ImU32 cc = gizmo_.hover == centre ? kHot : IM_COL32(240, 206, 96, dragging ? 140 : 255);
+        const ImU32 cc = neutral(centre);
         if (move) {
             dl->AddCircle(pc, 10.0f * s, shadow, 32, thick + 2.0f * s);
-            dl->AddCircle(pc, 10.0f * s, cc, 32, thick);
+            dl->AddCircle(pc, 10.0f * s, cc, 32, gizmo_.hover == centre ? thick : 2.0f * s);
         } else {
-            dl->AddCircleFilled(pc, 9.0f * s, cc, 32);
-            dl->AddCircle(pc, 9.0f * s, shadow, 32, 1.0f * s);
+            drawBall(dl, pc, 9.0f * s, cc, s);
         }
     } else {
-        // Rotate: rings with their back halves dimmed, the view ring outside them.
+        // Rotate: rings with their back halves dimmed, the view ring outside them. In All, a ring seen nearly
+        // edge-on (a line through the centre, over the shafts) and the back halves fade further: the shafts own it.
         for (int i = 0; i < 3; ++i) {
             const glm::vec3 u = f[(i + 1) % 3], v = f[(i + 2) % 3];
             const H h = H(int(H::RotateX) + i);
+            const bool hot = gizmo_.hover == h;
             const ImU32 col = colorFor(h, i);
+            const float face = std::abs(glm::dot(f[i], toEye));
+            const float fade = all && !hot ? std::clamp(0.35f + face * 3.25f, 0.35f, 1.0f) : 1.0f;
+            const ImU32 front = withAlpha(col, fade), back = withAlpha(col, all ? 0.18f : 0.28f);
+            const float w = hot ? thick + 0.8f * s : all ? 2.2f * s : thick;
             ImVec2 prev;
             bool havePrev = false, prevFront = true;
             for (int k = 0; k <= 96; ++k) {
@@ -925,23 +984,24 @@ void App::drawGizmo() {
                     havePrev = false;
                     continue;
                 }
-                const bool front = glm::dot(r, toEye) > -0.02f;
+                const bool isFront = glm::dot(r, toEye) > -0.02f;
                 if (havePrev) {
-                    if (front && prevFront) {
-                        dl->AddLine(prev, p, shadow, thick + 2.0f * s);
-                        dl->AddLine(prev, p, col, thick);
+                    if (isFront && prevFront) {
+                        dl->AddLine(prev, p, withAlpha(shadow, fade * 0.8f), w + 2.0f * s);
+                        dl->AddLine(prev, p, front, w);
                     } else {
-                        dl->AddLine(prev, p, (col & 0x00ffffff) | 0x48000000u, 1.5f * s);
+                        dl->AddLine(prev, p, back, 1.4f * s);
                     }
                 }
                 prev = p;
-                prevFront = front;
+                prevFront = isFront;
                 havePrev = true;
             }
         }
-        const ImU32 vc = gizmo_.hover == H::RotateView ? kHot : IM_COL32(222, 222, 222, dragging ? 110 : 220);
-        dl->AddCircle(pc, kRadiusPx * viewRing * s, shadow, 96, thick + 2.0f * s);
-        dl->AddCircle(pc, kRadiusPx * viewRing * s, vc, 96, thick);
+        const ImU32 vc = neutral(H::RotateView);
+        const float vw = gizmo_.hover == H::RotateView ? thick + 0.8f * s : 2.0f * s;
+        dl->AddCircle(pc, kRadiusPx * viewRing * s, withAlpha(shadow, 0.8f), 96, vw + 2.0f * s);
+        dl->AddCircle(pc, kRadiusPx * viewRing * s, vc, 96, vw);
         if (dragging && isRotate(gizmo_.handle) && !gizmo_.tangent) {
             // The swept angle as a pie, so the turn reads at a glance.
             const glm::vec3 a = gizmo_.handle == H::RotateView ? camera_.forward() : f[axisOf(gizmo_.handle)];
@@ -963,8 +1023,8 @@ void App::drawGizmo() {
         }
     }
     if (all) {
-        // Over the rings: plane squares, the short arrows (far ones first) with their scale boxes past the rings, the
-        // even-scale tabs outside the view ring, the free-move centre.
+        // Over the rings: plane squares, then each axis (far ones first) as a thin shaft with its scale ball and, past
+        // a gap, its move cone, ending well inside the rings; the even-scale tabs outside the view ring; the centre.
         const ga::Screen sc = gizmoAllScreen();
         auto im = [](glm::vec2 p) { return ImVec2(p.x, p.y); };
         int planes[3] = {0, 1, 2}; // far ones first, as ga::pick stacks them
@@ -972,42 +1032,37 @@ void App::drawGizmo() {
         for (int i : planes) {
             if (!sc.axis[i].plane) continue;
             const ImVec2 q[4] = {im(sc.axis[i].quad[0]), im(sc.axis[i].quad[1]), im(sc.axis[i].quad[2]), im(sc.axis[i].quad[3])};
-            const H h = H(int(H::PlaneYZ) + i);
-            const ImU32 col = colorFor(h, i);
-            dl->AddConvexPolyFilled(q, 4, (col & 0x00ffffff) | (gizmo_.hover == h ? 0x90000000u : 0x50000000u));
-            dl->AddPolyline(q, 4, col, ImDrawFlags_Closed, 1.5f * s);
+            planeSquare(q, i);
         }
         int order[3] = {0, 1, 2};
         std::sort(order, order + 3, [&](int a, int b) { return sc.axis[a].depth < sc.axis[b].depth; });
         for (int i : order) {
             const ga::Screen::Axis& ax = sc.axis[i];
-            if (ax.arrow) {
-                const ImU32 col = colorFor(H(int(H::MoveX) + i), i);
-                const glm::vec2 dir = glm::normalize(ax.tip - ax.from), nrm(-dir.y, dir.x);
-                const glm::vec2 base = ax.tip - dir * (ga::kHeadPx * s), w = nrm * (5.0f * s);
-                dl->AddLine(im(ax.from), im(base), shadow, thick + 2.0f * s);
-                dl->AddLine(im(ax.from), im(base), col, thick);
-                dl->AddTriangleFilled(im(ax.tip), im(base + w), im(base - w), col);
-            }
-            if (ax.box) {
-                const float h2 = ga::kBoxPx * s;
-                const ImVec2 lo(ax.boxAt.x - h2, ax.boxAt.y - h2), hi(ax.boxAt.x + h2, ax.boxAt.y + h2);
-                dl->AddRectFilled(lo, hi, colorFor(H(int(H::ScaleX) + i), i));
-                dl->AddRect(lo, hi, shadow, 0.0f, 0, 1.0f);
+            if (!ax.arrow) continue;
+            const H h = H(int(H::MoveX) + i);
+            const ImU32 col = colorFor(h, i);
+            const glm::vec2 dir = glm::normalize(ax.tip - ax.from);
+            const glm::vec2 base = ax.tip - dir * (ga::kHeadPx * s);
+            drawShaft(dl, im(ax.from), im(base), col, s);
+            drawCone(dl, im(base), im(ax.tip), (gizmo_.hover == h ? 6.5f : 5.5f) * s, col, s);
+            if (ax.ball) {
+                const H b = H(int(H::ScaleX) + i);
+                drawBall(dl, im(ax.ballAt), (ga::kBallPx + (gizmo_.hover == b ? 1.0f : 0.0f)) * s, colorFor(b, i), s);
             }
         }
         const float tabR = ga::kTabs * kRadiusPx * s;
-        const ImU32 tc = gizmo_.hover == H::ScaleUniform ? kHot : IM_COL32(240, 206, 96, dragging ? 140 : 255);
+        const ImU32 tc = neutral(H::ScaleUniform);
+        const float tw = gizmo_.hover == H::ScaleUniform ? 5.0f * s : 4.0f * s;
         for (int k = 0; k < 4; ++k) {
             const float t = 0.7853982f + float(k) * 1.5707963f; // (screen y points down: the arc about -t)
             dl->PathArcTo(pc, tabR, -t - ga::kTabHalf, -t + ga::kTabHalf, 12);
-            dl->PathStroke(shadow, 0, thick + 4.0f * s);
+            dl->PathStroke(shadow, 0, tw + 2.5f * s);
             dl->PathArcTo(pc, tabR, -t - ga::kTabHalf, -t + ga::kTabHalf, 12);
-            dl->PathStroke(tc, 0, thick + 1.5f * s);
+            dl->PathStroke(tc, 0, tw);
         }
-        const ImU32 cc = gizmo_.hover == H::MoveView ? kHot : IM_COL32(240, 206, 96, dragging ? 140 : 255);
+        const ImU32 cc = neutral(H::MoveView);
         dl->AddCircle(pc, 10.0f * s, shadow, 32, thick + 2.0f * s);
-        dl->AddCircle(pc, 10.0f * s, cc, 32, thick);
+        dl->AddCircle(pc, 10.0f * s, cc, 32, gizmo_.hover == H::MoveView ? thick : 2.0f * s);
     }
     // The pivot.
     dl->AddCircleFilled(pc, 3.5f * s, IM_COL32(255, 255, 255, 230), 16);
@@ -1040,7 +1095,7 @@ void App::drawGizmoPanel() {
 void App::drawGizmoContents(bool compact) {
     ui::Segmented(*this, {"tool.draw", "tool.move", "tool.scale", "tool.rotate", "tool.gizmo_all"});
     if (!compact && !gizmoActive()) {
-        ImGui::TextDisabled(tr("Q W E R: Draw, Move, Scale, Rotate; Shift+W: All"));
+        ImGui::TextDisabled("%s", tr("Q W E R: Draw, Move, Scale, Rotate; Shift+W: All"));
         return;
     }
     // Pivot.
@@ -1099,7 +1154,7 @@ void App::drawGizmoContents(bool compact) {
     }
     ui::HelpText("Clear", nullptr, "Set Move and Rotate back to 0 and Scale to 100%.", kPath);
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
-    ImGui::TextWrapped(tr("Shift snaps (15 deg, grid, 10%%). Alt+drag the gizmo: move it only. Alt+click the model: pivot there."));
+    ImGui::TextWrapped("%s", tr("Shift snaps (15 deg, grid, 10%). Alt+drag the gizmo: move it only. Alt+click the model: pivot there."));
     ImGui::PopStyleColor();
 }
 

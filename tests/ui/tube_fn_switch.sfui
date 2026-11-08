@@ -1,0 +1,65 @@
+# Tube functional pass: switching tools, Esc, undo in the middle of a stroke or a point drag; a tube on a dense mesh.
+run ui_look look=classic layout=classic
+wait 0.3
+click "Tube##tool.tube"
+click "Tube/Draw Tube"
+# A brush key mid-stroke: the stroke still ends as a tube, and Draw Tube is left.
+drag_path 0.3 0.4 0.55 0.2 0.8 0.45 keep S=0.6
+key 1
+release
+wait 0.2
+expect_value tube_parts == 1
+expect_value tube_draw == 0
+shot brush-key-mid
+# Esc mid-stroke drops the stroke (Draw Tube stays on).
+click "Tube/Draw Tube"
+drag_path 0.05 0.85 0.2 0.9 0.35 0.85 keep S=0.6
+key escape
+expect_status "stroke dropped"
+release
+wait 0.2
+expect_value tube_parts == 1
+expect_value tube_draw == 1
+shot esc-mid
+# Ctrl+Z mid-stroke drops the stroke, not the tube before it.
+drag_path 0.05 0.85 0.2 0.9 0.35 0.85 keep S=0.6
+key ctrl+z
+release
+wait 0.2
+expect_value tube_parts == 1
+# Ctrl+Z mid point drag puts the point back; the mesh still matches its points (a drag works after).
+drag_path 0.3 0.6 0.55 0.75 0.8 0.65 S=0.6
+wait 0.2
+expect_value tube_parts == 2
+run part_select index=1
+remember triangles before
+hold shift
+drag_tube_point 2 0 -60 keep
+hold none
+key ctrl+z
+expect_status "put back"
+release
+expect_value triangles == $before
+hold shift                                     # (Draw Tube is on: Shift grabs a dot)
+drag_tube_point 2 0 -40
+hold none
+expect_status "point moved"
+shot undo-mid
+# Dense: a 1.3M-triangle sphere, Surface depth and Merge.
+key escape
+run new_sphere subdivisions=8
+print triangles
+click "Tube/Merge"
+click "Tube/Draw Tube"                         # (Esc above left it)
+expect_value tube_draw == 1
+drag_path 0.3 0.4 0.5 0.35 0.7 0.4 S=0.8
+wait 0.5
+expect_status "merged into"
+expect_value open_edges == 0
+print frame_ms
+shot dense-merge
+click "Tube/New Part"
+drag_path 0.3 0.6 0.5 0.65 0.7 0.6 S=0.8
+wait 0.3
+expect_status "Added Tube Part"
+shot dense-part
