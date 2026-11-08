@@ -169,6 +169,10 @@ std::string App::leaveDrawModes() {
         gradient_.armed = false;
         left += left.empty() ? "Line Gradient" : " and Line Gradient";
     }
+    if (capture_.armed && drag_ != Drag::Capture) { // Brush > Capture from view waits for a square dragged on the model
+        capture_.armed = false;
+        left += left.empty() ? "Capture from view" : " and Capture from view";
+    }
     const int back = tubeReturnPart_;
     tubeReturnPart_ = -1;
     if (tubeActive() && back >= 0 && back < doc_.partCount() && back != doc_.activePart &&

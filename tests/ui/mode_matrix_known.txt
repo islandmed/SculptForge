@@ -1,9 +1,2 @@
 # Known mode matrix failures (tests/ui/mode_matrix.sfui, src/app/UiTestModes.cpp): ID | EXIT | the fix task.
 # Logged as KNOWN, not failed. When a fix lands its case passes and the matrix fails until the line goes.
-brush.capture_view | Draw | task modes-capture-exit: a brush or a tool leaves Capture from view
-brush.capture_view | Move | task modes-capture-exit: a brush or a tool leaves Capture from view
-brush.capture_view | Rotate | task modes-capture-exit: a brush or a tool leaves Capture from view
-brush.capture_view | Scale | task modes-capture-exit: a brush or a tool leaves Capture from view
-brush.capture_view | a brush on the shelf | task modes-capture-exit: a brush or a tool leaves Capture from view
-brush.capture_view | a palette action | task modes-capture-exit: a brush or a tool leaves Capture from view
-brush.capture_view | undo | task modes-capture-exit: a brush or a tool leaves Capture from view
