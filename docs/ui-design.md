@@ -11,7 +11,7 @@ Sculptors should find their way around within a minute:
 - **Library** on `,` (comma): a horizontal thumbnail strip along the top of the canvas;
 - a **script console** at the bottom;
 - **Ctrl+hover** on any control shows its description and shortcut;
-- **Customize**: Preferences > Config > Customize Shelves, Ctrl+Alt+drag to move or remove items, **Save Layout**, **Reset Layout and Shortcuts** (preferences and shortcuts save themselves, #117).
+- **Customize**: Preferences > Saving & Layouts > Customize Shelves, Ctrl+Alt+drag to move or remove items, **Save Layout**, **Reset Layout and Shortcuts** (preferences and shortcuts save themselves, #117).
 
 Not goals: free-floating or OS-level detachable panels, tabbed docking, a full keymap editor, a 2.5D canvas. These need ImGui's docking branch or aren't worth the cost (see §12).
 
@@ -137,7 +137,7 @@ Every palette's body is one function `void drawPalette_<Id>()`, and the same fun
 | **Generate** | Generate 3D (image/text -> 3D, ComfyUI) opens the existing Generate 3D window; Image Relief / Inflate / Project (`cmd:image_relief`, `image_inflate`, `image_project`); AI provider settings (`drawAiSettings`) |
 | **Help** | Controls (shortcut sheet generated from the Action registry), User Guide (Shift+F1), What's New (also opened once after each update), Command palette (F3), Website & documentation, Report a problem, About SculptForge |
 | **Material** | Studio + Lit Sphere thumbnail grid (`cmd:set_material`); base colour (today's "Material" ColorEdit in Tools) |
-| **Preferences** | Sub-palettes: **Config** (Customize Shelves, Save Layout, Revert to Saved Layout, Reset Layout and Shortcuts, Export Interface..., Import Interface... Ctrl+L); **Interface** (UI scale, Ctrl+hover help, Plain tooltips delay, One sub-palette open, Left-handed layout); **Library** (library folder, Show at startup, Startup rows, Placement top/bottom); **Hotkeys** (list with reset; Store); **Tablet** (pen, pressure meter, test area, pressure curve, eraser and side-button mappings; see docs/tablet.md); **Autosave** |
+| **Preferences** | Sub-palettes: **Saving & Layouts** (Customize Shelves, Save Layout, Revert to Saved Layout, Reset Layout and Shortcuts, Export Interface..., Import Interface... Ctrl+L); **Interface** (UI scale, Ctrl+hover help, Plain tooltips delay, One sub-palette open, Left-handed layout); **Library** (library folder, Show at startup, Startup rows, Placement top/bottom); **Hotkeys** (list with reset; Store); **Tablet** (pen, pressure meter, test area, pressure curve, eraser and side-button mappings; see docs/tablet.md); **Autosave** |
 | **Render** | Wireframe (Shift+F), Show Mesh, Show Vertex Paint, Show Mask, Show Face Groups, Show Splats, Frame Model (F) (today's View menu render toggles) |
 | **Script** | Show console (`` ` ``), Run script file..., Copy session as script, Clear console |
 | **Splats** | `drawSplatSection` body (info, clean, transform, to mesh, save, clear) |
@@ -423,7 +423,7 @@ Json toJson(const UiLayout&); bool fromJson(const Json&, UiLayout&, std::string&
 ```
 
 ### 9.2 Behaviour
-- **Preferences > Config > Customize Shelves** sets `customize`. While it's on, the shelves draw a dashed 1 px outline and the status line says "Customize: Ctrl+Alt+drag to move or remove items".
+- **Preferences > Saving & Layouts > Customize Shelves** sets `customize`. While it's on, the shelves draw a dashed 1 px outline and the status line says "Customize: Ctrl+Alt+drag to move or remove items".
 - **Ctrl+Alt+drag** any ActionButton or shelf widget. It works from palettes and pickers too, which is how you *add* an item to a shelf.
   - ImGui drag source, payload `"SF_UIITEM"` = `{ itemId, fromShelf, fromIndex }`.
   - Shelves draw insertion targets between items (2 px accent line).
@@ -434,7 +434,7 @@ Json toJson(const UiLayout&); bool fromJson(const Json&, UiLayout&, std::string&
 - **Revert to Saved Layout**: reload `ui.json`.
 - **Export Interface... / Import Interface... (Ctrl+L)**: the same JSON at a chosen path (for sharing layouts).
 - At startup `ui.json` is loaded if it's there, otherwise the standard layout. `--ui-test`, `--render` and recording **always** use the standard layout (deterministic tests and videos).
-- The layout is never saved automatically (the preferences are). So nobody is surprised, the first time the layout changes in a session (tray moved, shelf edited) the status line hints once: "Layout changed - Preferences > Config > Save Layout keeps it".
+- The layout is never saved automatically (the preferences are). So nobody is surprised, the first time the layout changes in a session (tray moved, shelf edited) the status line hints once: "Layout changed - Preferences > Saving & Layouts > Save Layout keeps it".
 
 ### 9.3 Presets (title-strip `[1][2][3]`)
 1. **Standard** (§2).

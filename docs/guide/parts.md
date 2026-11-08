@@ -192,11 +192,11 @@ split, use **Remove Hidden** or **Delete masked** in **Tool > Visibility**.
 
 ## Extract a shell
 
-**Extract**, in **Tool > Parts**, makes a new Part from the masked part of the active one: a helmet from the
+**Make Shell**, in **Tool > Parts > Extract**, makes a new Part from the masked part of the active one: a helmet from the
 top of a head, a strap, a sleeve, a piece of armour that fits the surface exactly. It works:
 
 1. Mask the part (hold <kbd>Ctrl</kbd> and paint, or use **Rectangle Mask** / **Lasso Mask**; see [Masking](masking.md)).
-2. Click **Extract**. The shell appears as a preview, a Part just below the active one.
+2. Click **Make Shell**. The shell appears as a preview, a Part just below the active one.
 3. Change **Thickness**, **Edge Smooth**, **Both Sides**, **Corners** or **Border** and the preview follows. Click **Accept** to keep it.
 
 | Setting | What it does |

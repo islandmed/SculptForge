@@ -10,7 +10,7 @@
 //  - Make Symmetric (Tool > Geometry > Symmetry): the half on the + side of a plane through the origin
 //    is kept and mirrored onto the - side, and the seam welded into one watertight mesh. Triangles crossing the
 //    plane are cut on it; face groups, vertex paint, mask, UVs and sculpt layers are carried over.
-//  - Mirror (Tool > Deformation): flips the Part across a plane (normals stay outward).
+//  - Mirror (Tool > Reshape): flips the Part across a plane (normals stay outward).
 #pragma once
 
 #include "core/Mesh.h"

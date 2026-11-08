@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Tool > Geometry > Merge by Distance and Check Mesh (foirgairwolf on Discord). The work is done by the weld_points,
+// Tool > Geometry > Merge by Distance and Find Problems (foirgairwolf on Discord). The work is done by the weld_points,
 // mesh_check and mesh_fix commands (core/MeshCheck.h); this is their panel and the weld's preview on the model.
 #include "app/App.h"
 #include "app/Demo.h"
@@ -54,7 +54,7 @@ void App::drawMeshCheckContents() {
     if (ImGui::Button(tr("Merge##weld_points"), ImVec2(button, 0))) {
         runCommand("weld_points", {{"distance", double(weldDistance_)}});
         weldKey_ = 0;
-        meshReportScroll_ = 2; // Check Mesh is next: its row comes into view (below the fold in a 1024 px drop-down)
+        meshReportScroll_ = 2; // Find Problems is next: its row comes into view (below the fold in a 1024 px drop-down)
     }
     ImGui::EndDisabled();
     ui::HelpText("Merge", nullptr,
@@ -87,15 +87,15 @@ void App::drawMeshCheckContents() {
         ImGui::TextDisabled("%s", tr("Let go of the slider to count"));
     Demo::popScope();
 
-    Demo::pushScope("Check Mesh");
-    tray::GroupLabel(*this, "Check Mesh");
+    Demo::pushScope("Find Problems");
+    tray::GroupLabel(*this, "Find Problems");
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
     const bool current = meshReportKey_ == key;
     if (ImGui::Button(tr("Check##mesh_check"), ImVec2(half, 0))) runMeshCheck();
     ui::HelpText("Check", nullptr,
                  "Look for what makes a mesh hard to sculpt, remesh, print or export. Checking changes nothing; each "
                  "Fix changes only what its row names, as one undo step.",
-                 "Tool > Geometry > Check Mesh");
+                 "Tool > Geometry > Find Problems");
     ImGui::SameLine();
     size_t fixable = 0;
     for (int i = 0; i < kMeshIssueCount; ++i)
@@ -109,7 +109,7 @@ void App::drawMeshCheckContents() {
     ui::HelpText("Fix all", nullptr,
                  "Fix every problem listed except holes, as one undo step. Holes stay open: a mesh can be open on "
                  "purpose (use their own Fix to cap them).",
-                 "Tool > Geometry > Check Mesh");
+                 "Tool > Geometry > Find Problems");
     if (meshReportKey_ == 0) {
         ImGui::TextDisabled("%s", tr("Not checked yet"));
     } else if (!current) {
@@ -147,7 +147,7 @@ void App::drawMeshCheckContents() {
             ImGui::PopID();
         }
     }
-    if (meshReportScroll_ > 0) { // Check Mesh's last line (the report's, or "check again") above the bottom edge
+    if (meshReportScroll_ > 0) { // Find Problems's last line (the report's, or "check again") above the bottom edge
         --meshReportScroll_;
         if (ImGui::GetCursorScreenPos().y > ImGui::GetWindowPos().y + ImGui::GetWindowHeight()) ImGui::SetScrollHereY(1.0f);
     }

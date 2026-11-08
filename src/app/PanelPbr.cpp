@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Material channels in the interface (core/TextureChannels.h, core/MapExport.h):
-//   - Tool > Texture Map > Material Channels: which channels the texture has, the solo channel view and Export
+//   - Tool > Texture Image > Material Channels: which channels the texture has, the solo channel view and Export
 //     Maps with a preset;
 //   - Color > Material: what the Paint brush lays on each channel (a checkbox, value swatches and a slider per
 //     channel) and material swatches that set every channel at once; C over the model picks every channel;
@@ -37,7 +37,7 @@ namespace sf {
 
 namespace {
 
-constexpr const char* kMapPath = "Tool > Texture Map";
+constexpr const char* kMapPath = "Tool > Texture Image";
 constexpr const char* kColorPath = "Color > Material";
 constexpr const char* kLayersPath = "Tool > Paint Layers";
 

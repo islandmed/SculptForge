@@ -261,7 +261,7 @@ void App::startBake() {
         sources->push_back(std::move(high));
     } else {
         if (!doc_.mesh.hasUvs()) {
-            status_ = "Bake needs UVs on this Part (the low-poly): Tool > Texture Map > Auto UV";
+            status_ = "Bake needs UVs on this Part (the low-poly): Tool > Texture Image > Auto UV";
             return;
         }
         std::string source = "all";
@@ -375,13 +375,13 @@ void App::drawBakeContents() {
 
     // What the maps go onto.
     if (!m.hasUvs()) {
-        ImGui::TextDisabled(tr("No UVs: Tool > Texture Map > Auto UV"));
+        ImGui::TextDisabled(tr("No UVs: Tool > Texture Image > Auto UV"));
     } else {
         ImGui::TextDisabled(tr("Onto %s (%zu tris, UVs)"), doc_.activePartInfo().name.c_str(), m.triangleCount());
     }
     ui::HelpText("Low-poly", nullptr,
                  "Maps are baked onto the active Part's UVs: make the low-poly active (it needs UVs from import or "
-                 "from Auto UV in Tool > Texture Map), and keep the high-poly Part(s) visible.",
+                 "from Auto UV in Tool > Texture Image), and keep the high-poly Part(s) visible.",
                  kPath);
 
     // Source.

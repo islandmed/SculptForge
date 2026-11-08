@@ -62,7 +62,7 @@ Clean-room: the Python sketch posted with the request is not opened or used. Cla
    Bernstein sum `p = sum B_i^l(s) B_j^m(t) B_k^n(u) P_ijk` (trilinear for resolution 1), weighted by 1 - mask,
    recomputed in parallel per change (positions only, through the same undo-replace preview as the stack).
 3. **Apply**: bake into the vertices as one undo step and drop the cage; **Cancel** drops it unchanged.
-   Toolbar buttons (Generate Lattice, Apply Lattice) plus Tool > Deformation > Lattice; commands
+   Toolbar buttons (Generate Lattice, Apply Lattice) plus Tool > Reshape > Lattice; commands
    `lattice_generate res=3,3,3`, `lattice_move_points`, `lattice_apply`, `lattice_cancel`.
 
 The What's New fragment for this slice credits fenix on Discord.

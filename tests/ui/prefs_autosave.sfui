@@ -44,9 +44,9 @@ key enter
 expect_status "Preferences saved"
 shot palette
 
-# Preferences > Config: Customize Shelves, Save Layout, Revert / Reset, Export / Import, and the note.
+# Preferences > Saving & Layouts: Customize Shelves, Save Layout, Revert / Reset, Export / Import, and the note.
 click "Preferences##palette.preferences"
-click "Config##preferences.config"
+click "Saving & Layouts##preferences.config"
 expect_text "Preferences and shortcuts save themselves"
 expect "Save Layout##config.save_layout"
 shot preferences-config

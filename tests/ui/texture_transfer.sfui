@@ -18,17 +18,17 @@ remember texture_painted painted
 shot painted
 
 # Auto UV again: the islands are packed for the 1K texture now (a new layout); the paint stays put.
-click "Texture Map##tool.texture"
-click "Texture Map/Auto UV"
+click "Texture Image##tool.texture"
+click "Texture Image/Auto UV"
 wait_idle 120
 expect_status "moved to the new UVs"
 expect_status "1 layer"
 expect_value texture_layers == 1
 expect_value texture_size == 1024
 shot after-auto-uv
-click "Texture Map/Show UVs"
+click "Texture Image/Show UVs"
 shot after-auto-uv-layout
-click "Texture Map/Show UVs"
+click "Texture Image/Show UVs"
 
 # One undo step brings back the old UVs and the old texture exactly.
 key ctrl+z

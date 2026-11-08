@@ -6,7 +6,7 @@ light, game-ready mesh holds pores, freckles and sharp decals that vertex paint 
 polygons. Everything you know from [vertex paint](vertex-paint.md) still applies: the same Paint brush, colours, fills,
 symmetry, mask and paint layers with blend modes.
 
-![Texture painting: a sharp texture stroke above a soft vertex paint stroke, with the UV view in Tool > Texture Map](images/texture-painting.jpg)
+![Texture painting: a sharp texture stroke above a soft vertex paint stroke, with the UV view in Tool > Texture Image](images/texture-painting.jpg)
 
 > The texture can also carry roughness, metallic, normal, height, AO, emission and opacity, painted in the same
 > strokes: see [Material painting (PBR)](pbr-painting.md).
@@ -16,12 +16,12 @@ symmetry, mask and paint layers with blend modes.
 Press <kbd>P</kbd> for the Paint brush (or turn on **Rgb**). While the Part has no texture, **New Texture**
 appears on the top shelf and in the **Paint** menu. Click it: if the model has no UVs, SculptForge runs **Auto
 UV** first (in the background; the status bar shows its progress), then gives it a white texture (2K, or the size
-chosen in Tool > Texture Map) and switches painting to **Texture**. Paint away. The steps below do the same thing
+chosen in Tool > Texture Image) and switches painting to **Texture**. Paint away. The steps below do the same thing
 by hand, with more choices.
 
 ## Paint a texture in four steps
 
-1. Open **Tool > Texture Map** in the right tray.
+1. Open **Tool > Texture Image** in the right tray.
 2. If the Part has no UVs (the sub-palette says "No UVs"), click **Auto UV**. SculptForge cuts the model
    into UV islands and packs them into the texture square. It works in the background with a progress bar; on
    a few hundred thousand triangles it takes seconds, on millions it can take a minute or more. Models imported
@@ -39,7 +39,7 @@ watch the texture fill in.
 ## Vertex or Texture
 
 When a Part has a texture, **Vertex** and **Texture** appear on the top shelf next to **Rgb** (and in the Color,
-Paint Layers and Texture Map palettes). They choose where paint goes:
+Paint Layers and Texture Image palettes). They choose where paint goes:
 
 - **Texture**: the Paint brush, **Rgb** while sculpting, **Fill**, **Fill masked**, **Cavity**, **Clear** and
   the Paint Layers palette work on the texture.
@@ -49,7 +49,7 @@ The model shows both: the vertex paint multiplied by the texture, over the mater
 the mesh's polygons, it is going into the vertices: check that **Texture** is lit, and that the Part carries no
 old vertex paint (Tool > Paint Layers, or **Vertex Paint > Texture** to move it into the texture). Texture paint itself
 is as sharp as the texture: a hard alpha gives the same texels on a two-triangle plane as on a dense mesh. Each Part keeps its own
-choice, saved in the project. **Show texture** (Texture Map, or the **Paint** menu) hides the texture in the
+choice, saved in the project. **Show texture** (Texture Image, or the **Paint** menu) hides the texture in the
 viewport without deleting it.
 
 ## How texture painting works

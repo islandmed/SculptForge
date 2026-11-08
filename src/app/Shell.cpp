@@ -575,7 +575,7 @@ void App::registerShellActions() {
          [this] { return renderSettings_.floorGrid; }, nullptr});
     flag("view.vertexpaint", "Paint", ICON_LC_PALETTE, "Render", "", &renderSettings_.showVertexPaint,
          "Show vertex paint colours (off: plain material).");
-    // Shading (Material palette, Tool > Display): the scene's, and the active Part's own.
+    // Shading (Material palette, Tool > Viewport Look): the scene's, and the active Part's own.
     // Viewport shading (Material > Viewport Shading): Lit Sphere or PBR.
     add({"view.shading_lit_sphere", "Lit Sphere", nullptr,
          "Lit Sphere shading (the default): the chosen material sphere or the studio lights, made for reading forms "

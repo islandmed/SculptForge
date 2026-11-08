@@ -3071,7 +3071,7 @@ void App::drawUi() {
     drawBrushGallery();
     if (showImageTo3D_) drawImageTo3D();
     drawPhoneWindow(); // File > Capture from phone (PanelPhone.cpp)
-    drawUvEditor();    // Tool > Texture Map > UV Editor (PanelUvEditor.cpp)
+    drawUvEditor();    // Tool > Texture Image > UV Editor (PanelUvEditor.cpp)
     drawTimelineUi();  // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)
     pollAlphaFile();
     pollStencilFile();

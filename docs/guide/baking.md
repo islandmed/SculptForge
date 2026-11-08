@@ -13,7 +13,7 @@ normal map on the low-poly right away so you can compare it with the sculpt.
 - **A high-poly source**: one or more Parts with the detail. They stay as they are.
 - **A low-poly Part with UVs**, in the same place as the high-poly. It can come from another app (import it
   with **Tool > Parts > Append**; models with UVs keep them), or you make it in SculptForge: **Duplicate** the
-  sculpt, **Tool > Geometry > Decimate** it, then **Tool > Texture Map > Auto UV**.
+  sculpt, **Tool > Geometry > Decimate** it, then **Tool > Texture Image > Auto UV**.
 
 The maps go onto the **active** Part, so select the low-poly before baking.
 

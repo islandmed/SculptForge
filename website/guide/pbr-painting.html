@@ -63,7 +63,7 @@
 Give the Part a texture (<a href="texture-painting.html">Texture painting</a>).
 </li>
 <li>
-Open <strong>Tool &gt; Texture Map</strong>. Under <strong>Material Channels</strong>, tick the channels you want (for a typical game asset: Roughness, Metallic and Normal; add Height to paint relief, Ambient Occlusion to paint dirt into crevices).
+Open <strong>Tool &gt; Texture Image</strong>. Under <strong>Material Channels</strong>, tick the channels you want (for a typical game asset: Roughness, Metallic and Normal; add Height to paint relief, Ambient Occlusion to paint dirt into crevices).
 </li>
 <li>
 <strong>Channel memory</strong> below the ticks shows what the painted tiles use; the same number, for every Part, is in <strong>Edit &gt; Preferences &gt; Performance</strong> under Memory.
@@ -71,7 +71,7 @@ Open <strong>Tool &gt; Texture Map</strong>. Under <strong>Material Channels</st
 </ol>
 <h2 id="paint-a-material">Paint a material<a class="anchor" href="#paint-a-material" aria-label="Link to this section">#</a></h2>
 <p>Open the <strong>Paint</strong> menu. With a material texture, a <strong>Material</strong> section appears under the swatches:</p>
-<figure class="shot"><a href="images/pbr-brush-material.jpg" class="zoom"><img src="images/pbr-brush-material.jpg" alt="Paint &gt; Material: material swatches, and per channel a tick, value swatches and a slider; Material Channels in Tool &gt; Texture Map" width="360" height="940" loading="lazy" decoding="async"></a><figcaption>Paint &gt; Material: material swatches, and per channel a tick, value swatches and a slider; Material Channels in Tool &gt; Texture Map</figcaption></figure>
+<figure class="shot"><a href="images/pbr-brush-material.jpg" class="zoom"><img src="images/pbr-brush-material.jpg" alt="Paint &gt; Material: material swatches, and per channel a tick, value swatches and a slider; Material Channels in Tool &gt; Texture Image" width="360" height="940" loading="lazy" decoding="async"></a><figcaption>Paint &gt; Material: material swatches, and per channel a tick, value swatches and a slider; Material Channels in Tool &gt; Texture Image</figcaption></figure>
 <ul>
 <li>
 <strong>Material swatches</strong> set the colour, roughness and metallic at once (bare metal, gold, copper, rust, gloss paint, rubber, stone, clay) and make the brush paint those channels.
@@ -119,7 +119,7 @@ The layer&#x27;s own opacity, visibility and lock apply to all its channels.
 <figure class="shot"><a href="images/pbr-environment.jpg" class="zoom"><img src="images/pbr-environment.jpg" alt="The environment behind the model: Outdoor Sky with the AgX tone map" width="960" height="676" loading="lazy" decoding="async"></a><figcaption>The environment behind the model: Outdoor Sky with the AgX tone map</figcaption></figure>
 <p>The view stays as fast as Lit Sphere: lighting is precomputed per environment (on a worker thread when you switch), and only the pixels on screen pay for it. A 20.9-million-triangle Part draws in about 8 ms in PBR next to about 6 ms with Lit Sphere on an Apple M1 Pro. The settings are saved with the project (<code>viewport_shading mode=pbr environment=outdoor_sky exposure=0.5 tone_map=agx</code>).</p>
 <h2 id="see-one-channel-on-its-own">See one channel on its own<a class="anchor" href="#see-one-channel-on-its-own" aria-label="Link to this section">#</a></h2>
-<p><strong>Tool &gt; Texture Map &gt; Normal view</strong> opens a list: pick <strong>Solo Roughness</strong> (or any enabled channel) and the model shows just that channel, in grey for roughness, metallic, height, AO and opacity, as colours for the normal (with the height&#x27;s normal in it) and in colour for emissive. Painting updates it live. Pick <strong>Normal view</strong> to go back. The viewport doesn&#x27;t yet render the channels together as a lit PBR material; the solo view is how you check them for now.</p>
+<p><strong>Tool &gt; Texture Image &gt; Normal view</strong> opens a list: pick <strong>Solo Roughness</strong> (or any enabled channel) and the model shows just that channel, in grey for roughness, metallic, height, AO and opacity, as colours for the normal (with the height&#x27;s normal in it) and in colour for emissive. Painting updates it live. Pick <strong>Normal view</strong> to go back. The viewport doesn&#x27;t yet render the channels together as a lit PBR material; the solo view is how you check them for now.</p>
 <h2 id="height-and-normals">Height and normals<a class="anchor" href="#height-and-normals" aria-label="Link to this section">#</a></h2>
 <p>Height is stored with 16 bits, so slow ramps don&#x27;t band. Its slope becomes a normal that is combined onto the Normal channel (Normal Combine) wherever a normal is shown or exported, so painting height also gives the shading detail. <code>texture_channels height_normal_strength=4</code> sets how steep that normal is (0: height adds no normal).</p>
 <h2 id="carrying-channels-through-geometry-changes">Carrying channels through geometry changes<a class="anchor" href="#carrying-channels-through-geometry-changes" aria-label="Link to this section">#</a></h2>

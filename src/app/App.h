@@ -362,7 +362,7 @@ private:
     // half-written value (they take effect from the next batch, as they did from the next dab before). The
     // alpha and the recipe are the stroke's own copies (strokeAlpha_, strokeRecipe_), which nothing changes.
     // Never on the solver thread: the painted texture and PBR channels (Mesh::texture: its tiles, shown() and dirty
-    // tiles are edited on the main thread only, and the Texture Map panel runs texture commands). Painting strokes
+    // tiles are edited on the main thread only, and the Texture Image panel runs texture commands). Painting strokes
     // stay in the frame loop (asyncStrokeAllowed), and nothing a batch does (dabAt without paint, the sculptor,
     // prepareStrokeUpload, which refuses slots with UVs) reads mesh->texture.
     struct DabSettings {
@@ -1067,7 +1067,7 @@ private:
     // The view's background (#21): gradient or a flat display colour; also the preference for the next session.
     void setBackground(bool gradient, const glm::vec3& color);
     void drawBackgroundControls(const char* idSuffix); // Preferences > Display and the Render palette
-    void drawShadingControls();     // Material palette and Tool > Display: Smooth | Flat, and the Part's own
+    void drawShadingControls();     // Material palette and Tool > Viewport Look: Smooth | Flat, and the Part's own
     void drawViewportShadingControls(); // Material palette: Lit Sphere | PBR and the environment
     void paintAt(const DabParams& p);
     void pickColorUnderCursor();
@@ -1077,7 +1077,7 @@ private:
     void beginPaintStroke();
     void finishPaintStroke(UndoRecord& record);
     TexturePainter texturePainter_; // strokes into the Part's texture (core/Texture.h)
-    // Texture Map sub-palette (PanelTexture.cpp): texture painting on UVs, Auto UV, the UV view.
+    // Texture Image sub-palette (PanelTexture.cpp): texture painting on UVs, Auto UV, the UV view.
     void drawTextureMapContents();
     void registerTextureUiActions();
     // UV Editor (PanelUvEditor.cpp): the window with the 2D UV layout and its tools, the 3D Seam / Select tool, the
@@ -1107,7 +1107,7 @@ private:
     void uvPackGridUsed(const Args& args);
     bool showUvEditor_ = false;
     // Auto UV on a worker (xatlas takes seconds on big meshes): the button, New Texture, and the uv_auto command from
-    // the console, an AI tool or a UI test (resolution 0: the texture's size, or the size chosen under Texture Map).
+    // the console, an AI tool or a UI test (resolution 0: the texture's size, or the size chosen under Texture Image).
     void startAutoUv(int resolution = 0, bool keepTexture = true, bool command = false);
     CommandResult startAutoUvCommand(const Args& args); // runCommand's uv_auto (macros keep the synchronous one)
     void startNewTexture(); // New Texture on the top shelf / Color palette: Auto UV first when there are no UVs
@@ -1135,8 +1135,8 @@ private:
     std::unique_ptr<AutoUvJob> autoUv_;
     bool textureAfterAutoUv_ = false;    // the running Auto UV came from New Texture: make the texture after it
     int textureSizeChoice_ = 1;          // 1K, 2K, 4K, 8K
-    bool showUvView_ = false;            // Texture Map > Show UVs
-    // Material channels (PanelPbr.cpp): channel toggles, the solo channel view and map export under Texture Map,
+    bool showUvView_ = false;            // Texture Image > Show UVs
+    // Material channels (PanelPbr.cpp): channel toggles, the solo channel view and map export under Texture Image,
     // the brush material (per-channel values and swatches) in the Color palette, and per-channel chips on the
     // Paint Layers rows (enable, blend, opacity).
     void drawTextureChannelsContents();
@@ -1390,7 +1390,7 @@ private:
         float x = 0.0f, y = 0.0f;
     } zsMenu_;
     bool forgesphereRightDown(float x, float y); // a right press on a sphere arms the menu
-    float deformAmount_[4] = {50.0f, 50.0f, 50.0f, 50.0f}; // Tool > Deformation: Polish, Relax, Smooth, Balloon
+    float deformAmount_[4] = {50.0f, 50.0f, 50.0f, 50.0f}; // Polish, Relax, Smooth, Balloon (shown Smooth first)
     bool deformKeepVolume_ = false;
     float zoomDragAmount(float dx, float dy) const; // Drag::Zoom's step (App.cpp)
     void drawForgeSphereMenu();
@@ -1887,12 +1887,12 @@ private:
     void partDropTarget(const std::string& folder, PartFolderActions& fa);
     std::string partFolderName(uint32_t id) const;
     void startFolderRename(); // the folder just made: its name ready to type
-    // PanelExtract.cpp: Tool > Part > Extract, Tool > Geometry > Symmetry (Make Symmetric) and
-    // Tool > Deformation (Mirror).
+    // PanelExtract.cpp: Tool > Part > Extract, Tool > Geometry > Symmetry (Make Symmetric, Mirror) and
+    // Tool > Reshape (Smooth, Relax, Polish, Balloon).
     void drawExtractContents();
     void drawSymmetryContents();
     void drawDeformationContents();
-    // PanelMeshCheck.cpp: Tool > Geometry > Merge by Distance (weld_points) and Check Mesh (mesh_check / mesh_fix),
+    // PanelMeshCheck.cpp: Tool > Geometry > Merge by Distance (weld_points) and Find Problems (mesh_check / mesh_fix),
     // and the points a weld would merge drawn on the model while the distance is dragged or hovered.
     void drawMeshCheckContents();
     void drawWeldPreviewOverlay();
@@ -1906,7 +1906,7 @@ private:
     std::vector<glm::vec3> weldPoints_; // a sample (<= 20000) of the points that would merge, for the preview
     MeshReport meshReport_;
     uint64_t meshReportKey_ = 0; // 0 = not checked yet
-    int meshReportScroll_ = 0; // frames left to scroll the tray down to Check Mesh (after Merge) or a new report's rows (below the fold)
+    int meshReportScroll_ = 0; // frames left to scroll down to Find Problems (after Merge) or a new report's rows (below the fold)
     void runMeshCheck();
     void runExtract(); // Extract with the palette's settings (a preview; Accept keeps it)
     static std::string axesText(const bool axes[3]); // "x", "xz", "" (the axis argument of mirror commands)
@@ -1916,8 +1916,8 @@ private:
     bool extractTriCorners_ = false;        // Corners: triangles in the rim's sharp corners
     bool extractTriBorder_ = false;         // Border: the whole rim triangles
     bool mirrorWeldAxes_[3] = {true, false, false}; // Make Symmetric's X Y Z
-    bool mirrorAxes_[3] = {true, false, false};     // Deformation > Mirror's X Y Z
-    // Deformation > Stack (docs/design/deform-panel.md): the steps, the one being edited and the preview, which is
+    bool mirrorAxes_[3] = {true, false, false};     // Symmetry > Mirror's X Y Z
+    // Reshape > Stack (docs/design/deform-panel.md): the steps, the one being edited and the preview, which is
     // the stack really applied as one undo step (redone after each change while it is still the last step).
     struct DeformStackUi {
         std::vector<DeformStep> steps;
@@ -1930,7 +1930,7 @@ private:
         uint32_t part = 0;       // the Part it was applied to
     } deformStack_;
     void drawDeformStack();
-    // Deformation > Size: the active Part's dimensions (scene units), worked out again when the undo history, the
+    // Reshape > Size: the active Part's dimensions (scene units), worked out again when the undo history, the
     // active Part or its vertex count changes; editing one resizes the Part (deform_size).
     struct DeformSizeUi {
         uint64_t revision = ~uint64_t(0);

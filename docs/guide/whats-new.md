@@ -29,7 +29,7 @@ highlight: macOS: SculptForge > Preferences... in the app menu opens Preferences
   rows instead of cutting words off.
 - **Tool > Geometry, grouped by what you do**: **Levels** (the **Level** slider, **Lower / Higher Level**, **Add
   Level** with **Smooth**, **Rebuild Lower Levels**, then **Remove Below / Remove Above**), **Micro Detail**,
-  **Resolution** (Decimate, Quad Remesh, Subdivide), **Cleanup** (**Fill Holes**, Merge by Distance, Check Mesh) and
+  **Resolution** (Decimate, Quad Remesh, Subdivide), **Cleanup** (**Fill Holes**, Merge by Distance, Find Problems) and
   **Symmetry** (**Make Symmetric**). Quad Remesh controls say what they do too (**Target Quads**, **50% / 100% /
   200%**, **Size Variation**, **Follow Face Groups**, **Keep Hard Edges**, **Guide Strength**), and **Remove Hidden**
   in Tool > Visibility. Shortcuts, shelves, scripts and saved files are unchanged, and the command search (F3) still
@@ -45,7 +45,7 @@ date: 2026-11-07
 tagline: Micro sculpting fixed, a 3D tube pen, and tools for tidy Parts.
 highlight: Fixed: big Clay strokes on Micro levels could break the surface into shards (since 0.11.10); Micro sculpting is back to 0.11.9's speed
 highlight: Tube: draw clay tubes in the air like a 3D pen, then edit their points (thanks GABO on Discord)
-highlight: Parts tools: split hidden, masked or unmasked areas into a new Part, merge points by distance, and Check Mesh with a Fix for each problem (thanks foirgairwolf on Discord)
+highlight: Parts tools: split hidden, masked or unmasked areas into a new Part, merge points by distance, and Find Problems with a Fix for each problem (thanks foirgairwolf on Discord)
 highlight: Hardware tiers and Turbo: SculptForge tunes itself to your computer, with a memory readout in the top bar (thanks Oslen on Discord)
 highlight: Side shelves no longer scroll sideways (thanks dm4nd on Discord), and Frame fits the model into the free area of the canvas
 ```
@@ -66,7 +66,7 @@ highlight: Side shelves no longer scroll sideways (thanks dm4nd on Discord), and
   to Smooth to Flat.
 - **Merge by Distance** (**Tool > Geometry**): merge points closer than a distance, with a live count and the points
   shown on the model before you click. For unwelded imports. Asked for by foirgairwolf on Discord.
-- **Check Mesh** (**Tool > Geometry**): counts non-manifold edges, holes, duplicate, degenerate, zero-area and flipped
+- **Find Problems** (**Tool > Geometry**): counts non-manifold edges, holes, duplicate, degenerate, zero-area and flipped
   triangles and isolated points, with a **Fix** per row and **Fix all**. Checking never changes the mesh.
 - **Recent colours**: the last eight colours you painted with sit under the colour picker on the left shelf; click one
   to paint with it again. Thanks Oslen on Discord.
@@ -86,11 +86,11 @@ highlight: Small screens: below 1280 px the side palettes open as drop-downs ins
 highlight: Membership moments: a quiet heart in the top bar and an occasional thank-you at a milestone; nothing in the app is ever paywalled
 ```
 
-- **Deformation stack** (requested by foirgairwolf on Discord): **Tool > Deformation > Stack** bends, twists, tapers,
+- **Deformation stack** (requested by foirgairwolf on Discord): **Tool > Reshape > Stack** bends, twists, tapers,
   shears, turns, moves, scales, squashes, rounds, boxes, flattens, sags or puts depth on the whole Part, along any of
   X, Y and Z, with a live preview. Stack steps up, switch them on and off, repeat one, then **Apply** (one undo step),
   **Apply Selected** or **Reset**. Every step is a command too: `deform_stack ops="bend 45 y soft; twist 90 y"`.
-- **Exact size** (requested by foirgairwolf on Discord): **Tool > Deformation > Size** shows the Part's width, height
+- **Exact size** (requested by foirgairwolf on Discord): **Tool > Reshape > Size** shows the Part's width, height
   and depth in scene units; drag one or type an exact value to resize it, with **Uniform** keeping its proportions.
 - **Membership moments**: the small membership card can now also come at a milestone (your 10th start, 10 hours of
   sculpting, your 100th save; counted on your computer only, never sent) and says the true number. After a third **Not
@@ -240,7 +240,7 @@ highlight: Hyper3D Rodin, direct: generate a model from an image or a descriptio
 - **Input style keys after a restart**: the Blender, Classic and Maya styles keep every key when SculptForge starts
   again (F for the Size slider in the Blender style, 9 for a Snapshot with the Classic keys).
 - **Auto UV never freezes the app**: the `uv_auto` command from the console, a script or an AI tool now unwraps in the
-  background like the **Tool > Texture Map > Auto UV** button, which gains a **Cancel** button beside its progress.
+  background like the **Tool > Texture Image > Auto UV** button, which gains a **Cancel** button beside its progress.
 - **Faster Pack**: **UV Editor > Pack** across a UDIM grid takes well under a second on most models (it could freeze
   the app for half a minute), runs in the background with a progress bar and **Cancel**, and lays islands out tighter.
   Unwrap runs in the background too.
@@ -484,7 +484,7 @@ action: guide:performance.md#working-with-big-meshes
   while you sculpt.
 - **Preferences save themselves**: key style, shortcuts, tablet, interface, performance and radial menus are kept a
   moment after every change, with nothing to press. The layout (shelves, trays) is kept with **Edit > Preferences >
-  Config > Save Layout**. Thanks fenixpoints (#117).
+  Saving & Layouts > Save Layout**. Thanks fenixpoints (#117).
 - **I is Falloff** with SculptForge keys (U stays Intensity); the Classic sculpting keys are unchanged.
 
 ## Version 0.11.0
@@ -841,7 +841,7 @@ action: guide:baking.md
 - **Move along the normal** (from the discussions): Move, Tendril, Elastic Tendril and KelvinGrab started with
   <kbd>Alt</kbd> held pull the surface straight out of itself (or push it straight in) instead of across the screen.
   See [Sculpting](sculpting.md#along-the-normal).
-- **Polish, Relax, Smooth and Balloon** (from the discussions): **Tool > Deformation** works on the whole Part by an
+- **Polish, Relax, Smooth and Balloon** (from the discussions): **Tool > Reshape** works on the whole Part by an
   amount: Polish flattens fine noise and keeps edges, Relax evens out the spacing, Smooth can keep the volume, and
   Balloon fills the form out. The mask holds what it covers; one undo step each. See
   [Sculpting](sculpting.md#whole-part-deformations).
@@ -854,7 +854,7 @@ action: guide:baking.md
 - **The SculptForge Discord** (**Help > Join the Discord...**): the official community, for questions, tips and
   work in progress. It is also on the support card, in the welcome note and on the website. Bugs still go to
   **Help > Report a problem** (GitHub issues).
-- **Backface culling** (#68, **Tool > Display**): don't draw the back faces of the model, for speed on open meshes
+- **Backface culling** (#68, **Tool > Viewport Look**): don't draw the back faces of the model, for speed on open meshes
   and to see through their openings. Brushes then work only on what you see. Off by default.
 - **A crosshair over the view** (#73): the pointer is a crosshair where brushes act and the arrow over the panels.
   **Preferences > Interface > Viewport cursor** brings the arrow back.
@@ -893,7 +893,7 @@ link: uv-editor.md
 - **Sets for pipelines**: `selection_set_*` commands for scripts, `sculptforge-cli` and the AI assistant,
   `doc.selection_set()` / `doc.set_selection_set()` in Python, `.sfsets` files to move sets between Parts and
   scenes, and USD exports that carry them as GeomSubsets and primvars (read back on import).
-- **UV Editor** (**Tool > Texture Map > UV Editor**, <kbd>Alt</kbd>+<kbd>U</kbd>): the Part's UVs flat over the UDIM
+- **UV Editor** (**Tool > Texture Image > UV Editor**, <kbd>Alt</kbd>+<kbd>U</kbd>): the Part's UVs flat over the UDIM
   tiles, drawn by the graphics card so a million triangles stay smooth. Draw seams on the model with the **Seam
   Tool** (or take them from face groups, island borders or sharp edges), then **Unwrap**: **Least Stretch**,
   **Conformal**, **By Face Groups**, **Planar**, **Unfold Islands** or **Auto Seams**, with closed and tangled pieces
@@ -1126,7 +1126,7 @@ helmet, a strap, a piece of armour. Set **Thick**, **Edge Smooth** and **Double*
 ### Make Symmetric
 
 **Tool > Geometry > Symmetry > Make Symmetric** mirrors one side of a model onto the other across X, Y
-or Z and welds the seam into one watertight mesh, keeping face groups and vertex paint. **Tool > Deformation >
+or Z and welds the seam into one watertight mesh, keeping face groups and vertex paint. **Tool > Reshape >
 Mirror** flips a Part. See [Make Symmetric](geometry.md#make-symmetric).
 
 ### A flat background
@@ -1645,7 +1645,7 @@ date: 2026-10-23
 Paint into a texture instead of the vertices, so the colour detail comes from the texture (1K to 8K), not from
 the mesh: sharp decals, pores and freckles on a light game mesh.
 
-- **Auto UV.** **Tool > Texture Map > Auto UV** unwraps any sculpt in the background. Models that come in with
+- **Auto UV.** **Tool > Texture Image > Auto UV** unwraps any sculpt in the background. Models that come in with
   UVs keep them, and now OBJ, FBX, USD and glTF carry UVs in and out too.
 - **New Texture.** Pick a size and click **New Texture**: the Paint brush, **Rgb** sculpting, fills, cavity paint
   and colour picking (<kbd>C</kbd>) now work on the texture, with the mask, symmetry, pen pressure and alphas.

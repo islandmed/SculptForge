@@ -70,7 +70,7 @@
 <strong>Extract labels in full</strong>: <strong>Tool &gt; Parts &gt; Extract</strong> reads <strong>Thickness</strong>, <strong>Edge Smooth</strong>, <strong>Both Sides</strong>, <strong>Corners</strong> and <strong>Border</strong>, and in a narrow tray (a small window, 150% or 200%) the controls move onto their own rows instead of cutting words off.
 </li>
 <li>
-<strong>Tool &gt; Geometry, grouped by what you do</strong>: <strong>Levels</strong> (the <strong>Level</strong> slider, <strong>Lower / Higher Level</strong>, <strong>Add Level</strong> with <strong>Smooth</strong>, <strong>Rebuild Lower Levels</strong>, then <strong>Remove Below / Remove Above</strong>), <strong>Micro Detail</strong>, <strong>Resolution</strong> (Decimate, Quad Remesh, Subdivide), <strong>Cleanup</strong> (<strong>Fill Holes</strong>, Merge by Distance, Check Mesh) and <strong>Symmetry</strong> (<strong>Make Symmetric</strong>). Quad Remesh controls say what they do too (<strong>Target Quads</strong>, <strong>50% / 100% / 200%</strong>, <strong>Size Variation</strong>, <strong>Follow Face Groups</strong>, <strong>Keep Hard Edges</strong>, <strong>Guide Strength</strong>), and <strong>Remove Hidden</strong> in Tool &gt; Visibility. Shortcuts, shelves, scripts and saved files are unchanged, and the command search (F3) still finds each control by the words it had before.
+<strong>Tool &gt; Geometry, grouped by what you do</strong>: <strong>Levels</strong> (the <strong>Level</strong> slider, <strong>Lower / Higher Level</strong>, <strong>Add Level</strong> with <strong>Smooth</strong>, <strong>Rebuild Lower Levels</strong>, then <strong>Remove Below / Remove Above</strong>), <strong>Micro Detail</strong>, <strong>Resolution</strong> (Decimate, Quad Remesh, Subdivide), <strong>Cleanup</strong> (<strong>Fill Holes</strong>, Merge by Distance, Find Problems) and <strong>Symmetry</strong> (<strong>Make Symmetric</strong>). Quad Remesh controls say what they do too (<strong>Target Quads</strong>, <strong>50% / 100% / 200%</strong>, <strong>Size Variation</strong>, <strong>Follow Face Groups</strong>, <strong>Keep Hard Edges</strong>, <strong>Guide Strength</strong>), and <strong>Remove Hidden</strong> in Tool &gt; Visibility. Shortcuts, shelves, scripts and saved files are unchanged, and the command search (F3) still finds each control by the words it had before.
 </li>
 <li>
 <strong>macOS</strong>: <strong>SculptForge &gt; Preferences...</strong> in the app menu opens Preferences (it was greyed out).
@@ -99,7 +99,7 @@
 <strong>Merge by Distance</strong> (<strong>Tool &gt; Geometry</strong>): merge points closer than a distance, with a live count and the points shown on the model before you click. For unwelded imports. Asked for by foirgairwolf on Discord.
 </li>
 <li>
-<strong>Check Mesh</strong> (<strong>Tool &gt; Geometry</strong>): counts non-manifold edges, holes, duplicate, degenerate, zero-area and flipped triangles and isolated points, with a <strong>Fix</strong> per row and <strong>Fix all</strong>. Checking never changes the mesh.
+<strong>Find Problems</strong> (<strong>Tool &gt; Geometry</strong>): counts non-manifold edges, holes, duplicate, degenerate, zero-area and flipped triangles and isolated points, with a <strong>Fix</strong> per row and <strong>Fix all</strong>. Checking never changes the mesh.
 </li>
 <li>
 <strong>Recent colours</strong>: the last eight colours you painted with sit under the colour picker on the left shelf; click one to paint with it again. Thanks Oslen on Discord.
@@ -113,10 +113,10 @@
 </ul></div></details></section>
 <section class="wn-version" id="version-01114"><header class="wn-band"><h2>Version 0.11.14<a class="anchor" href="#version-01114" aria-label="Link to this version">#</a></h2><time datetime="2026-11-07">2026-11-07</time><p class="wn-tagline">A deformation stack, a slimmer layout, and palettes that open on small screens.</p></header><details class="wn-all"><summary>All changes</summary><div class="wn-body"><ul>
 <li>
-<strong>Deformation stack</strong> (requested by foirgairwolf on Discord): <strong>Tool &gt; Deformation &gt; Stack</strong> bends, twists, tapers, shears, turns, moves, scales, squashes, rounds, boxes, flattens, sags or puts depth on the whole Part, along any of X, Y and Z, with a live preview. Stack steps up, switch them on and off, repeat one, then <strong>Apply</strong> (one undo step), <strong>Apply Selected</strong> or <strong>Reset</strong>. Every step is a command too: <code>deform_stack ops=&quot;bend 45 y soft; twist 90 y&quot;</code>.
+<strong>Deformation stack</strong> (requested by foirgairwolf on Discord): <strong>Tool &gt; Reshape &gt; Stack</strong> bends, twists, tapers, shears, turns, moves, scales, squashes, rounds, boxes, flattens, sags or puts depth on the whole Part, along any of X, Y and Z, with a live preview. Stack steps up, switch them on and off, repeat one, then <strong>Apply</strong> (one undo step), <strong>Apply Selected</strong> or <strong>Reset</strong>. Every step is a command too: <code>deform_stack ops=&quot;bend 45 y soft; twist 90 y&quot;</code>.
 </li>
 <li>
-<strong>Exact size</strong> (requested by foirgairwolf on Discord): <strong>Tool &gt; Deformation &gt; Size</strong> shows the Part&#x27;s width, height and depth in scene units; drag one or type an exact value to resize it, with <strong>Uniform</strong> keeping its proportions.
+<strong>Exact size</strong> (requested by foirgairwolf on Discord): <strong>Tool &gt; Reshape &gt; Size</strong> shows the Part&#x27;s width, height and depth in scene units; drag one or type an exact value to resize it, with <strong>Uniform</strong> keeping its proportions.
 </li>
 <li>
 <strong>Membership moments</strong>: the small membership card can now also come at a milestone (your 10th start, 10 hours of sculpting, your 100th save; counted on your computer only, never sent) and says the true number. After a third <strong>Not now</strong> it waits a month, after a sixth it only comes with an update. A quiet heart at the right of the top bar opens <strong>Help &gt; Support SculptForge...</strong>; members see a small badge there instead.
@@ -231,7 +231,7 @@ Fewer shards when sculpting rough micro-level surfaces (Clay strokes ending wher
 <strong>Input style keys after a restart</strong>: the Blender, Classic and Maya styles keep every key when SculptForge starts again (F for the Size slider in the Blender style, 9 for a Snapshot with the Classic keys).
 </li>
 <li>
-<strong>Auto UV never freezes the app</strong>: the <code>uv_auto</code> command from the console, a script or an AI tool now unwraps in the background like the <strong>Tool &gt; Texture Map &gt; Auto UV</strong> button, which gains a <strong>Cancel</strong> button beside its progress.
+<strong>Auto UV never freezes the app</strong>: the <code>uv_auto</code> command from the console, a script or an AI tool now unwraps in the background like the <strong>Tool &gt; Texture Image &gt; Auto UV</strong> button, which gains a <strong>Cancel</strong> button beside its progress.
 </li>
 <li>
 <strong>Faster Pack</strong>: <strong>UV Editor &gt; Pack</strong> across a UDIM grid takes well under a second on most models (it could freeze the app for half a minute), runs in the background with a progress bar and <strong>Cancel</strong>, and lays islands out tighter. Unwrap runs in the background too.
@@ -394,7 +394,7 @@ New icon and logo.
 <strong>Touch and trackpad navigation</strong>: two fingers pinch to zoom and twist to roll the view; the SpaceMouse holds still while you sculpt.
 </li>
 <li>
-<strong>Preferences save themselves</strong>: key style, shortcuts, tablet, interface, performance and radial menus are kept a moment after every change, with nothing to press. The layout (shelves, trays) is kept with <strong>Edit &gt; Preferences &gt; Config &gt; Save Layout</strong>. Thanks fenixpoints (#117).
+<strong>Preferences save themselves</strong>: key style, shortcuts, tablet, interface, performance and radial menus are kept a moment after every change, with nothing to press. The layout (shelves, trays) is kept with <strong>Edit &gt; Preferences &gt; Saving &amp; Layouts &gt; Save Layout</strong>. Thanks fenixpoints (#117).
 </li>
 <li>
 <strong>I is Falloff</strong> with SculptForge keys (U stays Intensity); the Classic sculpting keys are unchanged.
@@ -660,7 +660,7 @@ New icon and logo.
 <strong>Move along the normal</strong> (from the discussions): Move, Tendril, Elastic Tendril and KelvinGrab started with <kbd>Alt</kbd> held pull the surface straight out of itself (or push it straight in) instead of across the screen. See <a href="sculpting.html#along-the-normal">Sculpting</a>.
 </li>
 <li>
-<strong>Polish, Relax, Smooth and Balloon</strong> (from the discussions): <strong>Tool &gt; Deformation</strong> works on the whole Part by an amount: Polish flattens fine noise and keeps edges, Relax evens out the spacing, Smooth can keep the volume, and Balloon fills the form out. The mask holds what it covers; one undo step each. See <a href="sculpting.html#whole-part-deformations">Sculpting</a>.
+<strong>Polish, Relax, Smooth and Balloon</strong> (from the discussions): <strong>Tool &gt; Reshape</strong> works on the whole Part by an amount: Polish flattens fine noise and keeps edges, Relax evens out the spacing, Smooth can keep the volume, and Balloon fills the form out. The mask holds what it covers; one undo step each. See <a href="sculpting.html#whole-part-deformations">Sculpting</a>.
 </li>
 <li>
 <strong>Smooth without remeshing</strong> (from the discussions): <strong>Smooth remesh</strong> in <strong>Draw &gt; Dynamic topology</strong> sets how much Shift-smoothing changes the topology, down to <strong>Smooth only</strong>. See <a href="dynamic-topology.html#smooth-remesh">Dynamic topology</a>.
@@ -672,7 +672,7 @@ New icon and logo.
 <strong>The SculptForge Discord</strong> (<strong>Help &gt; Join the Discord...</strong>): the official community, for questions, tips and work in progress. It is also on the support card, in the welcome note and on the website. Bugs still go to <strong>Help &gt; Report a problem</strong> (GitHub issues).
 </li>
 <li>
-<strong>Backface culling</strong> (#68, <strong>Tool &gt; Display</strong>): don&#x27;t draw the back faces of the model, for speed on open meshes and to see through their openings. Brushes then work only on what you see. Off by default.
+<strong>Backface culling</strong> (#68, <strong>Tool &gt; Viewport Look</strong>): don&#x27;t draw the back faces of the model, for speed on open meshes and to see through their openings. Brushes then work only on what you see. Off by default.
 </li>
 <li>
 <strong>A crosshair over the view</strong> (#73): the pointer is a crosshair where brushes act and the arrow over the panels. <strong>Preferences &gt; Interface &gt; Viewport cursor</strong> brings the arrow back.
@@ -700,7 +700,7 @@ New icon and logo.
 <strong>Sets for pipelines</strong>: <code>selection_set_*</code> commands for scripts, <code>sculptforge-cli</code> and the AI assistant, <code>doc.selection_set()</code> / <code>doc.set_selection_set()</code> in Python, <code>.sfsets</code> files to move sets between Parts and scenes, and USD exports that carry them as GeomSubsets and primvars (read back on import).
 </li>
 <li>
-<strong>UV Editor</strong> (<strong>Tool &gt; Texture Map &gt; UV Editor</strong>, <kbd>Alt</kbd>+<kbd>U</kbd>): the Part&#x27;s UVs flat over the UDIM tiles, drawn by the graphics card so a million triangles stay smooth. Draw seams on the model with the <strong>Seam Tool</strong> (or take them from face groups, island borders or sharp edges), then <strong>Unwrap</strong>: <strong>Least Stretch</strong>, <strong>Conformal</strong>, <strong>By Face Groups</strong>, <strong>Planar</strong>, <strong>Unfold Islands</strong> or <strong>Auto Seams</strong>, with closed and tangled pieces cut for you. <strong>Pack</strong> into one tile or across UDIM tiles, <strong>Set</strong> and <strong>Match</strong> texel density, lay islands into <strong>trim sheet</strong> strips, and select vertices, edges, faces or islands (in the view or on the model) to move, rotate, scale, pin, weld, split, straighten and flip them. The model shows stretch, texel density, islands and a checker live while you edit, and a painted texture moves with every change so the model keeps its look. Every step is one undo step and a <code>uv_*</code> command for scripts. See <a href="uv-editor.html">UV Editor</a>.
+<strong>UV Editor</strong> (<strong>Tool &gt; Texture Image &gt; UV Editor</strong>, <kbd>Alt</kbd>+<kbd>U</kbd>): the Part&#x27;s UVs flat over the UDIM tiles, drawn by the graphics card so a million triangles stay smooth. Draw seams on the model with the <strong>Seam Tool</strong> (or take them from face groups, island borders or sharp edges), then <strong>Unwrap</strong>: <strong>Least Stretch</strong>, <strong>Conformal</strong>, <strong>By Face Groups</strong>, <strong>Planar</strong>, <strong>Unfold Islands</strong> or <strong>Auto Seams</strong>, with closed and tangled pieces cut for you. <strong>Pack</strong> into one tile or across UDIM tiles, <strong>Set</strong> and <strong>Match</strong> texel density, lay islands into <strong>trim sheet</strong> strips, and select vertices, edges, faces or islands (in the view or on the model) to move, rotate, scale, pin, weld, split, straighten and flip them. The model shows stretch, texel density, islands and a checker live while you edit, and a painted texture moves with every change so the model keeps its look. Every step is one undo step and a <code>uv_*</code> command for scripts. See <a href="uv-editor.html">UV Editor</a>.
 </li>
 </ul>
 <ul>
@@ -853,7 +853,7 @@ Dynamic topology with symmetry now adds detail on the mirrored side too when the
 </ul><h3 id="version-096" class="wn-ver">Version 0.9.6<time datetime="2026-10-31">2026-10-31</time></h3><h4 id="extract">Extract<a class="anchor" href="#extract" aria-label="Link to this section">#</a></h4>
 <p>Mask part of a Part and <strong>Tool &gt; Parts &gt; Extract</strong> turns it into a shell that fits the surface exactly: a helmet, a strap, a piece of armour. Set <strong>Thick</strong>, <strong>Edge Smooth</strong> and <strong>Double</strong> while the preview shows, then <strong>Accept</strong> keeps it as a new Part (and <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes it away again). <strong>Corners</strong> and <strong>Border</strong> give the rim triangles instead of quads. See <a href="parts.html#extract-a-shell">Extract a shell</a>.</p>
 <h4 id="make-symmetric">Make Symmetric<a class="anchor" href="#make-symmetric" aria-label="Link to this section">#</a></h4>
-<p><strong>Tool &gt; Geometry &gt; Symmetry &gt; Make Symmetric</strong> mirrors one side of a model onto the other across X, Y or Z and welds the seam into one watertight mesh, keeping face groups and vertex paint. <strong>Tool &gt; Deformation &gt; Mirror</strong> flips a Part. See <a href="geometry.html#make-symmetric">Make Symmetric</a>.</p>
+<p><strong>Tool &gt; Geometry &gt; Symmetry &gt; Make Symmetric</strong> mirrors one side of a model onto the other across X, Y or Z and welds the seam into one watertight mesh, keeping face groups and vertex paint. <strong>Tool &gt; Reshape &gt; Mirror</strong> flips a Part. See <a href="geometry.html#make-symmetric">Make Symmetric</a>.</p>
 <h4 id="a-flat-background">A flat background<a class="anchor" href="#a-flat-background" aria-label="Link to this section">#</a></h4>
 <p><strong>Preferences &gt; Display &gt; Background</strong> (also in the Render palette) switches the view from the gradient to a flat colour you pick. Saved automatically; projects keep their own. See <a href="interface.html#the-background">The background</a>.</p>
 <h4 id="flatpak">Flatpak<a class="anchor" href="#flatpak" aria-label="Link to this section">#</a></h4>
@@ -1137,7 +1137,7 @@ Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
 <p>Paint into a texture instead of the vertices, so the colour detail comes from the texture (1K to 8K), not from the mesh: sharp decals, pores and freckles on a light game mesh.</p>
 <ul>
 <li>
-<strong>Auto UV.</strong> <strong>Tool &gt; Texture Map &gt; Auto UV</strong> unwraps any sculpt in the background. Models that come in with UVs keep them, and now OBJ, FBX, USD and glTF carry UVs in and out too.
+<strong>Auto UV.</strong> <strong>Tool &gt; Texture Image &gt; Auto UV</strong> unwraps any sculpt in the background. Models that come in with UVs keep them, and now OBJ, FBX, USD and glTF carry UVs in and out too.
 </li>
 <li>
 <strong>New Texture.</strong> Pick a size and click <strong>New Texture</strong>: the Paint brush, <strong>Rgb</strong> sculpting, fills, cavity paint and colour picking (<kbd>C</kbd>) now work on the texture, with the mask, symmetry, pen pressure and alphas. Strokes never paint through to the far side, and seams stay invisible.

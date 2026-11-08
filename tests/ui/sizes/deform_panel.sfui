@@ -5,7 +5,7 @@ run ui_look look=classic layout=classic
 run new_sphere subdivisions=5
 run deform_scale amount=100 axes=y
 click "Tool##palette.tool"
-click "Deformation##tool.deformation"
+click "Reshape##tool.deformation"
 expect "Size/##deform_size_x"
 click "##deform_stack_add"
 click "Stack/Taper##deform_add_Taper"

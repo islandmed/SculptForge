@@ -6,7 +6,7 @@ preset**. SculptForge has presets for the common targets, and you can write your
 
 ## Export maps
 
-1. Open **Tool > Texture Map**. Under **Material Channels**, choose a preset in the list next to **Export
+1. Open **Tool > Texture Image**. Under **Material Channels**, choose a preset in the list next to **Export
    Maps...** (hover a preset for what it writes).
 2. Click **Export Maps...** and pick a folder. The files are named after the Part.
 

@@ -108,7 +108,7 @@ std::string materialRecipeText(const PaintTexture& t, const std::string& name) {
 bool applyMaterialRecipe(Document& doc, const MaterialRecipe& recipe, std::string& message) {
     Mesh& m = doc.mesh;
     if (!hasTexture(m)) {
-        message = "The Part has no texture: Tool > Texture Map > New Texture";
+        message = "The Part has no texture: Tool > Texture Image > New Texture";
         return false;
     }
     UndoRecord r = captureTexture(m, "Material Recipe");

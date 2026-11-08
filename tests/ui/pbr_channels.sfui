@@ -1,4 +1,4 @@
-# Material channels (PBR texture painting): Texture Map turns channels on, the Color palette's Material section
+# Material channels (PBR texture painting): Texture Image turns channels on, the Color palette's Material section
 # sets what the brush paints per channel, Paint Layers rows get channel chips, C picks every channel, and the
 # view can show one channel on its own.
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
@@ -8,10 +8,10 @@ run texture_create size=1024
 expect_value texture_size == 1024
 expect_value material_channels == 0
 
-# Tool > Texture Map > Material Channels: two clicks turn on roughness and metallic.
-click "Texture Map##tool.texture"
-click "Texture Map/Roughness##texchan"
-click "Texture Map/Metallic##texchan"
+# Tool > Texture Image > Material Channels: two clicks turn on roughness and metallic.
+click "Texture Image##tool.texture"
+click "Texture Image/Roughness##texchan"
+click "Texture Image/Metallic##texchan"
 expect_value material_channels == 2
 run texture_channels enable=normal,height
 expect_value material_channels == 4
@@ -71,10 +71,10 @@ expect_value texture_layers == 1
 expect_value roughness_painted == $with_layer
 
 # Ctrl-hover help on the new controls.
-click "Texture Map##tool.texture"
+click "Texture Image##tool.texture"
 hold ctrl
-hover "Texture Map/Roughness##texchan"
+hover "Texture Image/Roughness##texchan"
 expect_help "rough"
-hover "Texture Map/##channelview"
+hover "Texture Image/##channelview"
 expect_help "own"
 hold none

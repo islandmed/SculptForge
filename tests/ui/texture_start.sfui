@@ -1,4 +1,4 @@
-# Starting texture painting without hunting for Tool > Texture Map: with the Paint brush on, a Part without a
+# Starting texture painting without hunting for Tool > Texture Image: with the Paint brush on, a Part without a
 # texture shows New Texture on the top shelf (and in the Color palette). Without UVs it runs Auto UV first, then
 # makes the texture, so the next stroke goes into texels.
 run new_sphere subdivisions=3

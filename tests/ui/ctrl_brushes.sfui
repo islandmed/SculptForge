@@ -109,8 +109,8 @@ hold none
 click "Group by UVs##facegroup.uv_groups"
 expect_status "no UVs"
 expect_value groups == 1
-click "Texture Map##tool.texture"
-click "Texture Map/Auto UV"
+click "Texture Image##tool.texture"
+click "Texture Image/Auto UV"
 wait_idle 120
 expect_value uvs == 1
 click "Face Groups"

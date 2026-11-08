@@ -158,13 +158,13 @@ The eye on each row shows or hides that Part.
 <div class="table-wrap"><table><thead><tr><th>Button</th><th>Moves into the new Part</th><th>Command</th></tr></thead><tbody><tr><td><strong>Split &gt; Hidden</strong></td><td>the hidden triangles; they are shown in the new Part</td><td><code>part_split_hidden</code></td></tr><tr><td><strong>Split &gt; Masked</strong></td><td>the masked triangles; the new Part starts unmasked</td><td><code>part_split_masked</code></td></tr><tr><td><strong>Split &gt; Unmasked</strong></td><td>the triangles that are not masked; the masked ones stay</td><td><code>part_split_unmasked</code></td></tr><tr><td><strong>Keep original</strong> (checkbox below)</td><td>a <strong>copy</strong> of those triangles; the source Part stays as it is, levels and all, and undo just removes the copy</td><td><code>keep=true</code> on any of the three</td></tr></tbody></table></div>
 <p>A triangle counts as <strong>masked when the average mask of its three corners is above 50%</strong>, so a soft mask edge splits along its middle and a single masked corner doesn&#x27;t take its neighbours. UVs, face groups, vertex paint and sculpt layers carry over to both sides. <a href="subdivision-levels.html">Subdivision levels</a> can&#x27;t be cut: the split is made at the level the Part is on, which becomes its base (undo brings the levels back). To delete instead of split, use <strong>Remove Hidden</strong> or <strong>Delete masked</strong> in <strong>Tool &gt; Visibility</strong>.</p>
 <h2 id="extract-a-shell">Extract a shell<a class="anchor" href="#extract-a-shell" aria-label="Link to this section">#</a></h2>
-<p><strong>Extract</strong>, in <strong>Tool &gt; Parts</strong>, makes a new Part from the masked part of the active one: a helmet from the top of a head, a strap, a sleeve, a piece of armour that fits the surface exactly. It works:</p>
+<p><strong>Make Shell</strong>, in <strong>Tool &gt; Parts &gt; Extract</strong>, makes a new Part from the masked part of the active one: a helmet from the top of a head, a strap, a sleeve, a piece of armour that fits the surface exactly. It works:</p>
 <ol>
 <li>
 Mask the part (hold <kbd>Ctrl</kbd> and paint, or use <strong>Rectangle Mask</strong> / <strong>Lasso Mask</strong>; see <a href="masking.html">Masking</a>).
 </li>
 <li>
-Click <strong>Extract</strong>. The shell appears as a preview, a Part just below the active one.
+Click <strong>Make Shell</strong>. The shell appears as a preview, a Part just below the active one.
 </li>
 <li>
 Change <strong>Thickness</strong>, <strong>Edge Smooth</strong>, <strong>Both Sides</strong>, <strong>Corners</strong> or <strong>Border</strong> and the preview follows. Click <strong>Accept</strong> to keep it.

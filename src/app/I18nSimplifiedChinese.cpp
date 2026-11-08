@@ -61,9 +61,11 @@ constexpr Entry kSimplifiedChinese[] = {
     {"AI brush provider", "AI 笔刷提供商"},
     {"Autosave", "自动保存"},
     {"Bake", "烘焙"},
-    {"Config", "设置"},
-    {"Deformation", "变形"},
+    {"Saving & Layouts", "保存与布局"},
+    {"Reshape", "重塑"},
     {"Display", "显示"},
+    {"Viewport Look", "视口外观"},
+    {"Make Shell", "创建外壳"},
     {"Export", "导出"},
     {"Facial Shapes", "脸部形状"},
     {"Geometry", "几何"},
@@ -81,7 +83,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Part", "部件"},
     {"Parts", "部件"},
     {"Tablet", "数位板"},
-    {"Texture Map", "贴图"},
+    {"Texture Image", "纹理图像"},
     {"Updates", "更新"},
     {"Vector Displacement", "矢量位移"},
     {"Visibility", "可见性"},
@@ -488,7 +490,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Larger brush", "放大笔刷"},
     {"Smaller brush", "缩小笔刷"},
     {"Pivot", "枢轴点"},
-    // --- Preferences > Config ---
+    // --- Preferences > Saving & Layouts ---
     // --- Preferences > Interface ---
     {"Language", "语言"},
     {"Units", "单位"},
@@ -799,7 +801,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Roll", "翻滚"},
     {"Tilt", "倾斜"},
     {"Spin", "旋转"},
-    // --- Deformation > Stack (PanelDeform.cpp) ---
+    // --- Reshape > Stack (PanelDeform.cpp) ---
     {"Turn", "旋转"},
     {"Bend", "弯曲"},
     {"Twist", "扭转"},
@@ -992,9 +994,9 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Triangle border: the whole rim of the extracted shell is made of triangles instead of quads.",
      "三角形边缘：提取外壳的整圈边缘都改用三角面而非四边面。"},
     {"Mirror the + side of the Part onto the - side across the chosen axis and weld the seam into one watertight "
-     "mesh. Face Groups and vertex paint come along. To keep the other side, Deformation > Mirror first.",
+     "mesh. Face Groups and vertex paint come along. To keep the other side, Symmetry > Mirror first.",
      "沿所选轴将部件的 + 侧镜像到 - 侧，并将接缝焊接成一个封闭网格。面组与顶点绘制也会一并处理。若要保留另一侧，请"
-     "先使用变形 > 镜像。"},
+     "先使用对称 > 镜像。"},
     {"Flip the Part across the chosen axis, through the origin (the plane symmetry and Make Symmetric use).", "沿所选轴经由原点翻转部件（对称与使对称所用的平面）。"},
     {"An axis Make Symmetric mirrors across (several: one after the other).", "使对称所沿的轴（多个时：按序处理）。"},
     {"An axis Mirror flips along (several: one after the other).", "镜像翻转所沿的轴（多个时：按序处理）。"},
@@ -1316,8 +1318,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "one group.",
      "将遮罩部分转为新的面组并清除遮罩。若没有遮罩，所有可见部分会成为一个组。"},
     {"One face group per UV island: triangles that touch without a UV seam share a group. Only the visible part is "
-     "regrouped. Needs UVs (Tool > Texture Map > Auto UV makes some).",
-     "每个 UV 岛一个面组：相邻且无 UV 接缝的三角面属于同一组。只重新分组可见部分。需要 UV（工具 > 贴图 > 自动 UV "
+     "regrouped. Needs UVs (Tool > Texture Image > Auto UV makes some).",
+     "每个 UV 岛一个面组：相邻且无 UV 接缝的三角面属于同一组。只重新分组可见部分。需要 UV（工具 > 纹理图像 > 自动 UV "
      "可生成）。"},
     {"Classic sculpting keys", "经典雕刻按键"},
     {"The classic sculpting keys and gestures: I is Colour intensity, 9 saves a snapshot, the number keys don't pick "
@@ -1625,8 +1627,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "Bakes in your library folder.",
      "选择烘焙贴图的写入文件夹。留空：上次导出的位置旁，否则为项目文件夹，再否则为资源库文件夹中的 Bakes。"},
     {"Maps are baked onto the active Part's UVs: make the low-poly active (it needs UVs from import or from Auto UV "
-     "in Tool > Texture Map), and keep the high-poly Part(s) visible.",
-     "贴图会烘焙到当前部件的 UV 上：将低模设为当前（需要导入时的 UV，或工具 > 贴图中的自动 UV），并让高模部件保持可"
+     "in Tool > Texture Image), and keep the high-poly Part(s) visible.",
+     "贴图会烘焙到当前部件的 UV 上：将低模设为当前（需要导入时的 UV，或工具 > 纹理图像中的自动 UV），并让高模部件保持可"
      "见。"},
     {"The high-poly to bake from: one Part, or every visible Part except the active one (the low-poly), or this "
      "Part's own top subdivision level baked onto its lowest level, or its micro level baked onto its base. Hidden "
@@ -1706,9 +1708,9 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Thickness of the shell, as a fraction of the Part's size (0.015 is 1.5%). Negative grows it inward; 0 makes a "
      "single-sided surface.",
      "外壳的厚度，以部件大小的比例表示（0.015 为 1.5%）。负值向内长；0 会创建单面表面。"},
-    {"Deformation > Smooth smooths without shrinking the form (Taubin smoothing) instead of the plain smooth, which "
+    {"Reshape > Smooth smooths without shrinking the form (Taubin smoothing) instead of the plain smooth, which "
      "also shrinks it.",
-     "变形 > 平滑会在不缩小形体的情况下平滑（Taubin 平滑），而非同时使形体缩小的普通平滑。"},
+     "重塑 > 平滑会在不缩小形体的情况下平滑（Taubin 平滑），而非同时使形体缩小的普通平滑。"},
     // --- PanelFace.cpp (tools/i18n/coverage.py) ---
     {"Give the active Part (a humanoid head, looking down +Z in the front view) the 52 Apple ARKit blend shapes as "
      "sculpt layers: eyeBlinkLeft, jawOpen, mouthSmileRight and the rest, fitted to this head's proportions. Then "
@@ -2428,15 +2430,15 @@ constexpr Entry kSimplifiedChinese[] = {
      "以 GitHub 登录，与会员版本相同（偏好设置 > 更新）：不再显示会员卡片，并打开会员版本。"},
     // --- PanelTexture.cpp (tools/i18n/coverage.py) ---
     {"Paint into the vertices (vertex paint): the colour resolution is the mesh's. Shown when the Part has a texture "
-     "(Tool > Texture Map).",
-     "绘制到顶点（顶点绘制）：色彩分辨率取决于网格。部件有贴图时显示（工具 > 贴图）。"},
+     "(Tool > Texture Image).",
+     "绘制到顶点（顶点绘制）：色彩分辨率取决于网格。部件有贴图时显示（工具 > 纹理图像）。"},
     {"Paint into the Part's texture: the colour resolution comes from the texture, not the mesh. The Paint brush, Rgb "
      "sculpting, fills and Paint Layers all work on it.",
      "绘制到部件的贴图：色彩分辨率来自贴图而非网格。Paint 笔刷、Rgb 雕刻、填满与绘制图层都作用于贴图。"},
-    {"Start texture painting: give the Part a texture (the size chosen in Tool > Texture Map, 2K by default) so paint "
+    {"Start texture painting: give the Part a texture (the size chosen in Tool > Texture Image, 2K by default) so paint "
      "goes into texels instead of vertices, and the detail comes from the texture, not the mesh. Without UVs, Auto "
      "UV unwraps the model first (in the background, with its progress in the status bar).",
-     "开始贴图绘制：为部件加上贴图（大小在工具 > 贴图中选择，默认 2K），让绘制写入纹素而非顶点，细节来自贴图而非网"
+     "开始贴图绘制：为部件加上贴图（大小在工具 > 纹理图像中选择，默认 2K），让绘制写入纹素而非顶点，细节来自贴图而非网"
      "格。没有 UV 时，自动 UV 会先展开模型（在后台进行，进度显示在状态栏）。"},
     {"Show the painted texture on the model (multiplied over the material, like vertex paint).",
      "在模型上显示绘制的贴图（以色彩增值叠在材质上，与顶点绘制相同）。"},
@@ -3924,8 +3926,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "下一步"},
     {"No UVs: Auto UV makes them",
      "没有 UV：Auto UV 会生成"},
-    {"No UVs: Tool > Texture Map > Auto UV",
-     "没有 UV：工具 > 纹理贴图 > Auto UV"},
+    {"No UVs: Tool > Texture Image > Auto UV",
+     "没有 UV：工具 > 纹理图像 > Auto UV"},
     {"No alpha matches \"%s\"",
      "没有匹配“%s”的 Alpha"},
     {"No brush matches \"%s\"",
@@ -4441,7 +4443,12 @@ constexpr Entry kSimplifiedChinese[] = {
     {"%zu point will merge", "%zu 个点将合并"},
     {"%zu points will merge", "%zu 个点将合并"},
     {"Check", "检查"},
-    {"Check Mesh", "检查网格"},
+    {"Find Problems", "查找问题"},
+    {"Count what makes the active Part hard to sculpt, remesh, print or export: non-manifold edges, holes, "
+     "duplicate, degenerate and flipped triangles. Changes nothing; Tool > Geometry > Find Problems lists each "
+     "with its Fix.",
+     "统计让当前部件难以雕刻、重新网格化、打印或导出的问题：非流形边、孔洞、重复、退化与翻转的三角面。不会更改任何内容；"
+     "工具 > 几何 > 查找问题会逐项列出并附上修复。"},
     {"Degenerate triangles", "退化三角形"},
     {"Distance", "距离"},
     {"Duplicate triangles", "重复三角形"},

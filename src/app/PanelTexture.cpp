@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Texture Map sub-palette (Tool palette): texture painting on UVs (core/Texture.h). Auto UV unwraps the
+// Texture Image sub-palette (Tool palette): texture painting on UVs (core/Texture.h). Auto UV unwraps the
 // Part on a worker thread (core/AutoUv.h, xatlas); New gives it a 1K-8K texture, after which the Paint
 // brush, Rgb sculpting, fills and the Paint Layers palette work on the texture (the Vertex / Texture toggle
 // switches back). Vertex paint <-> Texture convert, Import / Export load and save PNGs, Show UVs draws the
@@ -28,7 +28,7 @@ namespace sf {
 
 namespace {
 
-constexpr const char* kPath = "Tool > Texture Map";
+constexpr const char* kPath = "Tool > Texture Image";
 constexpr int kSizes[] = {1024, 2048, 4096, 8192};
 constexpr const char* kSizeLabels[] = {"1K", "2K", "4K", "8K"};
 
@@ -111,7 +111,7 @@ void App::registerTextureUiActions() {
     add("draw.paint_vertex", "Vertex", "Draw", [this] { runCommand("paint_target", {{"target", std::string("vertex")}}); },
         [this] { return !paintsTexture(doc_.mesh); }, textured,
         "Paint into the vertices (vertex paint): the colour resolution is the mesh's. Shown when the Part has a "
-        "texture (Tool > Texture Map).");
+        "texture (Tool > Texture Image).");
     add("draw.paint_texture", "Texture", "Draw", [this] { runCommand("paint_target", {{"target", std::string("texture")}}); },
         [this] { return paintsTexture(doc_.mesh); }, textured,
         "Paint into the Part's texture: the colour resolution comes from the texture, not the mesh. The Paint "
@@ -119,7 +119,7 @@ void App::registerTextureUiActions() {
     // Shown on the top shelf and in the Color palette while painting a Part that has no texture yet.
     add("draw.new_texture", "New Texture", "Draw", [this] { startNewTexture(); }, nullptr,
         [this] { return !autoUv_ && doc_.mesh.triangleCount() > 0; },
-        "Start texture painting: give the Part a texture (the size chosen in Tool > Texture Map, 2K by default) "
+        "Start texture painting: give the Part a texture (the size chosen in Tool > Texture Image, 2K by default) "
         "so paint goes into texels instead of vertices, and the detail comes from the texture, not the mesh. "
         "Without UVs, Auto UV unwraps the model first (in the background, with its progress in the status bar).",
         "texture_create");

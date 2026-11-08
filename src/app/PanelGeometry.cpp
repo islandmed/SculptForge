@@ -3,7 +3,7 @@
 //
 // Tool > Geometry, grouped by what you do: Levels (the Level slider, Lower / Higher Level, Add Level with Smooth,
 // Rebuild Lower Levels, Remove Below / Above), Micro Detail, Resolution (Decimate, Quad Remesh, Subdivide), Cleanup
-// (Fill Holes, Merge by Distance, Check Mesh) and Symmetry (Make Symmetric). The levels themselves live in core/Multires.
+// (Fill Holes, Merge by Distance, Find Problems) and Symmetry (Make Symmetric). The levels themselves live in core/Multires.
 #include "app/App.h"
 #include "app/Demo.h"
 #include "app/Palettes.h"
@@ -139,7 +139,7 @@ void App::drawGeometrySection() {
     ImGui::Spacing();
     tray::GroupLabel(*this, "Cleanup");
     ui::ActionButton(*this, "geometry.close_holes", ImVec2(-1, 0), ui::Look::IconLabel);
-    drawMeshCheckContents(); // Merge by Distance, Check Mesh (PanelMeshCheck.cpp)
+    drawMeshCheckContents(); // Merge by Distance, Find Problems (PanelMeshCheck.cpp)
 
     drawSymmetryContents(); // Make Symmetric (PanelExtract.cpp)
 }

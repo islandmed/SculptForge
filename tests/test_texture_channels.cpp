@@ -748,7 +748,7 @@ TEST(texture_memory_readouts_are_safe_while_painting) {
 TEST(texture_edits_replace_the_texture_object) {
     // Why the UI defers texture commands until it has drawn: a command that edits the texture gives the mesh a
     // copy and keeps the old one only as an undo step's packed tiles, so a reference held across the command
-    // points at freed memory (the Texture Map panel crashed this way under load).
+    // points at freed memory (the Texture Image panel crashed this way under load).
     Document doc = makeDoc(texturedPlane(8, 256));
     std::weak_ptr<PaintTexture> old = doc.mesh.texture;
     CommandRegistry reg;
