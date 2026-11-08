@@ -2208,10 +2208,10 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
         status_ = "Quad Remesh Guides off";
         return;
     }
-    if (key == SDLK_ESCAPE && (!insertType_.empty() || tubeDraw_ || edgesMode_)) { // Append > Insert (#34), Draw Tube,
-        const bool tube = tubeDraw_, insert = !insertType_.empty();                // Edges mode off
-        leaveDrawModes();
-        status_ = tube ? "Tube: Draw Tube off" : insert ? "Insert off" : "Edges mode off";
+    if (key == SDLK_ESCAPE && (!insertType_.empty() || tubeDraw_ || edgesMode_ || facePlacing_)) { // Append > Insert
+        const bool tube = tubeDraw_, insert = !insertType_.empty(), edges = edgesMode_; // (#34), Draw Tube, Edges mode,
+        leaveDrawModes();                                                            // Place Landmarks off
+        status_ = tube ? "Tube: Draw Tube off" : insert ? "Insert off" : edges ? "Edges mode off" : "Place Landmarks off";
         return;
     }
     if (key == SDLK_ESCAPE && forgesphereActive() && forgesphereReturnPart_ >= 0 && drag_ == Drag::None && !zsMenu_.open) {

@@ -7,14 +7,6 @@ brush.capture_view | Scale | task modes-capture-exit: a brush or a tool leaves C
 brush.capture_view | a brush on the shelf | task modes-capture-exit: a brush or a tool leaves Capture from view
 brush.capture_view | a palette action | task modes-capture-exit: a brush or a tool leaves Capture from view
 brush.capture_view | undo | task modes-capture-exit: a brush or a tool leaves Capture from view
-face.landmarks | Draw | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
-face.landmarks | Esc | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
-face.landmarks | Move | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
-face.landmarks | Rotate | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
-face.landmarks | Scale | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
-face.landmarks | a brush on the shelf | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
-face.landmarks | a palette action | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
-face.landmarks | undo | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
 paint.line_gradient | Draw | task modes-gradient-exit: a brush or a tool leaves Line Gradient
 paint.line_gradient | Move | task modes-gradient-exit: a brush or a tool leaves Line Gradient
 paint.line_gradient | Rotate | task modes-gradient-exit: a brush or a tool leaves Line Gradient

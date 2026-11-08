@@ -160,6 +160,10 @@ std::string App::leaveDrawModes() {
         edgesMode_ = false;
         left += left.empty() ? "Edges mode" : " and Edges mode";
     }
+    if (facePlacing_) { // Facial Shapes > Place Landmarks takes clicks on the model (PanelFace.cpp)
+        facePlacing_ = false;
+        left += left.empty() ? "Place Landmarks" : " and Place Landmarks";
+    }
     const int back = tubeReturnPart_;
     tubeReturnPart_ = -1;
     if (tubeActive() && back >= 0 && back < doc_.partCount() && back != doc_.activePart &&
