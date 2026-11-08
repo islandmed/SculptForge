@@ -322,24 +322,28 @@ flat in int vPrimBase;
 // interpolated on the micro triangle under the pixel (normal, curvature, mask), whatever level the geometry drew.
 flat in int vSlot;
 flat in int vEdges;
-flat in int vPage; // Focus Detail: the page with the full shading grid (-1: uShade holds the coarse one)
 in vec2 vIJ;
 uniform samplerBuffer uShade;
-uniform samplerBuffer uPoolShade;
 uniform int uN;
 uniform int uSamples;
-uniform int uFocus, uCN, uCSamples;
 uniform mat4 uView;
 uniform int uMicroWire; // 1: the wireframe of the base (the level below the micro level) on the micro surface
 vec4 gNC;
 float gMask;
 float gWire = 0.0;
+#ifdef FOCUS
+// A streamed level (Focus Detail, render/MicroFocus.h; its own program, so levels in memory run the plain shader)
+flat in int vPage; // the page with the full shading grid (-1: uShade holds the coarse one)
+uniform samplerBuffer uPoolShade;
+uniform int uCN, uCSamples;
 bool gCoarse = false;
 vec4 shadeAt(int i, int j) {
     if (gCoarse) return texelFetch(uShade, vSlot * uCSamples + j * (uCN + 1) - (j * (j - 1)) / 2 + i);
-    int k = j * (uN + 1) - (j * (j - 1)) / 2 + i;
-    return uFocus == 1 ? texelFetch(uPoolShade, vPage * uSamples + k) : texelFetch(uShade, vSlot * uSamples + k);
+    return texelFetch(uPoolShade, vPage * uSamples + j * (uN + 1) - (j * (j - 1)) / 2 + i);
 }
+#else
+vec4 shadeAt(int i, int j) { return texelFetch(uShade, vSlot * uSamples + j * (uN + 1) - (j * (j - 1)) / 2 + i); }
+#endif
 vec3 octNormal(vec2 v) {
     vec2 e = v * 2.0 - 1.0;
     vec3 n = vec3(e, 1.0 - abs(e.x) - abs(e.y));
@@ -349,10 +353,15 @@ vec3 octNormal(vec2 v) {
     return normalize(n);
 }
 void microFetch() {
-    // (Focus Detail: a tile without its full shading interpolates the coarse grid's, gn segments)
-    gCoarse = uFocus == 1 && vPage < 0;
+#ifdef FOCUS
+    // (a tile without its full shading interpolates the coarse grid's, gn segments)
+    gCoarse = vPage < 0;
     int gn = gCoarse ? uCN : uN;
     vec2 gij = gCoarse ? vIJ * (float(uCN) / float(uN)) : vIJ;
+#else
+    int gn = uN;
+    vec2 gij = vIJ;
+#endif
     float fi = clamp(gij.x, 0.0, float(gn)), fj = clamp(gij.y, 0.0, float(gn));
     int i0 = min(int(fi), gn - 1), j0 = min(int(fj), gn - 1);
     if (i0 + j0 > gn - 1) {
@@ -1036,12 +1045,12 @@ bool Renderer::init(std::string& error) {
 const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (features & (kTextured | kNormalMap)) features |= kTextured | kPrim;
     // (micro levels: no per-vertex paint, per-triangle data or predictive preview)
-    if (features & kMicro) features &= kMicro | kFlat | kPbr;
+    if (features & kMicro) features &= kMicro | kFlat | kPbr | kFocus;
     MeshProgram& p = programs_[features & 255];
     if (p.id) return &p;
     std::string prefix = "#version 330 core\n";
-    if (features & kMicro) prefix += "#define MICRO\n";
-    if (features & kPaint) prefix += "#define PAINT\n";
+    if (features & kMicro) prefix += (features & kFocus) ? "#define MICRO\n#define FOCUS\n" : "#define MICRO\n";
+    else if (features & kPaint) prefix += "#define PAINT\n";
     if (features & kPrim) prefix += "#define PRIM\n";
     if (features & kTextured) prefix += "#define TEXTURED\n";
     if (features & kNormalMap) prefix += "#define NORMALMAP\n";
@@ -3575,7 +3584,8 @@ void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
 }
 
 void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
-    const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0));
+    const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0) |
+                                       (s.micro && s.micro->focus() ? kFocus : 0));
     if (!p) return;
     gl::UseProgram(p->id);
     setPbrUniforms(*p, settings, false, s);

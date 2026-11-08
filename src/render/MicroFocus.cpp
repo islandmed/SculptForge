@@ -434,13 +434,11 @@ void MicroFocus::bind(GLuint program, const std::vector<uint8_t>& visible, const
     if (u_.program != program) {
         u_.program = program;
         auto at = [&](const char* name) { return gl::GetUniformLocation(program, name); };
-        u_.focus = at("uFocus");
         u_.cn = at("uCN");
         u_.cSamples = at("uCSamples");
         u_.record = at("uRecord");
         u_.shift = at("uCShift");
     }
-    gl::Uniform1i(u_.focus, 1);
     gl::Uniform1i(u_.cn, int(coarseN_));
     gl::Uniform1i(u_.cSamples, int(coarseSamples_));
     gl::Uniform1i(u_.record, int(record_));

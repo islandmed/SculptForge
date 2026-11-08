@@ -36,13 +36,15 @@ uniform samplerBuffer uBase;    // per base vertex: position, normal
 uniform isamplerBuffer uDisp;   // this chunk's displacement grids
 uniform usamplerBuffer uLevels; // per cluster: the level it draws
 uniform int uSlotBase, uChunkSlot, uLevel, uN, uSamples;
-// Focus Detail (render/MicroFocus.h): uDisp holds per slot a record (the coarse grid, uCN segments, then the inner
-// points of the three edges at full resolution, uRecord values in all); the tiles with a page (uPages: page + 1,
-// bit 31 its shading is in, 0 = none) hold their full grid in uPool.
-uniform int uFocus, uCN, uCSamples, uRecord, uCShift;
+#ifdef FOCUS
+// Focus Detail (render/MicroFocus.h; its own program, so levels in memory run the plain shader): uDisp holds per
+// slot a record (the coarse grid, uCN segments, then the inner points of the three edges at full resolution, uRecord
+// values in all); the tiles with a page (uPages: page + 1, bit 31 its shading is in, 0 = none) hold their full grid in uPool.
+uniform int uCN, uCSamples, uRecord, uCShift;
 uniform usamplerBuffer uPages;
 uniform isamplerBuffer uPool;
 flat out int vPage; // the page whose full shading to use (-1: the coarse shading)
+#endif
 // > 0: a plain (not instanced) draw with this many corners per base triangle, each corner's grid point packed
 // i | j << 16 in uCorners (small patches: instancing a few triangles at a time costs more than it saves)
 uniform int uUnrolled;
@@ -58,8 +60,9 @@ vec3 P[3];
 vec3 Nn[3];
 int ord[3];
 int localSlot;
-int gPage;
 int sampleIndex(int i, int j) { return j * (uN + 1) - (j * (j - 1)) / 2 + i; }
+#ifdef FOCUS
+int gPage;
 int coarsePoint(int i, int j) { return texelFetch(uDisp, localSlot * uRecord + j * (uCN + 1) - (j * (j - 1)) / 2 + i).r; }
 // A record's grid point, as FocusDetail upsamples (core/FocusDetail.cpp, upsample: the same integer sums).
 int coarseAt(int I, int J) {
@@ -81,10 +84,12 @@ int coarseAt(int I, int J) {
     return q >= 0 ? q >> uCShift : -((-q + s - 1) >> uCShift);
 }
 float dispAt(int I, int J) {
-    if (uFocus == 0) return float(texelFetch(uDisp, localSlot * uSamples + sampleIndex(I, J)).r);
     if (gPage >= 0) return float(texelFetch(uPool, gPage * uSamples + sampleIndex(I, J)).r);
     return float(coarseAt(I, J));
 }
+#else
+float dispAt(int I, int J) { return float(texelFetch(uDisp, localSlot * uSamples + sampleIndex(I, J)).r); }
+#endif
 vec3 microPos(int I, int J) {
     float inv = 1.0 / float(uN);
     float wc[3] = float[3](float(uN - I - J) * inv, float(I) * inv, float(J) * inv);
@@ -120,13 +125,11 @@ void main() {
     int slot = uSlotBase + instance;
     localSlot = slot - uChunkSlot;
     vSlot = localSlot;
-    gPage = -1;
-    vPage = 0;
-    if (uFocus == 1) {
-        uint pg = texelFetch(uPages, slot).r;
-        gPage = int(pg & 0x7FFFFFFFu) - 1;
-        vPage = (pg & 0x80000000u) != 0u ? gPage : -1;
-    }
+#ifdef FOCUS
+    uint pg = texelFetch(uPages, slot).r;
+    gPage = int(pg & 0x7FFFFFFFu) - 1;
+    vPage = (pg & 0x80000000u) != 0u ? gPage : -1;
+#endif
     if (uLevel == 0) {
         // The base triangle alone (a cluster far away, a scan's millions of tiny patches): each vertex is one
         // corner, where the weights below are (1, 0, 0) and the bulge 0, so the same point from one base vertex.
@@ -809,7 +812,6 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
         gl::Uniform1i(at("uDisp"), 10);
         gl::Uniform1i(at("uLevels"), 11);
         gl::Uniform1i(at("uShade"), 12);
-        u_.focus = at("uFocus");
         // (always set: samplers of another type left on unit 0 make draws fail on some drivers)
         gl::Uniform1i(at("uPages"), 13);
         gl::Uniform1i(at("uPool"), 14);
@@ -825,7 +827,6 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
     gl::ActiveTexture(kUnitLevels);
     gl::BindTexture(GL_TEXTURE_BUFFER, levelTex_);
     if (focus_) focus_->bind(program, visible, want_);
-    else gl::Uniform1i(u_.focus, 0);
     if (closed_) gl::Enable(GL_CULL_FACE);
     size_t drawn = 0;
     int boundChunk = -1;

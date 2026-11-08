@@ -89,7 +89,7 @@ private:
     std::vector<uint32_t> shadeStaging_, written_, coarseShade_;
     struct Uniforms {
         GLuint program = 0;
-        GLint focus = -1, cn = -1, cSamples = -1, record = -1, shift = -1;
+        GLint cn = -1, cSamples = -1, record = -1, shift = -1;
     } u_;
 };
 
