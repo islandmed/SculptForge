@@ -86,7 +86,7 @@ the ones you will use most:
 | Files | `save_project` | `path` (default: the current project) |
 | Files | `open_project` | `path` |
 | Geometry | `subdivide` | `levels` (1 to 4, default 1) |
-| Geometry | `remesh` | `resolution` (32 to 512, default 200) |
+| Geometry | `remesh` | `resolution` (32 to 4096, default 200) |
 | Geometry | `decimate` | `ratio` (default 0.5) or `triangles` |
 | Geometry | `qremesh` | `target` (default 5000), `adaptive`, `keep_groups`, `detect_edges`, `use_vertexpaint`, `symmetry`, `keep_original` |
 | Parts | `project_all` | `distance` (default 0.02), `mean`, `blur`, `geometry`, `vertexpaint`, `source` |

@@ -96,6 +96,7 @@ add_library(sculptforge_core STATIC
   src/core/SplatCapture.cpp
   src/core/Sculptable.cpp
   src/core/Voxel.cpp
+  src/core/VoxelSparse.cpp
   src/core/QuickRemesh.cpp
   src/core/EnginePresets.cpp
   src/core/Masking.cpp

@@ -3179,6 +3179,7 @@ void App::drawUi() {
     drawBrushSetSave();  // Save Shelf as Brush Set, Delete Brush Set (PanelBrushSets.cpp)
     drawPacksUi();       // pack review, New Pack, macro confirmation and editor (PanelPacks.cpp)
     drawMemoryConfirm(); // "Not enough free memory" before a big mesh (MemoryConfirm.cpp)
+    drawVoxelHighResConfirm(); // Voxel Remesh above 512: what it will make, once (PanelRetopo.cpp)
     drawAiLink();        // live mode: Approve / Allow dialogs, the "AI connected" badge (PanelAiLink.cpp)
     drawMayaLinkDialog(); // the Maya Live link's warning (PanelMaya.cpp)
     drawConnectAi();     // Help > Connect an AI tool (PanelConnectAi.cpp)

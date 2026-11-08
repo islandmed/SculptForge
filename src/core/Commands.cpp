@@ -274,7 +274,9 @@ CommandRegistry::CommandRegistry() {
          "Voxel remesh (like Voxel Remesh): rebuild the sculpt as an even, watertight surface, merging overlapping "
          "parts and fixing broken scans or generated models. Sculpt layers are baked in. A painted texture is "
          "kept (new Auto UVs, colour projected from the old surface) unless keep_texture=false.",
-         {{"resolution", T::Number, "Voxels across the longest side (32-512). Default 200; higher keeps more detail.", false},
+         {{"resolution", T::Number, "Voxels across the longest side (32-4096). Default 200; higher keeps more detail. "
+                                  "Above 512 it can make tens of millions of triangles; it stops with a message when "
+                                  "it would not fit in the free memory.", false},
           {"keep_texture", T::Bool, "Keep a painted texture: Auto UV the result and project the texture onto it. "
                                     "Default true.", false},
           {"keep_masked", T::Bool, "Keep masked: masked areas keep their triangles exactly; the rest is remeshed and "
@@ -285,7 +287,7 @@ CommandRegistry::CommandRegistry() {
              const bool keeping = std::find(keep.begin(), keep.end(), 1) != keep.end();
              if (keeping && std::find(keep.begin(), keep.end(), 0) == keep.end())
                  return {false, "Remesh: everything is masked, so nothing would change"};
-             Mesh m = voxelRemesh(doc.mesh, std::clamp(int(argNumber(a, "resolution", 200)), 32, 512), &err);
+             Mesh m = voxelRemesh(doc.mesh, std::clamp(int(argNumber(a, "resolution", 200)), kVoxelResolutionMin, kVoxelResolutionMax), &err);
              if (m.triangleCount() == 0) return {false, err};
              std::string keepNote;
              if (keeping) {

@@ -161,6 +161,8 @@
 //                            longest_frame_ms (the longest real time between two frames since the last read; resets),
 //                            time_limit_scale (timeLimit()'s factor: 4 on CI or in a parallel ctest, else 1),
 //                            voxel_remesh_running, quick_remesh / remesh_after_stroke (Tool > Remesh, #121), stroke_stretched,
+//                            voxel_resolution, voxel_triangle_estimate (the line under it), voxel_highres_confirm (1 while
+//                            the above-512 confirmation is open),
 //                            qremesh_guides (guide curves on the active Part), qremesh_guide_loops (closed ones),
 //                            guides_mode (1 while the QRemesh Guides brush is picked),
 //                            quads (quad pairs in the active Part), quad_percent (quads among its polygons)
@@ -631,6 +633,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (const double v = app_.sculptableTestValue(name); !std::isnan(v)) return v;
     if (name == "qremesh_running") return app_.qremesh_ ? 1.0 : 0.0;
     if (name == "voxel_remesh_running") return app_.voxelRemesh_ ? 1.0 : 0.0;
+    if (name == "voxel_resolution") return double(app_.voxelResolution_);
+    if (name == "voxel_triangle_estimate") return double(app_.voxelEstimate().triangles);
+    if (name == "voxel_highres_confirm") return app_.voxelHighResConfirm_.open ? 1.0 : 0.0;
     if (name == "quick_remesh") return app_.uiPrefs_.quickRemesh ? 1.0 : 0.0;
     if (name == "remesh_after_stroke") return app_.uiPrefs_.remeshAfterStroke ? 1.0 : 0.0;
     if (name == "stroke_stretched") return double(app_.lastStrokeStretched_);
