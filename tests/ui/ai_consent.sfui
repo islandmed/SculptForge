@@ -1,7 +1,8 @@
 # The first-use notice for third-party AI hosts (ai/Consent.h, PanelAiConsent.cpp). A stub stands in for the service
 # (generator_stub: never the network, http_requests stays 0). Generate 3D's first Generate shows, inside the panel,
 # what is sent, to which host and who pays; Cancel sends nothing; Allow runs it and is remembered (no second notice);
-# Preferences > AI lists it with Revoke, after which it asks again. Brush Lab's free tier asks first too. In Spanish.
+# Preferences > AI lists it with Revoke, after which it asks again. Brush Lab's free tier asks first too. In Spanish, and at 200%
+# (ai_consent_1440 / ai_consent_2880 are the review sizes).
 run ui_look look=classic layout=classic
 run new_sphere subdivisions=3
 generator_stub sphere torus cube
@@ -77,6 +78,35 @@ expect "Permitir##send"
 expect "Cancelar##send"
 expect_text ¿Enviar a Pollinations.ai?
 shot consent-brush-es
+ui_scale 200
+wait 0.2
+expect "Permitir##send"
+shot consent-brush-es-200
+ui_scale 100
 click "Cancelar##send"
+expect_value http_requests == 0
+
+# 200% in English (the 2880 run's review shots): the notice's three buttons and the services table with Revoke.
+click "Preferencias##palette.preferences"
+click "Interfaz##preferences.interface"
+click "English##language.en"
+key escape
+ui_scale 200
+wait 0.2
+click "Generate 3D/Generate 3D model"
+expect "Allow##send"
+expect "Set up local##send"
+shot consent-generate-200
+click "Allow##send"
+click OK
+wait_value generate_candidates == 3 30
+click "Generate 3D/Discard all##candidates"
+click "Preferences##palette.preferences"
+click "AI##preferences.ai"
+expect_text Online AI services
+expect "Revoke"
+shot consent-prefs-200
+key escape
+ui_scale 100
 expect_value http_requests == 0
 generator_stub off
