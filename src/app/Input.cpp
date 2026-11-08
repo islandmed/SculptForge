@@ -769,7 +769,7 @@ void App::drawQuickMenu() {
     ImGui::SetNextWindowPos(ImVec2(quickMenu_.at.x - width * 0.5f, quickMenu_.at.y - tile * 0.5f), ImGuiCond_Appearing);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, theme::u32(theme::panelBg, 0.96f)); // the look's own grey, no blue tint
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, theme::u32(theme::panelBg)); // the look's own grey, no blue tint, opaque
     bool close = false;
     if (ImGui::Begin(tr("Quick Menu##quickmenu"), nullptr,
                      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |

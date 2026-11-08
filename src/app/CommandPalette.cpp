@@ -192,7 +192,7 @@ void CommandPalette::draw(App& app, const CanvasRect& area) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f * s, 8.0f * s));
     ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 6.0f * s);
     ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 1.0f);
-    ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0x25 / 255.0f, 0x25 / 255.0f, 0x28 / 255.0f, 0.98f));
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0x25 / 255.0f, 0x25 / 255.0f, 0x28 / 255.0f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(IM_COL32(0xf0, 0x88, 0x2e, 0x70)));
     std::function<void()> pending;
     std::string prefill;
