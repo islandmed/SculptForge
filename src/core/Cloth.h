@@ -32,7 +32,7 @@
 
 namespace sf {
 
-struct Mesh;
+class Mesh;
 
 // A fabric: how it stretches, bends, weighs and slides. Compliances are XPBD alphas (m/N), mass per area in kg/m^2.
 struct Fabric {

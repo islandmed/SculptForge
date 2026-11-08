@@ -3637,13 +3637,13 @@ void App::drawAiSettings() {
         ImGui::TreeNode(tr("Run a model on this computer"))) {
         // Steps for the platform we're on; the guide covers the others.
 #if defined(_WIN32)
-        ImGui::TextWrapped(tr("1. Install Ollama from ollama.com/download, or in PowerShell:\n"
+        ImGui::TextWrapped("%s", tr("1. Install Ollama from ollama.com/download, or in PowerShell:\n"
                            "      winget install Ollama.Ollama\n"
                            "2. Download the model (in PowerShell):\n"
                            "      ollama pull qwen3:4b-instruct\n"
                            "3. Ollama runs in the system tray. Pick Ollama above, then Find models."));
 #elif defined(__APPLE__)
-        ImGui::TextWrapped(tr("1. Install Ollama from ollama.com/download and drag it to Applications.\n"
+        ImGui::TextWrapped("%s", tr("1. Install Ollama from ollama.com/download and drag it to Applications.\n"
                            "2. Download the model (in Terminal):\n"
                            "      ollama pull qwen3:4b-instruct\n"
                            "3. Ollama runs in the menu bar. Pick Ollama above, then Find models."));
