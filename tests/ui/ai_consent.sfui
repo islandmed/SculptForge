@@ -88,6 +88,7 @@ expect_value http_requests == 0
 
 # 200% in English (the 2880 run's review shots): the notice's three buttons and the services table with Revoke.
 click "Preferencias##palette.preferences"
+click "AI##preferences.ai"                       # (Interface is still open from before: one section open at a time)
 click "Interfaz##preferences.interface"
 click "English##language.en"
 key escape
