@@ -18,6 +18,7 @@ title: Plugins
 line: Packs can bring sandboxed plugins: deformers and generators with no file, network or system access.
 image: images/wn-0120-plugins.jpg
 action: guide:packs-and-macros.md#plugins
+# optional: pose-all (keep only if feat/pose-all-2 is in 0.12.0; else delete this card and its image)
 title: Pose all Parts
 line: Pose every visible Part at once on one light Pose Mesh; Apply gives each Part the pose at full resolution.
 image: images/wn-0120-pose.jpg
