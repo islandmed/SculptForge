@@ -634,7 +634,7 @@ std::string App::perfTraceJobs() const {
     add(sculptableBusy(), "make sculptable");
     add(phoneBusy(), "phone");
     add(bool(updateJob_), "update check");
-    add(running(pendingBrush_) || running(pendingGenerator_) || running(pendingModels_) || running(pendingUnreal_) ||
+    add(running(pendingBrush_) || running(pendingGenerator_) || running(pendingBase_) || running(pendingModels_) || running(pendingUnreal_) ||
             running(pendingComfyCheck_),
         "AI / bridge request");
     add(solverBusy(), "stroke solver");

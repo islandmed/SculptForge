@@ -817,6 +817,7 @@ void Demo::buildImageTo3D() {
         app_.aiSettings_.hfModel = "hunyuan3d-2.1";
         app_.generatedRemesh_ = int(GeneratedRemesh::Quad);
         app_.remeshResolution_ = 256;
+        app_.candidateCount_ = 1; // one take: it lands at once
         app_.openPath(app_.options_.demoAsset); // opens the Generate 3D panel with the drawing
         fadeFrom_ = fadeTo_ = 1.0f;
         mouse_ = ImVec2(1000.0f * float(app_.options_.height) / 1080.0f, 760.0f * float(app_.options_.height) / 1080.0f);
@@ -839,7 +840,12 @@ void Demo::buildImageTo3D() {
         click("Generate 3D/Generate 3D model");
         waitUntil([this] { return ready(app_.pendingGenerator_); }, 600.0f, 10);
         run([this] {
-            app_.pollGenerator();
+            app_.pollGenerator(); // (one candidate: picked at once)
+            app_.useAsSculptingBase();
+        });
+        waitUntil([this] { return ready(app_.pendingBase_); }, 600.0f, 10);
+        run([this] {
+            app_.pollSculptingBase();
             if (!app_.options_.demoOutput.empty()) { // keep a copy for rehearsals; the status bar keeps its message
                 const std::string status = app_.status_;
                 app_.runCommand("export_glb", {{"path", app_.options_.demoOutput}});

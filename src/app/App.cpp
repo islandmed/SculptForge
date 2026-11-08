@@ -499,6 +499,7 @@ int App::runUiTest(int w, int h, int fps) {
         pollBrushRequest();
         pollUnreal();
         pollGenerator();
+        pollSculptingBase();
         pollBlender(); // (demo recordings leave the user's Blender bridge alone)
         pollMaya(); // (tests and recordings never read the user's Maya folder: maya.json isn't loaded)
         pollPhone();
@@ -810,7 +811,7 @@ void wakeMainLoop() {
 
 bool App::backgroundBusy() const {
     auto running = [](const auto& f) { return f.valid() && f.wait_for(std::chrono::seconds(0)) != std::future_status::ready; };
-    return running(pendingBrush_) || running(pendingGenerator_) || running(pendingModels_) || running(pendingUnreal_) ||
+    return running(pendingBrush_) || running(pendingGenerator_) || running(pendingBase_) || running(pendingModels_) || running(pendingUnreal_) ||
            running(pendingComfyCheck_) || galleryBusy() || thumbs_.busy() || libraryScanner_.busy() || autoUv_ ||
            bakeBusy() || qremesh_ || voxelRemesh_ || updateJob_ || splatTrainBusy() || sculptableBusy() || phoneBusy() || uvEditorBusy() ||
            renderer_.environmentPending() || meshMapsBusy();
@@ -1151,6 +1152,7 @@ int App::run() {
             animateLayers(dt);
             pollBrushRequest();
             pollGenerator();
+            pollSculptingBase();
             pollUnreal();
             pollBridge();
             pollBlender();
@@ -3070,7 +3072,7 @@ void App::drawUi() {
     drawPartPopups();
     if (showBrushLab_) drawBrushLab();
     drawBrushGallery();
-    if (showImageTo3D_) drawImageTo3D();
+    if (showImageTo3D_ && ai::aiEnabled()) drawImageTo3D(); // (closed when AI goes off; never drawn while it is)
     drawPhoneWindow(); // File > Capture from phone (PanelPhone.cpp)
     drawUvEditor();    // Tool > Texture Image > UV Editor (PanelUvEditor.cpp)
     drawTimelineUi();  // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)
@@ -3758,96 +3760,6 @@ void App::projectImageFromView() {
     updateTitle();
 }
 
-void App::startGenerator() {
-    if (pendingGenerator_.valid()) return;
-    if (textMode_ ? textPrompt_[0] == '\0' : refImagePath_.empty()) return;
-    aiSettings_.generatorCommand = generatorCommand_;
-    aiSettings_.falKey = falKey_;
-    aiSettings_.falModel = falModel_;
-    aiSettings_.meshyKey = meshyKey_;
-    aiSettings_.hyper3dKey = hyper3dKey_;
-    aiSettings_.hfToken = hfToken_;
-    aiSettings_.comfyUrl = comfyUrl_;
-    // With no workflow chosen, ComfyUI runs the bundled one the panel shows (not saved, so updates reach it).
-    ai::AiSettings settings = aiSettings_;
-    const bool hunyuan = settings.generatorService == "huggingface"
-                             ? ai::hunyuanModel(ai::resolveHfPreset(settings, textMode_).id)
-                             : settings.generatorService == "fal" &&
-                                   ai::hunyuanModel(textMode_ ? ai::falTextModel(settings.falModel) : settings.falModel);
-    if (hunyuan) showHunyuanNoticeOnce();
-    if (settings.comfyImageWorkflow.empty()) settings.comfyImageWorkflow = comfyDefaultWorkflow(false);
-    if (settings.comfyTextWorkflow.empty()) settings.comfyTextWorkflow = comfyDefaultWorkflow(true);
-    auto stem = (std::filesystem::temp_directory_path() / ("sculptforge_generated_" + std::to_string(SDL_GetTicksNS()))).u8string();
-    generatorTime_ = 0.0f;
-    generatorProgress_ = std::make_shared<ai::GenerationProgress>();
-    generatorProgress_->setStatus("Starting...");
-    auto promise = std::make_shared<std::promise<GeneratedModel>>();
-    pendingGenerator_ = promise->get_future();
-    std::thread([promise, settings, in = refImagePath_, text = textMode_ ? std::string(textPrompt_) : std::string(),
-                 out = std::string(stem.begin(), stem.end()), progress = generatorProgress_,
-                 mode = GeneratedRemesh(generatedRemesh_), resolution = remeshResolution_, dropBackdrop = removeBackground_] {
-        GeneratedModel g;
-        g.result = text.empty() ? ai::generate3D(settings, in, out, progress.get())
-                                : ai::generate3DFromText(settings, text, out, progress.get());
-        if (g.result.ok && (mode != GeneratedRemesh::Off || dropBackdrop)) {
-            // Made sculptable here, so the window stays responsive; the main thread opens the file and swaps this in.
-            Document scratch;
-            const CommandResult opened = CommandRegistry().execute(scratch, "open", {{"path", g.result.outputPath}});
-            // The background plane goes first (one undo step of its own), so the remesh doesn't build it in.
-            if (opened.ok && dropBackdrop && removeFlatBackdrop(scratch.mesh, &g.backdrop))
-                g.withoutBackdrop = std::make_shared<Mesh>(scratch.mesh);
-            Mesh m;
-            if (mode == GeneratedRemesh::Off) {
-                // (opened for the background check only)
-            } else if (!opened.ok) {
-                g.remeshError = opened.message;
-            } else {
-                progress->percent = 0;
-                progress->setStatus(mode == GeneratedRemesh::Quad ? "Making it sculptable: Quad Remesh..." : "Making it sculptable: Voxel Remesh...");
-                if (remeshGenerated(scratch.mesh, mode, resolution, 1, m, g.remeshError, &g.stats, [progress](float f) {
-                        progress->percent = int(f * 100.0f);
-                        return !progress->cancel.load();
-                    }))
-                    g.remeshed = std::make_shared<Mesh>(std::move(m));
-            }
-        }
-        promise->set_value(std::move(g));
-    }).detach();
-}
-
-void App::pollGenerator() {
-    if (!pendingGenerator_.valid() || pendingGenerator_.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
-        return;
-    GeneratedModel g = pendingGenerator_.get();
-    const ai::GeneratorResult& r = g.result;
-    const std::string note = r.note.empty() ? std::string() : " - " + r.note;
-    struct PrivateDir { // (Hyper3D: the downloaded file's own folder, gone once the model is in)
-        std::string path;
-        ~PrivateDir() {
-            std::error_code ec;
-            if (!path.empty()) std::filesystem::remove_all(std::filesystem::path(std::u8string(path.begin(), path.end())), ec);
-        }
-    } privateDir{r.privateDir};
-    if (!r.ok) {
-        status_ = "Image to 3D failed: " + r.error + note;
-        return;
-    }
-    runCommand("open", {{"path", r.outputPath}});
-    std::error_code ec;
-    std::filesystem::remove(std::filesystem::path(std::u8string(r.outputPath.begin(), r.outputPath.end())), ec);
-    const size_t raw = doc_.mesh.triangleCount();
-    const auto mode = GeneratedRemesh(generatedRemesh_);
-    if (g.withoutBackdrop) doc_.replaceMeshUndoable(std::move(*g.withoutBackdrop), "Remove Flat Background");
-    if (g.remeshed) doc_.replaceMeshUndoable(std::move(*g.remeshed), mode == GeneratedRemesh::Quad ? "Quad Remesh" : "Remesh");
-    doc_.path.clear();
-    const std::string remeshNote = g.remeshed ? ", " + generatedRemeshNote(g.stats, mode) : std::string();
-    status_ = !g.remeshError.empty()
-                  ? "Generated model imported (" + std::to_string(raw) + " tris, not remeshed: " + g.remeshError + ")" + note
-                  : "Generated model imported (" + std::to_string(raw) + " tris" + remeshNote + ") - ready to sculpt" + note;
-    if (g.backdrop.planes) status_ += ". " + backdropRemovedNote(g.backdrop) + ", Undo brings it back";
-    updateTitle();
-}
-
 void App::showHunyuanNoticeOnce() {
     if (aiSettings_.hunyuanNoticeShown) return;
     aiSettings_.hunyuanNoticeShown = true;
@@ -4030,7 +3942,7 @@ void App::drawImageTo3D() {
     };
     // The label column fits this language's longest label ("ID del modelo", "Token de HF"), at most 40% of the panel.
     float labelW = 0;
-    for (const char* l : {"Resolution", "Remesh", "Model", "Model id", "HF token", "API key", "Thickness", "Detail", "Depth"})
+    for (const char* l : {"Resolution", "Candidates", "Model", "Model id", "HF token", "API key", "Thickness", "Detail", "Depth"})
         labelW = std::max(labelW, ImGui::CalcTextSize(tr(l)).x);
     labelW = std::min(labelW, ImGui::GetContentRegionAvail().x * 0.4f) + ImGui::GetStyle().ItemInnerSpacing.x;
 
@@ -4128,18 +4040,17 @@ void App::drawImageTo3D() {
         hint(tr("Offline and instant, but only a puffy blockout of the outline - not a real reconstruction."));
     }
     if (serviceId != "inflate") {
-        const char* remeshModes[] = {tr("Quad Remesh"), tr("Voxel remesh"), tr("Off (raw mesh)")};
-        ImGui::Combo(tr("Remesh"), &generatedRemesh_, remeshModes, 3);
+        // Candidates: several shapes side by side to pick from. Billed services start at one (each is a generation
+        // on the user's key); the free and local ones at three.
+        int& count = serviceId == "fal" || serviceId == "meshy" || serviceId == "hyper3d" ? paidCandidateCount_ : candidateCount_;
+        ImGui::SliderInt(tr("Candidates"), &count, 1, 3);
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-            ImGui::SetTooltip(tr("Quad Remesh (default): clean quads ready for sculpting and subdividing, with one subdivision "
-                              "level holding the detail. Voxel remesh: an even, watertight triangle surface. Off: the "
-                              "model as the service made it."));
-        if (generatedRemesh_ != int(GeneratedRemesh::Off)) ImGui::SliderInt(tr("Resolution"), &remeshResolution_, 96, 400);
-        if (generatedRemesh_ == int(GeneratedRemesh::Quad)) {
-            char quads[160];
-            std::snprintf(quads, sizeof quads, tr("About %d quads, then 1 subdivision level"),
-                          generatedQuadTarget(remeshResolution_));
-            hint(quads);
+            ImGui::SetTooltip("%s", tr("How many shapes to make at once, shown side by side so you can pick the strongest "
+                                       "form before you spend time sculpting it."));
+        if (count > 1 && (serviceId == "fal" || serviceId == "meshy" || serviceId == "hyper3d")) {
+            char billed[160];
+            std::snprintf(billed, sizeof billed, tr("Each candidate is one generation on your key: %d are billed."), count);
+            hint(billed);
         }
         ImGui::Checkbox(tr("Remove flat background"), &removeBackground_);
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
@@ -4148,12 +4059,27 @@ void App::drawImageTo3D() {
                               "a removed plane back."));
     }
     ImGui::PopItemWidth();
-    if (pendingGenerator_.valid()) {
+    if (pendingGenerator_.valid() || pendingBase_.valid()) {
         generatorTime_ += ImGui::GetIO().DeltaTime;
-        const int pct = generatorProgress_ ? generatorProgress_->percent.load() : -1;
+        int pct = generatorProgress_ ? generatorProgress_->percent.load() : -1;
+        std::string text = generatorProgress_ ? generatorProgress_->status() : "Working...";
+        if (pendingGenerator_.valid() && candidateProgress_.size() > 1) { // the first one still running speaks for all
+            const int n = int(candidateProgress_.size()), done = candidatesDone_ ? candidatesDone_->load() : 0;
+            for (int i = 0; i < n; ++i)
+                if (const std::string st = candidateProgress_[size_t(i)]->status(); st != "Ready" && st != "Failed") {
+                    char line[256];
+                    std::snprintf(line, sizeof line, tr("%d of %d ready - %s"), done, n, tr(st.c_str()));
+                    text = line;
+                    break;
+                }
+            pct = -1;
+        }
         ImGui::ProgressBar(pct >= 0 ? float(pct) / 100.0f : -1.0f * float(ImGui::GetTime()), ImVec2(-1, 0),
-                           tr(generatorProgress_ ? generatorProgress_->status().c_str() : "Working..."));
-        if (ImGui::Button(tr("Cancel"), ImVec2(-1, 0)) && generatorProgress_) generatorProgress_->cancel = true;
+                           pendingGenerator_.valid() && candidateProgress_.size() > 1 ? text.c_str() : tr(text.c_str()));
+        if (ImGui::Button(tr("Cancel"), ImVec2(-1, 0))) {
+            if (generatorProgress_) generatorProgress_->cancel = true;
+            for (const auto& p : candidateProgress_) p->cancel = true;
+        }
     } else if (ImGui::Button(tr("Generate 3D model"), ImVec2(-1, 0))) {
         startGenerator();
     }
@@ -4181,6 +4107,8 @@ void App::drawImageTo3D() {
                                                                                         : "Save failed " + err;
         storeAiKeys();
     }
+    drawGeneratedCandidates(); // PanelGenerate3D.cpp
+    if (serviceId != "inflate") drawSculptingBase();
 
     if (textMode_) {
         ImGui::End();
