@@ -6,7 +6,8 @@ added: **Garment templates** (#garments): trousers, straight and A-line skirts (
   pair), next to the T-shirt. Flat panels at real size from a size chart saved in the project (chest, waist, hip,
   neck, shoulder, arm, inseam, rise, head, hand and more: `garment_size`), sewn the way each garment is made with
   the seam lengths matched; `garment_new template=... add=true` builds an outfit in one pattern. Our own proportions,
-  documented in docs/design/garment-templates.md.
+  documented in docs/design/garment-templates.md. Their seams read by name in the Pattern window ("Left front
+  inseam <-> Left back inseam", "Left sleeve cuff <-> ..."), as the T-shirt's do; mirrored panels keep the names.
   **Printing patterns at home**: `garment_export` writes tiled PDF (or one SVG per page) for A4 or Letter, portrait
   or landscape: trim lines, half triangles that complete across each join, page names (A1, A2, ... B1), the 50 mm
   check square on A1; blank pages are left out and a mirrored or repeated piece prints once, marked "cut 2, 1
