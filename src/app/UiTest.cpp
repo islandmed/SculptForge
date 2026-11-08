@@ -15,6 +15,7 @@
 //                            otherwise relative to the script), as Import... would
 //   radial_export N FILE     export radial menu N (1-based) to FILE in the shots folder, as Export... would
 //   key_down KEY / key_up KEY  press a key and keep it down / let go of it (key presses and lets go), e.g. key_down t
+//   action ID                run an action as its menu item or shortcut would (e.g. ui.palette.tool)
 //   key COMBO                e.g. enter, escape, ctrl+z, ctrl+shift+z, 3, comma, backtick, tab, f3, space, minus,
 //                            home, numpad1, ctrl+numpad7, numpad., numpadplus
 //   hold MODS                ctrl / shift / alt / ctrl+shift ... or none (for strokes and drags)
@@ -103,7 +104,7 @@
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once ui.json is written: the preferences save themselves, or Save Layout),
 //                            console_open, command_palette_open, customize, shelves_visible,
-//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, title_overlaps (top bar widgets over each other), timeline_overlaps (the timeline header's pieces over each other), menu_rect_changes (the open task menu moved or resized since last read), offscreen_items (past the window edge), hscroll_windows (shown vertical windows wider inside than out), hscrolled_windows (shown windows scrolled sideways), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
+//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, title_overlaps (top bar widgets over each other), timeline_overlaps (the timeline header's pieces over each other), menu_rect_changes (the open task menu moved or resized since last read), offscreen_items (past the window edge), clipped_labels / clipped_labels@SCOPE (controls whose label is wider than they are, e.g. @Extract), hscroll_windows (shown vertical windows wider inside than out), hscrolled_windows (shown windows scrolled sideways), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
@@ -973,6 +974,12 @@ double Demo::query(const std::string& name, bool& known) const {
     };
     if (name == "title_overlaps") return overlaps(app_.barSpans_, "title_overlaps"); // top bar widgets over each other
     if (name == "timeline_overlaps") return overlaps(app_.timelineSpans_, "timeline_overlaps"); // the timeline header's pieces
+    if (name == "clipped_labels" || name.rfind("clipped_labels@", 0) == 0) { // clipped_labels@Extract: controls there whose
+        // label was wider than the control last frame (all of them without @); names them in the log
+        const std::vector<std::string> cut = Demo::clippedLabels(name.size() > 15 ? name.substr(15) : std::string());
+        for (const std::string& c : cut) std::fprintf(stderr, "clipped label: %s\n", c.c_str());
+        return double(cut.size());
+    }
     if (name == "offscreen_items") { // items drawn past the window's edge last frame (#105); names them in the log
         const std::vector<std::string> off = Demo::offscreenItems();
         for (const std::string& o : off) std::fprintf(stderr, "offscreen: %s\n", o.c_str());
@@ -1801,6 +1808,15 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return true;
         });
         wait(0.1f);
+    } else if (verb == "action") { // action ID: run it as its menu item or shortcut would (ui.palette.tool: the
+        // palette in its tray, or its drop-down where the window is too narrow for the tray)
+        if (!need(1)) return false;
+        run([this, line, id = w[1]] {
+            const Action* a = app_.actions_.find(id);
+            if (!a || !a->run) fail(line, "no action " + id);
+            else a->run();
+        });
+        wait(0.2f);
     } else if (verb == "expect_shortcut") { // expect_shortcut ACTION KEYS: the action's keys (none: no key)
         if (!need(1)) return false;
         const std::string id = w[1], want = restOf(lineText_, 2);

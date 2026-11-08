@@ -829,28 +829,34 @@ void App::drawProjectContents() {
     const float x0 = ImGui::GetCursorPosX(); // line start, inside the section indent
     tray::GroupLabel(*this, "Project");
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
-    ui::ActionButton(*this, "part.project_all", ImVec2(half, 0));
-    ImGui::SameLine();
+    // Each pair shares a row when both labels fit half of it, else each takes its own row (no words cut off).
+    const bool detailPair = ui::ButtonWidth("Project Detail") <= half && ui::SliderWidth("Dist %.3f", 0.2) <= half;
+    ui::ActionButton(*this, "part.project_all", ImVec2(detailPair ? half : -1.0f, 0));
+    if (detailPair) ImGui::SameLine();
     ImGui::SetNextItemWidth(-1);
     ui::SliderInside("##pdist", &retopo_.projectDist, 0.001f, 0.2f, "Dist %.3f", ImGuiSliderFlags_Logarithmic);
     ui::HelpText("Dist", nullptr,
                  "How far each vertex looks for the source surface, along its normal, as a fraction of the Part's "
                  "size. Raise it if parts don't pick up the detail; lower it where surfaces are close together.",
                  kProjectPath);
-    ImGui::SetNextItemWidth(half);
+    const bool blurPair = ui::SliderWidth("Blur %d", 10) <= half && ui::CheckboxWidth("Mean") <= half;
+    ImGui::SetNextItemWidth(blurPair ? half : -1.0f);
     tray::SliderInt("##pblur", &retopo_.projectBlur, 0, 10, "Blur %d");
     ui::HelpText("Blur", nullptr, "Smooth the projected result this many times (softens noise from the source).",
                  kProjectPath);
-    ImGui::SameLine();
-    ImGui::Checkbox(tr("Mean"), &retopo_.projectMean);
+    if (blurPair) ImGui::SameLine();
+    ui::Checkbox("Mean", &retopo_.projectMean);
     ui::HelpText("Mean", nullptr,
                  "Where the source is found on both sides of a vertex, settle halfway between instead of on the nearest.",
                  kProjectPath);
-    ImGui::Checkbox(tr("Geometry"), &retopo_.projectGeometry);
+    const bool whatPair = ui::CheckboxWidth("Geometry") <= half && ui::CheckboxWidth("Vertex Paint") <= half;
+    ui::Checkbox("Geometry", &retopo_.projectGeometry);
     ui::HelpText("Geometry", nullptr, "Project the shape (into the active sculpt layer).", kProjectPath);
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
-    ImGui::Checkbox(tr("Vertex Paint"), &retopo_.projectVertexPaint);
+    if (whatPair) {
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
+    }
+    ui::Checkbox("Vertex Paint", &retopo_.projectVertexPaint);
     ui::HelpText("Vertex Paint", nullptr, "Project the vertex paint (into the active paint layer) when a source has any.",
                  kProjectPath);
 }

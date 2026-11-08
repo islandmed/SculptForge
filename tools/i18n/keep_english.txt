@@ -2,8 +2,6 @@
 # and products, file formats, units. One visible label per line, exactly as the code has it.
 AI
 Smt
-TCorne
-TBorder
 Kelvinlet
 PNG
 JPG

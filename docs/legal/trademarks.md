@@ -112,6 +112,7 @@ their old ids (`config.store`, `rgb_intensity`, `focal`, `subdiv_lower`...); onl
 | Mask Lasso / Mask Rect | Lasso Mask / Rectangle Mask |
 | Radial Count | Radial Copies |
 | Group Masked | Group from Mask |
+| Thick / E Smt / Double / TCorne / TBorder (Extract) | Thickness / Edge smooth / Both Sides / Corners / Border (scripts: `triangle_corners`, `triangle_border`; the old names still read) |
 
 <!-- labels:begin -->
     store ?config
@@ -133,6 +134,9 @@ their old ids (`config.store`, `rgb_intensity`, `focal`, `subdiv_lower`...); onl
     \bmask rect\b
     radial count
     group masked
+    (?-i:\bE Smt\b)
+    (?-i:\bTCorne\b)
+    (?-i:\bTBorder\b)
 <!-- labels:end -->
 
 ## Old words read on load (src/core/LegacyNames.h)
@@ -161,6 +165,10 @@ Whole names, matched only as the entire string (the word alone is an everyday on
 |---|---|---|---|
 | N1 | `brush.recipe.stone chisel` | `brush.recipe.Stone Carve` | `0x71FEDAD706F8BDF4` |
 | N2 | `stone chisel` | `Stone Carve` | `0xA8D1CB6C0FF343FC` |
+| N3 | `tcorne` | `triangle_corners` | `0x02E5D1FCA5703EA4` |
+| N4 | `tborder` | `triangle_border` | `0x374EB70D26D039F5` |
+| N5 | `part.extract_tcorne` | `part.extract_triangle_corners` | `0x3160EB71CE86F92D` |
+| N6 | `part.extract_tborder` | `part.extract_triangle_border` | `0xB780FCA1FA84E3DE` |
 
 ## The Bridge format's bytes (src/io/BridgeProtocol.h)
 

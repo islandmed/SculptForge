@@ -81,14 +81,14 @@ TEST(extract_shell_preview_accept_undo) {
     CHECK((groups(shell) == std::set<uint32_t>{1, 2, 3})); // outer, inner, rim
     CHECK(shell.hasQuads()); // the rim
     CHECK(!shell.hasMask());
-    // Thick 0.015 of the sphere's size (its side is 2 * radius) outward; the inner surface is the sphere's.
+    // Thickness 0.015 of the sphere's size (its side is 2 * radius) outward; the inner surface is the sphere's.
     float rmax = 0.0f, rmin = 1e9f;
     for (const auto& p : shell.positions) {
         rmax = std::max(rmax, glm::length(p));
         rmin = std::min(rmin, glm::length(p));
     }
     CHECK(std::abs(rmax - radius * (1.0f + 0.03f)) < radius * 0.01f);
-    CHECK(rmin > radius * 0.97f); // (E Smt pulls the edge in a little)
+    CHECK(rmin > radius * 0.97f); // (Edge smooth pulls the edge in a little)
     // Vertex paint comes along.
     CHECK(shell.hasColors() && shell.colors[0] == glm::vec3(1, 0, 0));
 
@@ -111,7 +111,7 @@ TEST(extract_shell_preview_accept_undo) {
     CHECK(doc.partCount() == 2 && doc.parts[1].id == previewId && doc.partMesh(1).triangleCount() > 0);
     CHECK(doc.dirty());
 
-    // A single-sided surface: Thick 0.
+    // A single-sided surface: Thickness 0.
     CHECK(reg.execute(doc, "extract", {{"thickness", 0.0}, {"accept", true}}).ok);
     CHECK(doc.partCount() == 3);
     const Mesh& surface = doc.partMesh(1); // right below the source
@@ -251,9 +251,9 @@ TEST(mirror_flip) {
     CHECK(!reg.execute(doc, "mirror", {{"pivot", std::string("somewhere")}}).ok);
 }
 
-TEST(extract_tcorne_tborder) {
+TEST(extract_triangle_corners_border) {
     // The top face of a cube: a square edge with four sharp corners. The rim is quads, without the corners'
-    // with TCorne, and triangles all along with TBorder.
+    // with Corners, and triangles all along with Border.
     Mesh cube = makeCube(4, 2.0f);
     cube.ensureMask();
     for (uint32_t v = 0; v < cube.vertexCount(); ++v) cube.mask[v] = cube.positions[v].y > 0.99f ? 1.0f : 0.0f;

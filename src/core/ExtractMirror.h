@@ -4,9 +4,9 @@
 // Two classic mesh tools:
 //  - Extract (Tool > Part > Extract): the masked part of a Part becomes a new Part, a shell with a
 //    thickness (a helmet, a strap, a piece of clothing). Extract shows it as a preview; Accept keeps it as an
-//    undoable step. Thick is a fraction of the Part's size (negative = inward), E Smt smooths the jagged edge
-//    the mask's triangles leave, Double grows the shell both ways; Thick 0 gives a single-sided surface. The rim
-//    is quads, except at sharp corners with TCorne and all along it with TBorder.
+//    undoable step. Thickness is a fraction of the Part's size (negative = inward), Edge smooth smooths the jagged edge
+//    the mask's triangles leave, Both Sides grows the shell both ways; Thickness 0 gives a single-sided surface. The rim
+//    is quads, except at sharp corners with Corners and all along it with Border.
 //  - Mirror And Weld (Tool > Geometry > Modify Topology): the half on the + side of a plane through the origin
 //    is kept and mirrored onto the - side, and the seam welded into one watertight mesh. Triangles crossing the
 //    plane are cut on it; face groups, vertex paint, mask, UVs and sculpt layers are carried over.
@@ -23,10 +23,10 @@ class CommandRegistry;
 
 struct ExtractOptions {
     float thickness = 0.015f; // fraction of the Part's largest side; < 0 grows inward, 0 = a single surface
-    int smooth = 5;           // E Smt: smoothing passes along the edge of the extracted part (0-50)
-    bool doubleSided = false; // Double: the shell grows both ways from the surface by the thickness
-    bool triangleCorners = false; // TCorne: the rim keeps triangles (not quads) where the edge turns sharply
-    bool triangleBorder = false;  // TBorder: the whole rim is triangles
+    int smooth = 5;           // Edge smooth: smoothing passes along the edge of the extracted part (0-50)
+    bool doubleSided = false; // Both Sides: the shell grows both ways from the surface by the thickness
+    bool triangleCorners = false; // Corners: the rim keeps triangles (not quads) where the edge turns sharply
+    bool triangleBorder = false;  // Border: the whole rim is triangles
     float threshold = 0.5f;   // a triangle is extracted when its corners' mean mask reaches this
 };
 

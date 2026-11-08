@@ -365,7 +365,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Extract", "提取"},
     {"Accept", "接受"},
     {"Double", "双倍"},
-    {"Thick", "厚度"},
+    {"Thickness %.3f", "厚度 %.3f"},
+    {"Both Sides", "两侧"},
     {"Dist", "距离"},
     // --- Geometry ---
     {"Divide", "细分"},
@@ -847,7 +848,10 @@ constexpr Entry kSimplifiedChinese[] = {
     {"The active Part's width (X), height (Y) and depth (Z) in scene units. Drag, or double-click and type an exact value: the Part resizes about its centre (one undo step). With Uniform, the other sides follow in proportion.",
      "当前部件的宽度（X）、高度（Y）和深度（Z），以场景单位表示。拖动，或双击输入精确数值：部件会以其中心调整尺寸（一个撤销步骤）。开启等比时，其他边按比例跟着调整。"},
     // --- Extract, Project, Deformation ---
-    {"E Smt", "E Smt"},
+    {"Edge smooth", "边缘平滑"},
+    {"Edge smooth %.0f", "边缘平滑 %.0f"},
+    {"Corners", "角落"},
+    {"Border", "边框"},
     {"Parts too", "连同其他部件"},
     {"This Part", "此部件"},
     {"Move along normals", "沿法线移动"},
@@ -989,8 +993,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "right-click menu).",
      "复制当前部件及其图层与属性，并将副本设为当前（部件列表的右键菜单中也有）。"},
     {"Make a shell from the masked part of the Part (a helmet, a strap, clothing), shown as a preview below it. "
-     "Change Thick, E Smt or Double and it updates; Accept keeps it as a new Part.",
-     "从部件的遮罩区域创建外壳（头盔、带子、衣物），并在下方显示预览。更改厚度、E Smt 或双倍时会实时更新；按“接受”"
+     "Change Thickness, Edge smooth, Both Sides, Corners or Border and it updates; Accept keeps it as a new Part.",
+     "从部件的遮罩区域创建外壳（头盔、带子、衣物），并在下方显示预览。更改厚度、边缘平滑、两侧、角落或边框时会实时更新；按“接受”"
      "即保留为新部件。"},
     {"Keep the Extract preview as a new Part below this one. Ctrl+Z takes it away again.",
      "将提取预览保留为此部件下方的新部件。按 Ctrl+Z 可再移除。"},

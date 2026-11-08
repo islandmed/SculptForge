@@ -119,10 +119,41 @@ TEST(legacy_whole_names_match_the_trademarks_table) {
                 mixed[i] = char(std::toupper(static_cast<unsigned char>(mixed[i])));
         CHECK(legacy::modernize(mixed) == now);
         CHECK(legacy::isOld(old));
-        const std::string word = old.substr(old.rfind(' ') + 1);
-        CHECK(legacy::modernize(word) == word);
-        CHECK(legacy::modernize("brush.recipe.My " + capitalised(word)) == "brush.recipe.My " + capitalised(word));
+        if (old.find(' ') != std::string::npos) { // a name of words: each alone stays
+            const std::string word = old.substr(old.rfind(' ') + 1);
+            CHECK(legacy::modernize(word) == word);
+            CHECK(legacy::modernize("brush.recipe.My " + capitalised(word)) == "brush.recipe.My " + capitalised(word));
+        }
         CHECK(legacy::modernize(old + " 2") == old + " 2");
+        CHECK(legacy::modernize("my_" + old) == "my_" + old);
     }
     CHECK(rows == std::size(legacy::kNames));
+}
+
+// Extract's old argument names (N3, N4) still work in a script: the same shell as today's names.
+TEST(legacy_extract_arguments) {
+    std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../docs/legal/trademarks.md");
+    std::stringstream s;
+    s << f.rdbuf();
+    const std::string text = s.str();
+    std::map<std::string, std::string> was; // today's name -> the old one
+    const std::regex row(R"(\| N\d+ \| `([^`]+)` \| `([^`]+)` \|)");
+    for (std::sregex_iterator it(text.begin(), text.end(), row), end; it != end; ++it) was[(*it)[2]] = (*it)[1];
+    CHECK(was.count("triangle_corners") && was.count("triangle_border"));
+    if (!was.count("triangle_corners") || !was.count("triangle_border")) return;
+    auto quads = [](const std::string& corners, const std::string& border) { // triangles in quads in the new Part
+        CommandRegistry reg;
+        Document doc;
+        CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 3.0}}).ok);
+        doc.mesh.ensureMask();
+        for (uint32_t v = 0; v < doc.mesh.vertexCount(); ++v) doc.mesh.mask[v] = doc.mesh.positions[v].y > 0.5f ? 1.0f : 0.0f;
+        CHECK(reg.execute(doc, "extract", {{"smooth", 0.0}, {corners, true}, {border, true}, {"accept", true}}).ok);
+        size_t n = 0;
+        if (doc.partCount() == 2)
+            for (uint32_t t = 0; t < doc.partMesh(1).triangleCount(); ++t) n += doc.partMesh(1).quadPartnerAt(t) != Mesh::kNoQuad;
+        return n;
+    };
+    const size_t today = quads("triangle_corners", "triangle_border");
+    CHECK(quads(was["triangle_corners"], was["triangle_border"]) == today);
+    CHECK(quads("no_corners", "no_border") > today); // (names it doesn't know: the rim stays quads)
 }

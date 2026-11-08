@@ -103,7 +103,7 @@ Mesh extractShell(const Mesh& mesh, const ExtractOptions& o, std::string& error)
     std::vector<glm::vec3> p(np);
     for (uint32_t i = 0; i < np; ++i) p[i] = mesh.positions[kept[i]];
 
-    // E Smt: Taubin smoothing along the patch's edge, which follows the triangles' staircase, so it doesn't shrink.
+    // Edge smooth: Taubin smoothing along the patch's edge, which follows the triangles' staircase, so it doesn't shrink.
     const auto boundary = boundaryEdges(tris);
     if (o.smooth > 0 && !boundary.empty()) {
         std::vector<std::array<uint32_t, 2>> nb(np, {kNone, kNone});
@@ -157,7 +157,7 @@ Mesh extractShell(const Mesh& mesh, const ExtractOptions& o, std::string& error)
         // The inner surface faces the other way; the rim joins the two along the patch's edge, one quad per edge.
         for (const glm::uvec3& c : tris) out.triangles.push_back(glm::uvec3(c.x + np, c.z + np, c.y + np));
         out.facegroups.resize(out.triangles.size(), 2u);
-        // TCorne: where the edge turns sharply (over 50 degrees) the rim keeps triangles; TBorder: all along it.
+        // Corners: where the edge turns sharply (over 50 degrees) the rim keeps triangles; Border: all along it.
         std::vector<uint8_t> corner(o.triangleCorners && !o.triangleBorder ? np : 0, 0);
         if (!corner.empty()) {
             std::vector<uint32_t> next(np, kNone), prev(np, kNone);
@@ -425,8 +425,8 @@ CommandResult runExtract(Document& doc, const Args& a) {
     o.thickness = std::clamp(float(argNumber(a, "thickness", o.thickness)), -1.0f, 1.0f);
     o.smooth = std::clamp(int(std::lround(argNumber(a, "smooth", o.smooth))), 0, 50);
     o.doubleSided = argBool(a, "double", false);
-    o.triangleCorners = argBool(a, "tcorne", false);
-    o.triangleBorder = argBool(a, "tborder", false);
+    o.triangleCorners = argBool(a, "triangle_corners", false);
+    o.triangleBorder = argBool(a, "triangle_border", false);
     std::string error;
     Mesh shell = extractShell(doc.mesh, o, error);
     if (shell.triangleCount() == 0) {
@@ -458,13 +458,13 @@ void registerExtractMirrorCommands(CommandRegistry& reg) {
              "show it as a preview below it; extract_accept (or accept=true) keeps it as a new Part in one undo "
              "step. Running it again replaces the preview.",
              {{"thickness", T::Number,
-               "Thick: shell thickness as a fraction of the Part's largest side (default 0.015; negative grows "
+               "Thickness: shell thickness as a fraction of the Part's largest side (default 0.015; negative grows "
                "inward; 0 = a single-sided surface).",
                false},
-              {"smooth", T::Number, "E Smt: smoothing passes along the extracted edge (0-50, default 5).", false},
-              {"double", T::Bool, "Double: grow the shell both inward and outward (default false).", false},
-              {"tcorne", T::Bool, "TCorne: triangles instead of quads in the rim's sharp corners (default false).", false},
-              {"tborder", T::Bool, "TBorder: the whole rim is triangles instead of quads (default false).", false},
+              {"smooth", T::Number, "Edge smooth: smoothing passes along the extracted edge (0-50, default 5).", false},
+              {"double", T::Bool, "Both Sides: grow the shell both inward and outward (default false).", false},
+              {"triangle_corners", T::Bool, "Corners: triangles instead of quads in the rim's sharp corners (default false).", false},
+              {"triangle_border", T::Bool, "Border: the whole rim is triangles instead of quads (default false).", false},
               {"accept", T::Bool, "Accept at once instead of leaving a preview (default false).", false}},
              runExtract});
     reg.add({"extract_accept", "Keep the Extract preview as a new Part (undo removes it again).", {},

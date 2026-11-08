@@ -3,6 +3,7 @@
 #include "app/Ui.h"
 
 #include "app/App.h"
+#include "app/Demo.h"
 #include "app/UiServe.h"
 #include "app/I18n.h"
 #include "app/Shell.h"
@@ -18,6 +19,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -203,6 +205,8 @@ bool GlyphButton(const char* id, const char* glyph, ImVec2 size) {
 
 bool Checkbox(const char* label, bool* v) {
     const bool changed = ImGui::Checkbox(tr(label), v);
+    if (ImGui::GetItemRectMax().x > ImGui::GetCurrentWindow()->WorkRect.Max.x + 0.5f) // its words run past the panel
+        Demo::noteClippedLabel(tr(label));
     if (!*v) {
         const ImVec2 a = ImGui::GetItemRectMin();
         const float sz = ImGui::GetFrameHeight();
@@ -608,7 +612,8 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
     if (look == Look::Label) {
         clicked = ImGui::Button(itemLabel.c_str(), size);
         const float textW = ImGui::CalcTextSize(itemLabel.c_str(), nullptr, true).x + 2.0f * ImGui::GetStyle().FramePadding.x;
-        clipped = size.x > 0.0f && textW > size.x + 0.5f;
+        clipped = textW > ImGui::GetItemRectSize().x + 0.5f; // (a -1 width can cut it off too)
+        if (clipped) Demo::noteClippedLabel(label);
     } else if (look == Look::IconLabel) {
         // Drawn by hand so the item keeps the plain label as its name ("Save Layout", not glyph + label).
         const std::string text = std::string(icon) + "  " + label;
@@ -623,6 +628,7 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
                                  ImVec2(r.Max.x - st.FramePadding.x, r.Max.y - st.FramePadding.y), text.c_str(), nullptr, &ts,
                                  st.ButtonTextAlign, &r);
         clipped = ts.x + st.FramePadding.x * 2.0f > full.x + 0.5f;
+        if (clipped) Demo::noteClippedLabel(label);
     } else if (look == Look::Tile) {
         // Shelf tiles (Shell.cpp): brush thumbnails on the bottom shelf, a large icon over a caption on the
         // right shelf. The item keeps the plain label as its name.
@@ -681,6 +687,26 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
     return true;
 }
 
+float ButtonWidth(const char* label) {
+    return ImGui::CalcTextSize(tr(label), nullptr, true).x + 2.0f * ImGui::GetStyle().FramePadding.x;
+}
+
+float SliderWidth(const char* format, double value) {
+    std::string fmt = format;
+    if (const size_t at = fmt.find("%d"); at != std::string::npos) fmt.replace(at, 2, "%.0f");
+    char shown[128];
+    ImFormatString(shown, sizeof(shown), tr(fmt.c_str()), value);
+    ImFont* numbers = theme::numberFont(); // as SliderInside draws it
+    if (numbers) ImGui::PushFont(numbers);
+    const float w = ImGui::CalcTextSize(shown).x;
+    if (numbers) ImGui::PopFont();
+    return w + 2.0f * ImGui::GetStyle().FramePadding.x;
+}
+
+float CheckboxWidth(const char* label) {
+    return ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x + ImGui::CalcTextSize(tr(label), nullptr, true).x;
+}
+
 bool SliderInside(const char* id, float* v, float lo, float hi, const char* format, ImGuiSliderFlags flags) {
     const float w = ImGui::CalcItemWidth(), h = ImGui::GetFrameHeight();
     // Looks with technical numbers draw the label in the monospace font, padded to the same frame height.
@@ -703,6 +729,11 @@ bool SliderInside(const char* id, float* v, float lo, float hi, const char* form
     ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0, 0, 0, 0));
     ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0, 0, 0, 0));
     const bool changed = ImGui::SliderFloat(id, v, lo, hi, format ? tr(format) : format, flags);
+    if (format) { // the label inside, as drawn: wider than the slider is cut off
+        char shown[128];
+        ImFormatString(shown, sizeof(shown), tr(format), double(*v));
+        if (ImGui::CalcTextSize(shown).x + 2.0f * ImGui::GetStyle().FramePadding.x > w + 0.5f) Demo::noteClippedLabel(shown);
+    }
     const bool active = ImGui::IsItemActive();
     const bool disabled = (ImGui::GetItemFlags() & ImGuiItemFlags_Disabled) != 0;
     const float hover = disabled ? 0.0f : HoverAmount(ImGui::GetItemID(), ImGui::IsItemHovered() || active || focusedByKeyboard(ImGui::GetItemID()));

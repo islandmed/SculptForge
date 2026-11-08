@@ -514,30 +514,30 @@ void App::initActions() {
     add("part.extract", "Extract", "Tool > Parts", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
         [this] { return doc_.mesh.hasMask(); },
         "Make a shell from the masked part of the Part (a helmet, a strap, clothing), shown as a preview below it. "
-        "Change Thick, E Smt or Double and it updates; Accept keeps it as a new Part.");
+        "Change Thickness, Edge smooth, Both Sides, Corners or Border and it updates; Accept keeps it as a new Part.");
     add("part.extract_accept", "Accept", "Tool > Parts", nullptr, [this] { runCommand("extract_accept"); }, nullptr,
         "extract_accept", nullptr, [this] { return doc_.extractPreviewCurrent(); },
         "Keep the Extract preview as a new Part below this one. Ctrl+Z takes it away again.");
-    add("part.extract_double", "Double", "Tool > Parts", nullptr,
+    add("part.extract_double", "Both Sides", "Tool > Parts", nullptr,
         [this] {
             extractDouble_ = !extractDouble_;
             if (doc_.extractPreviewCurrent()) runExtract();
         },
         nullptr, nullptr, [this] { return extractDouble_; }, nullptr,
         "Grow the extracted shell both inward and outward from the surface, instead of outward only.");
-    add("part.extract_tcorne", "TCorne", "Tool > Parts", nullptr,
+    add("part.extract_triangle_corners", "Corners", "Tool > Parts", nullptr,
         [this] {
-            extractTCorne_ = !extractTCorne_;
+            extractTriCorners_ = !extractTriCorners_;
             if (doc_.extractPreviewCurrent()) runExtract();
         },
-        nullptr, nullptr, [this] { return extractTCorne_; }, nullptr,
+        nullptr, nullptr, [this] { return extractTriCorners_; }, nullptr,
         "Triangle corners: where the extracted edge turns sharply, the rim is made of triangles instead of quads.");
-    add("part.extract_tborder", "TBorder", "Tool > Parts", nullptr,
+    add("part.extract_triangle_border", "Border", "Tool > Parts", nullptr,
         [this] {
-            extractTBorder_ = !extractTBorder_;
+            extractTriBorder_ = !extractTriBorder_;
             if (doc_.extractPreviewCurrent()) runExtract();
         },
-        nullptr, nullptr, [this] { return extractTBorder_; }, nullptr,
+        nullptr, nullptr, [this] { return extractTriBorder_; }, nullptr,
         "Triangle border: the whole rim of the extracted shell is made of triangles instead of quads.");
     add("geometry.mirror_weld", "Mirror And Weld", "Tool > Geometry", nullptr,
         [this] { runCommand("mirror_and_weld", {{"axis", axesText(mirrorWeldAxes_)}}); }, nullptr, "mirror_and_weld",
