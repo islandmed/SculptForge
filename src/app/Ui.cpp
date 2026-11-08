@@ -126,6 +126,18 @@ bool CtrlHeld() {
 
 bool AltHeld() { return ImGui::GetIO().KeyAlt || (SDL_GetModState() & SDL_KMOD_ALT) != 0; }
 
+const char* FloatingWindowAt(ImVec2 p) {
+    const ImGuiContext* g = ImGui::GetCurrentContext();
+    if (!g) return nullptr;
+    for (int i = g->Windows.Size - 1; i >= 0; --i) { // front to back
+        const ImGuiWindow* w = g->Windows[i];
+        if (!w->Active || w->Hidden || (w->Flags & (ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_ChildWindow))) continue;
+        if (w->Flags & ImGuiWindowFlags_NoBringToFrontOnFocus) continue; // the shell (Shell.cpp): the view's frame
+        if (w->Rect().Contains(p)) return w->Name;
+    }
+    return nullptr;
+}
+
 void SetNextItemOrigin(int shelf, int index) {
     g_nextShelf = shelf;
     g_nextIndex = index;

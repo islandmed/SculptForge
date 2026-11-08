@@ -70,6 +70,10 @@ bool HoveredOrFocused(ImGuiID id);
 // The item `id` draws its own hover (tiles, the canvas): no ring for it this frame.
 void NoHoverRing(ImGuiID id);
 bool HoverAnimating();
+// The floating window (a card, a panel, a pop-up; not the shell around the view) on top at `p` as last drawn, or
+// null. For a press before ImGui's next frame: its hover is a frame behind, and the press of a pointer that jumps
+// there (a pen landing, a tap, a click in the same batch of events as the move) must not reach the canvas (#161).
+const char* FloatingWindowAt(ImVec2 p);
 // For UI tests: the rings and lifted tiles drawn in the last frame.
 int HoverRingsShown();
 int HoverLiftsShown();

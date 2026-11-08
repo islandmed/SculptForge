@@ -1253,6 +1253,9 @@ private:
     // Performance, the first-run tier card, the tier chip and Turbo in the top bar, the memory guard.
     void drawHardwareTierSection();
     void drawTierCard();               // once per machine, after calibration (or a hardware change); never blocks
+    bool tierCardEvent(const SDL_Event& e); // its buttons take the press (never the canvas); Esc and Enter put it away
+    void dismissTierCard();            // Got it, the close, Esc, Enter: not again on this machine (saved)
+    void tierCardFromDisk();           // UI tests' restart: shown again unless the saved profile puts it away
     void updateTierMemoryGuard();      // every frame (cheap: looks once a second)
     void registerHardwareTierUiActions();
     void saveProfileOverrides(const struct ProfileOverrides& o); // map, save, apply
