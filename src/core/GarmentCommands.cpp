@@ -188,7 +188,7 @@ void registerGarmentCommands(CommandRegistry& reg) {
                  return {true, "Removed " + name};
              }});
     reg.add({"garment_mirror_copy",
-             "Garments: add a mirrored copy of a panel (the other sleeve or side), placed on the other side of the body.",
+             "Garments: add a mirrored copy of a panel (the other sleeve or side), placed beside it in the pattern.",
              {{"panel", T::String, "Panel name or number", true}, {"name", T::String, "The copy's name", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  CommandResult r;
@@ -297,6 +297,110 @@ void registerGarmentCommands(CommandRegistry& reg) {
                  pat.panels.insert(pat.panels.end(), panels.begin(), panels.end());
                  setDocumentPattern(doc, pat);
                  return {true, "Imported " + std::to_string(n) + " panels" + (error.empty() ? "" : " (" + error + ")")};
+             }});
+    reg.add({"garment_edit",
+             "Garments: edit a panel (the Pattern window's edits, one undo step each there). op: set_panel (its outline "
+             "from points [x0, y0, ...] in mm and curves [[edge, c1x, c1y, c2x, c2y], ...] with 0-based edges; seams "
+             "stay when the edge count does), split (a new point at t along an edge), remove_point, move (dx, dy mm), "
+             "duplicate, mirror (in place), unfold (about a straight fold edge) or rename.",
+             {{"op", T::String, "set_panel, split, remove_point, move, duplicate, mirror, unfold or rename", true},
+              {"panel", T::String, "Panel name or number", true},
+              {"points", T::String, "set_panel: outline as JSON [x0, y0, x1, y1, ...] in mm", false},
+              {"curves", T::String, "set_panel: curved edges as JSON [[edge, c1x, c1y, c2x, c2y], ...]", false},
+              {"edge", T::Number, "split, unfold: edge (1-based)", false},
+              {"t", T::Number, "split: where along the edge (0-1, default 0.5)", false},
+              {"point", T::Number, "remove_point: point (1-based)", false},
+              {"dx", T::Number, "move: mm right", false},
+              {"dy", T::Number, "move: mm up", false},
+              {"name", T::String, "duplicate, rename: the name", false}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 CommandResult r;
+                 Pattern pat;
+                 if (!loadOrFail(doc, pat, r)) return r;
+                 uint32_t i;
+                 std::string error;
+                 if (!findPanel(pat, argString(a, "panel"), i, error)) return {false, error};
+                 const std::string op = lower(argString(a, "op"));
+                 Panel& p = pat.panels[i];
+                 const uint32_t edges = uint32_t(p.points.size());
+                 auto edgeArg = [&](uint32_t& e) {
+                     const double v = argNumber(a, "edge", 0);
+                     if (!(v >= 1 && v <= double(edges))) return false;
+                     e = uint32_t(v) - 1;
+                     return true;
+                 };
+                 std::string done;
+                 if (op == "set_panel") {
+                     Json pj, cj;
+                     if (!Json::parse(argString(a, "points"), pj, error) || !pj.isArray() || pj.size() % 2 || pj.size() < 6 ||
+                         pj.size() > 40000)
+                         return {false, "points must be a JSON array [x0, y0, x1, y1, ...] of 3 to 20,000 points"};
+                     Panel q = p;
+                     q.points.clear();
+                     for (size_t k = 0; k + 1 < pj.size(); k += 2)
+                         q.points.push_back({float(pj[k].asNumber()), float(pj[k + 1].asNumber())});
+                     q.curves.assign(q.points.size(), EdgeCurve{});
+                     if (const std::string cs = argString(a, "curves"); !cs.empty()) {
+                         if (!Json::parse(cs, cj, error) || !cj.isArray()) return {false, "curves must be a JSON array"};
+                         for (const Json& c : cj.items()) {
+                             if (!c.isArray() || c.size() != 5) return {false, "Each curve is [edge, c1x, c1y, c2x, c2y]"};
+                             const double e = c[0].asNumber(-1);
+                             if (!(e >= 0 && e < double(q.points.size()))) return {false, "A curve's edge is out of range"};
+                             q.curves[size_t(e)] = {true, {float(c[1].asNumber()), float(c[2].asNumber())},
+                                                    {float(c[3].asNumber()), float(c[4].asNumber())}};
+                         }
+                     }
+                     size_t budget = kOutlineBudget;
+                     if (!validPanel(q, error, &budget)) return {false, error};
+                     if (panelArea(q) < 0.0f) return {false, q.name + "'s outline must run counter-clockwise"};
+                     const bool sameEdges = q.points.size() == edges;
+                     if (!sameEdges) {
+                         q.edgeNames.clear();
+                         pat.seams.erase(std::remove_if(pat.seams.begin(), pat.seams.end(),
+                                                        [&](const Seam& sm) { return sm.a.panel == i || sm.b.panel == i; }),
+                                         pat.seams.end());
+                     }
+                     normalizePanel(q);
+                     p = std::move(q);
+                     done = p.name + (sameEdges ? " reshaped" : " reshaped (its seams were removed: the edges changed)");
+                 } else if (op == "split") {
+                     uint32_t e;
+                     if (!edgeArg(e)) return {false, "No such edge on " + p.name};
+                     splitEdge(pat, i, e, float(std::clamp(argNumber(a, "t", 0.5), 0.01, 0.99)));
+                     done = "Split " + edgeName(pat, i, e);
+                 } else if (op == "remove_point") {
+                     const double v = argNumber(a, "point", 0);
+                     if (!(v >= 1 && v <= double(edges))) return {false, "No such point on " + p.name};
+                     if (!removePoint(pat, i, uint32_t(v) - 1)) return {false, p.name + " needs at least 3 points"};
+                     if (!validPanel(pat.panels[i], error)) return {false, error};
+                     done = "Removed point " + std::to_string(int(v)) + " of " + pat.panels[i].name;
+                 } else if (op == "move") {
+                     const glm::vec2 d(float(std::clamp(argNumber(a, "dx", 0), -1e5, 1e5)), float(std::clamp(argNumber(a, "dy", 0), -1e5, 1e5)));
+                     for (glm::vec2& q : p.points) q += d;
+                     for (EdgeCurve& c : p.curves) c.c1 += d, c.c2 += d;
+                     if (!validPanel(p, error)) return {false, error};
+                     done = "Moved " + p.name;
+                 } else if (op == "duplicate") {
+                     const uint32_t j = duplicatePanel(pat, i, {panelMax(p).x - panelMin(p).x + 60.0f, 0.0f}, argString(a, "name"));
+                     done = "Added " + pat.panels[j].name;
+                 } else if (op == "mirror") {
+                     mirrorPanel(pat, i);
+                     done = "Mirrored " + p.name;
+                 } else if (op == "unfold") {
+                     uint32_t e;
+                     if (!edgeArg(e)) return {false, "No such edge on " + p.name};
+                     if (!unfoldPanel(pat, i, e, error)) return {false, error};
+                     done = "Unfolded " + pat.panels[i].name;
+                 } else if (op == "rename") {
+                     const std::string name = argString(a, "name").substr(0, 128);
+                     if (name.empty()) return {false, "Give a name"};
+                     p.name = name;
+                     done = "Renamed to " + name;
+                 } else {
+                     return {false, "Unknown op \"" + op + "\""};
+                 }
+                 setDocumentPattern(doc, pat);
+                 return {true, done};
              }});
     reg.add({"garment_clear", "Garments: remove the garment pattern from the scene.", {},
              [](Document& doc, const Args&) -> CommandResult {

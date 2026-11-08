@@ -626,6 +626,7 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (const double v = app_.bakeTestValue(name); !std::isnan(v)) return v;
     if (const double v = app_.uvEditorTestValue(name); !std::isnan(v)) return v;
+    if (const double v = app_.garmentTestValue(name); !std::isnan(v)) return v;
     if (const double v = app_.pbrTestValue(name); !std::isnan(v)) return v; // material_channels, channel_view, ...
     if (const double v = app_.splatTrainTestValue(name); !std::isnan(v)) return v; // splat_training, ...
     if (const double v = app_.sculptableTestValue(name); !std::isnan(v)) return v;
@@ -816,6 +817,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "vdms") return double(app_.doc_.vdms.size());
     if (double gv = 0.0; app_.gradientUiValue(name, gv)) return gv; // gradient_armed, gradient_placed (LineGradient.cpp)
     if (double sv = 0.0; app_.stencilUiValue(name, sv)) return sv; // stencil_active, stencil_x / y / size x1000 (StencilOverlay.cpp)
+    if (double cv = 0.0; app_.clothUiValue(name, cv)) return cv; // cloth_* (PanelCloth.cpp)
     if (double kv = 0.0; app_.kelvinUiValue(name, kv)) return kv; // capture_*, kelvin_* (PanelKelvinlet.cpp)
     // Facial shapes (PanelFace.cpp): landmarks placed, placing them, a take playing, and face_<shape>: that layer's weight.
     if (name == "face_landmarks") return double(app_.faceLandmarks_.count());

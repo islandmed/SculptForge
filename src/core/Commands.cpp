@@ -40,6 +40,7 @@
 #include "core/Tube.h"
 #include "core/Garment.h"
 #include "core/Deform.h"
+#include "core/Drape.h"
 #include "core/Sculptable.h"
 #include "core/Splats.h"
 #include "core/StarterMeshes.h"
@@ -698,6 +699,7 @@ CommandRegistry::CommandRegistry() {
     registerForgeSphereCommands(*this);      // Forge Sphere_new, ... (Forge Spheres.cpp)
     registerTubeCommands(*this);             // tube_new, ... (Tube.cpp)
     registerAgentTools(*this);               // blockout, measure, scene_overview (core/AgentTools.cpp)
+    registerDrapeCommands(*this);        // cloth_drape (Drape.cpp)
     registerDeformCommands(*this);       // deform_polish, deform_relax, deform_smooth, deform_balloon (Deform.cpp)
 
     add({"stroke",

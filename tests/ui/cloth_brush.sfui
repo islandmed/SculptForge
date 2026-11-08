@@ -1,0 +1,98 @@
+# Cloth brush (docs/design/cloth.md, phase 1): picked from the shelf, a drag across the sphere moves the surface
+# near the stroke as fabric (folds, nothing far away moves), undo puts it all back; Brush > Cloth's mode and fabric.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=6
+wait_idle 30
+camera 0 0
+
+click "Cloth##brush.cloth"
+# (Symmetry X is on by default: off, so one drag shows its own folds; a drag across the mirror plane meets its copy.)
+key x
+expect_value symmetry_x == 0
+expect_value brush_type == 21
+snapshot
+stroke 0.42 0.5 0.6 0.5
+expect_value moved > 500
+expect_value cloth_region > 500
+expect_value can_undo == 1
+wait_idle 30
+shot cloth_drag
+key ctrl+z
+expect_value moved == 0
+
+# Symmetry X back on: a drag on one side folds both sides as much as the drag alone (the mirrored folds).
+key x
+expect_value symmetry_x == 1
+snapshot
+stroke 0.56 0.5 0.7 0.5
+expect_value moved > 500
+wait_idle 30
+shot cloth_drag_symmetric
+key ctrl+z
+expect_value moved == 0
+
+# The same stroke across the mirror plane: the copies meet, then pull apart and draw the cloth taut between them
+# (smooth, the same on both sides: never a crumple where they overlap).
+snapshot
+stroke 0.42 0.5 0.6 0.5
+expect_value moved > 500
+wait_idle 30
+shot cloth_drag_across
+key ctrl+z
+expect_value moved == 0
+
+# Brush > Cloth: mode and fabric, with help.
+click "Brush##palette.brush"
+click "Brush/##totray"
+wait 0.3
+click "Cloth##brush.cloth_options"
+expect "##clothmode"
+expect "##clothfabric"
+expect "##clothreach"
+expect "##clothsoft"
+hold ctrl
+hover "##clothmode"
+expect_help bunches
+expect_help balloons
+hover "##clothfabric"
+expect_help Denim
+hold none
+expect_value cloth_mode == 0
+expect_value cloth_fabric == 1
+expect_value cloth_soft == 0
+expect_value cloth_self == 1
+shot cloth_panel
+
+# The other modes, each picked in the panel: Grab carries the spot it started on, Pinch gathers the cloth into
+# folds, Inflate balloons it with wrinkles (Symmetry X is on: both sides).
+click "##clothmode"
+wait 0.2
+click "Grab##clothmode"
+expect_value cloth_mode == 3
+snapshot
+stroke 0.56 0.5 0.66 0.42
+expect_value moved > 200
+wait_idle 30
+shot cloth_grab
+key ctrl+z
+click "##clothmode"
+wait 0.2
+click "Pinch##clothmode"
+expect_value cloth_mode == 5
+snapshot
+stroke 0.6 0.5 0.64 0.5
+expect_value moved > 200
+wait_idle 30
+shot cloth_pinch
+key ctrl+z
+click "##clothmode"
+wait 0.2
+click "Inflate##clothmode"
+expect_value cloth_mode == 6
+snapshot
+stroke 0.6 0.5 0.62 0.5
+expect_value moved > 200
+wait_idle 30
+shot cloth_inflate
+key ctrl+z
+expect_value moved == 0

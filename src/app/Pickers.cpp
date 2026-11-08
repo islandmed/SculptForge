@@ -476,6 +476,9 @@ const char* brushTypeDescription(int type) {
     case BrushType::Morph:
         return "Pulls the surface back toward a stored shape: pick a selection set with Shape as the Morph Target in "
                "Tool > Selection Sets. Alt pushes away. Works at any subdivision level.";
+    case BrushType::Cloth:
+        return "Moves the surface like fabric: drag to pull it along and it folds where it bunches up; Push presses it "
+               "in, Settle lets it sag and drape over other Parts. Mode and fabric in Brush > Cloth; the mask pins it.";
     default:
         return "";
     }

@@ -369,6 +369,10 @@ void App::drawPalette_Brush() {
             }
         }
     }
+    if (subpalette("brush.cloth_options", "Cloth")) {
+        tray::Section section;
+        drawClothSection(); // PanelCloth.cpp
+    }
     if (subpalette("brush.kelvinlet", "Kelvinlet & Capture")) {
         tray::Section section;
         drawKelvinletSection(); // PanelKelvinlet.cpp
@@ -888,6 +892,12 @@ void App::drawPalette_Tool() {
         drawTextureMapContents();
         Demo::popScope();
     }
+    if (subpalette("tool.garments", "Garments")) {
+        tray::Section section;
+        Demo::pushScope("Garments");
+        drawGarmentsContents(); // PanelGarments.cpp
+        Demo::popScope();
+    }
     if (subpalette("tool.bake", "Bake")) {
         tray::Section section;
         Demo::pushScope("Bake");
@@ -943,6 +953,10 @@ void App::drawPalette_Tool() {
         Demo::pushScope("Deformation");
         drawDeformationContents(); // Mirror (PanelExtract.cpp)
         Demo::popScope();
+    }
+    if (subpalette("tool.drape", "Drape")) {
+        tray::Section section;
+        drawDrapeSection(); // PanelDrape.cpp
     }
     if (subpalette("tool.cut", "Cut")) {
         tray::Section section;

@@ -50,6 +50,7 @@ are on the bottom shelf by default and in the brush picker.
 | **Elastic Tendril** | | An elastic Tendril: smooth horns and tendrils that taper as they stretch. | No change |
 | **DetailClone** | | Paints copies of a captured detail (the VDM brush's map) along the stroke, each turned to follow it. | Digs them in |
 | **Morph** | | Pulls the surface back toward the morph target, a selection set with its shape ([Selection sets](selection-sets.md#morph-targets)). Does nothing until you pick one. | Pushes away from it |
+| **Cloth** | | Moves the surface like fabric: drag it and it folds where it bunches up (see [Cloth brush](#cloth-brush)). | Push mode: pulls out |
 | **Paint** | <kbd>P</kbd> | Paints colour without sculpting. See [Vertex Paint and materials](vertex-paint.md). | Paints back to white |
 
 Notes on particular brushes:
@@ -684,6 +685,54 @@ layers, and each stroke is one undo step. They don't remesh with dynamic topolog
 > pieces in one pass. Because it reaches further than Move, it costs more: on models of 20 million triangles and
 > up, keep the brush small or step down a subdivision level for big elastic moves (see
 > [Performance](performance.md)).
+
+## Cloth brush
+
+The **Cloth** brush treats the surface near the stroke as fabric. Drag across a sleeve or a sheet and the
+cloth follows the brush, bunching into folds on the side you push toward; the folds keep the fabric's length
+instead of stretching it like rubber. Only the surface within a few brush radii of the stroke moves, and masked
+areas hold still like pins, so mask a seam or a cuff to keep it in place.
+
+Set it up in **Sculpt > Brush > Cloth**:
+
+- **Mode**: **Drag** (the cloth follows the stroke), **Push** (presses it in along the surface; <kbd>Alt</kbd>
+  pulls it out, and the cloth around follows), **Settle** (only gravity: the cloth under the brush sags and drapes
+  over what's below), **Grab** (the cloth where the stroke starts is held and follows the brush; the cloth around it
+  trails and folds), **Expand** and **Pinch** (spread the cloth out from the brush centre or gather it in;
+  <kbd>Alt</kbd> swaps them), **Inflate** (adds fabric under the brush, so it balloons out and wrinkles where it
+  can't; <kbd>Alt</kbd> takes fabric away).
+- **Fabric**: **Silk** makes many fine folds, **Cotton** medium ones, **Denim** broad ones, **Leather** a few wide,
+  stiff ones.
+- **Gravity**: pulls the cloth down while you drag, so folds hang (0 keeps it in place).
+- **Reach**: how far around the brush the cloth is simulated, in brush radii. More lets folds travel further.
+- **Steps**: simulation steps per dab. More is softer and settles further, but slower.
+- **Soft body**: 0 leaves the cloth where the brush puts it. Higher values make it spring back toward its shape
+  at the start of the stroke, like a stuffed or elastic surface.
+- **Self-collision** (on by default): folds push against each other instead of passing through.
+- **Collide with other Parts**: the cloth rests on the other visible Parts instead of passing through them, so a
+  shirt Part settles onto the body Part under it.
+
+The Cloth brush works with symmetry and sculpt layers, and one stroke is one undo step. It doesn't apply to micro
+levels.
+
+## Drape
+
+**Drape** drops a whole Part as cloth: it falls under gravity onto the other visible Parts and settles there, the
+way a sheet settles over a chair or a shirt over a body. Make the cloth Part (a plane, an extracted shell, a
+garment you sculpted roughly), place it above the body, and with it active open **Tool > Drape**:
+
+- **Fabric**: **Silk** flows into many fine folds, **Cotton** medium ones, **Denim** holds broad folds,
+  **Leather** barely folds.
+- **Units per metre**: how big the sculpt is in real life. Cloth falls by real size, so a sculpt modelled at real
+  size (a SculptForge unit is a metre) uses 1; a body 2 units tall that should be a 1.8 m person uses 1.11.
+- **Pins from mask**: masked areas hold still, like pins: mask a waistband or a collar to hang the cloth from it.
+- **Collide with other Parts**: the cloth rests on the other visible Parts (hide a Part to let the cloth fall
+  through it).
+
+**Simulate** shows the cloth moving live. When it comes to rest the result is kept as one undo step;
+**Pause** / **Resume** stop and continue, **Keep** stops and keeps where it got to, **Reset** puts the Part back.
+Sculpting or running a command while it moves keeps where it got to first. The result is a normal Part: sculpt it,
+or give it thickness with Extract. From a script: `cloth_drape fabric=denim`.
 
 ## Capture an alpha or a VDM from the model
 
