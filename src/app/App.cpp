@@ -3170,6 +3170,7 @@ void App::drawUi() {
         (!ringOff || drag_ == Drag::Stroke || ctrlDown(inputMods())) &&
         (drag_ == Drag::Stroke || !overViewNavigator(mouse.x, mouse.y))) // (nor over the corner axes: a click there navigates)
         drawBrushCursor();
+    drawSizeSliderRing(); // a Size slider dragging (Precision.cpp)
     drawSelectionOverlay();
     drawBrushLibraryPopups();
     autosaveBrush();

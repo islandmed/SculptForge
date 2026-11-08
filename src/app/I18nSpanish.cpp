@@ -844,6 +844,9 @@ constexpr Entry kSpanish[] = {
     {"Dead zone", "Zona muerta"},
     {"Dominant axis", "Eje dominante"},
     {"Lock rotation to turntable", "Bloquear la rotación como plataforma giratoria"},
+    {"Flat shading", "Sombreado plano"},
+    {"Flat shading (on): every polygon shows its own face. Off: smooth shading, the default. The same as Material > Smooth | Flat; Parts set to Smooth or Flat keep their own. A preference, saved automatically.", "Sombreado plano (activado): cada polígono muestra su propia cara. Desactivado: sombreado suave, el predeterminado. Lo mismo que Material > Suave | Plano; las Partes configuradas como Suave o Plano conservan el suyo. Una preferencia, guardada automáticamente."},
+    {"Rotation drags turn the view like a turntable, the model upright (on), or freely about the screen's axes (off). The same as View > Orbit lock: Y (turntable) or Free. Saved with the preferences.", "Al arrastrar para rotar, la vista gira como una plataforma giratoria, con el modelo derecho (activado), o libremente sobre los ejes de la pantalla (desactivado). Lo mismo que Vista > Bloqueo de órbita: Y (plataforma giratoria) o Libre. Se guarda con las preferencias."},
     {"Plug it in. If 3DxWare is installed it may keep the device to itself: see the Navigation page of the guide.",
      "Conéctalo. Si 3DxWare está instalado puede quedarse con el dispositivo: consulta la página Navegación de la "
      "guía."},

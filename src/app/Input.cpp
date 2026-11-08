@@ -320,6 +320,11 @@ void App::registerViewActions() {
             autoOrtho_ = false;
         },
         [this] { return camera_.ortho; });
+    if (const Action* ortho = actions_.find("view.ortho")) { // (an icon for the right shelf's view toggles)
+        Action a = *ortho;
+        a.icon = ICON_LC_BOX;
+        actions_.add(std::move(a));
+    }
     add("view.orbit_left", "Orbit left", "Numpad 4", "Turn the view 15 degrees to the left around the model.",
         [this] { viewOrbitStep(-15.0f, 0.0f); });
     add("view.orbit_right", "Orbit right", "Numpad 6", "Turn the view 15 degrees to the right around the model.",

@@ -200,7 +200,8 @@
 //                            their own curve), dab_error_px (the last stroke's dab furthest from its cursor
 //                            position, projected back), dab_jitter / dab_jitter_raw (its depth wobble with / without
 //                            the pick filter, x1000 radii), dabs, pixel_density (2 on a HiDPI screen), input_style (0 classic, 1 SculptForge, 2 Blender), turntable, orbit_lock (0 free, 1 Y, 2 X, 3 Z),
-//                            camera_ortho, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
+//                            camera_ortho, checked@ACTION (1 when the toggle shows on), size_slider_ring (a Size slider's ring: 1 while it drags, then fading),
+//                            right_column_clipped (right shelf items past its bottom), mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
 //                            claim), brush_type (BrushType
 //                            index, -1 for a custom brush or Paint), last_dab_x / last_dab_y (window pixels), paint_r, recent_colors (the left shelf's recent paint colours)
 //                            gizmo_mode (0 Draw, 1 Move, 2 Scale, 3 Rotate, 4 All), gizmo_hover (handle under the cursor,
@@ -584,6 +585,10 @@ void Demo::detachVirtualSpaceMouse() {
 double Demo::query(const std::string& name, bool& known) const {
     const Mesh& m = app_.doc_.mesh;
     known = true;
+    if (name.rfind("checked@", 0) == 0) { // checked@ACTION: 1 when that toggle shows on (lit), 0 off, -1 no such action
+        const Action* a = app_.actions_.find(name.substr(8));
+        return !a ? -1.0 : a->checked && a->checked() ? 1.0 : 0.0;
+    }
     if (name.rfind("luma@", 0) == 0) { // luma@X,Y: brightness 0-255 of the last shot at window fractions X, Y
         float fx = 0.0f, fy = 0.0f;
         if (std::sscanf(name.c_str() + 5, "%f,%f", &fx, &fy) != 2) {
@@ -1248,6 +1253,8 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     // Items of the left shelf (the brush tiles, the colour picker) past its visible bottom in the last frame.
     if (name == "left_column_clipped") return double(app_.shelfClipped_[kShelfLeft]);
+    if (name == "right_column_clipped") return double(app_.shelfClipped_[kShelfRight]); // (the wheel scrolls to them)
+    if (name == "size_slider_ring") return double(app_.sizeSliderRingAlpha_); // a Size slider's ring: 1 dragging, fading after
     if (name == "timeline_y" || name == "axis_gizmo_y") {
         const auto c = app_.canvasRect();
         if (name == "timeline_y")
