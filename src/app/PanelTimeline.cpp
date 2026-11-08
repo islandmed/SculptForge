@@ -408,7 +408,9 @@ void App::drawTimelineUi() {
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button(tr("Close"))) ImGui::CloseCurrentPopup();
+        // Esc closes it like the other dialogs (not while the File field is being edited: Esc leaves the field first)
+        if (ImGui::Button(tr("Close")) || (ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::IsAnyItemActive()))
+            ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
 

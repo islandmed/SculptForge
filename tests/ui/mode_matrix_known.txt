@@ -27,4 +27,3 @@ paint.line_gradient | Scale | task modes-gradient-exit: a brush or a tool leaves
 paint.line_gradient | a brush on the shelf | task modes-gradient-exit: a brush or a tool leaves Line Gradient
 paint.line_gradient | a palette action | task modes-gradient-exit: a brush or a tool leaves Line Gradient
 paint.line_gradient | undo | task modes-gradient-exit: a brush or a tool leaves Line Gradient
-timeline.timelapse | Esc | task modes-timelapse-esc: Esc closes Export timelapse
