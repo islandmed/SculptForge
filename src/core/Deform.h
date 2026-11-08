@@ -5,9 +5,9 @@
 // the whole active Part with an amount, the mask holding masked parts in place (partly masked ones move partly),
 // hidden faces and open borders kept, and one undo step. They write through the Sculptor, so a sculpt layer that
 // is being recorded takes the change as a stroke would.
-//   Polish  - flattens fine noise while keeping planes and sharp edges: each vertex moves along its normal by a
-//             bilateral average of its neighbours' heights (Fleishman, Drori and Cohen-Or 2003, one ring), so
-//             small bumps average out and big steps (edges) barely count.
+//   Polish  - flattens fine noise while keeping planes and sharp edges: bilateral filtering of the face normals,
+//             then the vertices fit them (see surfaceOp), so small bumps average out and creases sharper than the
+//             edge angle barely count.
 //   Relax   - evens out the spacing of the vertices along the surface without changing its shape: the Laplacian
 //             step with its normal part removed.
 //   Smooth  - Laplacian smoothing; with keepVolume, Taubin's lambda | mu steps, which don't shrink the form.
@@ -18,7 +18,8 @@
 //   Transform    - Move, Turn, Scale, Squash (scale along an axis, keeping the volume).
 //   Bend & Twist - Bend, Twist, Taper, Shear, each along an axis; Soft eases the effect out toward the ends.
 //   Shape        - Round (toward a sphere or cylinder), Box, Flatten (cut one side flat), Sag (outer parts droop
-//                  along -axis), Depth (a perspective along the axis).
+//                  along -axis), Depth (a perspective along the axis), Noise (smooth random bumps along the axes),
+//                  Symmetrize (one side copied onto the other across the axis's plane, or both evened out).
 // Several run in order as one step (deformStackPositions, the deform_stack command).
 #pragma once
 
@@ -38,10 +39,11 @@ enum class DeformOp {
     Move, Turn, Scale, Squash,                     // Transform
     Bend, Twist, Taper, Shear,                     // Bend & Twist
     Round, Box, Flatten, Sag, Depth,               // Shape
+    Noise, Symmetrize,                             // Shape (foirgairwolf on Discord, 0.12.0)
 };
-constexpr int kDeformOpCount = 17;
-const char* deformName(DeformOp op);    // "Polish", ... "Depth"
-const char* deformCommand(DeformOp op); // "deform_polish", ... "deform_depth"
+constexpr int kDeformOpCount = 19;
+const char* deformName(DeformOp op);    // "Polish", ... "Symmetrize"
+const char* deformCommand(DeformOp op); // "deform_polish", ... "deform_symmetrize"
 bool deformFromName(const std::string& name, DeformOp& op); // a name or command, any case
 // The amount's range and default ("Turn" in degrees, the rest mostly percent).
 void deformRange(DeformOp op, float& lo, float& hi, float& def);
@@ -58,15 +60,20 @@ struct DeformOptions {
     uint8_t axes = DeformY;  // DeformAxis bits; shape operations only
     float direction = 0.0f;  // Bend, Shear: degrees about the axis (0: +Y for X and Z, +X for Y)
     bool soft = false;       // Bend, Twist, Taper, Shear, Flatten: eased profile
-    bool hasPivot = false;   // false: the Part's bounds centre
+    bool hasPivot = false;   // false: the Part's bounds centre (Symmetrize: the world origin, as symmetry)
     glm::vec3 pivot{0.0f};
+    float edge = 20.0f;      // Polish: degrees; creases sharper than this stay sharp
+    int passes = 6;          // Polish: filter passes at amount 100 (Surface Polish runs 12)
+    float scale = 4.0f;      // Noise: bumps across the Part's longest side
+    bool average = false;    // Symmetrize: both sides meet halfway instead of one copied onto the other
 };
 
 struct DeformStep {
     DeformOp op = DeformOp::Bend;
     DeformOptions options;
 };
-// "bend 40 y soft dir=90; twist 90 xz" (axes letters, "soft", "dir=", ";" between steps) <-> steps.
+// "bend 40 y soft dir=90; twist 90 xz; noise 20 y scale=6; symmetrize 100 x average" (axes letters, "soft",
+// "dir=", "scale=", "average", "edge=", ";" between steps) <-> steps.
 bool parseDeformStack(const std::string& text, std::vector<DeformStep>& steps, std::string& error);
 std::string deformStackText(const std::vector<DeformStep>& steps);
 std::string axesLetters(uint8_t axes); // "xz"
@@ -84,11 +91,15 @@ size_t deformActivePart(Document& doc, DeformOp op, const DeformOptions& options
 size_t deformActivePart(Document& doc, const std::vector<DeformStep>& steps, std::string& error,
                         const std::string& label = "Deform stack");
 
+// Tool > Geometry > Surface Polish (foirgairwolf on Discord): Polish at `amount` 0-1 (1 = 12 passes), creases
+// sharper than `edgeDegrees` kept sharp, as one undo step ("Surface Polish").
+size_t surfacePolishActivePart(Document& doc, float amount, float edgeDegrees, bool useMask, std::string& error);
+
 // Resizes the active Part to `size` (scene units per axis; <= 0 keeps that axis) about its bounds centre, weighted
 // by 1 - mask when `useMask`, as one undo step ("Size").
 size_t resizeActivePart(Document& doc, const glm::vec3& size, bool useMask, std::string& error);
 
-// deform_<op> for every operation, deform_size and deform_stack.
+// deform_<op> for every operation, deform_size, deform_stack and surface_polish.
 void registerDeformCommands(CommandRegistry& registry);
 
 } // namespace sf

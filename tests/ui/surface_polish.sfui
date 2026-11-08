@@ -1,0 +1,36 @@
+# Tool > Geometry > Surface Polish (foirgairwolf on Discord): smooths the surface while hard edges stay; the Part shows
+# it as the slider moves (one undo step), Cancel takes it back, Apply keeps it.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=4
+run deform_noise amount=60 axes=xyz scale=12
+click "Tool##palette.tool"
+click "Geometry##tool.geometry"
+expect "Surface Polish/##surface_polish_amount"
+expect "Surface Polish/##surface_polish_edge"
+hold ctrl
+hover "Surface Polish/Apply"
+expect_help "one undo step"
+hold none
+snapshot
+
+# The slider previews; Cancel takes it back.
+drag_item "Surface Polish/##surface_polish_amount" 30 0
+expect_status "Surface Polish"
+expect_value moved > 0
+shot surface-polish
+click "Surface Polish/Cancel"
+expect_value moved == 0
+
+# Apply keeps it as one undo step.
+drag_item "Surface Polish/##surface_polish_amount" 40 0
+click "Surface Polish/Apply"
+expect_value moved > 0
+key ctrl+z
+expect_value moved == 0
+
+# Apply without a preview polishes at the slider's amount.
+click "Surface Polish/Apply"
+expect_status "Surface Polish"
+expect_value moved > 0
+key ctrl+z
+expect_value moved == 0

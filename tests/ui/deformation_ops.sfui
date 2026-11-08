@@ -96,3 +96,22 @@ run deform_size uniform=3
 expect_status "Size 3"
 key ctrl+z
 expect_value moved == 0
+
+# Noise and Symmetrize in the stack (foirgairwolf on Discord): Noise has its Scale, Symmetrize its Average; Reset
+# takes them back.
+click "##deform_stack_add"
+click "Stack/Noise##deform_add_Noise"
+expect_status "Deform stack (1 step)"
+expect_value moved > 0
+expect "##deform_step_scale"
+expect "Stack/Y"
+shot stack-noise
+click "##deform_stack_add"
+click "Stack/Symmetrize##deform_add_Symmetrize"
+expect_status "Deform stack (2 steps)"
+click "Stack/Average##deform_step_average"
+expect_status "Deform stack (2 steps)"
+shot stack-symmetrize
+click "Stack/Reset"
+expect_value moved == 0
+expect_text No steps yet

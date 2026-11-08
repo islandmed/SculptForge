@@ -8,6 +8,7 @@
 #include "core/Commands.h"
 #include "core/Deform.h"
 #include "core/Primitives.h"
+#include "core/SurfaceQuery.h"
 
 #include <glm/gtc/quaternion.hpp>
 
@@ -247,12 +248,160 @@ TEST(deform_panel_stack_text_and_command) {
     CHECK(d.undo.undoCount() == n);
 }
 
+// The distance from q to the nearest vertex of P (brute force).
+static float nearestDistance(const std::vector<vec3>& P, const vec3& q) {
+    float best = 1e30f;
+    for (const vec3& p : P) best = std::min(best, glm::distance(p, q));
+    return best;
+}
+
+TEST(deform_panel_noise_and_symmetrize) {
+    // Noise (foirgairwolf on Discord): only along the chosen axis, bounded, the same every run, scale changes it.
+    const Mesh& c = cube();
+    std::vector<vec3> P = deformPositions(c, DeformOp::Noise, opts(100, DeformY));
+    float most = 0.0f;
+    for (size_t i = 0; i < P.size(); ++i) {
+        CHECK(P[i].x == c.positions[i].x && P[i].z == c.positions[i].z);
+        most = std::max(most, std::abs(P[i].y - c.positions[i].y));
+    }
+    CHECK(most > 0.01f && most < 0.05f * 2.0f * 1.6f); // up to 5% of the longest side (2) at 100, about
+    CHECK(deformPositions(c, DeformOp::Noise, opts(100, DeformY)) == P);
+    DeformOptions fine = opts(100, DeformY);
+    fine.scale = 16.0f;
+    CHECK(deformPositions(c, DeformOp::Noise, fine) != P);
+    CHECK(deformPositions(c, DeformOp::Noise, opts(0, DeformY)) == c.positions);
+
+    // Symmetrize: a sphere with a bulge on its +X side; the + side copied over makes it symmetric across X = 0
+    // (the surface matches its mirror image both ways) and leaves the + side alone.
+    Mesh s = makeIcosphere(4, 1.0f);
+    for (vec3& p : s.positions)
+        if (p.x > 0.2f) p *= 1.0f + 0.1f * glm::smoothstep(0.2f, 0.8f, p.x);
+    auto asymmetry = [&](const std::vector<vec3>& Q) {
+        Mesh a = s, b = s;
+        a.positions = Q;
+        b.positions = Q;
+        for (vec3& p : b.positions) p.x = -p.x;
+        return measureDeviation(a, b).max;
+    };
+    CHECK(asymmetry(s.positions) > 0.05f);
+    P = deformPositions(s, DeformOp::Symmetrize, opts(100, DeformX));
+    for (size_t i = 0; i < P.size(); ++i)
+        if (s.positions[i].x >= 0.0f) CHECK(P[i] == s.positions[i]);
+    CHECK(asymmetry(P) < 0.01f);
+    float wide = 0.0f;
+    for (const vec3& p : P) wide = std::max(wide, -p.x);
+    CHECK(wide > 1.05f); // the bulge is on the - side now
+    // A negative amount copies the - side: the bulge goes.
+    P = deformPositions(s, DeformOp::Symmetrize, opts(-100, DeformX));
+    for (size_t i = 0; i < P.size(); ++i)
+        if (s.positions[i].x <= 0.0f) CHECK(P[i] == s.positions[i]);
+    CHECK(asymmetry(P) < 0.01f);
+    wide = 0.0f;
+    for (const vec3& p : P) wide = std::max(wide, p.x);
+    CHECK(wide < 1.01f);
+    // Average: symmetric too, about half the bulge on each side.
+    DeformOptions avg = opts(100, DeformX);
+    avg.average = true;
+    P = deformPositions(s, DeformOp::Symmetrize, avg);
+    CHECK(asymmetry(P) < 0.01f);
+    wide = 0.0f;
+    for (const vec3& p : P) wide = std::max(wide, p.x);
+    CHECK(wide > 1.02f && wide < 1.08f);
+    // Half the amount: half way there.
+    P = deformPositions(s, DeformOp::Symmetrize, opts(50, DeformX));
+    CHECK(asymmetry(P) > 0.01f && asymmetry(P) < 0.7f * asymmetry(s.positions));
+    // The mask holds what it covers.
+    Mesh masked = s;
+    std::vector<float>& mask = masked.ensureMask();
+    for (uint32_t v = 0; v < masked.vertexCount(); ++v) mask[v] = masked.positions[v].y > 0.0f ? 1.0f : 0.0f;
+    P = deformPositions(masked, DeformOp::Symmetrize, opts(-100, DeformX));
+    for (uint32_t v = 0; v < masked.vertexCount(); ++v)
+        if (mask[v] == 1.0f) CHECK(P[v] == masked.positions[v]);
+    // Already symmetric: nothing moves.
+    const Mesh sym = makeIcosphere(3, 1.0f);
+    P = deformPositions(sym, DeformOp::Symmetrize, opts(100, DeformX | DeformZ));
+    for (size_t i = 0; i < P.size(); ++i) CHECK(near(P[i], sym.positions[i], 1e-5f));
+
+    // The stack text keeps scale= and average.
+    std::vector<DeformStep> steps;
+    std::string err;
+    CHECK(parseDeformStack("noise 30 xz scale=6; symmetrize -50 x average; polish 40 edge=35", steps, err));
+    CHECK(steps.size() == 3 && steps[0].options.scale == 6.0f && steps[1].options.average && steps[1].options.amount == -50.0f);
+    CHECK(steps[2].options.edge == 35.0f);
+    CHECK(deformStackText(steps) == "noise 30 xz scale=6; symmetrize -50 x average; polish 40 edge=35");
+}
+
+TEST(deform_panel_surface_polish) {
+    // Surface Polish (Tool > Geometry, foirgairwolf on Discord): a noisy cube comes out with flatter faces and its
+    // corners where they were; one undo step; amount 0 does nothing.
+    Mesh noisy = makeCube(16, 2.0f);
+    uint32_t seed = 12345u;
+    for (vec3& p : noisy.positions) {
+        seed = seed * 1664525u + 1013904223u;
+        const float r = (float(seed >> 8) / float(1u << 24) - 0.5f) * 0.02f;
+        // Along the face normal (the axis the point is furthest out on).
+        int a = 0;
+        for (int k = 1; k < 3; ++k)
+            if (std::abs(p[k]) > std::abs(p[a])) a = k;
+        if (std::abs(p[a]) > 0.999f) p[a] += r * (p[a] > 0.0f ? 1.0f : -1.0f);
+    }
+    auto roughness = [](const std::vector<vec3>& P) { // mean distance off the face planes, face interiors only
+        double sum = 0.0;
+        int n = 0;
+        for (const vec3& p : P) {
+            int a = 0;
+            for (int k = 1; k < 3; ++k)
+                if (std::abs(p[k]) > std::abs(p[a])) a = k;
+            const float other = std::max(std::abs(p[(a + 1) % 3]), std::abs(p[(a + 2) % 3]));
+            if (other > 0.8f) continue; // near an edge
+            sum += std::abs(std::abs(p[a]) - 1.0f);
+            ++n;
+        }
+        return sum / std::max(n, 1);
+    };
+    Document d = makeDoc(noisy);
+    const std::vector<vec3> before = d.mesh.positions;
+    CommandRegistry reg;
+    const CommandResult r = reg.execute(d, "surface_polish", {{"amount", 1.0}});
+    CHECK(r.ok && r.message.find("Surface Polish 1.00") == 0);
+    CHECK(d.undo.undoCount() == 1);
+    CHECK(roughness(d.mesh.positions) < 0.35 * roughness(before));
+    // The corners stay sharp: the vertex nearest each corner is still near it.
+    for (int k = 0; k < 8; ++k) {
+        const vec3 corner((k & 1) ? 1.0f : -1.0f, (k & 2) ? 1.0f : -1.0f, (k & 4) ? 1.0f : -1.0f);
+        CHECK(nearestDistance(d.mesh.positions, corner) < 0.04f);
+    }
+    CHECK(d.undo.undo(d.mesh, d.bvh) && d.mesh.positions == before);
+    CHECK(reg.execute(d, "surface_polish", {{"amount", 0.0}}).ok);
+    CHECK(d.undo.undoCount() == 0);
+}
+
 TEST(deform_panel_large_mesh_timing) {
     // SF_DEFORM_BENCH=1 (2.6M vertices) or 2 (10.5M): each shape operation applied to the whole Part.
     if (!std::getenv("SF_DEFORM_BENCH")) return;
     Document d = makeDoc(makeIcosphere(std::atoi(std::getenv("SF_DEFORM_BENCH")) > 1 ? 10 : 9, 1.0f));
     std::printf("bench mesh: %zu vertices\n", d.mesh.vertexCount());
     using clock = std::chrono::steady_clock;
+    { // Symmetrize on the untouched sphere with one side pushed out (the usual case), copy and average.
+        Mesh s = d.mesh;
+        for (vec3& p : s.positions)
+            if (p.x > 0.2f) p *= 1.05f;
+        for (bool average : {false, true}) {
+            DeformOptions o = opts(100, DeformX);
+            o.average = average;
+            const auto t0 = clock::now();
+            const std::vector<vec3> P = deformPositions(s, DeformOp::Symmetrize, o);
+            std::printf("deform Symmetrize%s on a sphere: positions %.0f ms\n", average ? " Average" : "",
+                        std::chrono::duration<double, std::milli>(clock::now() - t0).count());
+        }
+        DeformOptions o; // Surface Polish at 1: Polish with 12 passes
+        o.amount = 100.0f;
+        o.passes = 12;
+        const auto t0 = clock::now();
+        const std::vector<vec3> P = deformPositions(s, DeformOp::Polish, o);
+        std::printf("Surface Polish 1.0 on a sphere: positions %.0f ms\n",
+                    std::chrono::duration<double, std::milli>(clock::now() - t0).count());
+    }
     for (int i = int(DeformOp::Move); i < kDeformOpCount; ++i) {
         DeformOptions o;
         float lo, hi;

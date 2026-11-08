@@ -1945,6 +1945,19 @@ private:
     std::string dropdown_;     // palette open as a drop-down ("" = none)
     float dropdownX_ = 0.0f;
     bool openDropdown_ = false;
+    // Tool > Geometry > Surface Polish (foirgairwolf on Discord): smooth the surface, hard edges kept. The preview is
+    // the polish really applied as one undo step, redone after each change while it is still the last step.
+    struct SurfacePolishUi {
+        float amount = 0.5f;    // 0-1
+        float edge = 20.0f;     // degrees: creases sharper than this stay sharp
+        bool previewed = false; // the preview step is in the undo history
+        uint64_t revision = 0;  // undo revision right after it
+        uint32_t part = 0;      // the Part it was applied to
+    } surfacePolish_;
+    void drawSurfacePolish();
+    void surfacePolishRefresh(); // undo the preview if it is still the last step, then preview again
+    void surfacePolishApply();
+    void surfacePolishCancel();
     float decimateRatio_ = 0.5f;
     bool decimateKeepMasked_ = false; // Decimate's Keep Masked (#43)
     std::string flashPalette_; // a tray palette that was clicked in the bar: scrolled to and flashed

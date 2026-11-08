@@ -5,6 +5,7 @@
 #include "core/Commands.h"
 #include "core/Document.h"
 #include "core/PathStroke.h"
+#include "core/SurfaceQuery.h"
 #include "core/ThreadPool.h"
 
 #include <glm/gtc/quaternion.hpp>
@@ -37,7 +38,8 @@ const OpInfo kOps[kDeformOpCount] = {
     {DeformOp::Taper, "Taper", "deform_taper", -100, 100, 40},     {DeformOp::Shear, "Shear", "deform_shear", -100, 100, 30},
     {DeformOp::Round, "Round", "deform_round", -100, 100, 50},     {DeformOp::Box, "Box", "deform_box", -100, 100, 50},
     {DeformOp::Flatten, "Flatten", "deform_flatten", -100, 100, 20}, {DeformOp::Sag, "Sag", "deform_sag", -100, 100, 30},
-    {DeformOp::Depth, "Depth", "deform_depth", -90, 90, 40},
+    {DeformOp::Depth, "Depth", "deform_depth", -90, 90, 40},       {DeformOp::Noise, "Noise", "deform_noise", 0, 100, 20},
+    {DeformOp::Symmetrize, "Symmetrize", "deform_symmetrize", -100, 100, 100},
 };
 const OpInfo& info(DeformOp op) { return kOps[size_t(op)]; }
 
@@ -111,8 +113,14 @@ bool parseDeformStack(const std::string& text, std::vector<DeformStep>& steps, s
                 st.options.keepVolume = true;
             } else if (word == "nomask") {
                 st.options.useMask = false;
+            } else if (word == "average") {
+                st.options.average = true;
             } else if (word.rfind("dir=", 0) == 0) {
                 st.options.direction = std::strtof(word.c_str() + 4, nullptr);
+            } else if (word.rfind("scale=", 0) == 0) {
+                st.options.scale = std::clamp(std::strtof(word.c_str() + 6, nullptr), 0.5f, 64.0f);
+            } else if (word.rfind("edge=", 0) == 0) {
+                st.options.edge = std::clamp(std::strtof(word.c_str() + 5, nullptr), 1.0f, 90.0f);
             } else if (word.find_first_not_of("xyzXYZ") == std::string::npos) {
                 st.options.axes = 0;
                 for (char c : word) st.options.axes |= uint8_t(1 << (std::tolower(static_cast<unsigned char>(c)) - 'x'));
@@ -139,6 +147,9 @@ std::string deformStackText(const std::vector<DeformStep>& steps) {
         if (st.options.soft && deformUsesSoft(st.op)) out << " soft";
         if (st.options.direction != 0.0f && deformUsesDirection(st.op)) out << " dir=" << st.options.direction;
         if (st.options.keepVolume && st.op == DeformOp::Smooth) out << " volume";
+        if (st.op == DeformOp::Noise) out << " scale=" << st.options.scale;
+        if (st.op == DeformOp::Symmetrize && st.options.average) out << " average";
+        if (st.op == DeformOp::Polish && st.options.edge != DeformOptions{}.edge) out << " edge=" << st.options.edge;
         if (!st.options.useMask) out << " nomask";
     }
     return out.str();
@@ -245,7 +256,7 @@ void surfaceOp(const Mesh& m, std::vector<vec3>& P, DeformOp op, const DeformOpt
         // normals of the faces around it, weighted down by distance and, steeply, by how different they are, so
         // the small tilts of noise average out while the faces across an edge or corner don't count. Then the
         // vertices move to fit the filtered normals (Sun et al. 2007), which keeps edges where they are.
-        passes(o.amount, 6, count, each);
+        passes(o.amount, std::max(o.passes, 1), count, each);
         const size_t nt = m.triangleCount();
         std::vector<vec3> fn(nt), fc(nt), filtered(nt);
         std::vector<float> fa(nt);
@@ -261,7 +272,8 @@ void surfaceOp(const Mesh& m, std::vector<vec3>& P, DeformOp op, const DeformOpt
                 }
             }, kGrain);
         };
-        constexpr float kSigmaNormal = 0.35f; // |n_f - n_g| of a 20 degree tilt; a 90 degree edge is 1.41
+        // |n_f - n_g| of a tilt by the edge angle (0.35 at the default 20 degrees); a 90 degree edge is 1.41.
+        const float sigmaNormal = 2.0f * std::sin(glm::radians(std::clamp(o.edge, 1.0f, 90.0f)) * 0.5f);
         for (int i = 0; i < count; ++i) {
             faces();
             poolFor(nt, [&](size_t b, size_t e) {
@@ -277,7 +289,7 @@ void surfaceOp(const Mesh& m, std::vector<vec3>& P, DeformOp op, const DeformOpt
                             const vec3 dn = fn[g] - fn[t];
                             const vec3 dc = fc[g] - fc[t];
                             const float w = fa[g] * std::exp(-glm::dot(dc, dc) / (2.0f * spacing * spacing)) *
-                                            std::exp(-glm::dot(dn, dn) / (2.0f * kSigmaNormal * kSigmaNormal));
+                                            std::exp(-glm::dot(dn, dn) / (2.0f * sigmaNormal * sigmaNormal));
                             sum += fn[g] * w;
                         }
                     const float l = glm::length(sum);
@@ -342,11 +354,83 @@ void mapAll(std::vector<vec3>& Q, F&& f) {
     }, kGrain);
 }
 
-// Move ... Depth on P: the unweighted result of every pass, then blended in by each vertex's weight.
+// Noise: smooth gradient noise in [-1, 1] about, our own lattice hash (integer mix; the same on every platform).
+inline uint32_t hash3(int x, int y, int z, uint32_t seed) {
+    uint32_t h = uint32_t(x) * 0x8da6b343u ^ uint32_t(y) * 0xd8163841u ^ uint32_t(z) * 0xcb1ab31fu ^ seed * 0x9e3779b9u;
+    h ^= h >> 16;
+    h *= 0x7feb352du;
+    h ^= h >> 15;
+    h *= 0x846ca68bu;
+    return h ^ (h >> 16);
+}
+inline float gradDot(uint32_t h, const vec3& d) {
+    // One of 12 edge directions of a cube.
+    static constexpr float g[12][3] = {{1, 1, 0}, {-1, 1, 0}, {1, -1, 0}, {-1, -1, 0}, {1, 0, 1}, {-1, 0, 1},
+                                       {1, 0, -1}, {-1, 0, -1}, {0, 1, 1}, {0, -1, 1}, {0, 1, -1}, {0, -1, -1}};
+    const float* v = g[h % 12u];
+    return v[0] * d.x + v[1] * d.y + v[2] * d.z;
+}
+float gradientNoise(const vec3& p, uint32_t seed) {
+    const vec3 f = glm::floor(p), u = p - f;
+    const int x = int(f.x), y = int(f.y), z = int(f.z);
+    const vec3 s = u * u * u * (u * (u * 6.0f - 15.0f) + 10.0f); // quintic fade
+    float n[8];
+    for (int i = 0; i < 8; ++i) {
+        const int dx = i & 1, dy = (i >> 1) & 1, dz = (i >> 2) & 1;
+        n[i] = gradDot(hash3(x + dx, y + dy, z + dz, seed), u - vec3(float(dx), float(dy), float(dz)));
+    }
+    const float x00 = glm::mix(n[0], n[1], s.x), x10 = glm::mix(n[2], n[3], s.x);
+    const float x01 = glm::mix(n[4], n[5], s.x), x11 = glm::mix(n[6], n[7], s.x);
+    return glm::mix(glm::mix(x00, x10, s.y), glm::mix(x01, x11, s.y), s.z);
+}
+// Two octaves, about [-1, 1].
+float bumps(const vec3& p, uint32_t seed) {
+    return (gradientNoise(p, seed) + 0.35f * gradientNoise(p * 2.03f + vec3(17.1f, 3.7f, 9.2f), seed + 101u)) * 1.1f;
+}
+
+// Symmetrize Q across the plane through c across axis a: the side `t` points to (+ for t > 0) copied onto the
+// other one, or (average) every point halfway to the mirror of its opposite; |t| blends it in. Each point's
+// opposite is the closest point on the surface to its mirror image, so the two sides need not share topology.
+void symmetrizeAxis(const Mesh& m, std::vector<vec3>& Q, int a, float c, float t, bool average) {
+    const float side = t >= 0.0f ? 1.0f : -1.0f, w = std::min(std::abs(t), 1.0f);
+    auto mirror = [&](vec3 p) {
+        p[a] = 2.0f * c - p[a];
+        return p;
+    };
+    // The side copied from: its triangles (those reaching it; every one when averaging).
+    auto kept = [&](uint32_t v) { return (Q[v][a] - c) * side >= 0.0f; };
+    std::vector<glm::uvec3> source;
+    for (const glm::uvec3& f : m.triangles)
+        if (average || kept(f.x) || kept(f.y) || kept(f.z)) source.push_back(f);
+    if (source.empty()) return;
+    TriangleBVH surface;
+    surface.build(Q, std::move(source));
+    const std::vector<vec3> P = Q; // read from the snapshot: the same result in any order
+    AABB box;
+    for (const vec3& p : P) box.expand(p);
+    const float near = 0.02f * glm::length(box.extent()); // most mirror images land this close: a cheaper search first
+    poolFor(Q.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            const uint32_t v = uint32_t(i);
+            if (!average && (P[v][a] - c) * side >= 0.0f) continue; // the side that is kept
+            SurfaceHit hit;
+            const vec3 r = mirror(P[v]);
+            if (!surface.closestPoint(r, near, hit) && !surface.closestPoint(r, std::numeric_limits<float>::max(), hit))
+                continue;
+            vec3 to = mirror(hit.position);
+            if (average) to = 0.5f * (P[v] + to);
+            Q[i] = glm::mix(P[v], to, w);
+        }
+    }, kGrain);
+}
+
+// Move ... Symmetrize on P: the unweighted result of every pass, then blended in by each vertex's weight.
 void shapeOp(const Mesh& m, std::vector<vec3>& P, DeformOp op, const DeformOptions& o) {
     if (P.empty() || o.axes == 0) return;
     vec3 c = o.pivot;
-    if (!o.hasPivot) {
+    if (!o.hasPivot && op == DeformOp::Symmetrize) {
+        c = vec3(0.0f); // the plane symmetry and Make Symmetric use
+    } else if (!o.hasPivot) {
         AABB box;
         for (const vec3& p : P) box.expand(p);
         c = box.center();
@@ -527,6 +611,22 @@ void shapeOp(const Mesh& m, std::vector<vec3>& P, DeformOp op, const DeformOptio
                 });
                 break;
             }
+            case DeformOp::Noise: {
+                // Bumps along the axis: `scale` of them across the longest side, up to 5% of it high at 100.
+                AABB box;
+                for (const vec3& p : Q) box.expand(p);
+                const vec3 ext = box.max - box.min;
+                const float longest = std::max(ext.x, std::max(ext.y, ext.z));
+                if (longest < 1e-20f) break;
+                const float freq = std::max(o.scale, 0.5f) / longest, height = 0.05f * longest * t;
+                // Each axis its own field (seed), sampled where the point is.
+                mapAll(Q, [&](vec3 p) {
+                    p[a] += height * bumps((p - box.min) * freq, uint32_t(a + 1));
+                    return p;
+                });
+                break;
+            }
+            case DeformOp::Symmetrize: symmetrizeAxis(m, Q, a, c[a], t, o.average); break;
             default: break;
             }
         }
@@ -618,6 +718,15 @@ size_t deformActivePart(Document& doc, const std::vector<DeformStep>& steps, std
     return commitPositions(doc, deformStackPositions(doc.mesh, steps), label, masked, error);
 }
 
+size_t surfacePolishActivePart(Document& doc, float amount, float edgeDegrees, bool useMask, std::string& error) {
+    DeformStep st{DeformOp::Polish, {}};
+    st.options.amount = std::clamp(amount, 0.0f, 1.0f) * 100.0f;
+    st.options.passes = 12;
+    st.options.edge = std::clamp(edgeDegrees, 1.0f, 90.0f);
+    st.options.useMask = useMask;
+    return deformActivePart(doc, {st}, error, "Surface Polish");
+}
+
 size_t resizeActivePart(Document& doc, const glm::vec3& size, bool useMask, std::string& error) {
     if (!canDeform(doc, "Size", error)) return 0;
     const Mesh& m = doc.mesh;
@@ -701,6 +810,11 @@ void registerDeformCommands(CommandRegistry& reg) {
         "- side); soft=true rounds the edge of the cut.",
         "Sag the active Part along -axis: parts far from the axis droop (negative lifts them).",
         "Depth: a perspective along each axis, the + end wider for a positive amount.",
+        "Noise: smooth random bumps along each axis, up to 5% of the Part's longest side high at 100; scale sets "
+        "how many bumps across it.",
+        "Symmetrize the active Part across each axis's plane (through the world origin, or the pivot): the + side "
+        "is copied onto the - side (a negative amount: the - side onto the + side), by amount percent; "
+        "average=true evens both sides out halfway instead. The sides need not share topology.",
     };
     for (int i = 0; i < kDeformOpCount; ++i) {
         const DeformOp op = DeformOp(i);
@@ -718,6 +832,12 @@ void registerDeformCommands(CommandRegistry& reg) {
         if (deformUsesDirection(op))
             params.push_back({"direction", T::Number, "Degrees about the axis (0: toward +Y, +X for the Y axis).", false});
         if (deformUsesSoft(op)) params.push_back({"soft", T::Bool, "Eased profile (default false).", false});
+        if (op == DeformOp::Polish)
+            params.push_back({"edge", T::Number, "Degrees: creases sharper than this stay sharp (default 20).", false});
+        if (op == DeformOp::Noise)
+            params.push_back({"scale", T::Number, "Bumps across the Part's longest side, 0.5 to 64 (default 4).", false});
+        if (op == DeformOp::Symmetrize)
+            params.push_back({"average", T::Bool, "Even both sides out halfway (default false: copy one side).", false});
         const std::string tail = deformUsesAxes(op) ? " Mask-aware, hidden faces stay; one undo step."
                                                     : " Mask-aware (partly masked vertices move partly), hidden faces and "
                                                       "open borders stay; one undo step.";
@@ -727,6 +847,9 @@ void registerDeformCommands(CommandRegistry& reg) {
                      o.amount = float(std::clamp(argNumber(a, "amount", double(def)), double(lo), double(hi)));
                      o.useMask = argBool(a, "masked", true);
                      o.keepVolume = argBool(a, "keep_volume", false);
+                     o.edge = float(std::clamp(argNumber(a, "edge", double(o.edge)), 1.0, 90.0));
+                     o.scale = float(std::clamp(argNumber(a, "scale", double(o.scale)), 0.5, 64.0));
+                     o.average = argBool(a, "average", false);
                      std::string err;
                      if (deformUsesAxes(op) && !shapeArgs(a, o, err)) return {false, err};
                      if (o.amount == 0.0f) return {true, std::string(deformName(op)) + ": amount 0, nothing to do"};
@@ -765,11 +888,29 @@ void registerDeformCommands(CommandRegistry& reg) {
                                double(now.z), moved);
                  return {true, msg};
              }});
+    reg.add({"surface_polish",
+             "Surface Polish (Tool > Geometry): smooth the active Part's surface while keeping its hard edges sharp "
+             "(bilateral filtering of the face normals, then the vertices fit them). Mask-aware, hidden faces and "
+             "open borders stay; one undo step.",
+             {{"amount", T::Number, "How much, 0 to 1 (default 0.5).", false},
+              {"edge", T::Number, "Degrees: creases sharper than this stay sharp, 1 to 90 (default 20).", false},
+              {"masked", T::Bool, "Masked parts stay (default true).", false}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const float amount = float(std::clamp(argNumber(a, "amount", 0.5), 0.0, 1.0));
+                 const float edge = float(std::clamp(argNumber(a, "edge", 20.0), 1.0, 90.0));
+                 if (amount <= 0.0f) return {true, "Surface Polish: amount 0, nothing to do"};
+                 std::string err;
+                 const size_t moved = surfacePolishActivePart(doc, amount, edge, argBool(a, "masked", true), err);
+                 if (moved == 0) return {false, err};
+                 char msg[128];
+                 std::snprintf(msg, sizeof msg, "Surface Polish %.2f: moved %zu vertices", double(amount), moved);
+                 return {true, msg};
+             }});
     reg.add({"deform_stack",
              "Run several whole-Part deformations in order as one undo step, e.g. ops=\"bend 40 y soft dir=90; twist "
-             "90 y; taper -30 xz\" (name, amount, axes letters, soft, dir=degrees, volume for Smooth, nomask; "
-             "names: polish relax smooth balloon move turn scale squash bend twist taper shear round box flatten sag "
-             "depth).",
+             "90 y; taper -30 xz\" (name, amount, axes letters, soft, dir=degrees, volume for Smooth, scale= for Noise, "
+             "average for Symmetrize, edge= for Polish, nomask; names: polish relax smooth balloon move turn scale "
+             "squash bend twist taper shear round box flatten sag depth noise symmetrize).",
              {{"ops", T::String, "The steps, separated by ';'.", true},
               {"pivot", T::String, "x,y,z for every shape step (default: the Part's bounds centre at each step).", false}},
              [](Document& doc, const Args& a) -> CommandResult {

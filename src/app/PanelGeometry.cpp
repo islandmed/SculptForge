@@ -3,7 +3,8 @@
 //
 // Tool > Geometry, grouped by what you do: Levels (the Level slider, Lower / Higher Level, Add Level with Smooth,
 // Rebuild Lower Levels, Remove Below / Above), Micro Detail, Resolution (Decimate, Quad Remesh, Subdivide), Cleanup
-// (Fill Holes, Merge by Distance, Find Problems) and Symmetry (Make Symmetric). The levels themselves live in core/Multires.
+// (Fill Holes, Merge by Distance, Find Problems), Surface Polish and Symmetry (Make Symmetric). The levels themselves
+// live in core/Multires.
 #include "app/App.h"
 #include "app/Demo.h"
 #include "app/Palettes.h"
@@ -141,7 +142,76 @@ void App::drawGeometrySection() {
     ui::ActionButton(*this, "geometry.close_holes", ImVec2(-1, 0), ui::Look::IconLabel);
     drawMeshCheckContents(); // Merge by Distance, Find Problems (PanelMeshCheck.cpp)
 
+    drawSurfacePolish();
     drawSymmetryContents(); // Make Symmetric (PanelExtract.cpp)
+}
+
+namespace {
+// Above this many vertices the preview follows a slider when it is let go, not while it moves.
+constexpr size_t kPolishLiveVertices = 250000;
+} // namespace
+
+void App::surfacePolishRefresh() {
+    SurfacePolishUi& sp = surfacePolish_;
+    if (sp.previewed && doc_.undo.revision() == sp.revision && doc_.activePartInfo().id == sp.part) runCommand("undo");
+    sp.previewed = false;
+    if (sp.amount <= 0.0f) return;
+    const uint64_t before = doc_.undo.revision();
+    runCommand("surface_polish", {{"amount", double(sp.amount)}, {"edge", double(sp.edge)}});
+    if (!lastCommandOk_ || doc_.undo.revision() == before) return;
+    sp.previewed = true;
+    sp.revision = doc_.undo.revision();
+    sp.part = doc_.activePartInfo().id;
+}
+
+void App::surfacePolishApply() {
+    SurfacePolishUi& sp = surfacePolish_;
+    // The preview (current or not) is already on the Part: it stays. Without one, polish now.
+    if (sp.previewed) sp.previewed = false;
+    else runCommand("surface_polish", {{"amount", double(sp.amount)}, {"edge", double(sp.edge)}});
+}
+
+void App::surfacePolishCancel() {
+    SurfacePolishUi& sp = surfacePolish_;
+    if (sp.previewed && doc_.undo.revision() == sp.revision && doc_.activePartInfo().id == sp.part) runCommand("undo");
+    sp.previewed = false;
+}
+
+void App::drawSurfacePolish() {
+    SurfacePolishUi& sp = surfacePolish_;
+    // Another undo step since the preview: it is part of the history now (kept, never undone behind your back).
+    if (sp.previewed && (doc_.undo.revision() != sp.revision || doc_.activePartInfo().id != sp.part)) sp.previewed = false;
+    ImGui::Spacing();
+    Demo::pushScope("Surface Polish");
+    tray::GroupLabel(*this, "Surface Polish");
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
+    const bool live = doc_.mesh.vertexCount() < kPolishLiveVertices;
+    bool changed = false;
+    ImGui::SetNextItemWidth(half);
+    const std::string polish = std::string(tr("Polish")) + " %.2f";
+    const bool a = ui::SliderInside("##surface_polish_amount", &sp.amount, 0.0f, 1.0f, polish.c_str(), ImGuiSliderFlags_AlwaysClamp);
+    changed |= live ? a : ImGui::IsItemDeactivatedAfterEdit();
+    ui::HelpText("Polish", nullptr,
+                 "How much Surface Polish smooths the active Part: small bumps and noise even out while flat areas and "
+                 "hard edges stay crisp. The Part shows the result as you drag; Apply keeps it, Cancel takes it back.",
+                 "Tool > Geometry > Surface Polish");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(-1);
+    const std::string edge = std::string(tr("Edges")) + " %.0f\xc2\xb0";
+    const bool e = ui::SliderInside("##surface_polish_edge", &sp.edge, 5.0f, 60.0f, edge.c_str(), ImGuiSliderFlags_AlwaysClamp);
+    changed |= live ? e : ImGui::IsItemDeactivatedAfterEdit();
+    ui::HelpText("Edges", nullptr,
+                 "Which edges count as hard: creases sharper than this angle stay sharp, gentler ones are smoothed "
+                 "with the rest. Lower keeps more edges.",
+                 "Tool > Geometry > Surface Polish");
+    if (changed) surfacePolishRefresh();
+    ui::ActionButton(*this, "geometry.surface_polish_apply", ImVec2(half, 0));
+    ui::HelpAction(*this, "geometry.surface_polish_apply");
+    ImGui::SameLine();
+    ui::ActionButton(*this, "geometry.surface_polish_cancel", ImVec2(-1, 0));
+    ui::HelpAction(*this, "geometry.surface_polish_cancel");
+    Demo::popScope();
 }
 
 } // namespace sf

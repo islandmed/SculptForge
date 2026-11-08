@@ -448,6 +448,13 @@ void App::initActions() {
         "Cap every open boundary of the active Part (a hole, an open bottom, the rim of an extracted shell) with a "
         "new patch sized like the polygons around it, so remeshing and sculpting see a closed surface. The rest of "
         "the Part stays as it is; the patches get a face group of their own (#103).");
+    // Tool > Geometry > Surface Polish (PanelGeometry.cpp, foirgairwolf on Discord): the preview is the polish applied.
+    add("geometry.surface_polish_apply", "Apply", "Tool > Geometry", nullptr, [this] { surfacePolishApply(); }, nullptr,
+        nullptr, nullptr, [this] { return doc_.mesh.vertexCount() > 0 && surfacePolish_.amount > 0.0f; },
+        "Keep Surface Polish on the Part (one undo step). With the preview showing, what you see is what stays.");
+    add("geometry.surface_polish_cancel", "Cancel", "Tool > Geometry", nullptr, [this] { surfacePolishCancel(); },
+        nullptr, nullptr, nullptr, [this] { return surfacePolish_.previewed; },
+        "Take the Surface Polish preview back off the Part.");
     // Subdivision levels (Tool > Geometry; core/Multires.h).
     add("geometry.divide", "Add Level", "Tool > Geometry", "Ctrl+D", [this] { runCommand("subdiv_divide", {{"smooth", smt_}}); },
         ICON_LC_GRID_2X2, "subdiv_divide", nullptr, nullptr,

@@ -27,7 +27,8 @@ struct OpGroup {
 const OpGroup kGroups[] = {
     {"Transform", {DeformOp::Move, DeformOp::Turn, DeformOp::Scale, DeformOp::Squash}},
     {"Bend & Twist", {DeformOp::Bend, DeformOp::Twist, DeformOp::Taper, DeformOp::Shear}},
-    {"Shape", {DeformOp::Round, DeformOp::Box, DeformOp::Flatten, DeformOp::Sag, DeformOp::Depth}},
+    {"Shape", {DeformOp::Round, DeformOp::Box, DeformOp::Flatten, DeformOp::Sag, DeformOp::Depth, DeformOp::Noise,
+               DeformOp::Symmetrize}},
     {"Surface", {DeformOp::Polish, DeformOp::Relax, DeformOp::Smooth, DeformOp::Balloon}},
 };
 
@@ -45,6 +46,7 @@ std::string stepLabel(const DeformStep& st) {
         s += " " + axes;
     }
     if (st.options.soft && deformUsesSoft(st.op)) s += std::string(" ") + tr("Soft");
+    if (st.options.average && st.op == DeformOp::Symmetrize) s += std::string(" ") + tr("Average");
     return s;
 }
 
@@ -129,6 +131,7 @@ void App::deformStackAdd(DeformOp op) {
     deformRange(op, lo, hi, st.options.amount);
     // A new step starts on the axes of the step before it (most stacks work along one axis).
     if (!ds.steps.empty()) st.options.axes = ds.steps.back().options.axes;
+    if (op == DeformOp::Symmetrize) st.options.axes = DeformX; // left and right, as symmetry
     ds.steps.push_back(st);
     ds.on.push_back(1);
     ds.selected = int(ds.steps.size()) - 1;
@@ -210,7 +213,8 @@ void App::drawDeformStack() {
     }
     ui::HelpText("Add step", nullptr,
                  "Add a deformation to the stack: Transform (Move, Turn, Scale, Squash), Bend & Twist (Bend, Twist, "
-                 "Taper, Shear), Shape (Round, Box, Flatten, Sag, Depth) or Surface (Polish, Relax, Smooth, Balloon). "
+                 "Taper, Shear), Shape (Round, Box, Flatten, Sag, Depth, Noise, Symmetrize) or Surface (Polish, "
+                 "Relax, Smooth, Balloon). "
                  "The steps run in order on the whole Part.",
                  "Tool > Reshape > Stack");
     ImGui::SameLine();
@@ -273,6 +277,24 @@ void App::drawDeformStack() {
         }
         if (st.op == DeformOp::Smooth)
             changed |= ui::Checkbox((std::string(tr("Keep volume")) + "##deform_step_volume").c_str(), &st.options.keepVolume);
+        if (st.op == DeformOp::Noise) {
+            ImGui::SetNextItemWidth(-1);
+            const bool sc = ui::SliderInside("##deform_step_scale", &st.options.scale, 0.5f, 32.0f,
+                                             (std::string(tr("Scale")) + " %.1f").c_str(), ImGuiSliderFlags_Logarithmic);
+            changed |= live ? sc : ImGui::IsItemDeactivatedAfterEdit();
+            ui::HelpText("Scale", nullptr,
+                         "How many bumps Noise makes across the Part's longest side: low for a few broad swells, high "
+                         "for fine grain. The amount sets how high they are.",
+                         "Tool > Reshape > Stack");
+        }
+        if (st.op == DeformOp::Symmetrize) {
+            changed |= ui::Checkbox((std::string(tr("Average")) + "##deform_step_average").c_str(), &st.options.average);
+            ui::HelpText("Average", nullptr,
+                         "Symmetrize evens both sides out to meet halfway, instead of copying one side onto the other "
+                         "(a positive amount copies the + side, a negative one the - side). The plane is the one "
+                         "symmetry uses, through the world origin, or the gizmo's pivot when it is placed.",
+                         "Tool > Reshape > Stack");
+        }
         if (changed) deformStackRefresh();
         ui::ActionButton(*this, "deformation.stack_repeat", ImVec2(half, 0));
         ui::HelpAction(*this, "deformation.stack_repeat");
