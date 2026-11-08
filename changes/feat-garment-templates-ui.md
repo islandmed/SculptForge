@@ -3,7 +3,8 @@ whats_new: **Templates and Print in the Pattern window** (Tool > Garments): pick
 added: **Pattern window: Templates and Print** (Tool > Garments): **Templates** lists the T-shirt, trousers, straight
   and A-line skirts, hoodie, dress, cloak and gloves, with **Add beside the pattern** for an outfit and an editable
   **Size chart (mm)** (hover a measurement to see how to take it); **Print** picks A4 or Letter, portrait or
-  landscape, shows how many pages it takes, and saves one PDF or one SVG per page. Spanish and Chinese included.
+  landscape, shows how many pages it takes, and saves one PDF or one SVG per page. Both open under their buttons.
+  Spanish and Chinese included.
 testers:
   - Windows, Tool > Garments > Templates > Trousers: four panels appear in the Pattern window. Print > Save PDF...,
     open the PDF, print page A1 at 100%: the square measures 50 mm.

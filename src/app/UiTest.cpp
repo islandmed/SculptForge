@@ -1436,6 +1436,25 @@ double Demo::query(const std::string& name, bool& known) const {
     return queryModes(name, known); // latched, sculpted ... (UiTestModes.cpp); sets known
 }
 
+double Demo::rememberedNumber(int line, const std::string& text, bool* found) {
+    if (found) *found = true;
+    if (text.empty() || text[0] != '$') return std::strtod(text.c_str(), nullptr);
+    // $NAME, $NAME*K, $NAME+K or $NAME-K
+    const size_t op = text.find_first_of("*+-", 1);
+    const std::string key = text.substr(1, op == std::string::npos ? std::string::npos : op - 1);
+    const auto it = remembered_.find(key);
+    if (it == remembered_.end()) {
+        fail(line, "nothing remembered as $" + key);
+        if (found) *found = false;
+        return 0.0;
+    }
+    const double k = op == std::string::npos ? 0.0 : std::strtod(text.c_str() + op + 1, nullptr);
+    return op == std::string::npos ? it->second
+           : text[op] == '*'       ? it->second * k
+           : text[op] == '+'       ? it->second + k
+                                   : it->second - k;
+}
+
 void Demo::testClick(int line, const std::string& label, int button, bool doubleClick) {
     // Find the item (give the UI a moment to appear), glide there, press and release.
     const auto clipAt = std::make_shared<ImVec4>(); // the item's panel when the mouse glided there
@@ -1638,12 +1657,14 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         wait(0.6f); // tooltips appear after a short delay
     } else if (verb == "hover_model" || verb == "hover_window") {
         if (!need(2)) return false;
-        const float u = num(1, 0.5f), v = num(2, 0.5f), seconds = num(3, 0.3f);
+        const std::string us = w[1], vs = w[2]; // fractions, or remembered values ($u) as drag takes them
+        const float seconds = num(3, 0.3f);
         const bool window = verb == "hover_window";
         auto from = std::make_shared<ImVec2>();
         auto to = std::make_shared<ImVec2>();
-        steps_.push_back([this, from, to, u, v, seconds, window](float t) {
+        steps_.push_back([this, line, from, to, us, vs, seconds, window](float t) {
             if (t == 0.0f) {
+                const float u = float(rememberedNumber(line, us)), v = float(rememberedNumber(line, vs));
                 *from = mouse_;
                 int ww = 0, wh = 0;
                 SDL_GetWindowSize(app_.window_, &ww, &wh);
@@ -1862,12 +1883,17 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         wait(0.1f);
     } else if (verb == "drag") {
         if (!need(4)) return false;
-        const float x0 = num(1, 0), y0 = num(2, 0), x1 = num(3, 0), y1 = num(4, 0), seconds = num(5, 0.4f);
+        // X0 Y0 X1 Y1: window fractions, or remembered values ($u, $u-0.01: at any window size and UI scale).
+        const std::vector<std::string> at(w.begin() + 1, w.begin() + 5);
+        const float seconds = num(5, 0.4f);
         const bool release = w.size() > 6 && w[6] == "release";
-        steps_.push_back([this, x0, y0, x1, y1, seconds, release](float t) {
+        auto ends = std::make_shared<glm::vec4>();
+        steps_.push_back([this, line, at, ends, seconds, release](float t) {
+            if (t == 0.0f)
+                for (int i = 0; i < 4; ++i) (*ends)[i] = float(rememberedNumber(line, at[size_t(i)]));
             int ww = 0, wh = 0;
             SDL_GetWindowSize(app_.window_, &ww, &wh);
-            const ImVec2 a(x0 * float(ww), y0 * float(wh)), b(x1 * float(ww), y1 * float(wh));
+            const ImVec2 a(ends->x * float(ww), ends->y * float(wh)), b(ends->z * float(ww), ends->w * float(wh));
             if (t == 0.0f) {
                 mouseMotion(a.x, a.y);
                 return false;
@@ -2802,21 +2828,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         }
         const std::string name = w[1], op = w[2], wantText = w[3];
         run([this, line, name, op, wantText] {
-            double want = std::strtod(wantText.c_str(), nullptr);
-            if (!wantText.empty() && wantText[0] == '$') { // $NAME, $NAME*K, $NAME+K or $NAME-K
-                const size_t op = wantText.find_first_of("*+-", 1);
-                const std::string key = wantText.substr(1, op == std::string::npos ? std::string::npos : op - 1);
-                const auto it = remembered_.find(key);
-                if (it == remembered_.end()) {
-                    fail(line, "nothing remembered as $" + key);
-                    return;
-                }
-                const double k = op == std::string::npos ? 0.0 : std::strtod(wantText.c_str() + op + 1, nullptr);
-                want = op == std::string::npos  ? it->second
-                       : wantText[op] == '*'    ? it->second * k
-                       : wantText[op] == '+'    ? it->second + k
-                                                : it->second - k;
-            }
+            bool found = true;
+            const double want = rememberedNumber(line, wantText, &found);
+            if (!found) return;
             bool k = false;
             const double v = query(name, k);
             if (!compare(v, op, want)) fail(line, name + " is " + number(v) + ", expected " + op + " " + number(want) + " (" + wantText + ")");
