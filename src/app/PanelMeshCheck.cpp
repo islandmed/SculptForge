@@ -52,10 +52,15 @@ void App::drawMeshCheckContents() {
     const float button = ImGui::CalcTextSize(tr("Merge")).x + 2.0f * style.FramePadding.x + ImGui::GetFrameHeight();
     ImGui::BeginDisabled(weldCount_ == 0 || weldKey_ != key || weldKeyDistance_ != weldDistance_);
     if (ImGui::Button(tr("Merge##weld_points"), ImVec2(button, 0))) {
-        Args args{{"distance", double(weldDistance_)}};
-        if (weldMaskedOnly_) args["masked_only"] = true;
-        runCommand("weld_points", args);
-        weldKey_ = 0;
+        auto weld = [this] {
+            Args args{{"distance", double(weldDistance_)}};
+            if (weldMaskedOnly_) args["masked_only"] = true;
+            runCommand("weld_points", args);
+            weldKey_ = 0;
+        };
+        // #163: ask on a partly hidden Part, unless only the masked points (shown) merge.
+        const bool maskShown = weldMaskedOnly_ && doc_.mesh.hasMask() && renderSettings_.showMask;
+        if (unhideAllows("Merge by Distance", weld, maskShown)) weld();
         meshReportScroll_ = 2; // Find Problems is next: its row comes into view (below the fold in a 1024 px drop-down)
     }
     ImGui::EndDisabled();

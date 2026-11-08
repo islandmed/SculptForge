@@ -2877,6 +2877,31 @@ void App::drawDynamicOffer() {
         ImGui::EndPopup();
     }
 
+    // #163 (@TheLycanFenrir): an operation on the whole Part while some of it is hidden: unhide first, or cancel.
+    static constexpr const char* kUnhide = "##unhide_confirm";
+    if (openUnhideConfirm_) {
+        openUnhideConfirm_ = false;
+        ImGui::OpenPopup(kUnhide);
+    }
+    if (ImGui::BeginPopup(kUnhide)) {
+        Demo::pushScope("Hidden");
+        ImGui::Text(tr("Some of this Part is hidden. %s works on all of it."), tr(unhideOperation_.c_str()));
+        ImGui::TextDisabled("%s", tr("Unhide everything first, so you see what changes. Undo brings it back."));
+        ImGui::Spacing();
+        if (ImGui::Button(tr("Unhide and continue"))) {
+            ImGui::CloseCurrentPopup();
+            runCommand("show_all");
+            if (std::function<void()> proceed = std::exchange(unhideProceed_, nullptr)) proceed();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(tr("Cancel##unhide")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            unhideProceed_ = nullptr;
+            ImGui::CloseCurrentPopup();
+        }
+        Demo::popScope();
+        ImGui::EndPopup();
+    }
+
     static constexpr const char* kPopup = "##dynamic_offer";
     if (openDynamicOffer_) {
         openDynamicOffer_ = false;
@@ -3210,5 +3235,17 @@ void App::drawMaterialTile(const char* id, ImVec2 size) {
 }
 
 // drawColorWidget (the left tray's colour field) is in Pickers.cpp.
+
+bool App::unhideAllows(const char* operation, std::function<void()> proceed, bool skip) {
+    const Mesh& m = doc_.mesh;
+    if (skip || !m.hasHidden()) return true;
+    size_t hidden = 0;
+    for (uint8_t h : m.hidden) hidden += h != 0;
+    if (hidden == 0 || hidden == m.hidden.size()) return true; // nothing hidden, or all of it (nothing to see either way)
+    unhideOperation_ = operation;
+    unhideProceed_ = std::move(proceed);
+    openUnhideConfirm_ = true;
+    return false;
+}
 
 } // namespace sf

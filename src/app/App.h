@@ -221,6 +221,13 @@ private:
     std::string pendingLevelDelete_;
     bool openLevelDelete_ = false;
     bool openSubdivideConfirm_ = false; // Subdivide on a Part with levels: confirm first (Shell.cpp)
+    // #163: Quad Remesh, Voxel Remesh, Decimate and Merge by Distance on a partly hidden Part ask first (Shell.cpp):
+    // true when the operation may go ahead now; otherwise the prompt opens and "Unhide and continue" shows
+    // everything, then runs `proceed`.
+    bool unhideAllows(const char* operation, std::function<void()> proceed, bool skip = false);
+    std::string unhideOperation_;
+    std::function<void()> unhideProceed_;
+    bool openUnhideConfirm_ = false;
     void drawDetailSlider(const char* id);
 
     void runCommand(const std::string& name, const Args& args = {});
