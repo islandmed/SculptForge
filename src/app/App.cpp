@@ -1908,6 +1908,8 @@ bool App::blenderNavigationDown(Uint8 button) {
     const SDL_Keymod keys = SDL_GetModState(); // the keyboard itself: blenderMods turns Ctrl into the invert
     // Alt+left: Blender 5.1+ masks with it on the model (blenderMods, #77); beside the model, or always with
     // Preferences > Input > Emulate 3 Button Mouse, it is the emulated middle button.
+    // Ctrl+Shift+Alt+left is the hide-inside / cut-the-other-side gesture (blenderMods), not the emulated button.
+    if (button == SDL_BUTTON_LEFT && ctrlDown(keys) && (keys & SDL_KMOD_SHIFT) && !uiPrefs_.emulate3Button) return false;
     RayHit hit;
     const bool emulated = button == SDL_BUTTON_LEFT && (keys & SDL_KMOD_ALT) &&
                           (uiPrefs_.emulate3Button || (keys & SDL_KMOD_SHIFT) || previewLod_ >= 0 ||

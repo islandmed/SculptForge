@@ -1,0 +1,68 @@
+# Cut with X symmetry (Discord, dm4nd) for the look review at 1440 logical px (CMake: ui_cut_symmetry_1440 at 100 %,
+# ui_cut_symmetry_1440_200 at 200 %): Cut In with a rectangle across the middle (both sides to the same depth), a
+# replay of the double cut that took one side only before (Wire on, close up), and the Blender keys' Alt+Q in
+# Controls. Every shot comes before the checks, so the script also shows an older build as it was.
+logical_width 1440
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+remember triangles full
+
+# --- (1) Cut In, a rectangle across the middle ---
+click "Tool##palette.tool"
+click "Cut"
+click "In##cut.in"
+hold ctrl+shift
+click "##tile.brush"
+wait 0.1
+click "Cut Rectangle##held.cut.rect"
+hold none
+mouse_move 0.5 0.5
+key f
+wait_idle 10
+shot cut-in-before
+hold ctrl+shift
+drag_path 0.42 0.38 0.78 0.62 keep
+wait 0.1
+shot cut-in-drawing
+release
+hold none
+wait_idle 10
+shot cut-in-after
+camera 0 -35
+wait_idle 10
+shot cut-in-after-from-above
+
+# --- (2) The case the cut tests found broken (tests/test_cut.cpp cut_symmetry_overlapping_mirror_images): Away
+# across the middle from the front, then a rectangle across that cut from an angled view, both with X symmetry. The
+# first cut's mirror image left zero-area slivers in its walls, the second cut's mirror image cracked on them and was
+# dropped: one side cut only. Now both sides are cut and every cap closes. (The views as in the test, not the app's.)
+run new_sphere subdivisions=4
+run cut shape=rect points="-0.1 -0.2 0.4 0.2" mode=away symmetry=x view_proj="0.666666667 0 0 0 0 0.666666667 0 0 0 0 -0.02002002 0 0 0 -0.921921922 1"
+run cut shape=rect points="-0.15 -0.3 0.35 0.1" mode=away symmetry=x view_proj="2.0818069 -0.102480516 -0.168633393 -0.168296463 0 2.68238683 -0.216814362 -0.216381167 -0.364316207 -0.585602946 -0.963619387 -0.961694074 -2.34639438e-16 1.23918953e-16 3.96745365 4.15932687"
+camera 0 0
+click "Frame##view.frame"
+wait_idle 10
+shot replay-front
+camera 0 40
+wait_idle 10
+shot replay-from-below
+mouse_move 0.5 0.5
+key shift+f
+camera 20 -15
+zoom 1.6
+wait_idle 10
+shot replay-wire-closeup
+key shift+f
+
+# --- (3) Blender keys: Alt+Q in Controls > Mouse & pen ---
+input_style blender
+key f1
+click "Mouse & pen"
+expect_text Alt+Q over it
+shot controls-blender-alt-q
+key escape
+input_style sculptforge
+
+# --- Checks (after every shot) ---
+expect_value triangles != $full
+expect_value open_edges == 0

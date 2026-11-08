@@ -352,11 +352,13 @@ change in the Blender style:
 | Orthographic on or off | <kbd>Numpad 5</kbd> (the axis views turn it on until you rotate again) |
 | Orbit in 15 degree steps, the other side | <kbd>Numpad 4</kbd> <kbd>Numpad 6</kbd> <kbd>Numpad 8</kbd> <kbd>Numpad 2</kbd>, <kbd>Numpad 9</kbd> |
 | Frame the active Part / everything | <kbd>Numpad .</kbd> / <kbd>Home</kbd> |
+| Pick the Part to sculpt | <kbd>Alt</kbd>+<kbd>Q</kbd> over it (Blender's Switch Object; <kbd>Alt</kbd>+click masks in this style), or a triple-click on it |
 | Brush radius / strength | <kbd>F</kbd> / <kbd>Shift</kbd>+<kbd>F</kbd> (drag, or type a number) |
 | Draw, Smooth, Pinch, Inflate, Grab (Move) | <kbd>V</kbd>, <kbd>S</kbd>, <kbd>P</kbd>, <kbd>I</kbd>, <kbd>G</kbd> |
 | Clay Strips (Clay Block), Crease, Tendril, Scrape (Flatten) | <kbd>C</kbd>, <kbd>Shift</kbd>+<kbd>C</kbd>, <kbd>K</kbd>, <kbd>Shift</kbd>+<kbd>T</kbd> |
 | Mask brush | <kbd>M</kbd>, then drag to mask and <kbd>Ctrl</kbd>+drag to unmask; <kbd>M</kbd> again goes back to your brush |
 | Clear / invert the mask | <kbd>Alt</kbd>+<kbd>M</kbd> / <kbd>Ctrl</kbd>+<kbd>I</kbd> |
+| Hide or cut with a rectangle or lasso | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag, as in the other styles (add <kbd>Alt</kbd>: inside); <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click the brush tile or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> picks the shape, a [Cut](cut.md) shape too |
 | Hide the face group under the cursor | <kbd>H</kbd>; <kbd>Shift</kbd>+<kbd>H</kbd> shows only it (again: everything); <kbd>Alt</kbd>+<kbd>H</kbd> shows everything |
 | Lower / higher subdivision level | <kbd>Alt</kbd>+<kbd>1</kbd> / <kbd>Alt</kbd>+<kbd>2</kbd> (<kbd>Shift</kbd>+<kbd>D</kbd> / <kbd>D</kbd> still work) |
 | Swap colours / sample colour | <kbd>X</kbd> / <kbd>Shift</kbd>+<kbd>X</kbd> |

@@ -19,6 +19,9 @@ shape next to **Select Rectangle** and **Select Lasso**, or use the shape button
 While a Cut shape is picked, <kbd>Ctrl</kbd>+<kbd>Shift</kbd> cuts instead of hiding; pick **Select Rectangle**
 or **Select Lasso** again to hide parts of the model.
 
+The keys are the same in every input style, the [Blender style](shortcuts.md#blender-keys) too: there
+<kbd>Ctrl</kbd> alone inverts the brush, but <kbd>Ctrl</kbd>+<kbd>Shift</kbd> still picks, hides and cuts.
+
 ## Pick a mode
 
 **Tool > Cut** has four modes:
@@ -43,7 +46,9 @@ large model.
   **Tool > Remesh** or Dynamic topology ([Subdivide, remesh, decimate and LODs](geometry.md)).
 - Only the active Part is cut; the other [Parts](parts.md) are untouched. Cut each Part on its own, or merge them
   first.
-- With symmetry on (**X**, **Y**, **Z** or radial on the top shelf), the mirror image of the shape cuts too.
+- With symmetry on (**X**, **Y**, **Z** or radial on the top shelf), the mirror image of the shape cuts too. A shape across
+  the middle and its mirror image cut to the same depth on both sides. If the mirror image can't be cut
+  (it would take the rest of the Part, say), nothing is cut and the status bar says why.
 
 An open Part (a plane, a scan with holes) is trimmed without a cap. **Add** needs a closed Part. Forge Spheres
 and Parts with a micro level must be made into a plain mesh first.

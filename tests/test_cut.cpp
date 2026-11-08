@@ -15,6 +15,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 
 using namespace sf;
 
@@ -334,4 +335,89 @@ TEST(cut_clip_presses_flat_without_removing) {
     float minX = 1.0f;
     for (const glm::vec3& p : s.mesh.positions) minX = std::min(minX, p.x);
     CHECK(minX > -0.501f);
+}
+
+namespace {
+// Points of a grid that are inside the mesh while their X mirror image is not (rays along z, even-odd): 0 for a
+// mesh symmetric about x = 0. Also counts rays whose crossings are odd (a hole in the surface).
+std::pair<size_t, size_t> mirrorMismatch(const Mesh& m, int n = 48) {
+    auto insideColumn = [&](double x, double y, std::vector<double>& zs) {
+        zs.clear();
+        for (const glm::uvec3& t : m.triangles) {
+            const glm::dvec3 a(m.positions[t.x]), b(m.positions[t.y]), c(m.positions[t.z]);
+            const double d = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
+            if (d == 0.0) continue;
+            const double u = ((x - a.x) * (c.y - a.y) - (c.x - a.x) * (y - a.y)) / d;
+            const double v = ((b.x - a.x) * (y - a.y) - (x - a.x) * (b.y - a.y)) / d;
+            if (u < 0 || v < 0 || u + v > 1) continue;
+            zs.push_back(a.z + u * (b.z - a.z) + v * (c.z - a.z));
+        }
+        std::sort(zs.begin(), zs.end());
+    };
+    size_t bad = 0, odd = 0;
+    std::vector<double> za, zb;
+    for (int i = 0; i < n; ++i)
+        for (int j = 0; j < n; ++j) {
+            const double x = -1.3 + 2.6 * (i + 0.5137) / n, y = -1.3 + 2.6 * (j + 0.4719) / n;
+            insideColumn(x, y, za);
+            insideColumn(-x, y, zb);
+            odd += (za.size() % 2) + (zb.size() % 2);
+            for (int k = 0; k < n; ++k) {
+                const double z = -1.3 + 2.6 * (k + 0.5) / n;
+                auto in = [z](const std::vector<double>& zs) {
+                    return (std::upper_bound(zs.begin(), zs.end(), z) - zs.begin()) % 2 == 1;
+                };
+                bad += in(za) != in(zb);
+            }
+        }
+    return {bad, odd};
+}
+} // namespace
+
+// Discord (dm4nd): with symmetry on, a cut sometimes took one side only, and a cap sometimes failed to close. A mirror
+// image that overlaps the shape (a rectangle across the middle, a centred one seen at an angle) cut into the pocket
+// the first copy had made: In and Add measured their depth from there, and in the axis views the copies' walls fell
+// on each other, leaving zero-area triangles that cracked the next cut, which then dropped the mirror image silently.
+TEST(cut_symmetry_overlapping_mirror_images) {
+    const glm::mat4 front = glm::ortho(-1.5f, 1.5f, -1.5f, 1.5f, 0.1f, 100.0f) *
+                            glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0));
+    const glm::mat4 angled = glm::perspective(glm::radians(40.0f), 1.3f, 0.1f, 100.0f) *
+                             glm::lookAt(glm::vec3(0.7f, 0.9f, 4.0f), glm::vec3(0.0f), glm::vec3(0, 1, 0));
+    struct Shape {
+        const char* shape;
+        const char* points;
+        bool closed;
+    };
+    const Shape shapes[] = {{"rect", "-0.1 -0.2 0.4 0.2", false},
+                            {"lasso", "-0.1 -0.2 0.4 -0.15 0.35 0.25 -0.05 0.2", true},
+                            {"rect", "-0.2 -0.2 0.2 0.2", false}};
+    const glm::mat4 views[] = {front, angled};
+    for (int v = 0; v < 2; ++v)
+        for (const Shape& sh : shapes)
+            for (const char* mode : {"away", "in", "add", "clip"})
+                for (bool twice : {false, true}) {
+                    Document d = makeDoc(makeIcosphere(4));
+                    Args args = {{"view_proj", matrixString(views[v])}, {"closed", sh.closed}, {"depth", 0.1},
+                                 {"symmetry", std::string("x")}};
+                    CHECK(cut(d, sh.shape, sh.points, mode, args).ok);
+                    if (twice) { // a second cut across the first one's caps, from the other view
+                        args["view_proj"] = matrixString(views[1 - v]);
+                        CHECK(cut(d, "rect", "-0.15 -0.3 0.35 0.1", mode, args).ok);
+                    }
+                    const auto [mismatch, open] = mirrorMismatch(d.mesh, 24);
+                    CHECK(isWatertight(d.mesh));
+                    CHECK(open == 0);
+                    CHECK(mismatch <= 30); // (of 24^3 samples: the outline's own jitter)
+                }
+}
+
+// A mirror image that can't be cut cuts nothing at all, never one side only.
+TEST(cut_symmetry_all_or_nothing) {
+    Document d = makeDoc(makeIcosphere(4));
+    const size_t before = d.mesh.triangleCount();
+    // Upwards through the middle cuts the left half; its mirror image would take the right half: the whole Part.
+    const CommandResult r = cut(d, "line", "0.013 -2 0.013 2", "away", {{"symmetry", std::string("x")}});
+    CHECK(!r.ok);
+    CHECK(r.message.find("symmetry") != std::string::npos);
+    CHECK(d.mesh.triangleCount() == before);
 }

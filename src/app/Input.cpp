@@ -469,6 +469,13 @@ SDL_Keymod App::blenderMods(SDL_Keymod keyboard) const {
     // With Emulate 3 Button Mouse, Alt is the emulated middle button and means nothing here.
     SDL_Keymod out = keyboard & SDL_KMOD_SHIFT;
     const bool ctrl = (keyboard & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0;
+    // Ctrl+Shift stays itself: the visibility gestures, the Cut shapes and the selection brushes (Ctrl+Shift+B, the
+    // brush tile), as in every style; Alt with it hides inside / cuts the other side (Discord, dm4nd).
+    if (ctrl && (keyboard & SDL_KMOD_SHIFT)) {
+        out = SDL_Keymod(SDL_KMOD_LCTRL | SDL_KMOD_LSHIFT);
+        if ((keyboard & SDL_KMOD_ALT) && !uiPrefs_.emulate3Button) out = SDL_Keymod(out | SDL_KMOD_LALT);
+        return out;
+    }
     if ((keyboard & SDL_KMOD_ALT) && !uiPrefs_.emulate3Button) {
         out = SDL_KMOD_LCTRL; // the mask brush Ctrl (not with Shift: that would hide)
         if (ctrl) out = SDL_Keymod(out | SDL_KMOD_LALT); // ... unmasking Ctrl+Alt

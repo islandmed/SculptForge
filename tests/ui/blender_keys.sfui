@@ -227,6 +227,49 @@ mouse_move 0.5 0.3
 key shift+h
 expect_value hidden == 0
 
+# Ctrl+Shift keeps the visibility gestures and the Cut shapes (Discord, dm4nd: Ctrl was the invert, so Ctrl+Shift
+# smoothed inverted and nothing hid or cut): drag hides outside, Alt inside.
+hold ctrl+shift
+drag_path 0.4 0.2 0.6 0.4
+hold none
+wait 0.2
+expect_value hidden > 0
+key alt+h
+expect_value hidden == 0
+hold ctrl+shift+alt
+drag_path 0.4 0.2 0.6 0.4
+hold none
+wait 0.2
+expect_value hidden > 0
+key alt+h
+expect_value hidden == 0
+# The brush tile with Ctrl+Shift held offers the Cut shapes; Ctrl+Shift+drag cuts, one undo step.
+remember triangles t0
+hold ctrl+shift
+click "##tile.brush"
+wait 0.1
+expect "Cut Rectangle##held.cut.rect"
+click "Cut Rectangle##held.cut.rect"
+hold none
+expect_value hide_shape == 5
+hold ctrl+shift
+drag_path 0.38 0.36 0.62 0.6
+hold none
+wait 0.2
+expect_value triangles != $t0
+expect_value hidden == 0
+shot blender-cut
+key ctrl+z
+expect_value triangles == $t0
+# Ctrl+Shift+B: the same picker from the keyboard; back to Select Rectangle.
+hold ctrl+shift
+key ctrl+shift+b
+wait 0.1
+click "Select Rectangle##held.select.rect"
+hold none
+expect_value hide_shape == 2
+mouse_move 0.5 0.5                            # (back over the view: the keys below are the view's)
+
 # --- Alt+1 / Alt+2 step the subdivision levels; X swaps the colours; Shift+Z wireframe ---
 run subdiv_divide
 expect_value sdiv == 2
