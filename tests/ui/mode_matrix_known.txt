@@ -20,14 +20,6 @@ face.landmarks | Scale | task modes-landmarks-exit: Place Landmarks survives eve
 face.landmarks | a brush on the shelf | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
 face.landmarks | a palette action | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
 face.landmarks | undo | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
-forgesphere.new | Draw | task modes-forgesphere-exit: a new Forge Sphere Part has no way back to sculpting
-forgesphere.new | Esc | task modes-forgesphere-exit: a new Forge Sphere Part has no way back to sculpting
-forgesphere.new | Move | task modes-forgesphere-exit: a new Forge Sphere Part has no way back to sculpting
-forgesphere.new | Rotate | task modes-forgesphere-exit: a new Forge Sphere Part has no way back to sculpting
-forgesphere.new | Scale | task modes-forgesphere-exit: a new Forge Sphere Part has no way back to sculpting
-forgesphere.new | a brush on the shelf | task modes-forgesphere-exit: a new Forge Sphere Part has no way back to sculpting
-forgesphere.new | a palette action | task modes-forgesphere-exit: a new Forge Sphere Part has no way back to sculpting
-forgesphere.new | undo | task modes-forgesphere-exit: a new Forge Sphere Part has no way back to sculpting
 paint.line_gradient | Draw | task modes-gradient-exit: a brush or a tool leaves Line Gradient
 paint.line_gradient | Move | task modes-gradient-exit: a brush or a tool leaves Line Gradient
 paint.line_gradient | Rotate | task modes-gradient-exit: a brush or a tool leaves Line Gradient

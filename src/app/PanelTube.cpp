@@ -168,6 +168,15 @@ std::string App::leaveDrawModes() {
         partSelected("leaving Tube");
         if (left.empty()) left = "the Tube Part";
     }
+    // A Forge Sphere Part isn't sculpted either (until Make Mesh): back to the Part that was active before New Forge Sphere.
+    const int fromSpheres = forgesphereReturnPart_;
+    forgesphereReturnPart_ = -1;
+    if (forgesphereActive() && fromSpheres >= 0 && fromSpheres < doc_.partCount() && fromSpheres != doc_.activePart &&
+        doc_.partMesh(fromSpheres).forgespheres.empty() && doc_.partMesh(fromSpheres).tube.empty()) {
+        runCommand("part_select", {{"index", double(fromSpheres)}});
+        partSelected("leaving Forge Spheres");
+        left += left.empty() ? "the Forge Sphere Part" : " and the Forge Sphere Part";
+    }
     return left;
 }
 

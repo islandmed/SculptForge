@@ -1555,6 +1555,7 @@ private:
     bool tubeGrabsPoints(SDL_Keymod keys) const;            // a press on a dot edits it (Draw Tube on: Shift/Ctrl/Alt)
     bool tubeDraw_ = false;
     int tubeReturnPart_ = -1;      // the Part that was active before a press on a tube's point selected its Tube Part
+    int forgesphereReturnPart_ = -1; // the Part that was active before New Forge Sphere (a brush or Esc goes back to it)
     // Picking a brush or a tool (Draw / Move / Scale / Rotate), or Esc, leaves Draw Tube and Append > Insert; with a
     // Tube Part active (it can't be sculpted) it goes back to the Part before it. Returns what it left ("" if none).
     std::string leaveDrawModes();

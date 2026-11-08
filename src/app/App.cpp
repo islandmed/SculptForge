@@ -2209,6 +2209,10 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
         status_ = tube ? "Tube: Draw Tube off" : insert ? "Insert off" : "Edges mode off";
         return;
     }
+    if (key == SDLK_ESCAPE && forgesphereActive() && forgesphereReturnPart_ >= 0 && drag_ == Drag::None && !zsMenu_.open) {
+        leaveDrawModesStatus(); // a new Forge Sphere Part: back to the Part before it
+        return;
+    }
     if (captureShortcutKey(key, mod)) return; // Ctrl+Alt+click a button, then press its new key
     if (uvEditorKey(key, mod)) return;        // keys over the UV Editor's view (PanelUvEditor.cpp)
     if (garmentKey(key, mod)) return;         // keys over the Pattern window (PanelGarments.cpp)
