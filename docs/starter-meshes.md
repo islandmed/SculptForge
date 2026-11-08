@@ -17,9 +17,9 @@ licence and date. Never another app's assets or output, nothing scraped.
 | Full Body | MakeHuman hm08 base mesh | CC0 1.0 | The whole "body" group (helpers and joints dropped), A-pose |
 | Hand | MakeHuman hm08 base mesh | CC0 1.0 | The left hand past the wrist, stood up (fingers +Y, palm +Z) |
 | Foot | MakeHuman hm08 base mesh | CC0 1.0 | The left foot below 9 cm over the ankle |
-| Ear | MakeHuman hm08 base mesh | CC0 1.0 | The left ear and the skin round it, turned to face +Z |
+| Ear | MakeHuman hm08 base mesh | CC0 1.0 | The left ear and the skin round it (its rim relaxed into an even curve), turned to face +Z |
 | Stylised Head | MakeHuman hm08 base mesh | CC0 1.0 | The Human Head through a scripted space warp (cranium, eyes, nose, jaw) |
-| Torso | MakeHuman hm08 base mesh | CC0 1.0 | Neck to upper thighs, arms off at the shoulder |
+| Torso | MakeHuman hm08 base mesh | CC0 1.0 | Neck to upper thighs, arms cut near the top of the upper arm |
 | Eye | SculptForge (generated) | CC0 1.0 | Surface of revolution on cube topology with a cornea bulge |
 | Creature Head | SculptForge (generated) | CC0 1.0 | Box grids projected onto ellipsoids and warped (skull, jaw); revolved, bent horns |
 | Rounded Box, Cylinder, Capsule, Ring | SculptForge (generated) | CC0 1.0 | Rounded box from a box grid; revolved profiles on cube topology; a swept rounded rectangle |
@@ -35,9 +35,11 @@ the mesh is used; MakeHuman's AGPL code is not. Credited in THIRD_PARTY_NOTICES.
 
 Centimetres, Y up, looking down +Z, the character's left is +X. Centred on X and Z (Hand, Foot and Ear too, though
 they are one-sided, not symmetric), lowest point at Y = 0. All quads; edge-manifold; closed except where a
-piece was cut from the body. The symmetric meshes are exactly mirror-symmetric (MakeHuman's mesh is; the generated
-ones are built symmetric). `tests/test_starter_meshes.cpp` checks all of this for every mesh, and
-`tests/ui/starter_meshes.sfui` opens one from the Library.
+piece was cut from the body. A cut follows one of the base mesh's edge loops where one runs near it (neck, arms,
+thighs, wrist), so its open rim is a clean ring with no step for subdivision to pull into a spike. The symmetric
+meshes are exactly mirror-symmetric (MakeHuman's mesh is; the generated ones are built symmetric).
+`tests/test_starter_meshes.cpp` checks all of this for every mesh (the rims at the cage and the opening level),
+and `tests/ui/starter_meshes.sfui` opens one from the Library.
 
 ## Rebuilding
 

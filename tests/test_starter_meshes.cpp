@@ -3,7 +3,8 @@
 //
 // Starter meshes (core/StarterMeshes.h): every one unpacks and loads, is all quads, edge-manifold (closed where
 // it should be), mirror-symmetric where it should be, centred and standing on the ground at a life-like size;
-// the set stays inside its size budget; new_starter_mesh adds the subdivision levels and leaves no path.
+// the set stays inside its size budget; new_starter_mesh adds the subdivision levels and leaves no path; every
+// open rim is a clean, even edge loop at every level (no corner or spike sticking out of it).
 #include "TestHarness.h"
 
 #include "core/Commands.h"
@@ -11,12 +12,14 @@
 #include "core/Project.h"
 #include "core/StarterMeshes.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <map>
 #include <set>
 #include <tuple>
+#include <vector>
 
 using namespace sf;
 
@@ -28,6 +31,65 @@ Document load(const StarterMesh& m, int levels) {
     CHECK(loadStarterMesh(m, d, levels, error));
     if (!error.empty()) std::printf("  %s: %s\n", m.id, error.c_str());
     return d;
+}
+
+// The open rims of `mesh` as vertex loops (each in the order its triangles walk it).
+std::vector<std::vector<uint32_t>> openRims(const Mesh& mesh) {
+    std::map<std::pair<uint32_t, uint32_t>, int> count;
+    for (const glm::uvec3& t : mesh.triangles)
+        for (int k = 0; k < 3; ++k) ++count[{std::min(t[k], t[(k + 1) % 3]), std::max(t[k], t[(k + 1) % 3])}];
+    std::map<uint32_t, uint32_t> next;
+    for (const glm::uvec3& t : mesh.triangles)
+        for (int k = 0; k < 3; ++k) {
+            const uint32_t a = t[k], b = t[(k + 1) % 3];
+            if (count[{std::min(a, b), std::max(a, b)}] == 1) next[a] = b;
+        }
+    std::vector<std::vector<uint32_t>> rims;
+    std::set<uint32_t> done;
+    for (const auto& [start, unused] : next) {
+        if (done.count(start)) continue;
+        std::vector<uint32_t> rim;
+        for (uint32_t v = start; !done.count(v) && next.count(v); v = next[v]) {
+            done.insert(v);
+            rim.push_back(v);
+        }
+        rims.push_back(rim);
+    }
+    return rims;
+}
+
+// A cut that steps between rings of the base mesh leaves corners on the rim that subdivision pulls into spikes
+// (the Human Head's neck, 0.11.16). Sampled `stride` vertices apart (one cage edge at any level), every rim
+// vertex turns by less than 70 degrees (the interior angle is over 110) and sits within 0.15 of the rim's
+// radius of its neighbours' mean height over the rim's plane. Returns the rims that fail.
+int spikyRims(const Mesh& mesh, int stride, const char* id, int level) {
+    int bad = 0;
+    for (const std::vector<uint32_t>& rim : openRims(mesh)) {
+        const int n = int(rim.size());
+        if (n < 3 * stride) continue;
+        auto at = [&](int i) { return mesh.positions[rim[size_t(((i % n) + n) % n)]]; };
+        glm::vec3 centre(0.0f), normal(0.0f);
+        for (int i = 0; i < n; ++i) centre += at(i) / float(n);
+        for (int i = 0; i < n; ++i) normal += glm::cross(at(i) - centre, at(i + 1) - centre); // Newell
+        normal = glm::normalize(normal);
+        float radius = 0.0f;
+        for (int i = 0; i < n; ++i) radius += glm::length(at(i) - centre) / float(n);
+        float minAngle = 180.0f, maxSpike = 0.0f;
+        for (int i = 0; i < n; ++i) {
+            const glm::vec3 p = at(i), a = at(i - stride), b = at(i + stride);
+            const float c = glm::dot(glm::normalize(a - p), glm::normalize(b - p));
+            minAngle = std::min(minAngle, glm::degrees(std::acos(std::clamp(c, -1.0f, 1.0f))));
+            const float h = glm::dot(p - centre, normal);
+            const float around = 0.5f * (glm::dot(a - centre, normal) + glm::dot(b - centre, normal));
+            maxSpike = std::max(maxSpike, std::abs(h - around) / radius);
+        }
+        if (minAngle < 110.0f || maxSpike > 0.15f) {
+            std::printf("  %s level %d: a %d-vertex rim turns to %.0f degrees, spike %.3f of its radius\n", id, level,
+                        n, minAngle, maxSpike);
+            ++bad;
+        }
+    }
+    return bad;
 }
 
 } // namespace
@@ -110,6 +172,16 @@ TEST(starter_meshes_topology_symmetry_and_placement) {
         const float longest = std::max({size.x, size.y, size.z});
         CHECK(longest > 2.0f && longest < 200.0f);
         CHECK(d.path.empty());
+    }
+}
+
+TEST(starter_meshes_clean_rims) {
+    for (const StarterMesh& m : starterMeshes()) {
+        if (m.closed) continue;
+        for (int level : {0, m.levels}) {
+            Document d = load(m, level);
+            for (int i = 0; i < int(d.parts.size()); ++i) CHECK(spikyRims(d.partMesh(i), 1 << level, m.id, level) == 0);
+        }
     }
 }
 
