@@ -55,6 +55,19 @@
     .stage .thanks { background: rgba(242, 140, 60, 0.12); border: 1px solid rgba(242, 140, 60, 0.4); border-radius: 12px;
                      padding: 12px 16px; color: #f2e6da; }
 
+    .thanks-view { padding: 64px 0 80px; }
+    .thanks-view .copy { max-width: 760px; }
+    .thanks-view .mission p { color: var(--muted); font-size: 1.05rem; line-height: 1.7; }
+    .thanks-view .mission .big { color: #d4d4dc; font-size: 1.2rem; }
+    .next-step { margin: 32px 0; padding: clamp(20px, 4vw, 32px); border: 1px solid rgba(242, 140, 60, 0.5); border-radius: 16px;
+                 background: rgba(242, 140, 60, 0.09); }
+    .next-step h2 { font-size: 1.4rem; margin-bottom: 12px; }
+    .next-step ol { margin: 0 0 12px; padding-left: 1.3em; }
+    .next-step li { margin-bottom: 8px; }
+    .next-step pre { margin: 0 0 12px; padding: 12px 16px; background: #24242b; border-radius: 10px; overflow-x: auto; font: 0.95rem/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .next-step p { margin: 0 0 10px; }
+    .thanks-links { display: flex; flex-wrap: wrap; gap: 12px; }
+
     .tiers-wrap { position: relative; z-index: 1; margin-top: -170px; padding-bottom: 24px; }
     .tiers { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; align-items: stretch; max-width: 860px; margin: 0 auto; }
     .tier { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 28px 26px 26px; border-radius: 18px;
@@ -189,14 +202,41 @@
   </header>
 
   <main id="top">
+    <section class="thanks-view" id="thanks-view" aria-labelledby="thanks-title" hidden>
+      <div class="wrap copy">
+        <p class="eyebrow">Membership</p>
+        <h1 id="thanks-title">Thank you. You just helped change how this gets built.</h1>
+        <div class="mission">
+          <p class="big">SculptForge was born because I work with artists every day and hear how much this AI moment worries them. I had to do something.</p>
+          <p>We're here to change how software is built: we build the orchestration layer, and our agents build the software, openly, with the people who use it, shipped every few days. And no machine will ever replace your genius, your talent and your taste: that stays yours, and it's exactly what we want to protect.</p>
+        </div>
+        <div class="next-step">
+          <h2>Next step: tell us who you are</h2>
+          <ol>
+            <li>Check your inbox for the welcome email from <strong data-mail-text>our address</strong> (look in spam too).</li>
+            <li>Reply from the <strong>same address</strong> you paid with, with these lines:</li>
+          </ol>
+          <pre>Discord: your-username
+GitHub: your-username
+Credit: the name for the credits</pre>
+          <p>This unlocks your Discord roles and the Insiders builds. No Discord? Skip that line and email your requests instead. The Credit line is the name we put in the credits.</p>
+          <p class="fine">The invite to the members' build repository goes out within a couple of days of your reply.</p>
+        </div>
+        <div class="thanks-links">
+          <a class="btn primary" href="https://discord.gg/gWrYkEmQhH">Join the Discord</a>
+          <a class="btn" href="queue.html">Feature queue</a>
+          <a class="btn" href="#requests">How requests work</a>
+          <a class="btn" href="why.html">Why we build this</a>
+        </div>
+      </div>
+    </section>
+
     <section class="stage" aria-labelledby="support-title">
       <div class="stage-art" aria-hidden="true"></div>
       <div class="wrap">
         <div class="stage-copy">
           <p class="eyebrow">SculptForge Membership</p>
           <h1 id="support-title">Membership: <span class="accent">more for the artists who use it.</span></h1>
-          <p class="thanks" id="thanks" hidden><strong>Welcome aboard!</strong> Your membership is active. Check your
-            email for the receipt; the invite to the members' build repository goes out within a couple of days.</p>
           <p class="lede">SculptForge itself stays free, with no ads, no accounts and no telemetry, and nothing in the
             app is ever paywalled. Members get the next version first, a say in what gets built, their requests
             built first, and their name in the credits.</p>
@@ -348,7 +388,14 @@
     </div>
   </footer>
   <script>
-    if (new URLSearchParams(location.search).has('thanks')) document.getElementById('thanks').hidden = false;
+    // After paying (?thanks=1): the post-payment page replaces the pitch. The address is assembled here, never in the source (spam scrapers).
+    if (new URLSearchParams(location.search).has('thanks')) {
+      const v = document.getElementById('thanks-view'), addr = 'hello' + '@' + 'sculptforge.app';
+      document.querySelectorAll('main > section').forEach((el) => { if (el !== v && el.id !== 'requests') el.hidden = true; });
+      v.hidden = false;
+      document.querySelectorAll('[data-mail-text]').forEach((el) => { el.textContent = addr; });
+      document.title = 'Thank you - SculptForge';
+    }
     // Monthly or yearly: the Member card's price and checkout. Shown only once the yearly checkout exists (data-yearly).
     (() => {
       const link = document.querySelector('[data-member-link]'), billing = document.getElementById('billing');
