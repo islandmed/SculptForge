@@ -756,6 +756,7 @@ void App::initActions() {
                 paintMode_ = false;
                 guidesMode_ = false; // leaves the QRemesh Guides brush
                 maskBrush_.on = false;
+                leaveDrawModesStatus(); // and Draw Tube / Append > Insert
             },
             ICON_LC_BRUSH, nullptr, [this, type] { return brush_ == type && doc_.activeBrush < 0 && !paintMode_ && !guidesMode_; }, nullptr,
             (std::string("Sculpt with the ") + brushLabel(type) + " brush.").c_str());

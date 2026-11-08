@@ -55,7 +55,7 @@ void App::registerTubeUiActions() {
     add("tube.draw", "Draw Tube",
         [this] {
             tubeDraw_ = !tubeDraw_;
-            status_ = tubeDraw_ ? "Tube: drag anywhere to draw a tube in the air (Alt+drag moves the view)"
+            status_ = tubeDraw_ ? "Tube: drag anywhere to draw. Esc or a brush leaves it" // (short: the top bar)
                                 : "Tube: Draw Tube off";
         },
         nullptr, [this] { return tubeDraw_; },
@@ -110,6 +110,35 @@ void App::registerTubeUiActions() {
         "Make the active Tube Part a plain mesh to sculpt. Its points can't be edited after this (undo brings them "
         "back).",
         "tube_bake");
+}
+
+// Draw Tube and Append > Insert take every left drag in the view, so picking a brush or a tool, or Esc, leaves them
+// (GABO on Discord: "after entering the append mode or tube I cant use the other tools anymore").
+std::string App::leaveDrawModes() {
+    std::string left;
+    if (tubeDraw_) {
+        tubeDraw_ = false;
+        left = "Draw Tube";
+    }
+    if (!insertType_.empty()) {
+        insertType_.clear();
+        left += left.empty() ? "Insert" : " and Insert";
+    }
+    const int back = tubeReturnPart_;
+    tubeReturnPart_ = -1;
+    if (tubeActive() && back >= 0 && back < doc_.partCount() && back != doc_.activePart &&
+        doc_.partMesh(back).tube.empty()) { // a Tube Part isn't sculpted: back to the Part before it
+        runCommand("part_select", {{"index", double(back)}});
+        partSelected("leaving Tube");
+        if (left.empty()) left = "the Tube Part";
+    }
+    return left;
+}
+
+std::string App::leaveDrawModesStatus() {
+    std::string left = leaveDrawModes();
+    if (!left.empty()) status_ = "Left " + left + ": brushes sculpt again";
+    return left;
 }
 
 void App::drawTubeContents() {
@@ -217,6 +246,7 @@ bool App::tubeMouseDown(float x, float y, SDL_Keymod mod) {
     TubeDrag& d = tubeDrag_;
     if (point >= 0) {
         if (part != doc_.activePart) {
+            if (!tubeActive()) tubeReturnPart_ = doc_.activePart; // a brush or Esc goes back to it
             runCommand("part_select", {{"index", double(part)}});
             partSelected("tube point");
         }
@@ -273,7 +303,8 @@ bool App::tubeMouseDown(float x, float y, SDL_Keymod mod) {
     if (tubeActive()) { // a Tube Part isn't sculpted until it is baked
         RayHit hit;
         if (!pick(x, y, hit)) return false; // the background navigates
-        status_ = "Tube: drag a point to move it (Ctrl: thickness, Alt+click: delete); Bake to sculpt this Part";
+        status_ = "Tube: drag a point to move it (Ctrl: thickness, Alt+click: delete); Bake to sculpt this Part, or "
+                  "pick a brush to sculpt the Part before it";
         return true;
     }
     return false;
