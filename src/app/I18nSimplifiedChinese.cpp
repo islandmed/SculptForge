@@ -4781,6 +4781,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"How much a light touch of the pen thins the tube. 0: the same thickness all along.",
      "笔的轻触让管子变细的程度。0：整条粗细相同。"},
     {"How much the stroke's wobble is smoothed out before the tube is made.", "生成管子之前，笔画的抖动被平滑掉的程度。"},
+    {"The selected point's radius. Drag, or type a number and press Enter. One undo step.",
+     "选中的点的半径。拖动，或输入数值并按 Enter。一个撤销步骤。"},
     {"How thick new tubes are, as a radius on screen at the depth you draw at.", "新管子的粗细：在你绘制的深度上，屏幕上的半径。"},
     {"Make the active Tube Part a plain mesh to sculpt. Its points can't be edited after this (undo brings them back).",
      "把当前的 Tube 部件变成普通网格以便雕刻。之后不能再编辑它的点（撤销可以恢复）。"},

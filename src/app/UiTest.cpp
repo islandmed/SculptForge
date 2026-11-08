@@ -299,6 +299,7 @@
 //   wheel U V STEPS          the mouse wheel over the model point U V, STEPS notches (positive zooms in)
 //   mouse_move U V           a plain mouse (not the pen) moves to a point on the model, e.g. the stray mouse
 //                            events Windows Ink sends beside the pen's
+//   mouse_move X Y window    ... to X, Y as fractions of the window (as drag's), wherever the model is
 //
 // Touch (Touch.cpp): fingers as SDL sends them, each step a frame.
 //   touch_pinch U V SCALE TWIST DX DY [trackpad] [late]   two fingers about a point on the model, 120 px apart, over
@@ -709,6 +710,11 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "tube_draw") return app_.tubeDraw_ ? 1.0 : 0.0;
     if (name == "insert_mode") return app_.insertType_.empty() ? 0.0 : 1.0; // Append > Insert on the model waits for a drag
     if (name == "tube_selected") return double(app_.tubeSelection());
+    if (name == "tube_size") return double(app_.tubeSizePx_); // Draw Tube's Size (px)
+    if (name == "tube_selected_radius_x1000") { // the selected point's stored radius
+        const int sel = app_.tubeSelection();
+        return sel < 0 ? -1.0 : 1000.0 * m.tube.points[size_t(sel)].radius;
+    }
     if (name == "tube_first_radius_x1000" || name == "tube_last_radius_x1000") // the active Tube Part's ends
         return m.tube.empty() ? -1.0 : 1000.0 * (name[5] == 'f' ? m.tube.points.front() : m.tube.points.back()).radius;
     if (name == "tube_profile") return double(int(m.tube.profile)); // 0 round, 1 square, 2 triangle, 3 ribbon
@@ -3123,8 +3129,10 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         wait(0.1f);
     } else if (verb == "mouse_move") {
         if (!need(2)) return false;
-        run([this, u = num(1, 0.5f), v = num(2, 0.5f)] {
-            const ImVec2 p = onModel(u, v);
+        run([this, u = num(1, 0.5f), v = num(2, 0.5f), window = w.size() > 3 && w[3] == "window"] {
+            int ww = 0, wh = 0;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            const ImVec2 p = window ? ImVec2(u * float(ww), v * float(wh)) : onModel(u, v); // (window: as drag's)
             mouseMotion(p.x, p.y);
         });
         wait(0.05f);

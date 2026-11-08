@@ -113,6 +113,10 @@ struct State {
     int sliderFrame = -1;
     std::string sliderTyped;
     bool sliderWasActive = false;
+    int sliderTube = 0;            // PickerUi::TubeTarget: Size (S) sets Draw Tube's Size or a tube point's Radius
+    float sliderTubeR = 0.0f;      // (the point's radius being set, and what it was)
+    float sliderTubeStored = 0.0f;
+    int sliderTubePoint = -1;
     // Recently used brushes (ids, newest first).
     std::vector<std::string> recent;
     std::string lastActive;
@@ -1260,6 +1264,24 @@ void PickerUi::sizePopup(App& app, Slider which) {
     s.sliderFrame = ImGui::GetFrameCount();
     s.sliderTyped.clear();
     s.sliderWasActive = false;
+    // Size with a tube point selected sets its Radius; with Draw Tube on, the tube's Size (GABO on Discord).
+    s.sliderTube = TubeNone;
+    if (which == Slider::DrawSize && app.tubeActive() && app.tubeSelection() >= 0) {
+        s.sliderTube = TubePointRadius;
+        s.sliderTubePoint = app.tubeSelection();
+        s.sliderTubeStored = s.sliderTubeR = app.doc_.mesh.tube.points[size_t(s.sliderTubePoint)].radius;
+        app.tubeRadiusEdit_ = s.sliderTubeR;
+        app.tubeRadiusEditPoint_ = s.sliderTubePoint;
+    } else if (which == Slider::DrawSize && app.tubeDraw_) {
+        s.sliderTube = TubeSize;
+    }
+}
+
+int PickerUi::tubeSlider(ImVec2& at) {
+    const State& s = st();
+    if (s.slider != int(Slider::DrawSize)) return TubeNone;
+    at = s.sliderAt;
+    return s.sliderTube;
 }
 
 void drawPickers(App& app) {
@@ -1370,7 +1392,15 @@ void drawPickers(App& app) {
         };
         float* z = &app.intensityValue(s.sliderSmooth); // (in Paint mode the Colour intensity, #164)
         const bool paintZ = app.paintMode_ && !s.sliderSmooth;
-        const Def d = which == PickerUi::Slider::DrawSize
+        const int tube = which == PickerUi::Slider::DrawSize ? s.sliderTube : int(PickerUi::TubeNone);
+        const Def d = tube == PickerUi::TubeSize
+                          ? Def{"Size", "S", "How thick new tubes are, as a radius on screen at the depth you draw at.",
+                                &app.tubeSizePx_, App::kTubeSizeMinPx, App::kTubeSizeMaxPx, 1.0f}
+                      : tube == PickerUi::TubePointRadius
+                          ? Def{"Radius", "S",
+                                "The selected point's radius. Drag, or type a number and press Enter. One undo step.",
+                                &s.sliderTubeR, s.sliderTubeStored * 0.25f, s.sliderTubeStored * 4.0f, 1.0f}
+                      : which == PickerUi::Slider::DrawSize
                           ? Def{"Size", "S",
                                 "Brush radius in screen pixels. Drag, or type a number and press Enter. [ and ] also "
                                 "change it.",
@@ -1428,6 +1458,7 @@ void drawPickers(App& app) {
                         else if (which == PickerUi::Slider::FocalShift)
                             v /= 100.0f;
                         *d.value = std::clamp(v, d.lo, d.hi);
+                        if (tube == PickerUi::TubePointRadius) app.tubeRadiusEdit_ = s.sliderTubeR;
                     }
                     close = true;
                 }
@@ -1437,12 +1468,17 @@ void drawPickers(App& app) {
             char fmt[64];
             if (!s.sliderTyped.empty())
                 std::snprintf(fmt, sizeof fmt, "%s %s_", d.name, s.sliderTyped.c_str());
+            else if (tube == PickerUi::TubeSize)
+                std::snprintf(fmt, sizeof fmt, "%s", tr("Size %.0f"));
+            else if (tube == PickerUi::TubePointRadius)
+                std::snprintf(fmt, sizeof fmt, "%s", tr("Radius %.4g"));
             else if (which == PickerUi::Slider::DrawSize)
                 std::snprintf(fmt, sizeof fmt, "%s", app.drawSizeLabel().c_str()); // (px and mm, Precision.cpp)
             else
                 std::snprintf(fmt, sizeof fmt, "%s %%.0f", d.name);
-            if (which == PickerUi::Slider::DrawSize) {
+            if (which == PickerUi::Slider::DrawSize) { // (Size is logarithmic, the tube's too)
                 ImGui::SliderFloat("##cursorvalue", d.value, d.lo, d.hi, fmt, ImGuiSliderFlags_Logarithmic);
+                if (tube == PickerUi::TubePointRadius) app.tubeRadiusEdit_ = s.sliderTubeR;
             } else {
                 float shown = *d.value * d.shownScale;
                 if (ImGui::SliderFloat("##cursorvalue", &shown, d.lo * d.shownScale, d.hi * d.shownScale, fmt))
@@ -1480,13 +1516,23 @@ void drawPickers(App& app) {
         ImGui::End();
         ImGui::PopStyleColor();
         ImGui::PopStyleVar(2);
-        if (close) s.slider = -1;
+        if (close) {
+            s.slider = -1;
+            // A tube point's Radius: one undo step, as the panel's Radius slider gives.
+            if (tube == PickerUi::TubePointRadius) {
+                if (s.sliderTubeR != s.sliderTubeStored && app.tubeSelection() == s.sliderTubePoint)
+                    app.runCommand("tube_set_point", {{"index", double(s.sliderTubePoint)}, {"radius", double(s.sliderTubeR)}});
+                app.tubeRadiusEdit_ = -1.0f;
+            }
+            s.sliderTube = PickerUi::TubeNone;
+        }
     }
 }
 
 bool PickerUi::sliderPreview(const App& app, ImVec2& at, Slider& which, float& value) {
     const State& s = st();
     if (s.slider != int(Slider::DrawSize) && s.slider != int(Slider::FocalShift)) return false;
+    if (s.slider == int(Slider::DrawSize) && s.sliderTube != TubeNone) return false; // (Tube's ring, drawTubeOverlay)
     which = Slider(s.slider);
     at = s.sliderAt;
     value = which == Slider::DrawSize ? app.radiusPx_ : app.focalShift_;

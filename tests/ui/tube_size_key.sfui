@@ -1,0 +1,64 @@
+# Size (S) on a tube (requested by GABO on Discord): with Draw Tube on, S sets the tube's Size (a ring where it opened),
+# not the brush's; with a Tube Part's point selected, it sets that point's Radius (a ring around the point), one undo
+# step when it closes.
+run ui_look look=classic layout=classic
+wait 0.3
+click "Tube##tool.tube"
+click "Tube/Draw Tube"
+expect_value tube_draw == 1
+
+# Draw Tube on: S drags the tube's Size; the brush Size stays.
+remember draw_size b0
+remember tube_size t0
+mouse_move 0.5 0.5
+key s
+expect_value size_popup_open == 1
+drag_path 0.5 0.5 0.6 0.5 keep
+shot size
+release
+expect_value size_popup_open == 0
+expect_value tube_size > $t0
+expect_value draw_size == $b0
+
+# A typed number sets it too.
+mouse_move 0.5 0.5
+key s
+key 3
+key 0
+key enter
+expect_value size_popup_open == 0
+expect_value tube_size == 30
+
+# A tube, then a point of it selected (Shift grabs a dot with Draw Tube on).
+drag_path 0.3 0.4 0.55 0.2 0.8 0.45 1.05 0.25 1.3 0.5 keep S=1.2
+release
+wait 0.2
+expect_value tube_parts == 1
+hold shift
+drag_tube_point 2 0 -40
+hold none
+expect_value tube_selected == 2
+
+# S now sets the selected point's Radius (the tube's Size stays), one undo step.
+remember tube_selected_radius_x1000 r0
+remember tube_size t1
+mouse_move 0.45 0.75 window                  # (window coordinates: the active Part is now the Tube Part)
+key s
+expect_value size_popup_open == 1
+shot radius-open
+drag 0.45 0.75 0.5 0.75 0.4
+expect_value size_popup_open == 0
+expect_value tube_selected_radius_x1000 > $r0
+expect_value tube_size == $t1
+expect_value draw_size == $b0
+shot radius-done
+expect_value tube_parts == 1
+key ctrl+z
+expect_value tube_selected_radius_x1000 == $r0
+
+# Esc without a change leaves it (no undo step).
+mouse_move 0.45 0.75 window
+key s
+key escape
+expect_value size_popup_open == 0
+expect_value tube_selected_radius_x1000 == $r0

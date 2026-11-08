@@ -5264,6 +5264,8 @@ constexpr Entry kSpanish[] = {
      "Cuánto adelgaza el tubo un toque ligero del lápiz. 0: el mismo grosor en toda su longitud."},
     {"How much the stroke's wobble is smoothed out before the tube is made.",
      "Cuánto se suaviza el temblor del trazo antes de crear el tubo."},
+    {"The selected point's radius. Drag, or type a number and press Enter. One undo step.",
+     "El radio del punto seleccionado. Arrastra, o escribe un número y pulsa Intro. Un solo paso de deshacer."},
     {"How thick new tubes are, as a radius on screen at the depth you draw at.",
      "El grosor de los tubos nuevos, como radio en pantalla a la profundidad en que dibujas."},
     {"Make the active Tube Part a plain mesh to sculpt. Its points can't be edited after this (undo brings them back).",

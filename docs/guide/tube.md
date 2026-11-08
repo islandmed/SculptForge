@@ -24,7 +24,7 @@ will be. Press **Draw Tube** again, <kbd>Esc</kbd>, any brush, or **Draw** / **M
 
 | Setting | What it does |
 |---|---|
-| **Size** | How thick new tubes are: their radius on screen at the depth you draw at |
+| **Size** | How thick new tubes are: their radius on screen at the depth you draw at. With **Draw Tube** on, <kbd>S</kbd> sets it at the cursor (a ring shows it), as it sets a brush's size |
 | **Pressure** | How much a light touch of the pen thins the tube (0: the same thickness all along). A mouse draws at full size |
 | **Smoothing** | How much of the stroke's wobble is smoothed out before the tube is made |
 | **Point spacing** | How far apart the tube's points are, in tube radii. Higher: fewer points, easier to edit. Lower: the tube follows the stroke more closely |
@@ -72,7 +72,8 @@ Part show, but a plain drag always draws a new tube, even over a dot: hold <kbd>
 - **Drag** a dot to move it across the screen (<kbd>Shift</kbd>+drag while Draw Tube is on); the tube follows as you drag.
 - <kbd>Ctrl</kbd>+drag a dot up or right to make the tube thicker there, down or left to make it thinner.
 - <kbd>Alt</kbd>+click a dot to delete it.
-- The dot you last dragged is selected (orange): **Radius** sets its thickness exactly, **Insert Point** adds a
+- The dot you last dragged is selected (orange): **Radius** sets its thickness exactly (or press <kbd>S</kbd> and drag:
+  a ring around the dot shows it, one undo step), **Insert Point** adds a
   point halfway to the next one, **Delete Point** removes it.
 - **Rounded** and **Flat** change the ends of the selected tube.
 - **Simplify** takes out about a third of the points, the ones the curve needs least (the ends stay). Press it

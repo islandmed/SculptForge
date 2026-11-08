@@ -1014,6 +1014,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     if(TEST ui_tier_card_click)
       set_tests_properties(ui_tier_card_click PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1;SF_NO_CALIBRATION=1;SF_HW_SIMULATE=high")
     endif()
+    # Size (S) on a tube: the rings at 100 % and 200 % (tests/ui/tube_size_key.sfui).
+    sculptforge_ui_test(tube_size_key_1440 tube_size_key --size 1440x900)
+    sculptforge_ui_test(tube_size_key_2880 tube_size_key --size 2880x1800)
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     # Studio mode: About shows the studio (tests/data/studio; core/StudioProfile.h).
     sculptforge_ui_test(studio_mode studio/studio_mode --studio ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/studio/studio.json)

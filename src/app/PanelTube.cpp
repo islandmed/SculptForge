@@ -14,6 +14,7 @@
 #include "app/App.h"
 #include "app/Demo.h"
 #include "app/Palettes.h"
+#include "app/Pickers.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
 
@@ -205,8 +206,8 @@ void App::drawTubeContents() {
     ui::ActionButton(*this, "tube.draw", ImVec2(full, 0));
     tray::GroupLabel(*this, "Stroke");
     ImGui::SetNextItemWidth(full);
-    ui::SliderInside("##tubesize", &tubeSizePx_, 2.0f, 120.0f, tr("Size %.0f"));
-    ui::HelpText("Size", nullptr, "How thick new tubes are, as a radius on screen at the depth you draw at.", kTubePath);
+    ui::SliderInside("##tubesize", &tubeSizePx_, kTubeSizeMinPx, kTubeSizeMaxPx, tr("Size %.0f"));
+    ui::HelpText("Size", "S", "How thick new tubes are, as a radius on screen at the depth you draw at.", kTubePath);
     ImGui::SetNextItemWidth(full);
     ui::SliderInside("##tubepressure", &tubePressure_, 0.0f, 1.0f, tr("Pressure %.2f"));
     ui::HelpText("Pressure", nullptr, "How much a light touch of the pen thins the tube. 0: the same thickness all along.",
@@ -569,6 +570,18 @@ void App::drawTubeOverlay() {
     // Draw Tube's cursor: how thick the tube will be.
     if (tubeDraw_ && hoverOk && hover < 0)
         dl->AddCircle(ImVec2(mouseX_, mouseY_), tubeSizePx_, theme::u32(theme::accent), 32, 1.5f * s);
+    // Size (S) on a tube: the ring where it opened (the tube's Size), or around the selected point (its Radius).
+    ImVec2 opened;
+    const int sizing = PickerUi::tubeSlider(opened);
+    if (sizing == PickerUi::TubeSize) {
+        dl->AddCircle(opened, tubeSizePx_, theme::u32(theme::accent), 48, 1.5f * s);
+    } else if (const int sel = tubeSelection(); sizing == PickerUi::TubePointRadius && sel >= 0 && tubeRadiusEdit_ > 0.0f) {
+        const glm::vec3 at = doc_.mesh.tube.points[size_t(sel)].position;
+        const float wpp = worldPerPixel(at);
+        ImVec2 p;
+        if (wpp > 0.0f && gizmoProject(at, p))
+            dl->AddCircle(p, tubeRadiusEdit_ / wpp, theme::u32(theme::accent), 48, 1.5f * s);
+    }
     dl->PopClipRect();
 }
 

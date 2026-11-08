@@ -1572,6 +1572,7 @@ private:
     TubeDepth tubeDepth_ = TubeDepth::Surface;
     float tubeFixedDepth_ = 0.0f;  // Fixed: distance from the camera (0 = take the pivot's on first use)
     float tubeSizePx_ = 14.0f;     // tube radius on screen at the drawing depth
+    static constexpr float kTubeSizeMinPx = 2.0f, kTubeSizeMaxPx = 120.0f; // (its slider and S)
     float tubePressure_ = 0.7f;    // how much pen pressure thins the tube (0 = none)
     float tubeSmoothing_ = 0.5f;
     bool tubeSnap_ = true;         // points over a surface sit on it (and the plane follows them)

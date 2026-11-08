@@ -66,6 +66,10 @@ struct PickerUi {
     // While Size (S) or Falloff (O) is open (#138): where it opened (window coordinates), which, and the value it is
     // setting: the number being typed (not applied before Enter), else the current one. False otherwise.
     static bool sliderPreview(const App& app, ImVec2& at, Slider& which, float& value);
+    // Size (S) with Draw Tube on sets the tube's Size; with a Tube Part's point selected, that point's Radius (one
+    // undo step when it closes). Which one is open (0: neither, 1: Size, 2: point Radius) and where it opened.
+    enum TubeTarget { TubeNone, TubeSize, TubePointRadius };
+    static int tubeSlider(ImVec2& at);
 };
 
 // The sort menu of an asset list: a small "A-Z v" button that opens A-Z, Recent and (with `packs`) Pack. `pref`

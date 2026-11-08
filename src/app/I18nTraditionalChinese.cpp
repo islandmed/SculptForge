@@ -4779,6 +4779,8 @@ constexpr Entry kTraditionalChinese[] = {
     {"How much a light touch of the pen thins the tube. 0: the same thickness all along.",
      "筆的輕觸讓管子變細的程度。0：整條粗細相同。"},
     {"How much the stroke's wobble is smoothed out before the tube is made.", "產生管子之前，筆畫的抖動被平滑掉的程度。"},
+    {"The selected point's radius. Drag, or type a number and press Enter. One undo step.",
+     "選取的點的半徑。拖曳，或輸入數值並按 Enter。一個復原步驟。"},
     {"How thick new tubes are, as a radius on screen at the depth you draw at.", "新管子的粗細：在你繪製的深度上，螢幕上的半徑。"},
     {"Make the active Tube Part a plain mesh to sculpt. Its points can't be edited after this (undo brings them back).",
      "把作用中的 Tube 部件變成一般網格以便雕刻。之後不能再編輯它的點（復原可以找回）。"},
