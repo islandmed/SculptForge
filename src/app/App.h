@@ -2045,9 +2045,11 @@ private:
     size_t weldCount_ = 0;
     std::vector<glm::vec3> weldPoints_; // a sample (<= 20000) of the points that would merge, for the preview
     MeshReport meshReport_;
+    std::string meshFixLeft_; // what the last Fix couldn't do, and why (its status after "Left: "); cleared by a check
     uint64_t meshReportKey_ = 0; // 0 = not checked yet
     int meshReportScroll_ = 0; // frames left to scroll down to Find Problems (after Merge) or a new report's rows (below the fold)
     void runMeshCheck();
+    void runMeshFix(const std::string& issue); // mesh_fix, then a check; keeps what was left (meshFixLeft_)
     void runExtract(); // Extract with the palette's settings (a preview; Accept keeps it)
     static std::string axesText(const bool axes[3]); // "x", "xz", "" (the axis argument of mirror commands)
     float extractThick_ = 0.015f;          // Thickness: fraction of the Part's size
