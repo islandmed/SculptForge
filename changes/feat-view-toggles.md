@@ -6,10 +6,10 @@ whats_new: **Live brush ring on the Size slider**: dragging **Size** shows the b
 highlight: One-click Turntable, Ortho, Floor and Flat
 added: **View toggles on the right shelf**: Turntable (View > Orbit lock: Y or Free), Ortho (Numpad 5), Floor (View >
   Floor grid) and Flat (Render > Materials > Smooth | Flat), lit while on. Customised layouts get them below Rotate and Paint.
-  Thanks @foirgairwolf.
+  Thanks foirgairwolf on Discord.
 added: **Live brush ring on the Size slider**: while the top shelf's, the Draw palette's or the quick menu's Size slider
   drags, the brush ring shows on the canvas at the new size (where the cursor last lay on the model, else the middle of
-  the view) and fades out about half a second after release. Thanks @ABHITAR.
+  the view) and fades out about half a second after release. Thanks ABHITAR on Discord.
 testers:
   - Any OS, 1440x900 at 100% and 200%: the right shelf shows Turntable, Ortho, Floor and Flat, none cut off; click each,
     it lights and the view changes (rotation upright, no perspective, the floor grid, faceted shading); click again, back.
