@@ -1,0 +1,90 @@
+# Tool > Layers tools: show / hide, the weight from -1 to 1, the strength for all layers, Ctrl+click to select
+# several, Bake / Delete the selection, Merge down, Duplicate, Up / Down, rename with a double-click, More > Delete
+# all layers; one undo step each.
+run new_sphere subdivisions=5
+orbit 0 0
+click "Layers##tool.layers"
+expect "Layers/Base mesh"
+key b
+key s
+key t
+snapshot
+
+# Three layers, each with its own stroke.
+type "Layers/##newlayer" Smile
+click "Layers/+ Add"
+stroke 0.4 0.62 0.6 0.62
+type "Layers/##newlayer" Brow
+click "Layers/+ Add"
+stroke 0.4 0.35 0.6 0.35
+type "Layers/##newlayer" Cheek
+click "Layers/+ Add"
+stroke 0.62 0.5 0.66 0.52
+expect_value layers == 3
+expect_value active_layer == 2
+remember moved_max all_three
+shot three-layers
+
+# Hide Brow: the list dims it and the shape loses it; show it again.
+click "Layers/##eye Brow"
+expect_value hidden_layers == 1
+shot brow-hidden
+click "Layers/##eye Brow"
+expect_value hidden_layers == 0
+
+# The strength for all layers down to -1 (every layer the opposite way); one undo step back to 1.
+drag_item "Layers/##allstrength" -400 0
+expect_value layer_strength == -1
+key ctrl+z
+expect_value layer_strength == 1
+
+# Ctrl+click selects Smile and Cheek; Bake 2 puts them into the base and leaves Brow.
+click "Layers/Smile"
+expect_value active_layer == 0
+hold ctrl
+click "Layers/Cheek"
+hold none
+expect_value selected_layers == 2
+shot two-selected
+expect_text "Bake 2"
+click "Layers/###layerbake"
+expect_value layers == 1
+expect "Layers/Brow"
+expect_value moved_max >= $all_three*0.999
+key ctrl+z
+expect_value layers == 3
+
+# Duplicate Smile, then Merge down folds the copy into Brow; Up / Down move the active layer.
+click "Layers/Smile"
+click "Layers/Duplicate##layer"
+expect_value layers == 4
+expect "Layers/Smile copy"
+click "Layers/Merge down"
+expect_value layers == 3
+click "Layers/##layerdown"
+expect_value active_layer == 2
+click "Layers/##layerup"
+expect_value active_layer == 1
+shot merged
+
+# Rename with a double-click.
+double_click "Layers/Brow"
+type "Layers/##rename" Frown
+key enter
+expect "Layers/Frown"
+
+# More > Delete all layers; undo brings them back.
+click "Layers/###layermore"
+click "Delete all layers"
+expect_value layers == 0
+key ctrl+z
+expect_value layers == 3
+shot tidy-panel
+
+# Ctrl-hover help.
+hold ctrl
+hover "Layers/##allstrength"
+expect_help "every layer"
+hover "Layers/Merge down"
+expect_help "keeping how both look"
+hold none

@@ -287,7 +287,7 @@ bool saveGlb(const std::string& path, const std::vector<MeshObjectRef>& objects,
         json << "}]";
         if (!mesh.layers.empty()) {
             json << ",\"weights\":[";
-            for (size_t i = 0; i < mesh.layers.size(); ++i) json << (i ? "," : "") << mesh.layers[i].weight;
+            for (size_t i = 0; i < mesh.layers.size(); ++i) json << (i ? "," : "") << mesh.layerFactor(i); // as shown
             json << "],\"extras\":{\"targetNames\":[";
             for (size_t i = 0; i < mesh.layers.size(); ++i)
                 json << (i ? "," : "") << "\"" << jsonEscape(mesh.layers[i].name) << "\"";

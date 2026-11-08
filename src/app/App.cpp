@@ -3007,6 +3007,20 @@ void App::setLayerWeight(int index, float weight) {
     for (auto& lod : lods_) lod.setLayerWeight(index, weight); // LODs share the blend shapes
 }
 
+void App::setLayerStrength(float strength) {
+    if (solverBusy()) solverWait();
+    doc_.mesh.layerStrength = strength;
+    doc_.mesh.evaluateAll();
+    doc_.mesh.recomputeAllNormals();
+    doc_.bvhDirty = true;
+    doc_.modified = true;
+    for (auto& lod : lods_) {
+        lod.layerStrength = strength;
+        lod.evaluateAll();
+        lod.recomputeAllNormals();
+    }
+}
+
 void App::animateLayers(float dt) {
     animateFaceTake(dt); // (PanelFace.cpp)
     if (playingLayer_ < 0 || playingLayer_ >= int(doc_.mesh.layers.size())) {
@@ -3185,64 +3199,6 @@ void App::drawUi() {
     drawHelpConsoleUi(); // console, command palette, Controls (F1), Ctrl-hover help: last, on top
     drawWhatsNew();      // What's New after an update or from the Help menu (WhatsNewPopup.cpp)
     drawSupportCard();   // the support card at launch, over everything (PanelSupportCard.cpp)
-}
-
-void App::drawLayersContents() {
-    const float scale = uiScale_;
-    ImGui::TextDisabled(tr("Sculpt expressions & correctives;\nexported as glTF morph targets."));
-
-    if (ImGui::RadioButton(tr("Base mesh"), doc_.activeLayer < 0)) runCommand("layer_set_active", {{"index", -1.0}});
-    constexpr const char* kLayersPath = "Tool > Layers";
-    ui::HelpText("Base mesh", nullptr, "Strokes go into the base shape, not a layer.", kLayersPath);
-
-    int removeIndex = -1;
-    for (int i = 0; i < int(doc_.mesh.layers.size()); ++i) {
-        SculptLayer& layer = doc_.mesh.layers[i];
-        ImGui::PushID(i);
-        ImGui::Separator();
-        if (ImGui::RadioButton(layer.name.c_str(), doc_.activeLayer == i))
-            runCommand("layer_set_active", {{"index", double(i)}});
-        ui::HelpText(layer.name.c_str(), nullptr,
-                     "Select to sculpt into this layer. With subdivision levels, record at any level: a "
-                     "layer keeps its own detail on every level and follows Lower Level / Higher Level and Add Level.",
-                     kLayersPath);
-        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 52 * scale);
-        const bool playing = playingLayer_ == i;
-        if (ImGui::SmallButton(tr(playing ? "Stop" : "Play"))) {
-            playingLayer_ = playing ? -1 : i;
-            playTime_ = 0.0f;
-            if (playing) setLayerWeight(i, 1.0f);
-        }
-        ui::HelpText(playing ? "Stop" : "Play", nullptr, "Animate this blend shape 0 -> 1 -> 0 (Stop sets it back to 1).",
-                     kLayersPath);
-        ImGui::SameLine();
-        if (ImGui::SmallButton("X")) removeIndex = i;
-        ui::HelpText("Delete layer", nullptr, "Delete this layer on every subdivision level (undoable).", kLayersPath);
-        float w = layer.weight;
-        ImGui::SetNextItemWidth(-1);
-        if (ImGui::SliderFloat("##weight", &w, 0.0f, 1.0f, tr("weight %.2f"))) {
-            if (playingLayer_ == i) playingLayer_ = -1;
-            setLayerWeight(i, w);
-        }
-        ui::HelpText("Weight", nullptr,
-                     "How strongly the layer shows: 0 = off, 1 = as sculpted. One weight for every "
-                     "subdivision level.",
-                     kLayersPath);
-        ImGui::PopID();
-    }
-    if (removeIndex >= 0) {
-        if (playingLayer_ == removeIndex) playingLayer_ = -1;
-        runCommand("layer_remove", {{"index", double(removeIndex)}});
-    }
-
-    ImGui::Separator();
-    ImGui::SetNextItemWidth(-ImGui::CalcTextSize("+ Add").x - ImGui::GetStyle().FramePadding.x * 2 -
-                            ImGui::GetStyle().ItemSpacing.x);
-    bool enter = ImGui::InputText("##newlayer", newLayerName_, sizeof newLayerName_,
-                                  ImGuiInputTextFlags_EnterReturnsTrue);
-    ImGui::SameLine();
-    if (ImGui::Button(tr("+ Add")) || enter) runCommand("layer_add", {{"name", std::string(newLayerName_)}});
-    ui::HelpText("+ Add", nullptr, "Add a sculpt layer with the name typed beside it; strokes go into it.", kLayersPath);
 }
 
 void App::sendToUnreal() {

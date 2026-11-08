@@ -302,7 +302,8 @@ Mesh loopSubdivide(const Mesh& src) {
     out.positions = subdivideAttribute(src.positions);
     if (!src.layers.empty()) {
         out.base = subdivideAttribute(src.base);
-        for (const auto& l : src.layers) out.layers.push_back({l.name, subdivideAttribute(l.delta), l.weight});
+        out.layerStrength = src.layerStrength;
+        for (const auto& l : src.layers) out.layers.push_back(l.withDelta(subdivideAttribute(l.delta)));
     }
 
     // Mask and vertex paint are interpolated linearly (old vertices keep their

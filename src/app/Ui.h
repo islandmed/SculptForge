@@ -115,8 +115,11 @@ float KeycapsWidth(const std::string& chord);
 float KeycapsAt(ImDrawList* drawList, ImVec2 pos, const std::string& chord); // no layout; returns the width
 // A plain tooltip after the hover delay (icon-only buttons, clipped labels); suppressed while Ctrl is held.
 void DelayedTooltip(const char* text);
+// A clickable icon in a table cell (eye, lock, play): bright when `on`, a tooltip on hover. True when clicked.
+bool IconToggle(const char* id, const char* icon, bool on, const char* tip);
 bool CtrlHeld();
 bool AltHeld();
+bool ShiftHeld();
 
 // #100 (small screens, pens): a left-drag on a panel's empty space, or a middle-drag anywhere on it, scrolls it, as a
 // finger scrolls a list. Call once a frame, after every window (before ImGui ends the frame).

@@ -50,8 +50,8 @@ Mesh mergeMeshes(const std::vector<const Mesh*>& meshes) {
         colors |= m->hasColors();
         hidden |= m->hasHidden();
         uvs |= m->hasUvs();
-        for (const auto& l : m->layers)
-            if (layerWeights.emplace(l.name, l.weight).second) layerNames.push_back(l.name);
+        for (size_t i = 0; i < m->layers.size(); ++i) // as each shows (the merged mesh has strength 1, all shown)
+            if (layerWeights.emplace(m->layers[i].name, m->layerFactor(i)).second) layerNames.push_back(m->layers[i].name);
     }
     for (const auto& name : layerNames) out.layers.push_back({name, {}, layerWeights[name]});
 

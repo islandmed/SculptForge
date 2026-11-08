@@ -589,6 +589,12 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "triangles") return double(m.triangleCount());
     if (name == "vertices") return double(m.vertexCount());
     if (name == "layers") return double(m.layers.size());
+    // Tool > Layers (PanelSculptLayers.cpp): the active layer, the selection, hidden layers, the strength for all layers.
+    if (name == "active_layer") return double(app_.doc_.activeLayer);
+    if (name == "selected_layers") return double(app_.selectedSculptLayers().size());
+    if (name == "hidden_layers")
+        return double(std::count_if(m.layers.begin(), m.layers.end(), [](const SculptLayer& l) { return !l.visible; }));
+    if (name == "layer_strength") return double(m.layerStrength);
     if (name == "brushes") return double(app_.doc_.brushes.size());
     if (name == "colored") return m.hasColors() ? 1.0 : 0.0;
     if (name == "paint_layers") return double(m.paintLayers.size());

@@ -329,7 +329,9 @@ void writeMesh(Writer& w, const Mesh& mesh, const std::string& root, const std::
         w.s += '\n';
         w.open("def SkelAnimation \"Weights\"");
         w.array("uniform token[] blendShapes", shapeNames, [&](const std::string& n) { w.s += quoted(n); });
-        w.array("float[] blendShapeWeights", mesh.layers, [&](const SculptLayer& l) { w.num(l.weight); });
+        std::vector<float> shown; // the weights as shown (hidden layers 0, times the strength for all layers)
+        for (size_t i = 0; i < mesh.layers.size(); ++i) shown.push_back(mesh.layerFactor(i));
+        w.array("float[] blendShapeWeights", shown, [&](float f) { w.num(f); });
         if (animation && !animation->empty()) {
             // Keys for the shapes the animation names (the rest at their current weight), at time codes in frames.
             std::vector<int> channelOf;
@@ -347,7 +349,7 @@ void writeMesh(Writer& w, const Mesh& mesh, const std::string& root, const std::
                     w.s += ": [";
                     for (size_t i = 0; i < channelOf.size(); ++i) {
                         if (i) w.s += ", ";
-                        w.num(channelOf[i] >= 0 ? animation->value(k, size_t(channelOf[i])) : mesh.layers[i].weight);
+                        w.num(channelOf[i] >= 0 ? animation->value(k, size_t(channelOf[i])) : mesh.layerFactor(i));
                     }
                     w.s += "],\n";
                 }

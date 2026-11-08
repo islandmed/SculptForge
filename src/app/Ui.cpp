@@ -124,6 +124,8 @@ bool CtrlHeld() {
     return io.KeyCtrl || io.KeySuper || (SDL_GetModState() & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0;
 }
 
+bool ShiftHeld() { return ImGui::GetIO().KeyShift || (SDL_GetModState() & SDL_KMOD_SHIFT) != 0; }
+
 bool AltHeld() { return ImGui::GetIO().KeyAlt || (SDL_GetModState() & SDL_KMOD_ALT) != 0; }
 
 void SetNextItemOrigin(int shelf, int index) {
@@ -546,6 +548,22 @@ void DrawHover(App& app) {
     const int frame = ImGui::GetFrameCount();
     for (auto it = g_anims.begin(); it != g_anims.end();)
         it = frame - it->second.frame > 120 ? g_anims.erase(it) : std::next(it);
+}
+
+// A clickable icon cell (eye / lock); returns true when clicked.
+bool IconToggle(const char* id, const char* icon, bool on, const char* tip) {
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    const ImVec2 size(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeight());
+    const bool clicked = ImGui::InvisibleButton(id, size);
+    const bool hovered = ImGui::IsItemHovered();
+    if (hovered && !CtrlHeld()) ImGui::SetTooltip("%s", tip);
+    const ImU32 col = ImGui::GetColorU32(hovered ? style.Colors[ImGuiCol_ButtonHovered]
+                                         : on    ? style.Colors[ImGuiCol_Text]
+                                                 : style.Colors[ImGuiCol_TextDisabled]);
+    const ImVec2 ts = ImGui::CalcTextSize(icon);
+    ImGui::GetWindowDrawList()->AddText(ImVec2(pos.x + (size.x - ts.x) * 0.5f, pos.y + (size.y - ts.y) * 0.5f), col, icon);
+    return clicked;
 }
 
 void DelayedTooltip(const char* text) {

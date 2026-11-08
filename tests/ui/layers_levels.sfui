@@ -35,10 +35,15 @@ stroke 0.35 0.6 0.65 0.62
 expect_value moved > 50
 remember moved_max layer_height
 
-# Its weight slider takes it away and brings it back.
-drag_item "Layers/##weight" -400 0
+# Its eye takes it away and brings it back; its weight slider goes to -1 (the opposite way) and back to 1.
+click "Layers/##eye Smile"
 expect_value moved_max < 0.000001
+click "Layers/##eye Smile"
+expect_value moved_max >= $layer_height*0.999
+drag_item "Layers/##weight" -400 0
+expect_value face_Smile == -1
 drag_item "Layers/##weight" 400 0
+expect_value face_Smile == 1
 expect_value moved_max >= $layer_height*0.999
 
 # Down to Level 1 and back up: still there, exactly.
@@ -48,14 +53,14 @@ key shift+d
 expect_value subdiv_level == 1
 expect_value layers == 1
 shot layer-at-sdiv1
-# Off at the lowest level: off at the top too.
-drag_item "Layers/##weight" -400 0
+# Hidden at the lowest level: hidden at the top too.
+click "Layers/##eye Smile"
 key d
 key d
 key d
 expect_value subdiv_level == 4
 expect_value moved_max < 0.000001
-drag_item "Layers/##weight" 400 0
+click "Layers/##eye Smile"
 expect_value moved_max >= $layer_height*0.999
 shot layer-at-top
 

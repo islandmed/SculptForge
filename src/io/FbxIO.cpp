@@ -506,11 +506,12 @@ bool saveFbx(const std::string& path, const std::vector<FbxObject>& fbxObjects, 
                 blend.add("Version").i32(100);
                 addConnection(connections, "OO", blendId, geometryId);
                 ++deformers;
-                for (const auto& layer : mesh.layers) {
+                for (size_t li = 0; li < mesh.layers.size(); ++li) {
+                    const SculptLayer& layer = mesh.layers[li];
                     const int64_t channelId = ids(), shapeId = ids();
                     Node& channel = objects.add("Deformer").i64(channelId).objName(layer.name, "SubDeformer").str("BlendShapeChannel");
                     channel.add("Version").i32(100);
-                    channel.add("DeformPercent").f64(double(layer.weight) * 100.0);
+                    channel.add("DeformPercent").f64(double(mesh.layerFactor(li)) * 100.0); // as shown
 
                     std::vector<int32_t> indexes;
                     std::vector<double> offsets;

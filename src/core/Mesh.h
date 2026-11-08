@@ -71,7 +71,13 @@ struct AABB {
 struct SculptLayer {
     std::string name;
     std::vector<glm::vec3> delta;
-    float weight = 1.0f;
+    float weight = 1.0f;  // strength: 1 = as sculpted, 0 = off, negative = the opposite way
+    bool visible = true;  // a hidden layer adds nothing (its weight is kept)
+    // The same layer settings with other offsets (copies everything but `delta`).
+    SculptLayer withDelta(std::vector<glm::vec3> d) const {
+        SculptLayer l{name, std::move(d), weight, visible};
+        return l;
+    }
 };
 
 // Triangle mesh with vertex adjacency, suitable for sculpting.
@@ -179,9 +185,12 @@ public:
     void sanitizeAttributes();
 
     // Sculpt layers. While any exist, `base` holds the positions with every
-    // layer at zero and positions == base + sum(layer.weight * layer.delta).
+    // layer at zero and positions == base + sum(layerFactor(i) * layer.delta).
     std::vector<glm::vec3> base;
     std::vector<SculptLayer> layers;
+    float layerStrength = 1.0f; // one strength for all layers (scales every layer's weight)
+    // What layer i's offsets are scaled by: its weight times layerStrength, 0 while hidden.
+    float layerFactor(size_t i) const { return layers[i].visible ? layers[i].weight * layerStrength : 0.0f; }
 
     int addLayer(std::string name);
     void removeLayer(int index);

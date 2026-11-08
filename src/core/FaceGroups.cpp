@@ -359,8 +359,9 @@ Mesh rebuildTriangles(const Mesh& mesh, const std::vector<uint8_t>& keep, const 
         for (uint32_t v : kept) out.colors.push_back(mesh.colors[v]);
     if (!mesh.layers.empty()) {
         for (uint32_t v : kept) out.base.push_back(mesh.base[v]);
+        out.layerStrength = mesh.layerStrength;
         for (const auto& l : mesh.layers) {
-            SculptLayer nl{l.name, {}, l.weight};
+            SculptLayer nl = l.withDelta({});
             nl.delta.reserve(kept.size());
             for (uint32_t v : kept) nl.delta.push_back(l.delta[v]);
             out.layers.push_back(std::move(nl));

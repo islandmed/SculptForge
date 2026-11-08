@@ -41,6 +41,7 @@
 #include "core/Garment.h"
 #include "core/Deform.h"
 #include "core/Sculptable.h"
+#include "core/SculptLayers.h"
 #include "core/Splats.h"
 #include "core/StarterMeshes.h"
 #include "core/TextureTransfer.h"
@@ -409,7 +410,8 @@ CommandRegistry::CommandRegistry() {
          {{"name", T::String, "Layer name, e.g. 'Smile' or 'BlinkL'.", false}},
          [](Document& doc, const Args& a) -> CommandResult {
              Mesh m = doc.mesh;
-             int idx = m.addLayer(argString(a, "name", "Layer " + std::to_string(doc.mesh.layers.size() + 1)));
+             int idx = m.addLayer(uniqueSculptLayerName(
+                 m, argString(a, "name", "Layer " + std::to_string(doc.mesh.layers.size() + 1)))); // levels match by name
              doc.replaceMeshUndoable(std::move(m), "Add Layer");
              doc.activeLayer = idx;
              return {true, "Added layer '" + doc.mesh.layers[idx].name + "' (index " + std::to_string(idx) + ")"};
@@ -887,6 +889,7 @@ CommandRegistry::CommandRegistry() {
     registerSelectionSetCommands(*this); // selection_set_* (core/SelectionSets.h)
     registerPartCommands(*this);
     registerSubdivCommands(*this); // subdiv_* (core/MultiresCommands.cpp)
+    registerSculptLayerCommands(*this); // layer_move, layer_bake, ... (core/SculptLayers.cpp)
     registerMicroCommands(*this);  // micro_* (core/MicroCommands.cpp)
     registerDyntopoCommands(*this); // dyntopo (core/DyntopoCommands.cpp)
     registerSculptableCommands(*this); // splat_to_mesh, face_guides (core/Sculptable.h)

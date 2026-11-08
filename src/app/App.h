@@ -233,6 +233,7 @@ private:
     void processPendingFiles();
 
     void setLayerWeight(int index, float weight);
+    void setLayerStrength(float strength); // live preview of the strength for all layers (not undoable)
     void animateLayers(float dt);
     void generateLods();
     void clearLods();
@@ -1844,7 +1845,16 @@ private:
     void drawPalette_Transform();
     void drawRadialSymmetryControls(); // Transform > Symmetry: radial symmetry's toggle, count and axis (Palettes.cpp)
     void drawAlphaSection();
+    // Tool > Layers (PanelSculptLayers.cpp).
     void drawLayersContents();
+    std::vector<int> selectedSculptLayers() const; // the selected layers, else the active one
+    std::set<std::string> sculptLayerSelection_;   // by name (unique per Part)
+    int renamingSculptLayer_ = -2;
+    bool focusSculptRename_ = false;
+    char sculptRenameBuffer_[64] = "";
+    int listedSculptLayer_ = -2;
+    float weightDragFrom_ = -2.0f;   // the active layer's weight before a slider drag (< -1.5 = not dragging)
+    float allStrengthDrag_ = -2.0f;  // the strength for all layers before a drag
     // Paint Layers sub-palette (PanelPaintLayers.cpp).
     void drawPaintLayersContents();
     int renamingPaintLayer_ = -2; // layer being renamed inline (-2 = none)

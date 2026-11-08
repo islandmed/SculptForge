@@ -11,8 +11,8 @@ weighting, playing and exporting layers.
   times its weight.
 - New strokes go into the **active** layer, or into the base mesh when **Base mesh** is selected.
 - Layers belong to a [Part](parts.md): each Part has its own list of layers.
-- A weight of 0 turns a layer off, 1 shows it as sculpted. Scripts can also set negative weights or weights
-  above 1 to exaggerate a shape.
+- A weight of 1 shows a layer as sculpted (new layers start there), 0 turns it off and -1 turns it the opposite
+  way. **All layers** scales every layer's weight at once, and the eye hides a layer without losing its weight.
 - Layers work on every [subdivision level](subdivision-levels.md): see
   [Layers and subdivision levels](#layers-and-subdivision-levels).
 - Layers survive [subdividing](geometry.md#subdivide), [decimating](geometry.md#decimate) and
@@ -30,13 +30,19 @@ Open **Tool > Layers** in the right tray.
 
 From top to bottom:
 
-- **Base mesh**: select it to sculpt the base shape.
-- One block per layer: a radio button with the layer's name (select it to sculpt into that layer), **Play**, **X**
-  (delete) and a **weight** slider from 0 to 1.
+- **All layers**: one strength for every layer of the Part, from -1 to 1 (1 = as sculpted, 0 = all off).
+- The list: **Base mesh** (select it to sculpt the base shape), then one row per layer with its name, its weight,
+  **Play** and the eye (show / hide). Click a layer to sculpt into it; <kbd>Ctrl</kbd>+click adds layers to the
+  selection and <kbd>Shift</kbd>+click selects a run of them; double-click renames; right-click for the layer's menu.
+- **Weight**: the active layer's weight, from -1 to 1.
+- The arrows move the active layer up or down; **Merge down**, **Duplicate** and **Invert** work on the active layer.
+- **Bake** and **Delete** work on the selected layers (or the active one); **...** has Move to top, Move to bottom,
+  Rename, **Bake all layers** and **Delete all layers**.
 - A name field and **+ Add** at the bottom.
 
-The Layers list highlights the active layer; in the Classic layout the title strip also shows it (`Layer Smile`,
-or `Layer Base`).
+The Layers list highlights the active layer (and, more lightly, the other selected ones); in the Classic layout the
+title strip also shows it (`Layer Smile`, or `Layer Base`). Every one of these actions is one undo step, and the
+project keeps the order, names, weights, hidden layers and the strength for all layers.
 
 ## Add a layer and sculpt into it
 
@@ -45,7 +51,8 @@ or `Layer Base`).
 3. Sculpt. Every stroke goes into the layer until you select another layer or **Base mesh**. Moving, scaling and
    rotating with the [Transform gizmo](gizmo.md) (or the `transform` command) goes into the layer too, masked or not.
 
-A layer whose weight is 0 can't be sculpted into: SculptForge tells you to raise the weight first.
+A layer whose weight is 0 (or that is hidden, or with **All layers** at 0) can't be sculpted into: SculptForge
+tells you to raise the weight first.
 
 > **Tip:** Name layers the way your engine or rig expects (`jawOpen`, `BlinkL`): the names become the blend shape
 > and morph target names in exported files. For a face, **Tool > Facial Shapes** makes all 52 ARKit shapes for you:
@@ -53,16 +60,35 @@ A layer whose weight is 0 can't be sculpted into: SculptForge tells you to raise
 
 ## Adjust and preview weights
 
-- Drag a layer's **weight** slider to blend it in and out.
+- Drag the **Weight** slider to blend the active layer in and out; below 0 it pushes the other way.
+- Click the eye to hide a layer and again to show it; its weight is kept.
+- Drag **All layers** to dial every layer down (or past 0, the other way) at once.
 - **Play** animates the layer from 0 to 1 and back, over and over, so you can judge the motion. Click **Stop** to
   end it; the weight returns to 1. Starting a stroke also stops playback.
 
-Weights are saved with the project and used by exports that keep weights (USD writes the current weights).
+Weights are saved with the project and used by exports that keep weights (USD writes the current weights). Exports
+write each blend shape's weight as it shows: a hidden layer at 0, every weight times **All layers**.
 
-## Delete a layer
+## Organize layers
 
-Click **X** next to the layer. Its offsets are removed from the mesh and the base mesh becomes the active target.
-Deleting a layer is undoable.
+- **Move**: the arrows move the active layer up or down the list; **...** > **Move to top** / **Move to bottom**.
+  The order is how the list reads and the order blend shapes export in; the shape doesn't change.
+- **Rename**: double-click the name (or **...** > **Rename**), type, press <kbd>Enter</kbd>. Names stay unique in a Part
+  (a second `Smile` becomes `Smile 2`).
+- **Duplicate** copies the active layer, offsets and settings, to a new layer below it.
+- **Merge down** folds the active layer into the one below it, keeping how both look: the merged layer gets weight 1
+  and the name of the lower layer.
+- **Invert** turns the active layer the opposite way: bumps become dents.
+
+## Bake or delete layers
+
+- **Bake** puts the selected layers into the base mesh exactly as they show now (weight, hidden, **All layers**),
+  then removes them: the shape doesn't change. **...** > **Bake all layers** does it for every layer.
+- **Delete** removes the selected layers and their offsets; **...** > **Delete all layers** removes every layer.
+- Select several with <kbd>Ctrl</kbd>+click or <kbd>Shift</kbd>+click first; the buttons then read **Bake 2**,
+  **Delete 2**. With nothing else selected they act on the active layer.
+
+Every bake and delete is one undo step, and the base mesh becomes the active target.
 
 ## Layers and subdivision levels
 
@@ -81,7 +107,8 @@ top level for the fine detail of an expression, and it stays with the Part whate
   the new shape: its offsets turn with the surface instead of pointing the old way.
 - **Add Level** carries the layers to the new level. **Rebuild Lower Levels** keeps them, exact at the top. **Remove Below**
   and **Remove Above** keep the current level's layers as they are.
-- **Deleting a layer** removes it from every level. Undo steps back through strokes, level changes and divisions
+- **Deleting, baking, merging, duplicating, inverting, renaming or moving a layer** works on every level, at
+  whatever level you are: each level keeps its own detail of every layer. Undo steps back through strokes, level changes and divisions
   with their layers.
 - **Projects** keep every level's layers. **Exports** write the current level with its layers as blend shapes, so
   export from the top for the game mesh; `subdiv_export path=face_low.glb level=1` writes the base cage with its
@@ -112,7 +139,15 @@ Importing works the other way: glTF morph targets and FBX or USD blend shapes op
 |---|---|
 | `layer_add name=Smile` | Add a layer and make it active |
 | `layer_set_active index=0` | Choose the layer strokes go into (`-1` = base mesh) |
-| `layer_set_weight index=0 weight=0.5` | Set a layer's weight (negative or above 1 exaggerates) |
+| `layer_set_weight index=0 weight=0.5` | Set a layer's weight live (not an undo step; negative or above 1 exaggerates) |
+| `layer_set index=0 weight=-0.5 visible=false name=Frown` | Change a layer's weight (-1 to 1), visibility or name (undoable) |
+| `layer_strength strength=0.5` | The strength for all layers, -1 to 1 |
+| `layer_move index=0 direction=down` | Move a layer `up`, `down`, `top` or `bottom` |
+| `layer_duplicate index=0` | Copy a layer to a new layer below it |
+| `layer_merge_down index=0` | Merge a layer into the one below it |
+| `layer_invert index=0` | Turn a layer the opposite way |
+| `layer_bake indices=0,2` | Bake layers into the base mesh (`indices=all` for every layer) |
+| `layer_remove_many indices=all` | Delete several layers, or all of them |
 | `layer_remove index=0` | Delete a layer |
 
 Layers are addressed by index, starting at 0 for the top layer.

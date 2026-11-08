@@ -792,14 +792,14 @@ std::vector<glm::vec3>& Mesh::layerTarget(int layer) {
 
 float Mesh::layerTargetWeight(int layer) const {
     if (layers.empty() || layer < 0 || layer >= static_cast<int>(layers.size())) return 1.0f;
-    return layers[layer].weight;
+    return layerFactor(size_t(layer));
 }
 
 void Mesh::evaluate(std::span<const uint32_t> verts) {
     if (layers.empty()) return;
     for (uint32_t v : verts) {
         glm::vec3 p = base[v];
-        for (const auto& l : layers) p += l.weight * l.delta[v];
+        for (size_t i = 0; i < layers.size(); ++i) p += layerFactor(i) * layers[i].delta[v];
         positions[v] = p;
     }
 }
@@ -808,7 +808,7 @@ void Mesh::evaluateAll() {
     if (layers.empty()) return;
     for (size_t v = 0; v < positions.size(); ++v) {
         glm::vec3 p = base[v];
-        for (const auto& l : layers) p += l.weight * l.delta[v];
+        for (size_t i = 0; i < layers.size(); ++i) p += layerFactor(i) * layers[i].delta[v];
         positions[v] = p;
     }
 }
@@ -905,7 +905,7 @@ Mesh weldImported(const Mesh& m, const std::vector<SculptLayer>& layers) {
     if (!layers.empty()) {
         welded.base = welded.positions;
         for (const auto& src : layers) {
-            SculptLayer layer{src.name, {}, src.weight};
+            SculptLayer layer = src.withDelta({});
             layer.delta.reserve(kept.size());
             for (uint32_t v : kept) layer.delta.push_back(v < src.delta.size() ? src.delta[v] : glm::vec3(0.0f));
             welded.layers.push_back(std::move(layer));

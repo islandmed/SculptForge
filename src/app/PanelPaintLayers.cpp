@@ -48,21 +48,6 @@ const char* blendShort(BlendMode m) {
     return "";
 }
 
-// A clickable icon cell (eye / lock); returns true when clicked.
-bool iconToggle(const char* id, const char* icon, bool on, const char* tip) {
-    const ImGuiStyle& style = ImGui::GetStyle();
-    const ImVec2 pos = ImGui::GetCursorScreenPos();
-    const ImVec2 size(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeight());
-    const bool clicked = ImGui::InvisibleButton(id, size);
-    const bool hovered = ImGui::IsItemHovered();
-    if (hovered && !ui::CtrlHeld()) ImGui::SetTooltip("%s", tip);
-    const ImU32 col = ImGui::GetColorU32(hovered ? style.Colors[ImGuiCol_ButtonHovered]
-                                         : on    ? style.Colors[ImGuiCol_Text]
-                                                 : style.Colors[ImGuiCol_TextDisabled]);
-    const ImVec2 ts = ImGui::CalcTextSize(icon);
-    ImGui::GetWindowDrawList()->AddText(ImVec2(pos.x + (size.x - ts.x) * 0.5f, pos.y + (size.y - ts.y) * 0.5f), col, icon);
-    return clicked;
-}
 
 } // namespace
 
@@ -195,12 +180,12 @@ void App::drawPaintLayersContents() {
             ImGui::TextColored(modeCol, "%s", mode);
             if (l) {
                 ImGui::TableSetColumnIndex(2);
-                if (iconToggle(("##lock " + name).c_str(), ICON_LC_LOCK, l->locked,
+                if (ui::IconToggle(("##lock " + name).c_str(), ICON_LC_LOCK, l->locked,
                                tr(l->locked ? "Unlock (allow painting)" : "Lock against painting")))
                     toggleLock = i;
                 ui::HelpText("Lock", nullptr, "Lock the layer: the Paint brush, fills, clears and merges leave it alone.", kPath);
                 ImGui::TableSetColumnIndex(3);
-                if (iconToggle(("##eye " + name).c_str(), l->visible ? ICON_LC_EYE : ICON_LC_EYE_OFF, l->visible,
+                if (ui::IconToggle(("##eye " + name).c_str(), l->visible ? ICON_LC_EYE : ICON_LC_EYE_OFF, l->visible,
                                tr(l->visible ? "Hide layer" : "Show layer")))
                     toggleVisible = i;
                 ui::HelpText("Visibility", nullptr, "Show or hide the layer. Hidden layers don't show or export.", kPath);

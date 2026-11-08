@@ -266,8 +266,9 @@ Mesh decimate(const Mesh& src, size_t targetTriangles, bool keepMasked) {
         for (uint32_t v : kept) out.colors.push_back(src.colors[v]);
     if (!src.layers.empty()) {
         for (uint32_t v : kept) out.base.push_back(src.base[v]);
+        out.layerStrength = src.layerStrength;
         for (const auto& l : src.layers) {
-            SculptLayer nl{l.name, {}, l.weight};
+            SculptLayer nl = l.withDelta({});
             nl.delta.reserve(kept.size());
             for (uint32_t v : kept) nl.delta.push_back(l.delta[v]);
             out.layers.push_back(std::move(nl));

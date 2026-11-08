@@ -134,6 +134,7 @@ add_library(sculptforge_core STATIC
   src/core/LayerStackIO.cpp
   src/core/MapExport.cpp
   src/core/Multires.cpp
+  src/core/SculptLayers.cpp
   src/core/Micro.cpp
   src/core/MicroSculpt.cpp
   src/core/MicroCommands.cpp
@@ -441,6 +442,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelBrushSets.cpp
     src/app/MemoryConfirm.cpp
     src/app/PanelPaintLayers.cpp
+    src/app/PanelSculptLayers.cpp
     src/app/PanelTexture.cpp
     src/app/PanelUvEditor.cpp
     src/app/PanelPbr.cpp

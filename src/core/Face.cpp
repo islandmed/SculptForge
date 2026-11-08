@@ -1177,8 +1177,12 @@ FaceWeightsStats applyFaceWeights(Document& doc, const std::vector<std::pair<std
         std::vector<const std::vector<uint32_t>*> changedSupport;
         for (uint32_t li : changed) changedSupport.push_back(&layerSupport(m.layers[li], revision));
         std::vector<std::pair<const SculptLayer*, const std::vector<uint32_t>*>> live;
-        for (const auto& l : m.layers)
-            if (l.weight != 0.0f) live.push_back({&l, &layerSupport(l, revision)});
+        std::vector<float> factors;
+        for (size_t li = 0; li < m.layers.size(); ++li)
+            if (m.layerFactor(li) != 0.0f) {
+                live.push_back({&m.layers[li], &layerSupport(m.layers[li], revision)});
+                factors.push_back(m.layerFactor(li));
+            }
         constexpr size_t kBlock = 16384;
         const size_t nv = m.positions.size(), blocks = (nv + kBlock - 1) / kBlock;
         static std::vector<uint8_t> mark; // (guarded by gSupportMutex; all zero between calls)
@@ -1197,8 +1201,9 @@ FaceWeightsStats applyFaceWeights(Document& doc, const std::vector<std::pair<std
                         m.positions[v] = m.base[v];
                     }
                 if (vs.empty()) continue;
-                for (const auto& [l, support] : live) {
-                    const float w = l->weight;
+                for (size_t k = 0; k < live.size(); ++k) {
+                    const auto& [l, support] = live[k];
+                    const float w = factors[k];
                     for (auto it = std::lower_bound(support->begin(), support->end(), lo); it != support->end() && *it < hi; ++it)
                         if (mark[*it]) m.positions[*it] += w * l->delta[*it];
                 }
