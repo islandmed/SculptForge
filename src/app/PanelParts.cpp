@@ -613,7 +613,7 @@ void App::drawPartsContents() {
                 ImGui::EndMenu();
             }
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
-                ImGui::SetTooltip(tr(count > 1 ? "Insert a copy of another Part into the active one"
+                ImGui::SetTooltip("%s", tr(count > 1 ? "Insert a copy of another Part into the active one"
                                             : "Append another Part first"));
             if (ImGui::MenuItem(tr("From file...##insert")))
                 sf::dialogs::openFile(onAppendChosen, &dialogRequests_[int(FileAction::InsertMesh)], window_,
@@ -692,7 +692,7 @@ void App::drawPartsContents() {
     if (solo) ImGui::PopStyleColor();
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-        ImGui::SetTooltip(tr(solo ? "Show the other Parts again" : "Show only the active Part"));
+        ImGui::SetTooltip("%s", tr(solo ? "Show the other Parts again" : "Show only the active Part"));
     ImGui::SameLine();
     const bool xray = renderSettings_.xray;
     if (xray) ImGui::PushStyleColor(ImGuiCol_Button, style.Colors[ImGuiCol_ButtonActive]);

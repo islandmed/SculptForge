@@ -1042,7 +1042,7 @@ void App::drawGizmoPanel() {
 void App::drawGizmoContents(bool compact) {
     ui::Segmented(*this, {"tool.draw", "tool.move", "tool.scale", "tool.rotate", "tool.gizmo_all"});
     if (!compact && !gizmoActive()) {
-        ImGui::TextDisabled(tr("Q W E R: Draw, Move, Scale, Rotate; Shift+W: All"));
+        ImGui::TextDisabled("%s", tr("Q W E R: Draw, Move, Scale, Rotate; Shift+W: All"));
         return;
     }
     // Pivot.
@@ -1101,7 +1101,7 @@ void App::drawGizmoContents(bool compact) {
     }
     ui::HelpText("Clear", nullptr, "Set Move and Rotate back to 0 and Scale to 100%.", kPath);
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
-    ImGui::TextWrapped(tr("Shift snaps (15 deg, grid, 10%%). Alt+drag the gizmo: move it only. Alt+click the model: pivot there."));
+    ImGui::TextWrapped("%s", tr("Shift snaps (15 deg, grid, 10%). Alt+drag the gizmo: move it only. Alt+click the model: pivot there."));
     ImGui::PopStyleColor();
 }
 

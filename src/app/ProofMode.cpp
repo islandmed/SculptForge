@@ -486,7 +486,7 @@ void App::drawProofUi() {
         ImGui::OpenPopup("###proof.benchmark");
         if (ImGui::BeginPopupModal(tr("Benchmark (proof mode)###proof.benchmark"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::PushTextWrapPos(520 * sc);
-            ImGui::TextWrapped(tr("Proof mode measures how responsive sculpting is on this computer. For each mesh size it "
+            ImGui::TextWrapped("%s", tr("Proof mode measures how responsive sculpting is on this computer. For each mesh size it "
                                "builds a sphere with subdivision levels, then plays a scripted pen stroke through the "
                                "same code your pen goes through (240 samples a second), with a normal and a large brush, "
                                "and turns the view."));
@@ -523,15 +523,15 @@ void App::drawProofUi() {
                                        shortOf.c_str());
             }
             ImGui::Spacing();
-            ImGui::TextWrapped(tr("A live display shows the frame rate, frame times (median, 95th, 99th percentile), how far "
+            ImGui::TextWrapped("%s", tr("A live display shows the frame rate, frame times (median, 95th, 99th percentile), how far "
                                "the stroke trails the pointer, and memory. The result is saved as JSON beside a video "
                                "of the run:"));
             ImGui::TextDisabled("%s", p.jsonPath.c_str());
             ImGui::Checkbox(tr("Record a video of the run (needs ffmpeg)"), &p.video);
             ImGui::Checkbox(tr("Keep vertical sync on (frame rate capped at the display's)"), &p.vsync);
             ImGui::Spacing();
-            ImGui::TextColored(theme::accent, tr("The current scene is replaced. Save your work first."));
-            ImGui::TextDisabled(tr("Press Esc to stop the run."));
+            ImGui::TextColored(theme::accent, "%s", tr("The current scene is replaced. Save your work first."));
+            ImGui::TextDisabled("%s", tr("Press Esc to stop the run."));
             ImGui::PopTextWrapPos();
             if (ImGui::Button(tr("Start"))) {
                 p.stage = ProofState::Stage::Announce;

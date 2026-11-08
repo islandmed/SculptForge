@@ -337,7 +337,7 @@ void App::drawHardwareProfileOverlay() {
             finishCalibration();
         }
         ImGui::SameLine();
-        ImGui::TextDisabled(tr("Esc"));
+        ImGui::TextDisabled("%s", tr("Esc"));
     }
     ImGui::End();
 }

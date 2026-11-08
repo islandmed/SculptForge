@@ -31,6 +31,12 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 include(cmake/BuildSpeed.cmake)
 include(cmake/Dependencies.cmake)
 
+# A non-literal printf/ImGui format is an error everywhere (as distro package flags make it, e.g. Arch/CachyOS makepkg,
+# #162): a translated or user string holding '%' must never be read as a format. Our targets, CI, T0 and packages.
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+  add_compile_options(-Wformat -Werror=format-security)
+endif()
+
 # --- Core library: geometry, sculpting, undo, commands, file IO (no GPU/UI) ---
 # A custom studio build (docs/studios.md): the profile is compiled in (core/StudioProfile.h); empty for public builds.
 set(SCULPTFORGE_STUDIO_PROFILE "" CACHE FILEPATH "studio.json to bake into a studio build (empty: public build)")

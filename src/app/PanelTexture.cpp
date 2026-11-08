@@ -305,9 +305,9 @@ void App::drawTextureMapContents() {
         ImGui::SameLine();
         if (ImGui::Button(tr("Cancel##autouv"), ImVec2(-1, 0))) autoUv_->cancel->store(true);
     } else if (!m.hasUvs()) {
-        ImGui::TextDisabled(tr("No UVs: Auto UV makes them"));
+        ImGui::TextDisabled("%s", tr("No UVs: Auto UV makes them"));
     } else if (!hasTexture(m)) {
-        ImGui::TextDisabled(tr("UVs, no texture yet"));
+        ImGui::TextDisabled("%s", tr("UVs, no texture yet"));
     } else {
         const PaintTexture& t = *m.texture;
         ImGui::TextDisabled(tr(t.layers.empty() ? "%dx%d texture, %d layer" : "%dx%d texture, %d layers"), t.width, t.height,
@@ -330,7 +330,7 @@ void App::drawTextureMapContents() {
 
     if (hasTexture(m)) {
         ImGui::AlignTextToFramePadding();
-        ImGui::TextDisabled(tr("Paint into"));
+        ImGui::TextDisabled("%s", tr("Paint into"));
         ImGui::SameLine();
         ui::Segmented(*this, {"draw.paint_vertex", "draw.paint_texture"});
     }
