@@ -443,6 +443,7 @@ void App::registerShellActions() {
             doc_.activeBrush = -1;
             paintMode_ = false;
             guidesMode_ = false; // leaves the QRemesh Guides brush
+            edgesMode_ = false;  // and Edges mode
             maskBrush_.on = false;
             leaveDrawModesStatus(); // and Draw Tube / Append > Insert, the same brush picked again too
         };

@@ -223,8 +223,9 @@ CommandRegistry::CommandRegistry() {
              if (!unit) return {false, err};
              const bool unitless = ext == ".stl" || ext == ".ply" || ext == ".obj";
              bool ok;
+             std::string warnings; // malformed parts the importer skipped (USD creases)
              if (ext == ".glb" || ext == ".gltf") ok = loadGltf(path, objects, err, &splats);
-             else if (ext == ".usda" || ext == ".usd" || ext == ".usdz") ok = loadUsd(path, objects, splats, err);
+             else if (ext == ".usda" || ext == ".usd" || ext == ".usdz") ok = loadUsd(path, objects, splats, err, &warnings);
              else if (ext == ".splat") ok = loadDotSplat(path, splats, err);
              else if (ext == ".fbx") ok = loadFbx(path, objects, err);
              else if (ext == bridgefile::kExtLower) ok = loadBridge(path, m, err, &bridge);
@@ -268,6 +269,7 @@ CommandRegistry::CommandRegistry() {
                         std::to_string(doc.splats.shDegree) + ")";
                  if (hasMesh) doc.markClean(); // a model with its own splats is one freshly opened scene
              }
+             if (!warnings.empty()) msg += ". " + warnings;
              return {true, msg};
          }});
 

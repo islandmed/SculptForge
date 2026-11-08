@@ -1319,6 +1319,7 @@ private:
     std::shared_ptr<struct SculptableUiState> sculptable_;
     // Geometry > QRemesh (quad retopology on a worker thread) and Part > Project (ProjectAll); PanelRetopo.cpp.
     void registerRetopoUiActions();
+    void registerEdgeUiActions(); // Geometry > Edges (PanelEdges.cpp)
     void drawQRemeshContents();
     void drawProjectContents();
     void startQRemesh();
@@ -1393,11 +1394,33 @@ private:
     void drawQRemeshGuideControls();                          // Geometry > QRemesh > Guides
     int guideAt(float x, float y) const;                      // the guide drawn under the cursor, or -1
     bool guidesMode_ = false;
+    // Edges mode (PanelEdges.cpp, core/EdgeSelect.h): clicks on the model select edges of the base level. Picking a
+    // brush or the Gizmo leaves it.
+    void setEdgesMode(bool on);
+    void syncEdgesMode();
+    bool edgesMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
+    uint32_t edgeUnderCursor(float x, float y);           // kNoEdge off the model
+    void drawEdgeOverlay();                                // the selected and creased edges, the one under the cursor
+    void drawEdgesSection();                               // Geometry > Edges
+    bool edgesMode_ = false;
+    float edgeAngle_ = 30.0f;
+    bool edgeWithin_ = false;
+    float edgeCrease_ = 1.0f; // the value Crease sets
+    struct EdgeOverlay {
+        const void* topo = nullptr;
+        uint64_t revision = 0, creaseKey = 0, visibleKey = 0;
+        std::vector<uint32_t> edges;  // the selected edges (in Edges mode), then the creased ones
+        size_t selectedEdges = 0;     // how many of `edges` are selected ones
+        size_t creased = 0;           // creased edges of the Part
+        std::vector<float> crease;    // per entry of `edges`
+        std::vector<uint8_t> visible; // per entry of `edges`
+        uint32_t hovered = ~0u;
+    } edgeOverlay_;
     struct GuidesFrom { // the brush picked when the mode started
         BrushType brush = BrushType::Standard;
         int recipe = -1;
         bool paint = false;
-    } guidesFrom_;
+    } guidesFrom_, edgesFrom_;
     std::vector<glm::vec3> guidePath_; // the curve being drawn (points on the surface)
     float guidePathLast_[2] = {0.0f, 0.0f};
     float curvesStrength_ = 50.0f;     // Guide Strength 0-100 (QRemeshOptions::guideStrength x 100)

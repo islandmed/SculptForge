@@ -676,6 +676,16 @@ double Demo::query(const std::string& name, bool& known) const {
         return double(n);
     }
     if (name == "guides_mode") return app_.guidesMode_ ? 1.0 : 0.0;
+    if (name == "edges_mode") return app_.edgesMode_ ? 1.0 : 0.0; // Geometry > Edges (PanelEdges.cpp)
+    if (name == "edges_selected") return double(app_.doc_.edgeSelection.count);
+    if (name == "edges_total") return app_.doc_.edgeSelection.topo ? double(app_.doc_.edgeSelection.topo->edgeCount()) : 0.0;
+    if (name == "edges_creased")
+        return app_.doc_.edgeSelection.topo ? double(edgeCreasedCount(app_.doc_.mesh, *app_.doc_.edgeSelection.topo)) : 0.0;
+    if (name == "edges_shown") {
+        size_t n = 0;
+        for (uint8_t v : app_.edgeOverlay_.visible) n += v;
+        return double(n);
+    }
     if (name == "forgespheres") return double(m.forgespheres.size());
     if (name == "forgesphere_preview") return m.forgespherePreview ? 1.0 : 0.0;
     if (name == "tube_points") return double(m.tube.points.size()); // the active Tube Part's (Tube, PanelTube.cpp)

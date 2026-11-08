@@ -463,3 +463,60 @@ TEST(project_material_channels_round_trip_as_format_7) {
     CHECK(manifest["version"].asNumber() == 6);
     std::filesystem::remove(path);
 }
+
+// Edge creases (#108) are an optional blob: values out of range are clamped, a damaged blob (wrong layout, count,
+// size, missing file) is left out with a notice and the project still opens; another form of the key is ignored.
+TEST(project_hostile_edge_creases) {
+    Document doc = makeDoc(makeCube(1));
+    std::vector<float>& c = doc.mesh.ensureCreases();
+    c[0] = std::nanf("");
+    c[1] = INFINITY;
+    c[2] = -3.0f;
+    c[3] = 7.0f;
+    c[4] = 0.5f;
+    const std::string path = tempPath("sf_project_creases.sfproj");
+    std::string err;
+    CHECK(saveProject(path, doc, err));
+    {
+        Document back;
+        CHECK(loadProject(path, back, err));
+        CHECK(back.mesh.creases.size() == doc.mesh.triangleCount() * 3);
+        if (back.mesh.creases.size() > 4)
+            CHECK(back.mesh.creases[0] == 0.0f && back.mesh.creases[1] == 1.0f && back.mesh.creases[2] == 0.0f &&
+                  back.mesh.creases[3] == 1.0f && back.mesh.creases[4] == 0.5f);
+        CHECK(back.notice.find("edge creases") == std::string::npos);
+    }
+    std::vector<ZipEntry> original;
+    CHECK(readStoredZip(path, original, err));
+    auto damaged = [&](const std::function<void(Json&)>& edit, bool truncate = false) {
+        CHECK(writeStoredZip(path, original, 1, err));
+        if (truncate) {
+            std::vector<ZipEntry> entries = original;
+            for (auto& e : entries)
+                if (e.name.ends_with("creases.bin")) e.data.resize(e.data.size() / 2);
+            CHECK(writeStoredZip(path, entries, 1, err));
+        }
+        CHECK(editManifest(path, [&](Json& j) { editFirstMesh(j, edit); }));
+        Document back;
+        const bool loaded = loadProject(path, back, err);
+        CHECK(loaded);
+        CHECK(back.mesh.positions == doc.mesh.positions);
+        CHECK(!back.mesh.hasCreases());
+        return back.notice;
+    };
+    auto setField = [](const char* key, Json value) {
+        return [key, value](Json& mesh) {
+            Json cr = mesh["creases"];
+            cr.set(key, value);
+            mesh.set("creases", std::move(cr));
+        };
+    };
+    for (double count : {5.0, -36.0, 1e18, 72.5})
+        CHECK(damaged(setField("count", Json(count))).find("edge creases") != std::string::npos);
+    CHECK(damaged(setField("type", Json("u8"))).find("edge creases") != std::string::npos);
+    CHECK(damaged(setField("components", Json(3.0))).find("edge creases") != std::string::npos);
+    CHECK(damaged(setField("file", Json("parts/0/mesh/nothing.bin"))).find("edge creases") != std::string::npos);
+    CHECK(damaged([](Json&) {}, true).find("edge creases") != std::string::npos); // truncated blob
+    CHECK(damaged([](Json& mesh) { mesh.set("creases", Json(12.0)); }).find("edge creases") == std::string::npos); // not a blob: ignored
+    std::filesystem::remove(path);
+}
