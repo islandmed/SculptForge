@@ -67,8 +67,9 @@ A graphics card or processor that measures slow keeps a lower tier, whatever its
 
 The first time SculptForge starts (and when you change the graphics card or the memory), a small card in the
 corner of the 3D view says what it found, for example *Your machine: RTX 3060, 12 GB VRAM, 32 GB RAM. Tier:
-High*, and what that turns on. Click **Got it**; it doesn't show again on this computer. The tier is also in the
-top bar, next to the bolt: click it to open **Edit > Preferences > Performance**.
+High*, and what that turns on. Click **Got it** (or its close, or press Esc or Enter); it doesn't show again on
+this computer, even on a laptop that starts on either of its two graphics cards. The tier is also in the top bar,
+next to the bolt: click it to open **Edit > Preferences > Performance**.
 
 There, at the top:
 

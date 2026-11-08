@@ -4587,6 +4587,8 @@ constexpr Entry kTraditionalChinese[] = {
      "顯示卡"},
     {"Performance tier",
      "效能等級"},
+    {"Put this card away. It doesn't come back on this computer; the tier is in Preferences > Performance.",
+     "收起這張卡片。它不會在這台電腦上再次出現；等級在 偏好設定 > 效能 中。"},
     {"Preferences > Performance",
      "偏好設定 > 效能"},
     {"Render profile",

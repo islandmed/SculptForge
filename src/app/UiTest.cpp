@@ -7,6 +7,9 @@
 // "Brush Lab/Save settings" for the one in that window).
 //
 //   click LABEL / double_click LABEL / right_click LABEL / hover LABEL
+//   jump_click LABEL         the pointer jumps onto the item and clicks in the same frame, no hover frame first (a
+//                            press in the same batch of events as the move, a tap: ImGui's hover is a frame behind)
+//   tier_card new            the first-run tier card again, as on a machine it was never put away on
 //   hover_model U V [S]      glide the mouse (no button) to a point on the model (fractions of its on-screen bounds,
 //                            snapped onto the sculpt like stroke), e.g. to show the brush cursor
 //   hover_window X Y [S]     the same to window fractions (anywhere, e.g. the background)
@@ -59,7 +62,8 @@
 //   drop_library FILE        as if FILE were dropped onto the middle of the Library strip (an SDL drop event there)
 //   restart [FILE]           as quitting and starting again, for the preferences, shortcuts and layout: ui.json
 //                            is saved (what waits), the defaults come back, then ui.json is read as at the start;
-//                            FILE (beside the script) replaces ui.json first (an older version's settings)
+//                            FILE (beside the script) replaces ui.json first (an older version's settings); the
+//                            tier card is shown again unless the saved hardware profile put it away
 //   env NAME VALUE           set an environment variable; $SCRIPT_DIR is the script's folder
 //   generator_stub SHAPE...  Generate 3D answers from a stub instead of any service (never the network): generation
 //                            N gets the Nth shape (cycling): sphere cube torus capsule cone, or fail; off = the services
@@ -338,6 +342,7 @@
 #endif
 #include "app/Demo.h"
 #include "app/NativeDialog.h"
+#include "app/HwProfileUi.h"
 #include "app/Shell.h"
 #include "app/Ui.h"
 #include "app/UserGlyphs.h"
@@ -1378,6 +1383,14 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "wants_frames") return app_.wantsFrames(double(SDL_GetTicksNS()) * 1e-9) ? 1.0 : 0.0;
     if (name == "focus_frames") return app_.focusKeepsDrawing(double(SDL_GetTicksNS()) * 1e-9) ? 1.0 : 0.0;
     if (name == "pen_mouse_down") return app_.penMouseDown_ ? 1.0 : 0.0;
+    if (name == "tier_card") return app_.hwProfile_ && app_.hwProfile_->tierCard ? 1.0 : 0.0; // the first-run card is up
+    if (name == "tier_card_saved") { // the saved profile puts it away on this machine (what the next start reads)
+        HardwareProfile saved;
+        return app_.hwProfile_ && loadHardwareProfile(hardwareProfilePath(), saved) &&
+                       tierCardSeen(saved.overrides.tierCardFor, app_.hwProfile_->profile.hardware)
+                   ? 1.0
+                   : 0.0;
+    }
     if (name == "ui_left_down") return ImGui::IsMouseDown(ImGuiMouseButton_Left) ? 1.0 : 0.0;
     if (name == "soft_cursor") return app_.penSoftCursor() ? 1.0 : 0.0; // Mouse mode: the app draws the arrow
     if (name == "ui_mouse_x") return ImGui::GetIO().MousePos.x; // where the panels see the pointer
@@ -1562,6 +1575,36 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     if (verb == "click" || verb == "double_click" || verb == "right_click") {
         if (!need(1)) return false;
         testClick(line, w[1], verb == "right_click" ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT, verb == "double_click");
+    } else if (verb == "jump_click") {
+        if (!need(1)) return false;
+        const std::string label = w[1];
+        steps_.push_back([this, line, label](float t) {
+            ImVec2 to;
+            bool visible = false;
+            if (findItem(label, to, &visible) && visible) {
+                mouseMotion(to.x, to.y);
+                mouseButton(true, SDL_BUTTON_LEFT);
+                mouseButton(false, SDL_BUTTON_LEFT);
+                return true;
+            }
+            if (t > 3.0f) fail(line, notFound(label));
+            return t > 3.0f;
+        });
+        wait(0.1f);
+    } else if (verb == "tier_card") {
+        if (!need(1)) return false;
+        if (w[1] != "new") {
+            error = "tier_card takes new";
+            return false;
+        }
+        run([this, line] {
+            if (!app_.hwProfile_) return fail(line, "tier_card: no hardware profile (SF_HW_PROFILE_IN_TESTS=1)");
+            ProfileOverrides o = app_.hwProfile_->profile.overrides;
+            o.tierCardFor.clear();
+            app_.saveProfileOverrides(o);
+            app_.hwProfile_->tierCard = true;
+        });
+        wait(0.1f);
     } else if (verb == "hover") {
         if (!need(1)) return false;
         const std::string label = w[1];
@@ -2469,7 +2512,10 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             const auto u8 = file.lexically_normal().u8string();
             from.assign(u8.begin(), u8.end());
         }
-        run([this, from] { app_.restartPrefsForTest(from); });
+        run([this, from] {
+            app_.restartPrefsForTest(from);
+            app_.tierCardFromDisk();
+        });
     } else if (verb == "generator_stub") {
         if (!need(1)) return false;
         std::vector<std::string> shapes(w.begin() + 1, w.end());

@@ -979,6 +979,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     if(TEST ui_hardware_tier)
       set_tests_properties(ui_hardware_tier ui_hardware_tier_2880 PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1;SF_NO_CALIBRATION=1;SF_HW_SIMULATE=high")
     endif()
+    # Putting the first-run tier card away: every way, first press, any scale, nothing under it sculpted (#161).
+    if(TEST ui_tier_card_click)
+      set_tests_properties(ui_tier_card_click PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1;SF_NO_CALIBRATION=1;SF_HW_SIMULATE=high")
+    endif()
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     # Studio mode: About shows the studio (tests/data/studio; core/StudioProfile.h).
     sculptforge_ui_test(studio_mode studio/studio_mode --studio ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/studio/studio.json)

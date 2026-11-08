@@ -1561,6 +1561,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     if (whatsNewEvent(e)) return;     // so does What's New (WhatsNewPopup.cpp)
     if (radialMouseEvent(e)) return;  // clicks on an open radial menu, and the buttons that open one (RadialMenu.cpp)
     if (strokePopupMouseEvent(e)) return; // clicks on the open stroke popup (StrokePopup.cpp)
+    if (tierCardEvent(e)) return;     // the first-run tier card's buttons and keys (PanelHardwareTier.cpp)
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
     if (touchMouseEvent(e)) return; // a finger's press waits for a second finger; a gesture's stay off (Touch.cpp)
@@ -1621,7 +1622,9 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
         lastInputPen_ = e.button.which == SDL_PEN_MOUSEID;
         // Strokes and navigation start only on the canvas, never on the shell around it.
-        if (!io.WantCaptureMouse && canvasRect().contains(e.button.x, e.button.y)) {
+        // (Nor under a floating window the pointer only now reached: ImGui's hover is a frame behind, #161.)
+        if (!io.WantCaptureMouse && canvasRect().contains(e.button.x, e.button.y) &&
+            !ui::FloatingWindowAt(ImVec2(e.button.x, e.button.y))) {
             mouseClicks_ = e.button.clicks;
             onMouseDown(e.button.x, e.button.y, e.button.button);
             mouseClicks_ = 1;
@@ -1638,7 +1641,8 @@ void App::dispatchEvent(const SDL_Event& event) {
         break;
     case SDL_EVENT_MOUSE_WHEEL:
         // (Not the scroll a trackpad sends during a pinch or twist: Touch.cpp zooms for that.)
-        if (!io.WantCaptureMouse && !touchPinching_ && canvasRect().contains(e.wheel.mouse_x, e.wheel.mouse_y))
+        if (!io.WantCaptureMouse && !touchPinching_ && canvasRect().contains(e.wheel.mouse_x, e.wheel.mouse_y) &&
+            !ui::FloatingWindowAt(ImVec2(e.wheel.mouse_x, e.wheel.mouse_y)))
             wheelZoom(e.wheel.mouse_x, e.wheel.mouse_y, e.wheel.y);
         break;
     case SDL_EVENT_KEY_DOWN:
