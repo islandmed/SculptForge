@@ -14,7 +14,31 @@ highlight: Garments and cloth: real-size sewing patterns (millimetres, curves, n
 highlight: Plugins: install sandboxed add-ons from packs (deformers and generators; no file or network access) (thanks @bribblej-web, #20)
 highlight: The Tool palette in the order you work: Reshape gathers Size and the Stack, Mirror moves to Geometry > Symmetry, and Texture Image and Viewport Look say what they do (thanks foirgairwolf on Discord)
 highlight: Cleaner cuts and creases: crease edges (select them by angle too) and they stay sharp when you add levels (thanks @NicTanghe on GitHub, #108, and _tfx on Discord); cut caps are even triangles instead of thin slivers (thanks dm4nd on Discord)
-highlight: Tube shapes: round, square, triangle or ribbon profiles with taper that follow the surface, and any brush, tool or Esc leaves Draw Tube (thanks GABO on Discord); Linux pens keep their pressure on Wayland (thanks Huguillon on YouTube)
+highlight: Tube shapes: round, square, triangle or ribbon profiles with taper that follow the surface, and any brush, tool or Esc leaves Draw Tube (thanks GABO on Discord); pose every Part at once (thanks @ABHITAR)
+title: Garments and cloth
+line: Real-size sewing patterns from 8 templates at your sizes, printed at home or exported as DXF; Cloth brush and Drape.
+image: images/wn-0120-garments.jpg
+action: guide:garments.md
+title: Plugins
+line: Packs can bring sandboxed plugins: deformers and generators with no file, network or system access.
+image: images/wn-0120-plugins.jpg
+action: guide:packs-and-macros.md#plugins
+title: Pose all Parts
+line: Pose every visible Part at once on one light Pose Mesh; Apply gives each Part the pose at full resolution.
+image: images/wn-0120-pose.jpg
+action: guide:parts.md#pose-all-parts
+title: Tube shapes
+line: Round, square or ribbon cross-sections, with a taper at either end of the tube.
+image: images/wn-0120-tube.jpg
+action: guide:tube.md#shape-cross-section-and-taper
+title: Edge creases
+line: Crease edges (select them by angle too) and they stay sharp when you add levels.
+image: images/wn-0120-crease.jpg
+action: guide:edges.md#creases
+title: Reshape
+line: Tool > Reshape: Size, then a live stack of bends, twists and tapers you can reorder and apply.
+image: images/wn-0120-reshape.jpg
+action: guide:sculpting.md#deformation-stack
 ```
 
 ## Version 0.11.16
