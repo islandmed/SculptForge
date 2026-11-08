@@ -36,6 +36,11 @@ Panel makePanel(const std::string& name, std::vector<glm::vec2> pts) {
 
 void curve(Panel& p, uint32_t e, glm::vec2 c1, glm::vec2 c2) { p.curves[e] = {true, c1, c2}; }
 
+// Edge names as the wearer has them for a front or back piece whose +x edges are on one side: a front's +x side is
+// the wearer's left, a back's (seen from behind) their right. `side(front, true)`: the +x side's word.
+const char* side(bool front, bool plusX) { return front == plusX ? "left" : "right"; }
+std::string sided(bool front, bool plusX, const char* what) { return std::string(side(front, plusX)) + " " + what; }
+
 struct Builder {
     Pattern pat;
     std::string error;
@@ -76,8 +81,8 @@ void layout(Pattern& pat) {
 
 // A body panel centred on x = 0, hem at y = 0, edges as the T-shirt's: hem (0), side (1), armhole (2), shoulder (3),
 // neckline (4), shoulder (5), armhole (6), side (7). The sides run from the hem's half width to the chest's.
-Panel bodice(const std::string& name, float hemHalf, float chestHalf, float length, float shoulderHalf, float neckHalf,
-             float neckDepth, float armholeDepth) {
+Panel bodice(const std::string& name, bool front, float hemHalf, float chestHalf, float length, float shoulderHalf,
+             float neckHalf, float neckDepth, float armholeDepth) {
     const float drop = std::clamp(0.1f * shoulderHalf, 15.0f, 60.0f);
     const float armY = std::max(length - armholeDepth, 0.3f * length);
     shoulderHalf = std::clamp(shoulderHalf, neckHalf + 30.0f, chestHalf - 10.0f);
@@ -92,12 +97,15 @@ Panel bodice(const std::string& name, float hemHalf, float chestHalf, float leng
     const float cy = length - 4.0f * std::min(neckDepth, 0.6f * rise) / 3.0f; // the cubic dips 3/4 of this
     curve(p, 4, {neckHalf - 5.0f, cy}, {-neckHalf + 5.0f, cy});
     p.notches = {{1, 0.5f}, {7, 0.5f}};
+    p.edgeNames = {"hem", sided(front, true, "side"), sided(front, true, "armhole"), sided(front, true, "shoulder"),
+                   "neckline", sided(front, false, "shoulder"), sided(front, false, "armhole"), sided(front, false, "side")};
     return p;
 }
 
 // A sleeve centred on x = 0: hem (0), underarm (1), cap (2, over the top from the +x underarm), underarm (3); the
 // cap's height is found so the cap is `capLength` long.
-Panel sleeve(const std::string& name, float halfWidth, float hemHalf, float underarmLength, float capLength) {
+Panel sleeve(const std::string& name, float halfWidth, float hemHalf, float underarmLength, float capLength,
+             const char* hemName = "hem") {
     halfWidth = std::min(halfWidth, 0.45f * capLength);
     hemHalf = std::min(hemHalf, halfWidth);
     Panel p = makePanel(name, {{-hemHalf, 0}, {hemHalf, 0}, {halfWidth, underarmLength}, {-halfWidth, underarmLength}});
@@ -108,11 +116,12 @@ Panel sleeve(const std::string& name, float halfWidth, float hemHalf, float unde
         (edgeLength(p, 2) < capLength ? lo : hi) = m;
     }
     p.notches = {{2, 0.5f}};
+    p.edgeNames = {hemName, "underarm", "cap", "underarm"};
     return p;
 }
 
 // A skirt panel centred on x = 0: hem (0), side (1), hip curve (2), waist (3), hip curve (4), side (5).
-Panel skirtPanel(const std::string& name, float waistHalf, float hipHalf, float hemHalf, float length) {
+Panel skirtPanel(const std::string& name, bool front, float waistHalf, float hipHalf, float hemHalf, float length) {
     const float hipDepth = std::min(190.0f, 0.45f * length), hipY = length - hipDepth;
     Panel p = makePanel(name, {{-hemHalf, 0}, {hemHalf, 0}, {hipHalf, hipY}, {waistHalf, length}, {-waistHalf, length},
                                {-hipHalf, hipY}});
@@ -120,6 +129,8 @@ Panel skirtPanel(const std::string& name, float waistHalf, float hipHalf, float 
     curve(p, 2, {hipHalf, hipY + 0.45f * hipDepth}, {mid, length - 0.1f * hipDepth});
     curve(p, 4, {-mid, length - 0.1f * hipDepth}, {-hipHalf, hipY + 0.45f * hipDepth});
     p.notches = {{1, 0.9f}, {5, 0.1f}};
+    p.edgeNames = {"hem", sided(front, true, "side"), sided(front, true, "hip"), "waist", sided(front, false, "hip"),
+                   sided(front, false, "side")};
     return p;
 }
 
@@ -132,6 +143,7 @@ Panel hoodHalf(const std::string& name, float neck, float head) {
     curve(p, 1, {neck + 0.6f * (back - neck), 0.12f * height}, {back, 0.3f * height});
     curve(p, 2, {back, 0.8f * height}, {0.92f * depth, height});
     p.grainDegrees = 90.0f;
+    p.edgeNames = {"neck", "back", "crown", "top", "face opening"};
     return p;
 }
 
@@ -159,6 +171,7 @@ void trousers(const SizeChart& s, float length, Builder& b) {
                                    {-w - e, inseam}});
         curve(p, 4, {-w, inseam + 0.3f * rise}, {-w - 0.5f * e, inseam + 0.02f * rise});
         p.notches = {{1, 0.45f}};
+        p.edgeNames = {"hem", "outseam", "hip", "waist", "crotch", "inseam"};
         return p;
     };
     const Panel front = leg("Front", wF, eF, hemF, inF, 0.0f), back = leg("Back", wB, eB, hemB, inB, raise);
@@ -184,8 +197,8 @@ void skirt(const SizeChart& s, float length, bool aline, Builder& b, float waist
     const float hipH = std::max(0.25f * (s.get("hip") + 40.0f), waistH);
     const float hipDepth = std::min(190.0f, 0.45f * len);
     const float hemH = aline ? hipH + 0.25f * (len - hipDepth) : hipH;
-    const uint32_t f = b.add(skirtPanel("Skirt front", waistH, hipH, hemH, len));
-    const uint32_t k = b.add(skirtPanel("Skirt back", waistH, hipH, hemH, len));
+    const uint32_t f = b.add(skirtPanel("Skirt front", true, waistH, hipH, hemH, len));
+    const uint32_t k = b.add(skirtPanel("Skirt back", false, waistH, hipH, hemH, len));
     // Sides as the T-shirt's: the front's +x (the wearer's left) meets the back's -x.
     b.sew(f, 1, k, 5);
     b.sew(f, 2, k, 4);
@@ -196,6 +209,7 @@ void skirt(const SizeChart& s, float length, bool aline, Builder& b, float waist
     const float wf = b.len(f, 3), wk = b.len(k, 3);
     const uint32_t band = b.add(rectanglePanel("Waistband", wf + wk, 80.0f));
     b.pat.panels[band].grainDegrees = 0.0f;
+    b.pat.panels[band].edgeNames = {"skirt edge", "end", "fold", "end"};
     b.sew(band, 0, 0.0f, wf / (wf + wk), f, 3, 0.0f, 1.0f);
     b.sew(band, 0, wf / (wf + wk), 1.0f, k, 3, 0.0f, 1.0f);
     b.sew(band, 1, band, 3);
@@ -225,8 +239,8 @@ void hoodie(const SizeChart& s, float length, Builder& b) {
     const float len = length > 0.0f ? std::clamp(length, 300.0f, 1300.0f) : s.get("back_length") + 230.0f;
     const float neckHalf = std::clamp(0.24f * s.get("neck"), 55.0f, 0.5f * half);
     const float shoulderHalf = 0.5f * s.get("shoulder") + 10.0f, armDepth = 0.3f * s.get("chest") + 10.0f;
-    const uint32_t f = b.add(bodice("Front", half, half, len, shoulderHalf, neckHalf, 1.05f * neckHalf, armDepth));
-    const uint32_t k = b.add(bodice("Back", half, half, len, shoulderHalf, neckHalf, 0.25f * neckHalf, armDepth));
+    const uint32_t f = b.add(bodice("Front", true, half, half, len, shoulderHalf, neckHalf, 1.05f * neckHalf, armDepth));
+    const uint32_t k = b.add(bodice("Back", false, half, half, len, shoulderHalf, neckHalf, 0.25f * neckHalf, armDepth));
     b.sew(f, 1, k, 7);
     b.sew(f, 7, k, 1);
     b.sew(f, 3, k, 5);
@@ -235,8 +249,8 @@ void hoodie(const SizeChart& s, float length, Builder& b) {
     const float sleeveLen = s.get("arm") + 30.0f, upper = 0.5f * (s.get("upper_arm") + 90.0f);
     const float underarm = std::max(120.0f, sleeveLen - 0.3f * cap);
     const float wristHalf = 0.5f * (s.get("wrist") + 70.0f);
-    const uint32_t ls = b.add(sleeve("Left sleeve", upper, wristHalf, underarm, cap));
-    const uint32_t rs = b.add(sleeve("Right sleeve", upper, wristHalf, underarm, cap));
+    const uint32_t ls = b.add(sleeve("Left sleeve", upper, wristHalf, underarm, cap, "cuff"));
+    const uint32_t rs = b.add(sleeve("Right sleeve", upper, wristHalf, underarm, cap, "cuff"));
     // As the T-shirt: the left sleeve's +x half of the cap faces back, the right's faces front.
     b.sew(f, 2, 0, 1, ls, 2, 0.5f, 1);
     b.sew(k, 6, 0, 1, ls, 2, 0, 0.5f);
@@ -259,6 +273,7 @@ void hoodie(const SizeChart& s, float length, Builder& b) {
                                         {0, 0.35f * ph}});
     curve(pocket, 2, {0.86f * pw, 0.45f * ph}, {0.8f * pw, 0.75f * ph}); // the hand openings scoop in
     curve(pocket, 4, {0.2f * pw, 0.75f * ph}, {0.14f * pw, 0.45f * ph});
+    pocket.edgeNames = {"bottom", "side", "hand opening", "top", "hand opening", "side"};
     b.add(pocket);
 }
 
@@ -268,8 +283,9 @@ void dress(const SizeChart& s, float length, Builder& b) {
     const float len = s.get("back_length") + 15.0f;
     const float neckHalf = std::clamp(0.22f * s.get("neck"), 50.0f, 0.5f * half);
     const float shoulderHalf = 0.5f * s.get("shoulder") - 5.0f, armDepth = 0.24f * s.get("chest");
-    const uint32_t f = b.add(bodice("Bodice front", waistHalf, half, len, shoulderHalf, neckHalf, 1.3f * neckHalf, armDepth));
-    const uint32_t k = b.add(bodice("Bodice back", waistHalf, half, len, shoulderHalf, neckHalf, 0.3f * neckHalf, armDepth));
+    const uint32_t f = b.add(bodice("Bodice front", true, waistHalf, half, len, shoulderHalf, neckHalf, 1.3f * neckHalf, armDepth));
+    const uint32_t k = b.add(bodice("Bodice back", false, waistHalf, half, len, shoulderHalf, neckHalf, 0.3f * neckHalf, armDepth));
+    b.pat.panels[f].edgeNames[0] = b.pat.panels[k].edgeNames[0] = "waist"; // (the bodice ends at the waist seam)
     b.sew(f, 1, k, 7);
     b.sew(f, 7, k, 1);
     b.sew(f, 3, k, 5);
@@ -289,6 +305,7 @@ void cloak(const SizeChart& s, float length, Builder& b) {
     curve(left, 1, {-R, -kArc * R}, {-kArc * R, -R});
     curve(left, 3, {-kArc * r, -r}, {-r, -kArc * r});
     left.grainDegrees = 90.0f;
+    left.edgeNames = {"front edge", "hem", "centre back", "neck"};
     const uint32_t cl = b.add(left);
     Panel right = mirroredPanel(left);
     right.name = "Right cape";
@@ -310,6 +327,9 @@ Panel gloveBack(const SizeChart& s) {
     const float fw = 0.25f * width, gap = 0.18f * fw;
     const float tips[4] = {0.40f, 0.45f, 0.42f, 0.33f}; // index, middle, ring, little (of the hand length)
     std::vector<glm::vec2> pts = {{0.5f * width - wristHalf, 0}, {0.5f * width + wristHalf, 0}};
+    // names[i]: the edge from pts[i] to the next point.
+    std::vector<std::string> names = {"wrist", "side", "thumb", "thumb tip", "thumb"};
+    const char* fingers[4] = {"index finger", "middle finger", "ring finger", "little finger"};
     // Thumb: out and up from the side, 0.36 of the hand long on its lower side.
     const glm::vec2 d = glm::normalize(glm::vec2(0.55f, 1.0f));
     const float t0 = cuff + 0.2f * Lh, t1 = cuff + 0.45f * Lh, tl = 0.36f * Lh;
@@ -321,13 +341,21 @@ Panel gloveBack(const SizeChart& s) {
     std::vector<uint32_t> tipEdges = {3};
     for (int k = 0; k < 4; ++k) {
         const float xr = width - float(k) * fw, xl = xr - fw, tip = knuckle + tips[k] * Lh;
+        names.push_back(fingers[k]); // (from the point before: up the finger's thumb side)
         pts.push_back({xr - 0.5f * gap, tip});
         tipEdges.push_back(uint32_t(pts.size() - 1));
+        names.push_back(std::string(fingers[k]) + " tip");
         pts.push_back({xl + 0.5f * gap, tip});
-        if (k < 3) pts.push_back({xl, knuckle});
+        if (k < 3) {
+            names.push_back(fingers[k]);
+            pts.push_back({xl, knuckle});
+        }
     }
+    names.push_back(fingers[3]);
     pts.push_back({0, cuff + 0.45f * Lh});
+    names.push_back("side");
     Panel p = makePanel("Left glove back", std::move(pts));
+    p.edgeNames = std::move(names);
     for (uint32_t e : tipEdges) {
         const glm::vec2 a = p.points[e], c = p.points[(e + 1) % p.points.size()];
         const float bulge = 0.45f * glm::length(c - a);
@@ -452,6 +480,8 @@ Panel mirroredPanel(const Panel& src) {
         p.curves[j] = {c.curved, M(c.c2), M(c.c1)};
     }
     for (Notch& nt : p.notches) nt = {mirrorEdge(n, nt.edge % n), 1.0f - nt.t};
+    if (src.edgeNames.size() == n)
+        for (uint32_t j = 0; j < n; ++j) p.edgeNames[j] = src.edgeNames[mirrorEdge(n, j)];
     p.grainDegrees = 180.0f - src.grainDegrees;
     return p;
 }
