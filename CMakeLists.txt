@@ -1016,6 +1016,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(geometry_groups_1440 geometry_groups --size 1440x900)
     sculptforge_ui_test(geometry_groups_2880 geometry_groups --size 2880x1800) # its 200% shot: 1440 px of UI
     sculptforge_ui_test(geometry_groups_1024 narrow/geometry_groups --size 1024x768)
+    # #163's unhide prompt at 1440 and 2880 px (tests/ui/unhide_prompt.sfui).
+    sculptforge_ui_test(unhide_prompt_1440 unhide_prompt --size 1440x900)
+    sculptforge_ui_test(unhide_prompt_2880 unhide_prompt --size 2880x1800)
     # The Tool sub-palettes named and ordered by task (tests/ui/tool_palettes.sfui; narrow/ at 1024).
     sculptforge_ui_test(tool_palettes_1440 tool_palettes --size 1440x900)
     sculptforge_ui_test(tool_palettes_2880 tool_palettes --size 2880x1800)

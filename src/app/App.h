@@ -222,6 +222,13 @@ private:
     std::string pendingLevelDelete_;
     bool openLevelDelete_ = false;
     bool openSubdivideConfirm_ = false; // Subdivide on a Part with levels: confirm first (Shell.cpp)
+    // #163: Quad Remesh, Voxel Remesh, Decimate and Merge by Distance on a partly hidden Part ask first (Shell.cpp):
+    // true when the operation may go ahead now; otherwise the prompt opens and "Unhide and continue" shows
+    // everything, then runs `proceed`.
+    bool unhideAllows(const char* operation, std::function<void()> proceed, bool skip = false);
+    std::string unhideOperation_;
+    std::function<void()> unhideProceed_;
+    bool openUnhideConfirm_ = false;
     void drawDetailSlider(const char* id);
 
     void runCommand(const std::string& name, const Args& args = {});
@@ -2012,6 +2019,7 @@ private:
     size_t weldPreviewDrawn_ = 0;  // points the preview drew this frame (UI tests: weld_preview_points)
     uint64_t weldKey_ = 0;         // meshCheckKey() and distance the count below is for
     float weldKeyDistance_ = -1.0f;
+    bool weldMaskedOnly_ = false;  // Masked only: only masked points merge (foirgairwolf on Discord)
     size_t weldCount_ = 0;
     std::vector<glm::vec3> weldPoints_; // a sample (<= 20000) of the points that would merge, for the preview
     MeshReport meshReport_;

@@ -118,6 +118,7 @@ std::vector<uint8_t> keptForRemesh(const Mesh& mesh, bool keepMasked, bool& allM
 
 void App::startQRemesh() {
     if (qremesh_ || doc_.mesh.triangleCount() == 0) return;
+    if (!unhideAllows("Quad Remesh", [this] { startQRemesh(); })) return; // #163
     if (doc_.sculptor.strokeActive()) endStroke();
     bool allMasked = false;
     std::vector<uint8_t> keep = keptForRemesh(doc_.mesh, retopo_.keepMasked, allMasked);
@@ -193,6 +194,9 @@ void App::startQRemesh() {
 
 void App::startVoxelRemesh(RemeshTrigger trigger) {
     if (voxelRemesh_) return;
+    // #163: the button asks on a partly hidden Part (Quick Remesh and Remesh after each stroke just go).
+    if (!unhideAllows("Voxel Remesh", [this, trigger] { startVoxelRemesh(trigger); }, trigger != RemeshTrigger::Button))
+        return;
     Args args{{"resolution", double(voxelResolution_)}};
     if (voxelKeepMasked_) args["keep_masked"] = true;
     if (!memoryAllows("remesh", args, [this, trigger] { startVoxelRemesh(trigger); })) return;

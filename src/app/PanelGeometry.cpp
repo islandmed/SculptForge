@@ -130,9 +130,12 @@ void App::drawGeometrySection() {
     ImGui::Spacing();
     tray::GroupLabel(*this, "Resolution (no levels)");
     if (ImGui::Button(tr("Decimate"), ImVec2(half, 0))) {
-        Args args{{"ratio", double(decimateRatio_)}};
-        if (decimateKeepMasked_) args["keep_masked"] = true;
-        runCommand("decimate", args);
+        auto decimate = [this] {
+            Args args{{"ratio", double(decimateRatio_)}};
+            if (decimateKeepMasked_) args["keep_masked"] = true;
+            runCommand("decimate", args);
+        };
+        if (unhideAllows("Decimate", decimate)) decimate(); // #163
     }
     ui::HelpText("Decimate", nullptr, "Reduce the triangle count while keeping the shape. Sculpt layers are kept.",
                  "Tool > Geometry");
