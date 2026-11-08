@@ -10,8 +10,11 @@
 
 #include <glm/glm.hpp>
 
+#include <chrono>
 #include <complex>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <memory>
 #include <unordered_set>
@@ -28,6 +31,21 @@ inline vec3 safeNormalize(const vec3& v, const vec3& fallback = vec3(0, 0, 1)) {
     const float l = glm::length(v);
     return l > 1e-20f ? v / l : fallback;
 }
+
+// Stage times on stderr with SF_QREMESH_TIMING (sf_remesh_bench, tests/tools/remesh_bench.cpp): lap("x") prints the
+// time since the previous lap.
+struct StageClock {
+    const char* scope;
+    bool on = std::getenv("SF_QREMESH_TIMING") != nullptr;
+    std::chrono::steady_clock::time_point last = std::chrono::steady_clock::now();
+    explicit StageClock(const char* s) : scope(s) {}
+    void lap(const char* what) {
+        if (!on) return;
+        const auto now = std::chrono::steady_clock::now();
+        std::fprintf(stderr, "    %s %-22s %7.1f ms\n", scope, what, std::chrono::duration<double, std::milli>(now - last).count());
+        last = now;
+    }
+};
 
 // Runs fn(i) for i in [0, n) on all hardware threads (coarse jobs: one i is a lot of work).
 void parallelJobs(size_t n, const std::function<void(size_t)>& fn);

@@ -760,6 +760,12 @@ if(SCULPTFORGE_BUILD_TESTS)
   target_include_directories(sf_fake_splat_tools PRIVATE third_party/stb)
   target_link_libraries(sf_fake_splat_tools PRIVATE sculptforge_core)
   add_dependencies(sculptforge_tests sf_fake_splat_tools)
+  # Remesh timings per path and stage at the UI defaults (tests/tools/remesh_bench.cpp).
+  add_executable(sf_remesh_bench tests/tools/remesh_bench.cpp)
+  target_link_libraries(sf_remesh_bench PRIVATE sculptforge_core)
+  # Nightly (and the 3060 sanity row: pc.sh . -L nightly -R '^remesh_bench$' -V): the matrix at the UI defaults.
+  add_test(NAME remesh_bench COMMAND sf_remesh_bench --runs 3 --tris 1000,10000,100000,1000000 --bumpy)
+  set_tests_properties(remesh_bench PROPERTIES LABELS nightly TIMEOUT 1800)
   target_compile_definitions(sculptforge_tests PRIVATE SF_FAKE_SPLAT_TOOLS="$<TARGET_FILE:sf_fake_splat_tools>")
 
   # Tests that launch our programs from Python get a path they can run directly. When cross-compiling
