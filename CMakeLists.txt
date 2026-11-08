@@ -1028,9 +1028,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(tray_hscroll_hidpi hidpi/tray_hscroll --size 1920x1200)
     set_tests_properties(ui_right_tray_looks_720 ui_windows_dpi_2560 ui_windows_dpi_2160 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
     sculptforge_ui_test(user_guide_1080 user_guide --size 1920x1080)
-    # The mode matrix probes every registry action (tests/ui/mode_matrix.sfui): 3-4 min on a CI runner, so it starts first.
+    # The mode matrix probes every registry action (tests/ui/mode_matrix.sfui): 3-10 min on a loaded CI runner, so it starts first.
     if(TEST ui_mode_matrix)
-      set_tests_properties(ui_mode_matrix PROPERTIES TIMEOUT 600 COST 500)
+      set_tests_properties(ui_mode_matrix PROPERTIES TIMEOUT 1200 COST 500)
     endif()
     # Seeded user-action fuzz, many seeds (tests/ui/monkey.sfui runs a few in T0): nightly only (T3).
     sculptforge_ui_test(monkey_many nightly/monkey_many)
