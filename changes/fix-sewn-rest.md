@@ -4,8 +4,8 @@ fixed: **Drape** settles where it used to keep twitching: cloth pressed into a n
   through the body while they close. It now runs until the cloth has really stopped, which can take a moment longer
   (still under 10 s for a 2M-triangle body).
 testers:
-  - Any OS: Drape a plane onto a body so it hangs into an armpit or between the arm and the chest: it comes to rest
-    (the status says "at rest"), with no flicker in the fold.
+  - Garments: the T-shirt on the Full Body starter: the armpits and the inside of the elbows stay still at rest (no
+    flicker).
   - Garments: sew a T-shirt on the Full Body starter and Drape it: it reaches rest, the back neckline goes round the
     neck (not through it).
 ---
