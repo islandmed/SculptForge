@@ -20,6 +20,7 @@
 #include <atomic>
 #include <bit>
 #include <cmath>
+#include <stdexcept>
 #include <thread>
 
 using namespace sf;
@@ -114,6 +115,33 @@ TEST(thread_pool_runs_every_job_once) {
     std::thread::id where;
     poolFor(10, [&](size_t, size_t) { where = std::this_thread::get_id(); }, 4096);
     CHECK(where == std::this_thread::get_id());
+}
+
+// A job that throws (on the calling thread or a worker): the exception comes out of poolFor once the workers have
+// left, and the pool still runs every job of the next call. (It used to leave the pool pointing at the finished
+// call: the next one waited for ever, every thread asleep.)
+TEST(thread_pool_survives_a_throwing_job) {
+    const std::thread::id caller = std::this_thread::get_id();
+    for (int round = 0; round < 200; ++round) {
+        const bool onCaller = round % 2 == 0;
+        bool threw = false;
+        try {
+            poolFor(64, [&](size_t b, size_t) {
+                if (b == 7 * 8 && (onCaller ? std::this_thread::get_id() == caller : true)) throw std::runtime_error("x");
+                std::this_thread::yield();
+            }, 8);
+        } catch (const std::runtime_error&) {
+            threw = true;
+        }
+        if (!onCaller) CHECK(threw); // (the caller may not take block 7: then nothing threw)
+        std::vector<std::atomic<int>> hits(4096);
+        poolFor(hits.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) hits[i].fetch_add(1);
+        }, 64);
+        bool once = true;
+        for (auto& h : hits) once = once && h.load() == 1;
+        CHECK(once);
+    }
 }
 
 TEST(parallel_brushes_match_serial) {

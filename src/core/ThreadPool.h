@@ -13,6 +13,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstddef>
+#include <exception>
 #include <functional>
 #include <mutex>
 #include <thread>
@@ -39,7 +40,8 @@ public:
     bool serial() const { return serial_; }
     // Calls job(i) for every i in [0, count), spread over the pool and the calling thread; returns when all
     // are done. Runs inline when called from inside a job, while another thread is using the pool, or when
-    // count <= 1.
+    // count <= 1. A job that throws stops the jobs not yet started; run() rethrows the first exception once every
+    // worker has left (the pool stays usable).
     void run(size_t count, const std::function<void(size_t)>& job);
 
 private:
@@ -51,6 +53,7 @@ private:
         std::atomic<size_t> next{0};
         size_t finished = 0; // guarded by mutex_
         int users = 0;       // workers inside, guarded by mutex_
+        std::exception_ptr error; // the first job's exception, guarded by mutex_
     };
     void workerLoop();
     size_t drain(Run& run);

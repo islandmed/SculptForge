@@ -45,12 +45,19 @@ ThreadPool& ThreadPool::shared() {
     return pool;
 }
 
-// Runs jobs of `run` until none are left; returns how many this thread ran.
+// Runs jobs of `run` until none are left; returns how many this thread ran. A job's exception stays in run.error
+// and no further job starts: thrown through here, it left run() waiting for ever (its Run gone, workers still in it).
 size_t ThreadPool::drain(Run& run) {
     const bool wasInside = insidePoolJob;
     insidePoolJob = true;
     size_t ran = 0;
-    for (size_t i; (i = run.next.fetch_add(1)) < run.count; ++ran) (*run.job)(i);
+    try {
+        for (size_t i; (i = run.next.fetch_add(1)) < run.count; ++ran) (*run.job)(i);
+    } catch (...) {
+        run.next.store(run.count);
+        std::lock_guard lock(mutex_);
+        if (!run.error) run.error = std::current_exception();
+    }
     insidePoolJob = wasInside;
     return ran;
 }
@@ -74,7 +81,7 @@ void ThreadPool::workerLoop() {
         const size_t ran = drain(*run);
         lock.lock();
         run->finished += ran;
-        if (--run->users == 0 && run->finished == run->count) done_.notify_all();
+        if (--run->users == 0 && (run->finished == run->count || run->error)) done_.notify_all();
     }
 }
 
@@ -97,8 +104,9 @@ void ThreadPool::run(size_t count, const std::function<void(size_t)>& job) {
     const size_t ran = drain(run);
     std::unique_lock lock(mutex_);
     run.finished += ran;
-    done_.wait(lock, [&] { return run.users == 0 && run.finished == run.count; });
+    done_.wait(lock, [&] { return run.users == 0 && (run.finished == run.count || run.error); });
     current_ = nullptr;
+    if (run.error) std::rethrow_exception(run.error);
 }
 
 } // namespace sf
