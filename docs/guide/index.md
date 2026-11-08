@@ -44,6 +44,7 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 12. [Selection sets and morph targets](selection-sets.md)
 13. [Parts](parts.md)
     - [Linked Duplicates](linked-duplicates.md)
+    - [Garments: sewing patterns at real size](garments.md)
 14. [Forge Spheres](forge-spheres.md)
     - [Tube: draw in 3D space](tube.md)
 15. [Vertex Paint and materials](vertex-paint.md)

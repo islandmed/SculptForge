@@ -5,6 +5,8 @@
 // pattern files. The pattern lives in the project (Document::projectSettings["garment"]).
 #include "core/Commands.h"
 #include "core/Garment.h"
+#include "core/GarmentPrint.h"
+#include "core/GarmentTemplates.h"
 
 #include <algorithm>
 #include <cmath>
@@ -95,28 +97,86 @@ CommandResult seamCommand(Document& doc, const Args& a) {
 } // namespace
 
 void registerGarmentCommands(CommandRegistry& reg) {
+    // garment_new and garment_size take every size chart measurement as <key>_mm.
+    std::vector<ParamSpec> sizeParams;
+    for (const MeasureSpec& m : measureSpecs())
+        sizeParams.push_back({std::string(m.key) + "_mm", T::Number, m.description, false});
+    // Measurements given are stored in the project's size chart (and used by the next template too).
+    auto applySizes = [](Document& doc, const Args& a, std::string& changed) {
+        SizeChart chart = documentSizeChart(doc);
+        bool any = false;
+        for (const MeasureSpec& m : measureSpecs()) {
+            const std::string key = std::string(m.key) + "_mm";
+            if (!a.count(key)) continue;
+            chart.set(m.key, float(argNumber(a, key, m.fallback)));
+            changed += (changed.empty() ? "" : ", ") + std::string(m.key);
+            any = true;
+        }
+        if (any) setDocumentSizeChart(doc, chart);
+        return chart;
+    };
+    std::string templateList = "empty";
+    for (const TemplateSpec& t : templateSpecs()) templateList += "; " + std::string(t.description);
+    std::vector<ParamSpec> newParams = {
+        {"template", T::String, "tshirt (default), trousers, skirt, skirt_aline, hoodie, dress, cloak, glove or empty",
+         false},
+        {"length_mm", T::Number, "The template's main length in mm (see the template list; default from the size chart)",
+         false},
+        {"add", T::Bool, "Add the template beside the pattern already in the scene (an outfit) instead of replacing it",
+         false},
+        {"particle_mm", T::Number, "Distance between the cloth's particles in mm (default 15; gloves 3-6, from the hand)", false}};
+    newParams.insert(newParams.end(), sizeParams.begin(), sizeParams.end());
     reg.add({"garment_new",
-             "Garments: start a garment pattern in the scene (saved with the project). template: tshirt (front, back "
-             "and two sleeves, sewn and placed: ready to drape) or empty.",
-             {{"template", T::String, "tshirt (default) or empty", false},
-              {"chest_mm", T::Number, "T-shirt: the body's chest girth in mm (default 960)", false},
-              {"length_mm", T::Number, "T-shirt: length from the shoulder in mm (default 700)", false},
-              {"particle_mm", T::Number, "Distance between the cloth's particles in mm (default 15)", false}},
-             [](Document& doc, const Args& a) -> CommandResult {
+             "Garments: start a garment pattern in the scene (saved with the project) from a template, flat panels at "
+             "real size made from the project's size chart (give any measurement as <name>_mm to change it), sewn "
+             "the way the garment is made. Templates: " + templateList + ".",
+             newParams,
+             [applySizes](Document& doc, const Args& a) -> CommandResult {
                  const std::string t = lower(argString(a, "template", "tshirt"));
+                 std::string changed;
+                 const SizeChart chart = applySizes(doc, a, changed);
                  Pattern pat;
-                 if (t == "tshirt" || t == "t-shirt")
-                     pat = tshirtPattern(float(argNumber(a, "chest_mm", 960.0)), float(argNumber(a, "length_mm", 700.0)));
-                 else if (t != "empty")
-                     return {false, "Unknown template \"" + t + "\" (tshirt or empty)"};
-                 pat.particleDistance = float(std::clamp(argNumber(a, "particle_mm", pat.particleDistance), 2.0, 200.0));
+                 std::string error;
+                 if (t != "empty" && !makeTemplate(t == "t-shirt" ? "tshirt" : t, chart,
+                                                   float(argNumber(a, "length_mm", 0.0)), pat, error))
+                     return {false, error};
+                 const bool add = argBool(a, "add", false);
+                 Pattern old;
+                 if (add && t != "empty" && documentPattern(doc, old) && !old.empty()) {
+                     appendPattern(old, pat);
+                     pat = std::move(old);
+                 }
+                 if (a.count("particle_mm"))
+                     pat.particleDistance = float(std::clamp(argNumber(a, "particle_mm", 15.0), 2.0, 200.0));
+                 const std::string sizes = changed.empty() ? "" : " (size chart: " + changed + " set)";
                  if (pat.empty()) {
                      doc.projectSettings.set("garment", patternToJson(pat)); // an empty pattern to draw in
                      doc.modified = true;
-                     return {true, "New empty garment pattern"};
+                     return {true, "New empty garment pattern" + sizes};
                  }
                  setDocumentPattern(doc, pat);
-                 return {true, "New garment pattern: " + summary(pat)};
+                 return {true, std::string(add ? "Added " : "New ") + t + ": " + summary(pat) + sizes};
+             }});
+    std::vector<ParamSpec> chartParams = {{"reset", T::Bool, "Every measurement back to its default first", false}};
+    chartParams.insert(chartParams.end(), sizeParams.begin(), sizeParams.end());
+    reg.add({"garment_size",
+             "Garments: the project's size chart (body measurements in mm that garment_new's templates are made from). "
+             "Give any measurement as <name>_mm to set it; with none, lists the chart.",
+             chartParams,
+             [applySizes](Document& doc, const Args& a) -> CommandResult {
+                 if (argBool(a, "reset", false)) setDocumentSizeChart(doc, SizeChart{});
+                 std::string changed;
+                 const SizeChart chart = applySizes(doc, a, changed);
+                 std::ostringstream s;
+                 s << (changed.empty() ? "Size chart" : "Size chart (" + changed + " set)");
+                 const auto& specs = measureSpecs();
+                 for (size_t i = 0; i < specs.size(); ++i) {
+                     char buf[160];
+                     std::snprintf(buf, sizeof buf, "\n%s_mm = %.0f  (%s)", specs[i].key, double(chart.mm[i]),
+                                   specs[i].description);
+                     s << buf;
+                 }
+                 return {true, s.str()};
              }});
     reg.add({"garment_info", "Garments: the pattern's panels, seams (with their lengths) and any problems.", {},
              [](Document& doc, const Args&) -> CommandResult {
@@ -245,18 +305,50 @@ void registerGarmentCommands(CommandRegistry& reg) {
                  return {true, "Garment: " + summary(pat) + ", " + pat.fabric};
              }});
     reg.add({"garment_export",
-             "Garments: write the pattern at real size for sewing: svg (sewing and cutting lines, notches, grain "
-             "lines, names, a 50 mm scale square; print at 100%) or dxf (outlines in mm).",
-             {{"path", T::String, "File to write (.svg or .dxf)", true}, {"format", T::String, "svg or dxf (default: from the path)", false}},
+             "Garments: write the pattern at real size for sewing: pdf (tiled A4 or Letter pages to print at home: trim "
+             "lines, matching triangles, page names, a 50 mm scale square on A1), svg_pages (the same pages, one SVG "
+             "each: <name>-A1.svg, ...), svg (the whole sheet: sewing and cutting lines, notches, grain lines, names, "
+             "the 50 mm square; for a plotter or print shop) or dxf (outlines in mm, for cutters).",
+             {{"path", T::String, "File to write (.pdf, .svg or .dxf)", true},
+              {"format", T::String, "pdf, svg_pages, svg or dxf (default: from the path)", false},
+              {"paper", T::String, "pdf / svg_pages: a4 (default) or letter", false},
+              {"landscape", T::Bool, "pdf / svg_pages: pages on their side", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  CommandResult r;
                  Pattern pat;
                  if (!loadOrFail(doc, pat, r)) return r;
                  if (pat.empty()) return {false, "The pattern has no panels"};
                  const std::string path = argString(a, "path");
+                 const std::string lp = lower(path);
+                 auto ends = [&](const char* ext) {
+                     const std::string e(ext);
+                     return lp.size() > e.size() && lp.compare(lp.size() - e.size(), e.size(), e) == 0;
+                 };
                  std::string fmt = lower(argString(a, "format"));
-                 if (fmt.empty()) fmt = lower(path).size() > 4 && lower(path).substr(lower(path).size() - 4) == ".dxf" ? "dxf" : "svg";
+                 if (fmt.empty()) fmt = ends(".dxf") ? "dxf" : ends(".pdf") ? "pdf" : "svg";
+                 PrintOptions opt;
+                 const std::string paper = lower(argString(a, "paper", "a4"));
+                 if (paper != "a4" && paper != "letter") return {false, "Unknown paper \"" + paper + "\" (a4 or letter)"};
+                 opt.paper = paper == "letter" ? Paper::Letter : Paper::A4;
+                 opt.landscape = argBool(a, "landscape", false);
                  std::string error;
+                 if (fmt == "pdf" || fmt == "svg_pages") {
+                     const TileLayout t = tileLayout(pat, opt);
+                     const std::string pages = std::to_string(t.pages()) + " " + (paper == "letter" ? "Letter" : "A4") +
+                                               " pages (a grid of " + std::to_string(t.rows) + " rows x " + std::to_string(t.cols) + ", blank ones left out)";
+                     if (fmt == "pdf") {
+                         std::string pdf;
+                         if (!patternToTiledPdf(pat, opt, pdf, error) || !writeText(path, pdf, error)) return {false, error};
+                         return {true, "Wrote " + pages + " to " + path + ": print at 100%, check the 50 mm square on A1"};
+                     }
+                     std::vector<SvgPageFile> svgs;
+                     if (!patternToTiledSvgs(pat, opt, svgs, error)) return {false, error};
+                     const std::string stem = ends(".svg") ? path.substr(0, path.size() - 4) : path;
+                     for (const SvgPageFile& page : svgs)
+                         if (!writeText(stem + "-" + page.name + ".svg", page.svg, error)) return {false, error};
+                     return {true, "Wrote " + pages + " as " + stem + "-A1.svg ..."};
+                 }
+                 if (fmt != "svg" && fmt != "dxf") return {false, "Unknown format \"" + fmt + "\" (pdf, svg_pages, svg or dxf)"};
                  if (!writeText(path, fmt == "dxf" ? patternToDxf(pat) : patternToSvg(pat), error)) return {false, error};
                  return {true, "Wrote " + std::to_string(pat.panels.size()) + " panels to " + path};
              }});

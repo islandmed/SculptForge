@@ -815,7 +815,8 @@ Pattern tshirtPattern(float chestMm, float lengthMm) {
     // Two rows (a sheet about as tall as wide): the sleeves under the front and the back, the body panels 60 mm
     // above the taller sleeve.
     pat.panels.push_back(sleevePanel("Left sleeve", 0.0f, armhole * 1.02f));
-    pat.panels.push_back(sleevePanel("Right sleeve", backX, armhole * 1.02f));
+    // (A small chest puts the back closer than a sleeve is wide: the right sleeve keeps clear of the left.)
+    pat.panels.push_back(sleevePanel("Right sleeve", std::max(backX, 440.0f), armhole * 1.02f));
     const float rise = std::max(panelMax(pat.panels[2]).y, panelMax(pat.panels[3]).y) + 60.0f;
     movePanel(pat.panels[0], {0.0f, rise});
     movePanel(pat.panels[1], {0.0f, rise});
