@@ -70,7 +70,6 @@
         <h1>I had to do something.</h1>
         <p class="big">I'm a technologist at heart, but I work with artists every day, and I hear how much this AI moment worries them. I've seen colleagues wonder whether their craft will still have a place. SculptForge was born from that.</p>
         <p>Behind the scenes, the project really does use all this new technology: agents working around the clock, weighing every idea for both its technical and its artistic merit, so it grows faster than a small team ever could. But all that power has one purpose: to remove friction, to give people starting out a good baseline, and to leave more room for what matters.</p>
-        <!-- TODO(owner): his "change the world" line goes here once he gives the wording (asked the coordinator 11-08). Do not invent it. -->
       </div>
     </section>
 
@@ -101,9 +100,8 @@
         <p class="lede">Every message is read. Here is the path an idea or a bug report takes, from your words to the version on your machine.</p>
         <ol class="why-steps">
           <li class="card"><p class="n">1</p><h3>You tell us</h3><p>Post in #ideas or #bug-reports on <a href="https://discord.gg/gWrYkEmQhH">Discord</a>, or open a <a href="https://github.com/islandmed/SculptForge/issues">GitHub issue</a>. Any language is fine.</p></li>
-          <!-- TODO(owner): "usually within hours" and "every few days" below are promises; add them back only if the owner confirms. -->
           <li class="card"><p class="n">2</p><h3>We answer and sort it</h3><p>You get a reply. Bugs go straight to a fix, free for everyone. Ideas go into the public <a href="queue.html">feature queue</a>, member requests at the top.</p></li>
-          <li class="card"><p class="n">3</p><h3>Agents build it</h3><p>Each fix or feature gets its own build, weighed for technical and artistic merit. It runs hundreds of automated tests on Windows, macOS and Linux and is checked for speed on ordinary hardware.</p></li>
+          <li class="card"><p class="n">3</p><h3>Agents build it</h3><p>Each fix or feature gets its own build, weighed for technical and artistic merit. It runs hundreds of automated tests and is checked for speed on ordinary hardware, and every release is built and tested on Windows, macOS and Linux.</p></li>
           <li class="card"><p class="n">4</p><h3>A review, by eye</h3><p>Before it merges, every visible change is reviewed from screenshots: does it look right, read clearly and feel good to use? If not, it goes back.</p></li>
           <li class="card"><p class="n">5</p><h3>It ships, with your name</h3><p>We reply in your thread with the version it's in, and What's New credits you, if you'd like.</p></li>
         </ol>
@@ -150,40 +148,5 @@
       <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners. The site uses no cookies. Visits are counted anonymously with <a href="https://www.goatcounter.com/">GoatCounter</a>.</p>
     </div>
   </footer>
-  <script>
-    // Filters run in the page: no cookies, no storage. The URL hash keeps them, so a filtered list can be shared.
-    (() => {
-      const $ = (id) => document.getElementById(id);
-      const rows = [...document.querySelectorAll('#jobs .job')];
-      const ids = ['q', 'region', 'sector', 'role', 'remote', 'contract'];
-      const val = (id) => $(id).type === 'checkbox' ? ($(id).checked ? '1' : '') : $(id).value.trim();
-      function apply() {
-        const f = Object.fromEntries(ids.map((id) => [id, val(id)]));
-        const q = f.q.toLowerCase();
-        let n = 0;
-        for (const li of rows) {
-          const d = li.dataset;
-          const ok = (!f.region || d.regions.split('|').includes(f.region)) && (!f.sector || d.sector === f.sector) &&
-            (!f.role || d.role === f.role) && (!f.remote || d.remote === '1') && (!f.contract || d.contract === '1') &&
-            (!q || li.textContent.toLowerCase().includes(q));
-          li.hidden = !ok;
-          n += ok;
-        }
-        $('shown').textContent = n;
-        $('none').hidden = n > 0 || rows.length === 0;
-        const h = new URLSearchParams(Object.entries(f).filter(([, v]) => v)).toString();
-        history.replaceState(null, '', h ? '#' + h : location.pathname);
-      }
-      const p = new URLSearchParams(location.hash.slice(1));
-      for (const id of ids) {
-        const v = p.get(id);
-        if (v === null) continue;
-        if ($(id).type === 'checkbox') $(id).checked = v === '1';
-        else if ($(id).tagName !== 'SELECT' || [...$(id).options].some((o) => o.value === v)) $(id).value = v;
-      }
-      ids.forEach((id) => $(id).addEventListener('input', apply));
-      apply();
-    })();
-  </script>
 </body>
 </html>
