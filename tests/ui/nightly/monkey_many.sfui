@@ -1,0 +1,6 @@
+# The monkey (tests/ui/monkey.sfui) with 200 more seeds, 50 actions each: nightly (T3), about 10 minutes. Every
+# failing seed is listed with its replay file (ui-shots/monkey_many/replay-monkey-SEED.sfui); shrink it with
+# tools/test/shrink_sfui.py and file it as a fix task.
+run ui_look look=classic layout=classic
+wait 0.3
+monkey 1000 50 200 known=../mode_matrix_known.txt

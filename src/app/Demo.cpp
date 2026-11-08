@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/Demo.h"
 
+#include <utility>
+
 #include "app/App.h"
 #include "app/UiServe.h"
 #include "app/Ui.h"
@@ -262,7 +264,12 @@ void Demo::update(float dt) {
         lastUpdate_ = now;
     }
     while (step_ < steps_.size()) {
-        if (!steps_[step_](stepTime_)) {
+        const bool done = steps_[step_](stepTime_);
+        if (std::exchange(jumped_, false)) { // a generated case skipped or failed: on from its end (UiTestModes.cpp)
+            stepTime_ = 0.0f;
+            continue;
+        }
+        if (!done) {
             stepTime_ += dt;
             return;
         }

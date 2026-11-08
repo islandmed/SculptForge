@@ -326,6 +326,12 @@ private:
     void setPenPressure(bool size, PenPressure p); // this brush's (and a custom brush's recipe)
     void drawPenPressureSwitches(const char* id); // Pen pressure: Size / Strength [Use global | On | Off]
 
+    // UI tests only (UiTestModes.cpp; nothing else calls them): what holds the viewport now, one "kind: name" each: a
+    // mode a left drag goes to (mode: Draw Tube, mode: Insert, mode: Move ...), input still captured (input: drag 3),
+    // an open overlay or modal (overlay: stroke popup). Empty when a plain stroke sculpts with the picked brush.
+    std::vector<std::string> latchedForTest() const;
+    void unlatchForTest(); // clears all of it, whatever the app's own exits do (between the mode matrix's cases)
+
     // Input / stroke state
     Drag drag_ = Drag::None;
     // Rotation drags: the unsnapped view, so Shift (snap to an axis) can be pressed and released mid-drag.

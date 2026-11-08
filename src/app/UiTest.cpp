@@ -213,6 +213,9 @@
 //   print VALUE              write VALUE's current value to the log (benchmarks: frame_ms)
 //   shot NAME                save a screenshot NAME.png (to --ui-out)
 //   expect_guide FILE        the User Guide shows FILE ("masking.md", "index.md")
+//   Modes and the monkey (UiTestModes.cpp): expect_latched, expect_sculpts, expect_status_not, unlatch, try_action,
+//                            maybe_action, click_exit, snapshot_start, undo_all, expect_restored, expect_mesh_valid,
+//                            mode_matrix [known=FILE] [ID...], monkey SEED STEPS [COUNT]
 //   dump_shortcuts NAME      write every default shortcut as a Markdown table to --ui-out/NAME
 //   action ID                run a registry action as its key, shelf tile or the command palette would
 //   dialog_answer PATH|cancel   what the next file or folder dialog answers (none ever opens from a script:
@@ -508,8 +511,20 @@ std::string number(double v) {
 
 } // namespace
 
+// (UiTestModes.cpp's generated lines are parsed like the script's own)
+std::vector<std::string> splitScriptWords(const std::string& line) { return splitWords(line); }
+std::string restOfLine(const std::string& line, int skip) { return restOf(line, skip); }
+
 void Demo::fail(int line, const std::string& message) {
-    failures_.push_back(scriptName_ + ":" + std::to_string(line) + ": " + message);
+    if (softEnd_ != kNoCase && knownFailure(softEnd_, message)) return; // (a known mode matrix failure: its fix task)
+    failures_.push_back(scriptName_ + ":" + std::to_string(line) + ": " + message + (context_.empty() ? "" : " [" + context_ + "]"));
+    if (softEnd_ != kNoCase) { // inside a generated case: list it, write its script, go on with the next case
+        if (const std::string replay = writeReplay(softEnd_); !replay.empty()) failures_.back() += " (replay: " + replay + ")";
+        SDL_Log("FAIL %s", failures_.back().c_str());
+        if (!shotDir_.empty()) shotRequest_ = shotDir_ + "/FAIL-" + std::to_string(failures_.size()) + ".png";
+        jumpTo(softEnd_);
+        return;
+    }
     SDL_Log("FAIL %s", failures_.back().c_str());
     if (!shotDir_.empty()) shotRequest_ = shotDir_ + "/FAIL-line-" + std::to_string(line) + ".png";
     step_ = steps_.size(); // stop: later steps depend on this one
@@ -1362,8 +1377,7 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "dialogs_requested") return double(dialogs::requested());
     if (name == "dialog_kind") return double(int(dialogs::lastKind()));
-    known = false;
-    return 0.0;
+    return queryModes(name, known); // latched, sculpted ... (UiTestModes.cpp); sets known
 }
 
 void Demo::testClick(int line, const std::string& label, int button, bool doubleClick) {
@@ -3161,8 +3175,12 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
         wait(0.05f);
     } else {
-        error = "unknown step '" + verb + "'";
-        return false;
+        bool handled = false;
+        if (!parseModeStep(line, w, error, handled)) return false;
+        if (!handled) {
+            error = "unknown step '" + verb + "'";
+            return false;
+        }
     }
     return true;
 }
@@ -3489,6 +3507,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
             error = scriptName_ + ":" + std::to_string(n) + ": " + err;
             return false;
         }
+        setupLines_.push_back(line); // (a generated case's replay file starts with the lines before it)
         if (profile) stepLines_.resize(steps_.size(), n); // (steps the line added; the first wait counts as line 0)
     }
     wait(0.1f);

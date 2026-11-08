@@ -24,6 +24,7 @@
 #include <chrono>
 #include <functional>
 #include <map>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -120,6 +121,23 @@ private:
     void testKey(int line, const std::string& combo, int phase = 0);
     void testKeyNow(SDL_Keycode key, SDL_Keymod mods);
     double query(const std::string& name, bool& known) const;
+    // Modes and the monkey (UiTestModes.cpp): their steps, values and generated cases.
+    bool parseModeStep(int line, const std::vector<std::string>& words, std::string& error, bool& handled);
+    double queryModes(const std::string& name, bool& known) const;
+    int openEdges() const;
+    bool buildModeMatrix(int line, const std::vector<std::string>& only, std::string& error);
+    bool buildMonkey(int line, uint64_t seed, int count, std::string& error);
+    // A generated case: LINES parsed as script lines, skipped at run time unless WHEN (null: always), LAST (if any)
+    // run after them; a failure inside it is listed and the next case starts (fail() jumps to its end).
+    bool addCase(int line, const std::string& name, std::function<bool()> when, const std::vector<std::string>& lines,
+                 std::string& error, Step last = {}, std::string key = {});
+    bool loadKnownFailures(const std::string& file, std::string& error);
+    bool knownFailure(size_t end, const std::string& message); // logged as KNOWN instead of failed (mode_matrix)
+    void jumpTo(size_t step); // the next step to run is STEP (not step_ + 1)
+    void rememberToggles();   // every toggle action's state, when a case begins
+    void restoreToggles();    // ... back as it was, when it ends
+    std::vector<std::pair<std::string, bool>> toggles_;
+    std::string writeReplay(size_t end) const; // the failing case's script in --ui-out, or ""
 
     void buildShowcase();
     void buildSculpt();
@@ -187,6 +205,30 @@ private:
     bool testing_ = false;
     bool take_ = false; // loadTake: real-time pointer samples, no shots or expectations
     std::vector<std::string> failures_;
+    // Generated cases (UiTestModes.cpp): the one running (its name for failures, its end step), each case's lines by
+    // its end step (for the replay file), which probed actions were modes, and what snapshot_start kept.
+    static constexpr size_t kNoCase = ~size_t(0);
+    std::string context_;
+    size_t softEnd_ = kNoCase;
+    bool jumped_ = false;
+    struct Case {
+        std::string name;
+        std::vector<std::string> lines;
+        std::string key; // "ID | EXIT" (the mode matrix's known failures)
+        std::vector<std::string> setup; // the script's lines before the one that generated it (its replay's start)
+    };
+    std::vector<std::string> setupLines_;
+    std::vector<std::pair<std::string, std::vector<std::string>>> extraEntries_; // mode_entry
+    std::map<std::string, std::string> known_; // key -> its fix task
+    std::set<std::string> knownHit_, knownRan_;
+    std::map<size_t, Case> cases_;
+    std::map<std::string, bool> isMode_, modalOnly_;
+    struct Start {
+        int parts = 0, active = 0;
+        std::vector<glm::vec3> positions;
+        std::vector<glm::uvec3> triangles;
+        int openEdges = 0;
+    } start_;
     std::string frameText_, shotRequest_, shotDir_, scriptName_, lineText_;
     std::vector<uint8_t> lastShot_;
     int lastShotW_ = 0, lastShotH_ = 0;

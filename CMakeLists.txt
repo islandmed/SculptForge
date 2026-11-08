@@ -407,6 +407,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/AsyncStroke.cpp
     src/app/Demo.cpp
     src/app/UiTest.cpp
+    src/app/UiTestModes.cpp
     src/app/NativeDialog.cpp
     src/app/UiServe.cpp
     src/app/Ui.cpp
@@ -1027,6 +1028,13 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(tray_hscroll_hidpi hidpi/tray_hscroll --size 1920x1200)
     set_tests_properties(ui_right_tray_looks_720 ui_windows_dpi_2560 ui_windows_dpi_2160 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
     sculptforge_ui_test(user_guide_1080 user_guide --size 1920x1080)
+    # The mode matrix probes every registry action (tests/ui/mode_matrix.sfui): 3-4 min on a CI runner, so it starts first.
+    if(TEST ui_mode_matrix)
+      set_tests_properties(ui_mode_matrix PROPERTIES TIMEOUT 600 COST 500)
+    endif()
+    # Seeded user-action fuzz, many seeds (tests/ui/monkey.sfui runs a few in T0): nightly only (T3).
+    sculptforge_ui_test(monkey_many nightly/monkey_many)
+    set_tests_properties(ui_monkey_many PROPERTIES LABELS "ui;nightly" TIMEOUT 1800)
     # The Deform panel for the look review (tests/ui/sizes/: scripts only run at their own sizes).
     sculptforge_ui_test(deform_panel_1440 sizes/deform_panel --size 1440x900)
     sculptforge_ui_test(deform_panel_1024 sizes/deform_panel_1024 --size 1024x768)

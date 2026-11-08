@@ -1,0 +1,85 @@
+# Known mode matrix failures (tests/ui/mode_matrix.sfui, src/app/UiTestModes.cpp): ID | EXIT | the fix task.
+# Logged as KNOWN, not failed. When a fix lands its case passes and the matrix fails until the line goes.
+brush.capture_view | Draw | task modes-capture-exit: a brush or a tool leaves Capture from view
+brush.capture_view | Move | task modes-capture-exit: a brush or a tool leaves Capture from view
+brush.capture_view | Rotate | task modes-capture-exit: a brush or a tool leaves Capture from view
+brush.capture_view | Scale | task modes-capture-exit: a brush or a tool leaves Capture from view
+brush.capture_view | a brush on the shelf | task modes-capture-exit: a brush or a tool leaves Capture from view
+brush.capture_view | a palette action | task modes-capture-exit: a brush or a tool leaves Capture from view
+brush.capture_view | undo | task modes-capture-exit: a brush or a tool leaves Capture from view
+brush.qremesh_guides | Draw | task modes-guides-exit: Esc and Draw leave QRemesh Guides
+brush.qremesh_guides | Esc | task modes-guides-exit: Esc and Draw leave QRemesh Guides
+brush.qremesh_guides | a brush on the shelf | task modes-guides-exit: picking a brush leaves it but the status bar still names it
+brush.qremesh_guides | a palette action | task modes-guides-exit: picking a brush leaves it but the status bar still names it
+brush.qremesh_guides | undo | task modes-guides-exit: picking a brush leaves it but the status bar still names it
+face.landmarks | Draw | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
+face.landmarks | Esc | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
+face.landmarks | Move | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
+face.landmarks | Rotate | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
+face.landmarks | Scale | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
+face.landmarks | a brush on the shelf | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
+face.landmarks | a palette action | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
+face.landmarks | undo | task modes-landmarks-exit: Place Landmarks survives every exit, Esc too
+forgesphere.new | Draw | task modes-forgesphere-exit: a new Forge Sphere Part has no way back to sculpting
+forgesphere.new | Esc | task modes-forgesphere-exit: a new Forge Sphere Part has no way back to sculpting
+forgesphere.new | Move | task modes-forgesphere-exit: a new Forge Sphere Part has no way back to sculpting
+forgesphere.new | Rotate | task modes-forgesphere-exit: a new Forge Sphere Part has no way back to sculpting
+forgesphere.new | Scale | task modes-forgesphere-exit: a new Forge Sphere Part has no way back to sculpting
+forgesphere.new | a brush on the shelf | task modes-forgesphere-exit: a new Forge Sphere Part has no way back to sculpting
+forgesphere.new | a palette action | task modes-forgesphere-exit: a new Forge Sphere Part has no way back to sculpting
+forgesphere.new | undo | task modes-forgesphere-exit: a new Forge Sphere Part has no way back to sculpting
+paint.line_gradient | Draw | task modes-gradient-exit: a brush or a tool leaves Line Gradient
+paint.line_gradient | Move | task modes-gradient-exit: a brush or a tool leaves Line Gradient
+paint.line_gradient | Rotate | task modes-gradient-exit: a brush or a tool leaves Line Gradient
+paint.line_gradient | Scale | task modes-gradient-exit: a brush or a tool leaves Line Gradient
+paint.line_gradient | a brush on the shelf | task modes-gradient-exit: a brush or a tool leaves Line Gradient
+paint.line_gradient | a palette action | task modes-gradient-exit: a brush or a tool leaves Line Gradient
+paint.line_gradient | undo | task modes-gradient-exit: a brush or a tool leaves Line Gradient
+timeline.timelapse | Esc | task modes-timelapse-esc: Esc closes Export timelapse
+tool.gizmo_all | Esc | task modes-gizmo-exit
+tool.gizmo_all | a brush on the shelf | task modes-gizmo-exit
+tool.gizmo_all | a palette action | task modes-gizmo-exit
+tool.gizmo_all | undo | task modes-gizmo-exit
+tool.move | Esc | task modes-gizmo-exit: Esc or a brush leave Move / Scale / Rotate
+tool.move | a brush on the shelf | task modes-gizmo-exit: Esc or a brush leave Move / Scale / Rotate
+tool.move | a palette action | task modes-gizmo-exit: Esc or a brush leave Move / Scale / Rotate
+tool.move | undo | task modes-gizmo-exit: Esc or a brush leave Move / Scale / Rotate
+tool.rotate | Esc | task modes-gizmo-exit
+tool.rotate | a brush on the shelf | task modes-gizmo-exit
+tool.rotate | a palette action | task modes-gizmo-exit
+tool.rotate | undo | task modes-gizmo-exit
+tool.scale | Esc | task modes-gizmo-exit
+tool.scale | a brush on the shelf | task modes-gizmo-exit
+tool.scale | a palette action | task modes-gizmo-exit
+tool.scale | undo | task modes-gizmo-exit
+ui.command_palette | a brush on the shelf | task modes-palette-click: a click elsewhere closes the command palette
+ui.command_palette | a palette action | task modes-palette-click: a click elsewhere closes the command palette
+ui.command_palette | undo | task modes-palette-click: a click elsewhere closes the command palette
+ui.palette.color | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.color | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.color | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.draw | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.draw | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.draw | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.edit | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.edit | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.edit | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.file | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.file | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.file | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.generate | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.generate | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.generate | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.help | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.help | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.help | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.script | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.script | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.script | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.splats | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.splats | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.splats | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.transform | Draw | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.transform | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.transform | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
+ui.palette.transform | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing

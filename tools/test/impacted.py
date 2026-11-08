@@ -63,7 +63,8 @@ HAND_MAP = [
 # Public text is checked for third-party marks on every change: cheap, and the one check nobody may skip.
 ALWAYS = ["marks"]
 # The app's own sanity set, whenever the app program changed.
-SMOKE = ["ui_shell_layout", "ui_sculpt_basics", "ui_idle_redraw", "ui_release_smoke"]
+SMOKE = ["ui_shell_layout", "ui_sculpt_basics", "ui_idle_redraw", "ui_release_smoke",
+         "ui_mode_matrix", "ui_monkey"]  # (every mode can be left; seeded user-action fuzz: UiTestModes.cpp)
 # Sources whose change only matters to the app's UI (step 5); a core change reaches every test through the graph.
 APP_DIRS = ("src/app/", "src/render/", "src/link/")
 STOP_WORDS = {"panel", "tool", "tools", "util", "utils", "test", "impl", "main", "app", "core", "data", "file", "ui"}
