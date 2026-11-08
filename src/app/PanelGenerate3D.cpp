@@ -75,6 +75,9 @@ void App::startGenerator() {
     aiSettings_.hyper3dKey = hyper3dKey_;
     aiSettings_.hfToken = hfToken_;
     aiSettings_.comfyUrl = comfyUrl_;
+    if (!ai::generateKeyMissing(aiSettings_) &&
+        !askToSend(ai::generateTarget(aiSettings_, textMode_), SendPanel::Generate3D, [this] { startGenerator(); }))
+        return; // the first-use notice (PanelAiConsent.cpp): nothing sent before Allow
     // With no workflow chosen, ComfyUI runs the bundled one the panel shows (not saved, so updates reach it).
     ai::AiSettings settings = aiSettings_;
     const bool hunyuan = settings.generatorService == "huggingface"

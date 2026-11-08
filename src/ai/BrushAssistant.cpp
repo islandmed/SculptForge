@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ai/BrushAssistant.h"
 #include "ai/AiPolicy.h"
+#include "ai/Consent.h"
 
 #include "ai/Http.h"
 #include "ai/Oidc.h"
@@ -152,6 +153,9 @@ Json AiSettings::toJson() const {
     j.set("hfModel", hfModel);
     j.set("hfModelChosen", hfModelChosen);
     j.set("hunyuanNoticeShown", hunyuanNoticeShown);
+    Json allowed = Json::array();
+    for (const std::string& id : sendAllowed) allowed.push(id);
+    j.set("sendAllowed", allowed);
     j.set("falModel", falModel);
     j.set("falEndpoint", falEndpoint);
     j.set("meshyModel", meshyModel);
@@ -193,6 +197,8 @@ AiSettings AiSettings::fromJson(const Json& j) {
                                                   : !savedModel.empty() && (savedModel != "trellis-2" || !s.hfToken.empty());
     if (s.hfModelChosen && !savedModel.empty()) s.hfModel = savedModel;
     s.hunyuanNoticeShown = j["hunyuanNoticeShown"].asBool();
+    for (const auto& id : j["sendAllowed"].items())
+        if (id.isString() && !id.asString().empty()) s.sendAllowed.push_back(id.asString());
     text("falKey", s.falKey);
     text("falModel", s.falModel);
     text("falEndpoint", s.falEndpoint);
@@ -415,6 +421,7 @@ std::vector<std::string> listModels(const AiSettings& s, std::string& error) {
         return out;
     }
     if (!aiRequestAllowed(providerId(s), modelsUrl(s.endpoint), error)) return out;
+    if (!checkSendAllowed(s, brushTarget(s), error)) return out; // (the first-use notice, ai/Consent.h)
     HttpResponse r = httpRequest("GET", modelsUrl(s.endpoint), requestHeaders(s), {}, 5);
     if (!r.error.empty()) {
         error = "Nothing is answering at " + s.endpoint + " - is Ollama or LM Studio running? (" + r.error + ")";
@@ -473,6 +480,7 @@ BrushSuggestion requestBrush(const AiSettings& s, const std::vector<ChatMessage>
         out.error = "No Anthropic API key - add one in AI settings or set ANTHROPIC_API_KEY, or switch to Free.";
         return out;
     }
+    if (BrushSuggestion out; !checkSendAllowed(s, brushTarget(s), out.error)) return out; // nothing sent before Allow
     const std::string body = buildRequestBody(s, history);
     HttpResponse r = httpPostJson(requestUrl(s), requestHeaders(s), body);
     if (s.provider == AiSettings::Provider::Free) {

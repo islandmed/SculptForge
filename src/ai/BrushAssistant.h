@@ -39,6 +39,7 @@ struct AiSettings {
     std::string hfModel = "hunyuan3d-2.1"; // the default (hfPresets()[0]): free, no token
     bool hfModelChosen = false;   // the user picked hfModel; otherwise loading resets it to the current default
     bool hunyuanNoticeShown = false; // the one-time Hunyuan3D licence notice
+    std::vector<std::string> sendAllowed; // services the artist allowed in the first-use notice (ai/Consent.h)
     std::string generatorCommand;
     std::string falKey;   // empty = FAL_KEY from the environment
     std::string falModel = "fal-ai/trellis-2";

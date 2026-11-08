@@ -258,6 +258,7 @@ bool App::init(const AppOptions& options) {
         io.IniFilename = nullptr;
     }
     if (!options.uiTest.empty()) policy::resetPolicyForTests(); // (a UI test's ui_policy never reaches the next one)
+    if (!options.uiTest.empty()) aiSettings_.sendAllowed.clear(); // UI tests: every online AI service asks first
     // Preferences > AI: tests, renders and videos start with AI on whatever this computer chose (SF_AI still wins).
     ai::setAiEnabled(ai::aiFeaturesAllowed(headless || !options.demo.empty() || aiSettings_.enabled));
     // AI keys and the studio sign-in are in the OS keychain (ai/Secrets.h, ai/Oidc.h), read on a worker so no frame
@@ -814,7 +815,7 @@ void wakeMainLoop() {
 
 bool App::backgroundBusy() const {
     auto running = [](const auto& f) { return f.valid() && f.wait_for(std::chrono::seconds(0)) != std::future_status::ready; };
-    return running(pendingBrush_) || running(pendingGenerator_) || running(pendingBase_) || running(pendingModels_) || running(pendingUnreal_) ||
+    return running(pendingBrush_) || running(localProbe_) || running(pendingGenerator_) || running(pendingBase_) || running(pendingModels_) || running(pendingUnreal_) ||
            running(pendingComfyCheck_) || galleryBusy() || thumbs_.busy() || libraryScanner_.busy() || autoUv_ ||
            bakeBusy() || qremesh_ || voxelRemesh_ || updateJob_ || splatTrainBusy() || sculptableBusy() || phoneBusy() || uvEditorBusy() ||
            renderer_.environmentPending() || meshMapsBusy();
@@ -3403,6 +3404,9 @@ const BrushRecipe* App::activeRecipe() const {
 
 void App::sendBrushRequest(const std::string& text) {
     if (text.empty() || pendingBrush_.valid()) return;
+    const bool noKey = aiSettings_.provider == ai::AiSettings::Provider::Anthropic && aiSettings_.resolvedKey().empty();
+    if (ai::aiEnabled() && !noKey && !askToSend(ai::brushTarget(aiSettings_), SendPanel::BrushLab, [this, text] { sendBrushRequest(text); }))
+        return; // the first-use notice: nothing sent before Allow
     chat_.push_back(ai::composeUserMessage(text, refineCurrent_ ? activeRecipe() : nullptr));
     chatLog_.push_back({ChatLine::Kind::User, text});
     scrollChat_ = true;
@@ -3527,7 +3531,8 @@ void App::drawAiSettings() {
     };
     if (aiSettings_.provider == P::OpenAICompatible) {
         ImGui::BeginDisabled(pendingModels_.valid());
-        if (ImGui::Button(pendingModels_.valid() ? tr("Checking...") : tr("Find models"), ImVec2(-1, 0))) {
+        if (ImGui::Button(pendingModels_.valid() ? tr("Checking...") : tr("Find models"), ImVec2(-1, 0)) &&
+            askToSend(ai::brushTarget(aiSettings_), SendPanel::BrushLab, [] {})) {
             auto promise = std::make_shared<std::promise<ModelList>>();
             pendingModels_ = promise->get_future();
             std::thread([promise, settings = aiSettings_] {
@@ -3710,6 +3715,7 @@ void App::drawBrushLab() {
         chatInput_[0] = '\0';
         ImGui::SetKeyboardFocusHere(-1);
     }
+    drawSendNotice(SendPanel::BrushLab);
     ImGui::BeginDisabled(!activeRecipe());
     ImGui::Checkbox(tr("Refine the selected brush"), &refineCurrent_);
     ImGui::EndDisabled();
@@ -3853,7 +3859,8 @@ void App::drawComfyUi() {
          "(Hunyuan3D, TRELLIS and more). Nothing goes anywhere else."));
     ImGui::InputText(tr("Server"), comfyUrl_, sizeof comfyUrl_);
     ImGui::BeginDisabled(pendingComfyCheck_.valid());
-    if (ImGui::Button(tr(pendingComfyCheck_.valid() ? "Connecting..." : "Test connection"), ImVec2(-1, 0))) {
+    if (ImGui::Button(tr(pendingComfyCheck_.valid() ? "Connecting..." : "Test connection"), ImVec2(-1, 0)) &&
+        askToSend(ai::comfyTarget(comfyUrl_), SendPanel::Generate3D, [] {})) {
         auto promise = std::make_shared<std::promise<ComfyCheck>>();
         pendingComfyCheck_ = promise->get_future();
         std::thread([promise, url = std::string(comfyUrl_)] {
@@ -4105,6 +4112,7 @@ void App::drawImageTo3D() {
     } else if (ImGui::Button(tr("Generate 3D model"), ImVec2(-1, 0))) {
         startGenerator();
     }
+    drawSendNotice(SendPanel::Generate3D);
     if (openHunyuanNotice_) {
         ImGui::OpenPopup("###hunyuan.licence");
         openHunyuanNotice_ = false;

@@ -25,6 +25,13 @@ way (see [IT deployment](guide/studios.md#it-deployment)).
 | Generate 3D (text) | Hugging Face Spaces (free), fal.ai, Meshy, your own ComfyUI | Your text description | As above |
 | Send to Unreal | Your own Unreal Editor (local network) | The exported FBX | None |
 
+Before the first request to a service on someone else's computer (Pollinations, each Hugging Face Space family,
+fal.ai, Meshy, Hyper3D, a remote OpenAI-compatible server or ComfyUI), the panel shows what is sent, to which host and
+who pays; nothing is sent until **Allow**, which is remembered per service (`sendAllowed` in `ai.json`) and can be
+revoked in **Preferences > AI > Online AI services**. Scripts, `sculptforge-cli` and AI tools get the same refusal
+until it is allowed in the app. Servers on this computer never ask. A studio policy's `ai.providers` / `ai.endpoints`
+pre-allow what they list and forbid the rest.
+
 Keys are stored in your operating system's keychain (macOS Keychain, Windows Credential Manager, or the Secret
 Service on Linux), never in a settings file, or read from environment variables (`ANTHROPIC_API_KEY`,
 `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `HF_TOKEN`, `FAL_KEY`, `MESHY_API_KEY`). Keys saved by older versions in

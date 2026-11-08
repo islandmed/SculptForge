@@ -319,6 +319,9 @@ Without `service=`, commands use the settings you saved in the app. See
   (not for use in the EU, UK or South Korea); Stable Fast 3D uses the Stability AI Community License (free
   under US $1M annual revenue). Read the licence before commercial use.
 - With ComfyUI, the picture goes only to the server address you entered.
+- Before the first request to a hosted service (each Hugging Face Space family, fal.ai, Meshy, Hyper3D, or a
+  ComfyUI on another computer), the panel says what is sent, where, and who pays, and nothing goes until you press
+  **Allow**. See [What leaves your computer](interface.md#what-leaves-your-computer).
 
 The full table of what is sent where is in `docs/ai-services.md` in the SculptForge repository.
 

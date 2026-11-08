@@ -6,6 +6,7 @@
 #include "ai/AiPolicy.h"
 #include "ai/BrushGalleryClient.h"
 #include "ai/ComfyUI.h"
+#include "ai/Consent.h"
 #include "ai/ImageTo3DService.h"
 #include "core/EnginePresets.h"
 #include "core/Backdrop.h"
@@ -106,8 +107,11 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                    {"model", T::String, "Override the model name.", false}},
                   [settings](Document& doc, const Args& a) -> CommandResult {
                       AiSettings s = settings();
-                      if (a.contains("provider"))
-                          s = AiSettings::defaults(AiSettings::providerFromName(argString(a, "provider")));
+                      if (a.contains("provider")) {
+                          AiSettings d = AiSettings::defaults(AiSettings::providerFromName(argString(a, "provider")));
+                          d.sendAllowed = s.sendAllowed; // (what the artist allowed, ai/Consent.h)
+                          s = std::move(d);
+                      }
                       if (a.contains("endpoint")) s.endpoint = argString(a, "endpoint");
                       if (a.contains("model")) s.model = argString(a, "model");
                       std::vector<ChatMessage> history = {composeUserMessage(argString(a, "prompt"), nullptr)};
@@ -221,6 +225,7 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                       comfy::ServerInfo info;
                       std::string err;
                       const std::string url = comfy::normalizeUrl(argString(a, "url", settings().comfyUrl));
+                      if (!checkSendAllowed(settings(), comfyTarget(url), err)) return {false, err}; // (a remote server)
                       if (!comfy::checkServer(url, info, err)) return {false, err};
                       return {true, info.summary() + " at " + url};
                   }});

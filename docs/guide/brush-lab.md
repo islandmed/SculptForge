@@ -102,6 +102,9 @@ your choice. Keys are kept in your system's keychain (macOS Keychain, Windows Cr
 Service on Linux), never in a settings file. Requests go only to the endpoint you set. If your studio manages
 SculptForge, some providers may be greyed out with **Managed by your studio**.
 
+The first time a provider on someone else's computer would receive a request (Free included), Brush Lab says what is
+sent, where, and who pays, and waits for **Allow**. See [What leaves your computer](interface.md#what-leaves-your-computer).
+
 ### Run a model on your own computer
 
 For private, offline use with no rate limits, run a local model with Ollama or LM Studio:

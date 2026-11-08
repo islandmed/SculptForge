@@ -103,6 +103,30 @@ the same question. The choice is saved at once; turn it back on the same way, or
 Studios can turn it off for everyone with the environment variable `SF_AI=off` (or start with `--no-ai`); the
 setting is then locked. See [Studios](studios.md#environment-variables).
 
+## What leaves your computer
+
+Your sculpt never does. An AI feature sends only the request below, only when you press its button. The first time
+a service on someone else's computer would receive anything, the panel says what is sent, to which address and who
+pays, and nothing goes until you press **Allow** (asked once per service). **Use local instead** switches to a model
+on this computer when one is running (Ollama or LM Studio for brushes, ComfyUI for 3D); otherwise **Set up local**
+shows how. **Edit > Preferences > AI > Online AI services** lists each service as **Allowed** or **Asks first**, with
+**Revoke**. Models on this computer (`localhost`, `127.0.0.1`) never ask.
+
+| You use | Sent | To | Who pays |
+|---|---|---|---|
+| AI Brush, **Free** (the default) | Your brush description and the current brush settings | Pollinations.ai (`text.pollinations.ai`); a running Ollama on this computer if it can't be reached | Pollinations (free, rate limited), no account |
+| AI Brush, Anthropic, OpenAI or OpenRouter | The same text | `api.anthropic.com`, `api.openai.com` or `openrouter.ai` | You, on your own key |
+| AI Brush, Ollama, LM Studio, llama.cpp, vLLM | The same text | This computer (or the server address you typed) | Nobody / your server |
+| Generate 3D, **Hugging Face** (the default) | The picture (framed, at most 1024 px) or your text | The model author's Space, for example `tencent-hunyuan3d-2-1.hf.space` | Hugging Face's free shared GPUs (a daily allowance) |
+| Generate 3D, fal.ai, Meshy, Hyper3D | The picture or your text | `queue.fal.run`, `api.meshy.ai` or `api.hyper3d.com` | You, per generation, on your own key |
+| Generate 3D, ComfyUI | The picture or your text | Your ComfyUI (this computer by default) | Your own GPU |
+| Generate 3D, your command, Offline blockout | Nothing | Stays on this computer | - |
+| Connect an AI tool (MCP) | Nothing from SculptForge | Your AI tool talks to SculptForge on this computer | Your tool |
+
+SculptForge has no servers of its own and no telemetry: no request goes through us, and no key of ours is used.
+Studios can pre-allow the services their policy lists, or forbid the rest (see
+[IT deployment](studios.md#ai-providers)).
+
 ## The menu bar
 
 From left to right:

@@ -176,6 +176,8 @@ void App::drawAiPrefs() {
     ImGui::TextWrapped("%s", tr(ai::kPrivacyLine));
     ImGui::PopStyleColor();
     ImGui::Spacing();
+    if (ai::aiEnabled()) drawAiSendPrefs(); // the online services and what each may receive (PanelAiConsent.cpp)
+    ImGui::Spacing();
     drawAiLinkPrefs(); // live mode (PanelAiLink.cpp)
     ImGui::Spacing();
     if (ImGui::SmallButton(tr("AI services & privacy##prefs.ai")))
