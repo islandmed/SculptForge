@@ -507,7 +507,7 @@ void registerExtractMirrorCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"mirror",
-             "(Tool > Deformation): flip the active Part across a plane, by default the one through "
+             "(Tool > Reshape): flip the active Part across a plane, by default the one through "
              "the origin that symmetry and Make Symmetric use. One undo step.",
              {{"axis", T::String, "Axis to flip along: x (default), y or z; several (xz) in turn.", false},
               {"pivot", T::String, "origin (default) or center (flip in place about the Part's centre).", false}},

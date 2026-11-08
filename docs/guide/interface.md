@@ -174,7 +174,7 @@ turn on **Edit > Preferences > Interface > Palettes strictly A-Z (strict order)*
 | **Script** | File > Script | Console, Run script file, Copy session as script, Clear console |
 | **Splats** | Render > Gaussian Splats | Gaussian splat tools: show, flip, turn, fit, clean floaters, Make sculptable, sculpt to splats, save, clear |
 | **Stroke** | Sculpt > Stroke | The stroke types (Dots, Drag Stamp, Spray, Lazy Stroke) and their settings |
-| **Tool** | Mesh > Parts & Geometry, and the right tray | The active Part with Open, Save and Import, and the Part, Layers, Paint Layers, Geometry, Remesh, Deformation, Masking, Face Groups, Visibility, Export and Display sub-palettes |
+| **Tool** | Mesh > Parts & Geometry, and the right tray | The active Part with Open, Save and Import, and its sub-palettes in the order you work: Parts, Forge Spheres, Tube, Geometry, Remesh, Reshape, Cut, Layers, Facial Shapes, Masking, Face Groups, Visibility, Selection Sets, Paint Layers, Texture Image, Bake, Export and Viewport Look |
 | **Transform** | Sculpt > Symmetry & Gizmo | Draw, Move, Scale and Rotate (the [Gizmo](gizmo.md) with its pivot, axes, options and numeric entry), Symmetry X, Y and Z, Frame, Solo, Wire |
 | **Help** | Help | Controls, User Guide, What's New, Command palette, Website & documentation, Report a problem, Support SculptForge..., About SculptForge |
 
@@ -474,7 +474,7 @@ you keep them with **Save Layout**.
 
 ### Move, add and remove shelf items
 
-1. Open **Edit > Preferences > Config** and turn on **Customize Shelves**. The shelves get a dashed orange outline and
+1. Open **Edit > Preferences > Saving & Layouts** and turn on **Customize Shelves**. The shelves get a dashed orange outline and
    the status line reads "Customize: Ctrl+Alt+drag to move or remove items".
 2. Hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and drag any button, slider or tile:
    - onto a shelf to put it there (an orange line shows where it will go), which is how you **add** buttons
@@ -503,7 +503,7 @@ which action lost it.
 
 Every preference (key style, shortcuts, tablet, interface, performance, radial menus...) **saves itself** a moment
 after you change it; there is nothing to press. The layout is the one thing kept on purpose, with **Save Layout**.
-All in **Edit > Preferences > Config**:
+All in **Edit > Preferences > Saving & Layouts**:
 
 | Item | What it does |
 |---|---|
@@ -516,12 +516,12 @@ All in **Edit > Preferences > Config**:
 The command palette (<kbd>F3</kbd>) also has **Save Preferences Now**, which writes them at once; you never need it.
 
 The first time you change the layout in a session, the status line reminds you once: "Layout changed -
-Edit > Preferences > Config > Save Layout keeps it". What a session changes by itself (the console and Library being open, the Library
+Edit > Preferences > Saving & Layouts > Save Layout keeps it". What a session changes by itself (the console and Library being open, the Library
 tab) doesn't count as a layout change.
 
 ### Layout presets
 
-The **1**, **2** and **3** buttons at the top right (also in **Edit > Preferences > Config**) switch between three
+The **1**, **2** and **3** buttons at the top right (also in **Edit > Preferences > Saving & Layouts**) switch between three
 arrangements of the current layout:
 
 1. **Standard**: the Tool panel in the right tray and shelves around the canvas.

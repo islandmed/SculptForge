@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Whole-mesh deformations (Tool > Deformation, from the discussions): Polish, Relax, Smooth and Balloon, each over
+// Whole-mesh deformations (Tool > Reshape, from the discussions): Smooth, Relax, Polish and Balloon, each over
 // the whole active Part with an amount, the mask holding masked parts in place (partly masked ones move partly),
 // hidden faces and open borders kept, and one undo step. They write through the Sculptor, so a sculpt layer that
 // is being recorded takes the change as a stroke would.

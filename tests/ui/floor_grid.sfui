@@ -1,4 +1,4 @@
-# Floor grid (#115): View > Floor grid (also Tool > Display and the command palette) draws a faint grid on the floor
+# Floor grid (#115): View > Floor grid (also Tool > Viewport Look and the command palette) draws a faint grid on the floor
 # the model stands on (the lowest point of the visible Parts, Y up), the X and Z axes through the origin marked,
 # fading into the distance. It is drawn before the Parts, so it never shows on the model. Off by default; a preference.
 run ui_look look=forge layout=sculptforge
@@ -99,10 +99,10 @@ expect_value floor_grid_drawn == 0
 restart
 expect_value floor_grid == 0
 
-# Tool > Display has the same switch.
+# Tool > Viewport Look has the same switch.
 run ui_look look=classic layout=classic
 click "Tool##palette.tool"
-click "Display##tool.display"
+click "Viewport Look##tool.display"
 click "Floor grid##display"
 expect_value floor_grid == 1
 shot tool-display

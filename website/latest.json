@@ -5,7 +5,7 @@
   "highlights": [
     "Fixed: big Clay strokes on Micro levels could break the surface into shards (since 0.11.10); Micro sculpting is back to 0.11.9's speed",
     "Tube: draw clay tubes in the air like a 3D pen, then edit their points (thanks GABO on Discord)",
-    "Parts tools: split hidden, masked or unmasked areas into a new Part, merge points by distance, and Check Mesh with a Fix for each problem (thanks foirgairwolf on Discord)",
+    "Parts tools: split hidden, masked or unmasked areas into a new Part, merge points by distance, and Find Problems with a Fix for each problem (thanks foirgairwolf on Discord)",
     "Hardware tiers and Turbo: SculptForge tunes itself to your computer, with a memory readout in the top bar (thanks Oslen on Discord)",
     "Side shelves no longer scroll sideways (thanks dm4nd on Discord), and Frame fits the model into the free area of the canvas"
   ],

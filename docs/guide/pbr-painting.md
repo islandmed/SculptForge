@@ -28,7 +28,7 @@ what was painted in it; **Undo** brings it back.
 ## Turn channels on
 
 1. Give the Part a texture ([Texture painting](texture-painting.md)).
-2. Open **Tool > Texture Map**. Under **Material Channels**, tick the channels you want (for a typical game asset:
+2. Open **Tool > Texture Image**. Under **Material Channels**, tick the channels you want (for a typical game asset:
    Roughness, Metallic and Normal; add Height to paint relief, Ambient Occlusion to paint dirt into crevices).
 3. **Channel memory** below the ticks shows what the painted tiles use; the same number, for every Part, is in
    **Edit > Preferences > Performance** under Memory.
@@ -37,7 +37,7 @@ what was painted in it; **Undo** brings it back.
 
 Open the **Paint** menu. With a material texture, a **Material** section appears under the swatches:
 
-![Paint > Material: material swatches, and per channel a tick, value swatches and a slider; Material Channels in Tool > Texture Map](images/pbr-brush-material.jpg)
+![Paint > Material: material swatches, and per channel a tick, value swatches and a slider; Material Channels in Tool > Texture Image](images/pbr-brush-material.jpg)
 
 
 - **Material swatches** set the colour, roughness and metallic at once (bare metal, gold, copper, rust, gloss
@@ -97,7 +97,7 @@ to about 6 ms with Lit Sphere on an Apple M1 Pro. The settings are saved with th
 
 ## See one channel on its own
 
-**Tool > Texture Map > Normal view** opens a list: pick **Solo Roughness** (or any enabled channel) and the model
+**Tool > Texture Image > Normal view** opens a list: pick **Solo Roughness** (or any enabled channel) and the model
 shows just that channel, in grey for roughness, metallic, height, AO and opacity, as colours for the normal (with
 the height's normal in it) and in colour for emissive. Painting updates it live. Pick **Normal view** to go back.
 The viewport doesn't yet render the channels together as a lit PBR material; the solo view is how you check

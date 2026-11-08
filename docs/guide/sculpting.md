@@ -295,24 +295,24 @@ Your menus save themselves.
 
 ## Whole-Part deformations
 
-**Tool > Deformation** has four operations that work on the whole active Part at once, each with its amount
+**Tool > Reshape** has four operations that work on the whole active Part at once, each with its amount
 beside it (from the discussions). The mask holds what it covers (partly masked areas move partly), hidden faces and
 open borders stay where they are, and each is one undo step:
 
 | Operation | What it does |
 |---|---|
-| **Polish** | Flattens fine noise and small bumps while flat areas and sharp edges stay sharp: a scan's grain, or the ripples a voxel remesh leaves on a hard-surface piece. |
-| **Relax** | Evens out the spacing of the vertices along the surface without changing its shape, for areas a big Move or Tendril stretched. |
 | **Smooth** | Smooths everything; with **Smooth keeps volume** it doesn't shrink the form. |
-| **Balloon** | Fills the form out toward a rounder volume, like blowing into it (experienced sculptors: Inflate Balloon). A negative amount lets the air out. |
+| **Relax** | Evens out the spacing of the vertices along the surface without changing its shape, for areas a big Move or Tendril stretched. |
+| **Polish** | Flattens fine noise and small bumps while flat areas and sharp edges stay sharp: a scan's grain, or the ripples a voxel remesh leaves on a hard-surface piece. |
+| **Balloon** | Fills the form out toward a rounder volume, like blowing into it. A negative amount lets the air out. |
 
-They are commands too: `deform_polish amount=60`, `deform_relax`, `deform_smooth amount=30 keep_volume=true`,
+They are commands too: `deform_smooth amount=30 keep_volume=true`, `deform_relax`, `deform_polish amount=60`,
 `deform_balloon amount=-20` (add `masked=false` to ignore the mask). On a 10-million-vertex Part at amount 50,
 Smooth takes about 0.5 s, Balloon 0.7 s, Relax 0.9 s and Polish 2 s (Apple M1 Pro).
 
 ### Size
 
-**Tool > Deformation > Size** shows the active Part's width (**X**), height (**Y**) and depth (**Z**) in scene
+**Tool > Reshape > Size** shows the active Part's width (**X**), height (**Y**) and depth (**Z**) in scene
 units (requested by foirgairwolf on Discord). Drag one, or double-click it and type an exact value: the Part resizes about its
 centre as one undo step. With **Uniform** on (the default) the other sides follow in proportion; off, only that side
 changes. The mask holds what it covers. Command: `deform_size x=2.5` (any of `x`, `y`, `z`), or `deform_size
@@ -320,7 +320,7 @@ uniform=10` for the largest side.
 
 ### Deformation stack
 
-**Tool > Deformation > Stack** shapes the whole Part with a list of steps (requested by foirgairwolf on Discord). **Add step**
+**Tool > Reshape > Stack** shapes the whole Part with a list of steps (requested by foirgairwolf on Discord). **Add step**
 picks one; click a step to set its amount, its axes (**X Y Z**, any mix) and, where it applies, **Direction** and
 **Soft**. With **Preview** on, the Part follows each change (on very heavy Parts, when you let go of the slider).
 
@@ -816,11 +816,11 @@ Move, Smooth, Inflate, Pinch, Flatten, Crease, Trim, Tendril, Layer, Nudge and P
 - **Add a brush**: click the **+** tile at the end of the shelf and pick a brush, built-in or custom. Or
   right-click any tile in the brush picker and choose **Add to bottom shelf**.
 - **Remove a brush**: right-click its tile and choose **Remove from shelf**.
-- **Reorder**: turn on **Edit > Preferences > Config > Customize Shelves**, then <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+drag a
+- **Reorder**: turn on **Edit > Preferences > Saving & Layouts > Customize Shelves**, then <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+drag a
   tile to a new place.
 - **Change a brush's key**: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click its tile, then press the new key.
 
-Shelf changes last until you quit. **Edit > Preferences > Config > Save Layout** keeps
+Shelf changes last until you quit. **Edit > Preferences > Saving & Layouts > Save Layout** keeps
 them. See [The interface](interface.md) for more on customizing.
 
 ## Sculpt from a script

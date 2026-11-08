@@ -166,7 +166,7 @@ void App::registerInputActions() {
         [this] { groupMasked(); });
     add("facegroup.uv_groups", "Group by UVs", ICON_LC_GRID_2X2, "Tool > Face Groups", "",
         "One face group per UV island: triangles that touch without a UV seam share a group. "
-        "Only the visible part is regrouped. Needs UVs (Tool > Texture Map > Auto UV makes some).",
+        "Only the visible part is regrouped. Needs UVs (Tool > Texture Image > Auto UV makes some).",
         [this] {
             runCommand("facegroup_uv");
             if (lastCommandOk_) renderSettings_.showFaceGroups = true;

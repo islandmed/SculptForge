@@ -12,7 +12,7 @@ Quick answers:
 | The cursor jumps when the pen touches down | **Edit > Preferences > Tablet > Mouse mode (relative)** |
 | "Windows protected your PC" | **More info**, then **Run anyway** ([First launch warnings](#first-launch-warnings-on-macos-and-windows)) |
 | Text and buttons too small or too large | **Edit > Preferences > Interface > UI scale** ([details](#text-and-buttons-are-too-small-or-too-large)) |
-| Menus or shelves look wrong after an update | **Edit > Preferences > Config > Reset Layout and Shortcuts** ([Reset the interface](#reset-the-interface)) |
+| Menus or shelves look wrong after an update | **Edit > Preferences > Saving & Layouts > Reset Layout and Shortcuts** ([Reset the interface](#reset-the-interface)) |
 | Sculpting feels slow | [The viewport is slow](#the-viewport-is-slow) |
 | Lost work after a crash | [Recovering work after a crash](#recovering-work-after-a-crash) |
 | Want the Classic layout back | **Edit > Preferences > Interface > Look > Layout > Classic** |
@@ -189,11 +189,11 @@ font DPI (Xft.dpi); if Automatic looks wrong there, pick a size.
 ### My layout is gone after a restart
 
 Shortcuts and preferences save themselves; the layout (shelves, trays, open palettes) waits for
-**Edit > Preferences > Config > Save Layout**. See [The interface](interface.md#saving-preferences-and-layouts).
+**Edit > Preferences > Saving & Layouts > Save Layout**. See [The interface](interface.md#saving-preferences-and-layouts).
 
 ### Reset the interface
 
-- **Edit > Preferences > Config > Reset Layout and Shortcuts** returns to the built-in layout and default shortcuts. The shortcuts
+- **Edit > Preferences > Saving & Layouts > Reset Layout and Shortcuts** returns to the built-in layout and default shortcuts. The shortcuts
   save themselves; press **Save Layout** afterwards to keep the layout.
 - **Revert to Saved Layout** goes back to the layout the last Save Layout kept.
 - To start completely fresh, quit SculptForge and delete `ui.json` (layout, shortcuts, interface preferences)
@@ -234,7 +234,7 @@ Your **library folder** (projects, tools, alphas, images, splats and snapshots s
 separate: `Documents/SculptForge` by default, changeable in **Edit > Preferences > Library > Library folder**.
 
 > **Tip:** To move settings to another computer, copy `ui.json`, `ai.json` and the `brushes` folder. For a
-> shared layout, use **Edit > Preferences > Config > Export Interface...** and **Import Interface...** instead.
+> shared layout, use **Edit > Preferences > Saving & Layouts > Export Interface...** and **Import Interface...** instead.
 
 ## The log file
 

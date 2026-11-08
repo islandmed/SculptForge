@@ -1,4 +1,4 @@
-# Merge by Distance and Check Mesh in Tool > Geometry (foirgairwolf on Discord), on a cube whose faces don't share their
+# Merge by Distance and Find Problems in Tool > Geometry (foirgairwolf on Discord), on a cube whose faces don't share their
 # points (each face nudged 1e-5 apart, so the importer keeps them), with one flipped and one repeated triangle.
 run open path=$SCRIPT_DIR/../data/check_mesh_cube.obj
 expect_value vertices == 24

@@ -50,7 +50,7 @@ struct RenderSettings {
     // a timelapse seeking through the history flipped between the two from frame to frame (Discord, 0.11.10).
     bool fullDetail = false;
     bool flatShading = false;  // the scene's shading (Material palette): faceted; Parts can override (core/Document.h)
-    // Backface culling (#68, Tool > Display): back faces are never drawn, on any mesh (closed or not, from any
+    // Backface culling (#68, Tool > Viewport Look): back faces are never drawn, on any mesh (closed or not, from any
     // view). Off: they are skipped only where they can't show (a closed mesh seen from outside, Renderer::cull).
     bool backfaceCulling = false;
     // Floor grid (#115, View > Floor grid): a faint grid on the floor under the model (y = floorHeight, Y up; the

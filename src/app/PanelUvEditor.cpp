@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The UV Editor (Tool > Texture Map > UV Editor, Alt+U): a window with the active Part's UV layout in 2D,
+// The UV Editor (Tool > Texture Image > UV Editor, Alt+U): a window with the active Part's UV layout in 2D,
 // drawn on the GPU (render/UvView.h) over the UDIM tile grid with a checker or the painted texture behind it.
 //
 // - Select vertices, edges, faces or islands (1-4) by clicking or dragging a box (Shift adds, Ctrl removes), or

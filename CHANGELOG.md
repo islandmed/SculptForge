@@ -91,7 +91,7 @@ All notable changes to SculptForge are listed here. The format follows
 - **Merge by Distance** (Tool > Geometry; `weld_points distance=... preview=true`): the points of the active Part
   within the distance merge into the nearest kept one; collapsed triangles go; one undo step. The count follows the
   slider and the points that would merge show in orange. Thanks foirgairwolf on Discord.
-- **Check Mesh** (Tool > Geometry; `mesh_check`, `mesh_fix issue=...`): non-manifold edges (Fix loosens the extra
+- **Find Problems** (Tool > Geometry; `mesh_check`, `mesh_fix issue=...`): non-manifold edges (Fix loosens the extra
   triangles), holes (capped as Fill Holes), duplicate and degenerate triangles (deleted), zero-area triangles
   (shortest edge collapsed), flipped triangles and inside-out closed pieces (rewound), isolated points (removed). Fix
   all fixes everything except holes, as one undo step. Thanks foirgairwolf on Discord.
@@ -129,13 +129,13 @@ All notable changes to SculptForge are listed here. The format follows
 ## [0.11.14] - 2026-11-07
 
 ### Added
-- **Deformation stack** (Tool > Deformation > Stack, requested by foirgairwolf on Discord): thirteen whole-Part shape
+- **Deformation stack** (Tool > Reshape > Stack, requested by foirgairwolf on Discord): thirteen whole-Part shape
   operations in four groups (Transform: Move, Turn, Scale, Squash; Bend & Twist: Bend, Twist, Taper, Shear; Shape:
   Round, Box, Flatten, Sag, Depth; plus the Surface ones), each along any of X, Y and Z about the Part's centre (or
   the gizmo's placed pivot), with Direction for Bend and Shear and Soft for an eased profile. The preview is the stack
   applied as one undo step and follows each change; Apply, Apply Selected, Reset and Repeat. The mask holds what it
   covers. Commands `deform_move` ... `deform_depth` and `deform_stack` for scripts and the AI.
-- **Size** (Tool > Deformation, requested by foirgairwolf on Discord): the active Part's X, Y and Z dimensions in
+- **Size** (Tool > Reshape, requested by foirgairwolf on Discord): the active Part's X, Y and Z dimensions in
   scene units, to drag or type exactly; it resizes about its centre (Uniform: in proportion), one undo step. Command
   `deform_size`.
 - Top bar heart (Help > Support SculptForge); a small badge for verified members. Hidden in studio builds and before
@@ -306,7 +306,7 @@ All notable changes to SculptForge are listed here. The format follows
   Wing finger), clean closed quad meshes for dividing and sculpting, generated in-house by tools/creature-bones.
   Commands: `insert_set_items set=builtin:creature-bones`, `insert_mesh set=builtin:creature-bones index=<n>`.
   Translated piece names. Thanks @kenttumanda123-netizen.
-- **Floor grid** (#115, **View > Floor grid**, also **Tool > Display** and the command palette): a faint grid on the
+- **Floor grid** (#115, **View > Floor grid**, also **Tool > Viewport Look** and the command palette): a faint grid on the
   floor under the model (its lowest point, Y up; it moves when a stroke or a move ends), the X and Z axes through the
   origin marked, squares stepping by ten with the zoom and fading into the distance. It never draws over the model.
   Off by default; remembered in the preferences. Suggested by @fenixpoints.
@@ -425,7 +425,7 @@ All notable changes to SculptForge are listed here. The format follows
   200 MB and checked before import, kept in a private temporary folder deleted after import; polling backs off to 30
   s. Studios: provider id `hyper3d` in the policy, one audit log line per generation. Thanks to ElgoogUdiab for
   suggesting it (#123); re-implemented in house from Hyper3D's public API documentation.
-- **Cancel** for Auto UV (Tool > Texture Map), beside its progress bar.
+- **Cancel** for Auto UV (Tool > Texture Image), beside its progress bar.
 
 ### Changed
 - The console keeps one line for a job's progress ("Auto UV: 42%") instead of one line per percent.
@@ -801,7 +801,7 @@ All notable changes to SculptForge are listed here. The format follows
   budget per test. A release bump that only adds paperwork reuses CI instead of waiting for it again.
 - **Preferences save themselves** (#117, thanks fenixpoints): the key style, shortcuts, tablet, interface, performance
   and other preferences, and the radial menus, are written to ui.json half a second after they change (and at quit),
-  through a temporary file. The layout is kept only by the new **Save Layout** (Edit > Preferences > Config). The old
+  through a temporary file. The layout is kept only by the new **Save Layout** (Edit > Preferences > Saving & Layouts). The old
   save command and its Ctrl+Shift+I key are gone; keymaps and macros that name its id (`config.store`) still load, as
   **Save Preferences Now** in the command palette.
 - **SculptForge keys: I is Falloff** (as O); U stays Intensity. The Classic sculpting keys keep S size, U intensity, I
@@ -1316,7 +1316,7 @@ All notable changes to SculptForge are listed here. The format follows
   key held (<kbd>Alt</kbd>; <kbd>Ctrl</kbd> in the Blender and Maya styles) move the surface along the average
   normal under the brush instead of the view plane. These brushes had no use for the key; **Preferences > Input >
   Along the normal** makes it Always or Never.
-- Whole-Part deformations (from the discussions): **Tool > Deformation > Polish** (bilateral normal filtering:
+- Whole-Part deformations (from the discussions): **Tool > Reshape > Polish** (bilateral normal filtering:
   noise goes, planes and edges stay), **Relax** (even spacing along the surface), **Smooth** (Laplacian, or Taubin
   with Smooth keeps volume) and **Balloon** (fills the form out; negative lets the air out), each with an amount,
   mask-aware, open borders and hidden faces kept, one undo step, and as commands (`deform_polish`, `deform_relax`,
@@ -1339,7 +1339,7 @@ All notable changes to SculptForge are listed here. The format follows
 - The website's membership page is now `support.html` (titled Membership; the old address redirects there) and lists
   what each membership includes. Help > Support SculptForge, the welcome, the reminder and the launch card open it
   and describe the membership benefits; the one-time option is now the One-time Supporter (pay what you want).
-- Backface culling (#68): **Tool > Display > Backface culling** skips the back faces of every Part, closed or open,
+- Backface culling (#68): **Tool > Viewport Look > Backface culling** skips the back faces of every Part, closed or open,
   from any view: you see through the openings of open meshes, and brushes and picking work only on the faces drawn.
   Off by default; saved automatically, projects keep their own. An 8M-triangle open mesh seen from behind: 3.1 ms
   -> 0.7 ms a frame; a closed 20M sculpt is unchanged (its hidden back faces were already skipped).
@@ -1355,7 +1355,7 @@ All notable changes to SculptForge are listed here. The format follows
   the <kbd>Ctrl</kbd>+<kbd>Shift</kbd> visibility selection.
 - Smooth on Quad Remesh results (#69): smoothing averaged every neighbour along a triangle edge, quad diagonals
   included, so a vertex at one end of a diagonal was pulled along it and the quads sheared into zigzags. Smooth (the
-  brush, Shift, recipes' smoothing and Tool > Deformation > Smooth) now averages the polygon's own edges. 30 smooth
+  brush, Shift, recipes' smoothing and Tool > Reshape > Smooth) now averages the polygon's own edges. 30 smooth
   strokes on a remeshed sphere: corner angle error 3.9 -> 3.3 degrees (it was 8.8); on the lion head 8.7 -> 9.7
   (was 19.5). Triangle meshes are unchanged.
 - Keep Masked remeshing (#67): Voxel Remesh with Keep Masked failed on real models ("Couldn't cut the remeshed
@@ -1385,7 +1385,7 @@ All notable changes to SculptForge are listed here. The format follows
   `stroke`, `vdm_stamp`, `mask_rect`, `mask_lasso`, `hide_rect`, `hide_lasso`, `insert_primitive` and `insert_mesh`.
 - **Preferences > Interface > Timeline position** (#63): the Sculpt Timeline strip at the top of the viewport (the
   new default, away from the brush shelf) or at the bottom; saved automatically.
-- **UV Editor** (Tool > Texture Map > UV Editor, Alt+U): a window with the active Part's UV layout over the UDIM
+- **UV Editor** (Tool > Texture Image > UV Editor, Alt+U): a window with the active Part's UV layout over the UDIM
   tile grid, drawn on the GPU (pan, zoom, a checker or the painted texture behind). Select vertices, edges, faces or
   islands (1-4) by click or box, or on the model with **Select in 3D**; move, rotate and scale with the selection's
   handles or G / R / S (X / Y lock an axis, Ctrl snaps). **Seam Tool**: drag on the model to mark seams along the
@@ -1706,7 +1706,7 @@ All notable changes to SculptForge are listed here. The format follows
   (docs/performance.md, "Hardware profile").
 - Material painting (PBR): a painted texture can carry Roughness, Metallic, Normal, Height (16-bit), Ambient
   Occlusion, Emissive and Opacity besides its colour, all painted in the same strokes. Turn channels on in
-  **Tool > Texture Map > Material Channels** (`texture_channels`); a channel costs no memory until it is painted
+  **Tool > Texture Image > Material Channels** (`texture_channels`); a channel costs no memory until it is painted
   (64x64 copy-on-write tiles; untouched tiles aren't stored). **Color > Material** sets what the brush lays on
   each channel (material swatches, per-channel value swatches and sliders; `paint_material`), and **C** picks the
   whole material under the cursor. Paint layers hold every channel: channel chips on each layer row turn a
@@ -1714,7 +1714,7 @@ All notable changes to SculptForge are listed here. The format follows
   normals (`texture_layer_channel`). Height also yields a normal combined onto the Normal channel. One undo step
   per stroke, kept per layer and channel. Auto UV, Voxel Remesh, QRemesh and merging Parts carry every channel.
   See the guide's Material painting page.
-- Solo channel view: **Tool > Texture Map** shows one channel on the model (roughness and the other scalars in
+- Solo channel view: **Tool > Texture Image** shows one channel on the model (roughness and the other scalars in
   grey, the normal as colours, emission in colour), live while painting (`channel_view`).
 - Export Maps with presets (`export_maps`): Unreal (`T_*_BC`, `T_*_N` in DirectX, `T_*_ORM`), Unity URP and HDRP
   (mask map), glTF, Godot, Blender (one file per channel) and USD, plus your own JSON presets (the guide's Export
@@ -1861,7 +1861,7 @@ and a fix for Add Level crashing on models from Blender, with a log file so a cr
 - Extract (Tool > Part > Extract): the masked, visible part of a Part becomes a shell with Thick (a share of the Part's size; negative grows inward, 0 makes a single-sided surface), Edge Smooth (smooths the stepped edge) and Double (both ways). Extract shows a preview below the source that follows the settings; Accept keeps it as a new Part with outer, inner and rim face groups and the source's vertex paint, as one undo step (undo removes the Part, redo puts it back). Corners and Border make the rim triangles instead of quads at sharp corners or all along it. An unaccepted preview goes when the source changes and is never saved. Commands: extract, extract_accept, extract_cancel.
 - Make Symmetric (Tool > Geometry > Symmetry, X / Y / Z): keeps the + side of the plane through the origin, cuts polygons crossing it, mirrors the half and welds the seam into one watertight mesh, keeping face groups, vertex paint, mask, UVs, quads and sculpt layers (`mirror_and_weld`, with `side=negative` for the other half). Undoable.
 - A flat viewport background (#21): Preferences > Display > Background (also in the Render palette) switches between the gradient (the default) and Flat Colour with a colour picker. Saved automatically; projects keep their own, and `set_background` (mode, color) scripts it.
-- Mirror (Tool > Deformation, X / Y / Z): flips the Part across the plane through the origin, or in place with `pivot=center` (`mirror`). Undoable.
+- Mirror (Tool > Reshape, X / Y / Z): flips the Part across the plane through the origin, or in place with `pivot=center` (`mirror`). Undoable.
 - A log file, `sculptforge.log` in the user data folder (`%APPDATA%\SculptForge\SculptForge` on Windows,
   `~/Library/Application Support/SculptForge/SculptForge` on macOS, `~/.local/share/SculptForge/SculptForge` on
   Linux), so a crash is never silent: it holds the version, system and GPU, everything SDL_Log reports (the
@@ -1940,7 +1940,7 @@ Thank you for the reports.
   is hidden for the session and the message says where the file is). A project
   using one embeds it as a PNG (an `attachments` entry; no format change), so it opens with the same look anywhere.
   Scripts: `load_litsphere path=...`, `remove_litsphere name=...`, `set_material name=<your LitSphere>`.
-- Smooth / Flat shading (#11): **Material** palette (and **Tool > Display**) > **Shading** switches the whole
+- Smooth / Flat shading (#11): **Material** palette (and **Tool > Viewport Look**) > **Shading** switches the whole
   scene to flat, faceted shading, where every polygon shows its own face; **This Part** keeps one Part smooth
   or flat whatever the scene says. Both are saved in projects (no format change; older files open with your
   preferred shading) and the scene's choice is a preference (saved automatically). Smooth stays the default. Scripts:
@@ -2546,11 +2546,11 @@ adjacency that saves the memory).
 
 ### Texture painting on UV maps
 - Paint into a texture on the model's UVs instead of its vertices, so the colour detail comes from the texture
-  (1K, 2K, 4K or 8K), not from the mesh density (Tool > Texture Map > New Texture, `texture_create`). The Paint
+  (1K, 2K, 4K or 8K), not from the mesh density (Tool > Texture Image > New Texture, `texture_create`). The Paint
   brush, Rgb sculpting, fills, cavity paint, colour picking (C), mask, hidden faces, symmetry and pen pressure
   work as for vertex paint; texture strokes never paint through to the far side. A few texels of padding around
   every UV island keep seams invisible.
-- Vertex / Texture toggle on the top shelf (and in the Color, Paint Layers and Texture Map palettes) chooses
+- Vertex / Texture toggle on the top shelf (and in the Color, Paint Layers and Texture Image palettes) chooses
   where paint goes per Part (`paint_target`). The viewport multiplies the texture with the vertex paint over
   the material; Show texture hides it.
 - The Paint Layers palette works on the texture's own layer stack: blend modes, opacity, visibility, lock,
@@ -2560,7 +2560,7 @@ adjacency that saves the memory).
   tile of one colour costs 4 bytes: a stroke on a new 4K layer takes under a kilobyte of undo, not 64 MB.
 - Interactive at 4K on a 1.3M-triangle mesh: a dab visits only the triangles under the brush and uploads only
   the changed rectangle of the texture.
-- Auto UV (Tool > Texture Map, `uv_auto`): automatic UV unwrapping with xatlas (MIT, vendored in
+- Auto UV (Tool > Texture Image, `uv_auto`): automatic UV unwrapping with xatlas (MIT, vendored in
   third_party/xatlas), running in the background with progress. Show UVs draws the texture with the UV layout.
 - Vertex Paint > Texture and Texture > Vertex Paint (`texture_from_vertexpaint`, `vertexpaint_from_texture`), Import and
   Export Texture (PNG; `texture_import`, `texture_export`), Delete Texture (`texture_delete`).
@@ -2652,7 +2652,7 @@ Shaped by feedback from a working professional modeler and a survey of sculpting
 - Hold Ctrl over any button for what it does, its shortcut and its command (Ctrl+Alt for scripting parameters).
 - Command palette (F3 / Ctrl+Shift+P) finds and runs anything; the console (`` ` ``) shows every command as a
   script line, with completion and history, and copies the session as a macro.
-- Customize: Preferences > Config > Customize Shelves, then Ctrl+Alt+drag to add, move or remove shelf items;
+- Customize: Preferences > Saving & Layouts > Customize Shelves, then Ctrl+Alt+drag to add, move or remove shelf items;
   saving the interface (Ctrl+Shift+I), Reset Layout and Shortcuts, Export / Import Interface, three layout presets, and reassignable
   shortcuts (Ctrl+Alt+click a button, then press a key). Tab hides the shelves.
 - Lucide icons (ISC/MIT). Brush Lab now opens from the "AI Brush" button instead of covering the model at start.

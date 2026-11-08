@@ -520,7 +520,7 @@ void App::drawPalette_Color() {
         const Mesh& m = doc_.mesh;
         const bool layered = !m.paintLayers.empty() && m.activePaintLayer >= 0 && m.activePaintLayer < int(m.paintLayers.size());
         if (hasTexture(m)) {
-            // Where paint goes, when the Part has a texture (Tool > Texture Map).
+            // Where paint goes, when the Part has a texture (Tool > Texture Image).
             ImGui::AlignTextToFramePadding();
             ImGui::TextDisabled("%s", tr("Paint into"));
             ImGui::SameLine();

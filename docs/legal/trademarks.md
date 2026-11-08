@@ -118,6 +118,8 @@ their old ids (`config.store`, `rgb_intensity`, `focal`, `subdiv_lower`...); onl
 | Divide / Smt / SDiv | Add Level / Smooth / Level |
 | Close Holes / Delete Hidden | Fill Holes / Remove Hidden |
 | Target Polygons / Half / Same / Double / Adaptive Size / Keep Groups / Detect Edges / Curves Strength | Target Quads / 50% / 100% / 200% / Size Variation / Follow Face Groups / Keep Hard Edges / Guide Strength |
+| Tool sub-palettes Deformation / Texture Map / Display; Preferences > Config | Reshape / Texture Image / Viewport Look (ordered by task); Saving & Layouts (ids `tool.deformation`, `tool.texture`, `tool.display`, `preferences.config` kept) |
+| Check Mesh / Inflate Balloon | Find Problems / Balloon |
 
 <!-- labels:begin -->
     store ?config
@@ -155,6 +157,12 @@ their old ids (`config.store`, `rgb_intensity`, `focal`, `subdiv_lower`...); onl
     detect edges
     \bkeep groups\b
     \bhalf ?/ ?same ?/ ?double\b
+    tool > deformation
+    tool > display\b
+    preferences > config\b
+    (?-i:Texture Map)
+    (?-i:Check Mesh)
+    inflate balloon
 <!-- labels:end -->
 
 One-word labels that are everyday words in prose and code are refused only as a whole interface label: a string
@@ -164,6 +172,8 @@ ids) doesn't count.
 
 <!-- whole-labels:begin -->
     Divide
+    Deformation
+    Config
 <!-- whole-labels:end -->
 
 ## Old words read on load (src/core/LegacyNames.h)

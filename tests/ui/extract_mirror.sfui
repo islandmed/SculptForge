@@ -1,15 +1,15 @@
-# Extract (Tool > Part > Extract: preview, then Accept), Make Symmetric (Tool > Geometry > Symmetry)
-# and Mirror (Tool > Deformation); askNK's 0.9.5 review wishlist.
+# Extract (Tool > Part > Extract: preview, then Accept), Make Symmetric and Mirror (Tool > Geometry > Symmetry);
+# askNK's 0.9.5 review wishlist.
 
 # --- Extract: a cap from the masked top of a sphere.
 run new_sphere subdivisions=4
 run mask_rect y0=0.3
 expect_value masked > 0
-expect "Extract/Extract"
+expect "Extract/Make Shell"
 expect "Extract/Accept"
 camera 25 25
 key f
-click "Extract/Extract"
+click "Extract/Make Shell"
 expect_status "Extract preview"
 expect_value parts == 2
 expect_value active_part == 0
@@ -45,7 +45,7 @@ key ctrl+shift+z
 expect_value parts == 2
 
 # A preview that isn't accepted goes when the source changes.
-click "Extract/Extract"
+click "Extract/Make Shell"
 expect_value parts == 3
 run mask_invert
 wait_idle 5
@@ -77,16 +77,14 @@ shot head-before
 click "Symmetry/Make Symmetric"
 expect_status "Make Symmetric X"
 shot head-mirror-weld
-click "Geometry##tool.geometry"
 
-# --- Deformation > Mirror flips it (undoable); the axis toggles pick the axes.
-click "Deformation##tool.deformation"
-expect "Deformation/Mirror"
-click "Deformation/Mirror"
+# --- Symmetry > Mirror (beside Make Symmetric) flips it (undoable); the axis toggles pick the axes.
+expect "Symmetry/Mirror"
+click "Symmetry/Mirror"
 expect_status "Mirrored across X"
-shot deformation-palette
-click "Deformation/Y"
-click "Deformation/Mirror"
+shot symmetry-mirror
+click "Symmetry/Y##deformation.mirror_y"
+click "Symmetry/Mirror"
 expect_status "Mirrored across XY"
 key ctrl+z
 key ctrl+z

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Default actions and shortcuts, the preferences' autosave, Save Layout / Revert / Export / Import Interface,
-// the Preferences > Config / Interface / Hotkeys / Library sections, the F1
+// the Preferences > Saving & Layouts / Interface / Hotkeys / Library sections, the F1
 // Controls sheet (generated from the action registry) and classic
 // shortcut assignment.
 #include "app/UiScale.h"
@@ -433,6 +433,16 @@ void App::initActions() {
         "Destructive: four times the polygons as one plain mesh, with no lower levels to step back to. On a Part "
         "with subdivision levels it removes them (it asks first; Ctrl+Z brings them back). To keep levels, use "
         "Add Level instead.");
+    // Tool > Geometry > Cleanup > Find Problems (PanelMeshCheck.cpp, its Check button): here so F3 finds it.
+    add("geometry.mesh_check", "Find Problems", "Tool > Geometry", nullptr,
+        [this] {
+            runMeshCheck();
+            status_ = meshReport_.summary();
+        },
+        nullptr, "mesh_check", nullptr, [this] { return doc_.mesh.triangleCount() > 0; },
+        "Count what makes the active Part hard to sculpt, remesh, print or export: non-manifold edges, holes, "
+        "duplicate, degenerate and flipped triangles. Changes nothing; Tool > Geometry > Find Problems lists each "
+        "with its Fix.");
     add("geometry.close_holes", "Fill Holes", "Tool > Geometry", nullptr, [this] { runCommand("close_holes"); },
         ICON_LC_CIRCLE_DOT, "close_holes", nullptr, nullptr,
         "Cap every open boundary of the active Part (a hole, an open bottom, the rim of an extracted shell) with a "
@@ -510,8 +520,8 @@ void App::initActions() {
         ICON_LC_UNLINK, "part_make_unique", nullptr, [this] { return doc_.linkCount(doc_.activePart) > 1; },
         "Give the active linked Part its own copy of the mesh: it stays where it is and no longer changes with the "
         "others.");
-    // Tool > Part > Extract, Tool > Geometry > Symmetry, Tool > Deformation (PanelExtract.cpp).
-    add("part.extract", "Extract", "Tool > Parts", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
+    // Tool > Part > Extract, Tool > Geometry > Symmetry (Make Symmetric, Mirror), Tool > Reshape (PanelExtract.cpp).
+    add("part.extract", "Make Shell", "Tool > Parts", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
         [this] { return doc_.mesh.hasMask(); },
         "Make a shell from the masked part of the Part (a helmet, a strap, clothing), shown as a preview below it. "
         "Change Thickness, Edge Smooth, Both Sides, Corners or Border and it updates; Accept keeps it as a new Part.");
@@ -543,8 +553,8 @@ void App::initActions() {
         [this] { runCommand("mirror_and_weld", {{"axis", axesText(mirrorWeldAxes_)}}); }, nullptr, "mirror_and_weld",
         nullptr, [this] { return !axesText(mirrorWeldAxes_).empty() && doc_.mesh.triangleCount() > 0; },
         "Mirror the + side of the Part onto the - side across the chosen axis and weld the seam into one "
-        "watertight mesh. Face Groups and vertex paint come along. To keep the other side, Deformation > Mirror first.");
-    add("deformation.mirror", "Mirror", "Tool > Deformation", nullptr,
+        "watertight mesh. Face Groups and vertex paint come along. To keep the other side, Symmetry > Mirror first.");
+    add("deformation.mirror", "Mirror", "Tool > Geometry", nullptr,
         [this] { runCommand("mirror", {{"axis", axesText(mirrorAxes_)}}); }, nullptr, "mirror", nullptr,
         [this] { return !axesText(mirrorAxes_).empty() && doc_.mesh.vertexCount() > 0; },
         "Flip the Part across the chosen axis, through the origin (the plane symmetry and Make Symmetric use).");
@@ -555,7 +565,7 @@ void App::initActions() {
         add(kWeldIds[k], kNames[k], "Tool > Geometry", nullptr, [this, k] { mirrorWeldAxes_[k] = !mirrorWeldAxes_[k]; },
             nullptr, nullptr, [this, k] { return mirrorWeldAxes_[k]; }, nullptr,
             "An axis Make Symmetric mirrors across (several: one after the other).");
-        add(kMirrorIds[k], kNames[k], "Tool > Deformation", nullptr, [this, k] { mirrorAxes_[k] = !mirrorAxes_[k]; }, nullptr,
+        add(kMirrorIds[k], kNames[k], "Tool > Geometry", nullptr, [this, k] { mirrorAxes_[k] = !mirrorAxes_[k]; }, nullptr,
             nullptr, [this, k] { return mirrorAxes_[k]; }, nullptr, "An axis Mirror flips along (several: one after the other).");
     }
     // Whole-mesh deformations (core/Deform.h, PanelExtract.cpp), each by its amount slider.
@@ -573,7 +583,7 @@ void App::initActions() {
             "Fill the whole Part out toward a rounder volume, like a balloon; a negative "
             "amount lets the air out. The mask holds what it covers; one undo step."};
         for (int k = 0; k < 4; ++k)
-            add(kIds[k], kLabels[k], "Tool > Deformation", nullptr,
+            add(kIds[k], kLabels[k], "Tool > Reshape", nullptr,
                 [this, k] {
                     Args a{{"amount", double(deformAmount_[k])}};
                     if (k == 2) a["keep_volume"] = deformKeepVolume_;
@@ -582,24 +592,24 @@ void App::initActions() {
                 nullptr, kCommands[k], nullptr, [this, k] { return doc_.mesh.vertexCount() > 0 && deformAmount_[k] != 0.0f; },
                 kHelp[k]);
     }
-    // Deformation > Stack (PanelDeform.cpp, docs/design/deform-panel.md).
+    // Reshape > Stack (PanelDeform.cpp, docs/design/deform-panel.md).
     {
         auto sel = [this]() -> DeformStep* {
             DeformStackUi& ds = deformStack_;
             return ds.selected >= 0 && ds.selected < int(ds.steps.size()) ? &ds.steps[size_t(ds.selected)] : nullptr;
         };
         auto any = [this] { return !deformStack_.steps.empty(); };
-        add("deformation.stack_apply", "Apply", "Tool > Deformation", nullptr, [this] { deformStackApply(false); }, nullptr,
+        add("deformation.stack_apply", "Apply", "Tool > Reshape", nullptr, [this] { deformStackApply(false); }, nullptr,
             nullptr, nullptr, any,
             "Keep the stack's result on the Part (one undo step) and start a new stack. With Preview on, what you "
             "see is what stays.");
-        add("deformation.stack_apply_selected", "Apply Selected", "Tool > Deformation", nullptr,
+        add("deformation.stack_apply_selected", "Apply Selected", "Tool > Reshape", nullptr,
             [this] { deformStackApply(true); }, nullptr, nullptr, nullptr, [sel] { return sel() != nullptr; },
             "Keep only the selected step on the Part (one undo step) and take it off the stack; the rest stay to "
             "edit.");
-        add("deformation.stack_reset", "Reset", "Tool > Deformation", nullptr, [this] { deformStackReset(); }, nullptr,
+        add("deformation.stack_reset", "Reset", "Tool > Reshape", nullptr, [this] { deformStackReset(); }, nullptr,
             nullptr, nullptr, any, "Take the preview back off the Part and empty the stack.");
-        add("deformation.stack_repeat", "Repeat", "Tool > Deformation", nullptr,
+        add("deformation.stack_repeat", "Repeat", "Tool > Reshape", nullptr,
             [this, sel] {
                 if (DeformStep* st = sel()) {
                     const DeformStep copy = *st;
@@ -611,7 +621,7 @@ void App::initActions() {
             },
             nullptr, nullptr, nullptr, [sel] { return sel() != nullptr; },
             "Add the selected step again right after it (twice the twist, a second bend...).");
-        add("deformation.stack_remove", "Remove", "Tool > Deformation", nullptr,
+        add("deformation.stack_remove", "Remove", "Tool > Reshape", nullptr,
             [this, sel] {
                 if (sel()) {
                     deformStack_.steps.erase(deformStack_.steps.begin() + deformStack_.selected);
@@ -624,7 +634,7 @@ void App::initActions() {
         static const char* const kAxisIds[3] = {"deformation.stack_x", "deformation.stack_y", "deformation.stack_z"};
         static const char* const kAxisNames[3] = {"X", "Y", "Z"};
         for (int k = 0; k < 3; ++k)
-            add(kAxisIds[k], kAxisNames[k], "Tool > Deformation", nullptr,
+            add(kAxisIds[k], kAxisNames[k], "Tool > Reshape", nullptr,
                 [this, sel, k] {
                     DeformStep* st = sel();
                     if (!st) return;
@@ -841,30 +851,30 @@ void App::initActions() {
     add("script.clear_console", "Clear console", "Script", nullptr, [this] { console_.clear(); }, ICON_LC_TRASH_2, nullptr, nullptr,
         nullptr, "Empty the console log (the session script is kept).");
 
-    // --- Config (Preferences > Config) ---
+    // --- Config (Preferences > Saving & Layouts) ---
     // Preferences save themselves (#117); the layout is kept by Save Layout. config.store (Ctrl+Shift+I before
     // 0.11.1) stays as an id, so keymaps and macros that name it still load: it saves the preferences at once.
-    add("config.save_layout", "Save Layout", "Preferences > Config", nullptr, [this] { saveLayout(); }, ICON_LC_SAVE, nullptr,
+    add("config.save_layout", "Save Layout", "Preferences > Saving & Layouts", nullptr, [this] { saveLayout(); }, ICON_LC_SAVE, nullptr,
         nullptr, nullptr,
         "Keep the current layout (shelves, trays, open palettes) for future sessions. Preferences and shortcuts save "
         "themselves.");
-    add("config.store", "Save Preferences Now", "Preferences > Config", nullptr, [this] { savePrefsNow(); }, ICON_LC_SAVE,
+    add("config.store", "Save Preferences Now", "Preferences > Saving & Layouts", nullptr, [this] { savePrefsNow(); }, ICON_LC_SAVE,
         nullptr, nullptr, nullptr,
         "Write the preferences and shortcuts to disk now. Not needed: they save themselves a moment after every change.");
-    add("config.restore_standard", "Reset Layout and Shortcuts", "Preferences > Config", nullptr, [this] { restoreStandardUi(); },
+    add("config.restore_standard", "Reset Layout and Shortcuts", "Preferences > Saving & Layouts", nullptr, [this] { restoreStandardUi(); },
         ICON_LC_ROTATE_CCW, nullptr, nullptr, nullptr,
         "Go back to the built-in layout, shortcuts and radial menus. The shortcuts save themselves; Save Layout keeps "
         "the layout.");
-    add("config.restore_custom", "Revert to Saved Layout", "Preferences > Config", nullptr, [this] { restoreCustomUi(); },
+    add("config.restore_custom", "Revert to Saved Layout", "Preferences > Saving & Layouts", nullptr, [this] { restoreCustomUi(); },
         ICON_LC_ARCHIVE_RESTORE, nullptr, nullptr, [this] { return fileExists(uiConfigPath()); },
         "Go back to the layout the last Save Layout kept.");
-    add("config.load", "Import Interface...", "Preferences > Config", "Ctrl+L", [this] { loadUiDialog(); },
+    add("config.load", "Import Interface...", "Preferences > Saving & Layouts", "Ctrl+L", [this] { loadUiDialog(); },
         ICON_LC_FOLDER_INPUT, nullptr, nullptr, nullptr,
         "Load a layout and shortcuts file someone shared (or you saved with Export Interface).");
-    add("config.save", "Export Interface...", "Preferences > Config", nullptr, [this] { saveUiDialog(); },
+    add("config.save", "Export Interface...", "Preferences > Saving & Layouts", nullptr, [this] { saveUiDialog(); },
         ICON_LC_FOLDER_OUTPUT, nullptr, nullptr, nullptr,
         "Save the layout, shortcuts and interface preferences to a file you can share.");
-    add("config.customize", "Customize Shelves", "Preferences > Config", nullptr,
+    add("config.customize", "Customize Shelves", "Preferences > Saving & Layouts", nullptr,
         [this] {
             layout_.customize = !layout_.customize;
             status_ = layout_.customize ? "Customize: Ctrl+Alt+drag to move or remove items" : "Customize off";
@@ -875,7 +885,7 @@ void App::initActions() {
     // The shell's actions (Shell.cpp: brushes, shelves, palettes, trays): they replace any of the above with
     // the same id and own P (Paint), the symmetry toggles and Tab.
     registerShellActions();
-    registerTextureUiActions(); // Tool > Texture Map, the Vertex / Texture paint target (PanelTexture.cpp)
+    registerTextureUiActions(); // Tool > Texture Image, the Vertex / Texture paint target (PanelTexture.cpp)
     registerLineGradientActions(); // Color > Line Gradient (LineGradient.cpp)
     registerStencilActions();   // Alpha > Stencil (StencilOverlay.cpp)
     registerPbrUiActions();     // material channels, solo view, map export (PanelPbr.cpp)
@@ -1320,7 +1330,7 @@ void App::watchLayoutChanges() {
     if (layoutHintShown_ || uiConfigDeterministic_ || ++layoutCheckFrame_ % 20 != 0) return;
     if (layoutKey() == layoutBaseline_) return;
     layoutHintShown_ = true; // once per session (never saves the layout by itself)
-    status_ = "Layout changed - Preferences > Config > Save Layout keeps it";
+    status_ = "Layout changed - Preferences > Saving & Layouts > Save Layout keeps it";
 }
 
 // ---------------------------------------------------------------------------

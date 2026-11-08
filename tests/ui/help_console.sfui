@@ -59,6 +59,27 @@ key f3
 type "##Command palette" "holes close"
 expect_text "Fill Holes"
 key escape
+# ... and the renamed sub-palettes and buttons (fix/ip-palettes) by theirs.
+key f3
+type "##Command palette" "check mesh"
+expect_text "Find Problems"
+key escape
+key f3
+type "##Command palette" "deformation balloon"
+expect_text "Tool > Reshape"
+key escape
+key f3
+type "##Command palette" "deformation mirror"
+expect_text "Tool > Geometry"
+key escape
+key f3
+type "##Command palette" "config save layout"
+expect_text "Saving & Layouts"
+key escape
+key f3
+type "##Command palette" extract
+expect_text "Make Shell"
+key escape
 expect_value command_palette_open == 0
 
 # Commands that need parameters open in the console with their name typed.

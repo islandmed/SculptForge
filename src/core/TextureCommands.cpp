@@ -69,8 +69,8 @@ int layerArg(const PaintTexture& t, const Args& a, std::string& error) {
     return t.activeLayer >= -1 && t.activeLayer < int(t.layers.size()) ? t.activeLayer : -1;
 }
 
-const char* kNoUvs = "The Part has no UVs: run Auto UV first (Tool > Texture Map > Auto UV, or uv_auto)";
-const char* kNoTexture = "The Part has no texture: create one first (Tool > Texture Map > New, or texture_create)";
+const char* kNoUvs = "The Part has no UVs: run Auto UV first (Tool > Texture Image > Auto UV, or uv_auto)";
+const char* kNoTexture = "The Part has no texture: create one first (Tool > Texture Image > New, or texture_create)";
 
 } // namespace
 

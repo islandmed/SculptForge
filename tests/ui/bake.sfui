@@ -41,6 +41,19 @@ click "Bake/Displacement"
 click "Bake/Ambient Occlusion"
 shot bake-palette
 
+# Ctrl-hover help on the controls (here, while Bake is the newest open section: after a bake the tray sits at the
+# bottom of its scroll).
+hold ctrl
+hover "Bake/Bake"
+expect_help "UVs"
+hover "Bake/##bakefront"
+expect_help "in front of the low-poly"
+hover "Bake/##bakepad"
+expect_help "mipmapped"
+hover "Bake/Ambient Occlusion"
+expect_help "creases"
+hold none
+
 # Baking runs in the background with a progress bar, then the normal map shows on the low-poly.
 click "Bake/Bake"
 expect_value bake_running == 1
@@ -83,17 +96,7 @@ expect_status "Baked normal, cavity at 1024x1024"
 expect_value baked_maps == 2
 expect_value normal_map_preview == 1
 
-# Ctrl-hover help on the new controls, and the commands in the F3 palette.
-hold ctrl
-hover "Bake/Bake"
-expect_help "UVs"
-hover "Bake/##bakefront"
-expect_help "in front of the low-poly"
-hover "Bake/##bakepad"
-expect_help "mipmapped"
-hover "Bake/Ambient Occlusion"
-expect_help "creases"
-hold none
+# The commands in the F3 palette.
 key f3
 type "##Command palette" "preview normal"
 expect_text "Tool > Bake"

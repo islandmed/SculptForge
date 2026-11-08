@@ -53,14 +53,14 @@
       <article class="guide-article">
 <h1 id="texture-painting">Texture painting</h1>
 <p>Texture painting puts the colour into an image laid over the model&#x27;s UVs, instead of on its vertices. The detail you can paint then comes from the texture&#x27;s resolution, not from how dense the mesh is: a 4K texture on a light, game-ready mesh holds pores, freckles and sharp decals that vertex paint could only show on millions of polygons. Everything you know from <a href="vertex-paint.html">vertex paint</a> still applies: the same Paint brush, colours, fills, symmetry, mask and paint layers with blend modes.</p>
-<figure class="shot"><a href="images/texture-painting.jpg" class="zoom"><img src="images/texture-painting.jpg" alt="Texture painting: a sharp texture stroke above a soft vertex paint stroke, with the UV view in Tool &gt; Texture Map" width="1100" height="660" loading="lazy" decoding="async"></a><figcaption>Texture painting: a sharp texture stroke above a soft vertex paint stroke, with the UV view in Tool &gt; Texture Map</figcaption></figure>
+<figure class="shot"><a href="images/texture-painting.jpg" class="zoom"><img src="images/texture-painting.jpg" alt="Texture painting: a sharp texture stroke above a soft vertex paint stroke, with the UV view in Tool &gt; Texture Image" width="1100" height="660" loading="lazy" decoding="async"></a><figcaption>Texture painting: a sharp texture stroke above a soft vertex paint stroke, with the UV view in Tool &gt; Texture Image</figcaption></figure>
 <aside class="callout callout-note"><p>The texture can also carry roughness, metallic, normal, height, AO, emission and opacity, painted in the same strokes: see <a href="pbr-painting.html">Material painting (PBR)</a>.</p></aside>
 <h2 id="start-in-one-click">Start in one click<a class="anchor" href="#start-in-one-click" aria-label="Link to this section">#</a></h2>
-<p>Press <kbd>P</kbd> for the Paint brush (or turn on <strong>Rgb</strong>). While the Part has no texture, <strong>New Texture</strong> appears on the top shelf and in the <strong>Paint</strong> menu. Click it: if the model has no UVs, SculptForge runs <strong>Auto UV</strong> first (in the background; the status bar shows its progress), then gives it a white texture (2K, or the size chosen in Tool &gt; Texture Map) and switches painting to <strong>Texture</strong>. Paint away. The steps below do the same thing by hand, with more choices.</p>
+<p>Press <kbd>P</kbd> for the Paint brush (or turn on <strong>Rgb</strong>). While the Part has no texture, <strong>New Texture</strong> appears on the top shelf and in the <strong>Paint</strong> menu. Click it: if the model has no UVs, SculptForge runs <strong>Auto UV</strong> first (in the background; the status bar shows its progress), then gives it a white texture (2K, or the size chosen in Tool &gt; Texture Image) and switches painting to <strong>Texture</strong>. Paint away. The steps below do the same thing by hand, with more choices.</p>
 <h2 id="paint-a-texture-in-four-steps">Paint a texture in four steps<a class="anchor" href="#paint-a-texture-in-four-steps" aria-label="Link to this section">#</a></h2>
 <ol>
 <li>
-Open <strong>Tool &gt; Texture Map</strong> in the right tray.
+Open <strong>Tool &gt; Texture Image</strong> in the right tray.
 </li>
 <li>
 If the Part has no UVs (the sub-palette says &quot;No UVs&quot;), click <strong>Auto UV</strong>. SculptForge cuts the model into UV islands and packs them into the texture square. It works in the background with a progress bar; on a few hundred thousand triangles it takes seconds, on millions it can take a minute or more. Models imported with UVs already have them: skip this step.
@@ -74,7 +74,7 @@ Press <kbd>P</kbd> and paint. Size, Colour intensity, pen pressure, the stroke t
 </ol>
 <p>Click <strong>Show UVs</strong> to see the texture with the UV layout drawn over it, below the buttons, or open the <a href="uv-editor.html">UV Editor</a> (<kbd>Alt</kbd>+<kbd>U</kbd>) to cut seams, unwrap, pack and edit the UVs. Paint on the model and watch the texture fill in.</p>
 <h2 id="vertex-or-texture">Vertex or Texture<a class="anchor" href="#vertex-or-texture" aria-label="Link to this section">#</a></h2>
-<p>When a Part has a texture, <strong>Vertex</strong> and <strong>Texture</strong> appear on the top shelf next to <strong>Rgb</strong> (and in the Color, Paint Layers and Texture Map palettes). They choose where paint goes:</p>
+<p>When a Part has a texture, <strong>Vertex</strong> and <strong>Texture</strong> appear on the top shelf next to <strong>Rgb</strong> (and in the Color, Paint Layers and Texture Image palettes). They choose where paint goes:</p>
 <ul>
 <li>
 <strong>Texture</strong>: the Paint brush, <strong>Rgb</strong> while sculpting, <strong>Fill</strong>, <strong>Fill masked</strong>, <strong>Cavity</strong>, <strong>Clear</strong> and the Paint Layers palette work on the texture.
@@ -83,7 +83,7 @@ Press <kbd>P</kbd> and paint. Size, Colour intensity, pen pressure, the stroke t
 <strong>Vertex</strong>: they work on the vertex paint, exactly as before.
 </li>
 </ul>
-<p>The model shows both: the vertex paint multiplied by the texture, over the material. If paint looks as coarse as the mesh&#x27;s polygons, it is going into the vertices: check that <strong>Texture</strong> is lit, and that the Part carries no old vertex paint (Tool &gt; Paint Layers, or <strong>Vertex Paint &gt; Texture</strong> to move it into the texture). Texture paint itself is as sharp as the texture: a hard alpha gives the same texels on a two-triangle plane as on a dense mesh. Each Part keeps its own choice, saved in the project. <strong>Show texture</strong> (Texture Map, or the <strong>Paint</strong> menu) hides the texture in the viewport without deleting it.</p>
+<p>The model shows both: the vertex paint multiplied by the texture, over the material. If paint looks as coarse as the mesh&#x27;s polygons, it is going into the vertices: check that <strong>Texture</strong> is lit, and that the Part carries no old vertex paint (Tool &gt; Paint Layers, or <strong>Vertex Paint &gt; Texture</strong> to move it into the texture). Texture paint itself is as sharp as the texture: a hard alpha gives the same texels on a two-triangle plane as on a dense mesh. Each Part keeps its own choice, saved in the project. <strong>Show texture</strong> (Texture Image, or the <strong>Paint</strong> menu) hides the texture in the viewport without deleting it.</p>
 <h2 id="how-texture-painting-works">How texture painting works<a class="anchor" href="#how-texture-painting-works" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>

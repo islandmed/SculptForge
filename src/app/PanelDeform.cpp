@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Tool > Deformation > Stack (docs/design/deform-panel.md, foirgairwolf on Discord): a list of whole-Part shape operations
+// Tool > Reshape > Stack (docs/design/deform-panel.md, foirgairwolf on Discord): a list of whole-Part shape operations
 // (core/Deform.h) to stack up, each with its amount, axes, direction and Soft; the preview is the stack really
 // applied as one undo step (deform_stack), redone after each change while it is still the last step; Apply keeps
 // it, Apply Selected keeps one step, Reset takes it back.
@@ -163,12 +163,12 @@ void App::drawDeformSize() {
                      "The active Part's width (X), height (Y) and depth (Z) in scene units. Drag, or double-click and "
                      "type an exact value: the Part resizes about its centre (one undo step). With Uniform, the other "
                      "sides follow in proportion.",
-                     "Tool > Deformation > Size");
+                     "Tool > Reshape > Size");
     }
     ImGui::SameLine();
     ui::Checkbox((std::string(tr("Uniform")) + "##deform_size_uniform").c_str(), &sz.uniform);
     ui::HelpText("Uniform", nullptr, "Resizing one side resizes the others in proportion, keeping the Part's shape.",
-                 "Tool > Deformation > Size");
+                 "Tool > Reshape > Size");
     if (edited >= 0 && sz.edit[edited] > 0.0f && sz.edit[edited] != sz.size[edited]) {
         Args a;
         if (sz.uniform && sz.size[edited] > 0.0f) {
@@ -212,7 +212,7 @@ void App::drawDeformStack() {
                  "Add a deformation to the stack: Transform (Move, Turn, Scale, Squash), Bend & Twist (Bend, Twist, "
                  "Taper, Shear), Shape (Round, Box, Flatten, Sag, Depth) or Surface (Polish, Relax, Smooth, Balloon). "
                  "The steps run in order on the whole Part.",
-                 "Tool > Deformation > Stack");
+                 "Tool > Reshape > Stack");
     ImGui::SameLine();
     if (ui::Checkbox((std::string(tr("Preview")) + "##deform_stack_preview").c_str(), &ds.preview)) {
         if (ds.preview) deformStackRefresh();
@@ -221,7 +221,7 @@ void App::drawDeformStack() {
     ui::HelpText("Preview", nullptr,
                  "Show the stack on the Part as you edit it. It is applied for real (one undo step), so it saves and "
                  "exports like any change; Reset takes it back.",
-                 "Tool > Deformation > Stack");
+                 "Tool > Reshape > Stack");
 
     // The list: on/off and the step; click a step to edit it.
     if (ds.steps.empty()) {
@@ -262,14 +262,14 @@ void App::drawDeformStack() {
             ui::HelpText("Direction", nullptr,
                          "Which way the step bends or leans, in degrees around its axis: 0 is toward +Y (toward +X "
                          "for the Y axis).",
-                         "Tool > Deformation > Stack");
+                         "Tool > Reshape > Stack");
         }
         if (deformUsesSoft(st.op)) {
             changed |= ui::Checkbox((std::string(tr("Soft")) + "##deform_step_soft").c_str(), &st.options.soft);
             ui::HelpText("Soft", nullptr,
                          "Ease the step out toward the ends of the Part instead of an even change along it (a bend "
                          "that curves most in the middle, a cut with a rounded edge).",
-                         "Tool > Deformation > Stack");
+                         "Tool > Reshape > Stack");
         }
         if (st.op == DeformOp::Smooth)
             changed |= ui::Checkbox((std::string(tr("Keep volume")) + "##deform_step_volume").c_str(), &st.options.keepVolume);

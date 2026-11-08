@@ -59,9 +59,11 @@ constexpr Entry kSpanish[] = {
     {"AI brush provider", "Proveedor del pincel IA"},
     {"Autosave", "Autoguardado"},
     {"Bake", "Bake"},
-    {"Config", "Configuración"},
-    {"Deformation", "Deformación"},
+    {"Saving & Layouts", "Guardado y diseños"},
+    {"Reshape", "Remodelar"},
     {"Display", "Visualización"},
+    {"Viewport Look", "Aspecto de la vista"},
+    {"Make Shell", "Crear carcasa"},
     {"Export", "Exportar"},
     {"Facial Shapes", "Formas faciales"},
     {"Geometry", "Geometría"},
@@ -79,7 +81,7 @@ constexpr Entry kSpanish[] = {
     {"Part", "Pieza"},
     {"Parts", "Piezas"},
     {"Tablet", "Tableta"},
-    {"Texture Map", "Mapa de textura"},
+    {"Texture Image", "Imagen de textura"},
     {"Updates", "Actualizaciones"},
     {"Vector Displacement", "Desplazamiento vectorial"},
     {"Visibility", "Visibilidad"},
@@ -571,7 +573,7 @@ constexpr Entry kSpanish[] = {
     {"Smaller brush", "Pincel más pequeño"},
     {"Pivot", "Pivote"},
 
-    // --- Preferences > Config ---
+    // --- Preferences > Saving & Layouts ---
     {"Customize Shelves", "Personalizar estantes"},
     {"Save Layout", "Guardar diseño"},
     {"Save Preferences Now", "Guardar preferencias ahora"},
@@ -981,7 +983,7 @@ constexpr Entry kSpanish[] = {
     {"Tilt", "Inclinación"},
     {"Spin", "Giro"},
 
-    // --- Deformation > Stack (PanelDeform.cpp) ---
+    // --- Reshape > Stack (PanelDeform.cpp) ---
     {"Turn", "Girar"},
     {"Bend", "Doblar"},
     {"Twist", "Torcer"},
@@ -1181,9 +1183,9 @@ constexpr Entry kSpanish[] = {
     {"Triangle border: the whole rim of the extracted shell is made of triangles instead of quads.",
      "Borde en triángulos: todo el reborde de la cáscara extraída se hace con triángulos en vez de quads."},
     {"Mirror the + side of the Part onto the - side across the chosen axis and weld the seam into one watertight "
-     "mesh. Face Groups and vertex paint come along. To keep the other side, Deformation > Mirror first.",
+     "mesh. Face Groups and vertex paint come along. To keep the other side, Symmetry > Mirror first.",
      "Refleja el lado + de la Pieza sobre el lado - en el eje elegido y suelda la costura en una sola malla estanca. "
-     "Los grupos de caras y la pintura de vértices también pasan. Para conservar el otro lado, usa antes Deformación "
+     "Los grupos de caras y la pintura de vértices también pasan. Para conservar el otro lado, usa antes Simetría "
      "> Reflejar."},
     {"Flip the Part across the chosen axis, through the origin (the plane symmetry and Make Symmetric use).", "Voltea la Pieza en el eje elegido, a través del origen (el plano que usan la simetría y Hacer simétrico)."},
     {"An axis Make Symmetric mirrors across (several: one after the other).", "Un eje en el que refleja Hacer simétrico (varios: uno tras otro)."},
@@ -1536,9 +1538,9 @@ constexpr Entry kSpanish[] = {
      "Convierte lo enmascarado en un grupo de caras nuevo y borra la máscara. Sin nada enmascarado, todo lo visible "
      "pasa a ser un grupo."},
     {"One face group per UV island: triangles that touch without a UV seam share a group. Only the visible part is "
-     "regrouped. Needs UVs (Tool > Texture Map > Auto UV makes some).",
+     "regrouped. Needs UVs (Tool > Texture Image > Auto UV makes some).",
      "Un grupo de caras por isla UV: los triángulos que se tocan sin costura UV comparten grupo. Solo se reagrupa la "
-     "parte visible. Necesita UV (Herramienta > Mapa de textura > UV automáticas las crea)."},
+     "parte visible. Necesita UV (Herramienta > Imagen de textura > UV automáticas las crea)."},
     {"The classic sculpting keys and gestures: I is Colour intensity, 9 saves a snapshot, the number keys don't pick "
      "brushes, and Ctrl+drag on the background only clears the mask.",
      "Las teclas y gestos clásicos de escultura: I es Intensidad RGB, 9 guarda una instantánea, las teclas numéricas "
@@ -1874,9 +1876,9 @@ constexpr Entry kSpanish[] = {
      "Elige la carpeta donde se escriben los mapas horneados. Vacío: junto a tu última exportación, si no la carpeta "
      "del proyecto, si no Bakes en la carpeta de tu biblioteca."},
     {"Maps are baked onto the active Part's UVs: make the low-poly active (it needs UVs from import or from Auto UV "
-     "in Tool > Texture Map), and keep the high-poly Part(s) visible.",
+     "in Tool > Texture Image), and keep the high-poly Part(s) visible.",
      "Los mapas se hornean sobre las UV de la Pieza activa: activa el low-poly (necesita UV de la importación o de "
-     "UV automáticas en Herramienta > Mapa de textura) y deja visibles las Piezas high-poly."},
+     "UV automáticas en Herramienta > Imagen de textura) y deja visibles las Piezas high-poly."},
     {"The high-poly to bake from: one Part, or every visible Part except the active one (the low-poly), or this "
      "Part's own top subdivision level baked onto its lowest level, or its micro level baked onto its base. Hidden "
      "faces of the source are ignored. UVs outside 0..1 bake as UDIM tiles (name.1001.png, ...).",
@@ -1973,9 +1975,9 @@ constexpr Entry kSpanish[] = {
      "single-sided surface.",
      "Grosor de la cáscara, como fracción del tamaño de la Pieza (0,015 es 1,5%). Negativo la hace crecer hacia "
      "dentro; 0 crea una superficie de una sola cara."},
-    {"Deformation > Smooth smooths without shrinking the form (Taubin smoothing) instead of the plain smooth, which "
+    {"Reshape > Smooth smooths without shrinking the form (Taubin smoothing) instead of the plain smooth, which "
      "also shrinks it.",
-     "Deformación > Suavizar suaviza sin encoger la forma (suavizado de Taubin) en vez del suavizado simple, que "
+     "Remodelar > Suavizar suaviza sin encoger la forma (suavizado de Taubin) en vez del suavizado simple, que "
      "también la encoge."},
     // --- PanelFace.cpp (tools/i18n/coverage.py) ---
     {"Give the active Part (a humanoid head, looking down +Z in the front view) the 52 Apple ARKit blend shapes as "
@@ -2757,17 +2759,17 @@ constexpr Entry kSpanish[] = {
      "de membresía, y las versiones para miembros quedan activadas."},
     // --- PanelTexture.cpp (tools/i18n/coverage.py) ---
     {"Paint into the vertices (vertex paint): the colour resolution is the mesh's. Shown when the Part has a texture "
-     "(Tool > Texture Map).",
+     "(Tool > Texture Image).",
      "Pinta en los vértices (pintura de vértices): la resolución del color es la de la malla. Se muestra cuando la "
-     "Pieza tiene textura (Herramienta > Mapa de textura)."},
+     "Pieza tiene textura (Herramienta > Imagen de textura)."},
     {"Paint into the Part's texture: the colour resolution comes from the texture, not the mesh. The Paint brush, Rgb "
      "sculpting, fills and Paint Layers all work on it.",
      "Pinta en la textura de la Pieza: la resolución del color viene de la textura, no de la malla. El pincel Paint, "
      "la escultura con Rgb, los rellenos y las Capas de pintura funcionan sobre ella."},
-    {"Start texture painting: give the Part a texture (the size chosen in Tool > Texture Map, 2K by default) so paint "
+    {"Start texture painting: give the Part a texture (the size chosen in Tool > Texture Image, 2K by default) so paint "
      "goes into texels instead of vertices, and the detail comes from the texture, not the mesh. Without UVs, Auto "
      "UV unwraps the model first (in the background, with its progress in the status bar).",
-     "Empieza a pintar texturas: da a la Pieza una textura (del tamaño elegido en Herramienta > Mapa de textura, 2K "
+     "Empieza a pintar texturas: da a la Pieza una textura (del tamaño elegido en Herramienta > Imagen de textura, 2K "
      "por defecto) para que la pintura vaya a los téxeles en vez de a los vértices, y el detalle venga de la "
      "textura, no de la malla. Sin UV, UV automáticas desenvuelve antes el modelo (en segundo plano, con su progreso "
      "en la barra de estado)."},
@@ -4366,8 +4368,8 @@ constexpr Entry kSpanish[] = {
      "Siguiente"},
     {"No UVs: Auto UV makes them",
      "Sin UV: Auto UV las crea"},
-    {"No UVs: Tool > Texture Map > Auto UV",
-     "Sin UV: Herramienta > Mapa de textura > Auto UV"},
+    {"No UVs: Tool > Texture Image > Auto UV",
+     "Sin UV: Herramienta > Imagen de textura > Auto UV"},
     {"No alpha matches \"%s\"",
      "Ningún alpha coincide con \"%s\""},
     {"No brush matches \"%s\"",
@@ -4920,7 +4922,13 @@ constexpr Entry kSpanish[] = {
     {"%zu point will merge", "%zu punto se fusionará"},
     {"%zu points will merge", "%zu puntos se fusionarán"},
     {"Check", "Comprobar"},
-    {"Check Mesh", "Comprobar malla"},
+    {"Find Problems", "Buscar problemas"},
+    {"Count what makes the active Part hard to sculpt, remesh, print or export: non-manifold edges, holes, "
+     "duplicate, degenerate and flipped triangles. Changes nothing; Tool > Geometry > Find Problems lists each "
+     "with its Fix.",
+     "Cuenta lo que hace difícil esculpir, remallar, imprimir o exportar la Pieza activa: aristas no variedad, agujeros, "
+     "triángulos duplicados, degenerados e invertidos. No cambia nada; Herramienta > Geometría > Buscar problemas "
+     "muestra cada uno con su Corregir."},
     {"Degenerate triangles", "Triángulos degenerados"},
     {"Distance", "Distancia"},
     {"Duplicate triangles", "Triángulos duplicados"},

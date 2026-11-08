@@ -478,7 +478,7 @@ void registerMapExportCommands(CommandRegistry& reg) {
                      return {true, s};
                  }
                  if (!hasTexture(doc.mesh))
-                     return {false, "The Part has no texture: create one first (Tool > Texture Map > New, or texture_create)"};
+                     return {false, "The Part has no texture: create one first (Tool > Texture Image > New, or texture_create)"};
                  const std::string folder = argString(a, "folder");
                  if (folder.empty()) return {false, "Give a folder"};
                  ExportPreset preset;

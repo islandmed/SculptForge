@@ -24,11 +24,11 @@ click "Delete masked"
 expect_status Deleted
 key ctrl+z
 
-# Tool > Geometry: Merge by Distance with its live count, then Check Mesh's rows and Fix buttons.
+# Tool > Geometry: Merge by Distance with its live count, then Find Problems's rows and Fix buttons.
 run open path=$SCRIPT_DIR/../../data/check_mesh_cube.obj
 expect_value vertices == 24
 click "Geometry##tool.geometry"
-# The drop-down is taller than the window: a middle-drag on it scrolls down to Merge by Distance and Check Mesh.
+# The drop-down is taller than the window: a middle-drag on it scrolls down to Merge by Distance and Find Problems.
 button_drag middle 0.7 0.8 0.7 0.2 0.3
 expect_value panel_drag_scrolls >= 1
 expect_text 16 points will merge
