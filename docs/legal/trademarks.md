@@ -112,7 +112,7 @@ their old ids (`config.store`, `rgb_intensity`, `focal`, `subdiv_lower`...); onl
 | Mask Lasso / Mask Rect | Lasso Mask / Rectangle Mask |
 | Radial Count | Radial Copies |
 | Group Masked | Group from Mask |
-| Thick / E Smt / Double / TCorne / TBorder (Extract) | Thickness / Edge smooth / Both Sides / Corners / Border (scripts: `triangle_corners`, `triangle_border`; the old names still read) |
+| Thick / E Smt / Double / TCorne / TBorder (Extract) | Thickness / Edge Smooth / Both Sides / Corners / Border (scripts: `triangle_corners`, `triangle_border`; the old names still read) |
 
 <!-- labels:begin -->
     store ?config

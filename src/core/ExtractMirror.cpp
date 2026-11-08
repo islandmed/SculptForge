@@ -103,7 +103,7 @@ Mesh extractShell(const Mesh& mesh, const ExtractOptions& o, std::string& error)
     std::vector<glm::vec3> p(np);
     for (uint32_t i = 0; i < np; ++i) p[i] = mesh.positions[kept[i]];
 
-    // Edge smooth: Taubin smoothing along the patch's edge, which follows the triangles' staircase, so it doesn't shrink.
+    // Edge Smooth: Taubin smoothing along the patch's edge, which follows the triangles' staircase, so it doesn't shrink.
     const auto boundary = boundaryEdges(tris);
     if (o.smooth > 0 && !boundary.empty()) {
         std::vector<std::array<uint32_t, 2>> nb(np, {kNone, kNone});
@@ -461,7 +461,7 @@ void registerExtractMirrorCommands(CommandRegistry& reg) {
                "Thickness: shell thickness as a fraction of the Part's largest side (default 0.015; negative grows "
                "inward; 0 = a single-sided surface).",
                false},
-              {"smooth", T::Number, "Edge smooth: smoothing passes along the extracted edge (0-50, default 5).", false},
+              {"smooth", T::Number, "Edge Smooth: smoothing passes along the extracted edge (0-50, default 5).", false},
               {"double", T::Bool, "Both Sides: grow the shell both inward and outward (default false).", false},
               {"triangle_corners", T::Bool, "Corners: triangles instead of quads in the rim's sharp corners (default false).", false},
               {"triangle_border", T::Bool, "Border: the whole rim is triangles instead of quads (default false).", false},

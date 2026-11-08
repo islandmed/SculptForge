@@ -848,8 +848,8 @@ constexpr Entry kTraditionalChinese[] = {
     {"The active Part's width (X), height (Y) and depth (Z) in scene units. Drag, or double-click and type an exact value: the Part resizes about its centre (one undo step). With Uniform, the other sides follow in proportion.",
      "作用中部件的寬度（X）、高度（Y）與深度（Z），以場景單位表示。拖曳，或按兩下輸入精確數值：部件會以其中心調整尺寸（一個復原步驟）。開啟等比時，其他邊按比例跟著調整。"},
     // --- Extract, Project, Deformation ---
-    {"Edge smooth", "邊緣平滑"},
-    {"Edge smooth %.0f", "邊緣平滑 %.0f"},
+    {"Edge Smooth", "邊緣平滑"},
+    {"Edge Smooth %.0f", "邊緣平滑 %.0f"},
     {"Corners", "角落"},
     {"Border", "邊框"},
     {"Parts too", "連同其他部件"},
@@ -993,7 +993,7 @@ constexpr Entry kTraditionalChinese[] = {
      "right-click menu).",
      "複製目前的部件及其圖層與屬性，並將複本設為作用中（部件清單的右鍵選單中也有）。"},
     {"Make a shell from the masked part of the Part (a helmet, a strap, clothing), shown as a preview below it. "
-     "Change Thickness, Edge smooth, Both Sides, Corners or Border and it updates; Accept keeps it as a new Part.",
+     "Change Thickness, Edge Smooth, Both Sides, Corners or Border and it updates; Accept keeps it as a new Part.",
      "從部件的遮罩區域建立外殼（頭盔、帶子、衣物），並在下方顯示預覽。變更厚度、邊緣平滑、兩側、角落或邊框時會即時更新；按「接受」"
      "即保留為新部件。"},
     {"Keep the Extract preview as a new Part below this one. Ctrl+Z takes it away again.",

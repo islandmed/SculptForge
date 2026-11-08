@@ -1900,7 +1900,7 @@ private:
     void runExtract(); // Extract with the palette's settings (a preview; Accept keeps it)
     static std::string axesText(const bool axes[3]); // "x", "xz", "" (the axis argument of mirror commands)
     float extractThick_ = 0.015f;          // Thickness: fraction of the Part's size
-    int extractSmooth_ = 5;                // Edge smooth
+    int extractSmooth_ = 5;                // Edge Smooth
     bool extractDouble_ = false;           // Both Sides
     bool extractTriCorners_ = false;        // Corners: triangles in the rim's sharp corners
     bool extractTriBorder_ = false;         // Border: the whole rim triangles

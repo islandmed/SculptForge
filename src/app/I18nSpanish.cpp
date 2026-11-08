@@ -1024,8 +1024,8 @@ constexpr Entry kSpanish[] = {
     {"The active Part's width (X), height (Y) and depth (Z) in scene units. Drag, or double-click and type an exact value: the Part resizes about its centre (one undo step). With Uniform, the other sides follow in proportion.",
      "Ancho (X), alto (Y) y profundidad (Z) de la pieza activa en unidades de la escena. Arrastra, o haz doble clic y escribe un valor exacto: la pieza cambia de tamaño alrededor de su centro (un paso de deshacer). Con Uniforme, los demás lados siguen en proporción."},
     // --- Extract, Project, Deformation ---
-    {"Edge smooth", "Suavizar borde"},
-    {"Edge smooth %.0f", "Suavizar borde %.0f"},
+    {"Edge Smooth", "Suavizar borde"},
+    {"Edge Smooth %.0f", "Suavizar borde %.0f"},
     {"Corners", "Esquinas"},
     {"Border", "Borde"},
     {"Parts too", "También las piezas"},
@@ -1176,7 +1176,7 @@ constexpr Entry kSpanish[] = {
      "Copia la Pieza activa, con sus capas y atributos, y activa la copia (también en el menú contextual de la lista "
      "de Piezas)."},
     {"Make a shell from the masked part of the Part (a helmet, a strap, clothing), shown as a preview below it. "
-     "Change Thickness, Edge smooth, Both Sides, Corners or Border and it updates; Accept keeps it as a new Part.",
+     "Change Thickness, Edge Smooth, Both Sides, Corners or Border and it updates; Accept keeps it as a new Part.",
      "Crea una cáscara a partir de la parte enmascarada de la Pieza (un casco, una correa, ropa), con una vista "
      "previa debajo. Cambia Grosor, Suavizar borde, Ambos lados, Esquinas o Borde y se actualiza; Aceptar la guarda "
      "como Pieza nueva."},

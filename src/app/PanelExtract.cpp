@@ -60,11 +60,11 @@ void App::drawExtractContents() {
 
     // The settings: changing one while the preview shows extracts again, so the preview follows.
     bool changed = false;
-    const bool slidersPair = ui::SliderWidth("Edge smooth %d", 20) <= half && ui::SliderWidth("Thickness %.3f", -0.1) <= half;
+    const bool slidersPair = ui::SliderWidth("Edge Smooth %d", 20) <= half && ui::SliderWidth("Thickness %.3f", -0.1) <= half;
     ImGui::SetNextItemWidth(slidersPair ? half : -1.0f);
-    tray::SliderInt("##extract_smooth", &extractSmooth_, 0, 20, "Edge smooth %d");
+    tray::SliderInt("##extract_smooth", &extractSmooth_, 0, 20, "Edge Smooth %d");
     changed |= ImGui::IsItemDeactivatedAfterEdit();
-    ui::HelpText("Edge smooth", nullptr,
+    ui::HelpText("Edge Smooth", nullptr,
                  "Smooths the extracted edge, which otherwise follows the mask's triangles in steps (0 = as masked).",
                  "Tool > Parts > Extract");
     if (slidersPair) ImGui::SameLine();
