@@ -62,8 +62,8 @@ Click **Append** and choose:
   side too, in the same undo step; a shape inserted right on a mirror plane isn't doubled.
   To insert your own mesh, choose **Active Part's copy...** and pick another Part (it stays as it is), or
   **From file...** and pick an `.obj`, `.ply` or `.glb` file; then drag as with the shapes. The mesh is centred,
-  scaled so its largest side matches the drag, and stood on the surface along its own up (+Y) axis. Esc stops
-  inserting. (Command: `insert_mesh part=<name>` or `insert_mesh file=<path>`.)
+  scaled so its largest side matches the drag, and stood on the surface along its own up (+Y) axis. Esc, any
+  brush, or Draw / Move stops inserting. (Command: `insert_mesh part=<name>` or `insert_mesh file=<path>`.)
   To insert from a **kitbash set**, choose **Insert set from file...** (one `.obj` or `.glb` with several objects)
   or **Insert set from folder...** (its `.obj`, `.ply` and `.glb` files, by name; not its subfolders). The **Insert set**
   window shows a thumbnail of each item: click one, then drag on the model as above. While inserting, `]` steps to

@@ -15,7 +15,7 @@ smooth curve with a tube swept along it, and its points stay editable until you 
 
 While Draw Tube is on, <kbd>Alt</kbd>+drag still moves the view (and so do the right and middle buttons), so you can
 draw, turn the model, and draw again from another side. The brush ring is replaced by a circle as thick as the tube
-will be.
+will be. Press **Draw Tube** again, <kbd>Esc</kbd>, any brush, or **Draw** / **Move** to stop drawing tubes.
 
 ![Tool > Tube with a Tube Part selected](images/tube-panel.jpg)
 

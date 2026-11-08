@@ -574,6 +574,7 @@ bool PickerUi::isActive(const App& app, const BrushItem& item) {
 
 void PickerUi::select(App& app, const BrushItem& item) {
     if (item.kind != BrushItem::Kind::Guides) app.guidesMode_ = false;
+    const std::string left = app.leaveDrawModes(); // Draw Tube and Append > Insert end, the same brush again too
     switch (item.kind) {
     case BrushItem::Kind::Type:
         app.brush_ = BrushType(item.index);
@@ -597,8 +598,9 @@ void PickerUi::select(App& app, const BrushItem& item) {
         break;
     case BrushItem::Kind::Guides:
         app.setGuidesMode(true);
-        return;
+        break;
     }
+    if (!left.empty()) app.status_ = "Left " + left + ". " + app.status_;
 }
 
 ImTextureID PickerUi::thumbnail(App& app, const BrushItem& item) {

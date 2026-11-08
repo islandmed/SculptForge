@@ -1426,6 +1426,12 @@ private:
     int tubeSelection() const;                              // tubeSelected_ when it is still a point, else -1
     glm::vec3 tubeViewDir() const;                          // into the screen
     bool tubeDraw_ = false;
+    int tubeReturnPart_ = -1;      // the Part that was active before a press on a tube's point selected its Tube Part
+    // Picking a brush or a tool (Draw / Move / Scale / Rotate), or Esc, leaves Draw Tube and Append > Insert; with a
+    // Tube Part active (it can't be sculpted) it goes back to the Part before it. Returns what it left ("" if none).
+    std::string leaveDrawModes();
+    std::string leaveDrawModesStatus(); // leaveDrawModes() and a status line saying so (unchanged if nothing was on)
+    std::array<int, 4> drawModesBrush_{-1, -1, -1, -1}; // brush_, activeBrush, paint, guides as last seen (drawUi)
     TubeDepth tubeDepth_ = TubeDepth::Surface;
     float tubeFixedDepth_ = 0.0f;  // Fixed: distance from the camera (0 = take the pivot's on first use)
     float tubeSizePx_ = 14.0f;     // tube radius on screen at the drawing depth

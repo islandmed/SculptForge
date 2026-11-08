@@ -2150,9 +2150,10 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
         selectInsertSetItem(insertSet_.index + step);
         return;
     }
-    if (key == SDLK_ESCAPE && !insertType_.empty()) { // Append > Insert (#34) off
-        insertType_.clear();
-        status_ = "Insert off";
+    if (key == SDLK_ESCAPE && (!insertType_.empty() || tubeDraw_)) { // Append > Insert (#34), Draw Tube off
+        const bool tube = tubeDraw_;
+        leaveDrawModes();
+        status_ = tube ? "Tube: Draw Tube off" : "Insert off";
         return;
     }
     if (captureShortcutKey(key, mod)) return; // Ctrl+Alt+click a button, then press its new key
@@ -2942,7 +2943,7 @@ void App::processPendingFiles() {
             insertMeshKey_ = "file";
             insertMeshValue_ = f.path;
             status_ = "Insert " + std::filesystem::path(std::u8string(f.path.begin(), f.path.end())).filename().string() +
-                      ": drag on the model (the drag sets its size). Esc stops.";
+                      ": drag on the model to place it. Esc or a brush stops.";
             break;
         case FileAction::InsertSet: chooseInsertSet(f.path); break; // Insert on the model > Set (PanelParts.cpp)
         case FileAction::Count: break;
@@ -3081,6 +3082,12 @@ void App::drawUi() {
     drawWeldPreviewOverlay(); // the points Merge by Distance would merge (PanelMeshCheck.cpp)
     drawForgeSphereOverlay(); // the sphere under the cursor (PanelForge Spheres.cpp)
     drawForgeSphereMenu();    // a right click on a sphere
+    // A brush picked any way (shelf, picker, Library, a key): Draw Tube and Insert end (PanelTube.cpp).
+    const std::array<int, 4> brushNow{int(brush_), doc_.activeBrush, paintMode_ ? 1 : 0, guidesMode_ ? 1 : 0};
+    if (brushNow != drawModesBrush_) {
+        if (drawModesBrush_[0] >= 0 && drag_ != Drag::Tube && drag_ != Drag::Insert) leaveDrawModesStatus();
+        drawModesBrush_ = brushNow;
+    }
     drawTubeOverlay();        // Draw Tube's trail and cursor, a Tube Part's points (PanelTube.cpp)
     drawFaceOverlay();   // facial landmarks (PanelFace.cpp)
     drawSplatTrainOverlay(); // splat training progress (PanelSplatTrain.cpp)

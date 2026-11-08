@@ -645,6 +645,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "forgesphere_preview") return m.forgespherePreview ? 1.0 : 0.0;
     if (name == "tube_points") return double(m.tube.points.size()); // the active Tube Part's (Tube, PanelTube.cpp)
     if (name == "tube_draw") return app_.tubeDraw_ ? 1.0 : 0.0;
+    if (name == "insert_mode") return app_.insertType_.empty() ? 0.0 : 1.0; // Append > Insert on the model waits for a drag
     if (name == "tube_selected") return double(app_.tubeSelection());
     if (name == "tube_parts") {
         int n = 0;
