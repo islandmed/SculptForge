@@ -164,6 +164,11 @@ std::string App::leaveDrawModes() {
         facePlacing_ = false;
         left += left.empty() ? "Place Landmarks" : " and Place Landmarks";
     }
+    if (gradient_.armed) { // Color > Line Gradient takes drags on the model; a placed gradient is kept as painted
+        endGradientEdit();
+        gradient_.armed = false;
+        left += left.empty() ? "Line Gradient" : " and Line Gradient";
+    }
     const int back = tubeReturnPart_;
     tubeReturnPart_ = -1;
     if (tubeActive() && back >= 0 && back < doc_.partCount() && back != doc_.activePart &&
