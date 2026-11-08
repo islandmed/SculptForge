@@ -4445,6 +4445,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Split hidden: the hidden triangles become a new Part", "分离隐藏：隐藏的三角形成为新部件"},
     {"Split masked: the masked triangles (average mask above 50%) become a new Part", "分离遮罩：遮罩的三角形（平均遮罩高于 50%）成为新部件"},
     {"Split unmasked: the unmasked triangles become a new Part; the masked ones stay", "分离未遮罩：未遮罩的三角形成为新部件；遮罩的留下"},
+    {"Keep original", "保留原件"},
+    {"Split copies the triangles into the new Part and leaves this Part as it is", "分离会把三角形复制到新部件，此部件保持不变"},
     {"%zu point will merge", "%zu 个点将合并"},
     {"%zu points will merge", "%zu 个点将合并"},
     {"Check", "检查"},

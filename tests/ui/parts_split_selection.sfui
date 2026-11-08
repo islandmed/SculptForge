@@ -26,6 +26,20 @@ expect "Parts/Body unmasked"
 key ctrl+z
 expect_value parts == 1
 
+# Keep original (_tfx on Discord): Split copies, Body keeps every triangle; one Ctrl+Z takes the copy away.
+click "Parts/Keep original##part_split"
+click "Parts/Masked##part_split"
+expect_value parts == 2
+expect_value active_part == 0
+expect_status Body is unchanged
+expect "Parts/Body masked"
+expect_value triangles == $all
+shot split-keep-original
+key ctrl+z
+expect_value parts == 1
+expect_value triangles == $all
+click "Parts/Keep original##part_split"
+
 # Hidden: hide the left half, split it off.
 run mask_clear ; hide_rect x0=0 y0=-1 x1=1 y1=1
 expect_value hidden > 0

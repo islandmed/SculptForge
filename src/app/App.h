@@ -1729,6 +1729,7 @@ private:
     // Split by face groups needs more than one group; counted only when the active mesh changes.
     uint64_t splitGroupsKey_ = ~uint64_t(0);
     bool splitGroupsPossible_ = false;
+    bool splitKeepOriginal_ = false; // Split Hidden / Masked / Unmasked copy instead of move (keep=true)
     // Community brushes window (PanelBrushGallery.cpp): browse, search and install shared brushes.
     void drawBrushGallery(); // also finishes background downloads while the window is closed
     void refreshBrushGallery();

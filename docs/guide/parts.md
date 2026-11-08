@@ -182,6 +182,7 @@ triangles back and removes the new Part.
 | **Split > Hidden** | the hidden triangles; they are shown in the new Part | `part_split_hidden` |
 | **Split > Masked** | the masked triangles; the new Part starts unmasked | `part_split_masked` |
 | **Split > Unmasked** | the triangles that are not masked; the masked ones stay | `part_split_unmasked` |
+| **Keep original** (checkbox below) | a **copy** of those triangles; the source Part stays as it is, levels and all, and undo just removes the copy | `keep=true` on any of the three |
 
 A triangle counts as **masked when the average mask of its three corners is above 50%**, so a soft mask edge
 splits along its middle and a single masked corner doesn't take its neighbours. UVs, face groups, vertex paint and
@@ -259,7 +260,7 @@ used.
 | `transform translate=0,0.1,0 folder=true` | Transform the visible Parts in the active Part's folder |
 | `part_merge_down` / `part_merge_visible` | Merge |
 | `part_split_groups` / `part_split_parts` | Split |
-| `part_split_hidden` / `part_split_masked` / `part_split_unmasked` | Split off into a new Part (undoable) |
+| `part_split_hidden` / `part_split_masked` / `part_split_unmasked` | Split off into a new Part (undoable; `keep=true` copies and leaves the source as it is) |
 | `part_shading mode=flat` | Shade a Part `default` (as the scene), `smooth` or `flat` |
 | `extract thickness=0.02 smooth=5 double=false` | Preview an Extract shell from the mask; `tcorne` / `tborder` for a triangle rim; `accept=true` keeps it at once |
 | `extract_accept` / `extract_cancel` | Keep or remove the Extract preview |
