@@ -4576,6 +4576,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "显卡"},
     {"Performance tier",
      "性能等级"},
+    {"Put this card away. It doesn't come back on this computer; the tier is in Preferences > Performance.",
+     "收起这张卡片。它不会在这台电脑上再次出现；等级在 偏好设置 > 性能 中。"},
     {"Preferences > Performance",
      "偏好设置 > 性能"},
     {"Render profile",

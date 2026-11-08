@@ -5061,6 +5061,8 @@ constexpr Entry kSpanish[] = {
      "Tarjeta gráfica"},
     {"Performance tier",
      "Nivel de rendimiento"},
+    {"Put this card away. It doesn't come back on this computer; the tier is in Preferences > Performance.",
+     "Guarda esta tarjeta. No vuelve a aparecer en este ordenador; el nivel está en Preferencias > Rendimiento."},
     {"Preferences > Performance",
      "Preferencias > Rendimiento"},
     {"Render profile",
