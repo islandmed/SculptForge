@@ -37,7 +37,7 @@ example **Clay (Member pack)**.
 | Keymaps | **Library > Packs > Details > Apply keymap**, and **Edit > Preferences > Input > Pack keymaps**. |
 | Pie menus | **Library > Packs > Details > Add pie menu** (it becomes one of your radial menus). |
 | Macros | <kbd>F3</kbd>, the key editor and the pie menus, as **Name (Pack)**. |
-| Plugins | **Tool > Deformation > Plugins**, and **Library > Packs > Details**. |
+| Plugins | **Tool > Reshape > Plugins**, and **Library > Packs > Details**. |
 
 Keymaps and pie menus change how SculptForge responds, so they are only applied when you click **Apply keymap**
 or **Add pie menu**. The result saves itself.
@@ -81,7 +81,7 @@ A plugin is a small tool from a pack that works on a mesh, made by anyone and sa
   The result is one undo step; the mask and hidden faces hold their vertices, as with the other deformations.
 - A **generator** makes a new mesh, added as a new Part.
 
-Click a plugin's name in **Tool > Deformation > Plugins** (or in its pack's details) to open it: its settings,
+Click a plugin's name in **Tool > Reshape > Plugins** (or in its pack's details) to open it: its settings,
 drawn by SculptForge from what the plugin declares, and **Apply** (**Add Part** for a generator). It runs on a copy
 of the Part; the window shows how long it has been running, and **Stop** ends it at once.
 

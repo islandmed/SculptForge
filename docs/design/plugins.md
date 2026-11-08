@@ -17,7 +17,7 @@ never has to judge a permission prompt to stay safe.
 | Format | `.sfplugin` = one WebAssembly 1.0 core module, its manifest (JSON) in a custom section named `sculptforge.plugin` |
 | Install | only inside a pack: `plugins/<name>.sfplugin` (docs/pack-format.md). The pack review shows each plugin's name, kind, size, settings and "Permissions: none". One-click remove = removing (or turning off) the pack |
 | Runtime | [wasmtime](https://wasmtime.dev) C API 50.0.1, linked statically, pinned by SHA-256 per platform (cmake/Fetch.cmake); updated every release (docs/releasing.md) |
-| UI | the plugin's parameters (number, int, bool; min, max, default, help) come from its manifest and **we draw them** (PanelPlugins.cpp): Tool > Deformation > Plugins, or the pack's details in Library > Packs |
+| UI | the plugin's parameters (number, int, bool; min, max, default, help) come from its manifest and **we draw them** (PanelPlugins.cpp): Tool > Reshape > Plugins, or the pack's details in Library > Packs |
 | Runs | only when the user presses Apply / Add Part, or types `plugin_run` in the console, sculptforge-cli or Python. Never on install, never when a project opens, never from a macro, never from an AI agent (MCP and AI live mode don't list it) |
 | ABI | src/core/Plugin.h, sdk/plugin/sculptforge_plugin.h (C), a sample in WebAssembly text (tests/data/plugins/noise_displace.wat) and in C (sdk/plugin/examples/noise_displace.c); `tools/plugin/sfplugin.py` adds the manifest |
 
@@ -32,7 +32,7 @@ never has to judge a permission prompt to stay safe.
    memory's size, counts against the input (a deformer returns exactly one position per vertex and no triangles),
    every position finite and within 1e9, every triangle index in range with no repeats, caps of 64M vertices and
    128M triangles for a generator. The data is copied out; the store is dropped.
-5. Back on the UI thread the result is committed through the same path as Tool > Deformation (Sculptor, one undo
+5. Back on the UI thread the result is committed through the same path as Tool > Reshape (Sculptor, one undo
    step, sculpt layers respected) or added as a Part. If the Part changed meanwhile, nothing is applied.
 
 Any failure leaves the mesh untouched (nothing is written until step 5). A plugin that **traps** (out-of-bounds

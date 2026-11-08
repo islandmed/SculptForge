@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Sandboxed plugins in the app (core/Plugin.h): the plugin window (its parameters, drawn by us from its manifest;
-// Apply / Add Part; Stop while it runs), the Plugins group under Tool > Deformation, and the rows in a pack's
+// Apply / Add Part; Stop while it runs), the Plugins group under Tool > Reshape, and the rows in a pack's
 // details. A run copies the mesh on the UI thread, runs on a worker and is committed back on the UI thread.
 #include "app/App.h"
 #include "app/I18n.h"
@@ -134,7 +134,7 @@ void App::drawPluginButtons(const std::string& packId, bool endLine) {
     if (endLine) ImGui::NewLine();
 }
 
-// Tool > Deformation > Plugins (only when a pack brought some).
+// Tool > Reshape > Plugins (only when a pack brought some).
 void App::drawDeformPlugins() {
     if (plugins_.list.empty()) return;
     tray::GroupLabel(*this, "Plugins");
@@ -219,7 +219,7 @@ void App::drawPluginWindow() {
                          ? "Runs the plugin on a copy of the active Part and adds what it makes as a new Part."
                          : "Runs the plugin on a copy of the active Part and applies the result as one undo step. "
                            "The mask and hidden faces hold their vertices.",
-                     "Tool > Deformation > Plugins");
+                     "Tool > Reshape > Plugins");
     }
     ImGui::TextDisabled("%s", tr("Sandboxed: no files, network or system access; time and memory limits."));
     ImGui::End();

@@ -1,6 +1,6 @@
 ---
 whats_new: **Plugins**: packs can now bring sandboxed plugins: deformers that reshape the active Part and generators
-  that add a new Part. Open one from **Tool > Deformation > Plugins**: its settings, **Apply**, and **Stop** while it
+  that add a new Part. Open one from **Tool > Reshape > Plugins**: its settings, **Apply**, and **Stop** while it
   runs. A plugin sees only a copy of the mesh: no files, network or system access, with time and memory limits.
 highlight: Plugins: install sandboxed add-ons from packs (deformers and generators; no file or network access) (thanks
   @bribblej-web, #20)
@@ -17,7 +17,7 @@ security: Plugins: the design and threat model (sandbox escape, denial of servic
   docs/design/plugins.md. The runtime is wasmtime 50.0.1, pinned by SHA-256 and updated every release.
 testers:
   - Any OS: install a pack with a plugin (ask in #testers for the sample pack); the review lists the plugin with
-    "Permissions: none". Tool > Deformation > Plugins > Noise Displace > Apply: the sphere gets noisy; Ctrl+Z undoes it.
+    "Permissions: none". Tool > Reshape > Plugins > Noise Displace > Apply: the sphere gets noisy; Ctrl+Z undoes it.
   - Any OS: mask half the model, Apply again: the masked half doesn't move.
   - Windows and macOS: run a plugin on a 1M+ polygon model; the app stays responsive and Stop ends it at once.
 ---

@@ -149,7 +149,7 @@ bool setPluginOff(const InstalledPlugin& p, bool off, const std::string& why, st
 bool pluginParamValues(const PluginManifest& m, const std::map<std::string, double>& byId, std::vector<double>& out,
                        std::string& error);
 
-// Checks the active Part can take a plugin's result ("" when it can; the same rules as Tool > Deformation).
+// Checks the active Part can take a plugin's result ("" when it can; the same rules as Tool > Reshape).
 bool pluginCanRunOn(Document& doc, const InstalledPlugin& p, std::string& error);
 // Applies a run's result: a deformer's positions as one undo step on the active Part (the mask and hidden faces
 // hold their vertices), a generator's mesh as a new Part. `in` is the input the run was given (it must still match

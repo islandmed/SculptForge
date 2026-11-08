@@ -2442,7 +2442,7 @@ private:
     void startPluginRun(const InstalledPlugin& p);
     void pollPluginRun();
     void drawPluginButtons(const std::string& packId, bool endLine = true); // "" = every plugin
-    void drawDeformPlugins();                          // Tool > Deformation > Plugins
+    void drawDeformPlugins();                          // Tool > Reshape > Plugins
     void drawPluginWindow();
     struct PluginsUi {
         std::vector<InstalledPlugin> list;
