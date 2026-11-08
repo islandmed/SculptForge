@@ -25,7 +25,8 @@
 //                            point twice = a click)
 //   drag X0 Y0 X1 Y1 [S] [release]  left-drag in window fractions (rectangle hide, sliders...); release:
 //                            let go of the held modifiers halfway (Alt-drag, release Alt to zoom)
-//   drag_item LABEL DX DY [S] left-drag from the item by DX DY pixels (scrubbing, dragging a tile out)
+//   drag_item LABEL DX DY [S] [keep] left-drag from the item by DX DY pixels (scrubbing, dragging a tile out);
+//                            keep: leave the button down (a check mid-drag), then `release`
 //   wheel_item LABEL X Y      the mouse wheel over the item: X sideways (a trackpad swipe), Y up/down
 //   drag_path U0 V0 U1 V1 ... [keep] [S=seconds]   left-drag through the points (fractions of the model's
 //                            on-screen bounds; outside 0..1 is the background) with the held modifiers: a lasso,
@@ -313,6 +314,8 @@
 //                            framing keeps it clear of: the open Library, the Sculpt Timeline strip; < 0: under one),
 //                            camera_shift_y (the lens shift framing set, x1000; + up), left_column_clipped (left shelf
 //                            items past its visible bottom)
+//   expect_value weld_preview_points (Merge by Distance's orange dots drawn this frame: only while its distance is
+//                            dragged or hovered, fading out after)
 //   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 classic, 1 SculptForge)
 #include "app/App.h"
 #include "ai/Http.h"
@@ -1359,6 +1362,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "camera_distance") return app_.camera_.distance;
     if (name == "camera_shift_y") return std::round(double(app_.camera_.shift.y) * 1000.0);
     if (name == "camera_pan") return glm::length(app_.camera_.target);
+    if (name == "weld_preview_points") return double(app_.weldPreviewDrawn_); // Merge by Distance's dots on the model now
     if (name == "groups") {
         std::set<uint32_t> ids(m.facegroups.begin(), m.facegroups.end());
         return double(std::max<size_t>(ids.size(), m.triangleCount() ? 1 : 0));
@@ -1991,7 +1995,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "drag_item") {
         if (!need(3)) return false;
         const std::string label = w[1];
-        const float dx = num(2, 0), dy = num(3, 0), seconds = num(4, 0.4f);
+        const bool keep = w.back() == "keep"; // leave the button down (a check mid-drag), then `release`
+        const float dx = num(2, 0), dy = num(3, 0), seconds = w.size() > 4 && w[4] != "keep" ? num(4, 0.4f) : 0.4f;
         auto from = std::make_shared<ImVec2>();
         steps_.push_back([this, line, label, from](float t) {
             if (findItem(label, *from)) {
@@ -2001,13 +2006,13 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (t > 3.0f) fail(line, notFound(label));
             return t > 3.0f;
         });
-        steps_.push_back([this, from, dx, dy, seconds](float t) {
+        steps_.push_back([this, from, dx, dy, seconds, keep](float t) {
             if (t == 0.0f) return false; // a frame of hover first
             if (!buttonDown_ && t < seconds) mouseButton(true, SDL_BUTTON_LEFT);
             const float u = std::min(t / seconds, 1.0f);
             mouseMotion(from->x + dx * u, from->y + dy * u);
             if (t >= seconds) {
-                mouseButton(false, SDL_BUTTON_LEFT);
+                if (!keep) mouseButton(false, SDL_BUTTON_LEFT);
                 return true;
             }
             return false;
