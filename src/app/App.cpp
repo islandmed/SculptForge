@@ -1365,13 +1365,21 @@ void App::applyUiScale() {
     if (fontsLanguage_ != language()) glyphs::discardPending(); // (its own glyphs come with the new atlas)
     const bool newGlyphs = glyphs::resolve(language() == Language::TraditionalChinese);
     const bool rescale = uiScaleChanged(uiScale_, scale);
-    if (!rescale && !newGlyphs && fontsLanguage_ == language()) return;
+    const bool redensity = uiScaleChanged(fontDensity_, targetFontDensity(scale)); // (a Retina display, or off it)
+    if (!rescale && !redensity && !newGlyphs && fontsLanguage_ == language()) return;
     if (rescale) SDL_Log("UI scale %.0f%%", double(scale * 100.0f));
     uiScale_ = scale;
     ImGui::GetIO().Fonts->Clear();
     buildUiFonts(scale);
     if (ImGui::GetIO().BackendRendererUserData) ImGui_ImplOpenGL3_DestroyFontsTexture(); // the next NewFrame uploads it
     applyLook();
+}
+
+float App::targetFontDensity(float scale) const {
+    float density = 1.0f;
+    if (pixelDensityOverride_ > 0.0f) density = pixelDensityOverride_; // UI tests: pixel_density
+    else if (window_) density = SDL_GetWindowPixelDensity(window_);
+    return fontRasterDensity(scale, density);
 }
 
 void App::requestUiScale() {
@@ -1508,6 +1516,13 @@ void App::buildUiFonts(float scale) {
         fontCaptionSub_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular),
                                                          int(assets::fontRegular_size), float(options_.height) * 0.024f,
                                                          &fontConfig);
+    }
+    // At the window's pixel density (Retina, a scaled Wayland output): the same sizes in logical px, the glyphs drawn
+    // with as many texels as the screen has pixels. Every font above, the help, guide and typed-glyph ones included.
+    fontDensity_ = targetFontDensity(scale);
+    for (ImFontConfig& src : io.Fonts->Sources) {
+        src.RasterizerDensity = fontDensity_;
+        if (fontDensity_ >= 2.0f) src.OversampleH = 1; // the density already places glyphs finely; 2x more only grows the atlas
     }
 }
 

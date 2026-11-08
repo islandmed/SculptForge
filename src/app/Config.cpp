@@ -1698,14 +1698,18 @@ void drawInterfaceSection(App& app) {
         if (ui::Checkbox("Compact timeline##view.timeline_compact", &compact)) a->run();
         ui::HelpAction(app, "view.timeline_compact");
     }
-    static const char* kScales[] = {"Automatic", "100%", "125%", "150%", "175%", "200%"};
-    static const float kScaleValues[] = {0.0f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f};
+    // Finer steps near 100 % (125 % was too big a first step) and up to 300 % for a 5K or 5K2K monitor at its native
+    // resolution, no system scaling (fenix 11-08).
+    static const char* kScales[] = {"Automatic", "100%", "110%", "115%", "125%", "135%", "150%",
+                                    "175%",      "200%", "250%", "300%"};
+    static const float kScaleValues[] = {0.0f, 1.0f, 1.1f, 1.15f, 1.25f, 1.35f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f};
+    constexpr int kScaleCount = int(sizeof kScaleValues / sizeof kScaleValues[0]);
     int current = 0;
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < kScaleCount; ++i)
         if (std::abs(kScaleValues[i] - p.uiScale) < 0.01f) current = i;
     ImGui::SetNextItemWidth(-FLT_MIN);
     if (ImGui::BeginCombo("##ui_scale", (std::string(tr("UI scale:")) + " " + tr(kScales[current])).c_str())) {
-        for (int i = 0; i < 6; ++i)
+        for (int i = 0; i < kScaleCount; ++i)
             if (ImGui::Selectable(tr(kScales[i]), i == current)) {
                 p.uiScale = kScaleValues[i];
                 app.requestUiScale(); // live, from the next frame (#87)

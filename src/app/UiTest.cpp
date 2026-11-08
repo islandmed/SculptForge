@@ -299,7 +299,7 @@
 //   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view),
 //                            spacemouse_echo (1 while a mouse wheel would be dropped as the driver's echo)
 //   ui_scale PERCENT | auto  Preferences > Interface > UI scale (applied live, #87); display_scale PERCENT: the display's
-//                            content scale changes, with SDL's event (Windows DPI, another monitor); logical_width W: the display scale that makes the window W logical px wide (#105)
+//                            content scale changes, with SDL's event (Windows DPI, another monitor); pixel_density PERCENT: the window's pixel density (Retina; expect_value font_density, glyph_texels: x100); logical_width W: the display scale that makes the window W logical px wide (#105)
 //   expect_value ui_scale (percent built now), font_height (default font, px), frame_height, panel_width (right
 //                            shelf, px), title_height, glyphs_missing (glyphs drawn as "?" in the last frame),
 //                            glyphs_merged (typed characters taken from other fonts: SF_FALLBACK_FONTS, the system's),
@@ -810,6 +810,13 @@ double Demo::query(const std::string& name, bool& known) const {
         return 1000.0 * (name == "dab_jitter" ? a.jitterFiltered : a.jitterRaw) / n;
     }
     if (name == "pixel_density") return double(SDL_GetWindowPixelDensity(app_.window_));
+    if (name == "font_density") return double(app_.fontDensity_ * 100.0f); // the font atlas's px per logical px, x100
+    if (name == "glyph_texels") { // measured in the atlas: the default font's "M", texels per logical px, x100
+        const ImFontAtlas* a = ImGui::GetIO().Fonts;
+        const ImFontGlyph* g = ImGui::GetFont() ? ImGui::GetFont()->FindGlyphNoFallback('M') : nullptr;
+        if (!g || a->TexHeight <= 0 || g->Y1 <= g->Y0) return 0.0;
+        return 100.0 * double(g->V1 - g->V0) * double(a->TexHeight) / double(g->Y1 - g->Y0);
+    }
     if (name == "dabs") return double(app_.dabAccuracy_.count);
     if (name == "stroke_type") return double(int(app_.strokeType_)); // 0 Dots, 1 DragRect, 2 DragDot, 3 Spray, 4 LazyMouse
     if (name == "stroke_continuous") return app_.strokeContinuous_ ? 1.0 : 0.0; // Continuous (#31)
@@ -2338,6 +2345,18 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         run([this, v = num(1, 100) / 100.0f] {
             app_.displayScaleOverride_ = v;
+            SDL_Event e{};
+            e.type = SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED;
+            e.window.windowID = SDL_GetWindowID(app_.window_);
+            app_.handleEvent(e);
+        });
+        wait(0.2f);
+    } else if (verb == "pixel_density") {
+        // pixel_density 200: the window's pixel density (macOS Retina, a scaled Wayland output), as SDL reports it with
+        // its display-scale event; the framebuffer here stays 1x, so only the font atlas shows it (font_density)
+        if (!need(1)) return false;
+        run([this, v = num(1, 100) / 100.0f] {
+            app_.pixelDensityOverride_ = v;
             SDL_Event e{};
             e.type = SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED;
             e.window.windowID = SDL_GetWindowID(app_.window_);
