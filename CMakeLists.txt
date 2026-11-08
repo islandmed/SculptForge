@@ -72,6 +72,8 @@ add_library(sculptforge_core STATIC
   src/core/GarmentMesh.cpp
   src/core/GarmentFiles.cpp
   src/core/GarmentCommands.cpp
+  src/core/GarmentPrint.cpp
+  src/core/GarmentTemplates.cpp
   src/core/ExtractMirror.cpp
   src/core/MeshTransform.cpp
   src/core/Deform.cpp

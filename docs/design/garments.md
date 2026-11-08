@@ -18,6 +18,17 @@ The user picks both edges of every seam. A seam joins whole edges (or ranges alo
 window shows both lengths, green when they match, red when one side is eased in. Nothing snaps a seam's ends to
 make the lengths equal.
 
+## Templates and the size chart
+
+Templates (trousers, skirts, hoodie, dress, cloak, gloves; the T-shirt from part 1) are made from a size chart the
+user types in; their proportions are ours and written down in docs/design/garment-templates.md.
+
+## Printing
+
+core/GarmentPrint.h: the pattern cut into A4 or Letter pages (PDF from our own writer, or one SVG per page) with
+trim lines, half triangles that complete across each join, page names and the 50 mm square on A1. Blank pages are
+left out; a panel that is another's copy or mirror prints once marked "cut 2". The whole-sheet SVG and the DXF stay.
+
 ## Do not build (patents)
 
 Active patents read on these (search: ~/Work/.sf/reports/garment-patents.md, 2026-11-06; not legal advice).
