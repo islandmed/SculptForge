@@ -1,7 +1,7 @@
 ---
-whats_new: **Pick the strongest form**: **Generate 3D** makes up to three candidates at once and shows each as a
-  thumbnail over a black silhouette. Pick one and it becomes a Part; **Use as sculpting base** then rebuilds it as a
-  clean, even mesh to sculpt on, and keeps the model as generated hidden for Project Detail.
+whats_new: **Generate for form, remesh for topology**: **Generate 3D** gives you 1-3 candidates to compare by
+  silhouette; pick one, then **Use as sculpting base** remeshes it into clean, even topology and keeps the detailed
+  original as a hidden reference. Bring your own key to use your own provider and model at no markup.
 highlight: Generate 3D: pick the best of three, then one click to a clean sculpting base
 added: **Generate 3D candidates**: **Candidates** (1-3) makes several shapes in one go, side by side as a shaded
   thumbnail over a flat black silhouette, so the strongest form is picked before any sculpting. Free and local
@@ -12,7 +12,7 @@ added: **Generate 3D candidates**: **Candidates** (1-3) makes several shapes in 
 added: **Use as sculpting base** (Generate 3D): one click after picking runs Voxel Remesh, then Quad Remesh
   (**Then Quad Remesh**, on by default), for a clean, even mesh with one subdivision level. **Keep a high-detail copy
   (hidden)** keeps the model as generated as a hidden Part below it; **Project Detail from the high-detail copy**
-  brings its detail back after a Divide.
+  brings its detail back after Add Level.
 changed: Generate 3D no longer remeshes as part of generating: generate for form, then Use as sculpting base for
   topology. The Remesh drop-down is replaced by the Sculpting base section; the CLI's image_to_3d / text_to_3d
   (remesh=quad|voxel|false) are unchanged.
