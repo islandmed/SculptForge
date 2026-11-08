@@ -1,0 +1,67 @@
+# Garments (Tool > Garments, the Pattern window): a T-shirt pattern at real size, a point dragged with snap and
+# undone with the window's own undo, an edge split with Alt+click, a sleeve sewn by clicking two edges, Delete,
+# a seam row hovered (its connector drawn, edges named as the wearer has them).
+click "Garments##tool.garments"
+expect "Garments/T-Shirt"
+click "Garments/T-Shirt"
+expect_value garment_window_open == 1
+expect_value garment_panels == 4
+expect_value garment_seams > 0
+expect_value garment_problems == 0
+wait 0.3
+shot tshirt
+
+# Hover the first seam row (Front left side <-> Back left side): its connector shows.
+drag 0.66 0.30 0.66 0.30 0.05
+expect_value garment_hover_seam == 1
+shot seam-hovered
+
+# Select the front from the list, drag its first point: one command, snapped to the 5 mm grid, then undo / redo.
+click "Front"
+expect_value garment_selected == 1
+remember garment_point_x x0
+remember garment_edits edits
+# (the front's lower left corner sits at 0.3244, 0.5660 of the window in this layout)
+expect_value garment_point_u > 0.32
+expect_value garment_point_u < 0.33
+drag 0.3244 0.5660 0.3144 0.5560 0.3
+expect_value garment_point_x < $x0-40
+expect_value garment_edits == $edits+1
+expect_value garment_undo_steps == 2
+shot point-dragged
+key ctrl+z
+expect_value garment_point_x == $x0
+key ctrl+shift+z
+expect_value garment_point_x < $x0-40
+key ctrl+z
+
+# Alt+click the hem adds a point there (selected); Delete removes it again.
+remember garment_points pts
+hold alt
+drag 0.355 0.5660 0.355 0.5660 0.05
+hold none
+expect_value garment_points == $pts+1
+shot point-added
+key delete
+expect_value garment_points == $pts
+
+# Sew: click one sleeve's hem, then the other's (a seam that makes no garment sense, but a seam).
+remember garment_seams seams
+click "Sew"
+drag 0.38 0.7107 0.38 0.7107 0.05
+drag 0.51 0.7107 0.51 0.7107 0.05
+expect_value garment_seams == $seams+1
+shot sewn
+key ctrl+z
+expect_value garment_seams == $seams
+key escape
+expect_value garment_problems == 0
+
+# Cleared: no pattern (the hint in the view), then one rectangle: framed, with its name and size.
+run garment_clear
+expect_value garment_panels == 0
+shot empty
+click "Pattern/Rectangle"
+expect_value garment_panels == 1
+expect_value garment_selected == 1
+shot rectangle

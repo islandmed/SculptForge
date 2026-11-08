@@ -48,7 +48,7 @@ UiLayout standardLayout() {
     l.bottomShelf = {"brush.standard", "brush.clay",    "brush.clayblock", "brush.sharpcrease", "brush.move",
                      "brush.smooth",   "brush.inflate", "brush.pinch",       "brush.flatten",     "brush.crease",
                      "brush.trim",     "brush.tendril", "brush.layer",     "brush.nudge",       "brush.kelvingrab",
-                     "brush.detailclone", "brush.paint",
+                     "brush.cloth",    "brush.detailclone", "brush.paint",
                      "widget.add_brush"};
     return l;
 }

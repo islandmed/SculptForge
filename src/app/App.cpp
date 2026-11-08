@@ -508,6 +508,7 @@ int App::runUiTest(int w, int h, int fps) {
         pollPhone();
         pollAiLink(); // live mode (PanelAiLink.cpp)
         pollAutoUv();
+        pollDrape(); // (PanelDrape.cpp)
         pollUvEditor();
         pollBake();
         pollQRemesh();
@@ -732,6 +733,7 @@ int App::runRecording() {
         pollBrushRequest();
         pollUnreal();
         pollAutoUv();
+        pollDrape(); // (PanelDrape.cpp)
         pollUvEditor();
         pollBake();
         pollQRemesh();
@@ -1164,6 +1166,8 @@ int App::run() {
             pollPhone();
             pollAiLink(); // live mode (PanelAiLink.cpp): an AI tool's next step
             pollAutoUv();
+            pollDrape();
+        pollDrape(); // (PanelDrape.cpp)
             pollUvEditor();
             pollBake();
             pollQRemesh();
@@ -2192,6 +2196,7 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
     }
     if (captureShortcutKey(key, mod)) return; // Ctrl+Alt+click a button, then press its new key
     if (uvEditorKey(key, mod)) return;        // keys over the UV Editor's view (PanelUvEditor.cpp)
+    if (garmentKey(key, mod)) return;         // keys over the Pattern window (PanelGarments.cpp)
     if (key == SDLK_ESCAPE && capture_.armed) { // Capture from view waiting for its square (PanelKelvinlet.cpp)
         capture_.armed = false;
         status_ = "Capture cancelled";
@@ -2282,6 +2287,8 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     }();
     doc_.sculptor.analyticNormals = analyticNormals == 1 || (analyticNormals == -1 && radiusPx_ >= 160.0f);
     fusedDabs_ = 64.0;
+    if (drape_) finishDrape(true); // (PanelDrape.cpp: the stroke sculpts the kept result)
+    if (strokeSculpt_ && !recipe && strokeBrush_ == BrushType::Cloth) prepareClothColliders(); // (PanelCloth.cpp)
     if (!doc_.sculptor.beginStroke(doc_.mesh,
                                    !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushLabel(strokeBrush_),
                                    strokeSculpt_ ? doc_.activeLayer : -1)) {
@@ -2723,6 +2730,7 @@ void App::runCommand(const std::string& name, const Args& args) {
         return;
     }
     if (doc_.sculptor.strokeActive()) endStroke();
+    if (drape_) finishDrape(true); // (a running Drape keeps where it got to first: undo, save... see a real step)
     if (name == "save_project") storeProjectSettings();
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
     crashlog::action(name); // (failures reach the log through SDL_Log below)
@@ -2752,6 +2760,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     }
     status_ = r.message;
     if (name.rfind("uv_", 0) == 0 || name == "texture_create" || name == "texture_delete") uvEditorChanged();
+    garmentsChanged(name.rfind("garment_", 0) == 0); // (the Pattern window re-reads the pattern)
     lastCommandOk_ = r.ok;
     if (r.ok && name != "export_glb" && name != "export_lods" && name != "export_usd" && name != "export_fbx" &&
         name != "export_unreal" && name.rfind("unreal_", 0) != 0 && name != "save_obj" && name != "save_project" &&
@@ -2759,7 +2768,8 @@ void App::runCommand(const std::string& name, const Args& args) {
         name != "set_color" && name != "set_material" && name != "load_litsphere" && name != "set_shading" && name != "part_shading" &&
         name != "viewport_shading" &&
         name != "export_ply" && name != "face_weights" &&
-        name != "face_preset" && name.rfind("face_take", 0) != 0 && name != "face_landmarks_detect") {
+        name != "face_preset" && name.rfind("face_take", 0) != 0 && name != "face_landmarks_detect" &&
+        name.rfind("garment_", 0) != 0) {
         clearLods();
         playingLayer_ = -1;
     }
@@ -3096,6 +3106,7 @@ void App::drawUi() {
     if (showImageTo3D_ && ai::aiEnabled()) drawImageTo3D(); // (closed when AI goes off; never drawn while it is)
     drawPhoneWindow(); // File > Capture from phone (PanelPhone.cpp)
     drawUvEditor();    // Tool > Texture Image > UV Editor (PanelUvEditor.cpp)
+    drawGarments();    // Tool > Garments > Pattern (PanelGarments.cpp)
     drawTimelineUi();  // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)
     pollAlphaFile();
     pollStencilFile();

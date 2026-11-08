@@ -385,6 +385,56 @@ TEST(garment_edits_keep_seams_and_shapes) {
     CHECK(t.panels[c].name == "Extra" && t.seams.size() == tshirtPattern().seams.size()); // (no seams added)
 }
 
+TEST(garment_edge_names_follow_every_edit) {
+    // The template names its edges as the wearer has them; seams read by those names.
+    Pattern pat = tshirtPattern();
+    CHECK(edgeName(pat, 0, 1) == "Front left side");
+    CHECK(edgeName(pat, 1, 7) == "Back left side");
+    CHECK(edgeName(pat, 2, 2) == "Left sleeve cap");
+    CHECK(checkSeam(pat, pat.seams[0]).names == "Front left side <-> Back left side");
+    CHECK(checkSeam(pat, pat.seams[0]).text.find(" mm") != std::string::npos);
+    // Two rows: the sheet is about as tall as it is wide (the window frames it well).
+    glm::vec2 lo(1e9f), hi(-1e9f);
+    for (const Panel& p : pat.panels) lo = glm::min(lo, panelMin(p)), hi = glm::max(hi, panelMax(p));
+    CHECK((hi.y - lo.y) > 0.7f * (hi.x - lo.x) && (hi.y - lo.y) < 1.4f * (hi.x - lo.x));
+    CHECK(panelMin(pat.panels[0]).y > panelMax(pat.panels[2]).y); // the sleeves under the body panels
+    // Saved and loaded.
+    Pattern back;
+    std::string error;
+    CHECK(patternFromJson(patternToJson(pat), back, error));
+    CHECK(back.panels[1].edgeNames == pat.panels[1].edgeNames);
+    // Split: both halves keep the name; removing the new point merges them back.
+    splitEdge(pat, 0, 1, 0.5f);
+    CHECK(edgeName(pat, 0, 1) == "Front left side" && edgeName(pat, 0, 2) == "Front left side");
+    CHECK(edgeName(pat, 0, 3) == "Front left armhole" && pat.panels[0].edgeNames.size() == 9);
+    CHECK(removePoint(pat, 0, 2));
+    CHECK(pat.panels[0].edgeNames == tshirtPattern().panels[0].edgeNames);
+    // Removing point 0 merges the last edge into it: the merged edge keeps the last edge's name.
+    Pattern r = tshirtPattern();
+    CHECK(removePoint(r, 0, 0));
+    CHECK(r.panels[0].edgeNames.size() == 7 && r.panels[0].edgeNames.front() == "left side" &&
+          r.panels[0].edgeNames.back() == "right side");
+    // Mirror: the names stay on their edges (reversed with the outline).
+    Pattern m = tshirtPattern();
+    std::vector<std::string> sewn;
+    for (const Seam& s : m.seams) sewn.push_back(checkSeam(m, s).names);
+    mirrorPanel(m, 0);
+    for (size_t k = 0; k < m.seams.size(); ++k) CHECK(checkSeam(m, m.seams[k]).names == sewn[k]);
+    // Unfold: each half keeps its edges' names; the fold edge's name goes.
+    Pattern h;
+    h.panels.push_back(rectanglePanel("Half", 100.0f, 300.0f));
+    h.panels[0].edgeNames = {"hem", "side", "top", "fold"};
+    CHECK(unfoldPanel(h, 0, 3, error));
+    CHECK(h.panels[0].edgeNames.size() == 6);
+    CHECK(std::count(h.panels[0].edgeNames.begin(), h.panels[0].edgeNames.end(), "fold") == 0);
+    CHECK(std::count(h.panels[0].edgeNames.begin(), h.panels[0].edgeNames.end(), "side") == 2);
+    // No names: "edge N".
+    CHECK(edgeName(h, 0, 0).find("Half ") == 0);
+    Pattern plain;
+    plain.panels.push_back(rectanglePanel("Plain", 100.0f, 100.0f));
+    CHECK(edgeName(plain, 0, 2) == "Plain edge 3");
+}
+
 TEST(garment_triangulates_quickly) {
     Pattern pat = tshirtPattern();
     pat.particleDistance = 10.0f; // about 9,000 particles
@@ -423,6 +473,41 @@ TEST(garment_commands_make_sew_and_export) {
     CHECK(r.ok && r.message.find("Imported 5 panels") != std::string::npos);
     Pattern got;
     CHECK(documentPattern(doc, got) && got.panels.size() == 5);
+    // garment_edit: the Pattern window's edits.
+    auto edit = [&](Args a) { return reg.execute(doc, "garment_edit", a); };
+    const size_t edges0 = got.panels[0].points.size();
+    CHECK(edit({{"op", std::string("split")}, {"panel", std::string("1")}, {"edge", 1.0}, {"t", 0.5}}).ok);
+    CHECK(documentPattern(doc, got) && got.panels[0].points.size() == edges0 + 1);
+    CHECK(edit({{"op", std::string("remove_point")}, {"panel", std::string("1")}, {"point", 2.0}}).ok);
+    CHECK(documentPattern(doc, got) && got.panels[0].points.size() == edges0);
+    const glm::vec2 before = panelMin(got.panels[0]);
+    CHECK(edit({{"op", std::string("move")}, {"panel", std::string("1")}, {"dx", 10.0}, {"dy", -5.0}}).ok);
+    CHECK(documentPattern(doc, got) && glm::length(panelMin(got.panels[0]) - before - glm::vec2(10, -5)) < 0.01f);
+    CHECK(edit({{"op", std::string("rename")}, {"panel", std::string("1")}, {"name", std::string("Bodice")}}).ok);
+    CHECK(edit({{"op", std::string("duplicate")}, {"panel", std::string("Bodice")}}).ok);
+    CHECK(documentPattern(doc, got) && got.panels.size() == 6);
+    CHECK(edit({{"op", std::string("set_panel")}, {"panel", std::string("6")}, {"points", std::string("[0,0, 100,0, 100,80, 0,80]")},
+                {"curves", std::string("[[2, 70,100, 30,100]]")}}).ok);
+    CHECK(documentPattern(doc, got) && got.panels[5].points.size() == 4 && got.panels[5].curves[2].curved);
+    CHECK(!edit({{"op", std::string("set_panel")}, {"panel", std::string("6")}, {"points", std::string("[0,0, 0,80, 100,80, 100,0]")}}).ok); // clockwise
+    CHECK(!edit({{"op", std::string("set_panel")}, {"panel", std::string("6")}, {"points", std::string("[0,0, 100,80, 100,0, 0,80]")}}).ok); // crossing
+    CHECK(!edit({{"op", std::string("split")}, {"panel", std::string("6")}, {"edge", 9.0}}).ok);
+    CHECK(!edit({{"op", std::string("explode")}, {"panel", std::string("6")}}).ok);
+    // Reshaping with the same edges keeps seams; a different count drops that panel's seams.
+    CHECK(reg.execute(doc, "garment_new").ok);
+    CHECK(documentPattern(doc, got));
+    const size_t seams0 = got.seams.size();
+    std::string pts;
+    for (glm::vec2 q : got.panels[0].points) pts += (pts.empty() ? "[" : ",") + std::to_string(q.x * 1.01f) + "," + std::to_string(q.y);
+    std::string cur;
+    for (size_t e = 0; e < got.panels[0].curves.size(); ++e)
+        if (const EdgeCurve& c = got.panels[0].curves[e]; c.curved)
+            cur += std::string(cur.empty() ? "[" : ",") + "[" + std::to_string(e) + "," + std::to_string(c.c1.x * 1.01f) + "," +
+                   std::to_string(c.c1.y) + "," + std::to_string(c.c2.x * 1.01f) + "," + std::to_string(c.c2.y) + "]";
+    r = edit({{"op", std::string("set_panel")}, {"panel", std::string("1")}, {"points", pts + "]"}, {"curves", cur.empty() ? "[]" : cur + "]"}});
+    CHECK(r.ok);
+    if (!r.ok) std::printf("  set_panel: %s\n", r.message.c_str());
+    CHECK(documentPattern(doc, got) && got.seams.size() == seams0);
     CHECK(reg.execute(doc, "garment_clear").ok && !documentPattern(doc, got));
     std::remove(svg.c_str());
     std::remove(dxf.c_str());

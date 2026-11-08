@@ -370,6 +370,10 @@ void App::drawPalette_Brush() {
             }
         }
     }
+    if (subpalette("brush.cloth_options", "Cloth")) {
+        tray::Section section;
+        drawClothSection(); // PanelCloth.cpp
+    }
     if (subpalette("brush.kelvinlet", "Kelvinlet & Capture")) {
         tray::Section section;
         drawKelvinletSection(); // PanelKelvinlet.cpp
@@ -917,6 +921,10 @@ void App::drawPalette_Tool() {
         drawDeformationContents(); // Smooth, Relax, Polish, Balloon, Size, Stack (PanelExtract.cpp)
         Demo::popScope();
     }
+    if (subpalette("tool.drape", "Drape")) {
+        tray::Section section;
+        drawDrapeSection(); // PanelDrape.cpp
+    }
     if (subpalette("tool.cut", "Cut")) {
         tray::Section section;
         drawCutSection(); // PanelCut.cpp
@@ -959,6 +967,12 @@ void App::drawPalette_Tool() {
         tray::Section section;
         Demo::pushScope("Texture Image");
         drawTextureMapContents();
+        Demo::popScope();
+    }
+    if (subpalette("tool.garments", "Garments")) {
+        tray::Section section;
+        Demo::pushScope("Garments");
+        drawGarmentsContents(); // PanelGarments.cpp
         Demo::popScope();
     }
     if (subpalette("tool.bake", "Bake")) {
