@@ -146,6 +146,7 @@ add_library(sculptforge_core STATIC
   src/core/SurfaceQuery.cpp
   src/core/QRemesh.cpp
   src/core/GeneratedRemesh.cpp
+  src/core/MeshPreview.cpp
   src/core/Backdrop.cpp
   src/core/QRemeshGuides.cpp
   src/core/QRemesh2.cpp
@@ -450,6 +451,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelBake.cpp
     src/app/FocusDetailApp.cpp
     src/app/PanelRetopo.cpp
+    src/app/PanelGenerate3D.cpp
     src/app/PanelForgeSpheres.cpp
     src/app/PanelTube.cpp
     src/app/PanelSplatTrain.cpp

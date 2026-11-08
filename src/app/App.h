@@ -690,7 +690,7 @@ private:
     bool comfyWorkflowsScanned_ = false;
     bool comfyPickingText_ = false;
     std::string comfyWorkflowError_;
-    int generatedRemesh_ = int(GeneratedRemesh::Quad); // Generate 3D's Remesh: Quad (default), Voxel, Off
+    int generatedRemesh_ = int(GeneratedRemesh::Quad); // Generate 3D's sculpting base: Quad (Voxel, then Quad Remesh) or Voxel
     int voxelResolution_ = 200;
     bool voxelKeepMasked_ = false; // Voxel Remesh's Keep Masked (#43)
     static constexpr const char* kKeepMaskedHelp =
@@ -698,21 +698,49 @@ private:
         "it's joined to them along the mask's edge so the model stays closed. Mask what to keep first (Ctrl). "
         "If the mask's edge is too ragged to join up, the status line says so and nothing changes.";
     bool keepTexture_ = true; // Keep Texture: remeshes carry a painted texture over (core/TextureTransfer.h)
-    int remeshResolution_ = 256;
+    int remeshResolution_ = 256; // Generate 3D's sculpting base (its Voxel Remesh resolution)
     bool removeBackground_ = true; // Generate 3D's "Remove flat background" (core/Backdrop.h)
-    // A generated model, made sculptable on the worker thread (Quad Remesh takes seconds).
-    struct GeneratedModel {
+    // Generate 3D (PanelGenerate3D.cpp): generate for form, remesh for topology. One press makes 1-3 candidates side by
+    // side (a thumbnail and a silhouette each); the one picked becomes a Part; "Use as sculpting base" then remeshes it.
+    struct GeneratedCandidate {
         ai::GeneratorResult result;
-        std::shared_ptr<Mesh> remeshed; // null: Remesh off, or it failed (remeshError)
-        std::shared_ptr<Mesh> withoutBackdrop; // the raw mesh minus a flat background plane (null: none found or off)
+        std::shared_ptr<Mesh> mesh; // as generated, in one piece, its flat background dropped; null: it failed (error)
         BackdropRemoval backdrop;
-        GeneratedRemeshStats stats;
-        std::string remeshError;
+        std::string error;
+        Image shaded, silhouette; // (worker) previews; uploaded into the textures on the main thread
+        GLuint shadedTexture = 0, silhouetteTexture = 0;
+        int sameAs = -1; // its outline matches this earlier candidate's (the service gave the same shape twice)
     };
-    std::future<GeneratedModel> pendingGenerator_;
+    std::future<std::vector<GeneratedCandidate>> pendingGenerator_;
+    std::vector<std::shared_ptr<ai::GenerationProgress>> candidateProgress_; // one per candidate being generated
+    std::shared_ptr<std::atomic<int>> candidatesDone_;
+    std::vector<GeneratedCandidate> candidates_; // waiting for a pick
+    int candidateCount_ = 3;     // free and local services
+    int paidCandidateCount_ = 1; // services billed per generation (fal.ai, Meshy, Hyper3D): one unless asked
+    bool keepOtherCandidates_ = false; // the ones not picked stay as hidden Parts
+    bool keepHighDetail_ = true;       // the sculpting base keeps the generated model as a hidden Part to Project Detail from
+    uint32_t generatedPart_ = 0;       // the picked candidate's Part (0: none)
+    uint32_t highDetailPart_ = 0;      // its hidden high-detail copy, once the sculpting base is made
+    int scrollGenerateTo_ = 0;         // 1: the candidates arrived, 2: one was picked; the panel scrolls to what's next
+    struct SculptingBase {
+        bool ok = false;
+        std::shared_ptr<Mesh> result;
+        GeneratedRemeshStats stats;
+        std::string error;
+    };
+    std::future<SculptingBase> pendingBase_;
+    std::shared_ptr<Mesh> baseSource_; // the Part's mesh as it went into the remesh
+    size_t baseTriangles_ = 0;         // the Part must still have these when the remesh lands
     bool openHunyuanNotice_ = false;
     std::shared_ptr<ai::GenerationProgress> generatorProgress_;
     float generatorTime_ = 0.0f;
+    int candidateCountForService() const;
+    void clearCandidates();
+    void pickCandidate(int index);
+    void useAsSculptingBase();
+    void pollSculptingBase();
+    void drawGeneratedCandidates();
+    void drawSculptingBase();
 
     glm::vec3 lastDabHit_{0.0f};
     bool haveLastDab_ = false;

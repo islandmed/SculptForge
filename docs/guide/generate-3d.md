@@ -9,10 +9,15 @@ tools: relief, inflate and stamp.
 
 ## How it works
 
+Generate for form, remesh for topology: one pass is never asked to deliver both.
+
 1. You give SculptForge an image (a sketch, concept art, a photo of a figurine) or a short description.
-2. The service you picked reconstructs a complete mesh: front, back, limbs and all.
-3. SculptForge opens the result as a new scene and, unless you choose otherwise, **Quad Remeshes** it into
-   clean quads with one subdivision level that holds the detail, ready to sculpt and subdivide.
+2. The service you picked reconstructs complete meshes, front, back, limbs and all: up to three **candidates** at
+   once, shown side by side as a shaded thumbnail over a flat black silhouette.
+3. You pick the strongest form. It becomes a Part, exactly as generated.
+4. **Use as sculpting base** rebuilds it as a clean, even mesh to sculpt on: a Voxel Remesh, then (unless you turn
+   it off) a Quad Remesh into clean quads with one subdivision level that holds the detail. The model as generated
+   can stay as a hidden Part, to Project Detail from later.
 
 Nothing leaves your computer until you choose a hosted service and press **Generate 3D model**. For exactly
 what is sent where, see [AI services and privacy](#privacy-and-model-licences) below.
@@ -28,8 +33,8 @@ Any of these opens it:
 
 The window has two tabs, **From image** and **From text**.
 
-> **Warning:** A generated model replaces the current scene without asking, and arrives as a new, untitled
-> scene. Save your work (<kbd>Ctrl</kbd>+<kbd>S</kbd>) before you generate.
+A picked model joins the scene as a new Part named **Generated**, placed beside your work. Only an untitled scene
+you haven't touched (the starting sphere) is replaced by it.
 
 ## Generate from an image
 
@@ -38,24 +43,43 @@ The window has two tabs, **From image** and **From text**.
 2. Pick a service in the drop-down under **Full 3D model (AI reconstruction)**. The default is **Hugging Face
    - free models**.
 3. Set the service's options (model, token or key, see below).
-4. Choose **Remesh** and its **Resolution** (96 to 400, default 256; higher keeps more detail):
-   - **Quad Remesh** (the default): clean, all-quad topology of about resolution² / 2 quads (32768 at 256), then
-     one subdivision level projected onto the model so the detail survives. Generated meshes often have holes
-     and overlapping pieces, so a voxel pass cleans the mesh up first. Step down to the quad cage with
-     <kbd>Shift</kbd>+<kbd>D</kbd>.
-   - **Voxel remesh**: one even, watertight triangle surface. Faster (about a second).
-   - **Off (raw mesh)**: the model exactly as the service made it.
+4. Set **Candidates** (1 to 3): how many shapes to make at once. Free and local services start at 3. Paid
+   services (fal.ai, Meshy, Hyper3D) start at 1, because each candidate is one generation billed to your key;
+   above 1 the window says how many are billed.
 5. Leave **Remove flat background** on (the default) to drop the flat plane a picture's background often
    becomes: a thin wall behind or a ground under the subject that covers most of the model's bounds. A relief
-   or a coin on its own is kept. The status line says when a plane was removed; Undo brings it back (with Remesh
-   on, the first Undo steps back to the raw mesh, the second brings the plane back).
-6. Click **Generate 3D model**. A progress bar shows the queue position and progress; **Cancel** stops the
-   job.
+   or a coin on its own is kept. The status line says when a plane was removed.
+6. Click **Generate 3D model**. A progress bar shows the queue position and progress ("1 of 3 ready" with
+   several candidates); **Cancel** stops the job.
 
-When it finishes, the status line reports the size before and after remeshing, for example
-"Generated model imported (47214 tris, remeshed to 133540 quads (2 subdivision levels)) - ready to sculpt".
-Quad Remesh takes about 10 to 25 seconds after the model arrives (a 47,000-triangle Hunyuan3D head took 22 s
-on a busy 10-core computer); the progress bar shows it and the window stays usable.
+### Pick the strongest form
+
+With more than one candidate, **Pick the strongest form** shows each one as a shaded thumbnail over its
+silhouette, flat black on a light background. Judge the outline, not the detail: a strong silhouette sculpts
+well, and fine detail is what you add next. Click a picture or **Pick A** / **Pick B** / **Pick C**. If a service
+ignores the random seed and sends the same shape twice, the window says "Same shape as A".
+
+The others are discarded, unless **Keep the others as hidden Parts** is on: then they stay in the Parts list,
+hidden ("Option A", "Option C"), in the same place as the pick, to compare or use later. **Discard all** drops every candidate. With one candidate there is nothing to
+compare, so it lands at once.
+
+### Use as sculpting base
+
+Generated meshes are uneven, often holey and full of overlapping pieces: good form, poor topology. Under
+**Sculpting base**:
+
+- **Then Quad Remesh** (on by default): after the Voxel Remesh, clean all-quad topology of about
+  resolution² / 2 quads (32768 at 256), then one subdivision level projected onto the model so the detail
+  survives. Step down to the quad cage with <kbd>Shift</kbd>+<kbd>D</kbd>. Off: the even, watertight triangle
+  surface of the Voxel Remesh alone (about a second).
+- **Resolution** (96 to 400, default 256): higher keeps more detail.
+- **Keep a high-detail copy (hidden)** (on by default, for experts): the model as generated stays as a hidden Part
+  right below the base, named "Reference". Divide the base, then click **Project Detail from the
+  high-detail copy** to bring the fine detail back onto it.
+
+Click **Use as sculpting base**. The status line reports the result, for example "Sculpting base ready: remeshed
+to 32768 quads (2 subdivision levels)". Quad Remesh takes about 10 to 25 seconds on a typical model; the
+progress bar shows it and the window stays usable. Undo goes back to the model as generated.
 
 ### Pictures that work well
 
@@ -234,10 +258,11 @@ run instantly. The same tools are in **Mesh > Generate 3D** as **Relief**, **Inf
 Generated meshes are a starting point. A typical next pass:
 
 1. Check the size of the remeshed result in the bar along the top (the triangle count). If the detail is too soft, divide once more
-   (<kbd>Ctrl</kbd>+<kbd>D</kbd>), or generate again with a higher **Resolution**. **Tool > Remesh** has Quad Remesh
-   (first) and Voxel Remesh for another pass.
+   (<kbd>Ctrl</kbd>+<kbd>D</kbd>) and **Project Detail from the high-detail copy**, or press **Use as sculpting base**
+   again with a higher **Resolution** after Undo. **Tool > Remesh** has Quad Remesh (first) and Voxel Remesh for
+   another pass.
 2. Turn on **X** symmetry if the subject is symmetrical, and sculpt the forms with Clay Block, Move and Sharp Crease ([Sculpting and brushes](sculpting.md)).
-3. Save a project (<kbd>Ctrl</kbd>+<kbd>S</kbd>): generated scenes start untitled.
+3. Save a project (<kbd>Ctrl</kbd>+<kbd>S</kbd>).
 
 ## From scripts and agents
 

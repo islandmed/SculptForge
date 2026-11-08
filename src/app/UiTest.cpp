@@ -60,6 +60,8 @@
 //                            is saved (what waits), the defaults come back, then ui.json is read as at the start;
 //                            FILE (beside the script) replaces ui.json first (an older version's settings)
 //   env NAME VALUE           set an environment variable; $SCRIPT_DIR is the script's folder
+//   generator_stub SHAPE...  Generate 3D answers from a stub instead of any service (never the network): generation
+//                            N gets the Nth shape (cycling): sphere cube torus capsule cone, or fail; off = the services
 //   input_style STYLE        classic, sculptforge (the default), blender or maya, as Preferences > Input sets it
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
 //                            directory), e.g. to stage what another program would write (the Blender bridge);
@@ -94,6 +96,9 @@
 //                            supporter (the membership cards, Support.h),
 //                            welcome_open (the first-run welcome shown), new_look_card_open (the one-time
 //                            "SculptForge has a new look" card),
+//                            generate_candidates (Generate 3D's, waiting for a pick), generated_part (the pick's Part
+//                            index, -1 none), high_detail_part (its hidden copy's index, -1 none, -2 shown),
+//                            subdiv_levels (the active Part's, 0 none),
 //                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
 //                            linked_parts (Parts sharing the active one's mesh, #94; 1 = none), part_moved, part_x (its
 //                            centre's x in the scene),
@@ -311,6 +316,7 @@
 //   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 classic, 1 SculptForge)
 #include "app/App.h"
 #include "ai/Http.h"
+#include "ai/ImageTo3DService.h"
 
 #ifndef SDL_PEN_INPUT_IN_PROXIMITY
 #define SDL_PEN_INPUT_IN_PROXIMITY (1u << 31) // SDL 3.4's flag; older SDL 3 never sets it
@@ -326,11 +332,13 @@
 #include "core/LitSphere.h"
 #include "core/Multires.h"
 #include "core/PerfTrace.h"
+#include "core/Primitives.h"
 #include "core/Script.h"
 #include "core/SelectionSets.h"
 #include "core/ThreadPool.h"
 #include "core/Timeline.h"
 #include "io/BridgeProtocol.h"
+#include "io/ObjIO.h"
 #include "link/AiLink.h"
 #include "link/HttpServer.h"
 
@@ -1021,6 +1029,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "discord_connects") return double(discord::connectAttempts()); // Show SculptForge on Discord: never in tests
     if (name == "discord_presence") return app_.discordPrefs_.enabled ? 1.0 : 0.0;
     if (name == "http_requests") return double(ai::httpRequestCount()); // every request this process started
+    if (name == "generate_candidates") return double(app_.candidates_.size()); // Generate 3D's, waiting for a pick
+    if (name == "generated_part") return double(app_.doc_.partIndex(app_.generatedPart_)); // the pick's Part (-1 none)
+    if (name == "high_detail_part") { // its hidden high-detail copy: the index, -1 none (-2: shown)
+        const int i = app_.doc_.partIndex(app_.highDetailPart_);
+        return i < 0 ? -1.0 : app_.doc_.parts[size_t(i)].visible ? -2.0 : double(i);
+    }
+    if (name == "subdiv_levels") return double(subdivLevelCount(app_.doc_.mesh)); // the active Part's (0: none)
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
     // Help > Quick tour (QuickTour.cpp): open, the slide (1-based), waiting aside after Show me, the one offer.
     if (name == "quick_tour_open") return app_.quickTourOpen_ ? 1.0 : 0.0;
@@ -2385,6 +2400,34 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             from.assign(u8.begin(), u8.end());
         }
         run([this, from] { app_.restartPrefsForTest(from); });
+    } else if (verb == "generator_stub") {
+        if (!need(1)) return false;
+        std::vector<std::string> shapes(w.begin() + 1, w.end());
+        for (const std::string& shape : shapes)
+            if (shape != "off" && shape != "sphere" && shape != "cube" && shape != "torus" && shape != "capsule" &&
+                shape != "cone" && shape != "fail") {
+                error = "unknown generator_stub shape '" + shape + "'";
+                return false;
+            }
+        run([shapes] {
+            if (shapes.front() == "off") return ai::setGeneratorStubForTests({});
+            ai::setGeneratorStubForTests([shapes](int call, const std::string& stem) {
+                const std::string& shape = shapes[size_t(call) % shapes.size()];
+                ai::GeneratorResult r;
+                if (shape == "fail") {
+                    r.error = "The stub service said no";
+                    return r;
+                }
+                const Mesh m = shape == "cube"    ? makeCube(24, 1.6f)
+                               : shape == "torus"   ? makeTorus(48, 2.0f)
+                               : shape == "capsule" ? makeCapsule(32, 2.0f)
+                               : shape == "cone"    ? makeCone(48, 2.0f)
+                                                    : makeIcosphere(4, 1.0f);
+                r.outputPath = stem + ".obj";
+                r.ok = saveObj(r.outputPath, m, r.error);
+                return r;
+            });
+        });
     } else if (verb == "env") {
         if (!need(2)) return false;
         std::string value = restOf(lineText_, 2);

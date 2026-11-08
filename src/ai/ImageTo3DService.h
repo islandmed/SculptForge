@@ -21,6 +21,7 @@
 #include "core/Json.h"
 
 #include <atomic>
+#include <functional>
 #include <mutex>
 #include <string>
 #include <string_view>
@@ -84,6 +85,12 @@ GeneratorResult generate3D(const AiSettings& settings, const std::string& imageP
 // Text to 3D: same services (Hugging Face, fal.ai, Meshy); untextured shapes for sculpting.
 GeneratorResult generate3DFromText(const AiSettings& settings, const std::string& prompt, const std::string& outputStem,
                                    GenerationProgress* progress = nullptr);
+
+// Tests: answers generate3D / generate3DFromText in place of every service, after the same checks (the AI switch, the
+// studio policy), so a UI test never reaches the network. `call` counts the generations from 0 (any thread). {} = the
+// services again.
+using GeneratorStub = std::function<GeneratorResult(int call, const std::string& outputStem)>;
+void setGeneratorStubForTests(GeneratorStub stub);
 
 // Hyper3D Rodin on fal.ai: image or text to 3D on one endpoint.
 bool rodinModel(std::string_view id);

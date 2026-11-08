@@ -11,6 +11,7 @@ wait 0.2
 key escape
 drop ../../assets/demo/teddy-sketch.png
 wait_for "生成 3D 模型" 5
+wait 0.2                                         # the panel settles its scrollbar (it is taller since 0.12)
 expect_text 从图片
 expect_text 完整 3D 模型（AI 重建）
 expect_text Hunyuan3D 2.1 (Tencent) - 免费，无需令牌

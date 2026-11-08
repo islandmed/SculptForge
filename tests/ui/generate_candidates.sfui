@@ -1,0 +1,99 @@
+# Generate 3D: generate for form, remesh for topology. A stub stands in for the service (generator_stub: never the
+# network, http_requests stays 0). Three candidates side by side (thumbnail over silhouette), pick one -> a Part, the
+# others hidden; Use as sculpting base -> Voxel then Quad Remesh with a hidden high-detail copy (the Project Detail
+# source). Then: a pick in a scene with work in it is added beside it; a failed candidate says why; paid services
+# start at one candidate and say what more would bill; AI off hides it all.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+generator_stub sphere torus cube
+drop ../../assets/demo/teddy-sketch.png
+wait_for "Generate 3D/Generate 3D model" 5
+expect "Generate 3D/Candidates"
+expect "Generate 3D/Use as sculpting base"
+expect_text Generate a model and pick one first.
+expect_text The AI gives the form; SculptForge gives the topology.
+shot generate-flow-start
+
+click "Generate 3D/Generate 3D model"
+click OK                                         # the one-time Hunyuan3D licence notice (the default model)
+wait_value generate_candidates == 3 30
+expect_status 3 candidates ready: pick the strongest form
+expect "Generate 3D/Pick A##candidate.A"
+expect "Generate 3D/Pick C##candidate.C"
+expect_text Judge the outline
+shot generate-flow-candidates
+
+# B (the torus), the others kept hidden. The untouched starting scene gives way to it.
+click "Generate 3D/Keep the others as hidden Parts"
+click "Generate 3D/Pick B##candidate.B"
+expect_value generate_candidates == 0
+expect_status Picked B: Part Generated
+expect_value parts == 3
+expect_value visible_parts == 1
+expect_value generated_part == 0
+expect_value http_requests == 0
+shot generate-flow-picked
+
+# One click: a clean, even mesh to sculpt on (Resolution down to its minimum to keep the test quick).
+drag_item "Generate 3D/Resolution" -400 0
+click "Generate 3D/Use as sculpting base"
+wait_idle 90
+expect_status Sculpting base ready: remeshed to
+expect_status kept hidden as "Reference" for Project Detail
+expect_value subdiv_levels == 2
+expect_value high_detail_part == 1
+expect_value visible_parts == 1
+expect_value parts == 4
+expect "Generate 3D/Project Detail from the high-detail copy"
+shot generate-flow-base
+click "Generate 3D/Project Detail from the high-detail copy"
+expect_status Project Detail:
+expect_value active_part == 0
+expect_status from 1 Part in
+key ctrl+z
+
+# A scene with work in it keeps it: the next pick is a new Part. A failed candidate shows its reason.
+generator_stub fail cube
+click "Generate 3D/Generate 3D model"
+wait_value generate_candidates == 3 30
+expect_status 1 candidate ready
+expect_status 2 failed: The stub service said no
+expect_text The stub service said no
+expect_not "Generate 3D/Pick A##candidate.A"
+shot generate-flow-failed
+click "Generate 3D/Pick B##candidate.B"
+expect_value parts == 5
+expect_value visible_parts == 2
+expect_status Part Generated 2
+expect_value part_x > 0.5                         # beside the sculpt, not on top of it
+
+# A service that ignores the seed sends the same shape again: the picker says so.
+generator_stub sphere
+click "Generate 3D/Generate 3D model"
+wait_value generate_candidates == 3 30
+expect_text Same shape as A
+click "Generate 3D/Discard all##candidates"
+expect_value generate_candidates == 0
+expect_value parts == 5
+
+# Paid services: one candidate unless asked, and the panel says what more would bill.
+click "Generate 3D/##service"
+click "fal.ai - paid, your key"
+expect_no_text are billed
+drag_item "Generate 3D/Candidates" 400 0
+expect_text Each candidate is one generation on your key: 3 are billed.
+shot generate-flow-paid
+click "Generate 3D/##service"
+click "Hugging Face - free models"
+expect_value http_requests == 0
+
+# AI off: the window closes and stays closed; nothing is sent.
+run ai_features on=false
+expect_not "Generate 3D/Generate 3D model"
+drop ../../assets/demo/teddy-sketch.png
+wait 0.2
+expect_not "Generate 3D/Generate 3D model"
+expect_status Relief, Inflate or Stamp
+expect_value http_requests == 0
+run ai_features on=true
+generator_stub off

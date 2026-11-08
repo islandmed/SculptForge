@@ -563,12 +563,35 @@ bool serviceAllowed(const AiSettings& s, std::string& error) {
     if (url.empty()) return policy::aiProviderAllowed(svc, &error);
     return aiRequestAllowed(svc == "fal" || svc == "meshy" || svc == "comfyui" ? svc : "huggingface", url, error);
 }
+
+std::mutex stubMutex;
+GeneratorStub stub;
+std::atomic<int> stubCalls{0};
+
+// The test stub's answer, when one is set.
+bool stubbed(const std::string& outputStem, GeneratorResult& result) {
+    GeneratorStub s;
+    {
+        std::lock_guard lock(stubMutex);
+        s = stub;
+    }
+    if (!s) return false;
+    result = s(stubCalls++, outputStem);
+    return true;
+}
 } // namespace
+
+void setGeneratorStubForTests(GeneratorStub s) {
+    std::lock_guard lock(stubMutex);
+    stub = std::move(s);
+    stubCalls = 0;
+}
 
 GeneratorResult generate3D(const AiSettings& s, const std::string& imagePath, const std::string& outputStem,
                            GenerationProgress* progress) {
     if (!aiEnabled()) return {false, {}, aiOffError()};
     if (std::string why; !serviceAllowed(s, why)) return {false, {}, why};
+    if (GeneratorResult r; stubbed(outputStem, r)) return r;
     if (s.generatorService == "meshy") return runMeshy(s, imagePath, outputStem, progress);
     if (s.generatorService == "hyper3d") return hyper3d::run(s, imagePath, {}, progress);
     if (s.generatorService == "command") {
@@ -610,6 +633,7 @@ GeneratorResult generate3DFromText(const AiSettings& s, const std::string& promp
         result.error = "Describe the model you want";
         return result;
     }
+    if (stubbed(outputStem, result)) return result;
     if (s.generatorService == "hyper3d") return hyper3d::run(s, {}, prompt, progress);
     if (s.generatorService == "meshy") return runMeshyRequest(s, "/openapi/v2/text-to-3d", meshyTextBody(s.meshyModel, prompt), outputStem, progress);
     if (s.generatorService == "fal")
