@@ -1390,8 +1390,6 @@ private:
         float x = 0.0f, y = 0.0f;
     } zsMenu_;
     bool forgesphereRightDown(float x, float y); // a right press on a sphere arms the menu
-    float deformAmount_[4] = {50.0f, 50.0f, 50.0f, 50.0f}; // Polish, Relax, Smooth, Balloon (shown Smooth first)
-    bool deformKeepVolume_ = false;
     float zoomDragAmount(float dx, float dy) const; // Drag::Zoom's step (App.cpp)
     void drawForgeSphereMenu();
     bool zsMenuShown_ = false; // the menu was drawn this frame (UI tests)
