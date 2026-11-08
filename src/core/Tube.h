@@ -4,7 +4,8 @@
 // Tube: draw clay tubes freely in 3D space, like a 3D pen. A stroke becomes a smooth curve (centripetal
 // Catmull-Rom through control points, each with its own radius) and a tube is swept along it: rings placed
 // adaptively (closer where the curve bends), oriented by rotation-minimizing frames (double reflection), so the
-// tube never twists. The ends are round or flat. A Tube Part keeps its curve in Mesh::tube and its triangles are
+// tube never twists. The cross-section is round, square, triangular or a flat ribbon, turned and tapered as asked;
+// the ends are round or flat. A Tube Part keeps its curve in Mesh::tube and its triangles are
 // made from it, so the points can be moved and resized until Bake makes it a plain, sculptable mesh. Merged into
 // the active Part instead, the tube is swept with even edge lengths (rings with as many sides as their size
 // needs), which suits dynamic topology. Every change is one undo step.
@@ -37,8 +38,18 @@ float tubeEdgeLength(const TubeShape& shape);
 // A drawn stroke (dense pen samples with pressure-scaled radii) as control points: samples closer than a fraction
 // of their radius are dropped, `smoothing` (0..1) relaxes positions and radii (the ends stay), and the result is
 // resampled along its length to at most `maxPoints`. A stroke shorter than its radius becomes one point (a ball).
+// `spacing`: how far apart the control points are, in radii (kTubeSpacingMin..Max).
+constexpr float kTubeSpacingMin = 0.5f, kTubeSpacingMax = 8.0f;
 std::vector<TubePoint> tubeFromStroke(const std::vector<TubePoint>& samples, float smoothing,
-                                      size_t maxPoints = kTubeStrokePoints);
+                                      size_t maxPoints = kTubeStrokePoints, float spacing = 1.25f);
+// Fewer control points: takes out, one at a time, the interior point whose removal changes the curve least (its
+// distance from its neighbours' chord plus its radius change, in its radius) until `keep` (0..1) of them are left
+// (at least 2), or earlier when the next would change it by more than `tolerance` radii (0 = no limit).
+std::vector<TubePoint> tubeSimplify(const std::vector<TubePoint>& points, float keep, float tolerance = 0.0f);
+
+// "round", "square", "triangle", "ribbon".
+const char* tubeProfileName(TubeShape::Profile p);
+bool parseTubeProfile(const std::string& name, TubeShape::Profile& out);
 
 // A point of the swept centre line: position, radius and unit tangent.
 struct TubeSample {
@@ -51,8 +62,8 @@ struct TubeSample {
 std::vector<TubeSample> tubeCenterline(const TubeShape& shape, float edge);
 
 // The ring orientation along `line`: a unit normal per sample, at right angles to its tangent, carried along without
-// twisting (rotation-minimizing frames).
-std::vector<glm::vec3> tubeFrames(const std::vector<TubeSample>& line);
+// twisting (rotation-minimizing frames). The first normal is `up` at right angles to the tangent (0: any).
+std::vector<glm::vec3> tubeFrames(const std::vector<TubeSample>& line, const glm::vec3& up = glm::vec3(0.0f));
 
 // The tube as a plain mesh (no Mesh::tube): watertight, face groups as above. `uniform`: every edge near the edge
 // length (triangles; rings get as many sides as their radius needs) for dynamic topology; else rings with the
@@ -62,7 +73,8 @@ Mesh tubeSweep(const TubeShape& shape, bool uniform = false, float edge = 0.0f);
 // sweep when the full one would have more (the live preview while a point is dragged: 60 fps on the floor tier).
 Mesh tubeMesh(const TubeShape& shape, size_t maxTriangles = 0);
 constexpr size_t kTubePreviewTriangles = 60000;
-// The shape mirrored across x = 0 (the mirror copy symmetry X sweeps).
+// The shape mirrored across x = 0 (the mirror copy symmetry X sweeps; `up` mirrored and `roll` negated, so the
+// copy's cross-section is the exact mirror image).
 TubeShape tubeMirrored(const TubeShape& shape);
 
 // Adds a tube to the scene as one undo step: a new Tube Part (not made active; undo removes it), or with `merge`
@@ -83,7 +95,7 @@ TubeShape tubeFromJson(const Json& json);
 // `radius`.
 bool parseTubePoints(const std::string& text, float radius, std::vector<TubePoint>& out, std::string& error);
 
-// tube_new, tube_list, tube_set_point, tube_insert_point, tube_delete_point, tube_set, tube_bake.
+// tube_new, tube_list, tube_set_point, tube_insert_point, tube_delete_point, tube_set, tube_simplify, tube_bake.
 void registerTubeCommands(CommandRegistry& registry);
 
 } // namespace sf

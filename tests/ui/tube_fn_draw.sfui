@@ -32,6 +32,15 @@ print tube_last_radius_x1000
 remember tube_last_radius_x1000 last
 expect_value tube_first_radius_x1000 < $last    # pen pressure 0.1 -> 1: thin to thick
 run part_select index=0
+# A plain press on an old tube's dot draws a new tube (Shift, Ctrl or Alt edit the dot instead).
+run part_select index=0
+expect_value tube_parts == 3
+drag_tube_point 0 120 40
+wait 0.2
+expect_value tube_parts == 4
+expect_status "Added Tube Part"
+key ctrl+z
+expect_value tube_parts == 3
 # Very short: a click is a ball.
 drag_path 0.5 0.5 0.5005 0.5 S=0.05
 wait 0.2

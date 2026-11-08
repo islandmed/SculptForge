@@ -36,7 +36,9 @@ run redo
 expect_value tube_parts == 1
 
 # A point's dot: dragging it selects the Tube Part and moves the point (one undo step).
+hold shift                                     # (Draw Tube is on: Shift grabs a dot)
 drag_tube_point 2 0 -60
+hold none
 expect_value active_part == 1
 expect_value tube_selected == 2
 expect_status "point moved"
@@ -69,6 +71,29 @@ drag_tube_point 0 0 0
 hold none
 expect_status "Tube delete point"
 
+# Shape (GABO on Discord): the cross-section and taper of the active tube, each one undo step; Simplify takes points out.
+click "Tube/Square"
+expect_value tube_profile == 1
+expect_status "Tube settings"
+shot square
+click "Tube/Ribbon"
+expect_value tube_profile == 3
+expect "Tube/##tubethick"
+shot ribbon
+drag_item "Tube/##tubetaper1" 400 0
+wait 0.2
+expect_value tube_taper_end > 0.5
+expect_status "Tube settings"
+shot taper
+key ctrl+z
+expect_value tube_taper_end == 0
+click "Tube/Circle"
+expect_value tube_profile == 0
+click "Tube/Simplify"
+expect_status "Tube simplify"
+key ctrl+z
+expect_status "Undo"
+
 # Flat ends on the active tube, then Bake: a plain mesh to sculpt.
 click "Tube/Flat"
 expect_status "Tube settings"
@@ -80,10 +105,9 @@ expect_status "Baked the tube"
 key ctrl+z
 expect_value tube_parts == 1
 
-# Merge with Snap to surfaces: a strap along the sculpt goes into it, one undo step, no new Part.
+# Merge with Snap to surfaces (on by default): a strap along the sculpt goes into it, one undo step, no new Part.
 run part_select index=0
 click "Tube/Merge"
-click "Tube/Snap to surfaces"
 wait_value triangles > 0
 drag_path 0.22 0.55 0.35 0.72 0.5 0.78 0.65 0.72 0.78 0.55 S=0.8
 wait 0.2
@@ -92,7 +116,6 @@ expect_status "merged into"
 shot merged
 key ctrl+z
 expect_status "Undo"
-click "Tube/Snap to surfaces"
 click "Tube/Draw Tube"
 expect_value tube_draw == 0
 

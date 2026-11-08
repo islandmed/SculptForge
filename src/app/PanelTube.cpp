@@ -4,12 +4,12 @@
 // Tool > Tube and the Tube tool in the viewport (core/Tube.h): draw clay tubes in the air like a 3D pen.
 //   Draw Tube on: a left-drag anywhere (on the model or off it) draws a tube. Its points lie on a plane facing the
 //     view: through the surface under the pen where the stroke starts (else the last stroke's end, else the pivot),
-//     through the pivot, or at a fixed distance from the camera. Snap to surfaces puts points over a surface onto
-//     it. Pen pressure thins the tube; the stroke is smoothed and simplified into the curve's control points.
+//     through the pivot, or at a fixed distance from the camera. Snap to surfaces (on by default) puts points over a
+//     surface onto it, and the plane follows the last of them. Pen pressure thins the tube; the stroke is smoothed and simplified into the curve's control points.
 //     The result is a new Tube Part (undo takes it away again) or, with Merge, part of the active Part.
 //   A Tube Part's points show as dots: drag one to move it (in the view plane), Ctrl+drag to make the tube thicker
-//     or thinner there, Alt+click to delete it. With Draw Tube on, the dots of every visible Tube Part show and a
-//     press on one selects that Part. Bake makes the Part a plain mesh to sculpt.
+//     or thinner there, Alt+click to delete it. With Draw Tube on, a plain press always draws; the dots of every
+//     visible Tube Part show, and Shift+drag (or Ctrl, Alt) on one selects that Part and edits it. Bake makes the Part a plain mesh to sculpt.
 // Alt+drag still navigates; every stroke and point drag is one undo step. Symmetry X draws the mirror copy too.
 #include "app/App.h"
 #include "app/Demo.h"
@@ -75,13 +75,35 @@ void App::registerTubeUiActions() {
     add("tube.depth_fixed", "Fixed", depth(TubeDepth::Fixed), nullptr, [this] { return tubeDepth_ == TubeDepth::Fixed; },
         "Strokes are drawn at a fixed distance from the camera (Depth below); orbit to draw at another angle.");
     add("tube.snap", "Snap to surfaces", [this] { tubeSnap_ = !tubeSnap_; }, nullptr, [this] { return tubeSnap_; },
-        "Where the pen is over a surface, the tube lies on it (half sunk in) instead of on the drawing plane.");
+        "Where the pen is over a surface, the tube lies on it (half sunk in), and off it the stroke carries on in the "
+        "air from where it left the surface. Off: every point lies on the drawing plane.");
     add("tube.caps_round", "Rounded", [this] { tubeFlatCaps_ = false; if (tubeActive()) runCommand("tube_set", {{"caps", std::string("round")}}); },
         nullptr, [this] { return tubeActive() ? !doc_.mesh.tube.flatCaps : !tubeFlatCaps_; },
         "Round ends (for new tubes, and the active Tube Part).", "tube_set");
     add("tube.caps_flat", "Flat", [this] { tubeFlatCaps_ = true; if (tubeActive()) runCommand("tube_set", {{"caps", std::string("flat")}}); },
         nullptr, [this] { return tubeActive() ? doc_.mesh.tube.flatCaps : tubeFlatCaps_; },
         "Flat ends (for new tubes, and the active Tube Part).", "tube_set");
+    const auto profile = [this](TubeShape::Profile p) {
+        return [this, p] {
+            tubeLook_.profile = p;
+            if (tubeActive()) runCommand("tube_set", {{"profile", std::string(tubeProfileName(p))}});
+        };
+    };
+    const auto isProfile = [this](TubeShape::Profile p) {
+        return [this, p] { return (tubeActive() ? doc_.mesh.tube.profile : tubeLook_.profile) == p; };
+    };
+    add("tube.profile_round", "Circle", profile(TubeShape::Profile::Round), nullptr, isProfile(TubeShape::Profile::Round),
+        "A round cross-section (for new tubes, and the active Tube Part).", "tube_set");
+    add("tube.profile_square", "Square", profile(TubeShape::Profile::Square), nullptr, isProfile(TubeShape::Profile::Square),
+        "A square cross-section with sharp corners: beams, frames, planks (for new tubes, and the active Tube Part).",
+        "tube_set");
+    add("tube.profile_triangle", "Triangle", profile(TubeShape::Profile::Triangle), nullptr,
+        isProfile(TubeShape::Profile::Triangle),
+        "A triangular cross-section: ridges, blades, spines (for new tubes, and the active Tube Part).", "tube_set");
+    add("tube.profile_ribbon", "Ribbon", profile(TubeShape::Profile::Ribbon), nullptr, isProfile(TubeShape::Profile::Ribbon),
+        "A flat ribbon, lying flat towards you as you draw: straps, cloth strips, leaves, hair cards (for new tubes, "
+        "and the active Tube Part). Thickness sets how flat.",
+        "tube_set");
     add("tube.new_part", "New Part", [this] { tubeMerge_ = false; }, nullptr, [this] { return !tubeMerge_; },
         "Each stroke makes a Tube Part whose points stay editable until Bake.");
     add("tube.merge", "Merge", [this] { tubeMerge_ = true; }, nullptr, [this] { return tubeMerge_; },
@@ -101,6 +123,15 @@ void App::registerTubeUiActions() {
             tubeSelected_ = at + 1;
         },
         selected, nullptr, "Add a point halfway between the selected point and the next one.", "tube_insert_point");
+    add("tube.simplify", "Simplify",
+        [this] {
+            runCommand("tube_simplify");
+            tubeSelected_ = -1;
+        },
+        [this] { return tubeActive() && doc_.mesh.tube.points.size() > 2; }, nullptr,
+        "Fewer points: takes out about a third of them, the ones the curve needs least (the ends stay). Press again "
+        "for fewer still; undo brings them back.",
+        "tube_simplify");
     add("tube.bake", "Bake",
         [this] {
             runCommand("tube_bake", {{"uniform", tubeBakeUniform_}});
@@ -161,6 +192,13 @@ void App::drawTubeContents() {
     ImGui::SetNextItemWidth(full);
     ui::SliderInside("##tubesmooth", &tubeSmoothing_, 0.0f, 1.0f, tr("Smoothing %.2f"));
     ui::HelpText("Smoothing", nullptr, "How much the stroke's wobble is smoothed out before the tube is made.", kTubePath);
+    ImGui::SetNextItemWidth(full);
+    ui::SliderInside("##tubespacing", &tubeSpacing_, kTubeSpacingMin, kTubeSpacingMax, tr("Point spacing %.2f"),
+                     ImGuiSliderFlags_Logarithmic);
+    ui::HelpText("Point spacing", nullptr,
+                 "How far apart a drawn tube's points are, in tube radii: higher gives fewer points, easier to edit; "
+                 "lower follows the stroke more closely.",
+                 kTubePath);
     ImGui::AlignTextToFramePadding();
     ImGui::TextDisabled("%s", tr("Depth"));
     ImGui::SameLine();
@@ -171,6 +209,7 @@ void App::drawTubeContents() {
         ui::SliderInside("##tubedepth", &tubeFixedDepth_, 0.0f, far, tr("Distance %.2f"));
     }
     ui::ActionButton(*this, "tube.snap", ImVec2(full, 0));
+    drawTubeShapeControls(full);
     ImGui::AlignTextToFramePadding();
     ImGui::TextDisabled("%s", tr("Ends"));
     ImGui::SameLine();
@@ -208,12 +247,68 @@ void App::drawTubeContents() {
     ui::ActionButton(*this, "tube.delete_point", ImVec2(half, 0));
     ImGui::SameLine();
     ui::ActionButton(*this, "tube.insert_point", ImVec2(-1, 0));
+    ui::ActionButton(*this, "tube.simplify", ImVec2(full, 0));
     ui::ActionButton(*this, "tube.bake", ImVec2(half, 0));
     ImGui::SameLine();
     ui::Checkbox(tr("Even edges##tube_bake_uniform"), &tubeBakeUniform_);
     ui::HelpText("Even edges", nullptr,
                  "Bake re-sweeps the tube in triangles of one size (good for dynamic topology) instead of keeping its quads.",
                  kTubePath);
+}
+
+void App::drawTubeShapeControls(float full) {
+    tray::GroupLabel(*this, "Shape");
+    ui::Segmented(*this, {"tube.profile_round", "tube.profile_square", "tube.profile_triangle", "tube.profile_ribbon"}, full);
+    // A slider sets new tubes and, with a Tube Part active, previews on it while held: one undo step when let go.
+    const bool active = tubeActive();
+    const TubeShape& shown = active ? doc_.mesh.tube : tubeLook_;
+    const auto slider = [&](const char* id, float TubeShape::*field, float lo, float hi, const char* format,
+                            const char* arg, const char* title, const char* help) {
+        float v = shown.*field;
+        ImGui::SetNextItemWidth(full);
+        if (ui::SliderInside(id, &v, lo, hi, tr(format))) {
+            tubeLook_.*field = v;
+            if (active && (tubeLookEditing_ || tubeMatchesMesh(doc_.mesh))) {
+                if (!tubeLookEditing_) {
+                    tubeLookBefore_ = doc_.mesh;
+                    tubeLookEditing_ = true;
+                }
+                TubeShape s = doc_.mesh.tube;
+                s.*field = v;
+                if (tubeValidate(s).empty()) {
+                    doc_.mesh = tubeMesh(s, kTubePreviewTriangles);
+                    doc_.mesh.topologyDirty = true;
+                    doc_.bvhDirty = true;
+                }
+            }
+        }
+        if (ImGui::IsItemDeactivated() && tubeLookEditing_) {
+            const float value = doc_.mesh.tube.*field;
+            doc_.mesh = std::move(tubeLookBefore_);
+            tubeLookBefore_ = {};
+            tubeLookEditing_ = false;
+            doc_.mesh.topologyDirty = true;
+            doc_.bvhDirty = true;
+            if (value != doc_.mesh.tube.*field) runCommand("tube_set", {{arg, double(value)}});
+        }
+        ui::HelpText(title, nullptr, help, kTubePath);
+    };
+    if (shown.profile == TubeShape::Profile::Ribbon)
+        slider("##tubethick", &TubeShape::thickness, 0.05f, 1.0f, "Thickness %.2f", "thickness", "Thickness",
+               "How thick the ribbon is, as a fraction of its width.");
+    if (shown.profile != TubeShape::Profile::Round)
+        slider("##tuberoll", &TubeShape::roll, -180.0f, 180.0f, "Turn %.0f\xc2\xb0", "turn", "Turn",
+               "Turns the cross-section about the curve, in degrees.");
+    slider("##tubetaper0", &TubeShape::taperStart, 0.0f, 1.0f, "Taper start %.2f", "taper_start", "Taper start",
+           "How much of the length narrows to a point at the start (0: none, 1: all of it): horns, claws, spikes.");
+    slider("##tubetaper1", &TubeShape::taperEnd, 0.0f, 1.0f, "Taper end %.2f", "taper_end", "Taper end",
+           "How much of the length narrows to a point at the end (0: none, 1: all of it).");
+}
+
+// With Draw Tube on a plain press always draws (even over a tube's dot); Shift, Ctrl or Alt grab the dots.
+bool App::tubeGrabsPoints(SDL_Keymod keys) const {
+    if (tubeDraw_) return (keys & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_GUI | SDL_KMOD_ALT)) != 0;
+    return tubeActive();
 }
 
 glm::vec3 App::tubeViewDir() const { return glm::normalize(camera_.target - camera_.position()); }
@@ -247,7 +342,7 @@ int App::tubePointAt(float x, float y, int* part) const {
 bool App::tubeMouseDown(float x, float y, SDL_Keymod mod) {
     const SDL_Keymod keys = SDL_GetModState(); // the keyboard itself
     int part = -1;
-    const int point = (tubeActive() || tubeDraw_) ? tubePointAt(x, y, &part) : -1;
+    const int point = tubeGrabsPoints(keys) ? tubePointAt(x, y, &part) : -1;
     TubeDrag& d = tubeDrag_;
     if (point >= 0) {
         if (part != doc_.activePart) {
@@ -267,7 +362,7 @@ bool App::tubeMouseDown(float x, float y, SDL_Keymod mod) {
         }
         d = {};
         d.point = point;
-        d.resize = ctrlDown(mod);
+        d.resize = ctrlDown(mod) || ctrlDown(keys);
         d.start = doc_.mesh.tube;
         d.before = doc_.mesh;
         d.x = x;
@@ -327,7 +422,10 @@ void App::tubeDragTo(float x, float y) {
         const float r = d.radius * (1.0f - tubePressure_ + tubePressure_ * std::max(pressure, 0.05f));
         glm::vec3 p = planeHit(o, dir, d.planePoint, d.planeNormal);
         RayHit hit;
-        if (tubeSnap_ && pickPart(x, y, &hit) >= 0) p = hit.position + glm::normalize(hit.normal) * (0.5f * r);
+        if (tubeSnap_ && pickPart(x, y, &hit) >= 0) {
+            p = hit.position + glm::normalize(hit.normal) * (0.5f * r);
+            d.planePoint = p; // leaving the model, the stroke carries on in the air from here, not from the start
+        }
         if (!d.samples.empty() && glm::distance(d.samples.back().position, p) < 0.1f * r) return;
         d.samples.push_back({p, r});
         const float wpp = worldPerPixel(p);
@@ -355,7 +453,9 @@ void App::tubeRelease() {
     TubeDrag& d = tubeDrag_;
     if (d.drawing) {
         TubeShape s;
-        s.points = tubeFromStroke(d.samples, tubeSmoothing_);
+        s = tubeLook_;
+        s.points = tubeFromStroke(d.samples, tubeSmoothing_, kTubeStrokePoints, tubeSpacing_);
+        s.up = d.planeNormal; // a ribbon lies flat towards the view it was drawn in
         s.flatCaps = tubeFlatCaps_;
         s.mirrorX = symmetry_.x;
         if (!s.points.empty()) {
@@ -415,7 +515,7 @@ void App::drawTubeOverlay() {
     // The control points of the active Tube Part (and, while drawing tubes, of every visible one).
     const bool hoverOk = !ImGui::GetIO().WantCaptureMouse && cr.contains(mouseX_, mouseY_) && drag_ == Drag::None;
     int hoverPart = -1;
-    const int hover = hoverOk ? tubePointAt(mouseX_, mouseY_, &hoverPart) : -1;
+    const int hover = hoverOk && tubeGrabsPoints(inputMods()) ? tubePointAt(mouseX_, mouseY_, &hoverPart) : -1;
     for (int i = 0; i < doc_.partCount(); ++i) {
         if ((i != doc_.activePart && !tubeDraw_) || !doc_.parts[size_t(i)].visible) continue;
         const TubeShape& t = doc_.partMesh(i).tube;

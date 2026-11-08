@@ -13,6 +13,9 @@ smooth curve with a tube swept along it, and its points stay editable until you 
    draw; let go and it is made.
 3. <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes the tube away again.
 
+A click without dragging drops a ball as big as **Size**: a quick way to block in volumes (with **Merge**, straight
+into the active Part). With the **Square** shape it is a rounded block.
+
 While Draw Tube is on, <kbd>Alt</kbd>+drag still moves the view (and so do the right and middle buttons), so you can
 draw, turn the model, and draw again from another side. The brush ring is replaced by a circle as thick as the tube
 will be. Press **Draw Tube** again, <kbd>Esc</kbd>, any brush, or **Draw** / **Move** to stop drawing tubes.
@@ -24,8 +27,10 @@ will be. Press **Draw Tube** again, <kbd>Esc</kbd>, any brush, or **Draw** / **M
 | **Size** | How thick new tubes are: their radius on screen at the depth you draw at |
 | **Pressure** | How much a light touch of the pen thins the tube (0: the same thickness all along). A mouse draws at full size |
 | **Smoothing** | How much of the stroke's wobble is smoothed out before the tube is made |
+| **Point spacing** | How far apart the tube's points are, in tube radii. Higher: fewer points, easier to edit. Lower: the tube follows the stroke more closely |
 | **Depth** | Where in depth the stroke lies (below) |
-| **Snap to surfaces** | Where the pen is over a surface, the tube lies on it, half sunk in, instead of on the drawing plane |
+| **Snap to surfaces** | On by default: where the pen is over a surface, the tube lies on it, half sunk in, and off it the stroke carries on in the air from where it left the surface. Off: every point lies on the drawing plane |
+| **Shape** | The cross-section and taper (below) |
 | **Ends** | **Rounded** or **Flat** |
 | **Result** | **New Part**: each stroke is a Tube Part you can edit. **Merge**: the stroke goes into the active Part |
 
@@ -41,19 +46,37 @@ A stroke on a flat screen needs a depth. The tube's points lie on a plane facing
 - **Pivot**: through the view's pivot, the point the camera turns around.
 - **Fixed**: at a set **Distance** from the camera. Orbit and draw again to build up a shape in 3D.
 
-Turn **Snap to surfaces** on to draw along a model: a strap round an arm, a seam, a vein.
+**Snap to surfaces** (on by default) makes a stroke follow the model: a strap round an arm, a seam, a vein; pulled
+off the model, it carries on into the air from the edge. Turn it off to draw on the plane alone, for example to pass
+in front of the model.
+
+## Shape: cross-section and taper
+
+**Shape** sets the cross-section: **Circle**, **Square** (sharp corners: beams, frames, planks), **Triangle**
+(ridges, blades, spines) or **Ribbon** (a flat strip: straps, cloth strips, leaves, hair cards). A ribbon lies flat
+towards you as you draw it; **Thickness** sets how flat it is. **Turn** turns a square, triangle or ribbon about the
+curve.
+
+**Taper start** and **Taper end** narrow the tube to a point over that much of its length (0: none, 1: all of it):
+horns, claws, spikes, tails.
+
+These set new tubes and the selected Tube Part, so you can change the shape after drawing. A slider shows the
+change on the tube as you drag it, and letting go is one undo step.
 
 ## Edit the points
 
-A Tube Part's control points show as dots joined by a thin line (with Draw Tube on, the dots of every visible Tube
-Part show, and pressing one selects that Part):
+A Tube Part's control points show as dots joined by a thin line. With Draw Tube on, the dots of every visible Tube
+Part show, but a plain drag always draws a new tube, even over a dot: hold <kbd>Shift</kbd> (or <kbd>Ctrl</kbd>,
+<kbd>Alt</kbd>) to edit a dot instead, which also selects its Part.
 
-- **Drag** a dot to move it across the screen; the tube follows as you drag.
+- **Drag** a dot to move it across the screen (<kbd>Shift</kbd>+drag while Draw Tube is on); the tube follows as you drag.
 - <kbd>Ctrl</kbd>+drag a dot up or right to make the tube thicker there, down or left to make it thinner.
 - <kbd>Alt</kbd>+click a dot to delete it.
 - The dot you last dragged is selected (orange): **Radius** sets its thickness exactly, **Insert Point** adds a
   point halfway to the next one, **Delete Point** removes it.
 - **Rounded** and **Flat** change the ends of the selected tube.
+- **Simplify** takes out about a third of the points, the ones the curve needs least (the ends stay). Press it
+  again for fewer still.
 
 Each drag and button is one undo step. A Tube Part isn't sculpted while its points are editable: brushes leave it
 alone until you bake it. If you move, mirror or otherwise change the Part's mesh, its points no longer fit it and
@@ -84,8 +107,13 @@ tube_set_point index=1 position="0.5,0.6,0" radius=0.1
 tube_insert_point index=0
 tube_delete_point index=2
 tube_set caps=flat radius_scale=1.5
+tube_set profile=ribbon thickness=0.2 turn=30 taper_end=0.5
+tube_simplify keep=0.5
 tube_bake uniform=true
 ```
 
+`profile` is `round`, `square`, `triangle` or `ribbon`; `up="x,y,z"` sets which way the cross-section's first flat
+side faces.
+
 Each point is `x,y,z` or `x,y,z,radius`. With `smooth=0.5` the points are treated as raw pen samples: smoothed and
-simplified into control points, as a drawn stroke is. `merge=true` puts the tube into the active Part.
+simplified into control points, as a drawn stroke is (`spacing=` sets how far apart, in radii). `merge=true` puts the tube into the active Part.

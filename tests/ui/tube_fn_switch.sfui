@@ -33,12 +33,16 @@ wait 0.2
 expect_value tube_parts == 2
 run part_select index=1
 remember triangles before
+hold shift
 drag_tube_point 2 0 -60 keep
+hold none
 key ctrl+z
 expect_status "put back"
 release
 expect_value triangles == $before
+hold shift                                     # (Draw Tube is on: Shift grabs a dot)
 drag_tube_point 2 0 -40
+hold none
 expect_status "point moved"
 shot undo-mid
 # Dense: a 1.3M-triangle sphere, Surface depth and Merge.

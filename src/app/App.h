@@ -1512,6 +1512,7 @@ private:
     enum class TubeDepth { Surface, Pivot, Fixed };
     void registerTubeUiActions();
     void drawTubeContents();                                // Tool > Tube
+    void drawTubeShapeControls(float width);                // its Shape group
     bool tubeMouseDown(float x, float y, SDL_Keymod mod);   // true if it took the click
     void tubeDragTo(float x, float y);
     void tubeRelease();
@@ -1522,6 +1523,7 @@ private:
     int tubePointAt(float x, float y, int* part = nullptr) const; // control point under the cursor (of `part`), or -1
     int tubeSelection() const;                              // tubeSelected_ when it is still a point, else -1
     glm::vec3 tubeViewDir() const;                          // into the screen
+    bool tubeGrabsPoints(SDL_Keymod keys) const;            // a press on a dot edits it (Draw Tube on: Shift/Ctrl/Alt)
     bool tubeDraw_ = false;
     int tubeReturnPart_ = -1;      // the Part that was active before a press on a tube's point selected its Tube Part
     // Picking a brush or a tool (Draw / Move / Scale / Rotate), or Esc, leaves Draw Tube and Append > Insert; with a
@@ -1534,8 +1536,12 @@ private:
     float tubeSizePx_ = 14.0f;     // tube radius on screen at the drawing depth
     float tubePressure_ = 0.7f;    // how much pen pressure thins the tube (0 = none)
     float tubeSmoothing_ = 0.5f;
-    bool tubeSnap_ = false;        // points over a surface sit on it
+    bool tubeSnap_ = true;         // points over a surface sit on it (and the plane follows them)
     bool tubeFlatCaps_ = false;
+    float tubeSpacing_ = 1.25f;    // drawn strokes' control points, this many radii apart
+    TubeShape tubeLook_;           // new tubes' profile, thickness, turn and taper (its points unused)
+    bool tubeLookEditing_ = false; // a Shape slider is held: the active Tube Part previews it
+    Mesh tubeLookBefore_;          // (its mesh before, put back before the one undo step)
     bool tubeMerge_ = false;       // into the active Part (even edges) instead of a new Tube Part
     bool tubeBakeUniform_ = false; // Bake re-sweeps with even edges (dynamic topology)
     int tubeSelected_ = -1;
