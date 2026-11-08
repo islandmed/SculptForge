@@ -699,7 +699,7 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
   .community .ctas .btn { white-space: nowrap; padding: 12px 14px; }
 }
 
-/* "What artists say": member quotes (testimonials.json, exact wording, consent on record). One quote = one wide card;
+/* "What artists say": community quotes (testimonials.json, exact wording, consent on record). One quote = one wide card;
    more = a grid. The home page has it right under the hero; support.html beside the membership tiers. */
 .voices { padding: 64px 0; border-top: 1px solid var(--border);
           background: radial-gradient(800px 360px at 15% 0%, rgba(242, 140, 60, 0.07), transparent 65%); }
@@ -713,6 +713,8 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
 .voice blockquote { margin: 0; }
 .voice blockquote p { margin: 0; font-size: clamp(1.08rem, 1.6vw, 1.32rem); line-height: 1.6; color: var(--text);
                       max-width: 54em; }
+.voice-context { margin: 14px 0 0; font-size: 0.85rem; line-height: 1.45; color: var(--muted); }
+.voice-context + figcaption { margin-top: 6px; }
 .voice figcaption { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline;
                     font-size: 0.95rem; }
 .voice-name { font-weight: 600; color: var(--accent-2); }
