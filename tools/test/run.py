@@ -246,6 +246,28 @@ def inner_times(junit):
     return out
 
 
+RUN_LINE = re.compile(r"^\[ RUN\] (\S+)$", re.M)
+DONE_LINE = re.compile(r"^\[(?: OK |FAIL)\] (\S+) \(", re.M)
+
+
+def timeouts(junit):
+    """The tests ctest stopped at their TIMEOUT: {test: the sculptforge_tests case still running ("" if none)}."""
+    if ET is None:
+        return {}
+    try:
+        root = ET.parse(junit).getroot()
+    except (OSError, ET.ParseError):
+        return {}
+    out = {}
+    for tc in root.iter("testcase"):
+        if not any((f.get("message") or "").startswith("Timeout") for f in tc.iter("failure")):
+            continue
+        text = "".join(so.text or "" for so in tc.iter("system-out"))
+        done = set(DONE_LINE.findall(text))
+        out[tc.get("name")] = next((n for n in reversed(RUN_LINE.findall(text)) if n not in done), "")
+    return out
+
+
 def results(junit):
     if ET is None:
         return {}
@@ -320,7 +342,7 @@ def run_tests(argv=None):
         print(f"test cache: {len(cached)} of {len(prints)} tests passed before with these exact inputs: skipped "
               f"({time.time() - t0:.1f} s to fingerprint)")
     todo = [t["name"] for t in tests if not t["disabled"] and t["name"] not in cached]
-    res, inner, gpu_lost = {}, {}, []
+    res, inner, gpu_lost, hung = {}, {}, [], {}
     rc = 0
     with tempfile.TemporaryDirectory() as tmp:
         if todo:
@@ -337,7 +359,11 @@ def run_tests(argv=None):
             if not res and rc != 0:
                 print("run.py: ctest failed before running tests")
                 return 2
-            failed = [n for n, (s, _) in res.items() if s == "fail"]
+            # A hang is no flake, and its rerun would hold the machine as long again: named, never rerun.
+            hung = timeouts(os.path.join(tmp, "a.xml"))
+            for n, case in hung.items():
+                print(f"TIMEOUT: {n}" + (f" hung in {case}" if case else ""), flush=True)
+            failed = [n for n, (s, _) in res.items() if s == "fail" and n not in hung]
             flaky = []
             if failed:
                 print(f"\nrerunning {len(failed)} failed test(s) once: {' '.join(failed)}", flush=True)
@@ -412,7 +438,7 @@ def run_tests(argv=None):
         why = f"1.5x its {known[n] * scale:g} s in tests/slow_tests.txt" if n in known else f"the {a.budget:g} s budget"
         print(f"over budget: {n} {d:.1f} s, over {why} (wait on events, use a smaller mesh, split it, or label it nightly)")
     for n in real:
-        print(f"FAILED: {n}")
+        print(f"FAILED: {n}" + (f" (timed out in {hung[n]})" if hung.get(n) else " (timed out)" if n in hung else ""))
     if gpu_lost:
         print(f"GPU lost: {len(gpu_lost)} test(s) failed twice with the graphics device gone ({' '.join(gpu_lost[:8])}): "
               "the machine, not the code; run them again (ctest --rerun-failed)")
@@ -472,6 +498,11 @@ def self_test():
         open(junit, "w").write('<testsuite><testcase name="sculptforge_tests_0of2" time="9" status="run">'
                                '<system-out>[ RUN] x\n[ OK ] mesh_io (1200 ms)\n[FAIL] y (3 ms)\n</system-out></testcase></testsuite>')
         assert inner_times(junit) == {"mesh_io": 1.2}
+        open(junit, "w").write('<testsuite><testcase name="sculptforge_tests_1of2" time="600" status="fail">'
+                               '<failure message="Timeout"/><system-out>[ RUN] a\n[ OK ] a (1 ms)\n[ RUN] spin\n'
+                               '</system-out></testcase><testcase name="ui_x" status="fail"><failure message="Failed"/>'
+                               '</testcase><testcase name="ui_y" status="fail"><failure message="Timeout"/></testcase></testsuite>')
+        assert timeouts(junit) == {"sculptforge_tests_1of2": "spin", "ui_y": ""}
         open(os.path.join(d, "slow.txt"), "w").write("# x\nui_bake 40 smaller mesh\nsculptforge_tests: lion 50.5 nightly\n")
         assert load_slow_list(os.path.join(d, "slow.txt")) == {"ui_bake": 40.0, "sculptforge_tests: lion": 50.5}
     assert parallel_jobs(["-j10"]) == 10 and parallel_jobs(["-C", "Release", "-j", "4"]) == 4 and parallel_jobs([]) == 1
