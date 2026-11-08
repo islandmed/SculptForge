@@ -24,7 +24,11 @@ brush, alpha or material is refused here too, not only by the forum rules.
     requests.py schedule --listing L.json --bundle OUT     # in the public pack listing, released a month later
     requests.py due      --listing L.json [--today 2027-01-01]
     requests.py release  --listing L.json --id member-requests-2026-11
+    requests.py list     --month 2026-11 --root insiders/requests [--ballot]   # the month in order; --ballot: the vote's
     requests.py selftest [--cli sculptforge-cli]           # ctest member_requests
+
+A request whose member was refunded carries "member": false (written by the onboarding script, with "priority":
+"last"): it leaves the members' pack and the vote and sorts last, its folder and approval kept, never deleted.
 """
 
 import argparse
@@ -65,6 +69,24 @@ def credit(handle):
     return f"Requested by @{handle}"
 
 
+def demoted(r):
+    """The requester was refunded: no member priority (the onboarding script sets member=false)."""
+    return r.get("member") is False
+
+
+def requests_in_order(root, month):
+    """Every request.json of the month (approved or not): member requests by name, then the demoted ones by name."""
+    out = []
+    for meta_path in Path(root, month).glob("*/request.json"):
+        try:
+            r = json.loads(meta_path.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if isinstance(r, dict):
+            out.append((r, meta_path.parent))
+    return sorted(out, key=lambda x: (demoted(x[0]), str(x[0].get("name", "")).lower(), x[1].name))
+
+
 def load_items(root, month, marks=None):
     """The month's items: (request, folder) for each approved one, by name. Raises on a broken request."""
     marks = marks or check_marks.load_marks()
@@ -75,6 +97,9 @@ def load_items(root, month, marks=None):
         where = f"{month}/{folder.name}"
         if not r.get("approved"):
             print(f"{where}: not approved yet (the requester sees the preview first): skipped")
+            continue
+        if demoted(r):
+            print(f"{where}: not a member request any more (member=false): left out of the members' pack, kept")
             continue
         name, kind, handle = str(r.get("name", "")), r.get("type"), str(r.get("requested_by", "")).lstrip("@")
         if not NAME_RE.match(name):
@@ -244,6 +269,14 @@ def selftest(cli):
         check(m.startswith("# description: Requested by @cy\n"), f"macro credit: {m!r}")
         d = pack_description("2026-11", items)
         check("Bark Ridges (brush, requested by @ada)" in d and "November 2026" in d, f"pack description: {d}")
+        item("refunded", name="Refunded Ask", type="alpha", file="r.png", requested_by="dee", approved=True,
+             member=False, priority="last")
+        item("aardvark", name="Aardvark", type="alpha", file="a.png", requested_by="eve", approved=False)
+        check([r["name"] for r, _ in load_items(root, "2026-11")] == ["Bark Ridges", "Clean Up"],
+              "a member=false request leaves the pack")
+        order = [r["name"] for r, _ in requests_in_order(root, "2026-11")]
+        check(order == ["Aardvark", "Bark Ridges", "Clean Up", "Later", "Refunded Ask"], f"demoted sorts last: {order}")
+        check(json.loads((root / "2026-11/refunded/request.json").read_text())["approved"] is True, "status kept")
         many = [({"name": f"Item {i:02d}", "type": "alpha", "requested_by": "someone_long_name"}, None) for i in range(60)]
         check(len(pack_description("2026-11", many).encode()) <= DESCRIPTION_MAX, "a long month fits pack.json")
         # Refused: another app's name (the forum rule, checked again here), a bad name, a file outside the folder.
@@ -305,6 +338,10 @@ def main():
     s = sub.add_parser("release")
     s.add_argument("--listing", required=True)
     s.add_argument("--id", required=True)
+    s = sub.add_parser("list")
+    s.add_argument("--month", required=True)
+    s.add_argument("--root", required=True, help="the private repository's requests/ folder")
+    s.add_argument("--ballot", action="store_true", help="only what members vote on (no member=false requests)")
     s = sub.add_parser("selftest")
     s.add_argument("--cli")
     a = p.parse_args()
@@ -325,6 +362,13 @@ def main():
     if a.cmd == "due":
         for p_ in drops.due(a.listing, a.today or datetime.date.today().isoformat()):
             print(p_["id"])
+        return 0
+    if a.cmd == "list":
+        for r, folder in requests_in_order(a.root, a.month):
+            if a.ballot and demoted(r):
+                continue
+            state = "approved" if r.get("approved") else "waiting for the requester's OK"
+            print(f"{r.get('name', folder.name)}\t{state}" + ("\tnot a member request (member=false)" if demoted(r) else ""))
         return 0
     if a.cmd == "release":
         release(a.listing, a.id)
