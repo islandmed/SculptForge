@@ -6,6 +6,7 @@
 // the classic viewport gesture Alt+click to select a Part. Every action goes
 // through the part_* commands (core/Parts.cpp).
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "io/BridgeProtocol.h"
 #include "app/Demo.h"
 #include "app/Theme.h"
@@ -615,18 +616,18 @@ void App::drawPartsContents() {
                 ImGui::SetTooltip(tr(count > 1 ? "Insert a copy of another Part into the active one"
                                             : "Append another Part first"));
             if (ImGui::MenuItem(tr("From file...##insert")))
-                SDL_ShowOpenFileDialog(onAppendChosen, &dialogRequests_[int(FileAction::InsertMesh)], window_,
+                sf::dialogs::openFile(onAppendChosen, &dialogRequests_[int(FileAction::InsertMesh)], window_,
                                        kInsertFilters, 2, nullptr, false);
             // Insert sets (kitbash sets): a file with several objects, or a folder of model files; a picker of
             // their thumbnails, [ and ] step through them.
             ImGui::Separator();
             if (ImGui::MenuItem(tr("Insert set from file...")))
-                SDL_ShowOpenFileDialog(onAppendChosen, &dialogRequests_[int(FileAction::InsertSet)], window_,
+                sf::dialogs::openFile(onAppendChosen, &dialogRequests_[int(FileAction::InsertSet)], window_,
                                        kInsertFilters, 2, nullptr, false);
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
                 ImGui::SetTooltip("%s", tr("A model file with several objects: insert them one at a time"));
             if (ImGui::MenuItem(tr("Insert set from folder...")))
-                SDL_ShowOpenFolderDialog(onAppendChosen, &dialogRequests_[int(FileAction::InsertSet)], window_, nullptr, false);
+                sf::dialogs::openFolder(onAppendChosen, &dialogRequests_[int(FileAction::InsertSet)], window_, nullptr, false);
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
                 ImGui::SetTooltip("%s", tr("A folder of .obj, .ply or .glb files: insert them one at a time"));
             // The built-in sets (core/Parts.h): no file to pick.
@@ -640,7 +641,7 @@ void App::drawPartsContents() {
             ImGui::EndMenu();
         }
         if (ImGui::MenuItem(tr("From file...")))
-            SDL_ShowOpenFileDialog(onAppendChosen, &dialogRequests_[int(FileAction::AppendPart)], window_,
+            sf::dialogs::openFile(onAppendChosen, &dialogRequests_[int(FileAction::AppendPart)], window_,
                                    kAppendFilters, 2, nullptr, false);
         ImGui::EndPopup();
     }

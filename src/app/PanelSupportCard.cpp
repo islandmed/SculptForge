@@ -10,6 +10,7 @@
 // No countdowns, no guilt, nothing pre-selected; Close is always there. Every button only opens one of the fixed
 // links in Support.h in the browser, except "I'm already a member", which is the member builds' GitHub sign-in.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/CardPaint.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
@@ -159,7 +160,7 @@ void App::openSupportLink(const char* url) {
         status_ = std::string("Support SculptForge: ") + url;
         return;
     }
-    status_ = SDL_OpenURL(url) ? std::string("Opened ") + url + " in your browser"
+    status_ = sf::dialogs::openUrl(url) ? std::string("Opened ") + url + " in your browser"
                                : std::string("Couldn't open ") + url + ": " + SDL_GetError();
 }
 

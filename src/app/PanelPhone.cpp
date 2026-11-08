@@ -5,6 +5,7 @@
 // the phone is sending, View in AR on the phone, and the live face feed with Record / Stop. The phone link's
 // server runs only while this window is open.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/Ui.h"
 
 #include "link/PhoneRtc.h"
@@ -488,7 +489,7 @@ void App::drawPhoneWindow() {
         const size_t first = phoneCaptures_.size() > 3 ? phoneCaptures_.size() - 3 : 0;
         for (size_t i = phoneCaptures_.size(); i-- > first;) {
             ImGui::PushID(int(i));
-            if (ImGui::SmallButton(ICON_LC_FOLDER_OPEN) && interactive()) SDL_OpenURL(fileUrl(phoneCaptures_[i]).c_str());
+            if (ImGui::SmallButton(ICON_LC_FOLDER_OPEN) && interactive()) sf::dialogs::openUrl(fileUrl(phoneCaptures_[i]).c_str());
             if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Show the folder"));
             ImGui::PopID();
             ImGui::SameLine();

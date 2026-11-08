@@ -56,7 +56,7 @@ HAND_MAP = [
     ("services/link-worker/*", "link_worker ui_phone_link"),
     ("tools/brush-gallery/*", "brush_gallery_index ui_brush_gallery"),
     ("tools/marks_*.txt", "marks"),
-    ("src/app/*.cpp", "i18n_coverage"), ("tools/i18n/*", "i18n_coverage"),
+    ("src/app/*.cpp", "i18n_coverage"), ("src/*", "native_dialogs"), ("tools/i18n/*", "i18n_coverage"),
     ("tools/test/*", "test_impact"),
     ("tests/ui/data/*", ""),  # step 3 handles these
 ]

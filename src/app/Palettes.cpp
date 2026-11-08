@@ -7,6 +7,7 @@
 // Layers, Geometry, Remesh, Masking, Face groups, Visibility, Export and
 // Display sub-palettes.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 
 #include "app/Config.h"
 #include "app/Demo.h"
@@ -597,7 +598,7 @@ void App::drawPalette_Generate() {
     tray::GroupLabel(*this, "From an image");
     if (ImGui::Button(tr(refImage_.empty() ? "Choose image...##generate" : "Change image...##generate"), ImVec2(-1, 0))) {
         static const SDL_DialogFileFilter filters[] = {{"Images", "png;jpg;jpeg;bmp;tga;psd;gif"}, {"All files", "*"}};
-        SDL_ShowOpenFileDialog(
+        sf::dialogs::openFile(
             [](void* user, const char* const* files, int) {
                 if (files && files[0]) static_cast<App*>(user)->queueFile(FileAction::OpenImage, files[0]);
             },

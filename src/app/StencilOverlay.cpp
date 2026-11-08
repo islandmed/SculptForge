@@ -7,6 +7,7 @@
 // the round handle to turn it; the arrow keys move it, - and = scale it, , and . turn it (Shift: finely). Enter or
 // Esc leaves Adjust. It fades while the view moves (Hide while navigating), so the model shows as it turns under it.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/I18n.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
@@ -57,7 +58,7 @@ void App::registerStencilActions() {
     a.description = "Lay an image over the view and sculpt or paint through it: the sculpt brushes take its brightness "
                     "(white = full effect), Vertex Paint its colours, only where it covers the model.";
     a.command = "stencil_load";
-    a.run = [this] { SDL_ShowOpenFileDialog(App::onStencilChosen, this, window_, kStencilFilters, 2, nullptr, false); };
+    a.run = [this] { sf::dialogs::openFile(App::onStencilChosen, this, window_, kStencilFilters, 2, nullptr, false); };
     actions_.add(a);
 
     a = {};
@@ -276,7 +277,7 @@ void App::drawStencilSection() {
     ImGui::SeparatorText(tr("Stencil"));
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     if (ImGui::Button(tr(ICON_LC_IMAGE "  Load image...##stencil.load"), ImVec2(half, 0)))
-        SDL_ShowOpenFileDialog(App::onStencilChosen, this, window_, kStencilFilters, 2, nullptr, false);
+        sf::dialogs::openFile(App::onStencilChosen, this, window_, kStencilFilters, 2, nullptr, false);
     ui::HelpText("Load image", nullptr,
                  "Lay an image over the view and sculpt or paint through it: the sculpt brushes take its brightness "
                  "(white = full effect), Vertex Paint its colours, only where it covers the model.",

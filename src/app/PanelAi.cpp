@@ -7,6 +7,7 @@
 // AI network entry point refuses. Saved in ai.json at once, so the CLI, Python and MCP server follow it.
 // SF_AI=off (or --no-ai) locks it for studios.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/I18n.h"
 #include "app/Ui.h"
 
@@ -178,7 +179,7 @@ void App::drawAiPrefs() {
     drawAiLinkPrefs(); // live mode (PanelAiLink.cpp)
     ImGui::Spacing();
     if (ImGui::SmallButton(tr("AI services & privacy##prefs.ai")))
-        SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md");
+        sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md");
 }
 
 // The studio sign-in runs on a worker (ai/Oidc.h: discovery, the device code, polling); the panel shows the code.
@@ -221,7 +222,7 @@ void App::drawAiStudioPrefs() {
             if (signInJob_->haveCode) {
                 const auto& c = signInJob_->code;
                 if (!signInJob_->opened) {
-                    SDL_OpenURL((c.verificationUriComplete.empty() ? c.verificationUri : c.verificationUriComplete).c_str());
+                    sf::dialogs::openUrl((c.verificationUriComplete.empty() ? c.verificationUri : c.verificationUriComplete).c_str());
                     signInJob_->opened = true;
                 }
                 ImGui::TextWrapped("%s", tr("In your browser, sign in and enter this code:"));
@@ -229,7 +230,7 @@ void App::drawAiStudioPrefs() {
                 ImGui::SameLine();
                 if (ImGui::SmallButton(tr("Copy code"))) ImGui::SetClipboardText(signInJob_->code.userCode.c_str());
                 if (ImGui::SmallButton(tr("Open the sign-in page")))
-                    SDL_OpenURL((signInJob_->code.verificationUriComplete.empty() ? signInJob_->code.verificationUri
+                    sf::dialogs::openUrl((signInJob_->code.verificationUriComplete.empty() ? signInJob_->code.verificationUri
                                                                                   : signInJob_->code.verificationUriComplete)
                                     .c_str());
                 ImGui::SameLine();

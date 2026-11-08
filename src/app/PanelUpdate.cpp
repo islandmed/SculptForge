@@ -4,6 +4,7 @@
 // One-click update: the update banner's Update button (core/SelfUpdate.h says what is trusted and why). The
 // download runs on a worker thread; installing happens on Restart now, or when the app quits after Later.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/I18n.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
@@ -621,7 +622,7 @@ void App::drawMemberSignInSteps() {
         ImGui::SameLine();
         if (ImGui::Button(tr("Copy##member.copy"))) SDL_SetClipboardText(code.c_str());
         if (accentButton(tr("Open github.com/login/device##member.open"))) // the next step
-            SDL_OpenURL(member::kVerifyUrl); // (always this page, whatever GitHub's answer said)
+            sf::dialogs::openUrl(member::kVerifyUrl); // (always this page, whatever GitHub's answer said)
         ImGui::TextDisabled("%s", tr("Waiting for GitHub..."));
     }
     if (ImGui::Button(tr("Cancel##member.cancel"))) {

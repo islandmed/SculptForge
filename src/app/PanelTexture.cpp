@@ -8,6 +8,7 @@
 // texture with the UV layout over it. Everything but Auto UV and the file dialogs goes through commands,
 // so it is undoable and scriptable.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 #include "app/Demo.h"
 #include "app/Ui.h"
 
@@ -147,10 +148,10 @@ void App::registerTextureUiActions() {
         "Copy the texture into the vertex paint of every vertex (detail finer than the mesh is lost).",
         "vertexpaint_from_texture");
     add("texture.export", "Export Texture...", kPath,
-        [this] { SDL_ShowSaveFileDialog(onTextureFile, &g_dialogs[kExportTexture], window_, kPngFilter, 1, nullptr); },
+        [this] { sf::dialogs::saveFile(onTextureFile, &g_dialogs[kExportTexture], window_, kPngFilter, 1, nullptr); },
         nullptr, textured, "Save the texture (every visible layer composited) as a PNG image.", "texture_export");
     add("texture.import", "Import Texture...", kPath,
-        [this] { SDL_ShowOpenFileDialog(onTextureFile, &g_dialogs[kImportTexture], window_, kImageFilters, 2, nullptr, false); },
+        [this] { sf::dialogs::openFile(onTextureFile, &g_dialogs[kImportTexture], window_, kImageFilters, 2, nullptr, false); },
         nullptr, [this] { return doc_.mesh.hasUvs(); },
         "Load an image as the Part's texture (replacing its layers; undoable).", "texture_import");
     add("texture.delete", "Delete Texture", kPath, [this] { runCommand("texture_delete"); }, nullptr,

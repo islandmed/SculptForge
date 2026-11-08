@@ -7,6 +7,7 @@
 // the index and previews are cached on disk so the window still works offline.
 // Downloads are checked against the index's SHA-256 before brush_install.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 
 #include "ai/BrushGalleryClient.h"
 #include "render/GL.h"
@@ -229,7 +230,7 @@ void App::drawBrushGallery() {
     ImGui::EndDisabled();
     ImGui::SameLine();
     if (ImGui::Button(tr("Share yours"))) {
-        if (interactive()) SDL_OpenURL(kBrushGalleryShareUrl);
+        if (interactive()) sf::dialogs::openUrl(kBrushGalleryShareUrl);
         status_ = std::string("Share a brush: ") + kBrushGalleryShareUrl;
     }
     if (ImGui::IsItemHovered())

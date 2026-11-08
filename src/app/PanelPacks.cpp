@@ -5,6 +5,7 @@
 // remove, their keymaps, pie menus and macros), New Pack, recording and editing macros, the confirmation a macro
 // shows before it first runs, and its file dialogs. The checks themselves are in core/Pack.cpp and core/Macro.cpp.
 #include "app/App.h"
+#include "app/NativeDialog.h"
 
 #include "app/I18n.h"
 #include "app/Ui.h"
@@ -201,16 +202,16 @@ void App::openPackDialog(int kind, int pathKind) {
     const std::string project = macroProjectDir();
     const char* where = project.empty() ? nullptr : project.c_str();
     switch (kind) {
-    case kPackDialogInstall: SDL_ShowOpenFileDialog(onPackDialog, this, window_, kPackFilters, 2, nullptr, false); break;
+    case kPackDialogInstall: sf::dialogs::openFile(onPackDialog, this, window_, kPackFilters, 2, nullptr, false); break;
     case kPackDialogSave: {
         const std::string name = std::string(packs_.name[0] ? packs_.name : "My Pack") + kPackExtension;
-        SDL_ShowSaveFileDialog(onPackDialog, this, window_, kPackFilters, 2, name.c_str());
+        sf::dialogs::saveFile(onPackDialog, this, window_, kPackFilters, 2, name.c_str());
         break;
     }
     case kPackDialogMacro:
-        if (pathKind == int(MacroPathKind::Folder)) SDL_ShowOpenFolderDialog(onPackDialog, this, window_, where, false);
-        else if (pathKind == int(MacroPathKind::Save)) SDL_ShowSaveFileDialog(onPackDialog, this, window_, kAll, 1, where);
-        else SDL_ShowOpenFileDialog(onPackDialog, this, window_, kAll, 1, where, false);
+        if (pathKind == int(MacroPathKind::Folder)) sf::dialogs::openFolder(onPackDialog, this, window_, where, false);
+        else if (pathKind == int(MacroPathKind::Save)) sf::dialogs::saveFile(onPackDialog, this, window_, kAll, 1, where);
+        else sf::dialogs::openFile(onPackDialog, this, window_, kAll, 1, where, false);
         break;
     default: break;
     }
