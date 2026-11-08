@@ -161,6 +161,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 
 | Action | Keys | What it does |
 |---|---|---|
+| All | <kbd>Shift</kbd>+<kbd>W</kbd> | Gizmo, All: move, rotate and scale handles at once. Arrows and squares move, the centre moves in the view, rings turn, the boxes past the rings stretch along an axis and the four outer tabs scale evenly. Shift snaps. Shift+W again: back to Draw. |
 | Back view | <kbd>Ctrl</kbd>+<kbd>Numpad 1</kbd> | Look at the model from behind (orthographic). |
 | Bottom view | <kbd>Ctrl</kbd>+<kbd>Numpad 7</kbd> | Look up at the model from below (orthographic). |
 | Draw | <kbd>Q</kbd> | Draw mode: brushes sculpt and paint (leaves the Gizmo). |

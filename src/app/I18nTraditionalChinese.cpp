@@ -1229,6 +1229,11 @@ constexpr Entry kTraditionalChinese[] = {
      "snaps to 10% steps. E again: back to Draw.",
      "操縱器，縮放：拖曳方塊沿軸拉伸，拖曳中心等比例縮放（向右或向上：放大）。Shift 以 10% 為一級貼齊。再按 E：回到繪"
      "製。"},
+    {"Gizmo, All: move, rotate and scale handles at once. Arrows and squares move, the centre moves in the view, "
+     "rings turn, the boxes past the rings stretch along an axis and the four outer tabs scale evenly. Shift snaps. "
+     "Shift+W again: back to Draw.",
+     "操縱器，全部：同時提供移動、旋轉與縮放控制點。箭頭與方塊用於移動，中心在視圖中移動，圓環用於旋轉，圓環外的方塊沿軸"
+     "拉伸，外側四個標籤等比縮放。Shift 貼齊。再按 Shift+W：回到繪製。"},
     {"Gizmo, Rotate: drag a ring to turn about that axis, the outer ring to turn in the view. Mask the body and put "
      "the pivot at a joint to pose a limb. Shift snaps to 15 degrees. R again: back to Draw.",
      "操縱器，旋轉：拖曳圓環繞該軸旋轉，拖曳外環在視圖中旋轉。遮罩身體並將樞紐點放在關節上即可擺出肢體姿勢。Shift 以 "
@@ -4038,8 +4043,8 @@ constexpr Entry kTraditionalChinese[] = {
      "從目前視角把圖片投射到模型上作為表面細節（使用目前的圖層）。"},
     {"Proof mode measures how responsive sculpting is on this computer. For each mesh size it builds a sphere with subdivision levels, then plays a scripted pen stroke through the same code your pen goes through (240 samples a second), with a normal and a large brush, and turns the view.",
      "證明模式會測量這台電腦上雕刻的反應速度。針對每種網格大小，它會建立帶細分層級的球體，再以與你的筆相同的程式路徑（每秒 240 個取樣）播放預錄的筆觸，使用一般與大型筆刷，並旋轉視角。"},
-    {"Q W E R: Draw, Move, Scale, Rotate",
-     "Q W E R：繪製、移動、縮放、旋轉"},
+    {"Q W E R: Draw, Move, Scale, Rotate; Shift+W: All",
+     "Q W E R：繪製、移動、縮放、旋轉；Shift+W：全部"},
     {"Quad Remesh (default): clean quads ready for sculpting and subdividing, with one subdivision level holding the detail. Voxel remesh: an even, watertight triangle surface. Off: the model as the service made it.",
      "四邊形重拓樸（預設）：乾淨的四邊面，可直接雕刻與細分，並以一個細分層級保留細節。體素重新網格化：均勻、封閉的三角面。關閉：保留服務產生的原始模型。"},
     {"Quad Remesh 2",

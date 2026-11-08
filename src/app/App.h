@@ -7,6 +7,7 @@
 #include "app/Actions.h"
 #include "app/AssetLibrary.h"
 #include "app/AxisGizmo.h"
+#include "app/GizmoAll.h"
 #include "app/CommandPalette.h"
 #include "app/Config.h"
 #include "app/Console.h"
@@ -2139,9 +2140,9 @@ private:
     friend class UserGuide; // reads the UI scale, writes the status line
     UserGuide guide_;
     // ---- end User Guide (G) ----
-    // ---- Transform gizmo (Gizmo.cpp, core/MeshTransform.h): W Move, E Scale, R Rotate, Q back to Draw ----
+    // ---- Transform gizmo (Gizmo.cpp, core/MeshTransform.h): W Move, E Scale, R Rotate, Shift+W All, Q back to Draw ----
 public:
-    enum class GizmoMode { Off, Move, Scale, Rotate };
+    enum class GizmoMode { Off, Move, Scale, Rotate, All }; // All: every handle at once
     enum class GizmoHandle {
         None,
         MoveX, MoveY, MoveZ,       // axis arrows
@@ -2171,6 +2172,7 @@ private:
     bool gizmoProject(const glm::vec3& p, ImVec2& out) const; // false behind the camera
     bool partProject(const glm::vec3& p, ImVec2& out) const;  // a point of the active Part's mesh
     GizmoHandle gizmoHandleAt(float x, float y) const;
+    gizmo_all::Screen gizmoAllScreen() const; // All mode's handles on screen (app/GizmoAll.h picks among them)
     bool gizmoHandleScreen(GizmoHandle h, ImVec2& out) const; // a point to grab handle h (UI tests)
     std::vector<int> gizmoTargets() const; // Parts a drag transforms (the active one, or All)
     void gizmoAfterUndo(bool redo);        // the gizmo goes back (or forward) with its own steps

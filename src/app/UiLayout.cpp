@@ -33,7 +33,7 @@ UiLayout standardLayout() {
     l.rightTray = {"tool"};
     l.openSubpalettes = {"tool.part"};
     l.topShelf = {"ui.library",       "sep",           "tool.draw",            "tool.move",           "tool.scale",
-                  "tool.rotate",       "sep",           "draw.sculpt",          "draw.paint",          "sep",
+                  "tool.rotate",       "tool.gizmo_all",   "sep",           "draw.sculpt",          "draw.paint",          "sep",
                   "draw.raise",         "draw.lower",     "draw.rgb",             "draw.paint_vertex",   "draw.paint_texture",   "draw.new_texture",     "sep",                 "widget.draw_size",
                   "widget.strength",   "row",           "ui.brush_lab",         "draw.front_faces",    "sep",
                   "draw.dynamic",      "widget.dyntopo_detail", "sep",
@@ -60,7 +60,7 @@ UiLayout standardLayout(int shellLayout) {
     // dynamic topology, symmetry). Library, Brush Lab, Front, the pressure options and the triangle counts moved to
     // the menus (Sculpt > Draw) and the status bar.
     l.topShelf = {"draw.sculpt",          "draw.paint",           "sep",
-                  "tool.draw",            "tool.move",            "tool.scale",           "tool.rotate",       "sep",
+                  "tool.draw",            "tool.move",            "tool.scale",           "tool.rotate",       "tool.gizmo_all", "sep",
                   "draw.raise",            "draw.lower",            "draw.rgb",             "draw.paint_vertex", "draw.paint_texture",
                   "draw.new_texture",     "sep",                  "widget.draw_size",     "widget.strength",   "sep",
                   "draw.dynamic",         "widget.dyntopo_detail", "sep",

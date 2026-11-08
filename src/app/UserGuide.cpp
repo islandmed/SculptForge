@@ -477,7 +477,7 @@ std::string UserGuide::chapterFor(const std::string& palette, const std::string&
     if (starts("Script")) return "scripting.md";
     if (starts("Library > Packs") || starts("Macros") || idStarts("pack.") || idStarts("macro.")) return "packs-and-macros.md";
     if (starts("Transform > Gizmo") || idStarts("gizmo.") || actionId == "tool.draw" || actionId == "tool.move" ||
-        actionId == "tool.scale" || actionId == "tool.rotate")
+        actionId == "tool.scale" || actionId == "tool.rotate" || actionId == "tool.gizmo_all")
         return "gizmo.md";
     if (starts("Transform")) return idStarts("transform.symmetry") ? "sculpting.md" : "navigation.md";
     if (starts("Preferences > Integrations")) return "discord.md";

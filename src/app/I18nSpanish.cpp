@@ -1435,6 +1435,12 @@ constexpr Entry kSpanish[] = {
      "snaps to 10% steps. E again: back to Draw.",
      "Gizmo, Escalar: arrastra una caja para estirar en un eje o el centro para escalar por igual (derecha o arriba: "
      "más grande). Mayús ajusta a pasos del 10%. E otra vez: vuelve a Dibujar."},
+    {"Gizmo, All: move, rotate and scale handles at once. Arrows and squares move, the centre moves in the view, "
+     "rings turn, the boxes past the rings stretch along an axis and the four outer tabs scale evenly. Shift snaps. "
+     "Shift+W again: back to Draw.",
+     "Gizmo, Todo: asas de mover, rotar y escalar a la vez. Las flechas y los cuadrados mueven, el centro mueve en la "
+     "vista, los anillos giran, las cajas tras los anillos estiran a lo largo de un eje y las cuatro pestañas "
+     "exteriores escalan por igual. Mayús ajusta. Mayús+W otra vez: vuelve a Dibujar."},
     {"Gizmo, Rotate: drag a ring to turn about that axis, the outer ring to turn in the view. Mask the body and put "
      "the pivot at a joint to pose a limb. Shift snaps to 15 degrees. R again: back to Draw.",
      "Gizmo, Rotar: arrastra un anillo para girar sobre ese eje, el anillo exterior para girar en la vista. "
@@ -4483,8 +4489,8 @@ constexpr Entry kSpanish[] = {
      "Proyecta la imagen sobre el modelo desde la vista actual como detalle de superficie (usa la capa activa)."},
     {"Proof mode measures how responsive sculpting is on this computer. For each mesh size it builds a sphere with subdivision levels, then plays a scripted pen stroke through the same code your pen goes through (240 samples a second), with a normal and a large brush, and turns the view.",
      "El modo prueba mide lo ágil que es esculpir en este ordenador. Para cada tamaño de malla crea una esfera con niveles de subdivisión, reproduce un trazo de lápiz programado por el mismo código que usa tu lápiz (240 muestras por segundo), con un pincel normal y uno grande, y gira la vista."},
-    {"Q W E R: Draw, Move, Scale, Rotate",
-     "Q W E R: Dibujar, Mover, Escalar, Rotar"},
+    {"Q W E R: Draw, Move, Scale, Rotate; Shift+W: All",
+     "Q W E R: Dibujar, Mover, Escalar, Rotar; Shift+W: Todo"},
     {"Quad Remesh (default): clean quads ready for sculpting and subdividing, with one subdivision level holding the detail. Voxel remesh: an even, watertight triangle surface. Off: the model as the service made it.",
      "Quad Remesh (predeterminado): cuadriláteros limpios listos para esculpir y subdividir, con un nivel de subdivisión que guarda el detalle. Remallado vóxel: una superficie de triángulos uniforme y cerrada. Desactivado: el modelo tal como lo hizo el servicio."},
     {"Quad Remesh 2",

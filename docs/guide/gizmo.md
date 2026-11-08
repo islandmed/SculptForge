@@ -6,7 +6,7 @@ pivot at the shoulder and swing the arm. It works, with the same keys.
 
 ![The Gizmo's Move, Scale and Rotate modes; the handle under the cursor turns yellow](images/gizmo-modes.jpg)
 
-## The three modes
+## The modes
 
 Press a key, or click the button on the top shelf (they're also in **Sculpt > Symmetry & Gizmo**):
 
@@ -15,6 +15,7 @@ Press a key, or click the button on the top shelf (they're also in **Sculpt > Sy
 | <kbd>W</kbd> | **Move** | An **arrow** moves along that axis. A **square** moves in its plane. The **ring in the centre** moves freely in the view plane |
 | <kbd>E</kbd> | **Scale** | A **box** stretches along that axis. The **disc in the centre** scales evenly: drag right or up to grow, left or down to shrink |
 | <kbd>R</kbd> | **Rotate** | A **ring** turns about that axis. The **outer white ring** turns about the view direction |
+| <kbd>Shift</kbd>+<kbd>W</kbd> | **All** | Every handle at once: see [All handles at once](#all-handles-at-once) |
 | <kbd>Q</kbd> | **Draw** | Back to sculpting: brushes work again and the gizmo goes away |
 
 Pressing the same key again also goes back to Draw. X is red, Y green and Z blue; the handle under the cursor
@@ -24,6 +25,25 @@ turns yellow. While the gizmo is on, dragging anywhere off its handles still tur
 While you drag, the amount shows beside the gizmo (the distance, the angle or the percentage), and a rotation
 draws the swept angle as a slice. Each drag is **one undo step** (<kbd>Ctrl</kbd>+<kbd>Z</kbd>), and the gizmo
 goes back with it.
+
+### All handles at once
+
+**All** (<kbd>Shift</kbd>+<kbd>W</kbd>, or **All** beside Rotate) puts move, rotate and scale on one gizmo, so you
+can place, turn and size a part without switching modes:
+
+- Short **arrows** and **squares** inside the rings move, and the **ring in the centre** moves freely, as in Move.
+- The **rings** turn about each axis and the **white ring** around them turns in the view, as in Rotate.
+- A **box** on an axis line, just outside the rings, stretches along that axis. It hides while its axis points
+  straight at you (it would sit on the rings); turn the view a little to bring it back.
+- The four **gold tabs** on the outside scale evenly: drag right or up to grow, left or down to shrink.
+
+![All mode: arrows and squares inside the rings, the scale boxes past them (X lit up under the cursor), the white view ring, the gold even-scale tabs outermost](images/gizmo-all.jpg)
+
+Where handles cross, the one you see on top is the one you get: the centre first, then the boxes and the tabs,
+then an arrow or a square over a ring. Snapping, the readout, posing with a mask, <kbd>Alt</kbd>+drag for the
+pivot and one undo step per drag all work as in the single modes. Scripts switch modes with
+`gizmo_mode mode=all` (or `move`, `scale`, `rotate`, `draw`); like every action, **All** can take another key in
+**Edit > Preferences > Hotkeys**.
 
 ### Snapping
 
