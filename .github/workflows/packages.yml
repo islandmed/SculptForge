@@ -148,12 +148,12 @@ jobs:
         with:
           path: .ccache
           key: ccache-pkg-linux-${{ matrix.arch }}.${{ github.sha }}
-      # -j 2: at -j 4 the unit-test shards ran four at a time and the hosted runner was stopped (exit 143) on the
-      # 0.12.0 stage; two at a time fits the runner's memory.
-      - name: Test (every test, UI tests under Xvfb + Mesa)
+      # UI tests only: the unit-test shards (sculptforge_tests_*) already ran in CI on the same commit, and on the
+      # 0.12.0 stage the hosted runner was stopped (exit 143) each time they started here, at -j 4 and at -j 2.
+      - name: Test (UI tests under Xvfb + Mesa; unit tests run in CI)
         run: |
           xvfb-run -a -s "-screen 0 1920x1080x24" env LIBGL_ALWAYS_SOFTWARE=1 \
-            ctest --test-dir build --output-on-failure -j 2
+            ctest --test-dir build --output-on-failure -j 2 -E '^sculptforge_tests_'
       - name: .deb and .tar.gz
         run: cd build && cpack -G "DEB;TGZ"
       - name: AppImage
