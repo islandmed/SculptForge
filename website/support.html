@@ -94,7 +94,7 @@
     .support-fine { margin-top: 18px; max-width: 860px; margin-left: auto; margin-right: auto; }
     .tier .price .now { color: var(--tier-title); font-size: inherit; font-weight: inherit; letter-spacing: inherit; margin: 0; }
     .tier .per-year { margin-top: -4px; font-size: 0.9rem; }
-    /* Founding Member: the first 100 members (founding.json, updated by hand). Hidden once they are taken. */
+    /* Founding Member: the first 100 members (members-live.json, else founding.json). Hidden once they are taken. */
     .founding { margin: 4px 0 18px; padding: 10px 14px; border-radius: 12px; font-size: 0.9rem; line-height: 1.45;
                 border: 1px solid rgba(246, 153, 77, 0.45); background: rgba(246, 153, 77, 0.08); color: var(--tier-text); }
     .tier .founding strong { color: #f6994d; }
@@ -361,11 +361,13 @@
         alt.textContent = year ? '$4 a month, billed yearly' : 'or $48 a year';
       }));
     })();
-    // Founding Member places left, from founding.json (updated by hand): the note goes once all 100 are taken.
+    // Founding Member places left, from members-live.json (onboarding writes it minutes after a payment; else the
+    // release's founding.json): the note goes once all 100 are taken.
     (() => {
       const note = document.querySelector('[data-founding]'), left = document.querySelector('[data-founding-left]');
       if (!note || !left) return;
-      fetch('founding.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null)).then((f) => {
+      const get = (u) => fetch(u, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+      get('members-live.json').catch(() => get('founding.json')).then((f) => {
         if (!f || !Number.isFinite(f.limit) || !Number.isFinite(f.taken)) return;
         const n = Math.max(0, Math.round(f.limit - f.taken));
         if (n === 0) { note.hidden = true; return; }

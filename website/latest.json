@@ -1,12 +1,13 @@
 {
-  "version": "0.11.14",
+  "version": "0.11.15",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Deformation stack: bend, twist, taper and more on a whole Part, with a live preview you can reorder and apply (thanks foirgairwolf on Discord)",
-    "Slimmer Library and timeline: about a third less height, with the timeline as one thin row by default (thanks factoberplay on YouTube)",
-    "Small screens: below 1280 px the side palettes open as drop-downs instead of not opening at all",
-    "Membership moments: a quiet heart in the top bar and an occasional thank-you at a milestone; nothing in the app is ever paywalled"
+    "Fixed: big Clay strokes on Micro levels could break the surface into shards (since 0.11.10); Micro sculpting is back to 0.11.9's speed",
+    "Tube: draw clay tubes in the air like a 3D pen, then edit their points (thanks GABO on Discord)",
+    "Parts tools: split hidden, masked or unmasked areas into a new Part, merge points by distance, and Check Mesh with a Fix for each problem (thanks foirgairwolf on Discord)",
+    "Hardware tiers and Turbo: SculptForge tunes itself to your computer, with a memory readout in the top bar (thanks Oslen on Discord)",
+    "Side shelves no longer scroll sideways (thanks dm4nd on Discord), and Frame fits the model into the free area of the canvas"
   ],
   "support": {
     "founding": {
