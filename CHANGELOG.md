@@ -315,7 +315,7 @@ All notable changes to SculptForge are listed here. The format follows
 - **Sculpt the Part under the cursor** (Alt+Q in every input style, the same key as Blender's; Preferences > Hotkeys
   changes it; in the command palette): the visible Part under the pointer becomes the active one, without moving the
   camera; each Part keeps its mask. The status bar says "Sculpting: <Part>", or that no Part is under the cursor.
-  Asked for by @ziel9627 on Discord.
+  Asked for by ziel9627 on Discord.
 - **Units** (Edit > Preferences > Interface, #148, thanks @Swar55): sizes show in mm, cm, m or inches: the brush size,
   the active Part's width x height x depth under its name in Tool, and the size exports write in File > Import /
   Export. **OBJ/PLY in** reads the numbers in OBJ and PLY files (which have no units) as mm, cm, m (the default) or

@@ -166,7 +166,7 @@ highlight: Floor grid: View > Floor grid draws a faint grid on the floor the mod
 date: 2026-11-06
 tagline: Exports keep their real size, Alt+Q switches Parts, and insert sets for kitbashing.
 highlight: Exports keep their real size: what you import in mm or cm comes back out the same size, for 3D printing and other apps (thanks @Swar55, @NicTanghe, #148)
-highlight: Alt+Q sculpts the Part under the cursor, in every input style (thanks @ziel9627 on Discord)
+highlight: Alt+Q sculpts the Part under the cursor, in every input style (thanks ziel9627 on Discord)
 highlight: Insert sets: pick a piece from a multi-object file or folder by its thumbnail, step through them with [ and ]
 highlight: Spanish and Chinese everywhere: the Generate 3D panel and the last untranslated labels now read in your language
 highlight: Kitbash sets for Insert
