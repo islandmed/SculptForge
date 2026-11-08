@@ -5,38 +5,6 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
-## Version 0.12.0
-
-```features
-date: unreleased
-tagline: Sandboxed plugins, a Tool palette in the order you work, and cleaner cuts and creases.
-title: Garments and cloth
-line: Real-size sewing patterns from 8 templates at your sizes, printed at home or exported as DXF; Cloth brush and Drape.
-image: images/wn-0120-garments.jpg
-action: guide:garments.md
-title: Plugins
-line: Packs can bring sandboxed plugins: deformers and generators with no file, network or system access.
-image: images/wn-0120-plugins.jpg
-action: guide:packs-and-macros.md#plugins
-# optional: pose-all (keep only if feat/pose-all-2 is in 0.12.0; else delete this card and its image)
-title: Pose all Parts
-line: Pose every visible Part at once on one light Pose Mesh; Apply gives each Part the pose at full resolution.
-image: images/wn-0120-pose.jpg
-action: guide:parts.md#pose-all-parts
-title: Tube shapes
-line: Round, square or ribbon cross-sections, with a taper at either end of the tube.
-image: images/wn-0120-tube.jpg
-action: guide:tube.md#shape-cross-section-and-taper
-title: Edge creases
-line: Crease edges (select them by angle too) and they stay sharp when you add levels.
-image: images/wn-0120-crease.jpg
-action: guide:edges.md#creases
-title: Reshape
-line: Tool > Reshape: Size, then a live stack of bends, twists and tapers you can reorder and apply.
-image: images/wn-0120-reshape.jpg
-action: guide:sculpting.md#deformation-stack
-```
-
 ## Version 0.11.16
 
 ```features
