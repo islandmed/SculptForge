@@ -1,0 +1,8 @@
+# Seeded random user actions ("monkey", src/app/UiTestModes.cpp): sequences of brushes, strokes, undo / redo, panels,
+# mode toggles and view changes on a small sphere, then Esc and a brush. Afterwards nothing is latched, a plain stroke
+# sculpts, the mesh is valid, and undo back to the start restores it exactly. A failing seed's script is in
+# ui-shots/monkey/replay-monkey-SEED.sfui; tools/test/shrink_sfui.py makes it short. Many more seeds run nightly
+# (tests/ui/nightly/monkey_many.sfui).
+run ui_look look=classic layout=classic
+wait 0.3
+monkey 1 40 10 known=mode_matrix_known.txt
