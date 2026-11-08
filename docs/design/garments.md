@@ -12,6 +12,13 @@ The user places each panel: a click on the body says where it goes (part 3). The
 no body-part slots, bounding volumes or arrangement points, and no initial position computed from the body's
 shape. (Removed from part 1 on 11-06 before it shipped; see "Do not build".)
 
+Part 3 (core/GarmentDrape.h, src/app/PanelGarmentDrape.cpp): the click's point and the view it was made from are
+the whole placement: the panel's centre sits a user-set gap in front of the point, facing the camera, its top up
+the screen; Turn and Wrap (curl round an axis behind it) are the user's sliders. The one default not typed by the
+user, a 300 degree wrap for a panel sewn to itself, comes from the pattern's own seams, never the body. Units per
+metre starts at 100 for a scene over 20 units tall (a unit guess, shown and editable). Drape: rest shape =
+flatRest, seams = the GarmentMesh links, colliders = the visible Parts except the preview; Convert = garmentToMesh.
+
 ## Sewing
 
 The user picks both edges of every seam. A seam joins whole edges (or ranges along them the user chose); the

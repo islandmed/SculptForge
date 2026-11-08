@@ -69,6 +69,41 @@ garment_new template=trousers add=true
 garment_info
 ```
 
+## Drape it on a body
+
+A sewn pattern drapes on any body in the scene (the **Full Body** starter mesh is a good first one) and becomes a
+Part to sculpt. You put each panel where it goes; SculptForge sews and settles it.
+
+1. Start a garment (**Templates > T-shirt**). Under **Drape on the body** press **Place panels**.
+2. **Click the body once for each panel**: the front of the chest for a front panel. The panel appears a little in front of the click, facing you, its top up
+   the screen. The panel list ticks it off and asks for the next one. **Place each panel slightly in front of the
+   body at its widest point**, from the view that faces it: the front from the front, the back from behind
+   (turn the view round), each sleeve from its side.
+3. Adjust the chosen panel if it needs it: **Turn** spins it in the view (a sleeve's top toward the shoulder),
+   **Wrap** curls it round the body (a panel sewn to itself, like a sleeve or a trouser leg, starts at 300 degrees, a
+   tube), **Gap** moves it out from the click. Click a panel in the list to place it again.
+4. **Drape** sews the seams shut and lets the garment settle on the visible Parts, live. **Pause**, **Stop** (keep
+   it as it is now) or **Reset** (back to the placed panels).
+5. **Convert to Part** keeps it: the Part **Garment**, seams welded, UVs from the flat pattern (each panel where it
+   is on the sheet), the pattern's thickness. One undo step; the body stays the active Part.
+
+**Units per metre** says how big the body is in real life: 100 for a body modelled in centimetres (the starter
+meshes; set for you when the body is over 20 units tall), 1 for metres. The pattern is at real size, so a wrong
+value makes the garment a doll's or a giant's.
+
+Cloth dropped from above settles *behind* overhangs: a panel placed above a chin or a beard ends up tucked behind
+it. That is the physics, not a bug: place the panel in front of the body instead. From a script:
+
+```
+new_starter_mesh name=full-body
+garment_new template=tshirt
+garment_place panel=Front point=0,135,12 facing=0,0,1
+garment_place panel=Back point=0,135,-12 facing=0,0,-1
+garment_place panel="Left sleeve" point=20,140,0 facing=1,0,0
+garment_place panel="Right sleeve" point=-20,140,0 facing=-1,0,0
+garment_drape
+```
+
 ## Print it at home
 
 **Print** shows how many pages the pattern takes on **A4** or **Letter** (portrait or **Landscape**); **Save PDF...**

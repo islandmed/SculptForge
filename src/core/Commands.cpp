@@ -41,6 +41,7 @@
 #include "core/ForgeSpheres.h"
 #include "core/Tube.h"
 #include "core/Garment.h"
+#include "core/GarmentDrape.h"
 #include "core/Deform.h"
 #include "core/Drape.h"
 #include "core/Sculptable.h"
@@ -911,6 +912,7 @@ CommandRegistry::CommandRegistry() {
     registerMayaCommands(*this); // maya_send/receive (io/MayaCommands.cpp)
     registerBakeCommands(*this); // bake (core/Bake.cpp)
     registerGarmentCommands(*this); // garment_* (core/GarmentCommands.cpp)
+    registerGarmentDrapeCommands(*this); // garment_place, garment_drape (core/GarmentDrape.cpp)
     registerFaceCommands(*this); // face_shapes_generate, face_weights, ... (core/FaceCommands.cpp)
     registerStarterMeshCommands(*this); // new_starter_mesh (core/StarterMeshes.h)
     registerPackCommands(*this);    // pack_install, pack_list, pack_remove, ... (core/Pack.h)
