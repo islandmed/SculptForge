@@ -93,7 +93,10 @@ If no pen is detected or pressure doesn't change:
 - **Windows:** SculptForge reads pressure through Windows Ink, and through the driver's Wintab when Windows Ink is
   off (Wacom Tablet Properties > Mapping > **Use Windows Ink**). If pressure is still missing, switch that option
   and bring the pen back to the tablet. See [Pen tablets on Windows](installing.md#pen-tablets-windows-ink-and-wintab).
-- **Linux:** check that the system sees the pen as a tablet (for example in your desktop's tablet settings).
+- **Linux:** check that the system sees the pen as a tablet (for example in your desktop's tablet settings). If
+  pressure jumps or drops out mid-stroke, open **Edit > Preferences > Tablet > Troubleshooting details**: it shows
+  whether SculptForge runs on Wayland or through XWayland (Video driver), and starting it with
+  `SDL_VIDEO_DRIVER=wayland` uses Wayland directly. **Copy details** gives the lines to paste into a bug report.
 - If the cursor moves but strokes have no pressure, test in another application to see whether the driver
   reports pressure at all.
 - **The active Part changed by itself:** a Part becomes active with **Alt+click** on it (the keyboard's Alt, a

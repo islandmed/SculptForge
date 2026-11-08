@@ -141,8 +141,11 @@ bool App::init(const AppOptions& options) {
     // UI tests run in a hidden window that never has focus; SDL drops joystick input without focus otherwise, and
     // the scripted SpaceMouse is a virtual joystick (UiTest.cpp).
     if (!options.uiTest.empty()) SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
-    // The pen tip's mouse events come from the app, not SDL (App::penMouseEvents, #95).
+    // The pen tip's mouse events come from the app, not SDL (App::penMouseEvents, #95), and no touch events either:
+    // SDL's touch made from the pen counted as a finger, and a finger beside it as a two-finger gesture that ended
+    // the stroke (pen displays with touch).
     SDL_SetHint(SDL_HINT_PEN_MOUSE_EVENTS, "0");
+    SDL_SetHint(SDL_HINT_PEN_TOUCH_EVENTS, "0");
     // Full screen on one monitor stays up when the pointer clicks on another (Windows multi-monitor, Discord).
     SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
     if (!headless && options.demo.empty()) applyCachedThreadCount(); // the hardware profile's threads, before any brush work
@@ -1014,6 +1017,7 @@ int App::run() {
         phases = 0;
         mark();
         while (SDL_PollEvent(&e)) onEvent(e);
+        flushPenMotion(); // the batch's last pen motion, which waited for its pressure (Tablet.cpp)
         if (take_) takeBeforeFrame(); // a take's input since the last frame, at the wall clock's pace
         mark();
         // (The window must have settled too: a window manager that maximises it late, on a busy machine, changes
@@ -1520,14 +1524,26 @@ void App::buildUiFonts(float scale) {
 
 void App::handleEvent(const SDL_Event& event) {
     if (dropPenMouseEvent(event)) return; // the pen's mouse events are made here, not by SDL (#95, Tablet.cpp)
+    // A pen motion's mouse motion waits for the pressure that follows it (flushPenMotion, Tablet.cpp).
+    if (penMotionHeld_ && !(event.type == SDL_EVENT_PEN_AXIS && event.paxis.which == heldPenMotion_.pmotion.which))
+        flushPenMotion();
     penNoise_ = penRestNoise(event);      // a resting pen's tilt and jitter (Tablet.cpp)
     penMouseEvents(event, true);          // a pen leaving lets go of the tip's button first
     dispatchEvent(event);
+    if (event.type == SDL_EVENT_PEN_MOTION && !uiPrefs_.tablet.classicTiming) { // (Classic pen timing: at once)
+        heldPenMotion_ = event;
+        heldPenNoise_ = penNoise_;
+        penMotionHeld_ = true;
+        return;
+    }
     penMouseEvents(event, false);         // the tip's mouse events, after the pen's own
 }
 
 void App::dispatchEvent(const SDL_Event& event) {
-    if (strayMouseMotion(event)) return; // neither the canvas nor the UI follows a driver's stray mouse events
+    if (strayMouseMotion(event)) { // neither the canvas nor the UI follows a driver's stray mouse events
+        ++penDiag_.strayMouse;
+        return;
+    }
     if (event.type == SDL_EVENT_MOUSE_MOTION && event.motion.which != SDL_PEN_MOUSEID) mouseSincePen_ = true;
     if (sixDofPointerEvent(event)) return; // nor a SpaceMouse that also says it is a mouse (SpaceMouse.cpp)
     if (spaceMouseEcho(event)) return;     // nor the pointer a SpaceMouse driver moves while the cap is pushed

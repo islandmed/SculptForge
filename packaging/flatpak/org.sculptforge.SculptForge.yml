@@ -39,7 +39,7 @@ modules:
     builddir: true
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
-      - -DSCULPTFORGE_USE_SYSTEM_SDL=OFF # SDL 3.2.30, the version every other package ships (pen and tablet fixes)
+      - -DSCULPTFORGE_USE_SYSTEM_SDL=OFF # SDL 3.4.18, as every Linux package ships (Wayland pen fixes)
       - -DSCULPTFORGE_BUILD_TESTS=OFF # the tests run in CI and in the release jobs, outside the sandbox
       - -DSCULPTFORGE_BUILD_PYTHON=OFF
       - -DSCULPTFORGE_MOLD=OFF # the shipped binary keeps the system linker (docs/build-speed.md)
@@ -74,8 +74,8 @@ modules:
         sha256: 9f3174561fd26904b23f0db5e560971cbf9b3cbda0b280f04d5c379d03bf234c
         dest: _deps-src/glm
       - type: archive
-        url: https://github.com/libsdl-org/SDL/releases/download/release-3.2.30/SDL3-3.2.30.tar.gz
-        sha256: 4c3b09330d866dc52eb65b66259a6684ad387252ca8c57901b3a2b534eb42e3d
+        url: https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz
+        sha256: 9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3
         dest: _deps-src/SDL3
       - type: archive
         url: https://github.com/ocornut/imgui/archive/refs/tags/v1.91.9.tar.gz

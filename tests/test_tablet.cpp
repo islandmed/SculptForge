@@ -269,6 +269,18 @@ TEST(tablet_settings_view_speed_round_trip) {
     CHECK(near(d.viewSpeed, 0.1f));
 }
 
+TEST(tablet_settings_classic_pen_timing_round_trip) {
+    TabletSettings t;
+    CHECK(!t.classicTiming); // the new timing by default
+    t.classicTiming = true;
+    TabletSettings back;
+    fromJson(toJson(t), back);
+    CHECK(back.classicTiming);
+    TabletSettings old; // ui.json from before the setting: off
+    fromJson(Json::object(), old);
+    CHECK(!old.classicTiming);
+}
+
 // A pen without a pressure axis (Windows Ink off) sends 0 while touching: after a few motions it draws at full
 // pressure instead of never starting the stroke; a pen with pressure never does.
 TEST(pen_pressure_tracker_no_pressure_axis) {
@@ -299,6 +311,55 @@ TEST(pen_pressure_tracker_no_pressure_axis) {
     PenPressureTracker hover;
     for (int i = 0; i < 3 * PenPressureTracker::kSilentMotions; ++i) hover.motion();
     CHECK(!hover.noPressure()); // hovering never counts
+}
+
+// A sample that lost its value keeps the last pressure: never NaN or infinity; with holdLostZero (Linux: SDL's X11
+// valuators left out, its Wayland hover distance) not a 0 while the tip still presses. Lifting still reaches 0.
+TEST(pen_pressure_tracker_keeps_lost_samples) {
+    PenPressureTracker t;
+    t.holdLostZero = true;
+    t.touchDown();
+    CHECK(t.sample(0.0f)); // touching, not pressing yet: a real 0
+    CHECK(t.sample(0.4f));
+    CHECK(!t.sample(0.0f)); // the stroke already pressed: the X11 / Wayland gap
+    CHECK(near(t.raw(), 0.4f));
+    CHECK(!t.sample(-0.0001f));
+    CHECK(!t.sample(std::nanf("")));
+    CHECK(!t.sample(INFINITY));
+    CHECK(near(t.raw(), 0.4f));
+    CHECK(t.sample(0.01f)); // a light touch is pressure, not a gap
+    CHECK(near(t.raw(), 0.01f));
+    t.touchUp();
+    CHECK(t.sample(0.0f)); // lifted: 0 is real
+    CHECK(near(t.raw(), 0.0f));
+    t.reset();
+    CHECK(t.holdLostZero); // (the platform's, not the pen's)
+
+    PenPressureTracker w; // Windows and macOS: a 0 while touching is the pen's (the lift's last samples, #146)
+    w.touchDown();
+    w.sample(0.5f);
+    CHECK(w.sample(0.0f));
+    CHECK(near(w.raw(), 0.0f));
+    CHECK(!w.sample(INFINITY));
+}
+
+TEST(pen_diagnostics_report) {
+    PenDiagnostics d;
+    std::string r = penReport({{"SDL", "3.4.18"}, {"Video driver", "wayland"}}, d);
+    CHECK(r.find("SDL: 3.4.18\n") == 0);
+    CHECK(r.find("Video driver: wayland") != std::string::npos);
+    CHECK(r.find("Last pressure: none yet") != std::string::npos);
+    d.motion = 12;
+    d.lostSamples = 3;
+    d.touchDown();
+    d.sampled(0.25f, true);
+    d.sampled(0.75f, true);
+    d.sampled(0.0f, false); // hovering: not the stroke's
+    r = penReport({}, d);
+    CHECK(r.find("motion 12,") != std::string::npos);
+    CHECK(r.find("Lost pressure samples: 3") != std::string::npos);
+    CHECK(r.find("Last pressure: 0.000") != std::string::npos);
+    CHECK(r.find("Last stroke's pressure: 0.250 to 0.750") != std::string::npos);
 }
 
 TEST(tablet_hotplug_notes) {

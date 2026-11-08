@@ -22,7 +22,7 @@ NOTICES = ROOT / "THIRD_PARTY_NOTICES.md"
 FETCH = ROOT / "cmake" / "Fetch.cmake"
 
 # Fetch.cmake pin name -> the component's name in THIRD_PARTY_NOTICES.md
-PIN_NAMES = {"glm": "GLM", "SDL3": "SDL 3", "imgui": "Dear ImGui", "mbedtls": "Mbed TLS", "libdatachannel": "libdatachannel",
+PIN_NAMES = {"glm": "GLM", "SDL3": "SDL 3", "SDL3_linux": "SDL 3", "imgui": "Dear ImGui", "mbedtls": "Mbed TLS", "libdatachannel": "libdatachannel",
              "ldc_usrsctp": "usrsctp", "ldc_libjuice": "libjuice", "ldc_plog": "plog", "pybind11": "pybind11",
              **{f"wasmtime_{p}": "Wasmtime" for p in ("linux_x86_64", "linux_aarch64", "macos_x86_64", "macos_aarch64",
                                                       "windows_x86_64")}}
@@ -61,7 +61,9 @@ def license_entry(text):
 
 def build(version):
     p = pins()
-    by_name = {v: k for k, v in PIN_NAMES.items()}
+    by_name = {}  # component -> its pins (SDL 3: one for Windows and macOS, one for Linux)
+    for k, v in PIN_NAMES.items():
+        by_name.setdefault(v, []).append(k)
     components = []
     for r in notice_rows():
         if "not shipped" in r["use"] or "nothing vendored" in r["version"] or r["version"] in ("—", "colour values only") or "formulas only" in r["version"]:
@@ -70,14 +72,11 @@ def build(version):
              "licenses": [license_entry(r["license"])]}
         if r["url"]:
             c["externalReferences"] = [{"type": "website", "url": r["url"]}]
-        if r["name"] == "Wasmtime":  # one prebuilt archive per platform (cmake/Wasmtime.cmake)
-            for k in sorted(k for k in p if k.startswith("wasmtime_")):
-                c.setdefault("hashes", []).append({"alg": "SHA-256", "content": p[k][1]})
-                c.setdefault("externalReferences", []).append({"type": "distribution", "url": p[k][0]})
-        pin = None if r["name"] == "Wasmtime" else by_name.get(r["name"])
-        if pin and pin in p:
+        for pin in sorted(by_name.get(r["name"], [])):  # Wasmtime: one prebuilt archive per platform (cmake/Wasmtime.cmake)
+            if pin not in p:
+                continue
             url, sha = p[pin]
-            c["hashes"] = [{"alg": "SHA-256", "content": sha}]
+            c.setdefault("hashes", []).append({"alg": "SHA-256", "content": sha})
             c.setdefault("externalReferences", []).append({"type": "distribution", "url": url})
         components.append(c)
     return {

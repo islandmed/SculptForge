@@ -3180,6 +3180,12 @@ constexpr Entry kTraditionalChinese[] = {
     {"Troubleshooting", "疑難排解"},
     {"No pen seen yet", "尚未偵測到繪圖筆"},
     {"Tilt: not reported by this pen", "傾斜：此繪圖筆不回報"},
+    {"Troubleshooting details", "疑難排解詳細資訊"},
+    {"Copy details", "複製詳細資訊"},
+    {"Classic pen timing", "經典繪圖筆時序"},
+    {"The pen as in SculptForge 0.11.15 and before: strokes move without waiting for each pen sample's pressure, and a pressure sample the system lost is not held. Turn on only if pressure got worse with your tablet since 0.11.16, and tell us (Copy details below).", "繪圖筆按 SculptForge 0.11.15 及更早版本的方式運作：筆畫移動時不等待每個取樣的壓力，系統遺失的壓力取樣也不保留。僅在你的繪圖板自 0.11.16 起壓力感應變差時才開啟，並告訴我們（下方的複製詳細資訊）。"},
+    {"Copies the lines above for a bug report about the pen: the SDL version, the display system, how SculptForge was installed and the pen's events.", "複製以上內容用於繪圖筆錯誤回報：SDL 版本、顯示系統、SculptForge 的安裝方式以及繪圖筆輸入。"},
+    {"Running through XWayland. If the pen's pressure is poor, start SculptForge with SDL_VIDEO_DRIVER=wayland to use Wayland directly.", "正在透過 XWayland 執行。如果繪圖筆壓力感應不佳，請用 SDL_VIDEO_DRIVER=wayland 啟動 SculptForge，直接使用 Wayland。"},
     {"Pressure curve (all brushes)", "壓力曲線（所有筆刷）"},
     // --- UserGuide.cpp (tools/i18n/coverage.py) ---
     {"SculptForge is free and open source, and stays that way. If it helps your work, you can support its development.",

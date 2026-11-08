@@ -44,6 +44,10 @@ void App::touchEvent(const SDL_Event& e) {
 #endif
     const SDL_TouchFingerEvent& f = e.tfinger;
     if (f.touchID == SDL_MOUSE_TOUCHID) return; // SDL's touches made from the mouse
+    if (f.touchID == SDL_PEN_TOUCHID) { // ... and from the pen (off, SDL_HINT_PEN_TOUCH_EVENTS; a system SDL may not be)
+        ++penDiag_.penTouchEvents;
+        return;
+    }
     if (e.type == SDL_EVENT_FINGER_UP || e.type == SDL_EVENT_FINGER_CANCELED) {
         touch_.up(f.fingerID);
         if (touch_.fingers() == 0) {

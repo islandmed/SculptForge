@@ -139,6 +139,8 @@
 //                            moved_off_stencil (moved vertices that showed off the Stencil's image), stencil_active,
 //                            stencil_adjust, stencil_x / stencil_y / stencil_size (x1000), stencil_angle (degrees),
 //                            pen_pressure (raw), brush_pressure (after the curve; 1 for the mouse),
+//                            stroke_sample_pressure (the last stroke sample's, as its dabs got it),
+//                            pen_lost_samples (pressure samples that lost their value), pen_axes_after_motion,
 //                            pressure_status (0 no pen yet, 1 on, 2 not detected, 3 not known yet),
 //                            stroke_continuous (Stroke > Continuous, 1 on),
 //                            stroking (1 while a stroke is open), cursor_x / cursor_y (the brush cursor, pixels),
@@ -270,6 +272,8 @@
 //                            motion and pressure, as a pen resting its tip on the tablet
 //   pen_press U V [P]        the pen moves to a point on the model and touches down (pressure P, default 0.5), and
 //                            stays down until pen_lift
+//   pen_sample U V P         one sample of the touching pen: its motion to a point on the model, then pressure P
+//                            (SDL's order on every platform)
 //   pen_lift                 the touching pen lifts
 //   tablet_plug [NAME]       a tablet plugged in while running (default name: a generic HID mouse); its pen gets
 //                            a new id
@@ -1291,6 +1295,9 @@ double Demo::query(const std::string& name, bool& known) const {
         return st == "Pressure: on" ? 1.0 : st == "Pressure: not detected" ? 2.0 : app_.penSeen_ ? 3.0 : 0.0;
     }
     if (name == "brush_pressure") return app_.strokePressure();
+    if (name == "stroke_sample_pressure") return app_.lastStrokePressure_; // the last stroke sample's (dabs end there)
+    if (name == "pen_lost_samples") return double(app_.penDiag_.lostSamples);
+    if (name == "pen_axes_after_motion") return app_.penDiag_.axesAfterMotion ? 1.0 : 0.0;
     if (name == "stroking") return app_.drag_ == App::Drag::Stroke ? 1.0 : 0.0;
     if (name == "tablet_mouse_mode") return app_.uiPrefs_.tablet.mouseMode ? 1.0 : 0.0;
     if (name == "tablet_view_speed") return double(app_.uiPrefs_.tablet.viewSpeed);
@@ -3205,6 +3212,16 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             penPressed_ = true;
         });
         wait(0.1f);
+    } else if (verb == "pen_sample") {
+        // One pen sample while touching, as SDL sends it (Wayland's tablet frame, X11, Windows Ink): the motion
+        // to u, v, then its pressure.
+        if (!need(3)) return false;
+        run([this, u = num(1, 0.5f), v = num(2, 0.5f), pressure = num(3, 0.5f)] {
+            const ImVec2 p = onModel(u, v);
+            penMove(p.x, p.y);
+            penPressure(pressure);
+        });
+        wait(0.05f);
     } else if (verb == "pen_lift") {
         run([this] {
             penPressed_ = false;
@@ -3458,11 +3475,11 @@ void Demo::penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bo
         constexpr int kSamples = 4;
         if (*last < 1.0f) {
             const float u = std::min(t / seconds, 1.0f);
-            for (int k = 1; k <= kSamples; ++k) {
+            for (int k = 1; k <= kSamples; ++k) { // (each sample as SDL sends it: the motion, then its pressure)
                 const float uu = *last + (u - *last) * float(k) / float(kSamples);
-                penPressure(p0 + (p1 - p0) * uu);
                 const ImVec2 p = path(uu);
                 penMove(p.x, p.y);
+                penPressure(p0 + (p1 - p0) * uu);
                 if (afterSample) afterSample();
             }
             *last = u;
@@ -3474,8 +3491,8 @@ void Demo::penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bo
             const float dx = b.x - a.x, dy = b.y - a.y, len = std::max(std::hypot(dx, dy), 1e-3f);
             for (int k = 1; k <= kSamples; ++k) {
                 const int i = *tailFrame * kSamples + k;
-                penPressure(p1 * (1.0f - float(i) / float(2 * kSamples)));
                 penMove(b.x + dx / len * 0.5f * float(i), b.y + dy / len * 0.5f * float(i));
+                penPressure(p1 * (1.0f - float(i) / float(2 * kSamples)));
                 if (afterSample) afterSample();
             }
             if (++*tailFrame < 2) return false;
