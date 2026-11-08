@@ -101,12 +101,15 @@ shot consent-generate-200
 click "Allow##send"                              # (the Hunyuan3D licence note was shown once already)
 wait_value generate_candidates == 3 30
 click "Generate 3D/Discard all##candidates"
+ui_scale 100                                     # (opened at 100%: at 1440 x 900 the 200% list runs past the screen)
 click "Preferences##palette.preferences"
 click "AI##preferences.ai"
 expect_text Online AI services
 expect "Revoke"
+ui_scale 200
+wait 0.2
 shot consent-prefs-200
-key escape
 ui_scale 100
+key escape
 expect_value http_requests == 0
 generator_stub off
