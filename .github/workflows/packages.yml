@@ -148,10 +148,12 @@ jobs:
         with:
           path: .ccache
           key: ccache-pkg-linux-${{ matrix.arch }}.${{ github.sha }}
+      # -j 2: at -j 4 the unit-test shards ran four at a time and the hosted runner was stopped (exit 143) on the
+      # 0.12.0 stage; two at a time fits the runner's memory.
       - name: Test (every test, UI tests under Xvfb + Mesa)
         run: |
           xvfb-run -a -s "-screen 0 1920x1080x24" env LIBGL_ALWAYS_SOFTWARE=1 \
-            ctest --test-dir build --output-on-failure -j 4
+            ctest --test-dir build --output-on-failure -j 2
       - name: .deb and .tar.gz
         run: cd build && cpack -G "DEB;TGZ"
       - name: AppImage
