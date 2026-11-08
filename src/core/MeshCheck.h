@@ -56,7 +56,7 @@ MeshReport checkMesh(const Mesh& mesh);
 // The mesh with one issue fixed, and how many elements changed in `fixed`:
 //  - NonManifold: each triangle past the first two on such an edge gets its own copy of the edge's points (the
 //    fin comes loose; nothing is deleted)
-//  - Holes: capped as Close Holes does (a patch per loop, in a face group of its own)
+//  - Holes: capped as Fill Holes does (a patch per loop, in a face group of its own)
 //  - Duplicate / Degenerate: those triangles are deleted
 //  - ZeroArea: the shortest edge of each is collapsed (its points merged), which removes it and its neighbour
 //  - Flipped: the minority winding of each piece is turned to match the rest; a closed piece wound inside out

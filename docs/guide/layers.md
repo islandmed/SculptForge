@@ -79,8 +79,8 @@ top level for the fine detail of an expression, and it stays with the Part whate
   level above it too.
 - **Reshape the base at a low level** (or turn it with the [Gizmo](gizmo.md)) and each layer's detail rides on
   the new shape: its offsets turn with the surface instead of pointing the old way.
-- **Divide** carries the layers to the new level. **Reconstruct Subdiv** keeps them, exact at the top. **Delete Lower**
-  and **Delete Higher** keep the current level's layers as they are.
+- **Add Level** carries the layers to the new level. **Rebuild Lower Levels** keeps them, exact at the top. **Remove Below**
+  and **Remove Above** keep the current level's layers as they are.
 - **Deleting a layer** removes it from every level. Undo steps back through strokes, level changes and divisions
   with their layers.
 - **Projects** keep every level's layers. **Exports** write the current level with its layers as blend shapes, so

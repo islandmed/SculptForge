@@ -117,7 +117,7 @@ class SCULPTFORGE_OT_classic_brush(bpy.types.Operator):
 
 class SCULPTFORGE_OT_classic_sdiv(bpy.types.Operator):
     bl_idname = "sculptforge.classic_sdiv"
-    bl_label = "Classic SDiv"
+    bl_label = "Classic Level Step"
     bl_description = "Sculpt one Multires level higher or lower (D / Shift+D); never adds a level"
     bl_options = {"REGISTER", "UNDO"}
 
@@ -132,13 +132,13 @@ class SCULPTFORGE_OT_classic_sdiv(bpy.types.Operator):
         level = max(0, min(multires.total_levels, multires.sculpt_levels + self.step))
         multires.sculpt_levels = level
         multires.levels = level  # the viewport shows the level being sculpted
-        self.report({"INFO"}, "SDiv %d of %d" % (level, multires.total_levels))
+        self.report({"INFO"}, "Level %d of %d" % (level, multires.total_levels))
         return {"FINISHED"}
 
 
 class SCULPTFORGE_OT_classic_divide(bpy.types.Operator):
     bl_idname = "sculptforge.classic_divide"
-    bl_label = "Classic Divide"
+    bl_label = "Classic Add Level"
     bl_description = "Add a subdivision level to the Multires modifier (adding one if needed) and sculpt on it (Ctrl+D)"
     bl_options = {"REGISTER", "UNDO"}
 
@@ -155,7 +155,7 @@ class SCULPTFORGE_OT_classic_divide(bpy.types.Operator):
         if "FINISHED" not in result:
             return {"CANCELLED"}
         multires.sculpt_levels = multires.levels = multires.total_levels
-        self.report({"INFO"}, "SDiv %d of %d" % (multires.sculpt_levels, multires.total_levels))
+        self.report({"INFO"}, "Level %d of %d" % (multires.sculpt_levels, multires.total_levels))
         return {"FINISHED"}
 
 
@@ -225,10 +225,10 @@ def key_table():
         ("P", "Perspective on / off", "view3d.view_persportho", "P", False, False, False, "PRESS", {}),
         ("L", "LazyMouse (Blender: Stabilize Stroke)", toggle, "L", False, False, False, "PRESS",
          {"data_path": "tool_settings.sculpt.brush.use_smooth_stroke"}),
-        ("Ctrl+D", "Divide (adds a Multires level)", SCULPTFORGE_OT_classic_divide.bl_idname, "D", True, False, False,
+        ("Ctrl+D", "Add Level (a Multires level)", SCULPTFORGE_OT_classic_divide.bl_idname, "D", True, False, False,
          "PRESS", {}),
-        ("D", "SDiv up", SCULPTFORGE_OT_classic_sdiv.bl_idname, "D", False, False, False, "PRESS", {"step": 1}),
-        ("Shift+D", "SDiv down", SCULPTFORGE_OT_classic_sdiv.bl_idname, "D", False, True, False, "PRESS", {"step": -1}),
+        ("D", "Level up", SCULPTFORGE_OT_classic_sdiv.bl_idname, "D", False, False, False, "PRESS", {"step": 1}),
+        ("Shift+D", "Level down", SCULPTFORGE_OT_classic_sdiv.bl_idname, "D", False, True, False, "PRESS", {"step": -1}),
         ("Ctrl+W", "Group from Mask and clear the mask, or Group Visible (face sets)", SCULPTFORGE_OT_classic_group.bl_idname,
          "W", True, False, False, "PRESS", {}),
         ("W / E / R", "Move / Scale / Rotate", "wm.tool_set_by_id", "W", False, False, False, "PRESS",

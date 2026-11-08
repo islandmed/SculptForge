@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Close Holes (see CloseHoles.h).
+// Fill Holes (see CloseHoles.h).
 #include "core/CloseHoles.h"
 
 #include "core/Commands.h"
@@ -380,7 +380,7 @@ std::vector<std::vector<uint32_t>> boundaryLoops(const Mesh& mesh) {
 bool closeHoles(Mesh& mesh, const CloseHolesOptions& options, CloseHolesStats& stats, std::string& error) {
     stats = {};
     if (mesh.triangleCount() == 0) {
-        error = "Close Holes: the Part is empty";
+        error = "Fill Holes: the Part is empty";
         return false;
     }
     const std::vector<std::vector<uint32_t>> loops = boundaryLoops(mesh);
@@ -477,7 +477,7 @@ void registerCloseHolesCommands(CommandRegistry& registry) {
     using T = ParamSpec::Type;
     registry.add(
         {"close_holes",
-         "Close Holes: cap every open boundary of the active Part (a hole, an open bottom, the edge of an extracted "
+         "Fill Holes: cap every open boundary of the active Part (a hole, an open bottom, the edge of an extracted "
          "shell) with a new patch of triangles sized like the edges around it, curved to continue the surface around the hole. The "
          "rest of the Part is not changed. The patches get a new face group.",
          {{"max_edges", T::Number, "Only holes with at most this many boundary edges (default 0: every hole).", false},
@@ -486,9 +486,9 @@ void registerCloseHolesCommands(CommandRegistry& registry) {
           {"new_group", T::Bool, "Give the patches a new face group (default true).", false}},
          [](Document& doc, const Args& a) -> CommandResult {
              if (doc.mesh.triangleCount() == 0) return {false, "The Part is empty"};
-             if (!doc.mesh.forgespheres.empty()) return {false, "Close Holes: make Forge Spheres into a mesh first"};
-             if (!doc.mesh.tube.empty()) return {false, "Close Holes: bake the Tube first"};
-             if (doc.mesh.micro) return {false, "Close Holes: apply or remove the micro level first"};
+             if (!doc.mesh.forgespheres.empty()) return {false, "Fill Holes: make Forge Spheres into a mesh first"};
+             if (!doc.mesh.tube.empty()) return {false, "Fill Holes: bake the Tube first"};
+             if (doc.mesh.micro) return {false, "Fill Holes: apply or remove the micro level first"};
              CloseHolesOptions o;
              o.maxEdges = size_t(std::max(0.0, argNumber(a, "max_edges", 0.0)));
              o.refine = argBool(a, "refine", true);
@@ -497,12 +497,12 @@ void registerCloseHolesCommands(CommandRegistry& registry) {
              CloseHolesStats s;
              std::string error;
              if (!closeHoles(m, o, s, error)) return {false, error};
-             if (s.holes == 0) return {true, "Close Holes: the Part has no holes"};
+             if (s.holes == 0) return {true, "Fill Holes: the Part has no holes"};
              if (s.filled == 0)
-                 return {true, "Close Holes: " + std::to_string(s.holes) + " hole" + (s.holes == 1 ? "" : "s") +
+                 return {true, "Fill Holes: " + std::to_string(s.holes) + " hole" + (s.holes == 1 ? "" : "s") +
                                    ", none small enough to close (max_edges)"};
-             doc.replaceMeshUndoable(std::move(m), "Close Holes");
-             std::string msg = "Close Holes: closed " + std::to_string(s.filled) + " hole" + (s.filled == 1 ? "" : "s") +
+             doc.replaceMeshUndoable(std::move(m), "Fill Holes");
+             std::string msg = "Fill Holes: closed " + std::to_string(s.filled) + " hole" + (s.filled == 1 ? "" : "s") +
                                " (+" + std::to_string(s.triangles) + " triangles)";
              if (s.skipped) msg += ", left " + std::to_string(s.skipped) + " bigger one" + (s.skipped == 1 ? "" : "s");
              return {true, msg};

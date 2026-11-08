@@ -98,7 +98,7 @@ expect_value quick_tour_slide == 4
 shot tour-04
 click "Show me##quicktour"
 wait 1.6
-expect_text Target Polygons
+expect_text Target Quads
 mouse_leave
 wait 0.2
 shot 04-quad
@@ -110,7 +110,7 @@ expect_value quick_tour_slide == 5
 shot tour-05
 click "Show me##quicktour"
 wait 1.6
-expect_text Divide
+expect_text Add Level
 mouse_leave
 wait 0.2
 shot 05-levels

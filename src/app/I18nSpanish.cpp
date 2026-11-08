@@ -6,10 +6,10 @@
 //
 // Conventions, as Spanish-speaking experienced sculptors use them:
 //   - Names of tools, brushes and products stay in English: Quad Remesh, Forge Spheres, Lit Sphere, Clay Block and every
-//     other brush, Smt, Rgb, Project Detail, Lazy Stroke, Mask Pen, VDM. Generic words are translated: Pieza (Part),
+//     other brush, Rgb, Project Detail, Lazy Stroke, Mask Pen, VDM. Generic words are translated: Pieza (Part),
 //     Biblioteca (Library), Pintura de vértices (Vertex Paint), Grupos de caras (Face Groups).
 //   - Palettes and actions read own Spanish: Pincel, Trazo, Herramienta, Dibujar, Tamaño de dibujo,
-//     Intensidad, Atenuación, Dividir, Enmascarado.
+//     Intensidad, Atenuación, Añadir nivel, Enmascarado.
 //   - Short and imperative, "tú" (Elige, Guarda), sentence case like the English.
 //   - printf conversions (%d, %.1f, %s, %%) stay in the same order: tests check every entry.
 // Keep the entries sorted by English within each group, one entry per English text.
@@ -100,7 +100,6 @@ constexpr Entry kSpanish[] = {
     {"From Image", "Desde imagen"},
     {"Voxel Remesh", "Remallado vóxel"},
     {"Quick Remesh", "Remallado rápido"},
-    {"Modify Topology", "Modificar topología"},
     {"Game Ready", "Listo para juegos"},
     {"Navigation", "Navegación"},
 
@@ -221,7 +220,6 @@ constexpr Entry kSpanish[] = {
     {"Invert", "Invertir"},
     {"Smooth keeps volume", "Smooth conserva el volumen"},
     {"Smooth face group borders only", "Smooth solo en bordes de grupos"},
-    {"Symmetry", "Simetría"},
     {"Symmetry X", "Simetría X"},
     {"Local", "Local"},
     {"X axis", "Eje X"},
@@ -413,51 +411,53 @@ constexpr Entry kSpanish[] = {
     {"Dist", "Dist"},
 
     // --- Geometry ---
-    {"Divide", "Dividir"},
     {"Subdivide", "Subdividir"},
     {"Subdivide (removes levels)", "Subdividir (quita los niveles)"},
-    {"Divide (keeps levels)", "Dividir (conserva los niveles)"},
-    {"Change the Mesh (no levels)", "Cambiar la malla (sin niveles)"},
+    {"Symmetry", "Simetría"},
+    {"Levels", "Niveles"},
+    {"Cleanup", "Limpieza"},
+    {"Resolution (no levels)", "Resolución (sin niveles)"},
+    {"No subdivision levels - Add Level adds them", "Sin niveles de subdivisión: Añadir nivel los añade"},
+    {"Remove levels %d to %d and the detail sculpted on them?", "¿Quitar los niveles %d a %d y el detalle esculpido en ellos?"},
+    {"Remove levels 1 to %d? Level %d becomes the base mesh.", "¿Quitar los niveles 1 a %d? El nivel %d pasa a ser la malla base."},
+    {"Add Level", "Añadir nivel"},
     {"Micro Detail", "Detalle micro"},
     {"Subdivide and Remove Levels", "Subdividir y quitar los niveles"},
-    {"Lower Level", "Res. menor"},
-    {"Higher Level", "Res. mayor"},
-    {"Delete Lower", "Borrar inferiores"},
-    {"Delete Higher", "Borrar superiores"},
-    {"Reconstruct Subdiv", "Reconstruir subdiv."},
-    {"Divide to Micro", "Dividir a micro"},
+    {"Lower Level", "Nivel inferior"},
+    {"Higher Level", "Nivel superior"},
+    {"Remove Below", "Quitar inferiores"},
+    {"Remove Above", "Quitar superiores"},
+    {"Rebuild Lower Levels", "Reconstruir niveles inferiores"},
+    {"Add Micro", "Añadir micro"},
     {"Delete Micro", "Eliminar micro"},
     {"Bake Micro", "Hacer bake de micro"},
     {"Micro Surface Noise", "Ruido de superficie micro"},
     {"Micro", "Micro"},
-    {"SDiv", "SDiv"},
-    {"No subdivision levels - Divide adds them", "Sin niveles de subdivisión: Dividir los añade"},
+    {"Level", "Nivel"},
     {"Decimate", "Diezmar"},
     {"Keep", "Conservar"},
     {"Keep Masked", "Conservar máscara"},
-    {"Keep Groups", "Conservar grupos"},
+    {"Follow Face Groups", "Seguir grupos de caras"},
     {"Keep Original", "Conservar original"},
     {"Keep Texture", "Conservar textura"},
     {"Reduce the triangle count while keeping the shape. Sculpt layers are kept.",
      "Reduce el número de triángulos conservando la forma. Las capas de esculpido se conservan."},
     {"Fraction of the triangles Decimate keeps.", "Fracción de los triángulos que conserva Diezmar."},
     {"Mirror", "Reflejar"},
-    {"Mirror And Weld", "Reflejar y soldar"},
+    {"Make Symmetric", "Hacer simétrico"},
     {"Close Gaps", "Cerrar huecos"},
     {"Fill holes", "Rellenar agujeros"},
-    {"Delete hidden", "Eliminar ocultos"},
+    {"Remove Hidden", "Quitar ocultos"},
 
     // --- Quad Remesh and Remesh ---
     {"Quad Remesh", "Quad Remesh"},
     {"Quad Remesh Guides", "Guías de Quad Remesh"},
-    {"Target Polygons", "Polígonos objetivo"},
-    {"Adaptive Size", "Tamaño adaptativo"},
-    {"Curves Strength", "Fuerza de las curvas"},
+    {"Target Quads", "Quads objetivo"},
+    {"Size Variation", "Variación de tamaño"},
+    {"Guide Strength", "Fuerza de las guías"},
     {"Guides", "Guías"},
     {"Use Vertex Paint", "Usar pintura"},
-    {"Detect Edges", "Detectar bordes"},
-    {"Half", "Mitad"},
-    {"Same", "Igual"},
+    {"Keep Hard Edges", "Conservar bordes duros"},
     {"Quality Report", "Informe de calidad"},
     {"no curves", "sin curvas"},
     {"%zu curves (%zu loops)", "%zu curvas (%zu bucles)"},
@@ -1112,10 +1112,7 @@ constexpr Entry kSpanish[] = {
     {"Dark is high", "Oscuro es alto"},
     // --- App.cpp (tools/i18n/coverage.py) ---
     {"Strokes go into the base shape, not a layer.", "Los trazos van a la forma base, no a una capa."},
-    {"Select to sculpt into this layer. With subdivision levels, record at any level: a layer keeps its own detail on "
-     "every level and follows Lower Level / Higher Level and Divide.",
-     "Elige para esculpir en esta capa. Con niveles de subdivisión, graba en cualquier nivel: una capa guarda su "
-     "propio detalle en cada nivel y sigue a Res. menor / Res. mayor y Dividir."},
+    {"Select to sculpt into this layer. With subdivision levels, record at any level: a layer keeps its own detail on every level and follows Lower Level / Higher Level and Add Level.", "Elige para esculpir en esta capa. Con niveles de subdivisión, graba en cualquier nivel: una capa guarda su propio detalle en cada nivel y sigue a Nivel inferior / Nivel superior y Añadir nivel."},
     {"Animate this blend shape 0 -> 1 -> 0 (Stop sets it back to 1).",
      "Anima esta forma de mezcla 0 -> 1 -> 0 (Detener la devuelve a 1)."},
     {"Delete this layer on every subdivision level (undoable).",
@@ -1134,21 +1131,15 @@ constexpr Entry kSpanish[] = {
      "Carga una captura de prueba incluida (una cabeza estilizada en splats gaussianos, con algunos flotantes) para "
      "probar Hacer esculpible sin un escaneo propio. splat_test_capture kind=object carga una taza."},
     // --- Config.cpp (tools/i18n/coverage.py) ---
-    {"Close Holes", "Cerrar agujeros"},
+    {"Fill Holes", "Rellenar agujeros"},
     {"Cap every open boundary of the active Part (a hole, an open bottom, the rim of an extracted shell) with a new "
      "patch sized like the polygons around it, so remeshing and sculpting see a closed surface. The rest of the Part "
      "stays as it is; the patches get a face group of their own (#103).",
      "Tapa cada borde abierto de la Pieza activa (un agujero, una base abierta, el borde de una cáscara extraída) "
      "con un parche nuevo del tamaño de los polígonos de alrededor, para que el remallado y la escultura vean una "
      "superficie cerrada. El resto de la Pieza no cambia; los parches reciben su propio grupo de caras (#103)."},
-    {"Add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to shape "
-     "big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smt off divides without smoothing.",
-     "Añade un nivel de subdivisión: cuatro veces los polígonos, y se conservan los niveles inferiores, para bajar a "
-     "dar forma a lo grande y volver al detalle. Los quads siguen siendo quads (Catmull-Clark). Con Smt apagado "
-     "divide sin suavizar."},
-    {"Smooth the next Divide (on by default). Off: the new level keeps the hard edges and flat faces of the one below.",
-     "Suaviza la próxima división (activado por defecto). Apagado: el nuevo nivel conserva los bordes duros y las "
-     "caras planas del de abajo."},
+    {"Add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to shape big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smooth off divides without smoothing.", "Añade un nivel de subdivisión: cuatro veces los polígonos, y se conservan los niveles inferiores, para bajar a dar forma a lo grande y volver al detalle. Los quads siguen siendo quads (Catmull-Clark). Con Suavizar apagado divide sin suavizar."},
+    {"Smooth the next new level (on by default). Off: the new level keeps the hard edges and flat faces of the one below.", "Suaviza el próximo nivel nuevo (activado por defecto). Apagado: el nuevo nivel conserva los bordes duros y las caras planas del de abajo."},
     {"Step one subdivision level down (fewer polygons, for big forms). The detail of the higher levels is kept.",
      "Baja un nivel de subdivisión (menos polígonos, para las formas grandes). Se conserva el detalle de los niveles "
      "superiores."},
@@ -1194,10 +1185,8 @@ constexpr Entry kSpanish[] = {
      "Refleja el lado + de la Pieza sobre el lado - en el eje elegido y suelda la costura en una sola malla estanca. "
      "Los grupos de caras y la pintura de vértices también pasan. Para conservar el otro lado, usa antes Deformación "
      "> Reflejar."},
-    {"Flip the Part across the chosen axis, through the origin (the plane symmetry and Mirror And Weld use).",
-     "Voltea la Pieza en el eje elegido, a través del origen (el plano que usan la simetría y Reflejar y soldar)."},
-    {"An axis Mirror And Weld mirrors across (several: one after the other).",
-     "Un eje en el que refleja Reflejar y soldar (varios: uno tras otro)."},
+    {"Flip the Part across the chosen axis, through the origin (the plane symmetry and Make Symmetric use).", "Voltea la Pieza en el eje elegido, a través del origen (el plano que usan la simetría y Hacer simétrico)."},
+    {"An axis Make Symmetric mirrors across (several: one after the other).", "Un eje en el que refleja Hacer simétrico (varios: uno tras otro)."},
     {"An axis Mirror flips along (several: one after the other).",
      "Un eje en el que voltea Reflejar (varios: uno tras otro)."},
     {"New from Starter Mesh...", "Nuevo desde malla inicial..."},
@@ -2555,12 +2544,7 @@ constexpr Entry kSpanish[] = {
      "actualizaciones. Las betas son una ventaja para miembros: las reciben del repositorio privado de miembros y "
      "del canal #members de Discord. Cuando la versión estable supera a una beta, Vista previa ofrece esa."},
     // --- PanelRetopo.cpp (tools/i18n/coverage.py) ---
-    {"Automatic quad retopology: rebuilds the Part as clean, all-quad topology whose edge loops follow the forms, "
-     "close to Target Polygons. Runs in the background (Cancel stops it); undoable. Then divide it and use Part > "
-     "Project > Project Detail to bring the detail back.",
-     "Retopología automática en quads: reconstruye la Pieza como topología limpia, toda de quads, cuyos bucles de "
-     "aristas siguen las formas, cerca de Polígonos objetivo. Se ejecuta en segundo plano (Cancelar la detiene); se "
-     "puede deshacer. Luego divídela y usa Pieza > Proyectar > Project Detail para recuperar el detalle."},
+    {"Automatic quad retopology: rebuilds the Part as clean, all-quad topology whose edge loops follow the forms, close to Target Quads. Runs in the background (Cancel stops it); undoable. Then divide it and use Part > Project > Project Detail to bring the detail back.", "Retopología automática en quads: reconstruye la Pieza como topología limpia, toda de quads, cuyos bucles de aristas siguen las formas, cerca de Quads objetivo. Se ejecuta en segundo plano (Cancelar la detiene); se puede deshacer. Luego divídela y usa Pieza > Proyectar > Project Detail para recuperar el detalle."},
     {"The Quad Remesh Guides brush: drag on the model to draw a curve for Quad Remesh's edge loops to follow, around "
      "an eye, the mouth or a joint. A curve that ends where it started becomes a loop. Symmetry mirrors it; "
      "Alt+click a curve to delete it. Pick any brush to sculpt again.",
@@ -2593,10 +2577,7 @@ constexpr Entry kSpanish[] = {
      "sobre todo el modelo, así los polos aparecen solo donde la forma los necesita y los bucles de aristas corren "
      "sin cortes; las curvas guía abiertas se vuelven bucles de aristas exactos. Heredado: el método de SculptForge "
      "0.9 (más polos, un aspecto partido)."},
-    {"About how many quads Quad Remesh makes (Ctrl+click to type a number). Half / Same / Double set it from the "
-     "Part's current polygon count.",
-     "Más o menos cuántos quads hace Quad Remesh (Ctrl+clic para escribir un número). Mitad / Igual / Doble lo fijan "
-     "a partir del número de polígonos actual de la Pieza."},
+    {"About how many quads Quad Remesh makes (Ctrl+click to type a number). 50% / 100% / 200% set it from the Part's current polygon count.", "Más o menos cuántos quads hace Quad Remesh (Ctrl+clic para escribir un número). 50% / 100% / 200% lo fijan a partir del número de polígonos actual de la Pieza."},
     {"Target half the Part's current polygon count.", "Objetivo: la mitad de los polígonos actuales de la Pieza."},
     {"Target the Part's current polygon count (to clean up topology without changing its density).",
      "Objetivo: los polígonos actuales de la Pieza (para limpiar la topología sin cambiar su densidad)."},
@@ -3891,12 +3872,10 @@ constexpr Entry kSpanish[] = {
     {"Your studio doesn't allow this provider: pick another", "Tu estudio no permite este proveedor: elige otro"},
     // Review fixes (fix/review-voidart-2)
     {"Ctrl+Z brings them back.", "Ctrl+Z los recupera."},
-    {"Delete Higher Levels", "Borrar niveles superiores"},
-    {"Delete Lower Levels", "Borrar niveles inferiores"},
-    {"Delete SDiv %d to %d and the detail sculpted on them?", "¿Borrar SDiv %d a %d y el detalle esculpido en ellos?"},
-    {"Delete SDiv 1 to %d? SDiv %d becomes the base mesh.", "¿Borrar SDiv 1 a %d? SDiv %d pasa a ser la malla base."},
+    {"Remove Levels Above", "Quitar niveles superiores"},
+    {"Remove Levels Below", "Quitar niveles inferiores"},
     {"Delete view", "Borrar vista"},
-    {"Destructive: four times the polygons as one plain mesh, with no lower levels to step back to. On a Part with subdivision levels it removes them (it asks first; Ctrl+Z brings them back). To keep levels, use Divide (keeps levels) instead.", "Destructivo: cuatro veces los polígonos en una sola malla, sin niveles inferiores a los que volver. En una Parte con niveles de subdivisión los quita (pregunta antes; Ctrl+Z los recupera). Para conservar niveles, usa Dividir (conserva los niveles)."},
+    {"Destructive: four times the polygons as one plain mesh, with no lower levels to step back to. On a Part with subdivision levels it removes them (it asks first; Ctrl+Z brings them back). To keep levels, use Add Level instead.", "Destructivo: cuatro veces los polígonos en una sola malla, sin niveles inferiores a los que volver. En una Parte con niveles de subdivisión los quita (pregunta antes; Ctrl+Z los recupera). Para conservar niveles, usa Añadir nivel."},
     {"Don't ask again", "No volver a preguntar"},
     {"Dynamic needs one plain mesh: Freeze keeps the level shown and removes the others (Ctrl+Z brings them back).", "Dinámica necesita una sola malla: Congelar conserva el nivel mostrado y quita los demás (Ctrl+Z los recupera)."},
     {"Extract makes a shell from the masked area: mask it first (Ctrl+drag on the model).", "Extraer crea una cáscara del área enmascarada: enmascárala primero (Ctrl+arrastrar sobre el modelo)."},
@@ -3913,7 +3892,7 @@ constexpr Entry kSpanish[] = {
     {"Mask darkness", "Oscuridad de máscara"},
     {"Mask darkness %.2f", "Oscuridad de máscara %.2f"},
     {"Mask first (Ctrl+drag)", "Enmascara primero (Ctrl+arrastrar)"},
-    {"Non-destructive: add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to shape big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smt off divides without smoothing.", "No destructivo: añade un nivel de subdivisión: cuatro veces los polígonos, y los niveles inferiores se conservan, así puedes bajar para dar forma a lo grande y volver a subir al detalle. Los quads siguen siendo quads (Catmull-Clark). Con Smt apagado divide sin suavizar."},
+    {"Non-destructive: add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to shape big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smooth off divides without smoothing.", "No destructivo: añade un nivel de subdivisión: cuatro veces los polígonos, y los niveles inferiores se conservan, así puedes bajar para dar forma a lo grande y volver a subir al detalle. Los quads siguen siendo quads (Catmull-Clark). Con Suavizar apagado divide sin suavizar."},
     {"Remember this camera as a named view (View > Views; the name field names it). Saved with the project.", "Recordar esta cámara como una vista con nombre (Vista > Vistas; el campo de nombre la nombra). Se guarda con el proyecto."},
     {"Restore View", "Restaurar vista"},
     {"Save View", "Guardar vista"},
@@ -4960,7 +4939,7 @@ constexpr Entry kSpanish[] = {
     {"No problems found", "No se encontraron problemas"},
     {"Non-manifold edges", "Aristas no múltiples"},
     {"Not checked yet", "Aún sin comprobar"},
-    {"Open boundaries. Fix caps each one with a patch, as Close Holes does.", "Bordes abiertos. Corregir tapa cada uno con un parche, como Cerrar agujeros."},
+    {"Open boundaries. Fix caps each one with a patch, as Fill Holes does.", "Bordes abiertos. Corregir tapa cada uno con un parche, como Cerrar agujeros."},
     {"Points no triangle uses. Fix removes them.", "Puntos que ningún triángulo usa. Corregir los elimina."},
     {"Points this close (in scene units) or closer merge. 0 merges only points exactly on top of each other. The points that would merge show on the model in orange.", "Se fusionan los puntos a esta distancia (en unidades de escena) o menos. 0 fusiona solo los puntos exactamente superpuestos. Los puntos que se fusionarían se ven en naranja sobre el modelo."},
     {"The mesh changed: check again", "La malla cambió: vuelve a comprobar"},

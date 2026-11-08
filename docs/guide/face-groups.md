@@ -91,10 +91,10 @@ Open **Tool > Visibility**:
 | **Select Rectangle** / **Select Lasso** | The shape <kbd>Ctrl</kbd>+<kbd>Shift</kbd> + drag draws: a rectangle or a free-hand lasso. | `hide_rect` / `hide_lasso` |
 | **Show all** | Show every hidden part again. Available when something is hidden. | `show_all` |
 | **Invert visible** | Hide what is visible and show what is hidden. | `invert_visibility` |
-| **Delete hidden** | Permanently remove the hidden triangles from the mesh. Undoable. | `delete_hidden` |
+| **Remove Hidden** | Permanently remove the hidden triangles from the mesh. Undoable. | `delete_hidden` |
 | **Delete masked** | Remove the masked triangles (their corners' average mask above 50%). Undoable. Available when something is masked. | `delete_masked` |
 
-**Delete hidden** and **Delete masked** keep every attribute of what remains (mask, vertex paint, face groups, UVs and sculpt layers).
+**Remove Hidden** and **Delete masked** keep every attribute of what remains (mask, vertex paint, face groups, UVs and sculpt layers).
 Use it to cut away parts of a scan or a generated model, or to remove the inside of a mesh after you isolated
 the outside.
 
@@ -112,7 +112,7 @@ the outside.
 1. Turn the model so the unwanted piece is on screen.
 2. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd> + drag a rectangle over it to hide it. For an awkward shape,
    pick **Select Lasso** in **Tool > Visibility** first and draw around it.
-3. Click **Delete hidden** in **Tool > Visibility**.
+3. Click **Remove Hidden** in **Tool > Visibility**.
 
 ### Split a model into Parts
 

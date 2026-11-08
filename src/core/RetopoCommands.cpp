@@ -95,10 +95,10 @@ void registerRetopoCommands(CommandRegistry& reg) {
                                     "'legacy': the 0.9 method.", false},
               {"quality", T::Bool, "Measure the result (poles, valences, corner angles, distance to the sculpt) and "
                                    "report it. Default true.", false},
-              {"adaptive", T::Number, "Adaptive Size 0-1: 0 = even quads, 1 = small quads in curved areas, big "
+              {"adaptive", T::Number, "Size Variation 0-1: 0 = even quads, 1 = small quads in curved areas, big "
                                       "ones on flat areas. Default 0.5.", false},
-              {"keep_groups", T::Bool, "Keep Groups: edge loops follow the face group borders and the groups are kept.", false},
-              {"detect_edges", T::Bool, "Detect Edges: hard edges get an edge loop (v2: faces meeting at more than about "
+              {"keep_groups", T::Bool, "Follow Face Groups: edge loops follow the face group borders and the groups are kept.", false},
+              {"detect_edges", T::Bool, "Keep Hard Edges: hard edges get an edge loop (v2: faces meeting at more than about "
                                         "60 degrees along a line a few quads long; legacy: over 50 degrees). Default true.", false},
               {"use_vertexpaint", T::Bool, "Use the vertex paint as a density guide: red areas get up to 4x the quads, blue "
                                          "areas down to a quarter.", false},
@@ -115,7 +115,7 @@ void registerRetopoCommands(CommandRegistry& reg) {
                                         "Default true.", false},
               {"guides", T::Bool, "Follow the Part's Quad Remesh Guides (curves drawn with qremesh_guide): an edge loop "
                                   "runs along each. Default true.", false},
-              {"curves_strength", T::Number, "Curves Strength 0-100: how far around each guide the edge flow follows "
+              {"curves_strength", T::Number, "Guide Strength 0-100: how far around each guide the edge flow follows "
                                              "it (0 = just the loop on the curve, 100 = about six quads to each side). "
                                              "Default 50.", false},
               {"keep_masked", T::Bool, "Keep masked: masked areas keep their triangles exactly as a fixed piece; the "

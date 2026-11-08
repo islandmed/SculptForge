@@ -170,7 +170,7 @@ def test_classic_keys():
         bpy.ops.sculptforge.classic_sdiv(step=-1)
         bpy.ops.sculptforge.classic_sdiv(step=-1)
         bpy.ops.sculptforge.classic_sdiv(step=-1)
-        check(multires.sculpt_levels == 0 and multires.total_levels == 2, "Shift+D steps down to SDiv 0")
+        check(multires.sculpt_levels == 0 and multires.total_levels == 2, "Shift+D steps down to Level 0")
         bpy.ops.sculptforge.classic_sdiv(step=1)
         bpy.ops.sculptforge.classic_sdiv(step=1)
         bpy.ops.sculptforge.classic_sdiv(step=1)

@@ -477,7 +477,7 @@ void registerExtractMirrorCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"mirror_and_weld",
-             "(Tool > Geometry > Modify Topology): keep the half of the active Part on the "
+             "(Tool > Geometry > Symmetry): keep the half of the active Part on the "
              "+ side of the plane through the origin, mirror it onto the other side and weld the seam into one "
              "watertight mesh. Face Groups, vertex paint, mask, UVs and sculpt layers are kept. One undo step.",
              {{"axis", T::String, "Axis whose plane to mirror across: x (default), y or z; several (xz) in turn.", false},
@@ -489,8 +489,8 @@ void registerExtractMirrorCommands(CommandRegistry& reg) {
                  const bool positive = side == "positive" || side == "+" || side == "pos";
                  if (!positive && side != "negative" && side != "-" && side != "neg")
                      return {false, "Bad side '" + side + "' (positive or negative)"};
-                 if (!doc.mesh.forgespheres.empty()) return {false, "Mirror And Weld works on meshes; make the Forge Spheres a mesh first"};
-                 if (!doc.mesh.tube.empty()) return {false, "Mirror And Weld works on meshes; bake the Tube first"};
+                 if (!doc.mesh.forgespheres.empty()) return {false, "Make Symmetric works on meshes; make the Forge Spheres a mesh first"};
+                 if (!doc.mesh.tube.empty()) return {false, "Make Symmetric works on meshes; bake the Tube first"};
                  if (doc.mesh.triangleCount() == 0) return {false, "The Part is empty"};
                  const size_t before = doc.mesh.triangleCount();
                  Mesh m = doc.mesh;
@@ -502,13 +502,13 @@ void registerExtractMirrorCommands(CommandRegistry& reg) {
                      names += axisName(axis);
                  }
                  const size_t after = m.triangleCount();
-                 doc.replaceMeshUndoable(std::move(m), "Mirror And Weld");
-                 return {true, "Mirror And Weld " + names + ": " + triangles(before) + " -> " + triangles(after)};
+                 doc.replaceMeshUndoable(std::move(m), "Make Symmetric");
+                 return {true, "Make Symmetric " + names + ": " + triangles(before) + " -> " + triangles(after)};
              }});
 
     reg.add({"mirror",
              "(Tool > Deformation): flip the active Part across a plane, by default the one through "
-             "the origin that symmetry and Mirror And Weld use. One undo step.",
+             "the origin that symmetry and Make Symmetric use. One undo step.",
              {{"axis", T::String, "Axis to flip along: x (default), y or z; several (xz) in turn.", false},
               {"pivot", T::String, "origin (default) or center (flip in place about the Part's centre).", false}},
              [](Document& doc, const Args& a) -> CommandResult {

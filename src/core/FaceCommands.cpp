@@ -106,7 +106,7 @@ void registerFaceCommands(CommandRegistry& registry) {
                    {"parts", T::Bool, "Also give the shapes to eyes, teeth, tongue and Parts on the face (default true).",
                     false},
                    {"level", T::Number,
-                    "Subdivision level (1-based, as SDiv) to make the shapes on; default: the lowest with at least 20,000 "
+                    "Subdivision level (1-based, as the Level slider) to make the shapes on; default: the lowest with at least 20,000 "
                     "vertices. Higher levels carry them up with their detail.",
                     false}},
                   [](Document& doc, const Args& a) -> CommandResult {
@@ -125,7 +125,7 @@ void registerFaceCommands(CommandRegistry& registry) {
                       FaceShapesReport r;
                       if (!generateFaceShapes(doc, o, r, error)) return {false, error};
                       std::string msg = "Generated 52 facial shapes on " + doc.activePartInfo().name;
-                      if (subdivLevelCount(doc.mesh)) msg += " (made at SDiv " + std::to_string(r.level + 1) + ")";
+                      if (subdivLevelCount(doc.mesh)) msg += " (made at Level " + std::to_string(r.level + 1) + ")";
                       msg += ": fit error " + percent(headShare(r.fit)) + " of the head, " + percent(r.fit.coverage) +
                              " of the template's face on the sculpt" + (r.symmetric ? ", Left/Right mirrored" : "");
                       for (const auto& s : r.parts) msg += "; " + s;

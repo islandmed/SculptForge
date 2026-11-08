@@ -1116,7 +1116,7 @@ void enterLevel(Mesh& mesh, int level, BVH* bvh, const SubdivLevel* leavingLevel
     std::shared_ptr<Mesh> leaving = leavingLevel ? leavingLevel->data : nullptr;
     std::shared_ptr<const SubdivTopology> leavingTopo = leavingLevel && generatedLevel(*leavingLevel) ? leavingLevel->topo : nullptr;
     std::shared_ptr<MultiresStack> stack = mesh.multires;
-    if (leaving && leaving == stack->levels[size_t(level)].data) return; // already that level (e.g. Delete Lower)
+    if (leaving && leaving == stack->levels[size_t(level)].data) return; // already that level (e.g. Remove Below)
     if (!stack->cache) stack->cache = std::make_shared<SubdivLevelCache>();
     SubdivLevelCache& cache = *stack->cache;
     std::shared_ptr<PaintTexture> texture = mesh.texture;
@@ -1554,7 +1554,7 @@ int subdivCurrentLevel(const Mesh& mesh) { return mesh.multires ? mesh.multires-
 
 std::string subdivLevelText(const Mesh& mesh) {
     if (!mesh.multires) return {};
-    return "SDiv " + std::to_string(mesh.multires->current + 1) + "/" + std::to_string(mesh.multires->levels.size());
+    return "Level " + std::to_string(mesh.multires->current + 1) + "/" + std::to_string(mesh.multires->levels.size());
 }
 
 size_t subdivLevelTriangles(const Mesh& mesh, int level) {
@@ -1611,7 +1611,7 @@ void subdivReleaseCache(Mesh& mesh) {
 
 std::string subdivDroppedNote(const Mesh& mesh, const std::string& name) {
     if (!mesh.multires || mesh.multires->levels.size() < 2) return {};
-    return "Subdivision levels removed: " + (name.empty() ? std::string() : name + " ") + "SDiv " +
+    return "Subdivision levels removed: " + (name.empty() ? std::string() : name + " ") + "Level " +
            std::to_string(mesh.multires->current + 1) + " of " + std::to_string(mesh.multires->levels.size()) +
            " kept as the new base";
 }
@@ -1805,7 +1805,7 @@ bool subdivDeleteLower(Mesh& mesh, std::string& error) {
         return false;
     }
     if (mesh.multires->current == 0) {
-        error = "There are no lower levels (this is SDiv 1)";
+        error = "There are no lower levels (this is Level 1)";
         return false;
     }
     MultiresStack& s = mutableStack(mesh);
@@ -1970,7 +1970,7 @@ bool subdivInSync(const Mesh& mesh) {
            !levelsDiffer(mesh, r);
 }
 
-// --- Reconstruct Subdiv ---
+// --- Rebuild Lower Levels ---
 
 namespace {
 
@@ -2321,7 +2321,7 @@ bool subdivReconstruct(Mesh& mesh, std::string& error, BVH* bvh) {
         if (!subdivCommit(mesh)) {
             // dropped: reconstruct from this mesh alone
         } else if (mesh.multires->current != 0) {
-            error = "Reconstruct Subdiv works at the lowest level (step down to SDiv 1 first)";
+            error = "Rebuild Lower Levels works at the lowest level (step down to Level 1 first)";
             return false;
         }
     }
@@ -2495,9 +2495,9 @@ std::string levelSummary(const Mesh& m) {
 } // namespace
 
 bool divideUndoable(Document& doc, bool smooth, std::string& message) {
-    return runUndoable(doc, "Divide", [&](Mesh& m, std::string& msg, BVH* bvh) {
+    return runUndoable(doc, "Add Level", [&](Mesh& m, std::string& msg, BVH* bvh) {
         if (!subdivDivide(m, smooth, msg, bvh)) return false;
-        msg = "Divided: " + levelSummary(m);
+        msg = "Added a level: " + levelSummary(m);
         return true;
     }, message, doc.mesh.multires ? -1 : 0);
 }
@@ -2511,7 +2511,7 @@ bool setSubdivLevelUndoable(Document& doc, int level, std::string& message) {
         message = levelSummary(doc.mesh);
         return true;
     }
-    return runUndoable(doc, "SDiv " + std::to_string(level + 1), [&](Mesh& m, std::string& msg, BVH* bvh) {
+    return runUndoable(doc, "Level " + std::to_string(level + 1), [&](Mesh& m, std::string& msg, BVH* bvh) {
         if (!subdivSetLevel(m, level, msg, bvh)) return false;
         msg = levelSummary(m);
         return true;
@@ -2519,7 +2519,7 @@ bool setSubdivLevelUndoable(Document& doc, int level, std::string& message) {
 }
 
 bool deleteLowerUndoable(Document& doc, std::string& message) {
-    return runUndoable(doc, "Delete Lower", [&](Mesh& m, std::string& msg, BVH*) {
+    return runUndoable(doc, "Remove Below", [&](Mesh& m, std::string& msg, BVH*) {
         if (!subdivDeleteLower(m, msg)) return false;
         msg = "Deleted the lower levels: " + levelSummary(m);
         return true;
@@ -2527,7 +2527,7 @@ bool deleteLowerUndoable(Document& doc, std::string& message) {
 }
 
 bool deleteHigherUndoable(Document& doc, std::string& message) {
-    return runUndoable(doc, "Delete Higher", [&](Mesh& m, std::string& msg, BVH*) {
+    return runUndoable(doc, "Remove Above", [&](Mesh& m, std::string& msg, BVH*) {
         if (!subdivDeleteHigher(m, msg)) return false;
         msg = "Deleted the higher levels: " + levelSummary(m);
         return true;
@@ -2547,13 +2547,13 @@ bool freezeLevelsUndoable(Document& doc, std::string& message) {
         }
         if (m.multires && m.multires->current + 1 < int(m.multires->levels.size()) && !subdivDeleteHigher(m, msg)) return false;
         if (m.multires && m.multires->current > 0 && !subdivDeleteLower(m, msg)) return false;
-        msg = "Froze SDiv " + std::to_string(level) + " of " + std::to_string(levels) + ": " + levelSummary(m);
+        msg = "Froze Level " + std::to_string(level) + " of " + std::to_string(levels) + ": " + levelSummary(m);
         return true;
     }, message);
 }
 
 bool reconstructUndoable(Document& doc, std::string& message) {
-    return runUndoable(doc, "Reconstruct Subdiv", [&](Mesh& m, std::string& msg, BVH* bvh) {
+    return runUndoable(doc, "Rebuild Lower Levels", [&](Mesh& m, std::string& msg, BVH* bvh) {
         if (!subdivReconstruct(m, msg, bvh)) return false;
         msg = "Reconstructed a lower level: " + levelSummary(m);
         return true;

@@ -95,7 +95,7 @@
 <strong>Memory.</strong> A divided model takes about 85 bytes per triangle: about 37 for the sculpting mesh, 17 for its BVH and 29 for its subdivision levels. A 33 million triangle sculpt with levels needs about 3.4 GB of memory, a 100 million one about 9 GB (and a little more while dividing). Opening a project needs only a little more than the model itself. A mesh without levels (an import, a remesh) takes about 60 bytes per triangle for the mesh. Project files over 4 GB are saved in the ZIP64 format.
 </li>
 <li>
-<strong>How far Divide goes</strong> depends on the memory: about 160 million triangles on a computer with 32 GB.
+<strong>How far Add Level goes</strong> depends on the memory: about 160 million triangles on a computer with 32 GB.
 </li>
 <li>
 <strong>The graphics card.</strong> A mesh needs about 15 bytes per triangle on the graphics card (vertex paint and a mask add about 3; the wireframe, while it is on, about 4; the lighter version Fast Navigation draws, once you move the view, about 1.5). If a Part doesn&#x27;t fit, SculptForge doesn&#x27;t draw it and says so in the status bar instead of failing: hide other Parts or step down a subdivision level.

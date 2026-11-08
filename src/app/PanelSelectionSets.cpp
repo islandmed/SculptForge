@@ -123,7 +123,7 @@ void App::drawSelectionSetsSection() {
             if (!fits) ImGui::PopStyleColor();
             if (ImGui::IsItemHovered()) {
                 std::string tip = setChannelNames(s.channels);
-                if (subdivLevelCount(doc_.mesh)) tip += "\nStored at SDiv " + std::to_string(s.level + 1);
+                if (subdivLevelCount(doc_.mesh)) tip += "\nStored at Level " + std::to_string(s.level + 1);
                 if (!fits) tip += "\nDoesn't fit this mesh (its topology changed)";
                 tip += "\nDouble-click to restore";
                 ImGui::SetTooltip("%s", tip.c_str());

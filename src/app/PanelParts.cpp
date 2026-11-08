@@ -329,10 +329,10 @@ void App::drawPartsContents() {
     if (ImGui::BeginTable("##parts", 5, ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_PadOuterX, ImVec2(-1, listH))) {
         const float eyeW = ImGui::GetTextLineHeight() * 1.2f;
         ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthStretch);
-        // Subdivision levels lists them ("SDiv 3/5"); empty for meshes without levels.
+        // Subdivision levels lists them ("Level 3/5"); empty for meshes without levels.
         bool anyLevels = false;
         for (int i = 0; i < count && !anyLevels; ++i) anyLevels = subdivLevelCount(doc_.partMesh(i)) > 0;
-        ImGui::TableSetupColumn("sdiv", ImGuiTableColumnFlags_WidthFixed, anyLevels ? ImGui::CalcTextSize("SDiv 8/8").x : 0.0f);
+        ImGui::TableSetupColumn("level", ImGuiTableColumnFlags_WidthFixed, anyLevels ? ImGui::CalcTextSize("Level 8/8").x : 0.0f);
         ImGui::TableSetupColumn("tris", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("0.00M").x);
         ImGui::TableSetupColumn("shade", ImGuiTableColumnFlags_WidthFixed, eyeW);
         ImGui::TableSetupColumn("eye", ImGuiTableColumnFlags_WidthFixed, eyeW);
@@ -467,10 +467,10 @@ void App::drawPartsContents() {
             }
             ImGui::TableSetColumnIndex(1);
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + textDy);
-            if (const std::string sdiv = subdivLevelText(doc_.partMesh(i)); !sdiv.empty()) {
+            if (const std::string levelText = subdivLevelText(doc_.partMesh(i)); !levelText.empty()) {
                 ImVec4 col = style.Colors[isActive ? ImGuiCol_Text : ImGuiCol_TextDisabled];
                 if (isActive) col.w *= 0.75f;
-                ImGui::TextColored(col, "%s", sdiv.c_str());
+                ImGui::TextColored(col, "%s", levelText.c_str());
             }
             ImGui::TableSetColumnIndex(2);
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + textDy);

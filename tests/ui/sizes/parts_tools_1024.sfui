@@ -17,7 +17,7 @@ expect_value part_shading == 2
 shot parts-split-shading
 key ctrl+z
 
-# Tool > Visibility: Delete masked beside Delete hidden.
+# Tool > Visibility: Delete masked beside Remove Hidden.
 click "Visibility"
 shot delete-masked-button
 click "Delete masked"

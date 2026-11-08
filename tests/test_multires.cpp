@@ -3,7 +3,7 @@
 //
 // Multiresolution subdivision levels (core/Multires.h): Divide keeps quads, detail survives stepping up and
 // down bit-for-bit, low-level edits carry the high-level detail along, high-level edits show up below, mask /
-// face groups / UVs / paint / sculpt layers follow the levels, undo steps across levels, Delete Lower / Delete
+// face groups / UVs / paint / sculpt layers follow the levels, undo steps across levels, Remove Below / Delete
 // Higher / Reconstruct, projects keep every level, and exports can write the base.
 #include "TestHarness.h"
 
@@ -90,7 +90,7 @@ TEST(multires_divide_keeps_quads_and_counts) {
     CHECK(d.mesh.triangleCount() == baseTris * 4);
     CHECK(d.mesh.quadCount() * 2 == d.mesh.triangleCount()); // Catmull-Clark: all quads
     CHECK(run(d, "subdiv_divide").ok);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 3/3");
+    CHECK(subdivLevelText(d.mesh) == "Level 3/3");
     CHECK(d.mesh.triangleCount() == baseTris * 16);
     CHECK(d.mesh.quadCount() * 2 == d.mesh.triangleCount());
     CHECK(subdivLevelTriangles(d.mesh, 0) == baseTris);
@@ -336,16 +336,16 @@ TEST(multires_delete_lower_and_higher) {
     const std::vector<glm::vec3> level2 = d.mesh.positions;
     const size_t tris2 = d.mesh.triangleCount();
     CHECK(run(d, "subdiv_delete_lower").ok);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 1/3");
+    CHECK(subdivLevelText(d.mesh) == "Level 1/3");
     CHECK(bitEqual(d.mesh.positions, level2));
     CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
     CHECK(d.mesh.triangleCount() == tris2 * 16);
     CHECK(run(d, "subdiv_level", {{"level", 2.0}}).ok);
     CHECK(run(d, "subdiv_delete_higher").ok);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 2/2");
+    CHECK(subdivLevelText(d.mesh) == "Level 2/2");
     CHECK(!run(d, "subdiv_higher").ok);
     CHECK(run(d, "undo").ok);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 2/3");
+    CHECK(subdivLevelText(d.mesh) == "Level 2/3");
     // Deleting down to one level leaves a plain mesh.
     CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
     CHECK(run(d, "subdiv_delete_higher").ok);
@@ -370,7 +370,7 @@ TEST(multires_freeze_levels_for_dynamic) {
     CHECK(d.mesh.triangleCount() == tris2);
     CHECK(bitEqual(d.mesh.positions, level2));
     CHECK(run(d, "undo").ok);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 2/4");
+    CHECK(subdivLevelText(d.mesh) == "Level 2/4");
     CHECK(bitEqual(d.mesh.positions, level2));
     // In one go, from the top level.
     Document e = dividedCube(2);
@@ -395,11 +395,11 @@ TEST(multires_reconstruct_finds_lower_levels) {
     const std::vector<glm::vec3> fine = plain.positions;
     Document d = makeDoc(std::move(plain));
     CHECK(run(d, "subdiv_reconstruct").ok);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 1/2");
+    CHECK(subdivLevelText(d.mesh) == "Level 1/2");
     CHECK(d.mesh.triangleCount() == src.mesh.triangleCount() / 4);
     CHECK(d.mesh.quadCount() * 2 == d.mesh.triangleCount());
     CHECK(run(d, "subdiv_reconstruct").ok);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 1/3");
+    CHECK(subdivLevelText(d.mesh) == "Level 1/3");
     CHECK(d.mesh.triangleCount() == makeCube(2).triangleCount());
     CHECK(d.mesh.vertexCount() == makeCube(2).vertexCount());
     // The base sits on the fine level's corner vertices.
@@ -425,7 +425,7 @@ TEST(multires_reconstruct_finds_lower_levels) {
     CHECK(subdivLevelCount(ok.mesh) == 0);
     CHECK(run(d, "undo").ok); // the step to level 3
     CHECK(run(d, "undo").ok); // the second reconstruct
-    CHECK(subdivLevelText(d.mesh) == "SDiv 1/2");
+    CHECK(subdivLevelText(d.mesh) == "Level 1/2");
 }
 
 // #145: `coarse` (all quads) gets UDIM UVs, every quad in its own tile (so every edge is a seam), is divided once
@@ -485,7 +485,7 @@ static void checkReconstructKeepsUvs(Mesh coarse, bool flip = false) {
     const std::vector<glm::vec3> finePositions = plain.positions;
     Document d = makeDoc(std::move(plain));
     CHECK(run(d, "subdiv_reconstruct").ok);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 1/2");
+    CHECK(subdivLevelText(d.mesh) == "Level 1/2");
     const Mesh base = subdivLevelMesh(src.mesh, 0);
     CHECK(d.mesh.triangleCount() == base.triangleCount() && d.mesh.vertexCount() == base.vertexCount());
     CHECK(d.mesh.uvs.size() == d.mesh.triangleCount() * 3);
@@ -624,11 +624,11 @@ static void checkReconstructLevelsKeepUvs(const char* name, Mesh coarse, int lev
                 if ((found = all)) break;
             }
             if (!found && wrong++ == 0)
-                std::printf("    SDiv %d triangle %u: UVs (%g,%g) (%g,%g) (%g,%g) aren't one original face's\n", k + 1, t,
+                std::printf("    Level %d triangle %u: UVs (%g,%g) (%g,%g) (%g,%g) aren't one original face's\n", k + 1, t,
                             got.uvs[t * 3].x, got.uvs[t * 3].y, got.uvs[t * 3 + 1].x, got.uvs[t * 3 + 1].y, got.uvs[t * 3 + 2].x,
                             got.uvs[t * 3 + 2].y);
         }
-        if (wrong) std::printf("    SDiv %d: %zu of %zu triangles wrong\n", k + 1, wrong, got.triangleCount());
+        if (wrong) std::printf("    Level %d: %zu of %zu triangles wrong\n", k + 1, wrong, got.triangleCount());
         CHECK(wrong == 0);
     }
     // Stepping through every level and back to the top gives back the imported UVs.
@@ -707,10 +707,10 @@ static void checkReconstructSeamsThroughFaces(const char* name, Mesh coarse, int
                     ok = glm::length(got.uvs[size_t(t) * 3 + size_t(j)] - islandUv(island, got.positions[got.triangles[t][j]])) < 0.05f;
             }
             if (!ok && wrong++ == 0)
-                std::printf("    SDiv %d triangle %u: UVs (%g,%g) (%g,%g) (%g,%g) aren't one island's\n", k + 1, t, got.uvs[t * 3].x,
+                std::printf("    Level %d triangle %u: UVs (%g,%g) (%g,%g) (%g,%g) aren't one island's\n", k + 1, t, got.uvs[t * 3].x,
                             got.uvs[t * 3].y, got.uvs[t * 3 + 1].x, got.uvs[t * 3 + 1].y, got.uvs[t * 3 + 2].x, got.uvs[t * 3 + 2].y);
         }
-        if (wrong) std::printf("    SDiv %d: %zu of %zu triangles wrong\n", k + 1, wrong, got.triangleCount());
+        if (wrong) std::printf("    Level %d: %zu of %zu triangles wrong\n", k + 1, wrong, got.triangleCount());
         CHECK(wrong == 0);
     }
     CHECK(run(d, "subdiv_level", {{"level", double(levels + 1)}}).ok);
@@ -739,7 +739,7 @@ TEST(multires_project_round_trip_keeps_every_level) {
     CHECK(saveProject(path, d, err));
     Document e;
     CHECK(loadProject(path, e, err));
-    CHECK(subdivLevelText(e.mesh) == "SDiv 2/4");
+    CHECK(subdivLevelText(e.mesh) == "Level 2/4");
     CHECK(bitEqual(e.mesh.positions, levels[1]));
     CHECK(e.mesh.facegroupAt(3) == 5);
     for (int i : {0, 3, 2, 1}) {
@@ -753,9 +753,9 @@ TEST(multires_project_round_trip_keeps_every_level) {
     Document f;
     CHECK(loadProject(path, f, err));
     CHECK(f.partCount() == 2);
-    CHECK(subdivLevelText(f.mesh) == "SDiv 2/2");
+    CHECK(subdivLevelText(f.mesh) == "Level 2/2");
     f.selectPart(0);
-    CHECK(subdivLevelText(f.mesh) == "SDiv 2/4");
+    CHECK(subdivLevelText(f.mesh) == "Level 2/4");
     CHECK(run(f, "subdiv_level", {{"level", 4.0}}).ok);
     CHECK(maxDistance(f.mesh.positions, levels[3]) < 1e-6f);
     std::filesystem::remove(path);
@@ -766,9 +766,9 @@ TEST(multires_parts_exports_and_info) {
     d.addPart(makeIcosphere(1), "Eye", true);
     CHECK(subdivLevelCount(d.mesh) == 0);
     d.selectPart(0);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 3/3");
-    CHECK(run(d, "part_list").message.find("SDiv 3/3") != std::string::npos);
-    CHECK(run(d, "subdiv_info").message.find("SDiv 1: 108 triangles") != std::string::npos);
+    CHECK(subdivLevelText(d.mesh) == "Level 3/3");
+    CHECK(run(d, "part_list").message.find("Level 3/3") != std::string::npos);
+    CHECK(run(d, "subdiv_info").message.find("Level 1: 108 triangles") != std::string::npos);
     // Exports write the current level; subdiv_export the base.
     const std::string cur = tempPath("sf_multires_cur.obj"), base = tempPath("sf_multires_base.obj");
     d.parts[1].visible = false;
@@ -776,7 +776,7 @@ TEST(multires_parts_exports_and_info) {
     CHECK(run(d, "subdiv_export", {{"path", base}}).ok);
     CHECK(countObjFaces(cur, 4) == 54 * 16);
     CHECK(countObjFaces(base, 4) == 54);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 3/3"); // exporting the base doesn't change the scene
+    CHECK(subdivLevelText(d.mesh) == "Level 3/3"); // exporting the base doesn't change the scene
     std::filesystem::remove(cur);
     std::filesystem::remove(base);
     // A topology change (remesh, the old flat subdivide) drops the levels.

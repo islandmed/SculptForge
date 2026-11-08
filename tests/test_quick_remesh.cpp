@@ -171,7 +171,7 @@ TEST(voxel_remesh_open_starter_head_stays_solid) {
 
 // A mesh that can't be made solid keeps the original: an empty result and a reason, never a holed shell. A sphere
 // with its top cut off and a fin on one edge of the opening: that edge has two triangles, so the border is no loop
-// Close Holes can cap, and the outside floods in.
+// Fill Holes can cap, and the outside floods in.
 TEST(voxel_remesh_uncappable_open_mesh_says_why) {
     Mesh bowl = makeIcosphere(4);
     std::vector<glm::uvec3> kept;
@@ -192,7 +192,7 @@ TEST(voxel_remesh_uncappable_open_mesh_says_why) {
     fin.positions.push_back((fin.positions[a] + fin.positions[b]) * 0.5f + glm::vec3(0.0f, 0.3f, 0.0f));
     fin.triangles.push_back(glm::uvec3(a, b, uint32_t(fin.positions.size() - 1))); // (a -> b twice)
     fin.rebuildTopology();
-    CHECK(boundaryLoops(fin).empty()); // (nothing Close Holes could cap)
+    CHECK(boundaryLoops(fin).empty()); // (nothing Fill Holes could cap)
     err.clear();
     CHECK(voxelRemesh(fin, 64, &err).triangleCount() == 0);
     CHECK(err.find("open borders") != std::string::npos);

@@ -7,7 +7,7 @@
 // entry, so older versions ignore them and older projects open without any).
 //
 // QRemesh (core/QRemesh.cpp) uses them twice: the cross field turns to follow every curve, with a falloff
-// over a few quads that Curves Strength widens, and the quad lattice gets a line along each curve, so one edge
+// over a few quads that Guide Strength widens, and the quad lattice gets a line along each curve, so one edge
 // loop runs right on it.
 #pragma once
 

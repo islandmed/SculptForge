@@ -140,7 +140,7 @@ setting is also in the <kbd>F3</kbd> command palette (type "antialiasing", "fast
   million one about 9 GB (and a little more while dividing). Opening a project needs only a little more than the
   model itself. A mesh without levels (an import, a remesh) takes about 60 bytes per triangle for the mesh. Project
   files over 4 GB are saved in the ZIP64 format.
-- **How far Divide goes** depends on the memory: about 160 million triangles on a computer with 32 GB.
+- **How far Add Level goes** depends on the memory: about 160 million triangles on a computer with 32 GB.
 - **The graphics card.** A mesh needs about 15 bytes per triangle on the graphics card (vertex paint and a mask add
   about 3; the wireframe, while it is on, about 4; the lighter version Fast Navigation draws, once you move
   the view, about 1.5). If a Part doesn't fit, SculptForge doesn't draw it and says so in the status bar

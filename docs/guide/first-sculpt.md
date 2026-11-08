@@ -70,14 +70,14 @@ it smaller and bigger.
 
 > **Tip:** hold <kbd>Shift</kbd> and drag to smooth with any brush, whenever a stroke leaves a lump.
 
-## 5. Divide three times
+## 5. Add three levels
 
 **Goal:** enough polygons for crisp eyes and colours.
 
-1. Press <kbd>Ctrl</kbd>+<kbd>D</kbd> three times (**Tool > Geometry > Divide**). Each Divide makes four polygons
+1. Press <kbd>Ctrl</kbd>+<kbd>D</kbd> three times (**Tool > Geometry > Add Level**). Each new level makes four polygons
    out of every one and smooths the shape: about 5 million triangles now.
 
-![Divided three times: the same shape, smoother](images/first-sculpt/05-divide.jpg)
+![Three levels added: the same shape, smoother](images/first-sculpt/05-divide.jpg)
 
 > **Tip:** sculptors block out the big shapes on a light mesh, then divide for details.
 > <kbd>Shift</kbd>+<kbd>D</kbd> and <kbd>D</kbd> step down and up the levels. See

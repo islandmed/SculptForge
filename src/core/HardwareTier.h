@@ -46,7 +46,7 @@ bool simulatedHwTier(HwTier& out);
 struct TierBudgets {
     // Scenes
     uint64_t residentTriangles = 300'000'000;  // triangles held in full detail; past it far parts use coarse levels
-    uint64_t maxMicroTriangles = 300'000'000;  // micro triangles the tier holds before Divide to Micro asks (it then
+    uint64_t maxMicroTriangles = 300'000'000;  // micro triangles the tier holds before Add Micro asks (it then
                                                // streams with Focus Detail rather than failing)
     bool billionScenes = false;                // 1B-triangle scenes without asking (else opt-in)
     uint64_t optInMicroTriangles = 1'000'000'000; // the opt-in ceiling (past it: coarse levels and a message, no failure)

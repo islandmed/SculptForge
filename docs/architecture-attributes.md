@@ -46,7 +46,7 @@ requires both halves to share a face group: what Wire shows as a quad and what e
 | `decimate` / `generateLods` (Decimate.cpp) | exact (vertices are a subset) | surviving faces keep theirs | follow kept vertex (approximate at seams) | dropped |
 | `voxelRemesh` (Voxel.cpp) | nearest original vertex (`transferVertexAttributes`) | **reset** (visible, group 0) | dropped | new: every surface-nets quad |
 | `weldImported` (Mesh.cpp) | first vertex of each welded group | per kept triangle | per kept triangle | pairs of kept triangles |
-| `extractTriangles` / split / delete hidden (Face Groups.cpp) | per kept vertex | per kept triangle | per kept triangle | pairs with both halves kept |
+| `extractTriangles` / split / remove hidden (Face Groups.cpp) | per kept vertex | per kept triangle | per kept triangle | pairs with both halves kept |
 | `mergeMeshes` (Parts.cpp) | concatenated | concatenated | concatenated | concatenated (ids shifted) |
 | plane / cube primitives | empty | cube: one group per side | empty | every grid cell |
 | icosphere, image relief/inflate | empty | empty | empty | empty |

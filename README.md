@@ -76,7 +76,7 @@ paint come along).
 - Stroke types (dots, drag-rect, spray, lazy mouse) and brush alphas (built-in or any grayscale image).
 - **Masking** (Ctrl to paint, invert, blur, sharpen, grow/shrink, mask by cavity or face group) that every brush
   respects.
-- **Face Groups and visibility** with classic gestures: auto groups, Ctrl+Shift isolate / hide, rectangle hide, delete
+- **Face Groups and visibility** with classic gestures: auto groups, Ctrl+Shift isolate / hide, rectangle hide, remove
   hidden.
 - **Parts**: keep the body, eyes, teeth and armour as separate meshes, each with its own undo history. You can
   append a sphere, cube, plane or model file, show/hide, solo, reorder, duplicate, merge and split (by face group or
@@ -90,7 +90,7 @@ paint come along).
   USD, FBX and Bridge exports write the PNG next to the model.
 - **Project files** (`.sfproj`) that keep everything, with an unsaved-changes prompt, recent files and autosave.
 - Unlimited undo, Loop subdivision, **voxel remesh** (voxel remesh) and quadric decimation.
-- **Quad Remesh** quad retopology (quad remesh: target count, Adaptive Size, Keep Groups, vertex paint density,
+- **Quad Remesh** quad retopology (quad remesh: target count, Size Variation, Follow Face Groups, vertex paint density,
   symmetry) and **Project Detail** to bring the sculpted detail back onto the new topology.
 - **Sculpt layers** that work as blend shapes, with live weights and playback.
 

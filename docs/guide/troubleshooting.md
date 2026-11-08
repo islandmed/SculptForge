@@ -279,7 +279,7 @@ Not directly: those formats are proprietary and undocumented. Export OBJ or FBX 
 
 **Does it have subdivision levels, voxel remesh, quad remesh or UVs?**
 Yes: **Voxel Remesh**, **Quad Remesh** (with **Project Detail** to bring the detail back; see
-[Quad retopology](retopology.md)), **Auto UV** unwraps any model, and Divide adds subdivision levels you can
+[Quad retopology](retopology.md)), **Auto UV** unwraps any model, and Add Level adds subdivision levels you can
 step up and down (see [Subdivision levels](subdivision-levels.md)). **Dynamic** on the top shelf is dynamic
 topology, like dynamic topology (see [Dynamic topology](dynamic-topology.md)).
 

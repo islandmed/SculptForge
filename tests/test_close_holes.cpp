@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Close Holes (#103): holes in a sphere, an open hemisphere, a plane, the size filter, attributes and undo.
+// Fill Holes (#103): holes in a sphere, an open hemisphere, a plane, the size filter, attributes and undo.
 #include "TestHarness.h"
 
 #include "core/CloseHoles.h"
@@ -81,7 +81,7 @@ TEST(close_holes_two_holes_in_a_sphere) {
     // Each patch is its own new face group.
     CHECK(d.mesh.hasFaceGroups());
     CHECK(d.mesh.facegroupAt(0) == 0 && d.mesh.facegroupAt(uint32_t(d.mesh.triangleCount() - 1)) == 1);
-    // Undo brings the holes back; a second Close Holes finds none.
+    // Undo brings the holes back; a second Fill Holes finds none.
     CHECK(registry().execute(d, "undo").ok);
     CHECK(d.mesh.triangleCount() == t0);
     CHECK(registry().execute(d, "redo").ok);
@@ -155,7 +155,7 @@ TEST(close_holes_big_hole_is_quick) {
     const auto start = std::chrono::steady_clock::now();
     CHECK(closeHoles(half, {}, s, error));
     const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-    std::printf("  close holes: %zu-edge loop, %zu triangles in %.0f ms\n", loop, s.triangles, seconds * 1000.0);
+    std::printf("  fill holes: %zu-edge loop, %zu triangles in %.0f ms\n", loop, s.triangles, seconds * 1000.0);
     CHECK(seconds < sf::test::timeLimit(1.5));
     CHECK(isWatertight(half));
     float lowest = 0.0f;

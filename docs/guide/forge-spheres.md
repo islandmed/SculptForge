@@ -63,7 +63,7 @@ Turn Preview off to edit the spheres again; while it is on, clicks on the model 
 **Make Mesh** builds the skin as a new Part right below the Forge Sphere Part and makes it active:
 
 - It is watertight and made of quads, ready for the brushes, [Dynamic topology](dynamic-topology.md),
-  [Divide](subdivision-levels.md) or [Quad Remesh](retopology.md).
+  [Add Level](subdivision-levels.md) or [Quad Remesh](retopology.md).
 - Each link gets its own [face group](face-groups.md), so you can isolate or mask a limb straight away.
 - **Resolution** sets how dense it is: cells across the model's longest side. 128 suits a blockout; raise it for
   thin fingers or tails that come out too thin or broken.
@@ -71,7 +71,7 @@ Turn Preview off to edit the spheres again; while it is on, clicks on the model 
 The Forge Sphere Part is hidden and kept. To change the proportions later, show and select it, edit the spheres and
 Make Mesh again. The armature is saved with the project.
 
-> **Tip:** for clean edge flow, run [Quad Remesh](retopology.md) on the new mesh, then Divide and sculpt.
+> **Tip:** for clean edge flow, run [Quad Remesh](retopology.md) on the new mesh, then add levels and sculpt.
 
 ## Scripting
 

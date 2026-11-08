@@ -204,7 +204,7 @@ TEST(qremesh2_hard_edges_and_groups) {
                 r.st.quality.hausdorff, r.st.fallbackPieces);
     CHECK(topologyReport(r.out).manifold());
     CHECK(r.st.quality.hausdorff < 1.0f); // the corners and the fin stay sharp
-    // Keep Groups on a cube: the result keeps the six groups, each quad in one.
+    // Follow Face Groups on a cube: the result keeps the six groups, each quad in one.
     CommandRegistry reg;
     Document doc;
     doc.setMesh(makeCube(24));

@@ -1054,7 +1054,7 @@ void registerSelectionSetCommands(CommandRegistry& reg) {
                  s << list->sets.size() << " selection set" << (list->sets.size() == 1 ? "" : "s") << ":";
                  for (const auto& set : list->sets) {
                      s << "\n  " << set->name << " (" << setChannelNames(set->channels);
-                     if (subdivLevelCount(doc.mesh)) s << ", SDiv " << set->level + 1;
+                     if (subdivLevelCount(doc.mesh)) s << ", Level " << set->level + 1;
                      if (!selectionSetFits(doc.mesh, *set)) s << ", doesn't fit this mesh";
                      if (set->name == list->morphTarget) s << ", morph target";
                      s << ")";

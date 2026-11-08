@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Sculpt layers on subdivision levels 3D Layers: a layer recorded at the top level survives stepping
-// down and up, Divide, Reconstruct Subdiv, Delete Lower / Delete Higher, saving and loading, and stays togglable and
+// down and up, Divide, Rebuild Lower Levels, Remove Below / Remove Above, saving and loading, and stays togglable and
 // blendable at every level; layers added or sculpted at a low level show at the top; undo across levels; blend
 // shapes export from the current level.
 #include "TestHarness.h"
@@ -87,7 +87,7 @@ Document layeredCube(int levels) {
 
 TEST(layers_levels_record_at_top_step_down_and_up) {
     Document d = layeredCube(3);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 4/4");
+    CHECK(subdivLevelText(d.mesh) == "Level 4/4");
     CHECK(d.mesh.layers.size() == 1);
     const std::vector<glm::vec3> top = d.mesh.positions, base = d.mesh.base, delta = d.mesh.layers[0].delta;
     CHECK(maxLength(delta) > 0.02f);
@@ -133,7 +133,7 @@ TEST(layers_levels_low_level_shows_the_layer_as_the_base_would) {
         CHECK(run(b, "subdiv_level", {{"level", double(level)}}).ok);
         std::vector<glm::vec3> change(b.mesh.positions.size());
         for (size_t v = 0; v < change.size(); ++v) change[v] = b.mesh.positions[v] - plain[size_t(level - 1)][v];
-        std::printf("  SDiv %d: layer %.4f, base change %.4f, differ by %.2g; base untouched %.2g\n", level,
+        std::printf("  Level %d: layer %.4f, base change %.4f, differ by %.2g; base untouched %.2g\n", level,
                     maxLength(a.mesh.layers[0].delta), maxLength(change), maxDistance(a.mesh.layers[0].delta, change),
                     maxDistance(a.mesh.base, plain[size_t(level - 1)]));
         CHECK(maxDistance(a.mesh.layers[0].delta, change) < 1e-4f);
@@ -168,7 +168,7 @@ TEST(layers_levels_divide_with_layers) {
     const std::vector<glm::vec3> top = d.mesh.positions;
     const size_t tris = d.mesh.triangleCount();
     CHECK(run(d, "subdiv_divide").ok);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 4/4");
+    CHECK(subdivLevelText(d.mesh) == "Level 4/4");
     CHECK(d.mesh.triangleCount() == tris * 4);
     CHECK(d.mesh.layers.size() == 1);
     CHECK(layerMismatch(d.mesh) < 1e-5f);
@@ -181,7 +181,7 @@ TEST(layers_levels_divide_with_layers) {
     // Divide from a lower level steps to the top first.
     CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
     CHECK(run(d, "subdiv_divide").ok);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 5/5");
+    CHECK(subdivLevelText(d.mesh) == "Level 5/5");
     CHECK(d.mesh.layers.size() == 1 && layerMismatch(d.mesh) < 1e-5f);
     // A layer added at the top after dividing, and one more division.
     CHECK(run(d, "layer_add", {{"name", "Blink"}}).ok);
@@ -195,7 +195,7 @@ TEST(layers_levels_divide_with_layers) {
 TEST(layers_levels_added_or_sculpted_low_show_at_the_top) {
     Document d = layeredCube(2);
     const std::vector<glm::vec3> topDelta = d.mesh.layers[0].delta;
-    // A new layer added and sculpted at SDiv 1.
+    // A new layer added and sculpted at Level 1.
     CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
     CHECK(run(d, "layer_add", {{"name", "Jaw"}}).ok);
     d.activeLayer = 1;
@@ -205,10 +205,10 @@ TEST(layers_levels_added_or_sculpted_low_show_at_the_top) {
     CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
     CHECK(d.mesh.layers.size() == 2 && d.mesh.layers[1].name == "Jaw");
     CHECK(layerMismatch(d.mesh) < 1e-5f);
-    std::printf("  Jaw: %.3f at SDiv 1, %.3f at the top\n", lowJaw, maxLength(d.mesh.layers[1].delta));
+    std::printf("  Jaw: %.3f at Level 1, %.3f at the top\n", lowJaw, maxLength(d.mesh.layers[1].delta));
     CHECK(maxLength(d.mesh.layers[1].delta) > 0.5f * lowJaw);
     CHECK(maxDistance(d.mesh.layers[0].delta, topDelta) < 1e-5f); // the other layer is untouched
-    // The Smile layer sculpted further at SDiv 2 keeps its top-level detail and adds the broad change.
+    // The Smile layer sculpted further at Level 2 keeps its top-level detail and adds the broad change.
     CHECK(run(d, "subdiv_level", {{"level", 2.0}}).ok);
     d.activeLayer = 0;
     CHECK(stroke(d, "0.35,0.35,2 0.45,0.45,2", "Standard", 0.3));
@@ -220,7 +220,7 @@ TEST(layers_levels_added_or_sculpted_low_show_at_the_top) {
         if (d.mesh.positions[v].x > 0.2f && d.mesh.positions[v].y > 0.2f) changed = std::max(changed, dv);
         else if (d.mesh.positions[v].x < -0.2f) kept = std::max(kept, dv);
     }
-    std::printf("  Smile after a stroke at SDiv 2: %.3f where it went, %.2g far away\n", changed, kept);
+    std::printf("  Smile after a stroke at Level 2: %.3f where it went, %.2g far away\n", changed, kept);
     CHECK(changed > 0.01f && kept < 1e-4f);
     // Removing a layer at a low level removes it everywhere.
     CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
@@ -231,7 +231,7 @@ TEST(layers_levels_added_or_sculpted_low_show_at_the_top) {
 }
 
 TEST(layers_levels_base_edit_low_keeps_the_layer_on_top) {
-    // Reshape the base at SDiv 1 (no layer active): the top keeps its layer, riding on the new shape.
+    // Reshape the base at Level 1 (no layer active): the top keeps its layer, riding on the new shape.
     Document d = layeredCube(2);
     const std::vector<glm::vec3> delta = d.mesh.layers[0].delta;
     CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
@@ -260,10 +260,10 @@ TEST(layers_levels_reconstruct_with_layers) {
     const std::vector<glm::vec3> top = plain.positions, delta = plain.layers[0].delta;
     Document d = makeDoc(std::move(plain));
     CHECK(run(d, "subdiv_reconstruct").ok);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 1/2");
+    CHECK(subdivLevelText(d.mesh) == "Level 1/2");
     CHECK(d.mesh.layers.size() == 1 && layerMismatch(d.mesh) < 1e-5f);
     CHECK(run(d, "subdiv_reconstruct").ok);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 1/3");
+    CHECK(subdivLevelText(d.mesh) == "Level 1/3");
     CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
     CHECK(maxDistance(d.mesh.positions, top) < 1e-5f);
     CHECK(maxDistance(d.mesh.layers[0].delta, delta) < 1e-5f);
@@ -281,18 +281,18 @@ TEST(layers_levels_delete_lower_and_higher) {
     CHECK(run(d, "subdiv_level", {{"level", 2.0}}).ok);
     const std::vector<glm::vec3> level2 = d.mesh.positions, delta2 = d.mesh.layers[0].delta;
     CHECK(run(d, "subdiv_delete_lower").ok);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 1/3");
+    CHECK(subdivLevelText(d.mesh) == "Level 1/3");
     CHECK(maxDistance(d.mesh.positions, level2) < 1e-6f);
     CHECK(maxDistance(d.mesh.layers[0].delta, delta2) < 1e-6f);
     CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
     CHECK(maxDistance(d.mesh.positions, top) < 1e-5f);
     CHECK(maxDistance(d.mesh.layers[0].delta, delta) < 1e-5f);
     CHECK(layerMismatch(d.mesh) < 1e-5f);
-    // Delete Higher at SDiv 2: that level, layer included, becomes the top.
+    // Remove Above at Level 2: that level, layer included, becomes the top.
     CHECK(run(d, "subdiv_level", {{"level", 2.0}}).ok);
     const std::vector<glm::vec3> mid = d.mesh.positions, midDelta = d.mesh.layers[0].delta;
     CHECK(run(d, "subdiv_delete_higher").ok);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 2/2");
+    CHECK(subdivLevelText(d.mesh) == "Level 2/2");
     CHECK(maxDistance(d.mesh.positions, mid) < 1e-6f && maxDistance(d.mesh.layers[0].delta, midDelta) < 1e-6f);
     CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
     CHECK(run(d, "subdiv_level", {{"level", 2.0}}).ok);
@@ -301,7 +301,7 @@ TEST(layers_levels_delete_lower_and_higher) {
     CHECK(run(d, "undo").ok);
     CHECK(run(d, "undo").ok);
     CHECK(run(d, "undo").ok);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 2/3");
+    CHECK(subdivLevelText(d.mesh) == "Level 2/3");
     CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
     CHECK(maxDistance(d.mesh.positions, top) < 1e-5f && maxDistance(d.mesh.layers[0].delta, delta) < 1e-5f);
 }
@@ -313,13 +313,13 @@ TEST(layers_levels_undo_across_levels) {
     d.activeLayer = 0;
     const std::vector<glm::vec3> lowBefore = d.mesh.layers[0].delta;
     CHECK(stroke(d, "-0.2,-0.4,2 0.2,-0.4,2", "Standard", 0.4));
-    std::printf("  low stroke into the layer: %.4f at SDiv 1\n", maxDistance(d.mesh.layers[0].delta, lowBefore));
+    std::printf("  low stroke into the layer: %.4f at Level 1\n", maxDistance(d.mesh.layers[0].delta, lowBefore));
     CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
     std::printf("  and %.4f at the top\n", maxDistance(d.mesh.layers[0].delta, delta));
     CHECK(maxDistance(d.mesh.layers[0].delta, delta) > 1e-2f);
     // Undo the level step and the low stroke (four passes): back to the top as it was.
     CHECK(run(d, "undo").ok);
-    CHECK(subdivLevelText(d.mesh) == "SDiv 1/3");
+    CHECK(subdivLevelText(d.mesh) == "Level 1/3");
     for (int i = 0; i < 4; ++i) CHECK(run(d, "undo").ok);
     CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
     CHECK(maxDistance(d.mesh.positions, top) < 1e-5f);
@@ -366,7 +366,7 @@ TEST(layers_levels_project_round_trip) {
                               maxDistance(e.mesh.layers[1].delta, del1[size_t(level)])});
             CHECK(layerMismatch(e.mesh) < 1e-5f);
         }
-        std::printf("  saved at SDiv %d: levels and layers within %.2g after loading\n", savedAt, worst);
+        std::printf("  saved at Level %d: levels and layers within %.2g after loading\n", savedAt, worst);
         CHECK(worst < 1e-5f);
     }
 }
@@ -390,7 +390,7 @@ TEST(layers_levels_export_blend_shapes) {
         double sumA = 0.0, sumB = 0.0;
         for (const auto& v : m.layers[0].delta) sumA += glm::length(v);
         for (const auto& v : d.mesh.layers[0].delta) sumB += glm::length(v);
-        std::printf("  SDiv %d: %zu vertices, morph target total %.4f vs layer %.4f\n", level, m.vertexCount(), sumA, sumB);
+        std::printf("  Level %d: %zu vertices, morph target total %.4f vs layer %.4f\n", level, m.vertexCount(), sumA, sumB);
         CHECK(std::abs(sumA - sumB) < 1e-3 * std::max(sumB, 1.0));
         CHECK(std::abs(maxLength(m.layers[0].delta) - maxLength(d.mesh.layers[0].delta)) < 1e-4f);
     }
@@ -427,7 +427,7 @@ TEST(layers_levels_subdiv_export_other_levels) {
             double sumA = 0.0, sumB = 0.0;
             for (const auto& v : m.layers[0].delta) sumA += glm::length(v);
             for (const auto& v : expect.layers[0].delta) sumB += glm::length(v);
-            std::printf("  from SDiv %d, SDiv %d: morph target total %.4f, layer %.4f (as recorded %.4f)\n", from, level,
+            std::printf("  from Level %d, Level %d: morph target total %.4f, layer %.4f (as recorded %.4f)\n", from, level,
                         sumA, sumB, [&] {
                             double t = 0.0;
                             for (const auto& v : delta[size_t(level)]) t += glm::length(v);

@@ -506,7 +506,7 @@ TEST(face_generation_is_deterministic_with_threads) {
 }
 
 TEST(face_shapes_on_subdivision_levels) {
-    // A head with 3 levels (11k, 45k, 180k vertices): the shapes are made on SDiv 2 (the lowest with 20k) and show
+    // A head with 3 levels (11k, 45k, 180k vertices): the shapes are made on Level 2 (the lowest with 20k) and show
     // at the top level, where the top level's own detail is kept at weight 0.
     Document doc = makeDoc(templateHead());
     std::string msg;
@@ -519,7 +519,7 @@ TEST(face_shapes_on_subdivision_levels) {
     const auto detailed = doc.mesh.positions;
     const CommandResult r = run(doc, "face_shapes_generate");
     CHECK(r.ok);
-    CHECK(r.message.find("SDiv 2") != std::string::npos);
+    CHECK(r.message.find("Level 2") != std::string::npos);
     CHECK(subdivCurrentLevel(doc.mesh) == 2);
     CHECK(doc.mesh.layers.size() == 52);
     float detailErr = 0.0f;
@@ -527,7 +527,7 @@ TEST(face_shapes_on_subdivision_levels) {
     CHECK(detailErr < 1e-5f);
     const SculptLayer* jaw = findLayer(doc.mesh, "jawOpen");
     CHECK(jaw && maxLength(jaw->delta) > 0.02f);
-    // Down to SDiv 1 and the layers are there too.
+    // Down to Level 1 and the layers are there too.
     CHECK(setSubdivLevelUndoable(doc, 0, msg));
     CHECK(doc.mesh.layers.size() == 52);
 }

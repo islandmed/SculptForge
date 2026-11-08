@@ -1,4 +1,4 @@
-# Extract (Tool > Part > Extract: preview, then Accept), Mirror And Weld (Tool > Geometry > Modify Topology)
+# Extract (Tool > Part > Extract: preview, then Accept), Make Symmetric (Tool > Geometry > Symmetry)
 # and Mirror (Tool > Deformation); askNK's 0.9.5 review wishlist.
 
 # --- Extract: a cap from the masked top of a sphere.
@@ -52,30 +52,30 @@ wait_idle 5
 expect_value parts == 2
 expect_value extract_preview == 0
 
-# --- Mirror And Weld: an off-centre sphere comes back symmetric and closed.
+# --- Make Symmetric: an off-centre sphere comes back symmetric and closed.
 run new_sphere subdivisions=4
 run transform translate=0.4,0,0 masked=0
 expect_value open_edges == 0
 wait 0.2
 click "Geometry##tool.geometry"
-expect "Modify Topology/Mirror And Weld"
-click "Modify Topology/Mirror And Weld"
-expect_status "Mirror And Weld X"
+expect "Symmetry/Make Symmetric"
+click "Symmetry/Make Symmetric"
+expect_status "Make Symmetric X"
 expect_value open_edges == 0
 expect_value can_undo == 1
 camera 0 0
 key f
 shot mirror-weld-sphere
 
-# A head sculpted on one side only (a scar and a brow ridge on its right): Mirror And Weld gives the left side the same.
+# A head sculpted on one side only (a scar and a brow ridge on its right): Make Symmetric gives the left side the same.
 run new_head
 run stroke points="0.035,0.005,0.2 0.06,-0.03,0.2 0.07,-0.07,0.2" brush=Standard radius=0.012 strength=1
 run stroke points="0.015,0.105,0.2 0.04,0.1,0.2 0.065,0.085,0.2" brush=Standard radius=0.014 strength=1
 camera 0 0
 key f
 shot head-before
-click "Modify Topology/Mirror And Weld"
-expect_status "Mirror And Weld X"
+click "Symmetry/Make Symmetric"
+expect_status "Make Symmetric X"
 shot head-mirror-weld
 click "Geometry##tool.geometry"
 

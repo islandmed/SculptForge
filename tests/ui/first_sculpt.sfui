@@ -78,7 +78,7 @@ hover_window 0.97 0.5
 wait 0.6
 shot 04-beak
 
-# 5. Divide three times (Ctrl+D): 5 million triangles, so the details and colours stay sharp.
+# 5. Add three levels (Ctrl+D): 5 million triangles, so the details and colours stay sharp.
 remember triangles t0
 key ctrl+d
 key ctrl+d

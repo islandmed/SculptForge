@@ -2808,7 +2808,7 @@ void App::confirmLevelDelete(const std::string& command) {
 }
 
 void App::drawDynamicOffer() {
-    // Delete Lower / Delete Higher: say which levels go before they do.
+    // Remove Below / Remove Above: say which levels go before they do.
     static constexpr const char* kDelete = "##level_delete";
     if (openLevelDelete_) {
         openLevelDelete_ = false;
@@ -2823,12 +2823,12 @@ void App::drawDynamicOffer() {
             ImGui::CloseCurrentPopup();
         } else {
             if (lower)
-                ImGui::Text(tr("Delete SDiv 1 to %d? SDiv %d becomes the base mesh."), current, current + 1);
+                ImGui::Text(tr("Remove levels 1 to %d? Level %d becomes the base mesh."), current, current + 1);
             else
-                ImGui::Text(tr("Delete SDiv %d to %d and the detail sculpted on them?"), current + 2, levels);
+                ImGui::Text(tr("Remove levels %d to %d and the detail sculpted on them?"), current + 2, levels);
             ImGui::TextDisabled("%s", tr("Ctrl+Z brings them back."));
             ImGui::Spacing();
-            if (ImGui::Button(tr(tr(lower ? "Delete Lower Levels" : "Delete Higher Levels")))) {
+            if (ImGui::Button(tr(tr(lower ? "Remove Levels Below" : "Remove Levels Above")))) {
                 ImGui::CloseCurrentPopup();
                 runCommand(pendingLevelDelete_);
                 pendingLevelDelete_.clear();
@@ -2855,7 +2855,7 @@ void App::drawDynamicOffer() {
             ImGui::CloseCurrentPopup();
         } else {
             ImGui::Text(tr("This removes your %d subdivision levels. Undo brings them back."), subdivLevelCount(doc_.mesh));
-            ImGui::TextDisabled(tr("SDiv %d becomes one plain mesh, then it is subdivided. Divide (keeps levels) adds a "
+            ImGui::TextDisabled(tr("Level %d becomes one plain mesh, then it is subdivided. Add Level adds a "
                                    "level instead."),
                                 subdivCurrentLevel(doc_.mesh) + 1);
             bool ask = !uiPrefs_.confirmSubdivide;

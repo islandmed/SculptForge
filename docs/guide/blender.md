@@ -57,7 +57,7 @@ come across the right way out.
 it had: its n-gons, edges, seams, creases, custom attributes and the other UV maps; only the positions, the active
 UV map, colour, mask and face sets are updated.
 
-**When the topology changes** (Divide, a remesh, Quad Remesh, Subdivide...), the object's mesh is rebuilt from what
+**When the topology changes** (Add Level, a remesh, Quad Remesh, Subdivide...), the object's mesh is rebuilt from what
 SculptForge sent. The object keeps its transform, materials, modifiers and the names of its active UV map and
 colour attribute; things tied to the old faces (material per face, seams, other UV maps, shape keys) can't
 follow and are reset.
@@ -100,7 +100,7 @@ add-on. The preferences list every key while it's on.
 | <kbd>Ctrl</kbd>+drag / <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+drag | Mask / unmask, drawn as a lasso |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+drag | Show only what's inside / hide what's inside |
 | <kbd>Ctrl</kbd>+<kbd>W</kbd> | Group the masked part as a face set and clear the mask (with nothing masked: the visible part) |
-| <kbd>Ctrl</kbd>+<kbd>D</kbd> / <kbd>D</kbd> / <kbd>Shift</kbd>+<kbd>D</kbd> | Divide (a Multires level) / SDiv up / SDiv down (never adds a level) |
+| <kbd>Ctrl</kbd>+<kbd>D</kbd> / <kbd>D</kbd> / <kbd>Shift</kbd>+<kbd>D</kbd> | Add Level (a Multires level) / Level up / Level down (never adds a level) |
 | <kbd>X</kbd> | Symmetry X |
 | <kbd>Shift</kbd>+<kbd>F</kbd> | Wireframe (the wireframe overlay) |
 | <kbd>F</kbd> / <kbd>P</kbd> | Frame the model / perspective on and off |

@@ -272,11 +272,11 @@ mouse_move 0.5 0.5                            # (back over the view: the keys be
 
 # --- Alt+1 / Alt+2 step the subdivision levels; X swaps the colours; Shift+Z wireframe ---
 run subdiv_divide
-expect_value sdiv == 2
+expect_value subdiv_level == 2
 key alt+1
-expect_value sdiv == 1
+expect_value subdiv_level == 1
 key alt+2
-expect_value sdiv == 2
+expect_value subdiv_level == 2
 remember paint_r r0
 key x
 expect_value paint_r != $r0

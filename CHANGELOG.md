@@ -35,13 +35,13 @@ All notable changes to SculptForge are listed here. The format follows
   shading), one undo step that also removes the new Part. A triangle is masked when its corners' average mask is above
   50%. UVs, face groups, vertex paint and sculpt layers carry over; subdivision levels are cut at the current level
   (undo restores them). Thanks foirgairwolf on Discord.
-- **Delete masked** (Tool > Visibility; `delete_masked`), the mirror of Delete hidden. Thanks foirgairwolf on Discord.
+- **Delete masked** (Tool > Visibility; `delete_masked`), the mirror of Remove Hidden. Thanks foirgairwolf on Discord.
 - A per-Part shading mark in the Parts list (Scene / Smooth / Flat; `part_shading`). Thanks foirgairwolf on Discord.
 - **Merge by Distance** (Tool > Geometry; `weld_points distance=... preview=true`): the points of the active Part
   within the distance merge into the nearest kept one; collapsed triangles go; one undo step. The count follows the
   slider and the points that would merge show in orange. Thanks foirgairwolf on Discord.
 - **Check Mesh** (Tool > Geometry; `mesh_check`, `mesh_fix issue=...`): non-manifold edges (Fix loosens the extra
-  triangles), holes (capped as Close Holes), duplicate and degenerate triangles (deleted), zero-area triangles
+  triangles), holes (capped as Fill Holes), duplicate and degenerate triangles (deleted), zero-area triangles
   (shortest edge collapsed), flipped triangles and inside-out closed pieces (rewound), isolated points (removed). Fix
   all fixes everything except holes, as one undo step. Thanks foirgairwolf on Discord.
 - **Recent colours** (Oslen on Discord): under the left shelf's two swatches, the last eight paint colours a stroke or
@@ -162,7 +162,7 @@ All notable changes to SculptForge are listed here. The format follows
 
 ### Fixed
 - The membership card now shows the Studio membership's flat price for any number of artists.
-- **Reconstruct Subdiv** (Tool > Geometry): the levels it builds keep each face inside one UV island when the imported
+- **Rebuild Lower Levels** (Tool > Geometry): the levels it builds keep each face inside one UV island when the imported
   high-poly's seams run through the lower level's faces (UVs made on the high-poly, automatic unwraps with overlapping
   islands). Such faces used to take each corner's UV from a different island and stretch across UDIM tiles.
   Reconstructing again on such a mesh also finds the right lower level now. Thanks @RodTDai for the report, the
@@ -428,7 +428,7 @@ All notable changes to SculptForge are listed here. The format follows
 ### Fixed
 - The guide's **Edit > Preferences** paths now say where Preferences is in the Classic layout (its own palette in the
   palette bar), and the Classic layout's **Edit** palette has **Preferences...** too. Thanks NicTanghe (#144).
-- **Reconstruct Subdiv** (Tool > Geometry) on open meshes (a border, e.g. a UDIM-tiled panel) no longer reads the
+- **Rebuild Lower Levels** (Tool > Geometry) on open meshes (a border, e.g. a UDIM-tiled panel) no longer reads the
   mesh's corners and face centres the wrong way round, which failed with "a face point joins 1 quads" or gave a wrong
   lower level; the lower level keeps every face's UVs across seams and UDIM tiles, and stepping back up gives back the
   imported UVs exactly (#145, thanks @RodTDai).
@@ -570,10 +570,10 @@ All notable changes to SculptForge are listed here. The format follows
 - The wireframe fades edges shorter than a few pixels: a dense mesh shows a light veil, not a dark moire.
 - Options that are on (toggles) have an accent-tinted fill in every colour scheme, not just a lighter grey.
 - Quad Remesh guide curves draw smooth, with stroke smoothing while drawing and a dark outline for contrast.
-- Tool > Geometry (from Discord): **Divide (keeps levels)** and **Subdivide (removes levels)** are named for what they
+- Tool > Geometry (from Discord): **Add Level** and **Subdivide (removes levels)** are named for what they
   do and sit apart: Micro in its own Micro Detail group, Subdivide under Change the Mesh (no levels). On a Part with
-  levels, Subdivide asks first ("This removes your N subdivision levels"), with Don't ask again; Delete Lower and
-  Delete Higher ask too (Ctrl+Z still brings the levels back).
+  levels, Subdivide asks first ("This removes your N subdivision levels"), with Don't ask again; Remove Below and
+  Remove Above ask too (Ctrl+Z still brings the levels back).
 - Tool > Parts > Extract says to mask first when there's no mask, instead of only greying out its buttons.
 
 ### Fixed
@@ -581,7 +581,7 @@ All notable changes to SculptForge are listed here. The format follows
   especially after a Move pull near the neck) gave a thin shell full of holes: the outside flowed in through the
   opening. Open borders are now capped before the voxels are made (only for the remesh; the Part's own surface is not
   touched), and a Part that still isn't a closed solid (borders that can't be capped) is left unchanged with a message
-  pointing to **Tool > Geometry > Close Holes**, instead of a broken result.
+  pointing to **Tool > Geometry > Fill Holes**, instead of a broken result.
 - **UV Editor** at UI scale 2.4 (a 4K screen): the **On model: Colours / Checker** row was cut off and **Frame** was
   drawn over it, so clicking Frame toggled Colours. The toolbar now measures each control (in the interface language)
   and wraps onto more lines when it needs to; every control is where it is drawn.
@@ -757,7 +757,7 @@ All notable changes to SculptForge are listed here. The format follows
   colour intensity, O falloff (#117).
 - **Plain names** for controls that carried another application's labels: Size, Intensity, Colour intensity, Falloff,
   Ctrl+hover help, Help box opacity, Customize Shelves, Reset Layout and Shortcuts, Revert to Saved Layout, Export /
-  Import Interface, Lower / Higher Level, Delete Lower / Higher, Project Detail, Lasso Mask, Rectangle Mask, Radial
+  Import Interface, Lower / Higher Level, Remove Below / Above, Project Detail, Lasso Mask, Rectangle Mask, Radial
   Copies and Group from Mask. Script commands, their parameters and saved files are unchanged.
 
 ### Fixed
@@ -891,7 +891,7 @@ All notable changes to SculptForge are listed here. The format follows
 
 ### Changed
 - "Your first sculpt in 10 minutes" makes a cute owl head instead of the mushroom house: ear tufts pulled with
-  Move, face discs dug with Alt+Clay, a beak, Divide three times, inflated eyes and Clay brows, then brown, cream,
+  Move, face discs dug with Alt+Clay, a beak, three levels added, inflated eyes and Clay brows, then brown, cream,
   amber and orange Vertex Paint and a PBR render. Every step sets the brush's size (brushes keep their own since
   0.10.9). New step pictures and What's New card, made from tests/ui/first_sculpt.sfui and a 2x Save Render.
 - Faster CI for branches and pull requests: the VFX Reference Platform and Blender add-on checks run on main, in the
@@ -924,7 +924,7 @@ All notable changes to SculptForge are listed here. The format follows
   USB ids, and why it was or wasn't taken: not a SpaceMouse, cannot open, fewer than six axes), warns when the
   SpaceMouse is open but no axis has moved (another program such as 3DxWare holds it), and **Copy device report**
   copies that list with the version, platform and SDL version. Skipped devices are also logged.
-- **Close Holes** (Tool > Geometry, `close_holes`, #103): caps every open boundary of the active Part (a hole, an open
+- **Fill Holes** (Tool > Geometry, `close_holes`, #103): caps every open boundary of the active Part (a hole, an open
   bottom, the rim of an extracted shell) with new triangles sized like the ones around it. The patch is faired into
   the curvature around the hole, so a sphere closes round, not flat. The rest of the Part is not changed, and the
   patches get a face group of their own. `max_edges` closes only the small holes. Thanks to the reporter of #103.
@@ -991,7 +991,7 @@ All notable changes to SculptForge are listed here. The format follows
   (docs/starter-meshes.md).
 - "Your first sculpt in 10 minutes" (docs/guide/first-sculpt.md): a twelve-step lesson for complete beginners that
   turns the default sphere into a mushroom house: masked Move strokes for the walls and an overhanging cap, colour
-  filled through the mask, Divide twice, a door and framed windows carved with Crease and Clay, raised spots
+  filled through the mask, two levels added, a door and framed windows carved with Crease and Clay, raised spots
   painted with a hard-edged Paint brush, PBR shading and a saved render. The welcome has a big **Start the 10-minute
   lesson** button, and **Help > Your first sculpt (10 min)** opens it. Its screenshots come from
   tests/ui/first_sculpt.sfui, which ctest runs so the lesson keeps working. The website links it from the homepage
@@ -1121,7 +1121,7 @@ All notable changes to SculptForge are listed here. The format follows
   computer's total: a scene that doesn't fit (15M needs about 2.2 GB free, 33M about 5 GB, plus a margin) is skipped
   with a clear message ("33M skipped: needs ~5 GB free, 1.3 GB available. Close other apps and run again") rather
   than running the system out of memory. The result lists skipped scenes; the command line exits with code 2.
-- Subdivide, Divide, Divide to a micro level and Voxel Remesh ask first ("Not enough free memory", Continue anyway or
+- Subdivide, Add Level, Add Micro and Voxel Remesh ask first ("Not enough free memory", Continue anyway or
   Cancel) when the mesh they would build doesn't fit the memory free now.
 - Runs started by scripts and agents (`SDL_APP_ID=sculptforge-agent`, or `SF_ISOLATE=1`) use their own settings and
   log folder for every mode (renders, `--bench`, `--calibrate` too), so they no longer write into your
@@ -1532,7 +1532,7 @@ All notable changes to SculptForge are listed here. The format follows
   parametrization whose grid lines are the edge loops, with feature lines and guides on grid lines and the poles
   on grid points, extracted at the target density. Poles appear only where the form needs them (a sphere gets
   exactly eight, a box one per corner) and loops run unbroken; open QRemesh Guides are exact edge loops; hard
-  edges and face group borders (Keep Groups) are kept on their exact place; vertex paint density adds the pole pairs a
+  edges and face group borders (Follow Face Groups) are kept on their exact place; vertex paint density adds the pole pairs a
   change of density needs; symmetry mirrors the field and the result exactly; the result is deterministic.
   Loop-aware relaxation lets vertices slide along loops on ridges but not off them. Against the legacy method on
   the lion scan, the ICT head, a creature sculpted from a sphere and a hard-surface part at 2k / 5k / 10k quads:
@@ -1779,7 +1779,7 @@ with symmetry remeshes both sides of an asymmetric mesh (#23) and the orthograph
     pointer at 21M, all placed on release).
   - The BVH refit of a big dab recomputes the ancestors of its leaves in parallel (13 ms on one thread before).
   - A dab's normals are recomputed for the corners of the BVH leaves its queries listed instead of every moved
-    vertex's neighbour ring (7 ms a dab on levels made by Divide).
+    vertex's neighbour ring (7 ms a dab on levels made by Add Level).
   - The GPU upload sends the changed blocks until three quarters of the mesh changed (it re-sent the whole
     mesh above a quarter: 78 ms a frame against 14-30), and finds them in parallel (3.7 -> 0.4 ms).
   - Starting a stroke no longer re-uploads the whole mesh when there are no LODs.
@@ -1802,13 +1802,13 @@ with symmetry remeshes both sides of an asymmetric mesh (#23) and the orthograph
 
 ## [0.9.6] - 2026-10-31
 
-The same evening as 0.9.5, the next batch from your reports and from askNK's review: Extract and Mirror And Weld,
+The same evening as 0.9.5, the next batch from your reports and from askNK's review: Extract and Make Symmetric,
 a flat background, a Flatpak, strokes that keep their shape on dense meshes (built on a patch by @bribblej-web),
-and a fix for Divide crashing on models from Blender, with a log file so a crash is never silent again.
+and a fix for Add Level crashing on models from Blender, with a log file so a crash is never silent again.
 
 ### Added
 - Extract (Tool > Part > Extract): the masked, visible part of a Part becomes a shell with Thick (a share of the Part's size; negative grows inward, 0 makes a single-sided surface), Edge Smooth (smooths the stepped edge) and Double (both ways). Extract shows a preview below the source that follows the settings; Accept keeps it as a new Part with outer, inner and rim face groups and the source's vertex paint, as one undo step (undo removes the Part, redo puts it back). Corners and Border make the rim triangles instead of quads at sharp corners or all along it. An unaccepted preview goes when the source changes and is never saved. Commands: extract, extract_accept, extract_cancel.
-- Mirror And Weld (Tool > Geometry > Modify Topology, X / Y / Z): keeps the + side of the plane through the origin, cuts polygons crossing it, mirrors the half and welds the seam into one watertight mesh, keeping face groups, vertex paint, mask, UVs, quads and sculpt layers (`mirror_and_weld`, with `side=negative` for the other half). Undoable.
+- Make Symmetric (Tool > Geometry > Symmetry, X / Y / Z): keeps the + side of the plane through the origin, cuts polygons crossing it, mirrors the half and welds the seam into one watertight mesh, keeping face groups, vertex paint, mask, UVs, quads and sculpt layers (`mirror_and_weld`, with `side=negative` for the other half). Undoable.
 - A flat viewport background (#21): Preferences > Display > Background (also in the Render palette) switches between the gradient (the default) and Flat Colour with a colour picker. Saved automatically; projects keep their own, and `set_background` (mode, color) scripts it.
 - Mirror (Tool > Deformation, X / Y / Z): flips the Part across the plane through the origin, or in place with `pivot=center` (`mirror`). Undoable.
 - A log file, `sculptforge.log` in the user data folder (`%APPDATA%\SculptForge\SculptForge` on Windows,
@@ -1842,7 +1842,7 @@ and a fix for Divide crashing on models from Blender, with a log file so a crash
   such as AppManager and Gear Lever show the icon when they integrate it, and the current appimagetool accepts
   the AppDir. The AppImage is now built with appimagetool directly (packaging/linux/build-appimage.sh), which
   checks the AppDir before packing it.
-- Divide crashed on models with a vertex shared by 22 or more triangles (#16), such as a cylinder sent from Blender
+- Add Level crashed on models with a vertex shared by 22 or more triangles (#16), such as a cylinder sent from Blender
   with Triangle Fan caps of 22 sides or more (21 worked) or Blender's UV sphere. The first subdivision level
   works out each vertex's neighbours from the base mesh; around a high-valence base vertex the list was gathered
   with every polygon twice before removing the repeats, which overran its 64 slots (3 x valence) and corrupted
@@ -2144,7 +2144,7 @@ Guide: docs/guide/sculpting.md, "Vector displacement brushes".
   the stroke switches to DragRect (the previous stroke comes back with the next brush).
 - **Create VDM from a plane**: a 2 x 2 VDM plane with UVs and
   a masked border as a new Part (the others hidden, top view); Create VDM rasterizes each point's offset
-  through the UVs into a map saved in the brush library (Divide keeps the UVs).
+  through the UVs into a map saved in the brush library (Add Level keeps the UVs).
 - **Blender's convention**, checked against the VDM Brush Baker's source and in Blender 4.2 and 5.2: RGB = XYZ in
   brush radii over the brush's square, first scanline = top. Exported EXRs read in Blender with the same vectors
   the same way up; Blender's 32-bit ZIP/PIZ and 16-bit EXRs load unchanged.
@@ -2160,11 +2160,11 @@ Guide: docs/guide/blender.md, "the Classic sculpting keys in Sculpt Mode".
   Strength and Hardness (Falloff); Space the Sculpt context menu; B a brush list by name (type to
   filter; Blender 4.3+ brush assets, 4.2 brush tools); Alt+drag Sub; Ctrl(+Alt)+drag lasso mask / unmask;
   Ctrl+Shift(+Alt)+drag show only / hide inside; Ctrl+W group from mask and clear the mask (else group visible);
-  Ctrl+D Divide (Multires), D / Shift+D SDiv up / down; X symmetry; Shift+F wireframe; F frame; P perspective;
+  Ctrl+D Add Level (Multires), D / Shift+D Level up / down; X symmetry; Shift+F wireframe; F frame; P perspective;
   L Stabilize Stroke; W / E / R move / scale / rotate. Turning it off (or disabling the add-on) removes them.
   The preferences and the guide list the Classic sculpting keys Blender has no equivalent for.
 - tests/blender/test_in_blender.py checks every key's operator and settings, the data paths (Blender 4.2's
-  unified paint settings vs 5's per-mode ones), the brush picks, SDiv and Divide, on/off, and the VDM EXR
+  unified paint settings vs 5's per-mode ones), the brush picks, Level and Add Level, on/off, and the VDM EXR
   round trips; run in real Blender 4.2.23 and 5.2.3.
 
 ### QRemesh Guides
@@ -2175,7 +2175,7 @@ Guide: docs/guide/blender.md, "the Classic sculpting keys in Sculpt Mode".
   **Delete Last** and **Clear**. Ctrl still masks and Shift still smooths while the brush is picked.
 - QRemesh puts an edge loop on every curve (a lattice line along it; along a closed curve the corners are placed
   at an even number of even steps, so the loop closes without a kink) and turns the edge flow around it to
-  follow; **Curves Strength** (0-100, default 50) sets how far. With symmetry, a curve on either side guides
+  follow; **Guide Strength** (0-100, default 50) sets how far. With symmetry, a curve on either side guides
   both, and a loop across the middle (the mouth) meets its mirror image at a corner on the seam. A result with a
   broken loop or a fan by a guide is tried again with another start for the field. On a sphere with a circular
   guide round an "eye", the edges near it are within 2-8 degrees of its direction (about 22 without), and the
@@ -2186,12 +2186,12 @@ Guide: docs/guide/blender.md, "the Classic sculpting keys in Sculpt Mode".
   the surface (the Part moved) are ignored with a note.
 - Scripting: `qremesh_guide` (points, view, symmetry), `qremesh_guide_delete_last`, `qremesh_guides_clear`,
   `qremesh_guides_info`; `qremesh` gains `guides` and `curves_strength`.
-- Keep Groups (loops along face group borders) and Use Vertex Paint (density) were already there.
+- Follow Face Groups (loops along face group borders) and Use Vertex Paint (density) were already there.
 
 ### Sculpt layers on subdivision levels
 - Checked against 3D Layers and covered by tests: a layer recorded at the top survives Lower / Higher Level
   bit for bit, shows at lower levels as the same strokes in the base would, keeps one weight for every level, and
-  survives Divide, Reconstruct Subdiv, Delete Lower / Delete Higher, undo, saving and loading at any level, and blend
+  survives Add Level, Rebuild Lower Levels, Remove Below / Remove Above, undo, saving and loading at any level, and blend
   shape export from any level (`subdiv_export`). Layers added or sculpted at a low level show above. Nothing needed
   fixing; the Layers panel got Ctrl-hover help and the guide a "Layers and subdivision levels" section.
 
@@ -2277,19 +2277,19 @@ adjacency that saves the memory).
 ### Memory: sculpts with subdivision levels take half as much
 - A divided sculpt takes about 90 bytes per triangle in memory instead of 160: a 33 million triangle model with
   its levels needs 3.0 GB instead of 5.3 GB, and a 100 million triangle one fits in 9 GB.
-  - Levels made by Divide store no triangles, quad pairs or vertex maps: they follow from the level below, and are
+  - Levels made by Add Level store no triangles, quad pairs or vertex maps: they follow from the level below, and are
     generated when a level is entered. A level also no longer keeps its detail next to its positions (the detail
     is fitted to the positions when a lower level changes). The level stack went from 75 to 29 bytes per triangle.
   - The mesh of such a level works out which vertices and triangles surround each vertex from the level's
     topology instead of storing those lists (62 -> 39 bytes per triangle for the sculpting mesh). Brushes, normals,
     undo and the renderer get exactly the same lists, so sculpting gives bit-identical results; working them out
     costs some speed: dabs on divided meshes are up to about 15% slower (large brushes at 33M: 3%).
-- **Divide goes to 100 million triangles and beyond**: the limit follows the computer's memory (about 160 million
+- **Add Level goes to 100 million triangles and beyond**: the limit follows the computer's memory (about 160 million
   on 32 GB) instead of a fixed 50 million.
 - **Opening a project** no longer needs twice the scene's memory (the file is read straight into the meshes) and
   is about twice as fast (33M: 4.7 -> 2.1 s; the BVH is built while the levels load). Saving no longer copies the
   meshes first, and project files of divided sculpts are about 30% smaller.
-- Lower Level after sculpting at the top level is faster (33M: 1.5 -> 0.9 s), and so is Divide (2.4 -> 1.4 s).
+- Lower Level after sculpting at the top level is faster (33M: 1.5 -> 0.9 s), and so is Add Level (2.4 -> 1.4 s).
 - Project format 6. Projects from 0.5 and earlier open as before (and get the savings); 0.5 can't open format 6
   projects.
 
@@ -2344,23 +2344,23 @@ adjacency that saves the memory).
 ## [0.5.0] - 2026-10-23
 
 ### Subdivision levels (multiresolution)
-- Divide (Tool > Geometry, Ctrl+D, `subdiv_divide`) adds a subdivision level per Part and keeps the lower
-  ones: Catmull-Clark on meshes with quads (quads stay quads), Loop on triangle meshes, flat with Smt off.
-- Lower Level / Higher Level (Shift+D / D, `subdiv_lower`, `subdiv_higher`) and the SDiv slider (`subdiv_level`)
+- Add Level (Tool > Geometry, Ctrl+D, `subdiv_divide`) adds a subdivision level per Part and keeps the lower
+  ones: Catmull-Clark on meshes with quads (quads stay quads), Loop on triangle meshes, flat with Smooth off.
+- Lower Level / Higher Level (Shift+D / D, `subdiv_lower`, `subdiv_higher`) and the Level slider (`subdiv_level`)
   step between levels. Detail is stored per level as a displacement in the local frame of the smoothed level
   below, so reshaping a low level carries it along; edits at a high level are restricted (full weighting) to
   the lower ones. Round trips without edits are bit-for-bit.
 - Mask, vertex paint, paint layers, face groups, hidden faces and UVs follow the levels (copied down, interpolated or
   inherited up where they changed); sculpt layers have their own detail per level; the texture is shared.
-- Delete Lower, Delete Higher (`subdiv_delete_lower`, `subdiv_delete_higher`) and Reconstruct Subdiv
+- Remove Below, Remove Above (`subdiv_delete_lower`, `subdiv_delete_higher`) and Rebuild Lower Levels
   (`subdiv_reconstruct`: finds the lower level of a regular Catmull-Clark or Loop subdivision, keeping the mesh
   and its vertex order). `subdiv_info` lists the levels; `subdiv_export` writes the visible Parts at another
   level (e.g. the base cage) in any export format.
 - Each level change is one undo step, as is each stroke at any level; level edits share unchanged levels
   copy-on-write. The two levels left last keep their topology and BVH, so stepping back and forth is instant
   (1-45 ms at 6.5M triangles).
-- Projects save every level (project format 4). The Part list shows "SDiv n/m".
-- Ctrl+D now runs Divide; the one-way Subdivide stays in Tool > Geometry and as `subdivide`.
+- Projects save every level (project format 4). The Part list shows "Level n/m".
+- Ctrl+D now runs Add Level; the one-way Subdivide stays in Tool > Geometry and as `subdivide`.
 
 ### Transform gizmo (moving, scaling, rotating and posing)
 - Transform gizmo modes: W Move, E Scale, R Rotate, Q back to Draw (top shelf, Transform palette, F3).
@@ -2411,8 +2411,8 @@ adjacency that saves the memory).
   credited in THIRD_PARTY_NOTICES.md): a multi-resolution 4-RoSy orientation field and position field, polygon
   extraction, then every polygon split into quads and relaxed onto the sculpt. The result is 100% quads,
   2-manifold and closed where the sculpt is, within about 5% of the target count.
-- Options: Target Polygons with Half / Same / Double, Adaptive Size (curvature-driven quad size), Keep Groups
-  (edge loops along face group borders, groups kept), Detect Edges (loops on hard edges over 50 degrees),
+- Options: Target Quads with 50% / 100% / 200%, Size Variation (curvature-driven quad size), Follow Face Groups
+  (edge loops along face group borders, groups kept), Keep Hard Edges (loops on hard edges over 50 degrees),
   Use Vertex Paint (red = up to 4x the density, blue = down to a quarter), Symmetry (one half remeshed and mirrored,
   welded on the seam), Keep Original (the old Part kept hidden below, for ProjectAll).
 - Runs in the background in the app with a progress bar and Cancel; one undo step. Mask and vertex paint are
@@ -2463,9 +2463,9 @@ adjacency that saves the memory).
 - Auto UV no longer crashes or folds UVs on dense smooth meshes (e.g. the default 82k-triangle sphere): fixed in
   third_party/xatlas. UV islands are capped at about 4000 triangles, so a 1.3M-triangle sculpt unwraps in about
   16 s instead of minutes.
-- Subdivision levels: Voxel Remesh, Decimate, QRemesh, Subdivide, Delete Hidden and merging or splitting Parts
+- Subdivision levels: Voxel Remesh, Decimate, QRemesh, Subdivide, Remove Hidden and merging or splitting Parts
   say in the status line that they removed the levels and which one became the new base ("Subdivision levels
-  removed: SDiv 3 of 5 kept as the new base"); undo restores every level (now covered by tests).
+  removed: Level 3 of 5 kept as the new base"); undo restores every level (now covered by tests).
 - Subdivision levels: a sculpt layer's fine detail now turns and bends with a low level rotated with the Transform gizmo
   or reshaped (layer details are stored relative to the surface). Project format 5; format 4 projects are
   converted when they open.

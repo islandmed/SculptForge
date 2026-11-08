@@ -52,7 +52,7 @@ The menu next to **From Visible** sets how **Restore** meets what you have now, 
 Every store, restore, rename, delete and combine is one undo step.
 
 A set greyed out in the list no longer fits the Part: its topology changed since (a remesh, Dynamic topology,
-Delete hidden). Undo the change, or delete the set.
+Remove Hidden). Undo the change, or delete the set.
 
 ## Combine sets
 
@@ -71,9 +71,9 @@ A set remembers the level it was stored at, and restores at any level of the sam
 - a shape travels as its difference from that level's own surface, so the detail of the levels in between stays
   where it is.
 
-So you can store a mask at SDiv 1, sculpt at SDiv 5 and restore the mask there, or keep a high-resolution face group
-set and use it at the base cage. Sets survive **Divide**, **Delete Lower**, **Delete Higher** and **Reconstruct
-Subdiv** as long as the level they were stored at still exists.
+So you can store a mask at Level 1, sculpt at Level 5 and restore the mask there, or keep a high-resolution face group
+set and use it at the base cage. Sets survive **Add Level**, **Remove Below**, **Remove Above** and **Rebuild
+Lower Levels** as long as the level they were stored at still exists.
 
 ## Morph targets
 

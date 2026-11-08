@@ -42,7 +42,7 @@ void registerSubdivCommands(CommandRegistry& reg) {
              "Divide: add a subdivision level above the highest one and step "
              "to it. Quads stay quads (Catmull-Clark); triangle meshes use Loop subdivision. Lower levels are kept, so "
              "you can step down to sculpt big forms and back up to the detail. Each level has 4x the polygons.",
-             {{"smooth", T::Bool, "Smt: smooth the new level (default true); false divides flat, keeping hard edges.", false}},
+             {{"smooth", T::Bool, "Smooth: smooth the new level (default true); false divides flat, keeping hard edges.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  std::string msg;
                  const bool ok = divideUndoable(doc, argBool(a, "smooth", true), msg);
@@ -63,7 +63,7 @@ void registerSubdivCommands(CommandRegistry& reg) {
     reg.add({"subdiv_lower", "Lower Level (Shift+D): step one subdivision level down.", {},
              [](Document& doc, const Args&) -> CommandResult {
                  if (!doc.mesh.multires) return {false, "This Part has no subdivision levels (Divide adds them)"};
-                 if (subdivCurrentLevel(doc.mesh) == 0) return {false, "Already at the lowest level (SDiv 1)"};
+                 if (subdivCurrentLevel(doc.mesh) == 0) return {false, "Already at the lowest level (Level 1)"};
                  std::string msg;
                  const bool ok = setSubdivLevelUndoable(doc, subdivCurrentLevel(doc.mesh) - 1, msg);
                  return result(ok, msg);
@@ -80,7 +80,7 @@ void registerSubdivCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"subdiv_delete_lower",
-             "Delete Lower: delete the subdivision levels below the current one; the current level becomes the base cage.",
+             "Remove Below: delete the subdivision levels below the current one; the current level becomes the base cage.",
              {}, [](Document& doc, const Args&) -> CommandResult {
                  std::string msg;
                  const bool ok = deleteLowerUndoable(doc, msg);
@@ -97,7 +97,7 @@ void registerSubdivCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"subdiv_delete_higher",
-             "Delete Higher: delete the subdivision levels above the current one (and the detail sculpted on them).", {},
+             "Remove Above: delete the subdivision levels above the current one (and the detail sculpted on them).", {},
              [](Document& doc, const Args&) -> CommandResult {
                  std::string msg;
                  const bool ok = deleteHigherUndoable(doc, msg);
@@ -105,7 +105,7 @@ void registerSubdivCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"subdiv_reconstruct",
-             "Reconstruct Subdiv: at the lowest level, find the mesh this one was subdivided from (a regular "
+             "Rebuild Lower Levels: at the lowest level, find the mesh this one was subdivided from (a regular "
              "Catmull-Clark subdivision of quads, or Loop subdivision of triangles, e.g. an imported subdivided "
              "model) and add it as a new lower level. Run it again for more levels.",
              {}, [](Document& doc, const Args&) -> CommandResult {
@@ -120,7 +120,7 @@ void registerSubdivCommands(CommandRegistry& reg) {
                  if (n == 0) return {true, "No subdivision levels (" + std::to_string(doc.mesh.triangleCount()) + " triangles)"};
                  std::string out = subdivLevelText(doc.mesh) + ":";
                  for (int i = 0; i < n; ++i) {
-                     out += "\n  SDiv " + std::to_string(i + 1) + ": " + std::to_string(subdivLevelTriangles(doc.mesh, i)) + " triangles";
+                     out += "\n  Level " + std::to_string(i + 1) + ": " + std::to_string(subdivLevelTriangles(doc.mesh, i)) + " triangles";
                      if (i == subdivCurrentLevel(doc.mesh)) out += " (current)";
                  }
                  return {true, out};
@@ -152,7 +152,7 @@ void registerSubdivCommands(CommandRegistry& reg) {
                  if (first) return {false, "Nothing visible to export"};
                  scratch.path = doc.path;
                  CommandResult r = CommandRegistry().execute(scratch, command, {{"path", path}});
-                 if (r.ok) r.message += " (SDiv " + std::to_string(level + 1) + ")";
+                 if (r.ok) r.message += " (Level " + std::to_string(level + 1) + ")";
                  return r;
              }});
 }

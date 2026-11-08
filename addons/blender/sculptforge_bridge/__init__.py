@@ -560,7 +560,7 @@ class SculptForgePreferences(bpy.types.AddonPreferences):
     classic_keys: BoolProperty(
         name="Classic sculpting keys in Sculpt Mode",
         description="S / U / O for Size / Intensity / Falloff, B for the brush list, Space for the quick "
-                    "menu, Alt to dig in, Ctrl to mask, Ctrl+Shift to hide, D / Shift+D for SDiv... Turning it off "
+                    "menu, Alt to dig in, Ctrl to mask, Ctrl+Shift to hide, D / Shift+D for levels... Turning it off "
                     "removes them again and Blender's own keys are back",
         default=False,
         update=lambda self, context: _apply_classic_keys(self))

@@ -165,7 +165,7 @@
 //                            guides_mode (1 while the QRemesh Guides brush is picked),
 //                            quads (quad pairs in the active Part), quad_percent (quads among its polygons)
 //                            mask_shape (0 MaskPen, 1 MaskLasso, 2 MaskRect), hide_shape (1 SelectLasso, 2 SelectRect)
-//                            sdiv (the current subdivision level, 1 = base; 0 without levels), sdiv_levels (0 = none)
+//                            subdiv_level (the current subdivision level, 1 = base; 0 without levels), sdiv_levels (0 = none)
 //                            antialiasing (Preferences > Performance: 1, 2, 4, 8), view_samples (what the interactive
 //                            view draws with now: 1 while Fast Navigation moves a big scene), multithreading (1 on),
 //                            last_stroke_dabs (dabs of the last finished stroke)
@@ -601,7 +601,7 @@ double Demo::query(const std::string& name, bool& known) const {
         return 255.0 * sum / double(m.colors.size());
     }
     if (name == "uvs") return m.hasUvs() ? 1.0 : 0.0;
-    if (name == "sdiv") return subdivLevelCount(m) ? double(subdivCurrentLevel(m) + 1) : 0.0;
+    if (name == "subdiv_level") return subdivLevelCount(m) ? double(subdivCurrentLevel(m) + 1) : 0.0;
     if (name == "sdiv_levels") return double(subdivLevelCount(m));
     if (name == "antialiasing") return double(app_.uiPrefs_.antialiasing);
     if (name == "view_samples") return double(app_.perf_.samplesWanted);
