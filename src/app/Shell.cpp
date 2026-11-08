@@ -2320,7 +2320,21 @@ void App::drawTray(bool right, const CanvasRect& r) {
     const std::vector<std::string> ids = list; // headers may move palettes out
     for (const std::string& id : ids) {
         const PaletteDef* def = findPalette(id);
-        if (!def || panelDetached("palette." + id)) continue; // in a window of its own (PanelWindows.cpp)
+        if (!def) continue;
+        if (PanelWindow* panel = findPanel("palette." + id)) {
+            // In a window of its own (PanelWindows.cpp): a line that says so where it was, not a gap in the tray.
+            ImGui::PushID(id.c_str());
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("%s  %s", tr(def->name), tr("In a window of its own"));
+            if (panel->window) {
+                if (ImGui::SmallButton(tr(ICON_LC_SQUARE_ARROW_OUT_UP_RIGHT "  Show it"))) SDL_RaiseWindow(panel->window);
+                ImGui::SameLine();
+            }
+            if (ImGui::SmallButton(tr(ICON_LC_PANEL_TOP "  Back in the main window"))) dockPanel("palette." + id);
+            ImGui::Dummy(ImVec2(0, 4.0f * s));
+            ImGui::PopID();
+            continue;
+        }
         ImGui::PushID(id.c_str());
         Demo::pushScope(def->name);
         if (def->scope) Demo::pushScope(def->scope);
