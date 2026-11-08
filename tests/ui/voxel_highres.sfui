@@ -63,15 +63,24 @@ type "Resolution##voxrestype" 600
 key enter
 click "Voxel Remesh##geometry.remesh"
 expect_value voxel_highres_confirm == 1
+expect_no_text fast computer
 click "Cancel##voxelhighres"
 
-# Won't fit in the free memory: no dialog, no remesh, the status and the red estimate say what it needs.
-env SF_AVAILABLE_MEMORY_MB 200
+# A heavy result (most of the free memory): the dialog also says sculpting it needs a fast computer.
+env SF_AVAILABLE_MEMORY_MB 1900
 hold ctrl
 click "##voxres"
 hold none
 type "Resolution##voxrestype" 4096
 key enter
+click "Voxel Remesh##geometry.remesh"
+expect_value voxel_highres_confirm == 1
+expect_text fast computer
+shot voxel_highres_confirm_heavy
+click "Cancel##voxelhighres"
+
+# Won't fit in the free memory: no dialog, no remesh, the status and the red estimate say what it needs.
+env SF_AVAILABLE_MEMORY_MB 200
 expect_value voxel_resolution == 4096
 click "Voxel Remesh##geometry.remesh"
 expect_value voxel_highres_confirm == 0

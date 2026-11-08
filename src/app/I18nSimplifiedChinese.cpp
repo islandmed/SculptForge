@@ -5001,8 +5001,10 @@ constexpr Entry kSimplifiedChinese[] = {
      "高分辨率重新网格化"},
     {"Voxel Remesh at resolution %d makes about %s triangles and needs about %s of memory (%s free).",
      "以分辨率 %d 进行体素重新网格化大约会生成 %s 个三角形，需要约 %s 内存（可用 %s）。"},
-    {"It can take a few minutes; Cancel in Tool > Remesh stops it and the Part stays as it is. Sculpting that many triangles needs a fast computer: Decimate or a lower Resolution makes it lighter. This won't ask again until the Resolution goes back to 512 or less.",
-     "可能需要几分钟；在 工具 > 重新网格化 中点击取消即可停止，部件保持原样。雕刻这么多三角形需要较快的电脑：减面或降低分辨率可以让它更轻。在分辨率回到 512 或以下之前不会再询问。"},
+    {"It can take a few minutes; Cancel in Tool > Remesh stops it and the Part stays as it is. This won't ask again until the Resolution goes back to 512 or less.",
+     "可能需要几分钟；在 工具 > 重新网格化 中点击取消即可停止，部件保持原样。在分辨率回到 512 或以下之前不会再询问。"},
+    {"Sculpting that many triangles needs a fast computer: Decimate or a lower Resolution makes it lighter.",
+     "雕刻这么多三角形需要较快的电脑：减面或降低分辨率可以让它更轻。"},
 };
 
 } // namespace

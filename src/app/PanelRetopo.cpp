@@ -295,8 +295,10 @@ void App::drawVoxelHighResConfirm() {
                   voxelResolution_, formatTriangles(e.triangles).c_str(), memoryText(e.bytes).c_str(), memoryText(c.availableBytes).c_str());
     ImGui::Text("%s", what);
     ImGui::TextWrapped("%s", tr("It can take a few minutes; Cancel in Tool > Remesh stops it and the Part stays as it is. "
-                                "Sculpting that many triangles needs a fast computer: Decimate or a lower Resolution "
-                                "makes it lighter. This won't ask again until the Resolution goes back to 512 or less."));
+                                "This won't ask again until the Resolution goes back to 512 or less."));
+    // Only for a heavy result: tens of millions of triangles, or most of the free memory.
+    if (e.triangles > 10'000'000 || (c.availableBytes > 0 && e.bytes > c.availableBytes / 2))
+        ImGui::TextWrapped("%s", tr("Sculpting that many triangles needs a fast computer: Decimate or a lower Resolution makes it lighter."));
     ImGui::PopTextWrapPos();
     bool go = false;
     if (ImGui::Button(tr("Remesh##voxelhighres"), ImVec2(140 * s, 0))) go = true;
