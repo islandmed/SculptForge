@@ -1,13 +1,13 @@
 {
-  "version": "0.11.15",
+  "version": "0.11.16",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Fixed: big Clay strokes on Micro levels could break the surface into shards (since 0.11.10); Micro sculpting is back to 0.11.9's speed",
-    "Tube: draw clay tubes in the air like a 3D pen, then edit their points (thanks GABO on Discord)",
-    "Parts tools: split hidden, masked or unmasked areas into a new Part, merge points by distance, and Check Mesh with a Fix for each problem (thanks foirgairwolf on Discord)",
-    "Hardware tiers and Turbo: SculptForge tunes itself to your computer, with a memory readout in the top bar (thanks Oslen on Discord)",
-    "Side shelves no longer scroll sideways (thanks dm4nd on Discord), and Frame fits the model into the free area of the canvas"
+    "Gizmo All: one gizmo with move, rotate and scale handles at once, on Shift+W (thanks fenix on Discord, @fenixpoints)",
+    "Cut with symmetry cuts both sides alike, and Blender keys get Ctrl+Shift cut shapes and Alt+Q to pick a Part (thanks dm4nd on Discord)",
+    "Split can keep the original: copy hidden, masked or unmasked areas into a new Part and leave the source as it is (thanks _tfx on Discord)",
+    "Tool > Geometry is reorganised by task (Levels, Micro Detail, Resolution, Cleanup, Symmetry) with clearer names, Extract reads Thickness, Edge Smooth, Both Sides, Corners and Border, and popups are fully opaque",
+    "macOS: SculptForge > Preferences... in the app menu opens Preferences (thanks @fenixpoints)"
   ],
   "support": {
     "founding": {
