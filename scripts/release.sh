@@ -529,7 +529,7 @@ PY
     git add CMakeLists.txt CITATION.cff packaging/rez/package.py packaging/linux/org.sculptforge.SculptForge.metainfo.xml CHANGELOG.md website/index.html docs/guide/whats-new.md
     git add website/founding.json docs/supporters.txt
     git add -A changes tests/ui/whats_new.sfui
-    git add -A website/guide
+    git add -A website/guide website/sitemap.xml # build_site.py writes both (a new guide page is a new sitemap line)
     if git diff --cached --quiet; then
         ok "every version file already says $V and the guide is built"
         return
