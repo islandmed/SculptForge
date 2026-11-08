@@ -20,6 +20,19 @@
   <link rel="stylesheet" href="style.css?v=20">
   <script src="motion.js?v=12" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <style>
+    /* Most-wanted brushes (#requests): the list is generated from brush-requests.json. */
+    .requests { list-style: none; counter-reset: req; margin: 0; padding: 0; max-width: 760px; }
+    .requests li { counter-increment: req; display: flex; align-items: baseline; gap: 10px; padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+    .requests li::before { content: counter(req) "."; min-width: 2.2em; color: var(--muted, #9a9aa6);
+      font-variant-numeric: tabular-nums; }
+    .requests a { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .requests .votes { margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .requests .renamed { font-style: italic; opacity: 0.75; }
+    .requests .shipped { padding: 1px 8px; border-radius: 999px; font-size: 0.75rem; background: rgba(80, 200, 120, 0.16);
+      color: #7fdc9b; white-space: nowrap; }
+  </style>
 </head>
 <body>
   <div class="scroll-progress" aria-hidden="true"></div>
@@ -51,6 +64,7 @@
         <div class="ctas">
           <a class="btn primary" href="#gallery">Browse brushes</a>
           <a class="btn" href="#packs">Built-in packs</a>
+          <a class="btn" href="#requests">Most wanted</a>
           <a class="btn" href="https://github.com/islandmed/sculptforge-brushes#share-your-brush">Share yours</a>
         </div>
       </div>
@@ -246,6 +260,20 @@
             <li><strong>Checked downloads.</strong> The app verifies each brush's SHA-256 before installing it.</li>
           </ul>
         </div>
+      </div>
+    </section>
+    <section class="section alt" id="requests">
+      <div class="wrap">
+        <div class="gallery-head">
+          <h2>Most-wanted brushes</h2>
+          <p class="fine">Ranked by 👍 votes on our Discord</p>
+        </div>
+        <p class="section-lede">Want a brush that isn't here yet? Start a post in <strong>#ideas</strong> on our
+          <a href="https://discord.gg/gWrYkEmQhH">Discord</a> with the Brushes tag, one brush per post, and vote with 👍
+          on the ones you want. The list updates every 30 minutes.</p>
+<!-- requests:start (generated from brush-requests.json; do not edit by hand) -->
+        <p class="fine">No requests yet. Be the first.</p>
+<!-- requests:end -->
       </div>
     </section>
   </main>
