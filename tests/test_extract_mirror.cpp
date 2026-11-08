@@ -88,7 +88,7 @@ TEST(extract_shell_preview_accept_undo) {
         rmin = std::min(rmin, glm::length(p));
     }
     CHECK(std::abs(rmax - radius * (1.0f + 0.03f)) < radius * 0.01f);
-    CHECK(rmin > radius * 0.97f); // (Edge smooth pulls the edge in a little)
+    CHECK(rmin > radius * 0.97f); // (Edge Smooth pulls the edge in a little)
     // Vertex paint comes along.
     CHECK(shell.hasColors() && shell.colors[0] == glm::vec3(1, 0, 0));
 

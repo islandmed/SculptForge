@@ -514,7 +514,7 @@ void App::initActions() {
     add("part.extract", "Extract", "Tool > Parts", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
         [this] { return doc_.mesh.hasMask(); },
         "Make a shell from the masked part of the Part (a helmet, a strap, clothing), shown as a preview below it. "
-        "Change Thickness, Edge smooth, Both Sides, Corners or Border and it updates; Accept keeps it as a new Part.");
+        "Change Thickness, Edge Smooth, Both Sides, Corners or Border and it updates; Accept keeps it as a new Part.");
     add("part.extract_accept", "Accept", "Tool > Parts", nullptr, [this] { runCommand("extract_accept"); }, nullptr,
         "extract_accept", nullptr, [this] { return doc_.extractPreviewCurrent(); },
         "Keep the Extract preview as a new Part below this one. Ctrl+Z takes it away again.");

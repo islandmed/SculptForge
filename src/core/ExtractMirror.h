@@ -4,7 +4,7 @@
 // Two classic mesh tools:
 //  - Extract (Tool > Part > Extract): the masked part of a Part becomes a new Part, a shell with a
 //    thickness (a helmet, a strap, a piece of clothing). Extract shows it as a preview; Accept keeps it as an
-//    undoable step. Thickness is a fraction of the Part's size (negative = inward), Edge smooth smooths the jagged edge
+//    undoable step. Thickness is a fraction of the Part's size (negative = inward), Edge Smooth smooths the jagged edge
 //    the mask's triangles leave, Both Sides grows the shell both ways; Thickness 0 gives a single-sided surface. The rim
 //    is quads, except at sharp corners with Corners and all along it with Border.
 //  - Mirror And Weld (Tool > Geometry > Modify Topology): the half on the + side of a plane through the origin
@@ -23,7 +23,7 @@ class CommandRegistry;
 
 struct ExtractOptions {
     float thickness = 0.015f; // fraction of the Part's largest side; < 0 grows inward, 0 = a single surface
-    int smooth = 5;           // Edge smooth: smoothing passes along the edge of the extracted part (0-50)
+    int smooth = 5;           // Edge Smooth: smoothing passes along the edge of the extracted part (0-50)
     bool doubleSided = false; // Both Sides: the shell grows both ways from the surface by the thickness
     bool triangleCorners = false; // Corners: the rim keeps triangles (not quads) where the edge turns sharply
     bool triangleBorder = false;  // Border: the whole rim is triangles

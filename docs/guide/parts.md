@@ -196,12 +196,12 @@ top of a head, a strap, a sleeve, a piece of armour that fits the surface exactl
 
 1. Mask the part (hold <kbd>Ctrl</kbd> and paint, or use **Rectangle Mask** / **Lasso Mask**; see [Masking](masking.md)).
 2. Click **Extract**. The shell appears as a preview, a Part just below the active one.
-3. Change **Thickness**, **Edge smooth**, **Both Sides**, **Corners** or **Border** and the preview follows. Click **Accept** to keep it.
+3. Change **Thickness**, **Edge Smooth**, **Both Sides**, **Corners** or **Border** and the preview follows. Click **Accept** to keep it.
 
 | Setting | What it does |
 |---|---|
 | **Thickness** | The shell's thickness as a share of the Part's size: 0.015 (the default) is 1.5%. Negative grows it inward; 0 makes a single-sided surface |
-| **Edge smooth** | Smooths the extracted edge, which otherwise follows the mask's triangles in steps. 0 keeps it as masked |
+| **Edge Smooth** | Smooths the extracted edge, which otherwise follows the mask's triangles in steps. 0 keeps it as masked |
 | **Both Sides** | Grows the shell both inward and outward from the surface |
 | **Corners** | Triangles instead of quads in the rim where the edge turns sharply (over 50 degrees), so tight corners don't get twisted quads |
 | **Border** | The whole rim is triangles instead of quads |
