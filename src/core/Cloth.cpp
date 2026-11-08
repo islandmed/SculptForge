@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <limits>
 #include <cctype>
 #include <unordered_map>
 
@@ -70,7 +71,20 @@ struct ClothColliders::Impl {
     std::vector<glm::vec3> normals; // per vertex, area-weighted (inside / outside near edges and corners)
     TriangleBVH bvh;
     bool built = false;
+    // Sharp features: per vertex, the fastest turn of the normal toward a neighbour (radians per metre: 1 / the
+    // tightest radius round it).
+    std::vector<float> bend;
 };
+
+namespace {
+
+uint64_t cellKey(const glm::ivec3& c) {
+    // 21 bits per axis (cells of a centimetre reach +-10 km).
+    return (uint64_t(uint32_t(c.x) & 0x1FFFFF) << 42) | (uint64_t(uint32_t(c.y) & 0x1FFFFF) << 21) |
+           uint64_t(uint32_t(c.z) & 0x1FFFFF);
+}
+
+} // namespace
 
 ClothColliders::ClothColliders() : impl_(std::make_unique<Impl>()) {}
 ClothColliders::~ClothColliders() = default;
@@ -119,8 +133,53 @@ void ClothColliders::build() const {
         const float l = glm::length(n);
         n = l > 1e-30f ? n / l : glm::vec3(0.0f, 1.0f, 0.0f);
     }
+    m.bend.assign(m.positions.size(), 0.0f);
+    for (const glm::uvec3& t : m.triangles)
+        for (int k = 0; k < 3; ++k) {
+            const uint32_t a = t[k], b = t[(k + 1) % 3];
+            const float len = glm::distance(m.positions[a], m.positions[b]);
+            if (len < 1e-12f) continue;
+            const float turn = glm::distance(m.normals[a], m.normals[b]) / len; // (the chord: the angle, near enough)
+            m.bend[a] = std::max(m.bend[a], turn), m.bend[b] = std::max(m.bend[b], turn);
+        }
     m.bvh.build(m.positions, m.triangles);
     m.built = true;
+}
+
+void ClothColliders::sharpVertices(const glm::vec3& lo, const glm::vec3& hi, float radius,
+                                   std::vector<uint32_t>& out) const {
+    out.clear();
+    const Impl& m = *impl_;
+    const size_t n = m.positions.size();
+    if (!m.built || n == 0 || radius <= 0.0f) return;
+    const float minBend = 1.0f / radius;
+    // Per block, joined in order.
+    constexpr size_t kBlock = 1 << 16;
+    std::vector<std::vector<uint32_t>> parts((n + kBlock - 1) / kBlock);
+    poolFor(n, [&](size_t b, size_t e) {
+        std::vector<uint32_t>& part = parts[b / kBlock];
+        for (size_t i = b; i < e; ++i) {
+            if (m.bend[i] < minBend) continue;
+            const glm::vec3& p = m.positions[i];
+            if (p.x >= lo.x && p.y >= lo.y && p.z >= lo.z && p.x <= hi.x && p.y <= hi.y && p.z <= hi.z)
+                part.push_back(uint32_t(i));
+        }
+    }, kBlock);
+    for (const auto& part : parts) out.insert(out.end(), part.begin(), part.end());
+}
+
+const glm::vec3& ClothColliders::vertex(uint32_t i) const { return impl_->positions[i]; }
+const glm::vec3& ClothColliders::vertexNormal(uint32_t i) const { return impl_->normals[i]; }
+
+bool ClothColliders::raycast(const glm::vec3& origin, const glm::vec3& dir, float maxT, glm::vec3& point,
+                             glm::vec3& normal) const {
+    const Impl& m = *impl_;
+    if (!m.built || m.triangles.empty()) return false;
+    SurfaceHit hit;
+    if (!m.bvh.raycast(origin, dir, maxT, hit)) return false;
+    point = hit.position;
+    normal = m.bvh.faceNormal(hit.prim);
+    return true;
 }
 
 bool ClothColliders::empty() const { return impl_->triangles.empty(); }
@@ -180,6 +239,9 @@ bool ClothSim::init(const ClothSetup& setup, const Fabric& fabric, const ClothSe
         if (!setup.pin.empty()) pin(uint32_t(i), setup.pin[i]);
     }
     buildConstraints(setup);
+    double edges = 0.0;
+    for (const Edge& e : stretch_) edges += e.rest;
+    if (!stretch_.empty()) meanEdge_ = std::max(float(edges / double(stretch_.size())), 1e-4f);
     return true;
 }
 
@@ -317,6 +379,7 @@ void ClothSim::substep(float h) {
         for (size_t k = serialBegin_; k < order_.size(); ++k) project(order_[k], h2inv);
     }
     if (selfPairs_) separateSelf();
+    if (!thin_.empty()) separateThin();
     // Pins (soft ones pull toward their target), contact, velocities.
     const float thickness = fabric_.thickness, friction = std::clamp(fabric_.friction, 0.0f, 1.0f);
     const float invH = 1.0f / h;
@@ -361,6 +424,206 @@ void ClothSim::findContacts(float frame) {
                 contactPoint_[i] = q;
                 contactNormal_[i] = nrm;
             }
+        }
+    }, 1024);
+}
+
+// Thin features: collider vertices on features sharper than the particle spacing (ClothColliders::sharpVertices)
+// within reach of a cloth triangle (inside its outline, near its plane) keep the side of it they are on, so a strand,
+// a curl's ridge or a needle can't pass between particles. Smooth surfaces are left to the particles' own contacts. A pair seen last
+// frame keeps its side out to an edge length off the plane; a new one takes the side of the vertex's nearest pair
+// last frame when the triangles share a particle (a tip sliding across an edge), else the side it is on now (the
+// reach covers a frame's travel, so that is before anything could cross).
+void ClothSim::findThinPairs(float span) {
+    constexpr uint32_t kSlots = 6;
+    thinLast_.swap(thin_);
+    thin_.clear();
+    const size_t nt = tris_.size();
+    thinLastAt_.assign(nt + 1, 0);
+    for (const ThinPair& p : thinLast_) ++thinLastAt_[p.tri + 1];
+    for (size_t t = 0; t < nt; ++t) thinLastAt_[t + 1] += thinLastAt_[t];
+    const float thickness = fabric_.thickness;
+    float fastest = 0.0f;
+    glm::vec3 lo(std::numeric_limits<float>::max()), hi(-std::numeric_limits<float>::max());
+    for (size_t i = 0; i < x_.size(); ++i) {
+        fastest = std::max(fastest, glm::dot(v_[i], v_[i]));
+        lo = glm::min(lo, x_[i]), hi = glm::max(hi, x_[i]);
+    }
+    const float travel = (std::sqrt(fastest) + glm::length(settings_.gravity) * span) * span * 1.5f;
+    const float reach = std::clamp(thickness * 2.0f + travel, thickness * 2.0f, meanEdge_);
+    // (held pairs reach an edge length off the cloth; the box is padded so a falling cloth keeps it a while)
+    lo -= glm::vec3(meanEdge_), hi += glm::vec3(meanEdge_);
+    if (glm::any(glm::lessThan(lo, thinLo_)) || glm::any(glm::greaterThan(hi, thinHi_))) {
+        const glm::vec3 size = hi - lo;
+        const glm::vec3 pad(std::max(size.x, std::max(size.y, size.z)) * 0.5f + meanEdge_ * 4.0f);
+        thinLo_ = lo - pad, thinHi_ = hi + pad;
+        colliders_->sharpVertices(thinLo_, thinHi_, meanEdge_ * 1.5f, thinVerts_);
+        thinGrid_.resize(thinVerts_.size());
+        for (size_t k = 0; k < thinVerts_.size(); ++k)
+            thinGrid_[k] = {cellKey(glm::ivec3(glm::floor(colliders_->vertex(thinVerts_[k]) / meanEdge_))), thinVerts_[k]};
+        std::sort(thinGrid_.begin(), thinGrid_.end());
+    }
+    if (thinGrid_.empty()) {
+        thinNearest_.clear();
+        return;
+    }
+    const float cell = meanEdge_;
+    const auto& keyed = thinGrid_;
+    const auto sharesParticle = [&](uint32_t s, uint32_t t) {
+        const glm::uvec3 a = tris_[s], b = tris_[t];
+        return glm::any(glm::equal(glm::uvec3(a.x), b)) || glm::any(glm::equal(glm::uvec3(a.y), b)) ||
+               glm::any(glm::equal(glm::uvec3(a.z), b));
+    };
+    std::vector<ThinPair> slots(nt * kSlots, ThinPair{0, 0, 0.0f});
+    poolFor(nt, [&](size_t b, size_t e) {
+        std::vector<std::pair<float, ThinPair>> found;
+        for (size_t t = b; t < e; ++t) {
+            const glm::uvec3 tri = tris_[t];
+            const glm::vec3 a = x_[tri.x], ab = x_[tri.y] - a, ac = x_[tri.z] - a;
+            glm::vec3 n = glm::cross(ab, ac);
+            const float area2 = glm::length(n);
+            if (area2 < 1e-14f) continue;
+            n /= area2;
+            const float d00 = glm::dot(ab, ab), d01 = glm::dot(ab, ac), d11 = glm::dot(ac, ac);
+            const float den = d00 * d11 - d01 * d01;
+            if (std::abs(den) < 1e-20f) continue;
+            // Where vertex v is against this triangle: off the plane (signed) and whether it is over the outline.
+            const auto place = [&](uint32_t v, float& sd) {
+                const glm::vec3 c = colliders_->vertex(v) - a;
+                sd = glm::dot(c, n);
+                const glm::vec3 q = c - n * sd;
+                const float d20 = glm::dot(q, ab), d21 = glm::dot(q, ac);
+                const float bv = (d11 * d20 - d01 * d21) / den, bw = (d00 * d21 - d01 * d20) / den;
+                return bv >= -0.15f && bw >= -0.15f && bv + bw <= 1.15f;
+            };
+            found.clear();
+            // Held pairs: out to an edge length.
+            for (uint32_t k = thinLastAt_[t]; k < thinLastAt_[t + 1]; ++k) {
+                float sd;
+                const ThinPair& p = thinLast_[k];
+                if (place(p.vertex, sd) && std::abs(sd) <= meanEdge_) found.push_back({p.side * sd, p});
+            }
+            const size_t held = found.size();
+            const glm::vec3 tlo = glm::min(a, glm::min(x_[tri.y], x_[tri.z])) - glm::vec3(reach);
+            const glm::vec3 thi = glm::max(a, glm::max(x_[tri.y], x_[tri.z])) + glm::vec3(reach);
+            const glm::ivec3 c0(glm::floor(tlo / cell)), c1(glm::floor(thi / cell));
+            if (glm::any(glm::greaterThan(c1 - c0, glm::ivec3(6)))) continue; // (a stretched-out triangle: skip)
+            for (int z = c0.z; z <= c1.z; ++z)
+                for (int y = c0.y; y <= c1.y; ++y)
+                    for (int x = c0.x; x <= c1.x; ++x) {
+                        const uint64_t key = cellKey({x, y, z});
+                        auto it = std::lower_bound(keyed.begin(), keyed.end(), std::make_pair(key, 0u));
+                        for (; it != keyed.end() && it->first == key; ++it) {
+                            const uint32_t v = it->second;
+                            bool known = false;
+                            for (size_t h = 0; h < held && !known; ++h) known = found[h].second.vertex == v;
+                            float sd;
+                            if (known || !place(v, sd) || std::abs(sd) > reach || std::abs(sd) < 1e-7f) continue;
+                            float side = sd > 0.0f ? 1.0f : -1.0f;
+                            if (const auto nt0 = thinNearest_.find(v);
+                                nt0 != thinNearest_.end() && sharesParticle(nt0->second.tri, uint32_t(t))) {
+                                // (the neighbour's normal, flipped if this triangle faces the other way)
+                                const glm::uvec3 o = tris_[nt0->second.tri];
+                                const glm::vec3 on = glm::cross(x_[o.y] - x_[o.x], x_[o.z] - x_[o.x]);
+                                side = glm::dot(on, n) >= 0.0f ? nt0->second.side : -nt0->second.side;
+                            } else if (std::abs(sd) < thickness * 1.5f) {
+                                // (on the plane: the cloth belongs outside the surface, along the vertex's normal)
+                                const float facing = glm::dot(colliders_->vertexNormal(v), n);
+                                if (std::abs(facing) > 0.2f) side = facing > 0.0f ? -1.0f : 1.0f;
+                            }
+                            found.push_back({side * sd, ThinPair{uint32_t(t), v, side}});
+                        }
+                    }
+            // The kSlots deepest on their wrong side or nearest it (ties by vertex index): deterministic whatever
+            // the grid's order.
+            std::sort(found.begin(), found.end(), [](const auto& l, const auto& r) {
+                return l.first != r.first ? l.first < r.first : l.second.vertex < r.second.vertex;
+            });
+            ThinPair* slot = &slots[t * kSlots];
+            for (size_t k = 0; k < kSlots; ++k) slot[k] = k < found.size() ? found[k].second : ThinPair{0, 0, 0.0f};
+        }
+    }, 256);
+    std::unordered_map<uint32_t, float> nearestD;
+    thinNearest_.clear();
+    for (const ThinPair& p : slots) {
+        if (p.side == 0.0f) continue;
+        thin_.push_back(p);
+        const glm::uvec3 tri = tris_[p.tri];
+        const glm::vec3 c = (x_[tri.x] + x_[tri.y] + x_[tri.z]) / 3.0f;
+        const float d = glm::distance(c, colliders_->vertex(p.vertex));
+        const auto [it, added] = nearestD.emplace(p.vertex, d);
+        if (added || d < it->second) it->second = d, thinNearest_[p.vertex] = p;
+    }
+}
+
+// Pushes each cloth triangle back to its side of the collider vertices it holds, `thickness` off (the vertex is
+// fixed: the corners move by their share, as in a point-triangle constraint). Serial: deterministic.
+void ClothSim::separateThin() {
+    const size_t n = x_.size();
+    const float thickness = fabric_.thickness;
+    thinDx_.assign(n, glm::vec3(0.0f));
+    thinCount_.assign(n, 0.0f);
+    for (const ThinPair& p : thin_) {
+        const glm::uvec3 tri = tris_[p.tri];
+        const glm::vec3 a = x_[tri.x], ab = x_[tri.y] - a, ac = x_[tri.z] - a;
+        glm::vec3 nrm = glm::cross(ab, ac);
+        const float len = glm::length(nrm);
+        if (len < 1e-14f) continue;
+        nrm /= len;
+        const glm::vec3 c = colliders_->vertex(p.vertex) - a;
+        const float d = p.side * glm::dot(c, nrm);
+        if (d >= thickness) continue;
+        const glm::vec3 q = c - nrm * glm::dot(c, nrm);
+        const float d00 = glm::dot(ab, ab), d01 = glm::dot(ab, ac), d11 = glm::dot(ac, ac);
+        const float den = d00 * d11 - d01 * d01;
+        if (std::abs(den) < 1e-20f) continue;
+        const float d20 = glm::dot(q, ab), d21 = glm::dot(q, ac);
+        const float bv = (d11 * d20 - d01 * d21) / den, bw = (d00 * d21 - d01 * d20) / den;
+        if (bv < -0.25f || bw < -0.25f || bv + bw > 1.25f) continue; // (slid off: a neighbouring triangle has it)
+        const float bary[3] = {std::clamp(1.0f - bv - bw, 0.0f, 1.0f), std::clamp(bv, 0.0f, 1.0f), std::clamp(bw, 0.0f, 1.0f)};
+        const uint32_t ids[3] = {tri.x, tri.y, tri.z};
+        float wsum = 0.0f;
+        for (int k = 0; k < 3; ++k) wsum += w_[ids[k]] * bary[k] * bary[k];
+        if (wsum <= 1e-12f) continue;
+        // (at most a quarter of an edge a substep: a big push would turn into a big velocity)
+        const glm::vec3 push = -p.side * nrm * (std::min(thickness - d, meanEdge_ * 0.25f) / wsum);
+        for (int k = 0; k < 3; ++k) {
+            if (w_[ids[k]] <= 0.0f || bary[k] <= 0.0f) continue;
+            thinDx_[ids[k]] += push * (w_[ids[k]] * bary[k]);
+            thinCount_[ids[k]] += 1.0f;
+        }
+    }
+    const float friction = std::clamp(fabric_.friction, 0.0f, 1.0f);
+    for (size_t i = 0; i < n; ++i)
+        if (thinCount_[i] > 0.0f) {
+            const glm::vec3 dx = thinDx_[i] / thinCount_[i];
+            x_[i] += dx;
+            // Friction against the feature, as at a contact: part of this substep's sliding across the push.
+            const glm::vec3 nd = dx / std::max(glm::length(dx), 1e-12f);
+            glm::vec3 move = x_[i] - prev_[i];
+            move -= nd * glm::dot(move, nd);
+            x_[i] -= move * friction;
+        }
+}
+
+// Each particle's path through the frame against the colliders: one that crossed a face from its front ends up
+// back in front of it (thickness off), its velocity into the surface removed. Catches what the frame's nearest
+// contact missed: a second, thin feature on the way (a nose or a beard lock past the cheek it was resting on).
+void ClothSim::sweepParticles() {
+    const float thickness = fabric_.thickness;
+    poolFor(x_.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            if (w_[i] <= 0.0f || !contact_[i]) continue;
+            glm::vec3 d = x_[i] - start_[i];
+            const float len = glm::length(d);
+            // (shorter than the way to the nearest surface at the start: it crossed nothing)
+            if (len < 1e-6f || len < glm::distance(start_[i], contactPoint_[i])) continue;
+            d /= len;
+            glm::vec3 p, fn;
+            if (!colliders_->raycast(start_[i], d, len, p, fn) || glm::dot(fn, d) >= 0.0f) continue;
+            x_[i] = p + fn * thickness;
+            const float vn = glm::dot(v_[i], fn);
+            if (vn < 0.0f) v_[i] -= fn * vn;
         }
     }, 1024);
 }
@@ -469,7 +732,24 @@ bool ClothSim::step() {
     if (ramp >= 1.0f && seamCompliance_ <= 0.0f) seamAlpha_ = 0.0f;
     findContacts(frame);
     findSelfPairs(frame);
-    for (int s = 0; s < substeps; ++s) substep(h);
+    // Thin pairs are looked for out to an edge length: a cloth moving farther than that in a frame looks again
+    // within it, every `every` substeps.
+    const bool thin = settings_.thinFeatures && colliders_ && !colliders_->empty();
+    int every = substeps;
+    if (thin) {
+        start_ = x_;
+        const float travel = (maxSpeed_ + glm::length(settings_.gravity) * frame) * frame * 1.5f;
+        const int looks = std::clamp(int(std::ceil(travel / meanEdge_)), 1, substeps);
+        every = (substeps + looks - 1) / looks;
+        findThinPairs(h * float(every));
+    } else {
+        thin_.clear();
+    }
+    for (int s = 0; s < substeps; ++s) {
+        if (thin && s > 0 && s % every == 0) findThinPairs(h * float(every));
+        substep(h);
+    }
+    if (thin) sweepParticles();
     // Damping once per frame, then the rest test.
     const float keep = 1.0f - std::clamp(fabric_.damping, 0.0f, 1.0f);
     float fastest = 0.0f;

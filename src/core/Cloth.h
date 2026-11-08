@@ -27,6 +27,7 @@
 #include <memory>
 #include <span>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace sf {
@@ -83,6 +84,13 @@ public:
     size_t triangles() const;
     // The nearest surface point within `maxDistance` of `p` and the surface's outward normal there (false: none).
     bool closest(const glm::vec3& p, float maxDistance, glm::vec3& point, glm::vec3& normal) const;
+    // The first surface along origin + t * dir (dir unit length, t <= maxT): where, and that triangle's normal.
+    bool raycast(const glm::vec3& origin, const glm::vec3& dir, float maxT, glm::vec3& point, glm::vec3& normal) const;
+    // The vertices in the box [lo, hi] on sharp features: the surface turns round them tighter than `radius` (a
+    // strand, a curl's ridge, a needle, a fingertip, a shelf's edge). In index order, for vertex() / vertexNormal().
+    void sharpVertices(const glm::vec3& lo, const glm::vec3& hi, float radius, std::vector<uint32_t>& out) const;
+    const glm::vec3& vertex(uint32_t i) const;
+    const glm::vec3& vertexNormal(uint32_t i) const;
 
 private:
     struct Impl;
@@ -100,6 +108,10 @@ struct ClothSettings {
     int restFrames = 10;
     // > 0: self-collision, particles keep at least this far apart (m; pairs closer than it at rest are skipped).
     float selfDistance = 0.0f;
+    // Thin features (a beard strand, a finger, an edge sharper than the particle spacing) and fast particles:
+    // collider vertices keep to their side of the cloth's triangles, and a particle's path through the frame is
+    // checked against the surface (it never ends up past a face it crossed). Drape; the brush leaves it off.
+    bool thinFeatures = true;
 };
 
 // One simulation: particles, constraints, contact. Deterministic: the same setup gives the same positions on
@@ -108,7 +120,11 @@ class ClothSim {
 public:
     // False (and empty) when the setup is unusable (no triangles, an index out of range, mismatched sizes).
     bool init(const ClothSetup& setup, const Fabric& fabric, const ClothSettings& settings = {});
-    void setColliders(const ClothColliders* colliders) { colliders_ = colliders; }
+    void setColliders(const ClothColliders* colliders) {
+        colliders_ = colliders;
+        thinLo_ = glm::vec3(0.0f), thinHi_ = glm::vec3(-1.0f); // (its sharp vertices are queried again)
+        thinVerts_.clear(), thinGrid_.clear();
+    }
     void setFabric(const Fabric& fabric);
     void setSettings(const ClothSettings& settings) { settings_ = settings; }
     // Changes a particle's pin (0..1) and its pinned target (default: where it is now).
@@ -146,6 +162,9 @@ private:
     void findContacts(float frame);
     void findSelfPairs(float frame);
     void separateSelf();
+    void findThinPairs(float span); // (span: seconds until the next look)
+    void separateThin();
+    void sweepParticles();
     void substep(float h);
 
     Fabric fabric_;
@@ -167,6 +186,24 @@ private:
     // Per particle, this frame's nearest collider point and normal (contact_ = 0: none in reach).
     std::vector<uint8_t> contact_;
     std::vector<glm::vec3> contactPoint_, contactNormal_;
+    // Thin features: a collider vertex near a cloth triangle and the side of it the vertex keeps (+1 / -1).
+    struct ThinPair {
+        uint32_t tri, vertex;
+        float side;
+    };
+    std::vector<ThinPair> thin_, thinLast_; // this frame's, in triangle order; last frame's
+    std::vector<uint32_t> thinLastAt_;      // per triangle + 1: its range in thinLast_
+    // Per collider vertex, last frame's nearest pair: a new triangle next to it (sharing a particle) takes its side.
+    std::unordered_map<uint32_t, ThinPair> thinNearest_;
+    // The collider's sharp vertices in a box around the cloth (queried again once the cloth leaves it), gridded by
+    // an edge length: (cell key, vertex), sorted.
+    std::vector<uint32_t> thinVerts_;
+    std::vector<std::pair<uint64_t, uint32_t>> thinGrid_;
+    glm::vec3 thinLo_{0.0f}, thinHi_{-1.0f};
+    std::vector<glm::vec3> start_; // positions at the frame's start (the swept-path check)
+    std::vector<glm::vec3> thinDx_;
+    std::vector<float> thinCount_;
+    float meanEdge_ = 0.01f;       // rest edge length, mean
     float seamCompliance_ = 0.0f, seamAlpha_ = 0.0f;
     int frame_ = 0;
     float maxSpeed_ = 0.0f;
