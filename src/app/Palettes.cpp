@@ -759,7 +759,7 @@ void App::drawPalette_Render() {
     if (ui::Checkbox("Lock camera##view.lock_camera", &lockCamera)) uiPrefs_.airStrokes = lockCamera;
     ui::HelpAction(*this, "input.toggle_air_strokes");
     ImGui::TextDisabled("%s", tr("Orbit lock"));
-    ui::Segmented(*this, {"view.orbit_lock_free", "view.orbit_lock_y", "view.orbit_lock_x", "view.orbit_lock_z"});
+    ui::Segmented(*this, {"view.orbit_lock_free", "view.orbit_lock_x", "view.orbit_lock_y", "view.orbit_lock_z"});
     drawBackgroundControls("render");
     ImGui::TextDisabled("%s", tr("View resolution"));
     ui::Segmented(*this, {"perf.res_100", "perf.res_75", "perf.res_50"});

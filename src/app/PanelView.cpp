@@ -133,8 +133,8 @@ void App::registerViewUiCommands() {
     // View > Orbit lock (a request from foirgairwolf on Discord): which way a rotation drag turns the view.
     commands_.add({"orbit_lock",
                    "Orbit lock (View > Orbit lock): how a rotation drag turns the view. free: about the screen's axes "
-                   "(it can roll over the top); y: a turntable, upright, about the vertical axis; x or z: about that "
-                   "world axis only. The axis gizmo shows the lock; saved with the preferences.",
+                   "(it can roll over the top); x or z: about that world axis only; y: a turntable, upright, about "
+                   "the vertical axis. The axis gizmo shows the lock; saved with the preferences.",
                    {{"axis", T::String, "free, x, y or z.", true}},
                    [this](Document&, const Args& a) -> CommandResult {
                        const int lock = parseOrbitLock(argString(a, "axis"));
@@ -156,15 +156,15 @@ void App::registerViewUiCommands() {
         "Rotation drags turn the view about the screen's axes and can roll it over the top (the "
         "default). Saved with the preferences.",
         "View > Orbit lock", lockRun(0), lockOn(0), "Alt+Shift+F");
-    add("view.orbit_lock_y", "Y (turntable)", nullptr,
-        "Rotation drags turn the view like a turntable: the model stays upright and turns about its "
-        "vertical (Y) axis. Saved with the preferences.",
-        "View > Orbit lock", lockRun(1), lockOn(1), "Alt+Shift+Y");
     add("view.orbit_lock_x", "X", nullptr,
         "Rotation drags turn the view about the world X axis only (red): from the front, an up or down drag tips "
         "the model towards you or away. Shift still snaps to a side view; the axis gizmo shows the lock. Saved with "
         "the preferences.",
         "View > Orbit lock", lockRun(2), lockOn(2), "Alt+Shift+X");
+    add("view.orbit_lock_y", "Y (turntable)", nullptr,
+        "Rotation drags turn the view like a turntable: the model stays upright and turns about its "
+        "vertical (Y) axis. Saved with the preferences.",
+        "View > Orbit lock", lockRun(1), lockOn(1), "Alt+Shift+Y");
     add("view.orbit_lock_z", "Z", nullptr,
         "Rotation drags turn the view about the world Z axis only (blue): from the front, a drag around the middle "
         "turns the model like a wheel. Shift still snaps to a side view; the axis gizmo shows the lock. Saved with "

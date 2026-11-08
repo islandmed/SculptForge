@@ -1,4 +1,4 @@
-# View > Orbit lock (foirgairwolf on Discord, #ideas): Free / Y (turntable) / X / Z, a key and the orbit_lock command
+# View > Orbit lock (foirgairwolf on Discord, #ideas): Free / X / Y (turntable) / Z, a key and the orbit_lock command
 # each. A rotation drag turns the view about the locked world axis only; the axis gizmo draws that axis through its
 # disc with a lock badge; Shift still snaps; the lock is saved with the preferences.
 run ui_look look=forge layout=sculptforge

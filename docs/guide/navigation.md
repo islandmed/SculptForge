@@ -19,15 +19,15 @@ model around its vertical axis and up-down drags tilt it, stopping just short of
 | Lock | Key | A rotation drag |
 |---|---|---|
 | **Free** | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> | turns about the screen's axes (the default, as above) |
-| **Y (turntable)** | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Y</kbd> | keeps the model upright: the **Turntable** rotation above |
 | **X** | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> | turns about the world X axis only: from the front, an up or down drag tips the model towards you or away, and sideways drags do nothing |
+| **Y (turntable)** | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Y</kbd> | keeps the model upright: the **Turntable** rotation above |
 | **Z** | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> | turns about the world Z axis only: from the front, a drag around the middle of the view turns the model like a wheel; from the side, an up or down drag tips it |
 
 With X or Z locked, only the part of the drag that moves across the axis on screen counts, so the axis itself never
 moves: nothing drifts, however long you drag. <kbd>Shift</kbd> still snaps to the nearest side view. The axis
 gizmo shows the lock: the locked axis runs through its disc in its colour, and a small lock with the axis letter sits
 at the disc's lower right. The lock is the same setting as **Edit > Preferences > Interface > Rotation**, saved
-with your preferences; scripts and the console use `orbit_lock axis=free|y|x|z`.
+with your preferences; scripts and the console use `orbit_lock axis=free|x|y|z`.
 
 ![View > Orbit lock: the X lock picked in the View menu, the axis gizmo with X through its disc and the lock badge](images/orbit-lock.jpg)
 
