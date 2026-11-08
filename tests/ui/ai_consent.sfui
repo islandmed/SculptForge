@@ -98,8 +98,7 @@ click "Generate 3D/Generate 3D model"
 expect "Allow##send"
 expect "Set up local##send"
 shot consent-generate-200
-click "Allow##send"
-click OK
+click "Allow##send"                              # (the Hunyuan3D licence note was shown once already)
 wait_value generate_candidates == 3 30
 click "Generate 3D/Discard all##candidates"
 click "Preferences##palette.preferences"
