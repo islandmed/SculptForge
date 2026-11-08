@@ -301,6 +301,14 @@ int brushTypeOfAction(std::string_view id) {
     return -1;
 }
 
+// The right shelf's view toggles: the ones that fold into its View button when the shelf doesn't fit.
+// Right shelf tiles shorter than this (logical px; the shelf shrunk to fit a short window) show their icon alone.
+constexpr float kCaptionTileH = 34.0f;
+
+static bool foldsIntoView(const std::string& item) {
+    return item == "view.turntable" || item == "view.ortho" || item == "view.floor_grid" || item == "view.flat_shading";
+}
+
 // ---------------------------------------------------------------------------
 // Button looks (ui::ActionButton)
 // ---------------------------------------------------------------------------
@@ -340,6 +348,11 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
         // Two text levels only: actions and hovered items in text, options that are off in textOff (readable, so
         // off doesn't look disabled); disabled items are faded by alpha.
         const ImU32 fg = theme::u32(on ? (mode ? theme::textOnAccent : theme::textBright) : hovered || !a.checked ? theme::text : theme::textOff, alpha);
+        if (!leftShelf && size.y < kCaptionTileH * s) { // shrunk to fit a short window: the icon alone
+            centredText(dl, app.fontIcons_, p0, p1, fg, a.icon ? a.icon : "?");
+            if (hovered && !ImGui::GetIO().KeyCtrl) ui::DelayedTooltip(label.c_str());
+            return clicked;
+        }
         centredText(dl, app.fontIcons_, p0, ImVec2(p1.x, p1.y - capH + 2.0f * s), fg, a.icon ? a.icon : "?");
         // Captions that fit the column for actions named in full elsewhere (menus, the command palette).
         const char* shortName = a.id == "view.turntable" ? "Turn" : a.id == "view.ortho" ? "Ortho" : a.id == "view.floor_grid" ? "Floor"
@@ -2465,10 +2478,21 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f * s, 4.0f * s));
     bool lineStart = true;
     int prevShown = -1; // the last item drawn on this line (contextual items may be skipped)
+    const bool folded = shelf == kShelfRight && rightShelfFolded_ && !layout_.customize;
+    bool foldShown = false;
     for (int i = 0; i < int(list.size()); ++i) {
         const std::string& item = list[size_t(i)];
         if (item == "row") {
             lineStart = true;
+            continue;
+        }
+        if (folded && foldsIntoView(item)) { // one View button where the first of them was
+            if (foldShown) continue;
+            foldShown = true;
+            prevShown = i;
+            drawShelfItem(shelf, i, "widget.view_fold", vertical);
+            rects.push_back(ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()));
+            indices.push_back(i);
             continue;
         }
         if (!shelfItemShown(item)) continue;
@@ -2517,15 +2541,27 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
         for (size_t k = 0; k < rects.size(); ++k) {
             const std::string& id = list[size_t(indices[k])];
             // What shrinks: the tiles, the picker, and on the left shelf its action tiles (Stroke popup).
-            if (id.rfind("widget.tile.", 0) == 0 || id == "widget.color" || (shelf == kShelfLeft && id != "sep" && actions_.find(id)))
+            // On the right shelf, every button (its tiles drop their captions when short; the view toggles fold first).
+            if (id.rfind("widget.tile.", 0) == 0 || id == "widget.color" || (shelf == kShelfLeft && id != "sep" && actions_.find(id)) ||
+                (shelf == kShelfRight && id != "sep"))
                 scalable += rects[k].GetHeight();
         }
         const float needed = rects.back().Max.y + ImGui::GetScrollY() - r.y + pad.y;
         shelfClipped_[shelf] = int(std::count_if(rects.begin(), rects.end(), [&](const ImRect& rc) { return rc.Max.y > r.y + r.h + 0.5f; }));
+        if (shelf == kShelfRight && !layout_.customize) { // fold the view toggles when the shelf is too tall
+            const int folds = int(std::count_if(list.begin(), list.end(), [](const std::string& id) { return foldsIntoView(id); }));
+            if (!rightShelfFolded_ && folds > 0 && needed > r.h + 0.5f) {
+                rightShelfFolded_ = true;
+            } else if (rightShelfFolded_) {
+                // Unfolded at full size: the buttons at fit 1, and the View button's place taken by all of them.
+                const float full = needed - scalable + scalable / std::max(shelfFit_[shelf], 0.1f) + float(folds - 1) * 44.0f * s;
+                if (full <= r.h - 4.0f * s) rightShelfFolded_ = false; // (a small margin: no flicker at the edge)
+            }
+        }
         float& fit = shelfFit_[shelf];
         if (scalable > 0.0f) {
             const float fixed = needed - scalable;
-            const float want = std::clamp(fit * (r.h - 1.0f * s - fixed) / scalable, 0.6f, 1.0f);
+            const float want = std::clamp(fit * (r.h - 1.0f * s - fixed) / scalable, shelf == kShelfRight ? 0.5f : 0.6f, 1.0f); // (the right shelf: icons alone)
             if (want < fit - 0.002f || want > fit + 0.02f) fit = want; // (growing back waits for a clear margin)
         } else {
             fit = 1.0f;
@@ -2719,7 +2755,41 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         const int mode = item == "widget.nav.move" ? 0 : item == "widget.nav.zoom" ? 1 : 2;
         canvasNavButton(mode == 0 ? "nav.move" : mode == 1 ? "nav.zoom" : "nav.rotate",
                         mode == 0 ? ICON_LC_HAND : mode == 1 ? ICON_LC_ZOOM_IN : ICON_LC_ROTATE_3D,
-                        mode == 0 ? "Move" : mode == 1 ? "Zoom" : "Rotate", mode, navW);
+                        mode == 0 ? "Move" : mode == 1 ? "Zoom" : "Rotate", mode, navW,
+                        shelf == kShelfRight ? std::floor(40.0f * s * shelfFit_[shelf]) : 0.0f);
+    } else if (item == "widget.view_fold") {
+        // The folded view toggles (rightShelfFolded_): one button, lit while any of them is on, opening their list.
+        const char* ids[] = {"view.turntable", "view.ortho", "view.floor_grid", "view.flat_shading"};
+        bool anyOn = false;
+        for (const char* id : ids)
+            if (const Action* a = actions_.find(id); a && a->checked && a->checked()) anyOn = true;
+        Action fold;
+        fold.id = "widget.view_fold";
+        fold.label = "View";
+        fold.icon = ICON_LC_EYE;
+        fold.checked = [anyOn] { return anyOn; };
+        const ImVec2 size(fitW(44.0f * s), std::floor(40.0f * s * shelfFit_[shelf]));
+        centre(size.x);
+        if (drawShelfTile(*this, fold, size)) ImGui::OpenPopup("##viewfold");
+        ui::HelpText("View", nullptr, "Turntable, Orthographic, Floor grid and Flat shading: the window is too short "
+                     "to show them as buttons here, so they wait in this list.", "Right shelf");
+        const ImVec2 at = ImGui::GetItemRectMin();
+        ImGui::SetNextWindowPos(ImVec2(at.x - 4.0f * s, at.y), ImGuiCond_Appearing, ImVec2(1.0f, 0.0f));
+        if (ImGui::BeginPopup("##viewfold")) {
+            for (const char* id : ids) {
+                const Action* a = actions_.find(id);
+                if (!a) continue;
+                const std::string key = actions_.shortcutText(id);
+                const bool on = a->checked && a->checked();
+                const std::string label = std::string(trAction(a->id, a->label)) + "##fold." + id;
+                if (ImGui::MenuItem(label.c_str(), key.empty() ? nullptr : key.c_str(), on) && a->run) {
+                    actions_.touch(a->id);
+                    a->run();
+                }
+                ui::HelpAction(*this, id);
+            }
+            ImGui::EndPopup();
+        }
     } else if (item == "widget.add_brush") {
         const ImVec2 size(48.0f * s, shell::bottomShelfSize(layout_.shelfTiles).tileH * s);
         if (ImGui::InvisibleButton("##addbrush", size)) // the brush picker in "add to shelf" mode (Pickers.cpp)
@@ -2780,7 +2850,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
                               : a->icon          ? (topShelfCompact_ ? ui::Look::Icon : ui::Look::IconLabel)
                                                  : ui::Look::Label;
         const ImVec2 size = shelf == kShelfTop      ? ImVec2(look == ui::Look::Icon ? rowH : 0.0f, rowH)
-                            : shelf == kShelfRight  ? ImVec2(fitW(44.0f * s), 40.0f * s)
+                            : shelf == kShelfRight  ? ImVec2(fitW(44.0f * s), std::floor(40.0f * s * shelfFit_[shelf]))
                             : shelf == kShelfBottom ? ImVec2(bottomTileW_, shell::bottomShelfSize(layout_.shelfTiles).tileH * s)
                                                     : ImVec2(winW - 2.0f * padX, std::floor(60.0f * s * shelfFit_[shelf]));
         centre(size.x);
@@ -3032,10 +3102,10 @@ void App::finishShelfDrag() {
 }
 
 // Right-shelf Move / Zoom / Rotate: drag on the button to navigate.
-bool App::canvasNavButton(const char* id, const char* icon, const char* englishLabel, int mode, float width) {
+bool App::canvasNavButton(const char* id, const char* icon, const char* englishLabel, int mode, float width, float height) {
     const char* label = tr(englishLabel);
     const float s = uiScale_;
-    const ImVec2 size(width > 0.0f ? width : 44.0f * s, 40.0f * s);
+    const ImVec2 size(width > 0.0f ? width : 44.0f * s, height > 0.0f ? height : 40.0f * s);
     ImGui::InvisibleButton((std::string(label) + "##" + id).c_str(), size);
     const bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
     if (active) {
@@ -3060,8 +3130,13 @@ bool App::canvasNavButton(const char* id, const char* icon, const char* englishL
     dl->AddRectFilled(a, b, theme::u32(active ? theme::accent : hovered ? theme::buttonHover : theme::frame), theme::rounding(4.0f * s));
     const float capH = (fontTiny_ ? fontTiny_->FontSize : 10.0f) + 2.0f * s;
     const ImU32 fg = theme::u32(active ? theme::textOnAccent : theme::text);
-    centredText(dl, fontIcons_, a, ImVec2(b.x, b.y - capH + 2.0f * s), fg, icon);
-    centredText(dl, fontTiny_, ImVec2(a.x, b.y - capH), ImVec2(b.x, b.y - 1.0f * s), fg, label);
+    if (size.y < kCaptionTileH * s) { // a right shelf shrunk to fit: the icon alone, the name in the tooltip
+        centredText(dl, fontIcons_, a, b, fg, icon);
+        if (hovered && !ImGui::GetIO().KeyCtrl) ui::DelayedTooltip(label);
+    } else {
+        centredText(dl, fontIcons_, a, ImVec2(b.x, b.y - capH + 2.0f * s), fg, icon);
+        centredText(dl, fontTiny_, ImVec2(a.x, b.y - capH), ImVec2(b.x, b.y - 1.0f * s), fg, label);
+    }
     ui::HelpAction(*this, id);
     return active;
 }

@@ -1101,6 +1101,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The right shelf's view toggles and the Size slider's ring at 1440 px, 100 % and 200 % (tests/ui/sizes/view_toggles.sfui).
     sculptforge_ui_test(view_toggles_1440 sizes/view_toggles --size 1440x900)
     sculptforge_ui_test(view_toggles_1440_200 sizes/view_toggles --size 2880x1800)
+    # A shorter window: the view toggles fold into one View button (tests/ui/sizes/view_toggles_short.sfui).
+    sculptforge_ui_test(view_toggles_1024 sizes/view_toggles_short --size 1024x768)
+    sculptforge_ui_test(view_toggles_1024_200 sizes/view_toggles_short --size 2048x1536)
     # A crash leaves a note in the log file (#16). Needs no window.
     add_test(NAME crash_log COMMAND ${CMAKE_COMMAND} -DAPP=$<TARGET_FILE:sculptforge>
              -DDIR=${CMAKE_CURRENT_BINARY_DIR}/crash-log-test -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/crash_log.cmake)

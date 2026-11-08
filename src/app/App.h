@@ -1963,7 +1963,8 @@ private:
     Renderer::Viewport canvasViewport(int fbWidth, int fbHeight) const; // the canvas in framebuffer pixels
     void drawCanvasFrame();
     // Right-shelf Move/Zoom/Rotate; width 0: the standard 44 px (times the UI scale).
-    bool canvasNavButton(const char* id, const char* icon, const char* label, int mode, float width = 0.0f);
+    bool canvasNavButton(const char* id, const char* icon, const char* label, int mode, float width = 0.0f,
+                         float height = 0.0f); // (a short height: the icon alone, no caption)
     void drawBrushTile(const char* id, ImVec2 size);
     void drawStrokeTile(const char* id, ImVec2 size);
     void drawStrokeIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, StrokeType type); // the shelf tile's picture
@@ -2120,6 +2121,9 @@ private:
     // The top shelf when its row doesn't fit (#105: 1280 logical px at Windows' 200 %): the sliders leave room for the
     // items after them (topShelfTailW_, measured last frame), then the icon buttons drop their labels.
     bool topShelfCompact_ = false;
+    // The right shelf too tall for the window (1024x768, 1600x960 at 150 %): its view toggles (Turntable, Ortho,
+    // Floor, Flat) fold into one View button with a pop-over, until the window is tall enough again.
+    bool rightShelfFolded_ = false;
     float topShelfFullW_ = 0.0f, topShelfTailW_ = 0.0f;
     int navDrag_ = -1;          // right-shelf drag button being dragged (0 move, 1 zoom, 2 rotate)
     ImVec2 navLast_{0, 0};      // the cursor at its last frame (the drag moves by the cursor's own steps)
