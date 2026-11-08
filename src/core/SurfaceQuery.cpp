@@ -277,7 +277,11 @@ bool TriangleBVH::raycast(const glm::vec3& origin, const glm::vec3& dir, float m
     if (bvh_.empty()) return false;
     const auto& nodes = bvh_.nodes();
     const auto& order = bvh_.order();
-    const glm::vec3 inv(1.0f / dir.x, 1.0f / dir.y, 1.0f / dir.z);
+    // (no 0 * inf = NaN in the slab test for an axis-aligned ray, as in BVH::raycast)
+    glm::vec3 safe = dir;
+    for (int i = 0; i < 3; ++i)
+        if (std::abs(safe[i]) < 1e-20f) safe[i] = std::copysign(1e-20f, safe[i]);
+    const glm::vec3 inv = 1.0f / safe;
     float bestT = maxT;
     bool found = false;
     uint32_t stack[64];
