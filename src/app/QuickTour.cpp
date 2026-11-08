@@ -228,14 +228,14 @@ void App::drawQuickTour() {
             ImGui::PushStyleColor(ImGuiCol_Button, accent);
             if (ImGui::Button(tr(ICON_LC_HEART "  See memberships##quicktour"))) openSupportPage();
             ImGui::PopStyleColor();
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Opens sculptforge.app/support.html in your browser."));
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Opens sculptforge.app/support.html in your browser."));
             ImGui::SameLine();
             if (ImGui::Button(tr("Maybe later##quicktour"))) closeQuickTour(); // and it never comes back by itself
         } else if (slide.action) {
             ImGui::PushStyleColor(ImGuiCol_Button, accent);
             if (ImGui::Button(tr(ICON_LC_EYE "  Show me##quicktour"))) quickTourShowMe(i);
             ImGui::PopStyleColor();
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Opens it in SculptForge; the tour waits at the bottom."));
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Opens it in SculptForge; the tour waits at the bottom."));
         }
         // Back and Next at the right.
         const ImGuiStyle& st = ImGui::GetStyle();

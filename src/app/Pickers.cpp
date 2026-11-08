@@ -683,7 +683,7 @@ void drawBrushGrid(App& app, GridMode mode) {
     if (popup) {
         // What was typed, or how to type.
         if (typed.empty()) {
-            ImGui::TextDisabled(tr("Type a letter to narrow the brushes, then press its orange key"));
+            ImGui::TextDisabled("%s", tr("Type a letter to narrow the brushes, then press its orange key"));
             ImGui::SameLine();
             SortMenu("brushsortpop", app.uiPrefs_.brushSort);
         } else {
@@ -692,7 +692,7 @@ void drawBrushGrid(App& app, GridMode mode) {
                 c = char(std::toupper(static_cast<unsigned char>(c)));
             ImGui::TextColored(ImVec4(0.94f, 0.53f, 0.18f, 1.0f), "%s", shownTyped.c_str());
             ImGui::SameLine();
-            ImGui::TextDisabled(tr(substring ? "(contains)  Backspace: undo a letter  Enter: first match"
+            ImGui::TextDisabled("%s", tr(substring ? "(contains)  Backspace: undo a letter  Enter: first match"
                                           : "Backspace: undo a letter  Enter: first match"));
         }
     }
@@ -767,7 +767,7 @@ void drawBrushGrid(App& app, GridMode mode) {
             if (b.kind == BrushItem::Kind::Recipe) {
                 // The same menu as the Brush palette's custom-brush list (PanelBrushLibrary.cpp).
                 if (ImGui::MenuItem(tr("Copy brush code"))) app.copyBrushCode(b.index);
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("One line of text to share in chat, email or a forum"));
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("One line of text to share in chat, email or a forum"));
                 if (ImGui::MenuItem(tr("Rename...##brush"))) {
                     app.brushPopup_ = App::BrushPopup::Rename;
                     app.brushPopupName_ = app.doc_.brushes[size_t(b.index)].name;

@@ -346,10 +346,10 @@ void App::drawSplatTrainSection() {
     ImGui::SameLine();
     ui::ActionButton(*this, "splats.train_folder", ImVec2((avail - gap) * 0.5f, 0), ui::Look::IconLabel);
     if (s.job.busy()) {
-        ImGui::TextDisabled(tr("Training - progress is over the viewport"));
+        ImGui::TextDisabled("%s", tr("Training - progress is over the viewport"));
     } else if (s.brush.empty()) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-        ImGui::TextWrapped(tr("Trainer: Brush is not installed yet (it is offered when you start)."));
+        ImGui::TextWrapped("%s", tr("Trainer: Brush is not installed yet (it is offered when you start)."));
         ImGui::PopStyleColor();
     }
     if (ImGui::TreeNode(tr("Tools##splattrain"))) {
@@ -388,11 +388,11 @@ void App::drawSplatTrainOverlay() {
             ImGui::TextUnformatted(tr(s.promptFor == Pick::Brush ? "Splat training needs Brush" : "Splat training needs COLMAP"));
             ImGui::Spacing();
             if (s.promptFor == Pick::Brush)
-                ImGui::TextWrapped(tr("Brush is a free, open-source Gaussian splat trainer (Apache-2.0) that runs on your "
+                ImGui::TextWrapped("%s", tr("Brush is a free, open-source Gaussian splat trainer (Apache-2.0) that runs on your "
                                    "graphics card - NVIDIA, AMD, Intel or Apple, no CUDA needed. SculptForge runs it "
                                    "as a separate program."));
             else
-                ImGui::TextWrapped(tr("COLMAP (BSD licence) works out where each photo was taken, which training needs. "
+                ImGui::TextWrapped("%s", tr("COLMAP (BSD licence) works out where each photo was taken, which training needs. "
                                    "SculptForge runs it as a separate program."));
             ImGui::Spacing();
             if (d) {

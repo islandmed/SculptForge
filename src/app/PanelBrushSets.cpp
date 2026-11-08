@@ -67,10 +67,13 @@ int findSet(const std::vector<BrushSet>& list, const std::string& name) {
 
 // printf into a std::string (the messages below come in English and in the interface language).
 template <class... A> std::string format(const char* f, A... args) {
-    if constexpr (sizeof...(A) == 0) return f;
-    char buf[512];
-    std::snprintf(buf, sizeof buf, f, args...);
-    return buf;
+    if constexpr (sizeof...(A) == 0) {
+        return f; // (no arguments: the text is used as is, never read as a format)
+    } else {
+        char buf[512];
+        std::snprintf(buf, sizeof buf, f, args...);
+        return buf;
+    }
 }
 
 std::string countText(int n, const char* one, const char* many, bool translated) {

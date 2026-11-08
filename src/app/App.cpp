@@ -3193,17 +3193,17 @@ void App::drawUi() {
                 if (p.name.empty()) ImGui::TextWrapped("%s", tr("Studio mode"));
                 else ImGui::TextWrapped(tr("Studio build for %s"), p.name.c_str());
                 ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-                ImGui::TextWrapped(tr("Offline: no outside connections. Updates come only from your studio's channel."));
+                ImGui::TextWrapped("%s", tr("Offline: no outside connections. Updates come only from your studio's channel."));
                 ImGui::PopStyleColor();
                 ImGui::Spacing();
             }
             ImGui::TextWrapped("%s", tr(ai::kPrivacyLine)); // also on the site (website/index.html) and in docs/ai-services.md
             ImGui::Spacing();
-            ImGui::TextWrapped(tr("Copyright (C) 2026 The SculptForge contributors. This program is free software: you can "
+            ImGui::TextWrapped("%s", tr("Copyright (C) 2026 The SculptForge contributors. This program is free software: you can "
                                "redistribute it and/or modify it under the terms of the GNU General Public License, "
                                "version 3 or later. It comes with ABSOLUTELY NO WARRANTY."));
             ImGui::Spacing();
-            ImGui::TextWrapped(tr("Built with SDL 3 (zlib), Dear ImGui (MIT), GLM (MIT), stb (MIT/public domain), ufbx "
+            ImGui::TextWrapped("%s", tr("Built with SDL 3 (zlib), Dear ImGui (MIT), GLM (MIT), stb (MIT/public domain), ufbx "
                                "(MIT/public domain), xatlas (MIT), MikkTSpace (zlib), the Inter and JetBrains Mono typefaces "
                                "(SIL OFL 1.1) and the MIT-licensed colours of the Forge Terminal look's schemes. Quad Remesh "
                                "follows Instant Meshes "
@@ -3239,7 +3239,7 @@ void App::drawUi() {
 
 void App::drawLayersContents() {
     const float scale = uiScale_;
-    ImGui::TextDisabled(tr("Sculpt expressions & correctives;\nexported as glTF morph targets."));
+    ImGui::TextDisabled("%s", tr("Sculpt expressions & correctives;\nexported as glTF morph targets."));
 
     if (ImGui::RadioButton(tr("Base mesh"), doc_.activeLayer < 0)) runCommand("layer_set_active", {{"index", -1.0}});
     constexpr const char* kLayersPath = "Tool > Layers";
@@ -3356,7 +3356,7 @@ void App::drawGameExportContents() {
             ImGui::TableNextColumn();
             ImGui::Text("%zu", doc_.mesh.triangleCount());
             ImGui::TableNextColumn();
-            ImGui::TextDisabled(tr("editable"));
+            ImGui::TextDisabled("%s", tr("editable"));
             for (int i = 0; i < int(lods_.size()); ++i) {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
@@ -3372,7 +3372,7 @@ void App::drawGameExportContents() {
             }
             ImGui::EndTable();
         }
-        ImGui::TextDisabled(tr("Click a level to inspect it in the viewport."));
+        ImGui::TextDisabled("%s", tr("Click a level to inspect it in the viewport."));
     }
 
     ImGui::SeparatorText(tr("Unreal Engine"));
@@ -3383,7 +3383,7 @@ void App::drawGameExportContents() {
     ImGui::PopItemWidth();
     ImGui::Checkbox(tr("Unreal is on another computer"), &unrealNetwork_);
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip(tr("In Unreal: Project Settings > Plugins > Python > Advanced:\nMulticast Time-To-Live = 1, "
+        ImGui::SetTooltip("%s", tr("In Unreal: Project Settings > Plugins > Python > Advanced:\nMulticast Time-To-Live = 1, "
                           "Multicast Bind Address = 0.0.0.0"));
     if (pendingUnreal_.valid()) {
         ImGui::ProgressBar(-1.0f * float(ImGui::GetTime()), ImVec2(-1, 0), tr("Sending to Unreal..."));
@@ -3391,7 +3391,7 @@ void App::drawGameExportContents() {
         sendToUnreal();
     }
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip(tr("Imports (or updates) the asset in the open Unreal Editor.\nNeeds the Python Editor Script "
+        ImGui::SetTooltip("%s", tr("Imports (or updates) the asset in the open Unreal Editor.\nNeeds the Python Editor Script "
                           "Plugin and Project Settings > Python > Enable Remote Execution."));
     if (ImGui::Button(tr("Export FBX for Unreal..."), ImVec2(-1, 0))) saveFileDialog(FileAction::ExportUnreal);
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
@@ -3403,7 +3403,7 @@ void App::drawGameExportContents() {
     if (ImGui::Button(tr("GLB + blend shapes"), ImVec2(-1, 0))) saveFileDialog(FileAction::ExportGlb);
     if (ImGui::Button(tr("LOD chain (GLB per level)"), ImVec2(-1, 0))) saveFileDialog(FileAction::ExportLods);
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped(tr("Unreal, Unity, Godot, Blender, three.js"));
+    ImGui::TextWrapped("%s", tr("Unreal, Unity, Godot, Blender, three.js"));
     ImGui::PopStyleColor();
 }
 
@@ -3619,7 +3619,7 @@ void App::drawAiSettings() {
                            "      ollama pull qwen3:4b-instruct\n"
                            "3. Ollama runs in the menu bar. Pick Ollama above, then Find models."));
 #else
-        ImGui::TextWrapped(tr("1. Install Ollama (or use your package manager, e.g. sudo pacman -S ollama):\n"
+        ImGui::TextWrapped("%s", tr("1. Install Ollama (or use your package manager, e.g. sudo pacman -S ollama):\n"
                            "      curl -fsSL https://ollama.com/install.sh | sh\n"
                            "2. Start it if needed:\n"
                            "      sudo systemctl enable --now ollama\n"
@@ -3627,7 +3627,7 @@ void App::drawAiSettings() {
                            "      ollama pull qwen3:4b-instruct\n"
                            "4. Pick Ollama above, then Find models."));
 #endif
-        ImGui::TextWrapped(tr("The 2.5 GB model needs about 4 GB of free memory and works without a graphics card "
+        ImGui::TextWrapped("%s", tr("The 2.5 GB model needs about 4 GB of free memory and works without a graphics card "
                            "(10-20 s per brush on a laptop CPU, a few seconds with a GPU)."));
         if (ImGui::SmallButton(tr("Full guide: Windows, macOS, Linux, LM Studio")))
             sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/blob/main/docs/local-ai.md");
@@ -3666,12 +3666,12 @@ void App::drawBrushLab() {
         ImGui::End();
         return;
     }
-    ImGui::TextWrapped(tr("Describe a brush the way you'd describe it to another sculptor."));
+    ImGui::TextWrapped("%s", tr("Describe a brush the way you'd describe it to another sculptor."));
 
     // Conversation: just a hint until there is one, then a box that grows with it and scrolls past ~8 lines.
     if (chatLog_.empty() && !pendingBrush_.valid()) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-        ImGui::TextWrapped(tr("Try an idea below, or ask for changes to the selected brush, like \"sharper\" or "
+        ImGui::TextWrapped("%s", tr("Try an idea below, or ask for changes to the selected brush, like \"sharper\" or "
                            "\"less buildup\"."));
         ImGui::PopStyleColor();
     } else {
@@ -3736,7 +3736,7 @@ void App::drawBrushLab() {
     ImGui::SameLine();
     if (ImGui::SmallButton(tr("Paste brush"))) pasteBrush();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-        ImGui::SetTooltip(tr("Install a brush someone shared: a brush code (sfbrush1:...) or .sfbrush text on the "
+        ImGui::SetTooltip("%s", tr("Install a brush someone shared: a brush code (sfbrush1:...) or .sfbrush text on the "
                           "clipboard (Ctrl+V in the viewport)"));
 
     if (BrushRecipe* recipe = doc_.activeBrush >= 0 ? &doc_.brushes[doc_.activeBrush] : nullptr) {
@@ -3949,7 +3949,7 @@ void App::drawImageTo3D() {
         ImGui::SetNextItemWidth(-1);
         ImGui::InputTextMultiline("##textprompt", textPrompt_, sizeof textPrompt_, ImVec2(-1, ImGui::GetTextLineHeight() * 3.5f));
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-        ImGui::TextWrapped(tr("Describe one object: \"a stylised dragon head with curled horns\", \"a cartoon fox sitting\"."));
+        ImGui::TextWrapped("%s", tr("Describe one object: \"a stylised dragon head with curled horns\", \"a cartoon fox sitting\"."));
         ImGui::PopStyleColor();
     } else {
         if (ImGui::Button(tr(refImage_.empty() ? "Choose image..." : "Change image..."), ImVec2(-1, 0)))
@@ -3957,7 +3957,7 @@ void App::drawImageTo3D() {
                                    nullptr, false);
         if (refImage_.empty()) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-            ImGui::TextWrapped(tr("Or drop a sketch, concept, logo, photo or height map onto the window."));
+            ImGui::TextWrapped("%s", tr("Or drop a sketch, concept, logo, photo or height map onto the window."));
             ImGui::PopStyleColor();
             ImGui::End();
             return;
@@ -4091,7 +4091,7 @@ void App::drawImageTo3D() {
         }
         ImGui::Checkbox(tr("Remove flat background"), &removeBackground_);
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-            ImGui::SetTooltip(tr("Drops the flat plane a picture's background often becomes (a wall behind or ground under "
+            ImGui::SetTooltip("%s", tr("Drops the flat plane a picture's background often becomes (a wall behind or ground under "
                               "the subject) before the model lands. A relief or coin on its own is kept. Undo brings "
                               "a removed plane back."));
     }
@@ -4127,7 +4127,7 @@ void App::drawImageTo3D() {
     ImGui::SetNextWindowSize(ImVec2(320 * scale, 0));
     if (ImGui::BeginPopupModal(tr("Hunyuan3D licence###hunyuan.licence"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped("%s", tr(ai::kHunyuanLicenceNote));
-        ImGui::TextDisabled(tr("This stays in the Model tooltip."));
+        ImGui::TextDisabled("%s", tr("This stays in the Model tooltip."));
         if (ImGui::Button(tr("OK"), ImVec2(-1, 0))) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
@@ -4197,7 +4197,7 @@ void App::drawPalette_Splats() {
         drawSplatTrainSection(); // train one from a phone capture (PanelSplatTrain.cpp)
         ImGui::Spacing();
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-        ImGui::TextWrapped(tr("Open or drop a .ply capture (Polycam, Luma, Postshot, Scaniverse...) to sculpt against it."));
+        ImGui::TextWrapped("%s", tr("Open or drop a .ply capture (Polycam, Luma, Postshot, Scaniverse...) to sculpt against it."));
         ImGui::PopStyleColor();
         if (ImGui::Button(tr("Sculpt to splats"), ImVec2(-1, 0))) runCommand("mesh_to_splats");
         if (ImGui::Button(tr("Try a test head##splats"), ImVec2(-1, 0))) runCommand("splat_test_capture", {{"kind", std::string("head")}});
@@ -4215,12 +4215,12 @@ void App::drawPalette_Splats() {
     ImGui::SliderFloat("##splatopacity", &renderSettings_.splatOpacity, 0.05f, 1.0f, tr("opacity %.2f"));
     const float third = (ImGui::GetContentRegionAvail().x - 2 * ImGui::GetStyle().ItemSpacing.x) / 3.0f;
     if (ImGui::Button(tr("Flip"), ImVec2(third, 0))) runCommand("splat_transform", {{"rotate_x", 180.0}});
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Turn upside down (most captures are)"));
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Turn upside down (most captures are)"));
     ImGui::SameLine();
     if (ImGui::Button(tr("Turn 90"), ImVec2(third, 0))) runCommand("splat_transform", {{"rotate_y", 90.0}});
     ImGui::SameLine();
     if (ImGui::Button(tr("Fit"), ImVec2(third, 0))) runCommand("splat_transform", {{"fit", true}});
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Centre and scale to the sculpt"));
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Centre and scale to the sculpt"));
     if (ImGui::Button(tr("Clean floaters"), ImVec2(-1, 0))) runCommand("splat_clean", {{"min_opacity", 0.1}, {"keep", 0.97}});
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     if (ImGui::Button(tr("Save splats..."), ImVec2(half, 0))) saveFileDialog(FileAction::SaveSplats);

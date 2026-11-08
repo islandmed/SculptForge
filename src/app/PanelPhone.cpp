@@ -369,7 +369,7 @@ void App::drawPhoneWindow() {
         return;
     }
     if (!phoneError_.empty() || !phone_ || !phone_->running()) {
-        ImGui::TextColored(kBad, tr("The phone link couldn't start."));
+        ImGui::TextColored(kBad, "%s", tr("The phone link couldn't start."));
         ImGui::TextWrapped("%s", phoneError_.empty() ? "Starting..." : phoneError_.c_str());
         if (ImGui::Button(tr("Try again##phone"))) phoneError_.clear();
         ImGui::End();
@@ -418,7 +418,7 @@ void App::drawPhoneWindow() {
     hint(tr("Phone and computer on the same Wi-Fi. No app to install."));
     hint(tr("Page won't open? Use Firefox on the phone: some Chrome versions block home-network addresses."));
     ImGui::Spacing();
-    ImGui::TextDisabled(tr("No camera? Open this in the phone's browser:"));
+    ImGui::TextDisabled("%s", tr("No camera? Open this in the phone's browser:"));
     ImGui::Text(tr("http://%s"), st.address.c_str());
     ImGui::Text(tr("and type the code  %.3s %.3s"), st.code.c_str(), st.code.size() > 3 ? st.code.c_str() + 3 : "");
     ui::HelpText("Pairing code", nullptr,
@@ -442,7 +442,7 @@ void App::drawPhoneWindow() {
                      "the Wi-Fi the phone uses (often 192.168.x.x).",
                      "File > Capture from phone");
     } else if (addresses.empty()) {
-        ImGui::TextColored(kWarn, tr("This computer isn't on a local network."));
+        ImGui::TextColored(kWarn, "%s", tr("This computer isn't on a local network."));
     }
     if (st.tokenExpiresIn > 0 && st.tokenExpiresIn < 120 && st.secondsSinceSeen < 0)
         ImGui::TextColored(kWarn, tr("This code expires in %.0f s"), st.tokenExpiresIn);
@@ -459,14 +459,14 @@ void App::drawPhoneWindow() {
         ImGui::TextColored(kWarn, tr(ICON_LC_SMARTPHONE "  %s: not seen for %.0f s"), st.device.c_str(), st.secondsSinceSeen);
         hint(tr("The page may be closed or the phone asleep: open it again to carry on."));
     } else {
-        ImGui::TextDisabled(tr(ICON_LC_SMARTPHONE "  Waiting for your phone..."));
+        ImGui::TextDisabled("%s", tr(ICON_LC_SMARTPHONE "  Waiting for your phone..."));
         if (ImGui::TreeNode(tr("The phone can't open the page?"))) {
-            ImGui::BulletText(tr("Same Wi-Fi: not a guest network, not mobile data."));
-            ImGui::BulletText(tr("Turn off VPNs on the phone and the computer."));
-            ImGui::BulletText(tr("Windows: allow SculptForge on private networks\nwhen the firewall asks."));
-            ImGui::BulletText(tr("macOS: allow incoming connections for SculptForge\n(System Settings > Network > Firewall)."));
-            ImGui::BulletText(tr("Several networks? Pick the Wi-Fi one under Network."));
-            ImGui::BulletText(tr("Android Chrome says \"This site can't be reached\"\n(ERR_TOO_MANY_RETRIES)? Recent Chrome versions can\n"
+            ImGui::BulletText("%s", tr("Same Wi-Fi: not a guest network, not mobile data."));
+            ImGui::BulletText("%s", tr("Turn off VPNs on the phone and the computer."));
+            ImGui::BulletText("%s", tr("Windows: allow SculptForge on private networks\nwhen the firewall asks."));
+            ImGui::BulletText("%s", tr("macOS: allow incoming connections for SculptForge\n(System Settings > Network > Firewall)."));
+            ImGui::BulletText("%s", tr("Several networks? Pick the Wi-Fi one under Network."));
+            ImGui::BulletText("%s", tr("Android Chrome says \"This site can't be reached\"\n(ERR_TOO_MANY_RETRIES)? Recent Chrome versions can\n"
                               "block every home-network address, even your router.\nUse Firefox on the phone instead and allow it to\n"
                               "reach local devices when it asks."));
             ImGui::BulletText(tr("Linux: allow port %d (TCP and UDP) through the\nfirewall, e.g. sudo ufw allow from\n<your network>/24 to any port %d"),
@@ -490,7 +490,7 @@ void App::drawPhoneWindow() {
         for (size_t i = phoneCaptures_.size(); i-- > first;) {
             ImGui::PushID(int(i));
             if (ImGui::SmallButton(ICON_LC_FOLDER_OPEN) && interactive()) sf::dialogs::openUrl(fileUrl(phoneCaptures_[i]).c_str());
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Show the folder"));
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Show the folder"));
             ImGui::PopID();
             ImGui::SameLine();
             ImGui::Text(tr("Captures/%s"), folderName(phoneCaptures_[i]).c_str());
@@ -504,7 +504,7 @@ void App::drawPhoneWindow() {
 
     // AR on the desk.
     ImGui::SeparatorText(tr("View in AR"));
-    if (st.arBusy) ImGui::TextColored(kWarn, tr("Preparing the model for the phone..."));
+    if (st.arBusy) ImGui::TextColored(kWarn, "%s", tr("Preparing the model for the phone..."));
     else if (!st.arError.empty()) ImGui::TextColored(kBad, "%s", st.arError.c_str());
     else if (st.arVersion > 0) ImGui::Text(tr("On the phone: %s"), st.arSummary.c_str());
     else hint(tr("Tap View in AR on the phone: the active Part (or the scene) stands on your desk."));
@@ -530,7 +530,7 @@ void App::drawPhoneWindow() {
         hint(tr("On the phone: Face capture. The front camera tracks 52 expressions on the phone; only the numbers "
              "come here."));
     }
-    if (phoneFaceCommandMissing_) ImGui::TextColored(kWarn, tr("face_weights isn't in this build: the model doesn't move yet."));
+    if (phoneFaceCommandMissing_) ImGui::TextColored(kWarn, "%s", tr("face_weights isn't in this build: the model doesn't move yet."));
     ui::ActionButton(*this, "phone.record_face");
     if (st.recording) {
         ImGui::SameLine();

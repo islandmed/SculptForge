@@ -375,7 +375,7 @@ void App::drawBakeContents() {
 
     // What the maps go onto.
     if (!m.hasUvs()) {
-        ImGui::TextDisabled(tr("No UVs: Tool > Texture Image > Auto UV"));
+        ImGui::TextDisabled("%s", tr("No UVs: Tool > Texture Image > Auto UV"));
     } else {
         ImGui::TextDisabled(tr("Onto %s (%zu tris, UVs)"), doc_.activePartInfo().name.c_str(), m.triangleCount());
     }

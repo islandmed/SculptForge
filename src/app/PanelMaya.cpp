@@ -487,9 +487,9 @@ void App::drawMayaMenu() {
         ui::HelpText("Turn the Maya bridge off", nullptr, "Forget the exchange folder; nothing in it is deleted.",
                      "File > Maya");
     } else {
-        ImGui::TextDisabled(tr("Off: choose an exchange folder first."));
+        ImGui::TextDisabled("%s", tr("Off: choose an exchange folder first."));
     }
-    ImGui::TextDisabled(tr("Needs the SculptForge shelf script in Maya\n(Help > User Guide > Working with Maya)."));
+    ImGui::TextDisabled("%s", tr("Needs the SculptForge shelf script in Maya\n(Help > User Guide > Working with Maya)."));
     ImGui::EndMenu();
 }
 

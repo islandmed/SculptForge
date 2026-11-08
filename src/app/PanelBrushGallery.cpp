@@ -214,7 +214,7 @@ void App::drawBrushGallery() {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
         if (ImGui::Button("x##clearsearch", ImVec2(h, h))) g.search[0] = '\0';
         ImGui::PopStyleColor();
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Clear the search"));
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Clear the search"));
     } // SameLine below continues after the field (the button ends where it does)
     ImGui::SameLine();
     ImGui::SetNextItemWidth(tagW);
@@ -377,7 +377,7 @@ void App::drawBrushGallery() {
         hint(("Gallery: " + g.location + " (from SCULPTFORGE_BRUSH_GALLERY)").c_str());
     } else {
         ImGui::AlignTextToFramePadding();
-        ImGui::TextDisabled(tr("Gallery"));
+        ImGui::TextDisabled("%s", tr("Gallery"));
         ImGui::SameLine();
         ImGui::SetNextItemWidth(-ImGui::CalcTextSize("Use").x - ImGui::GetStyle().FramePadding.x * 2 - spacing);
         ImGui::InputTextWithHint("##gallerysource", tr("Community gallery (or a URL / folder for a studio mirror)"),

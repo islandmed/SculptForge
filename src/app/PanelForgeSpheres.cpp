@@ -115,7 +115,7 @@ void App::drawForgeSpheresContents() {
     if (!forgesphereActive()) {
         ui::ActionButton(*this, "forgesphere.new", ImVec2(full, 0));
         ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextDisabled(tr("Block out a base mesh from connected spheres, then Make Mesh to sculpt it."));
+        ImGui::TextDisabled("%s", tr("Block out a base mesh from connected spheres, then Make Mesh to sculpt it."));
         ImGui::PopTextWrapPos();
         return;
     }

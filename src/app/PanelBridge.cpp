@@ -63,7 +63,7 @@ void App::drawBridgeMenu() {
     if (ImGui::MenuItem(tr("Receive automatically"), nullptr, &bridgeAutoReceive_, bridge) && bridgeAutoReceive_)
         bridgeListTime_ = fileTime(bridgeObjectListPath(root));
     if (bridge) ImGui::TextDisabled(tr("Bridge folder: %s"), root.c_str());
-    else ImGui::TextDisabled(tr("No default bridge folder on this system;\nBridge files still import and export."));
+    else ImGui::TextDisabled("%s", tr("No default bridge folder on this system;\nBridge files still import and export."));
     ImGui::SetNextItemWidth(260.0f * uiScale_);
     ImGui::InputTextWithHint("##bridgefolder", tr("Custom bridge folder (optional)"), bridgeFolder_, sizeof(bridgeFolder_));
     ImGui::Separator();
