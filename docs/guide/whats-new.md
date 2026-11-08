@@ -15,6 +15,17 @@ highlight: Plugins: install sandboxed add-ons from packs (deformers and generato
 highlight: The Tool palette in the order you work: Reshape gathers Size and the Stack, Mirror moves to Geometry > Symmetry, and Texture Image and Viewport Look say what they do (thanks foirgairwolf on Discord)
 highlight: Cleaner cuts and creases: crease edges (select them by angle too) and they stay sharp when you add levels (thanks @NicTanghe on GitHub, #108, and _tfx on Discord); cut caps are even triangles instead of thin slivers (thanks dm4nd on Discord)
 highlight: Tube shapes: round, square, triangle or ribbon profiles with taper that follow the surface, and any brush, tool or Esc leaves Draw Tube (thanks GABO on Discord); pose every Part at once (thanks @ABHITAR)
+highlight: Each online AI service asks once before anything is sent
+highlight: Cloth brush: folds that behave like fabric
+highlight: Creased edges stay sharp as you add levels
+highlight: Select edges by angle, loop or click
+highlight: Sewing patterns from your measurements, printed at home
+highlight: Generate 3D: pick the best of three, then one click to a clean sculpting base
+highlight: Pose a whole character at once
+highlight: Tube: square, triangle and ribbon shapes, tapers, fewer points (thanks GABO on Discord)
+highlight: One-click Turntable, Ortho, Floor and Flat
+highlight: Cut caps are clean, even triangles instead of thin slivers (thanks dm4nd on Discord)
+highlight: Quad Remesh up to 2.3x faster
 title: Garments and cloth
 line: Real-size sewing patterns from 8 templates at your sizes, printed at home or exported as DXF; Cloth brush and Drape.
 image: images/wn-0120-garments.jpg
@@ -40,6 +51,85 @@ line: Tool > Reshape: Size, then a live stack of bends, twists and tapers you ca
 image: images/wn-0120-reshape.jpg
 action: guide:sculpting.md#deformation-stack
 ```
+
+- **Nothing leaves without your OK**: the first time AI Brush or Generate 3D would send anything to a service on
+  someone else's computer, the panel says what is sent, to which address and who pays, and waits for **Allow** (once
+  per service). **Use local instead** switches to a model running on this computer. Revoke any service in **Edit >
+  Preferences > AI > Online AI services**.
+- **Cloth brush**: drag the surface like fabric and it folds where it bunches up; **Sculpt > Brush > Cloth** sets
+  Drag, Push, Settle, Grab, Expand, Pinch or Inflate, the fabric (Silk, Cotton, Denim, Leather), gravity reach, Soft
+  body and Self-collision. It rests on other Parts and the mask pins it.
+- **Drape**: **Tool > Drape** drops the active Part as cloth onto the other Parts (a sheet over a chair, a shirt over
+  a body), live, with Silk, Cotton, Denim or Leather; the mask pins it; at rest it is one undo step.
+- **Edge creases** (**Tool > Geometry > Edges**): give the selected edges a crease from 0 to 1 with **Crease**, or
+  remove it with **Uncrease**, and Add Level keeps them sharp: hard rims, panel lines and corners on a smooth
+  subdivided model (#108).
+- **Edges mode** (**Tool > Geometry > Edges**): select edges of the base level on the model (click, Shift adds, Ctrl
+  removes, double-click takes the edge loop), every hard edge at once with **Select by Angle**, open borders, Grow and
+  Shrink. The first step towards edge creases for subdivision (#108).
+- **Templates and Print in the Pattern window** (Tool > Garments): pick a garment at your sizes, edit the size chart,
+  add garments side by side for an outfit, and print the pattern on A4 or Letter with a live page count.
+- **Garment templates and home printing**: trousers, straight and A-line skirts, a hoodie with hood and kangaroo
+  pocket, a dress, a hooded cloak and gloves, drawn at real size from a size chart you type in once (`garment_size`,
+  `garment_new template=...`, `add=true` for an outfit). `garment_export path=x.pdf` prints any pattern on A4 or
+  Letter pages with trim lines, matching triangles, page names and a 50 mm check square; mirrored pieces print once,
+  marked "cut 2". Guide: [Garments](garments.md).
+- **Generate for form, remesh for topology**: **Generate 3D** gives you 1-3 candidates to compare by silhouette; pick
+  one, then **Use as sculpting base** remeshes it into clean, even topology and keeps the detailed original as a
+  hidden reference. Bring your own key to use your own provider and model at no markup.
+- **A cleaner gizmo**: in **All** (Shift+W) each axis is a thin line with its scale ball and its move arrow, well
+  inside the rings, and rings seen edge-on fade away from the centre. Move and Scale use the same arrows and balls.
+  Design by fenix on Discord (@fenixpoints).
+- **Esc** (or picking a brush) now leaves Move, Scale, Rotate and All, so the next stroke sculpts again.
+- **Pose all Parts**: **Tool > Parts > Pose all Parts** merges every visible Part into one light Pose Mesh; pose it
+  with the Gizmo and masks, then **Apply Pose** gives every Part the pose at full resolution, as one undo step.
+  Requested by @ABHITAR.
+- **Tube shapes**: **Tool > Tube > Shape** draws square, triangular and flat ribbon tubes as well as round ones,
+  turned and tapered to a point at either end, and changes them after drawing. **Point spacing** draws with fewer
+  points, and **Simplify** takes points out of a tube you already drew.
+- **View toggles on the right shelf**: **Turn** (turntable), **Ortho**, **Floor** and **Flat** buttons under Rotate
+  and Paint switch the rotation style, the projection, the floor grid and the shading in one click, lit while on.
+- **Live brush ring on the Size slider**: dragging **Size** shows the brush ring on the model at the new size, fading
+  out when you let go.
+- **Plugins**: packs can now bring sandboxed plugins: deformers that reshape the active Part and generators that add a
+  new Part. Open one from **Tool > Reshape > Plugins**: its settings, **Apply**, and **Stop** while it runs. A plugin
+  sees only a copy of the mesh: no files, network or system access, with time and memory limits.
+- **Cut** caps and walls come out as clean, even triangles about the size of the mesh's own, ready to sculpt without a
+  remesh.
+- **Tidier Reshape panel** (thanks foirgairwolf on Discord): **Tool > Reshape** reads top to bottom as Size, then the
+  Stack. Polish, Relax, Smooth and Balloon are now steps in Tool > Reshape > Stack (Add step > Surface); their menu
+  items and keys still run them at 50.
+- **Sharper text on Retina and 5K screens**: text and icons are drawn at the display's full resolution, and
+  **Preferences > Interface > UI scale** has finer steps (**110%**, **115%**, **135%**) and goes to **250%** and
+  **300%** for large high-resolution monitors.
+- **The Tool palette in the order you work**: Parts, then shaping (Geometry, Remesh, **Reshape**, Cut, Layers),
+  masking and groups, painting (Paint Layers, **Texture Image**), then Bake and Export, with **Viewport Look** last.
+  **Reshape** lists Smooth, Relax, Polish and Balloon from gentlest to strongest, and **Mirror** now sits beside
+  **Make Symmetric** in **Tool > Geometry > Symmetry**. Extract's button is **Make Shell**, the mesh check is **Find
+  Problems**, and **Edit > Preferences > Saving & Layouts** holds Save Layout, Reset and Export / Import Interface.
+  Shortcuts, shelves, scripts, saved layouts and files are unchanged, and the command search (F3) still finds each one
+  by its old name.
+- **Masked only** in **Tool > Geometry > Merge by Distance**: weld just the masked points, for example one seam, and
+  leave the rest of the Part alone.
+- **Hidden faces**: Quad Remesh, Voxel Remesh, Decimate and Merge by Distance ask first when part of the Part is
+  hidden, with **Unhide and continue** or **Cancel**.
+- **Paint Intensity**: in Paint mode the **Intensity** slider (top bar, Draw palette, Quick Menu, U) sets how strongly
+  the paint colours, for every stroke type, with or without an alpha.
+- **Quad Remesh on pointed parts**: **Tool > Geometry > Quad Remesh** on a thin part with a sharp tip (a horn, a claw,
+  a blade) no longer tangles along its length, and the quads now end on the point. Thanks Oslen on Discord for the
+  report.
+- **Starter meshes**: the Human Head's neck ends in a clean, even rim (no more two spikes under the jaw), and the
+  Stylised Head, Bust, Torso, Hand and Ear have clean open edges too.
+- **The tier card puts itself away**: **Got it**, its new close button, Esc or Enter dismiss the "Tuned for your
+  machine" card on the first press, and it stays away, also on laptops with two graphics cards.
+- **Tube and Insert let go**: picking any brush or tool (**Draw**, **Move**, **Scale**, **Rotate**), or pressing
+  **Esc**, now ends **Draw Tube** and **Parts > Append > Insert on the model**; the status bar says how.
+- **Pen pressure on Linux**: Wayland pens keep their pressure through the whole stroke, the eraser end works on
+  Wayland, and **Edit > Preferences > Tablet > Troubleshooting details** shows what the pen sends, with **Copy
+  details** for a bug report (and **Classic pen timing**, should pressure feel worse with your tablet).
+- **Faster remeshing**: **Tool > Geometry > Quad Remesh** at the defaults is up to 2.3 times faster (a 1,000-triangle
+  sculpt: 1.24 s before, 0.54 s now on our floor-tier laptop), and **Voxel Remesh** on a 10 million triangle sculpt
+  takes 1.6 s instead of 4.0 s. The quality is the same. Thanks factoberplay on YouTube for the report.
 
 ## Version 0.11.16
 
