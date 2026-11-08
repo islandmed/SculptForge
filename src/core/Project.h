@@ -28,7 +28,8 @@ namespace sf {
 // may carry material channels (the texture's "pbr" key, core/LayerStackIO.h), and a Part a micro-displacement
 // level ("micro", core/Micro.h); both keys are optional in 7. 8: Linked Duplicates (#94): a Part may share an
 // earlier Part's mesh ("link": that Part's index, no mesh of its own) and have a "transform" (16 numbers,
-// column-major) placing its mesh in the scene.
+// column-major) placing its mesh in the scene. 9: a streamed micro level (Focus Detail, core/FocusDetail.h): the
+// Part's "micro" names its .sfdetail beside the project ("detail") instead of holding the displacement.
 //
 // kProjectVersion is the newest format this build reads. Saving writes the lowest version the content needs
 // (ProjectVersionNeed): a project that uses nothing newer than format 6 is still written as 6, so older

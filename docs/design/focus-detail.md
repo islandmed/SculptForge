@@ -194,7 +194,7 @@ without them, so it overstates what prediction misses. The quiet run will remeas
   0.49 s with the first frame fully shaded at 0.65 s (same run). The official bench.sh focus rows replace these.
 - ~~Not wired into projects~~ **Done (11-06, `feat/focus-detail-app`):** Divide to Micro past `kFocusTriangles`
   (300M micro triangles; `SF_FOCUS_DETAIL=0/1` overrides) writes the new level to a detail file and streams it
-  (`FocusDetail::create`). A `.sfproj` (format 8) names `<stem>.sfdetail` beside it; Save writes it in place
+  (`FocusDetail::create`). A `.sfproj` (format 9) names `<stem>.sfdetail` beside it; Save writes it in place
   (changed tiles appended) or, the first time and on Save As, as a compact copy the Part then streams from
   (`saveAs`: unchanged tiles copied as stored, written beside the file and renamed over it). A save whose garbage
   would pass half the file compacts the same way. Autosave only names the file as last saved: a crash keeps the

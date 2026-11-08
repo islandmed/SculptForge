@@ -656,7 +656,7 @@ TEST(focus_detail_divide_to_micro_switches_when_large) {
     CHECK(!microWantsFocus(size_t(1) << 30, FocusDetail::kCoarseLevel));
 }
 
-// A micro level in memory still saves as format 7 (no detail file) and loads back exactly: format 8 is written
+// A micro level in memory still saves as format 7 (no detail file) and loads back exactly: format 9 is written
 // only when a level streams, so builds before 0.11.12 keep opening these projects.
 TEST(focus_detail_in_memory_micro_project_stays_format_7) {
     setenv("SF_FOCUS_DETAIL", "0", 1);

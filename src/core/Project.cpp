@@ -940,7 +940,7 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
             Json mj = Json::object();
             mj.set("level", mm.level);
             mj.set("step", double(mm.step));
-            if (mm.focus) { // format 8: streamed from a detail file (core/FocusDetail.h); the file holds the level
+            if (mm.focus) { // format 9: streamed from a detail file (core/FocusDetail.h); the file holds the level
                 FocusDetail& fd = *mm.focus;
                 std::string ref = fd.path();
                 if (!autosave) {
@@ -958,7 +958,7 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
                     ref = utf8(target.filename());
                 }
                 mj.set("detail", ref);
-                version.need(8);
+                version.need(9);
             } else {
                 // Tiles packed (delta + per-tile range, core/MicroStore.h): untouched tiles are 3 bytes.
                 std::vector<uint8_t> packed;
@@ -1185,7 +1185,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
                 const uint32_t samples = (n + 1) * (n + 2) / 2;
                 MicroStore disp;
                 std::vector<uint8_t> mask;
-                if (const Json& dj = mj["detail"]; dj.isString() && version >= 8) { // streamed (core/FocusDetail.h)
+                if (const Json& dj = mj["detail"]; dj.isString() && version >= 9) { // streamed (core/FocusDetail.h)
                     if (mj["mask"].isObject() && !r.bytes(mj["mask"], "micro mask", count, mask)) {
                         error = r.error;
                         return false;
@@ -1224,7 +1224,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
                     }
                     disp = std::move(plain);
                 }
-                if (!mj["detail"].isString() || version < 8) {
+                if (!mj["detail"].isString() || version < 9) {
                     if (mj["mask"].isObject() && !r.bytes(mj["mask"], "micro mask", count, mask)) {
                         error = r.error;
                         return false;
