@@ -21,7 +21,7 @@ name: Release
 #            UPDATE_SIGNING_KEY besides member-release: tags v* only): checksums re-checked, signed, notes from
 #            CHANGELOG.md, the GitHub release. A tag with
 #            a '-' (a beta) is a member perk, published by publish-members instead: a pre-release in the private
-#            repository islandmed/sculptforge-insiders (INSIDERS_REPO_TOKEN, held only by the environment
+#            repository sculptforge/sculptforge-insiders (INSIDERS_REPO_TOKEN, held only by the environment
 #            member-release: v* tags only, maintainer approval) with CHANGELOG's [Unreleased] notes, and posted in
 #            #members (DISCORD_MEMBERS_WEBHOOK). Nothing public: no release here, no update feed entry.
 #
@@ -395,7 +395,7 @@ jobs:
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "SculptForge ${TAG#v}" --notes-file notes.md
           gh release upload "$TAG" dist/* --clobber
 
-  # A beta (a tag with a '-') is a member perk, published only in the private repository islandmed/sculptforge-insiders.
+  # A beta (a tag with a '-') is a member perk, published only in the private repository sculptforge/sculptforge-insiders.
   # INSIDERS_REPO_TOKEN lives only in the GitHub Environment "member-release" (deployment: tags v* only; the maintainer
   # approves each run), so no other job, workflow or branch can read it. This job's GitHub token only reads; the
   # insiders token reaches exactly one step, as an env var. Runs only for the tag push itself (the environment refuses
@@ -447,10 +447,10 @@ jobs:
           printf '%s\n\n' "**Members' beta.** Thank you for being a member! Please report problems in #members on Discord (or a GitHub issue) with your OS, this version (Help > About) and your graphics card." > notes.md
           awk -v h="## [Unreleased]" 'index($0, h) == 1 {flag=1;next} /^## \[/{flag=0} flag' CHANGELOG.md >> notes.md
           cat packaging/release-notes-footer.md >> notes.md
-      - name: Pre-release in islandmed/sculptforge-insiders
+      - name: Pre-release in sculptforge/sculptforge-insiders
         env:
           GH_TOKEN: ${{ secrets.INSIDERS_REPO_TOKEN }}
-          GH_REPO: islandmed/sculptforge-insiders
+          GH_REPO: sculptforge/sculptforge-insiders
         run: |
           [ -n "$GH_TOKEN" ] || { echo "::error::No INSIDERS_REPO_TOKEN in the member-release environment"; exit 1; }
           pre=${TAG#*-}
@@ -465,7 +465,7 @@ jobs:
           if [ -z "$WEBHOOK" ]; then echo "::warning::No DISCORD_MEMBERS_WEBHOOK secret: post the beta in #members by hand"; exit 0; fi
           pre=${TAG#*-}
           label="${TAG%%-*} $(sed -E 's/^rc/RC/; s/^./\U&/; s/\./ /g' <<<"$pre")"
-          url="https://github.com/islandmed/sculptforge-insiders/releases/tag/$TAG"
+          url="https://github.com/sculptforge/sculptforge-insiders/releases/tag/$TAG"
           jq -n --arg c "**SculptForge ${label#v} is up for members:** $url
           Please report anything that goes wrong here, with your OS and graphics card. Not invited to the repository yet? Reply with your GitHub username." \
             '{content: $c, allowed_mentions: {parse: []}, flags: 4}' |

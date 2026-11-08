@@ -149,17 +149,20 @@ writer fails); capture to a variable or file first, or let grep read everything 
 ## Betas (members only)
 
 A beta is the next release, published early for members (Member and Studio; docs/design/release-train.md §1). Since
-0.11.1 betas are not public: they go to the private repository islandmed/sculptforge-insiders, and members are invited
-to it by hand with the GitHub username they gave at checkout.
+0.11.1 betas are not public: they go to the private repository sculptforge/sculptforge-insiders (org sculptforge).
+Members get read access through the org team `insiders` (closed, `pull` on that repository only): member onboarding
+adds each paying member's confirmed GitHub username to the team and removes it when the membership ends.
 
 ```sh
 scripts/release.sh 0.12.0-beta.1 --yes                      # a beta (also 0.12.0-rc.1)
 HIGHLIGHTS=highlights.txt scripts/release.sh 0.12.0 --yes   # later: the stable release, on main as it is then
-gh api -X PUT repos/islandmed/sculptforge-insiders/collaborators/USERNAME -f permission=pull   # a new member
+gh api -X PUT orgs/sculptforge/teams/insiders/memberships/USERNAME -f role=member   # by hand, if ever needed
 ```
 
-Members are **always** invited with `permission=pull` (read: download releases, nothing else); never `push`,
-`maintain` or `admin`. Check with `gh api repos/islandmed/sculptforge-insiders/collaborators --jq '.[]|.login+" "+.role_name'`.
+Members get access **only** through the team, which has `pull` (read: download releases, nothing else); never add
+them as collaborators, never `push`, `maintain` or `admin`. Org settings: base permission none, members can't create
+or fork repositories. Check with `gh api orgs/sculptforge/teams/insiders/members --jq '.[].login'` and
+`gh api orgs/sculptforge/teams/insiders/repos --jq '.[]|.full_name+" "+.role_name'` (only `sculptforge-insiders read`).
 
 Steps for a beta: `bump check ci tag release status`.
 
@@ -173,7 +176,7 @@ Steps for a beta: `bump check ci tag release status`.
   checks.
 - **tag / release**: `v0.12.0-beta.1` (the tag is public, like the source). release.yml checks that the tag equals the
   version plus the prerelease, then its job `publish-members` waits for the maintainer's approval (one click in the
-  run, or `gh run view`), publishes a **pre-release in islandmed/sculptforge-insiders** with
+  run, or `gh run view`), publishes a **pre-release in sculptforge/sculptforge-insiders** with
   `INSIDERS_REPO_TOKEN` (a fine-grained token for that repository only, Contents: read and write), and posts it in
   #members (`DISCORD_MEMBERS_WEBHOOK`). Nothing is published in the public repository, and the update feed is
   untouched: the app's Preview channel offers only what the feed names.
@@ -192,7 +195,8 @@ What keeps the insiders token from leaking; `tools/release/check_workflows.py` (
 
 - `INSIDERS_REPO_TOKEN` exists only as a secret of the environment **`member-release`**, never at repository level:
   deployment only from tags `v*`, required reviewer islandmed (self-review allowed: solo maintainer). Only release.yml's
-  `publish-members` uses it; a workflow_dispatch from a branch can't. Set or rotate (never echo it):
+  `publish-members` uses it; a workflow_dispatch from a branch can't. It is a fine-grained token with resource owner
+  **sculptforge**, only sculptforge-insiders, Contents: read and write, 1-year expiry. Set or rotate (never echo it):
   `wl-paste -n | gh secret set INSIDERS_REPO_TOKEN --env member-release -R islandmed/SculptForge`.
   (The daily-drop workflow and the preview-build workflow were retired with the Insider tier; betas are the members' builds.)
 - member-requests.yml's `publish` job is the only other user, also in `member-release` (one approval a month); it
@@ -206,7 +210,7 @@ What keeps the insiders token from leaking; `tools/release/check_workflows.py` (
   every outside contributor's run waits for approval.
 - Repository: secret scanning and push protection on, Dependabot alerts and security updates on, the default workflow
   token read-only, Actions may not create or approve pull requests.
-- islandmed/sculptforge-insiders: private, members invited with `permission=pull` only, ruleset on `main`: no force
+- sculptforge/sculptforge-insiders: private, members only through team `insiders` (`pull`), ruleset on `main`: no force
   push, no deletion.
 
 ## Integration releases (Blender add-on, Maya script)
@@ -259,7 +263,7 @@ automatically.
   line. Only real numbers: `founding` from `website/founding.json`, the requests count from
   `tools/release/assemble_notes.py X.Y.Z --member-requests` before the bump (fragments with `member_request: true`).
   Never anything that reads as urgency.
-- **Member Requests:** each approved request goes into islandmed/sculptforge-insiders as
+- **Member Requests:** each approved request goes into sculptforge/sculptforge-insiders as
   `requests/YYYY-MM/<slug>/request.json` + its file (+ `preview.png`), `"approved": true` once the requester has
   OK'd the preview (format: `tools/member-requests/requests.py`). On the 1st, member-requests.yml packs last month's,
   waits for the `member-release` approval, releases `requests-YYYY-MM` there, posts in #members, and schedules the

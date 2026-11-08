@@ -63,7 +63,7 @@ Developer ID and notarization: download the `.dmg` (same chain), `hdiutil attach
 
 ## Member builds (src/core/MemberBuilds.*, src/core/Keychain.*)
 
-Membership = read access to the private repository islandmed/sculptforge-insiders (where betas are published). No
+Membership = read access to the private repository sculptforge/sculptforge-insiders (where betas are published). No
 server of ours.
 
 - **Sign-in**: GitHub's device flow for the GitHub App "SculptForge Member Builds" (client ID `Iv23liK7goArrLDUGKEk`,
@@ -72,13 +72,13 @@ server of ours.
   secret (device flow and its refresh need none); the app's private key exists only because GitHub requires one and
   is never used. POSTs go to exactly `github.com/login/device/code` and `github.com/login/oauth/access_token`, no
   redirects followed. The page the user opens is fixed (`github.com/login/device`); an answer naming another is refused.
-- **Membership check**: after sign-in, `GET /repos/islandmed/sculptforge-insiders/releases`: 200 = member; 403/404 =
+- **Membership check**: after sign-in, `GET /repos/sculptforge/sculptforge-insiders/releases`: 200 = member; 403/404 =
   not a member, and the token is dropped, never stored.
 - **Token storage**: OS keychain only (Windows Credential Manager `SculptForge/member-builds`; Secret Service via
   libsecret, loaded at run time; macOS Keychain to follow). No keychain: in memory until quit. Never in the
   preferences (they hold only "signed in" and the login name) or logs. Access tokens expire (8 h); the refresh token is
   single-use, so each refresh stores the new pair at once, under a mutex. A refused refresh or a 401 signs out.
-- **Where the token goes**: only to the member API URLs (`api.github.com/repos/islandmed/sculptforge-insiders/releases`,
+- **Where the token goes**: only to the member API URLs (`api.github.com/repos/sculptforge/sculptforge-insiders/releases`,
   `.../releases/assets/<number>`, `api.github.com/user`), checked per hop; never to the asset host a redirect points at.
 - **Same verification**: a member build's SHA256SUMS.txt, .sig and package are fetched as assets of its release; the
   same Ed25519 key, the same versioned file name, hash, size cap and install path as public releases. release.yml signs

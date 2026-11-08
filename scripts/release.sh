@@ -19,7 +19,7 @@
 #   scripts/release.sh X.Y.Z --only bump --staged        the bump commit only, not pushed (what --stage does first;
 #                     RELEASE=X.Y.Z ~/Work/.sf/merge-batch.sh uses it before its own staging run)
 #   scripts/release.sh X.Y.Z-beta.N --yes  a beta (also -rc.N): a members-only pre-release in the private repository
-#                     islandmed/sculptforge-insiders, announced in #members (see "Betas" below and docs/releasing.md)
+#                     sculptforge/sculptforge-insiders, announced in #members (see "Betas" below and docs/releasing.md)
 #   HIGHLIGHTS=file   the update feed's 3-5 highlight lines, one per line (default: the version's highlight: lines in
 #                     What's New and the note fragments, tools/release/assemble_notes.py X.Y.Z --highlights)
 #   (the home page's What's New area is written by tools/guide/build_site.py from docs/guide/whats-new.md: the
@@ -44,7 +44,7 @@
 set -euo pipefail
 
 REPO=islandmed/SculptForge
-INSIDERS_REPO=islandmed/sculptforge-insiders # members' betas (release.yml publishes there with INSIDERS_REPO_TOKEN)
+INSIDERS_REPO=sculptforge/sculptforge-insiders # members' betas (release.yml publishes there with INSIDERS_REPO_TOKEN)
 MEMBER_ENV=member-release
 AUTHOR_NAME=islandmed
 AUTHOR_EMAIL=232726012+islandmed@users.noreply.github.com # never a personal address in outside repos
@@ -357,8 +357,10 @@ preflight() {
     if [ -n "$PRE" ]; then # a beta: members only, through the private repository; nothing of the site, no packages
         gh secret list --env member-release -R "$REPO" 2>/dev/null | grep '^INSIDERS_REPO_TOKEN\b' >/dev/null ||
             die "the member-release environment has no INSIDERS_REPO_TOKEN, so release.yml can't publish the beta to $INSIDERS_REPO" \
-                "the owner pastes it (fine-grained token, only $INSIDERS_REPO, Contents: read and write): wl-paste -n | gh secret set INSIDERS_REPO_TOKEN --env member-release -R $REPO"
-        gh repo view "$INSIDERS_REPO" >/dev/null 2>&1 || die "can't see $INSIDERS_REPO" "gh auth status: log in as the owner of $INSIDERS_REPO"
+                "the owner pastes it (fine-grained token, resource owner ${INSIDERS_REPO%%/*}, only $INSIDERS_REPO, Contents: read and write): wl-paste -n | gh secret set INSIDERS_REPO_TOKEN --env member-release -R $REPO"
+        # Exact name: a moved repository's old path still answers through GitHub's redirect.
+        [ "$(gh repo view "$INSIDERS_REPO" --json nameWithOwner -q .nameWithOwner 2>/dev/null)" = "$INSIDERS_REPO" ] ||
+            die "can't see $INSIDERS_REPO (or it moved)" "gh auth status: log in as an owner of ${INSIDERS_REPO%%/*}; if it moved, set INSIDERS_REPO in scripts/release.sh"
         ok "What's New $BASE is ready and $INSIDERS_REPO takes the beta (a beta has no site, package or reply steps)"
         return
     fi
@@ -879,8 +881,8 @@ step_status() {
     if [ -n "$PRE" ]; then
         echo "   Beta:     https://github.com/$INSIDERS_REPO/releases/tag/$T (members only; nothing public)"
         echo "   Discord:  release.yml posted it in #members (DISCORD_MEMBERS_WEBHOOK)"
-        echo "   Members:  invite new members' GitHub usernames (from the Stripe checkout) by hand:"
-        echo "             gh api -X PUT repos/$INSIDERS_REPO/collaborators/USERNAME -f permission=pull"
+        echo "   Members:  onboarding adds each paying member's confirmed GitHub username to team ${INSIDERS_REPO%%/*}/insiders"
+        echo "             (read on $INSIDERS_REPO only; ~/Work/.sf/members/onboard.py status)"
         if [ -f "release-testers-$V.md" ]; then
             echo "   Testers:  $PWD/release-testers-$V.md (read it, then post it in #members)"
         else

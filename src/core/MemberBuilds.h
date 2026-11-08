@@ -1,8 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Member builds: Member and Studio members are read collaborators on the private repository
-// islandmed/sculptforge-insiders, where the members' betas are published. Preferences > Updates > Member builds
+// Member builds: Member and Studio members have read access (org team "insiders") to the private repository
+// sculptforge/sculptforge-insiders, where the members' betas are published. Preferences > Updates > Member builds
 // signs in with GitHub's device flow for the GitHub App "SculptForge Member Builds", which is installed only on that
 // repository with Contents: read. Its user-to-server token reaches only repositories both the app and the user can
 // access, so it can read that repository's releases and nothing else. No server of ours, no client secret (the
@@ -23,9 +23,9 @@ inline constexpr const char* kClientId = "Iv23liK7goArrLDUGKEk"; // public (GitH
 inline constexpr const char* kDeviceCodeUrl = "https://github.com/login/device/code";
 inline constexpr const char* kTokenUrl = "https://github.com/login/oauth/access_token";
 inline constexpr const char* kVerifyUrl = "https://github.com/login/device"; // where the user types the code
-inline constexpr const char* kReleasesUrl = "https://api.github.com/repos/islandmed/sculptforge-insiders/releases?per_page=20";
+inline constexpr const char* kReleasesUrl = "https://api.github.com/repos/sculptforge/sculptforge-insiders/releases?per_page=20";
 inline constexpr const char* kUserUrl = "https://api.github.com/user";
-inline constexpr const char* kAssetUrlPrefix = "https://api.github.com/repos/islandmed/sculptforge-insiders/releases/assets/";
+inline constexpr const char* kAssetUrlPrefix = "https://api.github.com/repos/sculptforge/sculptforge-insiders/releases/assets/";
 inline constexpr const char* kKeychainAccount = "member-builds"; // (core/Keychain.h)
 inline constexpr size_t kMaxTokenLength = 4096; // longest access/refresh/device code accepted (GitHub: ~520 today)
 
