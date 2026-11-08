@@ -267,15 +267,22 @@ void replaceWithPieces(Document& doc, int index, std::vector<Mesh> pieces) {
 // source's old mesh and the new Part go back together. Every attribute extractTriangles keeps carries over (UVs,
 // face groups, vertex paint, sculpt layers); subdivision levels can't be cut, so the source's are noted dropped
 // and undo restores them. The new Part shows everything (Split Hidden) and starts unmasked (Split Masked).
-CommandResult splitOffPart(Document& doc, TriangleSet set, const char* label, const char* suffix, const char* what) {
+// With `keep` (Keep original, _tfx on Discord) the triangles are copied instead: the source stays untouched,
+// levels and all, and undo just takes the new Part away.
+CommandResult splitOffPart(Document& doc, TriangleSet set, const char* label, const char* suffix, const char* what,
+                           bool keep) {
     size_t n = 0;
     std::vector<uint8_t> in = trianglesIn(doc.mesh, set, &n);
     const std::string source = doc.activePartInfo().name;
     if (n == 0) return {false, "Nothing in " + source + " is " + what};
-    if (n == doc.mesh.triangleCount()) return {false, "Everything in " + source + " is " + what + ": nothing would stay"};
+    if (!keep && n == doc.mesh.triangleCount())
+        return {false, "Everything in " + source + " is " + what + ": nothing would stay"};
     Mesh piece = extractTriangles(doc.mesh, in);
-    for (uint8_t& k : in) k = !k;
-    Mesh rest = extractTriangles(doc.mesh, in);
+    Mesh rest;
+    if (!keep) {
+        for (uint8_t& k : in) k = !k;
+        rest = extractTriangles(doc.mesh, in);
+    }
     in = {};
     if (set == TriangleSet::Hidden) piece.hidden.clear();
     if (set == TriangleSet::Masked) piece.mask.clear();
@@ -292,12 +299,19 @@ CommandResult splitOffPart(Document& doc, TriangleSet set, const char* label, co
     added.transform = place;
     const uint32_t id = added.id;
     const std::string name = added.name;
-    doc.replaceMeshUndoable(std::move(rest), label);
-    if (UndoRecord* r = doc.undo.lastUndo()) {
-        r->part = std::make_shared<PartStep>();
-        r->part->id = id;
-        r->part->at = at;
+    auto step = std::make_shared<PartStep>();
+    step->id = id;
+    step->at = at;
+    if (keep) {
+        UndoRecord r; // undo just takes the copy away again
+        r.label = std::string(label) + " (keep original)";
+        r.part = std::move(step);
+        doc.undo.push(std::move(r));
+        doc.modified = true;
+        return {true, "Copied " + countText(n) + " into " + name + "; " + source + " is unchanged"};
     }
+    doc.replaceMeshUndoable(std::move(rest), label);
+    if (UndoRecord* r = doc.undo.lastUndo()) r->part = std::move(step);
     return {true, "Split " + countText(n) + " into " + name + ", " + countText(doc.mesh.triangleCount()) + " stay in " + source};
 }
 
@@ -1026,25 +1040,33 @@ void registerPartCommands(CommandRegistry& reg) {
                  return {true, "Split into " + std::to_string(n) + " Parts"};
              }});
 
-    reg.add({"part_split_hidden", "Move the hidden triangles of the active Part into a new Part below it (one undo step).", {},
-             [](Document& doc, const Args&) -> CommandResult {
-                 return splitOffPart(doc, TriangleSet::Hidden, "Split Hidden", "hidden", "hidden");
+    const ParamSpec keepParam{"keep", T::Bool,
+                              "Keep original: copy the triangles into the new Part and leave the source untouched "
+                              "(undo takes the copy away). Default false.",
+                              false};
+    reg.add({"part_split_hidden", "Move the hidden triangles of the active Part into a new Part below it (one undo step).",
+             {keepParam},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 return splitOffPart(doc, TriangleSet::Hidden, "Split Hidden", "hidden", "hidden",
+                                     argBool(a, "keep", false));
              }});
 
     reg.add({"part_split_masked",
              "Move the masked triangles of the active Part (corners' average mask above 0.5) into a new, unmasked "
              "Part below it (one undo step).",
-             {},
-             [](Document& doc, const Args&) -> CommandResult {
-                 return splitOffPart(doc, TriangleSet::Masked, "Split Masked", "masked", "masked");
+             {keepParam},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 return splitOffPart(doc, TriangleSet::Masked, "Split Masked", "masked", "masked",
+                                     argBool(a, "keep", false));
              }});
 
     reg.add({"part_split_unmasked",
              "Move the unmasked triangles of the active Part (corners' average mask 0.5 or less) into a new Part "
              "below it; the masked ones stay (one undo step).",
-             {},
-             [](Document& doc, const Args&) -> CommandResult {
-                 return splitOffPart(doc, TriangleSet::Unmasked, "Split Unmasked", "unmasked", "unmasked");
+             {keepParam},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 return splitOffPart(doc, TriangleSet::Unmasked, "Split Unmasked", "unmasked", "unmasked",
+                                     argBool(a, "keep", false));
              }});
 }
 

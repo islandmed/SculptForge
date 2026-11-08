@@ -8,6 +8,7 @@
 
 #include "core/Commands.h"
 #include "core/FaceGroups.h"
+#include "core/Multires.h"
 #include "core/Primitives.h"
 #include "core/Parts.h"
 #include "io/ObjIO.h"
@@ -294,6 +295,43 @@ TEST(part_split_by_selection) {
     doc.mesh.mask.assign(doc.mesh.vertexCount(), 1.0f);
     CHECK(!reg.execute(doc, "delete_masked").ok); // everything masked
     CHECK(!reg.execute(doc, "part_split_masked").ok);
+}
+
+TEST(part_split_keep_original) {
+    // Keep original (_tfx on Discord): keep=true copies the triangles into the new Part; the source stays untouched,
+    // mask, levels and all; one undo takes the copy away.
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 2.0}}).ok);
+    CHECK(reg.execute(doc, "subdiv_divide").ok);
+    const int levels = subdivLevelCount(doc.mesh);
+    CHECK(levels == 2);
+    const size_t total = doc.mesh.triangleCount();
+    doc.mesh.mask.assign(doc.mesh.vertexCount(), 0.0f);
+    for (size_t v = 0; v < doc.mesh.vertexCount(); ++v) doc.mesh.mask[v] = doc.mesh.positions[v].x > 0.0f ? 1.0f : 0.0f;
+    doc.mesh.colors.assign(doc.mesh.vertexCount(), glm::vec3(0.7f, 0.1f, 0.3f));
+    size_t masked = 0;
+    trianglesIn(doc.mesh, TriangleSet::Masked, &masked);
+    CHECK(reg.execute(doc, "part_split_masked", {{"keep", true}}).ok);
+    CHECK(doc.partCount() == 2 && doc.activePart == 0);
+    CHECK(doc.mesh.triangleCount() == total && doc.mesh.hasMask() && subdivLevelCount(doc.mesh) == levels);
+    CHECK(doc.partMesh(1).triangleCount() == masked && !doc.partMesh(1).hasMask());
+    CHECK(doc.partMesh(1).hasColors() && doc.partMesh(1).colors[0] == glm::vec3(0.7f, 0.1f, 0.3f));
+    CHECK(doc.parts[1].name == doc.parts[0].name + " masked");
+    CHECK(reg.execute(doc, "undo").ok);
+    CHECK(doc.partCount() == 1 && doc.mesh.triangleCount() == total && doc.mesh.hasMask());
+    CHECK(reg.execute(doc, "redo").ok);
+    CHECK(doc.partCount() == 2 && doc.partMesh(1).triangleCount() == masked && doc.mesh.triangleCount() == total);
+    CHECK(reg.execute(doc, "undo").ok);
+    CHECK(reg.execute(doc, "part_split_unmasked", {{"keep", true}}).ok);
+    CHECK(doc.partMesh(1).triangleCount() == total - masked && doc.mesh.triangleCount() == total);
+    CHECK(reg.execute(doc, "undo").ok);
+    // Everything masked: a plain split refuses (nothing would stay); keep copies it all.
+    doc.mesh.mask.assign(doc.mesh.vertexCount(), 1.0f);
+    CHECK(!reg.execute(doc, "part_split_masked").ok);
+    CHECK(reg.execute(doc, "part_split_masked", {{"keep", true}}).ok);
+    CHECK(subdivLevelCount(doc.partMesh(1)) == 0 && subdivLevelCount(doc.mesh) == levels); // cut on the copy only
+    CHECK(doc.partMesh(1).triangleCount() == total && doc.mesh.triangleCount() == total);
 }
 
 TEST(part_split_linked_copy) {

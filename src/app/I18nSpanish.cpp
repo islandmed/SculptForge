@@ -4936,6 +4936,8 @@ constexpr Entry kSpanish[] = {
     {"Split hidden: the hidden triangles become a new Part", "Separar ocultos: los triángulos ocultos pasan a una pieza nueva"},
     {"Split masked: the masked triangles (average mask above 50%) become a new Part", "Separar enmascarados: los triángulos enmascarados (máscara media por encima del 50%) pasan a una pieza nueva"},
     {"Split unmasked: the unmasked triangles become a new Part; the masked ones stay", "Separar sin máscara: los triángulos sin máscara pasan a una pieza nueva; los enmascarados se quedan"},
+    {"Keep original", "Conservar original"},
+    {"Split copies the triangles into the new Part and leaves this Part as it is", "Separar copia los triángulos a la pieza nueva y deja esta pieza como está"},
     {"%zu point will merge", "%zu punto se fusionará"},
     {"%zu points will merge", "%zu puntos se fusionarán"},
     {"Check", "Comprobar"},

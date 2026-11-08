@@ -744,7 +744,7 @@ void App::drawPartsContents() {
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip("%s", tr("One Part per disconnected piece"));
     // Split off what is hidden, masked or not masked into a new Part below (one undo step each): "Split" and three
-    // short buttons, so the row fits the narrowest tray.
+    // short buttons, so the row fits the narrowest tray; Keep original below them copies instead.
     {
         ImGui::AlignTextToFramePadding();
         ImGui::TextDisabled("%s", tr("Split"));
@@ -753,7 +753,8 @@ void App::drawPartsContents() {
         const bool masked = doc_.mesh.hasMask();
         auto splitButton = [&](const char* label, const char* command, bool enabled, const char* tip) {
             ImGui::BeginDisabled(!enabled);
-            if (ImGui::Button(tr(label), ImVec2(third, 0))) runCommand(command);
+            if (ImGui::Button(tr(label), ImVec2(third, 0)))
+                runCommand(command, splitKeepOriginal_ ? Args{{"keep", true}} : Args{});
             ImGui::EndDisabled();
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
                 ImGui::SetTooltip("%s", tr(tip));
@@ -766,6 +767,9 @@ void App::drawPartsContents() {
         ImGui::SameLine();
         splitButton("Unmasked##part_split", "part_split_unmasked", masked,
                     "Split unmasked: the unmasked triangles become a new Part; the masked ones stay");
+        ImGui::Checkbox(tr("Keep original##part_split"), &splitKeepOriginal_);
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("%s", tr("Split copies the triangles into the new Part and leaves this Part as it is"));
     }
     if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::TextDisabled("%s", tr("Alt+click a Part to select it"));
