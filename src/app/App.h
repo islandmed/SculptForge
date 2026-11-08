@@ -283,6 +283,9 @@ private:
     float uiScale_ = 1.0f; // UI layout scale (fonts are rasterised at this scale)
     bool uiScaleDirty_ = false;          // the UI scale may have changed: applyUiScale before the next frame
     float displayScaleOverride_ = 0.0f;  // UI tests (display_scale): the display's content scale, 0 = the real one
+    float pixelDensityOverride_ = 0.0f;  // UI tests (pixel_density): the window's pixel density, 0 = the real one
+    float fontDensity_ = 1.0f;           // framebuffer px per logical px the font atlas was rasterised at
+    float targetFontDensity(float scale) const; // what fontDensity_ should be at UI scale `scale` (the window's display)
     float targetUiScale() const;         // what uiScale_ should be now (Preferences, the display; Config.cpp)
     void applyUiScale();                 // rebuild fonts and style live when it changed (between frames)
     void buildUiFonts(float scale);
