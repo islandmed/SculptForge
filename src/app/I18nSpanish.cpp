@@ -5112,8 +5112,10 @@ constexpr Entry kSpanish[] = {
      "Remallado de alta resolución"},
     {"Voxel Remesh at resolution %d makes about %s triangles and needs about %s of memory (%s free).",
      "El Remallado vóxel a resolución %d crea unos %s triángulos y necesita unos %s de memoria (%s libres)."},
-    {"It can take a few minutes; Cancel in Tool > Remesh stops it and the Part stays as it is. Sculpting that many triangles needs a fast computer: Decimate or a lower Resolution makes it lighter. This won't ask again until the Resolution goes back to 512 or less.",
-     "Puede tardar unos minutos; Cancelar en Herramienta > Remallado lo detiene y la Pieza queda como está. Esculpir tantos triángulos requiere un ordenador rápido: Diezmar o una Resolución más baja lo aligera. No volverá a preguntar hasta que la Resolución vuelva a 512 o menos."},
+    {"It can take a few minutes; Cancel in Tool > Remesh stops it and the Part stays as it is. This won't ask again until the Resolution goes back to 512 or less.",
+     "Puede tardar unos minutos; Cancelar en Herramienta > Remallado lo detiene y la Pieza queda como está. No volverá a preguntar hasta que la Resolución vuelva a 512 o menos."},
+    {"Sculpting that many triangles needs a fast computer: Decimate or a lower Resolution makes it lighter.",
+     "Esculpir tantos triángulos requiere un ordenador rápido: Diezmar o una Resolución más baja lo aligera."},
 };
 
 } // namespace
