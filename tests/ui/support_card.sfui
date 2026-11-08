@@ -26,7 +26,7 @@ expect_text Member Requests: one a month, built first, credited to you
 expect_text A flat rate for the whole studio: any number of artists, each with everything in Member
 expect_no_text 10 artists
 expect_text Isolated: a private release channel, no outside connections
-expect_text Founding Studio: $150, first 10 studios
+expect_text Founding Studio: $150, first 5 studios
 expect_text or $48 a year
 expect "Member, $48 a year##card.member_yearly"
 shot first_run

@@ -152,7 +152,7 @@ SculptForge is free software under the GNU General Public License, version 3 or 
 ## Studio membership
 
 SculptForge is free for any number of artists, and nothing in the app is ever paywalled. A Studio membership is
-a flat $300 a month for the whole studio, any number of artists. The first 10 studios become Founding
+a flat $300 a month for the whole studio, any number of artists. The first 5 studios become Founding
 Studios at a flat $150 a month, locked for as long as they stay subscribed. Each artist gets everything in Member, and the
 studio gets:
 

@@ -26,7 +26,7 @@ inline constexpr const char* kSupportUrl = "https://sculptforge.app/support.html
 // The official community Discord (a permanent invite; the same link as on the website and in the README).
 inline constexpr const char* kDiscordUrl = "https://discord.gg/gWrYkEmQhH";
 // Two memberships: Member ($5 / month or $48 / year) and Studio (a flat $300 / month for the whole studio, any number of
-// artists; the first 10 studios pay a flat $150 as Founding Studios). The same Stripe checkout links as website/support.html
+// artists; the first 5 studios pay a flat $150 as Founding Studios). The same Stripe checkout links as website/support.html
 // and studios.html (tests/test_support.cpp checks they match). An empty yearly link hides the yearly choice in the
 // app and on the site. The card's Studio button opens the studio page (its own build is set up by email first).
 inline constexpr const char* kSupportUrlMember = "https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201";   // $5 / month
