@@ -2188,10 +2188,10 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
         selectInsertSetItem(insertSet_.index + step);
         return;
     }
-    if (key == SDLK_ESCAPE && (!insertType_.empty() || tubeDraw_)) { // Append > Insert (#34), Draw Tube off
-        const bool tube = tubeDraw_;
+    if (key == SDLK_ESCAPE && (!insertType_.empty() || tubeDraw_ || edgesMode_)) { // Append > Insert (#34), Draw Tube,
+        const bool tube = tubeDraw_, insert = !insertType_.empty();                // Edges mode off
         leaveDrawModes();
-        status_ = tube ? "Tube: Draw Tube off" : "Insert off";
+        status_ = tube ? "Tube: Draw Tube off" : insert ? "Insert off" : "Edges mode off";
         return;
     }
     if (captureShortcutKey(key, mod)) return; // Ctrl+Alt+click a button, then press its new key
