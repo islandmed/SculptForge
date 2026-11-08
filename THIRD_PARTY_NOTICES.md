@@ -66,6 +66,9 @@ the Autodesk FBX SDK, the OpenUSD SDK or Unreal Engine is included.
 
 https://libsdl.org — zlib License
 
+Altered on Linux: the build adds a marked three-line guard to src/video/wayland/SDL_waylandevents.c so SDL 3.4.18
+compiles against wayland-client before 1.24 (cmake/Dependencies.cmake).
+
 ```
 Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
   

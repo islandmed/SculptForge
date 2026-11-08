@@ -41,6 +41,27 @@ else()
   # (CI, the PC's Linux builds) don't all have libxtst-dev.
   set(SDL_X11_XTEST OFF CACHE BOOL "" FORCE)
   FetchContent_MakeAvailable(SDL3)
+  # SDL 3.4.18's SDL_waylandevents.c names WL_KEYBOARD_KEY_STATE_REPEATED, which wayland-client's headers have only
+  # from 1.24 (Ubuntu 22.04/24.04, EL8/9: 1.20-1.22). Which copy of wayland-client-protocol.h a file sees (the
+  # system's or SDL's generated one) depends on include order, so the file itself says: without the enum's
+  # _SINCE_VERSION macro, the protocol value 2. (SDL binds wl_seat at version 9 there: no compositor sends it.)
+  set(sf_wl_events "${sdl3_SOURCE_DIR}/src/video/wayland/SDL_waylandevents.c")
+  if(EXISTS "${sf_wl_events}")
+    file(READ "${sf_wl_events}" sf_src)
+    set(sf_anchor "static void keyboard_handle_key(")
+    if(NOT sf_src MATCHES "SculptForge: wayland-client" AND sf_src MATCHES "WL_KEYBOARD_KEY_STATE_REPEATED")
+      string(FIND "${sf_src}" "${sf_anchor}" sf_at)
+      if(sf_at LESS 0)
+        message(FATAL_ERROR "SDL_waylandevents.c changed: update the WL_KEYBOARD_KEY_STATE_REPEATED guard in cmake/Dependencies.cmake")
+      endif()
+      string(REPLACE "${sf_anchor}" "// SculptForge: wayland-client before 1.24 has no repeated key state (cmake/Dependencies.cmake)
+#ifndef WL_KEYBOARD_KEY_STATE_REPEATED_SINCE_VERSION
+#define WL_KEYBOARD_KEY_STATE_REPEATED 2
+#endif
+${sf_anchor}" sf_src "${sf_src}")
+      file(WRITE "${sf_wl_events}" "${sf_src}")
+    endif()
+  endif()
 endif()
 
 # Dear ImGui (UI) with the SDL3 + OpenGL3 backends

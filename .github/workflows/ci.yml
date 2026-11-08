@@ -438,11 +438,38 @@ jobs:
             [ "$(printf '%s\n' "GLIBC_${{ matrix.glibc }}" "$max" | sort -V | tail -1)" = "GLIBC_${{ matrix.glibc }}" ]
           done
 
+  # The oldest Linux headers the packages build against (the .deb/AppImage job runs on Ubuntu 22.04: wayland 1.20,
+  # older than 24.04's 1.22 and EL8/9's 1.21), on every code change, not just full runs: SDL 3.4.18 named a
+  # wayland 1.24 enum and broke the 24.04 builds unseen (11-07). Builds only the fetched SDL, a few minutes.
+  oldest-linux:
+    name: Oldest Linux headers (Ubuntu 22.04, SDL)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ${{ vars.SF_RUNNER_LINUX_OLD || 'ubuntu-22.04' }}
+    env:
+      SF_DEPS_CACHE: .deps
+    steps:
+      - uses: actions/checkout@v7
+      - name: Downloads (cmake/Fetch.cmake's archives, kept by hash)
+        uses: actions/cache@v5
+        with:
+          path: .deps
+          key: deps-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('cmake/Fetch.cmake', '.github/workflows/ci.yml') }}
+          restore-keys: deps-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-
+      - run: sudo ./packaging/linux/install-build-deps.sh >/dev/null
+      - name: Configure and build SDL3 (Wayland and X11 on, as the packages)
+        run: |
+          pkg-config --modversion wayland-client
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF -DSCULPTFORGE_BUILD_TESTS=OFF \
+            -DSCULPTFORGE_MOLD=OFF -DSDL_WAYLAND=ON -DSDL_X11=ON
+          cmake --build build --target SDL3-static -j4
+          find build -name SDL_waylandevents.c.o | grep -q . # Wayland really built, not quietly left out
+
   # The checks branch protection requires, by name. Each passes when the build and test jobs passed or were skipped
   # (a website-only change); a failure anywhere fails them all, and the run shows which job failed.
   result:
     name: ${{ matrix.check }}
-    needs: [changes, marks, build, blender-addon, vfx-platform]
+    needs: [changes, marks, build, oldest-linux, blender-addon, vfx-platform]
     if: always()
     runs-on: ubuntu-24.04
     strategy:
@@ -457,7 +484,7 @@ jobs:
           - VFX Reference Platform CY2027 (rockylinux:9)
     steps:
       - env:
-          RESULTS: ${{ needs.changes.result }} ${{ needs.marks.result }} ${{ needs.build.result }} ${{ needs.blender-addon.result }} ${{ needs.vfx-platform.result }}
+          RESULTS: ${{ needs.changes.result }} ${{ needs.marks.result }} ${{ needs.build.result }} ${{ needs.oldest-linux.result }} ${{ needs.blender-addon.result }} ${{ needs.vfx-platform.result }}
         run: |
-          echo "changes, marks, build, blender-addon, vfx-platform: $RESULTS"
+          echo "changes, marks, build, oldest-linux, blender-addon, vfx-platform: $RESULTS"
           for r in $RESULTS; do case $r in success|skipped) ;; *) exit 1 ;; esac; done

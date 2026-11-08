@@ -13,3 +13,6 @@ testers:
 Reviewers: the SDL bump is Linux only (cmake/Fetch.cmake SF_PIN_SDL3_linux, cmake/Dependencies.cmake); Windows and
 macOS stay on 3.2.30. The held pen motion is App::flushPenMotion (Tablet.cpp); the lost-sample rule is
 PenPressureTracker::holdLostZero (core/Tablet.h), Linux only.
+Older Linux (wayland-client before 1.24: Ubuntu 22.04/24.04, EL8/9): SDL 3.4.18 names WL_KEYBOARD_KEY_STATE_REPEATED,
+so cmake/Dependencies.cmake adds a 3-line guard to SDL_waylandevents.c at configure time (the value 2 only where the header lacks the enum); SDL binds
+wl_seat at version 9 there, so the branch never runs. CI's "Oldest Linux headers" job builds SDL on Ubuntu 22.04.
