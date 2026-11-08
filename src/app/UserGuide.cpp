@@ -531,7 +531,9 @@ void UserGuide::draw(App& app) {
     ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h * 0.5f), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSizeConstraints(ImVec2(520.0f * s, 320.0f * s), ImVec2(FLT_MAX, FLT_MAX));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f * s, 8.0f * s));
-    const bool visible = ImGui::Begin(tr("User Guide"), &open_, ImGuiWindowFlags_NoCollapse);
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
+    app.fillPanelHost(flags); // in a window of its own: fills it (PanelWindows.cpp)
+    const bool visible = ImGui::Begin(tr("User Guide"), &open_, flags);
     ImGui::PopStyleVar();
     if (!visible) {
         ImGui::End();
@@ -629,7 +631,10 @@ void UserGuide::drawToolbar(App& app) {
     ui::HelpText("Contents", nullptr, "The guide's first page: every chapter.", "Help > User Guide");
     ui::DelayedTooltip("Contents");
     ImGui::SameLine();
-    const float webW = ImGui::CalcTextSize(ICON_LC_GLOBE "  Open in browser").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    // In the main window: a button that moves the guide to a window of its own (another monitor, PanelWindows.cpp).
+    const bool canDetach = !app.panelHost_;
+    const float detachW = canDetach ? btn.x + ImGui::GetStyle().ItemSpacing.x : 0.0f;
+    const float webW = ImGui::CalcTextSize(ICON_LC_GLOBE "  Open in browser").x + ImGui::GetStyle().FramePadding.x * 2.0f + detachW;
     ImGui::SetNextItemWidth(std::min(340.0f * s, ImGui::GetContentRegionAvail().x - webW - 12.0f * s));
     if (focusSearch_) {
         ImGui::SetKeyboardFocusHere();
@@ -650,6 +655,14 @@ void UserGuide::drawToolbar(App& app) {
     ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - webW);
     if (ImGui::Button(tr(ICON_LC_GLOBE "  Open in browser##guide_web"))) SDL_OpenURL(websiteUrl().c_str());
     ui::HelpText("Open in browser", nullptr, "Read this page on the SculptForge website.", "Help > User Guide");
+    if (canDetach) {
+        ImGui::SameLine();
+        if (ImGui::Button(ICON_LC_SQUARE_ARROW_OUT_UP_RIGHT "##guide_detach", btn)) app.detachPanel("guide");
+        ui::HelpText("Open in its own window", nullptr,
+                     "Move the guide to a window of its own, to keep on another monitor. It opens there next time too.",
+                     "Help > User Guide");
+        ui::DelayedTooltip("Open in its own window");
+    }
     ImGui::Dummy(ImVec2(0, 2.0f * s));
 }
 

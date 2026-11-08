@@ -4610,6 +4610,21 @@ constexpr Entry kTraditionalChinese[] = {
      "這張顯示卡不會回報記憶體使用量"},
     {"Updated every second",
      "每秒更新"},
+    // Panels in windows of their own (PanelWindows.cpp)
+    {"Back in the main window", "移回主視窗"},
+    {"Controls in its own window", "在獨立視窗中顯示操作方式"},
+    {"In a window of its own", "在獨立視窗中"},
+    {"Show it", "顯示"},
+    {"Move Controls to a window of its own, to keep on another monitor. It opens there next time too.", "將操作方式移到獨立視窗，以便放在另一台螢幕上。下次也會在那裡開啟。"},
+    {"Move the guide to a window of its own, to keep on another monitor. It opens there next time too.", "將指南移到獨立視窗，以便放在另一台螢幕上。下次也會在那裡開啟。"},
+    {"Move this palette to a window of its own, to keep on another monitor or a pen display. Close that window to bring it back. It opens there next time too.", "將此面板移到獨立視窗，以便放在另一台螢幕或繪圖螢幕上。關閉該視窗即可移回。下次也會在那裡開啟。"},
+    {"Open Controls (every shortcut and gesture) in a window of its own, to keep on another monitor.", "在獨立視窗中開啟操作方式（所有快速鍵與手勢），以便放在另一台螢幕上。"},
+    {"Open in its own window", "在獨立視窗中開啟"},
+    {"Open the User Guide in a window of its own, to keep on another monitor. It opens there next time too.", "在獨立視窗中開啟使用指南，以便放在另一台螢幕上。下次也會在那裡開啟。"},
+    {"Put every panel that is in a window of its own back in the main window, and forget where those windows were.", "將所有在獨立視窗中的面板移回主視窗，並忘記那些視窗的位置。"},
+    {"Put this panel back in the main window. Preferences > Config > Reset panel windows puts all of them back.", "將此面板移回主視窗。偏好設定 > 設定 > 重設面板視窗會將全部移回。"},
+    {"Reset panel windows", "重設面板視窗"},
+    {"User Guide in its own window", "在獨立視窗中顯示使用指南"},
 };
 
 } // namespace
