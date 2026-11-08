@@ -29,6 +29,15 @@
     .tag { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 0.75rem;
            border: 1px solid var(--border); color: var(--muted); }
     .table-wrap + .fine { margin-top: 16px; }
+    .member-reqs { display: grid; gap: 12px; max-width: 900px; margin: 0 0 8px; padding: 0; list-style: none;
+                   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+    .member-reqs li { background: var(--panel); border: 1px solid var(--accent); border-radius: var(--radius);
+                      padding: 14px 16px; }
+    .member-reqs .badge { display: inline-block; margin-bottom: 6px; padding: 1px 9px; border-radius: 999px;
+                          font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em; background: var(--accent); color: #1a0d04; }
+    .member-reqs .idea { display: block; font-weight: 600; }
+    .member-reqs .st { display: block; margin-top: 6px; color: var(--muted); font-size: 0.85rem; }
+    .member-cta { margin-top: 14px; }
     @media (max-width: 600px) { .queue th, .queue td { padding: 8px 6px; } .queue .st { white-space: normal; } }
   </style>
 </head>
@@ -61,14 +70,34 @@
       </div>
     </section>
 
+
+    <section class="section">
+      <div class="wrap">
+        <h2>Member requests</h2>
+        <p class="lede">Members fund SculptForge, so their requests are built first and credited in the release.</p>
+        <ul class="member-reqs">
+            <li><span class="badge">Member request</span><span class="idea">Edge crease for subdivision + select edges by angle; creases through the Blender Bridge both ways</span><span class="st">Building</span></li>
+            <li><span class="badge">Member request</span><span class="idea">Detachable panels (Member Request, November)</span><span class="st">Building</span></li>
+            <li><span class="badge">Member request</span><span class="idea">Standalone curves: polyline to Bezier/NURBS, resample with point slider, curve from edges</span><span class="st">Planned</span></li>
+            <li><span class="badge">Member request</span><span class="idea">Polygon modelling mode: separate Points, Edges and Polygons panels, beginner-friendly; extrude, smart bevel, circle from edges, bridge</span><span class="st">Queued</span></li>
+            <li><span class="badge">Member request</span><span class="idea">Wood detail brush pack: weathered grain, splinters/chaff, alphas in their own subfolder</span><span class="st">Queued</span></li>
+            <li><span class="badge">Member request</span><span class="idea">Shortcut editor: warn when a key is already used (no silent reassign) + per-shortcut reset button</span><span class="st">Queued</span></li>
+            <li><span class="badge">Member request</span><span class="idea">Multi-key shortcut sequences (e.g. A then A) for more bindable keys</span><span class="st">Queued</span></li>
+            <li><span class="badge">Member request</span><span class="idea">Pan left/right/up/down as separate bindable keys (for game pads / analog sticks; zoom in/out keys exist)</span><span class="st">Queued</span></li>
+            <li><span class="badge">Member request</span><span class="idea">Workspaces (&quot;rooms&quot;) with their own tools and keys: Sculpt/Retopo, Model, Paint/Render, UV, and how a mesh moves between them</span><span class="st">Queued</span></li>
+            <li><span class="badge">Member request</span><span class="idea">Custom quick panel: drag sections/buttons from any palette into it, open floating with a key or dock it in a tray; sections can be dragged out, hold a key to drag (not a pie menu)</span><span class="st">Queued</span></li>
+        </ul>
+        <p class="member-cta"><a class="btn primary" href="support.html">Become a member</a></p>
+      </div>
+    </section>
+
     <section class="section alt">
       <div class="wrap">
+        <h2>Everyone's ideas</h2>
         <div class="table-wrap">
         <table class="queue">
           <thead><tr><th scope="col">Idea</th><th scope="col">Status</th></tr></thead>
           <tbody>
-            <tr><td>Edge crease for subdivision + select edges by angle; creases through the Blender Bridge both ways <span class="tag">member</span></td><td class="st">Building</td></tr>
-            <tr><td>Detachable panels (Member Request, November) <span class="tag">member</span></td><td class="st">Building</td></tr>
             <tr><td>Insert brush + Forge Stamps brush pack</td><td class="st">Building</td></tr>
             <tr><td>Sculpt layer management (duplicate, reorder, ...)</td><td class="st">Building</td></tr>
             <tr><td>Geometry panel + Parts list improvements</td><td class="st">Building</td></tr>
@@ -76,7 +105,7 @@
             <tr><td>Bend over a range (start/end span)</td><td class="st">Building</td></tr>
             <tr><td>Load reference images in the viewport</td><td class="st">Building</td></tr>
             <tr><td>Brush per modifier key (Shift/Ctrl assignment)</td><td class="st">Building</td></tr>
-            <tr><td>Package managers (AUR, apt, dnf, winget)</td><td class="st">Building</td></tr>
+            <tr><td>Package managers (AUR, apt, dnf, winget, Scoop)</td><td class="st">Building</td></tr>
             <tr><td>One-click mirrored copy of a Part</td><td class="st">Building</td></tr>
             <tr><td>Numbered duplicates (Head.01) instead of &quot;copy copy&quot;</td><td class="st">Building</td></tr>
             <tr><td>Crisp-edge flatten</td><td class="st">Building</td></tr>
@@ -85,7 +114,6 @@
             <tr><td>Pose all Parts through a proxy (Pose Maker)</td><td class="st">Designing</td></tr>
             <tr><td>Bones and skin weights as USD skeletons, posing first</td><td class="st">Designing</td></tr>
             <tr><td>Paint layers exported as separate colour attributes</td><td class="st">Planned</td></tr>
-            <tr><td>Standalone curves: polyline to Bezier/NURBS, resample with point slider, curve from edges</td><td class="st">Planned</td></tr>
             <tr><td>Sculpt layers on micro levels</td><td class="st">Planned</td></tr>
             <tr><td>Micro levels: rebuild subdivision levels from a micro level</td><td class="st">Planned</td></tr>
             <tr><td>Micro levels: turn top subdivision levels into a micro level</td><td class="st">Planned</td></tr>
@@ -95,9 +123,6 @@
             <tr><td>Blender Bridge: update the base mesh and keep detail layers; shape keys back as layers</td><td class="st">Planned</td></tr>
             <tr><td>Manual retopology on the surface: draw polygons, strips, loops</td><td class="st">Planned</td></tr>
             <tr><td>Brushes on the graphics card (GPU sculpting)</td><td class="st">Planned</td></tr>
-            <tr><td>Polygon modelling mode: separate Points, Edges and Polygons panels, beginner-friendly; extrude, smart bevel, circle from edges, bridge <span class="tag">member</span></td><td class="st">Queued</td></tr>
-            <tr><td>Wood detail brush pack: weathered grain, splinters/chaff, alphas in their own subfolder <span class="tag">member</span></td><td class="st">Queued</td></tr>
-            <tr><td>Custom quick panel: drag sections/buttons from any palette into it, open floating with a key or dock it in a tray; sections can be dragged out (not a pie menu) <span class="tag">member</span></td><td class="st">Queued</td></tr>
             <tr><td>Simpler app icon</td><td class="st">Queued</td></tr>
             <tr><td>Origin tools + pie menu</td><td class="st">Queued</td></tr>
             <tr><td>Send Divide levels to Blender as Multires</td><td class="st">Queued</td></tr>
@@ -115,8 +140,15 @@
             <tr><td>Tube profiles: square, disc and other cross-sections</td><td class="st">Queued</td></tr>
             <tr><td>Voxel Remesh above 512 (to 4096, polygon estimate + one-time warning)</td><td class="st">Queued</td></tr>
             <tr><td>Android port (phones and tablets with a pen)</td><td class="st">Queued</td></tr>
+            <tr><td>Tab over a shelf hides only that shelf (Tab elsewhere hides all, as now)</td><td class="st">Queued</td></tr>
             <tr><td>Brush Accumulate on/off (off: a stroke does not pile up over itself)</td><td class="st">Queued</td></tr>
             <tr><td>Brush auto-masking in the brush settings: directional, cavity (invert), backface, opposite, colour, topological, face group, face group boundary, view angle; per-mask strength + curve; own Sculpt &gt; Brush &gt; Auto-masking subpanel</td><td class="st">Queued</td></tr>
+            <tr><td>Blend across Parts switch: smoothing/dynamic topology strokes blend an appended Part into the one it overlaps</td><td class="st">Queued</td></tr>
+            <tr><td>Custom interface colours (pick your own accent and panel colours)</td><td class="st">Queued</td></tr>
+            <tr><td>Forge Spheres: draw and move in one mode, no switching (e.g. drag a sphere to move it, drag from its edge to grow one); child size option for Drag places child; in-between spheres along links as a preview</td><td class="st">Queued</td></tr>
+            <tr><td>Split view: a second live view of the model (e.g. sculpt from the side while watching the front); split by dragging, detachable window</td><td class="st">Queued</td></tr>
+            <tr><td>Unlit view: show painted colour/texture without lighting or shadows, with a quick key to toggle</td><td class="st">Queued</td></tr>
+            <tr><td>Generate a cavity map <span class="tag">member</span></td><td class="st">Already in the app<span class="detail">Tool &gt; Bake &gt; Cavity; Masking &gt; By cavity</span></td></tr>
             <tr><td>Deformation panel expansion</td><td class="st">Shipped<span class="detail">in 0.11.14</span></td></tr>
             <tr><td>X/Y/Z orbit lock</td><td class="st">Shipped<span class="detail">in 0.11.13</span></td></tr>
             <tr><td>Multi-object gizmo</td><td class="st">Shipped<span class="detail">in 0.11.16</span></td></tr>
@@ -127,7 +159,6 @@
             <tr><td>Duplicate Part shortcut</td><td class="st">Already in the app<span class="detail">Ctrl+Shift+D</span></td></tr>
             <tr><td>Constant detail for dynamic topology</td><td class="st">Already in the app<span class="detail">Draw &amp; Tablet &gt; Constant detail</span></td></tr>
             <tr><td>Hold a key to change brush size</td><td class="st">Already in the app<span class="detail">hold [ or ], S for a Size slider</span></td></tr>
-            <tr><td>Generate a cavity map</td><td class="st">Already in the app<span class="detail">Tool &gt; Bake &gt; Cavity; Masking &gt; By cavity</span></td></tr>
             <tr><td>Outside remeshing add-on</td><td class="st">Declined<span class="detail">no outside code; we&#x27;ll link it if published</span></td></tr>
             <tr><td>Re-create a third-party add-on</td><td class="st">Declined<span class="detail">their work and licence</span></td></tr>
           </tbody>

@@ -1,13 +1,13 @@
 {
-  "version": "0.11.16",
+  "version": "0.12.0",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Gizmo All: one gizmo with move, rotate and scale handles at once, on Shift+W (thanks fenix on Discord, @fenixpoints)",
-    "Cut with symmetry cuts both sides alike, and Blender keys get Ctrl+Shift cut shapes and Alt+Q to pick a Part (thanks dm4nd on Discord)",
-    "Split can keep the original: copy hidden, masked or unmasked areas into a new Part and leave the source as it is (thanks _tfx on Discord)",
-    "Tool > Geometry is reorganised by task (Levels, Micro Detail, Resolution, Cleanup, Symmetry) with clearer names, Extract reads Thickness, Edge Smooth, Both Sides, Corners and Border, and popups are fully opaque",
-    "macOS: SculptForge > Preferences... in the app menu opens Preferences (thanks @fenixpoints)"
+    "Garments and cloth: real-size sewing patterns (millimetres, curves, notches, grain line, seam allowance) from 8 templates at your sizes, sewn with matched seam lengths; print at home at real size (PDF/SVG pages) or export DXF for cutters; plus a Cloth brush and Drape for folds on any mesh. For cosplay, costume and textile work",
+    "Plugins: install sandboxed add-ons from packs (deformers and generators; no file or network access) (thanks @bribblej-web, #20)",
+    "The Tool palette in the order you work: Reshape gathers Size and the Stack, Mirror moves to Geometry > Symmetry, and Texture Image and Viewport Look say what they do (thanks foirgairwolf on Discord)",
+    "Cleaner cuts and creases: crease edges (select them by angle too) and they stay sharp when you add levels (thanks @NicTanghe on GitHub, #108, and _tfx on Discord); cut caps are even triangles instead of thin slivers (thanks dm4nd on Discord)",
+    "Tube shapes: round, square, triangle or ribbon profiles with taper that follow the surface, and any brush, tool or Esc leaves Draw Tube (thanks GABO on Discord); pose every Part at once (thanks @ABHITAR)"
   ],
   "support": {
     "founding": {
