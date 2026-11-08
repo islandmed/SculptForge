@@ -190,6 +190,36 @@ TEST(figure_pose_is_one_undo_step_across_parts) {
     CHECK(sameBits(d.partMesh(1).positions, eye));
 }
 
+// The undo step holds an edge-crease channel (#108) and the Pose's transform (both 0.12.0): crease, pose, then undo
+// and redo both steps, each restoring positions and creases bit for bit.
+TEST(figure_pose_and_edge_creases_undo_redo_round_trip) {
+    Document d = makeFigure(4);
+    const auto arm = d.partMesh(0).positions, eye = d.partMesh(1).positions;
+    CHECK(run(d, "edge_select", {{"op", std::string("all")}}).ok);
+    CHECK(run(d, "edge_crease", {{"value", 0.5}}).ok);
+    const auto creased = d.partMesh(0).creases;
+    CHECK(!creased.empty());
+    CHECK(figurePoseBegin(d, 50000).ok);
+    maskBelowX(d.mesh, 0.0f);
+    CHECK(run(d, "transform", {{"rotate", std::string("0,0,30")}, {"pivot", std::string("0,0,0")}, {"falloff", 0.1}}).ok);
+    CHECK(figurePoseApply(d).ok);
+    const auto armPosed = d.partMesh(0).positions, eyePosed = d.partMesh(1).positions;
+    CHECK(!sameBits(armPosed, arm));
+    CHECK(sameBits(d.partMesh(0).creases, creased)); // posing moves points, never the creases
+    CHECK(run(d, "undo").ok); // the pose
+    CHECK(sameBits(d.partMesh(0).positions, arm) && sameBits(d.partMesh(1).positions, eye));
+    CHECK(sameBits(d.partMesh(0).creases, creased));
+    CHECK(run(d, "undo").ok); // the crease
+    CHECK(d.partMesh(0).creases.empty() || std::all_of(d.partMesh(0).creases.begin(), d.partMesh(0).creases.end(),
+                                                        [](float c) { return c == 0.0f; }));
+    CHECK(sameBits(d.partMesh(0).positions, arm));
+    CHECK(run(d, "redo").ok);
+    CHECK(sameBits(d.partMesh(0).creases, creased) && sameBits(d.partMesh(0).positions, arm));
+    CHECK(run(d, "redo").ok);
+    CHECK(sameBits(d.partMesh(0).positions, armPosed) && sameBits(d.partMesh(1).positions, eyePosed));
+    CHECK(sameBits(d.partMesh(0).creases, creased));
+}
+
 TEST(figure_pose_undo_on_the_pose_mesh_drops_the_move) {
     Document d = makeFigure(5);
     const auto arm = d.partMesh(0).positions;
