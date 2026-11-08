@@ -2883,6 +2883,8 @@ void App::drawDynamicOffer() {
         openUnhideConfirm_ = false;
         ImGui::OpenPopup(kUnhide);
     }
+    // In the middle of the window, not at the button (a tray button near the edge pushed it into a corner).
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopup(kUnhide)) {
         Demo::pushScope("Hidden");
         ImGui::Text(tr("Some of this Part is hidden. %s works on all of it."), tr(unhideOperation_.c_str()));
