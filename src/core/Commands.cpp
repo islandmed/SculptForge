@@ -13,6 +13,7 @@
 #include "core/KeepMasked.h"
 #include "core/Macro.h"
 #include "core/Pack.h"
+#include "core/Plugin.h"
 #include "core/Dyntopo.h"
 #include "core/EnginePresets.h"
 #include "core/ExtractMirror.h"
@@ -905,6 +906,7 @@ CommandRegistry::CommandRegistry() {
     registerFaceCommands(*this); // face_shapes_generate, face_weights, ... (core/FaceCommands.cpp)
     registerStarterMeshCommands(*this); // new_starter_mesh (core/StarterMeshes.h)
     registerPackCommands(*this);    // pack_install, pack_list, pack_remove, ... (core/Pack.h)
+    registerPluginCommands(*this);  // plugin_list, plugin_run, plugin_enable (core/Plugin.h)
     registerMacroCommands(*this);   // macro_run, macro_list, macro_check (core/Macro.h)
     registerProjectCommands(*this); // keep last (core/Project.cpp)
 }

@@ -2747,6 +2747,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     // The console shows every command as a script line (but not a live face feed, 30 times a second).
     if (name != "face_weights" || !r.ok) consoleEcho(name, args, r);
     if (r.ok && (name == "pack_remove" || name == "pack_enable" || name == "pack_disable")) refreshPacks();
+    if (name == "plugin_run" || name == "plugin_enable") refreshPlugins(); // a run may turn one off
     // Macro > Record keeps what the user runs (not what a running macro runs).
     if (r.ok && macros_.recorder.active() && macros_.runDepth == 0 && name != "face_weights")
         macros_.recorder.record(name, args, macroProjectDir());
@@ -3169,6 +3170,7 @@ void App::drawUi() {
     guide_.draw(*this);  // Help > User Guide
     drawBrushSetSave();  // Save Shelf as Brush Set, Delete Brush Set (PanelBrushSets.cpp)
     drawPacksUi();       // pack review, New Pack, macro confirmation and editor (PanelPacks.cpp)
+    drawPluginWindow();  // a plugin's parameters, Apply / Add Part, Stop (PanelPlugins.cpp)
     drawMemoryConfirm(); // "Not enough free memory" before a big mesh (MemoryConfirm.cpp)
     drawAiLink();        // live mode: Approve / Allow dialogs, the "AI connected" badge (PanelAiLink.cpp)
     drawMayaLinkDialog(); // the Maya Live link's warning (PanelMaya.cpp)

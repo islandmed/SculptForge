@@ -25,6 +25,19 @@ set(SF_PIN_ldc_plog https://github.com/SergiusTheBest/plog/archive/94899e0b926ac
 set(SF_PIN_pybind11 https://github.com/pybind/pybind11/archive/refs/tags/v3.0.4.tar.gz
     74b6a2c2b4573a400cafb6ecbf60c98df300cd3d0041296b913d02b2cbbb2676)
 
+# wasmtime's C API, prebuilt (cmake/Wasmtime.cmake): sandboxed plugins. Update every release (docs/releasing.md).
+set(SF_WASMTIME_VERSION 50.0.1) # also in each URL below
+set(SF_PIN_wasmtime_linux_x86_64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-x86_64-linux-c-api.tar.xz
+    e2c0c26e1aef52f82f0b9918ad6f34cc30f4b557aee3e261cb127a9462be8f4d)
+set(SF_PIN_wasmtime_linux_aarch64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-aarch64-linux-c-api.tar.xz
+    1a36140a016a9cc098f02a37bb0cc7be6451032861ba70049127928d2f31ef84)
+set(SF_PIN_wasmtime_macos_x86_64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-x86_64-macos-c-api.tar.xz
+    b6d436cba5c0964785c6ff7c9b5a743131555a0227b4f742185c4fb520c502c5)
+set(SF_PIN_wasmtime_macos_aarch64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-aarch64-macos-c-api.tar.xz
+    a49327ca596fae51cd92e230265132112bb7896c5a24e4d58cd05b56612e26bb)
+set(SF_PIN_wasmtime_windows_x86_64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-x86_64-windows-c-api.zip
+    8b461d9dc12b076d0414b1023433bbb2dc08d3b1c0f0a156853ede35f0147802)
+
 function(sf_fetch_declare name)
   if(NOT DEFINED SF_PIN_${name})
     message(FATAL_ERROR "sf_fetch_declare(${name}): no SF_PIN_${name} (URL and SHA-256) in cmake/Fetch.cmake")

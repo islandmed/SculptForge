@@ -335,3 +335,13 @@ Some jobs always stay on GitHub's own runners: the ones that read the repository
 Release `locate`), the required-check result jobs, and `publish`, the only job with a token that can write. Build
 and test jobs get no secrets, only a read-only token, so a third-party runner holds nothing that can change the
 repository.
+
+## The plugin runtime (every release)
+
+Plugins run in wasmtime (docs/design/plugins.md), the one dependency that is a security boundary. Before each
+release: if the upstream watch reports a newer wasmtime (or it has a security advisory), set `SF_WASMTIME_VERSION`
+in cmake/Fetch.cmake, replace the five `SF_PIN_wasmtime_*` SHA-256s (`sha256sum` of each `*-c-api.tar.xz` / `.zip`
+from its GitHub release), the Flatpak manifest's two wasmtime sources and the version in THIRD_PARTY_NOTICES.md and
+packaging/upstream.json, then run the plugin tests (the `plugin_` cases of the test binary) and tests/ui/plugins.sfui.
+A security advisory doesn't wait for the train: it ships as its own fix release.
+

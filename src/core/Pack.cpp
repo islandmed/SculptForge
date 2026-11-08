@@ -8,6 +8,7 @@
 #include "core/Image.h"
 #include "core/LegacyNames.h"
 #include "core/Macro.h"
+#include "core/Plugin.h"
 #include "core/MaterialRecipe.h"
 #include "core/RadialMenu.h"
 #include "core/UpdateCheck.h"
@@ -132,6 +133,9 @@ bool versionOk(const std::string& v) {
 
 } // namespace
 
+bool packTextOk(const std::string& s, size_t maxBytes, bool multiline) { return cleanTextOk(s, maxBytes, multiline); }
+bool packIdValid(const std::string& id) { return packIdOk(id); }
+
 // ---------------------------------------------------------------------------
 // Item types
 // ---------------------------------------------------------------------------
@@ -146,6 +150,7 @@ const char* packItemTypeId(PackItemType t) {
     case PackItemType::Keymap: return "keymap";
     case PackItemType::PieMenu: return "piemenu";
     case PackItemType::Macro: return "macro";
+    case PackItemType::Plugin: return "plugin";
     case PackItemType::Count: break;
     }
     return "";
@@ -161,6 +166,7 @@ const char* packItemFolder(PackItemType t) {
     case PackItemType::Keymap: return "keymaps";
     case PackItemType::PieMenu: return "piemenus";
     case PackItemType::Macro: return "macros";
+    case PackItemType::Plugin: return "plugins";
     case PackItemType::Count: break;
     }
     return "";
@@ -177,6 +183,7 @@ const char* packItemLabel(PackItemType t, int count) {
     case PackItemType::Keymap: return one ? "keymap" : "keymaps";
     case PackItemType::PieMenu: return one ? "pie menu" : "pie menus";
     case PackItemType::Macro: return one ? "macro" : "macros";
+    case PackItemType::Plugin: return one ? "plugin" : "plugins";
     case PackItemType::Count: break;
     }
     return "";
@@ -202,6 +209,7 @@ bool packItemExtensionOk(PackItemType t, const std::string& fileName) {
     case PackItemType::Keymap:
     case PackItemType::PieMenu: return ext == ".json";
     case PackItemType::Macro: return ext == kMacroExtension;
+    case PackItemType::Plugin: return ext == kPluginExtension;
     case PackItemType::Count: break;
     }
     return false;
@@ -775,6 +783,15 @@ bool checkPackFile(PackItemType type, const PackFile& f, const CommandRegistry* 
         }
         return true;
     }
+    case PackItemType::Plugin: {
+        PluginManifest m;
+        std::string err;
+        if (!readPlugin(f.data, m, err)) {
+            error = "\"" + shown + "\" is not a plugin SculptForge can install: " + err;
+            return false;
+        }
+        return true;
+    }
     case PackItemType::Count: break;
     }
     error = "\"" + shown + "\" has an unknown type";
@@ -852,6 +869,19 @@ bool reviewPackFiles(std::vector<PackFile> files, PackReview& out, std::string& 
         if (!checkPackFile(it->second, f, registry, error)) return false;
         ++out.counts[size_t(it->second)];
         out.itemNames.push_back(std::string(packItemTypeId(it->second)) + ": " + stemOf(f.name));
+        if (it->second == PackItemType::Plugin) {
+            PluginManifest pm;
+            std::string err;
+            readPlugin(f.data, pm, err); // checked above
+            PackReview::Plugin r;
+            r.file = f.name;
+            r.name = pm.name;
+            r.version = pm.version;
+            r.kind = pluginKindLabel(pm.kind);
+            r.bytes = f.data.size();
+            for (const PluginParam& q : pm.params) r.params += (r.params.empty() ? "" : ", ") + q.label;
+            out.plugins.push_back(std::move(r));
+        }
     }
     for (const PackItem& it : m.contents)
         if (!present.count(it.path)) {
@@ -1307,7 +1337,7 @@ void registerPackCommands(CommandRegistry& registry) {
                   }});
     registry.add({"pack_create",
                   "Make a pack (.sfpack) from a folder laid out like one: brushes/, alphas/, litspheres/, materials/, vdms/, "
-                  "keymaps/, piemenus/ and macros/ (each with its own file types), plus LICENSE.txt and preview.png if "
+                  "keymaps/, piemenus/, macros/ and plugins/ (each with its own file types), plus LICENSE.txt and preview.png if "
                   "there. Everything is checked exactly as an install would check it.",
                   {{"folder", T::String, "The folder holding the items.", true},
                    {"path", T::String, "The .sfpack to write.", true},
