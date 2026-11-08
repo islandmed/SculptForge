@@ -103,7 +103,13 @@ run subdiv_divide
 run subdiv_divide
 run subdiv_divide
 expect_value subdiv_level == 4
+# The Levels line in short counts (full counts clipped at 1440 px): 27.6K base, 1.77M on top.
+expect_text "Level 4 of 4 - base 27.6K, top 1.77M tris"
 shot edge-crease-divided
+ui_scale 200
+wait 0.3
+shot edge-crease-divided-200
+ui_scale 100
 run subdiv_level level=1
 expect_value subdiv_level == 1
 expect_value edges_mode == 1

@@ -21,6 +21,17 @@
 
 namespace sf {
 
+namespace {
+// 27648 -> "27.6K", 1769472 -> "1.77M": the Levels line fits the tray at 1440 px and 200% (it clipped with full counts).
+std::string triangleCount(size_t n) {
+    char text[32];
+    if (n < 10000) std::snprintf(text, sizeof text, "%zu", n);
+    else if (n < 1000000) std::snprintf(text, sizeof text, "%.1fK", double(n) / 1e3);
+    else std::snprintf(text, sizeof text, "%.2fM", double(n) / 1e6);
+    return text;
+}
+} // namespace
+
 void App::drawGeometrySection() {
     const Mesh& m = doc_.mesh;
     const int levels = subdivLevelCount(m), current = subdivCurrentLevel(m);
@@ -64,8 +75,9 @@ void App::drawGeometrySection() {
 
     if (levels) {
         char info[96];
-        std::snprintf(info, sizeof info, "Level %d of %d  -  base %zu, top %zu triangles", current + 1, levels,
-                      subdivLevelTriangles(m, 0), subdivLevelTriangles(m, levels - 1));
+        std::snprintf(info, sizeof info, "Level %d of %d - base %s, top %s tris", current + 1, levels,
+                      triangleCount(subdivLevelTriangles(m, 0)).c_str(),
+                      triangleCount(subdivLevelTriangles(m, levels - 1)).c_str());
         ImGui::TextDisabled("%s", info);
     } else {
         ImGui::TextDisabled("%s", tr("No subdivision levels - Add Level adds them"));
