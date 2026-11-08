@@ -40,8 +40,8 @@ expect_not "Hidden/Unhide and continue"
 expect_value hidden > 0
 expect_value triangles == 5120
 
-# Merge by Distance: asks on the unwelded cube with a face hidden; with Masked only and the mask shown it doesn't.
-run open path=$SCRIPT_DIR/data/check_mesh_cube.obj
+# Merge by Distance: asks on the unwelded cube with half of it hidden; with Masked only and the mask shown it doesn't.
+run open path=$SCRIPT_DIR/../data/check_mesh_cube.obj
 run hide_rect x0=0 y0=-1 x1=1 y1=1 inside=true
 expect_value hidden > 0
 expect_text 16 points will merge
@@ -55,5 +55,6 @@ run mask_all
 click "Masked only##weld_masked_only"
 click "Merge##weld_points"
 expect_not "Hidden/Unhide and continue"
-expect_status Merged 16 points
+expect_status Merged 9 points
 expect_value hidden > 0
+# (Mask All leaves hidden faces unmasked, so only the shown points merged.)

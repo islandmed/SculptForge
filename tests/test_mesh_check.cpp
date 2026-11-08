@@ -77,8 +77,10 @@ TEST(weld_points_by_distance) {
     Mesh masked = loose;
     std::vector<float>& mask = masked.ensureMask();
     for (uint32_t v = 0; v < masked.vertexCount(); ++v) mask[v] = masked.positions[v].y > 0.3f ? 1.0f : 0.0f;
+    size_t all = 0;
+    weldTargets(loose, 0.0f, &all);
     const std::vector<uint32_t> target = weldTargets(masked, 0.0f, &n, true);
-    CHECK(n > 0 && n < merged);
+    CHECK(n > 0 && n < all);
     for (uint32_t v = 0; v < masked.vertexCount(); ++v)
         if (target[v] != v) CHECK(mask[v] >= 0.5f && mask[target[v]] >= 0.5f);
     welded = weldByDistance(masked, 0.0f, &merged, true);
@@ -88,8 +90,6 @@ TEST(weld_points_by_distance) {
     CHECK(n == 0);
     std::fill(mask.begin(), mask.end(), 1.0f);
     weldTargets(masked, 0.0f, &n, true);
-    size_t all = 0;
-    weldTargets(loose, 0.0f, &all);
     CHECK(n == all);
 }
 

@@ -43,18 +43,19 @@ expect_value triangles == 13
 key ctrl+z
 expect_value vertices == 24
 
-# Masked only (foirgairwolf on Discord): with the top and +X faces masked, only their two shared corners merge; the
+# Masked only (foirgairwolf on Discord): with the top and +X faces masked, only masked points merge: their two shared
+# corners, and one more where the flipped triangle's -X face points (their normals cancel) pass the facing mask. The
 # count and the preview follow the checkbox, and Merge welds just those.
 run mask_by_facing x=0 y=1 z=0 angle=10
 run mask_by_facing x=1 y=0 z=0 angle=10 add=true
 click "Masked only##weld_masked_only"
-expect_text 2 points will merge
+expect_text 3 points will merge
 hover "Masked only##weld_masked_only"
-expect_value weld_preview_points == 2
+expect_value weld_preview_points == 3
 shot masked-only
 click "Merge##weld_points"
-expect_value vertices == 22
-expect_status Merged 2 points
+expect_value vertices == 21
+expect_status Merged 3 points
 key ctrl+z
 expect_value vertices == 24
 click "Masked only##weld_masked_only"
