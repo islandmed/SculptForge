@@ -2250,6 +2250,39 @@ void App::drawPaletteBody(const std::string& id) {
     ImGui::PopID();
 }
 
+void App::closePopupsOnPressOutside(const SDL_Event& e) {
+    if (e.type != SDL_EVENT_MOUSE_BUTTON_DOWN) return;
+    ImGuiContext* g = ImGui::GetCurrentContext();
+    if (!g || g->OpenPopupStack.Size == 0) return;
+    const float x = e.button.x, y = e.button.y;
+    auto inside = [&](float rx, float ry, float rw, float rh) { return x >= rx && x < rx + rw && y >= ry && y < ry + rh; };
+    const ImGuiWindow* hovered = g->HoveredWindow ? g->HoveredWindow->RootWindow : nullptr;
+    for (const ImGuiPopupData& p : g->OpenPopupStack) {
+        if (!p.Window) continue;
+        if (p.Window->Flags & ImGuiWindowFlags_Modal) return; // (a modal dialog keeps its clicks: Esc or its buttons)
+        // Its own press: over it as ImGui sees it (an auto-sized popup grows a frame after its content), or in its rect.
+        if (hovered == p.Window->RootWindow || inside(p.Window->Pos.x, p.Window->Pos.y, p.Window->Size.x, p.Window->Size.y))
+            return;
+        // A press in the window that opened it (a combo's own button, which closes it): ImGui's, as before.
+        if (hovered && p.Window->ParentWindow && hovered == p.Window->ParentWindow->RootWindow) return;
+    }
+    if (!dropdown_.empty()) {
+        const ImVec4 r = sculptForgeLayout() ? menuRect_ : dropdownRect_;
+        if (r.z > 0.0f && inside(r.x, r.y, r.z, r.w)) return;
+        for (const CanvasRect& bar : {shell_.paletteBar, shell_.title})
+            if (inside(bar.x, bar.y, bar.w, bar.h)) return; // (the menu names switch to another menu or close this one)
+    }
+    ImGui::ClosePopupToLevel(0, false);
+    ImGui::FocusWindow(nullptr); // (a focused popup, even closed, blocks hovering the rest for a frame: the press)
+    // On the bare canvas the press starts a stroke: ImGui still wants the mouse from the frame the popup was open.
+    if (!g->HoveredWindow || (g->HoveredWindow->RootWindow && (g->HoveredWindow->RootWindow->Flags & ImGuiWindowFlags_Popup)))
+        ImGui::GetIO().WantCaptureMouse = false;
+    dropdown_.clear();
+    dropdownRect_ = ImVec4();
+    menuX_ = 0.0f;
+    menuRect_ = ImVec4();
+}
+
 void App::drawPaletteDropdown() {
     if (openDropdown_) {
         ImGui::OpenPopup("##palettedropdown");
@@ -2276,7 +2309,12 @@ void App::drawPaletteDropdown() {
     ImGui::PopStyleVar();
     if (!open) {
         dropdown_.clear();
+        dropdownRect_ = ImVec4();
         return;
+    }
+    {
+        const ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
+        dropdownRect_ = ImVec4(wp.x, wp.y, ws.x, ws.y);
     }
     Demo::pushScope(def->name);
     if (def->scope) Demo::pushScope(def->scope);

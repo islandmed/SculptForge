@@ -2085,6 +2085,11 @@ private:
     ImFont* fontCardTitle_ = nullptr, *fontCardHead_ = nullptr, *fontCardBody_ = nullptr; // the support card (Latin only)
     std::string dropdown_;     // palette open as a drop-down ("" = none)
     float dropdownX_ = 0.0f;
+    ImVec4 dropdownRect_{};    // the open drop-down's rect last frame (x, y, w, h)
+    // A press outside every open popup (a palette drop-down or task menu, the command palette, a context menu; not on the
+    // menu names, which switch or close menus, nor with a modal dialog open) closes them before the UI sees the press, so
+    // the press acts: a shelf brush is picked, a stroke on the model starts (mode matrix).
+    void closePopupsOnPressOutside(const SDL_Event& e);
     bool openDropdown_ = false;
     float decimateRatio_ = 0.5f;
     bool decimateKeepMasked_ = false; // Decimate's Keep Masked (#43)

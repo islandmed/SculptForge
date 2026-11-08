@@ -1,0 +1,48 @@
+# A press outside an open palette drop-down (Classic layout), task menu (SculptForge layout) or the command palette acts as well as closing
+# it: a shelf brush is picked with the Color palette open (mode matrix, Shell.cpp closePopupsOnPressOutside).
+run ui_look look=classic layout=classic
+wait 0.3
+run new_sphere subdivisions=3
+click "Color"
+expect_value dropdown_open == 1
+click "Clay##brush.clay"
+expect_value dropdown_open == 0
+expect_value brush_type == 1
+# Its menu name again closes it (not closed by the press, then opened again).
+click "Color"
+expect_value dropdown_open == 1
+click "Color"
+expect_value dropdown_open == 0
+# Opened by its action (F3, a key), then a tool on the top shelf.
+action ui.palette.color
+expect_value dropdown_open == 1
+click "Move##tool.move"
+expect_value dropdown_open == 0
+expect_value gizmo_mode == 1
+click "Draw##tool.draw"
+
+# The SculptForge layout's task menu.
+run ui_look layout=sculptforge
+wait 0.3
+action ui.palette.color
+expect_value dropdown_open == 1
+shot task_menu_open
+click "Inflate##brush.inflate"
+expect_value dropdown_open == 0
+expect_value brush_type == 4
+shot task_menu_closed_brush_picked
+
+# A stroke on the model with a menu open sculpts too (the press isn't spent closing the menu).
+action ui.palette.transform
+expect_value dropdown_open == 1
+expect_sculpts
+expect_value dropdown_open == 0
+
+# The command palette (F3 / Search) too: a brush on the shelf is picked and the palette closes.
+run ui_look look=classic layout=classic
+wait 0.3
+action ui.command_palette
+expect_value command_palette_open == 1
+click "Clay##brush.clay"
+expect_value command_palette_open == 0
+expect_value brush_type == 1

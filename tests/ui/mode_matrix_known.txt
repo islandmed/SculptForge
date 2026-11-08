@@ -36,34 +36,3 @@ paint.line_gradient | a brush on the shelf | task modes-gradient-exit: a brush o
 paint.line_gradient | a palette action | task modes-gradient-exit: a brush or a tool leaves Line Gradient
 paint.line_gradient | undo | task modes-gradient-exit: a brush or a tool leaves Line Gradient
 timeline.timelapse | Esc | task modes-timelapse-esc: Esc closes Export timelapse
-ui.command_palette | a brush on the shelf | task modes-palette-click: a click elsewhere closes the command palette
-ui.command_palette | a palette action | task modes-palette-click: a click elsewhere closes the command palette
-ui.command_palette | undo | task modes-palette-click: a click elsewhere closes the command palette
-ui.palette.color | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.color | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.color | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.draw | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.draw | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.draw | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.edit | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.edit | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.edit | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.file | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.file | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.file | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.generate | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.generate | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.generate | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.help | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.help | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.help | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.script | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.script | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.script | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.splats | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.splats | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.splats | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.transform | Draw | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.transform | a brush on the shelf | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.transform | a palette action | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
-ui.palette.transform | undo | task modes-menu-click: with a top-menu palette open, a click on a shelf brush or Draw does nothing
