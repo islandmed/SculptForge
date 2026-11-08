@@ -30,6 +30,7 @@
 #include "app/Theme.h"
 #include "app/Ui.h"
 #include "app/UserGlyphs.h"
+#include "app/MacAppMenu.h"
 #include "app/UiServe.h"
 #include "app/UserData.h"
 
@@ -153,6 +154,7 @@ bool App::init(const AppOptions& options) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return false;
     }
+    if (!headless) macmenu::install(); // SculptForge > Preferences... in the macOS app menu (#111)
     // Joysticks for a 3Dconnexion SpaceMouse (SpaceMouse.cpp). Not fatal: the app works without them.
     if (!headless || !options.uiTest.empty()) {
         if (SDL_InitSubSystem(SDL_INIT_JOYSTICK)) spaceMouseScan();
@@ -1202,6 +1204,11 @@ int App::run() {
         ImGui_ImplSDL3_NewFrame();
         keepImGuiOnPen();
         ImGui::NewFrame();
+        if (macmenu::takePreferencesRequest()) // the macOS app menu's Preferences... (MacAppMenu.h)
+            if (const Action* a = actions().find("ui.palette.preferences"); a && a->run) {
+                actions().touch(a->id);
+                a->run();
+            }
         drawUi();
         drawHardwareProfileOverlay();
         ImGui::Render();

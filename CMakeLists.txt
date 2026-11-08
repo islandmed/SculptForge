@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.24)
 project(SculptForge VERSION 0.11.15 LANGUAGES C CXX)
+if(APPLE)
+  enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
+endif()
 # "beta.1" while this is a beta of that version (title bar and About: "0.11.0 Beta 1"), "" for a stable release.
 # scripts/release.sh sets it; release.yml checks the tag against both (v0.11.0-beta.1).
 set(SCULPTFORGE_PRERELEASE "")
@@ -532,6 +535,10 @@ if(SCULPTFORGE_BUILD_APP)
     endif()
   endif()
   if(APPLE)
+    # SculptForge > Preferences... in the app menu (#111): SDL's item, given its action (src/app/MacAppMenu.h).
+    target_sources(sculptforge PRIVATE src/app/MacAppMenu.mm)
+    set_source_files_properties(src/app/MacAppMenu.mm PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+    target_link_libraries(sculptforge PRIVATE "-framework Cocoa")
     # App icon: assets/branding/sculptforge.icns (tools/brand/make_icons.py: the SF mark on Apple's icon grid).
     set(ICNS ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge.icns)
     target_sources(sculptforge PRIVATE ${ICNS})
