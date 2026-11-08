@@ -26,6 +26,9 @@
      "why": "Pinned in cmake/Fetch.cmake (3.2.30)."},
     {"name": "Dear ImGui", "version": "1.91.9", "source": {"kind": "github", "repo": "ocornut/imgui"},
      "why": "Pinned in cmake/Fetch.cmake."},
+    {"name": "Wasmtime", "version": "50.0.1", "source": {"kind": "github", "repo": "bytecodealliance/wasmtime"},
+     "notes": "https://github.com/bytecodealliance/wasmtime/security/advisories",
+     "why": "The plugin sandbox (docs/design/plugins.md): pinned in cmake/Fetch.cmake; update every release, at once for a security advisory."},
     {"name": "Python", "version": "3.13", "track": "minor", "source": {"kind": "endoflife", "product": "python"},
      "notes": "https://docs.python.org/{major}.{minor}/whatsnew/{major}.{minor}.html",
      "why": "The module follows the VFX Reference Platform's Python; test it on the new version, switch when the platform does."}

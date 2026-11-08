@@ -1,8 +1,9 @@
 # The SculptForge pack format (.sfpack)
 
-A pack shares brushes, alphas, Lit Spheres, Material Recipes, VDM brushes, keymaps, pie menus and macros as one
-file. It is **data only**: SculptForge never runs anything from a pack, nothing happens when it is installed or
-when a project opens, and nothing in it reaches the network. Users install packs with **File > Install Pack...**
+A pack shares brushes, alphas, Lit Spheres, Material Recipes, VDM brushes, keymaps, pie menus, macros and sandboxed
+plugins as one file. Nothing happens when it is installed or when a project opens, and nothing in it reaches the
+network. Everything but plugins is data; plugins are WebAssembly modules that run in a sandbox with no access to
+anything but the mesh they are given, and only when the user runs them (below, and docs/design/plugins.md). Users install packs with **File > Install Pack...**
 (a review shows what's inside first), `pack_install path=...` in `sculptforge-cli` or Python; see the user guide
 chapter [Packs and macros](guide/packs-and-macros.md).
 
@@ -25,6 +26,7 @@ vdms/<name>.sfvdm              vector displacement maps (core/Vdm.h)
 keymaps/<name>.json            keymaps (below)
 piemenus/<name>.json           pie menus, as Preferences > Input > Radial Menus exports them
 macros/<name>.sfmacro          macros (below)
+plugins/<name>.sfplugin        sandboxed plugins (below)
 ```
 
 Every file outside `pack.json`, the license and the preview must be listed in `pack.json`'s `contents`, directly
@@ -66,7 +68,7 @@ in its type's folder, with its type's extension. Anything else is refused.
 | `minAppVersion` | no | The oldest SculptForge that may install it; newer than the running app: refused. |
 | `preview` | no | `preview.png` or `preview.jpg`, which must be in the archive. |
 | `channel` | no | Lower-case letters, digits and `-`. `"insider"` marks a members' pack (Member Requests) (shown as **Member pack**; the name is kept for older apps). **Display only**: it changes a label, nothing else; there is no DRM and anyone can install the file. |
-| `contents` | yes | A list of `{"type", "path"}`. Types: `brush`, `alpha`, `litsphere`, `material`, `vdm`, `keymap`, `piemenu`, `macro`. |
+| `contents` | yes | A list of `{"type", "path"}`. Types: `brush`, `alpha`, `litsphere`, `material`, `vdm`, `keymap`, `piemenu`, `macro`, `plugin`. |
 
 Text values must be valid UTF-8 without control characters. The JSON is parsed strictly: a key given twice,
 an unknown key, a number JSON doesn't allow or trailing text is an error.
@@ -92,7 +94,7 @@ Every pack is treated as hostile input. It is refused, with a message naming the
 - **Contents**: each file is parsed as what it claims to be. Brushes, Material Recipes, keymaps and pie menus are
   strict JSON within their size caps; images are PNG or JPEG whose bytes match the extension, at most 4096 pixels
   a side (the preview 2048), and must decode; VDMs must have the `.sfvdm` header and exactly the size it states;
-  the license is plain text up to 64 KB; macros pass the macro rules below.
+  the license is plain text up to 64 KB; macros pass the macro rules below; plugins pass the plugin rules below.
 
 Installing unpacks into a fresh staging folder inside `<app data>/packs/`, checks every destination again, then
 swaps it in, so a failed install leaves the previous version as it was. Packs never write anywhere else and
@@ -123,3 +125,23 @@ comments, optional `# name:` and `# description:` header lines. At most 64 KB an
 - In the app, a macro shows its whole command list and asks before it first runs, and again after its text
   changes (confirmations are kept by SHA-256 of the text). `sculptforge-cli` and Python run what the user asked.
   AI agents on `sculptforge-cli --mcp` can't install, remove or switch packs.
+
+## Plugins (.sfplugin)
+
+A WebAssembly 1.0 core module (not a component), at most 16 MB, with its manifest as JSON in a custom section named
+`sculptforge.plugin` (`tools/plugin/sfplugin.py module.wasm manifest.json -o Name.sfplugin` adds it). It is refused
+when it imports anything at all (no WASI, no host functions, no imported memory or tables), doesn't export `memory`,
+`sf_alloc` and `sf_run`, doesn't validate, or its manifest breaks these rules:
+
+```json
+{"format": "sculptforge-plugin", "formatVersion": 1, "id": "noise-displace", "name": "Noise Displace",
+ "version": "1.0", "author": "...", "license": "CC0-1.0", "description": "...", "kind": "deformer",
+ "permissions": [],
+ "params": [{"id": "amount", "label": "Amount", "type": "number", "min": -1, "max": 1, "default": 0.05,
+             "help": "How far vertices move."},
+            {"id": "seed", "label": "Seed", "type": "int", "min": 0, "max": 1000, "default": 1}]}
+```
+
+`kind` is `deformer` or `generator`; `permissions` must be empty (phase 1 grants none); at most 32 `params`, each
+`number`, `int` or `bool` with min <= default <= max; the same text rules as pack.json, parsed as strictly. The ABI,
+the limits and the threat model are in docs/design/plugins.md; a C header in sdk/plugin.

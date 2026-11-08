@@ -23,6 +23,10 @@ SculptForge opens files from untrusted sources (OBJ, FBX, glTF, PLY, USD/USDZ, i
 network services you configure (AI providers, Hugging Face Spaces, the Unreal Editor). Crashes or memory
 errors from malformed files, and anything that could leak API keys, are in scope.
 
+Packs may hold sandboxed plugins (WebAssembly, run by wasmtime with no imports, fuel, memory and time limits; see
+docs/design/plugins.md). A plugin that reaches anything beyond the mesh it is given (files, network, other memory of
+the app), crashes or hangs the app, or changes the scene when its run failed, is in scope.
+
 API keys you enter, and studio sign-in tokens, are stored in the operating system's keychain (macOS Keychain,
 Windows Credential Manager, Linux Secret Service), never in settings files or logs. They are only ever sent to the
 service they belong to. SculptForge opens no network listener for AI tools (MCP is stdio only) or for sign-in (the

@@ -23,5 +23,9 @@ pkgbase = sculptforge
 	sha256sums = 36a72d0cc01e3c48330ea2496c639995e38303d09ef404cf0fd171cd77fd39cf
 	sha256sums = 3872a5f90df78fced023c1945f4466b654fd74573370b77b17742149763a7a7c
 	sha256sums = 9f3174561fd26904b23f0db5e560971cbf9b3cbda0b280f04d5c379d03bf234c
+	source_x86_64 = https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-x86_64-linux-c-api.tar.xz
+	sha256sums_x86_64 = e2c0c26e1aef52f82f0b9918ad6f34cc30f4b557aee3e261cb127a9462be8f4d
+	source_aarch64 = https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-aarch64-linux-c-api.tar.xz
+	sha256sums_aarch64 = 1a36140a016a9cc098f02a37bb0cc7be6451032861ba70049127928d2f31ef84
 
 pkgname = sculptforge

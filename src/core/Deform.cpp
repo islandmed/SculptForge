@@ -610,6 +610,14 @@ size_t commitPositions(Document& doc, const std::vector<vec3>& P, const std::str
 
 } // namespace
 
+bool canDeformActivePart(Document& doc, const std::string& label, std::string& error) { return canDeform(doc, label, error); }
+
+size_t commitDeformedPositions(Document& doc, const std::vector<vec3>& P, const std::string& label, bool masked,
+                               std::string& error) {
+    doc.syncBvh();
+    return commitPositions(doc, P, label, masked, error);
+}
+
 size_t deformActivePart(Document& doc, const std::vector<DeformStep>& steps, std::string& error, const std::string& label) {
     if (!canDeform(doc, label, error)) return 0;
     doc.syncBvh();

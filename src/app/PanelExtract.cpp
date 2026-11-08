@@ -127,6 +127,7 @@ void App::drawDeformationContents() {
                  "Tool > Deformation");
     drawDeformSize();  // PanelDeform.cpp
     drawDeformStack();
+    drawDeformPlugins(); // PanelPlugins.cpp
 }
 
 } // namespace sf

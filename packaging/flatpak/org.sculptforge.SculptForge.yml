@@ -52,6 +52,8 @@ modules:
       - -DFETCHCONTENT_SOURCE_DIR_LDC_USRSCTP=/run/build/sculptforge/_deps-src/usrsctp
       - -DFETCHCONTENT_SOURCE_DIR_LDC_LIBJUICE=/run/build/sculptforge/_deps-src/libjuice
       - -DFETCHCONTENT_SOURCE_DIR_LDC_PLOG=/run/build/sculptforge/_deps-src/plog
+      - -DFETCHCONTENT_SOURCE_DIR_WASMTIME_LINUX_X86_64=/run/build/sculptforge/_deps-src/wasmtime
+      - -DFETCHCONTENT_SOURCE_DIR_WASMTIME_LINUX_AARCH64=/run/build/sculptforge/_deps-src/wasmtime
     sources:
       - type: dir
         path: ../..
@@ -99,3 +101,13 @@ modules:
         url: https://github.com/SergiusTheBest/plog/archive/94899e0b926ac1b0f4750bfbd495167b4a6ae9ef.tar.gz
         sha256: 92a08bce559b5f28aa88d3fd9071567414b9f43a83fe2a05a6dd14f1da536072
         dest: _deps-src/plog
+      - type: archive
+        only-arches: [x86_64]
+        url: https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-x86_64-linux-c-api.tar.xz
+        sha256: e2c0c26e1aef52f82f0b9918ad6f34cc30f4b557aee3e261cb127a9462be8f4d
+        dest: _deps-src/wasmtime
+      - type: archive
+        only-arches: [aarch64]
+        url: https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-aarch64-linux-c-api.tar.xz
+        sha256: 1a36140a016a9cc098f02a37bb0cc7be6451032861ba70049127928d2f31ef84
+        dest: _deps-src/wasmtime

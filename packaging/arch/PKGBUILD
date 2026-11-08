@@ -13,12 +13,17 @@ optdepends=('ollama: local AI for the Brush Lab'
             'ffmpeg: recording demo videos (sculptforge --record)')
 _imgui=1.91.9
 _glm=1.0.1
+_wasmtime=50.0.1 # the plugin sandbox (cmake/Fetch.cmake pins the same archives)
 source=("$pkgname-$pkgver.tar.gz::https://github.com/islandmed/SculptForge/archive/refs/tags/v$pkgver.tar.gz"
         "imgui-$_imgui.tar.gz::https://github.com/ocornut/imgui/archive/refs/tags/v$_imgui.tar.gz"
         "glm-$_glm.tar.gz::https://github.com/g-truc/glm/archive/refs/tags/$_glm.tar.gz")
 sha256sums=('36a72d0cc01e3c48330ea2496c639995e38303d09ef404cf0fd171cd77fd39cf'
             '3872a5f90df78fced023c1945f4466b654fd74573370b77b17742149763a7a7c'
             '9f3174561fd26904b23f0db5e560971cbf9b3cbda0b280f04d5c379d03bf234c')
+source_x86_64=("https://github.com/bytecodealliance/wasmtime/releases/download/v$_wasmtime/wasmtime-v$_wasmtime-x86_64-linux-c-api.tar.xz")
+source_aarch64=("https://github.com/bytecodealliance/wasmtime/releases/download/v$_wasmtime/wasmtime-v$_wasmtime-aarch64-linux-c-api.tar.xz")
+sha256sums_x86_64=('e2c0c26e1aef52f82f0b9918ad6f34cc30f4b557aee3e261cb127a9462be8f4d')
+sha256sums_aarch64=('1a36140a016a9cc098f02a37bb0cc7be6451032861ba70049127928d2f31ef84')
 
 build() {
   cmake -S "SculptForge-$pkgver" -B build \
@@ -31,7 +36,8 @@ build() {
     -DSCULPTFORGE_MOLD=OFF \
     -DFETCHCONTENT_FULLY_DISCONNECTED=ON \
     -DFETCHCONTENT_SOURCE_DIR_IMGUI="$srcdir/imgui-$_imgui" \
-    -DFETCHCONTENT_SOURCE_DIR_GLM="$srcdir/glm-$_glm"
+    -DFETCHCONTENT_SOURCE_DIR_GLM="$srcdir/glm-$_glm" \
+    -DFETCHCONTENT_SOURCE_DIR_WASMTIME_LINUX_${CARCH^^}="$srcdir/wasmtime-v$_wasmtime-$CARCH-linux-c-api"
   cmake --build build
 }
 

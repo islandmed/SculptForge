@@ -80,6 +80,7 @@ add_library(sculptforge_core STATIC
   src/core/Script.cpp
   src/core/Macro.cpp
   src/core/Pack.cpp
+  src/core/Plugin.cpp
   src/core/NetworkPolicy.cpp
   src/core/StudioProfile.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/StudioBuild.cpp
@@ -253,6 +254,9 @@ else()
 endif()
 find_package(Threads REQUIRED)
 target_link_libraries(sculptforge_core PUBLIC glm::glm Threads::Threads)
+if(TARGET sf_wasmtime)
+  target_link_libraries(sculptforge_core PRIVATE sf_wasmtime) # core/Plugin.cpp: sandboxed plugins (cmake/Wasmtime.cmake)
+endif()
 if(UNIX AND NOT APPLE)
   target_link_libraries(sculptforge_core PRIVATE ${CMAKE_DL_LIBS}) # core/Keychain.cpp: libsecret, loaded at run time
 endif()
@@ -438,6 +442,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/LineGradient.cpp
     src/app/StencilOverlay.cpp
     src/app/PanelPacks.cpp
+    src/app/PanelPlugins.cpp
     src/app/PanelBrushSets.cpp
     src/app/MemoryConfirm.cpp
     src/app/PanelPaintLayers.cpp
