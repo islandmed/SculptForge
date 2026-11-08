@@ -342,10 +342,13 @@ picks one; click a step to set its amount, its axes (**X Y Z**, any mix) and, wh
 | | **Flatten** | Cuts the + side flat by a percent of the depth (negative: the - side). |
 | | **Sag** | Parts far from the axis droop down it, like a weight on outstretched arms (negative lifts). |
 | | **Depth** | A perspective: the + end wider, the - end narrower, more toward the ends. |
+| | **Noise** | Smooth random bumps along the axis, up to 5% of the Part's size high at 100; **Scale** sets how many across it. |
+| | **Symmetrize** | Copies the + side onto the - side across the symmetry plane (negative: the - side onto the + side); with **Average**, both sides meet halfway. The sides need not have matching topology. |
 | Surface | **Polish**, **Relax**, **Smooth** (**Keep volume**), **Balloon** | See [Whole-Part deformations](#whole-part-deformations). |
 
 **Soft** eases Bend, Twist, Taper and Shear toward the ends (a bend that curves most in the middle) and rounds
-Flatten's cut. Steps work about the Part's centre, or about the gizmo's pivot when you placed it.
+Flatten's cut. Steps work about the Part's centre, or about the gizmo's pivot when you placed it; Symmetrize works
+across the plane symmetry uses, through the world origin (or the placed pivot).
 
 The checkbox beside a step switches it off without losing it; **Repeat** adds the selected step again; **Remove**
 takes it out. **Apply** keeps the result (one undo step) and starts a new stack, **Apply Selected** keeps only

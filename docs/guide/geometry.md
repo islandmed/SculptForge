@@ -8,8 +8,8 @@ All of them work on the **active Part** and, except the LOD preview, are undoabl
 <kbd>Ctrl</kbd>+<kbd>Z</kbd>.
 
 In **Tool > Geometry** they are grouped by what you do: **Levels** (see [Subdivision levels](subdivision-levels.md)),
-**Micro Detail**, **Resolution** (Decimate, Quad Remesh, Subdivide), **Cleanup** (Fill Holes) and **Symmetry**
-(Make Symmetric).
+**Micro Detail**, **Resolution** (Decimate, Quad Remesh, Subdivide), **Cleanup** (Fill Holes), **Surface Polish** and
+**Symmetry** (Make Symmetric).
 
 ## At a glance
 
@@ -160,6 +160,15 @@ scan down to something you can work with.
 
 > **Tip:** Decimate a duplicate Part (**Tool > Parts > Duplicate**) when you want to keep the full-resolution
 > sculpt in the same project.
+
+## Surface Polish
+
+**Surface Polish**, in **Tool > Geometry**, smooths the active Part's surface while its hard edges stay sharp: small
+bumps, noise and a scan's grain even out, flat areas stay flat and crisp edges stay crisp (requested by foirgairwolf
+on Discord). **Polish** sets how much, from 0 to 1; **Edges** sets which edges count as hard: creases sharper than
+that angle are kept, gentler ones are smoothed with the rest (lower keeps more). The Part shows the result as you
+drag (on very heavy Parts, when you let go); **Apply** keeps it as one undo step and **Cancel** takes it back. The
+mask holds what it covers. Command: `surface_polish amount=0.6 edge=20`.
 
 ## Make Symmetric
 
