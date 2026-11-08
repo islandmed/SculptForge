@@ -450,6 +450,7 @@ void App::registerShellActions() {
             edgesMode_ = false;  // and Edges mode
             maskBrush_.on = false;
             leaveDrawModesStatus(); // and Draw Tube / Append > Insert, the same brush picked again too
+            if (gizmoActive()) setGizmoMode(GizmoMode::Off); // and the gizmo: the brush sculpts again
         };
         a.checked = [this, type] { return brush_ == type && doc_.activeBrush < 0 && !paintMode_ && !guidesMode_; };
         add(std::move(a));

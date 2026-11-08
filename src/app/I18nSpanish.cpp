@@ -1519,15 +1519,15 @@ constexpr Entry kSpanish[] = {
      "Gizmo, Mover: arrastra una flecha para mover en un eje, un cuadrado para mover en un plano, el centro para "
      "mover en la vista. Lo enmascarado se queda; Mayús ajusta a la rejilla; Alt+arrastrar mueve solo el gizmo. W "
      "otra vez: vuelve a Dibujar."},
-    {"Gizmo, Scale: drag a box to stretch along an axis or the centre to scale evenly (right or up: bigger). Shift "
+    {"Gizmo, Scale: drag a ball to stretch along an axis or the centre to scale evenly (right or up: bigger). Shift "
      "snaps to 10% steps. E again: back to Draw.",
-     "Gizmo, Escalar: arrastra una caja para estirar en un eje o el centro para escalar por igual (derecha o arriba: "
+     "Gizmo, Escalar: arrastra una bola para estirar en un eje o el centro para escalar por igual (derecha o arriba: "
      "más grande). Mayús ajusta a pasos del 10%. E otra vez: vuelve a Dibujar."},
     {"Gizmo, All: move, rotate and scale handles at once. Arrows and squares move, the centre moves in the view, "
-     "rings turn, the boxes past the rings stretch along an axis and the four outer tabs scale evenly. Shift snaps. "
+     "rings turn, the ball on each axis stretches along it and the four outer tabs scale evenly. Shift snaps. "
      "Shift+W again: back to Draw.",
      "Gizmo, Todo: asas de mover, rotar y escalar a la vez. Las flechas y los cuadrados mueven, el centro mueve en la "
-     "vista, los anillos giran, las cajas tras los anillos estiran a lo largo de un eje y las cuatro pestañas "
+     "vista, los anillos giran, la bola de cada eje estira a lo largo de él y las cuatro pestañas "
      "exteriores escalan por igual. Mayús ajusta. Mayús+W otra vez: vuelve a Dibujar."},
     {"Gizmo, Rotate: drag a ring to turn about that axis, the outer ring to turn in the view. Mask the body and put "
      "the pivot at a joint to pose a limb. Shift snaps to 15 degrees. R again: back to Draw.",

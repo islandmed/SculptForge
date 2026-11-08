@@ -36,22 +36,6 @@ paint.line_gradient | a brush on the shelf | task modes-gradient-exit: a brush o
 paint.line_gradient | a palette action | task modes-gradient-exit: a brush or a tool leaves Line Gradient
 paint.line_gradient | undo | task modes-gradient-exit: a brush or a tool leaves Line Gradient
 timeline.timelapse | Esc | task modes-timelapse-esc: Esc closes Export timelapse
-tool.gizmo_all | Esc | task modes-gizmo-exit
-tool.gizmo_all | a brush on the shelf | task modes-gizmo-exit
-tool.gizmo_all | a palette action | task modes-gizmo-exit
-tool.gizmo_all | undo | task modes-gizmo-exit
-tool.move | Esc | task modes-gizmo-exit: Esc or a brush leave Move / Scale / Rotate
-tool.move | a brush on the shelf | task modes-gizmo-exit: Esc or a brush leave Move / Scale / Rotate
-tool.move | a palette action | task modes-gizmo-exit: Esc or a brush leave Move / Scale / Rotate
-tool.move | undo | task modes-gizmo-exit: Esc or a brush leave Move / Scale / Rotate
-tool.rotate | Esc | task modes-gizmo-exit
-tool.rotate | a brush on the shelf | task modes-gizmo-exit
-tool.rotate | a palette action | task modes-gizmo-exit
-tool.rotate | undo | task modes-gizmo-exit
-tool.scale | Esc | task modes-gizmo-exit
-tool.scale | a brush on the shelf | task modes-gizmo-exit
-tool.scale | a palette action | task modes-gizmo-exit
-tool.scale | undo | task modes-gizmo-exit
 ui.command_palette | a brush on the shelf | task modes-palette-click: a click elsewhere closes the command palette
 ui.command_palette | a palette action | task modes-palette-click: a click elsewhere closes the command palette
 ui.command_palette | undo | task modes-palette-click: a click elsewhere closes the command palette
