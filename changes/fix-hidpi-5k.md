@@ -5,6 +5,8 @@ whats_new: **Sharper text on Retina and 5K screens**: text and icons are drawn a
 fixed: Text and icons were soft on Retina and other 2x displays (5K monitors, scaled Wayland outputs): the
   font atlas was rasterised at 1x and stretched. It now follows the window's pixel density, and moving the window
   between a 1x and a 2x monitor rebuilds it.
+changed: The interface's font texture is about 5x smaller (6 MB instead of 32 MB at 100%, 40 MB instead of 256 MB at
+  300%): only the icons the app uses are loaded.
 added: **Finer UI scale steps** (Preferences > Interface): 110%, 115% and 135% between 100% and 150%, and 250% and
   300% for 5K and 5K2K monitors run at their native resolution. Thanks @fenixpoints for the suggestion.
 testers:

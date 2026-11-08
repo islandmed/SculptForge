@@ -799,6 +799,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME marks COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}) # docs/legal/trademarks.md
     # No raw string literal in src/ over MSVC's ~16K characters (C2026: only the Windows build would fail).
+    # The fonts load only the Lucide icons src/ uses (src/app/IconsUsed.h, generated): a new ICON_LC_* needs the script run.
+    add_test(NAME icons_used COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/dev/icons_used.py --check)
     add_test(NAME raw_literal_size COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/dev/check_literals.py)
     # assets/branding/sculptforge.icns: every slot decodes at its size, 16/32 px as RGB + mask, never PNG (#156).
     add_test(NAME icns COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/brand/icns.py)

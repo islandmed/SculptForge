@@ -9,6 +9,7 @@
 #include "core/HardwareProfile.h"
 #include "app/ShellQuote.h"
 #include "app/SpaceCamera.h"
+#include "app/IconsUsed.h"
 #include "app/UiScale.h"
 #include "app/AirStroke.h"
 #include "app/I18n.h"
@@ -1432,29 +1433,27 @@ void App::buildUiFonts(float scale) {
                                                   15.0f * scale, &fontConfig);
     // Lucide icons (ISC/MIT) merged into the UI font, so ICON_LC_* strings work in any label.
     {
-        static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
-        ImFontConfig icons;
+                ImFontConfig icons;
         icons.MergeMode = true;
         icons.PixelSnapH = true;
         icons.FontDataOwnedByAtlas = false;
         icons.GlyphMinAdvanceX = 15.0f * scale;
         icons.GlyphOffset = ImVec2(0, 2.0f * scale);
         io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
-                                       15.0f * scale, &icons, kIconRanges);
+                                       15.0f * scale, &icons, kUsedIconRanges);
         mergeCjkFont(15.0f * scale);
     }
     // Shell fonts: 12 px captions and 10 px right-shelf labels (with icons), large shelf icons, SemiBold titles.
     {
         auto addIcons = [&](float size) {
-            static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
-            ImFontConfig icons;
+                        ImFontConfig icons;
             icons.MergeMode = true;
             icons.PixelSnapH = true;
             icons.FontDataOwnedByAtlas = false;
             icons.GlyphMinAdvanceX = size * scale;
             icons.GlyphOffset = ImVec2(0, size * 0.13f * scale);
             io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
-                                           size * scale, &icons, kIconRanges);
+                                           size * scale, &icons, kUsedIconRanges);
             mergeCjkFont(size * scale);
         };
         fontSmall_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular),
@@ -1466,17 +1465,15 @@ void App::buildUiFonts(float scale) {
         fontBold_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontSemiBold),
                                                    int(assets::fontSemiBold_size), 15.0f * scale, &fontConfig);
         addIcons(15.0f);
-        static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
-        ImFontConfig big;
+                ImFontConfig big;
         big.PixelSnapH = true;
         big.FontDataOwnedByAtlas = false;
         fontIcons_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
-                                                    20.0f * scale, &big, kIconRanges);
+                                                    20.0f * scale, &big, kUsedIconRanges);
     }
     { // JetBrains Mono (SIL OFL) for the looks (Preferences > Interface > Look), with the icons and box drawing.
         static const ImWchar kMonoRanges[] = {0x0020, 0x00FF, 0x2010, 0x2027, 0x2190, 0x21FF, 0x2500, 0x259F, 0x25A0, 0x25FF, 0};
-        static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
-        auto addMono = [&](const unsigned char* data, unsigned long long size, float px) {
+                auto addMono = [&](const unsigned char* data, unsigned long long size, float px) {
             ImFont* f = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(data), int(size), px * scale, &fontConfig, kMonoRanges);
             ImFontConfig icons;
             icons.MergeMode = true;
@@ -1485,7 +1482,7 @@ void App::buildUiFonts(float scale) {
             icons.GlyphMinAdvanceX = px * scale;
             icons.GlyphOffset = ImVec2(0, px * 0.13f * scale);
             io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size), px * scale,
-                                           &icons, kIconRanges);
+                                           &icons, kUsedIconRanges);
             mergeCjkFont(px * scale);
             return f;
         };
@@ -1520,6 +1517,7 @@ void App::buildUiFonts(float scale) {
     // At the window's pixel density (Retina, a scaled Wayland output): the same sizes in logical px, the glyphs drawn
     // with as many texels as the screen has pixels. Every font above, the help, guide and typed-glyph ones included.
     fontDensity_ = targetFontDensity(scale);
+    io.Fonts->Flags |= ImFontAtlasFlags_NoPowerOfTwoHeight; // (GL 3 takes any height; rounding up wasted up to half)
     for (ImFontConfig& src : io.Fonts->Sources) {
         src.RasterizerDensity = fontDensity_;
         if (fontDensity_ >= 2.0f) src.OversampleH = 1; // the density already places glyphs finely; 2x more only grows the atlas

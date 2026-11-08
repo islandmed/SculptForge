@@ -1,7 +1,7 @@
 # A 5K monitor (5120x2880; fenix on Discord, 11-08): at 200, 250 and 300 % UI scale the shelves, brush tiles, Library
 # tiles and the transform gizmo grow by the scale and keep their shape (shots for the look review). On a 2x display
 # (macOS Retina, a scaled Wayland output) the fonts and icons are rasterised at the pixel density, not stretched from
-# a 1x atlas; the atlas stays inside a GPU's texture limit (Traditional Chinese measured the same: 4096x16384 at 300 %).
+# a 1x atlas; the atlas stays within 4096x8192 (Traditional Chinese, the largest, measured 4096x4442 at 2x / 200 %).
 # CMake runs it at 5120x2880.
 run ui_look look=classic layout=classic
 run new_sphere subdivisions=2
@@ -35,11 +35,17 @@ expect_value font_height >= 44
 expect_value font_height <= 46
 expect_value panel_width >= 155
 expect_value panel_width <= 157
-expect_value font_atlas_kpx <= 67109
+expect_value font_atlas_kpx <= 33554
+expect_value glyphs_missing == 0
 shot scale_300
 
+# 1x at 100 %: the baseline (the app: 1024x1495, ~6 MB as RGBA; a test also has demo captions sized for its frame).
+ui_scale 100
+expect_value font_atlas_kpx <= 4096
+remember font_atlas_kpx a1x
+
 # A 2x display: the same layout (logical px), the glyphs at the pixel density, measured in the atlas: 2x up to
-# 150 %, then less, so the atlas is never bigger than 300 % at 1x already makes it (4096x16384, a GPU's usual limit).
+# 150 %, then less (UI scale x density at most 3), and the atlas stays within 4096x8192.
 ui_scale 150
 pixel_density 200
 expect_value ui_scale == 150
@@ -54,10 +60,15 @@ ui_scale 200
 expect_value font_density == 150
 expect_value glyph_texels >= 138
 expect_value glyph_texels <= 162
-expect_value font_atlas_kpx <= 67109
+expect_value font_atlas_kpx <= 33554
 ui_scale 300
 expect_value font_density == 100
-expect_value font_atlas_kpx <= 67109
+expect_value font_atlas_kpx <= 33554
+
+# A common 2x laptop at 100 %: the atlas at most 4x the 1x one (the icons the UI uses only; no power-of-two height).
+ui_scale 100
+expect_value font_density == 200
+expect_value font_atlas_kpx <= $a1x*4
 pixel_density 100
 expect_value font_density == 100
 expect_value glyph_texels >= 92

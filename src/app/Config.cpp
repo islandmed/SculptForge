@@ -5,6 +5,7 @@
 // the Preferences > Config / Interface / Hotkeys / Library sections, the F1
 // Controls sheet (generated from the action registry) and classic
 // shortcut assignment.
+#include "app/IconsUsed.h"
 #include "app/UiScale.h"
 #include "app/Config.h"
 
@@ -381,15 +382,14 @@ void App::addHelpFonts(float scale) {
     cfg.OversampleH = 2;
     fontHelpTitle_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontSemiBold),
                                                     int(assets::fontSemiBold_size), 15.0f * scale, &cfg);
-    static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
-    ImFontConfig icons;
+        ImFontConfig icons;
     icons.MergeMode = true;
     icons.PixelSnapH = true;
     icons.FontDataOwnedByAtlas = false;
     icons.GlyphMinAdvanceX = 15.0f * scale;
     icons.GlyphOffset = ImVec2(0, 2.0f * scale);
     io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size), 15.0f * scale,
-                                   &icons, kIconRanges);
+                                   &icons, kUsedIconRanges);
     mergeCjkFont(15.0f * scale);
     // ProggyClean (ships inside Dear ImGui) is a pixel font: keep it at whole multiples of 13 px.
     ImFontConfig mono;
