@@ -1,13 +1,13 @@
 {
  "format": "sculptforge-brush-requests",
  "version": 1,
- "updated": "2026-11-08T14:07:06Z",
+ "updated": "2026-11-08T23:07:12Z",
  "source": "https://discord.com/channels/1566592020024266812/1568787293731561483",
  "brushes": [
   {
    "rank": 1,
    "title": "Big Feature Request: Brush Automasking",
-   "votes": 1,
+   "votes": 3,
    "shipped": false,
    "renamed": false,
    "created": "2026-11-08",
@@ -16,7 +16,7 @@
   {
    "rank": 2,
    "title": "brushes #brushes wood detailing",
-   "votes": 0,
+   "votes": 1,
    "shipped": false,
    "renamed": false,
    "created": "2026-11-08",
