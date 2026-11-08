@@ -977,6 +977,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(geometry_groups_1440 geometry_groups --size 1440x900)
     sculptforge_ui_test(geometry_groups_2880 geometry_groups --size 2880x1800) # its 200% shot: 1440 px of UI
     sculptforge_ui_test(geometry_groups_1024 narrow/geometry_groups --size 1024x768)
+    # The Transform gizmo's look, each mode front and 3/4, 100% and 200% (tests/ui/gizmo/look.sfui).
+    sculptforge_ui_test(gizmo_look_1440 gizmo/look --size 1440x900)
+    sculptforge_ui_test(gizmo_look_2880 gizmo/look --size 2880x1800)
     sculptforge_ui_test(timeline_narrow_1024 timeline_narrow --size 1024x768)
     sculptforge_ui_test(extract_labels_1024 extract_labels --size 1024x768)
     sculptforge_ui_test(extract_labels_1440 extract_labels --size 1440x900)

@@ -161,7 +161,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 
 | Action | Keys | What it does |
 |---|---|---|
-| All | <kbd>Shift</kbd>+<kbd>W</kbd> | Gizmo, All: move, rotate and scale handles at once. Arrows and squares move, the centre moves in the view, rings turn, the boxes past the rings stretch along an axis and the four outer tabs scale evenly. Shift snaps. Shift+W again: back to Draw. |
+| All | <kbd>Shift</kbd>+<kbd>W</kbd> | Gizmo, All: move, rotate and scale handles at once. Arrows and squares move, the centre moves in the view, rings turn, the ball on each axis stretches along it and the four outer tabs scale evenly. Shift snaps. Shift+W again: back to Draw. |
 | Back view | <kbd>Ctrl</kbd>+<kbd>Numpad 1</kbd> | Look at the model from behind (orthographic). |
 | Bottom view | <kbd>Ctrl</kbd>+<kbd>Numpad 7</kbd> | Look up at the model from below (orthographic). |
 | Draw | <kbd>Q</kbd> | Draw mode: brushes sculpt and paint (leaves the Gizmo). |
@@ -180,7 +180,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Right view | <kbd>Numpad 3</kbd> | Look at the model's right side (orthographic). |
 | Rotate | <kbd>R</kbd> | Gizmo, Rotate: drag a ring to turn about that axis, the outer ring to turn in the view. Mask the body and put the pivot at a joint to pose a limb. Shift snaps to 15 degrees. R again: back to Draw. |
 | Save View | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Numpad 0</kbd> | Remember this camera as a named view (View > Views; the name field names it). Saved with the project. |
-| Scale | <kbd>E</kbd> | Gizmo, Scale: drag a box to stretch along an axis or the centre to scale evenly (right or up: bigger). Shift snaps to 10% steps. E again: back to Draw. |
+| Scale | <kbd>E</kbd> | Gizmo, Scale: drag a ball to stretch along an axis or the centre to scale evenly (right or up: bigger). Shift snaps to 10% steps. E again: back to Draw. |
 | Top view | <kbd>Numpad 7</kbd> | Look down on the model (orthographic). |
 | X | <kbd>X</kbd> | Mirror strokes across X (left and right). |
 | Zoom in | <kbd>Numpad Plus</kbd> | Move the view closer. |

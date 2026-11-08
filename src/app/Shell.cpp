@@ -443,6 +443,7 @@ void App::registerShellActions() {
             paintMode_ = false;
             guidesMode_ = false; // leaves the QRemesh Guides brush
             maskBrush_.on = false;
+            if (gizmoActive()) setGizmoMode(GizmoMode::Off); // and the gizmo: the brush sculpts again
         };
         a.checked = [this, type] { return brush_ == type && doc_.activeBrush < 0 && !paintMode_ && !guidesMode_; };
         add(std::move(a));

@@ -2172,6 +2172,10 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
         return;
     }
     if (libraryKey(key, mod)) return;        // , Library, B / M pickers, S / I pop-ups (Library.cpp)
+    if (key == SDLK_ESCAPE && gizmoActive() && drag_ != Drag::Gizmo) { // Esc leaves Move / Scale / Rotate / All
+        setGizmoMode(GizmoMode::Off);
+        return;
+    }
     // Blender's Emulate Numpad: the number row works as the numpad, unless the key itself has an action.
     if (blenderStyle() && uiPrefs_.emulateNumpad && key >= SDLK_0 && key <= SDLK_9 &&
         !actions_.actionForChord(chordFromEvent(key, mod)))

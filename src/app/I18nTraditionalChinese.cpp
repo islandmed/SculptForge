@@ -1214,15 +1214,15 @@ constexpr Entry kTraditionalChinese[] = {
      "Masked parts stay; Shift snaps to the grid; Alt+drag moves only the gizmo. W again: back to Draw.",
      "操縱器，移動：拖曳箭頭沿軸移動，拖曳方塊在平面上移動，拖曳中心在視圖中移動。遮罩部分保持不動；Shift 貼齊格線；"
      "Alt+拖曳只移動操縱器。再按 W：回到繪製。"},
-    {"Gizmo, Scale: drag a box to stretch along an axis or the centre to scale evenly (right or up: bigger). Shift "
+    {"Gizmo, Scale: drag a ball to stretch along an axis or the centre to scale evenly (right or up: bigger). Shift "
      "snaps to 10% steps. E again: back to Draw.",
-     "操縱器，縮放：拖曳方塊沿軸拉伸，拖曳中心等比例縮放（向右或向上：放大）。Shift 以 10% 為一級貼齊。再按 E：回到繪"
+     "操縱器，縮放：拖曳小球沿軸拉伸，拖曳中心等比例縮放（向右或向上：放大）。Shift 以 10% 為一級貼齊。再按 E：回到繪"
      "製。"},
     {"Gizmo, All: move, rotate and scale handles at once. Arrows and squares move, the centre moves in the view, "
-     "rings turn, the boxes past the rings stretch along an axis and the four outer tabs scale evenly. Shift snaps. "
+     "rings turn, the ball on each axis stretches along it and the four outer tabs scale evenly. Shift snaps. "
      "Shift+W again: back to Draw.",
-     "操縱器，全部：同時提供移動、旋轉與縮放控制點。箭頭與方塊用於移動，中心在視圖中移動，圓環用於旋轉，圓環外的方塊沿軸"
-     "拉伸，外側四個標籤等比縮放。Shift 貼齊。再按 Shift+W：回到繪製。"},
+     "操縱器，全部：同時提供移動、旋轉與縮放控制點。箭頭與方塊用於移動，中心在視圖中移動，圓環用於旋轉，每個軸上的小球沿"
+     "該軸拉伸，外側四個標籤等比縮放。Shift 貼齊。再按 Shift+W：回到繪製。"},
     {"Gizmo, Rotate: drag a ring to turn about that axis, the outer ring to turn in the view. Mask the body and put "
      "the pivot at a joint to pose a limb. Shift snaps to 15 degrees. R again: back to Draw.",
      "操縱器，旋轉：拖曳圓環繞該軸旋轉，拖曳外環在視圖中旋轉。遮罩身體並將樞紐點放在關節上即可擺出肢體姿勢。Shift 以 "

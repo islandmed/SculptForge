@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The Transform gizmo's All mode (Shift+W; fenix on Discord's idea): move, rotate and scale handles at once. Where the
-// handles sit, in arrow lengths from the pivot, and which one a point on screen picks. Nothing overlaps at any zoom or
-// UI scale: short arrows and plane squares inside the rings, the scale boxes on the axis lines just past the rings
-// (hidden while their axis points at the viewer, where they would sit on a ring), the view ring, and outermost four
-// even-scale tabs on the screen diagonals. Pure arithmetic (no ImGui), so the priorities can be unit tested.
+// handles sit, in arrow lengths from the pivot, and which one a point on screen picks. The look follows fenix's design
+// (separated handles, clean rings and arrows, nothing piled on the centre): each axis is a thin shaft with its scale
+// ball part way out and the move cone at its end, well inside the rings (hidden while the axis points at the viewer);
+// the plane squares between the shafts; then the rings, the view ring, and outermost four even-scale tabs on the
+// screen diagonals. Nothing overlaps at any zoom or UI scale. Pure arithmetic (no ImGui), so the priorities can be
+// unit tested.
 #pragma once
 
 #include <glm/glm.hpp>
@@ -18,12 +20,12 @@ namespace sf {
 
 namespace gizmo_all {
 
-constexpr float kShaftLo = 0.2f, kShaftHi = 0.6f;  // the arrows (their heads go on, on screen)
-constexpr float kHeadPx = 12.0f;
-constexpr float kPlaneLo = 0.26f, kPlaneHi = 0.42f; // the plane squares, between the arrows
-constexpr float kBox = 1.16f;                       // the scale boxes, past the rings (at 1)
-constexpr float kBoxMin = 0.6f;                     // ...shown while the axis is at least this long on screen
-constexpr float kBoxPx = 5.0f;                      // half size
+constexpr float kShaftLo = 0.16f, kShaftHi = 0.66f; // the arrows (their heads go on, on screen; the rings are at 1)
+constexpr float kHeadPx = 15.0f;
+constexpr float kPlaneLo = 0.26f, kPlaneHi = 0.4f;  // the plane squares, between the arrows
+constexpr float kBall = 0.42f;                      // the scale balls, on the shafts before the heads
+constexpr float kBallMin = 0.6f;                    // ...shown while the axis is at least this long on screen
+constexpr float kBallPx = 6.0f;                     // radius
 constexpr float kViewRing = 1.3f;
 constexpr float kTabs = 1.44f;                      // the even-scale tabs' radius
 constexpr float kTabHalf = 0.21f;                   // radians each side of a diagonal
@@ -44,10 +46,10 @@ struct Screen {
     struct Axis {
         bool arrow = false; // false: pointing at the viewer
         glm::vec2 from{0.0f}, tip{0.0f};
-        float depth = 0.0f;      // toward the viewer: the arrow (and box) in front draws over the others
+        float depth = 0.0f;      // toward the viewer: the arrow (and ball) in front draws over the others
         float planeDepth = 0.0f; // the same for the plane square
-        bool box = false;
-        glm::vec2 boxAt{0.0f};
+        bool ball = false;
+        glm::vec2 ballAt{0.0f};
         bool plane = false; // the square in the plane across this axis (false: seen edge-on)
         glm::vec2 quad[4];
         std::vector<glm::vec2> ring; // the ring about this axis, closed
@@ -78,7 +80,7 @@ inline glm::vec2 tabPoint(const Screen& s, int k) {
 
 // The gizmo at pivot c with axes f (columns), L world units to an arrow's length, as `project` (world point ->
 // pixels, false behind the camera) shows it; toEye points at the viewer. An axis pointing at the viewer hides its
-// arrow and its box (the box would sit on the rings).
+// arrow and its ball (they would sit on the centre).
 template <class Project>
 Screen layout(Project project, const glm::vec3& c, const glm::mat3& f, float L, const glm::vec3& toEye, float unit,
               float scale) {
@@ -96,8 +98,8 @@ Screen layout(Project project, const glm::vec3& c, const glm::mat3& f, float L, 
             a.arrow = len >= 10.0f * scale;
             if (a.arrow) a.tip = hi + (hi - a.from) / len * (kHeadPx * scale);
         }
-        a.box = project(c + f[i] * L, end) && glm::length(end - out.centre) >= kBoxMin * unit &&
-                project(c + f[i] * (kBox * L), a.boxAt);
+        a.ball = a.arrow && project(c + f[i] * L, end) && glm::length(end - out.centre) >= kBallMin * unit &&
+                 project(c + f[i] * (kBall * L), a.ballAt);
         const glm::vec3 u = f[(i + 1) % 3], v = f[(i + 2) % 3];
         const float lo = kPlaneLo * L, top = kPlaneHi * L;
         a.plane = std::abs(glm::dot(f[i], toEye)) >= 0.15f && project(c + u * lo + v * lo, a.quad[0]) &&
@@ -115,7 +117,7 @@ Screen layout(Project project, const glm::vec3& c, const glm::mat3& f, float L, 
     return out;
 }
 
-// The handle under p, as the drawing stacks them: the centre, the scale boxes and the even-scale tabs each win anywhere
+// The handle under p, as the drawing stacks them: the centre, the scale balls and the even-scale tabs each win anywhere
 // on themselves; then an arrow on its line; a plane square anywhere inside it; an arrow within the pick distance;
 // then the nearest ring (back halves count further away). Where two arrows or two squares cover each other (their
 // axes in line on screen) the one in front, drawn on top, is picked.
@@ -123,11 +125,13 @@ inline Handle pick(const Screen& s, glm::vec2 p) {
     const float pickPx = kPickPx * s.scale;
     const float r = glm::length(p - s.centre);
     if (r < kCentrePx * s.scale) return MoveView;
+    int ball = -1; // two balls in line on screen: the one in front, drawn on top
     for (int i = 0; i < 3; ++i) {
-        const float half = (kBoxPx + 3.0f) * s.scale;
         const Screen::Axis& a = s.axis[i];
-        if (a.box && std::abs(p.x - a.boxAt.x) < half && std::abs(p.y - a.boxAt.y) < half) return Handle(ScaleX + i);
+        if (a.ball && glm::length(p - a.ballAt) < (kBallPx + 3.0f) * s.scale && (ball < 0 || a.depth > s.axis[ball].depth))
+            ball = i;
     }
+    if (ball >= 0) return Handle(ScaleX + ball);
     if (std::abs(r - kTabs * s.unit) < pickPx * 0.75f) {
         const float q = 1.5707963f, ang = std::atan2(s.centre.y - p.y, p.x - s.centre.x) - q * 0.5f;
         if (std::abs(ang - q * std::round(ang / q)) < kTabHalf + 0.05f) return ScaleUniform;
