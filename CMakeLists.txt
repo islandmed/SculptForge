@@ -1101,6 +1101,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The mode matrix probes every registry action (tests/ui/mode_matrix.sfui): 3-10 min on a loaded CI runner, so it starts first.
     if(TEST ui_mode_matrix)
       set_tests_properties(ui_mode_matrix PROPERTIES TIMEOUT 1200 COST 500)
+      set_property(TEST ui_mode_matrix APPEND PROPERTY ENVIRONMENT SF_UI_TIMEOUT=1190) # warm_ui.py's own limit
     endif()
     # Seeded user-action fuzz, many seeds (tests/ui/monkey.sfui runs a few in T0): nightly only (T3).
     sculptforge_ui_test(monkey_many nightly/monkey_many)
