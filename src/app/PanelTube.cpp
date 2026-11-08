@@ -112,7 +112,8 @@ void App::registerTubeUiActions() {
         "tube_bake");
 }
 
-// Draw Tube and Append > Insert take every left drag in the view, so picking a brush or a tool, or Esc, leaves them
+// Draw Tube, Append > Insert and Edges mode take every left drag or click in the view, so picking a brush or a tool,
+// or Esc, leaves them
 // (GABO on Discord: "after entering the append mode or tube I cant use the other tools anymore").
 std::string App::leaveDrawModes() {
     std::string left;
@@ -123,6 +124,10 @@ std::string App::leaveDrawModes() {
     if (!insertType_.empty()) {
         insertType_.clear();
         left += left.empty() ? "Insert" : " and Insert";
+    }
+    if (edgesMode_) { // Tool > Geometry > Edges takes left clicks to select edges (PanelEdges.cpp)
+        edgesMode_ = false;
+        left += left.empty() ? "Edges mode" : " and Edges mode";
     }
     const int back = tubeReturnPart_;
     tubeReturnPart_ = -1;
