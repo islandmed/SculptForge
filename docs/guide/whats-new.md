@@ -46,10 +46,6 @@ title: Edge creases
 line: Crease edges (select them by angle too) and they stay sharp when you add levels.
 image: images/wn-0120-crease.jpg
 action: guide:edges.md#creases
-title: Reshape
-line: Tool > Reshape: Size, then a live stack of bends, twists and tapers you can reorder and apply.
-image: images/wn-0120-reshape.jpg
-action: guide:sculpting.md#deformation-stack
 ```
 
 - **Nothing leaves without your OK**: the first time AI Brush or Generate 3D would send anything to a service on
