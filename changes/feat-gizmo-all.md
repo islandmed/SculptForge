@@ -1,6 +1,6 @@
 ---
 whats_new: **Gizmo, All**: **Shift+W** (or **All** beside Rotate) puts move, rotate and scale handles on one gizmo: arrows and squares inside the rings, boxes past them to stretch, four outer tabs to scale evenly.
-highlight: One gizmo with move, rotate and scale handles
+highlight: Gizmo All: one gizmo with move, rotate and scale handles at once, on Shift+W (thanks fenix on Discord, @fenixpoints)
 added: **Gizmo All mode** (Shift+W, top shelf, Sculpt > Symmetry & Gizmo; the `gizmo_mode` command): move, rotate and
   scale handles at once, with clear priorities where they cross and no overlaps at any zoom or UI scale. Snapping,
   the readout, posing with a mask, Alt+drag for the pivot and one undo step per drag work as in the single modes.

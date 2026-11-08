@@ -5,6 +5,18 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.16
+
+```features
+date: 2026-11-07
+tagline: One gizmo for move, rotate and scale, symmetric cuts, and clearer labels.
+highlight: Gizmo All: one gizmo with move, rotate and scale handles at once, on Shift+W (thanks fenix on Discord, @fenixpoints)
+highlight: Cut with symmetry cuts both sides alike, and Blender keys get Ctrl+Shift cut shapes and Alt+Q to pick a Part (thanks dm4nd on Discord)
+highlight: Split can keep the original: copy hidden, masked or unmasked areas into a new Part and leave the source as it is (thanks _tfx on Discord)
+highlight: Clearer labels: Extract reads Thickness, Edge Smooth, Both Sides, Corners and Border, and popups and menus are fully opaque at every scale
+highlight: macOS: SculptForge > Preferences... in the app menu opens Preferences (thanks @fenixpoints)
+```
+
 ## Version 0.11.15
 
 ```features
