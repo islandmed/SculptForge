@@ -346,7 +346,7 @@ preflight() {
         kexp=$(gpg --batch --with-colons --show-keys website/sculptforge.asc 2>/dev/null |
             awk -F: '$1 == "sub" && $2 !~ /[rei]/ && $12 ~ /s/ {print ($7 == "" ? 9999999999 : $7)}' | sort -n | tail -1)
         [ -n "$kexp" ] && [ "$kexp" -gt $(($(date +%s) + 120 * 86400)) ] ||
-            die "the apt/dnf signing subkey in website/sculptforge.asc expires ${kexp:+on $(date -d "@$kexp" +%F)}${kexp:-(none valid)}" "Tony: ~/Work/.sf/repo-key.sh --extend (in his terminal); then copy ~/Work/.sf/secrets/repo-key/sculptforge.asc to website/sculptforge.asc, commit, push main"
+            die "the apt/dnf signing subkey in website/sculptforge.asc expires ${kexp:+on $(date -d "@$kexp" +%F)}${kexp:-(none valid)}" "the owner: ~/Work/.sf/repo-key.sh --extend (in their terminal); then copy ~/Work/.sf/secrets/repo-key/sculptforge.asc to website/sculptforge.asc, commit, push main"
     fi
     # The members' publishing path: release.yml's actions pinned to commit SHAs, INSIDERS_REPO_TOKEN only in the
     # member-release environment (docs/releasing.md, "Secrets").
