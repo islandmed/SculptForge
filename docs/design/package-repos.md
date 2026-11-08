@@ -1,15 +1,14 @@
 # apt and dnf repositories (#149)
 
-Status: built and tested, **off until the maintainer creates the signing key** (below). Until then nothing changes
+Status: built and tested, **off until the maintainer creates the signing key** (`~/Work/.sf/repo-key.sh`, below). Until then nothing changes
 for users: releases carry no repository metadata and the site has no /apt or /rpm.
 
 ## What users get
 
 ```sh
 # Debian, Ubuntu, Mint, Pop!_OS (amd64, arm64)
-sudo install -d -m 0755 /etc/apt/keyrings
-curl -fsSL https://sculptforge.app/apt/sculptforge.asc | sudo tee /etc/apt/keyrings/sculptforge.asc >/dev/null
-echo "deb [signed-by=/etc/apt/keyrings/sculptforge.asc] https://sculptforge.app/apt stable main" |
+sudo curl -fsSL -o /usr/share/keyrings/sculptforge.asc https://sculptforge.app/sculptforge.asc
+echo "deb [signed-by=/usr/share/keyrings/sculptforge.asc] https://sculptforge.app/apt stable main" |
   sudo tee /etc/apt/sources.list.d/sculptforge.list
 sudo apt update && sudo apt install sculptforge
 
@@ -17,6 +16,9 @@ sudo apt update && sudo apt install sculptforge
 sudo curl -fsSL -o /etc/yum.repos.d/sculptforge.repo https://sculptforge.app/rpm/sculptforge.repo
 sudo dnf install sculptforge      # asks once to trust the key: compare its fingerprint with the guide's
 ```
+
+The apt key goes in `/usr/share/keyrings/` (not `/etc/apt/keyrings/`) so a later `.deb` can ship that same file
+and renew it on every upgrade (see "Expiry" below).
 
 Then `apt upgrade` / `dnf upgrade` bring each release. The packages are the release's own `.deb` and `.rpm`
 files, byte for byte (the ones the release workflow verified and smoke-tested).
@@ -43,44 +45,42 @@ The key lives only in the `release` environment (tags `v*` only), reaches one st
 outside that step's temporary keyring (the passphrase goes to gpg through a 0600 file, never a command line). The tools are installed in an earlier step that never sees it. pages.yml
 and everything else never see it.
 
-## The signing key (maintainer: once, about 5 minutes)
+## The signing key (maintainer: once, about 2 minutes)
 
 Not the app's update key (`UPDATE_SIGNING_KEY`): a separate OpenPGP key used only for these repositories.
 
-- **Type**: OpenPGP, RSA 4096, sign-only primary key, no subkeys (works with every apt, including `sqv` on Debian
-  13+, and with dnf/rpm on RHEL 9).
+- **Shape**: an **offline primary** key (RSA 4096, certify only, no expiry) and a **signing subkey** (RSA 4096,
+  2 years). RSA works with every apt, including `sqv` on Debian 13+, and with dnf/rpm on RHEL 9.
 - **Identity**: `SculptForge packages <232726012+islandmed@users.noreply.github.com>` (no personal name or address).
-- **Expiry**: none. apt and dnf keep the copy users installed and never refresh it, so an expiring key silently
-  stops every user's updates on the expiry date. Rotation (below) handles compromise instead.
-- **Where it is made**: on the laptop, in a temporary keyring in RAM (`/dev/shm`), never in `~/.gnupg`.
-- **Where the private part lives**: GitHub Actions secrets `REPO_SIGNING_KEY` (armored private key) and
-  `REPO_SIGNING_PASSPHRASE`, in the **`release` environment only**: not repository secrets, not `member-release`.
-  One offline copy in the password manager: the armored private key, the passphrase and the revocation
-  certificate gpg writes (`openpgp-revocs.d/<fingerprint>.rev`).
+- **Made by** `~/Work/.sf/repo-key.sh`, run by the maintainer in their own terminal (it asks for a passphrase), in a
+  temporary keyring in RAM (`/dev/shm`), never `~/.gnupg`. It keeps in `~/Work/.sf/secrets/repo-key/` (chmod 700):
+  the full secret key **encrypted with that passphrase** (which lives only in the password manager, so nothing on
+  the laptop, agents included, can use the primary), gpg's revocation certificate, the public key and its
+  fingerprint. It sets one secret, `REPO_SIGNING_KEY`, in the **`release` environment only**: the signing subkey
+  with the primary as a stub, unprotected (the environment secret is its protection; no passphrase secret).
+  `--print` prints it to paste instead of setting it with gh.
+- **The public key** is committed as `website/sculptforge.asc` (sculptforge.app/sculptforge.asc); pages.yml refuses
+  repository metadata signed by any other primary key and copies the committed key to `/apt` and `/rpm`.
 
-```sh
-export GNUPGHOME=$(mktemp -d -p /dev/shm)
-gpg --quick-gen-key "SculptForge packages <232726012+islandmed@users.noreply.github.com>" rsa4096 sign never
-#   (pick a long passphrase when asked; it goes in the password manager and the second secret)
-gpg --armor --export-secret-keys | gh secret set REPO_SIGNING_KEY --env release -R islandmed/SculptForge
-gh secret set REPO_SIGNING_PASSPHRASE --env release -R islandmed/SculptForge    # paste the passphrase
-gpg --armor --export-secret-keys; cat "$GNUPGHOME"/openpgp-revocs.d/*.rev       # both into the password manager
-gpg --fingerprint                                                                # send the fingerprint to the coordinator
-rm -rf "$GNUPGHOME"; unset GNUPGHOME
-```
+**The coordinator then**: commits `~/Work/.sf/secrets/repo-key/sculptforge.asc` as `website/sculptforge.asc` (site
+lane); from the next release on the repositories go live by themselves. Check that
+https://sculptforge.app/apt/dists/stable/InRelease verifies against it, add the snippets above and the fingerprint
+to docs/guide/installing.md ("Package managers": apt and dnf **Available**), install/README.md and the home page
+note, and close #149 (credit @NicTanghe).
 
-From the next release on, the repositories go live by themselves.
+## Expiry
 
-**The coordinator then**: checks that https://sculptforge.app/apt/dists/stable/InRelease is signed by that
-fingerprint (`gpg --show-keys` on `/apt/sculptforge.asc`), adds the snippets above and the fingerprint to
-docs/guide/installing.md ("Package managers": apt and dnf **Available**), install/README.md and the home page note,
-and replies on #149 (credit @NicTanghe).
+`scripts/release.sh` (step check) stops a release once the subkey has less than 120 days left. Then the maintainer
+runs `~/Work/.sf/repo-key.sh --extend` (2 more years, same keys, the secret replaced) and the coordinator commits
+the new `website/sculptforge.asc`. Users' installed copies keep the old date, so **before the first extension
+(by 2028-07)** the `.deb` must ship `/usr/share/keyrings/sculptforge.asc` and the `.rpm` the key for dnf, so every
+upgrade renews them (app lane, its own branch; the key file exists only once the key is made).
 
 ## Rotation and compromise
 
-- **Suspected leak** (a secret exposed, a stolen laptop with the password-manager copy unlocked): make a new key
-  exactly as above, replace both secrets, release at once, and announce in the release notes, #announcements and
-  #149 that apt users re-run the `curl ... sculptforge.asc` line (dnf asks to import the new key by itself on the
+- **Suspected leak** (a secret exposed, a stolen laptop with the password-manager copy unlocked): move `~/Work/.sf/secrets/repo-key` aside, make a new key
+  exactly as above (it replaces the secret), release at once, and announce in the release notes, #announcements and
+  #149 that apt users re-run the `curl ... sculptforge.asc` line (until the packages ship the key) (dnf asks to import the new key by itself on the
   next upgrade). Publish the old key's revocation certificate on docs/guide/security.md.
 - **Planned rotation** (optional, e.g. every 5 years or a stronger algorithm): the same steps without the revocation;
   announce a release ahead.
