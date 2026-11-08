@@ -1,0 +1,66 @@
+# Surface Polish on a hard-surface block (foirgairwolf on Discord), at 1440x900 (CMake: ui_surface_polish_proof_1440):
+# a cube with dents and noise on its faces, before, after Polish 0.7 with Edges 20 (faces smooth, edges crisp), and
+# with Edges 5 / 60 for contrast (5: the noise's own tilts count as edges and stay; 60: the box edges round off too),
+# each also as a 3/4 close-up of one edge (surface_polish_proof_200.sfui: the same at 200%). The sliders are set by dragging from their middle
+# (Polish 0.5, Edges 32.5) by a measured number of pixels; the status confirms the values.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=2
+run part_append type=cube size=1
+run part_delete index=0
+run deform_noise amount=12 axes=xyz scale=22
+click "Tool##palette.tool"
+click "Geometry##tool.geometry"
+wheel_item "Geometry/Decimate" 0 -30
+wait 0.3
+expect "Surface Polish/##surface_polish_amount"
+camera 35 25
+key f
+wait 0.3
+mouse_leave
+snapshot
+shot before
+zoom 2.2
+wait 0.3
+shot before-closeup
+zoom 0.4545
+
+# Polish 0.7, Edges 20.
+drag_item "Surface Polish/##surface_polish_edge" -32 0
+drag_item "Surface Polish/##surface_polish_amount" 29 0
+wait 0.3
+expect_status "Surface Polish 0.70"
+expect_text "Edges 20"
+expect_value moved > 0
+mouse_leave
+shot polish-07-edges-20
+zoom 2.2
+wait 0.3
+shot polish-07-edges-20-closeup
+zoom 0.4545
+
+# Edges 5: much more of the noise stays.
+drag_item "Surface Polish/##surface_polish_edge" -2000 0
+wait 0.3
+expect_status "Surface Polish 0.70"
+expect_text "Edges 5"
+mouse_leave
+shot polish-07-edges-5
+zoom 2.2
+wait 0.3
+shot polish-07-edges-5-closeup
+zoom 0.4545
+
+# Edges 60: the box's own edges are no longer kept and round off.
+drag_item "Surface Polish/##surface_polish_edge" 2000 0
+wait 0.3
+expect_text "Edges 60"
+mouse_leave
+shot polish-07-edges-60
+zoom 2.2
+wait 0.3
+shot polish-07-edges-60-closeup
+zoom 0.4545
+
+# Cancel: back to the dented block.
+click "Surface Polish/Cancel"
+expect_value moved == 0

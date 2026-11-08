@@ -1,0 +1,29 @@
+# Surface Polish on the dented block at 200% (CMake: ui_surface_polish_proof_2880, a 2880x1800 window: 1440 px of UI):
+# Polish 0.7, Edges 20, the panel and a 3/4 close-up (surface_polish_proof.sfui is the 100% one). The sliders are
+# twice as wide here, so the drags are twice as long.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=2
+run part_append type=cube size=1
+run part_delete index=0
+run deform_noise amount=12 axes=xyz scale=22
+click "Tool##palette.tool"
+click "Geometry##tool.geometry"
+wheel_item "Geometry/Decimate" 0 -30
+wait 0.3
+camera 35 25
+key f
+wait 0.3
+mouse_leave
+snapshot
+shot before-200
+drag_item "Surface Polish/##surface_polish_edge" -64 0
+drag_item "Surface Polish/##surface_polish_amount" 57 0
+wait 0.3
+expect_status "Surface Polish 0.70"
+expect_text "Edges 20"
+expect_value moved > 0
+mouse_leave
+shot polish-07-edges-20-200
+zoom 2.2
+wait 0.3
+shot polish-07-edges-20-closeup-200
