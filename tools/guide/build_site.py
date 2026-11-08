@@ -1181,7 +1181,7 @@ def main() -> int:
             write_home(wn, False)
         urls = [SITE, SITE + "brushes.html", SITE + "press.html",
                 SITE + "studios.html", SITE + "ai.html", SITE + "support.html", SITE + "terms.html", SITE + "jobs.html", SITE + "queue.html",
-                SITE + "supporters.html",
+                SITE + "supporters.html", SITE + "why.html", SITE + "code-signing.html",
                 SITE + "performance/"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]
         (ROOT / "website" / "sitemap.xml").write_text(
             '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
