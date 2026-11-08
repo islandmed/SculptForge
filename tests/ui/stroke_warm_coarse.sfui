@@ -1,0 +1,25 @@
+# The stroke programs' warm-up (stroke_warm.sfui) on a mesh over the triangle budget: every visible cluster draws at a
+# coarse level, none in full, and the warm-up still runs (with a coarse cluster drawn in full, as a stroke's edited
+# ones are). Without it the 3060's first stroke on lion-28m, or the 15M head at the floor tier, took 1.8 s of GPU time:
+# a project opens with its coarse levels ready, so no frame before the stroke drew a cluster in full.
+run ui_look look=classic layout=classic
+# (the budgets are the hardware tier's; small ones here, set before the mesh as at startup)
+env SF_TRIANGLE_BUDGET 40000
+env SF_STILL_FRAME_MS 0.001
+run new_sphere subdivisions=6
+camera 0 0
+wait 0.6
+expect_value coarse_clusters > 0
+expect_value drawn_triangles <= 40000
+# Coarse now: as a project opening that way, before any stroke.
+forget_stroke_programs
+expect_value stroke_programs == 0
+expect_value drawn_triangles > 0               # a frame drawn coarse
+expect_value drawn_triangles > 0               # a frame later: warmed
+expect_value coarse_clusters > 0               # (still coarse: the warm-up ran on a coarse cluster)
+expect_value stroke_programs >= 3
+key f
+camera 0 0
+snapshot
+drag_path 0.4 0.5 0.6 0.5
+expect_value moved > 0

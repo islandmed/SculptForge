@@ -2694,6 +2694,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             f << shortcutsMarkdown();
             if (!f) fail(line, "can't write " + name + " in " + shotDir_);
         });
+    } else if (verb == "forget_stroke_programs") { // as before any stroke: the stroke programs warm again (stroke_warm_coarse)
+        run([this] { app_.renderer_.forgetStrokePrograms(); });
     } else if (verb == "snapshot") {
         run([this] {
             basePositions_ = app_.doc_.mesh.positions;

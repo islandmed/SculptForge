@@ -1021,6 +1021,15 @@ bool Renderer::init(std::string& error) {
     return true;
 }
 
+void Renderer::forgetStrokePrograms() {
+    for (int f = 0; f < 256; ++f)
+        if (programs_[f].id && (f & (kGhost | kFlat))) {
+            deleteProgram(programs_[f].id); // (a kept program stays linked: the count still drops, the warm-up binds it again)
+            programs_[f] = MeshProgram{};
+        }
+    for (MeshSlot& s : slots_) s.strokeWarmed = -1, s.strokeWarmFrames = 0;
+}
+
 const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (features & (kTextured | kNormalMap)) features |= kTextured | kPrim;
     // (micro levels: no per-vertex paint, per-triangle data or predictive preview)
@@ -3724,12 +3733,16 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     // draw (NVIDIA on Windows) stalled the first stroke of every session 1-1.8 s. Each draws one cluster here, under
     // the main draw (same depth: it paints over it), and that cluster's vertices go up once as a stroke upload does.
     // SF_NO_STROKE_WARM=1 leaves it out (to compare); SF_FRAME_LOG says what it cost.
+    // A mesh over the triangle budget can draw every visible cluster at a coarse level (cullCoarse leaves none in
+    // full): then a coarse one warms, drawn in full as the stroke's edited clusters are (11-08: without it the warm-up
+    // never ran on the 3060's lion-28m, or the 15M head at the floor tier, and the first stroke's GPU frame took 1.8 s).
     static const bool noWarm = std::getenv("SF_NO_STROKE_WARM") != nullptr;
-    if (active && !noWarm && !thumbnailPass_ && !settings.fullDetail && !textured && !normalMapped && drawAlpha_ >= 1.0f && !xrayCull_ && !drawClusters_.empty() &&
+    const bool anyCluster = !drawClusters_.empty() || !coarseClusters_.empty();
+    if (active && !noWarm && !thumbnailPass_ && !settings.fullDetail && !textured && !normalMapped && drawAlpha_ >= 1.0f && !xrayCull_ && anyCluster &&
         s.strokeWarmed != features && s.strokeWarmFrames++ >= 1) {
         s.strokeWarmed = features;
         const auto warmStart = std::chrono::steady_clock::now();
-        const std::vector<uint32_t> one{drawClusters_.front()};
+        const std::vector<uint32_t> one{!drawClusters_.empty() ? drawClusters_.front() : coarseClusters_.front()};
         const auto range = s.order.clusters()[one[0]];
         std::vector<PackedVertex> verts(range.vertexCount);
         if (!verts.empty()) { // (BufferSubData of what is there: the stroke uploads' path, nothing changes)

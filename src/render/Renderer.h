@@ -283,6 +283,8 @@ public:
         for (int f = 0; f < 256; ++f) n += programs_[f].id && (f & (kGhost | kFlat)) ? 1 : 0;
         return n;
     }
+    // Tests: as before any stroke (those programs gone, every Part not warmed yet), so the warm-up runs again.
+    void forgetStrokePrograms();
     // At rest (still 150 ms, no stroke) an over-budget mesh draws in full detail when one full frame fits the still-frame
     // budget (100 ms, from the measured GPU time per triangle); else it stays coarse (coarsePreviewOnly: the info line
     // says so). coarseStillWanted: the last frame drew coarse and full detail follows once the view has been still long
