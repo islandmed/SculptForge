@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The filled cube: the alternative app icon (the shipped one is the outline cube in tools/brand/cube-outline/, Tony
+"""The filled cube: the alternative app icon (the shipped one is the outline cube in tools/brand/cube-outline/, owner
 11-06 21:1x; docs/brand.md). An orange cube seen corner on (three faces: light top, forge-orange left, dark right, split
 by dark seams) on a dark tile. Our own drawing: six points of a regular hexagon and its centre, nothing traced or taken
 from an icon set.

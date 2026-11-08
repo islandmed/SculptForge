@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail if a public file carries our email address (Tony 11-06: hello@ is a private support inbox, spam).
+"""Fail if a public file carries our email address (owner 11-06: hello@ is a private support inbox, spam).
 
 Scans website/, docs/ and README* for a literal "@sculptforge.app" or a mailto: to our domain. The Studios page
 builds its address in JavaScript on click, so it is never literal and passes.

@@ -4,7 +4,7 @@
     python -I tools/brand/make_icons.py <bust.jpeg> [--discord DIR] [--style outline|filled]
     python -I tools/brand/make_icons.py --icns-only [--style outline|filled]
 
-Which mark goes where: docs/brand.md. The app icon is the outline cube (Tony 11-06 21:1x: "I want that back as the icon
+Which mark goes where: docs/brand.md. The app icon is the outline cube (owner 11-06 21:1x: "I want that back as the icon
 as it was before"): the files that shipped in 0.1-0.10, frozen in tools/brand/cube-outline/ (Lucide's "box" on a dark
 tile, ISC, THIRD_PARTY_NOTICES.md). Those sizes are copied byte for byte (512/1024/256 PNGs, the .ico's frames); the
 others (24 px, the .icns on Apple's grid, apple-touch-icon) are its SVG rendered with rsvg-convert. --style filled
@@ -296,13 +296,13 @@ def main():
 
     if a.discord:
         # Discord and GitHub crop to circles: the bot avatar, the server icon and the GitHub avatar are the bust (the
-        # brand, Tony 11-06), inset on the dark backdrop.
+        # brand, owner 11-06), inset on the dark backdrop.
         for name, n in (("discord-bot-avatar", 512), ("discord-server-icon", 512), ("github-avatar", 500)):
             av = Image.new("RGBA", (n, n), (0x1c, 0x1a, 0x1c, 255))
             k = round(n * 440 / 512)
             av.alpha_composite(shrink(bust, k), ((n - k) // 2, (n - k) // 2))
             av.convert("RGB").save(os.path.join(a.discord, f"{name}-{n}.png"))
-        # Discord server and developer portal icon: the app icon (Tony 11-06 21:02), on its tile's dark.
+        # Discord server and developer portal icon: the app icon (owner 11-06 21:02), on its tile's dark.
         flat(icon(512)).save(os.path.join(a.discord, f"discord-server-icon-cube-{STYLE}-512.png"))
         icon(1024).save(os.path.join(a.discord, f"discord-portal-icon-cube-{STYLE}-1024.png"))
     print("done")
