@@ -1,0 +1,61 @@
+# Cut with X symmetry (Discord, dm4nd) for the look review at 1440 logical px (CMake: ui_cut_symmetry_1440 at 100 %,
+# ui_cut_symmetry_1440_200 at 200 %): Cut In with a rectangle across the middle (both sides to the same depth), a
+# second cut across its caps from an angled view (the caps close; Wire on, close up), and the Blender keys' Alt+Q in
+# Controls. Every shot comes before the checks, so the script also shows an older build as it was.
+logical_width 1440
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+remember triangles full
+
+# --- (1) Cut In, a rectangle across the middle ---
+click "Tool##palette.tool"
+click "Cut"
+click "In##cut.in"
+hold ctrl+shift
+click "##tile.brush"
+wait 0.1
+click "Cut Rectangle##held.cut.rect"
+hold none
+mouse_move 0.5 0.5
+key f
+wait_idle 10
+shot cut-in-before
+hold ctrl+shift
+drag_path 0.42 0.38 0.78 0.62 keep
+wait 0.1
+shot cut-in-drawing
+release
+hold none
+wait_idle 10
+shot cut-in-after
+camera 0 -35
+wait_idle 10
+shot cut-in-after-from-above
+
+# --- (2) A second cut across the first one's caps, from an angled view: Away, Wire on, close up ---
+click "Away##cut.away"
+camera 30 -20
+wait_idle 10
+hold ctrl+shift
+drag_path 0.3 0.3 0.62 0.55
+hold none
+wait_idle 10
+mouse_move 0.5 0.5
+key shift+f
+zoom 1.8
+wait_idle 10
+shot cap-wire-closeup
+key shift+f
+
+# --- (3) Blender keys: Alt+Q in Controls > Mouse & pen ---
+input_style blender
+key f1
+click "Mouse & pen"
+expect_text Alt+Q over it
+shot controls-blender-alt-q
+key escape
+input_style sculptforge
+
+# --- Checks (after every shot) ---
+expect_value triangles != $full
+expect_value open_edges == 0
