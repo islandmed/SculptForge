@@ -17,7 +17,7 @@ interface and keep your changes. The pictures show the default look and layout.
 | Top shelf | Under the menu bar | Sculpt/Paint, Draw/Move/Scale/Rotate, Add/Sub, Rgb, Size, Intensity, Dynamic, symmetry |
 | Left shelf | Left of the canvas | Brush, Stroke, Alpha and Material tiles, the colour picker, Fill |
 | Canvas | Centre | The 3D view, with the Sculpt Timeline along its top; strokes and navigation start only here |
-| Right shelf | Right of the canvas | Undo and Redo, Frame, Move, Zoom and Rotate, display toggles, Solo |
+| Right shelf | Right of the canvas | Undo and Redo, Frame, Move, Zoom and Rotate, view and display toggles, Solo |
 | Right tray | Far right | The **Tool** panel: the active Part, Parts, Layers, Geometry, Masking and more |
 | Bottom shelf | Below the canvas | Your quick brushes |
 
@@ -250,7 +250,8 @@ interface](#customizing-the-interface) to add items.
 - **Add** / **Sub**: brushes add to or subtract from the surface. Holding <kbd>Alt</kbd> flips it for one
   stroke.
 - **Rgb**: sculpt brushes paint the colour at the same time.
-- **Size**: the brush radius in screen pixels (2 to 800).
+- **Size**: the brush radius in screen pixels (2 to 800). While you drag it, the brush ring shows on the model at the
+  new size, where the cursor last was (or in the middle of the view), and fades out when you let go.
 - **Intensity**: how strongly each dab changes the surface (1 to 100). While <kbd>Shift</kbd> is held it shows
   Smooth's own value.
 - **Dynamic**: [dynamic topology](dynamic-topology.md), with its **Detail** slider while it is on.
@@ -279,14 +280,20 @@ unmasked area with the main colour.
 ### Right shelf
 
 - **Undo** and **Redo** (<kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>): greyed out when
-  there is nothing to undo or redo. A layout you customised before they were added gets them at the top.
+  there is nothing to undo or redo. A layout you customised before they were added gets them at the top (and the
+  view toggles below Rotate and Paint).
 - **Frame** (<kbd>F</kbd>): fits the model in the view.
 - **Move**, **Zoom**, **Rotate**: drag on these buttons to pan, zoom and orbit the view.
+- **Turn**: rotation drags turn the model upright like a turntable (on) or freely (off), as **View > Orbit
+  lock** sets it.
+- **Ortho** (<kbd>Numpad 5</kbd>): an orthographic view (on) or perspective (off).
+- **Floor**: the floor grid under the model, as **View > Floor grid**.
 - **Wire** (<kbd>Shift</kbd>+<kbd>F</kbd>): shows the mesh's polygons: quads as quads, triangles as triangles.
 - **Groups**: colours each face group.
 - **Mask** (<kbd>Ctrl</kbd>+<kbd>H</kbd>): shows or hides the mask's darkening (on by default). Hiding it keeps
   the mask, which still protects the surface.
 - **Paint**: shows vertex paint colours (on by default).
+- **Flat**: flat shading, every polygon its own face (on), or smooth shading (off), as **Render > Materials > Smooth | Flat**.
 - **Solo**: shows only the active Part (available with two or more Parts).
 - **Splats**: shows or hides a Gaussian splat capture (only shown while one is loaded).
 

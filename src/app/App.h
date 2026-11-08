@@ -905,6 +905,13 @@ private:
     float sizeReadoutPx_ = 0.0f;   // the size readout by the brush shows for a moment after a change
     double sizeReadoutUntil_ = 0.0;
     void drawSizeSlider(const char* id, const char* helpPath, const char* help);
+    // While a Size slider drags (top shelf, Draw palette, quick menu; ABHITAR on Discord): the brush ring at the new
+    // size, live, on the canvas where the cursor last lay on the model (else its centre), fading out after release.
+    void drawSizeSliderRing();
+    bool sizeSliderHeld_ = false;
+    double sizeSliderRingUntil_ = 0.0; // the fade's end
+    ImVec2 sizeSliderRingAt_{0.0f, 0.0f};
+    float sizeSliderRingAlpha_ = 0.0f; // as last drawn (UI tests: size_slider_ring)
     // Shift+Alt held mid-stroke: the brush moves at a quarter of the pen's speed and dabs at Precision Intensity.
     PrecisionDrag precision_;
     bool precisionActive_ = false;

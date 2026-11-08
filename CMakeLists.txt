@@ -1098,6 +1098,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Cut with X symmetry and its caps, for the look review at 1440 px, 100 % and 200 % (tests/ui/sizes/cut_symmetry.sfui).
     sculptforge_ui_test(cut_symmetry_1440 sizes/cut_symmetry --size 1440x900)
     sculptforge_ui_test(cut_symmetry_1440_200 sizes/cut_symmetry --size 2880x1800)
+    # The right shelf's view toggles and the Size slider's ring at 1440 px, 100 % and 200 % (tests/ui/sizes/view_toggles.sfui).
+    sculptforge_ui_test(view_toggles_1440 sizes/view_toggles --size 1440x900)
+    sculptforge_ui_test(view_toggles_1440_200 sizes/view_toggles --size 2880x1800)
     # A crash leaves a note in the log file (#16). Needs no window.
     add_test(NAME crash_log COMMAND ${CMAKE_COMMAND} -DAPP=$<TARGET_FILE:sculptforge>
              -DDIR=${CMAKE_CURRENT_BINARY_DIR}/crash-log-test -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/crash_log.cmake)
