@@ -10,8 +10,8 @@
 //   panel's inside to move it. Alt+click an edge adds a point there, Delete removes the selected point (or panel),
 //   C makes the selected edge curved or straight again. Sew: click one edge, then the edge it is sewn to.
 // - Every edit is a garment_* command (scriptable) and one step of the window's own undo (Ctrl+Z / Ctrl+Shift+Z
-//   while the pointer is over the window): the pattern lives in the project settings, which the document's undo
-//   (per Part, for meshes) does not cover.
+//   while the window has focus; with no pattern step, or focus elsewhere, they undo the scene): the pattern lives in
+//   the project settings, which the document's undo (per Part, for meshes) does not cover.
 #include "app/App.h"
 #include "app/I18n.h"
 #include "app/Theme.h"
@@ -108,6 +108,7 @@ struct GarmentEditorState {
     bool frame = true;
     ImVec2 viewMin{0, 0}, viewSize{1, 1};
     bool hovered = false;
+    bool focused = false; // the window has keyboard focus: Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y are the pattern's
     int panel = -1, point = -1, edge = -1; // the selection (panel and one of its points or edges)
     enum class Drag { None, Pan, Point, Handle, Panel } drag = Drag::None;
     int dragIndex = 0;     // Point: the point; Handle: edge * 2 + (0: c1, 1: c2)
@@ -629,9 +630,11 @@ void App::drawGarments() {
     ImGui::SetNextWindowSizeConstraints(ImVec2(std::min(520 * scale, cr.w), std::min(360 * scale, cr.h)), ImVec2(FLT_MAX, FLT_MAX));
     ImGui::SetNextWindowBgAlpha(1.0f);
     if (!ImGui::Begin(tr("Pattern"), &showGarments_, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar)) {
+        s.hovered = s.focused = false;
         ImGui::End();
         return;
     }
+    s.focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
     const ImGuiStyle& style = ImGui::GetStyle();
     Pattern& pat = s.pat;
     if (s.panel >= int(pat.panels.size())) s.panel = -1;
@@ -1005,14 +1008,23 @@ void App::drawGarments() {
 }
 
 bool App::garmentKey(SDL_Keycode key, SDL_Keymod mod) {
-    if (!showGarments_ || !garments_ || !garments_->hovered || ImGui::GetIO().WantTextInput) return false;
+    if (!showGarments_ || !garments_ || ImGui::GetIO().WantTextInput) return false;
     GarmentEditorState& s = *garments_;
     GarmentUi u{*this, s};
     const bool ctrl = (mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0, shift = (mod & SDL_KMOD_SHIFT) != 0;
+    // Undo / redo go to the pattern while the window has focus and the pattern has a step; otherwise the key falls
+    // through to the scene's undo (never swallowed: ui_monkey seed 4).
+    const bool redoKey = (key == SDLK_Z && ctrl && shift) || (key == SDLK_Y && ctrl), undoKey = key == SDLK_Z && ctrl && !shift;
+    if (redoKey || undoKey) {
+        std::vector<std::string>& from = undoKey ? s.undo : s.redo;
+        if (!s.focused || from.empty()) return false;
+        if (s.drag != GarmentEditorState::Drag::None) return true; // (the drag commits on release first)
+        u.restore(from, undoKey ? s.redo : s.undo);
+        return true;
+    }
+    if (!s.hovered) return false;
     if (s.drag != GarmentEditorState::Drag::None) return true;
-    if ((key == SDLK_Z && ctrl && shift) || (key == SDLK_Y && ctrl)) u.restore(s.redo, s.undo);
-    else if (key == SDLK_Z && ctrl) u.restore(s.undo, s.redo);
-    else if (key == SDLK_D && ctrl) {
+    if (key == SDLK_D && ctrl) {
         if (const Action* a = actions_.find("garment.duplicate"); a && a->enabled && a->enabled()) a->run();
     } else if ((key == SDLK_DELETE || key == SDLK_BACKSPACE) && !ctrl) u.removeSelected();
     else if (key == SDLK_C && !ctrl) u.toggleCurve();
