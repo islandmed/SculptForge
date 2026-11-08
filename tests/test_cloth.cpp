@@ -130,6 +130,33 @@ void addBox(std::vector<glm::vec3>& pos, std::vector<glm::uvec3>& tris, glm::vec
     for (const auto& t : f) tris.push_back(glm::uvec3(b + t[0], b + t[1], b + t[2]));
 }
 
+// A closed tube `r` round from `a` to `b`: rings every centimetre (fine, so its normals are the surface's), capped.
+void addTube(std::vector<glm::vec3>& pos, std::vector<glm::uvec3>& tris, glm::vec3 a, glm::vec3 b, float r) {
+    const glm::vec3 axis = glm::normalize(b - a);
+    const glm::vec3 u = glm::normalize(glm::cross(axis, std::abs(axis.y) < 0.9f ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0)));
+    const glm::vec3 v = glm::cross(axis, u);
+    const int seg = 32, rings = std::max(2, int(std::ceil(glm::distance(a, b) / 0.01f)) + 1);
+    const uint32_t base = uint32_t(pos.size());
+    for (int k = 0; k < rings; ++k)
+        for (int j = 0; j < seg; ++j) {
+            const float t = glm::two_pi<float>() * float(j) / float(seg);
+            pos.push_back(glm::mix(a, b, float(k) / float(rings - 1)) + (u * std::cos(t) + v * std::sin(t)) * r);
+        }
+    for (int k = 0; k + 1 < rings; ++k)
+        for (int j = 0; j < seg; ++j) {
+            const uint32_t p0 = base + uint32_t(k * seg + j), p1 = base + uint32_t(k * seg + (j + 1) % seg);
+            tris.push_back({p0, p1, p0 + seg});
+            tris.push_back({p1, p1 + seg, p0 + seg});
+        }
+    const uint32_t ca = uint32_t(pos.size()), cb = ca + 1;
+    pos.push_back(a), pos.push_back(b);
+    for (int j = 0; j < seg; ++j) {
+        const uint32_t j1 = uint32_t((j + 1) % seg), last = base + uint32_t((rings - 1) * seg);
+        tris.push_back({ca, base + j1, base + uint32_t(j)});
+        tris.push_back({cb, last + uint32_t(j), last + j1});
+    }
+}
+
 // The cloth's height above (x, z): the triangle under that point, interpolated (false: none).
 bool clothHeightAt(const std::vector<glm::vec3>& x, const std::vector<glm::uvec3>& tris, float px, float pz, float& y) {
     for (const glm::uvec3& t : tris) {
@@ -177,6 +204,33 @@ TEST(cloth_thin_features_stay_under_the_cloth) {
     std::printf("  needles: %d frames, %d covered, %d through the cloth\n", r.frames, covered, through);
     CHECK(covered >= 25);
     CHECK(through == 0);
+    // At rest means settled: 150 frames more and nothing moves 2 mm.
+    ClothSim sim;
+    CHECK(sim.init(s, fabricPreset(FabricPreset::Silk), opt.settings));
+    sim.setColliders(&colliders);
+    int frames = 0;
+    while (sim.step() && frames < opt.maxFrames) ++frames;
+    CHECK(sim.atRest());
+    const std::vector<glm::vec3> rested = sim.positions();
+    for (int f = 0; f < 150; ++f) sim.step();
+    float moved = 0.0f;
+    for (size_t i = 0; i < rested.size(); ++i) moved = std::max(moved, glm::distance(rested[i], sim.positions()[i]));
+    std::printf("  needles: at rest after %d frames, then %.2f mm in 150 more\n", frames + 1, moved * 1000.0f);
+    CHECK(moved < 0.002f);
+}
+
+TEST(cloth_falling_is_never_at_rest) {
+    // Dropped from still (the first frames barely move) and falling free: never reads as at rest.
+    ClothSim sim;
+    CHECK(sim.init(sheet(10, 0.2f, 1.0f), fabricPreset(FabricPreset::Cotton)));
+    for (int f = 0; f < 120; ++f) {
+        sim.step();
+        if (sim.atRest()) {
+            std::printf("  at rest while falling, frame %d\n", f);
+            CHECK(false);
+            break;
+        }
+    }
 }
 
 // A closed tube (8 sides, `r` round) along a path: rings at each point, capped at both ends.
@@ -907,4 +961,143 @@ TEST(cloth_bench_drape_and_brush_on_a_dense_body) {
     std::printf("  bench brush: region %zu vertices, dab p50 %.1f ms, slowest %.1f ms\n", d.sculptor.clothRegion(),
                 dabs[dabs.size() / 2], dabs.back());
     if (std::getenv("SF_BENCH_LIMITS")) CHECK(r.rested && total < 10.0);
+}
+
+TEST(cloth_seams_do_not_pull_the_cloth_through_a_body) {
+    // Two sheets either side of a 4 cm slab, every particle sewn to its twin on the other sheet: the seams close
+    // fast and pull the sheets together, but each stays on its side of the slab (pressed onto it).
+    // (its two faces as fine grids, so their normals are the faces')
+    std::vector<glm::vec3> pos;
+    std::vector<glm::uvec3> tris;
+    const Mesh grid = makePlane(30, 0.6f); // y up
+    for (int side = -1; side <= 1; side += 2) {
+        const uint32_t b = uint32_t(pos.size());
+        for (const glm::vec3& p : grid.positions) pos.push_back({p.x, p.z, 0.02f * float(side)});
+        for (glm::uvec3 t : grid.triangles) {
+            if (side > 0) std::swap(t.y, t.z); // (front faces +z, back faces -z)
+            tris.push_back(t + glm::uvec3(b));
+        }
+    }
+    ClothColliders colliders;
+    colliders.add(pos, tris);
+    colliders.build();
+    const ClothSetup one = sheet(20, 0.2f, 0.0f); // 1 cm spacing
+    ClothSetup s;
+    const uint32_t n = uint32_t(one.positions.size());
+    for (int side = 0; side < 2; ++side) {
+        for (const glm::vec3& p : one.positions) s.positions.push_back({p.x, p.z, side ? -0.06f : 0.06f});
+        for (const glm::uvec3& t : one.triangles) s.triangles.push_back(t + glm::uvec3(side * n));
+    }
+    for (uint32_t i = 0; i < n; ++i) s.seams.push_back({i, i + n});
+    DrapeOptions opt;
+    opt.maxFrames = 240;
+    opt.settings.gravity = glm::vec3(0.0f);
+    const DrapeResult r = drapeToRest(s, colliders, fabricPreset(FabricPreset::Cotton), opt);
+    int wrong = 0;
+    float nearest = 1.0f;
+    for (uint32_t i = 0; i < 2 * n; ++i) {
+        const float z = r.positions[i].z * (i < n ? 1.0f : -1.0f);
+        wrong += z < 0.02f;
+        nearest = std::min(nearest, z);
+    }
+    std::printf("  slab: %s after %d frames, %d of %u particles through, nearest %.1f mm off the slab\n",
+                r.rested ? "at rest" : "stopped", r.frames, wrong, 2 * n, (nearest - 0.02f) * 1000.0f);
+    CHECK(wrong == 0);
+}
+
+TEST(cloth_rests_in_a_narrow_wedge) {
+    // Two walls leaning 15 degrees off upright cross in a V (an armpit, the inside of a knee); a sheet falls into
+    // it. A particle in the crease is pushed off one wall into the other: it has to keep both, or it bounces from
+    // one to the other frame after frame and the cloth never rests. (Fine grids, so their normals are the walls'.)
+    std::vector<glm::vec3> pos;
+    std::vector<glm::uvec3> tris;
+    const Mesh grid = makePlane(30, 0.6f); // y up
+    const float c = std::cos(glm::radians(15.0f)), sn = std::sin(glm::radians(15.0f));
+    for (int side = -1; side <= 1; side += 2) {
+        const uint32_t b = uint32_t(pos.size());
+        const glm::vec3 along(sn * float(side), c, 0.0f); // up the wall (its front faces into the V)
+        for (const glm::vec3& p : grid.positions) pos.push_back(along * (p.x + 0.25f) + glm::vec3(0.0f, 0.0f, p.z));
+        for (glm::uvec3 t : grid.triangles) {
+            if (side < 0) std::swap(t.y, t.z); // (mirrored: keep the front facing in)
+            tris.push_back(t + glm::uvec3(b));
+        }
+    }
+    ClothColliders colliders;
+    colliders.add(pos, tris);
+    colliders.build();
+    ClothSetup s = sheet(20, 0.16f, 0.3f);
+    DrapeOptions opt;
+    opt.maxFrames = 900;
+    const DrapeResult r = drapeToRest(s, colliders, fabricPreset(FabricPreset::Cotton), opt);
+    int inside = 0;
+    for (const glm::vec3& p : r.positions) {
+        glm::vec3 q, n;
+        inside += colliders.closest(p, 0.05f, q, n) && glm::dot(p - q, n) < -0.0005f;
+    }
+    std::printf("  wedge: %s after %d frames, %d inside\n", r.rested ? "at rest" : "stopped", r.frames, inside);
+    CHECK(r.rested);
+    CHECK(inside == 0);
+}
+
+TEST(cloth_sleeve_started_in_a_bent_arm_leaves_it_outward) {
+    // A sleeve (a tube 6 cm round) on an upper arm (4 cm round) bent 90 degrees forward at the elbow: its hem starts
+    // inside the forearm. Those particles leave the arm the way the sleeve was put on (out from its axis), not to the
+    // nearest surface (half of them the far side of the forearm, the hem split across it). Same for the sleeve put on
+    // 5 mm off in any direction.
+    std::vector<glm::vec3> pos;
+    std::vector<glm::uvec3> tris;
+    addTube(pos, tris, {0.0f, 0.0f, 0.0f}, {0.0f, 0.35f, 0.0f}, 0.04f);    // upper arm, shoulder up
+    addTube(pos, tris, {0.0f, 0.03f, -0.03f}, {0.0f, 0.03f, 0.3f}, 0.04f); // forearm, forward from the elbow
+    ClothColliders colliders;
+    colliders.add(pos, tris);
+    colliders.build();
+    int worstInside = 0;
+    float worstStretch = 0.0f;
+    for (int jitter = 0; jitter < 7; ++jitter) {
+        const glm::vec3 off = jitter == 0 ? glm::vec3(0.0f) : glm::vec3(jitter == 1 ? 0.005f : jitter == 2 ? -0.005f : 0.0f,
+                                                                       jitter == 3 ? 0.005f : jitter == 4 ? -0.005f : 0.0f,
+                                                                       jitter == 5 ? 0.005f : jitter == 6 ? -0.005f : 0.0f);
+        // The sleeve: 24 x 30 particles (2 cm round, 1 cm down), from 30 cm down to 1 cm below the elbow.
+        ClothSetup s;
+        const int seg = 24, rows = 30;
+        for (int k = 0; k < rows; ++k)
+            for (int j = 0; j < seg; ++j) {
+                const float t = glm::two_pi<float>() * float(j) / float(seg);
+                const glm::vec3 radial(std::cos(t), 0.0f, std::sin(t));
+                s.positions.push_back(glm::vec3(0.0f, 0.30f - 0.01f * float(k), 0.0f) + radial * 0.06f + off);
+                s.outward.push_back(radial);
+            }
+        for (int k = 0; k + 1 < rows; ++k)
+            for (int j = 0; j < seg; ++j) {
+                const uint32_t p0 = uint32_t(k * seg + j), p1 = uint32_t(k * seg + (j + 1) % seg);
+                s.triangles.push_back({p0, p0 + seg, p1});
+                s.triangles.push_back({p1, p0 + seg, p1 + seg});
+            }
+        int startInside = 0;
+        for (const glm::vec3& p : s.positions) {
+            glm::vec3 q, n;
+            startInside += colliders.closest(p, 0.1f, q, n) && glm::dot(p - q, n) < 0.0f;
+        }
+        DrapeOptions opt;
+        opt.maxFrames = 120;
+        const DrapeResult r = drapeToRest(s, colliders, fabricPreset(FabricPreset::Cotton), opt);
+        int inside = 0;
+        for (const glm::vec3& p : r.positions) {
+            glm::vec3 q, n;
+            inside += colliders.closest(p, 0.1f, q, n) && glm::dot(p - q, n) < -0.0005f;
+        }
+        float stretch = 0.0f; // (an edge across the forearm is stretched round it, about x3)
+        for (const glm::uvec3& t : s.triangles)
+            for (int e = 0; e < 3; ++e) {
+                const uint32_t i = t[e], j = t[(e + 1) % 3];
+                stretch = std::max(stretch, glm::distance(r.positions[i], r.positions[j]) / glm::distance(s.positions[i], s.positions[j]));
+            }
+        std::printf("  sleeve %+.0f %+.0f %+.0f mm: %d start inside, %d inside after %d frames, worst edge x%.2f\n", off.x * 1000.0f,
+                    off.y * 1000.0f, off.z * 1000.0f, startInside, inside, r.frames, stretch);
+        CHECK(startInside > 0);
+        worstInside = std::max(worstInside, inside);
+        worstStretch = std::max(worstStretch, stretch);
+    }
+    CHECK(worstInside == 0);
+    CHECK(worstStretch < 2.0f); // (split across the forearm: x3)
 }
