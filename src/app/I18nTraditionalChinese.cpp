@@ -1966,23 +1966,27 @@ constexpr Entry kTraditionalChinese[] = {
      "在遮罩堆疊底部加入效果。產生器讀取 Mesh Maps：Edge Wear（凸出邊緣）、Dirt（縫隙）、Gradient、Thickness（薄的部"
      "分）、Light Direction（朝上的表面）。Noise 是 3D 的，因此沒有 UV 接縫。Paint 讓你用 Paint 筆刷繪製遮罩。"},
     // --- PanelForgeSpheres.cpp (tools/i18n/coverage.py) ---
-    {"Add a Forge Sphere Part: one root sphere to block out a body, creature or plant from. Drag on a sphere to grow "
-     "limbs from it, Move and Scale them into proportion, check the skin with Preview (A), then Make Mesh.",
-     "新增 Forge Sphere 部件：一個根球體，用來打出身體、生物或植物的粗胚。在球體上拖曳即可長出肢體，用移動與縮放調整"
-     "比例，以預覽 (A) 檢查外皮，再「建立網格」。"},
-    {"Drag on a sphere to grow a new sphere from it (how far you drag sets its size). Click a link between two "
-     "spheres to add a joint there, and drag to place it. Alt+click a sphere to delete it.",
-     "在球體上拖曳即可從它長出新球體（拖曳距離決定大小）。按一下兩球體間的連結可在該處加入關節，拖曳即可放置。Alt+按"
-     "一下球體即可刪除。"},
+    {"Add a Forge Sphere Part: one root sphere to block out a body, creature or plant from. Click a sphere to grow "
+     "limbs from it, drag them into place and proportion, check the skin with Preview (A), then Make Mesh.",
+     "新增 Forge Sphere 部件：一個根球體，用來打出身體、生物或植物的粗胚。按一下球體即可長出肢體，拖曳它們調整位置與比例，"
+     "以預覽 (A) 檢查外皮，再「建立網格」。"},
+    {"Build without switching modes: click a sphere to grow a new one from it, drag a sphere to move it, drag "
+     "near its edge to resize it (the cursor shows which). Click a link between two spheres to add a joint "
+     "there, and drag to place it. Alt+click a sphere to delete it.",
+     "無需切換模式：按一下球體即可從它長出新球體，拖曳球體即可移動，在其邊緣附近拖曳即可調整大小（游標會提示）。按一下兩"
+     "球體間的連結可在該處加入關節，拖曳即可放置。Alt+按一下球體即可刪除。"},
     {"Drag a sphere to move it; the links stretch to follow. Symmetry moves its mirror twin too.",
      "拖曳球體即可移動；連結會伸展跟隨。對稱時其鏡像也會一起移動。"},
     {"Drag a sphere up or right to make it bigger, down or left to make it smaller.",
      "將球體向上或向右拖曳可放大，向下或向左拖曳可縮小。"},
     {"Drag places child", "拖曳放置子球"},
-    {"Draw: dragging on a sphere moves the new sphere away from it (one drag places a limb joint) instead of sizing "
-     "it. Off, hold Ctrl while you drag for the same.",
-     "繪製：在球體上拖曳會讓新球體遠離它（一次拖曳放置一個肢體關節），而不是調整大小。關閉時，拖曳時按住 Ctrl 效果相"
-     "同。"},
+    {"Draw: dragging on a sphere grows a new sphere and moves it away from it (one drag places a limb joint) "
+     "instead of moving the sphere. Off, hold Ctrl while you drag for the same.",
+     "繪製：在球體上拖曳會長出新球體並讓它遠離該球體（一次拖曳放置一個肢體關節），而不是移動該球體。關閉時，拖曳時按住 "
+     "Ctrl 效果相同。"},
+    {"click: add  drag: move", "按一下：新增  拖曳：移動"},
+    {"drag: add", "拖曳：新增"},
+    {"drag: resize", "拖曳：調整大小"},
     {"Delete Selected", "刪除所選"},
     {"Delete the selected sphere (the one you last clicked or added, outlined in orange) and everything growing from "
      "it. The root stays.",

@@ -57,17 +57,29 @@
 <p><strong>Tool &gt; Forge Spheres &gt; New Forge Sphere</strong> adds a Forge Sphere Part holding one root sphere at the centre and makes it active. It sits in the Parts list like any other Part, so you can block out a creature next to a model you already have.</p>
 <p>While a Forge Sphere Part is active, dragging on it edits the spheres instead of sculpting. Dragging the background still navigates. The brush ring is hidden; the sphere under the cursor gets an outline instead.</p>
 <h2 id="edit-the-spheres">Edit the spheres<a class="anchor" href="#edit-the-spheres" aria-label="Link to this section">#</a></h2>
-<p>Pick the mode in <strong>Tool &gt; Forge Spheres</strong>:</p>
-<div class="table-wrap"><table><thead><tr><th>Mode</th><th>On a sphere</th><th>On a link</th></tr></thead><tbody><tr><td><strong>Draw</strong></td><td>Drag to grow a new sphere from it. It starts on the surface where you pressed; how far you drag sets its size (a click makes one half the size of its parent)</td><td>Click to add a joint halfway along the link, and drag to place it</td></tr><tr><td><strong>Move</strong></td><td>Drag to move it across the screen. The links stretch to follow</td><td>Moves the sphere at the end of the link</td></tr><tr><td><strong>Scale</strong></td><td>Drag up or right to make it bigger, down or left to make it smaller</td><td>Scales the sphere at the end of the link</td></tr></tbody></table></div>
+<p><strong>Draw</strong> (the default) does all three without switching modes (#167):</p>
+<ul>
+<li>
+<strong>Click</strong> a sphere to grow a new one from it, half its size, on the surface where you clicked.
+</li>
+<li>
+<strong>Drag</strong> a sphere&#x27;s middle to move it.
+</li>
+<li>
+<strong>Drag near its edge</strong> (the outer band of the outline) to resize it: the edge follows the cursor.
+</li>
+</ul>
+<p>The cursor and a small tag beside it (<em>drag: move</em>, <em>drag: resize</em>) show what a drag will do before you press. The <strong>Move</strong> and <strong>Scale</strong> modes are still there in <strong>Tool &gt; Forge Spheres</strong> for when you want one action only:</p>
+<div class="table-wrap"><table><thead><tr><th>Mode</th><th>On a sphere</th><th>On a link</th></tr></thead><tbody><tr><td><strong>Draw</strong></td><td>Click to grow a new sphere; drag the middle to move it, the edge to resize it</td><td>Click to add a joint halfway along the link, and drag to place it</td></tr><tr><td><strong>Move</strong></td><td>Drag to move it across the screen. The links stretch to follow</td><td>Moves the sphere at the end of the link</td></tr><tr><td><strong>Scale</strong></td><td>Drag up or right to make it bigger, down or left to make it smaller</td><td>Scales the sphere at the end of the link</td></tr></tbody></table></div>
 <p>In every mode, <kbd>Alt</kbd>+click a sphere to delete it together with everything that grows from it. The root sphere (orange) always stays.</p>
 <p><strong>Symmetry</strong> (<kbd>X</kbd>) mirrors every edit: grow an arm on the right and the left one grows with it, move a leg and its twin moves too. A sphere on the centre line stays on it, and a new sphere placed closer to the centre line than its own radius snaps onto it as one sphere instead of two overlapping twins.</p>
 <p>Every drag is one step of the Part&#x27;s undo history, so <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes back the last sphere you added, moved or scaled.</p>
-<aside class="callout callout-tip"><p><strong>Tip:</strong> build the structure first with few spheres (one per joint), set the proportions with Move and Scale, and add joints on links only where a limb needs to bend or swell.</p></aside>
+<aside class="callout callout-tip"><p><strong>Tip:</strong> build the structure first with few spheres (one per joint), drag them into place and size in Draw, and add joints on links only where a limb needs to bend or swell.</p></aside>
 <h2 id="pointer-only">Pointer only<a class="anchor" href="#pointer-only" aria-label="Link to this section">#</a></h2>
 <p>Everything also works with the pointer alone, without a key held (#8):</p>
 <ul>
 <li>
-<strong>Drag places child</strong>: with it on, a Draw drag on a sphere makes a new sphere half its size and moves it away from its parent as you drag, so one drag places the next joint of a limb. With it off, hold <kbd>Ctrl</kbd> while you drag for the same.
+<strong>Drag places child</strong>: with it on, a Draw drag on a sphere makes a new sphere half its size and moves it away from its parent as you drag (instead of moving the sphere), so one drag places the next joint of a limb. With it off, hold <kbd>Ctrl</kbd> while you drag for the same.
 </li>
 <li>
 <strong>The selected sphere</strong>: the sphere you last clicked or added is outlined in orange. <strong>Delete Selected</strong> deletes it and everything growing from it, <strong>Insert Between</strong> adds a joint halfway to the sphere it grows from, and <strong>Set as Root</strong> makes it the root: the armature keeps its shape and links and grows from there, so the skin doesn&#x27;t change.

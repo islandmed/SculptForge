@@ -1511,9 +1511,11 @@ private:
     void drawForgeSphereOverlay();                            // the hovered sphere's outline
     bool forgesphereActive() const { return !doc_.mesh.forgespheres.empty(); }
     int forgesphereAt(float x, float y, bool* link = nullptr) const; // sphere (or link's child) under the cursor, or -1
+    bool forgesphereNearRim(int i, float x, float y) const; // (x, y) on sphere i's rim band (Draw: a drag resizes)
     float worldPerPixel(const glm::vec3& at) const;       // world size of one canvas pixel at `at`'s depth
     ForgeSphereMode forgesphereMode_ = ForgeSphereMode::Draw;
     bool forgespherePlaceChild_ = false; // Draw: the drag moves the new sphere away from its parent (Ctrl does it too)
+    int forgesphereHint_ = 0;           // the overlay's hint: what a Draw drag would do (0 none, 1 move, 2 resize, 3 add)
     int forgesphereSelected_ = -1;      // the sphere last clicked or added (Delete Selected, the menu); -1 none
     // The right-click menu on a sphere: armed by a right press on one, opened if it was a click.
     struct ForgeSphereMenu {
@@ -1540,6 +1542,9 @@ private:
         float x = 0.0f, y = 0.0f;      // where the press was
         bool changed = false;
         bool place = false;            // Draw: the new sphere follows the cursor (Drag places child, Ctrl)
+        bool pending = false;          // Draw: nothing yet; a click adds a sphere, a drag moves it (body) or resizes it (rim)
+        bool rim = false;              // Draw: the press was on the sphere's outer band
+        float rimFrom = 0.0f;          // Draw's resize: the press's screen distance from the sphere's centre
         int added = -1;                // Draw: the new sphere's index
         const char* label = "";
     } zsDrag_;
