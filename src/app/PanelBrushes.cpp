@@ -163,7 +163,7 @@ void App::snakeHookTo(float x, float y) {
 
 // DragRect: undo the previous stamp and press a new one sized and rotated by the drag (without remeshing:
 // restoreStroke puts positions back, not topology).
-void App::dragRectTo(float x, float y) {
+void App::dragRectTo(float x, float y, bool commit) {
     doc_.sculptor.restoreStroke(doc_.mesh, doc_.bvh);
     const glm::vec2 drag = glm::vec2(x, y) - dragAnchor_;
     const float len = glm::length(drag);
@@ -183,6 +183,9 @@ void App::dragRectTo(float x, float y) {
     p.viewFalloff = uiPrefs_.viewFalloff;
     p.focal = focalShift_;
     p.alpha = &doc_.brushAlpha;
+    p.stampFootprint = commit; // (the moves before the release keep the sphere: the live preview stays cheap)
+    stampCursor_ = glm::vec2(x, y);
+    stampPlaced_ = true;
     // The stamp's top follows the drag (a VDM's only with Follow stroke direction, #136), turned by Angle and jitter.
     const bool follow = strokeBrush_ != BrushType::Vdm || alphaOptions_.followStroke;
     const float a = alphaStampAngle(alphaOptions_, follow, drag, stampJitter_);

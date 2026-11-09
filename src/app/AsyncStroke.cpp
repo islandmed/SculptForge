@@ -94,7 +94,7 @@ void App::StrokeSolver::loop() {
         app.doc_.sculptor.beginBatch(); // (a big brush's dabs go through the vertices together: core/SculptBatch.cpp)
         for (const PathDab& d : batch) {
             const auto t0 = std::chrono::steady_clock::now();
-            app.dabAt(d.x, d.y, d.pressure);
+            app.dabAt(d.x, d.y, d.pressure, d.stamp);
             spent += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         }
         {

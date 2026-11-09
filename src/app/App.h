@@ -209,7 +209,7 @@ private:
     bool airMoved_ = false;           // it moved past the click slop (a Ctrl+click still inverts the mask)
     float airX_ = 0.0f, airY_ = 0.0f; // where it was pressed
     void strokeTo(float x, float y);
-    void dabAt(float x, float y, float pressure = -1.0f); // pressure < 0: strokePressure()
+    void dabAt(float x, float y, float pressure = -1.0f, bool stamp = false); // pressure < 0: strokePressure()
     void endStroke();
     // Dynamic topology (dynamic topology, core/Dyntopo.h): turns it on or off (not on a mesh with
     // subdivision levels), saying so in the status bar; the Detail slider.
@@ -876,7 +876,7 @@ private:
     std::array<uint64_t, 6> visibleGroupsKey_{};
     // Stroke types, alphas and the extra brushes (PanelBrushes.cpp).
     void snakeHookTo(float x, float y);
-    void dragRectTo(float x, float y);
+    void dragRectTo(float x, float y, bool commit = false); // commit: the release's final stamp (the footprint)
     glm::vec3 screenUpVector(float angle) const; // camera up rotated by `angle` around the view axis
     static void SDLCALL onAlphaChosen(void* userdata, const char* const* files, int filter);
     StrokeType strokeType_ = StrokeType::Dots;
@@ -964,13 +964,17 @@ private:
     // from stroke to stroke (each stamp gets its own turn).
     float stampJitter_ = 0.0f;
     uint32_t stampSeed_ = 0x2545f491u;
+    // Drag Stamp / Slide Stamp re-stamp on every move; the footprint query is paid once, by the release's final stamp.
+    glm::vec2 stampCursor_{0.0f};
+    bool stampPlaced_ = false;
+    bool benchStampFootprint_ = false; // bench.sh alpha with SF_BENCH_STAMP: every dab takes the stamp footprint
     float lastDabAngle_ = 0.0f; // radians (UI tests: last_dab_angle)
     void drawAlphaOptions(bool vdm = false); // vdm: Brush > Vector Displacement's rows (no Tile, #136)
     std::mutex alphaMutex_;
     std::string pendingAlphaPath_; // set by the file dialog thread
     // Vector displacement brushes (PanelVdm.cpp, core/Vdm.h): the Brush palette's Vector Displacement section,
     // its file dialogs and actions, DragDot, and the DragRect stroke the VDM brush brings along (as the classic do).
-    void dragDotTo(float x, float y);
+    void dragDotTo(float x, float y, bool commit = false);
     bool vdmBrushActive() const { return brush_ == BrushType::Vdm && doc_.activeBrush < 0 && !paintMode_; }
     void drawVdmSection();
     void registerVdmActions();

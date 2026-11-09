@@ -6,6 +6,7 @@
 #include "core/ThreadPool.h"
 
 #include <algorithm>
+#include <limits>
 #include <atomic>
 #include <cmath>
 
@@ -444,6 +445,7 @@ struct SphereShape {
 struct CylinderShape {
     glm::vec3 c, a;
     float r, r2;
+    float h = std::numeric_limits<float>::infinity(); // half length along `a` (infinite: the whole line)
     float dist2(const glm::vec3& p) const {
         const glm::vec3 d = p - c;
         const glm::vec3 off = d - a * glm::dot(d, a);
@@ -452,16 +454,16 @@ struct CylinderShape {
     bool touches(const AABB& b) const { // conservative: the box's bounding sphere against the cylinder
         const glm::vec3 mid = (b.min + b.max) * 0.5f;
         const float reach = r + glm::length(b.max - mid);
-        return dist2(mid) <= reach * reach;
+        return dist2(mid) <= reach * reach && std::abs(glm::dot(mid - c, a)) <= h + glm::length(b.max - mid);
     }
     bool containsBox(const AABB& b) const {
         for (int k = 0; k < 8; ++k) {
             const glm::vec3 p((k & 1) ? b.max.x : b.min.x, (k & 2) ? b.max.y : b.min.y, (k & 4) ? b.max.z : b.min.z);
-            if (dist2(p) > r2) return false;
+            if (dist2(p) > r2 || std::abs(glm::dot(p - c, a)) > h) return false;
         }
         return true;
     }
-    bool contains(const glm::vec3& p) const { return dist2(p) <= r2; }
+    bool contains(const glm::vec3& p) const { return dist2(p) <= r2 && std::abs(glm::dot(p - c, a)) <= h; }
 };
 
 } // namespace
@@ -501,13 +503,13 @@ void BVH::queryVertices(const Mesh& mesh, const glm::vec3& center, float radius,
 }
 
 void BVH::queryVerticesCylinder(const Mesh& mesh, const glm::vec3& point, const glm::vec3& axis, float radius,
-                                std::vector<uint32_t>& out) const {
+                                std::vector<uint32_t>& out, float halfLength) const {
     const float len = glm::length(axis);
     if (!(len > 1e-12f)) {
         queryVertices(mesh, point, radius, out);
         return;
     }
-    queryVerticesIn(mesh, CylinderShape{point, axis / len, radius, radius * radius}, out);
+    queryVerticesIn(mesh, CylinderShape{point, axis / len, radius, radius * radius, halfLength}, out);
 }
 
 void BVH::refit(const Mesh& mesh, std::span<const uint32_t> movedVerts) {

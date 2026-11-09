@@ -1031,6 +1031,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The first-use notice for online AI services (tests/ui/ai_consent.sfui, 100% and 200% inside).
     sculptforge_ui_test(ai_consent_1440 ai_consent --size 1440x900)
     sculptforge_ui_test(ai_consent_2880 ai_consent --size 2880x1800) # its 200% shots: 1440 px of UI
+    sculptforge_ui_test(drag_stamp_footprint_1440 drag_stamp_footprint --size 1440x900) # #174's shots at 1440 and 2880 px
+    sculptforge_ui_test(drag_stamp_footprint_2880 drag_stamp_footprint --size 2880x1800)
     sculptforge_ui_test(geometry_groups_1440 geometry_groups --size 1440x900)
     sculptforge_ui_test(geometry_groups_2880 geometry_groups --size 2880x1800) # its 200% shot: 1440 px of UI
     sculptforge_ui_test(geometry_groups_1024 narrow/geometry_groups --size 1024x768)

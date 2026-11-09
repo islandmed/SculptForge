@@ -2392,6 +2392,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     if (strokeType_ == StrokeType::DragRect || strokeType_ == StrokeType::DragDot) {
         stampJitter_ = alphaJitterAngle(alphaOptions_.jitter, stampSeed_);
         stampPressure_.reset();
+        stampPlaced_ = false;
     }
     if (strokeType_ == StrokeType::DragRect) {
         dragAnchor_ = glm::vec2(x, y);
@@ -2494,8 +2495,8 @@ void App::strokeTo(float x, float y) {
         }
         firstDabPending_ = false;
         lastStrokePressure_ = strokePressure();
-        if (asyncStroke_) dabQueue_.push({lastX_, lastY_, lastStrokePressure_}); // (the solver thread places it)
-        else dabAt(lastX_, lastY_, lastStrokePressure_);
+        if (asyncStroke_) dabQueue_.push({lastX_, lastY_, lastStrokePressure_, true}); // (the solver thread places it)
+        else dabAt(lastX_, lastY_, lastStrokePressure_, true);
     }
 
     // Place dabs at even screen-space spacing along the cursor path. Every input sample counts (pens
@@ -2546,7 +2547,7 @@ void App::drainStrokeDabs(double budgetSeconds) {
     while (!dabQueue_.empty()) {
         const PathDab d = dabQueue_.pop();
         const auto dabStart = std::chrono::steady_clock::now();
-        dabAt(d.x, d.y, d.pressure);
+        dabAt(d.x, d.y, d.pressure, d.stamp);
         ++placed;
         if (doc_.sculptor.batchWaiting() > 0) continue; // (its cost shows when the batch is placed, below)
         // what a dab costs on this mesh with this brush (the backlog limit in strokeTo)
@@ -2574,7 +2575,7 @@ void App::drainStrokeDabs(double budgetSeconds) {
     }
 }
 
-void App::dabAt(float x, float y, float pressure) {
+void App::dabAt(float x, float y, float pressure, bool stamp) {
     // On the solver thread (predictive strokes) the dab sees the view and the brush settings as they were when its
     // batch began (DabSettings), and nothing the main thread changes meanwhile.
     const DabSettings live = dabView_ ? DabSettings() : dabSettings();
@@ -2657,6 +2658,7 @@ void App::dabAt(float x, float y, float pressure) {
     p.frontFacesOnly = st.frontFacesOnly;
     p.connectedOnly = st.connectedOnly;
     p.viewFalloff = st.viewFalloff;
+    p.stampFootprint = stamp || benchStampFootprint_;
     p.focal = st.focal;
     if (!dabView_) { // (the solver's: when its batch is committed)
         lastDabScreen_ = glm::vec2(x, y);
@@ -2720,6 +2722,11 @@ void App::endStroke() {
     doc_.sculptor.microBaseFuse = true; // (big dabs on a micro level's base: these go through together)
     drainStrokeDabs(0.0); // the dabs still waiting belong to this stroke
     doc_.sculptor.microBaseFuse = false;
+    if (stampPlaced_ && !strokeMask_ && doc_.sculptor.strokeActive()) { // Drag / Slide Stamp: the final stamp takes the footprint, once (#174)
+        stampPlaced_ = false;
+        if (strokeType_ == StrokeType::DragRect) dragRectTo(stampCursor_.x, stampCursor_.y, true);
+        else if (strokeType_ == StrokeType::DragDot) dragDotTo(stampCursor_.x, stampCursor_.y, true);
+    }
     doc_.sculptor.flushDetailClone(doc_.mesh, doc_.bvh, symmetry_); // a Detail Clone click
     kelvinFinish(); // the rest of a Kelvinlet move (PanelKelvinlet.cpp)
     // (a command can end a Ctrl+click before its release: finishStrokeNow clears the mask click too)

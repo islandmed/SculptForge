@@ -12,6 +12,10 @@ sculptforge-cli --bench ...                     # the same without the GPU (CI, 
 Machine for all figures: Apple M1 Pro (8 performance + 2 efficiency cores, 32 GB unified memory, 30 GB usable
 under Asahi Linux), integrated GPU, Mesa 26.1 (OpenGL 4.6). How the benchmark works is described under v0.5 below.
 
+## Alpha stamps on curved surfaces (fix/dragstamp-curvature, #174)
+
+Drag Stamp, Slide Stamp and a stroke's first (stamp) dab with an alpha now cover the visible surface under their whole footprint, so a big stamp on a curved model has no gaps. On a 28M-triangle model at the floor tier, the largest alpha stamps take about 100 ms longer (once per stamp: the moves of a drag keep the cheaper region and the release's final stamp pays it); Dots, Spray and plain strokes are unchanged.
+
 ## 0.10.9: background dabs, Move once a frame (perf/bigbrush-p99)
 
 `--benchmark standard` placed every stroke in the frame loop (predictive strokes are off by default), and on the

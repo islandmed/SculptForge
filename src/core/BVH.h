@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <limits>
+
 #include "core/IndexBits.h"
 #include "core/Mesh.h"
 
@@ -29,9 +31,11 @@ public:
     // Ignores visibility; brushes use sf::brushVertices, which filters hidden ones.
     void queryVertices(const Mesh& mesh, const glm::vec3& center, float radius, std::vector<uint32_t>& out) const;
     // queryVertices for an infinite cylinder: every vertex within `radius` of the line through `point` along
-    // `axis` (a brush whose falloff is measured on screen reaches through the model along the view).
+    // `axis` (a brush whose falloff is measured on screen reaches through the model along the view), or only
+    // those within `halfLength` of `point` along it.
     void queryVerticesCylinder(const Mesh& mesh, const glm::vec3& point, const glm::vec3& axis, float radius,
-                               std::vector<uint32_t>& out) const;
+                               std::vector<uint32_t>& out,
+                               float halfLength = std::numeric_limits<float>::infinity()) const;
     // queryVertices for a capsule: every vertex within `radius` of the segment a..b (a fused batch of dabs along
     // a stroke, core/SculptBatch.cpp).
     void queryVerticesCapsule(const Mesh& mesh, const glm::vec3& a, const glm::vec3& b, float radius,

@@ -129,7 +129,7 @@ void App::afterVdmCommand(const std::string& name, const CommandResult& r) {
 
 // DragDot: one stamp at the brush size under the cursor; dragging slides it over the surface, and it stays where
 // the button comes up.
-void App::dragDotTo(float x, float y) {
+void App::dragDotTo(float x, float y, bool commit) {
     doc_.sculptor.restoreStroke(doc_.mesh, doc_.bvh);
     RayHit hit;
     if (!pick(x, y, hit)) return;
@@ -147,6 +147,9 @@ void App::dragDotTo(float x, float y) {
     p.viewFalloff = uiPrefs_.viewFalloff;
     p.focal = focalShift_;
     p.alpha = &doc_.brushAlpha;
+    p.stampFootprint = commit;
+    stampCursor_ = glm::vec2(x, y);
+    stampPlaced_ = true;
     lastDabAngle_ = alphaStampAngle(alphaOptions_, false, {}, stampJitter_); // Angle and jitter (#136); it slides, not turns
     p.alphaUp = screenUpVector(lastDabAngle_);
     p.vdm = doc_.brushVdm.get();
