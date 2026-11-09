@@ -166,7 +166,6 @@ p { margin: 0 0 1em; }
 }
 @media (max-width: 620px) {
   .nav nav a:not(.gh):not(.nav-dl):not(.nav-support) { display: none; }
-  .nav.tight nav a.nav-support { display: none; }
   .footer-grid { grid-template-columns: 1fr; }
   .footer .links { align-items: flex-start; }
   .section { padding: 64px 0; }
@@ -778,3 +777,12 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
 }
 .hero .first-sculpt { margin: 0 0 16px; }
 .hero .speed-line { margin: 0 0 8px; }
+
+/* Phone header: logo, Support (outline), Download (primary), menu: all in the bar at 360 px (Support stays in the menu too). */
+@media (max-width: 620px) {
+  .nav nav { gap: 6px; }
+  .nav nav a.nav-support, .nav nav a.nav-dl { font-size: 0.85rem; padding: 6px 11px; }
+  .nav .brand { gap: 8px; font-size: 1rem; }
+  .nav .brand .brand-mark { width: 36px; height: 36px; }
+  .nav-toggle { flex: none; }
+}
