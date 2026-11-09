@@ -17,7 +17,7 @@
   <meta property="og:url" content="https://sculptforge.app/queue.html">
   <link rel="canonical" href="https://sculptforge.app/queue.html">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="style.css?v=19">
+  <link rel="stylesheet" href="style.css?v=35">
   <script src="motion.js?v=12" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   <style>
@@ -45,7 +45,7 @@
   <div class="scroll-progress" aria-hidden="true"></div>
   <header class="nav">
     <div class="wrap nav-inner">
-      <a class="brand" href="index.html"><img class="brand-mark" src="img/bust-mark-44.png" srcset="img/bust-mark-88.png 2x, img/bust-mark-132.png 3x" width="44" height="44" alt=""><span>SculptForge</span></a>
+      <a class="brand" href="index.html"><img class="brand-wordmark" src="img/logo-wordmark-dark.svg" width="137" height="32" alt="SculptForge"><img class="brand-cube" src="img/logo-cube.svg" width="38" height="40" alt="SculptForge"></a>
       <nav aria-label="Main">
         <a href="index.html#features">Features</a>
         <a href="index.html#demos">Demos</a>
@@ -86,6 +86,7 @@
             <li><span class="badge">Member request</span><span class="idea">Pan left/right/up/down as separate bindable keys (for game pads / analog sticks; zoom in/out keys exist)</span><span class="st">Queued</span></li>
             <li><span class="badge">Member request</span><span class="idea">Workspaces (&quot;rooms&quot;) with their own tools and keys: Sculpt/Retopo, Model, Paint/Render, UV, and how a mesh moves between them</span><span class="st">Queued</span></li>
             <li><span class="badge">Member request</span><span class="idea">Custom quick panel: drag sections/buttons from any palette into it, open floating with a key or dock it in a tray; sections can be dragged out, hold a key to drag (not a pie menu)</span><span class="st">Queued</span></li>
+            <li><span class="badge">Member request</span><span class="idea">Improved Tube/curves: twist, spin and spread modifiers, rope / braid / sleeve profiles, and repeating a premade shape (e.g. a chain link) along a curve</span><span class="st">Queued</span></li>
             <li><span class="badge">Member request</span><span class="idea">Cloth panel: one place for the Cloth brush settings and running a simulation (Drape)</span><span class="st">Queued</span></li>
         </ul>
         <p class="member-cta"><a class="btn primary" href="support.html">Become a member</a></p>
@@ -148,7 +149,11 @@
             <tr><td>Forge Spheres: draw and move in one mode, no switching (e.g. drag a sphere to move it, drag from its edge to grow one); child size option for Drag places child; in-between spheres along links as a preview</td><td class="st">Queued</td></tr>
             <tr><td>Split view: a second live view of the model (e.g. sculpt from the side while watching the front); split by dragging, detachable window</td><td class="st">Queued</td></tr>
             <tr><td>Touch navigation on desktop: pen sculpts, fingers navigate (1 finger orbit, 2 fingers pan/zoom, 2-finger tap undo), setting to choose</td><td class="st">Queued</td></tr>
+            <tr><td>F key: one press frames the active Part, a second press frames the whole scene</td><td class="st">Queued</td></tr>
             <tr><td>Noise panel (pop-up): procedural 3D / alpha noise as displacement with scale, strength, mask-magnify and curves; colour blend modes; Mask / Unmask by noise; apply to mesh; presets in the Library</td><td class="st">Queued</td></tr>
+            <tr><td>Freeze subdivision: freeze the levels, edit the base topology, unfreeze with the sculpted detail carried onto the new mesh; plus Rebuild Lower Levels (rebuild the lower levels from the top one)</td><td class="st">Queued</td></tr>
+            <tr><td>Confirm pop-up before Voxel Remesh, Quad Remesh, Decimate (and later modelling ops) drop subdivision levels: Freeze Levels and Proceed / Cancel</td><td class="st">Queued</td></tr>
+            <tr><td>Morph panel, separate from Sculpt layers: Store, Delete, Apply and Accumulate; a Morph slider plus Width, Height and Distance sliders per axis; Project Morph</td><td class="st">Queued</td></tr>
             <tr><td>Unlit view: show painted colour/texture without lighting or shadows, with a quick key to toggle</td><td class="st">Queued</td></tr>
             <tr><td>Edge crease for subdivision + select edges by angle; creases through the Blender Bridge both ways <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.12.0</span></td></tr>
             <tr><td>Generate a cavity map <span class="tag">member</span></td><td class="st">Already in the app<span class="detail">Tool &gt; Bake &gt; Cavity; Masking &gt; By cavity</span></td></tr>
@@ -165,6 +170,7 @@
             <tr><td>Hold a key to change brush size</td><td class="st">Already in the app<span class="detail">hold [ or ], S for a Size slider</span></td></tr>
             <tr><td>Outside remeshing add-on</td><td class="st">Declined<span class="detail">no outside code; we&#x27;ll link it if published</span></td></tr>
             <tr><td>Re-create a third-party add-on</td><td class="st">Declined<span class="detail">their work and licence</span></td></tr>
+            <tr><td>Rename the Tendril brush to a more familiar name</td><td class="st">Declined</td></tr>
           </tbody>
         </table>
         </div>
@@ -177,7 +183,7 @@
   <footer class="footer">
     <div class="wrap footer-grid">
       <div>
-        <a class="brand" href="index.html"><img class="brand-mark" src="img/bust-mark-44.png" srcset="img/bust-mark-88.png 2x, img/bust-mark-132.png 3x" width="32" height="32" alt=""><span>SculptForge</span></a>
+        <a class="brand" href="index.html"><img class="brand-wordmark" src="img/logo-wordmark-dark.svg" width="103" height="24" alt="SculptForge"><img class="brand-cube" src="img/logo-cube.svg" width="30" height="32" alt="SculptForge"></a>
         <p class="fine">Copyright © 2026 The SculptForge contributors. SculptForge is licensed under the
           <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
       </div>

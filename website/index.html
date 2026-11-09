@@ -23,7 +23,7 @@
   </script>
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://sculptforge.app/img/social-preview.png?v=5">
-  <link rel="stylesheet" href="style.css?v=30">
+  <link rel="stylesheet" href="style.css?v=35">
   <script src="motion.js?v=12" defer></script>
   <script src="testimonials.js?v=2" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
@@ -32,7 +32,7 @@
   <div class="scroll-progress" aria-hidden="true"></div>
   <header class="nav">
     <div class="wrap nav-inner">
-      <a class="brand" href="#top"><img class="brand-mark" src="img/bust-mark-44.png" srcset="img/bust-mark-88.png 2x, img/bust-mark-132.png 3x" width="44" height="44" alt=""><span>SculptForge</span></a>
+      <a class="brand" href="#top"><img class="brand-wordmark" src="img/logo-wordmark-dark.svg" width="137" height="32" alt="SculptForge"><img class="brand-cube" src="img/logo-cube.svg" width="38" height="40" alt="SculptForge"></a>
       <nav aria-label="Main">
         <a href="#features">Features</a>
         <a href="#demos">Demos</a>
@@ -68,22 +68,21 @@
             after a big stroke. <a href="performance/">How we measure &rarr;</a></p>
           <p class="first-sculpt"><a href="guide/first-sculpt.html">New to sculpting? Make your first sculpt in 10 minutes &rarr;</a></p>
           <ul class="pills" aria-label="Built for studios">
-            <li>VFX Reference Platform</li><li>OpenUSD</li><li>Python API</li><li>Classic sculpting keys</li><li>Game-ready LODs</li>
+            <li>VFX Reference Platform</li><li>OpenUSD</li><li>Houdini via USD</li><li>Unreal Engine</li><li>Native Wayland</li><li>Python API</li><li>Classic sculpting keys</li><li>Game-ready LODs</li>
           </ul>
           <p class="studio-line"><a href="studios.html">Studio pipeline details &rarr;</a></p>
         </div>
-        <!-- Hero clip: everything about the source lives in this figure (files, poster, frame sizes, description, credit).
-             New source: desktop + webm + 720x866 phone cut + poster in media/, then edit this block only. A caption with
-             class="hero-credit" stays visible on phones; without it the caption hides there. -->
-        <figure class="hero-video hero-sculpt" style="--hero-ar: 1176 / 850; --hero-ar-phone: 720 / 866">
-          <video id="hero-video" poster="media/poster-asknk.jpg?v=1" autoplay muted loop playsinline preload="metadata"
-                 aria-label="A clip from askNK's video review of SculptForge: Facial Shapes turns a sculpted head through a smile, an open mouth, a blink and other expressions">
-            <source src="media/asknk-review-mobile.mp4?v=1" type="video/mp4" media="(max-width: 620px)">
-            <source src="media/asknk-review.webm?v=1" type="video/webm">
-            <source src="media/asknk-review.mp4?v=1" type="video/mp4">
-          </video>
-          <figcaption class="hero-credit">From <a href="https://www.youtube.com/watch?v=cunchKGUzcw" rel="noopener">askNK's review</a>
-            of SculptForge: Facial Shapes on a sculpted head. Clip shared with askNK's permission.</figcaption>
+        <!-- Hero video: askNK's review of SculptForge. Click-to-play: nothing is requested from YouTube (no IP, no referrer, no
+             cookies) until the button is pressed; then the privacy-enhanced embed replaces the poster (script at the end of
+             the page). The clip files in media/asknk-review* are unused; swap the video id here to change the video. -->
+        <figure class="hero-video hero-yt" id="hero-yt" data-embed="https://www.youtube-nocookie.com/embed/8oMCKB_7TRs?rel=0&amp;autoplay=1">
+          <div class="hero-yt-box">
+            <img src="media/poster-asknk.jpg?v=1" alt="" width="1176" height="850">
+            <button type="button" class="hero-yt-play" aria-label="Play askNK's review on YouTube"><svg viewBox="0 0 68 48" width="68" height="48" aria-hidden="true"><path d="M66.5 7.7a8.5 8.5 0 0 0-6-6C55.2.3 34 .3 34 .3S12.8.3 7.5 1.7a8.5 8.5 0 0 0-6 6C0 13 0 24 0 24s0 11 1.5 16.3a8.5 8.5 0 0 0 6 6C12.8 47.7 34 47.7 34 47.7s21.2 0 26.5-1.4a8.5 8.5 0 0 0 6-6C68 35 68 24 68 24s0-11-1.5-16.3z" fill="#f28c3c"/><path d="M27 34V14l18 10z" fill="#1a0d04"/></svg></button>
+          </div>
+          <noscript><p class="hero-credit"><a href="https://www.youtube.com/watch?v=8oMCKB_7TRs" rel="noopener">Watch askNK's review on YouTube</a></p></noscript>
+          <figcaption class="hero-credit">Video review by <a href="https://www.youtube.com/watch?v=8oMCKB_7TRs" rel="noopener">askNK</a>
+            on YouTube. It loads from YouTube when you press play.</figcaption>
         </figure>
       </div>
     </section>
@@ -91,7 +90,7 @@
     <!-- 0.12 launch band (site/launch-012): lands with the v0.12.0 tag only. The reel is recorded in the app on the
          0.12.0 build (~/Work/.sf/launch-012: record.sh + compose.py); swap the files in media/, keep the names. -->
     <section id="new-in-012" class="section release-band" aria-labelledby="new-in-012-title">
-      <div class="wrap release-grid">
+      <div class="wrap release-grid release-solo">
         <div class="release-copy">
           <p class="eyebrow">New in 0.12</p>
           <h2 id="new-in-012-title">Garments, plugins and posing</h2>
@@ -108,15 +107,6 @@
             <a class="btn" href="guide/whats-new.html">What's new</a>
           </div>
         </div>
-        <figure class="release-video">
-          <video poster="media/poster-reel-012.jpg?v=1" muted loop playsinline controls preload="none"
-                 aria-label="The SculptForge 0.12 reel, recorded in the app: a sewing pattern made from a template and its print pages, installing a plugin pack and running Noise Displace, posing every Part at once, tube shapes, and edge creases holding through subdivision levels">
-            <source src="media/reel-012-mobile.mp4?v=1" type="video/mp4" media="(max-width: 620px)">
-            <source src="media/reel-012.webm?v=1" type="video/webm">
-            <source src="media/reel-012.mp4?v=1" type="video/mp4">
-          </video>
-          <figcaption>Recorded in SculptForge 0.12.</figcaption>
-        </figure>
       </div>
     </section>
 
@@ -135,6 +125,10 @@
             <blockquote><p>You add it so quick !!? On Saturday !? Wow !</p></blockquote>
             <p class="voice-context">About the Tube drawing tool</p>
             <figcaption><span class="voice-name">GABO - Gabriel Abdala</span><span class="voice-role">Sculptor</span></figcaption>
+          </figure>
+          <figure class="voice">
+            <blockquote><p>After years of struggling with expensive software subscriptions, finding SculptForge felt like a breath of fresh air. It is evolving fast, with new improvements arriving regularly, and I genuinely believe it has a bright future. What excites me most is how it is made: artists steering and agents building is a monumental change in how software gets developed. My advice as a Senior Lead Character &amp; Creature Artist and mentor: don't chase millions of polygons. Plan your models, build your forms intelligently, and add detail when needed. I strongly recommend every artist give it a try.</p></blockquote>
+            <figcaption><span class="voice-name">Abhik Mitra (VOIDART ACADEMY)</span><span class="voice-role">Senior Lead Character &amp; Creature Artist</span></figcaption>
           </figure>
         </div>
       </div>
@@ -322,6 +316,10 @@
           <div class="spec"><strong>Rocky Linux 8 &amp; 9</strong><span>glibc 2.28 / 2.34, verified in CI</span></div>
           <div class="spec"><strong>GCC 14.2 · C++20</strong><span>gcc-toolset-14, as the platform specifies</span></div>
           <div class="spec"><strong>Python 3.13</strong><span><code>import sculptforge</code> with NumPy mesh access</span></div>
+          <div class="spec"><strong>Unreal Engine 5</strong><span>Send to Unreal: a static mesh with LODs, into a running editor</span></div>
+          <div class="spec"><strong>Houdini via USD</strong><span>USD in and out, other units open at real size</span></div>
+          <div class="spec"><strong>Native Wayland</strong><span>No XWayland, pen pressure, X11 works too</span></div>
+          <div class="spec"><strong>Blender &middot; Maya</strong><span>Bridge add-on (4.2+) and a Maya shelf (2022+)</span></div>
         </div>
         <div class="vfx-grid">
           <ul class="vfx-points">
@@ -553,7 +551,7 @@ rez-env sculptforge -- sculptforge troll.usda \
   <footer class="footer">
     <div class="wrap footer-grid">
       <div>
-        <a class="brand" href="#top"><img class="brand-mark" src="img/bust-mark-44.png" srcset="img/bust-mark-88.png 2x, img/bust-mark-132.png 3x" width="32" height="32" alt=""><span>SculptForge</span></a>
+        <a class="brand" href="#top"><img class="brand-wordmark" src="img/logo-wordmark-dark.svg" width="103" height="24" alt="SculptForge"><img class="brand-cube" src="img/logo-cube.svg" width="30" height="32" alt="SculptForge"></a>
         <p class="fine">Copyright © 2026 The SculptForge contributors.<br>Licensed under the
           <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
       </div>
@@ -605,6 +603,22 @@ rez-env sculptforge -- sculptforge troll.usda \
         if (still) v.controls = true;
       }
       // Scroll reveals, transitions and the progress bar: motion.js.
+    })();
+  </script>
+  <script>
+    (function () {
+      var fig = document.getElementById("hero-yt"); if (!fig) return;
+      var btn = fig.querySelector(".hero-yt-play"), box = fig.querySelector(".hero-yt-box");
+      btn.addEventListener("click", function () {
+        var f = document.createElement("iframe");
+        f.src = fig.getAttribute("data-embed");
+        f.title = "askNK's video review of SculptForge";
+        f.allow = "accelerometer; autoplay; encrypted-media; picture-in-picture; fullscreen";
+        f.allowFullscreen = true;
+        f.referrerPolicy = "strict-origin-when-cross-origin";
+        box.replaceChildren(f);
+        f.focus();
+      });
     })();
   </script>
 </body>

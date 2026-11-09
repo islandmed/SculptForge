@@ -81,7 +81,7 @@
     const inner = siteHeader.querySelector(".nav-inner"), brand = siteHeader.querySelector(".brand");
     const items = [...mainNav.querySelectorAll("a:not(.gh):not(.nav-dl)")];
     const ghs = [...mainNav.querySelectorAll("a.gh")]; // Discord and GitHub
-    if (!brand.hasAttribute("aria-label")) brand.setAttribute("aria-label", brand.textContent.trim());
+    if (!brand.hasAttribute("aria-label")) brand.setAttribute("aria-label", brand.textContent.trim() || "SculptForge");
     const menu = document.createElement("div");
     menu.className = "nav-menu";
     menu.id = "site-menu";

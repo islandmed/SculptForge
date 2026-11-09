@@ -28,6 +28,11 @@
   <a href="https://sculptforge.app/support.html">Membership</a>
 </p>
 
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=8oMCKB_7TRs"><img src="website/media/poster-asknk.jpg" width="640" alt="Watch askNK's review of SculptForge on YouTube"></a><br>
+  <sub>Video review by <a href="https://www.youtube.com/@asknk">askNK</a>. Click to watch on YouTube.</sub>
+</p>
+
 <p align="center"><sub>
   If sculptforge.app is blocked on your network: <a href="https://github.com/islandmed/SculptForge/releases/latest">download from GitHub Releases</a>
   and read the <a href="docs/guide/index.md">user guide on GitHub</a>.
