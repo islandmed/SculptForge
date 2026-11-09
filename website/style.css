@@ -761,3 +761,20 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
 /* Home: "Why we build this" band */
 .why-band h2 { max-width: 22em; }
 .why-band .section-lede { margin-bottom: 24px; }
+
+/* Home hero (mission headline): the H1 is the mission, the old tagline sits under the line, studio facts are a chip strip. */
+.hero h1 { font-size: clamp(2.1rem, 8.4vw, 3.6rem); line-height: 1.06; text-wrap: balance; }
+.tagline { color: var(--accent-2); font-weight: 600; margin: 0.9em 0 0; }
+.hero-note { color: var(--muted); font-size: 0.92rem; margin: 0 0 14px; }
+.studio-line { margin: 10px 0 0; font-size: 0.9rem; }
+@media (max-width: 620px) {
+  .hero h1 { font-size: clamp(1.9rem, 9vw, 2.4rem); }
+  .tagline { order: 3; text-align: center; margin: -0.4em 0 1em; }
+  .hero-note { order: 6; text-align: center; margin: 0 0 14px; }
+  .studio-line { display: none; }
+  .ctas { flex-direction: column; }
+  .ctas .btn { flex: none; width: 100%; }
+  .speed-line { order: 6; }
+}
+.hero .first-sculpt { margin: 0 0 16px; }
+.hero .speed-line { margin: 0 0 8px; }
