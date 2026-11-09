@@ -61,6 +61,9 @@ void usage() {
         "  --ui-record out.mp4      Also record the UI test, every frame in real time with the pointer drawn (needs ffmpeg)\n"
         "  --ui-serve [--threads N] Warm UI test server: one window, then one test per stdin line (tools/test/warm_ui.py)\n"
         "  --fullscreen             Start filling the screen (F11 toggles)\n"
+        "  --splash                 Force showing the startup splash screen\n"
+        "  --no-splash              Skip the startup splash screen\n"
+        "  --splash-seconds S       Splash screen display duration in seconds (default 2.5)\n"
         "  --no-ai                  Start with every AI feature off and locked (as SF_AI=off)\n"
         "  --no-packs               Safe mode: start without any installed pack (Library > Packs)\n"
         "  --studio FILE            Start in studio mode with this studio profile (studio.json; docs/studios.md)\n"
@@ -218,6 +221,9 @@ static int runMain(int argc, char** argv) {
         else if (a == "--supersample") options.supersample = std::clamp(std::atoi(next().c_str()), 1, 4);
         else if (a == "--ui-test") options.uiTest = next();
         else if (a == "--fullscreen") options.fullscreen = true;
+        else if (a == "--splash") options.splash = true;
+        else if (a == "--no-splash") options.noSplash = true;
+        else if (a == "--splash-seconds") options.splashSeconds = std::clamp(float(std::atof(next().c_str())), 0.1f, 30.0f);
         else if (a == "--no-ai") sf::ai::setAiForcedOff(true); // as SF_AI=off (ai/AiPolicy.h)
         else if (a == "--no-packs") sf::setPacksSafeMode(true); // safe mode: no installed pack is loaded
         else if (a == "--studio") studioProfile = next();             // core/StudioProfile.h
@@ -275,7 +281,8 @@ static int runMain(int argc, char** argv) {
         }
     }
     g_isolatedDir.clear(); // (the warm server's last script's folder)
-    if (automatedRun()) isolateSettings();
+    options.automated = automatedRun();
+    if (options.automated) isolateSettings();
     if (bench.run) return finishIsolated(sf::runAppBenchmark(bench));
     if (optimistic) return finishIsolated(sf::runOptimisticBench(optimisticOptions));
     if (calibrate) return finishIsolated(sf::runCalibrateCommandLine(calibrateQuick, calibrateSave));

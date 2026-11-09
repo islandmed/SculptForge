@@ -92,47 +92,9 @@ namespace sf::ai {
 class ChildProcess; // ai/Process.h (the updater's restart)
 }
 
-namespace sf {
+#include "app/SplashScreen.h"
 
-struct AppOptions {
-    std::string openPath;   // model or image to open at start
-    bool blender = false;   // started by the Blender add-on: load what it sent (--blender)
-    std::string script;     // commands to run after start-up (same language as sculptforge-cli)
-    std::string renderPath; // headless: render a PNG and exit
-    int width = 1024, height = 1024;
-    float yawDegrees = -30.0f, pitchDegrees = -15.0f;
-    float zoom = 1.0f; // headless: camera this many times closer than the framed view
-    int turntable = 0; // headless: render N frames around the model (<path>_000.png ...)
-    bool wireframe = false;
-    bool facegroups = false; // headless: colour each face group
-    bool hideMesh = false; // headless: show only the splats
-    std::string demo;       // scripted demo to play (see Demo.h)
-    std::string recordPath; // record the session to this .mp4 (needs ffmpeg) and exit
-    std::string uiRecordPath; // --ui-test: also record every frame, paced to real time, to this .mp4 (launch clips)
-    std::string demoAsset;  // file the demo opens (image or model)
-    std::string demoOutput; // where the demo saves its result (optional)
-    int fps = 30;
-    int supersample = 1; // recording: render this many times larger, then downsample (crisp text, room to zoom)
-    std::string uiTest;   // run this .sfui UI test script headless and exit (see UiTest.cpp)
-    std::string uiOutDir; // where UI tests save screenshots
-    bool fullscreen = false; // start fullscreen (F11 toggles)
-    float measureStroke = 0.0f; // --measure-stroke S: a scripted fast circle stroke, report its path and frame times
-    float measureStrokeRadius = 0.0f; // --measure-stroke S,R: the brush radius in screen pixels
-    float measureIdle = 0.0f; // --measure-idle S: after a settling pause, count the frames drawn in S idle seconds, exit
-    // --timelapse out.mp4: render the opened project's history (its .sfhist) as a turntable timelapse and exit.
-    std::string timelapsePath;
-    float timelapseSeconds = 20.0f;
-    // --benchmark: proof mode (ProofMode.cpp), then exit. Sizes in millions of triangles (empty: 5, 20, 33 and
-    // 100 when memory allows); outputs default to the current folder.
-    bool benchmark = false;
-    std::string benchmarkScene; // --benchmark standard-15m | standard-33m | standard | standard-1b: a standard scene (ProofMode.h)
-    std::string benchmarkSizes, benchmarkOut, benchmarkVideo;
-    bool benchmarkNoVideo = false, benchmarkVsync = false;
-    float benchmarkStrokeSeconds = 6.0f;
-    // --benchmark-script take.sfui: the take (a UI test script's input) played in real time with the benchmark HUD,
-    // video and a per-frame CSV (BenchTake.cpp); benchmark is set too (isolated settings, --size 1920x1080).
-    std::string benchmarkScript;
-};
+namespace sf {
 
 class Demo;
 struct LengthUnit; // core/Units.h

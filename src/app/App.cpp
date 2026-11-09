@@ -4,6 +4,7 @@
 #include "app/NativeDialog.h"
 #include "app/Pickers.h"
 #include "app/BrandMark.h"
+#include "app/SplashScreen.h"
 #include "io/BridgeProtocol.h"
 #include "core/ThreadPool.h"
 #include "core/LayerStack.h"
@@ -159,6 +160,9 @@ bool App::init(const AppOptions& options) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return false;
     }
+    const bool showSplash = shouldShowSplash(options, headless, sharedWindow_ != nullptr, options.automated);
+    SplashScreen splash;
+    if (showSplash) splash.open(options.splashSeconds);
     if (!headless) macmenu::install(); // SculptForge > Preferences... in the macOS app menu (#111)
     // Joysticks for a 3Dconnexion SpaceMouse (SpaceMouse.cpp). Not fatal: the app works without them.
     if (!headless || !options.uiTest.empty()) {
@@ -169,8 +173,8 @@ bool App::init(const AppOptions& options) {
     glWindowAttributes();
 
     const SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
-                                  (headless ? SDL_WINDOW_HIDDEN : 0) |
-                                  (options.fullscreen && !headless ? SDL_WINDOW_FULLSCREEN : 0);
+                                  ((headless || showSplash) ? SDL_WINDOW_HIDDEN : 0) |
+                                  (options.fullscreen && !headless && !showSplash ? SDL_WINDOW_FULLSCREEN : 0);
     const bool sized = recording || options.benchmark; // proof mode: --size (1920x1080 by default)
     rememberWindow_ = !sized && !headless && options.demo.empty() && !options.fullscreen;
     const WindowState saved = rememberWindow_ ? loadWindowState() : WindowState{};
@@ -191,11 +195,13 @@ bool App::init(const AppOptions& options) {
     windowFocused_ = (SDL_GetWindowFlags(window_) & SDL_WINDOW_INPUT_FOCUS) != 0;
     if (rememberWindow_) { // #35: where and how big it was last time, inside the screen (#105)
         fitWindowToDisplay(saved);
-        if (restoresFullscreen(saved.fullscreen)) SDL_SetWindowFullscreen(window_, true);
-        // #41, #85: on macOS full screen is a Space of its own; entered at start-up (before the first frame, or right
-        // after it) the menu bar and traffic lights couldn't be revealed. A window that was full screen comes back
-        // filling the screen as a maximised window instead (the green button, or F11, takes it full screen again).
-        else if (saved.maximized || saved.fullscreen) SDL_MaximizeWindow(window_);
+        if (!showSplash) {
+            if (restoresFullscreen(saved.fullscreen)) SDL_SetWindowFullscreen(window_, true);
+            // #41, #85: on macOS full screen is a Space of its own; entered at start-up (before the first frame, or right
+            // after it) the menu bar and traffic lights couldn't be revealed. A window that was full screen comes back
+            // filling the screen as a maximised window instead (the green button, or F11, takes it full screen again).
+            else if (saved.maximized || saved.fullscreen) SDL_MaximizeWindow(window_);
+        }
     }
     {
         // The cube app icon, with its small cut as the alternate for small task bar and title bar icons.
@@ -223,6 +229,7 @@ bool App::init(const AppOptions& options) {
     }
     SDL_GL_MakeCurrent(window_, glContext_);
     SDL_GL_SetSwapInterval(1);
+    splash.setProgress(0.18f);
     timer.step("window, GL context");
 
     if (const char* missing = sharedContext_ ? nullptr // (loaded by the server)
@@ -242,6 +249,7 @@ bool App::init(const AppOptions& options) {
     }
     if (!headless && options.demo.empty() && !sharedWindow_) gpuChoiceStarted(); // (the chosen card works)
     if (!gpuNotice.empty()) status_ = gpuNotice;
+    splash.setProgress(0.38f);
     timer.step("renderer");
     renderer_.setEnvironmentWake([] { wakeMainLoop(); }); // (PBR view: a new environment's lighting is ready)
     // Fill layers ask for Mesh Maps: the app bakes them on a worker thread (PanelFill.cpp, updateMeshMaps).
@@ -288,6 +296,7 @@ bool App::init(const AppOptions& options) {
     initUiConfig(headless || !options.demo.empty()); // ui.json (layout, shortcuts, UI scale); never for tests and videos
     uiScale_ = targetUiScale(); // the style follows in applyLook below
     buildUiFonts(uiScale_);
+    splash.setProgress(0.58f);
     timer.step("ImGui, settings, fonts");
     if (recording || !options.benchmarkScript.empty()) { // (a benchmark take: the same scripts)
         ImGui::GetCurrentContext()->TestEngineHookItems = true; // lets the demo find buttons by label
@@ -299,6 +308,7 @@ bool App::init(const AppOptions& options) {
 
     for (int i = 0; i < int(FileAction::Count); ++i) dialogRequests_[i] = {this, FileAction(i)};
     initBrushLibrary(); // before a project can bring its own brushes
+    splash.setProgress(0.75f);
     timer.step("look, brush library");
     initProject(); // before opening anything, so it lands in the recent files
     initActions(); // the default shortcuts and every command, for keys, help and the command palette
@@ -306,8 +316,10 @@ bool App::init(const AppOptions& options) {
     loadBrushCurves(); // each brush's own pressure curve (Precision.cpp)
     initPhoneActions(); // File > Capture from phone (PanelPhone.cpp)
     initLibraryBrowser();
+    splash.setProgress(0.88f);
     timer.step("project, actions, library");
     runCommand("new_sphere");
+    splash.setProgress(0.95f);
     timer.step("new sphere");
     if (!options.openPath.empty()) openPath(options.openPath);
     if (!options.script.empty()) {
@@ -318,6 +330,11 @@ bool App::init(const AppOptions& options) {
             return false;
         }
         for (const auto& st : statements) {
+            if (st.command == "quit" || st.command == "exit") {
+                running_ = false;
+                SDL_Log("%s: quitting after startup", st.command.c_str());
+                continue;
+            }
             CommandResult r = commands_.execute(doc_, st.command, st.args);
             SDL_Log("%s: %s", st.command.c_str(), r.message.c_str());
             if (!r.ok && headless) return false;
@@ -338,6 +355,27 @@ bool App::init(const AppOptions& options) {
     }
     initHardwareProfile(); // the cached hardware profile, or calibration over the first frames (PanelPerformanceProfile.cpp)
     timer.step("hardware profile");
+    if (showSplash) {
+        if (!splash.finish()) {
+            running_ = false;
+        } else if (running_) {
+            gl::ClearColor(0.07f, 0.07f, 0.085f, 1.0f);
+            gl::Clear(GL_COLOR_BUFFER_BIT);
+            SDL_GL_SwapWindow(window_);
+            SDL_ShowWindow(window_);
+            if (options.fullscreen) {
+                SDL_SetWindowFullscreen(window_, true);
+            } else if (rememberWindow_) {
+                fitWindowToDisplay(saved);
+                if (restoresFullscreen(saved.fullscreen)) SDL_SetWindowFullscreen(window_, true);
+                else if (saved.maximized || saved.fullscreen) SDL_MaximizeWindow(window_);
+            }
+            SDL_RaiseWindow(window_);
+            SDL_SyncWindow(window_);
+            windowFocused_ = (SDL_GetWindowFlags(window_) & SDL_WINDOW_INPUT_FOCUS) != 0;
+        }
+        timer.step("splash");
+    }
     initialised_ = true;
     return true;
 }
@@ -1356,7 +1394,8 @@ void App::fitWindowToDisplay(const WindowState& saved) {
                                     {usable.x, usable.y, usable.w, usable.h}, b, scale);
     SDL_SetWindowSize(window_, fit.rect.w, fit.rect.h);
     SDL_SetWindowPosition(window_, fit.rect.x, fit.rect.y);
-    if (fit.maximize && !saved.fullscreen) SDL_MaximizeWindow(window_);
+    if (fit.maximize && !saved.fullscreen && !(SDL_GetWindowFlags(window_) & SDL_WINDOW_HIDDEN))
+        SDL_MaximizeWindow(window_);
 }
 
 // The UI scale (Preferences > Interface > UI scale, #87). Automatic follows the window's display: on Windows
