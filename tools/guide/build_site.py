@@ -798,7 +798,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <div class="scroll-progress" aria-hidden="true"></div>
   <header class="nav">
     <div class="wrap nav-inner">
-      <a class="brand" href="../index.html"><img class="brand-wordmark" src="../img/logo-wordmark-dark.svg" width="137" height="32" alt="SculptForge"><img class="brand-cube" src="../img/logo-cube.svg" width="38" height="40" alt=""></a>
+      <a class="brand" href="../index.html"><img class="brand-wordmark" src="../img/logo-wordmark-dark.svg" width="137" height="32" alt="SculptForge"><img class="brand-cube" src="../img/logo-cube.svg" width="38" height="40" alt="SculptForge"></a>
       <nav aria-label="Main">
         <a href="../index.html#features">Features</a>
         <a href="../index.html#demos">Demos</a>
@@ -835,7 +835,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <footer class="footer">
     <div class="wrap footer-grid">
       <div>
-        <a class="brand" href="../index.html"><img class="brand-wordmark" src="../img/logo-wordmark-dark.svg" width="103" height="24" alt="SculptForge"><img class="brand-cube" src="../img/logo-cube.svg" width="30" height="32" alt=""></a>
+        <a class="brand" href="../index.html"><img class="brand-wordmark" src="../img/logo-wordmark-dark.svg" width="103" height="24" alt="SculptForge"><img class="brand-cube" src="../img/logo-cube.svg" width="30" height="32" alt="SculptForge"></a>
         <p class="fine">Copyright © 2026 The SculptForge contributors.<br>The SculptForge User Guide is part of
           SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
       </div>
@@ -1064,7 +1064,7 @@ def supporters_html() -> str:
 <body>
   <header class="nav">
     <div class="wrap nav-inner">
-      <a class="brand" href="index.html"><img class="brand-wordmark" src="img/logo-wordmark-dark.svg" width="137" height="32" alt="SculptForge"><img class="brand-cube" src="img/logo-cube.svg" width="38" height="40" alt=""></a>
+      <a class="brand" href="index.html"><img class="brand-wordmark" src="img/logo-wordmark-dark.svg" width="137" height="32" alt="SculptForge"><img class="brand-cube" src="img/logo-cube.svg" width="38" height="40" alt="SculptForge"></a>
       <nav aria-label="Main">
         <a href="guide/index.html">Guide</a>
         <a href="studios.html">For studios</a>
