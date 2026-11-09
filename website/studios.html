@@ -43,6 +43,8 @@
     .stage .wrap { width: 100%; }
     .stage-copy { max-width: 780px; margin: 0 auto; text-align: center; animation: rise 0.8s cubic-bezier(.2, .7, .2, 1) both; }
     .stage .eyebrow { letter-spacing: 0.22em; font-size: 0.78rem; color: #ffb06a; }
+    .stage-facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; list-style: none; padding: 0; margin: 0 0 26px; }
+    .stage-facts li { font-size: 0.82rem; color: #d8d8e0; border: 1px solid rgba(255,255,255,0.18); border-radius: 999px; padding: 4px 12px; }
     .stage h1 { font-size: clamp(2.5rem, 5.4vw, 4.2rem); line-height: 1.03; margin: 0.3em 0 0.4em; color: #fff; letter-spacing: -0.01em; text-wrap: balance; }
     .stage h1 .accent { display: block; color: #ffb06a; }
     .stage .lede { color: #cfcfd6; margin: 0 auto 26px; max-width: 36em; }
@@ -185,6 +187,7 @@
       .stage .accent { color: #c8621f; text-shadow: none; }
       .stage h1 { color: #16161a; }
       .stage .eyebrow { color: #b8561a; }
+      .stage-facts li { color: #3d3d46; border-color: rgba(28,28,33,.22); }
       .stage .lede { color: #4d4d56; }
       .stage .thanks { color: #3d3229; }
       .studio-page code { background: #ebe8e3; }
@@ -212,7 +215,8 @@
         <a href="index.html#demos">Demos</a>
         <a href="brushes.html">Brushes</a>
         <a href="guide/index.html">Guide</a>
-        <a href="studios.html" aria-current="page">Studios</a>
+        <a href="studios.html" aria-current="page">For studios</a>
+        <a href="why.html">About</a>
         <a class="nav-support" href="support.html">Support</a>
         <a class="nav-dl" href="index.html#download">Download</a>
         <a class="gh" href="https://discord.gg/gWrYkEmQhH">Discord</a>
@@ -231,6 +235,9 @@
           <p class="lede">SculptForge is free and open source for any number of artists: no seats, no licence server,
             no accounts and no telemetry. It runs on Linux, Windows and macOS, works offline, and talks to Blender,
             Maya, Unreal and other sculpting apps.</p>
+          <ul class="stage-facts" aria-label="Pipeline facts">
+            <li>VFX Reference Platform CY2026 / CY2027</li><li>Rocky Linux 8 &amp; 9</li><li>Python 3.13</li><li>OpenUSD</li><li>Rez</li><li>Game-ready LODs</li><li>Send to Unreal</li>
+          </ul>
           <div class="stage-ctas">
             <a class="btn btn-hot" href="#membership">Your studio build</a>
             <a class="btn btn-ghost" href="#pipeline">Pipeline details</a>

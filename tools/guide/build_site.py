@@ -1067,7 +1067,7 @@ def supporters_html() -> str:
       <a class="brand" href="index.html"><img class="brand-mark" src="img/bust-mark-44.png" srcset="img/bust-mark-88.png 2x, img/bust-mark-132.png 3x" width="44" height="44" alt=""><span>SculptForge</span></a>
       <nav aria-label="Main">
         <a href="guide/index.html">Guide</a>
-        <a href="studios.html">Studios</a>
+        <a href="studios.html">For studios</a>
         <a class="nav-support" href="support.html">Support</a>
         <a class="nav-dl" href="index.html#download">Download</a>
       </nav>
