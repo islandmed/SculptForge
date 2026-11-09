@@ -10,7 +10,7 @@ The clay bust melting into an anvil, on its dark rounded tile. It is who we are:
 
 | Where | File |
 |---|---|
-| Site header lockup: bust + "SculptForge" (44 px, 1x-3x; 32 px in the footer) | `website/img/bust-mark-44/88/132.png` (`class="brand-mark"`, pages and `tools/guide/build_site.py`) |
+| Site header/footer brand: the wordmark (cube + SCULPT FORGE; 32 px, 24 px in the footer; cube only on very narrow bars) | `website/img/logo-wordmark-dark.svg`, `logo-cube.svg` (`class="brand-wordmark"`/`brand-cube`, pages and `tools/guide/build_site.py`); light/press copies in `website/press/` |
 | README hero | `website/img/bust-256.png` |
 | Social previews (site, GitHub) | `website/img/social-preview.png`, `docs/images/social-preview.png` |
 | GitHub org avatar, Discord bot avatar and server icon (uploaded by hand) | `make_icons.py --discord DIR`: `github-avatar-500.png`, `discord-bot-avatar-512.png`, `discord-server-icon-512.png` |

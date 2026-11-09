@@ -43,8 +43,9 @@ p { margin: 0 0 1em; }
 .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 600; font-size: 1.1rem; }
 .brand:hover { text-decoration: none; }
-/* The brand lockup: the bust (website/img/bust-mark-*.png; docs/brand.md) and the name. */
-.brand .brand-mark { display: block; flex: none; }
+/* The brand: the wordmark (website/img/logo-wordmark-*.svg); the cube alone when the bar is tight. The bust stays the favicon/app icon. */
+.brand .brand-wordmark { display: block; flex: none; width: auto; }
+.brand .brand-cube { display: none; flex: none; width: auto; }
 .nav nav { display: flex; gap: 22px; align-items: center; flex: none; }
 .nav nav a { color: var(--muted); font-size: 0.95rem; white-space: nowrap; }
 .nav nav a:hover { color: var(--text); text-decoration: none; }
@@ -55,7 +56,8 @@ p { margin: 0 0 1em; }
 .nav nav a.nav-support { color: #f6994d; border: 1px solid rgba(246, 153, 77, 0.55); padding: 6px 14px; border-radius: 999px;
                          font-weight: 600; }
 .nav nav a.nav-support:hover { color: #1a0d04; background: #f6994d; }
-.nav.tiny .brand span { display: none; }
+.nav.tiny .brand-wordmark { display: none; }
+.nav.tiny .brand-cube { display: block; }
 .nav.compact nav a.nav-dl { color: #1a0d04; background: linear-gradient(180deg, #f6994d, #e2742a); padding: 6px 14px;
                             border-radius: 999px; font-weight: 600; }
 .nav-menu .menu-gh { display: none; }
@@ -783,7 +785,11 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
 @media (max-width: 620px) {
   .nav nav { gap: 6px; }
   .nav nav a.nav-support, .nav nav a.nav-dl { font-size: 0.85rem; padding: 6px 11px; }
-  .nav .brand { gap: 8px; font-size: 1rem; }
-  .nav .brand .brand-mark { width: 36px; height: 36px; }
+  .nav .brand .brand-wordmark { height: 26px; }
   .nav-toggle { flex: none; }
+}
+
+@media (max-width: 400px) {
+  .nav .brand-wordmark { display: none; }
+  .nav .brand-cube { display: block; height: 34px; }
 }
