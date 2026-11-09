@@ -739,6 +739,7 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
 .release-band { background: radial-gradient(ellipse at 70% 40%, #1d1d23 0%, var(--bg) 70%); border-top: 1px solid var(--border); }
 .release-grid { display: grid; grid-template-columns: 0.9fr 1.3fr; gap: 48px; align-items: center; }
 .release-grid > * { min-width: 0; }
+.release-solo { grid-template-columns: 1fr; }
 .release-copy h2 { margin-top: 0.3em; }
 .release-copy .section-lede { margin-bottom: 22px; }
 .release-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
