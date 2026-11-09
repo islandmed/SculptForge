@@ -23,7 +23,7 @@
   </script>
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://sculptforge.app/img/social-preview.png?v=5">
-  <link rel="stylesheet" href="style.css?v=31">
+  <link rel="stylesheet" href="style.css?v=32">
   <script src="motion.js?v=12" defer></script>
   <script src="testimonials.js?v=2" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
@@ -72,18 +72,17 @@
           </ul>
           <p class="studio-line"><a href="studios.html">Studio pipeline details &rarr;</a></p>
         </div>
-        <!-- Hero clip: everything about the source lives in this figure (files, poster, frame sizes, description, credit).
-             New source: desktop + webm + 720x866 phone cut + poster in media/, then edit this block only. A caption with
-             class="hero-credit" stays visible on phones; without it the caption hides there. -->
-        <figure class="hero-video hero-sculpt" style="--hero-ar: 1176 / 850; --hero-ar-phone: 720 / 866">
-          <video id="hero-video" poster="media/poster-asknk.jpg?v=1" autoplay muted loop playsinline preload="metadata"
-                 aria-label="A clip from askNK's video review of SculptForge: Facial Shapes turns a sculpted head through a smile, an open mouth, a blink and other expressions">
-            <source src="media/asknk-review-mobile.mp4?v=1" type="video/mp4" media="(max-width: 620px)">
-            <source src="media/asknk-review.webm?v=1" type="video/webm">
-            <source src="media/asknk-review.mp4?v=1" type="video/mp4">
-          </video>
-          <figcaption class="hero-credit">From <a href="https://www.youtube.com/watch?v=8oMCKB_7TRs" rel="noopener">askNK's review</a>
-            of SculptForge: Facial Shapes on a sculpted head. Clip shared with askNK's permission.</figcaption>
+        <!-- Hero video: askNK's review of SculptForge. Click-to-play: nothing is requested from YouTube (no IP, no referrer, no
+             cookies) until the button is pressed; then the privacy-enhanced embed replaces the poster (script at the end of
+             the page). The clip files in media/asknk-review* are unused; swap the video id here to change the video. -->
+        <figure class="hero-video hero-yt" id="hero-yt" data-embed="https://www.youtube-nocookie.com/embed/8oMCKB_7TRs?rel=0&amp;autoplay=1">
+          <div class="hero-yt-box">
+            <img src="media/poster-asknk.jpg?v=1" alt="" width="1176" height="850">
+            <button type="button" class="hero-yt-play" aria-label="Play askNK's review on YouTube"><svg viewBox="0 0 68 48" width="68" height="48" aria-hidden="true"><path d="M66.5 7.7a8.5 8.5 0 0 0-6-6C55.2.3 34 .3 34 .3S12.8.3 7.5 1.7a8.5 8.5 0 0 0-6 6C0 13 0 24 0 24s0 11 1.5 16.3a8.5 8.5 0 0 0 6 6C12.8 47.7 34 47.7 34 47.7s21.2 0 26.5-1.4a8.5 8.5 0 0 0 6-6C68 35 68 24 68 24s0-11-1.5-16.3z" fill="#f28c3c"/><path d="M27 34V14l18 10z" fill="#1a0d04"/></svg></button>
+          </div>
+          <noscript><p class="hero-credit"><a href="https://www.youtube.com/watch?v=8oMCKB_7TRs" rel="noopener">Watch askNK's review on YouTube</a></p></noscript>
+          <figcaption class="hero-credit">Video review by <a href="https://www.youtube.com/watch?v=8oMCKB_7TRs" rel="noopener">askNK</a>
+            on YouTube. It loads from YouTube when you press play.</figcaption>
         </figure>
       </div>
     </section>
@@ -596,6 +595,22 @@ rez-env sculptforge -- sculptforge troll.usda \
         if (still) v.controls = true;
       }
       // Scroll reveals, transitions and the progress bar: motion.js.
+    })();
+  </script>
+  <script>
+    (function () {
+      var fig = document.getElementById("hero-yt"); if (!fig) return;
+      var btn = fig.querySelector(".hero-yt-play"), box = fig.querySelector(".hero-yt-box");
+      btn.addEventListener("click", function () {
+        var f = document.createElement("iframe");
+        f.src = fig.getAttribute("data-embed");
+        f.title = "askNK's video review of SculptForge";
+        f.allow = "accelerometer; autoplay; encrypted-media; picture-in-picture; fullscreen";
+        f.allowFullscreen = true;
+        f.referrerPolicy = "strict-origin-when-cross-origin";
+        box.replaceChildren(f);
+        f.focus();
+      });
     })();
   </script>
 </body>
