@@ -71,11 +71,30 @@ Use it to:
 - even out stretched triangles after heavy Move or Tendril work;
 - clean up scans, splat conversions and AI-generated models before sculpting.
 
-The **Resolution** slider next to the button sets how many voxels span the longest side of the model (32 to 512, as
-the `remesh` command; default 200). Higher keeps more detail and makes more triangles. 512 is safe on an 8 GB
-computer: a 28M-triangle scan remeshes at 512 in about 8 s (14 s on 4 cores) into about 760,000 triangles; a round
-2M-triangle sculpt, which fills its box, in about 3 s (5 s on 4 cores) into about 2.5 million triangles, with about
-2 GB of memory at its peak.
+The **Resolution** slider next to the button sets how many voxels span the longest side of the model (32 to 4096,
+as the `remesh` command; default 200). Higher keeps more detail and makes more triangles, about four times as many
+for each doubling. Two thirds of the slider covers 32 to 512, the everyday range; the last third goes up to 2048 and
+then 4096 (Ctrl+click it to type a number). The line under it estimates the result, *About 1.6M triangles*, from
+the Part's surface area (fine detail smaller than a voxel counts there, so a dense scan comes out somewhat lower).
+
+512 is safe on an 8 GB computer: a 28M-triangle scan remeshes at 512 in about 8 s (14 s on 4 cores) into about
+760,000 triangles; a round 2M-triangle sculpt, which fills its box, in about 3 s (5 s on 4 cores) into about 2.5
+million triangles, with about 2 GB of memory at its peak.
+
+Above 512 only the voxels near the surface are stored, so memory grows with the surface, not the volume: a sculpted
+head remeshes at 1024 into about 5.6 million triangles in about 3 s (5 s on 4 cores; 0.8 GB at its peak) and at
+2048 into about 22 million in about 9 s (21 s on 4 cores; 3 GB). At 4096 the same head would be about 90 million
+triangles and needs over 16 GB, so on most computers it says so instead of starting. Above 512:
+
+- the estimate line also shows the memory the remesh needs, in red when that is more than is free now;
+- the first remesh asks once, with the estimate (**Remesh** or **Cancel**); it asks again after the Resolution has
+  been back at 512 or less;
+- a remesh that won't fit in the free memory doesn't start: the status line says how much it needs and how much is
+  free. Lower the Resolution or close other apps;
+- it runs in the background with a progress bar; **Cancel** stops it within seconds and the Part stays as it was.
+
+Sculpting tens of millions of triangles needs a fast computer: **Decimate** or a lower Resolution makes the result
+lighter.
 
 ![Wireframe of a model before and after a voxel remesh](images/remesh.jpg)
 
@@ -269,7 +288,7 @@ each of them. Before a big change on a heavy sculpt:
 | Command | Options |
 |---|---|
 | `subdivide` | `levels` 1-4 (default 1) |
-| `remesh` | `resolution` 32-512 voxels across the longest side (default 200); `keep_texture` (default true) |
+| `remesh` | `resolution` 32-4096 voxels across the longest side (default 200; above 512 it stops with a message when it won't fit in the free memory); `keep_texture` (default true) |
 | `decimate` | `ratio` 0.01-1 of the triangles to keep (default 0.5), or `triangles` for an exact target |
 | `qremesh` | `target` quads (default 5000), `adaptive`, `keep_groups`, `detect_edges`, `use_vertexpaint`, `symmetry`, `keep_original`, `keep_texture`; see [Quad retopology](retopology.md#scripting) |
 | `close_holes` | `max_edges` closes only holes with at most that many boundary edges (default 0: all); `refine` (default true; false: as few triangles as possible); `new_group` (default true) |
@@ -283,8 +302,6 @@ each of them. Before a big change on a heavy sculpt:
 ```sh
 sculptforge-cli -c 'open path=scan.obj; remesh resolution=256; decimate triangles=200000; export_lods path=out/rock.glb levels=4 ratio=0.5'
 ```
-
-The command line accepts a wider remesh range (32-512) than the palette slider.
 
 ## See also
 

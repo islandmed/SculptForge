@@ -592,8 +592,6 @@ constexpr Entry kSpanish[] = {
     {"Remesh after each stroke", "Remallar tras cada trazo"},
     {"Cancel", "Cancelar"},
     {"Stop the remesh; the Part stays as it is.", "Detén el remallado; la pieza se queda como está."},
-    {"Voxels across the model: higher keeps more detail and makes more triangles.",
-     "Vóxeles a lo ancho del modelo: más conserva más detalle y genera más triángulos."},
     {"Remesh for sculpting", "Remallar para esculpir"},
 
     // --- Masking ---
@@ -5480,6 +5478,27 @@ constexpr Entry kSpanish[] = {
     {"Allowed", "Permitido"},
     {"Asks first", "Pregunta antes"},
     {"Revoke", "Revocar"},
+    // Voxel Remesh up to 4096 (PanelRetopo.cpp)
+    {"Voxels across the model, 32 to 4096: higher keeps more detail and makes more triangles (about 4x for each doubling). The line under it estimates the result. Above 512 a remesh can make tens of millions of triangles and take minutes; it asks once first, and won't start if it can't fit in the free memory. Ctrl+click to type a value.",
+     "Vóxeles a lo ancho del modelo, de 32 a 4096: más alto conserva más detalle y crea más triángulos (unas 4 veces más cada vez que se duplica). La línea de debajo estima el resultado. Por encima de 512 un remallado puede crear decenas de millones de triángulos y tardar minutos; pregunta una vez antes y no empieza si no cabe en la memoria libre. Ctrl+clic para escribir un valor."},
+    {"Estimate",
+     "Estimación"},
+    {"About how many triangles Voxel Remesh makes at this Resolution, from the Part's surface area (fine detail smaller than a voxel counts, so a dense scan comes out lower). Above 512 also the memory the remesh needs; in red when that is more than is free now.",
+     "Cuántos triángulos crea aproximadamente el Remallado vóxel con esta Resolución, a partir del área de la superficie de la Pieza (el detalle más fino que un vóxel cuenta, así que un escaneo denso sale por debajo). Por encima de 512 también la memoria que necesita; en rojo cuando es más de la que hay libre ahora."},
+    {"About %s triangles",
+     "Unos %s triángulos"},
+    {"About %s triangles, ~%s of memory",
+     "Unos %s triángulos, ~%s de memoria"},
+    {"About %s triangles, needs ~%s, %s free",
+     "Unos %s triángulos, necesita ~%s, %s libres"},
+    {"High resolution remesh",
+     "Remallado de alta resolución"},
+    {"Voxel Remesh at resolution %d makes about %s triangles and needs about %s of memory (%s free).",
+     "El Remallado vóxel a resolución %d crea unos %s triángulos y necesita unos %s de memoria (%s libres)."},
+    {"It can take a few minutes; Cancel in Tool > Remesh stops it and the Part stays as it is. This won't ask again until the Resolution goes back to 512 or less.",
+     "Puede tardar unos minutos; Cancelar en Herramienta > Remallado lo detiene y la Pieza queda como está. No volverá a preguntar hasta que la Resolución vuelva a 512 o menos."},
+    {"Sculpting that many triangles needs a fast computer: Decimate or a lower Resolution makes it lighter.",
+     "Esculpir tantos triángulos requiere un ordenador rápido: Diezmar o una Resolución más baja lo aligera."},
 };
 
 } // namespace

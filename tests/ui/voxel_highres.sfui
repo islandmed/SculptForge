@@ -1,0 +1,92 @@
+# Voxel Remesh up to 4096: two thirds of the Resolution slider for 32-512, the estimated
+# triangles under it, a one-time confirmation above 512 (again after going back to 512 or less), and a refusal
+# with what it needs when the remesh won't fit in the free memory.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+run transform scale=1,0.04,0.04
+key f
+camera 0 0
+remember triangles before
+click "Remesh##tool.remesh"
+expect_value voxel_resolution == 200
+expect_value voxel_triangle_estimate > 1000
+expect_text About
+hold ctrl
+hover "##voxres"
+expect_help 4096
+hold none
+
+# Typed in (Ctrl+click), above 512: the dialog says what it makes; Cancel leaves the Part as it is.
+hold ctrl
+click "##voxres"
+hold none
+type "Resolution##voxrestype" 528
+key enter
+expect_value voxel_resolution == 528
+expect_value voxel_triangle_estimate > 20000
+expect_value voxel_triangle_estimate < 400000
+shot voxel_highres_estimate
+click "Voxel Remesh##geometry.remesh"
+expect_value voxel_highres_confirm == 1
+expect_status about
+shot voxel_highres_confirm
+click "Cancel##voxelhighres"
+expect_value voxel_highres_confirm == 0
+expect_value voxel_remesh_running == 0
+expect_value triangles == $before
+
+# Remesh: runs in the background with progress; one undo step.
+click "Voxel Remesh##geometry.remesh"
+expect_value voxel_highres_confirm == 1
+click "Remesh##voxelhighres"
+wait_idle 120
+expect_status Remeshed
+expect_value triangles > 20000
+key ctrl+z
+expect_value triangles == $before
+
+# Asked once per trip above 512: no dialog now; after going back to 512, it asks again.
+click "Voxel Remesh##geometry.remesh"
+expect_value voxel_highres_confirm == 0
+wait_idle 120
+expect_status Remeshed
+key ctrl+z
+hold ctrl
+click "##voxres"
+hold none
+type "Resolution##voxrestype" 512
+key enter
+hold ctrl
+click "##voxres"
+hold none
+type "Resolution##voxrestype" 600
+key enter
+click "Voxel Remesh##geometry.remesh"
+expect_value voxel_highres_confirm == 1
+expect_no_text fast computer
+click "Cancel##voxelhighres"
+
+# A heavy result (most of the free memory): the dialog also says sculpting it needs a fast computer.
+env SF_AVAILABLE_MEMORY_MB 1900
+hold ctrl
+click "##voxres"
+hold none
+type "Resolution##voxrestype" 4096
+key enter
+click "Voxel Remesh##geometry.remesh"
+expect_value voxel_highres_confirm == 1
+expect_text fast computer
+shot voxel_highres_confirm_heavy
+click "Cancel##voxelhighres"
+
+# Won't fit in the free memory: no dialog, no remesh, the status and the red estimate say what it needs.
+env SF_AVAILABLE_MEMORY_MB 200
+expect_value voxel_resolution == 4096
+click "Voxel Remesh##geometry.remesh"
+expect_value voxel_highres_confirm == 0
+expect_value voxel_remesh_running == 0
+expect_status needs ~
+expect_status Lower the Resolution
+expect_value triangles == $before
+shot voxel_highres_refused
+env SF_AVAILABLE_MEMORY_MB 0

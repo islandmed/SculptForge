@@ -58,6 +58,7 @@
 #include "core/StudioProfile.h"
 #include "core/UpdateCheck.h"
 #include "core/ViewCapture.h"
+#include "core/Voxel.h"
 #include "core/WhatsNew.h"
 #include "core/Texture.h"
 #include "io/ArExport.h"
@@ -1425,6 +1426,25 @@ private:
         bool keepMasked = false, keepTexture = true;
     };
     std::unique_ptr<VoxelRemeshJob> voxelRemesh_;
+    // Resolution above 512: the estimate under the slider, a one-time confirmation with it
+    // (again after going back to 512 or less), and a refusal when it won't fit in the free memory (PanelRetopo.cpp).
+    void drawVoxelResolution(); // the slider (2/3 of its travel for 32-512) and the estimate line
+    void drawVoxelHighResConfirm();
+    struct VoxelEstimateCache {
+        uint32_t part = ~0u;
+        uint64_t revision = ~0ull;
+        size_t triangles = 0;
+        int resolution = 0;
+        double area = 0.0;
+        VoxelRemeshEstimate estimate;
+    } voxelEstimate_;
+    const VoxelRemeshEstimate& voxelEstimate(); // for the active Part at voxelResolution_
+    bool voxelHighResOk_ = false; // confirmed for this trip above 512
+    int voxelResolutionTyped_ = 200; // Ctrl+click on the slider: the number being typed
+    struct VoxelHighResConfirm {
+        bool open = false;
+        RemeshTrigger trigger = RemeshTrigger::Button;
+    } voxelHighResConfirm_;
     void pollQRemesh();
     struct QRemeshJob {
         std::future<bool> done;
