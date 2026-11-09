@@ -1,7 +1,7 @@
 {
  "format": "sculptforge-brush-requests",
  "version": 1,
- "updated": "2026-11-08T23:07:12Z",
+ "updated": "2026-11-09T01:37:05Z",
  "source": "https://discord.com/channels/1566592020024266812/1568787293731561483",
  "brushes": [
   {
@@ -21,6 +21,15 @@
    "renamed": false,
    "created": "2026-11-08",
    "url": "https://discord.com/channels/1566592020024266812/1568923216314114069"
+  },
+  {
+   "rank": 3,
+   "title": "Brush Rename Request: Tendril to Snake Hook",
+   "votes": 0,
+   "shipped": false,
+   "renamed": false,
+   "created": "2026-11-09",
+   "url": "https://discord.com/channels/1566592020024266812/1569160430847524948"
   }
  ]
 }
