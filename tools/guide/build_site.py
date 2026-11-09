@@ -789,7 +789,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <meta property="og:description" content="{desc}">
   <meta property="og:image" content="{SITE}img/social-preview.png?v=5">
   <meta property="og:url" content="{url}">
-  <link rel="stylesheet" href="../style.css?v=32">
+  <link rel="stylesheet" href="../style.css?v=33">
   <script src="../motion.js?v=12" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   <script src="search-index.js?v={len(chapters)}" defer></script>
@@ -1054,7 +1054,7 @@ def supporters_html() -> str:
   <meta name="color-scheme" content="dark light">
   <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png?v=7">
   <link rel="canonical" href="{SITE}supporters.html">
-  <link rel="stylesheet" href="style.css?v=32">
+  <link rel="stylesheet" href="style.css?v=33">
   <style>
     .supporters {{ columns: 3 14em; column-gap: 32px; padding: 0; list-style: none; }}
     .supporters li {{ break-inside: avoid; padding: 4px 0; }}
