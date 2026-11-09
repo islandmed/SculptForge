@@ -82,7 +82,7 @@ p { margin: 0 0 1em; }
 /* Hero */
 .hero { padding: 36px 0 56px; background: radial-gradient(1200px 600px at 15% -10%, rgba(242, 140, 60, 0.16), transparent 60%); }
 .hero-grid { display: grid; grid-template-columns: 1.05fr 1.2fr; gap: 48px; align-items: center; }
-@media (min-width: 961px) { .hero-grid { grid-template-columns: 1.05fr 1.3fr; align-items: start; } .hero-grid > .hero-video { margin-top: var(--hero-video-top, 2.7rem); } } /* video top lines up with the headline, below the eyebrow line */
+@media (min-width: 961px) { .hero-grid { grid-template-columns: 1.05fr 1.3fr; align-items: start; } .hero-grid > .hero-video { margin-top: var(--hero-video-top, 2.2rem); } } /* video top lines up with the headline, below the eyebrow line */
 .new-badge { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 18px; padding: 5px 14px 5px 5px;
              border: 1px solid var(--border); border-radius: 999px; background: rgba(242, 140, 60, 0.06); color: #cfcfd6;
              font-size: 0.88rem; }
