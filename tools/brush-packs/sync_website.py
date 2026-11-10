@@ -23,7 +23,7 @@ PAGE = ROOT / "website" / "brushes.html"
 IMAGES = ROOT / "website" / "img" / "brush-packs"
 GUIDE = ROOT / "website" / "guide" / "brush-packs.html"
 START, END = "<!-- packs:start -->", "<!-- packs:end -->"
-PACK_FUNCTIONS = ["clayAndForm", "hardSurface", "organicAndSkin", "clothAndFolds", "damageAndWear", "ornament"]
+PACK_FUNCTIONS = ["clayAndForm", "hardSurface", "organicAndSkin", "clothAndFolds", "damageAndWear", "ornament", "wood"]
 
 
 def read_packs():

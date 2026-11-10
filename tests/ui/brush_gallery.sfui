@@ -3,7 +3,7 @@
 # gallery that can't be reached shows a clear error instead of an empty window.
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 env SCULPTFORGE_BRUSH_GALLERY $SCRIPT_DIR/../../tools/brush-gallery/repo
-expect_value brushes == 67
+expect_value brushes == 77
 click "Brush##palette.brush"
 click "Community brushes##ui.brush_gallery"
 wait_idle 30
@@ -25,7 +25,7 @@ shot search
 click "Install##Snake Scales"
 wait_idle 30
 expect "Installed##Snake Scales"
-expect_value brushes == 68
+expect_value brushes == 78
 expect_status Snake Scales
 shot installed
 

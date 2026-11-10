@@ -358,6 +358,84 @@ const Generated kGenerated[] = {
              return std::clamp(facet * 1.6f, 0.0f, 1.0f) * roundEdge(u, v);
          });
      }},
+    {"Weathered Grain", "Long, uneven grain lines with worn-down soft wood between, for old boards and driftwood.",
+     [] {
+         return generate("Weathered Grain", [](float u, float v) {
+             const float warp = (fbm(u * 1.5f + 9.0f, v * 0.5f, 111, 3) - 0.5f) * 0.9f;
+             const float line = 1.0f - std::abs(std::sin((u * 5.0f + warp) * kPi));
+             const float hard = std::pow(line, 2.5f);                        // thin hard late-wood lines
+             const float wear = fbm(u * 3.0f, v * 7.0f + 5.0f, 113, 3);      // soft wood wears away in patches
+             return std::clamp(hard * (0.45f + 0.7f * wear) + 0.2f * wear, 0.0f, 1.0f) * squareEdge(u, v);
+         });
+     }},
+    {"Splinters", "A fan of thin, sharp splinters and torn fibres, for broken planks and snapped wood.",
+     [] {
+         return generate("Splinters", [](float u, float v) {
+             float best = 0.0f;
+             for (int k = 0; k < 9; ++k) {
+                 const float h = hash01(k, 3, 117);
+                 const float x0 = (float(k) - 4.0f) * 0.17f + (h - 0.5f) * 0.1f;
+                 const float len = 0.45f + 0.5f * hash01(k, 5, 119);
+                 const float lean = (hash01(k, 7, 121) - 0.5f) * 0.35f;
+                 const float y0 = -0.9f, y1 = -0.9f + len * 1.8f;
+                 const float d = segmentDistance(u, v, x0, y0, x0 + lean * (y1 - y0), y1);
+                 const float along = smooth01((v - y0) / std::max(y1 - y0, 0.01f));
+                 const float width = 0.075f * (1.0f - along * 0.85f) + 0.008f; // tapers to a point
+                 best = std::max(best, 1.0f - smooth01(d / width));
+             }
+             return best * squareEdge(u, v);
+         });
+     }},
+    {"Grain Cracks", "Narrow splits that run along the grain and fork, for dried and checked timber.",
+     [] {
+         return generate("Grain Cracks", [](float u, float v) {
+             float best = 0.0f;
+             for (int k = 0; k < 4; ++k) {
+                 const float cx = (float(k) - 1.5f) * 0.45f + (hash01(k, 2, 123) - 0.5f) * 0.2f;
+                 const float len = 0.6f + 0.35f * hash01(k, 4, 125);
+                 const float off = (hash01(k, 6, 127) - 0.5f) * 0.5f;
+                 const float wob = (fbm(v * 3.0f + float(k) * 5.0f, 2.0f, 129, 2) - 0.5f) * 0.18f;
+                 const float d = std::abs(u - cx - wob - 0.12f * (v + off) * (hash01(k, 8, 131) - 0.5f));
+                 const float taper = smooth01((len - std::abs(v - off)) / 0.3f);
+                 best = std::max(best, (1.0f - smooth01(d / (0.045f * taper + 0.006f))) * taper);
+             }
+             return best * squareEdge(u, v);
+         });
+     }},
+    {"Knot", "A round knot where the grain bends around a dark core, for boards, beams and trunks.",
+     [] {
+         return generate("Knot", [](float u, float v) {
+             const float r = std::hypot(u * 1.15f, v * 0.85f);
+             const float rings = 0.5f + 0.5f * std::cos(r * 9.0f * kPi + (fbm(u * 3.0f + 2.0f, v * 3.0f, 133) - 0.5f));
+             const float core = 1.0f - smooth01(r / 0.28f);
+             const float body = (1.0f - smooth01((r - 0.45f) / 0.35f)) * (0.55f + 0.3f * rings);
+             const float lines = (1.0f - smooth01(std::abs(v) / 0.9f)) * 0.15f * (0.5f + 0.5f * std::sin(u * 14.0f));
+             return std::clamp(std::max(body, core) + lines, 0.0f, 1.0f) * roundEdge(u, v);
+         });
+     }},
+    {"End Rings", "Concentric growth rings with radial checks, as on a sawn log end.",
+     [] {
+         return generate("End Rings", [](float u, float v) {
+             const float cx = 0.08f, cy = -0.05f; // the pith sits a little off centre
+             const float r = std::hypot(u - cx, v - cy) * (1.0f + 0.04f * std::sin(std::atan2(v - cy, u - cx) * 3.0f));
+             const float wob = (fbm(u * 2.5f + 1.0f, v * 2.5f, 135) - 0.5f) * 0.12f;
+             const float ring = std::pow(0.5f + 0.5f * std::cos((r + wob) * 13.0f * kPi * 0.5f), 1.6f);
+             const float ang = std::atan2(v - cy, u - cx);
+             const float check = smooth01(std::abs(std::sin(ang * 2.5f + 0.7f)) * 6.0f - 5.0f) * smooth01(r / 0.2f);
+             return std::clamp(ring * (1.0f - 0.8f * check), 0.0f, 1.0f) * roundEdge(u, v);
+         });
+     }},
+    {"Plank Seams", "Two boards meeting at a dark seam, with grain and nail dimples, for floors, decks and doors.",
+     [] {
+         return generate("Plank Seams", [](float u, float v) {
+             const float seam = smooth01((std::abs(u) - 0.035f) / 0.09f);   // 0 in the seam, 1 on the boards
+             const float side = u < 0.0f ? 0.0f : 1.0f;
+             const float level = 0.72f + 0.14f * side;                       // each board sits at its own height
+             const float grain = 0.1f * std::sin((u * 26.0f + 3.0f * fbm(u * 2.0f, v * 0.7f, 139)) * kPi);
+             const float nail = 1.0f - smooth01(std::hypot(std::abs(u) - 0.55f, std::fmod(std::abs(v) + 0.5f, 1.0f) - 0.5f) / 0.09f);
+             return std::clamp(seam * (level + grain) - 0.3f * nail * seam, 0.0f, 1.0f) * squareEdge(u, v);
+         });
+     }},
 };
 
 } // namespace
