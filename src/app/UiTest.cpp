@@ -68,6 +68,7 @@
 //   env NAME VALUE           set an environment variable; $SCRIPT_DIR is the script's folder
 //   generator_stub SHAPE...  Generate 3D answers from a stub instead of any service (never the network): candidate
 //                            N (A first) gets the Nth shape (cycling): sphere cube torus capsule cone, or fail; off = the services
+//   key_nav_speed X          the pan and zoom key speed (Preferences > Input), 0.1 to 5
 //   input_style STYLE        classic, sculptforge (the default), blender or maya, as Preferences > Input sets it
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
 //                            directory), e.g. to stage what another program would write (the Blender bridge);
@@ -922,6 +923,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "brush_sets") return double(app_.brushSets().size()); // brush sets in the library (#143)
     if (name == "brush_set_active") return double(app_.matchingBrushSet()); // the set the bottom shelf is, -1 none
     if (name == "bottom_shelf_items") return double(app_.layout_.bottomShelf.size());
+    if (name == "shortcut_conflict_open") return app_.shortcutConflictOpen() ? 1.0 : 0.0; // the Replace / Cancel popup
+    if (name == "shortcut_popup_overlaps_anchor") { // the popup over the button it belongs to (queue 14: popups clear their anchor)
+        const ImVec4 p = app_.shortcutPopupRect_, a = app_.shortcutAnchor_;
+        if (p.z <= p.x || a.z <= a.x) return -1.0; // no popup, or no anchor known
+        return p.x < a.z && a.x < p.z && p.y < a.w && a.y < p.w ? 1.0 : 0.0;
+    }
+    if (name == "key_nav_speed") return std::round(double(app_.uiPrefs_.keyNavSpeed) * 100.0);
     if (name == "shortcut_conflicts") { // keys that two actions claim (only the first would ever run)
         int conflicts = 0;
         std::vector<Chord> seen;
@@ -2693,6 +2701,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "quick_tour_offers") {
         // quick_tour_offers: UI tests leave out the quick tour's one offer (it would sit over their clicks)
         run([this] { app_.quickTourOffersInTests_ = true; });
+    } else if (verb == "key_nav_speed") { // key_nav_speed X: Preferences > Input's pan and zoom key speed (0.1 to 5)
+        if (!need(1)) return false;
+        run([this, v = num(1, 1.0f)] { app_.uiPrefs_.keyNavSpeed = std::clamp(v, 0.1f, 5.0f); });
     } else if (verb == "input_style") {
         // input_style classic|sculptforge|blender|maya: as Preferences > Input sets it (scripts written for one style)
         if (!need(1)) return false;
@@ -3864,7 +3875,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
                 "key_up", "hold", "stroke", "view_drag", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
                 "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
                 "drag_item", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "look",
-                "run", "wait", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
+                "run", "key_nav_speed", "wait", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
                 "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move",
                 "touch_stroke", "touch_pinch", "classic_keys", "input_style"};
             if (!allowed.count(verb)) {
