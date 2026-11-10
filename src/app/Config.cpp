@@ -920,6 +920,7 @@ void App::initActions() {
     registerPerformanceUiActions(); // Preferences > Performance (PanelPerformance.cpp)
     registerInputActions();     // the Classic sculpting keys: U I O, Space, L, V, Ctrl+A / I / H / W..., the input style (Input.cpp)
     registerTimelineUiActions(); // Sculpt Timeline, timelapse, Help > Benchmark (PanelTimeline.cpp)
+    registerPanelActions();      // panels in windows of their own, Reset panel windows (PanelWindows.cpp)
 
     registerBrushSets(); // brush set commands and actions; the active set's shelf back (PanelBrushSets.cpp)
     // Every command, so the command palette finds anything scriptable.
@@ -1213,6 +1214,7 @@ void App::restoreStandardUi() {
     layout_.customize = customize;
     actions_.clearOverrides();
     resetRadialMenus();
+    resetPanels(); // every panel back in the main window (PanelWindows.cpp)
     layoutBaseline_ = layoutKey();
     status_ = "Standard layout and shortcuts restored - Save Layout keeps the layout";
 }
@@ -1461,7 +1463,7 @@ void App::drawHelpConsoleUi() {
     console_.watchStatus(status_);
     if (layout_.consoleOpen) console_.draw(*this, consoleRect());
     palette_.draw(*this, paletteArea());
-    if (showHelp_) drawControlsWindow();
+    if (showHelp_ && !panelDetached("controls")) drawControlsWindow();
     if (!capturingShortcut_.empty()) {
         const Action* a = actions_.find(capturingShortcut_);
         const CanvasRect area = paletteArea();
@@ -1512,7 +1514,9 @@ void App::drawControlsWindow() {
     const float s = uiScale_;
     ImGui::SetNextWindowSize(ImVec2(560.0f * s, 640.0f * s), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
-    if (!ImGui::Begin(tr("Controls"), &showHelp_, ImGuiWindowFlags_NoCollapse)) {
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
+    fillPanelHost(flags); // in a window of its own: fills it (PanelWindows.cpp)
+    if (!ImGui::Begin(tr("Controls"), &showHelp_, flags)) {
         ImGui::End();
         return;
     }
@@ -1523,8 +1527,17 @@ void App::drawControlsWindow() {
     ImGui::SameLine();
     ui::ActionButton(*this, "input.import_blender", ImVec2(-FLT_MIN, 0), ui::Look::IconLabel);
     char (&filter)[96] = g_controlsFilter;
-    ImGui::SetNextItemWidth(-FLT_MIN);
+    const bool canDetach = !panelHost_; // in the main window: a button that moves it to a window of its own
+    const float detachW = ImGui::GetFrameHeight() * 1.2f;
+    ImGui::SetNextItemWidth(canDetach ? -(detachW + ImGui::GetStyle().ItemSpacing.x) : -FLT_MIN);
     ImGui::InputTextWithHint("##controls_filter", tr(ICON_LC_SEARCH "  Filter shortcuts and gestures"), filter, sizeof filter);
+    if (canDetach) {
+        ImGui::SameLine();
+        if (ImGui::Button(ICON_LC_SQUARE_ARROW_OUT_UP_RIGHT "##controls_detach", ImVec2(detachW, 0))) detachPanel("controls");
+        ui::HelpText("Open in its own window", nullptr,
+                     "Move Controls to a window of its own, to keep on another monitor. It opens there next time too.", "Help");
+        ui::DelayedTooltip("Open in its own window");
+    }
     const std::string f = lower(filter);
     auto matches = [&](const std::string& a, const std::string& b, const std::string& c) {
         return f.empty() || lower(a).find(f) != std::string::npos || lower(b).find(f) != std::string::npos ||
@@ -1609,6 +1622,7 @@ void drawConfigSection(App& app) {
     ui::ActionButton(app, "config.save_layout", full, ui::Look::IconLabel);
     ui::ActionButton(app, "config.restore_custom", full, ui::Look::IconLabel);
     ui::ActionButton(app, "config.restore_standard", full, ui::Look::IconLabel);
+    ui::ActionButton(app, "panel.reset", full, ui::Look::IconLabel); // panels in windows of their own (PanelWindows.cpp)
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     ui::ActionButton(app, "config.save", ImVec2(half, 0), ui::Look::IconLabel);
     ImGui::SameLine();

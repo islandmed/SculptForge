@@ -1,0 +1,22 @@
+# Panels in windows of their own (Member Request from Richard Throgmorton (MakIt3D), Founding Member #1) for the look
+# review at 1440 logical px (CMake: ui_detach_panels_1440 at 100 %, ui_detach_panels_1440_200 at 200 %): the palette
+# header's "Open in its own window" icon, the palette floating inside the window (offscreen: no window system to make
+# an OS window), its header in the task menu while it's out, and Controls' own button. Every shot comes before the
+# checks, so the script also shows an older build as it was.
+logical_width 1440
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+click "Tool##palette.tool"
+hover "Tool/##detach"
+wait 1.0
+shot header-icon-tooltip
+click "Tool/##detach"
+wait 0.3
+click "Display##tool.display"
+wait 0.2
+shot detached-floating
+key f1
+wait 0.3
+shot controls-own-window-button
+key escape
+expect_value detached_panels == 1

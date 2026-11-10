@@ -5471,6 +5471,21 @@ constexpr Entry kSpanish[] = {
     {"Allowed", "Permitido"},
     {"Asks first", "Pregunta antes"},
     {"Revoke", "Revocar"},
+    // Panels in windows of their own (PanelWindows.cpp)
+    {"Back in the main window", "De vuelta en la ventana principal"},
+    {"Controls in its own window", "Controles en su propia ventana"},
+    {"In a window of its own", "En una ventana propia"},
+    {"Show it", "Mostrarla"},
+    {"Move Controls to a window of its own, to keep on another monitor. It opens there next time too.", "Mueve Controles a una ventana propia, para tenerla en otro monitor. La próxima vez también se abre allí."},
+    {"Move the guide to a window of its own, to keep on another monitor. It opens there next time too.", "Mueve la guía a una ventana propia, para tenerla en otro monitor. La próxima vez también se abre allí."},
+    {"Move this palette to a window of its own, to keep on another monitor or a pen display. Close that window to bring it back. It opens there next time too.", "Mueve esta paleta a una ventana propia, para tenerla en otro monitor o en una pantalla de lápiz. Cierra esa ventana para devolverla. La próxima vez también se abre allí."},
+    {"Open Controls (every shortcut and gesture) in a window of its own, to keep on another monitor.", "Abre Controles (todos los atajos y gestos) en una ventana propia, para tenerla en otro monitor."},
+    {"Open in its own window", "Abrir en su propia ventana"},
+    {"Open the User Guide in a window of its own, to keep on another monitor. It opens there next time too.", "Abre la Guía del usuario en una ventana propia, para tenerla en otro monitor. La próxima vez también se abre allí."},
+    {"Put every panel that is in a window of its own back in the main window, and forget where those windows were.", "Devuelve a la ventana principal cada panel que está en una ventana propia y olvida dónde estaban esas ventanas."},
+    {"Put this panel back in the main window. Preferences > Saving & Layouts > Reset panel windows puts all of them back.", "Devuelve este panel a la ventana principal. Preferencias > Guardado y diseños > Restablecer ventanas de paneles los devuelve todos."},
+    {"Reset panel windows", "Restablecer ventanas de paneles"},
+    {"User Guide in its own window", "Guía del usuario en su propia ventana"},
 };
 
 } // namespace

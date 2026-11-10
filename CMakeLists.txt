@@ -431,6 +431,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Ui.cpp
     src/app/UserGlyphs.cpp
     src/app/Shell.cpp
+    src/app/PanelWindows.cpp
     src/app/Palettes.cpp
     src/app/Theme.cpp
     src/app/CommandPalette.cpp
@@ -1122,6 +1123,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Cut caps, Wire on, low-poly and 20k spheres, for the look review at 1440 px, 100 % and 200 % (tests/ui/sizes/cut_cap_quality.sfui).
     sculptforge_ui_test(cut_cap_quality_1440 sizes/cut_cap_quality --size 1440x900)
     sculptforge_ui_test(cut_cap_quality_1440_200 sizes/cut_cap_quality --size 2880x1800)
+    # Panels in windows of their own (Founding Member #1's request), for the look review at 1440 px, 100 % and 200 %.
+    sculptforge_ui_test(detach_panels_1440 sizes/detach_panels --size 1440x900)
+    sculptforge_ui_test(detach_panels_1440_200 sizes/detach_panels --size 2880x1800)
     # A crash leaves a note in the log file (#16). Needs no window.
     add_test(NAME crash_log COMMAND ${CMAKE_COMMAND} -DAPP=$<TARGET_FILE:sculptforge>
              -DDIR=${CMAKE_CURRENT_BINARY_DIR}/crash-log-test -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/crash_log.cmake)

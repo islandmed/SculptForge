@@ -1,0 +1,33 @@
+# Panels in windows of their own (docs/design/detach-panels.md; Member Request from Richard Throgmorton (MakIt3D),
+# Founding Member #1). Offscreen there is no window system to make them: a palette detaches into a window floating
+# inside the main one, works there, and Reset panel windows (or closing it) puts it back where it was.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar
+run new_sphere subdivisions=3
+expect_value detached_panels == 0
+click "Tool##palette.tool"
+click "Tool/##detach"
+wait 0.2
+expect_value detached_panels == 1
+expect "Display##tool.display"
+click "Display##tool.display"
+click "Backface culling##display"
+expect_value backface_culling == 1
+shot detached
+# Its drop-down doesn't open a second copy while it's out.
+click "Tool##palette.tool"
+expect_value detached_panels == 1
+# Reset panel windows (Preferences > Saving & Layouts): back in the main window.
+click "Preferences##palette.preferences"
+click "Saving & Layouts##preferences.config"
+click "Reset panel windows##panel.reset"
+expect_value detached_panels == 0
+expect_status "back in the main window"
+key escape
+# The User Guide and Controls float inside the window already: nothing to detach offscreen, the app says so.
+key f1
+expect "Controls"
+key f3
+type "##Command palette" "controls in its own window"
+key enter
+expect_status "Separate windows"
+expect_value detached_panels == 0

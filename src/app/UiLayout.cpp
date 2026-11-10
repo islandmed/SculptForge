@@ -172,4 +172,53 @@ bool fromJson(const Json& j, UiLayout& l, std::string& error, int shellLayout) {
     return true;
 }
 
+Json panelPlacementsToJson(const std::vector<PanelPlacement>& panels) {
+    Json list = Json::array();
+    for (const PanelPlacement& p : panels) {
+        Json e = Json::object();
+        e.set("id", p.id);
+        e.set("w", double(p.w));
+        e.set("h", double(p.h));
+        if (p.placed) {
+            e.set("x", double(p.x));
+            e.set("y", double(p.y));
+        }
+        list.push(std::move(e));
+    }
+    Json j = Json::object();
+    j.set("version", 1.0);
+    j.set("panels", std::move(list));
+    return j;
+}
+
+std::vector<PanelPlacement> panelPlacementsFromJson(const Json& j) {
+    std::vector<PanelPlacement> out;
+    const Json& list = j["panels"];
+    for (size_t i = 0; i < list.size() && out.size() < 32; ++i) {
+        const Json& e = list[i];
+        if (!e["id"].isString()) continue;
+        PanelPlacement p;
+        p.id = e["id"].asString();
+        if (p.id.empty() || p.id.size() > 64 ||
+            std::any_of(out.begin(), out.end(), [&](const PanelPlacement& q) { return q.id == p.id; }))
+            continue;
+        p.w = std::clamp(int(e["w"].asNumber(p.w)), 160, 16384);
+        p.h = std::clamp(int(e["h"].asNumber(p.h)), 160, 16384);
+        if (e["x"].isNumber() && e["y"].isNumber()) {
+            p.x = std::clamp(int(e["x"].asNumber()), -100000, 100000);
+            p.y = std::clamp(int(e["y"].asNumber()), -100000, 100000);
+            p.placed = true;
+        }
+        out.push_back(std::move(p));
+    }
+    return out;
+}
+
+bool panelOnDisplays(const PanelPlacement& p, const std::vector<DisplayRect>& displays) {
+    if (!p.placed) return false;
+    return std::any_of(displays.begin(), displays.end(), [&](const DisplayRect& r) {
+        return p.x + 100 > r.x && p.x < r.x + r.w - 100 && p.y >= r.y - 10 && p.y < r.y + r.h - 50;
+    });
+}
+
 } // namespace sf

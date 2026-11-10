@@ -89,7 +89,7 @@
 //                            (3 = a triple-click; 0 = only point at it, e.g. for a key that acts under the cursor)
 //   expect_value NAME OP N   triangles, vertices, layers, brushes, masked, hidden, groups, colored,
 //                            can_undo, dirty, splats, show_face groups, show_mask, show_mesh, wireframe,
-//                            flat_shading (the scene's: 1 Flat), gradient_background (1 Gradient, 0 Flat Colour),
+//                            detached_panels (in windows of their own), flat_shading (the scene's: 1 Flat), gradient_background (1 Gradient, 0 Flat Colour),
 //                            background_r / background_g / background_b (the flat colour, 0-255), part_shading (0 Scene, 1 Smooth, 2 Flat),
 //                            custom_lit spheres (Lit Spheres loaded from images), material_custom (1 when the view uses
 //                            one), lit sphere_files (images in the library's Lit Spheres folder),
@@ -1336,6 +1336,7 @@ double Demo::query(const std::string& name, bool& known) const {
         return n;
     }
     if (name == "backface_culling") return app_.renderSettings_.backfaceCulling ? 1.0 : 0.0;
+    if (name == "detached_panels") return double(app_.panelWindows_.size()); // in windows of their own (PanelWindows.cpp)
     if (name == "floor_grid") return app_.renderSettings_.floorGrid ? 1.0 : 0.0;
     if (name == "floor_height") return double(app_.renderSettings_.floorHeight); // (the visible Parts' lowest point)
     if (name == "floor_grid_drawn") { // the 3D view drawn once more now: 1 if it drew the floor grid

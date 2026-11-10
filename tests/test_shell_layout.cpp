@@ -283,3 +283,29 @@ TEST(window_fits_display) {
     f = fitWindow({-1900, 50, 1600, 960}, true, true, 1.0f, {-1920, 0, 1920, 1040}, {30, 0, 0, 0}, 1.0f);
     CHECK(f.rect.x == -1900 && f.rect.y == 50);
 }
+
+// Panels in their own windows (docs/design/detach-panels.md): panels.json round trip, bad entries dropped, and a
+// stored position used only while a display still shows the window's top.
+TEST(panel_placements_json) {
+    std::vector<PanelPlacement> in{{"palette.tool", -1700, 120, 340, 700, true}, {"guide", 0, 0, 900, 700, false}};
+    std::vector<PanelPlacement> out = panelPlacementsFromJson(panelPlacementsToJson(in));
+    CHECK(out.size() == 2);
+    CHECK(out[0].id == "palette.tool" && out[0].placed && out[0].x == -1700 && out[0].y == 120 && out[0].w == 340 && out[0].h == 700);
+    CHECK(out[1].id == "guide" && !out[1].placed && out[1].w == 900);
+    Json j;
+    std::string err;
+    CHECK(Json::parse(R"({"panels": [{"id": "controls", "w": 5, "h": 99999}, {"id": "controls"}, {"w": 300},
+                                      {"id": ""}, {"id": "palette.brush", "x": "left", "y": 3}]})",
+                      j, err));
+    out = panelPlacementsFromJson(j);
+    CHECK(out.size() == 2);
+    CHECK(out[0].id == "controls" && out[0].w == 160 && out[0].h == 16384 && !out[0].placed);
+    CHECK(out[1].id == "palette.brush" && !out[1].placed);
+    CHECK(panelPlacementsFromJson(Json()).empty());
+    // The main monitor and one to its left; the left one unplugged.
+    const std::vector<DisplayRect> two{{0, 0, 2560, 1400}, {-1920, 0, 1920, 1040}}, one{{0, 0, 2560, 1400}};
+    const PanelPlacement left{"palette.tool", -1700, 120, 340, 700, true};
+    CHECK(panelOnDisplays(left, two));
+    CHECK(!panelOnDisplays(left, one));
+    CHECK(!panelOnDisplays({"guide", 0, 0, 900, 700, false}, two)); // the window system places it
+}
