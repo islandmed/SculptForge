@@ -924,6 +924,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     endif()
     # The Actions cache pruner keeps the newest cache of each kind (tools/ci/prune_caches.py).
     add_test(NAME ci_prune_caches COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/prune_caches.py --self-test)
+    add_test(NAME test_warm_ui COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/warm_ui.py self-test)
     add_test(NAME ci_slowest_tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/slowest_tests.py --self-test)
     add_test(NAME test_impact COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/impacted.py --self-test)
     add_test(NAME test_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/run.py --self-test)
