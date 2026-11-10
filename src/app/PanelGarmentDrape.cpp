@@ -268,6 +268,12 @@ void App::convertGarment() {
               " triangles; Ctrl+Z undoes it)";
 }
 
+void App::garmentDraped() {
+    garmentPlacing_ = -1;
+    dropGarmentPreview();
+    garmentPreviewDirty_ = false;
+}
+
 void App::drawGarmentDrapeSection() {
     Pattern pat;
     if (!documentPattern(doc_, pat) || pat.panels.empty()) {

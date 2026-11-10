@@ -1260,6 +1260,7 @@ private:
     void pollGarmentDrape();
     void finishGarmentDrape();
     void convertGarment();
+    void garmentDraped(); // before garment_drape: the placement preview goes (else it collides), placing stops
     // UI test values: garment_placed, garment_placing, garment_drape_running, garment_draped, garment_preview,
     // garment_units, garment_seam_gap_mm, garment_drape_rested, garment_inside; NaN for other names.
     double garmentDrapeTestValue(const std::string& name);
