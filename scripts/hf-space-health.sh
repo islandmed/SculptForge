@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Daily probe of the free Hugging Face Spaces that Generate 3D uses (no Claude, no GPU quota: it only reads each
-# Space's public /config). Prints nothing while every Space is as last time; prints the differences when one goes
+# Space's public /config; whether a Space has switched Text to 3D off is NOT in /config - its Text Prompt tab stays
+# visible - so that is only learned by a real job, and the app retries on use). Prints nothing while every Space is as last time; prints the differences when one goes
 # down, loses its endpoint, or changes the shape of its inputs/outputs. Run by sf-hfhealth.timer.
 #   scripts/hf-space-health.sh [state-dir]      exit 0 always; output = what changed
 set -u
-state=${1:-$HOME/Work/.sf/systemd/state}; mkdir -p "$state"
+state=${1:-${XDG_STATE_HOME:-$HOME/.local/state}/sculptforge}; mkdir -p "$state"
 spaces="tencent-hunyuan3d-2mini-turbo tencent-hunyuan3d-2 tencent-hunyuan3d-2-1 microsoft-trellis-2"
 now=$(for sp in $spaces; do
   body=$(curl -fsS -m 45 "https://$sp.hf.space/config" 2>/dev/null) || { echo "$sp DOWN (no /config)"; continue; }

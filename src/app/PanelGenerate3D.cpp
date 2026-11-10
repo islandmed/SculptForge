@@ -65,7 +65,13 @@ int App::candidateCountForService() const {
     return std::clamp(paidService(svc) ? paidCandidateCount_ : candidateCount_, 1, 3);
 }
 
+std::string App::textOffKey() const {
+    if (!textMode_ || aiSettings_.generatorService != "huggingface") return {};
+    return ai::resolveHfPreset(aiSettings_, true).id;
+}
+
 void App::startGenerator() {
+    if (const std::string key = textOffKey(); !key.empty() && textOffPresets_.count(key)) return; // greyed in the panel
     if (pendingGenerator_.valid() || pendingBase_.valid()) return;
     if (textMode_ ? textPrompt_[0] == '\0' : refImagePath_.empty()) return;
     aiSettings_.generatorCommand = generatorCommand_;
@@ -177,6 +183,8 @@ void App::pollGenerator() {
     const std::string noteText = note.empty() ? std::string() : " - " + note;
     if (ready == 0) {
         clearCandidates();
+        if (error.find("switched Text to 3D off") != std::string::npos)
+            if (const std::string key = textOffKey(); !key.empty()) textOffPresets_.insert(key);
         generatorError_ = (textMode_ ? "Text to 3D failed: " : "Image to 3D failed: ") + error + noteText;
         status_ = generatorError_;
         SDL_Log("%s", generatorError_.c_str());
