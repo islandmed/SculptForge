@@ -771,6 +771,42 @@ void BVH::refitChanged(const Mesh& mesh) {
         if (nodes_[leaf].count > kMaxLeaf) splitLeaf(mesh, leaf);
 }
 
+void BVH::syncTopologyChange(const Mesh& mesh, std::span<const uint32_t> changedSlots, std::span<const uint32_t> movedVerts) {
+    const uint32_t nt = uint32_t(mesh.triangleCount());
+    if (nodes_.empty() || triLeaf_.empty()) {
+        build(mesh);
+        return;
+    }
+    const uint32_t old = uint32_t(triLeaf_.size());
+    for (uint32_t t : changedSlots)
+        if (t >= nt) removeTriangle(t);
+    for (uint32_t t = nt; t < old; ++t) removeTriangle(t); // (slots the list doesn't name)
+    if (nt < old) resizeTriangles(nt);
+    auto place = [&](uint32_t t) { // a live slot with no leaf yet: beside a triangle it shares a vertex with
+        uint32_t nearby = ~0u;
+        const glm::uvec3& tri = mesh.triangles[t];
+        for (int c = 0; c < 3 && nearby == ~0u; ++c)
+            for (uint32_t u : mesh.vertexTriangles(tri[c]))
+                if (u != t && u < triLeaf_.size() && triLeaf_[u] != kNoLeaf) {
+                    nearby = u;
+                    break;
+                }
+        insertTriangle(mesh, t, nearby);
+    };
+    for (uint32_t t : changedSlots) {
+        if (t >= nt) continue;
+        if (t < triLeaf_.size() && triLeaf_[t] != kNoLeaf) touchTriangle(t);
+        else place(t);
+    }
+    for (uint32_t t = old; t < nt; ++t)
+        if (t >= triLeaf_.size() || triLeaf_[t] == kNoLeaf) place(t);
+    for (uint32_t v : movedVerts)
+        if (v < mesh.vertexCount())
+            for (uint32_t t : mesh.vertexTriangles(v)) touchTriangle(t);
+    refitChanged(mesh);
+    if (degraded()) build(mesh);
+}
+
 bool BVH::degraded() const {
     // Rebuild once the edits rival the tree: boxes only grow, and moved leaves leave entries unused.
     const size_t live = triLeaf_.size();

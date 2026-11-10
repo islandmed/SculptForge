@@ -80,6 +80,13 @@ public:
     void touchTriangle(uint32_t t);
     void refitChanged(const Mesh& mesh);
     bool degraded() const;
+    // Brings the tree up to date after the mesh's triangles changed in the listed slots and/or the vertices
+    // `movedVerts` moved (an undo of a dynamic-topology stroke: the mesh now has its adjacency for this state, no
+    // dead slots). Slots at or past the mesh's triangle count leave the tree, new ones join the leaf of a neighbour,
+    // changed ones are refitted in place; every other triangle keeps its leaf. Falls back to build() when the tree
+    // doesn't match (empty) or has degraded.
+    void syncTopologyChange(const Mesh& mesh, std::span<const uint32_t> changedSlots, std::span<const uint32_t> movedVerts);
+    size_t triangleCount() const { return triLeaf_.size(); }
 
     size_t nodeCount() const { return nodes_.size(); }
 

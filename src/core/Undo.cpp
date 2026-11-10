@@ -181,7 +181,8 @@ void UndoStack::apply(UndoRecord& r, Mesh& mesh, BVH& bvh) {
         if (!restored.empty() && !mesh.layers.empty()) mesh.evaluate(restored);
         if (!restored.empty() && !mesh.paintLayers.empty()) compositePaint(mesh, restored);
         mesh.recomputeAllNormals();
-        bvh.build(mesh);
+        // The slots it changed leave, join or refit in the tree (a stroke's few thousand, not the whole mesh).
+        bvh.syncTopologyChange(mesh, r.topology->triangleSlots, r.topology->vertexSlots);
     }
     if (!r.positions.empty()) {
         r.positions.swapWithUnique(mesh.layerTarget(r.layer));

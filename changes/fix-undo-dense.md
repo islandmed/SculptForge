@@ -1,14 +1,18 @@
 ---
 whats_new: **Faster Undo after a remesh**: undoing or redoing a Voxel Remesh (or another whole-model step) on a very dense
-  model no longer stops for a second while the model's search tree is rebuilt. Thanks @TheLycanFenrir (#181).
+  model no longer stops for a second while the model's search tree is rebuilt. Thanks @TheLycanFenrir and @Devon0209 (#181).
 fixed: **Undo / Redo of a whole-model step on a very dense mesh (#181).** A step that replaces the mesh (Voxel Remesh and
   the other tools that remesh) now keeps the old mesh's BVH with it, so undo and redo swap the two instead of building a
   tree again (0.7 s of a 12M-triangle undo, now 0 ms; the tree isn't counted against the undo byte budget, so it doesn't
   push the remesh step out of the history). Stroke undo and redo were already O(touched vertices); tests now hold that
-  (time and step size). Thanks @TheLycanFenrir for the report.
+  (time and step size). Undoing a Dynamic Topology stroke no longer builds the tree again either: only the triangles the
+  stroke changed are updated (115 ms to 23-30 ms at 1.3M triangles, and it no longer grows with the whole mesh there).
+  Thanks @TheLycanFenrir and @Devon0209 for the reports.
 testers:
   - A model of 8M+ triangles (Voxel Remesh at a high resolution): Ctrl+Z the remesh, then Ctrl+Shift+Z; the model switches
     back and forth without a long freeze, and picking / sculpting right after works on the right surface.
+  - Dynamic Topology on a 1M+ triangle model: sculpt a few strokes, Ctrl+Z each and Ctrl+Shift+Z them back; no stall, and
+    picking / sculpting afterwards lands on the surface under the cursor.
   - On the same model, a few strokes and Ctrl+Z each: instant, and the surface returns exactly.
 ---
 Measured on the floor-tier laptop (aarch64, core only; the GPU upload after a whole-mesh step is unchanged): 4M / 8M / 12M triangles,
