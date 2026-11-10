@@ -47,13 +47,6 @@ private:
     std::string lastModelUrl_;
 };
 
-// A process_completed queue message: true with the output values, or false with a readable `error`.
-bool gradioCompleted(const Json& message, std::vector<Json>& outputs, std::string& error);
-// The first 3D model file among `outputs` of endpoint `apiName` (config = the Space's /config), as a download URL under
-// `base` (root + api prefix); empty when the Space returned none. Reads FileData objects, bare URLs and lists.
-std::string gradioModelUrl(const Json& config, const std::string& apiName, const std::vector<Json>& outputs,
-                           const std::string& base);
-
 // Turns Gradio/ZeroGPU failures into advice for artists.
 std::string friendlyGradioError(const std::string& raw);
 

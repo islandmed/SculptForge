@@ -2724,7 +2724,6 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Copy", "复制"},
     {"Download the new package from the website and open it.", "从网站下载新的安装包并打开。"},
     {"Try again", "再试一次"},
-    {"Switched off by the Space's owner, use Image to 3D", "该 Space 的所有者已将其关闭，请使用图像转 3D"},
     {"Update", "更新"},
     {"Download the new version from SculptForge's GitHub releases, check its signature and checksum, and install it. "
      "The current version is kept until the new one has started.",

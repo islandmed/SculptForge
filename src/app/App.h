@@ -22,8 +22,6 @@
 #include "app/UiLayout.h"
 #include "app/UserGuide.h"
 #include "ai/ComfyUI.h"
-
-#include <set>
 #include "ai/ImageTo3DService.h"
 #include "core/BrushSets.h"
 #include "core/BrushSettings.h"
@@ -794,9 +792,6 @@ private:
     bool openHunyuanNotice_ = false;
     std::shared_ptr<ai::GenerationProgress> generatorProgress_;
     float generatorTime_ = 0.0f;
-    std::set<std::string> textOffPresets_; // free text presets a Space refused this session ("Text to 3D is disable"); never probed
-    std::string textOffKey() const; // the chosen free text preset, "" when the service is not the free Hugging Face one
-    std::string generatorError_; // why the last Generate 3D gave no model; stays in the panel until the next run
     int candidateCountForService() const;
     void clearCandidates();
     void pickCandidate(int index);

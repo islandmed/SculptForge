@@ -1433,34 +1433,6 @@ TEST(free_huggingface_models) {
     std::string png, err;
     CHECK(!ai::prepareImagePng(tempPath("missing_sculptforge.png"), png, err));
 
-    // Recorded Gradio replies (hunyuan3d-2mini-turbo, shape_generation; 11-09): text-only is refused by the Space, and the
-    // model comes back as FileData, a bare URL, or a list.
-    {
-        Json cfg, msg;
-        CHECK(Json::parse(R"({"components":[{"id":21,"type":"file"},{"id":57,"type":"html"}],
-            "dependencies":[{"api_name":"shape_generation","outputs":[21,57]}]})", cfg, err));
-        std::vector<Json> outs;
-        std::string failure;
-        CHECK(Json::parse(R"({"msg":"process_completed","output":{"error":"'Text to 3D is disable. Please enable it by `python gradio_app.py --enable_t23d`.'","duration":10,"visible":true},"success":false})", msg, err));
-        CHECK(!ai::gradioCompleted(msg, outs, failure) && failure.find("switched Text to 3D off") != std::string::npos);
-        const char* shapes[] = {
-            R"({"path":"/tmp/gradio/a/white_mesh.glb","url":"https://x.hf.space/gradio_api/file=/tmp/gradio/a/white_mesh.glb","orig_name":"white_mesh.glb"})",
-            R"("https://x.hf.space/gradio_api/file=/tmp/gradio/a/white_mesh.glb")",
-            R"([{"path":"/tmp/gradio/a/white_mesh.glb","orig_name":"white_mesh.glb"}])",
-            R"({"__type__":"update","value":{"path":"/tmp/gradio/a/white_mesh.glb"}})"};
-        for (const char* shape : shapes) {
-            std::string reply = std::string(R"({"msg":"process_completed","success":true,"output":{"data":[)") + shape + R"(,null]}})";
-            outs.clear();
-            CHECK(Json::parse(reply, msg, err) && ai::gradioCompleted(msg, outs, failure));
-            CHECK(ai::gradioModelUrl(cfg, "shape_generation", outs, "https://x.hf.space").find("white_mesh.glb") != std::string::npos);
-        }
-        for (const char* none : {R"({"msg":"process_completed","success":true,"output":{"data":[null,"<div/>"]}})",
-                                 R"({"msg":"process_completed","success":true,"output":{"data":[]}})"}) {
-            outs.clear();
-            CHECK(Json::parse(none, msg, err) && ai::gradioCompleted(msg, outs, failure));
-            CHECK(ai::gradioModelUrl(cfg, "shape_generation", outs, "https://x.hf.space").empty()); // -> "finished without a model"
-        }
-    }
     // Text to 3D.
     CHECK(!ai::hfTextPresets().empty());
     bool usesPrompt = true;
