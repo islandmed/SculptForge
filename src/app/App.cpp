@@ -1881,6 +1881,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (uvToolMouseDown(x, y, mod)) return; // the UV Editor's Seam / Select in 3D tool (PanelUvEditor.cpp)
         if (guideMouseDown(x, y, mod)) return; // the QRemesh Guides brush (PanelRetopo.cpp)
         if (faceMouseDown(x, y, mod)) return;  // placing facial landmarks (PanelFace.cpp)
+        if (garmentPlaceMouseDown(x, y, mod)) return; // Garments > Place panels (PanelGarmentDrape.cpp)
         if (sculptableMouseDown(x, y)) return; // Make sculptable: landmarks, crop box (PanelSculptable.cpp)
         if (captureMouseDown(x, y)) return;    // Capture from view: the drag draws the square (PanelKelvinlet.cpp)
         // A triple-click on another Part makes it the active one and frames it (#43). (Its first two clicks

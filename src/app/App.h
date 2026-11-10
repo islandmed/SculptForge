@@ -35,6 +35,7 @@
 #include "core/Document.h"
 #include "core/Deform.h"
 #include "core/Drape.h"
+#include "core/Garment.h"
 #include "core/DiscordPresence.h"
 #include "core/Face.h"
 #include "core/Backdrop.h"
@@ -1237,6 +1238,31 @@ private:
     double garmentTestValue(const std::string& name);
     static void SDLCALL onGarmentFileChosen(void* userdata, const char* const* files, int filter);
     std::shared_ptr<struct GarmentEditorState> garments_;
+    // Drape on the body (PanelGarmentDrape.cpp; core/GarmentDrape.h): Place panels (a click on the body per panel),
+    // the placed panels as a preview Part (no undo), Drape live on it, Convert to Part (one undo step).
+    struct GarmentDrapeJob;
+    std::shared_ptr<GarmentDrapeJob> garmentDrape_;
+    int garmentPlacing_ = -1;      // the panel the next click on the body places (-1: not placing)
+    int garmentEditPanel_ = -1;    // the placed panel Turn / Wrap / Gap adjust
+    garment::Placement garmentEdit_; // its values while a slider is dragged
+    bool garmentEditing_ = false;
+    bool garmentPreviewDirty_ = false;
+    uint32_t garmentPreview_ = 0;  // the preview Part's id (0: none)
+    std::vector<glm::vec3> garmentDrapeResult_; // metres, the last drape (Convert to Part keeps it)
+    float garmentSeamGapMm_ = -1.0f;            // its widest seam gap, whether it rested, particles left inside a
+    bool garmentDrapeRested_ = false;           // body (UI tests)
+    int garmentInside_ = -1;
+    void drawGarmentDrapeSection();
+    bool garmentPlaceMouseDown(float x, float y, SDL_Keymod mod);
+    void garmentPreviewRefresh();
+    void dropGarmentPreview();
+    void startGarmentDrape();
+    void pollGarmentDrape();
+    void finishGarmentDrape();
+    void convertGarment();
+    // UI test values: garment_placed, garment_placing, garment_drape_running, garment_draped, garment_preview,
+    // garment_units, garment_seam_gap_mm, garment_drape_rested, garment_inside; NaN for other names.
+    double garmentDrapeTestValue(const std::string& name);
     bool showGarments_ = false;
     // Auto UV on a worker (xatlas takes seconds on big meshes): the button, New Texture, and the uv_auto command from
     // the console, an AI tool or a UI test (resolution 0: the texture's size, or the size chosen under Texture Image).
