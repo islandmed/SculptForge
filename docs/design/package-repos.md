@@ -39,6 +39,8 @@ files, byte for byte (the ones the release workflow verified and smoke-tested).
    puts the site together from the assets the last good fetch kept in the Actions cache (`PACKAGE_REPOS_KEEP`, one
    cache per release tag, saved from main only) through the same script, so the signature and every checksum are
    checked again, and a site-only change still deploys. With no kept copy the deploy fails rather than drop /apt and /rpm.
+   Tradeoff: while the downloads fail, a deploy publishes the previous release's apt and dnf repositories, so apt and dnf
+   users stay one release behind until the next deploy that fetches fresh (the run says so in a warning).
 3. **Trust chain**: the key signs the metadata; the metadata lists each package's SHA-256; apt and dnf refuse a
    package whose bytes differ (`.github/workflows/repos.yml` tests exactly that, plus installs on Debian, Ubuntu,
    Fedora and Rocky 9 with a throwaway key). The `.rpm` files themselves are not signed, because signing would
