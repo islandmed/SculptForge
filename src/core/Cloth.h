@@ -108,7 +108,7 @@ struct ClothSettings {
     int substeps = 12;
     int iterations = 1; // constraint passes per substep (the brush uses more: its soft pins pull every substep)
     // At rest: over `restFrames` frames no particle got half as far as this speed (m/s) would take it, and none went
-    // faster than ten times it.
+    // faster than ten times it over any two frames.
     float restSpeed = 0.01f;
     int restFrames = 10;
     // > 0: self-collision, particles keep at least this far apart (m; pairs closer than it at rest are skipped).
@@ -172,6 +172,11 @@ private:
     void sweepParticles();
     void leaveColliders(); // (the first frame: particles that start inside go out along outward_)
     void substep(float h);
+    void holdSeamsOnContact(float h);
+    // How far off a collider the cloth is held: the fabric's, and at least an eighth of the particle spacing (a
+    // triangle between particles sags into a curved body: 1.9 mm at 15 mm spacing; a third (and a fifth to a seventh, unevenly) made a 20 mm bag over a ball
+    // flutter and never rest, and a fifth cost the 2M drape bench 25% more frames).
+    float contactThickness() const { return std::max(fabric_.thickness, meanEdge_ / 8.0f); }
 
     Fabric fabric_;
     ClothSettings settings_;
@@ -219,6 +224,7 @@ private:
     int frame_ = 0;
     float maxSpeed_ = 0.0f;
     std::vector<glm::vec3> restFrom_; // positions at the rest window's start
+    std::vector<glm::vec3> twoBack_;  // positions two frames ago (the window's peak is over two frames)
     int restFromFrame_ = 0;
     float restPeak_ = 0.0f;           // the fastest frame in the window, m/s
     bool rested_ = false;
