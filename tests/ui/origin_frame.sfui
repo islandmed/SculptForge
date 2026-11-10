@@ -14,11 +14,17 @@ key f
 expect_value camera_distance > $part
 wait 1.0
 key f
+wait 1.0
 expect_value camera_distance == $part
 
 # Origin tools on the Eye: centre it, undo, drop it.
 run transform translate=3,2,1
+key w
+wait 0.3
+shot origin-gizmo-panel
 run center_on_origin
+wait 0.3
+shot origin-centred
 expect_value part_x == 0
 key ctrl+z
 run drop_to_floor
