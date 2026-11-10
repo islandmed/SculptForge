@@ -40,6 +40,9 @@
 #include <unistd.h>
 extern char** environ;
 #endif
+#if defined(__GLIBC__)
+#include <malloc.h>
+#endif
 
 namespace sf {
 
@@ -182,6 +185,11 @@ void syncSdlEnvironment() {
 }
 
 int runUiServer(int argc, char** argv, int (*runOne)(int argc, char** argv)) {
+#if defined(__GLIBC__)
+    // One malloc arena for every thread: each script's worker threads otherwise fill arenas of their own with free
+    // holes the next script's threads can't use (RSS grew ~10 MB per script, to 7-8 GB after 150). Results don't depend on it.
+    mallopt(M_ARENA_MAX, 1);
+#endif
     int width = 1600, height = 960;
     for (int i = 1; i + 1 < argc; ++i) {
         const std::string a = argv[i];
@@ -285,6 +293,11 @@ int runUiServer(int argc, char** argv, int (*runOne)(int argc, char** argv)) {
         dup2(savedErr, fileno(stderr));
         restoreEnvironment(savedEnv);
         std::filesystem::current_path(savedDir, ec);
+        // A script's worker threads leave free heap in their malloc arenas that the next script's threads don't
+        // reuse: ~10 MB per script, 7-8 GB after 150 (not a leak: the same script repeated levels off). Give it back.
+#if defined(__GLIBC__)
+        malloc_trim(0);
+#endif
         const bool healthy = glHealthy();
         std::fprintf(answers, "done\t%d\t%.0f%s\n", code, ms, healthy ? "" : "\tlost");
         std::fflush(answers);
