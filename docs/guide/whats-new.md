@@ -9,24 +9,18 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: 2026-11-10
-tagline: Drape a garment on a body, Curves and rope tubes, a Wood brush pack, and shortcuts that ask first.
-highlight: Drape a garment on a body: place the panels, watch it sew and settle, then sculpt it
+tagline: Curves and rope tubes, a Wood brush pack, an Unlit view, and origin tools.
 highlight: Curves, and rope, braid and sleeve tubes (requested by Hameron (FXiT))
 highlight: A Wood brush pack (requested by Hameron (FXiT))
-highlight: Shortcuts ask before they take a key, with a reset arrow on each (requested by Artizmo on Discord)
+highlight: Shift smoothing keeps Smooth's own Intensity in every stroke type (thanks @nekirk11)
 highlight: Unlit view on Alt+L (thanks @nagdav853); Center on origin and Drop to floor in the Gizmo panel
 ```
 
-- **Drape a garment on a body**: in **Tool > Garments**, click the body once for each panel, press **Drape** and
-  watch the pattern sew itself shut and settle, then **Convert to Part** to sculpt it (UVs from the flat pattern).
-  Sleeves no longer jitter once the cloth is at rest.
 - **Curves**: **Tool > Tube > Result > Curve** draws a guide line on or over the model; **Resample** sets its point
   count exactly and **Tube from curve** turns it into a tube. New tube profiles **Rope**, **Braid** and **Sleeve**,
   and **Twist**, **Spin** and **Spread** sliders. Requested by Hameron (FXiT).
 - **Wood brush pack**: ten brushes and six alphas for weathered grain, splinters, cracks, knots, end-grain rings and
   plank seams (**Sculpt > Brush**, pack **Wood**). Requested by Hameron (FXiT).
-- **Shortcuts ask first**: press a key another action uses and a **Replace / Cancel** box names that action; each
-  shortcut has its own reset arrow, and Ctrl+Numpad 4/6/8/2 pans the view. Requested by Artizmo on Discord.
 - **Unlit view** (Render menu, <kbd>Alt</kbd>+<kbd>L</kbd>): shows the base colour alone, with no lighting, so painted
   colour reads exactly as stored. Thanks @nagdav853.
 - **Center on origin, Drop to floor**: two buttons in the Gizmo panel put the Part's bounding-box centre on 0,0,0 or
@@ -36,6 +30,7 @@ highlight: Unlit view on Alt+L (thanks @nagdav853); Center on origin and Drop to
   @nekirk11.
 - **Stencil**: Adjust, Tile and Remove are back in **Sculpt > Alpha > Stencil** in the SculptForge layout. Thanks
   MasterFULL on Discord.
+- **Drape**: sleeves no longer jitter once the cloth is at rest.
 - **Customize Shelves**: every button and value field can be moved with Ctrl+Alt+drag, including greyed-out options
   and the Size, Intensity and Detail fields.
 
