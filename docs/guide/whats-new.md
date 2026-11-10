@@ -33,6 +33,10 @@ highlight: Focus Detail projects save and reopen with their full detail (Linux a
   look and feel the same.
 - **Focus Detail in projects**: a streamed level saves and reopens with its full detail, and bake, displacement
   export, surface noise and copies use it too. Linux and macOS for now.
+- **Big stamps on curved surfaces**: Drag Stamp, Slide Stamp and every alpha brush now cover their whole footprint on
+  a curved surface, with no untouched gaps. Thanks @Devon0209 (#174).
+- **Remesh asks before dropping levels**: Voxel Remesh, Quad Remesh and Decimate say how many subdivision levels they
+  would drop, with **Freeze Levels**, **Proceed** or **Cancel**. Thanks @TheLycanFenrir (#173).
 - **Founding Studio** is for the first 5 studios, a flat $150 a month, locked.
 - **Keyboard and mouse** guide: Option is Alt on macOS, and how to make Option Alt and Cmd Ctrl when the Windows
   version runs under CrossOver or Wine on a Mac. Thanks @fenixpoints.
