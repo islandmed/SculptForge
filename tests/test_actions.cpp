@@ -107,6 +107,25 @@ TEST(action_brush_size_keys_follow_rebinding) {
     CHECK(brushSizeStep(nullptr) == 0);
 }
 
+TEST(action_mac_modifiers) {
+    // fenix on Discord: macOS Option is Alt, Cmd is Ctrl, never Cmd as Alt (SDL reports Option as ALT, Cmd as GUI;
+    // Cmd standing in for Alt comes from Wine's Mac driver when the Windows build runs under CrossOver).
+    CHECK(chordFromEvent(SDLK_D, SDL_KMOD_LALT).alt && !chordFromEvent(SDLK_D, SDL_KMOD_LALT).ctrl);
+    CHECK(chordFromEvent(SDLK_D, SDL_KMOD_RGUI).ctrl && !chordFromEvent(SDLK_D, SDL_KMOD_RGUI).alt);
+    ActionRegistry reg;
+    int mask = 0, save = 0;
+    reg.add({"mask.invert", "Invert mask", nullptr, "", "Mask", "Alt+I", "", [&] { ++mask; }, nullptr, nullptr});
+    reg.add({"file.save", "Save", nullptr, "", "File", "Ctrl+S", "", [&] { ++save; }, nullptr, nullptr});
+    CHECK(reg.handleKey(SDLK_I, SDL_KMOD_LALT) && mask == 1);  // Option+I
+    CHECK(!reg.handleKey(SDLK_I, SDL_KMOD_LGUI) && mask == 1); // Cmd+I is not Alt+I
+    CHECK(reg.handleKey(SDLK_S, SDL_KMOD_LGUI) && save == 1);  // Cmd+S saves
+    reg.setShortcut("mask.invert", "Alt+K"); // rebound: still Option, still not Cmd
+    CHECK(reg.handleKey(SDLK_K, SDL_KMOD_RALT) && mask == 2);
+    CHECK(!reg.handleKey(SDLK_K, SDL_KMOD_RGUI) && mask == 2);
+    reg.setShortcut("file.save", "Cmd+J"); // the macOS spelling binds Ctrl, which Cmd presses
+    CHECK(reg.handleKey(SDLK_J, SDL_KMOD_LGUI) && reg.handleKey(SDLK_J, SDL_KMOD_LCTRL) && save == 3);
+}
+
 TEST(action_registry_commands) {
     CommandRegistry commands;
     ActionRegistry reg;
