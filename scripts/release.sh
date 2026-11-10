@@ -232,6 +232,18 @@ ci_reused() {
     done
     return 1
 }
+# t1_reused SHA: prints the commit before the bump whose full suite t1.sh logged green (T1_GREEN, "date<TAB>sha<TAB>green"
+# lines) when SHA differs from it only by release paperwork. Fails safe: no log, no entry, anything else changed: run T1.
+T1_GREEN=${SF_T1_GREEN:-$HOME/Work/.sf/t1/green.tsv}
+t1_reused() {
+    local sha=$1 c
+    [ -f "$T1_GREEN" ] || return 1
+    for c in $(git rev-list --first-parent -n 8 "$sha~1" 2>/dev/null); do
+        python3 tools/release/paperwork_only.py "$c" "$sha" >/dev/null 2>&1 || return 1
+        awk -F'\t' -v s="$c" '$2 == s && $3 == "green" { found = 1 } END { exit !found }' "$T1_GREEN" && { echo "$c"; return 0; }
+    done
+    return 1
+}
 # wait_live URL TEXT SECONDS: true once the live page contains TEXT. Pages deploys lag, so it polls every 15 s.
 # grep reads the whole page: grep -q would close the pipe early and curl would fail under pipefail.
 wait_live() {
@@ -558,12 +570,26 @@ PY
 # --stage: the batch with the bump on top goes through staging (CI there, STAGE_WITH here); main fast-forwards to it
 # and packages.yml builds the packages of X.Y.Z on the push to staging, which the release then promotes.
 step_stage() {
-    local sha with=${STAGE_WITH-}
+    local sha c with=${STAGE_WITH-}
     sha=$(git rev-parse HEAD)
     bumped || die "HEAD ${sha:0:8} is not at $V" "run the bump first: $(resume bump)"
     [ -n "${STAGE_WITH+x}" ] || { [ -x "$HOME/Work/.sf/t1.sh" ] && with="$HOME/Work/.sf/t1.sh ."; }
+    # The full suite runs once, on the batch (docs/testing-flow.md "Areas"): t1.sh logged that commit green, and the bump
+    # on top only adds paperwork (as CI's reuse, ci_reused), so the PC doesn't run the whole suite a second time.
+    if [ -n "$with" ] && [ -z "${SF_T1_FORCE:-}" ] && c=$(t1_reused "$sha"); then
+        ok "T1: ${sha:0:8} only adds release paperwork to ${c:0:8}, whose full suite passed on the PC (tools/release/paperwork_only.py): reused"
+        with=""
+    fi
+    # Likewise the full CI on staging: the batch's own run passed (and main's push CI reused it), so the bump commit that only
+    # adds paperwork doesn't dispatch a second one. The staging push still happens: it starts the Packages run.
+    local reused=""
+    if [ -z "${SF_T1_FORCE:-}" ] && reused=$(ci_reused "$sha"); then
+        ok "CI: ${sha:0:8} only adds release paperwork to ${reused%% *}, whose CI run ${reused##* } passed: no second full run on staging"
+    else
+        reused=""
+    fi
     # The release's own suite goes first on the PC (pc.sh priority lane), not behind benches (0.11.14 waited for one).
-    SF_PC_PRIO=1 "${MERGE_QUEUE:-scripts/merge-queue.sh}" staging ${with:+--with "$with"} "$sha" ||
+    SF_STAGE_CI_REUSED=$reused SF_PC_PRIO=1 "${MERGE_QUEUE:-scripts/merge-queue.sh}" staging ${with:+--with "$with"} "$sha" ||
         die "staging ${sha:0:8} is red, or main moved (above)" "fix the batch (main moved: merge origin/main), then $(resume bump)"
     ok "main is the staged ${sha:0:8} ($V); packages.yml is building its packages on the staging push"
     # The staging push's Packages run builds what --yes will promote, the macOS .dmg included (deployment target 11:

@@ -25,13 +25,14 @@ inline int g_checks = 0;
 struct TestCase {
     const char* name;
     std::function<void()> fn;
+    const char* file; // the tests/test_*.cpp it is in: its area (tests/areas.map [units]), SF_TEST_AREA
 };
 inline std::vector<TestCase>& registry() {
     static std::vector<TestCase> r;
     return r;
 }
 struct Register {
-    Register(const char* n, std::function<void()> f) { registry().push_back({n, std::move(f)}); }
+    Register(const char* n, std::function<void()> f, const char* file) { registry().push_back({n, std::move(f), file}); }
 };
 
 inline Document makeDoc(Mesh m) {
@@ -54,6 +55,8 @@ inline std::uint32_t shardHash(const char* name) {
 // A shard's expected seconds for each of N shards (tests/test_main.cpp), and inShard from it.
 std::vector<double> shardSeconds(int shards);
 bool inShard(const char* name, int shard, int shards);
+// The area (tests/areas.map [units]) of a test file, "" when the map has no line for it.
+std::string areaOfFile(const char* file);
 
 // A wall-clock limit for a speed check: the value given on a developer machine, four times that on a CI runner
 // (CI or GITHUB_ACTIONS set: shared, often loaded virtual machines, where Windows runners have flaked at 1.1x), and
@@ -91,7 +94,7 @@ inline std::string tempPath(const char* name) { return (std::filesystem::temp_di
 
 #define TEST(name)                                                  \
     static void name();                                             \
-    static ::sf::test::Register reg_##name(#name, name);            \
+    static ::sf::test::Register reg_##name(#name, name, __FILE__);  \
     static void name()
 
 using sf::test::makeDoc;

@@ -185,7 +185,9 @@ land_staging() { # land_staging [--with CMD] [REF]
         pid=$!
         echo "   alongside: $with (log /tmp/merge-queue-with-${sha:0:8}.log)"
     fi
-    ci=$(wait_ci staging)
+    # SF_STAGE_CI_REUSED="<commit> <run>": release.sh --stage found that this commit only adds release paperwork to one whose
+    # full CI passed (tools/release/paperwork_only.py): the same answer, not another 20 minutes of it.
+    if [ -n "${SF_STAGE_CI_REUSED:-}" ]; then ci=success; echo "   CI: reused from ${SF_STAGE_CI_REUSED%% *} (run ${SF_STAGE_CI_REUSED##* }; paperwork only)"; else ci=$(wait_ci staging); fi
     if [ -n "$pid" ]; then wait "$pid" || local_rc=$?; tail -5 "/tmp/merge-queue-with-${sha:0:8}.log" | sed 's/^/   /'; fi
     echo "   CI on staging: $ci; local: $([ $local_rc = 0 ] && echo ok || echo "failed ($local_rc)"); $(( $(date +%s) - t0 )) s"
     [ "$ci" = success ] && [ $local_rc = 0 ] || die "staging is red: main stays at $(git rev-parse --short origin/main); fix the batch and run again"

@@ -31,6 +31,10 @@ LINES = {
     "packaging/rez/package.py": r'version = "[0-9.]+"',
     "packaging/linux/org.sculptforge.SculptForge.metainfo.xml": r'\s*<release version="[0-9.]+" date="[0-9-]+"/>',
     "CHANGELOG.md": None,
+    # step bump pins the What's New test to the new version (tools/release/pin_whats_new_test.py: the pinned guide version,
+    # its comment and the expected "Version X" / tagline texts); step check runs that test on the bumped tree. Without
+    # this line every real bump failed this check and CI waited for a second full run (0.12.0's bump edits it).
+    "tests/ui/whats_new.sfui": r'(#.*|env SF_GUIDE_VERSION [0-9.]+|expect_text ".*")',
 }
 
 
@@ -146,6 +150,20 @@ def self_test():
             run("git", "add", "-A")
             run("git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "d")
             assert check("HEAD~1", "HEAD") == ["src/a.cpp: not release paperwork"]
+            # the bump's pin of the What's New test: its version and expected texts only
+            os.makedirs("tests/ui")
+            w("tests/ui/whats_new.sfui", "# pinned to 1.2.3\nenv SF_GUIDE_VERSION 1.2.3\nexpect_text \"Version 1.2.3\"\nclick \"x\"\n")
+            run("git", "add", "-A")
+            run("git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "d2")
+            w("tests/ui/whats_new.sfui", "# pinned to 1.3.0\nenv SF_GUIDE_VERSION 1.3.0\nexpect_text \"Version 1.3.0\"\nclick \"x\"\n")
+            run("git", "add", "-A")
+            run("git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "d3")
+            assert check("HEAD~1", "HEAD") == [], check("HEAD~1", "HEAD")
+            w("tests/ui/whats_new.sfui", "# pinned to 1.3.0\nenv SF_GUIDE_VERSION 1.3.0\nexpect_text \"Version 1.3.0\"\nclick \"y\"\n")
+            run("git", "add", "-A")
+            run("git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "d4")
+            assert check("HEAD~1", "HEAD") == ['tests/ui/whats_new.sfui: -click "x"', 'tests/ui/whats_new.sfui: +click "y"'], check("HEAD~1", "HEAD")
+            run("git", "reset", "-q", "--hard", "HEAD~3")
             # --post-tag: only the site, docs Markdown and the AUR files' version lines; never code, tests, the build,
             # workflows, other packaging, note fragments, or a PKGBUILD build step
             os.makedirs("website/link")

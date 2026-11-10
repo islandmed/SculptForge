@@ -57,7 +57,7 @@ HAND_MAP = [
     ("tools/brush-gallery/*", "brush_gallery_index ui_brush_gallery"),
     ("tools/marks_*.txt", "marks"),
     ("src/app/*.cpp", "i18n_coverage"), ("src/*", "native_dialogs"), ("tools/i18n/*", "i18n_coverage"),
-    ("tools/test/*", "test_impact"),
+    ("tools/test/*", "test_impact test_affected test_areas"),
     ("tests/ui/data/*", ""),  # step 3 handles these
 ]
 # Public text is checked for third-party marks on every change: cheap, and the one check nobody may skip.

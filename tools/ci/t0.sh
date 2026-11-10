@@ -62,7 +62,15 @@ mapfile -t files < <(git diff --name-only "$base" "$tip")
 git diff -U0 "$base" "$tip" -- CMakeLists.txt > "$out/cmake.diff" # (test-only CMake edits run just those tests)
 regex=""; [ ${#files[@]} -gt 0 ] && regex=$(python3 tools/test/impacted.py --build build --base "$base" -v --cmake-diff "$out/cmake.diff" \
   --files "${files[@]}" 2> "$out/impacted.log")
-echo "T0: ${#files[@]} changed file(s) -> ${regex:-no tests}"
+# Areas (tests/areas.map, docs/testing-flow.md): smoke + the changed files' areas join impacted.py's picks, and the
+# sculptforge_tests shards run only those areas' cases (SF_TEST_AREA). A core header, CMake or an unknown path: everything.
+# A branch from before areas (no affected.py) keeps impacted.py's list alone.
+if [ ${#files[@]} -gt 0 ] && [ -f tools/test/affected.py ] && [ -f tests/areas.map ]; then
+  plan=$(python3 tools/test/affected.py --build build --cmake-diff "$out/cmake.diff" --files "${files[@]}" --merge "$regex" --json -v 2>> "$out/impacted.log") &&
+    { regex=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["regex"])' <<< "$plan")
+      export SF_TEST_AREA=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["unit_areas"])' <<< "$plan"); }
+fi
+echo "T0: ${#files[@]} changed file(s) -> ${regex:-no tests}${SF_TEST_AREA:+ (unit cases of: $SF_TEST_AREA)}"
 if [ -z "$regex" ]; then result=green; finish; fi
 args=(-j 4); [ "$regex" != . ] && args+=(-R "$regex")
 t=$(date +%s)
