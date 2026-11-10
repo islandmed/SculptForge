@@ -57,7 +57,7 @@ Shift modifiers, masking and face groups with Ctrl and Ctrl+Shift, Parts, subdiv
 remeshing and a Gizmo. Bring models over as OBJ, FBX, glTF or USD, or through the Bridge (face groups, mask and vertex
 paint come along).
 
-> **Status: early release (v0.8).** The core sculpting, pipeline and AI features work and are tested on every
+> **Status: early release; see [Releases](https://github.com/islandmed/SculptForge/releases/latest) for the latest version.** The core sculpting, pipeline and AI features work and are tested on every
 > commit. Version 0.8 adds dynamic topology (brushes add triangles where they need them),
 > vector displacement brushes, Quad Remesh Guides and sculpt layers on every subdivision level; 0.7 added classic
 > keys and gestures and a Blender bridge add-on; 0.6 halved the memory and made the view twice as
