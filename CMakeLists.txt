@@ -971,8 +971,9 @@ if(SCULPTFORGE_BUILD_TESTS)
       set_tests_properties(ui_warm_start PROPERTIES FIXTURES_SETUP ui_warm LABELS ui TIMEOUT 60)
       set_tests_properties(ui_warm_stop PROPERTIES FIXTURES_CLEANUP ui_warm LABELS ui TIMEOUT 400)
       # A server that runs 40 scripts in a row stays under 700 MB (software Mesa: 330; it held 2180 when each script left its capture targets, ~50 MB, behind).
+      # 40 scripts take ~2 min on the PC (0.12.4 stage: 125.7 s, budget 20 s): nightly, not in every full suite.
       add_test(NAME ui_serve_leak COMMAND ${SF_UI_WARM_PY} leak-check --app ${SF_UI_WARM_APP} --runs 40 --max-mb 700)
-      set_tests_properties(ui_serve_leak PROPERTIES LABELS ui TIMEOUT 600)
+      set_tests_properties(ui_serve_leak PROPERTIES LABELS "ui;nightly" TIMEOUT 600)
     endif()
     # sculptforge_ui_test(NAME SCRIPT [ARGS...]): ui_NAME runs tests/ui/SCRIPT.sfui, screenshots in ui-shots/NAME.
     function(sculptforge_ui_test name script)
