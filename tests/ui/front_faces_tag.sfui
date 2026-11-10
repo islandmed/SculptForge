@@ -1,0 +1,20 @@
+# Front faces only is easy to leave on: Smooth (and every brush) then skips the inner side of a thin or Extract-made
+# Part. While it is on, the brush cursor carries a "Front faces only" tag and the Brush palette says so, with a
+# Turn off button; off, neither shows.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+key f
+hover_model 0.5 0.5
+expect_value front_faces_tag == 0
+action draw.front_faces
+hover_model 0.52 0.5
+expect_value front_faces_tag == 1
+shot front-faces-cursor
+click "Brush##palette.brush"
+expect "Turn off##front_faces_off"
+shot front-faces-on
+click "Turn off##front_faces_off"
+expect_not "Turn off##front_faces_off"
+click "Brush##palette.brush"
+hover_model 0.5 0.5
+expect_value front_faces_tag == 0

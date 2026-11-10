@@ -290,6 +290,7 @@ private:
     float sizeRingPreviewPx_ = 0.0f; // its radius, pixels (UI tests: size_ring_px)
     std::vector<glm::vec3> cursorRing_, cursorInner_; // scratch, kept to avoid allocating per frame
     bool surfaceCursorShown_ = false; // the last cursor drawn lay on the surface (UI tests: surface_cursor)
+    bool frontFacesTagShown_ = false; // the last cursor drawn carried the "Front faces only" tag (UI tests: front_faces_tag)
     bool ringShown_ = true;           // the last cursor drawn had its ring (UI tests: cursor_ring)
     void updateTitle();
 

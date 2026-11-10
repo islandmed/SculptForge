@@ -4636,6 +4636,18 @@ void App::drawBrushCursor() {
             dl->AddCircleFilled(c, 2.0f * uiScale_, col);
         }
     }
+    // Front faces only is easy to leave on and then wonder why Smooth and the other brushes skip the inner side of
+    // a thin Part (an Extract's inside, #bug-reports): say so by the cursor while it is on.
+    frontFacesTagShown_ = frontFacesOnly_ && !masking && !sizeRingPreview_;
+    if (frontFacesTagShown_) {
+        const char* label = tr("Front faces only");
+        const ImVec2 size = ImGui::CalcTextSize(label);
+        const float pad = 3.0f * uiScale_;
+        const ImVec2 at0(c.x - size.x * 0.5f, c.y + r + 6.0f * uiScale_);
+        dl->AddRectFilled(ImVec2(at0.x - pad, at0.y - pad), ImVec2(at0.x + size.x + pad, at0.y + size.y + pad),
+                          IM_COL32(20, 20, 24, 190), 3.0f * uiScale_);
+        dl->AddText(at0, IM_COL32(255, 210, 130, 255), label);
+    }
     if (!sizeRingPreview_) drawPrecisionCursor(dl, c, r, col); // Steady Stroke's string, the precision drag, the size in mm (Precision.cpp; the pop-up shows the size itself)
 }
 
