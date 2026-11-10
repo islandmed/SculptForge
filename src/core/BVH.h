@@ -99,6 +99,9 @@ public:
     void rayTrianglesPadded(const Mesh& mesh, const glm::vec3& origin, const glm::vec3& dir, std::span<const float> pad, float extra,
                             std::vector<uint32_t>& out) const;
     size_t memoryBytes() const;
+    // Exchanges the trees (whole-mesh undo steps keep the other mesh's tree, so undo doesn't rebuild one). Both then
+    // report a new structureSerial(), so caches keyed on it (Micro) never take a swapped tree for the old one.
+    void swapTree(BVH& other);
 
 private:
     struct Node {
