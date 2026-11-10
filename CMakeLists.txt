@@ -1039,6 +1039,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(geometry_groups_1440 geometry_groups --size 1440x900)
     sculptforge_ui_test(geometry_groups_2880 geometry_groups --size 2880x1800) # its 200% shot: 1440 px of UI
     sculptforge_ui_test(geometry_groups_1024 narrow/geometry_groups --size 1024x768)
+    # Curves and the Tube modifiers at 1440 and 2880 px (tests/ui/curve.sfui; its 200% shots inside).
+    sculptforge_ui_test(curve_1440 curve --size 1440x900)
+    sculptforge_ui_test(curve_2880 curve --size 2880x1800)
     # #163's unhide prompt at 1440 and 2880 px (tests/ui/unhide_prompt.sfui).
     sculptforge_ui_test(unhide_prompt_1440 unhide_prompt --size 1440x900)
     sculptforge_ui_test(unhide_prompt_2880 unhide_prompt --size 2880x1800)

@@ -104,11 +104,32 @@ void App::registerTubeUiActions() {
         "A flat ribbon, lying flat towards you as you draw: straps, cloth strips, leaves, hair cards (for new tubes, "
         "and the active Tube Part). Thickness sets how flat.",
         "tube_set");
-    add("tube.new_part", "New Part", [this] { tubeMerge_ = false; }, nullptr, [this] { return !tubeMerge_; },
-        "Each stroke makes a Tube Part whose points stay editable until Bake.");
-    add("tube.merge", "Merge", [this] { tubeMerge_ = true; }, nullptr, [this] { return tubeMerge_; },
+    add("tube.profile_rope", "Rope", profile(TubeShape::Profile::Rope), nullptr, isProfile(TubeShape::Profile::Rope),
+        "Three strands wound round the curve: rope, cable, twine. Spread sets how far apart the strands are, Twist and "
+        "Spin turn them (for new tubes, and the active Tube Part).",
+        "tube_set");
+    add("tube.profile_braid", "Braid", profile(TubeShape::Profile::Braid), nullptr, isProfile(TubeShape::Profile::Braid),
+        "Three flat strands woven across each other: plaits, straps, braided hair (for new tubes, and the active Tube "
+        "Part). Spread sets how far apart the strands are.",
+        "tube_set");
+    add("tube.profile_sleeve", "Sleeve", profile(TubeShape::Profile::Sleeve), nullptr, isProfile(TubeShape::Profile::Sleeve),
+        "A hollow tube with open ends: sleeves, pipes, bracelets, hoses (for new tubes, and the active Tube Part). "
+        "Spread sets how thick the wall is.",
+        "tube_set");
+    add("tube.new_part", "New Part", [this] { tubeMerge_ = tubeCurve_ = false; }, nullptr,
+        [this] { return !tubeMerge_ && !tubeCurve_; }, "Each stroke makes a Tube Part whose points stay editable until Bake.");
+    add("tube.merge", "Merge", [this] { tubeMerge_ = true; tubeCurve_ = false; }, nullptr, [this] { return tubeMerge_; },
         "Each stroke goes into the active Part, with even edge lengths close to that Part's own, ready for dynamic "
         "topology.");
+    add("tube.curve", "Curve", [this] { tubeCurve_ = true; tubeMerge_ = false; }, nullptr, [this] { return tubeCurve_; },
+        "Each stroke makes a Curve Part: a guide line you can draw on or over the surface, move its points, Resample, and "
+        "then turn into a tube with Tube from curve.",
+        "tube_new");
+    add("tube.from_curve", "Tube from curve",
+        [this] { runCommand("tube_from_curve"); tubeSelected_ = -1; },
+        [this] { return tubeActive() && doc_.mesh.tube.curve; }, nullptr,
+        "Make the active Curve Part a tube, with the Shape, Ends and modifiers set here. Undo brings the curve back.",
+        "tube_from_curve");
     const auto selected = [this] { return tubeSelection() >= 0; };
     add("tube.delete_point", "Delete Point",
         [this] { if (const int i = tubeSelection(); i >= 0) runCommand("tube_delete_point", {{"index", double(i)}}); tubeSelected_ = -1; },
@@ -137,7 +158,7 @@ void App::registerTubeUiActions() {
             runCommand("tube_bake", {{"uniform", tubeBakeUniform_}});
             tubeSelected_ = -1;
         },
-        [this] { return tubeActive(); }, nullptr,
+        [this] { return tubeActive() && !doc_.mesh.tube.curve; }, nullptr,
         "Make the active Tube Part a plain mesh to sculpt. Its points can't be edited after this (undo brings them "
         "back).",
         "tube_bake");
@@ -239,7 +260,7 @@ void App::drawTubeContents() {
     ImGui::AlignTextToFramePadding();
     ImGui::TextDisabled("%s", tr("Result"));
     ImGui::SameLine();
-    ui::Segmented(*this, {"tube.new_part", "tube.merge"});
+    ui::Segmented(*this, {"tube.new_part", "tube.merge", "tube.curve"});
     if (!tubeActive()) {
         ImGui::PushTextWrapPos(0.0f);
         ImGui::TextDisabled("%s", tr("Select a Tube Part to edit its points."));
@@ -265,11 +286,30 @@ void App::drawTubeContents() {
             tubeRadiusEdit_ = -1.0f;
         }
     }
+    {   // Resample: exactly this many evenly spaced points along the curve (one undo step when let go)
+        float n = tubeResampleEdit_ > 0.0f ? tubeResampleEdit_ : float(t.points.size());
+        ImGui::SetNextItemWidth(full);
+        if (ui::SliderInside("##tuberesample", &n, 2.0f, 400.0f, tr("Resample %.0f points"), ImGuiSliderFlags_Logarithmic))
+            tubeResampleEdit_ = std::round(n);
+        if (ImGui::IsItemDeactivated() && tubeResampleEdit_ > 0.0f) {
+            if (size_t(tubeResampleEdit_) != t.points.size()) {
+                runCommand("tube_resample", {{"count", double(tubeResampleEdit_)}});
+                tubeSelected_ = -1;
+            }
+            tubeResampleEdit_ = -1.0f;
+        }
+        ui::HelpText("Resample", nullptr,
+                     "Replace the curve's points with exactly this many, evenly spaced along it (the ends stay). Fewer "
+                     "points give a smoother, easier to edit curve; more follow it closely.",
+                     kTubePath);
+    }
+    if (t.curve) ui::ActionButton(*this, "tube.from_curve", ImVec2(full, 0));
     const float half = (full - style.ItemSpacing.x) * 0.5f;
     ui::ActionButton(*this, "tube.delete_point", ImVec2(half, 0));
     ImGui::SameLine();
     ui::ActionButton(*this, "tube.insert_point", ImVec2(-1, 0));
     ui::ActionButton(*this, "tube.simplify", ImVec2(full, 0));
+    if (t.curve) return; // a curve is baked after Tube from curve
     ui::ActionButton(*this, "tube.bake", ImVec2(half, 0));
     ImGui::SameLine();
     ui::Checkbox(tr("Even edges##tube_bake_uniform"), &tubeBakeUniform_);
@@ -281,6 +321,7 @@ void App::drawTubeContents() {
 void App::drawTubeShapeControls(float full) {
     tray::GroupLabel(*this, "Shape");
     ui::Segmented(*this, {"tube.profile_round", "tube.profile_square", "tube.profile_triangle", "tube.profile_ribbon"}, full);
+    ui::Segmented(*this, {"tube.profile_rope", "tube.profile_braid", "tube.profile_sleeve"}, full);
     // A slider sets new tubes and, with a Tube Part active, previews on it while held: one undo step when let go.
     const bool active = tubeActive();
     const TubeShape& shown = active ? doc_.mesh.tube : tubeLook_;
@@ -321,6 +362,20 @@ void App::drawTubeShapeControls(float full) {
     if (shown.profile != TubeShape::Profile::Round)
         slider("##tuberoll", &TubeShape::roll, -180.0f, 180.0f, "Turn %.0f\xc2\xb0", "turn", "Turn",
                "Turns the cross-section about the curve, in degrees.");
+    if (shown.profile != TubeShape::Profile::Round) {
+        slider("##tubetwist", &TubeShape::twist, -720.0f, 720.0f, "Twist %.0f\xc2\xb0", "twist", "Twist",
+               "Turns the cross-section a little more along the tube, so it has turned this many degrees by the far end: "
+               "twisted ribbons, beams and ropes.");
+        slider("##tubespin", &TubeShape::spin, -90.0f, 90.0f, "Spin %.0f\xc2\xb0", "spin", "Spin",
+               "Turns the cross-section steadily, this many degrees per tube radius of length: a screw thread, a barley "
+               "twist.");
+    }
+    if (shown.profile == TubeShape::Profile::Rope || shown.profile == TubeShape::Profile::Braid ||
+        shown.profile == TubeShape::Profile::Sleeve)
+        slider("##tubespread", &TubeShape::spread, 0.0f, 1.0f,
+               shown.profile == TubeShape::Profile::Sleeve ? "Wall %.2f" : "Spread %.2f", "spread",
+               shown.profile == TubeShape::Profile::Sleeve ? "Wall" : "Spread",
+               "Rope and braid: how far apart the strands are (0.5: touching). Sleeve: how thick the wall is.");
     slider("##tubetaper0", &TubeShape::taperStart, 0.0f, 1.0f, "Taper start %.2f", "taper_start", "Taper start",
            "How much of the length narrows to a point at the start (0: none, 1: all of it): horns, claws, spikes.");
     slider("##tubetaper1", &TubeShape::taperEnd, 0.0f, 1.0f, "Taper end %.2f", "taper_end", "Taper end",
@@ -480,9 +535,10 @@ void App::tubeRelease() {
         s.up = d.planeNormal; // a ribbon lies flat towards the view it was drawn in
         s.flatCaps = tubeFlatCaps_;
         s.mirrorX = symmetry_.x;
+        s.curve = tubeCurve_;
         if (!s.points.empty()) {
             int edited = -1;
-            const CommandResult r = tubeAdd(doc_, s, tubeMerge_, "Tube", &edited);
+            const CommandResult r = tubeAdd(doc_, s, tubeMerge_ && !tubeCurve_, tubeCurve_ ? "Curve" : "Tube", &edited);
             status_ = r.message;
             if (r.ok) {
                 tubeAnchor_ = s.points.back().position;
