@@ -159,7 +159,19 @@
     url.searchParams.set("client_reference_id", ref);
     return url.href;
   };
+  // The visit's utm_* also ride along on links to the membership pages, so a home-page ad visitor who clicks
+  // Membership or Studios keeps the tag (the URL is the only place it lives).
+  const utm = [...new URLSearchParams(location.search)].filter(([k]) => /^utm_[a-z]+$/.test(k));
+  const member = 'a[href*="support"], a[href*="studios"]';
+  const carry = (a) => {
+    if (!ref || !a.href) return;
+    const url = new URL(a.href, location.href);
+    if (url.origin !== location.origin || !/\/(support|studios)(\.html)?$/.test(url.pathname)) return;
+    utm.forEach(([k, v]) => { if (!url.searchParams.has(k)) url.searchParams.set(k, v.slice(0, 200)); });
+    a.href = url.href;
+  };
   if (ref) {
+    document.querySelectorAll(member).forEach(carry);
     document.querySelectorAll(buy).forEach((a) => {
       a.href = tag(a.href);
       if (a.dataset.yearly) a.dataset.yearly = tag(a.dataset.yearly);
@@ -169,6 +181,8 @@
     ["pointerdown", "click", "auxclick", "contextmenu"].forEach((type) => document.addEventListener(type, (e) => {
       const a = e.target.closest?.(buy);
       if (a) a.href = tag(a.href);
+      const m = e.target.closest?.(member);
+      if (m) carry(m);
     }, true));
   }
   document.addEventListener("click", (e) => {
