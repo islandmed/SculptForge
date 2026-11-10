@@ -2812,6 +2812,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     }
     if (doc_.sculptor.strokeActive()) endStroke();
     if (drape_) finishDrape(true); // (a running Drape keeps where it got to first: undo, save... see a real step)
+    if (name == "garment_drape") garmentDraped(); // (the placement preview would be a collider: it goes first)
     if (name == "save_project") storeProjectSettings();
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
     crashlog::action(name); // (failures reach the log through SDL_Log below)
@@ -2842,6 +2843,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     status_ = r.message;
     if (name.rfind("uv_", 0) == 0 || name == "texture_create" || name == "texture_delete") uvEditorChanged();
     garmentsChanged(name.rfind("garment_", 0) == 0); // (the Pattern window re-reads the pattern)
+    if (name == "garment_drape") garmentPreviewDirty_ = false; // (no preview over the Part it made)
     lastCommandOk_ = r.ok;
     if (r.ok && name != "export_glb" && name != "export_lods" && name != "export_usd" && name != "export_fbx" &&
         name != "export_unreal" && name.rfind("unreal_", 0) != 0 && name != "save_obj" && name != "save_project" &&
