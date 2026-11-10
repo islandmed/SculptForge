@@ -781,6 +781,7 @@ private:
     bool openHunyuanNotice_ = false;
     std::shared_ptr<ai::GenerationProgress> generatorProgress_;
     float generatorTime_ = 0.0f;
+    std::string generatorError_; // why the last Generate 3D gave no model; stays in the panel until the next run
     int candidateCountForService() const;
     void clearCandidates();
     void pickCandidate(int index);

@@ -88,6 +88,7 @@ void App::startGenerator() {
     if (settings.comfyImageWorkflow.empty()) settings.comfyImageWorkflow = comfyDefaultWorkflow(false);
     if (settings.comfyTextWorkflow.empty()) settings.comfyTextWorkflow = comfyDefaultWorkflow(true);
     clearCandidates();
+    generatorError_.clear();
     const int count = candidateCountForService();
     const std::string stem = [] {
         const auto p = (std::filesystem::temp_directory_path() / ("sculptforge_generated_" + std::to_string(SDL_GetTicksNS()))).u8string();
@@ -176,7 +177,9 @@ void App::pollGenerator() {
     const std::string noteText = note.empty() ? std::string() : " - " + note;
     if (ready == 0) {
         clearCandidates();
-        status_ = "Image to 3D failed: " + error + noteText;
+        generatorError_ = (textMode_ ? "Text to 3D failed: " : "Image to 3D failed: ") + error + noteText;
+        status_ = generatorError_;
+        SDL_Log("%s", generatorError_.c_str());
         return;
     }
     if (candidates_.size() == 1) { // nothing to compare: it lands at once
