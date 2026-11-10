@@ -290,15 +290,23 @@ words_ok() {
     [ "${1:-}" = bump ] || python3 tools/release/pin_whats_new_test.py "$BASE" --check >/dev/null ||
         die "tests/ui/whats_new.sfui isn't pinned to $BASE's What's New" "run step bump (it pins it): $(resume bump)"
 }
-# UI scale / DPI (#87): the Windows manifest still asks for per-monitor DPI v2, and the "dpi" UI tests (100-200 %, a
-# display-scale event) pass on main's build. BUILD_DIR (default build) is the coordinator's tree, already built for
-# the full ctest; only the app is rebuilt here.
+# UI scale / DPI (#87): the Windows manifest still asks for per-monitor DPI v2 (a grep: nothing is built), and the "dpi"
+# UI tests (100-200 %, a display-scale event) pass. Those run in ci.yml's suite (Linux and Windows), and step ci does not
+# tag without CI green on this commit, or on the main commit it differs from only by release paperwork (ci_reused): CI's
+# result for the same SHA is the check, not a second build on this machine ("if it's built clean in CI, what are we
+# doing here", owner 11-09). Only --rebuild (the old path: the bump goes straight to main and CI reuses the commit
+# before it, which never saw the bump's files) still builds, in BUILD_DIR (default build, the coordinator's tree), to
+# run the dpi tests and what the bump changed.
 dpi_ok() {
     local b=${BUILD_DIR:-build} heavy=(nice -n 19 ionice -c3)
     [ -x "$HOME/Work/.sf/heavy.sh" ] && heavy=("$HOME/Work/.sf/heavy.sh") # one heavy job machine-wide
     grep -q '<dpiAwareness[^>]*>PerMonitorV2' packaging/windows/sculptforge.manifest 2>/dev/null &&
         grep -q 'packaging/windows/sculptforge.manifest' CMakeLists.txt ||
         die "the Windows build no longer declares per-monitor DPI v2" "restore packaging/windows/sculptforge.manifest and its target_sources line in CMakeLists.txt (git log -p -- packaging/windows)"
+    if [ "$MODE" != rebuild ]; then
+        ok "Windows manifest declares PerMonitorV2; the UI scale tests (label dpi) are in CI's suite, which step ci waits for (nothing built here)"
+        return
+    fi
     [ -f "$b/CTestTestfile.cmake" ] || die "no build tree at $b for the DPI UI tests" "cmake -S . -B $b -DCMAKE_BUILD_TYPE=Release, or run again with BUILD_DIR=<your build>"
     "${heavy[@]}" cmake --build "$b" --target sculptforge -j3 >/dev/null || die "the app doesn't build in $b" "cmake --build $b --target sculptforge and fix the error"
     SDL_APP_ID=sculptforge-agent "${heavy[@]}" ctest --test-dir "$b" -L dpi --output-on-failure >"$b/release-dpi.log" 2>&1 ||

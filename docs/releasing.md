@@ -171,7 +171,7 @@ Steps for a beta: `bump check ci tag release status`.
   `VERSION 0.12.0` and `set(SCULPTFORGE_PRERELEASE "beta.1")`. The app reads "0.12.0 Beta 1" in the title bar and
   About; packages are named `SculptForge-0.12.0-*`. CITATION, rez, metainfo, the CHANGELOG section and the home page
   stay at the stable release (`build_site.py` leaves the home page alone while a prerelease is set).
-- **check** checks CMakeLists.txt (version and prerelease), the guide, the DPI tests, the workflows (below, "Secrets"),
+- **check** checks CMakeLists.txt (version and prerelease), the guide, the DPI manifest (the DPI UI tests are CI's: step **ci** waits for them, nothing is built here; only `--rebuild` still builds), the workflows (below, "Secrets"),
   that the `member-release` environment has the `INSIDERS_REPO_TOKEN` secret and that gh can see the private repository. A beta skips the site/AUR/Homebrew/Omarchy
   checks.
 - **tag / release**: `v0.12.0-beta.1` (the tag is public, like the source). release.yml checks that the tag equals the
