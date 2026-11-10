@@ -21,6 +21,7 @@ Nightly tests are never listed. The tests are the ctest list of --build (ctest -
 the [tests] rules.
 """
 import argparse
+import importlib.util
 import json
 import os
 import re
@@ -125,11 +126,19 @@ def load_tests(build):
     return tests
 
 
-def affected(root, files, amap, tests=None, fan_in=None):
-    """-> {"full", "areas", "regex", "unit_areas", "why"} for the changed files. tests: {ctest name: labels}."""
+def affected(root, files, amap, tests=None, fan_in=None, cmake_regs=None):
+    """-> {"full", "areas", "regex", "unit_areas", "why"} for the changed files. tests: {ctest name: labels}.
+    cmake_regs: the test names a CMakeLists.txt diff only registers or edits (impacted.test_registrations), None when it
+    changes anything else: a branch that adds a UI test is its area's change, not a build change."""
     fan_in = fan_in or (lambda h: includers(root, h))
     why, areas, full = [], set(), False
     for f in files:
+        if f == "CMakeLists.txt" and cmake_regs is not None:
+            for n in sorted(cmake_regs):
+                a = amap.test_area(n)
+                areas.add(a or "site")
+                why.append(f"CMakeLists.txt registers {n}: {a}")
+            continue
         if amap.is_core_path(f):
             full = True
             why.append(f"{f}: core path, the full suite")
@@ -232,6 +241,8 @@ ui_shell
     assert r("src/core/Mesh.h")["regex"] == "." and r("src/core/Mesh.h")["full"]
     assert r("src/core/Small.h")["regex"] != "."
     assert r("CMakeLists.txt")["regex"] == "." and r("tests/areas.map")["full"]
+    c = affected("/nonexistent", ["CMakeLists.txt", "tests/ui/tube.sfui"], amap, tests, fan, cmake_regs={"ui_cloth_drape"})
+    assert not c["full"] and c["areas"] == ["cloth", "ui"], c  # a CMake edit that only registers a test is that test's area
     assert r("weird/new.thing")["regex"] == ".", "an unknown path is the full suite"
     assert r("docs/x.md")["areas"] == ["site"]
     assert r("tests/ui/cloth_drape.sfui")["areas"] == ["cloth"] and r("tests/ui/tube.sfui")["areas"] == ["ui"]
@@ -255,6 +266,7 @@ def main():
     ap.add_argument("--base", default="origin/main")
     ap.add_argument("--files", nargs="*")
     ap.add_argument("--area", help="comma list of areas: their tests, no git")
+    ap.add_argument("--cmake-diff", help="git diff -U0 of CMakeLists.txt against the base (a tree without .git)")
     ap.add_argument("--merge", help="impacted.py's regex: its picks join the area tests (its '.' stays '.')")
     ap.add_argument("--print", default="regex", choices=("regex", "unit_areas"), help="what to print (default: the regex)")
     ap.add_argument("--json", action="store_true")
@@ -276,7 +288,18 @@ def main():
                "regex": regex_for(set(names), amap, tests, False)}
     else:
         files = a.files if a.files is not None else changed_files(root, a.base)
-        res = affected(root, files, amap, tests)
+        regs = None
+        if "CMakeLists.txt" in files:
+            diff = open(a.cmake_diff, encoding="utf-8").read() if a.cmake_diff else sh(
+                "git", "diff", "-U0", sh("git", "merge-base", a.base, "HEAD", cwd=root).strip() or a.base, "--", "CMakeLists.txt", cwd=root)
+            try:
+                spec = importlib.util.spec_from_file_location("impacted", os.path.join(os.path.dirname(os.path.abspath(__file__)), "impacted.py"))
+                imp = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(imp)
+                regs = imp.test_registrations(open(os.path.join(root, "CMakeLists.txt"), encoding="utf-8").read(), diff) if diff else None
+            except (OSError, ImportError, AttributeError):
+                regs = None
+        res = affected(root, files, amap, tests, cmake_regs=regs)
     if a.merge is not None:
         res["regex"] = merge(res, a.merge)
     if a.verbose:
