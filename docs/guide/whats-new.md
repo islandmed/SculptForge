@@ -9,14 +9,20 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: 2026-11-09
-tagline: Voxel Remesh up to 4096, Forge Spheres in one mode, and a Find Problems that finishes the job.
+tagline: Panels on your second monitor, Voxel Remesh up to 4096, Forge Spheres in one mode, and a Find Problems that finishes the job.
+highlight: Palettes, the User Guide and Controls on your second monitor (requested by Richard Throgmorton (MakIt3D), our first Founding Member)
 highlight: Voxel Remesh up to 4096, with a live triangle estimate (thanks foirgairwolf on Discord)
 highlight: Forge Spheres: draw, move and resize without switching modes (thanks @tristratos)
 highlight: Find Problems: Fix all repairs messy meshes completely and says what it couldn't fix (thanks foirgairwolf on Discord)
 highlight: Drape settles in tight folds instead of twitching, and Clay, Flatten and Trim on micro levels avoid stretched triangles
-highlight: Focus Detail projects save and reopen with their full detail (Linux and macOS)
 ```
 
+- **Panels in their own windows**: every palette has a new **Open in its own window** icon in its header, and the
+  **User Guide** and **Controls** have one in their toolbar. Drag that window to your second monitor or pen display;
+  it opens there again next time. Close it (or **Back in the main window**) to bring the panel back. Requested by
+  Richard Throgmorton (MakIt3D), our first Founding Member.
+- **Solo** (Tool > Parts) puts back exactly the Parts that were shown before it: a Part you had hidden stays hidden.
+  Thanks MasterFULL on Discord.
 - **Voxel Remesh up to 4096**: the **Tool > Remesh** Resolution slider now goes to 4096 (two thirds of it still covers
   32-512), the line under it estimates the triangles it makes, and above 512 it asks once and never starts a remesh
   that won't fit in the free memory. A sculpted head remeshes at 1024 into about 5.6 million triangles in about 3 s.

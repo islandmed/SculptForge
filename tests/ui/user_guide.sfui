@@ -18,9 +18,10 @@ expect_guide face-groups.md
 shot chapter
 
 # Search finds a term across chapters; a result opens its chapter.
-type "User Guide/##guide_search" "voxel remesh"
+# A phrase only geometry.md has (feature names also land in whats-new.md, which then ranks first).
+type "User Guide/##guide_search" "collapses edges"
 expect_value guide_hits > 0
-expect_text Voxel remesh
+expect_text Quads and triangles
 shot search
 click "User Guide/##guide.hit.0"
 expect_guide geometry.md
