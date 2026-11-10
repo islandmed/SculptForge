@@ -1,0 +1,13 @@
+# Customize Shelves: every button on the shelves can be moved (Ctrl+Alt+drag). Fenix couldn't move Backface (Front), Mirror worked.
+# Each action is dragged off its shelf onto the canvas and must come off.
+run ui_look look=forge layout=classic
+run new_sphere subdivisions=4
+wait 0.3
+key f3
+type "##Command palette" "customize shelves"
+key enter
+expect_value customize == 1
+hold ctrl+alt
+drag_shelf_items 25
+hold none
+shot all-moved

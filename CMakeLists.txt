@@ -1119,6 +1119,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # A shorter window: the view toggles fold into one View button (tests/ui/sizes/view_toggles_short.sfui).
     sculptforge_ui_test(view_toggles_1024 sizes/view_toggles_short --size 1024x768)
     sculptforge_ui_test(view_toggles_1024_200 sizes/view_toggles_short --size 2048x1536)
+    # The right shelf with the console open holds still at every window height (tests/ui/sizes/shelf_console_*.sfui; the member's Retina: 982 logical px).
+    sculptforge_ui_test(shelf_console_classic sizes/shelf_console_classic --size 1512x982)
+    sculptforge_ui_test(shelf_console_forge sizes/shelf_console_forge --size 1512x982)
     # Cut caps, Wire on, low-poly and 20k spheres, for the look review at 1440 px, 100 % and 200 % (tests/ui/sizes/cut_cap_quality.sfui).
     sculptforge_ui_test(cut_cap_quality_1440 sizes/cut_cap_quality --size 1440x900)
     sculptforge_ui_test(cut_cap_quality_1440_200 sizes/cut_cap_quality --size 2880x1800)

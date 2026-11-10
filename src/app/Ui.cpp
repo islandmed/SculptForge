@@ -618,7 +618,10 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
             colors = 3;
         }
     }
-    ImGui::BeginDisabled(!enabled);
+    // Customize Shelves: a button that doesn't apply now (Backface-style options, Vertex / Texture paint without a texture) must
+    // still take the Ctrl+Alt press, or it can't be moved (#bug 45).
+    const bool grabbable = app.layout().customize && CtrlHeld() && AltHeld();
+    ImGui::BeginDisabled(!enabled && !grabbable);
     bool clicked = false;
     bool clipped = false;
     if (look == Look::Label) {

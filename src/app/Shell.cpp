@@ -2548,11 +2548,14 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
         }
         const float needed = rects.back().Max.y + ImGui::GetScrollY() - r.y + pad.y;
         shelfClipped_[shelf] = int(std::count_if(rects.begin(), rects.end(), [&](const ImRect& rc) { return rc.Max.y > r.y + r.h + 0.5f; }));
+        const bool foldedBefore = rightShelfFolded_;
+        const float fitBefore = shelfFit_[shelf];
         if (shelf == kShelfRight && !layout_.customize) { // fold the view toggles when the shelf is too tall
             const int folds = int(std::count_if(list.begin(), list.end(), [](const std::string& id) { return foldsIntoView(id); }));
             if (!rightShelfFolded_ && folds > 0 && needed > r.h + 0.5f) {
                 rightShelfFolded_ = true;
-            } else if (rightShelfFolded_) {
+                rightShelfFoldH_ = r.h;
+            } else if (rightShelfFolded_ && r.h > rightShelfFoldH_ + 6.0f * s) { // (only for a taller shelf than the one that folded)
                 // Unfolded at full size: the buttons at fit 1, and the View button's place taken by all of them.
                 const float full = needed - scalable + scalable / std::max(shelfFit_[shelf], 0.1f) + float(folds - 1) * 44.0f * s;
                 if (full <= r.h - 4.0f * s) rightShelfFolded_ = false; // (a small margin: no flicker at the edge)
@@ -2562,10 +2565,18 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
         if (scalable > 0.0f) {
             const float fixed = needed - scalable;
             const float want = std::clamp(fit * (r.h - 1.0f * s - fixed) / scalable, shelf == kShelfRight ? 0.5f : 0.6f, 1.0f); // (the right shelf: icons alone)
-            if (want < fit - 0.002f || want > fit + 0.02f) fit = want; // (growing back waits for a clear margin)
+            // Shrinking follows the overflow; growing back waits for a clear margin and for a taller shelf than the one it last
+            // shrank for, or the quantised button heights could make it grow and shrink every other frame.
+            if (want < fit - 0.002f) {
+                fit = want;
+                shelfShrinkH_[shelf] = r.h;
+            } else if (want > fit + 0.02f && std::abs(r.h - shelfShrinkH_[shelf]) > 0.5f) {
+                fit = want;
+            }
         } else {
             fit = 1.0f;
         }
+        if (shelf == kShelfRight && (rightShelfFolded_ != foldedBefore || fit != fitBefore)) ++rightShelfChanges_;
     }
 
     ImGuiWindow* window = ImGui::GetCurrentWindow();
@@ -2643,6 +2654,13 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
     const float winW = ImGui::GetWindowWidth();
     const float padX = ImGui::GetStyle().WindowPadding.x;
     ImGui::PushID(index);
+    // Ctrl+Alt in Customize Shelves grabs a widget (sliders, tiles, the colour picker): it is drawn inert and a button over
+    // it takes the press, so the field can't swallow it (Voxel Resolution and the Draw slider wouldn't move).
+    const bool grab = layout_.customize && ui::CtrlHeld() && ui::AltHeld() && item.rfind("widget.", 0) == 0 && !actions_.find(item);
+    if (grab) {
+        ImGui::BeginGroup();
+        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+    }
     auto centre = [&](float w) {
         if (vertical) ImGui::SetCursorPosX(std::max(padX, (winW - w) * 0.5f));
     };
@@ -2903,6 +2921,20 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
             ImGui::EndMenu();
         }
         ImGui::EndPopup();
+    }
+    if (grab) {
+        ImGui::PopItemFlag();
+        ImGui::EndGroup();
+        const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
+        ImGui::SetCursorScreenPos(lo);
+        ImGui::InvisibleButton(("##grab." + item).c_str(), ImVec2(std::max(hi.x - lo.x, 1.0f), std::max(hi.y - lo.y, 1.0f)));
+        // The press is taken by hand: the pointer over a field the shelf draws inert would otherwise fall through to moving the
+        // shelf's window, and the drag source (which needs an active item) never began.
+        ImGuiContext& g = *ImGui::GetCurrentContext();
+        if (ImGui::IsMouseClicked(0) && ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(lo, hi) && g.ActiveId == 0) {
+            ImGui::SetActiveID(ImGui::GetItemID(), ImGui::GetCurrentWindow());
+            g.ActiveIdMouseButton = 0;
+        }
     }
     // Customize mode: widgets (sliders, tiles, readouts) are Ctrl+Alt drag sources too.
     if (item != "sep" && (!actions_.find(item) || item.rfind("brush.recipe.", 0) == 0)) { // (custom brushes have actions, #143)
