@@ -107,6 +107,7 @@ struct UiPrefs {
     // Preferences > Interface > Mask darkness (and Tool > Masking): how dark masked areas show, 0-1
     // (RenderSettings::maskDarkness).
     float maskDarkness = 0.7f;
+    bool confirmRemeshLevels = true; // Voxel/Quad Remesh and Decimate ask first on a Part with levels (#173)
     bool confirmSubdivide = true; // Subdivide (removes levels) asks first on a Part with levels (Don't ask again)
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons
     SpaceMouseSettings spaceMouse; // Preferences > Input > SpaceMouse

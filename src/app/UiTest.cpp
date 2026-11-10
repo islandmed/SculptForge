@@ -80,6 +80,7 @@
 //   wait_value NAME OP N [TIMEOUT]  wait (real time, default 30 s) until expect_value NAME OP N would pass
 //   expect LABEL / expect_not LABEL
 //   expect_text TEXT / expect_no_text TEXT   any text drawn this frame contains TEXT
+//   expect_clear POPUP ANCHOR                the POPUP item's box does not overlap the ANCHOR item's (popups must not cover what opened them)
 //   expect_status TEXT       the status bar message contains TEXT
 //   expect_help TEXT         the Ctrl-hover help box shown this frame contains TEXT (hold ctrl, then hover)
 //   clipboard TEXT           put TEXT on the clipboard (to test pasting, e.g. a brush code)
@@ -2787,6 +2788,19 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             ImVec2 at;
             if (findItem(label, at) != want)
                 fail(line, want ? "expected UI item \"" + label + "\"" : "UI item \"" + label + "\" should not be shown");
+            return true;
+        });
+    } else if (verb == "expect_clear") { // expect_clear POPUP_ITEM ANCHOR_ITEM: the popup's box doesn't cover the anchor
+        if (!need(2)) return false;
+        const std::string popup = w[1], anchor = w[2];
+        steps_.push_back([this, line, popup, anchor](float t) {
+            if (t == 0.0f) return false;
+            ImVec2 c;
+            ImVec4 a, p;
+            if (!findItem(anchor, c, nullptr, nullptr, &a)) fail(line, "no UI item \"" + anchor + "\"");
+            else if (!findItem(popup, c, nullptr, nullptr, &p)) fail(line, "no UI item \"" + popup + "\"");
+            else if (p.x < a.z && a.x < p.z && p.y < a.w && a.y < p.w)
+                fail(line, "\"" + popup + "\" covers \"" + anchor + "\"");
             return true;
         });
     } else if (verb == "expect_text" || verb == "expect_no_text") {

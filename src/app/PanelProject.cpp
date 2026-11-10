@@ -156,6 +156,7 @@ void App::initProject() {
         newLookCardDone_ = prefs["new_look_card_done"].asBool(false);
         quickTourDone_ = prefs["quick_tour_done"].asBool(false);
         uiPrefs_.confirmSubdivide = prefs["confirm_subdivide"].asBool(uiPrefs_.confirmSubdivide); // (Don't ask again)
+        uiPrefs_.confirmRemeshLevels = prefs["confirm_remesh_levels"].asBool(uiPrefs_.confirmRemeshLevels);
         recentColors_.clear();
         for (const auto& c : prefs["recent_colors"].items()) {
             if (recentColors_.size() >= kRecentColorsMax || !c.isArray()) break;
@@ -269,6 +270,7 @@ void App::saveProjectPrefs() {
     prefs.set("new_look_card_done", newLookCardDone_);
     prefs.set("quick_tour_done", quickTourDone_);
     prefs.set("confirm_subdivide", uiPrefs_.confirmSubdivide);
+    prefs.set("confirm_remesh_levels", uiPrefs_.confirmRemeshLevels);
     Json colours = Json::array(); // the left shelf's recent colours, newest first
     for (const glm::vec3& c : recentColors_) colours.push(vec3Json(c));
     prefs.set("recent_colors", std::move(colours));
