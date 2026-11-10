@@ -4194,8 +4194,23 @@ void App::drawImageTo3D() {
             if (generatorProgress_) generatorProgress_->cancel = true;
             for (const auto& p : candidateProgress_) p->cancel = true;
         }
+    } else if (const std::string offKey = textOffKey(); !offKey.empty() && textOffPresets_.count(offKey)) {
+        ImGui::BeginDisabled();
+        ImGui::Button(tr("Generate 3D model"), ImVec2(-1, 0));
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("%s", tr("Switched off by the Space's owner, use Image to 3D"));
+        if (ImGui::SmallButton(tr("Try again"))) {
+            textOffPresets_.erase(offKey);
+            generatorError_.clear();
+        }
     } else if (ImGui::Button(tr("Generate 3D model"), ImVec2(-1, 0))) {
         startGenerator();
+    }
+    if (!generatorError_.empty() && !pendingGenerator_.valid()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.45f, 0.40f, 1.0f));
+        ImGui::TextWrapped("%s", generatorError_.c_str());
+        ImGui::PopStyleColor();
     }
     drawSendNotice(SendPanel::Generate3D);
     if (openHunyuanNotice_) {
