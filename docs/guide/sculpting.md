@@ -380,7 +380,10 @@ Notes:
 - With **Drag Stamp**, the stamp is placed where you first click. While you drag, it is redrawn at the new size
   and angle, and it is committed when you release.
 - With **Slide Stamp**, the stamp appears under the cursor at once and follows it while you drag; the mesh under it
-  goes back to how it was as it moves on.
+  goes back to how it was as it moves on. Hold <kbd>Shift</kbd> after the drag has begun and the stamp stays put while
+  its alpha turns toward the cursor; let go and it slides on with that turn. The turn belongs to that stroke and
+  leaves the brush's **Angle** alone. Held at the press, <kbd>Shift</kbd> still smooths. The key is
+  **Edit > Preferences > Input > Slide Stamp rotates with** (Shift, Ctrl, Alt or Off).
 - Mask strokes (<kbd>Ctrl</kbd>) always use dots, even when Drag Stamp or Slide Stamp is selected.
 - Custom brushes set their own dab spacing and can add jitter (see [Brush Lab](brush-lab.md)).
 

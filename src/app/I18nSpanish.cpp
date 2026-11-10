@@ -1857,6 +1857,12 @@ constexpr Entry kSpanish[] = {
      "La rueda del ratón acerca hacia el punto del modelo bajo el puntero, que se queda bajo él, en vez del centro "
      "de la vista. Activado con las teclas de Maya (al elegir un estilo se ajusta), desactivado con los demás."},
     {"Along the normal", "En la normal"},
+    {"Shift", "Mayús"},
+    {"Ctrl", "Ctrl"},
+    {"Alt", "Alt"},
+    {"Slide Stamp rotates with", "Slide Stamp gira con"},
+    {"How dabs follow the cursor: Dots, Drag Stamp, Slide Stamp, Spray or Lazy Stroke. Click to choose. In Slide Stamp, hold Shift while dragging to turn the alpha toward the cursor (Preferences > Input).", "Cómo siguen los toques al cursor: Dots, Drag Stamp, Slide Stamp, Spray o Lazy Stroke. Clic para elegir. En Slide Stamp, mantén Mayús mientras arrastras para girar el alpha hacia el cursor (Preferencias > Entrada)."},
+    {"With the Slide Stamp stroke, hold this key after the stroke has begun and the stamp stays where it is while its alpha turns toward the cursor; let go and it slides on with that turn. Held at the press it keeps its own meaning (Shift smooths, Ctrl masks, Alt inverts). The turn belongs to that stroke: the brush's Angle is not changed. Off: the key does nothing here.", "Con el trazo Slide Stamp, mantén esta tecla después de empezar el trazo y el sello se queda donde está mientras su alpha gira hacia el cursor; al soltarla sigue deslizándose con ese giro. Si está pulsada al empezar, conserva su función (Mayús suaviza, Ctrl enmascara, Alt invierte). El giro es de ese trazo: el Ángulo del pincel no cambia. Off: la tecla no hace nada aquí."},
     {"Always", "Siempre"},
     {"Never", "Nunca"},
     {"Move, Tendril, Elastic Tendril and KelvinGrab: with the invert key held as the stroke begins (Alt; Ctrl in the "

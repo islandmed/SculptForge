@@ -787,6 +787,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "share_brush_size") return app_.brushSettingsStore().shareSizeIntensity ? 1.0 : 0.0;
     if (name == "alpha_follow") return app_.alphaOptions_.followStroke ? 1.0 : 0.0; // alpha options (#76)
     if (name == "alpha_angle") return std::round(app_.alphaOptions_.angle);
+    if (name == "slide_turned") return app_.slideTurn_.turned() ? 1.0 : 0.0; // Slide Stamp: the alpha turned with the rotate key (#175)
+    if (name == "slide_turn") return std::round(glm::degrees(app_.slideTurn_.angle())); // its turn, degrees
     if (name == "alpha_jitter") return std::round(app_.alphaOptions_.jitter);
     if (name == "recipe_alpha_angle" || name == "recipe_alpha_jitter" || name == "recipe_alpha_follow") { // its .sfbrush's (#136)
         const BrushRecipe* r = app_.activeRecipe();

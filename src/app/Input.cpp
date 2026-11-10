@@ -618,6 +618,19 @@ void App::drawInputSection() {
                      "in. Always: every stroke of those brushes does; Never: the key does nothing for them.",
                      "Preferences > Input");
     }
+    {
+        ImGui::TextDisabled("%s", tr("Slide Stamp rotates with"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1);
+        const std::string keys = std::string(tr("Shift")) + '\0' + tr("Ctrl") + '\0' + tr("Alt") + '\0' + tr("Off") + '\0';
+        ImGui::Combo("##input.slide_rotate", &uiPrefs_.slideRotateKey, keys.c_str());
+        ui::HelpText("Slide Stamp rotates with", nullptr,
+                     "With the Slide Stamp stroke, hold this key after the stroke has begun and the stamp stays where it is while "
+                     "its alpha turns toward the cursor; let go and it slides on with that turn. Held at the press it keeps its own "
+                     "meaning (Shift smooths, Ctrl masks, Alt inverts). The turn belongs to that stroke: the brush's Angle is not "
+                     "changed. Off: the key does nothing here.",
+                     "Preferences > Input");
+    }
     bool airStrokes = uiPrefs_.airStrokes;
     if (ui::Checkbox("Start strokes off the model##input.air_strokes", &airStrokes)) uiPrefs_.airStrokes = airStrokes;
     ui::HelpAction(*this, "input.air_strokes");

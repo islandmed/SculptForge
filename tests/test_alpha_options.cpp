@@ -139,3 +139,43 @@ TEST(alpha_stamp_angle) {
     bad.clamp();
     CHECK(bad.angle == 0.0f && bad.jitter == 0.0f);
 }
+
+TEST(slide_stamp_turn_follows_the_cursor_while_the_key_is_held) {
+    // #175: the rotate key held mid-drag keeps the stamp where it is and turns the alpha toward the cursor; let go, the
+    // stamp slides on with the turn kept; it never touches the brush's saved Angle.
+    AlphaOptions brush;
+    brush.angle = 25.0f;
+    const AlphaOptions before = brush;
+    SlideStampTurn t;
+    t.reset();
+    // Sliding (key up): the stamp is under the cursor, no turn.
+    glm::vec2 at = t.position(false, {100, 100});
+    t.turn(false, {100, 100});
+    CHECK(at == glm::vec2(100, 100) && !t.turned());
+    at = t.position(false, {140, 100});
+    CHECK(at == glm::vec2(140, 100) && !t.turned());
+    // Key down: the stamp stays at (140, 100); the cursor to its right turns the alpha's top to the right...
+    at = t.position(true, {200, 100});
+    t.turn(true, {200, 100});
+    CHECK(at == glm::vec2(140, 100) && t.turned());
+    CHECK(std::fabs(t.angle() - alphaStampAngle(AlphaOptions{}, true, {60, 0}, 0.0f)) < 1e-6f); // (= Drag Stamp's own rule)
+    // ...above it, upward on the screen (y down): the alpha's top at the top, angle 0; to the left, a quarter turn the other way.
+    t.position(true, {140, 40});
+    t.turn(true, {140, 40});
+    CHECK(std::fabs(t.angle()) < 1e-6f);
+    t.position(true, {80, 100});
+    t.turn(true, {80, 100});
+    CHECK(std::fabs(t.angle() - glm::radians(90.0f)) < 1e-5f);
+    // A cursor on the stamp itself gives no direction: the turn stays.
+    t.position(true, {140, 101});
+    t.turn(true, {140, 101});
+    CHECK(std::fabs(t.angle() - glm::radians(90.0f)) < 1e-5f);
+    // Key up: the stamp follows the cursor again, turned as it was.
+    at = t.position(false, {300, 220});
+    t.turn(false, {300, 220});
+    CHECK(at == glm::vec2(300, 220) && t.turned() && std::fabs(t.angle() - glm::radians(90.0f)) < 1e-5f);
+    // A new stroke starts clean; the brush's Angle is what it was.
+    t.reset();
+    CHECK(!t.turned() && t.angle() == 0.0f);
+    CHECK(brush == before);
+}

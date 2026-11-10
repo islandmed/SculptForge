@@ -115,6 +115,7 @@ Json toJson(const UiPrefs& p) {
     j.set("viewFalloff", p.viewFalloff);
     j.set("dyntopoSmoothRemesh", double(p.dyntopoSmoothRemesh));
     j.set("airStrokes", p.airStrokes);
+    j.set("slideRotateKey", std::string(p.slideRotateKey == 1 ? "ctrl" : p.slideRotateKey == 2 ? "alt" : p.slideRotateKey == 3 ? "off" : "shift"));
     j.set("cursorFollowsSurface", p.cursorFollowsSurface);
     j.set("hideRingWhileStroking", p.hideRingWhileStroking);
     j.set("timelinePosition", std::string(p.timelineTop ? "top" : "bottom"));
@@ -211,6 +212,10 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.viewFalloff = j["viewFalloff"].asBool(p.viewFalloff);
     p.dyntopoSmoothRemesh = std::clamp(float(j["dyntopoSmoothRemesh"].asNumber(p.dyntopoSmoothRemesh)), 0.0f, 1.0f);
     p.airStrokes = j["airStrokes"].asBool(p.airStrokes);
+    if (j["slideRotateKey"].isString()) {
+        const std::string k = j["slideRotateKey"].asString();
+        p.slideRotateKey = k == "ctrl" ? 1 : k == "alt" ? 2 : k == "off" ? 3 : 0;
+    }
     p.cursorFollowsSurface = j["cursorFollowsSurface"].asBool(p.cursorFollowsSurface);
     p.hideRingWhileStroking = j["hideRingWhileStroking"].asBool(p.hideRingWhileStroking);
     if (j["timelinePosition"].isString()) p.timelineTop = j["timelinePosition"].asString() != "bottom";
