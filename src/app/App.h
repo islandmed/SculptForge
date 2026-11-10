@@ -1984,6 +1984,48 @@ private:
     void removePaletteFromTrays(const std::string& id);
     // In a tray that is drawn: below 1280 px the right tray isn't, and its palettes open as drop-downs instead.
     bool paletteInShownTray(const std::string& id) const;
+    // Panels in windows of their own, for a second monitor (PanelWindows.cpp, docs/design/detach-panels.md):
+    // "palette.<id>", "guide" or "controls". Each has an SDL window and its own ImGui context sharing the fonts,
+    // the GL context and the renderer; with no window system to make one (offscreen tests) a palette floats inside
+    // the main window instead (window null).
+    struct PanelWindow {
+        std::string id;
+        SDL_Window* window = nullptr;
+        SDL_WindowID windowId = 0;
+        ImGuiContext* ctx = nullptr;
+        bool shown = false;
+        int cursor = 0; // its ImGui's mouse cursor after its last frame
+        int frames = 0; // drawn so far
+    };
+    std::vector<PanelWindow> panelWindows_;
+    std::vector<PanelPlacement> panelPlacements_; // where each panel window was (panels.json)
+    std::string pendingDetach_;  // asked for during a stroke or a drag: made once it ends
+    double panelsSaveAt_ = 0.0;   // a move or resize to write to panels.json, once it settles
+    double panelsDrawnAt_ = 0.0;
+    double panelsActiveUntil_ = 0.0; // hover input in a panel: it keeps redrawing (tooltips) this long
+    bool panelsDirty_ = false;       // a panel needs a frame (hover in it), the main window doesn't
+    bool benchPanels_ = false;       // SF_BENCH_PANELS: panel windows offscreen too (bench.sh A/B)
+    PanelWindow* panelHost_ = nullptr; // drawing inside this panel window's ImGui context now
+    enum class PanelEvent { None, PanelOnly, Main }; // not a panel's / redraw the panel only / the main window too
+    PanelEvent panelWindowEvent(const SDL_Event& e);
+    PanelWindow* findPanel(std::string_view id);
+    bool panelDetached(std::string_view id) const;
+    bool panelWindowsAvailable() const;
+    std::string panelTitle(const std::string& id) const;
+    // restoring: at start-up, shown without taking the focus; the User Guide and Controls stay closed until opened
+    void detachPanel(const std::string& id, bool restoring = false);
+    void dockPanel(const std::string& id);
+    void resetPanels();
+    void drawPanelWindows(bool force);  // after a main frame (force: also while a drag runs)
+    void drawPanelWindow(PanelWindow& p);
+    void drawFloatingPanels();          // the in-window fallback, from drawUi
+    void restorePanelWindows();         // at start-up, from panels.json
+    void savePanelWindows();
+    void closePanelWindows();           // at quit (the placements are kept)
+    void notePanelPlacement(const PanelWindow& p);
+    // In a panel window: the next ImGui::Begin fills it under its header (the User Guide's and Controls' own windows).
+    void fillPanelHost(ImGuiWindowFlags& flags);
+    void registerPanelActions();
     void finishShelfDrag();
     void noteLayoutChanged();
     void applyPreset(int preset);
