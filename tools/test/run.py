@@ -30,6 +30,7 @@ import os
 import platform
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -71,6 +72,8 @@ def sha_file(path):
         st = os.stat(path)
     except OSError:
         return "missing"
+    if not stat.S_ISREG(st.st_mode):
+        return "special"  # a FIFO/socket/device left in a tree (11-09: a test's leftover pipe blocked open() for a day)
     key = (path, st.st_mtime_ns, st.st_size)
     if key not in memo:
         h = hashlib.sha256()
@@ -87,7 +90,7 @@ def sha_path(path):
         return memo[path]
     if os.path.isdir(path):
         h = hashlib.sha256()
-        for d, dirs, files in sorted(os.walk(path)):
+        for d, dirs, files in os.walk(path):  # lazy: the prune below only works before os.walk descends (sorted(os.walk()) hashed all of build/)
             dirs[:] = sorted(x for x in dirs if x not in (".git", "build", "__pycache__", "node_modules"))
             for f in sorted(files):
                 p = os.path.join(d, f)
@@ -499,6 +502,17 @@ def self_test():
         open(os.path.join(src, "other.md"), "w").write("new")  # an unlisted script test may read any file
         forget()
         assert fingerprint(py, src, d, {}) != g1, "unlisted script tests hash the whole tree"
+        # A test whose command names the source root (public_email) must neither descend into build/ nor block on a FIFO
+        # there (11-09: sorted(os.walk()) pruned too late; a leftover test-tmp pipe hung run.py in open() for a day).
+        if hasattr(os, "mkfifo"):
+            os.makedirs(os.path.join(src, "build", "test-tmp"))
+            os.mkfifo(os.path.join(src, "build", "test-tmp", "pipe.sfdetail"))
+            os.mkfifo(os.path.join(src, "assets", "odd.pipe"))
+            forget()
+            rootcmd = {"name": "walks_root", "command": [sys.executable, os.path.join(src, "t.py"), src], "labels": [], "env": [],
+                       "cwd": os.path.join(src, "build")}
+            fingerprint(rootcmd, src, os.path.join(src, "build"), {})  # (would hang here)
+            os.unlink(os.path.join(src, "assets", "odd.pipe"))
         junit = os.path.join(d, "j.xml")
         open(junit, "w").write('<testsuite><testcase name="a" time="1.5" status="run"/>'
                                '<testcase name="b" time="2" status="fail"><failure message="x"/></testcase></testsuite>')
