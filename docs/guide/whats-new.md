@@ -5,6 +5,38 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.12.1
+
+```features
+date: 2026-11-09
+tagline: Voxel Remesh up to 4096, Forge Spheres in one mode, and a Find Problems that finishes the job.
+highlight: Voxel Remesh up to 4096, with a live triangle estimate (thanks foirgairwolf on Discord)
+highlight: Forge Spheres: draw, move and resize without switching modes (thanks @tristratos)
+highlight: Find Problems: Fix all repairs messy meshes completely and says what it couldn't fix (thanks foirgairwolf on Discord)
+highlight: Drape settles in tight folds instead of twitching, and Clay, Flatten and Trim on micro levels avoid stretched triangles
+highlight: Focus Detail projects save and reopen with their full detail (Linux and macOS)
+```
+
+- **Voxel Remesh up to 4096**: the **Tool > Remesh** Resolution slider now goes to 4096 (two thirds of it still covers
+  32-512), the line under it estimates the triangles it makes, and above 512 it asks once and never starts a remesh
+  that won't fit in the free memory. A sculpted head remeshes at 1024 into about 5.6 million triangles in about 3 s.
+  Thanks foirgairwolf on Discord.
+- **Forge Spheres in one mode**: in **Tool > Forge Spheres > Draw**, click a sphere to grow a new one, drag it to
+  move it, drag near its edge to resize it; the cursor and a small tag say which. Each drag is one undo step. Thanks
+  @tristratos.
+- **Find Problems > Fix all** repairs messy meshes (a rough remesh, solids touching along an edge) completely, and
+  anything it can't fix is listed under **Not fixed**, with why. The inner wall of a hollow is no longer counted as
+  flipped. Thanks foirgairwolf on Discord.
+- **Drape** settles where it used to keep twitching: cloth pressed into an armpit or the inside of an elbow stays put,
+  and sewn seams no longer pull the cloth through the body while they close.
+- **Micro levels**: Clay, Clay Block, Flatten and Trim keep big moves from stretching triangles; ordinary strokes
+  look and feel the same.
+- **Focus Detail in projects**: a streamed level saves and reopens with its full detail, and bake, displacement
+  export, surface noise and copies use it too. Linux and macOS for now.
+- **Founding Studio** is for the first 5 studios, a flat $150 a month, locked.
+- **Keyboard and mouse** guide: Option is Alt on macOS, and how to make Option Alt and Cmd Ctrl when the Windows
+  version runs under CrossOver or Wine on a Mac. Thanks @fenixpoints.
+
 ## Version 0.12.0
 
 ```features
