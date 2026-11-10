@@ -52,6 +52,11 @@ EOF
 # The real tree's What's New may still hold {{NAME}} placeholders for numbers not measured yet; this test is about the
 # steps, so the sandbox fills them (the placeholder check itself is tested below).
 sed -i 's/{{[A-Z0-9_]*}}/measured/g' docs/guide/whats-new.md CHANGELOG.md
+# The site pages too, from the sandbox's own generator (after the placeholders above). A base whose committed
+# supporters.html or sitemap.xml trails build_site.py (automation commits site data between releases, so branches on an
+# older main carry the trail) left step bump's regeneration uncommitted, and step check stopped on "uncommitted
+# changes": this test failed on T0 for those branches (11-09).
+python3 tools/guide/build_site.py >/dev/null
 git add -A . && git commit -q -m "sandbox"
 git init -q --bare "$S/origin.git"
 git remote set-url origin "$S/origin.git"
