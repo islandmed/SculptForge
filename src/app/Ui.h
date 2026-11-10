@@ -46,6 +46,10 @@ void CentredGlyph(ImDrawList* drawList, ImFont* font, ImVec2 a, ImVec2 b, ImU32 
 void ManagedBadge();
 // "Managed by your studio", or "Managed by Acme Animation" with the policy's organisation, translated.
 std::string ManagedByText();
+// The next item on the same line at `cursorPosX` (ImGui::GetCursorPosX() terms, window-relative). ImGui::SameLine(x) adds the
+// enclosing group's offset to x, and GetCursorPosX() already holds it: inside the task menus' group (beside their section
+// list) a column or a right-edge button placed with SameLine(x) landed past the panel's edge.
+void SameLineAt(float cursorPosX);
 // Ctrl-hover help for the last item.
 void HelpText(const char* title, const char* shortcut, const char* description, const char* path = nullptr);
 void HelpAction(App& app, const char* actionId);

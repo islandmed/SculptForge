@@ -284,7 +284,7 @@ void App::drawFillLayerControls() {
                 ImGui::EndCombo();
             }
         }
-        ImGui::SameLine(ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - ImGui::GetFrameHeight());
+        ui::SameLineAt(ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - ImGui::GetFrameHeight());
         if (ImGui::SmallButton(ICON_LC_X "##remove")) remove = int(k);
         auto slider = [&](const char* id, const char* key, float value, float lo, float hi, const char* fmt) {
             ImGui::SetNextItemWidth(-1);

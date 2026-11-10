@@ -82,6 +82,8 @@
 //   expect LABEL / expect_not LABEL
 //   expect_text TEXT / expect_no_text TEXT   any text drawn this frame contains TEXT
 //   expect_clear POPUP ANCHOR                the POPUP item's box does not overlap the ANCHOR item's (popups must not cover what opened them)
+//   remember_items NAME SCOPE / expect_same_items NAME SCOPE   the items reachable in the panel SCOPE (its name in the
+//                            bar: Alpha, Brush...), kept as NAME, and later the same list: one section in two layouts
 //   expect_status TEXT       the status bar message contains TEXT
 //   expect_help TEXT         the Ctrl-hover help box shown this frame contains TEXT (hold ctrl, then hover)
 //   clipboard TEXT           put TEXT on the clipboard (to test pasting, e.g. a brush code)
@@ -143,7 +145,7 @@
 //                            smooth_group_borders (Brush > Smooth face group borders only, #81),
 //                            moved_out (summed movement along the snapshot's normals: > 0 out, < 0 in),
 //                            moved_off_stencil (moved vertices that showed off the Stencil's image), stencil_active,
-//                            stencil_adjust, stencil_x / stencil_y / stencil_size (x1000), stencil_angle (degrees),
+//                            stencil_adjust, stencil_tile, stencil_x / stencil_y / stencil_size (x1000), stencil_angle (degrees),
 //                            pen_pressure (raw), brush_pressure (after the curve; 1 for the mouse),
 //                            stroke_sample_pressure (the last stroke sample's, as its dabs got it),
 //                            pen_lost_samples (pressure samples that lost their value), pen_axes_after_motion,
@@ -2880,6 +2882,36 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 fail(line, want ? "no text \"" + text + "\" on screen" : "text \"" + text + "\" is on screen");
             return true;
         });
+    } else if (verb == "remember_items" || verb == "expect_same_items") {
+        // remember_items NAME SCOPE: the items a person can reach in the panel SCOPE ("Alpha") now, kept as NAME.
+        // expect_same_items NAME SCOPE: the panel shows exactly those (the same section in another layout).
+        if (!need(2)) return false;
+        const std::string name = w[1], scope = w[2];
+        const bool keep = verb == "remember_items";
+        steps_.push_back([this, line, name, scope, keep](float t) {
+            if (t == 0.0f) return false; // the frame drawn after the previous step
+            const std::vector<std::string> now = Demo::scopeItems(scope);
+            if (keep) {
+                if (now.empty()) fail(line, "no items drawn in \"" + scope + "\" to remember");
+                rememberedItems_[name] = now;
+                SDL_Log("remember_items %s = %zu items in %s", name.c_str(), now.size(), scope.c_str());
+                return true;
+            }
+            const auto it = rememberedItems_.find(name);
+            if (it == rememberedItems_.end()) {
+                fail(line, "remember_items " + name + " came first?");
+                return true;
+            }
+            std::string missing, extra;
+            for (const std::string& s : it->second)
+                if (!std::binary_search(now.begin(), now.end(), s)) missing += (missing.empty() ? "" : ", ") + s;
+            for (const std::string& s : now)
+                if (!std::binary_search(it->second.begin(), it->second.end(), s)) extra += (extra.empty() ? "" : ", ") + s;
+            if (!missing.empty() || !extra.empty())
+                fail(line, "\"" + scope + "\" differs from " + name + (missing.empty() ? "" : "; missing here: " + missing) +
+                               (extra.empty() ? "" : "; only here: " + extra));
+            return true;
+        });
     } else if (verb == "expect_title") { // the OS window title contains the text ({version}: the version as shown)
         if (!need(1)) return false;
         const std::string text = withVersion(restOf(lineText_, 1), App::appShownVersion().text());
@@ -3736,7 +3768,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
         lineText_ = line;
         if (take_) { // a benchmark take: only what a person does in real time
             const std::string& verb = words[0];
-            static const std::set<std::string> skipped = {"shot", "snapshot", "remember", "print", "dump_shortcuts"};
+            static const std::set<std::string> skipped = {"shot", "snapshot", "remember", "remember_items", "print", "dump_shortcuts"};
             if (skipped.count(verb) || verb.rfind("expect", 0) == 0) {
                 SDL_Log("%s:%d: '%s' skipped (a take checks and shoots nothing)", scriptName_.c_str(), n, verb.c_str());
                 continue;

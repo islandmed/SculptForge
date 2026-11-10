@@ -1017,6 +1017,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     if(TEST ui_tier_card_click)
       set_tests_properties(ui_tier_card_click PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1;SF_NO_CALIBRATION=1;SF_HW_SIMULATE=high")
     endif()
+    # One Alpha palette in the Classic and the SculptForge layout: the same controls reachable (tests/ui/alpha_layouts.sfui,
+    # MasterFULL on Discord: Stencil's Adjust and Tile), at 1440 px of UI and at 200 % (2880 px).
+    sculptforge_ui_test(alpha_layouts_1440 alpha_layouts --size 1440x900)
+    sculptforge_ui_test(alpha_layouts_2880 alpha_layouts --size 2880x1800)
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     # Studio mode: About shows the studio (tests/data/studio; core/StudioProfile.h).
     sculptforge_ui_test(studio_mode studio/studio_mode --studio ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/studio/studio.json)

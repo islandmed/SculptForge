@@ -296,16 +296,18 @@ void App::drawStencilSection() {
     }
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(st.name.c_str());
-    ImGui::SameLine(ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - ImGui::GetFrameHeight());
+    ui::SameLineAt(ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - ImGui::GetFrameHeight());
     if (ui::GlyphButton("##stencil.clear", ICON_LC_X, ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight())))
         runCommand("stencil_clear");
     ui::HelpText("Remove", nullptr, "Take the Stencil off the view.", where);
     if (!st.image) return;
 
-    const float column2 = ImGui::GetCursorPosX() + half + ImGui::GetStyle().ItemSpacing.x; // (the second of two columns)
+    // (The second of two columns. Placed with ui::SameLineAt: in the Sculpt menu's group, beside its section list,
+    // SameLine(x) put Adjust, Tile and the Remove button past the panel's edge, #bug-reports 11-09.)
+    const float column2 = ImGui::GetCursorPosX() + half + ImGui::GetStyle().ItemSpacing.x;
     if (ui::Checkbox(tr("Show##stencil.show"), &st.visible) && !st.visible) stencil_.adjust = false;
     ui::HelpText("Show", nullptr, "Hidden, the Stencil is off: the brushes work as if it weren't there.", where);
-    ImGui::SameLine(column2);
+    ui::SameLineAt(column2);
     bool adjust = stencil_.adjust;
     ImGui::BeginDisabled(!st.visible);
     if (ui::Checkbox(tr("Adjust##stencil.adjust"), &adjust)) stencil_.adjust = adjust;
@@ -317,7 +319,7 @@ void App::drawStencilSection() {
                  where);
     ui::Checkbox(tr("Invert##stencil.invert"), &st.invert);
     ui::HelpText("Invert", nullptr, "Use the image's negative: black works, white leaves the surface alone.", where);
-    ImGui::SameLine(column2);
+    ui::SameLineAt(column2);
     ui::Checkbox(tr("Tile##stencil.tile"), &st.tile);
     ui::HelpText("Tile", nullptr, "Repeat the image across the whole view, for skin, fabric and other patterns.", where);
     ui::Checkbox(tr("Paint its colours##stencil.colors"), &st.colors);
@@ -347,6 +349,7 @@ bool App::stencilUiValue(const std::string& name, double& out) const {
     const Stencil& st = doc_.stencil;
     if (name == "stencil_active") out = st.active() ? 1.0 : 0.0;
     else if (name == "stencil_adjust") out = stencil_.adjust ? 1.0 : 0.0;
+    else if (name == "stencil_tile") out = st.tile ? 1.0 : 0.0;
     else if (name == "stencil_x") out = std::round(double(st.center.x) * 1000.0); // x1000
     else if (name == "stencil_y") out = std::round(double(st.center.y) * 1000.0);
     else if (name == "stencil_size") out = std::round(double(st.size) * 1000.0);
