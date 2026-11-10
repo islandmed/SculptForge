@@ -13,6 +13,7 @@ tagline: Your language from the first start, and Slide Stamp turns as you slide.
 highlight: The interface starts in your language (Spanish, Traditional or Simplified Chinese)
 highlight: Hold Shift to turn a Slide Stamp as you slide it (thanks @Devon0209)
 highlight: The welcome has a Language row with all four languages, each in its own script
+highlight: The interface starts in your language
 ```
 
 - **Your language on the first start**: if your computer is in Spanish, Traditional Chinese or Simplified Chinese,
@@ -20,6 +21,11 @@ highlight: The welcome has a Language row with all four languages, each in its o
   **Language** row with all four, each in its own script.
 - **Turn a Slide Stamp as you slide it**: hold **Shift** while dragging a Slide Stamp and the alpha turns toward the
   cursor instead of the stamp moving; let go and it slides on with that turn. Thanks @Devon0209 (#175).
+- **Your language on the first start**: if your computer is in Spanish, Traditional Chinese or Simplified Chinese,
+  SculptForge starts in it, with a note to change it. Any other language starts in English and the welcome has a
+  **Language** row with all four, each in its own script.
+- **Turn a Slide Stamp as you slide it**: hold **Shift** while dragging a Slide Stamp and the alpha turns toward the
+  cursor instead of the stamp moving; let go and it slides on with that turn.
 
 ## Version 0.12.2
 

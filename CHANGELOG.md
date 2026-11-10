@@ -6,6 +6,20 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.12.3] - 2026-11-10
+
+### Added
+- **Language on the first start** (#44): the first start reads the operating system's interface language (Windows
+  display language, macOS preferred language, `LC_ALL` / `LC_MESSAGES` / `LANG` on Linux) and, for Spanish,
+  Traditional Chinese (zh-TW, zh-HK, zh-MO, zh-Hant) and Simplified Chinese, starts in it with a one-time note,
+  "SculptForge is in Español. Change", in that language and in English. Any other language stays English, and the
+  welcome (also Help > Welcome) has a Language row with the four names in their own script that switches live. Never
+  on a headless display, in tests, renders or demos, or twice.
+- **Turn a Slide Stamp with a key** (#175, thanks @Devon0209): with the Slide Stamp stroke, hold Shift after the drag
+  has begun and the stamp stays where it is while its alpha turns toward the cursor; let go and it slides on with the
+  turn kept. The turn belongs to that stroke and the brush's Angle is not changed. Shift held at the press still
+  smooths. **Edit > Preferences > Input > Slide Stamp rotates with** picks Shift, Ctrl, Alt or Off.
+
 ## [0.12.2] - 2026-11-10
 
 ### Added
