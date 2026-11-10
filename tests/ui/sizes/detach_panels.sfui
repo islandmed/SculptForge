@@ -12,7 +12,7 @@ wait 1.0
 shot header-icon-tooltip
 click "Tool/##detach"
 wait 0.3
-click "Viewport Look##tool.display"
+click "Reshape##tool.deformation"       # a section the floating palette shows without scrolling (its list grew with Garments and Drape)
 wait 0.2
 shot detached-floating
 key f1
