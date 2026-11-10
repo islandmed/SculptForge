@@ -173,6 +173,7 @@ void App::drawDrapeSection() {
         ImGui::SameLine();
         if (ImGui::Button(tr("Reset##drape"), ImVec2(half, 0))) finishDrape(false);
     }
+    drawClothSettingsLink("drape"); // (PanelCloth.cpp)
 }
 
 } // namespace sf

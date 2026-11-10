@@ -1,0 +1,24 @@
+# Tool > Cloth: the Cloth brush settings and Drape in one section; "Cloth settings..." in Brush > Cloth and in
+# Tool > Drape opens it. The controls are the same state as Brush > Cloth (a mode set there shows here).
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=4
+wait_idle 30
+click "Cloth##brush.cloth"
+click "Brush##palette.brush"
+click "Brush/##totray"
+wait 0.3
+click "Cloth##brush.cloth_options"
+expect "##clothmode"
+click "Cloth settings...##brush"
+wait_idle 10
+expect "Simulate##drape"
+expect "##clothfabric"
+click "##clothmode"
+click "Grab##clothmode"
+wait_value cloth_mode == 3 5
+shot cloth_panel
+# From Drape: the link opens the same section.
+click "Drape##tool.drape"
+click "Cloth settings...##drape"
+wait_idle 10
+expect "Simulate##drape"

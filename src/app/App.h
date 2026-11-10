@@ -1001,6 +1001,10 @@ private:
     // Cloth brush and Drape (PanelCloth.cpp, core/Cloth.h): Brush > Cloth, and the other visible Parts as the
     // surfaces the cloth collides with (built once, rebuilt when one of them changes).
     void drawClothSection();
+    void drawClothPanel();                          // Tool > Cloth: the brush settings and Drape together
+    void showClothPanel();                          // open it (the "Cloth settings..." links)
+    void drawClothSettingsLink(const char* id);
+    bool inClothPanel_ = false;
     void prepareClothColliders();
     bool clothUiValue(const std::string& name, double& out) const; // UI test values (UiTest.cpp)
     std::unique_ptr<ClothColliders> clothColliders_;

@@ -696,7 +696,8 @@ cloth follows the brush, bunching into folds on the side you push toward; the fo
 instead of stretching it like rubber. Only the surface within a few brush radii of the stroke moves, and masked
 areas hold still like pins, so mask a seam or a cuff to keep it in place.
 
-Set it up in **Sculpt > Brush > Cloth**:
+Set it up in **Sculpt > Brush > Cloth**, or in **Tool > Cloth**, which shows these settings together with
+[Drape](#drape) in one place (**Cloth settings...** under the Cloth brush's settings and under Drape opens it):
 
 - **Mode**: **Drag** (the cloth follows the stroke), **Push** (presses it in along the surface; <kbd>Alt</kbd>
   pulls it out, and the cloth around follows), **Settle** (only gravity: the cloth under the brush sags and drapes
@@ -722,7 +723,8 @@ levels.
 
 **Drape** drops a whole Part as cloth: it falls under gravity onto the other visible Parts and settles there, the
 way a sheet settles over a chair or a shirt over a body. Make the cloth Part (a plane, an extracted shell, a
-garment you sculpted roughly), place it above the body, and with it active open **Tool > Drape**:
+garment you sculpted roughly), place it above the body, and with it active open **Tool > Drape** (or **Tool > Cloth**,
+which also holds the Cloth brush's settings):
 
 - **Fabric**: **Silk** flows into many fine folds, **Cotton** medium ones, **Denim** holds broad folds,
   **Leather** barely folds.
