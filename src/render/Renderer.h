@@ -49,6 +49,9 @@ struct RenderSettings {
     // too slow for the still budget stays coarse while edited clusters draw in full until their levels follow, so
     // a timelapse seeking through the history flipped between the two from frame to frame (Discord, 0.11.10).
     bool fullDetail = false;
+    // Unlit (#168): every surface shows its base colour (vertex paint, texture, face groups) with no lighting, Lit Sphere
+    // or PBR shading, for judging painted colour as stored. The mask tint, wireframe and the dimming stay.
+    bool unlit = false;
     bool flatShading = false;  // the scene's shading (Material palette): faceted; Parts can override (core/Document.h)
     // Backface culling (#68, Tool > Viewport Look): back faces are never drawn, on any mesh (closed or not, from any
     // view). Off: they are skipped only where they can't show (a closed mesh seen from outside, Renderer::cull).
@@ -561,7 +564,7 @@ private:
         GLuint id = 0;
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
               showMask = -1, maskDarkness = -1, groups = -1, litsphere = -1, litsphereCavity = -1, dim = -1, primBase = -1,
-              hasPaint = -1, normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1, lightRot = -1,
+              hasPaint = -1, unlit = -1, normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1, lightRot = -1,
               lightLevels = -1, alpha = -1, microWire = -1;
         GLint hasOrm = -1, hasEmissive = -1, hasMatNormal = -1, envLevels = -1, exposure = -1, toneMap = -1, material = -1,
               pbrCavity = -1, viewToEnv = -1, sh = -1;

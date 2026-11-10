@@ -1038,6 +1038,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(drag_stamp_footprint_2880 drag_stamp_footprint --size 2880x1800)
     sculptforge_ui_test(geometry_groups_1440 geometry_groups --size 1440x900)
     sculptforge_ui_test(geometry_groups_2880 geometry_groups --size 2880x1800) # its 200% shot: 1440 px of UI
+    sculptforge_ui_test(unlit_view_1440 unlit_view --size 1440x1300) # #168: the Unlit button and the unlit colours at 1440 and 2880 px
+    sculptforge_ui_test(unlit_view_2880 unlit_view --size 2880x3200)
     sculptforge_ui_test(geometry_groups_1024 narrow/geometry_groups --size 1024x768)
     # Curves and the Tube modifiers at 1440 and 2880 px (tests/ui/curve.sfui; its 200% shots inside).
     sculptforge_ui_test(curve_1440 curve --size 1440x900)
