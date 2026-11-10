@@ -13,6 +13,7 @@
 #include "core/Primitives.h"
 #include "core/QRemesh.h"
 #include "core/Sculpt.h"
+#include "core/Voxel.h"
 
 #include <algorithm>
 #include <cmath>
@@ -138,4 +139,33 @@ TEST(hidden_spikes_extract) {
             (void)thickness;
             CHECK(n1 <= n0 + n0 / 4); // the shell keeps its thickness under every brush, as Smooth and Standard do
         }
+}
+
+// phoenix (macOS, 0.12.x): Clay breaks the topology of a fresh Voxel Remesh result. Shapes with a thin part (a horn, a
+// cloth-like sheet) as well as a plain sphere and a torus, at a mid resolution.
+TEST(hidden_spikes_voxel_remesh) {
+    struct Shape { const char* name; Mesh mesh; };
+    std::vector<Shape> shapes;
+    shapes.push_back({"sphere", makeIcosphere(4)});
+    shapes.push_back({"torus", makeTorus(48)});
+    shapes.push_back({"cone", makeCone(48)});
+    shapes.push_back({"capsule", makeCapsule(48)});
+    for (Shape& sh : shapes) {
+        sh.mesh.rebuildTopology();
+        std::string err;
+        Mesh vox = voxelRemesh(sh.mesh, 96, &err);
+        CHECK(vox.vertexCount() > 0);
+        vox.rebuildTopology();
+        vox.recomputeAllNormals();
+        Document d = makeDoc(std::move(vox));
+        const size_t s0 = spikes(d.mesh);
+        std::printf("voxel %-8s %zu verts, %s, spikes %zu", sh.name, d.mesh.vertexCount(), checkMesh(d.mesh).summary().c_str(), s0);
+        for (BrushType t : {BrushType::Clay, BrushType::Flatten, BrushType::Smooth, BrushType::Clay}) {
+            for (float a : {0.0f, 0.4f, 0.8f}) run(d, t, glm::normalize(glm::vec3(std::sin(a), 0.2f, std::cos(a))) * 0.9f, 0.25f, 3);
+            std::printf(", %s %zu", brushName(t), spikes(d.mesh));
+        }
+        std::printf(", after: %s\n", checkMesh(d.mesh).summary().c_str());
+        std::fflush(stdout);
+        CHECK(spikes(d.mesh) <= s0 + s0 / 4 + 4);
+    }
 }
