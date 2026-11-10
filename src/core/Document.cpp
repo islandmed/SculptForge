@@ -424,9 +424,6 @@ void Document::replaceMeshUndoable(Mesh m, std::string label) {
     UndoRecord r;
     r.label = std::move(label);
     r.mesh = std::make_unique<Mesh>(std::move(mesh));
-    // The old mesh keeps its tree (undo swaps it back instead of rebuilding one), when it has a current one.
-    if (!bvhDirty && bvh.nodeCount()) r.meshBvh = std::make_unique<BVH>(std::move(bvh));
-    bvh = BVH();
     mesh = std::move(m);
     mesh.topologyDirty = true;
     bvh.build(mesh);

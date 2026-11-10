@@ -524,13 +524,6 @@ void BVH::refit(const Mesh& mesh, std::span<const uint32_t> movedVerts) {
     refitLeaves(mesh, scratchLeaves_);
 }
 
-void BVH::swapTree(BVH& other) {
-    const uint64_t next = std::max(structure_, other.structure_) + 1;
-    std::swap(*this, other);
-    structure_ = next;
-    other.structure_ = next + 1;
-}
-
 void BVH::refitQueried(const Mesh& mesh) { refitLeaves(mesh, queryLeaves_); }
 
 void BVH::refitLeaves(const Mesh& mesh, std::span<const uint32_t> leaves) {

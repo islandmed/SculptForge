@@ -25,7 +25,6 @@ size_t UndoRecord::approxBytes() const {
                  mesh->mask.size() * sizeof(float) + mesh->colors.size() * sizeof(glm::vec3) +
                  mesh->facegroups.size() * sizeof(uint32_t) + mesh->hidden.size() + mesh->uvs.size() * sizeof(glm::vec2) +
                  mesh->quadPartners.size() * sizeof(uint32_t) + mesh->creases.size() * sizeof(float);
-    if (meshBvh) bytes += meshBvh->memoryBytes();
     if (mesh) {
         bytes += mesh->paintBase.size() * sizeof(glm::vec3);
         for (const auto& l : mesh->paintLayers) bytes += l.color.size() * sizeof(glm::vec3) + l.alpha.size() * sizeof(float);
@@ -165,9 +164,7 @@ void UndoStack::apply(UndoRecord& r, Mesh& mesh, BVH& bvh) {
     if (r.mesh) {
         std::swap(*r.mesh, mesh);
         mesh.topologyDirty = true;
-        // The tree of the mesh that goes comes along: a rebuild is seconds at 10M triangles.
-        if (r.meshBvh && r.meshBvh->nodeCount()) bvh.swapTree(*r.meshBvh);
-        else bvh.build(mesh);
+        bvh.build(mesh);
         return;
     }
     if (r.topology) {
@@ -319,9 +316,9 @@ size_t UndoStack::undoBytes() const {
 
 void UndoStack::enforceBudget() {
     size_t total = 0;
-    for (const auto& r : undo_) total += r.budgetBytes();
+    for (const auto& r : undo_) total += r.approxBytes();
     while (undo_.size() > 1 && total > byteBudget) {
-        total -= undo_.front().budgetBytes();
+        total -= undo_.front().approxBytes();
         undo_.pop_front();
         if (listener) listener->undoDroppedOldest();
     }
