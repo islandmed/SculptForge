@@ -1036,6 +1036,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(ai_consent_2880 ai_consent --size 2880x1800) # its 200% shots: 1440 px of UI
     sculptforge_ui_test(drag_stamp_footprint_1440 drag_stamp_footprint --size 1440x900) # #174's shots at 1440 and 2880 px
     sculptforge_ui_test(drag_stamp_footprint_2880 drag_stamp_footprint --size 2880x1800)
+    # Origin tools in the Gizmo panel and the Classic frame keys (tests/ui/origin_frame.sfui).
+    sculptforge_ui_test(origin_frame_1440 origin_frame --size 1440x900)
+    sculptforge_ui_test(origin_frame_2880 origin_frame --size 2880x1800)
     sculptforge_ui_test(geometry_groups_1440 geometry_groups --size 1440x900)
     sculptforge_ui_test(geometry_groups_2880 geometry_groups --size 2880x1800) # its 200% shot: 1440 px of UI
     sculptforge_ui_test(unlit_view_1440 unlit_view --size 1440x1300) # #168: the Unlit button and the unlit colours at 1440 and 2880 px

@@ -1,0 +1,31 @@
+# Origin tools (Gizmo panel) and the Classic frame keys: F frames the active Part, F twice quickly the scene.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+run part_append type=sphere size=0.2 name=Eye
+input_style classic
+expect_value input_style == 0
+mouse_move 0.5 0.5
+key f
+remember camera_distance part
+wait 1.0
+key f
+wait 0.05
+key f
+expect_value camera_distance > $part
+wait 1.0
+key f
+wait 1.0
+expect_value camera_distance == $part
+
+# Origin tools on the Eye: centre it, undo, drop it.
+run transform translate=3,2,1
+key w
+wait 0.3
+shot origin-gizmo-panel
+run center_on_origin
+wait 0.3
+shot origin-centred
+expect_value part_x == 0
+key ctrl+z
+run drop_to_floor
+expect_value part_x != 0

@@ -462,6 +462,15 @@ void App::viewOrbitStep(float yawDegrees, float pitchDegrees) {
     }
 }
 
+void App::frameKeyPress() {
+    const Uint64 now = clickClockNs();
+    const Uint64 window = Uint64(uiPrefs_.frameDoubleTapMs) * 1000000ull;
+    const bool twice = lastFrameKeyNs_ != 0 && now - lastFrameKeyNs_ < window;
+    lastFrameKeyNs_ = twice ? 0 : now;
+    if (!classicStyle() || window == 0 || doc_.partCount() < 2 || twice) frameView(sceneBounds());
+    else frameActivePart();
+}
+
 void App::frameActivePart() {
     const AABB b = doc_.partBounds(doc_.activePart); // (where it is: a moved linked copy, #94)
     if (b.valid()) frameView(b);
@@ -570,6 +579,15 @@ void App::drawInputSection() {
         bool emulate = uiPrefs_.emulateNumpad;
         if (ImGui::Checkbox(tr("Emulate Numpad"), &emulate)) uiPrefs_.emulateNumpad = emulate;
         ui::HelpAction(*this, "input.emulate_numpad");
+    }
+    if (classicStyle()) {
+        float tap = float(uiPrefs_.frameDoubleTapMs);
+        ImGui::SetNextItemWidth(160.0f * uiScale_);
+        if (ui::SliderInside("##input.frame_tap", &tap, 0.0f, 1000.0f, tr("Frame double-tap %.0f ms")))
+            uiPrefs_.frameDoubleTapMs = int(tap);
+        ui::HelpText("Frame double-tap", nullptr,
+                     "With several Parts, F frames the active Part and F twice within this time frames the whole "
+                     "scene. 0: F always frames the whole scene.", "");
     }
     bool rightClickMenu = uiPrefs_.rightClickQuickMenu;
     if (ui::Checkbox("Right click opens the Quick Menu##input.right_click_menu", &rightClickMenu))

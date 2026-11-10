@@ -97,6 +97,7 @@ Json toJson(const UiPrefs& p) {
     j.set("turntable", p.orbitLock == 1);
     j.set("inputStyle", std::string(p.inputStyle == 3 ? "maya" : p.inputStyle == 2 ? "blender" : p.inputStyle == 1 ? "sculptforge" : "classic"));
     j.set("emulateNumpad", p.emulateNumpad);
+    j.set("frameDoubleTapMs", double(p.frameDoubleTapMs));
     j.set("rightClickQuickMenu", p.rightClickQuickMenu);
     j.set("brushSort", p.brushSort);
     j.set("alphaSort", p.alphaSort);
@@ -191,6 +192,7 @@ void fromJson(const Json& j, UiPrefs& p) {
         p.inputStyle = style == "maya" ? 3 : style == "blender" ? 2 : style == "sculptforge" ? 1 : 0;
     }
     p.emulateNumpad = j["emulateNumpad"].asBool(p.emulateNumpad);
+    p.frameDoubleTapMs = std::clamp(int(j["frameDoubleTapMs"].asNumber(p.frameDoubleTapMs)), 0, 1000);
     p.rightClickQuickMenu = j["rightClickQuickMenu"].asBool(p.rightClickQuickMenu);
     for (auto [key, v] : {std::pair{"brushSort", &p.brushSort}, std::pair{"alphaSort", &p.alphaSort},
                           std::pair{"materialSort", &p.materialSort}, std::pair{"librarySort", &p.librarySort}})
@@ -764,8 +766,11 @@ void App::initActions() {
     add("view.wireframe", "Wireframe", "Render", "Shift+F", [this] { renderSettings_.wireframe = !renderSettings_.wireframe; },
         ICON_LC_GRID_3X3, nullptr, [this] { return renderSettings_.wireframe; }, nullptr,
         "Show the mesh's polygons (quads and triangles) over the surface.");
-    add("view.frame", "Frame model", "Transform", "F", [this] { frameView(sceneBounds()); }, ICON_LC_SCAN, nullptr, nullptr,
-        nullptr, "Fit the whole model in the view.");
+    add("view.frame", "Frame model", "Transform", "F", [this] { frameKeyPress(); }, ICON_LC_SCAN, nullptr, nullptr,
+        nullptr, "Fit the whole model in the view. Classic sculpting keys, with several Parts: F frames the active Part, "
+        "F twice quickly frames the whole scene.");
+    add("view.frame_scene", "Frame scene", "Transform", "", [this] { frameView(sceneBounds()); }, ICON_LC_SCAN, nullptr, nullptr,
+        nullptr, "Fit every visible Part in the view (bind a key to it: F frames the active Part on the Classic sculpting keys).");
     add("color.pick", "Pick colour", "Color", "C", [this] { pickColorUnderCursor(); }, ICON_LC_PIPETTE, nullptr, nullptr, nullptr,
         "Take the paint colour from the model under the cursor.");
     for (int i = 0; i < int(BrushType::Count); ++i) {

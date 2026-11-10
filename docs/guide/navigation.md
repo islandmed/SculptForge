@@ -69,7 +69,7 @@ camera.
 | Roll (turn about the view axis) | <kbd>Shift</kbd>+click the background, let go of <kbd>Shift</kbd>, then drag (Maya style: hold <kbd>Alt</kbd>, add <kbd>Ctrl</kbd>, left-drag sideways) |
 | Pan | <kbd>Alt</kbd>+left-drag on the background, <kbd>Alt</kbd>+right-drag, or middle-drag |
 | Zoom | Mouse wheel (toward the middle of the view, or toward the pointer with **Edit > Preferences > Input > Wheel zooms toward the pointer**, on in the Maya style); <kbd>Alt</kbd>+left-drag on the background, then let go of <kbd>Alt</kbd> and keep dragging; <kbd>Ctrl</kbd>+right-drag; <kbd>Ctrl</kbd>+middle-drag; <kbd>Ctrl</kbd>+left-drag on the background when nothing is masked (not with the Classic sculpting keys) |
-| Frame the model | <kbd>F</kbd> (Blender style: <kbd>Home</kbd>), or **Frame** on the right shelf |
+| Frame the model | <kbd>F</kbd> (Blender style: <kbd>Home</kbd>), or **Frame** on the right shelf. Classic sculpting keys, several Parts: <kbd>F</kbd> frames the active Part, <kbd>F</kbd> twice quickly frames the whole scene (**Frame scene** can take a key of its own) |
 | Front, right, top view | <kbd>Numpad 1</kbd>, <kbd>Numpad 3</kbd>, <kbd>Numpad 7</kbd>; <kbd>Ctrl</kbd> for the back, left and bottom |
 | Front, side, top or bottom view with the mouse | Click an end of the axis gizmo in the canvas corner |
 | Orthographic on or off | <kbd>Numpad 5</kbd> |

@@ -2494,6 +2494,9 @@ private:
     void drawViewsSection(); // Palettes.cpp, in View
     void viewOrbitStep(float yawDegrees, float pitchDegrees);
     void frameActivePart();
+    void frameKeyPress(); // F: the active Part, twice quickly the scene (Classic sculpting keys, several Parts)
+    Uint64 lastFrameKeyNs_ = 0;
+    void originMove(const char* which); // Gizmo Origin tools (Gizmo.cpp)
     // Focus Detail (prototype, FocusDetailApp.cpp): open a .sfdetail file; once a frame, the camera and brush.
     void openFocusDetail(const std::string& path);
     void updateFocusDetail(float heightPx = 0.0f); // (0: the canvas's)
