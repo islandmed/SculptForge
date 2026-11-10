@@ -1041,6 +1041,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(tool_palettes_1440 tool_palettes --size 1440x900)
     sculptforge_ui_test(tool_palettes_2880 tool_palettes --size 2880x1800)
     sculptforge_ui_test(tool_palettes_1024 narrow/tool_palettes --size 1024x768)
+    # Tool > Cloth (tests/ui/cloth_panel.sfui) at 1440 and 2880 px.
+    sculptforge_ui_test(cloth_panel_1440 cloth_panel --size 1440x900)
+    sculptforge_ui_test(cloth_panel_2880 cloth_panel --size 2880x1800)
     # Edges mode and creases (tests/ui/edge_select.sfui) at 1440 px of UI, 100% and 200% (#108).
     sculptforge_ui_test(edge_select_1440 edge_select --size 1440x900)
     sculptforge_ui_test(edge_select_2880 edge_select --size 2880x1800) # its 200% shots: 1440 px of UI
