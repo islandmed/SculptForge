@@ -8,7 +8,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.12.4
 
 ```features
-date: unreleased
+date: 2026-11-10
 tagline: Shortcuts ask before they take a key, and Front faces only shows when it is on.
 highlight: Shortcuts ask before they take a key another action uses (requested by Artizmo on Discord)
 highlight: Pan and zoom from the keyboard: Ctrl+Numpad 4, 6, 8, 2 and Zoom in/out keep moving while held
@@ -20,6 +20,8 @@ highlight: Front faces only shows a tag by the brush cursor and a Turn off butto
   Hotkeys**. Requested by Artizmo on Discord.
 - **Pan and zoom keys**: Pan left, right, up and down (Ctrl+Numpad 4, 6, 8, 2) step on a press and keep moving while
   held, like Zoom in and Zoom out; **Preferences > Input > Pan and zoom key speed** sets how fast.
+- **Front faces only** now shows when it is on: a small tag by the brush cursor and a line at the top of the Brush
+  palette, with a button to turn it off.
 
 ## Version 0.12.3
 
