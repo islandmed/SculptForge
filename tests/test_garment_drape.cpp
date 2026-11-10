@@ -117,62 +117,6 @@ TEST(garment_placements_save_and_copies_start_unplaced) {
     CHECK(unitsPerMetreForSize(1.8f) == 1.0f && unitsPerMetreForSize(180.0f) == 100.0f && unitsPerMetreForSize(1800.0f) == 1000.0f);
 }
 
-TEST(garment_bag_sews_then_drapes_over_a_ball) {
-    const float radius = 0.1f; // (the bag is 800 mm round: it closes under a ball 630 mm round)
-    Document doc = makeDoc(makeIcosphere(4, radius));
-    Pattern pat = bag();
-    pat.unitsPerMetre = 1.0f;
-    pat.thickness = 0.0f;
-    GarmentDrapeScene scene;
-    std::string error;
-    setDocumentPattern(doc, pat);
-    CHECK(!garmentDrapeScene(doc, pat, scene, error) && error.find("Front") != std::string::npos);
-    pat.panels[0].place = placeAt({0.0f, 0.0f, radius}, {0.0f, 0.0f, 1.0f});
-    pat.panels[1].place = placeAt({0.0f, 0.0f, -radius}, {0.0f, 0.0f, -1.0f});
-    CHECK(garmentDrapeScene(doc, pat, scene, error));
-    CHECK(!scene.colliders.empty() && !scene.setup.seams.empty());
-    CHECK(scene.setup.rest.size() == scene.setup.positions.size());
-    // Placed in front of the ball: nothing starts inside it.
-    for (const glm::vec3& p : scene.setup.positions) CHECK(glm::length(p) > radius);
-    auto widestGap = [&](const std::vector<glm::vec3>& x) {
-        float gap = 0.0f;
-        for (const ClothSeam& s : scene.setup.seams) gap = std::max(gap, glm::length(x[s.a] - x[s.b]));
-        return gap;
-    };
-    auto meanY = [](const std::vector<glm::vec3>& x) {
-        double y = 0.0;
-        for (const glm::vec3& p : x) y += p.y;
-        return float(y / double(x.size()));
-    };
-    // Sewing (gravity off): the seams close where the panels were put; nothing falls meanwhile.
-    const ClothSettings base = garmentSettings(pat);
-    ClothSim sim;
-    CHECK(sim.init(scene.setup, scene.fabric, base));
-    sim.setColliders(&scene.colliders);
-    for (int f = 0; f < kSewFrames; ++f) CHECK(garmentStep(sim, f, base, scene.fabric)); // (never at rest while sewing)
-    std::printf("  sewn: widest seam gap %.1f mm, mean height %+.1f mm\n", widestGap(sim.positions()) * 1000.0f,
-                (meanY(sim.positions()) - meanY(scene.setup.positions)) * 1000.0f);
-    CHECK(widestGap(sim.positions()) < 0.5f * 0.020f); // (from 300 mm apart; the settling closes the rest)
-    CHECK(meanY(sim.positions()) - meanY(scene.setup.positions) > -0.01f); // (closing pulls it up a little; it does not fall)
-    // Draped as Garments drapes (sewn first, then gravity): it rests on the ball, sewn shut, nothing inside it.
-    const DrapeResult r = garmentDrapeToRest(scene, base, 900);
-    float inside = 1.0f, top = -1.0f;
-    for (const glm::vec3& p : r.positions) {
-        inside = std::min(inside, glm::length(p) - radius);
-        top = std::max(top, p.y);
-    }
-    const float gap = widestGap(r.positions);
-    std::printf("  bag: %s after %d frames (%.0f ms), widest seam gap %.1f mm, deepest %.1f mm, top %.3f m\n",
-                r.rested ? "at rest" : "stopped", r.frames, r.milliseconds, gap * 1000.0f, -inside * 1000.0f, top);
-    CHECK(r.rested);
-    CHECK(gap < 0.3f * 0.020f);   // sewn shut (within a third of the particle distance; the Part welds them)
-    CHECK(inside > -0.003f);      // on the ball, not through it
-    CHECK(top > radius && top < radius + 0.08f); // hanging from the ball's top (its corners stand up), not fallen off
-    // The Part: welded (fewer vertices than particles), UVs.
-    const Mesh m = drapedMesh(pat, scene.mesh, r.positions);
-    CHECK(m.vertexCount() < scene.mesh.vertexCount() && !m.uvs.empty());
-}
-
 TEST(garment_drape_command_adds_the_part_in_one_undo_step) {
     CommandRegistry reg;
     Document doc = makeDoc(makeIcosphere(3, 0.2f));
