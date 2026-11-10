@@ -1,7 +1,7 @@
 {
  "format": "sculptforge-brush-requests",
  "version": 1,
- "updated": "2026-11-09T04:37:12Z",
+ "updated": "2026-11-10T08:37:05Z",
  "source": "https://discord.com/channels/1566592020024266812/1568787293731561483",
  "brushes": [
   {
@@ -17,7 +17,7 @@
    "rank": 2,
    "title": "brushes #brushes wood detailing",
    "votes": 1,
-   "shipped": false,
+   "shipped": true,
    "renamed": false,
    "created": "2026-11-08",
    "url": "https://discord.com/channels/1566592020024266812/1568923216314114069"
