@@ -66,6 +66,16 @@ jobs:
           cp "$RUNNER_TEMP/test-key.asc" site/sculptforge.asc
           PACKAGE_REPOS_LOCAL=dist tools/publish/package_repos_fetch.sh vTEST site
           cmp site/sculptforge.asc site/apt/sculptforge.asc && cmp site/sculptforge.asc site/rpm/sculptforge.asc
+          # pages.yml's fallback while GitHub's downloads fail: the assets a fresh run kept (PACKAGE_REPOS_KEEP) put the
+          # same site together again, every check included; a kept copy whose bytes differ is refused.
+          mkdir site-kept site-fallback site-tampered
+          for d in site-kept site-fallback site-tampered; do cp "$RUNNER_TEMP/test-key.asc" $d/sculptforge.asc; done
+          PACKAGE_REPOS_LOCAL=dist PACKAGE_REPOS_KEEP=kept tools/publish/package_repos_fetch.sh vTEST site-kept
+          test "$(cat kept/TAG)" = vTEST
+          PACKAGE_REPOS_LOCAL=kept tools/publish/package_repos_fetch.sh vTEST site-fallback
+          diff -r site-kept site-fallback && diff -r site site-kept
+          cp -r kept kept-bad && for f in kept-bad/*.deb; do echo x >> "$f"; done
+          if PACKAGE_REPOS_LOCAL=kept-bad tools/publish/package_repos_fetch.sh vTEST site-tampered; then echo "tampered kept copy accepted"; exit 1; fi
           find site -type f | sort
           (cd site && python3 -m http.server 8000 --bind 127.0.0.1 >/dev/null 2>&1 &)
           sleep 1
