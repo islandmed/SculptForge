@@ -30,6 +30,7 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <tuple>
 
 namespace sf {
 
@@ -336,8 +337,19 @@ void App::registerViewActions() {
     add("view.opposite", "Opposite side", "Numpad 9", "Look at the model from the other side.", [this] {
         camera_.setOrientation(camera_.orientation() * glm::angleAxis(glm::pi<float>(), glm::vec3(0, 1, 0)));
     });
-    add("view.zoom_in", "Zoom in", "Numpad Plus", "Move the view closer.", [this] { camera_.zoom(1.0f); });
-    add("view.zoom_out", "Zoom out", "Numpad Minus", "Move the view back.", [this] { camera_.zoom(-1.0f); });
+    add("view.zoom_in", "Zoom in", "Numpad Plus", "Move the view closer.", [this] { keyNavStep("view.zoom_in"); });
+    add("view.zoom_out", "Zoom out", "Numpad Minus", "Move the view back.", [this] { keyNavStep("view.zoom_out"); });
+    // Pan and zoom by key (Artizmo on Discord): a press steps, holding the key keeps moving (updateKeyNav, Speed in
+    // Preferences > Input). Zoom in and out above hold the same way.
+    for (const auto& [id, label, key, text] : {std::tuple{"view.pan_left", "Pan left", "Ctrl+Numpad 4",
+                                                          "Slide the view left. Hold the key to keep moving; Speed is in Preferences > Input."},
+                                                std::tuple{"view.pan_right", "Pan right", "Ctrl+Numpad 6",
+                                                           "Slide the view right. Hold the key to keep moving; Speed is in Preferences > Input."},
+                                                std::tuple{"view.pan_up", "Pan up", "Ctrl+Numpad 8",
+                                                           "Slide the view up. Hold the key to keep moving; Speed is in Preferences > Input."},
+                                                std::tuple{"view.pan_down", "Pan down", "Ctrl+Numpad 2",
+                                                           "Slide the view down. Hold the key to keep moving; Speed is in Preferences > Input."}})
+        add(id, label, key, text, [this, id = std::string(id)] { keyNavStep(id); });
     add("view.frame_selected", "Frame Part", "Numpad .", "Fit the active Part in the view (Blender: View Selected; "
         "Maya keys: Alt+F).", [this] { frameActivePart(); });
     add("view.reset", "Reset view", "", "Back to the view a new model opens with: from the front, in perspective, "
@@ -450,6 +462,46 @@ void App::viewAxis(float yawDegrees, float pitchDegrees) {
         camera_.ortho = true;
         autoOrtho_ = true;
     }
+}
+
+// A press of a pan or zoom key moves the view a tenth of a second's worth; holding it carries on (updateKeyNav).
+void App::keyNavStep(const std::string& id) {
+    float px, py, zoom;
+    if (!keyNavMotion(actions_.find(id), px, py, zoom)) return;
+    const float k = 0.1f * std::clamp(uiPrefs_.keyNavSpeed, 0.1f, 5.0f);
+    if (px != 0.0f || py != 0.0f) camera_.pan(px * k, py * k, canvasHeight());
+    if (zoom != 0.0f) camera_.zoom(zoom * k);
+}
+
+// Once a frame: the pan and zoom keys that are held (after the first press's step and a short wait) move the view
+// by their speed, whatever chords they are bound to and in every key style.
+void App::updateKeyNav(float dt) {
+    const bool blocked = ImGui::GetIO().WantCaptureKeyboard || !capturingShortcut_.empty() || shortcutConflictOpen();
+    const bool* down = SDL_GetKeyboardState(nullptr);
+    const SDL_Keymod mods = SDL_GetModState();
+    const bool ctrl = mods & (SDL_KMOD_CTRL | SDL_KMOD_GUI), shift = mods & SDL_KMOD_SHIFT, alt = mods & SDL_KMOD_ALT;
+    float px = 0.0f, py = 0.0f, zoom = 0.0f;
+    bool any = false;
+    for (const char* id : {"view.pan_left", "view.pan_right", "view.pan_up", "view.pan_down", "view.zoom_in", "view.zoom_out"}) {
+        float& held = keyNavHeld_[id];
+        bool on = false;
+        if (!blocked && down)
+            for (const Chord& c : parseChords(actions_.shortcutText(id))) {
+                const SDL_Scancode sc = SDL_GetScancodeFromKey(c.key, nullptr);
+                if (sc != SDL_SCANCODE_UNKNOWN && down[sc] && c.ctrl == ctrl && c.shift == shift && c.alt == alt) on = true;
+            }
+        held = on ? held + dt : 0.0f;
+        float x, y, z;
+        if (held < 0.25f || !keyNavMotion(actions_.find(id), x, y, z)) continue;
+        px += x, py += y, zoom += z;
+        any = true;
+    }
+    if (!any) return;
+    const float k = dt * std::clamp(uiPrefs_.keyNavSpeed, 0.1f, 5.0f);
+    if (px != 0.0f || py != 0.0f) camera_.pan(px * k, py * k, canvasHeight());
+    if (zoom != 0.0f) camera_.zoom(zoom * k);
+    keyNavMoving_ = true;
+    regrabAfterViewMove();
 }
 
 void App::viewOrbitStep(float yawDegrees, float pitchDegrees) {
@@ -599,6 +651,16 @@ void App::drawInputSection() {
     }
     ui::Checkbox("Invert zoom##input.invert_zoom", &uiPrefs_.invertZoom);
     ui::HelpText("Invert zoom", nullptr, "Turn zoom drags around (the mouse wheel stays as it is).", "Preferences > Input");
+    {
+        ImGui::TextDisabled("%s", tr("Pan and zoom key speed"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1);
+        ImGui::SliderFloat("##input.key_nav_speed", &uiPrefs_.keyNavSpeed, 0.1f, 5.0f, "%.1fx", ImGuiSliderFlags_Logarithmic);
+        ui::HelpText("Pan and zoom key speed", nullptr,
+                     "How fast the view moves while a Pan or Zoom key is held (Ctrl+Numpad 4, 6, 8 and 2 pan; Numpad Plus "
+                     "and Minus zoom; rebind them in Hotkeys). 1x is a screen in about two seconds.",
+                     "Preferences > Input");
+    }
     ui::Checkbox("Wheel zooms toward the pointer##input.wheel_to_pointer", &uiPrefs_.wheelZoomToPointer);
     ui::HelpText("Wheel zooms toward the pointer", nullptr,
                  "The mouse wheel zooms toward the point of the model under the pointer, which stays under it, instead "

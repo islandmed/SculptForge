@@ -149,3 +149,36 @@ TEST(search_aliases_are_generic_words) {
     CHECK(brushFromName("snakehook", t) && t == BrushType::SnakeHook);
     CHECK(!brushFromName("frobnicate", t));
 }
+
+TEST(action_registry_conflicts_reset_and_key_nav) {
+    ActionRegistry reg;
+    reg.add({"edit.undo", "Undo", nullptr, "", "Edit", "Ctrl+Z", "", [] {}, nullptr, nullptr});
+    reg.add({"brush.clay", "Clay", nullptr, "", "Brush", "Z", "", [] {}, nullptr, nullptr});
+    reg.add({"view.pan_left", "Pan left", nullptr, "", "View", "Ctrl+Numpad 4", "", [] {}, nullptr, nullptr});
+    reg.add({"view.zoom_in", "Zoom in", nullptr, "", "View", "Numpad Plus", "", [] {}, nullptr, nullptr});
+    Chord z, ctrlZ, shiftZ;
+    CHECK(parseChord("Z", z) && parseChord("Ctrl+Z", ctrlZ) && parseChord("Shift+Z", shiftZ));
+    // Modifiers count: Z is Clay's, Ctrl+Z is Undo's, Shift+Z nobody's.
+    auto h = reg.holdersOf(z, "view.pan_left");
+    CHECK(h.size() == 1 && h[0]->id == "brush.clay");
+    h = reg.holdersOf(ctrlZ, "view.pan_left");
+    CHECK(h.size() == 1 && h[0]->id == "edit.undo");
+    CHECK(reg.holdersOf(shiftZ, "view.pan_left").empty());
+    CHECK(reg.holdersOf(z, "brush.clay").empty()); // its own key is not a conflict
+
+    // Replace: the other loses it; per-shortcut reset gives it back and takes it from the new holder.
+    CHECK(reg.assignShortcut("view.pan_left", "Z") == "Clay");
+    CHECK(reg.shortcutText("brush.clay").empty() && reg.hasOverride("view.pan_left"));
+    CHECK(reg.resetShortcut("brush.clay") == "Pan left");
+    CHECK(reg.shortcutText("brush.clay") == "Z" && !reg.hasOverride("brush.clay"));
+    CHECK(reg.shortcutText("view.pan_left").empty());
+    CHECK(reg.resetShortcut("view.pan_left").empty());
+    CHECK(reg.shortcutText("view.pan_left") == "Ctrl+Numpad 4" && !reg.hasOverride("view.pan_left"));
+
+    // Pan and zoom keys: directions, and nothing for other actions.
+    float px, py, zoom;
+    CHECK(keyNavMotion(reg.find("view.pan_left"), px, py, zoom) && px < 0 && py == 0 && zoom == 0);
+    CHECK(keyNavMotion(reg.find("view.zoom_in"), px, py, zoom) && zoom > 0 && px == 0);
+    CHECK(!keyNavMotion(reg.find("brush.clay"), px, py, zoom));
+    CHECK(px == 0 && py == 0 && zoom == 0);
+}

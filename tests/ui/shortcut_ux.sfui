@@ -1,0 +1,27 @@
+# Preferences > Hotkeys: a key another action uses asks first (Replace / Cancel, the popup clear of its button), a changed
+# shortcut can be reset on its own, and Ctrl+Numpad 4 / 6 / 8 / 2 pan the view (Requested by Artizmo on Discord).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+expect_value shortcut_conflicts == 0
+expect_value shortcut_conflict_open == 0
+
+# The pan keys step the view; the Frame key still frames afterwards (Customize Shelves must not rebind it).
+camera 0 0
+key ctrl+numpad4
+expect_value camera_pan != 0
+key f
+expect_value camera_pan == 0
+
+click "Preferences##palette.preferences"
+click "Hotkeys##preferences.hotkeys"
+type "##hotkeys_filter" "Pan "
+click "Ctrl+Numpad 4##hk.view.pan_left"
+key ctrl+numpad6
+expect_value shortcut_conflict_open == 1
+expect_value shortcut_popup_overlaps_anchor == 0
+shot shortcut_conflict
+# Replace takes it from Pan right.
+click "Replace##shortcut_replace"
+expect_value shortcut_conflict_open == 0
+expect_value shortcut_conflicts == 0
+shot shortcut_replaced

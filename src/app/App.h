@@ -2189,6 +2189,9 @@ public:
     // The next key press becomes ACTION's shortcut (Ctrl+Alt+click a button, or Preferences > Hotkeys).
     void beginShortcutCapture(const std::string& actionId);
     const std::string& capturingShortcut() const { return capturingShortcut_; }
+    // A pressed key that another action already uses waits here for Replace or Cancel (a popup by the button).
+    bool shortcutConflictOpen() const { return !conflict_.actionId.empty(); }
+    void resolveShortcutConflict(bool replace);
     void openCommandPalette() { palette_.open(); }
     void setConsoleOpen(bool open);
     void consolePrefill(const std::string& text); // opens the console with TEXT typed
@@ -2214,6 +2217,7 @@ private:
     void drawHelpConsoleUi();              // console, command palette, Controls, shortcut capture, Ctrl help
     void drawControlsWindow();
     bool captureShortcutKey(SDL_Keycode key, SDL_Keymod mod);
+    void drawShortcutConflict();
     void consoleEcho(const std::string& name, const Args& args, const CommandResult& r);
     std::string uiConfigPath() const;
     // Window size, position, maximised and full screen, kept in window.json beside ui.json (#35). Not for tests,
@@ -2275,6 +2279,13 @@ private:
     CommandPalette palette_;
     std::string configDir_;           // <prefs>/ (ui.json, console_history.txt, recent_actions.txt)
     std::string capturingShortcut_;   // action id waiting for a key
+    struct ShortcutConflict {
+        std::string actionId, chord, holders; // the action being set, the key pressed, "Orbit left, Zoom in"
+    } conflict_;
+    ImVec4 shortcutAnchor_{};           // the button the capture began from (min x, y, max x, y); zero: unknown
+    ImVec4 shortcutPopupRect_{};        // the Replace / Cancel popup as last drawn (UiTest checks it clears the anchor)
+    std::map<std::string, float> keyNavHeld_; // seconds each pan / zoom key has been down (updateKeyNav)
+    bool keyNavMoving_ = false;
     std::string layoutBaseline_;      // layoutKey() as last stored / loaded / restored
     Json storedLayout_;               // the layout ui.json keeps (Save Layout); null: none yet, the standard one
     std::string prefsSavedKey_;       // prefsKey() as last saved (or read at the start)
@@ -2411,6 +2422,8 @@ private:
     void restoreView(int index);
     void drawViewsSection(); // Palettes.cpp, in View
     void viewOrbitStep(float yawDegrees, float pitchDegrees);
+    void keyNavStep(const std::string& id);   // one press of a pan or zoom key
+    void updateKeyNav(float dt);              // once a frame: the held ones keep moving the view
     void frameActivePart();
     // Focus Detail (prototype, FocusDetailApp.cpp): open a .sfdetail file; once a frame, the camera and brush.
     void openFocusDetail(const std::string& path);
@@ -2885,6 +2898,7 @@ private:
     void spaceMouseScan();                    // take the first SpaceMouse SDL knows about, if none is open
     void spaceMouseClose();
     void updateSpaceMouse(float dt);          // once a frame: move the camera by the held axes
+    bool keyNavMoving() const { return keyNavMoving_; }
     bool spaceMouseMoving() const { return spaceMouseMoving_; } // keep frames coming while the cap is pushed
     bool spaceMouseDeflected() const; // the cap is pushed past the dead zone now (an axis event worth a frame)
     void drawSpaceMouseSection();             // Preferences > Input > SpaceMouse

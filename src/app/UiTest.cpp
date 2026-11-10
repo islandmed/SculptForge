@@ -906,6 +906,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "brush_sets") return double(app_.brushSets().size()); // brush sets in the library (#143)
     if (name == "brush_set_active") return double(app_.matchingBrushSet()); // the set the bottom shelf is, -1 none
     if (name == "bottom_shelf_items") return double(app_.layout_.bottomShelf.size());
+    if (name == "shortcut_conflict_open") return app_.shortcutConflictOpen() ? 1.0 : 0.0; // the Replace / Cancel popup
+    if (name == "shortcut_popup_overlaps_anchor") { // the popup over the button it belongs to (queue 14: popups clear their anchor)
+        const ImVec4 p = app_.shortcutPopupRect_, a = app_.shortcutAnchor_;
+        if (p.z <= p.x || a.z <= a.x) return -1.0; // no popup, or no anchor known
+        return p.x < a.z && a.x < p.z && p.y < a.w && a.y < p.w ? 1.0 : 0.0;
+    }
+    if (name == "key_nav_speed") return std::round(double(app_.uiPrefs_.keyNavSpeed) * 100.0);
     if (name == "shortcut_conflicts") { // keys that two actions claim (only the first would ever run)
         int conflicts = 0;
         std::vector<Chord> seen;

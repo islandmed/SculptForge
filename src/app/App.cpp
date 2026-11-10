@@ -518,6 +518,8 @@ int App::runUiTest(int w, int h, int fps) {
         pollSculptable();
         updateCameraAspect();
         updateSpaceMouse(dt);
+        keyNavMoving_ = false;
+        updateKeyNav(dt);
         touchTick(); // a finger's press that waited for a second finger long enough goes through
 
         hardwareProfileFrameBegin(); // (only with SF_HW_PROFILE_IN_TESTS=1: tests use fixed settings)
@@ -851,6 +853,7 @@ bool App::wantsFrames(double now) const {
            strokeFinishing_ || solverBusy() || // the solver thread is placing a stroke's dabs (AsyncStroke.cpp)
            backgroundBusy() || playingLayer_ >= 0 || faceTakePlaying_ ||
            timelapseBusy() || hardwareCalibrating() || // both render a step per frame: they stop when the frames do
+           keyNavMoving() || // a held pan or zoom key sends no events after its first repeat
            spaceMouseMoving() || // a held SpaceMouse cap sends no events, but the view keeps moving (SpaceMouse.cpp)
            perf_.framesStill < 10 || // the view just moved: Fast Navigation's full-quality frame comes after it stops
            (perf_.proxyPrebuild && renderer_.proxiesPending()) || // motion proxies left to build, a few ms a frame
