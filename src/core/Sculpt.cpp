@@ -156,8 +156,33 @@ void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t
 }
 
 void brushRegion(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, const glm::vec3& viewDir, float radius,
-                 bool connectedOnly, bool viewFalloff, std::vector<uint32_t>& out, ConnectedScratch& scratch) {
-    if (viewFalloff) {
+                 bool connectedOnly, bool viewFalloff, std::vector<uint32_t>& out, ConnectedScratch& scratch,
+                 bool footprint) {
+    if (footprint && !viewFalloff && mesh.normals.size() == mesh.vertexCount()) {
+        bvh.queryVerticesCylinder(mesh, center, viewDir, radius, out, radius); // (depth: the reach, as below)
+        const float r2 = radius * radius;
+        // The sphere's own vertices, and the visible ones beyond it (not the part of the model far behind: the surface
+        // follows the footprint, within the reach in depth too). Millions of candidates on a big stamp: flagged in parallel.
+        static thread_local std::vector<uint8_t> keepStore;
+        std::vector<uint8_t>& keep = keepStore; // (the workers write the caller's, not their own thread_local)
+        keep.resize(out.size());
+        const bool anyHidden = mesh.hasHidden();
+        poolFor(out.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                const uint32_t v = out[i];
+                const glm::vec3 d = mesh.positions[v] - center;
+                bool k = true;
+                if (anyHidden && mesh.vertexHidden(v)) k = false;
+                else if (glm::dot(d, d) > r2)
+                    k = glm::dot(mesh.normals[v], viewDir) <= 0.0f && std::abs(glm::dot(d, viewDir)) <= radius;
+                keep[i] = k;
+            }
+        }, 32768);
+        size_t n = 0;
+        for (size_t i = 0; i < out.size(); ++i)
+            if (keep[i]) out[n++] = out[i];
+        out.resize(n);
+    } else if (viewFalloff) {
         bvh.queryVerticesCylinder(mesh, center, viewDir, radius, out);
         if (mesh.hasHidden()) std::erase_if(out, [&](uint32_t v) { return mesh.vertexHidden(v); });
     } else {
@@ -975,7 +1000,8 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     const bool useAlpha = p.alpha && !p.alpha->empty();
     const bool useStencil = p.stencil.active();
     const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBlock ? 1.3f : 1.0f;
-    brushRegion(mesh, bvh, p.center, p.viewDir, p.radius * reach, p.connectedOnly, p.viewFalloff, verts_, connected_);
+    brushRegion(mesh, bvh, p.center, p.viewDir, p.radius * reach, p.connectedOnly, p.viewFalloff, verts_, connected_,
+                useAlpha && p.stampFootprint);
     if (verts_.empty()) return;
     StencilView stencil = p.stencil; // (averaged over the vertices' spacing where they are many pixels apart)
     if (useStencil) stencil.setSpacing(p.center, p.viewDir, p.radius * reach, verts_.size());
@@ -1378,7 +1404,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     // the whole alpha shows (#75; the built-in brushes got this in #60).
     const bool useAlpha = p.alpha && !p.alpha->empty();
     brushRegion(mesh, bvh, p.center, p.viewDir, p.radius * (useAlpha ? kAlphaReach : 1.0f), p.connectedOnly,
-                p.viewFalloff, verts_, connected_);
+                p.viewFalloff, verts_, connected_, useAlpha && p.stampFootprint);
     if (verts_.empty()) return;
     StencilView stencil = p.stencil;
     if (stencil.active()) stencil.setSpacing(p.center, p.viewDir, p.radius * (useAlpha ? kAlphaReach : 1.0f), verts_.size());

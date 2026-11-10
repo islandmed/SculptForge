@@ -752,6 +752,13 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                              doc_.stencil.image ? doc_.stencil.image->width : 0,
                              doc_.stencil.image ? doc_.stencil.image->height : 0, doc_.stencil.size);
             }
+            // SF_BENCH_ALPHA=Cracks (a built-in alpha's name): the brush itself stamps that alpha, so every dab takes the
+            // alpha path (the region reaches the stamp's corners). bench.sh alpha.
+            if (const char* ab = std::getenv("SF_BENCH_ALPHA"); ab && *ab) {
+                if (BrushAlpha::builtin(ab, doc_.brushAlpha))
+                    std::fprintf(stderr, "bench alpha: %s\n", ab);
+                benchStampFootprint_ = std::getenv("SF_BENCH_STAMP") != nullptr; // every dab as a stamp's (dabAt)
+            }
             strokeProbe_ = &p.dabs;
             onMouseDown(q.x, q.y, SDL_BUTTON_LEFT);
             p.pressed = drag_ == Drag::Stroke;

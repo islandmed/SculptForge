@@ -87,6 +87,10 @@ struct DabParams {
     // on screen, so the brush reaches through the model along the view as a cylinder.
     bool connectedOnly = false;
     bool viewFalloff = false;
+    // A stamp (Drag Stamp, Slide Stamp: one big dab per drag step) with an alpha also takes the visible surface under
+    // its footprint on the view plane, which a surface curving away puts outside the dab's sphere (#174). Not on the
+    // many-dab alpha brushes (Dots, Spray), which keep the sphere: a dab there is per-frame hot.
+    bool stampFootprint = false;
     // The direction of the ray that picked `center` (zero: viewDir), so a fused batch (Sculptor::beginBatch) can
     // find where that ray meets the surface the batch's earlier dabs left.
     glm::vec3 pickDir{0.0f};
@@ -141,9 +145,12 @@ struct ConnectedScratch {
 // reaches through edges between vertices of `verts`; the order stays.
 void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& scratch);
 // The vertices a dab may touch with the falloff options: brushVertices, or the cylinder along `viewDir`
-// (viewFalloff), then keepConnected from `center` (connectedOnly).
+// (viewFalloff), then keepConnected from `center` (connectedOnly). `footprint` (an alpha stamp, #174): also the
+// surface facing the viewer under the stamp's footprint on the view plane, which a surface curving away reaches
+// further than `radius` in space (the sphere alone left gaps in a big stamp on a head).
 void brushRegion(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, const glm::vec3& viewDir, float radius,
-                 bool connectedOnly, bool viewFalloff, std::vector<uint32_t>& out, ConnectedScratch& scratch);
+                 bool connectedOnly, bool viewFalloff, std::vector<uint32_t>& out, ConnectedScratch& scratch,
+                 bool footprint = false);
 // Along the normal (from the discussions: Move, Tendril, Elastic Tendril and Elastic Grab with Alt): the
 // falloff-weighted average normal of the visible surface within `radius` of `center`, unit length (zero when
 // there is no surface there).

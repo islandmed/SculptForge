@@ -596,6 +596,78 @@ TEST(vertexpaint_dab_follows_the_alpha) {
     d2.undo.push(d2.sculptor.endStroke());
 }
 
+TEST(vertexpaint_big_alpha_dab_covers_its_footprint_on_a_curved_surface) {
+    // #174: a big square alpha (Drag Stamp) on a curved surface leaves no gaps: every visible vertex under the stamp's
+    // footprint on the view plane is painted, however far the surface curves away from that plane.
+    Document doc = makeDoc(makeIcosphere(6));
+    Mesh& m = doc.mesh;
+    BrushAlpha solid;
+    solid.name = "Solid";
+    solid.width = solid.height = 4;
+    solid.values.assign(16, 1.0f);
+    DabParams p = paintParams({0, 0, 1}, 0.95f); // nearly the sphere's own radius
+    p.alpha = &solid;
+    p.alphaUp = {0, 1, 0};
+    p.focal = -1.0f; // flat to the corners
+    p.stampFootprint = true;
+    CHECK(doc.sculptor.beginStroke(m, "Paint"));
+    paintDab(doc.sculptor, m, doc.bvh, p, kRed, Symmetry{false, false, false});
+    size_t inside = 0, missed = 0;
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+        const glm::vec3 x = m.positions[v];
+        if (x.z < 0.05f || std::abs(x.x) > 0.9f || std::abs(x.y) > 0.9f) continue; // visible, under the footprint
+        ++inside;
+        missed += m.colors[v].y > 0.95f;
+    }
+    CHECK(inside > 1000);
+    CHECK(missed == 0);
+    doc.undo.push(doc.sculptor.endStroke());
+}
+
+TEST(alpha_stamp_covers_its_footprint_on_a_dense_mesh_with_a_big_brush) {
+    // #174 as reported: 1.3M polys, a large brush, any alpha. Paint and sculpt, no vertex of the visible footprint untouched.
+    Mesh base = makeIcosphere(8); // 1,310,720 faces
+    CHECK(base.triangles.size() > 1300000);
+    Document doc = makeDoc(base);
+    BrushAlpha square, cracks, cobble;
+    square.name = "Solid";
+    square.width = square.height = 8;
+    square.values.assign(64, 1.0f);
+    CHECK(BrushAlpha::builtin("Cracks", cracks));
+    CHECK(BrushAlpha::builtin("Cobblestone", cobble));
+    // Alphas with black in them leave vertices at 0 by design: the footprint to cover is where the alpha is lit.
+    const BrushAlpha* alphas[] = {&square, &cracks, &cobble};
+    for (int sculpt = 0; sculpt < 2; ++sculpt) {
+        for (const BrushAlpha* a : alphas) {
+            Mesh& m = doc.mesh;
+            const std::vector<glm::vec3> before = m.positions;
+            m.ensureColors();
+            std::fill(m.colors.begin(), m.colors.end(), glm::vec3(1.0f));
+            DabParams p = paintParams({0, 0, 1}, 0.9f); // a large brush: nearly the sphere's radius
+            p.alpha = a;
+            p.alphaUp = {0, 1, 0};
+            p.focal = -1.0f;
+            p.stampFootprint = true;
+            const glm::vec3 right = glm::cross(p.alphaUp, -p.viewDir);
+            CHECK(doc.sculptor.beginStroke(m, sculpt ? "Sculpt" : "Paint"));
+            if (sculpt) doc.sculptor.dab(m, doc.bvh, BrushType::Standard, p, Symmetry{false, false, false});
+            else paintDab(doc.sculptor, m, doc.bvh, p, kRed, Symmetry{false, false, false});
+            size_t lit = 0, missed = 0;
+            for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+                const glm::vec3 x = before[v];
+                if (x.z < 0.05f || std::abs(x.x) > 0.85f || std::abs(x.y) > 0.85f) continue;
+                if (a->sample(glm::dot(x, right) / p.radius, glm::dot(x, p.alphaUp) / p.radius) < 0.5f) continue;
+                ++lit;
+                missed += sculpt ? m.positions[v] == before[v] : m.colors[v].y > 0.95f;
+            }
+            CHECK(lit > 2000);
+            CHECK(missed == 0);
+            doc.undo.push(doc.sculptor.endStroke());
+            CHECK(doc.undo.undo(m, doc.bvh));
+        }
+    }
+}
+
 TEST(vertexpaint_dab_strength_scales_with_and_without_alpha) {
     // #164: the dab's strength (the Paint brush's Intensity) scales the colour, with an alpha (Cobblestone) and without.
     for (const bool withAlpha : {true, false}) {
