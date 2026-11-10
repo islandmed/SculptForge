@@ -927,6 +927,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME ci_slowest_tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/slowest_tests.py --self-test)
     add_test(NAME test_impact COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/impacted.py --self-test)
     add_test(NAME test_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/run.py --self-test)
+    # Areas (tests/areas.map, docs/testing-flow.md): the picker's self-test, and every test in exactly one area.
+    add_test(NAME test_affected COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/affected.py --self-test)
+    add_test(NAME test_areas COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/check_areas.py
+             --map ${CMAKE_CURRENT_SOURCE_DIR}/tests/areas.map --tsv ${CMAKE_CURRENT_BINARY_DIR}/test-areas.tsv
+             --units $<TARGET_FILE:sculptforge_tests>)
     add_test(NAME benchmark_submit COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/benchmark/submit.py selftest)
     # The upstream watch (tools/upstream-watch, .github/workflows/upstream-watch.yml) against recorded API responses.
     add_test(NAME upstream_watch COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/upstream/test_upstream_watch.py)
@@ -1235,4 +1240,7 @@ if(SCULPTFORGE_BUILD_TESTS)
       endif()
     endif()
   endforeach()
+  # One area label per entry, a smoke label on the quick cross-area set (tests/areas.map, docs/testing-flow.md).
+  include(cmake/TestAreas.cmake)
+  sculptforge_label_test_areas()
 endif()

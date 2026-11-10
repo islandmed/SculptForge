@@ -1,0 +1,438 @@
+# Test areas (docs/testing-flow.md "Areas"): the one place that says which part of the app a test, a source file and a
+# unit-test file belong to. Read by CMakeLists.txt (a LABELS entry area_<name> on every ctest entry), tools/test/affected.py
+# (changed files -> areas) and tests/test_main.cpp ([units]: SF_TEST_AREA runs only that area's TEST cases).
+# First match wins inside a section, so list specific globs first. `*` matches anything, `/` included.
+# A new test needs no line when a glob below covers it; one nothing covers fails `test_areas` (not the build).
+#
+# [areas]: name | what it owns
+# [tests]: ctest name glob -> area       [units]: tests/test_*.cpp glob -> area      [paths]: repo path glob -> area
+# [smoke]: ctest names of the cross-area set (start, open, stroke, save/load, one UI shot; under 3 minutes on CI)
+# [core]: paths that mean the FULL suite when changed (headers half the app includes, build files). Besides these,
+#         affected.py counts includers: a header included by 30+ files under src/ and tests/ is core too.
+
+[areas]
+sculpt | brush engine, strokes, masking, paint, textures, input devices, performance, hardware tiers
+mesh   | mesh operations: remesh, cut, crease, levels, tube, parts, face groups, UV, retopo, forge spheres
+cloth  | cloth, drape, garments
+ui     | shell, panels, menus, shortcuts, gizmos, layout, scale, tour, library, support cards
+render | viewport, camera, shading, environment, drivers
+io     | file formats, projects, bridges (Blender, Maya), packs, plugins, export
+ai     | AI generation, consent, links, network, updates, Discord presence
+unit   | the sculptforge_tests shards: unit cases of every area (SF_TEST_AREA picks the cases; areas by [units])
+site   | i18n, docs, guide, website, release and CI tooling, marks and other repo checks
+
+[tests]
+# sculpt, mesh, cloth first: their feature UI tests, before the generic ui_ catch-all below.
+ui_cloth*                   cloth
+ui_garment*                 cloth
+ui_drape*                   cloth
+ui_ai_*                     ai
+ui_generate_*               ai
+ui_comfyui                  ai
+ui_connect_ai               ai
+ui_phone_link               ai
+ui_discord_presence         ai
+ui_self_update              ai
+ui_update_check             ai
+ui_splat_train              ai
+ui_maya_*                   io
+ui_blender_*                io
+ui_packs                    io
+ui_brush_packs              io
+ui_plugins                  io
+ui_prefs_*                  io
+ui_parts_files              io
+ui_v05_pipeline             io
+ui_texture_transfer         io
+ui_bake*                    io
+ui_extract_labels*          mesh
+ui_extract_mirror           mesh
+ui_dyntopo*                 mesh
+ui_qremesh_*                mesh
+ui_quick_remesh             mesh
+ui_remesh_*                 mesh
+ui_retopo                   mesh
+ui_cut_*                    mesh
+ui_tube*                    mesh
+ui_part*                    mesh
+ui_job_keeps_part           mesh
+ui_forge*                   mesh
+ui_geometry_groups*         mesh
+ui_edge_select*             mesh
+ui_levels_rebuild           mesh
+ui_layers_levels            mesh
+ui_multires                 mesh
+ui_micro_levels             mesh
+ui_coarse_lod*              mesh
+ui_divide_*                 mesh
+ui_face_shapes              mesh
+ui_figure_pose              mesh
+ui_insert_*                 mesh
+ui_linked_duplicate         mesh
+ui_make_sculptable          mesh
+ui_mesh_check*              mesh
+ui_mirror_stress            mesh
+ui_selection_sets           mesh
+ui_starter_meshes           mesh
+ui_uv_editor*               mesh
+ui_weld_preview*            mesh
+ui_deformation_ops*         mesh
+ui_deform_panel*            mesh
+ui_auto_uv_worker           mesh
+ui_radial_symmetry          mesh
+ui_view_*                   render
+ui_viewport_cursor          render
+ui_backface_culling         render
+ui_background*              render
+ui_floor_grid               render
+ui_flat_shading             render
+ui_ortho_shading            render
+ui_pbr_*                    render
+ui_space_camera             render
+ui_navigation               render
+ui_orbit_lock               render
+ui_timelapse_flicker        render
+ui_remove_flat_background   render
+ui_frame_free_area*         render
+ui_hover_pop                render
+ui_surface_cursor           sculpt
+ui_air_strokes              sculpt
+ui_along_normal             sculpt
+ui_alpha_*                  sculpt
+ui_alternate_smooth         sculpt
+ui_big_mesh_tip             sculpt
+ui_brush_*                  sculpt
+ui_builtin_presets          sculpt
+ui_classic_feel             sculpt
+ui_contextual_shelf         sculpt
+ui_ctrl_brushes             sculpt
+ui_custom_litspheres        sculpt
+ui_empty_shelves            sculpt
+ui_fill_layers              sculpt
+ui_first_sculpt             sculpt
+ui_focal_alpha              sculpt
+ui_hardware_*               sculpt
+ui_kelvinlet_capture        sculpt
+ui_keep_masked              sculpt
+ui_library*                 ui
+ui_line_gradient            sculpt
+ui_litsphere_manage         sculpt
+ui_live_move                sculpt
+ui_looks                    sculpt
+ui_mask_*                   sculpt
+ui_masking_panel            sculpt
+ui_memory_confirm           sculpt
+ui_paint_*                  sculpt
+ui_pen_*                    sculpt
+ui_perf_trace               sculpt
+ui_performance              sculpt
+ui_precision*               sculpt
+ui_sculpt_basics            sculpt
+ui_size_*                   sculpt
+ui_spacemouse*              sculpt
+ui_stencil                  sculpt
+ui_stroke_*                 sculpt
+ui_tablet*                  sculpt
+ui_texture_*                sculpt
+ui_touch                    sculpt
+ui_triple_click             sculpt
+ui_undo_session             sculpt
+ui_vdm*                     sculpt
+ui_units                    sculpt
+perf_*                      sculpt
+bench_take_sphere           sculpt
+ui_idle_*                   sculpt
+ui_calibrate_json           sculpt
+ui_monkey*                  ui
+ui_mode_matrix              ui
+ui_*                        ui
+sculptforge_tests_*         unit
+figure_pose_bench           mesh
+decimate_valence_ab         mesh
+remesh_bench                mesh
+python_api                  io
+blender_*                   io
+maya_*                      io
+brush_gallery_index         sculpt
+website_brush_packs         site
+link_worker                 ai
+upstream_watch              ai
+member_requests             site
+insider_drops               site
+crash_log                   ui
+native_dialogs*             ui
+icons*                      ui
+raw_literal_size            ui
+macos_api*                  ui
+icns_self_test              ui
+benchmark_submit            sculpt
+release_*                   site
+ci_*                        site
+test_*                      site
+guide_*                     site
+i18n_*                      site
+marks*                      site
+public_email*               site
+media_takedown*             site
+gallery_published*          site
+credits_*                   site
+mcp*                        site
+reply_drafts*               site
+sbom                        site
+stale_tree                  site
+*                           site
+
+[units]
+test_cloth                  cloth
+test_garment*               cloth
+test_actions                ui
+test_axis_gizmo             ui
+test_gizmo_all              ui
+test_shell_layout           ui
+test_shell_quote            ui
+test_ui_scale               ui
+test_radial_menu            ui
+test_mac_menu               ui
+test_support                ui
+test_library                ui
+test_connect_ai             ai
+test_ai_*                   ai
+test_comfyui                ai
+test_hyper3d                ai
+test_rodin_fal              ai
+test_phone_link             ai
+test_discord_presence       ai
+test_update_check           ai
+test_self_update            ai
+test_splat_train            ai
+test_studio_*               ai
+test_i18n                   site
+test_guide                  site
+test_legacy_names           site
+test_blender_keymap         io
+test_blender_bridge         io
+test_bridge                 io
+test_maya_*                 io
+test_project                io
+test_malformed_files        io
+test_texture_io             io
+test_packs                  io
+test_plugins                io
+test_part_io                io
+test_map_export             io
+test_bake                   io
+test_camera                 render
+test_backdrop               render
+test_environment            render
+test_ghost                  render
+test_render_clusters        render
+test_video_drivers          render
+test_space_camera           render
+test_close_holes            mesh
+test_cut                    mesh
+test_decimate_valence       mesh
+test_divide_valence         mesh
+test_dyntopo                mesh
+test_edge_*                 mesh
+test_extract_mirror         mesh
+test_face*                  mesh
+test_figure_pose            mesh
+test_forgespheres           mesh
+test_generated_remesh       mesh
+test_linked_duplicate       mesh
+test_mesh_check             mesh
+test_mesh_maps              mesh
+test_mesh_preview           mesh
+test_micro                  mesh
+test_multires*              mesh
+test_part*                  mesh
+test_primitives_insert      mesh
+test_qremesh*               mesh
+test_quads                  mesh
+test_quick_remesh           mesh
+test_remesh_speed           mesh
+test_retopo*                mesh
+test_sculptable             mesh
+test_selection_sets         mesh
+test_starter_meshes         mesh
+test_transform              mesh
+test_tube                   mesh
+test_uv_editor              mesh
+test_deform_panel           mesh
+test_radial_symmetry        mesh
+# Everything else is the sculpt engine: brushes, strokes, masking, paint, textures, input, performance.
+test_*                      sculpt
+
+[paths]
+src/app/I18n*                      site
+src/app/IconsUsed.h                ui
+src/app/Panel*Cloth*               cloth
+src/app/PanelDrape*                cloth
+src/app/PanelGarment*              cloth
+src/app/PanelAi*                   ai
+src/app/PanelConnectAi*            ai
+src/app/ConnectAi*                 ai
+src/app/PanelGenerate3D*           ai
+src/app/PanelPhone*                ai
+src/app/PanelUpdate*               ai
+src/app/PanelSplatTrain*           ai
+src/app/PanelBlender*              io
+src/app/PanelMaya*                 io
+src/app/PanelBridge*               io
+src/app/PanelPacks*                io
+src/app/PanelPlugins*              io
+src/app/PanelIntegrations*         io
+src/app/PanelBake*                 io
+src/app/PanelProject*              io
+src/app/BlenderKeymap*             io
+src/app/PanelBrush*                sculpt
+src/app/PanelKelvinlet*            sculpt
+src/app/PanelMasking*              sculpt
+src/app/PanelPaintLayers*          sculpt
+src/app/PanelPerformance*          sculpt
+src/app/PanelHardwareTier*         sculpt
+src/app/PanelFill*                 sculpt
+src/app/PanelTexture*              sculpt
+src/app/PanelVdm*                  sculpt
+src/app/PanelVertexPaint*          sculpt
+src/app/PanelPbr*                  render
+src/app/PanelView*                 render
+src/app/SpaceCamera*               render
+src/app/Panel*                     mesh
+src/app/Brush*                     sculpt
+src/app/AirStroke*                 sculpt
+src/app/AsyncStroke*               sculpt
+src/app/Stencil*                   sculpt
+src/app/StrokePopup*               sculpt
+src/app/Precision*                 sculpt
+src/app/Tablet*                    sculpt
+src/app/SpaceMouse*                sculpt
+src/app/Touch*                     sculpt
+src/app/Wintab*                    sculpt
+src/app/Bench*                     sculpt
+src/app/OptimisticBench*           sculpt
+src/app/Calibration*               sculpt
+src/app/LineGradient*              sculpt
+src/app/BigMeshTip*                sculpt
+src/app/MemoryConfirm*             sculpt
+src/app/UserGuide*                 site
+src/app/WhatsNewPopup*             site
+src/app/SearchAliases*             site
+src/app/Support*                   ui
+src/app/*                          ui
+src/render/Camera*                 render
+src/render/UvView*                 mesh
+src/render/*                       render
+src/io/ArExport*                   io
+src/io/*                           io
+src/ai/*                           ai
+src/link/MayaLink*                 io
+src/link/*                         ai
+src/cli/*                          ai
+src/python/*                       io
+src/core/Cloth*                    cloth
+src/core/Garment*                  cloth
+src/core/Drape*                    cloth
+src/core/Agent*                    ai
+src/core/ImageTo3D*                ai
+src/core/Generators*               ai
+src/core/NetworkPolicy*            ai
+src/core/ManagedPolicy*            ai
+src/core/StudioProfile*            ai
+src/core/SelfUpdate*               ai
+src/core/UpdateCheck*              ai
+src/core/DiscordPresence*          ai
+src/core/MemberBuilds*             ai
+src/core/Keychain*                 ai
+src/core/Ed25519*                  ai
+src/core/Sha256*                   ai
+src/core/Guide*                    site
+src/core/WhatsNew*                 site
+src/core/LegacyNames*              site
+src/core/Project*                  io
+src/core/Pack*                     io
+src/core/Plugin*                   io
+src/core/MapExport*                io
+src/core/Bake*                     io
+src/core/Script*                   io
+src/core/Macro*                    io
+src/core/LayerStackIO*             io
+src/core/GarmentFiles*             cloth
+src/core/Uv*                       mesh
+src/core/AutoUv*                   mesh
+src/core/QRemesh*                  mesh
+src/core/QuickRemesh*              mesh
+src/core/GeneratedRemesh*          mesh
+src/core/Dyntopo*                  mesh
+src/core/Decimate*                 mesh
+src/core/Cut*                      mesh
+src/core/CloseHoles*               mesh
+src/core/Tube*                     mesh
+src/core/Parts*                    mesh
+src/core/Multires*                 mesh
+src/core/Micro*                    mesh
+src/core/Face*                     mesh
+src/core/ForgeSpheres*             mesh
+src/core/FigurePose*               mesh
+src/core/ExtractMirror*            mesh
+src/core/EdgeSelect*               mesh
+src/core/Primitives*               mesh
+src/core/Sculptable*               mesh
+src/core/SelectionSets*            mesh
+src/core/StarterMeshes*            mesh
+src/core/TransformCommands*        mesh
+src/core/RetopoCommands*           mesh
+src/core/MeshCheck*                mesh
+src/core/Deform*                   mesh
+src/core/Symmetry*                 mesh
+src/core/Wavelet*                  mesh
+src/core/Voxel*                    mesh
+src/core/Quad*                     mesh
+src/core/*                         sculpt
+tests/ui/mode_matrix_known.txt     ui
+tests/ui/*                         @test
+tests/test_*.cpp                   @unit
+tests/*                            site
+tools/i18n/*                       site
+tools/guide/*                      site
+tools/release/*                    site
+tools/ci/*                         site
+tools/test/*                       site
+tools/*                            site
+docs/*                             site
+website/*                          site
+changes/*                          site
+scripts/*                          site
+packaging/*                        site
+install/*                          site
+.github/*                          site
+integrations/maya/*                io
+addons/blender/*                   io
+services/*                         ai
+assets/*                           ui
+*.md                               site
+
+[core]
+CMakeLists.txt
+cmake/*
+CMakePresets.json
+third_party/*
+src/core/CMakeLists.txt
+tests/TestHarness.h
+tests/test_main.cpp
+tests/shard_times.inc
+tests/areas.map
+.github/workflows/ci.yml
+
+[smoke]
+marks
+ui_release_smoke
+ui_shell_layout
+ui_sculpt_basics
+ui_first_sculpt
+ui_idle_redraw
+ui_undo_session
+ui_parts_files
+ui_mode_matrix
+ui_monkey
+release_smoke
