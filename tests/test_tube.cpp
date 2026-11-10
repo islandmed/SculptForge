@@ -475,3 +475,193 @@ TEST(tube_profile_commands_and_project) {
     CHECK(tubeMatchesMesh(back.mesh));
     std::filesystem::remove(path);
 }
+
+namespace {
+
+// The turn of a square tube's cross-section at x (degrees, a quarter turn is the same square): the polar angle of the
+// ring's farthest corner about the x axis.
+double cornerAngle(const Mesh& m, float x, float tol) {
+    float best = -1.0f;
+    double angle = 0.0;
+    for (const vec3& p : m.positions) {
+        if (std::abs(p.x - x) > tol) continue;
+        const float r = std::hypot(p.y, p.z);
+        if (r > best) best = r, angle = std::atan2(p.z, p.y) * 180.0 / 3.14159265;
+    }
+    angle = std::fmod(angle, 90.0);
+    return angle < 0.0 ? angle + 90.0 : angle;
+}
+// a - b folded into (-45, 45].
+double quarterDiff(double a, double b) {
+    double d = std::fmod(a - b, 90.0);
+    if (d > 45.0) d -= 90.0;
+    if (d <= -45.0) d += 90.0;
+    return d;
+}
+
+int components(const Mesh& m) {
+    std::vector<uint32_t> up(m.positions.size());
+    for (size_t i = 0; i < up.size(); ++i) up[i] = uint32_t(i);
+    const auto find = [&](uint32_t a) {
+        while (up[a] != a) a = up[a] = up[up[a]];
+        return a;
+    };
+    for (const glm::uvec3& t : m.triangles) up[find(t.y)] = find(t.x), up[find(t.z)] = find(t.x);
+    std::map<uint32_t, int> roots;
+    for (const glm::uvec3& t : m.triangles) roots[find(t.x)] = 1;
+    return int(roots.size());
+}
+
+TubeShape squareLine() {
+    TubeShape s = line(2.0f, 0.25f);
+    s.profile = TubeShape::Profile::Square;
+    s.up = vec3(0, 0, 1);
+    s.flatCaps = true;
+    return s;
+}
+
+} // namespace
+
+TEST(tube_resample_exact_count_even_spacing) {
+    const TubeShape s = curvy();
+    for (size_t n : {2u, 3u, 7u, 37u, 60u, 200u}) {
+        const std::vector<TubePoint> r = tubeResample(s.points, n);
+        CHECK(r.size() == n);
+        CHECK(r.front().position == s.points.front().position && r.back().position == s.points.back().position);
+    }
+    const std::vector<TubePoint> r = tubeResample(s.points, 60);
+    float lo = 1e9f, hi = 0.0f;
+    for (size_t i = 1; i < r.size(); ++i) {
+        const float d = glm::distance(r[i - 1].position, r[i].position);
+        lo = std::min(lo, d), hi = std::max(hi, d);
+    }
+    CHECK(hi < 1.15f * lo);
+    // Radii run from the first to the last point's.
+    CHECK(std::abs(r.front().radius - 0.2f) < 1e-6f && std::abs(r.back().radius - 0.44f) < 1e-6f);
+    // The new points stay on the old curve: the sweep of the resampled curve is about the same size.
+    TubeShape t = s;
+    t.points = r;
+    CHECK(std::abs(signedVolume(tubeSweep(t)) / signedVolume(tubeSweep(s)) - 1.0) < 0.05);
+    CHECK(tubeResample({{vec3(0), 0.1f}}, 5).empty());
+    CHECK(tubeResample({{vec3(1), 0.1f}, {vec3(1), 0.1f}}, 5).empty());
+}
+
+TEST(tube_twist_and_spin_turn_the_profile_along_the_length) {
+    const float tol = 0.02f;
+    TubeShape s = squareLine();
+    const double start = cornerAngle(tubeSweep(s), 0.0f, tol);
+    s.twist = 30.0f;
+    Mesh m = tubeSweep(s);
+    CHECK(watertight(m) && oriented(m) && signedVolume(m) > 0.0);
+    CHECK(std::abs(quarterDiff(cornerAngle(m, 0.0f, tol), start)) < 1.0);
+    const double half = quarterDiff(cornerAngle(m, 1.0f, tol), start), end = quarterDiff(cornerAngle(m, 2.0f, tol), start);
+    CHECK(std::abs(std::abs(end) - 30.0) < 1.5);                 // the whole twist at the end
+    CHECK(std::abs(half - end / 2.0) < 1.5 && half * end > 0.0); // linear along the length
+    // Spin: degrees per radius of length (0.25): 20 degrees at x = 0.5 is 40.
+    TubeShape p = squareLine();
+    p.spin = 20.0f;
+    CHECK(std::abs(std::abs(quarterDiff(cornerAngle(tubeSweep(p), 0.5f, tol), start)) - 40.0) < 1.5);
+    // Twist the other way for the mirror copy: the X mirror of a twisted tube is its mirror image.
+    TubeShape q = squareLine();
+    q.twist = 40.0f;
+    q.points = {{vec3(0.5f, 0, 0), 0.25f}, {vec3(1.5f, 0, 0.5f), 0.25f}, {vec3(2.5f, 0, 0), 0.25f}};
+    Mesh both = tubeSweep([&] { TubeShape x = q; x.mirrorX = true; return x; }());
+    CHECK(watertight(both) && oriented(both));
+    const Mesh a = tubeSweep(q), b = tubeSweep(tubeMirrored(q));
+    CHECK(a.vertexCount() == b.vertexCount());
+    for (size_t i = 0; i < a.vertexCount(); i += 7)
+        CHECK(glm::distance(vec3(-a.positions[i].x, a.positions[i].y, a.positions[i].z), b.positions[i]) < 1e-4f);
+    // No twist and no spin: exactly the old sweep.
+    TubeShape plain = squareLine();
+    plain.roll = 10.0f;
+    CHECK(tubeSweep(plain).positions == tubeSweep([&] { TubeShape x = plain; x.twist = x.spin = 0.0f; return x; }()).positions);
+}
+
+TEST(tube_profiles_rope_braid_sleeve) {
+    const float R = 0.25f, L = 2.0f, pi = 3.14159265f;
+    // Sleeve: a hollow tube with open ends; wall = 0.5 * spread of the radius. Volume of the wall.
+    TubeShape sl = line(L, R);
+    sl.profile = TubeShape::Profile::Sleeve;
+    sl.spread = 0.5f;
+    Mesh m = tubeSweep(sl);
+    CHECK(watertight(m) && oriented(m));
+    const double wall = 0.25, inner = R * (1.0 - wall);
+    CHECK(std::abs(signedVolume(m) / (pi * (R * R - inner * inner) * L) - 1.0) < 0.04);
+    float rmin = 1e9f, rmax = 0.0f;
+    for (const vec3& p : m.positions) {
+        const float r = std::hypot(p.y, p.z);
+        rmin = std::min(rmin, r), rmax = std::max(rmax, r);
+    }
+    CHECK(std::abs(rmax - R) < 1e-4f && std::abs(rmin - float(inner)) < 1e-4f); // open: nothing on the axis
+    CHECK(m.facegroups.size() == m.triangleCount());
+    // Rope: three strands inside the radius, each a closed tube; they wind round the axis.
+    TubeShape rope = line(L, R);
+    rope.profile = TubeShape::Profile::Rope;
+    m = tubeSweep(rope);
+    CHECK(watertight(m) && oriented(m) && signedVolume(m) > 0.0 && components(m) == 3);
+    float reach = 0.0f;
+    for (const vec3& p : m.positions) reach = std::max(reach, std::hypot(p.y, p.z));
+    CHECK(reach < R * 1.01f && reach > R * 0.97f);
+    // Strands touch at spread 0.5 and are fused at 0, apart at 1: the covered volume falls as they separate.
+    rope.spread = 0.0f;
+    const double fused = signedVolume(tubeSweep(rope));
+    rope.spread = 1.0f;
+    CHECK(fused > signedVolume(tubeSweep(rope)));
+    // Rope turns with Twist: the strand positions at the end differ from the untwisted rope's.
+    TubeShape tw = line(L, R);
+    tw.profile = TubeShape::Profile::Rope;
+    tw.twist = 90.0f;
+    const Mesh t0 = tubeSweep(line(L, R)), t1 = tubeSweep(tw);
+    CHECK(watertight(t1) && t1.vertexCount() > 0 && t0.vertexCount() > 0);
+    // Braid: wide across, shallow in depth (the first ring's normal is automatic, so look at both axes).
+    TubeShape br = line(L, R);
+    br.profile = TubeShape::Profile::Braid;
+    br.up = vec3(0, 0, 1);
+    m = tubeSweep(br);
+    CHECK(watertight(m) && oriented(m) && components(m) == 3);
+    float across = 0.0f, deep = 0.0f;
+    for (const vec3& p : m.positions) across = std::max(across, std::abs(p.y)), deep = std::max(deep, std::abs(p.z));
+    CHECK(across > 0.97f * R && across < 1.01f * R && deep < 0.8f * R);
+    // A one-point rope or sleeve is just a ball.
+    TubeShape ball;
+    ball.points = {{vec3(0), 0.2f}};
+    ball.profile = TubeShape::Profile::Sleeve;
+    CHECK(watertight(tubeSweep(ball)));
+}
+
+TEST(curve_part_resample_and_tube_from_curve) {
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "tube_new", {{"points", std::string("0,0,0 1,0.5,0 2,0,0.4 3,0.3,0.1")}, {"radius", 0.1}, {"curve", true}}).ok);
+    doc.selectPart(1);
+    CHECK(doc.mesh.tube.curve && doc.parts[1].name == "Curve" && watertight(doc.mesh));
+    const double wireVolume = signedVolume(doc.mesh);
+    CHECK(!reg.execute(doc, "tube_new", {{"points", std::string("0,0,0 1,0,0")}, {"curve", true}, {"merge", true}}).ok);
+    CHECK(!reg.execute(doc, "tube_bake").ok);
+    CHECK(!reg.execute(doc, "tube_resample", {{"count", 1.0}}).ok);
+    for (double n : {2.0, 9.0, 40.0}) {
+        CHECK(reg.execute(doc, "tube_resample", {{"count", n}}).ok);
+        CHECK(doc.mesh.tube.points.size() == size_t(n) && doc.mesh.tube.curve && tubeMatchesMesh(doc.mesh));
+    }
+    CHECK(reg.execute(doc, "undo").ok && doc.mesh.tube.points.size() == 9);
+    // Saved with the project.
+    const std::string path = tempPath("sf_curve.sfproj");
+    std::string err;
+    CHECK(saveProject(path, doc, err));
+    Document back;
+    CHECK(loadProject(path, back, err));
+    back.selectPart(1);
+    CHECK(back.mesh.tube.curve && back.mesh.tube.points.size() == 9 && tubeMatchesMesh(back.mesh));
+    std::filesystem::remove(path);
+    // Tube from curve: the Tube tool's sweep with the chosen profile and modifiers.
+    CHECK(!reg.execute(doc, "tube_from_curve", {{"radius", -1.0}}).ok);
+    CHECK(reg.execute(doc, "tube_from_curve", {{"radius", 0.15}, {"profile", std::string("rope")}, {"twist", 45.0}, {"spread", 0.6}}).ok);
+    const TubeShape& t = doc.mesh.tube;
+    CHECK(!t.curve && t.profile == TubeShape::Profile::Rope && t.twist == 45.0f && t.spread == 0.6f && t.points[0].radius == 0.15f);
+    CHECK(signedVolume(doc.mesh) > 20.0 * wireVolume && watertight(doc.mesh));
+    CHECK(!reg.execute(doc, "tube_from_curve").ok); // no longer a curve
+    CHECK(reg.execute(doc, "tube_resample", {{"count", 12.0}}).ok && doc.mesh.tube.points.size() == 12);
+    CHECK(reg.execute(doc, "undo").ok && reg.execute(doc, "undo").ok && doc.mesh.tube.curve);
+    CHECK(reg.execute(doc, "tube_list").message.find("a curve") != std::string::npos);
+    CHECK(reg.execute(doc, "tube_set", {{"profile", std::string("zigzag")}}).message.find("braid") != std::string::npos);
+}

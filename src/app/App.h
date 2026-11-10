@@ -1581,6 +1581,8 @@ private:
     bool tubeLookEditing_ = false; // a Shape slider is held: the active Tube Part previews it
     Mesh tubeLookBefore_;          // (its mesh before, put back before the one undo step)
     bool tubeMerge_ = false;       // into the active Part (even edges) instead of a new Tube Part
+    bool tubeCurve_ = false;       // each stroke makes a Curve Part (a guide line; Tube from curve makes the tube)
+    float tubeResampleEdit_ = -1.0f; // the Resample slider while held (the point count), else -1
     bool tubeBakeUniform_ = false; // Bake re-sweeps with even edges (dynamic topology)
     int tubeSelected_ = -1;
     float tubeRadiusEdit_ = -1.0f; // the selected point's Radius slider while it is held

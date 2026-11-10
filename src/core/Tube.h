@@ -5,7 +5,9 @@
 // Catmull-Rom through control points, each with its own radius) and a tube is swept along it: rings placed
 // adaptively (closer where the curve bends), oriented by rotation-minimizing frames (double reflection), so the
 // tube never twists. The cross-section is round, square, triangular or a flat ribbon, turned and tapered as asked;
-// the ends are round or flat. A Tube Part keeps its curve in Mesh::tube and its triangles are
+// the ends are round or flat. Rope and Braid are three strands round the curve, Sleeve is hollow with open ends; Twist
+// and Spin turn the cross-section along the length. A Curve Part is the same data swept as a thin wire (only the guide
+// line): Resample sets its point count exactly, and Tube from curve makes it a tube. A Tube Part keeps its curve in Mesh::tube and its triangles are
 // made from it, so the points can be moved and resized until Bake makes it a plain, sculptable mesh. Merged into
 // the active Part instead, the tube is swept with even edge lengths (rings with as many sides as their size
 // needs), which suits dynamic topology. Every change is one undo step.
@@ -47,7 +49,11 @@ std::vector<TubePoint> tubeFromStroke(const std::vector<TubePoint>& samples, flo
 // (at least 2), or earlier when the next would change it by more than `tolerance` radii (0 = no limit).
 std::vector<TubePoint> tubeSimplify(const std::vector<TubePoint>& points, float keep, float tolerance = 0.0f);
 
-// "round", "square", "triangle", "ribbon".
+// Exactly `count` (2..kTubeMaxPoints) points evenly spaced along the smooth curve through `points`, radii blended
+// between them; the first and last stay as they were. Empty for fewer than two distinct points.
+std::vector<TubePoint> tubeResample(const std::vector<TubePoint>& points, size_t count);
+
+// "round", "square", "triangle", "ribbon", "rope", "braid", "sleeve".
 const char* tubeProfileName(TubeShape::Profile p);
 bool parseTubeProfile(const std::string& name, TubeShape::Profile& out);
 
@@ -95,7 +101,8 @@ TubeShape tubeFromJson(const Json& json);
 // `radius`.
 bool parseTubePoints(const std::string& text, float radius, std::vector<TubePoint>& out, std::string& error);
 
-// tube_new, tube_list, tube_set_point, tube_insert_point, tube_delete_point, tube_set, tube_simplify, tube_bake.
+// tube_new (curve=true: a Curve Part), tube_list, tube_set_point, tube_insert_point, tube_delete_point, tube_set,
+// tube_simplify, tube_resample, tube_from_curve, tube_bake.
 void registerTubeCommands(CommandRegistry& registry);
 
 } // namespace sf

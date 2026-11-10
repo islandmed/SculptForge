@@ -32,7 +32,7 @@ will be. Press **Draw Tube** again, <kbd>Esc</kbd>, any brush, or **Draw** / **M
 | **Snap to surfaces** | On by default: where the pen is over a surface, the tube lies on it, half sunk in, and off it the stroke carries on in the air from where it left the surface. Off: every point lies on the drawing plane |
 | **Shape** | The cross-section and taper (below) |
 | **Ends** | **Rounded** or **Flat** |
-| **Result** | **New Part**: each stroke is a Tube Part you can edit. **Merge**: the stroke goes into the active Part |
+| **Result** | **New Part**: each stroke is a Tube Part you can edit. **Merge**: the stroke goes into the active Part. **Curve**: each stroke is a Curve Part (below) |
 
 **Symmetry** (<kbd>X</kbd>) draws the mirror copy across the X plane too, and keeps it as you edit the tube.
 
@@ -62,6 +62,31 @@ horns, claws, spikes, tails.
 
 These set new tubes and the selected Tube Part, so you can change the shape after drawing. A slider shows the
 change on the tube as you drag it, and letting go is one undo step.
+
+## Profiles and modifiers
+
+Beside **Circle**, **Square**, **Triangle** and **Ribbon**, three profiles build more than an outline:
+
+- **Rope**: three round strands wound round the curve (rope, cable, twine).
+- **Braid**: three flat strands woven across each other (plaits, straps, braided hair).
+- **Sleeve**: a hollow tube with open ends (sleeves, pipes, bracelets, hoses).
+
+For any profile but Circle, **Twist** turns the cross-section a set number of degrees from the start to the end, and
+**Spin** turns it steadily, so many degrees per tube radius of length (a screw thread). **Spread** is how far apart a
+rope's or braid's strands are (0.5: touching), and for a sleeve how thick the wall is. **Taper** narrows strands and
+walls with the tube. Each one is a live slider on the selected Tube Part and one undo step.
+
+## Curves: draw first, tube later
+
+Set **Result > Curve** and each stroke becomes a **Curve Part**: a thin guide line you draw on or over the surface
+(Snap to surfaces and Depth work as for tubes). Its points move, resize and delete like a tube's.
+
+- **Resample** sets the number of points exactly, evenly spaced along the curve (the ends stay). Fewer points give a
+  smoother curve that is easier to edit.
+- **Tube from curve** turns it into a tube with the Shape, Ends, Taper and the modifiers above. Undo brings the
+  curve back; **Size** sets the tube's thickness when you draw, and the point **Radius** changes it per point.
+
+*Requested by Hameron (FXiT), GABO and Artizmo.*
 
 ## Edit the points
 
@@ -109,10 +134,13 @@ tube_delete_point index=2
 tube_set caps=flat radius_scale=1.5
 tube_set profile=ribbon thickness=0.2 turn=30 taper_end=0.5
 tube_simplify keep=0.5
+tube_new points="0,0,0 1,0.5,0 2,0,0.4" curve=true
+tube_resample count=24
+tube_from_curve radius=0.08 profile=rope twist=180 spread=0.6
 tube_bake uniform=true
 ```
 
-`profile` is `round`, `square`, `triangle` or `ribbon`; `up="x,y,z"` sets which way the cross-section's first flat
+`profile` is `round`, `square`, `triangle`, `ribbon`, `rope`, `braid` or `sleeve` (with `twist`, `spin`, `spread`); `up="x,y,z"` sets which way the cross-section's first flat
 side faces.
 
 Each point is `x,y,z` or `x,y,z,radius`. With `smooth=0.5` the points are treated as raw pen samples: smoothed and
