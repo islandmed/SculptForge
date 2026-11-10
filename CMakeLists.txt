@@ -373,7 +373,7 @@ target_link_libraries(sculptforge-cli PRIVATE sculptforge_core sculptforge_ai sc
 if(SCULPTFORGE_BUILD_APP OR SCULPTFORGE_BUILD_TESTS)
   add_library(sculptforge_appshared STATIC src/app/AssetLibrary.cpp src/app/BrushPreview.cpp src/app/UiLayout.cpp
     src/app/ShellGeometry.cpp src/app/LookSchemes.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp
-    src/app/I18nTraditionalChinese.cpp src/app/I18nSimplifiedChinese.cpp src/app/ConnectAi.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
+    src/app/I18nTraditionalChinese.cpp src/app/I18nSimplifiedChinese.cpp src/app/StartupSplash.cpp src/app/ConnectAi.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
   target_link_libraries(sculptforge_appshared PUBLIC sculptforge_core)
   if(MSVC)
     target_compile_options(sculptforge_appshared PRIVATE /W4 /utf-8 /permissive-)
@@ -406,6 +406,8 @@ if(SCULPTFORGE_BUILD_APP)
     fontCjkSc ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansSC-UI.otf # Simplified Chinese (the same tool)
     appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png # the cube app icon: window, title bar (BrandMark.cpp)
     appIconSmall ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-32.png # its small cut (up to 32 px)
+    splashWordmark ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/splash-wordmark.png # the start-up splash: wordmark and brand bust
+    splashBust ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/splash-bust.png # (StartupSplashWindow.cpp; the bust is website/press/sculptforge-bust-1024.png at 576 px, 256 colours)
     bustMark ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/bust/bust-256.png # the illustration: About, What's New, support card
     supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt # Help > About (never empty: it starts with comments)
     foundingMembers ${CMAKE_CURRENT_SOURCE_DIR}/website/founding.json) # Help > About and the membership card
@@ -417,6 +419,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/main.cpp
     src/app/Bench.cpp
     src/app/Calibration.cpp
+    src/app/StartupSplashWindow.cpp
     src/app/OptimisticBench.cpp
     src/app/PanelPerformanceProfile.cpp
     src/app/PanelHardwareTier.cpp

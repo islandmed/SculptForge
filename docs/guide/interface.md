@@ -576,6 +576,7 @@ Layout keeps it.
 |---|---|---|
 | **Look**, **Outlines** and **Layout** | Forge Terminal, Neutral, Subtle, SculptForge | See [Looks and layouts](#looks-and-layouts) |
 | **Language** | English | The interface language: **English**, **Español**, Traditional Chinese or Simplified Chinese (see below) |
+| **Show startup splash** | On | The SculptForge logo and version while a slow start runs; a quick start (under about a third of a second) shows nothing. Applies at the next start |
 | **Ctrl+hover help** | On | Ctrl-hover help boxes |
 | **Help box opacity** | 0.97 | How solid the help box is |
 | **Tooltip delay** | 0.5 s | How long to point at an icon-only button before its name appears |

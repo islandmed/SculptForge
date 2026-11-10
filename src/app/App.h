@@ -89,6 +89,10 @@
 #include <utility>
 #include <vector>
 
+namespace sf::splash {
+class Window; // StartupSplashWindow.h
+}
+
 namespace sf::ai {
 class ChildProcess; // ai/Process.h (the updater's restart)
 }
@@ -133,6 +137,7 @@ struct AppOptions {
     // --benchmark-script take.sfui: the take (a UI test script's input) played in real time with the benchmark HUD,
     // video and a per-frame CSV (BenchTake.cpp); benchmark is set too (isolated settings, --size 1920x1080).
     std::string benchmarkScript;
+    std::string splashShotPath; // --splash-shot FILE: the start-up splash as a PNG at --size, no window (StartupSplash.h)
 };
 
 class Demo;
@@ -159,6 +164,8 @@ public:
     bool init(const AppOptions& options);
     const std::string& startError() const { return startError_; } // why init failed, for the message box (#109)
     int run(); // returns the process exit code
+    static std::string splashVersionLine(); // "Version 0.12.2 Beta 1" in the interface language
+    void closeSplash(); // the start-up splash goes (the main window drew its first frame, or start-up failed)
     // Redraw on demand (#14): the interactive loop sleeps in SDL_WaitEventTimeout until an event, a background
     // job or an animation needs a new frame. UI tests and recordings (runRecording) draw every frame as before.
     bool backgroundBusy() const; // a background job runs (also the UI tests' wait_idle)
@@ -2307,6 +2314,13 @@ private:
     static WindowState loadWindowState();
     void saveWindowState() const;
     bool rememberWindow_ = false;
+    // The start-up splash (StartupSplash.h): with it enabled the main window starts hidden; it shows after its first
+    // frame, and the splash (opened at a start-up step once start-up is past 300 ms) closes then.
+    std::unique_ptr<splash::Window> splash_;
+    bool splashEnabled_ = false, splashShown_ = false, mainWindowHidden_ = false;
+    std::chrono::steady_clock::time_point startedAt_;
+    void splashCheckpoint(); // between start-up steps
+    void revealMainWindow(); // after the first frame
     void drawAxisGizmo();
     std::array<AxisGizmoEnd, 6> axisGizmoLayout() const; // the gizmo's ends on screen now (AxisGizmo.h)
     glm::vec2 axisGizmoCentre() const;                  // the centre of its disc

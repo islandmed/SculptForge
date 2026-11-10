@@ -1342,6 +1342,10 @@ double Demo::query(const std::string& name, bool& known) const {
         for (std::string row; std::getline(in, row);) n += row.find(what) != std::string::npos ? 1.0 : 0.0;
         return n;
     }
+    if (name == "startup_splash_pref") return app_.uiPrefs_.startupSplash ? 1.0 : 0.0; // Preferences > Interface
+    if (name == "startup_splash_enabled") return app_.splashEnabled_ ? 1.0 : 0.0;      // (never in a test: StartupSplash.h)
+    if (name == "startup_splash_open") return app_.splash_ ? 1.0 : 0.0;
+    if (name == "main_window_hidden") return app_.mainWindowHidden_ ? 1.0 : 0.0;
     if (name == "backface_culling") return app_.renderSettings_.backfaceCulling ? 1.0 : 0.0;
     if (name == "detached_panels") return double(app_.panelWindows_.size()); // in windows of their own (PanelWindows.cpp)
     if (name == "floor_grid") return app_.renderSettings_.floorGrid ? 1.0 : 0.0;

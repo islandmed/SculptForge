@@ -677,6 +677,9 @@ constexpr Entry kTraditionalChinese[] = {
     {"Default shortcuts", "預設快速鍵"},
     // --- Preferences > Display, Library, Tablet, Performance, Updates, Autosave ---
     {"Show at startup", "啟動時顯示"},
+    {"Show startup splash", "顯示啟動畫面"},
+    {"Show the SculptForge logo while a slow start runs. A quick start shows nothing. Applies at the next start.",
+     "啟動較慢時顯示 SculptForge 標誌。快速啟動時不顯示。下次啟動時生效。"},
     {"Show Library at startup", "啟動時顯示資源庫"},
     {"Placement", "位置"},
     {"Top", "上方"},

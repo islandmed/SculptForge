@@ -15,6 +15,8 @@
 #include "app/UiScale.h"
 #include "app/AirStroke.h"
 #include "app/I18n.h"
+#include "app/StartupSplash.h"
+#include "app/StartupSplashWindow.h"
 #include "app/AsyncStroke.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
@@ -67,6 +69,7 @@
 #include <cfloat>
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 #include <iterator>
 #include <memory>
 #include <thread>
@@ -137,6 +140,7 @@ App::~App() = default;
 
 bool App::init(const AppOptions& options) {
     options_ = options;
+    startedAt_ = std::chrono::steady_clock::now();
     StartupTimer timer;
     const bool recording = !options.recordPath.empty() || !options.uiTest.empty();
     const bool headless = !options.renderPath.empty() || recording || !options.timelapsePath.empty();
@@ -160,6 +164,26 @@ bool App::init(const AppOptions& options) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return false;
     }
+    // The start-up splash (StartupSplash.h): the main window starts hidden, and shows after its first frame. Never for
+    // tests, renders, recordings, benchmarks or a window system that draws nowhere (SDL_VIDEO_DRIVER=offscreen).
+    {
+        splash::Setting setting;
+        setting.interactive = !headless && options.demo.empty() && !sharedWindow_ && !options.benchmark &&
+                              options.benchmarkScript.empty() && options.measureIdle <= 0.0f && options.measureStroke <= 0.0f;
+        const char* off = std::getenv("SF_STARTUP_SPLASH"); // SF_STARTUP_SPLASH=0: not this run (comparisons, bug reports)
+        if (off && *off == '0') setting.interactive = false;
+        const char* driver = SDL_GetCurrentVideoDriver();
+        setting.videoDriver = driver ? driver : "";
+        if (setting.interactive && !setting.videoDriver.empty()) { // (ui.json is read in full later: this is only the two settings)
+            if (const std::string dir = userDataDir(); !dir.empty()) {
+                std::ifstream in(std::filesystem::path(std::u8string(dir.begin(), dir.end())) / "ui.json", std::ios::binary);
+                const std::string text((std::istreambuf_iterator<char>(in)), {});
+                setting.preference = splash::preferenceFromUiJson(text);
+                setLanguage(languageFromCode(splash::languageFromUiJson(text))); // (for the version line; applyLook sets it again)
+            }
+        }
+        splashEnabled_ = splash::enabled(setting);
+    }
     if (!headless) macmenu::install(); // SculptForge > Preferences... in the macOS app menu (#111)
     // Joysticks for a 3Dconnexion SpaceMouse (SpaceMouse.cpp). Not fatal: the app works without them.
     if (!headless || !options.uiTest.empty()) {
@@ -170,7 +194,7 @@ bool App::init(const AppOptions& options) {
     glWindowAttributes();
 
     const SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
-                                  (headless ? SDL_WINDOW_HIDDEN : 0) |
+                                  ((headless || splashEnabled_) ? SDL_WINDOW_HIDDEN : 0) |
                                   (options.fullscreen && !headless ? SDL_WINDOW_FULLSCREEN : 0);
     const bool sized = recording || options.benchmark; // proof mode: --size (1920x1080 by default)
     rememberWindow_ = !sized && !headless && options.demo.empty() && !options.fullscreen;
@@ -187,6 +211,7 @@ bool App::init(const AppOptions& options) {
         SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
         return false;
     }
+    mainWindowHidden_ = splashEnabled_;
     wintab_.open(window_); // Windows: pressure from a tablet driver without Windows Ink (Wintab.h)
     // Focused from the start when the window system says so: the FOCUS_GAINED event can come before the loop runs.
     windowFocused_ = (SDL_GetWindowFlags(window_) & SDL_WINDOW_INPUT_FOCUS) != 0;
@@ -225,6 +250,7 @@ bool App::init(const AppOptions& options) {
     SDL_GL_MakeCurrent(window_, glContext_);
     SDL_GL_SetSwapInterval(1);
     timer.step("window, GL context");
+    splashCheckpoint();
 
     if (const char* missing = sharedContext_ ? nullptr // (loaded by the server)
                               : gl::load([](const char* n) { return reinterpret_cast<gl::GenericProc>(SDL_GL_GetProcAddress(n)); })) {
@@ -244,6 +270,7 @@ bool App::init(const AppOptions& options) {
     if (!headless && options.demo.empty() && !sharedWindow_) gpuChoiceStarted(); // (the chosen card works)
     if (!gpuNotice.empty()) status_ = gpuNotice;
     timer.step("renderer");
+    splashCheckpoint();
     renderer_.setEnvironmentWake([] { wakeMainLoop(); }); // (PBR view: a new environment's lighting is ready)
     // Fill layers ask for Mesh Maps: the app bakes them on a worker thread (PanelFill.cpp, updateMeshMaps).
     setMeshMapRequester([this](Document&) { meshMapsWanted_ = true; });
@@ -290,6 +317,7 @@ bool App::init(const AppOptions& options) {
     uiScale_ = targetUiScale(); // the style follows in applyLook below
     buildUiFonts(uiScale_);
     timer.step("ImGui, settings, fonts");
+    splashCheckpoint();
     if (recording || !options.benchmarkScript.empty()) { // (a benchmark take: the same scripts)
         ImGui::GetCurrentContext()->TestEngineHookItems = true; // lets the demo find buttons by label
         io.IniFilename = nullptr;                               // fixed, reproducible layout
@@ -301,6 +329,7 @@ bool App::init(const AppOptions& options) {
     for (int i = 0; i < int(FileAction::Count); ++i) dialogRequests_[i] = {this, FileAction(i)};
     initBrushLibrary(); // before a project can bring its own brushes
     timer.step("look, brush library");
+    splashCheckpoint();
     initProject(); // before opening anything, so it lands in the recent files
     initActions(); // the default shortcuts and every command, for keys, help and the command palette
     initBrushSettings(); // each brush's own size, intensity, stroke and alpha (#78)
@@ -308,8 +337,10 @@ bool App::init(const AppOptions& options) {
     initPhoneActions(); // File > Capture from phone (PanelPhone.cpp)
     initLibraryBrowser();
     timer.step("project, actions, library");
+    splashCheckpoint();
     runCommand("new_sphere");
     timer.step("new sphere");
+    splashCheckpoint();
     if (!options.openPath.empty()) openPath(options.openPath);
     if (!options.script.empty()) {
         std::vector<ScriptStatement> statements;
@@ -339,11 +370,13 @@ bool App::init(const AppOptions& options) {
     }
     initHardwareProfile(); // the cached hardware profile, or calibration over the first frames (PanelPerformanceProfile.cpp)
     timer.step("hardware profile");
+    splashCheckpoint();
     initialised_ = true;
     return true;
 }
 
 void App::shutdown() {
+    closeSplash(); // (before SDL_Quit)
     if (!initialised_) { // init stopped early (no window or no OpenGL): nothing but SDL to take down
         if (sharedWindow_) return; // --ui-serve: the server's window, context and SDL stay
         if (glContext_) SDL_GL_DestroyContext(glContext_);
@@ -385,6 +418,38 @@ void App::shutdown() {
     if (glContext_) SDL_GL_DestroyContext(glContext_);
     if (window_) SDL_DestroyWindow(window_);
     SDL_Quit();
+}
+
+void App::splashCheckpoint() {
+    if (!splashEnabled_) return;
+    if (splash_) {
+        splash_->pump();
+        return;
+    }
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - startedAt_).count();
+    if (!splash::due(true, splashShown_, ms)) return;
+    splashShown_ = true; // (once: a window system that said no isn't asked again)
+    auto window = std::make_unique<splash::Window>();
+    if (window->open(splashVersionLine())) {
+        splash_ = std::move(window);
+        SDL_Log("Start-up splash shown after %.0f ms", ms);
+    }
+}
+
+void App::revealMainWindow() {
+    mainWindowHidden_ = false;
+    if (window_) {
+        SDL_ShowWindow(window_);
+        SDL_RaiseWindow(window_);
+    }
+    activeUntil_ = std::max(activeUntil_, double(SDL_GetTicksNS()) * 1e-9 + 0.5); // (a few frames for the window system to map it)
+    closeSplash();
+}
+
+std::string App::splashVersionLine() { return std::string(tr("Version")) + " " + appVersionLabel(); }
+
+void App::closeSplash() {
+    splash_.reset();
 }
 
 void App::glWindowAttributes() {
@@ -1312,6 +1377,7 @@ int App::run() {
         // (the input lag doesn't grow): the last frame's GPU work is done before this one is shown.
         waitLastFrame();
         SDL_GL_SwapWindow(window_);
+        if (mainWindowHidden_) revealMainWindow(); // the first frame is on the window: show it, the splash goes
         lastFrameFence_ = gl::FenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
         gl::Flush(); // (to the GPU now: an offscreen swap sends nothing)
         drawPanelWindows(false); // panels in windows of their own (PanelWindows.cpp), after the main window's swap

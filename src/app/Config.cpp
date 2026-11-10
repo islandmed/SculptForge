@@ -91,6 +91,7 @@ Json toJson(const UiPrefs& p) {
     j.set("autoCollapseRight", p.autoCollapseRight);
     j.set("uiScale", double(p.uiScale));
     j.set("libraryAtStartup", p.libraryAtStartup);
+    j.set("startupSplash", p.startupSplash);
     j.set("libraryFolder", p.libraryFolder);
     j.set("cameraNotch", double(p.cameraNotch));
     j.set("orbitLock", std::string(orbitLockName(p.orbitLock)));
@@ -181,6 +182,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.autoCollapseRight = j["autoCollapseRight"].asBool(p.autoCollapseRight);
     p.uiScale = std::clamp(float(j["uiScale"].asNumber(p.uiScale)), 0.0f, 3.0f);
     p.libraryAtStartup = j["libraryAtStartup"].asBool(p.libraryAtStartup);
+    p.startupSplash = j["startupSplash"].asBool(p.startupSplash);
     if (j["libraryFolder"].isString()) p.libraryFolder = j["libraryFolder"].asString();
     p.cameraNotch = std::clamp(int(j["cameraNotch"].asNumber(p.cameraNotch)), 0, 2);
     if (j["turntable"].asBool(false)) p.orbitLock = 1;
@@ -1677,6 +1679,10 @@ void drawInterfaceSection(App& app) {
             "OBJ and PLY files have no units. Their numbers are read in this unit (mm for most 3D printing files, m for "
             "Blender and game tools), and exporting OBJ or PLY writes them back in the unit they were opened with, so "
             "a part keeps its size. STL is always millimetres.");
+    ImGui::Checkbox(tr("Show startup splash"), &p.startupSplash);
+    ui::HelpText("Show startup splash", nullptr,
+                 "Show the SculptForge logo while a slow start runs. A quick start shows nothing. Applies at the next start.",
+                 "Preferences > Interface");
     ImGui::Checkbox(tr("Ctrl+hover help"), &p.popupInfo);
     ui::HelpText("Ctrl+hover help", nullptr,
                  "Hold Ctrl and point at any control to see what it does and its shortcut. Ctrl+Alt shows a command's "
