@@ -10,10 +10,12 @@
 #include "core/FaceGroups.h"
 #include "core/Multires.h"
 #include "core/Primitives.h"
+#include "core/Project.h"
 #include "core/Parts.h"
 #include "io/ObjIO.h"
 
 #include <cmath>
+#include <filesystem>
 #include <set>
 
 using namespace sf;
@@ -94,6 +96,46 @@ TEST(part_document_basics) {
     CHECK(reg.execute(doc, "part_append").ok);
     CHECK(reg.execute(doc, "new_plane", {{"resolution", 4.0}}).ok);
     CHECK(doc.partCount() == 1 && doc.activePartInfo().name == "Plane");
+}
+
+// Solo remembers what was shown when it began and puts exactly that back (a hidden Part stays hidden).
+TEST(part_solo_restores_hidden_parts) {
+    Document doc;
+    CommandRegistry reg;
+    doc.setMesh(makeCube(4, 2.0f), "A");
+    for (const char* n : {"B", "C", "D"}) {
+        CHECK(reg.execute(doc, "part_append", {{"type", std::string("cube")}}).ok);
+        doc.activePartInfo().name = n;
+    }
+    CHECK(reg.execute(doc, "part_visibility", {{"index", 0.0}, {"visible", false}}).ok); // hide A
+    CHECK(reg.execute(doc, "part_select", {{"name", std::string("B")}}).ok);
+    CHECK(reg.execute(doc, "part_solo").ok);
+    CHECK(!doc.parts[0].visible && doc.parts[1].visible && !doc.parts[2].visible && !doc.parts[3].visible);
+
+    // The project keeps Solo's memory (save / load while in Solo).
+    const std::string path = (std::filesystem::temp_directory_path() / "sf_solo_hidden.sfproj").string();
+    std::string err;
+    CHECK(saveProject(path, doc, err));
+    Document back;
+    CHECK(loadProject(path, back, err));
+    CHECK(reg.execute(back, "part_solo").ok);
+    CHECK(!back.parts[0].visible && back.parts[1].visible && back.parts[2].visible && back.parts[3].visible);
+    std::filesystem::remove(path);
+
+    // During Solo: a new Part, a rename, a delete and a selection change keep the memory.
+    CHECK(reg.execute(doc, "part_select", {{"name", std::string("C")}}).ok);
+    CHECK(reg.execute(doc, "part_rename", {{"to", std::string("Cee")}}).ok);
+    CHECK(reg.execute(doc, "part_delete", {{"name", std::string("D")}}).ok);
+    CHECK(reg.execute(doc, "part_select", {{"name", std::string("B")}}).ok);
+    CHECK(reg.execute(doc, "part_solo").ok); // soloing again after the selection moved: still B alone
+    CHECK(doc.partCount() == 3 && doc.parts[1].visible && !doc.parts[0].visible && !doc.parts[2].visible);
+    CHECK(reg.execute(doc, "part_solo").ok);
+    CHECK(!doc.parts[0].visible && doc.parts[1].visible && doc.parts[2].visible); // A still hidden
+    CHECK(reg.execute(doc, "part_solo").ok); // Solo again (A still hidden); Unhide all then ends its memory
+    CHECK(reg.execute(doc, "part_show_all").ok);
+    CHECK(reg.execute(doc, "part_solo").ok);
+    CHECK(reg.execute(doc, "part_solo").ok);
+    CHECK(doc.parts[0].visible && doc.parts[1].visible && doc.parts[2].visible); // "Unhide all" ended the old memory
 }
 
 TEST(part_cube_primitive) {
