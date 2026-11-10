@@ -5,6 +5,7 @@
 // pattern files. The pattern lives in the project (Document::projectSettings["garment"]).
 #include "core/Commands.h"
 #include "core/Garment.h"
+#include "core/GarmentDrape.h"
 #include "core/GarmentPrint.h"
 #include "core/GarmentTemplates.h"
 
@@ -28,8 +29,10 @@ std::string lower(std::string s) {
     return s;
 }
 
+} // namespace
+
 // A panel by name (any case) or 1-based number.
-bool findPanel(const Pattern& pat, const std::string& ref, uint32_t& out, std::string& error) {
+bool garment::findPanelRef(const garment::Pattern& pat, const std::string& ref, uint32_t& out, std::string& error) {
     for (uint32_t i = 0; i < pat.panels.size(); ++i)
         if (lower(pat.panels[i].name) == lower(ref)) {
             out = i;
@@ -43,6 +46,12 @@ bool findPanel(const Pattern& pat, const std::string& ref, uint32_t& out, std::s
     }
     error = "No panel \"" + ref + "\" in the pattern";
     return false;
+}
+
+namespace {
+
+bool findPanel(const Pattern& pat, const std::string& ref, uint32_t& out, std::string& error) {
+    return findPanelRef(pat, ref, out, error);
 }
 
 bool loadOrFail(const Document& doc, Pattern& pat, CommandResult& r) {
