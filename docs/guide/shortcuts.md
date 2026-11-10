@@ -165,7 +165,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Back view | <kbd>Ctrl</kbd>+<kbd>Numpad 1</kbd> | Look at the model from behind (orthographic). |
 | Bottom view | <kbd>Ctrl</kbd>+<kbd>Numpad 7</kbd> | Look up at the model from below (orthographic). |
 | Draw | <kbd>Q</kbd> | Draw mode: brushes sculpt and paint (leaves the Gizmo). |
-| Frame | <kbd>F</kbd> | Fit the whole model in the view. |
+| Frame | <kbd>F</kbd> | Fit the whole model in the view. Classic sculpting keys, with several Parts: F frames the active Part, F twice quickly frames the whole scene. |
 | Frame Part | <kbd>Numpad .</kbd> | Fit the active Part in the view (Blender: View Selected; Maya keys: Alt+F). |
 | Front view | <kbd>Numpad 1</kbd> | Look at the model from the front (orthographic). |
 | Left view | <kbd>Ctrl</kbd>+<kbd>Numpad 3</kbd> | Look at the model's left side (orthographic). |

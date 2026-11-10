@@ -198,6 +198,12 @@ void App::registerGizmoActions() {
         "snaps. Shift+W again: back to Draw.");
     add("gizmo.reset_pivot", "Reset", ICON_LC_LOCATE_FIXED, kPath, "", [this] { resetGizmoPivot(); }, nullptr,
         "Put the gizmo back at the centre of what moves (the Part, or its unmasked part) with world axes.");
+    add("gizmo.center_origin", "Center on origin", ICON_LC_CROSSHAIR, kPath, "", [this] { originMove("center_origin"); }, nullptr,
+        "Move the Part so the centre of its bounding box sits at the world origin 0,0,0, as one undo step (with "
+        "All Parts: every visible Part together, keeping how they sit to each other).");
+    add("gizmo.drop_floor", "Drop to floor", ICON_LC_ARROW_DOWN_TO_LINE, kPath, "", [this] { originMove("drop_floor"); }, nullptr,
+        "Move the Part straight down (or up) until its lowest point rests on the floor, Y = 0, as one undo step "
+        "(with All Parts: every visible Part together).");
     add("gizmo.snap_pivot", "To Surface", ICON_LC_CROSSHAIR, kPath, "",
         [this] {
             gizmo_.snapNext = !gizmo_.snapNext;
@@ -308,6 +314,16 @@ void App::updateGizmoPivot() {
                                                c & 4 ? local.max.z : local.min.z, 1.0f)));
     }
     gizmo_.pivot = box.valid() ? box.center() : glm::vec3(0.0f);
+}
+
+// Origin tools: center_on_origin / drop_to_floor on what the gizmo moves, then the gizmo follows the Part again.
+void App::originMove(const char* which) {
+    Args args;
+    if (gizmo_.all) args["all"] = true;
+    else if (gizmo_.folder && doc_.activePartInfo().folder) args["folder"] = true;
+    runCommand(std::string(which) == "center_origin" ? "center_on_origin" : "drop_to_floor", args);
+    gizmo_.pivotPlaced = false;
+    gizmo_.centreKey = ~uint64_t(0);
 }
 
 void App::resetGizmoPivot() {
@@ -1110,6 +1126,7 @@ void App::drawGizmoContents(bool compact) {
                  "moves until you place it: Alt+drag the gizmo, Alt+click the model, To Surface, or type here.",
                  kPath);
     ui::Segmented(*this, {"gizmo.reset_pivot", "gizmo.snap_pivot"});
+    ui::Segmented(*this, {"gizmo.center_origin", "gizmo.drop_floor"}); // Origin tools
     ui::Segmented(*this, {"gizmo.orient_world", "gizmo.orient_surface"});
     ui::Segmented(*this, {"gizmo.use_mask", "gizmo.folder", "gizmo.all"});
     float pct = gizmo_.falloff * 100.0f;

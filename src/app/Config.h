@@ -46,6 +46,9 @@ struct UiPrefs {
                                 // Blender's sculpt keys), 3 Maya (Input.cpp). The first-run welcome asks.
     bool inputStyleSaved = false; // ui.json named the style (not saved itself): an install from before 0.10.4
                                   // without it had the Classic sculpting keys and keeps them (PanelProject.cpp)
+    // Classic sculpting keys: F frames the active Part, F twice within this many ms frames the whole scene (a scene
+    // with one Part always frames it whole). 0: F always frames the whole scene.
+    int frameDoubleTapMs = 400;
     bool emulateNumpad = false; // Blender style: the 1-9 and 0 keys above the letters act as the numpad (laptops)
     // The order of the asset lists (core/ListSort.h ids "az", "recent", "pack"): brushes, alphas, materials, Library.
     std::string brushSort = "az", alphaSort = "az", materialSort = "az", librarySort = "az";

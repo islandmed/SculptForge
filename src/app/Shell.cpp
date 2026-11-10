@@ -574,8 +574,8 @@ void App::registerShellActions() {
          "Browse, search and install brushes other sculptors shared.");
 
     // View (right shelf, Render palette). Frame keeps F; its short label fits the right shelf.
-    add({"view.frame", "Frame", ICON_LC_SCAN, "Fit the whole model in the view.", "Transform", "F", "",
-         [this] { frameView(sceneBounds()); }, nullptr, nullptr});
+    add({"view.frame", "Frame", ICON_LC_SCAN, "Fit the whole model in the view. Classic sculpting keys, with several Parts: F frames the active Part, F twice quickly frames the whole scene.", "Transform", "F", "",
+         [this] { frameKeyPress(); }, nullptr, nullptr});
         flag("view.wire", "Wire", ICON_LC_GRID_3X3, "Render", "", &renderSettings_.wireframe,
          "Wireframe: show the polygons of the active Part (Shift+F).");
     flag("view.facegroups", "Groups", ICON_LC_SHAPES, "Render", "", &renderSettings_.showFaceGroups,

@@ -99,6 +99,8 @@ will move (the Part, or its unmasked part) and follows it when you change the ma
 | Put the pivot on the surface | <kbd>Alt</kbd>+click the model, or **To Surface** then click the model |
 | Type the pivot | The three numbers under the mode buttons in the Gizmo panel |
 | Go back to the centre, with world axes | **Reset** |
+| Put the Part's bounding-box centre on the world origin 0,0,0 | **Center on origin** (one undo step; with **All Parts** every visible Part moves together and keeps its place among the others) |
+| Rest the Part on the floor (lowest point at Y = 0) | **Drop to floor** |
 
 After a drag the gizmo moves (and with **Surface** axes, turns) with what it moved.
 
