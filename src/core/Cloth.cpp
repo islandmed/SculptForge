@@ -387,7 +387,7 @@ void ClothSim::substep(float h) {
     if (selfPairs_) separateSelf();
     if (!thin_.empty()) separateThin();
     // Pins (soft ones pull toward their target), contact, velocities.
-    const float thickness = fabric_.thickness, friction = std::clamp(fabric_.friction, 0.0f, 1.0f);
+    const float thickness = contactThickness(), friction = std::clamp(fabric_.friction, 0.0f, 1.0f);
     const float invH = 1.0f / h;
     poolFor(n, [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
@@ -421,7 +421,7 @@ void ClothSim::substep(float h) {
 // both ends of each out together along the shared contact normal (the pair moves, not one end), so a seam under
 // contact keeps its gap.
 void ClothSim::holdSeamsOnContact(float h) {
-    const float thickness = fabric_.thickness, invH = 1.0f / h;
+    const float thickness = contactThickness(), invH = 1.0f / h;
     auto push = [&](uint32_t i) {
         if (w_[i] <= 0.0f || !contact_[i]) return;
         for (int k = 0; k < (contact2_[i] ? 2 : 1); ++k) {
@@ -462,7 +462,7 @@ void ClothSim::findContacts(float frame) {
     contactPoint2_.resize(n);
     contactNormal2_.resize(n);
     if (!colliders_ || colliders_->empty()) return;
-    const float thickness = fabric_.thickness;
+    const float thickness = contactThickness();
     poolFor(n, [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
             if (w_[i] <= 0.0f) continue;
@@ -508,7 +508,7 @@ void ClothSim::findThinPairs(float span) {
     thinLastAt_.assign(nt + 1, 0);
     for (const ThinPair& p : thinLast_) ++thinLastAt_[p.tri + 1];
     for (size_t t = 0; t < nt; ++t) thinLastAt_[t + 1] += thinLastAt_[t];
-    const float thickness = fabric_.thickness;
+    const float thickness = contactThickness();
     float fastest = 0.0f;
     glm::vec3 lo(std::numeric_limits<float>::max()), hi(-std::numeric_limits<float>::max());
     for (size_t i = 0; i < x_.size(); ++i) {
@@ -628,7 +628,7 @@ void ClothSim::findThinPairs(float span) {
 // fixed: the corners move by their share, as in a point-triangle constraint). Serial: deterministic.
 void ClothSim::separateThin() {
     const size_t n = x_.size();
-    const float thickness = fabric_.thickness;
+    const float thickness = contactThickness();
     thinDx_.assign(n, glm::vec3(0.0f));
     thinCount_.assign(n, 0.0f);
     for (const ThinPair& p : thin_) {
@@ -679,7 +679,7 @@ void ClothSim::separateThin() {
 // pushed to the nearest surface instead, a sleeve's hem in the crook of an elbow splits across the forearm.
 void ClothSim::leaveColliders() {
     if (!colliders_ || colliders_->empty()) return;
-    const float thickness = fabric_.thickness;
+    const float thickness = contactThickness();
     poolFor(x_.size(), [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
             const glm::vec3 d = outward_[i];
@@ -697,7 +697,7 @@ void ClothSim::leaveColliders() {
 // back in front of it (thickness off), its velocity into the surface removed. Catches what the frame's nearest
 // contact missed: a second, thin feature on the way (a nose or a beard lock past the cheek it was resting on).
 void ClothSim::sweepParticles() {
-    const float thickness = fabric_.thickness;
+    const float thickness = contactThickness();
     poolFor(x_.size(), [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
             if (w_[i] <= 0.0f) continue;

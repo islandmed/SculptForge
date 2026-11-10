@@ -173,6 +173,10 @@ private:
     void leaveColliders(); // (the first frame: particles that start inside go out along outward_)
     void substep(float h);
     void holdSeamsOnContact(float h);
+    // How far off a collider the cloth is held: the fabric's, and at least a fifth of the particle spacing (a
+    // triangle between particles sags into a curved body: 3 mm at 15 mm spacing; a third made a 20 mm bag over a ball
+    // flutter and never rest).
+    float contactThickness() const { return std::max(fabric_.thickness, meanEdge_ / 5.0f); }
 
     Fabric fabric_;
     ClothSettings settings_;

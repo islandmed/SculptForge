@@ -7,5 +7,5 @@ testers:
     rest and the waist and armpit seams look closed.
 ---
 Solver (src/core/Cloth.*): after the contact push each seam is closed again and both ends are pushed out together along the
-contact normal (the pair moves, not one end); the rest window's peak speed is taken over two frames. Fabric thickness for
-garments (5 mm closes the hip poke) is set by the garment drape, not here.
+contact normal (the pair moves, not one end); the rest window's peak speed is taken over two frames. Contact thickness is at least a fifth of the
+particle spacing (3 mm at 15 mm) (the hip poke between particles; a garment drape can ask for more).
