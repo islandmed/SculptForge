@@ -33,7 +33,6 @@ expect_value alpha_index == 24
 run brush_use name="Plank Seams"
 wait 0.2
 expect_value alpha_follow == 1
-run new_plane resolution=200
 snapshot
 stroke 0.2 0.5 0.8 0.5
 expect_value moved > 50
