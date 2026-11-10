@@ -158,6 +158,83 @@ void App::drawLookPicker() {
     }
 }
 
+void App::setInterfaceLanguage(Language lang) {
+    uiPrefs_.language = languageCode(lang);
+    setLanguage(lang);
+    requestUiScale(); // the fonts again, with or without the Chinese glyphs
+}
+
+void App::offerFirstRunLanguage(std::string_view osTag) {
+    const Language lang = languageFromOsLocale(osTag);
+    if (lang == Language::English) return; // not shipped (or English): the welcome's language row is the offer
+    setInterfaceLanguage(lang);
+    languageBar_ = true;
+    languageBarFor_ = lang;
+    languageUnsaved_ = true; // (the first autosave look would take it for what was on disk)
+}
+
+// Each language in its own script, so it can be found from any other; the current one lit.
+void App::drawLanguageRow() {
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(tr("Language:"));
+    for (int i = 0; i < kLanguageCount; ++i) {
+        const Language lang = Language(i);
+        const std::string label = std::string(languageName(lang)) + "##welcome.language." + languageCode(lang);
+        ImGui::SameLine();
+        const float width = ImGui::CalcTextSize(languageName(lang)).x + 2.0f * ImGui::GetStyle().FramePadding.x;
+        if (ImGui::GetContentRegionAvail().x < width) ImGui::NewLine(); // a narrow window: the rest on the next row
+        const bool on = language() == lang;
+        if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+        if (ImGui::Button(label.c_str()) && !on) setInterfaceLanguage(lang);
+        if (on) ImGui::PopStyleColor();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", tr("The language of menus, palettes, shelves and messages. Brush and tool names (Quad Remesh, "
+                                       "Forge Spheres, Clay Block...) stay as they are."));
+    }
+}
+
+void App::openPreferencesSection(const char* subpalette) {
+    auto& open = layout_.openSubpalettes;
+    if (uiPrefs_.oneSubpalette) // as a click on its header would: the other Preferences sections close
+        open.erase(std::remove_if(open.begin(), open.end(), [](const std::string& o) { return o.rfind("preferences.", 0) == 0; }),
+                   open.end());
+    if (std::find(open.begin(), open.end(), subpalette) == open.end()) open.push_back(subpalette);
+    flashSubpalette_ = subpalette;
+    flashSubpaletteStart_ = ImGui::GetTime();
+    if (const Action* a = actions_.find("ui.palette.preferences"); a && a->run) a->run();
+}
+
+// After the first start switched the language by itself: a note along the bottom, in that language and in English.
+void App::drawLanguageBar(const CanvasRect& c) {
+    if (languageBar_ && language() != languageBarFor_) languageBar_ = false; // changed another way: nothing to offer
+    if (!languageBar_ || supportCardOpen()) return;
+    const float s = uiScale_;
+    ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h - 12.0f * s), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+    ImGui::SetNextWindowSize(ImVec2(std::min(500.0f * s, c.w - 32.0f * s), 0.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.96f);
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize |
+                                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav |
+                                   ImGuiWindowFlags_NoTitleBar;
+    bool open = true;
+    if (ImGui::Begin("##languagebar", &open, flags)) {
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextWrapped(tr("SculptForge is in %s."), languageName(languageBarFor_));
+        ImGui::SameLine();
+        if (ImGui::Button(tr("Change##languagebar"))) {
+            openPreferencesSection("preferences.interface");
+            open = false;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(tr("Got it##languagebar"))) open = false;
+        // (English on purpose, whatever the language: someone who can't read the line above can read this one)
+        const std::string english = std::string("SculptForge is in ") + languageName(languageBarFor_) +
+                                    ". Preferences > Interface > Language changes it.";
+        ImGui::TextDisabled("%s", english.c_str());
+    }
+    ImGui::End();
+    if (!open) languageBar_ = false;
+}
+
 void App::drawSupportUi() {
     tickBigMeshTip(); // (here, not in tickProject: this runs every frame, UI tests included)
     const float s = uiScale_;
@@ -171,7 +248,10 @@ void App::drawSupportUi() {
         ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h * 0.3f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         ImGui::SetNextWindowSize(ImVec2(500.0f * s, 0.0f), ImGuiCond_Appearing);
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize;
-        if (ImGui::Begin(tr("Welcome to SculptForge"), &showWelcome_, flags)) {
+        if (ImGui::Begin(tr("Welcome to SculptForge##welcome"), &showWelcome_, flags)) {
+            // The interface language: one click, live (a hook for the mission headline above it, queue item 44).
+            drawLanguageRow();
+            ImGui::Spacing();
             // New to sculpting: the lesson first, big (docs/guide/first-sculpt.md).
             ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
             if (ImGui::Button(tr(ICON_LC_GRADUATION_CAP "  Start the 10-minute lesson##welcome.lesson"), ImVec2(-1, 40.0f * s))) {
@@ -282,6 +362,7 @@ void App::drawSupportUi() {
         ImGui::End();
     }
     drawQuickTour(); // QuickTour.cpp
+    drawLanguageBar(c);
     if (newLookCard_ && !showWelcome_ && !supportCardOpen() && !whatsNew_ && !showWhatsNew_) {
         // Once, after updating from before 0.10.7 (PanelProject.cpp): the new default look, never forced.
         ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h - 16.0f * s), ImGuiCond_Always, ImVec2(0.5f, 1.0f));

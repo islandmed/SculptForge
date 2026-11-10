@@ -1070,6 +1070,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(support_1440 support --size 1440x900)
     sculptforge_ui_test(support_card_1440 support_card --size 1440x900)
     sculptforge_ui_test(support_shots_1024 support/support_shots --size 1024x768)
+    # The first start's language: the OS-language decision, the welcome's language row and the "SculptForge is in..." bar (1440 + 2880).
+    sculptforge_ui_test(first_run_language_1440 first_run_language --size 1440x900)
+    sculptforge_ui_test(first_run_language_2880 first_run_language --size 2880x1800)
     sculptforge_ui_test(help_console_1080 help_console --size 1920x1080)
     # The S / U / I / O slider on a UI scaled 1.5x (Windows at 150%, #9): it must still open under the cursor.
     sculptforge_ui_test(size_popup_scaled size_popup --size 2400x1350)

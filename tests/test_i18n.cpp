@@ -189,6 +189,24 @@ TEST(i18n_language_codes) {
     CHECK(std::string(languageName(Language::SimplifiedChinese)) == "\u7b80\u4f53\u4e2d\u6587");
 }
 
+// The first start (App::offerFirstRunLanguage): the OS's own tag -> a shipped language, from what Windows
+// (es-MX, zh-TW), macOS (zh-Hant-TW, es-419) and Linux (es_ES.UTF-8, zh_CN.UTF-8@x, C) hand over.
+TEST(i18n_os_locale_maps_to_a_shipped_language) {
+    const Language es = Language::Spanish, tc = Language::TraditionalChinese, sc = Language::SimplifiedChinese,
+                   en = Language::English;
+    for (const char* tag : {"es", "es-ES", "es-MX", "es-419", "es_ES.UTF-8", "es_MX.UTF-8@euro", "ES-es", "es:en"})
+        CHECK(languageFromOsLocale(tag) == es);
+    for (const char* tag : {"zh-TW", "zh-HK", "zh-MO", "zh-Hant", "zh-Hant-TW", "zh-Hant-HK", "zh_TW.UTF-8", "zh_HK.utf8",
+                            "zh-tw"})
+        CHECK(languageFromOsLocale(tag) == tc);
+    for (const char* tag : {"zh-CN", "zh-SG", "zh-Hans", "zh-Hans-CN", "zh-Hans-HK", "zh_CN.UTF-8", "zh_SG.UTF-8@x", "zh"})
+        CHECK(languageFromOsLocale(tag) == sc);
+    // Not shipped, English, or no language at all: English (the welcome's language row is the offer).
+    for (const char* tag : {"en-US", "en_GB.UTF-8", "pt-BR", "pt_PT", "fr-FR", "de", "ja-JP", "ko_KR.UTF-8", "esperanto",
+                            "est-EE", "et_EE.UTF-8", "C", "POSIX", "", ".UTF-8", "@euro"})
+        CHECK(languageFromOsLocale(tag) == en);
+}
+
 TEST(i18n_tables_are_well_formed) {
   for (const Language lang : {Language::Spanish, Language::TraditionalChinese, Language::SimplifiedChinese}) {
     std::set<std::string_view> seen;

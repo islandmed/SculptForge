@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/Calibration.h"
+#include "app/I18n.h"
 
 #include "core/ThreadPool.h"
 #include "core/TierConfig.h"
@@ -14,7 +15,9 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <string>
 #include <vector>
 
 #if defined(_WIN32)
@@ -22,6 +25,7 @@
 #include <windows.h>
 #include <dxgi.h>
 #elif defined(__APPLE__)
+#include <CoreFoundation/CoreFoundation.h> // (osLanguageTag; sculptforge_core links it already for the keychain)
 #include <dlfcn.h>
 #endif
 
@@ -704,6 +708,45 @@ int runCalibrateCommandLine(bool quick, bool save) {
     SDL_DestroyWindow(window);
     SDL_Quit();
     return code;
+}
+
+// The language the operating system's interface is in, for the first start's language offer (I18n.h); one code path
+// per OS, the mapping to a shipped language is languageFromOsLocale (tested). Here because this file already has the
+// per-OS includes.
+std::string osLanguageTag() {
+    if (const char* forced = std::getenv("SF_OS_LANGUAGE"); forced && *forced) return forced; // QA: pretend the OS is in this
+#if defined(_WIN32)
+    // The display language Windows was set to (not the regional format): LANGID -> "es-MX", "zh-TW", "zh-CN"...
+    wchar_t name[LOCALE_NAME_MAX_LENGTH] = {};
+    if (LCIDToLocaleName(MAKELCID(GetUserDefaultUILanguage(), SORT_DEFAULT), name, LOCALE_NAME_MAX_LENGTH, 0) <= 0) return {};
+    char utf8[LOCALE_NAME_MAX_LENGTH * 3] = {};
+    if (WideCharToMultiByte(CP_UTF8, 0, name, -1, utf8, int(sizeof utf8), nullptr, nullptr) <= 0) return {};
+    return utf8;
+#elif defined(__APPLE__)
+    // The first of the user's preferred languages: "es-MX", "zh-Hant-TW", "en-US".
+    std::string out;
+    if (CFArrayRef languages = CFLocaleCopyPreferredLanguages()) {
+        if (CFArrayGetCount(languages) > 0) {
+            if (auto first = static_cast<CFStringRef>(CFArrayGetValueAtIndex(languages, 0))) {
+                char buf[128] = {};
+                if (CFStringGetCString(first, buf, sizeof buf, kCFStringEncodingUTF8)) out = buf;
+            }
+        }
+        CFRelease(languages);
+    }
+    return out;
+#else
+    // POSIX order: LC_ALL, then LC_MESSAGES, then LANG; "C" and "POSIX" name no language. (LANGUAGE is a list
+    // that only works when LANG is set: the three above are what a desktop session sets.)
+    for (const char* var : {"LC_ALL", "LC_MESSAGES", "LANG"}) {
+        const char* value = std::getenv(var);
+        if (!value || !*value) continue;
+        const std::string v = value;
+        if (v == "C" || v == "POSIX" || v.rfind("C.", 0) == 0) return {};
+        return v;
+    }
+    return {};
+#endif
 }
 
 } // namespace sf

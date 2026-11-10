@@ -131,6 +131,26 @@ Language languageFromCode(std::string_view code) {
     return Language::English;
 }
 
+Language languageFromOsLocale(std::string_view tag) {
+    // "es_MX.UTF-8@euro" -> "es-mx"; a LANGUAGE-style list ("es:en") -> its first entry.
+    std::string t;
+    for (const char c : tag) {
+        if (c == '.' || c == '@' || c == ':' || c == ',' || c == ';') break;
+        t += c == '_' ? '-' : char((c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c);
+    }
+    const size_t dash = t.find('-');
+    const std::string lang = t.substr(0, dash);
+    const std::string rest = dash == std::string::npos ? "" : t.substr(dash);
+    auto has = [&](const char* part) { return rest.find(part) != std::string::npos; };
+    if (lang == "es" || lang == "spa") return Language::Spanish;
+    if (lang == "zh" || lang == "zho" || lang == "chi") {
+        if (has("-hans")) return Language::SimplifiedChinese;
+        if (has("-hant") || has("-tw") || has("-hk") || has("-mo")) return Language::TraditionalChinese;
+        return Language::SimplifiedChinese;
+    }
+    return Language::English;
+}
+
 const char* languageName(Language language) {
     switch (language) {
     case Language::Spanish: return "Español";

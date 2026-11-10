@@ -1107,6 +1107,7 @@ double Demo::query(const std::string& name, bool& known) const {
         return i < 0 ? -1.0 : app_.doc_.parts[size_t(i)].visible ? -2.0 : double(i);
     }
     if (name == "subdiv_levels") return double(subdivLevelCount(app_.doc_.mesh)); // the active Part's (0: none)
+    if (name == "language_bar_open") return app_.languageBar_ ? 1.0 : 0.0; // the first start's "SculptForge is in..." note
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
     // Help > Quick tour (QuickTour.cpp): open, the slide (1-based), waiting aside after Show me, the one offer.
     if (name == "quick_tour_open") return app_.quickTourOpen_ ? 1.0 : 0.0;
@@ -2729,6 +2730,18 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 }
             }
         });
+    } else if (verb == "first_run_language") {
+        // The first start's language decision (App::offerFirstRunLanguage) for an OS language tag: `os=es-MX`.
+        // UI tests never detect by themselves.
+        std::string os;
+        for (size_t i = 1; i < w.size(); ++i) {
+            if (w[i].rfind("os=", 0) == 0) os = w[i].substr(3);
+            else {
+                error = "first_run_language: unknown option '" + w[i] + "'";
+                return false;
+            }
+        }
+        run([this, os] { app_.offerFirstRunLanguage(os); });
     } else if (verb == "support_card") {
         // The launch decision for the full membership card (Support.h), as a start would make it: `first_run` and
         // `test_mode` (how every UI test, render and CI run starts: never shown).

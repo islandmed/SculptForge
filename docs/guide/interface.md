@@ -596,6 +596,13 @@ and the brush and tool names in English; **Simplified Chinese** (the fourth butt
 characters with mainland terms, drawn with mainland glyph shapes. Anything not translated yet (most Ctrl-help descriptions, this guide) shows in English. Scripts and
 `sculptforge-cli` commands are the same in every language.
 
+**On the first start** SculptForge looks at the language your computer's interface is in (Windows display language, macOS
+preferred language, or `LC_ALL`, `LC_MESSAGES` and `LANG` on Linux). If it is one of the four above it starts in it, with a
+small note along the bottom, *SculptForge is in Español. Change*, in that language and in English; **Change** opens
+Edit > Preferences > Interface. Any other computer language (Portuguese, French...) starts in English, and the **Language** row at
+the top of the welcome shows the four names, each in its own script: one click switches the whole interface. **Help >
+Welcome** shows the row again. Nothing is ever sent anywhere, and the choice is asked once.
+
 **UI scale** also applies at once: text, buttons, shelves and trays resize on the next frame; saved automatically.
 **Automatic** uses the scale of the monitor the window is on (Windows: **Settings > Display > Scale**; macOS and
 Wayland: the display's scaling; X11: the desktop's font DPI). Drag the window to a monitor at another scale, or

@@ -609,6 +609,9 @@ constexpr Entry kTraditionalChinese[] = {
     // --- Preferences > Saving & Layouts ---
     // --- Preferences > Interface ---
     {"Language", "語言"},
+    {"Language:", "語言："},
+    {"Change", "變更"},
+    {"SculptForge is in %s.", "SculptForge 的介面語言是 %s。"},
     {"Units", "單位"},
     {"OBJ/PLY in", "OBJ/PLY 單位"},
     {"Part size", "部件尺寸"},
