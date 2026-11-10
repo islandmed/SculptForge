@@ -47,3 +47,5 @@ sculptforge_tests: adaptive_dabs_leave_small_brushes_alone          21  new on m
 # sphere), ui_make_sculptable (a 30k capture): 9-16 s now.
 # 11-07 (0.11.12 batch): ui_review_fixes split in two (review_fixes + review_fixes_mask_views, each < 20 s); its line is gone.
 ui_mode_matrix                                                     50  every registry action probed (~300) and 22 modes x 8 exits: 34 s on the laptop, 208-582 s on a CI runner; shard by action id (two scripts) when it grows
+ui_make_sculptable                                                 22  29.8 s on the PC in the 0.12.4 stage (9-16 s before): a smaller capture than 30k
+ui_language_panels                                                 16  22.6 s on the PC in the 0.12.4 stage: every panel in four languages; split it per language
