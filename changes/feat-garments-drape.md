@@ -11,7 +11,8 @@ testers:
   - Any OS: File > New from starter > Full Body, Tool > Garments > Templates > T-shirt, Place panels: click the
     chest (front view), the back (behind), each upper arm (from outside and a little above, the arm running up the
     screen). Drape: the shirt closes on the body, shoulders on the shoulders, sleeves round the arms; the status
-    line names the widest seam gap (under 7.5 mm). Convert to Part: a Part "Garment"; Ctrl+Z removes it.
+    line names the widest seam gap (under 7.5 mm). A sleeve cap may puff into a fold; say how it looks. Convert to
+    Part: a Part "Garment"; Ctrl+Z removes it.
   - Windows: drape the T-shirt on the Full Body; it comes to rest within about 10 s.
 ---
 Part 3 of docs/design/garments.md. Placement is by hand only (see "Do not build").
