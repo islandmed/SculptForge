@@ -66,7 +66,7 @@
 //                            tier card is shown again unless the saved hardware profile put it away
 //   env NAME VALUE           set an environment variable; $SCRIPT_DIR is the script's folder
 //   generator_stub SHAPE...  Generate 3D answers from a stub instead of any service (never the network): candidate
-//                            N (A first) gets the Nth shape (cycling): sphere cube torus capsule cone, or fail; off = the services
+//                            N (A first) gets the Nth shape (cycling): sphere cube torus capsule cone, or fail, textoff, nomodel (the free Spaces' real refusal / empty answers); off = the services
 //   input_style STYLE        classic, sculptforge (the default), blender or maya, as Preferences > Input sets it
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
 //                            directory), e.g. to stage what another program would write (the Blender bridge);
@@ -337,6 +337,7 @@
 //   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 classic, 1 SculptForge)
 #include "app/App.h"
 #include "ai/Http.h"
+#include "ai/GradioClient.h"
 #include "ai/ImageTo3DService.h"
 
 #ifndef SDL_PEN_INPUT_IN_PROXIMITY
@@ -2579,7 +2580,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         std::vector<std::string> shapes(w.begin() + 1, w.end());
         for (const std::string& shape : shapes)
             if (shape != "off" && shape != "sphere" && shape != "cube" && shape != "torus" && shape != "capsule" &&
-                shape != "cone" && shape != "fail") {
+                shape != "cone" && shape != "fail" && shape != "textoff" && shape != "nomodel") {
                 error = "unknown generator_stub shape '" + shape + "'";
                 return false;
             }
@@ -2588,6 +2589,12 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             ai::setGeneratorStubForTests([shapes](int candidate, const std::string& stem) {
                 const std::string& shape = shapes[size_t(candidate) % shapes.size()];
                 ai::GeneratorResult r;
+                if (shape == "textoff" || shape == "nomodel") { // the real wording of a Space refusing / returning nothing
+                    r.error = shape == "textoff" ? "Hunyuan3D 2 mini Turbo (Tencent) - free, fast: " +
+                                                       ai::friendlyGradioError("'Text to 3D is disable. Please enable it by `python gradio_app.py --enable_t23d`.'")
+                                                 : "Hunyuan3D 2 (Tencent) - free finished without a model: try again or another provider";
+                    return r;
+                }
                 if (shape == "fail") {
                     r.error = "The stub service said no";
                     return r;

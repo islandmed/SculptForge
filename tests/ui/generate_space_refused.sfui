@@ -1,0 +1,35 @@
+# Generate 3D with the free Hugging Face Spaces: a job that comes back without a model, or a Space that has switched
+# Text to 3D off, says so in red under Generate (service name included) instead of looking silent. After the refusal
+# the Generate button stays greyed for that model (this session only: nothing is probed) until "Try again".
+# A stub answers with the Spaces' real wording (generator_stub textoff / nomodel; never the network).
+# CMake runs it at 1440x900 and 2880x1800 (the review sizes).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+drop ../../assets/demo/teddy-sketch.png
+wait_for "Generate 3D/Generate 3D model" 5
+
+generator_stub nomodel
+click "Generate 3D/Generate 3D model"
+click "Allow##send"
+click OK
+wait_for "Generate 3D/Generate 3D model" 30
+expect_text finished without a model: try again or another provider
+shot generate-no-model
+
+click "Generate 3D/From text"
+type "##textprompt" a stylised dragon head
+generator_stub textoff
+click "Generate 3D/Generate 3D model"
+wait_value generate_candidates == 0 30
+wait 0.5
+expect_text Text to 3D failed
+expect_text Hunyuan3D 2 mini Turbo
+expect_text switched Text to 3D off
+expect_text Try again
+shot generate-text-off
+
+click "Generate 3D/Try again"
+expect_no_text switched Text to 3D off
+expect "Generate 3D/Generate 3D model"
+expect_value http_requests == 0
+generator_stub off
