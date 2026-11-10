@@ -1624,6 +1624,12 @@ constexpr Entry kSimplifiedChinese[] = {
      "鼠标滚轮会朝指针下的模型位置缩放，该点维持在指针下，而不是朝视图中央。使用 Maya 按键时打开（选择风格时会自动设"
      "置），其他风格则关闭。"},
     {"Along the normal", "沿法线"},
+    {"Shift", "Shift"},
+    {"Ctrl", "Ctrl"},
+    {"Alt", "Alt"},
+    {"Slide Stamp rotates with", "Slide Stamp 旋转键"},
+    {"How dabs follow the cursor: Dots, Drag Stamp, Slide Stamp, Spray or Lazy Stroke. Click to choose. In Slide Stamp, hold Shift while dragging to turn the alpha toward the cursor (Preferences > Input).", "笔触如何跟随光标：Dots、Drag Stamp、Slide Stamp、Spray 或 Lazy Stroke。点击选择。在 Slide Stamp 中，拖动时按住 Shift 可让 Alpha 转向光标（偏好设置 > 输入）。"},
+    {"With the Slide Stamp stroke, hold this key after the stroke has begun and the stamp stays where it is while its alpha turns toward the cursor; let go and it slides on with that turn. Held at the press it keeps its own meaning (Shift smooths, Ctrl masks, Alt inverts). The turn belongs to that stroke: the brush's Angle is not changed. Off: the key does nothing here.", "使用 Slide Stamp 笔触时，在笔触开始后按住此键，印章保持原位，其 Alpha 转向光标；松开后印章带着该旋转继续滑动。开始时就按住则保持它原有的作用（Shift 平滑、Ctrl 遮罩、Alt 反向）。旋转只属于该笔触：画笔的角度不会改变。关闭：此键在这里不起作用。"},
     {"Always", "始终"},
     {"Never", "永不"},
     {"Move, Tendril, Elastic Tendril and KelvinGrab: with the invert key held as the stroke begins (Alt; Ctrl in the "

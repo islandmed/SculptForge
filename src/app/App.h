@@ -976,6 +976,9 @@ private:
     glm::vec2 stampCursor_{0.0f};
     bool stampPlaced_ = false;
     bool benchStampFootprint_ = false; // bench.sh alpha with SF_BENCH_STAMP: every dab takes the stamp footprint
+    SDL_Keymod slideKeysAtStart_ = SDL_KMOD_NONE; // the modifiers down when a Slide Stamp stroke began
+    SlideStampTurn slideTurn_; // Slide Stamp: the alpha turned toward the cursor while the rotate key is held (#175)
+    bool slideRotateHeld() const; // the Preferences > Input key is down now (and, for Shift, was not at the press)
     float lastDabAngle_ = 0.0f; // radians (UI tests: last_dab_angle)
     void drawAlphaOptions(bool vdm = false); // vdm: Brush > Vector Displacement's rows (no Tile, #136)
     std::mutex alphaMutex_;

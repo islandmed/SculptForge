@@ -9,6 +9,7 @@
 
 #include <glm/glm.hpp>
 
+#include <cmath>
 #include <cstdint>
 
 namespace sf {
@@ -48,5 +49,36 @@ float alphaJitterAngle(float jitterDeg, uint32_t& seed);
 // A drag stamp's angle (Drag Stamp, Slide Stamp: one stamp per stroke, #136): the drag's direction on screen
 // (window pixels, y down) when `followDrag`, plus Angle and the stroke's `jitter` (from alphaJitterAngle).
 float alphaStampAngle(const AlphaOptions& o, bool followDrag, glm::vec2 drag, float jitter);
+
+// Slide Stamp's turn (#175): while the rotate key is held mid-drag the stamp stays where it is and its alpha turns
+// toward the cursor; let go, it slides on with that turn kept. The turn belongs to the stroke: it is never written
+// to the brush's saved Angle.
+class SlideStampTurn {
+public:
+    static constexpr float kMinPx = 3.0f; // a cursor nearer than this to the stamp gives no direction
+    void reset() { turned_ = false; havePos_ = false; angle_ = 0.0f; }
+    // The stamp's screen position for a cursor at `cursor` (window pixels, y down); `rotating`: the key is held.
+    glm::vec2 position(bool rotating, glm::vec2 cursor) {
+        if (!rotating || !havePos_) pos_ = cursor;
+        havePos_ = true;
+        return pos_;
+    }
+    // While rotating: the angle (radians, alphaStampAngle's convention) that points the alpha's top from the stamp
+    // toward `cursor`, kept for the rest of the stroke. Not rotating: unchanged.
+    void turn(bool rotating, glm::vec2 cursor) {
+        if (!rotating || !havePos_) return;
+        const glm::vec2 d = cursor - pos_;
+        if (glm::dot(d, d) < kMinPx * kMinPx) return;
+        angle_ = std::atan2(-d.x, -d.y);
+        turned_ = true;
+    }
+    bool turned() const { return turned_; }
+    float angle() const { return angle_; } // radians; only the stroke's own part (Angle and jitter come on top)
+
+private:
+    glm::vec2 pos_{0.0f};
+    float angle_ = 0.0f;
+    bool turned_ = false, havePos_ = false;
+};
 
 } // namespace sf

@@ -129,8 +129,29 @@ void App::afterVdmCommand(const std::string& name, const CommandResult& r) {
 
 // DragDot: one stamp at the brush size under the cursor; dragging slides it over the surface, and it stays where
 // the button comes up.
+// With the rotate key held (Preferences > Input, Shift as the default, pressed after the stroke began: at the press
+// Shift smooths) the stamp stays where it is and its alpha turns toward the cursor; let go, it slides on with the
+// turn kept. The turn is the stroke's own: the brush's saved Angle is not touched (#175).
+bool App::slideRotateHeld() const {
+    const SDL_Keymod keys = inputMods();
+    SDL_Keymod want = 0;
+    switch (uiPrefs_.slideRotateKey) {
+    case 0: want = SDL_KMOD_SHIFT; break;
+    case 1: want = SDL_KMOD_CTRL; break;
+    case 2: want = SDL_KMOD_ALT; break;
+    default: return false;
+    }
+    if (uiPrefs_.slideRotateKey == 0 && precisionHeld()) return false; // (Shift+Alt is the precision drag)
+    return (keys & want) && !(slideKeysAtStart_ & want); // (down at the press: its own meaning, smooth / mask / invert)
+}
+
 void App::dragDotTo(float x, float y, bool commit) {
     doc_.sculptor.restoreStroke(doc_.mesh, doc_.bvh);
+    const bool rotating = slideRotateHeld();
+    const glm::vec2 at = slideTurn_.position(rotating, glm::vec2(x, y)); // (rotating: where the stamp was)
+    if (!commit) slideTurn_.turn(rotating, glm::vec2(x, y)); // (the release's final stamp stays put)
+    x = at.x;
+    y = at.y;
     RayHit hit;
     if (!pick(x, y, hit)) return;
     const float pressure = stampPressure_.hold(strokePressure()); // (not the lift's falling pressure, #146)
@@ -151,6 +172,7 @@ void App::dragDotTo(float x, float y, bool commit) {
     stampCursor_ = glm::vec2(x, y);
     stampPlaced_ = true;
     lastDabAngle_ = alphaStampAngle(alphaOptions_, false, {}, stampJitter_); // Angle and jitter (#136); it slides, not turns
+    if (slideTurn_.turned()) lastDabAngle_ += slideTurn_.angle(); // (turned toward the cursor with the rotate key, #175)
     p.alphaUp = screenUpVector(lastDabAngle_);
     p.vdm = doc_.brushVdm.get();
     lastDabScreen_ = glm::vec2(x, y);

@@ -1,0 +1,35 @@
+# #175: Slide Stamp: hold Shift after the drag has begun and the stamp stays put while its alpha turns toward the cursor;
+# let go and it slides on with the turn kept. Shift held at the press keeps its own meaning (it smooths). The turn
+# belongs to the stroke: the brush's saved Angle is not touched.
+run new_sphere subdivisions=5
+camera 0 0
+key f
+run brush_set_alpha name=square
+action stroke.type.slide_stamp
+expect_value stroke_type == 2
+expect_value alpha_angle == 0
+expect_value slide_turned == 0
+
+# Shift after the press: the alpha turns toward the cursor (above the stamp: the top points up, angle 0; to its
+# right: -90), the stamp stays where it was.
+drag_path 0.3 0.5 0.5 0.5 keep
+wait 0.2
+expect_value slide_turned == 0
+hold shift
+hover_window 0.62 0.5
+wait 0.2
+expect_value slide_turned == 1
+expect_value slide_turn <= -80
+expect_value slide_turn >= -100
+shot turned
+hold none
+release
+wait_value stroking == 0 10
+expect_value alpha_angle == 0
+
+# Shift down at the press: it keeps its own meaning, the stamp slides and nothing turns.
+hold shift
+stroke 0.3 0.5 0.6 0.5
+hold none
+expect_value slide_turned == 0
+expect_value alpha_angle == 0

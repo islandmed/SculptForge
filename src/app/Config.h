@@ -76,6 +76,7 @@ struct UiPrefs {
     bool viewFalloff = false;
     // Dynamic topology: how much Smooth remeshes, 0-1 (DyntopoSettings::smoothRemesh; 1 as before).
     float dyntopoSmoothRemesh = 1.0f;
+    int slideRotateKey = 0;   // Slide Stamp (#175): the key that turns the alpha toward the cursor while sliding: 0 Shift, 1 Ctrl, 2 Alt, 3 off
     bool airStrokes = false;  // start strokes off the model (#62): a left-drag on the background sculpts once it
                               // reaches the surface instead of turning the view (off: it turns the view, classic)
     bool showAxes = true;              // Draw > Camera > Axes: the X / Y / Z gizmo in the canvas corner (#31)

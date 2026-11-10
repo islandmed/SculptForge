@@ -2428,6 +2428,8 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         stampJitter_ = alphaJitterAngle(alphaOptions_.jitter, stampSeed_);
         stampPressure_.reset();
         stampPlaced_ = false;
+        slideTurn_.reset();
+        slideKeysAtStart_ = inputMods();
     }
     if (strokeType_ == StrokeType::DragRect) {
         dragAnchor_ = glm::vec2(x, y);

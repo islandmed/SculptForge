@@ -3417,7 +3417,8 @@ void App::drawStrokeTile(const char* id, ImVec2 size) {
     const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, strokeTypeName(strokeType_), s, a, b);
     drawStrokeIcon(ImGui::GetWindowDrawList(), a, b, strokeType_);
     if (clicked) openPicker(Picker::Stroke, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
-    ui::HelpText("Stroke", nullptr, "How dabs follow the cursor: Dots, Drag Stamp, Slide Stamp, Spray or Lazy Stroke. Click to choose.",
+    ui::HelpText("Stroke", nullptr, "How dabs follow the cursor: Dots, Drag Stamp, Slide Stamp, Spray or Lazy Stroke. Click to choose. In Slide Stamp, hold Shift "
+                 "while dragging to turn the alpha toward the cursor (Preferences > Input).",
                  "Left shelf");
 }
 

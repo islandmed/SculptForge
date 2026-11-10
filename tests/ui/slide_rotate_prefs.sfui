@@ -1,0 +1,42 @@
+# #175: Preferences > Input > "Slide Stamp rotates with" (Shift / Ctrl / Alt / Off) in English, Spanish and Simplified
+# Chinese: the longer labels must fit the row, and the combo opens with all four choices.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=2
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+expect "##input.slide_rotate"
+shot row-en
+click "##input.slide_rotate"
+expect_text Shift
+expect_text Ctrl
+expect_text Alt
+expect_text Off
+shot combo-en
+click "##input.slide_rotate"
+
+click "Interface##preferences.interface"
+click "Español##language.es"
+click "Entrada##preferences.input"
+expect "##input.slide_rotate"
+expect_text "Slide Stamp gira con"
+shot row-es
+click "##input.slide_rotate"
+expect_text Mayús
+expect_text Desactivado
+shot combo-es
+click "##input.slide_rotate"
+
+click "Interfaz##preferences.interface"
+click "简体中文##language.zh-CN"
+click "输入##preferences.input"
+expect "##input.slide_rotate"
+expect_text "Slide Stamp 旋转键"
+shot row-zh-cn
+click "##input.slide_rotate"
+shot combo-zh-cn
+click "##input.slide_rotate"
+
+click "界面##preferences.interface"
+click "English##language.en"
+expect "Interface##preferences.interface"
+key escape
