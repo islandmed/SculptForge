@@ -89,9 +89,9 @@ expect_value visible_parts == 1
 expect_status Solo: Body
 shot solo
 click "Parts/Solo"
-expect_value visible_parts == 3
+expect_value visible_parts == 2   # leaving Solo restores what was shown before it: Sphere stays hidden
 click "Parts/##eye Cube"
-expect_value visible_parts == 2
+expect_value visible_parts == 1
 click "Parts/Unhide all"
 expect_value visible_parts == 3
 
