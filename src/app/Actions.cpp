@@ -262,19 +262,6 @@ int brushSizeStep(const Action* a) {
     return 0;
 }
 
-bool keyNavMotion(const Action* a, float& panX, float& panY, float& zoomSteps) {
-    panX = panY = zoomSteps = 0.0f;
-    if (!a) return false;
-    if (a->id == "view.pan_left") panX = -kKeyNavPanPixels;
-    else if (a->id == "view.pan_right") panX = kKeyNavPanPixels;
-    else if (a->id == "view.pan_up") panY = -kKeyNavPanPixels;
-    else if (a->id == "view.pan_down") panY = kKeyNavPanPixels;
-    else if (a->id == "view.zoom_in") zoomSteps = kKeyNavZoomSteps;
-    else if (a->id == "view.zoom_out") zoomSteps = -kKeyNavZoomSteps;
-    else return false;
-    return true;
-}
-
 bool ActionRegistry::handleKey(SDL_Keycode key, SDL_Keymod mods) {
     const Action* a = actionForKey(key, mods);
     if (!a || !a->run) return false;
@@ -346,37 +333,6 @@ bool ActionRegistry::hasOverride(std::string_view id) const {
     for (const auto& o : overrides_)
         if (o.first == id) return true;
     return false;
-}
-
-std::vector<const Action*> ActionRegistry::holdersOf(const Chord& chord, std::string_view exceptId) const {
-    std::vector<const Action*> out;
-    for (const auto& other : actions_) {
-        if (other.id == exceptId || !other.run) continue;
-        const std::vector<Chord> theirs = parseChords(shortcutText(other.id));
-        if (std::find(theirs.begin(), theirs.end(), chord) != theirs.end()) out.push_back(&other);
-    }
-    return out;
-}
-
-std::string ActionRegistry::resetShortcut(std::string_view id) {
-    const Action* a = find(id);
-    if (!a) return {};
-    std::string lost;
-    for (const Chord& c : parseChords(a->shortcut))
-        for (const Action* other : holdersOf(c, a->id)) {
-            std::string keep;
-            for (const Chord& t : parseChords(shortcutText(other->id)))
-                if (!(t == c)) keep += (keep.empty() ? "" : " / ") + chordText(t);
-            lost += (lost.empty() ? "" : ", ") + other->label;
-            setShortcut(other->id, keep);
-        }
-    for (auto it = overrides_.begin(); it != overrides_.end(); ++it)
-        if (it->first == a->id) {
-            overrides_.erase(it);
-            break;
-        }
-    ++revision_;
-    return lost;
 }
 
 void ActionRegistry::clearOverrides() {
