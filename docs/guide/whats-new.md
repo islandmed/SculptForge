@@ -9,11 +9,10 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: 2026-11-10
-tagline: Your language from the first start, Slide Stamp turns as you slide, and faster Undo on dense models.
+tagline: Your language from the first start, and Slide Stamp turns as you slide.
 highlight: The interface starts in your language (Spanish, Traditional or Simplified Chinese)
 highlight: Hold Shift to turn a Slide Stamp as you slide it (thanks @Devon0209)
-highlight: Undo and Redo after a remesh on a very dense model no longer pause (thanks @TheLycanFenrir)
-highlight: Generate 3D says in the panel when a free service returns nothing
+highlight: The welcome has a Language row with all four languages, each in its own script
 ```
 
 - **Your language on the first start**: if your computer is in Spanish, Traditional Chinese or Simplified Chinese,
@@ -21,10 +20,6 @@ highlight: Generate 3D says in the panel when a free service returns nothing
   **Language** row with all four, each in its own script.
 - **Turn a Slide Stamp as you slide it**: hold **Shift** while dragging a Slide Stamp and the alpha turns toward the
   cursor instead of the stamp moving; let go and it slides on with that turn. Thanks @Devon0209 (#175).
-- **Faster Undo after a remesh**: undoing or redoing a Voxel Remesh (or another whole-model step) on a very dense
-  model no longer stops for a second while the model's search tree is rebuilt. Thanks @TheLycanFenrir (#181).
-- **Generate 3D** says so in red under **Generate** when a free model finishes without a result or refuses the job,
-  with the service name and **Try again** (it used to show only in the status bar).
 
 ## Version 0.12.2
 

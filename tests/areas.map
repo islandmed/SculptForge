@@ -233,7 +233,6 @@ test_decimate_valence       mesh
 test_divide_valence         mesh
 test_dyntopo                mesh
 test_edge_*                 mesh
-test_undo*                  mesh
 test_extract_mirror         mesh
 test_face*                  mesh
 test_figure_pose            mesh
