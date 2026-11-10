@@ -382,9 +382,13 @@ if(SCULPTFORGE_BUILD_APP OR SCULPTFORGE_BUILD_TESTS)
   endif()
   sculptforge_pch(sculptforge_appshared)
 endif()
-# The action registry (key chords, shortcut overrides; needs SDL's key names): the app and its tests.
+# The action registry (key chords, shortcut overrides; needs SDL's key names) and startup splash screen: the app and its tests.
 if(SCULPTFORGE_BUILD_APP)
-  add_library(sculptforge_actions STATIC src/app/Actions.cpp src/app/BlenderKeymap.cpp)
+  include(cmake/EmbedFile.cmake)
+  embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedSplash.cpp sf::assets
+    splashImage ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/splash.jpg)
+  add_library(sculptforge_actions STATIC src/app/Actions.cpp src/app/BlenderKeymap.cpp src/app/SplashScreen.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedSplash.cpp)
   target_link_libraries(sculptforge_actions PUBLIC sculptforge_core SDL3::SDL3)
   if(MSVC)
     target_compile_options(sculptforge_actions PRIVATE /W4 /utf-8 /permissive-)
