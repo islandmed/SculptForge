@@ -12,7 +12,7 @@ wait 1.0
 shot header-icon-tooltip
 click "Tool/##detach"
 wait 0.3
-click "Display##tool.display"
+click "Viewport Look##tool.display"
 wait 0.2
 shot detached-floating
 key f1

@@ -8,8 +8,8 @@ click "Tool##palette.tool"
 click "Tool/##detach"
 wait 0.2
 expect_value detached_panels == 1
-expect "Display##tool.display"
-click "Display##tool.display"
+expect "Viewport Look##tool.display"
+click "Viewport Look##tool.display"
 click "Backface culling##display"
 expect_value backface_culling == 1
 shot detached
