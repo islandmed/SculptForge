@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -308,15 +309,20 @@ GeneratorResult runHuggingFace(const AiSettings& s, const std::string& imagePath
             }
         }
         std::vector<Json> outputs;
-        if (!client.call(step.api, args, outputs, result.error, [&](const std::string& text) { status(p, text); }))
+        if (!client.call(step.api, args, outputs, result.error, [&](const std::string& text) { status(p, text); })) {
+            std::fprintf(stderr, "Generate 3D: %s (%s) '%s' failed: %s\n", preset->label, preset->space, step.api, result.error.c_str());
+            result.error = std::string(preset->label) + ": " + result.error;
             return result;
+        }
         Json first = outputs.empty() ? Json() : outputs[0];
         if (first.isObject() && first["value"].isObject()) first = first["value"]; // unwrap component updates
         firstOutputs.push_back(first);
     }
     const std::string url = client.lastModelUrl();
     if (url.empty()) {
-        result.error = "The Space finished but returned no 3D model";
+        result.error = std::string(preset->label) + " finished without a model: try again or another provider";
+        std::fprintf(stderr, "Generate 3D: %s (%s) finished OK but returned no model file (%zu outputs)\n", preset->label, preset->space,
+                firstOutputs.size());
         return result;
     }
     status(p, "Downloading model...");

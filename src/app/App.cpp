@@ -4151,6 +4151,11 @@ void App::drawImageTo3D() {
     } else if (ImGui::Button(tr("Generate 3D model"), ImVec2(-1, 0))) {
         startGenerator();
     }
+    if (!generatorError_.empty() && !pendingGenerator_.valid()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.45f, 0.40f, 1.0f));
+        ImGui::TextWrapped("%s", generatorError_.c_str());
+        ImGui::PopStyleColor();
+    }
     drawSendNotice(SendPanel::Generate3D);
     if (openHunyuanNotice_) {
         ImGui::OpenPopup("###hunyuan.licence");
