@@ -1348,6 +1348,12 @@ void Renderer::shutdown() {
         gl::DeleteRenderbuffers(3, viewRb_);
         viewFbo_ = viewResolveFbo_ = 0;
     }
+    if (captureFbo_[0]) { // (screenshots and recordings; --ui-serve's context outlives the Renderer)
+        gl::DeleteFramebuffers(2, captureFbo_);
+        gl::DeleteRenderbuffers(3, captureRb_);
+        captureFbo_[0] = captureFbo_[1] = 0;
+        captureW_ = captureH_ = 0;
+    }
 }
 
 void Renderer::syncSplats(const SplatCloud& c, uint64_t version) {
