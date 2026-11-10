@@ -589,7 +589,7 @@ void App::buildGhost() {
         d.radius = (worldSize_ && worldRadius_ > 0.0f ? worldRadius_ : radiusPx_ * cam.worldPerPixel(d.center, c.h)) *
                    (pressureSizeOn() ? std::max(sd.pressure, 0.05f) : 1.0f);
         d.normal = n;
-        d.strength = std::clamp((strokeBrush_ == BrushType::Smooth ? smoothStrength_ : strength_), 0.0f, 1.0f) *
+        d.strength = std::clamp(strokeIntensity(), 0.0f, 1.0f) *
                      std::clamp(pressureStrengthOn() ? sd.pressure : 1.0f, 0.0f, 1.0f);
         d.areaCenter = d.center - n * depth;
         d.weight = sd.weight;
