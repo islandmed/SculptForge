@@ -477,19 +477,17 @@ void App::keyNavStep(const std::string& id) {
 // by their speed, whatever chords they are bound to and in every key style.
 void App::updateKeyNav(float dt) {
     const bool blocked = ImGui::GetIO().WantCaptureKeyboard || !capturingShortcut_.empty() || shortcutConflictOpen();
-    const bool* down = SDL_GetKeyboardState(nullptr);
-    const SDL_Keymod mods = SDL_GetModState();
-    const bool ctrl = mods & (SDL_KMOD_CTRL | SDL_KMOD_GUI), shift = mods & SDL_KMOD_SHIFT, alt = mods & SDL_KMOD_ALT;
     float px = 0.0f, py = 0.0f, zoom = 0.0f;
     bool any = false;
     for (const char* id : {"view.pan_left", "view.pan_right", "view.pan_up", "view.pan_down", "view.zoom_in", "view.zoom_out"}) {
         float& held = keyNavHeld_[id];
         bool on = false;
-        if (!blocked && down)
-            for (const Chord& c : parseChords(actions_.shortcutText(id))) {
-                const SDL_Scancode sc = SDL_GetScancodeFromKey(c.key, nullptr);
-                if (sc != SDL_SCANCODE_UNKNOWN && down[sc] && c.ctrl == ctrl && c.shift == shift && c.alt == alt) on = true;
-            }
+        if (!blocked)
+            for (const Chord& c : parseChords(actions_.shortcutText(id)))
+                for (const auto& [key, mods] : keysDown_) { // (key events, not the keyboard state: focus loss clears them)
+                    const bool ctrl = mods & (SDL_KMOD_CTRL | SDL_KMOD_GUI), shift = mods & SDL_KMOD_SHIFT, alt = mods & SDL_KMOD_ALT;
+                    if (key == c.key && c.ctrl == ctrl && c.shift == shift && c.alt == alt) on = true;
+                }
         held = on ? held + dt : 0.0f;
         float x, y, z;
         if (held < 0.25f || !keyNavMotion(actions_.find(id), x, y, z)) continue;
@@ -653,8 +651,7 @@ void App::drawInputSection() {
     ui::HelpText("Invert zoom", nullptr, "Turn zoom drags around (the mouse wheel stays as it is).", "Preferences > Input");
     {
         ImGui::TextDisabled("%s", tr("Pan and zoom key speed"));
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(-1);
+        ImGui::SetNextItemWidth(-FLT_MIN);
         ImGui::SliderFloat("##input.key_nav_speed", &uiPrefs_.keyNavSpeed, 0.1f, 5.0f, "%.1fx", ImGuiSliderFlags_Logarithmic);
         ui::HelpText("Pan and zoom key speed", nullptr,
                      "How fast the view moves while a Pan or Zoom key is held (Ctrl+Numpad 4, 6, 8 and 2 pan; Numpad Plus "

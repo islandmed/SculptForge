@@ -2173,7 +2173,7 @@ void App::drawTaskMenu() {
         Demo::popScope();
     }
     ImGui::EndGroup();
-    if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::IsAnyItemActive()) ImGui::CloseCurrentPopup();
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !conflictPopupOpened_ && !ImGui::IsAnyItemActive()) ImGui::CloseCurrentPopup(); // (Esc answering the shortcut box closes only it)
     ImGui::EndPopup();
 }
 
@@ -2353,7 +2353,7 @@ void App::drawPaletteDropdown() {
     if (paletteHeader(id.c_str(), false, true)) drawPaletteBody(id);
     if (def->scope) Demo::popScope();
     Demo::popScope();
-    if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::IsAnyItemActive()) ImGui::CloseCurrentPopup();
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !conflictPopupOpened_ && !ImGui::IsAnyItemActive()) ImGui::CloseCurrentPopup();
     ImGui::EndPopup();
 }
 

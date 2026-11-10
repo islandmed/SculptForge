@@ -1449,10 +1449,20 @@ bool App::captureShortcutKey(SDL_Keycode key, SDL_Keymod mod) {
 // ---------------------------------------------------------------------------
 
 // The key is used already: say by what, Replace or Cancel. Beside the button that was clicked (below it, or above
-// when there is no room), never over it, so the key and the action stay in view.
+// when there is no room), never over it, so the key and the action stay in view. It is an ImGui popup drawn from
+// where the button is (Preferences > Hotkeys, so inside the Preferences menu's popup stack): Esc, a click elsewhere
+// or Cancel close this box and nothing else, and the Preferences menu stays open behind it. Anywhere else (a shelf
+// tile's Ctrl+Alt+click) drawHelpConsoleUi draws it at the end of the frame.
 void App::drawShortcutConflict() {
     shortcutPopupRect_ = {};
-    if (!shortcutConflictOpen()) return;
+    const char* const id = "##shortcut_conflict";
+    conflictDrawnFrame_ = ImGui::GetFrameCount();
+    if (shortcutConflictOpen() && !conflictPopupOpened_) {
+        ImGui::OpenPopup(id);
+        conflictPopupOpened_ = true;
+        conflictOpenedFrame_ = ImGui::GetFrameCount();
+    }
+    if (!conflictPopupOpened_) return;
     const float s = uiScale_;
     const ImVec2 view = ImGui::GetMainViewport()->Size;
     const ImVec4 an = shortcutAnchor_;
@@ -1461,12 +1471,19 @@ void App::drawShortcutConflict() {
     ImVec2 pos(view.x * 0.5f - w * 0.5f, 120.0f * s);
     ImVec2 pivot(0.0f, 0.0f);
     if (known) {
-        pos.x = std::clamp(an.x, 8.0f * s, std::max(8.0f * s, view.x - w - 8.0f * s));
-        const float below = an.w + gap;
-        if (below + 130.0f * s < view.y) pos.y = below;
-        else pos.y = an.y - gap, pivot.y = 1.0f;
+        const ImVec2 hp = ImGui::GetWindowPos(), hz = ImGui::GetWindowSize();
+        const bool hosted = hz.x > 0.0f && an.x >= hp.x && an.z <= hp.x + hz.x; // drawn from inside the window the button is in
+        if (hosted && hp.x + hz.x + gap + w <= view.x) { // beside the window, level with the button: the list stays in view
+            pos = ImVec2(hp.x + hz.x + gap, an.y);
+        } else if (hosted && hp.x - gap - w >= 0.0f) {
+            pos = ImVec2(hp.x - gap - w, an.y);
+        } else {
+            pos.x = std::clamp(an.x, 8.0f * s, std::max(8.0f * s, view.x - w - 8.0f * s));
+            const float below = an.w + gap;
+            if (below + 130.0f * s < view.y) pos.y = below;
+            else pos.y = an.y - gap, pivot.y = 1.0f;
+        }
     }
-    const Action* a = actions_.find(conflict_.actionId);
     ImGui::SetNextWindowPos(pos, ImGuiCond_Always, pivot);
     ImGui::SetNextWindowSize(ImVec2(w, 0.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(14.0f * s, 12.0f * s));
@@ -1474,30 +1491,38 @@ void App::drawShortcutConflict() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, col(IM_COL32(0x18, 0x18, 0x1a, 0xff)));
     ImGui::PushStyleColor(ImGuiCol_Border, col(IM_COL32(0xf0, 0x88, 0x2e, 0xa0)));
-    if (ImGui::Begin("##shortcut_conflict", nullptr,
-                     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
-                         ImGuiWindowFlags_NoMove)) {
-        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + w - 28.0f * s);
-        ImGui::Text(tr("%s is already used by %s."), conflict_.chord.c_str(), conflict_.holders.c_str());
-        ImGui::TextColored(col(ui::color::textDim), tr("Replace gives it to '%s' and takes it from there."),
-                           a ? trAction(a->id, a->label) : conflict_.actionId.c_str());
-        ImGui::PopTextWrapPos();
-        ImGui::Spacing();
-        if (ImGui::Button((std::string(tr("Replace")) + "##shortcut_replace").c_str())) resolveShortcutConflict(true);
-        ImGui::SameLine();
-        if (!shortcutConflictOpen()) {
-            ImGui::End();
-            ImGui::PopStyleColor(2);
-            ImGui::PopStyleVar(3);
-            return;
+    const bool shown = ImGui::BeginPopup(id, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings);
+    if (shown) {
+        if (!shortcutConflictOpen()) { // answered (Enter or Esc went through captureShortcutKey): close just this box
+            ImGui::CloseCurrentPopup();
+        } else {
+            const Action* a = actions_.find(conflict_.actionId);
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + w - 28.0f * s);
+            ImGui::Text(tr("%s is already used by %s."), conflict_.chord.c_str(), conflict_.holders.c_str());
+            ImGui::TextColored(col(ui::color::textDim), tr("Replace gives it to '%s' and takes it from there."),
+                               a ? trAction(a->id, a->label) : conflict_.actionId.c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::Spacing();
+            if (ImGui::Button((std::string(tr("Replace")) + "##shortcut_replace").c_str())) {
+                resolveShortcutConflict(true);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button((std::string(tr("Cancel")) + "##shortcut_cancel").c_str())) {
+                resolveShortcutConflict(false);
+                ImGui::CloseCurrentPopup();
+            }
+            const ImVec2 p = ImGui::GetWindowPos(), z = ImGui::GetWindowSize();
+            shortcutPopupRect_ = ImVec4(p.x, p.y, p.x + z.x, p.y + z.y);
         }
-        if (ImGui::Button((std::string(tr("Cancel")) + "##shortcut_cancel").c_str())) resolveShortcutConflict(false);
-        const ImVec2 p = ImGui::GetWindowPos(), z = ImGui::GetWindowSize();
-        shortcutPopupRect_ = ImVec4(p.x, p.y, p.x + z.x, p.y + z.y);
+        ImGui::EndPopup();
     }
-    ImGui::End();
     ImGui::PopStyleColor(2);
     ImGui::PopStyleVar(3);
+    if (!shown) { // closed by ImGui (a click elsewhere): that is Cancel; the popup gets a frame to open first
+        if (shortcutConflictOpen() && ImGui::GetFrameCount() > conflictOpenedFrame_ + 1) resolveShortcutConflict(false);
+        if (!shortcutConflictOpen() && ImGui::GetFrameCount() > conflictOpenedFrame_ + 1) conflictPopupOpened_ = false;
+    }
 }
 
 void App::drawHelpConsoleUi() {
@@ -1578,7 +1603,7 @@ void App::drawHelpConsoleUi() {
         ImGui::PopStyleColor(2);
         ImGui::PopStyleVar(3);
     }
-    drawShortcutConflict();
+    if (conflictDrawnFrame_ != ImGui::GetFrameCount()) drawShortcutConflict(); // (Hotkeys draws it where its button is)
     watchLayoutChanges();
     ui::DragScrollPanels(); // #100: pen and middle drags scroll panels (after every window)
     ui::DrawHover(*this); // the hover and keyboard-focus rings, over every window
@@ -1905,7 +1930,14 @@ void drawHotkeysSection(App& app) {
                          "Preferences > Hotkeys");
             if (reg.hasOverride(a->id)) {
                 ImGui::SameLine(0.0f, 2.0f * s);
-                if (ImGui::SmallButton((std::string(ICON_LC_ROTATE_CCW) + "##hkreset." + a->id).c_str())) {
+                const bool resetClicked = ImGui::SmallButton(("##hkreset." + a->id).c_str());
+                {   // the arrow drawn over the button, which keeps a plain id (scripts click it by "##hkreset.<action>")
+                    const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
+                    const ImVec2 sz = ImGui::CalcTextSize(ICON_LC_ROTATE_CCW);
+                    ImGui::GetWindowDrawList()->AddText(ImVec2((lo.x + hi.x - sz.x) * 0.5f, (lo.y + hi.y - sz.y) * 0.5f),
+                                                        ImGui::GetColorU32(ImGuiCol_Text), ICON_LC_ROTATE_CCW);
+                }
+                if (resetClicked) {
                     const std::string lost = reg.resetShortcut(a->id);
                     app.status_ = std::string(trAction(a->id, a->label)) + ": default " + reg.shortcutText(a->id) +
                                   (lost.empty() ? "" : " (was " + lost + ")");
@@ -1920,6 +1952,7 @@ void drawHotkeysSection(App& app) {
         app.status_ = "Default shortcuts restored";
     }
     ui::HelpText("Default shortcuts", nullptr, "Undo every shortcut change.", "Preferences > Hotkeys");
+    app.drawShortcutConflict(); // inside the Preferences popup stack: Esc closes only the box
 }
 
 void drawLibraryBrowserSection(App& app) {

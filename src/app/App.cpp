@@ -1603,6 +1603,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         windowFocused_ = false;
+        keysDown_.clear(); // a key let go in another window never reaches us: the pan and zoom keys stop
         if (radial_.hold != RadialHold::None) closeRadialMenu(); // its key or button's release won't come here
         if (strokePopup_.held) closeStrokePopup();
         spaceHeld_ = false; // Space let go in another window never reaches us
@@ -1668,6 +1669,8 @@ void App::dispatchEvent(const SDL_Event& event) {
             wheelZoom(e.wheel.mouse_x, e.wheel.mouse_y, e.wheel.y);
         break;
     case SDL_EVENT_KEY_DOWN:
+        if (!isModifierKey(e.key.key) && std::none_of(keysDown_.begin(), keysDown_.end(), [&](const auto& k) { return k.first == e.key.key; }))
+            keysDown_.emplace_back(e.key.key, e.key.mod);
         if (e.key.key == SDLK_SPACE && !e.key.repeat && // hold Space and drag: the camera (#43; not while typing)
             spaceCameraKeyDown(uiPrefs_.spaceCamera, io.WantTextInput || io.WantCaptureKeyboard)) {
             spaceHeld_ = true;
@@ -1679,6 +1682,8 @@ void App::dispatchEvent(const SDL_Event& event) {
             onKey(e.key.key, e.key.mod); // held brush size keys repeat, whatever they are bound to
         break;
     case SDL_EVENT_KEY_UP:
+        std::erase_if(keysDown_, [&](const auto& k) { return k.first == e.key.key; });
+        if (isModifierKey(e.key.key)) keysDown_.clear(); // Ctrl let go: a Ctrl chord's key stops (it must be pressed again)
         if (e.key.key == SDLK_SPACE) spaceHeld_ = false;
         quickRemeshKey(e.key.key, e.key.mod, false);
         if (e.key.key == SDLK_SPACE) quickMenuKeyUp(); // a held Space closes the QuickMenu when let go

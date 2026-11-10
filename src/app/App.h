@@ -2192,6 +2192,7 @@ public:
     // A pressed key that another action already uses waits here for Replace or Cancel (a popup by the button).
     bool shortcutConflictOpen() const { return !conflict_.actionId.empty(); }
     void resolveShortcutConflict(bool replace);
+    void drawShortcutConflict(); // the Replace / Cancel popup (Config.cpp)
     void openCommandPalette() { palette_.open(); }
     void setConsoleOpen(bool open);
     void consolePrefill(const std::string& text); // opens the console with TEXT typed
@@ -2217,7 +2218,7 @@ private:
     void drawHelpConsoleUi();              // console, command palette, Controls, shortcut capture, Ctrl help
     void drawControlsWindow();
     bool captureShortcutKey(SDL_Keycode key, SDL_Keymod mod);
-    void drawShortcutConflict();
+
     void consoleEcho(const std::string& name, const Args& args, const CommandResult& r);
     std::string uiConfigPath() const;
     // Window size, position, maximised and full screen, kept in window.json beside ui.json (#35). Not for tests,
@@ -2283,7 +2284,10 @@ private:
         std::string actionId, chord, holders; // the action being set, the key pressed, "Orbit left, Zoom in"
     } conflict_;
     ImVec4 shortcutAnchor_{};           // the button the capture began from (min x, y, max x, y); zero: unknown
+    bool conflictPopupOpened_ = false;  // OpenPopup was called for the open conflict
+    int conflictDrawnFrame_ = -1, conflictOpenedFrame_ = 0;
     ImVec4 shortcutPopupRect_{};        // the Replace / Cancel popup as last drawn (UiTest checks it clears the anchor)
+    std::vector<std::pair<SDL_Keycode, SDL_Keymod>> keysDown_; // keys held now, with the modifiers at their press (updateKeyNav)
     std::map<std::string, float> keyNavHeld_; // seconds each pan / zoom key has been down (updateKeyNav)
     bool keyNavMoving_ = false;
     std::string layoutBaseline_;      // layoutKey() as last stored / loaded / restored
