@@ -249,7 +249,7 @@
 <strong>Floor</strong>: the floor grid under the model, as <strong>View &gt; Floor grid</strong>.
 </li>
 <li>
-In a window too short for all of them, Turn, Ortho, Floor and Flat fold into one <strong>View</strong> button: click it for their list.
+In a window too short for all of them, Turn, Ortho, Floor, Flat and Unlit fold into one <strong>View</strong> button: click it for their list.
 </li>
 <li>
 <strong>Wire</strong> (<kbd>Shift</kbd>+<kbd>F</kbd>): shows the mesh&#x27;s polygons: quads as quads, triangles as triangles.
@@ -265,6 +265,9 @@ In a window too short for all of them, Turn, Ortho, Floor and Flat fold into one
 </li>
 <li>
 <strong>Flat</strong>: flat shading, every polygon its own face (on), or smooth shading (off), as <strong>Render &gt; Materials &gt; Smooth | Flat</strong>.
+</li>
+<li>
+<strong>Unlit</strong> (<kbd>Alt</kbd>+<kbd>L</kbd>, <strong>Render &gt; Materials &gt; Unlit</strong>, or in the <strong>View</strong> list when the shelf is folded; not a default shelf button, but Customize can add one): the base colour alone, with no lighting, Lit Sphere or PBR shading, so vertex paint, texture paint and PBR base colour read exactly as stored. The mask tint and <strong>Wire</strong> still draw. The status bar shows <strong>Unlit</strong> while it is on. Saved with the project (a new session starts shaded); <code>set_unlit on=true</code> from a script. Suggested by @nagdav853.
 </li>
 <li>
 <strong>Solo</strong>: shows only the active Part (available with two or more Parts).
