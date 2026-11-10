@@ -1041,6 +1041,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # #163's unhide prompt at 1440 and 2880 px (tests/ui/unhide_prompt.sfui).
     sculptforge_ui_test(unhide_prompt_1440 unhide_prompt --size 1440x900)
     sculptforge_ui_test(unhide_prompt_2880 unhide_prompt --size 2880x1800)
+    # #173's levels prompt before a remesh or decimate (tests/ui/levels_confirm.sfui).
+    sculptforge_ui_test(levels_confirm_1440 levels_confirm --size 1440x900)
+    sculptforge_ui_test(levels_confirm_2880 levels_confirm --size 2880x1800)
     # The Tool sub-palettes named and ordered by task (tests/ui/tool_palettes.sfui; narrow/ at 1024).
     sculptforge_ui_test(tool_palettes_1440 tool_palettes --size 1440x900)
     sculptforge_ui_test(tool_palettes_2880 tool_palettes --size 2880x1800)

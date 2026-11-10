@@ -202,9 +202,10 @@ std::vector<std::string> Demo::clippedLabels(const std::string& scope) {
     return out;
 }
 
-bool Demo::findItem(const std::string& label, ImVec2& center, bool* visible, ImVec4* clipOut) const {
+bool Demo::findItem(const std::string& label, ImVec2& center, bool* visible, ImVec4* clipOut, ImVec4* rectOut) const {
     auto found = [&](const Placed& p) {
         center = p.rect.GetCenter();
+        if (rectOut) *rectOut = ImVec4(p.rect.Min.x, p.rect.Min.y, p.rect.Max.x, p.rect.Max.y);
         if (visible) *visible = p.clip.Contains(center);
         if (clipOut) *clipOut = ImVec4(p.clip.Min.x, p.clip.Min.y, p.clip.Max.x, p.clip.Max.y);
         return true;

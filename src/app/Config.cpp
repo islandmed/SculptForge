@@ -147,6 +147,7 @@ Json toJson(const UiPrefs& p) {
     j.set("uvPackRows", double(p.uvPackRows));
     j.set("maskDarkness", double(p.maskDarkness));
     j.set("confirmSubdivide", p.confirmSubdivide);
+    j.set("confirmRemeshLevels", p.confirmRemeshLevels);
     j.set("background", std::string(p.gradientBackground ? "gradient" : "flat"));
     Json bg = Json::array();
     for (int i = 0; i < 3; ++i) bg.push(double(p.backgroundColor[i]));
@@ -255,6 +256,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.uvPackRows = std::clamp(int(j["uvPackRows"].asNumber(p.uvPackRows)), 1, 10);
     p.maskDarkness = std::clamp(float(j["maskDarkness"].asNumber(p.maskDarkness)), 0.0f, 1.0f);
     p.confirmSubdivide = j["confirmSubdivide"].asBool(p.confirmSubdivide);
+    p.confirmRemeshLevels = j["confirmRemeshLevels"].asBool(p.confirmRemeshLevels);
     if (j["background"].isString()) p.gradientBackground = j["background"].asString() != "flat";
     p.showHints = j["showHints"].asBool(p.showHints);
     if (const Json& hints = j["hiddenHints"]; hints.size() > 0) {

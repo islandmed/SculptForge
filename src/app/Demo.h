@@ -51,7 +51,8 @@ public:
 
     // Screen rect of the most recent UI item with this label (text before "##" also matches;
     // "Window/label" picks the item in one window).
-    bool findItem(const std::string& label, ImVec2& center, bool* visible = nullptr, ImVec4* clip = nullptr) const;
+    bool findItem(const std::string& label, ImVec2& center, bool* visible = nullptr, ImVec4* clip = nullptr,
+                  ImVec4* rect = nullptr) const; // rect: the item's own box (min x, min y, max x, max y)
     static void beginFrame(); // clears the item table (called before ImGui::NewFrame)
     // Items drawn between these are also found as "NAME/label" (palettes in the shell's trays and drop-downs,
     // whose ImGui window is the tray, keep their panel names: "Parts/Append").

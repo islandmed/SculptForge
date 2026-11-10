@@ -231,6 +231,13 @@ private:
     std::string unhideOperation_;
     std::function<void()> unhideProceed_;
     bool openUnhideConfirm_ = false;
+    // #173: Voxel Remesh, Quad Remesh and Decimate drop the subdivision levels; on a Part with levels they ask first
+    // (Freeze Levels and Proceed / Cancel). Same shape as unhideAllows; `skip` for automatic remeshes.
+    bool levelsAllow(const char* operation, std::function<void()> proceed, bool skip = false);
+    std::string levelsOperation_;
+    std::function<void()> levelsProceed_;
+    bool openLevelsConfirm_ = false;
+    bool levelsConfirmed_ = false; // Freeze Levels and Proceed was clicked: the next levelsAllow lets it through
     void drawDetailSlider(const char* id);
 
     void runCommand(const std::string& name, const Args& args = {});

@@ -141,7 +141,7 @@ void App::drawGeometrySection() {
             if (decimateKeepMasked_) args["keep_masked"] = true;
             runCommand("decimate", args);
         };
-        if (unhideAllows("Decimate", decimate)) decimate(); // #163
+        if (unhideAllows("Decimate", decimate) && levelsAllow("Decimate", decimate)) decimate(); // #163, #173
     }
     ui::HelpText("Decimate", nullptr, "Reduce the triangle count while keeping the shape. Sculpt layers are kept.",
                  "Tool > Geometry");

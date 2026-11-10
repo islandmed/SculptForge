@@ -3036,6 +3036,43 @@ void App::drawDynamicOffer() {
         ImGui::EndPopup();
     }
 
+    // #173 (@TheLycanFenrir): the remesh operations drop the subdivision levels: say so before they do.
+    static constexpr const char* kLevels = "##levels_confirm";
+    if (openLevelsConfirm_) {
+        openLevelsConfirm_ = false;
+        ImGui::OpenPopup(kLevels);
+    }
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopup(kLevels)) {
+        Demo::pushScope("Levels");
+        if (!doc_.mesh.multires) {
+            levelsProceed_ = nullptr;
+            ImGui::CloseCurrentPopup();
+        } else {
+            const int n = subdivLevelCount(doc_.mesh);
+            ImGui::Text(n == 1 ? tr("This drops %d subdivision level. %s keeps the level shown as one plain mesh.")
+                               : tr("This drops %d subdivision levels. %s keeps the level shown as one plain mesh."),
+                        n, tr(levelsOperation_.c_str()));
+            ImGui::TextDisabled("%s", tr("Undo brings the levels back."));
+            bool ask = !uiPrefs_.confirmRemeshLevels;
+            if (ImGui::Checkbox(tr("Don't ask again##remesh_levels"), &ask)) uiPrefs_.confirmRemeshLevels = !ask;
+            ImGui::Spacing();
+            if (ImGui::Button(tr("Freeze Levels and Proceed"))) {
+                ImGui::CloseCurrentPopup();
+                levelsConfirmed_ = true;
+                if (std::function<void()> proceed = std::exchange(levelsProceed_, nullptr)) proceed();
+                levelsConfirmed_ = false;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(tr("Cancel##remesh_levels")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                levelsProceed_ = nullptr;
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        Demo::popScope();
+        ImGui::EndPopup();
+    }
+
     static constexpr const char* kPopup = "##dynamic_offer";
     if (openDynamicOffer_) {
         openDynamicOffer_ = false;
@@ -3384,6 +3421,15 @@ bool App::unhideAllows(const char* operation, std::function<void()> proceed, boo
     unhideOperation_ = operation;
     unhideProceed_ = std::move(proceed);
     openUnhideConfirm_ = true;
+    return false;
+}
+
+bool App::levelsAllow(const char* operation, std::function<void()> proceed, bool skip) {
+    if (levelsConfirmed_) return true;
+    if (skip || !doc_.mesh.multires || subdivLevelCount(doc_.mesh) == 0 || !uiPrefs_.confirmRemeshLevels) return true;
+    levelsOperation_ = operation;
+    levelsProceed_ = std::move(proceed);
+    openLevelsConfirm_ = true;
     return false;
 }
 
