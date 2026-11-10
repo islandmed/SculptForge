@@ -24,11 +24,11 @@
 
 using namespace sf;
 
-TEST(brush_packs_six_packs_of_ten) {
+TEST(brush_packs_seven_packs_of_ten) {
     const std::vector<BrushRecipe> all = builtinBrushRecipes();
     const std::vector<BrushRecipe> packs = builtinPackRecipes();
-    CHECK(builtinBrushPacks().size() == 6);
-    CHECK(packs.size() == 60);
+    CHECK(builtinBrushPacks().size() == 7);
+    CHECK(packs.size() == 70);
     CHECK(all.size() == 7 + packs.size()); // the classic seven first
     std::map<std::string, int> perPack;
     std::set<std::string> names;
@@ -81,10 +81,11 @@ TEST(brush_recipe_alpha_keys_round_trip) {
 
 TEST(brush_alphas_builtin_set) {
     const auto& all = BrushAlpha::builtins();
-    CHECK(all.size() == 21); // Round, Square, Noise, the twelve patterns and the six for the packs
+    CHECK(all.size() == 27); // Round, Square, Noise, the twelve patterns, the six for the packs and the six wood ones
     std::set<std::string> names;
     for (const BrushAlpha& a : all) CHECK(names.insert(a.name).second);
-    for (const char* name : {"Cobblestone", "Leather Grain", "Hex Plates", "Knit", "Bolt", "Chips"}) {
+    for (const char* name : {"Cobblestone", "Leather Grain", "Hex Plates", "Knit", "Bolt", "Chips", "Weathered Grain", "Splinters",
+                             "Grain Cracks", "Knot", "End Rings", "Plank Seams"}) {
         BrushAlpha a;
         CHECK(BrushAlpha::builtin(name, a));
         CHECK(!a.empty());
@@ -141,7 +142,7 @@ TEST(brush_packs_every_brush_leaves_a_clean_mark) {
             slowest = r.name;
         }
     }
-    std::printf("  60 pack brush strokes: %.0f ms in all, slowest %s %.0f ms\n", totalMs, slowest.c_str(), slowestMs);
+    std::printf("  %zu pack brush strokes: %.0f ms in all, slowest %s %.0f ms\n", builtinPackRecipes().size(), totalMs, slowest.c_str(), slowestMs);
     CHECK(slowestMs < timeLimit(400.0));
 }
 

@@ -24,6 +24,7 @@ const PackInfo kPacks[] = {
     {"Cloth & Folds", "Folds, seams, stitches, weave and knit for clothing and soft goods."},
     {"Damage & Wear", "Cracks, chips, dents, scratches and erosion for weathered stone, wood and metal."},
     {"Ornament", "Beads, ropes, filigree, studs and carved patterns for jewellery, trims and decoration."},
+    {"Wood", "Weathered grain, splinters, cracks, knots, end-grain rings and plank seams for old timber."},
 };
 
 // Adds brushes to `out` for one pack: b("Name", "One line.", [](BrushRecipe& r) { ... }).
@@ -271,6 +272,51 @@ void ornament(PackBuilder b) {
     });
 }
 
+void wood(PackBuilder b) {
+    b("Weathered Planks", "Long worn grain lines with the soft wood eaten away between, for old boards; drag along the grain.",
+      [](BrushRecipe& r) {
+          r.depth = -0.5f; r.alpha = "Weathered Grain"; r.alphaFollow = true; r.spacing = 0.4f; r.frontFacesOnly = true;
+      });
+    b("Raised Grain", "Hard late-wood lines standing proud of the surface, as on sandblasted or driftwood boards.",
+      [](BrushRecipe& r) {
+          r.depth = 0.4f; r.alpha = "Weathered Grain"; r.alphaFollow = true; r.spacing = 0.4f; r.smooth = 0.05f;
+          r.frontFacesOnly = true;
+      });
+    b("Splinters", "A fan of sharp, torn splinters standing up from the surface, for broken planks.", [](BrushRecipe& r) {
+        r.depth = 0.6f; r.alpha = "Splinters"; r.alphaFollow = true; r.hardness = 0.8f; r.spacing = 0.9f;
+        r.jitter = 0.2f; r.frontFacesOnly = true;
+    });
+    b("Wood Chaff", "Scattered shavings and chips of torn fibre, for splintered ends and chopped wood.",
+      [](BrushRecipe& r) {
+          r.depth = 0.3f; r.alpha = "Splinters"; r.hardness = 0.7f; r.spacing = 0.35f; r.jitter = 0.7f;
+          r.alphaJitter = 180.0f; r.frontFacesOnly = true;
+      });
+    b("Grain Cracks", "Narrow forked splits that run along the grain, for dried and checked timber.", [](BrushRecipe& r) {
+        r.depth = -0.7f; r.alpha = "Grain Cracks"; r.alphaFollow = true; r.spacing = 0.55f; r.jitter = 0.15f;
+        r.frontFacesOnly = true;
+    });
+    b("Check Split", "One deep, pinched split along the stroke, for dried beams.", [](BrushRecipe& r) {
+        r.depth = -0.55f; r.pinch = 0.45f; r.tipSharpness = 0.5f; r.hardness = 0.2f; r.jitter = 0.1f; r.spacing = 0.07f;
+    });
+    b("Knot", "Stamps a round knot with the grain bending around it; click once.", [](BrushRecipe& r) {
+        r.depth = 0.85f; r.alpha = "Knot"; r.hardness = 0.8f; r.spacing = 1.8f; r.jitter = 0.0f; r.alphaJitter = 25.0f;
+        r.frontFacesOnly = true;
+    });
+    b("End Rings", "Stamps the rings and radial checks of a sawn log end; click once.", [](BrushRecipe& r) {
+        r.depth = -0.8f; r.alpha = "End Rings"; r.hardness = 0.85f; r.spacing = 2.0f; r.alphaJitter = 180.0f;
+        r.frontFacesOnly = true;
+    });
+    b("Plank Seams", "Two boards meeting at a seam with grain and nail dimples, for floors and doors; drag along the seam.",
+      [](BrushRecipe& r) {
+          r.depth = 0.55f; r.alpha = "Plank Seams"; r.alphaFollow = true; r.hardness = 0.9f; r.spacing = 0.3f;
+          r.frontFacesOnly = true;
+      });
+    b("Board Gap", "A clean, narrow gap between two boards with softened edges.", [](BrushRecipe& r) {
+        r.depth = -0.35f; r.pinch = 0.2f; r.hardness = 0.4f; r.tipSharpness = 0.3f; r.smooth = 0.15f; r.spacing = 0.07f;
+        r.frontFacesOnly = true;
+    });
+}
+
 } // namespace
 
 const std::vector<std::string>& builtinBrushPacks() {
@@ -290,13 +336,14 @@ std::string builtinBrushPackHelp(const std::string& pack) {
 
 std::vector<BrushRecipe> builtinPackRecipes() {
     std::vector<BrushRecipe> out;
-    out.reserve(60);
+    out.reserve(70);
     clayAndForm({out, kPacks[0].name});
     hardSurface({out, kPacks[1].name});
     organicAndSkin({out, kPacks[2].name});
     clothAndFolds({out, kPacks[3].name});
     damageAndWear({out, kPacks[4].name});
     ornament({out, kPacks[5].name});
+    wood({out, kPacks[6].name});
     return out;
 }
 

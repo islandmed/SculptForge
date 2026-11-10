@@ -1,6 +1,6 @@
 # Brush packs
 
-SculptForge comes with sixty ready-tuned brushes in six packs, on top of the built-in brushes. Each one is a
+SculptForge comes with seventy ready-tuned brushes in seven packs, on top of the built-in brushes. Each one is a
 brush recipe (see [Brush Lab](brush-lab.md)) with its own alpha where it needs one, so you can use them as they are,
 or open one in Brush Lab and make your own version. Every brush, alpha and preview here is made by SculptForge itself:
 the recipe engine, procedural alphas and the same clay-ball thumbnails as the brush picker.
@@ -137,8 +137,32 @@ Beads, ropes, filigree, studs and carved patterns for jewellery, trims and decor
 | **Gem Setting** | A raised round setting with a crisp rim, for cabochons and gem seats. |  |
 | **Dot Texture** | Fine even dots, for stippling, punched leather and decorative fields. | Dot Grid |
 
+## Wood
+
+Weathered grain, splinters, cracks, knots, end-grain rings and plank seams for old timber. Requested by Hameron (FXiT).
+
+![The Wood brushes](images/brush-packs/wood.jpg)
+
+| Brush | What it does | Alpha |
+|---|---|---|
+| **Weathered Planks** | Long worn grain lines with the soft wood eaten away between; drag along the grain. | Weathered Grain |
+| **Raised Grain** | Hard late-wood lines standing proud of the surface, as on sandblasted or driftwood boards. | Weathered Grain |
+| **Splinters** | A fan of sharp, torn splinters standing up from the surface, for broken planks. | Splinters |
+| **Wood Chaff** | Scattered shavings and chips of torn fibre, for splintered ends and chopped wood. | Splinters |
+| **Grain Cracks** | Narrow forked splits that run along the grain, for dried and checked timber. | Grain Cracks |
+| **Check Split** | One deep, pinched split along the stroke, for dried beams. |  |
+| **Knot** | Stamps a round knot with the grain bending around it; click once. | Knot |
+| **End Rings** | Stamps the rings and radial checks of a sawn log end; click once. | End Rings |
+| **Plank Seams** | Two boards meeting at a seam with grain and nail dimples, for floors and doors; drag along the seam. | Plank Seams |
+| **Board Gap** | A clean, narrow gap between two boards with softened edges. |  |
+
+The six wood alphas (**Sculpt > Alpha**) are made in code like the others and work with any brush: Weathered Grain,
+Splinters, Grain Cracks, Knot, End Rings and Plank Seams.
+
+![The six wood alphas](images/brush-packs/wood/alphas.png)
+
 ## New alphas
 
 Six procedural alphas came with the packs and work with any brush (**Sculpt > Alpha**): **Cobblestone**,
-**Leather Grain**, **Hex Plates**, **Knit**, **Bolt** and **Chips**. **Sculpt > Alpha** lists every alpha A-Z (Round, the
+**Leather Grain**, **Hex Plates**, **Knit**, **Bolt** and **Chips**; the Wood pack adds six more (above). **Sculpt > Alpha** lists every alpha A-Z (Round, the
 plain tip, first), has a filter field, and **Sort** for the most recently used first or by pack.
