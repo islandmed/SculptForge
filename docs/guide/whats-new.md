@@ -5,6 +5,22 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.12.4
+
+```features
+date: unreleased
+tagline: Shortcuts ask before they take a key, and Front faces only shows when it is on.
+highlight: Shortcuts ask before they take a key another action uses (requested by Artizmo on Discord)
+highlight: Pan and zoom from the keyboard: Ctrl+Numpad 4, 6, 8, 2 and Zoom in/out keep moving while held
+highlight: Front faces only shows a tag by the brush cursor and a Turn off button (thanks rand_gogh)
+```
+
+- **Shortcuts ask before they take a key**: press a key that another action already uses and a box names that
+  action, with **Replace** (Enter) and **Cancel** (Esc); a changed shortcut has a reset arrow in **Preferences >
+  Hotkeys**. Requested by Artizmo on Discord.
+- **Pan and zoom keys**: Pan left, right, up and down (Ctrl+Numpad 4, 6, 8, 2) step on a press and keep moving while
+  held, like Zoom in and Zoom out; **Preferences > Input > Pan and zoom key speed** sets how fast.
+
 ## Version 0.12.3
 
 ```features
@@ -13,7 +29,6 @@ tagline: Your language from the first start, and Slide Stamp turns as you slide.
 highlight: The interface starts in your language (Spanish, Traditional or Simplified Chinese)
 highlight: Hold Shift to turn a Slide Stamp as you slide it (thanks @Devon0209)
 highlight: The welcome has a Language row with all four languages, each in its own script
-highlight: The interface starts in your language
 ```
 
 - **Your language on the first start**: if your computer is in Spanish, Traditional Chinese or Simplified Chinese,
@@ -21,11 +36,6 @@ highlight: The interface starts in your language
   **Language** row with all four, each in its own script.
 - **Turn a Slide Stamp as you slide it**: hold **Shift** while dragging a Slide Stamp and the alpha turns toward the
   cursor instead of the stamp moving; let go and it slides on with that turn. Thanks @Devon0209 (#175).
-- **Your language on the first start**: if your computer is in Spanish, Traditional Chinese or Simplified Chinese,
-  SculptForge starts in it, with a note to change it. Any other language starts in English and the welcome has a
-  **Language** row with all four, each in its own script.
-- **Turn a Slide Stamp as you slide it**: hold **Shift** while dragging a Slide Stamp and the alpha turns toward the
-  cursor instead of the stamp moving; let go and it slides on with that turn.
 
 ## Version 0.12.2
 
@@ -36,8 +46,6 @@ highlight: Curves, and rope, braid and sleeve tubes (requested by Hameron (FXiT)
 highlight: A Wood brush pack (requested by Hameron (FXiT))
 highlight: Shift smoothing keeps Smooth's own Intensity in every stroke type (thanks @nekirk11)
 highlight: Unlit view on Alt+L (thanks @nagdav853); Center on origin and Drop to floor in the Gizmo panel
-highlight: Curves, and rope, braid and sleeve tubes
-highlight: A Wood brush pack
 ```
 
 - **Curves**: **Tool > Tube > Result > Curve** draws a guide line on or over the model; **Resample** sets its point
@@ -57,21 +65,6 @@ highlight: A Wood brush pack
 - **Drape**: sleeves no longer jitter once the cloth is at rest.
 - **Customize Shelves**: every button and value field can be moved with Ctrl+Alt+drag, including greyed-out options
   and the Size, Intensity and Detail fields.
-- **Curves**: **Tool > Tube > Result > Curve** draws a guide line on or over the model; **Resample** sets its point
-  count exactly and **Tube from curve** turns it into a tube. New tube profiles **Rope**, **Braid** and **Sleeve**,
-  and **Twist**, **Spin** and **Spread** sliders.
-- **Center on origin, Drop to floor**: two buttons in the Gizmo panel put the Part's bounding-box centre on 0,0,0 or
-  rest it on the floor, in one undo step (all Parts together with **All Parts**). With the Classic sculpting keys,
-  **F** frames the active Part and **F** twice quickly frames the whole scene.
-- **Unlit view** (Render menu, <kbd>Alt</kbd>+<kbd>L</kbd>): shows the base colour alone, with no lighting, so painted
-  colour reads exactly as stored.
-- **Wood brush pack**: ten brushes and six alphas for weathered grain, splinters, cracks, knots, end-grain rings and
-  plank seams (**Sculpt > Brush**, pack **Wood**). Requested by Hameron (FXiT).
-- **Customize Shelves**: every button and value field can be moved with Ctrl+Alt+drag, including options that are
-  greyed out and the Size, Intensity and Detail fields.
-- **Shift smoothing keeps Smooth's own Intensity**: set Smooth's Intensity with Shift held, and every stroke type
-  (Drag Stamp too) smooths at that value from the first dab, not at the brush's Intensity. The Intensity slider keeps
-  showing it while you smooth.
 
 ## Version 0.12.1
 
@@ -83,9 +76,6 @@ highlight: Voxel Remesh up to 4096, with a live triangle estimate (thanks foirga
 highlight: Forge Spheres: draw, move and resize without switching modes (thanks @tristratos)
 highlight: Find Problems: Fix all repairs messy meshes completely and says what it couldn't fix (thanks foirgairwolf on Discord)
 highlight: Drape settles in tight folds instead of twitching, and Clay, Flatten and Trim on micro levels avoid stretched triangles
-highlight: Palettes, the User Guide and Controls on your second monitor
-highlight: Voxel Remesh up to 4096, with a live triangle estimate
-highlight: Forge Spheres: draw, move and resize without switching modes
 ```
 
 - **Panels in their own windows**: every palette has a new **Open in its own window** icon in its header, and the
@@ -117,21 +107,8 @@ highlight: Forge Spheres: draw, move and resize without switching modes
 - **Founding Studio** is for the first 5 studios, a flat $150 a month, locked.
 - **Keyboard and mouse** guide: Option is Alt on macOS, and how to make Option Alt and Cmd Ctrl when the Windows
   version runs under CrossOver or Wine on a Mac. Thanks @fenixpoints.
-- **Panels in their own windows**: every palette has a new **Open in its own window** icon in its header, and the
-  **User Guide** and **Controls** have one in their toolbar. Drag that window to your second monitor or pen display;
-  it opens there again next time. Close a palette's window (or **Back in the main window**) to bring it back;
-  **Preferences > Saving & Layouts > Reset panel windows** brings them all back. Requested by Richard Throgmorton
-  (MakIt3D), our first Founding Member.
-- **Voxel Remesh up to 4096**: the **Tool > Remesh** Resolution slider now goes to 4096 (two thirds of it still covers
-  32-512), the line under it estimates the triangles it makes, and above 512 it asks once and never starts a remesh
-  that won't fit in the free memory.
-- **Forge Spheres in one mode**: in **Tool > Forge Spheres > Draw**, click a sphere to grow a new one, drag it to move
-  it, drag near its edge to resize it. The cursor and a small tag show which a drag will do.
 - **Find Problems**: **Fix all** now repairs messy meshes (a rough remesh, touching solids) completely, and anything
   it can't fix is listed under **Not fixed**, with why.
-- **Big stamps on curved surfaces**: Drag Stamp, Slide Stamp and every alpha brush now cover their whole footprint on
-  a curved surface, with no untouched gaps.
-- **Solo** (Tool > Parts) puts back exactly the Parts that were shown before it: a Part you had hidden stays hidden.
 
 ## Version 0.12.0
 
