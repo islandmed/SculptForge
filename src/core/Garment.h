@@ -55,21 +55,6 @@ struct Notch {
     float t = 0.5f;
 };
 
-// Where the user put a panel for draping (garment_place; docs/design/garments.md: placed by hand only, nothing
-// computes it from the body). The panel's centre sits `gapMm` in front of the clicked body point along `facing`
-// (toward the view it was placed from, the right side of the fabric facing out), its sheet's +y along `up` turned
-// `turnDegrees` about `facing`; `wrapDegrees` > 0 curls it back around an axis along its sheet's y (a sleeve or a
-// leg as a tube).
-struct Placement {
-    bool placed = false;
-    glm::vec3 point{0.0f};               // world units, on the body
-    glm::vec3 facing{0.0f, 0.0f, 1.0f};  // unit, out of the body toward the viewer
-    glm::vec3 up{0.0f, 1.0f, 0.0f};      // unit, the view's up (made perpendicular to facing)
-    float turnDegrees = 0.0f;
-    float wrapDegrees = 0.0f;            // 0..360
-    float gapMm = 30.0f;
-};
-
 struct Panel {
     std::string name = "Panel";
     std::vector<glm::vec2> points; // mm, the sewing line, counter-clockwise from the right side
@@ -78,7 +63,6 @@ struct Panel {
     std::vector<std::string> edgeNames; // empty, or one per edge ("left side"; "" = unnamed)
     float grainDegrees = 90.0f;    // warp direction, degrees from +x (90 = up the panel)
     float seamAllowance = 10.0f;   // mm
-    Placement place;               // for draping (copies and mirrored copies start unplaced)
 };
 
 struct SeamSide {
@@ -97,7 +81,6 @@ struct Pattern {
     float particleDistance = 15.0f; // mm between neighbouring particles (triangle edge length)
     std::string fabric = "cotton";  // a core/Cloth.h fabric preset id
     float thickness = 2.0f;         // mm, given to the Part made by Convert (0 = a single surface)
-    float unitsPerMetre = 0.0f;     // the body's world units per metre (0 = not chosen yet: 1, or set at the first placing)
     bool empty() const { return panels.empty(); }
 };
 
@@ -124,9 +107,6 @@ constexpr size_t kOutlineBudget = 50000;
 bool validPanel(const Panel& p, std::string& error, size_t* outlineBudget = nullptr);
 // The outline grown outward by `distance` mm (the cutting line), as a closed polyline.
 std::vector<glm::vec2> offsetOutline(const Panel& p, float distance);
-
-// A panel by name (any case) or 1-based number (the garment_* commands' `panel`); false with the reason.
-bool findPanelRef(const Pattern& pat, const std::string& ref, uint32_t& out, std::string& error);
 
 // --- Pattern edits (each keeps seams pointing at the right panels and edges) ---
 

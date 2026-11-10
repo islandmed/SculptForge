@@ -78,7 +78,6 @@ add_library(sculptforge_core STATIC
   src/core/GarmentMesh.cpp
   src/core/GarmentFiles.cpp
   src/core/GarmentCommands.cpp
-  src/core/GarmentDrape.cpp
   src/core/GarmentPrint.cpp
   src/core/GarmentTemplates.cpp
   src/core/ExtractMirror.cpp
@@ -469,7 +468,6 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelPaintLayers.cpp
     src/app/PanelTexture.cpp
     src/app/PanelGarments.cpp
-    src/app/PanelGarmentDrape.cpp
     src/app/PanelUvEditor.cpp
     src/app/PanelPbr.cpp
     src/app/PanelFill.cpp
@@ -1058,9 +1056,6 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Curves and the Tube modifiers at 1440 and 2880 px (tests/ui/curve.sfui; its 200% shots inside).
     sculptforge_ui_test(curve_1440 curve --size 1440x900)
     sculptforge_ui_test(curve_2880 curve --size 2880x1800)
-    # Garments draped on the Full Body at 1440 and 2880 px (tests/ui/garments_drape.sfui).
-    sculptforge_ui_test(garments_drape_1440 garments_drape --size 1440x900)
-    sculptforge_ui_test(garments_drape_2880 garments_drape --size 2880x1800)
     # #163's unhide prompt at 1440 and 2880 px (tests/ui/unhide_prompt.sfui).
     sculptforge_ui_test(unhide_prompt_1440 unhide_prompt --size 1440x900)
     sculptforge_ui_test(unhide_prompt_2880 unhide_prompt --size 2880x1800)

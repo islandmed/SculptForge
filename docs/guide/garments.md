@@ -1,8 +1,7 @@
 # Garments: sewing patterns at real size
 
 A garment in SculptForge is made the way clothes are made: flat pattern panels at their real size in millimetres,
-sewn edge to edge. The same pattern prints on your home printer to cut real fabric, and drapes on your model ([Drape it on a
-body](#drape-it-on-a-body)).
+sewn edge to edge. The same pattern prints on your home printer to cut real fabric, and drapes on your model.
 Open **Tool > Garments** (the **Pattern** window shows the panels flat): **Templates** starts a garment at your
 sizes, **Print** writes the pages. Everything here is also a `garment_*` command for **Scripting** and the AI
 assistant ("make me trousers for a 1000 mm hip").
@@ -68,92 +67,6 @@ garment_size hip_mm=1050 inseam_mm=780
 garment_new template=hoodie
 garment_new template=trousers add=true
 garment_info
-```
-
-## Drape it on a body
-
-A sewn pattern drapes on any body in the scene and becomes a Part you can sculpt, paint and export. You put each
-panel where it goes; SculptForge sews the seams and lets the cloth settle. The **Full Body** starter mesh
-(**File > New from starter**) is a good first body.
-
-### 1. Place the panels
-
-Start a garment (**Templates > T-shirt**), then under **Drape on the body** press **Place panels**. The list below
-the button shows every panel; the one waiting for a click is highlighted and the text under the button names it.
-
-**Click the body once for each panel, from the view that faces that panel.** The panel appears a little in front
-of the click, facing you, its top up the screen. The panel's widest line goes at the click: a shirt's chest line
-(just under the armholes), a sleeve's line under its cap, trousers' hip line. So **place each panel slightly in
-front of the body at its widest point**:
-
-| Panel | Where to click | From |
-| --- | --- | --- |
-| Front | the front of the chest | the front |
-| Back | the back, at chest height | behind (turn the view round) |
-| Sleeve | the top of the upper arm, just below the shoulder | outside and a little above, so the arm runs up the screen toward the shoulder |
-| Trouser leg | the side of the hip | the side |
-
-After each click the list ticks the panel off and asks for the next one; when every panel is placed, the button
-lets go. Click a panel in the list to place it again. The placed panels show on the body as a preview (seams still
-open), and they are saved with the pattern.
-
-### 2. Adjust a panel
-
-The last panel placed (or the one picked in the list) has three sliders:
-
-- **Turn** spins it in the view's plane: a sleeve's top toward the shoulder when the arm slants.
-- **Wrap** curls it back round the body: 0 is flat, 360 a closed tube. A panel sewn to itself (a sleeve, a
-  trouser leg) starts as a nearly closed tube with its own seam on the far side from your click, so the arm or
-  leg sits inside it.
-- **Gap** moves it out from the click (30 mm to start). Wherever the preview disappears into the body, raise Gap
-  until it clears: the back of a T-shirt usually needs about 70 mm so its hem clears the hips.
-
-### 3. Drape
-
-**Drape** sews every seam shut and lets the garment settle on the visible Parts, live (the body and anything else
-shown; hide Parts it shouldn't touch). It sews first with gravity off, then lets the cloth fall and stops on its own
-once it is still. **Pause** holds it, **Stop** keeps it as it is now, **Reset** goes back to the placed panels. When
-it stops, the view shows the garment as Convert will make it, and the status line says how many frames it took
-and the widest seam gap (a few millimetres is normal: Convert closes it).
-
-### 4. Convert to Part
-
-**Convert to Part** keeps it as the Part **Garment**: seams welded, the pattern's thickness (2 mm unless set),
-UVs from the flat pattern (each panel where it lies on the sheet, so a texture painted on the pattern lines up),
-one face group per panel. It is one undo step, and the body stays the active Part. To drape another garment,
-start or load its pattern and place it the same way.
-
-### Size and units
-
-The garment is at the size of its pattern, the size chart's measurements, never stretched to the body: if it is
-too loose or too tight, change the chart (or the model) and start the template again. A SculptForge unit is a
-metre; a body modelled bigger is read by its size: over 20 units counts as centimetres (the starter meshes are),
-over 600 as millimetres.
-
-### When something looks wrong
-
-- **The body shows through the cloth**: the panel started inside the body. Raise its **Gap** and drape again.
-- **A sleeve or leg slides off**: look at the limb from outside so it runs up the screen, click its top, and check
-  that the preview tube goes round it.
-- **Cloth tucked behind the chin or a beard**: cloth dropped from above settles behind overhangs. That is the
-  physics, not a bug: place the panel in front of the body instead of above it.
-- **A seam gap over 10 mm** in the status line: a panel was placed far from where it is sewn. Place it closer to
-  its neighbours and drape again.
-
-### From a script
-
-`garment_place` puts a panel on the body (`point` on the body, `facing` toward the viewer, `up` the panel's top,
-optional `turn`, `wrap`, `gap_mm`; `clear=true` takes it off) and `garment_drape` drapes and converts in one step
-(`frames`, `fabric`):
-
-```
-new_starter_mesh name=full-body
-garment_new template=tshirt
-garment_place panel=Front point=0,116,5 facing=0,0,1
-garment_place panel=Back point=0,116,-15 facing=0,0,-1 gap_mm=70
-garment_place panel="Left sleeve" point=27,133,-9.5 facing=0.88,0.47,0 up=-0.47,0.88,0
-garment_place panel="Right sleeve" point=-27,133,-9.5 facing=-0.88,0.47,0 up=0.47,0.88,0
-garment_drape
 ```
 
 ## Print it at home

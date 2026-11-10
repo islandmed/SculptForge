@@ -14,8 +14,6 @@
 
 namespace sf {
 
-struct Document;
-
 struct LengthUnit {
     const char* id;     // "mm", "cm", "m", "in"
     double perMetre;    // numbers in this unit per metre
@@ -42,12 +40,5 @@ glm::vec3 toFileUnits(glm::vec3 metres, double perMetre);
 std::string formatLength(double metres, const LengthUnit& unit);
 // "50 x 20 x 12.5 mm": an extent (x, y, z) in the unit.
 std::string formatSize(glm::vec3 metres, const LengthUnit& unit);
-
-// World units per real metre for real-size simulation (Drape, Garments). A unit is a metre, but models often aren't
-// made to that scale (the starter meshes are in centimetres): a scene whose largest extent is over 600 units is
-// read as millimetres (1000), over 20 as centimetres (100), else metres (1).
-float unitsPerMetreForSize(float largestExtent);
-// The same for the visible Parts' largest extent (their transforms applied).
-float sceneUnitsPerMetre(const Document& doc);
 
 } // namespace sf

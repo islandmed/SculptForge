@@ -364,7 +364,6 @@ uint32_t duplicatePanel(Pattern& pat, uint32_t i, glm::vec2 offset, const std::s
         c.c2 += offset;
     }
     p.name = name.empty() ? p.name + " 2" : name;
-    p.place = {}; // (placed by hand, like any panel)
     pat.panels.push_back(std::move(p));
     return uint32_t(pat.panels.size() - 1);
 }
@@ -876,7 +875,6 @@ Json patternToJson(const Pattern& pat) {
     j.set("particle_mm", num(pat.particleDistance));
     j.set("fabric", pat.fabric);
     j.set("thickness_mm", num(pat.thickness));
-    if (pat.unitsPerMetre > 0.0f) j.set("units_per_metre", double(pat.unitsPerMetre));
     Json panels = Json::array();
     for (const Panel& p : pat.panels) {
         Json pj = Json::object();
@@ -912,22 +910,6 @@ Json patternToJson(const Pattern& pat) {
         }
         pj.set("grain", num(p.grainDegrees));
         pj.set("allowance_mm", num(p.seamAllowance));
-        if (p.place.placed) {
-            const Placement& pl = p.place;
-            Json place = Json::object();
-            auto vec = [](glm::vec3 v) {
-                Json a = Json::array();
-                for (int k = 0; k < 3; ++k) a.push(double(v[k]));
-                return a;
-            };
-            place.set("point", vec(pl.point));
-            place.set("facing", vec(pl.facing));
-            place.set("up", vec(pl.up));
-            place.set("turn", num(pl.turnDegrees));
-            place.set("wrap", num(pl.wrapDegrees));
-            place.set("gap_mm", num(pl.gapMm));
-            pj.set("place", std::move(place));
-        }
         panels.push(std::move(pj));
     }
     j.set("panels", std::move(panels));
@@ -956,7 +938,6 @@ bool patternFromJson(const Json& j, Pattern& out, std::string& error) {
     pat.particleDistance = std::clamp(fnum(j["particle_mm"], 15.0f), 2.0f, 200.0f);
     if (j["fabric"].isString()) pat.fabric = j["fabric"].asString().substr(0, 32);
     pat.thickness = std::clamp(fnum(j["thickness_mm"], 2.0f), 0.0f, 100.0f);
-    if (const float u = fnum(j["units_per_metre"], 0.0f); u > 0.0f) pat.unitsPerMetre = std::clamp(u, 1e-4f, 1e4f);
     std::vector<int> index; // old panel index -> new (-1: left out)
     size_t totalPoints = 0, outlineBudget = kOutlineBudget;
     for (const Json& pj : j["panels"].items()) {
@@ -985,24 +966,6 @@ bool patternFromJson(const Json& j, Pattern& out, std::string& error) {
             for (const Json& nj : names.items()) p.edgeNames.push_back(nj.isString() ? nj.asString().substr(0, 64) : std::string());
         p.grainDegrees = fnum(pj["grain"], 90.0f);
         p.seamAllowance = std::clamp(fnum(pj["allowance_mm"], 10.0f), 0.0f, 200.0f);
-        if (const Json& place = pj["place"]; place.isObject()) {
-            auto vec = [](const Json& a, glm::vec3& v) {
-                if (!a.isArray() || a.size() != 3) return false;
-                for (size_t k = 0; k < 3; ++k) v[int(k)] = fnum(a[k], 0.0f);
-                return std::abs(v.x) < 1e7f && std::abs(v.y) < 1e7f && std::abs(v.z) < 1e7f;
-            };
-            Placement pl;
-            if (vec(place["point"], pl.point) && vec(place["facing"], pl.facing) && vec(place["up"], pl.up) &&
-                glm::length(pl.facing) > 1e-3f && glm::length(glm::cross(pl.facing, pl.up)) > 1e-3f) {
-                pl.facing = glm::normalize(pl.facing);
-                pl.up = glm::normalize(pl.up);
-                pl.turnDegrees = std::clamp(fnum(place["turn"], 0.0f), -360.0f, 360.0f);
-                pl.wrapDegrees = std::clamp(fnum(place["wrap"], 0.0f), 0.0f, 360.0f);
-                pl.gapMm = std::clamp(fnum(place["gap_mm"], 30.0f), 0.0f, 1000.0f);
-                pl.placed = true;
-                p.place = pl;
-            }
-        }
         normalizePanel(p);
         std::string why;
         if (!validPanel(p, why, &outlineBudget)) {

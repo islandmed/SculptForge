@@ -77,7 +77,6 @@ void App::startDrape() {
 
 // Shows the worker's latest frame on the Part (no undo: Keep or rest records one step).
 void App::pollDrape() {
-    pollGarmentDrape(); // (Garments > Drape on the body, PanelGarmentDrape.cpp)
     if (!drape_) return;
     DrapeJob& j = *drape_;
     const bool here = doc_.activePartInfo().id == j.part && doc_.mesh.vertexCount() == j.vertices;
