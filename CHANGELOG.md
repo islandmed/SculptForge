@@ -6,6 +6,73 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-11-09
+
+### Added
+- Focus Detail in projects: **Divide to Micro** past 300 million micro triangles streams the new level from a detail
+  file (`.sfdetail`) instead of holding it all in memory; full detail loads where you look and sculpt. Save writes
+  `<project>.sfdetail` beside the `.sfproj` (only the changed tiles, compacted once half the file is garbage) and
+  opening the project streams from it again. Project format 9 (only for projects with a streamed level). Linux and
+  macOS for now: Windows keeps such levels in memory, and a project with a streamed level opens on Linux and macOS
+  only until Windows streaming lands.
+- **Panels in their own windows** (multi-monitor): any palette, the User Guide and Controls open in a window of their
+  own from the new icon in their header or toolbar, to keep on another monitor or a pen display. Where each window was
+  is remembered between sessions (per computer, panels.json, not in shared interface files); a monitor that has gone
+  brings the panel back beside the main window. Shortcuts keep working while a panel window has the keyboard. **Reset
+  panel windows** (Preferences > Saving & Layouts, command palette; also part of Reset Layout and Shortcuts) puts
+  every panel back. On Wayland the compositor places the windows (their size is remembered, not their position).
+  Requested by Richard Throgmorton (MakIt3D), Founding Member #1's Member Request.
+- **Voxel Remesh up to 4096** (foirgairwolf on Discord): **Tool > Remesh > Resolution** and the `remesh` command go
+  from 32 to 4096 (was 512). The slider keeps two thirds of its travel for 32-512 and a sixth each for 528-2048 and
+  2112-4096; Ctrl+click types a number. Above 512 only the voxels near the surface are stored (8x8x8 bricks), so
+  memory grows with the surface, not the volume, and the result is the same surface the full grid would make. A
+  sculpted head remeshes at 1024 into about 5.6M triangles in about 3 s, at 2048 into about 22M in about 9 s.
+- **Triangle estimate** under the Voxel Remesh Resolution slider (*About 1.6M triangles*), live as it moves; above 512
+  it also shows the memory needed, in red when more than is free.
+- **High resolution remesh** confirmation: the first remesh above 512 shows the estimated triangles and memory (Remesh
+  / Cancel); it asks again after the Resolution goes back to 512 or less. A remesh that won't fit in the free memory
+  doesn't start (the app and the `remesh` command both say how much it needs); it is cancellable with progress
+  throughout.
+- Voxel Remesh, Quad Remesh and Decimate ask before they drop your subdivision levels ("This drops 3 subdivision
+  levels"), with Freeze Levels and Proceed or Cancel, and Don't ask again. Nothing changes on a Part without levels.
+  Thanks @TheLycanFenrir (#173).
+
+### Changed
+- **Forge Spheres** Draw builds without switching modes: a click on a sphere grows a new one, a drag on its body moves
+  it and a drag on its rim resizes it (the cursor and a tag beside it say which); each drag is one undo step. Move and
+  Scale work as before, and Drag places child (or Ctrl+drag) still grows and places a new sphere in one drag. Thanks
+  @tristratos (#167)
+- **Founding Studio** is now for the first 5 studios (was 10): a flat $150 a month, locked, on the Help > Support
+  card, the user guide's Studio membership and docs/studios.md.
+- **Keyboard and mouse** guide: Option is Alt on macOS, and how to make Option Alt and Cmd Ctrl when the Windows
+  version runs under CrossOver or Wine on a Mac (their Mac driver sends Cmd as Alt by default; thanks @fenixpoints).
+- Focus Detail (experimental, `--focus-detail`): the GPU now keeps a small record per tile (coarse grid and edges) and
+  full-resolution grids only for the tiles drawn close up, within a fixed pool; coarse tiles are shaded at their own
+  level, so a streamed level opens shaded at once instead of shading every full grid first.
+- Website: the Membership page thanks every Founding Member by their credit name (the same list as the Members page),
+  and `build_site.py --supporters` rewrites that line with the list, so a newly credited founder shows up in both.
+
+### Fixed
+- Focus Detail: saving a project with a streamed level kept only the coarse detail; bake, displacement export, surface
+  noise and copies of a streamed level now use full detail.
+- **Find Problems > Fix all** left non-manifold edges and opened holes on messy meshes, such as a rough remesh
+  (foirgairwolf on Discord). Solids touching along an edge now come apart closed, Fix all repeats until only holes are
+  left, the Holes Fix never makes other problems or leaves more holes than it found, and the panel says what couldn't
+  be fixed and why. The inner wall of a hollow (or an eye inside a head) is no longer counted as flipped.
+- **Alpha stamps leaving gaps on curved meshes** (#174, thanks @Devon0209): a large Drag Stamp or Slide Stamp (any
+  alpha, sculpt or paint) only reached the vertices within its radius in space, so where the surface curved away from
+  the view part of the stamp's footprint stayed untouched. The stamp now also takes the visible surface under its
+  footprint.
+- Clay, Clay Block, Flatten and Trim on micro levels have a safeguard against stretched triangles on big moves: points
+  facing away from the brush plane stay put, and no point moves more than a quarter of the brush per dab. Ordinary
+  strokes look and feel the same.
+- **Drape** settles where it used to keep twitching: cloth pressed into a narrow fold of the body (an armpit, the
+  inside of an elbow) stays put instead of bouncing between the two sides, and sewn seams no longer pull the cloth
+  through the body while they close. It now runs until the cloth has really stopped, which can take a moment longer
+  (still under 10 s for a 2M-triangle body).
+- Solo in the Parts panel now remembers which Parts were shown when it began and restores exactly those on exit, so
+  Parts hidden beforehand stay hidden (also across save and load while in Solo). Thanks MasterFULL on Discord
+
 ## [0.12.0] - 2026-11-08
 
 ### Added

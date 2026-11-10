@@ -15,6 +15,9 @@ highlight: Voxel Remesh up to 4096, with a live triangle estimate (thanks foirga
 highlight: Forge Spheres: draw, move and resize without switching modes (thanks @tristratos)
 highlight: Find Problems: Fix all repairs messy meshes completely and says what it couldn't fix (thanks foirgairwolf on Discord)
 highlight: Drape settles in tight folds instead of twitching, and Clay, Flatten and Trim on micro levels avoid stretched triangles
+highlight: Palettes, the User Guide and Controls on your second monitor
+highlight: Voxel Remesh up to 4096, with a live triangle estimate
+highlight: Forge Spheres: draw, move and resize without switching modes
 ```
 
 - **Panels in their own windows**: every palette has a new **Open in its own window** icon in its header, and the
@@ -46,6 +49,21 @@ highlight: Drape settles in tight folds instead of twitching, and Clay, Flatten 
 - **Founding Studio** is for the first 5 studios, a flat $150 a month, locked.
 - **Keyboard and mouse** guide: Option is Alt on macOS, and how to make Option Alt and Cmd Ctrl when the Windows
   version runs under CrossOver or Wine on a Mac. Thanks @fenixpoints.
+- **Panels in their own windows**: every palette has a new **Open in its own window** icon in its header, and the
+  **User Guide** and **Controls** have one in their toolbar. Drag that window to your second monitor or pen display;
+  it opens there again next time. Close a palette's window (or **Back in the main window**) to bring it back;
+  **Preferences > Saving & Layouts > Reset panel windows** brings them all back. Requested by Richard Throgmorton
+  (MakIt3D), our first Founding Member.
+- **Voxel Remesh up to 4096**: the **Tool > Remesh** Resolution slider now goes to 4096 (two thirds of it still covers
+  32-512), the line under it estimates the triangles it makes, and above 512 it asks once and never starts a remesh
+  that won't fit in the free memory.
+- **Forge Spheres in one mode**: in **Tool > Forge Spheres > Draw**, click a sphere to grow a new one, drag it to move
+  it, drag near its edge to resize it. The cursor and a small tag show which a drag will do.
+- **Find Problems**: **Fix all** now repairs messy meshes (a rough remesh, touching solids) completely, and anything
+  it can't fix is listed under **Not fixed**, with why.
+- **Big stamps on curved surfaces**: Drag Stamp, Slide Stamp and every alpha brush now cover their whole footprint on
+  a curved surface, with no untouched gaps.
+- **Solo** (Tool > Parts) puts back exactly the Parts that were shown before it: a Part you had hidden stays hidden.
 
 ## Version 0.12.0
 
