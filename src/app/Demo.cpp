@@ -19,6 +19,7 @@
 #include <future>
 #include <map>
 #include <memory>
+#include <set>
 
 // ---------------------------------------------------------------------------
 // Dear ImGui test-engine hooks: record where every labelled item was drawn.
@@ -51,6 +52,13 @@ struct ItemTable {
     std::map<ImGuiID, std::string> pastRight;
     // Controls whose label didn't fit them this frame, with the scopes open then.
     std::vector<std::pair<std::string, std::vector<std::string>>> clipped;
+    // Every labelled item drawn inside a pushScope this frame, by its full label ("Adjust##stencil.adjust").
+    struct Labelled {
+        std::string text;
+        Placed placed;
+        std::vector<std::string> scopes;
+    };
+    std::vector<Labelled> labelled;
 };
 ItemTable& items() {
     static ItemTable t;
@@ -111,6 +119,7 @@ void ImGuiTestEngineHook_ItemInfo(ImGuiContext* ctx, ImGuiID id, const char* lab
         for (const auto& scope : items().scopes) items().byLabel[scope + "/" + key] = it->second;
     };
     add(text);
+    if (!items().scopes.empty()) items().labelled.push_back({text, it->second, items().scopes});
     if (const size_t hash = text.find("##"); hash != std::string::npos && hash > 0) add(text.substr(0, hash));
     // Labels that start with an icon (ICON_LC_*: UTF-8 private-use characters, U+E000-U+F8FF) are also found
     // by their words: "AI Brush" for "<sparkles> AI Brush".
@@ -156,6 +165,7 @@ void Demo::beginFrame() {
     items().offscreen.clear();
     items().pastRight.clear();
     items().clipped.clear();
+    items().labelled.clear();
     items().frame.clear();
     items().scopes.clear();
 }
@@ -190,6 +200,16 @@ std::vector<std::string> Demo::pastRightEdge(const std::string& window) {
     for (const auto& [id, name] : items().pastRight)
         if (name.compare(0, window.size() + 1, window + "/") == 0) out.push_back(name);
     return out;
+}
+
+std::vector<std::string> Demo::scopeItems(const std::string& scope) {
+    std::set<std::string> out;
+    for (const auto& item : items().labelled) {
+        if (std::find(item.scopes.begin(), item.scopes.end(), scope) == item.scopes.end()) continue;
+        const float x = item.placed.rect.GetCenter().x; // (a control pushed past its panel's side can't be reached)
+        if (x >= item.placed.clip.Min.x && x <= item.placed.clip.Max.x) out.insert(item.text);
+    }
+    return {out.begin(), out.end()};
 }
 
 void Demo::noteClippedLabel(const std::string& label) { items().clipped.push_back({label.substr(0, label.find("##")), items().scopes}); }

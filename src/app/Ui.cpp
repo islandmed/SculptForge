@@ -149,6 +149,11 @@ bool UiItemDragSource(App& app, const char* itemId, const char* label) {
     return dragSource(app, itemId, label, shelf, index);
 }
 
+void SameLineAt(float cursorPosX) {
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(cursorPosX);
+}
+
 void HelpText(const char* title, const char* shortcut, const char* description, const char* path) {
     if (!wantHelp() || !itemHoveredForHelp()) return;
     g_help = HelpRequest{};

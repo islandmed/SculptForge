@@ -65,6 +65,9 @@ public:
     // open then ("Extract/Corners"). clippedLabels(scope) lists last frame's, all of them for an empty scope.
     static void noteClippedLabel(const std::string& label);
     static std::vector<std::string> clippedLabels(const std::string& scope);
+    // The full labels ("Adjust##stencil.adjust") of the items drawn last frame inside SCOPE that are within their window's
+    // sides (not pushed past a panel's edge), sorted: what a person can reach there. Vertical scrolling doesn't count.
+    static std::vector<std::string> scopeItems(const std::string& scope);
 
     // UI tests (UiTest.cpp). Steps that fail stop the run; failures() lists why.
     bool loadScript(const std::string& path, std::string& error);
@@ -267,6 +270,7 @@ private:
     // `snapshot` saves the active mesh; moved* values compare against it. `remember` keeps values for $NAME.
     std::vector<glm::vec3> basePositions_, baseNormals_;
     std::map<std::string, double> remembered_;
+    std::map<std::string, std::vector<std::string>> rememberedItems_; // remember_items NAME SCOPE
     // Simulated SpaceMouse (spacemouse* steps): an SDL virtual joystick with a SpaceMouse Compact's ids.
     SDL_JoystickID virtualSpaceMouse_ = 0;
     SDL_Joystick* virtualSpaceMouseHandle_ = nullptr;
