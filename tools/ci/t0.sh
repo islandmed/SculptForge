@@ -72,10 +72,20 @@ if [ ${#files[@]} -gt 0 ] && [ -f tools/test/affected.py ] && [ -f tests/areas.m
 fi
 echo "T0: ${#files[@]} changed file(s) -> ${regex:-no tests}${SF_TEST_AREA:+ (unit cases of: $SF_TEST_AREA)}"
 if [ -z "$regex" ]; then result=green; finish; fi
+# "[t0 full]" in the branch tip's subject runs every test (proof that a full run completes here).
+git log -1 --format=%s "$tip" | grep -qF '[t0 full]' && { regex=.; echo "T0: [t0 full] in the commit subject: every test"; }
 args=(-j 4); [ "$regex" != . ] && args+=(-R "$regex")
 t=$(date +%s)
+# The tests run in the background and the shell waits, so a SIGTERM reaches this trap at once. A full run once died here (exit
+# 143, no artifact): the warm UI servers had grown past the runner's 16 GB and the kernel's OOM kill took the job with it
+# (tools/test/warm_ui.py MAX_MB). The trap and the memory line below say why, should a runner ever do that again.
+trap 'echo "[t0] SIGTERM $(date +%T)"; free -m; ps -eo pid,ppid,rss,etime,args --sort=-rss | cut -c1-150 | head -8; sudo dmesg 2>/dev/null | grep -i -E "out of memory|oom" | tail -3; tail -4 "$out/ctest.log"; exit 143' TERM
+( while sleep 60; do echo "[t0 $(date +%T)] mem used $(free -m | awk 'NR==2{print $3 " avail " $7}') MB, $(grep -c ' Test  *#' "$out/ctest.log" 2>/dev/null) tests done"; done ) &
+tick=$!
 SDL_VIDEO_DRIVER=offscreen LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
-  python3 tools/test/run.py --build build --junit build/ctest.xml -- "${args[@]}" > "$out/ctest.log" 2>&1; rc=$?
+  python3 tools/test/run.py --build build --junit build/ctest.xml -- "${args[@]}" > "$out/ctest.log" 2>&1 & wait $!; rc=$?
+kill $tick 2>/dev/null
+pkill -f 'build/sculptforge --ui-serve' 2>/dev/null # (a pool the fixture cleanup missed)
 test_s=$(($(date +%s) - t))
 tail -40 "$out/ctest.log"
 if [ $rc -eq 0 ] && grep -q '^== [0-9]* run' "$out/ctest.log"; then result=green; finish; fi
