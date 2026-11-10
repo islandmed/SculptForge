@@ -1,13 +1,12 @@
 {
-  "version": "0.12.1",
+  "version": "0.12.2",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Palettes, the User Guide and Controls on your second monitor (requested by Richard Throgmorton (MakIt3D), our first Founding Member)",
-    "Voxel Remesh up to 4096, with a live triangle estimate (thanks foirgairwolf on Discord)",
-    "Forge Spheres: draw, move and resize without switching modes (thanks @tristratos)",
-    "Find Problems: Fix all repairs messy meshes completely and says what it couldn't fix (thanks foirgairwolf on Discord)",
-    "Solo restores exactly the Parts you had shown (thanks MasterFULL on Discord); big alpha stamps cover curved surfaces (thanks @Devon0209)"
+    "Curves, and rope, braid and sleeve tubes (requested by Hameron (FXiT))",
+    "A Wood brush pack (requested by Hameron (FXiT))",
+    "Shift smoothing keeps Smooth's own Intensity in every stroke type (thanks @nekirk11)",
+    "Unlit view on Alt+L (thanks @nagdav853); Center on origin and Drop to floor in the Gizmo panel"
   ],
   "support": {
     "founding": {
