@@ -62,6 +62,7 @@ struct UiPrefs {
     // vertical as the other styles. invertZoom turns every zoom drag around.
     bool mayaZoomHorizontal = true;
     bool invertZoom = false;
+    float keyNavSpeed = 1.0f; // the pan and zoom keys' speed, times 0.1 to 5 (Preferences > Input)
     // The mouse wheel zooms toward the surface point under the pointer (#134) instead of the view's centre. On for
     // the Maya style (set with the style, and the default when ui.json doesn't say); the other styles keep the centre.
     bool wheelZoomToPointer = false;

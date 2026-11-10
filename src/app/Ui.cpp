@@ -692,7 +692,10 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
     if (!clicked) return false;
     if (CtrlHeld() && AltHeld()) {
         // Ctrl+Alt+click: customize mode drags instead; otherwise it assigns a shortcut.
-        if (!customize) app.beginShortcutCapture(id);
+        // A click that moved was the start of a customize drag (Fenix, Discord: it rebound F silently).
+        const ImVec2 io = ImGui::GetIO().MousePos, down = ImGui::GetIO().MouseClickedPos[0];
+        const float moved = std::abs(io.x - down.x) + std::abs(io.y - down.y);
+        if (!customize && moved < 4.0f) app.beginShortcutCapture(id);
         return false;
     }
     if (run) run();
