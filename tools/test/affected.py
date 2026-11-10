@@ -28,7 +28,8 @@ import re
 import subprocess
 import sys
 
-CORE_FAN_IN = 30  # a header included by this many files under src/ and tests/ is core
+CORE_FAN_IN = 30  # a src/core header included by this many files under src/ and tests/ is core
+AREA_CAP = 40     # T0 runs a whole area only up to this many tests; a broader one rides impacted.py's picks + smoke + its unit cases
 SOURCE_EXT = (".h", ".hpp", ".cpp", ".mm", ".inc")
 
 
@@ -143,7 +144,7 @@ def affected(root, files, amap, tests=None, fan_in=None, cmake_regs=None):
             full = True
             why.append(f"{f}: core path, the full suite")
             continue
-        if f.endswith((".h", ".hpp")) and f.startswith(("src/", "tests/")):
+        if f.endswith((".h", ".hpp")) and f.startswith(("src/core/", "tests/")):  # the data model; app/render headers are impacted.py's build graph
             n = fan_in(f)
             if n >= CORE_FAN_IN:
                 full = True
@@ -160,37 +161,45 @@ def affected(root, files, amap, tests=None, fan_in=None, cmake_regs=None):
     # The unit cases (SF_TEST_AREA): the areas themselves; a file in no [units] area never filters (runs always).
     res["unit_areas"] = ",".join(sorted(areas)) if not full else ""
     res["regex"] = regex_for(areas, amap, tests, full)
+    res["t0_regex"] = regex_for(areas, amap, tests, full, AREA_CAP)  # what T0 runs (merge)
     return res
 
 
-def tests_of(areas, amap, tests):
-    """Names of the non-nightly tests of these areas, plus the smoke set; the sculptforge_tests shards when any area has units."""
+def tests_of(areas, amap, tests, cap=None):
+    """Names of the non-nightly tests of these areas, plus the smoke set; the sculptforge_tests shards when any area has units.
+    cap: leave out the tests of an area with more than that many (smoke and shards stay)."""
     out = set()
+    size = {}
+    for name, labels in (tests or {}).items():
+        if "nightly" not in labels:
+            a = amap.test_area(name)
+            size[a] = size.get(a, 0) + 1
     for name, labels in (tests or {}).items():
         if "nightly" in labels:
             continue
         a = amap.test_area(name)
-        if a in areas or name in amap.sections.get("smoke", []) or a == "unit":
+        if (a in areas and not (cap and size.get(a, 0) > cap)) or name in amap.sections.get("smoke", []) or a == "unit":
             out.add(name)
     if "marks" in (tests or {}):
         out.add("marks")
     return out
 
 
-def regex_for(areas, amap, tests, full):
+def regex_for(areas, amap, tests, full, cap=None):
     if full:
         return "."
-    names = tests_of(areas, amap, tests)
+    names = tests_of(areas, amap, tests, cap)
     return "^(" + "|".join(sorted(names)) + ")$" if names else ""
 
 
 def merge(res, impacted_regex):
     """The area tests plus the direct picks of impacted.py (a script's own tests, a UI test sharing a word with the file ...):
-    never fewer tests than the area says, and `.` from either side stays the full suite."""
+    and `.` from either side stays the full suite. A broad area (over AREA_CAP tests) adds only its unit cases and the smoke
+    set here: its UI tests are impacted.py's picks, and `affected.py --area X` / `ctest -L area_X` run them all."""
     if res["full"] or impacted_regex == "." or res["regex"] == ".":
         return "."
     picks = set(re.findall(r"[A-Za-z0-9_]+", impacted_regex))
-    mine = set(re.findall(r"[A-Za-z0-9_]+", res["regex"]))
+    mine = set(re.findall(r"[A-Za-z0-9_]+", res.get("t0_regex", res["regex"])))
     names = mine | picks
     return "^(" + "|".join(sorted(names)) + ")$" if names else ""
 
@@ -238,6 +247,11 @@ ui_shell
     assert a["areas"] == ["cloth"] and a["unit_areas"] == "cloth" and not a["full"], a
     assert a["regex"] == "^(marks|sculptforge_tests_0of2|sculptforge_tests_1of2|ui_cloth_brush|ui_cloth_drape|ui_shell)$", a["regex"]
     assert r("src/core/Cloth.cpp", "src/app/Shell.cpp")["unit_areas"] == "cloth,ui"
+    assert merge(a, "^(ui_tube)$") == "^(marks|sculptforge_tests_0of2|sculptforge_tests_1of2|ui_cloth_brush|ui_cloth_drape|ui_shell|ui_tube)$"
+    big = {f"ui_n{i}": ["ui"] for i in range(AREA_CAP + 1)}
+    big.update(tests)
+    b = affected("/nonexistent", ["src/app/Shell.cpp"], amap, big, fan)
+    assert "ui_n3" in b["regex"] and "ui_n3" not in merge(b, "^(ui_tube)$") and "ui_tube" in merge(b, "^(ui_tube)$"), "a broad area is not added whole to T0"
     assert r("src/core/Mesh.h")["regex"] == "." and r("src/core/Mesh.h")["full"]
     assert r("src/core/Small.h")["regex"] != "."
     assert r("CMakeLists.txt")["regex"] == "." and r("tests/areas.map")["full"]

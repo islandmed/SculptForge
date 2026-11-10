@@ -67,10 +67,11 @@ tooling, repo checks). Its sections map ctest names (`[tests]`), `tests/test_*.c
   `SF_TEST_AREA=cloth,ui` (or `--area`) makes every shard run only those cases. `test_areas` fails for a test, a unit
   file or a smoke name the map doesn't cover (add a line; the globs cover most new tests), so every test has one area.
 - **T0 = smoke + the changed files' areas + impacted.py's direct picks** (tools/test/affected.py `--merge`; t0.sh, pc.sh and
-  tools/ci/t0.sh call it). A branch that touches one area runs that area's tests, its unit cases and the smoke set, and not
-  the other areas' tests. A CMakeLists.txt edit that only registers tests counts as those tests' area.
-- **Everything runs** (`.`) for a [core] path (CMake beyond test registrations, the harness, the map), a header included by
-  30+ files under src/ and tests/ (Document.h, Mesh.h, Json.h ...), or a path no `[paths]` line covers. Nothing is skipped
+  tools/ci/t0.sh call it). A branch that touches one area runs that area's tests (a broad area, over 40 tests, only its unit
+  cases and the smoke set: its UI tests are impacted.py's picks; `affected.py --area sculpt` or `ctest -L area_sculpt`
+  runs them all), and not the other areas' tests. A CMakeLists.txt edit that only registers tests counts as those tests' area.
+- **Everything runs** (`.`) for a [core] path (CMake beyond test registrations, the harness, the map), a src/core or tests header included by
+  30+ files (Document.h, Mesh.h, Json.h ...; app and render headers are the build graph's), or a path no `[paths]` line covers. Nothing is skipped
   or weakened by areas: a flaky test stays in its area and is listed in tests/flaky.md; T1 and the batch stage run every test.
 - **The full suite runs once per release batch**: `merge-batch.sh` stages the batch (CI on `staging` and `t1.sh` on the PC,
   both the whole suite). `t1.sh` logs a green run on a clean tree in `~/Work/.sf/t1/green.tsv`, and `release.sh X.Y.Z --stage`
