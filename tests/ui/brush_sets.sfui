@@ -5,21 +5,21 @@ run ui_look look=classic layout=classic
 run new_sphere subdivisions=5
 expect_value brush_sets == 0
 
-# Wood: Rivet Row on the shelf, with J (Ctrl+Alt+click its tile, then the key), and K on Clay.
+# Wood: Rivet Row on the shelf, with H (Ctrl+Alt+click its tile, then the key), and K on Clay.
 click "##addbrush"
 click "Rivet Row"
 expect "Rivet Row##brush.recipe.Rivet Row"
 hold ctrl+alt
 click "Rivet Row##brush.recipe.Rivet Row"
 hold none
-key j
-expect_shortcut "brush.recipe.Rivet Row" J
+key h
+expect_shortcut "brush.recipe.Rivet Row" H
 hold ctrl+alt
 click "Clay##brush.clay"
 hold none
 key k
 expect_shortcut brush.clay K
-key j
+key h
 expect_value brush_type == -1
 key k
 expect_value brush_type == 1
@@ -38,7 +38,7 @@ expect_status Brush set saved: Wood
 expect_value brush_sets == 1
 expect_value brush_set_active == 0
 
-# Metal: no Rivet Row, no Clay on the shelf, and J on Flatten (taken from Rivet Row).
+# Metal: no Rivet Row, no Clay on the shelf, and H on Flatten (taken from Rivet Row).
 right_click "Rivet Row##brush.recipe.Rivet Row"
 click "Remove from shelf"
 right_click "Clay##brush.clay"
@@ -47,8 +47,8 @@ expect_value brush_set_active == -1
 hold ctrl+alt
 click "Flatten##brush.flatten"
 hold none
-key j
-expect_shortcut brush.flatten J
+key h
+expect_shortcut brush.flatten H
 run brush_set_save name=Metal
 expect_value brush_sets == 2
 click "Brush##palette.brush"
@@ -63,10 +63,10 @@ click "Wood##brushset1"
 expect_status Brush set: Wood
 expect "Rivet Row##brush.recipe.Rivet Row"
 expect "Clay##brush.clay"
-expect_shortcut "brush.recipe.Rivet Row" J
+expect_shortcut "brush.recipe.Rivet Row" H
 expect_shortcut brush.clay K
 expect_value shortcut_conflicts == 0
-key j
+key h
 expect_value brush_type == -1
 
 # Metal again from the bottom shelf's right-click menu.
@@ -79,9 +79,9 @@ shot shelf_menu
 click "Metal##brushset0"
 expect_not "Rivet Row##brush.recipe.Rivet Row"
 expect_not "Clay##brush.clay"
-expect_shortcut brush.flatten J
+expect_shortcut brush.flatten H
 expect_value shortcut_conflicts == 0
-key j
+key h
 expect_value brush_type == 6
 
 # F3 finds every set.
@@ -98,7 +98,7 @@ restart
 expect_value brush_sets == 2
 expect_value brush_set_active == 1
 expect "Rivet Row##brush.recipe.Rivet Row"
-expect_shortcut "brush.recipe.Rivet Row" J
+expect_shortcut "brush.recipe.Rivet Row" H
 click "Brush##palette.brush"
 expect_text Brush set: Wood
 wait_idle 60

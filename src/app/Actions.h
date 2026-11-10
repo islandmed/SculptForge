@@ -52,6 +52,11 @@ std::vector<std::string> chordKeys(std::string_view chord);
 // key is held, and step through an insert set, on whatever keys they are bound to.
 int brushSizeStep(const Action* a);
 
+// The view actions that move the camera while their key is held (Pan left/right/up/down, Zoom in/out): the
+// direction as pixels per second of panning at speed 1 and zoom steps per second, or false for any other action.
+bool keyNavMotion(const Action* a, float& panX, float& panY, float& zoomSteps);
+constexpr float kKeyNavPanPixels = 600.0f, kKeyNavZoomSteps = 4.0f; // per second at speed 1.0 (Preferences > Input)
+
 class ActionRegistry {
 public:
     void add(Action a); // replaces by id
@@ -77,6 +82,11 @@ public:
     // keepOthers: add CHORD to the action's chords instead of replacing them (an imported keymap's second key).
     std::string assignShortcut(std::string_view id, const std::string& chord, bool keepOthers = false);
     bool hasOverride(std::string_view id) const;
+    // The other actions that already use CHORD (exactly: Ctrl+Z is not Z), for the warning before a key is reassigned.
+    std::vector<const Action*> holdersOf(const Chord& chord, std::string_view exceptId) const;
+    // Back to the action's default chord (the key style's); any action that holds it now loses it. Returns the
+    // labels of those actions, ", " separated, or "".
+    std::string resetShortcut(std::string_view id);
     void clearOverrides();
     // The action that CHORD runs (enabled or not), or nullptr.
     const Action* actionForChord(const Chord& chord) const;
