@@ -52,6 +52,36 @@ stay in `~/Work/.sf/t0-ci/<worktree>/`.
   the tests are still picked from the branch's own files.
 - The PC stays for GPU-specific checks (it runs the D3D12 GPU path), T1 and release staging.
 
+## Areas: test the part you touched, the whole once per batch
+
+`tests/areas.map` is the one map. Eight areas: **sculpt** (brush engine, strokes, masking, paint, input, performance),
+**mesh** (remesh, cut, crease, levels, tube, parts, UV), **cloth**, **ui** (shell, panels, menus, gizmos), **render**,
+**io** (formats, projects, bridges, packs), **ai** (generation, links, updates), **site** (i18n, docs, release and CI
+tooling, repo checks). Its sections map ctest names (`[tests]`), `tests/test_*.cpp` files (`[units]`) and source paths
+(`[paths]`); `[smoke]` is the cross-area set (start, open, stroke, save/load, a UI shot, mode matrix and monkey);
+`[core]` lists the paths that mean everything.
+
+- **Labels**: cmake/TestAreas.cmake gives every ctest entry exactly one label `area_<name>` (plus `smoke`).
+  `ctest -L area_cloth` is the cloth tests, `ctest -L smoke` the quick set; `tools/test/affected.py --area cloth` prints the
+  names. The `sculptforge_tests` shards are area `unit`: their TEST cases belong to the area of their file (`[units]`) and
+  `SF_TEST_AREA=cloth,ui` (or `--area`) makes every shard run only those cases. `test_areas` fails for a test, a unit
+  file or a smoke name the map doesn't cover (add a line; the globs cover most new tests), so every test has one area.
+- **T0 = smoke + the changed files' areas + impacted.py's direct picks** (tools/test/affected.py `--merge`; t0.sh, pc.sh and
+  tools/ci/t0.sh call it). A branch that touches one area runs that area's tests, its unit cases and the smoke set, and not
+  the other areas' tests. A CMakeLists.txt edit that only registers tests counts as those tests' area.
+- **Everything runs** (`.`) for a [core] path (CMake beyond test registrations, the harness, the map), a header included by
+  30+ files under src/ and tests/ (Document.h, Mesh.h, Json.h ...), or a path no `[paths]` line covers. Nothing is skipped
+  or weakened by areas: a flaky test stays in its area and is listed in tests/flaky.md; T1 and the batch stage run every test.
+- **The full suite runs once per release batch**: `merge-batch.sh` stages the batch (CI on `staging` and `t1.sh` on the PC,
+  both the whole suite). `t1.sh` logs a green run on a clean tree in `~/Work/.sf/t1/green.tsv`, and `release.sh X.Y.Z --stage`
+  skips its own T1 when the bump commit only adds release paperwork to a commit logged there
+  (`tools/release/paperwork_only.py`, the rule CI's reuse uses; `SF_T1_FORCE=1` runs it anyway). It does the same for the
+  full CI on `staging` (`ci_reused`: the batch commit's CI passed, so `SF_STAGE_CI_REUSED` makes merge-queue.sh skip the
+  second dispatch). The push to `staging` still happens, for its Packages run. The bump costs paperwork checks, not a second
+  suite; the bump's own tests (What's New, guide, notes) run in step `check`. The bump pins `tests/ui/whats_new.sfui`, which
+  paperwork_only.py now allows line by line (version, comment, expected texts); before, every real bump failed that check.
+  Floor benches stay with `bench.sh`.
+
 ## T1 and T2: one batch, two machines at once
 
 The merger (`~/Work/.sf/merge-batch.sh`) merges the green branches, then calls

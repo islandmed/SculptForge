@@ -572,8 +572,16 @@ step_stage() {
         ok "T1: ${sha:0:8} only adds release paperwork to ${c:0:8}, whose full suite passed on the PC (tools/release/paperwork_only.py): reused"
         with=""
     fi
+    # Likewise the full CI on staging: the batch's own run passed (and main's push CI reused it), so the bump commit that only
+    # adds paperwork doesn't dispatch a second one. The staging push still happens: it starts the Packages run.
+    local reused=""
+    if [ -z "${SF_T1_FORCE:-}" ] && reused=$(ci_reused "$sha"); then
+        ok "CI: ${sha:0:8} only adds release paperwork to ${reused%% *}, whose CI run ${reused##* } passed: no second full run on staging"
+    else
+        reused=""
+    fi
     # The release's own suite goes first on the PC (pc.sh priority lane), not behind benches (0.11.14 waited for one).
-    SF_PC_PRIO=1 "${MERGE_QUEUE:-scripts/merge-queue.sh}" staging ${with:+--with "$with"} "$sha" ||
+    SF_STAGE_CI_REUSED=$reused SF_PC_PRIO=1 "${MERGE_QUEUE:-scripts/merge-queue.sh}" staging ${with:+--with "$with"} "$sha" ||
         die "staging ${sha:0:8} is red, or main moved (above)" "fix the batch (main moved: merge origin/main), then $(resume bump)"
     ok "main is the staged ${sha:0:8} ($V); packages.yml is building its packages on the staging push"
     # The staging push's Packages run builds what --yes will promote, the macOS .dmg included (deployment target 11:
