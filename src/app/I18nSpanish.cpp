@@ -3079,6 +3079,7 @@ constexpr Entry kSpanish[] = {
     {"Download the new package from the website and open it.",
      "Descarga el paquete nuevo desde el sitio web y ábrelo."},
     {"Try again", "Reintentar"},
+    {"Switched off by the Space's owner, use Image to 3D", "El propietario del Space lo desactivó; usa Imagen a 3D"},
     {"Update", "Actualizar"},
     {"Download the new version from SculptForge's GitHub releases, check its signature and checksum, and install it. "
      "The current version is kept until the new one has started.",
