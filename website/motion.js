@@ -146,6 +146,39 @@
     window.goatcounter.count({ path: "download: " + file + (campaign ? " [" + campaign + "]" : ""), title, event: true });
   });
 
+  // --- Memberships per ad: a visit that arrived from a tagged link carries its campaign into Stripe's checkout as
+  // client_reference_id (onboarding reads it back), and the click is a GoatCounter event named for the tier and the
+  // campaign. Current page view only: no cookie, no storage. Without a campaign the links are left as they are. ---
+  const ref = (new URLSearchParams(location.search).get("utm_campaign") || "")
+    .toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 200);
+  const buy = 'a[href^="https://buy.stripe.com/"]';
+  const tag = (u) => {
+    if (!ref || !u) return u;
+    const url = new URL(u, location.href);
+    if (url.hostname !== "buy.stripe.com") return u;
+    url.searchParams.set("client_reference_id", ref);
+    return url.href;
+  };
+  if (ref) {
+    document.querySelectorAll(buy).forEach((a) => {
+      a.href = tag(a.href);
+      if (a.dataset.yearly) a.dataset.yearly = tag(a.dataset.yearly);
+    });
+    // A script that swaps the link later (support.html's monthly/yearly switch) can put an untagged one back: tag it
+    // again as the visitor reaches for it.
+    ["pointerdown", "click", "auxclick", "contextmenu"].forEach((type) => document.addEventListener(type, (e) => {
+      const a = e.target.closest?.(buy);
+      if (a) a.href = tag(a.href);
+    }, true));
+  }
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest(buy);
+    if (!a || !window.goatcounter?.count) return;
+    const tier = a.hasAttribute("data-member-link") ? "member" : "studio"; // every other buy link is a Studio plan
+    window.goatcounter.count({ path: "checkout: " + tier + (ref ? " [" + ref.slice(0, 40) + "]" : ""),
+      title: a.innerText.replace(/\s+/g, " ").trim().slice(0, 60), event: true });
+  });
+
   if (!guide) return;
 
   // --- Contents drawer (phones and tablets) ---
