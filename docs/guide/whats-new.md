@@ -14,6 +14,8 @@ highlight: Curves, and rope, braid and sleeve tubes (requested by Hameron (FXiT)
 highlight: A Wood brush pack (requested by Hameron (FXiT))
 highlight: Shift smoothing keeps Smooth's own Intensity in every stroke type (thanks @nekirk11)
 highlight: Unlit view on Alt+L (thanks @nagdav853); Center on origin and Drop to floor in the Gizmo panel
+highlight: Curves, and rope, braid and sleeve tubes
+highlight: A Wood brush pack
 ```
 
 - **Curves**: **Tool > Tube > Result > Curve** draws a guide line on or over the model; **Resample** sets its point
@@ -33,6 +35,21 @@ highlight: Unlit view on Alt+L (thanks @nagdav853); Center on origin and Drop to
 - **Drape**: sleeves no longer jitter once the cloth is at rest.
 - **Customize Shelves**: every button and value field can be moved with Ctrl+Alt+drag, including greyed-out options
   and the Size, Intensity and Detail fields.
+- **Curves**: **Tool > Tube > Result > Curve** draws a guide line on or over the model; **Resample** sets its point
+  count exactly and **Tube from curve** turns it into a tube. New tube profiles **Rope**, **Braid** and **Sleeve**,
+  and **Twist**, **Spin** and **Spread** sliders.
+- **Center on origin, Drop to floor**: two buttons in the Gizmo panel put the Part's bounding-box centre on 0,0,0 or
+  rest it on the floor, in one undo step (all Parts together with **All Parts**). With the Classic sculpting keys,
+  **F** frames the active Part and **F** twice quickly frames the whole scene.
+- **Unlit view** (Render menu, <kbd>Alt</kbd>+<kbd>L</kbd>): shows the base colour alone, with no lighting, so painted
+  colour reads exactly as stored.
+- **Wood brush pack**: ten brushes and six alphas for weathered grain, splinters, cracks, knots, end-grain rings and
+  plank seams (**Sculpt > Brush**, pack **Wood**). Requested by Hameron (FXiT).
+- **Customize Shelves**: every button and value field can be moved with Ctrl+Alt+drag, including options that are
+  greyed out and the Size, Intensity and Detail fields.
+- **Shift smoothing keeps Smooth's own Intensity**: set Smooth's Intensity with Shift held, and every stroke type
+  (Drag Stamp too) smooths at that value from the first dab, not at the brush's Intensity. The Intensity slider keeps
+  showing it while you smooth.
 
 ## Version 0.12.1
 

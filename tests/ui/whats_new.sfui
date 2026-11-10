@@ -2,9 +2,9 @@
 # block); Esc closes it, Try it opens the feature, Full release notes opens the guide chapter, which shows the last
 # three versions in full and folds the older ones into groups.
 # The window is pinned to 0.10.7's five cards (SF_WHATS_NEW_VERSION), so this stays valid after each release; the guide
-# chapter below is pinned to 0.12.1 (SF_GUIDE_VERSION), so it checks 0.12.1's section before and after the release.
+# chapter below is pinned to 0.12.2 (SF_GUIDE_VERSION), so it checks 0.12.2's section before and after the release.
 env SF_WHATS_NEW_VERSION 0.10.7
-env SF_GUIDE_VERSION 0.12.1
+env SF_GUIDE_VERSION 0.12.2
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 click "Help##palette.help"
@@ -62,12 +62,12 @@ wait 0.3
 expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
+expect_text "Version 0.12.2"
+expect_text "Curves and rope tubes, a Wood brush pack, an Unlit view, and origin tools."
 expect_text "Version 0.12.1"
 expect_text "Panels on your second monitor, Voxel Remesh up to 4096, Forge Spheres in one mode, and a Find Problems that finishes the job."
 expect_text "Version 0.12.0"
 expect_text "Garments and cloth, sandboxed plugins, a Tool palette in the order you work, and cleaner cuts and creases."
-expect_text "Version 0.11.16"
-expect_text "One gizmo for move, rotate and scale, symmetric cuts, and clearer labels."
 expect_value whats_new_contents == 6
 expect_value whats_new_expanded == 1
 shot whats-new-guide
