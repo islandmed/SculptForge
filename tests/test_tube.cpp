@@ -569,8 +569,11 @@ TEST(tube_twist_and_spin_turn_the_profile_along_the_length) {
     CHECK(watertight(both) && oriented(both));
     const Mesh a = tubeSweep(q), b = tubeSweep(tubeMirrored(q));
     CHECK(a.vertexCount() == b.vertexCount());
-    for (size_t i = 0; i < a.vertexCount(); i += 7)
-        CHECK(glm::distance(vec3(-a.positions[i].x, a.positions[i].y, a.positions[i].z), b.positions[i]) < 1e-4f);
+    for (size_t i = 0; i < a.vertexCount(); i += 7) { // (the mirror reverses each ring's order: look for the vertex)
+        float nearest = 1e9f;
+        for (const vec3& p : b.positions) nearest = std::min(nearest, glm::distance(vec3(-a.positions[i].x, a.positions[i].y, a.positions[i].z), p));
+        CHECK(nearest < 1e-4f);
+    }
     // No twist and no spin: exactly the old sweep.
     TubeShape plain = squareLine();
     plain.roll = 10.0f;

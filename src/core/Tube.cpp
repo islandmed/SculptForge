@@ -639,7 +639,7 @@ static TubeShape curveWire(TubeShape w) {
 Mesh tubeSweep(const TubeShape& shape_, bool uniform, float edge) {
     if (!tubeValidate(shape_).empty()) return {};
     const TubeShape shape = shape_.curve ? curveWire(shape_) : shape_;
-    if (!(edge > 0.0f)) edge = tubeEdgeLength(shape);
+    if (!(edge > 0.0f)) edge = tubeEdgeLength(shape_); // (a curve's wire is swept at its tube's edge length)
     Builder b;
     b.sweep(shape, uniform, edge, 0);
     if (shape.mirrorX) {
