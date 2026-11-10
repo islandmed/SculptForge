@@ -706,6 +706,9 @@ constexpr Entry kSpanish[] = {
 
     // --- Preferences > Interface ---
     {"Language", "Idioma"},
+    {"Language:", "Idioma:"},
+    {"Change", "Cambiar"},
+    {"SculptForge is in %s.", "SculptForge está en %s."},
     {"Units", "Unidades"},
     {"OBJ/PLY in", "OBJ/PLY en"},
     {"Part size", "Tamaño de la parte"},

@@ -7,6 +7,8 @@ bar at the bottom of the view (**Back to the tour** brings it back).
 
 The pictures are SculptForge in its default look and layout.
 
+The interface is also in Spanish, Traditional Chinese and Simplified Chinese: the welcome's **Language** row (or **Edit > Preferences > Interface > Language**) switches it at once.
+
 ## Where things are
 
 ![The command search finding Quad Remesh by the word "retopo"](images/quick-tour/01-where.jpg)

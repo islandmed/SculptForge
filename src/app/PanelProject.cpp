@@ -32,6 +32,7 @@
 #include <cctype>
 #include <chrono>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -180,6 +181,12 @@ void App::initProject() {
     } else {
         showWelcome_ = options_.uiTest.empty() && options_.demo.empty() && !options_.benchmark; // the first start: no prefs yet
         startInputStyle_ = uiPrefs_.inputStyle; // a new install: SculptForge's keys until the welcome's choice
+        // The OS language, if SculptForge has it (PanelSupport.cpp). Never for a headless display, a test, a demo, a
+        // studio build (its profile sets the language) or a ui.json someone already made.
+        const char* driver = SDL_GetCurrentVideoDriver();
+        const bool noScreen = driver && (std::strcmp(driver, "offscreen") == 0 || std::strcmp(driver, "dummy") == 0);
+        if (showWelcome_ && !noScreen && !uiConfigDeterministic_ && !studioMembership() && !fileExists(uiConfigPath()))
+            offerFirstRunLanguage(osLanguageTag());
         newLookCardDone_ = true; // a new install starts in the new look (or ui.json's): nothing to announce
     }
     initSelfUpdate(); // a just-installed version counts its start (PanelUpdate.cpp)

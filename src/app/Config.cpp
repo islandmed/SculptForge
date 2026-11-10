@@ -1097,7 +1097,8 @@ void App::autosavePrefs(bool flush) {
     std::string key = prefsKey();
     if (!prefsKeyKnown_) { // the first look: what the start read (or the defaults) is already on disk
         prefsKeyKnown_ = true;
-        prefsSavedKey_ = std::move(key);
+        prefsSavedKey_ = languageUnsaved_ ? std::string() : std::move(key); // (the first start's language still has to be written)
+        languageUnsaved_ = false;
         return;
     }
     if (key == prefsSavedKey_) {
@@ -1661,9 +1662,7 @@ void drawInterfaceSection(App& app) {
         if (ImGui::GetContentRegionAvail().x < width) ImGui::NewLine();
         const std::string label = std::string(languageName(lang)) + "##language." + languageCode(lang);
         if (ImGui::RadioButton(label.c_str(), languageFromCode(p.language) == lang)) {
-            p.language = languageCode(lang);
-            setLanguage(lang);
-            app.requestUiScale(); // the fonts again, with or without the Chinese glyphs
+            app.setInterfaceLanguage(lang);
         }
         ui::HelpText("Language", nullptr,
                      "The language of menus, palettes, shelves and messages. Brush and tool names (Quad Remesh, Forge Spheres, "

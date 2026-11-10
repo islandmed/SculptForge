@@ -173,6 +173,7 @@ public:
     // window and GL context, made once, instead of its own; shutdown() leaves them (and SDL) for the next script.
     static void shareWindow(SDL_Window* window, SDL_GLContext context);
     static void glWindowAttributes(); // OpenGL 3.3 core, before a window is made
+    void setInterfaceLanguage(Language lang); // live and remembered in ui.json (Preferences > Interface, the welcome, the bar)
     void requestUiScale(); // Preferences > Interface > UI scale changed: rebuilt live before the next frame (#87)
 
     enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, AppendPart, ComfyWorkflow, LoadLitSphere, InsertMesh, InsertSet, Count };
@@ -516,6 +517,16 @@ private:
     void drawSupportUi();               // the first-run welcome and the new-look note
     void drawSupportersSection();       // Help > About: the names from docs/supporters.txt, as plain text
     bool showWelcome_ = false;          // the first start (no project.json yet), or Help > Welcome
+    // The first start's language (#44, PanelSupport.cpp): an OS language SculptForge ships starts in it, with a small bar
+    // ("SculptForge is in Español. [Change]") for this session only; any other OS language keeps English and the
+    // welcome's language row is the offer. Never in tests, renders, demos or a headless display.
+    void offerFirstRunLanguage(std::string_view osTag); // the decision, from osLanguageTag() (UI tests: any tag)
+    void drawLanguageRow();                              // the welcome's row: each language in its own script
+    void drawLanguageBar(const CanvasRect& canvas);
+    void openPreferencesSection(const char* subpalette); // Preferences with that section open and flashed
+    bool languageBar_ = false;                           // the bar after an automatic switch
+    Language languageBarFor_ = Language::English;        // (it goes when the language is changed another way)
+    bool languageUnsaved_ = false;                       // the automatic choice isn't in ui.json yet (autosavePrefs)
     // project.json "input_style": the key style an install started with (the welcome's "Coming from" choice, or
     // SculptForge for a new install), used while ui.json (saved automatically) names none; -1: an install from before it,
     // which keeps the Classic sculpting keys it had.

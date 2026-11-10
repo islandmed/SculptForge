@@ -33,6 +33,13 @@ Language language();
 const char* languageCode(Language language);    // "en", "es", "zh-TW", "zh-CN" (ui.json)
 Language languageFromCode(std::string_view code); // unknown codes are English
 const char* languageName(Language language);    // in that language: "English", "Español", "繁體中文", "简体中文"
+// The shipped language for an operating system's locale tag: "es-MX", "es_ES.UTF-8", "zh-Hant-TW", "zh_CN.UTF-8@x", any
+// case. Spanish; Traditional Chinese for zh-TW / zh-HK / zh-MO / zh-Hant; Simplified for the other zh; everything else
+// (pt-BR, "C", "POSIX", "") is English. For the first start (App::offerFirstRunLanguage), not for ui.json (languageFromCode).
+Language languageFromOsLocale(std::string_view tag);
+// The language tag the OS interface is in (Windows GetUserDefaultUILanguage, macOS CFLocaleCopyPreferredLanguages, else
+// LC_ALL / LC_MESSAGES / LANG), "" when it can't tell. SF_OS_LANGUAGE overrides it (QA). Calibration.cpp.
+std::string osLanguageTag();
 // True for a language whose text needs the CJK font merged into the UI fonts (App::buildUiFonts).
 bool languageNeedsCjkFont(Language language);
 
