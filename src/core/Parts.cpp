@@ -950,15 +950,26 @@ void registerPartCommands(CommandRegistry& reg) {
                  bool othersShown = false;
                  for (int i = 0; i < doc.partCount(); ++i)
                      othersShown |= i != doc.activePart && doc.parts[size_t(i)].visible;
-                 for (int i = 0; i < doc.partCount(); ++i)
-                     doc.parts[size_t(i)].visible = i == doc.activePart || !othersShown;
+                 if (othersShown) { // Solo on (or the active Part changed during Solo: the first memory stays)
+                     for (int i = 0; i < doc.partCount(); ++i) {
+                         Part& s = doc.parts[size_t(i)];
+                         if (s.shownBeforeSolo < 0) s.shownBeforeSolo = s.visible ? 1 : 0;
+                         s.visible = i == doc.activePart;
+                     }
+                 } else { // Solo off: back to what was shown when it began (a Part made since is shown)
+                     for (int i = 0; i < doc.partCount(); ++i) {
+                         Part& s = doc.parts[size_t(i)];
+                         s.visible = i == doc.activePart || s.shownBeforeSolo != 0;
+                         s.shownBeforeSolo = -1;
+                     }
+                 }
                  doc.modified = true;
-                 return {true, othersShown ? "Solo: " + doc.activePartInfo().name : std::string("All Parts shown")};
+                 return {true, othersShown ? "Solo: " + doc.activePartInfo().name : std::string("Back to the Parts shown before Solo")};
              }});
 
     reg.add({"part_show_all", "Show every Part.", {},
              [](Document& doc, const Args&) -> CommandResult {
-                 for (auto& s : doc.parts) s.visible = true;
+                 for (auto& s : doc.parts) s.visible = true, s.shownBeforeSolo = -1;
                  doc.modified = true;
                  return {true, "All Parts shown"};
              }});

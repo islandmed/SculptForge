@@ -54,6 +54,9 @@ struct Part {
     uint32_t id = 0; // stable for the session (renderer slots, UI selection)
     std::string name;
     bool visible = true;
+    // While Solo is on: whether this Part was shown when Solo began (Solo's exit puts it back exactly). -1 = not
+    // remembered (a Part made during Solo, or Solo is off).
+    int8_t shownBeforeSolo = -1;
     Shading shading = Shading::Default; // per-Part override of the scene's shading
     uint32_t folder = 0;                // the PartFolder it's in (its id), 0 = none
     // Where the mesh is in the scene: world = transform * mesh position. Identity unless the Part is a linked copy

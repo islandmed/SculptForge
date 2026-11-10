@@ -875,6 +875,7 @@ struct LoadedPart {
     std::string name, bridgeName;
     std::vector<QRemeshGuide> qremeshGuides;
     bool visible = true;
+    int8_t shownBeforeSolo = -1;
     Shading shading = Shading::Default;
     int folder = -1; // index into the manifest's part_folders (#96)
     int activeLayer = -1;
@@ -934,6 +935,7 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
                 if (id == s.id) visible = was;
         }
         st.set("visible", visible);
+        if (s.shownBeforeSolo >= 0) st.set("shown_before_solo", s.shownBeforeSolo != 0); // (optional: Solo in progress)
         if (s.shading != Shading::Default) st.set("shading", shadingName(s.shading)); // (no format change: optional)
         if (const int f = doc.partFolderIndex(s.folder); f >= 0) st.set("folder", f); // (#96: optional, as shading)
         if (s.moved()) {
@@ -1120,6 +1122,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             s.name = sj["name"].asString();
             if (s.name.empty()) s.name = "Part";
             s.visible = sj["visible"].asBool(true);
+            if (sj["shown_before_solo"].isBool()) s.shownBeforeSolo = sj["shown_before_solo"].asBool(true) ? 1 : 0;
             if (sj["shading"].isString()) parseShading(sj["shading"].asString(), s.shading); // unknown: Default
             s.folder = int(sj["folder"].asNumber(-1));
             s.bridgeName = sj["bridge_name"].asString();
@@ -1228,12 +1231,14 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     doc.bridgeName = parts[0].bridgeName;
     doc.qremeshGuides = std::move(parts[0].qremeshGuides);
     doc.parts[0].visible = parts[0].visible;
+    doc.parts[0].shownBeforeSolo = parts[0].shownBeforeSolo;
     doc.parts[0].shading = parts[0].shading;
     doc.parts[0].transform = parts[0].transform;
     for (size_t i = 1; i < parts.size(); ++i) {
         if (parts[i].link >= 0) { // shares an earlier Part's mesh (Parts load in order: index i is i here too)
             const int at = doc.addLink(parts[i].link, parts[i].name, parts[i].transform);
             doc.parts[size_t(at)].visible = parts[i].visible;
+            doc.parts[size_t(at)].shownBeforeSolo = parts[i].shownBeforeSolo;
             doc.parts[size_t(at)].shading = parts[i].shading;
             continue;
         }
@@ -1241,6 +1246,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
         const int at = doc.addPart(std::move(parts[i].mesh), parts[i].name, false, -1, builtI);
         Part& s = doc.parts[size_t(at)];
         s.visible = parts[i].visible;
+        s.shownBeforeSolo = parts[i].shownBeforeSolo;
         s.shading = parts[i].shading;
         s.transform = parts[i].transform;
         s.data->activeLayer = validLayer(parts[i].activeLayer, s.data->mesh);
