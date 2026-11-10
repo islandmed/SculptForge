@@ -2206,6 +2206,9 @@ private:
     // The right shelf too tall for the window (1024x768, 1600x960 at 150 %): its view toggles (Turntable, Ortho,
     // Floor, Flat) fold into one View button with a pop-over, until the window is tall enough again.
     bool rightShelfFolded_ = false;
+    float rightShelfFoldH_ = 0.0f;        // the shelf's height when it folded: it unfolds only when taller (no flicker at the edge)
+    float shelfShrinkH_[4] = {0, 0, 0, 0}; // a side shelf's height when its buttons last shrank: they grow back only for a taller one
+    int rightShelfChanges_ = 0; // frames that folded, unfolded or resized the right shelf (UI tests: none without input)
     float topShelfFullW_ = 0.0f, topShelfTailW_ = 0.0f;
     int navDrag_ = -1;          // right-shelf drag button being dragged (0 move, 1 zoom, 2 rotate)
     ImVec2 navLast_{0, 0};      // the cursor at its last frame (the drag moves by the cursor's own steps)

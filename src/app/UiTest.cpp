@@ -30,6 +30,7 @@
 //                            let go of the held modifiers halfway (Alt-drag, release Alt to zoom)
 //   drag_item LABEL DX DY [S] [keep] left-drag from the item by DX DY pixels (scrubbing, dragging a tile out);
 //                            keep: leave the button down (a check mid-drag), then `release`
+//   drag_shelf_items N       Customize Shelves + Ctrl+Alt held: drag every action off the shelves; each must come off (at least N)
 //   wheel_item LABEL X Y      the mouse wheel over the item: X sideways (a trackpad swipe), Y up/down
 //   drag_path U0 V0 U1 V1 ... [keep] [S=seconds]   left-drag through the points (fractions of the model's
 //                            on-screen bounds; outside 0..1 is the background) with the held modifiers: a lasso,
@@ -208,7 +209,8 @@
 //                            position, projected back), dab_jitter / dab_jitter_raw (its depth wobble with / without
 //                            the pick filter, x1000 radii), dabs, pixel_density (2 on a HiDPI screen), input_style (0 classic, 1 SculptForge, 2 Blender), turntable, orbit_lock (0 free, 1 Y, 2 X, 3 Z),
 //                            camera_ortho, checked@ACTION (1 when the toggle shows on), size_slider_ring (a Size slider's ring: 1 while it drags, then fading),
-//                            right_column_clipped (right shelf items past its bottom), mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
+//                            right_column_clipped (right shelf items past its bottom), right_shelf_changes (frames that folded,
+//                            unfolded or resized it; steady = no change), right_shelf_folded, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
 //                            claim), brush_type (BrushType
 //                            index, -1 for a custom brush or Paint), last_dab_x / last_dab_y (window pixels), paint_r, recent_colors (the left shelf's recent paint colours)
 //                            gizmo_mode (0 Draw, 1 Move, 2 Scale, 3 Rotate, 4 All), gizmo_hover (handle under the cursor,
@@ -351,6 +353,7 @@
 #include "app/Demo.h"
 #include "app/NativeDialog.h"
 #include "app/HwProfileUi.h"
+#include "app/I18n.h"
 #include "app/Shell.h"
 #include "app/Ui.h"
 #include "app/UserGlyphs.h"
@@ -1282,6 +1285,8 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     // Items of the left shelf (the brush tiles, the colour picker) past its visible bottom in the last frame.
     if (name == "left_column_clipped") return double(app_.shelfClipped_[kShelfLeft]);
+    if (name == "right_shelf_changes") return double(app_.rightShelfChanges_);
+    if (name == "right_shelf_folded") return app_.rightShelfFolded_ ? 1.0 : 0.0;
     if (name == "right_column_clipped") return double(app_.shelfClipped_[kShelfRight]); // (the wheel scrolls to them)
     if (name == "size_slider_ring") return double(app_.sizeSliderRingAlpha_); // a Size slider's ring: 1 dragging, fading after
     if (name == "timeline_y" || name == "axis_gizmo_y") {
@@ -2216,6 +2221,83 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (t >= seconds) {
                 if (!keep) mouseButton(false, SDL_BUTTON_LEFT);
                 return true;
+            }
+            return false;
+        });
+        wait(0.1f);
+    } else if (verb == "drag_shelf_items") {
+        // Every action on the shelves (Customize Shelves, Ctrl+Alt held): drag it out onto the canvas; it must come off its
+        // shelf (item 45: one button had no drag source). Expects at least N dragged.
+        if (!need(1)) return false;
+        const int atLeast = int(num(1, 1));
+        struct Run { std::vector<std::pair<std::string, std::string>> todo; size_t done = 0; int dragged = 0, before = 0; ImVec2 from{}; std::string why, press; };
+        auto uses = [this](const std::string& id) { // how many shelf slots hold it (Paint is on two shelves)
+            int n = 0;
+            for (const auto* list : {&app_.layout_.topShelf, &app_.layout_.leftShelf, &app_.layout_.rightShelf, &app_.layout_.bottomShelf})
+                n += int(std::count(list->begin(), list->end(), id));
+            return n;
+        };
+        auto st = std::make_shared<Run>();
+        steps_.push_back([this, line, st, atLeast, uses](float t) {
+            constexpr float kSlot = 1.0f;
+            if (t == 0.0f) {
+                for (const auto* list : {&app_.layout_.topShelf, &app_.layout_.leftShelf, &app_.layout_.rightShelf, &app_.layout_.bottomShelf})
+                    for (const std::string& id : *list)
+                        if (const Action* a = app_.actions().find(id == "brush.paint" ? std::string("draw.paint") : id))
+                            st->todo.push_back({id, std::string(trAction(a->id, a->label)) + "##" + a->id});
+                        else if (id.rfind("widget.", 0) == 0) st->todo.push_back({id, "##grab." + id}); // (sliders, tiles, colour: Shell.cpp's grab button)
+                // (One label, two slots, e.g. Paint on the top and bottom shelves: the test can't tell which it grabbed.)
+                std::map<std::string, int> seen;
+                for (const auto& it : st->todo) ++seen[it.second];
+                st->todo.erase(std::remove_if(st->todo.begin(), st->todo.end(), [&](const auto& it) { return seen[it.second] > 1; }),
+                               st->todo.end());
+                return false;
+            }
+            const size_t i = size_t(t / kSlot);
+            if (i >= st->todo.size()) {
+                if (buttonDown_) mouseButton(false, SDL_BUTTON_LEFT);
+                if (st->dragged < atLeast) fail(line, "only " + std::to_string(st->dragged) + " shelf items dragged");
+                return true;
+            }
+            const float local = t - float(i) * kSlot;
+            if (i > st->done) { // the previous slot ended
+                st->done = i;
+            }
+            const auto& [id, label] = st->todo[i];
+            int ww = 0, wh = 0;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            if (local < 0.1f) {
+                if (!findItem(label, st->from)) { // (an action may be off a scrolled shelf; a widget must be there)
+                    if (label[0] == '#' && local > 0.08f) fail(line, "widget \"" + id + "\" has no drag handle in Customize Shelves");
+                    return false;
+                }
+                st->before = uses(id);
+                mouseMotion(st->from.x, st->from.y);
+            } else if (local < 0.6f) {
+                if (st->from.x == 0.0f && st->from.y == 0.0f) return false;
+                if (!buttonDown_) mouseButton(true, SDL_BUTTON_LEFT);
+                if (local < 0.2f && buttonDown_) { // the press just landed: who took it
+                    ImGuiContext& g = *ImGui::GetCurrentContext();
+                    st->press = std::string("press: hovered window ") + (g.HoveredWindow ? g.HoveredWindow->Name : "none") + ", hovered id " +
+                                std::to_string(g.HoveredId) + (g.HoveredIdIsDisabled ? " (disabled)" : "") + ", active id " +
+                                std::to_string(g.ActiveId) + " in " + (g.ActiveIdWindow ? g.ActiveIdWindow->Name : "none") +
+                                (g.ActiveIdWindow && g.ActiveId == g.ActiveIdWindow->MoveId ? " (window move)" : "") + (g.TempInputId == g.ActiveId ? " (typed input)" : "") +
+                                " ctrl " + (g.IO.KeyCtrl ? "yes" : "no") + "; ";
+                }
+                const float u = (local - 0.1f) / 0.4f;
+                mouseMotion(st->from.x + (float(ww) * 0.5f - st->from.x) * u, st->from.y + (float(wh) * 0.5f - st->from.y) * u);
+            } else if (local < 0.8f) {
+                if (buttonDown_) {
+                    ImGuiContext& g = *ImGui::GetCurrentContext();
+                    st->why = std::string("drag active ") + (g.DragDropActive ? "yes" : "no") + ", active id " + std::to_string(g.ActiveId) +
+                              ", hovered id " + std::to_string(g.HoveredId) + ", mouse " + std::to_string(int(g.IO.MousePos.x)) + "," +
+                              std::to_string(int(g.IO.MousePos.y)) + " from " + std::to_string(int(st->from.x)) + "," + std::to_string(int(st->from.y));
+                    mouseButton(false, SDL_BUTTON_LEFT);
+                }
+            } else if (local < 0.95f && st->from.x != 0.0f) {
+                if (uses(id) >= st->before) fail(line, "\"" + id + "\" would not move: still on its shelf after Ctrl+Alt+drag (" + st->press + st->why + ")");
+                else ++st->dragged;
+                st->from = ImVec2(0, 0);
             }
             return false;
         });
@@ -3777,7 +3859,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
                 "click", "double_click", "right_click", "hover", "hover_model", "hover_window", "type", "key", "key_down",
                 "key_up", "hold", "stroke", "view_drag", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
                 "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
-                "drag_item", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "look",
+                "drag_item", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "look",
                 "run", "key_nav_speed", "wait", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
                 "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move",
                 "touch_stroke", "touch_pinch", "classic_keys", "input_style"};
