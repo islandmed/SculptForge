@@ -139,7 +139,7 @@ void App::dragDotTo(float x, float y, bool commit) {
     p.viewDir = partCamera().forward();
     p.radius = radiusPx_ * (pressureSizeOn() ? std::max(pressure, 0.05f) : 1.0f) *
                partCamera().worldPerPixel(hit.position, canvasHeight());
-    p.strength = strokeBrush_ == BrushType::Smooth ? smoothStrength_ : strength_;
+    p.strength = strokeIntensity();
     p.pressure = pressureStrengthOn() ? pressure : 1.0f;
     p.invert = strokeInvert_;
     p.frontFacesOnly = frontFacesOnly_;

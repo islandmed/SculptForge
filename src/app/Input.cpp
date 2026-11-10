@@ -743,7 +743,8 @@ void App::drawCursorSection() {
 }
 
 void App::drawZIntensitySlider(const char* id) {
-    const bool smooth = activeBrush() == BrushType::Smooth && drag_ != Drag::Stroke;
+    // The stroke's own brush while one runs: the press must not turn the readout back to the main Intensity (#180).
+    const bool smooth = (drag_ == Drag::Stroke ? strokeBrush_ : activeBrush()) == BrushType::Smooth;
     float& value = intensityValue(smooth);
     float shown = value * 100.0f;
     if (ui::SliderInside(id, &shown, 1.0f, 100.0f, smooth ? "Smooth Intensity %.0f" : "Intensity %.0f"))

@@ -175,7 +175,7 @@ void App::dragRectTo(float x, float y, bool commit) {
     p.center = dragAnchorHit_;
     p.viewDir = partCamera().forward();
     p.radius = len * partCamera().worldPerPixel(dragAnchorHit_, canvasHeight());
-    p.strength = strength_;
+    p.strength = strokeIntensity();
     p.pressure = pressureStrengthOn() ? pressure : 1.0f;
     p.invert = strokeInvert_;
     p.frontFacesOnly = frontFacesOnly_;

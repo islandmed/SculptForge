@@ -2566,6 +2566,9 @@ private:
     // Colour intensity (#164: painting reads it, so in Paint mode Intensity is how strongly paint colours), or the
     // sculpt Intensity.
     float& intensityValue(bool smooth) { return smooth ? smoothStrength_ : paintMode_ ? rgbIntensity_ : strength_; }
+    // What the running stroke sculpts with: Smooth's own Intensity when it smooths (Shift held at the press, #180),
+    // else the brush's. Every stroke type reads this, none reads strength_ itself.
+    float strokeIntensity() const { return strokeBrush_ == BrushType::Smooth ? smoothStrength_ : strength_; }
     void openQuickMenu();
     void quickMenuKeyUp();   // Space released: a hold closes the menu, a tap leaves it open
     // A right click on the canvas (pressed and let go without moving past kRightClickSlop) opens the QuickMenu
