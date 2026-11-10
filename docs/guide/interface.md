@@ -288,7 +288,7 @@ unmasked area with the main colour.
   lock** sets it.
 - **Ortho** (<kbd>Numpad 5</kbd>): an orthographic view (on) or perspective (off).
 - **Floor**: the floor grid under the model, as **View > Floor grid**.
-- In a window too short for all of them, Turn, Ortho, Floor and Flat fold into one **View** button: click it for
+- In a window too short for all of them, Turn, Ortho, Floor, Flat and Unlit fold into one **View** button: click it for
   their list.
 - **Wire** (<kbd>Shift</kbd>+<kbd>F</kbd>): shows the mesh's polygons: quads as quads, triangles as triangles.
 - **Groups**: colours each face group.
@@ -296,6 +296,10 @@ unmasked area with the main colour.
   the mask, which still protects the surface.
 - **Paint**: shows vertex paint colours (on by default).
 - **Flat**: flat shading, every polygon its own face (on), or smooth shading (off), as **Render > Materials > Smooth | Flat**.
+- **Unlit** (<kbd>Alt</kbd>+<kbd>L</kbd>, **Render > Materials > Unlit**, or in the **View** list when the shelf is folded; not a default shelf button, but Customize can add one): the base colour alone, with no lighting, Lit Sphere or PBR shading, so vertex
+  paint, texture paint and PBR base colour read exactly as stored. The mask tint and **Wire** still draw. The status
+  bar shows **Unlit** while it is on. Saved with the project (a new session starts shaded); `set_unlit on=true`
+  from a script. Suggested by @nagdav853.
 - **Solo**: shows only the active Part (available with two or more Parts).
 - **Splats**: shows or hides a Gaussian splat capture (only shown while one is loaded).
 

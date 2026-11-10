@@ -367,6 +367,15 @@ void App::registerPaintUiCommands() {
                        return {true, mode == "gradient" ? std::string("Background: Gradient")
                                                         : "Background: Flat Colour " + colorToHex(srgbToLinear(color))};
                    }});
+    // Unlit view (#168): the base colour alone, for judging vertex and texture paint as stored.
+    commands_.add({"set_unlit",
+                   "Unlit view: every surface shows its base colour (vertex paint, texture, face groups) with no lighting, "
+                   "Lit Sphere or PBR shading. The mask tint and the wireframe still draw. Saved with the project.",
+                   {{"on", ParamSpec::Type::Bool, "true for unlit, false for the shaded view (default: toggle).", false}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       renderSettings_.unlit = argBool(a, "on", !renderSettings_.unlit);
+                       return {true, renderSettings_.unlit ? "Unlit view: on (base colour, no lighting)" : "Unlit view: off"};
+                   }});
     // The scene's shading; Parts can override it (part_shading). Also the preference for new sessions.
     commands_.add({"set_shading",
                    "Viewport shading for every Part that doesn't set its own (part_shading): smooth (the "
@@ -596,6 +605,13 @@ void App::drawViewportShadingControls() {
     ImGui::Spacing();
     ImGui::TextDisabled("%s", tr("Viewport Shading"));
     ui::Segmented(*this, {"view.shading_lit_sphere", "view.shading_pbr"});
+    bool unlit = renderSettings_.unlit; // (#168: the same as Alt+L; not a default shelf button, the right shelf is full)
+    if (ui::Checkbox("Unlit##unlit", &unlit)) runCommand("set_unlit", {{"on", unlit}});
+    ui::HelpText("Unlit", "Alt+L",
+                 "Unlit view (on): the base colour alone, with no lighting, Lit Sphere or PBR shading, so painted colour "
+                 "reads exactly as stored. Works with vertex paint, texture paint and PBR; the mask and wireframe still "
+                 "draw. Saved with the project.",
+                 "Material > Viewport Shading");
     if (!renderSettings_.pbr()) return;
     RenderSettings& v = renderSettings_;
     const auto& envs = environments();

@@ -1000,6 +1000,7 @@ double Demo::query(const std::string& name, bool& known) const {
         }
         return double(n);
     }
+    if (name == "unlit") return app_.renderSettings_.unlit ? 1.0 : 0.0;
     if (name == "flat_shading") return app_.renderSettings_.flatShading ? 1.0 : 0.0;
     if (name == "gradient_background") return app_.renderSettings_.gradientBackground ? 1.0 : 0.0;
     if (name == "background_r" || name == "background_g" || name == "background_b") // 0-255, display values

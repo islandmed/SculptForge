@@ -749,8 +749,6 @@ constexpr Entry kSpanish[] = {
      "Arrastrar para girar mueve la vista solo sobre el eje Z del mundo (azul): desde el frente, "
      "arrastrar alrededor del centro gira el modelo como una rueda. Mayús sigue ajustando a una vista "
      "lateral; el gizmo de ejes muestra el bloqueo. Se guarda con las preferencias."},
-    {"Turntable, Orthographic, Floor grid and Flat shading: the window is too short to show them as buttons here, so they wait in this list.",
-     "Plataforma giratoria, Ortográfica, Rejilla del suelo y Sombreado plano: la ventana es demasiado baja para mostrarlos aquí como botones, así que esperan en esta lista."},
     {"Turntable", "Plataforma giratoria"},
     {"Camera notch", "Muesca de la cámara"},
     {"Always reserve", "Reservar siempre"},
@@ -959,6 +957,9 @@ constexpr Entry kSpanish[] = {
     {"Apply", "Aplicar"},
     {"Reset", "Restablecer"},
     {"Preview", "Vista previa"},
+    {"Turntable, Orthographic, Floor grid, Flat shading and Unlit: the window is too short to show them as buttons here, so they wait in this list.", "Plataforma giratoria, Ortográfica, Cuadrícula del suelo, Sombreado plano y Sin iluminación: la ventana es demasiado baja para mostrarlos como botones aquí, así que esperan en esta lista."},
+    {"Unlit", "Sin iluminación"},
+    {"Unlit view (on): the base colour alone, with no lighting, Lit Sphere or PBR shading, so painted colour reads exactly as stored. Works with vertex paint, texture paint and PBR; the mask and wireframe still draw. Saved with the project.", "Vista sin iluminación (activada): solo el color base, sin iluminación, Lit Sphere ni sombreado PBR, así el color pintado se ve exactamente como está guardado. Funciona con pintura de vértices, pintura de textura y PBR; la máscara y la malla de alambre se siguen dibujando. Se guarda con el proyecto."},
     {"Preview detail", "Detalle de vista previa"},
     {"Finish", "Terminar"},
     {"Close", "Cerrar"},

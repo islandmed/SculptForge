@@ -125,6 +125,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 |---|---|---|
 | Fullscreen | <kbd>F11</kbd> | Fill the screen with SculptForge (again: back to a window). |
 | Mask | <kbd>Ctrl</kbd>+<kbd>H</kbd> | Show or hide the mask (masked areas drawn darker). Hiding it keeps the mask: masked areas stay protected from brushes until you clear it. |
+| Unlit | <kbd>Alt</kbd>+<kbd>L</kbd> | Unlit view (on): the base colour alone, with no lighting, Lit Sphere or PBR shading, so painted colour reads exactly as stored. Works with vertex paint, texture paint and PBR; the mask and wireframe still draw. Saved with the project. |
 | Wireframe | <kbd>Shift</kbd>+<kbd>F</kbd> | Show the mesh's polygons (quads and triangles) over the surface. |
 
 ### Script

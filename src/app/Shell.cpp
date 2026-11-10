@@ -306,7 +306,7 @@ int brushTypeOfAction(std::string_view id) {
 constexpr float kCaptionTileH = 34.0f;
 
 static bool foldsIntoView(const std::string& item) {
-    return item == "view.turntable" || item == "view.ortho" || item == "view.floor_grid" || item == "view.flat_shading";
+    return item == "view.turntable" || item == "view.ortho" || item == "view.floor_grid" || item == "view.flat_shading" || item == "view.unlit";
 }
 
 // ---------------------------------------------------------------------------
@@ -610,6 +610,12 @@ void App::registerShellActions() {
          "Render", "", "set_shading",
          [this] { runCommand("set_shading", {{"mode", std::string(renderSettings_.flatShading ? "smooth" : "flat")}}); },
          [this] { return renderSettings_.flatShading; }, nullptr});
+    add({"view.unlit", "Unlit", ICON_LC_LIGHTBULB_OFF,
+         "Unlit view (on): the base colour alone, with no lighting, Lit Sphere or PBR shading, so painted colour reads "
+         "exactly as stored. Works with vertex paint, texture paint and PBR; the mask and wireframe still draw. Saved "
+         "with the project.",
+         "Render", "Alt+L", "set_unlit", [this] { runCommand("set_unlit", {}); },
+         [this] { return renderSettings_.unlit; }, nullptr});
     flag("view.vertexpaint", "Paint", ICON_LC_PALETTE, "Render", "", &renderSettings_.showVertexPaint,
          "Show vertex paint colours (off: plain material).");
     // Shading (Material palette, Tool > Viewport Look): the scene's, and the active Part's own.
@@ -1235,6 +1241,10 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     if (renderer_.coarsePreviewOnly()) { // (a mesh over the triangle budget whose full detail won't fit a still frame)
         std::strncat(info, "   ", sizeof info - std::strlen(info) - 1);
         std::strncat(info, tr("Preview detail"), sizeof info - std::strlen(info) - 1);
+    }
+    if (renderSettings_.unlit) { // the mode stays in view while it is on (#168)
+        std::strncat(info, "   ", sizeof info - std::strlen(info) - 1);
+        std::strncat(info, tr("Unlit"), sizeof info - std::strlen(info) - 1);
     }
     // The frame rate gets a fixed-width slot, refreshed twice a second: a number that changes width every frame
     // would make everything after it (the status message) jitter.
@@ -2759,7 +2769,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
                         shelf == kShelfRight ? std::floor(40.0f * s * shelfFit_[shelf]) : 0.0f);
     } else if (item == "widget.view_fold") {
         // The folded view toggles (rightShelfFolded_): one button, lit while any of them is on, opening their list.
-        const char* ids[] = {"view.turntable", "view.ortho", "view.floor_grid", "view.flat_shading"};
+        const char* ids[] = {"view.turntable", "view.ortho", "view.floor_grid", "view.flat_shading", "view.unlit"};
         bool anyOn = false;
         for (const char* id : ids)
             if (const Action* a = actions_.find(id); a && a->checked && a->checked()) anyOn = true;
@@ -2771,7 +2781,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         const ImVec2 size(fitW(44.0f * s), std::floor(40.0f * s * shelfFit_[shelf]));
         centre(size.x);
         if (drawShelfTile(*this, fold, size)) ImGui::OpenPopup("##viewfold");
-        ui::HelpText("View", nullptr, "Turntable, Orthographic, Floor grid and Flat shading: the window is too short "
+        ui::HelpText("View", nullptr, "Turntable, Orthographic, Floor grid, Flat shading and Unlit: the window is too short "
                      "to show them as buttons here, so they wait in this list.", "Right shelf");
         const ImVec2 at = ImGui::GetItemRectMin();
         ImGui::SetNextWindowPos(ImVec2(at.x - 4.0f * s, at.y), ImGuiCond_Appearing, ImVec2(1.0f, 0.0f));

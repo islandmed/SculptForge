@@ -390,6 +390,7 @@ uniform int uGroups;     // 0: off, 1: per-triangle ids from uGroupIds, 2: every
 uniform usamplerBuffer uGroupIds;
 uniform int uChecker;        // 1: a checker on the UVs (TEXTURED), tinted per UDIM tile
 uniform float uCheckerScale; // checker squares per UV unit
+uniform int uUnlit;              // 1: the colour as it is, no lighting (RenderSettings::unlit)
 uniform int uLitSphere;          // 1: shade with the lit sphere texture instead of the studio lights
 uniform sampler2D uLitSphereTex; // sRGB-encoded lit sphere (core/Lit Sphere.h)
 uniform vec2 uLitSphereCavity;   // crease darkening, ridge lift (sf::lit sphereCavity)
@@ -555,6 +556,12 @@ void main() {
 #ifndef FLAT
     if (!gl_FrontFacing && uTwoSided == 1) n = -n;
 #endif
+    if (uUnlit == 1) { // the base colour alone: vertex paint, texture or face groups, plus the mask tint
+        vec3 c = albedo;
+        if (uShowMask == 1) c = maskTint(c, V_MASK);
+        fragColor = finish(c);
+        return;
+    }
     vec3 v = viewRay();
 #ifdef PBR
     {
@@ -1054,6 +1061,7 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.maskDarkness = at("uMaskDarkness");
     p.groups = at("uGroups");
     p.litsphere = at("uLitSphere");
+    p.unlit = at("uUnlit");
     p.litsphereCavity = at("uLitSphereCavity");
     p.dim = at("uDim");
     p.lightRot = at("uLightRot");
@@ -2880,7 +2888,7 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     while (samples > 1 && !viewTarget(width, height, samples)) samples /= 2;
     screenStrokeDrawn_ = false;
     // A screen stroke needs the view in a target it can read back: through the single-sample one when no AA.
-    const bool screen = !screenStroke_.dabs.empty() && settings.litsphere >= 0 && !settings.pbr();
+    const bool screen = !screenStroke_.dabs.empty() && settings.litsphere >= 0 && !settings.pbr() && !settings.unlit;
     if (samples <= 1 && !(screen && viewTarget(width, height, 1))) {
         gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
         draw(camera, width, height, settings, viewport);
@@ -3570,6 +3578,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     gl::Uniform3fv(p->baseColor, 1, glm::value_ptr(settings.baseColor));
     gl::Uniform3fv(p->tintShift, 1, glm::value_ptr(materialTintShift(settings, s.hasColors)));
     gl::Uniform1i(p->litsphere, litsphereTexture(settings.litsphere) ? 1 : 0);
+    gl::Uniform1i(p->unlit, settings.unlit ? 1 : 0);
     const LitSphereCavity cavity = litsphereCavity(settings.litsphere);
     gl::Uniform2f(p->litsphereCavity, cavity.crease, cavity.ridge);
     gl::Uniform1i(p->paint, 0);
@@ -3644,6 +3653,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::Uniform3fv(p->baseColor, 1, glm::value_ptr(settings.baseColor));
     gl::Uniform3fv(p->tintShift, 1, glm::value_ptr(materialTintShift(settings, s.hasColors)));
     gl::Uniform1i(p->litsphere, litsphereTexture(settings.litsphere) ? 1 : 0);
+    gl::Uniform1i(p->unlit, settings.unlit ? 1 : 0);
     const LitSphereCavity cavity = litsphereCavity(settings.litsphere);
     gl::Uniform2f(p->litsphereCavity, cavity.crease, cavity.ridge);
     if (textured || normalMapped) {
