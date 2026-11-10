@@ -1,0 +1,4 @@
+---
+fixed: Clay, Flatten and Clay Block no longer pull the far side of a thin sheet up through the near side (an Extract, a cloth or a wing under a brush much wider than it is thick): spikes hidden inside the mesh that Flatten brought back are gone (reported by Big Play and Oslen on Discord)
+---
+The plane brushes cut a dab's region to the surface joined to the pen, without crossing a sharp crease (a sheet's rim is one), whenever the region also reaches vertices facing away from the pen at the pen side's depth. Closed smooth forms are untouched. Test: hidden_spikes_extract (the shell keeps its thickness under Clay and Flatten; Smooth and Standard never moved it). A standard sphere through Quad Remesh and five subdivision levels stays clean under Clay, Flatten and Smooth (hidden_spikes_remeshed_sphere_with_levels), so Oslen's picture is still wanted. Builds on the thin-sheet findings of fix/clay-thin-sheet-fold.

@@ -139,7 +139,12 @@ struct ConnectedScratch {
 };
 // Connected only: keeps the vertices of `verts` (in increasing order) that the vertex of `verts` nearest `seed`
 // reaches through edges between vertices of `verts`; the order stays.
-void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& scratch);
+// minNormalDot (> -1): an edge between vertices whose normals have a smaller dot product is not crossed (a crease).
+void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& scratch,
+                   float minNormalDot = -2.0f);
+// Plane brushes on a thin sheet: cuts a region that reaches the sheet's far side down to the pen's side (true if cut).
+bool dropFarSide(const Mesh& mesh, const glm::vec3& center, const glm::vec3& viewDir, float radius,
+                 std::vector<uint32_t>& verts, ConnectedScratch& scratch);
 // The vertices a dab may touch with the falloff options: brushVertices, or the cylinder along `viewDir`
 // (viewFalloff), then keepConnected from `center` (connectedOnly).
 void brushRegion(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, const glm::vec3& viewDir, float radius,

@@ -123,7 +123,9 @@ bool lineRayClosest(const glm::vec3& point, const glm::vec3& dir, const glm::vec
     return std::isfinite(s);
 }
 
-void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& sc) {
+void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& sc,
+                   float minNormalDot) {
+    const bool creases = minNormalDot > -1.0f && mesh.normals.size() == mesh.vertexCount();
     if (verts.empty()) return;
     const size_t n = mesh.vertexCount();
     if (sc.stamp.size() < n) sc.stamp.resize(n, 0);
@@ -147,12 +149,36 @@ void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t
     sc.stamp[start] = reached;
     for (size_t head = 0; head < q.size(); ++head)
         for (uint32_t w : mesh.neighbors(q[head]))
-            if (sc.stamp[w] == inside) {
+            if (sc.stamp[w] == inside && (!creases || glm::dot(mesh.normals[q[head]], mesh.normals[w]) >= minNormalDot)) {
                 sc.stamp[w] = reached;
                 q.push_back(w);
             }
     if (q.size() == verts.size()) return; // all of it is one piece
     std::erase_if(verts, [&](uint32_t v) { return sc.stamp[v] != reached; });
+}
+
+bool dropFarSide(const Mesh& mesh, const glm::vec3& center, const glm::vec3& viewDir, float radius,
+                 std::vector<uint32_t>& verts, ConnectedScratch& sc) {
+    // A thin sheet (an Extract, a cloth, a wing) under a brush much wider than it is thick has its far side in the
+    // region too: the plane brushes would pull it up through the near side (spikes inside, the sheet folded onto
+    // itself). A region with vertices facing away from the pen AND lying near the near side's depth is cut to the
+    // surface joined to the pen without crossing a crease (a sheet's rim is one: its layers' normals are ~90 degrees
+    // apart); on a closed smooth form nothing is cut. Not decided by per-vertex normal shares (they tear scans).
+    constexpr size_t kSamples = 512, kMaxRegion = 4000000;
+    if (mesh.normals.size() != mesh.vertexCount() || verts.size() < 8 || verts.size() > kMaxRegion) return false;
+    const size_t stride = std::max<size_t>(1, verts.size() / kSamples);
+    const glm::vec3 view = glm::normalize(viewDir);
+    float nearest = std::numeric_limits<float>::max();
+    for (size_t i = 0; i < verts.size(); i += stride) nearest = std::min(nearest, glm::dot(mesh.positions[verts[i]] - center, view));
+    bool away = false;
+    for (size_t i = 0; i < verts.size() && !away; i += stride) {
+        const uint32_t v = verts[i];
+        away = glm::dot(mesh.normals[v], view) > 0.3f && glm::dot(mesh.positions[v] - center, view) - nearest < 0.35f * radius;
+    }
+    if (!away) return false;
+    const size_t before = verts.size();
+    keepConnected(mesh, center, verts, sc, 0.3f);
+    return verts.size() != before;
 }
 
 void brushRegion(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, const glm::vec3& viewDir, float radius,
@@ -977,6 +1003,8 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBlock ? 1.3f : 1.0f;
     brushRegion(mesh, bvh, p.center, p.viewDir, p.radius * reach, p.connectedOnly, p.viewFalloff, verts_, connected_);
     if (verts_.empty()) return;
+    const bool sheetCut = (type == BrushType::Clay || type == BrushType::Flatten || type == BrushType::ClayBlock) &&
+                          !p.connectedOnly && dropFarSide(mesh, p.center, p.viewDir, p.radius * reach, verts_, connected_);
     StencilView stencil = p.stencil; // (averaged over the vertices' spacing where they are many pixels apart)
     if (useStencil) stencil.setSpacing(p.center, p.viewDir, p.radius * reach, verts_.size());
 
@@ -1025,7 +1053,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     if (frameWanted_) {
         lastFrame = {p.center, areaNormal, areaCenter, true};
         frameWanted_ = false;
-        lastRegion_ = verts_.size();
+        lastRegion_ = sheetCut ? 0 : verts_.size(); // (a sheet's dabs stay on this path: fused batches reach both sides)
         lastRegionRadius_ = p.radius;
     }
 
