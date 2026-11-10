@@ -86,8 +86,10 @@ public:
     void build() const; // after the last add (drapeToRest calls it; queries before it find nothing)
     bool empty() const;
     size_t triangles() const;
-    // The nearest surface point within `maxDistance` of `p` and the surface's outward normal there (false: none).
-    bool closest(const glm::vec3& p, float maxDistance, glm::vec3& point, glm::vec3& normal) const;
+    // The nearest surface point within `maxDistance` of `p` and the surface's outward normal there (false: none);
+    // `triangle`: in, the one to keep (~0u: none) unless another is nearer by more than `keep` (m); out, the one used.
+    bool closest(const glm::vec3& p, float maxDistance, glm::vec3& point, glm::vec3& normal, uint32_t* triangle = nullptr,
+                 float keep = 0.0f) const;
     // The first surface along origin + t * dir (dir unit length, t <= maxT): where, and that triangle's normal.
     bool raycast(const glm::vec3& origin, const glm::vec3& dir, float maxT, glm::vec3& point, glm::vec3& normal) const;
     // The vertices in the box [lo, hi] on sharp features: the surface turns round them tighter than `radius` (a
@@ -107,8 +109,8 @@ struct ClothSettings {
     float frameSeconds = 1.0f / 60.0f;
     int substeps = 12;
     int iterations = 1; // constraint passes per substep (the brush uses more: its soft pins pull every substep)
-    // At rest: over `restFrames` frames no particle got half as far as this speed (m/s) would take it, and none went
-    // faster than ten times it over any two frames.
+    // At rest: every particle's mean position over `restFrames` frames moved from the last such window's mean less than
+    // half as far as this speed (m/s) would take it, and none went faster than ten times it over any two frames.
     float restSpeed = 0.01f;
     int restFrames = 10;
     // > 0: self-collision, particles keep at least this far apart (m; pairs closer than it at rest are skipped).
@@ -196,9 +198,13 @@ private:
     uint32_t serialBegin_ = 0;
     // Per particle, this frame's nearest collider point and normal (contact_ = 0: none in reach).
     std::vector<uint8_t> contact_;
+    // contactTri_: its triangle, kept from frame to frame while it is slow unless another is clearly nearer
+    // (kContactKeep).
     std::vector<glm::vec3> contactPoint_, contactNormal_;
+    std::vector<uint32_t> contactTri_;
     std::vector<uint8_t> contact2_;                   // a second surface in a concave corner (an armpit, a crotch)
     std::vector<glm::vec3> contactPoint2_, contactNormal2_;
+    std::vector<uint32_t> contactTri2_;
     std::vector<uint8_t> hadContact2_;                // last frame's contact2_ (looked for again every frame)
     std::vector<float> contactReach_; // (how far findContacts looked: a move shorter than that crossed nothing)
     // Thin features: a collider vertex near a cloth triangle and the side of it the vertex keeps (+1 / -1).
@@ -223,7 +229,7 @@ private:
     float seamCompliance_ = 0.0f, seamAlpha_ = 0.0f;
     int frame_ = 0;
     float maxSpeed_ = 0.0f;
-    std::vector<glm::vec3> restFrom_; // positions at the rest window's start
+    std::vector<glm::vec3> restSum_, restMean_; // each particle's sum of positions over the window, the last window's mean
     std::vector<glm::vec3> twoBack_;  // positions two frames ago (the window's peak is over two frames)
     int restFromFrame_ = 0;
     float restPeak_ = 0.0f;           // the fastest frame in the window, m/s
