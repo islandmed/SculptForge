@@ -38,7 +38,6 @@ ui_splat_train              ai
 ui_maya_*                   io
 ui_blender_*                io
 ui_packs                    io
-ui_brush_packs              io
 ui_plugins                  io
 ui_prefs_*                  io
 ui_parts_files              io
