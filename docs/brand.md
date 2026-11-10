@@ -67,4 +67,4 @@ history; no shipped file uses them. "SF" is fine as a nickname in text only.
     python -I tools/brand/make_icons.py ~/Work/.sf/brand/icon-concept-anvil-bust-A.jpeg --discord ~/Work/.sf/brand
 
 (`--style filled` for the alternative.) Then `tools/check_marks.py` and `tools/check_marks_media.py`. Trademark review
-of the bust before 1.0; the cube is a stock ISC icon, so it can't be registered as our mark.
+of the bust before the SculptForge 2027 launch; the cube is a stock ISC icon, so it can't be registered as our mark.
