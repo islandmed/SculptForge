@@ -1,0 +1,90 @@
+# Garments, part 3 (Tool > Garments > Drape on the body): a T-shirt template on the Full Body starter (167 units
+# tall: 100 units per metre, set at the first click), Place panels clicked on the body from the view facing each
+# (front, back; the sleeves with the values a click on each upper arm gives), the hint by the button, Drape live (a
+# shot mid-drape), Convert to Part (the Parts list shows "Garment"), one undo step. Placement is the user's only.
+run ui_look look=classic layout=classic
+run new_starter_mesh name=full-body
+click "Garments##tool.garments"
+click "Garments/Templates"
+click "T-Shirt##garment.tpl.tshirt"
+expect_value garment_panels == 4
+click "Garments/Pattern"                         # (the Pattern window closed: the body in full view)
+expect_value garment_window_open == 0
+expect "Place panels##garment"
+expect_value garment_placed == 0
+hold ctrl
+hover "Place panels##garment"
+expect_help widest point
+hold none
+
+# Front: from the front, the front of the chest.
+camera 0 0
+look 0 120 0
+zoom 1.6
+click "Place panels##garment"
+expect_value garment_placing == 0
+expect_status "Click the body where Front goes"
+mouse_leave
+shot placing-hint
+stroke 0.5 0.3 0.5 0.3 0.05
+expect_value garment_placed == 1
+expect_value garment_units == 100
+expect_value garment_preview == 1
+expect_value garment_placing == 1
+expect_status "Placed Front"
+mouse_leave
+shot front-placed
+
+# Back from behind (a click), then each sleeve as a click on the upper arm from outside and above, the arm running
+# up the screen to the shoulder (the values such a click gives: the A-pose upper arm runs out and down).
+camera 180 0
+stroke 0.5 0.3 0.5 0.3 0.05
+expect_value garment_placed == 2
+run garment_place panel=Back gap_mm=70                # (the preview showed its hem inside the hips: Gap up)
+run garment_place panel="Left sleeve" point=27,133,-9.5 facing=0.88,0.47,0 up=-0.47,0.88,0
+run garment_place panel="Right sleeve" point=-27,133,-9.5 facing=-0.88,0.47,0 up=0.47,0.88,0
+expect_value garment_placed == 4
+click "Place panels##garment"
+expect_value garment_placing == -1
+camera 30 -10
+mouse_leave
+shot all-placed
+
+# Drape: live on the preview; a frame mid-way, then at rest.
+click "Drape##garment"
+expect_value garment_drape_running == 1
+wait 1.0
+mouse_leave
+shot mid-drape
+wait_value garment_drape_running == 0 120
+expect_value garment_draped == 1
+expect_value garment_drape_rested == 1
+expect_value garment_seam_gap_mm < 7.5             # (half the particle spacing)
+expect_value garment_inside == 0
+mouse_leave
+shot draped
+camera 0 0
+mouse_leave
+shot draped-front
+camera 180 0
+mouse_leave
+shot draped-back
+camera 0 0
+
+# Convert to Part: the Part "Garment" in the Parts list, one undo step.
+remember parts parts0
+click "Convert to Part##garment"
+expect_value garment_draped == 0
+expect_value garment_preview == 0
+expect_status "Converted to the Part Garment"
+click "Parts##tool.part"
+wait 0.3
+mouse_leave
+shot converted-parts
+
+key ctrl+z
+wait 0.2
+expect_value parts == $parts0-1
+key ctrl+shift+z
+wait 0.2
+expect_value parts == $parts0
