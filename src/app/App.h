@@ -1012,6 +1012,8 @@ private:
     struct DrapeJob;
     std::shared_ptr<DrapeJob> drape_;
     DrapeRequest drapeRequest_;
+    bool drapeScaleTouched_ = false; // the user moved the slider: stop guessing
+    uint32_t drapeScalePart_ = 0xffffffffu;       // the active Part the guess was made for
     void drawDrapeSection();
     void startDrape();
     void pollDrape();
