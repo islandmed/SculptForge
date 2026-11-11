@@ -324,6 +324,16 @@
      "votes": 0,
      "status": "open",
      "shipped": ""
+    },
+    {
+     "slug": "node-based-sculpting",
+     "anchor": "vote-node-based-sculpting",
+     "title": "Node-based sculpting",
+     "line": "Build a model as a chain of nodes (mesh, remesh, mask, sculpt, mirror, merge, export) instead of destructive edits, so any step can be changed later.",
+     "where": "New node graph view",
+     "votes": 0,
+     "status": "open",
+     "shipped": ""
     }
    ]
   },
@@ -648,6 +658,16 @@
      "shipped": ""
     },
     {
+     "slug": "alternate-interface",
+     "anchor": "vote-alternate-interface",
+     "title": "Alternate interface",
+     "line": "A modern, cleaner alternative to the current layout, with fewer buttons, sliders and tabs on screen at once.",
+     "where": "Preferences / Interface",
+     "votes": 0,
+     "status": "open",
+     "shipped": ""
+    },
+    {
      "slug": "discord-rich-presence",
      "anchor": "vote-discord-rich-presence",
      "title": "Discord Rich Presence",
@@ -754,5 +774,5 @@
    ]
   }
  ],
- "updated": "2026-11-11T00:37:46Z"
+ "updated": "2026-11-11T01:37:50Z"
 }

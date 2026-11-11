@@ -201,3 +201,51 @@ TEST(action_registry_conflicts_reset_and_key_nav) {
     CHECK(!keyNavMotion(reg.find("brush.clay"), px, py, zoom));
     CHECK(px == 0 && py == 0 && zoom == 0);
 }
+
+// The pan and zoom keys ease in and out and cover the same distance at any frame rate (no OS key repeat involved).
+namespace {
+struct HeldRun {
+    float distance = 0.0f, biggestStep = 0.0f; // seconds of full-speed travel, total and in the biggest frame
+};
+// Held for `held` seconds, then released, run for `total` seconds in frames of 1/fps.
+HeldRun runKey(int fps, float held, float total) {
+    KeyNavEase e;
+    HeldRun r;
+    const int frames = int(std::lround(total * fps));
+    for (int i = 0; i < frames; ++i) {
+        const float step = e.advance(float(i) / float(fps) < held - 1e-6f, 1.0f / float(fps));
+        r.distance += step;
+        r.biggestStep = std::max(r.biggestStep, step);
+    }
+    return r;
+}
+} // namespace
+
+TEST(key_nav_eases_and_is_frame_rate_independent) {
+    // Held 1 s then let go: the same distance at 30, 60 and 144 fps (full speed for 1 s minus the ease-in, plus the ease-out).
+    const HeldRun a = runKey(30, 1.0f, 1.5f), b = runKey(60, 1.0f, 1.5f), c = runKey(144, 1.0f, 1.5f);
+    CHECK(std::abs(a.distance - c.distance) < 0.03f * c.distance && std::abs(b.distance - c.distance) < 0.03f * c.distance);
+    CHECK(std::abs(c.distance - 1.0f) < 0.01f); // ease-in and ease-out are mirror images: 1 s of travel in all
+    // No frame moves further than a frame's worth of full speed (no jumps), and the first frame is a fraction of one.
+    for (const HeldRun& r : {a, b, c}) CHECK(r.biggestStep <= 1.0f / 30.0f + 1e-6f);
+    KeyNavEase e;
+    CHECK(e.advance(true, 1.0f / 144.0f) < 0.1f / 144.0f && e.level > 0.0f && e.level < 0.1f);
+    // Speed rises to 1 after the ease-in time and falls to 0 after the ease-out time, whatever the frame sizes.
+    KeyNavEase f;
+    for (int i = 0; i < 4; ++i) f.advance(true, kKeyNavEaseSeconds / 4.0f);
+    CHECK(std::abs(f.level - 1.0f) < 1e-5f);
+    for (int i = 0; i < 4; ++i) f.advance(false, kKeyNavEaseSeconds / 4.0f);
+    CHECK(f.level < 1e-5f && f.advance(false, 0.5f) == 0.0f);
+    // One frame longer than the whole ramp: the exact integral (a quarter-second hold = 0.25 - half the ease-in).
+    KeyNavEase g;
+    CHECK(std::abs(g.advance(true, 0.25f) - (0.25f - 0.5f * kKeyNavEaseSeconds)) < 1e-5f);
+    // Held halfway up then released: it comes back down smoothly (no jump to 0), covering the other half of the ramp.
+    KeyNavEase h;
+    const float up = h.advance(true, kKeyNavEaseSeconds * 0.5f), down = h.advance(false, 1.0f);
+    CHECK(std::abs(up - 0.125f * kKeyNavEaseSeconds) < 1e-5f && std::abs(down - 0.125f * kKeyNavEaseSeconds) < 1e-5f && h.level == 0.0f);
+    // Zoom is exponential per second: the distance factor is pow(0.88, steps), so N seconds in any split is the same factor.
+    float one = 1.0f, many = 1.0f;
+    one *= std::pow(0.88f, kKeyNavZoomSteps * 1.0f);
+    for (int i = 0; i < 144; ++i) many *= std::pow(0.88f, kKeyNavZoomSteps / 144.0f);
+    CHECK(std::abs(one - many) < 1e-4f);
+}

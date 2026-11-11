@@ -7,6 +7,8 @@
 // "cmd.<name>", so anything scriptable is reachable from the UI.
 #pragma once
 
+#include <cmath>
+
 #include "core/Json.h"
 
 #include <SDL3/SDL.h>
@@ -56,6 +58,30 @@ int brushSizeStep(const Action* a);
 // direction as pixels per second of panning at speed 1 and zoom steps per second, or false for any other action.
 bool keyNavMotion(const Action* a, float& panX, float& panY, float& zoomSteps);
 constexpr float kKeyNavPanPixels = 600.0f, kKeyNavZoomSteps = 4.0f; // per second at speed 1.0 (Preferences > Input)
+constexpr float kKeyNavEaseSeconds = 0.12f; // from standing to full speed on a press, and back to standing on a release
+
+// One pan / zoom key's speed, 0 (standing) to 1 (full), easing linearly over kKeyNavEaseSeconds. advance() moves it
+// by one frame and returns the seconds of full-speed travel that frame covers (the exact integral of the speed over
+// the frame, so the distance after any time is the same at 30 fps and at 144 fps). No OS key repeat is involved: the
+// caller says whether the key is down.
+struct KeyNavEase {
+    float level = 0.0f;
+    float advance(bool held, float dt) {
+        if (dt <= 0.0f) return 0.0f;
+        const float target = held ? 1.0f : 0.0f;
+        const float rate = 1.0f / kKeyNavEaseSeconds;
+        const float toTarget = std::abs(target - level) / rate; // seconds until it gets there
+        if (dt <= toTarget) {
+            const float end = level + (held ? rate * dt : -rate * dt);
+            const float area = dt * (level + end) * 0.5f;
+            level = end;
+            return area;
+        }
+        const float area = toTarget * (level + target) * 0.5f + (held ? dt - toTarget : 0.0f);
+        level = target;
+        return area;
+    }
+};
 
 class ActionRegistry {
 public:
