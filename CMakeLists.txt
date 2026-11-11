@@ -1196,6 +1196,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The first start's language: the OS-language decision, the welcome's language row and the "SculptForge is in..." bar (1440 + 2880).
     sculptforge_ui_test(first_run_language_1440 first_run_language --size 1440x900)
     sculptforge_ui_test(first_run_language_2880 first_run_language --size 2880x1800)
+    # What's New's hero band and drawn cards (tests/ui/sizes/whats_new_cards.sfui) at 1440 and 2880 px.
+    sculptforge_ui_test(whats_new_cards_1440 sizes/whats_new_cards --size 1440x900)
+    sculptforge_ui_test(whats_new_cards_2880 sizes/whats_new_cards --size 2880x1800)
     sculptforge_ui_test(save_visible_parts_1440 sizes/save_visible_parts --size 1440x900)
     sculptforge_ui_test(save_visible_parts_2880 sizes/save_visible_parts --size 2880x1800)
     sculptforge_ui_test(help_console_1080 help_console --size 1920x1080)

@@ -4973,6 +4973,8 @@ constexpr Entry kSpanish[] = {
      "Prueba una idea de abajo o pide cambios al pincel seleccionado, como \"más nítido\" o \"menos acumulación\"."},
     {"Try it",
      "Probarlo"},
+    {"Read more", "Leer más"},
+    {"Full release notes", "Notas completas de la versión"},
     {"Turn 90",
      "Girar 90"},
     {"Turn off VPNs on the phone and the computer.",

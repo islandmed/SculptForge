@@ -4532,6 +4532,8 @@ constexpr Entry kTraditionalChinese[] = {
      "試試下面的點子，或要求修改所選筆刷，例如「更銳利」或「少一點堆積」。"},
     {"Try it",
      "試用"},
+    {"Read more", "閱讀更多"},
+    {"Full release notes", "完整版本說明"},
     {"Turn 90",
      "旋轉 90"},
     {"Turn off VPNs on the phone and the computer.",

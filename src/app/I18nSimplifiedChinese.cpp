@@ -4534,6 +4534,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "试试下面的点子，或要求修改所选笔刷，例如“更锐利”或“少一点堆积”。"},
     {"Try it",
      "试用"},
+    {"Read more", "阅读更多"},
+    {"Full release notes", "完整版本说明"},
     {"Turn 90",
      "旋转 90"},
     {"Turn off VPNs on the phone and the computer.",
