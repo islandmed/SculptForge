@@ -15,10 +15,10 @@ if [ "${1:-}" = --self-test ]; then
   done
   RUN_ID=9 WORKFLOW=CI BRANCH=main SHA=def CONCLUSION=failure CI_STATUS_REMOTE=$t/origin.git ROWS_KEEP=3 "$0"
   out=$(git -C "$t/origin.git" show ci-status:status.tsv)
-  [ "$(printf '%s\n' "$out" | wc -l)" = 3 ] || { echo "FAIL: expected 3 kept lines: $out"; exit 1; }
+  [ "$(printf '%s\n' "$out" | wc -l | tr -d " ")" -eq 3 ] || { echo "FAIL: expected 3 kept lines: $out"; exit 1; }
   printf '%s\n' "$out" | tail -1 | awk -F'\t' '$1=="9"&&$2=="CI"&&$5=="failure"&&NF==6{ok=1}END{exit !ok}' || { echo "FAIL: last line: $out"; exit 1; }
   printf '%s\n' "$out" | head -1 | awk -F'\t' '$3=="t0/fix/a_b"{ok=1}END{exit !ok}' || { echo "FAIL: branch not cleaned: $out"; exit 1; }
-  [ "$(git -C "$t/origin.git" rev-list --count ci-status)" = 1 ] || { echo "FAIL: history grew"; exit 1; }
+  [ "$(git -C "$t/origin.git" rev-list --count ci-status | tr -d " ")" -eq 1 ] || { echo "FAIL: history grew"; exit 1; }
   echo "ci_status OK"; exit 0
 fi
 clean() { printf '%s' "${1:-}" | tr -d '\000-\037\177' | tr ' ' '_' | cut -c1-120; }
@@ -30,7 +30,7 @@ cd "$d"
 git init -q
 git remote add origin "$remote"
 if [ -n "${CI_STATUS_TOKEN:-}" ]; then
-  git config http.https://github.com/.extraheader "AUTHORIZATION: basic $(printf 'x-access-token:%s' "$CI_STATUS_TOKEN" | base64 -w0)"
+  git config http.https://github.com/.extraheader "AUTHORIZATION: basic $(printf 'x-access-token:%s' "$CI_STATUS_TOKEN" | base64 | tr -d "\n")"
 fi
 export GIT_AUTHOR_NAME=github-actions GIT_AUTHOR_EMAIL=41898282+github-actions[bot]@users.noreply.github.com GIT_COMMITTER_NAME=github-actions GIT_COMMITTER_EMAIL=41898282+github-actions[bot]@users.noreply.github.com
 for attempt in 1 2 3 4 5 6 7 8; do
