@@ -175,6 +175,10 @@ TEST(social_links_are_the_websites_https_pages) {
     for (const SocialLink& link : kSocialLinks) {
         const std::string url = link.url, base = url.substr(0, url.find('?'));
         CHECK(url.rfind("https://", 0) == 0);
+        if (std::string(link.name) == "Facebook") { // the page the owner gave; the site gets the same link in its own branch
+            CHECK(url.rfind("https://www.facebook.com/profile.php?id=61596196961617&", 0) == 0);
+            continue;
+        }
         if (page.find("href=\"" + base) == std::string::npos) std::printf("  not on the site: %s\n", link.url);
         CHECK(page.find("href=\"" + base) != std::string::npos);
     }
