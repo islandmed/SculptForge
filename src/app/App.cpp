@@ -2035,6 +2035,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (axisGizmoMouseDown(x, y)) return;   // the axis gizmo's ends snap to a side view (#43)
         if (forgesphereMouseDown(x, y, mod)) return; // a Forge Sphere Part takes clicks on it (PanelForge Spheres.cpp)
         if (tubeMouseDown(x, y, mod)) return;        // Draw Tube, a Tube Part's points (PanelTube.cpp)
+        if (referenceMouseDown(x, y, nav)) return; // Adjust Reference: move, scale it (ReferenceImages.cpp)
         if (stencilMouseDown(x, y, nav)) return; // Adjust Stencil: move, scale, turn it (StencilOverlay.cpp)
         if (gradientMouseDown(x, y, nav)) return; // Line Gradient: a new line or an end handle (LineGradient.cpp)
         if (edgesMouseDown(x, y, mod)) return; // Edges mode: clicks select edges (PanelEdges.cpp)
@@ -2226,6 +2227,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Capture: captureMouseMove(x, y); break;
     case Drag::Gradient: gradientMouseMove(x, y); break;
     case Drag::Stencil: stencilMouseMove(x, y); break;
+    case Drag::Reference: referenceMouseMove(x, y); break;
     case Drag::ForgeSphere: forgesphereDragTo(x, y); break;
     case Drag::Tube: tubeDragTo(x, y); break;
     case Drag::AirStroke: airStrokeTo(x, y); break;
@@ -2394,6 +2396,7 @@ void App::onMouseUp() {
     if (drag_ == Drag::Capture) captureMouseUp();
     if (drag_ == Drag::Gradient) gradientMouseUp();
     if (drag_ == Drag::Stencil) stencilMouseUp();
+    if (drag_ == Drag::Reference) referenceMouseUp();
     if (drag_ == Drag::ForgeSphere) forgesphereRelease();
     if (drag_ == Drag::Tube) tubeRelease();
     if (drag_ == Drag::AirStroke) airStrokeRelease();
@@ -2407,6 +2410,7 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
     if (tubeKey(key, mod)) return;   // Esc / Undo / Redo during a tube stroke or point drag drop it (PanelTube.cpp)
     if (cutPolylineKey(key)) return; // Enter ends a Cut Polyline, Esc drops it (PanelCut.cpp)
     if (gradientKey(key)) return;    // Enter keeps a Line Gradient, Esc takes it back (LineGradient.cpp)
+    if (referenceKey(key, mod)) return; // Adjust Reference's keys, Enter / Esc ends it (ReferenceImages.cpp)
     if (stencilKey(key, mod)) return; // Adjust Stencil's keys, Enter / Esc ends it (StencilOverlay.cpp)
     if (key == SDLK_ESCAPE && radial_.menu >= 0) {
         closeRadialMenu();
@@ -3130,6 +3134,7 @@ void App::openPath(const std::string& path) {
     std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     if (Image::isImagePath(path)) {
+        if (takeReferenceDrop(path)) return; // View > Reference images showing: it becomes one (ReferenceImages.cpp)
         if (loadReferenceImage(path)) {
             if (ai::aiEnabled()) showImageTo3D_ = true;
             else status_ = "Image loaded: Relief, Inflate or Stamp it from Mesh > From Image";
@@ -3292,6 +3297,7 @@ Mesh& App::displayedMesh() {
 }
 
 void App::syncScene() {
+    renderer_.setReferences(doc_.references); // View > Reference images (ReferenceImages.cpp; not the mesh: always)
     if (solverBusy()) return; // the solver thread is changing the mesh: the GPU keeps what it has (AsyncStroke.cpp)
     updateFloorHeight();
     // Fill layers: Mesh Maps bakes started and landed (live after sculpting), and a painted mask's tiles evaluated.
@@ -3407,6 +3413,7 @@ void App::drawUi() {
     drawTimelineUi();  // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)
     pollAlphaFile();
     pollStencilFile();
+    pollReferenceFiles();
     syncBrushSettings(); // a brush switch brings back that brush's own settings (#78); before pollVdm's stroke
     syncWorldSize(); // World Size: the brush keeps its size on the surface as you zoom (Precision.cpp)
     pollVdm();
@@ -3419,6 +3426,7 @@ void App::drawUi() {
     }
     const ImVec2 mouse(mouseX_, mouseY_);
     drawStencilOverlay(); // the Stencil and, in Adjust, its handles (StencilOverlay.cpp)
+    drawReferenceOverlay(); // Adjust Reference's outlines and handles (ReferenceImages.cpp)
     drawGizmo(); // Transform gizmo handles and panel (Gizmo.cpp)
     drawQRemeshGuides(); // QRemesh Guides curves (PanelRetopo.cpp)
     drawEdgeOverlay();   // Edges mode: the selected edges (PanelEdges.cpp)

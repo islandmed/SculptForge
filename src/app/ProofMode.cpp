@@ -722,6 +722,23 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         p.dabs.clear();
         p.sent = 1;
         p.dabFrom = p.previewFrom = 0;
+        // SF_BENCH_REFERENCES=a.png;b.png: reference images in the view for every phase (View > Reference images): the
+        // first behind the model filling the view, the others planes in the scene (front, side, top). bench.sh quick
+        // SHA SHA with SHA_ENV=SF_BENCH_REFERENCES=... measures what they cost an orbit.
+        if (const char* refs = std::getenv("SF_BENCH_REFERENCES"); refs && *refs && doc_.references.empty()) {
+            static constexpr const char* kPlanes[] = {"front", "side", "top"};
+            std::string list = refs;
+            for (size_t at = 0, k = 0; at <= list.size() && k < 4; ++k) {
+                const size_t end = std::min(list.find(';', at), list.size());
+                const std::string path = list.substr(at, end - at);
+                at = end + 1;
+                if (path.empty()) continue;
+                if (k == 0) runCommand("reference_add", {{"path", path}, {"height", 1.0}, {"opacity", 0.5}});
+                else runCommand("reference_add", {{"path", path}, {"mode", std::string("scene")}, {"plane", std::string(kPlanes[(k - 1) % 3])}});
+            }
+            std::fprintf(stderr, "bench references: %zu, %.1f MB of textures\n", doc_.references.size(),
+                         double(referenceGpuBytes(doc_.references)) / double(1 << 20));
+        }
         if (spec.radiusPx > 0) {
             brush_ = spec.brush;
             doc_.activeBrush = -1;

@@ -716,6 +716,28 @@ void main() {
 }
 )";
 
+// Reference images (core/Reference.h): one textured quad, its corners given in clip space (perspective-correct).
+const char* kReferenceVS = R"(#version 330 core
+uniform vec4 uClip[4];
+uniform vec4 uUv[4];
+out vec2 vUv;
+void main() {
+    vUv = uUv[gl_VertexID].xy;
+    gl_Position = uClip[gl_VertexID];
+}
+)";
+
+const char* kReferenceFS = R"(#version 330 core
+in vec2 vUv;
+out vec4 fragColor;
+uniform sampler2D uTex;
+uniform float uAlpha;
+void main() {
+    vec4 c = texture(uTex, vUv);
+    fragColor = vec4(c.rgb, c.a * uAlpha);
+}
+)";
+
 const char* kBgFS = R"(#version 330 core
 in vec2 vUv;
 out vec4 fragColor;
@@ -1335,6 +1357,11 @@ void Renderer::shutdown() {
     envBgProgram_ = 0;
     deleteProgram(floorProgram_);
     floorProgram_ = 0;
+    deleteProgram(referenceProgram_);
+    referenceProgram_ = 0;
+    for (ReferenceTexture& t : referenceTextures_) gl::DeleteTextures(1, &t.tex);
+    referenceTextures_.clear();
+    references_.clear();
     gl::DeleteVertexArrays(1, &emptyVao_);
     for (MeshProgram& p : programs_) {
         deleteProgram(p.id);
@@ -2810,7 +2837,10 @@ bool Renderer::renderToImage(const Camera& camera, int width, int height, const 
     ok = ok && gl::CheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
     if (ok) {
         gl::BindFramebuffer(GL_FRAMEBUFFER, fbo[0]);
+        const bool viewReferences = viewReferences_;
+        viewReferences_ = false; // (renders show only the references marked "Show in renders")
         draw(camera, width, height, settings);
+        viewReferences_ = viewReferences;
         gl::BindFramebuffer(GL_READ_FRAMEBUFFER, fbo[0]);
         gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo[1]);
         gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
@@ -3011,6 +3041,86 @@ void Renderer::endCapture(std::vector<uint8_t>& rgba) {
     gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void Renderer::setReferences(const std::vector<ReferenceImage>& refs) {
+    if (refs.empty() && references_.empty() && referenceTextures_.empty()) return; // (every frame: nothing to copy)
+    references_ = refs;
+    for (size_t i = 0; i < referenceTextures_.size();) { // textures of images no longer in the list go
+        const Image* img = referenceTextures_[i].image.get();
+        const bool used = std::any_of(refs.begin(), refs.end(), [&](const ReferenceImage& r) { return r.image.get() == img; });
+        if (used) {
+            ++i;
+            continue;
+        }
+        gl::DeleteTextures(1, &referenceTextures_[i].tex);
+        referenceTextures_.erase(referenceTextures_.begin() + std::ptrdiff_t(i));
+    }
+}
+
+void Renderer::drawReferences(bool behind, const glm::mat4& view, const glm::mat4& proj, bool ortho, float aspect) {
+    if (thumbnailPass_) return;
+    bool started = false;
+    for (const ReferenceImage& r : references_) {
+        if (!r.shown() || behind != (r.mode == ReferenceMode::Behind) || (!viewReferences_ && !r.inRenders)) continue;
+        const float alpha = std::clamp(r.opacity, 0.0f, 1.0f) * r.facing(view, ortho);
+        if (alpha < 1.0f / 255.0f) continue;
+        auto t = std::find_if(referenceTextures_.begin(), referenceTextures_.end(),
+                              [&](const ReferenceTexture& x) { return x.image == r.image; });
+        if (t == referenceTextures_.end()) { // uploaded once per image, with mip levels (zoomed out it stays smooth)
+            ReferenceTexture nt{r.image, 0};
+            gl::GenTextures(1, &nt.tex);
+            gl::BindTexture(GL_TEXTURE_2D, nt.tex);
+            gl::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
+            gl::TexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA8), r.image->width, r.image->height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                           r.image->rgba.data());
+            gl::GenerateMipmap(GL_TEXTURE_2D);
+            gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_LINEAR_MIPMAP_LINEAR));
+            gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GLint(GL_LINEAR));
+            gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GLint(GL_CLAMP_TO_EDGE));
+            gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GLint(GL_CLAMP_TO_EDGE));
+            referenceTextures_.push_back(nt);
+            t = referenceTextures_.end() - 1;
+        }
+        if (!started) {
+            if (!referenceProgram_) { // linked when the first reference is drawn: none shown costs nothing
+                std::string error;
+                referenceProgram_ = link(kReferenceVS, kReferenceFS, error);
+                if (!referenceProgram_) {
+                    SDL_Log("reference images: %s", error.c_str());
+                    return;
+                }
+            }
+            started = true;
+            gl::UseProgram(referenceProgram_);
+            gl::BindVertexArray(emptyVao_);
+            gl::Enable(GL_BLEND);
+            gl::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            gl::DepthMask(GL_FALSE); // (never in the depth: nothing it covers is hidden from picks or later passes)
+            if (behind) gl::Disable(GL_DEPTH_TEST);
+            gl::Uniform1i(gl::GetUniformLocation(referenceProgram_, "uTex"), 0);
+            gl::ActiveTexture(GL_TEXTURE0);
+        }
+        const std::array<glm::vec3, 4> c = r.corners(aspect);
+        glm::vec4 clip[4], uv[4];
+        static constexpr int kStrip[4] = {0, 1, 3, 2}; // (the corners as a triangle strip)
+        for (int k = 0; k < 4; ++k) {
+            const glm::vec3& p = c[size_t(kStrip[k])];
+            clip[k] = behind ? glm::vec4(p.x * 2.0f - 1.0f, 1.0f - p.y * 2.0f, 0.0f, 1.0f) : proj * view * glm::vec4(p, 1.0f);
+            uv[k] = glm::vec4(r.cornerUv(kStrip[k]), 0.0f, 0.0f);
+        }
+        gl::Uniform4fv(gl::GetUniformLocation(referenceProgram_, "uClip"), 4, glm::value_ptr(clip[0]));
+        gl::Uniform4fv(gl::GetUniformLocation(referenceProgram_, "uUv"), 4, glm::value_ptr(uv[0]));
+        gl::Uniform1f(gl::GetUniformLocation(referenceProgram_, "uAlpha"), alpha);
+        gl::BindTexture(GL_TEXTURE_2D, t->tex);
+        gl::DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    }
+    if (!started) return;
+    gl::BindTexture(GL_TEXTURE_2D, 0);
+    gl::Disable(GL_BLEND);
+    gl::DepthMask(GL_TRUE);
+    if (behind) gl::Disable(GL_DEPTH_TEST); // (the background pass runs with it off; draw() turns it on next)
+    else gl::Enable(GL_DEPTH_TEST);
+}
+
 void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, const RenderSettings& settings,
                     const Viewport& viewport) {
     if (!settings.motionProxy) lodBudget_ = triangleBudget(settings); // (sync builds coarse levels of meshes over it)
@@ -3108,6 +3218,9 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         gl::DrawArrays(GL_TRIANGLES, 0, 3);
     }
 
+    const float viewAspect = float(fbWidth) / float(std::max(fbHeight, 1));
+    if (!references_.empty()) drawReferences(true, view, proj, camera.ortho, viewAspect); // (Behind the model)
+
     frameView_ = view;
     frameProj_ = proj;
     frameViewport_ = inset ? glm::vec4(float(viewport.x), float(viewport.y), float(viewport.w), float(viewport.h))
@@ -3121,6 +3234,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     floorGridDrawn_ = false;
     if (settings.floorGrid) drawFloorGrid(camera, view, proj, settings); // (under everything: the Parts paint over it)
     if (drawList_.empty() || !settings.showMesh) {
+        if (!references_.empty()) drawReferences(false, view, proj, camera.ortho, viewAspect);
         if (settings.showSplats) drawSplats(view, proj, fbWidth, fbHeight, settings.splatOpacity);
         gl::UseProgram(0);
         return;
@@ -3148,6 +3262,11 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0 && !seeThrough(item))
             drawItem(*s, item, settings);
     drawMark(2);
+    if (!references_.empty()) { // In the scene: behind or in front of the opaque Parts, under the see-through ones
+        gl::Disable(GL_POLYGON_OFFSET_FILL);
+        drawReferences(false, view, proj, camera.ortho, viewAspect);
+        gl::Enable(GL_POLYGON_OFFSET_FILL);
+    }
     if (xray) {
         gl::Enable(GL_BLEND);
         gl::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

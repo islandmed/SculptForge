@@ -22,6 +22,8 @@ struct Image {
 
     static bool load(const std::string& path, Image& out, std::string& error);
     static bool decode(const unsigned char* bytes, size_t size, Image& out, std::string& error);
+    // The width and height a PNG/JPEG header claims, read without decoding (false if it isn't one).
+    static bool dimensions(const unsigned char* bytes, size_t size, int& width, int& height);
     bool savePng(const std::string& path, std::string& error) const;
     bool encodePng(std::vector<uint8_t>& out) const;
     // JPEG (no alpha: transparent pixels go over black) at `quality` 1-100.

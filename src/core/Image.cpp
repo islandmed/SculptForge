@@ -3,6 +3,7 @@
 #include "core/Image.h"
 
 #include <algorithm>
+#include <climits>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
@@ -178,6 +179,11 @@ bool Image::load(const std::string& path, Image& out, std::string& error) {
         return false;
     }
     return decode(bytes.data(), bytes.size(), out, error);
+}
+
+bool Image::dimensions(const unsigned char* bytes, size_t size, int& width, int& height) {
+    int channels = 0;
+    return size <= size_t(INT_MAX) && stbi_info_from_memory(bytes, int(size), &width, &height, &channels) == 1;
 }
 
 bool Image::decode(const unsigned char* bytes, size_t size, Image& out, std::string& error) {

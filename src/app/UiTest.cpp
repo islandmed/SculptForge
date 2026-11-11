@@ -152,6 +152,10 @@
 //                            moved_out (summed movement along the snapshot's normals: > 0 out, < 0 in),
 //                            moved_off_stencil (moved vertices that showed off the Stencil's image), stencil_active,
 //                            stencil_adjust, stencil_tile, stencil_x / stencil_y / stencil_size (x1000), stencil_angle (degrees),
+//                            reference_count, reference_selected, reference_adjust, reference_gpu_kb, reference_x /
+//                            reference_y / reference_height / reference_stretch / reference_origin_x..z (x1000, the
+//                            selected one), reference_scene, reference_has_image, reference_facing (x1000),
+//                            reference_render_r (a 64 px render's mean red: what renders show),
 //                            pen_pressure (raw), brush_pressure (after the curve; 1 for the mouse),
 //                            stroke_sample_pressure (the last stroke sample's, as its dabs got it),
 //                            pen_lost_samples (pressure samples that lost their value), pen_axes_after_motion,
@@ -931,6 +935,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "stroke_continuous") return app_.strokeContinuous_ ? 1.0 : 0.0; // Continuous (#31)
     if (name == "vdms") return double(app_.doc_.vdms.size());
     if (double gv = 0.0; app_.gradientUiValue(name, gv)) return gv; // gradient_armed, gradient_placed (LineGradient.cpp)
+    if (double rv = 0.0; app_.referenceUiValue(name, rv)) return rv; // reference_count, reference_x x1000, ... (ReferenceImages.cpp)
     if (double sv = 0.0; app_.stencilUiValue(name, sv)) return sv; // stencil_active, stencil_x / y / size x1000 (StencilOverlay.cpp)
     if (double cv = 0.0; app_.clothUiValue(name, cv)) return cv; // cloth_* (PanelCloth.cpp)
     if (double kv = 0.0; app_.kelvinUiValue(name, kv)) return kv; // capture_*, kelvin_* (PanelKelvinlet.cpp)

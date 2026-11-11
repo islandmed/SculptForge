@@ -33,6 +33,7 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 5. [Install SculptForge on Windows, macOS and Linux](installing.md)
 6. [The interface](interface.md)
 7. [Navigating the view](navigation.md)
+    - [Reference images](reference-images.md)
 
 ## Sculpting
 
