@@ -200,8 +200,10 @@ These settings save themselves.
   Manager > Services), unplug the SpaceMouse and plug it back in. Without 3DxWare, Windows treats the SpaceMouse as
   a game controller, which is how SculptForge reads it. If SculptForge sees the SpaceMouse with 3DxWare running,
   give the buttons a job in only one of the two places, or one press does two things.
-- **macOS:** the same applies to 3DxWare for Mac: quit it (or uninstall it) and plug the SpaceMouse in again.
-  Suspending it isn't enough: suspended, it can still move the pointer and scroll while you push the cap.
+- **macOS:** the same applies to 3DxWare for Mac (its DriverKit extension): quit it (or uninstall it). If the
+  driver had the device to itself when SculptForge started, SculptForge tries to open it again every few seconds, so
+  it picks the SpaceMouse up once the driver lets go; if it doesn't, plug the SpaceMouse in again.
+  Suspending the driver isn't enough: suspended, it can still move the pointer and scroll while you push the cap.
 - **Linux:** if **spacenavd** is running, it normally opens the device exclusively. SculptForge may still list
   the SpaceMouse but get no motion from it. Stop it while you sculpt (`sudo systemctl stop spacenavd`). SculptForge
   reads the device through `/dev/input` as a joystick: that works when the kernel reports the cap's axes as

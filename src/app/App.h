@@ -3104,7 +3104,7 @@ private:
     // every frame, independently of the mouse and pen (held while a stroke runs, unless Hold during strokes is off),
     // its buttons run actions.
     void spaceMouseEvent(const SDL_Event& e); // hot-plug and buttons
-    void spaceMouseScan();                    // take the first SpaceMouse SDL knows about, if none is open
+    void spaceMouseScan(bool retry = false);              // take the first SpaceMouse SDL knows about, if none is open
     void spaceMouseClose();
     void updateSpaceMouse(float dt);          // once a frame: move the camera by the held axes
     bool keyNavMoving() const { return keyNavMoving_; }
@@ -3118,6 +3118,8 @@ private:
     std::array<float, kSmAxes> spaceMouseAxes_{}; // the last values read, -1 .. 1 (Preferences shows them)
     bool spaceMouseMoving_ = false;
     int spaceMouseLastButton_ = -1; // for Preferences: "Button N pressed"
+    bool spaceMouseOpenFailed_ = false; // SDL listed a SpaceMouse it could not open: updateSpaceMouse tries again (#110)
+    double spaceMouseRetryAt_ = 0.0;
     bool spaceMouseReported_ = false; // an axis has moved since the device was opened (else 3DxWare may hold it, #104)
     // Every joystick SDL listed at the last scan and why it was or wasn't taken, for Preferences and the device
     // report a user can paste into an issue (#104).
