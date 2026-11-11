@@ -1067,11 +1067,6 @@ double Demo::query(const std::string& name, bool& known) const {
         const std::string p = app_.uiConfigPath();
         return !p.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
     }
-    if (name == "ui_prev_file") { // ui.json's copy from before this session's first write (Config.cpp writeJsonAtomic)
-        std::error_code ec;
-        const std::string p = app_.configDir_ + "ui.prev.json";
-        return !app_.configDir_.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
-    }
     if (name == "autosave_file" || name == "autosave_prev_file") { // the project autosave in the settings folder (PanelProject.cpp)
         std::error_code ec;
         const std::string p = app_.prefDir_ + (name == "autosave_file" ? "autosave.sfproj" : "autosave.prev.sfproj");
