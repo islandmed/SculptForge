@@ -232,6 +232,21 @@ def load_scale(load1=None, cores=None):
     return min(3.0, max(1.0, load1 / cores))
 
 
+NEAR = 0.8  # of the budget: a test this slow and not on slow_tests.txt is named before a stage trips on it
+
+
+def near_budget(res, inner, labels, known, budget):
+    """(seconds, name) of the tests between NEAR x budget and the budget that slow_tests.txt doesn't list (11-11: the 0.12.6
+    stage lost 77 min on ui_key_nav_loop, 24 s against the PC's 20 s, after T0 had passed it under CI's scaled budget)."""
+    if budget <= 0:
+        return []
+    out = [(d, n) for n, (st, d) in res.items() if NEAR * budget < d <= budget and st == "pass" and n not in known
+           and "nightly" not in labels.get(n, []) and not n.startswith("sculptforge_tests")]
+    out += [(d, f"sculptforge_tests: {n}") for n, d in inner.items() if NEAR * budget < d <= budget
+            and f"sculptforge_tests: {n}" not in known and not n.startswith("nightly_")]
+    return sorted(out, reverse=True)
+
+
 def parallel_jobs(args):
     """N of ctest's -jN / -j N / --parallel N (1 when absent)."""
     for i, x in enumerate(args):
@@ -508,6 +523,9 @@ def run_tests(argv=None):
                     print(f"over budget under load only: {n} {d:.1f} s in the run, {d2:.1f} s alone (not counted{load})")
                 elif load:
                     print(f"over budget alone too: {n} {d2:.1f} s{load}")
+    for d, n in near_budget(res, inner, labels, known, a.budget):
+        print(f"near budget: {n} {d:.1f} s, over {NEAR:g}x the {a.budget:g} s budget (split it, make it faster, or list it in "
+              f"tests/slow_tests.txt before a slower machine fails it)")
     for d, n in slow:
         why = f"1.5x its {known[n] * scale:g} s in tests/slow_tests.txt" if n in known else f"the {a.budget:g} s budget"
         print(f"over budget: {n} {d:.1f} s, over {why} (wait on events, use a smaller mesh, split it, or label it nightly)")
@@ -531,6 +549,9 @@ deletes it; remove its lines once fixed.
 
 
 def self_test():
+    nb = near_budget({"a": ("pass", 17.0), "b": ("pass", 15.0), "c": ("pass", 18.0), "d": ("pass", 19.0), "e": ("fail", 19.0)},
+                     {"x": 17.0}, {"d": ["nightly"]}, {"c": 30}, 20)
+    assert nb == [(17.0, "sculptforge_tests: x"), (17.0, "a")], nb
     assert load_scale(15, 10) == 1.5 and load_scale(2, 10) == 1.0 and load_scale(80, 10) == 3.0
     q = {"a": ("qa", "2026-11-18", "x", ""), "b": ("qa", "2026-11-01", "y", ""), "m": ("qa", "2026-11-18", "t", "[monkey 1064]")}
     blocking, tolerated, notes = split_failures(["a", "b", "c", "d"], {"d": ["flaky"]}, q, "2026-11-11")

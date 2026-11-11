@@ -24,7 +24,8 @@ lines = [f"## T0 {result}" + ("" if result == "green" else f" ({stage})") + (" (
          f"- tests: `{regex or 'none'}`"]
 if r["failed"]:
     lines += ["- failed: " + " ".join(f"`{n}`" for n in r["failed"])]
-for name, title in (("failed.txt", "LastTestsFailed + FAILED lines"), ("output.txt", "output on failure (last 300 lines)")):
+for name, title in (("near.txt", "near the budget: split, speed up or list in tests/slow_tests.txt before a stage fails it"),
+                    ("failed.txt", "LastTestsFailed + FAILED lines"), ("output.txt", "output on failure (last 300 lines)")):
     p = f"{out}/{name}"
     if os.path.exists(p) and os.path.getsize(p):
         lines += ["", f"### {title}", "", "```", open(p, errors="replace").read()[-60000:].rstrip(), "```"]
@@ -94,6 +95,7 @@ kill $tick 2>/dev/null
 pkill -f 'build/sculptforge --ui-serve' 2>/dev/null # (a pool the fixture cleanup missed)
 test_s=$(($(date +%s) - t))
 tail -40 "$out/ctest.log"
+sed -n 's/^near budget: //p' "$out/ctest.log" > "$out/near.txt"
 if [ $rc -eq 0 ] && grep -q '^== [0-9]* run' "$out/ctest.log"; then result=green; finish; fi
 # Red: what failed (ctest's list from the first run, run.py's FAILED / over-budget lines), then their output.
 { echo "LastTestsFailed.log:"; cat build/Testing/Temporary/LastTestsFailed.log 2>/dev/null
