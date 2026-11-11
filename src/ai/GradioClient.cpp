@@ -6,7 +6,6 @@
 
 #include "ai/Http.h"
 
-#include <algorithm>
 #include <chrono>
 #include <random>
 
@@ -28,85 +27,9 @@ bool isFileData(const Json& v) { return v.isObject() && (v["path"].isString() ||
 // Gradio may wrap returned values as {"__type__": "update", "value": ...}.
 const Json& unwrap(const Json& v) { return v.isObject() && v["value"].isObject() ? v["value"] : v; }
 
-bool modelName(std::string s) {
-    s = s.substr(0, s.find('?'));
-    for (char& c : s) c = char(std::tolower(static_cast<unsigned char>(c)));
-    for (const char* ext : {".glb", ".gltf", ".obj", ".ply"})
-        if (s.ends_with(ext)) return true;
-    return false;
-}
-
-// The first file in a returned value of any shape: a FileData object, a bare path or URL string to a model, a list of
-// either, or a component update wrapping them.
-bool firstFile(const Json& v, bool anyFile, Json& found, int depth = 0) {
-    if (depth > 4) return false;
-    if (v.isString()) {
-        const std::string& str = v.asString();
-        if (!modelName(str) || (str.rfind("http", 0) != 0 && str.rfind('/', 0) != 0)) return false;
-        found = Json::object();
-        found.set(str.rfind("http", 0) == 0 ? "url" : "path", str);
-        return true;
-    }
-    if (isFileData(v)) {
-        const std::string name = v["url"].isString() ? v["url"].asString() : v["path"].asString();
-        if (!anyFile && !modelName(v["orig_name"].isString() ? v["orig_name"].asString() : name) && !modelName(name)) return false;
-        found = v;
-        return true;
-    }
-    if (v.isArray()) {
-        for (const auto& item : v.items())
-            if (firstFile(item, anyFile, found, depth + 1)) return true;
-    } else if (v.isObject() && v.has("value")) {
-        return firstFile(v["value"], anyFile, found, depth + 1);
-    }
-    return false;
-}
-
 } // namespace
 
-bool gradioCompleted(const Json& m, std::vector<Json>& outputs, std::string& error) {
-    if (m["success"].asBool(false)) {
-        outputs = m["output"]["data"].items();
-        return true;
-    }
-    const Json& o = m["output"];
-    error = friendlyGradioError(o["error"].isString() ? o["error"].asString()
-                                : m["title"].isString() ? m["title"].asString()
-                                                        : std::string("The Space reported an error"));
-    return false;
-}
-
-std::string gradioModelUrl(const Json& config, const std::string& apiName, const std::vector<Json>& outputs,
-                           const std::string& base) {
-    auto urlOf = [&](const Json& file) {
-        if (file["url"].isString() && !file["url"].asString().empty()) return file["url"].asString();
-        return base + "/file=" + file["path"].asString();
-    };
-    const Json& deps = config["dependencies"];
-    const Json* dep = nullptr;
-    for (size_t i = 0; i < deps.size(); ++i)
-        if (deps[i]["api_name"].asString() == apiName) dep = &deps[i];
-    auto typeOf = [&](double id) {
-        for (const auto& c : config["components"].items())
-            if (c["id"].asNumber() == id) return c["type"].asString();
-        return std::string();
-    };
-    Json found;
-    // 3D model outputs first, then file outputs, then anything that holds a model file.
-    for (int pass = 0; pass < 3; ++pass)
-        for (size_t i = 0; i < outputs.size(); ++i) {
-            const std::string type = dep && i < (*dep)["outputs"].size() ? typeOf((*dep)["outputs"][i].asNumber()) : std::string();
-            const bool modelType = type == "model3d" || type == "litmodel3d";
-            if (pass == 0 && !modelType) continue;
-            if (pass == 1 && type != "file") continue;
-            if (firstFile(outputs[i], pass < 2, found)) return urlOf(found);
-        }
-    return {};
-}
-
 std::string friendlyGradioError(const std::string& raw) {
-    if (raw.find("Text to 3D is disable") != std::string::npos)
-        return "This free Hugging Face Space has switched Text to 3D off. Use Image to 3D (or another provider) for now.";
     if (raw.find("ZeroGPU") != std::string::npos || raw.find("GPU quota") != std::string::npos)
         return "Hugging Face's free GPU time is used up for now. Add a free Hugging Face token "
                "(huggingface.co/settings/tokens) for a bigger daily allowance, wait for it to refill, or pick another model. (" +
@@ -255,7 +178,15 @@ bool GradioClient::call(const std::string& apiName, const std::vector<Json>& use
                     }
                 } else if (msg == "process_completed") {
                     done = true;
-                    ok = gradioCompleted(m, outputs, error);
+                    ok = m["success"].asBool(false);
+                    if (ok) {
+                        outputs = m["output"]["data"].items();
+                    } else {
+                        const Json& o = m["output"];
+                        error = friendlyGradioError(o["error"].isString() ? o["error"].asString()
+                                                    : m["title"].isString() ? m["title"].asString()
+                                                                            : std::string("The Space reported an error"));
+                    }
                     return false; // stop reading
                 } else if (msg == "close_stream") {
                     return false;
@@ -270,7 +201,19 @@ bool GradioClient::call(const std::string& apiName, const std::vector<Json>& use
     if (!ok) return false;
 
     // Remember the first 3D model (or file) output.
-    lastModelUrl_ = gradioModelUrl(config_, apiName, outputs, root_ + prefix_);
+    lastModelUrl_.clear();
+    const Json& outs = (*dep)["outputs"];
+    for (int pass = 0; pass < 2 && lastModelUrl_.empty(); ++pass)
+        for (size_t i = 0; i < outputs.size() && i < outs.size(); ++i) {
+            const Json* c = component(outs[i].asNumber());
+            const std::string type = c ? (*c)["type"].asString() : std::string();
+            const bool modelType = type == "model3d" || type == "litmodel3d";
+            if ((pass == 0 && modelType) || (pass == 1 && type == "file"))
+                if (isFileData(unwrap(outputs[i]))) {
+                    lastModelUrl_ = fileUrl(outputs[i]);
+                    break;
+                }
+        }
     return true;
 }
 
