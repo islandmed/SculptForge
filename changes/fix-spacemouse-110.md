@@ -1,5 +1,5 @@
 ---
-whats_new: **SpaceMouse** (macOS, Windows): a SpaceMouse that 3Dconnexion's driver was holding when SculptForge started is picked up on its own once the driver lets go, no unplugging needed.
+whats_new: **SpaceMouse** (macOS, Windows): a SpaceMouse that 3Dconnexion's driver was holding when SculptForge started should be picked up on its own once the driver lets go, no unplugging needed.
 fixed: SpaceMouse (#110, thanks @fenixpoints): a SpaceMouse that SDL listed but could not open (3DxWare held it) was never tried again until it was replugged; SculptForge now retries every 3 seconds. Running alongside 3DxWare and the Wacom conflict are still open.
 testers:
   - macOS with a SpaceMouse and 3DxWare installed (#testers): quit 3DxWare, start SculptForge, open Edit > Preferences > Input > SpaceMouse. Note the device line, and whether the live bars move when you push the cap.
