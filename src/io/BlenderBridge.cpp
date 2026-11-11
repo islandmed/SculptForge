@@ -426,10 +426,14 @@ bool blenderReceive(const std::string& root, std::vector<MeshObject>& out, Bridg
     }
     size_t triangles = 0;
     for (const auto& o : objects) triangles += o.mesh.triangleCount();
-    message = "Received " + std::to_string(objects.size()) + (objects.size() == 1 ? " object" : " objects") +
-              " from Blender (" + std::to_string(triangles) + " triangles";
-    if (!cloud.empty()) message += std::string(triangles ? ", " : "") + std::to_string(cloud.size()) + " Gaussian splats";
-    message += ")" + warnings;
+    if (objects.empty()) {
+        message = "Received " + std::to_string(cloud.size()) + " Gaussian splats from Blender" + warnings;
+    } else {
+        message = "Received " + std::to_string(objects.size()) + (objects.size() == 1 ? " object" : " objects") +
+                  " from Blender (" + std::to_string(triangles) + " triangles";
+        if (!cloud.empty()) message += ", " + std::to_string(cloud.size()) + " Gaussian splats";
+        message += ")" + warnings;
+    }
     if (!cloud.empty()) {
         if (splats) *splats = std::move(cloud);
         if (splatsFound) *splatsFound = true;

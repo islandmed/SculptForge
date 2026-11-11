@@ -263,11 +263,21 @@ def test_splats():
 
     if not bridge.splats_supported():
         print("Blender %s has no Gaussian splats: they must refuse cleanly" % bpy.app.version_string)
-        check(bpy.ops.sculptforge.import_splat(filepath=dot) == {"CANCELLED"}, "older Blender: importing a .splat says so and does nothing")
+        # (An operator that reports an error raises RuntimeError for a script; Blender's UI shows the report.)
+        try:
+            bpy.ops.sculptforge.import_splat(filepath=dot)
+            said = ""
+        except RuntimeError as e:
+            said = str(e)
+        check("5.3" in said, "older Blender: importing a .splat says it needs 5.3 and does nothing (%s)" % said)
         exchange.write_manifest(exchange.inbox(ROOT), [], "test", [{"name": "Capture", "file": "r99_splats.ply"}])
         splat_io.write_ply(os.path.join(exchange.inbox(ROOT), "r99_splats.ply"), a)
-        check(bpy.ops.sculptforge.receive() == {"CANCELLED"} and "5.3" in bridge.state.message,
-              "older Blender: receiving splats says it needs 5.3 (%s)" % bridge.state.message)
+        try:
+            bpy.ops.sculptforge.receive()
+            said = ""
+        except RuntimeError as e:
+            said = str(e)
+        check("5.3" in said and "5.3" in bridge.state.message, "older Blender: receiving splats says it needs 5.3 (%s)" % bridge.state.message)
         check(not bpy.ops.sculptforge.send.poll(), "older Blender: nothing selected, nothing to send, no crash")
         return
 
@@ -280,6 +290,10 @@ def test_splats():
     check(np.allclose(np.array(obj.matrix_world), np.array(m), atol=1e-6), "the object is placed by the matrix")
     got = bridge.splat_arrays(pc)
     same_splats(a, got, "Blender's import and the add-on's reading of its attributes agree with the PLY")
+    for name in ("radiance:base", "rotation", "scale"):
+        attr = pc.attributes[name]
+        print("splat attribute %s: %s, element properties %s" % (name, attr.data_type, [x.identifier for x in attr.data[0].bl_rna.properties]))
+    check(not bridge.slow_reads, "the splat attributes are read in bulk, not element by element (%s)" % bridge.slow_reads)
 
     # To SculptForge and back through the folder: nothing baked, SH degree 3 intact, the placement kept.
     bpy.ops.object.select_all(action="DESELECT")

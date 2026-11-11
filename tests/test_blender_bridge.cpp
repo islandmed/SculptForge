@@ -237,7 +237,7 @@ TEST(blender_splats_round_trip) {
 
     Document doc = makeDoc(makeIcosphere(1));
     CommandResult r = reg.execute(doc, "blender_receive", {{"folder", folder}});
-    CHECK(r.ok && r.message.find("40 Gaussian splats") != std::string::npos);
+    CHECK(r.ok && r.message.find("Received 40 Gaussian splats") != std::string::npos);
     CHECK(doc.splats.size() == 40 && doc.splats.shDegree == 3 && doc.splats.name == "Capture ü");
     CHECK(doc.partCount() == 1); // splats alone leave the sculpt as it is
     // Nothing is baked: the splats are as stored, the placement turns the object into the scene (Z up -> Y up).

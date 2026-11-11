@@ -285,22 +285,28 @@ def selected_splats(context):
     return found
 
 
+_VALUE_PROPS = {"FLOAT_VECTOR": ("vector",), "FLOAT_COLOR": ("color",), "FLOAT": ("value",),
+                "QUATERNION": ("value",), "FLOAT4": ("value", "vector", "color")}
+slow_reads = []  # attributes that had to be read element by element (a test checks there are none)
+
+
 def _attribute_values(pc, name, width, count):
     """Attribute `name` of a point cloud as float32 (count, width), or None when it is missing."""
     attr = pc.attributes.get(name)
     if attr is None or len(attr.data) != count:
         return None
-    prop = {"FLOAT_VECTOR": "vector", "FLOAT_COLOR": "color", "FLOAT": "value", "QUATERNION": "value"}.get(attr.data_type)
     out = np.empty(count * width, dtype=np.float32)
     if count:
-        try:
-            if prop is None:
-                raise TypeError(attr.data_type)
-            attr.data.foreach_get(prop, out)
-        except (AttributeError, TypeError, RuntimeError, ValueError):
-            # (a type foreach_get does not take: read element by element)
-            for i, item in enumerate(attr.data):
-                out[i * width:(i + 1) * width] = list(getattr(item, "value", None) or getattr(item, "vector", None) or item.color)
+        for prop in _VALUE_PROPS.get(attr.data_type, ()):
+            try:
+                attr.data.foreach_get(prop, out)
+                return out.reshape(count, width)
+            except (AttributeError, TypeError, RuntimeError, ValueError):
+                continue
+        # (a type foreach_get does not take: read element by element, slowly)
+        slow_reads.append((name, attr.data_type))
+        for i, item in enumerate(attr.data):
+            out[i * width:(i + 1) * width] = list(getattr(item, "value", None) or getattr(item, "vector", None) or item.color)
     return out.reshape(count, width)
 
 
