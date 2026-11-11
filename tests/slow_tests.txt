@@ -49,3 +49,4 @@ sculptforge_tests: adaptive_dabs_leave_small_brushes_alone          21  new on m
 ui_mode_matrix                                                     50  every registry action probed (~300) and 22 modes x 8 exits: 34 s on the laptop, 208-582 s on a CI runner; shard by action id (two scripts) when it grows
 ui_make_sculptable                                                 22  29.8 s on the PC in the 0.12.4 stage (9-16 s before): a smaller capture than 30k
 ui_language_panels                                                 16  22.6 s on the PC in the 0.12.4 stage: every panel in four languages; split it per language
+ui_e2e_voxel_remesh                                                34  45.4 s alone on the PC in the 0.12.5 stage: Voxel Remesh at 2M triangles is the point; a smaller remesh or nightly if it grows
