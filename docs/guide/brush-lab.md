@@ -66,6 +66,10 @@ description.
 | **Jitter** | 0 to 1 | Random scatter of dabs around the stroke. |
 | **Pressure curve** | 0.3 to 3 | Tablet response: above 1 needs a firmer press, below 1 responds to a light touch. |
 | **Front faces only** | on / off | Only affects surfaces facing the camera, protecting thin parts. |
+| **Connected only** | on / off | Only reaches the surface joined to the point under the cursor. |
+| **View falloff** | on / off | Measures the falloff on screen, as a cylinder through the model along the view. |
+| **Lock plane** | on / off | The plane is taken where the stroke starts and kept for the whole stroke, so one stroke cuts one flat face. Off, the plane follows the surface under each dab. |
+| **Crisp edge** | on / off | Full strength out to a hard edge with a thin smoothed band (about two or three polygons wide, so the edge doesn't stair-step), the plane pulled all the way at the default Intensity, and only shallow dips filled (surface turned far from the plane stays put). Hardness and Tip sharpness don't apply. |
 | **Cavity mask** | -1 to 1 | Positive: only cavities. Negative: only ridges and peaks (as Edge Wear does). |
 
 The name field at the top of the editor renames the brush when you press <kbd>Enter</kbd>.

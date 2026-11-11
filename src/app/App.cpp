@@ -3697,9 +3697,16 @@ void App::drawRecipeEditor(BrushRecipe& recipe) {
             break;
         case RecipeParam::Kind::Bool:
             ImGui::Checkbox(p.label, &recipe.frontFacesOnly);
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", p.help);
             ImGui::Checkbox(tr("Connected only##recipe"), &recipe.connectedOnly); // (falloff options, not recipeParams)
             ImGui::Checkbox(tr("View falloff##recipe"), &recipe.viewFalloff);
-            break;
+            ImGui::Checkbox(tr("Lock plane##recipe"), &recipe.planeLock); // (hard-surface planes, not recipeParams)
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+                ImGui::SetTooltip("%s", tr("Keep the plane the stroke starts on for the whole stroke."));
+            ImGui::Checkbox(tr("Crisp edge##recipe"), &recipe.crispEdge);
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+                ImGui::SetTooltip("%s", tr("A hard, clean tip edge and a full plane pull, for hard-surface planes."));
+            continue; // (each has its own tooltip)
         case RecipeParam::Kind::Enum: {
             int idx = recipe.enumIndex(p.key);
             if (ImGui::Combo(p.label, &idx, p.options.data(), int(p.options.size()))) recipe.setEnumIndex(p.key, idx);
