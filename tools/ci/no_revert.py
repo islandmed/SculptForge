@@ -13,7 +13,8 @@ A merge X of A and B (merge base M) must keep both sides' changes: no file A cha
 was at M or as B has it (the same for B). Conflict resolutions that take one side's file wholesale, or a
 squash made from a branch that started before main moved, undo the other side instead (0.11.1: the quick-remesh
 merge nearly reverted main's newer micro-renderer fix). Five or more changed lines thrown away that way (branch notes
-and the generated guide don't count) fail the check, listed per file. A deliberate revert passes with SF_ALLOW_REVERT=<its commit>.
+and the generated guide don't count) fail the check, listed per file. A change a later commit on the same side already reverted (0.12.3: shortcuts-ux merged, then reverted, on main)
+isn't main's to lose: only the net change counts. A deliberate revert passes with SF_ALLOW_REVERT=<its commit>.
 --stale catches what a merge check can't: a branch commit made from an old tree (0.11.11: a squash with
 `git reset --soft origin/main` after origin/main had moved put the feed, the home page and security.txt back to an
 older main inside the branch's own commit). A file TIP has as an older version from BASE's recent history (its last
@@ -69,23 +70,27 @@ def undone(bases, side, other, result, cwd=None):
             continue  # result has a version of its own: a combined resolution
         # side's own commits on the file (not in other) whose change result lacks: the patch applies to result's file
         # forward and not in reverse (a rebased or cherry-picked copy of it on the other side is no loss)
-        n = sum(lost(c, p, result, cwd) for c in git("rev-list", "--no-merges", f"{other}..{side}", "--", p, cwd=cwd).split())
+        n = sum(lost(c, p, result, side, cwd) for c in git("rev-list", "--no-merges", f"{other}..{side}", "--", p, cwd=cwd).split())
         if n:
             found[p] = n
     return found
 
 
-def lost(commit, path, result, cwd=None):
-    """Lines of commit's change to path that result doesn't have (0 when result has it, or it can't be told)."""
+def lost(commit, path, result, side, cwd=None):
+    """Lines of commit's change to path that result doesn't have (0 when result has it, or it can't be told, or side
+    no longer has it either: a later commit on side reverted it, so the net change on side is empty)."""
     patch = git("diff", "--no-color", "--no-renames", "--full-index", "--binary", commit + "^", commit, "--", path, cwd=cwd)
     if not patch:
         return 0
     with tempfile.TemporaryDirectory() as d:
-        env = dict(os.environ, GIT_INDEX_FILE=os.path.join(d, "index"))
-        subprocess.run(["git", "read-tree", result], cwd=cwd, env=env, check=True, capture_output=True)
-        check = lambda *a: subprocess.run(["git", "apply", "--cached", "--check", *a], cwd=cwd, env=env, input=patch,
-                                          capture_output=True, text=True).returncode == 0
-        if check("-R") or not check():
+        def applies(tree_ish, *flags):
+            env = dict(os.environ, GIT_INDEX_FILE=os.path.join(d, "index"))
+            subprocess.run(["git", "read-tree", tree_ish], cwd=cwd, env=env, check=True, capture_output=True)
+            return subprocess.run(["git", "apply", "--cached", "--check", *flags], cwd=cwd, env=env, input=patch,
+                                  capture_output=True, text=True).returncode == 0
+        if applies(result, "-R") or not applies(result):
+            return 0
+        if applies(side):  # the patch applies to side's file again: side's own history undid it (merge + revert)
             return 0
     return size(commit + "^", commit, path, cwd)
 
@@ -223,13 +228,13 @@ def self_test():
         # the branch: its own feature in b.cpp, plus an unrelated small edit in a.cpp
         g("checkout", "-q", "feat")
         write("b.cpp", ["int b = 1;", "int feature_one = 1;", "int feature_two = 2;"])
-        write("REPORT.md", ["READY abc1234 notes for the coordinator"])
+        write("TESTERS.md", ["notes for the testers"])
         g("add", "-A"); g("commit", "-qm", "feat")
         feat = g("rev-parse", "HEAD").strip()
         # 1. a clean merge keeps both: passes, even though the notes go afterwards
         g("checkout", "-q", "main")
         g("merge", "-q", "--no-ff", "-m", "Merge feat", "feat")
-        g("rm", "-q", "REPORT.md"); g("commit", "-qm", "Remove branch notes")
+        g("rm", "-q", "TESTERS.md"); g("commit", "-qm", "Remove branch notes")
         assert run(["HEAD~3..HEAD"], d) == 0, "a clean merge was refused"
         # 2. a merge whose "resolution" took the branch's a.cpp: refused, and passes when allowed by its sha
         g("reset", "-q", "--hard", "HEAD~2")
@@ -274,6 +279,31 @@ def self_test():
         g("checkout", "-q", "-b", "again", "main")
         write("e.cpp", ["int e = 1;"]); g("add", "-A"); g("commit", "-qm", 'Reapply "e v1"')
         assert run(["--stale", "main", "again"], d) == 0, "a deliberate Reapply was refused"
+        # 6. main merged a topic and reverted it (net change empty): a later merge of a branch that edits the same file
+        #    elsewhere is not a revert; a real revert of a change main kept still is
+        g("checkout", "-q", "main")
+        base = [f"int f_{i} = {i};" for i in range(30)]
+        write("f.cpp", base); g("add", "-A"); g("commit", "-qm", "f base")
+        g("branch", "mr-feat")
+        g("checkout", "-q", "-b", "mr-topic")
+        write("f.cpp", [f"int topic_{i} = {i};" for i in range(10)] + base[10:]); g("commit", "-qam", "topic: rewrite f")
+        g("checkout", "-q", "main")
+        g("merge", "-q", "--no-ff", "-m", "Merge topic", "mr-topic")
+        g("revert", "-m", "1", "--no-edit", "HEAD")
+        g("checkout", "-q", "mr-feat")
+        write("f.cpp", base[:29] + ["int feat_tail = 1;"]); g("commit", "-qam", "feat: edits the end of f")
+        g("checkout", "-q", "main")
+        g("merge", "-q", "--no-ff", "-m", "Merge feat after merge+revert", "mr-feat")
+        assert run(["--merge", "HEAD"], d) == 0, "a merge after main's merge+revert was refused"
+        write("f.cpp", [f"int kept_{i} = {i};" for i in range(10)] + base[10:29] + ["int feat_tail = 1;"])
+        g("commit", "-qam", "main: kept change")
+        g("checkout", "-q", "-b", "mr-feat2", "mr-feat")
+        write("f.cpp", base[:28] + ["int feat2_tail = 1;", "int feat_tail = 1;"]); g("commit", "-qam", "feat2: edits f")
+        g("checkout", "-q", "main")
+        g("merge", "-q", "--no-ff", "--no-commit", "mr-feat2")
+        write("f.cpp", base[:28] + ["int feat2_tail = 1;", "int feat_tail = 1;"])
+        g("add", "-A"); g("commit", "-qm", "Merge feat2 (takes the branch's f.cpp, dropping kept)")
+        assert run(["--merge", "HEAD"], d) == 1, "a real revert of main's kept change passed"
     print("no_revert self-test: ok")
 
 
