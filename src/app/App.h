@@ -172,6 +172,7 @@ public:
     bool init(const AppOptions& options);
     const std::string& startError() const { return startError_; } // why init failed, for the message box (#109)
     int run(); // returns the process exit code
+    static bool usesProfileThreads(const AppOptions& options); // a window run (not a test, render, recording or demo): the saved hardware profile's threads
     static std::string splashVersionLine(); // "Version 0.12.2 Beta 1" in the interface language
     void closeSplash(); // the start-up splash goes (the main window drew its first frame, or start-up failed)
     // Redraw on demand (#14): the interactive loop sleeps in SDL_WaitEventTimeout until an event, a background
