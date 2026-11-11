@@ -1,5 +1,6 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "core/ExitWatchdog.h"
 #include "app/App.h"
 #include "app/NativeDialog.h"
 #include "core/FocusDetail.h"
@@ -415,6 +416,18 @@ void App::shutdown() {
         wintab_.close();
         return;
     }
+#if defined(__linux__)
+    // Closed with Alt+F4: the window stays until the keys are up (2 s at most). Gone while they were held, the repeat
+    // or the release landed on the desktop behind it, where Alt+F4 can be Log out (#183: X11, GNOME).
+    waitWhileHeld(
+        [] {
+            int n = 0;
+            const bool* keys = SDL_GetKeyboardState(&n);
+            auto down = [&](SDL_Scancode k) { return keys && int(k) < n && keys[k]; };
+            return down(SDL_SCANCODE_F4) || down(SDL_SCANCODE_LALT) || down(SDL_SCANCODE_RALT);
+        },
+        2000, 10, [] { SDL_PumpEvents(); });
+#endif
     if (glContext_) SDL_GL_DestroyContext(glContext_);
     if (window_) SDL_DestroyWindow(window_);
     SDL_Quit();
