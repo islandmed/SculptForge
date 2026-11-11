@@ -16,6 +16,8 @@ on:
       - 'src/app/main.cpp'
       - 'CMakeLists.txt'
       - 'cmake/**'
+  schedule:
+    - cron: '17 9 * * *' # daily on main: any change to the shared code that breaks the Android build shows the next day
   workflow_dispatch:
 
 permissions:
