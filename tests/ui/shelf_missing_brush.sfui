@@ -1,0 +1,36 @@
+# A bottom-shelf slot whose brush is gone (file deleted, brush deleted): it shows as missing with a tooltip, never as a
+# usable brush; the brush comes back when its file does; right-click > Remove from shelf clears the slot.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+run brush_install code=sfbrush1:eyJuYW1lIjoiU2hhcmVkIE1vc3MiLCJkZXNjcmlwdGlvbiI6IiIsImRpcmVjdGlvbiI6Im5vcm1hbCIsImRlcHRoIjowLjIsInBsYW5lIjoibm9uZSIsInBsYW5lQW1vdW50IjowLjUsInBpbmNoIjowLCJkcmFnIjowLCJzbW9vdGgiOjAsImhhcmRuZXNzIjowLCJ0aXBTaGFycG5lc3MiOjAsInBhdHRlcm4iOiJub2lzZSIsInBhdHRlcm5TY2FsZSI6MC4yLCJwYXR0ZXJuQW1vdW50IjowLjUsInNwYWNpbmciOjAuMTUsImppdHRlciI6MCwicHJlc3N1cmVDdXJ2ZSI6MSwiZnJvbnRGYWNlc09ubHkiOmZhbHNlLCJjYXZpdHlNYXNrIjowfQ
+expect_value library_files == 1
+
+# On the shelf (the [+] picker's list).
+click "##addbrush"
+click "Shared Moss"
+expect "Shared Moss##brush.recipe.Shared Moss"
+
+# Deleted in the library: the slot stays, marked missing, and says why.
+run brush_delete name="Shared Moss"
+expect_value user_brushes == 0
+wait 0.4
+expect "Shared Moss##brush.recipe.Shared Moss"
+hold ctrl
+hover "Shared Moss##brush.recipe.Shared Moss"
+wait 0.6
+expect_help isn't in your library
+hold none
+click "Shared Moss##brush.recipe.Shared Moss"
+expect_status isn't in your library
+wait_idle 30
+shot shelf_missing
+
+# Remove clears it.
+right_click "Shared Moss##brush.recipe.Shared Moss"
+click "Remove from shelf"
+expect_not "Shared Moss##brush.recipe.Shared Moss"
+
+# HiDPI.
+ui_scale 200
+wait_idle 60
+shot shelf_missing_hidpi

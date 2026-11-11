@@ -2883,6 +2883,17 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         int found = -1;
         for (int i = 0; i < int(doc_.brushes.size()); ++i)
             if (doc_.brushes[size_t(i)].name == name) found = i;
+        if (found < 0) { // a slot whose brush isn't loaded: look for its file now and then (a restored or copied file returns it)
+            double& tried = shelfBrushTried_[name];
+            if (ImGui::GetTime() - tried > 3.0) {
+                tried = ImGui::GetTime();
+                std::string note;
+                found = recoverBrush(doc_, name, note);
+                if (found >= 0) status_ = note;
+            }
+        } else {
+            shelfBrushTried_.erase(name);
+        }
         const ImVec2 size(bottomTileW_, shell::bottomShelfSize(layout_.shelfTiles).tileH * s);
         const bool clicked = ImGui::InvisibleButton((name + "##" + item).c_str(), size);
         const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
@@ -2895,9 +2906,12 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         const ImVec2 c((a.x + b.x) * 0.5f, a.y + pic * 0.5f);
         if (tex) dl->AddImageRounded(tex, ImVec2(c.x - pic * 0.5f, a.y), ImVec2(c.x + pic * 0.5f, a.y + pic), ImVec2(0, 0), ImVec2(1, 1),
                                      IM_COL32_WHITE, theme::rounding(4.0f * s));
+        else if (found < 0) // missing: a plain "not here" mark, not a brush that looks usable
+            centredText(dl, fontSmall_, ImVec2(a.x, a.y), ImVec2(b.x, a.y + pic), theme::u32(theme::textDim), ICON_LC_CIRCLE_ALERT);
         else drawBrushIcon(dl, c, pic * 0.36f, int(BrushType::Standard));
-        dl->AddText(fontSmall_, fontSmall_ ? fontSmall_->FontSize : 12.0f, ImVec2(a.x + 2.0f * s, a.y), theme::u32(theme::accent),
-                    ICON_LC_SPARKLE);
+        if (found >= 0)
+            dl->AddText(fontSmall_, fontSmall_ ? fontSmall_->FontSize : 12.0f, ImVec2(a.x + 2.0f * s, a.y), theme::u32(theme::accent),
+                        ICON_LC_SPARKLE);
         // Its key (a brush set gives it one, #143) in the other corner, as the built-in tiles show theirs.
         const std::string chord = actions_.shortcutText(item);
         if (chord.size() == 1 && fontSmall_) {
@@ -2912,10 +2926,14 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         } else if (clicked && found >= 0) {
             doc_.activeBrush = found;
             paintMode_ = false;
+        } else if (clicked) {
+            status_ = "The brush '" + name + "' isn't in your library (right-click the slot > Remove from shelf)";
         }
         ui::HelpText(name.c_str(), chord.empty() ? nullptr : chord.c_str(),
-                     found >= 0 && !doc_.brushes[size_t(found)].description.empty() ? doc_.brushes[size_t(found)].description.c_str()
-                                                                                   : "One of your custom brushes.",
+                     found < 0 ? "This brush isn't in your library (its file is missing). It comes back by itself if the file returns. "
+                                 "Right-click > Remove from shelf to clear the slot."
+                     : !doc_.brushes[size_t(found)].description.empty() ? doc_.brushes[size_t(found)].description.c_str()
+                                                                       : "One of your custom brushes.",
                      "Bottom shelf");
     } else if (const Action* a = actions_.find(item == "brush.paint" ? std::string("draw.paint") : item)) {
         const ui::Look look = shelf != kShelfTop ? ui::Look::Tile

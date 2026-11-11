@@ -64,7 +64,8 @@ std::string brushFileName(const std::string& name);
 
 // Replaces doc.brushes with the built-ins, the studio folders and the user
 // library (the active brush is kept by name). Files that can't be read are
-// skipped; returns one message per skipped file or folder.
+// kept (never changed or deleted) and listed; a user brush file that can't be read comes from backups/ when that has it.
+// Brushes that live only in this session or the open project are kept. Returns one message per file or folder.
 std::vector<std::string> loadBrushLibrary(Document& doc, const BrushLibraryPaths& paths = brushLibraryPaths());
 
 // Saves doc.brushes[index] into the user library (updating its file if it has
@@ -73,6 +74,12 @@ std::vector<std::string> loadBrushLibrary(Document& doc, const BrushLibraryPaths
 // Returns false with `error` when there is no user library or it can't be written.
 bool saveBrushToLibrary(Document& doc, int index, std::string& error, bool gallery = false,
                         const BrushLibraryPaths& paths = brushLibraryPaths());
+
+// A brush called `name` that isn't loaded (a shelf slot names it): looks for its file in the user library, then for its
+// last good copy in <user library>/backups (kept by Save; a brush deleted on purpose is in backups/deleted and stays deleted), and puts it back, saved again when it
+// came from the backup. Returns its index, or -1 when there is none; `message` says what was done.
+int recoverBrush(Document& doc, const std::string& name, std::string& message,
+                 const BrushLibraryPaths& paths = brushLibraryPaths());
 
 // Adds (or updates, by name) `recipe`, saves it to the user library and makes
 // it the active brush. Returns its index; on a save error the brush is still
