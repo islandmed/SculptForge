@@ -15,6 +15,7 @@
 #include "core/BVH.h"
 #include "core/BrushAlpha.h"
 #include "core/Sculpt.h"
+#include "core/SculptKernel.h"
 #include "core/ThreadPool.h"
 #include "core/TierConfig.h"
 
@@ -584,9 +585,10 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                     }
                     case BrushType::Clay: {
                         if (!reachesPlane) break;
-                        const glm::vec3 pp = areaCenter + areaNormal * (sign * r * 0.05f * s);
+                        float k;
+                        const glm::vec3 pp = PlaneKernel::clayPlaneAt(areaCenter, areaNormal, center, sign, r * 0.05f * s, k); // (reaches the cursor)
                         const float h = glm::dot(p - pp, areaNormal);
-                        if (sign * h < 0.0f) delta = std::clamp(-h * f * clayPull(s) / facing, -planeCap, planeCap);
+                        if (sign * h < 0.0f) delta = std::clamp(-h * f * clayPull(s) * k / facing, -planeCap, planeCap);
                         break;
                     }
                     case BrushType::ClayBlock: {

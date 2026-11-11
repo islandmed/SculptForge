@@ -987,11 +987,19 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
     dabVerts_.clear();
     dabLeaves_.clear();
     if (!batching_) lastLazyLeaves_.clear(); // (a batch's: catchUpBehind clears them after it)
-    for (const SymCopy& m : copies(sym)) {
+    const std::vector<SymCopy> all = copies(sym);
+    for (size_t ci = 0; ci < all.size(); ++ci) {
+        const SymCopy& m = all[ci];
         frameWanted_ = m.identity(); // (the unmirrored pass records lastFrame)
         const DabParams mp = m.identity() ? p : transformed(p, m);
         if (type == BrushType::Vdm) dabVdmSingle(mesh, bvh, mp, m.handedness());
         else dabSingle(mesh, bvh, type, mp);
+        if (ci + 1 < all.size() && isPlaneKernelBrush(type) && !dabVerts_.empty()) {
+            // (a copy that meets the next one's brush: that one's plane reads the moved surface's normals)
+            bool meets = false;
+            for (size_t cj = ci + 1; cj < all.size() && !meets; ++cj) meets = glm::distance(mp.center, all[cj].point(p.center)) < 2.0f * p.radius;
+            if (meets) updateDabNormals(mesh, bvh);
+        }
     }
     if (!dabVerts_.empty() || !dabLeaves_.empty() || lastLazyLeaves_.empty()) updateDabNormals(mesh, bvh);
     if (type != BrushType::Move) repairDab(mesh, bvh);
@@ -1622,9 +1630,10 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         } else
         switch (r.plane) {
         case BrushRecipe::Plane::Clay: {
-            glm::vec3 planePoint = areaCenter + areaNormal * (sign * rad * 0.06f * s);
+            float k;
+            const glm::vec3 planePoint = PlaneKernel::clayPlaneAt(areaCenter, areaNormal, p.center, sign, rad * 0.06f * s, k);
             float hc = glm::dot(x - planePoint, areaNormal);
-            if (sign * hc < 0.0f) d -= areaNormal * (hc * f * r.planeAmount * clayPull(s));
+            if (sign * hc < 0.0f) d -= areaNormal * (hc * f * r.planeAmount * clayPull(s) * k);
             break;
         }
         case BrushRecipe::Plane::Flatten: d -= areaNormal * (h * planePull * f * fill * r.planeAmount); break;

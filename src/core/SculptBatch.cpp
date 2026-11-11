@@ -94,16 +94,18 @@ void Sculptor::flushBatch(Mesh& mesh, BVH& bvh) {
     // The passes, dab by dab and copy by copy (the dab-by-dab path's order), and a group per copy.
     struct Pass {
         DabParams p;
-        size_t group = 0;
+        size_t group = 0, dab = 0; // (dab: the pending dab it is a copy of)
         bool identity = false, valid = false;
         PlaneKernel k;
     };
     std::vector<Pass> passes;
     std::vector<Group> groups(cs.size());
     float maxRadius = 0.0f;
-    for (const PendingDab& d : dabs)
+    for (size_t di = 0; di < dabs.size(); ++di)
         for (size_t c = 0; c < cs.size(); ++c) {
+            const PendingDab& d = dabs[di];
             Pass ps;
+            ps.dab = di;
             ps.p = cs[c].identity() ? d.p : transformed(d.p, cs[c]);
             ps.group = c;
             ps.identity = cs[c].identity();
@@ -236,7 +238,7 @@ void Sculptor::flushBatch(Mesh& mesh, BVH& bvh) {
         bool moved = false;
         for (size_t i : g.passes) {
             if (i >= j) break;
-            if (!passes[i].valid) continue;
+            if (!passes[i].valid || passes[i].dab == ps.dab) continue; // (a copy's centre is its dab's mirrored pick: the other copies of the dab don't move it)
             const PlaneKernel& k = passes[i].k;
             if (glm::length(n) == 0.0f) n = k.areaNormal;
             if (!k.reaches(c)) continue;
