@@ -459,8 +459,8 @@ preflight() {
     pr=$(gh pr view "$OMARCHY_PR" -R omacom/omarchy-pkgs --json state,headRepositoryOwner,headRefName \
         -q '.state + " " + .headRepositoryOwner.login + " " + .headRefName' 2>/dev/null || true)
     read -r state owner branch <<<"$pr" || true
-    [ "$state" = OPEN ] || die "omacom/omarchy-pkgs#$OMARCHY_PR is ${state:-unreadable}" "if it merged, open a version-bump PR for pkgbuilds/sculptforge/PKGBUILD there and set OMARCHY_PR in this script; if it was closed, ask the owner"
-    gh_file "$owner/omarchy-pkgs" pkgbuilds/sculptforge/PKGBUILD "$branch" | grep -E "^sha256sums=\('[0-9a-f]{64}'" >/dev/null ||
+    [ "$state" = OPEN ] || die "omacom/omarchy-pkgs#$OMARCHY_PR is ${state:-unreadable}" "if it merged, open a version-bump PR for pkgbuilds/omasculpt/PKGBUILD there and set OMARCHY_PR in this script; if it was closed, ask the owner"
+    gh_file "$owner/omarchy-pkgs" pkgbuilds/omasculpt/PKGBUILD "$branch" | grep -E "^sha256sums=\('[0-9a-f]{64}'" >/dev/null ||
         die "the Omarchy PKGBUILD on $owner/omarchy-pkgs $branch has no sha256sums=('<64 hex>' line" "fix it on that branch"
     ok "What's New, home page card, highlights, PKGBUILD, Homebrew tap and Omarchy PR #$OMARCHY_PR are ready"
 }
@@ -916,7 +916,7 @@ step_brew() {
 
 step_omarchy() {
     release_ready
-    local state branch owner path=pkgbuilds/sculptforge/PKGBUILD sum pr
+    local state branch owner path=pkgbuilds/omasculpt/PKGBUILD sum pr
     pr=$(gh pr view "$OMARCHY_PR" -R omacom/omarchy-pkgs --json state,headRepositoryOwner,headRefName \
         -q '.state + " " + .headRepositoryOwner.login + " " + .headRefName' 2>/dev/null || true)
     read -r state owner branch <<<"$pr" || true
@@ -938,7 +938,7 @@ open(p, "w", encoding="utf-8").write(t)
 PY
     (cd "$work/omarchy" && grep -q "^pkgver=$V\$" "$path" && grep -qF "'$sum'" "$path") ||
         die "couldn't update the Omarchy PKGBUILD" "edit $path on $owner/omarchy-pkgs branch $branch by hand (pkgver=$V, first sha256 $sum)"
-    (cd "$work/omarchy" && git add "$path" && commit -m "sculptforge $V" && gitp push -q origin "HEAD:$branch") ||
+    (cd "$work/omarchy" && git add "$path" && commit -m "omasculpt $V" && gitp push -q origin "HEAD:$branch") ||
         die "pushing to $owner/omarchy-pkgs $branch failed" "check gh auth status, then run again"
     ok "Omarchy PR #$OMARCHY_PR builds $V (author $AUTHOR_EMAIL)"
 }
