@@ -1169,10 +1169,13 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
         s.activeLayer = int(manifest["active_layer"].asNumber(-1));
     } else {
         const Json& list = manifest["parts"];
-        if (!list.isArray() || list.size() == 0 || list.size() > kMaxProjectParts) {
+        if (!list.isArray() || list.size() > kMaxProjectParts) {
             error = "Project has no valid Part list";
             return false;
         }
+        // An empty list is an empty scene (settings, lights, cameras, views and shelves still load): a Document
+        // always holds one Part, so it becomes one empty "Sculpt" Part, which saves back as the same scene.
+        if (list.size() == 0) parts.emplace_back().name = "Sculpt";
         for (const Json& sj : list.items()) {
             LoadedPart& s = parts.emplace_back();
             s.name = sj["name"].asString();

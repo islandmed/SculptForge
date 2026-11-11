@@ -668,6 +668,16 @@
      "shipped": ""
     },
     {
+     "slug": "taller-parts-panel",
+     "anchor": "vote-taller-parts-panel",
+     "title": "Taller Parts panel",
+     "line": "The Parts list has little room: a drag handle to make it taller, or a scrollbar, so long lists fit.",
+     "where": "Parts panel",
+     "votes": 0,
+     "status": "open",
+     "shipped": ""
+    },
+    {
      "slug": "discord-rich-presence",
      "anchor": "vote-discord-rich-presence",
      "title": "Discord Rich Presence",
@@ -774,5 +784,5 @@
    ]
   }
  ],
- "updated": "2026-11-11T01:37:50Z"
+ "updated": "2026-11-11T08:37:56Z"
 }
