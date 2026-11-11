@@ -24,7 +24,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://sculptforge.app/img/social-preview.png?v=5">
   <script>document.documentElement.classList.add("js")</script>
-  <link rel="stylesheet" href="style.css?v=36">
+  <link rel="stylesheet" href="style.css?v=37">
   <script src="motion.js?v=15" defer></script>
   <script src="testimonials.js?v=2" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
@@ -51,6 +51,24 @@
   </header>
 
   <main id="top">
+    <!-- news-hero:start (tools/guide/build_site.py rewrites this from the newest version in whats-new.md at each release;
+         a hand-edited band for the same version is kept; the art is media/news-bust.jpg) -->
+    <section class="news-hero" data-version="0.12.7" aria-labelledby="news-hero-title">
+      <div class="wrap news-hero-grid">
+        <div class="news-hero-copy">
+          <p class="eyebrow">New in 0.12.7</p>
+          <h2 id="news-hero-title">Splats, straight into Blender.</h2>
+          <p class="news-hero-line">Blender 5.3 draws splats but can't send them back. SculptForge sculpts them and sends them back, updating the same object.</p>
+          <div class="ctas">
+            <a class="btn primary" href="guide/splats.html#splats-with-blender">How it works</a>
+            <a class="btn" href="#download">Download free</a>
+          </div>
+        </div>
+        <img class="news-hero-art" src="media/news-bust.jpg?v=1" alt="A clay bust, sculpted in SculptForge" width="518" height="310">
+      </div>
+    </section>
+    <!-- news-hero:end -->
+
     <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">

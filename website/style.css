@@ -820,3 +820,16 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
   .nav .brand-wordmark { display: none; }
   .nav .brand-cube { display: block; height: 34px; }
 }
+
+/* News band above the hero (index.html .news-hero): the newest release's headline, rewritten by build_site.py. */
+.news-hero { background: radial-gradient(900px 260px at 85% 50%, rgba(242, 140, 60, 0.18), transparent 70%), var(--bg-alt); border-bottom: 1px solid var(--border); }
+.news-hero-grid { display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: center; padding-top: 22px; padding-bottom: 22px; }
+.news-hero-copy { min-width: 0; }
+.news-hero h2 { margin: 0.15em 0 0.3em; font-size: clamp(1.6rem, 3.4vw, 2.3rem); line-height: 1.15; color: #fff; }
+.news-hero-line { margin: 0 0 18px; max-width: 46rem; color: var(--muted); font-size: 1.05rem; line-height: 1.5; }
+.news-hero .ctas { margin-top: 0; }
+.news-hero-art { display: block; width: 300px; height: auto; border-radius: var(--radius); }
+@media (max-width: 760px) {
+  .news-hero-grid { grid-template-columns: 1fr; gap: 16px; }
+  .news-hero-art { width: 100%; max-width: 360px; order: -1; margin: 0 auto; }
+}

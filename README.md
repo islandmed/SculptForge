@@ -5,6 +5,10 @@
 <h1 align="center">SculptForge</h1>
 
 <p align="center">
+  <strong>New in 0.12.7:</strong> Gaussian splats round-trip with Blender 5.3 (<a href="https://sculptforge.app/guide/splats.html#splats-with-blender">how it works</a>)
+</p>
+
+<p align="center">
   <strong>The free, open-source sculpting app.</strong><br>
   Digital sculpting for VFX, animation and games on Linux, macOS and Windows, with free built-in AI:<br>
   an AI brush creator and image/text to 3D.
