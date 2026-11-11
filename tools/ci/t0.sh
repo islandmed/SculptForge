@@ -90,7 +90,7 @@ trap 'echo "[t0] SIGTERM $(date +%T)"; free -m; ps -eo pid,ppid,rss,etime,args -
 ( while sleep 60; do echo "[t0 $(date +%T)] mem used $(free -m | awk 'NR==2{print $3 " avail " $7}') MB, $(grep -c ' Test  *#' "$out/ctest.log" 2>/dev/null) tests done"; done ) &
 tick=$!
 SDL_VIDEO_DRIVER=offscreen LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
-  python3 tools/test/run.py --build build --junit build/ctest.xml -- "${args[@]}" > "$out/ctest.log" 2>&1 & wait $!; rc=$?
+  python3 tools/test/run.py --build build --junit build/ctest.xml $(grep -q -- --near-budget tools/test/run.py && echo --near-budget 20) -- "${args[@]}" > "$out/ctest.log" 2>&1 & wait $!; rc=$?
 kill $tick 2>/dev/null
 pkill -f 'build/sculptforge --ui-serve' 2>/dev/null # (a pool the fixture cleanup missed)
 test_s=$(($(date +%s) - t))
