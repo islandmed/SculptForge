@@ -1072,6 +1072,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Garments draped on the Full Body at 1440 and 2880 px (tests/ui/garments_drape.sfui).
     sculptforge_ui_test(garments_drape_1440 garments_drape --size 1440x900)
     sculptforge_ui_test(garments_drape_2880 garments_drape --size 2880x1800)
+    # Drape on the Full Body (centimetres) at its default Units per metre: comes to rest (tests/ui/cloth_drape_units.sfui).
+    sculptforge_ui_test(cloth_drape_units_1440 cloth_drape_units --size 1440x900)
+    sculptforge_ui_test(cloth_drape_units_2880 cloth_drape_units --size 2880x1800)
     # #163's unhide prompt at 1440 and 2880 px (tests/ui/unhide_prompt.sfui).
     sculptforge_ui_test(unhide_prompt_1440 unhide_prompt --size 1440x900)
     sculptforge_ui_test(unhide_prompt_2880 unhide_prompt --size 2880x1800)
