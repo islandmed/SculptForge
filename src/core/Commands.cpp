@@ -707,6 +707,7 @@ CommandRegistry::CommandRegistry() {
     registerBrushLibraryCommands(*this); // brush_install, brush_code, brush_delete, ... (BrushLibrary.cpp)
     registerBrushCommands(*this); // brush_set_alpha (BrushAlpha.cpp)
     registerStencilCommands(*this); // stencil_load, stencil_set, stencil_clear (Stencil.cpp)
+    registerReferenceCommands(*this); // reference_add, reference_set, reference_remove, reference_pair (Reference.cpp)
     registerVdmCommands(*this);   // vdm_set, vdm_capture, vdm_stamp, ... (Vdm.cpp)
     registerKelvinletCommands(*this); // kelvinlet_settings (Kelvinlet.cpp)
     registerCaptureCommands(*this); // capture_alpha, capture_vdm: alpha / VDM from the viewport (ViewCapture.cpp)

@@ -119,6 +119,7 @@ add_library(sculptforge_core STATIC
   src/core/MeshCheck.cpp
   src/core/BrushAlpha.cpp
   src/core/Stencil.cpp
+  src/core/Reference.cpp
   src/core/Stroke.cpp
   src/core/Precision.cpp
   src/core/PathStroke.cpp
@@ -472,6 +473,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelVertexPaint.cpp
     src/app/LineGradient.cpp
     src/app/StencilOverlay.cpp
+    src/app/ReferenceImages.cpp
     src/app/PanelPacks.cpp
     src/app/PanelPlugins.cpp
     src/app/PanelBrushSets.cpp
@@ -1083,6 +1085,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The Orbit around the pointer preference (tests/ui/orbit_at_pointer.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(orbit_at_pointer_1440 orbit_at_pointer --size 1440x900)
     sculptforge_ui_test(orbit_at_pointer_2880 orbit_at_pointer --size 2880x1800)
+    # View > Reference images (tests/ui/reference_images.sfui), at 1440 px and at 200 % (2880 px).
+    sculptforge_ui_test(reference_images_1440 reference_images --size 1440x900)
+    sculptforge_ui_test(reference_images_2880 reference_images --size 2880x1800)
     # A shelf slot whose brush is missing (tests/ui/shelf_missing_brush.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(shelf_missing_brush_1440 shelf_missing_brush --size 1440x900)
     sculptforge_ui_test(shelf_missing_brush_2880 shelf_missing_brush --size 2880x1800)

@@ -205,7 +205,7 @@ public:
 
 private:
     enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, PartClick, Select, Gizmo, Guide, Sculptable, ForgeSphere, Insert, Capture,
-                      AirStroke, UvTool, SizeScrub, QuickRemesh, Gradient, Stencil, Tube }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
+                      AirStroke, UvTool, SizeScrub, QuickRemesh, Gradient, Stencil, Tube, Reference }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
 
     void handleEvent(const SDL_Event& e); // the pen's mouse events first (penMouseEvents), then dispatchEvent
     void dispatchEvent(const SDL_Event& e);
@@ -1158,6 +1158,36 @@ private:
         bool texInvert = false;
         std::string pendingPath;     // set by the file dialog thread (under alphaMutex_)
     } stencil_;
+    // Reference images (ReferenceImages.cpp; core/Reference.h): View > Reference images. Adjust puts handles on the
+    // selected one (drag inside to move, a corner to scale, Shift keeps its proportions) until Enter or Esc; outside
+    // Adjust they take no clicks at all.
+    void registerReferenceActions();
+    void drawReferencesSection(); // View palette
+    void drawReferenceOverlay();  // Adjust's outline and handles, under the panels
+    bool referenceCorners(const ReferenceImage& r, std::array<glm::vec2, 4>& out) const; // window corners; false edge-on
+    bool referenceMouseDown(float x, float y, SDL_Keymod mod); // true when Adjust takes the click
+    void referenceMouseMove(float x, float y);
+    void referenceMouseUp();
+    bool referenceKey(SDL_Keycode key, SDL_Keymod mod);
+    bool referenceUiValue(const std::string& name, double& out); // (reference_render_r renders)
+    bool takeReferenceDrop(const std::string& path); // an image dropped while the section shows becomes a reference
+    void openReferenceDialog(int kind);              // 0 add images, 1 the front of a pair, 2 its side
+    static void SDLCALL onReferenceChosen(void* userdata, const char* const* files, int filter);
+    void pollReferenceFiles();
+    struct ReferenceUi {
+        int selected = -1; // in doc_.references
+        size_t count = 0;  // doc_.references.size() last frame (a new one is selected)
+        bool adjust = false;
+        int handle = -1;   // being dragged: 0 inside, 1-4 a corner (referenceHandleAt's)
+        ReferenceImage start; // as it was when the drag began
+        glm::vec2 startMouse{0.0f};
+        glm::vec2 startLocal{0.0f}; // the pointer in the reference's own plane at the press
+        double sectionShownAt = -1.0; // seconds() when the View palette last drew the section (drops go to it)
+        int dialogKind = 0;
+        std::vector<std::string> pending; // set by the file dialog thread (under alphaMutex_), with pendingKind
+        int pendingKind = 0;
+        std::string pairFront; // the pair's front image, waiting for its side
+    } refUi_;
     bool gradientUiValue(const std::string& name, double& out) const; // UI test values
     struct GradientUi {
         bool armed = false;
