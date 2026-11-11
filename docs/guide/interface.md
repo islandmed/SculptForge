@@ -64,7 +64,9 @@ the window buttons. Drag the empty parts of the bar to move the window, double-c
 the window's edges to resize it. The bars, shelves and trays are one flat colour (Forge Night: deep blue-grey with
 the forge orange; a Forge Terminal scheme other than Neutral, or Match my desktop theme, keeps its own colours),
 and a right click on the model adds Select Part, Hide and Isolate face group, Frame, Mask, Face Groups, Remesh and
-Search all tools to the Quick Menu.
+Search all tools to the Quick Menu. What just happened ("Created sphere", an error) shows for a moment over the
+bottom of the 3D view, and **Tool > Parts** shows the core Part tools, with Linked Duplicate, Merge, Pose, Split,
+Extract and Project behind **More Part tools**.
 
 - **Classic look** (Edit > Preferences > Interface > Look) brings back the status bar, the tiles and the system title bar
   in one click. Shelves, trays, menus and every key are the same in both. The first start after the update shows

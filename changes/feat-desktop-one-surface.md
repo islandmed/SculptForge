@@ -8,7 +8,9 @@ added: **The one-surface look** (the default with the SculptForge layout; idea b
   memory, frame time and the slowest frame, Parts, undo steps, the version and the performance tier (pin it to keep
   it open). Bars, shelves and trays are one flat colour with a rounded viewport, in Forge Night's colours (shared
   with the touch layout). A right click on the model adds Select Part, Hide and Isolate face group, Frame, Mask,
-  Face Groups, Remesh and Search all tools to the Quick Menu. **Classic look** (Edit > Preferences > Interface > Look)
+  Face Groups, Remesh and Search all tools to the Quick Menu. What just happened shows as a short line over the bottom
+  of the canvas instead of in the bar, and Tool > Parts keeps the core tools up front, the rest (Linked Duplicate, Merge,
+  Pose, Split, Extract, Project) behind **More Part tools**; Search (F3) finds them all. **Classic look** (Edit > Preferences > Interface > Look)
   brings back the status bar, tiles and system title bar; shelves, trays, menus and keys are unchanged in both.
   **System title bar** keeps the system's own above it; tiling desktops and macOS always do.
 testers:

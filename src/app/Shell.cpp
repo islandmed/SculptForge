@@ -1142,6 +1142,7 @@ void App::drawShell() {
     finishShelfDrag();
     finishMyPanelDrag();
     drawOneSurfaceToast();
+    if (oneSurface()) drawOneSurfaceStatus();
 }
 
 void App::drawTitleStrip(const ShellGeometry& g) {

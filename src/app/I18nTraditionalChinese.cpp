@@ -5222,6 +5222,8 @@ constexpr Entry kTraditionalChinese[] = {
     {"Remove from My Panel", "從「我的面板」移除"},
     {"Your own panel, floating at the cursor: the buttons and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own.", "屬於你自己的面板，浮動在游標處：包含你拖入的按鈕和分區（按住 Alt 從任何面板拖曳）。再按一次該按鍵或 Esc 即可關閉。它也是一個可放入側欄的面板（編輯 > 我的面板），還可以移到獨立視窗。"},
     // --- The one-surface look (OneSurface.cpp, Preferences > Interface > Look) ---
+    {"More Part tools", "更多零件工具"},
+    {"Linked Duplicate, Merge, Pose, Split, Extract and Project. Search (F3) finds them too.", "連結複製、合併、姿勢、分離、擷取與投射。搜尋（F3）也找得到它們。"},
     {"Back to the status bar and tiles. Preferences > Interface > Look switches again.", "回到狀態列與分格面板。偏好設定 > 介面 > 外觀可再切換回來。"},
     {"Classic look", "經典外觀"},
     {"Click to keep the stats open", "按一下讓統計資料保持開啟"},

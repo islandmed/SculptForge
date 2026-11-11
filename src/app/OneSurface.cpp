@@ -502,19 +502,6 @@ void App::drawOneSurfaceBar(const ShellGeometry& g) {
         }
     }
 
-    // The status message (what just happened), quiet, between the centre and undo while there is room.
-    {
-        const float from = centre ? cx + cw + 16.0f * s : leftEnd, to = right - 6.0f * s;
-        const std::string msg = layout_.customize ? std::string(tr("Customize: Ctrl+Alt+drag to move or remove items")) : tr(status_);
-        const bool recent = ImGui::GetTime() - statusSince_ < 6.0 || layout_.customize;
-        if (!msg.empty() && recent && to - from > 80.0f * s) {
-            const bool error = !layout_.customize && !lastCommandOk_;
-            const std::string t = elideTo(small, msg, to - from);
-            textAt(small, to - textW(small, t), error ? theme::u32(theme::danger) : dim, t);
-            if (!lastCommandOk_ || layout_.customize) redrawIn(6.05);
-        }
-    }
-
     // The Maya Live link, while it is on.
     if (mayaLink) {
         const bool clicked = button((std::string(tr("Live link on")) + "##mayalink.chip").c_str(), linkX, linkW);
@@ -716,6 +703,37 @@ void App::drawOneSurfaceCorners() {
         }
         dl->AddConcavePolyFilled(pts, kSteps + 2, col);
     }
+}
+
+// What just happened ("Created sphere", an error): a short line over the bottom of the canvas, gone after 3 s (an
+// error after 6 s), fading in its last half second. The top bar stays the file, rooms, brush, undo, stats and window.
+void App::drawOneSurfaceStatus() {
+    const bool customize = layout_.customize;
+    const std::string msg = customize ? std::string(tr("Customize: Ctrl+Alt+drag to move or remove items")) : tr(status_);
+    if (msg.empty()) return;
+    const bool error = !customize && !lastCommandOk_;
+    const double life = customize ? 1e9 : error ? 6.0 : 3.0, age = ImGui::GetTime() - statusSince_;
+    if (age >= life) return;
+    const float alpha = float(std::clamp((life - age) / 0.5, 0.0, 1.0));
+    redrawIn(alpha < 1.0f ? 1.0 / 30.0 : life - age - 0.5); // (the fade needs frames; idle until it starts)
+    const float s = uiScale_;
+    const CanvasRect& c = shell_.canvas;
+    const float lift = oneSurfaceToast_ ? 56.0f * s : 0.0f; // above the "new look" line while that shows
+    ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h - 16.0f * s - lift), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+    ImGui::SetNextWindowBgAlpha(0.92f * alpha);
+    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(14.0f * s, 7.0f * s));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f * s);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, theme::shellBg);
+    if (ImGui::Begin("##os.status", nullptr, kCardFlags | ImGuiWindowFlags_NoInputs)) {
+        const std::string shown = elideTo(ImGui::GetFont(), msg, std::max(120.0f * s, c.w * 0.6f));
+        ImGui::TextColored(error ? theme::danger : customize ? theme::accent : theme::text, "%s", shown.c_str());
+        ImGui::LogText("%s", shown.c_str());
+    }
+    ImGui::End();
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(4);
 }
 
 // After the update: one line, once, over the bottom of the viewport.

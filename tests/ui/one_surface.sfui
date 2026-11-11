@@ -10,6 +10,16 @@ expect_value title_height > 40
 expect_value title_overlaps == 0
 shot one-surface
 
+# What just happened shows over the canvas, not in the bar; the Tool panel shows the core Part tools, the rest behind a row.
+run new_sphere subdivisions=4
+expect_text Created sphere
+expect_no_text Merge down...
+click "More Part tools##parts.more"
+expect_text Merge down...
+expect_text Split groups
+click "More Part tools##parts.more"
+expect_no_text Merge down...
+
 # The rooms: Sculpt, Paint, UV and back; Model opens the Mesh menu.
 click "Paint##room.paint"
 expect_value paint_mode == 1

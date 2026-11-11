@@ -5707,6 +5707,8 @@ constexpr Entry kSpanish[] = {
     {"Remove from My Panel", "Quitar de Mi panel"},
     {"Your own panel, floating at the cursor: the buttons and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own.", "Tu propio panel, flotando junto al cursor: los botones y secciones que arrastraste a él (mantén Alt y arrastra desde cualquier paleta). Pulsa la tecla otra vez, o Esc, para cerrarlo. También es una paleta (Editar > Mi panel) para una bandeja, y puede pasar a una ventana propia."},
     // --- The one-surface look (OneSurface.cpp, Preferences > Interface > Look) ---
+    {"More Part tools", "Más herramientas de piezas"},
+    {"Linked Duplicate, Merge, Pose, Split, Extract and Project. Search (F3) finds them too.", "Linked Duplicate, fusionar, pose, separar, Extract y Project. La búsqueda (F3) también los encuentra."},
     {"Back to the status bar and tiles. Preferences > Interface > Look switches again.", "Vuelve a la barra de estado y los mosaicos. Preferencias > Interfaz > Aspecto lo cambia de nuevo."},
     {"Classic look", "Aspecto clásico"},
     {"Click to keep the stats open", "Haz clic para dejar abiertas las estadísticas"},

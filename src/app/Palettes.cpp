@@ -888,7 +888,7 @@ void App::drawPalette_Tool() {
                          "Units; STL exports write it in millimetres.",
                          "Tool");
         }
-        actionRow(*this, {"file.open", "file.save", "file.import"});
+        if (!oneSurface()) actionRow(*this, {"file.open", "file.save", "file.import"}); // (one surface: the top bar's File)
         ImGui::Dummy(ImVec2(0, 2.0f * s));
     }
     // By what you do (fix/ip-palettes): make the Parts, shape them (levels, remesh, reshape, cut, layers), mask and
@@ -898,10 +898,12 @@ void App::drawPalette_Tool() {
         Demo::pushScope("Parts");
         drawPartsContents();
         Demo::popScope();
-        drawExtractContents(); // PanelExtract.cpp
-        Demo::pushScope("Project");
-        drawProjectContents(); // ProjectAll (PanelRetopo.cpp)
-        Demo::popScope();
+        if (!oneSurface() || partsMore_) { // (one surface: behind More Part tools, PanelParts.cpp)
+            drawExtractContents(); // PanelExtract.cpp
+            Demo::pushScope("Project");
+            drawProjectContents(); // ProjectAll (PanelRetopo.cpp)
+            Demo::popScope();
+        }
     }
     if (subpalette("tool.garments", "Garments")) {
         tray::Section section;

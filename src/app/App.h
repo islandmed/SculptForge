@@ -2115,6 +2115,8 @@ private:
     bool oneSurfaceToast_ = false, oneSurfaceToastDone_ = false; // "New look": shown once after the update
     double oneSurfaceToastAt_ = -1.0;
     bool statsPinned_ = false;    // the stats card stays open
+    bool partsMore_ = false;      // Tool > Parts > More Part tools is open (one surface)
+    void drawOneSurfaceStatus(); // what just happened: a line over the bottom of the canvas that fades
     std::string statsChip_;       // "1.4M · 144 fps", refreshed twice a second
     double statsChipAt_ = -1.0;
     bool statsHover_ = false;     // the pointer was on the chip or the card last frame

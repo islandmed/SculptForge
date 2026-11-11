@@ -706,8 +706,9 @@ void App::drawPartsContents() {
     if (ImGui::Button(tr("Delete..."), ImVec2(third, 0)))
         confirm("Delete Part?", "Delete \"" + activeName + "\"? This can't be undone.", "Delete", "part_delete");
     ImGui::EndDisabled();
-    // Linked Duplicates (#94): copies sharing one mesh, each placed on its own.
-    {
+    // Linked Duplicates (#94): copies sharing one mesh, each placed on its own. (One surface: under More Part tools.)
+    const bool lean = oneSurface();
+    if (!lean) {
         const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) / 2.0f;
         ui::ActionButton(*this, "part.duplicate_linked", ImVec2(half, 0), ui::Look::IconLabel);
         ImGui::SameLine();
@@ -757,6 +758,28 @@ void App::drawPartsContents() {
     ImGui::BeginDisabled(visibleCount == count);
     if (ImGui::Button(tr("Unhide all"), ImVec2(-1, 0))) runCommand("part_show_all");
     ImGui::EndDisabled();
+
+    // One surface (polyflow: only the core tools up front): the rarer Part tools wait behind one row, closed at first;
+    // every one of them is also in Search (F3).
+    if (lean) {
+        const float rowH = ImGui::GetFrameHeight();
+        const bool clicked = ImGui::InvisibleButton("More Part tools##parts.more", ImVec2(ImGui::GetContentRegionAvail().x, rowH));
+        const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        if (ImGui::IsItemHovered()) dl->AddRectFilled(a, b, IM_COL32(255, 255, 255, 12), 6.0f * uiScale_);
+        const float ty = std::floor(a.y + (rowH - ImGui::GetFontSize()) * 0.5f);
+        dl->AddText(ImVec2(a.x + 4.0f * uiScale_, ty), theme::u32(theme::textDim), tr("More Part tools"));
+        const char* chevron = partsMore_ ? ICON_LC_CHEVRON_DOWN : ICON_LC_CHEVRON_RIGHT;
+        dl->AddText(ImVec2(b.x - ImGui::CalcTextSize(chevron).x - 4.0f * uiScale_, ty), theme::u32(theme::textDim), chevron);
+        ui::HelpText("More Part tools", nullptr, "Linked Duplicate, Merge, Pose, Split, Extract and Project. Search (F3) finds them too.",
+                     "Tool > Parts");
+        if (clicked) partsMore_ = !partsMore_;
+        if (!partsMore_) return;
+        const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) / 2.0f;
+        ui::ActionButton(*this, "part.duplicate_linked", ImVec2(half, 0), ui::Look::IconLabel);
+        ImGui::SameLine();
+        ui::ActionButton(*this, "part.make_unique", ImVec2(half, 0), ui::Look::IconLabel);
+    }
 
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
     ImGui::BeginDisabled(active >= count - 1);
