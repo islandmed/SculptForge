@@ -71,10 +71,29 @@ Beside **Circle**, **Square**, **Triangle** and **Ribbon**, three profiles build
 - **Braid**: three flat strands woven across each other (plaits, straps, braided hair).
 - **Sleeve**: a hollow tube with open ends (sleeves, pipes, bracelets, hoses).
 
+**Strands** sets how many strands a rope or braid has, 1 to 8 (3 by default). A braid's strands are flat ribbons that
+pass over and under each other, so more strands make a wider plait. A rope of one strand is a **spring**: **Spread**
+opens the coils, and **Spin** changes how tightly it winds.
+
 For any profile but Circle, **Twist** turns the cross-section a set number of degrees from the start to the end, and
 **Spin** turns it steadily, so many degrees per tube radius of length (a screw thread). **Spread** is how far apart a
 rope's or braid's strands are (0.5: touching), and for a sleeve how thick the wall is. **Taper** narrows strands and
 walls with the tube. Each one is a live slider on the selected Tube Part and one undo step.
+
+## Repeat a Part along a curve
+
+**Repeat along curve** lays copies of another Part along the active Tube or Curve Part: chain links, beads, scales,
+studs, fence posts. Add the Part you want repeated first (a single link, say), select the curve, and in **Tool > Tube**
+pick the Part, set the two sliders and press **Repeat along curve**.
+
+- **Spacing** is how far apart the copies are, in lengths of the Part: 1 puts them end to end, 0.8 overlaps them like
+  chain links. It is adjusted a little so whole copies fill the curve.
+- **Turn** turns each copy that many degrees more than the one before, about the curve: 90 makes the links of a chain
+  alternate.
+
+The Part's longest side lies along the curve. The copies become one new Part named "<Part> Repeat" (the curve and the
+original are untouched, and undo removes it), which you can sculpt, move or merge. A repeat is capped at 5000 copies and
+4 million triangles; raise the spacing or use a lighter Part when it says so.
 
 ## Curves: draw first, tube later
 
