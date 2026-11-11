@@ -86,7 +86,7 @@ Set **Result > Curve** and each stroke becomes a **Curve Part**: a thin guide li
 - **Tube from curve** turns it into a tube with the Shape, Ends, Taper and the modifiers above. Undo brings the
   curve back; **Size** sets the tube's thickness when you draw, and the point **Radius** changes it per point.
 
-*Requested by Hameron (FXiT), GABO and Artizmo.*
+*Requested by Hameron, GABO and Artizmo.*
 
 ## Edit the points
 

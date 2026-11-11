@@ -49,7 +49,7 @@ All notable changes to SculptForge are listed here. The format follows
   with editable points, **Resample** (`tube_resample count=N`, exactly N evenly spaced points) and **Tube from curve**
   (`tube_from_curve`), which uses the Tube tool's sweep. New Tube profiles **Rope** and **Braid** (three strands round
   or across the curve) and **Sleeve** (hollow, open ends), and the **Twist**, **Spin** and **Spread** modifiers
-  (`twist`, `spin`, `spread` in `tube_new`, `tube_set`). Requested by Hameron (FXiT), GABO and Artizmo.
+  (`twist`, `spin`, `spread` in `tube_new`, `tube_set`). Requested by Hameron, GABO and Artizmo.
 - **Origin tools** in the Gizmo panel (requested by Ziel on Discord, with the Origin tools idea from @Devon0209):
   **Center on origin** moves the Part's bounding-box centre to 0,0,0 and **Drop to floor** rests its lowest point on Y
   = 0, each one undo step per Part, with **All Parts** together. Also the commands `center_on_origin` and
@@ -63,7 +63,7 @@ All notable changes to SculptForge are listed here. The format follows
   and wireframe still draw; the status bar shows Unlit while it is on. Saved with the project.
 - **Wood brush pack** (a seventh built-in pack, ten brushes: Weathered Planks, Raised Grain, Splinters, Wood Chaff,
   Grain Cracks, Check Split, Knot, End Rings, Plank Seams, Board Gap) with six new procedural alphas (Weathered Grain,
-  Splinters, Grain Cracks, Knot, End Rings, Plank Seams) that work with any brush. Requested by Hameron (FXiT).
+  Splinters, Grain Cracks, Knot, End Rings, Plank Seams) that work with any brush. Requested by Hameron.
 
 ### Fixed
 - **Customize Shelves** (Ctrl+Alt+drag): buttons that don't apply right now (the Front option, Vertex / Texture paint
@@ -71,7 +71,7 @@ All notable changes to SculptForge are listed here. The format follows
   Discord and MasterFULL on Discord.
 - **Right shelf** with the console open: the view toggles fold into the View button only when the shelf really is too
   short, and unfold only for a taller shelf; the buttons grow back only for a taller shelf, so the shelf should hold
-  still (reported by Hameron (FXiT); please say if it still moves).
+  still (reported by Hameron; please say if it still moves).
 - **Drape**: sewn seams stay closed where the cloth rests on the body (a T-shirt's waist and armpit seams stay within
   about 4 mm instead of opening to 6-9 mm), and a drape with one particle flipping between two spots a millimetre
   apart now comes to rest.

@@ -44,17 +44,17 @@ highlight: The welcome has a Language row with all four languages, each in its o
 ```features
 date: 2026-11-10
 tagline: Curves and rope tubes, a Wood brush pack, an Unlit view, and origin tools.
-highlight: Curves, and rope, braid and sleeve tubes (requested by Hameron (FXiT))
-highlight: A Wood brush pack (requested by Hameron (FXiT))
+highlight: Curves, and rope, braid and sleeve tubes (requested by Hameron)
+highlight: A Wood brush pack (requested by Hameron)
 highlight: Shift smoothing keeps Smooth's own Intensity in every stroke type (thanks @nekirk11)
 highlight: Unlit view on Alt+L (thanks @nagdav853); Center on origin and Drop to floor in the Gizmo panel
 ```
 
 - **Curves**: **Tool > Tube > Result > Curve** draws a guide line on or over the model; **Resample** sets its point
   count exactly and **Tube from curve** turns it into a tube. New tube profiles **Rope**, **Braid** and **Sleeve**,
-  and **Twist**, **Spin** and **Spread** sliders. Requested by Hameron (FXiT).
+  and **Twist**, **Spin** and **Spread** sliders. Requested by Hameron.
 - **Wood brush pack**: ten brushes and six alphas for weathered grain, splinters, cracks, knots, end-grain rings and
-  plank seams (**Sculpt > Brush**, pack **Wood**). Requested by Hameron (FXiT).
+  plank seams (**Sculpt > Brush**, pack **Wood**). Requested by Hameron.
 - **Unlit view** (Render menu, <kbd>Alt</kbd>+<kbd>L</kbd>): shows the base colour alone, with no lighting, so painted
   colour reads exactly as stored. Thanks @nagdav853.
 - **Center on origin, Drop to floor**: two buttons in the Gizmo panel put the Part's bounding-box centre on 0,0,0 or

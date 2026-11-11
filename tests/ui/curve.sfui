@@ -1,4 +1,4 @@
-# Curve Part and the Tube modifiers (Tool > Tube, PanelTube.cpp; requested by Hameron (FXiT), GABO and Artizmo): draw a
+# Curve Part and the Tube modifiers (Tool > Tube, PanelTube.cpp; requested by Hameron, GABO and Artizmo): draw a
 # curve on and over the model, Resample it to an exact point count, Tube from curve, then the Rope, Braid and Sleeve
 # profiles with Twist, Spin and Spread. The shots feed the guide's Tube chapter.
 run ui_look look=classic layout=classic

@@ -139,7 +139,7 @@ Beads, ropes, filigree, studs and carved patterns for jewellery, trims and decor
 
 ## Wood
 
-Weathered grain, splinters, cracks, knots, end-grain rings and plank seams for old timber. Requested by Hameron (FXiT).
+Weathered grain, splinters, cracks, knots, end-grain rings and plank seams for old timber. Requested by Hameron.
 
 ![The Wood brushes](images/brush-packs/wood.jpg)
 
