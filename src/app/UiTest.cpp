@@ -731,6 +731,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "tube_profile") return double(int(m.tube.profile)); // 0 round, 1 square, 2 triangle, 3 ribbon, 4 rope, 5 braid, 6 sleeve
     if (name == "tube_curve") return m.tube.curve ? 1.0 : 0.0; // the active Part is a Curve Part
     if (name == "tube_twist") return double(m.tube.twist);
+    if (name == "tube_strands") return double(m.tube.strands);
     if (name == "tube_taper_end") return double(m.tube.taperEnd);
     if (name == "tube_parts") {
         int n = 0;

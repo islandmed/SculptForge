@@ -1681,6 +1681,9 @@ private:
     bool tubeMerge_ = false;       // into the active Part (even edges) instead of a new Tube Part
     bool tubeCurve_ = false;       // each stroke makes a Curve Part (a guide line; Tube from curve makes the tube)
     float tubeResampleEdit_ = -1.0f; // the Resample slider while held (the point count), else -1
+    float tubeStrandsEdit_ = -1.0f; // the Strands slider while held, else -1
+    uint32_t tubeRepeatPart_ = 0;   // Repeat along curve: the Part to repeat (its id; 0 = none picked)
+    float tubeRepeatSpacing_ = 1.0f, tubeRepeatTurn_ = 0.0f; // ... how far apart the copies are, how far each is turned
     bool tubeBakeUniform_ = false; // Bake re-sweeps with even edges (dynamic topology)
     int tubeSelected_ = -1;
     float tubeRadiusEdit_ = -1.0f; // the selected point's Radius slider while it is held
