@@ -171,6 +171,7 @@ struct UndoRecord {
     std::unique_ptr<TextureTileUndo> textureTiles;
     std::unique_ptr<TextureStackUndo> texture;
     std::unique_ptr<Mesh> mesh;
+    std::unique_ptr<BVH> meshBvh; // with `mesh`: its tree, when the step that made it had one (applying swaps it too)
     std::unique_ptr<SubdivUndo> subdiv;
     std::unique_ptr<TopologyUndo> topology;
     std::shared_ptr<PartStep> part; // (shared: PartStep is defined in core/Document.h)
@@ -190,6 +191,9 @@ struct UndoRecord {
                uvs.empty() && !sets && !uv && creases.empty();
     }
     size_t approxBytes() const;
+    // approxBytes() without the kept tree: what the byte budget counts, so a tree (a fifth of a 10M triangle mesh
+    // step) doesn't push the remesh step it saves a rebuild for out of the history.
+    size_t budgetBytes() const { return approxBytes() - (meshBvh ? meshBvh->memoryBytes() : 0); }
 
     // Convenience snapshots of whole attributes (or of `elements` only), e.g.
     // before "mask all", "invert mask", "fill color" or "hide group".

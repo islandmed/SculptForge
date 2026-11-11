@@ -412,7 +412,7 @@ std::string Document::assetName() const {
     return std::string(stem.begin(), stem.end());
 }
 
-void Document::replaceMeshUndoable(Mesh m, std::string label) {
+void Document::replaceMeshUndoable(Mesh m, std::string label, bool keepTree) {
     if (!m.selectionSets) m.selectionSets = mesh.selectionSets; // the Part keeps its sets (restoring checks they fit)
     if (m.multires && !subdivMatches(m)) m.multires.reset();
     if (mesh.multires && !m.multires) {
@@ -424,6 +424,9 @@ void Document::replaceMeshUndoable(Mesh m, std::string label) {
     UndoRecord r;
     r.label = std::move(label);
     r.mesh = std::make_unique<Mesh>(std::move(mesh));
+    // The old mesh keeps its tree (undo swaps it back instead of rebuilding one) when the caller says it is current.
+    if (keepTree && !bvhDirty && bvh.nodeCount()) r.meshBvh = std::make_unique<BVH>(std::move(bvh));
+    bvh = BVH();
     mesh = std::move(m);
     mesh.topologyDirty = true;
     bvh.build(mesh);
