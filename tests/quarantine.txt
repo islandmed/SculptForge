@@ -2,5 +2,6 @@
 # a run until its date; after it, it blocks again ("quarantine ran out: fix it or delete it"). Every line has an owner,
 # a date at most a week out and the follow-up task that fixes or deletes it (a line without a task quarantines nothing).
 # A real failure is never retried away silently: run.py's one rerun is logged in tests/flaky.md, and the entry stays there.
-# name                     | owner   | until      | task                      | why
-ui_monkey_many             | qa-lean | 2026-11-18 | fix/monkey-cross-seed-leak | seed 1064 failed once after quick-panel's toggle shifted the pool; its replay passes alone on main and the branch: a latent cross-seed leak (ui.my_panel left out of the pool meanwhile), tests/flaky.md
+# A last field (match) narrows it to one case: every FAIL line must hold it, so another seed of the same test blocks.
+# name                     | owner   | until      | task                      | why | match
+ui_monkey_many             | qa-lean | 2026-11-18 | fix/monkey-cross-seed-leak | seed 1064 failed once after quick-panel's toggle shifted the pool; its replay passes alone on main and the branch: a latent cross-seed leak (ui.my_panel left out of the pool meanwhile), tests/flaky.md | [monkey 1064]

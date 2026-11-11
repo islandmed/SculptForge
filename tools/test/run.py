@@ -178,29 +178,37 @@ def load_slow_list(path):
 
 
 def load_quarantine(path):
-    """tests/quarantine.txt: `name | owner | YYYY-MM-DD | task | why` lines (# comments): a known flake, fixed or deleted by
-    its owner before that date in the named task (a line without a task quarantines nothing). -> {name: (owner, date, task)}"""
+    """tests/quarantine.txt: `name | owner | YYYY-MM-DD | task | why [| match]` lines (# comments): a known flake, fixed or
+    deleted by its owner before that date in the named task (a line without a task quarantines nothing). match: text every
+    FAIL line of the failure must hold (`[monkey 1064]`), so another case of the same test still blocks.
+    -> {name: (owner, date, task, match)}"""
     out = {}
     try:
         for line in open(path, encoding="utf-8"):
             line = line.split("#", 1)[0].strip()
             parts = [p.strip() for p in line.split("|")]
             if len(parts) >= 4 and parts[3] and re.fullmatch(r"\d{4}-\d{2}-\d{2}", parts[2]):
-                out[parts[0]] = (parts[1], parts[2], parts[3])
+                out[parts[0]] = (parts[1], parts[2], parts[3], parts[5] if len(parts) > 5 else "")
     except OSError:
         pass
     return out
 
 
-def split_failures(failed, labels, quarantine, today):
+def split_failures(failed, labels, quarantine, today, said=None):
     """-> (blocking, tolerated, notes): a `flaky` label or a quarantine line before its date doesn't block; a quarantine
-    past its date does (fix it or delete it: a test nobody owns doesn't stay)."""
+    past its date does (fix it or delete it: a test nobody owns doesn't stay), and so does a failure whose FAIL lines
+    aren't all the quarantined case (its match). said: test -> its output; the notes name the failing cases."""
     blocking, tolerated, notes = [], [], []
     for n in failed:
         q = quarantine.get(n)
-        if q and today <= q[1]:
+        fails = [l.strip() for l in (said or {}).get(n, "").splitlines() if l.lstrip().startswith("FAIL")]
+        cases = (": " + " / ".join(fails[:3]) + (f" (+{len(fails) - 3} more)" if len(fails) > 3 else "")) if fails else ""
+        if q and today <= q[1] and q[3] and not (fails and all(q[3] in l for l in fails)):
+            blocking.append(n)
+            notes.append(f"{n} is quarantined for {q[3]} only, and this failure isn't that case{cases or ' (no FAIL lines)'}")
+        elif q and today <= q[1]:
             tolerated.append(n)
-            notes.append(f"failed but quarantined until {q[1]} (owner {q[0]}, {q[2]}; does not block): {n}")
+            notes.append(f"failed but quarantined until {q[1]} (owner {q[0]}, {q[2]}; does not block): {n}{cases}")
         elif q:
             blocking.append(n)
             notes.append(f"quarantine of {n} ran out {q[1]} (owner {q[0]}, {q[2]}): fix it or delete it")
@@ -392,7 +400,7 @@ def run_tests(argv=None):
               f"({time.time() - t0:.1f} s to fingerprint)")
     todo = [t["name"] for t in tests if not t["disabled"] and t["name"] not in cached]
     res, inner, gpu_lost, hung = {}, {}, [], {}
-    rc = 0
+    rc, said = 0, {}
     with tempfile.TemporaryDirectory() as tmp:
         if todo:
             run_args = list(args)
@@ -448,7 +456,7 @@ def run_tests(argv=None):
                 open(os.path.join(a.cache, prints[n]), "w").write(f"{n} {time.strftime('%Y-%m-%dT%H:%M:%S')}\n")
     quarantine = load_quarantine(os.path.join(root, a.quarantine) if not os.path.isabs(a.quarantine) else a.quarantine)
     real, tolerated, notes = split_failures([n for n, (s, _) in res.items() if s == "fail" and n not in gpu_lost], labels,
-                                            quarantine, time.strftime("%Y-%m-%d"))
+                                            quarantine, time.strftime("%Y-%m-%d"), said)
     # The budget is per test: a ctest entry, or one TEST case inside a sculptforge_tests shard (a shard is many tests).
     slow = sorted(((d, n) for n, (s, d) in res.items() if a.budget > 0 and d > a.budget and s != "skip"
                    and "nightly" not in labels.get(n, []) and not n.startswith("sculptforge_tests")), reverse=True)
@@ -507,14 +515,19 @@ deletes it; remove its lines once fixed.
 
 
 def self_test():
-    q = {"a": ("qa", "2026-11-18", "x"), "b": ("qa", "2026-11-01", "y")}
+    q = {"a": ("qa", "2026-11-18", "x", ""), "b": ("qa", "2026-11-01", "y", ""), "m": ("qa", "2026-11-18", "t", "[monkey 1064]")}
     blocking, tolerated, notes = split_failures(["a", "b", "c", "d"], {"d": ["flaky"]}, q, "2026-11-11")
     assert (blocking, tolerated) == (["b", "c"], ["a", "d"]), (blocking, tolerated)
     assert "ran out 2026-11-01" in notes[1], notes
+    out = lambda *cases: {"m": "".join(f"FAIL monkey_many.sfui:3: nothing latched [monkey {c}]\n" for c in cases)}
+    assert split_failures(["m"], {}, q, "2026-11-11", out(1064))[:2] == ([], ["m"])
+    b, _, nt = split_failures(["m"], {}, q, "2026-11-11", out(1064, 77))
+    assert b == ["m"] and "[monkey 77]" in nt[0], nt  # another seed still blocks, and is named
+    assert split_failures(["m"], {}, q, "2026-11-11", {})[0] == ["m"]  # no FAIL lines to match: blocks
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
         f.write("# name | owner | until | task | why\nui_x | qa-lean | 2026-11-18 | fix/x | seed 1064 # leak\n"
                 "ui_y | qa | 2026-11-18 |  | no task\nbad line\n")
-    assert load_quarantine(f.name) == {"ui_x": ("qa-lean", "2026-11-18", "fix/x")}, load_quarantine(f.name)
+    assert load_quarantine(f.name) == {"ui_x": ("qa-lean", "2026-11-18", "fix/x", "")}, load_quarantine(f.name)
     os.unlink(f.name)
     if ET is None:
         print("run.py self-test: no XML parser in this Python (pyexpat): skipped")
