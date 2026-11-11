@@ -41,6 +41,12 @@ stay in `~/Work/.sf/t0-ci/<worktree>/`.
 - The run (`tools/ci/t0.sh`): `check_marks`, a Ninja build, impacted.py against the merge base with `origin/main`,
   the picked tests through `run.py` on the CPU (Mesa llvmpipe, `SDL_VIDEO_DRIVER=offscreen`, `SF_TEST_BUDGET=150`;
   `GITHUB_ACTIONS` gives the in-test time limits their CI slack).
+- **A full run fits**: all ~390 tests finish in about 10 minutes on a runner, as long as the warm UI servers
+  (`tools/test/warm_ui.py`) stay small. They keep memory from each script they run, so a server is replaced after 60
+  scripts or 2 GB (`SF_UI_SERVER_RUNS` / `SF_UI_SERVER_MB`; test `test_warm_ui`). Before that, a full T0 ran two servers
+  to 15 GB on the 16 GB runner and the kernel's OOM kill ended the job (exit 143, no artifact). The log prints memory and
+  tests done every minute, and on a SIGTERM what held the memory. `[t0 full]` in the tip commit's subject forces every
+  test, the proof that a full run completes.
 - **Always green**: the job is `continue-on-error` and the script never fails, so a red T0 emails nobody. The verdict
   is the run summary and the artifact `t0-result` (`result.json`: green/red, stage, failed tests; `failed.txt`:
   LastTestsFailed + FAILED lines; `output.txt`: `ctest --output-on-failure` on the failed tests).

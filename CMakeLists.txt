@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.12.3 LANGUAGES C CXX)
+project(SculptForge VERSION 0.12.4 LANGUAGES C CXX)
 if(APPLE)
   enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
 endif()
@@ -924,6 +924,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     endif()
     # The Actions cache pruner keeps the newest cache of each kind (tools/ci/prune_caches.py).
     add_test(NAME ci_prune_caches COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/prune_caches.py --self-test)
+    add_test(NAME test_warm_ui COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/warm_ui.py self-test)
     add_test(NAME ci_slowest_tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/slowest_tests.py --self-test)
     add_test(NAME test_impact COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/impacted.py --self-test)
     add_test(NAME test_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/run.py --self-test)
@@ -969,6 +970,10 @@ if(SCULPTFORGE_BUILD_TESTS)
       add_test(NAME ui_warm_stop COMMAND ${SF_UI_WARM_PY} stop --dir ${SF_UI_WARM_DIR})
       set_tests_properties(ui_warm_start PROPERTIES FIXTURES_SETUP ui_warm LABELS ui TIMEOUT 60)
       set_tests_properties(ui_warm_stop PROPERTIES FIXTURES_CLEANUP ui_warm LABELS ui TIMEOUT 400)
+      # A server that runs 40 scripts in a row stays under 700 MB (software Mesa: 330; it held 2180 when each script left its capture targets, ~50 MB, behind).
+      # 40 scripts take ~2 min on the PC (0.12.4 stage: 125.7 s, budget 20 s): nightly, not in every full suite.
+      add_test(NAME ui_serve_leak COMMAND ${SF_UI_WARM_PY} leak-check --app ${SF_UI_WARM_APP} --runs 40 --max-mb 700)
+      set_tests_properties(ui_serve_leak PROPERTIES LABELS "ui;nightly" TIMEOUT 600)
     endif()
     # sculptforge_ui_test(NAME SCRIPT [ARGS...]): ui_NAME runs tests/ui/SCRIPT.sfui, screenshots in ui-shots/NAME.
     function(sculptforge_ui_test name script)
@@ -1026,6 +1031,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # MasterFULL on Discord: Stencil's Adjust and Tile), at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(alpha_layouts_1440 alpha_layouts --size 1440x900)
     sculptforge_ui_test(alpha_layouts_2880 alpha_layouts --size 2880x1800)
+    # Front faces only's tag by the cursor and in the Brush palette, at 1440 px and at 200 % (tests/ui/front_faces_tag.sfui).
+    sculptforge_ui_test(front_faces_tag_1440 front_faces_tag --size 1440x900)
+    sculptforge_ui_test(front_faces_tag_2880 front_faces_tag --size 2880x1800)
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     # Studio mode: About shows the studio (tests/data/studio; core/StudioProfile.h).
     sculptforge_ui_test(studio_mode studio/studio_mode --studio ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/studio/studio.json)

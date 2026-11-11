@@ -135,7 +135,7 @@ expect_value radial_open == 1
 key escape
 pen_out
 
-# A new menu: its first item picked with the palette's search (Smooth), then a key (N).
+# A new menu: its first item picked with the palette's search (Smooth), then a key (F9, free in every style).
 click "Preferences##palette.preferences"
 click "###radial.add_menu"
 expect_value radial_menus == 4
@@ -143,15 +143,15 @@ type "##radial.search" smooth
 click "###radial.pick.brush.smooth"
 expect_value radial_slots_4 == 1
 click "###radial.key"
-key n
-expect_shortcut radial.menu4 N
+key f9
+expect_shortcut radial.menu4 F9
 expect_value shortcut_conflicts == 0
 key escape
 hover_window 0.5 0.5
-key_down n
+key_down f9
 expect_value radial_menu == 3
 hover_window 0.5 0.4 0.1
-key_up n
+key_up f9
 expect_value brush_type == 2
 
 # Import a menu file: unknown actions, a command that needs a path, a bad icon and a wrong type are left out; its
@@ -176,7 +176,7 @@ key escape
 button_drag middle 0.5 0.5 0.5 0.4 0.3
 expect_value brush_type == 2
 
-# Every style keeps T, Y, J (and the N set above) free of other actions.
+# Every style keeps T, Y, J (and the F9 set above) free of other actions.
 click "Preferences##palette.preferences"
 click "SculptForge##input.style_sculptforge"
 expect_value shortcut_conflicts == 0

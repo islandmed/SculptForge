@@ -184,6 +184,10 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Orbit right | <kbd>Numpad 6</kbd> | Turn the view 15 degrees to the right around the model. |
 | Orbit up | <kbd>Numpad 8</kbd> | Turn the view 15 degrees up over the model. |
 | Orthographic | <kbd>Numpad 5</kbd> | Switch between a perspective and an orthographic view (no foreshortening: sizes don't shrink with depth). |
+| Pan down | <kbd>Ctrl</kbd>+<kbd>Numpad 2</kbd> | Slide the view down. Hold the key to keep moving; Speed is in Preferences > Input. |
+| Pan left | <kbd>Ctrl</kbd>+<kbd>Numpad 4</kbd> | Slide the view left. Hold the key to keep moving; Speed is in Preferences > Input. |
+| Pan right | <kbd>Ctrl</kbd>+<kbd>Numpad 6</kbd> | Slide the view right. Hold the key to keep moving; Speed is in Preferences > Input. |
+| Pan up | <kbd>Ctrl</kbd>+<kbd>Numpad 8</kbd> | Slide the view up. Hold the key to keep moving; Speed is in Preferences > Input. |
 | Restore View | <kbd>Numpad 0</kbd> | Go back to the view saved or restored last (View > Views). |
 | Right view | <kbd>Numpad 3</kbd> | Look at the model's right side (orthographic). |
 | Rotate | <kbd>R</kbd> | Gizmo, Rotate: drag a ring to turn about that axis, the outer ring to turn in the view. Mask the body and put the pivot at a joint to pose a limb. Shift snaps to 15 degrees. R again: back to Draw. |

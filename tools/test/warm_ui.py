@@ -11,6 +11,8 @@ without starting a process, SDL, a window and an OpenGL context for each one.
   warm_ui.py suite  --build B [--cold] [--repeat K] [--shuffle] [--json F]
                                            every ui test ctest knows, through a pool of its own (or cold), with
                                            wall time and screenshot hashes: to compare warm with cold
+  warm_ui.py leak-check --app APP [--runs N] [--max-mb M]
+                                           one server runs N scripts in a row: its memory must stay under M MB
   warm_ui.py compare COLD.json WARM.json   verdicts and screenshots of WARM's runs that differ from what every run
                                            in COLD agrees on
 
@@ -38,6 +40,26 @@ import uuid
 # under it (ui_mode_matrix: 1200, 3-10 min on a loaded CI runner).
 TIMEOUT = int(os.environ.get("SF_UI_TIMEOUT", "290"))
 IDLE_EXIT = 900  # a pool nobody used for this long stops (a ctest run that never reached the cleanup)
+# A server used to grow by ~50 MB per script it ran (7-8 GB after ~150 on the 4-core runner: two of them ran its 16 GB out, and
+# the kernel's OOM kill ended the whole T0 job, exit 143). Two causes, both fixed: Renderer::shutdown left the screenshot
+# framebuffers behind (software Mesa keeps them in RAM), and a script's worker threads left free heap in malloc arenas the next
+# script's could not use (UiServe.cpp: one arena, a trim after each script). `leak-check` (ctest ui_serve_leak) holds both.
+# A server is still replaced once it has run MAX_RUNS scripts or holds MAX_MB (Linux: /proc; elsewhere only the count
+# applies), as a backstop. SF_UI_SERVER_MB / SF_UI_SERVER_RUNS change them.
+MAX_MB = int(os.environ.get("SF_UI_SERVER_MB", "1500"))
+MAX_RUNS = int(os.environ.get("SF_UI_SERVER_RUNS", "300"))
+
+
+def rss_mb(pid):
+    """Resident memory of a process in MB, 0 where /proc doesn't say."""
+    try:
+        with open(f"/proc/{pid}/status", encoding="ascii", errors="replace") as f:
+            for line in f:
+                if line.startswith("VmRSS:"):
+                    return int(line.split()[1]) // 1024
+    except (OSError, ValueError, IndexError):
+        pass
+    return 0
 
 
 def servers_wanted():
@@ -159,6 +181,8 @@ class Server:
         if "lost" in fields[3:]:  # the GPU dropped its device: the server quit; a failure may be that, not the script
             self.stop(kill=True)
             return None if code != 0 else code
+        if self.runs >= MAX_RUNS or rss_mb(self.proc.pid) > MAX_MB:
+            self.stop()  # a fresh one starts with the next script: a server keeps ~50 MB of each script it ran (see MAX_MB)
         return code
 
 
@@ -477,6 +501,41 @@ def cmd_suite(a):
     return 0 if all(not r["failed"] for r in results.values()) else 1
 
 
+def cmd_leak_check(a):
+    """A server must not keep what its scripts used: after N scripts (the first N of tests/ui that run warm) its resident
+    memory is under --max-mb. Software Mesa (the Actions runner) keeps textures in RAM: ~330 MB after 40 now, 2180 MB when Renderer::shutdown left its capture targets behind. Hardware GPU: ~130."""
+    if not os.path.exists("/proc/self/status"):
+        print("leak-check: no /proc here; skipped")
+        return 0
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    scripts = [p for p in sorted(os.listdir(os.path.join(root, "tests", "ui"))) if p.endswith(".sfui")]
+    scripts = [os.path.join(root, "tests", "ui", p) for p in scripts]
+    scripts = [p for p in scripts if not wants_cold(["--ui-test", p])][:a.runs]
+    global MAX_RUNS, MAX_MB
+    MAX_RUNS, MAX_MB = 10**9, 10**9  # (the backstop would hide the growth)
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        srv = Server(a.app, d, 0, 2)
+        if not srv.start_retrying():
+            print("leak-check: the server did not start")
+            return 1
+        peak = start = rss_mb(srv.proc.pid)
+        for i, script in enumerate(scripts):
+            name = os.path.basename(script)[:-len(".sfui")]
+            if srv.run(["--ui-test", script, "--ui-out", os.path.join(d, "shots", name)], {}, d,
+                       os.path.join(d, "log"), TIMEOUT) is None:
+                print(f"leak-check: the server failed on {name} (script {i + 1})")
+                return 1
+            peak = max(peak, rss_mb(srv.proc.pid))
+        end = rss_mb(srv.proc.pid)
+        srv.stop()
+    print(f"leak-check: {len(scripts)} scripts, resident {start} MB at start, {end} MB at the end, {peak} MB at most (limit {a.max_mb})")
+    if end > a.max_mb:
+        print(f"FAIL: a server holds {end} MB after {len(scripts)} scripts: something is kept from script to script")
+        return 1
+    return 0
+
+
 def cmd_compare(a):
     """The first file's runs are the reference (cold ones, say): a verdict or screenshot counts only where they
     all agree, since some screenshots differ from run to run anyway (GPU timing). Each run of the other files is
@@ -507,6 +566,39 @@ def cmd_compare(a):
     return 1 if differ else 0
 
 
+def cmd_selftest(_):
+    """A server is replaced after MAX_RUNS scripts or above MAX_MB, not kept until the machine runs out of memory."""
+    import tempfile
+    global MAX_RUNS, MAX_MB
+    if os.name == "nt":
+        return 0
+    with tempfile.TemporaryDirectory() as d:
+        app = os.path.join(d, "fake-app")
+        starts = os.path.join(d, "starts")
+        with open(app, "w") as f:  # speaks the --ui-serve protocol: ready, then done<TAB>code per run, quit
+            f.write(f"#!{sys.executable}\nimport sys\nopen({starts!r}, 'a').write('x')\nprint('ready', flush=True)\n"
+                    "for line in sys.stdin:\n    if line.startswith('quit'):\n        break\n"
+                    "    print('done\\t0\\t0', flush=True)\n")
+        os.chmod(app, 0o755)
+        n = lambda: len(open(starts).read())
+
+        def run(count):
+            srv = Server(app, d, 0, 2)
+            codes = [srv.run(["--ui-test", "x.sfui"], {}, d, os.path.join(d, "log"), 20) for _ in range(count)]
+            srv.stop()
+            return codes
+
+        MAX_RUNS, MAX_MB = 3, 10**6
+        assert run(7) == [0] * 7 and n() == 3, (n(), "a server runs MAX_RUNS scripts, then a new one starts")
+        os.remove(starts)
+        MAX_RUNS, MAX_MB = 10**6, -1  # every process holds more than -1 MB, where /proc says (Linux)
+        assert run(4) == [0] * 4
+        assert n() == 4, (n(), "above MAX_MB a new server starts for every script")
+        assert rss_mb(os.getpid()) > 0 or not os.path.exists("/proc/self/status")
+    print("warm_ui.py self-test passed")
+    return 0
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -532,11 +624,16 @@ def main():
     s.add_argument("--verbose", action="store_true", help="print the end of each failed test's output")
     s = sub.add_parser("compare")
     s.add_argument("files", nargs="+")
+    s = sub.add_parser("leak-check")
+    s.add_argument("--app", required=True)
+    s.add_argument("--runs", type=int, default=40)
+    s.add_argument("--max-mb", type=int, default=700)
+    sub.add_parser("self-test")
     a = p.parse_args()
     if os.name != "nt":
         signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
     return {"start": cmd_start, "serve": cmd_serve, "client": cmd_client, "stop": cmd_stop,
-            "suite": cmd_suite, "compare": cmd_compare}[a.cmd](a)
+            "suite": cmd_suite, "leak-check": cmd_leak_check, "compare": cmd_compare, "self-test": cmd_selftest}[a.cmd](a)
 
 
 if __name__ == "__main__":

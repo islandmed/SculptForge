@@ -327,6 +327,15 @@ void App::drawPalette_Alpha() { drawAlphaSection(); }
 
 void App::drawPalette_Brush() {
     const tray::Style style; // quiet check marks
+    if (frontFacesOnly_) { // (on: Smooth and every brush skip the inner side of a thin Part; easy to forget it is on)
+        ImGui::TextColored(ImVec4(1.0f, 0.82f, 0.51f, 1.0f), "%s", tr("Front faces only is ON"));
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", tr("Brushes skip surfaces that face away from you: the hidden inside of a thin or Extract-made "
+                                        "Part, and its far side. Smooth cannot reach spikes there. Untick Front faces only below to "
+                                        "reach them."));
+        ImGui::SameLine();
+        if (ImGui::SmallButton(tr("Turn off##front_faces_off"))) frontFacesOnly_ = false;
+    }
     // Your brushes first (PanelBrushLibrary.cpp: tags, and the right-click menu to share, rename or delete),
     // then every brush as thumbnails (Pickers.cpp, the same grid as the B picker).
     actionRow(*this, {"ui.brush_lab", "ui.brush_gallery"});

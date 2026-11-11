@@ -150,8 +150,13 @@ def whats_new(text, version, frags):
         lines = fm.group(1).split("\n")
         last = max([i for i, l in enumerate(lines) if l.startswith(("date:", "tagline:", "highlight:"))], default=-1)
         have = {l[len("highlight:"):].strip() for l in lines if l.startswith("highlight:")}
-        lines[last + 1:last + 1] = [f"highlight: {h}" for h in dict.fromkeys(highlights) if h not in have]
+        # A hand-written line that starts with the note's text (plus a credit) is the same highlight (0.12.2/0.12.3 doubled).
+        lines[last + 1:last + 1] = [f"highlight: {h}" for h in dict.fromkeys(highlights)
+                                    if not any(x == h or x.startswith(h + " (") for x in have)]
         section = section[:fm.start(1)] + "\n".join(lines) + section[fm.end(1):]
+    # A bullet whose bold title the section already has was written by hand (0.12.2/0.12.3 shipped it twice).
+    titles = set(re.findall(r"^- (\*\*[^*]+\*\*)", section, re.M))
+    bullets = [b for b in bullets if not (re.match(r"\*\*[^*]+\*\*", b) and re.match(r"\*\*[^*]+\*\*", b).group(0) in titles)]
     if bullets:
         # Straight after the list if the section has one, else after a blank line.
         list_end = re.search(r"^- ", section, re.M) and section.rstrip("\n").split("\n")[-1].startswith(("- ", "  "))

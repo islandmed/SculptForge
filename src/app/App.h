@@ -291,6 +291,7 @@ private:
     float sizeRingPreviewPx_ = 0.0f; // its radius, pixels (UI tests: size_ring_px)
     std::vector<glm::vec3> cursorRing_, cursorInner_; // scratch, kept to avoid allocating per frame
     bool surfaceCursorShown_ = false; // the last cursor drawn lay on the surface (UI tests: surface_cursor)
+    bool frontFacesTagShown_ = false; // the last cursor drawn carried the "Front faces only" tag (UI tests: front_faces_tag)
     bool ringShown_ = true;           // the last cursor drawn had its ring (UI tests: cursor_ring)
     void updateTitle();
 
@@ -2288,6 +2289,10 @@ public:
     // The next key press becomes ACTION's shortcut (Ctrl+Alt+click a button, or Preferences > Hotkeys).
     void beginShortcutCapture(const std::string& actionId);
     const std::string& capturingShortcut() const { return capturingShortcut_; }
+    // A pressed key that another action already uses waits here for Replace or Cancel (a popup by the button).
+    bool shortcutConflictOpen() const { return !conflict_.actionId.empty(); }
+    void resolveShortcutConflict(bool replace);
+    void drawShortcutConflict(); // the Replace / Cancel popup (Config.cpp)
     void openCommandPalette() { palette_.open(); }
     void setConsoleOpen(bool open);
     void consolePrefill(const std::string& text); // opens the console with TEXT typed
@@ -2313,6 +2318,7 @@ private:
     void drawHelpConsoleUi();              // console, command palette, Controls, shortcut capture, Ctrl help
     void drawControlsWindow();
     bool captureShortcutKey(SDL_Keycode key, SDL_Keymod mod);
+
     void consoleEcho(const std::string& name, const Args& args, const CommandResult& r);
     std::string uiConfigPath() const;
     // Window size, position, maximised and full screen, kept in window.json beside ui.json (#35). Not for tests,
@@ -2374,6 +2380,16 @@ private:
     CommandPalette palette_;
     std::string configDir_;           // <prefs>/ (ui.json, console_history.txt, recent_actions.txt)
     std::string capturingShortcut_;   // action id waiting for a key
+    struct ShortcutConflict {
+        std::string actionId, chord, holders; // the action being set, the key pressed, "Orbit left, Zoom in"
+    } conflict_;
+    ImVec4 shortcutAnchor_{};           // the button the capture began from (min x, y, max x, y); zero: unknown
+    bool conflictPopupOpened_ = false;  // OpenPopup was called for the open conflict
+    int conflictDrawnFrame_ = -1, conflictOpenedFrame_ = 0;
+    ImVec4 shortcutPopupRect_{};        // the Replace / Cancel popup as last drawn (UiTest checks it clears the anchor)
+    std::vector<std::pair<SDL_Keycode, SDL_Keymod>> keysDown_; // keys held now, with the modifiers at their press (updateKeyNav)
+    std::map<std::string, float> keyNavHeld_; // seconds each pan / zoom key has been down (updateKeyNav)
+    bool keyNavMoving_ = false;
     std::string layoutBaseline_;      // layoutKey() as last stored / loaded / restored
     Json storedLayout_;               // the layout ui.json keeps (Save Layout); null: none yet, the standard one
     std::string prefsSavedKey_;       // prefsKey() as last saved (or read at the start)
@@ -2510,6 +2526,8 @@ private:
     void restoreView(int index);
     void drawViewsSection(); // Palettes.cpp, in View
     void viewOrbitStep(float yawDegrees, float pitchDegrees);
+    void keyNavStep(const std::string& id);   // one press of a pan or zoom key
+    void updateKeyNav(float dt);              // once a frame: the held ones keep moving the view
     void frameActivePart();
     void frameKeyPress(); // F: the active Part, twice quickly the scene (Classic sculpting keys, several Parts)
     Uint64 lastFrameKeyNs_ = 0;
@@ -2990,6 +3008,7 @@ private:
     void spaceMouseScan();                    // take the first SpaceMouse SDL knows about, if none is open
     void spaceMouseClose();
     void updateSpaceMouse(float dt);          // once a frame: move the camera by the held axes
+    bool keyNavMoving() const { return keyNavMoving_; }
     bool spaceMouseMoving() const { return spaceMouseMoving_; } // keep frames coming while the cap is pushed
     bool spaceMouseDeflected() const; // the cap is pushed past the dead zone now (an axis event worth a frame)
     void drawSpaceMouseSection();             // Preferences > Input > SpaceMouse

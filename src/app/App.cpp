@@ -532,6 +532,8 @@ int App::runUiTest(int w, int h, int fps) {
         pollSculptable();
         updateCameraAspect();
         updateSpaceMouse(dt);
+        keyNavMoving_ = false;
+        updateKeyNav(dt);
         touchTick(); // a finger's press that waited for a second finger long enough goes through
 
         hardwareProfileFrameBegin(); // (only with SF_HW_PROFILE_IN_TESTS=1: tests use fixed settings)
@@ -865,6 +867,7 @@ bool App::wantsFrames(double now) const {
            strokeFinishing_ || solverBusy() || // the solver thread is placing a stroke's dabs (AsyncStroke.cpp)
            backgroundBusy() || playingLayer_ >= 0 || faceTakePlaying_ ||
            timelapseBusy() || hardwareCalibrating() || // both render a step per frame: they stop when the frames do
+           keyNavMoving() || // a held pan or zoom key sends no events after its first repeat
            spaceMouseMoving() || // a held SpaceMouse cap sends no events, but the view keeps moving (SpaceMouse.cpp)
            perf_.framesStill < 10 || // the view just moved: Fast Navigation's full-quality frame comes after it stops
            (perf_.proxyPrebuild && renderer_.proxiesPending()) || // motion proxies left to build, a few ms a frame
@@ -1629,6 +1632,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         windowFocused_ = false;
+        keysDown_.clear(); // a key let go in another window never reaches us: the pan and zoom keys stop
         if (radial_.hold != RadialHold::None) closeRadialMenu(); // its key or button's release won't come here
         if (strokePopup_.held) closeStrokePopup();
         spaceHeld_ = false; // Space let go in another window never reaches us
@@ -1694,6 +1698,8 @@ void App::dispatchEvent(const SDL_Event& event) {
             wheelZoom(e.wheel.mouse_x, e.wheel.mouse_y, e.wheel.y);
         break;
     case SDL_EVENT_KEY_DOWN:
+        if (!isModifierKey(e.key.key) && std::none_of(keysDown_.begin(), keysDown_.end(), [&](const auto& k) { return k.first == e.key.key; }))
+            keysDown_.emplace_back(e.key.key, e.key.mod);
         if (e.key.key == SDLK_SPACE && !e.key.repeat && // hold Space and drag: the camera (#43; not while typing)
             spaceCameraKeyDown(uiPrefs_.spaceCamera, io.WantTextInput || io.WantCaptureKeyboard)) {
             spaceHeld_ = true;
@@ -1705,6 +1711,8 @@ void App::dispatchEvent(const SDL_Event& event) {
             onKey(e.key.key, e.key.mod); // held brush size keys repeat, whatever they are bound to
         break;
     case SDL_EVENT_KEY_UP:
+        std::erase_if(keysDown_, [&](const auto& k) { return k.first == e.key.key; });
+        if (isModifierKey(e.key.key)) keysDown_.clear(); // Ctrl let go: a Ctrl chord's key stops (it must be pressed again)
         if (e.key.key == SDLK_SPACE) spaceHeld_ = false;
         quickRemeshKey(e.key.key, e.key.mod, false);
         if (e.key.key == SDLK_SPACE) quickMenuKeyUp(); // a held Space closes the QuickMenu when let go
@@ -4637,6 +4645,18 @@ void App::drawBrushCursor() {
         } else {
             dl->AddCircleFilled(c, 2.0f * uiScale_, col);
         }
+    }
+    // Front faces only is easy to leave on and then wonder why Smooth and the other brushes skip the inner side of
+    // a thin Part (an Extract's inside, #bug-reports): say so by the cursor while it is on.
+    frontFacesTagShown_ = frontFacesOnly_ && !masking && !sizeRingPreview_;
+    if (frontFacesTagShown_) {
+        const char* label = tr("Front faces only");
+        const ImVec2 size = ImGui::CalcTextSize(label);
+        const float pad = 3.0f * uiScale_;
+        const ImVec2 at0(c.x - size.x * 0.5f, c.y + r + 6.0f * uiScale_);
+        dl->AddRectFilled(ImVec2(at0.x - pad, at0.y - pad), ImVec2(at0.x + size.x + pad, at0.y + size.y + pad),
+                          IM_COL32(20, 20, 24, 190), 3.0f * uiScale_);
+        dl->AddText(at0, IM_COL32(255, 210, 130, 255), label);
     }
     if (!sizeRingPreview_) drawPrecisionCursor(dl, c, r, col); // Steady Stroke's string, the precision drag, the size in mm (Precision.cpp; the pop-up shows the size itself)
 }
