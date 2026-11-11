@@ -2212,6 +2212,7 @@ private:
     void rememberPaintColor(const glm::vec3& linear);
     uint64_t activeTrisKey_ = ~uint64_t(0); // the top shelf's ActiveTris, recounted when the scene changes
     size_t activeTris_ = 0;
+    std::map<std::string, double> shelfBrushTried_; // shelf slots whose brush is missing: when its file was last looked for
     float bottomTileW_ = 58.0f; // bottom shelf tiles shrink (down to 44 px) before the shelf scrolls
     float shelfFit_[4] = {1.0f, 1.0f, 1.0f, 1.0f}; // a side shelf's tiles and colour picker shrink (to 0.6) before it scrolls
     int shelfClipped_[4] = {0, 0, 0, 0};           // items past a side shelf's visible bottom last frame (UI tests)

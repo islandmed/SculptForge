@@ -9,6 +9,7 @@
 #include "core/Commands.h"
 #include "core/Project.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -226,7 +227,8 @@ TEST(brush_install_update_and_delete) {
     res = reg.execute(doc, "brush_install", {{"json", r.toJson().dump()}});
     CHECK(res.ok && res.message.find("Updated") != std::string::npos);
     CHECK(doc.brushes.size() == builtins + 1);
-    CHECK(std::distance(fs::directory_iterator(lib.user), fs::directory_iterator()) == 1);
+    CHECK(std::count_if(fs::directory_iterator(lib.user), fs::directory_iterator(), [](const fs::directory_entry& e) { return e.is_regular_file(); }) == 1);
+    CHECK(fs::exists(lib.user / "backups" / "Bark.sfbrush")); // (the first version, one generation back)
     Document fresh;
     loadBrushLibrary(fresh, lib.paths());
     CHECK(find(fresh, "Bark") && std::abs(find(fresh, "Bark")->depth + 0.6f) < 1e-4f);
@@ -409,4 +411,86 @@ TEST(brush_search_path_split) {
     CHECK(parts.size() == 2 && parts[0] == "/a" && parts[1] == "/b c");
 #endif
     CHECK(splitSearchPath("").empty());
+}
+
+// A user brush file that stops reading (a cut-off write, a bad sync) is kept as it is, listed, and the brush comes back
+// from the last good copy; nothing deletes a user brush on load.
+TEST(brush_library_unreadable_file_is_kept_and_restored) {
+    LibraryFixture lib("damaged");
+    Document doc;
+    loadBrushLibrary(doc, lib.paths());
+    BrushRecipe r;
+    r.name = "MyBrush";
+    std::string err;
+    installBrush(doc, r, err, false, lib.paths());
+    CHECK(err.empty());
+    doc.brushes[size_t(doc.activeBrush)].depth = 0.31f;
+    CHECK(saveBrushToLibrary(doc, doc.activeBrush, err, false, lib.paths())); // the first version is now in backups/
+    const fs::path file = lib.user / "MyBrush.sfbrush";
+    CHECK(fs::exists(lib.user / "backups" / "MyBrush.sfbrush"));
+
+    writeText(file, "{\"format\": \"sfbrush\", \"name\": \"hPol"); // cut off
+    Document again;
+    const auto messages = loadBrushLibrary(again, lib.paths());
+    CHECK(find(again, "MyBrush") != nullptr);
+    CHECK(!messages.empty());
+    CHECK(fs::exists(file)); // not deleted
+
+    // With no backup the file is still kept, and the brush is reported rather than silently gone.
+    fs::remove_all(lib.user / "backups");
+    Document third;
+    const auto lost = loadBrushLibrary(third, lib.paths());
+    CHECK(find(third, "MyBrush") == nullptr);
+    CHECK(lost.size() == 1 && lost[0].find("Kept") == 0);
+    CHECK(fs::exists(file));
+}
+
+// A shelf slot's brush that isn't loaded: recoverBrush finds its file, or its last good copy when the file vanished; a brush deleted on purpose stays deleted.
+TEST(brush_library_recover_brush) {
+    LibraryFixture lib("recover");
+    Document doc;
+    loadBrushLibrary(doc, lib.paths());
+    std::string err, note;
+    CHECK(recoverBrush(doc, "MyBrush", note, lib.paths()) < 0);
+
+    BrushRecipe r;
+    r.name = "MyBrush";
+    r.depth = 0.4f;
+    installBrush(doc, r, err, false, lib.paths());
+    r.depth = 0.5f;
+    installBrush(doc, r, err, false, lib.paths()); // a second save: the first version is in backups/
+    // The file vanishes (a sync tool, a clean-up): the brush is still loaded now, and the slot gets it back after a restart.
+    Document restarted;
+    fs::remove(lib.user / "MyBrush.sfbrush");
+    loadBrushLibrary(restarted, lib.paths());
+    CHECK(find(restarted, "MyBrush") == nullptr);
+    const int back = recoverBrush(restarted, "MyBrush", note, lib.paths());
+    CHECK(back >= 0 && restarted.brushes[size_t(back)].name == "MyBrush");
+    CHECK(restarted.brushes[size_t(back)].origin.source == BrushSource::User);
+    CHECK(fs::exists(lib.user / "MyBrush.sfbrush")); // saved again
+
+    // Deleted on purpose: it stays deleted (a copy is kept in backups/deleted).
+    CHECK(deleteBrush(restarted, back, err, lib.paths()));
+    CHECK(recoverBrush(restarted, "MyBrush", note, lib.paths()) < 0);
+    CHECK(fs::exists(lib.user / "backups" / "deleted" / "MyBrush.sfbrush"));
+
+    // The file appears on disk after the start (copied in): the next look loads it.
+    Document other;
+    loadBrushLibrary(other, lib.paths());
+    writeBrush(lib.user / "Late.sfbrush", "Late", 0.2f);
+    const int late = recoverBrush(other, "Late", note, lib.paths());
+    CHECK(late >= 0 && other.brushes[size_t(late)].origin.path == (lib.user / "Late.sfbrush").string());
+}
+
+// Reloading the library (a pack installed or switched on) keeps the brushes that exist only in this session.
+TEST(brush_library_reload_keeps_session_brushes) {
+    LibraryFixture lib("session");
+    Document doc;
+    loadBrushLibrary(doc, lib.paths());
+    BrushRecipe r;
+    r.name = "Unsaved";
+    doc.addBrush(r);
+    CHECK(find(doc, "Unsaved")->origin.source == BrushSource::Session);
+    loadBrushLibrary(doc, lib.paths());
+    CHECK(find(doc, "Unsaved") != nullptr);
 }
