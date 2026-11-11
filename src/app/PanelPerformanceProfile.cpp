@@ -97,7 +97,7 @@ void App::initHardwareProfile() {
     const char* inTests = std::getenv("SF_HW_PROFILE_IN_TESTS");
     const bool testThis = !options_.uiTest.empty() && inTests && std::string(inTests) == "1";
     if (!testThis && (uiConfigDeterministic_ || !options_.renderPath.empty() || !options_.recordPath.empty() ||
-                      !options_.uiTest.empty() || options_.measureIdle > 0.0f || options_.measureStroke > 0.0f))
+                      !options_.uiTest.empty() || options_.measureIdle > 0.0f || options_.measureStroke > 0.0f || options_.measureKeyNav))
         return;
     hwProfile_ = std::make_shared<HwProfileUi>();
     HwProfileUi& hw = *hwProfile_;

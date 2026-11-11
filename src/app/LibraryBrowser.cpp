@@ -325,6 +325,18 @@ void LibraryBrowser::rootEntries(App& app, std::vector<AssetEntry>& out) {
                 out.push_back(std::move(e));
             }
         }
+        if (!app.prefDir_.empty()) { // the autosave a crashed session left, when a later session went on without restoring it
+            const std::string prev = app.prefDir_ + "autosave.prev.sfproj";
+            std::error_code ec;
+            if (fs::is_regular_file(fsPath(prev), ec)) {
+                AssetEntry e;
+                e.kind = AssetKind::Project;
+                e.name = "Autosave (previous session)";
+                e.path = prev;
+                e.mtime = modifiedTime(prev);
+                out.push_back(std::move(e));
+            }
+        }
         // "QuickSave 2026-10-21 23-15-04" reads better as its time: "Oct 21  23:15:04".
         for (AssetEntry e : scan(userDir, true)) {
             if ((e.name.rfind("Snapshot ", 0) == 0 || e.name.rfind("QuickSave ", 0) == 0) && e.mtime) { // (older ones: QuickSave)

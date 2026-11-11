@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Units.h"
 
+#include "core/Document.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -86,6 +88,17 @@ std::string formatLength(double metres, const LengthUnit& unit) { return number(
 std::string formatSize(glm::vec3 metres, const LengthUnit& unit) {
     return number(metres.x * unit.perMetre) + " x " + number(metres.y * unit.perMetre) + " x " +
            number(metres.z * unit.perMetre) + " " + unit.id;
+}
+
+float unitsPerMetreForSize(float largestExtent) {
+    return largestExtent > 600.0f ? 1000.0f : largestExtent > 20.0f ? 100.0f : 1.0f;
+}
+
+float sceneUnitsPerMetre(const Document& doc) {
+    const AABB b = doc.visibleBounds();
+    if (!b.valid()) return 1.0f;
+    const glm::vec3 e = b.max - b.min;
+    return unitsPerMetreForSize(std::max(e.x, std::max(e.y, e.z)));
 }
 
 } // namespace sf

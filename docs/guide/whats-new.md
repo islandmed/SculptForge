@@ -5,6 +5,41 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.12.6
+
+```features
+date: 2026-11-11
+tagline: Pan and zoom keys work again, layouts revert safely, and garments drape on a body.
+highlight: Pan and zoom keys work again: a tap nudges the view, holding glides (thanks Artizmo on Discord)
+highlight: Revert to Saved Layout should no longer crash, and the previous autosave is kept (thanks phoenix and raffaele_3d_design)
+highlight: Vertex paint keeps its detail across subdivision levels (thanks masterfull95 on Discord)
+highlight: Drape a garment on a body in Tool > Garments, with a steadier cloth rest
+highlight: Save Visible Parts As and a Mask colour preference
+highlight: Save only the visible Parts
+highlight: Featured creator card in the Welcome window
+```
+
+- **Drape a garment on a body**: in **Tool > Garments**, click the body once for each panel, press **Drape** and watch
+  the pattern sew itself shut and settle, then **Convert to Part** to sculpt it (UVs from the flat pattern).
+- "**Save Visible Parts As**: **File > Save Visible Parts As...** writes a copy of the project with only the Parts you
+  can see, keeping their materials, layers and the scene's cameras and settings. The open project is untouched."
+- **Featured creator**: the Welcome window (Help > Welcome) shows one video by an artist who made something about
+  SculptForge, with its picture, title and a **Watch** button that opens it in your browser. The small x hides that
+  video. It comes with the daily update check, so it is off with **Preferences > Updates > Check for updates** and
+  when you are offline.
+- **Alt+click a Part** finds thin and far Parts: a click a few points off the Part counts, and a trackpad click that
+  wobbles is still a click.
+- **Projects with no models** open: a project saved without any Parts loads as an empty scene, with its settings,
+  lights, cameras and views.
+- **Pan and zoom keys work again**: Pan left / right / up / down and Zoom in / out (on their own keys or rebound) move
+  the view again; a tap nudges it, holding glides.
+- **Revert to Saved Layout** should no longer crash (it, Reset Layout and Import Interface now run between frames), a
+  colour picker or tile taken off a shelf can be put back (**Preferences > Saving & Layouts**), and there is always a
+  way out of a broken layout: **Reset Layout** and `--reset-layout`.
+- **Mask colour**: **Edit > Preferences > Interface > Mask colour** picks the colour masked areas show.
+- **Vertex paint keeps its detail across subdivision levels**: paint a stroke at a low level and it blends over the
+  finer colour above instead of replacing it.
+
 ## Version 0.12.5
 
 ```features

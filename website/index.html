@@ -19,7 +19,7 @@
   <meta property="og:url" content="https://sculptforge.app/">
   <link rel="canonical" href="https://sculptforge.app/">
   <script type="application/ld+json">
-  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.12.5", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=5", "sameAs": ["https://github.com/islandmed/SculptForge"]}
+  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.12.6", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=5", "sameAs": ["https://github.com/islandmed/SculptForge"]}
   </script>
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://sculptforge.app/img/social-preview.png?v=5">
@@ -450,14 +450,14 @@ rez-env sculptforge -- sculptforge troll.usda \
       <div class="wrap">
         <h2>What's new in 0.12</h2>
         <!-- whats-new:start (tools/guide/build_site.py writes this from docs/guide/whats-new.md: edit that) -->
-        <p class="section-lede">New in 0.12.5: Rgb colours Sub strokes, your brushes are safer, and the pan keys glide. <a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
+        <p class="section-lede">New in 0.12.6: Pan and zoom keys work again, layouts revert safely, and garments drape on a body. <a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
         <div class="wn-home">
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-0126"><div class="wn-card-body"><h3>Pan and zoom keys work again <small>new in 0.12.6</small></h3><p>Pan and zoom keys work again, layouts revert safely, and garments drape on a body.</p><ul><li>A tap nudges the view, holding glides (thanks Artizmo on Discord)</li><li>Revert to Saved Layout should no longer crash, and the previous autosave is kept (thanks phoenix and raffaele_3d_design)</li><li>Vertex paint keeps its detail across subdivision levels (thanks masterfull95 on Discord)</li><li>Drape a garment on a body in Tool &gt; Garments, with a steadier cloth rest</li><li>Save Visible Parts As and a Mask colour preference</li><li>Save only the visible Parts</li><li>Featured creator card in the Welcome window</li></ul></div></a></article>
           <article class="wn-home-card"><a href="guide/whats-new.html#version-0125"><div class="wn-card-body"><h3>Brushes you made are safer <small>new in 0.12.5</small></h3><p>Rgb colours Sub strokes, your brushes are safer, and the pan keys glide.</p><ul><li>Rgb lays colour on Sub strokes too, for every brush and stroke type</li><li>A missing bottom-shelf brush shows a mark and comes back from its backup (thanks rand_gogh)</li><li>Holding the pan and zoom keys glides smoothly at any frame rate (requested by Artizmo on Discord)</li><li>Thread counts above 16 set in Preferences &gt; Performance apply at the next start (#184)</li><li>A startup splash shows the bust and version while SculptForge starts</li></ul></div></a></article>
           <article class="wn-home-card"><a href="guide/whats-new.html#version-0124"><div class="wn-card-body"><h3>Pan and zoom from the keyboard <small>new in 0.12.4</small></h3><p>Shortcuts ask before they take a key, and Front faces only shows when it is on.</p><ul><li>Shortcuts ask before they take a key another action uses (requested by Artizmo on Discord)</li><li>Ctrl+Numpad 4, 6, 8, 2 and Zoom in/out keep moving while held</li><li>Front faces only shows a tag by the brush cursor and a Turn off button (thanks rand_gogh)</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-0123"><div class="wn-card-body"><h3>Version 0.12.3 <small>new in 0.12.3</small></h3><p>Your language from the first start, and Slide Stamp turns as you slide.</p><ul><li>The interface starts in your language (Spanish, Traditional or Simplified Chinese)</li><li>Hold Shift to turn a Slide Stamp as you slide it (thanks @Devon0209)</li><li>The welcome has a Language row with all four languages, each in its own script</li></ul></div></a></article>
         </div>
         <div class="wn-home-groups">
-          <a class="wn-home-group" href="guide/whats-new.html#versions-0120-to-0122"><h3>0.12.0 to 0.12.2</h3><ul><li>Garments and cloth</li><li>Plugins</li></ul><span>All changes &rarr;</span></a>
+          <a class="wn-home-group" href="guide/whats-new.html#versions-0120-to-0123"><h3>0.12.0 to 0.12.3</h3><ul><li>Garments and cloth</li><li>Plugins</li></ul><span>All changes &rarr;</span></a>
           <a class="wn-home-group" href="guide/whats-new.html#versions-011x"><h3>0.11.x</h3><ul><li>Gizmo All</li><li>Fixed</li><li>Linked duplicates</li><li>Your languages</li><li>Stencil</li><li>Exports keep their real size</li></ul><span>All changes &rarr;</span></a>
         </div>
         <!-- whats-new:end -->
@@ -482,7 +482,7 @@ rez-env sculptforge -- sculptforge troll.usda \
     <section id="download" class="section alt">
       <div class="wrap">
         <h2>Download</h2>
-        <p class="section-lede">Version 0.12.5. All builds come from the
+        <p class="section-lede">Version 0.12.6. All builds come from the
           <a href="https://github.com/islandmed/SculptForge/releases/latest">latest GitHub release</a>, with
           SHA-256 checksums. Free forever; <a href="support.html">membership</a> adds betas and early builds, Member Requests, a roadmap vote and credits.</p>
         <div class="downloads">

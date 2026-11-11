@@ -406,6 +406,7 @@ uniform vec3 uTintShift; // the material tint less 1 (0, the default, is no tint
 uniform int uPaint;      // 1: vertex colours replace the base colour
 uniform int uShowMask;   // 1: darken masked areas
 uniform float uMaskDarkness; // RenderSettings::maskDarkness, 0..1
+uniform vec4 uMaskColor;     // RenderSettings::maskColor (linear), w = 1 when the user picked one
 uniform int uGroups;     // 0: off, 1: per-triangle ids from uGroupIds, 2: everything is group 0, 3: per-triangle
                          // colours (0xBBGGRR) from uGroupIds (the UV Editor's overlay)
 uniform usamplerBuffer uGroupIds;
@@ -426,7 +427,7 @@ out vec4 fragColor;
 // edge is a soft band rather than a hard, stepped one along the triangles.
 vec3 maskTint(vec3 c, float m) {
     float k = smoothstep(0.0, 1.0, clamp(m, 0.0, 1.0)) * uMaskDarkness;
-    vec3 tinted = c * vec3(0.20, 0.22, 0.30) + vec3(0.006, 0.008, 0.016);
+    vec3 tinted = uMaskColor.w > 0.5 ? uMaskColor.rgb : c * vec3(0.20, 0.22, 0.30) + vec3(0.006, 0.008, 0.016);
     return mix(c, tinted, k);
 }
 vec4 finish(vec3 c) {
@@ -1080,6 +1081,7 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.paint = at("uPaint");
     p.showMask = at("uShowMask");
     p.maskDarkness = at("uMaskDarkness");
+    p.maskColor = at("uMaskColor");
     p.groups = at("uGroups");
     p.litsphere = at("uLitSphere");
     p.unlit = at("uUnlit");
@@ -3617,6 +3619,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     gl::Uniform1i(p->paint, 0);
     gl::Uniform1i(p->showMask, active && settings.showMask ? 1 : 0);
     gl::Uniform1f(p->maskDarkness, std::clamp(settings.maskDarkness, 0.0f, 1.0f));
+    gl::Uniform4fv(p->maskColor, 1, glm::value_ptr(glm::vec4(settings.maskColor, settings.maskColorCustom ? 1.0f : 0.0f)));
     gl::Uniform1i(p->groups, active && settings.showFaceGroups ? 2 : 0);
     gl::Uniform1i(p->dim, !active && settings.dimInactive ? 1 : 0);
     gl::Uniform1i(p->microWire, active && settings.wireframe ? 1 : 0); // (#128: the wireframe pass skips micro levels)
@@ -3712,6 +3715,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::Uniform1i(p->paint, settings.showVertexPaint && s.hasColors ? 1 : 0);
     gl::Uniform1i(p->showMask, active && settings.showMask && s.hasMask ? 1 : 0);
     gl::Uniform1f(p->maskDarkness, std::clamp(settings.maskDarkness, 0.0f, 1.0f));
+    gl::Uniform4fv(p->maskColor, 1, glm::value_ptr(glm::vec4(settings.maskColor, settings.maskColorCustom ? 1.0f : 0.0f)));
     gl::Uniform1i(p->groups, groups);
     gl::Uniform1i(p->dim, !active && settings.dimInactive ? 1 : 0);
     setLightUniforms(*p, settings);

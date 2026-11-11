@@ -35,7 +35,6 @@ namespace sf {
 
 namespace {
 
-constexpr float kClickSlopPx = 4.0f; // movement that turns an Alt+click into a drag
 constexpr Uint64 kPartClickNs = 500000000ull; // a pen pressed longer than this isn't an Alt+click
 constexpr int kListRows = 6;         // the list scrolls beyond this many Parts
 // The Part list's colours; should become theme tokens (Theme.h).
@@ -106,34 +105,19 @@ void drawShadeMark(ImDrawList* dl, ImVec2 c, float size, bool flat, ImU32 col) {
 } // namespace
 
 int App::pickPart(float x, float y, RayHit* out) {
-    glm::vec3 origin, dir;
-    canvasRay(x, y, origin, dir);
-    int best = -1;
-    RayHit nearest;
-    for (int i = 0; i < doc_.partCount(); ++i) {
-        Part& s = doc_.parts[size_t(i)];
-        if (!s.visible) continue;
-        RayHit hit;
-        bool found = false;
-        // In the Part's own space (a linked copy's transform): the ray goes there, the hit comes back.
-        const glm::mat4 inv = s.moved() ? glm::inverse(s.transform) : glm::mat4(1.0f);
-        const glm::vec3 o = glm::vec3(inv * glm::vec4(origin, 1.0f)), d = glm::mat3(inv) * dir;
-        found = doc_.partBvh(i).raycast(doc_.partMesh(i), o, d, hit);
-        if (found && s.moved()) {
-            hit.position = glm::vec3(s.transform * glm::vec4(hit.position, 1.0f));
-            hit.normal = glm::normalize(glm::mat3(s.transform) * hit.normal);
-        }
-        if (found && (best < 0 || hit.t < nearest.t)) {
-            best = i;
-            nearest = hit;
-        }
-    }
-    if (out && best >= 0) *out = nearest;
-    return best;
+    return pickPartAt(doc_, [this](float px, float py, glm::vec3& o, glm::vec3& d) { canvasRay(px, py, o, d); }, x, y, 0.0f,
+                      doc_.activePart, out);
+}
+
+// The Part to select by a click: pickPart, and a thin or far Part a few points off the pointer counts (Discord, macOS:
+// Alt+click often missed a Part until zoomed in close). Window points, so a Retina screen needs no scaling.
+int App::pickPartNear(float x, float y, RayHit* out) {
+    return pickPartAt(doc_, [this](float px, float py, glm::vec3& o, glm::vec3& d) { canvasRay(px, py, o, d); }, x, y,
+                      kPartPickTolerance, doc_.activePart, out);
 }
 
 void App::partClickMove(float x, float y) {
-    if (std::hypot(x - partClickX_, y - partClickY_) < kClickSlopPx) return;
+    if (!partClickIsDrag(x - partClickX_, y - partClickY_)) return;
     // A drag, not a click: what an Alt+drag from here does on the active Part
     // (brushes ignore the others): an inverted stroke, or a pan off the model.
     drag_ = Drag::None;
@@ -177,7 +161,7 @@ void App::partSelected(const char* how) {
 void App::sculptPartUnderCursor() {
     if (drag_ != Drag::None) return; // mid-stroke or mid-drag: switching would split it across two Parts
     const bool overCanvas = !ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouseX_, mouseY_);
-    const int target = overCanvas ? pickPart(mouseX_, mouseY_) : -1;
+    const int target = overCanvas ? pickPartNear(mouseX_, mouseY_) : -1;
     if (target < 0) {
         status_ = tr("No Part under the cursor");
         return;

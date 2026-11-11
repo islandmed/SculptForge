@@ -19,6 +19,7 @@
 #include <stb_image.h>
 
 #include <cctype>
+#include <cmath>
 #include <deque>
 #include <algorithm>
 #include <cstdlib>
@@ -123,6 +124,71 @@ const Mesh& partPlacedMesh(const Document& doc, int i, Mesh& scratch) {
     if (!doc.parts[size_t(i)].moved()) return doc.partMesh(i);
     scratch = placedMesh(doc.partMesh(i), doc.parts[size_t(i)].transform);
     return scratch;
+}
+
+namespace {
+
+// The nearest visible Part along one ray (index, -1 for none), `skip` left out; its hit in scene space.
+int nearestPartOnRay(Document& doc, const glm::vec3& origin, const glm::vec3& dir, int skip, RayHit& nearest) {
+    int best = -1;
+    for (int i = 0; i < doc.partCount(); ++i) {
+        Part& s = doc.parts[size_t(i)];
+        if (!s.visible || i == skip) continue;
+        // In the Part's own space (a linked copy's transform): the ray goes there, the hit comes back.
+        const glm::mat4 inv = s.moved() ? glm::inverse(s.transform) : glm::mat4(1.0f);
+        const glm::vec3 o = glm::vec3(inv * glm::vec4(origin, 1.0f)), d = glm::mat3(inv) * dir;
+        RayHit hit;
+        if (!doc.partBvh(i).raycast(doc.partMesh(i), o, d, hit)) continue;
+        if (s.moved()) {
+            hit.position = glm::vec3(s.transform * glm::vec4(hit.position, 1.0f));
+            hit.normal = glm::normalize(glm::mat3(s.transform) * hit.normal);
+        }
+        if (best < 0 || hit.t < nearest.t) {
+            best = i;
+            nearest = hit;
+        }
+    }
+    return best;
+}
+
+} // namespace
+
+int pickPartAt(Document& doc, const PartRayFn& rayAt, float x, float y, float tolerance, int active, RayHit* out) {
+    glm::vec3 origin, dir;
+    rayAt(x, y, origin, dir);
+    RayHit exact;
+    const int under = nearestPartOnRay(doc, origin, dir, -1, exact);
+    if (tolerance <= 0.0f || (under >= 0 && under != active)) {
+        if (out && under >= 0) *out = exact;
+        return under;
+    }
+    // Nothing under the pointer, or the Part already being sculpted: look for another Part in front within the
+    // tolerance, on rings around the pointer a quarter of the tolerance apart with the samples as far apart (a Part
+    // a pixel or two wide can't slip between them). The nearer ring wins; a tie goes to the nearer hit.
+    int best = -1;
+    RayHit closeHit;
+    const float step = tolerance * 0.25f;
+    for (int ring = 1; ring <= 4 && best < 0; ++ring) {
+        const float r = step * float(ring);
+        const int samples = std::max(8, int(std::ceil(6.2831853f * r / step)));
+        for (int k = 0; k < samples; ++k) {
+            const float a = 6.2831853f * float(k) / float(samples);
+            rayAt(x + r * std::cos(a), y + r * std::sin(a), origin, dir);
+            RayHit hit;
+            const int p = nearestPartOnRay(doc, origin, dir, active, hit);
+            if (p < 0 || (under >= 0 && hit.t >= exact.t)) continue; // behind what the pointer is on
+            if (best < 0 || hit.t < closeHit.t) {
+                best = p;
+                closeHit = hit;
+            }
+        }
+    }
+    if (best >= 0) {
+        if (out) *out = closeHit;
+        return best;
+    }
+    if (out && under >= 0) *out = exact;
+    return under;
 }
 
 Mesh mergedVisibleMesh(const Document& doc) {

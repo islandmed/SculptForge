@@ -171,9 +171,9 @@ bool App::init(const AppOptions& options) {
     {
         splash::Setting setting;
         setting.interactive = !headless && options.demo.empty() && !sharedWindow_ && !options.benchmark &&
-                              options.benchmarkScript.empty() && options.measureIdle <= 0.0f && options.measureStroke <= 0.0f;
+                              options.benchmarkScript.empty() && options.measureIdle <= 0.0f && options.measureStroke <= 0.0f && !options.measureKeyNav;
         const char* off = std::getenv("SF_STARTUP_SPLASH"); // SF_STARTUP_SPLASH=0: not this run (comparisons, bug reports)
-        if (off && *off == '0') setting.interactive = false;
+        if (off && *off == '0' && !splash::forcedFromEnv(std::getenv("SF_SPLASH"))) setting.interactive = false;
         const char* driver = SDL_GetCurrentVideoDriver();
         setting.videoDriver = driver ? driver : "";
         if (setting.interactive && !setting.videoDriver.empty()) { // (ui.json is read in full later: this is only the two settings)
@@ -184,6 +184,8 @@ bool App::init(const AppOptions& options) {
                 setLanguage(languageFromCode(splash::languageFromUiJson(text))); // (for the version line; applyLook sets it again)
             }
         }
+        splashForced_ = splash::forcedFromEnv(std::getenv("SF_SPLASH")); // SF_SPLASH=1: to see it (StartupSplash.h)
+        if (splashForced_) setting.preference = true;
         splashEnabled_ = splash::enabled(setting);
     }
     if (!headless) macmenu::install(); // SculptForge > Preferences... in the macOS app menu (#111)
@@ -441,17 +443,26 @@ void App::splashCheckpoint() {
         return;
     }
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - startedAt_).count();
-    if (!splash::due(true, splashShown_, ms)) return;
+    if (!splash::due(true, splashShown_, ms, splashForced_ ? 0.0 : splash::kShowAfterMs)) return;
     splashShown_ = true; // (once: a window system that said no isn't asked again)
     auto window = std::make_unique<splash::Window>();
     if (window->open(splashVersionLine())) {
         splash_ = std::move(window);
+        splashOpenedAt_ = std::chrono::steady_clock::now();
         SDL_Log("Start-up splash shown after %.0f ms", ms);
-    }
+    } else
+        SDL_Log("Start-up splash could not open after %.0f ms: %s", ms, SDL_GetError());
 }
 
 void App::revealMainWindow() {
     mainWindowHidden_ = false;
+    if (splash_) { // up for at least kMinVisibleMs, so it is seen (only a start that showed it waits; a fast start never gets here)
+        const double visible = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - splashOpenedAt_).count();
+        for (double left = splash::holdMs(visible); left > 0.0; left -= 16.0) {
+            splash_->pump();
+            SDL_Delay(16);
+        }
+    }
     if (window_) {
         SDL_ShowWindow(window_);
         SDL_RaiseWindow(window_);
@@ -623,7 +634,6 @@ int App::runUiTest(int w, int h, int fps) {
         pollSculptable();
         updateCameraAspect();
         updateSpaceMouse(dt);
-        keyNavMoving_ = false;
         updateKeyNav(dt);
         touchTick(); // a finger's press that waited for a second finger long enough goes through
 
@@ -1067,6 +1077,7 @@ int App::run() {
     const bool verify = verifyEnv && *verifyEnv && *verifyEnv != '0';
     const char* snapshotEnv = std::getenv("SF_MEASURE_SNAPSHOT");
     while (running_) {
+        if (mainWindowHidden_) splashCheckpoint(); // (before the first frame: restoring panel windows and the first frame can be slow too)
         const double t0 = seconds();
         if (options_.measureIdle > 0.0f) {
             if (!measuring && t0 >= measureFrom) {
@@ -1156,6 +1167,8 @@ int App::run() {
         while (SDL_PollEvent(&e)) onEvent(e);
         flushPenMotion(); // the batch's last pen motion, which waited for its pressure (Tablet.cpp)
         if (take_) takeBeforeFrame(); // a take's input since the last frame, at the wall clock's pace
+        if (options_.measureKeyNav && t0 - started >= kMeasureSettle && !backgroundBusy())
+            if (const int r = measureKeyNavStep(draw); r >= 0) return r; // (Input.cpp)
         mark();
         // (The window must have settled too: a window manager that maximises it late, on a busy machine, changes
         // the canvas and with it the brush's size in the world mid-stroke.)
@@ -1346,6 +1359,7 @@ int App::run() {
         // The SpaceMouse moves the view by its held axes every frame (frame-rate independent); while it does,
         // spaceMouseMoving() is true and a loop that waits for events when idle must keep drawing.
         updateSpaceMouse(dt);
+        updateKeyNav(dt); // the held pan and zoom keys (runUiTest calls it too)
         touchTick(); // a finger's press that waited for a second finger long enough goes through
 
         hardwareProfileFrameBegin(); // the frame governor's CPU and GPU timing
@@ -1996,6 +2010,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (uvToolMouseDown(x, y, mod)) return; // the UV Editor's Seam / Select in 3D tool (PanelUvEditor.cpp)
         if (guideMouseDown(x, y, mod)) return; // the QRemesh Guides brush (PanelRetopo.cpp)
         if (faceMouseDown(x, y, mod)) return;  // placing facial landmarks (PanelFace.cpp)
+        if (garmentPlaceMouseDown(x, y, mod)) return; // Garments > Place panels (PanelGarmentDrape.cpp)
         if (sculptableMouseDown(x, y)) return; // Make sculptable: landmarks, crop box (PanelSculptable.cpp)
         if (captureMouseDown(x, y)) return;    // Capture from view: the drag draws the square (PanelKelvinlet.cpp)
         // A triple-click on another Part makes it the active one and frames it (#43). (Its first two clicks
@@ -2005,7 +2020,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         const bool penNear = penInProximity_ && clickClockNs() - lastPenNs_ < 1000000000ull;
         if (mouseClicks_ >= 3 && !lastInputPen_ && !wintabPen_ && !penNear && !(mod & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) &&
             insertType_.empty() && doc_.partCount() > 1) {
-            const int target = pickPart(x, y);
+            const int target = pickPartNear(x, y);
             if (target >= 0 && target != doc_.activePart) {
                 runCommand("part_select", {{"index", double(target)}});
                 partSelected("triple-click");
@@ -2021,7 +2036,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         const bool frameClick = (keys & SDL_KMOD_ALT) && (mod & SDL_KMOD_SHIFT) && !ctrlDown(mod);
         if (!blenderStyle() && (keys & SDL_KMOD_ALT) && !ctrlDown(mod) && (frameClick || !(mod & SDL_KMOD_SHIFT)) &&
             (doc_.partCount() > 1 || frameClick)) {
-            const int target = pickPart(x, y);
+            const int target = pickPartNear(x, y);
             partClickFrame_ = frameClick;
             if (target >= 0 && (target != doc_.activePart || frameClick)) {
                 drag_ = Drag::PartClick;
@@ -2918,6 +2933,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     }
     if (doc_.sculptor.strokeActive()) endStroke();
     if (drape_) finishDrape(true); // (a running Drape keeps where it got to first: undo, save... see a real step)
+    if (name == "garment_drape") garmentDraped(); // (the placement preview would be a collider: it goes first)
     if (name == "save_project") storeProjectSettings();
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
     crashlog::action(name); // (failures reach the log through SDL_Log below)
@@ -2948,6 +2964,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     status_ = r.message;
     if (name.rfind("uv_", 0) == 0 || name == "texture_create" || name == "texture_delete") uvEditorChanged();
     garmentsChanged(name.rfind("garment_", 0) == 0); // (the Pattern window re-reads the pattern)
+    if (name == "garment_drape") garmentPreviewDirty_ = false; // (no preview over the Part it made)
     lastCommandOk_ = r.ok;
     if (r.ok && name != "export_glb" && name != "export_lods" && name != "export_usd" && name != "export_fbx" &&
         name != "export_unreal" && name.rfind("unreal_", 0) != 0 && name != "save_obj" && name != "save_project" &&
@@ -3008,9 +3025,9 @@ void App::queueFile(FileAction action, std::string path) {
                 : action == FileAction::ExportUsd  ? ".usdz"
                 : action == FileAction::SaveSplats ? ".ply"
                 : action == FileAction::ExportUnreal ? ".fbx"
-                : action == FileAction::SaveProject ? ".sfproj"
+                : action == FileAction::SaveProject || action == FileAction::SaveVisibleParts ? ".sfproj"
                                                    : ".glb";
-    else if (action == FileAction::SaveProject && !path.empty() && !isProjectPath(path))
+    else if ((action == FileAction::SaveProject || action == FileAction::SaveVisibleParts) && !path.empty() && !isProjectPath(path))
         path += kProjectExtension; // as save_project does, so the recent list gets the real name
     std::lock_guard lock(pendingMutex_);
     pendingFiles_.push_back({action, std::move(path)});
@@ -3164,6 +3181,9 @@ void App::processPendingFiles() {
             break;
         }
         case FileAction::SaveProject: saveProjectTo(f.path); break;
+        case FileAction::SaveVisibleParts:
+            if (!f.path.empty()) runCommand("save_visible_parts", {{"path", f.path}});
+            break;
         case FileAction::AppendPart:
             runCommand("part_append", {{"path", f.path}});
             if (lastCommandOk_) frameView(sceneBounds()); // a model can be any size, anywhere

@@ -78,8 +78,11 @@ void buildNode(std::vector<FlatBVH::Node>& nodes, std::vector<uint32_t>& order, 
     }
     const int axis = ext.x >= ext.y && ext.x >= ext.z ? 0 : ext.y >= ext.z ? 1 : 2;
     const uint32_t mid = t.begin + count / 2;
-    std::nth_element(order.begin() + t.begin, order.begin() + mid, order.begin() + t.end,
-                     [&](uint32_t a, uint32_t b) { return centers[a][axis] < centers[b][axis]; });
+    // Equal centres by index: each half is then the same set whichever standard library splits it (libstdc++, libc++
+    // and MSVC order ties differently; the cloth drape followed which triangle a query found first).
+    std::nth_element(order.begin() + t.begin, order.begin() + mid, order.begin() + t.end, [&](uint32_t a, uint32_t b) {
+        return centers[a][axis] != centers[b][axis] ? centers[a][axis] < centers[b][axis] : a < b;
+    });
     const uint32_t left = uint32_t(nodes.size());
     nodes.push_back({});
     nodes.push_back({});
@@ -248,7 +251,7 @@ bool TriangleBVH::closestPoint(const glm::vec3& p, float maxDistance, SurfaceHit
                 glm::vec3 bary;
                 const glm::vec3 q = closestPointOnTriangle(p, positions_[tri.x], positions_[tri.y], positions_[tri.z], bary);
                 const float d2 = glm::dot(q - p, q - p);
-                if (d2 <= best2) {
+                if (d2 < best2 || (d2 == best2 && (!found || t < hit.prim))) { // (a tie: the lowest triangle)
                     best2 = d2;
                     found = true;
                     hit.prim = t;
@@ -306,7 +309,7 @@ bool TriangleBVH::raycast(const glm::vec3& origin, const glm::vec3& dir, float m
                 const float v = glm::dot(dir, qv) * invDet;
                 if (v < 0.0f || u + v > 1.0f) continue;
                 const float tt = glm::dot(e2, qv) * invDet;
-                if (tt < 0.0f || tt > bestT) continue;
+                if (tt < 0.0f || tt > bestT || (tt == bestT && found && t > hit.prim)) continue; // (a tie: the lowest)
                 bestT = tt;
                 found = true;
                 hit.prim = t;
@@ -365,7 +368,7 @@ bool SegmentBVH::closestPoint(const glm::vec3& p, float maxDistance, SurfaceHit&
                 float u = 0.0f;
                 const glm::vec3 q = closestPointOnSegment(p, a_[s], b_[s], u);
                 const float d2 = glm::dot(q - p, q - p);
-                if (d2 <= best2) {
+                if (d2 < best2 || (d2 == best2 && (!found || s < hit.prim))) { // (a tie: the lowest segment)
                     best2 = d2;
                     found = true;
                     hit.prim = s;

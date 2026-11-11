@@ -53,6 +53,7 @@
 //   axis_drag DX DY          left-drag from a spot on the axis gizmo's disc clear of its ends, by DX DY unscaled pixels
 //   axis_hover +x|...|-z|disc  rest the pointer on that end of the axis gizmo, or on its disc clear of the ends
 //   button_drag middle|right X0 Y0 X1 Y1 [S]  drag with that button in window fractions (with the held modifiers)
+//   set_shortcut ACTION KEYS rebind an action as Preferences > Hotkeys does (the key's other action loses it), e.g. set_shortcut view.pan_left J
 //   expect_shortcut ACTION KEYS  the action's effective keys, e.g. expect_shortcut view.front Numpad 1
 //   camera YAW PITCH         set the view's angles in degrees (0 0 = the front view), e.g. for guide screenshots
 //   brush_size PX            set Size (the brush radius, screen pixels)
@@ -104,6 +105,7 @@
 //                            custom_brush_active (a custom brush is the active one),
 //                            member_card_open / member_card_pending / member_card_verifying / member_signed_in /
 //                            supporter (the membership cards, Support.h),
+//                            featured_shown / featured_watch_requests (the welcome's featured creator card has an entry; Watch clicks),
 //                            welcome_open (the first-run welcome shown), new_look_card_open (the one-time
 //                            "SculptForge has a new look" card),
 //                            generate_candidates (Generate 3D's, waiting for a pick), generated_part (the pick's Part
@@ -159,7 +161,7 @@
 //                            cursor_ring (1 when the last brush cursor drawn had its ring; 0: the dot only, #88),
 //                            hide_ring_while_stroking (Preferences > Cursor, 1 on),
 //                            cursor_follows_surface (Preferences > Input, 1 on),
-//                            saved_views (View > Views), mask_darkness (0-100),
+//                            saved_views (View > Views), mask_darkness (0-100), mask_colour_custom (1: a picked Mask colour),
 //                            camera_yaw / camera_pitch / camera_roll (degrees),
 //                            camera_up (the view's up vector . world Y), camera_aligned (1 when looking along a world
 //                            axis), camera_distance, camera_pan (target offset);
@@ -965,6 +967,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "dynamic") return app_.doc_.sculptor.dyntopo.enabled ? 1.0 : 0.0;
     if (name == "dynamic_detail") return std::round(app_.doc_.sculptor.dyntopo.detail * 100.0f);
     if (name == "saved_views") return double(app_.savedViews_.size());
+    if (name == "mask_colour_custom") return app_.renderSettings_.maskColorCustom ? 1.0 : 0.0;
     if (name == "mask_darkness") return std::round(app_.renderSettings_.maskDarkness * 100.0f);
     if (name == "brush_type") return app_.doc_.activeBrush >= 0 || app_.paintMode_ ? -1.0 : double(int(app_.brush_));
     if (name == "dab_scene_error_px") { // the last dab's centre, placed in the scene and shown by the view, to the cursor
@@ -1041,7 +1044,19 @@ double Demo::query(const std::string& name, bool& known) const {
         const std::string p = app_.uiConfigPath();
         return !p.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
     }
+    if (name == "autosave_file" || name == "autosave_prev_file") { // the project autosave in the settings folder (PanelProject.cpp)
+        std::error_code ec;
+        const std::string p = app_.prefDir_ + (name == "autosave_file" ? "autosave.sfproj" : "autosave.prev.sfproj");
+        return !app_.prefDir_.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
+    }
     if (name == "console_open") return app_.layout_.consoleOpen ? 1.0 : 0.0;
+    if (name.rfind("shelf_has_", 0) == 0) { // how many shelf slots hold the item (shelf_has_widget.color)
+        const std::string id = name.substr(10);
+        int n = 0;
+        for (const auto* list : {&app_.layout_.topShelf, &app_.layout_.leftShelf, &app_.layout_.rightShelf, &app_.layout_.bottomShelf})
+            n += int(std::count(list->begin(), list->end(), id));
+        return n;
+    }
     if (name == "command_palette_open") return app_.palette_.isOpen() ? 1.0 : 0.0;
     if (name == "customize") return app_.layout_.customize ? 1.0 : 0.0;
     if (name == "shelves_visible") return app_.layout_.shelvesVisible ? 1.0 : 0.0;
@@ -1130,6 +1145,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "subdiv_levels") return double(subdivLevelCount(app_.doc_.mesh)); // the active Part's (0: none)
     if (name == "language_bar_open") return app_.languageBar_ ? 1.0 : 0.0; // the first start's "SculptForge is in..." note
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
+    if (name == "featured_shown") return app_.featuredCard() ? 1.0 : 0.0;       // the welcome's featured creator card has an entry
+    if (name == "featured_watch_requests") return double(app_.featuredWatchRequests_);
     // Help > Quick tour (QuickTour.cpp): open, the slide (1-based), waiting aside after Show me, the one offer.
     if (name == "quick_tour_open") return app_.quickTourOpen_ ? 1.0 : 0.0;
     if (name == "quick_tour_slide") return double(app_.quickTourSlide_ + 1);
@@ -2008,6 +2025,13 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             else a->run();
         });
         wait(0.2f);
+    } else if (verb == "set_shortcut") { // set_shortcut ACTION KEYS
+        if (!need(2)) return false;
+        const std::string id = w[1], keys = restOf(lineText_, 2);
+        run([this, line, id, keys] {
+            if (!app_.actions_.find(id)) fail(line, "no action " + id);
+            else app_.actions_.assignShortcut(id, keys);
+        });
     } else if (verb == "expect_shortcut") { // expect_shortcut ACTION KEYS: the action's keys (none: no key)
         if (!need(1)) return false;
         const std::string id = w[1], want = restOf(lineText_, 2);

@@ -53,6 +53,7 @@ std::string utf8(const std::filesystem::path& p) {
     return std::string(s.begin(), s.end());
 }
 std::string autosavePath(const std::string& prefDir) { return prefDir + "autosave.sfproj"; }
+std::string autosavePrevPath(const std::string& prefDir) { return prefDir + "autosave.prev.sfproj"; }
 bool fileExists(const std::string& p) {
     std::error_code ec;
     return std::filesystem::is_regular_file(fsPath(p), ec);
@@ -119,6 +120,9 @@ void App::initProject() {
         if (prefs["update_channel"].isString())
             updateChannel_ = prefs["update_channel"].asString() == "preview" ? UpdateChannel::Preview : UpdateChannel::Stable;
         applyUpdatePolicy();
+        featuredLaunch_ = uint64_t(std::clamp(prefs["featured_launch"].asNumber(0), 0.0, 1e12));
+        for (const Json& h : prefs["featured_hidden"].items())
+            if (h.isString() && featuredHidden_.size() < 64) featuredHidden_.push_back(h.asString());
         // The membership cards (Support.h). ("support_card": false, the old switch, and "supporter" from before
         // 0.11.1 are honoured as they were: a member said so.)
         supportCardPrefs_.supporter = prefs["supporter"].asBool(false) || !prefs["support_card"].asBool(true);
@@ -193,6 +197,8 @@ void App::initProject() {
     recentFiles_ = pruneRecentFiles(std::move(recentFiles_), fileExists);
     // (the starts milestone: counted on this computer only, never sent)
     if (!supportCardTestMode()) supportCardPrefs_.starts = std::min(supportCardPrefs_.starts + 1, 100000000);
+    ++featuredLaunch_; // (the featured creator card moves on a start: core/Featured.h)
+    loadFeaturedCache();
     saveProjectPrefs(); // records this version, so What's New shows once
     updateDiscordPresence(); // on if it was left on (PanelIntegrations.cpp)
     // The full membership card on the first start (Support.h); after an update, the small card's moment; then a
@@ -213,7 +219,9 @@ void App::initProject() {
 
     // An autosave newer than the last clean exit means the previous session ended unexpectedly.
     std::error_code ec;
-    const auto autosave = fsPath(autosavePath(prefDir_)), marker = fsPath(prefDir_ + "clean_exit");
+    auto autosave = fsPath(autosavePath(prefDir_));
+    const auto marker = fsPath(prefDir_ + "clean_exit");
+    if (!std::filesystem::is_regular_file(autosave, ec)) autosave = fsPath(autosavePrevPath(prefDir_)); // (the one before a skipped prompt)
     if (std::filesystem::is_regular_file(autosave, ec)) {
         const auto saved = std::filesystem::last_write_time(autosave, ec);
         std::error_code ec2;
@@ -239,6 +247,12 @@ void App::saveProjectPrefs() {
     prefs.set("last_seen_version", std::string(SCULPTFORGE_VERSION));
     prefs.set("check_updates", checkUpdates_);
     prefs.set("update_checked_at", double(updateCheckedAt_));
+    prefs.set("featured_launch", double(featuredLaunch_));
+    if (!featuredHidden_.empty()) {
+        Json hidden = Json::array();
+        for (const std::string& h : featuredHidden_) hidden.push(h);
+        prefs.set("featured_hidden", std::move(hidden));
+    }
     if (!updateSkipped_.empty()) prefs.set("update_skipped", updateSkipped_);
     prefs.set("update_channel", std::string(updateChannel_ == UpdateChannel::Preview ? "preview" : "stable"));
     prefs.set("member_builds", memberBuilds_ && !memberSessionOnly_);
@@ -302,6 +316,7 @@ void App::rememberRecent(const std::string& path) {
     std::string full = utf8(std::filesystem::absolute(fsPath(path), ec).lexically_normal());
     if (ec) full = path;
     if (full == utf8(fsPath(autosavePath(prefDir_)).lexically_normal())) return;
+    if (full == utf8(fsPath(autosavePrevPath(prefDir_)).lexically_normal())) return;
     recentFiles_ = addRecentFile(std::move(recentFiles_), full);
     saveProjectPrefs();
 }
@@ -346,15 +361,30 @@ void App::tickProject(float dt) {
         (revision == autosaveRevision_ && !doc_.modified))
         return;
     autosaveTimer_ = 0.0f;
+    autosaveNow();
+}
+
+// The first autosave of a session never replaces the one a session before it left: that one is kept as
+// autosave.prev.sfproj (a crash, then a start whose Restore prompt was skipped or declined, must not cost the work).
+bool App::autosaveNow() {
+    // (UI tests run as a demo script, so interactive() is false there; they set prefDir_ before it and write the file too.)
+    const bool recording = !options_.renderPath.empty() || !options_.recordPath.empty() || (demo_ && options_.uiTest.empty());
+    if (recording || prefDir_.empty() || !doc_.dirty()) return false;
+    const uint64_t revision = doc_.undo.revision() * 1000003u + doc_.splatsVersion;
+    std::error_code ec;
+    if (!autosaveWritten_ && std::filesystem::is_regular_file(fsPath(autosavePath(prefDir_)), ec))
+        std::filesystem::rename(fsPath(autosavePath(prefDir_)), fsPath(autosavePrevPath(prefDir_)), ec);
+    autosaveTimer_ = 0.0f;
     storeProjectSettings();
     std::string err;
-    if (saveProject(autosavePath(prefDir_), doc_, err, /*autosave*/ true)) {
-        autosaveRevision_ = revision;
-        autosaveWritten_ = true;
-        SDL_Log("Autosaved to %s", autosavePath(prefDir_).c_str());
-    } else {
+    if (!saveProject(autosavePath(prefDir_), doc_, err, /*autosave*/ true)) {
         status_ = "Autosave failed: " + err;
+        return false;
     }
+    autosaveRevision_ = revision;
+    autosaveWritten_ = true;
+    SDL_Log("Autosaved to %s", autosavePath(prefDir_).c_str());
+    return true;
 }
 
 void App::saveProjectAs(bool forceDialog) {
@@ -365,6 +395,13 @@ void App::saveProjectAs(bool forceDialog) {
     std::string suggestion;
     if (!doc_.path.empty()) suggestion = utf8(fsPath(doc_.path).replace_extension(kProjectExtension));
     sf::dialogs::saveFile(onProjectChosen, &dialogRequests_[int(FileAction::SaveProject)], window_, kProjectFilters, 2,
+                           suggestion.empty() ? nullptr : suggestion.c_str());
+}
+
+void App::saveVisiblePartsAs() {
+    std::string suggestion;
+    if (!doc_.path.empty()) suggestion = utf8(fsPath(doc_.path).replace_extension().concat("-visible").replace_extension(kProjectExtension));
+    sf::dialogs::saveFile(onProjectChosen, &dialogRequests_[int(FileAction::SaveVisibleParts)], window_, kProjectFilters, 2,
                            suggestion.empty() ? nullptr : suggestion.c_str());
 }
 
@@ -768,6 +805,7 @@ void App::drawFileMenuProjectItems() {
     }
     if (ImGui::MenuItem(tr("Save"), "Ctrl+S")) saveProjectAs(false);
     if (ImGui::MenuItem(tr("Save As..."), "Ctrl+Shift+S")) saveProjectAs(true);
+    if (ImGui::MenuItem(tr("Save Visible Parts As..."))) saveVisiblePartsAs();
     ImGui::SetNextItemWidth(120.0f * uiScale_);
     ImGui::SliderInt(tr("Autosave (min)"), &autosaveMinutes_, 0, 60, tr(autosaveMinutes_ ? "%d" : "off"));
     if (ImGui::IsItemDeactivatedAfterEdit()) saveProjectPrefs();
@@ -833,7 +871,9 @@ void App::drawProjectPopups() {
         }
         ImGui::Spacing();
         const float w = 110.0f * uiScale_;
-        const std::string autosave = autosavePath(prefDir_);
+        std::error_code existsEc;
+        const std::string autosave = std::filesystem::is_regular_file(fsPath(autosavePath(prefDir_)), existsEc)
+                                         ? autosavePath(prefDir_) : autosavePrevPath(prefDir_);
         if (ImGui::Button(tr("Restore"), ImVec2(w, 0))) {
             ImGui::CloseCurrentPopup();
             runCommand("open_project", {{"path", autosave}});
@@ -847,7 +887,8 @@ void App::drawProjectPopups() {
         if (ImGui::Button(tr("Discard"), ImVec2(w, 0))) {
             ImGui::CloseCurrentPopup();
             std::error_code ec;
-            std::filesystem::remove(fsPath(autosave), ec);
+            std::filesystem::remove(fsPath(autosavePath(prefDir_)), ec);
+            std::filesystem::remove(fsPath(autosavePrevPath(prefDir_)), ec);
         }
         ImGui::EndPopup();
     }
@@ -891,24 +932,16 @@ void App::startUpdateCheck(bool manual) {
     // Member builds only when signed in, never in UI tests (the network) and never in studio mode (its own channel).
     const std::shared_ptr<MemberAuth> member =
         memberBuilds_ && options_.uiTest.empty() && !studioMode().active ? memberAuth_ : nullptr;
-    std::thread([job, source, fallback, channel, member] {
+    // The featured creator card's feed rides along on the public feed only (never a studio's own channel).
+    const bool featuredToo = !studioMode().active && policy::current().updateFeed.empty() && policy::current().updateMirror.empty();
+    const std::string featuredDir = prefDir_;
+    std::thread([job, source, fallback, channel, member, featuredToo, featuredDir] {
         std::string body;
         // A URL or a local file (a studio's mirror on a share; UI tests).
-        auto fetch = [&](const std::string& from) {
-            job->error.clear();
-            if (from.rfind("https://", 0) == 0 || from.rfind("http://", 0) == 0) {
-                ai::HttpResponse r = ai::httpRequest("GET", from, {"Accept: application/json"}, {}, 15);
-                if (r.status == 200) body = r.body;
-                else job->error = r.status ? "the server answered " + std::to_string(r.status) : (r.error.empty() ? "no connection" : r.error);
-            } else {
-                std::ifstream f(fsPath(from), std::ios::binary);
-                if (f) body.assign(std::istreambuf_iterator<char>(f), {});
-                else job->error = "can't read " + from;
-            }
-            return job->error.empty();
-        };
+        auto fetch = [&](const std::string& from) { return readFeedText(from, body, job->error); };
         if (!fetch(source) && !fallback.empty()) fetch(fallback);
         if (job->error.empty()) job->ok = parseUpdateFeed(body, job->info, job->error, channel);
+        if (featuredToo && !featuredDir.empty()) fetchFeatured(*job, source, fallback, featuredDir);
         if (member) checkMemberBuilds(*member, *job); // (PanelUpdate.cpp)
         job->done = true;
     }).detach();
@@ -925,6 +958,7 @@ void App::pollUpdateCheck() {
     } else if (!job->memberError.empty()) {
         memberStatus_ = "Couldn't check member builds: " + job->memberError;
     }
+    applyFeaturedJob(*job); // (the featured creator card: kept, or gone when the site can't be reached)
     if (!job->ok) {
         updateStatus_ = "Couldn't check for updates: " + job->error;
         if (job->manual) status_ = updateStatus_;
@@ -1022,7 +1056,8 @@ void App::drawUpdatesSection() {
     if (checkLocked) ui::ManagedBadge();
     ui::HelpText("Check for updates", nullptr,
                  "Once a day at startup, download a small file from the SculptForge website that names the newest "
-                 "version, and show a banner when there is a newer one. Nothing about you or your computer is sent.",
+                 "version, and show a banner when there is a newer one. The welcome window's Featured creator card "
+                 "comes with it (off with this switch). Nothing about you or your computer is sent.",
                  "Preferences > Updates");
     ImGui::TextUnformatted(tr("Update channel"));
     int channel = updateChannel_ == UpdateChannel::Preview ? 1 : 0;

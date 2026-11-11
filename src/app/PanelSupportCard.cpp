@@ -114,7 +114,7 @@ struct Tier {
 
 bool App::supportCardTestMode() const {
     return !interactive() || !options_.uiTest.empty() || !options_.demo.empty() || !options_.script.empty() ||
-           options_.measureIdle > 0.0f || options_.measureStroke > 0.0f || options_.benchmark ||
+           options_.measureIdle > 0.0f || options_.measureStroke > 0.0f || options_.measureKeyNav || options_.benchmark ||
            !options_.timelapsePath.empty() || std::getenv("SF_NO_SUPPORT_CARD") || std::getenv("CI");
 }
 
