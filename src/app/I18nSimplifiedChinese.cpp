@@ -2735,6 +2735,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Asking GitHub...", "正在询问 GitHub..."},
     {"On GitHub, enter this code:", "请在 GitHub 输入此代码："},
     {"Open github.com/login/device", "打开 github.com/login/device"},
+    {"Open the invitations page", "打开邀请页面"},
     {"Waiting for GitHub...", "正在等待 GitHub..."},
     {"Member builds", "会员版本"},
     {"Member and Studio members get each release early. Sign in with the GitHub account that has the invitation to "
@@ -2744,8 +2745,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "Member 与 Studio 会员可抢先获取每个版本。请以收到会员仓库邀请的 GitHub 账号登录：SculptForge 之后也会提供会员版"
      "本，并以与所有版本相同的签章检查。此登录只能读取该仓库的发布版本；它保存在系统的钥匙圈中，按“退出登录”即可移"
      "除。"},
-    {"Signed in with GitHub.", "已以 GitHub 登录。"},
-    {"Signed in as %s on GitHub.", "已以 %s 身份登录 GitHub。"},
+    {"Signed in with GitHub: member builds on.", "已以 GitHub 登录：会员版本已开启。"},
+    {"Signed in as %s: member builds on.", "已以 %s 身份登录：会员版本已开启。"},
     {"Sign out", "退出登录"},
     {"Sign in with GitHub", "以 GitHub 登录"},
     // --- PanelUvEditor.cpp (tools/i18n/coverage.py) ---

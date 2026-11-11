@@ -3087,6 +3087,7 @@ constexpr Entry kSpanish[] = {
     {"Asking GitHub...", "Preguntando a GitHub..."},
     {"On GitHub, enter this code:", "En GitHub, escribe este código:"},
     {"Open github.com/login/device", "Abrir github.com/login/device"},
+    {"Open the invitations page", "Abrir la página de invitaciones"},
     {"Waiting for GitHub...", "Esperando a GitHub..."},
     {"Member builds", "Versiones de miembros"},
     {"Member and Studio members get each release early. Sign in with the GitHub account that has the invitation to "
@@ -3097,8 +3098,8 @@ constexpr Entry kSpanish[] = {
      "invitación al repositorio de miembros: SculptForge ofrece entonces también las versiones de miembros, "
      "comprobadas con la misma firma que cada versión. El inicio de sesión solo puede leer las versiones de ese "
      "repositorio; se guarda en el llavero de tu sistema y Cerrar sesión lo quita."},
-    {"Signed in with GitHub.", "Sesión iniciada con GitHub."},
-    {"Signed in as %s on GitHub.", "Sesión iniciada como %s en GitHub."},
+    {"Signed in with GitHub: member builds on.", "Sesión iniciada con GitHub: compilaciones para miembros activadas."},
+    {"Signed in as %s: member builds on.", "Sesión iniciada como %s: compilaciones para miembros activadas."},
     {"Sign out", "Cerrar sesión"},
     {"Sign in with GitHub", "Iniciar sesión con GitHub"},
     // --- PanelUvEditor.cpp (tools/i18n/coverage.py) ---

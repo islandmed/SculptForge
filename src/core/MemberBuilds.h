@@ -14,6 +14,7 @@
 #include "core/UpdateCheck.h"
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -25,6 +26,9 @@ inline constexpr const char* kTokenUrl = "https://github.com/login/oauth/access_
 inline constexpr const char* kVerifyUrl = "https://github.com/login/device"; // where the user types the code
 inline constexpr const char* kReleasesUrl = "https://api.github.com/repos/sculptforge/sculptforge-insiders/releases?per_page=20";
 inline constexpr const char* kUserUrl = "https://api.github.com/user";
+inline constexpr const char* kInvitationsApiUrl = "https://api.github.com/user/repository_invitations?per_page=100";
+inline constexpr const char* kInvitationsPage = "https://github.com/sculptforge/sculptforge-insiders/invitations"; // opened by the app
+inline constexpr const char* kRepoFullName = "sculptforge/sculptforge-insiders";
 inline constexpr const char* kAssetUrlPrefix = "https://api.github.com/repos/sculptforge/sculptforge-insiders/releases/assets/";
 inline constexpr const char* kKeychainAccount = "member-builds"; // (core/Keychain.h)
 inline constexpr size_t kMaxTokenLength = 4096; // longest access/refresh/device code accepted (GitHub: ~520 today)
@@ -76,5 +80,42 @@ bool parseMemberReleases(const std::string& json, UpdateInfo& out, std::string& 
 
 // The login from GET kUserUrl ("" when the answer isn't one).
 std::string parseLogin(const std::string& json);
+
+// True when GET kInvitationsApiUrl lists a pending invitation to the member repository.
+bool hasPendingInvitation(const std::string& json);
+
+// --- The whole sign-in (device flow, then "can this account read the member repository?") ---
+// The network, the clock and the waiting are passed in, so the loop and every outcome are testable without GitHub.
+struct Reply {
+    long status = 0; // 0: never reached the server
+    std::string body, error;
+};
+struct SignInIo {
+    std::function<Reply(const std::string& url, const std::string& formBody)> post;
+    std::function<Reply(const std::string& url, const std::string& token, size_t cap)> get; // (token only for isMemberApiUrl)
+    std::function<bool(int milliseconds)> wait; // sleeps; false = the user cancelled
+    std::function<int64_t()> now;               // unix seconds
+    std::function<void(const DeviceCode&)> showCode; // the code to enter, once GitHub has given it
+};
+enum class SignInResult {
+    Member,        // signed in, and the account can read the member repository
+    NoAccess,      // signed in, but not on the member list (no collaborator access, no invitation found)
+    InvitePending, // signed in, and an invitation to the member repository is waiting to be accepted
+    Declined,      // the user said no on GitHub
+    Expired,       // the code ran out before it was entered
+    Failed,        // GitHub or the network (`error` says what)
+    Cancelled,
+};
+struct SignInOutcome {
+    SignInResult result = SignInResult::Failed;
+    std::string login; // the GitHub login when known (any signed-in outcome)
+    std::string error; // Failed only
+    Tokens tokens;     // Member only
+    int polls = 0;     // token requests made (tests: the loop ends)
+};
+SignInOutcome runSignIn(const SignInIo& io);
+
+// The words for an outcome (shown in Preferences > Updates; "" for Member and Cancelled: nothing to add).
+std::string signInMessage(const SignInOutcome& o);
 
 } // namespace sf::member

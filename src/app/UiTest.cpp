@@ -2902,19 +2902,25 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
     } else if (verb == "member_sign_in") {
         // Ends the GitHub sign-in that is running (UI tests never reach GitHub): `ok` (the account can read the
-        // member repository) or `fail` (no access, declined, the code ran out).
+        // member repository), `fail`/`noaccess` (signed in, not on the member list), `pending` (an invitation waits),
+        // `declined` or `expired`.
         if (!need(1)) return false;
-        const bool ok = w[1] == "ok";
-        if (!ok && w[1] != "fail") {
-            error = "member_sign_in: ok or fail";
+        member::SignInResult result;
+        if (w[1] == "ok") result = member::SignInResult::Member;
+        else if (w[1] == "fail" || w[1] == "noaccess") result = member::SignInResult::NoAccess;
+        else if (w[1] == "pending") result = member::SignInResult::InvitePending;
+        else if (w[1] == "declined") result = member::SignInResult::Declined;
+        else if (w[1] == "expired") result = member::SignInResult::Expired;
+        else {
+            error = "member_sign_in: ok, noaccess, pending, declined or expired";
             return false;
         }
-        run([this, line, ok] {
+        run([this, line, result] {
             if (!app_.memberSignIn_) {
                 fail(line, "member_sign_in: no sign-in is running");
                 return;
             }
-            app_.finishMemberSignInForTest(ok);
+            app_.finishMemberSignInForTest(result);
         });
     } else if (verb == "wait") {
         if (!need(1)) return false;

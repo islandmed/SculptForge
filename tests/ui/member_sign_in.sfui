@@ -1,0 +1,47 @@
+# Preferences > Updates > Member builds: every GitHub sign-in outcome says something (a UI test ends the running
+# sign-in with member_sign_in; GitHub is never reached): not on the member list, an invitation waiting, declined,
+# the code ran out, and a member.
+run ui_look look=classic layout=classic
+click "Preferences##palette.preferences"
+click "Updates##preferences.updates"
+expect_text "Member builds"
+click "Sign in with GitHub##member.sign_in"
+wait 0.3
+member_sign_in noaccess
+wait 0.4
+expect_text "Signed in as test-member, but this account isn't on the member list yet"
+expect_text "tell us your GitHub name in #members"
+expect "Open the invitations page##member.invites"
+expect "Sign in with GitHub##member.sign_in"
+shot member-sign-in-no-access
+click "Sign in with GitHub##member.sign_in"
+wait 0.3
+expect_not "Open the invitations page##member.invites"
+member_sign_in pending
+wait 0.4
+expect_text "invitation to the member repository that isn't accepted yet"
+expect "Open the invitations page##member.invites"
+shot member-sign-in-pending
+click "Sign in with GitHub##member.sign_in"
+wait 0.3
+member_sign_in declined
+wait 0.4
+expect_text "Sign-in declined on GitHub"
+expect_not "Open the invitations page##member.invites"
+shot member-sign-in-declined
+click "Sign in with GitHub##member.sign_in"
+wait 0.3
+member_sign_in expired
+wait 0.4
+expect_text "The code ran out before it was entered"
+expect "Sign in with GitHub##member.sign_in"
+click "Sign in with GitHub##member.sign_in"
+wait 0.3
+member_sign_in ok
+wait 0.4
+expect_text "Signed in as test-member: member builds on."
+expect "Sign out##member.sign_out"
+expect_not "Open the invitations page##member.invites"
+shot member-sign-in-ok
+click "Sign out##member.sign_out"
+expect "Sign in with GitHub##member.sign_in"

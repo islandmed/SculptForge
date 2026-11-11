@@ -23,6 +23,7 @@
 #include "app/UserGuide.h"
 #include "ai/ComfyUI.h"
 #include "ai/ImageTo3DService.h"
+#include "core/MemberBuilds.h"
 #include "core/BrushSets.h"
 #include "core/BrushSettings.h"
 #include "core/Commands.h"
@@ -1863,7 +1864,7 @@ private:
     // member" both use it): `onDone(member)` runs on the main thread when it ends: true = signed in with an account
     // that can see member builds (memberBuilds_ is then true); false = not a member, declined, failed or cancelled.
     void startMemberSignIn(std::function<void(bool member)> onDone = {});
-    void finishMemberSignInForTest(bool ok); // UI tests' member_sign_in: the running sign-in ends (GitHub never reached)
+    void finishMemberSignInForTest(member::SignInResult result); // UI tests' member_sign_in: the running sign-in ends (GitHub never reached)
     void memberSignOut();
     std::shared_ptr<MemberAuth> memberAuth_;
     std::shared_ptr<MemberSignIn> memberSignIn_;
@@ -1872,6 +1873,7 @@ private:
     std::string memberLogin_;    // the GitHub login shown ("Signed in as ..."); saved; not a secret
     bool memberSessionOnly_ = false; // signed in, but no keychain kept it: not saved, gone at quit
     std::string memberStatus_;
+    bool memberInvitesLink_ = false; // the last sign-in found no access or a pending invitation: offer the invitations page
     int autosaveMinutes_ = 5; // 0 = off
     float autosaveTimer_ = 0.0f;
     uint64_t autosaveRevision_ = ~uint64_t(0);
