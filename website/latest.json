@@ -1,11 +1,13 @@
 {
-  "version": "0.12.4",
+  "version": "0.12.5",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Shortcuts ask before they take a key another action uses (requested by Artizmo on Discord)",
-    "Pan and zoom from the keyboard: Ctrl+Numpad 4, 6, 8, 2 and Zoom in/out keep moving while held",
-    "Front faces only shows a tag by the brush cursor and a Turn off button (thanks rand_gogh)"
+    "Rgb lays colour on Sub strokes too, for every brush and stroke type",
+    "Brushes you made are safer: a missing bottom-shelf brush shows a mark and comes back from its backup (thanks rand_gogh)",
+    "Holding the pan and zoom keys glides smoothly at any frame rate (requested by Artizmo on Discord)",
+    "Thread counts above 16 set in Preferences > Performance apply at the next start (#184)",
+    "A startup splash shows the bust and version while SculptForge starts"
   ],
   "support": {
     "founding": {
