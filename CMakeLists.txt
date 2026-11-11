@@ -1208,6 +1208,13 @@ if(SCULPTFORGE_BUILD_TESTS)
     # A crash leaves a note in the log file (#16). Needs no window.
     add_test(NAME crash_log COMMAND ${CMAKE_COMMAND} -DAPP=$<TARGET_FILE:sculptforge>
              -DDIR=${CMAKE_CURRENT_BINARY_DIR}/crash-log-test -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/crash_log.cmake)
+    # A Threads value saved in Preferences reaches the shared pool at the next start (#184; the 0.12.5 fix never ran in the
+    # real app, the App's Document started the pool at 16 first). Starts the app twice, offscreen.
+    if(NOT WIN32 AND Python3_Interpreter_FOUND)
+      add_test(NAME threads_restart COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/threads_restart.py
+               $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_BINARY_DIR}/threads-restart-test)
+      set_tests_properties(threads_restart PROPERTIES LABELS ui TIMEOUT 300)
+    endif()
     # Idle, the app draws nothing (#14) and uses next to no CPU: --measure-idle fails when it keeps drawing frames or
     # its process CPU is over SF_IDLE_CPU_MAX % of one core (4 s here: a spinning loop's 100 % fails it; the 30 s
     # nightly holds it to 2 %).

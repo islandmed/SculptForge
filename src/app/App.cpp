@@ -140,6 +140,12 @@ struct StartupTimer {
 App::App() = default;
 App::~App() = default;
 
+bool App::usesProfileThreads(const AppOptions& options) {
+    const bool recording = !options.recordPath.empty() || !options.uiTest.empty();
+    const bool headless = !options.renderPath.empty() || recording || !options.timelapsePath.empty();
+    return !headless && options.demo.empty();
+}
+
 bool App::init(const AppOptions& options) {
     options_ = options;
     startedAt_ = std::chrono::steady_clock::now();
@@ -156,7 +162,6 @@ bool App::init(const AppOptions& options) {
     SDL_SetHint(SDL_HINT_PEN_TOUCH_EVENTS, "0");
     // Full screen on one monitor stays up when the pointer clicks on another (Windows multi-monitor, Discord).
     SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
-    if (!headless && options.demo.empty()) applyCachedThreadCount(); // the hardware profile's threads, before any brush work
     // The graphics card chosen in Preferences > Performance, before the GL context (a failed start falls back).
     std::string gpuNotice;
     if (!headless && options.demo.empty() && !sharedWindow_) gpuNotice = applyCachedGpuChoice();
