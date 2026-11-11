@@ -1009,7 +1009,7 @@ void App::updateCameraAspect() {
     camera_.aspect = c.w / std::max(c.h, 1.0f);
 }
 
-// The one-time "Layout changed - ... Save Layout keeps it" hint comes from watchLayoutChanges (Config.cpp),
+// The one-time "Layout changes save themselves - ..." hint comes from watchLayoutChanges (Config.cpp),
 // which compares the layout with the stored one; shell edits only need to change layout_.
 void App::noteLayoutChanged() {}
 
@@ -1036,7 +1036,7 @@ void App::applyPreset(int preset) {
     layout_ = std::move(l);
     collapsedPalettes_.clear();
     dropdown_.clear();
-    status_ = std::string("Layout: ") + kNames[std::clamp(preset, 0, 2)] + " (Save Layout keeps it)";
+    status_ = std::string("Layout: ") + kNames[std::clamp(preset, 0, 2)]; // (the layout saves itself)
     lastCommandOk_ = true;
 }
 

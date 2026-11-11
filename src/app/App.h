@@ -2496,9 +2496,10 @@ private:
     // own: our ui.json (its layout becomes storedLayout_; it may have none), not a shared file.
     bool readUiConfig(const std::string& path, std::string& err, bool own = false);
     bool writeUiConfig(const std::string& path, std::string& err);
+    void backUpUiConfigOnce();
     static bool writeJsonAtomic(const std::string& path, const Json& j, std::string& err); // temp file, then rename
     std::string prefsKey() const;          // the shortcuts, preferences and radial menus, to notice changes
-    bool saveUiPrefs(std::string& err);     // ui.json with them and storedLayout_
+    bool saveUiPrefs(std::string& err);     // ui.json: them, the layout in use and storedLayout_
     void autosavePrefs(bool flush = false); // every frame: saves a moment after a change (flush: now, at quit)
     void noteLayoutStored();                // layout_ is what ui.json keeps now
     std::string layoutKey() const; // the layout without per-session state, to notice edits
@@ -2532,9 +2533,11 @@ private:
         bool rebound = false, movedWhileHeld = false;
     } keyNavProbe_;
     std::string layoutBaseline_;      // layoutKey() as last stored / loaded / restored
-    Json storedLayout_;               // the layout ui.json keeps (Save Layout); null: none yet, the standard one
+    Json storedLayout_;               // the layout Save Layout last kept ("layoutSaved"; Revert returns to it); null: none yet
     std::string prefsSavedKey_;       // prefsKey() as last saved (or read at the start)
+    std::string layoutSavedKey_;      // layoutKey() as ui.json's layout last has it (the autosave writes when it changes)
     bool prefsKeyKnown_ = false, actionsReady_ = false;
+    bool uiConfigBackedUp_ = false; // ui.json copied to ui.prev.json before this session's first write
     double prefsCheckedAt_ = 0.0, prefsSaveAt_ = 0.0; // the last look; when a pending change is written (0: none)
     bool layoutHintShown_ = false;
     int layoutCheckFrame_ = 0;

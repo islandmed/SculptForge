@@ -1331,9 +1331,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "将本次会话运行过的所有命令以脚本形式放到剪贴板，可直接重播（宏录制器）。"},
     {"Empty the console log (the session script is kept).", "清空控制台日志（保留会话脚本）。"},
     {"Save Layout", "保存布局"},
-    {"Keep the current layout (shelves, trays, open palettes) for future sessions. Preferences and shortcuts save "
-     "themselves.",
-     "保留当前布局（工具栏、工具箱、打开的调色板）供之后的会话使用。偏好设置与快捷键会自动保存。"},
+    {"Make the current layout (shelves, trays, open palettes) the one Revert to Saved Layout returns to. The layout, preferences and shortcuts also save themselves.",
+     "将当前布局（工具栏、工具箱、打开的调色板）设为“还原到已保存的布局”所回到的布局。布局、偏好设置与快捷键也会自动保存。"},
     {"Save Preferences Now", "立即保存偏好设置"},
     {"Write the preferences and shortcuts to disk now. Not needed: they save themselves a moment after every change.",
      "立即将偏好设置与快捷键写入磁盘。通常不需要：每次更改后它们会在片刻后自动保存。"},
@@ -1342,11 +1341,11 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Put back on the shelf: ", "放回工具架: "},
     {"Back to the built-in shelves, trays and panels, with every panel in the main window. Shortcuts and preferences stay. Always works, whatever state the layout is in (a layout that can't be used: start with --reset-layout).",
      "回到内置的工具架、托盘和面板，所有面板都回到主窗口。快捷键与偏好设置保留。无论布局处于什么状态都能使用（布局无法使用时：用 --reset-layout 启动）。"},
-    {"Go back to the built-in layout, shortcuts and radial menus. The shortcuts save themselves; Save Layout keeps "
-     "the layout.",
-     "回到内置的布局、快捷键与饼菜单。快捷键会自动保存；“保存布局”会保留布局。"},
+    {"Go back to the built-in layout, shortcuts and radial menus. They save themselves; Revert to Saved Layout still returns to the layout Save Layout kept.",
+     "回到内置的布局、快捷键与径向菜单。它们会自动保存；“还原到已保存的布局”仍会回到“保存布局”所保留的布局。"},
     {"Revert to Saved Layout", "还原为已保存的布局"},
-    {"Go back to the layout the last Save Layout kept.", "回到上一次“保存布局”所保留的布局。"},
+    {"Go back to the layout the last Save Layout kept (the layout in use saves itself, so this is the way back to it).",
+     "回到上一次“保存布局”所保留的布局（使用中的布局会自动保存，所以这是回到它的方法）。"},
     {"Import Interface...", "导入界面..."},
     {"Load a layout and shortcuts file someone shared (or you saved with Export Interface).",
      "加载别人分享（或你用“导出界面”保存）的布局与快捷键文件。"},
@@ -1360,8 +1359,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "SculptForge 在 3D 视图上显示的简短提示（已打开的模式、工具的下一步）。关闭会全部隐藏；每则提示也各有“不再显示"
      "”。"},
     {"Customize Shelves", "自定义工具栏"},
-    {"Preferences and shortcuts save themselves. Layout changes last until you quit; Save Layout keeps them.",
-     "偏好设置与快捷键会自动保存。布局的更改会持续到你退出程序为止；“保存布局”会保留它们。"},
+    {"Preferences, shortcuts and the layout save themselves. Save Layout sets the layout Revert to Saved Layout returns to.",
+     "偏好设置、快捷键与布局都会自动保存。“保存布局”会设定“还原到已保存的布局”所回到的布局。"},
     {"The language of menus, palettes, shelves and messages. Brush and tool names (Quad Remesh, Forge Spheres, Clay "
      "Block...) stay as they are.",
      "菜单、调色板、工具栏与消息所使用的语言。笔刷与工命名称（Quad Remesh、Forge Spheres、Clay Block...）保持原样。"},

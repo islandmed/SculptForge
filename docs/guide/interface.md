@@ -527,8 +527,8 @@ See [Scripting and automation](scripting.md) for the command language, scripts a
 ## Customizing the interface
 
 Everything about the layout can change: which palettes sit in the trays, what's on each shelf, and which keys
-do what. **Shortcuts and preferences save themselves**; layout changes (shelves, trays) last until you quit unless
-you keep them with **Save Layout**.
+do what. **Shortcuts, preferences and the layout save themselves** (the layout a couple of seconds after a change and when
+you quit); **Save Layout** marks the layout **Revert to Saved Layout** returns to.
 
 ### Move, add and remove shelf items
 
@@ -560,21 +560,22 @@ which action lost it.
 ### Saving preferences and layouts
 
 Every preference (key style, shortcuts, tablet, interface, performance, radial menus...) **saves itself** a moment
-after you change it; there is nothing to press. The layout is the one thing kept on purpose, with **Save Layout**.
-All in **Edit > Preferences > Saving & Layouts**:
+after you change it; there is nothing to press. So does the layout: what you change in the shelves, trays and open palettes is
+written a couple of seconds later and when you quit, so a restart or a crash brings it back. **Save Layout** marks a layout you
+like, so **Revert to Saved Layout** can return to it later. All in **Edit > Preferences > Saving & Layouts**:
 
 | Item | What it does |
 |---|---|
-| **Save Layout** | Keeps the current shelves, trays and open palettes for future sessions |
-| **Revert to Saved Layout** | Goes back to the layout the last Save Layout kept |
-| **Reset Layout and Shortcuts** | Goes back to the built-in layout, shortcuts and radial menus (Save Layout afterwards to keep the layout) |
+| **Save Layout** | Marks the current shelves, trays and open palettes as the layout Revert returns to |
+| **Revert to Saved Layout** | Goes back to the layout the last Save Layout kept (the autosave then keeps that one) |
+| **Reset Layout and Shortcuts** | Goes back to the built-in layout, shortcuts and radial menus (Revert to Saved Layout still returns to the one Save Layout kept) |
 | **Export Interface...** | Saves the layout, shortcuts and preferences to a `.json` file you can share |
-| **Import Interface...** (<kbd>Ctrl</kbd>+<kbd>L</kbd>) | Loads such a file (Save Layout afterwards to keep its layout) |
+| **Import Interface...** (<kbd>Ctrl</kbd>+<kbd>L</kbd>) | Loads such a file (its layout saves itself like any other) |
 
 The command palette (<kbd>F3</kbd>) also has **Save Preferences Now**, which writes them at once; you never need it.
 
-The first time you change the layout in a session, the status line reminds you once: "Layout changed -
-Edit > Preferences > Saving & Layouts > Save Layout keeps it". What a session changes by itself (the console and Library being open, the Library
+The first time you change the layout in a session, the status line tells you once: "Layout changes save themselves -
+Edit > Preferences > Saving & Layouts > Save Layout sets what Revert returns to". What a session changes by itself (the console and Library being open, the Library
 tab) doesn't count as a layout change.
 
 ### Layout presets
@@ -586,8 +587,8 @@ arrangements of the current layout:
 2. **Sculpt**: both trays closed, for the largest canvas.
 3. **Wide**: Brush, Stroke and Alpha in the left tray, Tool and Material in the right tray.
 
-A preset changes the layout only (the console, Library and left-handed setting stay as they are). Save
-Layout keeps it.
+A preset changes the layout only (the console, Library and left-handed setting stay as they are). The
+layout saves itself.
 
 ### Interface preferences
 

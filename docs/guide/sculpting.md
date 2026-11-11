@@ -896,8 +896,8 @@ Move, Smooth, Inflate, Pinch, Flatten, Crease, Trim, Tendril, Layer, Nudge and P
   tile to a new place.
 - **Change a brush's key**: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click its tile, then press the new key.
 
-Shelf changes last until you quit. **Edit > Preferences > Saving & Layouts > Save Layout** keeps
-them. See [The interface](interface.md) for more on customizing.
+Shelf changes save themselves. **Edit > Preferences > Saving & Layouts > Save Layout** marks the layout that
+**Revert to Saved Layout** returns to. See [The interface](interface.md) for more on customizing.
 
 ## Sculpt from a script
 
