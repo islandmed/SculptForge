@@ -624,6 +624,170 @@ TEST(member_builds_device_flow_answers) {
     CHECK(parseLogin(R"({"login":"<script>"})").empty());
 }
 
+// The whole sign-in against a scripted GitHub: every outcome, and the polling loop ends in each of them.
+namespace {
+struct FakeGitHub {
+    std::vector<std::string> tokenReplies;          // answers to the polls, in order (the last repeats)
+    long releasesStatus = 200, userStatus = 200, inviteStatus = 200;
+    std::string invitations = "[]";
+    int64_t clock = 1000;
+    std::vector<int> waits;                         // each wait (ms)
+    int cancelAfterWaits = -1;
+    int polls = 0, inviteCalls = 0;
+    std::string seenCode;
+    sf::member::SignInIo io() {
+        using namespace sf::member;
+        SignInIo o;
+        o.post = [this](const std::string& url, const std::string&) {
+            Reply r;
+            r.status = 200;
+            if (url == kDeviceCodeUrl) {
+                r.body = R"({"device_code":"dc1","user_code":"WDJB-MJHT","verification_uri":"https://github.com/login/device","expires_in":900,"interval":5})";
+            } else {
+                r.body = tokenReplies[std::min<size_t>(polls, tokenReplies.size() - 1)];
+                ++polls;
+            }
+            return r;
+        };
+        o.get = [this](const std::string& url, const std::string& token, size_t) {
+            Reply r;
+            if (token != "ghu_tok") { r.status = 401; return r; }
+            if (url == kUserUrl) r.status = userStatus, r.body = R"({"login":"hameron"})";
+            else if (url == kReleasesUrl) r.status = releasesStatus, r.body = "[]";
+            else if (url == kInvitationsApiUrl) ++inviteCalls, r.status = inviteStatus, r.body = invitations;
+            else r.status = 599;
+            return r;
+        };
+        o.wait = [this](int ms) {
+            waits.push_back(ms);
+            clock += ms / 1000;
+            return cancelAfterWaits < 0 || int(waits.size()) <= cancelAfterWaits;
+        };
+        o.now = [this] { return clock; };
+        o.showCode = [this](const DeviceCode& c) { seenCode = c.userCode; };
+        return o;
+    }
+};
+const char* kTokenOk = R"({"access_token":"ghu_tok","token_type":"bearer","expires_in":28800,"refresh_token":"ghr_x"})";
+const char* kPending = R"({"error":"authorization_pending"})";
+} // namespace
+
+TEST(member_sign_in_outcomes) {
+    using namespace sf::member;
+    { // signed in, on the member list
+        FakeGitHub g;
+        g.tokenReplies = {kPending, kPending, kTokenOk};
+        const SignInOutcome o = runSignIn(g.io());
+        CHECK(o.result == SignInResult::Member && o.login == "hameron" && o.tokens.access == "ghu_tok" && o.polls == 3);
+        CHECK(g.seenCode == "WDJB-MJHT" && signInMessage(o).empty() && g.inviteCalls == 0);
+    }
+    { // signed in, not a collaborator, nothing pending: says so, with the login and what to do
+        FakeGitHub g;
+        g.tokenReplies = {kTokenOk};
+        g.releasesStatus = 404;
+        const SignInOutcome o = runSignIn(g.io());
+        const std::string m = signInMessage(o);
+        CHECK(o.result == SignInResult::NoAccess && o.login == "hameron" && o.tokens.access.empty());
+        CHECK(m == "Signed in as hameron, but this account isn't on the member list yet. Check the invitation email from "
+                   "GitHub, or tell us your GitHub name in #members.");
+    }
+    { // 403 is the same; an invitations answer that fails or lists other repositories changes nothing
+        FakeGitHub g;
+        g.tokenReplies = {kTokenOk};
+        g.releasesStatus = 403;
+        g.inviteStatus = 404;
+        CHECK(runSignIn(g.io()).result == SignInResult::NoAccess);
+        g.inviteStatus = 200;
+        g.invitations = R"([{"repository":{"full_name":"someone/else"}}, 5, {"repository":null}])";
+        CHECK(runSignIn(g.io()).result == SignInResult::NoAccess);
+    }
+    { // an invitation to the member repository is waiting
+        FakeGitHub g;
+        g.tokenReplies = {kTokenOk};
+        g.releasesStatus = 404;
+        g.invitations = R"([{"id":1,"repository":{"full_name":"sculptforge/sculptforge-insiders"}}])";
+        const SignInOutcome o = runSignIn(g.io());
+        CHECK(o.result == SignInResult::InvitePending && signInMessage(o).find("hameron") != std::string::npos &&
+              signInMessage(o).find("isn't accepted yet") != std::string::npos);
+        CHECK(std::string(kInvitationsPage) == "https://github.com/sculptforge/sculptforge-insiders/invitations");
+    }
+    { // the login is unknown (the user call failed): the message still reads
+        FakeGitHub g;
+        g.tokenReplies = {kTokenOk};
+        g.releasesStatus = 404;
+        g.userStatus = 500;
+        const std::string m = signInMessage(runSignIn(g.io()));
+        CHECK(m.rfind("Signed in, but this account isn't on the member list yet.", 0) == 0);
+    }
+    { // GitHub itself failing is a failure with a retry hint, not "no access"
+        FakeGitHub g;
+        g.tokenReplies = {kTokenOk};
+        g.releasesStatus = 502;
+        const SignInOutcome o = runSignIn(g.io());
+        CHECK(o.result == SignInResult::Failed && o.error == "GitHub answered 502" && signInMessage(o).find("try again") != std::string::npos);
+    }
+    { // declined on GitHub
+        FakeGitHub g;
+        g.tokenReplies = {kPending, R"({"error":"access_denied"})"};
+        const SignInOutcome o = runSignIn(g.io());
+        CHECK(o.result == SignInResult::Declined && o.polls == 2 && signInMessage(o).find("try again") != std::string::npos);
+    }
+    { // GitHub says the code is expired
+        FakeGitHub g;
+        g.tokenReplies = {R"({"error":"expired_token"})"};
+        const SignInOutcome o = runSignIn(g.io());
+        CHECK(o.result == SignInResult::Expired && signInMessage(o).find("ran out") != std::string::npos);
+    }
+    { // nobody ever enters the code: the loop stops at the code's own expiry (900 s at 5 s = under 200 polls)
+        FakeGitHub g;
+        g.tokenReplies = {kPending};
+        const SignInOutcome o = runSignIn(g.io());
+        CHECK(o.result == SignInResult::Expired && o.polls > 100 && o.polls < 200 && g.clock >= 1900);
+    }
+    { // slow_down adds 5 s each time and the loop keeps the new pace
+        FakeGitHub g;
+        g.tokenReplies = {R"({"error":"slow_down","interval":10})", R"({"error":"slow_down","interval":15})", kPending, kTokenOk};
+        const SignInOutcome o = runSignIn(g.io());
+        CHECK(o.result == SignInResult::Member && g.waits == std::vector<int>({5000, 10000, 15000, 15000}));
+    }
+    { // cancelled while waiting: no further request
+        FakeGitHub g;
+        g.tokenReplies = {kPending};
+        g.cancelAfterWaits = 2;
+        const SignInOutcome o = runSignIn(g.io());
+        CHECK(o.result == SignInResult::Cancelled && g.polls == 2 && g.waits.size() == 3 && signInMessage(o).empty());
+    }
+    { // a dropped connection or a 5xx between polls is retried; another error ends it
+        FakeGitHub g;
+        g.tokenReplies = {"", kTokenOk};
+        sf::member::SignInIo io = g.io();
+        auto post = io.post;
+        int n = 0;
+        io.post = [&](const std::string& url, const std::string& b) {
+            Reply r = post(url, b);
+            if (url == kTokenUrl && n++ == 0) r.status = 503, r.body = "<html>";
+            return r;
+        };
+        CHECK(runSignIn(io).result == SignInResult::Member);
+        FakeGitHub h;
+        h.tokenReplies = {R"({"error":"incorrect_device_code"})"};
+        const SignInOutcome o = runSignIn(h.io());
+        CHECK(o.result == SignInResult::Failed && signInMessage(o).find("incorrect_device_code") != std::string::npos);
+    }
+    { // the device code request itself refused (device flow off): a failure that says why
+        FakeGitHub g;
+        sf::member::SignInIo io = g.io();
+        io.post = [](const std::string&, const std::string&) { Reply r; r.status = 200; r.body = R"({"error":"device_flow_disabled"})"; return r; };
+        const SignInOutcome o = runSignIn(io);
+        CHECK(o.result == SignInResult::Failed && signInMessage(o).find("switched off") != std::string::npos);
+        io.post = [](const std::string&, const std::string&) { Reply r; r.error = "could not resolve host"; return r; };
+        CHECK(runSignIn(io).error == "could not resolve host");
+    }
+    // The invitations call carries the token like the other member API calls, and nothing else does.
+    CHECK(isMemberApiUrl(kInvitationsApiUrl) && headersFor(kInvitationsApiUrl, "ghu_x").size() == 3);
+    CHECK(!isMemberApiUrl("https://api.github.com/user/repository_invitations/5"));
+}
+
 // GitHub's newer tokens are ~520 characters and may grow: up to kMaxTokenLength parse, store (split across entries
 // where one entry is too small, as on Windows), load and go into the header; longer is refused.
 TEST(member_builds_long_tokens) {

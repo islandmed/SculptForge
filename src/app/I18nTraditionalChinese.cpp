@@ -2736,6 +2736,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"Asking GitHub...", "正在詢問 GitHub..."},
     {"On GitHub, enter this code:", "請在 GitHub 輸入此代碼："},
     {"Open github.com/login/device", "開啟 github.com/login/device"},
+    {"Open the invitations page", "開啟邀請頁面"},
     {"Waiting for GitHub...", "正在等待 GitHub..."},
     {"Member builds", "會員版本"},
     {"Member and Studio members get each release early. Sign in with the GitHub account that has the invitation to "
@@ -2745,8 +2746,8 @@ constexpr Entry kTraditionalChinese[] = {
      "Member 與 Studio 會員可搶先取得每個版本。請以收到會員儲存庫邀請的 GitHub 帳號登入：SculptForge 之後也會提供會員"
      "版本，並以與所有版本相同的簽章檢查。此登入只能讀取該儲存庫的發行版本；它保存在系統的鑰匙圈中，按「登出」即可移"
      "除。"},
-    {"Signed in with GitHub.", "已以 GitHub 登入。"},
-    {"Signed in as %s on GitHub.", "已以 %s 身分登入 GitHub。"},
+    {"Signed in with GitHub: member builds on.", "已以 GitHub 登入：會員版本已開啟。"},
+    {"Signed in as %s: member builds on.", "已以 %s 身分登入：會員版本已開啟。"},
     {"Sign out", "登出"},
     {"Sign in with GitHub", "以 GitHub 登入"},
     // --- PanelUvEditor.cpp (tools/i18n/coverage.py) ---

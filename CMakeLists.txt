@@ -1053,6 +1053,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The first-use notice for online AI services (tests/ui/ai_consent.sfui, 100% and 200% inside).
     sculptforge_ui_test(ai_consent_1440 ai_consent --size 1440x900)
     sculptforge_ui_test(ai_consent_2880 ai_consent --size 2880x1800) # its 200% shots: 1440 px of UI
+    sculptforge_ui_test(member_sign_in_1440 member_sign_in --size 1440x900) # Preferences > Updates > Member builds' messages
+    sculptforge_ui_test(member_sign_in_2880 member_sign_in --size 2880x1800)
     sculptforge_ui_test(drag_stamp_footprint_1440 drag_stamp_footprint --size 1440x900) # #174's shots at 1440 and 2880 px
     sculptforge_ui_test(drag_stamp_footprint_2880 drag_stamp_footprint --size 2880x1800)
     # Origin tools in the Gizmo panel and the Classic frame keys (tests/ui/origin_frame.sfui).

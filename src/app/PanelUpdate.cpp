@@ -46,8 +46,8 @@ struct App::MemberSignIn {
     std::string userCode; // shown once GitHub has answered
     int64_t expiresAt = 0;
     std::atomic<bool> cancel{false}, done{false};
-    bool ok = false, saved = false;
-    std::string login, error;
+    member::SignInOutcome outcome; // read once `done`
+    bool saved = false;            // the token went into the keychain
 };
 
 namespace {
@@ -183,19 +183,22 @@ void App::endOldAppImage() {
 void App::tickSelfUpdate() {
     if (memberSignIn_ && memberSignIn_->done) {
         const std::shared_ptr<MemberSignIn> job = std::move(memberSignIn_);
-        if (job->ok) {
+        const member::SignInOutcome& o = job->outcome;
+        const bool ok = o.result == member::SignInResult::Member;
+        memberInvitesLink_ = o.result == member::SignInResult::NoAccess || o.result == member::SignInResult::InvitePending;
+        if (ok) {
             memberBuilds_ = true;
             memberSessionOnly_ = !job->saved; // (no keychain: signed in until quitting, nothing saved)
-            memberLogin_ = job->login;
+            memberLogin_ = o.login;
             memberStatus_ = job->saved ? "" : "Signed in until you quit: this system has no keychain to keep it in.";
             saveProjectPrefs();
             startUpdateCheck(true); // what's there for members now
-        } else if (!job->cancel) {
-            memberStatus_ = "Couldn't sign in: " + job->error;
+        } else {
+            memberStatus_ = member::signInMessage(o); // (every outcome says something; a cancel says nothing)
         }
         if (auto done = std::move(memberSignInDone_)) {
             memberSignInDone_ = nullptr;
-            done(job->ok);
+            done(ok);
         }
     }
     if (confirmStartAt_ > 0.0 && nowSeconds() >= confirmStartAt_) {
@@ -512,6 +515,7 @@ void App::startMemberSignIn(std::function<void(bool member)> onDone) {
     auto job = std::make_shared<MemberSignIn>();
     memberSignIn_ = job;
     memberStatus_.clear();
+    memberInvitesLink_ = false;
     if (!options_.uiTest.empty()) { // UI tests: the code screen, no network
         job->userCode = "TEST-CODE";
         job->expiresAt = unixNow() + 900;
@@ -523,67 +527,43 @@ void App::startMemberSignIn(std::function<void(bool member)> onDone) {
             MemberSignIn& j;
             ~Done() { j.done = true; }
         } done{*job};
-        ai::HttpResponse r = postGitHub(member::kDeviceCodeUrl, member::deviceCodeBody());
-        member::DeviceCode code;
-        if (r.status != 200 || !member::parseDeviceCode(r.body, unixNow(), code, job->error)) {
-            if (job->error.empty()) job->error = r.error.empty() ? "GitHub answered " + std::to_string(r.status) : r.error;
-            return;
-        }
-        {
+        member::SignInIo io;
+        io.post = [](const std::string& url, const std::string& body) {
+            const ai::HttpResponse r = postGitHub(url.c_str(), body);
+            return member::Reply{r.status, r.body, r.error};
+        };
+        io.get = [](const std::string& url, const std::string& token, size_t cap) {
+            const ai::HttpResponse r = memberGet(url, token, cap);
+            return member::Reply{r.status, r.body, r.error};
+        };
+        io.wait = [&job](int ms) { // (cancel is noticed within 100 ms)
+            for (int i = 0; i < ms / 100; ++i) {
+                if (job->cancel) return false;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+            return !job->cancel;
+        };
+        io.now = unixNow;
+        io.showCode = [&job](const member::DeviceCode& code) {
             std::lock_guard<std::mutex> lock(job->mutex);
             job->userCode = code.userCode;
             job->expiresAt = code.expiresAt;
-        }
-        int interval = code.interval;
-        member::Tokens tokens;
-        while (true) { // GitHub's pace: one poll per interval until the user has entered the code (or not)
-            for (int i = 0; i < interval * 10; ++i) {
-                if (job->cancel) return;
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-            if (unixNow() >= code.expiresAt) {
-                job->error = "the code ran out: sign in again";
-                return;
-            }
-            r = postGitHub(member::kTokenUrl, member::pollBody(code.deviceCode));
-            if (!r.error.empty()) continue; // (a dropped connection: the next poll)
-            const member::TokenReply reply = member::parseTokenReply(r.body, unixNow(), tokens, job->error);
-            if (reply == member::TokenReply::Ok) break;
-            if (reply == member::TokenReply::Pending) continue;
-            if (reply == member::TokenReply::SlowDown) {
-                interval += 5;
-                continue;
-            }
-            if (reply == member::TokenReply::Expired) job->error = "the code ran out: sign in again";
-            else if (reply == member::TokenReply::Denied) job->error = "the sign-in was declined on GitHub";
-            return;
-        }
-        // Signed in to GitHub; a member is one who can see the member repository's releases.
-        r = memberGet(member::kReleasesUrl, tokens.access, 4u << 20);
-        if (r.status != 200) {
-            job->error = r.status == 404 || r.status == 403
-                             ? "this GitHub account has no access to member builds (Member or Studio membership, "
-                               "with the invitation to the member repository accepted)"
-                             : r.error.empty() ? "GitHub answered " + std::to_string(r.status) : r.error;
-            return; // (the token is dropped)
-        }
-        r = memberGet(member::kUserUrl, tokens.access, 64u << 10);
-        if (r.status == 200) job->login = member::parseLogin(r.body);
-        job->saved = keychain::store(member::kKeychainAccount, member::tokensToSecret(tokens));
-        {
-            std::lock_guard<std::mutex> lock(auth->mutex);
-            auth->tokens = tokens;
-            auth->loaded = true;
-        }
-        job->ok = true;
+        };
+        job->outcome = member::runSignIn(io);
+        if (job->outcome.result != member::SignInResult::Member) return; // (the token is dropped)
+        job->saved = keychain::store(member::kKeychainAccount, member::tokensToSecret(job->outcome.tokens));
+        std::lock_guard<std::mutex> lock(auth->mutex);
+        auth->tokens = job->outcome.tokens;
+        auth->loaded = true;
     }).detach();
 }
 
-void App::finishMemberSignInForTest(bool ok) {
+void App::finishMemberSignInForTest(member::SignInResult result) {
     if (!memberSignIn_ || options_.uiTest.empty()) return;
-    memberSignIn_->ok = ok;
-    memberSignIn_->login = ok ? "test-member" : "";
-    memberSignIn_->error = ok ? "" : "this GitHub account has no access to member builds";
+    memberSignIn_->outcome.result = result;
+    if (result != member::SignInResult::Declined && result != member::SignInResult::Expired) memberSignIn_->outcome.login = "test-member";
+    memberSignIn_->outcome.error = "no network in UI tests";
+    memberSignIn_->saved = result == member::SignInResult::Member;
     memberSignIn_->done = true;
 }
 
@@ -593,6 +573,7 @@ void App::memberSignOut() {
     memberBuilds_ = memberSessionOnly_ = false;
     memberLogin_.clear();
     memberStatus_ = "Signed out.";
+    memberInvitesLink_ = false;
     saveProjectPrefs();
     const std::shared_ptr<MemberAuth> auth = memberAuth_;
     if (auth) {
@@ -627,7 +608,7 @@ void App::drawMemberSignInSteps() {
     }
     if (ImGui::Button(tr("Cancel##member.cancel"))) {
         memberSignIn_->cancel = true;
-        if (!options_.uiTest.empty()) memberSignIn_->done = true;
+        if (!options_.uiTest.empty()) memberSignIn_->outcome.result = member::SignInResult::Cancelled, memberSignIn_->done = true;
     }
 }
 
@@ -644,13 +625,15 @@ void App::drawMemberBuildsSection() {
     if (memberSignIn_) {
         drawMemberSignInSteps();
     } else if (signedIn) {
-        if (memberLogin_.empty()) ImGui::TextUnformatted(tr("Signed in with GitHub."));
-        else ImGui::Text(tr("Signed in as %s on GitHub."), memberLogin_.c_str());
+        if (memberLogin_.empty()) ImGui::TextWrapped("%s", tr("Signed in with GitHub: member builds on."));
+        else ImGui::TextWrapped(tr("Signed in as %s: member builds on."), memberLogin_.c_str());
         if (ImGui::Button(tr("Sign out##member.sign_out"))) memberSignOut();
     } else {
         if (ImGui::Button(tr("Sign in with GitHub##member.sign_in"))) startMemberSignIn();
     }
     if (!memberStatus_.empty()) ImGui::TextWrapped("%s", memberStatus_.c_str());
+    if (memberInvitesLink_ && !memberSignIn_ && ImGui::Button(tr("Open the invitations page##member.invites")))
+        sf::dialogs::openUrl(member::kInvitationsPage); // (always this page)
 }
 
 } // namespace sf
