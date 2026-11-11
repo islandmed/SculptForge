@@ -129,6 +129,9 @@ bool paint(int width, int height, const std::string& versionText, std::vector<ui
 
 bool Window::open(const std::string& versionText) {
     if (window_) return true;
+    // A software window surface: with the default SDL may back it with an accelerated renderer, i.e. its own OpenGL context
+    // made current on this thread, under the main window's (#192: the main shaders then compiled in the wrong context).
+    SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0");
     SDL_Window* w = SDL_CreateWindow("SculptForge", kLogicalWidth, kLogicalHeight,
                                      SDL_WINDOW_BORDERLESS | SDL_WINDOW_UTILITY | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN);
     if (!w) return false;

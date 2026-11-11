@@ -2481,6 +2481,7 @@ private:
     std::unique_ptr<splash::Window> splash_;
     bool splashEnabled_ = false, splashForced_ = false, splashShown_ = false, mainWindowHidden_ = false;
     std::chrono::steady_clock::time_point startedAt_, splashOpenedAt_;
+    void makeMainContextCurrent(bool force = false); // after any splash step
     void splashCheckpoint(); // between start-up steps and before the first frame
     void revealMainWindow(); // after the first frame
     void drawAxisGizmo();

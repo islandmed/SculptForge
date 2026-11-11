@@ -898,6 +898,10 @@ constexpr GLenum kRgb16f = 0x881B, kRg16f = 0x822F, kRg = 0x8227, kRepeat = 0x29
 
 GLuint compile(GLenum type, const char* src, std::string& error, const char* prefix = nullptr) {
     GLuint s = gl::CreateShader(type);
+    if (!s) { // (0 with no GL error to read: this thread has no current context, or the driver is out of objects)
+        error = "Shader compile error: no current OpenGL context (the graphics driver gave no shader object)";
+        return 0;
+    }
     const char* sources[2] = {prefix, src};
     if (prefix) gl::ShaderSource(s, 2, sources, nullptr);
     else gl::ShaderSource(s, 1, &src, nullptr);
@@ -905,9 +909,9 @@ GLuint compile(GLenum type, const char* src, std::string& error, const char* pre
     GLint ok = 0;
     gl::GetShaderiv(s, GL_COMPILE_STATUS, &ok);
     if (!ok) {
-        char log[2048];
-        gl::GetShaderInfoLog(s, sizeof log, nullptr, log);
-        error = std::string("Shader compile error: ") + log;
+        char log[2048] = {};
+        gl::GetShaderInfoLog(s, sizeof log - 1, nullptr, log);
+        error = std::string("Shader compile error: ") + (*log ? log : "(empty driver log)");
         gl::DeleteShader(s);
         return 0;
     }
@@ -965,9 +969,9 @@ GLuint linkNew(const char* vs, const char* fs, std::string& error, const char* f
     GLint ok = 0;
     gl::GetProgramiv(p, GL_LINK_STATUS, &ok);
     if (!ok) {
-        char log[2048];
-        gl::GetProgramInfoLog(p, sizeof log, nullptr, log);
-        error = std::string("Shader link error: ") + log;
+        char log[2048] = {};
+        gl::GetProgramInfoLog(p, sizeof log - 1, nullptr, log);
+        error = std::string("Shader link error: ") + (*log ? log : "(empty driver log)");
         gl::DeleteProgram(p);
         return 0;
     }

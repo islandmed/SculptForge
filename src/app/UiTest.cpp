@@ -1431,6 +1431,7 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "startup_splash_pref") return app_.uiPrefs_.startupSplash ? 1.0 : 0.0; // Preferences > Interface
     if (name == "startup_splash_enabled") return app_.splashEnabled_ ? 1.0 : 0.0;      // (never in a test: StartupSplash.h)
+    if (name == "gl_context_current") return app_.glContext_ && SDL_GL_GetCurrentContext() == app_.glContext_ && gl::GetString(GL_VERSION) ? 1.0 : 0.0;
     if (name == "startup_splash_open") return app_.splash_ ? 1.0 : 0.0;
     if (name == "main_window_hidden") return app_.mainWindowHidden_ ? 1.0 : 0.0;
     if (name == "backface_culling") return app_.renderSettings_.backfaceCulling ? 1.0 : 0.0;
