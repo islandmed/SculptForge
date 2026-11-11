@@ -1,6 +1,6 @@
 # Brush packs
 
-SculptForge comes with seventy ready-tuned brushes in seven packs, on top of the built-in brushes. Each one is a
+SculptForge comes with seventy-one ready-tuned brushes in seven packs, on top of the built-in brushes. Each one is a
 brush recipe (see [Brush Lab](brush-lab.md)) with its own alpha where it needs one, so you can use them as they are,
 or open one in Brush Lab and make your own version. Every brush, alpha and preview here is made by SculptForge itself:
 the recipe engine, procedural alphas and the same clay-ball thumbnails as the brush picker.
@@ -52,6 +52,7 @@ Crisp planes, panel lines, bevels, rivets and bolts for props, armour and machin
 |---|---|---|
 | **Panel Groove** | Cuts a clean, narrow groove for panel gaps and seams. |  |
 | **Flat Plane** | Presses a perfectly flat face with a hard edge, for machined surfaces. | Square |
+| **Crisp Flatten** | Flattens to the plane the stroke starts on with a clean, sharp edge, for hard planes and bevels. |  |
 | **Bevel Scrape** | Scrapes high points into a bevel along an edge, for chamfers. |  |
 | **Raised Plate** | Builds a flat, square-edged plate on the surface, for armour and hull panels. | Square |
 | **Rivet Row** | Stamps rows of round rivet heads along the stroke. | Rivets |
@@ -60,6 +61,15 @@ Crisp planes, panel lines, bevels, rivets and bolts for props, armour and machin
 | **Vent Slots** | Cuts parallel slots like a vent grille; drag across the slots. | Wrinkles |
 | **Grid Studs** | An even grid of small studs, for grip textures and tread plates. | Dot Grid |
 | **Hard Cut** | Cuts the surface flat below the stroke, for sharp silhouettes and clean cuts. | Square |
+
+**Crisp Flatten** (thanks _tfx on Discord) cuts hard-surface planes with a clean boundary instead of the soft
+fade of Flatten and Trim. The plane is taken where the stroke starts and held for the whole stroke, so you can drag
+across a curved form and leave one flat facet; start the next stroke on another side for the next facet, and where
+two meet you get a crisp bevel. It cuts everything above the plane and fills only shallow dips below it, so dragging
+over a rounded form never builds a wall of clay past the form. The edge is hard with a thin smoothed band (about two or three polygons), so it reads
+as a clean line at any resolution; subdivide or use [Dynamic topology](dynamic-topology.md) for a sharper one. It
+works with symmetry, masks and Dynamic topology. In Brush Lab, **Lock plane** off makes the plane follow the surface
+instead, and **Crisp edge** off gives the soft edge back.
 
 ## Organic & Skin
 

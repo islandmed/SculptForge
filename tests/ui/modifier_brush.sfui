@@ -1,0 +1,94 @@
+# The Shift and Ctrl brushes (Discord #ideas): Shift+click a brush on the bottom shelf and holding Shift sculpts
+# with it instead of Smooth; Ctrl+click one and holding Ctrl sculpts with it instead of masking. The main brush stays.
+# Shift+click Smooth, a mask brush picked with Ctrl held, or set_modifier_brush ... =default go back, and Smooth's
+# alternate smooth (#40) is as before.
+run new_sphere subdivisions=5
+snapshot
+expect_value shift_brush == -1
+expect_value ctrl_brush == -1
+click "Standard##brush.standard"
+expect_value main_brush == 0
+
+# Shift+click Trim: the Shift brush; the main brush stays Standard.
+hold shift
+click "Trim##brush.trim"
+hold none
+expect_value shift_brush == 11
+expect_value main_brush == 0
+expect_status Shift brush: Trim
+hold ctrl
+hover "Trim##brush.trim"
+expect_help Shift+click
+hold none
+
+# A stroke with Shift held trims, with the Shift brush's own Intensity; a plain stroke is still Standard.
+hold shift
+drag_path 0.4 0.4 0.5 0.4 keep
+expect_value stroking == 1
+expect_value stroke_brush == 11
+expect_value stroke_slot == 1
+drag_path 0.5 0.4 0.6 0.45 keep
+release
+hold none
+key ctrl+z
+drag_path 0.4 0.4 0.5 0.4 keep
+expect_value stroke_brush == 0
+expect_value stroke_slot == 0
+release
+expect_value moved > 0
+key ctrl+z
+
+# Ctrl+click Flatten: the Ctrl brush. Ctrl+drag on the model flattens instead of masking.
+hold ctrl
+click "Flatten##brush.flatten"
+hold none
+expect_value ctrl_brush == 6
+expect_value shift_brush == 11
+expect_value main_brush == 0
+expect_status Ctrl brush: Flatten
+shot badges
+ui_scale 200
+wait 0.3
+shot badges-200
+ui_scale 100
+wait 0.3
+hold ctrl
+drag_path 0.4 0.4 0.5 0.4 keep
+expect_value stroke_brush == 6
+expect_value stroke_slot == 2
+drag_path 0.5 0.4 0.6 0.45 keep
+release
+hold none
+expect_value masked == 0
+key ctrl+z
+
+# Scriptable: set_modifier_brush.
+run set_modifier_brush shift=clay
+expect_value shift_brush == 1
+expect_status Shift brush: Clay
+
+# Shift+click Smooth: Shift smooths again, with the classic alternate smooth (#40).
+hold shift
+click "Smooth##brush.smooth"
+hold none
+expect_value shift_brush == -1
+expect_value main_brush == 0
+hold shift
+drag_path 0.3 0.35 0.35 0.35 keep
+expect_value stroke_brush == 2
+expect_value stroke_slot == 0
+expect_value stroke_keep_volume == 0
+hold none
+drag_path 0.35 0.35 0.7 0.35 0.7 0.65 keep
+expect_value stroke_keep_volume == 1
+expect_status keeping volume
+release
+key ctrl+z
+
+# Ctrl back to the mask: Ctrl+drag masks again.
+run set_modifier_brush ctrl=default
+expect_value ctrl_brush == -1
+hold ctrl
+drag_path 0.4 0.4 0.5 0.4 0.6 0.45
+hold none
+expect_value masked > 0

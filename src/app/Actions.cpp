@@ -202,6 +202,52 @@ std::vector<std::string> chordKeys(std::string_view chord) {
     return keys;
 }
 
+bool parseSequence(std::string_view text, KeySequence& out) {
+    out = KeySequence{};
+    const size_t at = text.find(kThen);
+    if (at == std::string_view::npos) return false;
+    if (!parseChord(text.substr(0, at), out.first) || !parseChord(text.substr(at + kThen.size()), out.second)) return false;
+    return out.first.key != out.second.key; // two different keys: no double tap
+}
+
+std::string sequenceText(const KeySequence& s) { return chordText(s.first) + std::string(kThen) + chordText(s.second); }
+
+std::vector<std::string> shortcutSteps(std::string_view alternative) {
+    const size_t at = alternative.find(kThen);
+    if (at == std::string_view::npos) return {std::string(alternative)};
+    return {std::string(alternative.substr(0, at)), std::string(alternative.substr(at + kThen.size()))};
+}
+
+std::string canonicalShortcut(std::string_view alternative) {
+    KeySequence seq;
+    if (parseSequence(alternative, seq)) return sequenceText(seq);
+    Chord c;
+    return parseChord(alternative, c) ? chordText(c) : std::string();
+}
+
+std::vector<std::string> shortcutAlternatives(std::string_view text) {
+    std::vector<std::string> out;
+    size_t start = 0;
+    while (start <= text.size()) {
+        const size_t at = text.find(" / ", start);
+        const std::string c = canonicalShortcut(text.substr(start, at == std::string_view::npos ? std::string_view::npos : at - start));
+        if (!c.empty()) out.push_back(c);
+        if (at == std::string_view::npos) break;
+        start = at + 3;
+    }
+    return out;
+}
+
+namespace {
+
+std::string joinShortcuts(const std::vector<std::string>& alternatives) {
+    std::string out;
+    for (const std::string& a : alternatives) out += (out.empty() ? "" : " / ") + a;
+    return out;
+}
+
+} // namespace
+
 void ActionRegistry::add(Action a) {
     ++revision_;
     for (const auto& [id, chord] : styleDefaults_)
@@ -226,13 +272,40 @@ const Action* ActionRegistry::find(std::string_view id) const {
     return nullptr;
 }
 
-const std::vector<Chord>& ActionRegistry::chordsOf(size_t index) const {
-    if (chordsRevision_ != revision_ || chords_.size() != actions_.size()) {
-        chords_.clear();
-        for (const auto& a : actions_) chords_.push_back(parseChords(shortcutText(a.id)));
-        chordsRevision_ = revision_;
+void ActionRegistry::rebuildChords() const {
+    if (chordsRevision_ == revision_ && chords_.size() == actions_.size()) return;
+    chords_.clear();
+    sequences_.clear();
+    for (const auto& a : actions_) {
+        const std::string text = shortcutText(a.id);
+        chords_.push_back(parseChords(text));
+        std::vector<KeySequence> seqs;
+        for (const std::string& alt : shortcutAlternatives(text))
+            if (KeySequence seq; parseSequence(alt, seq)) seqs.push_back(seq);
+        sequences_.push_back(std::move(seqs));
     }
+    chordsRevision_ = revision_;
+}
+
+const std::vector<Chord>& ActionRegistry::chordsOf(size_t index) const {
+    rebuildChords();
     return chords_[index];
+}
+
+const Action* ActionRegistry::actionForSequence(const KeySequence& sequence) const {
+    rebuildChords();
+    for (size_t i = 0; i < actions_.size(); ++i)
+        for (const KeySequence& s : sequences_[i])
+            if (s == sequence) return &actions_[i];
+    return nullptr;
+}
+
+bool ActionRegistry::isSequenceStart(const Chord& chord) const {
+    rebuildChords();
+    for (const auto& seqs : sequences_)
+        for (const KeySequence& s : seqs)
+            if (s.first == chord) return true;
+    return false;
 }
 
 const Action* ActionRegistry::actionForChord(const Chord& chord) const {
@@ -275,14 +348,47 @@ bool keyNavMotion(const Action* a, float& panX, float& panY, float& zoomSteps) {
     return true;
 }
 
-bool ActionRegistry::handleKey(SDL_Keycode key, SDL_Keymod mods) {
-    const Action* a = actionForKey(key, mods);
+bool ActionRegistry::runAction(const Action* a) {
     if (!a || !a->run) return false;
     if (a->enabled && !a->enabled()) return true; // bound, just not available right now
     // Copy: running an action may register or replace actions.
     const std::function<void()> run = a->run;
     run();
     return true;
+}
+
+void ActionRegistry::flushPending() {
+    if (!pending_.on) return;
+    const std::string id = pending_.aloneId;
+    pending_ = {};
+    if (!id.empty()) runAction(find(id));
+}
+
+void ActionRegistry::tick(float dt) {
+    clock_ += double(dt);
+    if (pending_.on && clock_ >= pending_.until) flushPending();
+}
+
+bool ActionRegistry::handleKey(SDL_Keycode key, SDL_Keymod mods) {
+    if (isModifierKey(key)) return false; // Shift or Ctrl pressed on the way to the second key changes nothing
+    const Chord chord = chordFromEvent(key, mods);
+    if (pending_.on) {
+        const Chord first = pending_.first;
+        const bool inTime = clock_ < pending_.until;
+        if (inTime)
+            if (const Action* seq = actionForSequence({first, chord})) {
+                pending_ = {}; // the sequence replaces the first key's own action
+                runAction(seq);
+                return true;
+            }
+        flushPending(); // not the second key (or too late): the first key alone, then this key as usual
+    }
+    if (isSequenceStart(chord)) {
+        const Action* alone = actionForKey(key, mods);
+        pending_ = {true, chord, clock_ + double(kKeySequenceSeconds), alone && alone->run ? alone->id : std::string()};
+        return true;
+    }
+    return runAction(actionForKey(key, mods));
 }
 
 void ActionRegistry::setDefaultShortcut(std::string_view id, std::string chord) {
@@ -317,28 +423,27 @@ void ActionRegistry::setShortcut(std::string_view id, std::string chord) {
     if (!isDefault) overrides_.emplace_back(std::string(id), std::move(chord));
 }
 
-std::string ActionRegistry::assignShortcut(std::string_view id, const std::string& chordString, bool keepOthers) {
-    Chord chord;
-    if (!parseChord(chordString, chord)) {
+std::string ActionRegistry::assignShortcut(std::string_view id, const std::string& shortcut, bool keepOthers) {
+    const std::string mine = canonicalShortcut(shortcut);
+    if (mine.empty()) {
         if (!keepOthers) setShortcut(id, "");
         return {};
     }
     std::string lost;
     for (const auto& other : actions_) {
         if (other.id == id) continue;
-        const std::vector<Chord> theirs = parseChords(shortcutText(other.id));
-        if (std::find(theirs.begin(), theirs.end(), chord) == theirs.end()) continue;
-        std::string keep;
-        for (const Chord& c : theirs)
-            if (!(c == chord)) keep += (keep.empty() ? "" : " / ") + chordText(c);
+        std::vector<std::string> theirs = shortcutAlternatives(shortcutText(other.id));
+        const size_t before = theirs.size();
+        theirs.erase(std::remove(theirs.begin(), theirs.end(), mine), theirs.end());
+        if (theirs.size() == before) continue;
         lost = other.label;
-        setShortcut(other.id, keep);
+        setShortcut(other.id, joinShortcuts(theirs));
     }
-    std::string mine = chordText(chord);
+    std::vector<std::string> kept{mine};
     if (keepOthers)
-        for (const Chord& c : parseChords(shortcutText(id)))
-            if (!(c == chord)) mine += " / " + chordText(c);
-    setShortcut(id, mine);
+        for (const std::string& a : shortcutAlternatives(shortcutText(id)))
+            if (a != mine) kept.push_back(a);
+    setShortcut(id, joinShortcuts(kept));
     return lost;
 }
 
@@ -349,11 +454,17 @@ bool ActionRegistry::hasOverride(std::string_view id) const {
 }
 
 std::vector<const Action*> ActionRegistry::holdersOf(const Chord& chord, std::string_view exceptId) const {
+    return holdersOfShortcut(chordText(chord), exceptId);
+}
+
+std::vector<const Action*> ActionRegistry::holdersOfShortcut(std::string_view alternative, std::string_view exceptId) const {
     std::vector<const Action*> out;
+    const std::string want = canonicalShortcut(alternative);
+    if (want.empty()) return out;
     for (const auto& other : actions_) {
         if (other.id == exceptId || !other.run) continue;
-        const std::vector<Chord> theirs = parseChords(shortcutText(other.id));
-        if (std::find(theirs.begin(), theirs.end(), chord) != theirs.end()) out.push_back(&other);
+        const std::vector<std::string> theirs = shortcutAlternatives(shortcutText(other.id));
+        if (std::find(theirs.begin(), theirs.end(), want) != theirs.end()) out.push_back(&other);
     }
     return out;
 }
@@ -362,13 +473,12 @@ std::string ActionRegistry::resetShortcut(std::string_view id) {
     const Action* a = find(id);
     if (!a) return {};
     std::string lost;
-    for (const Chord& c : parseChords(a->shortcut))
-        for (const Action* other : holdersOf(c, a->id)) {
-            std::string keep;
-            for (const Chord& t : parseChords(shortcutText(other->id)))
-                if (!(t == c)) keep += (keep.empty() ? "" : " / ") + chordText(t);
+    for (const std::string& alt : shortcutAlternatives(a->shortcut))
+        for (const Action* other : holdersOfShortcut(alt, a->id)) {
+            std::vector<std::string> keep = shortcutAlternatives(shortcutText(other->id));
+            keep.erase(std::remove(keep.begin(), keep.end(), alt), keep.end());
             lost += (lost.empty() ? "" : ", ") + other->label;
-            setShortcut(other->id, keep);
+            setShortcut(other->id, joinShortcuts(keep));
         }
     for (auto it = overrides_.begin(); it != overrides_.end(); ++it)
         if (it->first == a->id) {

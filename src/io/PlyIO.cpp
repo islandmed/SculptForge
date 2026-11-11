@@ -339,7 +339,7 @@ bool loadPly(const std::string& path, Mesh& mesh, SplatCloud& splats, PlyContent
     return true;
 }
 
-bool saveSplatPly(const std::string& path, const SplatCloud& input, std::string& error) {
+bool saveSplatPly(const std::string& path, const SplatCloud& input, std::string& error, bool bakePlacement) {
     if (input.empty()) {
         error = "There are no splats to save";
         return false;
@@ -349,7 +349,7 @@ bool saveSplatPly(const std::string& path, const SplatCloud& input, std::string&
         return false;
     }
     SplatCloud cloud = input;
-    cloud.bakeTransform();
+    if (bakePlacement) cloud.bakeTransform();
     const int perChannel = cloud.shCount() - 1;
 
     std::ostringstream h;

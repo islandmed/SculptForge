@@ -66,6 +66,7 @@ void App::beginMaskStroke(float x, float y) {
     strokeSculpt_ = true;
     paintSnapshot_.reset();
     strokeBrush_ = BrushType::Standard;
+    strokeSlot_ = ModifierSlot::None;
     haveLastDab_ = false;
     drag_ = Drag::Stroke;
     lastX_ = x;
@@ -194,6 +195,8 @@ bool App::drawHeldBrushGrid(HeldBrush held, bool strokes) {
             actions_.touch(a->id);
             a->run();
             status_ = std::string("Brush: ") + it.brush;
+            if (held == HeldBrush::Mask && uiPrefs_.modifierBrushes.bound(ModifierSlot::Ctrl))
+                setModifierBrush(ModifierSlot::Ctrl, -1); // a mask brush picked with Ctrl held: Ctrl masks again
             picked = true;
         }
         const std::string help = strokes ? std::string("Stroke of ") + it.brush + ". " + (a ? a->description : "")

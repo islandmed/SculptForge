@@ -14,6 +14,20 @@ your saved style is kept.
 Every key below can be reassigned: hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and click a button, then press the new
 key, or use **Edit > Preferences > Hotkeys**. Your changes save themselves. See [Customizing the interface](interface.md#customizing-the-interface).
 
+### Two keys in a row
+
+An action can also take two different keys one after the other, like <kbd>A</kbd> then <kbd>S</kbd>, which
+gives you many more keys to bind. In **Edit > Preferences > Hotkeys** click the small **>>** button at the right of
+the action's key, then press the first key and the second. The sequence is added to the action's other keys, and a
+sequence another action already uses asks first (Replace / Cancel), like any key. <kbd>Backspace</kbd> in that box
+removes the action's two-key shortcuts and leaves its single keys.
+
+- The second key must come within half a second of the first.
+- It has to be a different key: the same key twice is not a sequence.
+- If the first key is bound on its own, it still works: it waits that half second, and runs by itself when no second
+  key follows. A first key with no shortcut of its own does nothing alone.
+- Either key can carry <kbd>Ctrl</kbd>, <kbd>Shift</kbd> or <kbd>Alt</kbd>.
+
 On macOS, <kbd>Cmd</kbd> works wherever a shortcut says <kbd>Ctrl</kbd>, and <kbd>Option</kbd> wherever it says
 <kbd>Alt</kbd>. Single-letter shortcuts don't fire while you type in a text field.
 
@@ -73,6 +87,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 
 | Action | Keys | What it does |
 |---|---|---|
+| My Panel | <kbd>F4</kbd> | Your own panel, floating at the cursor: the buttons and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own. |
 | Redo | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> or <kbd>Ctrl</kbd>+<kbd>Y</kbd> | Redo the last undone action. |
 | Undo | <kbd>Ctrl</kbd>+<kbd>Z</kbd> | Undo the last action. |
 
@@ -336,6 +351,9 @@ long as <kbd>Alt</kbd> is the only key held:
 
 The roll needs <kbd>Alt</kbd> first: press <kbd>Ctrl</kbd> first (or both together) and <kbd>Ctrl</kbd>+<kbd>Alt</kbd>
 masks as before, on the model, and clears the mask beside it.
+
+**Edit > Preferences > Input > Orbit around the pointer** (on for new installs, every style) turns the view about the point
+of the model under the pointer when a rotation starts over it; over the background, about the middle of the view.
 
 **Edit > Preferences > Input > Wheel zooms toward the pointer** (#134) keeps the point of the model under the pointer
 where it is while the wheel zooms; beside the model it zooms toward the pointer at the model's depth. Choosing the Maya

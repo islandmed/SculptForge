@@ -26,6 +26,7 @@
 //   stroke U0 V0 U1 V1 [S]   brush stroke across the model (fractions of its on-screen bounds)
 //   view_drag X0 Y0 X1 Y1 [S]  left-drag in the viewport at window fractions, gliding there first like stroke (same
 //                            point twice = a click)
+//   drag_frames X0 Y0 X1 Y1 N NAME  left-drag at window fractions in N steps, a shot NAME-0..NAME-N along the way
 //   drag X0 Y0 X1 Y1 [S] [release]  left-drag in window fractions (rectangle hide, sliders...); release:
 //                            let go of the held modifiers halfway (Alt-drag, release Alt to zoom)
 //   drag_item LABEL DX DY [S] [keep] left-drag from the item by DX DY pixels (scrubbing, dragging a tile out);
@@ -114,6 +115,8 @@
 //                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
 //                            linked_parts (Parts sharing the active one's mesh, #94; 1 = none), part_moved, part_x (its
 //                            centre's x in the scene),
+//                            boolean_preview (triangles of the Boolean result the view shows in place of its Parts, 0
+//                            none), boolean_parts (shown Parts with a Boolean),
 //                            extract_preview (1 while an Extract preview waits for Accept), open_edges (edges of
 //                            the active Part with one triangle: 0 = watertight), solid_volume (the active Part's
 //                            volume with its open borders capped),
@@ -149,6 +152,10 @@
 //                            moved_out (summed movement along the snapshot's normals: > 0 out, < 0 in),
 //                            moved_off_stencil (moved vertices that showed off the Stencil's image), stencil_active,
 //                            stencil_adjust, stencil_tile, stencil_x / stencil_y / stencil_size (x1000), stencil_angle (degrees),
+//                            reference_count, reference_selected, reference_adjust, reference_gpu_kb, reference_x /
+//                            reference_y / reference_height / reference_stretch / reference_origin_x..z (x1000, the
+//                            selected one), reference_scene, reference_has_image, reference_facing (x1000),
+//                            reference_render_r (a 64 px render's mean red: what renders show),
 //                            pen_pressure (raw), brush_pressure (after the curve; 1 for the mouse),
 //                            stroke_sample_pressure (the last stroke sample's, as its dabs got it),
 //                            pen_lost_samples (pressure samples that lost their value), pen_axes_after_motion,
@@ -230,7 +237,8 @@
 //                            phone_captures (captures received), phone_face_frames, phone_face_fps, phone_recording,
 //                            phone_take_frames, phone_ar_version (AR models published), phone_ar_busy
 //                            brush_sort / alpha_sort / material_sort / library_sort (0 A-Z, 1 Recent, 2 Pack),
-//                            builtin_pack_brushes (built-in brush-pack brushes loaded), alpha_index (0 Round, -1 an image)
+//                            builtin_pack_brushes (built-in brush-pack brushes loaded), alpha_index (0 Round, -1 an image),
+//                            alpha_pool_size, alpha_scale_jitter, alpha_position_jitter (the alpha pool and jitter, Alpha palette)
 //   (mesh values are the active Part's)
 //   snapshot                 remember the active mesh's vertices (for the moved* values)
 //   remember VALUE NAME      keep VALUE's current value as $NAME
@@ -599,6 +607,13 @@ void Demo::detachVirtualSpaceMouse() {
 double Demo::query(const std::string& name, bool& known) const {
     const Mesh& m = app_.doc_.mesh;
     known = true;
+    if (name == "mypanel_entries") return double(app_.layout_.myPanel.size()); // My Panel (PanelMyPanel.cpp)
+    if (name == "mypanel_floating") return app_.myPanelFloating_ ? 1.0 : 0.0;
+    if (name.rfind("mypanel_at@", 0) == 0) { // mypanel_at@action:geometry.subdivide: its place in My Panel (0 first), -1 not in it
+        const auto& list = app_.layout_.myPanel;
+        const auto it = std::find(list.begin(), list.end(), name.substr(11));
+        return it == list.end() ? -1.0 : double(it - list.begin());
+    }
     if (name.rfind("checked@", 0) == 0) { // checked@ACTION: 1 when that toggle shows on (lit), 0 off, -1 no such action
         const Action* a = app_.actions_.find(name.substr(8));
         return !a ? -1.0 : a->checked && a->checked() ? 1.0 : 0.0;
@@ -731,6 +746,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "tube_profile") return double(int(m.tube.profile)); // 0 round, 1 square, 2 triangle, 3 ribbon, 4 rope, 5 braid, 6 sleeve
     if (name == "tube_curve") return m.tube.curve ? 1.0 : 0.0; // the active Part is a Curve Part
     if (name == "tube_twist") return double(m.tube.twist);
+    if (name == "tube_strands") return double(m.tube.strands);
     if (name == "tube_taper_end") return double(m.tube.taperEnd);
     if (name == "tube_parts") {
         int n = 0;
@@ -760,6 +776,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "maya_link_connected") return app_.mayaLink_ && app_.mayaLink_->connected() ? 1.0 : 0.0;
     if (name == "maya_link_streams") return double(app_.mayaLinkStreams_);
     if (name == "wheel_to_pointer") return app_.uiPrefs_.wheelZoomToPointer ? 1.0 : 0.0;
+    if (name == "orbit_at_pointer") return app_.uiPrefs_.orbitAtPointer ? 1.0 : 0.0;
     if (name == "along_normal") return double(app_.uiPrefs_.alongNormal);
     if (name == "stroke_along_normal") return app_.strokeAlongNormal_ ? 1.0 : 0.0;
     if (name.rfind("forgesphere_x", 0) == 0 || name.rfind("forgesphere_r", 0) == 0) { // forgesphere_x2, forgesphere_r2: sphere 2's x / radius
@@ -788,6 +805,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "smooth_group_borders") return app_.smoothGroupBorders_ ? 1.0 : 0.0;
     if (name == "stroke_keep_volume") return app_.dabSettings().smoothKeepVolume ? 1.0 : 0.0; // (Smooth's dabs)
     if (name == "smooth_intensity") return std::round(app_.smoothStrength_ * 100.0f);
+    // the Shift / Ctrl brushes (ModifierBrush.cpp): BrushType numbers, -1 the default; the stroke's brush and slot
+    if (name == "shift_brush") return double(app_.uiPrefs_.modifierBrushes.shift);
+    if (name == "ctrl_brush") return double(app_.uiPrefs_.modifierBrushes.ctrl);
+    if (name == "shift_intensity") return std::round(app_.uiPrefs_.modifierBrushes.shiftIntensity * 100.0f);
+    if (name == "stroke_brush") return double(int(app_.strokeBrush_));
+    if (name == "stroke_slot") return double(int(app_.strokeSlot_));
+    if (name == "main_brush") return double(int(app_.brush_));
     if (name == "rgb_intensity") return std::round(app_.rgbIntensity_ * 100.0f);
     if (name == "focal_shift") return std::round(app_.focalShift_ * 100.0f);
     if (name == "draw_size") return std::round(app_.radiusPx_);
@@ -828,6 +852,9 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "alpha_tile_x") return double(app_.doc_.brushAlpha.tileX);
     if (name == "alpha_tile_y") return double(app_.doc_.brushAlpha.tileY);
+    if (name == "alpha_pool_size") return app_.alphaPool_ ? double(app_.alphaPool_->size()) : 0.0;
+    if (name == "alpha_scale_jitter") return double(app_.alphaOptions_.scaleJitter);
+    if (name == "alpha_position_jitter") return double(app_.alphaOptions_.positionJitter);
     if (name == "last_dab_angle") { // degrees, -180..180: the alpha's turn on the last dab
         const float d = std::remainder(glm::degrees(app_.lastDabAngle_), 360.0f);
         return std::round(d);
@@ -908,6 +935,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "stroke_continuous") return app_.strokeContinuous_ ? 1.0 : 0.0; // Continuous (#31)
     if (name == "vdms") return double(app_.doc_.vdms.size());
     if (double gv = 0.0; app_.gradientUiValue(name, gv)) return gv; // gradient_armed, gradient_placed (LineGradient.cpp)
+    if (double rv = 0.0; app_.referenceUiValue(name, rv)) return rv; // reference_count, reference_x x1000, ... (ReferenceImages.cpp)
     if (double sv = 0.0; app_.stencilUiValue(name, sv)) return sv; // stencil_active, stencil_x / y / size x1000 (StencilOverlay.cpp)
     if (double cv = 0.0; app_.clothUiValue(name, cv)) return cv; // cloth_* (PanelCloth.cpp)
     if (double kv = 0.0; app_.kelvinUiValue(name, kv)) return kv; // capture_*, kelvin_* (PanelKelvinlet.cpp)
@@ -1044,6 +1072,22 @@ double Demo::query(const std::string& name, bool& known) const {
         const std::string p = app_.uiConfigPath();
         return !p.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
     }
+    if (name == "ui_prev_file") { // ui.json's copy from before this session's first write (Config.cpp writeJsonAtomic)
+        std::error_code ec;
+        const std::string p = app_.configDir_ + "ui.prev.json";
+        return !app_.configDir_.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
+    }
+    if (name == "ui_prev_file") { // ui.json's copy from before this session's first write (Config.cpp backUpUiConfigOnce)
+        std::error_code ec;
+        const std::string p = app_.configDir_ + "ui.prev.json";
+        return !app_.configDir_.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
+    }
+    if (name == "ui_prev2_file") { // the copy before ui.prev.json (Config.cpp backUpUiConfigOnce)
+        std::error_code ec;
+        const std::string p = app_.configDir_ + "ui.prev2.json";
+        return !app_.configDir_.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
+    }
+    if (name == "layout_autosaved") return app_.layoutKey() == app_.layoutSavedKey_ ? 1.0 : 0.0; // ui.json holds the layout in use
     if (name == "autosave_file" || name == "autosave_prev_file") { // the project autosave in the settings folder (PanelProject.cpp)
         std::error_code ec;
         const std::string p = app_.prefDir_ + (name == "autosave_file" ? "autosave.sfproj" : "autosave.prev.sfproj");
@@ -1129,6 +1173,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "guide_hits") return double(app_.guide_.searchHits());
     const Document& doc = app_.doc_;
     if (name == "parts") return double(doc.partCount());
+    if (name == "social_requests") return double(app_.socialRequests_); // Welcome icon row clicks
+    if (name == "last_social") return double(app_.lastSocial_);
     if (name == "discord_requests") return double(app_.discordRequests_); // Join the community on Discord clicks
     if (name == "support_requests") return double(app_.supportPageRequests_); // Support SculptForge clicks
     if (name == "ai_enabled") return ai::aiEnabled() ? 1.0 : 0.0; // Preferences > AI (PanelAi.cpp)
@@ -1187,6 +1233,11 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "active_part") return double(doc.activePart);
     if (name == "extract_preview") return doc.extractPreviewCurrent() ? 1.0 : 0.0;
+    if (name == "boolean_preview") {
+        const Mesh* r = app_.booleanPreviewMesh();
+        return r ? double(r->triangleCount()) : 0.0;
+    }
+    if (name == "boolean_parts") return double(booleanPartIndices(doc).size());
     if (name == "open_edges") {
         std::map<std::pair<uint32_t, uint32_t>, int> edges;
         for (const auto& t : m.triangles)
@@ -1385,6 +1436,7 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "startup_splash_pref") return app_.uiPrefs_.startupSplash ? 1.0 : 0.0; // Preferences > Interface
     if (name == "startup_splash_enabled") return app_.splashEnabled_ ? 1.0 : 0.0;      // (never in a test: StartupSplash.h)
+    if (name == "gl_context_current") return app_.glContext_ && SDL_GL_GetCurrentContext() == app_.glContext_ && gl::GetString(GL_VERSION) ? 1.0 : 0.0;
     if (name == "startup_splash_open") return app_.splash_ ? 1.0 : 0.0;
     if (name == "main_window_hidden") return app_.mainWindowHidden_ ? 1.0 : 0.0;
     if (name == "backface_culling") return app_.renderSettings_.backfaceCulling ? 1.0 : 0.0;
@@ -1801,6 +1853,37 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return ImVec2((x0 + (x1 - x0) * u) * float(ww), (y0 + (y1 - y0) * u) * float(wh));
         }, seconds);
         run([this] { SDL_SetModState(held_); });
+        wait(0.1f);
+    } else if (verb == "drag_frames") {
+        // drag_frames x0 y0 x1 y1 N NAME: a left drag at window fractions in N even steps, a screenshot NAME-0 (pressed,
+        // not moved yet) to NAME-N after each step; the button goes up after the last. For a drag's frames as reviewers see them.
+        if (!need(6)) return false;
+        const float x0 = num(1, 0), y0 = num(2, 0), x1 = num(3, 0), y1 = num(4, 0);
+        const int n = std::clamp(int(num(5, 6)), 1, 30);
+        const std::string name = w[6];
+        auto at = [this](float x, float y) {
+            int ww = 0, wh = 0;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            return ImVec2(x * float(ww), y * float(wh));
+        };
+        auto shoot = [this](const std::string& file) {
+            steps_.push_back([this, file](float t) {
+                if (t == 0.0f) return false; // a settled frame
+                if (!shotDir_.empty()) shotRequest_ = shotDir_ + "/" + file + ".png";
+                return true;
+            });
+            wait(0.05f);
+        };
+        run([this, at, x0, y0] { const ImVec2 p = at(x0, y0); mouseMotion(p.x, p.y); });
+        wait(0.1f);
+        run([this] { SDL_SetModState(held_); mouseButton(true, SDL_BUTTON_LEFT); });
+        shoot(name + "-0");
+        for (int k = 1; k <= n; ++k) {
+            const float u = float(k) / float(n);
+            run([this, at, x = x0 + (x1 - x0) * u, y = y0 + (y1 - y0) * u] { const ImVec2 p = at(x, y); mouseMotion(p.x, p.y); });
+            shoot(name + "-" + std::to_string(k));
+        }
+        run([this] { mouseButton(false, SDL_BUTTON_LEFT); SDL_SetModState(held_); });
         wait(0.1f);
     } else if (verb == "axis_click") {
         // axis_click +x|-x|+y|-y|+z|-z: click that end of the axis gizmo (Draw > Camera > Axes, #43)
@@ -2259,6 +2342,38 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             mouseMotion(from->x + dx * u, from->y + dy * u);
             if (t >= seconds) {
                 if (!keep) mouseButton(false, SDL_BUTTON_LEFT);
+                return true;
+            }
+            return false;
+        });
+        wait(0.1f);
+    } else if (verb == "drag_to") {
+        // drag_to "from" "to" [dx dy] [seconds]: press on one item, glide to the middle of another (plus an offset) and
+        // let go: a drag and drop between two panels (My Panel).
+        if (!need(2)) return false;
+        const std::string from = w[1], to = w[2];
+        const float dx = num(3, 0), dy = num(4, 0), seconds = num(5, 0.5f);
+        auto a = std::make_shared<ImVec2>(), b = std::make_shared<ImVec2>();
+        steps_.push_back([this, line, from, a](float t) {
+            if (findItem(from, *a)) {
+                mouseMotion(a->x, a->y);
+                return true;
+            }
+            if (t > 3.0f) fail(line, notFound(from));
+            return t > 3.0f;
+        });
+        steps_.push_back([this, line, to, b](float t) {
+            if (findItem(to, *b)) return true;
+            if (t > 3.0f) fail(line, notFound(to));
+            return t > 3.0f;
+        });
+        steps_.push_back([this, a, b, dx, dy, seconds](float t) {
+            if (t == 0.0f) return false;
+            if (!buttonDown_) mouseButton(true, SDL_BUTTON_LEFT);
+            const float u = std::min(t / seconds, 1.0f);
+            mouseMotion(a->x + (b->x + dx - a->x) * u, a->y + (b->y + dy - a->y) * u);
+            if (t >= seconds + 0.1f) {
+                mouseButton(false, SDL_BUTTON_LEFT);
                 return true;
             }
             return false;
@@ -3920,9 +4035,9 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
             }
             static const std::set<std::string> allowed = {
                 "click", "double_click", "right_click", "hover", "hover_model", "hover_window", "type", "key", "key_down",
-                "key_up", "hold", "stroke", "view_drag", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
+                "key_up", "hold", "stroke", "view_drag", "drag_frames", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
                 "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
-                "drag_item", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "look",
+                "drag_item", "drag_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "look",
                 "run", "key_nav_speed", "wait", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
                 "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move",
                 "touch_stroke", "touch_pinch", "classic_keys", "input_style"};

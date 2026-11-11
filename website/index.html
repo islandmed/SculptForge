@@ -19,12 +19,12 @@
   <meta property="og:url" content="https://sculptforge.app/">
   <link rel="canonical" href="https://sculptforge.app/">
   <script type="application/ld+json">
-  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.12.6", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=5", "sameAs": ["https://github.com/islandmed/SculptForge"]}
+  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.12.8", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=5", "sameAs": ["https://github.com/islandmed/SculptForge"]}
   </script>
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://sculptforge.app/img/social-preview.png?v=5">
   <script>document.documentElement.classList.add("js")</script>
-  <link rel="stylesheet" href="style.css?v=36">
+  <link rel="stylesheet" href="style.css?v=39">
   <script src="motion.js?v=15" defer></script>
   <script src="testimonials.js?v=2" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
@@ -51,10 +51,24 @@
   </header>
 
   <main id="top">
+    <!-- news-hero:start (build_site.py rewrites this bar and the hero line below from the newest What's New version each release; a hand-edited one for the same version is kept) -->
+    <aside class="news-bar" data-version="0.12.8" aria-label="Latest release">
+      <div class="wrap news-bar-inner">
+        <a class="news-bar-link" href="guide/whats-new.html#version-0128"><span class="news-pill">New</span><span class="news-bar-text">Reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts</span><span class="news-bar-go" aria-hidden="true">&rarr;</span></a>
+        <button class="news-bar-x" type="button" aria-label="Dismiss this announcement">&times;</button>
+      </div>
+    </aside>
+    <script>(function(){var b=document.querySelector(".news-bar");if(!b)return;try{if(localStorage.getItem("sf-news-x")===b.dataset.version)b.hidden=true}catch(e){}
+b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage.setItem("sf-news-x",b.dataset.version)}catch(e){}}})()</script>
+    <!-- news-hero:end -->
+
     <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
           <p class="eyebrow">The free, open-source sculpting app</p>
+          <!-- hero-news:start -->
+          <p class="hero-news" data-version="0.12.8"><a href="guide/whats-new.html#version-0128"><strong>New in 0.12.8:</strong> reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts.</a></p>
+          <!-- hero-news:end -->
           <h1>Change how software is built.</h1>
           <p class="lede">We build the orchestration layer, and our agents build the software, openly, with the artists
             who use it. New versions every few days, bug fixes sooner.</p>
@@ -244,7 +258,7 @@
         <div class="grid">
           <article class="card">
             <h3>Sculpt the way you already do</h3>
-            <p>Twenty built-in brushes including Clay Block, Sharp Crease, Tendril, Trim and Move, plus seventy
+            <p>Twenty built-in brushes including Clay Block, Sharp Crease, Tendril, Trim and Move, plus seventy-one
               ready-tuned brushes in seven packs, with alphas, Lazy Stroke, symmetry, tablet pressure, classic, Blender and Maya-style navigation, subdivision and voxel remesh.</p>
           </article>
           <article class="card">
@@ -450,14 +464,14 @@ rez-env sculptforge -- sculptforge troll.usda \
       <div class="wrap">
         <h2>What's new in 0.12</h2>
         <!-- whats-new:start (tools/guide/build_site.py writes this from docs/guide/whats-new.md: edit that) -->
-        <p class="section-lede">New in 0.12.6: Pan and zoom keys work again, layouts revert safely, and garments drape on a body. <a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
+        <p class="section-lede">New in 0.12.8: Reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts. <a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
         <div class="wn-home">
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-0128"><div class="wn-card-body"><h3>Reference images, Start-up fix, Two-key shortcuts <small>new in 0.12.8</small></h3><p>Reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts.</p><ul><li>Your front and side drawings in the view while you sculpt (idea by Oslen on Discord)</li><li>SculptForge should start again on Linux NVIDIA drivers where 0.12.5 to 0.12.7 stopped with a shader error (#192)</li><li>Bind an action to two keys in a row, like A then S (requested by Artizmo on Discord)</li><li>Shortcuts with two keys in a row</li><li>Reference images to sculpt against</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-0127"><div class="wn-card-body"><h3>Booleans between Parts, My Panel, Crisp Flatten <small>new in 0.12.7</small></h3><p>Booleans between Parts, Gaussian splats with Blender, and a panel of your own.</p><ul><li>Add, Subtract or Intersect from Tool &gt; Parts, with a live preview</li><li>Gaussian splats both ways with Blender 5.3 through the Blender bridge</li><li>Crisp Flatten, Smooth Peaks, an alpha pool with jitter, and Shift and Ctrl brushes (thanks _tfx on Discord)</li><li>A panel of your own, built by Alt-dragging buttons and sections (requested by Hameron)</li><li>Faster Undo after a remesh on dense meshes, and a Threads value above 16 now applies (#181, #184)</li><li>Alpha pool and jitter for non-repeating detail</li><li>Hard planes with a sharp edge</li><li>Warnings before destructive operations</li><li>Put any brush on Shift or Ctrl</li><li>Orbit around the point under the pointer</li><li>Exact Booleans between Parts, with a live preview</li><li>My Panel, a panel you build from your own buttons and sections</li><li>Smooth Peaks brush</li><li>Repeat a Part along a curve, real braids and springs</li></ul></div></a></article>
           <article class="wn-home-card"><a href="guide/whats-new.html#version-0126"><div class="wn-card-body"><h3>Pan and zoom keys work again <small>new in 0.12.6</small></h3><p>Pan and zoom keys work again, layouts revert safely, and garments drape on a body.</p><ul><li>A tap nudges the view, holding glides (thanks Artizmo on Discord)</li><li>Revert to Saved Layout should no longer crash, and the previous autosave is kept (thanks phoenix and raffaele_3d_design)</li><li>Vertex paint keeps its detail across subdivision levels (thanks masterfull95 on Discord)</li><li>Drape a garment on a body in Tool &gt; Garments, with a steadier cloth rest</li><li>Save Visible Parts As and a Mask colour preference</li><li>Save only the visible Parts</li><li>Featured creator card in the Welcome window</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-0125"><div class="wn-card-body"><h3>Brushes you made are safer <small>new in 0.12.5</small></h3><p>Rgb colours Sub strokes, your brushes are safer, and the pan keys glide.</p><ul><li>Rgb lays colour on Sub strokes too, for every brush and stroke type</li><li>A missing bottom-shelf brush shows a mark and comes back from its backup (thanks rand_gogh)</li><li>Holding the pan and zoom keys glides smoothly at any frame rate (requested by Artizmo on Discord)</li><li>Thread counts above 16 set in Preferences &gt; Performance apply at the next start (#184)</li><li>A startup splash shows the bust and version while SculptForge starts</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-0124"><div class="wn-card-body"><h3>Pan and zoom from the keyboard <small>new in 0.12.4</small></h3><p>Shortcuts ask before they take a key, and Front faces only shows when it is on.</p><ul><li>Shortcuts ask before they take a key another action uses (requested by Artizmo on Discord)</li><li>Ctrl+Numpad 4, 6, 8, 2 and Zoom in/out keep moving while held</li><li>Front faces only shows a tag by the brush cursor and a Turn off button (thanks rand_gogh)</li></ul></div></a></article>
         </div>
         <div class="wn-home-groups">
-          <a class="wn-home-group" href="guide/whats-new.html#versions-0120-to-0123"><h3>0.12.0 to 0.12.3</h3><ul><li>Garments and cloth</li><li>Plugins</li></ul><span>All changes &rarr;</span></a>
+          <a class="wn-home-group" href="guide/whats-new.html#versions-0120-to-0125"><h3>0.12.0 to 0.12.5</h3><ul><li>Garments and cloth</li></ul><span>All changes &rarr;</span></a>
           <a class="wn-home-group" href="guide/whats-new.html#versions-011x"><h3>0.11.x</h3><ul><li>Gizmo All</li><li>Fixed</li><li>Linked duplicates</li><li>Your languages</li><li>Stencil</li><li>Exports keep their real size</li></ul><span>All changes &rarr;</span></a>
         </div>
         <!-- whats-new:end -->
@@ -482,7 +496,7 @@ rez-env sculptforge -- sculptforge troll.usda \
     <section id="download" class="section alt">
       <div class="wrap">
         <h2>Download</h2>
-        <p class="section-lede">Version 0.12.6. All builds come from the
+        <p class="section-lede">Version 0.12.8. All builds come from the
           <a href="https://github.com/islandmed/SculptForge/releases/latest">latest GitHub release</a>, with
           SHA-256 checksums. Free forever; <a href="support.html">membership</a> adds betas and early builds, Member Requests, a roadmap vote and credits.</p>
         <div class="downloads">

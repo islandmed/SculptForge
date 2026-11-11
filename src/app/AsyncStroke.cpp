@@ -437,7 +437,7 @@ App::DabSettings App::dabSettings() const {
     st.radiusPx = radiusPx_;
     st.worldRadius = worldSize_ && worldRadius_ > 0.0f ? worldRadius_ : 0.0f;
     st.pressureCurve = strokeCurve_;
-    st.strength = precisionActive_ ? precisionIntensity_ : strength_; // Shift+Alt mid-stroke (Precision.cpp)
+    st.strength = precisionActive_ ? precisionIntensity_ : strokeStrength(); // Shift+Alt mid-stroke (Precision.cpp)
     st.smoothStrength = smoothStrength_;
     st.smoothKeepVolume = smoothKeepVolume_ != strokeAltSmooth_;
     st.smoothGroupBorders = smoothGroupBorders_;
@@ -461,6 +461,7 @@ App::DabSettings App::dabSettings() const {
     // A predictive stroke works from its own copies of the recipe and alpha (made when it began).
     st.recipe = asyncStroke_ ? strokeRecipe_.get() : strokeRecipe();
     st.alpha = asyncStroke_ ? strokeAlpha_.get() : &doc_.brushAlpha; // (null: round)
+    st.pool = alphaPool_;
     st.stencil = doc_.stencil;
     st.vdmOwner = doc_.brushVdm;
     st.vdm = st.vdmOwner.get();

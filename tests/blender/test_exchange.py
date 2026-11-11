@@ -18,6 +18,7 @@ import numpy as np
 # exchange.py alone: the package's __init__ needs bpy.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "addons", "blender", "sculptforge_bridge"))
 import exchange  # noqa: E402
+import splats  # noqa: E402
 
 N = exchange.NO_INDEX
 failures = []
@@ -168,6 +169,142 @@ def test_manifest(tmp):
         pass
 
 
+# ---------------------------------------------------------------------------- Gaussian splats
+
+
+def sample_splats(n=500, degree=3, seed=7):
+    """Splats a capture could hold: values inside the ranges the PLY's logit and log can carry."""
+    rng = np.random.default_rng(seed)
+    q = rng.normal(size=(n, 4))
+    q /= np.linalg.norm(q, axis=1, keepdims=True)
+    sh = rng.normal(scale=0.4, size=(n, (degree + 1) ** 2, 3))
+    return splats.SplatArrays(rng.normal(size=(n, 3)), q, np.exp(rng.uniform(-6, -1, (n, 3))),
+                              rng.uniform(0.02, 0.98, n), sh)
+
+
+def same_splats(a, b, what, atol=2e-5):
+    """Equal splats (a and b in the same order): compared after float32, which the files hold."""
+    ok = len(a) == len(b) and a.sh.shape == b.sh.shape
+    err = {}
+    if ok:
+        # q and -q turn the same way
+        sign = np.sign(np.sum(a.rotations * b.rotations, axis=1, keepdims=True))
+        err = {"positions": np.abs(a.positions - b.positions).max(), "rotations": np.abs(a.rotations - sign * b.rotations).max(),
+               "scales": np.abs(a.scales / b.scales - 1).max(), "opacities": np.abs(a.opacities - b.opacities).max(),
+               "sh": np.abs(a.sh - b.sh).max()}
+        ok = all(v < atol for v in err.values())
+    check(ok, "%s: positions, rotations, scales, opacity and SH agree (%s)" % (
+        what, ", ".join("%s %.2g" % kv for kv in err.items()) if err else "different sizes"))
+
+
+def test_splat_files(tmp):
+    a = sample_splats()
+    path = os.path.join(tmp, "s.ply")
+    splats.write_ply(path, a)
+    header = open(path, "rb").read(4000).split(b"end_header")[0].decode()
+    check("property float f_rest_44" in header and "f_rest_45" not in header, "degree 3: 45 f_rest properties")
+    check(header.index("f_dc_0") < header.index("f_rest_0") < header.index("opacity") < header.index("rot_3"),
+          "standard 3DGS property order")
+    same_splats(a, splats.read_ply(path), "PLY round trip")
+    for degree in (0, 1, 2):
+        b = sample_splats(40, degree, degree)
+        splats.write_ply(path, b)
+        back = splats.read_ply(path)
+        check(back.degree == degree, "SH degree %d kept" % degree)
+        same_splats(b, back, "PLY round trip, degree %d" % degree)
+    # f_rest holds red's coefficients first: coefficient 1 of green is f_rest_15 at degree 3.
+    one = splats.SplatArrays([[0, 0, 0]], [[1, 0, 0, 0]], [[0.1] * 3], [0.5], np.arange(48, dtype=float).reshape(1, 16, 3))
+    splats.write_ply(path, one)
+    raw = open(path, "rb").read()
+    cols = np.frombuffer(raw[raw.index(b"end_header\n") + 11:], dtype="<f4")
+    check(cols[9 + 0] == one.sh[0, 1, 0] and cols[9 + 15] == one.sh[0, 1, 1] and cols[9 + 30] == one.sh[0, 1, 2],
+          "f_rest is channel-major (the k-th coefficient of red, green, blue at k, 15 + k, 30 + k)")
+    check(abs(cols[9 + 45] - 0.0) < 1e-6, "opacity 0.5 is logit 0")
+    # Not splat files: a mesh PLY, ASCII.
+    with open(path, "wb") as f:
+        f.write(b"ply\nformat binary_little_endian 1.0\nelement vertex 1\nproperty float x\nproperty float y\n"
+                b"property float z\nelement face 1\nproperty list uchar int vertex_indices\nend_header\n")
+    try:
+        splats.read_ply(path)
+        check(False, "a mesh PLY is not read as splats")
+    except ValueError:
+        check(True, "a mesh PLY is not read as splats")
+    # The compact .splat format: 32 bytes per splat.
+    rec = bytearray()
+    for i in range(3):
+        rec += np.array([i, 2 * i, -i, 0.1, 0.2, 0.3], dtype="<f4").tobytes() + bytes([255, 128, 0, 200, 255, 128, 128, 128])
+    dot = os.path.join(tmp, "s.splat")
+    open(dot, "wb").write(bytes(rec))
+    d = splats.read_dot_splat(dot)
+    check(len(d) == 3 and np.allclose(d.positions[2], (2, 4, -2)) and np.allclose(d.scales[0], (0.1, 0.2, 0.3)),
+          ".splat: positions and scales")
+    check(np.allclose(d.colors()[0], (1.0, 128 / 255, 0.0), atol=1e-6) and abs(d.opacities[0] - 200 / 255) < 1e-6,
+          ".splat: colour and opacity")
+    check(np.allclose(d.rotations[0], (1, 0, 0, 0)), ".splat: rotation bytes 255,128,128,128 -> identity")
+
+
+def test_splat_bake():
+    a = sample_splats(60, 2, 3)
+    rot = rotation((0.3, 1.0, -0.5), 41.0)
+    m = matrix(rot, (2.0, 2.0, 2.0), (1.0, -2.0, 0.5))
+    b, kept = splats.baked(a, m)
+    check(not kept and b.sh.shape[1] == 1, "turned splats keep their plain colour only")
+    check(np.allclose(b.positions, exchange.transform_points(m, a.positions), atol=1e-5), "baked positions")
+    check(np.allclose(b.scales, a.scales * 2.0, atol=1e-6), "baked scale")
+    # The covariance R S S^T R^T of a splat, before and after: the splat is the same ellipsoid, moved.
+    def cov(r_q, scale):
+        w, x, y, z = r_q
+        r = np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                      [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                      [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+        return r @ np.diag(scale ** 2) @ r.T
+    for i in (0, 17, 59):
+        want = (rot * 2.0) @ cov(a.rotations[i], a.scales[i]) @ (rot * 2.0).T
+        check(np.allclose(cov(b.rotations[i], b.scales[i]), want, atol=1e-6), "baked splat %d is the moved ellipsoid" % i)
+    c, kept = splats.baked(a, matrix(np.eye(3), (1, 1, 1), (0, 0, 1)))
+    check(kept and c.sh.shape[1] == 9, "a plain move keeps view-dependent colour")
+
+
+def test_splats_through_sculptforge(tmp, cli):
+    root = os.path.join(tmp, "splat-exchange")
+    out = exchange.outbox(root)
+    os.makedirs(out)
+    a = sample_splats(300, 3, 11)
+    m = matrix(rotation((1.0, 2.0, 0.5), 37.0), (1.5, 1.5, 1.5), (0.3, -1.2, 2.0))
+    splats.write_ply(os.path.join(out, "r1_splats.ply"), a)
+    # A mesh and the splats in one send; the older keys are untouched.
+    arrays, _ = object_arrays(grid_with_ngon(), False, 1)
+    exchange.write_bridge(os.path.join(out, "r1_000.Bridge"), "Grid", **arrays)
+    exchange.write_manifest(out, [{"name": "Grid", "file": "r1_000.Bridge"}], "test",
+                            [{"name": "Capture ü", "file": "r1_splats.ply", "matrix_world": m.tolist()}])
+    r = subprocess.run([cli, "-c", 'blender_receive folder="%s"; splat_info; blender_send folder="%s"' % (root, root)],
+                       capture_output=True, text=True)
+    print(r.stdout.strip())
+    check(r.returncode == 0 and "300 Gaussian splats" in r.stdout and "SH degree 3" in r.stdout,
+          "sculptforge-cli received the splats (%s)" % r.stderr.strip())
+    if r.returncode:
+        return
+    manifest = exchange.read_manifest(exchange.inbox(root))
+    check([o["name"] for o in manifest["objects"]] == ["Grid"], "the mesh still comes back")
+    entries = manifest.get("splats", [])
+    check(len(entries) == 1 and entries[0]["name"] == "Capture ü", "the splats come back under their Blender name")
+    if not entries:
+        return
+    back = splats.read_ply(os.path.join(exchange.inbox(root), entries[0]["file"]))
+    same_splats(a, back, "through SculptForge (nothing baked, SH degree 3 intact)")
+    got = np.array(entries[0]["matrix_world"])
+    check(np.abs(got - m).max() < 1e-5, "the object's matrix comes back (max error %.2g)" % np.abs(got - m).max())
+    # No matrix: the splats come back at the origin, upright in Blender's axes.
+    exchange.write_manifest(out, [], "test", [{"name": "Plain", "file": "r2_splats.ply"}])
+    splats.write_ply(os.path.join(out, "r2_splats.ply"), a)
+    r = subprocess.run([cli, "-c", 'blender_receive folder="%s"; blender_send folder="%s"' % (root, root)],
+                       capture_output=True, text=True)
+    check(r.returncode == 0, "splats alone are received (%s)" % (r.stdout + r.stderr).strip())
+    entries = exchange.read_manifest(exchange.inbox(root)).get("splats", [])
+    check(len(entries) == 1 and np.abs(np.array(entries[0]["matrix_world"]) - np.eye(4)).max() < 1e-6,
+          "no matrix in, identity out")
+
+
 # ---------------------------------------------------------------------------- through SculptForge
 
 
@@ -289,7 +426,10 @@ def main():
         test_canonical_and_reverse()
         test_bridge_round_trip(tmp)
         test_manifest(tmp)
+        test_splat_files(tmp)
+        test_splat_bake()
         if args.cli:
+            test_splats_through_sculptforge(tmp, args.cli)
             test_round_trip_through_sculptforge(tmp, args.cli)
             test_shapes_through_sculptforge(tmp, args.cli)
     if failures:

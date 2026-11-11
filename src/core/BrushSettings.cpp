@@ -52,6 +52,8 @@ Json BrushToolSettings::toJson() const {
     j.set("alpha_follow_stroke", a.followStroke); // (always: the VDM brush's default is on)
     if (a.angle != 0.0f) j.set("alpha_angle", double(a.angle));
     if (a.jitter != 0.0f) j.set("alpha_angle_jitter", double(a.jitter));
+    if (a.scaleJitter != 0.0f) j.set("alpha_scale_jitter", double(a.scaleJitter));
+    if (a.positionJitter != 0.0f) j.set("alpha_position_jitter", double(a.positionJitter));
     if (a.tileX != 1 || a.tileY != 1) {
         j.set("alpha_tile_x", a.tileX);
         j.set("alpha_tile_y", a.tileY);
@@ -80,6 +82,8 @@ void BrushToolSettings::applyJson(const Json& j) {
     a.followStroke = j["alpha_follow_stroke"].asBool(a.followStroke);
     readFloat(j, "alpha_angle", a.angle);
     readFloat(j, "alpha_angle_jitter", a.jitter);
+    readFloat(j, "alpha_scale_jitter", a.scaleJitter);
+    readFloat(j, "alpha_position_jitter", a.positionJitter);
     a.tileX = int(j["alpha_tile_x"].asNumber(a.tileX));
     a.tileY = int(j["alpha_tile_y"].asNumber(a.tileY));
     pressureSize = penPressureFromId(j["pen_pressure_size"].asString(), pressureSize);

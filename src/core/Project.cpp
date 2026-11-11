@@ -60,7 +60,7 @@ ProjectThumbnailProvider& thumbnailProvider() {
 // Document::projectSettings (camera, render, brush, symmetry, ...).
 const char* const kCoreKeys[] = {"format", "version", "app_version", "mesh", "layers", "active_layer",
                                  "parts", "active_part", "part_folders", "brushes", "active_brush", "splats", "attachments",
-                                 "unitless_scale", "unitless_format"};
+                                 "references", "unitless_scale", "unitless_format"};
 
 std::filesystem::path fsPath(const std::string& p) { return std::filesystem::path(std::u8string(p.begin(), p.end())); }
 std::string utf8(const std::filesystem::path& p) {
@@ -882,6 +882,7 @@ struct LoadedPart {
     bool visible = true;
     int8_t shownBeforeSolo = -1;
     Shading shading = Shading::Default;
+    PartBoolean boolean = PartBoolean::None;
     int folder = -1; // index into the manifest's part_folders (#96)
     int activeLayer = -1;
     int link = -1;              // a linked copy of this earlier Part (#94): no mesh of its own
@@ -969,6 +970,7 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         st.set("visible", savedVisible(s));
         if (s.shownBeforeSolo >= 0) st.set("shown_before_solo", s.shownBeforeSolo != 0); // (optional: Solo in progress)
         if (s.shading != Shading::Default) st.set("shading", shadingName(s.shading)); // (no format change: optional)
+        if (s.boolean != PartBoolean::None) st.set("boolean", partBooleanName(s.boolean)); // (optional, as shading)
         if (const int f = doc.partFolderIndex(s.folder); f >= 0) st.set("folder", folderIndex[size_t(f)]); // (#96: optional, as shading)
         if (s.moved()) {
             st.set("transform", matrixJson(s.transform));
@@ -1099,6 +1101,18 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         manifest.set("attachments", std::move(files));
     }
 
+    if (!doc.references.empty()) { // View > Reference images (no format change: optional, older readers ignore it)
+        Json refs = Json::array();
+        for (size_t i = 0; i < doc.references.size() && i < size_t(kMaxReferences); ++i) {
+            const ReferenceImage& ref = doc.references[i];
+            Json r = referenceToJson(ref);
+            if (std::vector<uint8_t> bytes; ref.embed && referenceEmbedBytes(ref, bytes))
+                r.set("image", w.bytes("references/" + std::to_string(i) + ".bin", bytes));
+            refs.push(std::move(r));
+        }
+        manifest.set("references", std::move(refs));
+    }
+
     if (doc.projectSettings.isObject())
         for (const auto& [key, value] : doc.projectSettings.members())
             if (!isCoreKey(key)) manifest.set(key, value);
@@ -1213,6 +1227,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             s.visible = sj["visible"].asBool(true);
             if (sj["shown_before_solo"].isBool()) s.shownBeforeSolo = sj["shown_before_solo"].asBool(true) ? 1 : 0;
             if (sj["shading"].isString()) parseShading(sj["shading"].asString(), s.shading); // unknown: Default
+            if (sj["boolean"].isString()) parsePartBoolean(sj["boolean"].asString(), s.boolean); // unknown: None
             s.folder = int(sj["folder"].asNumber(-1));
             s.bridgeName = sj["bridge_name"].asString();
             s.qremeshGuides = qremeshGuidesFromJson(sj["qremesh_guides"]);
@@ -1342,6 +1357,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     doc.parts[0].visible = parts[0].visible;
     doc.parts[0].shownBeforeSolo = parts[0].shownBeforeSolo;
     doc.parts[0].shading = parts[0].shading;
+    doc.parts[0].boolean = parts[0].boolean;
     doc.parts[0].transform = parts[0].transform;
     for (size_t i = 1; i < parts.size(); ++i) {
         if (parts[i].link >= 0) { // shares an earlier Part's mesh (Parts load in order: index i is i here too)
@@ -1349,6 +1365,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             doc.parts[size_t(at)].visible = parts[i].visible;
             doc.parts[size_t(at)].shownBeforeSolo = parts[i].shownBeforeSolo;
             doc.parts[size_t(at)].shading = parts[i].shading;
+            doc.parts[size_t(at)].boolean = parts[i].boolean;
             continue;
         }
         BVH* builtI = parts[i].finishBvh();
@@ -1357,6 +1374,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
         s.visible = parts[i].visible;
         s.shownBeforeSolo = parts[i].shownBeforeSolo;
         s.shading = parts[i].shading;
+        s.boolean = parts[i].boolean;
         s.transform = parts[i].transform;
         s.data->activeLayer = validLayer(parts[i].activeLayer, s.data->mesh);
         s.data->bridgeName = parts[i].bridgeName;
@@ -1413,6 +1431,17 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
         if (r.bytes(f["data"], "attachment", n, bytes)) doc.projectFiles[name] = std::move(bytes);
     }
     r.error.clear();
+    // Reference images: like attachments, one that can't be read is left out rather than failing the file.
+    doc.references.clear();
+    for (const Json& j : manifest["references"].items()) {
+        if (doc.references.size() >= size_t(kMaxReferences)) break;
+        std::vector<uint8_t> bytes;
+        const size_t n = countOf(j["image"]["count"]);
+        const bool embedded = j["image"].isObject() && n != size_t(-1) && n <= kReferenceMaxFileBytes &&
+                              r.bytes(j["image"], "reference image", n, bytes);
+        r.error.clear();
+        if (ReferenceImage ref; referenceFromJson(j, embedded ? &bytes : nullptr, ref)) doc.references.push_back(std::move(ref));
+    }
     doc.path = path;
     doc.markClean();
     return true;

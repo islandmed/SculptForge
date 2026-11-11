@@ -443,7 +443,7 @@ void App::pollVoxelRemesh() {
         return;
     }
     const JobPart part(*this, index);
-    doc_.replaceMeshUndoable(std::move(*job->result), "Remesh"); // as the remesh command
+    doc_.replaceMeshUndoable(std::move(*job->result), "Remesh", true); // as the remesh command
     CommandResult r{true, std::string(job->trigger == RemeshTrigger::Quick         ? "Quick Remesh: remeshed"
                                       : job->trigger == RemeshTrigger::AfterStroke ? "Remeshed after the stroke"
                                                                                    : "Remeshed") +
