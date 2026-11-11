@@ -234,6 +234,10 @@ bool ChildProcess::start(const std::string& program, const std::vector<std::stri
         error = "Cannot start " + exe + ": " + std::strerror(rc);
         return false;
     }
+    if (pid <= 1) { // (never; but a pid of 0 or 1 would turn every later signal into one on us or on init)
+        error = "Cannot start " + exe + ": no process id";
+        return false;
+    }
     pid_ = pid;
     started_ = true;
     finished_ = false;
@@ -247,19 +251,32 @@ bool ChildProcess::running() {
     const pid_t r = ::waitpid(pid_, &status, WNOHANG);
     if (r == 0) return true;
     if (r == pid_) exitCode_ = WIFEXITED(status) ? WEXITSTATUS(status) : 128 + (WIFSIGNALED(status) ? WTERMSIG(status) : 0);
-    finished_ = true;
+    finished_ = true; // (reaped, or not ours any more (ECHILD): the pid may be anyone's now)
+    pid_ = -1;
     return false;
 }
 
 void ChildProcess::detach() { started_ = false; } // (it was spawned in its own process group)
 
+bool signalChildGroup(int pid, int sig) {
+    // kill(0) is our own group, kill(-1) everything we may signal, and a stale pid may be anyone's: on a desktop
+    // launcher's session that ended the user's session (#183). Only a real child, in a group of its own, is
+    // signalled by group.
+    if (pid <= 1 || pid == int(::getpid())) return false;
+    const pid_t group = ::getpgid(pid);
+    if (group < 0) return false; // gone, or never ours
+    if (group == ::getpgrp()) return ::kill(pid, sig) == 0; // it shares our group (the spawn's setpgroup did not happen): it alone
+    if (group == pid) return ::kill(-pid, sig) == 0;
+    return ::kill(pid, sig) == 0; // someone else's group: only the child itself
+}
+
 void ChildProcess::kill(double graceSeconds) {
-    if (!running()) return;
-    ::kill(-pid_, SIGTERM);
+    if (!running()) return; // (reaped, never started or detached = nothing of ours to signal)
+    signalChildGroup(pid_, SIGTERM);
     const auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(int(graceSeconds * 1000));
     while (running() && std::chrono::steady_clock::now() < until) std::this_thread::sleep_for(std::chrono::milliseconds(20));
     if (running()) {
-        ::kill(-pid_, SIGKILL);
+        signalChildGroup(pid_, SIGKILL);
         wait();
     }
 }
