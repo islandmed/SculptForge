@@ -917,7 +917,7 @@ bool isProjectPath(const std::string& path) {
     return ext == kProjectExtension;
 }
 
-bool saveProject(const std::string& path, const Document& doc, std::string& error, bool autosave) {
+bool saveProject(const std::string& path, const Document& doc, std::string& error, bool autosave, bool visibleOnly) {
     Writer w;
     Json manifest = Json::object();
     manifest.set("format", kFormatName);
@@ -928,29 +928,55 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
     // Every Part with its mesh, layers and state; blobs live under parts/<i>/.
     Json parts = Json::array();
     int streamed = 0; // Parts with a streamed micro level so far (their detail files' names)
-    for (int i = 0; i < doc.partCount(); ++i) {
+    // During a Figure Pose the Parts are saved shown as before it, and the Pose Mesh hidden (core/FigurePose.h).
+    const auto savedVisible = [&doc](const Part& s) {
+        if (!doc.figurePose || doc.partIndex(doc.figurePose->poseMesh) < 0) return s.visible;
+        bool visible = false;
+        for (const auto& [id, was] : doc.figurePose->visibility)
+            if (id == s.id) visible = was;
+        return visible;
+    };
+    // The Parts written, as indices into doc.parts (all of them, or only the visible ones for Save Visible Parts);
+    // `newIndex` is where each lands in the file, for links, folders and the active Part.
+    std::vector<int> kept, newIndex(size_t(doc.partCount()), -1);
+    for (int i = 0; i < doc.partCount(); ++i)
+        if (!visibleOnly || savedVisible(doc.parts[size_t(i)])) {
+            newIndex[size_t(i)] = int(kept.size());
+            kept.push_back(i);
+        }
+    if (kept.empty()) {
+        error = "No visible Parts to save";
+        return false;
+    }
+    std::vector<int> folderIndex(doc.partFolders.size(), -1); // the folders those Parts are in
+    std::vector<const PartFolder*> keptFolders;
+    if (!visibleOnly) // (a full save keeps every folder, empty ones too)
+        for (size_t f = 0; f < doc.partFolders.size(); ++f) {
+            folderIndex[f] = int(f);
+            keptFolders.push_back(&doc.partFolders[f]);
+        }
+    else
+        for (int i : kept)
+            if (const int f = doc.partFolderIndex(doc.parts[size_t(i)].folder); f >= 0 && folderIndex[size_t(f)] < 0) {
+                folderIndex[size_t(f)] = int(keptFolders.size());
+                keptFolders.push_back(&doc.partFolders[size_t(f)]);
+            }
+    for (int i : kept) {
         const Part& s = doc.parts[size_t(i)];
         const bool active = doc.checkedOut(i);
         Json st = Json::object();
         st.set("name", s.name);
-        // During a Figure Pose the Parts are saved shown as before it, and the Pose Mesh hidden (core/FigurePose.h).
-        bool visible = s.visible;
-        if (doc.figurePose && doc.partIndex(doc.figurePose->poseMesh) >= 0) {
-            visible = false;
-            for (const auto& [id, was] : doc.figurePose->visibility)
-                if (id == s.id) visible = was;
-        }
-        st.set("visible", visible);
+        st.set("visible", savedVisible(s));
         if (s.shownBeforeSolo >= 0) st.set("shown_before_solo", s.shownBeforeSolo != 0); // (optional: Solo in progress)
         if (s.shading != Shading::Default) st.set("shading", shadingName(s.shading)); // (no format change: optional)
-        if (const int f = doc.partFolderIndex(s.folder); f >= 0) st.set("folder", f); // (#96: optional, as shading)
+        if (const int f = doc.partFolderIndex(s.folder); f >= 0) st.set("folder", folderIndex[size_t(f)]); // (#96: optional, as shading)
         if (s.moved()) {
             st.set("transform", matrixJson(s.transform));
             version.need(8);
         }
         int link = -1; // a linked copy (#94): the first Part with its mesh holds it
         for (int k = 0; k < i && link < 0; ++k)
-            if (doc.parts[size_t(k)].data == s.data) link = k;
+            if (newIndex[size_t(k)] >= 0 && doc.parts[size_t(k)].data == s.data) link = newIndex[size_t(k)];
         if (link >= 0) {
             st.set("link", link);
             version.need(8);
@@ -976,6 +1002,10 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
             if (mm.focus) { // format 9: streamed from a detail file (core/FocusDetail.h); the file holds the level
                 FocusDetail& fd = *mm.focus;
                 std::string ref = fd.path();
+                if (visibleOnly) { // (saving it elsewhere would move the open project's detail file along)
+                    error = s.name + " has streamed detail; use Save As to keep it";
+                    return false;
+                }
                 if (!autosave) {
                     std::filesystem::path target = fsPath(path);
                     const std::string stem = utf8(target.stem());
@@ -1017,13 +1047,13 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         parts.push(std::move(st));
     }
     manifest.set("parts", std::move(parts));
-    manifest.set("active_part", doc.activePart);
-    if (!doc.partFolders.empty()) { // Parts list folders (#96); no format change: older readers ignore them
+    manifest.set("active_part", std::max(0, newIndex[size_t(doc.activePart)])); // (a hidden active Part: the first)
+    if (!keptFolders.empty()) { // Parts list folders (#96); no format change: older readers ignore them
         Json folders = Json::array();
-        for (const PartFolder& f : doc.partFolders) {
+        for (const PartFolder* f : keptFolders) {
             Json fj = Json::object();
-            fj.set("name", f.name);
-            if (f.collapsed) fj.set("collapsed", true);
+            fj.set("name", f->name);
+            if (f->collapsed) fj.set("collapsed", true);
             folders.push(std::move(fj));
         }
         manifest.set("part_folders", std::move(folders));
@@ -1456,6 +1486,19 @@ void registerProjectCommands(CommandRegistry& registry) {
                       if (Timeline::saveWithProject && &doc == Timeline::historyDocument && !saveHistorySidecar(doc, path, &err))
                           return {true, "Saved project " + path + " (the history wasn't saved: " + err + ")"};
                       return {true, "Saved project " + path};
+                  }});
+    registry.add({"save_visible_parts",
+                  "Save a copy of the project (.sfproj) with only the visible Parts (their materials, layers and the scene's "
+                  "cameras and settings); the open project and its path stay as they are.",
+                  {{"path", T::String, "Output .sfproj path (UTF-8).", true}},
+                  [](Document& doc, const Args& a) -> CommandResult {
+                      std::string path = argString(a, "path");
+                      if (path.empty()) return {false, "No path given"};
+                      if (!isProjectPath(path)) path += kProjectExtension;
+                      std::string err;
+                      subdivCommit(doc.mesh);
+                      if (!saveProject(path, doc, err, false, /*visibleOnly*/ true)) return {false, err};
+                      return {true, "Saved the visible Parts to " + path};
                   }});
     registry.add({"open_project", "Open a SculptForge project (.sfproj), replacing the current scene.",
                   {{"path", T::String, ".sfproj path (UTF-8).", true}},

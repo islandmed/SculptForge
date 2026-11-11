@@ -695,6 +695,9 @@ void App::initActions() {
         "Save the project (.sfproj: every Part, layer, brush and setting). Asks for a name the first time.");
     add("file.save_as", "Save As...", "File", "Ctrl+Shift+S", [this] { saveProjectAs(true); }, nullptr, nullptr, nullptr, nullptr,
         "Save the project under a new name.");
+    add("file.save_visible_parts", "Save Visible Parts As...", "File", nullptr, [this] { saveVisiblePartsAs(); }, nullptr, nullptr,
+        nullptr, nullptr,
+        "Save a copy of the project (.sfproj) with only the visible Parts, and their materials and layers. The open project stays as it is.");
     add("file.export_glb", "Export GLB...", "File > Export", "Ctrl+E", [this] { saveFileDialog(FileAction::ExportGlb); },
         ICON_LC_PACKAGE, nullptr, nullptr, nullptr,
         "Export the model as glTF binary, with sculpt layers as blend shapes (morph targets).");

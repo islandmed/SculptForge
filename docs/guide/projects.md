@@ -26,6 +26,8 @@ them is an export, not a save. See [Exporting](exporting.md).
 - **File > Save** (<kbd>Ctrl</kbd>+<kbd>S</kbd>) saves to the current project. The first time, it asks for a file
   name.
 - **File > Save As...** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) saves under a new name.
+- **File > Save Visible Parts As...** saves a copy with only the Parts you can see (hidden ones are left out), keeping
+  their materials, layers, folders and the scene's cameras and settings. The open project stays as it is.
 - In the Classic layout, clicking the document name in the title strip also saves.
 
 The bar along the top shows the file name with `*` after it while there are unsaved changes, and so does the window
