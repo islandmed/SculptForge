@@ -2388,7 +2388,8 @@ private:
     int conflictDrawnFrame_ = -1, conflictOpenedFrame_ = 0;
     ImVec4 shortcutPopupRect_{};        // the Replace / Cancel popup as last drawn (UiTest checks it clears the anchor)
     std::vector<std::pair<SDL_Keycode, SDL_Keymod>> keysDown_; // keys held now, with the modifiers at their press (updateKeyNav)
-    std::map<std::string, float> keyNavHeld_; // seconds each pan / zoom key has been down (updateKeyNav)
+    std::map<std::string, KeyNavEase> keyNavEase_; // each pan / zoom key's eased speed (updateKeyNav)
+    std::map<std::string, bool> keyNavTapped_;     // pressed since the last frame (a tap shorter than a frame still moves)
     bool keyNavMoving_ = false;
     std::string layoutBaseline_;      // layoutKey() as last stored / loaded / restored
     Json storedLayout_;               // the layout ui.json keeps (Save Layout); null: none yet, the standard one
@@ -2526,7 +2527,7 @@ private:
     void restoreView(int index);
     void drawViewsSection(); // Palettes.cpp, in View
     void viewOrbitStep(float yawDegrees, float pitchDegrees);
-    void keyNavStep(const std::string& id);   // one press of a pan or zoom key
+    void keyNavStep(const std::string& id);   // notes a press of a pan or zoom key
     void updateKeyNav(float dt);              // once a frame: the held ones keep moving the view
     void frameActivePart();
     void frameKeyPress(); // F: the active Part, twice quickly the scene (Classic sculpting keys, several Parts)

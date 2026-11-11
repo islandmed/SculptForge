@@ -6,7 +6,7 @@ run new_sphere subdivisions=3
 expect_value shortcut_conflicts == 0
 expect_value shortcut_conflict_open == 0
 
-# --- Held pan keys: a press steps, holding carries on, release stops (also when the window loses focus mid-hold) ---
+# --- Held pan keys: a hold eases in and glides, release eases out and stops (also when the window loses focus mid-hold) ---
 camera 0 0
 remember camera_pan p0
 key_down ctrl+numpad6

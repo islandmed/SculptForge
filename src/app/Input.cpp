@@ -339,7 +339,7 @@ void App::registerViewActions() {
     });
     add("view.zoom_in", "Zoom in", "Numpad Plus", "Move the view closer.", [this] { keyNavStep("view.zoom_in"); });
     add("view.zoom_out", "Zoom out", "Numpad Minus", "Move the view back.", [this] { keyNavStep("view.zoom_out"); });
-    // Pan and zoom by key (Artizmo on Discord): a press steps, holding the key keeps moving (updateKeyNav, Speed in
+    // Pan and zoom by key (Artizmo on Discord): holding the key glides, easing in and out (updateKeyNav, Speed in
     // Preferences > Input). Zoom in and out above hold the same way.
     for (const auto& [id, label, key, text] : {std::tuple{"view.pan_left", "Pan left", "Ctrl+Numpad 4",
                                                           "Slide the view left. Hold the key to keep moving; Speed is in Preferences > Input."},
@@ -464,38 +464,35 @@ void App::viewAxis(float yawDegrees, float pitchDegrees) {
     }
 }
 
-// A press of a pan or zoom key moves the view a tenth of a second's worth; holding it carries on (updateKeyNav).
-void App::keyNavStep(const std::string& id) {
-    float px, py, zoom;
-    if (!keyNavMotion(actions_.find(id), px, py, zoom)) return;
-    const float k = 0.1f * std::clamp(uiPrefs_.keyNavSpeed, 0.1f, 5.0f);
-    if (px != 0.0f || py != 0.0f) camera_.pan(px * k, py * k, canvasHeight());
-    if (zoom != 0.0f) camera_.zoom(zoom * k);
-}
+// A press of a pan or zoom key only notes the press (a tap shorter than a frame still moves the view a little);
+// updateKeyNav does the moving.
+void App::keyNavStep(const std::string& id) { keyNavTapped_[id] = true; }
 
-// Once a frame: the pan and zoom keys that are held (after the first press's step and a short wait) move the view
-// by their speed, whatever chords they are bound to and in every key style.
+// Once a frame: each pan and zoom key that is down (whatever chord it is bound to, in every key style) eases up to its
+// speed over kKeyNavEaseSeconds and back down after its release, moving the view by speed * time: smooth, the same
+// distance at any frame rate, and nothing to do with the OS's key repeat.
 void App::updateKeyNav(float dt) {
     const bool blocked = ImGui::GetIO().WantCaptureKeyboard || !capturingShortcut_.empty() || shortcutConflictOpen();
+    dt = std::min(dt, 0.1f); // (a hitch of a frame is not a jump of the view)
     float px = 0.0f, py = 0.0f, zoom = 0.0f;
     bool any = false;
     for (const char* id : {"view.pan_left", "view.pan_right", "view.pan_up", "view.pan_down", "view.zoom_in", "view.zoom_out"}) {
-        float& held = keyNavHeld_[id];
-        bool on = false;
+        bool on = keyNavTapped_[id] && !blocked;
+        keyNavTapped_[id] = false;
         if (!blocked)
             for (const Chord& c : parseChords(actions_.shortcutText(id)))
                 for (const auto& [key, mods] : keysDown_) { // (key events, not the keyboard state: focus loss clears them)
                     const bool ctrl = mods & (SDL_KMOD_CTRL | SDL_KMOD_GUI), shift = mods & SDL_KMOD_SHIFT, alt = mods & SDL_KMOD_ALT;
                     if (key == c.key && c.ctrl == ctrl && c.shift == shift && c.alt == alt) on = true;
                 }
-        held = on ? held + dt : 0.0f;
+        const float seconds = keyNavEase_[id].advance(on, dt);
         float x, y, z;
-        if (held < 0.25f || !keyNavMotion(actions_.find(id), x, y, z)) continue;
-        px += x, py += y, zoom += z;
+        if (seconds <= 0.0f || !keyNavMotion(actions_.find(id), x, y, z)) continue;
+        px += x * seconds, py += y * seconds, zoom += z * seconds;
         any = true;
     }
     if (!any) return;
-    const float k = dt * std::clamp(uiPrefs_.keyNavSpeed, 0.1f, 5.0f);
+    const float k = std::clamp(uiPrefs_.keyNavSpeed, 0.1f, 5.0f);
     if (px != 0.0f || py != 0.0f) camera_.pan(px * k, py * k, canvasHeight());
     if (zoom != 0.0f) camera_.zoom(zoom * k);
     keyNavMoving_ = true;
