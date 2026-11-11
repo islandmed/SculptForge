@@ -7,6 +7,7 @@
 
 #include "core/Benchmark.h"
 #include "core/Commands.h"
+#include "core/Multires.h"
 #include "core/Primitives.h"
 #include "core/Timeline.h"
 #include "core/UploadOrder.h"
@@ -14,6 +15,7 @@
 
 #include <chrono>
 #include <cstdio>
+#include <cstring>
 
 using namespace sf;
 
@@ -387,4 +389,79 @@ TEST(undo_dense_after_voxel_remesh_measure) {
         std::printf("[undo_dense_remesh]   Clay-ish r=%.2f: stroke %.0f ms, %zu verts (whole-mesh step %d), step %zu KB, undo %.1f ms redo %.1f ms\n",
                     radius, strokeMs, n, int(whole), d.undo.lastUndo()->approxBytes() / 1024, u, msSince(t));
     }
+}
+
+// A stroke on the top of a Divide stack (#181): the step holds the touched vertices only and undo / redo follow them, the
+// levels below are not walked.
+TEST(undo_dense_stroke_on_divide_levels) {
+    Document d = makeDoc(makeBenchSphere(20000));
+    std::string msg;
+    for (int i = 0; i < 3; ++i) CHECK(divideUndoable(d, true, msg));
+    CHECK(subdivLevelCount(d.mesh) >= 4);
+    const size_t undoStepsBefore = d.undo.undoCount();
+    auto tl = Timeline::attach(d);
+    const std::vector<glm::vec3> before = d.mesh.positions;
+    strokeOnce(d, 0.15f, BrushType::Clay);
+    const UndoRecord* step = d.undo.lastUndo();
+    CHECK(step != nullptr && !step->subdiv);
+    const size_t touched = step->positions.indices.size();
+    CHECK(touched > 500 && touched < d.mesh.vertexCount() / 10);
+    CHECK(step->approxBytes() <= touched * 2 * (sizeof(uint32_t) + sizeof(glm::vec3)));
+    const std::vector<glm::vec3> after = d.mesh.positions;
+    auto t = std::chrono::steady_clock::now();
+    CHECK(d.undo.undo(d.mesh, d.bvh));
+    const double undoMs = msSince(t);
+    CHECK(d.mesh.positions == before);
+    t = std::chrono::steady_clock::now();
+    CHECK(d.undo.redo(d.mesh, d.bvh));
+    const double redoMs = msSince(t);
+    CHECK(d.mesh.positions == after);
+    CHECK(undoMs < timeLimit(25.0) && redoMs < timeLimit(25.0));
+    CHECK(d.undo.undo(d.mesh, d.bvh));
+    CHECK(d.undo.undoCount() == undoStepsBefore);
+    // The dirty marks an undo leaves for the renderer cover the stroke's vertices and not the whole mesh.
+    d.mesh.clearDirty();
+    CHECK(d.undo.redo(d.mesh, d.bvh));
+    CHECK(!d.mesh.topologyDirty);
+    size_t dirty = 0;
+    for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) dirty += d.mesh.vertexDirty(v);
+    CHECK(dirty >= touched && dirty < d.mesh.vertexCount() / 4);
+}
+
+// Measurement only (SF_UNDO_DENSE_LEVELS="81000,3"): base triangles and Divide levels; a stroke at the top level, then undo / redo.
+TEST(undo_dense_levels_measure) {
+    const char* env = std::getenv("SF_UNDO_DENSE_LEVELS");
+    if (!env) return;
+    const size_t baseTris = std::stoull(env);
+    const char* comma = std::strchr(env, ',');
+    const int levels = comma ? std::atoi(comma + 1) : 3;
+    Document d = makeDoc(makeBenchSphere(baseTris));
+    std::string msg;
+    for (int i = 0; i < levels; ++i) CHECK(divideUndoable(d, true, msg));
+    auto tl = Timeline::attach(d);
+    std::printf("[undo_dense_levels] %zu tris, %d levels\n", d.mesh.triangleCount(), subdivLevelCount(d.mesh));
+    for (int rep = 0; rep < 3; ++rep) {
+        strokeOnce(d, 0.15f, BrushType::Clay);
+        const size_t n = d.undo.lastUndo()->positions.indices.size();
+        auto t = std::chrono::steady_clock::now();
+        d.undo.undo(d.mesh, d.bvh);
+        const double u = msSince(t);
+        t = std::chrono::steady_clock::now();
+        d.undo.redo(d.mesh, d.bvh);
+        std::printf("[undo_dense_levels]   %zu verts: undo %.1f ms redo %.1f ms (step %zu KB)\n", n, u, msSince(t),
+                    d.undo.lastUndo()->approxBytes() >> 10);
+    }
+    // Where the time goes: the stages of an undo on the touched vertices.
+    strokeOnce(d, 0.15f, BrushType::Clay);
+    const std::vector<uint32_t> idx = d.undo.lastUndo()->positions.indices;
+    auto stage = [&](const char* what, auto fn) {
+        auto t = std::chrono::steady_clock::now();
+        fn();
+        std::printf("[undo_dense_levels]     %-22s %.2f ms\n", what, msSince(t));
+    };
+    stage("mesh.evaluate", [&] { d.mesh.evaluate(idx); });
+    stage("mesh.updateNormals", [&] { d.mesh.updateNormals(idx); });
+    stage("bvh.refit", [&] { d.bvh.refit(d.mesh, idx); });
+    stage("UploadOrder.build", [&] { UploadOrder o; o.build(d.mesh); });
+    stage("subdivCommit", [&] { subdivCommit(d.mesh); });
 }

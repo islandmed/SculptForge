@@ -3335,9 +3335,12 @@ void App::generateLods() {
 }
 
 void App::clearLods() {
+    // The LODs go; the shown mesh changes only when one was previewed. Otherwise syncScene keeps sending just what
+    // changed (an undo on a 6M triangle mesh was a full upload and proxy rebuild each, half a second, #181).
+    const bool previewed = previewLod_ >= 0;
     lods_.clear();
     previewLod_ = -1;
-    lastDisplayed_ = nullptr;
+    if (previewed) lastDisplayed_ = nullptr;
 }
 
 void App::updateTitle() {
