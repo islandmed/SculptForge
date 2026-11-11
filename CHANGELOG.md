@@ -6,6 +6,52 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.12.5] - 2026-11-10
+
+### Added
+- **Startup splash**: when start-up takes longer than about 0.3 s, a small window with the SculptForge bust, the
+  wordmark and the version shows until the main window has drawn its first frame; the main window starts hidden
+  instead of empty. Never in headless runs, tests or benchmarks (SDL_VIDEO_DRIVER=offscreen). **Preferences >
+  Interface > Show startup splash** (on by default). Splash design idea by @lowenski (#176).
+
+### Changed
+- **Pan and zoom keys** (Ctrl+Numpad 4, 6, 8, 2, Zoom in/out) glide: a held key eases in and out (about 0.12 s each)
+  and moves by speed x time every frame, so a 1-second hold covers the same distance at 30 and 144 fps, instead of a
+  step, a quarter-second pause and then the hold. No OS key repeat is involved (requested by Artizmo on Discord).
+- The guide's Welcome chapter says membership early builds (each release about two weeks early) start with SculptForge
+  2027, the name of the official launch. Version numbers are unchanged.
+- **Testing**: end-to-end modelling scenarios (tests/e2e) run inside the existing test suites: sculpting, Voxel Remesh
+  at 2M triangles, Extract, shelves, paint, tubes, cloth, Parts, export round trips, preferences and quitting. Nothing
+  changes in the app.
+
+### Fixed
+- Generate 3D: when a free Hugging Face model finishes without a model, or refuses the job, the panel now says so in
+  red under Generate, with the service name (it used to show only in the status bar, so it looked silent). Text to 3D
+  on the two free Hunyuan3D Spaces is switched off by their owners; the message says that and points to Image to 3D or
+  another provider. Photos from the phone use the same message.
+- **Member builds** (Preferences > Updates): the GitHub sign-in always ends with a visible message, including an
+  account that is not yet on the member list or has an invitation to accept, a declined sign-in and an expired code
+  (reported by a member). The sign-in's polling also retries a GitHub 5xx or rate limit instead of stopping. The
+  device flow is now one tested function (all outcomes, `slow_down`, expiry, cancel).
+- **Quitting with Alt+F4 on Linux** (#183, X11): the window now stays until Alt and F4 are released (2 seconds at
+  most). Closed while they were still down, the held key repeat or the release reached the desktop behind it, where
+  Alt+F4 can be Log out. Stopping a helper program (splat trainer, COLMAP, ffmpeg) also can only signal that helper
+  now: never our own process group, never everything (a pid of 0 or -1), never one that was already gone.
+- With **Rgb** on, a Sub stroke (Alt, or Sub toggled) laid no colour: it painted back towards white instead, so only
+  Add strokes coloured the Part. Sub now lays the colour like Add, with the same alpha and Colour intensity, for every
+  brush and stroke type. The Paint brush itself still paints back to white on Alt.
+- **A custom brush lost from the bottom shelf** (rand_gogh): a slot whose brush wasn't loaded kept its name and looked
+  usable. It now shows a missing mark with a tooltip, finds the brush again if its file comes back (or is in the new
+  backups folder), and Remove from shelf clears it.
+- **Brush files are saved more safely**: a save that doesn't fully reach the disk no longer replaces the good file,
+  the file being replaced and a deleted brush are copied to `backups/` in the brush library first, a brush file that
+  can't be read is kept (and listed) and restored from that copy, and brushes that exist only in this session survive
+  a library reload (installing or switching a pack).
+- **Thread count capped at 16** (#184): a Threads value set by hand (Preferences > Performance, or
+  `set_performance_override threads`) above 16 is used at the next start, up to the computer's hardware threads; the
+  default is still every hardware thread up to 16. The paint-layer, transform, multires and texture loops follow the
+  same count.
+
 ## [0.12.4] - 2026-11-10
 
 ### Added

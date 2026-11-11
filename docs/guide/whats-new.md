@@ -8,7 +8,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.12.5
 
 ```features
-date: unreleased
+date: 2026-11-10
 tagline: Rgb colours Sub strokes, your brushes are safer, and the pan keys glide.
 highlight: Rgb lays colour on Sub strokes too, for every brush and stroke type
 highlight: Brushes you made are safer: a missing bottom-shelf brush shows a mark and comes back from its backup (thanks rand_gogh)
@@ -16,6 +16,21 @@ highlight: Holding the pan and zoom keys glides smoothly at any frame rate (requ
 highlight: Thread counts above 16 set in Preferences > Performance apply at the next start (#184)
 highlight: A startup splash shows the bust and version while SculptForge starts
 ```
+
+- **Startup splash**: while SculptForge takes a moment to start, the bust, wordmark and version show on the dark
+  background, and the main window appears once it is ready (no empty window first). A quick start shows nothing.
+  **Preferences > Interface > Show startup splash** turns it off.
+- **Smooth pan and zoom keys**: holding Pan left/right/up/down or Zoom in/out now glides: it eases in over a tenth of
+  a second, moves at the same speed at any frame rate and eases out when you let go, instead of a jump and a pause.
+  Requested by Artizmo on Discord.
+- **Member sign-in says what happened**: after you enter the code on GitHub, **Preferences > Updates > Member builds**
+  now tells you the result: signed in with member builds on, signed in but not on the member list yet (or an
+  invitation still waiting, with a button to the invitations page), declined, or the code ran out.
+- **Rgb** now lays colour on Sub strokes too, for every brush and stroke type.
+- **Brushes you made are safer**: a brush file that can't be read is kept and comes back from its backup; a
+  bottom-shelf slot whose brush is missing shows a "missing" mark instead of a brush that looks usable.
+- **Threads above 16**: a thread count you set in **Preferences > Performance** (up to every thread your computer has)
+  now applies at the next start; the default stays at 16.
 
 ## Version 0.12.4
 
