@@ -1,16 +1,16 @@
 # e2e: preferences. A threads override (set_performance_override name=threads, Preferences > Performance) is kept for the
 # next start: what the profile file holds is what the pool is made with, up to the hardware's threads and not capped at 16
-# (#184: 32 was saved and shown, then 16 ran after a restart; fix/threads-cap). auto gives it back.
+# (#184: 32 was saved and shown, then 16 ran after a restart; fix/threads-cap). auto gives it back. 3, not 40: the value
+# is capped at the hardware's threads (3-4 on CI runners); the threads-cap unit test covers above 16.
 run new_sphere subdivisions=3
-run set_performance_override name=threads value=40
-expect_value profile_threads == 40
+run set_performance_override name=threads value=3
+expect_value profile_threads == 3
 restart
 wait 0.2
-expect_value profile_threads == 40
+expect_value profile_threads == 3
 run set_performance_override name=threads value=2
 expect_value profile_threads == 2
 restart
 expect_value profile_threads == 2
 run set_performance_override name=threads value=auto
 expect_value profile_threads >= 1
-expect_value profile_threads != 40
