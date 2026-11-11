@@ -238,12 +238,16 @@ TEST(layer_brush_raises_constant_height_without_stacking) {
 TEST(smooth_peaks_lowers_only_the_high_points) {
     // A bump and a pit on a plane: Smooth Peaks wears the bump down and leaves the pit's floor where it was,
     // where plain Smooth fills the pit.
-    Document d = planeDoc();
-    DabParams bump = dabAt(glm::vec3(0.3f, 0, 0), 0.2f, 1.0f);
-    stroke(d, BrushType::Standard, bump, kNoSymmetry, 3);
-    DabParams pit = dabAt(glm::vec3(-0.3f, 0, 0), 0.2f, 1.0f);
-    pit.invert = true;
-    stroke(d, BrushType::Standard, pit, kNoSymmetry, 3);
+    const auto bumpy = [] {
+        Document d = planeDoc();
+        DabParams bump = dabAt(glm::vec3(0.3f, 0, 0), 0.2f, 1.0f);
+        stroke(d, BrushType::Standard, bump, kNoSymmetry, 3);
+        DabParams pit = dabAt(glm::vec3(-0.3f, 0, 0), 0.2f, 1.0f);
+        pit.invert = true;
+        stroke(d, BrushType::Standard, pit, kNoSymmetry, 3);
+        return d;
+    };
+    Document d = bumpy();
     uint32_t top = 0, floor = 0;
     for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) {
         if (d.mesh.positions[v].y > d.mesh.positions[top].y) top = v;
@@ -252,7 +256,7 @@ TEST(smooth_peaks_lowers_only_the_high_points) {
     CHECK(d.mesh.positions[top].y > 0.05f && d.mesh.positions[floor].y < -0.05f);
     const auto before = d.mesh.positions;
 
-    Document plain = d;
+    Document plain = bumpy();
     stroke(plain, BrushType::Smooth, dabAt(glm::vec3(0.0f), 0.8f, 1.0f), kNoSymmetry, 4);
     CHECK(plain.mesh.positions[floor].y > before[floor].y + 0.01f);
 
