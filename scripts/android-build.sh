@@ -50,7 +50,7 @@ for abi in "${abis[@]}"; do
     -DCMAKE_BUILD_TYPE=$cmake_type -DSCULPTFORGE_USE_SYSTEM_SDL=OFF -DSCULPTFORGE_PLUGINS=OFF \
     -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
     ${CMAKE_CXX_COMPILER_LAUNCHER:+-DCMAKE_C_COMPILER_LAUNCHER=$CMAKE_CXX_COMPILER_LAUNCHER -DCMAKE_CXX_COMPILER_LAUNCHER=$CMAKE_CXX_COMPILER_LAUNCHER}
-  cmake --build "$b" --target sculptforge
+  cmake --build "$b" --target sculptforge -- -k 0 # (all compile errors in one CI run)
   mkdir -p "$jni/$abi"
   cp "$b/libmain.so" "$jni/$abi/"
   cp "$(find "$b" -name libSDL3.so -print -quit)" "$jni/$abi/"
