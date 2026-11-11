@@ -141,6 +141,45 @@ TEST(founding_members_json) {
     CHECK(Json::parse(text, j, error) && j["limit"].isNumber() && j["taken"].isNumber() && j["names"].isArray());
 }
 
+TEST(featured_videos_parse_and_drop_the_odd) {
+    CHECK(parseFeaturedVideos("").empty());
+    CHECK(parseFeaturedVideos("{\"videos\": []}").empty()); // the bundled list today: the Welcome shows no section
+    const std::string ok = "{\"title\": \"Honest review\", \"creator\": \"Ada\", \"url\": \"https://example.org/v\", \"thumb\": \"ada.jpg\"}";
+    auto one = [](const std::string& title, const std::string& url, const std::string& thumb) {
+        return "{\"videos\": [{\"title\": \"" + title + "\", \"creator\": \"Ada\", \"url\": \"" + url + "\", \"thumb\": \"" + thumb + "\"}]}";
+    };
+    const auto v = parseFeaturedVideos("{\"videos\": [" + ok + "]}");
+    CHECK(v.size() == 1 && v[0].title == "Honest review" && v[0].creator == "Ada" && v[0].thumb == "ada.jpg");
+    CHECK(parseFeaturedVideos(one("T", "http://example.org/v", "a.jpg")).empty());      // https only
+    CHECK(parseFeaturedVideos(one("T", "javascript:alert(1)", "a.jpg")).empty());
+    CHECK(parseFeaturedVideos(one("T", "https://example.org/v", "../a.jpg")).empty()); // a file name, not a path
+    CHECK(parseFeaturedVideos(one("T", "https://example.org/v", "")).empty());
+    CHECK(parseFeaturedVideos(one("\\u202e", "https://example.org/v", "a.jpg")).empty()); // a title that sanitises to nothing
+    std::string many = "{\"videos\": [";
+    for (int i = 0; i < 6; ++i) many += (i ? "," : "") + ok;
+    CHECK(parseFeaturedVideos(many + "]}").size() == kFeaturedMax);
+    // The bundled file in the repository parses as written.
+    std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../assets/featured/featured.json", std::ios::binary);
+    CHECK(f.good());
+    Json j;
+    std::string error;
+    CHECK(Json::parse(std::string{std::istreambuf_iterator<char>(f), {}}, j, error) && j["videos"].isArray());
+}
+
+TEST(social_links_are_the_websites_https_pages) {
+    // The Welcome icon row opens the same accounts as the site's socials row, over https, and nothing else.
+    std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../website/index.html", std::ios::binary);
+    CHECK(f.good());
+    const std::string page{std::istreambuf_iterator<char>(f), {}};
+    CHECK(kSocialCount == 5);
+    for (const SocialLink& link : kSocialLinks) {
+        const std::string url = link.url, base = url.substr(0, url.find('?'));
+        CHECK(url.rfind("https://", 0) == 0);
+        if (page.find("href=\"" + base) == std::string::npos) std::printf("  not on the site: %s\n", link.url);
+        CHECK(page.find("href=\"" + base) != std::string::npos);
+    }
+}
+
 TEST(support_card_links_match_the_website) {
     // The card opens the same Stripe checkout pages as the membership page and the studio page (never links of its own).
     auto read = [](const char* name) {

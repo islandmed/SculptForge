@@ -5,6 +5,7 @@
 // Members in Help > About. Each only opens kSupportUrl in the browser (Support.h); the app is the same for everyone,
 // so nothing here checks, sends or stores anything else.
 #include "app/App.h"
+#include "app/BrandMark.h"
 #include "app/NativeDialog.h"
 #include "app/Config.h"
 #include "app/LookSchemes.h"
@@ -20,6 +21,15 @@
 #include <vector>
 
 namespace sf {
+namespace featured_data { // assets/featured, compiled in (cmake/EmbedFeatured.cmake)
+struct File {
+    const char* path;
+    const unsigned char* data;
+    unsigned long long size;
+};
+extern const File kFiles[];
+extern const int kFileCount;
+} // namespace featured_data
 
 namespace assets {
 extern const unsigned char supporters[]; // docs/supporters.txt (CMakeLists.txt)
@@ -62,6 +72,113 @@ void App::openDiscordPage() {
     }
     status_ = sf::dialogs::openUrl(kDiscordUrl) ? std::string("Opened the SculptForge Discord invite in your browser")
                                        : std::string("Couldn't open ") + kDiscordUrl + ": " + SDL_GetError();
+}
+
+void App::openSocialLink(int index) {
+    if (index < 0 || index >= kSocialCount) return;
+    ++socialRequests_;
+    lastSocial_ = index;
+    const SocialLink& link = kSocialLinks[index];
+    if (!interactive()) { // UI tests, renders and demos never start a browser
+        status_ = std::string(link.name) + ": " + link.url;
+        return;
+    }
+    status_ = sf::dialogs::openUrl(link.url) ? std::string("Opened SculptForge on ") + link.name + " in your browser"
+                                             : std::string("Couldn't open ") + link.url + ": " + SDL_GetError();
+}
+
+// Small grey icons in a row at the cursor, one line high, each lighter under the pointer; a click opens that page in the browser.
+float App::socialRowWidth() const {
+    const float size = ImGui::GetFrameHeight() * 0.72f, gap = 8.0f * uiScale_;
+    return kSocialCount * size + (kSocialCount - 1) * gap;
+}
+
+void App::drawSocialRow(const char* where, ImVec2 at) {
+    const float size = ImGui::GetFrameHeight() * 0.72f, gap = 8.0f * uiScale_, frame = ImGui::GetFrameHeight();
+    const ImVec2 topLeft(at.x, at.y - frame * 0.5f);
+    ImGui::BeginGroup(); // one frame-high item: what follows (the Support button) keeps its place
+    for (int i = 0; i < kSocialCount; ++i) {
+        const ImVec2 icon(at.x + float(i) * (size + gap), at.y - size * 0.5f);
+        ImGui::SetCursorScreenPos(icon);
+        const std::string id = std::string(kSocialLinks[i].name) + "##" + where + ".social";
+        const bool clicked = ImGui::InvisibleButton(id.c_str(), ImVec2(size, size));
+        const bool hot = ImGui::IsItemHovered();
+        const ImVec4 tint = ImGui::GetStyleColorVec4(hot ? ImGuiCol_Text : ImGuiCol_TextDisabled);
+        brand::socialIcon(ImGui::GetWindowDrawList(), i, icon, size, ImGui::GetColorU32(tint));
+        if (hot) ImGui::SetTooltip("%s", kSocialLinks[i].name);
+        if (clicked) openSocialLink(i);
+    }
+    ImGui::SetCursorScreenPos(topLeft);
+    ImGui::Dummy(ImVec2(socialRowWidth(), frame));
+    ImGui::EndGroup();
+}
+
+namespace {
+// The bundled creator videos (assets/featured), parsed once; their thumbnails are uploaded when first drawn.
+struct FeaturedSlot {
+    std::vector<FeaturedVideo> videos;
+    std::vector<unsigned> textures;
+};
+FeaturedSlot& featuredSlot() {
+    static FeaturedSlot slot = [] {
+        FeaturedSlot f;
+        const featured_data::File* json = nullptr;
+        for (int i = 0; i < featured_data::kFileCount; ++i)
+            if (std::string_view(featured_data::kFiles[i].path) == "featured.json") json = &featured_data::kFiles[i];
+        if (json) f.videos = parseFeaturedVideos(std::string(reinterpret_cast<const char*>(json->data), size_t(json->size)));
+        f.textures.assign(f.videos.size(), 0u);
+        return f;
+    }();
+    return slot;
+}
+} // namespace
+
+// "Featured by creators": up to three cards (thumbnail, title, creator); a click opens the video's page in the browser. Nothing
+// is drawn, not even the heading, while the bundled list is empty.
+void App::drawFeaturedVideos() {
+    FeaturedSlot& slot = featuredSlot();
+    if (slot.videos.empty()) return;
+    ImGui::Spacing();
+    ImGui::TextUnformatted(tr("Featured by creators"));
+    const float gap = ImGui::GetStyle().ItemSpacing.x;
+    const float width = (ImGui::GetContentRegionAvail().x - gap * float(kFeaturedMax - 1)) / float(kFeaturedMax), height = width * 9.0f / 16.0f;
+    for (size_t i = 0; i < slot.videos.size(); ++i) {
+        const FeaturedVideo& v = slot.videos[i];
+        if (i > 0) ImGui::SameLine();
+        ImGui::BeginGroup();
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const std::string id = "##welcome.featured." + std::to_string(i);
+        const bool clicked = ImGui::InvisibleButton(id.c_str(), ImVec2(width, height));
+        if (slot.textures[i] == 0)
+            for (int k = 0; k < featured_data::kFileCount; ++k)
+                if (v.thumb == featured_data::kFiles[k].path)
+                    slot.textures[i] = brand::imageTexture(featured_data::kFiles[k].data, featured_data::kFiles[k].size);
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        dl->AddRectFilled(at, ImVec2(at.x + width, at.y + height), IM_COL32(24, 24, 28, 255), 3.0f * uiScale_);
+        if (slot.textures[i])
+            dl->AddImageRounded(ImTextureID(uintptr_t(slot.textures[i])), at, ImVec2(at.x + width, at.y + height), ImVec2(0, 0), ImVec2(1, 1),
+                                ImGui::IsItemHovered() ? IM_COL32_WHITE : IM_COL32(220, 220, 220, 255), 3.0f * uiScale_);
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width);
+        ImGui::TextUnformatted(v.title.c_str());
+        ImGui::TextDisabled("%s", v.creator.c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::EndGroup();
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Opens in your browser."));
+        if (clicked) openFeaturedVideo(int(i));
+    }
+}
+
+void App::openFeaturedVideo(int index) {
+    const FeaturedSlot& slot = featuredSlot();
+    if (index < 0 || size_t(index) >= slot.videos.size()) return;
+    ++featuredRequests_;
+    const std::string& url = slot.videos[size_t(index)].url;
+    if (!interactive()) { // UI tests, renders and demos never start a browser
+        status_ = "Featured video: " + url;
+        return;
+    }
+    status_ = sf::dialogs::openUrl(url.c_str()) ? std::string("Opened the video in your browser")
+                                                : std::string("Couldn't open ") + url + ": " + SDL_GetError();
 }
 
 void App::drawSupportersSection() {
@@ -252,24 +369,23 @@ void App::drawSupportUi() {
             // The interface language: one click, live (a hook for the mission headline above it, queue item 44).
             drawLanguageRow();
             ImGui::Spacing();
-            // New to sculpting: the lesson first, big (docs/guide/first-sculpt.md).
+            // New to sculpting: the lesson first, big (docs/guide/first-sculpt.md); beside it, for those who have sculpted
+            // before, the quick tour (QuickTour.cpp), where everything is in ten slides.
+            const float tourW = ImGui::CalcTextSize(tr("Quick tour")).x + ImGui::GetFontSize() * 2.2f + 2.0f * ImGui::GetStyle().FramePadding.x;
             ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-            if (ImGui::Button(tr(ICON_LC_GRADUATION_CAP "  Start the 10-minute lesson##welcome.lesson"), ImVec2(-1, 40.0f * s))) {
+            if (ImGui::Button(tr(ICON_LC_GRADUATION_CAP "  Start the 10-minute lesson##welcome.lesson"),
+                              ImVec2(ImGui::GetContentRegionAvail().x - tourW - ImGui::GetStyle().ItemSpacing.x, 40.0f * s))) {
                 guide_.open("first-sculpt.md");
                 showWelcome_ = false;
             }
             ImGui::PopStyleColor();
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", tr("Your first sculpt: a cute owl head from this sphere, step by step, in about ten minutes."));
-            // Sculpted before: the quick tour (QuickTour.cpp), where everything is in ten slides.
-            if (ImGui::Button(tr(ICON_LC_COMPASS "  Sculpted before? Take the quick tour##welcome.tour"), ImVec2(-1, 0)))
-                showQuickTour(0);
+            ImGui::SameLine();
+            if (ImGui::Button(tr(ICON_LC_COMPASS "  Quick tour##welcome.tour"), ImVec2(-1, 40.0f * s))) showQuickTour(0);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", tr("Ten short slides: remeshing, dynamic topology, retopology, levels, masking, cut, "
                                   "brushes and baking, each with a Show me button."));
-            ImGui::Spacing();
-            ImGui::TextWrapped("%s", tr("Hold Ctrl over any control to see what it does. The User Guide (Shift+F1) explains every "
-                               "tool, and the quick tour shows what is where."));
             // The look (0.10.9, #U6): three cards, the first the default. Existing installs never see this window
             // unless they open Help > Welcome, so nobody's look changes by itself.
             ImGui::Spacing();
@@ -323,6 +439,7 @@ void App::drawSupportUi() {
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", tr("Bust, full body, hand, foot, ear, eye, stylised and creature heads, torso and "
                                   "bevelled primitives: Library > Tool > Starter meshes."));
+            drawFeaturedVideos(); // creator reviews and tutorials: bundled, and nothing at all while there are none
             // AI (Preferences > AI changes it later; saved at once).
             ImGui::Spacing();
             ImGui::AlignTextToFramePadding();
@@ -339,22 +456,29 @@ void App::drawSupportUi() {
                     ImGui::SetTooltip("%s", choice ? "AI Brush (describe a brush) and Generate 3D (image or text to a model)."
                                                    : "Hides them; SculptForge makes no AI network calls.");
             }
-            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-            ImGui::TextWrapped("%s", ai::kPrivacyLine);
-            ImGui::PopStyleColor();
-            ImGui::Spacing();
-            if (ImGui::Button(tr("Open the User Guide##welcome"))) {
-                guide_.open();
-                showWelcome_ = false;
-            }
             ImGui::SameLine();
-            if (ImGui::Button(tr("Join the community on Discord##welcome"))) openDiscordPage();
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s", tr("Questions, tips and work in progress: opens the invite in your browser."));
+            ImGui::TextDisabled("%s", tr("Your art is never uploaded or used for training."));
+            ImGui::SameLine();
+            if (ImGui::SmallButton(tr("Details##welcome.ai"))) // the full wording: ai::kPrivacyLine, also in Help > About
+                sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md");
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr(ai::kPrivacyLine));
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
-            ImGui::TextWrapped(tr("SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (one request a month, built first and credited to you) and your name in the credits. %s"), kFreeReleaseNote);
+            ImGui::TextDisabled("%s", tr("Free for everyone. Members get betas and a vote on what's next."));
+            // The guide, the community (Discord, GitHub, X, Bluesky, Instagram) and, on the right, the memberships.
+            const float rightW = ImGui::CalcTextSize(tr("Support SculptForge")).x + ImGui::CalcTextSize(tr("Close")).x +
+                                 4.0f * ImGui::GetStyle().FramePadding.x + ImGui::GetStyle().ItemSpacing.x;
+            if (ImGui::Button(tr("User Guide##welcome"))) {
+                guide_.open();
+                showWelcome_ = false;
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", tr("Hold Ctrl over any control to see what it does. Shift+F1 opens the guide any time."));
+            const float guideMid = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
+            ImGui::SameLine(0.0f, 14.0f * s);
+            drawSocialRow("welcome", ImVec2(ImGui::GetCursorScreenPos().x, guideMid)); // centred on the button
+            ImGui::SameLine(std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - rightW));
             if (ImGui::Button(tr("Support SculptForge##welcome"))) showSupportCard(SupportCardReason::Manual); // the memberships
             ImGui::SameLine();
             if (ImGui::Button(tr("Close##welcome"))) showWelcome_ = false;

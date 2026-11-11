@@ -521,6 +521,11 @@ private:
     // Supporting SculptForge (Support.h): the app only ever opens the membership page or its Stripe checkout links in the
     // browser; nothing else changes.
     void openSupportPage();
+    void openSocialLink(int index); // kSocialLinks[index] in the browser (UI tests: the status bar only)
+    void drawFeaturedVideos();       // Welcome: the creator video cards, nothing while there are none (PanelSupport.cpp)
+    void openFeaturedVideo(int index);
+    void drawSocialRow(const char* where, ImVec2 at); // `at`: its left edge and vertical centre (screen) // the community icon row at the cursor: "welcome" or "about" (PanelSupport.cpp)
+    float socialRowWidth() const;          // its width
     void openDiscordPage(); // kDiscordUrl in the browser (UI tests: the status bar only)
     void openSupportLink(const char* url); // one of the Support.h links (UI tests: the status bar only)
     void drawSupportUi();               // the first-run welcome and the new-look note
@@ -564,6 +569,9 @@ private:
     size_t sceneTrianglesWithMicro() const; // visible base triangles, micro levels counted in full
     void openPerformancePrefs();            // Preferences > Performance, opened and flashed
     void tickBigMeshTip();                  // every frame (drawSupportUi): shows the tip when due
+    int featuredRequests_ = 0;          // UI tests: how often a featured video was opened
+    int socialRequests_ = 0;            // UI tests: how often a community icon was clicked
+    int lastSocial_ = -1;               // and which one (index into kSocialLinks)
     int discordRequests_ = 0;           // UI tests: how often the Discord invite was asked for
     int supportPageRequests_ = 0;       // UI tests: how often the page was asked for (only opened when interactive)
     // The membership cards (Support.h, PanelSupportCard.cpp): the full card on the first start (and from Help >

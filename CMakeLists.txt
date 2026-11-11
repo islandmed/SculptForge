@@ -409,13 +409,17 @@ if(SCULPTFORGE_BUILD_APP)
     splashWordmark ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/splash-wordmark.png # the start-up splash: wordmark and brand bust
     splashBust ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/splash-bust.png # (StartupSplashWindow.cpp; the bust is website/press/sculptforge-bust-1024.png at 576 px, 256 colours)
     bustMark ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/bust/bust-256.png # the illustration: About, What's New, support card
+    socialIcons ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/social/social-icons.png # the community icon strip (Welcome; tools/brand/make_social_icons.py)
     supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt # Help > About (never empty: it starts with comments)
     foundingMembers ${CMAKE_CURRENT_SOURCE_DIR}/website/founding.json) # Help > About and the membership card
+  include(cmake/EmbedFeatured.cmake)
+  embed_featured(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFeatured.cpp ${CMAKE_CURRENT_SOURCE_DIR}/assets/featured) # the Welcome dialog's creator videos
   include(cmake/EmbedGuide.cmake)
   embed_guide(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp ${CMAKE_CURRENT_SOURCE_DIR}/docs/guide)
   add_executable(sculptforge
     ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFonts.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFeatured.cpp
     src/app/main.cpp
     src/app/Bench.cpp
     src/app/Calibration.cpp
@@ -551,7 +555,7 @@ if(SCULPTFORGE_BUILD_APP)
   endif()
   sculptforge_pch(sculptforge <imgui.h>)
   set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFonts.cpp ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp
-                              PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+                              ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFeatured.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
   if(WIN32)
     set_target_properties(sculptforge PROPERTIES WIN32_EXECUTABLE $<CONFIG:Release,MinSizeRel>)
     set(ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge.ico")
@@ -1129,6 +1133,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(support_shots_1440 support/support_shots --size 1440x900)
     # Help > Support (the welcome screen) and the full membership card at 1440 px: the perk lines fit (100 % and 200 %).
     sculptforge_ui_test(support_1440 support --size 1440x900)
+    sculptforge_ui_test(support_2880 support --size 2880x1620) # the welcome and About at 200 %: the icon rows keep their line
     sculptforge_ui_test(support_card_1440 support_card --size 1440x900)
     sculptforge_ui_test(support_shots_1024 support/support_shots --size 1024x768)
     # The first start's language: the OS-language decision, the welcome's language row and the "SculptForge is in..." bar (1440 + 2880).

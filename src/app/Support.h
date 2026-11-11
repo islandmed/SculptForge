@@ -25,6 +25,18 @@ namespace sf {
 inline constexpr const char* kSupportUrl = "https://sculptforge.app/support.html";
 // The official community Discord (a permanent invite; the same link as on the website and in the README).
 inline constexpr const char* kDiscordUrl = "https://discord.gg/gWrYkEmQhH";
+// The community places the Welcome dialog's icon row opens (in this order, like the strip in assets/branding/social); the same
+// accounts as the website's footer. Opened on a click only; the app makes no request to any of them.
+struct SocialLink { const char* name; const char* url; };
+inline constexpr SocialLink kSocialLinks[] = {
+    {"Discord", kDiscordUrl},
+    {"GitHub", "https://github.com/islandmed/SculptForge"},
+    {"X", "https://x.com/SculptForgeApp?utm_source=app&utm_medium=welcome"},
+    {"Bluesky", "https://bsky.app/profile/sculptforge.bsky.social?utm_source=app&utm_medium=welcome"},
+    {"Instagram", "https://www.instagram.com/sculptforge.app?utm_source=app&utm_medium=welcome"},
+};
+inline constexpr int kSocialCount = int(sizeof(kSocialLinks) / sizeof(kSocialLinks[0]));
+
 // Two memberships: Member ($5 / month or $48 / year) and Studio (a flat $300 / month for the whole studio, any number of
 // artists; the first 5 studios pay a flat $150 as Founding Studios). The same Stripe checkout links as website/support.html
 // and studios.html (tests/test_support.cpp checks they match). An empty yearly link hides the yearly choice in the
@@ -329,6 +341,31 @@ inline FoundingMembers parseFoundingMembers(const std::string& json) {
             if (!name.empty()) f.names.push_back(std::move(name));
         }
     return f;
+}
+
+// assets/featured/featured.json: {"videos": [{"title", "creator", "url", "thumb"}]}, the creator videos the Welcome dialog
+// features (bundled with the app, nothing fetched; an empty list hides the section). At most kFeaturedMax; an entry without
+// a title, an https url or a thumbnail file name is dropped; title and creator are sanitised like the supporters.
+inline constexpr size_t kFeaturedMax = 3;
+struct FeaturedVideo {
+    std::string title, creator, url, thumb;
+};
+inline std::vector<FeaturedVideo> parseFeaturedVideos(const std::string& json) {
+    std::vector<FeaturedVideo> out;
+    Json j;
+    std::string error;
+    if (!Json::parse(json, j, error) || !j.isObject() || !j["videos"].isArray()) return out;
+    for (const Json& v : j["videos"].items()) {
+        if (out.size() >= kFeaturedMax) break;
+        if (!v.isObject() || !v["title"].isString() || !v["url"].isString() || !v["thumb"].isString()) continue;
+        FeaturedVideo f{sanitizeSupporterName(v["title"].asString()),
+                        v["creator"].isString() ? sanitizeSupporterName(v["creator"].asString()) : std::string(),
+                        v["url"].asString(), v["thumb"].asString()};
+        const bool plainName = !f.thumb.empty() && f.thumb.find_first_of("/\\:") == std::string::npos && f.thumb[0] != '.';
+        if (f.title.empty() || f.url.rfind("https://", 0) != 0 || f.url.size() > 300 || !plainName) continue;
+        out.push_back(std::move(f));
+    }
+    return out;
 }
 
 } // namespace sf
