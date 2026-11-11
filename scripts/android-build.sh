@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Builds the Android APK (android/README.md): the app's native code with the NDK (libmain.so + libSDL3.so per ABI),
-# then the Gradle project around it. Unsigned: scripts/android-sign.sh signs a release APK with our key, locally.
+# then the Gradle project around it.
 #
 #   scripts/android-build.sh [--abi arm64-v8a] [--abi x86_64] [--debug] [--unsigned] [--out DIR]
 #
