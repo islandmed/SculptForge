@@ -788,6 +788,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "smooth_group_borders") return app_.smoothGroupBorders_ ? 1.0 : 0.0;
     if (name == "stroke_keep_volume") return app_.dabSettings().smoothKeepVolume ? 1.0 : 0.0; // (Smooth's dabs)
     if (name == "smooth_intensity") return std::round(app_.smoothStrength_ * 100.0f);
+    // the Shift / Ctrl brushes (ModifierBrush.cpp): BrushType numbers, -1 the default; the stroke's brush and slot
+    if (name == "shift_brush") return double(app_.uiPrefs_.modifierBrushes.shift);
+    if (name == "ctrl_brush") return double(app_.uiPrefs_.modifierBrushes.ctrl);
+    if (name == "shift_intensity") return std::round(app_.uiPrefs_.modifierBrushes.shiftIntensity * 100.0f);
+    if (name == "stroke_brush") return double(int(app_.strokeBrush_));
+    if (name == "stroke_slot") return double(int(app_.strokeSlot_));
+    if (name == "main_brush") return double(int(app_.brush_));
     if (name == "rgb_intensity") return std::round(app_.rgbIntensity_ * 100.0f);
     if (name == "focal_shift") return std::round(app_.focalShift_ * 100.0f);
     if (name == "draw_size") return std::round(app_.radiusPx_);

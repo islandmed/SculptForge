@@ -437,7 +437,7 @@ App::DabSettings App::dabSettings() const {
     st.radiusPx = radiusPx_;
     st.worldRadius = worldSize_ && worldRadius_ > 0.0f ? worldRadius_ : 0.0f;
     st.pressureCurve = strokeCurve_;
-    st.strength = precisionActive_ ? precisionIntensity_ : strength_; // Shift+Alt mid-stroke (Precision.cpp)
+    st.strength = precisionActive_ ? precisionIntensity_ : strokeStrength(); // Shift+Alt mid-stroke (Precision.cpp)
     st.smoothStrength = smoothStrength_;
     st.smoothKeepVolume = smoothKeepVolume_ != strokeAltSmooth_;
     st.smoothGroupBorders = smoothGroupBorders_;

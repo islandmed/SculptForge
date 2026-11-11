@@ -106,6 +106,8 @@ struct State {
     // Size / Intensity / Colour intensity / Falloff at the cursor.
     int slider = -1; // PickerUi::Slider, -1 = closed
     bool sliderSmooth = false; // Intensity of the Smooth brush (Shift was held)
+    float* sliderZ = nullptr;  // the Intensity it sets: the main one, Smooth's or the Shift / Ctrl brush's own
+    std::string sliderZName = "Intensity";
     ImVec2 sliderAt{0, 0};  // the cursor when it opened
     ImVec2 sliderPos{0, 0}; // the window's place, fixed once the knob is under sliderAt
     bool sliderPlaced = false;
@@ -583,6 +585,7 @@ void PickerUi::select(App& app, const BrushItem& item) {
     app.edgesMode_ = false; // picking any brush leaves Edges mode (PanelEdges.cpp)
     switch (item.kind) {
     case BrushItem::Kind::Type:
+        if (app.modifierBrushClick(item.index)) return; // Shift+click: the Shift brush (ModifierBrush.cpp)
         app.brush_ = BrushType(item.index);
         app.doc_.activeBrush = -1;
         app.paintMode_ = false;
@@ -1252,6 +1255,8 @@ void PickerUi::sizePopup(App& app, Slider which) {
     // Smooth's own Intensity when Smooth is the brush or Shift is held. Not Shift in the Blender style:
     // there Shift+F is the brush's Strength, as in Blender, and Shift has no smoothing meaning for a key.
     s.sliderSmooth = app.blenderStyle() ? app.brush_ == BrushType::Smooth : app.activeBrush() == BrushType::Smooth;
+    s.sliderZ = app.blenderStyle() ? (s.sliderSmooth ? &app.smoothStrength_ : &app.intensityValue(false)) : &app.heldIntensity();
+    s.sliderZName = app.blenderStyle() ? (s.sliderSmooth ? "Smooth Intensity" : "Intensity") : app.heldIntensityName();
     // The brush cursor's own position (SDL's window coordinates, the brush ring's centre) rather than ImGui's
     // MousePos: on Windows ImGui's comes from the global cursor minus the window position while no button is held,
     // and pen drivers' stray mouse events move it too, so the slider opened away from the cursor (#9).
@@ -1368,7 +1373,7 @@ void drawPickers(App& app) {
             float* value;
             float lo, hi, shownScale;
         };
-        float* z = &app.intensityValue(s.sliderSmooth); // (in Paint mode the Colour intensity, #164)
+        float* z = s.sliderZ ? s.sliderZ : &app.intensityValue(s.sliderSmooth); // (in Paint mode the Colour intensity, #164)
         const bool paintZ = app.paintMode_ && !s.sliderSmooth;
         const Def d = which == PickerUi::Slider::DrawSize
                           ? Def{"Size", "S",
@@ -1376,7 +1381,7 @@ void drawPickers(App& app) {
                                 "change it.",
                                 &app.radiusPx_, kMinDrawSizePx, kMaxDrawSizePx, 1.0f}
                       : which == PickerUi::Slider::ZIntensity
-                          ? Def{s.sliderSmooth ? "Smooth Intensity" : "Intensity", "U",
+                          ? Def{s.sliderZName.c_str(), "U",
                                 s.sliderSmooth ? "How strongly Smooth works (it keeps its own value: hold "
                                                  "Shift and press U to set it). Type a number and press Enter."
                                 : paintZ ? "How strongly painting colours the surface (1-100). Drag, or type a number "
