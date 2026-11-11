@@ -143,6 +143,12 @@ Palette blueprintPalette() {
             0x6fe3ff, 0xffffff, 0xff7a85, 0x7dffc4, 0xffe27a, false};
 }
 
+Palette forgeNightPalette() {
+    // The values of ForgeTokens.h: night, panel, canvas, surface, raised; ink and ink dim; the forge orange.
+    return {0x0f0f12, 0x141418, 0x18181d, 0x202028, 0x2a2a34, 0x3a3a46, 0x6b6b78, 0x9a9aa6, 0xececf1, 0xf7f7fa,
+            0xf28c3c, 0xffb37a, 0xe5604a, 0x4cc38a, 0xe0b050, false};
+}
+
 bool parseHex(std::string_view text, unsigned& out) {
     if (!text.empty() && text.front() == '#') text.remove_prefix(1);
     if (text.size() == 8) text = text.substr(0, 6); // #rrggbbaa: drop the alpha

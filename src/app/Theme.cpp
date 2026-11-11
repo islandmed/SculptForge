@@ -267,6 +267,62 @@ void applyLook(const LookSettings& settings, std::string* status) {
     syncUiColors();
 }
 
+void applyOneSurface(const LookSettings& settings) {
+    // The palette: Forge Night, unless the user chose colours of their own (a Forge Terminal scheme other than the
+    // default, the desktop theme, Phosphor or Blueprint): theirs, laid flat the same way.
+    looks::Palette palette = looks::forgeNightPalette();
+    looks::LookId id = looks::LookId::ForgeTerminal;
+    if (settings.look == int(looks::LookId::Phosphor)) {
+        palette = looks::phosphorPalette(settings.amber);
+        id = looks::LookId::Phosphor;
+    } else if (settings.look == int(looks::LookId::Blueprint)) {
+        palette = looks::blueprintPalette();
+        id = looks::LookId::Blueprint;
+    } else if (settings.look == int(looks::LookId::ForgeTerminal)) {
+        looks::Palette omarchy;
+        std::string name, error;
+        if (settings.matchOmarchy && looks::readOmarchyTheme(omarchy, name, error)) palette = omarchy;
+        else if (const looks::SchemeInfo* scheme = looks::findScheme(settings.scheme); scheme && settings.scheme != "neutral")
+            palette = scheme->palette;
+    }
+    const std::vector<ImVec4>& classic = classicTokens();
+    for (size_t i = 0; i < std::size(kTokens); ++i) *kTokens[i] = classic[i];
+    setTokens(palette, id);
+    look = LookStyle{};
+    look.id = int(id);
+    look.outlines = 0;
+    look.roundingScale = 1.0f;
+    // One surface: the bars, shelves, trays and menus are one colour with no borders between them; only the
+    // controls inside (frames, buttons) step up from it.
+    const ImVec4 surface = rgb(palette.mantle);
+    shellBg = panelBg = header = surface;
+    border = canvasBorder = tileBorder = focusBorder = surface;
+    gapBg = surface;
+    sectionRule = ImVec4(rgb(palette.surface1).x, rgb(palette.surface1).y, rgb(palette.surface1).z, 0.6f);
+    applyStyle();
+    ImGuiStyle& st = ImGui::GetStyle();
+    st.WindowRounding = st.PopupRounding = 10.0f;
+    st.ChildRounding = 8.0f;
+    st.FrameRounding = st.GrabRounding = st.TabRounding = 6.0f;
+    st.ScrollbarRounding = 4.0f;
+    st.ScrollbarSize = 8.0f;
+    st.WindowBorderSize = 0.0f;
+    st.PopupBorderSize = 1.0f; // (a hairline keeps a menu apart from the model behind it)
+    ImVec4* c = st.Colors;
+    const ImVec4 s1 = rgb(palette.surface1), s2 = rgb(palette.surface2);
+    c[ImGuiCol_WindowBg] = c[ImGuiCol_PopupBg] = c[ImGuiCol_ChildBg] = ImVec4(surface.x, surface.y, surface.z, 1.0f);
+    c[ImGuiCol_Border] = ImVec4(1.0f, 1.0f, 1.0f, 0.08f); // ForgeTokens kLine
+    c[ImGuiCol_FrameBgActive] = s1;
+    c[ImGuiCol_TitleBg] = c[ImGuiCol_TitleBgActive] = c[ImGuiCol_TitleBgCollapsed] = surface;
+    c[ImGuiCol_ScrollbarBg] = ImVec4(0, 0, 0, 0);
+    c[ImGuiCol_ScrollbarGrab] = s1;
+    c[ImGuiCol_ScrollbarGrabHovered] = s2;
+    c[ImGuiCol_Separator] = s1;
+    c[ImGuiCol_TabSelected] = c[ImGuiCol_TabDimmedSelected] = s1;
+    c[ImGuiCol_TextSelectedBg] = ImVec4(accent.x, accent.y, accent.z, 0.30f);
+    syncUiColors();
+}
+
 void lookViewportGradient(ImVec4& centre, ImVec4& edge) {
     centre = g_gradCentre;
     edge = g_gradEdge;

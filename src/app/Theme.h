@@ -117,6 +117,12 @@ struct LookSettings {
 // Sets the look's colour tokens, LookStyle and ImGui style (unscaled, like applyStyle). `status` gets a message
 // when Match my Omarchy theme can't read the theme (the scheme is used instead).
 void applyLook(const LookSettings& settings, std::string* status = nullptr);
+// The one-surface look (Preferences > Interface > Look, Classic look off; App::oneSurface): on top of applyLook, one
+// flat panel colour for the bars, shelves, trays and menus (no boxes inside boxes, no borders, no gaps), rounded
+// pop-ups, Inter labels. Forge Night's colours (ForgeTokens.h) unless the user picked another Forge Terminal scheme
+// or the desktop theme, whose colours it keeps. Call before ImGuiStyle::ScaleAllSizes, as applyLook.
+void applyOneSurface(const LookSettings& settings);
+
 // The 3D view's gradient background in the current look (display sRGB 0-1): behind the model and at the edges.
 void lookViewportGradient(ImVec4& centre, ImVec4& edge);
 

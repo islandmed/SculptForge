@@ -44,6 +44,8 @@ const SchemeInfo* findScheme(std::string_view key); // nullptr when unknown
 // Phosphor's two screens and Blueprint's paper.
 Palette phosphorPalette(bool amber);
 Palette blueprintPalette();
+// Forge Night (ForgeTokens.h): the one-surface look's palette, shared with the touch layout.
+Palette forgeNightPalette();
 
 // "#7aa2f7" or "7aa2f7" -> 0x7aa2f7.
 bool parseHex(std::string_view text, unsigned& out);
