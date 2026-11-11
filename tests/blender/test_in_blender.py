@@ -278,6 +278,7 @@ def test_splats():
         except RuntimeError as e:
             said = str(e)
         check("5.3" in said and "5.3" in bridge.state.message, "older Blender: receiving splats says it needs 5.3 (%s)" % bridge.state.message)
+        bpy.context.view_layer.objects.active = None  # (send also takes the active mesh)
         check(not bpy.ops.sculptforge.send.poll(), "older Blender: nothing selected, nothing to send, no crash")
         return
 
