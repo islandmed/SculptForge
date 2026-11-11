@@ -87,7 +87,8 @@ A library brush gets its `<name>_invariant` test by itself: its promise is read 
 Flatten cut, Clay and Fill build, a texture or alpha skips the edge check). For a new brush type, a new tool or a
 new promise: add the case to `promiseOf` or a `*_invariant` TEST, run it on main first and see it fail on the
 defect it is meant to catch. A red found on main is filed as an issue and listed in `kKnown` with it: the test
-prints KNOWN and stays green, and turns red once it passes, so the fixing branch removes its line.
+prints KNOWN and stays green, and turns red once it passes. A fix must flip its known-red to a normal test: the
+fixing branch deletes its `kKnown` line in the same commit, so the test guards the fix from then on.
 ready.sh refuses a brush or tool branch (~/Work/.sf/brush-paths.txt) without added test lines naming an invariant.
 
 ## Areas: test the part you touched, the whole once per batch

@@ -77,6 +77,7 @@ const std::map<std::string, const char*> kKnown = {
     {"end_rings_invariant", "#197"},
     {"plank_seams_invariant", "#197"},
     {"brush_tendril_invariant", "#198"},
+    {"clay_big_brush_invariant_builds_a_mound_not_a_ring", "#196"},
     {"brush_nudge_invariant", "#199"},
     {"brush_cloth_invariant", "#200"},
 };
@@ -364,6 +365,19 @@ void addTest(const std::string& name, std::function<void()> fn) {
     return true;
 }();
 
+// One dab's radial profile at `radius` on the dense sphere (no symmetry).
+Profile oneDab(BrushType t, float radius, float& peak) {
+    Document d = denseSphere();
+    const std::vector<glm::vec3> before = d.mesh.positions, normals = d.mesh.normals;
+    const glm::vec3 at = glm::normalize(glm::vec3(0.45f, 0.6f, 0.66f));
+    DabParams p;
+    p.center = at, p.viewDir = -at, p.radius = radius, p.strength = 0.5f;
+    strokes(d, brushName(t), [t](Document& x, const DabParams& q, Symmetry s) { x.sculptor.dab(x.mesh, x.bvh, t, q, s); },
+            {{p}}, kNoSymmetry);
+    peak = maxRise(before, d.mesh, normals);
+    return radialProfile(d.mesh, before, normals, at, radius, meanEdge(denseSphereFixture().mesh));
+}
+
 double sphereVolume(int level) { return meshVolume(makeIcosphere(level)); }
 
 // Distance of every vertex from the unit sphere (the source of the tools below), as a fraction of its radius.
@@ -603,5 +617,23 @@ TEST(dyntopo_invariant_closed_outward_build_only) {
         expect(isWatertight(m), "dynamic topology left holes or non-manifold edges");
         expect(inwardFaces(m) == 0 && nonFinite(m) == 0, "dynamic topology: %zu faces inside out or NaN", inwardFaces(m));
         expect(inside < 0.25f * edge, "a raising stroke with dynamic topology sank the surface %.3g", inside);
+    });
+}
+
+// A big Clay dab on a curved form builds a mound, highest in the middle, not a ring: its profile never climbs
+// going outward, at a small radius and at half the form's radius (#196: rings per dab on big strokes).
+TEST(clay_big_brush_invariant_builds_a_mound_not_a_ring) {
+    guarded("clay_big_brush_invariant_builds_a_mound_not_a_ring", [] {
+        for (float radius : {0.15f, 0.5f}) {
+            float peak = 0.0f;
+            const Profile pr = oneDab(BrushType::Clay, radius, peak);
+            std::printf("  Clay radius %.2f: peak %.4f, %d climbing steps (worst %.1f%% of the peak); profile", radius, peak,
+                        pr.steps, 100.0f * pr.worstClimb);
+            for (size_t i = 0; i < pr.h.size(); i += std::max<size_t>(1, pr.h.size() / 8)) std::printf(" %.4f", pr.h[i]);
+            std::printf("\n");
+            expect(peak > 0.0f, "Clay at radius %.2f built nothing", radius);
+            expect(pr.steps == 0, "Clay at radius %.2f lifts a ring: its profile climbs %.1f%% of its height toward the edge",
+                   radius, 100.0f * pr.worstClimb);
+        }
     });
 }
