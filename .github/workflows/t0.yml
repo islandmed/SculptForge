@@ -39,21 +39,46 @@ jobs:
         with:
           fetch-depth: 0 # impacted.py: the merge base with origin/main and the last 600 commits' file lists
           filter: blob:none
+      # Main: a push whose every file is site lane (tools/ci/site_lane.txt, read from the commit before it, as ci.yml) builds
+      # nothing: the next app push restores the newest ccache-t0-linux.* (11-11: site-data commits 3+/h kept main's queue
+      # 10 deep and branch T0s waiting 30+ min). A new ref, a force push or a missing before commit builds.
+      - name: Site lane (main)
+        id: lane
+        if: github.ref == 'refs/heads/main'
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          site=false
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null &&
+             lane=$(git show "$BEFORE:tools/ci/site_lane.txt" 2>/dev/null); then
+            files=$(git diff --name-only "$BEFORE" "$GITHUB_SHA")
+            appin=$(grep '^!' <<< "$lane" | cut -c2- || true)
+            pat=$(grep -v -e '^#' -e '^!' -e '^[[:space:]]*$' <<< "$lane" || true)
+            if [ -n "$files" ] && [ -n "$pat" ] && ! { [ -n "$appin" ] && grep -qE -f <(echo "$appin") <<< "$files"; } &&
+               ! grep -qvE -f <(echo "$pat") <<< "$files"; then
+              site=true; echo "::notice::site lane only (tools/ci/site_lane.txt): no build, no cache save"
+            fi
+          fi
+          echo "site=$site" >> "$GITHUB_OUTPUT"
       - name: Downloads (ci.yml's, restored only)
+        if: steps.lane.outputs.site != 'true'
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .deps
           key: deps-build-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('cmake/Fetch.cmake', '.github/workflows/ci.yml') }}
           restore-keys: deps-build-${{ runner.os }}-${{ runner.arch }}-
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        if: steps.lane.outputs.site != 'true'
         with:
           python-version: '3.13' # as ci.yml: the same compile lines, so main's compiler cache hits
       - name: Install dependencies
+        if: steps.lane.outputs.site != 'true'
         run: |
           sudo ./packaging/linux/install-build-deps.sh >/dev/null
           sudo ./packaging/linux/apt-retry.sh install -y -qq --no-install-recommends ccache ninja-build libgl1-mesa-dri libegl1 mold >/dev/null
           python -m pip install -q numpy
       - name: Compiler cache (restore main's)
+        if: steps.lane.outputs.site != 'true'
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .ccache
@@ -62,10 +87,10 @@ jobs:
             ccache-t0-linux.
             ccache-ci-linux-x86_64.
       - name: Build (main; the cache for the T0 runs)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && steps.lane.outputs.site != 'true'
         run: bash tools/ci/t0.sh --warm t0-result
       - name: Compiler cache (save; main only)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && steps.lane.outputs.site != 'true'
         uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .ccache

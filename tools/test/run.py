@@ -220,6 +220,18 @@ def split_failures(failed, labels, quarantine, today, said=None):
     return blocking, tolerated, notes
 
 
+def load_scale(load1=None, cores=None):
+    """The alone rerun's budget factor: max(1, load1 / cores), at most 3 (11-11: marks 37 s against 21 s at load 15 on a
+    10-core laptop failed a T0 with nothing broken). CI and the PC run at load ~1, so their gates don't move; a 3x
+    slowdown still fails anywhere."""
+    try:
+        load1 = os.getloadavg()[0] if load1 is None else load1
+    except (OSError, AttributeError):
+        return 1.0
+    cores = cores or os.cpu_count() or 1
+    return min(3.0, max(1.0, load1 / cores))
+
+
 def parallel_jobs(args):
     """N of ctest's -jN / -j N / --parallel N (1 when absent)."""
     for i, x in enumerate(args):
@@ -488,10 +500,14 @@ def run_tests(argv=None):
                     continue
                 ctest(build, ["-R", f"^{re.escape(n)}$"], os.path.join(tmp2, "alone.xml"))
                 s2, d2 = results(os.path.join(tmp2, "alone.xml")).get(n, ("fail", d))
-                limit = 1.5 * known[n] * scale if n in known else a.budget
+                busy = load_scale()
+                limit = (1.5 * known[n] * scale if n in known else a.budget) * busy
+                load = f"; machine load x{busy:.2f}: limit {limit:.0f} s" if busy > 1 else ""
                 if s2 == "pass" and d2 <= limit:
                     slow.remove((d, n))
-                    print(f"over budget under load only: {n} {d:.1f} s in the run, {d2:.1f} s alone (not counted)")
+                    print(f"over budget under load only: {n} {d:.1f} s in the run, {d2:.1f} s alone (not counted{load})")
+                elif load:
+                    print(f"over budget alone too: {n} {d2:.1f} s{load}")
     for d, n in slow:
         why = f"1.5x its {known[n] * scale:g} s in tests/slow_tests.txt" if n in known else f"the {a.budget:g} s budget"
         print(f"over budget: {n} {d:.1f} s, over {why} (wait on events, use a smaller mesh, split it, or label it nightly)")
@@ -515,6 +531,7 @@ deletes it; remove its lines once fixed.
 
 
 def self_test():
+    assert load_scale(15, 10) == 1.5 and load_scale(2, 10) == 1.0 and load_scale(80, 10) == 3.0
     q = {"a": ("qa", "2026-11-18", "x", ""), "b": ("qa", "2026-11-01", "y", ""), "m": ("qa", "2026-11-18", "t", "[monkey 1064]")}
     blocking, tolerated, notes = split_failures(["a", "b", "c", "d"], {"d": ["flaky"]}, q, "2026-11-11")
     assert (blocking, tolerated) == (["b", "c"], ["a", "d"]), (blocking, tolerated)

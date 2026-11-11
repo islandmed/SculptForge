@@ -9,10 +9,15 @@ unpacked first) and the strings in SculptForge's own formats; images, video and 
 discord.py (the coordinator's posts) uses marks_in() from here, so the two can't disagree.
 
   check_marks.py            check the repository (ctest: marks; CI job "Trademarks")
+                            Files whose git blob passed before with the same patterns and this script are not read
+                            again (cache: $SF_MARKS_CACHE, default ~/.cache/sf-marks; never on CI; SF_MARKS_CACHE=0:
+                            off). Files changed in the working tree are always read.
   check_marks.py --count    print matches per pattern and per top-level folder
   check_marks.py --self-test
 """
+import hashlib
 import io
+import os
 import re
 import subprocess
 import sys
@@ -170,16 +175,67 @@ def marks_in(text, mark_re=None):
     return problems_in(text, mark_re or load_marks())
 
 
+def blob_ids():
+    """path -> git blob id of the tracked files whose working copy is the committed one (changed files are left out)."""
+    git = ["git", "-c", "safe.directory=*"]
+    r = subprocess.run(git + ["ls-files", "-s", "-z"], cwd=ROOT, capture_output=True)
+    d = subprocess.run(git + ["diff", "--name-only", "-z", "HEAD"], cwd=ROOT, capture_output=True)
+    if r.returncode or d.returncode:
+        return {}
+    changed = set(d.stdout.decode("utf-8", "replace").split("\0"))
+    out = {}
+    for e in r.stdout.decode("utf-8", "replace").split("\0"):
+        if "\t" in e:
+            meta, path = e.split("\t", 1)
+            if path not in changed:
+                out[path] = meta.split()[1]
+    return out
+
+
+def cache_file():
+    """The clean-blob list for these patterns and this script, or None (CI, SF_MARKS_CACHE=0)."""
+    where = os.environ.get("SF_MARKS_CACHE", "")
+    if where == "0" or os.environ.get("CI"):
+        return None
+    try:
+        key = hashlib.sha256((ROOT / TRADEMARKS).read_bytes() + Path(__file__).read_bytes()).hexdigest()[:24]
+    except OSError:
+        return None
+    return Path(where or Path.home() / ".cache" / "sf-marks") / f"clean-{key}.txt"
+
+
 def scan(mark_re):
     errors = []
+    cf = cache_file()
+    blobs = blob_ids() if cf else {}
+    try:
+        clean = set(cf.read_text().split()) if cf else set()
+    except OSError:
+        clean = set()
+    passed = set()
     for path in tracked_files():
         if path == TRADEMARKS:
             continue
         if has_mark(path, mark_re):
             errors.append(f"{path}: the file name has a mark")
+        blob = blobs.get(path)
+        if blob and blob in clean:
+            continue  # this exact content passed with these patterns
+        found = False
         for where, text in read_texts(path):
             for n, snippet in problems_in(text, mark_re):
                 errors.append(f"{where}:{n}: {snippet[:160]}")
+                found = True
+        if blob and not found:
+            passed.add(blob)
+    if cf and passed - clean:
+        try:
+            cf.parent.mkdir(parents=True, exist_ok=True)
+            tmp = cf.with_suffix(f".{os.getpid()}")
+            tmp.write_text("\n".join(sorted(clean | passed)) + "\n")
+            os.replace(tmp, cf)
+        except OSError:
+            pass
     return errors
 
 
