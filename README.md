@@ -25,7 +25,7 @@
   <a href="#building">Build from source</a> ·
   <a href="CONTRIBUTING.md">Contribute</a> ·
   <a href="https://discord.gg/gWrYkEmQhH">Discord</a> ·
-  <a href="https://sculptforge.app/support.html">Membership</a>
+  <a href="https://sculptforge.app/support.html?utm_campaign=github">Membership</a>
 </p>
 
 <p align="center">
@@ -320,10 +320,10 @@ where, and for the licences of the AI models.
 ## Membership
 
 SculptForge is free, and nothing in the app is ever paywalled.
-**[Member](https://sculptforge.app/support.html)** ($5 / month or $48 / year): betas and early builds, the monthly
+**[Member](https://sculptforge.app/support.html?utm_campaign=github)** ($5 / month or $48 / year): betas and early builds, the monthly
 feature vote, Member Requests (one request a month, built first and credited to you), #members on Discord and your name in
 the [credits](https://sculptforge.app/supporters.html); the first 100 members are Founding Members, price locked for
-good. **[Studio](https://sculptforge.app/studios.html#membership)**
+good. **[Studio](https://sculptforge.app/studios.html?utm_campaign=github#membership)**
 ($300 / month flat for the whole studio, any number of artists; Founding Studio $150 for the first 5 studios): your
 studio's own isolated build with your assets built in, a pinned version with security fixes, an offline signed
 installer, support and a private channel. Every release
