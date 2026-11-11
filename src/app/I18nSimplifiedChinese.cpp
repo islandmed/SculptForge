@@ -1658,6 +1658,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Orbit around the pointer", "以指针为中心环绕"},
     {"A rotation that starts over the model turns the view about the point under the pointer, and later zooms work at that depth. Started over the background, it turns about the middle of the view as before. In every key style.",
      "从模型上开始的旋转会以指针下的点为中心旋转视图，之后的缩放也在该深度进行。从背景开始时，照旧以视图中心旋转。适用于所有按键风格。"},
+    {"Mouse orbit speed", "鼠标环绕速度"},
+    {"How far the view turns for each pixel a mouse or trackpad rotation drag moves, in every key style. 1x is the usual turn; lower it if the view spins too fast. The pen has its own View speed in Preferences > Tablet.", "鼠标或触控板的旋转拖动每移动一个像素，视图转动的幅度，适用于所有按键风格。1x 为通常的转速；视图转得过快时可调低。画笔有自己的视图速度（偏好设置 > 数位板）。"},
     {"The mouse wheel zooms toward the point of the model under the pointer, which stays under it, instead of the "
      "middle of the view. On with Maya keys (choosing a style sets it), off with the others.",
      "鼠标滚轮会朝指针下的模型位置缩放，该点维持在指针下，而不是朝视图中央。使用 Maya 按键时打开（选择风格时会自动设"

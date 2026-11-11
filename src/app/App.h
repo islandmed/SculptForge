@@ -9,6 +9,7 @@
 #include "app/AssetLibrary.h"
 #include "app/AxisGizmo.h"
 #include "app/GizmoAll.h"
+#include "app/OrbitSpeed.h"
 #include "app/CommandPalette.h"
 #include "app/Config.h"
 #include "app/Console.h"
@@ -214,7 +215,7 @@ private:
     void onMouseUp();
     bool blenderNavigationDown(Uint8 button); // Blender style: a press that navigates (Input.cpp's style)
     // A rotation drag: free, turntable, or about the world X or Z axis (View > Orbit lock); Shift snaps.
-    void orbitBy(float x, float y, float dx, float dy);
+    void orbitBy(float x, float y, float dx, float dy, bool mouse = false);
     std::optional<glm::vec3> orbitPivotAt(float x, float y); // Preferences > Input > Orbit around the pointer
     float rollSweep(float x, float y, float dx, float dy) const; // radians the cursor turns around the canvas centre
     void rollBy(float x, float y, float dx, float dy); // Shift+click, release Shift, drag: turn about the view axis
