@@ -1897,6 +1897,7 @@ private:
     void drawPartPopups();
     // Index of the nearest visible Part under the cursor (-1: none); builds stale BVHs on the way.
     int pickPart(float x, float y, RayHit* hit = nullptr);
+    int pickPartNear(float x, float y, RayHit* hit = nullptr); // ... and a Part a few points off the pointer
     void partClickMove(float x, float y); // Alt press on another Part: dragging turns it into a stroke
     void partClickRelease();              // ... and releasing without dragging selects it
     int partClickTarget_ = -1;
