@@ -6,6 +6,60 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.12.6] - 2026-11-11
+
+### Added
+- **Garments: drape on the body** (Tool > Garments > Drape on the body, `garment_place`, `garment_drape`): each panel
+  placed by a click on the body (in front of it, facing the view; Turn, Wrap, Gap), saved with the pattern; the sewn
+  pattern simulated live on the visible Parts (rest shape = the flat pattern, seams pulled shut).
+- **Garments: Convert to Part**: the draped garment as the Part "Garment": seams welded, UVs from the flat pattern,
+  the pattern's thickness, one undo step.
+- "**Save Visible Parts As...** (File): saves a new .sfproj with only the visible Parts (their materials, layers,
+  folders and linked copies kept, the cameras and settings too). The open project and its file stay as they are. Parts
+  with streamed detail need Save As for now. Requested by phoenix."
+- **Featured creator** card in the Welcome window: a picture, the video's title and creator, and Watch (opens the
+  browser; no embedded player). The list is `featured.json` beside `latest.json` on the same host, read with the daily
+  update check and kept with its thumbnails in the preferences folder; a different entry each start, the x hides one
+  for good. Watch links go only to https youtube.com, youtu.be and vimeo.com, thumbnails only from sculptforge.app;
+  nothing is shown when the list is empty, the site can't be reached or update checks are off. First featured: askNK.
+- **Reset Layout** (Preferences > Saving & Layouts, command palette): the built-in shelves and trays with every panel
+  back in the main window, shortcuts and preferences kept. `sculptforge --reset-layout` does the same at start. A
+  shelf widget (colour picker, brush tiles, sliders) taken off a shelf is listed there with a Put back button.
+- **Mask colour** (Edit > Preferences > Interface): choose the colour masked areas show in the viewport; **Mask
+  darkness** sets how much of it shows, **Reset** goes back to the default darkening look. Saved in the preferences.
+  Requested by ABHITAR.
+
+### Changed
+- **Startup splash**: the start-up is also checked just before the first frame (a slow first frame or panel restore
+  showed no splash), and once the splash is up it stays at least 0.7 s so it is seen, not flashed. A start that is
+  over within 0.3 s still shows no splash and gets no added wait. `SF_SPLASH=1` (environment variable) shows it on
+  that run whatever the start-up time or the preference, for 0.7 s at least, to see it on a fast computer.
+
+### Fixed
+- **Alt+click to select a Part** (also Triple-click and Alt+Q) often missed thin, small or distant Parts, and a
+  trackpad click that moved 4 points began a stroke instead. The pick now takes a Part within 8 points of the pointer
+  when it is in front of the Part being sculpted, and a click may move 6 points (reported by phoenix on macOS).
+- **Drape**: cloth resting on a faceted body no longer creeps sideways
+- **Drape** on a figure modelled in centimetres or millimetres (the Full Body starter, most scans): the Units per
+  metre slider now starts from the size of the scene (centimetres above 20 units tall, millimetres above 600) instead
+  of 1, so the cloth falls and folds at a real-world speed instead of as if the figure were 100 times its size. Move
+  the slider to set it yourself; the `cloth_drape` command still defaults to 1.
+- A project whose Part list is empty no longer fails with "Project has no valid Part list"; it opens as an empty scene
+  (settings, lights, cameras, views and shelves load) and saves back the same.
+- The guide's 3D printing section pointed to File > Bridge > Export STL; Export STL is under **File > Export**.
+- **Pan and zoom keys did nothing** (0.12.5: the keys' glide ran in the test runner's frame loop only, never in the
+  app's own; reported by Artizmo on Discord). A tap now moves the view about a tenth of a second's worth, a hold
+  glides, on the default and on rebound keys. Tests: `ui_key_nav_loop` drives the app's real loop
+  (`--measure-key-nav`), `ui_key_nav` the rest.
+- Revert to Saved Layout, Reset Layout and Import Interface run between frames instead of inside the palette that
+  asked, so they can no longer swap the layout under it (reported by phoenix and raffaele_3d_design on macOS,
+  Discord). Unsaved work is autosaved first; the first autosave of a session keeps the previous session's as
+  `autosave.prev.sfproj` (Library > QuickSave), and the Restore prompt offers it.
+- **Vertex paint lost on a subdivision round trip**: fine colour painted at the highest level was overwritten with the
+  interpolated low-level colour after painting at a lower level and stepping back up. A low-level stroke now goes up
+  as a blended delta added to the colour the higher levels already hold (vertex paint, Base and paint layers). Undo
+  across levels and Voxel Remesh colour transfer are covered by tests. Reported by masterfull95 on Discord.
+
 ## [0.12.5] - 2026-11-10
 
 ### Added
