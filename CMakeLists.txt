@@ -288,8 +288,9 @@ if(APPLE)
 endif()
 # zstd for Focus Detail tiles (core/FocusDetail.h), when the system has it; without it the tiles use our own codec.
 # Not on macOS: Homebrew's zstd is single-architecture and breaks the universal (x86_64 + arm64) build.
+# Not on Android: pkg-config finds the build machine's zstd, and the NDK has no zstd.h.
 find_package(PkgConfig QUIET)
-if(PkgConfig_FOUND AND NOT APPLE)
+if(PkgConfig_FOUND AND NOT APPLE AND NOT ANDROID)
   pkg_check_modules(SF_ZSTD QUIET IMPORTED_TARGET libzstd)
 endif()
 if(SF_ZSTD_FOUND)
