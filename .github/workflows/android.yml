@@ -1,0 +1,70 @@
+name: Android
+
+# The Android APK (android/README.md): scripts/android-build.sh on GitHub's runner, which has the SDK, an NDK, Java 17
+# and Gradle. Unsigned (the release key never leaves the release machine: scripts/android-sign.sh); the artifact is
+# the APK testers sideload. No secrets, read-only, pinned actions.
+
+on:
+  push:
+    branches: [main, 'feat/android']
+    paths:
+      - 'android/**'
+      - 'scripts/android-build.sh'
+      - '.github/workflows/android.yml'
+      - 'src/render/GL.*'
+      - 'src/app/NativeDialog.*'
+      - 'src/app/main.cpp'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: APK (arm64-v8a)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 500M
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install dependencies
+        run: |
+          # (retries: a half-synced Ubuntu mirror fails one apt run now and then)
+          for i in 1 2 3; do sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ccache ninja-build >/dev/null && break; sleep 20; done
+          command -v gradle && gradle --version | head -3
+          echo "JAVA_HOME=${JAVA_HOME_17_X64}" >> "$GITHUB_ENV"
+      - name: Compiler cache
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .ccache
+          key: ccache-android-arm64.${{ github.sha }}
+          restore-keys: ccache-android-arm64.
+      - name: Build
+        run: scripts/android-build.sh --abi arm64-v8a | tee apk-path.txt
+      - name: Compiler cache (save)
+        if: always()
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .ccache
+          key: ccache-android-arm64.${{ github.sha }}
+      - name: Check the APK
+        run: |
+          apk=$(tail -1 apk-path.txt)
+          ls -l "$apk"
+          unzip -l "$apk" | grep -E 'lib/arm64-v8a/lib(main|SDL3)\.so' | tee -a "$GITHUB_STEP_SUMMARY"
+          "$ANDROID_HOME"/build-tools/$(ls "$ANDROID_HOME"/build-tools | sort -V | tail -1)/aapt2 dump permissions "$apk" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sculptforge-android-unsigned
+          path: build-android/*.apk
+          retention-days: 14

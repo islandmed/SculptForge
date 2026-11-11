@@ -22,6 +22,14 @@ set(SCULPTFORGE_PACKAGE_SUFFIX "" CACHE STRING "Extra tag in package file names,
 option(SCULPTFORGE_BUILD_TESTS "Build unit tests" ON)
 option(SCULPTFORGE_USE_SYSTEM_SDL "Use an installed SDL3 if one is found" ON)
 option(SCULPTFORGE_UPDATE_CHECK "The app checks the website for a newer version once a day (OFF for package managers)" ON)
+# Android (android/README.md): the app is libmain.so inside an APK, drawing with OpenGL ES 3.2. SCULPTFORGE_GLES=ON on a
+# desktop builds that same ES path against the desktop's GLES driver (Mesa), to test it without a device.
+option(SCULPTFORGE_GLES "Draw with OpenGL ES 3.2 instead of desktop OpenGL 3.3 (ON for Android)" ${ANDROID})
+if(ANDROID)
+  set(SCULPTFORGE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+  set(SCULPTFORGE_WEBRTC OFF CACHE BOOL "" FORCE) # the live face feed is the phone's job, not the tablet's (M1)
+  set(SCULPTFORGE_UPDATE_CHECK OFF CACHE BOOL "" FORCE) # (the insiders release says when a new APK is out)
+endif()
 if(SCULPTFORGE_BUILD_TESTS)
   enable_testing()
 endif()
@@ -413,7 +421,13 @@ if(SCULPTFORGE_BUILD_APP)
     foundingMembers ${CMAKE_CURRENT_SOURCE_DIR}/website/founding.json) # Help > About and the membership card
   include(cmake/EmbedGuide.cmake)
   embed_guide(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp ${CMAKE_CURRENT_SOURCE_DIR}/docs/guide)
-  add_executable(sculptforge
+  if(ANDROID)
+    add_library(sculptforge SHARED) # SDL's Java activity loads libmain.so and calls SDL_main
+    set_target_properties(sculptforge PROPERTIES OUTPUT_NAME main)
+  else()
+    add_executable(sculptforge)
+  endif()
+  target_sources(sculptforge PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFonts.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp
     src/app/main.cpp
@@ -526,6 +540,12 @@ if(SCULPTFORGE_BUILD_APP)
   target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone sculptforge_appshared
                                             sculptforge_mcp sculptforge_actions imgui SDL3::SDL3)
   target_include_directories(sculptforge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lucide)
+  if(SCULPTFORGE_GLES)
+    target_compile_definitions(sculptforge PRIVATE SF_GLES=1)
+  endif()
+  if(ANDROID)
+    target_link_libraries(sculptforge PRIVATE android log GLESv3 EGL)
+  endif()
   target_compile_definitions(sculptforge PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}"
                                                  SCULPTFORGE_PRERELEASE="${SCULPTFORGE_PRERELEASE}"
                                                  SF_UPDATE_CHECK=$<BOOL:${SCULPTFORGE_UPDATE_CHECK}>)
