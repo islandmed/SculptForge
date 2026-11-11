@@ -330,6 +330,10 @@
 //                            or trackpad; late: the first finger lands alone and drags 40 px first (a stroke starts)
 //   touch_stroke U0 V0 U1 V1 one finger on the touch screen from one point on the model to another (sculpts)
 //   expect_value touch_fingers (fingers down now)
+//   touch_tap N U V          N fingers (1-4) tap the touch screen at once, 60 px apart around a point on the model
+//   touch_key NAME           the mouse taps the touch layout's rail key NAME (Invert, Smooth, Mask, Lock) (TouchShell.cpp)
+//   expect_value touch_layout (the touch layout is on), finger_undos / finger_redos (finger mode's undo and redo
+//                            steps), touch_mods (the rail keys' modifiers: 1 Alt, 2 Shift, 4 Ctrl)
 //
 // Simulated 3Dconnexion SpaceMouse: an SDL virtual joystick with a SpaceMouse Compact's USB ids (256F:C635), six
 // axes and two buttons, found and opened by the app as a real one would be (SpaceMouse.cpp, hot-plug included).
@@ -1567,6 +1571,13 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "touch_fingers") return double(app_.touch_.fingers());
     if (name == "palm_guard") return app_.palmGuard() ? 1.0 : 0.0;
+    if (name == "touch_layout") return app_.touchLayoutOn() ? 1.0 : 0.0;
+    if (name == "finger_undos") return double(app_.touchFingerUndos_);
+    if (name == "finger_redos") return double(app_.touchFingerRedos_);
+    if (name == "touch_mods") {
+        const SDL_Keymod m = app_.touchShellMods();
+        return double(((m & SDL_KMOD_ALT) ? 1 : 0) | ((m & SDL_KMOD_SHIFT) ? 2 : 0) | ((m & SDL_KMOD_CTRL) ? 4 : 0));
+    }
     if (name == "spacemouse_connected") return app_.spaceMouse_ ? 1.0 : 0.0;
     if (name == "spacemouse_moving") return app_.spaceMouseMoving() ? 1.0 : 0.0;
     if (name == "spacemouse_echo") { // a mouse's wheel turned now would be taken for the driver's echo
@@ -3566,6 +3577,50 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(2)) return false;
         run([this, dx = num(1, 0.0f), dy = num(2, 0.0f)] { mouseMotion(app_.mouseX_ + dx, app_.mouseY_ + dy); });
         wait(0.05f);
+    } else if (verb == "touch_tap") {
+        if (!need(3)) return false;
+        const int n = std::clamp(int(num(1, 2)), 1, 4);
+        run([this, n, u = num(2, 0.5f), v = num(3, 0.5f)] {
+            const ImVec2 c = onModel(u, v);
+            int ww = 0, wh = 0;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            for (int pass = 0; pass < 2; ++pass)
+                for (int i = 0; i < n; ++i) {
+                    const ImVec2 p(c.x + (float(i) - float(n - 1) * 0.5f) * 60.0f, c.y);
+                    if (i == 0) { // SDL's mouse events for the first finger, before its own
+                        mouseMotion(p.x, p.y, SDL_TOUCH_MOUSEID);
+                        mouseButton(pass == 0, SDL_BUTTON_LEFT, SDL_TOUCH_MOUSEID);
+                    }
+                    SDL_Event e{};
+                    e.type = pass == 0 ? SDL_EVENT_FINGER_DOWN : SDL_EVENT_FINGER_UP;
+                    e.tfinger.touchID = App::kUiTestTouchScreen;
+                    e.tfinger.fingerID = SDL_FingerID(i + 1);
+                    e.tfinger.x = p.x / float(ww);
+                    e.tfinger.y = p.y / float(wh);
+                    e.tfinger.pressure = pass == 0 ? 1.0f : 0.0f;
+                    e.tfinger.windowID = SDL_GetWindowID(app_.window_);
+                    app_.handleEvent(e);
+                }
+        });
+        wait(0.1f);
+    } else if (verb == "touch_key") {
+        if (!need(1)) return false;
+        static const char* const kKeys[] = {"Invert", "Smooth", "Mask", "Lock"};
+        int k = -1;
+        for (int i = 0; i < 4; ++i)
+            if (w[1] == kKeys[i]) k = i;
+        if (k < 0) {
+            error = "touch_key: Invert, Smooth, Mask or Lock";
+            return false;
+        }
+        run([this, k] {
+            const TouchShell::Rect& r = app_.touchShell_.keyRect[k];
+            const ImVec2 p((r.a.x + r.b.x) * 0.5f, (r.a.y + r.b.y) * 0.5f);
+            mouseMotion(p.x, p.y);
+            mouseButton(true, SDL_BUTTON_LEFT);
+            mouseButton(false, SDL_BUTTON_LEFT);
+        });
+        wait(0.1f);
     } else if (verb == "touch_pinch" || verb == "touch_stroke") {
         // Fingers as SDL sends them, on a touch screen with the mouse events SDL makes from the first finger (before
         // that finger's own event), or on a trackpad (no mouse events; the pointer rests over the model).

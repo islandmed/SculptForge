@@ -1765,6 +1765,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     SDL_Event e = event;
     mapPenPosition(e); // a tablet in mouse mode moves the cursor relatively (#54), for the canvas and the UI
     if (palmMouseEvent(e)) return; // a palm resting by the pen: not a click anywhere (Touch.cpp)
+    if (touchShellEvent(e)) return; // the touch layout: its rail and finger mode on the canvas (TouchShell.cpp)
     if (supportCardEvent(e)) return;  // the support card at launch takes clicks and keys while open
     if (whatsNewEvent(e)) return;     // so does What's New (WhatsNewPopup.cpp)
     if (radialMouseEvent(e)) return;  // clicks on an open radial menu, and the buttons that open one (RadialMenu.cpp)
@@ -3419,6 +3420,7 @@ void App::drawUi() {
     if (hideUi_) return; // demos: clean beauty shots
     // Draw order (ui-spec §12): shells, Library, floating windows, then pop-ups and help.
     drawShell();
+    drawTouchShell(); // the touch layout over it (TouchShell.cpp)
     drawLibraryBrowserUi(); // thumbnails, the Library over the canvas, pickers, size / strength pop-ups
     drawQuickMenu();  // Space (Input.cpp)
     drawRadialMenu(); // radial menus (RadialMenu.cpp)
@@ -3430,7 +3432,8 @@ void App::drawUi() {
     drawPhoneWindow(); // File > Capture from phone (PanelPhone.cpp)
     drawUvEditor();    // Tool > Texture Image > UV Editor (PanelUvEditor.cpp)
     drawGarments();    // Tool > Garments > Pattern (PanelGarments.cpp)
-    drawTimelineUi();  // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)
+    if (touchSurface()) timelineTopInset_ = 0.0f;
+    else drawTimelineUi(); // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)
     pollAlphaFile();
     pollStencilFile();
     pollReferenceFiles();
@@ -3466,7 +3469,7 @@ void App::drawUi() {
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
     drawCaptureOverlay();    // Capture from view: the square, the result window (PanelKelvinlet.cpp)
     drawGradientOverlay();   // Line Gradient: the line and its end handles (LineGradient.cpp)
-    if (uiPrefs_.showAxes) drawAxisGizmo(); // X / Y / Z in the canvas corner (#31)
+    if (uiPrefs_.showAxes && !touchLayoutOn()) drawAxisGizmo(); // X / Y / Z in the canvas corner (#31; not under the touch layout's top bar)
     if (uiPrefs_.showViewFigure) drawViewFigure();
     drawAirStrokeIndicator(); // Start strokes off the model is on (#62, Input.cpp)
     if (drag_ == Drag::Insert) { // the size the insert will get
@@ -3485,7 +3488,9 @@ void App::drawUi() {
                             canvasRect().contains(sliderOpened.x, sliderOpened.y);
     if (!sliderRing) sizeRingPreview_ = false;
     if (((!ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y)) || drag_ == Drag::Stroke || sliderRing) &&
-        !hideBrushCursor_ && radial_.menu < 0 && !strokePopup_.open && drag_ != Drag::Select && drag_ != Drag::Guide && // (no ring under a pie or the stroke popup)
+        !hideBrushCursor_ && radial_.menu < 0 &&
+        (!touchLayoutOn() || touchShell_.pointerOver || penInProximity_ || drag_ == Drag::Stroke) && // (touch: no pointer, no ring)
+        !strokePopup_.open && drag_ != Drag::Select && drag_ != Drag::Guide && // (no ring under a pie or the stroke popup)
         (!gradient_.armed || ctrlDown(inputMods()) || (inputMods() & SDL_KMOD_SHIFT)) && // (nor while a Line Gradient takes the drags)
         aiLinkStateValue() != 2 && aiLinkStateValue() != 4 && // (nor over a live-mode question: it is drawn above windows)
         (!ringOff || drag_ == Drag::Stroke || ctrlDown(inputMods())) &&
@@ -4689,11 +4694,13 @@ glm::vec2 App::viewFigureCentre() const {
 }
 
 bool App::overViewNavigator(float x, float y) const {
+    if (touchLayoutOn()) return false; // (not drawn under the touch layout)
     if (uiPrefs_.showAxes && axisGizmoOnDisc(axisGizmoCentre(), kAxisGizmoDisc * axisGizmoUnit(), x, y)) return true;
     return uiPrefs_.showViewFigure && glm::length(glm::vec2(x, y) - viewFigureCentre()) <= viewFigureRadius();
 }
 
 bool App::axisGizmoMouseDown(float x, float y) {
+    if (touchLayoutOn()) return false; // (not drawn under the touch layout)
     // A click on an end snaps to that side view, orthographic (#43, as in Blender's navigation gizmo), a second click
     // on it to the opposite side; a plain drag on the disc behind the ends orbits; a click on the View Figure snaps to
     // the side view nearest the current one.

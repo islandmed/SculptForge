@@ -22,6 +22,28 @@ namespace sf::i18n {
 namespace {
 
 constexpr Entry kSpanish[] = {
+    // --- The touch layout (TouchShell.cpp) ---
+    {"All brushes", "Todos los pinceles"},
+    {"Desktop panels", "Paneles de escritorio"},
+    {"Dock", "Dock"},
+    {"Every brush. Long-press a pinned slot to put the current brush there.", "Todos los pinceles. Mantén pulsada una casilla fijada para poner ahí el pincel actual."},
+    {"History", "Historial"},
+    {"Not saved", "Sin guardar"},
+    {"Or tap the canvas with three fingers.", "O toca el lienzo con tres dedos."},
+    {"Or tap the canvas with two fingers.", "O toca el lienzo con dos dedos."},
+    {"Paint and UV rooms are coming", "Las salas Pintar y UV están en camino"},
+    {"Pinned", "Fijado"},
+    {"Projects", "Proyectos"},
+    {"Rail: two sliders", "Barra: dos deslizadores"},
+    {"Room", "Sala"},
+    {"Sculpt. Paint and UV come next, on the same model.", "Esculpir. Pintar y UV llegan después, sobre el mismo modelo."},
+    {"The tablet layout (a preview): the model fills the screen, with a thumb pad and hold keys beside your free hand and the brush dock down the pen hand's edge. Without a pen, one finger sculpts once it moves, two navigate, a two-finger tap undoes and three redo. Automatic turns it on for Android; On tries it on a desktop touch screen.", "El diseño para tabletas (versión preliminar): el modelo ocupa la pantalla, con un pad para el pulgar y teclas de mantener junto a tu mano libre y el dock de pinceles en el borde de la mano del lápiz. Sin lápiz, un dedo esculpe en cuanto se mueve, dos navegan, un toque con dos dedos deshace y con tres rehace. Automático lo activa en Android; Activado lo prueba en una pantalla táctil de escritorio."},
+    {"The tablet layout (a preview): the model fills the screen, a thumb pad and hold keys, the brush dock down the pen hand's edge (Preferences > Interface > Touch layout).", "El diseño para tabletas (versión preliminar): el modelo ocupa la pantalla, un pad para el pulgar y teclas de mantener, el dock de pinceles en el borde de la mano del lápiz (Preferencias > Interfaz > Diseño táctil)."},
+    {"Touch layout", "Diseño táctil"},
+    {"Touch layout:", "Diseño táctil:"},
+    {"Turn the touch layout off", "Desactivar el diseño táctil"},
+    {"Your projects in the Library.", "Tus proyectos en la Biblioteca."},
+    {"pressure", "presión"},
     // --- Palettes (the palette bar) and their sub-palettes ---
     {"Alpha", "Alpha"},
     {"Brush", "Pincel"},

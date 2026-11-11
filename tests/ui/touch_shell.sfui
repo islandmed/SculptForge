@@ -1,0 +1,102 @@
+# The touch layout (TouchShell.cpp, core/FingerMode.h): the Sculpt-room overlay for tablets (rail with the thumb pad
+# and hold keys, the dock and context strip, the top bar) and finger mode on the canvas: one finger sculpts once it
+# moves, a one-finger tap does nothing, a two-finger tap undoes, three redo, a pinch navigates and never undoes. A
+# tapped rail key latches its modifier. Stylus first: the canvas is the whole window, the dock runs down the pen-hand
+# edge, nothing sits in the bottom corner the pen hand rests on, the side button + hover drag sets size and strength.
+# touch_shell_1440 / touch_shell_2880 are the review sizes.
+logical_width 1440                               # (the 2880 run at 200 %)
+run new_sphere subdivisions=4
+snapshot
+action view.touch_layout
+expect_value touch_layout == 1
+wait_idle 30                                     # (the dock's brush thumbnails)
+shot touch_shell
+
+# Stroking: the chrome fades to about 10 %, the size and pressure stay at full opacity by the pen.
+pen_press 0.45 0.5 0.6
+pen_sample 0.5 0.5 0.7
+pen_sample 0.55 0.52 0.72
+wait 0.4
+expect_value stroking == 1
+shot touch_shell_stroking
+pen_lift
+pen_out
+expect_value stroking == 0
+key ctrl+z
+
+# The pen alone: the side button held while hovering, dragged sideways grows the brush, up strengthens it.
+brush_size 60
+remember draw_size s0
+remember z_intensity i0
+pen_enter 0.35 0.5
+pen_button 1 down
+pen_hover 0.65 0.5
+expect_value draw_size > $s0
+pen_hover 0.65 0.3
+expect_value z_intensity > $i0
+shot touch_shell_pen_adjust
+pen_button 1 up
+pen_out
+brush_size 60
+# Out of range with the button still held: back in range, hovering leaves the size alone.
+pen_enter 0.35 0.5
+pen_button 1 down
+pen_out
+pen_enter 0.35 0.5
+pen_hover 0.65 0.5
+expect_value draw_size == 60
+pen_out
+
+# The A/B rail: two sliders instead of the thumb pad.
+click "##touch_more"
+click "Rail: two sliders"
+wait 0.1
+shot touch_shell_sliders
+click "##touch_more"
+click "Rail: two sliders"
+
+# One finger sculpts; two fingers tapped undo it; three redo it.
+key f
+camera 0 0
+touch_stroke 0.35 0.45 0.65 0.55
+expect_value stroking == 0
+expect_value moved_out > 0
+touch_tap 2 0.5 0.5
+expect_value finger_undos == 1
+expect_value moved == 0
+touch_tap 3 0.5 0.5
+expect_value finger_redos == 1
+expect_value moved_out > 0
+key ctrl+z
+expect_value moved == 0
+
+# A one-finger tap neither sculpts nor undoes.
+touch_tap 1 0.5 0.5
+expect_value moved == 0
+expect_value finger_undos == 1
+
+# Two fingers spread: the view zooms, nothing is undone or sculpted.
+remember camera_distance d0
+touch_pinch 0.5 0.5 2 0 0 0
+expect_value camera_distance < $d0*0.7
+expect_value finger_undos == 1
+expect_value moved == 0
+
+# The rail's hold keys: a tap latches (Smooth = Shift), a second tap lets go; Lock stops finger navigation.
+touch_key Smooth
+expect_value touch_mods == 2
+touch_key Invert
+expect_value touch_mods == 3
+shot touch_shell_latched
+touch_key Smooth
+touch_key Invert
+expect_value touch_mods == 0
+touch_key Lock
+remember camera_distance d1
+touch_pinch 0.5 0.5 2 0 0 0
+expect_value camera_distance == $d1
+touch_key Lock
+
+# Off again: the desktop as before.
+action view.touch_layout
+expect_value touch_layout == 0

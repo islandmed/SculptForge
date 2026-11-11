@@ -202,6 +202,7 @@ add_library(sculptforge_core STATIC
   src/core/StrokePopup.cpp
   src/core/SpaceMouse.cpp
   src/core/TouchGesture.cpp
+  src/core/FingerMode.cpp
   src/io/ObjIO.cpp
   src/io/FbxIO.cpp
   third_party/ufbx/ufbx.c
@@ -526,6 +527,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Wintab.cpp
     src/app/SpaceMouse.cpp
     src/app/Touch.cpp
+    src/app/TouchShell.cpp
     src/app/Input.cpp
     src/app/RadialMenu.cpp
     src/app/StrokePopup.cpp
@@ -1096,6 +1098,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     endif()
     # One Alpha palette in the Classic and the SculptForge layout: the same controls reachable (tests/ui/alpha_layouts.sfui,
     # MasterFULL on Discord: Stencil's Adjust and Tile), at 1440 px of UI and at 200 % (2880 px).
+    # The touch layout (tests/ui/touch_shell.sfui) at 1440 px and at 200 % (2880 px).
+    sculptforge_ui_test(touch_shell_1440 touch_shell --size 1440x900)
+    sculptforge_ui_test(touch_shell_2880 touch_shell --size 2880x1800)
     sculptforge_ui_test(alpha_layouts_1440 alpha_layouts --size 1440x900)
     sculptforge_ui_test(alpha_layouts_2880 alpha_layouts --size 2880x1800)
     # The alpha pool and Scale / Position jitter (tests/ui/alpha_pool.sfui), at 1440 px of UI and at 200 % (2880 px).

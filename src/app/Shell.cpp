@@ -939,7 +939,7 @@ ShellGeometry App::shellGeometry() const {
 CanvasRect App::canvasRect() const {
     int w = 0, h = 0;
     SDL_GetWindowSize(window_, &w, &h);
-    if (hideUi_) return {0.0f, 0.0f, float(std::max(w, 1)), float(std::max(h, 1))};
+    if (hideUi_ || touchSurface()) return {0.0f, 0.0f, float(std::max(w, 1)), float(std::max(h, 1))};
     CanvasRect c = computeShell(layout_, float(w), float(h), uiScale_, topInset(), shellMetrics()).canvas;
     // On whole framebuffer pixels, as canvasViewport draws it: with a fractional rect (HiDPI, UI scales) the view
     // was drawn up to half a pixel from where the rays for the brush were cast.
@@ -1118,6 +1118,12 @@ void App::drawShell() {
         statusShown_ = status_;
         statusSince_ = ImGui::GetTime();
         if (!lastCommandOk_) redrawIn(6.05); // the error colour below goes after 6 s, idle or not
+    }
+    if (touchSurface()) { // the touch layout: the canvas is the whole window, the desktop panels stay away (TouchShell.cpp)
+        shell_ = {};
+        shell_.canvas = canvasRect();
+        focusRect_ = shell_.canvas;
+        return;
     }
     drawLookChrome();
     drawCanvasFrame();

@@ -97,6 +97,11 @@ Json toJson(const UiPrefs& p) {
     j.set("startupSplash", p.startupSplash);
     j.set("libraryFolder", p.libraryFolder);
     j.set("cameraNotch", double(p.cameraNotch));
+    j.set("touchLayout", double(p.touchLayout));
+    j.set("touchRailSliders", p.touchRailSliders);
+    Json pinned = Json::array();
+    for (const std::string& id : p.touchPinned) pinned.push(id);
+    j.set("touchPinned", std::move(pinned));
     j.set("orbitLock", std::string(orbitLockName(p.orbitLock)));
     j.set("turntable", p.orbitLock == 1);
     j.set("inputStyle", std::string(p.inputStyle == 3 ? "maya" : p.inputStyle == 2 ? "blender" : p.inputStyle == 1 ? "sculptforge" : "classic"));
@@ -196,6 +201,11 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.startupSplash = j["startupSplash"].asBool(p.startupSplash);
     if (j["libraryFolder"].isString()) p.libraryFolder = j["libraryFolder"].asString();
     p.cameraNotch = std::clamp(int(j["cameraNotch"].asNumber(p.cameraNotch)), 0, 2);
+    p.touchLayout = std::clamp(int(j["touchLayout"].asNumber(p.touchLayout)), 0, 2);
+    p.touchRailSliders = j["touchRailSliders"].asBool(p.touchRailSliders);
+    if (const Json& pinned = j["touchPinned"]; pinned.size() == p.touchPinned.size())
+        for (size_t i = 0; i < pinned.size(); ++i)
+            if (pinned[i].isString() && pinned[i].asString().size() < 256) p.touchPinned[i] = pinned[i].asString();
     if (j["turntable"].asBool(false)) p.orbitLock = 1;
     if (j["orbitLock"].isString()) p.orbitLock = std::max(parseOrbitLock(j["orbitLock"].asString()), 0);
     if (j["inputStyle"].isString()) {
@@ -455,6 +465,11 @@ void App::initActions() {
         [this] { return doc_.undo.canUndo(); });
     add("edit.redo", "Redo", "Edit", "Ctrl+Shift+Z / Ctrl+Y", [this] { runCommand("redo"); }, ICON_LC_REDO_2, "redo", nullptr,
         [this] { return doc_.undo.canRedo(); });
+    add("view.touch_layout", "Touch layout", "View", nullptr,
+        [this] { uiPrefs_.touchLayout = touchLayoutOn() ? 2 : 1; }, ICON_LC_TABLET_SMARTPHONE, nullptr,
+        [this] { return touchLayoutOn(); }, nullptr,
+        "The tablet layout (a preview): the model fills the screen, a thumb pad and hold keys, the brush dock down "
+        "the pen hand's edge (Preferences > Interface > Touch layout).");
     // Subdivide bakes: it keeps no levels, and on a Part with levels it removes them. Named and placed apart from
     // Add Level, and it asks first on a Part with levels (Discord 11-02: "I keep pressing the wrong one").
     add("geometry.subdivide", "Subdivide (removes levels)", "Tool > Geometry", nullptr,
@@ -2122,6 +2137,19 @@ void drawInterfaceSection(App& app) {
     ui::HelpText("Camera notch", nullptr,
                  "Keeps the interface below the camera notch of MacBooks (and other laptops) when SculptForge fills the "
                  "screen. Automatic asks the system (macOS) or recognises a notched MacBook display (Linux).",
+                 "Preferences > Interface");
+    static const char* kTouch[] = {"Automatic", "On", "Off"};
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    if (ImGui::BeginCombo("##touch_layout", (std::string(tr("Touch layout:")) + " " + tr(kTouch[std::clamp(p.touchLayout, 0, 2)])).c_str())) {
+        for (int i = 0; i < 3; ++i)
+            if (ImGui::Selectable(tr(kTouch[i]), i == p.touchLayout)) p.touchLayout = i;
+        ImGui::EndCombo();
+    }
+    ui::HelpText("Touch layout", nullptr,
+                 "The tablet layout (a preview): the model fills the screen, with a thumb pad and hold keys beside your "
+                 "free hand and the brush dock down the pen hand's edge. Without a pen, one finger sculpts once it moves, "
+                 "two navigate, a two-finger tap undoes and three redo. Automatic turns it on for Android; On tries it "
+                 "on a desktop touch screen.",
                  "Preferences > Interface");
 }
 

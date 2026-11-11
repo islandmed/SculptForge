@@ -130,6 +130,26 @@ A twist starts rolling once the fingers have turned about 10 degrees, so a pinch
 On a touch screen a single finger waits a moment for a second one before it sculpts; if the second finger lands
 after a stroke has started, the stroke ends there and the fingers take over the view (one undo removes the stroke).
 
+### Touch layout (preview)
+
+On Android (and on a desktop touch screen with **Edit > Preferences > Interface > Touch layout: On**) the touch layout puts
+the model on the whole screen with a rail beside your free hand and a brush dock down the pen hand's edge (nothing
+sits where that hand rests). Hold the pen's side button while it hovers and drag: sideways sets the size, up and down
+the strength. Without a pen, the canvas uses finger mode:
+
+| Gesture | Does |
+|---|---|
+| One finger, moved | Sculpts from where it landed (a finger held still or tapped does nothing) |
+| Two fingers | Pan, pinch to zoom, twist to roll |
+| Two-finger tap | Undo |
+| Three-finger tap | Redo |
+| Two fingers held still, then slid sideways | Step back (left) or forward (right) through the undo history |
+
+The rail's thumb pad sets the size (drag up and down) and the strength (sideways) in one move; tap it for the exact
+values. Hold **Invert**, **Smooth** or **Mask** while you stroke for that stroke, or tap one to keep it on. **Lock**
+stops finger navigation, for when your palm rests on the screen. Touches that land while the pen is near the glass
+are ignored. The **...** menu has the side views, the left-handed layout and the desktop panels.
+
 ## The right-shelf navigation buttons
 
 The right shelf has three buttons you **drag on** rather than click. They are handy with a pen,

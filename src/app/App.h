@@ -59,6 +59,8 @@
 #include "core/SurfaceCursor.h"
 #include "core/SpaceMouse.h"
 #include "core/TouchGesture.h"
+#include "core/FingerMode.h"
+#include "app/TouchShell.h"
 #include "core/Tablet.h"
 #include "core/SelfUpdate.h"
 #include "core/StudioProfile.h"
@@ -3288,6 +3290,25 @@ private:
         int clicks = 1;
         double at = 0.0;
     } touchPress_;
+    // The touch layout (TouchShell.cpp, app/TouchShell.h; Preferences > Interface > Touch layout): the Sculpt-room
+    // overlay and finger mode (core/FingerMode.h) for the fingers on the canvas.
+    bool touchLayoutOn() const;
+    bool touchSurface() const { return touchLayoutOn() && !touchShell_.desktopPanels; } // the canvas is the window
+    bool touchShellPenButton(bool down, float x, float y); // the pen's side button: + hover drag = size / strength (true: taken)
+    void touchShellPenHover(float x, float y);
+    bool touchShellEvent(const SDL_Event& e); // after palmMouseEvent: true when the overlay or finger mode took it
+    void drawTouchShell();                    // in drawUi, over the shell
+    SDL_Keymod touchShellMods() const;        // the held or latched Invert / Smooth / Mask keys (as Alt / Shift / Ctrl)
+    void touchShellFinger(const FingerMode::Events& events);
+    bool touchShellGrab(uint64_t pointer, ImVec2 p);
+    void touchShellDrag(TouchShell::Grab& g, ImVec2 p);
+    void touchShellRelease(TouchShell::Grab& g);
+    void touchShellLetGo(); // every touch, hold key and pen adjust let go (layout off, focus lost)
+    bool touchShellCanvasAt(ImVec2 p) const;
+    void touchShellUndo(int steps); // < 0 undo, > 0 redo
+    TouchShell touchShell_;
+    FingerMode fingerMode_;
+    int touchFingerUndos_ = 0, touchFingerRedos_ = 0; // finger mode's taps and scrub steps (UI tests)
     // ---- end Touch ----
     // ---- Sculpt Timeline (PanelTimeline.cpp, core/Timeline.h) and proof mode (ProofMode.cpp) ----
     // The history strip along the bottom of the canvas, the timelapse export, and Help > Benchmark: a scripted

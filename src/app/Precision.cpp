@@ -160,7 +160,8 @@ void App::drawPrecisionCursor(ImDrawList* dl, ImVec2 c, float r, ImU32 col) {
         sizeReadoutPx_ = radiusPx_;
         sizeReadoutUntil_ = ImGui::GetTime() + 1.5;
     }
-    if (drag_ == Drag::SizeScrub || worldSize_ || ImGui::GetTime() < sizeReadoutUntil_) {
+    // (Not under the touch layout: its readout by the pen says the size, TouchShell.cpp.)
+    if (!touchLayoutOn() && (drag_ == Drag::SizeScrub || worldSize_ || ImGui::GetTime() < sizeReadoutUntil_)) {
         const std::string text = drawSizeStatus().substr(10); // without "Size "
         const ImVec2 at(c.x + std::max(r, 6.0f * s) + 6.0f * s, c.y - ImGui::GetFontSize() * 0.5f);
         dl->AddText(ImVec2(at.x + 1, at.y + 1), IM_COL32(0, 0, 0, 160), text.c_str());
