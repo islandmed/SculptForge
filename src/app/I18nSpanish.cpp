@@ -5625,6 +5625,13 @@ constexpr Entry kSpanish[] = {
     {"Put this panel back in the main window. Preferences > Saving & Layouts > Reset panel windows puts all of them back.", "Devuelve este panel a la ventana principal. Preferencias > Guardado y diseños > Restablecer ventanas de paneles los devuelve todos."},
     {"Reset panel windows", "Restablecer ventanas de paneles"},
     {"User Guide in its own window", "Guía del usuario en su propia ventana"},
+    {"Alt+drag to add or move. Right-click an entry to remove it.", "Alt+arrastrar para añadir o mover. Clic derecho en una entrada para quitarla."},
+    {"Drop on My Panel to add", "Suelta en Mi panel para añadir"},
+    {"Drop on My Panel to move, elsewhere to remove", "Suelta en Mi panel para mover, en otro sitio para quitar"},
+    {"Hold Alt and drag a button, or a section's title, from any palette into this panel. Right-click an entry to remove it.", "Mantén Alt y arrastra un botón, o el título de una sección, desde cualquier paleta hasta este panel. Clic derecho en una entrada para quitarla."},
+    {"My Panel", "Mi panel"},
+    {"Remove from My Panel", "Quitar de Mi panel"},
+    {"Your own panel, floating at the cursor: the buttons and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own.", "Tu propio panel, flotando junto al cursor: los botones y secciones que arrastraste a él (mantén Alt y arrastra desde cualquier paleta). Pulsa la tecla otra vez, o Esc, para cerrarlo. También es una paleta (Editar > Mi panel) para una bandeja, y puede pasar a una ventana propia."},
 };
 
 } // namespace

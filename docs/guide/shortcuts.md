@@ -73,6 +73,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 
 | Action | Keys | What it does |
 |---|---|---|
+| My Panel | <kbd>F4</kbd> | Your own panel, floating at the cursor: the buttons and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own. |
 | Redo | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> or <kbd>Ctrl</kbd>+<kbd>Y</kbd> | Redo the last undone action. |
 | Undo | <kbd>Ctrl</kbd>+<kbd>Z</kbd> | Undo the last action. |
 

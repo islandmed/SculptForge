@@ -29,6 +29,8 @@ struct UiLayout {
     float leftTrayWidth = 300, rightTrayWidth = 300; // logical px
     std::vector<std::string> leftTray, rightTray;     // palette ids, top to bottom
     std::vector<std::string> openSubpalettes;         // "tool.part", ...
+    // My Panel (Palettes.cpp): what the member dragged in, top to bottom: "action:<action id>" or "section:<section id>".
+    std::vector<std::string> myPanel;
     // Item ids: action ids, "widget.*", "sep", "row" (top shelf line break).
     std::vector<std::string> topShelf, leftShelf, rightShelf, bottomShelf;
     bool consoleOpen = false;
@@ -43,6 +45,15 @@ struct UiLayout {
     int shelfTiles = 1; // bottom shelf brush tiles: 0 small, 1 medium, 2 large (shell::bottomShelfSize)
     bool customize = false; // runtime only, never stored
 };
+
+// One My Panel entry: a button (an action) or a whole section of a palette. Empty id = not an entry.
+constexpr size_t kMyPanelMax = 64;
+struct MyPanelEntry {
+    bool section = false;
+    std::string id;
+    bool valid() const { return !id.empty(); }
+};
+MyPanelEntry myPanelEntry(const std::string& entry);
 
 // A shelf with nothing on it but separators and line breaks: hidden outside Customize Shelves, so the canvas takes
 // its space, and back while customizing so items can be dropped onto it again (#139).

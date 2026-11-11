@@ -1000,6 +1000,7 @@ void App::applyPreset(int preset) {
     l.libraryTab = layout_.libraryTab;
     l.libraryBottom = layout_.libraryBottom;
     l.leftHanded = layout_.leftHanded;
+    l.myPanel = layout_.myPanel; // what you built is not a preset's to change
     static const char* const kNames[] = {"Standard", "Sculpt", "Wide"};
     if (preset == 1) {
         l.leftTrayOpen = l.rightTrayOpen = false;
@@ -1111,6 +1112,7 @@ void App::drawShell() {
     if (sculptForgeLayout()) drawTaskMenu();
     else drawPaletteDropdown();
     finishShelfDrag();
+    finishMyPanelDrag();
 }
 
 void App::drawTitleStrip(const ShellGeometry& g) {
@@ -1392,6 +1394,9 @@ void App::drawPaletteBar(const ShellGeometry& g) {
     int help = -1;
     for (int i = 0; i < count; ++i) {
         if (!uiPrefs_.alphabeticalPalettes && std::string_view(list[i].id) == "help") help = i; // last, as usual
+        else if (std::string_view(list[i].id) == "mypanel" && layout_.myPanel.empty() && !paletteInShownTray("mypanel") &&
+                 dropdown_ != "mypanel")
+            continue; // (empty and not in use: off the bar, which is full on a tablet; Edit > My Panel opens it)
         else if (std::find(order.begin(), order.end(), i) == order.end()) order.push_back(i);
     }
     if (help >= 0) order.push_back(help);

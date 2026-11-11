@@ -1,0 +1,69 @@
+# My Panel (Member Request, Hameron (FXiT)): a panel of your own. Hold Alt and drag a button or a section's title from any
+# palette into it: it keeps that button, or the whole section with its live controls. It sits in a tray like any palette,
+# floats at the cursor on a key, keeps its order, and an entry dragged out of it is removed.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar
+run new_sphere subdivisions=3
+# My Panel in the left tray (Shift+click the tray icon), the Tool palette stays in the right one.
+# (Off the bar while empty: Edit > My Panel... opens it.)
+expect_not "My Panel##palette.mypanel"
+click "Edit##palette.edit"
+click "My Panel...##edit.mypanel"
+hold shift
+click "My Panel/##totray"
+hold none
+expect_value left_tray == 1
+expect_value mypanel_entries == 0
+# Without Alt a drag from a button is just a click-and-drag: nothing is added.
+drag_to "Wire##view.wire" "My Panel/##totray" 0 100
+expect_value mypanel_entries == 0
+# A button: Alt+drag Wire from the right shelf into the panel.
+hold alt
+drag_to "Wire##view.wire" "My Panel/##totray" 0 100
+hold none
+expect_value mypanel_entries == 1
+expect_value mypanel_at@action:view.wire == 0
+# The drag did not press the button.
+expect_value checked@view.wire == 0
+# A section: Alt+drag Masking's title from the Tool palette. Its controls now live in My Panel (Invert is closed in the
+# Tool palette, so this one is My Panel's own).
+expect_not "Invert##mask"
+click "Parts##tool.part"                # (closed: Masking is then in view, not scrolled off the tray)
+hold alt
+drag_to "Masking##tool.masking" "My Panel/##totray" 0 100
+hold none
+expect_value mypanel_entries == 2
+expect_value mypanel_at@section:tool.masking == 1
+expect "Invert##mask"
+shot filled
+# It works: Invert in My Panel inverts the mask like the one in the Tool palette.
+click "Invert##mask"
+# Folding a section here leaves the Tool palette alone.
+click "Masking##mypanel.section.tool.masking"
+expect_not "Invert##mask"
+click "Masking##mypanel.section.tool.masking"
+expect "Invert##mask"
+# Reorder: Alt+drag the section above the button.
+hold alt
+drag_to "Masking##mypanel.section.tool.masking" "Masking##mypanel.section.tool.masking" -140 -30
+hold none
+expect_value mypanel_at@section:tool.masking == 0
+expect_value mypanel_at@action:view.wire == 1
+# Dragged out and dropped anywhere but on My Panel: gone.
+hold alt
+drag_item "Masking##mypanel.section.tool.masking" 500 300
+hold none
+expect_value mypanel_entries == 1
+expect_not "Invert##mask"
+# Floating at the cursor on its key, closed by the same key and by Esc.
+key f4
+wait 0.2
+expect_value mypanel_floating == 1
+shot floating
+key f4
+wait 0.2
+expect_value mypanel_floating == 0
+key f4
+wait 0.2
+key escape
+wait 0.2
+expect_value mypanel_floating == 0

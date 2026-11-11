@@ -236,6 +236,27 @@ When you open a Gaussian splat capture, **Render > Gaussian Splats** moves into 
 > open as drop-downs only. The left-shelf tiles get smaller and the bottom shelf scrolls sideways with the
 > mouse wheel.
 
+## My Panel
+
+**My Panel** is a panel you build yourself, out of the buttons and sections you use most. It is in the **Edit** menu
+(**Edit > My Panel...**; the Classic layout's palette bar shows it once it holds something or sits in a tray), and it
+works like any other palette: put it in a tray, or open it in a window of its own for a second monitor.
+
+- **Add a button or a whole section**: hold <kbd>Alt</kbd> and drag it from any palette (or a shelf) into My Panel.
+  A section keeps all its controls, live, so **Masking** or **Geometry** can sit next to the three buttons you press
+  all day. A line shows where it will land.
+- **Reorder**: hold <kbd>Alt</kbd> and drag an entry to a new place in My Panel.
+- **Take one out**: drag it out of My Panel (still holding <kbd>Alt</kbd>) and let go anywhere else, or right-click it
+  and choose **Remove from My Panel**.
+- **Fold a section** in My Panel by clicking its title. This does not change the same section in its own palette.
+- **Open it where you are working**: press <kbd>F4</kbd> (change the key in **Edit > Preferences > Hotkeys**, the action is
+  **My Panel**). My Panel appears at the cursor; press the key again or <kbd>Esc</kbd> to close it.
+
+Buttons and sections can be dragged in. Sliders and checkboxes on their own cannot; drag the section that holds them.
+In a My Panel kept in a window of its own you can reorder and remove entries, but to add one, drag it in from the main
+window first. What is in My Panel is saved with your layout (**Edit > Preferences > Saving & Layouts**), and **Reset Layout**
+empties it.
+
 ## The shelves
 
 Shelves surround the canvas and hold the controls you use all the time. Point at anything with <kbd>Ctrl</kbd>

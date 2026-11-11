@@ -348,3 +348,26 @@ TEST(layout_from_corrupt_or_odd_json_still_lays_out) {
         if (shell == 0) CHECK(holds(std_, "widget.color"));
     }
 }
+
+// My Panel (PanelMyPanel.cpp): what was dragged in is saved with the layout; bad entries, repeats and extras are dropped.
+TEST(my_panel_layout_json) {
+    CHECK(!toJson(standardLayout()).has("myPanel")); // nothing stored for an empty panel
+    UiLayout l = standardLayout();
+    l.myPanel = {"action:view.wire", "section:tool.masking"};
+    UiLayout back;
+    std::string err;
+    CHECK(fromJson(toJson(l), back, err));
+    CHECK(back.myPanel == l.myPanel);
+    Json j;
+    CHECK(Json::parse(R"({"myPanel": ["action:a.b", "action:a.b", "bogus", "section:", "action:", "section:tool.part", 7]})", j, err));
+    CHECK(fromJson(j, back, err));
+    CHECK(back.myPanel.size() == 2 && back.myPanel[0] == "action:a.b" && back.myPanel[1] == "section:tool.part");
+    Json many = Json::array();
+    for (int i = 0; i < 100; ++i) many.push("action:x." + std::to_string(i));
+    Json big = Json::object();
+    big.set("myPanel", many);
+    CHECK(fromJson(big, back, err));
+    CHECK(back.myPanel.size() == kMyPanelMax);
+    CHECK(myPanelEntry("section:tool.geometry").section && myPanelEntry("section:tool.geometry").id == "tool.geometry");
+    CHECK(!myPanelEntry("tool.geometry").valid());
+}
