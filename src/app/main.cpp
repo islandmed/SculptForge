@@ -6,6 +6,7 @@
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
 #include "app/OptimisticBench.h"
+#include "app/StartupSplashWindow.h"
 #include "app/UiServe.h"
 #include "ai/AiPolicy.h"
 #include "core/Benchmark.h"
@@ -78,6 +79,7 @@ void usage() {
         "  --bench-out FILE         Write the benchmark report (Markdown) to FILE\n"
         "  --calibrate              Measure this computer (GPU, CPU, memory; about 2-3 s), print the hardware\n"
         "                           profile as JSON and save it (add --calibrate-quick, --calibrate-no-save)\n"
+        "  --splash-shot out.png    The start-up splash as a PNG (size from --size, default 1440x810) and exit\n"
         "  --timelapse out.mp4      Render the opened project's history (saved beside it as .sfhist) as a\n"
         "                           turntable timelapse and exit (--size 3840x2160 for 4K, --fps N)\n"
         "  --timelapse-seconds S    Length of the timelapse (default 20)\n"
@@ -234,6 +236,7 @@ static int runMain(int argc, char** argv) {
             if (const size_t comma = v.find(','); comma != std::string::npos)
                 options.measureStrokeRadius = float(std::atof(v.c_str() + comma + 1));
         }
+        else if (a == "--splash-shot") options.splashShotPath = next();
         else if (a == "--timelapse") options.timelapsePath = next();
         else if (a == "--timelapse-seconds") options.timelapseSeconds = std::max(2.0f, float(std::atof(next().c_str())));
         else if (a == "--benchmark") {
@@ -273,6 +276,15 @@ static int runMain(int argc, char** argv) {
             usage();
             return 1;
         }
+    }
+    if (!options.splashShotPath.empty()) { // the start-up splash as a picture, to check it by eye
+        std::string error;
+        if (!sf::splash::writeShot(options.splashShotPath, sizeGiven ? options.width : 1440, sizeGiven ? options.height : 810,
+                                   sf::App::splashVersionLine(), error)) {
+            std::fprintf(stderr, "%s\n", error.c_str());
+            return 1;
+        }
+        return 0;
     }
     g_isolatedDir.clear(); // (the warm server's last script's folder)
     if (automatedRun()) isolateSettings();
@@ -326,6 +338,7 @@ static int runMain(int argc, char** argv) {
         const bool interactive = options.renderPath.empty() && options.recordPath.empty() && options.uiTest.empty() &&
                                  options.timelapsePath.empty() && !options.benchmark && options.demo.empty() &&
                                  !automatedRun();
+        app->closeSplash(); // (the message must not sit behind it)
         if (interactive) {
             std::string text = "SculptForge could not start.\n\n" +
                                (app->startError().empty() ? std::string("See the log for details.") : app->startError()) +

@@ -1,0 +1,19 @@
+# The start-up splash (StartupSplash.h, idea by @lowenski #176): a test run never has one (headless, and the main window
+# is never held back), and Preferences > Interface > Show startup splash is on by default and switches off.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=2
+expect_value startup_splash_enabled == 0
+expect_value startup_splash_open == 0
+expect_value main_window_hidden == 0
+expect_value startup_splash_pref == 1
+
+click "Preferences##palette.preferences"
+click "Interface##preferences.interface"
+expect "Show startup splash"
+shot prefs-startup-splash-on
+click "Show startup splash"
+expect_value startup_splash_pref == 0
+shot prefs-startup-splash-off
+click "Show startup splash"
+expect_value startup_splash_pref == 1
+expect_value startup_splash_enabled == 0

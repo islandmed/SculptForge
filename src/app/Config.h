@@ -31,6 +31,7 @@ struct UiPrefs {
     bool autoCollapseLeft = true, autoCollapseRight = false; // trays collapse palettes that would overflow
     float uiScale = 0.0f;       // 0 = follow the display; otherwise applied at the next start
     bool libraryAtStartup = true;
+    bool startupSplash = true;  // the logo while a slow start-up runs (read early from ui.json: StartupSplash.h)
     std::string libraryFolder;  // "" = Documents/SculptForge
     bool alphabeticalPalettes = false; // strict A-Z palette bar (default: File, Edit first)
     // Preferences > Interface > Units (#148; core/Units.h ids): the unit sizes show in (brush ring, Part size, export
