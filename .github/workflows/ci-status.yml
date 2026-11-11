@@ -17,11 +17,12 @@ permissions:
 jobs:
   record:
     name: Record the finished run
-    if: github.repository == 'islandmed/SculptForge'
+    # Only this repository's own runs: a fork's pull request can start CI, and its runs must not push real rows out of the 500 kept.
+    if: github.repository == 'islandmed/SculptForge' && github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           sparse-checkout: tools/ci
           persist-credentials: false
