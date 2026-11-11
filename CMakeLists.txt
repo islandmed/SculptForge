@@ -935,7 +935,7 @@ if(SCULPTFORGE_BUILD_TESTS)
       set_tests_properties(apt_retry PROPERTIES TIMEOUT 60)
     endif()
     # tools/ci/ci_status.sh: the ci-status branch's one line per finished run (ci-status.yml), in a local bare remote.
-    if(UNIX)
+    if(UNIX AND NOT APPLE) # (it only ever runs on the Ubuntu runner; macOS's BSD tools differ and 0.12.6's staging failed there)
       add_test(NAME ci_status COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/ci_status.sh --self-test)
       set_tests_properties(ci_status PROPERTIES TIMEOUT 60)
     endif()
