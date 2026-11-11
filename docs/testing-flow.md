@@ -40,7 +40,6 @@ stay in `~/Work/.sf/t0-ci/<worktree>/`.
 ### PC flow guards (11-10: 13 branch T0s and a daytime bench jammed both PC slots for hours)
 
 - `pc.sh` refuses a branch T0 (`SF_T0=1`, exit 7, "use t0-ci.sh") unless `SF_PC_PRIO=1` (release stage, security), `--shots` or `--bench`.
-- Until `ops/t0-full` (14ae2fb8, the full-suite warm-UI fix) is on main, `t0-ci.sh` adds it to the CI ref only.
 - A whole-PC job (`bench.sh` PC rows, `win.sh run`) holds the slots only 00:30-06:30 local, or when no `pc.sh` job waits; otherwise it queues behind them (`SF_WIN_NOW=1`: by hand).
 - A `SF_PC_PRIO=1` job always goes first, past a draining or between-run bench; whole-PC runs step behind it.
 - Queue watchdog (`pcq.sh alerts`, every minute while the queue is active): a job waiting > 45 min (PRIO > 10 min) wakes the coordinator once, with the queue table.
